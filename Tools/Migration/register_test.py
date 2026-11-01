@@ -11,7 +11,7 @@ Usage:
     register_test.py <crate-dir> <test-name>
 
 `<test-name>` is the target name; the path is derived as
-`rust/tests/<test-name>.rs`. Missing files and duplicate entries are rejected so
+`src/tests/<test-name>.rs`. Missing files and duplicate entries are rejected so
 a manifest can never point at a target that does not build.
 """
 
@@ -31,7 +31,7 @@ def main() -> int:
 
     crate_dir = sys.argv[1]
     name = sys.argv[2]
-    rel_path = f"rust/tests/{name}.rs"
+    rel_path = f"src/tests/{name}.rs"
     source = os.path.join(ROOT, crate_dir, rel_path)
     manifest = os.path.join(ROOT, crate_dir, "Cargo.toml")
 

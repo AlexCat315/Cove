@@ -1,0 +1,31 @@
+[package]
+name = "cove-ui-compose"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "CoveUI widget layer (Compose)"
+
+[dependencies]
+cove-composition.workspace = true
+cove-core.workspace = true
+cove-platform.workspace = true
+cove-graphics.workspace = true
+cove-text.workspace = true
+cove-imaging.workspace = true
+cove-logging.workspace = true
+cove-system.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+pulldown-cmark.workspace = true
+
+[build-dependencies]
+cc.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true
+
+[lints]
+workspace = true
+

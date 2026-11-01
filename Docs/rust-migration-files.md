@@ -1,1049 +1,1374 @@
 # Rust 迁移逐文件映射表
 
-由 `Docs/rust-migration-files.json` 生成，状态必须与该 JSON 一致。`（计划）` 表示 Rust 目标路径尚未创建，只是登记的目标位置。
+保留删除前的源路径、SHA-256 和行数；删除源文件不会删掉映射。JSON 是完整记录，`cargo xtask audit` 检查所有目标仍然存在。
 
-## 口径
+目标存在与行为等价分开记录；验证范围及已知差异见 [验证报告](rust-migration-validation.md)。
 
-- 生产源码：排除测试目录、SwiftPM 清单、CLI 项目模板与所有构建/依赖产物。
-- 排除路径：`**/.build/**`、`third-party/**`、`vendor/**`、`target/**`、`dist/**`、`Artifacts/**`、`build/**`、`node_modules/**`、`.git/**`。
-- `Tests/**` 与 `**/Tests/**` 归为测试源码（kind=`test`）；`Package.swift` 归为清单（kind=`manifest`）；`**/Templates/**` 归为模板（kind=`template`）。
-- 状态：`未开始` / `进行中（有缺项）` / `已写入（未验证）` / `Cargo 清单已建立`。`已写入` 不代表通过编译、行为对照或平台验收。
+| 范围 | 源文件数 |
+| --- | ---: |
+| 生产源码 | 914 |
+| 测试及辅助文件 | 411 |
+| SwiftPM 清单 | 23 |
 
-## 汇总
+## 生产源码
 
-| 范围 | 文件数 | 已写入 | 进行中 | 未开始 |
-| --- | ---: | ---: | ---: | ---: |
-| 生产源码 | 914 | 914 | 0 | 0 |
-| 测试源码 | 411 | 328 | 0 | 83 |
-| SwiftPM 清单 | 23 | 23 | 0 | 0 |
-| 项目模板 | 0 | 0 | 0 | 0 |
-| 合计 | 1348 | — | — | — |
+| 原源文件 | 行数 | Rust / C / Cargo 目标 |
+| --- | ---: | --- |
+| `Browser/Sources/CoveUIBrowserPrototype/main.swift` | 400 | [examples/counter/src/main.rs](../examples/counter/src/main.rs) |
+| `Compose/Composition/Sources/CoveUIComposeCore/Adaptive/ContainerQuery.swift` | 108 | [crates/composition/src/adaptive/container_query.rs](../crates/composition/src/adaptive/container_query.rs) |
+| `Compose/Composition/Sources/CoveUIComposeCore/Adaptive/Surface.swift` | 22 | [crates/composition/src/adaptive/surface.rs](../crates/composition/src/adaptive/surface.rs) |
+| `Compose/Composition/Sources/CoveUIComposeCore/Adaptive/ViewportTraits.swift` | 26 | [crates/composition/src/adaptive/viewport_traits.rs](../crates/composition/src/adaptive/viewport_traits.rs) |
+| `Compose/Composition/Sources/CoveUIComposeCore/Adaptive/WidthClass.swift` | 13 | [crates/composition/src/adaptive/width_class.rs](../crates/composition/src/adaptive/width_class.rs) |
+| `Compose/Composition/Sources/CoveUIComposeCore/AnyView.swift` | 26 | [crates/composition/src/any_view.rs](../crates/composition/src/any_view.rs) |
+| `Compose/Composition/Sources/CoveUIComposeCore/AroundApplyingModifier.swift` | 17 | [crates/composition/src/around_applying_modifier.rs](../crates/composition/src/around_applying_modifier.rs) |
+| `Compose/Composition/Sources/CoveUIComposeCore/Box.swift` | 253 | [crates/composition/src/box_view.rs](../crates/composition/src/box_view.rs) |
+| `Compose/Composition/Sources/CoveUIComposeCore/CompositionLocalProvider.swift` | 46 | [crates/composition/src/composition_local_provider.rs](../crates/composition/src/composition_local_provider.rs) |
+| `Compose/Composition/Sources/CoveUIComposeCore/Exports.swift` | 1 | [crates/logging/src/exports.rs](../crates/logging/src/exports.rs)<br>[crates/logging/src/logging_exports.rs](../crates/logging/src/logging_exports.rs) |
+| `Compose/Composition/Sources/CoveUIComposeCore/IdentifiedView.swift` | 42 | [crates/composition/src/identified_view.rs](../crates/composition/src/identified_view.rs) |
+| `Compose/Composition/Sources/CoveUIComposeCore/Layout/Direction.swift` | 14 | [crates/composition/src/layout/direction.rs](../crates/composition/src/layout/direction.rs) |
+| `Compose/Composition/Sources/CoveUIComposeCore/Layout/Layout.swift` | 91 | [crates/composition/src/layout/mod.rs](../crates/composition/src/layout/mod.rs) |
+| `Compose/Composition/Sources/CoveUIComposeCore/Layout/LayoutValue.swift` | 30 | [crates/composition/src/layout/value.rs](../crates/composition/src/layout/value.rs) |
+| `Compose/Composition/Sources/CoveUIComposeCore/LayoutDebugModifier.swift` | 48 | [crates/composition/src/layout_debug_modifier.rs](../crates/composition/src/layout_debug_modifier.rs) |
+| `Compose/Composition/Sources/CoveUIComposeCore/LayoutTree.swift` | 30 | [crates/composition/src/layout_tree.rs](../crates/composition/src/layout_tree.rs) |
+| `Compose/Composition/Sources/CoveUIComposeCore/MemoizedView.swift` | 23 | [crates/composition/src/memoized_view.rs](../crates/composition/src/memoized_view.rs) |
+| `Compose/Composition/Sources/CoveUIComposeCore/ModifiedContent+Materialise.swift` | 196 | [crates/composition/src/modified_content_materialise.rs](../crates/composition/src/modified_content_materialise.rs) |
+| `Compose/Composition/Sources/CoveUIComposeCore/ModifierReplay.swift` | 34 | [crates/composition/src/modifier_replay.rs](../crates/composition/src/modifier_replay.rs) |
+| `Compose/Composition/Sources/CoveUIComposeCore/PrimitiveView.swift` | 39 | [crates/composition/src/primitive_view.rs](../crates/composition/src/primitive_view.rs) |
+| `Compose/Composition/Sources/CoveUIComposeCore/PrimitiveViews.swift` | 36 | [crates/composition/src/primitive_views.rs](../crates/composition/src/primitive_views.rs) |
+| `Compose/Composition/Sources/CoveUIComposeCore/Scancode.swift` | 64 | [crates/composition/src/scancode.rs](../crates/composition/src/scancode.rs) |
+| `Compose/Composition/Sources/CoveUIComposeCore/SourceLocation.swift` | 31 | [crates/composition/src/source_location.rs](../crates/composition/src/source_location.rs) |
+| `Compose/Composition/Sources/CoveUIComposeCore/StructuralView.swift` | 46 | [crates/composition/src/structural_view.rs](../crates/composition/src/structural_view.rs) |
+| `Compose/Composition/Sources/CoveUIComposeCore/TrackStateReads.swift` | 20 | [crates/composition/src/track_state_reads.rs](../crates/composition/src/track_state_reads.rs) |
+| `Compose/Composition/Sources/CoveUIComposeCore/View.swift` | 25 | [crates/composition/src/view.rs](../crates/composition/src/view.rs) |
+| `Compose/Composition/Sources/CoveUIComposeCore/ViewBuilder.swift` | 75 | [crates/composition/src/view_builder.rs](../crates/composition/src/view_builder.rs) |
+| `Compose/Composition/Sources/CoveUIComposeCore/ViewGraph.swift` | 1028 | [crates/composition/src/view_graph.rs](../crates/composition/src/view_graph.rs) |
+| `Compose/Composition/Sources/CoveUIComposeCore/ViewInputComparison.swift` | 71 | [crates/composition/src/view_input_comparison.rs](../crates/composition/src/view_input_comparison.rs) |
+| `Compose/Composition/Sources/CoveUIComposeCore/ViewModifier.swift` | 71 | [crates/composition/src/view_modifier.rs](../crates/composition/src/view_modifier.rs) |
+| `Compose/Composition/Sources/CoveUIReadMacros/Plugin.swift` | 7 | [crates/composition-macros/src/lib.rs](../crates/composition-macros/src/lib.rs) |
+| `Compose/Composition/Sources/CoveUIReadMacros/TrackStateReadsMacro.swift` | 210 | [crates/composition-macros/src/lib.rs](../crates/composition-macros/src/lib.rs) |
+| `Compose/Sources/CoveUICompose/Animation/AnimatedVisibility.swift` | 238 | [crates/compose/src/animation/content/animated_visibility.rs](../crates/compose/src/animation/content/animated_visibility.rs) |
+| `Compose/Sources/CoveUICompose/Animation/AnimationValueModifier.swift` | 74 | [crates/compose/src/modifiers/animation_value.rs](../crates/compose/src/modifiers/animation_value.rs) |
+| `Compose/Sources/CoveUICompose/Animation/Content/NumericText.swift` | 78 | [crates/compose/src/animation/content/numeric_text.rs](../crates/compose/src/animation/content/numeric_text.rs) |
+| `Compose/Sources/CoveUICompose/Animation/EdgeInsets+Interpolatable.swift` | 14 | [crates/compose/src/modifiers/layout/mod.rs](../crates/compose/src/modifiers/layout/mod.rs) |
+| `Compose/Sources/CoveUICompose/Animation/Geometry/Matched.swift` | 146 | [crates/compose/src/animation/geometry/matched.rs](../crates/compose/src/animation/geometry/matched.rs) |
+| `Compose/Sources/CoveUICompose/Animation/Geometry/Transforms.swift` | 40 | [crates/compose/src/animation/geometry/transforms.rs](../crates/compose/src/animation/geometry/transforms.rs) |
+| `Compose/Sources/CoveUICompose/Animation/Interaction/SpringDrag.swift` | 126 | [crates/compose/src/animation/interaction/spring_drag.rs](../crates/compose/src/animation/interaction/spring_drag.rs) |
+| `Compose/Sources/CoveUICompose/Animation/Keyframes/Track.swift` | 86 | [crates/compose/src/animation/keyframes/track.rs](../crates/compose/src/animation/keyframes/track.rs) |
+| `Compose/Sources/CoveUICompose/Animation/Phases/Sequence.swift` | 107 | [crates/compose/src/animation/phases/sequence.rs](../crates/compose/src/animation/phases/sequence.rs) |
+| `Compose/Sources/CoveUICompose/Animation/Transition.swift` | 111 | [crates/compose/src/animation/transition.rs](../crates/compose/src/animation/transition.rs) |
+| `Compose/Sources/CoveUICompose/Animation/TransitionView.swift` | 33 | [crates/compose/src/animation/transition_view.rs](../crates/compose/src/animation/transition_view.rs) |
+| `Compose/Sources/CoveUICompose/Animation/WithAnimation.swift` | 52 | [crates/compose/src/lib.rs](../crates/compose/src/lib.rs)<br>[crates/core/src/scene/animation/context.rs](../crates/core/src/scene/animation/context.rs) |
+| `Compose/Sources/CoveUICompose/AppStorage.swift` | 318 | [crates/compose/src/app_storage.rs](../crates/compose/src/app_storage.rs) |
+| `Compose/Sources/CoveUICompose/Core/Log.swift` | 5 | [crates/compose/src/primitives/overlays/modal/dialog.rs](../crates/compose/src/primitives/overlays/modal/dialog.rs) |
+| `Compose/Sources/CoveUICompose/CoreExports.swift` | 3 | [crates/compose/src/core_exports.rs](../crates/compose/src/core_exports.rs) |
+| `Compose/Sources/CoveUICompose/CoveUICompose.swift` | 7 | [crates/compose/src/lib.rs](../crates/compose/src/lib.rs) |
+| `Compose/Sources/CoveUICompose/CoveUIComposeResourceBundle.swift` | 6 | [crates/compose/src/resource_bundle.rs](../crates/compose/src/resource_bundle.rs)<br>[crates/platform/src/resources.rs](../crates/platform/src/resources.rs) |
+| `Compose/Sources/CoveUICompose/Foundation/Color+Adjust.swift` | 34 | [crates/compose/src/foundation/color_adjust.rs](../crates/compose/src/foundation/color_adjust.rs) |
+| `Compose/Sources/CoveUICompose/I18n/LocalizedStringKey.swift` | 35 | [crates/compose/src/i18n/localized_string_key.rs](../crates/compose/src/i18n/localized_string_key.rs) |
+| `Compose/Sources/CoveUICompose/Modifiers/Interaction/AccessibilityModifier.swift` | 33 | [crates/compose/src/modifiers/interaction/mod.rs](../crates/compose/src/modifiers/interaction/mod.rs) |
+| `Compose/Sources/CoveUICompose/Modifiers/Interaction/CursorModifier.swift` | 29 | [crates/compose/src/modifiers/interaction/mod.rs](../crates/compose/src/modifiers/interaction/mod.rs) |
+| `Compose/Sources/CoveUICompose/Modifiers/Interaction/FocusRequestModifier.swift` | 16 | [crates/compose/src/modifiers/interaction/mod.rs](../crates/compose/src/modifiers/interaction/mod.rs) |
+| `Compose/Sources/CoveUICompose/Modifiers/Interaction/HitTestingModifier.swift` | 21 | [crates/compose/src/modifiers/interaction/mod.rs](../crates/compose/src/modifiers/interaction/mod.rs) |
+| `Compose/Sources/CoveUICompose/Modifiers/Interaction/HoverModifier.swift` | 28 | [crates/compose/src/modifiers/interaction/mod.rs](../crates/compose/src/modifiers/interaction/mod.rs) |
+| `Compose/Sources/CoveUICompose/Modifiers/Layout/AbsolutePositionModifier.swift` | 57 | [crates/compose/src/modifiers/layout/mod.rs](../crates/compose/src/modifiers/layout/mod.rs) |
+| `Compose/Sources/CoveUICompose/Modifiers/Layout/FlexModifier.swift` | 35 | [crates/compose/src/modifiers/layout/mod.rs](../crates/compose/src/modifiers/layout/mod.rs) |
+| `Compose/Sources/CoveUICompose/Modifiers/Layout/FrameCaptureModifier.swift` | 59 | [crates/compose/src/modifiers/layout/frame_capture.rs](../crates/compose/src/modifiers/layout/frame_capture.rs) |
+| `Compose/Sources/CoveUICompose/Modifiers/Layout/FrameModifier.swift` | 182 | [crates/compose/src/modifiers/layout/mod.rs](../crates/compose/src/modifiers/layout/mod.rs) |
+| `Compose/Sources/CoveUICompose/Modifiers/Layout/LetterSpacingModifier.swift` | 21 | [crates/compose/src/modifiers/style/style_modifiers.rs](../crates/compose/src/modifiers/style/style_modifiers.rs) |
+| `Compose/Sources/CoveUICompose/Modifiers/Layout/PaddingModifier.swift` | 58 | [crates/compose/src/modifiers/layout/mod.rs](../crates/compose/src/modifiers/layout/mod.rs) |
+| `Compose/Sources/CoveUICompose/Modifiers/Layout/PaddingSugar.swift` | 14 | [crates/compose/src/modifiers/layout/mod.rs](../crates/compose/src/modifiers/layout/mod.rs) |
+| `Compose/Sources/CoveUICompose/Modifiers/Style/StyleModifiers.swift` | 247 | [crates/compose/src/modifiers/style/style_modifiers.rs](../crates/compose/src/modifiers/style/style_modifiers.rs) |
+| `Compose/Sources/CoveUICompose/Modifiers/Style/SurfaceFinishModifier.swift` | 82 | [crates/compose/src/modifiers/style/surface.rs](../crates/compose/src/modifiers/style/surface.rs) |
+| `Compose/Sources/CoveUICompose/Observed.swift` | 59 | [crates/compose/src/observed.rs](../crates/compose/src/observed.rs) |
+| `Compose/Sources/CoveUICompose/Pet/PetAnchor.swift` | 60 | [crates/compose/src/pet/pet_anchor.rs](../crates/compose/src/pet/pet_anchor.rs) |
+| `Compose/Sources/CoveUICompose/Pet/PetScene.swift` | 43 | [crates/compose/src/pet/pet_scene.rs](../crates/compose/src/pet/pet_scene.rs) |
+| `Compose/Sources/CoveUICompose/Pet/PetTypes.swift` | 181 | [crates/compose/src/pet/pet_types.rs](../crates/compose/src/pet/pet_types.rs) |
+| `Compose/Sources/CoveUICompose/Pet/PetView.swift` | 122 | [crates/compose/src/pet/pet_view.rs](../crates/compose/src/pet/pet_view.rs) |
+| `Compose/Sources/CoveUICompose/Pet/PetWorld.swift` | 333 | [crates/compose/src/pet/pet_world.rs](../crates/compose/src/pet/pet_world.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Columns/Picker.swift` | 39 | [crates/compose/src/primitives/columns/picker.rs](../crates/compose/src/primitives/columns/picker.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Columns/Priority.swift` | 50 | [crates/compose/src/primitives/columns/mod.rs](../crates/compose/src/primitives/columns/mod.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Controls/Adaptive/ControlExtent.swift` | 15 | [crates/compose/src/primitives/controls/adaptive/control_extent.rs](../crates/compose/src/primitives/controls/adaptive/control_extent.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Controls/Adaptive/LongPress.swift` | 41 | [crates/compose/src/primitives/controls/adaptive/long_press.rs](../crates/compose/src/primitives/controls/adaptive/long_press.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Controls/AppBar.swift` | 115 | [crates/compose/src/primitives/controls/app_bar.rs](../crates/compose/src/primitives/controls/app_bar.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Controls/AppBar/Back.swift` | 22 | [crates/core/src/scene/node_renderer.rs](../crates/core/src/scene/node_renderer.rs)<br>[crates/graphics/src/dx12/backend.rs](../crates/graphics/src/dx12/backend.rs)<br>[crates/graphics/src/dx12/device.rs](../crates/graphics/src/dx12/device.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Controls/Button.swift` | 551 | [crates/compose/src/primitives/controls/button.rs](../crates/compose/src/primitives/controls/button.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Controls/Button/Chrome.swift` | 280 | [crates/compose/src/theme/styles/buttons/builtin_button_chrome.rs](../crates/compose/src/theme/styles/buttons/builtin_button_chrome.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Controls/Calendar/Calendar.swift` | 399 | [crates/compose/src/foundation/calendar.rs](../crates/compose/src/foundation/calendar.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Controls/Calendar/Navigation.swift` | 109 | [crates/compose/src/primitives/layout/sidebar/mod.rs](../crates/compose/src/primitives/layout/sidebar/mod.rs)<br>[crates/compose/src/primitives/layout/sidebar/sidebar.rs](../crates/compose/src/primitives/layout/sidebar/sidebar.rs)<br>[crates/compose/src/primitives/navigation/mod.rs](../crates/compose/src/primitives/navigation/mod.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Controls/Calendar/Period.swift` | 98 | [crates/compose/src/primitives/controls/calendar/period.rs](../crates/compose/src/primitives/controls/calendar/period.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Controls/CompletionPopover.swift` | 252 | [crates/compose/src/primitives/controls/completion_popover.rs](../crates/compose/src/primitives/controls/completion_popover.rs)<br>[crates/compose/src/primitives/text/text_completion_rebase.rs](../crates/compose/src/primitives/text/text_completion_rebase.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Controls/DateValues.swift` | 69 | [crates/compose/src/primitives/controls/date_values.rs](../crates/compose/src/primitives/controls/date_values.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Controls/FieldLabel.swift` | 47 | [crates/compose/src/primitives/controls/field_label.rs](../crates/compose/src/primitives/controls/field_label.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Controls/Fields/AssetRefField.swift` | 188 | [crates/compose/src/primitives/controls/fields/asset_ref_model.rs](../crates/compose/src/primitives/controls/fields/asset_ref_model.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Controls/Fields/ColorField.swift` | 296 | [crates/compose/src/primitives/controls/fields/color_field_model.rs](../crates/compose/src/primitives/controls/fields/color_field_model.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Controls/Fields/Combobox/Combobox.swift` | 197 | [crates/compose/src/primitives/controls/fields/combobox_model.rs](../crates/compose/src/primitives/controls/fields/combobox_model.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Controls/Fields/Combobox/RemoteSearch.swift` | 129 | [crates/compose/src/primitives/controls/fields/combobox_model.rs](../crates/compose/src/primitives/controls/fields/combobox_model.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Controls/Fields/Combobox/Results.swift` | 50 | [crates/compose/src/primitives/controls/fields/combobox_model.rs](../crates/compose/src/primitives/controls/fields/combobox_model.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Controls/Fields/DatePicker.swift` | 55 | [crates/compose/src/primitives/controls/fields/date_picker.rs](../crates/compose/src/primitives/controls/fields/date_picker.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Controls/Fields/DateRange/RangePicker.swift` | 311 | [crates/compose/src/primitives/controls/fields/date_range.rs](../crates/compose/src/primitives/controls/fields/date_range.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Controls/Fields/DateRange/Rules.swift` | 84 | [crates/compose/src/primitives/controls/fields/date_range_rules.rs](../crates/compose/src/primitives/controls/fields/date_range_rules.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Controls/Fields/JSON/ExpandedEditor.swift` | 104 | [crates/compose/src/primitives/controls/fields/json_field.rs](../crates/compose/src/primitives/controls/fields/json_field.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Controls/Fields/JsonField.swift` | 235 | [crates/compose/src/primitives/controls/fields/json_field_model.rs](../crates/compose/src/primitives/controls/fields/json_field_model.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Controls/Fields/Numeric/AxisLayout.swift` | 46 | [crates/compose/src/primitives/controls/fields/numeric/axis_layout.rs](../crates/compose/src/primitives/controls/fields/numeric/axis_layout.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Controls/Fields/Numeric/NumberField.swift` | 291 | [crates/compose/src/primitives/controls/fields/numeric/number_field.rs](../crates/compose/src/primitives/controls/fields/numeric/number_field.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Controls/Fields/Numeric/PrefixStyle.swift` | 37 | [crates/compose/src/primitives/controls/fields/numeric/prefix_style.rs](../crates/compose/src/primitives/controls/fields/numeric/prefix_style.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Controls/Fields/Numeric/Scrub.swift` | 110 | [crates/compose/src/primitives/controls/fields/numeric/scrub.rs](../crates/compose/src/primitives/controls/fields/numeric/scrub.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Controls/Fields/Numeric/TextFormat.swift` | 50 | [crates/compose/src/primitives/controls/fields/numeric/text_format.rs](../crates/compose/src/primitives/controls/fields/numeric/text_format.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Controls/Fields/Numeric/Vec3Field.swift` | 115 | [crates/compose/src/primitives/controls/fields/vec3_model.rs](../crates/compose/src/primitives/controls/fields/vec3_model.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Controls/Fields/RadioGroup.swift` | 104 | [crates/compose/src/primitives/controls/fields/radio_group.rs](../crates/compose/src/primitives/controls/fields/radio_group.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Controls/Fields/RangeSlider.swift` | 498 | [crates/compose/src/primitives/controls/fields/range_slider.rs](../crates/compose/src/primitives/controls/fields/range_slider.rs)<br>[examples/gallery/src/gallery_content/catalog.rs](../examples/gallery/src/gallery_content/catalog.rs)<br>[examples/gallery/src/gallery_content/routing.rs](../examples/gallery/src/gallery_content/routing.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Controls/Fields/SearchField.swift` | 154 | [crates/compose/src/primitives/controls/fields/search_field_model.rs](../crates/compose/src/primitives/controls/fields/search_field_model.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Controls/Fields/Select.swift` | 255 | [crates/compose/src/primitives/controls/fields/select.rs](../crates/compose/src/primitives/controls/fields/select.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Controls/Fields/Slider/Geometry.swift` | 37 | [crates/compose/src/primitives/controls/fields/slider/geometry.rs](../crates/compose/src/primitives/controls/fields/slider/geometry.rs)<br>[crates/compose/src/primitives/controls/fields/slider/mod.rs](../crates/compose/src/primitives/controls/fields/slider/mod.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Controls/Fields/Slider/Host.swift` | 206 | [crates/compose/src/primitives/controls/fields/slider/host.rs](../crates/compose/src/primitives/controls/fields/slider/host.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Controls/Fields/Slider/Paint.swift` | 78 | [crates/compose/src/primitives/controls/fields/slider/paint.rs](../crates/compose/src/primitives/controls/fields/slider/paint.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Controls/Fields/Slider/Slider.swift` | 76 | [crates/compose/src/primitives/controls/fields/slider/slider.rs](../crates/compose/src/primitives/controls/fields/slider/slider.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Controls/Fields/TimeField.swift` | 60 | [crates/compose/src/primitives/controls/fields/time_input_model.rs](../crates/compose/src/primitives/controls/fields/time_input_model.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Controls/Fields/TimeInput.swift` | 320 | [crates/compose/src/primitives/controls/fields/time_input_model.rs](../crates/compose/src/primitives/controls/fields/time_input_model.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Controls/Form.swift` | 144 | [crates/compose/src/primitives/controls/form/form.rs](../crates/compose/src/primitives/controls/form/form.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Controls/Form/LabelPlacement.swift` | 15 | [crates/compose/src/primitives/controls/form/label_placement.rs](../crates/compose/src/primitives/controls/form/label_placement.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Controls/Form/LabelScope.swift` | 19 | [crates/compose/src/primitives/controls/form/label_scope.rs](../crates/compose/src/primitives/controls/form/label_scope.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Controls/FormValidation.swift` | 75 | [crates/compose/src/primitives/controls/form_validation.rs](../crates/compose/src/primitives/controls/form_validation.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Controls/InlineLabelLayout.swift` | 46 | [crates/compose/src/primitives/controls/inline_label_layout.rs](../crates/compose/src/primitives/controls/inline_label_layout.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Controls/KeyCap.swift` | 78 | [crates/compose/src/primitives/controls/key_cap.rs](../crates/compose/src/primitives/controls/key_cap.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Controls/Link.swift` | 113 | [crates/compose/src/primitives/controls/link.rs](../crates/compose/src/primitives/controls/link.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Controls/MenuButton.swift` | 117 | [crates/compose/src/primitives/controls/menu_button.rs](../crates/compose/src/primitives/controls/menu_button.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Controls/Rating/Rating.swift` | 74 | [crates/compose/src/primitives/controls/rating/rating.rs](../crates/compose/src/primitives/controls/rating/rating.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Controls/Rating/RatingGeometry.swift` | 75 | [crates/compose/src/primitives/controls/rating/rating_geometry.rs](../crates/compose/src/primitives/controls/rating/rating_geometry.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Controls/Rating/RatingHost.swift` | 114 | [crates/compose/src/primitives/controls/rating/rating.rs](../crates/compose/src/primitives/controls/rating/rating.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Controls/Rating/RatingPaint.swift` | 61 | [crates/compose/src/primitives/controls/rating/rating.rs](../crates/compose/src/primitives/controls/rating/rating.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Controls/SplitButton.swift` | 102 | [crates/compose/src/primitives/controls/split_button.rs](../crates/compose/src/primitives/controls/split_button.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Controls/Tag.swift` | 153 | [crates/compose/src/primitives/controls/tag.rs](../crates/compose/src/primitives/controls/tag.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Controls/TimePicker.swift` | 132 | [crates/compose/src/primitives/controls/time_picker.rs](../crates/compose/src/primitives/controls/time_picker.rs)<br>[examples/gallery/src/gallery_content/catalog.rs](../examples/gallery/src/gallery_content/catalog.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Controls/Toggle.swift` | 500 | [crates/compose/src/primitives/controls/toggle.rs](../crates/compose/src/primitives/controls/toggle.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Controls/Toolbar.swift` | 163 | [crates/compose/src/theme/styles/buttons/toolbar_toggle_button_style.rs](../crates/compose/src/theme/styles/buttons/toolbar_toggle_button_style.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Controls/Toolbar/Commands.swift` | 143 | [crates/graphics/src/rhi/commands.rs](../crates/graphics/src/rhi/commands.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Controls/Toolbar/OverflowLayout.swift` | 83 | [crates/compose/src/primitives/controls/toolbar/overflow_layout.rs](../crates/compose/src/primitives/controls/toolbar/overflow_layout.rs)<br>[crates/compose/src/primitives/layout/tab_overflow.rs](../crates/compose/src/primitives/layout/tab_overflow.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Controls/Toolbar/RetainedCommand.swift` | 61 | [crates/compose/src/primitives/controls/toolbar/commands.rs](../crates/compose/src/primitives/controls/toolbar/commands.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Controls/WheelPicker.swift` | 269 | [crates/compose/src/primitives/controls/fields/wheel_picker.rs](../crates/compose/src/primitives/controls/fields/wheel_picker.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Data/Avatar/Avatar.swift` | 165 | [crates/compose/src/primitives/data/avatar/avatar.rs](../crates/compose/src/primitives/data/avatar/avatar.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Data/Avatar/Group.swift` | 135 | [crates/compose/src/primitives/data/avatar/group.rs](../crates/compose/src/primitives/data/avatar/group.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Data/Avatar/MemberList.swift` | 89 | [crates/compose/src/primitives/data/avatar/member_list.rs](../crates/compose/src/primitives/data/avatar/member_list.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Data/Avatar/Status.swift` | 96 | [crates/compose/src/primitives/data/avatar/status.rs](../crates/compose/src/primitives/data/avatar/status.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Data/Chart/Axes.swift` | 68 | [crates/compose/src/primitives/data/chart/axes.rs](../crates/compose/src/primitives/data/chart/axes.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Data/Chart/Axis.swift` | 218 | [crates/compose/src/primitives/data/chart/axis.rs](../crates/compose/src/primitives/data/chart/axis.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Data/Chart/Cache.swift` | 47 | [crates/compose/src/primitives/data/chart/cache.rs](../crates/compose/src/primitives/data/chart/cache.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Data/Chart/Chart.swift` | 262 | [crates/compose/src/primitives/data/chart/axes.rs](../crates/compose/src/primitives/data/chart/axes.rs)<br>[crates/compose/src/primitives/data/chart/axis.rs](../crates/compose/src/primitives/data/chart/axis.rs)<br>[crates/compose/src/primitives/data/chart/cache.rs](../crates/compose/src/primitives/data/chart/cache.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Data/Chart/ChartDataTable.swift` | 205 | [crates/compose/src/primitives/data/chart/data_table.rs](../crates/compose/src/primitives/data/chart/data_table.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Data/Chart/ChartOverlay.swift` | 218 | [crates/compose/src/primitives/data/chart/overlay.rs](../crates/compose/src/primitives/data/chart/overlay.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Data/Chart/Coordinates.swift` | 333 | [crates/compose/src/primitives/data/chart/coordinates.rs](../crates/compose/src/primitives/data/chart/coordinates.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Data/Chart/Drawing.swift` | 499 | [crates/compose/src/primitives/data/chart/drawing.rs](../crates/compose/src/primitives/data/chart/drawing.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Data/Chart/Histogram.swift` | 80 | [crates/compose/src/primitives/data/chart/histogram.rs](../crates/compose/src/primitives/data/chart/histogram.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Data/Chart/Interaction.swift` | 175 | [crates/compose/src/primitives/data/chart/interaction.rs](../crates/compose/src/primitives/data/chart/interaction.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Data/Chart/Legend.swift` | 102 | [crates/compose/src/primitives/data/chart/legend.rs](../crates/compose/src/primitives/data/chart/legend.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Data/Chart/Model.swift` | 474 | [crates/compose/src/primitives/data/chart/model.rs](../crates/compose/src/primitives/data/chart/model.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Data/Chart/Morph.swift` | 77 | [crates/compose/src/primitives/data/chart/morph.rs](../crates/compose/src/primitives/data/chart/morph.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Data/Chart/Plot.swift` | 708 | [crates/compose/src/primitives/data/chart/plot.rs](../crates/compose/src/primitives/data/chart/plot.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Data/Chart/Scale.swift` | 203 | [crates/compose/src/primitives/data/chart/scale.rs](../crates/compose/src/primitives/data/chart/scale.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Data/Chart/Stacking.swift` | 112 | [crates/compose/src/primitives/data/chart/stacking.rs](../crates/compose/src/primitives/data/chart/stacking.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Data/Chart/Viewport.swift` | 92 | [crates/compose/src/primitives/data/chart/viewport.rs](../crates/compose/src/primitives/data/chart/viewport.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Data/Columns/Focus.swift` | 44 | [crates/compose/src/primitives/interaction/scrollbar.rs](../crates/compose/src/primitives/interaction/scrollbar.rs)<br>[crates/compose/src/primitives/layout/sidebar/focus_handoff.rs](../crates/compose/src/primitives/layout/sidebar/focus_handoff.rs)<br>[crates/compose/src/primitives/overlays/roving_focus.rs](../crates/compose/src/primitives/overlays/roving_focus.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Data/Columns/TablePresentation.swift` | 34 | [crates/compose/src/primitives/data/columns/table_presentation.rs](../crates/compose/src/primitives/data/columns/table_presentation.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Data/Columns/Visibility.swift` | 25 | [crates/compose/src/primitives/data/lists/table.rs](../crates/compose/src/primitives/data/lists/table.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Data/DataTable/ColumnOrder.swift` | 141 | [crates/compose/src/primitives/data/data_table/column_order.rs](../crates/compose/src/primitives/data/data_table/column_order.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Data/DataTable/DataTable.swift` | 604 | [crates/compose/src/primitives/data/data_table/view.rs](../crates/compose/src/primitives/data/data_table/view.rs)<br>[crates/compose/src/primitives/data/data_table/selection_model.rs](../crates/compose/src/primitives/data/data_table/selection_model.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Data/DataTable/DataTableEditing.swift` | 66 | [crates/compose/src/primitives/data/data_table/editing_model.rs](../crates/compose/src/primitives/data/data_table/editing_model.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Data/DataTable/DataTableGeometry.swift` | 32 | [crates/compose/src/primitives/data/data_table/data_table_geometry.rs](../crates/compose/src/primitives/data/data_table/data_table_geometry.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Data/DataTable/DataTableHosts.swift` | 119 | [crates/compose/src/primitives/data/data_table/hosts_model.rs](../crates/compose/src/primitives/data/data_table/hosts_model.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Data/DataTable/DataTableModel.swift` | 112 | [crates/compose/src/primitives/data/data_table/model.rs](../crates/compose/src/primitives/data/data_table/model.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Data/DataTable/DataTableSelection.swift` | 29 | [crates/compose/src/primitives/data/data_table/selection_model.rs](../crates/compose/src/primitives/data/data_table/selection_model.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Data/DataTable/DataTableSortWorker.swift` | 45 | [crates/compose/src/primitives/data/data_table/row_metrics.rs](../crates/compose/src/primitives/data/data_table/row_metrics.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Data/DataTable/EditorPresence.swift` | 22 | [crates/compose/src/primitives/data/data_table/hosts_model.rs](../crates/compose/src/primitives/data/data_table/hosts_model.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Data/DataTable/VariableRows.swift` | 60 | [crates/compose/src/primitives/data/data_table/row_metrics.rs](../crates/compose/src/primitives/data/data_table/row_metrics.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Data/Lists/InsetGroup.swift` | 79 | [crates/compose/src/primitives/data/lists/inset_group.rs](../crates/compose/src/primitives/data/lists/inset_group.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Data/Lists/List.swift` | 285 | [crates/compose/src/primitives/data/lists/list.rs](../crates/compose/src/primitives/data/lists/list.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Data/Lists/Refresh.swift` | 79 | [crates/compose/src/primitives/data/lists/refresh.rs](../crates/compose/src/primitives/data/lists/refresh.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Data/Lists/Reorder/Handle.swift` | 151 | [crates/hosts/src/desktop/display/handle.rs](../crates/hosts/src/desktop/display/handle.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Data/Lists/Reorder/Preview.swift` | 62 | [crates/compose/src/primitives/data/lists/reorder_model.rs](../crates/compose/src/primitives/data/lists/reorder_model.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Data/Lists/Reorder/Reorderable.swift` | 268 | [crates/compose/src/primitives/data/lists/reorder_model.rs](../crates/compose/src/primitives/data/lists/reorder_model.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Data/Lists/Row.swift` | 152 | [crates/compose/src/primitives/data/lists/row.rs](../crates/compose/src/primitives/data/lists/row.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Data/Lists/SectionedList.swift` | 272 | [crates/compose/src/primitives/data/lists/sectioned_list.rs](../crates/compose/src/primitives/data/lists/sectioned_list.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Data/Lists/Selection.swift` | 61 | [crates/terminal/src/engine/selection.rs](../crates/terminal/src/engine/selection.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Data/Lists/SwipeList.swift` | 409 | [crates/compose/src/primitives/data/lists/swipe_list.rs](../crates/compose/src/primitives/data/lists/swipe_list.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Data/Lists/Table.swift` | 309 | [crates/compose/src/primitives/text/markdown/table_block.rs](../crates/compose/src/primitives/text/markdown/table_block.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Data/Lists/Tree.swift` | 1372 | [crates/composition/src/layout_tree.rs](../crates/composition/src/layout_tree.rs)<br>[crates/composition/src/view_graph.rs](../crates/composition/src/view_graph.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Data/Lists/Tree/Guides.swift` | 135 | [crates/compose/src/primitives/text/text_field/indent_guides.rs](../crates/compose/src/primitives/text/text_field/indent_guides.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Data/Lists/TreeOptions.swift` | 86 | [crates/compose/src/primitives/data/lists/tree/options.rs](../crates/compose/src/primitives/data/lists/tree/options.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Data/PropertyGrid.swift` | 454 | [crates/compose/src/primitives/data/property_grid.rs](../crates/compose/src/primitives/data/property_grid.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Data/Timeline.swift` | 266 | [crates/core/src/scene/animation/timeline.rs](../crates/core/src/scene/animation/timeline.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Data/Timeline/HeadingLayout.swift` | 52 | [crates/compose/src/primitives/data/timeline/heading_layout.rs](../crates/compose/src/primitives/data/timeline/heading_layout.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Data/TreeTable/TreeTable.swift` | 201 | [crates/compose/src/primitives/data/tree_table.rs](../crates/compose/src/primitives/data/tree_table.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Feedback/Alert.swift` | 157 | [crates/compose/src/primitives/feedback/alert.rs](../crates/compose/src/primitives/feedback/alert.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Feedback/Badge.swift` | 142 | [crates/compose/src/primitives/feedback/badge.rs](../crates/compose/src/primitives/feedback/badge.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Feedback/EmptyState.swift` | 117 | [crates/compose/src/primitives/feedback/empty_state.rs](../crates/compose/src/primitives/feedback/empty_state.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Feedback/Progress.swift` | 129 | [crates/compose/src/primitives/feedback/progress.rs](../crates/compose/src/primitives/feedback/progress.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Feedback/ProgressCircle.swift` | 170 | [crates/compose/src/primitives/feedback/progress_circle.rs](../crates/compose/src/primitives/feedback/progress_circle.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Feedback/ProgressValue.swift` | 35 | [crates/compose/src/primitives/feedback/progress_value.rs](../crates/compose/src/primitives/feedback/progress_value.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Feedback/Spinner.swift` | 60 | [crates/compose/src/primitives/feedback/spinner.rs](../crates/compose/src/primitives/feedback/spinner.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Feedback/StatusTone.swift` | 46 | [crates/compose/src/primitives/feedback/status_tone.rs](../crates/compose/src/primitives/feedback/status_tone.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Interaction/DragAndDrop.swift` | 285 | [crates/compose/src/primitives/interaction/drag_and_drop.rs](../crates/compose/src/primitives/interaction/drag_and_drop.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Interaction/EdgeAutoScroll.swift` | 72 | [crates/compose/src/primitives/interaction/edge_auto_scroll.rs](../crates/compose/src/primitives/interaction/edge_auto_scroll.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Interaction/HorizontalSwipe.swift` | 120 | [crates/compose/src/primitives/interaction/horizontal_swipe.rs](../crates/compose/src/primitives/interaction/horizontal_swipe.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Interaction/Scrollbar.swift` | 303 | [crates/compose/src/primitives/interaction/scrollbar.rs](../crates/compose/src/primitives/interaction/scrollbar.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Layout/Accordion.swift` | 74 | [crates/compose/src/primitives/layout/accordion.rs](../crates/compose/src/primitives/layout/accordion.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Layout/BoundedScrollView.swift` | 50 | [crates/compose/src/primitives/layout/bounded_scroll_view.rs](../crates/compose/src/primitives/layout/bounded_scroll_view.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Layout/Carousel/Autoplay.swift` | 132 | [crates/compose/src/primitives/layout/carousel/autoplay.rs](../crates/compose/src/primitives/layout/carousel/autoplay.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Layout/Carousel/Carousel.swift` | 215 | [crates/compose/src/primitives/layout/carousel/mod.rs](../crates/compose/src/primitives/layout/carousel/mod.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Layout/Carousel/Indicator.swift` | 44 | [crates/compose/src/primitives/layout/carousel/indicator.rs](../crates/compose/src/primitives/layout/carousel/indicator.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Layout/Direction/Resolved.swift` | 35 | [crates/compose/src/primitives/layout/direction/resolved.rs](../crates/compose/src/primitives/layout/direction/resolved.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Layout/DisclosureGroup.swift` | 62 | [crates/compose/src/primitives/layout/disclosure_group.rs](../crates/compose/src/primitives/layout/disclosure_group.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Layout/Grid/Columns.swift` | 157 | [crates/compose/src/primitives/layout/grid/columns.rs](../crates/compose/src/primitives/layout/grid/columns.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Layout/Grid/Grid.swift` | 267 | [crates/compose/src/primitives/layout/grid/grid.rs](../crates/compose/src/primitives/layout/grid/grid.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Layout/Grid/InteractionGate.swift` | 17 | [crates/compose/src/primitives/layout/grid/grid.rs](../crates/compose/src/primitives/layout/grid/grid.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Layout/Grid/LazyGrid.swift` | 211 | [crates/compose/src/primitives/layout/grid/lazy_grid.rs](../crates/compose/src/primitives/layout/grid/lazy_grid.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Layout/Grid/NamedColumns.swift` | 27 | [crates/compose/src/primitives/layout/grid/named_columns.rs](../crates/compose/src/primitives/layout/grid/named_columns.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Layout/Grid/RowHeights.swift` | 109 | [crates/compose/src/primitives/layout/grid/row_heights.rs](../crates/compose/src/primitives/layout/grid/row_heights.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Layout/Grid/Span.swift` | 82 | [crates/compose/src/primitives/layout/grid/span.rs](../crates/compose/src/primitives/layout/grid/span.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Layout/HorizontalScrollOrigin.swift` | 16 | [crates/compose/src/primitives/layout/horizontal_scroll_origin.rs](../crates/compose/src/primitives/layout/horizontal_scroll_origin.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Layout/Insets/SafeArea.swift` | 65 | [crates/compose/src/primitives/layout/insets/safe_area.rs](../crates/compose/src/primitives/layout/insets/safe_area.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Layout/Insets/SurfaceRoot.swift` | 53 | [crates/compose/src/primitives/layout/insets/surface_root.rs](../crates/compose/src/primitives/layout/insets/surface_root.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Layout/Masonry/Masonry.swift` | 167 | [crates/compose/src/primitives/layout/masonry/masonry.rs](../crates/compose/src/primitives/layout/masonry/masonry.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Layout/NavigationComponents.swift` | 114 | [crates/compose/src/primitives/controls/button_group.rs](../crates/compose/src/primitives/controls/button_group.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Layout/Overlay.swift` | 97 | [crates/compose/src/primitives/layout/overlay.rs](../crates/compose/src/primitives/layout/overlay.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Layout/Panel.swift` | 70 | [crates/compose/src/primitives/layout/panel.rs](../crates/compose/src/primitives/layout/panel.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Layout/ResizableEditor.swift` | 36 | [crates/compose/src/primitives/layout/resizable_editor.rs](../crates/compose/src/primitives/layout/resizable_editor.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Layout/ResizableTextArea.swift` | 56 | [crates/compose/src/primitives/layout/resizable_text_area.rs](../crates/compose/src/primitives/layout/resizable_text_area.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Layout/Resize/HeightHandle.swift` | 131 | [crates/compose/src/primitives/layout/resize/height_handle.rs](../crates/compose/src/primitives/layout/resize/height_handle.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Layout/Resize/HeightLimits.swift` | 13 | [crates/compose/src/primitives/layout/resize/height_limits.rs](../crates/compose/src/primitives/layout/resize/height_limits.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Layout/Responsive/ActionGroup.swift` | 57 | [crates/compose/src/primitives/layout/responsive/action_group.rs](../crates/compose/src/primitives/layout/responsive/action_group.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Layout/Responsive/Candidates.swift` | 41 | [crates/compose/src/primitives/layout/responsive/candidates.rs](../crates/compose/src/primitives/layout/responsive/candidates.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Layout/Responsive/Stack.swift` | 118 | [crates/compose/src/primitives/layout/responsive/stack.rs](../crates/compose/src/primitives/layout/responsive/stack.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Layout/Responsive/ViewThatFits.swift` | 118 | [crates/compose/src/primitives/layout/responsive/view_that_fits.rs](../crates/compose/src/primitives/layout/responsive/view_that_fits.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Layout/RowSlot.swift` | 22 | [crates/compose/src/primitives/layout/row_slot.rs](../crates/compose/src/primitives/layout/row_slot.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Layout/ScrollReveal.swift` | 19 | [crates/compose/src/primitives/layout/scroll_reveal.rs](../crates/compose/src/primitives/layout/scroll_reveal.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Layout/ScrollView.swift` | 1139 | [crates/compose/src/primitives/layout/scroll_view.rs](../crates/compose/src/primitives/layout/scroll_view.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Layout/Scrolling/KeyboardFocus.swift` | 49 | [crates/compose/src/primitives/layout/scroll_view.rs](../crates/compose/src/primitives/layout/scroll_view.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Layout/Sidebar/AdaptiveHosts.swift` | 103 | [crates/compose/src/primitives/layout/sidebar/adaptive_hosts.rs](../crates/compose/src/primitives/layout/sidebar/adaptive_hosts.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Layout/Sidebar/AdaptiveOptions.swift` | 69 | [crates/compose/src/primitives/layout/sidebar/adaptive_options.rs](../crates/compose/src/primitives/layout/sidebar/adaptive_options.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Layout/Sidebar/AdaptiveSidebar.swift` | 199 | [crates/compose/src/primitives/layout/sidebar/adaptive_sidebar.rs](../crates/compose/src/primitives/layout/sidebar/adaptive_sidebar.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Layout/Sidebar/Destination.swift` | 234 | [crates/compose/src/primitives/layout/sidebar/destination.rs](../crates/compose/src/primitives/layout/sidebar/destination.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Layout/Sidebar/Drawer.swift` | 92 | [crates/compose/src/primitives/layout/sidebar/drawer.rs](../crates/compose/src/primitives/layout/sidebar/drawer.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Layout/Sidebar/FocusHandoff.swift` | 110 | [crates/compose/src/primitives/layout/sidebar/focus_handoff.rs](../crates/compose/src/primitives/layout/sidebar/focus_handoff.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Layout/Sidebar/Hierarchy.swift` | 64 | [crates/compose/src/primitives/layout/sidebar/hierarchy.rs](../crates/compose/src/primitives/layout/sidebar/hierarchy.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Layout/Sidebar/HierarchyHost.swift` | 85 | [crates/compose/src/primitives/layout/sidebar/destination.rs](../crates/compose/src/primitives/layout/sidebar/destination.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Layout/Sidebar/Items.swift` | 48 | [crates/compose/src/primitives/layout/sidebar/items.rs](../crates/compose/src/primitives/layout/sidebar/items.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Layout/Sidebar/Presentation.swift` | 19 | [crates/graphics/src/rhi/presentation.rs](../crates/graphics/src/rhi/presentation.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Layout/Sidebar/PresentationToggle.swift` | 12 | [crates/compose/src/primitives/layout/sidebar/drawer.rs](../crates/compose/src/primitives/layout/sidebar/drawer.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Layout/Sidebar/Rail.swift` | 51 | [crates/compose/src/primitives/layout/sidebar/rail.rs](../crates/compose/src/primitives/layout/sidebar/rail.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Layout/Sidebar/RailDestination.swift` | 89 | [crates/compose/src/primitives/layout/sidebar/rail.rs](../crates/compose/src/primitives/layout/sidebar/rail.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Layout/Sidebar/ResizeHandle.swift` | 136 | [crates/compose/src/primitives/layout/sidebar/resize_handle.rs](../crates/compose/src/primitives/layout/sidebar/resize_handle.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Layout/Sidebar/Resizing.swift` | 20 | [crates/compose/src/primitives/layout/sidebar/resizing.rs](../crates/compose/src/primitives/layout/sidebar/resizing.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Layout/Sidebar/Sidebar.swift` | 126 | [crates/compose/src/primitives/layout/sidebar/sidebar.rs](../crates/compose/src/primitives/layout/sidebar/sidebar.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Layout/Split/Compact.swift` | 67 | [crates/compose/src/primitives/layout/split_compact.rs](../crates/compose/src/primitives/layout/split_compact.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Layout/Split/Constraints.swift` | 44 | [crates/compose/src/primitives/overlays/portal/fit_constraints.rs](../crates/compose/src/primitives/overlays/portal/fit_constraints.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Layout/Split/Retention.swift` | 109 | [crates/compose/src/primitives/overlays/toast/exit_retention.rs](../crates/compose/src/primitives/overlays/toast/exit_retention.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Layout/SplitView.swift` | 360 | [crates/compose/src/primitives/layout/split/split_view.rs](../crates/compose/src/primitives/layout/split/split_view.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Layout/StatusBar.swift` | 184 | [crates/compose/src/primitives/layout/status_bar.rs](../crates/compose/src/primitives/layout/status_bar.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Layout/TabView.swift` | 299 | [crates/compose/src/primitives/layout/tab_view.rs](../crates/compose/src/primitives/layout/tab_view.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Layout/Tabs/MenuStrip.swift` | 61 | [crates/compose/src/primitives/layout/tab_overflow.rs](../crates/compose/src/primitives/layout/tab_overflow.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Layout/Tabs/MobileBar.swift` | 94 | [crates/compose/src/primitives/layout/mobile_tab_bar.rs](../crates/compose/src/primitives/layout/mobile_tab_bar.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Layout/Tabs/StripLayout.swift` | 64 | [crates/compose/src/primitives/layout/tab_overflow.rs](../crates/compose/src/primitives/layout/tab_overflow.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Layout/Virtualization/EstimatedStack.swift` | 169 | [crates/compose/src/primitives/layout/virtualization/estimated_stack.rs](../crates/compose/src/primitives/layout/virtualization/estimated_stack.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Layout/Virtualization/FixedStack.swift` | 137 | [crates/compose/src/primitives/layout/virtualization/fixed_stack.rs](../crates/compose/src/primitives/layout/virtualization/fixed_stack.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Layout/Virtualization/RowIndex.swift` | 147 | [crates/compose/src/primitives/layout/virtualization/row_index.rs](../crates/compose/src/primitives/layout/virtualization/row_index.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Layout/Virtualization/RowMetrics.swift` | 47 | [crates/compose/src/primitives/layout/virtualization/row_metrics.rs](../crates/compose/src/primitives/layout/virtualization/row_metrics.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Layout/Virtualization/VariableStack.swift` | 108 | [crates/compose/src/primitives/layout/virtualization/variable_stack.rs](../crates/compose/src/primitives/layout/virtualization/variable_stack.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Layout/Virtualization/VirtualStack.swift` | 77 | [crates/compose/src/primitives/layout/virtualization/virtual_stack.rs](../crates/compose/src/primitives/layout/virtualization/virtual_stack.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Layout/Virtualization/VirtualWindow.swift` | 41 | [crates/compose/src/primitives/layout/virtualization/virtual_window.rs](../crates/compose/src/primitives/layout/virtualization/virtual_window.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Layout/ZStack.swift` | 89 | [crates/compose/src/primitives/layout/zstack.rs](../crates/compose/src/primitives/layout/zstack.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Media/AsyncImage.swift` | 335 | [crates/compose/src/primitives/media/async_image.rs](../crates/compose/src/primitives/media/async_image.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Media/Icon.swift` | 87 | [crates/compose/src/primitives/media/icon.rs](../crates/compose/src/primitives/media/icon.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Media/Image+File.swift` | 144 | [crates/compose/src/primitives/media/image_file.rs](../crates/compose/src/primitives/media/image_file.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Media/Image.swift` | 173 | [crates/compose/src/primitives/media/image.rs](../crates/compose/src/primitives/media/image.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Media/ImageDataDownload.swift` | 130 | [crates/compose/src/primitives/media/image_data_download.rs](../crates/compose/src/primitives/media/image_data_download.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Media/ImageGeometry.swift` | 33 | [crates/compose/src/primitives/media/image_geometry.rs](../crates/compose/src/primitives/media/image_geometry.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Media/ImageLoadServices.swift` | 146 | [crates/compose/src/primitives/media/image_load_services.rs](../crates/compose/src/primitives/media/image_load_services.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Media/LoadingAnimationClock.swift` | 33 | [crates/compose/src/primitives/media/loading_animation_clock.rs](../crates/compose/src/primitives/media/loading_animation_clock.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Media/Skeleton.swift` | 88 | [crates/compose/src/primitives/media/skeleton.rs](../crates/compose/src/primitives/media/skeleton.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Media/UIIconCatalog.swift` | 735 | [crates/compose/src/primitives/media/ui_icon_catalog.rs](../crates/compose/src/primitives/media/ui_icon_catalog.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Media/VectorImageRaster.swift` | 44 | [crates/compose/src/primitives/media/vector_image_raster.rs](../crates/compose/src/primitives/media/vector_image_raster.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Navigation/NavigationStack.swift` | 311 | [crates/compose/src/primitives/navigation/navigation_stack.rs](../crates/compose/src/primitives/navigation/navigation_stack.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Navigation/RouteOutlet.swift` | 19 | [crates/compose/src/primitives/navigation/route_outlet.rs](../crates/compose/src/primitives/navigation/route_outlet.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Navigation/Stepper/Stepper.swift` | 155 | [crates/compose/src/primitives/navigation/stepper/stepper.rs](../crates/compose/src/primitives/navigation/stepper/stepper.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Navigation/Stepper/Values.swift` | 50 | [crates/compose/src/primitives/navigation/stepper/values.rs](../crates/compose/src/primitives/navigation/stepper/values.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Overlays/ActionSheet.swift` | 125 | [crates/compose/src/primitives/overlays/modal/action_sheet.rs](../crates/compose/src/primitives/overlays/modal/action_sheet.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Overlays/ActionSheet/Content.swift` | 106 | [crates/browser/src/prototype/mod.rs](../crates/browser/src/prototype/mod.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Overlays/Anchored/Anchoring.swift` | 126 | [crates/compose/src/primitives/overlays/anchored/anchoring.rs](../crates/compose/src/primitives/overlays/anchored/anchoring.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Overlays/Anchored/Placement.swift` | 94 | [crates/compose/src/primitives/overlays/anchored/placement.rs](../crates/compose/src/primitives/overlays/anchored/placement.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Overlays/Anchored/Surface.swift` | 60 | [crates/composition/src/adaptive/surface.rs](../crates/composition/src/adaptive/surface.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Overlays/AssetDropTarget.swift` | 212 | [crates/compose/src/primitives/overlays/asset_drop_target.rs](../crates/compose/src/primitives/overlays/asset_drop_target.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Overlays/Command/Search.swift` | 89 | [crates/compose/src/primitives/overlays/command_palette_model.rs](../crates/compose/src/primitives/overlays/command_palette_model.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Overlays/CommandPalette.swift` | 436 | [crates/compose/src/primitives/overlays/command_palette_model.rs](../crates/compose/src/primitives/overlays/command_palette_model.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Overlays/FocusScope.swift` | 22 | [crates/compose/src/primitives/overlays/focus_scope.rs](../crates/compose/src/primitives/overlays/focus_scope.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Overlays/HoverCard.swift` | 183 | [crates/compose/src/primitives/overlays/hover_card.rs](../crates/compose/src/primitives/overlays/hover_card.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Overlays/Menu/ContextMenu.swift` | 155 | [crates/compose/src/primitives/overlays/context_menu.rs](../crates/compose/src/primitives/overlays/context_menu.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Overlays/Menu/Menu.swift` | 300 | [crates/compose/src/primitives/overlays/menu/menu.rs](../crates/compose/src/primitives/overlays/menu/menu.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Overlays/Menu/MenuDescriptor.swift` | 19 | [crates/compose/src/primitives/overlays/menu/menu_descriptor.rs](../crates/compose/src/primitives/overlays/menu/menu_descriptor.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Overlays/Menu/MenuItemRow.swift` | 264 | [crates/compose/src/primitives/overlays/menu/menu_item_row.rs](../crates/compose/src/primitives/overlays/menu/menu_item_row.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Overlays/Menu/MenuNavigation.swift` | 188 | [crates/compose/src/primitives/overlays/menu/menu_navigation.rs](../crates/compose/src/primitives/overlays/menu/menu_navigation.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Overlays/Menu/NativeMenuBridge.swift` | 128 | [crates/compose/src/primitives/overlays/menu/native_menu_bridge.rs](../crates/compose/src/primitives/overlays/menu/native_menu_bridge.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Overlays/Menu/RowContent.swift` | 60 | [crates/compose/src/primitives/overlays/menu/row_content.rs](../crates/compose/src/primitives/overlays/menu/row_content.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Overlays/Menu/TouchMenu.swift` | 106 | [crates/compose/src/primitives/overlays/menu/touch_menu.rs](../crates/compose/src/primitives/overlays/menu/touch_menu.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Overlays/Modal/BottomSheet.swift` | 104 | [crates/compose/src/primitives/overlays/modal/bottom_sheet.rs](../crates/compose/src/primitives/overlays/modal/bottom_sheet.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Overlays/Modal/Dialog.swift` | 146 | [crates/compose/src/primitives/overlays/modal/dialog.rs](../crates/compose/src/primitives/overlays/modal/dialog.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Overlays/Modal/DragHandle.swift` | 104 | [crates/compose/src/primitives/overlays/modal/drag_handle.rs](../crates/compose/src/primitives/overlays/modal/drag_handle.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Overlays/Modal/Modal.swift` | 115 | [crates/compose/src/primitives/overlays/modal/modal.rs](../crates/compose/src/primitives/overlays/modal/modal.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Overlays/Modal/ModalOptions.swift` | 48 | [crates/compose/src/primitives/overlays/modal/modal_options.rs](../crates/compose/src/primitives/overlays/modal/modal_options.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Overlays/Modal/TouchPresentation.swift` | 76 | [crates/compose/src/primitives/overlays/modal/touch_presentation.rs](../crates/compose/src/primitives/overlays/modal/touch_presentation.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Overlays/OverlayHost.swift` | 10 | [crates/compose/src/primitives/overlays/overlay_host.rs](../crates/compose/src/primitives/overlays/overlay_host.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Overlays/Popconfirm/Popconfirm.swift` | 71 | [crates/compose/src/primitives/overlays/popconfirm.rs](../crates/compose/src/primitives/overlays/popconfirm.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Overlays/Popover.swift` | 108 | [crates/compose/src/primitives/overlays/popover.rs](../crates/compose/src/primitives/overlays/popover.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Overlays/Portal/FitConstraints.swift` | 19 | [crates/compose/src/primitives/overlays/portal/fit_constraints.rs](../crates/compose/src/primitives/overlays/portal/fit_constraints.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Overlays/Portal/LayerRoot.swift` | 95 | [crates/compose/src/primitives/overlays/portal/layer_root.rs](../crates/compose/src/primitives/overlays/portal/layer_root.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Overlays/Portal/OverlayPlacement.swift` | 24 | [crates/compose/src/primitives/overlays/portal/overlay_placement.rs](../crates/compose/src/primitives/overlays/portal/overlay_placement.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Overlays/Portal/PortalHost.swift` | 218 | [crates/compose/src/primitives/overlays/portal/portal_host.rs](../crates/compose/src/primitives/overlays/portal/portal_host.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Overlays/Portal/PortalPlacement.swift` | 41 | [crates/compose/src/primitives/overlays/portal/portal_placement.rs](../crates/compose/src/primitives/overlays/portal/portal_placement.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Overlays/Portal/PortalRegistry.swift` | 386 | [crates/compose/src/primitives/overlays/portal/portal_registry.rs](../crates/compose/src/primitives/overlays/portal/portal_registry.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Overlays/RovingFocus.swift` | 128 | [crates/compose/src/primitives/overlays/roving_focus.rs](../crates/compose/src/primitives/overlays/roving_focus.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Overlays/SelectionKeyHost.swift` | 44 | [crates/compose/src/primitives/overlays/selection_key_host.rs](../crates/compose/src/primitives/overlays/selection_key_host.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Overlays/ShortcutHost.swift` | 58 | [crates/compose/src/primitives/overlays/shortcut_host.rs](../crates/compose/src/primitives/overlays/shortcut_host.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Overlays/Toast/Controller.swift` | 90 | [crates/core/src/scene/animation/controller.rs](../crates/core/src/scene/animation/controller.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Overlays/Toast/ExitRetention.swift` | 45 | [crates/compose/src/primitives/overlays/toast/exit_retention.rs](../crates/compose/src/primitives/overlays/toast/exit_retention.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Overlays/Toast/NotificationHost.swift` | 172 | [crates/compose/src/primitives/overlays/toast/notification_host.rs](../crates/compose/src/primitives/overlays/toast/notification_host.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Overlays/Tooltip.swift` | 412 | [crates/compose/src/primitives/overlays/tooltip.rs](../crates/compose/src/primitives/overlays/tooltip.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Text/Code/FoldingOptions.swift` | 121 | [crates/compose/src/primitives/text/code/folding_options.rs](../crates/compose/src/primitives/text/code/folding_options.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Text/Code/GutterControls.swift` | 181 | [crates/compose/src/primitives/text/code/gutter_controls.rs](../crates/compose/src/primitives/text/code/gutter_controls.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Text/Code/GutterGeometry.swift` | 46 | [crates/compose/src/primitives/text/code/gutter_geometry.rs](../crates/compose/src/primitives/text/code/gutter_geometry.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Text/Code/GutterLayout.swift` | 74 | [crates/compose/src/primitives/text/code/gutter_layout.rs](../crates/compose/src/primitives/text/code/gutter_layout.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Text/Code/GutterOptions.swift` | 69 | [crates/compose/src/primitives/text/code/gutter_options.rs](../crates/compose/src/primitives/text/code/gutter_options.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Text/Code/GutterSession.swift` | 121 | [crates/compose/src/primitives/text/code/gutter_session.rs](../crates/compose/src/primitives/text/code/gutter_session.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Text/Code/Minimap.swift` | 112 | [crates/compose/src/primitives/text/code/minimap.rs](../crates/compose/src/primitives/text/code/minimap.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Text/Code/Occurrences.swift` | 27 | [crates/compose/src/primitives/text/code/occurrences.rs](../crates/compose/src/primitives/text/code/occurrences.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Text/Markdown/CodeBlock.swift` | 100 | [crates/compose/src/primitives/text/markdown/code_block.rs](../crates/compose/src/primitives/text/markdown/code_block.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Text/Markdown/Document.swift` | 30 | [crates/compose/src/primitives/text/markdown/document.rs](../crates/compose/src/primitives/text/markdown/document.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Text/Markdown/ListBlock.swift` | 98 | [crates/compose/src/primitives/text/markdown/list_block.rs](../crates/compose/src/primitives/text/markdown/list_block.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Text/Markdown/MarkdownView.swift` | 135 | [crates/compose/src/primitives/text/markdown/markdown_view.rs](../crates/compose/src/primitives/text/markdown/markdown_view.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Text/Markdown/Parse.swift` | 139 | [crates/compose/src/primitives/text/markdown/parse.rs](../crates/compose/src/primitives/text/markdown/parse.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Text/Markdown/TableBlock.swift` | 107 | [crates/compose/src/primitives/text/markdown/table_block.rs](../crates/compose/src/primitives/text/markdown/table_block.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Text/Rich/Flow.swift` | 413 | [crates/compose/src/primitives/text/rich/flow.rs](../crates/compose/src/primitives/text/rich/flow.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Text/Rich/LinkAnchor.swift` | 56 | [crates/compose/src/primitives/text/rich/link_anchor.rs](../crates/compose/src/primitives/text/rich/link_anchor.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Text/Rich/Paragraph.swift` | 357 | [crates/compose/src/primitives/text/rich/paragraph.rs](../crates/compose/src/primitives/text/rich/paragraph.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Text/Rich/RichText.swift` | 199 | [crates/compose/src/primitives/text/rich/rich_text.rs](../crates/compose/src/primitives/text/rich/rich_text.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Text/Rich/Run.swift` | 27 | [crates/compose/src/primitives/text/rich/run.rs](../crates/compose/src/primitives/text/rich/run.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Text/Rich/TextSelection.swift` | 620 | [crates/compose/src/primitives/text/rich/text_selection.rs](../crates/compose/src/primitives/text/rich/text_selection.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Text/Rope/RopeDifference.swift` | 45 | [crates/compose/src/primitives/text/rope/rope_difference.rs](../crates/compose/src/primitives/text/rope/rope_difference.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Text/Rope/RopeEditing.swift` | 70 | [crates/compose/src/primitives/text/rope/rope_editing.rs](../crates/compose/src/primitives/text/rope/rope_editing.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Text/Rope/RopeLookup.swift` | 126 | [crates/compose/src/primitives/text/rope/rope_lookup.rs](../crates/compose/src/primitives/text/rope/rope_lookup.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Text/Rope/RopeStorage.swift` | 93 | [crates/compose/src/primitives/text/rope/rope_storage.rs](../crates/compose/src/primitives/text/rope/rope_storage.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Text/SingleLine.swift` | 19 | [crates/compose/src/primitives/text/single_line.rs](../crates/compose/src/primitives/text/single_line.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Text/Text.swift` | 605 | [crates/compose/src/primitives/text/text.rs](../crates/compose/src/primitives/text/text.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Text/TextBuffer.swift` | 188 | [crates/compose/src/primitives/text/text_buffer.rs](../crates/compose/src/primitives/text/text_buffer.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Text/TextCompletionRebase.swift` | 47 | [crates/compose/src/primitives/text/text_completion_rebase.rs](../crates/compose/src/primitives/text/text_completion_rebase.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Text/TextDiagnostic.swift` | 118 | [crates/compose/src/primitives/text/text_diagnostic.rs](../crates/compose/src/primitives/text/text_diagnostic.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Text/TextDocumentLayout.swift` | 263 | [crates/compose/src/primitives/text/text_document_layout.rs](../crates/compose/src/primitives/text/text_document_layout.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Text/TextEditHistory.swift` | 97 | [crates/compose/src/primitives/text/text_edit_history.rs](../crates/compose/src/primitives/text/text_edit_history.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Text/TextEditingCommands.swift` | 18 | [crates/compose/src/primitives/text/text_editing_commands.rs](../crates/compose/src/primitives/text/text_editing_commands.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Text/TextField/BracketMatching.swift` | 129 | [crates/compose/src/primitives/text/text_field/bracket_matching.rs](../crates/compose/src/primitives/text/text_field/bracket_matching.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Text/TextField/IndentGuides.swift` | 84 | [crates/compose/src/primitives/text/text_field/indent_guides.rs](../crates/compose/src/primitives/text/text_field/indent_guides.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Text/TextField/PlatformInput.swift` | 75 | [crates/core/src/scene/input/platform_input_context.rs](../crates/core/src/scene/input/platform_input_context.rs)<br>[crates/core/src/scene/input/pointer_capture.rs](../crates/core/src/scene/input/pointer_capture.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Text/TextField/Snippet.swift` | 177 | [crates/compose/src/primitives/text/text_field/snippet.rs](../crates/compose/src/primitives/text/text_field/snippet.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Text/TextField/TextField.swift` | 1483 | [crates/compose/src/primitives/text/text_field/text_field.rs](../crates/compose/src/primitives/text/text_field/text_field.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Text/TextField/TextFieldCodeEditing.swift` | 54 | [crates/compose/src/primitives/text/text_field/text_field_code_editing.rs](../crates/compose/src/primitives/text/text_field/text_field_code_editing.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Text/TextField/TextFieldEditing.swift` | 218 | [crates/compose/src/primitives/text/text_field/text_field_editing.rs](../crates/compose/src/primitives/text/text_field/text_field_editing.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Text/TextField/TextFieldHorizontalScroll.swift` | 35 | [crates/compose/src/primitives/text/text_field/text_field_horizontal_scroll.rs](../crates/compose/src/primitives/text/text_field/text_field_horizontal_scroll.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Text/TextField/TextFieldHost.swift` | 162 | [crates/compose/src/primitives/text/text_field/text_field.rs](../crates/compose/src/primitives/text/text_field/text_field.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Text/TextField/TextFieldInputController.swift` | 155 | [crates/compose/src/primitives/text/text_field/text_field.rs](../crates/compose/src/primitives/text/text_field/text_field.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Text/TextField/TextFieldLayoutEngine.swift` | 262 | [crates/compose/src/primitives/text/text_field/text_field_layout_engine.rs](../crates/compose/src/primitives/text/text_field/text_field_layout_engine.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Text/TextField/TextFieldNavigation.swift` | 60 | [crates/compose/src/primitives/text/text_field/text_field_navigation.rs](../crates/compose/src/primitives/text/text_field/text_field_navigation.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Text/TextField/TextFieldObservation.swift` | 62 | [crates/compose/src/primitives/text/text_field/text_field_observation.rs](../crates/compose/src/primitives/text/text_field/text_field_observation.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Text/TextField/TextFieldOptions.swift` | 122 | [crates/compose/src/primitives/text/text_field/text_field_options.rs](../crates/compose/src/primitives/text/text_field/text_field_options.rs) |
+| `Compose/Sources/CoveUICompose/Primitives/Text/TextField/TextVisualLineIndex.swift` | 106 | [crates/compose/src/primitives/text/text_field/text_visual_line_index.rs](../crates/compose/src/primitives/text/text_field/text_visual_line_index.rs) |
+| `Compose/Sources/CoveUICompose/Rendering/OffscreenView.swift` | 154 | [crates/compose/src/rendering/offscreen_view.rs](../crates/compose/src/rendering/offscreen_view.rs) |
+| `Compose/Sources/CoveUICompose/Scrolling/ScrollPhysicsEnvironment.swift` | 30 | [crates/compose/src/scrolling/scroll_physics_environment.rs](../crates/compose/src/scrolling/scroll_physics_environment.rs) |
+| `Compose/Sources/CoveUICompose/Theme/Styles/AppearanceModifier.swift` | 25 | [crates/compose/src/theme/styles/appearance_modifier.rs](../crates/compose/src/theme/styles/appearance_modifier.rs) |
+| `Compose/Sources/CoveUICompose/Theme/Styles/Buttons/ButtonStyle.swift` | 186 | [crates/compose/src/theme/styles/buttons/button_style.rs](../crates/compose/src/theme/styles/buttons/button_style.rs) |
+| `Compose/Sources/CoveUICompose/Theme/Styles/Buttons/DestructiveButtonStyle.swift` | 18 | [crates/compose/src/theme/styles/buttons/destructive_button_style.rs](../crates/compose/src/theme/styles/buttons/destructive_button_style.rs) |
+| `Compose/Sources/CoveUICompose/Theme/Styles/Buttons/GhostButtonStyle.swift` | 17 | [crates/compose/src/theme/styles/buttons/ghost_button_style.rs](../crates/compose/src/theme/styles/buttons/ghost_button_style.rs) |
+| `Compose/Sources/CoveUICompose/Theme/Styles/Buttons/PlainButtonStyle.swift` | 18 | [crates/compose/src/theme/styles/buttons/plain_button_style.rs](../crates/compose/src/theme/styles/buttons/plain_button_style.rs) |
+| `Compose/Sources/CoveUICompose/Theme/Styles/Buttons/PrimaryButtonStyle.swift` | 26 | [crates/compose/src/theme/styles/buttons/primary_button_style.rs](../crates/compose/src/theme/styles/buttons/primary_button_style.rs) |
+| `Compose/Sources/CoveUICompose/Theme/Styles/Buttons/SecondaryButtonStyle.swift` | 17 | [crates/compose/src/theme/styles/buttons/secondary_button_style.rs](../crates/compose/src/theme/styles/buttons/secondary_button_style.rs) |
+| `Compose/Sources/CoveUICompose/Theme/Styles/Buttons/SegmentButtonStyle.swift` | 24 | [crates/compose/src/theme/styles/buttons/segment_button_style.rs](../crates/compose/src/theme/styles/buttons/segment_button_style.rs) |
+| `Compose/Sources/CoveUICompose/Theme/Styles/Buttons/StatusButtonStyle.swift` | 34 | [crates/compose/src/theme/styles/buttons/status_button_style.rs](../crates/compose/src/theme/styles/buttons/status_button_style.rs) |
+| `Compose/Sources/CoveUICompose/Theme/Styles/Buttons/TabButtonStyle.swift` | 51 | [crates/compose/src/theme/styles/buttons/tab_button_style.rs](../crates/compose/src/theme/styles/buttons/tab_button_style.rs) |
+| `Compose/Sources/CoveUICompose/Theme/Styles/Buttons/ToggleButtonStyle.swift` | 33 | [crates/compose/src/theme/styles/buttons/toggle_button_style.rs](../crates/compose/src/theme/styles/buttons/toggle_button_style.rs) |
+| `Compose/Sources/CoveUICompose/Theme/Styles/Buttons/ToolbarToggleButtonStyle.swift` | 32 | [crates/compose/src/theme/styles/buttons/toolbar_toggle_button_style.rs](../crates/compose/src/theme/styles/buttons/toolbar_toggle_button_style.rs) |
+| `Compose/Sources/CoveUICompose/Theme/Styles/CircularAppearance.swift` | 89 | [crates/compose/src/theme/styles/circular_appearance.rs](../crates/compose/src/theme/styles/circular_appearance.rs) |
+| `Compose/Sources/CoveUICompose/Theme/Styles/Components/DefaultDividerStyle.swift` | 19 | [crates/compose/src/theme/styles/components/default_divider_style.rs](../crates/compose/src/theme/styles/components/default_divider_style.rs) |
+| `Compose/Sources/CoveUICompose/Theme/Styles/Components/DefaultListRowStyle.swift` | 78 | [crates/compose/src/theme/styles/components/default_list_row_style.rs](../crates/compose/src/theme/styles/components/default_list_row_style.rs) |
+| `Compose/Sources/CoveUICompose/Theme/Styles/Components/DefaultPanelStyle.swift` | 48 | [crates/compose/src/theme/styles/components/default_panel_style.rs](../crates/compose/src/theme/styles/components/default_panel_style.rs) |
+| `Compose/Sources/CoveUICompose/Theme/Styles/Components/DefaultTextFieldStyle.swift` | 48 | [crates/compose/src/theme/styles/components/default_text_field_style.rs](../crates/compose/src/theme/styles/components/default_text_field_style.rs) |
+| `Compose/Sources/CoveUICompose/Theme/Styles/Components/DefaultTreeRowStyle.swift` | 62 | [crates/compose/src/theme/styles/components/default_tree_row_style.rs](../crates/compose/src/theme/styles/components/default_tree_row_style.rs) |
+| `Compose/Sources/CoveUICompose/Theme/Styles/Components/DividerStyle.swift` | 42 | [crates/compose/src/theme/styles/components/divider_style.rs](../crates/compose/src/theme/styles/components/divider_style.rs) |
+| `Compose/Sources/CoveUICompose/Theme/Styles/Components/EditorTextFieldStyle.swift` | 18 | [crates/compose/src/theme/styles/components/editor_text_field_style.rs](../crates/compose/src/theme/styles/components/editor_text_field_style.rs) |
+| `Compose/Sources/CoveUICompose/Theme/Styles/Components/InputAppearance.swift` | 72 | [crates/compose/src/theme/styles/components/input_appearance.rs](../crates/compose/src/theme/styles/components/input_appearance.rs) |
+| `Compose/Sources/CoveUICompose/Theme/Styles/Components/ListRowStyle.swift` | 64 | [crates/compose/src/theme/styles/components/list_row_style.rs](../crates/compose/src/theme/styles/components/list_row_style.rs) |
+| `Compose/Sources/CoveUICompose/Theme/Styles/Components/PanelStyle.swift` | 40 | [crates/compose/src/theme/styles/components/panel_style.rs](../crates/compose/src/theme/styles/components/panel_style.rs) |
+| `Compose/Sources/CoveUICompose/Theme/Styles/Components/SelectionAppearance.swift` | 84 | [crates/compose/src/theme/styles/components/selection_appearance.rs](../crates/compose/src/theme/styles/components/selection_appearance.rs) |
+| `Compose/Sources/CoveUICompose/Theme/Styles/Components/SliderStyle.swift` | 161 | [crates/compose/src/theme/styles/components/slider_style.rs](../crates/compose/src/theme/styles/components/slider_style.rs) |
+| `Compose/Sources/CoveUICompose/Theme/Styles/Components/TextFieldStyle.swift` | 71 | [crates/compose/src/theme/styles/components/text_field_style.rs](../crates/compose/src/theme/styles/components/text_field_style.rs) |
+| `Compose/Sources/CoveUICompose/Theme/Styles/Components/TreeRowStyle.swift` | 78 | [crates/compose/src/theme/styles/components/tree_row_style.rs](../crates/compose/src/theme/styles/components/tree_row_style.rs) |
+| `Compose/Sources/CoveUICompose/Theme/Styles/DefaultDarkTheme.swift` | 95 | [crates/compose/src/theme/styles/default_dark_theme.rs](../crates/compose/src/theme/styles/default_dark_theme.rs) |
+| `Compose/Sources/CoveUICompose/Theme/Styles/DefaultLightTheme.swift` | 85 | [crates/compose/src/theme/styles/default_light_theme.rs](../crates/compose/src/theme/styles/default_light_theme.rs) |
+| `Compose/Sources/CoveUICompose/Theme/Theme.swift` | 58 | [crates/compose/src/theme/theme.rs](../crates/compose/src/theme/theme.rs) |
+| `Compose/Sources/CoveUICompose/Theme/ThemeEnvironment.swift` | 63 | [crates/compose/src/theme/theme_environment.rs](../crates/compose/src/theme/theme_environment.rs) |
+| `Compose/Sources/CoveUICompose/Theme/ThemeReader.swift` | 20 | [crates/compose/src/theme/theme_reader.rs](../crates/compose/src/theme/theme_reader.rs) |
+| `Compose/Sources/CoveUICompose/Theme/Tokens/ColorScheme.swift` | 151 | [crates/compose/src/theme/tokens/color_scheme.rs](../crates/compose/src/theme/tokens/color_scheme.rs) |
+| `Compose/Sources/CoveUICompose/Theme/Tokens/ControlSize.swift` | 61 | [crates/compose/src/theme/tokens/control_size.rs](../crates/compose/src/theme/tokens/control_size.rs) |
+| `Compose/Sources/CoveUICompose/Theme/Tokens/ElevationScale.swift` | 26 | [crates/compose/src/theme/tokens/elevation_scale.rs](../crates/compose/src/theme/tokens/elevation_scale.rs) |
+| `Compose/Sources/CoveUICompose/Theme/Tokens/Extensions.swift` | 21 | [crates/compose/src/theme/tokens/extensions.rs](../crates/compose/src/theme/tokens/extensions.rs) |
+| `Compose/Sources/CoveUICompose/Theme/Tokens/FloatingSurfaceTokens.swift` | 17 | [crates/compose/src/theme/tokens/floating_surface_tokens.rs](../crates/compose/src/theme/tokens/floating_surface_tokens.rs) |
+| `Compose/Sources/CoveUICompose/Theme/Tokens/Icons.swift` | 78 | [crates/compose/src/theme/tokens/icons.rs](../crates/compose/src/theme/tokens/icons.rs) |
+| `Compose/Sources/CoveUICompose/Theme/Tokens/Metrics.swift` | 26 | [crates/compose/src/theme/tokens/metrics.rs](../crates/compose/src/theme/tokens/metrics.rs) |
+| `Compose/Sources/CoveUICompose/Theme/Tokens/MotionScale.swift` | 59 | [crates/compose/src/theme/tokens/motion_scale.rs](../crates/compose/src/theme/tokens/motion_scale.rs) |
+| `Compose/Sources/CoveUICompose/Theme/Tokens/RadiusScale.swift` | 19 | [crates/compose/src/theme/tokens/radius_scale.rs](../crates/compose/src/theme/tokens/radius_scale.rs) |
+| `Compose/Sources/CoveUICompose/Theme/Tokens/ReducedMotionEnvironment.swift` | 13 | [crates/compose/src/theme/tokens/reduced_motion_environment.rs](../crates/compose/src/theme/tokens/reduced_motion_environment.rs) |
+| `Compose/Sources/CoveUICompose/Theme/Tokens/SemanticColor.swift` | 86 | [crates/compose/src/theme/tokens/semantic_color.rs](../crates/compose/src/theme/tokens/semantic_color.rs) |
+| `Compose/Sources/CoveUICompose/Theme/Tokens/SemanticModifiers.swift` | 92 | [crates/compose/src/theme/tokens/semantic_modifiers.rs](../crates/compose/src/theme/tokens/semantic_modifiers.rs) |
+| `Compose/Sources/CoveUICompose/Theme/Tokens/SemanticMotion.swift` | 108 | [crates/compose/src/theme/tokens/semantic_motion.rs](../crates/compose/src/theme/tokens/semantic_motion.rs) |
+| `Compose/Sources/CoveUICompose/Theme/Tokens/SpacingScale.swift` | 20 | [crates/compose/src/theme/tokens/spacing_scale.rs](../crates/compose/src/theme/tokens/spacing_scale.rs) |
+| `Compose/Sources/CoveUICompose/Theme/Tokens/TextEmphasis.swift` | 12 | [crates/compose/src/theme/tokens/text_emphasis.rs](../crates/compose/src/theme/tokens/text_emphasis.rs) |
+| `Compose/Sources/CoveUICompose/Theme/Tokens/TextScaler.swift` | 76 | [crates/compose/src/theme/tokens/text_scaler.rs](../crates/compose/src/theme/tokens/text_scaler.rs) |
+| `Compose/Sources/CoveUICompose/Theme/Tokens/Typography.swift` | 74 | [crates/compose/src/theme/tokens/typography.rs](../crates/compose/src/theme/tokens/typography.rs) |
+| `Core/Sources/CoveUICore/Adaptive/Environment.swift` | 82 | [crates/core/src/adaptive_environment.rs](../crates/core/src/adaptive_environment.rs) |
+| `Core/Sources/CoveUICore/Adaptive/TextScale.swift` | 44 | [crates/core/src/text_scale.rs](../crates/core/src/text_scale.rs) |
+| `Core/Sources/CoveUICore/AnalyticClipper.swift` | 62 | [crates/core/src/analytic_clipper.rs](../crates/core/src/analytic_clipper.rs) |
+| `Core/Sources/CoveUICore/AnalyticStroke.swift` | 80 | [crates/core/src/analytic_stroke.rs](../crates/core/src/analytic_stroke.rs) |
+| `Core/Sources/CoveUICore/Bidi.swift` | 267 | [crates/core/src/bidi.rs](../crates/core/src/bidi.rs) |
+| `Core/Sources/CoveUICore/Binding.swift` | 32 | [crates/core/src/binding.rs](../crates/core/src/binding.rs) |
+| `Core/Sources/CoveUICore/Bitmap.swift` | 21 | [crates/core/src/bitmap.rs](../crates/core/src/bitmap.rs)<br>[crates/core/src/draw_list_resources.rs](../crates/core/src/draw_list_resources.rs) |
+| `Core/Sources/CoveUICore/Color.swift` | 56 | [crates/core/src/geometry.rs](../crates/core/src/geometry.rs) |
+| `Core/Sources/CoveUICore/ContentScale.swift` | 7 | [crates/core/src/content_scale.rs](../crates/core/src/content_scale.rs) |
+| `Core/Sources/CoveUICore/DrawList.swift` | 1026 | [crates/core/src/draw.rs](../crates/core/src/draw.rs)<br>[crates/core/src/draw_primitives.rs](../crates/core/src/draw_primitives.rs) |
+| `Core/Sources/CoveUICore/DrawListResources.swift` | 25 | [crates/core/src/draw_list_resources.rs](../crates/core/src/draw_list_resources.rs) |
+| `Core/Sources/CoveUICore/DynamicProperty.swift` | 5 | [crates/core/src/dynamic_property.rs](../crates/core/src/dynamic_property.rs) |
+| `Core/Sources/CoveUICore/Font.swift` | 50 | [crates/core/src/font.rs](../crates/core/src/font.rs) |
+| `Core/Sources/CoveUICore/GeometryKernels.swift` | 62 | [crates/core/src/geometry_kernels.rs](../crates/core/src/geometry_kernels.rs) |
+| `Core/Sources/CoveUICore/GlyphMetrics.swift` | 66 | [crates/core/src/glyph_metrics.rs](../crates/core/src/glyph_metrics.rs) |
+| `Core/Sources/CoveUICore/LineBreaks.swift` | 45 | [crates/core/src/line_breaks.rs](../crates/core/src/line_breaks.rs) |
+| `Core/Sources/CoveUICore/LinearGradient.swift` | 53 | [crates/core/src/linear_gradient.rs](../crates/core/src/linear_gradient.rs) |
+| `Core/Sources/CoveUICore/Mipmaps.swift` | 52 | [crates/core/src/bitmap.rs](../crates/core/src/bitmap.rs) |
+| `Core/Sources/CoveUICore/RoundedClip.swift` | 124 | [crates/core/src/rounded_clip.rs](../crates/core/src/rounded_clip.rs) |
+| `Core/Sources/CoveUICore/ShapedGlyph.swift` | 27 | [crates/core/src/shaped_glyph.rs](../crates/core/src/shaped_glyph.rs) |
+| `Core/Sources/CoveUICore/State.swift` | 154 | [crates/core/src/state.rs](../crates/core/src/state.rs) |
+| `Core/Sources/CoveUICore/StateReadTracking.swift` | 431 | [crates/core/src/state_read_tracking.rs](../crates/core/src/state_read_tracking.rs)<br>[crates/core/src/state.rs](../crates/core/src/state.rs) |
+| `Core/Sources/CoveUICore/SurfaceShadow.swift` | 55 | [crates/core/src/surface_shadow.rs](../crates/core/src/surface_shadow.rs) |
+| `Core/Sources/CoveUICore/TextLayout.swift` | 381 | [crates/core/src/text_layout.rs](../crates/core/src/text_layout.rs) |
+| `Core/Sources/CoveUICore/TextMeasureSlot.swift` | 67 | [crates/core/src/text_measure_slot.rs](../crates/core/src/text_measure_slot.rs) |
+| `Core/Sources/CoveUICore/UIReveal.swift` | 43 | [crates/core/src/ui_reveal.rs](../crates/core/src/ui_reveal.rs) |
+| `Core/Sources/CoveUICore/UIShader.swift` | 107 | [crates/core/src/ui_shader.rs](../crates/core/src/ui_shader.rs) |
+| `Core/Sources/CoveUICore/UIVertex.swift` | 41 | [crates/core/src/draw.rs](../crates/core/src/draw.rs)<br>[crates/core/src/geometry.rs](../crates/core/src/geometry.rs) |
+| `Core/Sources/CoveUIScene/Accessibility.swift` | 252 | [crates/core/src/scene/accessibility.rs](../crates/core/src/scene/accessibility.rs) |
+| `Core/Sources/CoveUIScene/AmbientSlot.swift` | 17 | [crates/core/src/scene/ambient_slot.rs](../crates/core/src/scene/ambient_slot.rs) |
+| `Core/Sources/CoveUIScene/Animation/ActiveAnimationContext.swift` | 166 | [crates/core/src/scene/animation/context.rs](../crates/core/src/scene/animation/context.rs) |
+| `Core/Sources/CoveUIScene/Animation/AnimatableProperty.swift` | 118 | [crates/core/src/scene/animatable_property.rs](../crates/core/src/scene/animatable_property.rs) |
+| `Core/Sources/CoveUIScene/Animation/AnimatableWrite.swift` | 193 | [crates/core/src/scene/animatable_write.rs](../crates/core/src/scene/animatable_write.rs) |
+| `Core/Sources/CoveUIScene/Animation/Animation.swift` | 249 | [crates/core/src/scene/animation/animation.rs](../crates/core/src/scene/animation/animation.rs) |
+| `Core/Sources/CoveUIScene/Animation/AnimationController.swift` | 147 | [crates/core/src/scene/animation/controller.rs](../crates/core/src/scene/animation/controller.rs) |
+| `Core/Sources/CoveUIScene/Animation/Curves/Linear.swift` | 38 | [crates/core/src/scene/animation/linear.rs](../crates/core/src/scene/animation/linear.rs) |
+| `Core/Sources/CoveUIScene/Animation/Curves/Oscillation.swift` | 23 | [crates/core/src/scene/animation/animation.rs](../crates/core/src/scene/animation/animation.rs) |
+| `Core/Sources/CoveUIScene/Animation/Curves/Steps.swift` | 19 | [crates/core/src/scene/animation/animation.rs](../crates/core/src/scene/animation/animation.rs) |
+| `Core/Sources/CoveUIScene/Animation/Interpolatable.swift` | 83 | [crates/core/src/scene/animation/interpolatable.rs](../crates/core/src/scene/animation/interpolatable.rs) |
+| `Core/Sources/CoveUIScene/Animation/Keyframes/Timeline.swift` | 41 | [crates/core/src/scene/animation/timeline.rs](../crates/core/src/scene/animation/timeline.rs) |
+| `Core/Sources/CoveUIScene/Animation/MotionVector.swift` | 13 | [crates/core/src/scene/animation/motion_vector.rs](../crates/core/src/scene/animation/motion_vector.rs) |
+| `Core/Sources/CoveUIScene/Animation/Playback.swift` | 30 | [crates/core/src/scene/animation/playback.rs](../crates/core/src/scene/animation/playback.rs) |
+| `Core/Sources/CoveUIScene/Animation/Scheduler.swift` | 96 | [crates/core/src/scene/animation/scheduler.rs](../crates/core/src/scene/animation/scheduler.rs) |
+| `Core/Sources/CoveUIScene/Animation/SpringSolution.swift` | 142 | [crates/core/src/scene/animation/spring_solution.rs](../crates/core/src/scene/animation/spring_solution.rs) |
+| `Core/Sources/CoveUIScene/ComponentDiagnostics.swift` | 42 | [crates/core/src/scene/component_diagnostics.rs](../crates/core/src/scene/component_diagnostics.rs) |
+| `Core/Sources/CoveUIScene/CompositionLocal.swift` | 39 | [crates/core/src/scene/composition_local.rs](../crates/core/src/scene/composition_local.rs) |
+| `Core/Sources/CoveUIScene/ElementID.swift` | 44 | [crates/core/src/scene/element_id.rs](../crates/core/src/scene/element_id.rs) |
+| `Core/Sources/CoveUIScene/Exports.swift` | 3 | [crates/logging/src/exports.rs](../crates/logging/src/exports.rs)<br>[crates/logging/src/logging_exports.rs](../crates/logging/src/logging_exports.rs) |
+| `Core/Sources/CoveUIScene/FlexProps.swift` | 238 | [crates/core/src/scene/flex_props.rs](../crates/core/src/scene/flex_props.rs) |
+| `Core/Sources/CoveUIScene/Input/EventDispatcher.swift` | 622 | [crates/core/src/scene/input/event_dispatcher.rs](../crates/core/src/scene/input/event_dispatcher.rs) |
+| `Core/Sources/CoveUIScene/Input/FocusAccessoryResource.swift` | 17 | [crates/core/src/scene/input/focus_accessory_resource.rs](../crates/core/src/scene/input/focus_accessory_resource.rs) |
+| `Core/Sources/CoveUIScene/Input/FocusChain.swift` | 266 | [crates/core/src/scene/input/focus_chain.rs](../crates/core/src/scene/input/focus_chain.rs) |
+| `Core/Sources/CoveUIScene/Input/HitTester.swift` | 97 | [crates/core/src/scene/input/hit_tester.rs](../crates/core/src/scene/input/hit_tester.rs) |
+| `Core/Sources/CoveUIScene/Input/InteractionRegistry.swift` | 442 | [crates/core/src/scene/input/interaction_registry.rs](../crates/core/src/scene/input/interaction_registry.rs) |
+| `Core/Sources/CoveUIScene/Input/ModalFocusResource.swift` | 24 | [crates/core/src/scene/input/modal_focus_resource.rs](../crates/core/src/scene/input/modal_focus_resource.rs) |
+| `Core/Sources/CoveUIScene/Input/PlatformInputContext.swift` | 131 | [crates/core/src/scene/input/platform_input_context.rs](../crates/core/src/scene/input/platform_input_context.rs) |
+| `Core/Sources/CoveUIScene/Input/PointerCapture.swift` | 43 | [crates/core/src/scene/input/pointer_capture.rs](../crates/core/src/scene/input/pointer_capture.rs) |
+| `Core/Sources/CoveUIScene/Input/TabStop.swift` | 21 | [crates/core/src/scene/input/tab_stop.rs](../crates/core/src/scene/input/tab_stop.rs) |
+| `Core/Sources/CoveUIScene/Input/WheelGesture.swift` | 49 | [crates/core/src/scene/input/wheel_gesture.rs](../crates/core/src/scene/input/wheel_gesture.rs) |
+| `Core/Sources/CoveUIScene/Input/WheelRoutingAttachment.swift` | 42 | [crates/core/src/scene/input/wheel_routing_attachment.rs](../crates/core/src/scene/input/wheel_routing_attachment.rs) |
+| `Core/Sources/CoveUIScene/InvalidationLog.swift` | 126 | [crates/core/src/scene/invalidation_log.rs](../crates/core/src/scene/invalidation_log.rs) |
+| `Core/Sources/CoveUIScene/LayerAwareNodeRenderer.swift` | 303 | [crates/core/src/scene/layer_aware_node_renderer.rs](../crates/core/src/scene/layer_aware_node_renderer.rs) |
+| `Core/Sources/CoveUIScene/Layout/CustomLayout.swift` | 174 | [crates/core/src/scene/layout_node.rs](../crates/core/src/scene/layout_node.rs) |
+| `Core/Sources/CoveUIScene/Layout/LayoutDirection.swift` | 13 | [crates/compose/src/primitives/overlays/support.rs](../crates/compose/src/primitives/overlays/support.rs) |
+| `Core/Sources/CoveUIScene/Layout/Node+LayoutVisibility.swift` | 21 | [crates/core/src/scene/node.rs](../crates/core/src/scene/node.rs) |
+| `Core/Sources/CoveUIScene/LayoutNode.swift` | 636 | [crates/core/src/scene/layout_node.rs](../crates/core/src/scene/layout_node.rs) |
+| `Core/Sources/CoveUIScene/LayoutPass.swift` | 40 | [crates/core/src/scene/layout_pass.rs](../crates/core/src/scene/layout_pass.rs) |
+| `Core/Sources/CoveUIScene/Node.swift` | 835 | [crates/core/src/scene/node.rs](../crates/core/src/scene/node.rs) |
+| `Core/Sources/CoveUIScene/NodeGeometry.swift` | 58 | [crates/core/src/scene/node_geometry.rs](../crates/core/src/scene/node_geometry.rs) |
+| `Core/Sources/CoveUIScene/NodeRenderer.swift` | 159 | [crates/core/src/scene/node_renderer.rs](../crates/core/src/scene/node_renderer.rs) |
+| `Core/Sources/CoveUIScene/NodeResource.swift` | 23 | [crates/core/src/scene/node_resource.rs](../crates/core/src/scene/node_resource.rs) |
+| `Core/Sources/CoveUIScene/NodeTransform.swift` | 173 | [crates/core/src/scene/node_transform.rs](../crates/core/src/scene/node_transform.rs) |
+| `Core/Sources/CoveUIScene/NodeTree.swift` | 104 | [crates/core/src/scene/node_tree.rs](../crates/core/src/scene/node_tree.rs) |
+| `Core/Sources/CoveUIScene/ObservableObject.swift` | 29 | [crates/core/src/scene/observable_object.rs](../crates/core/src/scene/observable_object.rs) |
+| `Core/Sources/CoveUIScene/ObservableStateTracking.swift` | 184 | [crates/core/src/scene/observable_state_tracking.rs](../crates/core/src/scene/observable_state_tracking.rs) |
+| `Core/Sources/CoveUIScene/PerformanceTimeline.swift` | 75 | [crates/core/src/scene/performance_timeline.rs](../crates/core/src/scene/performance_timeline.rs) |
+| `Core/Sources/CoveUIScene/Recomposer.swift` | 138 | [crates/core/src/scene/recomposer.rs](../crates/core/src/scene/recomposer.rs) |
+| `Core/Sources/CoveUIScene/ReducedMotion.swift` | 13 | [crates/core/src/scene/environment_hooks.rs](../crates/core/src/scene/environment_hooks.rs) |
+| `Core/Sources/CoveUIScene/RenderCulling.swift` | 17 | [crates/core/src/scene/render_culling.rs](../crates/core/src/scene/render_culling.rs) |
+| `Core/Sources/CoveUIScene/RenderTree.swift` | 328 | [crates/core/src/scene/render_tree.rs](../crates/core/src/scene/render_tree.rs) |
+| `Core/Sources/CoveUIScene/Rendering/ContentMask.swift` | 13 | [crates/core/src/scene/rendering/content_mask.rs](../crates/core/src/scene/rendering/content_mask.rs) |
+| `Core/Sources/CoveUIScene/Rendering/ScaledPainting.swift` | 36 | [crates/core/src/scene/rendering/scaled_painting.rs](../crates/core/src/scene/rendering/scaled_painting.rs) |
+| `Core/Sources/CoveUIScene/Rendering/Snapshot.swift` | 54 | [crates/core/src/scene/rendering/snapshot.rs](../crates/core/src/scene/rendering/snapshot.rs) |
+| `Core/Sources/CoveUIScene/Scrolling/AxisMotion.swift` | 50 | [crates/core/src/scene/scrolling/animator.rs](../crates/core/src/scene/scrolling/animator.rs) |
+| `Core/Sources/CoveUIScene/Scrolling/Reveal.swift` | 22 | [crates/core/src/scene/scrolling/reveal.rs](../crates/core/src/scene/scrolling/reveal.rs) |
+| `Core/Sources/CoveUIScene/Scrolling/RubberBand.swift` | 70 | [crates/core/src/scene/scrolling/physics.rs](../crates/core/src/scene/scrolling/physics.rs) |
+| `Core/Sources/CoveUIScene/Scrolling/ScrollAnimator.swift` | 573 | [crates/core/src/scene/scrolling/animator.rs](../crates/core/src/scene/scrolling/animator.rs) |
+| `Core/Sources/CoveUIScene/Scrolling/ScrollPhysics.swift` | 197 | [crates/core/src/scene/scrolling/physics.rs](../crates/core/src/scene/scrolling/physics.rs) |
+| `Core/Sources/CoveUIScene/Scrolling/ScrollSpring.swift` | 65 | [crates/core/src/scene/scrolling/physics.rs](../crates/core/src/scene/scrolling/physics.rs) |
+| `Core/Sources/CoveUIScene/Scrolling/ScrollVelocityTracker.swift` | 112 | [crates/core/src/scene/scrolling/physics.rs](../crates/core/src/scene/scrolling/physics.rs) |
+| `Core/Sources/CoveUIScene/StateRegistry.swift` | 50 | [crates/core/src/scene/state_registry.rs](../crates/core/src/scene/state_registry.rs) |
+| `Core/Sources/CoveUIScene/SurfacePainting.swift` | 237 | [crates/core/src/scene/surface_painting.rs](../crates/core/src/scene/surface_painting.rs) |
+| `Core/Sources/CoveUIScene/TextInputAttachment.swift` | 43 | [crates/core/src/scene/input/text_input.rs](../crates/core/src/scene/input/text_input.rs) |
+| `Core/Sources/CoveUIScene/TextInputClient.swift` | 26 | [crates/core/src/scene/input/text_input.rs](../crates/core/src/scene/input/text_input.rs) |
+| `Core/Sources/CoveUIScene/TimingTrace.swift` | 55 | [crates/core/src/scene/timing_trace.rs](../crates/core/src/scene/timing_trace.rs) |
+| `Core/Sources/CoveUIScene/UIWorkScheduler.swift` | 11 | [crates/core/src/scene/environment_hooks.rs](../crates/core/src/scene/environment_hooks.rs) |
+| `Core/Sources/CoveUIScene/WindowReveal.swift` | 26 | [crates/core/src/scene/environment_hooks.rs](../crates/core/src/scene/environment_hooks.rs) |
+| `DevTools/Inspection/Sources/CoveUIAgentCore/Contracts/Schema.swift` | 479 | [crates/devtools/src/lib.rs](../crates/devtools/src/lib.rs) |
+| `DevTools/Inspection/Sources/CoveUIAgentCore/Contracts/Tool.swift` | 51 | [crates/agent/src/ui_tools.rs](../crates/agent/src/ui_tools.rs) |
+| `DevTools/Inspection/Sources/CoveUIAgentCore/MCP/Server.swift` | 105 | [crates/agent/src/mcp.rs](../crates/agent/src/mcp.rs) |
+| `DevTools/Inspection/Sources/CoveUIAgentCore/Session/Conversation.swift` | 86 | [crates/agent/src/tool.rs](../crates/agent/src/tool.rs) |
+| `DevTools/Inspection/Sources/CoveUIAgentCore/Skills/Directory.swift` | 49 | [crates/agent/src/skills.rs](../crates/agent/src/skills.rs) |
+| `DevTools/Inspection/Sources/CoveUIAgentCore/Skills/Skill.swift` | 42 | [crates/agent/src/skills.rs](../crates/agent/src/skills.rs) |
+| `DevTools/Inspection/Sources/CoveUIAgentCore/Tools/Diagnostics.swift` | 92 | [crates/devtools/src/inspection/diagnostics.rs](../crates/devtools/src/inspection/diagnostics.rs) |
+| `DevTools/Inspection/Sources/CoveUIAgentCore/Tools/Toolbox.swift` | 44 | [crates/agent/src/tool.rs](../crates/agent/src/tool.rs) |
+| `DevTools/Inspection/Sources/CoveUIDevToolsScene/Diagnostics/Actions.swift` | 41 | [crates/devtools/src/inspection/actions.rs](../crates/devtools/src/inspection/actions.rs) |
+| `DevTools/Inspection/Sources/CoveUIDevToolsScene/Diagnostics/Geometry.swift` | 72 | [crates/compose/src/primitives/controls/fields/slider/geometry.rs](../crates/compose/src/primitives/controls/fields/slider/geometry.rs) |
+| `DevTools/Inspection/Sources/CoveUIDevToolsScene/Diagnostics/Memory.swift` | 11 | [crates/hosts/src/desktop/application/memory.rs](../crates/hosts/src/desktop/application/memory.rs) |
+| `DevTools/Inspection/Sources/CoveUIDevToolsScene/Diagnostics/Presentation.swift` | 62 | [crates/graphics/src/rhi/presentation.rs](../crates/graphics/src/rhi/presentation.rs) |
+| `DevTools/Inspection/Sources/CoveUIDevToolsScene/Diagnostics/Queries.swift` | 200 | [crates/devtools/src/inspection/diagnostics.rs](../crates/devtools/src/inspection/diagnostics.rs) |
+| `DevTools/Inspection/Sources/CoveUIDevToolsScene/Diagnostics/Requests.swift` | 50 | [crates/devtools/src/server/mod.rs](../crates/devtools/src/server/mod.rs) |
+| `DevTools/Inspection/Sources/CoveUIDevToolsScene/Diagnostics/Tools.swift` | 222 | [crates/agent/src/ui_tools.rs](../crates/agent/src/ui_tools.rs) |
+| `DevTools/Inspection/Sources/CoveUIDevToolsScene/Diagnostics/Trace.swift` | 103 | [crates/core/src/scene/timing_trace.rs](../crates/core/src/scene/timing_trace.rs) |
+| `DevTools/Inspection/Sources/CoveUIDevToolsScene/Observation.swift` | 19 | [crates/logging/src/observation.rs](../crates/logging/src/observation.rs) |
+| `DevTools/Inspection/Sources/CoveUIDevToolsScene/SceneEditor.swift` | 209 | [crates/devtools/src/inspection/editor.rs](../crates/devtools/src/inspection/editor.rs) |
+| `DevTools/Inspection/Sources/CoveUIDevToolsScene/SceneInspector.swift` | 177 | [crates/devtools/src/inspection/inspector.rs](../crates/devtools/src/inspection/inspector.rs) |
+| `DevTools/Protocol/Sources/CoveUIDevToolsProtocol/ComponentAnalysis.swift` | 25 | [crates/devtools-protocol/src/lib.rs](../crates/devtools-protocol/src/lib.rs) |
+| `DevTools/Protocol/Sources/CoveUIDevToolsProtocol/DevToolsSession.swift` | 104 | [crates/devtools-protocol/src/session.rs](../crates/devtools-protocol/src/session.rs) |
+| `DevTools/Protocol/Sources/CoveUIDevToolsProtocol/Discovery.swift` | 22 | [crates/devtools/src/devtools/mod.rs](../crates/devtools/src/devtools/mod.rs) |
+| `DevTools/Protocol/Sources/CoveUIDevToolsProtocol/Exports.swift` | 1 | [crates/logging/src/exports.rs](../crates/logging/src/exports.rs)<br>[crates/logging/src/logging_exports.rs](../crates/logging/src/logging_exports.rs) |
+| `DevTools/Protocol/Sources/CoveUIDevToolsProtocol/InputRecording.swift` | 75 | [crates/devtools-protocol/src/recording.rs](../crates/devtools-protocol/src/recording.rs) |
+| `DevTools/Protocol/Sources/CoveUIDevToolsProtocol/Inspection.swift` | 86 | [crates/devtools-protocol/src/lib.rs](../crates/devtools-protocol/src/lib.rs) |
+| `DevTools/Protocol/Sources/CoveUIDevToolsProtocol/Observation.swift` | 57 | [crates/devtools-protocol/src/lib.rs](../crates/devtools-protocol/src/lib.rs) |
+| `DevTools/Protocol/Sources/CoveUIDevToolsProtocol/Protocol.swift` | 486 | [crates/devtools-protocol/src/lib.rs](../crates/devtools-protocol/src/lib.rs) |
+| `DevTools/Sources/CoveUIAgent/Exports.swift` | 3 | [crates/logging/src/exports.rs](../crates/logging/src/exports.rs) |
+| `DevTools/Sources/CoveUIAgentTransport/LocalServer.swift` | 110 | [crates/agent/src/transport.rs](../crates/agent/src/transport.rs) |
+| `DevTools/Sources/CoveUIDevTools/Integration/Exports.swift` | 4 | [crates/logging/src/exports.rs](../crates/logging/src/exports.rs) |
+| `DevTools/Sources/CoveUIDevTools/Mirror/NativeAppFrameCapture.swift` | 52 | [crates/devtools/src/devtools/mirror.rs](../crates/devtools/src/devtools/mirror.rs) |
+| `DevTools/Sources/CoveUIDevTools/Session/DevTools.swift` | 230 | [crates/devtools/src/devtools/mod.rs](../crates/devtools/src/devtools/mod.rs) |
+| `DevTools/Sources/CoveUIDevTools/Session/Discovery.swift` | 19 | [crates/devtools/src/devtools/mod.rs](../crates/devtools/src/devtools/mod.rs) |
+| `DevTools/Sources/CoveUIDevTools/Taps/FrameTap.swift` | 276 | [crates/devtools/src/devtools/mirror.rs](../crates/devtools/src/devtools/mirror.rs) |
+| `DevTools/Sources/CoveUIDevTools/Taps/InputBridge.swift` | 151 | [crates/devtools/src/devtools/mirror.rs](../crates/devtools/src/devtools/mirror.rs) |
+| `DevTools/Sources/CoveUIDevTools/Taps/TimingPublisher.swift` | 45 | [crates/devtools/src/devtools/mirror.rs](../crates/devtools/src/devtools/mirror.rs) |
+| `DevTools/Sources/CoveUIDevToolsProbe/main.swift` | 72 | [examples/counter/src/main.rs](../examples/counter/src/main.rs) |
+| `DevTools/Sources/CoveUIDevToolsServer/Requests/Checkpoint.swift` | 47 | [crates/hosts/src/desktop/diagnostics/checkpoint.rs](../crates/hosts/src/desktop/diagnostics/checkpoint.rs) |
+| `DevTools/Sources/CoveUIDevToolsServer/Requests/Diagnostics.swift` | 17 | [crates/devtools/src/inspection/diagnostics.rs](../crates/devtools/src/inspection/diagnostics.rs) |
+| `DevTools/Sources/CoveUIDevToolsServer/Requests/Mirror.swift` | 79 | [crates/devtools/src/devtools/mirror.rs](../crates/devtools/src/devtools/mirror.rs) |
+| `DevTools/Sources/CoveUIDevToolsServer/Requests/Observation.swift` | 45 | [crates/logging/src/observation.rs](../crates/logging/src/observation.rs) |
+| `DevTools/Sources/CoveUIDevToolsServer/Requests/Recording.swift` | 47 | [crates/devtools-protocol/src/recording.rs](../crates/devtools-protocol/src/recording.rs) |
+| `DevTools/Sources/CoveUIDevToolsServer/Requests/Scene.swift` | 90 | [crates/hosts/src/android/integration/scene.rs](../crates/hosts/src/android/integration/scene.rs) |
+| `DevTools/Sources/CoveUIDevToolsServer/Requests/Window.swift` | 21 | [crates/compose/src/primitives/overlays/toast/controller.rs](../crates/compose/src/primitives/overlays/toast/controller.rs)<br>[crates/compose/src/theme/styles/circular_appearance.rs](../crates/compose/src/theme/styles/circular_appearance.rs) |
+| `DevTools/Sources/CoveUIDevToolsServer/Session/Configuration.swift` | 69 | [crates/hosts/src/desktop/application/configuration.rs](../crates/hosts/src/desktop/application/configuration.rs) |
+| `DevTools/Sources/CoveUIDevToolsServer/Session/DevServer.swift` | 454 | [crates/devtools/src/server/mod.rs](../crates/devtools/src/server/mod.rs) |
+| `DevTools/Sources/CoveUIDevToolsServer/Session/Host.swift` | 53 | [crates/compose/src/primitives/controls/fields/slider/host.rs](../crates/compose/src/primitives/controls/fields/slider/host.rs) |
+| `DevTools/Sources/CoveUIDevToolsServer/Streams/Logs.swift` | 55 | [crates/devtools/src/server/mod.rs](../crates/devtools/src/server/mod.rs) |
+| `DevTools/Sources/CoveUIDevToolsServer/Transport/DevToolsTransport.swift` | 24 | [crates/devtools/src/server/transport.rs](../crates/devtools/src/server/transport.rs) |
+| `DevTools/Sources/CoveUIDevToolsServer/Transport/NIODevToolsTransport.swift` | 190 | [crates/devtools/src/server/mod.rs](../crates/devtools/src/server/mod.rs) |
+| `DevTools/Sources/CoveUIDevToolsServer/Tree/TreeEncodingWorker.swift` | 60 | [crates/devtools/src/server/mod.rs](../crates/devtools/src/server/mod.rs) |
+| `Examples/Counter/Sources/CounterExample/CounterView.swift` | 200 | [examples/gallery/src/counter.rs](../examples/gallery/src/counter.rs) |
+| `Examples/Mobile/Sources/AppContent/App.swift` | 33 | [examples/gallery/src/mobile/app.rs](../examples/gallery/src/mobile/app.rs) |
+| `Examples/Mobile/Sources/AppContent/Model.swift` | 30 | [crates/compose/src/primitives/data/chart/model.rs](../crates/compose/src/primitives/data/chart/model.rs) |
+| `Examples/Mobile/Sources/AppContent/Projects.swift` | 57 | [examples/gallery/src/mobile/model.rs](../examples/gallery/src/mobile/model.rs)<br>[examples/gallery/src/mobile/today.rs](../examples/gallery/src/mobile/today.rs) |
+| `Examples/Mobile/Sources/AppContent/Settings.swift` | 50 | [examples/gallery/src/mobile/settings.rs](../examples/gallery/src/mobile/settings.rs) |
+| `Examples/Mobile/Sources/AppContent/Today.swift` | 49 | [examples/gallery/src/mobile/today.rs](../examples/gallery/src/mobile/today.rs) |
+| `Examples/Platforms/iOS/main.swift` | 10 | [examples/counter/src/main.rs](../examples/counter/src/main.rs) |
+| `Examples/Sources/CoveUIDemo/Launch.swift` | 79 | [crates/hosts/src/android/contract/launch.rs](../crates/hosts/src/android/contract/launch.rs) |
+| `Examples/Sources/CoveUIDemo/main.swift` | 7 | [examples/counter/src/main.rs](../examples/counter/src/main.rs) |
+| `Examples/Sources/GalleryContent/CounterContent.swift` | 18 | [examples/gallery/src/gallery_content/counter_content.rs](../examples/gallery/src/gallery_content/counter_content.rs) |
+| `Examples/Sources/GalleryContent/GalleryCatalog.swift` | 150 | [examples/gallery/src/gallery_content/catalog.rs](../examples/gallery/src/gallery_content/catalog.rs) |
+| `Examples/Sources/GalleryContent/GalleryView.swift` | 218 | [examples/gallery/src/gallery_content/gallery_view.rs](../examples/gallery/src/gallery_content/gallery_view.rs) |
+| `Examples/Sources/GalleryContent/NavigationIcons.swift` | 105 | [examples/gallery/src/gallery_content/icons.rs](../examples/gallery/src/gallery_content/icons.rs) |
+| `Examples/Sources/GalleryContent/Stories/Controls/ControlStories.swift` | 380 | [examples/gallery/src/gallery_content/stories/controls.rs](../examples/gallery/src/gallery_content/stories/controls.rs) |
+| `Examples/Sources/GalleryContent/Stories/Controls/StepperStory.swift` | 36 | [examples/gallery/src/gallery_content/stories/stepper.rs](../examples/gallery/src/gallery_content/stories/stepper.rs) |
+| `Examples/Sources/GalleryContent/Stories/Controls/TextEditorStory.swift` | 327 | [examples/gallery/src/gallery_content/stories/text_editor_story.rs](../examples/gallery/src/gallery_content/stories/text_editor_story.rs) |
+| `Examples/Sources/GalleryContent/Stories/Controls/TimePickerStory.swift` | 95 | [examples/gallery/src/gallery_content/stories/time_picker_story.rs](../examples/gallery/src/gallery_content/stories/time_picker_story.rs) |
+| `Examples/Sources/GalleryContent/Stories/Controls/ToolbarStory.swift` | 71 | [examples/gallery/src/gallery_content/stories/toolbar_story.rs](../examples/gallery/src/gallery_content/stories/toolbar_story.rs) |
+| `Examples/Sources/GalleryContent/Stories/Controls/WheelPickerStory.swift` | 104 | [examples/gallery/src/gallery_content/stories/wheel_picker_story.rs](../examples/gallery/src/gallery_content/stories/wheel_picker_story.rs) |
+| `Examples/Sources/GalleryContent/Stories/Data/AdaptiveTables.swift` | 19 | [examples/gallery/src/gallery_content/stories/data_stories.rs](../examples/gallery/src/gallery_content/stories/data_stories.rs) |
+| `Examples/Sources/GalleryContent/Stories/Data/ChartExploration.swift` | 37 | [examples/gallery/src/gallery_content/stories/data_stories.rs](../examples/gallery/src/gallery_content/stories/data_stories.rs) |
+| `Examples/Sources/GalleryContent/Stories/Data/DataStories.swift` | 714 | [examples/gallery/src/gallery_content/stories/data_stories_file.rs](../examples/gallery/src/gallery_content/stories/data_stories_file.rs) |
+| `Examples/Sources/GalleryContent/Stories/Data/DataTableStory.swift` | 131 | [examples/gallery/src/gallery_content/stories/data_table_story.rs](../examples/gallery/src/gallery_content/stories/data_table_story.rs) |
+| `Examples/Sources/GalleryContent/Stories/Data/DateTableStories.swift` | 114 | [examples/gallery/src/gallery_content/stories/calendar.rs](../examples/gallery/src/gallery_content/stories/calendar.rs) |
+| `Examples/Sources/GalleryContent/Stories/Data/MarkdownStory.swift` | 77 | [examples/gallery/src/gallery_content/stories/markdown_story.rs](../examples/gallery/src/gallery_content/stories/markdown_story.rs) |
+| `Examples/Sources/GalleryContent/Stories/Data/RichTextStory.swift` | 58 | [examples/gallery/src/gallery_content/stories/rich_text.rs](../examples/gallery/src/gallery_content/stories/rich_text.rs) |
+| `Examples/Sources/GalleryContent/Stories/Data/WebStory.swift` | 193 | [examples/gallery/src/gallery_content/stories/web_story.rs](../examples/gallery/src/gallery_content/stories/web_story.rs) |
+| `Examples/Sources/GalleryContent/Stories/Feedback/AvatarStory.swift` | 86 | [examples/gallery/src/gallery_content/stories/avatar_story.rs](../examples/gallery/src/gallery_content/stories/avatar_story.rs) |
+| `Examples/Sources/GalleryContent/Stories/Feedback/FeedbackStories.swift` | 250 | [examples/gallery/src/gallery_content/routing.rs](../examples/gallery/src/gallery_content/routing.rs) |
+| `Examples/Sources/GalleryContent/Stories/Feedback/RatingSample.swift` | 48 | [examples/gallery/src/gallery_content/stories/media_stories.rs](../examples/gallery/src/gallery_content/stories/media_stories.rs) |
+| `Examples/Sources/GalleryContent/Stories/Feedback/RatingStory.swift` | 77 | [examples/gallery/src/gallery_content/stories/media_stories.rs](../examples/gallery/src/gallery_content/stories/media_stories.rs) |
+| `Examples/Sources/GalleryContent/Stories/Feedback/SkeletonStory.swift` | 43 | [examples/gallery/src/gallery_content/stories/media_stories.rs](../examples/gallery/src/gallery_content/stories/media_stories.rs) |
+| `Examples/Sources/GalleryContent/Stories/Foundation/AdaptiveExamples.swift` | 551 | [examples/gallery/src/gallery_content/stories/adaptive_examples.rs](../examples/gallery/src/gallery_content/stories/adaptive_examples.rs) |
+| `Examples/Sources/GalleryContent/Stories/Foundation/AnimationCurves.swift` | 51 | [examples/gallery/src/gallery_content/stories/animation_curves.rs](../examples/gallery/src/gallery_content/stories/animation_curves.rs) |
+| `Examples/Sources/GalleryContent/Stories/Foundation/AnimationSystem.swift` | 81 | [examples/gallery/src/gallery_content/stories/animation_system.rs](../examples/gallery/src/gallery_content/stories/animation_system.rs) |
+| `Examples/Sources/GalleryContent/Stories/Foundation/IntrinsicFitting.swift` | 35 | [examples/gallery/src/gallery_content/stories/intrinsic_fitting.rs](../examples/gallery/src/gallery_content/stories/intrinsic_fitting.rs) |
+| `Examples/Sources/GalleryContent/Stories/Foundation/SurfaceTraits.swift` | 70 | [examples/gallery/src/gallery_content/stories/viewport_traits.rs](../examples/gallery/src/gallery_content/stories/viewport_traits.rs) |
+| `Examples/Sources/GalleryContent/Stories/Foundation/ThemeStory.swift` | 89 | [examples/gallery/src/gallery_content/stories/theme.rs](../examples/gallery/src/gallery_content/stories/theme.rs) |
+| `Examples/Sources/GalleryContent/Stories/Layout/DrawerStory.swift` | 56 | [examples/gallery/src/gallery_content/stories/navigation_layout_stories.rs](../examples/gallery/src/gallery_content/stories/navigation_layout_stories.rs) |
+| `Examples/Sources/GalleryContent/Stories/Layout/FoundationExamples.swift` | 134 | [examples/gallery/src/gallery_content/stories/layout.rs](../examples/gallery/src/gallery_content/stories/layout.rs) |
+| `Examples/Sources/GalleryContent/Stories/Layout/GridColumns.swift` | 53 | [crates/compose/src/primitives/layout/grid/columns.rs](../crates/compose/src/primitives/layout/grid/columns.rs) |
+| `Examples/Sources/GalleryContent/Stories/Layout/ImageStory.swift` | 80 | [examples/gallery/src/gallery_content/stories/image_story.rs](../examples/gallery/src/gallery_content/stories/image_story.rs) |
+| `Examples/Sources/GalleryContent/Stories/Layout/LayoutStories.swift` | 396 | [examples/gallery/src/gallery_content/stories/animation.rs](../examples/gallery/src/gallery_content/stories/animation.rs) |
+| `Examples/Sources/GalleryContent/Stories/Layout/MasonryStory.swift` | 81 | [examples/gallery/src/gallery_content/stories/layout.rs](../examples/gallery/src/gallery_content/stories/layout.rs) |
+| `Examples/Sources/GalleryContent/Stories/Layout/NavigationStories.swift` | 291 | [examples/gallery/src/gallery_content/stories/navigation_stories_file.rs](../examples/gallery/src/gallery_content/stories/navigation_stories_file.rs) |
+| `Examples/Sources/GalleryContent/Stories/Layout/NestedSidebarExample.swift` | 56 | [examples/gallery/src/gallery_content/stories/sidebar_stories.rs](../examples/gallery/src/gallery_content/stories/sidebar_stories.rs) |
+| `Examples/Sources/GalleryContent/Stories/Layout/OverlayStories.swift` | 199 | [examples/gallery/src/gallery_content/stories/overlay_stories_file.rs](../examples/gallery/src/gallery_content/stories/overlay_stories_file.rs) |
+| `Examples/Sources/GalleryContent/Stories/Layout/ProductStories.swift` | 152 | [examples/gallery/src/gallery_content/stories/product_stories.rs](../examples/gallery/src/gallery_content/stories/product_stories.rs) |
+| `Examples/Sources/GalleryContent/Stories/Layout/RailStory.swift` | 84 | [examples/gallery/src/gallery_content/stories/navigation_layout_stories.rs](../examples/gallery/src/gallery_content/stories/navigation_layout_stories.rs) |
+| `Examples/Sources/GalleryContent/Stories/Layout/ResizableSidebarExample.swift` | 31 | [examples/gallery/src/gallery_content/stories/sidebar_stories.rs](../examples/gallery/src/gallery_content/stories/sidebar_stories.rs) |
+| `Examples/Sources/GalleryContent/Stories/Layout/SidebarStory.swift` | 118 | [examples/gallery/src/gallery_content/stories/sidebar_story.rs](../examples/gallery/src/gallery_content/stories/sidebar_story.rs) |
+| `Examples/Sources/GalleryContent/Stories/Navigation/AppBarStory.swift` | 53 | [examples/gallery/src/gallery_content/stories/navigation_stories.rs](../examples/gallery/src/gallery_content/stories/navigation_stories.rs) |
+| `Examples/Sources/GalleryContent/Stories/Overlays/ActionSheetStory.swift` | 75 | [examples/gallery/src/gallery_content/stories/action_sheet_story.rs](../examples/gallery/src/gallery_content/stories/action_sheet_story.rs) |
+| `Examples/Sources/GalleryContent/Stories/Overlays/CommandStory.swift` | 67 | [examples/gallery/src/gallery_content/stories/command_story.rs](../examples/gallery/src/gallery_content/stories/command_story.rs) |
+| `Examples/Sources/GalleryContent/Stories/Overlays/HoverStory.swift` | 50 | [examples/gallery/src/gallery_content/stories/overlay_stories.rs](../examples/gallery/src/gallery_content/stories/overlay_stories.rs) |
+| `Examples/Sources/GalleryContent/Stories/Overlays/Popconfirm/PlacementExample.swift` | 73 | [examples/gallery/src/gallery_content/stories/placement_example.rs](../examples/gallery/src/gallery_content/stories/placement_example.rs) |
+| `Examples/Sources/GalleryContent/Stories/Overlays/PopconfirmStory.swift` | 74 | [examples/gallery/src/gallery_content/stories/overlay_stories.rs](../examples/gallery/src/gallery_content/stories/overlay_stories.rs) |
+| `Examples/Sources/GalleryContent/Stories/Overview/Dashboard.swift` | 105 | [examples/gallery/src/gallery_content/stories/overview.rs](../examples/gallery/src/gallery_content/stories/overview.rs) |
+| `Examples/Sources/GalleryContent/Stories/Overview/MetricCard.swift` | 49 | [examples/gallery/src/gallery_content/stories/overview.rs](../examples/gallery/src/gallery_content/stories/overview.rs) |
+| `Examples/Sources/PetDemo/main.swift` | 111 | [examples/counter/src/main.rs](../examples/counter/src/main.rs) |
+| `Graphics/Sources/CoveUIGraphics/Exports.swift` | 2 | [crates/logging/src/exports.rs](../crates/logging/src/exports.rs)<br>[crates/logging/src/logging_exports.rs](../crates/logging/src/logging_exports.rs) |
+| `Graphics/Sources/CoveUIGraphics/Images/TextureImage.swift` | 26 | [crates/graphics/src/ui/texture_image.rs](../crates/graphics/src/ui/texture_image.rs) |
+| `Graphics/Sources/CoveUIGraphics/Images/UIAssetResidency.swift` | 33 | [crates/graphics/src/ui/asset_residency.rs](../crates/graphics/src/ui/asset_residency.rs) |
+| `Graphics/Sources/CoveUIGraphics/NativeUIViewport.swift` | 44 | [crates/graphics/src/ui/viewport.rs](../crates/graphics/src/ui/viewport.rs) |
+| `Graphics/Sources/CoveUIGraphics/Rendering/DrawGeometry.swift` | 99 | [crates/graphics/src/ui/draw_geometry.rs](../crates/graphics/src/ui/draw_geometry.rs) |
+| `Graphics/Sources/CoveUIGraphics/Rendering/NativeDrawListRenderer.swift` | 473 | [crates/graphics/src/ui/draw_list_renderer.rs](../crates/graphics/src/ui/draw_list_renderer.rs) |
+| `Graphics/Sources/CoveUIGraphics/Rendering/NativeUIBackdropPass.swift` | 531 | [crates/graphics/src/ui/backdrop_pass.rs](../crates/graphics/src/ui/backdrop_pass.rs) |
+| `Graphics/Sources/CoveUIGraphics/Rendering/NativeUIRasterWorkspace.swift` | 59 | [crates/graphics/src/ui/raster_workspace.rs](../crates/graphics/src/ui/raster_workspace.rs) |
+| `Graphics/Sources/CoveUIGraphics/Rendering/NativeUIShaderResources.swift` | 75 | [crates/graphics/src/ui/shader_resources.rs](../crates/graphics/src/ui/shader_resources.rs) |
+| `Graphics/Sources/CoveUIGraphics/Rendering/NativeUITextureStore.swift` | 379 | [crates/graphics/src/ui/texture_store.rs](../crates/graphics/src/ui/texture_store.rs) |
+| `Graphics/Sources/CoveUIGraphics/Rendering/Resources.swift` | 9 | [crates/graphics/src/ui/resources.rs](../crates/graphics/src/ui/resources.rs) |
+| `Graphics/Sources/CoveUIGraphics/Text/AtlasUpload.swift` | 27 | [crates/graphics/src/ui/texture_store.rs](../crates/graphics/src/ui/texture_store.rs) |
+| `Graphics/Sources/NativeRHI/BackendFactory.swift` | 32 | [crates/graphics/src/rhi/backend_factory.rs](../crates/graphics/src/rhi/backend_factory.rs) |
+| `Graphics/Sources/NativeRHI/DX12/DX12Backend.swift` | 15 | [crates/graphics/src/dx12/backend.rs](../crates/graphics/src/dx12/backend.rs) |
+| `Graphics/Sources/NativeRHI/DX12/DX12Device.swift` | 94 | [crates/graphics/src/dx12/device.rs](../crates/graphics/src/dx12/device.rs) |
+| `Graphics/Sources/NativeRHI/DX12/DX12Formats.swift` | 32 | [crates/graphics/src/dx12/formats.rs](../crates/graphics/src/dx12/formats.rs) |
+| `Graphics/Sources/NativeRHI/DX12/Resources/DX12Compilation.swift` | 24 | [crates/graphics/src/dx12/resources.rs](../crates/graphics/src/dx12/resources.rs) |
+| `Graphics/Sources/NativeRHI/DX12/Resources/DX12Pipelines.swift` | 74 | [crates/graphics/src/dx12/resources.rs](../crates/graphics/src/dx12/resources.rs) |
+| `Graphics/Sources/NativeRHI/DX12/Resources/DX12Resources.swift` | 92 | [crates/graphics/src/dx12/resources.rs](../crates/graphics/src/dx12/resources.rs) |
+| `Graphics/Sources/NativeRHI/DX12/Submission/DX12Submission.swift` | 144 | [crates/graphics/src/dx12/backend.rs](../crates/graphics/src/dx12/backend.rs) |
+| `Graphics/Sources/NativeRHI/DX12/Submission/DX12Uploader.swift` | 34 | [crates/graphics/src/dx12/resources.rs](../crates/graphics/src/dx12/resources.rs) |
+| `Graphics/Sources/NativeRHI/Device/AsyncResources.swift` | 26 | [crates/graphics/src/rhi/device.rs](../crates/graphics/src/rhi/device.rs) |
+| `Graphics/Sources/NativeRHI/Device/Capabilities.swift` | 45 | [crates/graphics/src/rhi/capabilities.rs](../crates/graphics/src/rhi/capabilities.rs) |
+| `Graphics/Sources/NativeRHI/Device/Commands.swift` | 353 | [crates/graphics/src/rhi/commands.rs](../crates/graphics/src/rhi/commands.rs) |
+| `Graphics/Sources/NativeRHI/Device/Descriptors.swift` | 507 | [crates/graphics/src/rhi/descriptors.rs](../crates/graphics/src/rhi/descriptors.rs) |
+| `Graphics/Sources/NativeRHI/Device/Device.swift` | 937 | [crates/graphics/src/rhi/device.rs](../crates/graphics/src/rhi/device.rs) |
+| `Graphics/Sources/NativeRHI/Device/Handles.swift` | 25 | [crates/graphics/src/rhi/handles.rs](../crates/graphics/src/rhi/handles.rs) |
+| `Graphics/Sources/NativeRHI/Device/PipelineCache.swift` | 295 | [crates/graphics/src/rhi/pipeline_cache.rs](../crates/graphics/src/rhi/pipeline_cache.rs) |
+| `Graphics/Sources/NativeRHI/Device/Queue.swift` | 24 | [crates/graphics/src/rhi/queue.rs](../crates/graphics/src/rhi/queue.rs) |
+| `Graphics/Sources/NativeRHI/Device/ResourcePreparation.swift` | 120 | [crates/graphics/src/rhi/resource_preparation.rs](../crates/graphics/src/rhi/resource_preparation.rs) |
+| `Graphics/Sources/NativeRHI/Metal/Bindings/MetalBindingRegistry.swift` | 33 | [crates/graphics/src/metal/registries.rs](../crates/graphics/src/metal/registries.rs) |
+| `Graphics/Sources/NativeRHI/Metal/Bindings/MetalLibraryCache.swift` | 62 | [crates/graphics/src/metal/library_cache.rs](../crates/graphics/src/metal/library_cache.rs) |
+| `Graphics/Sources/NativeRHI/Metal/Bindings/MetalRegistries.swift` | 129 | [crates/graphics/src/metal/registries.rs](../crates/graphics/src/metal/registries.rs) |
+| `Graphics/Sources/NativeRHI/Metal/Bindings/MetalRenderBindings.swift` | 46 | [crates/graphics/src/metal/render_bindings.rs](../crates/graphics/src/metal/render_bindings.rs) |
+| `Graphics/Sources/NativeRHI/Metal/Device/MetalCompilation.swift` | 12 | [crates/graphics/src/metal/backend.rs](../crates/graphics/src/metal/backend.rs) |
+| `Graphics/Sources/NativeRHI/Metal/Device/MetalDeviceResources.swift` | 275 | [crates/graphics/src/metal/resources.rs](../crates/graphics/src/metal/resources.rs) |
+| `Graphics/Sources/NativeRHI/Metal/Device/MetalDeviceTransfer.swift` | 299 | [crates/graphics/src/metal/transfer.rs](../crates/graphics/src/metal/transfer.rs) |
+| `Graphics/Sources/NativeRHI/Metal/Device/MetalUploadRing.swift` | 55 | [crates/graphics/src/metal/upload_ring.rs](../crates/graphics/src/metal/upload_ring.rs) |
+| `Graphics/Sources/NativeRHI/Metal/MetalAccelerationStructure.swift` | 97 | [crates/graphics/src/metal/acceleration.rs](../crates/graphics/src/metal/acceleration.rs) |
+| `Graphics/Sources/NativeRHI/Metal/MetalBackend.swift` | 16 | [crates/graphics/src/metal/backend.rs](../crates/graphics/src/metal/backend.rs) |
+| `Graphics/Sources/NativeRHI/Metal/MetalDevice.swift` | 208 | [crates/graphics/src/metal/device.rs](../crates/graphics/src/metal/device.rs) |
+| `Graphics/Sources/NativeRHI/Metal/MetalFormats.swift` | 232 | [crates/graphics/src/metal/formats.rs](../crates/graphics/src/metal/formats.rs) |
+| `Graphics/Sources/NativeRHI/Metal/Pipelines/MetalMeshPipeline.swift` | 86 | [crates/graphics/src/metal/registries.rs](../crates/graphics/src/metal/registries.rs) |
+| `Graphics/Sources/NativeRHI/Metal/Pipelines/MetalSubmissionStatus.swift` | 20 | [crates/graphics/src/metal/submission_status.rs](../crates/graphics/src/metal/submission_status.rs) |
+| `Graphics/Sources/NativeRHI/Metal/Pipelines/MetalSubmitEncoder.swift` | 610 | [crates/graphics/src/metal/backend.rs](../crates/graphics/src/metal/backend.rs)<br>[crates/graphics/src/metal/submit.rs](../crates/graphics/src/metal/submit.rs) |
+| `Graphics/Sources/NativeRHI/NativeRHI.swift` | 61 | [crates/graphics/src/rhi/mod.rs](../crates/graphics/src/rhi/mod.rs) |
+| `Graphics/Sources/NativeRHI/RHIBackend.swift` | 133 | [crates/graphics/src/rhi/backend.rs](../crates/graphics/src/rhi/backend.rs) |
+| `Graphics/Sources/NativeRHI/RHIError.swift` | 39 | [crates/graphics/src/rhi/error.rs](../crates/graphics/src/rhi/error.rs) |
+| `Graphics/Sources/NativeRHI/RHITypes.swift` | 229 | [crates/graphics/src/rhi/types.rs](../crates/graphics/src/rhi/types.rs) |
+| `Graphics/Sources/NativeRHI/Resources/AccelerationStructure.swift` | 40 | [crates/graphics/src/rhi/resources.rs](../crates/graphics/src/rhi/resources.rs) |
+| `Graphics/Sources/NativeRHI/Resources/BackgroundCompilation.swift` | 33 | [crates/graphics/src/rhi/resources.rs](../crates/graphics/src/rhi/resources.rs) |
+| `Graphics/Sources/NativeRHI/Resources/MeshPipeline.swift` | 23 | [crates/graphics/src/rhi/descriptors.rs](../crates/graphics/src/rhi/descriptors.rs) |
+| `Graphics/Sources/NativeRHI/Resources/PipelineInterface.swift` | 66 | [crates/graphics/src/rhi/pipeline_interface.rs](../crates/graphics/src/rhi/pipeline_interface.rs) |
+| `Graphics/Sources/NativeRHI/Resources/PresentationMode.swift` | 16 | [crates/graphics/src/rhi/presentation.rs](../crates/graphics/src/rhi/presentation.rs) |
+| `Graphics/Sources/NativeRHI/Resources/ShaderArtifact.swift` | 113 | [crates/graphics/src/rhi/shader_artifact.rs](../crates/graphics/src/rhi/shader_artifact.rs) |
+| `Graphics/Sources/NativeRHI/Resources/ShaderArtifactLoading.swift` | 47 | [crates/graphics/src/rhi/shader_artifact_loading.rs](../crates/graphics/src/rhi/shader_artifact_loading.rs) |
+| `Graphics/Sources/NativeRHI/Resources/ShaderSpecialization.swift` | 48 | [crates/graphics/src/rhi/specialization.rs](../crates/graphics/src/rhi/specialization.rs) |
+| `Graphics/Sources/NativeRHI/Resources/ShaderVisibility.swift` | 16 | [crates/graphics/src/rhi/visibility.rs](../crates/graphics/src/rhi/visibility.rs) |
+| `Graphics/Sources/NativeRHI/Resources/SwapchainResource.swift` | 19 | [crates/graphics/src/rhi/resource_ownership.rs](../crates/graphics/src/rhi/resource_ownership.rs) |
+| `Graphics/Sources/NativeRHI/Resources/TextureAllocation.swift` | 15 | [crates/graphics/src/rhi/resources.rs](../crates/graphics/src/rhi/resources.rs) |
+| `Graphics/Sources/NativeRHI/Resources/TextureBufferUpload.swift` | 14 | [crates/graphics/src/rhi/commands.rs](../crates/graphics/src/rhi/commands.rs) |
+| `Graphics/Sources/NativeRHI/Resources/TextureResource.swift` | 17 | [crates/graphics/src/rhi/resource_ownership.rs](../crates/graphics/src/rhi/resource_ownership.rs) |
+| `Graphics/Sources/NativeRHI/Resources/TextureUploadRegion.swift` | 7 | [crates/graphics/src/rhi/resources.rs](../crates/graphics/src/rhi/resources.rs) |
+| `Graphics/Sources/NativeRHI/Submission/FrameRing.swift` | 128 | [crates/graphics/src/rhi/submission.rs](../crates/graphics/src/rhi/submission.rs) |
+| `Graphics/Sources/NativeRHI/Submission/GPUTimestampProfile.swift` | 75 | [crates/graphics/src/rhi/submission.rs](../crates/graphics/src/rhi/submission.rs) |
+| `Graphics/Sources/NativeRHI/Submission/Plan.swift` | 103 | [crates/graphics/src/rhi/submission_planner.rs](../crates/graphics/src/rhi/submission_planner.rs) |
+| `Graphics/Sources/NativeRHI/Submission/SubmissionCPUProfile.swift` | 63 | [crates/graphics/src/rhi/submission.rs](../crates/graphics/src/rhi/submission.rs) |
+| `Graphics/Sources/NativeRHI/Submission/SubmissionPlanner.swift` | 786 | [crates/graphics/src/rhi/submission_planner.rs](../crates/graphics/src/rhi/submission_planner.rs) |
+| `Graphics/Sources/NativeRHI/Submission/UploadRing.swift` | 109 | [crates/graphics/src/rhi/submission.rs](../crates/graphics/src/rhi/submission.rs) |
+| `Graphics/Sources/NativeRHI/Validation/AccessTracker.swift` | 207 | [crates/graphics/src/rhi/access_tracker.rs](../crates/graphics/src/rhi/access_tracker.rs) |
+| `Graphics/Sources/NativeRHI/Validation/Caches.swift` | 249 | [crates/graphics/src/rhi/caches.rs](../crates/graphics/src/rhi/caches.rs) |
+| `Graphics/Sources/NativeRHI/Validation/PipelineValidation.swift` | 101 | [crates/graphics/src/rhi/pipeline_validation.rs](../crates/graphics/src/rhi/pipeline_validation.rs) |
+| `Graphics/Sources/NativeRHI/Validation/ReflectedBindingLayout.swift` | 24 | [crates/graphics/src/rhi/shader_artifact.rs](../crates/graphics/src/rhi/shader_artifact.rs) |
+| `Graphics/Sources/NativeRHI/Validation/RenderAttachmentValidation.swift` | 82 | [crates/graphics/src/rhi/validation.rs](../crates/graphics/src/rhi/validation.rs) |
+| `Graphics/Sources/NativeRHI/Validation/ResourceValidation.swift` | 62 | [crates/graphics/src/rhi/validation.rs](../crates/graphics/src/rhi/validation.rs) |
+| `Graphics/Sources/NativeRHI/Validation/StateTracker.swift` | 108 | [crates/graphics/src/rhi/state_tracker.rs](../crates/graphics/src/rhi/state_tracker.rs) |
+| `Graphics/Sources/NativeRHI/Vulkan/Backend/Bindings.swift` | 147 | [crates/graphics/src/metal/library_cache.rs](../crates/graphics/src/metal/library_cache.rs)<br>[crates/graphics/src/metal/mod.rs](../crates/graphics/src/metal/mod.rs)<br>[crates/graphics/src/metal/registries.rs](../crates/graphics/src/metal/registries.rs) |
+| `Graphics/Sources/NativeRHI/Vulkan/Backend/Encoder.swift` | 324 | [crates/graphics/src/vulkan/submission.rs](../crates/graphics/src/vulkan/submission.rs) |
+| `Graphics/Sources/NativeRHI/Vulkan/Backend/Pipelines.swift` | 179 | [crates/graphics/src/vulkan/pipelines.rs](../crates/graphics/src/vulkan/pipelines.rs) |
+| `Graphics/Sources/NativeRHI/Vulkan/Backend/Submit.swift` | 405 | [crates/graphics/src/metal/submit.rs](../crates/graphics/src/metal/submit.rs) |
+| `Graphics/Sources/NativeRHI/Vulkan/Backend/Timestamps.swift` | 149 | [crates/graphics/src/vulkan/submission.rs](../crates/graphics/src/vulkan/submission.rs) |
+| `Graphics/Sources/NativeRHI/Vulkan/Backend/VulkanBackendResources.swift` | 339 | [crates/graphics/src/vulkan/resources.rs](../crates/graphics/src/vulkan/resources.rs) |
+| `Graphics/Sources/NativeRHI/Vulkan/Backend/VulkanBackendTransfer.swift` | 258 | [crates/graphics/src/vulkan/submission.rs](../crates/graphics/src/vulkan/submission.rs)<br>[crates/graphics/src/vulkan/backend.rs](../crates/graphics/src/vulkan/backend.rs) |
+| `Graphics/Sources/NativeRHI/Vulkan/Backend/VulkanCompilation.swift` | 12 | [crates/graphics/src/vulkan/backend.rs](../crates/graphics/src/vulkan/backend.rs) |
+| `Graphics/Sources/NativeRHI/Vulkan/Presentation/PresentMode.swift` | 11 | [crates/graphics/src/vulkan/presentation.rs](../crates/graphics/src/vulkan/presentation.rs) |
+| `Graphics/Sources/NativeRHI/Vulkan/Presentation/SurfaceState.swift` | 7 | [crates/hosts/src/android/integration/surface/state.rs](../crates/hosts/src/android/integration/surface/state.rs) |
+| `Graphics/Sources/NativeRHI/Vulkan/Presentation/VulkanPresentation.swift` | 24 | [crates/graphics/src/vulkan/presentation.rs](../crates/graphics/src/vulkan/presentation.rs) |
+| `Graphics/Sources/NativeRHI/Vulkan/Presentation/VulkanSwapchain.swift` | 319 | [crates/graphics/src/vulkan/presentation.rs](../crates/graphics/src/vulkan/presentation.rs) |
+| `Graphics/Sources/NativeRHI/Vulkan/Presentation/VulkanSynchronization.swift` | 107 | [crates/graphics/src/vulkan/presentation.rs](../crates/graphics/src/vulkan/presentation.rs) |
+| `Graphics/Sources/NativeRHI/Vulkan/Resources/VulkanAcceleration.swift` | 154 | [crates/graphics/src/vulkan/acceleration.rs](../crates/graphics/src/vulkan/acceleration.rs) |
+| `Graphics/Sources/NativeRHI/Vulkan/Resources/VulkanMemory.swift` | 206 | [crates/graphics/src/vulkan/memory.rs](../crates/graphics/src/vulkan/memory.rs) |
+| `Graphics/Sources/NativeRHI/Vulkan/Resources/VulkanMesh.swift` | 44 | [crates/graphics/src/vulkan/registries.rs](../crates/graphics/src/vulkan/registries.rs) |
+| `Graphics/Sources/NativeRHI/Vulkan/Resources/VulkanResources.swift` | 100 | [crates/graphics/src/vulkan/resources.rs](../crates/graphics/src/vulkan/resources.rs) |
+| `Graphics/Sources/NativeRHI/Vulkan/Setup/VulkanDeviceSetup.swift` | 373 | [crates/graphics/src/vulkan/setup.rs](../crates/graphics/src/vulkan/setup.rs) |
+| `Graphics/Sources/NativeRHI/Vulkan/Setup/VulkanInstanceSetup.swift` | 84 | [crates/graphics/src/vulkan/setup.rs](../crates/graphics/src/vulkan/setup.rs) |
+| `Graphics/Sources/NativeRHI/Vulkan/Submission/CommandPool.swift` | 32 | [crates/graphics/src/vulkan/submission.rs](../crates/graphics/src/vulkan/submission.rs) |
+| `Graphics/Sources/NativeRHI/Vulkan/Submission/VulkanCleanup.swift` | 32 | [crates/graphics/src/vulkan/setup.rs](../crates/graphics/src/vulkan/setup.rs) |
+| `Graphics/Sources/NativeRHI/Vulkan/Submission/VulkanScratch.swift` | 28 | [crates/graphics/src/vulkan/pipelines.rs](../crates/graphics/src/vulkan/pipelines.rs) |
+| `Graphics/Sources/NativeRHI/Vulkan/Submission/VulkanSubmissionStatus.swift` | 10 | [crates/graphics/src/vulkan/status.rs](../crates/graphics/src/vulkan/status.rs) |
+| `Graphics/Sources/NativeRHI/Vulkan/Submission/VulkanUploadRing.swift` | 32 | [crates/graphics/src/vulkan/submission.rs](../crates/graphics/src/vulkan/submission.rs) |
+| `Graphics/Sources/NativeRHI/Vulkan/VulkanAdvanced.swift` | 37 | [crates/graphics/src/vulkan/sys.rs](../crates/graphics/src/vulkan/sys.rs) |
+| `Graphics/Sources/NativeRHI/Vulkan/VulkanAuxiliary.swift` | 52 | [crates/graphics/src/vulkan/formats.rs](../crates/graphics/src/vulkan/formats.rs) |
+| `Graphics/Sources/NativeRHI/Vulkan/VulkanBackend.swift` | 175 | [crates/graphics/src/vulkan/backend.rs](../crates/graphics/src/vulkan/backend.rs) |
+| `Graphics/Sources/NativeRHI/Vulkan/VulkanFormats.swift` | 148 | [crates/graphics/src/vulkan/formats.rs](../crates/graphics/src/vulkan/formats.rs) |
+| `Graphics/Sources/NativeRHI/Vulkan/VulkanFunctions.swift` | 687 | [crates/graphics/src/vulkan/sys.rs](../crates/graphics/src/vulkan/sys.rs) |
+| `Graphics/Sources/NativeRHI/Vulkan/VulkanRendering.swift` | 149 | [crates/graphics/src/vulkan/rendering.rs](../crates/graphics/src/vulkan/rendering.rs) |
+| `Graphics/Sources/NativeRHI/Vulkan/VulkanRuntime.swift` | 67 | [crates/graphics/src/vulkan/backend.rs](../crates/graphics/src/vulkan/backend.rs)<br>[crates/graphics/src/vulkan/setup.rs](../crates/graphics/src/vulkan/setup.rs) |
+| `Hosts/Android/Contract/Sources/CoveAndroidContract/FrameClock.swift` | 21 | [crates/hosts/src/android/contract/frame_clock.rs](../crates/hosts/src/android/contract/frame_clock.rs) |
+| `Hosts/Android/Contract/Sources/CoveAndroidContract/Launch.swift` | 14 | [crates/hosts/src/android/contract/launch.rs](../crates/hosts/src/android/contract/launch.rs) |
+| `Hosts/Android/Integration/Diagnostics.swift` | 54 | [crates/hosts/src/android/integration/diagnostics.rs](../crates/hosts/src/android/integration/diagnostics.rs) |
+| `Hosts/Android/Integration/Environment.swift` | 45 | [crates/hosts/src/android/integration/environment.rs](../crates/hosts/src/android/integration/environment.rs) |
+| `Hosts/Android/Integration/Inspection.swift` | 21 | [crates/hosts/src/android/integration/inspection.rs](../crates/hosts/src/android/integration/inspection.rs) |
+| `Hosts/Android/Integration/Scene.swift` | 196 | [crates/hosts/src/android/integration/scene.rs](../crates/hosts/src/android/integration/scene.rs) |
+| `Hosts/Android/Integration/Surface/State.swift` | 56 | [crates/hosts/src/android/integration/surface/state.rs](../crates/hosts/src/android/integration/surface/state.rs) |
+| `Hosts/Android/Integration/TouchInput.swift` | 52 | [crates/hosts/src/android/integration/touch_input.rs](../crates/hosts/src/android/integration/touch_input.rs) |
+| `Hosts/Android/Sources/CoveAndroidApp/Application.swift` | 39 | [crates/hosts/src/android/sources/cove_android_app/application.rs](../crates/hosts/src/android/sources/cove_android_app/application.rs) |
+| `Hosts/Android/Sources/CoveAndroidApp/Bridge.swift` | 185 | [crates/hosts/src/android/sources/cove_android_app/bridge.rs](../crates/hosts/src/android/sources/cove_android_app/bridge.rs) |
+| `Hosts/Android/Sources/CoveAndroidApp/Content/InputSnapshot.swift` | 17 | [crates/hosts/src/android/sources/cove_android_app/content/inspection.rs](../crates/hosts/src/android/sources/cove_android_app/content/inspection.rs) |
+| `Hosts/Android/Sources/CoveAndroidApp/Content/Inspection.swift` | 29 | [crates/hosts/src/android/sources/cove_android_app/content/inspection.rs](../crates/hosts/src/android/sources/cove_android_app/content/inspection.rs) |
+| `Hosts/Android/Sources/CoveAndroidApp/Content/Scene.swift` | 157 | [crates/hosts/src/android/sources/cove_android_app/content/scene.rs](../crates/hosts/src/android/sources/cove_android_app/content/scene.rs) |
+| `Hosts/Android/Sources/CoveAndroidApp/Frame/GPUTimings.swift` | 85 | [crates/hosts/src/android/sources/cove_android_app/frame/gpu_timings.rs](../crates/hosts/src/android/sources/cove_android_app/frame/gpu_timings.rs) |
+| `Hosts/Android/Sources/CoveAndroidApp/Frame/RuntimeOptions.swift` | 29 | [crates/hosts/src/android/sources/cove_android_app/frame/runtime_options.rs](../crates/hosts/src/android/sources/cove_android_app/frame/runtime_options.rs) |
+| `Hosts/Android/Sources/CoveAndroidApp/Frame/Timings.swift` | 46 | [crates/hosts/src/android/sources/cove_android_app/frame/timings.rs](../crates/hosts/src/android/sources/cove_android_app/frame/timings.rs) |
+| `Hosts/Android/Sources/CoveAndroidApp/SurfaceSession.swift` | 92 | [crates/hosts/src/android/sources/cove_android_app/surface_session.rs](../crates/hosts/src/android/sources/cove_android_app/surface_session.rs) |
+| `Hosts/Android/Sources/CoveAndroidApp/Validation/Counter/Typography.swift` | 43 | [crates/hosts/src/android/sources/cove_android_app/validation/counter/typography.rs](../crates/hosts/src/android/sources/cove_android_app/validation/counter/typography.rs) |
+| `Hosts/Android/Sources/CoveAndroidApp/Validation/Showcase.swift` | 37 | [crates/hosts/src/android/sources/cove_android_app/validation/showcase.rs](../crates/hosts/src/android/sources/cove_android_app/validation/showcase.rs) |
+| `Hosts/Android/Sources/CoveAndroidProbe/Layout.swift` | 20 | [crates/hosts/src/android/probe/layout.rs](../crates/hosts/src/android/probe/layout.rs) |
+| `Hosts/Android/Sources/CoveAndroidProbe/Raster.swift` | 58 | [crates/hosts/src/android/probe/raster.rs](../crates/hosts/src/android/probe/raster.rs) |
+| `Hosts/Android/Sources/CoveAndroidProbe/Runner.swift` | 55 | [crates/hosts/src/android/probe/runner.rs](../crates/hosts/src/android/probe/runner.rs) |
+| `Hosts/Android/Sources/CoveAndroidProbe/Transfer.swift` | 43 | [crates/hosts/src/android/probe/transfer.rs](../crates/hosts/src/android/probe/transfer.rs) |
+| `Hosts/Android/Sources/CoveAndroidProbe/UI.swift` | 50 | [crates/hosts/src/android/probe/ui.rs](../crates/hosts/src/android/probe/ui.rs) |
+| `Hosts/Android/Sources/CoveAndroidProbe/main.swift` | 45 | [crates/hosts/src/android/probe/main.rs](../crates/hosts/src/android/probe/main.rs) |
+| `Hosts/Desktop/Sources/CoveUI/Application/AdaptiveContent.swift` | 15 | [crates/hosts/src/desktop/application/typography.rs](../crates/hosts/src/desktop/application/typography.rs) |
+| `Hosts/Desktop/Sources/CoveUI/Application/Callbacks.swift` | 10 | [crates/hosts/src/desktop/application/runtime.rs](../crates/hosts/src/desktop/application/runtime.rs) |
+| `Hosts/Desktop/Sources/CoveUI/Application/Composition.swift` | 22 | [crates/hosts/src/desktop/application/composition.rs](../crates/hosts/src/desktop/application/composition.rs) |
+| `Hosts/Desktop/Sources/CoveUI/Application/Configuration.swift` | 100 | [crates/hosts/src/desktop/application/configuration.rs](../crates/hosts/src/desktop/application/configuration.rs) |
+| `Hosts/Desktop/Sources/CoveUI/Application/Memory.swift` | 94 | [crates/hosts/src/desktop/application/memory.rs](../crates/hosts/src/desktop/application/memory.rs) |
+| `Hosts/Desktop/Sources/CoveUI/Application/MemoryPressureProbe.swift` | 69 | [crates/hosts/src/desktop/application/memory.rs](../crates/hosts/src/desktop/application/memory.rs) |
+| `Hosts/Desktop/Sources/CoveUI/Application/Runtime.swift` | 911 | [crates/hosts/src/desktop/application/runtime.rs](../crates/hosts/src/desktop/application/runtime.rs) |
+| `Hosts/Desktop/Sources/CoveUI/Application/Services.swift` | 31 | [crates/hosts/src/desktop/application/services.rs](../crates/hosts/src/desktop/application/services.rs) |
+| `Hosts/Desktop/Sources/CoveUI/Application/Typography.swift` | 7 | [crates/hosts/src/desktop/application/typography.rs](../crates/hosts/src/desktop/application/typography.rs) |
+| `Hosts/Desktop/Sources/CoveUI/Diagnostics/Checkpoint.swift` | 13 | [crates/hosts/src/desktop/diagnostics/checkpoint.rs](../crates/hosts/src/desktop/diagnostics/checkpoint.rs) |
+| `Hosts/Desktop/Sources/CoveUI/Diagnostics/FrameMetrics.swift` | 44 | [crates/hosts/src/desktop/diagnostics/frame_metrics.rs](../crates/hosts/src/desktop/diagnostics/frame_metrics.rs) |
+| `Hosts/Desktop/Sources/CoveUI/Diagnostics/PerformanceHUD.swift` | 30 | [crates/hosts/src/desktop/diagnostics/performance_hud.rs](../crates/hosts/src/desktop/diagnostics/performance_hud.rs) |
+| `Hosts/Desktop/Sources/CoveUI/Diagnostics/Recording.swift` | 40 | [crates/hosts/src/desktop/diagnostics/recording.rs](../crates/hosts/src/desktop/diagnostics/recording.rs) |
+| `Hosts/Desktop/Sources/CoveUI/Diagnostics/Session.swift` | 7 | [crates/hosts/src/desktop/diagnostics/session.rs](../crates/hosts/src/desktop/diagnostics/session.rs) |
+| `Hosts/Desktop/Sources/CoveUI/Display/Controls.swift` | 30 | [crates/hosts/src/desktop/display/controls.rs](../crates/hosts/src/desktop/display/controls.rs) |
+| `Hosts/Desktop/Sources/CoveUI/Display/Handle.swift` | 303 | [crates/hosts/src/desktop/display/handle.rs](../crates/hosts/src/desktop/display/handle.rs) |
+| `Hosts/Desktop/Sources/CoveUI/Exports.swift` | 7 | [crates/logging/src/exports.rs](../crates/logging/src/exports.rs) |
+| `Hosts/Desktop/Sources/CoveUI/Rendering/Context.swift` | 45 | [crates/hosts/src/desktop/rendering/context.rs](../crates/hosts/src/desktop/rendering/context.rs) |
+| `Hosts/Desktop/Sources/CoveUI/ResourcesSupport/Bundle.swift` | 9 | [crates/compose/src/primitives/media/ui_icon_catalog.rs](../crates/compose/src/primitives/media/ui_icon_catalog.rs)<br>[crates/compose/src/resource_bundle.rs](../crates/compose/src/resource_bundle.rs) |
+| `Hosts/Desktop/Sources/CoveUI/ResourcesSupport/Lookup.swift` | 6 | [crates/hosts/src/desktop/resources_support/mod.rs](../crates/hosts/src/desktop/resources_support/mod.rs) |
+| `Hosts/Desktop/Sources/CoveUI/Window/Auxiliary.swift` | 202 | [crates/hosts/src/desktop/window/auxiliary.rs](../crates/hosts/src/desktop/window/auxiliary.rs) |
+| `Hosts/Desktop/Sources/CoveUI/Window/NativeMenu.swift` | 228 | [crates/hosts/src/desktop/window/native_menu.rs](../crates/hosts/src/desktop/window/native_menu.rs) |
+| `Hosts/Desktop/Sources/CoveUI/Window/NativeRenderer.swift` | 115 | [crates/hosts/src/desktop/window/native_renderer.rs](../crates/hosts/src/desktop/window/native_renderer.rs) |
+| `Hosts/Desktop/Sources/CoveUI/Window/Renderer.swift` | 15 | [crates/core/src/scene/layer_aware_node_renderer.rs](../crates/core/src/scene/layer_aware_node_renderer.rs)<br>[crates/core/src/scene/node_renderer.rs](../crates/core/src/scene/node_renderer.rs)<br>[crates/hosts/src/desktop/window/native_renderer.rs](../crates/hosts/src/desktop/window/native_renderer.rs) |
+| `Hosts/Desktop/Sources/CoveUI/Window/State.swift` | 15 | [crates/hosts/src/desktop/window/state.rs](../crates/hosts/src/desktop/window/state.rs) |
+| `Hosts/Desktop/Sources/CoveUI/Window/WindowChrome.swift` | 397 | [crates/hosts/src/desktop/window/chrome.rs](../crates/hosts/src/desktop/window/chrome.rs) |
+| `Imaging/Sources/CoveUIImaging/Animation.swift` | 74 | [crates/imaging/src/animation.rs](../crates/imaging/src/animation.rs) |
+| `Imaging/Sources/CoveUIImaging/BundleImageResource.swift` | 48 | [crates/imaging/src/bundle_image_resource.rs](../crates/imaging/src/bundle_image_resource.rs) |
+| `Imaging/Sources/CoveUIImaging/Exports.swift` | 1 | [crates/logging/src/exports.rs](../crates/logging/src/exports.rs)<br>[crates/logging/src/logging_exports.rs](../crates/logging/src/logging_exports.rs) |
+| `Imaging/Sources/CoveUIImaging/ImageAssetRegistry.swift` | 175 | [crates/imaging/src/image_asset_registry.rs](../crates/imaging/src/image_asset_registry.rs) |
+| `Imaging/Sources/CoveUIImaging/ImageDecoder.swift` | 194 | [crates/imaging/src/image_decoder.rs](../crates/imaging/src/image_decoder.rs) |
+| `Imaging/Sources/CoveUIImaging/Orientation.swift` | 84 | [crates/imaging/src/orientation.rs](../crates/imaging/src/orientation.rs) |
+| `Imaging/Sources/CoveUIImaging/Progressive.swift` | 42 | [crates/imaging/src/progressive.rs](../crates/imaging/src/progressive.rs) |
+| `Imaging/Sources/CoveUIImaging/Rasterization.swift` | 50 | [crates/imaging/src/rasterization.rs](../crates/imaging/src/rasterization.rs) |
+| `Imaging/Sources/CoveUIImaging/TextureImage.swift` | 29 | [crates/imaging/src/texture_image.rs](../crates/imaging/src/texture_image.rs) |
+| `Logging/Sources/CoveLogCore/Configuration/Configuration.swift` | 117 | [crates/logging/src/configuration.rs](../crates/logging/src/configuration.rs) |
+| `Logging/Sources/CoveLogCore/Configuration/Environment.swift` | 35 | [crates/logging/src/environment.rs](../crates/logging/src/environment.rs) |
+| `Logging/Sources/CoveLogCore/Exports.swift` | 1 | [crates/logging/src/exports.rs](../crates/logging/src/exports.rs) |
+| `Logging/Sources/CoveLogCore/Records/Context.swift` | 12 | [crates/logging/src/context.rs](../crates/logging/src/context.rs) |
+| `Logging/Sources/CoveLogCore/Records/Record.swift` | 79 | [crates/logging/src/record.rs](../crates/logging/src/record.rs) |
+| `Logging/Sources/CoveLogging/Exports.swift` | 1 | [crates/logging/src/logging_exports.rs](../crates/logging/src/logging_exports.rs) |
+| `Logging/Sources/CoveLogging/Outputs/File.swift` | 66 | [crates/logging/src/file.rs](../crates/logging/src/file.rs) |
+| `Logging/Sources/CoveLogging/Outputs/Formatting.swift` | 23 | [crates/logging/src/formatting.rs](../crates/logging/src/formatting.rs) |
+| `Logging/Sources/CoveLogging/Runtime/Executor.swift` | 19 | [crates/logging/src/executor.rs](../crates/logging/src/executor.rs) |
+| `Logging/Sources/CoveLogging/Runtime/Handler.swift` | 25 | [crates/logging/src/handler.rs](../crates/logging/src/handler.rs) |
+| `Logging/Sources/CoveLogging/Runtime/History.swift` | 27 | [crates/logging/src/history.rs](../crates/logging/src/history.rs) |
+| `Logging/Sources/CoveLogging/Runtime/Observation.swift` | 9 | [crates/logging/src/observation.rs](../crates/logging/src/observation.rs) |
+| `Logging/Sources/CoveLogging/Runtime/Runtime.swift` | 180 | [crates/logging/src/runtime.rs](../crates/logging/src/runtime.rs) |
+| `Logging/Sources/CoveLogging/Runtime/Sanitizer.swift` | 46 | [crates/logging/src/sanitizer.rs](../crates/logging/src/sanitizer.rs) |
+| `Logging/Sources/CoveLogging/System.swift` | 65 | [crates/logging/src/system.rs](../crates/logging/src/system.rs) |
+| `PlatformCore/Sources/CovePlatformCore/Cursor.swift` | 25 | [crates/platform/src/lib.rs](../crates/platform/src/lib.rs) |
+| `PlatformCore/Sources/CovePlatformCore/InputEvent.swift` | 284 | [crates/platform/src/lib.rs](../crates/platform/src/lib.rs) |
+| `PlatformCore/Sources/CovePlatformCore/NativeMenuSnapshot.swift` | 65 | [crates/platform/src/lib.rs](../crates/platform/src/lib.rs) |
+| `PlatformCore/Sources/CovePlatformCore/PackageResourceBundle.swift` | 110 | [crates/platform/src/resources.rs](../crates/platform/src/resources.rs) |
+| `PlatformCore/Sources/CovePlatformCore/ScrollInput.swift` | 46 | [crates/platform/src/lib.rs](../crates/platform/src/lib.rs) |
+| `PlatformCore/Sources/CovePlatformCore/WindowID.swift` | 11 | [crates/platform/src/lib.rs](../crates/platform/src/lib.rs) |
+| `Runtime/Sources/CoveUIRuntime/Core/AppBridge.swift` | 34 | [crates/runtime/src/app_bridge.rs](../crates/runtime/src/app_bridge.rs) |
+| `Runtime/Sources/CoveUIRuntime/Core/CoveUIRuntime.swift` | 17 | [crates/runtime/src/lib.rs](../crates/runtime/src/lib.rs) |
+| `Runtime/Sources/CoveUIRuntime/Core/FrameDeadline.swift` | 28 | [crates/runtime/src/frame_deadline.rs](../crates/runtime/src/frame_deadline.rs) |
+| `Runtime/Sources/CoveUIRuntime/Core/FrameDrive.swift` | 24 | [crates/runtime/src/frame_drive.rs](../crates/runtime/src/frame_drive.rs) |
+| `Runtime/Sources/CoveUIRuntime/Core/Log.swift` | 9 | [crates/runtime/src/sdl3_platform_host.rs](../crates/runtime/src/sdl3_platform_host.rs) |
+| `Runtime/Sources/CoveUIRuntime/Core/NativeAccessibility.swift` | 303 | [crates/runtime/src/native_accessibility.rs](../crates/runtime/src/native_accessibility.rs) |
+| `Runtime/Sources/CoveUIRuntime/Core/PlatformHost.swift` | 17 | [crates/runtime/src/platform_host.rs](../crates/runtime/src/platform_host.rs) |
+| `Runtime/Sources/CoveUIRuntime/Core/SDL3PlatformHost.swift` | 993 | [crates/runtime/src/sdl3_platform_host.rs](../crates/runtime/src/sdl3_platform_host.rs) |
+| `Runtime/Sources/CoveUIRuntime/Core/iOS/DisplayDriver.swift` | 22 | [crates/runtime/src/ios/mod.rs](../crates/runtime/src/ios/mod.rs) |
+| `Runtime/Sources/CoveUIRuntime/Exports.swift` | 4 | [crates/logging/src/exports.rs](../crates/logging/src/exports.rs)<br>[crates/logging/src/logging_exports.rs](../crates/logging/src/logging_exports.rs) |
+| `Runtime/Sources/CoveUIRuntime/Rendering/SurfaceFactory.swift` | 34 | [crates/runtime/src/surface_factory.rs](../crates/runtime/src/surface_factory.rs) |
+| `Shell/Sources/PlatformShell/ApplicationEntry.swift` | 34 | [crates/shell/src/application_entry.rs](../crates/shell/src/application_entry.rs) |
+| `Shell/Sources/PlatformShell/Cursor.swift` | 2 | [crates/shell/src/cursor.rs](../crates/shell/src/cursor.rs) |
+| `Shell/Sources/PlatformShell/Diagnostics/SDL.swift` | 18 | [crates/shell/src/diagnostics/mod.rs](../crates/shell/src/diagnostics/mod.rs) |
+| `Shell/Sources/PlatformShell/DisplayRefresh/CoreVideo.swift` | 62 | [crates/shell/src/display_refresh/mod.rs](../crates/shell/src/display_refresh/mod.rs) |
+| `Shell/Sources/PlatformShell/DisplayRefresh/MacDisplayLink.swift` | 29 | [crates/shell/src/display_refresh/mod.rs](../crates/shell/src/display_refresh/mod.rs) |
+| `Shell/Sources/PlatformShell/DisplayRefresh/Signal.swift` | 50 | [crates/shell/src/display_refresh/signal.rs](../crates/shell/src/display_refresh/signal.rs) |
+| `Shell/Sources/PlatformShell/DisplayRefresh/WindowDisplayLink.swift` | 45 | [crates/shell/src/display_refresh/mod.rs](../crates/shell/src/display_refresh/mod.rs) |
+| `Shell/Sources/PlatformShell/Log.swift` | 5 | [crates/shell/src/native.rs](../crates/shell/src/native.rs) |
+| `Shell/Sources/PlatformShell/NativeMenuPopover.swift` | 100 | [crates/shell/src/native_menu_popover.rs](../crates/shell/src/native_menu_popover.rs) |
+| `Shell/Sources/PlatformShell/PlatformShell.swift` | 579 | [crates/shell/src/platform_shell.rs](../crates/shell/src/platform_shell.rs)<br>[crates/shell/src/sdl3_shell.rs](../crates/shell/src/sdl3_shell.rs) |
+| `Shell/Sources/PlatformShell/SDL3Clipboard.swift` | 22 | [crates/shell/src/sdl3_clipboard.rs](../crates/shell/src/sdl3_clipboard.rs) |
+| `Shell/Sources/PlatformShell/SDL3Shell.swift` | 1510 | [crates/shell/src/sdl3_shell.rs](../crates/shell/src/sdl3_shell.rs) |
+| `Shell/Sources/PlatformShell/Scroll/AppKitInput.swift` | 73 | [crates/shell/native/apple.m](../crates/shell/native/apple.m)<br>[crates/shell/src/scroll/mod.rs](../crates/shell/src/scroll/mod.rs) |
+| `Sources/CoveUIWebView/Apple/WebKitHost.swift` | 22 | [crates/addons/src/webview/apple.rs](../crates/addons/src/webview/apple.rs) |
+| `Sources/CoveUIWebView/Apple/WebKitSurface.swift` | 232 | [crates/addons/src/webview/apple.rs](../crates/addons/src/webview/apple.rs)<br>[crates/addons/src/webview/linux.rs](../crates/addons/src/webview/linux.rs) |
+| `Sources/CoveUIWebView/WebView.swift` | 170 | [crates/addons/src/webview/view.rs](../crates/addons/src/webview/view.rs) |
+| `Sources/CoveUIWebView/WebViewHandle.swift` | 51 | [crates/addons/src/webview/mod.rs](../crates/addons/src/webview/mod.rs) |
+| `Sources/CoveUIWebView/WebViewState.swift` | 46 | [crates/addons/src/webview/mod.rs](../crates/addons/src/webview/mod.rs) |
+| `Sources/CoveUIWebView/WebViewSurface.swift` | 77 | [crates/addons/src/webview/mod.rs](../crates/addons/src/webview/mod.rs) |
+| `Sources/CoveUIWorkspace/Icons/CoveUIWorkspaceResourceBundle.swift` | 6 | [crates/compose/src/resource_bundle.rs](../crates/compose/src/resource_bundle.rs) |
+| `Sources/CoveUIWorkspace/Icons/WorkspacePanelIconCatalog.swift` | 17 | [crates/addons/src/workspace/icons.rs](../crates/addons/src/workspace/icons.rs) |
+| `Sources/CoveUIWorkspace/Layout/Split.swift` | 32 | [crates/addons/src/workspace/model.rs](../crates/addons/src/workspace/model.rs) |
+| `Sources/CoveUIWorkspace/Layout/Tree.swift` | 49 | [crates/composition/src/layout_tree.rs](../crates/composition/src/layout_tree.rs)<br>[crates/composition/src/view_graph.rs](../crates/composition/src/view_graph.rs) |
+| `Sources/CoveUIWorkspace/Observation.swift` | 14 | [crates/logging/src/observation.rs](../crates/logging/src/observation.rs) |
+| `Sources/CoveUIWorkspace/Sizing/Panel.swift` | 47 | [crates/compose/src/primitives/layout/panel.rs](../crates/compose/src/primitives/layout/panel.rs) |
+| `Sources/CoveUIWorkspace/Sizing/Resolution.swift` | 172 | [crates/core/src/bidi.rs](../crates/core/src/bidi.rs) |
+| `Sources/CoveUIWorkspace/Theme/TabStyle.swift` | 22 | [crates/addons/src/workspace/tab_style.rs](../crates/addons/src/workspace/tab_style.rs) |
+| `Sources/CoveUIWorkspace/Theme/WorkspaceRegionTransition.swift` | 179 | [crates/addons/src/workspace/view.rs](../crates/addons/src/workspace/view.rs) |
+| `Sources/CoveUIWorkspace/Theme/WorkspaceTheme.swift` | 51 | [crates/addons/src/workspace/theme.rs](../crates/addons/src/workspace/theme.rs) |
+| `Sources/CoveUIWorkspace/WorkspaceController.swift` | 915 | [crates/addons/src/workspace/controller.rs](../crates/addons/src/workspace/controller.rs) |
+| `Sources/CoveUIWorkspace/WorkspaceModel.swift` | 590 | [crates/addons/src/workspace/model.rs](../crates/addons/src/workspace/model.rs) |
+| `Sources/CoveUIWorkspace/WorkspaceView.swift` | 2169 | [crates/addons/src/workspace/workspace_view.rs](../crates/addons/src/workspace/workspace_view.rs) |
+| `System/Sources/CoveFileSystem/AtomicFile.swift` | 27 | [crates/system/src/files.rs](../crates/system/src/files.rs)<br>[crates/system/src/atomic_file.rs](../crates/system/src/atomic_file.rs) |
+| `System/Sources/CoveFileSystem/FileLock.swift` | 20 | [crates/system/src/files.rs](../crates/system/src/files.rs)<br>[crates/system/src/file_lock.rs](../crates/system/src/file_lock.rs) |
+| `System/Sources/CoveFileSystem/Paths.swift` | 140 | [crates/system/src/files.rs](../crates/system/src/files.rs)<br>[crates/system/src/paths.rs](../crates/system/src/paths.rs) |
+| `System/Sources/CoveFileSystem/Permissions.swift` | 28 | [crates/system/src/files.rs](../crates/system/src/files.rs)<br>[crates/system/src/permissions.rs](../crates/system/src/permissions.rs) |
+| `System/Sources/CoveFileSystem/Replacement.swift` | 40 | [crates/system/src/files.rs](../crates/system/src/files.rs)<br>[crates/system/src/replacement.rs](../crates/system/src/replacement.rs) |
+| `System/Sources/CoveFileSystem/Trash.swift` | 20 | [crates/system/src/files.rs](../crates/system/src/files.rs)<br>[crates/system/src/trash.rs](../crates/system/src/trash.rs) |
+| `System/Sources/CoveProcess/Command.swift` | 65 | [crates/system/src/files.rs](../crates/system/src/files.rs)<br>[crates/system/src/command.rs](../crates/system/src/command.rs) |
+| `System/Sources/CoveProcess/EventBuffer.swift` | 98 | [crates/system/src/files.rs](../crates/system/src/files.rs)<br>[crates/system/src/event_buffer.rs](../crates/system/src/event_buffer.rs) |
+| `System/Sources/CoveProcess/IOState.swift` | 29 | [crates/system/src/files.rs](../crates/system/src/files.rs)<br>[crates/system/src/io_state.rs](../crates/system/src/io_state.rs) |
+| `System/Sources/CoveProcess/NativeProcess.swift` | 94 | [crates/system/src/files.rs](../crates/system/src/files.rs)<br>[crates/system/src/native_process.rs](../crates/system/src/native_process.rs) |
+| `System/Sources/CoveProcess/PipeRead.swift` | 48 | [crates/system/src/files.rs](../crates/system/src/files.rs)<br>[crates/system/src/pipe_read.rs](../crates/system/src/pipe_read.rs) |
+| `System/Sources/CoveProcess/Platform.swift` | 34 | [crates/system/src/files.rs](../crates/system/src/files.rs)<br>[crates/system/src/platform.rs](../crates/system/src/platform.rs) |
+| `System/Sources/CoveProcess/Run.swift` | 55 | [crates/system/src/files.rs](../crates/system/src/files.rs)<br>[crates/system/src/run.rs](../crates/system/src/run.rs) |
+| `System/Sources/CoveProcess/Session.swift` | 155 | [crates/system/src/files.rs](../crates/system/src/files.rs)<br>[crates/system/src/session.rs](../crates/system/src/session.rs) |
+| `System/Sources/CoveProcess/ToolLocator.swift` | 53 | [crates/system/src/files.rs](../crates/system/src/files.rs)<br>[crates/system/src/tool_locator.rs](../crates/system/src/tool_locator.rs) |
+| `System/Sources/CoveProcess/WindowsLaunch.swift` | 57 | [crates/system/src/files.rs](../crates/system/src/files.rs)<br>[crates/system/src/windows_launch.rs](../crates/system/src/windows_launch.rs) |
+| `System/Sources/CoveProcessFixture/main.swift` | 41 | [examples/counter/src/main.rs](../examples/counter/src/main.rs) |
+| `Terminal/Sources/CoveUITerminal/Engine/Engine.swift` | 202 | [crates/compose/src/primitives/text/text_field/text_field_layout_engine.rs](../crates/compose/src/primitives/text/text_field/text_field_layout_engine.rs)<br>[crates/addons/src/webview/mod.rs](../crates/addons/src/webview/mod.rs) |
+| `Terminal/Sources/CoveUITerminal/Engine/Frame.swift` | 100 | [crates/terminal/src/engine/frame.rs](../crates/terminal/src/engine/frame.rs) |
+| `Terminal/Sources/CoveUITerminal/Engine/FrameReader.swift` | 140 | [crates/terminal/src/engine/frame_reader.rs](../crates/terminal/src/engine/frame_reader.rs) |
+| `Terminal/Sources/CoveUITerminal/Engine/Hyperlink.swift` | 18 | [crates/terminal/src/engine/hyperlink.rs](../crates/terminal/src/engine/hyperlink.rs) |
+| `Terminal/Sources/CoveUITerminal/Engine/Images.swift` | 136 | [crates/terminal/src/engine/images.rs](../crates/terminal/src/engine/images.rs) |
+| `Terminal/Sources/CoveUITerminal/Engine/KeyEncoder.swift` | 123 | [crates/terminal/src/engine/key_encoder.rs](../crates/terminal/src/engine/key_encoder.rs) |
+| `Terminal/Sources/CoveUITerminal/Engine/Mouse.swift` | 94 | [crates/terminal/src/engine/mouse.rs](../crates/terminal/src/engine/mouse.rs) |
+| `Terminal/Sources/CoveUITerminal/Engine/PlaceholderDiacritics.swift` | 30 | [crates/terminal/src/engine/placeholder_diacritics.rs](../crates/terminal/src/engine/placeholder_diacritics.rs) |
+| `Terminal/Sources/CoveUITerminal/Engine/Placeholders.swift` | 182 | [crates/terminal/src/engine/placeholders.rs](../crates/terminal/src/engine/placeholders.rs) |
+| `Terminal/Sources/CoveUITerminal/Engine/Selection.swift` | 144 | [crates/terminal/src/engine/selection.rs](../crates/terminal/src/engine/selection.rs) |
+| `Terminal/Sources/CoveUITerminal/Engine/Sized.swift` | 7 | [crates/terminal/src/engine/sized.rs](../crates/terminal/src/engine/sized.rs) |
+| `Terminal/Sources/CoveUITerminal/Process/Command.swift` | 77 | [crates/terminal/src/process/command.rs](../crates/terminal/src/process/command.rs) |
+| `Terminal/Sources/CoveUITerminal/Process/ConPTY.swift` | 179 | [crates/terminal/src/lib.rs](../crates/terminal/src/lib.rs)<br>[crates/terminal/src/process/conpty.rs](../crates/terminal/src/process/conpty.rs)<br>[crates/terminal/src/process/windows_command_line.rs](../crates/terminal/src/process/windows_command_line.rs) |
+| `Terminal/Sources/CoveUITerminal/Process/POSIX.swift` | 176 | [crates/terminal/src/process/posix.rs](../crates/terminal/src/process/posix.rs) |
+| `Terminal/Sources/CoveUITerminal/Process/PseudoTerminal.swift` | 83 | [crates/terminal/src/process/mod.rs](../crates/terminal/src/process/mod.rs) |
+| `Terminal/Sources/CoveUITerminal/Process/WindowsCommandLine.swift` | 30 | [crates/terminal/src/process/windows_command_line.rs](../crates/terminal/src/process/windows_command_line.rs) |
+| `Terminal/Sources/CoveUITerminal/Session.swift` | 259 | [crates/devtools-protocol/src/session.rs](../crates/devtools-protocol/src/session.rs) |
+| `Terminal/Sources/CoveUITerminal/View/BlinkTimer.swift` | 54 | [crates/terminal/src/view/blink_timer.rs](../crates/terminal/src/view/blink_timer.rs) |
+| `Terminal/Sources/CoveUITerminal/View/BoxDrawing.swift` | 246 | [crates/terminal/src/view/box_drawing.rs](../crates/terminal/src/view/box_drawing.rs) |
+| `Terminal/Sources/CoveUITerminal/View/CellMetrics.swift` | 24 | [crates/terminal/src/view/cell_metrics.rs](../crates/terminal/src/view/cell_metrics.rs) |
+| `Terminal/Sources/CoveUITerminal/View/ImageTextures.swift` | 27 | [crates/terminal/src/view/image_textures.rs](../crates/terminal/src/view/image_textures.rs) |
+| `Terminal/Sources/CoveUITerminal/View/KeyRouting.swift` | 71 | [crates/terminal/src/view/key_routing.rs](../crates/terminal/src/view/key_routing.rs) |
+| `Terminal/Sources/CoveUITerminal/View/LinkOpener.swift` | 26 | [crates/terminal/src/view/terminal_view.rs](../crates/terminal/src/view/terminal_view.rs) |
+| `Terminal/Sources/CoveUITerminal/View/Painter.swift` | 173 | [crates/core/src/scene/rendering/scaled_painting.rs](../crates/core/src/scene/rendering/scaled_painting.rs) |
+| `Terminal/Sources/CoveUITerminal/View/PointerRouter.swift` | 136 | [crates/terminal/src/view/pointer_router.rs](../crates/terminal/src/view/pointer_router.rs) |
+| `Terminal/Sources/CoveUITerminal/View/SurfaceState.swift` | 87 | [crates/hosts/src/android/integration/surface/state.rs](../crates/hosts/src/android/integration/surface/state.rs) |
+| `Terminal/Sources/CoveUITerminal/View/TerminalView.swift` | 174 | [crates/terminal/src/view/terminal_view.rs](../crates/terminal/src/view/terminal_view.rs) |
+| `Terminal/Sources/CoveUITerminal/View/URLDetector.swift` | 59 | [crates/terminal/src/view/url_detector.rs](../crates/terminal/src/view/url_detector.rs) |
+| `Terminal/Sources/TerminalDemo/main.swift` | 31 | [examples/counter/src/main.rs](../examples/counter/src/main.rs) |
+| `Text/Sources/CoveUIText/ColorGlyphAtlas.swift` | 61 | [crates/text/src/color_glyph_atlas.rs](../crates/text/src/color_glyph_atlas.rs) |
+| `Text/Sources/CoveUIText/ColorGlyphSource.swift` | 26 | [crates/text/src/color_glyph_source.rs](../crates/text/src/color_glyph_source.rs) |
+| `Text/Sources/CoveUIText/DrawList+Text.swift` | 42 | [crates/text/src/draw_list_text.rs](../crates/text/src/draw_list_text.rs) |
+| `Text/Sources/CoveUIText/Exports.swift` | 1 | [crates/logging/src/exports.rs](../crates/logging/src/exports.rs)<br>[crates/logging/src/logging_exports.rs](../crates/logging/src/logging_exports.rs) |
+| `Text/Sources/CoveUIText/FontAtlas.swift` | 441 | [crates/text/src/font_atlas.rs](../crates/text/src/font_atlas.rs) |
+| `Text/Sources/CoveUIText/FontCollection.swift` | 99 | [crates/text/src/font_collection.rs](../crates/text/src/font_collection.rs) |
+| `Text/Sources/CoveUIText/FontFace.swift` | 546 | [crates/text/src/font_face.rs](../crates/text/src/font_face.rs) |
+| `Text/Sources/CoveUIText/FontProvider.swift` | 613 | [crates/text/src/font_provider.rs](../crates/text/src/font_provider.rs) |
+| `Text/Sources/CoveUIText/FreeTypeColorGlyphs.swift` | 140 | [crates/text/src/free_type_color_glyphs.rs](../crates/text/src/free_type_color_glyphs.rs) |
+| `Text/Sources/CoveUIText/NativeColorGlyphFont.swift` | 101 | [crates/text/src/native_color_glyph_font.rs](../crates/text/src/native_color_glyph_font.rs) |
+| `Text/Sources/CoveUIText/TextCache.swift` | 77 | [crates/text/src/text_cache.rs](../crates/text/src/text_cache.rs) |
+| `Text/Sources/CoveUIText/TextEnvironment.swift` | 209 | [crates/text/src/text_environment.rs](../crates/text/src/text_environment.rs) |
+| `Text/Sources/CoveUIText/TextShaper.swift` | 54 | [crates/text/src/text_shaper.rs](../crates/text/src/text_shaper.rs) |
+| `Text/Sources/CoveUIText/TextStyle.swift` | 166 | [crates/text/src/text_style.rs](../crates/text/src/text_style.rs) |
 
-## 生产源码逐文件映射
+## 测试及辅助文件
 
-### Compose
+| 原源文件 | 行数 | Rust / C / Cargo 目标 |
+| --- | ---: | --- |
+| `Core/Tests/CoveUICoreTests/AdaptiveEnvironmentTests.swift` | 42 | [crates/core/tests/adaptive_environment.rs](../crates/core/tests/adaptive_environment.rs)<br>[crates/compose/tests/adaptive_environment.rs](../crates/compose/tests/adaptive_environment.rs) |
+| `Core/Tests/CoveUICoreTests/DrawListResourceTests.swift` | 42 | [crates/core/tests/draw_list_resources.rs](../crates/core/tests/draw_list_resources.rs) |
+| `Core/Tests/CoveUICoreTests/GeometryKernelTests.swift` | 59 | [crates/core/tests/geometry_kernel.rs](../crates/core/tests/geometry_kernel.rs) |
+| `Core/Tests/CoveUICoreTests/MipmapTests.swift` | 15 | [crates/core/tests/mipmap.rs](../crates/core/tests/mipmap.rs) |
+| `Core/Tests/CoveUICoreTests/PortableCoreTests.swift` | 41 | [crates/core/tests/portable_core.rs](../crates/core/tests/portable_core.rs) |
+| `Core/Tests/CoveUICoreTests/TextScaleTests.swift` | 32 | [crates/core/tests/text_scale.rs](../crates/core/tests/text_scale.rs) |
+| `DevTools/Inspection/Tests/CoveUIAgentCoreTests/AgentTests.swift` | 93 | [crates/agent/tests/agent_tests.rs](../crates/agent/tests/agent_tests.rs) |
+| `DevTools/Tests/CoveUIAgentTransportTests/TransportTests.swift` | 26 | [crates/agent/tests/transport_tests.rs](../crates/agent/tests/transport_tests.rs) |
+| `DevTools/Tests/CoveUIDevToolsServerTests/DevServerTests.swift` | 553 | [crates/devtools/tests/dev_server_tests.rs](../crates/devtools/tests/dev_server_tests.rs) |
+| `Examples/Counter/Tests/CounterExampleTests/ComponentAnalysisTests.swift` | 236 | [examples/gallery/tests/component_analysis_tests.rs](../examples/gallery/tests/component_analysis_tests.rs) |
+| `Examples/Counter/Tests/CounterExampleTests/InspectionTests.swift` | 184 | [examples/gallery/tests/inspection_tests.rs](../examples/gallery/tests/inspection_tests.rs) |
+| `Examples/Counter/Tests/CounterExampleTests/SharedSceneTests.swift` | 117 | [examples/gallery/tests/shared_scene_tests.rs](../examples/gallery/tests/shared_scene_tests.rs) |
+| `Examples/Mobile/Tests/AppContentTests/Model.swift` | 6 | [examples/gallery/tests/model.rs](../examples/gallery/tests/model.rs) |
+| `Examples/Tests/GalleryContentTests/AdaptiveShellTests.swift` | 190 | [examples/gallery/tests/adaptive_shell_tests.rs](../examples/gallery/tests/adaptive_shell_tests.rs) |
+| `Examples/Tests/GalleryContentTests/AnimationSystemTests.swift` | 165 | [examples/gallery/tests/animation_system_tests.rs](../examples/gallery/tests/animation_system_tests.rs) |
+| `Examples/Tests/GalleryContentTests/AnimationTests.swift` | 105 | [examples/gallery/tests/animation_tests.rs](../examples/gallery/tests/animation_tests.rs) |
+| `Examples/Tests/GalleryContentTests/AppBarTests.swift` | 48 | [examples/gallery/tests/app_bar_tests.rs](../examples/gallery/tests/app_bar_tests.rs)<br>[crates/compose/tests/app_bar_tests.rs](../crates/compose/tests/app_bar_tests.rs) |
+| `Examples/Tests/GalleryContentTests/AppearanceTests.swift` | 52 | [crates/compose/tests/appearance.rs](../crates/compose/tests/appearance.rs) |
+| `Examples/Tests/GalleryContentTests/DrawerTests.swift` | 105 | [examples/gallery/tests/drawer_tests.rs](../examples/gallery/tests/drawer_tests.rs) |
+| `Examples/Tests/GalleryContentTests/GalleryTests.swift` | 206 | [examples/gallery/tests/gallery_tests.rs](../examples/gallery/tests/gallery_tests.rs) |
+| `Examples/Tests/GalleryContentTests/ImageLayoutTests.swift` | 62 | [examples/gallery/tests/image_layout_tests.rs](../examples/gallery/tests/image_layout_tests.rs) |
+| `Examples/Tests/GalleryContentTests/ListRowLayoutTests.swift` | 67 | [examples/gallery/tests/list_row_layout_tests.rs](../examples/gallery/tests/list_row_layout_tests.rs) |
+| `Examples/Tests/GalleryContentTests/NavigationStateTests.swift` | 143 | [examples/gallery/tests/navigation_state_tests.rs](../examples/gallery/tests/navigation_state_tests.rs) |
+| `Examples/Tests/GalleryContentTests/RailTests.swift` | 80 | [examples/gallery/tests/rail_tests.rs](../examples/gallery/tests/rail_tests.rs) |
+| `Examples/Tests/GalleryContentTests/RatingLayoutTests.swift` | 58 | [examples/gallery/tests/rating_layout_tests.rs](../examples/gallery/tests/rating_layout_tests.rs) |
+| `Examples/Tests/GalleryContentTests/SelectionShellTests.swift` | 421 | [examples/gallery/tests/selection_shell_tests.rs](../examples/gallery/tests/selection_shell_tests.rs) |
+| `Examples/Tests/GalleryContentTests/SplitTests.swift` | 80 | [examples/gallery/tests/split_tests.rs](../examples/gallery/tests/split_tests.rs) |
+| `Examples/Tests/GalleryContentTests/SurfaceTraitsTests.swift` | 31 | [examples/gallery/tests/surface_traits_tests.rs](../examples/gallery/tests/surface_traits_tests.rs) |
+| `Examples/Tests/GalleryContentTests/TextEditorLayoutTests.swift` | 66 | [examples/gallery/tests/text_editor_layout_tests.rs](../examples/gallery/tests/text_editor_layout_tests.rs) |
+| `Graphics/Tests/NativeRHITests/AccessTrackerTests.swift` | 182 | [crates/graphics/tests/access_tracker.rs](../crates/graphics/tests/access_tracker.rs) |
+| `Graphics/Tests/NativeRHITests/CacheTests.swift` | 84 | [crates/graphics/tests/caches.rs](../crates/graphics/tests/caches.rs) |
+| `Graphics/Tests/NativeRHITests/ChunkUploadAllocatorTests.swift` | 97 | [crates/graphics/tests/chunk_upload_allocator.rs](../crates/graphics/tests/chunk_upload_allocator.rs) |
+| `Graphics/Tests/NativeRHITests/FrameRingTests.swift` | 116 | [crates/graphics/tests/frame_ring.rs](../crates/graphics/tests/frame_ring.rs) |
+| `Graphics/Tests/NativeRHITests/GPUTimestampProfileTests.swift` | 63 | [crates/graphics/tests/gpu_timestamp_profile.rs](../crates/graphics/tests/gpu_timestamp_profile.rs) |
+| `Graphics/Tests/NativeRHITests/LRUMapTests.swift` | 82 | [crates/graphics/tests/lru_map.rs](../crates/graphics/tests/lru_map.rs) |
+| `Graphics/Tests/NativeRHITests/MacSurfaceTests.swift` | 144 | [crates/graphics/tests/mac_surface_tests.rs](../crates/graphics/tests/mac_surface_tests.rs) |
+| `Graphics/Tests/NativeRHITests/Metal/MetalBindingLifetimeTests.swift` | 107 | [crates/graphics/tests/metal_binding_lifetime_tests.rs](../crates/graphics/tests/metal_binding_lifetime_tests.rs) |
+| `Graphics/Tests/NativeRHITests/Metal/MetalCapabilityProbeTests.swift` | 63 | [crates/graphics/tests/metal_capability_probe_tests.rs](../crates/graphics/tests/metal_capability_probe_tests.rs) |
+| `Graphics/Tests/NativeRHITests/Metal/MetalClearReadbackTests.swift` | 63 | [crates/graphics/tests/metal_clear_readback_tests.rs](../crates/graphics/tests/metal_clear_readback_tests.rs) |
+| `Graphics/Tests/NativeRHITests/Metal/MetalFrameLifecycleTests.swift` | 88 | [crates/graphics/tests/metal_frame_lifecycle_tests.rs](../crates/graphics/tests/metal_frame_lifecycle_tests.rs) |
+| `Graphics/Tests/NativeRHITests/Metal/MetalRayQueryTests.swift` | 76 | [crates/graphics/tests/metal_ray_query_tests.rs](../crates/graphics/tests/metal_ray_query_tests.rs) |
+| `Graphics/Tests/NativeRHITests/Metal/MetalRenderBindingTests.swift` | 108 | [crates/graphics/tests/metal_render_binding_tests.rs](../crates/graphics/tests/metal_render_binding_tests.rs) |
+| `Graphics/Tests/NativeRHITests/Metal/MetalSlangTests.swift` | 72 | [crates/graphics/tests/metal_slang_tests.rs](../crates/graphics/tests/metal_slang_tests.rs) |
+| `Graphics/Tests/NativeRHITests/Metal/MetalStorageHazardTests.swift` | 85 | [crates/graphics/tests/metal_storage_hazard_tests.rs](../crates/graphics/tests/metal_storage_hazard_tests.rs) |
+| `Graphics/Tests/NativeRHITests/NativeGPUContractTests.swift` | 223 | [crates/graphics/tests/native_gpu_contract_tests.rs](../crates/graphics/tests/native_gpu_contract_tests.rs) |
+| `Graphics/Tests/NativeRHITests/NativeMultisampleTests.swift` | 210 | [crates/graphics/tests/native_multisample_tests.rs](../crates/graphics/tests/native_multisample_tests.rs) |
+| `Graphics/Tests/NativeRHITests/NativeRHISmokeTests.swift` | 38 | [crates/graphics/tests/native_rhi_smoke_tests.rs](../crates/graphics/tests/native_rhi_smoke_tests.rs) |
+| `Graphics/Tests/NativeRHITests/NativeRecordedTextureUploadTests.swift` | 83 | [crates/graphics/tests/native_recorded_texture_upload.rs](../crates/graphics/tests/native_recorded_texture_upload.rs) |
+| `Graphics/Tests/NativeRHITests/NativeTestDevice.swift` | 14 | [crates/graphics/src/rhi/testing.rs](../crates/graphics/src/rhi/testing.rs) |
+| `Graphics/Tests/NativeRHITests/NativeTextureCopyTests.swift` | 46 | [crates/graphics/tests/native_texture_copy.rs](../crates/graphics/tests/native_texture_copy.rs) |
+| `Graphics/Tests/NativeRHITests/NativeTextureRegionTests.swift` | 82 | [crates/graphics/tests/native_texture_region.rs](../crates/graphics/tests/native_texture_region.rs) |
+| `Graphics/Tests/NativeRHITests/PipelineCacheTests.swift` | 264 | [crates/graphics/tests/pipeline_cache.rs](../crates/graphics/tests/pipeline_cache.rs) |
+| `Graphics/Tests/NativeRHITests/ReflectedBindingLayoutTests.swift` | 38 | [crates/graphics/tests/reflected_binding_layout.rs](../crates/graphics/tests/reflected_binding_layout.rs) |
+| `Graphics/Tests/NativeRHITests/RenderAttachmentValidationTests.swift` | 77 | [crates/graphics/tests/render_attachment_validation.rs](../crates/graphics/tests/render_attachment_validation.rs) |
+| `Graphics/Tests/NativeRHITests/ResourcePreparationTests.swift` | 153 | [crates/graphics/tests/resource_preparation_tests.rs](../crates/graphics/tests/resource_preparation_tests.rs) |
+| `Graphics/Tests/NativeRHITests/ShaderArtifactTests.swift` | 29 | [crates/graphics/tests/shader_artifact.rs](../crates/graphics/tests/shader_artifact.rs) |
+| `Graphics/Tests/NativeRHITests/ShaderFixtureCompiler.swift` | 90 | [crates/graphics/tests/shader_specialization_tests.rs](../crates/graphics/tests/shader_specialization_tests.rs) |
+| `Graphics/Tests/NativeRHITests/ShaderSpecializationTests.swift` | 60 | [crates/graphics/tests/shader_specialization_tests.rs](../crates/graphics/tests/shader_specialization_tests.rs) |
+| `Graphics/Tests/NativeRHITests/StateTrackerTests.swift` | 76 | [crates/graphics/tests/state_tracker.rs](../crates/graphics/tests/state_tracker.rs) |
+| `Graphics/Tests/NativeRHITests/SubmissionPlannerTests.swift` | 414 | [crates/graphics/tests/submission_planner.rs](../crates/graphics/tests/submission_planner.rs) |
+| `Graphics/Tests/NativeRHITests/SwapchainLifetimeTests.swift` | 223 | [crates/graphics/tests/swapchain_lifetime_tests.rs](../crates/graphics/tests/swapchain_lifetime_tests.rs) |
+| `Graphics/Tests/NativeRHITests/Vulkan/PresentationPolicyTests.swift` | 36 | [crates/graphics/tests/presentation_policy_tests.rs](../crates/graphics/tests/presentation_policy_tests.rs) |
+| `Graphics/Tests/NativeRHITests/Vulkan/VulkanCapabilityProbeTests.swift` | 51 | [crates/graphics/tests/vulkan_capability_probe_tests.rs](../crates/graphics/tests/vulkan_capability_probe_tests.rs) |
+| `Graphics/Tests/NativeRHITests/Vulkan/VulkanSlangTests.swift` | 80 | [crates/graphics/tests/vulkan_slang_tests.rs](../crates/graphics/tests/vulkan_slang_tests.rs) |
+| `Graphics/Tests/NativeRHITests/Vulkan/VulkanUploadReadbackTests.swift` | 86 | [crates/graphics/tests/vulkan_upload_readback_tests.rs](../crates/graphics/tests/vulkan_upload_readback_tests.rs) |
+| `Hosts/Android/Contract/Tests/CoveAndroidContractTests/FrameClockTests.swift` | 40 | [crates/hosts/tests/frame_clock_tests.rs](../crates/hosts/tests/frame_clock_tests.rs) |
+| `Hosts/Android/Contract/Tests/CoveAndroidContractTests/LaunchTests.swift` | 13 | [crates/hosts/tests/launch_tests.rs](../crates/hosts/tests/launch_tests.rs) |
+| `Logging/Tests/CoveLoggingTests/PipelineTests.swift` | 113 | [crates/logging/tests/pipeline.rs](../crates/logging/tests/pipeline.rs) |
+| `Logging/Tests/CoveLoggingTests/StartupTests.swift` | 22 | [crates/logging/tests/startup_tests.rs](../crates/logging/tests/startup_tests.rs) |
+| `Logging/Tests/CoveLoggingTests/StorageTests.swift` | 53 | [crates/logging/tests/storage_tests.rs](../crates/logging/tests/storage_tests.rs) |
+| `PlatformCore/Tests/CovePlatformCoreTests/ScrollInputTests.swift` | 31 | [crates/platform/tests/scroll_input.rs](../crates/platform/tests/scroll_input.rs) |
+| `System/Tests/CoveFileSystemTests/FileLockTests.swift` | 24 | [crates/system/tests/file_lock.rs](../crates/system/tests/file_lock.rs) |
+| `System/Tests/CoveFileSystemTests/Files.swift` | 91 | [crates/system/tests/files.rs](../crates/system/tests/files.rs) |
+| `System/Tests/CoveFileSystemTests/Paths.swift` | 49 | [crates/system/tests/paths.rs](../crates/system/tests/paths.rs) |
+| `System/Tests/CoveProcessTests/BufferTests.swift` | 39 | [crates/system/tests/buffer.rs](../crates/system/tests/buffer.rs) |
+| `System/Tests/CoveProcessTests/Contracts.swift` | 115 | [crates/system/tests/contracts.rs](../crates/system/tests/contracts.rs) |
+| `System/Tests/CoveProcessTests/ProcessTests.swift` | 104 | [crates/system/tests/process.rs](../crates/system/tests/process.rs) |
+| `Terminal/Tests/CoveUITerminalTests/EngineTests.swift` | 151 | [crates/terminal/tests/engine_tests.rs](../crates/terminal/tests/engine_tests.rs) |
+| `Terminal/Tests/CoveUITerminalTests/InteractionTests.swift` | 104 | [crates/compose/tests/interaction_tests.rs](../crates/compose/tests/interaction_tests.rs)<br>[crates/terminal/tests/interaction_tests.rs](../crates/terminal/tests/interaction_tests.rs) |
+| `Terminal/Tests/CoveUITerminalTests/KeyRoutingTests.swift` | 44 | [crates/terminal/tests/key_routing_tests.rs](../crates/terminal/tests/key_routing_tests.rs) |
+| `Terminal/Tests/CoveUITerminalTests/RenderingFeatureTests.swift` | 118 | [crates/terminal/tests/rendering_feature_tests.rs](../crates/terminal/tests/rendering_feature_tests.rs) |
+| `Terminal/Tests/CoveUITerminalTests/SessionTests.swift` | 106 | [crates/hosts/tests/session_tests.rs](../crates/hosts/tests/session_tests.rs)<br>[crates/terminal/tests/session_tests.rs](../crates/terminal/tests/session_tests.rs) |
+| `Terminal/Tests/CoveUITerminalTests/ViewTests.swift` | 287 | [crates/terminal/tests/view_tests.rs](../crates/terminal/tests/view_tests.rs) |
+| `Terminal/Tests/CoveUITerminalTests/WindowsCommandLineTests.swift` | 25 | [crates/terminal/tests/windows_command_line_tests.rs](../crates/terminal/tests/windows_command_line_tests.rs) |
+| `Terminal/Tests/CoveUITerminalTests/WindowsSessionTests.swift` | 52 | [crates/terminal/tests/windows_session_tests.rs](../crates/terminal/tests/windows_session_tests.rs) |
+| `Tests/CoveUIAndroidTests/SessionTests.swift` | 51 | [crates/hosts/tests/session_tests.rs](../crates/hosts/tests/session_tests.rs)<br>[crates/terminal/tests/session_tests.rs](../crates/terminal/tests/session_tests.rs) |
+| `Tests/CoveUIAndroidTests/SurfaceMetricsTests.swift` | 98 | [crates/hosts/tests/surface_metrics_tests.rs](../crates/hosts/tests/surface_metrics_tests.rs) |
+| `Tests/CoveUIComposeTests/AccessibilitySemanticsTests.swift` | 130 | [crates/compose/tests/accessibility_semantics_tests.rs](../crates/compose/tests/accessibility_semantics_tests.rs) |
+| `Tests/CoveUIComposeTests/ActionSheetTests.swift` | 265 | [crates/compose/tests/action_sheet_tests.rs](../crates/compose/tests/action_sheet_tests.rs) |
+| `Tests/CoveUIComposeTests/Adaptive/AdaptiveSidebarTests.swift` | 574 | [crates/compose/tests/adaptive_sidebar_tests.rs](../crates/compose/tests/adaptive_sidebar_tests.rs) |
+| `Tests/CoveUIComposeTests/Adaptive/AlertTests.swift` | 117 | [crates/compose/tests/alert_tests.rs](../crates/compose/tests/alert_tests.rs) |
+| `Tests/CoveUIComposeTests/Adaptive/AppBarTests.swift` | 270 | [examples/gallery/tests/app_bar_tests.rs](../examples/gallery/tests/app_bar_tests.rs)<br>[crates/compose/tests/app_bar_tests.rs](../crates/compose/tests/app_bar_tests.rs) |
+| `Tests/CoveUIComposeTests/Adaptive/AssetFieldTests.swift` | 88 | [crates/compose/tests/asset_field_tests.rs](../crates/compose/tests/asset_field_tests.rs) |
+| `Tests/CoveUIComposeTests/Adaptive/CommandPaletteAdaptiveTests.swift` | 92 | [crates/compose/tests/command_palette_adaptive_tests.rs](../crates/compose/tests/command_palette_adaptive_tests.rs) |
+| `Tests/CoveUIComposeTests/Adaptive/CompactLabelTests.swift` | 75 | [crates/compose/tests/adaptive_compact_label.rs](../crates/compose/tests/adaptive_compact_label.rs) |
+| `Tests/CoveUIComposeTests/Adaptive/DialogTests.swift` | 123 | [crates/compose/tests/adaptive_dialog_tests.rs](../crates/compose/tests/adaptive_dialog_tests.rs) |
+| `Tests/CoveUIComposeTests/Adaptive/DisclosureTests.swift` | 60 | [crates/compose/tests/adaptive_disclosure_tests.rs](../crates/compose/tests/adaptive_disclosure_tests.rs) |
+| `Tests/CoveUIComposeTests/Adaptive/EditorHeightTests.swift` | 196 | [crates/compose/tests/editor_height_tests.rs](../crates/compose/tests/editor_height_tests.rs) |
+| `Tests/CoveUIComposeTests/Adaptive/FieldLayoutTests.swift` | 222 | [crates/compose/tests/field_layout_tests.rs](../crates/compose/tests/field_layout_tests.rs) |
+| `Tests/CoveUIComposeTests/Adaptive/GridColumnsTests.swift` | 270 | [crates/compose/tests/grid_columns_tests.rs](../crates/compose/tests/grid_columns_tests.rs) |
+| `Tests/CoveUIComposeTests/Adaptive/JsonEditorTests.swift` | 132 | [crates/compose/tests/json_editor_tests.rs](../crates/compose/tests/json_editor_tests.rs) |
+| `Tests/CoveUIComposeTests/Adaptive/NarrowReflowTests.swift` | 139 | [crates/compose/tests/narrow_reflow_tests.rs](../crates/compose/tests/narrow_reflow_tests.rs) |
+| `Tests/CoveUIComposeTests/Adaptive/NavigationDrawerTests.swift` | 394 | [crates/compose/tests/navigation_drawer_tests.rs](../crates/compose/tests/navigation_drawer_tests.rs) |
+| `Tests/CoveUIComposeTests/Adaptive/NavigationRailTests.swift` | 360 | [crates/compose/tests/navigation_rail_tests.rs](../crates/compose/tests/navigation_rail_tests.rs) |
+| `Tests/CoveUIComposeTests/Adaptive/RowDensityTests.swift` | 233 | [crates/compose/tests/row_density_tests.rs](../crates/compose/tests/row_density_tests.rs) |
+| `Tests/CoveUIComposeTests/Adaptive/SelectionFieldTests.swift` | 199 | [crates/compose/tests/selection_field_tests.rs](../crates/compose/tests/selection_field_tests.rs) |
+| `Tests/CoveUIComposeTests/Adaptive/SidebarHierarchyTests.swift` | 300 | [crates/compose/tests/sidebar_hierarchy_tests.rs](../crates/compose/tests/sidebar_hierarchy_tests.rs) |
+| `Tests/CoveUIComposeTests/Adaptive/SidebarResizeTests.swift` | 251 | [crates/compose/tests/sidebar_resize_tests.rs](../crates/compose/tests/sidebar_resize_tests.rs) |
+| `Tests/CoveUIComposeTests/Adaptive/SplitPresentationTests.swift` | 347 | [crates/compose/tests/split_presentation_tests.rs](../crates/compose/tests/split_presentation_tests.rs) |
+| `Tests/CoveUIComposeTests/Adaptive/SurfaceRootTests.swift` | 59 | [crates/compose/tests/adaptive_surface_root.rs](../crates/compose/tests/adaptive_surface_root.rs) |
+| `Tests/CoveUIComposeTests/Adaptive/TabOverflowTests.swift` | 232 | [crates/compose/tests/tab_overflow_tests.rs](../crates/compose/tests/tab_overflow_tests.rs) |
+| `Tests/CoveUIComposeTests/Adaptive/TableColumnsTests.swift` | 285 | [crates/compose/tests/table_columns_tests.rs](../crates/compose/tests/table_columns_tests.rs) |
+| `Tests/CoveUIComposeTests/Adaptive/TextScaleRows.swift` | 201 | [crates/compose/tests/text_scale_rows.rs](../crates/compose/tests/text_scale_rows.rs) |
+| `Tests/CoveUIComposeTests/Adaptive/TimelineTests.swift` | 145 | [crates/compose/tests/adaptive_timeline_tests.rs](../crates/compose/tests/adaptive_timeline_tests.rs) |
+| `Tests/CoveUIComposeTests/Adaptive/ToolbarOverflowTests.swift` | 195 | [crates/compose/tests/toolbar_overflow_tests.rs](../crates/compose/tests/toolbar_overflow_tests.rs) |
+| `Tests/CoveUIComposeTests/AdaptiveEnvironmentTests.swift` | 41 | [crates/core/tests/adaptive_environment.rs](../crates/core/tests/adaptive_environment.rs)<br>[crates/compose/tests/adaptive_environment.rs](../crates/compose/tests/adaptive_environment.rs) |
+| `Tests/CoveUIComposeTests/AdaptiveNavigationTests.swift` | 52 | [crates/compose/tests/adaptive_navigation_tests.rs](../crates/compose/tests/adaptive_navigation_tests.rs) |
+| `Tests/CoveUIComposeTests/AdvancedInteractionTests.swift` | 263 | [crates/compose/tests/advanced_interaction_tests.rs](../crates/compose/tests/advanced_interaction_tests.rs) |
+| `Tests/CoveUIComposeTests/Agent/ControlDiscoveryTests.swift` | 78 | [crates/compose/tests/control_discovery_tests.rs](../crates/compose/tests/control_discovery_tests.rs) |
+| `Tests/CoveUIComposeTests/AnimatedVisibilityTests.swift` | 157 | [crates/compose/tests/animated_visibility_tests.rs](../crates/compose/tests/animated_visibility_tests.rs) |
+| `Tests/CoveUIComposeTests/Animation/AppearanceRevealTests.swift` | 97 | [crates/compose/tests/appearance_reveal_tests.rs](../crates/compose/tests/appearance_reveal_tests.rs) |
+| `Tests/CoveUIComposeTests/Animation/InteractionTests.swift` | 117 | [crates/compose/tests/interaction_tests.rs](../crates/compose/tests/interaction_tests.rs)<br>[crates/terminal/tests/interaction_tests.rs](../crates/terminal/tests/interaction_tests.rs) |
+| `Tests/CoveUIComposeTests/Animation/SequenceLifecycleTests.swift` | 58 | [crates/compose/tests/sequence_lifecycle_tests.rs](../crates/compose/tests/sequence_lifecycle_tests.rs) |
+| `Tests/CoveUIComposeTests/AnimationIntegrationTests.swift` | 719 | [crates/compose/tests/animation_integration_tests.rs](../crates/compose/tests/animation_integration_tests.rs) |
+| `Tests/CoveUIComposeTests/AnimationValueModifierTests.swift` | 272 | [crates/compose/tests/animation_value_modifier_tests.rs](../crates/compose/tests/animation_value_modifier_tests.rs) |
+| `Tests/CoveUIComposeTests/AppStorageTests.swift` | 212 | [crates/compose/tests/app_storage.rs](../crates/compose/tests/app_storage.rs) |
+| `Tests/CoveUIComposeTests/AppearanceTests.swift` | 60 | [crates/compose/tests/appearance.rs](../crates/compose/tests/appearance.rs) |
+| `Tests/CoveUIComposeTests/AssetRefFieldTests.swift` | 90 | [crates/compose/tests/asset_ref_field_tests.rs](../crates/compose/tests/asset_ref_field_tests.rs) |
+| `Tests/CoveUIComposeTests/AsyncImageTests.swift` | 247 | [crates/compose/tests/async_image_tests.rs](../crates/compose/tests/async_image_tests.rs) |
+| `Tests/CoveUIComposeTests/AvatarPresenceTests.swift` | 76 | [crates/compose/tests/avatar_presence.rs](../crates/compose/tests/avatar_presence.rs) |
+| `Tests/CoveUIComposeTests/AvatarTests.swift` | 93 | [crates/compose/tests/avatar.rs](../crates/compose/tests/avatar.rs) |
+| `Tests/CoveUIComposeTests/BidiTests.swift` | 100 | [crates/compose/tests/bidi_tests.rs](../crates/compose/tests/bidi_tests.rs) |
+| `Tests/CoveUIComposeTests/BoolControlLabelTests.swift` | 44 | [crates/compose/tests/bool_control_label.rs](../crates/compose/tests/bool_control_label.rs) |
+| `Tests/CoveUIComposeTests/BottomSheetTests.swift` | 139 | [crates/compose/tests/bottom_sheet_tests.rs](../crates/compose/tests/bottom_sheet_tests.rs) |
+| `Tests/CoveUIComposeTests/BracketMatchingTests.swift` | 44 | [crates/compose/tests/bracket_matching.rs](../crates/compose/tests/bracket_matching.rs) |
+| `Tests/CoveUIComposeTests/ButtonIconTests.swift` | 302 | [crates/compose/tests/button_icon_tests.rs](../crates/compose/tests/button_icon_tests.rs) |
+| `Tests/CoveUIComposeTests/ButtonPressRecomposeTests.swift` | 219 | [crates/compose/tests/button_press_recompose_tests.rs](../crates/compose/tests/button_press_recompose_tests.rs) |
+| `Tests/CoveUIComposeTests/ButtonScrollViewTests.swift` | 1054 | [crates/compose/tests/button_scroll_view_tests.rs](../crates/compose/tests/button_scroll_view_tests.rs) |
+| `Tests/CoveUIComposeTests/ButtonStyleAnimationTests.swift` | 113 | [crates/compose/tests/button_style_animation_tests.rs](../crates/compose/tests/button_style_animation_tests.rs) |
+| `Tests/CoveUIComposeTests/ButtonStyleTests.swift` | 358 | [crates/compose/tests/button_style_tests.rs](../crates/compose/tests/button_style_tests.rs) |
+| `Tests/CoveUIComposeTests/Calendar/AdaptiveTests.swift` | 57 | [crates/compose/tests/calendar_adaptive_tests.rs](../crates/compose/tests/calendar_adaptive_tests.rs) |
+| `Tests/CoveUIComposeTests/Calendar/KeyboardNavigationTests.swift` | 225 | [crates/compose/tests/calendar_keyboard_navigation_tests.rs](../crates/compose/tests/calendar_keyboard_navigation_tests.rs) |
+| `Tests/CoveUIComposeTests/Calendar/ModesTests.swift` | 159 | [crates/compose/tests/calendar_modes_tests.rs](../crates/compose/tests/calendar_modes_tests.rs) |
+| `Tests/CoveUIComposeTests/CarouselTests.swift` | 252 | [crates/compose/tests/carousel_tests.rs](../crates/compose/tests/carousel_tests.rs) |
+| `Tests/CoveUIComposeTests/CatalogInteractionTests.swift` | 197 | [crates/compose/tests/catalog_interaction_tests.rs](../crates/compose/tests/catalog_interaction_tests.rs) |
+| `Tests/CoveUIComposeTests/ChartAccessibilityTests.swift` | 242 | [crates/compose/tests/chart_accessibility_tests.rs](../crates/compose/tests/chart_accessibility_tests.rs) |
+| `Tests/CoveUIComposeTests/ChartAxisTests.swift` | 242 | [crates/compose/tests/chart_axis.rs](../crates/compose/tests/chart_axis.rs) |
+| `Tests/CoveUIComposeTests/ChartInteractionTests.swift` | 237 | [crates/compose/tests/chart_interaction_tests.rs](../crates/compose/tests/chart_interaction_tests.rs) |
+| `Tests/CoveUIComposeTests/ChartOrientationTests.swift` | 256 | [crates/compose/tests/chart_orientation_tests.rs](../crates/compose/tests/chart_orientation_tests.rs) |
+| `Tests/CoveUIComposeTests/ChartPerformanceTests.swift` | 148 | [crates/compose/tests/chart_performance_tests.rs](../crates/compose/tests/chart_performance_tests.rs) |
+| `Tests/CoveUIComposeTests/ChartTests.swift` | 463 | [crates/compose/tests/chart_tests.rs](../crates/compose/tests/chart_tests.rs) |
+| `Tests/CoveUIComposeTests/ChartViewportTests.swift` | 175 | [crates/compose/tests/chart_viewport_tests.rs](../crates/compose/tests/chart_viewport_tests.rs) |
+| `Tests/CoveUIComposeTests/ChromeComponentTests.swift` | 58 | [crates/compose/tests/chrome_component.rs](../crates/compose/tests/chrome_component.rs) |
+| `Tests/CoveUIComposeTests/ChromeRegressionTests.swift` | 72 | [crates/compose/tests/chrome_regression_tests.rs](../crates/compose/tests/chrome_regression_tests.rs) |
+| `Tests/CoveUIComposeTests/CodeEditing/GutterTests.swift` | 325 | [crates/compose/tests/gutter_tests.rs](../crates/compose/tests/gutter_tests.rs) |
+| `Tests/CoveUIComposeTests/CodeEditingUITests.swift` | 231 | [crates/compose/tests/code_editing_ui_tests.rs](../crates/compose/tests/code_editing_ui_tests.rs) |
+| `Tests/CoveUIComposeTests/ColorGlyphResampleTests.swift` | 24 | [crates/compose/tests/color_glyph_resample.rs](../crates/compose/tests/color_glyph_resample.rs) |
+| `Tests/CoveUIComposeTests/ComboboxSearchTests.swift` | 129 | [crates/compose/tests/combobox_search_tests.rs](../crates/compose/tests/combobox_search_tests.rs) |
+| `Tests/CoveUIComposeTests/CommandPaletteFooterTests.swift` | 83 | [crates/compose/tests/command_palette_footer_tests.rs](../crates/compose/tests/command_palette_footer_tests.rs) |
+| `Tests/CoveUIComposeTests/CompositionLocalTests.swift` | 102 | [crates/compose/tests/composition_local_tests.rs](../crates/compose/tests/composition_local_tests.rs) |
+| `Tests/CoveUIComposeTests/ContainerQueryTests.swift` | 174 | [crates/compose/tests/container_query_tests.rs](../crates/compose/tests/container_query_tests.rs) |
+| `Tests/CoveUIComposeTests/ControlDensityTests.swift` | 74 | [crates/compose/tests/control_density_tests.rs](../crates/compose/tests/control_density_tests.rs) |
+| `Tests/CoveUIComposeTests/ControlMotionTests.swift` | 72 | [crates/compose/tests/control_motion_tests.rs](../crates/compose/tests/control_motion_tests.rs) |
+| `Tests/CoveUIComposeTests/CursorPipelineTests.swift` | 76 | [crates/compose/tests/cursor_pipeline_tests.rs](../crates/compose/tests/cursor_pipeline_tests.rs) |
+| `Tests/CoveUIComposeTests/CustomLayoutTests.swift` | 170 | [crates/compose/tests/custom_layout_tests.rs](../crates/compose/tests/custom_layout_tests.rs) |
+| `Tests/CoveUIComposeTests/CustomLayoutVisibilityTests.swift` | 76 | [crates/compose/tests/custom_layout_visibility_tests.rs](../crates/compose/tests/custom_layout_visibility_tests.rs) |
+| `Tests/CoveUIComposeTests/DataTableInteractionTests.swift` | 132 | [crates/compose/tests/data_table_interaction.rs](../crates/compose/tests/data_table_interaction.rs) |
+| `Tests/CoveUIComposeTests/DataTableLayoutTests.swift` | 161 | [crates/compose/tests/data_table_layout.rs](../crates/compose/tests/data_table_layout.rs) |
+| `Tests/CoveUIComposeTests/DataTableModelTests.swift` | 89 | [crates/compose/tests/data_table_model.rs](../crates/compose/tests/data_table_model.rs) |
+| `Tests/CoveUIComposeTests/DataTableScrollTests.swift` | 94 | [crates/compose/tests/data_table_scroll_tests.rs](../crates/compose/tests/data_table_scroll_tests.rs) |
+| `Tests/CoveUIComposeTests/DateRangePickerTests.swift` | 96 | [crates/compose/tests/date_range_picker_tests.rs](../crates/compose/tests/date_range_picker_tests.rs) |
+| `Tests/CoveUIComposeTests/DateRangeRulesTests.swift` | 91 | [crates/compose/tests/date_range_rules.rs](../crates/compose/tests/date_range_rules.rs) |
+| `Tests/CoveUIComposeTests/DemoCrossFadeTests.swift` | 66 | [crates/compose/tests/demo_cross_fade_tests.rs](../crates/compose/tests/demo_cross_fade_tests.rs) |
+| `Tests/CoveUIComposeTests/DesignSystemTests.swift` | 414 | [crates/compose/tests/design_system_tests.rs](../crates/compose/tests/design_system_tests.rs) |
+| `Tests/CoveUIComposeTests/DisclosureContainerTests.swift` | 127 | [crates/compose/tests/disclosure_container_tests.rs](../crates/compose/tests/disclosure_container_tests.rs) |
+| `Tests/CoveUIComposeTests/DisclosureGroupTests.swift` | 105 | [crates/compose/tests/disclosure_group_tests.rs](../crates/compose/tests/disclosure_group_tests.rs) |
+| `Tests/CoveUIComposeTests/DragAndDropTests.swift` | 149 | [crates/compose/tests/drag_and_drop_tests.rs](../crates/compose/tests/drag_and_drop_tests.rs) |
+| `Tests/CoveUIComposeTests/EdgeInsetsInterpolatableTests.swift` | 26 | [crates/compose/tests/edge_insets_interpolatable.rs](../crates/compose/tests/edge_insets_interpolatable.rs) |
+| `Tests/CoveUIComposeTests/EditorInteractionTests.swift` | 432 | [crates/compose/tests/editor_interaction_tests.rs](../crates/compose/tests/editor_interaction_tests.rs) |
+| `Tests/CoveUIComposeTests/FeedbackComponentTests.swift` | 121 | [crates/compose/tests/feedback_component_tests.rs](../crates/compose/tests/feedback_component_tests.rs) |
+| `Tests/CoveUIComposeTests/FloatingSurfaceTests.swift` | 161 | [crates/compose/tests/floating_surface_tests.rs](../crates/compose/tests/floating_surface_tests.rs) |
+| `Tests/CoveUIComposeTests/FocusRingTests.swift` | 122 | [crates/compose/tests/focus_ring_tests.rs](../crates/compose/tests/focus_ring_tests.rs) |
+| `Tests/CoveUIComposeTests/FourTreeConsistencyTests.swift` | 118 | [crates/compose/tests/four_tree_consistency_tests.rs](../crates/compose/tests/four_tree_consistency_tests.rs) |
+| `Tests/CoveUIComposeTests/GridLayoutTests.swift` | 111 | [crates/compose/tests/grid_layout_tests.rs](../crates/compose/tests/grid_layout_tests.rs) |
+| `Tests/CoveUIComposeTests/GridSpanTests.swift` | 74 | [crates/compose/tests/grid_span.rs](../crates/compose/tests/grid_span.rs) |
+| `Tests/CoveUIComposeTests/ImageFileContentModeTests.swift` | 165 | [crates/compose/tests/image_file_content_mode_tests.rs](../crates/compose/tests/image_file_content_mode_tests.rs) |
+| `Tests/CoveUIComposeTests/ImagePipelineTests.swift` | 138 | [crates/compose/tests/image_pipeline_tests.rs](../crates/compose/tests/image_pipeline_tests.rs) |
+| `Tests/CoveUIComposeTests/Images/HTTPServer.swift` | 88 | [crates/compose/tests/image_pipeline_tests.rs](../crates/compose/tests/image_pipeline_tests.rs)<br>[crates/compose/tests/async_image_tests.rs](../crates/compose/tests/async_image_tests.rs) |
+| `Tests/CoveUIComposeTests/InteractiveScene.swift` | 100 | [crates/compose/tests/interactive_scene.rs](../crates/compose/tests/interactive_scene.rs) |
+| `Tests/CoveUIComposeTests/JsonFieldTests.swift` | 141 | [crates/compose/tests/json_field.rs](../crates/compose/tests/json_field.rs) |
+| `Tests/CoveUIComposeTests/KeyboardShortcutTests.swift` | 17 | [crates/compose/tests/keyboard_shortcut.rs](../crates/compose/tests/keyboard_shortcut.rs) |
+| `Tests/CoveUIComposeTests/KeyedReconcilerTests.swift` | 246 | [crates/compose/tests/keyed_reconciler_tests.rs](../crates/compose/tests/keyed_reconciler_tests.rs) |
+| `Tests/CoveUIComposeTests/LabelSelectionTests.swift` | 348 | [crates/compose/tests/label_selection_tests.rs](../crates/compose/tests/label_selection_tests.rs) |
+| `Tests/CoveUIComposeTests/LazyGridTests.swift` | 129 | [crates/compose/tests/lazy_grid_tests.rs](../crates/compose/tests/lazy_grid_tests.rs) |
+| `Tests/CoveUIComposeTests/ListMultipleSelectionTests.swift` | 112 | [crates/compose/tests/list_multiple_selection_tests.rs](../crates/compose/tests/list_multiple_selection_tests.rs) |
+| `Tests/CoveUIComposeTests/ListRowTests.swift` | 241 | [crates/compose/tests/list_row_tests.rs](../crates/compose/tests/list_row_tests.rs) |
+| `Tests/CoveUIComposeTests/ListTreeTests.swift` | 896 | [crates/compose/tests/list_tree_tests.rs](../crates/compose/tests/list_tree_tests.rs) |
+| `Tests/CoveUIComposeTests/MarkdownTests.swift` | 266 | [crates/compose/tests/markdown_tests.rs](../crates/compose/tests/markdown_tests.rs) |
+| `Tests/CoveUIComposeTests/MasonryTests.swift` | 84 | [crates/compose/tests/masonry_tests.rs](../crates/compose/tests/masonry_tests.rs) |
+| `Tests/CoveUIComposeTests/MenuButtonTests.swift` | 113 | [crates/compose/tests/menu_button_tests.rs](../crates/compose/tests/menu_button_tests.rs) |
+| `Tests/CoveUIComposeTests/MenuContentTests.swift` | 89 | [crates/compose/tests/menu_content_tests.rs](../crates/compose/tests/menu_content_tests.rs) |
+| `Tests/CoveUIComposeTests/MenuHierarchyTests.swift` | 337 | [crates/compose/tests/menu_hierarchy_tests.rs](../crates/compose/tests/menu_hierarchy_tests.rs) |
+| `Tests/CoveUIComposeTests/MenuPointerRoutingTests.swift` | 137 | [crates/compose/tests/menu_pointer_routing_tests.rs](../crates/compose/tests/menu_pointer_routing_tests.rs) |
+| `Tests/CoveUIComposeTests/Mobile/Fixtures.swift` | 119 | [crates/compose/tests/mobile_presentation_tests.rs](../crates/compose/tests/mobile_presentation_tests.rs) |
+| `Tests/CoveUIComposeTests/Mobile/PresentationTests.swift` | 273 | [crates/compose/tests/mobile_presentation_tests.rs](../crates/compose/tests/mobile_presentation_tests.rs) |
+| `Tests/CoveUIComposeTests/ModifierReplayTests.swift` | 115 | [crates/compose/tests/modifier_replay_tests.rs](../crates/compose/tests/modifier_replay_tests.rs) |
+| `Tests/CoveUIComposeTests/NativeMenuTests.swift` | 158 | [crates/compose/tests/native_menu_tests.rs](../crates/compose/tests/native_menu_tests.rs) |
+| `Tests/CoveUIComposeTests/NavigationStackTests.swift` | 163 | [crates/compose/tests/navigation_stack_tests.rs](../crates/compose/tests/navigation_stack_tests.rs) |
+| `Tests/CoveUIComposeTests/NumberFieldTests.swift` | 114 | [crates/compose/tests/number_field_tests.rs](../crates/compose/tests/number_field_tests.rs) |
+| `Tests/CoveUIComposeTests/NumericLocaleTests.swift` | 85 | [crates/compose/tests/numeric_locale.rs](../crates/compose/tests/numeric_locale.rs) |
+| `Tests/CoveUIComposeTests/ObservableStateTrackingTests.swift` | 304 | [crates/compose/tests/observable_state_tracking_tests.rs](../crates/compose/tests/observable_state_tracking_tests.rs) |
+| `Tests/CoveUIComposeTests/OffscreenReuseTests.swift` | 30 | [crates/compose/tests/offscreen_reuse.rs](../crates/compose/tests/offscreen_reuse.rs) |
+| `Tests/CoveUIComposeTests/OverlayScrollInputTests.swift` | 76 | [crates/compose/tests/overlay_scroll_input_tests.rs](../crates/compose/tests/overlay_scroll_input_tests.rs) |
+| `Tests/CoveUIComposeTests/OverlayTests.swift` | 93 | [crates/compose/tests/overlay.rs](../crates/compose/tests/overlay.rs) |
+| `Tests/CoveUIComposeTests/PackageResourceBundleTests.swift` | 15 | [crates/compose/tests/package_resource_bundle.rs](../crates/compose/tests/package_resource_bundle.rs) |
+| `Tests/CoveUIComposeTests/PopconfirmTests.swift` | 247 | [crates/compose/tests/popconfirm_tests.rs](../crates/compose/tests/popconfirm_tests.rs) |
+| `Tests/CoveUIComposeTests/PopoverTests.swift` | 686 | [crates/compose/tests/popover_tests.rs](../crates/compose/tests/popover_tests.rs) |
+| `Tests/CoveUIComposeTests/PortalLayoutTests.swift` | 99 | [crates/compose/tests/portal_layout_tests.rs](../crates/compose/tests/portal_layout_tests.rs) |
+| `Tests/CoveUIComposeTests/PortalScopeTests.swift` | 88 | [crates/compose/tests/portal_scope_tests.rs](../crates/compose/tests/portal_scope_tests.rs) |
+| `Tests/CoveUIComposeTests/PrimitiveLayoutTests.swift` | 286 | [crates/compose/tests/primitive_layout_tests.rs](../crates/compose/tests/primitive_layout_tests.rs) |
+| `Tests/CoveUIComposeTests/ProductComponentTests.swift` | 390 | [crates/compose/tests/product_component_tests.rs](../crates/compose/tests/product_component_tests.rs) |
+| `Tests/CoveUIComposeTests/ProductInteractionRegressionTests.swift` | 397 | [crates/compose/tests/product_interaction_regression_tests.rs](../crates/compose/tests/product_interaction_regression_tests.rs) |
+| `Tests/CoveUIComposeTests/ProgressAnimationTests.swift` | 47 | [crates/compose/tests/progress_animation.rs](../crates/compose/tests/progress_animation.rs) |
+| `Tests/CoveUIComposeTests/PropertyGridSizingTests.swift` | 99 | [crates/compose/tests/property_grid_sizing.rs](../crates/compose/tests/property_grid_sizing.rs) |
+| `Tests/CoveUIComposeTests/RangeSliderTests.swift` | 189 | [crates/compose/tests/range_slider_tests.rs](../crates/compose/tests/range_slider_tests.rs) |
+| `Tests/CoveUIComposeTests/RatingTests.swift` | 299 | [crates/compose/tests/rating_tests.rs](../crates/compose/tests/rating_tests.rs) |
+| `Tests/CoveUIComposeTests/RecompositionPaintTests.swift` | 49 | [crates/compose/tests/recomposition_paint.rs](../crates/compose/tests/recomposition_paint.rs) |
+| `Tests/CoveUIComposeTests/RefreshTests.swift` | 154 | [crates/compose/tests/refresh_tests.rs](../crates/compose/tests/refresh_tests.rs) |
+| `Tests/CoveUIComposeTests/RenderTreeMirrorTests.swift` | 258 | [crates/compose/tests/render_tree_mirror_tests.rs](../crates/compose/tests/render_tree_mirror_tests.rs) |
+| `Tests/CoveUIComposeTests/ReorderableListTests.swift` | 263 | [crates/compose/tests/reorderable_list_tests.rs](../crates/compose/tests/reorderable_list_tests.rs) |
+| `Tests/CoveUIComposeTests/ResponsiveLayoutTests.swift` | 187 | [crates/compose/tests/responsive_layout_tests.rs](../crates/compose/tests/responsive_layout_tests.rs) |
+| `Tests/CoveUIComposeTests/RetainedVisibilityTests.swift` | 67 | [crates/compose/tests/retained_visibility_tests.rs](../crates/compose/tests/retained_visibility_tests.rs) |
+| `Tests/CoveUIComposeTests/RichTextTests.swift` | 282 | [crates/compose/tests/rich_text_tests.rs](../crates/compose/tests/rich_text_tests.rs) |
+| `Tests/CoveUIComposeTests/RouteAndPreloadTests.swift` | 167 | [crates/compose/tests/route_and_preload_tests.rs](../crates/compose/tests/route_and_preload_tests.rs) |
+| `Tests/CoveUIComposeTests/RowSlotTests.swift` | 58 | [crates/compose/tests/row_slot.rs](../crates/compose/tests/row_slot.rs) |
+| `Tests/CoveUIComposeTests/ScratchGeometryTests.swift` | 48 | [crates/compose/tests/scratch_geometry.rs](../crates/compose/tests/scratch_geometry.rs) |
+| `Tests/CoveUIComposeTests/ScrollOffsetBindingTests.swift` | 151 | [crates/compose/tests/scroll_offset_binding_tests.rs](../crates/compose/tests/scroll_offset_binding_tests.rs) |
+| `Tests/CoveUIComposeTests/ScrollViewInputTests.swift` | 167 | [crates/compose/tests/scroll_view_input_tests.rs](../crates/compose/tests/scroll_view_input_tests.rs) |
+| `Tests/CoveUIComposeTests/ScrollbarTests.swift` | 281 | [crates/compose/tests/scrollbar_tests.rs](../crates/compose/tests/scrollbar_tests.rs) |
+| `Tests/CoveUIComposeTests/ScrolledControlClickTests.swift` | 507 | [crates/compose/tests/scrolled_control_click_tests.rs](../crates/compose/tests/scrolled_control_click_tests.rs) |
+| `Tests/CoveUIComposeTests/Scrolling/IndicatorTests.swift` | 88 | [crates/compose/tests/indicator_tests.rs](../crates/compose/tests/indicator_tests.rs) |
+| `Tests/CoveUIComposeTests/Scrolling/KeyboardFocusTests.swift` | 63 | [crates/compose/tests/keyboard_focus_tests.rs](../crates/compose/tests/keyboard_focus_tests.rs) |
+| `Tests/CoveUIComposeTests/Scrolling/NestedScrollRoutingTests.swift` | 146 | [crates/compose/tests/nested_scroll_routing_tests.rs](../crates/compose/tests/nested_scroll_routing_tests.rs) |
+| `Tests/CoveUIComposeTests/Scrolling/ScrollPhysicsTests.swift` | 454 | [crates/compose/tests/scroll_physics_tests.rs](../crates/compose/tests/scroll_physics_tests.rs) |
+| `Tests/CoveUIComposeTests/SearchFieldTests.swift` | 95 | [crates/compose/tests/search_field.rs](../crates/compose/tests/search_field.rs) |
+| `Tests/CoveUIComposeTests/SectionedListTests.swift` | 211 | [crates/compose/tests/sectioned_list_tests.rs](../crates/compose/tests/sectioned_list_tests.rs) |
+| `Tests/CoveUIComposeTests/SelectEnumerationTests.swift` | 18 | [crates/compose/tests/select_enumeration.rs](../crates/compose/tests/select_enumeration.rs) |
+| `Tests/CoveUIComposeTests/SemanticMotionTests.swift` | 96 | [crates/compose/tests/semantic_motion_tests.rs](../crates/compose/tests/semantic_motion_tests.rs) |
+| `Tests/CoveUIComposeTests/SheetTests.swift` | 82 | [crates/compose/tests/sheet_tests.rs](../crates/compose/tests/sheet_tests.rs) |
+| `Tests/CoveUIComposeTests/ShortcutHostTests.swift` | 59 | [crates/compose/tests/shortcut_host_tests.rs](../crates/compose/tests/shortcut_host_tests.rs) |
+| `Tests/CoveUIComposeTests/SidebarContentTests.swift` | 212 | [crates/compose/tests/sidebar_content_tests.rs](../crates/compose/tests/sidebar_content_tests.rs) |
+| `Tests/CoveUIComposeTests/SidebarSlotTests.swift` | 62 | [crates/compose/tests/sidebar_slot_tests.rs](../crates/compose/tests/sidebar_slot_tests.rs) |
+| `Tests/CoveUIComposeTests/SidebarTests.swift` | 87 | [crates/compose/tests/sidebar_tests.rs](../crates/compose/tests/sidebar_tests.rs) |
+| `Tests/CoveUIComposeTests/SingleLineTextTests.swift` | 92 | [crates/compose/tests/single_line_text_tests.rs](../crates/compose/tests/single_line_text_tests.rs) |
+| `Tests/CoveUIComposeTests/SliderAxisTests.swift` | 111 | [crates/compose/tests/slider_axis_tests.rs](../crates/compose/tests/slider_axis_tests.rs) |
+| `Tests/CoveUIComposeTests/SliderTests.swift` | 300 | [crates/compose/tests/slider.rs](../crates/compose/tests/slider.rs) |
+| `Tests/CoveUIComposeTests/SnippetTests.swift` | 109 | [crates/compose/tests/snippet_tests.rs](../crates/compose/tests/snippet_tests.rs) |
+| `Tests/CoveUIComposeTests/SplitButtonTests.swift` | 146 | [crates/compose/tests/split_button_tests.rs](../crates/compose/tests/split_button_tests.rs) |
+| `Tests/CoveUIComposeTests/SplitViewPanelTests.swift` | 137 | [crates/compose/tests/split_view_panel_tests.rs](../crates/compose/tests/split_view_panel_tests.rs) |
+| `Tests/CoveUIComposeTests/SpringInterruptionTests.swift` | 145 | [crates/compose/tests/spring_interruption_tests.rs](../crates/compose/tests/spring_interruption_tests.rs) |
+| `Tests/CoveUIComposeTests/StatePropagationRegressionTests.swift` | 149 | [crates/compose/tests/state_propagation_regression_tests.rs](../crates/compose/tests/state_propagation_regression_tests.rs) |
+| `Tests/CoveUIComposeTests/StatusBarPanelTruncationTests.swift` | 101 | [crates/compose/tests/status_bar_panel_truncation_tests.rs](../crates/compose/tests/status_bar_panel_truncation_tests.rs) |
+| `Tests/CoveUIComposeTests/StyleIntegrationTests.swift` | 210 | [crates/compose/tests/style_integration_tests.rs](../crates/compose/tests/style_integration_tests.rs) |
+| `Tests/CoveUIComposeTests/StyleSkeletonTests.swift` | 102 | [crates/compose/tests/style_skeleton_tests.rs](../crates/compose/tests/style_skeleton_tests.rs) |
+| `Tests/CoveUIComposeTests/SwiftObservationTests.swift` | 92 | [crates/compose/tests/swift_observation_tests.rs](../crates/compose/tests/swift_observation_tests.rs) |
+| `Tests/CoveUIComposeTests/SwipeListTests.swift` | 236 | [crates/compose/tests/swipe_list_tests.rs](../crates/compose/tests/swipe_list_tests.rs) |
+| `Tests/CoveUIComposeTests/TabViewTests.swift` | 122 | [crates/compose/tests/tab_view_tests.rs](../crates/compose/tests/tab_view_tests.rs) |
+| `Tests/CoveUIComposeTests/TestSupport.swift` | 63 | [crates/compose/tests/support/mod.rs](../crates/compose/tests/support/mod.rs) |
+| `Tests/CoveUIComposeTests/TextBufferTests.swift` | 194 | [crates/compose/tests/text_buffer_tests.rs](../crates/compose/tests/text_buffer_tests.rs) |
+| `Tests/CoveUIComposeTests/TextCacheTests.swift` | 53 | [crates/compose/tests/text_cache.rs](../crates/compose/tests/text_cache.rs) |
+| `Tests/CoveUIComposeTests/TextDividerTests.swift` | 204 | [crates/compose/tests/text_divider.rs](../crates/compose/tests/text_divider.rs) |
+| `Tests/CoveUIComposeTests/TextDocumentLayoutTests.swift` | 77 | [crates/compose/tests/text_document_layout_tests.rs](../crates/compose/tests/text_document_layout_tests.rs) |
+| `Tests/CoveUIComposeTests/TextEditorAppearanceTests.swift` | 77 | [crates/compose/tests/text_editor_appearance_tests.rs](../crates/compose/tests/text_editor_appearance_tests.rs) |
+| `Tests/CoveUIComposeTests/TextFieldLargeDocumentTests.swift` | 122 | [crates/compose/tests/text_field_large_document_tests.rs](../crates/compose/tests/text_field_large_document_tests.rs) |
+| `Tests/CoveUIComposeTests/TextFieldNavigationTests.swift` | 187 | [crates/compose/tests/text_field_navigation_tests.rs](../crates/compose/tests/text_field_navigation_tests.rs) |
+| `Tests/CoveUIComposeTests/TextFieldTests.swift` | 1014 | [crates/compose/tests/text_field_tests.rs](../crates/compose/tests/text_field_tests.rs) |
+| `Tests/CoveUIComposeTests/TextIndentGuidesTests.swift` | 50 | [crates/compose/tests/text_indent_guides.rs](../crates/compose/tests/text_indent_guides.rs) |
+| `Tests/CoveUIComposeTests/TextMeasureSlotTests.swift` | 52 | [crates/compose/tests/text_measure_slot.rs](../crates/compose/tests/text_measure_slot.rs) |
+| `Tests/CoveUIComposeTests/TextSelectionGeometryTests.swift` | 74 | [crates/compose/tests/text_selection_geometry.rs](../crates/compose/tests/text_selection_geometry.rs) |
+| `Tests/CoveUIComposeTests/TextSelectionScopeTests.swift` | 184 | [crates/compose/tests/text_selection_scope_tests.rs](../crates/compose/tests/text_selection_scope_tests.rs) |
+| `Tests/CoveUIComposeTests/TextShapeCacheTests.swift` | 136 | [crates/compose/tests/text_shape_cache_tests.rs](../crates/compose/tests/text_shape_cache_tests.rs) |
+| `Tests/CoveUIComposeTests/TextVisualLineIndexTests.swift` | 51 | [crates/compose/tests/text_visual_line_index.rs](../crates/compose/tests/text_visual_line_index.rs) |
+| `Tests/CoveUIComposeTests/ThemeCrossFadeComponentTests.swift` | 213 | [crates/compose/tests/theme_cross_fade_component_tests.rs](../crates/compose/tests/theme_cross_fade_component_tests.rs) |
+| `Tests/CoveUIComposeTests/ThemeEnvironmentTests.swift` | 108 | [crates/compose/tests/theme_environment.rs](../crates/compose/tests/theme_environment.rs) |
+| `Tests/CoveUIComposeTests/ThemeInteractionRegressionTests.swift` | 254 | [crates/compose/tests/theme_interaction_regression_tests.rs](../crates/compose/tests/theme_interaction_regression_tests.rs) |
+| `Tests/CoveUIComposeTests/ThemePaintInvalidationTests.swift` | 54 | [crates/compose/tests/theme_paint_invalidation.rs](../crates/compose/tests/theme_paint_invalidation.rs) |
+| `Tests/CoveUIComposeTests/ThemeTests.swift` | 72 | [crates/compose/tests/theme.rs](../crates/compose/tests/theme.rs) |
+| `Tests/CoveUIComposeTests/TimeInputTests.swift` | 125 | [crates/compose/tests/time_input.rs](../crates/compose/tests/time_input.rs) |
+| `Tests/CoveUIComposeTests/TimePickerTests.swift` | 85 | [crates/compose/tests/time_picker_tests.rs](../crates/compose/tests/time_picker_tests.rs) |
+| `Tests/CoveUIComposeTests/TimelineGroupTests.swift` | 86 | [crates/compose/tests/timeline_group_tests.rs](../crates/compose/tests/timeline_group_tests.rs) |
+| `Tests/CoveUIComposeTests/ToastAnimationTests.swift` | 96 | [crates/compose/tests/toast_animation_tests.rs](../crates/compose/tests/toast_animation_tests.rs) |
+| `Tests/CoveUIComposeTests/ToggleTests.swift` | 209 | [crates/compose/tests/toggle_tests.rs](../crates/compose/tests/toggle_tests.rs) |
+| `Tests/CoveUIComposeTests/TooltipDeduplicationTests.swift` | 109 | [crates/compose/tests/tooltip_deduplication_tests.rs](../crates/compose/tests/tooltip_deduplication_tests.rs) |
+| `Tests/CoveUIComposeTests/TouchDensityTests.swift` | 171 | [crates/compose/tests/touch_density_tests.rs](../crates/compose/tests/touch_density_tests.rs) |
+| `Tests/CoveUIComposeTests/Transitions/ScaleTests.swift` | 245 | [crates/compose/tests/scale_tests.rs](../crates/compose/tests/scale_tests.rs) |
+| `Tests/CoveUIComposeTests/Transitions/SurfaceRevealTests.swift` | 120 | [crates/compose/tests/surface_reveal_tests.rs](../crates/compose/tests/surface_reveal_tests.rs) |
+| `Tests/CoveUIComposeTests/Tree/BehaviorTests.swift` | 148 | [crates/compose/tests/tree_behavior.rs](../crates/compose/tests/tree_behavior.rs) |
+| `Tests/CoveUIComposeTests/TruncationTests.swift` | 79 | [crates/compose/tests/truncation_tests.rs](../crates/compose/tests/truncation_tests.rs) |
+| `Tests/CoveUIComposeTests/TypographyRasterTests.swift` | 98 | [crates/compose/tests/typography_raster_tests.rs](../crates/compose/tests/typography_raster_tests.rs) |
+| `Tests/CoveUIComposeTests/ValueSubtreeTests.swift` | 47 | [crates/compose/tests/value_subtree.rs](../crates/compose/tests/value_subtree.rs) |
+| `Tests/CoveUIComposeTests/Vec3FieldTests.swift` | 129 | [crates/compose/tests/vec3_field.rs](../crates/compose/tests/vec3_field.rs) |
+| `Tests/CoveUIComposeTests/VerticalToolbarTests.swift` | 58 | [crates/compose/tests/vertical_toolbar_tests.rs](../crates/compose/tests/vertical_toolbar_tests.rs) |
+| `Tests/CoveUIComposeTests/ViewBuilderTests.swift` | 74 | [crates/compose/tests/view_builder.rs](../crates/compose/tests/view_builder.rs) |
+| `Tests/CoveUIComposeTests/ViewGraphTests.swift` | 351 | [crates/compose/tests/view_graph.rs](../crates/compose/tests/view_graph.rs) |
+| `Tests/CoveUIComposeTests/ViewThatFitsTests.swift` | 137 | [crates/compose/tests/view_that_fits_tests.rs](../crates/compose/tests/view_that_fits_tests.rs) |
+| `Tests/CoveUIComposeTests/ViewportTraitsTests.swift` | 102 | [crates/compose/tests/viewport_traits_tests.rs](../crates/compose/tests/viewport_traits_tests.rs) |
+| `Tests/CoveUIComposeTests/VirtualStackVariableRowsTests.swift` | 217 | [crates/compose/tests/virtual_stack_variable_rows_tests.rs](../crates/compose/tests/virtual_stack_variable_rows_tests.rs) |
+| `Tests/CoveUIComposeTests/VirtualizationEstimateTests.swift` | 59 | [crates/compose/tests/virtualization_estimate_tests.rs](../crates/compose/tests/virtualization_estimate_tests.rs) |
+| `Tests/CoveUIComposeTests/WheelPickerTests.swift` | 169 | [crates/compose/tests/wheel_picker.rs](../crates/compose/tests/wheel_picker.rs) |
+| `Tests/CoveUIComposeTests/WithAnimationCompletionTests.swift` | 169 | [crates/compose/tests/with_animation_completion_tests.rs](../crates/compose/tests/with_animation_completion_tests.rs) |
+| `Tests/CoveUIComposeTests/WithAnimationOpacityTests.swift` | 150 | [crates/compose/tests/with_animation_opacity_tests.rs](../crates/compose/tests/with_animation_opacity_tests.rs) |
+| `Tests/CoveUIComposeTests/WithAnimationPropertiesTests.swift` | 465 | [crates/compose/tests/with_animation_properties_tests.rs](../crates/compose/tests/with_animation_properties_tests.rs) |
+| `Tests/CoveUIComposeTests/ZStackTests.swift` | 132 | [crates/compose/tests/zstack.rs](../crates/compose/tests/zstack.rs) |
+| `Tests/CoveUIDevToolsTests/DevServerInputAndStateTests.swift` | 286 | [crates/devtools/tests/dev_server_input_and_state_tests.rs](../crates/devtools/tests/dev_server_input_and_state_tests.rs) |
+| `Tests/CoveUIDevToolsTests/DevServerSmokeTests.swift` | 209 | [crates/devtools/tests/dev_server_smoke_tests.rs](../crates/devtools/tests/dev_server_smoke_tests.rs) |
+| `Tests/CoveUIDevToolsTests/MirrorBackdropTests.swift` | 47 | [crates/devtools/tests/mirror_backdrop_tests.rs](../crates/devtools/tests/mirror_backdrop_tests.rs) |
+| `Tests/CoveUIDevToolsTests/TimingPublisherTests.swift` | 15 | [crates/devtools/tests/timing_publisher_tests.rs](../crates/devtools/tests/timing_publisher_tests.rs) |
+| `Tests/CoveUIRuntimeTests/AccessibilityGeometryTests.swift` | 36 | [crates/core/tests/accessibility_geometry.rs](../crates/core/tests/accessibility_geometry.rs) |
+| `Tests/CoveUIRuntimeTests/AnimationControllerTests.swift` | 220 | [crates/core/tests/animation_controller_tests.rs](../crates/core/tests/animation_controller_tests.rs) |
+| `Tests/CoveUIRuntimeTests/AnimationValueTests.swift` | 184 | [crates/core/tests/animation_value.rs](../crates/core/tests/animation_value.rs) |
+| `Tests/CoveUIRuntimeTests/AppKitScrollInputTests.swift` | 125 | [crates/shell/tests/app_kit_scroll_input_tests.rs](../crates/shell/tests/app_kit_scroll_input_tests.rs) |
+| `Tests/CoveUIRuntimeTests/ColorGlyphTests.swift` | 90 | [crates/text/tests/color_glyph_tests.rs](../crates/text/tests/color_glyph_tests.rs) |
+| `Tests/CoveUIRuntimeTests/ContainerOpacityTests.swift` | 38 | [crates/core/tests/container_opacity.rs](../crates/core/tests/container_opacity.rs) |
+| `Tests/CoveUIRuntimeTests/DisplayRefreshRateTests.swift` | 23 | [crates/shell/tests/display_refresh_rate_tests.rs](../crates/shell/tests/display_refresh_rate_tests.rs) |
+| `Tests/CoveUIRuntimeTests/DrawBatchCoalescingTests.swift` | 68 | [crates/graphics/tests/draw_batch_coalescing_tests.rs](../crates/graphics/tests/draw_batch_coalescing_tests.rs) |
+| `Tests/CoveUIRuntimeTests/DrawListTests.swift` | 287 | [crates/runtime/tests/draw_list_tests.rs](../crates/runtime/tests/draw_list_tests.rs) |
+| `Tests/CoveUIRuntimeTests/EventDispatcherCursorTests.swift` | 98 | [crates/runtime/tests/event_dispatcher_cursor_tests.rs](../crates/runtime/tests/event_dispatcher_cursor_tests.rs) |
+| `Tests/CoveUIRuntimeTests/EventDispatcherTests.swift` | 496 | [crates/runtime/tests/event_dispatcher_tests.rs](../crates/runtime/tests/event_dispatcher_tests.rs) |
+| `Tests/CoveUIRuntimeTests/FallbackStyleTests.swift` | 49 | [crates/text/tests/fallback_style_tests.rs](../crates/text/tests/fallback_style_tests.rs) |
+| `Tests/CoveUIRuntimeTests/FocusChainTests.swift` | 149 | [crates/core/tests/focus_chain.rs](../crates/core/tests/focus_chain.rs) |
+| `Tests/CoveUIRuntimeTests/FrameDeadlineTests.swift` | 85 | [crates/runtime/tests/frame_deadline_tests.rs](../crates/runtime/tests/frame_deadline_tests.rs) |
+| `Tests/CoveUIRuntimeTests/GeometryFunnelReproTests.swift` | 79 | [crates/core/tests/geometry_funnel_repro_tests.rs](../crates/core/tests/geometry_funnel_repro_tests.rs) |
+| `Tests/CoveUIRuntimeTests/HitTesterTests.swift` | 112 | [crates/core/tests/hit_tester.rs](../crates/core/tests/hit_tester.rs) |
+| `Tests/CoveUIRuntimeTests/ImageAssetRegistryTests.swift` | 57 | [crates/imaging/tests/image_asset_registry_tests.rs](../crates/imaging/tests/image_asset_registry_tests.rs) |
+| `Tests/CoveUIRuntimeTests/ImageDecoderTests.swift` | 141 | [crates/imaging/tests/image_decoder_tests.rs](../crates/imaging/tests/image_decoder_tests.rs) |
+| `Tests/CoveUIRuntimeTests/InterpolatableTests.swift` | 93 | [crates/core/tests/interpolatable.rs](../crates/core/tests/interpolatable.rs) |
+| `Tests/CoveUIRuntimeTests/LayerAwareNodeRendererTests.swift` | 544 | [crates/core/tests/layer_aware_node_renderer_tests.rs](../crates/core/tests/layer_aware_node_renderer_tests.rs) |
+| `Tests/CoveUIRuntimeTests/LayoutTests.swift` | 334 | [crates/core/tests/layout_tests.rs](../crates/core/tests/layout_tests.rs) |
+| `Tests/CoveUIRuntimeTests/LinearGradientTests.swift` | 49 | [crates/core/tests/linear_gradient.rs](../crates/core/tests/linear_gradient.rs) |
+| `Tests/CoveUIRuntimeTests/MultiWindowSmokeTests.swift` | 1048 | [crates/runtime/tests/multi_window_smoke_tests.rs](../crates/runtime/tests/multi_window_smoke_tests.rs) |
+| `Tests/CoveUIRuntimeTests/NativeAccessibilityTests.swift` | 162 | [crates/runtime/tests/native_accessibility_tests.rs](../crates/runtime/tests/native_accessibility_tests.rs) |
+| `Tests/CoveUIRuntimeTests/NativeAnalyticClipTests.swift` | 33 | [crates/graphics/tests/native_analytic_clip_tests.rs](../crates/graphics/tests/native_analytic_clip_tests.rs) |
+| `Tests/CoveUIRuntimeTests/NativeDisplayRefreshTests.swift` | 71 | [crates/shell/tests/native_display_refresh_tests.rs](../crates/shell/tests/native_display_refresh_tests.rs) |
+| `Tests/CoveUIRuntimeTests/NativeDrawListBenchmarkTests.swift` | 306 | [crates/graphics/tests/native_draw_list_benchmark_tests.rs](../crates/graphics/tests/native_draw_list_benchmark_tests.rs) |
+| `Tests/CoveUIRuntimeTests/NativeDrawListLifecycleTests.swift` | 269 | [crates/graphics/tests/native_draw_list_lifecycle_tests.rs](../crates/graphics/tests/native_draw_list_lifecycle_tests.rs) |
+| `Tests/CoveUIRuntimeTests/NativeDrawListParityTests.swift` | 62 | [crates/graphics/tests/native_draw_list_parity_tests.rs](../crates/graphics/tests/native_draw_list_parity_tests.rs) |
+| `Tests/CoveUIRuntimeTests/NativeImageAssetTests.swift` | 106 | [crates/graphics/tests/native_image_asset_tests.rs](../crates/graphics/tests/native_image_asset_tests.rs) |
+| `Tests/CoveUIRuntimeTests/NativeRoundedFillTests.swift` | 36 | [crates/graphics/tests/native_rounded_fill_tests.rs](../crates/graphics/tests/native_rounded_fill_tests.rs) |
+| `Tests/CoveUIRuntimeTests/NativeShaderLibraryTests.swift` | 60 | [crates/graphics/tests/native_shader_library_tests.rs](../crates/graphics/tests/native_shader_library_tests.rs) |
+| `Tests/CoveUIRuntimeTests/NativeUIBackdropTests.swift` | 337 | [crates/graphics/tests/native_ui_backdrop_tests.rs](../crates/graphics/tests/native_ui_backdrop_tests.rs) |
+| `Tests/CoveUIRuntimeTests/NativeUIBindingReuseTests.swift` | 62 | [crates/graphics/tests/native_ui_binding_reuse_tests.rs](../crates/graphics/tests/native_ui_binding_reuse_tests.rs) |
+| `Tests/CoveUIRuntimeTests/NativeUIDrawTestSupport.swift` | 165 | [crates/graphics/tests/native_draw_list_parity_tests.rs](../crates/graphics/tests/native_draw_list_parity_tests.rs)<br>[crates/graphics/tests/native_ui_binding_reuse_tests.rs](../crates/graphics/tests/native_ui_binding_reuse_tests.rs) |
+| `Tests/CoveUIRuntimeTests/NodeLifecycleCleanupTests.swift` | 107 | [crates/core/tests/node_lifecycle_cleanup_tests.rs](../crates/core/tests/node_lifecycle_cleanup_tests.rs) |
+| `Tests/CoveUIRuntimeTests/NodeRendererTests.swift` | 227 | [crates/core/tests/node_renderer_tests.rs](../crates/core/tests/node_renderer_tests.rs) |
+| `Tests/CoveUIRuntimeTests/NodeResourceTests.swift` | 90 | [crates/core/tests/node_resource.rs](../crates/core/tests/node_resource.rs) |
+| `Tests/CoveUIRuntimeTests/NodeTransformRenderTests.swift` | 248 | [crates/core/tests/node_transform_render_tests.rs](../crates/core/tests/node_transform_render_tests.rs) |
+| `Tests/CoveUIRuntimeTests/NodeTransformTests.swift` | 174 | [crates/core/tests/node_transform.rs](../crates/core/tests/node_transform.rs) |
+| `Tests/CoveUIRuntimeTests/NodeTreeTests.swift` | 159 | [crates/core/tests/node_tree_tests.rs](../crates/core/tests/node_tree_tests.rs) |
+| `Tests/CoveUIRuntimeTests/ProgressiveImageTests.swift` | 76 | [crates/imaging/tests/progressive_image_tests.rs](../crates/imaging/tests/progressive_image_tests.rs) |
+| `Tests/CoveUIRuntimeTests/RecomposerTests.swift` | 182 | [crates/core/tests/recomposer_tests.rs](../crates/core/tests/recomposer_tests.rs) |
+| `Tests/CoveUIRuntimeTests/Rendering/BackdropOpacityTests.swift` | 61 | [crates/core/tests/backdrop_opacity_tests.rs](../crates/core/tests/backdrop_opacity_tests.rs) |
+| `Tests/CoveUIRuntimeTests/Rendering/CircularRevealPixels.swift` | 72 | [crates/graphics/tests/circular_reveal_pixels.rs](../crates/graphics/tests/circular_reveal_pixels.rs) |
+| `Tests/CoveUIRuntimeTests/Rendering/CompositionPaintTests.swift` | 39 | [crates/core/tests/composition_paint_tests.rs](../crates/core/tests/composition_paint_tests.rs) |
+| `Tests/CoveUIRuntimeTests/Rendering/EffectReplayTests.swift` | 68 | [crates/graphics/tests/effect_replay_tests.rs](../crates/graphics/tests/effect_replay_tests.rs) |
+| `Tests/CoveUIRuntimeTests/Rendering/MSAAEvaluationTests.swift` | 184 | [crates/graphics/tests/msaa_evaluation_tests.rs](../crates/graphics/tests/msaa_evaluation_tests.rs) |
+| `Tests/CoveUIRuntimeTests/Rendering/RevealRequestTests.swift` | 89 | [crates/core/tests/reveal_request_tests.rs](../crates/core/tests/reveal_request_tests.rs) |
+| `Tests/CoveUIRuntimeTests/Rendering/TransientMSAATests.swift` | 90 | [crates/graphics/tests/transient_msaa_tests.rs](../crates/graphics/tests/transient_msaa_tests.rs) |
+| `Tests/CoveUIRuntimeTests/RoundedClipTests.swift` | 212 | [crates/core/tests/rounded_clip_tests.rs](../crates/core/tests/rounded_clip_tests.rs) |
+| `Tests/CoveUIRuntimeTests/ShadowQuantizationTests.swift` | 214 | [crates/core/tests/shadow_quantization_tests.rs](../crates/core/tests/shadow_quantization_tests.rs) |
+| `Tests/CoveUIRuntimeTests/SurfacePaintingTests.swift` | 111 | [crates/core/tests/surface_painting_tests.rs](../crates/core/tests/surface_painting_tests.rs) |
+| `Tests/CoveUIRuntimeTests/SurfaceRenderingTests.swift` | 56 | [crates/text/tests/surface_rendering_tests.rs](../crates/text/tests/surface_rendering_tests.rs) |
+| `Tests/CoveUIRuntimeTests/SystemFontInstanceTests.swift` | 77 | [crates/text/tests/system_font_instance_tests.rs](../crates/text/tests/system_font_instance_tests.rs) |
+| `Tests/CoveUIRuntimeTests/TextLayoutRegressionTests.swift` | 66 | [crates/core/tests/text_layout_regression_tests.rs](../crates/core/tests/text_layout_regression_tests.rs) |
+| `Tests/CoveUIRuntimeTests/TextTests.swift` | 403 | [crates/text/tests/text_tests.rs](../crates/text/tests/text_tests.rs) |
+| `Tests/CoveUIRuntimeTests/Transforms/HitTestingTests.swift` | 200 | [crates/core/tests/hit_testing_tests.rs](../crates/core/tests/hit_testing_tests.rs) |
+| `Tests/CoveUIRuntimeTests/Transforms/PaintTests.swift` | 47 | [crates/core/tests/paint_tests.rs](../crates/core/tests/paint_tests.rs) |
+| `Tests/CoveUIRuntimeTests/Transforms/ShadowTests.swift` | 112 | [crates/core/tests/shadow_tests.rs](../crates/core/tests/shadow_tests.rs) |
+| `Tests/CoveUIRuntimeTests/WheelInputTests.swift` | 125 | [crates/core/tests/wheel_input_tests.rs](../crates/core/tests/wheel_input_tests.rs) |
+| `Tests/CoveUIRuntimeTests/ZIndexTests.swift` | 34 | [crates/core/tests/z_index_tests.rs](../crates/core/tests/z_index_tests.rs) |
+| `Tests/CoveUITests/AppDisplayHandleTests.swift` | 38 | [crates/hosts/tests/app_display_handle_tests.rs](../crates/hosts/tests/app_display_handle_tests.rs) |
+| `Tests/CoveUITests/ApplicationTests.swift` | 101 | [crates/hosts/tests/application_tests.rs](../crates/hosts/tests/application_tests.rs) |
+| `Tests/CoveUITests/NativeWindowLifecycleTests.swift` | 72 | [crates/hosts/tests/native_window_lifecycle_tests.rs](../crates/hosts/tests/native_window_lifecycle_tests.rs) |
+| `Tests/CoveUITests/PackageResourceBundleTests.swift` | 13 | [crates/compose/tests/package_resource_bundle.rs](../crates/compose/tests/package_resource_bundle.rs) |
+| `Tests/CoveUITests/WindowChromeInteractionTests.swift` | 159 | [crates/hosts/tests/window_chrome_interaction_tests.rs](../crates/hosts/tests/window_chrome_interaction_tests.rs) |
+| `Tests/CoveUIWebViewTests/WebViewGeometryTests.swift` | 115 | [crates/addons/tests/web_view_geometry_tests.rs](../crates/addons/tests/web_view_geometry_tests.rs) |
+| `Tests/CoveUIWebViewTests/WebViewLifecycleTests.swift` | 128 | [crates/addons/tests/web_view_lifecycle_tests.rs](../crates/addons/tests/web_view_lifecycle_tests.rs) |
+| `Tests/CoveUIWorkspaceTests/PackageResourceBundleTests.swift` | 13 | [crates/compose/tests/package_resource_bundle.rs](../crates/compose/tests/package_resource_bundle.rs) |
+| `Tests/CoveUIWorkspaceTests/PanelRegistryTests.swift` | 69 | [crates/addons/tests/panel_registry.rs](../crates/addons/tests/panel_registry.rs) |
+| `Tests/CoveUIWorkspaceTests/PanelSizingTests.swift` | 85 | [crates/addons/tests/panel_sizing.rs](../crates/addons/tests/panel_sizing.rs) |
+| `Tests/CoveUIWorkspaceTests/PanelWorkspaceIntegrationTests.swift` | 46 | [crates/addons/tests/panel_workspace_integration_tests.rs](../crates/addons/tests/panel_workspace_integration_tests.rs) |
+| `Tests/CoveUIWorkspaceTests/WorkspaceControllerTests.swift` | 473 | [crates/addons/tests/workspace_controller_tests.rs](../crates/addons/tests/workspace_controller_tests.rs) |
+| `Tests/CoveUIWorkspaceTests/WorkspaceViewTests.swift` | 1177 | [crates/addons/tests/workspace_view_tests.rs](../crates/addons/tests/workspace_view_tests.rs) |
+| `Tests/Headless/Tests/CoveUISceneTests/Animation/CurveTests.swift` | 141 | [crates/core/tests/animation_curve_tests.rs](../crates/core/tests/animation_curve_tests.rs) |
+| `Tests/Headless/Tests/CoveUISceneTests/Animation/PlaybackTests.swift` | 155 | [crates/core/tests/playback_tests.rs](../crates/core/tests/playback_tests.rs) |
+| `Tests/Headless/Tests/CoveUISceneTests/DiagnosticPresentationTests.swift` | 184 | [crates/devtools/tests/diagnostic_presentation_tests.rs](../crates/devtools/tests/diagnostic_presentation_tests.rs) |
+| `Tests/Headless/Tests/CoveUISceneTests/DiagnosticsTests.swift` | 337 | [crates/devtools/tests/diagnostics_tests.rs](../crates/devtools/tests/diagnostics_tests.rs) |
+| `Tests/Headless/Tests/CoveUISceneTests/FlatRenderPlanTests.swift` | 157 | [crates/core/tests/flat_render_plan_tests.rs](../crates/core/tests/flat_render_plan_tests.rs) |
+| `Tests/Headless/Tests/CoveUISceneTests/Input/CaptureCancellationTests.swift` | 50 | [crates/core/tests/capture_cancellation_tests.rs](../crates/core/tests/capture_cancellation_tests.rs) |
+| `Tests/Headless/Tests/CoveUISceneTests/Input/FocusAccessoryTests.swift` | 58 | [crates/core/tests/focus_accessory_tests.rs](../crates/core/tests/focus_accessory_tests.rs) |
+| `Tests/Headless/Tests/CoveUISceneTests/Layout/MeasurementLifecycleTests.swift` | 70 | [crates/core/tests/measurement_lifecycle_tests.rs](../crates/core/tests/measurement_lifecycle_tests.rs) |
+| `Tests/Headless/Tests/CoveUISceneTests/Layout/MinimumSizeTests.swift` | 41 | [crates/core/tests/minimum_size_tests.rs](../crates/core/tests/minimum_size_tests.rs) |
+| `Tests/Headless/Tests/CoveUISceneTests/ObservationTests.swift` | 103 | [crates/core/tests/observation_tests.rs](../crates/core/tests/observation_tests.rs) |
+| `Tests/Headless/Tests/CoveUISceneTests/RenderPipelinePerformanceTests.swift` | 43 | [crates/core/tests/render_pipeline_performance_tests.rs](../crates/core/tests/render_pipeline_performance_tests.rs) |
+| `Tests/Headless/Tests/CoveUISceneTests/Scrolling/RubberBandTests.swift` | 67 | [crates/core/tests/rubber_band_tests.rs](../crates/core/tests/rubber_band_tests.rs) |
+| `Tests/Headless/Tests/CoveUISceneTests/Scrolling/ScrollAnimatorTests.swift` | 603 | [tests/scroll_animator_tests.rs](../tests/scroll_animator_tests.rs)<br>[crates/core/tests/scroll_animator_tests.rs](../crates/core/tests/scroll_animator_tests.rs) |
+| `Tests/Headless/Tests/CoveUISceneTests/Scrolling/ScrollSpringTests.swift` | 92 | [tests/scroll_spring_tests.rs](../tests/scroll_spring_tests.rs)<br>[crates/core/tests/scroll_spring_tests.rs](../crates/core/tests/scroll_spring_tests.rs) |
+| `Tests/Headless/Tests/CoveUISceneTests/Scrolling/ScrollVelocityTrackerTests.swift` | 107 | [tests/scroll_velocity_tracker_tests.rs](../tests/scroll_velocity_tracker_tests.rs)<br>[crates/core/tests/scroll_velocity_tracker_tests.rs](../crates/core/tests/scroll_velocity_tracker_tests.rs) |
+| `Tests/Headless/Tests/CoveUISceneTests/StateFieldReadTests.swift` | 595 | [crates/composition/tests/state_field_read_tests.rs](../crates/composition/tests/state_field_read_tests.rs) |
+| `Tests/Headless/Tests/CoveUISceneTests/StructuralModifierTests.swift` | 138 | [crates/composition/tests/structural_modifier_tests.rs](../crates/composition/tests/structural_modifier_tests.rs) |
+| `Text/Tests/CoveUITextTests/ColorGlyphAtlasTests.swift` | 74 | [crates/text/tests/color_glyph_atlas.rs](../crates/text/tests/color_glyph_atlas.rs) |
+| `Text/Tests/CoveUITextTests/FontPipelineTests.swift` | 137 | [crates/text/tests/font_pipeline_tests.rs](../crates/text/tests/font_pipeline_tests.rs) |
 
-共 414 个文件：已写入 414，进行中 0，未开始 0。
+## SwiftPM 清单
 
-| 源文件 | 行 | 状态 | Rust/C 目标 | 依赖或阻塞 |
-| --- | ---: | --- | --- | --- |
-| `Compose/Composition/Sources/CoveUIComposeCore/Adaptive/ContainerQuery.swift` | 108 | 已写入（未验证） | `Compose/Composition/rust/adaptive/container_query.rs` | 未编译、未行为对照 |
-| `Compose/Composition/Sources/CoveUIComposeCore/Adaptive/Surface.swift` | 22 | 已写入（未验证） | `Compose/Composition/rust/adaptive/surface.rs` | 未编译、未行为对照 |
-| `Compose/Composition/Sources/CoveUIComposeCore/Adaptive/ViewportTraits.swift` | 26 | 已写入（未验证） | `Compose/Composition/rust/adaptive/viewport_traits.rs` | 未编译、未行为对照 |
-| `Compose/Composition/Sources/CoveUIComposeCore/Adaptive/WidthClass.swift` | 13 | 已写入（未验证） | `Compose/Composition/rust/adaptive/width_class.rs` | 未编译、未行为对照 |
-| `Compose/Composition/Sources/CoveUIComposeCore/AnyView.swift` | 26 | 已写入（未验证） | `Compose/Composition/rust/any_view.rs` | 未编译、未行为对照 |
-| `Compose/Composition/Sources/CoveUIComposeCore/AroundApplyingModifier.swift` | 17 | 已写入（未验证） | `Compose/Composition/rust/around_applying_modifier.rs` | 未编译、未行为对照 |
-| `Compose/Composition/Sources/CoveUIComposeCore/Box.swift` | 253 | 已写入（未验证） | `Compose/Composition/rust/box_view.rs` | 未编译、未行为对照 |
-| `Compose/Composition/Sources/CoveUIComposeCore/CompositionLocalProvider.swift` | 46 | 已写入（未验证） | `Compose/Composition/rust/composition_local_provider.rs` | 未编译、未行为对照 |
-| `Compose/Composition/Sources/CoveUIComposeCore/Exports.swift` | 1 | 已写入（未验证） | `Logging/rust/exports.rs`<br>`Logging/rust/logging_exports.rs` | 未编译、未行为对照 |
-| `Compose/Composition/Sources/CoveUIComposeCore/IdentifiedView.swift` | 42 | 已写入（未验证） | `Compose/Composition/rust/identified_view.rs` | 未编译、未行为对照 |
-| `Compose/Composition/Sources/CoveUIComposeCore/Layout/Direction.swift` | 14 | 已写入（未验证） | `Compose/Composition/rust/layout/direction.rs` | 未编译、未行为对照 |
-| `Compose/Composition/Sources/CoveUIComposeCore/Layout/Layout.swift` | 91 | 已写入（未验证） | `Compose/Composition/rust/layout/mod.rs` | 未编译、未行为对照 |
-| `Compose/Composition/Sources/CoveUIComposeCore/Layout/LayoutValue.swift` | 30 | 已写入（未验证） | `Compose/Composition/rust/layout/value.rs` | 未编译、未行为对照 |
-| `Compose/Composition/Sources/CoveUIComposeCore/LayoutDebugModifier.swift` | 48 | 已写入（未验证） | `Compose/Composition/rust/layout_debug_modifier.rs` | 未编译、未行为对照 |
-| `Compose/Composition/Sources/CoveUIComposeCore/LayoutTree.swift` | 30 | 已写入（未验证） | `Compose/Composition/rust/layout_tree.rs` | 未编译、未行为对照 |
-| `Compose/Composition/Sources/CoveUIComposeCore/MemoizedView.swift` | 23 | 已写入（未验证） | `Compose/Composition/rust/memoized_view.rs` | 未编译、未行为对照 |
-| `Compose/Composition/Sources/CoveUIComposeCore/ModifiedContent+Materialise.swift` | 196 | 已写入（未验证） | `Compose/Composition/rust/modified_content_materialise.rs` | 未编译、未行为对照 |
-| `Compose/Composition/Sources/CoveUIComposeCore/ModifierReplay.swift` | 34 | 已写入（未验证） | `Compose/Composition/rust/modifier_replay.rs` | 未编译、未行为对照 |
-| `Compose/Composition/Sources/CoveUIComposeCore/PrimitiveView.swift` | 39 | 已写入（未验证） | `Compose/Composition/rust/primitive_view.rs` | 未编译、未行为对照 |
-| `Compose/Composition/Sources/CoveUIComposeCore/PrimitiveViews.swift` | 36 | 已写入（未验证） | `Compose/Composition/rust/primitive_views.rs` | 未编译、未行为对照 |
-| `Compose/Composition/Sources/CoveUIComposeCore/Scancode.swift` | 64 | 已写入（未验证） | `Compose/Composition/rust/scancode.rs` | 未编译、未行为对照 |
-| `Compose/Composition/Sources/CoveUIComposeCore/SourceLocation.swift` | 31 | 已写入（未验证） | `Compose/Composition/rust/source_location.rs` | 未编译、未行为对照 |
-| `Compose/Composition/Sources/CoveUIComposeCore/StructuralView.swift` | 46 | 已写入（未验证） | `Compose/Composition/rust/structural_view.rs` | 未编译、未行为对照 |
-| `Compose/Composition/Sources/CoveUIComposeCore/TrackStateReads.swift` | 20 | 已写入（未验证） | `Compose/Composition/rust/track_state_reads.rs` | 未编译、未行为对照 |
-| `Compose/Composition/Sources/CoveUIComposeCore/View.swift` | 25 | 已写入（未验证） | `Compose/Composition/rust/view.rs` | 未编译、未行为对照 |
-| `Compose/Composition/Sources/CoveUIComposeCore/ViewBuilder.swift` | 75 | 已写入（未验证） | `Compose/Composition/rust/view_builder.rs` | 未编译、未行为对照 |
-| `Compose/Composition/Sources/CoveUIComposeCore/ViewGraph.swift` | 1028 | 已写入（未验证） | `Compose/Composition/rust/view_graph.rs` | 未编译、未行为对照 |
-| `Compose/Composition/Sources/CoveUIComposeCore/ViewInputComparison.swift` | 71 | 已写入（未验证） | `Compose/Composition/rust/view_input_comparison.rs` | 未编译、未行为对照 |
-| `Compose/Composition/Sources/CoveUIComposeCore/ViewModifier.swift` | 71 | 已写入（未验证） | `Compose/Composition/rust/view_modifier.rs` | 未编译、未行为对照 |
-| `Compose/Composition/Sources/CoveUIReadMacros/Plugin.swift` | 7 | 已写入（未验证） | `Compose/CompositionMacros/rust/lib.rs` | 未编译、未行为对照 |
-| `Compose/Composition/Sources/CoveUIReadMacros/TrackStateReadsMacro.swift` | 210 | 已写入（未验证） | `Compose/CompositionMacros/rust/lib.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Animation/AnimatedVisibility.swift` | 238 | 已写入（未验证） | `Compose/rust/animation/content/animated_visibility.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Animation/AnimationValueModifier.swift` | 74 | 已写入（未验证） | `Compose/rust/modifiers/animation_value.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Animation/Content/NumericText.swift` | 78 | 已写入（未验证） | `Compose/rust/animation/content/numeric_text.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Animation/EdgeInsets+Interpolatable.swift` | 14 | 已写入（未验证） | `Compose/rust/modifiers/layout/mod.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Animation/Geometry/Matched.swift` | 146 | 已写入（未验证） | `Compose/rust/animation/geometry/matched.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Animation/Geometry/Transforms.swift` | 40 | 已写入（未验证） | `Compose/rust/animation/geometry/transforms.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Animation/Interaction/SpringDrag.swift` | 126 | 已写入（未验证） | `Compose/rust/animation/interaction/spring_drag.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Animation/Keyframes/Track.swift` | 86 | 已写入（未验证） | `Compose/rust/animation/keyframes/track.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Animation/Phases/Sequence.swift` | 107 | 已写入（未验证） | `Compose/rust/animation/phases/sequence.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Animation/Transition.swift` | 111 | 已写入（未验证） | `Compose/rust/animation/transition.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Animation/TransitionView.swift` | 33 | 已写入（未验证） | `Compose/rust/animation/transition_view.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Animation/WithAnimation.swift` | 52 | 已写入（未验证） | `Compose/rust/lib.rs`<br>`Core/rust/scene/animation/context.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/AppStorage.swift` | 318 | 已写入（未验证） | `Compose/rust/app_storage.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Core/Log.swift` | 4 | 已写入（未验证） | `Compose/rust/primitives/overlays/modal/dialog.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/CoreExports.swift` | 3 | 已写入（未验证） | `Compose/rust/core_exports.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/CoveUICompose.swift` | 7 | 已写入（未验证） | `Compose/rust/lib.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/CoveUIComposeResourceBundle.swift` | 6 | 已写入（未验证） | `Compose/rust/resource_bundle.rs`<br>`PlatformCore/rust/resources.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Foundation/Color+Adjust.swift` | 34 | 已写入（未验证） | `Compose/rust/foundation/color_adjust.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/I18n/LocalizedStringKey.swift` | 35 | 已写入（未验证） | `Compose/rust/i18n/localized_string_key.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Modifiers/Interaction/AccessibilityModifier.swift` | 33 | 已写入（未验证） | `Compose/rust/modifiers/interaction/mod.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Modifiers/Interaction/CursorModifier.swift` | 29 | 已写入（未验证） | `Compose/rust/modifiers/interaction/mod.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Modifiers/Interaction/FocusRequestModifier.swift` | 16 | 已写入（未验证） | `Compose/rust/modifiers/interaction/mod.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Modifiers/Interaction/HitTestingModifier.swift` | 21 | 已写入（未验证） | `Compose/rust/modifiers/interaction/mod.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Modifiers/Interaction/HoverModifier.swift` | 28 | 已写入（未验证） | `Compose/rust/modifiers/interaction/mod.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Modifiers/Layout/AbsolutePositionModifier.swift` | 57 | 已写入（未验证） | `Compose/rust/modifiers/layout/mod.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Modifiers/Layout/FlexModifier.swift` | 35 | 已写入（未验证） | `Compose/rust/modifiers/layout/mod.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Modifiers/Layout/FrameCaptureModifier.swift` | 59 | 已写入（未验证） | `Compose/rust/modifiers/layout/frame_capture.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Modifiers/Layout/FrameModifier.swift` | 182 | 已写入（未验证） | `Compose/rust/modifiers/layout/mod.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Modifiers/Layout/LetterSpacingModifier.swift` | 21 | 已写入（未验证） | `Compose/rust/modifiers/style/style_modifiers.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Modifiers/Layout/PaddingModifier.swift` | 58 | 已写入（未验证） | `Compose/rust/modifiers/layout/mod.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Modifiers/Layout/PaddingSugar.swift` | 14 | 已写入（未验证） | `Compose/rust/modifiers/layout/mod.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Modifiers/Style/StyleModifiers.swift` | 247 | 已写入（未验证） | `Compose/rust/modifiers/style/style_modifiers.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Modifiers/Style/SurfaceFinishModifier.swift` | 82 | 已写入（未验证） | `Compose/rust/modifiers/style/surface.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Observed.swift` | 59 | 已写入（未验证） | `Compose/rust/observed.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Pet/PetAnchor.swift` | 60 | 已写入（未验证） | `Compose/rust/pet/pet_anchor.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Pet/PetScene.swift` | 43 | 已写入（未验证） | `Compose/rust/pet/pet_scene.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Pet/PetTypes.swift` | 181 | 已写入（未验证） | `Compose/rust/pet/pet_types.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Pet/PetView.swift` | 122 | 已写入（未验证） | `Compose/rust/pet/pet_view.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Pet/PetWorld.swift` | 333 | 已写入（未验证） | `Compose/rust/pet/pet_world.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Columns/Picker.swift` | 39 | 已写入（未验证） | `Compose/rust/primitives/columns/picker.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Columns/Priority.swift` | 50 | 已写入（未验证） | `Compose/rust/primitives/columns/mod.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Controls/Adaptive/ControlExtent.swift` | 15 | 已写入（未验证） | `Compose/rust/primitives/controls/adaptive/control_extent.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Controls/Adaptive/LongPress.swift` | 41 | 已写入（未验证） | `Compose/rust/primitives/controls/adaptive/long_press.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Controls/AppBar.swift` | 115 | 已写入（未验证） | `Compose/rust/primitives/controls/app_bar.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Controls/AppBar/Back.swift` | 22 | 已写入（未验证） | `Core/rust/scene/node_renderer.rs`<br>`Graphics/rust/dx12/backend.rs`<br>`Graphics/rust/dx12/device.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Controls/Button.swift` | 551 | 已写入（未验证） | `Compose/rust/primitives/controls/button.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Controls/Button/Chrome.swift` | 280 | 已写入（未验证） | `Compose/rust/theme/styles/buttons/builtin_button_chrome.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Controls/Calendar/Calendar.swift` | 399 | 已写入（未验证） | `Compose/rust/foundation/calendar.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Controls/Calendar/Navigation.swift` | 109 | 已写入（未验证） | `Compose/rust/primitives/layout/sidebar/mod.rs`<br>`Compose/rust/primitives/layout/sidebar/sidebar.rs`<br>`Compose/rust/primitives/navigation/mod.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Controls/Calendar/Period.swift` | 98 | 已写入（未验证） | `Compose/rust/primitives/controls/calendar/period.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Controls/CompletionPopover.swift` | 252 | 已写入（未验证） | `Compose/rust/primitives/controls/completion_popover.rs`<br>`Compose/rust/primitives/text/text_completion_rebase.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Controls/DateValues.swift` | 69 | 已写入（未验证） | `Compose/rust/primitives/controls/date_values.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Controls/FieldLabel.swift` | 47 | 已写入（未验证） | `Compose/rust/primitives/controls/field_label.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Controls/Fields/AssetRefField.swift` | 188 | 已写入（未验证） | `Compose/rust/primitives/controls/fields/asset_ref_model.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Controls/Fields/ColorField.swift` | 296 | 已写入（未验证） | `Compose/rust/primitives/controls/fields/color_field_model.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Controls/Fields/Combobox/Combobox.swift` | 197 | 已写入（未验证） | `Compose/rust/primitives/controls/fields/combobox_model.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Controls/Fields/Combobox/RemoteSearch.swift` | 129 | 已写入（未验证） | `Compose/rust/primitives/controls/fields/combobox_model.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Controls/Fields/Combobox/Results.swift` | 50 | 已写入（未验证） | `Compose/rust/primitives/controls/fields/combobox_model.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Controls/Fields/DatePicker.swift` | 55 | 已写入（未验证） | `Compose/rust/primitives/controls/fields/date_picker.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Controls/Fields/DateRange/RangePicker.swift` | 311 | 已写入（未验证） | `Compose/rust/primitives/controls/fields/date_range.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Controls/Fields/DateRange/Rules.swift` | 84 | 已写入（未验证） | `Compose/rust/primitives/controls/fields/date_range_rules.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Controls/Fields/JSON/ExpandedEditor.swift` | 104 | 已写入（未验证） | `Compose/rust/primitives/controls/fields/json_field.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Controls/Fields/JsonField.swift` | 235 | 已写入（未验证） | `Compose/rust/primitives/controls/fields/json_field_model.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Controls/Fields/Numeric/AxisLayout.swift` | 46 | 已写入（未验证） | `Compose/rust/primitives/controls/fields/numeric/axis_layout.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Controls/Fields/Numeric/NumberField.swift` | 291 | 已写入（未验证） | `Compose/rust/primitives/controls/fields/numeric/number_field.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Controls/Fields/Numeric/PrefixStyle.swift` | 37 | 已写入（未验证） | `Compose/rust/primitives/controls/fields/numeric/prefix_style.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Controls/Fields/Numeric/Scrub.swift` | 110 | 已写入（未验证） | `Compose/rust/primitives/controls/fields/numeric/scrub.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Controls/Fields/Numeric/TextFormat.swift` | 50 | 已写入（未验证） | `Compose/rust/primitives/controls/fields/numeric/text_format.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Controls/Fields/Numeric/Vec3Field.swift` | 115 | 已写入（未验证） | `Compose/rust/primitives/controls/fields/vec3_model.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Controls/Fields/RadioGroup.swift` | 104 | 已写入（未验证） | `Compose/rust/primitives/controls/fields/radio_group.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Controls/Fields/RangeSlider.swift` | 498 | 已写入（未验证） | `Compose/rust/primitives/controls/fields/range_slider.rs`<br>`Examples/rust/gallery_content/catalog.rs`<br>`Examples/rust/gallery_content/routing.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Controls/Fields/SearchField.swift` | 154 | 已写入（未验证） | `Compose/rust/primitives/controls/fields/search_field_model.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Controls/Fields/Select.swift` | 255 | 已写入（未验证） | `Compose/rust/primitives/controls/fields/select.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Controls/Fields/Slider/Geometry.swift` | 37 | 已写入（未验证） | `Compose/rust/primitives/controls/fields/slider/geometry.rs`<br>`Compose/rust/primitives/controls/fields/slider/mod.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Controls/Fields/Slider/Host.swift` | 206 | 已写入（未验证） | `Compose/rust/primitives/controls/fields/slider/host.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Controls/Fields/Slider/Paint.swift` | 78 | 已写入（未验证） | `Compose/rust/primitives/controls/fields/slider/paint.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Controls/Fields/Slider/Slider.swift` | 76 | 已写入（未验证） | `Compose/rust/primitives/controls/fields/slider/slider.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Controls/Fields/TimeField.swift` | 60 | 已写入（未验证） | `Compose/rust/primitives/controls/fields/time_input_model.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Controls/Fields/TimeInput.swift` | 320 | 已写入（未验证） | `Compose/rust/primitives/controls/fields/time_input_model.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Controls/Form.swift` | 144 | 已写入（未验证） | `Compose/rust/primitives/controls/form/form.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Controls/Form/LabelPlacement.swift` | 15 | 已写入（未验证） | `Compose/rust/primitives/controls/form/label_placement.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Controls/Form/LabelScope.swift` | 19 | 已写入（未验证） | `Compose/rust/primitives/controls/form/label_scope.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Controls/FormValidation.swift` | 75 | 已写入（未验证） | `Compose/rust/primitives/controls/form_validation.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Controls/InlineLabelLayout.swift` | 46 | 已写入（未验证） | `Compose/rust/primitives/controls/inline_label_layout.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Controls/KeyCap.swift` | 78 | 已写入（未验证） | `Compose/rust/primitives/controls/key_cap.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Controls/Link.swift` | 113 | 已写入（未验证） | `Compose/rust/primitives/controls/link.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Controls/MenuButton.swift` | 117 | 已写入（未验证） | `Compose/rust/primitives/controls/menu_button.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Controls/Rating/Rating.swift` | 74 | 已写入（未验证） | `Compose/rust/primitives/controls/rating/rating.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Controls/Rating/RatingGeometry.swift` | 75 | 已写入（未验证） | `Compose/rust/primitives/controls/rating/rating_geometry.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Controls/Rating/RatingHost.swift` | 114 | 已写入（未验证） | `Compose/rust/primitives/controls/rating/rating.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Controls/Rating/RatingPaint.swift` | 61 | 已写入（未验证） | `Compose/rust/primitives/controls/rating/rating.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Controls/SplitButton.swift` | 102 | 已写入（未验证） | `Compose/rust/primitives/controls/split_button.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Controls/Tag.swift` | 153 | 已写入（未验证） | `Compose/rust/primitives/controls/tag.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Controls/TimePicker.swift` | 132 | 已写入（未验证） | `Compose/rust/primitives/controls/time_picker.rs`<br>`Examples/rust/gallery_content/catalog.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Controls/Toggle.swift` | 500 | 已写入（未验证） | `Compose/rust/primitives/controls/toggle.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Controls/Toolbar.swift` | 163 | 已写入（未验证） | `Compose/rust/theme/styles/buttons/toolbar_toggle_button_style.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Controls/Toolbar/Commands.swift` | 143 | 已写入（未验证） | `Graphics/rust/rhi/commands.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Controls/Toolbar/OverflowLayout.swift` | 83 | 已写入（未验证） | `Compose/rust/primitives/controls/toolbar/overflow_layout.rs`<br>`Compose/rust/primitives/layout/tab_overflow.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Controls/Toolbar/RetainedCommand.swift` | 61 | 已写入（未验证） | `Compose/rust/primitives/controls/toolbar/commands.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Controls/WheelPicker.swift` | 269 | 已写入（未验证） | `Compose/rust/primitives/controls/fields/wheel_picker.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Data/Avatar/Avatar.swift` | 165 | 已写入（未验证） | `Compose/rust/primitives/data/avatar/avatar.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Data/Avatar/Group.swift` | 135 | 已写入（未验证） | `Compose/rust/primitives/data/avatar/group.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Data/Avatar/MemberList.swift` | 89 | 已写入（未验证） | `Compose/rust/primitives/data/avatar/member_list.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Data/Avatar/Status.swift` | 96 | 已写入（未验证） | `Compose/rust/primitives/data/avatar/status.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Data/Chart/Axes.swift` | 68 | 已写入（未验证） | `Compose/rust/primitives/data/chart/axes.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Data/Chart/Axis.swift` | 218 | 已写入（未验证） | `Compose/rust/primitives/data/chart/axis.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Data/Chart/Cache.swift` | 47 | 已写入（未验证） | `Compose/rust/primitives/data/chart/cache.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Data/Chart/Chart.swift` | 262 | 已写入（未验证） | `Compose/rust/primitives/data/chart/axes.rs`<br>`Compose/rust/primitives/data/chart/axis.rs`<br>`Compose/rust/primitives/data/chart/cache.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Data/Chart/ChartDataTable.swift` | 205 | 已写入（未验证） | `Compose/rust/primitives/data/chart/data_table.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Data/Chart/ChartOverlay.swift` | 218 | 已写入（未验证） | `Compose/rust/primitives/data/chart/overlay.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Data/Chart/Coordinates.swift` | 333 | 已写入（未验证） | `Compose/rust/primitives/data/chart/coordinates.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Data/Chart/Drawing.swift` | 499 | 已写入（未验证） | `Compose/rust/primitives/data/chart/drawing.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Data/Chart/Histogram.swift` | 80 | 已写入（未验证） | `Compose/rust/primitives/data/chart/histogram.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Data/Chart/Interaction.swift` | 175 | 已写入（未验证） | `Compose/rust/primitives/data/chart/interaction.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Data/Chart/Legend.swift` | 102 | 已写入（未验证） | `Compose/rust/primitives/data/chart/legend.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Data/Chart/Model.swift` | 474 | 已写入（未验证） | `Compose/rust/primitives/data/chart/model.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Data/Chart/Morph.swift` | 77 | 已写入（未验证） | `Compose/rust/primitives/data/chart/morph.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Data/Chart/Plot.swift` | 708 | 已写入（未验证） | `Compose/rust/primitives/data/chart/plot.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Data/Chart/Scale.swift` | 203 | 已写入（未验证） | `Compose/rust/primitives/data/chart/scale.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Data/Chart/Stacking.swift` | 112 | 已写入（未验证） | `Compose/rust/primitives/data/chart/stacking.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Data/Chart/Viewport.swift` | 92 | 已写入（未验证） | `Compose/rust/primitives/data/chart/viewport.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Data/Columns/Focus.swift` | 44 | 已写入（未验证） | `Compose/rust/primitives/interaction/scrollbar.rs`<br>`Compose/rust/primitives/layout/sidebar/focus_handoff.rs`<br>`Compose/rust/primitives/overlays/roving_focus.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Data/Columns/TablePresentation.swift` | 34 | 已写入（未验证） | `Compose/rust/primitives/data/columns/table_presentation.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Data/Columns/Visibility.swift` | 25 | 已写入（未验证） | `Compose/rust/primitives/data/lists/table.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Data/DataTable/ColumnOrder.swift` | 141 | 已写入（未验证） | `Compose/rust/primitives/data/data_table/column_order.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Data/DataTable/DataTable.swift` | 604 | 已写入（未验证） | `Compose/rust/primitives/data/data_table/view.rs`<br>`Compose/rust/primitives/data/data_table/selection_model.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Data/DataTable/DataTableEditing.swift` | 66 | 已写入（未验证） | `Compose/rust/primitives/data/data_table/editing_model.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Data/DataTable/DataTableGeometry.swift` | 32 | 已写入（未验证） | `Compose/rust/primitives/data/data_table/data_table_geometry.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Data/DataTable/DataTableHosts.swift` | 119 | 已写入（未验证） | `Compose/rust/primitives/data/data_table/hosts_model.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Data/DataTable/DataTableModel.swift` | 112 | 已写入（未验证） | `Compose/rust/primitives/data/data_table/model.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Data/DataTable/DataTableSelection.swift` | 29 | 已写入（未验证） | `Compose/rust/primitives/data/data_table/selection_model.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Data/DataTable/DataTableSortWorker.swift` | 45 | 已写入（未验证） | `Compose/rust/primitives/data/data_table/row_metrics.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Data/DataTable/EditorPresence.swift` | 22 | 已写入（未验证） | `Compose/rust/primitives/data/data_table/hosts_model.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Data/DataTable/VariableRows.swift` | 60 | 已写入（未验证） | `Compose/rust/primitives/data/data_table/row_metrics.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Data/Lists/InsetGroup.swift` | 79 | 已写入（未验证） | `Compose/rust/primitives/data/lists/inset_group.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Data/Lists/List.swift` | 285 | 已写入（未验证） | `Compose/rust/primitives/data/lists/list.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Data/Lists/Refresh.swift` | 79 | 已写入（未验证） | `Compose/rust/primitives/data/lists/refresh.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Data/Lists/Reorder/Handle.swift` | 151 | 已写入（未验证） | `Hosts/rust/desktop/display/handle.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Data/Lists/Reorder/Preview.swift` | 62 | 已写入（未验证） | `Compose/rust/primitives/data/lists/reorder_model.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Data/Lists/Reorder/Reorderable.swift` | 268 | 已写入（未验证） | `Compose/rust/primitives/data/lists/reorder_model.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Data/Lists/Row.swift` | 152 | 已写入（未验证） | `Compose/rust/primitives/data/lists/row.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Data/Lists/SectionedList.swift` | 272 | 已写入（未验证） | `Compose/rust/primitives/data/lists/sectioned_list.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Data/Lists/Selection.swift` | 61 | 已写入（未验证） | `Terminal/rust/engine/selection.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Data/Lists/SwipeList.swift` | 409 | 已写入（未验证） | `Compose/rust/primitives/data/lists/swipe_list.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Data/Lists/Table.swift` | 309 | 已写入（未验证） | `Compose/rust/primitives/text/markdown/table_block.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Data/Lists/Tree.swift` | 1372 | 已写入（未验证） | `Compose/Composition/rust/layout_tree.rs`<br>`Compose/Composition/rust/view_graph.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Data/Lists/Tree/Guides.swift` | 135 | 已写入（未验证） | `Compose/rust/primitives/text/text_field/indent_guides.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Data/Lists/TreeOptions.swift` | 86 | 已写入（未验证） | `Compose/rust/primitives/data/lists/tree/options.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Data/PropertyGrid.swift` | 454 | 已写入（未验证） | `Compose/rust/primitives/data/property_grid.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Data/Timeline.swift` | 266 | 已写入（未验证） | `Core/rust/scene/animation/timeline.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Data/Timeline/HeadingLayout.swift` | 52 | 已写入（未验证） | `Compose/rust/primitives/data/timeline/heading_layout.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Data/TreeTable/TreeTable.swift` | 201 | 已写入（未验证） | `Compose/rust/primitives/data/tree_table.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Feedback/Alert.swift` | 157 | 已写入（未验证） | `Compose/rust/primitives/feedback/alert.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Feedback/Badge.swift` | 142 | 已写入（未验证） | `Compose/rust/primitives/feedback/badge.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Feedback/EmptyState.swift` | 117 | 已写入（未验证） | `Compose/rust/primitives/feedback/empty_state.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Feedback/Progress.swift` | 129 | 已写入（未验证） | `Compose/rust/primitives/feedback/progress.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Feedback/ProgressCircle.swift` | 170 | 已写入（未验证） | `Compose/rust/primitives/feedback/progress_circle.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Feedback/ProgressValue.swift` | 35 | 已写入（未验证） | `Compose/rust/primitives/feedback/progress_value.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Feedback/Spinner.swift` | 60 | 已写入（未验证） | `Compose/rust/primitives/feedback/spinner.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Feedback/StatusTone.swift` | 46 | 已写入（未验证） | `Compose/rust/primitives/feedback/status_tone.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Interaction/DragAndDrop.swift` | 285 | 已写入（未验证） | `Compose/rust/primitives/interaction/drag_and_drop.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Interaction/EdgeAutoScroll.swift` | 72 | 已写入（未验证） | `Compose/rust/primitives/interaction/edge_auto_scroll.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Interaction/HorizontalSwipe.swift` | 120 | 已写入（未验证） | `Compose/rust/primitives/interaction/horizontal_swipe.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Interaction/Scrollbar.swift` | 303 | 已写入（未验证） | `Compose/rust/primitives/interaction/scrollbar.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Layout/Accordion.swift` | 74 | 已写入（未验证） | `Compose/rust/primitives/layout/accordion.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Layout/BoundedScrollView.swift` | 50 | 已写入（未验证） | `Compose/rust/primitives/layout/bounded_scroll_view.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Layout/Carousel/Autoplay.swift` | 132 | 已写入（未验证） | `Compose/rust/primitives/layout/carousel/autoplay.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Layout/Carousel/Carousel.swift` | 215 | 已写入（未验证） | `Compose/rust/primitives/layout/carousel/mod.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Layout/Carousel/Indicator.swift` | 44 | 已写入（未验证） | `Compose/rust/primitives/layout/carousel/indicator.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Layout/Direction/Resolved.swift` | 35 | 已写入（未验证） | `Compose/rust/primitives/layout/direction/resolved.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Layout/DisclosureGroup.swift` | 62 | 已写入（未验证） | `Compose/rust/primitives/layout/disclosure_group.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Layout/Grid/Columns.swift` | 157 | 已写入（未验证） | `Compose/rust/primitives/layout/grid/columns.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Layout/Grid/Grid.swift` | 267 | 已写入（未验证） | `Compose/rust/primitives/layout/grid/grid.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Layout/Grid/InteractionGate.swift` | 17 | 已写入（未验证） | `Compose/rust/primitives/layout/grid/grid.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Layout/Grid/LazyGrid.swift` | 211 | 已写入（未验证） | `Compose/rust/primitives/layout/grid/lazy_grid.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Layout/Grid/NamedColumns.swift` | 27 | 已写入（未验证） | `Compose/rust/primitives/layout/grid/named_columns.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Layout/Grid/RowHeights.swift` | 109 | 已写入（未验证） | `Compose/rust/primitives/layout/grid/row_heights.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Layout/Grid/Span.swift` | 82 | 已写入（未验证） | `Compose/rust/primitives/layout/grid/span.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Layout/HorizontalScrollOrigin.swift` | 16 | 已写入（未验证） | `Compose/rust/primitives/layout/horizontal_scroll_origin.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Layout/Insets/SafeArea.swift` | 65 | 已写入（未验证） | `Compose/rust/primitives/layout/insets/safe_area.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Layout/Insets/SurfaceRoot.swift` | 53 | 已写入（未验证） | `Compose/rust/primitives/layout/insets/surface_root.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Layout/Masonry/Masonry.swift` | 167 | 已写入（未验证） | `Compose/rust/primitives/layout/masonry/masonry.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Layout/NavigationComponents.swift` | 114 | 已写入（未验证） | `Compose/rust/primitives/controls/button_group.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Layout/Overlay.swift` | 97 | 已写入（未验证） | `Compose/rust/primitives/layout/overlay.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Layout/Panel.swift` | 70 | 已写入（未验证） | `Compose/rust/primitives/layout/panel.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Layout/ResizableEditor.swift` | 36 | 已写入（未验证） | `Compose/rust/primitives/layout/resizable_editor.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Layout/ResizableTextArea.swift` | 56 | 已写入（未验证） | `Compose/rust/primitives/layout/resizable_text_area.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Layout/Resize/HeightHandle.swift` | 131 | 已写入（未验证） | `Compose/rust/primitives/layout/resize/height_handle.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Layout/Resize/HeightLimits.swift` | 13 | 已写入（未验证） | `Compose/rust/primitives/layout/resize/height_limits.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Layout/Responsive/ActionGroup.swift` | 57 | 已写入（未验证） | `Compose/rust/primitives/layout/responsive/action_group.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Layout/Responsive/Candidates.swift` | 41 | 已写入（未验证） | `Compose/rust/primitives/layout/responsive/candidates.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Layout/Responsive/Stack.swift` | 118 | 已写入（未验证） | `Compose/rust/primitives/layout/responsive/stack.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Layout/Responsive/ViewThatFits.swift` | 118 | 已写入（未验证） | `Compose/rust/primitives/layout/responsive/view_that_fits.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Layout/RowSlot.swift` | 22 | 已写入（未验证） | `Compose/rust/primitives/layout/row_slot.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Layout/ScrollReveal.swift` | 19 | 已写入（未验证） | `Compose/rust/primitives/layout/scroll_reveal.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Layout/ScrollView.swift` | 1139 | 已写入（未验证） | `Compose/rust/primitives/layout/scroll_view.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Layout/Scrolling/KeyboardFocus.swift` | 49 | 已写入（未验证） | `Compose/rust/primitives/layout/scroll_view.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Layout/Sidebar/AdaptiveHosts.swift` | 103 | 已写入（未验证） | `Compose/rust/primitives/layout/sidebar/adaptive_hosts.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Layout/Sidebar/AdaptiveOptions.swift` | 69 | 已写入（未验证） | `Compose/rust/primitives/layout/sidebar/adaptive_options.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Layout/Sidebar/AdaptiveSidebar.swift` | 199 | 已写入（未验证） | `Compose/rust/primitives/layout/sidebar/adaptive_sidebar.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Layout/Sidebar/Destination.swift` | 234 | 已写入（未验证） | `Compose/rust/primitives/layout/sidebar/destination.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Layout/Sidebar/Drawer.swift` | 92 | 已写入（未验证） | `Compose/rust/primitives/layout/sidebar/drawer.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Layout/Sidebar/FocusHandoff.swift` | 110 | 已写入（未验证） | `Compose/rust/primitives/layout/sidebar/focus_handoff.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Layout/Sidebar/Hierarchy.swift` | 64 | 已写入（未验证） | `Compose/rust/primitives/layout/sidebar/hierarchy.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Layout/Sidebar/HierarchyHost.swift` | 85 | 已写入（未验证） | `Compose/rust/primitives/layout/sidebar/destination.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Layout/Sidebar/Items.swift` | 48 | 已写入（未验证） | `Compose/rust/primitives/layout/sidebar/items.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Layout/Sidebar/Presentation.swift` | 19 | 已写入（未验证） | `Graphics/rust/rhi/presentation.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Layout/Sidebar/PresentationToggle.swift` | 12 | 已写入（未验证） | `Compose/rust/primitives/layout/sidebar/drawer.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Layout/Sidebar/Rail.swift` | 51 | 已写入（未验证） | `Compose/rust/primitives/layout/sidebar/rail.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Layout/Sidebar/RailDestination.swift` | 89 | 已写入（未验证） | `Compose/rust/primitives/layout/sidebar/rail.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Layout/Sidebar/ResizeHandle.swift` | 136 | 已写入（未验证） | `Compose/rust/primitives/layout/sidebar/resize_handle.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Layout/Sidebar/Resizing.swift` | 20 | 已写入（未验证） | `Compose/rust/primitives/layout/sidebar/resizing.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Layout/Sidebar/Sidebar.swift` | 126 | 已写入（未验证） | `Compose/rust/primitives/layout/sidebar/sidebar.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Layout/Split/Compact.swift` | 67 | 已写入（未验证） | `Compose/rust/primitives/layout/split_compact.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Layout/Split/Constraints.swift` | 44 | 已写入（未验证） | `Compose/rust/primitives/overlays/portal/fit_constraints.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Layout/Split/Retention.swift` | 109 | 已写入（未验证） | `Compose/rust/primitives/overlays/toast/exit_retention.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Layout/SplitView.swift` | 360 | 已写入（未验证） | `Compose/rust/primitives/layout/split/split_view.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Layout/StatusBar.swift` | 184 | 已写入（未验证） | `Compose/rust/primitives/layout/status_bar.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Layout/TabView.swift` | 299 | 已写入（未验证） | `Compose/rust/primitives/layout/tab_view.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Layout/Tabs/MenuStrip.swift` | 61 | 已写入（未验证） | `Compose/rust/primitives/layout/tab_overflow.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Layout/Tabs/MobileBar.swift` | 94 | 已写入（未验证） | `Compose/rust/primitives/layout/mobile_tab_bar.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Layout/Tabs/StripLayout.swift` | 64 | 已写入（未验证） | `Compose/rust/primitives/layout/tab_overflow.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Layout/Virtualization/EstimatedStack.swift` | 169 | 已写入（未验证） | `Compose/rust/primitives/layout/virtualization/estimated_stack.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Layout/Virtualization/FixedStack.swift` | 137 | 已写入（未验证） | `Compose/rust/primitives/layout/virtualization/fixed_stack.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Layout/Virtualization/RowIndex.swift` | 147 | 已写入（未验证） | `Compose/rust/primitives/layout/virtualization/row_index.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Layout/Virtualization/RowMetrics.swift` | 47 | 已写入（未验证） | `Compose/rust/primitives/layout/virtualization/row_metrics.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Layout/Virtualization/VariableStack.swift` | 108 | 已写入（未验证） | `Compose/rust/primitives/layout/virtualization/variable_stack.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Layout/Virtualization/VirtualStack.swift` | 77 | 已写入（未验证） | `Compose/rust/primitives/layout/virtualization/virtual_stack.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Layout/Virtualization/VirtualWindow.swift` | 41 | 已写入（未验证） | `Compose/rust/primitives/layout/virtualization/virtual_window.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Layout/ZStack.swift` | 89 | 已写入（未验证） | `Compose/rust/primitives/layout/zstack.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Media/AsyncImage.swift` | 335 | 已写入（未验证） | `Compose/rust/primitives/media/async_image.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Media/Icon.swift` | 87 | 已写入（未验证） | `Compose/rust/primitives/media/icon.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Media/Image+File.swift` | 144 | 已写入（未验证） | `Compose/rust/primitives/media/image_file.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Media/Image.swift` | 173 | 已写入（未验证） | `Compose/rust/primitives/media/image.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Media/ImageDataDownload.swift` | 130 | 已写入（未验证） | `Compose/rust/primitives/media/image_data_download.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Media/ImageGeometry.swift` | 33 | 已写入（未验证） | `Compose/rust/primitives/media/image_geometry.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Media/ImageLoadServices.swift` | 146 | 已写入（未验证） | `Compose/rust/primitives/media/image_load_services.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Media/LoadingAnimationClock.swift` | 33 | 已写入（未验证） | `Compose/rust/primitives/media/loading_animation_clock.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Media/Skeleton.swift` | 88 | 已写入（未验证） | `Compose/rust/primitives/media/skeleton.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Media/UIIconCatalog.swift` | 735 | 已写入（未验证） | `Compose/rust/primitives/media/ui_icon_catalog.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Media/VectorImageRaster.swift` | 44 | 已写入（未验证） | `Compose/rust/primitives/media/vector_image_raster.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Navigation/NavigationStack.swift` | 311 | 已写入（未验证） | `Compose/rust/primitives/navigation/navigation_stack.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Navigation/RouteOutlet.swift` | 19 | 已写入（未验证） | `Compose/rust/primitives/navigation/route_outlet.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Navigation/Stepper/Stepper.swift` | 155 | 已写入（未验证） | `Compose/rust/primitives/navigation/stepper/stepper.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Navigation/Stepper/Values.swift` | 50 | 已写入（未验证） | `Compose/rust/primitives/navigation/stepper/values.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Overlays/ActionSheet.swift` | 125 | 已写入（未验证） | `Compose/rust/primitives/overlays/modal/action_sheet.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Overlays/ActionSheet/Content.swift` | 106 | 已写入（未验证） | `Browser/rust/prototype/mod.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Overlays/Anchored/Anchoring.swift` | 126 | 已写入（未验证） | `Compose/rust/primitives/overlays/anchored/anchoring.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Overlays/Anchored/Placement.swift` | 94 | 已写入（未验证） | `Compose/rust/primitives/overlays/anchored/placement.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Overlays/Anchored/Surface.swift` | 60 | 已写入（未验证） | `Compose/Composition/rust/adaptive/surface.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Overlays/AssetDropTarget.swift` | 212 | 已写入（未验证） | `Compose/rust/primitives/overlays/asset_drop_target.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Overlays/Command/Search.swift` | 89 | 已写入（未验证） | `Compose/rust/primitives/overlays/command_palette_model.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Overlays/CommandPalette.swift` | 436 | 已写入（未验证） | `Compose/rust/primitives/overlays/command_palette_model.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Overlays/FocusScope.swift` | 22 | 已写入（未验证） | `Compose/rust/primitives/overlays/focus_scope.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Overlays/HoverCard.swift` | 183 | 已写入（未验证） | `Compose/rust/primitives/overlays/hover_card.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Overlays/Menu/ContextMenu.swift` | 155 | 已写入（未验证） | `Compose/rust/primitives/overlays/context_menu.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Overlays/Menu/Menu.swift` | 300 | 已写入（未验证） | `Compose/rust/primitives/overlays/menu/menu.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Overlays/Menu/MenuDescriptor.swift` | 19 | 已写入（未验证） | `Compose/rust/primitives/overlays/menu/menu_descriptor.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Overlays/Menu/MenuItemRow.swift` | 264 | 已写入（未验证） | `Compose/rust/primitives/overlays/menu/menu_item_row.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Overlays/Menu/MenuNavigation.swift` | 188 | 已写入（未验证） | `Compose/rust/primitives/overlays/menu/menu_navigation.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Overlays/Menu/NativeMenuBridge.swift` | 128 | 已写入（未验证） | `Compose/rust/primitives/overlays/menu/native_menu_bridge.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Overlays/Menu/RowContent.swift` | 60 | 已写入（未验证） | `Compose/rust/primitives/overlays/menu/row_content.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Overlays/Menu/TouchMenu.swift` | 106 | 已写入（未验证） | `Compose/rust/primitives/overlays/menu/touch_menu.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Overlays/Modal/BottomSheet.swift` | 104 | 已写入（未验证） | `Compose/rust/primitives/overlays/modal/bottom_sheet.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Overlays/Modal/Dialog.swift` | 146 | 已写入（未验证） | `Compose/rust/primitives/overlays/modal/dialog.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Overlays/Modal/DragHandle.swift` | 104 | 已写入（未验证） | `Compose/rust/primitives/overlays/modal/drag_handle.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Overlays/Modal/Modal.swift` | 115 | 已写入（未验证） | `Compose/rust/primitives/overlays/modal/modal.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Overlays/Modal/ModalOptions.swift` | 48 | 已写入（未验证） | `Compose/rust/primitives/overlays/modal/modal_options.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Overlays/Modal/TouchPresentation.swift` | 76 | 已写入（未验证） | `Compose/rust/primitives/overlays/modal/touch_presentation.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Overlays/OverlayHost.swift` | 10 | 已写入（未验证） | `Compose/rust/primitives/overlays/overlay_host.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Overlays/Popconfirm/Popconfirm.swift` | 71 | 已写入（未验证） | `Compose/rust/primitives/overlays/popconfirm.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Overlays/Popover.swift` | 108 | 已写入（未验证） | `Compose/rust/primitives/overlays/popover.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Overlays/Portal/FitConstraints.swift` | 19 | 已写入（未验证） | `Compose/rust/primitives/overlays/portal/fit_constraints.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Overlays/Portal/LayerRoot.swift` | 95 | 已写入（未验证） | `Compose/rust/primitives/overlays/portal/layer_root.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Overlays/Portal/OverlayPlacement.swift` | 24 | 已写入（未验证） | `Compose/rust/primitives/overlays/portal/overlay_placement.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Overlays/Portal/PortalHost.swift` | 218 | 已写入（未验证） | `Compose/rust/primitives/overlays/portal/portal_host.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Overlays/Portal/PortalPlacement.swift` | 41 | 已写入（未验证） | `Compose/rust/primitives/overlays/portal/portal_placement.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Overlays/Portal/PortalRegistry.swift` | 386 | 已写入（未验证） | `Compose/rust/primitives/overlays/portal/portal_registry.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Overlays/RovingFocus.swift` | 128 | 已写入（未验证） | `Compose/rust/primitives/overlays/roving_focus.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Overlays/SelectionKeyHost.swift` | 44 | 已写入（未验证） | `Compose/rust/primitives/overlays/selection_key_host.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Overlays/ShortcutHost.swift` | 58 | 已写入（未验证） | `Compose/rust/primitives/overlays/shortcut_host.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Overlays/Toast/Controller.swift` | 90 | 已写入（未验证） | `Core/rust/scene/animation/controller.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Overlays/Toast/ExitRetention.swift` | 45 | 已写入（未验证） | `Compose/rust/primitives/overlays/toast/exit_retention.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Overlays/Toast/NotificationHost.swift` | 172 | 已写入（未验证） | `Compose/rust/primitives/overlays/toast/notification_host.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Overlays/Tooltip.swift` | 412 | 已写入（未验证） | `Compose/rust/primitives/overlays/tooltip.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Text/Code/FoldingOptions.swift` | 121 | 已写入（未验证） | `Compose/rust/primitives/text/code/folding_options.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Text/Code/GutterControls.swift` | 181 | 已写入（未验证） | `Compose/rust/primitives/text/code/gutter_controls.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Text/Code/GutterGeometry.swift` | 46 | 已写入（未验证） | `Compose/rust/primitives/text/code/gutter_geometry.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Text/Code/GutterLayout.swift` | 74 | 已写入（未验证） | `Compose/rust/primitives/text/code/gutter_layout.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Text/Code/GutterOptions.swift` | 69 | 已写入（未验证） | `Compose/rust/primitives/text/code/gutter_options.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Text/Code/GutterSession.swift` | 121 | 已写入（未验证） | `Compose/rust/primitives/text/code/gutter_session.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Text/Code/Minimap.swift` | 112 | 已写入（未验证） | `Compose/rust/primitives/text/code/minimap.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Text/Code/Occurrences.swift` | 27 | 已写入（未验证） | `Compose/rust/primitives/text/code/occurrences.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Text/Markdown/CodeBlock.swift` | 100 | 已写入（未验证） | `Compose/rust/primitives/text/markdown/code_block.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Text/Markdown/Document.swift` | 30 | 已写入（未验证） | `Compose/rust/primitives/text/markdown/document.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Text/Markdown/ListBlock.swift` | 98 | 已写入（未验证） | `Compose/rust/primitives/text/markdown/list_block.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Text/Markdown/MarkdownView.swift` | 135 | 已写入（未验证） | `Compose/rust/primitives/text/markdown/markdown_view.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Text/Markdown/Parse.swift` | 139 | 已写入（未验证） | `Compose/rust/primitives/text/markdown/parse.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Text/Markdown/TableBlock.swift` | 107 | 已写入（未验证） | `Compose/rust/primitives/text/markdown/table_block.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Text/Rich/Flow.swift` | 413 | 已写入（未验证） | `Compose/rust/primitives/text/rich/flow.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Text/Rich/LinkAnchor.swift` | 56 | 已写入（未验证） | `Compose/rust/primitives/text/rich/link_anchor.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Text/Rich/Paragraph.swift` | 357 | 已写入（未验证） | `Compose/rust/primitives/text/rich/paragraph.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Text/Rich/RichText.swift` | 199 | 已写入（未验证） | `Compose/rust/primitives/text/rich/rich_text.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Text/Rich/Run.swift` | 27 | 已写入（未验证） | `Compose/rust/primitives/text/rich/run.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Text/Rich/TextSelection.swift` | 620 | 已写入（未验证） | `Compose/rust/primitives/text/rich/text_selection.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Text/Rope/RopeDifference.swift` | 45 | 已写入（未验证） | `Compose/rust/primitives/text/rope/rope_difference.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Text/Rope/RopeEditing.swift` | 70 | 已写入（未验证） | `Compose/rust/primitives/text/rope/rope_editing.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Text/Rope/RopeLookup.swift` | 126 | 已写入（未验证） | `Compose/rust/primitives/text/rope/rope_lookup.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Text/Rope/RopeStorage.swift` | 93 | 已写入（未验证） | `Compose/rust/primitives/text/rope/rope_storage.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Text/SingleLine.swift` | 19 | 已写入（未验证） | `Compose/rust/primitives/text/single_line.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Text/Text.swift` | 605 | 已写入（未验证） | `Compose/rust/primitives/text/text.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Text/TextBuffer.swift` | 188 | 已写入（未验证） | `Compose/rust/primitives/text/text_buffer.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Text/TextCompletionRebase.swift` | 47 | 已写入（未验证） | `Compose/rust/primitives/text/text_completion_rebase.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Text/TextDiagnostic.swift` | 118 | 已写入（未验证） | `Compose/rust/primitives/text/text_diagnostic.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Text/TextDocumentLayout.swift` | 263 | 已写入（未验证） | `Compose/rust/primitives/text/text_document_layout.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Text/TextEditHistory.swift` | 97 | 已写入（未验证） | `Compose/rust/primitives/text/text_edit_history.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Text/TextEditingCommands.swift` | 18 | 已写入（未验证） | `Compose/rust/primitives/text/text_editing_commands.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Text/TextField/BracketMatching.swift` | 129 | 已写入（未验证） | `Compose/rust/primitives/text/text_field/bracket_matching.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Text/TextField/IndentGuides.swift` | 84 | 已写入（未验证） | `Compose/rust/primitives/text/text_field/indent_guides.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Text/TextField/PlatformInput.swift` | 75 | 已写入（未验证） | `Core/rust/scene/input/platform_input_context.rs`<br>`Core/rust/scene/input/pointer_capture.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Text/TextField/Snippet.swift` | 177 | 已写入（未验证） | `Compose/rust/primitives/text/text_field/snippet.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Text/TextField/TextField.swift` | 1483 | 已写入（未验证） | `Compose/rust/primitives/text/text_field/text_field.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Text/TextField/TextFieldCodeEditing.swift` | 54 | 已写入（未验证） | `Compose/rust/primitives/text/text_field/text_field_code_editing.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Text/TextField/TextFieldEditing.swift` | 218 | 已写入（未验证） | `Compose/rust/primitives/text/text_field/text_field_editing.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Text/TextField/TextFieldHorizontalScroll.swift` | 35 | 已写入（未验证） | `Compose/rust/primitives/text/text_field/text_field_horizontal_scroll.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Text/TextField/TextFieldHost.swift` | 162 | 已写入（未验证） | `Compose/rust/primitives/text/text_field/text_field.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Text/TextField/TextFieldInputController.swift` | 155 | 已写入（未验证） | `Compose/rust/primitives/text/text_field/text_field.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Text/TextField/TextFieldLayoutEngine.swift` | 262 | 已写入（未验证） | `Compose/rust/primitives/text/text_field/text_field_layout_engine.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Text/TextField/TextFieldNavigation.swift` | 60 | 已写入（未验证） | `Compose/rust/primitives/text/text_field/text_field_navigation.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Text/TextField/TextFieldObservation.swift` | 62 | 已写入（未验证） | `Compose/rust/primitives/text/text_field/text_field_observation.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Text/TextField/TextFieldOptions.swift` | 122 | 已写入（未验证） | `Compose/rust/primitives/text/text_field/text_field_options.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Text/TextField/TextVisualLineIndex.swift` | 106 | 已写入（未验证） | `Compose/rust/primitives/text/text_field/text_visual_line_index.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Rendering/OffscreenView.swift` | 154 | 已写入（未验证） | `Compose/rust/rendering/offscreen_view.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Scrolling/ScrollPhysicsEnvironment.swift` | 30 | 已写入（未验证） | `Compose/rust/scrolling/scroll_physics_environment.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Theme/Styles/AppearanceModifier.swift` | 25 | 已写入（未验证） | `Compose/rust/theme/styles/appearance_modifier.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Theme/Styles/Buttons/ButtonStyle.swift` | 186 | 已写入（未验证） | `Compose/rust/theme/styles/buttons/button_style.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Theme/Styles/Buttons/DestructiveButtonStyle.swift` | 18 | 已写入（未验证） | `Compose/rust/theme/styles/buttons/destructive_button_style.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Theme/Styles/Buttons/GhostButtonStyle.swift` | 17 | 已写入（未验证） | `Compose/rust/theme/styles/buttons/ghost_button_style.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Theme/Styles/Buttons/PlainButtonStyle.swift` | 18 | 已写入（未验证） | `Compose/rust/theme/styles/buttons/plain_button_style.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Theme/Styles/Buttons/PrimaryButtonStyle.swift` | 26 | 已写入（未验证） | `Compose/rust/theme/styles/buttons/primary_button_style.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Theme/Styles/Buttons/SecondaryButtonStyle.swift` | 17 | 已写入（未验证） | `Compose/rust/theme/styles/buttons/secondary_button_style.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Theme/Styles/Buttons/SegmentButtonStyle.swift` | 24 | 已写入（未验证） | `Compose/rust/theme/styles/buttons/segment_button_style.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Theme/Styles/Buttons/StatusButtonStyle.swift` | 34 | 已写入（未验证） | `Compose/rust/theme/styles/buttons/status_button_style.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Theme/Styles/Buttons/TabButtonStyle.swift` | 50 | 已写入（未验证） | `Compose/rust/theme/styles/buttons/tab_button_style.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Theme/Styles/Buttons/ToggleButtonStyle.swift` | 33 | 已写入（未验证） | `Compose/rust/theme/styles/buttons/toggle_button_style.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Theme/Styles/Buttons/ToolbarToggleButtonStyle.swift` | 32 | 已写入（未验证） | `Compose/rust/theme/styles/buttons/toolbar_toggle_button_style.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Theme/Styles/CircularAppearance.swift` | 89 | 已写入（未验证） | `Compose/rust/theme/styles/circular_appearance.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Theme/Styles/Components/DefaultDividerStyle.swift` | 19 | 已写入（未验证） | `Compose/rust/theme/styles/components/default_divider_style.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Theme/Styles/Components/DefaultListRowStyle.swift` | 78 | 已写入（未验证） | `Compose/rust/theme/styles/components/default_list_row_style.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Theme/Styles/Components/DefaultPanelStyle.swift` | 48 | 已写入（未验证） | `Compose/rust/theme/styles/components/default_panel_style.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Theme/Styles/Components/DefaultTextFieldStyle.swift` | 48 | 已写入（未验证） | `Compose/rust/theme/styles/components/default_text_field_style.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Theme/Styles/Components/DefaultTreeRowStyle.swift` | 62 | 已写入（未验证） | `Compose/rust/theme/styles/components/default_tree_row_style.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Theme/Styles/Components/DividerStyle.swift` | 42 | 已写入（未验证） | `Compose/rust/theme/styles/components/divider_style.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Theme/Styles/Components/EditorTextFieldStyle.swift` | 18 | 已写入（未验证） | `Compose/rust/theme/styles/components/editor_text_field_style.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Theme/Styles/Components/InputAppearance.swift` | 72 | 已写入（未验证） | `Compose/rust/theme/styles/components/input_appearance.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Theme/Styles/Components/ListRowStyle.swift` | 64 | 已写入（未验证） | `Compose/rust/theme/styles/components/list_row_style.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Theme/Styles/Components/PanelStyle.swift` | 40 | 已写入（未验证） | `Compose/rust/theme/styles/components/panel_style.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Theme/Styles/Components/SelectionAppearance.swift` | 83 | 已写入（未验证） | `Compose/rust/theme/styles/components/selection_appearance.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Theme/Styles/Components/SliderStyle.swift` | 161 | 已写入（未验证） | `Compose/rust/theme/styles/components/slider_style.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Theme/Styles/Components/TextFieldStyle.swift` | 71 | 已写入（未验证） | `Compose/rust/theme/styles/components/text_field_style.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Theme/Styles/Components/TreeRowStyle.swift` | 78 | 已写入（未验证） | `Compose/rust/theme/styles/components/tree_row_style.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Theme/Styles/DefaultDarkTheme.swift` | 95 | 已写入（未验证） | `Compose/rust/theme/styles/default_dark_theme.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Theme/Styles/DefaultLightTheme.swift` | 85 | 已写入（未验证） | `Compose/rust/theme/styles/default_light_theme.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Theme/Theme.swift` | 58 | 已写入（未验证） | `Compose/rust/theme/theme.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Theme/ThemeEnvironment.swift` | 63 | 已写入（未验证） | `Compose/rust/theme/theme_environment.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Theme/ThemeReader.swift` | 20 | 已写入（未验证） | `Compose/rust/theme/theme_reader.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Theme/Tokens/ColorScheme.swift` | 151 | 已写入（未验证） | `Compose/rust/theme/tokens/color_scheme.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Theme/Tokens/ControlSize.swift` | 61 | 已写入（未验证） | `Compose/rust/theme/tokens/control_size.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Theme/Tokens/ElevationScale.swift` | 26 | 已写入（未验证） | `Compose/rust/theme/tokens/elevation_scale.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Theme/Tokens/Extensions.swift` | 21 | 已写入（未验证） | `Compose/rust/theme/tokens/extensions.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Theme/Tokens/FloatingSurfaceTokens.swift` | 17 | 已写入（未验证） | `Compose/rust/theme/tokens/floating_surface_tokens.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Theme/Tokens/Icons.swift` | 78 | 已写入（未验证） | `Compose/rust/theme/tokens/icons.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Theme/Tokens/Metrics.swift` | 26 | 已写入（未验证） | `Compose/rust/theme/tokens/metrics.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Theme/Tokens/MotionScale.swift` | 59 | 已写入（未验证） | `Compose/rust/theme/tokens/motion_scale.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Theme/Tokens/RadiusScale.swift` | 19 | 已写入（未验证） | `Compose/rust/theme/tokens/radius_scale.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Theme/Tokens/ReducedMotionEnvironment.swift` | 13 | 已写入（未验证） | `Compose/rust/theme/tokens/reduced_motion_environment.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Theme/Tokens/SemanticColor.swift` | 86 | 已写入（未验证） | `Compose/rust/theme/tokens/semantic_color.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Theme/Tokens/SemanticModifiers.swift` | 92 | 已写入（未验证） | `Compose/rust/theme/tokens/semantic_modifiers.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Theme/Tokens/SemanticMotion.swift` | 108 | 已写入（未验证） | `Compose/rust/theme/tokens/semantic_motion.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Theme/Tokens/SpacingScale.swift` | 20 | 已写入（未验证） | `Compose/rust/theme/tokens/spacing_scale.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Theme/Tokens/TextEmphasis.swift` | 12 | 已写入（未验证） | `Compose/rust/theme/tokens/text_emphasis.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Theme/Tokens/TextScaler.swift` | 76 | 已写入（未验证） | `Compose/rust/theme/tokens/text_scaler.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Theme/Tokens/Typography.swift` | 74 | 已写入（未验证） | `Compose/rust/theme/tokens/typography.rs` | 未编译、未行为对照 |
-
-### Graphics
-
-共 107 个文件：已写入 107，进行中 0，未开始 0。
-
-| 源文件 | 行 | 状态 | Rust/C 目标 | 依赖或阻塞 |
-| --- | ---: | --- | --- | --- |
-| `Graphics/Sources/CoveUIGraphics/Exports.swift` | 2 | 已写入（未验证） | `Logging/rust/exports.rs`<br>`Logging/rust/logging_exports.rs` | 未编译、未行为对照 |
-| `Graphics/Sources/CoveUIGraphics/Images/TextureImage.swift` | 26 | 已写入（未验证） | `Graphics/rust/ui/texture_image.rs` | 未编译、未行为对照 |
-| `Graphics/Sources/CoveUIGraphics/Images/UIAssetResidency.swift` | 33 | 已写入（未验证） | `Graphics/rust/ui/asset_residency.rs` | 未编译、未行为对照 |
-| `Graphics/Sources/CoveUIGraphics/NativeUIViewport.swift` | 44 | 已写入（未验证） | `Graphics/rust/ui/viewport.rs` | 未编译、未行为对照 |
-| `Graphics/Sources/CoveUIGraphics/Rendering/DrawGeometry.swift` | 99 | 已写入（未验证） | `Graphics/rust/ui/draw_geometry.rs` | 未编译、未行为对照 |
-| `Graphics/Sources/CoveUIGraphics/Rendering/NativeDrawListRenderer.swift` | 473 | 已写入（未验证） | `Graphics/rust/ui/draw_list_renderer.rs` | 未编译、未行为对照 |
-| `Graphics/Sources/CoveUIGraphics/Rendering/NativeUIBackdropPass.swift` | 531 | 已写入（未验证） | `Graphics/rust/ui/backdrop_pass.rs` | 未编译、未行为对照 |
-| `Graphics/Sources/CoveUIGraphics/Rendering/NativeUIRasterWorkspace.swift` | 59 | 已写入（未验证） | `Graphics/rust/ui/raster_workspace.rs` | 未编译、未行为对照 |
-| `Graphics/Sources/CoveUIGraphics/Rendering/NativeUIShaderResources.swift` | 75 | 已写入（未验证） | `Graphics/rust/ui/shader_resources.rs` | 未编译、未行为对照 |
-| `Graphics/Sources/CoveUIGraphics/Rendering/NativeUITextureStore.swift` | 379 | 已写入（未验证） | `Graphics/rust/ui/texture_store.rs` | 未编译、未行为对照 |
-| `Graphics/Sources/CoveUIGraphics/Rendering/Resources.swift` | 9 | 已写入（未验证） | `Graphics/rust/ui/resources.rs` | 未编译、未行为对照 |
-| `Graphics/Sources/CoveUIGraphics/Text/AtlasUpload.swift` | 27 | 已写入（未验证） | `Graphics/rust/ui/texture_store.rs` | 未编译、未行为对照 |
-| `Graphics/Sources/NativeRHI/BackendFactory.swift` | 32 | 已写入（未验证） | `Graphics/rust/rhi/backend_factory.rs` | 未编译、未行为对照 |
-| `Graphics/Sources/NativeRHI/DX12/DX12Backend.swift` | 15 | 已写入（未验证） | `Graphics/rust/dx12/backend.rs` | 未编译、未行为对照 |
-| `Graphics/Sources/NativeRHI/DX12/DX12Device.swift` | 94 | 已写入（未验证） | `Graphics/rust/dx12/device.rs` | 未编译、未行为对照 |
-| `Graphics/Sources/NativeRHI/DX12/DX12Formats.swift` | 32 | 已写入（未验证） | `Graphics/rust/dx12/formats.rs` | 未编译、未行为对照 |
-| `Graphics/Sources/NativeRHI/DX12/Resources/DX12Compilation.swift` | 24 | 已写入（未验证） | `Graphics/rust/dx12/resources.rs` | 未编译、未行为对照 |
-| `Graphics/Sources/NativeRHI/DX12/Resources/DX12Pipelines.swift` | 74 | 已写入（未验证） | `Graphics/rust/dx12/resources.rs` | 未编译、未行为对照 |
-| `Graphics/Sources/NativeRHI/DX12/Resources/DX12Resources.swift` | 92 | 已写入（未验证） | `Graphics/rust/dx12/resources.rs` | 未编译、未行为对照 |
-| `Graphics/Sources/NativeRHI/DX12/Submission/DX12Submission.swift` | 144 | 已写入（未验证） | `Graphics/rust/dx12/backend.rs` | 未编译、未行为对照 |
-| `Graphics/Sources/NativeRHI/DX12/Submission/DX12Uploader.swift` | 34 | 已写入（未验证） | `Graphics/rust/dx12/resources.rs` | 未编译、未行为对照 |
-| `Graphics/Sources/NativeRHI/Device/AsyncResources.swift` | 26 | 已写入（未验证） | `Graphics/rust/rhi/device.rs` | 未编译、未行为对照 |
-| `Graphics/Sources/NativeRHI/Device/Capabilities.swift` | 45 | 已写入（未验证） | `Graphics/rust/rhi/capabilities.rs` | 未编译、未行为对照 |
-| `Graphics/Sources/NativeRHI/Device/Commands.swift` | 353 | 已写入（未验证） | `Graphics/rust/rhi/commands.rs` | 未编译、未行为对照 |
-| `Graphics/Sources/NativeRHI/Device/Descriptors.swift` | 507 | 已写入（未验证） | `Graphics/rust/rhi/descriptors.rs` | 未编译、未行为对照 |
-| `Graphics/Sources/NativeRHI/Device/Device.swift` | 937 | 已写入（未验证） | `Graphics/rust/rhi/device.rs` | 未编译、未行为对照 |
-| `Graphics/Sources/NativeRHI/Device/Handles.swift` | 25 | 已写入（未验证） | `Graphics/rust/rhi/handles.rs` | 未编译、未行为对照 |
-| `Graphics/Sources/NativeRHI/Device/PipelineCache.swift` | 295 | 已写入（未验证） | `Graphics/rust/rhi/pipeline_cache.rs` | 未编译、未行为对照 |
-| `Graphics/Sources/NativeRHI/Device/Queue.swift` | 24 | 已写入（未验证） | `Graphics/rust/rhi/queue.rs` | 未编译、未行为对照 |
-| `Graphics/Sources/NativeRHI/Device/ResourcePreparation.swift` | 120 | 已写入（未验证） | `Graphics/rust/rhi/resource_preparation.rs` | 未编译、未行为对照 |
-| `Graphics/Sources/NativeRHI/Metal/Bindings/MetalBindingRegistry.swift` | 33 | 已写入（未验证） | `Graphics/rust/metal/registries.rs` | 未编译、未行为对照 |
-| `Graphics/Sources/NativeRHI/Metal/Bindings/MetalLibraryCache.swift` | 62 | 已写入（未验证） | `Graphics/rust/metal/library_cache.rs` | 未编译、未行为对照 |
-| `Graphics/Sources/NativeRHI/Metal/Bindings/MetalRegistries.swift` | 129 | 已写入（未验证） | `Graphics/rust/metal/registries.rs` | 未编译、未行为对照 |
-| `Graphics/Sources/NativeRHI/Metal/Bindings/MetalRenderBindings.swift` | 46 | 已写入（未验证） | `Graphics/rust/metal/render_bindings.rs` | 未编译、未行为对照 |
-| `Graphics/Sources/NativeRHI/Metal/Device/MetalCompilation.swift` | 12 | 已写入（未验证） | `Graphics/rust/metal/backend.rs` | 未编译、未行为对照 |
-| `Graphics/Sources/NativeRHI/Metal/Device/MetalDeviceResources.swift` | 275 | 已写入（未验证） | `Graphics/rust/metal/resources.rs` | 未编译、未行为对照 |
-| `Graphics/Sources/NativeRHI/Metal/Device/MetalDeviceTransfer.swift` | 299 | 已写入（未验证） | `Graphics/rust/metal/transfer.rs` | 未编译、未行为对照 |
-| `Graphics/Sources/NativeRHI/Metal/Device/MetalUploadRing.swift` | 55 | 已写入（未验证） | `Graphics/rust/metal/upload_ring.rs` | 未编译、未行为对照 |
-| `Graphics/Sources/NativeRHI/Metal/MetalAccelerationStructure.swift` | 97 | 已写入（未验证） | `Graphics/rust/metal/acceleration.rs` | 未编译、未行为对照 |
-| `Graphics/Sources/NativeRHI/Metal/MetalBackend.swift` | 16 | 已写入（未验证） | `Graphics/rust/metal/backend.rs` | 未编译、未行为对照 |
-| `Graphics/Sources/NativeRHI/Metal/MetalDevice.swift` | 208 | 已写入（未验证） | `Graphics/rust/metal/device.rs` | 未编译、未行为对照 |
-| `Graphics/Sources/NativeRHI/Metal/MetalFormats.swift` | 232 | 已写入（未验证） | `Graphics/rust/metal/formats.rs` | 未编译、未行为对照 |
-| `Graphics/Sources/NativeRHI/Metal/Pipelines/MetalMeshPipeline.swift` | 86 | 已写入（未验证） | `Graphics/rust/metal/registries.rs` | 未编译、未行为对照 |
-| `Graphics/Sources/NativeRHI/Metal/Pipelines/MetalSubmissionStatus.swift` | 20 | 已写入（未验证） | `Graphics/rust/metal/submission_status.rs` | 未编译、未行为对照 |
-| `Graphics/Sources/NativeRHI/Metal/Pipelines/MetalSubmitEncoder.swift` | 610 | 已写入（未验证） | `Graphics/rust/metal/backend.rs`<br>`Graphics/rust/metal/submit.rs` | 未编译、未行为对照 |
-| `Graphics/Sources/NativeRHI/NativeRHI.swift` | 61 | 已写入（未验证） | `Graphics/rust/rhi/mod.rs` | 未编译、未行为对照 |
-| `Graphics/Sources/NativeRHI/RHIBackend.swift` | 133 | 已写入（未验证） | `Graphics/rust/rhi/backend.rs` | 未编译、未行为对照 |
-| `Graphics/Sources/NativeRHI/RHIError.swift` | 39 | 已写入（未验证） | `Graphics/rust/rhi/error.rs` | 未编译、未行为对照 |
-| `Graphics/Sources/NativeRHI/RHITypes.swift` | 229 | 已写入（未验证） | `Graphics/rust/rhi/types.rs` | 未编译、未行为对照 |
-| `Graphics/Sources/NativeRHI/Resources/AccelerationStructure.swift` | 40 | 已写入（未验证） | `Graphics/rust/rhi/resources.rs` | 未编译、未行为对照 |
-| `Graphics/Sources/NativeRHI/Resources/BackgroundCompilation.swift` | 33 | 已写入（未验证） | `Graphics/rust/rhi/resources.rs` | 未编译、未行为对照 |
-| `Graphics/Sources/NativeRHI/Resources/MeshPipeline.swift` | 23 | 已写入（未验证） | `Graphics/rust/rhi/descriptors.rs` | 未编译、未行为对照 |
-| `Graphics/Sources/NativeRHI/Resources/PipelineInterface.swift` | 66 | 已写入（未验证） | `Graphics/rust/rhi/pipeline_interface.rs` | 未编译、未行为对照 |
-| `Graphics/Sources/NativeRHI/Resources/PresentationMode.swift` | 16 | 已写入（未验证） | `Graphics/rust/rhi/presentation.rs` | 未编译、未行为对照 |
-| `Graphics/Sources/NativeRHI/Resources/ShaderArtifact.swift` | 113 | 已写入（未验证） | `Graphics/rust/rhi/shader_artifact.rs` | 未编译、未行为对照 |
-| `Graphics/Sources/NativeRHI/Resources/ShaderArtifactLoading.swift` | 47 | 已写入（未验证） | `Graphics/rust/rhi/shader_artifact_loading.rs` | 未编译、未行为对照 |
-| `Graphics/Sources/NativeRHI/Resources/ShaderSpecialization.swift` | 48 | 已写入（未验证） | `Graphics/rust/rhi/specialization.rs` | 未编译、未行为对照 |
-| `Graphics/Sources/NativeRHI/Resources/ShaderVisibility.swift` | 16 | 已写入（未验证） | `Graphics/rust/rhi/visibility.rs` | 未编译、未行为对照 |
-| `Graphics/Sources/NativeRHI/Resources/SwapchainResource.swift` | 19 | 已写入（未验证） | `Graphics/rust/rhi/resource_ownership.rs` | 未编译、未行为对照 |
-| `Graphics/Sources/NativeRHI/Resources/TextureAllocation.swift` | 15 | 已写入（未验证） | `Graphics/rust/rhi/resources.rs` | 未编译、未行为对照 |
-| `Graphics/Sources/NativeRHI/Resources/TextureBufferUpload.swift` | 14 | 已写入（未验证） | `Graphics/rust/rhi/commands.rs` | 未编译、未行为对照 |
-| `Graphics/Sources/NativeRHI/Resources/TextureResource.swift` | 17 | 已写入（未验证） | `Graphics/rust/rhi/resource_ownership.rs` | 未编译、未行为对照 |
-| `Graphics/Sources/NativeRHI/Resources/TextureUploadRegion.swift` | 7 | 已写入（未验证） | `Graphics/rust/rhi/resources.rs` | 未编译、未行为对照 |
-| `Graphics/Sources/NativeRHI/Submission/FrameRing.swift` | 128 | 已写入（未验证） | `Graphics/rust/rhi/submission.rs` | 未编译、未行为对照 |
-| `Graphics/Sources/NativeRHI/Submission/GPUTimestampProfile.swift` | 75 | 已写入（未验证） | `Graphics/rust/rhi/submission.rs` | 未编译、未行为对照 |
-| `Graphics/Sources/NativeRHI/Submission/Plan.swift` | 103 | 已写入（未验证） | `Graphics/rust/rhi/submission_planner.rs` | 未编译、未行为对照 |
-| `Graphics/Sources/NativeRHI/Submission/SubmissionCPUProfile.swift` | 63 | 已写入（未验证） | `Graphics/rust/rhi/submission.rs` | 未编译、未行为对照 |
-| `Graphics/Sources/NativeRHI/Submission/SubmissionPlanner.swift` | 786 | 已写入（未验证） | `Graphics/rust/rhi/submission_planner.rs` | 未编译、未行为对照 |
-| `Graphics/Sources/NativeRHI/Submission/UploadRing.swift` | 109 | 已写入（未验证） | `Graphics/rust/rhi/submission.rs` | 未编译、未行为对照 |
-| `Graphics/Sources/NativeRHI/Validation/AccessTracker.swift` | 207 | 已写入（未验证） | `Graphics/rust/rhi/access_tracker.rs` | 未编译、未行为对照 |
-| `Graphics/Sources/NativeRHI/Validation/Caches.swift` | 249 | 已写入（未验证） | `Graphics/rust/rhi/caches.rs` | 未编译、未行为对照 |
-| `Graphics/Sources/NativeRHI/Validation/PipelineValidation.swift` | 101 | 已写入（未验证） | `Graphics/rust/rhi/pipeline_validation.rs` | 未编译、未行为对照 |
-| `Graphics/Sources/NativeRHI/Validation/ReflectedBindingLayout.swift` | 24 | 已写入（未验证） | `Graphics/rust/rhi/shader_artifact.rs` | 未编译、未行为对照 |
-| `Graphics/Sources/NativeRHI/Validation/RenderAttachmentValidation.swift` | 82 | 已写入（未验证） | `Graphics/rust/rhi/validation.rs` | 未编译、未行为对照 |
-| `Graphics/Sources/NativeRHI/Validation/ResourceValidation.swift` | 62 | 已写入（未验证） | `Graphics/rust/rhi/validation.rs` | 未编译、未行为对照 |
-| `Graphics/Sources/NativeRHI/Validation/StateTracker.swift` | 108 | 已写入（未验证） | `Graphics/rust/rhi/state_tracker.rs` | 未编译、未行为对照 |
-| `Graphics/Sources/NativeRHI/Vulkan/Backend/Bindings.swift` | 147 | 已写入（未验证） | `Graphics/rust/metal/library_cache.rs`<br>`Graphics/rust/metal/mod.rs`<br>`Graphics/rust/metal/registries.rs` | 未编译、未行为对照 |
-| `Graphics/Sources/NativeRHI/Vulkan/Backend/Encoder.swift` | 324 | 已写入（未验证） | `Graphics/rust/vulkan/submission.rs` | 未编译、未行为对照 |
-| `Graphics/Sources/NativeRHI/Vulkan/Backend/Pipelines.swift` | 179 | 已写入（未验证） | `Graphics/rust/vulkan/pipelines.rs` | 未编译、未行为对照 |
-| `Graphics/Sources/NativeRHI/Vulkan/Backend/Submit.swift` | 405 | 已写入（未验证） | `Graphics/rust/metal/submit.rs` | 未编译、未行为对照 |
-| `Graphics/Sources/NativeRHI/Vulkan/Backend/Timestamps.swift` | 149 | 已写入（未验证） | `Graphics/rust/vulkan/submission.rs` | 未编译、未行为对照 |
-| `Graphics/Sources/NativeRHI/Vulkan/Backend/VulkanBackendResources.swift` | 339 | 已写入（未验证） | `Graphics/rust/vulkan/resources.rs` | 未编译、未行为对照 |
-| `Graphics/Sources/NativeRHI/Vulkan/Backend/VulkanBackendTransfer.swift` | 258 | 已写入（未验证） | `Graphics/rust/vulkan/submission.rs`<br>`Graphics/rust/vulkan/backend.rs` | 未编译、未行为对照 |
-| `Graphics/Sources/NativeRHI/Vulkan/Backend/VulkanCompilation.swift` | 12 | 已写入（未验证） | `Graphics/rust/vulkan/backend.rs` | 未编译、未行为对照 |
-| `Graphics/Sources/NativeRHI/Vulkan/Presentation/PresentMode.swift` | 11 | 已写入（未验证） | `Graphics/rust/vulkan/presentation.rs` | 未编译、未行为对照 |
-| `Graphics/Sources/NativeRHI/Vulkan/Presentation/SurfaceState.swift` | 7 | 已写入（未验证） | `Hosts/rust/android/integration/surface/state.rs` | 未编译、未行为对照 |
-| `Graphics/Sources/NativeRHI/Vulkan/Presentation/VulkanPresentation.swift` | 24 | 已写入（未验证） | `Graphics/rust/vulkan/presentation.rs` | 未编译、未行为对照 |
-| `Graphics/Sources/NativeRHI/Vulkan/Presentation/VulkanSwapchain.swift` | 319 | 已写入（未验证） | `Graphics/rust/vulkan/presentation.rs` | 未编译、未行为对照 |
-| `Graphics/Sources/NativeRHI/Vulkan/Presentation/VulkanSynchronization.swift` | 107 | 已写入（未验证） | `Graphics/rust/vulkan/presentation.rs` | 未编译、未行为对照 |
-| `Graphics/Sources/NativeRHI/Vulkan/Resources/VulkanAcceleration.swift` | 154 | 已写入（未验证） | `Graphics/rust/vulkan/acceleration.rs` | 未编译、未行为对照 |
-| `Graphics/Sources/NativeRHI/Vulkan/Resources/VulkanMemory.swift` | 206 | 已写入（未验证） | `Graphics/rust/vulkan/memory.rs` | 未编译、未行为对照 |
-| `Graphics/Sources/NativeRHI/Vulkan/Resources/VulkanMesh.swift` | 44 | 已写入（未验证） | `Graphics/rust/vulkan/registries.rs` | 未编译、未行为对照 |
-| `Graphics/Sources/NativeRHI/Vulkan/Resources/VulkanResources.swift` | 100 | 已写入（未验证） | `Graphics/rust/vulkan/resources.rs` | 未编译、未行为对照 |
-| `Graphics/Sources/NativeRHI/Vulkan/Setup/VulkanDeviceSetup.swift` | 373 | 已写入（未验证） | `Graphics/rust/vulkan/setup.rs` | 未编译、未行为对照 |
-| `Graphics/Sources/NativeRHI/Vulkan/Setup/VulkanInstanceSetup.swift` | 84 | 已写入（未验证） | `Graphics/rust/vulkan/setup.rs` | 未编译、未行为对照 |
-| `Graphics/Sources/NativeRHI/Vulkan/Submission/CommandPool.swift` | 32 | 已写入（未验证） | `Graphics/rust/vulkan/submission.rs` | 未编译、未行为对照 |
-| `Graphics/Sources/NativeRHI/Vulkan/Submission/VulkanCleanup.swift` | 32 | 已写入（未验证） | `Graphics/rust/vulkan/setup.rs` | 未编译、未行为对照 |
-| `Graphics/Sources/NativeRHI/Vulkan/Submission/VulkanScratch.swift` | 28 | 已写入（未验证） | `Graphics/rust/vulkan/pipelines.rs` | 未编译、未行为对照 |
-| `Graphics/Sources/NativeRHI/Vulkan/Submission/VulkanSubmissionStatus.swift` | 10 | 已写入（未验证） | `Graphics/rust/vulkan/status.rs` | 未编译、未行为对照 |
-| `Graphics/Sources/NativeRHI/Vulkan/Submission/VulkanUploadRing.swift` | 32 | 已写入（未验证） | `Graphics/rust/vulkan/submission.rs` | 未编译、未行为对照 |
-| `Graphics/Sources/NativeRHI/Vulkan/VulkanAdvanced.swift` | 37 | 已写入（未验证） | `Graphics/rust/vulkan/sys.rs` | 未编译、未行为对照 |
-| `Graphics/Sources/NativeRHI/Vulkan/VulkanAuxiliary.swift` | 52 | 已写入（未验证） | `Graphics/rust/vulkan/formats.rs` | 未编译、未行为对照 |
-| `Graphics/Sources/NativeRHI/Vulkan/VulkanBackend.swift` | 175 | 已写入（未验证） | `Graphics/rust/vulkan/backend.rs` | 未编译、未行为对照 |
-| `Graphics/Sources/NativeRHI/Vulkan/VulkanFormats.swift` | 148 | 已写入（未验证） | `Graphics/rust/vulkan/formats.rs` | 未编译、未行为对照 |
-| `Graphics/Sources/NativeRHI/Vulkan/VulkanFunctions.swift` | 687 | 已写入（未验证） | `Graphics/rust/vulkan/sys.rs` | 未编译、未行为对照 |
-| `Graphics/Sources/NativeRHI/Vulkan/VulkanRendering.swift` | 149 | 已写入（未验证） | `Graphics/rust/vulkan/rendering.rs` | 未编译、未行为对照 |
-| `Graphics/Sources/NativeRHI/Vulkan/VulkanRuntime.swift` | 67 | 已写入（未验证） | `Graphics/rust/vulkan/backend.rs`<br>`Graphics/rust/vulkan/setup.rs` | 未编译、未行为对照 |
-
-### Core
-
-共 97 个文件：已写入 97，进行中 0，未开始 0。
-
-| 源文件 | 行 | 状态 | Rust/C 目标 | 依赖或阻塞 |
-| --- | ---: | --- | --- | --- |
-| `Core/Sources/CoveUICore/Adaptive/Environment.swift` | 82 | 已写入（未验证） | `Core/rust/adaptive_environment.rs` | 未编译、未行为对照 |
-| `Core/Sources/CoveUICore/Adaptive/TextScale.swift` | 44 | 已写入（未验证） | `Core/rust/text_scale.rs` | 未编译、未行为对照 |
-| `Core/Sources/CoveUICore/AnalyticClipper.swift` | 62 | 已写入（未验证） | `Core/rust/analytic_clipper.rs` | 未编译、未行为对照 |
-| `Core/Sources/CoveUICore/AnalyticStroke.swift` | 80 | 已写入（未验证） | `Core/rust/analytic_stroke.rs` | 未编译、未行为对照 |
-| `Core/Sources/CoveUICore/Bidi.swift` | 267 | 已写入（未验证） | `Core/rust/bidi.rs` | 未编译、未行为对照 |
-| `Core/Sources/CoveUICore/Binding.swift` | 32 | 已写入（未验证） | `Core/rust/binding.rs` | 未编译、未行为对照 |
-| `Core/Sources/CoveUICore/Bitmap.swift` | 21 | 已写入（未验证） | `Core/rust/bitmap.rs`<br>`Core/rust/draw_list_resources.rs` | 未编译、未行为对照 |
-| `Core/Sources/CoveUICore/Color.swift` | 56 | 已写入（未验证） | `Core/rust/geometry.rs` | 未编译、未行为对照 |
-| `Core/Sources/CoveUICore/ContentScale.swift` | 7 | 已写入（未验证） | `Core/rust/content_scale.rs` | 未编译、未行为对照 |
-| `Core/Sources/CoveUICore/DrawList.swift` | 1026 | 已写入（未验证） | `Core/rust/draw.rs`<br>`Core/rust/draw_primitives.rs` | 未编译、未行为对照 |
-| `Core/Sources/CoveUICore/DrawListResources.swift` | 25 | 已写入（未验证） | `Core/rust/draw_list_resources.rs` | 未编译、未行为对照 |
-| `Core/Sources/CoveUICore/DynamicProperty.swift` | 5 | 已写入（未验证） | `Core/rust/dynamic_property.rs` | 未编译、未行为对照 |
-| `Core/Sources/CoveUICore/Font.swift` | 50 | 已写入（未验证） | `Core/rust/font.rs` | 未编译、未行为对照 |
-| `Core/Sources/CoveUICore/GeometryKernels.swift` | 62 | 已写入（未验证） | `Core/rust/geometry_kernels.rs` | 未编译、未行为对照 |
-| `Core/Sources/CoveUICore/GlyphMetrics.swift` | 66 | 已写入（未验证） | `Core/rust/glyph_metrics.rs` | 未编译、未行为对照 |
-| `Core/Sources/CoveUICore/LineBreaks.swift` | 45 | 已写入（未验证） | `Core/rust/line_breaks.rs` | 未编译、未行为对照 |
-| `Core/Sources/CoveUICore/LinearGradient.swift` | 53 | 已写入（未验证） | `Core/rust/linear_gradient.rs` | 未编译、未行为对照 |
-| `Core/Sources/CoveUICore/Mipmaps.swift` | 52 | 已写入（未验证） | `Core/rust/bitmap.rs` | 未编译、未行为对照 |
-| `Core/Sources/CoveUICore/RoundedClip.swift` | 124 | 已写入（未验证） | `Core/rust/rounded_clip.rs` | 未编译、未行为对照 |
-| `Core/Sources/CoveUICore/ShapedGlyph.swift` | 27 | 已写入（未验证） | `Core/rust/shaped_glyph.rs` | 未编译、未行为对照 |
-| `Core/Sources/CoveUICore/State.swift` | 154 | 已写入（未验证） | `Core/rust/state.rs` | 未编译、未行为对照 |
-| `Core/Sources/CoveUICore/StateReadTracking.swift` | 431 | 已写入（未验证） | `Core/rust/state_read_tracking.rs`<br>`Core/rust/state.rs` | 未编译、未行为对照 |
-| `Core/Sources/CoveUICore/SurfaceShadow.swift` | 55 | 已写入（未验证） | `Core/rust/surface_shadow.rs` | 未编译、未行为对照 |
-| `Core/Sources/CoveUICore/TextLayout.swift` | 381 | 已写入（未验证） | `Core/rust/text_layout.rs` | 未编译、未行为对照 |
-| `Core/Sources/CoveUICore/TextMeasureSlot.swift` | 67 | 已写入（未验证） | `Core/rust/text_measure_slot.rs` | 未编译、未行为对照 |
-| `Core/Sources/CoveUICore/UIReveal.swift` | 43 | 已写入（未验证） | `Core/rust/ui_reveal.rs` | 未编译、未行为对照 |
-| `Core/Sources/CoveUICore/UIShader.swift` | 107 | 已写入（未验证） | `Core/rust/ui_shader.rs` | 未编译、未行为对照 |
-| `Core/Sources/CoveUICore/UIVertex.swift` | 41 | 已写入（未验证） | `Core/rust/draw.rs`<br>`Core/rust/geometry.rs` | 未编译、未行为对照 |
-| `Core/Sources/CoveUIScene/Accessibility.swift` | 252 | 已写入（未验证） | `Core/rust/scene/accessibility.rs` | 未编译、未行为对照 |
-| `Core/Sources/CoveUIScene/AmbientSlot.swift` | 17 | 已写入（未验证） | `Core/rust/scene/ambient_slot.rs` | 未编译、未行为对照 |
-| `Core/Sources/CoveUIScene/Animation/ActiveAnimationContext.swift` | 166 | 已写入（未验证） | `Core/rust/scene/animation/context.rs` | 未编译、未行为对照 |
-| `Core/Sources/CoveUIScene/Animation/AnimatableProperty.swift` | 118 | 已写入（未验证） | `Core/rust/scene/animatable_property.rs` | 未编译、未行为对照 |
-| `Core/Sources/CoveUIScene/Animation/AnimatableWrite.swift` | 193 | 已写入（未验证） | `Core/rust/scene/animatable_write.rs` | 未编译、未行为对照 |
-| `Core/Sources/CoveUIScene/Animation/Animation.swift` | 249 | 已写入（未验证） | `Core/rust/scene/animation/animation.rs` | 未编译、未行为对照 |
-| `Core/Sources/CoveUIScene/Animation/AnimationController.swift` | 147 | 已写入（未验证） | `Core/rust/scene/animation/controller.rs` | 未编译、未行为对照 |
-| `Core/Sources/CoveUIScene/Animation/Curves/Linear.swift` | 38 | 已写入（未验证） | `Core/rust/scene/animation/linear.rs` | 未编译、未行为对照 |
-| `Core/Sources/CoveUIScene/Animation/Curves/Oscillation.swift` | 23 | 已写入（未验证） | `Core/rust/scene/animation/animation.rs` | 未编译、未行为对照 |
-| `Core/Sources/CoveUIScene/Animation/Curves/Steps.swift` | 19 | 已写入（未验证） | `Core/rust/scene/animation/animation.rs` | 未编译、未行为对照 |
-| `Core/Sources/CoveUIScene/Animation/Interpolatable.swift` | 83 | 已写入（未验证） | `Core/rust/scene/animation/interpolatable.rs` | 未编译、未行为对照 |
-| `Core/Sources/CoveUIScene/Animation/Keyframes/Timeline.swift` | 41 | 已写入（未验证） | `Core/rust/scene/animation/timeline.rs` | 未编译、未行为对照 |
-| `Core/Sources/CoveUIScene/Animation/MotionVector.swift` | 13 | 已写入（未验证） | `Core/rust/scene/animation/motion_vector.rs` | 未编译、未行为对照 |
-| `Core/Sources/CoveUIScene/Animation/Playback.swift` | 30 | 已写入（未验证） | `Core/rust/scene/animation/playback.rs` | 未编译、未行为对照 |
-| `Core/Sources/CoveUIScene/Animation/Scheduler.swift` | 96 | 已写入（未验证） | `Core/rust/scene/animation/scheduler.rs` | 未编译、未行为对照 |
-| `Core/Sources/CoveUIScene/Animation/SpringSolution.swift` | 142 | 已写入（未验证） | `Core/rust/scene/animation/spring_solution.rs` | 未编译、未行为对照 |
-| `Core/Sources/CoveUIScene/ComponentDiagnostics.swift` | 42 | 已写入（未验证） | `Core/rust/scene/component_diagnostics.rs` | 未编译、未行为对照 |
-| `Core/Sources/CoveUIScene/CompositionLocal.swift` | 39 | 已写入（未验证） | `Core/rust/scene/composition_local.rs` | 未编译、未行为对照 |
-| `Core/Sources/CoveUIScene/ElementID.swift` | 44 | 已写入（未验证） | `Core/rust/scene/element_id.rs` | 未编译、未行为对照 |
-| `Core/Sources/CoveUIScene/Exports.swift` | 3 | 已写入（未验证） | `Logging/rust/exports.rs`<br>`Logging/rust/logging_exports.rs` | 未编译、未行为对照 |
-| `Core/Sources/CoveUIScene/FlexProps.swift` | 238 | 已写入（未验证） | `Core/rust/scene/flex_props.rs` | 未编译、未行为对照 |
-| `Core/Sources/CoveUIScene/Input/EventDispatcher.swift` | 622 | 已写入（未验证） | `Core/rust/scene/input/event_dispatcher.rs` | 未编译、未行为对照 |
-| `Core/Sources/CoveUIScene/Input/FocusAccessoryResource.swift` | 17 | 已写入（未验证） | `Core/rust/scene/input/focus_accessory_resource.rs` | 未编译、未行为对照 |
-| `Core/Sources/CoveUIScene/Input/FocusChain.swift` | 266 | 已写入（未验证） | `Core/rust/scene/input/focus_chain.rs` | 未编译、未行为对照 |
-| `Core/Sources/CoveUIScene/Input/HitTester.swift` | 97 | 已写入（未验证） | `Core/rust/scene/input/hit_tester.rs` | 未编译、未行为对照 |
-| `Core/Sources/CoveUIScene/Input/InteractionRegistry.swift` | 442 | 已写入（未验证） | `Core/rust/scene/input/interaction_registry.rs` | 未编译、未行为对照 |
-| `Core/Sources/CoveUIScene/Input/ModalFocusResource.swift` | 24 | 已写入（未验证） | `Core/rust/scene/input/modal_focus_resource.rs` | 未编译、未行为对照 |
-| `Core/Sources/CoveUIScene/Input/PlatformInputContext.swift` | 131 | 已写入（未验证） | `Core/rust/scene/input/platform_input_context.rs` | 未编译、未行为对照 |
-| `Core/Sources/CoveUIScene/Input/PointerCapture.swift` | 43 | 已写入（未验证） | `Core/rust/scene/input/pointer_capture.rs` | 未编译、未行为对照 |
-| `Core/Sources/CoveUIScene/Input/TabStop.swift` | 21 | 已写入（未验证） | `Core/rust/scene/input/tab_stop.rs` | 未编译、未行为对照 |
-| `Core/Sources/CoveUIScene/Input/WheelGesture.swift` | 49 | 已写入（未验证） | `Core/rust/scene/input/wheel_gesture.rs` | 未编译、未行为对照 |
-| `Core/Sources/CoveUIScene/Input/WheelRoutingAttachment.swift` | 42 | 已写入（未验证） | `Core/rust/scene/input/wheel_routing_attachment.rs` | 未编译、未行为对照 |
-| `Core/Sources/CoveUIScene/InvalidationLog.swift` | 126 | 已写入（未验证） | `Core/rust/scene/invalidation_log.rs` | 未编译、未行为对照 |
-| `Core/Sources/CoveUIScene/LayerAwareNodeRenderer.swift` | 303 | 已写入（未验证） | `Core/rust/scene/layer_aware_node_renderer.rs` | 未编译、未行为对照 |
-| `Core/Sources/CoveUIScene/Layout/CustomLayout.swift` | 174 | 已写入（未验证） | `Core/rust/scene/layout_node.rs` | 未编译、未行为对照 |
-| `Core/Sources/CoveUIScene/Layout/LayoutDirection.swift` | 13 | 已写入（未验证） | `Compose/rust/primitives/overlays/support.rs` | 未编译、未行为对照 |
-| `Core/Sources/CoveUIScene/Layout/Node+LayoutVisibility.swift` | 21 | 已写入（未验证） | `Core/rust/scene/node.rs` | 未编译、未行为对照 |
-| `Core/Sources/CoveUIScene/LayoutNode.swift` | 636 | 已写入（未验证） | `Core/rust/scene/layout_node.rs` | 未编译、未行为对照 |
-| `Core/Sources/CoveUIScene/LayoutPass.swift` | 40 | 已写入（未验证） | `Core/rust/scene/layout_pass.rs` | 未编译、未行为对照 |
-| `Core/Sources/CoveUIScene/Node.swift` | 835 | 已写入（未验证） | `Core/rust/scene/node.rs` | 未编译、未行为对照 |
-| `Core/Sources/CoveUIScene/NodeGeometry.swift` | 57 | 已写入（未验证） | `Core/rust/scene/node_geometry.rs` | 未编译、未行为对照 |
-| `Core/Sources/CoveUIScene/NodeRenderer.swift` | 159 | 已写入（未验证） | `Core/rust/scene/node_renderer.rs` | 未编译、未行为对照 |
-| `Core/Sources/CoveUIScene/NodeResource.swift` | 23 | 已写入（未验证） | `Core/rust/scene/node_resource.rs` | 未编译、未行为对照 |
-| `Core/Sources/CoveUIScene/NodeTransform.swift` | 173 | 已写入（未验证） | `Core/rust/scene/node_transform.rs` | 未编译、未行为对照 |
-| `Core/Sources/CoveUIScene/NodeTree.swift` | 104 | 已写入（未验证） | `Core/rust/scene/node_tree.rs` | 未编译、未行为对照 |
-| `Core/Sources/CoveUIScene/ObservableObject.swift` | 29 | 已写入（未验证） | `Core/rust/scene/observable_object.rs` | 未编译、未行为对照 |
-| `Core/Sources/CoveUIScene/ObservableStateTracking.swift` | 184 | 已写入（未验证） | `Core/rust/scene/observable_state_tracking.rs` | 未编译、未行为对照 |
-| `Core/Sources/CoveUIScene/PerformanceTimeline.swift` | 75 | 已写入（未验证） | `Core/rust/scene/performance_timeline.rs` | 未编译、未行为对照 |
-| `Core/Sources/CoveUIScene/Recomposer.swift` | 138 | 已写入（未验证） | `Core/rust/scene/recomposer.rs` | 未编译、未行为对照 |
-| `Core/Sources/CoveUIScene/ReducedMotion.swift` | 13 | 已写入（未验证） | `Core/rust/scene/environment_hooks.rs` | 未编译、未行为对照 |
-| `Core/Sources/CoveUIScene/RenderCulling.swift` | 17 | 已写入（未验证） | `Core/rust/scene/render_culling.rs` | 未编译、未行为对照 |
-| `Core/Sources/CoveUIScene/RenderTree.swift` | 328 | 已写入（未验证） | `Core/rust/scene/render_tree.rs` | 未编译、未行为对照 |
-| `Core/Sources/CoveUIScene/Rendering/ContentMask.swift` | 13 | 已写入（未验证） | `Core/rust/scene/rendering/content_mask.rs` | 未编译、未行为对照 |
-| `Core/Sources/CoveUIScene/Rendering/ScaledPainting.swift` | 36 | 已写入（未验证） | `Core/rust/scene/rendering/scaled_painting.rs` | 未编译、未行为对照 |
-| `Core/Sources/CoveUIScene/Rendering/Snapshot.swift` | 54 | 已写入（未验证） | `Core/rust/scene/rendering/snapshot.rs` | 未编译、未行为对照 |
-| `Core/Sources/CoveUIScene/Scrolling/AxisMotion.swift` | 50 | 已写入（未验证） | `Core/rust/scene/scrolling/animator.rs` | 未编译、未行为对照 |
-| `Core/Sources/CoveUIScene/Scrolling/Reveal.swift` | 22 | 已写入（未验证） | `Core/rust/scene/scrolling/reveal.rs` | 未编译、未行为对照 |
-| `Core/Sources/CoveUIScene/Scrolling/RubberBand.swift` | 70 | 已写入（未验证） | `Core/rust/scene/scrolling/physics.rs` | 未编译、未行为对照 |
-| `Core/Sources/CoveUIScene/Scrolling/ScrollAnimator.swift` | 573 | 已写入（未验证） | `Core/rust/scene/scrolling/animator.rs` | 未编译、未行为对照 |
-| `Core/Sources/CoveUIScene/Scrolling/ScrollPhysics.swift` | 197 | 已写入（未验证） | `Core/rust/scene/scrolling/physics.rs` | 未编译、未行为对照 |
-| `Core/Sources/CoveUIScene/Scrolling/ScrollSpring.swift` | 65 | 已写入（未验证） | `Core/rust/scene/scrolling/physics.rs` | 未编译、未行为对照 |
-| `Core/Sources/CoveUIScene/Scrolling/ScrollVelocityTracker.swift` | 112 | 已写入（未验证） | `Core/rust/scene/scrolling/physics.rs` | 未编译、未行为对照 |
-| `Core/Sources/CoveUIScene/StateRegistry.swift` | 50 | 已写入（未验证） | `Core/rust/scene/state_registry.rs` | 未编译、未行为对照 |
-| `Core/Sources/CoveUIScene/SurfacePainting.swift` | 237 | 已写入（未验证） | `Core/rust/scene/surface_painting.rs` | 未编译、未行为对照 |
-| `Core/Sources/CoveUIScene/TextInputAttachment.swift` | 43 | 已写入（未验证） | `Core/rust/scene/input/text_input.rs` | 未编译、未行为对照 |
-| `Core/Sources/CoveUIScene/TextInputClient.swift` | 26 | 已写入（未验证） | `Core/rust/scene/input/text_input.rs` | 未编译、未行为对照 |
-| `Core/Sources/CoveUIScene/TimingTrace.swift` | 54 | 已写入（未验证） | `Core/rust/scene/timing_trace.rs` | 未编译、未行为对照 |
-| `Core/Sources/CoveUIScene/UIWorkScheduler.swift` | 11 | 已写入（未验证） | `Core/rust/scene/environment_hooks.rs` | 未编译、未行为对照 |
-| `Core/Sources/CoveUIScene/WindowReveal.swift` | 26 | 已写入（未验证） | `Core/rust/scene/environment_hooks.rs` | 未编译、未行为对照 |
-
-### Examples
-
-共 60 个文件：已写入 60，进行中 0，未开始 0。
-
-| 源文件 | 行 | 状态 | Rust/C 目标 | 依赖或阻塞 |
-| --- | ---: | --- | --- | --- |
-| `Examples/Counter/Sources/CounterExample/CounterView.swift` | 200 | 已写入（未验证） | `Examples/rust/counter.rs` | 未编译、未行为对照 |
-| `Examples/Mobile/Sources/AppContent/App.swift` | 33 | 已写入（未验证） | `Examples/rust/mobile/app.rs` | 未编译、未行为对照 |
-| `Examples/Mobile/Sources/AppContent/Model.swift` | 30 | 已写入（未验证） | `Compose/rust/primitives/data/chart/model.rs` | 未编译、未行为对照 |
-| `Examples/Mobile/Sources/AppContent/Projects.swift` | 57 | 已写入（未验证） | `Examples/rust/mobile/model.rs`<br>`Examples/rust/mobile/today.rs` | 未编译、未行为对照 |
-| `Examples/Mobile/Sources/AppContent/Settings.swift` | 50 | 已写入（未验证） | `Examples/rust/mobile/settings.rs` | 未编译、未行为对照 |
-| `Examples/Mobile/Sources/AppContent/Today.swift` | 49 | 已写入（未验证） | `Examples/rust/mobile/today.rs` | 未编译、未行为对照 |
-| `Examples/Platforms/iOS/main.swift` | 10 | 已写入（未验证） | `Examples/RustCounter/src/main.rs` | 未编译、未行为对照 |
-| `Examples/Sources/CoveUIDemo/Launch.swift` | 79 | 已写入（未验证） | `Hosts/rust/android/contract/launch.rs` | 未编译、未行为对照 |
-| `Examples/Sources/CoveUIDemo/main.swift` | 7 | 已写入（未验证） | `Examples/RustCounter/src/main.rs` | 未编译、未行为对照 |
-| `Examples/Sources/GalleryContent/CounterContent.swift` | 18 | 已写入（未验证） | `Examples/rust/gallery_content/counter_content.rs` | 未编译、未行为对照 |
-| `Examples/Sources/GalleryContent/GalleryCatalog.swift` | 150 | 已写入（未验证） | `Examples/rust/gallery_content/catalog.rs` | 未编译、未行为对照 |
-| `Examples/Sources/GalleryContent/GalleryView.swift` | 218 | 已写入（未验证） | `Examples/rust/gallery_content/gallery_view.rs` | 未编译、未行为对照 |
-| `Examples/Sources/GalleryContent/NavigationIcons.swift` | 105 | 已写入（未验证） | `Examples/rust/gallery_content/icons.rs` | 未编译、未行为对照 |
-| `Examples/Sources/GalleryContent/Stories/Controls/ControlStories.swift` | 380 | 已写入（未验证） | `Examples/rust/gallery_content/stories/controls.rs` | 未编译、未行为对照 |
-| `Examples/Sources/GalleryContent/Stories/Controls/StepperStory.swift` | 36 | 已写入（未验证） | `Examples/rust/gallery_content/stories/stepper.rs` | 未编译、未行为对照 |
-| `Examples/Sources/GalleryContent/Stories/Controls/TextEditorStory.swift` | 327 | 已写入（未验证） | `Examples/rust/gallery_content/stories/text_editor_story.rs` | 未编译、未行为对照 |
-| `Examples/Sources/GalleryContent/Stories/Controls/TimePickerStory.swift` | 95 | 已写入（未验证） | `Examples/rust/gallery_content/stories/time_picker_story.rs` | 未编译、未行为对照 |
-| `Examples/Sources/GalleryContent/Stories/Controls/ToolbarStory.swift` | 71 | 已写入（未验证） | `Examples/rust/gallery_content/stories/toolbar_story.rs` | 未编译、未行为对照 |
-| `Examples/Sources/GalleryContent/Stories/Controls/WheelPickerStory.swift` | 104 | 已写入（未验证） | `Examples/rust/gallery_content/stories/wheel_picker_story.rs` | 未编译、未行为对照 |
-| `Examples/Sources/GalleryContent/Stories/Data/AdaptiveTables.swift` | 19 | 已写入（未验证） | `Examples/rust/gallery_content/stories/data_stories.rs` | 未编译、未行为对照 |
-| `Examples/Sources/GalleryContent/Stories/Data/ChartExploration.swift` | 37 | 已写入（未验证） | `Examples/rust/gallery_content/stories/data_stories.rs` | 未编译、未行为对照 |
-| `Examples/Sources/GalleryContent/Stories/Data/DataStories.swift` | 714 | 已写入（未验证） | `Examples/rust/gallery_content/stories/data_stories_file.rs` | 未编译、未行为对照 |
-| `Examples/Sources/GalleryContent/Stories/Data/DataTableStory.swift` | 131 | 已写入（未验证） | `Examples/rust/gallery_content/stories/data_table_story.rs` | 未编译、未行为对照 |
-| `Examples/Sources/GalleryContent/Stories/Data/DateTableStories.swift` | 114 | 已写入（未验证） | `Examples/rust/gallery_content/stories/calendar.rs` | 未编译、未行为对照 |
-| `Examples/Sources/GalleryContent/Stories/Data/MarkdownStory.swift` | 77 | 已写入（未验证） | `Examples/rust/gallery_content/stories/markdown_story.rs` | 未编译、未行为对照 |
-| `Examples/Sources/GalleryContent/Stories/Data/RichTextStory.swift` | 58 | 已写入（未验证） | `Examples/rust/gallery_content/stories/rich_text.rs` | 未编译、未行为对照 |
-| `Examples/Sources/GalleryContent/Stories/Data/WebStory.swift` | 193 | 已写入（未验证） | `Examples/rust/gallery_content/stories/web_story.rs` | 未编译、未行为对照 |
-| `Examples/Sources/GalleryContent/Stories/Feedback/AvatarStory.swift` | 86 | 已写入（未验证） | `Examples/rust/gallery_content/stories/avatar_story.rs` | 未编译、未行为对照 |
-| `Examples/Sources/GalleryContent/Stories/Feedback/FeedbackStories.swift` | 250 | 已写入（未验证） | `Examples/rust/gallery_content/routing.rs` | 未编译、未行为对照 |
-| `Examples/Sources/GalleryContent/Stories/Feedback/RatingSample.swift` | 48 | 已写入（未验证） | `Examples/rust/gallery_content/stories/media_stories.rs` | 未编译、未行为对照 |
-| `Examples/Sources/GalleryContent/Stories/Feedback/RatingStory.swift` | 77 | 已写入（未验证） | `Examples/rust/gallery_content/stories/media_stories.rs` | 未编译、未行为对照 |
-| `Examples/Sources/GalleryContent/Stories/Feedback/SkeletonStory.swift` | 43 | 已写入（未验证） | `Examples/rust/gallery_content/stories/media_stories.rs` | 未编译、未行为对照 |
-| `Examples/Sources/GalleryContent/Stories/Foundation/AdaptiveExamples.swift` | 551 | 已写入（未验证） | `Examples/rust/gallery_content/stories/adaptive_examples.rs` | 未编译、未行为对照 |
-| `Examples/Sources/GalleryContent/Stories/Foundation/AnimationCurves.swift` | 51 | 已写入（未验证） | `Examples/rust/gallery_content/stories/animation_curves.rs` | 未编译、未行为对照 |
-| `Examples/Sources/GalleryContent/Stories/Foundation/AnimationSystem.swift` | 81 | 已写入（未验证） | `Examples/rust/gallery_content/stories/animation_system.rs` | 未编译、未行为对照 |
-| `Examples/Sources/GalleryContent/Stories/Foundation/IntrinsicFitting.swift` | 35 | 已写入（未验证） | `Examples/rust/gallery_content/stories/intrinsic_fitting.rs` | 未编译、未行为对照 |
-| `Examples/Sources/GalleryContent/Stories/Foundation/SurfaceTraits.swift` | 70 | 已写入（未验证） | `Examples/rust/gallery_content/stories/viewport_traits.rs` | 未编译、未行为对照 |
-| `Examples/Sources/GalleryContent/Stories/Foundation/ThemeStory.swift` | 89 | 已写入（未验证） | `Examples/rust/gallery_content/stories/theme.rs` | 未编译、未行为对照 |
-| `Examples/Sources/GalleryContent/Stories/Layout/DrawerStory.swift` | 56 | 已写入（未验证） | `Examples/rust/gallery_content/stories/navigation_layout_stories.rs` | 未编译、未行为对照 |
-| `Examples/Sources/GalleryContent/Stories/Layout/FoundationExamples.swift` | 134 | 已写入（未验证） | `Examples/rust/gallery_content/stories/layout.rs` | 未编译、未行为对照 |
-| `Examples/Sources/GalleryContent/Stories/Layout/GridColumns.swift` | 53 | 已写入（未验证） | `Compose/rust/primitives/layout/grid/columns.rs` | 未编译、未行为对照 |
-| `Examples/Sources/GalleryContent/Stories/Layout/ImageStory.swift` | 80 | 已写入（未验证） | `Examples/rust/gallery_content/stories/image_story.rs` | 未编译、未行为对照 |
-| `Examples/Sources/GalleryContent/Stories/Layout/LayoutStories.swift` | 396 | 已写入（未验证） | `Examples/rust/gallery_content/stories/animation.rs` | 未编译、未行为对照 |
-| `Examples/Sources/GalleryContent/Stories/Layout/MasonryStory.swift` | 81 | 已写入（未验证） | `Examples/rust/gallery_content/stories/layout.rs` | 未编译、未行为对照 |
-| `Examples/Sources/GalleryContent/Stories/Layout/NavigationStories.swift` | 291 | 已写入（未验证） | `Examples/rust/gallery_content/stories/navigation_stories_file.rs` | 未编译、未行为对照 |
-| `Examples/Sources/GalleryContent/Stories/Layout/NestedSidebarExample.swift` | 56 | 已写入（未验证） | `Examples/rust/gallery_content/stories/sidebar_stories.rs` | 未编译、未行为对照 |
-| `Examples/Sources/GalleryContent/Stories/Layout/OverlayStories.swift` | 199 | 已写入（未验证） | `Examples/rust/gallery_content/stories/overlay_stories_file.rs` | 未编译、未行为对照 |
-| `Examples/Sources/GalleryContent/Stories/Layout/ProductStories.swift` | 152 | 已写入（未验证） | `Examples/rust/gallery_content/stories/product_stories.rs` | 未编译、未行为对照 |
-| `Examples/Sources/GalleryContent/Stories/Layout/RailStory.swift` | 84 | 已写入（未验证） | `Examples/rust/gallery_content/stories/navigation_layout_stories.rs` | 未编译、未行为对照 |
-| `Examples/Sources/GalleryContent/Stories/Layout/ResizableSidebarExample.swift` | 31 | 已写入（未验证） | `Examples/rust/gallery_content/stories/sidebar_stories.rs` | 未编译、未行为对照 |
-| `Examples/Sources/GalleryContent/Stories/Layout/SidebarStory.swift` | 118 | 已写入（未验证） | `Examples/rust/gallery_content/stories/sidebar_story.rs` | 未编译、未行为对照 |
-| `Examples/Sources/GalleryContent/Stories/Navigation/AppBarStory.swift` | 53 | 已写入（未验证） | `Examples/rust/gallery_content/stories/navigation_stories.rs` | 未编译、未行为对照 |
-| `Examples/Sources/GalleryContent/Stories/Overlays/ActionSheetStory.swift` | 75 | 已写入（未验证） | `Examples/rust/gallery_content/stories/action_sheet_story.rs` | 未编译、未行为对照 |
-| `Examples/Sources/GalleryContent/Stories/Overlays/CommandStory.swift` | 67 | 已写入（未验证） | `Examples/rust/gallery_content/stories/command_story.rs` | 未编译、未行为对照 |
-| `Examples/Sources/GalleryContent/Stories/Overlays/HoverStory.swift` | 50 | 已写入（未验证） | `Examples/rust/gallery_content/stories/overlay_stories.rs` | 未编译、未行为对照 |
-| `Examples/Sources/GalleryContent/Stories/Overlays/Popconfirm/PlacementExample.swift` | 73 | 已写入（未验证） | `Examples/rust/gallery_content/stories/placement_example.rs` | 未编译、未行为对照 |
-| `Examples/Sources/GalleryContent/Stories/Overlays/PopconfirmStory.swift` | 74 | 已写入（未验证） | `Examples/rust/gallery_content/stories/overlay_stories.rs` | 未编译、未行为对照 |
-| `Examples/Sources/GalleryContent/Stories/Overview/Dashboard.swift` | 105 | 已写入（未验证） | `Examples/rust/gallery_content/stories/overview.rs` | 未编译、未行为对照 |
-| `Examples/Sources/GalleryContent/Stories/Overview/MetricCard.swift` | 49 | 已写入（未验证） | `Examples/rust/gallery_content/stories/overview.rs` | 未编译、未行为对照 |
-| `Examples/Sources/PetDemo/main.swift` | 111 | 已写入（未验证） | `Examples/RustCounter/src/main.rs` | 未编译、未行为对照 |
-
-### DevTools
-
-共 51 个文件：已写入 51，进行中 0，未开始 0。
-
-| 源文件 | 行 | 状态 | Rust/C 目标 | 依赖或阻塞 |
-| --- | ---: | --- | --- | --- |
-| `DevTools/Inspection/Sources/CoveUIAgentCore/Contracts/Schema.swift` | 479 | 已写入（未验证） | `DevTools/rust/lib.rs` | 未编译、未行为对照 |
-| `DevTools/Inspection/Sources/CoveUIAgentCore/Contracts/Tool.swift` | 51 | 已写入（未验证） | `Agent/rust/ui_tools.rs` | 未编译、未行为对照 |
-| `DevTools/Inspection/Sources/CoveUIAgentCore/MCP/Server.swift` | 105 | 已写入（未验证） | `Agent/rust/mcp.rs` | 未编译、未行为对照 |
-| `DevTools/Inspection/Sources/CoveUIAgentCore/Session/Conversation.swift` | 86 | 已写入（未验证） | `Agent/rust/tool.rs` | 未编译、未行为对照 |
-| `DevTools/Inspection/Sources/CoveUIAgentCore/Skills/Directory.swift` | 49 | 已写入（未验证） | `Agent/rust/skills.rs` | 未编译、未行为对照 |
-| `DevTools/Inspection/Sources/CoveUIAgentCore/Skills/Skill.swift` | 42 | 已写入（未验证） | `Agent/rust/skills.rs` | 未编译、未行为对照 |
-| `DevTools/Inspection/Sources/CoveUIAgentCore/Tools/Diagnostics.swift` | 92 | 已写入（未验证） | `DevTools/rust/inspection/diagnostics.rs` | 未编译、未行为对照 |
-| `DevTools/Inspection/Sources/CoveUIAgentCore/Tools/Toolbox.swift` | 44 | 已写入（未验证） | `Agent/rust/tool.rs` | 未编译、未行为对照 |
-| `DevTools/Inspection/Sources/CoveUIDevToolsScene/Diagnostics/Actions.swift` | 41 | 已写入（未验证） | `DevTools/rust/inspection/actions.rs` | 未编译、未行为对照 |
-| `DevTools/Inspection/Sources/CoveUIDevToolsScene/Diagnostics/Geometry.swift` | 72 | 已写入（未验证） | `Compose/rust/primitives/controls/fields/slider/geometry.rs` | 未编译、未行为对照 |
-| `DevTools/Inspection/Sources/CoveUIDevToolsScene/Diagnostics/Memory.swift` | 11 | 已写入（未验证） | `Hosts/rust/desktop/application/memory.rs` | 未编译、未行为对照 |
-| `DevTools/Inspection/Sources/CoveUIDevToolsScene/Diagnostics/Presentation.swift` | 62 | 已写入（未验证） | `Graphics/rust/rhi/presentation.rs` | 未编译、未行为对照 |
-| `DevTools/Inspection/Sources/CoveUIDevToolsScene/Diagnostics/Queries.swift` | 200 | 已写入（未验证） | `DevTools/rust/inspection/diagnostics.rs` | 未编译、未行为对照 |
-| `DevTools/Inspection/Sources/CoveUIDevToolsScene/Diagnostics/Requests.swift` | 50 | 已写入（未验证） | `DevTools/rust/server/mod.rs` | 未编译、未行为对照 |
-| `DevTools/Inspection/Sources/CoveUIDevToolsScene/Diagnostics/Tools.swift` | 222 | 已写入（未验证） | `Agent/rust/ui_tools.rs` | 未编译、未行为对照 |
-| `DevTools/Inspection/Sources/CoveUIDevToolsScene/Diagnostics/Trace.swift` | 103 | 已写入（未验证） | `Core/rust/scene/timing_trace.rs` | 未编译、未行为对照 |
-| `DevTools/Inspection/Sources/CoveUIDevToolsScene/Observation.swift` | 19 | 已写入（未验证） | `Logging/rust/observation.rs` | 未编译、未行为对照 |
-| `DevTools/Inspection/Sources/CoveUIDevToolsScene/SceneEditor.swift` | 209 | 已写入（未验证） | `DevTools/rust/inspection/editor.rs` | 未编译、未行为对照 |
-| `DevTools/Inspection/Sources/CoveUIDevToolsScene/SceneInspector.swift` | 177 | 已写入（未验证） | `DevTools/rust/inspection/inspector.rs` | 未编译、未行为对照 |
-| `DevTools/Protocol/Sources/CoveUIDevToolsProtocol/ComponentAnalysis.swift` | 25 | 已写入（未验证） | `DevTools/Protocol/rust/lib.rs` | 未编译、未行为对照 |
-| `DevTools/Protocol/Sources/CoveUIDevToolsProtocol/DevToolsSession.swift` | 104 | 已写入（未验证） | `DevTools/Protocol/rust/session.rs` | 未编译、未行为对照 |
-| `DevTools/Protocol/Sources/CoveUIDevToolsProtocol/Discovery.swift` | 22 | 已写入（未验证） | `DevTools/rust/devtools/mod.rs` | 未编译、未行为对照 |
-| `DevTools/Protocol/Sources/CoveUIDevToolsProtocol/Exports.swift` | 1 | 已写入（未验证） | `Logging/rust/exports.rs`<br>`Logging/rust/logging_exports.rs` | 未编译、未行为对照 |
-| `DevTools/Protocol/Sources/CoveUIDevToolsProtocol/InputRecording.swift` | 75 | 已写入（未验证） | `DevTools/Protocol/rust/recording.rs` | 未编译、未行为对照 |
-| `DevTools/Protocol/Sources/CoveUIDevToolsProtocol/Inspection.swift` | 86 | 已写入（未验证） | `DevTools/Protocol/rust/lib.rs` | 未编译、未行为对照 |
-| `DevTools/Protocol/Sources/CoveUIDevToolsProtocol/Observation.swift` | 57 | 已写入（未验证） | `DevTools/Protocol/rust/lib.rs` | 未编译、未行为对照 |
-| `DevTools/Protocol/Sources/CoveUIDevToolsProtocol/Protocol.swift` | 486 | 已写入（未验证） | `DevTools/Protocol/rust/lib.rs` | 未编译、未行为对照 |
-| `DevTools/Sources/CoveUIAgent/Exports.swift` | 3 | 已写入（未验证） | `Logging/rust/exports.rs` | 未编译、未行为对照 |
-| `DevTools/Sources/CoveUIAgentTransport/LocalServer.swift` | 110 | 已写入（未验证） | `Agent/rust/transport.rs` | 未编译、未行为对照 |
-| `DevTools/Sources/CoveUIDevTools/Integration/Exports.swift` | 4 | 已写入（未验证） | `Logging/rust/exports.rs` | 未编译、未行为对照 |
-| `DevTools/Sources/CoveUIDevTools/Mirror/NativeAppFrameCapture.swift` | 52 | 已写入（未验证） | `DevTools/rust/devtools/mirror.rs` | 未编译、未行为对照 |
-| `DevTools/Sources/CoveUIDevTools/Session/DevTools.swift` | 230 | 已写入（未验证） | `DevTools/rust/devtools/mod.rs` | 未编译、未行为对照 |
-| `DevTools/Sources/CoveUIDevTools/Session/Discovery.swift` | 19 | 已写入（未验证） | `DevTools/rust/devtools/mod.rs` | 未编译、未行为对照 |
-| `DevTools/Sources/CoveUIDevTools/Taps/FrameTap.swift` | 276 | 已写入（未验证） | `DevTools/rust/devtools/mirror.rs` | 未编译、未行为对照 |
-| `DevTools/Sources/CoveUIDevTools/Taps/InputBridge.swift` | 151 | 已写入（未验证） | `DevTools/rust/devtools/mirror.rs` | 未编译、未行为对照 |
-| `DevTools/Sources/CoveUIDevTools/Taps/TimingPublisher.swift` | 45 | 已写入（未验证） | `DevTools/rust/devtools/mirror.rs` | 未编译、未行为对照 |
-| `DevTools/Sources/CoveUIDevToolsProbe/main.swift` | 72 | 已写入（未验证） | `Examples/RustCounter/src/main.rs` | 未编译、未行为对照 |
-| `DevTools/Sources/CoveUIDevToolsServer/Requests/Checkpoint.swift` | 47 | 已写入（未验证） | `Hosts/rust/desktop/diagnostics/checkpoint.rs` | 未编译、未行为对照 |
-| `DevTools/Sources/CoveUIDevToolsServer/Requests/Diagnostics.swift` | 17 | 已写入（未验证） | `DevTools/rust/inspection/diagnostics.rs` | 未编译、未行为对照 |
-| `DevTools/Sources/CoveUIDevToolsServer/Requests/Mirror.swift` | 79 | 已写入（未验证） | `DevTools/rust/devtools/mirror.rs` | 未编译、未行为对照 |
-| `DevTools/Sources/CoveUIDevToolsServer/Requests/Observation.swift` | 45 | 已写入（未验证） | `Logging/rust/observation.rs` | 未编译、未行为对照 |
-| `DevTools/Sources/CoveUIDevToolsServer/Requests/Recording.swift` | 47 | 已写入（未验证） | `DevTools/Protocol/rust/recording.rs` | 未编译、未行为对照 |
-| `DevTools/Sources/CoveUIDevToolsServer/Requests/Scene.swift` | 90 | 已写入（未验证） | `Hosts/rust/android/integration/scene.rs` | 未编译、未行为对照 |
-| `DevTools/Sources/CoveUIDevToolsServer/Requests/Window.swift` | 21 | 已写入（未验证） | `Compose/rust/primitives/overlays/toast/controller.rs`<br>`Compose/rust/theme/styles/circular_appearance.rs` | 未编译、未行为对照 |
-| `DevTools/Sources/CoveUIDevToolsServer/Session/Configuration.swift` | 69 | 已写入（未验证） | `Hosts/rust/desktop/application/configuration.rs` | 未编译、未行为对照 |
-| `DevTools/Sources/CoveUIDevToolsServer/Session/DevServer.swift` | 454 | 已写入（未验证） | `DevTools/rust/server/mod.rs` | 未编译、未行为对照 |
-| `DevTools/Sources/CoveUIDevToolsServer/Session/Host.swift` | 53 | 已写入（未验证） | `Compose/rust/primitives/controls/fields/slider/host.rs` | 未编译、未行为对照 |
-| `DevTools/Sources/CoveUIDevToolsServer/Streams/Logs.swift` | 55 | 已写入（未验证） | `DevTools/rust/server/mod.rs` | 未编译、未行为对照 |
-| `DevTools/Sources/CoveUIDevToolsServer/Transport/DevToolsTransport.swift` | 24 | 已写入（未验证） | `DevTools/rust/server/transport.rs` | 未编译、未行为对照 |
-| `DevTools/Sources/CoveUIDevToolsServer/Transport/NIODevToolsTransport.swift` | 190 | 已写入（未验证） | `DevTools/rust/server/mod.rs` | 未编译、未行为对照 |
-| `DevTools/Sources/CoveUIDevToolsServer/Tree/TreeEncodingWorker.swift` | 60 | 已写入（未验证） | `DevTools/rust/server/mod.rs` | 未编译、未行为对照 |
-
-### Hosts
-
-共 51 个文件：已写入 51，进行中 0，未开始 0。
-
-| 源文件 | 行 | 状态 | Rust/C 目标 | 依赖或阻塞 |
-| --- | ---: | --- | --- | --- |
-| `Hosts/Android/Contract/Sources/CoveAndroidContract/FrameClock.swift` | 21 | 已写入（未验证） | `Hosts/rust/android/contract/frame_clock.rs` | 未编译、未行为对照 |
-| `Hosts/Android/Contract/Sources/CoveAndroidContract/Launch.swift` | 14 | 已写入（未验证） | `Hosts/rust/android/contract/launch.rs` | 未编译、未行为对照 |
-| `Hosts/Android/Integration/Diagnostics.swift` | 54 | 已写入（未验证） | `Hosts/rust/android/integration/diagnostics.rs` | 未编译、未行为对照 |
-| `Hosts/Android/Integration/Environment.swift` | 45 | 已写入（未验证） | `Hosts/rust/android/integration/environment.rs` | 未编译、未行为对照 |
-| `Hosts/Android/Integration/Inspection.swift` | 21 | 已写入（未验证） | `Hosts/rust/android/integration/inspection.rs` | 未编译、未行为对照 |
-| `Hosts/Android/Integration/Scene.swift` | 196 | 已写入（未验证） | `Hosts/rust/android/integration/scene.rs` | 未编译、未行为对照 |
-| `Hosts/Android/Integration/Surface/State.swift` | 56 | 已写入（未验证） | `Hosts/rust/android/integration/surface/state.rs` | 未编译、未行为对照 |
-| `Hosts/Android/Integration/TouchInput.swift` | 52 | 已写入（未验证） | `Hosts/rust/android/integration/touch_input.rs` | 未编译、未行为对照 |
-| `Hosts/Android/Sources/CoveAndroidApp/Application.swift` | 39 | 已写入（未验证） | `Hosts/rust/android/sources/cove_android_app/application.rs` | 未编译、未行为对照 |
-| `Hosts/Android/Sources/CoveAndroidApp/Bridge.swift` | 185 | 已写入（未验证） | `Hosts/rust/android/sources/cove_android_app/bridge.rs` | 未编译、未行为对照 |
-| `Hosts/Android/Sources/CoveAndroidApp/Content/InputSnapshot.swift` | 17 | 已写入（未验证） | `Hosts/rust/android/sources/cove_android_app/content/inspection.rs` | 未编译、未行为对照 |
-| `Hosts/Android/Sources/CoveAndroidApp/Content/Inspection.swift` | 29 | 已写入（未验证） | `Hosts/rust/android/sources/cove_android_app/content/inspection.rs` | 未编译、未行为对照 |
-| `Hosts/Android/Sources/CoveAndroidApp/Content/Scene.swift` | 157 | 已写入（未验证） | `Hosts/rust/android/sources/cove_android_app/content/scene.rs` | 未编译、未行为对照 |
-| `Hosts/Android/Sources/CoveAndroidApp/Frame/GPUTimings.swift` | 85 | 已写入（未验证） | `Hosts/rust/android/sources/cove_android_app/frame/gpu_timings.rs` | 未编译、未行为对照 |
-| `Hosts/Android/Sources/CoveAndroidApp/Frame/RuntimeOptions.swift` | 29 | 已写入（未验证） | `Hosts/rust/android/sources/cove_android_app/frame/runtime_options.rs` | 未编译、未行为对照 |
-| `Hosts/Android/Sources/CoveAndroidApp/Frame/Timings.swift` | 46 | 已写入（未验证） | `Hosts/rust/android/sources/cove_android_app/frame/timings.rs` | 未编译、未行为对照 |
-| `Hosts/Android/Sources/CoveAndroidApp/SurfaceSession.swift` | 92 | 已写入（未验证） | `Hosts/rust/android/sources/cove_android_app/surface_session.rs` | 未编译、未行为对照 |
-| `Hosts/Android/Sources/CoveAndroidApp/Validation/Counter/Typography.swift` | 43 | 已写入（未验证） | `Hosts/rust/android/sources/cove_android_app/validation/counter/typography.rs` | 未编译、未行为对照 |
-| `Hosts/Android/Sources/CoveAndroidApp/Validation/Showcase.swift` | 37 | 已写入（未验证） | `Hosts/rust/android/sources/cove_android_app/validation/showcase.rs` | 未编译、未行为对照 |
-| `Hosts/Android/Sources/CoveAndroidProbe/Layout.swift` | 20 | 已写入（未验证） | `Hosts/rust/android/probe/layout.rs` | 未编译、未行为对照 |
-| `Hosts/Android/Sources/CoveAndroidProbe/Raster.swift` | 58 | 已写入（未验证） | `Hosts/rust/android/probe/raster.rs` | 未编译、未行为对照 |
-| `Hosts/Android/Sources/CoveAndroidProbe/Runner.swift` | 55 | 已写入（未验证） | `Hosts/rust/android/probe/runner.rs` | 未编译、未行为对照 |
-| `Hosts/Android/Sources/CoveAndroidProbe/Transfer.swift` | 43 | 已写入（未验证） | `Hosts/rust/android/probe/transfer.rs` | 未编译、未行为对照 |
-| `Hosts/Android/Sources/CoveAndroidProbe/UI.swift` | 50 | 已写入（未验证） | `Hosts/rust/android/probe/ui.rs` | 未编译、未行为对照 |
-| `Hosts/Android/Sources/CoveAndroidProbe/main.swift` | 45 | 已写入（未验证） | `Hosts/rust/android/probe/main.rs` | 未编译、未行为对照 |
-| `Hosts/Desktop/Sources/CoveUI/Application/AdaptiveContent.swift` | 15 | 已写入（未验证） | `Hosts/rust/desktop/application/typography.rs` | 未编译、未行为对照 |
-| `Hosts/Desktop/Sources/CoveUI/Application/Callbacks.swift` | 10 | 已写入（未验证） | `Hosts/rust/desktop/application/runtime.rs` | 未编译、未行为对照 |
-| `Hosts/Desktop/Sources/CoveUI/Application/Composition.swift` | 22 | 已写入（未验证） | `Hosts/rust/desktop/application/composition.rs` | 未编译、未行为对照 |
-| `Hosts/Desktop/Sources/CoveUI/Application/Configuration.swift` | 100 | 已写入（未验证） | `Hosts/rust/desktop/application/configuration.rs` | 未编译、未行为对照 |
-| `Hosts/Desktop/Sources/CoveUI/Application/Memory.swift` | 94 | 已写入（未验证） | `Hosts/rust/desktop/application/memory.rs` | 未编译、未行为对照 |
-| `Hosts/Desktop/Sources/CoveUI/Application/MemoryPressureProbe.swift` | 69 | 已写入（未验证） | `Hosts/rust/desktop/application/memory.rs` | 未编译、未行为对照 |
-| `Hosts/Desktop/Sources/CoveUI/Application/Runtime.swift` | 911 | 已写入（未验证） | `Hosts/rust/desktop/application/runtime.rs` | 未编译、未行为对照 |
-| `Hosts/Desktop/Sources/CoveUI/Application/Services.swift` | 31 | 已写入（未验证） | `Hosts/rust/desktop/application/services.rs` | 未编译、未行为对照 |
-| `Hosts/Desktop/Sources/CoveUI/Application/Typography.swift` | 7 | 已写入（未验证） | `Hosts/rust/desktop/application/typography.rs` | 未编译、未行为对照 |
-| `Hosts/Desktop/Sources/CoveUI/Diagnostics/Checkpoint.swift` | 13 | 已写入（未验证） | `Hosts/rust/desktop/diagnostics/checkpoint.rs` | 未编译、未行为对照 |
-| `Hosts/Desktop/Sources/CoveUI/Diagnostics/FrameMetrics.swift` | 44 | 已写入（未验证） | `Hosts/rust/desktop/diagnostics/frame_metrics.rs` | 未编译、未行为对照 |
-| `Hosts/Desktop/Sources/CoveUI/Diagnostics/PerformanceHUD.swift` | 30 | 已写入（未验证） | `Hosts/rust/desktop/diagnostics/performance_hud.rs` | 未编译、未行为对照 |
-| `Hosts/Desktop/Sources/CoveUI/Diagnostics/Recording.swift` | 40 | 已写入（未验证） | `Hosts/rust/desktop/diagnostics/recording.rs` | 未编译、未行为对照 |
-| `Hosts/Desktop/Sources/CoveUI/Diagnostics/Session.swift` | 7 | 已写入（未验证） | `Hosts/rust/desktop/diagnostics/session.rs` | 未编译、未行为对照 |
-| `Hosts/Desktop/Sources/CoveUI/Display/Controls.swift` | 30 | 已写入（未验证） | `Hosts/rust/desktop/display/controls.rs` | 未编译、未行为对照 |
-| `Hosts/Desktop/Sources/CoveUI/Display/Handle.swift` | 303 | 已写入（未验证） | `Hosts/rust/desktop/display/handle.rs` | 未编译、未行为对照 |
-| `Hosts/Desktop/Sources/CoveUI/Exports.swift` | 7 | 已写入（未验证） | `Logging/rust/exports.rs` | 未编译、未行为对照 |
-| `Hosts/Desktop/Sources/CoveUI/Rendering/Context.swift` | 45 | 已写入（未验证） | `Hosts/rust/desktop/rendering/context.rs` | 未编译、未行为对照 |
-| `Hosts/Desktop/Sources/CoveUI/ResourcesSupport/Bundle.swift` | 9 | 已写入（未验证） | `Compose/rust/primitives/media/ui_icon_catalog.rs`<br>`Compose/rust/resource_bundle.rs` | 未编译、未行为对照 |
-| `Hosts/Desktop/Sources/CoveUI/ResourcesSupport/Lookup.swift` | 6 | 已写入（未验证） | `Hosts/rust/desktop/resources_support/mod.rs` | 未编译、未行为对照 |
-| `Hosts/Desktop/Sources/CoveUI/Window/Auxiliary.swift` | 202 | 已写入（未验证） | `Hosts/rust/desktop/window/auxiliary.rs` | 未编译、未行为对照 |
-| `Hosts/Desktop/Sources/CoveUI/Window/NativeMenu.swift` | 228 | 已写入（未验证） | `Hosts/rust/desktop/window/native_menu.rs` | 未编译、未行为对照 |
-| `Hosts/Desktop/Sources/CoveUI/Window/NativeRenderer.swift` | 115 | 已写入（未验证） | `Hosts/rust/desktop/window/native_renderer.rs` | 未编译、未行为对照 |
-| `Hosts/Desktop/Sources/CoveUI/Window/Renderer.swift` | 15 | 已写入（未验证） | `Core/rust/scene/layer_aware_node_renderer.rs`<br>`Core/rust/scene/node_renderer.rs`<br>`Hosts/rust/desktop/window/native_renderer.rs` | 未编译、未行为对照 |
-| `Hosts/Desktop/Sources/CoveUI/Window/State.swift` | 15 | 已写入（未验证） | `Hosts/rust/desktop/window/state.rs` | 未编译、未行为对照 |
-| `Hosts/Desktop/Sources/CoveUI/Window/WindowChrome.swift` | 397 | 已写入（未验证） | `Hosts/rust/desktop/window/chrome.rs` | 未编译、未行为对照 |
-
-### Terminal
-
-共 29 个文件：已写入 29，进行中 0，未开始 0。
-
-| 源文件 | 行 | 状态 | Rust/C 目标 | 依赖或阻塞 |
-| --- | ---: | --- | --- | --- |
-| `Terminal/Sources/CoveUITerminal/Engine/Engine.swift` | 202 | 已写入（未验证） | `Compose/rust/primitives/text/text_field/text_field_layout_engine.rs`<br>`Sources/rust/webview/mod.rs` | 未编译、未行为对照 |
-| `Terminal/Sources/CoveUITerminal/Engine/Frame.swift` | 100 | 已写入（未验证） | `Terminal/rust/engine/frame.rs` | 未编译、未行为对照 |
-| `Terminal/Sources/CoveUITerminal/Engine/FrameReader.swift` | 140 | 已写入（未验证） | `Terminal/rust/engine/frame_reader.rs` | 未编译、未行为对照 |
-| `Terminal/Sources/CoveUITerminal/Engine/Hyperlink.swift` | 18 | 已写入（未验证） | `Terminal/rust/engine/hyperlink.rs` | 未编译、未行为对照 |
-| `Terminal/Sources/CoveUITerminal/Engine/Images.swift` | 136 | 已写入（未验证） | `Terminal/rust/engine/images.rs` | 未编译、未行为对照 |
-| `Terminal/Sources/CoveUITerminal/Engine/KeyEncoder.swift` | 123 | 已写入（未验证） | `Terminal/rust/engine/key_encoder.rs` | 未编译、未行为对照 |
-| `Terminal/Sources/CoveUITerminal/Engine/Mouse.swift` | 94 | 已写入（未验证） | `Terminal/rust/engine/mouse.rs` | 未编译、未行为对照 |
-| `Terminal/Sources/CoveUITerminal/Engine/PlaceholderDiacritics.swift` | 30 | 已写入（未验证） | `Terminal/rust/engine/placeholder_diacritics.rs` | 未编译、未行为对照 |
-| `Terminal/Sources/CoveUITerminal/Engine/Placeholders.swift` | 182 | 已写入（未验证） | `Terminal/rust/engine/placeholders.rs` | 未编译、未行为对照 |
-| `Terminal/Sources/CoveUITerminal/Engine/Selection.swift` | 144 | 已写入（未验证） | `Terminal/rust/engine/selection.rs` | 未编译、未行为对照 |
-| `Terminal/Sources/CoveUITerminal/Engine/Sized.swift` | 7 | 已写入（未验证） | `Terminal/rust/engine/sized.rs` | 未编译、未行为对照 |
-| `Terminal/Sources/CoveUITerminal/Process/Command.swift` | 77 | 已写入（未验证） | `Terminal/rust/process/command.rs` | 未编译、未行为对照 |
-| `Terminal/Sources/CoveUITerminal/Process/ConPTY.swift` | 179 | 已写入（未验证） | `Terminal/rust/lib.rs`<br>`Terminal/rust/process/conpty.rs`<br>`Terminal/rust/process/windows_command_line.rs` | 未编译、未行为对照 |
-| `Terminal/Sources/CoveUITerminal/Process/POSIX.swift` | 176 | 已写入（未验证） | `Terminal/rust/process/posix.rs` | 未编译、未行为对照 |
-| `Terminal/Sources/CoveUITerminal/Process/PseudoTerminal.swift` | 83 | 已写入（未验证） | `Terminal/rust/process/mod.rs` | 未编译、未行为对照 |
-| `Terminal/Sources/CoveUITerminal/Process/WindowsCommandLine.swift` | 30 | 已写入（未验证） | `Terminal/rust/process/windows_command_line.rs` | 未编译、未行为对照 |
-| `Terminal/Sources/CoveUITerminal/Session.swift` | 259 | 已写入（未验证） | `DevTools/Protocol/rust/session.rs` | 未编译、未行为对照 |
-| `Terminal/Sources/CoveUITerminal/View/BlinkTimer.swift` | 54 | 已写入（未验证） | `Terminal/rust/view/blink_timer.rs` | 未编译、未行为对照 |
-| `Terminal/Sources/CoveUITerminal/View/BoxDrawing.swift` | 246 | 已写入（未验证） | `Terminal/rust/view/box_drawing.rs` | 未编译、未行为对照 |
-| `Terminal/Sources/CoveUITerminal/View/CellMetrics.swift` | 24 | 已写入（未验证） | `Terminal/rust/view/cell_metrics.rs` | 未编译、未行为对照 |
-| `Terminal/Sources/CoveUITerminal/View/ImageTextures.swift` | 27 | 已写入（未验证） | `Terminal/rust/view/image_textures.rs` | 未编译、未行为对照 |
-| `Terminal/Sources/CoveUITerminal/View/KeyRouting.swift` | 71 | 已写入（未验证） | `Terminal/rust/view/key_routing.rs` | 未编译、未行为对照 |
-| `Terminal/Sources/CoveUITerminal/View/LinkOpener.swift` | 26 | 已写入（未验证） | `Terminal/rust/view/terminal_view.rs` | 未编译、未行为对照 |
-| `Terminal/Sources/CoveUITerminal/View/Painter.swift` | 173 | 已写入（未验证） | `Core/rust/scene/rendering/scaled_painting.rs` | 未编译、未行为对照 |
-| `Terminal/Sources/CoveUITerminal/View/PointerRouter.swift` | 136 | 已写入（未验证） | `Terminal/rust/view/pointer_router.rs` | 未编译、未行为对照 |
-| `Terminal/Sources/CoveUITerminal/View/SurfaceState.swift` | 87 | 已写入（未验证） | `Hosts/rust/android/integration/surface/state.rs` | 未编译、未行为对照 |
-| `Terminal/Sources/CoveUITerminal/View/TerminalView.swift` | 174 | 已写入（未验证） | `Terminal/rust/view/terminal_view.rs` | 未编译、未行为对照 |
-| `Terminal/Sources/CoveUITerminal/View/URLDetector.swift` | 59 | 已写入（未验证） | `Terminal/rust/view/url_detector.rs` | 未编译、未行为对照 |
-| `Terminal/Sources/TerminalDemo/main.swift` | 31 | 已写入（未验证） | `Examples/RustCounter/src/main.rs` | 未编译、未行为对照 |
-
-### Sources
-
-共 19 个文件：已写入 19，进行中 0，未开始 0。
-
-| 源文件 | 行 | 状态 | Rust/C 目标 | 依赖或阻塞 |
-| --- | ---: | --- | --- | --- |
-| `Sources/CoveUIWebView/Apple/WebKitHost.swift` | 22 | 已写入（未验证） | `Sources/rust/webview/apple.rs` | 未编译、未行为对照 |
-| `Sources/CoveUIWebView/Apple/WebKitSurface.swift` | 232 | 已写入（未验证） | `Sources/rust/webview/apple.rs`<br>`Sources/rust/webview/linux.rs` | 未编译、未行为对照 |
-| `Sources/CoveUIWebView/WebView.swift` | 170 | 已写入（未验证） | `Sources/rust/webview/view.rs` | 未编译、未行为对照 |
-| `Sources/CoveUIWebView/WebViewHandle.swift` | 51 | 已写入（未验证） | `Sources/rust/webview/mod.rs` | 未编译、未行为对照 |
-| `Sources/CoveUIWebView/WebViewState.swift` | 46 | 已写入（未验证） | `Sources/rust/webview/mod.rs` | 未编译、未行为对照 |
-| `Sources/CoveUIWebView/WebViewSurface.swift` | 77 | 已写入（未验证） | `Sources/rust/webview/mod.rs` | 未编译、未行为对照 |
-| `Sources/CoveUIWorkspace/Icons/CoveUIWorkspaceResourceBundle.swift` | 6 | 已写入（未验证） | `Compose/rust/resource_bundle.rs` | 未编译、未行为对照 |
-| `Sources/CoveUIWorkspace/Icons/WorkspacePanelIconCatalog.swift` | 17 | 已写入（未验证） | `Sources/rust/workspace/icons.rs` | 未编译、未行为对照 |
-| `Sources/CoveUIWorkspace/Layout/Split.swift` | 32 | 已写入（未验证） | `Sources/rust/workspace/model.rs` | 未编译、未行为对照 |
-| `Sources/CoveUIWorkspace/Layout/Tree.swift` | 49 | 已写入（未验证） | `Compose/Composition/rust/layout_tree.rs`<br>`Compose/Composition/rust/view_graph.rs` | 未编译、未行为对照 |
-| `Sources/CoveUIWorkspace/Observation.swift` | 14 | 已写入（未验证） | `Logging/rust/observation.rs` | 未编译、未行为对照 |
-| `Sources/CoveUIWorkspace/Sizing/Panel.swift` | 47 | 已写入（未验证） | `Compose/rust/primitives/layout/panel.rs` | 未编译、未行为对照 |
-| `Sources/CoveUIWorkspace/Sizing/Resolution.swift` | 172 | 已写入（未验证） | `Core/rust/bidi.rs` | 未编译、未行为对照 |
-| `Sources/CoveUIWorkspace/Theme/TabStyle.swift` | 22 | 已写入（未验证） | `Sources/rust/workspace/tab_style.rs` | 未编译、未行为对照 |
-| `Sources/CoveUIWorkspace/Theme/WorkspaceRegionTransition.swift` | 179 | 已写入（未验证） | `Sources/rust/workspace/view.rs` | 未编译、未行为对照 |
-| `Sources/CoveUIWorkspace/Theme/WorkspaceTheme.swift` | 51 | 已写入（未验证） | `Sources/rust/workspace/theme.rs` | 未编译、未行为对照 |
-| `Sources/CoveUIWorkspace/WorkspaceController.swift` | 915 | 已写入（未验证） | `Sources/rust/workspace/controller.rs` | 未编译、未行为对照 |
-| `Sources/CoveUIWorkspace/WorkspaceModel.swift` | 590 | 已写入（未验证） | `Sources/rust/workspace/model.rs` | 未编译、未行为对照 |
-| `Sources/CoveUIWorkspace/WorkspaceView.swift` | 2169 | 已写入（未验证） | `Sources/rust/workspace/workspace_view.rs` | 未编译、未行为对照 |
-
-### System
-
-共 17 个文件：已写入 17，进行中 0，未开始 0。
-
-| 源文件 | 行 | 状态 | Rust/C 目标 | 依赖或阻塞 |
-| --- | ---: | --- | --- | --- |
-| `System/Sources/CoveFileSystem/AtomicFile.swift` | 27 | 已写入（未验证） | `System/rust/files.rs`<br>`System/rust/atomic_file.rs` | 未编译、未行为对照 |
-| `System/Sources/CoveFileSystem/FileLock.swift` | 20 | 已写入（未验证） | `System/rust/files.rs`<br>`System/rust/file_lock.rs` | 未编译、未行为对照 |
-| `System/Sources/CoveFileSystem/Paths.swift` | 140 | 已写入（未验证） | `System/rust/files.rs`<br>`System/rust/paths.rs` | 未编译、未行为对照 |
-| `System/Sources/CoveFileSystem/Permissions.swift` | 28 | 已写入（未验证） | `System/rust/files.rs`<br>`System/rust/permissions.rs` | 未编译、未行为对照 |
-| `System/Sources/CoveFileSystem/Replacement.swift` | 40 | 已写入（未验证） | `System/rust/files.rs`<br>`System/rust/replacement.rs` | 未编译、未行为对照 |
-| `System/Sources/CoveFileSystem/Trash.swift` | 20 | 已写入（未验证） | `System/rust/files.rs`<br>`System/rust/trash.rs` | 未编译、未行为对照 |
-| `System/Sources/CoveProcess/Command.swift` | 65 | 已写入（未验证） | `System/rust/files.rs`<br>`System/rust/command.rs` | 未编译、未行为对照 |
-| `System/Sources/CoveProcess/EventBuffer.swift` | 98 | 已写入（未验证） | `System/rust/files.rs`<br>`System/rust/event_buffer.rs` | 未编译、未行为对照 |
-| `System/Sources/CoveProcess/IOState.swift` | 29 | 已写入（未验证） | `System/rust/files.rs`<br>`System/rust/io_state.rs` | 未编译、未行为对照 |
-| `System/Sources/CoveProcess/NativeProcess.swift` | 94 | 已写入（未验证） | `System/rust/files.rs`<br>`System/rust/native_process.rs` | 未编译、未行为对照 |
-| `System/Sources/CoveProcess/PipeRead.swift` | 48 | 已写入（未验证） | `System/rust/files.rs`<br>`System/rust/pipe_read.rs` | 未编译、未行为对照 |
-| `System/Sources/CoveProcess/Platform.swift` | 34 | 已写入（未验证） | `System/rust/files.rs`<br>`System/rust/platform.rs` | 未编译、未行为对照 |
-| `System/Sources/CoveProcess/Run.swift` | 55 | 已写入（未验证） | `System/rust/files.rs`<br>`System/rust/run.rs` | 未编译、未行为对照 |
-| `System/Sources/CoveProcess/Session.swift` | 155 | 已写入（未验证） | `System/rust/files.rs`<br>`System/rust/session.rs` | 未编译、未行为对照 |
-| `System/Sources/CoveProcess/ToolLocator.swift` | 53 | 已写入（未验证） | `System/rust/files.rs`<br>`System/rust/tool_locator.rs` | 未编译、未行为对照 |
-| `System/Sources/CoveProcess/WindowsLaunch.swift` | 57 | 已写入（未验证） | `System/rust/files.rs`<br>`System/rust/windows_launch.rs` | 未编译、未行为对照 |
-| `System/Sources/CoveProcessFixture/main.swift` | 41 | 已写入（未验证） | `Examples/RustCounter/src/main.rs` | 未编译、未行为对照 |
-
-### Logging
-
-共 15 个文件：已写入 15，进行中 0，未开始 0。
-
-| 源文件 | 行 | 状态 | Rust/C 目标 | 依赖或阻塞 |
-| --- | ---: | --- | --- | --- |
-| `Logging/Sources/CoveLogCore/Configuration/Configuration.swift` | 117 | 已写入（未验证） | `Logging/rust/configuration.rs` | 未编译、未行为对照 |
-| `Logging/Sources/CoveLogCore/Configuration/Environment.swift` | 35 | 已写入（未验证） | `Logging/rust/environment.rs` | 未编译、未行为对照 |
-| `Logging/Sources/CoveLogCore/Exports.swift` | 1 | 已写入（未验证） | `Logging/rust/exports.rs` | 未编译、未行为对照 |
-| `Logging/Sources/CoveLogCore/Records/Context.swift` | 12 | 已写入（未验证） | `Logging/rust/context.rs` | 未编译、未行为对照 |
-| `Logging/Sources/CoveLogCore/Records/Record.swift` | 79 | 已写入（未验证） | `Logging/rust/record.rs` | 未编译、未行为对照 |
-| `Logging/Sources/CoveLogging/Exports.swift` | 1 | 已写入（未验证） | `Logging/rust/logging_exports.rs` | 未编译、未行为对照 |
-| `Logging/Sources/CoveLogging/Outputs/File.swift` | 66 | 已写入（未验证） | `Logging/rust/file.rs` | 未编译、未行为对照 |
-| `Logging/Sources/CoveLogging/Outputs/Formatting.swift` | 23 | 已写入（未验证） | `Logging/rust/formatting.rs` | 未编译、未行为对照 |
-| `Logging/Sources/CoveLogging/Runtime/Executor.swift` | 19 | 已写入（未验证） | `Logging/rust/executor.rs` | 未编译、未行为对照 |
-| `Logging/Sources/CoveLogging/Runtime/Handler.swift` | 25 | 已写入（未验证） | `Logging/rust/handler.rs` | 未编译、未行为对照 |
-| `Logging/Sources/CoveLogging/Runtime/History.swift` | 27 | 已写入（未验证） | `Logging/rust/history.rs` | 未编译、未行为对照 |
-| `Logging/Sources/CoveLogging/Runtime/Observation.swift` | 9 | 已写入（未验证） | `Logging/rust/observation.rs` | 未编译、未行为对照 |
-| `Logging/Sources/CoveLogging/Runtime/Runtime.swift` | 180 | 已写入（未验证） | `Logging/rust/runtime.rs` | 未编译、未行为对照 |
-| `Logging/Sources/CoveLogging/Runtime/Sanitizer.swift` | 46 | 已写入（未验证） | `Logging/rust/sanitizer.rs` | 未编译、未行为对照 |
-| `Logging/Sources/CoveLogging/System.swift` | 65 | 已写入（未验证） | `Logging/rust/system.rs` | 未编译、未行为对照 |
-
-### Text
-
-共 14 个文件：已写入 14，进行中 0，未开始 0。
-
-| 源文件 | 行 | 状态 | Rust/C 目标 | 依赖或阻塞 |
-| --- | ---: | --- | --- | --- |
-| `Text/Sources/CoveUIText/ColorGlyphAtlas.swift` | 61 | 已写入（未验证） | `Text/rust/color_glyph_atlas.rs` | 未编译、未行为对照 |
-| `Text/Sources/CoveUIText/ColorGlyphSource.swift` | 26 | 已写入（未验证） | `Text/rust/color_glyph_source.rs` | 未编译、未行为对照 |
-| `Text/Sources/CoveUIText/DrawList+Text.swift` | 42 | 已写入（未验证） | `Text/rust/draw_list_text.rs` | 未编译、未行为对照 |
-| `Text/Sources/CoveUIText/Exports.swift` | 1 | 已写入（未验证） | `Logging/rust/exports.rs`<br>`Logging/rust/logging_exports.rs` | 未编译、未行为对照 |
-| `Text/Sources/CoveUIText/FontAtlas.swift` | 441 | 已写入（未验证） | `Text/rust/font_atlas.rs` | 未编译、未行为对照 |
-| `Text/Sources/CoveUIText/FontCollection.swift` | 99 | 已写入（未验证） | `Text/rust/font_collection.rs` | 未编译、未行为对照 |
-| `Text/Sources/CoveUIText/FontFace.swift` | 546 | 已写入（未验证） | `Text/rust/font_face.rs` | 未编译、未行为对照 |
-| `Text/Sources/CoveUIText/FontProvider.swift` | 613 | 已写入（未验证） | `Text/rust/font_provider.rs` | 未编译、未行为对照 |
-| `Text/Sources/CoveUIText/FreeTypeColorGlyphs.swift` | 140 | 已写入（未验证） | `Text/rust/free_type_color_glyphs.rs` | 未编译、未行为对照 |
-| `Text/Sources/CoveUIText/NativeColorGlyphFont.swift` | 101 | 已写入（未验证） | `Text/rust/native_color_glyph_font.rs` | 未编译、未行为对照 |
-| `Text/Sources/CoveUIText/TextCache.swift` | 77 | 已写入（未验证） | `Text/rust/text_cache.rs` | 未编译、未行为对照 |
-| `Text/Sources/CoveUIText/TextEnvironment.swift` | 209 | 已写入（未验证） | `Text/rust/text_environment.rs` | 未编译、未行为对照 |
-| `Text/Sources/CoveUIText/TextShaper.swift` | 54 | 已写入（未验证） | `Text/rust/text_shaper.rs` | 未编译、未行为对照 |
-| `Text/Sources/CoveUIText/TextStyle.swift` | 166 | 已写入（未验证） | `Text/rust/text_style.rs` | 未编译、未行为对照 |
-
-### Shell
-
-共 13 个文件：已写入 13，进行中 0，未开始 0。
-
-| 源文件 | 行 | 状态 | Rust/C 目标 | 依赖或阻塞 |
-| --- | ---: | --- | --- | --- |
-| `Shell/Sources/PlatformShell/ApplicationEntry.swift` | 34 | 已写入（未验证） | `Shell/rust/application_entry.rs` | 未编译、未行为对照 |
-| `Shell/Sources/PlatformShell/Cursor.swift` | 2 | 已写入（未验证） | `Shell/rust/cursor.rs` | 未编译、未行为对照 |
-| `Shell/Sources/PlatformShell/Diagnostics/SDL.swift` | 18 | 已写入（未验证） | `Shell/rust/diagnostics/mod.rs` | 未编译、未行为对照 |
-| `Shell/Sources/PlatformShell/DisplayRefresh/CoreVideo.swift` | 62 | 已写入（未验证） | `Shell/rust/display_refresh/mod.rs` | 未编译、未行为对照 |
-| `Shell/Sources/PlatformShell/DisplayRefresh/MacDisplayLink.swift` | 29 | 已写入（未验证） | `Shell/rust/display_refresh/mod.rs` | 未编译、未行为对照 |
-| `Shell/Sources/PlatformShell/DisplayRefresh/Signal.swift` | 50 | 已写入（未验证） | `Shell/rust/display_refresh/signal.rs` | 未编译、未行为对照 |
-| `Shell/Sources/PlatformShell/DisplayRefresh/WindowDisplayLink.swift` | 45 | 已写入（未验证） | `Shell/rust/display_refresh/mod.rs` | 未编译、未行为对照 |
-| `Shell/Sources/PlatformShell/Log.swift` | 5 | 已写入（未验证） | `Shell/rust/native.rs` | 未编译、未行为对照 |
-| `Shell/Sources/PlatformShell/NativeMenuPopover.swift` | 100 | 已写入（未验证） | `Shell/rust/native_menu_popover.rs` | 未编译、未行为对照 |
-| `Shell/Sources/PlatformShell/PlatformShell.swift` | 579 | 已写入（未验证） | `Shell/rust/platform_shell.rs`<br>`Shell/rust/sdl3_shell.rs` | 未编译、未行为对照 |
-| `Shell/Sources/PlatformShell/SDL3Clipboard.swift` | 22 | 已写入（未验证） | `Shell/rust/sdl3_clipboard.rs` | 未编译、未行为对照 |
-| `Shell/Sources/PlatformShell/SDL3Shell.swift` | 1510 | 已写入（未验证） | `Shell/rust/sdl3_shell.rs` | 未编译、未行为对照 |
-| `Shell/Sources/PlatformShell/Scroll/AppKitInput.swift` | 73 | 已写入（未验证） | `Shell/rust/apple.m`<br>`Shell/rust/scroll/mod.rs` | 未编译、未行为对照 |
-
-### Runtime
-
-共 11 个文件：已写入 11，进行中 0，未开始 0。
-
-| 源文件 | 行 | 状态 | Rust/C 目标 | 依赖或阻塞 |
-| --- | ---: | --- | --- | --- |
-| `Runtime/Sources/CoveUIRuntime/Core/AppBridge.swift` | 34 | 已写入（未验证） | `Runtime/rust/app_bridge.rs` | 未编译、未行为对照 |
-| `Runtime/Sources/CoveUIRuntime/Core/CoveUIRuntime.swift` | 17 | 已写入（未验证） | `Runtime/rust/lib.rs` | 未编译、未行为对照 |
-| `Runtime/Sources/CoveUIRuntime/Core/FrameDeadline.swift` | 28 | 已写入（未验证） | `Runtime/rust/frame_deadline.rs` | 未编译、未行为对照 |
-| `Runtime/Sources/CoveUIRuntime/Core/FrameDrive.swift` | 24 | 已写入（未验证） | `Runtime/rust/frame_drive.rs` | 未编译、未行为对照 |
-| `Runtime/Sources/CoveUIRuntime/Core/Log.swift` | 9 | 已写入（未验证） | `Runtime/rust/sdl3_platform_host.rs` | 未编译、未行为对照 |
-| `Runtime/Sources/CoveUIRuntime/Core/NativeAccessibility.swift` | 303 | 已写入（未验证） | `Runtime/rust/native_accessibility.rs` | 未编译、未行为对照 |
-| `Runtime/Sources/CoveUIRuntime/Core/PlatformHost.swift` | 17 | 已写入（未验证） | `Runtime/rust/platform_host.rs` | 未编译、未行为对照 |
-| `Runtime/Sources/CoveUIRuntime/Core/SDL3PlatformHost.swift` | 993 | 已写入（未验证） | `Runtime/rust/sdl3_platform_host.rs` | 未编译、未行为对照 |
-| `Runtime/Sources/CoveUIRuntime/Core/iOS/DisplayDriver.swift` | 22 | 已写入（未验证） | `Runtime/rust/ios/mod.rs` | 未编译、未行为对照 |
-| `Runtime/Sources/CoveUIRuntime/Exports.swift` | 4 | 已写入（未验证） | `Logging/rust/exports.rs`<br>`Logging/rust/logging_exports.rs` | 未编译、未行为对照 |
-| `Runtime/Sources/CoveUIRuntime/Rendering/SurfaceFactory.swift` | 34 | 已写入（未验证） | `Runtime/rust/surface_factory.rs` | 未编译、未行为对照 |
-
-### Imaging
-
-共 9 个文件：已写入 9，进行中 0，未开始 0。
-
-| 源文件 | 行 | 状态 | Rust/C 目标 | 依赖或阻塞 |
-| --- | ---: | --- | --- | --- |
-| `Imaging/Sources/CoveUIImaging/Animation.swift` | 74 | 已写入（未验证） | `Imaging/rust/animation.rs` | 未编译、未行为对照 |
-| `Imaging/Sources/CoveUIImaging/BundleImageResource.swift` | 47 | 已写入（未验证） | `Imaging/rust/bundle_image_resource.rs` | 未编译、未行为对照 |
-| `Imaging/Sources/CoveUIImaging/Exports.swift` | 1 | 已写入（未验证） | `Logging/rust/exports.rs`<br>`Logging/rust/logging_exports.rs` | 未编译、未行为对照 |
-| `Imaging/Sources/CoveUIImaging/ImageAssetRegistry.swift` | 175 | 已写入（未验证） | `Imaging/rust/image_asset_registry.rs` | 未编译、未行为对照 |
-| `Imaging/Sources/CoveUIImaging/ImageDecoder.swift` | 194 | 已写入（未验证） | `Imaging/rust/image_decoder.rs` | 未编译、未行为对照 |
-| `Imaging/Sources/CoveUIImaging/Orientation.swift` | 84 | 已写入（未验证） | `Imaging/rust/orientation.rs` | 未编译、未行为对照 |
-| `Imaging/Sources/CoveUIImaging/Progressive.swift` | 42 | 已写入（未验证） | `Imaging/rust/progressive.rs` | 未编译、未行为对照 |
-| `Imaging/Sources/CoveUIImaging/Rasterization.swift` | 50 | 已写入（未验证） | `Imaging/rust/rasterization.rs` | 未编译、未行为对照 |
-| `Imaging/Sources/CoveUIImaging/TextureImage.swift` | 29 | 已写入（未验证） | `Imaging/rust/texture_image.rs` | 未编译、未行为对照 |
-
-### PlatformCore
-
-共 6 个文件：已写入 6，进行中 0，未开始 0。
-
-| 源文件 | 行 | 状态 | Rust/C 目标 | 依赖或阻塞 |
-| --- | ---: | --- | --- | --- |
-| `PlatformCore/Sources/CovePlatformCore/Cursor.swift` | 25 | 已写入（未验证） | `PlatformCore/rust/lib.rs` | 未编译、未行为对照 |
-| `PlatformCore/Sources/CovePlatformCore/InputEvent.swift` | 284 | 已写入（未验证） | `PlatformCore/rust/lib.rs` | 未编译、未行为对照 |
-| `PlatformCore/Sources/CovePlatformCore/NativeMenuSnapshot.swift` | 65 | 已写入（未验证） | `PlatformCore/rust/lib.rs` | 未编译、未行为对照 |
-| `PlatformCore/Sources/CovePlatformCore/PackageResourceBundle.swift` | 110 | 已写入（未验证） | `PlatformCore/rust/resources.rs` | 未编译、未行为对照 |
-| `PlatformCore/Sources/CovePlatformCore/ScrollInput.swift` | 46 | 已写入（未验证） | `PlatformCore/rust/lib.rs` | 未编译、未行为对照 |
-| `PlatformCore/Sources/CovePlatformCore/WindowID.swift` | 10 | 已写入（未验证） | `PlatformCore/rust/lib.rs` | 未编译、未行为对照 |
-
-### Browser
-
-共 1 个文件：已写入 1，进行中 0，未开始 0。
-
-| 源文件 | 行 | 状态 | Rust/C 目标 | 依赖或阻塞 |
-| --- | ---: | --- | --- | --- |
-| `Browser/Sources/CoveUIBrowserPrototype/main.swift` | 400 | 已写入（未验证） | `Examples/RustCounter/src/main.rs` | 未编译、未行为对照 |
-
+| 原源文件 | 行数 | Rust / C / Cargo 目标 |
+| --- | ---: | --- |
+| `Browser/Package.swift` | 19 | [crates/browser/Cargo.toml](../crates/browser/Cargo.toml) |
+| `Compose/Composition/Package.swift` | 18 | [crates/composition/Cargo.toml](../crates/composition/Cargo.toml) |
+| `Compose/Package.swift` | 18 | [crates/compose/Cargo.toml](../crates/compose/Cargo.toml) |
+| `Core/Package.swift` | 18 | [crates/core/Cargo.toml](../crates/core/Cargo.toml) |
+| `DevTools/Inspection/Package.swift` | 14 | [crates/devtools/Cargo.toml](../crates/devtools/Cargo.toml) |
+| `DevTools/Package.swift` | 31 | [crates/devtools/Cargo.toml](../crates/devtools/Cargo.toml) |
+| `DevTools/Protocol/Package.swift` | 10 | [crates/devtools-protocol/Cargo.toml](../crates/devtools-protocol/Cargo.toml) |
+| `Examples/Counter/Package.swift` | 20 | [examples/gallery/Cargo.toml](../examples/gallery/Cargo.toml) |
+| `Examples/Mobile/Package.swift` | 73 | [examples/mobile/Cargo.toml](../examples/mobile/Cargo.toml) |
+| `Examples/Package.swift` | 73 | [examples/gallery/Cargo.toml](../examples/gallery/Cargo.toml) |
+| `Graphics/Package.swift` | 28 | [crates/graphics/Cargo.toml](../crates/graphics/Cargo.toml) |
+| `Hosts/Android/Contract/Package.swift` | 12 | [crates/hosts/Cargo.toml](../crates/hosts/Cargo.toml) |
+| `Hosts/Android/Package.swift` | 30 | [crates/hosts/Cargo.toml](../crates/hosts/Cargo.toml) |
+| `Imaging/Package.swift` | 22 | [crates/imaging/Cargo.toml](../crates/imaging/Cargo.toml) |
+| `Logging/Package.swift` | 13 | [crates/logging/Cargo.toml](../crates/logging/Cargo.toml) |
+| `Package.swift` | 92 | [Cargo.toml](../Cargo.toml) |
+| `PlatformCore/Package.swift` | 10 | [crates/platform/Cargo.toml](../crates/platform/Cargo.toml) |
+| `Runtime/Package.swift` | 16 | [crates/runtime/Cargo.toml](../crates/runtime/Cargo.toml) |
+| `Shell/Package.swift` | 55 | [crates/shell/Cargo.toml](../crates/shell/Cargo.toml) |
+| `System/Package.swift` | 26 | [crates/system/Cargo.toml](../crates/system/Cargo.toml) |
+| `Terminal/Package.swift` | 55 | [crates/terminal/Cargo.toml](../crates/terminal/Cargo.toml) |
+| `Tests/Headless/Package.swift` | 6 | [crates/core/Cargo.toml](../crates/core/Cargo.toml) |
+| `Text/Package.swift` | 16 | [crates/text/Cargo.toml](../crates/text/Cargo.toml) |

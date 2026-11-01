@@ -1,0 +1,19 @@
+[package]
+name = "cove-runtime"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+[dependencies]
+cove-core.workspace = true
+cove-platform.workspace = true
+cove-text.workspace = true
+cove-imaging.workspace = true
+cove-graphics.workspace = true
+cove-shell.workspace = true
+cove-logging.workspace = true
+[build-dependencies]
+cc.workspace = true
+[lints]
+workspace = true
+

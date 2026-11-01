@@ -1,18 +1,15 @@
 # Remaining test migration partition (wave 3 — final)
 
-Waves 1 and 2 are done: 362 of 412 Swift test files now have a Rust target whose
-module doc names them. What is left is the **Compose adaptive/editor/list/overlay
-tail**, the **Examples gallery suites**, one **Terminal** suite and the two tiny
-`PackageResourceBundleTests` suites.
+2026-11-01：下列 65 个 Rust 测试目标均已落盘并纳入 Cargo。源码路径保留为迁移来源；当前目标位于各 crate 的 `tests/`。全量执行结果见 [验证报告](rust-migration-validation.md)。
 
 Support files are not suites and are not in the groups below:
 
 | Swift file | Covered by |
 | --- | --- |
-| `Tests/CoveUIComposeTests/TestSupport.swift` | `Compose/rust/tests/support/mod.rs` |
+| `Tests/CoveUIComposeTests/TestSupport.swift` | `crates/compose/tests/support/mod.rs` |
 | `Tests/CoveUIComposeTests/Mobile/Fixtures.swift` | inline fixture inside `mobile_presentation_tests` |
 | `Tests/CoveUIComposeTests/Images/HTTPServer.swift` | `image_pipeline_tests` / `async_image_tests` own their loopback server |
-| `Graphics/Tests/NativeRHITests/NativeTestDevice.swift` | `Graphics/rust/rhi/testing.rs` |
+| `Graphics/Tests/NativeRHITests/NativeTestDevice.swift` | `crates/graphics/src/rhi/testing.rs` |
 | `Graphics/Tests/NativeRHITests/ShaderFixtureCompiler.swift` | `shader_specialization_tests` helper |
 | `Tests/Headless/Package.swift` | not a test |
 
@@ -28,7 +25,7 @@ Support files are not suites and are not in the groups below:
 | compose-menu-overlay | 5 | 1178 |
 | compose-misc | 7 | 1378 |
 | compose-regression-motion | 7 | 1886 |
-| gallery-and-tails | 9 | 1392 |
+| gallery-and-tails | 8 | 1392 |
 
 ## compose-sidebar
 

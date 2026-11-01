@@ -295,7 +295,7 @@ def not_portable_reason(entry: dict) -> str | None:
     if "MemberMacro" in text or "ExtensionMacro" in text or "SwiftSyntax" in text:
         return (
             "Swift macro plugin; the Rust equivalent is a declarative macro or "
-            "derive in Compose/CompositionMacros, not a runtime translation"
+            "derive in crates/compose/CompositionMacros, not a runtime translation"
         )
     if re.search(r"extension\s+NSNumber", text):
         return (
@@ -332,7 +332,7 @@ def derive(entries: list[dict], rust: list[str]) -> None:
             # be re-examined, otherwise the recovery passes below can never
             # re-admit it. Only an operator-cleared row without that note is
             # authoritative.
-            if entry.get("note", "").startswith("no Rust/C declaration matches"):
+            if entry.get("note", "").startswith("no src/C declaration matches"):
                 entry.pop("note", None)
             else:
                 continue
@@ -369,7 +369,7 @@ def derive(entries: list[dict], rust: list[str]) -> None:
             entry["status"] = "pending"
             entry["planned"] = True
             entry["note"] = not_portable_reason(entry) or (
-                "no Rust/C declaration matches this Swift file; "
+                "no src/C declaration matches this Swift file; "
                 "the previously recorded path declared nothing relevant"
             )
             continue
@@ -454,7 +454,7 @@ def type_index() -> dict[str, list[str]]:
 
     Several Swift files collapse into one Rust module (for example
     `Sources/CoveUIWebView/{WebView,WebViewHandle,WebViewState}.swift` all live
-    in `Sources/rust/webview/view.rs`). A shared target is still coverage, so a
+    in `crates/addons/src/webview/view.rs`). A shared target is still coverage, so a
     pending file whose primary type exists anywhere in Rust counts as written.
     """
     index: dict[str, list[str]] = {}
@@ -495,7 +495,7 @@ def write_markdown(document: dict) -> None:
         "- 生产源码：排除测试目录、SwiftPM 清单、CLI 项目模板与所有构建/依赖产物。",
         "- 排除路径：`**/.build/**`、`third-party/**`、`vendor/**`、`target/**`、"
         "`dist/**`、`Artifacts/**`、`build/**`、`node_modules/**`、`.git/**`。",
-        "- `Tests/**` 与 `**/Tests/**` 归为测试源码（kind=`test`）；"
+        "- `tests/**` 与 `**/Tests/**` 归为测试源码（kind=`test`）；"
         "`Package.swift` 归为清单（kind=`manifest`）；`**/Templates/**` 归为模板（kind=`template`）。",
         "- 状态：`未开始` / `进行中（有缺项）` / `已写入（未验证）` / `Cargo 清单已建立`。"
         "`已写入` 不代表通过编译、行为对照或平台验收。",
@@ -537,7 +537,7 @@ def write_markdown(document: dict) -> None:
             "",
             f"共 {len(entries)} 个文件：已写入 {written}，进行中 {partial}，未开始 {pending}。",
             "",
-            "| 源文件 | 行 | 状态 | Rust/C 目标 | 依赖或阻塞 |",
+            "| 源文件 | 行 | 状态 | src/C 目标 | 依赖或阻塞 |",
             "| --- | ---: | --- | --- | --- |",
         ]
         for entry in entries:
@@ -631,7 +631,7 @@ def is_reachable(path: str, declared: set[str]) -> bool:
     """Whether a Rust file is named by a `mod` statement in its own directory.
 
     The declaration must live in the parent module: `agent/skills.rs` is reached
-    by `mod skills;` inside `agent/mod.rs`, not by a same-named `mod` anywhere in
+    by `mod skills;` inside `crates/agent/mod.rs`, not by a same-named `mod` anywhere in
     the tree. Checking the directory keeps the answer honest — a file declared
     only in an unrelated crate's sibling is still dead.
     """
@@ -717,6 +717,15 @@ def main() -> int:
             continue
         stem = os.path.splitext(os.path.basename(entry["source"]))[0]
         if entry["kind"] == "test":
+            # Suite names are not globally unique (calendar AdaptiveTests,
+            # mobile PresentationTests, PackageResourceBundleTests). Prefer
+            # the source path recorded by the translated suite or helper.
+            mentioned = [path for path in rust if entry["source"] in source_header(path)]
+            if mentioned:
+                entry["rust"] = mentioned
+                entry["status"] = "written_unverified"
+                entry["planned"] = False
+                continue
             # Swift suites are named `<Name>Tests`; the Rust target drops the
             # suffix and sometimes the word boundaries (`ZStackTests` ->
             # `zstack`). Compare on collapsed alphanumerics with the suffix

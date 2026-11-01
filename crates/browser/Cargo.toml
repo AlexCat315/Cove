@@ -1,0 +1,23 @@
+[package]
+name = "cove-browser"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "Browser/WebAssembly prototype host"
+
+[dependencies]
+cove-composition.workspace = true
+cove-core.workspace = true
+cove-platform.workspace = true
+cove-graphics.workspace = true
+cove-logging.workspace = true
+cove-examples = { path = "../../examples/gallery" }
+cove-devtools = { path = "../devtools" }
+cove-devtools-protocol.workspace = true
+cove-text.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+
+[lints]
+workspace = true

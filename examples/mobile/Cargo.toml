@@ -11,8 +11,6 @@ id = "com.cove.mobile"
 name = "CoveUI Mobile"
 build = 1
 
-[lib]
-path = "src/lib.rs"
 
 [[bin]]
 name = "cove-mobile-example"
@@ -20,7 +18,7 @@ path = "src/main.rs"
 
 [dependencies]
 cove-ui = { path = "../.." }
-cove-examples = { path = ".." }
+cove-examples = { path = "../gallery" }
 
 [lints]
 workspace = true

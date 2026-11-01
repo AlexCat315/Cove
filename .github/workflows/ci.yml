@@ -1,4 +1,4 @@
-name: Rust foundation
+name: Rust workspace
 on: [push, pull_request, workflow_dispatch]
 permissions:
   contents: read
@@ -17,6 +17,11 @@ jobs:
         shell: bash
     steps:
       - uses: actions/checkout@v7.0.1
+        with:
+          submodules: recursive
+      - uses: mlugg/setup-zig@v2
+        with:
+          version: '0.16.0'
       - name: Rust toolchain
         run: rustup toolchain install 1.99.1 --profile minimal --component rustfmt --component clippy
       - uses: ilammy/msvc-dev-cmd@v1
@@ -28,16 +33,26 @@ jobs:
             ~/.cargo/git
             target
           key: rust-${{ runner.os }}-${{ hashFiles('Cargo.lock', 'rust-toolchain.toml') }}
+      - name: Linux native dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libvulkan-dev mesa-vulkan-drivers vulkan-validationlayers xvfb libx11-dev libxext-dev libxrandr-dev libxcursor-dev libxi-dev libxss-dev libxtst-dev libwayland-dev libxkbcommon-dev libasound2-dev libpulse-dev
       - name: Formatting
         run: cargo fmt --all --check
       - name: Lints
         run: cargo clippy --workspace --all-targets --locked -- -D warnings
-      - name: Foundation contracts
-        run: cargo test --workspace --locked -- --test-threads=1
-      - name: Headless checkpoint example
-        run: cargo run --locked --manifest-path Examples/RustCounter/Cargo.toml
-      - name: Record migration inventory
-        run: python3 Tools/Migration/inventory.py --status --json
+      - name: Workspace tests
+        run: |
+          if [[ "$RUNNER_OS" == "Linux" ]]; then
+            xvfb-run -a cargo test --workspace --locked --no-fail-fast -- --test-threads=1
+          else
+            cargo test --workspace --locked --no-fail-fast -- --test-threads=1
+          fi
+      - name: Headless counter example
+        run: cargo run --locked --manifest-path examples/gallery/counter/Cargo.toml
+      - name: Audit source layout and migration mappings
+        run: cargo xtask audit --json
   ios-foundation:
     runs-on: macos-15
     strategy:
@@ -46,14 +61,24 @@ jobs:
         target: [aarch64-apple-ios, aarch64-apple-ios-sim]
     steps:
       - uses: actions/checkout@v7.0.1
+        with:
+          submodules: recursive
+      - uses: mlugg/setup-zig@v2
+        with:
+          version: '0.16.0'
       - name: Rust toolchain
         run: rustup toolchain install 1.99.1 --profile minimal --target ${{ matrix.target }}
-      - name: Shared Rust foundation
+      - name: Shared Rust workspace
         run: cargo check --package cove-ui --target ${{ matrix.target }} --locked
   android-foundation:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v7.0.1
+        with:
+          submodules: recursive
+      - uses: mlugg/setup-zig@v2
+        with:
+          version: '0.16.0'
       - name: Rust toolchain
         run: rustup toolchain install 1.99.1 --profile minimal --target aarch64-linux-android
       - uses: android-actions/setup-android@v3
@@ -65,5 +90,5 @@ jobs:
           echo "CC_aarch64_linux_android=$ndk_cc" >> "$GITHUB_ENV"
           echo "AR_aarch64_linux_android=$ANDROID_HOME/ndk/30.0.16248370/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-ar" >> "$GITHUB_ENV"
           echo "CARGO_TARGET_AARCH64_LINUX_ANDROID_LINKER=$ndk_cc" >> "$GITHUB_ENV"
-      - name: Shared Rust foundation
+      - name: Shared Rust workspace
         run: cargo check --package cove-ui --target aarch64-linux-android --locked

@@ -4,6 +4,18 @@
 
 ## Unreleased
 
+- **继续测试迁移并整理 Cargo 工作区（2026-11-01，破坏性）**：
+  - 核对第三批 65 个测试目标，补入盘点遗漏的设计系统套件；修复 ScrollView、Tooltip 与
+    DataTable 测试的 Rust API 对接错误。
+  - crate 统一放入 `crates/`，使用 `src/`、`tests/`、`native/`、`resources/` 与根 `build.rs`；
+    示例放入 `examples/gallery/`，打包工具放入 `xtask/`，集成测试由 Cargo 自动发现。
+  - 新增 Rust `cargo xtask audit`，保留删除前 1,348 个 Swift 文件的校验值与映射，检查实际
+    src/C/Cargo 目标和目录；验证记录见 `Docs/rust-migration-validation.md`。
+  - 浏览器构建、调试配置与 CI 改用 Cargo；浏览器 JS 按 Rust 分配器 ABI 传入释放长度。
+    移除依赖旧 Swift CLI 的浏览器命令及外部 Diffuse 的 Swift shader-sdk CI 作业。
+
+
+
 - **新增 `cove-agent`（`Agent/`），agent/MCP 层脱离 UI 栈**：
   - `cove-devtools` 的 `agent/`、`agent_transport.rs` 与 `inspection/tools.rs` 移入，只依赖 serde；
     `cove-devtools` 以 `pub use cove_agent as agent` 与 `agent_transport`、`inspection::tools` 保留原路径。

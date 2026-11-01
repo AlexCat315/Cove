@@ -5,7 +5,7 @@ on:
       target:
         description: Artifact family to generate
         type: choice
-        options: [all, dxil, metal, engine-dxil]
+        options: [all, dxil, metal]
         default: all
       diffuseRef:
         description: Diffuse shader source revision
@@ -48,46 +48,10 @@ jobs:
           node Tools/Shaders/build-metal-libraries.mjs
           node Tools/Shaders/build-metal-libraries.mjs diffuse/Engine/Sources/RenderBackend/Resources/Shaders
           mkdir -p dist/metal/ui dist/metal/engine
-          cp -R Graphics/Sources/CoveUIGraphics/Resources/Shaders/Native/metal-* dist/metal/ui/
+          cp -R crates/graphics/resources/Shaders/Native/metal-* dist/metal/ui/
           cp -R diffuse/Engine/Sources/RenderBackend/Resources/Shaders/Native/metal-* dist/metal/engine/
       - uses: actions/upload-artifact@v4
         with:
           name: native-metal-libraries
           path: dist/metal
-          if-no-files-found: error
-  engine-dxil:
-    if: inputs.target == 'all' || inputs.target == 'engine-dxil'
-    runs-on: windows-2025-vs2026
-    timeout-minutes: 40
-    steps:
-      - uses: actions/checkout@v7.0.1
-      - uses: actions/checkout@v7.0.1
-        with:
-          repository: AlexCat315/Diffuse
-          ref: ${{ inputs.diffuseRef }}
-          path: diffuse
-      - uses: actions/checkout@v7.0.1
-        with:
-          ref: v0.2.6
-          path: shader-sdk
-      - uses: SwiftyLab/setup-swift@v1.14.1
-        with:
-          swift-version: '6.4.1'
-      - uses: ilammy/msvc-dev-cmd@v1
-      - uses: ./.github/actions/setup-slang
-      - name: Compile engine DXIL and fixed workgroup families
-        shell: pwsh
-        working-directory: diffuse
-        run: |
-          $env:COVE_SDK_ROOT = (Resolve-Path '../shader-sdk').Path
-          $env:COVE_ROOT = (Get-Location).Path
-          & ../shader-sdk/cove.cmd internal build-package Tools/Developer --product cove-dev --result-file ../shader-products.json
-          if ($LASTEXITCODE -ne 0) { throw 'Shader tool build failed' }
-          $products = (Get-Content ../shader-products.json | ConvertFrom-Json).products
-          & (Join-Path $products 'cove-dev.exe') shader rebuild --targets dxil
-          if ($LASTEXITCODE -ne 0) { throw 'Engine shader rebuild failed' }
-      - uses: actions/upload-artifact@v4
-        with:
-          name: native-engine-dxil
-          path: diffuse/Engine/Sources/RenderBackend/Resources/Shaders/Native/dxil
           if-no-files-found: error

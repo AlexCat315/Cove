@@ -1,44 +1,41 @@
 {
-    "configurations": [
-        {
-            "type": "swift",
-            "request": "launch",
-            "args": [],
-            "cwd": "${workspaceFolder:Cove}",
-            "name": "Debug CoveUIDevToolsProbe",
-            "target": "CoveUIDevToolsProbe",
-            "configuration": "debug",
-            "preLaunchTask": "swift: Build Debug CoveUIDevToolsProbe"
-        },
-        {
-            "type": "swift",
-            "request": "launch",
-            "args": [],
-            "cwd": "${workspaceFolder:Cove}",
-            "name": "Release CoveUIDevToolsProbe",
-            "target": "CoveUIDevToolsProbe",
-            "configuration": "release",
-            "preLaunchTask": "swift: Build Release CoveUIDevToolsProbe"
-        },
-        {
-            "type": "swift",
-            "request": "launch",
-            "args": [],
-            "cwd": "${workspaceFolder:Cove}",
-            "name": "Debug CoveProcessFixture",
-            "target": "CoveProcessFixture",
-            "configuration": "debug",
-            "preLaunchTask": "swift: Build Debug CoveProcessFixture"
-        },
-        {
-            "type": "swift",
-            "request": "launch",
-            "args": [],
-            "cwd": "${workspaceFolder:Cove}",
-            "name": "Release CoveProcessFixture",
-            "target": "CoveProcessFixture",
-            "configuration": "release",
-            "preLaunchTask": "swift: Build Release CoveProcessFixture"
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "type": "lldb",
+      "request": "launch",
+      "name": "Rust counter",
+      "cargo": {
+        "args": [
+          "build",
+          "--package",
+          "cove-rust-counter"
+        ],
+        "filter": {
+          "name": "cove-rust-counter",
+          "kind": "bin"
         }
-    ]
+      },
+      "cwd": "${workspaceFolder}"
+    },
+    {
+      "type": "lldb",
+      "request": "launch",
+      "name": "Process fixture",
+      "cargo": {
+        "args": [
+          "build",
+          "--package",
+          "cove-system",
+          "--bin",
+          "cove_process_fixture"
+        ],
+        "filter": {
+          "name": "cove_process_fixture",
+          "kind": "bin"
+        }
+      },
+      "cwd": "${workspaceFolder}"
+    }
+  ]
 }

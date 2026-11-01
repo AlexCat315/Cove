@@ -1,6 +1,6 @@
 # Cove 移动示例
 
-共享内容在 `Examples/rust/mobile`；本 crate（`cove-mobile-example`）用 `cove_ui::application!` 把它接到各平台宿主。
+共享内容在 `examples/gallery/src/mobile`；本 crate（`cove-mobile-example`）用 `cove_ui::application!` 把它接到各平台宿主。
 
 ```sh
 cargo run -p cove-mobile-example

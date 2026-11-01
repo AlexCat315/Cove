@@ -13,13 +13,13 @@ PACKAGES = {
     'Imaging': (2, {'Core'}),
     'Graphics': (3, {'Core', 'Text', 'Imaging'}),
     'Shell': (4, set()),
-    'Compose/Composition': (5, {'Core'}),
-    'Compose': (5, {'Core', 'Text', 'Imaging', 'Compose/Composition'}),
+    'crates/compose/Composition': (5, {'Core'}),
+    'Compose': (5, {'Core', 'Text', 'Imaging', 'crates/compose/Composition'}),
     'Runtime': (6, {'Core', 'Text', 'Imaging', 'Graphics', 'Shell', 'Compose'}),
-    'DevTools/Protocol': (7, set()),
-    'DevTools/Inspection': (7, {'Core', 'DevTools/Protocol'}),
-    'DevTools': (7, {'Core', 'Graphics', 'Runtime', 'DevTools/Protocol', 'DevTools/Inspection', 'Compose/Composition'}),
-    '.': (8, {'Core', 'Text', 'Imaging', 'Graphics', 'Shell', 'Compose', 'Compose/Composition', 'Runtime', 'DevTools'}),
+    'crates/devtools/Protocol': (7, set()),
+    'crates/devtools/Inspection': (7, {'Core', 'crates/devtools/Protocol'}),
+    'DevTools': (7, {'Core', 'Graphics', 'Runtime', 'crates/devtools/Protocol', 'crates/devtools/Inspection', 'crates/compose/Composition'}),
+    '.': (8, {'Core', 'Text', 'Imaging', 'Graphics', 'Shell', 'Compose', 'crates/compose/Composition', 'Runtime', 'DevTools'}),
 }
 SUPPORT = {'System', 'Logging', 'PlatformCore'}
 BRIDGES = {'CYoga', 'CFreeType', 'CHarfBuzz', 'CSDL3', 'CImageDecodeBridge', 'CDX12Bridge', 'CVulkanHeaders', 'GhosttyVt', 'SDL3', 'lunasvg', 'plutovg', 'webp', 'sharpyuv'}
@@ -64,9 +64,9 @@ def check():
     for package in PACKAGES:
         sources = ROOT / package / 'Sources'
         if package == '.':
-            folders = [(ROOT / 'Sources', None), (ROOT / 'Hosts/Desktop/Sources/CoveUI', 'CoveUI'),
-                       (ROOT / 'Hosts/Android/Integration', 'CoveUIAndroid'),
-                       (ROOT / 'Terminal/Sources/CoveUITerminal', 'CoveUITerminal')]
+            folders = [(ROOT / 'Sources', None), (ROOT / 'crates/hosts/Desktop/Sources/CoveUI', 'CoveUI'),
+                       (ROOT / 'crates/hosts/Android/Integration', 'CoveUIAndroid'),
+                       (ROOT / 'crates/terminal/Sources/CoveUITerminal', 'CoveUITerminal')]
         else:
             folders = [(sources, None)]
         for folder, entry_module in folders:

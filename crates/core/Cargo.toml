@@ -1,0 +1,23 @@
+[package]
+name = "cove-core"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+serde.workspace = true
+thiserror.workspace = true
+unicode-general-category.workspace = true
+unicode-segmentation.workspace = true
+cove-platform.workspace = true
+
+[build-dependencies]
+cc.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true
+
+[lints]
+workspace = true
+

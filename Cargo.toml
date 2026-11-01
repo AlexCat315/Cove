@@ -1,30 +1,30 @@
 [workspace]
 members = [
     ".",
-    "Core",
-    "PlatformCore",
-    "System",
-    "Logging",
-    "Graphics",
-    "Text",
-    "Imaging",
-    "Shell",
-    "Runtime",
-    "Compose",
-    "Compose/Composition",
-    "Compose/CompositionMacros",
-    "Terminal",
-    "Hosts",
-    "Agent",
-    "Http",
-    "DevTools",
-    "DevTools/Protocol",
-    "Sources",
-    "Tools/Package",
-    "Browser",
-    "Examples",
-    "Examples/RustCounter",
-    "Examples/Mobile",
+    "crates/core",
+    "crates/platform",
+    "crates/system",
+    "crates/logging",
+    "crates/graphics",
+    "crates/text",
+    "crates/imaging",
+    "crates/shell",
+    "crates/runtime",
+    "crates/compose",
+    "crates/composition",
+    "crates/composition-macros",
+    "crates/terminal",
+    "crates/hosts",
+    "crates/agent",
+    "crates/http",
+    "crates/devtools",
+    "crates/devtools-protocol",
+    "crates/addons",
+    "xtask",
+    "crates/browser",
+    "examples/gallery",
+    "examples/counter",
+    "examples/mobile",
 ]
 resolver = "3"
 
@@ -46,20 +46,20 @@ libc = "0.2"
 os_pipe = "1"
 unicode-general-category = "1"
 unicode-segmentation = "1"
-cove-core = { path = "Core" }
-cove-platform = { path = "PlatformCore" }
-cove-system = { path = "System" }
-cove-logging = { path = "Logging" }
-cove-graphics = { path = "Graphics" }
-cove-text = { path = "Text" }
-cove-imaging = { path = "Imaging" }
-cove-shell = { path = "Shell" }
-cove-runtime = { path = "Runtime" }
-cove-composition = { path = "Compose/Composition" }
-cove-composition-macros = { path = "Compose/CompositionMacros" }
-cove-agent = { path = "Agent" }
-cove-http = { path = "Http" }
-cove-devtools-protocol = { path = "DevTools/Protocol" }
+cove-core = { path = "crates/core" }
+cove-platform = { path = "crates/platform" }
+cove-system = { path = "crates/system" }
+cove-logging = { path = "crates/logging" }
+cove-graphics = { path = "crates/graphics" }
+cove-text = { path = "crates/text" }
+cove-imaging = { path = "crates/imaging" }
+cove-shell = { path = "crates/shell" }
+cove-runtime = { path = "crates/runtime" }
+cove-composition = { path = "crates/composition" }
+cove-composition-macros = { path = "crates/composition-macros" }
+cove-agent = { path = "crates/agent" }
+cove-http = { path = "crates/http" }
+cove-devtools-protocol = { path = "crates/devtools-protocol" }
 # CommonMark + GFM tables/strikethrough/task lists. The Swift original used
 # swift-markdown (cmark-gfm); this is the closest vetted equivalent. Pure Rust,
 # four small transitive crates, no build script, works on every target
@@ -88,10 +88,7 @@ edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
 repository.workspace = true
-description = "Cove Rust foundation; UI migration is in progress"
-
-[lib]
-path = "rust/lib.rs"
+description = "Cove cross-platform UI toolkit"
 
 [dependencies]
 cove-text.workspace = true
@@ -102,13 +99,13 @@ cove-platform.workspace = true
 cove-system.workspace = true
 cove-logging.workspace = true
 cove-devtools-protocol.workspace = true
-cove-composition = { path = "Compose/Composition" }
-cove-ui-compose = { path = "Compose" }
-cove-terminal = { path = "Terminal" }
-cove-hosts = { path = "Hosts" }
-cove-devtools = { path = "DevTools" }
-cove-ui-addons = { path = "Sources" }
-cove-browser = { path = "Browser" }
+cove-composition = { path = "crates/composition" }
+cove-ui-compose = { path = "crates/compose" }
+cove-terminal = { path = "crates/terminal" }
+cove-hosts = { path = "crates/hosts" }
+cove-devtools = { path = "crates/devtools" }
+cove-ui-addons = { path = "crates/addons" }
+cove-browser = { path = "crates/browser" }
 
 [lints]
 workspace = true
