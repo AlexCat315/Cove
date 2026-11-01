@@ -23,6 +23,7 @@ use super::items::SidebarSection;
 use super::presentation::SidebarToggle;
 use super::sidebar::Sidebar;
 
+#[expect(dead_code, reason = "ported from Swift but not wired in yet")]
 const EDGE_SWIPE_WIDTH: f32 = 24.0;
 
 /// Navigation plus content, switching between docked, rail and drawer.
@@ -88,6 +89,7 @@ impl<Id: PartialEq + Eq + std::hash::Hash + Clone + Send + Sync + 'static> Adapt
         }
     }
 
+    #[expect(dead_code, reason = "ported from Swift but not wired in yet")]
     fn set_collapsed(&self, value: bool) {
         match self.collapse.as_ref() {
             Some(binding) => {

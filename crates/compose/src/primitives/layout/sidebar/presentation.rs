@@ -1,7 +1,6 @@
 //! Translation of Primitives/Layout/Sidebar/Presentation.swift.
 //!
 //! Present the same destination nodes as a full sidebar or a narrow rail.
-use crate::modifiers::interaction::AccessibilityExt;
 use crate::primitives::controls::button::{Button, ButtonIconSource};
 use crate::theme::styles::buttons::{ButtonRole, ButtonStyleViewExt, GhostButtonStyle};
 use crate::{AnyView, PrimitiveView, View};

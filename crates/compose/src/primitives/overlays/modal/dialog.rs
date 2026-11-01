@@ -9,7 +9,7 @@ use std::rc::Rc;
 use crate::adaptive::SurfaceReader;
 use crate::modifiers::interaction::AccessibilityExt;
 use crate::modifiers::layout::{EdgeInsets, FlexExt, LayoutFrameExt, PaddingExt};
-use crate::modifiers::style::{AppearanceExt, SemanticStyleViewExt};
+use crate::modifiers::style::SemanticStyleViewExt;
 use crate::primitives::controls::button::{Button, ButtonIconSource, ButtonRole};
 use crate::primitives::feedback::StatusTone;
 use crate::primitives::layout::ActionGroupLayout;

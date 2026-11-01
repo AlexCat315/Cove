@@ -87,6 +87,7 @@ impl SidebarResizeHandle {
         proposed.clamp(self.range.0, self.range.1)
     }
 
+    #[expect(dead_code, reason = "ported from Swift but not wired in yet")]
     fn write(&self, node: &Node, proposed: f32) {
         if !node.accepts_subtree_input() || !proposed.is_finite() {
             return;

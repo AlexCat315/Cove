@@ -19,11 +19,11 @@ mod support;
 use std::rc::Rc;
 
 use cove_composition::{AnyView, TupleView, ViewExt};
+use cove_core::Point;
 use cove_core::scene::{
     Align, FlexDirection, FocusChainHolder, InteractionRegistry, InteractionRegistryHolder,
     Justify, Node, PointerCapture, PointerCaptureHolder, Wrap,
 };
-use cove_core::Point;
 use cove_core::{Environment, InputCapabilities};
 use cove_ui_compose::BoxView;
 use cove_ui_compose::adaptive::SurfaceEnvironmentExt;

@@ -359,7 +359,7 @@ impl<Id: PartialEq + Clone + std::hash::Hash + 'static> PrimitiveView for TabVie
             // (`TabView.swift:128`). A hash-derived key avoids requiring `Eq` on
             // `Id`, which `TabView` does not bound.
             let identity = {
-                use std::hash::{Hash, Hasher};
+                use std::hash::Hasher;
                 let mut hasher = std::collections::hash_map::DefaultHasher::new();
                 tab.id.hash(&mut hasher);
                 hasher.finish()

@@ -11,7 +11,7 @@
 use std::rc::Rc;
 
 use crate::modifiers::layout::PaddingExt;
-use crate::modifiers::style::{AppearanceExt, SemanticStyleViewExt};
+use crate::modifiers::style::SemanticStyleViewExt;
 use crate::primitives::text::rich::run::RichTextRun;
 use crate::{AnyView, BoxView, PrimitiveView, TupleView, View};
 use cove_core::TextAlignment;

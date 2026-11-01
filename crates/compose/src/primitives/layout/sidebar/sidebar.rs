@@ -335,6 +335,7 @@ impl_primitive_view!(SectionIdentity);
 /// The row is rebuilt from primitives on each pass: `Button` is not `Clone` and
 /// `button_style` returns `ModifiedContent`, so storing either would leave a
 /// value that cannot be re-emitted per frame.
+#[expect(dead_code, reason = "ported from Swift but not wired in yet")]
 struct SidebarRowBody<Id: PartialEq + Eq + std::hash::Hash + Clone + Send + Sync + 'static> {
     label: AnyView,
     is_enabled: bool,
@@ -421,6 +422,7 @@ impl<Id: PartialEq + Eq + std::hash::Hash + Clone + Send + Sync + 'static> View
 }
 
 /// Row semantics: label, badge value and branch expanded state.
+#[expect(dead_code, reason = "ported from Swift but not wired in yet")]
 struct SidebarRowSemantics {
     label: String,
     value: String,
@@ -442,6 +444,7 @@ impl cove_composition::ViewModifier for SidebarRowSemantics {
 /// The painted row, built in one pass so the modifier chain never needs erasing.
 struct SidebarChromeRow {
     label: AnyView,
+    #[expect(dead_code, reason = "ported from Swift but not wired in yet")]
     minimum_height: f32,
     fill: cove_core::Color,
     ink: cove_core::Color,

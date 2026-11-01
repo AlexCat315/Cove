@@ -62,6 +62,7 @@ impl SliderHost {
         self.clamped_value(low + count * step)
     }
 
+    #[expect(dead_code, reason = "ported from Swift but not wired in yet")]
     fn increment(&self) -> f64 {
         self.step
             .filter(|step| step.is_finite() && *step > 0.0)
@@ -431,11 +432,6 @@ impl Snapshot {
             range: self.range,
             step: self.step,
         }
-    }
-
-    fn is_reversed(self, axis: SliderAxis) -> bool {
-        let _ = axis;
-        false
     }
 }
 

@@ -80,6 +80,7 @@ impl<Id: std::hash::Hash + PartialEq + Clone + 'static> Stepper<Id> {
         self.items.len() as f32 * budget + connectors
     }
 
+    #[expect(dead_code, reason = "ported from Swift but not wired in yet")]
     fn select(&self, id: &Id) {
         if !self.enabled().contains(id) {
             return;

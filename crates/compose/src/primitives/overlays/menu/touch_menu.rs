@@ -25,8 +25,8 @@ use crate::primitives::text::Text;
 use crate::theme::styles::buttons::{ButtonRole, ButtonStyleViewExt};
 use crate::theme::{SemanticColorRef, SemanticFontRef};
 use crate::{AnyView, BoxView, TupleView, View};
+use cove_composition::LayoutDebugExt;
 use cove_composition::Scancode;
-use cove_composition::{LayoutDebugExt, ViewExt};
 use cove_core::State;
 use cove_core::scene::{
     AccessibilityRole, AccessibilitySemantics, Align, FlexDirection, Justify, Wrap,
@@ -322,6 +322,7 @@ impl View for TouchMenu {
 /// One actionable sheet row: icon, title/detail, and a trailing affordance.
 struct TouchMenuRow {
     row: MenuRowPresentation,
+    #[expect(dead_code, reason = "ported from Swift but not wired in yet")]
     is_tab_stop: bool,
     activate: Rc<dyn Fn()>,
 }

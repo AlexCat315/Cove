@@ -239,6 +239,7 @@ impl<Value: PartialEq + Clone + Send + Sync + 'static> Select<Value> {
     /// Border tone for the current trigger state. Open beats hover: the popup is
     /// open because of the trigger, so the trigger explains it even while the
     /// pointer has moved into the menu.
+    #[expect(dead_code, reason = "ported from Swift but not wired in yet")]
     fn border_color(&self, theme: &Theme, is_presented: bool, is_hovered: bool) -> Color {
         if !self.is_enabled {
             return theme.inputs.border_disabled;

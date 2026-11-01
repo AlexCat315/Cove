@@ -13,7 +13,7 @@ use cove_core::scene::{Align, FlexDirection, LayoutNode, Node};
 use cove_core::{Point, Size};
 
 use super::row_index::VariableRowIndex;
-use super::virtual_stack_body::{RowExtents, virtual_scroll};
+use super::virtual_stack_body::virtual_scroll;
 use super::virtual_window::VirtualWindow;
 
 /// Per-row measured heights, keyed by row id so a reorder keeps its measurements.

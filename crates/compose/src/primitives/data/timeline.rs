@@ -251,6 +251,7 @@ impl Timeline {
             .collect()
     }
 
+    #[expect(dead_code, reason = "ported from Swift but not wired in yet")]
     fn is_collapsed(&self, id: &str) -> bool {
         match &self.collapsed_groups {
             Some(binding) => binding.get().iter().any(|value| value == id),
@@ -262,6 +263,7 @@ impl Timeline {
         }
     }
 
+    #[expect(dead_code, reason = "ported from Swift but not wired in yet")]
     fn toggle_collapsed(&self, id: &str) {
         match &self.collapsed_groups {
             Some(binding) => {
@@ -284,6 +286,7 @@ impl Timeline {
         }
     }
 
+    #[expect(dead_code, reason = "ported from Swift but not wired in yet")]
     fn zoom_factor(&self) -> f32 {
         self.zoom
             .as_ref()

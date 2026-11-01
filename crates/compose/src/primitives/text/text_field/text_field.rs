@@ -9,8 +9,6 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use crate::modifiers::layout::LayoutFrameExt;
-use crate::modifiers::style::AppearanceExt;
 use crate::primitives::text::text_buffer::TextBuffer;
 use crate::primitives::text::text_document_layout::TextDocumentLayout;
 use crate::theme::styles::components::AnyTextFieldStyle;

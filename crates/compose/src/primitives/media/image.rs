@@ -334,15 +334,6 @@ pub type ContentMode = ImageContentMode;
 /// Compatibility alias for the Swift nested `Image.RenderingMode`.
 pub type RenderingMode = ImageRenderingMode;
 
-/// Shared helper for the 64-bit identity of an `Arc`-backed image.
-pub(crate) fn image_asset_eq(lhs: &Option<Arc<ImageAsset>>, rhs: &Option<Arc<ImageAsset>>) -> bool {
-    match (lhs, rhs) {
-        (Some(lhs), Some(rhs)) => Arc::ptr_eq(lhs, rhs),
-        (None, None) => true,
-        _ => false,
-    }
-}
-
 #[allow(dead_code)]
 fn _rc_identity<T>(value: &Rc<T>) -> usize {
     Rc::as_ptr(value) as *const () as usize

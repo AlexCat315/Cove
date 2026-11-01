@@ -365,7 +365,7 @@ impl<Id: PartialEq + Clone + 'static> cove_composition::ViewModifier for RovingI
 
 /// Convenience: hashes any hashable identity to the token used by the group.
 pub fn roving_identity<T: std::hash::Hash>(value: &T) -> u64 {
-    use std::hash::{Hash, Hasher};
+    use std::hash::Hasher;
     let mut hasher = std::collections::hash_map::DefaultHasher::new();
     value.hash(&mut hasher);
     hasher.finish()

@@ -569,6 +569,7 @@ struct LazyGridCell {
     x: f32,
     width: f32,
     height: f32,
+    #[expect(dead_code, reason = "ported from Swift but not wired in yet")]
     key: String,
     content: AnyView,
 }

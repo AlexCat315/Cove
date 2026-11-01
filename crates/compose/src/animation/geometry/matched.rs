@@ -388,7 +388,7 @@ pub struct Matched<Content: View> {
 
 impl<Content: View + Clone> Matched<Content> {
     pub fn new(id: impl std::hash::Hash, content: Content) -> Self {
-        use std::hash::{Hash, Hasher};
+        use std::hash::Hasher;
         let mut hasher = std::collections::hash_map::DefaultHasher::new();
         id.hash(&mut hasher);
         Self {

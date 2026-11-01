@@ -1,13 +1,13 @@
 //! Translation of Compose/Sources/CoveUICompose/Primitives/Overlays/Portal/PortalRegistry.swift.
 use super::fit_constraints::PortalFitConstraints;
 use super::portal_placement::{PortalPlacement, PortalPlacementMode, portal_window_bounds};
+use crate::AnyView;
 use crate::adaptive::{SurfaceEnvironment, SurfaceEnvironmentExt};
 use crate::animation::{AnimatedVisibility, Transition};
 use crate::theme::{
     IconScalingViewExt, ReducedMotionViewExt, SemanticMotionRef, TextScalerViewExt, Theme,
     ThemeViewExt,
 };
-use crate::{AnyView, ViewExt};
 use cove_core::scene::{CompositionLocal, Node, NodeResource, NodeWeak};
 use cove_core::{Point, Rect, Size};
 use std::cell::{Cell, RefCell};

@@ -93,6 +93,7 @@ impl Icon {
         }
     }
 
+    #[expect(dead_code, reason = "ported from Swift but not wired in yet")]
     fn resolved_fill(&self, theme: &Theme) -> Option<Color> {
         match &self.fill {
             IconFill::Inherited => None,

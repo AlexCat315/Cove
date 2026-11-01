@@ -12,7 +12,7 @@ use cove_core::scene::{
 };
 
 use crate::theme::Theme;
-use crate::{AnyView, Layout, PrimitiveView, View, impl_primitive_view};
+use crate::{AnyView, Layout, PrimitiveView, impl_primitive_view};
 
 use super::axes::ChartValueAxes;
 use super::axis::{ChartFrame, ChartText};
@@ -307,11 +307,6 @@ impl PrimitiveView for ChartOverlayHost {
     }
 }
 impl_primitive_view!(ChartOverlayHost);
-
-/// Small helper so the layout value can be measured and placed with one state.
-trait CloneAlgorithm {
-    fn clone_algorithm(&self) -> ChartOverlayLayout;
-}
 
 impl ChartPlot {
     /// Every overlay label for one size, back to front.

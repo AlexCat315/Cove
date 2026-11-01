@@ -5,7 +5,7 @@
 use std::rc::Rc;
 
 use crate::modifiers::layout::LayoutFrameExt;
-use crate::modifiers::style::{AppearanceExt, SemanticStyleViewExt};
+use crate::modifiers::style::SemanticStyleViewExt;
 use crate::primitives::controls::adaptive::apply_touch_control_extent;
 use crate::primitives::text::Text;
 use crate::theme::tokens::semantic_motion::{SemanticMotionRef, semantic_animation};

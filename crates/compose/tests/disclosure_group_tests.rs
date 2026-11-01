@@ -28,8 +28,8 @@ use std::rc::Rc;
 use cove_composition::{AnyView, LayoutDebugExt};
 use cove_core::State;
 use cove_core::scene::{
-    Align, EventPhase, EventResult, FlexDirection,
-    InteractionRegistry, InteractionRegistryHolder, Justify, Node, Wrap,
+    Align, EventPhase, EventResult, FlexDirection, InteractionRegistry, InteractionRegistryHolder,
+    Justify, Node, Wrap,
 };
 use cove_platform::{KeyEvent, KeyModifiers};
 use cove_ui_compose::Scancode;

@@ -356,7 +356,7 @@ fn hdr_and_depth_resolve() {
     let expected = [0x3400u16, 0x4000, 0x4400, 0x3800];
     for pixel in bits.as_chunks::<4>().0 {
         assert_eq!(
-            pixel, expected,
+            *pixel, expected,
             "every resolved pixel carries the cleared HDR colour exactly"
         );
     }

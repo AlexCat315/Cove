@@ -11,13 +11,14 @@ use crate::{AnyView, View};
 use cove_core::{Point, Size};
 
 use super::row_metrics::VariableRowMetrics;
-use super::virtual_stack_body::{RowExtents, virtual_scroll};
+use super::virtual_stack_body::virtual_scroll;
 use super::virtual_window::VirtualWindow;
 
 /// Authoritative window state for one variable stack.
 struct VariableState<Id: Ord + Clone> {
     metrics: VariableRowMetrics<Id>,
     window: VirtualWindow,
+    #[expect(dead_code, reason = "ported from Swift but not wired in yet")]
     viewport: ScrollViewport,
     previous_target: Option<usize>,
     generation: u64,

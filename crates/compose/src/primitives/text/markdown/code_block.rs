@@ -5,7 +5,6 @@
 use std::cell::Cell;
 use std::rc::Rc;
 
-use crate::modifiers::interaction::AccessibilityExt;
 use crate::modifiers::layout::{FlexExt, PaddingExt};
 use crate::modifiers::style::SemanticStyleViewExt;
 use crate::primitives::controls::button::{Button, ButtonIconSource, ButtonRole};
@@ -204,6 +203,7 @@ impl_primitive_view!(CodeBlockCard);
 impl_primitive_view!(MarkdownCodeBlockBody);
 
 /// Sunken card chrome and group semantics for one code block.
+#[expect(dead_code, reason = "ported from Swift but not wired in yet")]
 struct CodeBlockChrome;
 
 impl cove_composition::ViewModifier for CodeBlockChrome {

@@ -30,7 +30,7 @@ use crate::primitives::text::code::gutter_session::TextGutterSession;
 use crate::theme::styles::buttons::ButtonStyleViewExt;
 use crate::theme::{SemanticColorRef, SemanticFontRef};
 use crate::{AnyView, BoxView, PrimitiveView, TupleView, View};
-use cove_composition::{LayoutDebugExt, ViewExt};
+use cove_composition::ViewExt;
 use cove_core::State;
 use cove_core::scene::{
     AccessibilityRole, AccessibilitySemantics, Align, EventPhase, EventResult, FlexDirection,

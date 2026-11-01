@@ -251,9 +251,7 @@ impl crate::Layout for ToolbarOverflowLayout {
 mod tests {
     #[test]
     fn toolbar_overflow_moves_low_priority_commands() {
-        use crate::primitives::controls::toolbar::{
-            ToolbarItemPlacement, ToolbarOverflowLayout,
-        };
+        use crate::primitives::controls::toolbar::{ToolbarItemPlacement, ToolbarOverflowLayout};
         use cove_core::Size;
         // four commands of 44pt + 4pt spacing = 188pt; budget 100 fits two.
         let sizes = vec![

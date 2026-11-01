@@ -365,7 +365,6 @@ fn three_widths_keep_commands_and_fit_the_title() {
                             "the bar fills its allocation ({context_label})"
                         );
 
-                        
                         let visible: Vec<Node> = nodes_of(&chrome)
                             .into_iter()
                             .filter(|node| node.is_focusable() && node.accepts_subtree_input())

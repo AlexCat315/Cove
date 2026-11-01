@@ -10,7 +10,7 @@ use crate::primitives::controls::button::{ButtonIcon, ButtonIconSource};
 use crate::primitives::text::Text;
 use crate::theme::{SemanticFontRef, theme_for_node};
 use crate::{
-    AnyView, BoxView, PrimitiveView, Row, TupleView, VerticalAlignment, View, impl_primitive_view,
+    AnyView, BoxView, PrimitiveView, Row, TupleView, VerticalAlignment, impl_primitive_view,
 };
 use cove_core::Color;
 use cove_core::scene::{

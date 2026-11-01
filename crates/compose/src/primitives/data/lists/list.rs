@@ -8,9 +8,7 @@
 //! delegated to the active list row style.
 use std::rc::Rc;
 
-use crate::modifiers::interaction::CursorExt;
 use crate::modifiers::layout::{FlexExt, LayoutFrameExt};
-use crate::modifiers::style::AppearanceExt;
 use crate::primitives::controls::adaptive::{apply_touch_control_extent, supports_control_hover};
 use crate::theme::styles::components::selection_appearance::{SelectionAppearance, SelectionRole};
 use crate::theme::styles::components::{ListRowStyleConfiguration, ListRowStyleEnvironment};
@@ -297,6 +295,7 @@ impl<Id: Ord + Clone + Send + Sync + 'static> List<Id> {
         Some(self.ids[low..=high].to_vec())
     }
 
+    #[expect(dead_code, reason = "ported from Swift but not wired in yet")]
     fn tap(&self, id: Id, modifiers: cove_platform::KeyModifiers) {
         if modifiers.has_shift()
             && let Some(anchor) = self.anchor.get()

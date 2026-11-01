@@ -208,6 +208,7 @@ impl<Id: std::hash::Hash + Eq + Clone + PartialEq + 'static> TabOverflowStrip<Id
         }
     }
 
+    #[expect(dead_code, reason = "ported from Swift but not wired in yet")]
     fn selected_index(&self) -> Option<usize> {
         self.tabs
             .iter()

@@ -5,7 +5,6 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use crate::modifiers::interaction::AccessibilityExt;
 use crate::modifiers::layout::PaddingExt;
 use crate::modifiers::style::SemanticStyleViewExt;
 use crate::primitives::controls::button::{Button, ButtonRole};
@@ -226,7 +225,7 @@ impl<Id: PartialEq + Clone + std::hash::Hash + 'static> View for BreadcrumbBody<
 }
 
 fn menu_id(id: &impl std::hash::Hash) -> u64 {
-    use std::hash::{Hash, Hasher};
+    use std::hash::Hasher;
     let mut hasher = std::collections::hash_map::DefaultHasher::new();
     id.hash(&mut hasher);
     hasher.finish()

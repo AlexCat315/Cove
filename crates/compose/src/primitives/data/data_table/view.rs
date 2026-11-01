@@ -55,12 +55,14 @@ use crate::primitives::text::text_field::{
 };
 use crate::primitives::text::{Divider, DividerAxis, Text};
 use crate::theme::{SemanticFontRef, node_text_scaler, theme_for_node};
-use crate::{AnyView, BoxView, PrimitiveView, TupleView, View, ViewExt, impl_primitive_view};
+use crate::{AnyView, BoxView, PrimitiveView, TupleView, View, impl_primitive_view};
 
 const INPUT_MARKER: &str = "dataTable.input";
 const ROW_INDEX_MARKER: &str = "dataTable.rowIndex";
 const METRICS_CACHE: &str = "dataTable.metrics";
+#[expect(dead_code, reason = "ported from Swift but not wired in yet")]
 const ROW_HOVERED: &str = "__dataTable.rowHovered";
+#[expect(dead_code, reason = "ported from Swift but not wired in yet")]
 const COLUMN_DRAG: &str = "dataTable.columnDrag";
 
 /// Authored options for a `DataTable`.
@@ -1911,6 +1913,7 @@ struct DraftEditor<
 > {
     controller: DataTableController<Record, Id>,
     plan: DataTablePlan<Record>,
+    #[expect(dead_code, reason = "ported from Swift but not wired in yet")]
     column_id: String,
     buffer: String,
     title: String,
@@ -2026,8 +2029,10 @@ struct HeaderCell<
     Id: Ord + std::hash::Hash + Clone + Send + Sync + 'static,
 > {
     controller: DataTableController<Record, Id>,
+    #[expect(dead_code, reason = "ported from Swift but not wired in yet")]
     plan: DataTablePlan<Record>,
     column: TableColumn<Record>,
+    #[expect(dead_code, reason = "ported from Swift but not wired in yet")]
     index: usize,
     width: f32,
     height: f32,
@@ -2119,6 +2124,7 @@ struct HeaderCellHost<
     Id: Ord + std::hash::Hash + Clone + Send + Sync + 'static,
 > {
     controller: DataTableController<Record, Id>,
+    #[expect(dead_code, reason = "ported from Swift but not wired in yet")]
     column_id: String,
     title: String,
     width: f32,
