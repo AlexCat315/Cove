@@ -6,7 +6,6 @@
 //! and rounder corners.
 use std::rc::Rc;
 
-use crate::ViewExt;
 use crate::modifiers::layout::{LayoutFrameExt, PaddingExt};
 use crate::modifiers::style::{AppearanceExt, SemanticStyleViewExt};
 use crate::primitives::text::Text;

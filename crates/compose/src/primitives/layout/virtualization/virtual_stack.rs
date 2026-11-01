@@ -13,7 +13,7 @@
 //! edges; `overscan` is the minimum extra row count per edge.
 use std::rc::Rc;
 
-use crate::{AnyView, View};
+use crate::AnyView;
 
 use super::estimated_stack::EstimatedVirtualStack;
 use super::fixed_stack::FixedVirtualStack;

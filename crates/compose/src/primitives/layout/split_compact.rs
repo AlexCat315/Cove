@@ -90,7 +90,7 @@ impl View for SplitPaneSelector {
 
         let host_selection = selection.clone();
         let host_on_select = selection.clone();
-        let identity: Rc<dyn Fn(&SplitPane) -> u64> = Rc::new(|pane| roving_identity(pane));
+        let identity: Rc<dyn Fn(&SplitPane) -> u64> = Rc::new(roving_identity);
         let host = RovingFocusHost::new(
             SplitPane::all().to_vec(),
             move || Some(host_selection.get()),
@@ -103,7 +103,8 @@ impl View for SplitPaneSelector {
                 let row_selection = selection.clone();
                 let first_title = presentation.first_title.clone();
                 let second_title = presentation.second_title.clone();
-                let row = BoxView::new(
+
+                BoxView::new(
                     FlexDirection::Row,
                     Align::Stretch,
                     cove_core::scene::Justify::FlexStart,
@@ -118,8 +119,7 @@ impl View for SplitPaneSelector {
                         ),
                         pane_item(SplitPane::Second, second_title, row_selection, identity),
                     ])),
-                );
-                row
+                )
             },
         );
 

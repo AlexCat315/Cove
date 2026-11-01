@@ -12,7 +12,7 @@ use cove_core::scene::{
 };
 
 use crate::theme::Theme;
-use crate::{AnyView, Layout, LayoutContainer, PrimitiveView, View, impl_primitive_view};
+use crate::{AnyView, Layout, PrimitiveView, View, impl_primitive_view};
 
 use super::axes::ChartValueAxes;
 use super::axis::{ChartFrame, ChartText};
@@ -22,8 +22,8 @@ use super::drawing::ChartPaint;
 use super::model::{
     Accessibility as AccessibilityConfig, Axis as AxisConfig, ChartAnnotation, ChartBand,
     ChartCallout, ChartCalloutRow, ChartMarker, ChartOrientation, ChartPoint, ChartRange,
-    ChartSeries, ChartSlice, ChartStyle, ChartThreshold, ChartValueAxis, ChartXDomain,
-    Pie as PieConfig, Viewport as ViewportConfig,
+    ChartSeries, ChartSlice, ChartStyle, ChartThreshold, ChartXDomain, Pie as PieConfig,
+    Viewport as ViewportConfig,
 };
 use super::morph::ChartTransition;
 use super::overlay::{
@@ -531,40 +531,38 @@ impl ChartPlot {
             }
         }
 
-        if let Some(selection) = self.selection {
-            if let Some(callout) = (self.callout)(selection) {
-                let mut placement = None;
-                if let Some(geometry) = resolution
-                    .as_ref()
-                    .and_then(|resolution| resolution.cartesian.as_ref())
-                {
-                    if let Some(mark) = geometry.mark(callout.point) {
-                        placement = self.end_placement(mark, geometry, 10.0);
-                    }
-                } else if let Some(pie) = resolution
-                    .as_ref()
-                    .and_then(|resolution| resolution.pie.as_ref())
-                {
-                    if let Some(wedge) = pie
-                        .wedges
-                        .iter()
-                        .find(|wedge| wedge.index == callout.point.index)
-                    {
-                        let anchor = pie.anchor(wedge);
-                        placement = Some(
-                            ChartOverlayPlacement::new(anchor, 0.5, 1.0)
-                                .gap(10.0)
-                                .flips(true),
-                        );
-                    }
+        if let Some(selection) = self.selection
+            && let Some(callout) = (self.callout)(selection)
+        {
+            let mut placement = None;
+            if let Some(geometry) = resolution
+                .as_ref()
+                .and_then(|resolution| resolution.cartesian.as_ref())
+            {
+                if let Some(mark) = geometry.mark(callout.point) {
+                    placement = self.end_placement(mark, geometry, 10.0);
                 }
-                add(
-                    ChartOverlayItem::new(ChartOverlayKind::Callout, callout.title.clone())
-                        .rows(callout.rows.clone()),
-                    placement,
-                    false,
+            } else if let Some(pie) = resolution
+                .as_ref()
+                .and_then(|resolution| resolution.pie.as_ref())
+                && let Some(wedge) = pie
+                    .wedges
+                    .iter()
+                    .find(|wedge| wedge.index == callout.point.index)
+            {
+                let anchor = pie.anchor(wedge);
+                placement = Some(
+                    ChartOverlayPlacement::new(anchor, 0.5, 1.0)
+                        .gap(10.0)
+                        .flips(true),
                 );
             }
+            add(
+                ChartOverlayItem::new(ChartOverlayKind::Callout, callout.title.clone())
+                    .rows(callout.rows.clone()),
+                placement,
+                false,
+            );
         }
         slots
     }
@@ -1041,19 +1039,18 @@ impl ChartPlot {
         if let Some(geometry) = marks {
             list.push_clip_rect(geometry.plot);
         }
-        if let ChartContent::Cartesian { series, guides, .. } = &self.content {
-            if let Some(geometry) = marks {
-                paint.bands(&guides.bands, geometry, list);
-                paint.grid(list);
-                if let (Some(range), Some(window)) = (self.brushed_range, geometry.window.as_ref())
-                {
-                    paint.brush(range, window, list);
-                }
-                paint.thresholds(&guides.thresholds, geometry, list);
-                paint.series(series, geometry, list);
-                paint.markers(&guides.markers, geometry, list);
-                paint.selection(series, geometry, list);
+        if let ChartContent::Cartesian { series, guides, .. } = &self.content
+            && let Some(geometry) = marks
+        {
+            paint.bands(&guides.bands, geometry, list);
+            paint.grid(list);
+            if let (Some(range), Some(window)) = (self.brushed_range, geometry.window.as_ref()) {
+                paint.brush(range, window, list);
             }
+            paint.thresholds(&guides.thresholds, geometry, list);
+            paint.series(series, geometry, list);
+            paint.markers(&guides.markers, geometry, list);
+            paint.selection(series, geometry, list);
         }
         if marks.is_some() {
             list.pop_clip_rect();
@@ -1067,20 +1064,19 @@ impl ChartPlot {
             paint.pie(slices, geometry, list);
         }
         // Axis text is materialised by the overlay host (Text primitive gap).
-        if let Some(focus) = FocusChainHolder::current() {
-            if focus
+        if let Some(focus) = FocusChainHolder::current()
+            && focus
                 .focused()
                 .map(|focused| focused.id() == node.id())
                 .unwrap_or(false)
-                && focus.is_focus_visible()
-            {
-                let _ = list.add_rounded_rect_stroke(
-                    Rect::new(origin.x, origin.y, size.width, size.height),
-                    theme.radius.sm,
-                    2.0,
-                    theme.colors.focus_ring,
-                );
-            }
+            && focus.is_focus_visible()
+        {
+            let _ = list.add_rounded_rect_stroke(
+                Rect::new(origin.x, origin.y, size.width, size.height),
+                theme.radius.sm,
+                2.0,
+                theme.colors.focus_ring,
+            );
         }
     }
 }

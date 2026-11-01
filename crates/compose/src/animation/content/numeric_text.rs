@@ -172,10 +172,10 @@ impl NumberSession {
                     .borrow()
                     .as_ref()
                     .is_some_and(|controller| !controller.is_finished());
-            if self.target.get() == Some(value) {
-                if let Some(controller) = self.controller.borrow().as_ref() {
-                    controller.finish_immediately();
-                }
+            if self.target.get() == Some(value)
+                && let Some(controller) = self.controller.borrow().as_ref()
+            {
+                controller.finish_immediately();
             }
             self.stop();
             self.current.set(value);

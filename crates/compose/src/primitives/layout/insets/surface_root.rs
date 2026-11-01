@@ -11,7 +11,7 @@
 use crate::adaptive::SurfaceEnvironment;
 use crate::modifiers::layout::{EdgeInsets, FlexExt, LayoutFrameExt};
 use crate::theme::{TextScaler, TextScalerEnvironment, node_text_scaler};
-use crate::{AnyView, BoxView, PrimitiveView, View, ViewExt, impl_primitive_view};
+use crate::{AnyView, BoxView, PrimitiveView, View, impl_primitive_view};
 use cove_core::scene::ReducedMotionEnvironment;
 use cove_core::scene::{Align, FlexDirection, Justify, Wrap};
 

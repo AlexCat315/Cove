@@ -111,24 +111,24 @@ impl SidebarFocusHandoff {
         let Some(chain) = chain else { return };
         // A slot's own container query can settle one composition after the
         // shell. Hand off only if the remembered focus actually became inactive.
-        if self.destination.get().is_none() && chain.focused().is_none() {
-            if let Some(previous) = self.previous.borrow().clone()
-                && !previous.accepts_subtree_input()
+        if self.destination.get().is_none()
+            && chain.focused().is_none()
+            && let Some(previous) = self.previous.borrow().clone()
+            && !previous.accepts_subtree_input()
+        {
+            let mode = self.mode.get();
+            if Self::contains(&previous, self.navigation.borrow().as_ref()) {
+                self.destination.set(Some(
+                    if mode == Some(SidebarMode::Compact) && !self.is_modal.get() {
+                        HandoffDestination::Trigger
+                    } else {
+                        HandoffDestination::Navigation
+                    },
+                ));
+            } else if Self::contains(&previous, self.trigger.borrow().as_ref())
+                && mode != Some(SidebarMode::Compact)
             {
-                let mode = self.mode.get();
-                if Self::contains(&previous, self.navigation.borrow().as_ref()) {
-                    self.destination.set(Some(
-                        if mode == Some(SidebarMode::Compact) && !self.is_modal.get() {
-                            HandoffDestination::Trigger
-                        } else {
-                            HandoffDestination::Navigation
-                        },
-                    ));
-                } else if Self::contains(&previous, self.trigger.borrow().as_ref())
-                    && mode != Some(SidebarMode::Compact)
-                {
-                    self.destination.set(Some(HandoffDestination::Navigation));
-                }
+                self.destination.set(Some(HandoffDestination::Navigation));
             }
         }
         let Some(destination) = self.destination.get() else {

@@ -586,7 +586,7 @@ impl PropertyGridSurface {
             card_children.push(body);
         }
 
-        let card = AnyView::new(
+        AnyView::new(
             AnyView::new(BoxView::new(
                 FlexDirection::Column,
                 Align::Stretch,
@@ -601,8 +601,7 @@ impl PropertyGridSurface {
                 SemanticColorRef::surface_raised()
             })
             .corner_radius(if nested { 0.0 } else { 8.0 }),
-        );
-        card
+        )
     }
 
     fn section_body(&self, section: &PropertyGridSection, nested: bool) -> AnyView {
@@ -630,7 +629,7 @@ impl PropertyGridSurface {
             ));
         }
 
-        let column = AnyView::new(
+        AnyView::new(
             AnyView::new(BoxView::new(
                 FlexDirection::Column,
                 Align::Stretch,
@@ -644,8 +643,7 @@ impl PropertyGridSurface {
             } else {
                 EdgeInsets::new(0.0, 8.0, 8.0, 8.0)
             }),
-        );
-        column
+        )
     }
 
     fn row_view(

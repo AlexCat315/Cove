@@ -153,7 +153,7 @@ impl<Value> ComboboxSearch<Value> {
     /// Minimal validation: a minimum below zero becomes zero, and a negative
     /// delay cannot exist on `u64`.
     pub fn validated(mut self) -> Self {
-        self.minimum_query_length = self.minimum_query_length.max(0);
+        self.minimum_query_length = self.minimum_query_length;
         self
     }
 }

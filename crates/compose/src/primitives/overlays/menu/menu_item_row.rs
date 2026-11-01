@@ -4,7 +4,6 @@
 //! or rich title, detail line, shortcut or submenu chevron, and the link glyph.
 use std::rc::Rc;
 
-use crate::modifiers::interaction::CursorExt;
 use crate::modifiers::layout::{FlexExt, LayoutFrameExt, PaddingExt};
 use crate::modifiers::style::{AppearanceExt, SemanticStyleViewExt};
 use crate::primitives::controls::button::{ButtonIcon, ButtonIconSource};

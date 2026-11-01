@@ -6,9 +6,9 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use crate::modifiers::interaction::AccessibilityExt;
-use crate::modifiers::layout::{FlexExt, PaddingExt};
+use crate::modifiers::layout::PaddingExt;
 use crate::modifiers::style::SemanticStyleViewExt;
-use crate::primitives::controls::button::{Button, ButtonIconSource, ButtonRole};
+use crate::primitives::controls::button::{Button, ButtonRole};
 use crate::primitives::media::ui_icon_catalog;
 use crate::primitives::overlays::anchored::{PopoverOverflow, PopoverSurface};
 use crate::primitives::overlays::menu::{Menu, MenuEntry, MenuItem};
@@ -16,11 +16,9 @@ use crate::primitives::overlays::popover::Popover;
 use crate::primitives::text::Text;
 use crate::theme::styles::buttons::{ButtonStyleViewExt, GhostButtonStyle, ToggleButtonStyle};
 use crate::theme::{SemanticColorRef, SemanticFontRef};
-use crate::{AnyView, BoxView, PrimitiveView, Row, TupleView, VerticalAlignment, View};
+use crate::{AnyView, PrimitiveView, Row, TupleView, VerticalAlignment, View};
 use cove_core::Binding;
-use cove_core::scene::{
-    AccessibilityRole, AccessibilitySemantics, Align, FlexDirection, Justify, Node, Wrap,
-};
+use cove_core::scene::{AccessibilityRole, AccessibilitySemantics, Node};
 
 /// Default visible items before a breadcrumb collapses its middle.
 pub const DEFAULT_MAX_VISIBLE_ITEMS: usize = 4;

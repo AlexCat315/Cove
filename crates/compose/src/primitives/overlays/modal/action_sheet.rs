@@ -458,7 +458,7 @@ impl PrimitiveView for ActionSheetContent {
             Some(self.maximum_height),
         )));
 
-        let mut body = AnyView::new(
+        let body = AnyView::new(
             AnyView::new(BoxView::new(
                 FlexDirection::Column,
                 Align::Stretch,

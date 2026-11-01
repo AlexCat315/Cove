@@ -11,7 +11,7 @@ use crate::adaptive::{ContainerSizeReader, SurfaceEnvironment};
 use crate::animation::content::AnimatedVisibility;
 use crate::animation::transition::Transition;
 use crate::modifiers::interaction::AccessibilityExt;
-use crate::modifiers::layout::{FlexExt, LayoutFrameExt};
+use crate::modifiers::layout::LayoutFrameExt;
 use crate::modifiers::style::AppearanceExt;
 use crate::primitives::layout::ResolvedLayoutDirection;
 use crate::theme::{Theme, ThemeReader};
@@ -21,7 +21,7 @@ use cove_core::scene::{
     InputHandlerRoute, InputRoutingPriority, InteractionRegistryHolder, LayoutNode, Node,
     PointerCaptureHolder, PointerPhase,
 };
-use cove_core::{Binding, Point, Rect};
+use cove_core::{Binding, Point};
 use cove_platform::MouseButton;
 
 const PATH_COUNT: &str = "navigation.path.count";

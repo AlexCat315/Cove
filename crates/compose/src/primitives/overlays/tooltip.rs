@@ -959,11 +959,14 @@ impl PrimitiveView for TooltipHost {
                     if event.scancode != crate::Scancode::ESCAPE {
                         return EventResult::Ignored;
                     }
-                    key_session
+                    if key_session
                         .upgrade()
                         .is_some_and(|session| session.dismiss())
-                        .then_some(EventResult::Handled)
-                        .unwrap_or(EventResult::Ignored)
+                    {
+                        EventResult::Handled
+                    } else {
+                        EventResult::Ignored
+                    }
                 }),
             );
         }

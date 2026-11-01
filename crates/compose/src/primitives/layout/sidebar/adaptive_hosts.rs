@@ -6,10 +6,9 @@
 //! return target and the backdrop owns dismissal.
 use std::rc::Rc;
 
-use crate::modifiers::style::AppearanceExt;
 use crate::primitives::overlays::modal::ModalDismissal;
 use crate::theme::theme_for_node;
-use crate::{AnyView, PrimitiveView, View, impl_primitive_view};
+use crate::{AnyView, PrimitiveView, View};
 use cove_core::scene::ModalFocusResource;
 use cove_core::scene::{
     AccessibilityRole, AccessibilitySemantics, Align, EventResult, FocusChainHolder,

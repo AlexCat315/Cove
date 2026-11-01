@@ -108,13 +108,12 @@ impl PrimitiveView for SplitRetainedRegion {
             return;
         }
         // A hidden pane must not keep focus or the pointer hostage.
-        if let Some(chain) = FocusChainHolder::current() {
-            if let Some(focused) = chain.focused()
-                && contains(&focused, node)
-            {
-                *self.focus.pending_visibility.borrow_mut() = Some(chain.is_focus_visible());
-                chain.clear();
-            }
+        if let Some(chain) = FocusChainHolder::current()
+            && let Some(focused) = chain.focused()
+            && contains(&focused, node)
+        {
+            *self.focus.pending_visibility.borrow_mut() = Some(chain.is_focus_visible());
+            chain.clear();
         }
         if let Some(capture) = PointerCaptureHolder::current()
             && capture
@@ -170,10 +169,9 @@ impl SplitFocusHandoff {
                 .attachment::<Option<SplitPane>>(PANE_MARKER)
                 .flatten()
                 == Some(self.selection)
+            && let Some(found) = self.locate(candidate, false)
         {
-            if let Some(found) = self.locate(candidate, false) {
-                return Some(found);
-            }
+            return Some(found);
         }
         if !preferred && candidate.is_focusable() && candidate.is_tab_stop() {
             return Some(candidate.clone());
@@ -202,7 +200,7 @@ impl PrimitiveView for SplitFocusHandoff {
         let selection = self.selection;
         let weak = node.downgrade();
         node.set_layout_did_update(Some(Rc::new(move |node: &Node| {
-            let pending = focus.pending_visibility.borrow().clone();
+            let pending = *focus.pending_visibility.borrow();
             let Some(visible) = pending else { return };
             *focus.pending_visibility.borrow_mut() = None;
             let handoff = SplitFocusHandoff::new(focus.clone(), is_compact, selection);

@@ -1,8 +1,8 @@
 //! Translation of Primitives/Feedback/Progress.swift.
+use crate::PrimitiveView;
 use crate::impl_primitive_view;
 use crate::primitives::feedback::{ProgressValue, StatusTone};
 use crate::primitives::media::LoadingAnimationClock;
-use crate::{PrimitiveView, View};
 use cove_core::scene::{
     AccessibilityRole, AccessibilitySemantics, AccessibilityState, LayoutNode, MeasureMode, Node,
     NodeResource, Rect,

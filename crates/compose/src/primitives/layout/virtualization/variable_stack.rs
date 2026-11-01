@@ -10,7 +10,6 @@ use crate::primitives::layout::ScrollViewport;
 use crate::{AnyView, View};
 use cove_core::{Point, Size};
 
-use super::row_index::VariableRowIndex;
 use super::row_metrics::VariableRowMetrics;
 use super::virtual_stack_body::{RowExtents, virtual_scroll};
 use super::virtual_window::VirtualWindow;

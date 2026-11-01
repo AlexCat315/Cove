@@ -7,7 +7,7 @@ use std::collections::HashMap;
 use std::rc::{Rc, Weak};
 
 use crate::theme::{SemanticMotionRef, theme_for_node};
-use crate::{AnyView, PrimitiveView, View, impl_primitive_view};
+use crate::{AnyView, PrimitiveView, View};
 use cove_core::Rect;
 use cove_core::scene::{
     ActiveAnimationContext, Animation, AnimationCompletionGroup, AnimationController,

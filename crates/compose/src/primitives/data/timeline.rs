@@ -7,26 +7,23 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
+use crate::LayoutContainer;
 use crate::modifiers::interaction::AccessibilityExt;
 use crate::modifiers::layout::{EdgeInsets, FlexExt, LayoutFrameExt, PaddingExt};
 use crate::modifiers::style::{AppearanceExt, SemanticStyleViewExt};
-use crate::primitives::controls::button::{
-    ActionControlAccessibility, Button, ButtonIconSource, ButtonRole,
-};
+use crate::primitives::controls::button::{Button, ButtonIconSource, ButtonRole};
 use crate::primitives::feedback::{Badge, StatusTone};
 use crate::primitives::media::{Icon, ui_icon_catalog};
 use crate::primitives::text::Text;
 use crate::theme::styles::buttons::{ButtonStyleViewExt, GhostButtonStyle};
 use crate::theme::{
-    IconMetrics, SemanticColorRef, SemanticFontRef, SemanticIconSize, Theme, node_text_scaler,
-    theme_for_node,
+    IconMetrics, SemanticColorRef, SemanticFontRef, SemanticIconSize, Theme, theme_for_node,
 };
 use crate::{
     AnyView, BoxView, PrimitiveView, Row, Spacer, TupleView, VerticalAlignment, View, ViewExt,
 };
-use crate::{Layout, LayoutContainer, LayoutSubview, ProposedViewSize};
+use cove_core::Binding;
 use cove_core::scene::{AccessibilityRole, Align, FlexDirection, Justify, Node, Wrap};
-use cove_core::{Binding, Color, Point, Rect, Size};
 use cove_imaging::BundleImageResource;
 
 pub mod heading_layout;
@@ -144,9 +141,10 @@ impl TimelineGroup {
 }
 
 /// Vertical distance between consecutive events.
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, Default)]
 pub enum TimelineSpacing {
     /// One theme gap between entries: a sequence, not a time scale.
+    #[default]
     Uniform,
     /// Extra gap proportional to the time between dated events, clamped to
     /// `minimum..maximum` points, then multiplied by the zoom factor.
@@ -180,12 +178,6 @@ impl TimelineSpacing {
         };
         let hours = ((later - earlier).abs() / 3600.0) as f32;
         (hours * points_per_hour).clamp(minimum, maximum) * zoom
-    }
-}
-
-impl Default for TimelineSpacing {
-    fn default() -> Self {
-        Self::Uniform
     }
 }
 

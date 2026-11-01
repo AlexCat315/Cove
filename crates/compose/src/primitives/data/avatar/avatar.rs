@@ -5,7 +5,6 @@
 //! `AsyncImage`; those primitives have no Rust counterpart yet, so the caller
 //! may supply an erased fallback/content view. Identity initials, palette
 //! derivation, sizing, accessibility and status composition are preserved.
-use std::rc::Rc;
 
 use crate::theme::theme_environment::theme_for_node;
 use crate::theme::tokens::control_size::{ControlSize, ControlSizeEnvironment};
@@ -384,9 +383,9 @@ impl AvatarIdentity {
         let radians = hue * std::f32::consts::PI / 180.0;
         let a = chroma * radians.cos();
         let b = chroma * radians.sin();
-        let ll = lightness + 0.3963377774 * a + 0.2158037573 * b;
-        let mm = lightness - 0.1055613458 * a - 0.0638541728 * b;
-        let ss = lightness - 0.0894841775 * a - 1.2914855480 * b;
+        let ll = lightness + 0.396_337_78 * a + 0.215_803_76 * b;
+        let mm = lightness - 0.105_561_346 * a - 0.063_854_17 * b;
+        let ss = lightness - 0.089_484_18 * a - 1.291_485_5 * b;
         let l = ll * ll * ll;
         let m = mm * mm * mm;
         let s = ss * ss * ss;
@@ -399,9 +398,9 @@ impl AvatarIdentity {
             }
         };
         cove_core::scene::Color {
-            r: channel(4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s),
-            g: channel(-1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s),
-            b: channel(-0.0041960863 * l - 0.7034186147 * m + 1.7076147010 * s),
+            r: channel(4.076_741_7 * l - 3.307_711_6 * m + 0.230_969_94 * s),
+            g: channel(-1.268_438 * l + 2.609_757_4 * m - 0.341_319_38 * s),
+            b: channel(-0.0041960863 * l - 0.703_418_6 * m + 1.707_614_7 * s),
             a: 1.0,
         }
     }

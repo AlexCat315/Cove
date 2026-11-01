@@ -135,7 +135,7 @@ pub fn field_description(reference: Option<&AssetRef>) -> String {
 ///
 /// Only a slot that accepts exactly one kind hints; a multi-kind slot shows the
 /// generic icon instead of picking one arbitrarily.
-pub fn placeholder_kind<'a>(accepted_kinds: &'a BTreeSet<String>) -> Option<&'a str> {
+pub fn placeholder_kind(accepted_kinds: &BTreeSet<String>) -> Option<&str> {
     if accepted_kinds.len() == 1 {
         accepted_kinds.iter().next().map(String::as_str)
     } else {

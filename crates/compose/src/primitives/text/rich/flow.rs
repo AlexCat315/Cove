@@ -1,7 +1,7 @@
 //! Measured lines, glyphs and span fragments of one rich paragraph at one
 //! width. Offsets are UTF-8 byte offsets into the paragraph text.
 
-use super::run::{RichTextRun, RichTextTraits};
+use super::run::RichTextTraits;
 use cove_core::{
     BidiParagraphs, Font, PositionedGlyph, TextAlignment, TextLayoutResult, TextLine,
     line_break_opportunities,
@@ -114,7 +114,7 @@ impl RichTextFlow {
         let mut low = 0usize;
         let mut high = self.span_starts.len() - 1;
         while low < high {
-            let mid = (low + high + 1) / 2;
+            let mid = (low + high).div_ceil(2);
             if self.span_starts[mid] <= offset {
                 low = mid;
             } else {
@@ -366,21 +366,21 @@ impl FlowBuilder {
             glyph_lines.push(placed.glyphs);
             top += placed.line.height;
         }
-        if lines.is_empty() {
-            if let Some(first) = self.paragraph.spans.first() {
-                let empty = RichTextLine {
-                    top: 0.0,
-                    height: first.line_height,
-                    baseline: first.line_height * 0.75,
-                    width: 0.0,
-                    start_offset: 0,
-                    end_offset: 0,
-                    carets: vec![RichTextCaret { offset: 0, x: 0.0 }],
-                    is_right_to_left: false,
-                };
-                lines.push(empty);
-                top = first.line_height;
-            }
+        if lines.is_empty()
+            && let Some(first) = self.paragraph.spans.first()
+        {
+            let empty = RichTextLine {
+                top: 0.0,
+                height: first.line_height,
+                baseline: first.line_height * 0.75,
+                width: 0.0,
+                start_offset: 0,
+                end_offset: 0,
+                carets: vec![RichTextCaret { offset: 0, x: 0.0 }],
+                is_right_to_left: false,
+            };
+            lines.push(empty);
+            top = first.line_height;
         }
         let width = lines.iter().map(|line| line.width).fold(0.0, f32::max);
         let aligned = self.align(&lines, &glyph_lines, &fragments, width);
@@ -422,7 +422,7 @@ impl FlowBuilder {
                     let byte = utf8.get(local).copied().unwrap_or(0);
                     let cluster = segment_start + local;
                     shaped.push(Item {
-                        glyph: Some(glyph.clone()),
+                        glyph: Some(*glyph),
                         span: index,
                         cluster,
                         advance: glyph.x_advance,
@@ -567,33 +567,33 @@ impl FlowBuilder {
         for item in &content {
             let span = &self.paragraph.spans[item.span];
             height = height.max(span.line_height);
-            if !metrics_by_span.contains_key(&item.span) {
-                if let Some(glyph) = &item.glyph {
-                    let metrics = self.env.atlas.line_metrics(glyph.font_id);
-                    metrics_by_span.insert(
-                        item.span,
-                        (
-                            metrics
-                                .as_ref()
-                                .map_or(span.font.size() * 0.8, |m| m.ascent),
-                            metrics
-                                .as_ref()
-                                .map_or(span.font.size() * 0.2, |m| m.descent),
-                        ),
-                    );
-                }
+            if !metrics_by_span.contains_key(&item.span)
+                && let Some(glyph) = &item.glyph
+            {
+                let metrics = self.env.atlas.line_metrics(glyph.font_id);
+                metrics_by_span.insert(
+                    item.span,
+                    (
+                        metrics
+                            .as_ref()
+                            .map_or(span.font.size() * 0.8, |m| m.ascent),
+                        metrics
+                            .as_ref()
+                            .map_or(span.font.size() * 0.2, |m| m.descent),
+                    ),
+                );
             }
             if let Some((a, d)) = metrics_by_span.get(&item.span) {
                 ascent = ascent.max(*a);
                 descent = descent.max(*d);
             }
         }
-        if height == 0.0 {
-            if let Some(span) = self.paragraph.spans.get(fallback_span) {
-                height = span.line_height;
-                ascent = span.font.size() * 0.8;
-                descent = span.font.size() * 0.2;
-            }
+        if height == 0.0
+            && let Some(span) = self.paragraph.spans.get(fallback_span)
+        {
+            height = span.line_height;
+            ascent = span.font.size() * 0.8;
+            descent = span.font.size() * 0.2;
         }
         let baseline = (top + (height - ascent - descent) / 2.0 + ascent).round();
 

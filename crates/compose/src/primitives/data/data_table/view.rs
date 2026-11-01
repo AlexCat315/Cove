@@ -34,8 +34,8 @@ use cove_core::{Binding, Point, Size, State};
 use cove_platform::{KeyEvent, KeyModifiers, MouseButton, SystemCursor};
 
 use super::super::lists::table::{
-    ColumnVisibility, ComparisonResult, TableColumn, TableColumnLayout, TableColumnPlan,
-    TableLayout, TableSort, TableSortDirection,
+    ColumnVisibility, TableColumn, TableColumnLayout, TableColumnPlan, TableLayout, TableSort,
+    TableSortDirection,
 };
 use super::column_order::DataTableColumnOrder;
 use super::data_table_geometry::DataTableColumnGeometry;
@@ -45,7 +45,7 @@ use super::row_metrics::{
     DataTableRowMetrics, RowHeightKey, row_height_key_matches, variable_row_heights,
 };
 use super::selection_model::{DataTableNavigation, DataTableSelection, DataTableSelectionMode};
-use crate::modifiers::layout::{EdgeInsets, FlexExt, LayoutFrameExt, PaddingExt};
+use crate::modifiers::layout::{FlexExt, LayoutFrameExt, PaddingExt};
 use crate::modifiers::style::{AppearanceExt, SemanticStyleViewExt};
 use crate::primitives::feedback::EmptyState;
 use crate::primitives::layout::{ScrollAxis, ScrollView, ScrollbarGutter};
@@ -54,7 +54,7 @@ use crate::primitives::text::text_field::{
     TextField, TextFieldBehavior, TextFieldEvents, TextFieldNavigationRequest,
 };
 use crate::primitives::text::{Divider, DividerAxis, Text};
-use crate::theme::{SemanticColorRef, SemanticFontRef, node_text_scaler, theme_for_node};
+use crate::theme::{SemanticFontRef, node_text_scaler, theme_for_node};
 use crate::{AnyView, BoxView, PrimitiveView, TupleView, View, ViewExt, impl_primitive_view};
 
 const INPUT_MARKER: &str = "dataTable.input";
@@ -741,7 +741,7 @@ impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 
         metrics: &DataTableRowMetrics,
         moving_width: f32,
         viewport_height: f32,
-        input: &Rc<RefCell<Option<Node>>>,
+        _input: &Rc<RefCell<Option<Node>>>,
     ) -> bool {
         if !self.is_enabled || self.model.count() == 0 || plan.columns.is_empty() {
             return false;
@@ -1381,7 +1381,7 @@ fn build_moving_lane<
     let columns = window.columns(plan.columns.len());
     let start = columns.start.max(frozen_count);
     let rows = window.rows(metrics.count);
-    let content_width = plan.geometry.moving_width().max(moving_width);
+    let _content_width = plan.geometry.moving_width().max(moving_width);
     let content = AnyView::new(MovingRows {
         controller: controller.clone(),
         plan: plan.clone(),
@@ -1843,7 +1843,7 @@ impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 
             ..Default::default()
         }));
         let controller = self.controller.clone();
-        let plan = self.plan.clone();
+        let _plan = self.plan.clone();
         let row = self.row;
         let column_index = self.column_index;
         let activate = self.is_enabled;
@@ -1926,7 +1926,7 @@ impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 
         let plan = self.plan.clone();
         let input: Rc<RefCell<Option<Node>>> = Rc::new(RefCell::new(None));
         let buffer = self.buffer.clone();
-        let write_controller = controller.clone();
+        let _write_controller = controller.clone();
         // `Binding` requires `Send + Sync`; the draft buffer itself lives on the
         // controller, so the source is mirrored through a `State` and written back
         // on set (same pattern as the virtual stack's offset binding).

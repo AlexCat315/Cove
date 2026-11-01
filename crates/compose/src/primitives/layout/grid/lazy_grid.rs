@@ -28,7 +28,7 @@ impl LazyGridRows {
         let Some(raw_spans) = raw_spans else {
             return Self {
                 columns,
-                count: item_count / columns + usize::from(item_count % columns != 0),
+                count: item_count / columns + usize::from(!item_count.is_multiple_of(columns)),
                 item_count,
                 row_starts: None,
                 item_columns: None,

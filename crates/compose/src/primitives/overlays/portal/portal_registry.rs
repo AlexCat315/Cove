@@ -9,7 +9,7 @@ use crate::theme::{
 };
 use crate::{AnyView, ViewExt};
 use cove_core::scene::{CompositionLocal, Node, NodeResource, NodeWeak};
-use cove_core::{Environment, Point, Rect, Size};
+use cove_core::{Point, Rect, Size};
 use std::cell::{Cell, RefCell};
 use std::collections::{BTreeMap, HashMap};
 use std::rc::{Rc, Weak};
@@ -702,10 +702,9 @@ impl PortalResource {
         if self.is_dismissing.get() {
             return;
         }
-        let (Some(content), Some(transition)) = (
-            self.content.borrow().clone(),
-            self.transition.borrow().clone(),
-        ) else {
+        let (Some(content), Some(transition)) =
+            (self.content.borrow().clone(), *self.transition.borrow())
+        else {
             self.unmount(node);
             return;
         };
@@ -754,26 +753,26 @@ impl PortalResource {
             return;
         };
         if !owner.accepts_subtree_input() {
-            if let Some(id) = self.entry_id.borrow().clone() {
-                if let Some(store) = self.store() {
-                    store.request_dismissal(&id);
-                }
+            if let Some(id) = self.entry_id.borrow().clone()
+                && let Some(store) = self.store()
+            {
+                store.request_dismissal(&id);
             }
             self.unmount(&owner);
             return;
         }
-        if let Some(id) = self.entry_id.borrow().clone() {
-            if let Some(store) = self.store() {
-                store.update_position(&id, position);
-            }
+        if let Some(id) = self.entry_id.borrow().clone()
+            && let Some(store) = self.store()
+        {
+            store.update_position(&id, position);
         }
     }
 
     pub fn update_fit(&self, fit: PortalFitConstraints) {
-        if let Some(id) = self.entry_id.borrow().clone() {
-            if let Some(store) = self.store() {
-                store.configure_fit(&id, fit);
-            }
+        if let Some(id) = self.entry_id.borrow().clone()
+            && let Some(store) = self.store()
+        {
+            store.configure_fit(&id, fit);
         }
     }
 
@@ -783,10 +782,10 @@ impl PortalResource {
     }
 
     pub fn set_dismissal(&self, anchor: Rc<dyn Fn() -> Rect>, dismiss: Rc<dyn Fn()>) {
-        if let Some(id) = self.entry_id.borrow().clone() {
-            if let Some(store) = self.store() {
-                store.set_dismissal(&id, anchor, dismiss);
-            }
+        if let Some(id) = self.entry_id.borrow().clone()
+            && let Some(store) = self.store()
+        {
+            store.set_dismissal(&id, anchor, dismiss);
         }
     }
 }
@@ -797,10 +796,10 @@ impl NodeResource for PortalResource {
 
     /// Idempotent: safe to call more than once during teardown.
     fn unmount(&self, _node: &Node) {
-        if let Some(id) = self.entry_id.borrow_mut().take() {
-            if let Some(store) = self.store() {
-                store.unregister(&id);
-            }
+        if let Some(id) = self.entry_id.borrow_mut().take()
+            && let Some(store) = self.store()
+        {
+            store.unregister(&id);
         }
         *self.store.borrow_mut() = None;
         *self.content.borrow_mut() = None;

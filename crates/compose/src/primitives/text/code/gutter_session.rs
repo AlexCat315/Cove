@@ -20,10 +20,8 @@ use std::cell::{Cell, RefCell};
 use std::collections::{BTreeMap, BTreeSet};
 use std::rc::Rc;
 
-use crate::primitives::text::code::folding_options::{
-    TextEditorFolding, TextFoldRegion, TextLineRebase,
-};
-use crate::primitives::text::code::gutter_geometry::{TextGutterControl, TextGutterControlKind};
+use crate::primitives::text::code::folding_options::{TextEditorFolding, TextFoldRegion};
+use crate::primitives::text::code::gutter_geometry::TextGutterControl;
 use crate::primitives::text::code::gutter_options::{
     TextBreakpoint, TextBreakpointState, TextEditorGutter, TextGutterMarker,
 };
@@ -432,5 +430,11 @@ impl TextGutterSession {
         }
 
         false
+    }
+}
+
+impl Default for TextGutterSession {
+    fn default() -> Self {
+        Self::new()
     }
 }

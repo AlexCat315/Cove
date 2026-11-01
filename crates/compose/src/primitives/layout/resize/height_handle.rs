@@ -14,10 +14,9 @@ use cove_core::scene::{
 use cove_platform::{MouseButton, SystemCursor};
 
 use super::height_limits::EditorHeightLimits;
-use crate::modifiers::interaction::CursorExt;
 use crate::primitives::layout::scroll_reveal::ScrollReveal;
 use crate::theme::theme_for_node;
-use crate::{PrimitiveView, View, impl_primitive_view};
+use crate::{PrimitiveView, impl_primitive_view};
 
 const START: &str = "editor.resize.start";
 const BASIS: &str = "editor.resize.basis";

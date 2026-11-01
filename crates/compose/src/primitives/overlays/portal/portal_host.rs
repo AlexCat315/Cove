@@ -20,9 +20,8 @@ use cove_composition::{
     AnyView, LayoutDebugAttachmentKey, PrimitiveView, View, ViewExt, impl_primitive_view,
 };
 use cove_core::scene::{
-    Align, Edge, FlexDirection, FocusChainHolder, InputHandlerRoute, InteractionRegistryHolder,
-    LayoutNode, Node, PointerCaptureHolder, PointerPhase, PositionType, WheelRoutingAttachmentKey,
-    WheelRoutingPriority,
+    Edge, InputHandlerRoute, InteractionRegistryHolder, LayoutNode, Node, PointerPhase,
+    PositionType, WheelRoutingAttachmentKey, WheelRoutingPriority,
 };
 use cove_core::{Point, Rect, Size};
 

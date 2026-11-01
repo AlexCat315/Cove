@@ -8,10 +8,7 @@ use cove_core::scene::{
     AccessibilityRevision, CompositionLocal, InvalidationSource, Node, NodeResource, NodeWeak,
 };
 use cove_core::scene::{FocusChainHolder, InputRoutingPriority, InteractionRegistryHolder};
-use cove_core::{
-    Clip, Color, DrawList, InvalidationSource as _, Node as _, Painter, Point, Rect, RoundedRect,
-    paint_scaled,
-};
+use cove_core::{Clip, Color, DrawList, Painter, Point, Rect, RoundedRect, paint_scaled};
 use cove_text::TextEnvironmentHolder;
 use std::any::Any;
 use std::cell::RefCell;
@@ -243,10 +240,10 @@ impl TextSelectionScope {
             let mut changed: std::collections::HashSet<u64> = previous.keys().copied().collect();
             changed.extend(current.keys().copied());
             for id in changed {
-                if previous.get(&id) != current.get(&id) {
-                    if let Some(node) = self.members.get(&id).and_then(SelectionMember::node) {
-                        node.mark_render_dirty(InvalidationSource::style_set("textSelection"));
-                    }
+                if previous.get(&id) != current.get(&id)
+                    && let Some(node) = self.members.get(&id).and_then(SelectionMember::node)
+                {
+                    node.mark_render_dirty(InvalidationSource::style_set("textSelection"));
                 }
             }
         }
@@ -321,10 +318,10 @@ impl TextSelectionScope {
         };
         let mut result = std::collections::HashMap::new();
         for index in span.lower..=span.upper {
-            if let Some(range) = self.range_at(index, Some(span), ids) {
-                if let Some(id) = ids.get(index) {
-                    result.insert(*id, range);
-                }
+            if let Some(range) = self.range_at(index, Some(span), ids)
+                && let Some(id) = ids.get(index)
+            {
+                result.insert(*id, range);
             }
         }
         result
@@ -739,15 +736,15 @@ impl TextSelectionChrome {
         start: Option<Rect>,
         end: Option<Rect>,
     ) -> Option<TextSelectionEndpoint> {
-        if let Some(start) = start {
-            if Self::distance(local, Self::handle_center(start, true)) <= Self::HIT_SLOP {
-                return Some(TextSelectionEndpoint::Start);
-            }
+        if let Some(start) = start
+            && Self::distance(local, Self::handle_center(start, true)) <= Self::HIT_SLOP
+        {
+            return Some(TextSelectionEndpoint::Start);
         }
-        if let Some(end) = end {
-            if Self::distance(local, Self::handle_center(end, false)) <= Self::HIT_SLOP {
-                return Some(TextSelectionEndpoint::End);
-            }
+        if let Some(end) = end
+            && Self::distance(local, Self::handle_center(end, false)) <= Self::HIT_SLOP
+        {
+            return Some(TextSelectionEndpoint::End);
         }
         None
     }
@@ -832,12 +829,11 @@ impl TextSelectionChrome {
         };
         let mut ancestor = node.parent();
         while let Some(current) = ancestor {
-            if let Some(route) = registry.handlers(&current).pointer_route {
-                if route.priority <= InputRoutingPriority::NORMAL
-                    && route.role != cove_core::scene::InputHandlerRole::Scroll
-                {
-                    return true;
-                }
+            if let Some(route) = registry.handlers(&current).pointer_route
+                && route.priority <= InputRoutingPriority::NORMAL
+                && route.role != cove_core::scene::InputHandlerRole::Scroll
+            {
+                return true;
             }
             ancestor = current.parent();
         }

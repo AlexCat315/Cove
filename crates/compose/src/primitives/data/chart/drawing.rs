@@ -121,7 +121,7 @@ impl<'a> ChartPaint<'a> {
     /// consumes these; the draw list itself cannot rasterize glyphs yet.
     pub fn axis_label_layouts(&self) -> Vec<(String, Point)> {
         let color_slot = ();
-        let _ = color_slot;
+        color_slot;
         let mut result = Vec::new();
         let bounds = self.frame.bounds;
         let plot = self.frame.plot;

@@ -100,21 +100,11 @@ impl DateRangePickerPresentation {
 }
 
 /// Authored range-picker options.
-#[derive(Clone)]
+#[derive(Clone, Default)]
 pub struct DateRangePickerOptions {
     pub calendar: CalendarOptions,
     pub rules: DateRangeRules,
     pub presentation: DateRangePickerPresentation,
-}
-
-impl Default for DateRangePickerOptions {
-    fn default() -> Self {
-        Self {
-            calendar: CalendarOptions::default(),
-            rules: DateRangeRules::default(),
-            presentation: DateRangePickerPresentation::default(),
-        }
-    }
 }
 
 impl DateRangePickerOptions {

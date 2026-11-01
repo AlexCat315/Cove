@@ -136,7 +136,7 @@ impl GridLayout {
             self.columns.len()
         };
         let row_count = subviews.len() / source_column_count
-            + usize::from(subviews.len() % source_column_count != 0);
+            + usize::from(!subviews.len().is_multiple_of(source_column_count));
         let mut heights = vec![0.0f32; row_count];
         let mut active_rows = vec![false; row_count];
         let mut sizes = Vec::with_capacity(subviews.len());
@@ -455,7 +455,7 @@ impl View for Grid {
         let is_enabled = self.is_enabled;
         let overrides = self.column_visibility.clone();
         let local = self.local_visibility.clone();
-        let reader = crate::adaptive::ContainerSizeReader::new(move |size: CoreSize| {
+        let reader = crate::adaptive::ContainerSizeReader::new(move |_size: CoreSize| {
             let values = overrides
                 .as_ref()
                 .map(|state| state.get())
@@ -515,10 +515,9 @@ impl PrimitiveView for GridInteractionHost {
         if let Some(target) = cove_core::scene::input::PointerCaptureHolder::current()
             .and_then(|capture| capture.target())
             && chain.contains(&target, node)
+            && let Some(capture) = cove_core::scene::input::PointerCaptureHolder::current()
         {
-            if let Some(capture) = cove_core::scene::input::PointerCaptureHolder::current() {
-                capture.release();
-            }
+            capture.release();
         }
         if let Some(target) = chain.focused()
             && chain.contains(&target, node)

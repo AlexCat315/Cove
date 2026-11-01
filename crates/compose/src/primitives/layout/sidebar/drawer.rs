@@ -4,10 +4,9 @@
 //! lifecycle. The application owns presentation and selection, so resizing never
 //! resets them.
 use std::collections::HashSet;
-use std::rc::Rc;
 
 use crate::modifiers::interaction::AccessibilityExt;
-use crate::modifiers::layout::{FlexExt, PaddingExt};
+use crate::modifiers::layout::PaddingExt;
 use crate::modifiers::style::AppearanceExt;
 use crate::modifiers::style::SemanticStyleViewExt;
 use crate::primitives::interaction::horizontal_swipe::{HorizontalSwipe, HorizontalSwipeDirection};

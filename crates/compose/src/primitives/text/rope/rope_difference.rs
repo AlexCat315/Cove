@@ -39,11 +39,11 @@ impl Cursor {
 
     fn consume(&mut self, count: usize) {
         self.byte_offset += count;
-        if let Some(node) = self.nodes.last() {
-            if self.byte_offset == node.metrics.utf8_length {
-                self.nodes.pop();
-                self.byte_offset = 0;
-            }
+        if let Some(node) = self.nodes.last()
+            && self.byte_offset == node.metrics.utf8_length
+        {
+            self.nodes.pop();
+            self.byte_offset = 0;
         }
     }
 }

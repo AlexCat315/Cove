@@ -80,15 +80,15 @@ fn preferred_locales() -> Vec<String> {
         .or_else(|| std::env::var("LANG").ok().filter(|v| !v.is_empty()))
         .unwrap_or_else(|| "en".into());
     let locale = raw
-        .split(|character| character == '.' || character == '@')
+        .split(['.', '@'])
         .next()
         .unwrap_or(&raw)
         .replace('_', "-");
     let mut locales = vec![locale.clone()];
-    if let Some(language) = locale.split('-').next() {
-        if language != locale {
-            locales.push(language.to_owned());
-        }
+    if let Some(language) = locale.split('-').next()
+        && language != locale
+    {
+        locales.push(language.to_owned());
     }
     locales
 }
@@ -98,18 +98,17 @@ fn main_resource_roots() -> Vec<PathBuf> {
     if let Some(path) = std::env::var_os("PACKAGE_RESOURCE_BUNDLE_PATH") {
         roots.push(path.into());
     }
-    if let Ok(executable) = std::env::current_exe() {
-        if let Some(parent) = executable.parent() {
-            roots.push(parent.to_owned());
-            roots.push(parent.join("Resources"));
-            if parent.file_name().is_some_and(|name| name == "MacOS") {
-                if let Some(contents) = parent
-                    .parent()
-                    .filter(|path| path.file_name().is_some_and(|name| name == "Contents"))
-                {
-                    roots.push(contents.join("Resources"));
-                }
-            }
+    if let Ok(executable) = std::env::current_exe()
+        && let Some(parent) = executable.parent()
+    {
+        roots.push(parent.to_owned());
+        roots.push(parent.join("Resources"));
+        if parent.file_name().is_some_and(|name| name == "MacOS")
+            && let Some(contents) = parent
+                .parent()
+                .filter(|path| path.file_name().is_some_and(|name| name == "Contents"))
+        {
+            roots.push(contents.join("Resources"));
         }
     }
     roots
@@ -128,7 +127,7 @@ fn read_translation(path: &Path, key: &str) -> Option<String> {
 fn decode_strings(bytes: &[u8]) -> Option<String> {
     if bytes.starts_with(&[0xff, 0xfe]) || bytes.starts_with(&[0xfe, 0xff]) {
         let little_endian = bytes[0] == 0xff;
-        let units = bytes[2..].chunks_exact(2).map(|pair| {
+        let units = bytes[2..].as_chunks::<2>().0.iter().map(|pair| {
             if little_endian {
                 u16::from_le_bytes([pair[0], pair[1]])
             } else {

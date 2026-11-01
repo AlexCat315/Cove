@@ -2,9 +2,9 @@
 //!
 //! A flat document surface for crates/text/code editors whose caller owns the chrome.
 //! Focus stays visible through the caret, selection and active code line.
+use crate::AnyView;
 use crate::modifiers::style::{AppearanceExt, SemanticStyleViewExt};
 use crate::theme::SemanticColorRef;
-use crate::{AnyView, View};
 
 use super::text_field_style::{TextFieldStyle, TextFieldStyleConfiguration};
 

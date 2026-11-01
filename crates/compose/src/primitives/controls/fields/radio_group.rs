@@ -15,8 +15,7 @@ use crate::{
     impl_primitive_view,
 };
 use cove_core::scene::{
-    AccessibilityRole, Align, FlexDirection, FocusChainHolder, Justify, LayoutNode, Node, Rect,
-    Wrap,
+    AccessibilityRole, Align, FlexDirection, Justify, LayoutNode, Node, Rect, Wrap,
 };
 use cove_core::{Binding, Color};
 

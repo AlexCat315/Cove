@@ -12,9 +12,7 @@ use cove_imaging::BundleImageResource;
 
 use super::menu_descriptor::{MenuDescriptor, MenuItemDescriptor};
 use super::menu_item_row::MenuItemRowHost;
-use super::menu_navigation::{
-    MENU_ITEM_ID, MENU_SCROLL_MARKER, MenuRowEvents, MenuRowPresentation, MenuSession,
-};
+use super::menu_navigation::{MENU_SCROLL_MARKER, MenuRowEvents, MenuRowPresentation, MenuSession};
 use super::row_content::MenuItemContent;
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]

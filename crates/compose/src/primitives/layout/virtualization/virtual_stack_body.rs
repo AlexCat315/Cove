@@ -7,7 +7,7 @@ use std::rc::Rc;
 
 use crate::modifiers::layout::LayoutFrameExt;
 use crate::primitives::layout::{ScrollAxis, ScrollView, ScrollViewport, ScrollbarGutter};
-use crate::{AnyView, BoxView, PrimitiveView, View};
+use crate::{AnyView, BoxView, PrimitiveView};
 use cove_core::Point;
 use cove_core::scene::{Align, FlexDirection, Justify, LayoutNode, Node, Wrap};
 

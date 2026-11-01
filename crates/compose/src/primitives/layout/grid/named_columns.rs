@@ -83,7 +83,7 @@ impl ColumnVisibilityPlan {
                         right.cmp(&left)
                     }
                 })
-                .or_else(|| if columns.is_empty() { None } else { Some(0) });
+                .or(if columns.is_empty() { None } else { Some(0) });
             if let Some(anchor) = anchor {
                 required.insert(anchor);
                 shown.insert(anchor);

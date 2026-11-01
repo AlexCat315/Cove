@@ -2,7 +2,7 @@
 //!
 //! Only sampled values animate. Authored data and session state stay separate.
 use std::cell::RefCell;
-use std::rc::{Rc, Weak};
+use std::rc::Rc;
 
 use cove_core::scene::{Animation, Interpolatable, Node};
 
@@ -116,13 +116,9 @@ impl Interpolatable for ChartSamples {
 }
 
 /// Drives the `chart.samples` animatable property. Reduced motion snaps.
+#[derive(Default)]
 pub struct ChartTransition {
     target: Option<ChartSamples>,
-}
-impl Default for ChartTransition {
-    fn default() -> Self {
-        Self { target: None }
-    }
 }
 impl ChartTransition {
     pub fn update(

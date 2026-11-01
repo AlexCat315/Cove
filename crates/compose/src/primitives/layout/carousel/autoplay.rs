@@ -7,7 +7,7 @@
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 
-use cove_composition::{AnyView, PrimitiveView, View};
+use cove_composition::{AnyView, PrimitiveView};
 use cove_core::scene::{
     AnimatorScheduler, AnyAnimationController, FocusChainHolder, InvalidationSource, LayoutNode,
     Node, NodeResource,

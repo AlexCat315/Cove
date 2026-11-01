@@ -5,13 +5,12 @@
 //! without scheduling a recompose.
 use std::rc::Rc;
 
-use crate::modifiers::interaction::CursorExt;
 use crate::primitives::controls::adaptive::{apply_touch_control_extent, supports_control_hover};
 use crate::theme::styles::components::{
     AnySliderStyle, SliderStyleConfiguration, SliderStyleEnvironment,
 };
 use crate::theme::theme_for_node;
-use crate::{PrimitiveView, View, impl_primitive_view};
+use crate::{PrimitiveView, impl_primitive_view};
 use cove_core::scene::{
     AccessibilityActions, AccessibilityRole, AccessibilitySemantics, AccessibilityState,
     EventPhase, EventResult, FocusChainHolder, HoverPhase, InputHandlerRoute,

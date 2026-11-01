@@ -4,9 +4,9 @@ use crate::modifiers::layout::{LayoutFrameExt, PaddingExt};
 use crate::modifiers::style::{AppearanceExt, SemanticStyleViewExt};
 use crate::primitives::controls::button::{ButtonIcon, ButtonIconSource};
 use crate::primitives::text::Text;
-use crate::theme::{SemanticColorRef, SemanticFontRef, Theme, theme_for_node};
+use crate::theme::{SemanticColorRef, SemanticFontRef, Theme};
 use crate::{AnyView, BoxView, TupleView, View};
-use cove_core::scene::{AccessibilityRole, Align, FlexDirection, Justify, Node, Wrap};
+use cove_core::scene::{AccessibilityRole, Align, FlexDirection, Justify, Wrap};
 use cove_imaging::BundleImageResource;
 
 /// Vertical weight of an `EmptyState` block.

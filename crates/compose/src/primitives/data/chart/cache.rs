@@ -17,20 +17,12 @@ struct Slot {
     resolution: ChartResolution,
 }
 
+#[derive(Default)]
 pub struct ChartResolutionCache {
     slots: Vec<Slot>,
     pub samples: Option<ChartSamples>,
     /// How many resolutions have been built. A repeat resolve leaves it alone.
     pub builds: usize,
-}
-impl Default for ChartResolutionCache {
-    fn default() -> Self {
-        Self {
-            slots: Vec::new(),
-            samples: None,
-            builds: 0,
-        }
-    }
 }
 impl ChartResolutionCache {
     pub fn new() -> Self {

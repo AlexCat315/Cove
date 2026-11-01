@@ -547,7 +547,7 @@ impl<Record: 'static, Id: PartialEq + Clone + 'static> View for Table<Record, Id
                     let sort_binding = sort_binding.clone();
                     Rc::new(move || {
                         let next = match (
-                            sort_binding.as_ref().map(|binding| binding.get()).flatten(),
+                            sort_binding.as_ref().and_then(|binding| binding.get()),
                             is_sorted,
                         ) {
                             (Some(current), true)
@@ -625,10 +625,10 @@ impl<Record: 'static, Id: PartialEq + Clone + 'static> View for Table<Record, Id
                         Some(binding) => binding.set(Some(row_key.clone())),
                         None => session.borrow_mut().selection = Some(row_key.clone()),
                     }
-                    if let Some(handler) = on_activate.as_ref() {
-                        if let Some(record) = records_for_rows.get(row_index) {
-                            handler(record);
-                        }
+                    if let Some(handler) = on_activate.as_ref()
+                        && let Some(record) = records_for_rows.get(row_index)
+                    {
+                        handler(record);
                     }
                 }),
                 content: AnyView::new(

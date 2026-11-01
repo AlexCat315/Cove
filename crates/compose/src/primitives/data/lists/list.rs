@@ -6,7 +6,6 @@
 //! extends from the anchor, Cmd/Ctrl-click toggles, Shift+Arrow extends, Space
 //! toggles the cursor row and Cmd/Ctrl+A selects everything. Visual chrome is
 //! delegated to the active list row style.
-use std::cell::RefCell;
 use std::rc::Rc;
 
 use crate::modifiers::interaction::CursorExt;

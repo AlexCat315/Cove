@@ -21,8 +21,8 @@ use crate::primitives::overlays::modal::{
 use crate::primitives::text::{Divider, DividerAxis, Text};
 use crate::theme::styles::buttons::{ButtonStyleViewExt, GhostButtonStyle};
 use crate::theme::{ControlSize, ControlSizeViewExt, SemanticColorRef, SemanticFontRef};
-use crate::{AnyView, BoxView, PrimitiveView, TupleView, View};
-use cove_core::scene::{AccessibilityRole, Align, FlexDirection, Justify, Node, Wrap};
+use crate::{AnyView, BoxView, TupleView, View};
+use cove_core::scene::{AccessibilityRole, Align, FlexDirection, Justify, Wrap};
 use cove_core::{Binding, Environment, SizeClass};
 
 /// Presentation knobs layered above `ModalOptions`.

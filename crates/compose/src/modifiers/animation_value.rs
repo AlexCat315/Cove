@@ -50,7 +50,7 @@ impl<Value: Clone + PartialEq + 'static> ViewModifier for AnimationValueModifier
         if changed {
             let animation = self.resolved_animation(node);
             let disables = animation.is_none();
-            ActiveAnimationContext::with(animation, None, Some(disables), || perform());
+            ActiveAnimationContext::with(animation, None, Some(disables), perform);
         } else {
             perform();
         }

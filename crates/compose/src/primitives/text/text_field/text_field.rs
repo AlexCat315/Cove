@@ -9,23 +9,19 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use crate::modifiers::interaction::CursorExt;
-use crate::modifiers::layout::{FlexExt, LayoutFrameExt, PaddingExt};
-use crate::modifiers::style::{AppearanceExt, SemanticStyleViewExt};
+use crate::modifiers::layout::LayoutFrameExt;
+use crate::modifiers::style::AppearanceExt;
 use crate::primitives::text::text_buffer::TextBuffer;
-use crate::primitives::text::text_document_layout::{TextDocumentLayout, TextLineGeometry};
-use crate::theme::styles::components::{
-    AnyTextFieldStyle, TextFieldStyleConfiguration, TextFieldStyleEnvironment,
-};
-use crate::theme::{SemanticColorRef, SemanticFontRef, Theme, ThemeReader, theme_for_node};
+use crate::primitives::text::text_document_layout::TextDocumentLayout;
+use crate::theme::styles::components::AnyTextFieldStyle;
+use crate::theme::{SemanticFontRef, Theme, theme_for_node};
 use crate::{AnyView, PrimitiveView, View, impl_primitive_view};
 use cove_core::scene::{
-    AccessibilityActions, AccessibilityRole, AccessibilitySemantics, AccessibilityState,
-    EventPhase, EventResult, FocusChainHolder, HoverPhase, InputHandlerRoute,
-    InteractionRegistryHolder, LayoutNode, MeasureMode, Node, NodeResource, Overflow,
-    PointerCaptureHolder, PointerPhase, TextInputAttachmentKey, TextInputClient, TextInputSnapshot,
+    AccessibilityRole, AccessibilitySemantics, AccessibilityState, EventResult, FocusChainHolder,
+    HoverPhase, InputHandlerRoute, InteractionRegistryHolder, LayoutNode, Node, NodeResource,
+    Overflow, PointerCaptureHolder, PointerPhase, TextInputAttachmentKey,
 };
-use cove_core::{Binding, Color, InputCapabilities, Point, Rect, Size, TextAlignment};
+use cove_core::{Binding, Color, Point, Rect};
 use cove_platform::{MouseButton, MouseWheelEvent, SystemCursor};
 use cove_text::{DrawListText, TextEnvironment, TextEnvironmentHolder};
 
@@ -33,8 +29,8 @@ use super::indent_guides::TextIndentGuides;
 use super::text_field_code_editing::indented_newline;
 use super::text_field_layout_engine::{
     FIELD_STATE_KEY, FieldCompositionState, FieldLayoutInputs, FieldScrollState,
-    FieldSelectionState, RenderDraftState, RenderState, document_geometry, make_render_state,
-    selection_range, update_scroll,
+    FieldSelectionState, RenderDraftState, document_geometry, make_render_state, selection_range,
+    update_scroll,
 };
 use super::text_field_observation::{TextFieldCaretState, TextFieldHoverAnchor};
 use super::text_field_options::{
@@ -693,10 +689,9 @@ fn install_interaction(node: &Node, field: &TextField, state: Rc<RefCell<FieldSt
             };
             if let Some(custom) =
                 owner.attachment::<Rc<dyn Fn(&cove_platform::KeyEvent) -> bool>>("__textfield_key")
+                && custom(event)
             {
-                if custom(event) {
-                    return EventResult::Handled;
-                }
+                return EventResult::Handled;
             }
             let mut state = key_state.borrow_mut();
             match event.scancode {

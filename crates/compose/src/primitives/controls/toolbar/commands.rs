@@ -6,7 +6,7 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use crate::modifiers::interaction::AccessibilityExt;
-use crate::modifiers::layout::{FlexExt, LayoutFrameExt, PaddingExt};
+use crate::modifiers::layout::{LayoutFrameExt, PaddingExt};
 use crate::modifiers::style::SemanticStyleViewExt;
 use crate::primitives::controls::button::{Button, ButtonRole};
 use crate::primitives::media::ui_icon_catalog;
@@ -16,7 +16,7 @@ use crate::primitives::overlays::popover::Popover;
 use crate::{AnyView, BoxView, PrimitiveView, TupleView, View};
 use cove_core::scene::{Align, FlexDirection, Justify, Node, Wrap};
 
-use super::{ToolbarAxis, ToolbarItem, ToolbarItemPlacement, ToolbarOverflowLayout};
+use super::{ToolbarAxis, ToolbarItem, ToolbarOverflowLayout};
 
 /// Presentation values for a command row.
 #[derive(Clone, Debug, Default, PartialEq)]

@@ -5,7 +5,7 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use crate::{AnyView, PrimitiveView, View, impl_primitive_view};
+use crate::{AnyView, PrimitiveView, View};
 use cove_core::scene::{
     EventPhase, EventResult, FocusChainHolder, InputHandlerRoute, InteractionRegistryHolder,
     LayoutNode, Node, NodeResource,
@@ -235,7 +235,7 @@ impl<Id: PartialEq + Clone + 'static> PrimitiveView for RovingFocusHost<Id> {
             return;
         };
         let key_request = request.clone();
-        let key_selection = self.selection.clone();
+        let _key_selection = self.selection.clone();
         let key_enabled = self.enabled_items.clone();
         let key_identity = self.identity.clone();
         let key_on_select = self.on_select.clone();

@@ -9,9 +9,8 @@ use std::rc::Rc;
 
 use crate::adaptive::WidthClassReader;
 use crate::animation::geometry::transforms::TransformViewExt;
-use crate::modifiers::layout::FlexExt;
 use crate::primitives::overlays::modal::{Modal, ModalDismissal, ModalPlacement, SheetDragHandle};
-use crate::{AnyView, BoxView, PrimitiveView, TupleView, View};
+use crate::{AnyView, BoxView, TupleView, View};
 use cove_core::scene::{Align, FlexDirection, Justify, Wrap};
 use cove_core::{Binding, SizeClass};
 
@@ -153,7 +152,7 @@ impl View for BottomSheet {
             let height = options.detents.get(index).copied().unwrap_or(320.0);
 
             let mut modal_options = crate::primitives::overlays::modal::ModalOptions::default();
-            modal_options.dismissal = options.dismissal.clone();
+            modal_options.dismissal = options.dismissal;
             modal_options.geometry.corner_radius = 12.0;
             if compact {
                 modal_options.geometry.placement = ModalPlacement::Bottom;

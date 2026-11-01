@@ -332,14 +332,14 @@ fn convert<'a>(events: impl Iterator<Item = Event<'a>>) -> Vec<MarkdownBlock> {
                     }
                 }
                 TagEnd::Item => {
-                    if let Some(Frame::Item(item)) = stack.pop() {
-                        if let Some(Frame::List(list)) = stack.last_mut() {
-                            list.items.push(MarkdownListItem {
-                                is_checked: item.is_checked,
-                                blocks: item.blocks,
-                            });
-                            list.next += 1;
-                        }
+                    if let Some(Frame::Item(item)) = stack.pop()
+                        && let Some(Frame::List(list)) = stack.last_mut()
+                    {
+                        list.items.push(MarkdownListItem {
+                            is_checked: item.is_checked,
+                            blocks: item.blocks,
+                        });
+                        list.next += 1;
                     }
                 }
                 TagEnd::List(_) => {

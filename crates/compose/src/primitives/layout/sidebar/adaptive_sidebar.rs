@@ -11,8 +11,7 @@ use crate::adaptive::ContainerSizeReader;
 use crate::animation::content::AnimatedVisibility;
 use crate::animation::transition::Transition;
 use crate::modifiers::interaction::AccessibilityExt;
-use crate::modifiers::layout::{LayoutFrameExt, PaddingExt};
-use crate::primitives::overlays::modal::uses_sheet;
+use crate::modifiers::layout::PaddingExt;
 use crate::{AnyView, BoxView, PrimitiveView, TupleView, View};
 use cove_core::Binding;
 use cove_core::scene::{AccessibilityRole, Align, FlexDirection, Justify, Node, Wrap};
@@ -21,7 +20,7 @@ use super::adaptive_hosts::{SidebarBackdrop, SidebarLayer, SidebarShellHost, Sid
 use super::adaptive_options::{AdaptiveSidebarOptions, SidebarGeometry, SidebarMode};
 use super::focus_handoff::SidebarFocusHandoff;
 use super::items::SidebarSection;
-use super::presentation::{SidebarPresentation, SidebarToggle};
+use super::presentation::SidebarToggle;
 use super::sidebar::Sidebar;
 
 const EDGE_SWIPE_WIDTH: f32 = 24.0;

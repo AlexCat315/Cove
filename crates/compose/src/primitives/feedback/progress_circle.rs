@@ -6,7 +6,7 @@ use crate::primitives::feedback::{ProgressValue, StatusTone};
 use crate::primitives::media::LoadingAnimationClock;
 use crate::primitives::text::Text;
 use crate::theme::tokens::semantic_modifiers::SemanticStyleViewExt;
-use crate::{AnyView, PrimitiveView, View};
+use crate::{AnyView, PrimitiveView};
 use cove_core::scene::{
     AccessibilityRole, AccessibilitySemantics, AccessibilityState, Align, Justify, LayoutNode,
     Node, NodeResource, Point,

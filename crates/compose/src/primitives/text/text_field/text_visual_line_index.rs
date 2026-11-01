@@ -94,20 +94,19 @@ pub fn join(left: Rc<VisualLineNode>, right: Rc<VisualLineNode>) -> Rc<VisualLin
         VisualLineStorage::Run { rows_per_line: a },
         VisualLineStorage::Run { rows_per_line: b },
     ) = (&left.storage, &right.storage)
+        && a == b
     {
-        if a == b {
-            return Rc::new(VisualLineNode::run(left.lines + right.lines, *a));
-        }
+        return Rc::new(VisualLineNode::run(left.lines + right.lines, *a));
     }
-    if left.height > right.height + 1 {
-        if let VisualLineStorage::Branch { left: a, right: b } = &left.storage {
-            return balanced(a.clone(), join(b.clone(), right));
-        }
+    if left.height > right.height + 1
+        && let VisualLineStorage::Branch { left: a, right: b } = &left.storage
+    {
+        return balanced(a.clone(), join(b.clone(), right));
     }
-    if right.height > left.height + 1 {
-        if let VisualLineStorage::Branch { left: a, right: b } = &right.storage {
-            return balanced(join(left, a.clone()), b.clone());
-        }
+    if right.height > left.height + 1
+        && let VisualLineStorage::Branch { left: a, right: b } = &right.storage
+    {
+        return balanced(join(left, a.clone()), b.clone());
     }
     Rc::new(VisualLineNode::branch(left, right))
 }
@@ -120,36 +119,36 @@ fn branch_parts(node: &VisualLineNode) -> Option<(Rc<VisualLineNode>, Rc<VisualL
 }
 
 fn balanced(left: Rc<VisualLineNode>, right: Rc<VisualLineNode>) -> Rc<VisualLineNode> {
-    if left.height > right.height + 1 {
-        if let Some((a, b)) = branch_parts(&left) {
-            if a.height >= b.height {
-                return Rc::new(VisualLineNode::branch(
-                    a,
-                    Rc::new(VisualLineNode::branch(b, right)),
-                ));
-            }
-            if let Some((c, d)) = branch_parts(&b) {
-                return Rc::new(VisualLineNode::branch(
-                    Rc::new(VisualLineNode::branch(a, c)),
-                    Rc::new(VisualLineNode::branch(d, right)),
-                ));
-            }
+    if left.height > right.height + 1
+        && let Some((a, b)) = branch_parts(&left)
+    {
+        if a.height >= b.height {
+            return Rc::new(VisualLineNode::branch(
+                a,
+                Rc::new(VisualLineNode::branch(b, right)),
+            ));
+        }
+        if let Some((c, d)) = branch_parts(&b) {
+            return Rc::new(VisualLineNode::branch(
+                Rc::new(VisualLineNode::branch(a, c)),
+                Rc::new(VisualLineNode::branch(d, right)),
+            ));
         }
     }
-    if right.height > left.height + 1 {
-        if let Some((a, b)) = branch_parts(&right) {
-            if b.height >= a.height {
-                return Rc::new(VisualLineNode::branch(
-                    Rc::new(VisualLineNode::branch(left, a)),
-                    b,
-                ));
-            }
-            if let Some((c, d)) = branch_parts(&a) {
-                return Rc::new(VisualLineNode::branch(
-                    Rc::new(VisualLineNode::branch(left, c)),
-                    Rc::new(VisualLineNode::branch(d, b)),
-                ));
-            }
+    if right.height > left.height + 1
+        && let Some((a, b)) = branch_parts(&right)
+    {
+        if b.height >= a.height {
+            return Rc::new(VisualLineNode::branch(
+                Rc::new(VisualLineNode::branch(left, a)),
+                b,
+            ));
+        }
+        if let Some((c, d)) = branch_parts(&a) {
+            return Rc::new(VisualLineNode::branch(
+                Rc::new(VisualLineNode::branch(left, c)),
+                Rc::new(VisualLineNode::branch(d, b)),
+            ));
         }
     }
     Rc::new(VisualLineNode::branch(left, right))

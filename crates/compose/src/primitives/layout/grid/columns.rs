@@ -50,10 +50,13 @@ impl GridColumn {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
 pub enum ColumnVisibility {
+    #[default]
     Required,
-    Automatic { priority: i32 },
+    Automatic {
+        priority: i32,
+    },
 }
 impl ColumnVisibility {
     pub fn automatic(priority: i32) -> Self {
@@ -64,11 +67,6 @@ impl ColumnVisibility {
             Self::Required => i32::MAX,
             Self::Automatic { priority } => priority,
         }
-    }
-}
-impl Default for ColumnVisibility {
-    fn default() -> Self {
-        Self::Required
     }
 }
 

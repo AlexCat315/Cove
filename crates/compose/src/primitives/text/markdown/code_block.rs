@@ -69,7 +69,7 @@ impl PrimitiveView for MarkdownCodeBlockBody {
     fn update_node(&self, _node: &Node) {}
 
     fn children(&self, node: &Node) -> Vec<AnyView> {
-        let theme = theme_for_node(node);
+        let _theme = theme_for_node(node);
         let is_copied = self.copied.get();
         let language_label = self.language.clone().unwrap_or_else(|| "Code".to_string());
         let tooltip = if is_copied { "Copied" } else { "Copy code" };

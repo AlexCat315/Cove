@@ -9,7 +9,7 @@
 
 use crate::modifiers::style::AppearanceExt;
 use cove_composition::{
-    AnyView, LayoutDebugAttachmentKey, PrimitiveView, View, ViewExt, impl_primitive_view,
+    AnyView, LayoutDebugAttachmentKey, PrimitiveView, View, impl_primitive_view,
 };
 use cove_core::scene::{Align, Display, Edge, FlexDirection, LayoutNode, Node, PositionType};
 

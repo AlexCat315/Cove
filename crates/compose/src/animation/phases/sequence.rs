@@ -240,10 +240,11 @@ impl<Phase: Clone + Eq + 'static, Trigger: Clone + Eq + 'static> PhaseSession<Ph
         *self.trigger.borrow_mut() = Some(trigger);
         self.repeating.set(repeating);
         self.reduced_motion.set(reduced_motion);
-        if reduced_motion && was_playing {
-            if let Some(controller) = self.controller.borrow().as_ref() {
-                controller.finish_immediately();
-            }
+        if reduced_motion
+            && was_playing
+            && let Some(controller) = self.controller.borrow().as_ref()
+        {
+            controller.finish_immediately();
         }
         self.stop();
 

@@ -11,63 +11,63 @@ pub fn join(left: RopeHandle, right: RopeHandle) -> RopeHandle {
     if right.metrics.utf8_length == 0 {
         return left;
     }
-    if left.metrics.height > right.metrics.height + 1 {
-        if let RopeStorage::Branch(branch) = &left.storage {
-            return Arc::new(balance(
-                branch.left.clone(),
-                join(branch.right.clone(), right),
-            ));
-        }
+    if left.metrics.height > right.metrics.height + 1
+        && let RopeStorage::Branch(branch) = &left.storage
+    {
+        return Arc::new(balance(
+            branch.left.clone(),
+            join(branch.right.clone(), right),
+        ));
     }
-    if right.metrics.height > left.metrics.height + 1 {
-        if let RopeStorage::Branch(branch) = &right.storage {
-            return Arc::new(balance(
-                join(left, branch.left.clone()),
-                branch.right.clone(),
-            ));
-        }
+    if right.metrics.height > left.metrics.height + 1
+        && let RopeStorage::Branch(branch) = &right.storage
+    {
+        return Arc::new(balance(
+            join(left, branch.left.clone()),
+            branch.right.clone(),
+        ));
     }
-    if let (RopeStorage::Leaf(a), RopeStorage::Leaf(b)) = (&left.storage, &right.storage) {
-        if a.bytes.len() + b.bytes.len() <= RopeNode::MAX_LEAF_BYTES {
-            let mut text = a.text.clone();
-            text.push_str(&b.text);
-            return Arc::new(RopeNode::with_leaf(Arc::new(RopeLeaf::new(text))));
-        }
+    if let (RopeStorage::Leaf(a), RopeStorage::Leaf(b)) = (&left.storage, &right.storage)
+        && a.bytes.len() + b.bytes.len() <= RopeNode::MAX_LEAF_BYTES
+    {
+        let mut text = a.text.clone();
+        text.push_str(&b.text);
+        return Arc::new(RopeNode::with_leaf(Arc::new(RopeLeaf::new(text))));
     }
     Arc::new(RopeNode::new(left, right))
 }
 
 fn balance(left: RopeHandle, right: RopeHandle) -> RopeNode {
-    if left.metrics.height > right.metrics.height + 1 {
-        if let RopeStorage::Branch(a) = &left.storage {
-            if a.left.metrics.height >= a.right.metrics.height {
-                return RopeNode::new(
-                    a.left.clone(),
-                    Arc::new(RopeNode::new(a.right.clone(), right)),
-                );
-            }
-            if let RopeStorage::Branch(b) = &a.right.storage {
-                return RopeNode::new(
-                    Arc::new(RopeNode::new(a.left.clone(), b.left.clone())),
-                    Arc::new(RopeNode::new(b.right.clone(), right)),
-                );
-            }
+    if left.metrics.height > right.metrics.height + 1
+        && let RopeStorage::Branch(a) = &left.storage
+    {
+        if a.left.metrics.height >= a.right.metrics.height {
+            return RopeNode::new(
+                a.left.clone(),
+                Arc::new(RopeNode::new(a.right.clone(), right)),
+            );
+        }
+        if let RopeStorage::Branch(b) = &a.right.storage {
+            return RopeNode::new(
+                Arc::new(RopeNode::new(a.left.clone(), b.left.clone())),
+                Arc::new(RopeNode::new(b.right.clone(), right)),
+            );
         }
     }
-    if right.metrics.height > left.metrics.height + 1 {
-        if let RopeStorage::Branch(a) = &right.storage {
-            if a.right.metrics.height >= a.left.metrics.height {
-                return RopeNode::new(
-                    Arc::new(RopeNode::new(left, a.left.clone())),
-                    a.right.clone(),
-                );
-            }
-            if let RopeStorage::Branch(b) = &a.left.storage {
-                return RopeNode::new(
-                    Arc::new(RopeNode::new(left, b.left.clone())),
-                    Arc::new(RopeNode::new(b.right.clone(), a.right.clone())),
-                );
-            }
+    if right.metrics.height > left.metrics.height + 1
+        && let RopeStorage::Branch(a) = &right.storage
+    {
+        if a.right.metrics.height >= a.left.metrics.height {
+            return RopeNode::new(
+                Arc::new(RopeNode::new(left, a.left.clone())),
+                a.right.clone(),
+            );
+        }
+        if let RopeStorage::Branch(b) = &a.left.storage {
+            return RopeNode::new(
+                Arc::new(RopeNode::new(left, b.left.clone())),
+                Arc::new(RopeNode::new(b.right.clone(), a.right.clone())),
+            );
         }
     }
     RopeNode::new(left, right)

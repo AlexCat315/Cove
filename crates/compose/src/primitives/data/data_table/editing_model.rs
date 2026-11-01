@@ -70,11 +70,10 @@ impl DataTableEditingState {
         {
             return false;
         }
-        if self.draft.is_some() {
-            match self.commit(previous_still_valid) {
-                CommitOutcome::Rejected(_) => return false,
-                _ => {}
-            }
+        if self.draft.is_some()
+            && let CommitOutcome::Rejected(_) = self.commit(previous_still_valid)
+        {
+            return false;
         }
         let initial = initial.into();
         self.draft = Some(DataTableCellDraft {

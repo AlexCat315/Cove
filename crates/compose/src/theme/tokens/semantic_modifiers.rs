@@ -1,6 +1,6 @@
 //! Translation of Theme/Tokens/SemanticModifiers.swift.
 use super::{SemanticColorRef, SemanticFontRef, ThemeMetric};
-use crate::theme::{Theme, ThemeReader};
+use crate::theme::ThemeReader;
 use crate::{AnyView, ModifiedContent, View, ViewExt, ViewModifier};
 use cove_core::scene::Node;
 

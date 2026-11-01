@@ -24,7 +24,7 @@ impl SingleLineText {
         let mut lower = 0usize;
         let mut upper = characters.len();
         while lower < upper {
-            let count = (lower + upper + 1) / 2;
+            let count = (lower + upper).div_ceil(2);
             let mut candidate: String = characters[..count].iter().collect();
             candidate.push('\u{2026}');
             if measure(&candidate) <= width {

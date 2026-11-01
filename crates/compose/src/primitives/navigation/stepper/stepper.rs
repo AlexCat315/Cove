@@ -23,9 +23,7 @@ use crate::theme::{
     theme_for_node,
 };
 use crate::{AnyView, BoxView, PrimitiveView, TupleView, View, ViewExt, impl_primitive_view};
-use cove_core::scene::{
-    AccessibilityRole, Align, FlexDirection, Justify, LayoutNode, Node, NodeResource, Wrap,
-};
+use cove_core::scene::{AccessibilityRole, Align, FlexDirection, Justify, LayoutNode, Node, Wrap};
 use cove_core::{Binding, Color};
 use cove_platform::KeyEvent;
 

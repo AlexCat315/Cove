@@ -148,11 +148,10 @@ impl PrimitiveView for NumericScrubHandle {
         let node = Node::new();
         let session: Rc<dyn NodeResource> = NumericScrubSession::new();
         node.add_resource(session.clone());
-        if let Some(session) = session
+        if let Ok(session) = session
             .clone()
             .as_any_rc()
             .downcast::<NumericScrubSession>()
-            .ok()
         {
             node.set_attachment(SCRUB_SESSION, session);
         }

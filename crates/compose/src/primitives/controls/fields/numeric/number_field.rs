@@ -189,7 +189,7 @@ impl View for NumberField {
         let draft = self.draft.clone();
         let is_editing = self.is_editing.clone();
         let draft_changed = self.draft_changed.clone();
-        let value = self.value.clone();
+        let _value = self.value.clone();
         let field = self.snapshot();
 
         let committed_for_get = committed_buffer.clone();

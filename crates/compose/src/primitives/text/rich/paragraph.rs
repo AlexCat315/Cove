@@ -5,33 +5,27 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use crate::modifiers::interaction::CursorExt;
 use crate::theme::theme_for_node;
-use crate::{AnyView, PrimitiveView, View, impl_primitive_view};
+use crate::{AnyView, PrimitiveView, impl_primitive_view};
 use cove_core::scene::{
     AccessibilityRole, AccessibilitySemantics, EventResult, InputHandlerRoute,
     InteractionRegistryHolder, LayoutNode, Node, PointerPhase, Rect,
 };
 use cove_core::{Color, Point};
 use cove_platform::{MouseButton, SystemCursor};
-use cove_text::{DrawListText, TextEnvironment, TextEnvironmentHolder};
+use cove_text::{DrawListText, TextEnvironmentHolder};
 
 use super::flow::{RichParagraph, RichTextFlow};
 use super::link_anchor::{FOCUSED_LINK, RichTextLinkAnchor};
 
 /// How a paragraph participates in its document.
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Default)]
 pub enum RichTextRole {
+    #[default]
     Paragraph,
     Heading(usize),
     /// Monospaced, unwrapped lines inside a horizontally scrolling block.
     CodeBlock,
-}
-
-impl Default for RichTextRole {
-    fn default() -> Self {
-        Self::Paragraph
-    }
 }
 
 /// Resolved colors for one paragraph.

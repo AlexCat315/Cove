@@ -149,8 +149,7 @@ impl<Value> SelectOption<Value> {
 use std::cell::Cell;
 use std::rc::Rc;
 
-use crate::modifiers::interaction::AccessibilityExt;
-use crate::modifiers::layout::{FlexExt, LayoutFrameExt, PaddingExt};
+use crate::modifiers::layout::{LayoutFrameExt, PaddingExt};
 use crate::modifiers::style::{AppearanceExt, SemanticStyleViewExt};
 use crate::primitives::controls::button::{
     ActionControlAccessibility, ButtonIcon, ButtonIconSource,

@@ -5,8 +5,6 @@
 //! keyboard while each segment keeps its authored width.
 use std::rc::Rc;
 
-use crate::modifiers::layout::PaddingExt;
-use crate::modifiers::style::AppearanceExt;
 use crate::primitives::controls::button::{Button, ButtonRole};
 use crate::primitives::overlays::roving_focus::{RovingFocusHost, RovingItem, roving_identity};
 use crate::theme::styles::buttons::{ButtonStyleViewExt, SegmentButtonStyle};

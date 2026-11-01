@@ -2,7 +2,6 @@
 //!
 //! One line of persistent context at the bottom of a window. Enforces a single
 //! height for every cell and leading/trailing slots that never fight for space.
-use std::rc::Rc;
 
 use crate::{Layout, LayoutContainer, LayoutSubview, ProposedViewSize};
 use cove_composition::{AnyView, View};
@@ -14,8 +13,7 @@ use crate::modifiers::style::{AppearanceExt, SemanticStyleViewExt};
 use crate::primitives::feedback::StatusTone;
 use crate::primitives::media::Icon;
 use crate::primitives::text::{Divider, DividerAxis, Text};
-use crate::theme::styles::buttons::ButtonStyleViewExt;
-use crate::theme::{SemanticColorRef, SemanticFontRef, Theme, ThemeReader, theme_for_node};
+use crate::theme::{SemanticColorRef, SemanticFontRef, Theme, ThemeReader};
 use crate::{BoxView, Row, TupleView};
 
 /// Shared height so swapping cells never changes the window's content height.
@@ -176,7 +174,7 @@ impl View for StatusBarText {
         let icon = self.icon.clone();
         let tone = self.tone;
         let is_monospaced = self.is_monospaced;
-        let content = ThemeReader::new(move |theme: &Theme| {
+        let content = ThemeReader::new(move |_theme: &Theme| {
             let ink = tone
                 .map(|tone| tone.color())
                 .unwrap_or_else(SemanticColorRef::on_surface_variant);
@@ -207,7 +205,8 @@ impl View for StatusBarText {
                     .flex_with(0.0, 1.0, None);
                 items.push(AnyView::new(detail_view));
             }
-            let row = Row::new(
+
+            Row::new(
                 crate::VerticalAlignment::Center,
                 4.0,
                 AnyView::new(TupleView::new(items)),
@@ -226,8 +225,7 @@ impl View for StatusBarText {
                     }
                     semantics.value = value;
                 }
-            });
-            row
+            })
         });
         AnyView::new(content)
     }

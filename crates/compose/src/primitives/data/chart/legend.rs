@@ -6,7 +6,7 @@
 use std::collections::HashSet;
 use std::rc::Rc;
 
-use crate::{Layout, LayoutSubview, PrimitiveView, ProposedViewSize, View, impl_primitive_view};
+use crate::{Layout, LayoutSubview, PrimitiveView, ProposedViewSize, impl_primitive_view};
 use cove_core::Binding;
 use cove_core::scene::{
     AccessibilityRole, AccessibilitySemantics, Direction, EventPhase, EventResult, LayoutNode,
@@ -41,7 +41,7 @@ impl PrimitiveView for ChartLegend {
             horizontal_spacing: 4.0,
             vertical_spacing: 2.0,
         };
-        let measure = algorithm.clone();
+        let measure = algorithm;
         let place = algorithm;
         layout.set_custom_layout(
             Rc::new(move |width, height, children| {

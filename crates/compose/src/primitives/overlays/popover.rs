@@ -5,7 +5,6 @@
 //! portal-rendered, so it escapes any clipping or stacking context the trigger
 //! sits in, and it is dismissed by Escape, by losing the pointer, or by the
 //! trigger being pressed again.
-use std::cell::Cell;
 use std::rc::Rc;
 
 use crate::modifiers::layout::{FlexExt, LayoutFrameExt};

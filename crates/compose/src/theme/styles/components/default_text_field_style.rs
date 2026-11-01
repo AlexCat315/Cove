@@ -4,7 +4,7 @@
 //! surface so inspector rows and toolbar fields read as inputs rather than as
 //! generic cards.
 use crate::modifiers::style::AppearanceExt;
-use crate::{AnyView, View, ViewExt};
+use crate::{AnyView, ViewExt};
 use cove_core::Color;
 use cove_core::scene::Node;
 
@@ -16,7 +16,7 @@ pub struct DefaultTextFieldStyle;
 impl TextFieldStyle for DefaultTextFieldStyle {
     fn make_body(&self, configuration: TextFieldStyleConfiguration) -> AnyView {
         let theme = configuration.theme.clone();
-        let inputs = theme.inputs.clone();
+        let inputs = theme.inputs;
         let background = if configuration.is_enabled {
             inputs.background
         } else {

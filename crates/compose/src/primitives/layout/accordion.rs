@@ -16,10 +16,7 @@ use crate::primitives::overlays::roving_focus::{
 use crate::primitives::text::Text;
 use crate::theme::SemanticFontRef;
 use crate::theme::styles::buttons::{ButtonStyle, ButtonStyleConfiguration, ButtonStyleViewExt};
-use crate::{
-    AnyView, BoxView, PrimitiveView, Row, TupleView, VerticalAlignment, View, ViewExt,
-    impl_primitive_view,
-};
+use crate::{AnyView, BoxView, Row, TupleView, VerticalAlignment, View, ViewExt};
 use cove_core::scene::{AccessibilityRole, Align, FlexDirection, Justify, Node, Wrap};
 use cove_core::{Binding, Color};
 use cove_platform::KeyEvent;

@@ -198,10 +198,11 @@ impl<Trigger: Clone + Eq + 'static> TrackSession<Trigger> {
         *self.repeating.borrow_mut() = repeating;
         *self.reduced_motion.borrow_mut() = reduced_motion;
         *self.duration.borrow_mut() = duration;
-        if reduced_motion && was_playing {
-            if let Some(controller) = self.controller.borrow().as_ref() {
-                controller.finish_immediately();
-            }
+        if reduced_motion
+            && was_playing
+            && let Some(controller) = self.controller.borrow().as_ref()
+        {
+            controller.finish_immediately();
         }
         self.stop();
 

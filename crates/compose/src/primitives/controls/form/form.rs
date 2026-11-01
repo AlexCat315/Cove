@@ -11,9 +11,7 @@ use crate::primitives::layout::grid::{Grid, GridColumn};
 use crate::primitives::text::Text;
 use crate::theme::{SemanticColorRef, SemanticFontRef, TextScalerReader};
 use crate::{AnyView, BoxView, TupleView, View, ViewExt};
-use cove_core::scene::{
-    AccessibilitySemantics, AccessibilityState, Align, FlexDirection, Justify, Wrap,
-};
+use cove_core::scene::{AccessibilityState, Align, FlexDirection, Justify, Wrap};
 use std::rc::Rc;
 
 #[derive(Clone, Debug)]

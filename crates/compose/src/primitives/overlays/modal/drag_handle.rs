@@ -8,7 +8,7 @@ use std::rc::Rc;
 use crate::modifiers::layout::LayoutFrameExt;
 use crate::modifiers::style::{AppearanceExt, SemanticStyleViewExt};
 use crate::theme::SemanticColorRef;
-use crate::{AnyView, BoxView, PrimitiveView, View, ViewExt, impl_primitive_view};
+use crate::{AnyView, BoxView, PrimitiveView, impl_primitive_view};
 use cove_core::scene::{
     AccessibilityRole, AccessibilitySemantics, Align, EventResult, FlexDirection, InputHandlerRole,
     InputHandlerRoute, InputRoutingPriority, InteractionRegistryHolder, Justify, LayoutNode, Node,

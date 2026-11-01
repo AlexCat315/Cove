@@ -1,8 +1,8 @@
 //! Translation of Primitives/Media/Skeleton.swift.
+use crate::PrimitiveView;
 use crate::impl_primitive_view;
 use crate::primitives::media::LoadingAnimationClock;
 use crate::theme::SemanticColorRef;
-use crate::{PrimitiveView, View};
 use cove_core::scene::{
     AccessibilityRole, AccessibilitySemantics, LayoutNode, MeasureMode, Node, NodeResource, Rect,
 };

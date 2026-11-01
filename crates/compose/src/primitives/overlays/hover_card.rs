@@ -7,16 +7,16 @@ use std::cell::{Cell, RefCell};
 use std::rc::{Rc, Weak};
 
 use cove_composition::{AnyView, PrimitiveView, View};
+use cove_core::Point;
 use cove_core::scene::{
     Align, AnimatorScheduler, EventResult, FlexDirection, HoverPhase, InputHandlerRoute,
     InteractionRegistryHolder, LayoutNode, Node, NodeResource, Wrap,
 };
-use cove_core::{Point, Size};
 
 use crate::BoxView;
-use crate::modifiers::interaction::{AccessibilityExt, HoverExt};
-use crate::modifiers::layout::{FlexExt, PaddingExt};
-use crate::modifiers::style::{AppearanceExt, SurfaceStyleExt};
+use crate::modifiers::interaction::HoverExt;
+use crate::modifiers::layout::PaddingExt;
+use crate::modifiers::style::SurfaceStyleExt;
 use crate::primitives::controls::button::{Button, ButtonRole};
 use crate::primitives::overlays::modal::BottomSheet;
 use crate::primitives::overlays::portal::{PortalPlacementMode, PortalResource, PortalStoreHolder};
@@ -192,11 +192,14 @@ impl PrimitiveView for HoverCardHost {
                     {
                         return EventResult::Ignored;
                     }
-                    key_session
+                    if key_session
                         .upgrade()
                         .is_some_and(|session| session.dismiss())
-                        .then(|| EventResult::Handled)
-                        .unwrap_or(EventResult::Ignored)
+                    {
+                        EventResult::Handled
+                    } else {
+                        EventResult::Ignored
+                    }
                 }),
             );
         }
@@ -442,7 +445,7 @@ impl NodeResource for HoverCardSession {
         *self.node.borrow_mut() = Some(node.clone());
     }
 
-    fn unmount(&self, node: &Node) {
+    fn unmount(&self, _node: &Node) {
         self.hide();
         *self.node.borrow_mut() = None;
         *self.content.borrow_mut() = None;

@@ -8,7 +8,6 @@ pub mod overflow_layout;
 
 use std::rc::Rc;
 
-use crate::modifiers::interaction::AccessibilityExt;
 use crate::modifiers::layout::{FlexExt, LayoutFrameExt, PaddingExt};
 use crate::modifiers::style::AppearanceExt;
 use crate::primitives::controls::button::ButtonIconSource;

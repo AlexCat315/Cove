@@ -55,8 +55,9 @@ impl TextFieldLayout {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Default)]
 pub enum TextFieldSize {
+    #[default]
     Automatic,
     Mini,
     Small,
@@ -105,12 +106,6 @@ pub struct TextFieldDecoration {
     pub placeholder_color: Option<Color>,
     pub cursor_color: Option<Color>,
     pub selection_color: Option<Color>,
-}
-
-impl Default for TextFieldSize {
-    fn default() -> Self {
-        Self::Automatic
-    }
 }
 
 impl TextFieldDecoration {
@@ -185,6 +180,7 @@ impl TextFieldCodeEditing {
 }
 
 /// Node-owned mutable payload for the code-editing settings.
+#[derive(Default)]
 pub struct TextFieldCodeStorage {
     pub value: TextFieldCodeEditing,
 }
@@ -192,13 +188,5 @@ pub struct TextFieldCodeStorage {
 impl TextFieldCodeStorage {
     pub fn new(value: TextFieldCodeEditing) -> Self {
         Self { value }
-    }
-}
-
-impl Default for TextFieldCodeStorage {
-    fn default() -> Self {
-        Self {
-            value: TextFieldCodeEditing::default(),
-        }
     }
 }

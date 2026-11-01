@@ -1,6 +1,6 @@
 //! Translation of Primitives/Feedback/Spinner.swift.
 use crate::primitives::media::LoadingAnimationClock;
-use crate::{PrimitiveView, View, impl_primitive_view};
+use crate::{PrimitiveView, impl_primitive_view};
 use cove_core::scene::{LayoutNode, Node, NodeResource, Point};
 use std::f32::consts::{PI, TAU};
 use std::rc::Rc;

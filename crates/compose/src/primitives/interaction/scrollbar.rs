@@ -3,16 +3,15 @@
 //! Focusable scroll thumb for a caller-owned offset. It is a companion to a
 //! scroll view: bind the same offset and place it beside the viewport. The
 //! component paints only the track and thumb; the caller owns layout.
-use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 
-use crate::{PrimitiveView, View, impl_primitive_view};
+use crate::{PrimitiveView, impl_primitive_view};
 use cove_core::scene::{
     AccessibilityActions, AccessibilityRole, AccessibilitySemantics, EventPhase, EventResult,
     FocusChainHolder, HoverPhase, InputHandlerRoute, InteractionRegistryHolder, LayoutNode, Node,
     PointerCaptureHolder, PointerPhase,
 };
-use cove_core::{Binding, Color, Point, Rect};
+use cove_core::{Binding, Point, Rect};
 use cove_platform::MouseButton;
 
 const CHROME_OPACITY: &str = "__scrollbar_chrome_opacity";

@@ -7,7 +7,7 @@ use std::rc::Rc;
 
 use crate::foundation::{CalendarUnit, Date};
 use crate::modifiers::layout::{FlexExt, LayoutFrameExt};
-use crate::modifiers::style::{AppearanceExt, SemanticStyleViewExt};
+use crate::modifiers::style::SemanticStyleViewExt;
 use crate::primitives::controls::button::{Button, ButtonIcon, ButtonIconSource, ButtonRole};
 use crate::primitives::controls::calendar::{CalendarGranularity, CalendarOptions, CalendarView};
 use crate::primitives::overlays::anchored::{PopoverOverflow, PopoverSurface};
@@ -51,19 +51,10 @@ impl DatePickerPresentation {
 }
 
 /// Authored picker options.
-#[derive(Clone)]
+#[derive(Clone, Default)]
 pub struct DatePickerOptions {
     pub calendar: CalendarOptions,
     pub presentation: DatePickerPresentation,
-}
-
-impl Default for DatePickerOptions {
-    fn default() -> Self {
-        Self {
-            calendar: CalendarOptions::default(),
-            presentation: DatePickerPresentation::default(),
-        }
-    }
 }
 
 impl DatePickerOptions {

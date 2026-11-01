@@ -314,17 +314,17 @@ impl ChartFrame {
         if texts.is_empty() {
             return Vec::new();
         }
-        if x_domain.is_numeric() {
-            if let Some(scale) = x_scale {
-                return texts
-                    .iter()
-                    .zip(&scale.ticks)
-                    .map(|(label, value)| ChartTick {
-                        position: orientation.across(scale, *value, plot),
-                        label: label.clone(),
-                    })
-                    .collect();
-            }
+        if x_domain.is_numeric()
+            && let Some(scale) = x_scale
+        {
+            return texts
+                .iter()
+                .zip(&scale.ticks)
+                .map(|(label, value)| ChartTick {
+                    position: orientation.across(scale, *value, plot),
+                    label: label.clone(),
+                })
+                .collect();
         }
         let span = window
             .map(|window| window.range.span())

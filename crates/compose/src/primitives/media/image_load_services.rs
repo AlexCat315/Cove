@@ -112,7 +112,7 @@ impl ImageLoadServices {
             cached: Rc::new(|key| {
                 ImageAssetRegistryHolder::current().and_then(|registry| registry.cached(key))
             }),
-            decode: Rc::new(|request, progress| decode_request(request, progress)),
+            decode: Rc::new(decode_request),
             register: Rc::new(|key, decoded| {
                 let registry = ImageAssetRegistryHolder::current()
                     .ok_or_else(|| AsyncImageError::HostUnavailable.to_string())?;

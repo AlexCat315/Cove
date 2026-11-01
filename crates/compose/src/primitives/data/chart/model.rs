@@ -528,8 +528,9 @@ impl Selection {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
 pub enum ChartLegendPlacement {
+    #[default]
     Hidden,
     Bottom,
 }
@@ -541,11 +542,6 @@ pub struct Legend {
 }
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct ChartLegendPlacementState(pub ChartLegendPlacement);
-impl Default for ChartLegendPlacement {
-    fn default() -> Self {
-        Self::Hidden
-    }
-}
 impl ChartLegendPlacementState {
     pub fn hidden() -> Self {
         Self(ChartLegendPlacement::Hidden)

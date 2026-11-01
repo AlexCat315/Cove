@@ -176,10 +176,10 @@ impl TextBuffer {
         if Arc::ptr_eq(&self.root, &previous.root) {
             return None;
         }
-        if let Some(last_edit) = &self.last_edit {
-            if Arc::ptr_eq(&last_edit.previous_root, &previous.root) {
-                return Some(last_edit.delta.clone());
-            }
+        if let Some(last_edit) = &self.last_edit
+            && Arc::ptr_eq(&last_edit.previous_root, &previous.root)
+        {
+            return Some(last_edit.delta.clone());
         }
         let limit = previous.utf8_length().min(self.utf8_length());
         let common_start = rope_difference::common_bytes(&previous.root, &self.root, false, limit);

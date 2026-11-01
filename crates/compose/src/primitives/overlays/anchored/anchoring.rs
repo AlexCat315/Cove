@@ -215,7 +215,7 @@ impl AnchoredOverlayHost {
 }
 
 fn place(
-    node: &Node,
+    _node: &Node,
     resource: &PortalResource,
     anchor: &PopoverAnchor,
     placement: PopoverPlacement,

@@ -56,10 +56,9 @@ impl<Id: std::hash::Hash + Eq + Clone + PartialEq + 'static> MobileTabBar<Id> {
         let mut result: Vec<TabItem<Id>> = self.tabs.iter().take(MAX_VISIBLE).cloned().collect();
         if let Some(selected) = self.tabs.iter().find(|tab| tab.id == self.selection.get())
             && !result.iter().any(|tab| tab.id == selected.id)
+            && let Some(slot) = result.get_mut(MAX_VISIBLE - 1)
         {
-            if let Some(slot) = result.get_mut(MAX_VISIBLE - 1) {
-                *slot = selected.clone();
-            }
+            *slot = selected.clone();
         }
         result
     }
@@ -290,12 +289,12 @@ impl ButtonStyle for MobileTabStyle {
         } else {
             AnyView::new(body)
         };
-        let body = if is_focused {
+
+        if is_focused {
             AnyView::new(body.border_color(theme.colors.focus_ring, 2.0))
         } else {
             body
-        };
-        body
+        }
     }
 
     fn style_identity(&self) -> u64 {

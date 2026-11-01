@@ -6,9 +6,7 @@
 use std::rc::Rc;
 
 use crate::LayoutContainer;
-use crate::modifiers::style::{AppearanceExt, SemanticStyleViewExt};
-use crate::primitives::text::Text;
-use crate::theme::{SemanticColorRef, SemanticFontRef, theme_for_node};
+use crate::theme::theme_for_node;
 use crate::{AnyView, Layout, LayoutSubview, ProposedViewSize, View};
 use cove_core::scene::{InvalidationSource, Node};
 use cove_core::{Point, Rect, Size, TextAlignment};

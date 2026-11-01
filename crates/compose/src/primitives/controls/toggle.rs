@@ -4,9 +4,7 @@
 //! that additionally reports a mixed state for partially selected collections.
 use std::rc::Rc;
 
-use crate::foundation::ColorAdjustExt;
-use crate::modifiers::interaction::{AccessibilityExt, CursorExt};
-use crate::modifiers::layout::{FlexExt, LayoutFrameExt};
+use crate::modifiers::layout::LayoutFrameExt;
 use crate::modifiers::style::{AppearanceExt, SemanticStyleViewExt};
 use crate::primitives::controls::adaptive::apply_touch_control_extent;
 use crate::primitives::text::Text;

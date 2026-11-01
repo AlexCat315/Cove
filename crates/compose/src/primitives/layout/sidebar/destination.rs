@@ -3,15 +3,13 @@
 //! One navigation row: the hit/selection surface spans the whole row, while an
 //! optional accessory and an actions menu sit outside the button at the trailing
 //! edge so they never shrink a short destination's hover band.
-use std::cell::Cell;
 use std::rc::Rc;
 
 use crate::modifiers::interaction::AccessibilityExt;
 use crate::modifiers::layout::{FlexExt, LayoutFrameExt, PaddingExt};
-use crate::modifiers::style::{AppearanceExt, SemanticStyleViewExt};
+use crate::modifiers::style::SemanticStyleViewExt;
 use crate::primitives::controls::button::{Button, ButtonIcon, ButtonIconSource, ButtonRole};
 use crate::primitives::feedback::Badge;
-use crate::primitives::overlays::menu::MenuEntry;
 use crate::primitives::text::Text;
 use crate::theme::styles::buttons::ButtonStyleViewExt;
 use crate::theme::{SemanticFontRef, theme_for_node};
@@ -305,14 +303,12 @@ impl<Id: PartialEq + Eq + std::hash::Hash + Clone + Send + Sync + 'static> Primi
         ))];
         // The accessory and actions menu sit outside the button so they never
         // shrink the destination's hover band.
-        if !is_rail {
-            if let Some(accessory) = self.entry.item.slots.accessory.clone() {
-                column.push(AnyView::new(SidebarTrailingLane {
-                    content: accessory,
-                    width: self.entry.item.slots.accessory_width,
-                    trailing: self.actions_width(),
-                }));
-            }
+        if !is_rail && let Some(accessory) = self.entry.item.slots.accessory.clone() {
+            column.push(AnyView::new(SidebarTrailingLane {
+                content: accessory,
+                width: self.entry.item.slots.accessory_width,
+                trailing: self.actions_width(),
+            }));
         }
         vec![AnyView::new(
             BoxView::new(

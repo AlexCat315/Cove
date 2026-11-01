@@ -4,7 +4,7 @@ use crate::modifiers::style::{
     text_style_font, text_style_letter_spacing, text_style_line_height,
 };
 use crate::theme::{TextScaler, TextStyleToken, theme_for_node};
-use crate::{PrimitiveView, View, impl_primitive_view};
+use crate::{PrimitiveView, impl_primitive_view};
 use cove_core::scene::{AccessibilityRole, AccessibilitySemantics, LayoutNode, MeasureMode, Node};
 use cove_core::{
     Color, Font, TextAlignment, TextLayoutCacheEntry, TextLayoutCacheKey, TextLayoutResult,

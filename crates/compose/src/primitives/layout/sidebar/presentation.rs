@@ -2,22 +2,18 @@
 //!
 //! Present the same destination nodes as a full sidebar or a narrow rail.
 use crate::modifiers::interaction::AccessibilityExt;
-use crate::modifiers::layout::FlexExt;
 use crate::primitives::controls::button::{Button, ButtonIconSource};
 use crate::theme::styles::buttons::{ButtonRole, ButtonStyleViewExt, GhostButtonStyle};
-use crate::{AnyView, PrimitiveView, View, ViewExt, impl_primitive_view};
+use crate::{AnyView, PrimitiveView, View};
 
 /// Full sidebar or narrow rail presentation.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Default)]
 pub enum SidebarPresentation {
+    #[default]
     Expanded,
-    Rail { shows_labels: bool },
-}
-
-impl Default for SidebarPresentation {
-    fn default() -> Self {
-        Self::Expanded
-    }
+    Rail {
+        shows_labels: bool,
+    },
 }
 
 impl SidebarPresentation {

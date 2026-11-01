@@ -213,7 +213,7 @@ impl AsyncImageSession {
         node: Option<&Node>,
     ) {
         let unchanged = self.request.borrow().as_ref() == Some(request)
-            && status_eq(&*self.phase.borrow(), &phase);
+            && status_eq(&self.phase.borrow(), &phase);
         if unchanged {
             return;
         }

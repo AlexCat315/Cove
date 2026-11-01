@@ -17,12 +17,11 @@ use std::rc::Rc;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
 
-use cove_composition::{AnyView, View};
+use cove_composition::AnyView;
 use cove_core::Binding;
 use cove_core::scene::{
-    AccessibilityRole, Align, EventPhase, EventResult, FocusChain, FocusChainHolder,
-    InteractionRegistry, InteractionRegistryHolder, Node, PointerCapture, PointerCaptureHolder,
-    PointerPhase,
+    AccessibilityRole, EventPhase, EventResult, FocusChain, FocusChainHolder, InteractionRegistry,
+    InteractionRegistryHolder, Node, PointerCapture, PointerCaptureHolder, PointerPhase,
 };
 use cove_ui_compose::modifiers::layout::LayoutFrameExt;
 use cove_ui_compose::primitives::controls::fields::slider::{Slider, SliderAxis, SliderGeometry};

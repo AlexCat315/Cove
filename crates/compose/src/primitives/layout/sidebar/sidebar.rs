@@ -6,9 +6,9 @@ use std::collections::HashSet;
 use std::rc::Rc;
 
 use crate::modifiers::interaction::AccessibilityExt;
-use crate::modifiers::layout::{FlexExt, LayoutFrameExt, PaddingExt};
+use crate::modifiers::layout::{FlexExt, PaddingExt};
 use crate::modifiers::style::{AppearanceExt, SemanticStyleViewExt};
-use crate::primitives::controls::button::{Button, ButtonIcon, ButtonIconSource, ButtonRole};
+use crate::primitives::controls::button::{Button, ButtonRole};
 use crate::primitives::overlays::roving_focus::{
     RovingFocusHost, RovingItem, SelectionNavigation, roving_identity,
 };
@@ -17,13 +17,11 @@ use crate::theme::SemanticFontRef;
 use crate::theme::styles::buttons::ButtonStyleViewExt;
 use crate::{AnyView, BoxView, PrimitiveView, TupleView, View, impl_primitive_view};
 use cove_core::Binding;
-use cove_core::scene::{
-    AccessibilityRole, Align, FlexDirection, FocusChainHolder, Justify, LayoutNode, Node, Wrap,
-};
+use cove_core::scene::{AccessibilityRole, Align, FlexDirection, Justify, Node, Wrap};
 use cove_platform::KeyEvent;
 
 use super::hierarchy::{SidebarEntry, SidebarHierarchy};
-use super::items::{SidebarItem, SidebarSection};
+use super::items::SidebarSection;
 use super::presentation::SidebarPresentation;
 
 /// Navigation chrome with header and footer slots.

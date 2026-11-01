@@ -5,9 +5,8 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use crate::modifiers::interaction::CursorExt;
 use crate::theme::theme_for_node;
-use crate::{PrimitiveView, View, impl_primitive_view};
+use crate::{PrimitiveView, impl_primitive_view};
 use cove_core::Binding;
 use cove_core::scene::{
     AccessibilityActions, AccessibilityRole, AccessibilitySemantics, Direction, Display,

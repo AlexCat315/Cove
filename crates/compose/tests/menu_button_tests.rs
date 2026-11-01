@@ -21,10 +21,7 @@
 
 mod support;
 
-use std::cell::Cell;
-use std::rc::Rc;
-
-use cove_composition::{AnyView, View};
+use cove_composition::AnyView;
 use cove_core::scene::{AccessibilityRole, AccessibilityTree, Node};
 use cove_ui_compose::primitives::controls::menu_button::MenuButtonTitle;
 use cove_ui_compose::primitives::overlays::menu::{MenuEntry, MenuItem};

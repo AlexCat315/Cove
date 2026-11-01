@@ -124,10 +124,9 @@ impl ChartPlot {
                         return EventResult::Ignored;
                     }
                     let hit = plot.hit(event.x, event.y, &owner);
-                    if hit.is_some() || !session.is_pressed.get() {
-                        if hit != session.current.get() {
-                            choose(hit);
-                        }
+                    if (hit.is_some() || !session.is_pressed.get()) && hit != session.current.get()
+                    {
+                        choose(hit);
                     }
                     if session.is_pressed.get() {
                         EventResult::Handled

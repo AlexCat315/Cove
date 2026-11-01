@@ -13,16 +13,13 @@
 //! - activating an item runs its action and then the sheet's dismissal
 //! - labels, separators and plain submenu entries are not actionable rows
 
-use std::cell::RefCell;
 use std::rc::Rc;
 
 use crate::modifiers::interaction::AccessibilityExt;
 use crate::modifiers::layout::{FlexExt, LayoutFrameExt, PaddingExt};
-use crate::modifiers::style::{AppearanceExt, SemanticStyleViewExt};
+use crate::modifiers::style::SemanticStyleViewExt;
 use crate::primitives::media::ui_icon_catalog;
-use crate::primitives::overlays::menu::{
-    MenuEntry, MenuItemContent, MenuItemRole, MenuRowPresentation, MenuSubmenu,
-};
+use crate::primitives::overlays::menu::{MenuEntry, MenuItemRole, MenuRowPresentation};
 use crate::primitives::overlays::roving_focus::{RovingFocusHost, SelectionNavigation};
 use crate::primitives::text::Text;
 use crate::theme::styles::buttons::{ButtonRole, ButtonStyleViewExt};

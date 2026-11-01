@@ -147,16 +147,15 @@ impl TextDocumentLayout {
         self.index.measure(row, entry.rows.len());
         self.shaped_line_count += 1;
         self.shaped_utf8_count += text.len();
-        if self.lines.len() > Self::RETAINED_LINES {
-            if let Some((oldest, _)) = self
+        if self.lines.len() > Self::RETAINED_LINES
+            && let Some((oldest, _)) = self
                 .access_order
                 .iter()
                 .min_by_key(|(_, access)| **access)
                 .map(|(line, access)| (*line, *access))
-            {
-                self.lines.remove(&oldest);
-                self.access_order.remove(&oldest);
-            }
+        {
+            self.lines.remove(&oldest);
+            self.access_order.remove(&oldest);
         }
         entry
     }
@@ -176,12 +175,12 @@ impl TextDocumentLayout {
         let mut last_space: Option<usize> = None;
         let mut pending = 0usize;
 
-        let mut flush = |piece: &str,
-                         glyphs: &mut Vec<PositionedGlyph>,
-                         x: &mut f32,
-                         byte: &mut usize,
-                         baseline: &mut Option<f32>,
-                         top: &mut f32| {
+        let flush = |piece: &str,
+                     glyphs: &mut Vec<PositionedGlyph>,
+                     x: &mut f32,
+                     byte: &mut usize,
+                     baseline: &mut Option<f32>,
+                     top: &mut f32| {
             let layout = env.cached_layout(
                 piece,
                 Some(&self.geometry.font),
@@ -287,7 +286,7 @@ impl TextDocumentLayout {
         let mut result: Vec<TextLine> = Vec::new();
         let mut line = first;
         let mut width: f32 = 0.0;
-        let end_row = first_row.max(0) + row_count.max(1);
+        let end_row = first_row + row_count.max(1);
         while line < self.buffer.line_count() && self.index.first_row_of_line(line) < end_row {
             if let Some(hidden) = self
                 .hidden_lines
@@ -497,13 +496,11 @@ impl MeasuredTextLine {
             if let Some(position) = positions
                 .iter()
                 .find(|position| position.character == cursor)
-            {
-                if cursor < positions.last().map_or(0, |last| last.character)
+                && (cursor < positions.last().map_or(0, |last| last.character)
                     || row == self.carets.len() - 1
-                    || line_end_affinity
-                {
-                    return (position.x, row);
-                }
+                    || line_end_affinity)
+            {
+                return (position.x, row);
             }
         }
         // A wrapping separator can be omitted by the shaper; attach it to the

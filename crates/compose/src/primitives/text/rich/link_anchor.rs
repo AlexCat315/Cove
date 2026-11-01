@@ -6,7 +6,7 @@
 //! through to the paragraph, which hit-tests every fragment.
 use std::rc::Rc;
 
-use crate::{PrimitiveView, View, impl_primitive_view};
+use crate::{PrimitiveView, impl_primitive_view};
 use cove_core::scene::{
     AccessibilityActions, AccessibilityRole, AccessibilitySemantics, EventPhase, EventResult,
     InputHandlerRoute, InteractionRegistryHolder, LayoutNode, Node, TextInputAttachmentKey,

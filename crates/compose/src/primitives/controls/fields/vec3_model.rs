@@ -154,7 +154,7 @@ impl Vec3Codec {
             _ => trimmed,
         };
         let parts: Vec<f32> = body
-            .split(|character: char| matches!(character, ',' | ';' | ' ' | '\t' | '\n'))
+            .split([',', ';', ' ', '\t', '\n'])
             .filter(|part| !part.is_empty())
             .filter_map(|part| part.parse::<f32>().ok())
             .collect();
@@ -173,8 +173,7 @@ fn first_bracket(text: &str) -> Option<usize> {
 
 fn last_bracket(text: &str) -> Option<usize> {
     text.char_indices()
-        .filter(|(_, character)| matches!(character, ')' | ']' | '}'))
-        .next_back()
+        .rfind(|(_, character)| matches!(character, ')' | ']' | '}'))
         .map(|(index, _)| index)
 }
 

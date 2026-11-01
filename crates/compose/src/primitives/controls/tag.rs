@@ -10,7 +10,7 @@ use crate::theme::{
     ControlSize, ControlSizeEnvironment, ControlSizeViewExt, SemanticColorRef, SemanticFontRef,
     Theme, theme_for_node,
 };
-use crate::{AnyView, BoxView, PrimitiveView, TupleView, View, impl_primitive_view};
+use crate::{AnyView, BoxView, PrimitiveView, TupleView, impl_primitive_view};
 use cove_core::Color;
 use cove_core::scene::{
     AccessibilityRole, AccessibilitySemantics, Align, FlexDirection, Justify, LayoutNode, Node,

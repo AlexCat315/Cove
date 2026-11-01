@@ -4,7 +4,7 @@
 //! trailing follow layout direction; explicit sides are retained by default.
 use cove_core::{Rect, Size};
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Default)]
 pub enum PopoverPlacement {
     TopLeading,
     Top,
@@ -15,6 +15,7 @@ pub enum PopoverPlacement {
     TrailingTop,
     Trailing,
     TrailingBottom,
+    #[default]
     BottomLeading,
     Bottom,
     BottomTrailing,
@@ -57,38 +58,22 @@ impl PopoverPlacement {
     }
 }
 
-impl Default for PopoverPlacement {
-    fn default() -> Self {
-        Self::BottomLeading
-    }
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Default)]
 pub enum PopoverOverflow {
     /// Keep the requested side and scroll content within its available space.
     Constrain,
     /// Allow adaptive menus to use the opposite side when the panel fits there.
+    #[default]
     Flip,
 }
 
-impl Default for PopoverOverflow {
-    fn default() -> Self {
-        Self::Flip
-    }
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Default)]
 pub enum PopoverSurface {
     /// A shared opaque card with a pointer, border and shadow.
     Bubble,
     /// The content already owns its surface, as menus and pickers do.
+    #[default]
     Content,
-}
-
-impl Default for PopoverSurface {
-    fn default() -> Self {
-        Self::Content
-    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]

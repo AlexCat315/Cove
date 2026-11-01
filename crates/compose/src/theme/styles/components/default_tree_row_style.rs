@@ -7,7 +7,7 @@
 use crate::modifiers::layout::{FlexExt, PaddingExt};
 use crate::modifiers::style::{AppearanceExt, SemanticStyleViewExt};
 use crate::theme::SemanticColorRef;
-use crate::{AnyView, Row, Spacer, TupleView, VerticalAlignment, View, ViewExt};
+use crate::{AnyView, Row, Spacer, TupleView, VerticalAlignment, ViewExt};
 use cove_core::Color;
 use cove_core::scene::Node;
 

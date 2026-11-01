@@ -4,9 +4,9 @@
 //! a "3 / 12" count beyond, where dots stop being countable.
 use std::rc::Rc;
 
-use cove_composition::{AnyView, PrimitiveView, View};
+use cove_composition::{AnyView, PrimitiveView};
+use cove_core::Rect;
 use cove_core::scene::{LayoutNode, Node};
-use cove_core::{Color, Rect};
 
 use super::autoplay::CarouselAutoplaySession;
 use crate::impl_primitive_view;

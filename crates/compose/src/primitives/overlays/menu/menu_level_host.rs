@@ -6,7 +6,7 @@ use std::rc::Rc;
 
 use crate::modifiers::layout::{LayoutFrameExt, PaddingExt};
 use crate::modifiers::style::{FloatingSurfaceElevation, SurfaceStyleExt};
-use crate::{AnyView, BoxView, PrimitiveView, View, ViewExt, impl_primitive_view};
+use crate::{AnyView, BoxView, PrimitiveView, ViewExt, impl_primitive_view};
 use cove_core::Point;
 use cove_core::scene::{
     Align, EventResult, FlexDirection, InputHandlerRoute, InteractionRegistryHolder, Justify, Node,

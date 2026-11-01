@@ -3,10 +3,9 @@
 //! Pointer rows use the shared navigation highlight; touch rows use a
 //! full-width band with an inset separator. The host owns the fixed row slot so
 //! oversized content cannot expand the hit region into a neighbouring row.
-use crate::modifiers::interaction::AccessibilityExt;
 use crate::modifiers::layout::{FlexExt, LayoutFrameExt, PaddingExt};
 use crate::modifiers::style::{AppearanceExt, SemanticStyleViewExt};
-use crate::{AnyView, Row, VerticalAlignment, View, ViewExt};
+use crate::{AnyView, Row, VerticalAlignment, ViewExt};
 use cove_core::scene::{Direction, Node};
 use cove_core::{Color, InputCapabilities, Rect};
 
