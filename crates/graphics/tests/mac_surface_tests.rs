@@ -299,7 +299,7 @@ fn windows_keep_independent_images() {
             .as_chunks::<4>()
             .0
             .iter()
-            .all(|pixel| pixel == [0, 0, 255, 255]),
+            .all(|pixel| *pixel == [0, 0, 255, 255]),
         "the first drawable is uniformly red: {:?}",
         &first_pixels[0..4],
     );
@@ -309,7 +309,7 @@ fn windows_keep_independent_images() {
             .as_chunks::<4>()
             .0
             .iter()
-            .all(|pixel| pixel == [0, 255, 0, 255]),
+            .all(|pixel| *pixel == [0, 255, 0, 255]),
         "the second drawable is uniformly green: {:?}",
         &second_pixels[0..4],
     );

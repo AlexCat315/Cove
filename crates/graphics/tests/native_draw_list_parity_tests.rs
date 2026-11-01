@@ -405,7 +405,9 @@ fn scene(context: &Context) -> DrawList {
         })
         .collect();
     let mut output = DrawList::default();
-    output.load(vertices, indices, batches, list.resources.clone());
+    output
+        .load(vertices, indices, batches, list.resources.clone())
+        .expect("the draw list loads");
     output
 }
 

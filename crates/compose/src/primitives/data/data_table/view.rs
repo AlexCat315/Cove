@@ -2124,7 +2124,6 @@ struct HeaderCellHost<
     Id: Ord + std::hash::Hash + Clone + Send + Sync + 'static,
 > {
     controller: DataTableController<Record, Id>,
-    #[expect(dead_code, reason = "ported from Swift but not wired in yet")]
     column_id: String,
     title: String,
     width: f32,

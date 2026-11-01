@@ -1295,7 +1295,7 @@ fn unique_suffix() -> u64 {
 
 #[cfg(test)]
 mod tests {
-    use super::super::model::WorkspacePanel;
+    use super::super::model::{WorkspacePanel, WorkspaceSlot};
     use super::*;
 
     fn controller() -> WorkspaceController {
