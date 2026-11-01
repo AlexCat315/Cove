@@ -30,7 +30,7 @@ pub enum VirtualRows {
 }
 
 /// Vertically scrolling stack that mounts only the rows around the viewport.
-pub struct VirtualStack<Id: Ord + Clone + 'static> {
+pub struct VirtualStack<Id: Ord + std::hash::Hash + Clone + 'static> {
     pub rows: VirtualRows,
     pub spacing: f32,
     pub overscan: usize,
@@ -39,7 +39,7 @@ pub struct VirtualStack<Id: Ord + Clone + 'static> {
     marker: std::marker::PhantomData<fn() -> Id>,
 }
 
-impl<Id: Ord + Clone + 'static> VirtualStack<Id> {
+impl<Id: Ord + std::hash::Hash + Clone + 'static> VirtualStack<Id> {
     fn resolved_spacing(&self) -> f32 {
         if self.spacing.is_finite() {
             self.spacing.max(0.0)
@@ -49,7 +49,7 @@ impl<Id: Ord + Clone + 'static> VirtualStack<Id> {
     }
 }
 
-impl<Id: Ord + Clone + 'static> VirtualStack<Id> {
+impl<Id: Ord + std::hash::Hash + Clone + 'static> VirtualStack<Id> {
     /// Uniform rows.
     pub fn fixed(row_height: f32) -> Self {
         Self {

@@ -1,16 +1,11 @@
 .DS_Store
 ._*
 .build/
-.swiftpm/
 target/
 !.cove/sdk.json
 .cache/
 node_modules/
-vendor/
 **/build/
-**/cmake-build-*/
-**/CMakeUserPresets.json
-CMakeFiles/
 compile_commands.json
 dist/
 .zig-cache/

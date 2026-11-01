@@ -1,6 +1,6 @@
 //! JNI entry points for `com.cove.probe.MainActivity` and `RuntimeLog`.
 //!
-//! Translation of `crates/hosts/Android/Sources/CAndroidHost/{Host,Input}.c`. The
+//! Translation of `Hosts/Android/Sources/CAndroidHost/{Host,Input}.c` (Swift package). The
 //! functions are `#[no_mangle]` Rust so a `cdylib` exports them; C objects in a
 //! static archive would stay hidden behind rustc's export list. Only the JNI
 //! table slots this host calls are bound; the indices are the `JNINativeInterface`

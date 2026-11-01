@@ -139,6 +139,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1c133bc6a41be0d194c306b5506d15e6feeea7b1d6604bd3f8310dfb2ca96486"
 
 [[package]]
+name = "cmake"
+version = "0.1.58"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c0f78a02292a74a88ac736019ab962ece0bc380e3f977bf72e376c5d78ff0678"
+dependencies = [
+ "cc",
+]
+
+[[package]]
 name = "colorchoice"
 version = "1.0.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -307,6 +316,7 @@ version = "0.3.0-dev"
 dependencies = [
  "cc",
  "cove-core",
+ "cove-native-build",
  "thiserror",
 ]
 
@@ -328,6 +338,14 @@ version = "0.1.0"
 dependencies = [
  "cove-examples",
  "cove-ui",
+]
+
+[[package]]
+name = "cove-native-build"
+version = "0.3.0-dev"
+dependencies = [
+ "cc",
+ "cmake",
 ]
 
 [[package]]
@@ -376,6 +394,7 @@ version = "0.3.0-dev"
 dependencies = [
  "cc",
  "cove-logging",
+ "cove-native-build",
  "cove-platform",
  "thiserror",
 ]
@@ -411,6 +430,7 @@ version = "0.3.0-dev"
 dependencies = [
  "cc",
  "cove-core",
+ "cove-native-build",
  "thiserror",
  "unicode-general-category",
  "unicode-segmentation",

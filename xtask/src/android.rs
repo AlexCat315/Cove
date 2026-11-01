@@ -163,7 +163,7 @@ pub fn prepare(project: &Project, mode: Mode) -> Result<PathBuf> {
     )?;
     for font in ["NotoEmoji.ttf", "OFL-Emoji.txt"] {
         process::copy(
-            &project.cove.join("crates/text/Fonts").join(font),
+            &project.cove.join("crates/text/fonts").join(font),
             &assets.join("Fonts").join(font),
         )?;
     }
@@ -174,7 +174,7 @@ pub fn prepare(project: &Project, mode: Mode) -> Result<PathBuf> {
             "runtime",
             project
                 .cove
-                .join("crates/hosts/Android/Runtime")
+                .join("crates/hosts/android/runtime")
                 .display()
                 .to_string(),
         ),

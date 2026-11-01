@@ -8,18 +8,21 @@
 //! delegated to the active list row style.
 use std::rc::Rc;
 
+use crate::adaptive::SurfaceReader;
 use crate::modifiers::layout::{FlexExt, LayoutFrameExt};
 use crate::primitives::controls::adaptive::{apply_touch_control_extent, supports_control_hover};
+use crate::primitives::layout::virtualization::FixedVirtualStack;
+use crate::primitives::overlays::selection_key_host::SelectionKeyHost;
 use crate::theme::styles::components::selection_appearance::{SelectionAppearance, SelectionRole};
 use crate::theme::styles::components::{ListRowStyleConfiguration, ListRowStyleEnvironment};
-use crate::theme::theme_for_node;
-use crate::{AnyView, BoxView, PrimitiveView, View, impl_primitive_view};
-use cove_core::Color;
+use crate::theme::{TextScalerReader, theme_for_node};
+use crate::{AnyView, PrimitiveView, View, impl_primitive_view};
 use cove_core::scene::{
-    AccessibilityActions, AccessibilityRole, AccessibilitySemantics, AccessibilityState, Align,
-    EventPhase, EventResult, FlexDirection, HoverPhase, InputHandlerRoute,
-    InteractionRegistryHolder, Justify, LayoutNode, Node, PointerCaptureHolder, PointerPhase, Wrap,
+    AccessibilityActions, AccessibilityRole, AccessibilitySemantics, AccessibilityState,
+    EventPhase, EventResult, HoverPhase, InputHandlerRoute, InteractionRegistryHolder, LayoutNode,
+    Node, PointerCaptureHolder, PointerPhase,
 };
+use cove_core::{Color, Environment, InputCapabilities};
 use cove_platform::{KeyEvent, MouseButton, SystemCursor};
 
 use super::refresh::RefreshOptions;
@@ -224,8 +227,8 @@ impl PrimitiveView for ListRowHost {
 impl_primitive_view!(ListRowHost);
 
 /// Vertical, virtualized list with single or multiple selection.
-pub struct List<Id: Ord + Clone + Send + Sync + 'static> {
-    pub ids: Vec<Id>,
+pub struct List<Id: Ord + std::hash::Hash + Clone + Send + Sync + 'static> {
+    pub ids: Rc<[Id]>,
     pub selection: CollectionSelection<Id>,
     /// Authored logical height, before text scaling and the touch density floor.
     pub row_height: Option<f32>,
@@ -237,13 +240,13 @@ pub struct List<Id: Ord + Clone + Send + Sync + 'static> {
     cursor: cove_core::State<Option<Id>>,
 }
 
-impl<Id: Ord + Clone + Send + Sync + 'static> List<Id> {
+impl<Id: Ord + std::hash::Hash + Clone + Send + Sync + 'static> List<Id> {
     pub fn new(
         selection: CollectionSelection<Id>,
         row_content: impl Fn(Id, bool) -> AnyView + 'static,
     ) -> Self {
         Self {
-            ids: Vec::new(),
+            ids: Rc::from([]),
             selection,
             row_height: None,
             row_spacing: 0.0,
@@ -256,7 +259,7 @@ impl<Id: Ord + Clone + Send + Sync + 'static> List<Id> {
     }
 
     pub fn rows(mut self, ids: Vec<Id>) -> Self {
-        self.ids = ids;
+        self.ids = ids.into();
         self
     }
 
@@ -295,7 +298,6 @@ impl<Id: Ord + Clone + Send + Sync + 'static> List<Id> {
         Some(self.ids[low..=high].to_vec())
     }
 
-    #[expect(dead_code, reason = "ported from Swift but not wired in yet")]
     fn tap(&self, id: Id, modifiers: cove_platform::KeyModifiers) {
         if modifiers.has_shift()
             && let Some(anchor) = self.anchor.get()
@@ -334,7 +336,7 @@ impl<Id: Ord + Clone + Send + Sync + 'static> List<Id> {
             && (event.modifiers.has_gui() || event.modifiers.has_ctrl())
             && event.scancode == crate::Scancode::A
         {
-            self.selection.replace(self.ids.clone());
+            self.selection.replace(self.ids.iter().cloned());
             self.anchor.set(self.ids.first().cloned());
             self.cursor.set(self.ids.last().cloned());
             return true;
@@ -386,92 +388,82 @@ impl<Id: Ord + Clone + Send + Sync + 'static> List<Id> {
     }
 
     fn rows_view(&self) -> AnyView {
-        let touch = false;
-        let effective_height = self.row_height.unwrap_or(if touch { 56.0 } else { 30.0 });
-        let mut rows: Vec<AnyView> = Vec::new();
-        for id in &self.ids {
-            let selected = self.selection.contains(id);
-            let tap_id = id.clone();
-            let activate_id = id.clone();
-            let selection = self.selection.clone();
-            let anchor = self.anchor.clone();
-            let cursor = self.cursor.clone();
-            let on_activate = self.on_activate.clone();
-            let multiple = self.selection.allows_multiple();
-            let ids = self.ids.clone();
-            let content = (self.row_content)(id.clone(), selected);
-            let activate_selection = selection.clone();
-            let activate_anchor = anchor.clone();
-            let activate_cursor = cursor.clone();
-            rows.push(AnyView::new(ListRowHost {
-                id: 0,
-                is_selected: selected,
-                row_height: effective_height,
-                on_activate: Rc::new(move || {
-                    activate_selection.replace([activate_id.clone()]);
-                    activate_anchor.set(Some(activate_id.clone()));
-                    activate_cursor.set(Some(activate_id.clone()));
-                    if let Some(handler) = on_activate.as_ref() {
-                        handler(activate_id.clone());
-                    }
-                }),
-                on_tap: multiple.then(|| {
-                    let selection = selection.clone();
-                    let anchor = anchor.clone();
-                    let cursor = cursor.clone();
-                    let ids = ids.clone();
-                    Rc::new(move |modifiers: cove_platform::KeyModifiers| {
-                        let index_of = |target: &Id| ids.iter().position(|id| id == target);
-                        if modifiers.has_shift()
-                            && let Some(from) = anchor.get()
-                            && let (Some(start), Some(end)) = (index_of(&from), index_of(&tap_id))
-                        {
-                            let (low, high) = (start.min(end), start.max(end));
-                            selection.replace(ids[low..=high].to_vec());
-                        } else if modifiers.has_gui() || modifiers.has_ctrl() {
-                            selection.toggle(tap_id.clone());
-                            anchor.set(Some(tap_id.clone()));
-                        } else {
-                            selection.replace([tap_id.clone()]);
-                            anchor.set(Some(tap_id.clone()));
-                        }
-                        cursor.set(Some(tap_id.clone()));
-                    }) as Rc<dyn Fn(cove_platform::KeyModifiers)>
-                }),
-                content,
-            }));
-        }
-        let scroll = crate::primitives::layout::ScrollView::vertical(AnyView::new(BoxView::new(
-            FlexDirection::Column,
-            Align::Stretch,
-            Justify::FlexStart,
-            Wrap::NoWrap,
-            self.row_spacing,
-            AnyView::new(crate::TupleView::new(rows)),
-        )));
-        AnyView::new(
-            scroll
-                .flex(1.0)
-                .frame(None, None, Some(0.0), Some(0.0), None, None),
-        )
+        let list = self.snapshot();
+        AnyView::new(SurfaceReader::new(move |surface: &Environment| {
+            let list = list.snapshot();
+            let touch = surface.input.contains(InputCapabilities::TOUCH);
+            let minimum = if touch {
+                surface.minimum_control_extent()
+            } else {
+                0.0
+            };
+            TextScalerReader::new(move |scaler| {
+                let authored = list.row_height.unwrap_or(if touch { 56.0 } else { 30.0 });
+                let height = scaler.scale(authored).max(minimum);
+                let target = list
+                    .cursor
+                    .get()
+                    .or_else(|| list.selection.first())
+                    .and_then(|id| list.index_of(&id));
+                let rows = list.snapshot();
+                let mut stack =
+                    FixedVirtualStack::new(list.ids.to_vec(), height, move |id: &Id| {
+                        let selected = rows.selection.contains(id);
+                        let activate = rows.snapshot();
+                        let activate_id = id.clone();
+                        let on_tap = rows.selection.allows_multiple().then(|| {
+                            let tap = rows.snapshot();
+                            let tap_id = id.clone();
+                            Rc::new(move |modifiers: cove_platform::KeyModifiers| {
+                                tap.tap(tap_id.clone(), modifiers)
+                            })
+                                as Rc<dyn Fn(cove_platform::KeyModifiers)>
+                        });
+                        AnyView::new(ListRowHost {
+                            id: 0,
+                            is_selected: selected,
+                            row_height: height,
+                            on_activate: Rc::new(move || activate.activate(activate_id.clone())),
+                            on_tap,
+                            content: (rows.row_content)(id.clone(), selected),
+                        })
+                    })
+                    .spacing(scaler.scale(list.row_spacing));
+                if let Some(index) = target {
+                    stack = stack.scroll_to_index(index);
+                }
+                AnyView::new(stack)
+                    .flex(1.0)
+                    .frame(None, None, Some(0.0), Some(0.0), None, None)
+            })
+        }))
     }
 }
 
-impl<Id: Ord + Clone + Send + Sync + 'static> View for List<Id> {
+impl<Id: Ord + std::hash::Hash + Clone + Send + Sync + 'static> View for List<Id> {
     fn body(&self) -> AnyView {
         let rows = self.rows_view();
-        let host = AnyView::new(ListKeyHost {
-            list: self.snapshot(),
-            content: rows,
-        });
+        let list = self.snapshot();
+        let host = AnyView::new(SelectionKeyHost::new(rows, true, move |event| {
+            list.handle_key(event)
+        }));
         AnyView::new(
             host.flex(1.0)
                 .frame(None, None, Some(0.0), Some(0.0), None, None),
         )
     }
+
+    /// Swift keeps `anchor` and `cursor` in `@State`; declaring them carries the
+    /// values over when the parent rebuilds the list.
+    fn dynamic_properties(&self) -> Vec<crate::DynamicField> {
+        vec![
+            crate::DynamicField::state("anchor", &self.anchor),
+            crate::DynamicField::state("cursor", &self.cursor),
+        ]
+    }
 }
 
-impl<Id: Ord + Clone + Send + Sync + 'static> List<Id> {
+impl<Id: Ord + std::hash::Hash + Clone + Send + Sync + 'static> List<Id> {
     fn snapshot(&self) -> List<Id> {
         List {
             ids: self.ids.clone(),
@@ -484,56 +476,5 @@ impl<Id: Ord + Clone + Send + Sync + 'static> List<Id> {
             anchor: self.anchor.clone(),
             cursor: self.cursor.clone(),
         }
-    }
-}
-
-/// Owns the keyboard routing for the list.
-struct ListKeyHost<Id: Ord + Clone + Send + Sync + 'static> {
-    list: List<Id>,
-    content: AnyView,
-}
-
-impl<Id: Ord + Clone + Send + Sync + 'static> PrimitiveView for ListKeyHost<Id> {
-    fn make_node(&self) -> Node {
-        let node = Node::new();
-        node.set_is_hit_testable(false);
-        node
-    }
-
-    fn make_layout_node(&self) -> Option<LayoutNode> {
-        None
-    }
-
-    fn update_node(&self, node: &Node) {
-        let Some(registry) = InteractionRegistryHolder::current() else {
-            return;
-        };
-        let list = self.list.snapshot();
-        registry.set_key(
-            node,
-            InputHandlerRoute::control(),
-            Rc::new(move |event, phase| {
-                if phase == EventPhase::Capture {
-                    return EventResult::Ignored;
-                }
-                if list.handle_key(event) {
-                    EventResult::Handled
-                } else {
-                    EventResult::Ignored
-                }
-            }),
-        );
-    }
-
-    fn children(&self, _node: &Node) -> Vec<AnyView> {
-        vec![self.content.clone()]
-    }
-}
-impl<Id: Ord + Clone + Send + Sync + 'static> View for ListKeyHost<Id> {
-    fn kind(&self) -> crate::ViewKind<'_> {
-        crate::ViewKind::Primitive(self)
-    }
-    fn tag(&self) -> &'static str {
-        std::any::type_name::<Self>()
     }
 }

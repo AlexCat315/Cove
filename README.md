@@ -19,7 +19,7 @@ cargo run --package cove-rust-counter --locked
 | `examples/` | Gallery、Counter、移动示例 |
 | `xtask/` | 应用打包、签名、安装与迁移审计 |
 | `Templates/app/` | `cargo-generate` 应用模板 |
-| `third-party/`、`Native/third-party/` | 原生依赖子模块 |
+| `third-party/` | 原生依赖子模块，由 `build.rs` 编译到 `OUT_DIR` |
 
 crate 使用 `src/`、`tests/`、`native/`、`resources/`；`build.rs` 位于 crate 根目录。性能关键的原生内核保留 C。
 

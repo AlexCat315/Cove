@@ -1,6 +1,6 @@
 //! Test fixture for `crates/system/tests/contracts.rs`.
 //!
-//! Mirrors `crates/system/Tests/CoveProcessTests/cove_process_fixture`, which the Swift
+//! Mirrors the Swift `System/Tests/CoveProcessTests/cove_process_fixture`, which the Swift
 //! suite spawns as a real child process so the tests exercise the OS
 //! implementation rather than a mock. Each mode prints exactly what the
 //! corresponding test expects and nothing more.

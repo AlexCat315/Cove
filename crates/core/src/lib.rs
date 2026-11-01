@@ -1,6 +1,6 @@
 //! Geometry, owned draw buffers, observable state and animation primitives.
 //!
-//! The `UI`-prefixed names in `crates/core/Sources/CoveUICore` are spelled without the
+//! The `UI`-prefixed names in `Core/Sources/CoveUICore` (Swift) are spelled without the
 //! prefix here; the rename is deliberate and each pair is a straight port, not a
 //! gap. `UILinearGradient` → [`LinearGradient`], `UIVertex` → [`Vertex`],
 //! `UIRect` → [`Rect`], `UIClip` → [`Clip`], `UIRoundedRect` →

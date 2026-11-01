@@ -12,6 +12,7 @@ thiserror.workspace = true
 
 [build-dependencies]
 cc.workspace = true
+cove-native-build.workspace = true
 
 [lints]
 workspace = true

@@ -112,22 +112,6 @@ impl ViewModifier for FlexModifier {
     }
 }
 
-pub struct FlexGrowModifier(pub f32);
-impl ViewModifier for FlexGrowModifier {
-    fn apply_node(&self, node: &Node) {
-        let Some(layout) = node.layout_node() else {
-            return;
-        };
-        let owner = layout.clone();
-        node.animatable_set_with(
-            "__layout.flex.grow",
-            layout.flex_grow(),
-            self.0,
-            move |value| owner.set_flex_grow(value),
-        );
-    }
-}
-
 pub struct FlexShrinkModifier(pub f32);
 impl ViewModifier for FlexShrinkModifier {
     fn apply_node(&self, node: &Node) {
@@ -426,8 +410,9 @@ pub trait PaddingExt: View + Sized + 'static {
 impl<T: View + Sized + 'static> PaddingExt for T {}
 
 pub trait FlexExt: View + Sized + 'static {
+    /// Swift's `flex(_:shrink:basis:)` with its default `shrink: 1`.
     fn flex(self, grow: f32) -> ModifiedContent {
-        self.modifier(FlexGrowModifier(grow))
+        self.modifier(FlexModifier::new(grow, 1.0, None))
     }
     fn flex_with(self, grow: f32, shrink: f32, basis: Option<f32>) -> ModifiedContent {
         self.modifier(FlexModifier::new(grow, shrink, basis))

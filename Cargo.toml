@@ -14,6 +14,7 @@ members = [
     "crates/composition",
     "crates/composition-macros",
     "crates/terminal",
+    "crates/native-build",
     "crates/hosts",
     "crates/agent",
     "crates/http",
@@ -40,6 +41,8 @@ serde = { version = "1", features = ["derive", "rc"] }
 serde_json = "1"
 thiserror = "2"
 cc = "1"
+cmake = "0.1"
+cove-native-build = { path = "crates/native-build" }
 clap = { version = "4", features = ["derive"] }
 tempfile = "3"
 libc = "0.2"

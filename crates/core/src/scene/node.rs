@@ -13,7 +13,7 @@ use crate::{Color, DrawList, LinearGradient, Point, Rect, Reveal, SurfaceShadow}
 use cove_platform::SystemCursor;
 use std::any::Any;
 use std::cell::RefCell;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashSet};
 use std::hash::{Hash, Hasher};
 use std::rc::{Rc, Weak};
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -387,13 +387,12 @@ impl Node {
             current.len(),
             "reorderChildren: count mismatch"
         );
-        let same_members = current
-            .iter()
-            .all(|node| ordered.iter().any(|candidate| candidate == node))
-            && ordered
-                .iter()
-                .all(|node| current.iter().any(|candidate| candidate == node));
-        assert!(same_members, "reorderChildren: membership mismatch");
+        let current_ids: HashSet<&Node> = current.iter().collect();
+        let next_ids: HashSet<&Node> = ordered.iter().collect();
+        assert!(
+            current_ids == next_ids,
+            "reorderChildren: membership mismatch"
+        );
         if current
             .iter()
             .zip(ordered)

@@ -23,12 +23,8 @@ jobs:
       - uses: actions/checkout@v7.0.1
         with:
           ref: ${{ inputs.tag || github.ref }}
-      - name: Require the completed Rust migration
-        run: python3 Tools/Migration/inventory.py --status --require-complete
-      - name: Check capability and resource ownership
-        run: |
-          python3 Tools/Architecture/check.py
-          python3 Tools/Architecture/test_check.py
+      - name: Audit source layout and migration mappings
+        run: cargo xtask audit --json
       - name: Verify release metadata
         run: node Tools/Release/check-version.mjs "$RELEASE_TAG" --release
   desktop:

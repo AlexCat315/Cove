@@ -16,4 +16,4 @@ cargo test -p cove-system -- --test-threads=1
 
 Windows 原生程序的参数直接按 CRT 规则传递。`.cmd`、`.bat` 需要 `cmd.exe`；为避免参数被解释成命令语法，批处理参数含引号、换行或 shell 元字符时会抛出 `ProcessError.invalidCommand`。需要传入任意参数的工具应绑定原生可执行文件。
 
-测试用真实辅助进程覆盖短消息、交互输入、最终输出、取消以及父进程退出后后代仍持有管道的情形。底层适配仅在 `crates/system/Sources` 中维护。
+测试用真实辅助进程覆盖短消息、交互输入、最终输出、取消以及父进程退出后后代仍持有管道的情形。底层适配仅在 `crates/system/src` 中维护。

@@ -7,7 +7,7 @@
 //! - the label is authored by the caller and defaults to none
 //!
 //! Named differences (production gap, recorded rather than fixed): none of the
-//! three Swift cases can run as written, because nothing in `crates/compose/rust`
+//! three Swift cases can run as written, because nothing in `crates/compose/src`
 //! reaches the refresh model.
 //! - `RefreshOptions::should_trigger` and `RefreshOptions::trigger` have no call
 //!   sites in the crate (only an `Examples` unit test), and `List` stores the

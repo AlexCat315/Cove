@@ -4,6 +4,35 @@
 
 ## Unreleased
 
+- **原生依赖改为 Cargo 构建脚本直接编译（2026-11-01，破坏性）**：
+  - 新增 `cove-native-build`（`crates/native-build`），用 `cmake` crate 把 `third-party/` 子模块编译进各
+    crate 的 `OUT_DIR` 并静态链接，统一处理 macOS/iOS 部署目标、Android NDK、wasi-sdk 与 MSVC 运行时。
+  - `cove-text`（FreeType、HarfBuzz）、`cove-shell`（SDL3）、`cove-imaging`（plutovg、lunasvg、libwebp）
+    不再读取 `vendor/`、`Native/vendor` 的 artifact bundle；lunasvg 使用独立的 plutovg 子模块。
+    `cove-terminal` 始终以 `zig build` 编译 libghostty-vt。
+  - 删除 `COVE_IMAGE_ARTIFACT_ROOT`、`COVE_GHOSTTY_VT_ROOT`、`COVE_GHOSTTY_ARTIFACT_ROOT`，以及 SwiftPM
+    时代的 CMake 暂存工程、artifact bundle 清单与 modulemap 模板（`cmake/`、`Native/`、
+    `third-party/cmake`、各 crate 的 `native/CMakeLists.txt`）。
+  - 子模块统一在 `third-party/`：`sdl3` 由 `Native/third-party/sdl3` 移入，新增 `lunasvg` v3.5.0、
+    `plutovg` v1.3.3、`libwebp` v1.6.0，均为浅克隆。Android runtime 的 SDL Java 源路径随之更新。
+
+- **删除 Swift 源码，修复迁移遗留缺陷（2026-11-01，破坏性）**：
+  - 按 git 路径白名单删除 1,369 个 Swift 文件（`.swift`、`Package.swift`、`Package.resolved` 与 4 个
+    `module.modulemap`）及只解析 Swift 包的 `Tools/Architecture`、`Tools/Migration`；
+    `Docs/rust-migration-files.json` 保留原路径与 SHA-256。`release.yml` 改用 `cargo xtask audit`。
+  - `List` 改回 Swift 的 `FixedVirtualStack` 虚拟化：此前逐行克隆整份 `ids`（20 万行约 160 GB）并挂载
+    全部行。`List::ids` 改为 `Rc<[Id]>`，`List`/`VirtualStack` 的 `Id` 需实现 `Hash`；键盘入口改用
+    `SelectionKeyHost`；`anchor`/`cursor` 声明为状态，父视图重建后不再丢失。
+  - `FixedVirtualStack` 按 Swift 重新移植：写回 viewport、首尾占位、偏移写入共享窗口、按行 id 保持身份、
+    每个栈值新的 generation；`visible_range` 在零高度时仍返回首行。
+  - `.flex(grow)` 与 Swift 一致带 `shrink: 1`（此前只设 grow，滚动容器随内容无限增高）；删除
+    `FlexGrowModifier`。
+  - `Node::reorder_children`、`LayoutNode::reorder_children` 的成员校验由 O(n²) 改为哈希集合。
+  - 修复目录重排误改：`HTTP/1.1` 请求行与 WebSocket 握手、`text/markdown` MIME、CI `http.version`；
+    `examples/gallery`、`examples/counter` 的 git 大小写；xtask Android 字体与 runtime 路径；CI counter
+    清单路径。
+  - 测试 `GlobalTestLock` 改为同线程可重入，修复嵌套加锁导致的死锁；新增 `clippy.toml`。
+
 - **继续测试迁移并整理 Cargo 工作区（2026-11-01，破坏性）**：
   - 核对第三批 65 个测试目标，补入盘点遗漏的设计系统套件；修复 ScrollView、Tooltip 与
     DataTable 测试的 Rust API 对接错误。

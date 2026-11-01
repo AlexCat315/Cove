@@ -10,7 +10,7 @@
 - 库：`crates/<name>/src/`、`tests/`、`native/`、`resources/`，构建脚本为根 `build.rs`。
 - 示例：`examples/gallery/`、`examples/counter/`、`examples/mobile/`。
 - 打包及审计：`xtask/`；执行 `cargo xtask audit --json`。
-- 原生依赖子模块保留在 `third-party/` 与 `Native/third-party/`；其中的第三方 Swift 文件不属于 Cove 源码清理范围。
+- 原生依赖子模块统一在 `third-party/`，由 `cove-native-build` 编译到各 crate 的 `OUT_DIR`；其中的第三方 Swift 文件不属于 Cove 源码清理范围。
 
 ## 验证记录
 

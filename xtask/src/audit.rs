@@ -53,7 +53,6 @@ fn check_sources(directory: &Path) -> Result<()> {
             ".git"
                 | "target"
                 | "third-party"
-                | "vendor"
                 | "node_modules"
                 | "build"
                 | "dist"

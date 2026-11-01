@@ -1,0 +1,16 @@
+[package]
+name = "cove-native-build"
+description = "Build-script helpers that compile Cove's pinned C/C++ dependencies from third-party/."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+
+[dependencies]
+cc.workspace = true
+cmake.workspace = true
+
+[lints]
+workspace = true

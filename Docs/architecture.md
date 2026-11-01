@@ -63,7 +63,7 @@ Core + Composition + Text + Inspection ← Browser
 
 ## 部署标注
 
-`Native/third-party` 与 `Native/vendor` 是原生构建输入、缓存和发布产物，不是框架层。Text 的产物暂沿用根 `vendor`。Android/iOS 的产物根目录仍由 CLI 传入；各能力包统一将路径解释为相对于 SDK 根目录，再解析到自身位置。SDK 打包必须包括所有能力 manifest 和源码。
+原生依赖是 `third-party/` 下固定版本的 git 子模块。`cove-native-build` 在各 crate 的 `build.rs` 中用 CMake 将其编译进 `OUT_DIR` 并静态链接；libghostty-vt 由 `zig build` 编译。不使用预编译产物目录或环境变量覆盖。
 
 部署标签描述完整依赖闭包，而非文件使用的语言。`Compose` 使用 Swift 实现，不意味着使用其完整图片和文本功能时没有原生库依赖。CLI 只选择协议闭包，Browser 原型选择基础组合、检查和 Wasm 字体实现，原生应用选择完整 Runtime。
 

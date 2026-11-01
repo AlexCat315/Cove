@@ -50,7 +50,7 @@ jobs:
             cargo test --workspace --locked --no-fail-fast -- --test-threads=1
           fi
       - name: Headless counter example
-        run: cargo run --locked --manifest-path examples/gallery/counter/Cargo.toml
+        run: cargo run --locked --manifest-path examples/counter/Cargo.toml
       - name: Audit source layout and migration mappings
         run: cargo xtask audit --json
   ios-foundation:

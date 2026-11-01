@@ -10,7 +10,7 @@ use super::{
 use crate::{Point, Rect, Size, TextLayoutCacheEntry, TextMeasureInputs};
 use std::any::Any;
 use std::cell::RefCell;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashSet};
 use std::rc::{Rc, Weak};
 
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
@@ -407,8 +407,12 @@ impl LayoutNode {
             current.len(),
             "LayoutNode.reorderChildren: count mismatch"
         );
+        let current_ids: HashSet<*const RefCell<LayoutNodeData>> =
+            current.iter().map(|node| Rc::as_ptr(&node.0)).collect();
+        let next_ids: HashSet<*const RefCell<LayoutNodeData>> =
+            ordered.iter().map(|node| Rc::as_ptr(&node.0)).collect();
         assert!(
-            current.iter().all(|node| ordered.contains(node)),
+            current_ids == next_ids,
             "LayoutNode.reorderChildren: membership mismatch"
         );
         if current

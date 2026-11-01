@@ -1,8 +1,8 @@
 # `cove-hosts` — platform coverage matrix
 
-Source: `crates/hosts/src/` (69 files, 9,518 lines). Desktop host = `crates/hosts/Desktop/Sources/CoveUI`
-(26 Swift files); Android host = `crates/hosts/Android/Sources/` (15 Swift files).
-Verified with `cargo check -p cove-hosts --all-targets` → 0 errors, 0 warnings.
+Source: `crates/hosts/src/` (67 files, 10,452 lines). The Swift desktop host (`Hosts/Desktop/Sources/CoveUI`,
+26 files) and Android host (`Hosts/Android/Sources/`, 15 files) are deleted; their paths and SHA-256 remain in
+`Docs/rust-migration-files.json`.
 
 ## Coverage matrix
 
@@ -15,15 +15,15 @@ Verified with `cargo check -p cove-hosts --all-targets` → 0 errors, 0 warnings
 | **Android** | Full Android host (15/15 Swift files): activity-retained application, JNI bridge (**all 18 `@_cdecl` entry points preserved** with identical names/signatures; the `Java_com_cove_probe_*` layer is Rust in `android/jni.rs`, application content arrives through `install_application_content`), surface session (swapchain, owned framebuffer, frosted-panel blit, texture teardown), content session (launch-mode selection, layer/direct rendering, input routing), frame timings + rolling GPU pass timings, device-fact surface updates (idiom/safe-area/keyboard/text-scale), system-bar icon style, memory-pressure trim, diagnostics pump. NDK symbols resolved by `dlopen`/`dlsym` (`liblog.so`, `libandroid.so`) — **no new crate dependency**. Logcat forwarding wired. Probe (`CoveAndroidProbe`) ported fully in-crate on `cove-graphics` only | Showcase/counter/gallery **content** is injected via `HostedSceneContent`/`ShowcaseProducts` traits — the host owns the machinery and the platform app supplies the products. Image transport via `cove-http` (HTTP/1.1 + OpenSSL); https needs `libssl.so`/`libcrypto.so` bundled from `COVE_OPENSSL_ANDROID_DIR` by `cargo xtask android-prepare` | "Android showcase and application content is supplied by the platform app through `HostedSceneContent`/`ShowcaseProducts`; `cove-hosts` carries no dependency on the example product crates." |
 | **Wasm** | Nothing. `cove-http` has no backend on Wasm, so `install_platform_services()` leaves the image-transport holder unset | Everything. `cove-hosts` is **not** a dependency of `cove-browser` (the Wasm host); they are independent crates | `TransportCapabilities` = `{http: false, https: false, file: true}`; limitation = **"no HTTP stack on this target"**. `file:` still works because `ImageDataDownload` handles it without a transport. |
 
-### Platform gate counts (actual `#[cfg]` usage)
+### Platform gate counts (`target_os = "…"` occurrences)
 
 | Gate | Occurrences |
 |---|---|
-| `macOS` | 18 |
-| `windows` | 11 |
-| `linux` | 8 |
-| `ios` | 8 |
-| `android` | 5 |
+| `macos` | 16 |
+| `android` | 6 |
+| `windows` | 5 |
+| `linux` | 3 |
+| `ios` | 3 |
 
 ## The three behaviours that could not be ported faithfully
 
