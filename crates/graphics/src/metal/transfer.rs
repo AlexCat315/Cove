@@ -297,9 +297,10 @@ fn shared_staging_buffer(
     minimum_size: usize,
 ) -> RhiResult<Retained<ProtocolObject<dyn MTLBuffer>>> {
     if let Some(existing) = &device.staging_buffer
-        && existing.length() >= minimum_size {
-            return Ok(existing.clone());
-        }
+        && existing.length() >= minimum_size
+    {
+        return Ok(existing.clone());
+    }
     let buffer = device
         .device
         .newBufferWithLength_options(minimum_size.max(1), MTLResourceOptions::StorageModeShared)
@@ -767,9 +768,10 @@ pub fn wait_until_idle(device: &mut MetalDeviceHandle) -> RhiResult<()> {
     }
     let graphics_pointer = Retained::as_ptr(&device.graphics_queue);
     if Retained::as_ptr(&device.compute_queue) != graphics_pointer
-        && let Some(compute) = device.compute_queue.commandBuffer() {
-            commit_and_wait(&compute);
-        }
+        && let Some(compute) = device.compute_queue.commandBuffer()
+    {
+        commit_and_wait(&compute);
+    }
     device.submission_status.check()
 }
 

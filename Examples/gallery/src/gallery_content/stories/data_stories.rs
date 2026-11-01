@@ -212,7 +212,11 @@ pub fn adaptive_table_columns(is_enabled: bool) -> (Vec<TableColumn<usize>>, Tab
         .layout(sized(100.0))
         .visibility(ColumnVisibility::Optional),
         TableColumn::new("category", "Category", move |row: &usize| {
-            AnyView::new(Text::new(if row.is_multiple_of(2) { "Texture" } else { "Material" }))
+            AnyView::new(Text::new(if row.is_multiple_of(2) {
+                "Texture"
+            } else {
+                "Material"
+            }))
         })
         .layout(sized(130.0))
         .visibility(ColumnVisibility::Optional),

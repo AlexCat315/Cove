@@ -1121,9 +1121,10 @@ pub fn upload_texture(
         Ok(())
     });
     if outcome.is_ok()
-        && let Some(record) = lock(registries).textures.get_mut(&texture.id()) {
-            record.layout = final_layout;
-        }
+        && let Some(record) = lock(registries).textures.get_mut(&texture.id())
+    {
+        record.layout = final_layout;
+    }
     // SAFETY: the copy completed (or failed before queueing), so the staging buffer
     // is unreferenced.
     unsafe { (context.core.destroy_buffer)(context.device, native, core::ptr::null()) };
@@ -1269,11 +1270,12 @@ pub fn read_texture(
         Ok(())
     });
     if outcome.is_ok()
-        && let Some(pointer) = allocation.cpu_pointer(0) {
-            // SAFETY: the copy completed and the staging mapping covers the range;
-            // `destination` is a distinct live slice.
-            unsafe { std::ptr::copy_nonoverlapping(pointer, destination.as_mut_ptr(), byte_count) };
-        }
+        && let Some(pointer) = allocation.cpu_pointer(0)
+    {
+        // SAFETY: the copy completed and the staging mapping covers the range;
+        // `destination` is a distinct live slice.
+        unsafe { std::ptr::copy_nonoverlapping(pointer, destination.as_mut_ptr(), byte_count) };
+    }
     // SAFETY: the readback completed (or failed before queueing), so the staging
     // buffer is unreferenced.
     unsafe { (context.core.destroy_buffer)(context.device, native, core::ptr::null()) };

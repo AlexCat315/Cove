@@ -148,9 +148,10 @@ impl PlatformWindowSession {
             _ => (),
         };
         if self.dispatch(&event)
-            && let Some(handler) = callback(&self.callbacks.on_event) {
-                self.with_current(|| handler(&event));
-            }
+            && let Some(handler) = callback(&self.callbacks.on_event)
+        {
+            self.with_current(|| handler(&event));
+        }
         self.request_display();
     }
     fn update_presentation(&self, active: bool) -> bool {
@@ -585,9 +586,10 @@ impl Sdl3PlatformHost {
             && size.0 > 0
             && size.1 > 0;
         if session.update_presentation(active)
-            && let Some(handler) = callback(&self.0.callbacks.on_window_presentation_changed) {
-                handler(id, active);
-            }
+            && let Some(handler) = callback(&self.0.callbacks.on_window_presentation_changed)
+        {
+            handler(id, active);
+        }
     }
     fn prune_closed_sessions(&self) {
         let live = self
@@ -682,9 +684,10 @@ impl Sdl3PlatformHost {
                     session.with_current(|| handler(&routed.event));
                 }
                 if Some(routed.window_id) == self.main_window()
-                    && let Some(handler) = callback(&self.0.callbacks.on_event) {
-                        session.with_current(|| handler(&routed.event));
-                    }
+                    && let Some(handler) = callback(&self.0.callbacks.on_event)
+                {
+                    session.with_current(|| handler(&routed.event));
+                }
             }
             session.request_display();
         }
@@ -838,24 +841,24 @@ impl Sdl3PlatformHost {
                 if let Some(handler) = callback(&session.callbacks.on_resize) {
                     handler(w, h);
                 }
-                if is_main
-                    && let Some(handler) = callback(&self.0.callbacks.on_resize) {
-                        handler(w, h);
-                    }
-            }
-            if !session.did_call_on_init.get() && session.presentation_active.get()
-                && let Some(surface) = handle.render_surface() {
-                    session.did_call_on_init.set(true);
-                    session.request_display();
-                    let (w, h) = session.drawable_size();
-                    if let Some(handler) = callback(&session.callbacks.on_init) {
-                        handler(surface, w, h);
-                    }
-                    if is_main
-                        && let Some(handler) = callback(&self.0.callbacks.on_init) {
-                            handler(surface, w, h);
-                        }
+                if is_main && let Some(handler) = callback(&self.0.callbacks.on_resize) {
+                    handler(w, h);
                 }
+            }
+            if !session.did_call_on_init.get()
+                && session.presentation_active.get()
+                && let Some(surface) = handle.render_surface()
+            {
+                session.did_call_on_init.set(true);
+                session.request_display();
+                let (w, h) = session.drawable_size();
+                if let Some(handler) = callback(&session.callbacks.on_init) {
+                    handler(surface, w, h);
+                }
+                if is_main && let Some(handler) = callback(&self.0.callbacks.on_init) {
+                    handler(surface, w, h);
+                }
+            }
             let dirty = session.tree.borrow().has_render_updates();
             let native = native_windows.contains(&session.id);
             let tick = ticks.contains_key(&session.id);
@@ -867,40 +870,39 @@ impl Sdl3PlatformHost {
                 && start >= session.next_render_attempt.get()
                 && (!cadence || tick || (!native && fallback_due))
                 && (cadence || !native || tick || session.needs_display.get());
-            if should_render
-                && let Some(surface) = handle.render_surface() {
-                    session.needs_display.set(false);
-                    let local = callback(&session.callbacks.on_frame);
-                    let main = if is_main {
-                        callback(&self.0.callbacks.on_frame)
-                    } else {
-                        None
-                    };
-                    let mut rendered = local.is_none() && main.is_none();
-                    if let Some(handler) = local {
-                        rendered = handler(surface) || rendered;
-                    }
-                    if let Some(handler) = main {
-                        rendered = handler(surface) || rendered;
-                    }
-                    if rendered {
-                        session.next_render_attempt.set(0.0);
-                        session.with_current(|| session.tree.borrow_mut().flush());
-                    } else {
-                        session.request_display();
-                        let hz = shell
-                            .borrow()
-                            .display_refresh_rate(Some(session.id))
-                            .filter(|hz| hz.is_finite() && *hz >= 30.0)
-                            .unwrap_or(60.0)
-                            .clamp(1.0, 240.0);
-                        session.next_render_attempt.set(if native {
-                            f64::INFINITY
-                        } else {
-                            self.now() + 1.0 / hz
-                        });
-                    }
+            if should_render && let Some(surface) = handle.render_surface() {
+                session.needs_display.set(false);
+                let local = callback(&session.callbacks.on_frame);
+                let main = if is_main {
+                    callback(&self.0.callbacks.on_frame)
+                } else {
+                    None
+                };
+                let mut rendered = local.is_none() && main.is_none();
+                if let Some(handler) = local {
+                    rendered = handler(surface) || rendered;
                 }
+                if let Some(handler) = main {
+                    rendered = handler(surface) || rendered;
+                }
+                if rendered {
+                    session.next_render_attempt.set(0.0);
+                    session.with_current(|| session.tree.borrow_mut().flush());
+                } else {
+                    session.request_display();
+                    let hz = shell
+                        .borrow()
+                        .display_refresh_rate(Some(session.id))
+                        .filter(|hz| hz.is_finite() && *hz >= 30.0)
+                        .unwrap_or(60.0)
+                        .clamp(1.0, 240.0);
+                    session.next_render_attempt.set(if native {
+                        f64::INFINITY
+                    } else {
+                        self.now() + 1.0 / hz
+                    });
+                }
+            }
             let area = session.focused_text_area();
             if area != session.last_text_input_area.get() {
                 shell.borrow().set_text_input_area(session.id, area);

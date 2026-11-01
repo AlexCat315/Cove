@@ -23,9 +23,7 @@ mod support;
 use std::rc::Rc;
 
 use cove_composition::AnyView;
-use cove_core::scene::{
-    Direction, Edge, LayoutInsets, LayoutNode, Node, NodeTree,
-};
+use cove_core::scene::{Direction, Edge, LayoutInsets, LayoutNode, Node, NodeTree};
 use cove_core::{Color, DrawList, Point, Rect};
 use cove_devtools::inspection::{SceneEditor, SceneInspector};
 use cove_devtools::protocol::{Envelope, JsonValue};

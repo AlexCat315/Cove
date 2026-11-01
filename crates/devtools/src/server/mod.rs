@@ -1004,9 +1004,10 @@ impl DevServer {
             }
             // Bound the backlog a single slow client can accumulate.
             if sequence.saturating_add(MAX_CLIENT_LOG_BACKLOG) < self.latest_log_sequence()
-                && let Some(client) = self.clients.get_mut(&key) {
-                    client.session.log_dropped = client.session.log_dropped.wrapping_add(1);
-                }
+                && let Some(client) = self.clients.get_mut(&key)
+            {
+                client.session.log_dropped = client.session.log_dropped.wrapping_add(1);
+            }
         }
     }
 

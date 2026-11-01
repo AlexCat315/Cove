@@ -5,7 +5,6 @@
 //! The header's state machine (long title toggle, text-vs-icon primary action,
 //! last performed action) is what the gallery drives, so it lives here as a type.
 
-
 use cove_core::scene::{Align, FlexDirection, Justify, Wrap};
 use cove_ui_compose::modifiers::style::SemanticStyleViewExt;
 use cove_ui_compose::primitives::controls::Checkbox;

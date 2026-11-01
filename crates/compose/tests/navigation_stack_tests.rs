@@ -32,8 +32,7 @@ use std::rc::Rc;
 
 use cove_composition::{AnyView, LayoutDebugExt, View};
 use cove_core::scene::{
-    AccessibilityElement, AccessibilityTree, AnimatorScheduler, FocusChain,
-    FocusChainHolder, Node,
+    AccessibilityElement, AccessibilityTree, AnimatorScheduler, FocusChain, FocusChainHolder, Node,
 };
 use cove_core::{Binding, State};
 use cove_ui_compose::modifiers::layout::LayoutFrameExt;

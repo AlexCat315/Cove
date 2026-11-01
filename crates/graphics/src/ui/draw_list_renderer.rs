@@ -381,9 +381,10 @@ impl NativeDrawListRenderer {
                     );
                 }
             } else if let Some(old) = state.reveal
-                && old.extent == viewport {
-                    retained = old.texture;
-                }
+                && old.extent == viewport
+            {
+                retained = old.texture;
+            }
             next_reveal = Some(RetainedReveal {
                 sequence: reveal.sequence,
                 texture: retained,
@@ -740,25 +741,24 @@ fn coalesce(draws: Vec<Batch>) -> Vec<Batch> {
     for draw in draws {
         if let Some(last) = result.last_mut()
             && last.bindings == draw.bindings
-                && !last.relies_on_clip
-                && !draw.relies_on_clip
-                && draw.indices.backdrop.is_none()
-                && last
-                    .indices
-                    .index_offset
-                    .checked_add(last.indices.index_count)
-                    == Some(draw.indices.index_offset)
-            {
-                let x = last.scissor.x.min(draw.scissor.x);
-                let y = last.scissor.y.min(draw.scissor.y);
-                let r =
-                    (last.scissor.x + last.scissor.width).max(draw.scissor.x + draw.scissor.width);
-                let b = (last.scissor.y + last.scissor.height)
-                    .max(draw.scissor.y + draw.scissor.height);
-                last.indices.index_count += draw.indices.index_count;
-                last.scissor = ScissorRect::at(x, y, r - x, b - y);
-                continue;
-            }
+            && !last.relies_on_clip
+            && !draw.relies_on_clip
+            && draw.indices.backdrop.is_none()
+            && last
+                .indices
+                .index_offset
+                .checked_add(last.indices.index_count)
+                == Some(draw.indices.index_offset)
+        {
+            let x = last.scissor.x.min(draw.scissor.x);
+            let y = last.scissor.y.min(draw.scissor.y);
+            let r = (last.scissor.x + last.scissor.width).max(draw.scissor.x + draw.scissor.width);
+            let b =
+                (last.scissor.y + last.scissor.height).max(draw.scissor.y + draw.scissor.height);
+            last.indices.index_count += draw.indices.index_count;
+            last.scissor = ScissorRect::at(x, y, r - x, b - y);
+            continue;
+        }
         result.push(draw);
     }
     result

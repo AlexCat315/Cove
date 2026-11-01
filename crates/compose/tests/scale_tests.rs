@@ -21,9 +21,7 @@
 mod support;
 
 use cove_composition::{AnyView, LayoutDebugExt, View, ViewExt};
-use cove_core::scene::{
-    AnimatorScheduler, HitTester, Node, NodeTransform,
-};
+use cove_core::scene::{AnimatorScheduler, HitTester, Node, NodeTransform};
 use cove_core::{Point, State};
 use cove_ui_compose::animation::content::animated_visibility::AnimatedVisibility;
 use cove_ui_compose::animation::transition::Transition;

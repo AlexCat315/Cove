@@ -18,9 +18,7 @@ mod support;
 use std::collections::BTreeSet;
 
 use cove_composition::AnyView;
-use cove_core::scene::{
-    AccessibilityRole, EventPhase, EventResult, FocusChain, Node,
-};
+use cove_core::scene::{AccessibilityRole, EventPhase, EventResult, FocusChain, Node};
 use cove_core::{Binding, State};
 use cove_platform::{KeyEvent, KeyModifiers, MouseButtonEvent};
 use cove_ui_compose::Scancode;

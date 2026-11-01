@@ -624,8 +624,7 @@ fn create_graphics_pipeline_native(
     let mut render_objects = super::rendering::RenderPassObjects::new(rendering);
     let render_pass = render_objects.pipeline_pass(descriptor)?;
 
-    let raw_stages: Vec<sys::VkPipelineShaderStageCreateInfo> = stages
-        .stages.to_vec();
+    let raw_stages: Vec<sys::VkPipelineShaderStageCreateInfo> = stages.stages.to_vec();
 
     let vertex_input = sys::VkVertexInputStateCreateInfo {
         sType: sys::VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO,

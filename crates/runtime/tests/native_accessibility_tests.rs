@@ -41,8 +41,7 @@ use std::rc::Rc;
 use cove_core::Rect;
 use cove_core::scene::{
     AccessibilityActions, AccessibilityElement, AccessibilityRevision, AccessibilityRole,
-    AccessibilitySemantics, AccessibilityTree, AccessibilityValueProvider,
-    FocusChain, Node,
+    AccessibilitySemantics, AccessibilityTree, AccessibilityValueProvider, FocusChain, Node,
 };
 
 fn node(x: f32, y: f32, width: f32, height: f32) -> Node {

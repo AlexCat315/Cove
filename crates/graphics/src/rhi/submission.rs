@@ -465,9 +465,10 @@ impl<C: UploadRingChunk + Clone> ChunkUploadAllocator<C> {
         let alignment = alignment.max(1);
 
         if let Some(index) = self.current_index
-            && let Some(allocation) = self.attempt(index, size, alignment) {
-                return Ok(allocation);
-            }
+            && let Some(allocation) = self.attempt(index, size, alignment)
+        {
+            return Ok(allocation);
+        }
         for index in 0..self.entries.len() {
             if Some(index) == self.current_index {
                 continue;

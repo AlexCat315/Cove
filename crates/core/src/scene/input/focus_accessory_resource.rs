@@ -40,9 +40,10 @@ impl NodeResource for FocusAccessoryResource {
                 .and_then(|capture| capture.target()),
             self.chain.borrow().clone(),
         ) && chain.contains(&captured, node)
-            && let Some(capture) = self.capture.borrow().as_ref() {
-                capture.release();
-            }
+            && let Some(capture) = self.capture.borrow().as_ref()
+        {
+            capture.release();
+        }
         if let Some(chain) = self.chain.borrow().clone() {
             chain.detach_accessory(node);
         }

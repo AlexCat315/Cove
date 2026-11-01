@@ -307,17 +307,18 @@ impl<'a> PassEncoder<'a> {
                 }
             }
             if let Some(target) = record.descriptor.depth_target
-                && is_memoryless(&registries, target.texture) {
-                    if matches!(target.load_action, DepthLoadAction::Load) {
-                        return Err(RhiError::invalid_argument(
-                            "memoryless depth attachments cannot load prior contents",
-                        ));
-                    }
-                    rhi_require(
-                        !target.store,
-                        "memoryless depth attachments cannot store contents",
-                    )?;
+                && is_memoryless(&registries, target.texture)
+            {
+                if matches!(target.load_action, DepthLoadAction::Load) {
+                    return Err(RhiError::invalid_argument(
+                        "memoryless depth attachments cannot load prior contents",
+                    ));
                 }
+                rhi_require(
+                    !target.store,
+                    "memoryless depth attachments cannot store contents",
+                )?;
+            }
         }
 
         for command in &record.body {
@@ -622,9 +623,10 @@ impl<'a> PassEncoder<'a> {
             }
             RenderCommand::PushConstant { stage, slot, data } => {
                 if !data.is_empty()
-                    && let Some(bindings) = self.render_bindings.as_mut() {
-                        bindings.invalidate_buffer(*slot, *stage);
-                    }
+                    && let Some(bindings) = self.render_bindings.as_mut()
+                {
+                    bindings.invalidate_buffer(*slot, *stage);
+                }
                 if data.is_empty() {
                     return Ok(());
                 }

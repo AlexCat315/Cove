@@ -287,9 +287,10 @@ impl NativeUITextureStore {
     }
     pub fn unregister(&mut self, id: TextureId) {
         if let Some(placement) = self.placements.remove(&id)
-            && let Some(atlas) = self.atlases.get_mut(placement.atlas) {
-                atlas.free.push(placement);
-            }
+            && let Some(atlas) = self.atlases.get_mut(placement.atlas)
+        {
+            atlas.free.push(placement);
+        }
         self.textures.remove(&id);
         self.residency.forget(id);
     }

@@ -184,7 +184,8 @@ fn summarize(node: &Node, owner_scope_id: Option<&str>) -> NodeSummary {
         ("foregroundColor", node.debug_foreground_color().is_some()),
     ]
     .into_iter()
-    .filter(|&(name, present)| present).map(|(name, present)| name.to_string())
+    .filter(|&(name, present)| present)
+    .map(|(name, present)| name.to_string())
     .collect();
     NodeSummary {
         id: SceneInspector::identifier(node),

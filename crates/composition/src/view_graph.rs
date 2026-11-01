@@ -1140,9 +1140,7 @@ impl ViewScope {
             return;
         }
         let anchor = scope.borrow().anchor.clone();
-        let mut metrics = anchor
-            .recomposition_metrics()
-            .unwrap_or_default();
+        let mut metrics = anchor.recomposition_metrics().unwrap_or_default();
         let milliseconds = start.elapsed().as_secs_f64() * 1000.0;
         metrics.record(milliseconds, initial, reasons);
         anchor.set_recomposition_metrics(Some(metrics));

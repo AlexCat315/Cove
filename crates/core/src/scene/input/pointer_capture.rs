@@ -37,16 +37,22 @@ impl PointerCapture {
         let previous = self.target.borrow_mut().replace(node.clone());
         self.allows_gesture_transfer.set(allows_gesture_transfer);
         if let Some(previous) = previous {
-            if let Some(callback) = previous
-                .attachment::<Rc<dyn Fn()>>(PointerCaptureAttachmentKey::DID_LOSE_CAPTURE) { callback() }
+            if let Some(callback) =
+                previous.attachment::<Rc<dyn Fn()>>(PointerCaptureAttachmentKey::DID_LOSE_CAPTURE)
+            {
+                callback()
+            }
         }
     }
     pub fn release(&self) {
         let previous = self.target.borrow_mut().take();
         self.allows_gesture_transfer.set(false);
         if let Some(previous) = previous {
-            if let Some(callback) = previous
-                .attachment::<Rc<dyn Fn()>>(PointerCaptureAttachmentKey::DID_LOSE_CAPTURE) { callback() }
+            if let Some(callback) =
+                previous.attachment::<Rc<dyn Fn()>>(PointerCaptureAttachmentKey::DID_LOSE_CAPTURE)
+            {
+                callback()
+            }
         }
     }
 }

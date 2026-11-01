@@ -30,8 +30,8 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use cove_ui_addons::workspace::{
     WorkspaceCommand, WorkspaceController, WorkspaceDocument, WorkspaceEdge, WorkspaceLayoutNode,
-    WorkspaceLayoutSplit, WorkspacePanel, WorkspacePanelID, WorkspaceRect,
-    WorkspaceSlot, WorkspaceSlotID, WorkspaceSlotKind, WorkspaceSlotSize, WorkspaceSplitAxis,
+    WorkspaceLayoutSplit, WorkspacePanel, WorkspacePanelID, WorkspaceRect, WorkspaceSlot,
+    WorkspaceSlotID, WorkspaceSlotKind, WorkspaceSlotSize, WorkspaceSplitAxis,
     WorkspaceSplitFractions, WorkspaceTabGroup, WorkspaceTabGroupID, WorkspaceTarget,
 };
 
@@ -203,11 +203,7 @@ fn nested_split_resize_persists_and_rejects_stale_addresses() {
         "the persisted shape has no derived layout tree"
     );
     let decoded: WorkspaceDocument = serde_json::from_str(&encoded).expect("document decodes");
-    assert_eq!(
-        &decoded,
-        controller.document(),
-        "the document round trips"
-    );
+    assert_eq!(&decoded, controller.document(), "the document round trips");
 
     assert!(
         !controller

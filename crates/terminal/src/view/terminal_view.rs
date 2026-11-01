@@ -254,13 +254,14 @@ impl TerminalView {
                         PointerPhase::Up => state.pointer.up(event, &down_session, &geometry),
                     };
                     if handled {
-                        if phase == PointerPhase::Down && event.modifiers.has_gui()
+                        if phase == PointerPhase::Down
+                            && event.modifiers.has_gui()
                             && let Some(pointer) =
                                 state.pointer.pointer(&geometry, event.x, event.y, 0)
-                                && let Some(link) = state.pointer.link_at(&pointer, &down_session)
-                            {
-                                state.open_link(&link);
-                            }
+                            && let Some(link) = state.pointer.link_at(&pointer, &down_session)
+                        {
+                            state.open_link(&link);
+                        }
                         state.redraw();
                         EventResult::Handled
                     } else {

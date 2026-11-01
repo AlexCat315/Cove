@@ -18,9 +18,7 @@ mod support;
 
 use std::rc::Rc;
 
-use cove_composition::{
-    AnyView, Column, DynamicField, PrimitiveView, TupleView, View, ViewGraph,
-};
+use cove_composition::{AnyView, Column, DynamicField, PrimitiveView, TupleView, View, ViewGraph};
 use cove_core::State;
 use cove_core::scene::{
     AccessibilityRole, EventPhase, FocusChain, FocusChainHolder, InteractionRegistry,

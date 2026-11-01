@@ -921,7 +921,8 @@ fn touch_lists_truncate_in_their_proposal_and_scale_two_line_rows_with_the_syste
         );
         assert!(
             !scene
-                .all(|node| text_of(node).as_deref() == Some("Secondary detail")).is_empty(),
+                .all(|node| text_of(node).as_deref() == Some("Secondary detail"))
+                .is_empty(),
             "the subtitle stays mounted at 200 percent"
         );
 

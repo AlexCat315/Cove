@@ -449,9 +449,9 @@ impl View for LazyGridStory {
                 2,
                 None,
                 Some(90.0),
-                Some(std::rc::Rc::new(
-                    |index: &u64| if index.is_multiple_of(7) { 2 } else { 1 },
-                )),
+                Some(std::rc::Rc::new(|index: &u64| {
+                    if index.is_multiple_of(7) { 2 } else { 1 }
+                })),
                 std::rc::Rc::new(|index: &u64| AnyView::new(LazyCell::new(format!("#{index}")))),
             )
             .frame_height(220.0)

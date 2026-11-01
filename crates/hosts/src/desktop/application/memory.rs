@@ -255,7 +255,6 @@ pub struct MemoryPressureProbe {
     previous: bool,
 }
 
-
 impl MemoryPressureProbe {
     pub fn new() -> Self {
         Self::default()

@@ -230,16 +230,17 @@ fn main() {
         .std("c11")
         .opt_level(3);
     if target.starts_with("wasm")
-        && let Some(sdk) = env::var_os("COVE_WASI_SDK_PATH") {
-            let sdk = PathBuf::from(sdk);
-            build
-                .compiler(sdk.join("bin/clang"))
-                .flag("--target=wasm32-wasi")
-                .flag(format!(
-                    "--sysroot={}",
-                    sdk.join("share/wasi-sysroot").display()
-                ));
-        }
+        && let Some(sdk) = env::var_os("COVE_WASI_SDK_PATH")
+    {
+        let sdk = PathBuf::from(sdk);
+        build
+            .compiler(sdk.join("bin/clang"))
+            .flag("--target=wasm32-wasi")
+            .flag(format!(
+                "--sysroot={}",
+                sdk.join("share/wasi-sysroot").display()
+            ));
+    }
     build.compile("cove_text_bridge");
     if os == "macos" || os == "ios" {
         cc::Build::new()

@@ -568,7 +568,9 @@ pub fn prepare_shader_compilation(
     // defined over. `chunks_exact` cannot fail because the length was checked.
     let words: Vec<u32> = descriptor
         .code
-        .as_chunks::<4>().0.iter()
+        .as_chunks::<4>()
+        .0
+        .iter()
         .map(|chunk| u32::from_le_bytes([chunk[0], chunk[1], chunk[2], chunk[3]]))
         .collect();
     rhi_require(words[0] == 0x0723_0203, "invalid SPIR-V magic")?;

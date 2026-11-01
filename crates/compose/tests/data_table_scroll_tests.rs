@@ -230,24 +230,22 @@ fn the_table_mounts_inside_a_scrolling_parent() {
 #[test]
 fn a_wheel_at_the_top_boundary_is_contained_by_the_table() {
     with_context(|context| {
-        {
-            let row_count = 100;
-            let harness = Harness::mount(row_count);
-            let dispatcher = harness.dispatcher(context);
-            let pane = harness
-                .frozen_pane()
-                .expect("the table lays out its frozen lane");
+        let row_count = 100;
+        let harness = Harness::mount(row_count);
+        let dispatcher = harness.dispatcher(context);
+        let pane = harness
+            .frozen_pane()
+            .expect("the table lays out its frozen lane");
 
-            let before = harness.parent_y();
-            wheel(&dispatcher, &pane, 1.0);
-            settle(&harness.graph);
+        let before = harness.parent_y();
+        wheel(&dispatcher, &pane, 1.0);
+        settle(&harness.graph);
 
-            assert_eq!(
-                harness.parent_y(),
-                before,
-                "the table consumes the wheel at its top boundary"
-            );
-        }
+        assert_eq!(
+            harness.parent_y(),
+            before,
+            "the table consumes the wheel at its top boundary"
+        );
     });
 }
 

@@ -282,16 +282,17 @@ pub fn folds(source: &str, tokens: &[Token]) -> Vec<FoldRegion> {
         if bytes[offset] == b'{' {
             stack.push(offset);
         } else if bytes[offset] == b'}'
-            && let Some(start) = stack.pop() {
-                let first = line_of_byte[start];
-                let last = line_of_byte[offset];
-                if first < last {
-                    regions.push(FoldRegion {
-                        first_line: first,
-                        last_line: last,
-                    });
-                }
+            && let Some(start) = stack.pop()
+        {
+            let first = line_of_byte[start];
+            let last = line_of_byte[offset];
+            if first < last {
+                regions.push(FoldRegion {
+                    first_line: first,
+                    last_line: last,
+                });
             }
+        }
     }
     regions.sort_by_key(|region| region.first_line);
     regions

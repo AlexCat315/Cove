@@ -295,7 +295,7 @@ impl Shell for MockShell {
     fn wait_for_events(&self, timeout: Duration) -> bool {
         let hook = self.0.borrow_mut().on_wait.take();
         self.0.borrow_mut().wait_timeouts.push(timeout);
-        
+
         match hook {
             Some(mut hook) => {
                 let signalled = hook(timeout);

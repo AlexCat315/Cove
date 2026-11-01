@@ -81,9 +81,10 @@ impl AppleSurfaceState {
         self.state.error_description = None;
         if let Some(web_view) = &self.web_view {
             if !self.loads_html
-                && let Some(url) = unsafe { web_view.URL() }.and_then(|url| url.absoluteString()) {
-                    self.state.url = Some(url.to_string());
-                }
+                && let Some(url) = unsafe { web_view.URL() }.and_then(|url| url.absoluteString())
+            {
+                self.state.url = Some(url.to_string());
+            }
             if let Some(title) = unsafe { web_view.title() } {
                 let title = title.to_string();
                 if !title.is_empty() {

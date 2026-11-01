@@ -138,9 +138,11 @@ impl NativeUIBackdropPass {
         height: usize,
     ) -> RhiResult<Scratch> {
         if let Some(s) = existing
-            && s.width() == width && s.height() == height {
-                return Ok(s.clone());
-            }
+            && s.width() == width
+            && s.height() == height
+        {
+            return Ok(s.clone());
+        }
         let mut d = TextureDescriptor::new(
             width,
             height,
@@ -170,9 +172,10 @@ impl NativeUIBackdropPass {
             }
         }
         if let Some((old, binding)) = self.frame_binding
-            && old == texture {
-                return Ok(binding);
-            }
+            && old == texture
+        {
+            return Ok(binding);
+        }
         let binding = self.shaders.binding(texture)?;
         self.frame_binding = Some((texture, binding));
         Ok(binding)

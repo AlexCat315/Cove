@@ -484,11 +484,12 @@ impl Device {
         }
         if (descriptor.stage == super::ShaderStage::Mesh
             || descriptor.stage == super::ShaderStage::Task)
-            && !self.capabilities.mesh_shading.mesh {
-                return Err(RhiError::unsupported_feature(
-                    "mesh shading is not implemented by this backend",
-                ));
-            }
+            && !self.capabilities.mesh_shading.mesh
+        {
+            return Err(RhiError::unsupported_feature(
+                "mesh shading is not implemented by this backend",
+            ));
+        }
         let during_frame = state.current_slot.is_some();
         let label = descriptor.entry_point.clone();
         let started = std::time::Instant::now();

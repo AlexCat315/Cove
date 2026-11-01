@@ -233,22 +233,24 @@ impl AccessTracker {
                 // write clears the window; new queues, ranges or stages still
                 // require their own RAW dependency.
                 if let Some(previous) = memory.reads.get(&read_key)
-                    && previous.is_superset_of(access.stage) {
-                        self.memories.insert(key, memory);
-                        return Vec::new();
-                    }
+                    && previous.is_superset_of(access.stage)
+                {
+                    self.memories.insert(key, memory);
+                    return Vec::new();
+                }
                 if let Some(write) = memory.last_write
-                    && overlaps(write.range, range) {
-                        hazards.push(Hazard {
-                            resource: access.resource,
-                            kind: HazardKind::ReadAfterWrite,
-                            source_stage: write.stage,
-                            destination_stage: access.stage,
-                            source_queue: write.queue,
-                            destination_queue: queue,
-                            range: access.range,
-                        });
-                    }
+                    && overlaps(write.range, range)
+                {
+                    hazards.push(Hazard {
+                        resource: access.resource,
+                        kind: HazardKind::ReadAfterWrite,
+                        source_stage: write.stage,
+                        destination_stage: access.stage,
+                        source_queue: write.queue,
+                        destination_queue: queue,
+                        range: access.range,
+                    });
+                }
                 memory
                     .reads
                     .entry(read_key)
@@ -257,17 +259,18 @@ impl AccessTracker {
             }
             AccessKind::Write => {
                 if let Some(write) = memory.last_write
-                    && overlaps(write.range, range) {
-                        hazards.push(Hazard {
-                            resource: access.resource,
-                            kind: HazardKind::WriteAfterWrite,
-                            source_stage: write.stage,
-                            destination_stage: access.stage,
-                            source_queue: write.queue,
-                            destination_queue: queue,
-                            range: access.range,
-                        });
-                    }
+                    && overlaps(write.range, range)
+                {
+                    hazards.push(Hazard {
+                        resource: access.resource,
+                        kind: HazardKind::WriteAfterWrite,
+                        source_stage: write.stage,
+                        destination_stage: access.stage,
+                        source_queue: write.queue,
+                        destination_queue: queue,
+                        range: access.range,
+                    });
+                }
                 for (read_key, stage) in &memory.reads {
                     if read_key.range.overlaps(range) {
                         hazards.push(Hazard {

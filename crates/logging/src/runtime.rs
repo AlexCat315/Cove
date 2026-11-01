@@ -230,11 +230,12 @@ impl LogRuntime {
                             match this.formatter.json(&record) {
                                 Ok(data) => {
                                     if let Some(file) = slot.as_mut()
-                                        && let Err(error) = file.append(&data) {
-                                            drop(slot);
-                                            this.storage_failed(&error);
-                                            break;
-                                        }
+                                        && let Err(error) = file.append(&data)
+                                    {
+                                        drop(slot);
+                                        this.storage_failed(&error);
+                                        break;
+                                    }
                                 }
                                 Err(error) => {
                                     drop(slot);
@@ -438,10 +439,11 @@ impl LogRuntime {
     fn flush_file(&self) {
         let mut slot = self.file.lock().unwrap_or_else(|e| e.into_inner());
         if let Some(file) = slot.as_mut()
-            && let Err(error) = file.flush() {
-                drop(slot);
-                self.storage_failed(&error);
-            }
+            && let Err(error) = file.flush()
+        {
+            drop(slot);
+            self.storage_failed(&error);
+        }
     }
 
     pub fn snapshot(&self, query: &LogQuery) -> LogSnapshot {

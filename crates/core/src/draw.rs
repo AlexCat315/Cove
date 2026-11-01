@@ -220,9 +220,9 @@ impl DrawList {
                     .indices
                     .get(batch.index_offset as usize)
                     .is_some_and(|&index| index as usize >= start)
-                {
-                    backdrop.opacity *= alpha;
-                }
+            {
+                backdrop.opacity *= alpha;
+            }
         }
     }
     pub(crate) fn recolor(&mut self, start: usize, color: impl Fn(f32, f32, f32) -> crate::Color) {
@@ -381,12 +381,12 @@ impl DrawList {
         if backdrop.is_none()
             && let Some(last) = batches.last_mut()
             && last.texture_id == texture_id
-                && last.scissor == scissor
-                && last.index_offset + last.index_count == start
-            {
-                last.index_count += count;
-                return Ok(());
-            }
+            && last.scissor == scissor
+            && last.index_offset + last.index_count == start
+        {
+            last.index_count += count;
+            return Ok(());
+        }
         batches.push(DrawBatch {
             index_offset: start,
             index_count: count,

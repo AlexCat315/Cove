@@ -18,7 +18,8 @@ use std::sync::{Mutex, MutexGuard, OnceLock};
 
 use cove_composition::{LayoutDebugAttachmentKey, PrimitiveView, View, ViewGraph, ViewKind};
 use cove_core::scene::{
-    AnimatorScheduler, EventDispatcher, FocusChain, InteractionRegistry, Node, NodeTree, PlatformInputContext, PointerCapture, Recomposer, ScopedAmbient,
+    AnimatorScheduler, EventDispatcher, FocusChain, InteractionRegistry, Node, NodeTree,
+    PlatformInputContext, PointerCapture, Recomposer, ScopedAmbient,
 };
 use cove_core::{Environment, Point};
 use cove_platform::{InputEvent, KeyEvent, KeyModifiers, MouseButton, MouseButtonEvent, WindowId};

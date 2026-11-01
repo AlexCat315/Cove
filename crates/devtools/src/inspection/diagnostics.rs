@@ -910,7 +910,8 @@ fn collect_overflow(root: &Node) -> Vec<DiagnosticOverflowIssue> {
             return None;
         }
         let frame = node.absolute_frame();
-        let mut bottom = (frame.width > 0.0 && frame.height > 0.0).then_some(frame.y + frame.height);
+        let mut bottom =
+            (frame.width > 0.0 && frame.height > 0.0).then_some(frame.y + frame.height);
         if node.clips_to_bounds() {
             return bottom;
         }

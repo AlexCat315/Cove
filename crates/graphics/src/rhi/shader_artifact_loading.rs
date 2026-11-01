@@ -40,10 +40,7 @@ impl ShaderArtifact {
                 .decode(code)
                 .map_err(|e| RhiError::layout_mismatch(format!("invalid shader bytecode: {e}")))?;
             value["code"] = serde_json::Value::Array(
-                decoded
-                    .into_iter()
-                    .map(serde_json::Value::from)
-                    .collect(),
+                decoded.into_iter().map(serde_json::Value::from).collect(),
             );
         }
         serde_json::from_value(value)
@@ -79,19 +76,19 @@ impl ShaderArtifact {
             return Err(RhiError::layout_mismatch("shader artifact stage mismatch"));
         }
         if api == GraphicsApi::Metal
-            && let Some(platform) = metal_library_platform() {
-                let path = root
-                    .join(directory)
-                    .join(format!("metal-{platform}"))
-                    .join(file);
-                if path.is_file() {
-                    let library = Self::from_json(
-                        &std::fs::read(path)
-                            .map_err(|e| RhiError::invalid_argument(e.to_string()))?,
-                    )?;
-                    return Self::prefer_library(source, library);
-                }
+            && let Some(platform) = metal_library_platform()
+        {
+            let path = root
+                .join(directory)
+                .join(format!("metal-{platform}"))
+                .join(file);
+            if path.is_file() {
+                let library = Self::from_json(
+                    &std::fs::read(path).map_err(|e| RhiError::invalid_argument(e.to_string()))?,
+                )?;
+                return Self::prefer_library(source, library);
             }
+        }
         Ok(source)
     }
     pub(crate) fn prefer_library(source: Self, mut library: Self) -> RhiResult<Self> {

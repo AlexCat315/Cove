@@ -195,7 +195,9 @@ impl ProbeContext {
         if samples == 4 {
             require(
                 pixels
-                    .as_chunks::<4>().0.iter()
+                    .as_chunks::<4>()
+                    .0
+                    .iter()
                     .any(|pixel| pixel[0] > 0 && pixel[0] < 255),
                 "MSAA edge coverage is missing",
             )?;

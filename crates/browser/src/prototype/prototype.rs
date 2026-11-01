@@ -557,32 +557,34 @@ impl<C: PrototypeContent> BrowserPrototype<C> {
     pub fn events(&mut self) {
         let mut messages: Vec<Envelope> = Vec::new();
         if self.session.subscriptions.contains(&Subscription::Tree)
-            && let Some(payload) = self.tree_payload() {
-                messages.push(Envelope::new("tree.delta", None, Some(payload)));
-            }
+            && let Some(payload) = self.tree_payload()
+        {
+            messages.push(Envelope::new("tree.delta", None, Some(payload)));
+        }
         if self.session.subscriptions.contains(&Subscription::Timing)
-            && let Some(frame) = &self.frame {
-                let payload = TimingFrame {
-                    frame: self.frame_number,
-                    recomposition_ms: Some(self.recomposition_ms),
-                    layout_ms: self.layout_ms,
-                    draw_ms: self.render_ms,
-                    present_ms: 0.0,
-                    presented: Some(true),
-                    total_ms: self.recomposition_ms + self.layout_ms + self.render_ms,
-                    node_count: frame
-                        .tree
-                        .input_inventory
-                        .as_ref()
-                        .map_or(0, |inventory| inventory.node_count),
-                    batch_count: frame.batches.len(),
-                };
-                messages.push(Envelope::new(
-                    "timing.frame",
-                    None,
-                    serde_json::to_value(payload).ok(),
-                ));
-            }
+            && let Some(frame) = &self.frame
+        {
+            let payload = TimingFrame {
+                frame: self.frame_number,
+                recomposition_ms: Some(self.recomposition_ms),
+                layout_ms: self.layout_ms,
+                draw_ms: self.render_ms,
+                present_ms: 0.0,
+                presented: Some(true),
+                total_ms: self.recomposition_ms + self.layout_ms + self.render_ms,
+                node_count: frame
+                    .tree
+                    .input_inventory
+                    .as_ref()
+                    .map_or(0, |inventory| inventory.node_count),
+                batch_count: frame.batches.len(),
+            };
+            messages.push(Envelope::new(
+                "timing.frame",
+                None,
+                serde_json::to_value(payload).ok(),
+            ));
+        }
         self.response_buffer.encode(&messages);
     }
 

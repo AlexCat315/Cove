@@ -205,10 +205,10 @@ impl SidebarStory {
         let icons_on = self.shows_icons.get();
         let badges_on = self.shows_badges.get();
         let item = |id: &str,
-                        title: &str,
-                        icon: Option<cove_imaging::BundleImageResource>,
-                        badge: Option<&str>,
-                        is_enabled: bool| {
+                    title: &str,
+                    icon: Option<cove_imaging::BundleImageResource>,
+                    badge: Option<&str>,
+                    is_enabled: bool| {
             let mut row =
                 SidebarItem::new(id.to_owned(), title.to_owned()).enabled(enabled && is_enabled);
             if icons_on && let Some(icon) = icon {

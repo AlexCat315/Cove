@@ -232,30 +232,32 @@ fn main() {
         );
     }
     if target.starts_with("wasm")
-        && let Some(sdk) = env::var_os("COVE_WASI_SDK_PATH") {
-            let sdk = PathBuf::from(sdk);
-            bridge
-                .compiler(sdk.join("bin/clang++"))
-                .flag("--target=wasm32-wasi")
-                .flag(format!(
-                    "--sysroot={}",
-                    sdk.join("share/wasi-sysroot").display()
-                ));
-        }
+        && let Some(sdk) = env::var_os("COVE_WASI_SDK_PATH")
+    {
+        let sdk = PathBuf::from(sdk);
+        bridge
+            .compiler(sdk.join("bin/clang++"))
+            .flag("--target=wasm32-wasi")
+            .flag(format!(
+                "--sysroot={}",
+                sdk.join("share/wasi-sysroot").display()
+            ));
+    }
     bridge.compile("cove_image_decode_bridge");
     let mut kernels = cc::Build::new();
     kernels.file("native/orientation.c").std("c11").opt_level(3);
     if target.starts_with("wasm")
-        && let Some(sdk) = env::var_os("COVE_WASI_SDK_PATH") {
-            let sdk = PathBuf::from(sdk);
-            kernels
-                .compiler(sdk.join("bin/clang"))
-                .flag("--target=wasm32-wasi")
-                .flag(format!(
-                    "--sysroot={}",
-                    sdk.join("share/wasi-sysroot").display()
-                ));
-        }
+        && let Some(sdk) = env::var_os("COVE_WASI_SDK_PATH")
+    {
+        let sdk = PathBuf::from(sdk);
+        kernels
+            .compiler(sdk.join("bin/clang"))
+            .flag("--target=wasm32-wasi")
+            .flag(format!(
+                "--sysroot={}",
+                sdk.join("share/wasi-sysroot").display()
+            ));
+    }
     kernels.compile("cove_image_kernels");
     if os == "macos" || os == "ios" {
         cc::Build::new()

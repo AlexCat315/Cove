@@ -559,9 +559,10 @@ impl PrimitiveView for DemoButton {
                     PointerPhase::Down => {
                         node.set_attachment(PRESSED, true);
                         if let Some(capture) = PointerCaptureHolder::current()
-                            && let Some(target) = Node::upgrade(&capture_node) {
-                                capture.acquire(&target, true);
-                            }
+                            && let Some(target) = Node::upgrade(&capture_node)
+                        {
+                            capture.acquire(&target, true);
+                        }
                         EventResult::Handled
                     }
                     PointerPhase::Up => {
@@ -719,9 +720,10 @@ impl PrimitiveView for DemoNote {
             let mut text = label.clone();
             if let Some(node) = Node::upgrade(&weak)
                 && let Some(preedit) = node.attachment::<String>(PREEDIT)
-                    && !preedit.is_empty() {
-                        text.text = format!("{}{preedit}", value.get());
-                    }
+                && !preedit.is_empty()
+            {
+                text.text = format!("{}{preedit}", value.get());
+            }
             let flat = value.get();
             if flat.is_empty() {
                 text.text = label.text.clone();

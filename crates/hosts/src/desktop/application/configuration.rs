@@ -174,13 +174,11 @@ impl DiagnosticsConfiguration {
     }
 }
 
-#[derive(Clone, Debug, PartialEq)]
-#[derive(Default)]
+#[derive(Clone, Debug, PartialEq, Default)]
 pub struct MemoryConfiguration {
     pub text: TextCacheLimits,
     pub images: ImageCacheLimits,
 }
-
 
 /// Application defaults are owned by the subsystem that consumes them.
 /// Configure only the groups the application needs; native GPU setup is

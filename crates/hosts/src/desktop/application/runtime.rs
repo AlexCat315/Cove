@@ -540,13 +540,7 @@ impl Application {
                       multiple: bool,
                       accept: Box<dyn FnOnce(Vec<String>)>| {
                     let window = host.main_window();
-                    host.show_open_file_dialog(
-                        window,
-                        path,
-                        filters,
-                        multiple,
-                        Box::new(accept),
-                    );
+                    host.show_open_file_dialog(window, path, filters, multiple, Box::new(accept));
                 }
             })),
             memory_query: Some(Rc::new({

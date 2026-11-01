@@ -74,7 +74,6 @@ impl ResizableSidebarExample {
 
 impl cove_ui_compose::View for ResizableSidebarExample {
     fn body(&self) -> cove_ui_compose::AnyView {
-        
         use cove_ui_compose::modifiers::layout::LayoutFrameExt;
 
         let content = cove_ui_compose::primitives::text::Text::new(self.requested_width_label());
@@ -223,7 +222,6 @@ impl NestedSidebarExample {
 
 impl cove_ui_compose::View for NestedSidebarExample {
     fn body(&self) -> cove_ui_compose::AnyView {
-        
         use cove_ui_compose::modifiers::layout::LayoutFrameExt;
 
         let selection = self.selection.get();

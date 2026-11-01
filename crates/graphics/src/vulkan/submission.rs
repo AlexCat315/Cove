@@ -1489,16 +1489,17 @@ impl<'a> Encoder<'a> {
                 }
             }
             if let Some(target) = record.descriptor.depth_target
-                && is_transient(&registries, target.texture) {
-                    rhi_require(
-                        !matches!(target.load_action, DepthLoadAction::Load),
-                        "transient depth attachments cannot load prior contents",
-                    )?;
-                    rhi_require(
-                        !target.store,
-                        "transient depth attachments cannot preserve contents",
-                    )?;
-                }
+                && is_transient(&registries, target.texture)
+            {
+                rhi_require(
+                    !matches!(target.load_action, DepthLoadAction::Load),
+                    "transient depth attachments cannot load prior contents",
+                )?;
+                rhi_require(
+                    !target.store,
+                    "transient depth attachments cannot preserve contents",
+                )?;
+            }
         }
         let registries = self.registries;
         rhi_render_pass_signature(&record.descriptor, |handle| {
@@ -2114,13 +2115,14 @@ pub fn read_buffer_data(
         Ok(())
     });
     if outcome.is_ok()
-        && let Some(pointer) = staging.pointer {
-            // SAFETY: the copy completed on the GPU and the staging mapping covers
-            // the range; `destination` is a distinct live slice.
-            unsafe {
-                std::ptr::copy_nonoverlapping(pointer, destination.as_mut_ptr(), destination.len())
-            };
-        }
+        && let Some(pointer) = staging.pointer
+    {
+        // SAFETY: the copy completed on the GPU and the staging mapping covers
+        // the range; `destination` is a distinct live slice.
+        unsafe {
+            std::ptr::copy_nonoverlapping(pointer, destination.as_mut_ptr(), destination.len())
+        };
+    }
     destroy_staging_buffer(context, registries, staging);
     let _ = allocator;
     outcome

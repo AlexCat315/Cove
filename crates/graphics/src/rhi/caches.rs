@@ -120,9 +120,10 @@ impl<K: Eq + Hash + Clone, V> LruMap<K, V> {
             entry.next = self.head;
         }
         if let Some(head) = self.head
-            && let Some(entry) = self.slots[head].as_mut() {
-                entry.prev = Some(slot);
-            }
+            && let Some(entry) = self.slots[head].as_mut()
+        {
+            entry.prev = Some(slot);
+        }
         self.head = Some(slot);
         if self.tail.is_none() {
             self.tail = Some(slot);

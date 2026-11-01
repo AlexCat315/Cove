@@ -66,9 +66,10 @@ impl ShowcaseContent {
     ) -> Result<Self, String> {
         let mode = launch.mode;
         if let Some(gallery) = products.gallery()
-            && let Some(page) = gallery.page_named(&launch.component) {
-                gallery.select_page(&page);
-            }
+            && let Some(page) = gallery.page_named(&launch.component)
+        {
+            gallery.select_page(&page);
+        }
         let has_typography =
             mode == SceneLaunchMode::Counter && products.typography_mut().is_some();
         let content = Self {
@@ -112,10 +113,12 @@ impl ShowcaseContent {
         products: &mut dyn ShowcaseProducts,
         painter: Option<Box<dyn CounterTextPainter>>,
     ) -> Option<AnyView> {
-        if self.mode == SceneLaunchMode::Counter && self.has_typography
-            && let Some(counter) = products.counter() {
-                return Some(counter.root(scale, painter));
-            }
+        if self.mode == SceneLaunchMode::Counter
+            && self.has_typography
+            && let Some(counter) = products.counter()
+        {
+            return Some(counter.root(scale, painter));
+        }
         products.gallery().map(|gallery| gallery.root())
     }
 

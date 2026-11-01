@@ -151,7 +151,9 @@ impl ProbeContext {
         result?;
         let values = read?;
         let decoded = values
-            .as_chunks::<4>().0.iter()
+            .as_chunks::<4>()
+            .0
+            .iter()
             .map(|word| u32::from_ne_bytes([word[0], word[1], word[2], word[3]]))
             .collect::<Vec<_>>();
         let expected = (7_u32..23).collect::<Vec<_>>();

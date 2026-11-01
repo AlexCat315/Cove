@@ -45,8 +45,11 @@ fn workspace_icon_resolves_through_the_packaged_resource_locator() {
     std::fs::copy(&source, staged.join("WorkspaceIcons/collapse.svg"))
         .expect("the collapse icon ships with the target");
 
-    let bundle = ResourceBundle::locate(&[WORKSPACE_RESOURCE_BUNDLE_NAME], std::slice::from_ref(&temp_root))
-        .expect("the packaged resource locator finds the bundle");
+    let bundle = ResourceBundle::locate(
+        &[WORKSPACE_RESOURCE_BUNDLE_NAME],
+        std::slice::from_ref(&temp_root),
+    )
+    .expect("the packaged resource locator finds the bundle");
     assert!(
         bundle.root().join("WorkspaceIcons/collapse.svg").is_file(),
         "{WORKSPACE_RESOURCE_BUNDLE_NAME} resolves collapse.svg"

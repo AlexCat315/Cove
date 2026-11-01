@@ -2,7 +2,6 @@
 //!
 //! Swift sources: `GalleryContent/Stories/Overlays/{PopconfirmStory,HoverStory}.swift`.
 
-
 use cove_core::State;
 use cove_core::scene::{Align, FlexDirection, Justify, Wrap};
 use cove_ui_compose::modifiers::style::SemanticStyleViewExt;

@@ -14,8 +14,7 @@ use super::{
 
 // MARK: - Render pass targets
 
-#[derive(Clone, Copy, Debug, PartialEq)]
-#[derive(Default)]
+#[derive(Clone, Copy, Debug, PartialEq, Default)]
 pub enum ColorLoadAction {
     Clear([f32; 4]),
     Load,

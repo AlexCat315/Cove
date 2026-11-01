@@ -20,19 +20,21 @@ pub fn line_break_opportunities(text: &str) -> HashSet<usize> {
     let mut previous = None;
     for (offset, character) in text.grapheme_indices(true) {
         if let Some(before) = previous
-            && !is_space(character) && !is_newline(character) {
-                if is_space(before) {
-                    result.insert(offset);
-                } else if is_ideographic(character) || is_ideographic(before) {
-                    if !CLOSING.contains(character) && !OPENING.contains(before) {
-                        result.insert(offset);
-                    }
-                } else if matches!(before, "-" | "/" | "—")
-                    && character.chars().any(char::is_alphanumeric)
-                {
+            && !is_space(character)
+            && !is_newline(character)
+        {
+            if is_space(before) {
+                result.insert(offset);
+            } else if is_ideographic(character) || is_ideographic(before) {
+                if !CLOSING.contains(character) && !OPENING.contains(before) {
                     result.insert(offset);
                 }
+            } else if matches!(before, "-" | "/" | "—")
+                && character.chars().any(char::is_alphanumeric)
+            {
+                result.insert(offset);
             }
+        }
         previous = Some(character);
     }
     result

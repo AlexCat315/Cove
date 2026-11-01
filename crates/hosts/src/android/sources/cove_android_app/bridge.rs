@@ -548,10 +548,11 @@ pub unsafe extern "C" fn cove_android_surface(
     }
     // SAFETY: the caller guarantees `text_count` readable floats.
     let sizes = unsafe { std::slice::from_raw_parts(text_sizes, text_count as usize) };
-    let text_scale = TextScale::from_samples(sizes.as_chunks::<2>().0.iter().map(|pair| TextScaleSample {
-        size: pair[0],
-        scaled_size: pair[1],
-    }));
+    let text_scale =
+        TextScale::from_samples(sizes.as_chunks::<2>().0.iter().map(|pair| TextScaleSample {
+            size: pair[0],
+            scaled_size: pair[1],
+        }));
     handle.session().application().update_scale(density);
     let safe_area = Insets {
         top,

@@ -20,11 +20,11 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use cove_composition::{AnyView, PrimitiveView, View, ViewGraph};
+use cove_core::Color;
 use cove_core::scene::{
     AccessibilityRole, AnimatorScheduler, EventResult, InteractionRegistry,
     InteractionRegistryHolder, Node, NodeTree, Recomposer,
 };
-use cove_core::Color;
 use cove_platform::{KeyEvent, MouseButton, MouseButtonEvent};
 use cove_ui_compose::modifiers::style::AppearanceExt;
 use cove_ui_compose::primitives::controls::button::Button;

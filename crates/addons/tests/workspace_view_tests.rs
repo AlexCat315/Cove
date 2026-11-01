@@ -89,15 +89,14 @@ use std::rc::Rc;
 use cove_composition::{AnyView, EmptyView, LayoutDebugExt, Scancode};
 use cove_core::Point;
 use cove_core::Rect;
-use cove_core::scene::{
-    AccessibilityRole, Align, FlexDirection, Justify, Node, Wrap,
-};
+use cove_core::scene::{AccessibilityRole, Align, FlexDirection, Justify, Node, Wrap};
 use cove_platform::{InputEvent, KeyEvent, KeyModifiers};
 use cove_ui_addons::workspace::{
     WorkspaceAxisSizing, WorkspaceCommand, WorkspaceController, WorkspaceDocument, WorkspaceEdge,
-    WorkspaceFloatingWindowID, WorkspacePanel, WorkspacePanelID,
-    WorkspacePanelSizing, WorkspaceRect, WorkspaceSlot, WorkspaceSlotID,
-    WorkspaceSlotKind, WorkspaceSlotSize, WorkspaceSplitFractions, WorkspaceTabGroup, WorkspaceTabGroupID, WorkspaceTarget, WorkspaceView,
+    WorkspaceFloatingWindowID, WorkspacePanel, WorkspacePanelID, WorkspacePanelSizing,
+    WorkspaceRect, WorkspaceSlot, WorkspaceSlotID, WorkspaceSlotKind, WorkspaceSlotSize,
+    WorkspaceSplitFractions, WorkspaceTabGroup, WorkspaceTabGroupID, WorkspaceTarget,
+    WorkspaceView,
 };
 use cove_ui_compose::BoxView;
 use cove_ui_compose::modifiers::layout::{FlexExt, LayoutFrameExt};

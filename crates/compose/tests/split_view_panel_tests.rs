@@ -27,8 +27,8 @@ mod support;
 use std::rc::Rc;
 
 use cove_composition::{AnyView, LayoutDebugExt, LayoutSnapshotEntry, ViewGraph};
-use cove_core::scene::Node;
 use cove_core::Color;
+use cove_core::scene::Node;
 use cove_ui_compose::BoxView;
 use cove_ui_compose::modifiers::layout::LayoutFrameExt;
 use cove_ui_compose::modifiers::style::AppearanceExt;

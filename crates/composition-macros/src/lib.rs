@@ -125,11 +125,9 @@ pub fn track_state_reads(attribute: TokenStream, item: TokenStream) -> TokenStre
     } else {
         generated.push(quote! { fn precise_state_reads(&self) -> bool { true } });
     }
-    implementation.items.extend(
-        generated
-            .into_iter()
-            .map(ImplItem::Verbatim),
-    );
+    implementation
+        .items
+        .extend(generated.into_iter().map(ImplItem::Verbatim));
 
     let self_ty = &implementation.self_ty;
     let (impl_generics, _, where_clause) = implementation.generics.split_for_impl();
@@ -186,19 +184,19 @@ impl VisitMut for StateFieldReads {
                 args,
                 ..
             }) = &*access.base
-                && method == "get"
-                && args.is_empty()
-                && let Some(state) = self.receiver_field(receiver)
-                && let Member::Named(field) = &access.member
-            {
-                let span = field.span();
-                let field_name = field.clone();
-                let replacement: Expr = syn::parse_quote_spanned! {span=>
-                    self.#state.read_field(stringify!(#field_name), |__cove_state| __cove_state.#field_name.clone())
-                };
-                *expression = replacement;
-                return;
-            }
+            && method == "get"
+            && args.is_empty()
+            && let Some(state) = self.receiver_field(receiver)
+            && let Member::Named(field) = &access.member
+        {
+            let span = field.span();
+            let field_name = field.clone();
+            let replacement: Expr = syn::parse_quote_spanned! {span=>
+                self.#state.read_field(stringify!(#field_name), |__cove_state| __cove_state.#field_name.clone())
+            };
+            *expression = replacement;
+            return;
+        }
         visit_mut::visit_expr_mut(self, expression);
     }
 }

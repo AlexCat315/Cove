@@ -16,8 +16,8 @@ mod support;
 
 use std::rc::Rc;
 
-use cove_composition::ViewGraph;
 use cove_composition::AnyView;
+use cove_composition::ViewGraph;
 use cove_core::scene::{
     AnimatorScheduler, EventPhase, InteractionRegistry, InteractionRegistryHolder, Node, NodeTree,
     PointerPhase, Recomposer,

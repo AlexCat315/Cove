@@ -323,10 +323,10 @@ impl AdaptiveControlExamples {
 
 impl cove_ui_compose::View for AdaptiveControlExamples {
     fn body(&self) -> cove_ui_compose::AnyView {
+        use cove_ui_compose::LayoutDebugExt;
         use cove_ui_compose::modifiers::style::SemanticStyleViewExt;
         use cove_ui_compose::primitives::text::Text;
         use cove_ui_compose::theme::tokens::SemanticColorRef;
-        use cove_ui_compose::LayoutDebugExt;
 
         let caption = Text::new(self.captions()[0])
             .semantic_font(cove_ui_compose::theme::SemanticFontRef::caption())

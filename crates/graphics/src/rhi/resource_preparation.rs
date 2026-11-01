@@ -145,11 +145,12 @@ impl ResourcePreparationContext {
         }
         self.check_cancellation()?;
         if let Some(total) = self.total
-            && *self.completed.lock().unwrap() >= total {
-                return Err(RhiError::invalid_argument(
-                    "preparation exceeded its declared step count",
-                ));
-            }
+            && *self.completed.lock().unwrap() >= total
+        {
+            return Err(RhiError::invalid_argument(
+                "preparation exceeded its declared step count",
+            ));
+        }
         *self.step_label.lock().unwrap() = Some(label.to_owned());
         self.emit(PreparationPhase::Preparing, None);
         let value = operation()?;
@@ -208,7 +209,9 @@ impl ResourcePreparationContext {
         let mut values: Vec<(usize, Owned)> = {
             let mut state = self.owned.lock().unwrap();
             let owned = std::mem::take(&mut state.owned);
-            owned.into_values().map(|value| (value.order, value))
+            owned
+                .into_values()
+                .map(|value| (value.order, value))
                 .collect()
         };
         // Newest first, matching the Swift teardown order.
@@ -266,11 +269,12 @@ impl ResourcePreparationContext {
             let value = operation()?;
             self.check_cancellation()?;
             if let Some(total) = self.total
-                && *self.completed.lock().unwrap() != total {
-                    return Err(RhiError::invalid_argument(
-                        "preparation did not complete its declared steps",
-                    ));
-                }
+                && *self.completed.lock().unwrap() != total
+            {
+                return Err(RhiError::invalid_argument(
+                    "preparation did not complete its declared steps",
+                ));
+            }
             // Ownership transfers with the successfully prepared result.
             self.owned.lock().unwrap().owned.clear();
             *self.step_label.lock().unwrap() = None;

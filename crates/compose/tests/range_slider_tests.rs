@@ -30,9 +30,9 @@ use cove_core::scene::{
     InteractionRegistryHolder, Node, NodeTree, PointerCapture, PointerCaptureHolder, Recomposer,
 };
 use cove_platform::{InputEvent, MouseButton, MouseButtonEvent, MouseMotionEvent, WindowId};
+use cove_ui_compose::Scancode;
 use cove_ui_compose::modifiers::layout::LayoutFrameExt;
 use cove_ui_compose::primitives::controls::fields::range_slider::{RangeSlider, RangeValue};
-use cove_ui_compose::Scancode;
 
 use support::GlobalTestLock;
 

@@ -425,7 +425,7 @@ impl View for PreviewCard {
 #[cfg(test)]
 mod checks {
     use super::*;
-    
+
     use cove_ui_compose::theme::styles::default_light_theme;
 
     fn base() -> Theme {

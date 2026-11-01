@@ -80,10 +80,9 @@ impl WebViewNodeResource {
         *self.on_state_change.borrow_mut() =
             on_state_change.map(|callback| Rc::from(callback) as Rc<dyn Fn(WebViewState)>);
 
-        if host_changed
-            && let Some(surface) = self.surface.borrow_mut().take() {
-                surface.borrow_mut().detach();
-            }
+        if host_changed && let Some(surface) = self.surface.borrow_mut().take() {
+            surface.borrow_mut().detach();
+        }
 
         let surface = self.ensure_surface(&host);
         // Clone the `Rc` out of the `RefCell` first: a surface that publishes

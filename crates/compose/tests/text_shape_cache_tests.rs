@@ -46,7 +46,6 @@ struct StableTextPaintHarness {
 
 impl View for StableTextPaintHarness {
     fn body(&self) -> AnyView {
-        
         use cove_ui_compose::modifiers::layout::LayoutFrameExt;
         let revision = self.revision.get();
         AnyView::new(Row::new(

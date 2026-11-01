@@ -344,9 +344,9 @@ impl FontProvider {
         if face.has_color_glyphs()
             && let Some(color) =
                 crate::NativeColorGlyphFont::new(native.clone(), self.size, self.scale)
-            {
-                face.set_native_color_font(color);
-            }
+        {
+            face.set_native_color_font(color);
+        }
         Some(self.register(face, name, aliases))
     }
     #[cfg(any(target_os = "macos", target_os = "ios"))]
