@@ -115,12 +115,12 @@ mod tests {
         assert_eq!(first, "provider.1");
         assert!(
             registry
-                .register(Some(String::new()), "bad", "Int", None, || String::new())
+                .register(Some(String::new()), "bad", "Int", None, String::new)
                 .is_none()
         );
         assert!(
             registry
-                .register(Some("x".repeat(257)), "bad", "Int", None, || String::new())
+                .register(Some("x".repeat(257)), "bad", "Int", None, String::new)
                 .is_none()
         );
         registry.register(Some("stable".into()), "stable", "Int", None, || "2".into());

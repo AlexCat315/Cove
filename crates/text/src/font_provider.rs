@@ -1,11 +1,14 @@
 //! Translation of CoveUIText/FontProvider.swift, including all platform branches.
+#[cfg(not(any(target_os = "macos", target_os = "ios")))]
+use crate::FontFaceSelector;
 #[cfg(any(target_os = "macos", target_os = "ios"))]
 use crate::native_color_glyph_font::AppleFont;
-use crate::{ColorGlyphSource, FontAtlas, FontFace, FontFaceSelector, TextDirection};
+use crate::{ColorGlyphSource, FontAtlas, FontFace, TextDirection};
 use cove_core::{FontWeight, ShapedGlyph};
+#[cfg(not(any(target_os = "macos", target_os = "ios")))]
+use std::path::{Path, PathBuf};
 use std::{
     collections::{HashMap, HashSet},
-    path::{Path, PathBuf},
     rc::Rc,
 };
 use unicode_segmentation::UnicodeSegmentation;
@@ -35,8 +38,13 @@ pub struct FontProvider {
     size: f32,
     scale: f32,
     primary_name: Option<String>,
+    /// Path-driven fallback state; Apple platforms resolve fallbacks through
+    /// `AppleFont` instead of scanning font directories.
+    #[cfg(not(any(target_os = "macos", target_os = "ios")))]
     fallback_chain: Vec<Rc<ManagedFont>>,
+    #[cfg(not(any(target_os = "macos", target_os = "ios")))]
     tried_paths: HashSet<PathBuf>,
+    #[cfg(not(any(target_os = "macos", target_os = "ios")))]
     fallback_paths: Vec<PathBuf>,
     #[cfg(any(target_os = "macos", target_os = "ios"))]
     primary_native: Option<AppleFont>,
@@ -57,8 +65,11 @@ impl FontProvider {
             size,
             scale: raster_scale.max(1.0),
             primary_name: None,
+            #[cfg(not(any(target_os = "macos", target_os = "ios")))]
             fallback_chain: vec![],
+            #[cfg(not(any(target_os = "macos", target_os = "ios")))]
             tried_paths: HashSet::new(),
+            #[cfg(not(any(target_os = "macos", target_os = "ios")))]
             fallback_paths: system_fallback_paths(),
             weight: FontWeight::Regular,
             italic: false,
@@ -204,6 +215,7 @@ impl FontProvider {
             run.font.id,
         )
     }
+    #[cfg(not(any(target_os = "macos", target_os = "ios")))]
     fn load_direct(&mut self, path: &Path, alias: &str) -> Option<Rc<ManagedFont>> {
         if let Some(font) = self.fonts.get(alias) {
             return Some(font.clone());
@@ -218,6 +230,7 @@ impl FontProvider {
         .ok()?;
         Some(self.register(face, alias.into(), &[]))
     }
+    #[cfg(not(any(target_os = "macos", target_os = "ios")))]
     fn load_primary_direct(&mut self, name: &str) -> Option<Rc<ManagedFont>> {
         if Path::new(name).is_absolute()
             && let Some(font) = self.load_direct(Path::new(name), name)
@@ -249,6 +262,7 @@ impl FontProvider {
         }
         None
     }
+    #[cfg(not(any(target_os = "macos", target_os = "ios")))]
     fn fallback_font(&mut self, cluster: &str, primary: &Rc<ManagedFont>) -> Rc<ManagedFont> {
         if primary.face.can_render(cluster) {
             return primary.clone();
@@ -406,6 +420,7 @@ impl FontProvider {
         primary.clone()
     }
 }
+#[cfg(not(any(target_os = "macos", target_os = "ios")))]
 fn windows_font_directory() -> PathBuf {
     std::env::var_os("WINDIR")
         .or_else(|| std::env::var_os("SystemRoot"))
@@ -413,6 +428,7 @@ fn windows_font_directory() -> PathBuf {
         .unwrap_or_else(|| PathBuf::from("C:\\Windows"))
         .join("Fonts")
 }
+#[cfg(not(any(target_os = "macos", target_os = "ios")))]
 fn system_primary_paths() -> Vec<PathBuf> {
     #[cfg(target_os = "windows")]
     {
@@ -447,6 +463,7 @@ fn system_primary_paths() -> Vec<PathBuf> {
     #[cfg(not(any(target_os = "windows", target_os = "android", target_os = "linux")))]
     Vec::new()
 }
+#[cfg(not(any(target_os = "macos", target_os = "ios")))]
 fn system_fallback_paths() -> Vec<PathBuf> {
     #[cfg(target_os = "windows")]
     {

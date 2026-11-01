@@ -155,7 +155,7 @@ mod unix {
         let mut session =
             ProcessSession::spawn(&command("while :; do :; done"), limits).expect("spawn");
         assert!(
-            session.write_input(&vec![1u8; 9]).is_err(),
+            session.write_input(&[1u8; 9]).is_err(),
             "nine bytes exceed the eight-byte pending-input budget"
         );
         session.cancel();

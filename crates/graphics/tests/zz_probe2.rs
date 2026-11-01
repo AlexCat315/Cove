@@ -2,9 +2,8 @@ use cove_core::{Color, DrawList, Rect};
 use cove_graphics::NativeDrawListRenderer;
 use cove_graphics::ui::NativeUIViewport;
 use cove_graphics::{
-    ColorLoadAction, CommandBuffer, Device, DeviceConfig, GraphicsApi, QueueClass,
-    RenderColorTarget, TextureDescriptor, TextureFormat, TextureResource, TextureSubresource,
-    TextureUsage,
+    CommandBuffer, Device, DeviceConfig, GraphicsApi, QueueClass, RenderColorTarget,
+    TextureDescriptor, TextureFormat, TextureResource, TextureSubresource, TextureUsage,
 };
 use std::sync::Arc;
 

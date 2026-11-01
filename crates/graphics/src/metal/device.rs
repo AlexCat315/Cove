@@ -210,6 +210,7 @@ impl MetalDeviceHandle {
             descriptor.setHeight(1);
         }
         if is_3d {
+            // SAFETY: a one-deep extent is valid for every 3D texture type.
             unsafe { descriptor.setDepth(1) };
         }
         descriptor.setUsage(MTLTextureUsage::ShaderRead);

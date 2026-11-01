@@ -114,6 +114,7 @@ impl SelectionGesture {
     /// Returns the selection to install, `Clear` when the gesture removes it, or
     /// `None` when nothing changes. `rectangle` selects a block of columns
     /// instead of running text.
+    #[allow(clippy::too_many_arguments)]
     pub(crate) fn apply(
         &self,
         phase: SelectionPhase,

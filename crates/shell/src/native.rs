@@ -104,6 +104,8 @@ unsafe extern "C" {
         target: *mut f64,
     ) -> bool;
     pub fn cove_shell_log_install(callback: unsafe extern "C" fn(i32, i32, *const c_char));
+    /// Mobile application entry: SDL owns `main` on iOS and Android.
+    #[cfg(any(target_os = "ios", target_os = "android"))]
     pub fn cove_sdl_run_app(
         callback: unsafe extern "C" fn(*mut c_void) -> i32,
         context: *mut c_void,

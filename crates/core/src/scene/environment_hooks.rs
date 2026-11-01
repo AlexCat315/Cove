@@ -24,16 +24,21 @@ impl Node {
     }
 }
 
+/// A unit of work handed to the UI run-loop thread.
+pub type UIWork = Rc<dyn Fn()>;
+/// Host hook that schedules [`UIWork`] on the UI run-loop thread.
+pub type WorkEnqueuer = Rc<dyn Fn(UIWork)>;
+
 /// Process-wide bridge for work that must run on the UI run-loop thread.
 pub struct UIWorkSchedulerHolder;
 thread_local! {
-    static ENQUEUE: RefCell<Option<Rc<dyn Fn(Rc<dyn Fn()>)>>> = const { RefCell::new(None) };
+    static ENQUEUE: RefCell<Option<WorkEnqueuer>> = const { RefCell::new(None) };
 }
 impl UIWorkSchedulerHolder {
-    pub fn set_enqueue(enqueue: Option<Rc<dyn Fn(Rc<dyn Fn()>)>>) {
+    pub fn set_enqueue(enqueue: Option<WorkEnqueuer>) {
         ENQUEUE.with(|slot| *slot.borrow_mut() = enqueue);
     }
-    pub fn schedule(work: Rc<dyn Fn()>) {
+    pub fn schedule(work: UIWork) {
         ENQUEUE.with(|slot| {
             if let Some(enqueue) = slot.borrow().as_ref() {
                 enqueue(work);
@@ -80,39 +85,6 @@ impl WindowReveal {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use std::cell::Cell;
-
-    #[test]
-    fn reveal_requests_carry_increasing_sequences() {
-        let mut reveal = WindowReveal::new(10.0, 10.0, 40.0);
-        assert_eq!(reveal.request().sequence, 1);
-        assert_eq!(reveal.request().sequence, 2);
-        assert!(reveal.covers(Rect::new(0.0, 0.0, 20.0, 20.0)));
-        assert!(!reveal.covers(Rect::new(200.0, 200.0, 10.0, 10.0)));
-    }
-
-    #[test]
-    fn reduced_motion_defaults_to_false_and_honours_providers() {
-        let node = Node::new();
-        assert!(!node.prefers_reduced_motion());
-        node.set_composition_value(&ReducedMotionEnvironment::key(), true);
-        assert!(node.prefers_reduced_motion());
-    }
-
-    #[test]
-    fn work_scheduler_forwards_to_the_host() {
-        let seen = Rc::new(Cell::new(0));
-        let counter = seen.clone();
-        UIWorkSchedulerHolder::set_enqueue(Some(Rc::new(move |work: Rc<dyn Fn()>| work())));
-        UIWorkSchedulerHolder::schedule(Rc::new(move || counter.set(counter.get() + 1)));
-        assert_eq!(seen.get(), 1);
-        UIWorkSchedulerHolder::set_enqueue(None);
-    }
-}
-
 /// WindowReveal.swift: activation origin belongs to the root window's attachment store.
 pub struct WindowRevealContext;
 impl WindowRevealContext {
@@ -141,5 +113,38 @@ impl WindowRevealContext {
     }
     pub fn bounds(node: &Node) -> Rect {
         Self::root(node).frame()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::cell::Cell;
+
+    #[test]
+    fn reveal_requests_carry_increasing_sequences() {
+        let mut reveal = WindowReveal::new(10.0, 10.0, 40.0);
+        assert_eq!(reveal.request().sequence, 1);
+        assert_eq!(reveal.request().sequence, 2);
+        assert!(reveal.covers(Rect::new(0.0, 0.0, 20.0, 20.0)));
+        assert!(!reveal.covers(Rect::new(200.0, 200.0, 10.0, 10.0)));
+    }
+
+    #[test]
+    fn reduced_motion_defaults_to_false_and_honours_providers() {
+        let node = Node::new();
+        assert!(!node.prefers_reduced_motion());
+        node.set_composition_value(&ReducedMotionEnvironment::key(), true);
+        assert!(node.prefers_reduced_motion());
+    }
+
+    #[test]
+    fn work_scheduler_forwards_to_the_host() {
+        let seen = Rc::new(Cell::new(0));
+        let counter = seen.clone();
+        UIWorkSchedulerHolder::set_enqueue(Some(Rc::new(move |work: UIWork| work())));
+        UIWorkSchedulerHolder::schedule(Rc::new(move || counter.set(counter.get() + 1)));
+        assert_eq!(seen.get(), 1);
+        UIWorkSchedulerHolder::set_enqueue(None);
     }
 }

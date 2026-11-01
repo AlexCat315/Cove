@@ -519,6 +519,7 @@ impl SubmissionPlanner {
         }
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn collect_binding_set_resources(
         &mut self,
         set: BindingSet,

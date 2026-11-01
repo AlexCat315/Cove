@@ -207,6 +207,8 @@ fn top_level(
 
     // Metal reads instance descriptors from a shared-storage buffer.
     let bytes = packed_bytes(&packed);
+    // SAFETY: `bytes` is live for the call and Metal copies it into the new
+    // buffer before returning.
     let buffer = unsafe {
         device.newBufferWithBytes_length_options(
             core::ptr::NonNull::new(bytes.as_ptr() as *mut core::ffi::c_void)

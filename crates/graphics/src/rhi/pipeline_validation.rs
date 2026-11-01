@@ -424,7 +424,7 @@ mod tests {
 
     #[test]
     fn binding_sets_must_match_the_declared_layout() {
-        let (interfaces, layout) = interfaces_with_graphics_pipeline();
+        let (interfaces, _layout) = interfaces_with_graphics_pipeline();
         let mut caches = DeviceCaches::new();
         caches.store_binding_set(50, 99);
         let buffer = render_pass(|encoder| {

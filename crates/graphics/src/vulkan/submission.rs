@@ -113,7 +113,6 @@ impl VulkanFrame {
 /// the `Buffer` handle it is registered under.
 #[derive(Clone)]
 pub struct VulkanUploadChunk {
-    pub buffer: sys::VkBuffer,
     pub allocation: VulkanMemoryAllocation,
     pub buffer_handle: crate::rhi::Buffer,
     pub capacity: usize,
@@ -499,7 +498,7 @@ impl<'a> Encoder<'a> {
         commands: &[PlannedCommand],
         profile: Option<&Arc<GpuTimestampProfile>>,
         slot: usize,
-        frames: &mut Vec<VulkanFrame>,
+        frames: &mut [VulkanFrame],
     ) -> RhiResult<Option<TimestampRecording>> {
         // Timestamps bracket each command so a slow pass is attributed to itself.
         let labels = encode_labels(commands);
@@ -1252,6 +1251,7 @@ impl<'a> Encoder<'a> {
         Ok(())
     }
 
+    #[allow(clippy::too_many_arguments)]
     unsafe fn texture_copy(
         &mut self,
         buffer: crate::rhi::Buffer,
@@ -1520,7 +1520,7 @@ impl<'a> Encoder<'a> {
         marker_count: usize,
         labels: Vec<String>,
         slot: usize,
-        frames: &mut Vec<VulkanFrame>,
+        frames: &mut [VulkanFrame],
     ) -> Option<TimestampRecording> {
         let profile = profile?;
         let period = f64::from(self.context.limits.timestampPeriod);
@@ -1821,9 +1821,9 @@ impl Submitter<'_> {
             flags: sys::VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT,
             pInheritanceInfo: core::ptr::null(),
         };
-        // SAFETY: `cmd` was just allocated from this slot's pool and is not
-        // recording.
         rhi_require(
+            // SAFETY: `cmd` was just allocated from this slot's pool and is not
+            // recording.
             unsafe { (self.context.draw.begin_command_buffer)(cmd, &begin_info) }
                 == sys::VK_SUCCESS,
             "vkBeginCommandBuffer failed",
@@ -1841,8 +1841,8 @@ impl Submitter<'_> {
                 return Err(error);
             }
         };
-        // SAFETY: `cmd` is recording and has not been ended yet.
         rhi_require(
+            // SAFETY: `cmd` is recording and has not been ended yet.
             unsafe { (self.context.draw.end_command_buffer)(cmd) } == sys::VK_SUCCESS,
             "vkEndCommandBuffer failed",
         )?;
@@ -1864,9 +1864,9 @@ impl Submitter<'_> {
             pNext: core::ptr::null(),
             flags: 0,
         };
-        // SAFETY: `fence_info` outlives the call and the out-parameter is a live
-        // local.
         rhi_require(
+            // SAFETY: `fence_info` outlives the call and the out-parameter is a live
+            // local.
             unsafe {
                 (self.context.sync.create_fence)(
                     self.context.device,
@@ -2232,8 +2232,8 @@ pub fn one_shot(
         commandBufferCount: 1,
     };
     let mut cmd: sys::VkCommandBuffer = core::ptr::null_mut();
-    // SAFETY: the pool is live and the out-parameter is a live local.
     rhi_require(
+        // SAFETY: the pool is live and the out-parameter is a live local.
         unsafe {
             (context.resources.allocate_command_buffers)(context.device, &allocate_info, &mut cmd)
         } == sys::VK_SUCCESS
@@ -2247,14 +2247,14 @@ pub fn one_shot(
         flags: sys::VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT,
         pInheritanceInfo: core::ptr::null(),
     };
-    // SAFETY: `cmd` was just allocated and is not recording.
     rhi_require(
+        // SAFETY: `cmd` was just allocated and is not recording.
         unsafe { (context.draw.begin_command_buffer)(cmd, &begin_info) } == sys::VK_SUCCESS,
         "immediate command begin failed",
     )?;
     body(cmd)?;
-    // SAFETY: `cmd` is recording.
     rhi_require(
+        // SAFETY: `cmd` is recording.
         unsafe { (context.draw.end_command_buffer)(cmd) } == sys::VK_SUCCESS,
         "immediate command end failed",
     )?;
@@ -2279,8 +2279,8 @@ pub fn one_shot(
         "Vulkan immediate transfer submit failed",
     )?;
     let mut fences = [fence];
-    // SAFETY: the fence belongs to this submission; wait indefinitely.
     rhi_require(
+        // SAFETY: the fence belongs to this submission; wait indefinitely.
         unsafe {
             (context.sync.wait_for_fences)(
                 context.device,
@@ -2325,9 +2325,9 @@ impl ScratchResources {
             queueFamilyIndex: context.queues.graphics.family,
         };
         let mut pool: sys::VkCommandPool = sys::VK_NULL_HANDLE;
-        // SAFETY: `create_info` outlives the call and the out-parameter is a live
-        // local.
         rhi_require(
+            // SAFETY: `create_info` outlives the call and the out-parameter is a live
+            // local.
             unsafe {
                 (context.resources.create_command_pool)(
                     context.device,
@@ -2353,9 +2353,9 @@ impl ScratchResources {
             flags: 0,
         };
         let mut fence: sys::VkFence = sys::VK_NULL_HANDLE;
-        // SAFETY: `create_info` outlives the call and the out-parameter is a live
-        // local.
         rhi_require(
+            // SAFETY: `create_info` outlives the call and the out-parameter is a live
+            // local.
             unsafe {
                 (context.sync.create_fence)(
                     context.device,

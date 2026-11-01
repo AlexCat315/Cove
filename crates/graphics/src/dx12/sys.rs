@@ -15,7 +15,15 @@
 //! ABI-correct. The module compiles on every host; only the loader is
 //! Windows-only, so the crate type-checks on macOS while the real code path stays
 //! Windows.
-#![allow(non_camel_case_types, non_snake_case, non_upper_case_globals)]
+// The declarations mirror the Win32/D3D12 headers, names included, so
+// interfaces and constants the backend does not call yet stay declared.
+#![allow(
+    non_camel_case_types,
+    non_snake_case,
+    non_upper_case_globals,
+    dead_code,
+    clippy::upper_case_acronyms
+)]
 
 use core::ffi::{c_char, c_void};
 

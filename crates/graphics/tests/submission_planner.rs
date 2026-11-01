@@ -13,7 +13,7 @@ use cove_graphics::{
     ResourceRef, ResourceState, Sampler, SubmissionPlanner, SubmitDescriptor, Texture,
 };
 
-fn set_entries(set: BindingSet, entries: &[BindingSetEntry]) -> RenderCommand {
+fn set_entries(set: BindingSet, _entries: &[BindingSetEntry]) -> RenderCommand {
     RenderCommand::SetBindingSet {
         slot: 0,
         set,
@@ -111,7 +111,7 @@ fn cached_read_dependencies_keep_upload_queue_write_and_forget_boundaries() {
     let first = planner
         .build_plan(
             QueueClass::Graphics,
-            &[render.clone()],
+            std::slice::from_ref(&render),
             &SubmitDescriptor::default(),
         )
         .expect("plan");
@@ -125,7 +125,7 @@ fn cached_read_dependencies_keep_upload_queue_write_and_forget_boundaries() {
     let steady = planner
         .build_plan(
             QueueClass::Graphics,
-            &[render.clone()],
+            std::slice::from_ref(&render),
             &SubmitDescriptor::default(),
         )
         .expect("plan");
@@ -154,7 +154,7 @@ fn cached_read_dependencies_keep_upload_queue_write_and_forget_boundaries() {
     let handoff = planner
         .build_plan(
             QueueClass::Compute,
-            &[compute.clone()],
+            std::slice::from_ref(&compute),
             &SubmitDescriptor::default(),
         )
         .expect("plan");
@@ -200,7 +200,7 @@ fn presentation_restores_external_state_before_image_reuse() {
     planner
         .build_plan(
             QueueClass::Graphics,
-            &[pass.clone()],
+            std::slice::from_ref(&pass),
             &SubmitDescriptor::default(),
         )
         .expect("first plan");

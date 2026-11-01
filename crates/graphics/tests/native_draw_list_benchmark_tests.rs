@@ -309,7 +309,7 @@ fn owned_images_render_and_stay_retained() {
                         ((index * 17 + x as usize * 3) % 256) as u8,
                         ((index * 29 + y as usize * 3) % 256) as u8,
                         ((x as usize * 2 + y as usize * 2) % 256) as u8,
-                        128 + (((x / 8 + y / 8) % 2) * 127) as u8,
+                        128 + (((x / 8 + y / 8) % 2) * 127),
                     ]);
                 }
             }

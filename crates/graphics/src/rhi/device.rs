@@ -6,6 +6,7 @@
 //!   * the frames-in-flight ring plus deferred destruction ([`FrameRing`]),
 //!   * the [`SubmissionPlanner`] that turns recorded commands into a
 //!     [`SubmitPlan`],
+//!
 //! and delegates all concrete GPU work to the selected [`RhiBackend`].
 //!
 //! Swift serializes every mutating operation on an `NSLock`; the Rust port keeps

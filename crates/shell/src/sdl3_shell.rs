@@ -613,6 +613,10 @@ impl Drop for Sdl3Shell {
 /// is only ever produced by `apple.m`, which needs a window and event monitor.
 /// `flags & 4` is `hasPreciseScrollingDeltas`; `phase`/`momentum` are the values
 /// `apple.m::phase_value` stored.
+#[allow(
+    clippy::too_many_arguments,
+    reason = "decodes ten fields of one AppKit scroll event, matching apple.m's payload"
+)]
 pub fn wheel_event(
     dx: f32,
     dy: f32,

@@ -36,10 +36,9 @@ struct OpenNode {
     node: Option<Node>,
     end: usize,
     /// `Some` when this record records into its own layer list; `None` when it
-    /// paints into the nearest enclosing list.
+    /// paints into the nearest enclosing list. A record that owns a list is a
+    /// layer whose slice `finish` caches.
     list: Option<DrawList>,
-    /// Whether `list` becomes the object's cached layer on close.
-    caches: bool,
     own: Affine2D,
     parent_clips: Vec<Clip>,
     child_clips: Vec<Clip>,
@@ -97,7 +96,6 @@ impl LayerAwareNodeRenderer {
             node: None,
             end: usize::MAX,
             list: Some(std::mem::take(frame)),
-            caches: false,
             own: Affine2D::IDENTITY,
             parent_clips: Vec::new(),
             child_clips: Vec::new(),
@@ -176,7 +174,6 @@ impl LayerAwareNodeRenderer {
             }
 
             let mut layer: Option<DrawList> = None;
-            let mut caches = false;
             let mut child_allows_cache = allows_cache;
             let mut inherited_clip_revision = 0;
             if object.is_layer_root() {
@@ -216,7 +213,6 @@ impl LayerAwareNodeRenderer {
                     }
                     inherited_clip_revision = list.clip_revision;
                     layer = Some(list);
-                    caches = true;
                     child_allows_cache = false;
                 }
             }
@@ -226,7 +222,6 @@ impl LayerAwareNodeRenderer {
                 &node,
                 end,
                 layer,
-                caches,
                 own,
                 &parent_clips,
                 child_allows_cache,
@@ -255,7 +250,6 @@ fn begin(
     node: &Node,
     end: usize,
     layer: Option<DrawList>,
-    caches: bool,
     own: Affine2D,
     parent_clips: &[Clip],
     allows_container_cache: bool,
@@ -279,7 +273,6 @@ fn begin(
         node: Some(node.clone()),
         end,
         list: layer,
-        caches,
         own,
         parent_clips: parent_clips.to_vec(),
         child_clips,

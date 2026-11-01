@@ -133,7 +133,7 @@ fn clear_preserves_retained_snapshots() {
     snapshot.resources = list.resources.clone();
     list.reset();
     registry.clear();
-    asset = None;
+    drop(asset.take());
 
     assert_eq!(registry.revision(), 1, "clear bumps the revision once");
     assert_eq!(snapshot.resources.len(), 1);

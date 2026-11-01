@@ -669,7 +669,7 @@ fn incomplete_jpeg() {
 #[test]
 fn orientation_and_bounds() {
     let upright = ImageDecoder::decode_partial(
-        &WITH_EXIF_ORIENTATION,
+        WITH_EXIF_ORIENTATION,
         bounds(96, 96),
         ImageDecoder::DEFAULT_SOURCE_PIXELS,
     )
@@ -681,7 +681,7 @@ fn orientation_and_bounds() {
     );
 
     let original = ImageDecoder::decode_partial(
-        &WITH_EXIF_ORIENTATION,
+        WITH_EXIF_ORIENTATION,
         bounds(512, 512),
         ImageDecoder::DEFAULT_SOURCE_PIXELS,
     )
@@ -696,11 +696,11 @@ fn orientation_and_bounds() {
 #[test]
 fn limits() {
     assert!(
-        ImageDecoder::decode_partial(&PROGRESSIVE, bounds(32, 32), SOURCE_PIXELS - 1,).is_none(),
+        ImageDecoder::decode_partial(PROGRESSIVE, bounds(32, 32), SOURCE_PIXELS - 1,).is_none(),
         "a source larger than the pixel budget yields no preview",
     );
     assert!(
-        ImageDecoder::decode_partial(&PROGRESSIVE, bounds(32, 32), 0).is_none(),
+        ImageDecoder::decode_partial(PROGRESSIVE, bounds(32, 32), 0).is_none(),
         "a zero pixel budget yields no preview",
     );
     // A zero, oversized or unrepresentable target width must produce no
@@ -709,7 +709,7 @@ fn limits() {
     // 8192 preview cap lives in `validate_bounds`, not in `PixelSize`.
     for width in [0_u32, 8_193, u32::MAX] {
         let result = ImageDecoder::decode_partial(
-            &PROGRESSIVE,
+            PROGRESSIVE,
             PixelSize { width, height: 32 },
             SOURCE_PIXELS,
         );

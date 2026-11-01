@@ -21,6 +21,9 @@ struct State {
     target_animation: Option<Rc<AnimationController<Point>>>,
 }
 
+/// Receives every offset the animator writes out.
+pub type ScrollOffsetCallback = Rc<dyn Fn(Point)>;
+
 /// Owns every kind of motion one scrollable offset can have: the inertia that
 /// carries content along after input stops, the rubber band it stretches
 /// against past its bounds, and the spring that brings it back.
@@ -31,7 +34,7 @@ struct State {
 pub struct ScrollAnimator {
     state: RefCell<State>,
     physics: Cell<ScrollPhysics>,
-    on_change: RefCell<Option<Rc<dyn Fn(Point)>>>,
+    on_change: RefCell<Option<ScrollOffsetCallback>>,
     clock: RefCell<Rc<dyn Fn() -> f64>>,
     scheduler: Option<AnimatorScheduler>,
     self_ref: RefCell<Weak<ScrollAnimator>>,
@@ -42,7 +45,7 @@ impl ScrollAnimator {
         maximum_offset: Point,
         viewport_size: Size,
         initial_offset: Point,
-        on_change: Option<Rc<dyn Fn(Point)>>,
+        on_change: Option<ScrollOffsetCallback>,
     ) -> Rc<Self> {
         let position = constrain(initial_offset, maximum_offset);
         let animator = Rc::new(Self {

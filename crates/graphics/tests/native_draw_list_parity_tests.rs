@@ -226,7 +226,9 @@ fn assert_parity(native: &[u8], reference: &[u8], format: TextureFormat, label: 
         // maximum absolute delta of 0.002 with no outliers past it.
         let decode = |bytes: &[u8]| -> Vec<f32> {
             bytes
-                .chunks_exact(2)
+                .as_chunks::<2>()
+                .0
+                .iter()
                 .map(|pair| half_to_f32(u16::from_le_bytes([pair[0], pair[1]])))
                 .collect()
         };

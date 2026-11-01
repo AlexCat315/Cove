@@ -3,6 +3,10 @@ use crate::FontAtlas;
 use cove_core::{
     Color, DrawError, DrawList, Point, PositionedGlyph, TextLayoutResult, TextureId, content_scale,
 };
+
+/// Maps a positioned glyph to a per-glyph colour override.
+pub type GlyphColorSource<'a> = &'a dyn Fn(&PositionedGlyph) -> Option<Color>;
+
 pub trait DrawListText {
     #[allow(
         clippy::too_many_arguments,
@@ -15,7 +19,7 @@ pub trait DrawListText {
         color: Color,
         texture_id: TextureId,
         atlas: Option<&FontAtlas>,
-        color_for_glyph: Option<&dyn Fn(&PositionedGlyph) -> Option<Color>>,
+        color_for_glyph: Option<GlyphColorSource<'_>>,
     ) -> Result<(), DrawError>;
 }
 impl DrawListText for DrawList {
@@ -26,7 +30,7 @@ impl DrawListText for DrawList {
         color: Color,
         texture_id: TextureId,
         atlas: Option<&FontAtlas>,
-        color_for_glyph: Option<&dyn Fn(&PositionedGlyph) -> Option<Color>>,
+        color_for_glyph: Option<GlyphColorSource<'_>>,
     ) -> Result<(), DrawError> {
         let scale = content_scale();
         let snap = |value: f32| {

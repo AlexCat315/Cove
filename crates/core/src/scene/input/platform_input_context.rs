@@ -16,11 +16,18 @@ use std::sync::Arc;
 // window owns its own registries; the holder is the ambient pointer the call
 // sites read.
 
+/// Host clipboard reader installed by the platform shell.
+pub type ClipboardReader = Rc<dyn Fn() -> Option<String>>;
+/// Host clipboard writer installed by the platform shell.
+pub type ClipboardWriter = Rc<dyn Fn(&str)>;
+/// Host native-menu presenter installed by the platform shell.
+pub type NativeMenuPresenterCallback = Rc<dyn Fn(&NativeMenuSnapshot, Point) -> Option<i64>>;
+
 thread_local! {
     static CURRENT_INTERACTIONS: RefCell<Option<Rc<InteractionRegistry>>> = const { RefCell::new(None) };
-    static CLIPBOARD_READ: RefCell<Option<Rc<dyn Fn() -> Option<String>>>> = const { RefCell::new(None) };
-    static CLIPBOARD_WRITE: RefCell<Option<Rc<dyn Fn(&str)>>> = const { RefCell::new(None) };
-    static NATIVE_MENU_PRESENTER: RefCell<Option<Rc<dyn Fn(&NativeMenuSnapshot, Point) -> Option<i64>>>> = const { RefCell::new(None) };
+    static CLIPBOARD_READ: RefCell<Option<ClipboardReader>> = const { RefCell::new(None) };
+    static CLIPBOARD_WRITE: RefCell<Option<ClipboardWriter>> = const { RefCell::new(None) };
+    static NATIVE_MENU_PRESENTER: RefCell<Option<NativeMenuPresenterCallback>> = const { RefCell::new(None) };
 }
 
 /// Holds the active window's interaction registry.
@@ -40,7 +47,7 @@ impl ClipboardHolder {
     pub fn read() -> Option<String> {
         CLIPBOARD_READ.with(|slot| slot.borrow().as_ref().and_then(|read| read()))
     }
-    pub fn set_read(read: Option<Rc<dyn Fn() -> Option<String>>>) {
+    pub fn set_read(read: Option<ClipboardReader>) {
         CLIPBOARD_READ.with(|slot| *slot.borrow_mut() = read);
     }
     pub fn write(text: &str) {
@@ -50,7 +57,7 @@ impl ClipboardHolder {
             }
         });
     }
-    pub fn set_write(write: Option<Rc<dyn Fn(&str)>>) {
+    pub fn set_write(write: Option<ClipboardWriter>) {
         CLIPBOARD_WRITE.with(|slot| *slot.borrow_mut() = write);
     }
 }
@@ -66,7 +73,7 @@ impl NativeMenuPresenter {
                 .and_then(|present| present(snapshot, at))
         })
     }
-    pub fn set_present(present: Option<Rc<dyn Fn(&NativeMenuSnapshot, Point) -> Option<i64>>>) {
+    pub fn set_present(present: Option<NativeMenuPresenterCallback>) {
         NATIVE_MENU_PRESENTER.with(|slot| *slot.borrow_mut() = present);
     }
 }

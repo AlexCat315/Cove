@@ -5,7 +5,6 @@
 //! Swift wrapped every create-info in a `VulkanScratch` arena because the C
 //! pointers only have to survive the call. The Rust port does the same with stack
 //! locals plus `Vec`s, which is the same guarantee with no manual free.
-use std::collections::HashSet;
 use std::sync::{Arc, Mutex};
 
 use crate::rhi::{
@@ -424,7 +423,9 @@ pub fn unregister_binding_set(
 /// move after `info` captures their addresses, so this value is created once and
 /// kept alive next to the stage that references it.
 struct SpecializationStorage {
+    #[allow(dead_code, reason = "`info.pMapEntries` points into this buffer")]
     entries: Vec<sys::VkSpecializationMapEntry>,
+    #[allow(dead_code, reason = "`info.pData` points into this buffer")]
     data: Vec<u32>,
     info: sys::VkSpecializationInfo,
 }
@@ -1075,6 +1076,7 @@ pub fn destroy_mesh_pipeline(
 }
 
 /// Dynamic-offset positions follow the ascending dynamic binding slot.
+#[cfg(test)]
 pub fn dynamic_slot_positions(layout_entries: &[BindingLayoutEntry]) -> Vec<(u32, u32)> {
     let mut dynamic: Vec<&BindingLayoutEntry> = layout_entries
         .iter()
@@ -1089,11 +1091,12 @@ pub fn dynamic_slot_positions(layout_entries: &[BindingLayoutEntry]) -> Vec<(u32
 }
 
 /// Rejects layouts whose slots collide or exceed the device's descriptor budget.
+#[cfg(test)]
 pub fn validate_binding_layout(
     entries: &[BindingLayoutEntry],
     max_descriptors: u32,
 ) -> RhiResult<()> {
-    let mut seen: HashSet<u32> = HashSet::new();
+    let mut seen = std::collections::HashSet::new();
     for entry in entries {
         rhi_require(
             seen.insert(entry.slot),

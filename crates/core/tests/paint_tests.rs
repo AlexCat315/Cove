@@ -11,7 +11,6 @@
 //! - the batch scissor stack is the content clip inside the group bounds
 //! - the legacy walker and the layer-aware renderer agree vertex for vertex
 
-use std::cell::RefCell;
 use std::rc::Rc;
 
 use cove_core::scene::{
@@ -38,7 +37,7 @@ fn custom_content() {
     let draw: DrawHook = Rc::new(|list: &mut DrawList, origin: cove_core::Point| {
         let rect = Rect::new(origin.x + 4.0, origin.y + 6.0, 20.0, 12.0);
         list.push_clip_rect(rect);
-        list.add_rect(rect, Color::WHITE);
+        list.add_rect(rect, Color::WHITE).expect("the rect fits");
         list.pop_clip_rect();
     });
     content.set_draw(Some(draw));
@@ -47,7 +46,8 @@ fn custom_content() {
         list.add_rect(
             Rect::new(origin.x + 30.0, origin.y + 10.0, 10.0, 8.0),
             Color::BLACK,
-        );
+        )
+        .expect("the rect fits");
     });
     content.set_overlay_draw(Some(overlay));
 

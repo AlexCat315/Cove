@@ -11,7 +11,7 @@ use cove_graphics::rhi::{
 use cove_graphics::ui::{NativeDrawListRenderer, NativeUIViewport};
 use cove_platform::{
     InputEvent, KeyEvent, KeyModifiers, MouseButton, MouseButtonEvent, MouseMotionEvent,
-    MouseWheelEvent, ScrollInput,
+    MouseWheelEvent,
 };
 use std::cell::RefCell;
 use std::rc::Rc;

@@ -30,9 +30,12 @@ use std::rc::Rc;
 /// port lets each scope own a stable token.
 pub type ScopeId = usize;
 
+/// Renders one composition scope for the reasons that invalidated it.
+pub type ScopeBody = Rc<dyn Fn(&[RecompositionReason])>;
+
 struct PendingScope {
     id: ScopeId,
-    body: Rc<dyn Fn(&[RecompositionReason])>,
+    body: ScopeBody,
     reasons: Vec<RecompositionReason>,
     /// Animation captured at write time. Re-established by `commit_all` before
     /// invoking `body` so modifier `apply` paths observe the same animation

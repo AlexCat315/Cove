@@ -493,6 +493,8 @@ unsafe extern "C" fn reply_callback(
     let Some(engine) = (unsafe { TerminalEngine::active() }) else {
         return;
     };
+    // SAFETY: `data` is non-null and readable for `length` bytes for the
+    // duration of the callback.
     let bytes = unsafe { std::slice::from_raw_parts(data, length) };
     if let Some(handler) = engine.on_reply.take() {
         handler(bytes);

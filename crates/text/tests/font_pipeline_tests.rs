@@ -381,7 +381,7 @@ fn dirty_regions_become_empty_when_existing_glyphs_are_reused() {
     let region = first.region;
     assert_eq!(
         first.pixels.len(),
-        (region.width * region.height) as usize,
+        region.width * region.height,
         "the payload covers exactly its dirty region"
     );
     assert!(

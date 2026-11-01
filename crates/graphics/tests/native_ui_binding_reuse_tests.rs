@@ -170,7 +170,7 @@ struct CacheDelta {
 /// Samples a BGRA8 image as RGBA so the comparison is channel-order agnostic.
 fn as_rgba_bgra(pixels: &[u8]) -> Vec<u8> {
     let mut out = Vec::with_capacity(pixels.len());
-    for texel in pixels.chunks_exact(4) {
+    for texel in pixels.as_chunks::<4>().0 {
         out.extend_from_slice(&[texel[2], texel[1], texel[0], texel[3]]);
     }
     out
@@ -221,7 +221,7 @@ fn recording_constants_are_independent() {
     for frame_index in 0..8 {
         let previous = context.device.binding_set_cache_stats();
         context.device.begin_frame().expect("begin frame");
-        let outcome = (|| {
+        let outcome = {
             let mut commands = CommandBuffer::new();
             let mut frames = Vec::new();
             for index in 0..formats.len() {
@@ -260,7 +260,7 @@ fn recording_constants_are_independent() {
                 frame.did_submit();
             }
             Ok::<_, String>(())
-        })();
+        };
         context.device.end_frame();
         outcome.expect("frame renders");
 

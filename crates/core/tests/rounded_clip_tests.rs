@@ -16,7 +16,6 @@
 //! - a cached leaf recorded outside a rounded clip paints once its parent moves
 //!   it into view
 
-use std::rc::Rc;
 use std::sync::{Mutex, MutexGuard, OnceLock};
 
 use cove_core::scene::{LayerAwareNodeRenderer, Node, NodeRenderer, NodeTree, RenderTree};
@@ -41,7 +40,8 @@ impl GlobalTestLock {
 /// Whether any triangle with visible alpha covers `(x, y)`, optionally of one
 /// colour family — the Swift `covers(_:_:in:color:)` helper.
 fn covers(x: f32, y: f32, list: &DrawList, color: Option<Color>) -> bool {
-    for triangle in list.indices().chunks_exact(3) {
+    let (triangles, _) = list.indices().as_chunks::<3>();
+    for triangle in triangles {
         let verts: Vec<&cove_core::Vertex> = triangle
             .iter()
             .map(|index| &list.vertices()[*index as usize])
@@ -268,7 +268,9 @@ fn preclipped_geometry() {
 
     let mut frame = DrawList::default();
     frame.push_clip(clip);
-    frame.append_preclipped(&cached, &[clip], Point::default());
+    frame
+        .append_preclipped(&cached, &[clip], Point::default())
+        .expect("the cached layer appends");
 
     assert_eq!(
         frame.vertices().len(),
@@ -310,7 +312,9 @@ fn preclipped_geometry() {
         mask: Some(RoundedRect::new(rect(40.0, 40.0, 20.0, 20.0), 5.0)),
     };
     constrained.push_clip(extra);
-    constrained.append_preclipped(&cached, &[clip], Point::default());
+    constrained
+        .append_preclipped(&cached, &[clip], Point::default())
+        .expect("the cached layer appends");
 
     assert!(
         covers(50.0, 50.0, &constrained, None),

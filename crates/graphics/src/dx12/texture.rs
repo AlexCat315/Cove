@@ -490,6 +490,7 @@ fn transfer_read(
 }
 
 /// One staged copy between a texture and a buffer.
+#[allow(clippy::too_many_arguments)]
 fn transfer(
     device: &mut Dx12DeviceHandle,
     record: &super::backend::TextureSnapshot,

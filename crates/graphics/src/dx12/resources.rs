@@ -77,6 +77,10 @@ pub struct Dx12Registries {
     pub next_descriptor_index: u32,
 }
 
+// SAFETY: the records are COM pointers plus plain data. D3D12 objects are
+// free-threaded, and the owning `Mutex` serializes access to the records.
+unsafe impl Send for Dx12Registries {}
+
 /// One registered binding set: the layout it was built from and its entries.
 pub struct Dx12SetRecordRecord {
     pub layout_id: u32,

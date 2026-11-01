@@ -135,19 +135,6 @@ impl StyleEdges {
             left: axis(self.left),
         }
     }
-    fn resolve_axis(self, horizontal: bool, basis: Option<f32>) -> (f32, f32) {
-        if horizontal {
-            (
-                self.left.resolve(basis).unwrap_or(0.0),
-                self.right.resolve(basis).unwrap_or(0.0),
-            )
-        } else {
-            (
-                self.top.resolve(basis).unwrap_or(0.0),
-                self.bottom.resolve(basis).unwrap_or(0.0),
-            )
-        }
-    }
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
@@ -377,9 +364,6 @@ impl LayoutNode {
     /// Upgrade a weak layout-node handle used by retained measure callbacks.
     pub fn upgrade(weak: &LayoutNodeWeak) -> Option<Self> {
         weak.upgrade().map(Self)
-    }
-    pub(crate) fn cell(&self) -> &Rc<RefCell<LayoutNodeData>> {
-        &self.0
     }
 
     // MARK: - Tree
@@ -1331,22 +1315,13 @@ impl LayoutNode {
                 + line_gap;
             let line_cross = line
                 .iter()
-                .enumerate()
-                .map(|(offset, &index)| {
-                    let child = &flow[index];
-                    let measured = if row {
-                        cross_sizes[index]
-                    } else {
-                        cross_sizes[index]
-                    };
-                    let _ = child;
-                    measured
+                .map(|&index| {
+                    cross_sizes[index]
                         + if row {
                             margins[index].vertical()
                         } else {
                             margins[index].horizontal()
                         }
-                        + sizes[offset] * 0.0
                 })
                 .fold(0.0f32, f32::max);
 

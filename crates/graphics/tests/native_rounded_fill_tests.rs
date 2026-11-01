@@ -150,7 +150,12 @@ fn single_sample_rounded_fills_have_smooth_corners_no_halo_and_no_alpha_accumula
             "scale {scale}: the first covered row is fully covered",
         );
 
-        let reds: Vec<u8> = image.chunks_exact(4).map(|texel| texel[2]).collect();
+        let reds: Vec<u8> = image
+            .as_chunks::<4>()
+            .0
+            .iter()
+            .map(|texel| texel[2])
+            .collect();
         assert!(
             reds.iter().all(|value| *value <= FILL_ALPHA),
             "scale {scale}: no pixel may accumulate above the requested alpha",

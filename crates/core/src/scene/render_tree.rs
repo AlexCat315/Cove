@@ -172,17 +172,13 @@ impl RenderObject {
             self.0.borrow_mut().is_layer_root = true;
             return;
         };
-        let layer_root = if self.parent().is_none() {
-            true
-        } else if node.clips_to_bounds() {
-            true
-        } else if node.opacity() < 1.0 {
-            true
-        } else if !node.shadow().is_empty() || !node.ambient_shadow().is_empty() {
-            true
-        } else {
-            node.draw().is_some() || node.overlay_draw().is_some()
-        };
+        let layer_root = self.parent().is_none()
+            || node.clips_to_bounds()
+            || node.opacity() < 1.0
+            || !node.shadow().is_empty()
+            || !node.ambient_shadow().is_empty()
+            || node.draw().is_some()
+            || node.overlay_draw().is_some();
         self.0.borrow_mut().is_layer_root = layer_root;
     }
 }
@@ -252,16 +248,19 @@ impl RenderTree {
         let Some(parent_object) = self.render_object(parent_node) else {
             return;
         };
-        let existing: HashMap<Node, RenderObject> = parent_object
+        // Children are keyed by the stable `ElementId` their node carries, so
+        // the map key has no interior mutability and cannot be invalidated by
+        // a later node mutation.
+        let existing: HashMap<ElementId, RenderObject> = parent_object
             .children()
             .into_iter()
-            .filter_map(|child| child.node().map(|node| (node, child)))
+            .filter_map(|child| child.node().map(|node| (node.id(), child)))
             .collect();
         let mut rebuilt = Vec::new();
         let mut seen = Vec::new();
         for child_node in parent_node.children() {
-            seen.push(child_node.clone());
-            if let Some(kept) = existing.get(&child_node) {
+            seen.push(child_node.id());
+            if let Some(kept) = existing.get(&child_node.id()) {
                 kept.set_parent(Some(&parent_object));
                 rebuilt.push(kept.clone());
             } else {
@@ -275,8 +274,8 @@ impl RenderTree {
                 self.rebuild_subtree(&made);
             }
         }
-        for (node, object) in existing {
-            if !seen.contains(&node) {
+        for (id, object) in existing {
+            if !seen.contains(&id) {
                 self.tear_down_object(&object);
             }
         }

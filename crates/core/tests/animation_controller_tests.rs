@@ -15,7 +15,7 @@
 //! - finished controllers are evicted on the same tick
 //! - an empty scheduler tick is a no-op and `reset` drops every active controller
 
-use std::cell::{Cell, RefCell};
+use std::cell::Cell;
 use std::rc::Rc;
 
 use cove_core::Color;

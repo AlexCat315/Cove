@@ -39,7 +39,6 @@ use super::{acceleration, pipelines, presentation, resources, submission};
 /// The concrete Vulkan backend.
 pub struct VulkanBackend {
     context: VulkanContext,
-    config: DeviceConfig,
     allocator: Arc<Mutex<VulkanMemoryAllocator>>,
     registries: Arc<Mutex<VulkanRegistries>>,
     descriptor_pool: sys::VkDescriptorPool,
@@ -90,7 +89,6 @@ impl VulkanBackend {
         let device_name = context.device_name.clone();
         Ok(Self {
             context,
-            config,
             allocator: Arc::new(Mutex::new(allocator)),
             registries: Arc::new(Mutex::new(VulkanRegistries::new())),
             descriptor_pool,
@@ -207,50 +205,6 @@ fn create_descriptor_pool(context: &VulkanContext) -> RhiResult<sys::VkDescripto
         return Err(RhiError::OutOfMemory);
     }
     Ok(pool)
-}
-
-/// Per-slot uploader chunk factory: a host-visible buffer registered under a
-/// backend-internal handle.
-fn make_upload_chunk(
-    context: &VulkanContext,
-    registries: &Arc<Mutex<VulkanRegistries>>,
-    allocator: &mut VulkanMemoryAllocator,
-    capacity: usize,
-) -> RhiResult<VulkanUploadChunk> {
-    let handle = crate::rhi::Buffer::new(lock(registries).next_internal_id());
-    let usage = crate::rhi::BufferUsage::TRANSFER_SOURCE
-        | crate::rhi::BufferUsage::TRANSFER_DESTINATION
-        | crate::rhi::BufferUsage::UNIFORM
-        | crate::rhi::BufferUsage::STORAGE_READ
-        | crate::rhi::BufferUsage::VERTEX
-        | crate::rhi::BufferUsage::INDEX
-        | crate::rhi::BufferUsage::INDIRECT;
-    // A transfer-only usage keeps the block host visible, which is what the upload
-    // ring needs.
-    resources::create_buffer(
-        context,
-        registries,
-        allocator,
-        handle,
-        BufferDescriptor::new(
-            capacity.max(1),
-            usage | crate::rhi::BufferUsage::TRANSFER_DESTINATION,
-        ),
-    )?;
-    let (native, allocation) = {
-        let registries = lock(registries);
-        let record = registries
-            .buffers
-            .get(&handle.id())
-            .ok_or(RhiError::OutOfMemory)?;
-        (record.buffer, record.allocation)
-    };
-    Ok(VulkanUploadChunk {
-        buffer: native,
-        allocation,
-        buffer_handle: handle,
-        capacity,
-    })
 }
 
 impl RhiBackend for VulkanBackend {
@@ -902,11 +856,6 @@ impl VulkanBackend {
         Ok(())
     }
 
-    /// Creates a binary semaphore for acquire/present handshakes.
-    fn make_binary_semaphore(&self) -> RhiResult<sys::VkSemaphore> {
-        binary_semaphore(&self.context)
-    }
-
     /// Runs one background compilation request.
     pub fn prepare_compilation(
         &self,
@@ -1140,6 +1089,7 @@ pub fn upload_texture(
 }
 
 /// Reads one region of a texture back through a staging buffer.
+#[allow(clippy::too_many_arguments)]
 pub fn read_texture(
     context: &VulkanContext,
     registries: &Arc<Mutex<VulkanRegistries>>,
@@ -1294,6 +1244,7 @@ pub fn read_texture(
 ///
 /// # Safety
 /// `cmd` must be recording.
+#[allow(clippy::too_many_arguments)]
 unsafe fn transition_image(
     context: &VulkanContext,
     cmd: sys::VkCommandBuffer,
@@ -1453,7 +1404,6 @@ impl UploadChunkContext {
                     },
                 );
                 Ok(VulkanUploadChunk {
-                    buffer: native,
                     allocation,
                     buffer_handle: handle,
                     capacity,
@@ -1492,41 +1442,6 @@ impl crate::rhi::FrameUploader for UploaderHandle {
             bytes,
             alignment,
         )
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn the_backend_reports_vulkan() {
-        assert_eq!(GraphicsApi::Vulkan.display_name(), "Vulkan");
-    }
-
-    #[test]
-    fn capability_probe_requires_every_acceleration_entry_point() {
-        // A context cannot be built without a driver, so this asserts the shaping
-        // rules the probe applies: ray tracing needs the feature AND all five
-        // resolved commands.
-        let mut features = sys::FeatureSupport::default();
-        assert!(!features.acceleration_structures);
-        features.acceleration_structures = true;
-        // The capability flag alone is not enough; the backend intersects it with the
-        // resolved table, which is why `probe_capabilities` checks each pointer.
-        assert!(features.acceleration_structures);
-    }
-
-    #[test]
-    fn aspect_masks_come_from_the_format() {
-        assert_eq!(
-            frames_aspect(crate::rhi::TextureFormat::Rgba8Unorm),
-            sys::VK_IMAGE_ASPECT_COLOR_BIT
-        );
-        assert_eq!(
-            frames_aspect(crate::rhi::TextureFormat::Depth32Float),
-            sys::VK_IMAGE_ASPECT_DEPTH_BIT
-        );
     }
 }
 
@@ -1781,4 +1696,39 @@ impl VulkanBackend {
 /// Factory used by the backend registry.
 pub fn make_backend(config: &DeviceConfig) -> RhiResult<Box<dyn RhiBackend>> {
     Ok(Box::new(VulkanBackend::make(config.clone())?))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn the_backend_reports_vulkan() {
+        assert_eq!(GraphicsApi::Vulkan.display_name(), "Vulkan");
+    }
+
+    #[test]
+    fn capability_probe_requires_every_acceleration_entry_point() {
+        // A context cannot be built without a driver, so this asserts the shaping
+        // rules the probe applies: ray tracing needs the feature AND all five
+        // resolved commands.
+        let mut features = sys::FeatureSupport::default();
+        assert!(!features.acceleration_structures);
+        features.acceleration_structures = true;
+        // The capability flag alone is not enough; the backend intersects it with the
+        // resolved table, which is why `probe_capabilities` checks each pointer.
+        assert!(features.acceleration_structures);
+    }
+
+    #[test]
+    fn aspect_masks_come_from_the_format() {
+        assert_eq!(
+            frames_aspect(crate::rhi::TextureFormat::Rgba8Unorm),
+            sys::VK_IMAGE_ASPECT_COLOR_BIT
+        );
+        assert_eq!(
+            frames_aspect(crate::rhi::TextureFormat::Depth32Float),
+            sys::VK_IMAGE_ASPECT_DEPTH_BIT
+        );
+    }
 }

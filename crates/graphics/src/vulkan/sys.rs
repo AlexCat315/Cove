@@ -19,7 +19,14 @@
 //!
 //! Translation of `Vulkan/VulkanAdvanced.swift`: the optional entry points and
 //! scratch alignment it resolves are [`AdvancedCommands`] in this module.
-#![allow(non_camel_case_types, non_snake_case, non_upper_case_globals)]
+// The declarations mirror the Vulkan headers, so constants and entry points the
+// backend does not call yet stay declared.
+#![allow(
+    non_camel_case_types,
+    non_snake_case,
+    non_upper_case_globals,
+    dead_code
+)]
 
 use core::ffi::{c_char, c_void};
 
@@ -2412,11 +2419,6 @@ impl VulkanLoader {
         unsafe { (self.get_instance_proc_addr)(instance, name.as_ptr()) }
     }
 
-    /// Resolves a global (instance-independent) entry point.
-    pub fn resolve_global(&self, name: &core::ffi::CStr) -> PFN_vkVoidFunction {
-        self.resolve(VK_NULL_INSTANCE, name)
-    }
-
     /// Casts a resolved pointer to a concrete function type.
     ///
     /// # Safety
@@ -2975,9 +2977,11 @@ impl AdvancedCommands {
             }};
         }
         let mut properties = VkPhysicalDeviceAccelerationStructurePropertiesKHR::default();
-        let mut info = VkPhysicalDeviceProperties2::default();
-        info.pNext = (&mut properties as *mut VkPhysicalDeviceAccelerationStructurePropertiesKHR)
-            .cast::<c_void>();
+        let mut info = VkPhysicalDeviceProperties2 {
+            pNext: (&mut properties as *mut VkPhysicalDeviceAccelerationStructurePropertiesKHR)
+                .cast::<c_void>(),
+            ..Default::default()
+        };
         // SAFETY: `info` and its `pNext` chain outlive the call, which only
         // writes into the properties block.
         unsafe {

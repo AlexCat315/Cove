@@ -109,7 +109,7 @@ fn observed_values_track_writes() {
         assert_eq!(descriptor.scope_id.as_deref(), Some("scope"));
 
         assert_eq!(
-            registry.values(&[provider.clone()])[0].summary,
+            registry.values(std::slice::from_ref(&provider))[0].summary,
             "3",
             "the initial value is read"
         );

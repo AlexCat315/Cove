@@ -141,12 +141,6 @@ impl RenderPassObjects {
         }
     }
 
-    /// Creates a render pass over `shapes` in declaration order: every color
-    /// target, then an optional depth target.
-    pub fn pass_for_shapes(&mut self, shapes: &[AttachmentShape]) -> RhiResult<sys::VkRenderPass> {
-        self.pass_with_clear_values(shapes).map(|(pass, _)| pass)
-    }
-
     /// Creates a render pass and the clear values its attachments need, so the
     /// caller can begin the pass without rebuilding either.
     pub fn pass_with_clear_values(
@@ -367,6 +361,7 @@ fn format_texture(format: TextureFormat) -> u32 {
 /// Whether a render pass over `shapes` can be shared across frames: it only can
 /// when every attachment keeps its load/store choice, which is why the per-pass
 /// path rebuilds it.
+#[cfg(test)]
 pub fn pass_is_reusable(shapes: &[AttachmentShape]) -> bool {
     !shapes.is_empty()
 }
@@ -392,6 +387,7 @@ pub fn clear_value(
 }
 
 /// A load/store pair for one attachment, resolved from the recorded target.
+#[cfg(test)]
 pub fn attachment_ops(load_clear: bool, store: bool) -> (u32, u32) {
     let load = if load_clear {
         sys::VK_ATTACHMENT_LOAD_OP_CLEAR
@@ -407,6 +403,7 @@ pub fn attachment_ops(load_clear: bool, store: bool) -> (u32, u32) {
 }
 
 /// Errors if a pass has no attachments, which Vulkan cannot express.
+#[cfg(test)]
 pub fn validate_shapes(shapes: &[AttachmentShape]) -> RhiResult<()> {
     rhi_require(
         !shapes.is_empty(),
@@ -487,8 +484,8 @@ mod tests {
             samples: 1,
             is_depth: true,
         };
-        // SAFETY: reading the variant that matches the shape.
         assert_eq!(
+            // SAFETY: reading the variant that matches the shape.
             unsafe {
                 clear_value(&color, Some([0.5, 0.25, 0.125, 1.0]), None)
                     .color
@@ -496,13 +493,13 @@ mod tests {
             }[0],
             0.5
         );
-        // SAFETY: as above, the depth variant is the active one.
         assert_eq!(
+            // SAFETY: as above, the depth variant is the active one.
             unsafe { clear_value(&depth, None, Some(0.75)).depthStencil.depth },
             0.75
         );
-        // SAFETY: the default depth clear is 1.0.
         assert_eq!(
+            // SAFETY: the default depth clear is 1.0.
             unsafe { clear_value(&depth, None, None).depthStencil.depth },
             1.0
         );

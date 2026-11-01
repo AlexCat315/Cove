@@ -7,15 +7,15 @@
 //! - reconfiguring with a new identity does not rewrite already-written records
 
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use cove_logging::{Level, LogEvent, LogQuery, LogRecord, LogRuntime, LoggingConfiguration};
 
 /// A configuration that logs to `directory` with a silent console.
-fn file_configuration(directory: &PathBuf) -> LoggingConfiguration {
+fn file_configuration(directory: &Path) -> LoggingConfiguration {
     let mut configuration = LoggingConfiguration::default();
     configuration.console.enabled = false;
-    configuration.storage.directory = Some(directory.clone());
+    configuration.storage.directory = Some(directory.to_path_buf());
     configuration
 }
 

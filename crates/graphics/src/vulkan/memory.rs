@@ -32,6 +32,11 @@ pub struct VulkanMemoryAllocation {
 // the thread that holds the registry lock.
 unsafe impl Send for VulkanMemoryAllocation {}
 
+// SAFETY: the allocator holds a device handle, entry points and block records.
+// It is only reached through a `Mutex`, so the blocks' mappings are touched by
+// one thread at a time.
+unsafe impl Send for VulkanMemoryAllocator {}
+
 impl VulkanMemoryAllocation {
     /// Writable CPU pointer at `offset` bytes into this allocation, or `None`
     /// when the block was not host visible.
@@ -255,11 +260,6 @@ impl VulkanMemoryAllocator {
         }
     }
 
-    /// Total bytes currently reserved from the driver, for diagnostics.
-    pub fn reserved_bytes(&self) -> sys::VkDeviceSize {
-        self.blocks.iter().flatten().map(|block| block.size).sum()
-    }
-
     fn create_block(
         &self,
         size: sys::VkDeviceSize,
@@ -349,19 +349,17 @@ fn take_free_region(
 mod tests {
     use super::*;
 
-    /// A command table whose entries are never called. `find_memory_type` only
-    /// reads `memory_properties`, so the table exists to satisfy the struct shape;
-    /// it is built with an explicit null-entry loader rather than `zeroed()`, which
-    /// would be undefined behaviour for a type holding raw pointers.
+    /// A command table whose entries are never called: `find_memory_type` only
+    /// reads `memory_properties`. Every field is a non-nullable function pointer,
+    /// so the table cannot be zeroed; each entry resolves to a trap instead.
     fn null_core_commands() -> sys::CoreCommands {
-        // `find_memory_type` only reads `memory_properties`, so every entry point
-        // may be null. Building the table from `MaybeUninit::zeroed` is sound
-        // because each field is an `Option<unsafe extern fn>`, whose null bit
-        // pattern is the valid `None`. Going through `CoreCommands::load` would
-        // fail: it requires a real entry point for every name.
-        // SAFETY: all-zeros is a valid representation for a struct of nullable
-        // function pointers.
-        unsafe { core::mem::MaybeUninit::<sys::CoreCommands>::zeroed().assume_init() }
+        unsafe extern "system" fn unreachable_entry() {
+            std::process::abort();
+        }
+        let resolve = |_: &core::ffi::CStr| unreachable_entry as sys::PFN_vkVoidFunction;
+        // SAFETY: no device is touched; every resolved entry is a non-null trap
+        // that is never called by these tests.
+        unsafe { sys::CoreCommands::load(&resolve) }.expect("every entry resolves")
     }
 
     fn block(size: sys::VkDeviceSize) -> VulkanMemoryBlock {
@@ -447,8 +445,10 @@ mod tests {
 
     #[test]
     fn memory_type_search_requires_every_requested_bit() {
-        let mut properties = sys::VkPhysicalDeviceMemoryProperties::default();
-        properties.memoryTypeCount = 2;
+        let mut properties = sys::VkPhysicalDeviceMemoryProperties {
+            memoryTypeCount: 2,
+            ..Default::default()
+        };
         properties.memoryTypes[0] = sys::VkMemoryType {
             propertyFlags: sys::VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
             heapIndex: 0,
@@ -458,10 +458,6 @@ mod tests {
                 | sys::VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
             heapIndex: 1,
         };
-        // `find_memory_type` only reads `memory_properties`, so the command table is
-        // never dereferenced here; it is left as a null-filled table rather than a
-        // zeroed struct, which would be undefined behaviour for a pointer-bearing
-        // type.
         let allocator = VulkanMemoryAllocator {
             device: core::ptr::null_mut(),
             core: null_core_commands(),

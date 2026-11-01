@@ -304,7 +304,7 @@ fn resize_and_sibling_ownership() {
         )
         .expect("the partial texture registers");
 
-    let mut sibling = renderer
+    let sibling = renderer
         .make_sibling(TextureFormat::Bgra8Unorm, 1)
         .expect("a sibling builds");
     let target = output(&device, TextureFormat::Bgra8Unorm);
@@ -682,7 +682,7 @@ fn validation_is_atomic() {
             (Err(error), RejectedAt::Record) => {
                 panic!("variant {variant} should reach the renderer but load refused it: {error:?}",)
             }
-            (Ok(list), RejectedAt::Load) => {
+            (Ok(_list), RejectedAt::Load) => {
                 panic!("variant {variant} should be refused by load but was accepted",)
             }
             (Ok(list), RejectedAt::Record) => list,

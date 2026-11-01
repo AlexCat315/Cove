@@ -10,6 +10,10 @@ use crate::{Color, DrawError, DrawList, LayeredShadow, Point, Rect, SurfaceShado
 /// stacking up into ridges.
 const STEP_SPACING: f32 = 0.25;
 
+/// A corner arc centre (`x`, `y`) paired with the two unit edge directions its
+/// quarter circle sweeps between.
+type CornerFringe = (f32, f32, (f32, f32, f32, f32));
+
 impl DrawList {
     /// Paint a layered shadow: ambient halo first, key shadow over it.
     #[allow(clippy::too_many_arguments)]
@@ -183,7 +187,7 @@ impl DrawList {
         let segments = self.fan_segments(step_radius);
         // Corner arc centres, paired with the two bounding edges their arc
         // sweeps between, as unit vectors.
-        let corners: [(f32, f32, (f32, f32, f32, f32)); 4] = [
+        let corners: [CornerFringe; 4] = [
             (
                 step.x + step_radius,
                 step.y + step_radius,

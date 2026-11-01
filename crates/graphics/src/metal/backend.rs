@@ -123,6 +123,10 @@ impl RhiBackend for MetalBackend {
         resources::create_shader_module(&self.device, handle, descriptor)
     }
 
+    #[allow(
+        clippy::arc_with_non_send_sync,
+        reason = "the structure is only reached through the registries' lock"
+    )]
     fn create_acceleration_structure(
         &mut self,
         handle: AccelerationStructure,

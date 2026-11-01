@@ -29,12 +29,6 @@ impl MetalUploadChunk {
             capacity,
         }
     }
-    pub fn buffer(&self) -> &Retained<ProtocolObject<dyn MTLBuffer>> {
-        &self.buffer
-    }
-    pub const fn buffer_handle(&self) -> Buffer {
-        self.buffer_handle
-    }
 }
 // SAFETY: Metal resources are documented as safe to use from multiple threads;
 // `MTLBuffer` retains its own atomic reference count and the allocator only

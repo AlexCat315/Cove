@@ -110,7 +110,7 @@ fn build_blas_tlas_then_trace_hit_and_miss() {
         ]))
         .expect("ray query binding layout");
     let layout = device
-        .make_pipeline_layout(PipelineLayoutDescriptor::new(vec![binding.clone()]))
+        .make_pipeline_layout(PipelineLayoutDescriptor::new(vec![binding]))
         .expect("ray query pipeline layout");
     let set = device
         .make_binding_set(

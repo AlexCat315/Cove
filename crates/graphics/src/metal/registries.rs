@@ -162,6 +162,7 @@ pub struct MetalMeshPipeline {
 /// Compiled function per shader-module handle, plus the library that owns it.
 pub struct MetalShaderRecord {
     pub function: Retained<ProtocolObject<dyn MTLFunction>>,
+    #[allow(dead_code, reason = "keeps the library that owns `function` alive")]
     pub library: Retained<ProtocolObject<dyn MTLLibrary>>,
     pub stage: ShaderStage,
     pub threadgroup_size: ThreadgroupSize,

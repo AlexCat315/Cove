@@ -603,6 +603,16 @@ pub fn event_channel() -> (Sender<DevToolsTransportEvent>, EventReceiver) {
     channel()
 }
 
+impl std::fmt::Debug for DevToolsTransportEvent {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Connected(_) => formatter.write_str("Connected"),
+            Self::Text(_, data) => write!(formatter, "Text({} bytes)", data.len()),
+            Self::Disconnected(_) => formatter.write_str("Disconnected"),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -641,15 +651,5 @@ mod tests {
         assert_eq!(resolve_bind_address("localhost").ok(), Some("127.0.0.1"));
         assert_eq!(resolve_bind_address("*").ok(), Some("0.0.0.0"));
         assert!(resolve_bind_address("example.com").is_err());
-    }
-}
-
-impl std::fmt::Debug for DevToolsTransportEvent {
-    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::Connected(_) => formatter.write_str("Connected"),
-            Self::Text(_, data) => write!(formatter, "Text({} bytes)", data.len()),
-            Self::Disconnected(_) => formatter.write_str("Disconnected"),
-        }
     }
 }

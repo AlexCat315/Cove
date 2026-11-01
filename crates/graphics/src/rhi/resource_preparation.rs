@@ -215,7 +215,7 @@ impl ResourcePreparationContext {
                 .collect()
         };
         // Newest first, matching the Swift teardown order.
-        values.sort_by(|left, right| right.0.cmp(&left.0));
+        values.sort_by_key(|value| std::cmp::Reverse(value.0));
         for (_, mut value) in values {
             for _ in 0..value.count {
                 (value.cleanup)();

@@ -457,7 +457,7 @@ impl RhiBackend for Dx12Backend {
     fn submit(
         &mut self,
         submit: &PlannedSubmit,
-        mut cpu_profile: Option<&mut SubmissionCpuProfile>,
+        cpu_profile: Option<&mut SubmissionCpuProfile>,
         completion: Completion,
     ) -> RhiResult<()> {
         let encoding_start = cpu_profile.as_deref().and_then(SubmissionCpuProfile::begin);

@@ -29,7 +29,6 @@ pub struct VulkanTextureRecord {
     pub format: TextureFormat,
     pub width: usize,
     pub height: usize,
-    pub depth: usize,
     pub dimension: TextureDimension,
     pub layers: u32,
     pub mip_levels: u32,
@@ -120,6 +119,11 @@ pub struct VulkanRegistries {
     internal_id: u32,
 }
 
+// SAFETY: the records are driver handles plus plain data. Vulkan objects may be
+// used from any thread under external synchronization, which the owning `Mutex`
+// provides.
+unsafe impl Send for VulkanRegistries {}
+
 /// First backend-internal handle. Frontend handles grow from 1, so the two spaces
 /// never overlap for any realistic session.
 pub const INTERNAL_ID_BASE: u32 = 0x8000_0000;
@@ -164,7 +168,6 @@ mod tests {
             format: TextureFormat::Rgba8Unorm,
             width: 4,
             height: 4,
-            depth: 1,
             dimension: TextureDimension::Texture2D,
             layers: 1,
             mip_levels: 4,

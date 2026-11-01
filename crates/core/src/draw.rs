@@ -289,11 +289,9 @@ impl DrawList {
         if vertex_base != 0 {
             geometry_kernels::rebase(&mut indices[index_base as usize..], vertex_base);
         }
-        Arc::make_mut(&mut self.batches).extend(source.batches.iter().cloned().map(|batch| {
-            DrawBatch {
-                index_offset: batch.index_offset + index_base,
-                ..batch
-            }
+        Arc::make_mut(&mut self.batches).extend(source.batches.iter().map(|batch| DrawBatch {
+            index_offset: batch.index_offset + index_base,
+            ..batch.clone()
         }));
         Ok(())
     }

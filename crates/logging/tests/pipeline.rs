@@ -18,7 +18,7 @@ use std::sync::Arc;
 
 use cove_logging::{
     Level, LogContext, LogEvent, LogQuery, LogRuntime, LogSnapshot, LogSystem, LogValue,
-    LoggingConfiguration, MetadataProvider, UnifiedLogHandler,
+    LoggingConfiguration, MetadataProvider,
 };
 
 /// A runtime with console and file storage disabled, so tests read history only.

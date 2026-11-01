@@ -90,7 +90,7 @@ fn a_scaled_custom_painter_preserves_its_backdrop_opacity() {
             blur_radius: 12.0,
             opacity: 0.3,
         });
-        list.add_rect(rect, Color::WHITE);
+        list.add_rect(rect, Color::WHITE).expect("the rect fits");
     })));
 
     let mut list = DrawList::default();

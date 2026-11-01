@@ -203,7 +203,7 @@ impl<'a> PassEncoder<'a> {
     fn encode(
         &mut self,
         command: &PlannedCommand,
-        mut cpu_profile: Option<&mut SubmissionCpuProfile>,
+        cpu_profile: Option<&mut SubmissionCpuProfile>,
     ) -> RhiResult<()> {
         match command {
             PlannedCommand::AccelerationStructureBuild(build) => {
@@ -464,7 +464,7 @@ impl<'a> PassEncoder<'a> {
     fn encode_render_command(
         &mut self,
         command: &RenderCommand,
-        mut cpu_profile: Option<&mut SubmissionCpuProfile>,
+        cpu_profile: Option<&mut SubmissionCpuProfile>,
     ) -> RhiResult<()> {
         let name = |command: &RenderCommand| {
             format!("{command:?}")

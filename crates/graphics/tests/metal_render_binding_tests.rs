@@ -90,7 +90,7 @@ fn sampler_and_texture_changes_remain_visible_after_repeated_sets() {
         )
         .expect("binding layout");
     let layout = device
-        .make_pipeline_layout(PipelineLayoutDescriptor::new(vec![binding.clone()]))
+        .make_pipeline_layout(PipelineLayoutDescriptor::new(vec![binding]))
         .expect("pipeline layout");
     let mut pipeline_descriptor = GraphicsPipelineDescriptor::new(
         layout,
@@ -262,7 +262,7 @@ fn offsets_inline_constants_and_new_pass_restore_the_required_buffer() {
         )]))
         .expect("binding layout");
     let layout = device
-        .make_pipeline_layout(PipelineLayoutDescriptor::new(vec![binding.clone()]))
+        .make_pipeline_layout(PipelineLayoutDescriptor::new(vec![binding]))
         .expect("pipeline layout");
     let inline_binding = device
         .make_binding_layout(BindingLayoutDescriptor::new(vec![BindingLayoutEntry::new(
@@ -271,7 +271,7 @@ fn offsets_inline_constants_and_new_pass_restore_the_required_buffer() {
             ShaderVisibility::VERTEX,
         )]))
         .expect("inline binding layout");
-    let mut inline_descriptor = PipelineLayoutDescriptor::new(vec![inline_binding.clone()]);
+    let mut inline_descriptor = PipelineLayoutDescriptor::new(vec![inline_binding]);
     inline_descriptor.push_constants = vec![PushConstantRange::new(ShaderStage::Fragment, 0, 16)];
     let inline_layout = device
         .make_pipeline_layout(inline_descriptor)

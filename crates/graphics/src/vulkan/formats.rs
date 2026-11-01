@@ -59,6 +59,7 @@ pub fn is_depth(format: TextureFormat) -> bool {
 }
 
 /// Whether a format has a stencil aspect.
+#[cfg(test)]
 pub fn is_stencil(format: TextureFormat) -> bool {
     format == TextureFormat::Depth24UnormStencil8
 }

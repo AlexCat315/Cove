@@ -130,11 +130,14 @@ impl AccessibilitySemantics {
     }
 }
 
+/// Applies a value handed in by an assistive client.
+pub type AccessibilityValueSetter = std::rc::Rc<dyn Fn(&str)>;
+
 /// Closures operate on the same controlled bindings as pointer and keyboard input.
 #[derive(Clone, Default)]
 pub struct AccessibilityActions {
     pub activate: Option<std::rc::Rc<dyn Fn()>>,
-    pub set_value: Option<std::rc::Rc<dyn Fn(&str)>>,
+    pub set_value: Option<AccessibilityValueSetter>,
     pub increment: Option<std::rc::Rc<dyn Fn()>>,
     pub decrement: Option<std::rc::Rc<dyn Fn()>>,
 }

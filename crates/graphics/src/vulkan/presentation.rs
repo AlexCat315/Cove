@@ -475,29 +475,6 @@ impl VulkanSwapchain {
         (index, result)
     }
 
-    /// Queues one presentation that waits on every semaphore in `wait`.
-    pub fn present_with(
-        &self,
-        context: &VulkanContext,
-        queue: sys::VkQueue,
-        wait: &[sys::VkSemaphore],
-        index: u32,
-    ) -> sys::VkResult {
-        let info = sys::VkPresentInfoKHR {
-            sType: sys::VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
-            pNext: core::ptr::null(),
-            waitSemaphoreCount: wait.len() as u32,
-            pWaitSemaphores: wait.as_ptr(),
-            swapchainCount: 1,
-            pSwapchains: &self.handle,
-            pImageIndices: &index,
-            pResults: core::ptr::null_mut(),
-        };
-        // SAFETY: every pointer in `info` refers to a live local and the swapchain
-        // is live.
-        unsafe { (context.sync.queue_present)(queue, &info) }
-    }
-
     /// `SUBOPTIMAL` is advisory. Android can return it on every landscape frame
     /// when identity `preTransform` leaves rotation to the compositor; rebuilding
     /// the identical chain cannot resolve that condition.
@@ -551,6 +528,7 @@ impl VulkanSwapchain {
         }
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn build(
         context: &VulkanContext,
         surface: sys::VkSurfaceKHR,
@@ -720,7 +698,7 @@ impl VulkanSwapchain {
             let mut registries = lock(registries);
             for image in &images {
                 let id = registries.next_internal_id();
-                let mut view_info = sys::VkImageViewCreateInfo {
+                let view_info = sys::VkImageViewCreateInfo {
                     sType: sys::VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
                     pNext: core::ptr::null(),
                     flags: 0,
@@ -770,7 +748,6 @@ impl VulkanSwapchain {
                     };
                     return Err(RhiError::OutOfMemory);
                 }
-                view_info.subresourceRange.levelCount = 1;
                 registries.textures.insert(
                     id,
                     VulkanTextureRecord {
@@ -780,7 +757,6 @@ impl VulkanSwapchain {
                         format: formats::texture_format(chosen.format),
                         width: extent.width as usize,
                         height: extent.height as usize,
-                        depth: 1,
                         dimension: crate::rhi::TextureDimension::Texture2D,
                         layers: 1,
                         mip_levels: 1,
@@ -892,11 +868,6 @@ fn present_modes(context: &VulkanContext, surface: sys::VkSurfaceKHR) -> RhiResu
     ))
 }
 
-/// The image aspect mask a texture's format needs for barriers.
-pub fn image_aspect(format: TextureFormat) -> u32 {
-    formats::aspect_flags(format)
-}
-
 /// Marks one acquired swapchain image as pending presentation.
 pub fn mark_acquired(window: &mut VulkanWindowSwapchain, texture: u32) {
     window.presentation.acquired_id = Some(texture);
@@ -971,12 +942,14 @@ mod tests {
 
     #[test]
     fn surface_state_compares_extent_and_transform() {
-        let mut capabilities = sys::VkSurfaceCapabilitiesKHR::default();
-        capabilities.currentExtent = sys::VkExtent2D {
-            width: 800,
-            height: 600,
+        let mut capabilities = sys::VkSurfaceCapabilitiesKHR {
+            currentExtent: sys::VkExtent2D {
+                width: 800,
+                height: 600,
+            },
+            currentTransform: sys::VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR,
+            ..Default::default()
         };
-        capabilities.currentTransform = sys::VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR;
         let state = SurfaceState::from_capabilities(&capabilities);
         assert_eq!(state.extent, [800, 600]);
         assert_eq!(state.transform, 1);

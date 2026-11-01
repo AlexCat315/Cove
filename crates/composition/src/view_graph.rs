@@ -9,11 +9,10 @@
 //! keeping primitive state in `Node` attachments. A mismatch tears down the old
 //! tail from that index and materialises the new tail.
 use cove_core::scene::{
-    ActiveAnimationContext, ComponentRecompositionMetrics, ComponentSourceLocation, Direction,
-    DirtyReason, ElementId, InvalidationLog, InvalidationLogHolder, InvalidationPhase,
-    InvalidationSource, LayoutNode, LocalInvalidationHandle, Node, NodeKey, NodeTree,
-    ObservableStateTracking, RecompositionReason, RenderTree, StateRegistry, TextInputAreaResolver,
-    TextInputAttachmentKey,
+    ActiveAnimationContext, ComponentSourceLocation, Direction, DirtyReason, ElementId,
+    InvalidationLog, InvalidationLogHolder, InvalidationPhase, InvalidationSource, LayoutNode,
+    LocalInvalidationHandle, Node, NodeKey, NodeTree, ObservableStateTracking, RecompositionReason,
+    RenderTree, StateRegistry, TextInputAreaResolver, TextInputAttachmentKey,
 };
 use cove_core::{Point, Rect, with_deferred_evaluation};
 use cove_platform::TextInputArea;
@@ -23,8 +22,8 @@ use std::rc::{Rc, Weak};
 
 use crate::layout_debug_modifier::LayoutDebugAttachmentKey;
 use crate::{
-    AnyModifiedContent, AnyView, AsAny, DynamicField, EmptyView, IdentifiedView, LayoutTree,
-    ModifierReplay, PrimitiveView, SourceLocatedView, View, ViewKind, ViewModifier,
+    AnyView, AsAny, DynamicField, EmptyView, IdentifiedView, LayoutTree, ModifierReplay,
+    PrimitiveView, SourceLocatedView, View, ViewKind,
 };
 
 pub struct LayoutSnapshotEntry {
@@ -720,6 +719,9 @@ impl ViewGraph {
 
     // MARK: - Internal
 
+    /// Ported from `ViewGraph.swift`'s `dropScope(for:)`. The Swift original is
+    /// also never called; kept so the two ports stay line-for-line comparable.
+    #[expect(dead_code)]
     pub(crate) fn drop_scope(&self, anchor: &Node) {
         if let Some(scope) = self.scopes.borrow_mut().remove(&anchor.id()) {
             ViewScope::uninstall(&scope, self);
@@ -729,6 +731,10 @@ impl ViewGraph {
     /// Remove a node's layout node from the layout tree and forget it. The
     /// caller passes the LayoutNode parent because LayoutNode has no parent
     /// lookup requirement; recursion follows the Node tree.
+    ///
+    /// Ported from `ViewGraph.swift`'s `forgetSubtreeLayout(_:parentLayout:)`,
+    /// which is likewise unused in the Swift original.
+    #[expect(dead_code)]
     pub(crate) fn forget_subtree_layout(&self, node: &Node, parent_layout: Option<&LayoutNode>) {
         let my_layout = self.layout_of.borrow_mut().remove(&node.id());
         if let Some(layout) = &my_layout

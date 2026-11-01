@@ -364,7 +364,6 @@ pub fn create_texture(
                     format: descriptor.format,
                     width: descriptor.width,
                     height: descriptor.height,
-                    depth: descriptor.depth,
                     dimension: descriptor.dimension,
                     layers: array_layers,
                     mip_levels: create_info.mipLevels,

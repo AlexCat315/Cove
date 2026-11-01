@@ -98,7 +98,7 @@ fn register(
         resources
             .iter()
             .enumerate()
-            .map(|(slot, resource)| BindingSetEntry::new(slot as u32, resource.clone()))
+            .map(|(slot, resource)| BindingSetEntry::new(slot as u32, *resource))
             .collect(),
     )?;
     Ok(set)

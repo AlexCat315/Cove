@@ -139,7 +139,7 @@ impl LogFile {
                 .unwrap_or(UNIX_EPOCH);
             sessions.push((created, path));
         }
-        sessions.sort_by(|lhs, rhs| rhs.0.cmp(&lhs.0));
+        sessions.sort_by_key(|session| std::cmp::Reverse(session.0));
         for (_, old) in sessions.iter().skip(self.configuration.retained_sessions) {
             if *old == self.directory {
                 continue;

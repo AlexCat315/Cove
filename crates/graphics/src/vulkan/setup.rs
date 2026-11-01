@@ -33,6 +33,10 @@ pub struct VulkanQueues {
 /// Everything a backend operation needs: the live handles, the resolved command
 /// tables, the device limits and the enabled feature set.
 pub struct VulkanContext {
+    #[allow(
+        dead_code,
+        reason = "keeps the driver library loaded while the context lives"
+    )]
     pub loader: std::sync::Arc<sys::VulkanLoader>,
     pub instance_commands: sys::InstanceCommands,
     pub core: sys::CoreCommands,
@@ -48,10 +52,6 @@ pub struct VulkanContext {
     pub queues: VulkanQueues,
     pub device_name: String,
     pub extensions: HashSet<String>,
-    /// Whether the core API version is at least 1.2.
-    pub core_1_2: bool,
-    /// Whether the API is at least 1.3.
-    pub core_1_3: bool,
     /// The block allocator immediate transfers stage through. Separate from the
     /// resource allocator so a transfer can map and release storage without
     /// touching the resource blocks.
@@ -64,17 +64,6 @@ impl VulkanContext {
     /// The render-pass handles this context's device can create passes with.
     pub fn rendering_handles(&self) -> super::rendering::RenderingHandles {
         super::rendering::RenderingHandles::new(self)
-    }
-
-    /// Destroys the logical device and instance. Callers must have released every
-    /// child object first (see `release_native_objects`).
-    pub fn destroy(self) {
-        // SAFETY: the device and instance are still live here, and every child
-        // object was released by the caller's teardown path.
-        unsafe {
-            (self.instance_commands.destroy_device)(self.device, core::ptr::null());
-            (self.instance_commands.destroy_instance)(self.instance, core::ptr::null());
-        }
     }
 }
 
@@ -99,9 +88,11 @@ fn probe_availability() -> bool {
         return false;
     };
     let Some(commands) = sys::InstanceCommands::load(&loader, instance) else {
-        // SAFETY: the instance was created above and has no children yet.
         if let Some(destroy) =
-            unsafe { loader.load::<sys::PFN_vkDestroyInstance>(instance, c"vkDestroyInstance") }
+            // SAFETY: the instance was created above and has no children yet.
+            unsafe {
+                loader.load::<sys::PFN_vkDestroyInstance>(instance, c"vkDestroyInstance")
+            }
         {
             // SAFETY: same as above; nothing else references the instance.
             unsafe { destroy(instance, core::ptr::null()) };
@@ -359,8 +350,6 @@ fn build_context(
     )?;
 
     let unique_families = unique_family_list(&families);
-    let core_1_2 = properties.apiVersion >= sys::api_version(1, 2);
-    let core_1_3 = properties.apiVersion >= sys::api_version(1, 3);
     let (device, features) = create_logical_device(
         instance_commands,
         physical_device,
@@ -464,8 +453,6 @@ fn build_context(
         },
         device_name,
         extensions,
-        core_1_2,
-        core_1_3,
         // The staging allocator only needs the device, its entry points and the
         // granularity the driver reports, so it is built from those directly.
         staging_allocator: std::sync::Arc::new(std::sync::Mutex::new(
@@ -684,9 +671,11 @@ fn create_logical_device(
     draw_parameters.pNext =
         (&mut timeline as *mut sys::VkPhysicalDeviceTimelineSemaphoreFeatures).cast();
 
-    let mut supported = sys::VkPhysicalDeviceFeatures2::default();
-    supported.pNext =
-        (&mut draw_parameters as *mut sys::VkPhysicalDeviceShaderDrawParametersFeatures).cast();
+    let mut supported = sys::VkPhysicalDeviceFeatures2 {
+        pNext: (&mut draw_parameters as *mut sys::VkPhysicalDeviceShaderDrawParametersFeatures)
+            .cast(),
+        ..Default::default()
+    };
     // SAFETY: every node in the chain outlives the call, which only writes into
     // them.
     unsafe { (commands.get_physical_device_features2)(physical_device, &mut supported) };
@@ -760,9 +749,11 @@ fn create_logical_device(
     draw_parameters.shaderDrawParameters = sys::VK_TRUE;
     draw_parameters.pNext =
         (&mut timeline as *mut sys::VkPhysicalDeviceTimelineSemaphoreFeatures).cast();
-    let mut enabled = sys::VkPhysicalDeviceFeatures::default();
-    enabled.fillModeNonSolid = supported.features.fillModeNonSolid;
-    enabled.drawIndirectFirstInstance = sys::VK_TRUE;
+    let enabled = sys::VkPhysicalDeviceFeatures {
+        fillModeNonSolid: supported.features.fillModeNonSolid,
+        drawIndirectFirstInstance: sys::VK_TRUE,
+        ..Default::default()
+    };
 
     let priority: f32 = 1.0;
     let queue_infos: Vec<sys::VkDeviceQueueCreateInfo> = unique_families

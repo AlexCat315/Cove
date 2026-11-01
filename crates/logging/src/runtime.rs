@@ -35,9 +35,13 @@ struct Capture {
     configured: bool,
 }
 
+/// A subscriber's receive callback, shared so the runtime can copy it out of
+/// the subscriber map and invoke it after the lock is released.
+type SubscriberCallback = Arc<dyn Fn(&LogRecord) + Send + Sync>;
+
 struct Subscriber {
     query: LogQuery,
-    receive: Arc<dyn Fn(&LogRecord) + Send + Sync>,
+    receive: SubscriberCallback,
 }
 
 pub struct LogRuntime {
@@ -399,7 +403,7 @@ impl LogRuntime {
                 .append(record.clone());
         }
         self.written.fetch_add(1, Ordering::Relaxed);
-        let subscribers: Vec<Arc<dyn Fn(&LogRecord) + Send + Sync>> = {
+        let subscribers: Vec<SubscriberCallback> = {
             let subscribers = self.subscribers.lock().unwrap_or_else(|e| e.into_inner());
             subscribers
                 .values()

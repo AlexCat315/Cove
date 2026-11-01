@@ -110,7 +110,7 @@ fn recovery_and_reclamation() {
     let asset = registry
         .register("red", pixel_rgba(233, 17, 99, 255))
         .expect("the image registers");
-    let id = asset.texture_id;
+    let _id = asset.texture_id;
     let list = image_owned(&asset, 0.0);
     let viewport = viewport([32, 16]);
     let target = output(&device, 32, 16);
@@ -338,7 +338,7 @@ fn a_foreign_renderer_cannot_be_synchronised() {
         })
         .expect("a second Metal device is available"),
     );
-    let mut foreign_renderer =
+    let foreign_renderer =
         NativeDrawListRenderer::new(foreign).expect("the foreign renderer builds");
     assert!(
         foreign_renderer.synchronize_textures(&renderer).is_err(),

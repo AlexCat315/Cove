@@ -77,7 +77,8 @@ fn cached_layer() {
     // A painter makes the node a layer root: that is the case which records into
     // its own cache and appends the cache instead of re-recording.
     let draw: DrawHook = Rc::new(|list: &mut DrawList, _origin: cove_core::Point| {
-        list.add_rect(Rect::new(0.0, 0.0, 8.0, 8.0), Color::WHITE);
+        list.add_rect(Rect::new(0.0, 0.0, 8.0, 8.0), Color::WHITE)
+            .expect("the rect fits");
     });
     surface.set_draw(Some(draw));
 

@@ -24,7 +24,7 @@ pub struct SurfaceState {
     preedit: RefCell<String>,
     /// Plain-text URL under the pointer (OSC 8 links are marked by the program).
     hovered_link: RefCell<Option<UrlMatch>>,
-    open_link: RefCell<Rc<dyn Fn(&str)>>,
+    open_link: RefCell<super::terminal_view::LinkOpener>,
     pub pointer: PointerRouter,
     pub blink: Rc<BlinkTimer>,
     pub text_blink: Rc<BlinkTimer>,
@@ -90,7 +90,7 @@ impl SurfaceState {
         }
     }
 
-    pub fn set_open_link(&self, open: Rc<dyn Fn(&str)>) {
+    pub fn set_open_link(&self, open: super::terminal_view::LinkOpener) {
         *self.open_link.borrow_mut() = open;
     }
 

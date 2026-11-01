@@ -391,7 +391,7 @@ mod tests {
             TextureDescriptor::new(8, 8, TextureFormat::Rgba8Unorm, TextureUsage::COLOR_TARGET)
                 .with_sample_count(4);
         assert!(rhi_validate_texture_samples(&descriptor).is_ok());
-        descriptor.usage = descriptor.usage | TextureUsage::SAMPLED;
+        descriptor.usage |= TextureUsage::SAMPLED;
         assert!(rhi_validate_texture_samples(&descriptor).is_err());
         descriptor.usage = TextureUsage::COLOR_TARGET;
         descriptor.mip_levels = 2;

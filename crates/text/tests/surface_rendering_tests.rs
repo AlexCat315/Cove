@@ -20,7 +20,8 @@ fn node(x: f32, y: f32, width: f32, height: f32) -> Node {
 }
 
 fn contains(x: f32, y: f32, list: &DrawList) -> bool {
-    for triangle in list.indices().chunks_exact(3) {
+    let (triangles, _) = list.indices().as_chunks::<3>();
+    for triangle in triangles {
         let a = list.vertices()[triangle[0] as usize];
         let b = list.vertices()[triangle[1] as usize];
         let c = list.vertices()[triangle[2] as usize];

@@ -310,7 +310,7 @@ mod tests {
             DevToolsCodec::decode::<TimingFramePayload>(&payload),
             Some(frame)
         );
-        let value = payload.unwrap();
+        let value = payload.as_ref().expect("encoded payload");
         assert!(value.get("recompositionMs").is_some());
         assert!(value.get("presented").is_some());
     }

@@ -92,7 +92,7 @@ fn visible_control_tree_reports_every_labelled_element() {
 
     let elements = AccessibilityTree::snapshot(&root);
     assert!(
-        elements.len() >= 1,
+        !elements.is_empty(),
         "a control tree with one labelled button must not snapshot empty"
     );
     let button = elements

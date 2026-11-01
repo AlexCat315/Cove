@@ -20,11 +20,14 @@ thread_local! {
     static INBOX:Arc<Inbox>=Arc::new(Inbox::default());
     static HANDLERS:RefCell<HashMap<ReadScopeId,Callback>>=RefCell::new(HashMap::new());
 }
-fn wake_slot() -> &'static Mutex<Option<Arc<dyn Fn() + Send + Sync>>> {
-    static SLOT: OnceLock<Mutex<Option<Arc<dyn Fn() + Send + Sync>>>> = OnceLock::new();
+/// Host hook that wakes the scene thread after a concurrent invalidation.
+pub type WakeCallback = Arc<dyn Fn() + Send + Sync>;
+
+fn wake_slot() -> &'static Mutex<Option<WakeCallback>> {
+    static SLOT: OnceLock<Mutex<Option<WakeCallback>>> = OnceLock::new();
     SLOT.get_or_init(Mutex::default)
 }
-pub fn set_scene_invalidation_wake(wake: Option<Arc<dyn Fn() + Send + Sync>>) {
+pub fn set_scene_invalidation_wake(wake: Option<WakeCallback>) {
     *wake_slot().lock().unwrap_or_else(|e| e.into_inner()) = wake;
 }
 fn deliver(id: ReadScopeId, reason: RecompositionReason) {

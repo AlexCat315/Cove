@@ -687,7 +687,7 @@ mod tests {
     #[test]
     fn internal_ids_start_above_the_frontend_space() {
         assert_eq!(INTERNAL_ID_BASE, 0xF000_0000);
-        assert!(INTERNAL_ID_BASE > 0x8000_0000);
+        const { assert!(INTERNAL_ID_BASE > 0x8000_0000) };
     }
 
     #[test]

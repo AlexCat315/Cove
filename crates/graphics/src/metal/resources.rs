@@ -86,19 +86,25 @@ pub fn create_texture(
     native.setPixelFormat(formats::pixel_format(descriptor.format));
     // SAFETY: every setter below takes an unsigned size the descriptor stores;
     // the frontend already validated the semantic combinations.
-    unsafe { native.setWidth(descriptor.width.max(1)) };
-    unsafe { native.setHeight(descriptor.height.max(1)) };
-    unsafe { native.setDepth(descriptor.depth.max(1)) };
+    unsafe {
+        native.setWidth(descriptor.width.max(1));
+        native.setHeight(descriptor.height.max(1));
+        native.setDepth(descriptor.depth.max(1));
+    }
     native.setTextureType(if descriptor.sample_count > 1 {
         objc2_metal::MTLTextureType::Type2DMultisample
     } else {
         formats::texture_type(descriptor.dimension)
     });
     if descriptor.dimension == TextureDimension::Texture2DArray {
+        // SAFETY: the layer count is clamped to at least one.
         unsafe { native.setArrayLength(descriptor.layers.max(1)) };
     }
-    unsafe { native.setMipmapLevelCount(descriptor.mip_levels.max(1)) };
-    unsafe { native.setSampleCount(descriptor.sample_count.max(1)) };
+    // SAFETY: both counts are clamped to at least one, as Metal requires.
+    unsafe {
+        native.setMipmapLevelCount(descriptor.mip_levels.max(1));
+        native.setSampleCount(descriptor.sample_count.max(1));
+    }
     native.setUsage(formats::texture_usage(descriptor.usage));
     // Ordinary textures use device-local storage; transient samples may remain
     // tile-only on Apple GPUs without changing their sample count.
@@ -183,11 +189,11 @@ pub fn prepare_shader_compilation(
                     ShaderConstantType::Bool => MTLDataType::Bool,
                 };
                 let bits = constant.value.bits();
+                let value = NonNull::new((&bits as *const u32).cast_mut().cast::<c_void>())
+                    .expect("a local scalar is never null");
                 // SAFETY: `bits` is a live local holding exactly the 32-bit
                 // representation the declared type consumes, and Metal copies
                 // it during the call.
-                let value = NonNull::new((&bits as *const u32).cast_mut().cast::<c_void>())
-                    .expect("a local scalar is never null");
                 unsafe {
                     values.setConstantValue_type_atIndex(value, data_type, constant.id as usize)
                 };

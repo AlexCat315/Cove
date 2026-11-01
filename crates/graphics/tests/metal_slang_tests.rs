@@ -57,9 +57,7 @@ impl std::fmt::Display for FixtureUnavailable {
 
 /// Loads one precompiled stage of a fixture through the offline artifact loader.
 fn compiled_artifact(name: &str, stage: ShaderStage) -> Option<ShaderArtifact> {
-    if std::env::var_os("SLANGC").is_none() {
-        return None;
-    }
+    std::env::var_os("SLANGC")?;
     let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests");
     ShaderArtifact::load_directory(
         &root,
@@ -135,7 +133,7 @@ fn slang_compute_uses_reflected_eight_thread_workgroups() {
         )
         .expect("binding layout");
     let layout = device
-        .make_pipeline_layout(PipelineLayoutDescriptor::new(vec![binding.clone()]))
+        .make_pipeline_layout(PipelineLayoutDescriptor::new(vec![binding]))
         .expect("pipeline layout");
     let set = device
         .make_binding_set(
@@ -177,7 +175,9 @@ fn slang_compute_uses_reflected_eight_thread_workgroups() {
         .read_texture_data(target, 16, 1, 64, TextureSubresource::default(), &mut bytes)
         .expect("read the compute output back");
     let values: Vec<u32> = bytes
-        .chunks_exact(4)
+        .as_chunks::<4>()
+        .0
+        .iter()
         .map(|chunk| u32::from_le_bytes([chunk[0], chunk[1], chunk[2], chunk[3]]))
         .collect();
     assert_eq!(

@@ -12,7 +12,7 @@
 
 mod support;
 
-use cove_text::{TextCache, TextCacheLimits, TextEnvironment};
+use cove_text::{TextCache, TextCacheLimits};
 
 use support::GlobalTestLock;
 

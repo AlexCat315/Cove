@@ -122,10 +122,7 @@ fn trim_trailing(text: &str, start: usize, end: usize) -> usize {
     let candidate = &text[start..end];
     let trailing = ['.', ',', ';', ':', '!', '?', '\'', '"', ')', ']', '}', '>'];
     let mut keep = candidate;
-    loop {
-        let Some(last) = keep.chars().next_back() else {
-            break;
-        };
+    while let Some(last) = keep.chars().next_back() {
         if !trailing.contains(&last) {
             break;
         }

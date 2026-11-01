@@ -547,7 +547,9 @@ mod tests {
         assert_eq!(bytes.len(), 64);
         // The transform occupies the first 48 bytes as twelve consecutive floats.
         let matrix: Vec<f32> = bytes[..48]
-            .chunks_exact(4)
+            .as_chunks::<4>()
+            .0
+            .iter()
             .map(|chunk| f32::from_le_bytes([chunk[0], chunk[1], chunk[2], chunk[3]]))
             .collect();
         assert_eq!(

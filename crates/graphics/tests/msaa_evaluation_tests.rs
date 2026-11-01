@@ -301,7 +301,7 @@ fn write_image(
 ) -> std::io::Result<()> {
     std::fs::write(path.with_extension("bgra"), pixels)?;
     let mut ppm = format!("P6\n{width} {height}\n255\n").into_bytes();
-    for texel in pixels.chunks_exact(4) {
+    for texel in pixels.as_chunks::<4>().0 {
         ppm.extend_from_slice(&[texel[2], texel[1], texel[0]]);
     }
     std::fs::write(path.with_extension("ppm"), ppm)

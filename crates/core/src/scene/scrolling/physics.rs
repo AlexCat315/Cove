@@ -1,5 +1,5 @@
 //! Translation of CoveUIScene/Scrolling/{ScrollPhysics,RubberBand,ScrollSpring,ScrollVelocityTracker,AxisMotion}.swift.
-use crate::{Point, Size};
+use crate::Point;
 
 /// Tuning for the rubber-band stretch applied when a scroll offset travels past
 /// one of its bounds.
@@ -459,12 +459,6 @@ pub(crate) fn constrain(value: Point, maximum: Point) -> Point {
     Point {
         x: value.x.clamp(0.0, maximum.x.max(0.0)),
         y: value.y.clamp(0.0, maximum.y.max(0.0)),
-    }
-}
-pub(crate) fn size_of(point: Point) -> Size {
-    Size {
-        width: point.x,
-        height: point.y,
     }
 }
 

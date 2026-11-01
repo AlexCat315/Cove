@@ -143,6 +143,7 @@ impl PosixPseudoTerminal {
             )
         };
         #[cfg(not(target_os = "linux"))]
+        // SAFETY: as above.
         let pid = unsafe {
             let mut window = window;
             libc::forkpty(
