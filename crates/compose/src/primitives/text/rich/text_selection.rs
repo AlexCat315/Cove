@@ -531,6 +531,8 @@ impl TextSelectionScope {
     pub fn position(&mut self, point: Point) -> Option<TextSelectionPosition> {
         self.update_order();
         let mut edge: i32 = 0;
+        // SAFETY: frames is a live repr(C) slice for the supplied count and edge
+        // is a writable local. The synchronous C search retains neither pointer.
         let index = unsafe {
             cove_selection_find(
                 self.frames.as_ptr(),
@@ -560,6 +562,8 @@ impl TextSelectionScope {
     pub fn text_under(&mut self, point: Point) -> bool {
         self.update_order();
         let mut edge: i32 = 0;
+        // SAFETY: frames is a live repr(C) slice for the supplied count and edge
+        // is a writable local. The synchronous C search retains neither pointer.
         unsafe {
             cove_selection_find(
                 self.frames.as_ptr(),

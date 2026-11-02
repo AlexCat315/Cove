@@ -571,6 +571,15 @@ fn keyboard_and_pointer() {
             Some("audit"),
             "collapse preserves the selected page"
         );
+        scene.settle(3, 0.05);
+        assert!(
+            scene
+                .focus
+                .focused()
+                .expect("Team retains focus")
+                .is_tab_stop(),
+            "the focused branch remains the tab stop after later layout passes"
+        );
         assert_eq!(
             live_all(scene, |node| node
                 .attachment::<u64>("__roving.item")

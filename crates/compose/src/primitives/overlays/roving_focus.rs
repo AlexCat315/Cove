@@ -184,6 +184,25 @@ fn update_tab_stops(node: &Node, target: Option<u64>) {
     }
 }
 
+fn focused_token(owner: &Node) -> Option<u64> {
+    let chain = FocusChainHolder::current()?;
+    let focused = chain.focused()?;
+    if !chain.contains(&focused, owner) {
+        return None;
+    }
+    let mut candidate = Some(focused);
+    while let Some(node) = candidate {
+        if let Some(token) = node.attachment::<u64>(ROVING_ITEM) {
+            return Some(token);
+        }
+        if node == *owner {
+            break;
+        }
+        candidate = node.parent();
+    }
+    None
+}
+
 impl<Id: PartialEq + Clone + 'static> PrimitiveView for RovingFocusHost<Id> {
     fn make_node(&self) -> Node {
         let node = Node::new();
@@ -229,7 +248,6 @@ impl<Id: PartialEq + Clone + 'static> PrimitiveView for RovingFocusHost<Id> {
         node.set_attachment(ROVING_TAB_STOP, tab_stop_fn.clone());
 
         let weak = node.downgrade();
-        let resolve_identity = self.identity.clone();
         node.set_layout_did_update(Some(Rc::new(move |owner: &Node| {
             let Some(owner_node) = Node::upgrade(&weak) else {
                 return;
@@ -240,7 +258,11 @@ impl<Id: PartialEq + Clone + 'static> PrimitiveView for RovingFocusHost<Id> {
                 return;
             };
             let state = request.borrow().clone();
-            update_tab_stops(owner, state.target.or_else(|| tab_stop_fn()));
+            let target = state
+                .target
+                .or_else(|| focused_token(owner).filter(|token| enabled_tokens.contains(token)))
+                .or_else(|| tab_stop_fn());
+            update_tab_stops(owner, target);
             let Some(target) = state.target else { return };
             let Some(item) = locate(owner, target) else {
                 return;
@@ -253,7 +275,6 @@ impl<Id: PartialEq + Clone + 'static> PrimitiveView for RovingFocusHost<Id> {
             }
             crate::primitives::layout::ScrollReveal::reveal(&item, false);
             request.borrow_mut().target = None;
-            let _ = &resolve_identity;
         }) as cove_core::scene::LayoutUpdateHook));
 
         let Some(registry) = InteractionRegistryHolder::current() else {

@@ -616,6 +616,22 @@ fn named_sides() {
                     placed,
                     "{placement:?} rtl {rtl} keeps its side: {surface:?} vs {anchor:?}"
                 );
+                let inset = PopoverGeometry::MARGIN;
+                assert!(
+                    surface.x >= inset - 0.5 && surface.max_x() <= h.width.get() - inset + 0.5,
+                    "the constrained bubble fits horizontally: {surface:?}"
+                );
+                if !edge.is_vertical() {
+                    let available = if edge == PopoverEdge::Left {
+                        anchor.x - inset
+                    } else {
+                        h.width.get() - inset - anchor.max_x()
+                    };
+                    assert!(
+                        surface.width <= available - PopoverGeometry::GAP + 0.5,
+                        "the side bubble narrows to the available width: {surface:?}, {available}"
+                    );
+                }
             }
         }
     });

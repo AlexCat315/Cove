@@ -50,7 +50,7 @@ impl AvatarStatusGeometry {
         let size = (diameter * 0.28).round().clamp(6.0, 24.0);
         let radius = shape.radius(diameter);
         // Distance from the bounding corner to the outline along the diagonal.
-        let corner_gap = radius * (1.0 - 0.70710678);
+        let corner_gap = radius * (1.0 - std::f32::consts::FRAC_1_SQRT_2);
         Self {
             size,
             inset: corner_gap - size / 2.0,

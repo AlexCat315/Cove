@@ -275,16 +275,15 @@ impl<Id: PartialEq + Eq + std::hash::Hash + Clone + Send + Sync + 'static> View 
             if disclose {
                 if entry.is_branch() && expanded.insert(source.clone()) {
                     keyboard_expanded.set(expanded);
-                } else if entry.is_branch() {
-                    if let Some(child) =
+                } else if entry.is_branch()
+                    && let Some(child) =
                         keyboard_hierarchy.entries().into_iter().find(|candidate| {
                             candidate.ancestors.last() == Some(source)
                                 && candidate.is_enabled
                                 && candidate.is_visible(&expanded)
                         })
-                    {
-                        target = child.item.id;
-                    }
+                {
+                    target = child.item.id;
                 }
             } else if entry.is_branch() && expanded.remove(source) {
                 keyboard_expanded.set(expanded);

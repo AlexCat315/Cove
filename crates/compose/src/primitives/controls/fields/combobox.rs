@@ -1079,10 +1079,10 @@ impl cove_core::scene::AnyAnimationController for ComboboxRequestTimer {
     }
     fn finish_immediately(&self) {
         let action = self.action.borrow_mut().take();
-        if (self.valid)() {
-            if let Some(action) = action {
-                action();
-            }
+        if (self.valid)()
+            && let Some(action) = action
+        {
+            action();
         }
     }
     fn cancel(&self) {

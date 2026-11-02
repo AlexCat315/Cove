@@ -29,13 +29,8 @@
 //!   row style rather than the closure.
 //! - `List` takes a `CollectionSelection` plus `.rows(ids)` instead of Swift's
 //!   `List(items, selection:)` initializer.
-//! - The Rust row style paints the selection on the horizontally padded row
-//!   node, so the fill spans the full 600pt row instead of Swift's pill inset
-//!   by `horizontal_inset` on both edges; `selected_row_fits_its_slot` pins the
-//!   full-width fill while still asserting the vertical inset and radius.
-//! - Rust `List` rows do not repaint the selection fill after a post-mount tap
-//!   even though the binding updates; a selection present at mount does paint.
-//!   `list_selection` pins zero fills after the tap.
+//! - The selection fill subtracts both horizontal insets from its width, but
+//!   starts at the viewport's leading edge rather than at the leading inset.
 //! - Tree hover repaints through the row's hover handler without a pending
 //!   recompose, but the row stays clear instead of painting the hover fill;
 //!   the test pins that current behaviour.
@@ -280,9 +275,8 @@ fn list_selection() {
             .filter(|node| node.background_color().is_some_and(|color| color.a > 0.1))
             .count();
         assert_eq!(
-            fills, 0,
-            "GAP: Rust writes the binding but never repaints the selection fill after a \
-             tap (a mount-time selection does paint), got {fills}"
+            fills, 1,
+            "the newly selected row repaints exactly one selection fill, got {fills}"
         );
     });
 }
@@ -349,12 +343,18 @@ fn selected_row_fits_its_slot() {
             .expect("GAP: the list must mount a clipping viewport");
         let viewport_width = viewport.absolute_frame().width;
         assert!(
-            (viewport_width - fill.absolute_frame().width).abs() < 0.5,
-            "GAP: Rust paints the selection edge-to-edge on the padded row node, not inset \
-             by {} per side; viewport {} fill {}",
+            (viewport_width - 2.0 * appearance.horizontal_inset - fill.absolute_frame().width)
+                .abs()
+                < 0.5,
+            "the selection fill is inset by {} per side; viewport {} fill {}",
             appearance.horizontal_inset,
             viewport_width,
             fill.absolute_frame().width
+        );
+        assert!(
+            (fill.absolute_frame().x - viewport.absolute_frame().x).abs() < 0.5,
+            "GAP: the fill width respects both insets, but its leading position is still zero rather than {}",
+            appearance.horizontal_inset
         );
 
         assert_eq!(

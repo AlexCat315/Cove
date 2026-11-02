@@ -33,16 +33,28 @@ its own verification pass.
 | 22 | `flash_touch_indicator` snapped 1→0 with no animation context, so a touch scroll indicator was never visible | `indicator_tests` |
 | 23 | `SceneEditor::intercept` held a `RefMut` across a `borrow_mut()` (Rust 2024 temporary scope), panicking on every second mouse-up while picking | `editor_pick_borrow_regression` |
 | 24 | `PortalStoreAmbient` had no `ScopedAmbient` impl and was not re-exported, so no caller could scope a portal store through the runtime ambient; `Examples` had reimplemented it locally | `portal_scope_tests` |
-| `EmptyDashboardSpace` was the last empty `impl View` on a plain struct, panicking on mounting the Introduction page | `cargo test -p cove-examples --lib` |
-| `Binding`-driven views never recomposed, so no popover, menu or asset picker could open. State now lives in the composition scope as `Signal`s read through tracked `Binding`s | `signal_scope_tests`, `menu_button_tests`, `split_button_tests`, `popconfirm_tests` |
-| Every `ModifiedContent` shared one slot tag, so reconciliation updated unrelated modified views in place | `product_interaction_regression_tests::command_palette_filters_through_real_input` |
-| `StoryDispatch::new` allowlisted only 15 pages while `view()` implemented 58, so **43 fully ported gallery stories were unreachable dead code** and rendered the "not migrated" notice | `every_implemented_view_arm_is_reachable` |
-| `SwapchainImage` equality was field-based with a per-window `generation`, so a stale acquisition ticket compared equal to the current one and could consume the frame; Swift used reference identity | `swapchain_lifetime_tests` |
+| 25 | `EmptyDashboardSpace` was the last empty `impl View` on a plain struct, panicking on mounting the Introduction page | `cargo test -p cove-examples --lib` |
+| 26 | `Binding`-driven views never recomposed, so no popover, menu or asset picker could open. State now lives in the composition scope as `Signal`s read through tracked `Binding`s | `signal_scope_tests`, `menu_button_tests`, `split_button_tests`, `popconfirm_tests` |
+| 27 | Every `ModifiedContent` shared one slot tag, so reconciliation updated unrelated modified views in place | `product_interaction_regression_tests::command_palette_filters_through_real_input` |
+| 28 | `StoryDispatch::new` allowlisted only 15 pages while `view()` implemented 58, so **43 fully ported gallery stories were unreachable dead code** and rendered the "not migrated" notice | `every_implemented_view_arm_is_reachable` |
+| 29 | `SwapchainImage` equality was field-based with a per-window `generation`, so a stale acquisition ticket compared equal to the current one and could consume the frame; Swift used reference identity | `swapchain_lifetime_tests` |
+| 30 | Calendar browsing lived in an unobserved `RefCell`; month/panel changes never rendered, reused day nodes retained old dates, and year paging could panic on a nested borrow. Scope signals now drive rendering and actual focus movement | `calendar_keyboard_navigation_tests`, `calendar_modes_tests` |
+| 31 | An open Popconfirm's modal focus boundary blocked the second pointer click on its trigger. The anchored host handles dismissal over its anchor before modal routing | `popconfirm_tests::lifecycle` |
+| 32 | Sidebar had no mirrored tree disclosure keys, and layoutless input hosts resolved RTL as LTR. Directional navigation now expands/collapses and moves parent/child focus using inherited direction | `sidebar_hierarchy_tests::keyboard_and_pointer`, `sidebar_hierarchy_tests::local_and_rtl`, `flex_props::tests::layoutless_input_hosts_inherit_direction_from_ancestors` |
+| 33 | Anchored overlay callbacks replaced the authored overflow policy with `Flip`, and the bubble applied only a maximum height. Constrained side placements now retain their side and narrow to available width | `popconfirm_tests::named_sides` |
+| 34 | Closed swipe actions remained in accessibility and hit testing, so the reveal gesture could activate an action. Closed actions now exclude both paths | `swipe_list_tests::actions_menu`, `swipe_list_tests::mirrored_actions` |
+| 35 | Combobox session mutations were unobserved, its remote callback never ran, and reconstruction discarded query state. Scope-owned sessions now execute debounced requests and publish current-generation results through the UI inbox | `reactive_component_sessions`, `combobox_search_tests` |
+| 36 | NavigationStack recreated its transition guard on reconstruction, accepting overlapping path changes; its return gesture also used width zero. Both now use retained scope state and the measured page width | `navigation_stack_tests` |
+| 37 | Sidebar row minimum height existed only in an unused style value, leaving rail/touch buttons below their required floor. The actual destination button now applies it | `sidebar_hierarchy_tests::adaptive_matrix` |
+
+Remaining legacy state callers and batch boundaries are tracked in [state-migration.md](state-migration.md).
 
 ## Open (each needs its own change + verification)
 
 | Defect | Why not fixed here |
 | --- | --- |
+| Extended `menu_hierarchy_tests` still has three baseline failures involving stale wrapped-row GAP assertions, the scaled-row viewport comparison, and a wheel offset that remains zero | Reproduced on pre-batch commit `297b96b8`; exact cases and observations are recorded in [state-migration.md](state-migration.md#验证) for a separate menu layout/session pass |
+| List selection fill subtracts both horizontal insets from its width but starts at the viewport's leading edge (0pt instead of 6pt); the old full-width GAP assertion was stale | Requires a separate row layout/placement fix; `list_tree_tests::selected_row_fits_its_slot` records the exact remaining offset |
 | `WorkspaceView` has no view reactivity: `dispatch` bumps `version` but nothing invalidates the scope, so an installed tree never re-renders | Sources-owned; a live host would show a stale workspace forever |
 | `WorkspaceDocument` cannot be serialized: `WorkspaceLayoutNode` derives `Serialize` with `#[serde(tag = "kind")]` on a newtype `Group` variant | Persistence is impossible; decoding works |
 | `Diagnostics::capture_trace` is synchronous (`thread::sleep` on the only thread that could emit), so a capture can never observe a span; Swift's is async | Needs an async capture or frame-inbox bracket — a DevTools design change |
