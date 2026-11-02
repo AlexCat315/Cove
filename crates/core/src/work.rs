@@ -7,8 +7,9 @@
 //! next frame, so the UI hot path takes no locks.
 //!
 //! [`par_map`] splits a slice across the pool for per-frame data parallelism.
-//! The calling thread works through the queue while it waits, so it is safe to
-//! call from inside a worker.
+//! A waiting caller helps with other `par_map` chunks, so it is safe to call from
+//! inside a worker, but it never picks up a spawned job: those stay on the
+//! workers, so a UI thread cannot end up running an image decode.
 use crate::reactive::ThreadInbox;
 use std::any::Any;
 use std::cell::RefCell;
@@ -23,42 +24,58 @@ type Job = Box<dyn FnOnce() + Send + 'static>;
 /// Jobs queued or running, for [`wait_idle`].
 static OUTSTANDING: AtomicUsize = AtomicUsize::new(0);
 
+#[derive(Default)]
+struct Pending {
+    /// Runners of a `par_map`, which any waiting thread may execute.
+    chunks: VecDeque<Job>,
+    /// Spawned jobs, which only pool threads execute.
+    jobs: VecDeque<Job>,
+}
+
 struct Queue {
-    jobs: Mutex<VecDeque<Job>>,
+    pending: Mutex<Pending>,
     available: Condvar,
 }
 
 impl Queue {
-    fn push(&self, job: Job) {
-        self.jobs
-            .lock()
-            .unwrap_or_else(PoisonError::into_inner)
-            .push_back(job);
+    fn lock(&self) -> std::sync::MutexGuard<'_, Pending> {
+        self.pending.lock().unwrap_or_else(PoisonError::into_inner)
+    }
+
+    fn push_job(&self, job: Job) {
+        self.lock().jobs.push_back(job);
         self.available.notify_one();
     }
 
-    fn try_pop(&self) -> Option<Job> {
-        self.jobs
-            .lock()
-            .unwrap_or_else(PoisonError::into_inner)
-            .pop_front()
+    fn push_chunk(&self, chunk: Job) {
+        self.lock().chunks.push_back(chunk);
+        self.available.notify_one();
     }
 
+    fn try_pop_chunk(&self) -> Option<Job> {
+        self.lock().chunks.pop_front()
+    }
+
+    /// Chunks first: a frame is waiting on them.
     fn pop_blocking(&self) -> Job {
-        let mut jobs = self.jobs.lock().unwrap_or_else(PoisonError::into_inner);
+        let mut pending = self.lock();
         loop {
-            if let Some(job) = jobs.pop_front() {
+            if let Some(job) = pending
+                .chunks
+                .pop_front()
+                .or_else(|| pending.jobs.pop_front())
+            {
                 return job;
             }
-            jobs = self
+            pending = self
                 .available
-                .wait(jobs)
+                .wait(pending)
                 .unwrap_or_else(PoisonError::into_inner);
         }
     }
 }
 
-/// A fixed set of named worker threads sharing one FIFO queue.
+/// A fixed set of named worker threads sharing one queue.
 pub struct WorkPool {
     queue: Arc<Queue>,
     threads: usize,
@@ -67,7 +84,7 @@ pub struct WorkPool {
 impl WorkPool {
     fn new(threads: usize) -> Self {
         let queue = Arc::new(Queue {
-            jobs: Mutex::new(VecDeque::new()),
+            pending: Mutex::default(),
             available: Condvar::new(),
         });
         for index in 0..threads {
@@ -93,7 +110,7 @@ impl WorkPool {
 
     pub fn spawn(&self, job: impl FnOnce() + Send + 'static) {
         OUTSTANDING.fetch_add(1, Ordering::AcqRel);
-        self.queue.push(Box::new(move || {
+        self.queue.push_job(Box::new(move || {
             struct Finished;
             impl Drop for Finished {
                 fn drop(&mut self) {
@@ -105,9 +122,9 @@ impl WorkPool {
         }));
     }
 
-    /// Run one queued job on the calling thread, if there is one.
+    /// Run one queued `par_map` chunk on the calling thread, if there is one.
     fn help(&self) -> bool {
-        match self.queue.try_pop() {
+        match self.queue.try_pop_chunk() {
             Some(job) => {
                 let _ = catch_unwind(AssertUnwindSafe(job));
                 true
@@ -276,7 +293,7 @@ pub fn par_map<T: Sync, R: Send, F: Fn(&T) -> R + Sync>(items: &[T], transform: 
         transform: &transform,
         grain,
         next: AtomicUsize::new(0),
-        pending: AtomicUsize::new(runners),
+        pending: AtomicUsize::new(1),
         done: (Mutex::new(()), Condvar::new()),
         panic: Mutex::new(None),
     };
@@ -310,36 +327,53 @@ pub fn par_map<T: Sync, R: Send, F: Fn(&T) -> R + Sync>(items: &[T], transform: 
         }
     }
 
+    /// Blocks until every runner finished, including while unwinding: the queued
+    /// runners borrow from this stack frame.
+    struct AwaitRunners<'s, 'a, T, R, F> {
+        shared: &'s Shared<'a, T, R, F>,
+        pool: &'static WorkPool,
+    }
+    impl<T, R, F> Drop for AwaitRunners<'_, '_, T, R, F> {
+        fn drop(&mut self) {
+            let shared = self.shared;
+            while shared.pending.load(Ordering::Acquire) > 0 {
+                // Keep chunks moving instead of idling; this also makes nested
+                // calls from inside a worker safe.
+                if !self.pool.help() {
+                    let guard = shared.done.0.lock().unwrap_or_else(PoisonError::into_inner);
+                    if shared.pending.load(Ordering::Acquire) > 0 {
+                        let _ = shared
+                            .done
+                            .1
+                            .wait_timeout(guard, std::time::Duration::from_micros(200));
+                    }
+                }
+            }
+        }
+    }
+    let waiter = AwaitRunners {
+        shared: &shared,
+        pool,
+    };
+
     // The calling thread is one runner; the rest go to the pool.
     for _ in 1..runners {
         let address = &shared as *const Shared<'_, T, R, F> as usize;
         let job: Box<dyn FnOnce() + Send + '_> = Box::new(move || {
-            // SAFETY: `shared` lives on the caller's stack until `pending`
-            // reaches zero, and the caller does not return before that, so the
-            // pointer stays valid for the whole job.
+            // SAFETY: `AwaitRunners` keeps `shared` on the caller's stack until
+            // `pending` reaches zero, on every exit path.
             let shared = unsafe { &*(address as *const Shared<'_, T, R, F>) };
             run(shared);
         });
-        // SAFETY: the job only borrows data the caller keeps alive until every
-        // runner has finished (the wait below), so extending its lifetime to
-        // `'static` for the queue cannot let it outlive what it borrows.
+        // SAFETY: the job only borrows data `AwaitRunners` keeps alive until every
+        // runner has finished, so extending its lifetime to `'static` for the
+        // queue cannot let it outlive what it borrows.
         let job: Job = unsafe { std::mem::transmute::<Box<dyn FnOnce() + Send + '_>, Job>(job) };
-        pool.queue.push(job);
+        shared.pending.fetch_add(1, Ordering::AcqRel);
+        pool.queue.push_chunk(job);
     }
     run(&shared);
-    while shared.pending.load(Ordering::Acquire) > 0 {
-        // Keep the queue moving instead of idling; this also makes nested
-        // calls from inside a worker safe.
-        if !pool.help() {
-            let guard = shared.done.0.lock().unwrap_or_else(PoisonError::into_inner);
-            if shared.pending.load(Ordering::Acquire) > 0 {
-                let _ = shared
-                    .done
-                    .1
-                    .wait_timeout(guard, std::time::Duration::from_micros(200));
-            }
-        }
-    }
+    drop(waiter);
     if let Some(payload) = shared
         .panic
         .lock()
@@ -409,10 +443,38 @@ mod tests {
     fn par_map_preserves_order_and_uses_workers() {
         let items: Vec<u64> = (0..1_000).collect();
         let squares = par_map(&items, |value| value * value);
-        assert_eq!(squares, items.iter().map(|value| value * value).collect::<Vec<_>>());
+        assert_eq!(
+            squares,
+            items.iter().map(|value| value * value).collect::<Vec<_>>()
+        );
         let threads = par_map(&items, |_| std::thread::current().id());
         let distinct: std::collections::HashSet<_> = threads.into_iter().collect();
         assert!(distinct.len() > 1 || pool().threads() < 2);
+    }
+
+    #[test]
+    fn waiting_on_par_map_never_runs_a_spawned_job_on_the_caller() {
+        let caller = std::thread::current().id();
+        let ran_on_caller = std::sync::Arc::new(AtomicUsize::new(0));
+        for _ in 0..(pool().threads() * 4) {
+            let ran_on_caller = ran_on_caller.clone();
+            spawn(move || {
+                if std::thread::current().id() == caller {
+                    ran_on_caller.fetch_add(1, Ordering::SeqCst);
+                }
+                std::thread::sleep(Duration::from_millis(2));
+            });
+        }
+        let items: Vec<u64> = (0..2_000).collect();
+        for _ in 0..20 {
+            let doubled = par_map(&items, |value| {
+                std::thread::sleep(Duration::from_micros(5));
+                value * 2
+            });
+            assert_eq!(doubled[1_999], 3_998);
+        }
+        assert!(wait_idle(Duration::from_secs(10)));
+        assert_eq!(ran_on_caller.load(Ordering::SeqCst), 0);
     }
 
     #[test]
@@ -420,7 +482,9 @@ mod tests {
         let outer: Vec<usize> = (0..16).collect();
         let sums = par_map(&outer, |&row| {
             let inner: Vec<usize> = (0..64).collect();
-            par_map(&inner, |&column| row * column).into_iter().sum::<usize>()
+            par_map(&inner, |&column| row * column)
+                .into_iter()
+                .sum::<usize>()
         });
         assert_eq!(sums[2], (0..64).map(|column| 2 * column).sum::<usize>());
     }
@@ -435,6 +499,10 @@ mod tests {
             })
         }));
         assert!(outcome.is_err());
-        assert_eq!(par_map(&items, |&value| value + 1)[0], 1, "the pool survives");
+        assert_eq!(
+            par_map(&items, |&value| value + 1)[0],
+            1,
+            "the pool survives"
+        );
     }
 }

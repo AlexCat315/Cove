@@ -4,6 +4,41 @@
 
 ## Unreleased
 
+- **下拉菜单、侧边栏、默认主题与 DevTools 帧回读（2026-11-02，破坏性）**：
+  - 修复下拉点击无反应、切页才出现：主窗口的 portal store 现在在挂载前就绪，`PortalHost` 与弹层使用同一个
+    store；`Select`、`ColorField` 的展开状态归各自 scope 持有，不再共享，也不会被其他面板带开。
+  - 菜单高亮改为响应式，跟随指针和方向键，同一时间只有一行高亮；高亮改用浅色强调色，文字颜色不再反转。
+    `Select::width` 现在决定触发器宽度，弹层至少同宽并随内容变宽。
+  - 侧边栏行撑满并有统一边距，hover 和选中区域覆盖整行；header、footer、分组标题共用一列；选中行也响应 hover。
+  - 破坏性：折叠按钮移到顶部，新增 `AdaptiveSidebar::brand` 槽位与其同行；`Sidebar` 的 header、footer 增加边距，
+    `SidebarPresentation::gutter` 给出其值。
+  - 默认主题更柔和：弱化 surface 与边框对比度，圆角阶梯调为 0/6/8/12/16。
+  - DevTools 补齐 Swift 的 host 接线：`mirror.start`/`stop` 驱动帧回读（含 Android），mirror 期间持续出帧，
+    并接上 `mirror.activate`、`window.resize`、状态观察、失效日志与渲染树；空闲 host 收到请求时会被唤醒；
+    检查器 overlay 与拦截改用实际的 `SceneInspector`。破坏性：`attach_frame_tap` 增加 reset 参数，
+    `set_state_registry` 改为 `set_state_source`，`DiagnosticsCallbacks` 增加字段。
+- **主线程、UI 线程、渲染线程分离（2026-11-02，破坏性）**：
+  - 桌面端主线程只做平台泵，组合、布局和绘制列表运行在新的 `cove-ui` 线程。`application!` 生成的 `run()`
+    改走 `ApplicationLaunch::launch`，声明在 UI 线程上构建；`COVE_SINGLE_THREAD=1` 退回单线程。iOS 和 Android
+    的 UI 仍在系统主线程上，平台调用走直通路径。
+  - 新增 `cove_runtime::platform`：可合并的调用进每窗口槽位，有序调用走 FIFO，读取来自发布的窗口快照，
+    结果作为消息回投。任何一侧都不等待另一侧；UI 线程无响应时，主线程在退出请求后 5 秒放弃它。
+  - 帧管线改为最多 2 帧在飞：`ThreadedWindowRenderer::submit` 立即返回，无空位时不录制；结果和错误由
+    `take_presented` 取回。`close` 最多等 2 秒。Android 的 GPU 工作移到每个 surface 的渲染线程，渲染线程
+    持有自己的 `ANativeWindow` 引用。
+  - 无障碍改为快照提交，取值读快照，动作排队回 UI 线程。原生菜单和剪贴板读取改为回调：
+    `NativeMenuPresenter::present` 和 `ClipboardHolder::request_read`。
+  - 窗口状态每轮事件泵读取一次并缓存，不再每次读取都调用原生接口。Debug 构建的原生入口断言主线程。
+  - 新增 `PlatformThreadWebViewHost`：UI 线程上组合的 `WebView` 必须用它包裹平台 host，否则视图不会创建。
+    新增 `PlatformThread::post` 和 `ThreadPoster`。
+  - 修复：`wake` 推送失败或与轮询竞争时丢失唤醒；首帧之后录制列表丢失 `geometry_antialiasing` 与
+    `clip_revision`，导致抗锯齿模式隔帧错误、图层缓存反复失效；DevTools 收到的是回收后的空绘制列表；
+    macOS 14 以下重复 `CVDisplayLinkStart` 被当作失败；`par_map` 等待时可能把图片解码等独立任务拉到调用线程，
+    现在只协助 `par_map` 分片，且任何退出路径都等齐所有分片；iOS 入口从未进入 `SDL_RunApp`，且
+    `run` 返回后立刻释放 GPU。
+  - 破坏性：`AppWindowRenderer` 只在渲染线程使用，host 持有具体类型 `ThreadedWindowRenderer`；
+    `native_menu::install` 增加 presenter 参数；`DiagnosticsSession::presented` 在移交帧时调用，
+    不再等呈现完成。
 - **compose 集成测试合并为单一二进制并清零失败（2026-11-02）**：
   - `crates/compose/tests` 的 248 个文件合并为 `--test compose`（`tests/main.rs`，`autotests = false`），
     只链接一次、共享一个进程；新增测试文件需在 `main.rs` 声明，漏声明会被 `every_test_file_is_declared` 拦下。

@@ -10,11 +10,11 @@ use crate::desktop::application::configuration::{
 };
 use crate::desktop::application::memory::AppWindowMemorySnapshot;
 use crate::desktop::application::typography::AdaptiveApplicationContent;
+use crate::desktop::rendering::ThreadedWindowRenderer;
 use crate::desktop::rendering::context::AppRenderingContext;
 use crate::desktop::window::chrome::{
     self, AppWindowChromeContextHolder, WindowChromeHitTestCollector,
 };
-use crate::desktop::window::native_renderer::AppWindowRenderer;
 use cove_composition::{AnyView, ViewGraph};
 use cove_core::scene::{LayerAwareNodeRenderer, NodeRenderer, NodeTree, Recomposer};
 use cove_core::{DrawList, Environment, State};
@@ -38,7 +38,7 @@ pub struct AuxiliaryAppWindow {
     root_view: AnyView,
     portal_store: Rc<PortalStore>,
     rendering: Rc<AppRenderingContext>,
-    window_renderer: Option<Box<dyn AppWindowRenderer>>,
+    window_renderer: Option<ThreadedWindowRenderer>,
     config: ApplicationConfiguration,
     window_rendering: AppWindowRendering,
     use_legacy_renderer: bool,
@@ -268,7 +268,7 @@ impl AuxiliaryAppWindow {
         let Some(renderer) = &self.window_renderer else {
             return false;
         };
-        if !renderer.is_configured() {
+        if !renderer.is_configured() || !renderer.has_frame_capacity() {
             return false;
         }
         let (root, timeline) = {
@@ -311,15 +311,20 @@ impl AuxiliaryAppWindow {
         let Some(renderer) = &mut self.window_renderer else {
             return false;
         };
-        match renderer.draw(&mut list, (logical.0 as f32, logical.1 as f32)) {
-            Ok(presented) => {
-                if !presented {
-                    self.session.request_display();
-                }
-                presented
-            }
-            Err(_) => false,
-        }
+        renderer
+            .submit(&mut list, (logical.0 as f32, logical.1 as f32))
+            .is_ok_and(|token| token.is_some())
+    }
+
+    /// Collects finished frames. True when one could not present and must retry.
+    pub fn take_presented(&mut self) -> Result<bool, String> {
+        let Some(renderer) = &mut self.window_renderer else {
+            return Ok(false);
+        };
+        renderer
+            .take_presented()
+            .map(|frames| frames.iter().any(|frame| !frame.presented))
+            .map_err(|error| error.to_string())
     }
 }
 

@@ -423,9 +423,8 @@ fn rail_geometry_holds_across_theme_density_and_text() {
                             let lane_bounds = nav.absolute_frame();
                             // GAP: Swift clamps the glyph to `railWidth - 16`;
                             // the Rust rail passes the authored 400pt extent
-                            // through (scaled by the icon metrics) and centres it
-                            // on the authored slot, so at 2x text the glyph spans
-                            // [-200, 600] and overhangs the lane's leading edge.
+                            // through (scaled by the icon metrics), centred on the
+                            // lane, so it overhangs the lane on both sides.
                             assert!(
                                 (glyph.frame().width - 400.0 * scale).abs() < 1.0,
                                 "GAP: the glyph is {} wide at scale {scale}; Swift clamps it \
@@ -434,7 +433,7 @@ fn rail_geometry_holds_across_theme_density_and_text() {
                                 rail_width - 16.0,
                             );
                             assert!(
-                                ((bounds.x + bounds.max_x()) / 2.0 - 200.0).abs() < 1.0,
+                                ((bounds.x + bounds.max_x()) / 2.0 - nav_width / 2.0).abs() < 1.0,
                                 "GAP: the {} glyph spans [{}, {}] inside the {} lane [{}, {}] \
                                  at scale {scale}; Swift clamps it inside the rail",
                                 row_glyph_width,

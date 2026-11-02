@@ -2,9 +2,8 @@
 
 use super::render_thread::ThreadedWindowRenderer;
 use crate::desktop::application::configuration::{AppWindowRendering, ApplicationConfiguration};
-use crate::desktop::window::native_renderer::{
-    AppWindowRenderSettings, AppWindowRenderer, NativeAppWindowRenderer,
-};
+use crate::desktop::diagnostics::integration::DiagnosticsFrameSource;
+use crate::desktop::window::native_renderer::{AppWindowRenderSettings, NativeAppWindowRenderer};
 use cove_core::{GeometryAntialiasing, TextureId};
 use cove_graphics::rhi::{Device, RhiResult, TextureFormat};
 use cove_graphics::ui::{FontAtlasUpload, NativeDrawListRenderer};
@@ -58,12 +57,26 @@ impl AppRenderingContext {
         self.device.clone()
     }
 
+    /// The renderer DevTools captures mirror frames with. It shares this
+    /// context's texture store, so uploads stay live.
+    pub fn frame_source(&self) -> RhiResult<DiagnosticsFrameSource> {
+        let device = self.device.clone();
+        let renderer = device.with_frame_session(|| {
+            self.renderer
+                .make_presentation_renderer(TextureFormat::Bgra8Unorm, 1)
+        })?;
+        Ok(DiagnosticsFrameSource {
+            device: self.device.clone(),
+            renderer,
+        })
+    }
+
     /// Builds the presentation renderer for one window. The sibling shares the
     /// texture store so a glyph atlas uploaded once serves every window.
     pub fn make_window(
         &self,
         settings: AppWindowRenderSettings,
-    ) -> RhiResult<Box<dyn AppWindowRenderer>> {
+    ) -> RhiResult<ThreadedWindowRenderer> {
         let device = self.device.clone();
         let presentation = device.with_frame_session(|| {
             self.renderer.make_presentation_renderer(
@@ -73,9 +86,9 @@ impl AppRenderingContext {
         })?;
         let renderer = Box::new(NativeAppWindowRenderer::new(device, presentation, settings));
         if std::env::var_os("COVE_SYNC_RENDER").is_some_and(|value| value == "1") {
-            return Ok(renderer);
+            return Ok(ThreadedWindowRenderer::inline(renderer));
         }
-        Ok(Box::new(ThreadedWindowRenderer::spawn(renderer, "window")))
+        Ok(ThreadedWindowRenderer::spawn(renderer, "window"))
     }
 
     /// Copies the atlas's pending regions for a window renderer to upload in

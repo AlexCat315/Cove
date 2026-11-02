@@ -112,6 +112,30 @@ mod ndk {
         // us; the accessor only reads the window's current geometry.
         Some(unsafe { query(window) })
     }
+
+    /// Adds a reference to `window`.
+    pub fn window_acquire(window: *mut c_void) -> bool {
+        type Acquire = unsafe extern "C" fn(*mut c_void);
+        let Some(acquire) =
+            android_library().and_then(|library| library.symbol::<Acquire>(c"ANativeWindow_acquire"))
+        else {
+            return false;
+        };
+        // SAFETY: the caller holds a live reference to this `ANativeWindow*`.
+        unsafe { acquire(window) };
+        true
+    }
+
+    /// Drops a reference taken by [`window_acquire`].
+    pub fn window_release(window: *mut c_void) {
+        type Release = unsafe extern "C" fn(*mut c_void);
+        if let Some(release) =
+            android_library().and_then(|library| library.symbol::<Release>(c"ANativeWindow_release"))
+        {
+            // SAFETY: releases exactly the reference `window_acquire` added.
+            unsafe { release(window) };
+        }
+    }
 }
 
 #[cfg(not(target_os = "android"))]
@@ -121,6 +145,12 @@ mod ndk {
     pub fn log_write(_tag: &CStr, _message: &CStr) -> bool {
         false
     }
+
+    pub fn window_acquire(_window: *mut c_void) -> bool {
+        true
+    }
+
+    pub fn window_release(_window: *mut c_void) {}
 
     pub fn window_query(_window: *mut c_void, _which: &CStr) -> Option<i32> {
         None
@@ -149,6 +179,25 @@ impl NativeWindow {
 
     pub fn library_available() -> bool {
         cfg!(target_os = "android")
+    }
+}
+
+/// An owned reference to an `ANativeWindow`, valid on any thread until dropped.
+pub struct AcquiredNativeWindow(usize);
+
+impl AcquiredNativeWindow {
+    pub fn acquire(window: usize) -> Option<Self> {
+        ndk::window_acquire(window as *mut c_void).then_some(Self(window))
+    }
+
+    pub fn raw(&self) -> usize {
+        self.0
+    }
+}
+
+impl Drop for AcquiredNativeWindow {
+    fn drop(&mut self) {
+        ndk::window_release(self.0 as *mut c_void);
     }
 }
 

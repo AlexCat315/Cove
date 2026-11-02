@@ -605,8 +605,7 @@ impl MenuEntryRef {
             session.hover_intent.cancel(self.id);
             return;
         }
-        // The accent band and its light ink follow the pointer at once; only a
-        // branch waits for the crossing delay, so a diagonal path cannot swap it
+        // The highlight follows the pointer at once; only a branch waits for the crossing delay, so a diagonal path cannot swap it
         // out under the pointer.
         if session.navigation().highlighted != Some(self.id) {
             let mut state = session.navigation();
@@ -799,6 +798,13 @@ impl MenuLevel {
 }
 
 impl View for MenuLevel {
+    fn dynamic_properties(&self) -> Vec<cove_composition::DynamicField> {
+        vec![cove_composition::DynamicField::state(
+            "revision",
+            &self.session.revision,
+        )]
+    }
+
     fn body(&self, _cx: &Scope) -> AnyView {
         let rows = self.rows();
         let on_key: Rc<dyn Fn(&cove_platform::KeyEvent, &Node) -> bool> = Rc::new({

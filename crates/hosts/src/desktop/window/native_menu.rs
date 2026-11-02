@@ -249,20 +249,15 @@ pub mod installer {
     /// exact tree the bar needs, so installing it is a shell-side addition, not a
     /// host-side one. Until then an application's menu bar is not shown, and the
     /// Compose menu path remains the one that works.
-    pub fn install(menu_bar: &NativeMenuBar) {
+    pub fn install(
+        menu_bar: &NativeMenuBar,
+        presenter: cove_core::scene::NativeMenuPresenterCallback,
+    ) {
         let (_snapshot, actions) = menu_bar.snapshot();
         // Retained so a popup routed through the shell can resolve its item ids
         // back to the authored closures.
         native_menu_bridge::set_actions(actions);
-        cove_core::scene::NativeMenuPresenter::set_present(Some(std::rc::Rc::new(
-            move |menu: &cove_platform::NativeMenuSnapshot, point: cove_core::Point| {
-                cove_shell::native_menu_popover::NativeMenuPopover::pop_up(
-                    menu, point.x, point.y, None,
-                )
-                .ok()
-                .flatten()
-            },
-        )));
+        cove_core::scene::NativeMenuPresenter::set_present(Some(presenter));
     }
 }
 
@@ -273,7 +268,11 @@ pub mod installer {
 pub mod installer {
     use super::*;
 
-    pub fn install(_menu_bar: &NativeMenuBar) {}
+    pub fn install(
+        _menu_bar: &NativeMenuBar,
+        _presenter: cove_core::scene::NativeMenuPresenterCallback,
+    ) {
+    }
 }
 
 /// Other platforms present Compose menus, so there is nothing native to install.
@@ -281,7 +280,11 @@ pub mod installer {
 pub mod installer {
     use super::*;
 
-    pub fn install(_menu_bar: &NativeMenuBar) {}
+    pub fn install(
+        _menu_bar: &NativeMenuBar,
+        _presenter: cove_core::scene::NativeMenuPresenterCallback,
+    ) {
+    }
 }
 
 pub use installer::install;

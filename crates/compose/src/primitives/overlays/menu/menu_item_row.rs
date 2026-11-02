@@ -60,15 +60,15 @@ fn update_fill(node: &Node) {
     let hovered = node.attachment::<bool>(HOVERED) == Some(true);
     let highlighted = node.attachment::<bool>(HIGHLIGHTED) == Some(true);
     let colors = theme_for_node(node).colors;
-    // The select paints the row the pointer or the arrows are on with the
-    // accent and swaps the ink to its paired colour; it snaps rather than
-    // easing, so the band follows the highlight without a trailing fade.
+    // The row the pointer or the arrows are on takes a soft accent tint and
+    // keeps its ink; it snaps rather than easing, so the band follows the
+    // highlight without a trailing fade.
     let fill = if !enabled {
         Color::CLEAR
     } else if pressed {
-        colors.accent_pressed
+        colors.selection
     } else if hovered || highlighted {
-        colors.accent
+        colors.accent_muted
     } else {
         Color::CLEAR
     };
@@ -379,27 +379,17 @@ impl PrimitiveView for MenuItemRowHost {
         } else {
             MINIMUM_ROW_HEIGHT
         };
-        // A highlighted row is an accent band with light ink: the whole row
-        // (label, icon, shortcut) inverts together instead of keeping dark text
-        // on an accent face.
-        let highlighted = self.item.is_enabled && self.is_highlighted;
         let title_color = if !self.item.is_enabled {
             theme
                 .text_emphasis
                 .disabled
                 .unwrap_or(theme.colors.on_surface_muted)
-        } else if highlighted {
-            theme.colors.on_accent
         } else if self.item.role == MenuItemRole::Destructive {
             theme.colors.error
         } else {
             theme.colors.on_surface
         };
-        let secondary_color = if highlighted {
-            theme.colors.on_accent
-        } else {
-            theme.colors.on_surface_muted
-        };
+        let secondary_color = theme.colors.on_surface_muted;
 
         let mut lanes: Vec<AnyView> = Vec::new();
         if self.shows_selection_column {

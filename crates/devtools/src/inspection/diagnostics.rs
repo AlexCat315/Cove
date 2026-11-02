@@ -237,11 +237,26 @@ impl From<DiagnosticError> for crate::agent::AgentError {
     }
 }
 
+/// Where diagnostics read opted-in state. Evaluated on the scene thread.
+pub trait DiagnosticStateSource {
+    fn descriptors(&self) -> Vec<StateDescriptor>;
+    fn values(&self, ids: &[String]) -> Vec<StateValue>;
+}
+
+impl DiagnosticStateSource for StateRegistry {
+    fn descriptors(&self) -> Vec<StateDescriptor> {
+        StateRegistry::descriptors(self)
+    }
+    fn values(&self, ids: &[String]) -> Vec<StateValue> {
+        StateRegistry::values(self, ids)
+    }
+}
+
 /// Read-only facade over the same scene data the inspector uses.
 pub struct Diagnostics {
     tree: Rc<RefCell<NodeTree>>,
     inspector: SceneInspector,
-    state: Option<StateRegistry>,
+    state: Option<Rc<dyn DiagnosticStateSource>>,
     traces: RefCell<TraceStore>,
     /// Optional memory provider the host installs.
     pub memory: RefCell<Option<Rc<dyn Fn() -> DiagnosticMemorySnapshot>>>,
@@ -249,6 +264,16 @@ pub struct Diagnostics {
 
 impl Diagnostics {
     pub fn new(tree: Rc<RefCell<NodeTree>>, state: Option<StateRegistry>) -> Self {
+        Self::with_state_source(
+            tree,
+            state.map(|registry| Rc::new(registry) as Rc<dyn DiagnosticStateSource>),
+        )
+    }
+
+    pub fn with_state_source(
+        tree: Rc<RefCell<NodeTree>>,
+        state: Option<Rc<dyn DiagnosticStateSource>>,
+    ) -> Self {
         Self {
             inspector: SceneInspector::new(tree.clone(), None, None),
             tree,

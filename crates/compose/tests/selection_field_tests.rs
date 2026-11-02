@@ -473,36 +473,27 @@ fn select_commits_through_its_menu_and_releases_a_disabled_popup() {
         scene.focus.focus(Some(&trigger), false);
         key(scene, Scancode::RETURN);
         scene.settle(10, 1.0);
-        // GAP: the select's presentation state is not observed by a
-        // `dynamic_properties` declaration, so Return cannot open the menu.
-        assert!(
-            scene.portal.entries().is_empty(),
-            "documented gap: Return does not present the select menu"
-        );
-        assert_eq!(
-            trigger
+        assert_eq!(scene.portal.entries().len(), 1, "Return presents the menu");
+        let expanded = |scene: &InteractiveScene| {
+            target(scene, TITLE)
                 .accessibility()
                 .expect("trigger semantics")
                 .state
-                .is_expanded,
-            Some(false),
-            "documented gap: the trigger stays collapsed"
-        );
+                .is_expanded
+        };
+        assert_eq!(expanded(scene), Some(true), "the trigger reports expanded");
 
-        key(scene, Scancode::END);
-        key(scene, Scancode::RETURN);
+        key(scene, Scancode::ESCAPE);
         scene.settle(10, 1.0);
-        assert_eq!(
-            state.selection.get(),
-            Some(1),
-            "documented gap: no menu commit reaches the selection"
-        );
+        assert!(scene.portal.entries().is_empty(), "Escape dismisses the menu");
 
+        let trigger = target(scene, TITLE);
         scene.click(&trigger, 1);
         scene.settle(10, 1.0);
-        assert!(
-            scene.portal.entries().is_empty(),
-            "documented gap: a pointer press does not present the select menu"
+        assert_eq!(
+            scene.portal.entries().len(),
+            1,
+            "a pointer press presents the menu"
         );
 
         state.enabled.set(false);
@@ -512,15 +503,7 @@ fn select_commits_through_its_menu_and_releases_a_disabled_popup() {
             "a disabled select owns no popup"
         );
         assert_eq!(state.selection.get(), Some(1), "disabling keeps the value");
-        assert_eq!(
-            trigger
-                .accessibility()
-                .expect("trigger semantics")
-                .state
-                .is_expanded,
-            Some(false),
-            "the closed trigger reports collapsed"
-        );
+        assert_eq!(expanded(scene), Some(false), "the closed trigger reports collapsed");
     });
 }
 

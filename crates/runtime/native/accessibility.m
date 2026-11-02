@@ -79,7 +79,7 @@ static id resolved_value(CoveAXElement *element){
 #endif
 }
 @end
-void *cove_runtime_ax_create(uintptr_t rawWindow,void *context,CoveAXAction action,CoveAXValue value,CoveAXFreeValue freeValue){
+void *cove_runtime_ax_create(uintptr_t rawWindow,void *context,CoveAXAction action,CoveAXValue value,CoveAXFreeValue freeValue){NSCAssert(NSThread.isMainThread,@"Accessibility bridges require the main thread");
     CoveAXBridge *bridge=[CoveAXBridge new];bridge.context=context;bridge.action=action;bridge.value=value;bridge.freeValue=freeValue;bridge.elements=[NSMutableDictionary new];
 #if TARGET_OS_OSX
     NSWindow *window=(__bridge NSWindow*)(void*)rawWindow;bridge.view=window.contentView;bridge.originalChildren=bridge.view.accessibilityChildren;bridge.originalIsElement=bridge.view.isAccessibilityElement;
@@ -88,7 +88,7 @@ void *cove_runtime_ax_create(uintptr_t rawWindow,void *context,CoveAXAction acti
 #endif
     return(__bridge_retained void*)bridge;
 }
-void cove_runtime_ax_destroy(void *raw){if(!raw)return;CoveAXBridge *bridge=CFBridgingRelease(raw);
+void cove_runtime_ax_destroy(void *raw){NSCAssert(NSThread.isMainThread,@"Accessibility bridges require the main thread");if(!raw)return;CoveAXBridge *bridge=CFBridgingRelease(raw);
 #if TARGET_OS_OSX
     [bridge.view setAccessibilityChildren:bridge.originalChildren];[bridge.view setAccessibilityElement:bridge.originalIsElement];
 #else
@@ -96,20 +96,12 @@ void cove_runtime_ax_destroy(void *raw){if(!raw)return;CoveAXBridge *bridge=CFBr
 #endif
     for(CoveAXElement *element in bridge.elements.allValues)[element invalidate];[bridge.elements removeAllObjects];bridge.context=NULL;bridge.action=NULL;bridge.value=NULL;bridge.freeValue=NULL;
 }
-void cove_runtime_ax_signature(void *raw,double *out){CoveAXBridge *bridge=(__bridge CoveAXBridge*)raw;if(!bridge||!out)return;
-#if TARGET_OS_OSX
-    CGRect bounds=bridge.view.bounds,frame=bridge.view.window.frame;
-#else
-    CGRect bounds=bridge.view.bounds,frame=bridge.view.window.frame;
-#endif
-    out[0]=bounds.origin.x;out[1]=bounds.origin.y;out[2]=bounds.size.width;out[3]=bounds.size.height;out[4]=frame.origin.x;out[5]=frame.origin.y;out[6]=frame.size.width;out[7]=frame.size.height;
-}
 #if TARGET_OS_OSX
 static NSAccessibilityRole native_role(uint32_t role){switch(role){case 1:return NSAccessibilityToolbarRole;case 2:return NSAccessibilityButtonRole;case 3:case 19:return NSAccessibilityStaticTextRole;case 4:if(@available(macOS 26.0,*))return NSAccessibilityHeadingRole;return NSAccessibilityStaticTextRole;case 5:return NSAccessibilityTextFieldRole;case 6:case 7:return NSAccessibilityCheckBoxRole;case 8:return NSAccessibilitySliderRole;case 9:case 10:return NSAccessibilityRadioButtonRole;case 11:return NSAccessibilityListRole;case 12:case 14:case 16:return NSAccessibilityRowRole;case 13:return NSAccessibilityOutlineRole;case 15:return NSAccessibilityTableRole;case 17:return NSAccessibilityCellRole;case 20:return NSAccessibilityProgressIndicatorRole;case 21:return NSAccessibilityImageRole;case 22:return NSAccessibilityLinkRole;case 23:return NSAccessibilityScrollAreaRole;case 24:return NSAccessibilityComboBoxRole;case 25:return NSAccessibilityTabGroupRole;default:return NSAccessibilityGroupRole;}}
 #else
 static UIAccessibilityTraits native_traits(uint32_t role,uint32_t flags,uint32_t actions){UIAccessibilityTraits result=UIAccessibilityTraitNone;if(role==2||role==6||role==7||role==9||role==10)result|=UIAccessibilityTraitButton;if(role==3||role==19)result|=UIAccessibilityTraitStaticText;if(role==4)result|=UIAccessibilityTraitHeader;if(role==21)result|=UIAccessibilityTraitImage;if(role==22)result|=UIAccessibilityTraitLink;if(actions&12)result|=UIAccessibilityTraitAdjustable;if(flags&2)result|=UIAccessibilityTraitSelected;if(!(flags&1))result|=UIAccessibilityTraitNotEnabled;return result;}
 #endif
-size_t cove_runtime_ax_update(void *raw,const CoveAXItem *items,size_t count){CoveAXBridge *bridge=(__bridge CoveAXBridge*)raw;if(!bridge||!bridge.view)return 0;
+size_t cove_runtime_ax_update(void *raw,const CoveAXItem *items,size_t count){NSCAssert(NSThread.isMainThread,@"Accessibility updates require the main thread");CoveAXBridge *bridge=(__bridge CoveAXBridge*)raw;if(!bridge||!bridge.view)return 0;
     NSMutableDictionary<NSNumber*,CoveAXElement*> *next=[NSMutableDictionary new];NSMutableDictionary<NSNumber*,NSMutableArray*> *children=[NSMutableDictionary new];NSMutableDictionary<NSNumber*,NSMutableArray*> *childIDs=[NSMutableDictionary new];size_t updated=0;
     for(size_t i=0;i<count;i++){CoveAXItem item=items[i];NSNumber *key=@(item.id);CoveAXElement *element=bridge.elements[key];if(!element){
 #if TARGET_OS_OSX

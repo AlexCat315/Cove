@@ -37,6 +37,19 @@ impl FrameTimings {
         self.phases.clear();
     }
 
+    /// Starts a frame whose first phase already ran elsewhere and took `nanos`.
+    pub fn begin_with(&mut self, phase: Phase, nanos: u64) {
+        if !self.is_sampling() {
+            return;
+        }
+        let now = Instant::now();
+        self.start = now
+            .checked_sub(std::time::Duration::from_nanos(nanos))
+            .unwrap_or(now);
+        self.phases.clear();
+        self.phases.insert(phase, nanos);
+    }
+
     pub fn measure<T>(&mut self, phase: Phase, operation: impl FnOnce() -> T) -> T {
         if !self.is_sampling() {
             return operation();

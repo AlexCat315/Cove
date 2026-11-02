@@ -8,6 +8,13 @@ typedef struct { uint32_t kind, window; double timestamp; uint64_t identity; int
 typedef struct { float x,y,width,height; } CoveShellRect;
 typedef struct { float title_height,leading,trailing,border; bool explicit_drag; const CoveShellRect *drag,*non_drag; size_t drag_count,non_drag_count; } CoveShellChrome;
 typedef struct { uint32_t id; int32_t width,height,pixel_width,pixel_height,x,y; float scale; bool focused,visible,minimized,occluded,maximized; float top,bottom,leading,trailing; uint32_t surface_kind; uintptr_t surface,display,instance,native_window; uint64_t native_number; double refresh_rate; } CoveShellWindowState;
+bool cove_shell_is_main_thread(void);
+#if defined(COVE_ASSERT_MAIN_THREAD)
+void cove_shell_assert_main_thread(const char *function);
+#define COVE_ASSERT_MAIN() cove_shell_assert_main_thread(__func__)
+#else
+#define COVE_ASSERT_MAIN() ((void)0)
+#endif
 bool cove_shell_init(void);
 void cove_shell_quit(void);
 const char *cove_shell_error(void);

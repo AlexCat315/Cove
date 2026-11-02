@@ -620,8 +620,8 @@ fn swipe_dismissal() {
         scene.settle(8, 1.0);
         swipe(scene, -120.0, 0.0);
         assert!(
-            harness.open.get() && harness.selection.get() == Some(0),
-            "GAP: Swift dismisses on a 120pt leftward swipe; the Rust drawer stays open and the press selects nothing"
+            !harness.open.get() && harness.selection.get() == Some(0),
+            "a 120pt leftward swipe dismisses and selects nothing"
         );
         assert!(
             scene.capture.target().is_none(),

@@ -209,6 +209,7 @@ pub(crate) struct RenderTreeData {
     pub flat_order_cache: Option<Rc<PaintPlan>>,
 }
 
+#[derive(Clone)]
 pub struct RenderTree {
     data: Rc<RefCell<RenderTreeData>>,
 }

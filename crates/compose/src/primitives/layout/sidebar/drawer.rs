@@ -153,7 +153,7 @@ impl<Id: PartialEq + Eq + std::hash::Hash + Clone + Send + Sync + 'static> View
                                 }),
                             ])),
                         )
-                        .padding_edges(12.0, 8.0),
+                        .padding_edges(0.0, 8.0),
                     ),
                     header.clone(),
                 ])),

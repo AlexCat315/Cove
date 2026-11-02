@@ -7,11 +7,14 @@
 //! memory counters remain available to the native host.
 
 use cove_core::DrawList;
-use cove_core::scene::NodeTree;
+use cove_core::scene::{InvalidationLog, NodeTree};
+use cove_graphics::rhi::Device;
+use cove_graphics::ui::NativeDrawListRenderer;
 use cove_platform::InputEvent;
 use std::cell::RefCell;
 use std::collections::BTreeMap;
 use std::rc::Rc;
+use std::sync::Arc;
 
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct DevToolsConfiguration {
@@ -26,9 +29,23 @@ pub struct DiagnosticMemorySnapshot {
     pub windows: BTreeMap<String, u64>,
 }
 
+/// The renderer an offscreen mirror capture draws with.
+pub struct DiagnosticsFrameSource {
+    pub device: Arc<Device>,
+    pub renderer: NativeDrawListRenderer,
+}
+
 pub struct DiagnosticsCallbacks {
     pub invalidate: Rc<dyn Fn()>,
     pub memory: Rc<dyn Fn() -> DiagnosticMemorySnapshot>,
+    pub invalidation_log: Option<Arc<InvalidationLog>>,
+    /// `None` where the host cannot read frames back.
+    pub frame_source: Option<DiagnosticsFrameSource>,
+    /// Keeps frames flowing while a mirror session is active, including while the
+    /// window is occluded, and restores the host's policy afterwards.
+    pub mirror_active: Rc<dyn Fn(bool)>,
+    /// `None` where windows cannot be resized. Returns why a resize failed.
+    pub resize_window: Option<Rc<dyn Fn(f32, f32) -> Option<String>>>,
 }
 
 /// One DevTools session bound to a single host tree and render graph.
@@ -38,13 +55,27 @@ pub trait DiagnosticsSession {
     fn overlay(&mut self, list: &mut DrawList);
     fn begin_frame(&mut self);
     fn prepared(&mut self, layout_ms: f64, draw_ms: f64);
-    /// Reports a frame that reached the swapchain. `presented` is false when the
-    /// host skipped presentation (occluded or locked window) and will retry.
+    /// Reports a frame handed to the render thread, with the list it recorded.
+    /// `presented` is false when the host had to skip the frame and will retry.
     fn presented(&mut self, tree: &mut NodeTree, list: &DrawList, presented: bool);
     /// Receives the host's injection point for remote input. Hosts that cannot
     /// deliver synthetic events keep the default no-op.
     fn attach_input(&mut self, inject: Rc<dyn Fn(InputEvent)>) {
         let _ = inject;
+    }
+    /// Whether a mirror session is active, for hosts deciding what to keep warm.
+    fn mirror_is_active(&self) -> bool {
+        false
+    }
+    /// Whether the next frame would be captured, so the host only keeps a copy of
+    /// the draw list when it is needed.
+    fn mirror_wants_frame(&self) -> bool {
+        false
+    }
+    /// Reads `list` back for the mirror. Runs after the frame is handed over; the
+    /// capture takes the device's frame session, so it orders with presentation.
+    fn mirror_capture(&mut self, list: &DrawList, pixels: (u32, u32), logical: (f32, f32)) {
+        let _ = (list, pixels, logical);
     }
     fn stop(&mut self);
 }

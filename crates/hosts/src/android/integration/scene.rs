@@ -1,10 +1,12 @@
 //! Translation of Android/Integration/Scene.swift.
 
-use super::diagnostics::AndroidDiagnostics;
+use super::diagnostics::{AndroidDiagnostics, AndroidDiagnosticsHooks};
 use super::environment::SceneEnvironment;
 use super::surface::SurfaceState;
 use super::touch_input::TouchInput;
-use crate::desktop::diagnostics::integration::{DevToolsConfiguration, DiagnosticMemorySnapshot};
+use crate::desktop::diagnostics::integration::{
+    DevToolsConfiguration, DiagnosticMemorySnapshot, DiagnosticsFrameSource,
+};
 use cove_composition::{
     AnyView, LayoutDebugAttachmentKey, PrimitiveView, View, ViewGraph, ViewKind,
 };
@@ -89,6 +91,8 @@ pub struct AndroidContentSession {
     dispatcher: OnceCell<Rc<EventDispatcher>>,
     needs_update: Cell<bool>,
     diagnostics: RefCell<Option<AndroidDiagnostics>>,
+    /// A mirror session needs a steady frame stream even when the UI is idle.
+    mirroring: Rc<Cell<bool>>,
     draw_list: DrawList,
     render_tree: RenderTree,
     render_root: Option<cove_core::scene::Node>,
@@ -169,6 +173,7 @@ impl AndroidContentSession {
             dispatcher: OnceCell::new(),
             needs_update: Cell::new(true),
             diagnostics: RefCell::new(None),
+            mirroring: Rc::new(Cell::new(false)),
             draw_list,
             render_tree: RenderTree::new(),
             render_root: None,
@@ -246,6 +251,7 @@ impl AndroidContentSession {
         &self,
         config: DevToolsConfiguration,
         schedule: Rc<dyn Fn()>,
+        frame_source: Option<DiagnosticsFrameSource>,
     ) -> Result<(), String> {
         if let Some(previous) = self.diagnostics.borrow_mut().as_mut() {
             previous.stop();
@@ -313,6 +319,20 @@ impl AndroidContentSession {
             schedule,
             invalidate,
             memory,
+            AndroidDiagnosticsHooks {
+                invalidation_log: self.context.invalidation_log.clone(),
+                frame_source,
+                mirror_active: {
+                    let mirroring = self.mirroring.clone();
+                    Rc::new(move |active| mirroring.set(active))
+                },
+                inject: {
+                    let dispatcher = self.dispatcher();
+                    Rc::new(move |event| {
+                        dispatcher.dispatch(&event);
+                    })
+                },
+            },
         )?;
         *self.diagnostics.borrow_mut() = Some(diagnostics);
         Ok(())
@@ -342,6 +362,7 @@ impl AndroidContentSession {
 
     pub fn needs_frame(&self) -> bool {
         self.needs_update.get()
+            || self.mirroring.get()
             || self.recomposer.has_pending()
             || self.tree.borrow().has_render_updates()
             || self.animations.has_active_animations()
@@ -504,6 +525,18 @@ impl AndroidContentSession {
         let mut tree = self.tree.borrow_mut();
         if let Some(diagnostics) = self.diagnostics.borrow_mut().as_mut() {
             diagnostics.presented(&mut tree, &self.draw_list);
+            if diagnostics.wants_mirror_frame() {
+                let logical = self.surface.logical_size();
+                let scale = self.surface.scale();
+                diagnostics.mirror_capture(
+                    &self.draw_list,
+                    (
+                        (logical.0 * scale).round() as u32,
+                        (logical.1 * scale).round() as u32,
+                    ),
+                    logical,
+                );
+            }
         }
         self.needs_update.set(false);
         tree.flush();

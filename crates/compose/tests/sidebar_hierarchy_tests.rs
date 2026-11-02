@@ -1158,8 +1158,8 @@ fn full_width_rows() {
             roving(&overview).frame()
         );
         assert!(
-            overview.frame().width < 250.0 && overview.frame().width != settings.frame().width,
-            "GAP: Swift's row button (the painted hover/selection surface) spans the full row (>= 250pt, equal widths); the Rust button hugs its content, saw {:?} vs {:?}",
+            overview.frame().width >= 250.0 && overview.frame().width == settings.frame().width,
+            "the row button (the painted hover and selection surface) spans the full row, saw {:?} vs {:?}",
             overview.frame(),
             settings.frame()
         );

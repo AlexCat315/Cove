@@ -5,14 +5,18 @@ use crate::{
 use cove_core::scene::*;
 use cove_platform::*;
 use cove_shell::{
-    FileDialogFilter, NativeRenderSurface, NativeWindowReference, Shell, ShellError,
-    WindowChromeHitTest, WindowHandle, WindowOptions, WindowSafeArea,
+    ClipboardCompletion, EventLoopWaker, FileDialogFilter, MenuCompletion, NativeRenderSurface,
+    NativeWindowReference, Shell, ShellError, WindowChromeHitTest, WindowHandle, WindowOptions,
+    WindowSafeArea,
 };
 use std::{
     cell::{Cell, RefCell},
     collections::{HashMap, HashSet},
     rc::Rc,
-    sync::mpsc::{self, Receiver, Sender},
+    sync::{
+        Arc, Mutex,
+        mpsc::{self, Receiver, Sender},
+    },
     time::Duration,
 };
 type EventCallback = Rc<dyn Fn(&InputEvent)>;
@@ -213,17 +217,25 @@ pub struct HostCallbacks {
 #[derive(Clone)]
 pub struct HostWorkSender {
     sender: Sender<Box<dyn FnOnce() + Send>>,
+    wake: Arc<Mutex<EventLoopWaker>>,
 }
 impl HostWorkSender {
     pub fn enqueue(&self, work: impl FnOnce() + Send + 'static) -> bool {
         let sent = self.sender.send(Box::new(work)).is_ok();
         if sent {
-            cove_shell::Sdl3Shell::wake();
+            self.wake_event_loop();
         }
         sent
     }
     pub fn wake_event_loop(&self) {
-        cove_shell::Sdl3Shell::wake();
+        let wake = self.waker();
+        wake();
+    }
+    fn waker(&self) -> EventLoopWaker {
+        self.wake.lock().unwrap_or_else(|e| e.into_inner()).clone()
+    }
+    fn set_waker(&self, wake: EventLoopWaker) {
+        *self.wake.lock().unwrap_or_else(|e| e.into_inner()) = wake;
     }
 }
 struct HostData {
@@ -246,6 +258,7 @@ struct HostData {
     work_receiver: RefCell<Receiver<Box<dyn FnOnce() + Send>>>,
     local_work: RefCell<Vec<Box<dyn FnOnce()>>>,
     clock: RefCell<Rc<dyn Fn() -> f64>>,
+    startup_error: RefCell<Option<ShellError>>,
     #[cfg(target_os = "ios")]
     driver: RefCell<Option<crate::ios::IOSFrameDriver>>,
 }
@@ -263,7 +276,10 @@ impl Sdl3PlatformHost {
             options,
             Rc::new(Recomposer::new()),
             Rc::new(PlatformInputContext::new()),
-            || cove_shell::make_default_shell().map(|s| Box::new(s) as Box<dyn Shell>),
+            || match crate::platform::PlatformLink::current() {
+                Some(link) => Ok(Box::new(crate::platform::ProxyShell::new(link)) as Box<dyn Shell>),
+                None => cove_shell::make_default_shell().map(|s| Box::new(s) as Box<dyn Shell>),
+            },
         )
     }
     pub fn with_services(
@@ -290,10 +306,14 @@ impl Sdl3PlatformHost {
             input,
             drive: Default::default(),
             callbacks: Default::default(),
-            work_sender: HostWorkSender { sender },
+            work_sender: HostWorkSender {
+                sender,
+                wake: Arc::new(Mutex::new(Arc::new(cove_shell::Sdl3Shell::wake))),
+            },
             work_receiver: RefCell::new(receiver),
             local_work: RefCell::new(Vec::new()),
             clock: RefCell::new(Rc::new(cove_shell::monotonic_seconds)),
+            startup_error: RefCell::new(None),
             #[cfg(target_os = "ios")]
             driver: RefCell::new(None),
         }))
@@ -322,6 +342,7 @@ impl Sdl3PlatformHost {
             return Ok(shell);
         }
         let mut shell = (self.0.shell_factory)()?;
+        self.0.work_sender.set_waker(shell.waker());
         let requests = self.0.close_requests.clone();
         shell.set_close_interceptor(Some(Box::new(move |id| {
             requests.borrow_mut().push(id);
@@ -524,6 +545,47 @@ impl Sdl3PlatformHost {
         self.0.closing.borrow_mut().remove(&id);
         self.prune_closed_sessions();
     }
+    pub fn write_clipboard(&self, text: &str) {
+        if let Ok(shell) = self.resolve_shell() {
+            shell.borrow().write_clipboard(text);
+        }
+    }
+    pub fn read_clipboard(&self, done: ClipboardCompletion) {
+        match self.resolve_shell() {
+            Ok(shell) => shell.borrow().read_clipboard(done),
+            Err(_) => done(None),
+        }
+    }
+    pub fn present_menu(
+        &self,
+        id: Option<WindowId>,
+        snapshot: &NativeMenuSnapshot,
+        x: f32,
+        y: f32,
+        done: MenuCompletion,
+    ) {
+        match self.shell() {
+            Some(shell) => shell.borrow().present_menu(id, snapshot, x, y, done),
+            None => done(None),
+        }
+    }
+    /// A window that could not present stays dirty and tries again one display
+    /// interval from now, so a failing present cannot spin the loop.
+    pub fn retry_display(&self, id: Option<WindowId>) {
+        let Some(session) = id
+            .or_else(|| self.main_window())
+            .and_then(|id| self.session(id))
+        else {
+            return;
+        };
+        let hz = self
+            .current_display_refresh_rate(Some(session.id))
+            .filter(|hz| *hz >= 30.0)
+            .unwrap_or(60.0);
+        session.request_display();
+        session.next_render_attempt.set(self.now() + 1.0 / hz);
+        self.wake_event_loop();
+    }
     pub fn request_display(&self, id: Option<WindowId>) {
         if let Some(session) = id
             .or_else(|| self.main_window())
@@ -615,13 +677,16 @@ impl Sdl3PlatformHost {
             ));
         }
         self.run_loop();
-        Ok(())
+        match self.0.startup_error.borrow_mut().take() {
+            Some(error) => Err(error),
+            None => Ok(()),
+        }
     }
     fn run_loop(&self) {
         if self.0.running.replace(true) {
             return;
         }
-        set_scene_invalidation_wake(Some(std::sync::Arc::new(cove_shell::Sdl3Shell::wake)));
+        set_scene_invalidation_wake(Some(self.0.work_sender.waker()));
         self.0.finishing.set(false);
         *self.0.drive.clock.borrow_mut() = Rc::new(HostFrameClock::new(self.now()));
         #[cfg(target_os = "ios")]
@@ -659,7 +724,6 @@ impl Sdl3PlatformHost {
         let state = self.0.drive.clock.borrow().clone();
         let start = self.now();
         let loop_delta = start - state.last_loop_time.replace(start);
-        drain_scene_invalidations();
         if let Some(tick) = callback(&self.0.callbacks.on_tick) {
             tick();
         }
@@ -668,6 +732,10 @@ impl Sdl3PlatformHost {
         for work in deferred {
             work();
         }
+        // After the poll: the poll consumes a coalesced wake, so work posted
+        // before this drain is seen and work posted after it wakes the next wait.
+        drain_scene_invalidations();
+        crate::NativeAccessibility::perform_pending();
         let close_requests = std::mem::take(&mut *self.0.close_requests.borrow_mut());
         for id in close_requests {
             if callback(&self.0.callbacks.window_close_interceptor).is_none_or(|f| f(id)) {
@@ -1017,6 +1085,7 @@ impl Sdl3PlatformHost {
         }
         let shell = self.0.shell.borrow_mut().take();
         if let Some(shell) = shell {
+            *self.0.startup_error.borrow_mut() = shell.borrow_mut().take_startup_error();
             shell.borrow_mut().shutdown();
         }
         self.0.sessions.borrow_mut().clear();
@@ -1029,7 +1098,10 @@ impl PlatformHost for Sdl3PlatformHost {
     fn run(&self, tree: Rc<RefCell<NodeTree>>) -> Result<(), ShellError> {
         self.ensure_main(tree)?;
         self.run_loop();
-        Ok(())
+        match self.0.startup_error.borrow_mut().take() {
+            Some(error) => Err(error),
+            None => Ok(()),
+        }
     }
     fn stop(&self) {
         self.0.running.set(false);

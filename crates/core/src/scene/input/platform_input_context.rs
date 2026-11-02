@@ -18,14 +18,21 @@ use std::sync::Arc;
 
 /// Host clipboard reader installed by the platform shell.
 pub type ClipboardReader = Rc<dyn Fn() -> Option<String>>;
+/// Receives the clipboard's text once the platform has read it.
+pub type ClipboardCompletion = Box<dyn FnOnce(Option<String>)>;
+/// Host clipboard read that answers later, for a platform on another thread.
+pub type ClipboardRequester = Rc<dyn Fn(ClipboardCompletion)>;
 /// Host clipboard writer installed by the platform shell.
 pub type ClipboardWriter = Rc<dyn Fn(&str)>;
+/// Receives the chosen item once the native menu closed.
+pub type NativeMenuCompletion = Box<dyn FnOnce(Option<i64>)>;
 /// Host native-menu presenter installed by the platform shell.
-pub type NativeMenuPresenterCallback = Rc<dyn Fn(&NativeMenuSnapshot, Point) -> Option<i64>>;
+pub type NativeMenuPresenterCallback = Rc<dyn Fn(&NativeMenuSnapshot, Point, NativeMenuCompletion)>;
 
 thread_local! {
     static CURRENT_INTERACTIONS: RefCell<Option<Rc<InteractionRegistry>>> = const { RefCell::new(None) };
     static CLIPBOARD_READ: RefCell<Option<ClipboardReader>> = const { RefCell::new(None) };
+    static CLIPBOARD_REQUEST: RefCell<Option<ClipboardRequester>> = const { RefCell::new(None) };
     static CLIPBOARD_WRITE: RefCell<Option<ClipboardWriter>> = const { RefCell::new(None) };
     static NATIVE_MENU_PRESENTER: RefCell<Option<NativeMenuPresenterCallback>> = const { RefCell::new(None) };
 }
@@ -50,6 +57,18 @@ impl ClipboardHolder {
     pub fn set_read(read: Option<ClipboardReader>) {
         CLIPBOARD_READ.with(|slot| *slot.borrow_mut() = read);
     }
+    /// Delivers the clipboard's text to `done`, later when the platform lives on
+    /// another thread. Prefer this over [`Self::read`], which only answers when
+    /// the host installed a synchronous reader.
+    pub fn request_read(done: ClipboardCompletion) {
+        match CLIPBOARD_REQUEST.with(|slot| slot.borrow().clone()) {
+            Some(request) => request(done),
+            None => done(Self::read()),
+        }
+    }
+    pub fn set_read_requester(request: Option<ClipboardRequester>) {
+        CLIPBOARD_REQUEST.with(|slot| *slot.borrow_mut() = request);
+    }
     pub fn write(text: &str) {
         CLIPBOARD_WRITE.with(|slot| {
             if let Some(write) = slot.borrow().as_ref() {
@@ -65,13 +84,13 @@ impl ClipboardHolder {
 /// Holds the native menu presenter, injected by the platform shell.
 pub struct NativeMenuPresenter;
 impl NativeMenuPresenter {
-    /// Presents the snapshot at a point and returns the chosen item's id.
-    pub fn present(snapshot: &NativeMenuSnapshot, at: Point) -> Option<i64> {
-        NATIVE_MENU_PRESENTER.with(|slot| {
-            slot.borrow()
-                .as_ref()
-                .and_then(|present| present(snapshot, at))
-        })
+    /// Presents the snapshot at a point. `done` receives the chosen item's id once
+    /// the menu closed; the caller keeps running meanwhile.
+    pub fn present(snapshot: &NativeMenuSnapshot, at: Point, done: NativeMenuCompletion) {
+        match NATIVE_MENU_PRESENTER.with(|slot| slot.borrow().clone()) {
+            Some(present) => present(snapshot, at, done),
+            None => done(None),
+        }
     }
     /// Whether a platform shell installed a presenter on this thread.
     pub fn is_installed() -> bool {
@@ -79,6 +98,31 @@ impl NativeMenuPresenter {
     }
     pub fn set_present(present: Option<NativeMenuPresenterCallback>) {
         NATIVE_MENU_PRESENTER.with(|slot| *slot.borrow_mut() = present);
+    }
+}
+
+/// Work for the thread that owns the platform, posted by a UI thread.
+pub type PlatformWork = Box<dyn FnOnce() + Send>;
+/// Host hook that delivers [`PlatformWork`] to the platform thread.
+pub type PlatformThreadExecutor = Rc<dyn Fn(PlatformWork)>;
+
+thread_local! {
+    static PLATFORM_THREAD_EXECUTOR: RefCell<Option<PlatformThreadExecutor>> = const { RefCell::new(None) };
+}
+
+/// Reaches native APIs bound to the platform thread, such as an embedded web view.
+pub struct PlatformThread;
+impl PlatformThread {
+    /// Runs `work` on the platform thread, in order with earlier posts and without
+    /// waiting for it. Runs it at once when this thread owns the platform.
+    pub fn post(work: PlatformWork) {
+        match PLATFORM_THREAD_EXECUTOR.with(|slot| slot.borrow().clone()) {
+            Some(execute) => execute(work),
+            None => work(),
+        }
+    }
+    pub fn set_executor(executor: Option<PlatformThreadExecutor>) {
+        PLATFORM_THREAD_EXECUTOR.with(|slot| *slot.borrow_mut() = executor);
     }
 }
 

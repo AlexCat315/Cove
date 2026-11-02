@@ -19,10 +19,11 @@ use crate::desktop::diagnostics::recording::{InputRecorder, RecordingControl};
 use crate::desktop::diagnostics::session::{ApplicationDiagnostics, DiagnosticsQueries};
 use crate::desktop::display::controls::{MainWindowControls, PresentationControls, WindowControls};
 use crate::desktop::display::{AppAuxiliaryWindowRequest, AppDisplayHandle, DisplayBindings};
+use crate::desktop::rendering::ThreadedWindowRenderer;
 use crate::desktop::rendering::context::AppRenderingContext;
 use crate::desktop::window::auxiliary::AuxiliaryAppWindow;
 use crate::desktop::window::chrome::{self, WindowChromeHitTestCollector};
-use crate::desktop::window::native_renderer::{AppWindowRenderSettings, AppWindowRenderer};
+use crate::desktop::window::native_renderer::AppWindowRenderSettings;
 use crate::desktop::window::state::MainWindowState;
 use cove_composition::AnyView;
 use cove_core::scene::{
@@ -42,7 +43,7 @@ use cove_text::{TextBootstrapOptions, TextEnvironment, TextEnvironmentHolder};
 use cove_ui_compose::primitives::overlays::portal::portal_registry::{
     PortalStore, PortalStoreAmbient,
 };
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
 use std::collections::{BTreeMap, HashMap};
 use std::rc::{Rc, Weak};
 use std::sync::Arc;
@@ -115,7 +116,9 @@ struct ApplicationState {
     composition: Rc<MainComposition>,
     host: Sdl3PlatformHost,
     rendering: Rc<AppRenderingContext>,
-    window_renderer: RefCell<Option<Box<dyn AppWindowRenderer>>>,
+    window_renderer: RefCell<Option<ThreadedWindowRenderer>>,
+    /// Render-thread cost of the latest finished frame.
+    last_render_ms: Cell<f64>,
     main_window: RefCell<MainWindowState>,
     typography: RefCell<ApplicationTypography>,
     auxiliary_windows: RefCell<HashMap<WindowId, AuxiliaryAppWindow>>,
@@ -233,6 +236,7 @@ impl Application {
             host,
             rendering,
             window_renderer: RefCell::new(None),
+            last_render_ms: Cell::new(0.0),
             main_window: RefCell::new(MainWindowState::new(is_vsync)),
             typography: RefCell::new(ApplicationTypography::default()),
             auxiliary_windows: RefCell::new(HashMap::new()),
@@ -315,16 +319,24 @@ impl Application {
         InteractionRegistryHolder::set_current(Some(input.interactions.clone()));
         FocusChainHolder::set_current(Some(input.focus_chain.clone()));
         PointerCaptureHolder::set_current(Some(input.pointer_capture.clone()));
-        ClipboardHolder::set_read(Some(Rc::new(cove_shell::Sdl3Clipboard::read)));
-        let write = Rc::new(|text: &str| {
-            let _ = cove_shell::Sdl3Clipboard::write(text);
+        let read: cove_core::scene::ClipboardRequester = Rc::new({
+            let host = host.clone();
+            move |done| host.read_clipboard(done)
+        });
+        ClipboardHolder::set_read_requester(Some(read.clone()));
+        let write: Rc<dyn Fn(&str)> = Rc::new({
+            let host = host.clone();
+            move |text: &str| host.write_clipboard(text)
         });
         ClipboardHolder::set_write(Some(write.clone()));
-        super::services::clipboard_handlers::remember(
-            Some(Rc::new(cove_shell::Sdl3Clipboard::read)),
-            Some(write),
-        );
+        super::services::clipboard_handlers::remember(Some(read), Some(write));
         AppDisplayHandleHolder::set_current(Some(state.display_handle.clone()));
+        if let Some(link) = cove_runtime::platform::PlatformLink::current() {
+            cove_core::scene::PlatformThread::set_executor(Some(Rc::new(move |work| {
+                link.bridge
+                    .post(cove_runtime::platform::PlatformCommand::Run(work));
+            })));
+        }
 
         self.install_display_bindings();
         if let Some(ready) = state.callbacks.ready.clone() {
@@ -350,10 +362,17 @@ impl Application {
         *state.memory_pressure.borrow_mut() = Some(ApplicationMemoryPressure::new());
 
         let run_result = host.run(composition.tree.clone());
+        // UIKit owns the main loop: `run` returned with the display link driving
+        // frames. The state stays alive through the host callbacks, and the host's
+        // teardown callback releases the GPU when the application ends.
+        if cfg!(target_os = "ios") {
+            return run_result.map_err(|error| error.to_string());
+        }
         if let Some(mut pressure) = state.memory_pressure.borrow_mut().take() {
             pressure.stop();
         }
         self.teardown();
+        cove_core::scene::PlatformThread::set_executor(None);
         services.restore();
         run_result.map_err(|error| error.to_string())?;
         match state.run_loop_error.borrow_mut().take() {
@@ -386,6 +405,36 @@ impl Application {
                 };
                 Rc::new(move || application.diagnostic_memory_snapshot())
             },
+            invalidation_log: Some(state.host.input_context().invalidation_log.clone()),
+            frame_source: match state.rendering.frame_source() {
+                Ok(source) => Some(source),
+                Err(error) => {
+                    LogSystem::logger("com.cove.ui.diagnostics").log(&LogEvent::new(
+                        Level::Warning,
+                        format!("DevTools mirror is unavailable: {error}"),
+                    ));
+                    None
+                }
+            },
+            mirror_active: {
+                let application = Application {
+                    state: state.clone(),
+                };
+                Rc::new(move |active| application.set_mirror_active(active))
+            },
+            resize_window: {
+                let host = state.host.clone();
+                Some(Rc::new(move |width, height| {
+                    let Some(window) = host.main_window() else {
+                        return Some("No main window".to_owned());
+                    };
+                    // A maximized native window can ignore explicit size requests.
+                    host.restore_window(window);
+                    host.set_window_size(window, width, height);
+                    host.request_display(None);
+                    None
+                }))
+            },
         };
         match factory(
             configuration,
@@ -410,6 +459,22 @@ impl Application {
                 format!("DevTools failed to start: {error}"),
             )),
         }
+    }
+
+    /// Keeps presenting for the mirror, even while the window is occluded. The
+    /// swapchain is still released on occlusion, so a background mirror does not
+    /// keep presentation memory resident.
+    fn set_mirror_active(&self, active: bool) {
+        let host = &self.state.host;
+        if let Some(window) = host.main_window() {
+            host.set_window_keep_rendering(window, active);
+        }
+        if active {
+            host.set_frame_rate_mode(PlatformFrameRateMode::DisplayRefresh);
+        } else {
+            self.apply_frame_rate_policy();
+        }
+        host.request_display(None);
     }
 
     /// Runs `body` against the live session without holding the `RefCell` borrow
@@ -584,8 +649,17 @@ impl Application {
                 };
                 move |id| application.is_auxiliary_window_open(id)
             })),
-            install_native_menu_bar: Some(Rc::new(|menu_bar| {
-                crate::desktop::window::native_menu::install(menu_bar);
+            install_native_menu_bar: Some(Rc::new({
+                let host = host.clone();
+                move |menu_bar| {
+                    let host = host.clone();
+                    crate::desktop::window::native_menu::install(
+                        menu_bar,
+                        Rc::new(move |menu, point, done| {
+                            host.present_menu(None, menu, point.x, point.y, done);
+                        }),
+                    );
+                }
             })),
             set_close_interceptor: Some(Rc::new({
                 let host = host.clone();
@@ -680,7 +754,9 @@ impl Application {
             let weak: Weak<ApplicationState> = Rc::downgrade(&state);
             *callbacks.on_tick.borrow_mut() = Some(Rc::new(move || {
                 if let Some(state) = weak.upgrade() {
-                    Application { state }.with_diagnostics(|session| session.drain());
+                    let application = Application { state };
+                    application.drain_presented_frames();
+                    application.with_diagnostics(|session| session.drain());
                 }
             }));
         }
@@ -746,6 +822,45 @@ impl Application {
         }
         state.diagnostics.borrow_mut().stop();
         self.release_all_gpu_surfaces();
+    }
+
+    /// Collects finished frames: recycles their buffers, surfaces render errors and
+    /// retries frames the renderer could not present.
+    fn drain_presented_frames(&self) {
+        let state = &self.state;
+        let result = match state.window_renderer.borrow_mut().as_mut() {
+            Some(renderer) => renderer.take_presented(),
+            None => Ok(Vec::new()),
+        };
+        match result {
+            Ok(frames) => {
+                if let Some(frame) = frames.last() {
+                    state.last_render_ms.set(frame.cpu_ms);
+                }
+                if frames.iter().any(|frame| !frame.presented) {
+                    state.host.retry_display(None);
+                }
+            }
+            Err(error) => self.fail_run_loop(&error.to_string(), "Frame rendering"),
+        }
+        let mut failed = Vec::new();
+        let mut retry = Vec::new();
+        for (id, window) in state.auxiliary_windows.borrow_mut().iter_mut() {
+            match window.take_presented() {
+                Ok(needs_retry) => {
+                    if needs_retry {
+                        retry.push(*id);
+                    }
+                }
+                Err(error) => failed.push((*id, error)),
+            }
+        }
+        for id in retry {
+            state.host.retry_display(Some(id));
+        }
+        for (id, error) in failed {
+            self.fail_auxiliary_window(id, &error, "rendering");
+        }
     }
 
     fn fail_run_loop(&self, error: &str, context: &str) {
@@ -905,24 +1020,27 @@ impl Application {
                     let main = state.main_window.borrow();
                     (main.logical_w as f32, main.logical_h as f32)
                 };
-                chrome::with_window_chrome_context(window_id, || {
-                    use cove_ui_compose::theme::tokens::TextScalerViewExt;
-                    // The portal store is scoped per window by the input context
-                    // ambient below, which is what `PortalStoreHolder::current()`
-                    // actually reads; the composition-local copy would need
-                    // `PortalStore: PartialEq`, which the registry does not provide.
-                    let content =
-                        AdaptiveApplicationContent::new(root_view, environment).text_scaler(scaler);
-                    composition.install_view(AnyView::new(content), logical.0, logical.1);
-                });
                 // Scope this window's overlay store for every consumer that reads
-                // the process ambient (menus, popovers, tooltips).
-                state
-                    .host
-                    .input_context()
-                    .add_scoped_ambient(Rc::new(PortalStoreScope::new(
-                        composition.portal_store.clone(),
-                    )));
+                // the process ambient (menus, popovers, tooltips). It has to be in
+                // place before the install: a portal host resolves its store when
+                // it mounts, and would otherwise watch the shared fallback while
+                // presenters publish to this window's store.
+                let context = state.host.input_context();
+                context.add_scoped_ambient(Rc::new(PortalStoreScope::new(
+                    composition.portal_store.clone(),
+                )));
+                context.with_current(|| {
+                    chrome::with_window_chrome_context(window_id, || {
+                        use cove_ui_compose::theme::tokens::TextScalerViewExt;
+                        // The portal store is scoped per window by the input context
+                        // ambient above, which is what `PortalStoreHolder::current()`
+                        // actually reads; the composition-local copy would need
+                        // `PortalStore: PartialEq`, which the registry does not provide.
+                        let content = AdaptiveApplicationContent::new(root_view, environment)
+                            .text_scaler(scaler);
+                        composition.install_view(AnyView::new(content), logical.0, logical.1);
+                    });
+                });
                 self.sync_main_window_chrome_hit_test();
                 state.main_window.borrow_mut().did_install_root = true;
             }
@@ -1045,7 +1163,7 @@ impl Application {
             let Some(renderer) = renderer.as_ref() else {
                 return false;
             };
-            if !renderer.is_configured() {
+            if !renderer.is_configured() || !renderer.has_frame_capacity() {
                 return false;
             }
         }
@@ -1148,49 +1266,46 @@ impl Application {
             return false;
         }
 
-        let (drawable_w, drawable_h) = {
-            let main = state.main_window.borrow();
-            (main.drawable_w, main.drawable_h)
-        };
-        let presented = {
+        {
+            let mut tree = state.composition.tree.borrow_mut();
+            let list = state.composition.draw_list.borrow();
+            self.with_diagnostics(|session| session.presented(&mut tree, &list, true));
+        }
+        // Submitting takes the list, and the readback belongs behind the primary
+        // frame, so a capture works from a copy.
+        let mut mirror_frame = None;
+        {
+            let list = state.composition.draw_list.borrow();
+            self.with_diagnostics(|session| {
+                if session.mirror_wants_frame() {
+                    mirror_frame = Some(list.clone());
+                }
+            });
+        }
+        let submitted = {
             let mut renderer = state.window_renderer.borrow_mut();
             let Some(renderer) = renderer.as_mut() else {
                 return false;
             };
             let mut list = state.composition.draw_list.borrow_mut();
-            renderer.draw(&mut list, (logical_w, logical_h))
+            renderer.submit(&mut list, (logical_w, logical_h))
         };
-        let presented = match presented {
-            Ok(presented) => presented,
+        if let Some(list) = mirror_frame.filter(|_| submitted.is_ok()) {
+            let pixels = {
+                let main = state.main_window.borrow();
+                (main.drawable_w, main.drawable_h)
+            };
+            self.with_diagnostics(|session| {
+                session.mirror_capture(&list, pixels, (logical_w, logical_h));
+            });
+        }
+        match submitted {
+            Ok(Some(_)) => {}
+            Ok(None) => return false,
             Err(error) => {
                 self.fail_run_loop(&error.to_string(), "Frame rendering");
                 return false;
             }
-        };
-        if !presented {
-            let present_end = Instant::now();
-            let batches = state.composition.draw_list.borrow().batches().len();
-            if fps_log_enabled() {
-                state.metrics.borrow_mut().record(
-                    layout_end.duration_since(layout_start).as_secs_f64() * 1000.0,
-                    draw_end.duration_since(layout_end).as_secs_f64() * 1000.0,
-                    0.0,
-                );
-            }
-            let _ = (
-                present_end,
-                batches,
-                frame_node_count,
-                drawable_w,
-                drawable_h,
-            );
-            {
-                let mut tree = state.composition.tree.borrow_mut();
-                let list = state.composition.draw_list.borrow();
-                self.with_diagnostics(|session| session.presented(&mut tree, &list, false));
-            }
-            state.host.request_display(None);
-            return false;
         }
         if state.config.frames.policy == AppFrameDrivePolicy::Continuous
             || force_continuous_frame_drive()
@@ -1200,22 +1315,21 @@ impl Application {
             // next frame instead.
             state.host.request_display(None);
         }
-        state.performance_hud.borrow_mut().presented();
-        {
-            let mut tree = state.composition.tree.borrow_mut();
-            let list = state.composition.draw_list.borrow();
-            self.with_diagnostics(|session| session.presented(&mut tree, &list, true));
+        // The mirror needs a steady frame stream even when the UI is idle.
+        let mut mirroring = false;
+        self.with_diagnostics(|session| mirroring = session.mirror_is_active());
+        if mirroring {
+            state.host.request_display(None);
         }
-        let present_end = Instant::now();
-
+        state.performance_hud.borrow_mut().presented();
         if fps_log_enabled() {
             state.metrics.borrow_mut().record(
                 layout_end.duration_since(layout_start).as_secs_f64() * 1000.0,
                 draw_end.duration_since(layout_end).as_secs_f64() * 1000.0,
-                present_end.duration_since(draw_end).as_secs_f64() * 1000.0,
+                state.last_render_ms.get(),
             );
         }
-        let _ = frame_start;
+        let _ = (frame_start, frame_node_count);
         true
     }
 
@@ -1238,8 +1352,11 @@ impl Application {
             // When the window goes off-screen the swapchain / MSAA / framebuffer
             // are already released. Also drop the heavy CPU caches (glyph atlas,
             // image assets, render tree) so backgrounding actually reclaims
-            // memory.
-            if !active {
+            // memory. Skip this while mirroring so the offscreen capture path
+            // keeps its shared texture uploads warm.
+            let mut mirroring = false;
+            self.with_diagnostics(|session| mirroring = session.mirror_is_active());
+            if !active && !mirroring {
                 self.trim_memory();
             }
         } else if let Some(window) = state.auxiliary_windows.borrow_mut().get_mut(&window_id)

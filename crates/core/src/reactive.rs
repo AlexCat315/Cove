@@ -221,6 +221,21 @@ impl ThreadInbox {
     }
 }
 
+/// Runs work on this thread's next scene drain, posted from any thread. Capture
+/// it on the thread that should run the work.
+#[derive(Clone)]
+pub struct ThreadPoster(ThreadInbox);
+
+impl ThreadPoster {
+    pub fn current() -> Self {
+        Self(ThreadInbox::current())
+    }
+
+    pub fn post(&self, work: impl FnOnce() + Send + 'static) {
+        self.0.post(Box::new(work));
+    }
+}
+
 /// Apply every update other threads posted through a [`SignalSender`].
 /// Called by the scene loop when it drains invalidations.
 pub fn drain_posted_signal_updates() {

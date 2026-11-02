@@ -18,10 +18,6 @@
 //!   ink colour but no border, so a destination never rings for keyboard focus.
 //!   Swift's `Destination`/`RailDestination` draw a 2pt (expanded) / 1pt (rail)
 //!   `focusRing` border. The three ring cases pin that with `GAP:` asserts.
-//! - The Rust row is measured to its content (`SidebarChromeRow` carries no
-//!   stretch), so a destination hugs its title instead of filling the lane.
-//!   Swift authors a full-bleed row inset 10pt on both sides. The two geometry
-//!   cases pin the measured widths with `GAP:` asserts.
 
 use crate::support;
 
@@ -111,18 +107,11 @@ fn highlight_is_symmetric() {
         let item = row_for(graph, "Button").absolute_frame();
         let leading = item.x - sidebar.x;
         let trailing = sidebar.max_x() - item.max_x();
-        // GAP: Swift asserts `|leading - trailing| < 0.5` and `|leading - 10| < 0.5`.
-        // The Rust row hugs its title, so it is inset 0 on the leading side and
-        // the whole remaining lane on the trailing side.
         assert!(
-            (leading - trailing).abs() >= 0.5,
-            "GAP: the row does not fill the lane, so the insets differ \
-             (leading {leading}, trailing {trailing}; Swift: equal)"
+            (leading - trailing).abs() < 0.5,
+            "the row is inset evenly (leading {leading}, trailing {trailing})"
         );
-        assert_eq!(
-            leading, 0.0,
-            "GAP: the leading inset is 0 (Swift: the sidebar's 10pt padding)"
-        );
+        assert!((leading - 10.0).abs() < 0.5, "leading inset {leading}");
     });
 }
 
@@ -132,14 +121,10 @@ fn rows_fill_the_pane() {
         let root = graph.tree.borrow().root().expect("root");
         let sidebar = root.absolute_frame();
         let item = row_for(graph, "Checkbox").absolute_frame();
-        // GAP: Swift asserts `|(sidebar.maxX - 10) - item.maxX| < 0.5`, i.e. the
-        // row reaches the pane's inner edge. The Rust row stops at its title's
-        // width, far short of the edge.
         let target = sidebar.max_x() - 10.0;
         assert!(
-            (target - item.max_x()).abs() >= 0.5,
-            "GAP: the row stops at its content width ({}) instead of the pane's \
-             inner edge ({target})",
+            (target - item.max_x()).abs() < 0.5,
+            "the row reaches the pane's inner edge ({target}), got {}",
             item.max_x()
         );
     });
@@ -242,4 +227,52 @@ fn ring_follows_the_keyboard_rail_without_labels() {
             );
         },
     );
+}
+
+#[test]
+fn leaving_the_rail_restores_the_pane_width() {
+    use std::cell::Cell;
+    struct Pane(Rc<Cell<SidebarPresentation>>);
+    impl cove_composition::View for Pane {
+        fn body(&self, _cx: &cove_composition::Scope) -> cove_composition::AnyView {
+            let mut sidebar = Sidebar::new(
+                Binding::constant(Some("button")),
+                vec![SidebarSection::new(
+                    "controls",
+                    vec![SidebarItem::new("button", "Button")],
+                )],
+            );
+            sidebar.presentation = self.0.get();
+            cove_composition::AnyView::new(sidebar)
+        }
+    }
+    GlobalTestLock::locked(|| {
+        let presentation = Rc::new(Cell::new(SidebarPresentation::Rail {
+            shows_labels: false,
+        }));
+        let graph = support::graph();
+        graph.install_view(
+            cove_composition::AnyView::new(Pane(presentation.clone())),
+            Default::default(),
+        );
+        graph.compute_layout(226.0, 400.0);
+        assert_eq!(row_for(&graph, "Button").absolute_frame().width, 44.0);
+
+        presentation.set(SidebarPresentation::Expanded);
+        graph.install_view(
+            cove_composition::AnyView::new(Pane(presentation.clone())),
+            Default::default(),
+        );
+        graph.recomposer.commit_all();
+        graph.compute_layout(226.0, 400.0);
+        assert_eq!(
+            row_for(&graph, "Button").absolute_frame().width,
+            206.0,
+            "the row fills the expanded pane"
+        );
+        graph.install_view(
+            cove_composition::AnyView::new(cove_composition::EmptyView),
+            Default::default(),
+        );
+    });
 }

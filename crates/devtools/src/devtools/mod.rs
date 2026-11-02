@@ -6,13 +6,13 @@
 //! delivered by `pump`, because the server owns the client list and a callback
 //! cannot borrow it.
 use crate::devtools::mirror::{FrameCapture, FrameTap, FrameTapSink, InputBridge, TimingPublisher};
-use crate::inspection::{Diagnostics, SceneInspector};
+use crate::inspection::{DiagnosticStateSource, Diagnostics, SceneInspector, UIAccessibilityActions};
 use crate::server::DevServer;
 use crate::server::Outbound;
 use crate::server::config::{
     DevToolsConfig, DevToolsHostMirror, DevToolsHostObservation, DevToolsHostScene,
 };
-use cove_core::scene::{InvalidationLog, NodeTree, PerformanceTimeline, RenderTree, StateRegistry};
+use cove_core::scene::{InvalidationLog, NodeTree, PerformanceTimeline, RenderTree};
 use cove_core::{DrawList, Rect};
 use cove_devtools_protocol::{
     Envelope, MirrorActivate, MirrorFrame, MirrorInput, MirrorStart, TimingFrame,
@@ -31,9 +31,10 @@ pub struct DevTools {
     tree: Rc<RefCell<NodeTree>>,
     pub server: DevServer,
     pub scene: SceneInspector,
-    pub diagnostics: Diagnostics,
+    /// Shared with the wire adapter, which reads whichever facade is current.
+    diagnostics: Rc<RefCell<Rc<Diagnostics>>>,
     pub timing: Rc<TimingPublisher>,
-    frame_tap: Option<FrameTap>,
+    frame_tap: Rc<RefCell<Option<FrameTap>>>,
     frame_tap_sink: Rc<FrameTapSink>,
     outbound: crate::devtools::mirror::OutboundQueue,
     /// Shared inspector the server adapters read through.
@@ -62,7 +63,7 @@ impl DevTools {
         render_tree: Option<RenderTree>,
     ) -> Self {
         let scene = SceneInspector::new(tree.clone(), invalidation_log, render_tree);
-        let diagnostics = Diagnostics::new(tree.clone(), None);
+        let diagnostics = Rc::new(RefCell::new(Rc::new(Diagnostics::new(tree.clone(), None))));
         let server = DevServer::new(config.clone());
         let outbound = server.outbound();
         let frame_tap_sink = FrameTapSink::new();
@@ -74,7 +75,7 @@ impl DevTools {
             scene,
             diagnostics,
             timing: TimingPublisher::new(),
-            frame_tap: None,
+            frame_tap: Rc::new(RefCell::new(None)),
             frame_tap_sink,
             outbound,
             scene_handle,
@@ -98,26 +99,45 @@ impl DevTools {
         &self.tree
     }
 
-    /// Give the diagnostics facade a state registry.
-    pub fn set_state_registry(&mut self, registry: Option<StateRegistry>) {
-        self.diagnostics = Diagnostics::new(self.tree.clone(), registry);
-        self.install_observers();
+    /// Give the diagnostics facade the state it reads.
+    pub fn set_state_source(&mut self, source: Option<Rc<dyn DiagnosticStateSource>>) {
+        let diagnostics = Rc::new(Diagnostics::with_state_source(self.tree.clone(), source));
+        *diagnostics.memory.borrow_mut() = self.diagnostics.borrow().memory.borrow().clone();
+        self.server.host.observation.state =
+            diagnostics.state_observation_available().then(|| {
+                let diagnostics = diagnostics.clone();
+                Rc::new(move |ids: &[String]| diagnostics.state_observation(ids))
+                    as Rc<dyn Fn(&[String]) -> cove_devtools_protocol::StateObservation>
+            });
+        *self.diagnostics.borrow_mut() = diagnostics;
     }
 
     pub fn set_memory_snapshot(
         &self,
         provider: Option<Rc<dyn Fn() -> crate::inspection::DiagnosticMemorySnapshot>>,
     ) {
-        *self.diagnostics.memory.borrow_mut() = provider;
+        *self.diagnostics.borrow().memory.borrow_mut() = provider;
     }
 
     /// `true` between `mirror.start` and `mirror.stop`.
     pub fn mirror_is_active(&self) -> bool {
-        self.frame_tap.as_ref().is_some_and(FrameTap::is_active)
+        self.frame_tap
+            .borrow()
+            .as_ref()
+            .is_some_and(FrameTap::is_active)
     }
 
-    pub fn attach_frame_tap(&mut self, capture: FrameCapture) {
-        self.frame_tap = Some(FrameTap::new(self.frame_tap_sink.clone(), capture));
+    /// Whether the next presented frame would be captured.
+    pub fn mirror_wants_frame(&self) -> bool {
+        self.frame_tap
+            .borrow()
+            .as_ref()
+            .is_some_and(FrameTap::wants_frame)
+    }
+
+    pub fn attach_frame_tap(&mut self, capture: FrameCapture, reset: impl Fn() + 'static) {
+        *self.frame_tap.borrow_mut() =
+            Some(FrameTap::new(self.frame_tap_sink.clone(), capture).with_reset(reset));
     }
 
     /// Capture a frame for the mirror viewport. No-op unless a client issued
@@ -130,7 +150,7 @@ impl DevTools {
         logical_width: f32,
         logical_height: f32,
     ) {
-        if let Some(tap) = &mut self.frame_tap {
+        if let Some(tap) = self.frame_tap.borrow_mut().as_mut() {
             tap.capture(
                 draw_list,
                 width_px,
@@ -176,14 +196,10 @@ impl DevTools {
             diagnostics: None,
         };
 
-        let diagnostics_tree = self.tree.clone();
-        let state_registry_available = self.diagnostics.state_observation_available();
-        let _ = state_registry_available;
+        let diagnostics = self.diagnostics.clone();
         self.server.host.scene.diagnostics = Some(Rc::new(move |request: &Envelope| {
-            // Reads are stateless apart from retained trace captures, so each
-            // request builds a facade over the same tree.
-            let diagnostics = Diagnostics::new(diagnostics_tree.clone(), None);
-            diagnostics.handle_read_request(request)
+            let current = diagnostics.borrow().clone();
+            current.handle_read_request(request)
         }));
 
         self.install_observers();
@@ -235,31 +251,36 @@ impl DevTools {
     }
 
     fn wire_mirror(&mut self) {
-        let outbound_start = self.outbound.clone();
+        let start_tap = self.frame_tap.clone();
+        let stop_tap = self.frame_tap.clone();
         let on_start = self.on_mirror_start.clone();
-        let tap_slot: Rc<RefCell<()>> = Rc::new(RefCell::new(()));
-        let _ = tap_slot;
-        let outbound_stop = self.outbound.clone();
         let on_stop = self.on_mirror_stop.clone();
+        let outbound = self.outbound.clone();
         let input_delivery = self.input_delivery.clone();
-        // Start/stop are driven by `apply_mirror_command`, which owns the tap;
-        // the adapters only report intent so no borrow crosses the callback.
-        let start_outbound = outbound_start.clone();
-        let stop_outbound = outbound_stop.clone();
-        let start_callback = on_start.clone();
-        let stop_callback = on_stop.clone();
+        let actions = UIAccessibilityActions::new(self.tree.clone());
         self.server.host.mirror = DevToolsHostMirror {
-            start: Some(Rc::new(move |_payload: &MirrorStart| {
-                let _ = &start_outbound;
-                if let Some(callback) = start_callback.borrow().clone() {
+            start: Some(Rc::new(move |payload: &MirrorStart| {
+                if let Some(tap) = start_tap.borrow_mut().as_mut() {
+                    tap.start(
+                        payload.fps.unwrap_or(15.0),
+                        payload.quality.unwrap_or(0.7),
+                        payload.scale.unwrap_or(1.0),
+                    );
+                }
+                if let Some(callback) = on_start.borrow().clone() {
                     callback();
                 }
             })),
             stop: Some(Rc::new(move || {
-                let _ = &stop_outbound;
-                if let Some(callback) = stop_callback.borrow().clone() {
+                if let Some(tap) = stop_tap.borrow_mut().as_mut() {
+                    tap.stop();
+                }
+                if let Some(callback) = on_stop.borrow().clone() {
                     callback();
                 }
+                outbound
+                    .borrow_mut()
+                    .push(Outbound::MirrorStopped("client".into()));
             })),
             input: Some(Rc::new(move |payload: &MirrorInput| {
                 let Some(event) = InputBridge::event(payload) else {
@@ -269,21 +290,10 @@ impl DevTools {
                     callback(event);
                 }
             })),
-            activate: None,
+            activate: Some(Rc::new(move |payload: &MirrorActivate| {
+                actions.perform(payload)
+            })),
         };
-    }
-
-    /// The state adapter for state observation, when a registry exists.
-    pub fn state_observation_provider(
-        &self,
-    ) -> Option<Rc<dyn Fn(&[String]) -> cove_devtools_protocol::StateObservation>> {
-        self.diagnostics.state_observation_available().then(|| {
-            let tree = self.tree.clone();
-            Rc::new(move |ids: &[String]| {
-                let diagnostics = Diagnostics::new(tree.clone(), None);
-                diagnostics.state_observation(ids)
-            }) as Rc<dyn Fn(&[String]) -> cove_devtools_protocol::StateObservation>
-        })
     }
 
     pub fn start(&mut self) -> std::io::Result<()> {
@@ -328,10 +338,10 @@ impl DevTools {
         .into_iter()
         .map(str::to_string)
         .collect();
-        if self.diagnostics.state_observation_available() {
+        if self.diagnostics.borrow().state_observation_available() {
             capabilities.push("state.observe".into());
         }
-        if self.frame_tap.is_some() {
+        if self.frame_tap.borrow().is_some() {
             capabilities.push("mirror".into());
         }
         if self.server.host.window.resize.is_some() {
@@ -352,14 +362,14 @@ impl DevTools {
     pub fn stop(&mut self) {
         let timeline = self.tree.borrow().timeline.clone();
         timeline.borrow_mut().set_enabled(false);
-        if let Some(tap) = &mut self.frame_tap {
+        if let Some(tap) = self.frame_tap.borrow_mut().as_mut() {
             tap.stop();
         }
         self.server.stop();
         if let Some(launch) = &self.config.launch {
             let _ = std::fs::remove_file(&launch.descriptor_path);
         }
-        self.scene.editor.reset();
+        self.scene_handle.borrow().editor.reset();
         self.unwire_sinks();
     }
 
@@ -375,7 +385,8 @@ impl DevTools {
 
     /// Id of the most recently selected node, for hosts that draw an overlay.
     pub fn selected_node_id(&self) -> Option<String> {
-        self.scene
+        self.scene_handle
+            .borrow()
             .editor
             .selected_node()
             .map(|node| node.id().0.to_string())
@@ -384,15 +395,18 @@ impl DevTools {
     /// Window-space frame for the selected node, if it still exists.
     pub fn selected_node_absolute_frame(&self) -> Option<Rect> {
         let id = self.selected_node_id()?;
-        self.scene.find(&id).map(|node| node.absolute_frame())
+        self.scene_handle
+            .borrow()
+            .find(&id)
+            .map(|node| node.absolute_frame())
     }
 
     pub fn intercept_input(&mut self, event: &cove_platform::InputEvent) -> bool {
-        self.scene.editor.intercept(event)
+        self.scene_handle.borrow().editor.intercept(event)
     }
 
     pub fn draw_inspection_overlay(&self, list: &mut DrawList) {
-        self.scene.editor.draw_overlay(list);
+        self.scene_handle.borrow().editor.draw_overlay(list);
     }
 
     /// Drain transport events and queued broadcasts. The host calls this once

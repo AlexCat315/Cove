@@ -3,18 +3,22 @@
 use super::content::scene::{HostedScene, linked_content};
 use super::frame::runtime_options::RuntimeOptions;
 use crate::android::contract::launch::SceneLaunch;
-use crate::desktop::diagnostics::integration::DevToolsConfiguration;
+use crate::desktop::diagnostics::integration::{DevToolsConfiguration, DiagnosticsFrameSource};
+use crate::desktop::rendering::ThreadedWindowRenderer;
 use cove_graphics::rhi::{Device, DeviceConfig, TextureFormat};
 use cove_graphics::ui::NativeDrawListRenderer;
 use cove_logging::LogSystem;
 use std::cell::{Cell, RefCell};
-use std::rc::Rc;
+use std::rc::{Rc, Weak};
 use std::sync::Arc;
 
 /// Activity-retained state. Surface loss only releases the swapchain.
 pub struct AndroidApplication {
     device: Arc<Device>,
     renderer: Rc<RefCell<NativeDrawListRenderer>>,
+    /// The open surface's presentation, which runs on its render thread.
+    window_renderer: RefCell<Weak<RefCell<ThreadedWindowRenderer>>>,
+    samples: usize,
     scene: Rc<RefCell<HostedScene>>,
     scale: Cell<f32>,
     runtime: RuntimeOptions,
@@ -80,6 +84,8 @@ impl AndroidApplication {
         let application = Rc::new(Self {
             device,
             renderer: Rc::new(RefCell::new(renderer)),
+            window_renderer: RefCell::new(Weak::new()),
+            samples,
             scene,
             scale: Cell::new(scale),
             runtime,
@@ -112,11 +118,27 @@ impl AndroidApplication {
                     application.schedule_diagnostics();
                 }
             });
+            // A frame the mirror reads back goes through a BGRA target of its own;
+            // the store stays shared with the presentation renderers.
+            let frame_source = {
+                let device = application.device();
+                let root = application.renderer();
+                device
+                    .with_frame_session(|| {
+                        root.borrow()
+                            .make_presentation_renderer(TextureFormat::Bgra8Unorm, 1)
+                    })
+                    .ok()
+                    .map(|renderer| DiagnosticsFrameSource {
+                        device: device.clone(),
+                        renderer,
+                    })
+            };
             application
                 .scene
                 .borrow()
                 .content()
-                .configure_diagnostics(configuration, schedule)
+                .configure_diagnostics(configuration, schedule, frame_source)
                 .map_err(|error| format!("diagnostics configuration failed: {error}"))?;
         }
         Ok(application)
@@ -128,6 +150,14 @@ impl AndroidApplication {
 
     pub fn renderer(&self) -> Rc<RefCell<NativeDrawListRenderer>> {
         self.renderer.clone()
+    }
+
+    pub fn samples(&self) -> usize {
+        self.samples
+    }
+
+    pub fn attach_window_renderer(&self, renderer: &Rc<RefCell<ThreadedWindowRenderer>>) {
+        *self.window_renderer.borrow_mut() = Rc::downgrade(renderer);
     }
 
     pub fn scene(&self) -> &Rc<RefCell<HostedScene>> {
@@ -181,13 +211,9 @@ impl AndroidApplication {
 
     pub fn trim_memory(&self) {
         self.scene.borrow_mut().content_mut().trim_memory();
-        let device = self.device.clone();
-        let renderer = self.renderer.clone();
-        let _ = device.with_frame_session(|| {
-            device.wait_until_idle()?;
-            renderer.borrow_mut().trim_presentation_resources();
-            Ok(())
-        });
+        if let Some(renderer) = self.window_renderer.borrow().upgrade() {
+            let _ = renderer.borrow_mut().trim_memory();
+        }
     }
 
     pub fn shutdown(&self) {

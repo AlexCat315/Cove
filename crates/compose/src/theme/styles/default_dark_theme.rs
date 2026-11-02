@@ -17,9 +17,9 @@ pub fn value() -> Theme {
     Theme::new(
         ColorScheme::new(
             color(0x18, 0x18, 0x1B),
-            color(0x27, 0x27, 0x2A),
-            color(0x32, 0x32, 0x36),
-            Some(color(0x3C, 0x3C, 0x41)),
+            color(0x1E, 0x1E, 0x21),
+            color(0x2A, 0x2A, 0x2E),
+            Some(color(0x35, 0x35, 0x3A)),
             color(0x18, 0x18, 0x1B),
             color(0x1D, 0x1D, 0x20),
             color(0x18, 0x18, 0x1B),
@@ -41,9 +41,9 @@ pub fn value() -> Theme {
             color(0xF5, 0x9E, 0x0B),
             color(0xEF, 0x44, 0x44),
             color(0x3B, 0x82, 0xF6),
-            color(0x3F, 0x3F, 0x46),
-            color(0x6C, 0x6C, 0x72),
-            color(0x27, 0x27, 0x2A),
+            color(0x34, 0x34, 0x3A),
+            color(0x56, 0x56, 0x5D),
+            color(0x2A, 0x2A, 0x2E),
             alpha(0x60, 0xA5, 0xFA, 0x99),
             alpha(0x3B, 0x82, 0xF6, 0x66),
             alpha(0x00, 0x00, 0x00, 0x66),
@@ -60,7 +60,7 @@ pub fn value() -> Theme {
             TextStyleToken::new(Font::monospaced(13.0, FontWeight::Regular), 20.0, 0.0),
         ),
         SpacingScale::new(4.0, 6.0, 8.0, 12.0, 16.0, 24.0),
-        RadiusScale::new(0.0, 4.0, 6.0, 8.0, 10.0, 9999.0),
+        RadiusScale::new(0.0, 6.0, 8.0, 12.0, 16.0, 9999.0),
         ElevationScale::new(
             SurfaceShadow::NONE,
             SurfaceShadow {

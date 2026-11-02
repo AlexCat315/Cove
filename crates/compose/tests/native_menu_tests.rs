@@ -76,13 +76,15 @@ fn menu_button_uses_the_native_presenter_and_runs_the_chosen_item() {
         PortalStoreHolder::current().clear();
         let presented = Rc::new(Cell::new(None::<usize>));
         let seen = presented.clone();
-        NativeMenuPresenter::set_present(Some(Rc::new(move |snapshot, _| {
+        NativeMenuPresenter::set_present(Some(Rc::new(move |snapshot, _, done| {
             seen.set(Some(snapshot.items.len()));
-            snapshot
-                .items
-                .iter()
-                .find(|item| item.kind == NativeMenuKind::Regular)
-                .map(|item| item.id)
+            done(
+                snapshot
+                    .items
+                    .iter()
+                    .find(|item| item.kind == NativeMenuKind::Regular)
+                    .map(|item| item.id),
+            );
         })));
         scene.install(AnyView::new(LayerRoot::new(AnyView::new(
             MenuButtonTitle::new("Options", entries),

@@ -1,5 +1,7 @@
-use cove_platform::{InputEvent, SystemCursor, TextInputArea, WindowId, WindowInputEvent};
-use std::{rc::Rc, time::Duration};
+use cove_platform::{
+    InputEvent, NativeMenuSnapshot, SystemCursor, TextInputArea, WindowId, WindowInputEvent,
+};
+use std::{rc::Rc, sync::Arc, time::Duration};
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum NativeRenderSurface {
     MetalLayer(usize),
@@ -114,7 +116,29 @@ pub trait WindowHandle {
     fn is_minimized(&self) -> bool;
     fn is_occluded(&self) -> bool;
 }
+/// Every window fact a thread other than the platform thread may read. The
+/// platform thread publishes it; readers never call the platform.
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct WindowSnapshot {
+    pub drawable_size: (u32, u32),
+    pub logical_size: (u32, u32),
+    pub content_scale: f32,
+    pub focused: bool,
+    pub visible: bool,
+    pub minimized: bool,
+    pub occluded: bool,
+    pub maximized: bool,
+    pub safe_area: WindowSafeArea,
+    pub position: Option<(f32, f32)>,
+    pub refresh_rate: Option<f64>,
+    pub surface: Option<NativeRenderSurface>,
+    pub native_window: Option<NativeWindowReference>,
+}
 pub type DialogCompletion = Box<dyn FnOnce(Vec<String>)>;
+pub type ClipboardCompletion = Box<dyn FnOnce(Option<String>)>;
+pub type MenuCompletion = Box<dyn FnOnce(Option<i64>)>;
+/// Wakes a blocked event loop from any thread.
+pub type EventLoopWaker = Arc<dyn Fn() + Send + Sync>;
 pub trait Shell {
     fn main_window_id(&self) -> Option<WindowId>;
     fn window_ids(&self) -> Vec<WindowId>;
@@ -170,6 +194,62 @@ pub trait Shell {
     fn set_display_refresh_enabled(&self, id: WindowId, enabled: bool) -> bool;
     fn take_display_refresh(&self, id: WindowId) -> Option<crate::DisplayRefreshTick>;
     fn shutdown(&mut self);
+    /// Claims the native event queue before any window exists, so a wake can
+    /// land and a wait can block from the first loop iteration.
+    fn prepare_event_loop(&mut self) -> Result<(), ShellError> {
+        Ok(())
+    }
+    /// A window creation that failed after `create_window` already returned.
+    fn take_startup_error(&mut self) -> Option<ShellError> {
+        None
+    }
+    fn waker(&self) -> EventLoopWaker {
+        Arc::new(crate::Sdl3Shell::wake)
+    }
+    fn write_clipboard(&self, text: &str) {
+        crate::Sdl3Clipboard::write(text);
+    }
+    /// `done` runs after the clipboard was read, never with a shell borrow held
+    /// by a threaded implementation.
+    fn read_clipboard(&self, done: ClipboardCompletion) {
+        done(crate::Sdl3Clipboard::read());
+    }
+    /// Shows a native menu and reports the chosen item through `done`.
+    fn present_menu(
+        &self,
+        id: Option<WindowId>,
+        snapshot: &NativeMenuSnapshot,
+        x: f32,
+        y: f32,
+        done: MenuCompletion,
+    ) {
+        let window = id
+            .and_then(|id| self.window(id))
+            .and_then(|window| window.native_window_reference());
+        done(
+            crate::native_menu_popover::NativeMenuPopover::pop_up(snapshot, x, y, window)
+                .ok()
+                .flatten(),
+        );
+    }
+    fn window_snapshot(&self, id: WindowId) -> Option<WindowSnapshot> {
+        let window = self.window(id)?;
+        Some(WindowSnapshot {
+            drawable_size: window.drawable_size(),
+            logical_size: window.logical_size(),
+            content_scale: window.content_scale_factor(),
+            focused: window.is_focused(),
+            visible: window.is_visible(),
+            minimized: window.is_minimized(),
+            occluded: window.is_occluded(),
+            maximized: self.is_window_maximized(id),
+            safe_area: window.safe_area(),
+            position: self.window_position(id),
+            refresh_rate: self.display_refresh_rate(Some(id)),
+            surface: window.render_surface(),
+            native_window: window.native_window_reference(),
+        })
+    }
     fn initialize_window(&mut self, title: &str) -> Result<(), ShellError> {
         if self.main_window_id().is_none() {
             self.create_window(title, WindowOptions::default())?;

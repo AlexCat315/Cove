@@ -22,13 +22,14 @@ use cove_core::{Binding, State};
 use cove_ui_compose::modifiers::layout::{FlexExt, LayoutFrameExt, PaddingExt};
 use cove_ui_compose::modifiers::style::AppearanceExt;
 use cove_ui_compose::primitives::controls::Button;
+use cove_ui_compose::primitives::controls::button::{ButtonIcon, ButtonIconSource};
 use cove_ui_compose::primitives::controls::fields::select::{Select, SelectOption};
 use cove_ui_compose::primitives::controls::toggle::Checkbox;
 use cove_ui_compose::primitives::layout::responsive::view_that_fits::ViewThatFits;
 use cove_ui_compose::primitives::layout::scroll_view::ScrollView;
 use cove_ui_compose::primitives::layout::insets::SafeArea;
 use cove_ui_compose::primitives::layout::sidebar::{
-    AdaptiveSidebar, AdaptiveSidebarOptions, SidebarItem, SidebarSection,
+    AdaptiveSidebar, AdaptiveSidebarOptions, SidebarItem, SidebarItemStyle, SidebarSection,
 };
 use cove_ui_compose::primitives::overlays::portal::LayerRoot;
 use cove_ui_compose::primitives::media::ui_icon_catalog as icons;
@@ -176,6 +177,7 @@ impl View for GalleryView {
         .collapse(self.navigation_collapsed.binding())
         .width(self.navigation_width.binding())
         .options(options)
+        .brand(self.navigation_brand())
         .header(ViewThatFits::threshold(
             NAVIGATION_RAIL_THRESHOLD,
             self.navigation_header(),
@@ -218,18 +220,22 @@ impl View for GalleryView {
 }
 
 impl GalleryView {
-    fn navigation_header(&self) -> AnyView {
+    fn navigation_brand(&self) -> AnyView {
         let brand = AnyView::new(
             cove_ui_compose::BoxView::new(
                 FlexDirection::Row,
                 Align::Center,
-                Justify::FlexStart,
+                Justify::Center,
                 Wrap::NoWrap,
-                10.0,
-                AnyView::new(Text::new("G").semantic_font(SemanticFontRef::headline())),
+                0.0,
+                AnyView::new(
+                    Text::new("G")
+                        .semantic_font(SemanticFontRef::body_strong())
+                        .semantic_foreground(SemanticColorRef::on_accent()),
+                ),
             )
-            .padding(9.0)
-            .corner_radius(9.0)
+            .frame_size(32.0, 32.0)
+            .corner_radius(10.0)
             .semantic_background(SemanticColorRef::accent()),
         );
         let titles = AnyView::new(cove_ui_compose::BoxView::new(
@@ -245,7 +251,7 @@ impl GalleryView {
                 ),
             ])),
         ));
-        let identity = AnyView::new(
+        AnyView::new(
             cove_ui_compose::BoxView::new(
                 FlexDirection::Row,
                 Align::Center,
@@ -254,18 +260,20 @@ impl GalleryView {
                 10.0,
                 AnyView::new(cove_composition::TupleView::new(vec![brand, titles])),
             )
-            .padding(16.0),
-        );
+            .padding_edges(10.0, 14.0),
+        )
+    }
+
+    fn navigation_header(&self) -> AnyView {
         let search = erased(
             AnyView::new(cove_ui_compose::primitives::text::TextField::new(
                 "Search components…",
                 self.search_binding(),
             ))
-            .padding_edges(12.0, 4.0)
             .debug_name("gallery-search"),
         );
 
-        let mut children = vec![identity, search];
+        let mut children = vec![search];
         if self.navigation_sections().is_empty() {
             children.push(erased(
                 AnyView::new(
@@ -273,7 +281,7 @@ impl GalleryView {
                         .semantic_font(SemanticFontRef::caption())
                         .semantic_foreground(SemanticColorRef::on_surface_muted()),
                 )
-                .padding(16.0),
+                .padding_edges(10.0, 12.0),
             ));
         }
         AnyView::new(cove_ui_compose::BoxView::new(
@@ -288,13 +296,19 @@ impl GalleryView {
 
     fn navigation_header_compact(&self) -> AnyView {
         erased(
-            AnyView::new(
-                Text::new("G")
-                    .semantic_font(SemanticFontRef::headline())
-                    .semantic_foreground(SemanticColorRef::accent()),
-            )
-            .padding_edges(0.0, 10.0)
-            .modifier(GalleryCompactHeaderFrame),
+            AnyView::new(cove_ui_compose::BoxView::new(
+                FlexDirection::Row,
+                Align::Center,
+                Justify::Center,
+                Wrap::NoWrap,
+                0.0,
+                AnyView::new(
+                    Text::new("G")
+                        .semantic_font(SemanticFontRef::headline())
+                        .semantic_foreground(SemanticColorRef::accent()),
+                ),
+            ))
+            .padding_edges(0.0, 10.0),
         )
     }
 
@@ -304,10 +318,31 @@ impl GalleryView {
             Appearance::Dark => "Switch to light theme",
         };
         let view = self.clone_handle();
+        let icon = match self.appearance.get() {
+            Appearance::Light => icons::device::moon(),
+            Appearance::Dark => icons::device::sun(),
+        };
+        let label = cove_ui_compose::BoxView::new(
+            FlexDirection::Row,
+            Align::Center,
+            Justify::FlexStart,
+            Wrap::NoWrap,
+            10.0,
+            AnyView::new(cove_composition::TupleView::new(vec![
+                AnyView::new(ButtonIcon::new(
+                    ButtonIconSource::resource(icon),
+                    Some(16.0),
+                    None,
+                )),
+                AnyView::new(Text::new(title).truncated().semantic_font(SemanticFontRef::label())),
+            ])),
+        )
+        .padding_edges(10.0, 0.0);
         erased(
-            AnyView::new(Button::title(title, move || view.toggle_theme()))
-                .button_style(GhostButtonStyle)
-                .padding(12.0)
+            AnyView::new(Button::new(label, move || view.toggle_theme()))
+                .button_style(SidebarItemStyle {
+                    minimum_height: 38.0,
+                })
                 .debug_name("gallery-theme"),
         )
     }
@@ -378,15 +413,6 @@ impl cove_composition::ViewModifier for GallerySidebarFrame {
         if self.width.is_finite() && self.width > 0.0 {
             layout.set_width(Some(self.width));
         }
-    }
-}
-
-struct GalleryCompactHeaderFrame;
-
-impl cove_composition::ViewModifier for GalleryCompactHeaderFrame {
-    fn apply_layout(&self, layout: &LayoutNode) {
-        layout.set_width_percent(100.0);
-        layout.set_align_items(Align::Center);
     }
 }
 
@@ -766,16 +792,12 @@ impl cove_composition::ViewModifier for GalleryToolbarFrame {
     }
 }
 
-/// A white card with a 1-px hairline and a 10-pt radius.
+/// The radius of a story card; its fill and hairline are semantic colours.
 struct GalleryCardModifier;
 
 impl cove_composition::ViewModifier for GalleryCardModifier {
     fn apply_node(&self, node: &Node) {
-        let colors = theme_for_node(node).colors;
-        node.set_background_color(Some(colors.background));
-        node.set_corner_radius(10.0);
-        node.set_border_color(Some(colors.border));
-        node.set_border_width(1.0);
+        node.set_corner_radius(theme_for_node(node).radius.lg);
     }
 }
 
@@ -812,6 +834,8 @@ impl View for GalleryStorySection {
                 self.content.clone(),
             ))
             .padding(18.0)
+            .semantic_background(SemanticColorRef::background())
+            .semantic_border(SemanticColorRef::border(), 1.0)
             .modifier(GalleryCardModifier),
         );
         erased(

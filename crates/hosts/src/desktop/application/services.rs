@@ -8,7 +8,7 @@ use crate::desktop::application::composition::{
     AppDisplayHandleHolder, AssetDropRegistry, AssetDropRegistryHolder,
 };
 use cove_core::scene::{
-    ClipboardHolder, FocusChain, FocusChainHolder, InteractionRegistry, InteractionRegistryHolder,
+    ClipboardHolder, ClipboardRequester, FocusChain, FocusChainHolder, InteractionRegistry, InteractionRegistryHolder,
     PointerCapture, PointerCaptureHolder, UIWorkSchedulerHolder,
 };
 use cove_imaging::{ImageAssetRegistry, ImageAssetRegistryHolder};
@@ -21,7 +21,7 @@ pub struct ApplicationServices {
     interactions: Option<Rc<InteractionRegistry>>,
     focus: Option<Rc<FocusChain>>,
     capture: Option<Rc<PointerCapture>>,
-    clipboard_read: Option<Rc<dyn Fn() -> Option<String>>>,
+    clipboard_read: Option<ClipboardRequester>,
     clipboard_write: Option<Rc<dyn Fn(&str)>>,
     images: Option<std::sync::Arc<ImageAssetRegistry>>,
     drops: Option<Rc<AssetDropRegistry>>,
@@ -53,7 +53,7 @@ impl ApplicationServices {
         InteractionRegistryHolder::set_current(self.interactions);
         FocusChainHolder::set_current(self.focus);
         PointerCaptureHolder::set_current(self.capture);
-        ClipboardHolder::set_read(self.clipboard_read.clone());
+        ClipboardHolder::set_read_requester(self.clipboard_read.clone());
         ClipboardHolder::set_write(self.clipboard_write.clone());
         clipboard_handlers::remember(self.clipboard_read, self.clipboard_write);
         ImageAssetRegistryHolder::set_current(self.images);
@@ -73,17 +73,15 @@ pub mod clipboard_handlers {
     use std::cell::RefCell;
 
     thread_local! {
-        static SLOT: RefCell<(
-            Option<Rc<dyn Fn() -> Option<String>>>,
-            Option<Rc<dyn Fn(&str)>>,
-        )> = const { RefCell::new((None, None)) };
+        static SLOT: RefCell<(Option<ClipboardRequester>, Option<Rc<dyn Fn(&str)>>)> =
+            const { RefCell::new((None, None)) };
     }
 
-    pub fn remember(read: Option<Rc<dyn Fn() -> Option<String>>>, write: Option<Rc<dyn Fn(&str)>>) {
+    pub fn remember(read: Option<ClipboardRequester>, write: Option<Rc<dyn Fn(&str)>>) {
         SLOT.with(|slot| *slot.borrow_mut() = (read, write));
     }
 
-    pub fn read() -> Option<Rc<dyn Fn() -> Option<String>>> {
+    pub fn read() -> Option<ClipboardRequester> {
         SLOT.with(|slot| slot.borrow().0.clone())
     }
 

@@ -35,15 +35,25 @@ fn main() {
         .std("c11")
         .opt_level(3);
     native::configure_cc(&mut bridge, false);
+    // Debug builds abort on any platform call that strays off the main thread.
+    let assert_main_thread = env::var("PROFILE").is_ok_and(|profile| profile == "debug");
+    println!("cargo:rerun-if-env-changed=PROFILE");
+    if assert_main_thread {
+        bridge.define("COVE_ASSERT_MAIN_THREAD", None);
+    }
     bridge.compile("cove_shell_bridge");
     if os == "macos" || os == "ios" {
-        cc::Build::new()
+        let mut apple = cc::Build::new();
+        apple
             .file("native/apple.m")
             .include("native")
             .include(&include)
             .flag("-fobjc-arc")
-            .flag("-fblocks")
-            .compile("cove_shell_apple");
+            .flag("-fblocks");
+        if assert_main_thread {
+            apple.define("COVE_ASSERT_MAIN_THREAD", None);
+        }
+        apple.compile("cove_shell_apple");
         for framework in [
             "Foundation",
             "AVFoundation",

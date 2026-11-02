@@ -1,15 +1,16 @@
 //! Translation of Android/Integration/Diagnostics.swift.
 
 use crate::desktop::diagnostics::integration::{
-    DevToolsConfiguration, DiagnosticMemorySnapshot, DiagnosticsCallbacks, DiagnosticsSession,
-    NullDiagnosticsSession, take_factory,
+    DevToolsConfiguration, DiagnosticMemorySnapshot, DiagnosticsCallbacks, DiagnosticsFrameSource,
+    DiagnosticsSession, NullDiagnosticsSession, take_factory,
 };
 use cove_composition::ViewGraph;
 use cove_core::DrawList;
-use cove_core::scene::NodeTree;
+use cove_core::scene::{InvalidationLog, NodeTree};
 use cove_platform::InputEvent;
 use std::cell::RefCell;
 use std::rc::Rc;
+use std::sync::Arc;
 use std::time::Instant;
 
 /// The socket queue only enqueues work; it never reads the scene or renderer.
@@ -45,6 +46,15 @@ impl DiagnosticsInbox {
     }
 }
 
+/// What the scene hands the session beyond its tree: the mirror's renderer and
+/// the hooks that keep frames flowing and deliver remote input.
+pub struct AndroidDiagnosticsHooks {
+    pub invalidation_log: Arc<InvalidationLog>,
+    pub frame_source: Option<DiagnosticsFrameSource>,
+    pub mirror_active: Rc<dyn Fn(bool)>,
+    pub inject: Rc<dyn Fn(InputEvent)>,
+}
+
 pub struct AndroidDiagnostics {
     inbox: DiagnosticsInbox,
     session: Box<dyn DiagnosticsSession>,
@@ -61,6 +71,7 @@ impl AndroidDiagnostics {
         schedule: Rc<dyn Fn()>,
         invalidate: Rc<dyn Fn()>,
         memory: Rc<dyn Fn() -> DiagnosticMemorySnapshot>,
+        hooks: AndroidDiagnosticsHooks,
     ) -> Result<Self, String> {
         let inbox = DiagnosticsInbox::new(schedule.clone());
         let session = if let Some(factory) = take_factory() {
@@ -70,12 +81,19 @@ impl AndroidDiagnostics {
                     Rc::new(move || invalidate())
                 },
                 memory: memory.clone(),
+                invalidation_log: Some(hooks.invalidation_log),
+                frame_source: hooks.frame_source,
+                mirror_active: hooks.mirror_active,
+                // A surface fills the screen; the system owns its size.
+                resize_window: None,
             };
-            factory(config, tree, graph, schedule, callbacks)?
+            let mut session = factory(config, tree, graph, schedule, callbacks)?;
+            session.attach_input(hooks.inject);
+            session
         } else {
             // DevTools is not linked into this build of `cove-hosts`; keep the
             // memory callback installable for a later backend.
-            let _ = (config, tree, graph, invalidate, memory);
+            let _ = (config, tree, graph, invalidate, memory, hooks);
             Box::new(NullDiagnosticsSession) as Box<dyn DiagnosticsSession>
         };
         Ok(Self {
@@ -117,6 +135,14 @@ impl AndroidDiagnostics {
         let total = self.frame_start.elapsed().as_secs_f64() * 1000.0;
         self.session.presented(tree, list, true);
         let _ = total;
+    }
+
+    pub fn wants_mirror_frame(&self) -> bool {
+        self.session.mirror_wants_frame()
+    }
+
+    pub fn mirror_capture(&mut self, list: &DrawList, pixels: (u32, u32), logical: (f32, f32)) {
+        self.session.mirror_capture(list, pixels, logical);
     }
 
     pub fn stop(&mut self) {

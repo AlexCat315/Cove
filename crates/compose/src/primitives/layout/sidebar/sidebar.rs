@@ -136,6 +136,21 @@ impl<Id: PartialEq + Eq + std::hash::Hash + Clone + Send + Sync + 'static> View 
         let selected = self.selection.get();
         let presentation = self.presentation;
         let minimum_row_height = self.minimum_row_height;
+        let gutter = presentation.gutter();
+        let slot = |content: AnyView| {
+            AnyView::new(
+                BoxView::new(
+                    FlexDirection::Column,
+                    Align::Stretch,
+                    Justify::FlexStart,
+                    Wrap::NoWrap,
+                    0.0,
+                    content,
+                )
+                .padding_edges(gutter, 0.0)
+                .flex_with(0.0, 0.0, None),
+            )
+        };
 
         let mut section_views: Vec<AnyView> = Vec::new();
         for (index, section) in self.sections.iter().enumerate() {
@@ -149,7 +164,7 @@ impl<Id: PartialEq + Eq + std::hash::Hash + Clone + Send + Sync + 'static> View 
                     Text::new(section.title.clone())
                         .semantic_font(SemanticFontRef::caption())
                         .semantic_foreground(crate::theme::SemanticColorRef::on_surface_muted())
-                        .padding_edges(8.0, 8.0),
+                        .padding_edges(10.0, 6.0),
                 ));
             }
             for entry in &entries {
@@ -198,7 +213,7 @@ impl<Id: PartialEq + Eq + std::hash::Hash + Clone + Send + Sync + 'static> View 
                 Align::Stretch,
                 Justify::FlexStart,
                 Wrap::NoWrap,
-                3.0,
+                2.0,
                 AnyView::new(TupleView::new(rows)),
             ));
             section_views.push(AnyView::new(SectionIdentity {
@@ -250,14 +265,17 @@ impl<Id: PartialEq + Eq + std::hash::Hash + Clone + Send + Sync + 'static> View 
                 }
             },
             move |id: &Id| identity(id),
-            AnyView::new(BoxView::new(
-                FlexDirection::Column,
-                Align::Stretch,
-                Justify::FlexStart,
-                Wrap::NoWrap,
-                10.0,
-                AnyView::new(TupleView::new(section_views)),
-            )),
+            AnyView::new(
+                BoxView::new(
+                    FlexDirection::Column,
+                    Align::Stretch,
+                    Justify::FlexStart,
+                    Wrap::NoWrap,
+                    10.0,
+                    AnyView::new(TupleView::new(section_views)),
+                )
+                .padding_edges(gutter, 4.0),
+            ),
         )
         .command(move |event: &KeyEvent| command(event))
         .directional_command(move |event, source, owner| {
@@ -309,9 +327,9 @@ impl<Id: PartialEq + Eq + std::hash::Hash + Clone + Send + Sync + 'static> View 
             Wrap::NoWrap,
             0.0,
             AnyView::new(TupleView::new(vec![
-                AnyView::new(self.header.clone().flex_with(0.0, 0.0, None)),
+                slot(self.header.clone()),
                 AnyView::new(AnyView::new(scroller).flex_with(1.0, 1.0, Some(0.0))),
-                AnyView::new(self.footer.clone().flex_with(0.0, 0.0, None)),
+                slot(self.footer.clone()),
             ])),
         ));
         // At rest the edge between navigation and content is the change of
@@ -319,8 +337,10 @@ impl<Id: PartialEq + Eq + std::hash::Hash + Clone + Send + Sync + 'static> View 
         let rail_width = self.presentation.rail_width();
         let body = AnyView::new(
             AnyView::new(body.semantic_background(crate::theme::SemanticColorRef::surface()))
+                // Always a width: the modifier leaves an unset dimension alone, so
+                // leaving the rail with `None` would keep the rail's width.
                 .frame(
-                    rail_width.map(FrameDimension::Points),
+                    Some(rail_width.map_or(FrameDimension::Percent(100.0), FrameDimension::Points)),
                     None,
                     Some(0.0),
                     Some(0.0),
@@ -514,7 +534,8 @@ impl PrimitiveView for SidebarChromeRow {
         .foreground_color(self.ink)
         .background_color(self.fill)
         .corner_radius(self.radius)
-        .frame(None, None, None, Some(self.minimum_height), None, None);
+        .flex_with(1.0, 1.0, None)
+        .frame(None, None, Some(0.0), Some(self.minimum_height), None, None);
         vec![AnyView::new(row)]
     }
 }
@@ -530,7 +551,8 @@ impl cove_composition::ViewModifier for FlexGrowOne {
     }
 }
 
-/// Destination row chrome: a solid selection band that does not move the text.
+/// Destination row chrome: a selection band that fills the row and does not move
+/// the text.
 pub struct SidebarItemStyle {
     pub minimum_height: f32,
 }
@@ -546,15 +568,11 @@ impl crate::theme::styles::buttons::ButtonStyle for SidebarItemStyle {
                 crate::theme::styles::components::selection_appearance::SelectionRole::Sidebar,
                 &theme,
             );
-        let fill = if configuration.is_pressed {
-            appearance.pressed_fill
-        } else if configuration.is_selected {
-            appearance.fill
-        } else if configuration.is_hovered {
-            appearance.hover_fill
-        } else {
-            cove_core::Color::CLEAR
-        };
+        let fill = appearance.fill(
+            configuration.is_selected,
+            configuration.is_hovered,
+            configuration.is_pressed,
+        );
         let ink = if !configuration.is_enabled {
             theme.colors.on_surface_muted
         } else if configuration.is_selected {

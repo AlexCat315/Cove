@@ -1022,14 +1022,18 @@ fn workspace_panel_content_is_clipped_to_its_region() {
         );
         ancestor = node.parent();
     }
-    // GAP: the region clips by frame, but oversized panel content is laid out at
-    // its own intrinsic size and is not constrained, so the panel node itself
-    // does cross the status bar. Swift's composed scroller kept the panel at the
-    // region height with only the overflow scrolling.
     assert!(
-        panel_frame.max_y() > status_bar.y,
-        "oversized panel content is not constrained to its region (panel maxY {})",
+        panel_frame.height > 0.0,
+        "the panel takes the region's height below the tab bar"
+    );
+    assert!(
+        panel_frame.max_y() <= status_bar.y + 1.0,
+        "oversized panel content stays inside its region (panel maxY {})",
         panel_frame.max_y()
+    );
+    assert!(
+        panel_node.children().iter().any(|child| child.clips_to_bounds()),
+        "the panel's viewport clips the overflow"
     );
     let region_frame = rig.frame("workspace-region-center");
     assert!(
@@ -1147,19 +1151,17 @@ fn collapsing_left_right_then_bottom_restores_in_place() {
         0.5,
         "the center and trailing panes are separated by one gutter",
     );
-    // GAP: the Rust divider hairline is centred one gutter inside the first
-    // pane's trailing edge, not on the gutter as Swift centred it.
     assert_close(
         leading_split.x + leading_split.width * 0.5,
-        leading_slot.max_x() - gutter + 0.5,
+        leading_slot.max_x() + gutter * 0.5,
         1.0,
-        "the leading divider hairline sits inside the leading pane",
+        "the leading divider is centred on its gutter",
     );
     assert_close(
         trailing_split.x + trailing_split.width * 0.5,
-        center_slot.max_x() - gutter + 0.5,
+        center_slot.max_x() + gutter * 0.5,
         1.0,
-        "the center/trailing divider hairline sits inside the center pane",
+        "the center/trailing divider is centred on its gutter",
     );
     assert_close(
         bottom_slot.x,
@@ -1246,26 +1248,18 @@ fn dragging_tab_within_same_group_reorders_panel() {
     let controller = Rc::new(RefCell::new(WorkspaceController::new(document)));
     let mut rig = ViewRig::standard(controller, 1000.0, 640.0);
 
-    // GAP: tab nodes live inside the tab bar's horizontal `ScrollView`, whose
-    // content offset is not folded into `absolute_frame`, so a tab's absolute
-    // frame is scroller-local (both report x = 0 and 18). A drag sampled from
-    // those frames lands outside the strip, so the reorder cannot be driven the
-    // way Swift drove it. Reorder itself works, which the command below asserts.
     let console = rig.frame("workspace-tab-console");
     let assets = rig.frame("workspace-tab-assets");
-    assert_close(
-        console.x,
-        0.0,
-        0.5,
-        "a tab's absolute frame is scroller-local rather than window-space",
+    let group = rig.frame("workspace-group-bottom");
+    assert!(
+        console.x >= group.x && assets.x > console.x,
+        "tab frames are in window space and lay out in order"
     );
-    assert!(assets.x > console.x, "tabs still lay out in order");
 
-    rig.dispatch(WorkspaceCommand::ReorderPanel {
-        panel_id: WorkspacePanelID::new("console"),
-        group_id: WorkspaceTabGroupID::new("bottom"),
-        index: 2,
-    });
+    rig.drag(
+        Point::new(console.x + console.width / 2.0, console.y + console.height / 2.0),
+        Point::new(assets.max_x() - 1.0, assets.y + assets.height / 2.0),
+    );
 
     assert_eq!(
         rig.panels_of("bottom"),

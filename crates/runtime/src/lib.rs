@@ -6,6 +6,7 @@ mod ios;
 mod lifecycle;
 mod log;
 mod native_accessibility;
+pub mod platform;
 mod platform_host;
 mod sdl3_platform_host;
 mod surface_factory;

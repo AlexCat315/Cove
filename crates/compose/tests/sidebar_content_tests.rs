@@ -392,8 +392,8 @@ fn scaled_alignment() {
             "the long row contains its title and badge, row {long_row:?}, title {long_title:?}, badge {long_badge:?}"
         );
         assert!(
-            long_row.width > 260.0,
-            "GAP: Swift keeps the long row inside the 260pt sidebar; the Rust row button hugs its content, saw {long_row:?}"
+            long_row.width <= 260.0,
+            "the long row stays inside the 260pt sidebar, saw {long_row:?}"
         );
         assert!(
             long_title.max_x() + 9.0 <= long_badge.x,
@@ -492,14 +492,14 @@ fn semantics_and_color() {
                 selection.fill, theme.colors.surface_variant,
                 "the sidebar selection uses the neutral grouped fill (dark {dark})"
             );
-            let hovered = selection.fill.composited(selection.hover_fill);
+            let hovered = selection.hover_fill.composited(selection.fill);
             let fills: Vec<_> = subtree(&projects)
                 .iter()
                 .filter_map(Node::background_color)
                 .collect();
             assert!(
-                !fills.contains(&hovered) && fills.contains(&selection.fill),
-                "GAP: Swift layers the hover state over the selected fill; the Rust row style picks the selected fill over hover, saw {fills:?} (dark {dark})"
+                fills.contains(&hovered),
+                "the hover state layers over the selected fill, saw {fills:?} (dark {dark})"
             );
         });
     }

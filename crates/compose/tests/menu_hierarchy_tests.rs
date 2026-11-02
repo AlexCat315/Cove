@@ -547,29 +547,26 @@ fn select_opens_at_its_selected_row_and_restores_the_trigger() {
         scene.focus.focus(Some(&trigger), false);
         key(scene, Scancode::RETURN);
         scene.settle(5, 1.0);
-        // GAP: `Select` keeps its presentation flag in a thread-local `State`
-        // that no scope declares, so writing it never invalidates the popover
-        // and the popup cannot open.
-        assert!(
-            scene.portal.entries().is_empty(),
-            "GAP: Swift opens the select popup on Return; Rust publishes no portal"
+        assert_eq!(
+            scene.portal.entries().len(),
+            1,
+            "Return opens the select popup"
         );
         assert_eq!(
             scene
                 .focus
                 .focused()
                 .and_then(|node| node.attachment::<u64>(MENU_ITEM_ID)),
-            None,
-            "GAP: no option row is focused because the popup never materialises"
+            Some(1),
+            "the popup opens on the selected row"
         );
-        assert_eq!(
-            selected.get(),
-            2,
-            "without a popup the selection cannot change"
-        );
+        key(scene, Scancode::ESCAPE);
+        scene.settle(5, 1.0);
+        assert!(scene.portal.entries().is_empty(), "Escape closes the popup");
+        assert_eq!(selected.get(), 2, "dismissing keeps the selection");
         assert!(
             focused(scene, &trigger),
-            "focus stays on the select trigger"
+            "focus returns to the select trigger"
         );
     });
 }

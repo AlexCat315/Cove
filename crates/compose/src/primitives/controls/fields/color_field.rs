@@ -43,7 +43,6 @@ pub struct ColorField {
     pub show_alpha: bool,
     pub shows_inline_values: bool,
     pub shows_inline_channels: bool,
-    is_presented: Arc<Mutex<bool>>,
     draft: Arc<Mutex<TextBuffer>>,
     is_editing: Arc<Mutex<bool>>,
 }
@@ -56,7 +55,6 @@ impl ColorField {
             show_alpha: true,
             shows_inline_values: false,
             shows_inline_channels: true,
-            is_presented: Arc::new(Mutex::new(false)),
             draft: Arc::new(Mutex::new(TextBuffer::empty())),
             is_editing: Arc::new(Mutex::new(false)),
         }
@@ -94,7 +92,6 @@ impl ColorField {
             show_alpha: self.show_alpha,
             shows_inline_values: self.shows_inline_values,
             shows_inline_channels: self.shows_inline_channels,
-            is_presented: self.is_presented.clone(),
             draft: self.draft.clone(),
             is_editing: self.is_editing.clone(),
         }
@@ -137,26 +134,9 @@ impl ColorField {
 }
 
 impl View for ColorField {
-    fn body(&self, _cx: &Scope) -> AnyView {
+    fn body(&self, cx: &Scope) -> AnyView {
         let field = self.snapshot();
-        let presented = Binding::new(
-            {
-                let state = self.is_presented.clone();
-                move || {
-                    *state
-                        .lock()
-                        .unwrap_or_else(|poisoned| poisoned.into_inner())
-                }
-            },
-            {
-                let state = self.is_presented.clone();
-                move |value: bool| {
-                    *state
-                        .lock()
-                        .unwrap_or_else(|poisoned| poisoned.into_inner()) = value;
-                }
-            },
-        );
+        let presented: Binding<bool> = cx.state(|| false).into();
         let trigger = AnyView::new(ColorSwatch {
             color: self.color.get(),
             is_enabled: self.is_enabled,

@@ -187,8 +187,8 @@ impl View for StorySection {
                 content,
             )
             .padding(18.0)
-            .background_color(cove_core::Color::WHITE)
-            .corner_radius(10.0)
+            .semantic_background(SemanticColorRef::background())
+            .corner_radius(12.0)
             .semantic_border(SemanticColorRef::border(), 1.0),
         );
         AnyView::new(

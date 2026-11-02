@@ -1,0 +1,632 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>平台线程分离 · 交互演示</title>
+<style>
+  :root{
+    --bg:#0d1117; --panel:#151b23; --panel2:#1b232d; --line:#2a3542;
+    --text:#d8e0ea; --dim:#7d8b9c; --accent:#4cc2ff; --warn:#ffb454; --ok:#4ade80;
+    --bad:#ff6b6b; --violet:#a78bfa;
+    --mono:ui-monospace,SFMono-Regular,Menlo,monospace;
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0; background:radial-gradient(1200px 600px at 50% -10%,#16202b,var(--bg) 60%);
+    color:var(--text); font:14px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif;
+    min-height:100vh;
+  }
+  .wrap{max-width:1180px; margin:0 auto; padding:36px 24px 72px}
+  h1{font-size:22px; margin:0 0 6px; letter-spacing:.2px}
+  .sub{color:var(--dim); font-size:13px; margin-bottom:28px}
+  .card{background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:20px}
+  .card + .card{margin-top:20px}
+  .card h2{font-size:14px; margin:0 0 4px; font-weight:600; letter-spacing:.3px}
+  .card p.hint{color:var(--dim); font-size:12.5px; margin:0 0 16px}
+  svg.diagram{width:100%; height:auto; display:block}
+
+  .grid{display:grid; grid-template-columns:1fr 320px; gap:20px; align-items:start}
+  @media (max-width:900px){ .grid{grid-template-columns:1fr} }
+
+  canvas{width:100%; height:300px; display:block; border-radius:10px; background:#0b1017; border:1px solid var(--line)}
+
+  .seg{display:inline-flex; background:var(--panel2); border:1px solid var(--line); border-radius:9px; padding:3px; gap:3px}
+  .seg button{
+    appearance:none; border:0; background:transparent; color:var(--dim); padding:7px 14px;
+    border-radius:7px; font:inherit; font-size:13px; cursor:pointer; transition:.15s;
+  }
+  .seg button.on{background:var(--accent); color:#04121c; font-weight:600}
+  .seg button.on.bad{background:var(--bad); color:#230808}
+
+  .row{display:flex; align-items:center; gap:12px; margin:14px 0}
+  .row label{color:var(--dim); font-size:12.5px; width:104px; flex:none}
+  input[type=range]{flex:1; accent-color:var(--accent); height:18px}
+  .val{font-family:var(--mono); font-size:12.5px; color:var(--text); width:64px; text-align:right}
+  button.act{
+    flex:1; background:var(--panel2); color:var(--text); border:1px solid var(--line);
+    border-radius:8px; padding:9px 10px; font:inherit; font-size:12.5px; cursor:pointer;
+  }
+  button.act:hover{border-color:var(--accent); color:var(--accent)}
+  button.act.warn:hover{border-color:var(--warn); color:var(--warn)}
+
+  .metrics{display:grid; grid-template-columns:1fr 1fr; gap:10px}
+  .metric{background:var(--panel2); border:1px solid var(--line); border-radius:9px; padding:10px 12px}
+  .metric .k{color:var(--dim); font-size:11px; letter-spacing:.4px}
+  .metric .v{font-family:var(--mono); font-size:19px; margin-top:2px}
+  .metric .v small{font-size:11px; color:var(--dim); margin-left:3px}
+  .v.good{color:var(--ok)} .v.bad{color:var(--bad)} .v.warn{color:var(--warn)}
+
+  table{width:100%; border-collapse:collapse; font-size:12.5px}
+  th,td{text-align:left; padding:8px 10px; border-bottom:1px solid var(--line)}
+  th{color:var(--dim); font-weight:500; font-size:11.5px; letter-spacing:.4px}
+  td.mono{font-family:var(--mono)}
+  tr:last-child td{border-bottom:0}
+  .tag{display:inline-block; padding:1px 7px; border-radius:99px; font-size:11px; border:1px solid}
+  .tag.a{color:var(--accent); border-color:#1c4f6b}
+  .tag.b{color:var(--warn); border-color:#5c4420}
+  .tag.c{color:var(--ok); border-color:#1f5133}
+  .foot{color:var(--dim); font-size:12px; margin-top:22px}
+  code{font-family:var(--mono); font-size:12px; background:#0b1017; border:1px solid var(--line); padding:1px 5px; border-radius:4px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <h1>平台线程分离 · 交互演示</h1>
+  <div class="sub">UI 线程不再直连 AppKit/UIKit：A 类合并、B 类排队、C 类读缓存。下面三段可以动手调。</div>
+
+  <!-- 1. 架构流程 -->
+  <div class="card">
+    <h2>1 · 目标数据流</h2>
+    <p class="hint">54 个同步平台调用被拆成三条通道；主线程退化成泵，UI 线程不再等待任何原生返回值。</p>
+    <svg class="diagram" viewBox="0 0 1100 300" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <marker id="ar" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto">
+          <path d="M0,0 L7,3 L0,6" fill="none" stroke="#4a5b6e" stroke-width="1.4"/>
+        </marker>
+        <marker id="arA" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto">
+          <path d="M0,0 L7,3 L0,6" fill="none" stroke="#4cc2ff" stroke-width="1.6"/>
+        </marker>
+        <marker id="arB" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto">
+          <path d="M0,0 L7,3 L0,6" fill="none" stroke="#ffb454" stroke-width="1.6"/>
+        </marker>
+        <marker id="arC" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto">
+          <path d="M0,0 L7,3 L0,6" fill="none" stroke="#4ade80" stroke-width="1.6"/>
+        </marker>
+        <marker id="arV" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto">
+          <path d="M0,0 L7,3 L0,6" fill="none" stroke="#a78bfa" stroke-width="1.6"/>
+        </marker>
+      </defs>
+
+      <!-- UI -->
+      <rect x="40" y="30" width="250" height="86" rx="10" fill="#152030" stroke="#2f5f7d"/>
+      <text x="60" y="58" fill="#d8e0ea" font-size="14" font-weight="600">UI 线程</text>
+      <text x="60" y="80" fill="#7d8b9c" font-size="11.5">组合 / 布局 / 生成 DrawList</text>
+      <text x="60" y="99" fill="#7d8b9c" font-size="11.5">光标槽 · 输入法槽 · 命令</text>
+
+      <!-- mailbox -->
+      <rect x="360" y="30" width="200" height="86" rx="10" fill="#141c17" stroke="#2f6b46"/>
+      <text x="380" y="58" fill="#d8e0ea" font-size="14" font-weight="600">主线程信箱</text>
+      <text x="380" y="80" fill="#7d8b9c" font-size="11.5">A 槽位覆盖 · B FIFO</text>
+      <text x="380" y="99" fill="#7d8b9c" font-size="11.5">每 tick 排空一次</text>
+
+      <!-- platform -->
+      <rect x="630" y="30" width="200" height="86" rx="10" fill="#2a1d1d" stroke="#7d4040"/>
+      <text x="650" y="58" fill="#d8e0ea" font-size="14" font-weight="600">主线程 · 平台</text>
+      <text x="650" y="80" fill="#7d8b9c" font-size="11.5">AppKit / UIKit / SDL</text>
+      <text x="650" y="99" fill="#7d8b9c" font-size="11.5">光标·IME·菜单·无障碍</text>
+
+      <!-- state cache -->
+      <rect x="630" y="176" width="200" height="76" rx="10" fill="#16211a" stroke="#2f6b46"/>
+      <text x="650" y="203" fill="#d8e0ea" font-size="14" font-weight="600">平台状态缓存</text>
+      <text x="650" y="225" fill="#7d8b9c" font-size="11.5">尺寸·缩放·焦点·遮挡</text>
+
+      <!-- render -->
+      <rect x="360" y="176" width="200" height="76" rx="10" fill="#1d1a2b" stroke="#5b4a8a"/>
+      <text x="380" y="203" fill="#d8e0ea" font-size="14" font-weight="600">渲染线程</text>
+      <text x="380" y="225" fill="#7d8b9c" font-size="11.5">2–3 帧在飞 · present</text>
+
+      <!-- arrows -->
+      <line x1="290" y1="58" x2="356" y2="58" stroke="#4cc2ff" stroke-width="1.8" marker-end="url(#arA)"/>
+      <text x="300" y="48" fill="#4cc2ff" font-size="10.5">A 合并</text>
+      <line x1="290" y1="88" x2="356" y2="88" stroke="#ffb454" stroke-width="1.8" marker-end="url(#arB)"/>
+      <text x="300" y="106" fill="#ffb454" font-size="10.5">B FIFO</text>
+
+      <line x1="560" y1="58" x2="626" y2="58" stroke="#4a5b6e" stroke-width="1.6" marker-end="url(#ar)"/>
+      <text x="566" y="48" fill="#7d8b9c" font-size="10.5">drain</text>
+
+      <line x1="560" y1="214" x2="626" y2="214" stroke="#4ade80" stroke-width="1.8" marker-end="url(#arC)"/>
+      <text x="566" y="204" fill="#4ade80" font-size="10.5">publish</text>
+      <path d="M730 262 L730 288 L165 288 L165 120" fill="none" stroke="#4ade80" stroke-width="1.6"
+            stroke-dasharray="5 4" marker-end="url(#arC)"/>
+      <text x="380" y="283" fill="#4ade80" font-size="10.5">C 类读：直接读缓存，零往返</text>
+
+      <path d="M165 120 L165 176 L356 176" fill="none" stroke="#a78bfa" stroke-width="1.8" marker-end="url(#arV)"/>
+      <text x="175" y="168" fill="#a78bfa" font-size="10.5">DrawList</text>
+      <path d="M460 176 L460 120 L200 120" fill="none" stroke="#a78bfa" stroke-width="1.4"
+            stroke-dasharray="4 4" marker-end="url(#arV)"/>
+      <text x="416" y="136" fill="#a78bfa" font-size="10.5">FramePresented</text>
+    </svg>
+  </div>
+
+  <!-- 2. 实时仿真 -->
+  <div class="card">
+    <h2>2 · 实时仿真</h2>
+    <p class="hint">切换模型后按「突发」或拖动调用率，观察 UI 线程是否被主线程拖住。</p>
+
+    <div class="row" style="margin-top:0">
+      <label>模型</label>
+      <div class="seg" id="modeSeg">
+        <button data-mode="sync" class="bad">同步直连（现状）</button>
+        <button data-mode="bridge" class="on">线程桥接（目标）</button>
+      </div>
+    </div>
+
+    <div class="grid" style="grid-template-columns:1fr 300px">
+      <div>
+        <canvas id="stage" width="1600" height="600"></canvas>
+        <div class="row"><label>调用率</label><input id="rate" type="range" min="30" max="600" value="240"><span class="val" id="rateV">240 Hz</span></div>
+        <div class="row"><label>阻塞时长</label><input id="stall" type="range" min="50" max="600" value="300"><span class="val" id="stallV">300 ms</span></div>
+        <div class="row"><label>在飞帧数</label><input id="ring" type="range" min="1" max="3" value="2"><span class="val" id="ringV">2</span></div>
+        <div class="row">
+          <button class="act warn" id="btnStall">模拟原生菜单阻塞</button>
+          <button class="act" id="btnBurst">突发 200 次 IME</button>
+          <button class="act" id="btnReset">重置统计</button>
+        </div>
+      </div>
+      <div class="metrics">
+        <div class="metric"><div class="k">UI 最大卡顿</div><div class="v" id="mStall">0<small>ms</small></div></div>
+        <div class="metric"><div class="k">合并率</div><div class="v" id="mCoal">–</div></div>
+        <div class="metric"><div class="k">信箱深度</div><div class="v" id="mDepth">0</div></div>
+        <div class="metric"><div class="k">丢帧</div><div class="v" id="mDrop">0</div></div>
+        <div class="metric"><div class="k">光标生效延迟</div><div class="v" id="mLat">0<small>ms</small></div></div>
+        <div class="metric"><div class="k">主线程占用</div><div class="v" id="mMain">0<small>%</small></div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 3. 分类表 -->
+  <div class="card">
+    <h2>3 · 54 个调用的归属</h2>
+    <p class="hint">只有 B 类真的需要排队；C 类全部靠缓存消除往返，这是能去掉同步语义的关键。</p>
+    <table>
+      <thead><tr><th style="width:88px">类别</th><th>方法</th><th style="width:190px">机制</th><th style="width:110px">阻塞 UI？</th></tr></thead>
+      <tbody>
+        <tr><td><span class="tag a">A 合并</span></td><td class="mono">set_cursor · set_text_input_area · set_window_chrome_hit_test · set_window_size/position · keep_rendering</td><td>按 (窗口, 种类) 覆盖槽位</td><td style="color:var(--ok)">否</td></tr>
+        <tr><td><span class="tag b">B 排队</span></td><td class="mono">show_window_system_menu · NativeMenuPopover::pop_up · clipboard write · open_*_dialog · create/close_window · shutdown</td><td>严格 FIFO，结果回投事件</td><td style="color:var(--ok)">否</td></tr>
+        <tr><td><span class="tag c">C 缓存</span></td><td class="mono">drawable_size · logical_size · content_scale_factor · is_focused/minimized/occluded · safe_area · refresh_rate · clipboard read(异步)</td><td>主线程 publish 快照</td><td style="color:var(--ok)">否</td></tr>
+        <tr><td><span class="tag">阻塞原语</span></td><td class="mono">dispatch_sync 到主线程</td><td>本设计不提供</td><td style="color:var(--bad)">会</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- 4. 实测对比 -->
+  <div class="card">
+    <h2>4 · 两种模型实测（本次会话累计）</h2>
+    <p class="hint">数据来自上面这个仿真本身，同参数下切换模型即可对比。</p>
+    <table>
+      <thead><tr><th>指标</th><th>同步直连</th><th>线程桥接</th><th style="width:170px">差异</th></tr></thead>
+      <tbody id="cmp"></tbody>
+    </table>
+  </div>
+
+  <div class="foot">
+    仿真的「同步直连」= 今天 <code>crates/shell/src/platform_shell.rs</code> 里 <code>Shell</code> 的 40 个方法 +
+    <code>WindowHandle</code> 11 个 + <code>PlatformHost</code> 3 个，全部在主线程上同步执行；
+    「渲染阻塞」= <code>crates/hosts/src/desktop/rendering/render_thread.rs:130</code> 的
+    <code>draw()</code> 先 <code>finish_in_flight()</code> 等上一帧。
+  </div>
+</div>
+
+<script>
+(() => {
+  const cvs = document.getElementById('stage');
+  const ctx = cvs.getContext('2d');
+  const W = cvs.width, H = cvs.height;
+  const DPR = 1;
+
+  const LANES = [
+    { name: '主线程 · AppKit / UIKit', y: 90,  color: '#ff8a8a' },
+    { name: 'UI 线程 · 组合 / 布局',   y: 280, color: '#4cc2ff' },
+    { name: '渲染线程 · GPU',          y: 470, color: '#a78bfa' },
+  ];
+  const LEFT = 260, RIGHT = W - 120;
+
+  const S = {
+    mode: 'bridge',
+    rate: 240,
+    stallMs: 300,
+    ring: 2,
+    now: 0,
+    carry: 0,
+    mainNext: 0,
+    mainStallUntil: 0,
+    uiBusyUntil: 0,
+    slots: new Map(),
+    queue: [],
+    inflight: [],
+    produced: 0,
+    applied: 0,
+    coalesced: 0,
+    dropped: 0,
+    uiStallMax: 0,
+    latSum: 0,
+    latN: 0,
+    mainWorkTicks: 0,
+    mainAllTicks: 0,
+    renderNext: 0,
+    packets: [],
+    totals: {
+      sync:   { stall: 0, lat: 0, dropped: 0, applied: 0 },
+      bridge: { stall: 0, lat: 0, dropped: 0, applied: 0 },
+    },
+    burst: 0,
+  };
+
+  const $ = id => document.getElementById(id);
+  const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+
+  function resetStats() {
+    S.produced = S.applied = S.coalesced = S.dropped = 0;
+    S.uiStallMax = 0; S.latSum = 0; S.latN = 0;
+    S.mainWorkTicks = S.mainAllTicks = 0;
+    S.renderNext = 0;
+    S.packets.length = 0;
+    S.slots.clear(); S.queue.length = 0; S.inflight.length = 0;
+  }
+
+  // ---- 事件绑定 ----
+  document.querySelectorAll('#modeSeg button').forEach(btn => {
+    btn.onclick = () => {
+      S.mode = btn.dataset.mode;
+      document.querySelectorAll('#modeSeg button').forEach(b => {
+        b.classList.toggle('on', b === btn);
+        b.classList.toggle('bad', b === btn && b.dataset.mode === 'sync');
+      });
+      resetStats();
+    };
+  });
+
+  const bind = (id, out, fn, fmt) => {
+    const el = $(id);
+    const sync = () => { fn(+el.value); $(out).textContent = fmt(+el.value); };
+    el.oninput = sync; sync();
+  };
+  bind('rate', 'rateV', v => { S.rate = v; }, v => v + ' Hz');
+  bind('stall', 'stallV', v => { S.stallMs = v; }, v => v + ' ms');
+  bind('ring', 'ringV', v => { S.ring = v; }, v => String(v));
+
+  $('btnStall').onclick = () => {
+    S.mainStallUntil = S.now + S.stallMs / 1000;
+  };
+  $('btnBurst').onclick = () => { S.burst += 200; };
+  $('btnReset').onclick = resetStats;
+
+  // ---- 仿真 ----
+  let last = performance.now() / 1000;
+  S.now = last;
+
+  function writeSlot(kind, key) {
+    // A 类：同 key 覆盖，旧值丢弃
+    if (S.slots.has(key)) { S.coalesced++; S.slots.get(key).written = S.now; }
+    else S.slots.set(key, { kind, written: S.now });
+  }
+
+  function produce(dt) {
+    // 同步模型下 UI 线程被主线程拖住，就无法继续产出
+    if (S.mode === 'sync' && S.now < S.uiBusyUntil) {
+      S.uiStallMax = Math.max(S.uiStallMax, (S.uiBusyUntil - S.now) * 1000);
+      return;
+    }
+    S.carry += S.rate * dt + S.burst;
+    const n = Math.floor(S.carry);
+    S.carry -= n;
+
+    for (let i = 0; i < n; i++) {
+      S.produced++;
+      const key = 'cursor:' + (i % 3);
+      if (S.mode === 'sync') {
+        // 同步往返：主线程忙着（菜单 / AX 同步 / 对话框）时，UI 一起等
+        const rtt = 0.00005;
+        const base = Math.max(S.now, S.uiBusyUntil, S.mainStallUntil);
+        S.uiBusyUntil = base + rtt;
+        S.uiStallMax = Math.max(S.uiStallMax, (S.uiBusyUntil - S.now) * 1000);
+        scheduleApply(key, S.now);
+        if (n <= 6 || i === 0) {
+          S.packets.push({ from: 1, to: 0, t0: S.now, dur: rtt, kind: 'sync', x: 0.5 });
+        }
+      } else {
+        writeSlot('cursor', key);
+        S.packets.push({
+          from: 1, to: 0, t0: S.now, dur: 0.16, kind: 'slot',
+          x: LEFT + (RIGHT - LEFT) * (0.25 + 0.5 * Math.random()),
+        });
+      }
+    }
+    if (S.mode === 'bridge' && n > 0) {
+      S.packets.push({ from: 1, to: 0, t0: S.now, dur: 0.2, kind: 'wake', x: LEFT + 40 });
+    }
+    if (S.burst > 0) S.burst = Math.max(0, S.burst - n);
+  }
+
+  const pendingApplies = [];
+  function scheduleApply(key, at) { pendingApplies.push({ key, at }); }
+
+  function mainTick() {
+    S.mainAllTicks += 1;
+    // 主线程每 tick 排空一次；被菜单阻塞时跳过
+    if (S.now < S.mainStallUntil) return;
+
+    let applied = 0;
+    for (const [key, slot] of S.slots) {
+      applied++;
+      S.applied++;
+      S.latSum += (S.now - slot.written) * 1000;
+      S.latN++;
+      S.packets.push({ from: 0, to: 0, t0: S.now, dur: 0.12, kind: 'apply', x: LEFT + (RIGHT - LEFT) * 0.5 });
+    }
+    S.slots.clear();
+
+    for (let i = pendingApplies.length - 1; i >= 0; i--) {
+      const p = pendingApplies[i];
+      if (p.at <= S.now) {
+        S.applied++;
+        S.latSum += (S.now - p.at) * 1000;
+        S.latN++;
+        pendingApplies.splice(i, 1);
+      }
+    }
+
+    if (S.queue.length) {
+      S.queue.splice(0, Math.min(4, S.queue.length)).forEach(() => {
+        S.applied++;
+        S.packets.push({ from: 1, to: 0, t0: S.now, dur: 0.3, kind: 'cmd', x: LEFT + 120 });
+      });
+    }
+    if (applied || S.queue.length) S.mainWorkTicks += 1;
+  }
+
+  function renderTick() {
+    // 渲染完成回投
+    for (let i = S.inflight.length - 1; i >= 0; i--) {
+      if (S.now - S.inflight[i] >= 0.0167) {
+        S.inflight.splice(i, 1);
+        S.packets.push({ from: 2, to: 1, t0: S.now, dur: 0.18, kind: 'done', x: LEFT + 320 });
+      }
+    }
+    // UI 每 60Hz 尝试提交一帧
+    if (S.now < S.renderNext) return;
+    S.renderNext = S.now + 1 / 60;
+
+    if (S.inflight.length < S.ring) {
+      S.inflight.push(S.now);
+      S.packets.push({ from: 1, to: 2, t0: S.now, dur: 0.16, kind: 'frame', x: LEFT + 380 });
+    } else if (S.mode === 'sync') {
+      // 现状：draw() 先 finish_in_flight()，UI 阻塞等上一帧
+      S.uiBusyUntil = Math.max(S.uiBusyUntil, S.now + 0.0167);
+      S.uiStallMax = Math.max(S.uiStallMax, (S.uiBusyUntil - S.now) * 1000);
+    } else {
+      S.dropped++;
+      S.packets.push({ from: 1, to: 1, t0: S.now, dur: 0.16, kind: 'drop', x: LEFT + 460 });
+    }
+  }
+
+  function step(dt) {
+    S.now += dt;
+    produce(dt);
+
+    if (S.now >= S.mainNext) {
+      S.mainNext = S.now + 1 / 60;
+      mainTick();
+    }
+    renderTick();
+
+    for (let i = S.packets.length - 1; i >= 0; i--) {
+      if (S.now - S.packets[i].t0 > Math.max(S.packets[i].dur, 0.35)) S.packets.splice(i, 1);
+    }
+    if (S.packets.length > 320) S.packets.splice(0, S.packets.length - 320);
+  }
+
+  // ---- 绘制 ----
+  function laneBox(lane) {
+    ctx.fillStyle = '#101822';
+    ctx.strokeStyle = '#22303d';
+    ctx.lineWidth = 1.5;
+    roundRect(LEFT, lane.y - 34, RIGHT - LEFT, 68, 10);
+    ctx.fill(); ctx.stroke();
+  }
+
+  function roundRect(x, y, w, h, r) {
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.arcTo(x + w, y, x + w, y + h, r);
+    ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r);
+    ctx.arcTo(x, y, x + w, y, r);
+    ctx.closePath();
+  }
+
+  function draw() {
+    ctx.clearRect(0, 0, W, H);
+    ctx.textBaseline = 'middle';
+
+    // 列标题
+    ctx.font = '500 15px ui-monospace,Menlo,monospace';
+    ctx.fillStyle = '#4a5b6e';
+    ctx.fillText('UI 产出', LEFT + 10, 26);
+    ctx.fillText('信箱', LEFT + 260, 26);
+    ctx.fillText('主线程应用', LEFT + 480, 26);
+
+    LANES.forEach(lane => {
+      laneBox(lane);
+      ctx.fillStyle = lane.color;
+      ctx.font = '600 17px -apple-system,system-ui,sans-serif';
+      ctx.fillText(lane.name, 18, lane.y - 8);
+      ctx.fillStyle = '#5a6a7c';
+      ctx.font = '13px ui-monospace,Menlo,monospace';
+      const sub = lane.y === 280
+        ? (S.mode === 'sync' ? '被主线程阻塞中' : '从不等待原生返回值')
+        : lane.y === 90 ? '每 tick 排空一次' : `${S.inflight.length}/${S.ring} 帧在飞`;
+      ctx.fillText(sub, 18, lane.y + 14);
+    });
+
+    // 槽位 / 队列可视化
+    const slotN = S.slots.size;
+    for (let i = 0; i < Math.min(slotN, 6); i++) {
+      const x = LEFT + 240 + i * 26;
+      ctx.fillStyle = 'rgba(76,194,255,.85)';
+      roundRect(x, LANES[0].y - 14, 18, 28, 4);
+      ctx.fill();
+    }
+    if (slotN) {
+      ctx.fillStyle = '#4cc2ff';
+      ctx.font = '600 14px ui-monospace,Menlo,monospace';
+      ctx.fillText('×' + slotN, LEFT + 240 + Math.min(slotN, 6) * 26 + 8, LANES[0].y);
+    }
+
+    for (let i = 0; i < Math.min(S.queue.length, 10); i++) {
+      ctx.fillStyle = 'rgba(255,180,84,.85)';
+      roundRect(LEFT + 240 + i * 20, LANES[0].y + 40, 12, 8, 3);
+      ctx.fill();
+    }
+
+    // 包
+    for (const p of S.packets) {
+      const k = clamp((S.now - p.t0) / p.dur, 0, 1);
+      const a = LANES[p.from].y, b = LANES[p.to].y;
+      const y = a + (b - a) * k;
+      const x = p.x;
+      const fade = 1 - k * 0.55;
+
+      if (p.kind === 'slot') {
+        ctx.fillStyle = `rgba(76,194,255,${fade})`;
+        dot(x, y, 5);
+      } else if (p.kind === 'frame') {
+        ctx.fillStyle = `rgba(167,139,250,${fade})`;
+        dot(x, y, 6);
+      } else if (p.kind === 'done') {
+        ctx.fillStyle = `rgba(167,139,250,${fade * 0.8})`;
+        dot(x, y, 4);
+      } else if (p.kind === 'drop') {
+        ctx.strokeStyle = `rgba(255,107,107,${fade})`;
+        ctx.lineWidth = 2.5;
+        ctx.beginPath(); ctx.arc(x, y, 7, 0, 6.283); ctx.stroke();
+      } else if (p.kind === 'cmd') {
+        ctx.fillStyle = `rgba(255,180,84,${fade})`;
+        dot(x, y, 6);
+      } else if (p.kind === 'apply') {
+        ctx.fillStyle = `rgba(74,222,128,${fade})`;
+        dot(x, y, 5);
+      } else if (p.kind === 'wake') {
+        ctx.strokeStyle = `rgba(76,194,255,${fade * 0.5})`;
+        ctx.lineWidth = 1.5;
+        ctx.beginPath(); ctx.arc(x, y, 4 + k * 8, 0, 6.283); ctx.stroke();
+      } else if (p.kind === 'sync') {
+        ctx.strokeStyle = `rgba(255,107,107,${fade})`;
+        ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.moveTo(x, y - 8); ctx.lineTo(x, y + 8); ctx.stroke();
+      }
+    }
+
+    // 主线程被阻塞的红色提示
+    if (S.now < S.mainStallUntil) {
+      const w = (RIGHT - LEFT) * ((S.mainStallUntil - S.now) / (S.stallMs / 1000));
+      ctx.fillStyle = 'rgba(255,107,107,.16)';
+      roundRect(LEFT + (RIGHT - LEFT) - w, LANES[0].y - 28, w, 56, 8);
+      ctx.fill();
+      ctx.fillStyle = '#ff6b6b';
+      ctx.font = '600 13px ui-monospace,Menlo,monospace';
+      ctx.fillText('原生菜单阻塞中', LEFT + (RIGHT - LEFT) - w + 12, LANES[0].y);
+    }
+
+    // UI 被拖住
+    if (S.mode === 'sync' && S.now < S.uiBusyUntil) {
+      ctx.fillStyle = 'rgba(255,107,107,.14)';
+      roundRect(LEFT, LANES[1].y - 28, RIGHT - LEFT, 56, 8);
+      ctx.fill();
+      ctx.fillStyle = '#ff6b6b';
+      ctx.font = '600 13px ui-monospace,Menlo,monospace';
+      ctx.fillText('UI 线程等待 dispatch_sync 返回 → 冻结', LEFT + 14, LANES[1].y);
+    }
+
+    // 指标
+    $('mStall').innerHTML = Math.round(S.uiStallMax) + '<small>ms</small>';
+    $('mStall').className = 'v ' + (S.uiStallMax > 50 ? 'bad' : S.uiStallMax > 8 ? 'warn' : 'good');
+
+    const coal = S.applied ? (1 - S.applied / Math.max(1, S.produced)) : 0;
+    $('mCoal').textContent = S.produced ? Math.round(clamp(coal, 0, 1) * 100) + '%' : '–';
+
+    $('mDepth').textContent = S.mode === 'sync' ? String(pendingApplies.length + S.queue.length) : String(S.slots.size + S.queue.length);
+
+    $('mDrop').textContent = String(S.dropped);
+    $('mDrop').className = 'v ' + (S.dropped > 0 ? 'warn' : 'good');
+
+    const lat = S.latN ? S.latSum / S.latN : 0;
+    $('mLat').innerHTML = Math.round(lat) + '<small>ms</small>';
+    $('mLat').className = 'v ' + (lat > 60 ? 'bad' : lat > 20 ? 'warn' : 'good');
+
+    const busy = S.mainWorkTicks / Math.max(1, S.mainAllTicks);
+    $('mMain').innerHTML = Math.round(busy * 100) + '<small>%</small>';
+
+    // 累计对比
+    const t = S.totals[S.mode];
+    t.stall = Math.max(t.stall, S.uiStallMax);
+    t.lat = S.latN ? Math.max(t.lat, lat) : t.lat;
+    t.dropped = S.dropped;
+    t.applied = S.applied;
+    renderCompare();
+  }
+
+  function dot(x, y, r) {
+    ctx.beginPath(); ctx.arc(x, y, r, 0, 6.283); ctx.fill();
+  }
+
+  let compareTimer = 0;
+  function renderCompare() {
+    if (S.now - compareTimer < 0.4) return;
+    compareTimer = S.now;
+    const a = S.totals.sync, b = S.totals.bridge;
+    const rows = [
+      ['UI 最大卡顿', a.stall ? Math.round(a.stall) + ' ms' : '–', b.stall ? Math.round(b.stall) + ' ms' : '–'],
+      ['光标生效延迟', a.lat ? Math.round(a.lat) + ' ms' : '–', b.lat ? Math.round(b.lat) + ' ms' : '–'],
+      ['生效调用数', String(a.applied), String(b.applied)],
+      ['丢帧', String(a.dropped), String(b.dropped)],
+    ];
+    $('cmp').innerHTML = rows.map(([k, x, y]) => {
+      const nx = parseFloat(x), ny = parseFloat(y);
+      let delta = '';
+      if (!isNaN(nx) && !isNaN(ny)) {
+        if (nx === ny) delta = '持平';
+        else if (ny === 0) delta = '归零';
+        else if (ny < nx) delta = '−' + Math.round((1 - ny / nx) * 100) + '%';
+        else delta = '+' + Math.round((ny / nx - 1) * 100) + '%';
+      }
+      return `<tr><td>${k}</td><td class="mono">${x}</td><td class="mono">${y}</td><td class="mono" style="color:var(--dim)">${delta}</td></tr>`;
+    }).join('');
+  }
+
+  function loop(ts) {
+    const now = ts / 1000;
+    let dt = now - last;
+    last = now;
+    dt = Math.min(dt, 0.05);
+
+    // 固定步长，避免高刷屏把结果放大
+    let remaining = dt;
+    while (remaining > 0) {
+      const slice = Math.min(remaining, 1 / 120);
+      step(slice);
+      remaining -= slice;
+    }
+
+    draw();
+    requestAnimationFrame(loop);
+  }
+
+  renderCompare();
+  requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>

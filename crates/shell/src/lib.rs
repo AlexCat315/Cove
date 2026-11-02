@@ -26,6 +26,12 @@ pub type AppKitShell = Sdl3Shell;
 #[cfg(target_os = "macos")]
 pub type MacShell = Sdl3Shell;
 
+/// Whether the caller runs on the thread that owns the platform event queue.
+pub fn is_main_thread() -> bool {
+    // SAFETY: SDL's main-thread check is thread-safe and requires no initialized subsystem.
+    unsafe { native::cove_shell_is_main_thread() }
+}
+
 /// Monotonic host-clock seconds, aligned with native display-link timestamps.
 pub fn monotonic_seconds() -> f64 {
     // SAFETY: SDL performance counters are thread-safe and require no initialized subsystem.

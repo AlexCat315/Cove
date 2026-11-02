@@ -88,8 +88,8 @@ fn spacing_scale_matches_the_authored_steps() {
     let radius = Theme::default_dark().radius;
     assert_eq!(
         [radius.none, radius.sm, radius.md, radius.lg, radius.xl],
-        [0.0, 4.0, 6.0, 8.0, 10.0],
-        "the authored 0/4/6/8/10 ramp"
+        [0.0, 6.0, 8.0, 12.0, 16.0],
+        "the authored 0/6/8/12/16 ramp"
     );
     assert!(radius.pill >= 9999.0, "pill is the fully rounded sentinel");
 }

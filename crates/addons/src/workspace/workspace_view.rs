@@ -229,9 +229,13 @@ struct WorkspaceSurfaceReader {
 impl View for WorkspaceSurfaceReader {
     fn body(&self, _cx: &Scope) -> AnyView {
         let build = self.build.clone();
-        AnyView::new(cove_composition::adaptive::ContainerSizeReader::new(
-            move |size: cove_core::Size| build(size.width),
-        ))
+        // The workspace fills its container, so the reader must not hug its content.
+        erased(
+            AnyView::new(cove_composition::adaptive::ContainerSizeReader::new(
+                move |size: cove_core::Size| build(size.width),
+            ))
+            .modifier(WorkspaceFillModifier),
+        )
     }
 }
 
@@ -1080,13 +1084,13 @@ impl View for WorkspaceBottomSlot {
                 )
             };
         erased(
-            AnyView::new(WorkspaceBox::column().child((inner).flex(1.0)).boxed()).modifier(
-                WorkspaceRoleModifier::new(
+            AnyView::new(WorkspaceBox::column().child((inner).flex(1.0)).boxed())
+                .modifier(WorkspaceFillModifier)
+                .modifier(WorkspaceRoleModifier::new(
                     "workspace-bottom-slot",
                     "workspace.bottom",
                     "workspace-bottom-slot",
-                ),
-            ),
+                )),
         )
     }
 }
@@ -1615,28 +1619,32 @@ impl PrimitiveView for WorkspaceSplitDivider {
 
     fn make_layout_node(&self) -> Option<LayoutNode> {
         let layout = LayoutNode::new();
-        if self.is_vertical_split {
-            layout.set_flex_direction(FlexDirection::Row);
-            layout.set_width(Some(1.0));
-        } else {
-            layout.set_flex_direction(FlexDirection::Column);
-            layout.set_height(Some(1.0));
-        }
         layout.set_align_items(Align::Stretch);
         layout.set_justify_content(Justify::Center);
-        layout.set_flex_shrink(0.0);
+        self.update_layout(&layout);
         Some(layout)
     }
 
+    /// A shell divider fills the region around its hairline, so that whole grab
+    /// area takes input. A divider inside a slot sits between its two panes.
     fn update_layout(&self, layout: &LayoutNode) {
-        if self.is_vertical_split {
-            layout.set_flex_direction(FlexDirection::Row);
-            layout.set_width(Some(1.0));
+        layout.set_flex_direction(if self.is_vertical_split {
+            FlexDirection::Row
         } else {
-            layout.set_flex_direction(FlexDirection::Column);
-            layout.set_height(Some(1.0));
+            FlexDirection::Column
+        });
+        if self.address.is_some() {
+            if self.is_vertical_split {
+                layout.set_width(Some(1.0));
+            } else {
+                layout.set_height(Some(1.0));
+            }
+            layout.set_flex_shrink(0.0);
+        } else {
+            layout.set_flex_grow(1.0);
+            layout.set_flex_shrink(1.0);
+            layout.set_flex_basis(0.0);
         }
-        layout.set_flex_shrink(0.0);
     }
 
     fn children(&self, _node: &Node) -> Vec<AnyView> {
@@ -1750,6 +1758,8 @@ impl View for WorkspaceTabGroupView {
             semantics.label = title;
             children.push(erased(
                 AnyView::new(WorkspaceBox::column().child(scrolled).boxed())
+                    .flex_with(1.0, 1.0, Some(0.0))
+                    .frame_min_width(0.0)
                     .modifier(WorkspaceSemanticsModifier(semantics))
                     .modifier(WorkspaceRoleModifier::new(
                         "workspace-panel-content",
@@ -1763,8 +1773,11 @@ impl View for WorkspaceTabGroupView {
             .layout_role("workspace-tab-group")
             .semantic_role("workspace.group");
         erased(
-            AnyView::new(pane.child(WorkspaceBox::column().children(children).boxed()))
-                .modifier(WorkspaceFillModifier),
+            AnyView::new(pane.child(erased(
+                AnyView::new(WorkspaceBox::column().children(children).boxed())
+                    .modifier(WorkspaceFillModifier),
+            )))
+            .modifier(WorkspaceFillModifier),
         )
     }
 }

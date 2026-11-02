@@ -11,7 +11,8 @@ use super::integration::{
 use cove_composition::ViewGraph;
 use cove_core::DrawList;
 use cove_core::scene::NodeTree;
-use cove_devtools::devtools::DevTools;
+use cove_devtools::devtools::{DevTools, NativeAppFrameCapture};
+use cove_devtools::inspection::DiagnosticStateSource;
 use cove_devtools::server::config::DevToolsConfig;
 use cove_platform::InputEvent;
 use std::cell::RefCell;
@@ -70,8 +71,33 @@ impl DiagnosticsSession for DevToolsSession {
         *self.devtools.input_delivery.borrow_mut() = Some(Rc::new(move |event| inject(event)));
     }
 
+    fn mirror_is_active(&self) -> bool {
+        self.devtools.mirror_is_active()
+    }
+
+    fn mirror_wants_frame(&self) -> bool {
+        self.devtools.mirror_wants_frame()
+    }
+
+    fn mirror_capture(&mut self, list: &DrawList, pixels: (u32, u32), logical: (f32, f32)) {
+        self.devtools
+            .mirror_capture(list, pixels.0, pixels.1, logical.0, logical.1);
+    }
+
     fn stop(&mut self) {
         self.devtools.stop();
+    }
+}
+
+/// Reads the live view graph, whose registry changes as views mount.
+struct GraphStateSource(Rc<ViewGraph>);
+
+impl DiagnosticStateSource for GraphStateSource {
+    fn descriptors(&self) -> Vec<cove_core::scene::StateDescriptor> {
+        self.0.state_descriptors()
+    }
+    fn values(&self, ids: &[String]) -> Vec<cove_core::scene::StateValue> {
+        self.0.state_values(ids)
     }
 }
 
@@ -81,7 +107,7 @@ pub fn factory() -> DiagnosticsFactory {
     Rc::new(
         |configuration: DevToolsConfiguration,
          tree: Rc<RefCell<NodeTree>>,
-         _graph: Rc<ViewGraph>,
+         graph: Rc<ViewGraph>,
          _schedule: Rc<dyn Fn()>,
          callbacks: DiagnosticsCallbacks|
          -> Result<Box<dyn DiagnosticsSession>, String> {
@@ -90,7 +116,32 @@ pub fn factory() -> DiagnosticsFactory {
             if configuration.port != 0 {
                 config.port = configuration.port;
             }
-            let mut devtools = DevTools::new(config, tree, None, None);
+            let render_tree = graph.render_tree().clone();
+            let mut devtools = DevTools::new(
+                config,
+                tree,
+                callbacks.invalidation_log.clone(),
+                Some(render_tree),
+            );
+            devtools.set_state_source(Some(Rc::new(GraphStateSource(graph))));
+
+            if let Some(source) = callbacks.frame_source {
+                let capture = Rc::new(
+                    NativeAppFrameCapture::with_device(source.device, &source.renderer)
+                        .map_err(|error| error.to_string())?,
+                );
+                let reset = capture.clone();
+                devtools.attach_frame_tap(capture.frame_capture(), move || reset.reset());
+            }
+            let mirror_active = callbacks.mirror_active.clone();
+            *devtools.on_mirror_start.borrow_mut() = Some(Rc::new(move || mirror_active(true)));
+            let mirror_active = callbacks.mirror_active.clone();
+            *devtools.on_mirror_stop.borrow_mut() = Some(Rc::new(move || mirror_active(false)));
+            if let Some(resize) = callbacks.resize_window.clone() {
+                devtools.window.resize = Some(Rc::new(move |size| {
+                    resize(size.width as f32, size.height as f32)
+                }));
+            }
 
             let memory = callbacks.memory.clone();
             devtools.set_memory_snapshot(Some(Rc::new(move || {
@@ -101,7 +152,13 @@ pub fn factory() -> DiagnosticsFactory {
                         .iter()
                         .map(|(key, value)| (key.clone(), *value as i64))
                         .collect(),
-                    windows: BTreeMap::new(),
+                    windows: snapshot
+                        .windows
+                        .iter()
+                        .map(|(key, value)| {
+                            (key.clone(), BTreeMap::from([("bytes".to_owned(), *value as i64)]))
+                        })
+                        .collect(),
                 }
             })));
 

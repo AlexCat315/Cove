@@ -74,6 +74,16 @@ impl ViewGraph {
         self.layout_tree.root.clone()
     }
 
+    /// Registered state metadata, for diagnostics.
+    pub fn state_descriptors(&self) -> Vec<cove_core::scene::StateDescriptor> {
+        self.state_registry.borrow().descriptors()
+    }
+
+    /// Current values of the watched state, for diagnostics.
+    pub fn state_values(&self, ids: &[String]) -> Vec<cove_core::scene::StateValue> {
+        self.state_registry.borrow().values(ids)
+    }
+
     pub fn render_tree(&self) -> &RenderTree {
         &self.render_tree
     }

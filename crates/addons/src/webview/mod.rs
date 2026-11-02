@@ -10,8 +10,12 @@
 //! | Windows             | WebView2   | `windows`   |
 //! | Linux               | WebKitGTK  | `linux`     |
 //!
+//! Each engine's views belong to the platform thread. An application composing on
+//! a UI thread wraps its host in [`PlatformThreadWebViewHost`].
+//!
 //! iOS (UIKit `WKWebView`) and Android (`android.webkit.WebView`) have no host
 //! yet; the Swift original was AppKit-only as well.
+mod platform_thread;
 mod view;
 
 #[cfg(target_os = "macos")]
@@ -21,6 +25,7 @@ pub mod linux;
 #[cfg(target_os = "windows")]
 pub mod windows;
 
+pub use platform_thread::PlatformThreadWebViewHost;
 pub use view::{WebView, WebViewNodeResource, geometry_for};
 
 pub use cove_core::Rect;

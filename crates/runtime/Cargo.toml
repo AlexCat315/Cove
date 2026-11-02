@@ -17,3 +17,7 @@ cc.workspace = true
 [lints]
 workspace = true
 
+
+[[test]]
+name = "platform_thread_window_tests"
+harness = false

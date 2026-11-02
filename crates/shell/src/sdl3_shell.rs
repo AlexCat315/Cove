@@ -37,16 +37,22 @@ pub struct Sdl3WindowHandle {
     pointer: Cell<*mut native::Window>,
     _session: Rc<Session>,
     last_area: Cell<Option<TextInputArea>>,
+    /// Refreshed once per event poll and after every command, so reads never
+    /// reach the platform.
+    state: Cell<native::WindowState>,
 }
 impl Sdl3WindowHandle {
     fn state(&self) -> native::WindowState {
+        self.state.get()
+    }
+    fn refresh(&self) {
         let mut state = native::WindowState::default();
         let pointer = self.pointer.get();
         if !pointer.is_null() {
             // SAFETY: live handle and exclusively borrowed output are valid; Rc confines all access to this thread.
             unsafe { native::cove_shell_state(pointer, &mut state) };
         }
-        state
+        self.state.set(state);
     }
     fn close(&self) {
         let pointer = self.pointer.replace(std::ptr::null_mut());
@@ -54,10 +60,12 @@ impl Sdl3WindowHandle {
             // SAFETY: take-and-null prevents double destruction even if clients retain the Rust handle.
             unsafe { native::cove_shell_destroy(pointer) };
         }
+        self.state.set(native::WindowState::default());
     }
     fn command(&self, command: i32, a: i32, b: i32) {
         // SAFETY: bridge accepts a closed/null window and calls SDL only for a live pointer.
         unsafe { native::cove_shell_command(self.pointer.get(), command, a, b) };
+        self.refresh();
     }
 }
 impl Drop for Sdl3WindowHandle {
@@ -368,6 +376,7 @@ impl Shell for Sdl3Shell {
             pointer: Cell::new(pointer),
             _session: self.session.as_ref().unwrap().clone(),
             last_area: Cell::new(None),
+            state: Cell::new(state),
         });
         self.windows.insert(id, window.clone());
         self.order.retain(|entry| *entry != id);
@@ -436,6 +445,9 @@ impl Shell for Sdl3Shell {
                     event: input,
                 });
             }
+        }
+        for window in self.windows.values() {
+            window.refresh();
         }
         collected
     }
@@ -589,6 +601,12 @@ impl Shell for Sdl3Shell {
                 timestamp,
                 target_timestamp: target,
             })
+    }
+    fn prepare_event_loop(&mut self) -> Result<(), ShellError> {
+        if self.session.is_none() {
+            self.session = Some(Session::acquire()?);
+        }
+        Ok(())
     }
     fn shutdown(&mut self) {
         let ids = self.order.clone();

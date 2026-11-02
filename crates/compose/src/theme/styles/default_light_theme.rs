@@ -15,9 +15,9 @@ pub fn value() -> Theme {
     Theme::new(
         ColorScheme::new(
             color(0xFF, 0xFF, 0xFF),
-            color(0xF4, 0xF4, 0xF5),
-            color(0xE9, 0xE9, 0xEC),
-            Some(color(0xDD, 0xDD, 0xE1)),
+            color(0xF9, 0xF9, 0xFA),
+            color(0xF0, 0xF0, 0xF2),
+            Some(color(0xE6, 0xE6, 0xEA)),
             color(0xFF, 0xFF, 0xFF),
             color(0xFF, 0xFF, 0xFF),
             color(0xFF, 0xFF, 0xFF),
@@ -39,9 +39,9 @@ pub fn value() -> Theme {
             color(0xD9, 0x77, 0x06),
             color(0xDC, 0x26, 0x26),
             color(0x25, 0x63, 0xEB),
-            color(0xD9, 0xD9, 0xDE),
-            color(0xA5, 0xA5, 0xAE),
-            color(0xE4, 0xE4, 0xE7),
+            color(0xE7, 0xE7, 0xEB),
+            color(0xC4, 0xC4, 0xCC),
+            color(0xEE, 0xEE, 0xF1),
             alpha(0x25, 0x63, 0xEB, 0x8C),
             alpha(0x25, 0x63, 0xEB, 0x40),
             alpha(0x00, 0x00, 0x00, 0x66),
@@ -64,10 +64,10 @@ pub fn value() -> Theme {
                 blur: 3.0,
             },
             SurfaceShadow {
-                color: Some(alpha(0, 0, 0, 0x2E)),
+                color: Some(alpha(0, 0, 0, 0x1F)),
                 offset_x: 0.0,
-                offset_y: 6.0,
-                blur: 20.0,
+                offset_y: 8.0,
+                blur: 28.0,
             },
             LayeredShadow {
                 ambient: SurfaceShadow {

@@ -142,6 +142,14 @@ impl FrameTap {
         self.enabled
     }
 
+    /// Whether the next frame would be captured, so a host can avoid retaining a
+    /// draw list for a frame the rate limit would skip.
+    pub fn wants_frame(&self) -> bool {
+        self.enabled
+            && self.sink.is_wired()
+            && (self.now)() - self.last_capture_at >= self.min_frame_interval
+    }
+
     pub fn start(&mut self, fps: f64, quality: f64, scale: f64) {
         self.scale = if scale.is_finite() {
             scale.clamp(1.0, 3.0)

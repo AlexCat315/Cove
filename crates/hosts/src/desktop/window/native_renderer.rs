@@ -24,7 +24,8 @@ pub struct AppWindowRenderSettings {
     pub clear_color: [f32; 4],
 }
 
-/// Presentation ownership for one window.
+/// Presentation ownership for one window. Runs on the render thread, where its
+/// calls may wait on the GPU and the display.
 pub trait AppWindowRenderer {
     fn is_configured(&self) -> bool;
     fn memory_snapshot(&self) -> AppWindowMemorySnapshot;
@@ -35,12 +36,15 @@ pub trait AppWindowRenderer {
         vsync: bool,
     ) -> RhiResult<()>;
     fn resize(&mut self, size: (u32, u32), vsync: bool) -> RhiResult<()>;
-    /// Present `list`. A threaded renderer takes the list's contents and hands
-    /// back a recycled buffer, so callers reset the list before reusing it.
+    /// Present `list`, returning false when presentation was skipped.
     fn draw(&mut self, list: &mut DrawList, logical: (f32, f32)) -> RhiResult<bool>;
     /// Write copied font-atlas regions before the next frame is encoded.
     fn upload_font_atlas(&mut self, upload: FontAtlasUpload) -> RhiResult<()>;
     fn set_presentation_active(&mut self, active: bool) -> RhiResult<()>;
+    /// Releases what the next frame can rebuild.
+    fn trim_memory(&mut self) -> RhiResult<()> {
+        Ok(())
+    }
     fn close(&mut self) -> RhiResult<()>;
 }
 

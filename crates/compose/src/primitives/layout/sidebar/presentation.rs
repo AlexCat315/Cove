@@ -24,6 +24,15 @@ impl SidebarPresentation {
         }
     }
 
+    /// Canvas between the pane's edges and everything it lays out, so rows,
+    /// section titles and the header and footer slots share one column.
+    pub fn gutter(self) -> f32 {
+        match self {
+            Self::Expanded => 10.0,
+            Self::Rail { .. } => 6.0,
+        }
+    }
+
     pub fn is_rail(self) -> bool {
         self.rail_width().is_some()
     }
@@ -217,12 +226,14 @@ impl PrimitiveView for SidebarToggleFloor {
         let layout = cove_core::scene::LayoutNode::new();
         layout.set_min_width(Some(44.0));
         layout.set_min_height(Some(44.0));
+        layout.set_justify_content(cove_core::scene::Justify::Center);
         Some(layout)
     }
 
     fn update_layout(&self, layout: &cove_core::scene::LayoutNode) {
         layout.set_min_width(Some(44.0));
         layout.set_min_height(Some(44.0));
+        layout.set_justify_content(cove_core::scene::Justify::Center);
     }
 
     fn update_node(&self, _node: &cove_core::scene::Node) {}

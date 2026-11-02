@@ -3,29 +3,28 @@
 use super::AndroidApplication;
 use super::content::scene::HostedScene;
 use super::frame::gpu_timings::GpuTimingReporter;
-use super::frame::timings::{FrameTimings, Phase};
+use super::frame::timings::FrameTimings;
+use super::frame::window_renderer::{AndroidWindowRenderer, FrameSample, SurfaceLaunchInfo};
 use crate::android::contract::frame_clock::DisplayFramePacer;
-use cove_core::DrawList;
-use cove_graphics::rhi::{
-    CommandBuffer, Device, QueueClass, RenderColorTarget, RhiResult, SurfaceDescriptor, Swapchain,
-    TextureDescriptor, TextureFormat, TextureResource, TextureUsage,
-};
-use cove_graphics::ui::NativeDrawListRenderer;
-use cove_graphics::ui::NativeUIViewport;
-use cove_logging::{Level, LogEvent, LogSystem};
+use crate::desktop::rendering::ThreadedWindowRenderer;
+use cove_graphics::rhi::{Device, RhiResult, TextureFormat};
+use cove_graphics::ui::{FontAtlasUpload, NativeDrawListRenderer};
+use cove_shell::NativeRenderSurface;
 use std::cell::{Ref, RefCell, RefMut};
 use std::rc::Rc;
 use std::sync::Arc;
+use std::sync::mpsc::{Sender, channel};
+use std::time::Instant;
 
-/// JNI serializes this surface's GPU and scene operations on the UI thread.
+/// JNI serializes this surface's scene operations on the UI thread; GPU work runs
+/// on the surface's render thread.
 pub struct SurfaceSession {
     application: Rc<AndroidApplication>,
-    swapchain: Swapchain,
     pixels: (usize, usize),
     clock: DisplayFramePacer,
-    timings: FrameTimings,
     gpu_timings: GpuTimingReporter,
-    framebuffer: Option<TextureResource>,
+    window_renderer: Rc<RefCell<ThreadedWindowRenderer>>,
+    frame_samples: Sender<FrameSample>,
 }
 
 impl SurfaceSession {
@@ -36,44 +35,52 @@ impl SurfaceSession {
         height: usize,
     ) -> Result<Self, String> {
         let device: Arc<Device> = application.device();
-        let timings = FrameTimings::new(application.runtime().timings);
         let gpu_timings = GpuTimingReporter::new(&device, application.runtime().timings);
         let vsync = application.runtime().vsync;
-        let swapchain = device
-            .with_frame_session(|| {
-                device.make_swapchain(
-                    SurfaceDescriptor::new(window)
-                        .with_size(width, height)
-                        .with_vsync(vsync),
-                )
-            })
-            .map_err(|error| error.to_string())?;
-        application.scene().borrow().invalidate();
-        let presentation = device.presentation_mode(swapchain).ok();
-        LogSystem::logger("com.cove.android.surface").log(&LogEvent::new(
-            Level::Info,
-            format!(
-                "OPEN {} {}x{} vsyncRequested={} presentMode={} displaySynchronized={} benchmark={} gpuTimings={}",
-                device.device_name(),
-                width,
-                height,
+        let presentation = {
+            let root = application.renderer();
+            device
+                .with_frame_session(|| {
+                    root.borrow().make_presentation_renderer(
+                        TextureFormat::Rgba8Unorm,
+                        application.samples(),
+                    )
+                })
+                .map_err(|error| error.to_string())?
+        };
+        let (frame_samples, samples) = channel();
+        let mut window_renderer = ThreadedWindowRenderer::spawn(
+            Box::new(AndroidWindowRenderer::new(
+                device,
+                presentation,
+                application.samples(),
+                application.clear_color(),
+                FrameTimings::new(application.runtime().timings),
+                samples,
+                SurfaceLaunchInfo {
+                    benchmark: application.runtime().benchmark,
+                    gpu_timings: gpu_timings.is_recording(),
+                },
+            )),
+            "android-surface",
+        );
+        window_renderer
+            .configure(
+                NativeRenderSurface::AndroidWindow(window),
+                (width as u32, height as u32),
                 vsync,
-                presentation.map_or_else(|| "unavailable".to_owned(), |mode| format!("{mode:?}")),
-                presentation
-                    .map(|mode| mode.synchronizes_to_display().to_string())
-                    .unwrap_or_else(|| "unavailable".to_owned()),
-                application.runtime().benchmark,
-                gpu_timings.is_recording()
-            ),
-        ));
+            )
+            .map_err(|error| error.to_string())?;
+        let window_renderer = Rc::new(RefCell::new(window_renderer));
+        application.attach_window_renderer(&window_renderer);
+        application.scene().borrow().invalidate();
         Ok(Self {
             application,
-            swapchain,
             pixels: (width, height),
             clock: DisplayFramePacer::default(),
-            timings,
             gpu_timings,
-            framebuffer: None,
+            window_renderer,
+            frame_samples,
         })
     }
 
@@ -101,7 +108,15 @@ impl SurfaceSession {
         self.application.scale()
     }
 
+    /// Prepares the scene and hands its draw list to the render thread. Returns
+    /// whether a frame was handed over; with every frame in flight the callback
+    /// returns at once and the next vsync tries again.
     pub fn frame(&mut self, timestamp: u64) -> Result<bool, String> {
+        self.collect_presented()
+            .map_err(|error| error.to_string())?;
+        if !self.window_renderer.borrow().has_frame_capacity() {
+            return Ok(false);
+        }
         let needs_frame =
             self.application.runtime().benchmark || self.application.scene().borrow().needs_frame();
         let Some(delta_time) =
@@ -112,120 +127,50 @@ impl SurfaceSession {
         };
         let scale = self.scale();
         let pixels = self.pixels;
-        self.timings.begin();
-        {
-            let mut scene = self.application.scene().borrow_mut();
-            self.timings.measure(Phase::ScenePrepare, || {
-                scene.prepare(pixels, scale, delta_time);
-            });
-        }
-        let device = self.application.device();
-        let result = device
-            .with_frame_session(|| self.present_frame())
+        let prepare_start = Instant::now();
+        self.application
+            .scene()
+            .borrow_mut()
+            .prepare(pixels, scale, delta_time);
+        let prepare_nanos = prepare_start.elapsed().as_nanos() as u64;
+        let submitted = self
+            .submit(timestamp, prepare_nanos)
             .map_err(|error| error.to_string())?;
-        let (vertices, indices) = {
-            let scene = self.application.scene().borrow();
-            let list: &DrawList = scene.list();
-            (list.vertices().len(), list.indices().len())
-        };
-        self.timings.finish(timestamp, vertices, indices);
+        if submitted {
+            self.application.scene().borrow_mut().did_present();
+        }
         self.gpu_timings.tick(timestamp);
-        Ok(result)
+        Ok(submitted)
     }
 
-    fn present_frame(&mut self) -> RhiResult<bool> {
-        let device: Arc<Device> = self.application.device();
-        let renderer = self.application.renderer();
-        self.timings
-            .measure_result(Phase::FrameSlot, || device.begin_frame())?;
-        struct EndFrame<'a> {
-            device: &'a Device,
+    fn collect_presented(&mut self) -> RhiResult<()> {
+        let frames = self.window_renderer.borrow_mut().take_presented()?;
+        if frames.iter().any(|frame| !frame.presented) {
+            self.application.scene().borrow().invalidate();
         }
-        impl Drop for EndFrame<'_> {
-            fn drop(&mut self) {
-                self.device.end_frame();
-            }
-        }
-        let _end = EndFrame { device: &device };
-        let image = self.timings.measure_result(Phase::DrawableAcquire, || {
-            device.acquire_swapchain_image(self.swapchain)
-        })?;
-        let atlas = self.application.scene().borrow().font_atlas();
-        self.timings.measure_result(Phase::AtlasUpload, || {
-            renderer.borrow().upload_font_atlas(&atlas, 1)
-        })?;
-        // A frosted panel samples what is already behind it, and a swapchain
-        // image is a render target that cannot be sampled. Only pay for the
-        // owned texture — and the blit that follows — on frames that really
-        // have a panel doing the sampling; the rest render straight into the
-        // drawable.
-        let list: DrawList = self.application.scene().borrow().list().clone();
-        let frosted = renderer.borrow().supports_backdrop()
-            && list.batches().iter().any(|batch| batch.backdrop.is_some());
-        if !frosted {
-            self.framebuffer = None;
-        } else if self.framebuffer.as_ref().is_none_or(|buffer| {
-            let descriptor = buffer.descriptor();
-            descriptor.width != image.width || descriptor.height != image.height
-        }) {
-            self.framebuffer = Some(TextureResource::new(
-                device.clone(),
-                TextureDescriptor::new(
-                    image.width,
-                    image.height,
-                    TextureFormat::Rgba8Unorm,
-                    TextureUsage::COLOR_TARGET | TextureUsage::SAMPLED,
-                )
-                .with_label("android-ui-framebuffer"),
-            )?);
-        }
-        let logical = self.application.scene().borrow().size();
-        let viewport = NativeUIViewport::new([image.width, image.height], [logical.0, logical.1]);
-        let mut commands = CommandBuffer::new();
-        let framebuffer_texture = self.framebuffer.as_ref().map(|buffer| buffer.texture());
-        let target_texture = framebuffer_texture.unwrap_or(image.texture);
-        let target = framebuffer_texture.is_some();
-        let record = self
-            .timings
-            .measure_result(Phase::CommandRecord, || -> RhiResult<_> {
-                let mut renderer = renderer.borrow_mut();
-                let frame = renderer.record(
-                    &list,
-                    &mut commands,
-                    RenderColorTarget::clearing(target_texture, self.application.clear_color()),
-                    viewport,
-                    framebuffer_texture,
-                )?;
-                if target {
-                    renderer.record_blit(
-                        target_texture,
-                        &mut commands,
-                        RenderColorTarget::new(image.texture),
-                        [image.width, image.height],
-                    )?;
-                }
-                Ok(frame)
-            });
-        let frame = record?;
-        self.timings.measure_result(Phase::QueueSubmit, || {
-            device.submit(&commands, QueueClass::Graphics, &[], &[], None)
-        })?;
-        let mut frame = frame;
-        frame.did_submit();
-        atlas.mark_clean();
-        self.timings
-            .measure_result(Phase::Present, || device.present(image))?;
-        self.application.scene().borrow_mut().did_present();
-        Ok(true)
+        Ok(())
     }
 
-    pub fn close(&mut self) {
-        let device = self.application.device();
-        let _ = device.with_frame_session(|| {
-            let _ = device.wait_until_idle();
-            device.destroy_swapchain(self.swapchain);
-            Ok(())
+    fn submit(&mut self, timestamp: u64, prepare_nanos: u64) -> RhiResult<bool> {
+        let mut renderer = self.window_renderer.borrow_mut();
+        let scene = self.application.scene().borrow();
+        // Ordered with the frame, so the glyphs land before they are sampled.
+        if let Some(upload) = FontAtlasUpload::take(&scene.font_atlas(), 1)? {
+            renderer.upload_font_atlas(upload)?;
+        }
+        let logical = scene.size();
+        let mut list = scene.list().clone();
+        drop(scene);
+        let _ = self.frame_samples.send(FrameSample {
+            timestamp,
+            prepare_nanos,
         });
-        LogSystem::logger("com.cove.android.surface").log(&LogEvent::new(Level::Info, "CLOSE"));
+        Ok(renderer.submit(&mut list, logical)?.is_some())
+    }
+
+    /// Waits for the render thread to release the swapchain, within a bound; the
+    /// caller releases its window reference right after.
+    pub fn close(&mut self) {
+        let _ = self.window_renderer.borrow_mut().close();
     }
 }

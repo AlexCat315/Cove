@@ -10,9 +10,9 @@
 //! the correct avoidance without a letterboxed surface.
 use crate::Scope;
 use crate::adaptive::SurfaceEnvironment;
-use crate::modifiers::layout::{EdgeInsets, FlexExt, LayoutFrameExt};
+use crate::modifiers::layout::{EdgeInsets, FillUnlessSizedModifier, FlexExt, LayoutFrameExt};
 use crate::theme::{TextScaler, TextScalerEnvironment, node_text_scaler};
-use crate::{AnyView, BoxView, PrimitiveView, View, impl_primitive_view};
+use crate::{AnyView, BoxView, PrimitiveView, View, ViewExt, impl_primitive_view};
 use cove_core::scene::ReducedMotionEnvironment;
 use cove_core::scene::{Align, FlexDirection, Justify, Wrap};
 
@@ -60,7 +60,7 @@ impl View for SurfaceRoot {
                 Justify::FlexStart,
                 Wrap::NoWrap,
                 0.0,
-                AnyView::new(self.content.clone().flex_with(1.0, 1.0, Some(0.0))),
+                AnyView::new(self.content.clone().modifier(FillUnlessSizedModifier)),
             )
             .flex_with(1.0, 1.0, Some(0.0))
             .frame(None, None, Some(0.0), Some(0.0), None, None),

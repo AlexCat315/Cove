@@ -280,6 +280,44 @@ fn the_gallery_shell_materializes_with_a_selected_story() {
 }
 
 #[test]
+fn the_sidebar_lays_its_slots_and_rows_on_one_column() {
+    scene(
+        1280.0,
+        820.0,
+        GalleryPage::Checkbox,
+        Appearance::Light,
+        |scene| {
+            let labelled = |label: &str| {
+                scene
+                    .first(|node| {
+                        node.is_hit_testable()
+                            && node
+                                .accessibility()
+                                .is_some_and(|semantics| semantics.label == label)
+                    })
+                    .unwrap_or_else(|| panic!("{label} is mounted"))
+                    .absolute_frame()
+            };
+            for frame in [
+                scene.require_named("gallery-search").absolute_frame(),
+                labelled("Dashboard"),
+                labelled("Checkbox"),
+                scene.require_named("gallery-theme").absolute_frame(),
+            ] {
+                assert_eq!(frame.x, 10.0, "{frame:?}");
+                assert_eq!(frame.width, 220.0, "{frame:?}");
+            }
+            let toggle = labelled("Collapse sidebar");
+            let search = scene.require_named("gallery-search").absolute_frame();
+            assert!(
+                toggle.max_y() <= search.y && toggle.max_x() == 230.0,
+                "the collapse toggle sits at the trailing end of the top row: {toggle:?}"
+            );
+        },
+    );
+}
+
+#[test]
 fn the_placement_playground_keeps_its_trigger_inside_the_story() {
     // GAP(placement_example.rs): Swift's `PopoverPlacementExample` rendered a
     // `popover-placement-preview` box holding twelve per-placement trigger

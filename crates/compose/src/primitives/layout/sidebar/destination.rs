@@ -298,7 +298,8 @@ impl<Id: PartialEq + Eq + std::hash::Hash + Clone + Send + Sync + 'static> Primi
             None,
         )
         .button_style(SidebarItemStyle { minimum_height })
-        .frame(None, None, None, Some(minimum_height), None, None);
+        .flex_with(1.0, 1.0, None)
+        .frame(None, None, Some(0.0), Some(minimum_height), None, None);
 
         let row_label = label.clone();
         let mut column: Vec<AnyView> = vec![AnyView::new(AnyView::new(button).with_modifier(

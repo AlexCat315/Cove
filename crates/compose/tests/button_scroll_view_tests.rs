@@ -1122,10 +1122,8 @@ fn menu_item_interaction_does_not_recompose() {
 
         hover(HoverPhase::Enter);
         assert!(
-            !graph.recomposer.has_pending(),
-            "GAP: Swift commits the pointer highlight through state (one pending \
-             recomposition that also updates the row's foreground); Rust applies the \
-             hover highlight to the row's render state only"
+            graph.recomposer.has_pending(),
+            "the pointer highlight commits through state: one pending recomposition"
         );
         assert!(graph.tree.borrow().has_render_updates());
         assert_eq!(item.attachment::<bool>("__menu_item_hovered"), Some(true));

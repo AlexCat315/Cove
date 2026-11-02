@@ -28,4 +28,4 @@ pub use presentation::{SidebarPresentation, SidebarResizeOptions, SidebarToggle}
 pub use rail::{RailDestination, SidebarRail};
 pub use resize_handle::SidebarResizeHandle;
 pub use resizing::{clamp_width, resolved_width};
-pub use sidebar::Sidebar;
+pub use sidebar::{Sidebar, SidebarItemStyle};

@@ -145,8 +145,11 @@ impl DevServer {
         self.transport.start(
             &self.config.host,
             self.config.port,
+            // The event-driven host loop sleeps until it is woken, so a request
+            // must wake it or it waits for the next unrelated input.
             Arc::new(move |event| {
                 let _ = sender_handle.send(event);
+                cove_core::scene::wake_scene_thread();
             }),
         )?;
         let _ = (capabilities, config);

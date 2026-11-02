@@ -50,6 +50,7 @@ pub struct AdaptiveSidebar<Id: PartialEq + Eq + std::hash::Hash + Clone + Send +
     pub local_presentation: cove_core::State<bool>,
     pub local_collapse: cove_core::State<bool>,
     pub focus: Rc<SidebarFocusHandoff>,
+    brand: AnyView,
     header: AnyView,
     footer: AnyView,
     content: AnyView,
@@ -69,6 +70,7 @@ struct AdaptiveSnapshot<Id: PartialEq + Eq + std::hash::Hash + Clone + Send + Sy
     local_presentation: cove_core::State<bool>,
     local_collapse: cove_core::State<bool>,
     focus: Rc<SidebarFocusHandoff>,
+    brand: AnyView,
     header: AnyView,
     footer: AnyView,
     content: AnyView,
@@ -205,8 +207,48 @@ impl<Id: PartialEq + Eq + std::hash::Hash + Clone + Send + Sync + 'static> Adapt
                         )),
                     ])),
                 )
-                .padding_edges(12.0, 4.0),
+                .padding_edges(0.0, 4.0),
             ));
+        }
+        // The top row: the application's identity with the collapse toggle at its
+        // trailing edge, where the opener sits once the pane is a rail.
+        if geometry.mode == SidebarMode::Expanded {
+            let collapse = self.collapse.clone();
+            let local = self.local_collapse.clone();
+            header_children.push(AnyView::new(
+                BoxView::new(
+                    FlexDirection::Row,
+                    Align::Center,
+                    Justify::FlexStart,
+                    Wrap::NoWrap,
+                    0.0,
+                    AnyView::new(TupleView::new(vec![
+                        AnyView::new(
+                            BoxView::new(
+                                FlexDirection::Column,
+                                Align::Stretch,
+                                Justify::Center,
+                                Wrap::NoWrap,
+                                0.0,
+                                self.brand.clone(),
+                            )
+                            .flex_with(1.0, 1.0, None)
+                            .frame_min_width(0.0),
+                        ),
+                        AnyView::new(SidebarToggle::new(
+                            self.options.collapse_label.clone(),
+                            true,
+                            move || match collapse.as_ref() {
+                                Some(binding) => binding.set(true),
+                                None => local.set(true),
+                            },
+                        )),
+                    ])),
+                )
+                .flex_with(0.0, 0.0, None),
+            ));
+        } else if is_modal {
+            header_children.push(self.brand.clone());
         }
         header_children.push(self.header.clone());
 
@@ -231,7 +273,7 @@ impl<Id: PartialEq + Eq + std::hash::Hash + Clone + Send + Sync + 'static> Adapt
             sidebar = sidebar.expanded(expanded);
         }
 
-        let mut column: Vec<AnyView> = vec![AnyView::new(
+        let column: Vec<AnyView> = vec![AnyView::new(
             AnyView::new(sidebar).flex_with(1.0, 1.0, Some(0.0)).frame(
                 None,
                 None,
@@ -241,18 +283,6 @@ impl<Id: PartialEq + Eq + std::hash::Hash + Clone + Send + Sync + 'static> Adapt
                 None,
             ),
         )];
-        if geometry.mode == SidebarMode::Expanded {
-            let collapse = self.collapse.clone();
-            let local = self.local_collapse.clone();
-            column.push(AnyView::new(SidebarToggle::new(
-                self.options.collapse_label.clone(),
-                true,
-                move || match collapse.as_ref() {
-                    Some(binding) => binding.set(true),
-                    None => local.set(true),
-                },
-            )));
-        }
         let title = self.title.clone();
         AnyView::new(
             BoxView::new(
@@ -321,6 +351,7 @@ impl<Id: PartialEq + Eq + std::hash::Hash + Clone + Send + Sync + 'static> Adapt
             local_presentation: cove_core::State::new(false),
             local_collapse: cove_core::State::new(false),
             focus: Rc::new(SidebarFocusHandoff::default()),
+            brand: AnyView::new(cove_composition::EmptyView),
             header: AnyView::new(cove_composition::EmptyView),
             footer: AnyView::new(cove_composition::EmptyView),
             content: AnyView::new(cove_composition::EmptyView),
@@ -330,6 +361,13 @@ impl<Id: PartialEq + Eq + std::hash::Hash + Clone + Send + Sync + 'static> Adapt
     /// The pane the sidebar navigates.
     pub fn content(mut self, content: impl View + 'static) -> Self {
         self.content = AnyView::new(content);
+        self
+    }
+
+    /// The application's identity, sharing the top row with the collapse toggle.
+    /// A rail has no room for it.
+    pub fn brand(mut self, brand: impl View + 'static) -> Self {
+        self.brand = AnyView::new(brand);
         self
     }
 
@@ -387,6 +425,7 @@ impl<Id: PartialEq + Eq + std::hash::Hash + Clone + Send + Sync + 'static> Adapt
             local_presentation: self.local_presentation.clone(),
             local_collapse: self.local_collapse.clone(),
             focus: self.focus.clone(),
+            brand: self.brand.clone(),
             header: self.header.clone(),
             footer: self.footer.clone(),
             content: self.content.clone(),

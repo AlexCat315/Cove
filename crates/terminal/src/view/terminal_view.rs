@@ -362,11 +362,16 @@ impl TerminalView {
                             KeyRouting::Text => EventResult::Handled,
                             KeyRouting::Host => EventResult::Ignored,
                             KeyRouting::Paste => {
-                                if let Some(text) = cove_core::scene::ClipboardHolder::read()
-                                    && !text.is_empty()
-                                {
-                                    key_session.paste(&text);
-                                }
+                                let session = key_session.clone();
+                                cove_core::scene::ClipboardHolder::request_read(Box::new(
+                                    move |text| {
+                                        if let Some(text) = text
+                                            && !text.is_empty()
+                                        {
+                                            session.paste(&text);
+                                        }
+                                    },
+                                ));
                                 EventResult::Handled
                             }
                             KeyRouting::Copy => {

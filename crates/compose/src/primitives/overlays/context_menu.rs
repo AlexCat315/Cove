@@ -98,11 +98,16 @@ impl View for ContextMenu {
                     // command; otherwise the self-drawn panel is presented.
                     if !sheet && NativeMenuPresenter::is_installed() {
                         let built = NativeMenuBuilder::build(&entries());
-                        if let Some(chosen) =
-                            NativeMenuPresenter::present(&built.snapshot, position)
-                        {
-                            built.run(chosen);
-                        }
+                        let snapshot = built.snapshot.clone();
+                        NativeMenuPresenter::present(
+                            &snapshot,
+                            position,
+                            Box::new(move |chosen| {
+                                if let Some(chosen) = chosen {
+                                    built.run(chosen);
+                                }
+                            }),
+                        );
                     } else {
                         point.set(Some(position));
                     }

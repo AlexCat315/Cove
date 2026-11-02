@@ -96,6 +96,8 @@ pub struct MenuNavigationState {
 /// Shared session for a menu level and its child portals.
 pub struct MenuSession {
     navigation: RefCell<MenuNavigationState>,
+    /// Advances with every navigation change, so the rows repaint their highlight.
+    pub revision: cove_core::State<u64>,
     scroll_offset: Cell<(u32, u32)>,
     pub hover_intent: Rc<MenuHoverIntent>,
     pub typeahead: RefCell<MenuTypeahead>,
@@ -106,6 +108,7 @@ impl MenuSession {
     pub fn new() -> Rc<Self> {
         Rc::new(Self {
             navigation: RefCell::new(MenuNavigationState::default()),
+            revision: cove_core::State::new(0),
             scroll_offset: Cell::new((0, 0)),
             hover_intent: MenuHoverIntent::new(),
             typeahead: RefCell::new(MenuTypeahead::new()),
@@ -122,6 +125,7 @@ impl MenuSession {
             return;
         }
         *self.navigation.borrow_mut() = value;
+        self.revision.update(|revision| *revision = revision.wrapping_add(1));
     }
 
     pub fn scroll_offset(&self) -> cove_core::Point {

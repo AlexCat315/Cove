@@ -13,15 +13,7 @@
 //! required — only the serialisation every suite that installs the process-wide
 //! scene holders needs.
 //!
-//! Remaining difference (reported, not fixed here):
-//!
-//! - `GAP: safe-area-padding-ignores-republished-metrics`. Since
-//!   `AndroidAdaptiveSurface` declares its `dynamic_properties`,
-//!   `update_surface` recomposes and `SurfaceReader` sees the new idiom,
-//!   keyboard height and text scale. `SafeArea` padding, however, still
-//!   resolves against the first frame's metrics, so publishing a top inset or
-//!   an open keyboard leaves the content bounds unchanged; Swift re-resolved
-//!   the padding on every `updateSurface`.
+//! `SafeArea` padding re-resolves on every `update_surface`, as in Swift.
 
 use cove_composition::Scope;
 use cove_composition::adaptive::SurfaceReader;
@@ -268,7 +260,7 @@ fn surface_metrics_reach_composed_content() {
 }
 
 #[test]
-fn safe_area_padding_stays_at_the_first_frame_metrics() {
+fn safe_area_padding_follows_republished_metrics() {
     Lock::with(|| {
         let mut session = session(1.0);
         // A zero-inset, keyboard-free first frame so the padding baseline is the
@@ -300,8 +292,8 @@ fn safe_area_padding_stays_at_the_first_frame_metrics() {
         let after = content(&session);
         assert_eq!(
             (after.x, after.y, after.width, after.height),
-            (baseline.x, baseline.y, baseline.width, baseline.height),
-            "GAP: safe-area-padding-ignores-republished-metrics — publishing a 59 point top inset and a 336 point keyboard leaves the content bounds untouched"
+            (0.0, 59.0, 393.0, 457.0),
+            "the content sits below the 59 point inset and above the 336 point keyboard, which overlays the 34 point bottom inset"
         );
     });
 }
@@ -350,8 +342,6 @@ fn logical_size_and_scale_follow_rotation_and_density() {
             "repeating identical surface facts does not queue a frame"
         );
 
-        let before_rotation = content(&session);
-
         session.suspend();
         session.prepare((2400, 1200), 3.0, 0.0);
         assert_eq!(
@@ -363,12 +353,14 @@ fn logical_size_and_scale_follow_rotation_and_density() {
 
         let after_rotation = content(&session);
         assert_eq!(
-            after_rotation.width, 800.0,
-            "the stretching root follows the rotated 800 point viewport"
-        );
-        assert_eq!(
-            after_rotation.height, before_rotation.height,
-            "GAP: safe-area-padding-ignores-republished-metrics — the padded extent ignores the rotated safe area and keyboard"
+            (
+                after_rotation.x,
+                after_rotation.y,
+                after_rotation.width,
+                after_rotation.height
+            ),
+            (10.0, 24.0, 790.0, 176.0),
+            "the padded extent follows the rotated 800x400 viewport, its insets and the keyboard"
         );
         assert!(
             publishes(&session, "probe-idiom-phone"),

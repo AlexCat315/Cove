@@ -8,8 +8,17 @@
 #include <string.h>
 struct CoveShellWindow { SDL_Window *window; void *metal_view,*layer,*apple; SDL_Cursor *cursors[12]; CoveShellChrome chrome; CoveShellRect *drag,*non_drag; bool has_chrome; };
 static SDL_AtomicInt wake_pending;
+static SDL_AtomicInt wake_lost;
 static SDL_AtomicInt initialized;
 static uint32_t wake_type;
+bool cove_shell_is_main_thread(void) { return SDL_IsMainThread(); }
+#if defined(COVE_ASSERT_MAIN_THREAD)
+void cove_shell_assert_main_thread(const char *function) {
+    if (SDL_IsMainThread()) return;
+    SDL_LogCritical(SDL_LOG_CATEGORY_APPLICATION,"%s called off the application main thread",function);
+    abort();
+}
+#endif
 static uint16_t modifiers(SDL_Keymod value) {
     return ((value & SDL_KMOD_LSHIFT)?1:0) | ((value & SDL_KMOD_RSHIFT)?2:0) | ((value & SDL_KMOD_LCTRL)?4:0) | ((value & SDL_KMOD_RCTRL)?8:0) | ((value & SDL_KMOD_LALT)?16:0) | ((value & SDL_KMOD_RALT)?32:0) | ((value & SDL_KMOD_LGUI)?64:0) | ((value & SDL_KMOD_RGUI)?128:0);
 }
@@ -27,9 +36,9 @@ bool cove_shell_init(void) {
     wake_type = SDL_RegisterEvents(1); if (wake_type == (uint32_t)-1) { SDL_Quit(); return false; }
     SDL_SetAtomicInt(&initialized,1); return true;
 }
-void cove_shell_quit(void) { if (SDL_GetAtomicInt(&initialized)) { SDL_Quit(); SDL_SetAtomicInt(&initialized,0); SDL_SetAtomicInt(&wake_pending,0); } }
+void cove_shell_quit(void) { COVE_ASSERT_MAIN(); if (SDL_GetAtomicInt(&initialized)) { SDL_Quit(); SDL_SetAtomicInt(&initialized,0); SDL_SetAtomicInt(&wake_pending,0); SDL_SetAtomicInt(&wake_lost,0); } }
 const char *cove_shell_error(void) { return SDL_GetError(); }
-CoveShellWindow *cove_shell_create(const char *title,int width,int height,bool inset,bool dock) {
+CoveShellWindow *cove_shell_create(const char *title,int width,int height,bool inset,bool dock) { COVE_ASSERT_MAIN();
     if (!cove_shell_init()) return NULL;
 #if defined(__APPLE__)
     cove_shell_apple_prepare(dock);
@@ -58,7 +67,7 @@ CoveShellWindow *cove_shell_create(const char *title,int width,int height,bool i
 #endif
     return handle;
 }
-void cove_shell_destroy(CoveShellWindow *handle) {
+void cove_shell_destroy(CoveShellWindow *handle) { COVE_ASSERT_MAIN();
     if (!handle) return;
     SDL_SetWindowHitTest(handle->window,NULL,NULL);
 #if defined(__APPLE__)
@@ -67,7 +76,7 @@ void cove_shell_destroy(CoveShellWindow *handle) {
     SDL_DestroyWindow(handle->window); for(int i=0;i<12;i++) if(handle->cursors[i]) SDL_DestroyCursor(handle->cursors[i]);
     free(handle->drag);free(handle->non_drag);free(handle);
 }
-bool cove_shell_state(CoveShellWindow *handle,CoveShellWindowState *out) {
+bool cove_shell_state(CoveShellWindow *handle,CoveShellWindowState *out) { COVE_ASSERT_MAIN();
     if (!handle || !out) return false; memset(out,0,sizeof(*out)); SDL_Window *window = handle->window;
     out->id = SDL_GetWindowID(window); SDL_GetWindowSize(window,&out->width,&out->height); SDL_GetWindowSizeInPixels(window,&out->pixel_width,&out->pixel_height); SDL_GetWindowPosition(window,&out->x,&out->y);
     out->scale = SDL_GetWindowDisplayScale(window); if (!isfinite(out->scale) || out->scale < 1) out->scale = 1;
@@ -96,7 +105,7 @@ static float coordinate_scale(uint32_t id) {
     (void)id;return 1;
 #endif
 }
-bool cove_shell_poll(CoveShellEvent *out) {
+bool cove_shell_poll(CoveShellEvent *out) { COVE_ASSERT_MAIN();
     SDL_Event e;
     while(SDL_GetAtomicInt(&initialized) && SDL_PollEvent(&e)) {
         memset(out,0,sizeof(*out)); out->window=e.window.windowID;out->timestamp=(double)e.common.timestamp/1e9;
@@ -146,9 +155,9 @@ bool cove_shell_poll(CoveShellEvent *out) {
     return false;
 }
 void cove_shell_event_free(CoveShellEvent *event) { SDL_free(event->text);event->text=NULL; }
-bool cove_shell_wait(uint64_t timeout) { uint64_t deadline=SDL_GetTicksNS()+SDL_min(timeout,86400000000000ULL);while(SDL_GetAtomicInt(&initialized)){uint64_t now=SDL_GetTicksNS();if(now>=deadline)return false;uint64_t remaining=deadline-now,ms=remaining/1000000;if(ms){if(SDL_WaitEventTimeout(NULL,(int)SDL_min(ms,2147483647)))return true;}else{SDL_DelayNS(remaining);return false;}}return false; }
-void cove_shell_wake(void) { if(SDL_GetAtomicInt(&initialized) && SDL_CompareAndSwapAtomicInt(&wake_pending,0,1)){SDL_Event e;SDL_zero(e);e.type=wake_type;if(!SDL_PushEvent(&e))SDL_SetAtomicInt(&wake_pending,0);} }
-void cove_shell_command(CoveShellWindow *h,int command,int a,int b) {
+bool cove_shell_wait(uint64_t timeout) { COVE_ASSERT_MAIN(); if(SDL_CompareAndSwapAtomicInt(&wake_lost,1,0))return true; uint64_t deadline=SDL_GetTicksNS()+SDL_min(timeout,86400000000000ULL);while(SDL_GetAtomicInt(&initialized)){uint64_t now=SDL_GetTicksNS();if(now>=deadline)return false;uint64_t remaining=deadline-now,ms=remaining/1000000;if(ms){if(SDL_WaitEventTimeout(NULL,(int)SDL_min(ms,2147483647)))return true;}else{SDL_DelayNS(remaining);return false;}}return false; }
+void cove_shell_wake(void) { if(SDL_GetAtomicInt(&initialized) && SDL_CompareAndSwapAtomicInt(&wake_pending,0,1)){SDL_Event e;SDL_zero(e);e.type=wake_type;if(!SDL_PushEvent(&e)){SDL_SetAtomicInt(&wake_lost,1);SDL_SetAtomicInt(&wake_pending,0);}} }
+void cove_shell_command(CoveShellWindow *h,int command,int a,int b) { COVE_ASSERT_MAIN();
     if(!h)return;
 #if defined(__APPLE__)
     if(cove_shell_apple_command(h->apple,command))return;
@@ -164,7 +173,7 @@ static SDL_HitTestResult SDLCALL hit_test(SDL_Window *window,const SDL_Point *po
     if(c->explicit_drag){for(size_t i=0;i<c->drag_count;i++)if(contains(c->drag[i],x,y))return SDL_HITTEST_DRAGGABLE;return SDL_HITTEST_NORMAL;}
     return y>=0&&y<c->title_height&&x>=c->leading&&x<w-c->trailing?SDL_HITTEST_DRAGGABLE:SDL_HITTEST_NORMAL;
 }
-void cove_shell_chrome(CoveShellWindow *h,const CoveShellChrome *chrome){
+void cove_shell_chrome(CoveShellWindow *h,const CoveShellChrome *chrome){ COVE_ASSERT_MAIN();
     if(!h)return;SDL_SetWindowHitTest(h->window,NULL,NULL);free(h->drag);free(h->non_drag);h->drag=h->non_drag=NULL;h->has_chrome=false;
     if(!chrome)return;h->chrome=*chrome;
     if(chrome->drag_count){h->drag=malloc(chrome->drag_count*sizeof(*h->drag));if(!h->drag)return;memcpy(h->drag,chrome->drag,chrome->drag_count*sizeof(*h->drag));}
@@ -174,25 +183,25 @@ void cove_shell_chrome(CoveShellWindow *h,const CoveShellChrome *chrome){
     cove_shell_apple_chrome(h->apple,&h->chrome);
 #endif
 }
-void cove_shell_text_area(CoveShellWindow *h,const float *area){if(!h)return;if(!area){SDL_SetTextInputArea(h->window,NULL,0);SDL_StopTextInput(h->window);return;}SDL_Rect r={(int)fmaxf(0,floorf(area[0])),(int)fmaxf(0,floorf(area[1])),(int)fmaxf(1,ceilf(area[2])),(int)fmaxf(1,ceilf(area[3]))};if(!SDL_TextInputActive(h->window))SDL_StartTextInput(h->window);SDL_SetTextInputArea(h->window,&r,(int)fmaxf(0,roundf(area[4])));}
-void cove_shell_cursor(CoveShellWindow *h,int cursor){static const SDL_SystemCursor ids[]={SDL_SYSTEM_CURSOR_DEFAULT,SDL_SYSTEM_CURSOR_POINTER,SDL_SYSTEM_CURSOR_TEXT,SDL_SYSTEM_CURSOR_CROSSHAIR,SDL_SYSTEM_CURSOR_WAIT,SDL_SYSTEM_CURSOR_PROGRESS,SDL_SYSTEM_CURSOR_NOT_ALLOWED,SDL_SYSTEM_CURSOR_MOVE,SDL_SYSTEM_CURSOR_EW_RESIZE,SDL_SYSTEM_CURSOR_NS_RESIZE,SDL_SYSTEM_CURSOR_NWSE_RESIZE,SDL_SYSTEM_CURSOR_NESW_RESIZE};if(!h||cursor<0||cursor>=12)return;if(!h->cursors[cursor])h->cursors[cursor]=SDL_CreateSystemCursor(ids[cursor]);if(h->cursors[cursor])SDL_SetCursor(h->cursors[cursor]);}
-bool cove_shell_global_pointer(float *x,float *y){if(!SDL_GetAtomicInt(&initialized))return false;SDL_GetGlobalMouseState(x,y);return true;}
-char *cove_shell_clipboard_read(void){return SDL_GetClipboardText();}bool cove_shell_clipboard_write(const char *text){return SDL_SetClipboardText(text);}void cove_shell_free(void *p){SDL_free(p);}
+void cove_shell_text_area(CoveShellWindow *h,const float *area){ COVE_ASSERT_MAIN();if(!h)return;if(!area){SDL_SetTextInputArea(h->window,NULL,0);SDL_StopTextInput(h->window);return;}SDL_Rect r={(int)fmaxf(0,floorf(area[0])),(int)fmaxf(0,floorf(area[1])),(int)fmaxf(1,ceilf(area[2])),(int)fmaxf(1,ceilf(area[3]))};if(!SDL_TextInputActive(h->window))SDL_StartTextInput(h->window);SDL_SetTextInputArea(h->window,&r,(int)fmaxf(0,roundf(area[4])));}
+void cove_shell_cursor(CoveShellWindow *h,int cursor){ COVE_ASSERT_MAIN();static const SDL_SystemCursor ids[]={SDL_SYSTEM_CURSOR_DEFAULT,SDL_SYSTEM_CURSOR_POINTER,SDL_SYSTEM_CURSOR_TEXT,SDL_SYSTEM_CURSOR_CROSSHAIR,SDL_SYSTEM_CURSOR_WAIT,SDL_SYSTEM_CURSOR_PROGRESS,SDL_SYSTEM_CURSOR_NOT_ALLOWED,SDL_SYSTEM_CURSOR_MOVE,SDL_SYSTEM_CURSOR_EW_RESIZE,SDL_SYSTEM_CURSOR_NS_RESIZE,SDL_SYSTEM_CURSOR_NWSE_RESIZE,SDL_SYSTEM_CURSOR_NESW_RESIZE};if(!h||cursor<0||cursor>=12)return;if(!h->cursors[cursor])h->cursors[cursor]=SDL_CreateSystemCursor(ids[cursor]);if(h->cursors[cursor])SDL_SetCursor(h->cursors[cursor]);}
+bool cove_shell_global_pointer(float *x,float *y){ COVE_ASSERT_MAIN();if(!SDL_GetAtomicInt(&initialized))return false;SDL_GetGlobalMouseState(x,y);return true;}
+char *cove_shell_clipboard_read(void){ COVE_ASSERT_MAIN();return SDL_GetClipboardText();}bool cove_shell_clipboard_write(const char *text){ COVE_ASSERT_MAIN();return SDL_SetClipboardText(text);}void cove_shell_free(void *p){SDL_free(p);}
 struct DialogBox{CoveShellDialogCallback callback;void *context;SDL_DialogFileFilter *filters;char *path;size_t count;};
 static void SDLCALL dialog_done(void *raw,const char *const *files,int filter){(void)filter;struct DialogBox *box=raw;box->callback(box->context,files);for(size_t i=0;i<box->count;i++){SDL_free((void*)box->filters[i].name);SDL_free((void*)box->filters[i].pattern);}SDL_free(box->filters);SDL_free(box->path);SDL_free(box);}
-void cove_shell_dialog(CoveShellWindow *window,bool folder,const char *path,const char *const *names,const char *const *patterns,size_t count,bool multiple,CoveShellDialogCallback callback,void *context){
+void cove_shell_dialog(CoveShellWindow *window,bool folder,const char *path,const char *const *names,const char *const *patterns,size_t count,bool multiple,CoveShellDialogCallback callback,void *context){ COVE_ASSERT_MAIN();
     struct DialogBox *box=SDL_calloc(1,sizeof(*box));if(!box){callback(context,NULL);return;}box->callback=callback;box->context=context;box->path=path?SDL_strdup(path):NULL;box->count=count;
     if(count){box->filters=SDL_calloc(count,sizeof(*box->filters));if(!box->filters){box->count=0;dialog_done(box,NULL,0);return;}for(size_t i=0;i<count;i++){box->filters[i].name=SDL_strdup(names[i]);box->filters[i].pattern=SDL_strdup(patterns[i]);}}
     if(folder)SDL_ShowOpenFolderDialog(dialog_done,box,window?window->window:NULL,box->path,false);else SDL_ShowOpenFileDialog(dialog_done,box,window?window->window:NULL,box->filters,(int)count,box->path,multiple);
 }
-bool cove_shell_refresh(CoveShellWindow *h,bool enabled){
+bool cove_shell_refresh(CoveShellWindow *h,bool enabled){ COVE_ASSERT_MAIN();
 #if defined(__APPLE__)
     return h&&cove_shell_apple_refresh(h->apple,enabled);
 #else
     (void)h;(void)enabled;return false;
 #endif
 }
-bool cove_shell_refresh_take(CoveShellWindow *h,double *timestamp,double *target){
+bool cove_shell_refresh_take(CoveShellWindow *h,double *timestamp,double *target){ COVE_ASSERT_MAIN();
 #if defined(__APPLE__)
     return h&&cove_shell_apple_refresh_take(h->apple,timestamp,target);
 #else

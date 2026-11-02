@@ -73,14 +73,14 @@ static int phase_value(unsigned long value) {
 #endif
 }
 @end
-void cove_shell_apple_prepare(bool dock) {
+void cove_shell_apple_prepare(bool dock) {COVE_ASSERT_MAIN();
 #if TARGET_OS_OSX
     [NSApplication.sharedApplication setActivationPolicy:dock?NSApplicationActivationPolicyRegular:NSApplicationActivationPolicyAccessory];
 #else
     (void)dock;
 #endif
 }
-void *cove_shell_apple_attach(void *rawWindow,void *rawLayer,bool inset,bool dock) {
+void *cove_shell_apple_attach(void *rawWindow,void *rawLayer,bool inset,bool dock) {COVE_ASSERT_MAIN();
     cove_shell_apple_prepare(dock);CoveShellAppleWindow *context=[CoveShellAppleWindow new];context.window=(__bridge id)rawWindow;context.layer=(__bridge CAMetalLayer*)rawLayer;
     context.layer.pixelFormat=MTLPixelFormatBGRA8Unorm;context.layer.framebufferOnly=YES;
     if(!windows)windows=[NSMutableDictionary new];
@@ -115,8 +115,8 @@ void *cove_shell_apple_attach(void *rawWindow,void *rawLayer,bool inset,bool doc
 #endif
     return (__bridge_retained void*)context;
 }
-void cove_shell_apple_detach(void *raw) { if(!raw)return;CoveShellAppleWindow *context=CFBridgingRelease(raw);[context stop];[windows removeObjectForKey:@(context.windowID)]; }
-void cove_shell_apple_update(void *raw,CoveShellWindowState *state) {
+void cove_shell_apple_detach(void *raw) {COVE_ASSERT_MAIN(); if(!raw)return;CoveShellAppleWindow *context=CFBridgingRelease(raw);[context stop];[windows removeObjectForKey:@(context.windowID)]; }
+void cove_shell_apple_update(void *raw,CoveShellWindowState *state) {COVE_ASSERT_MAIN();
     CoveShellAppleWindow *context=(__bridge CoveShellAppleWindow*)raw;if(!context)return;context.windowID=state->id;windows[@(state->id)]=context;
     state->native_window=(uintptr_t)(__bridge void*)context.window;
 #if TARGET_OS_OSX
@@ -124,7 +124,7 @@ void cove_shell_apple_update(void *raw,CoveShellWindowState *state) {
 #endif
     context.layer.contentsScale=fmax(1,(double)state->pixel_width/fmax(1,state->width));context.layer.drawableSize=CGSizeMake(state->pixel_width,state->pixel_height);
 }
-bool cove_shell_apple_command(void *raw,int command) {
+bool cove_shell_apple_command(void *raw,int command) {COVE_ASSERT_MAIN();
 #if TARGET_OS_OSX
     NSWindow *window=((__bridge CoveShellAppleWindow*)raw).window;if(!window)return false;
     switch(command){case 3:case 8:[window makeKeyAndOrderFront:nil];[NSApp activateIgnoringOtherApps:YES];return true;case 4:[window performMiniaturize:nil];return true;case 5:if(!window.isZoomed)[window performZoom:nil];return true;case 6:if(window.isMiniaturized)[window deminiaturize:nil];else if(window.isZoomed)[window performZoom:nil];else if(window.styleMask&NSWindowStyleMaskFullScreen)[window toggleFullScreen:nil];return true;case 7:[window orderOut:nil];return true;default:return false;}
@@ -132,7 +132,7 @@ bool cove_shell_apple_command(void *raw,int command) {
     (void)raw;(void)command;return false;
 #endif
 }
-void cove_shell_apple_chrome(void *raw,const CoveShellChrome *chrome) {
+void cove_shell_apple_chrome(void *raw,const CoveShellChrome *chrome) {COVE_ASSERT_MAIN();
     CoveShellAppleWindow *context=(__bridge CoveShellAppleWindow*)raw;if(!context)return;
     context.drag=[NSData dataWithBytes:chrome->drag length:chrome->drag_count*sizeof(CoveShellRect)];context.nonDrag=[NSData dataWithBytes:chrome->non_drag length:chrome->non_drag_count*sizeof(CoveShellRect)];
     CoveShellChrome owned=*chrome;owned.drag=context.drag.bytes;owned.non_drag=context.nonDrag.bytes;context.chrome=owned;
@@ -140,7 +140,7 @@ void cove_shell_apple_chrome(void *raw,const CoveShellChrome *chrome) {
     [context alignTrafficLights];
 #endif
 }
-bool cove_shell_apple_refresh(void *raw,bool active) {
+bool cove_shell_apple_refresh(void *raw,bool active) {COVE_ASSERT_MAIN();
     CoveShellAppleWindow *context=(__bridge CoveShellAppleWindow*)raw;if(!context)return false;
 #if TARGET_OS_OSX
     NSWindow *window=context.window;active=active&&window.isVisible&&!NSApp.isHidden&&!window.isMiniaturized&&(window.occlusionState&NSWindowOcclusionStateVisible);
@@ -149,31 +149,31 @@ bool cove_shell_apple_refresh(void *raw,bool active) {
         else {NSNumber *number=window.screen.deviceDescription[@"NSScreenNumber"];CVDisplayLinkRef link=NULL;if(!number||CVDisplayLinkCreateWithCGDisplay(number.unsignedIntValue,&link)!=kCVReturnSuccess)return false;
             __weak CoveShellAppleWindow *weak=context;double frequency=CVGetHostClockFrequency();CVReturn status=CVDisplayLinkSetOutputHandler(link,^CVReturn(CVDisplayLinkRef displayLink,const CVTimeStamp *now,const CVTimeStamp *output,CVOptionFlags input,CVOptionFlags *flags){(void)displayLink;(void)input;(void)flags;[weak publish:now->hostTime/frequency target:output->hostTime/frequency];return kCVReturnSuccess;});if(status!=kCVReturnSuccess){CVDisplayLinkRelease(link);return false;}context.videoLink=link;}
     }
-    if(context.videoLink){if(active){if(CVDisplayLinkStart(context.videoLink)!=kCVReturnSuccess)return false;}else CVDisplayLinkStop(context.videoLink);}
+    if(context.videoLink){if(active){if(!CVDisplayLinkIsRunning(context.videoLink)&&CVDisplayLinkStart(context.videoLink)!=kCVReturnSuccess)return false;}else CVDisplayLinkStop(context.videoLink);}
 #else
     UIWindow *window=context.window;active=active&&!window.hidden&&window.windowScene.activationState==UISceneActivationStateForegroundActive;
     if(!context.displayLink){context.displayLink=[CADisplayLink displayLinkWithTarget:context selector:@selector(displayDidRefresh:)];[context.displayLink addToRunLoop:NSRunLoop.mainRunLoop forMode:NSRunLoopCommonModes];}
 #endif
     [context.inboxLock lock];context.enabled=active;if(!active)context.hasTick=NO;[context.inboxLock unlock];context.displayLink.paused=!active;return active;
 }
-bool cove_shell_apple_refresh_take(void *raw,double *timestamp,double *target) {
+bool cove_shell_apple_refresh_take(void *raw,double *timestamp,double *target) {COVE_ASSERT_MAIN();
     CoveShellAppleWindow *context=(__bridge CoveShellAppleWindow*)raw;if(!context)return false;[context.inboxLock lock];BOOL result=context.hasTick;if(result){*timestamp=context.timestamp;*target=context.target;context.hasTick=NO;}[context.inboxLock unlock];return result;
 }
-bool cove_shell_apple_event(CoveShellEvent *event) {
+bool cove_shell_apple_event(CoveShellEvent *event) {COVE_ASSERT_MAIN();
 #if TARGET_OS_OSX
     if(event->kind!=scrollType)return false;CoveShellEvent *wheel=(void*)(uintptr_t)event->identity;if(!wheel)return false;*event=*wheel;free(wheel);return true;
 #else
     (void)event;return false;
 #endif
 }
-bool cove_shell_apple_wheel_owned(uint32_t id) {
+bool cove_shell_apple_wheel_owned(uint32_t id) {COVE_ASSERT_MAIN();
 #if TARGET_OS_OSX
     return windows[@(id)]!=nil;
 #else
     (void)id;return false;
 #endif
 }
-bool cove_shell_apple_shortcut(uint32_t id,int scancode,uint16_t modifiers) {
+bool cove_shell_apple_shortcut(uint32_t id,int scancode,uint16_t modifiers) {COVE_ASSERT_MAIN();
 #if TARGET_OS_OSX
     NSWindow *window=windows[@(id)].window;if(!window||!(modifiers&192))return false;switch(scancode){case 16:[window performMiniaturize:nil];return true;case 26:[window performClose:nil];return true;case 9:if(modifiers&12){[window toggleFullScreen:nil];return true;}default:break;}
 #else
@@ -181,7 +181,7 @@ bool cove_shell_apple_shortcut(uint32_t id,int scancode,uint16_t modifiers) {
 #endif
     return false;
 }
-void cove_shell_apple_flush(void) {[CATransaction flush];}
+void cove_shell_apple_flush(void) {COVE_ASSERT_MAIN();[CATransaction flush];}
 #if TARGET_OS_OSX
 @interface CoveShellMenuTarget : NSObject
 @property(nonatomic) BOOL chosen;
@@ -192,7 +192,7 @@ void cove_shell_apple_flush(void) {[CATransaction flush];}
 - (void)choose:(NSMenuItem*)sender{self.chosen=YES;self.chosenID=sender.tag;}
 @end
 typedef struct {size_t parent;int64_t id;uint32_t kind,flags;const char *title,*key;const uint8_t *png;size_t png_size;} CoveShellMenuItem;
-bool cove_shell_menu_popup(const CoveShellMenuItem *items,size_t count,float x,float y,uintptr_t rawWindow,int64_t *chosen){
+bool cove_shell_menu_popup(const CoveShellMenuItem *items,size_t count,float x,float y,uintptr_t rawWindow,int64_t *chosen){COVE_ASSERT_MAIN();
     CoveShellMenuTarget *target=[CoveShellMenuTarget new];NSMenu *root=[NSMenu new];root.autoenablesItems=NO;
     NSMutableArray<NSMenuItem*> *built=[NSMutableArray arrayWithCapacity:count];
     for(size_t i=0;i<count;i++){

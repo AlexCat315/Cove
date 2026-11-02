@@ -93,11 +93,16 @@ impl<Label: View + Clone + 'static> MenuButton<Label> {
                     return;
                 };
                 let built = NativeMenuBuilder::build(&entries);
-                if let Some(chosen) =
-                    NativeMenuPresenter::present(&built.snapshot, anchor(rect, placement))
-                {
-                    built.run(chosen);
-                }
+                let snapshot = built.snapshot.clone();
+                NativeMenuPresenter::present(
+                    &snapshot,
+                    anchor(rect, placement),
+                    Box::new(move |chosen| {
+                        if let Some(chosen) = chosen {
+                            built.run(chosen);
+                        }
+                    }),
+                );
             },
             ButtonRole::Normal,
             self.is_enabled,

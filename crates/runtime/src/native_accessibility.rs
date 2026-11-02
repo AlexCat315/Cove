@@ -22,219 +22,165 @@ impl NativeAccessibility {
             let bridge = if let Some(bridge) = root.first_resource::<AppleAccessibilityBridge>() {
                 bridge
             } else {
-                let bridge = AppleAccessibilityBridge::new(native);
+                let bridge = AppleAccessibilityBridge::new(native, session.id);
                 root.add_resource(bridge.clone());
                 bridge
             };
-            bridge.update(session, root, timeline);
+            bridge.update(host, session, root, timeline);
         }
         #[cfg(not(any(target_os = "macos", target_os = "ios")))]
         {
             let _ = (host, session, root, timeline);
         }
     }
+    /// Runs the actions assistive technology requested since the last call.
+    pub fn perform_pending() {
+        #[cfg(any(target_os = "macos", target_os = "ios"))]
+        apple::perform_pending();
+    }
 }
 #[cfg(any(target_os = "macos", target_os = "ios"))]
 mod apple {
     use super::*;
-    use std::{
-        any::Any,
-        collections::HashMap,
-        ffi::{CStr, CString, c_char, c_void},
+    use crate::platform::{
+        AccessibilityItem, AccessibilitySnapshot, PlatformCommand, PlatformLink,
+        accessibility::{Presenter, take_actions},
     };
-    #[repr(C)]
-    struct Item {
-        id: u64,
-        parent: u64,
-        role: u32,
-        flags: u32,
-        actions: u32,
-        x: f32,
-        y: f32,
-        width: f32,
-        height: f32,
-        label: *const c_char,
-        value: *const c_char,
-        help: *const c_char,
-        identifier: *const c_char,
-        revision: u64,
+    use cove_platform::WindowId;
+    use std::{any::Any, collections::HashMap, ffi::CString, sync::Arc};
+    thread_local! {
+        static BRIDGES: RefCell<HashMap<u64, Weak<AppleAccessibilityBridge>>> = RefCell::default();
     }
-    unsafe extern "C" {
-        fn cove_runtime_ax_create(
-            window: usize,
-            context: *mut c_void,
-            action: unsafe extern "C" fn(*mut c_void, u64, u32, *const c_char) -> bool,
-            value: unsafe extern "C" fn(*mut c_void, u64) -> *mut c_char,
-            free_value: unsafe extern "C" fn(*mut c_char),
-        ) -> *mut c_void;
-        fn cove_runtime_ax_destroy(bridge: *mut c_void);
-        fn cove_runtime_ax_signature(bridge: *mut c_void, out: *mut f64);
-        fn cove_runtime_ax_update(bridge: *mut c_void, items: *const Item, count: usize) -> usize;
+    pub(super) fn perform_pending() {
+        for action in take_actions() {
+            let bridge = BRIDGES.with(|bridges| {
+                bridges
+                    .borrow()
+                    .get(&action.bridge)
+                    .and_then(Weak::upgrade)
+            });
+            if let Some(bridge) = bridge {
+                bridge.perform(action.element, action.kind, action.value.as_deref());
+            }
+        }
+    }
+    /// Where a window's snapshots go: a presenter on this thread when it owns the
+    /// platform, otherwise the platform thread.
+    enum Target {
+        Direct { window: usize, presenter: RefCell<Option<Presenter>> },
+        Remote(Arc<PlatformLink>),
     }
     #[derive(Clone, PartialEq)]
     struct Signature {
         roots: Vec<ElementId>,
         focused: Option<ElementId>,
         frame: cove_core::Rect,
-        native: [f64; 8],
+        native: [f64; 4],
     }
     pub(super) struct AppleAccessibilityBridge {
-        pointer: Cell<*mut c_void>,
-        context: Cell<*mut c_void>,
+        key: u64,
+        window: WindowId,
+        target: Target,
+        closed: Cell<bool>,
         nodes: RefCell<HashMap<u64, NodeWeak>>,
         session: RefCell<Weak<PlatformWindowSession>>,
         last: RefCell<Option<Signature>>,
         structure: Cell<u64>,
         geometry: Cell<u64>,
         last_time: Cell<f64>,
-        pub updated_element_count: Cell<usize>,
+        /// Provider values re-read only when their revision moves.
+        provided_values: RefCell<HashMap<u64, (u64, CString)>>,
     }
     impl AppleAccessibilityBridge {
-        pub fn new(window: usize) -> Rc<Self> {
+        pub fn new(window: usize, id: WindowId) -> Rc<Self> {
+            static NEXT: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(1);
+            let key = NEXT.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
             let bridge = Rc::new(Self {
-                pointer: Cell::new(std::ptr::null_mut()),
-                context: Cell::new(std::ptr::null_mut()),
+                key,
+                window: id,
+                target: match PlatformLink::current() {
+                    Some(link) => Target::Remote(link),
+                    None => Target::Direct {
+                        window,
+                        presenter: RefCell::new(None),
+                    },
+                },
+                closed: Cell::new(false),
                 nodes: RefCell::new(HashMap::new()),
                 session: RefCell::new(Weak::new()),
                 last: RefCell::new(None),
                 structure: Cell::new(u64::MAX),
                 geometry: Cell::new(u64::MAX),
                 last_time: Cell::new(0.0),
-                updated_element_count: Cell::new(0),
+                provided_values: RefCell::default(),
             });
-            unsafe extern "C" fn action(
-                context: *mut c_void,
-                id: u64,
-                kind: u32,
-                value: *const c_char,
-            ) -> bool {
-                std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-                    // SAFETY: bridge owns a boxed Weak until native callbacks are invalidated.
-                    let bridge =
-                        unsafe { &*context.cast::<Weak<AppleAccessibilityBridge>>() }.upgrade();
-                    let Some(bridge) = bridge else {
-                        return false;
-                    };
-                    let session = bridge.session.borrow().upgrade();
-                    let Some(session) = session else {
-                        return false;
-                    };
-                    let weak = bridge.nodes.borrow().get(&id).cloned();
-                    let Some(node) = weak.as_ref().and_then(Node::upgrade) else {
-                        return false;
-                    };
-                    if !node.accepts_subtree_input()
-                        || !node.accessibility().is_some_and(|s| s.state.is_enabled)
-                        || !session.input_context.focus_chain.permits_input(&node)
-                    {
-                        return false;
-                    }
-                    let actions = node.accessibility_actions();
-                    let handled = session.with_current(|| match kind {
-                        1 => {
-                            if let Some(f) = actions.activate {
-                                f();
-                                true
-                            } else {
-                                false
-                            }
-                        }
-                        2 => {
-                            if let Some(f) = actions.set_value {
-                                if value.is_null() {
-                                    return false;
-                                } // SAFETY: native setter passes a NUL terminated UTF-8 value for this synchronous callback.
-                                let text = unsafe { CStr::from_ptr(value) }.to_string_lossy();
-                                f(&text);
-                                true
-                            } else {
-                                false
-                            }
-                        }
-                        3 => {
-                            if let Some(f) = actions.increment {
-                                f();
-                                true
-                            } else {
-                                false
-                            }
-                        }
-                        4 => {
-                            if let Some(f) = actions.decrement {
-                                f();
-                                true
-                            } else {
-                                false
-                            }
-                        }
-                        5 => {
-                            session.input_context.focus_chain.focus(Some(&node), true);
-                            true
-                        }
-                        _ => false,
-                    });
-                    if handled {
-                        session.with_current(|| {
-                            session.recomposer.commit_all();
-                        });
-                        session.request_display();
-                    }
-                    handled
-                }))
-                .unwrap_or(false)
+            BRIDGES.with(|bridges| {
+                bridges.borrow_mut().insert(key, Rc::downgrade(&bridge));
+            });
+            bridge
+        }
+        fn perform(&self, id: u64, kind: u32, value: Option<&str>) {
+            let Some(session) = self.session.borrow().upgrade() else {
+                return;
+            };
+            let weak = self.nodes.borrow().get(&id).cloned();
+            let Some(node) = weak.as_ref().and_then(Node::upgrade) else {
+                return;
+            };
+            if !node.accepts_subtree_input()
+                || !node.accessibility().is_some_and(|s| s.state.is_enabled)
+                || !session.input_context.focus_chain.permits_input(&node)
+            {
+                return;
             }
-            unsafe extern "C" fn value(context: *mut c_void, id: u64) -> *mut c_char {
-                std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-                    // SAFETY: context remains live while this native element is registered.
-                    let bridge =
-                        unsafe { &*context.cast::<Weak<AppleAccessibilityBridge>>() }.upgrade()?;
-                    let weak = bridge.nodes.borrow().get(&id).cloned()?;
-                    let node = Node::upgrade(&weak)?;
-                    let text = if let Some(provider) = node.accessibility_value_provider() {
-                        (provider.read)()
-                    } else {
-                        let s = node.accessibility()?;
-                        if matches!(
-                            s.role,
-                            AccessibilityRole::StaticText | AccessibilityRole::Status
-                        ) && s.value.is_empty()
-                        {
-                            s.label
-                        } else {
-                            s.value
-                        }
-                    };
-                    CString::new(text.replace('\0', ""))
-                        .ok()
-                        .map(CString::into_raw)
-                }))
-                .ok()
-                .flatten()
-                .unwrap_or(std::ptr::null_mut())
-            }
-            unsafe extern "C" fn free_value(value: *mut c_char) {
-                if !value.is_null() {
-                    // SAFETY: pointer was returned by CString::into_raw in value(), and native frees it once.
-                    unsafe {
-                        drop(CString::from_raw(value));
+            let actions = node.accessibility_actions();
+            let handled = session.with_current(|| match kind {
+                1 => actions.activate.map(|f| f()).is_some(),
+                2 => match (actions.set_value, value) {
+                    (Some(f), Some(text)) => {
+                        f(text);
+                        true
                     }
+                    _ => false,
+                },
+                3 => actions.increment.map(|f| f()).is_some(),
+                4 => actions.decrement.map(|f| f()).is_some(),
+                5 => {
+                    session.input_context.focus_chain.focus(Some(&node), true);
+                    true
+                }
+                _ => false,
+            });
+            if handled {
+                session.with_current(|| {
+                    session.recomposer.commit_all();
+                });
+                session.request_display();
+            }
+        }
+        fn deliver(&self, snapshot: AccessibilitySnapshot) {
+            match &self.target {
+                Target::Direct { window, presenter } => {
+                    presenter
+                        .borrow_mut()
+                        .get_or_insert_with(|| Presenter::new(*window, self.key))
+                        .apply(&snapshot);
+                }
+                Target::Remote(link) => {
+                    link.bridge
+                        .post(PlatformCommand::UpdateAccessibility(self.window, snapshot));
                 }
             }
-            let context = Box::into_raw(Box::new(Rc::downgrade(&bridge))).cast();
-            bridge.context.set(context); // SAFETY: boxed weak and callbacks outlive native bridge; window is owned by the session shell.
-            bridge
-                .pointer
-                .set(unsafe { cove_runtime_ax_create(window, context, action, value, free_value) });
-            bridge
         }
         pub fn update(
             &self,
+            host: &Sdl3PlatformHost,
             session: &Rc<PlatformWindowSession>,
             root: &Node,
             timeline: &RefCell<PerformanceTimeline>,
         ) {
             *self.session.borrow_mut() = Rc::downgrade(session);
-            if self.pointer.get().is_null() {
+            if self.closed.get() {
                 return;
             }
             let focus = &session.input_context.focus_chain;
@@ -245,8 +191,16 @@ mod apple {
             } else {
                 vec![root.clone()]
             };
-            let mut native = [0.0; 8]; // SAFETY: native bridge is live; output has exactly eight double slots.
-            unsafe { cove_runtime_ax_signature(self.pointer.get(), native.as_mut_ptr()) };
+            // Screen-space frames follow the window, so its placement is part of
+            // what makes a committed tree stale.
+            let position = host.window_position(session.id).unwrap_or_default();
+            let logical = session.logical_size();
+            let native = [
+                f64::from(position.0),
+                f64::from(position.1),
+                f64::from(logical.0),
+                f64::from(logical.1),
+            ];
             let signature = Signature {
                 roots: roots.iter().map(Node::id).collect(),
                 focused: focus.focused().map(|n| n.id()),
@@ -261,7 +215,6 @@ mod apple {
             if !changed
                 && (geometry == self.geometry.get() || now - self.last_time.get() < 1.0 / 30.0)
             {
-                self.updated_element_count.set(0);
                 return;
             }
             self.structure.set(structure);
@@ -278,12 +231,16 @@ mod apple {
             timeline
                 .borrow_mut()
                 .end(trace, "frame", "Accessibility snapshot", None, &[]);
+            fn text(value: &str) -> CString {
+                CString::new(value.replace('\0', "")).unwrap_or_default()
+            }
             fn flatten(
                 elements: &[AccessibilityElement],
                 parent: u64,
-                items: &mut Vec<Item>,
-                strings: &mut Vec<CString>,
+                items: &mut Vec<AccessibilityItem>,
                 nodes: &mut HashMap<u64, NodeWeak>,
+                provided: &mut HashMap<u64, (u64, CString)>,
+                retained: &mut HashMap<u64, (u64, CString)>,
                 focus: &FocusChain,
             ) {
                 for item in elements {
@@ -314,79 +271,73 @@ mod apple {
                         | u32::from(actions.increment.is_some()) << 2
                         | u32::from(actions.decrement.is_some()) << 3
                         | u32::from(item.node.is_focusable()) << 4;
-                    let mut cstr = |text: &str| {
-                        strings.push(CString::new(text.replace('\0', "")).unwrap());
-                        strings.last().unwrap().as_ptr()
-                    };
                     let static_text = matches!(
                         s.role,
                         AccessibilityRole::StaticText | AccessibilityRole::Status
                     );
-                    let label = cstr(if static_text && s.value.is_empty() {
-                        ""
-                    } else {
-                        &s.label
+                    let bare_text = static_text && s.value.is_empty();
+                    let provider = item.node.accessibility_value_provider();
+                    let revision = provider.as_ref().map_or(0, |p| p.revision);
+                    let live_value = provider.map(|provider| {
+                        let value = match provided.remove(&id) {
+                            Some((seen, value)) if seen == revision => value,
+                            _ => text(&(provider.read)()),
+                        };
+                        retained.insert(id, (revision, value.clone()));
+                        value
                     });
-                    let value = cstr(if static_text && s.value.is_empty() {
-                        &s.label
-                    } else {
-                        &s.value
-                    });
-                    let help = cstr(&s.help);
-                    let identifier = cstr(if s.identifier.is_empty() {
-                        ""
-                    } else {
-                        &s.identifier
-                    });
-                    let revision = item
-                        .node
-                        .accessibility_value_provider()
-                        .map_or(0, |p| p.revision);
-                    items.push(Item {
+                    items.push(AccessibilityItem {
                         id,
                         parent,
                         role: role_id(s.role),
                         flags,
                         actions: action_flags,
-                        x: item.frame.x,
-                        y: item.frame.y,
-                        width: item.frame.width,
-                        height: item.frame.height,
-                        label,
-                        value,
-                        help,
-                        identifier,
+                        frame: [item.frame.x, item.frame.y, item.frame.width, item.frame.height],
+                        label: text(if bare_text { "" } else { &s.label }),
+                        value: text(if bare_text { &s.label } else { &s.value }),
+                        live_value,
+                        help: text(&s.help),
+                        identifier: text(&s.identifier),
                         revision,
                     });
-                    flatten(&item.children, id, items, strings, nodes, focus);
+                    flatten(&item.children, id, items, nodes, provided, retained, focus);
                 }
             }
             let commit = timeline.borrow().begin();
             let mut items = Vec::new();
-            let mut strings = Vec::new();
             let mut nodes = HashMap::new();
-            flatten(&snapshots, 0, &mut items, &mut strings, &mut nodes, focus);
-            *self.nodes.borrow_mut() = nodes; // SAFETY: native commits copied strings and geometry synchronously; nodes remain weakly registered.
-            let updated =
-                unsafe { cove_runtime_ax_update(self.pointer.get(), items.as_ptr(), items.len()) };
-            self.updated_element_count.set(updated);
+            let mut retained = HashMap::new();
+            flatten(
+                &snapshots,
+                0,
+                &mut items,
+                &mut nodes,
+                &mut self.provided_values.borrow_mut(),
+                &mut retained,
+                focus,
+            );
+            *self.provided_values.borrow_mut() = retained;
+            *self.nodes.borrow_mut() = nodes;
+            self.deliver(AccessibilitySnapshot {
+                bridge: self.key,
+                items,
+            });
             timeline
                 .borrow_mut()
                 .end(commit, "frame", "Accessibility bridge commit", None, &[]);
         }
         fn invalidate(&self) {
-            let pointer = self.pointer.replace(std::ptr::null_mut());
-            if !pointer.is_null() {
-                // SAFETY: native destroy invalidates all callbacks before the weak context is freed.
-                unsafe { cove_runtime_ax_destroy(pointer) };
+            if self.closed.replace(true) {
+                return;
             }
-            let context = self.context.replace(std::ptr::null_mut());
-            if !context.is_null() {
-                // SAFETY: context was created by Box::into_raw and is released once, after native invalidation.
-                unsafe {
-                    drop(Box::from_raw(
-                        context.cast::<Weak<AppleAccessibilityBridge>>(),
-                    ));
+            BRIDGES.with(|bridges| {
+                bridges.borrow_mut().remove(&self.key);
+            });
+            match &self.target {
+                Target::Direct { presenter, .. } => drop(presenter.borrow_mut().take()),
+                Target::Remote(link) => {
+                    link.bridge
+                        .post(PlatformCommand::CloseAccessibility(self.window, self.key));
                 }
             }
             self.nodes.borrow_mut().clear();

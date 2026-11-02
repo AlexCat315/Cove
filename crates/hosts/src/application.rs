@@ -52,8 +52,9 @@ impl ApplicationLaunch {
         self
     }
 
-    /// Runs the native window host. Android invokes the registered factory from
-    /// its Activity instead of entering this blocking loop.
+    /// Runs the native window host on the calling thread, which then owns the
+    /// platform directly. Android invokes the registered factory from its Activity
+    /// instead of entering this blocking loop.
     pub fn run(self) -> Result<(), String> {
         crate::desktop::diagnostics::integration::set_diagnostics_factory(self.diagnostics);
         Application::run(
@@ -63,6 +64,44 @@ impl ApplicationLaunch {
             ApplicationCallbacks::default(),
             self.checkpoint,
         )
+    }
+
+    /// The process entry: called on the main thread, it keeps that thread as the
+    /// platform pump and builds and runs the application on a UI thread. The
+    /// declaration is made there because views are bound to the thread that
+    /// created them.
+    ///
+    /// `COVE_SINGLE_THREAD=1` runs UI and platform on the main thread instead. iOS
+    /// enters UIKit through SDL and stays on its main thread, as does Android
+    /// through its Activity.
+    pub fn launch(factory: impl FnOnce() -> Self + Send + 'static) -> Result<(), String> {
+        #[cfg(target_os = "ios")]
+        {
+            cove_shell::PlatformApplication::run(move || {
+                factory()
+                    .run()
+                    .map_err(cove_shell::ShellError::InitializationFailed)
+            })
+            .map_err(|error| error.to_string())
+        }
+        #[cfg(target_os = "android")]
+        {
+            factory().run()
+        }
+        #[cfg(not(any(target_os = "ios", target_os = "android")))]
+        {
+            if std::env::var_os("COVE_SINGLE_THREAD").is_some_and(|value| value == "1") {
+                return factory().run();
+            }
+            cove_runtime::platform::run_with_ui_thread(
+                || {
+                    cove_shell::make_default_shell()
+                        .map(|shell| Box::new(shell) as Box<dyn cove_shell::Shell>)
+                },
+                move || factory().run(),
+            )
+            .map_err(|error| error.to_string())?
+        }
     }
 }
 
@@ -90,7 +129,7 @@ macro_rules! application {
         }
 
         pub fn run() -> ::std::result::Result<(), ::std::string::String> {
-            application().run()
+            $crate::ApplicationLaunch::launch(application)
         }
 
         /// # Safety
