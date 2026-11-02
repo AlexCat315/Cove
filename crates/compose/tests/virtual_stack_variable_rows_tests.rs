@@ -166,15 +166,13 @@ fn height_changes_insertions_and_deletion_retain_the_anchor() {
     let anchor = rows
         .anchor_at(59.0)
         .expect("an offset inside the list has an anchor");
-    assert_eq!(anchor, 2, "offset 59 sits inside row 2");
-    // The anchor carries how far into its row the viewport sat.
-    let inset = 59.0 - rows.offset_of(2);
-    assert_eq!(inset, 5.0, "the anchor records a 5pt inset into row 2");
+    assert_eq!(anchor.id, 2, "offset 59 sits inside row 2");
+    assert_eq!(anchor.inset, 5.0, "the anchor records a 5pt inset into row 2");
 
     // A taller first row pushes the anchor down.
     rows.replace(&[0, 1, 2, 3], &[70.0, 30.0, 40.0, 200.0], 2.0);
     assert_eq!(
-        rows.offset_for(&anchor, 100.0) + inset,
+        rows.offset_for(&anchor, 100.0),
         109.0,
         "the anchor keeps its row and inset after the first row grows"
     );
@@ -182,25 +180,25 @@ fn height_changes_insertions_and_deletion_retain_the_anchor() {
     // A reorder moves the anchor with its row.
     rows.replace(&[9, 2, 0, 1, 3], &[10.0, 40.0, 70.0, 30.0, 200.0], 2.0);
     assert_eq!(
-        rows.offset_for(&anchor, 100.0) + inset,
+        rows.offset_for(&anchor, 100.0),
         17.0,
         "the anchor follows its id to the new position"
     );
 
-    // Deleting an earlier row shifts the anchor up.
+    // Deleting the anchor's row falls back to the row now at its index.
     rows.replace(&[9, 0, 1, 3], &[10.0, 70.0, 30.0, 200.0], 2.0);
     assert_eq!(
-        rows.offset_for(&anchor, 100.0) + inset,
+        rows.offset_for(&anchor, 100.0),
         89.0,
-        "deleting an earlier row pulls the anchor up"
+        "a deleted anchor resolves to the row at its old index"
     );
 
-    // Deleting the anchor itself resets to the top, like Swift.
+    // The clamp still bounds the result when little content remains.
     rows.replace(&[9], &[5.0], 2.0);
     assert_eq!(
         rows.offset_for(&anchor, 100.0),
         0.0,
-        "a missing anchor resolves to the top"
+        "content shorter than the viewport resolves to the top"
     );
 }
 

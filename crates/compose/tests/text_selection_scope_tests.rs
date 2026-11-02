@@ -95,6 +95,7 @@ fn dragging_repaints_only_changed_paragraphs() {
                 )
             })
             .collect();
+        flush(&mut tree);
 
         scope
             .borrow_mut()

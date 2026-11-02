@@ -166,7 +166,7 @@ impl<Id: Ord + Clone + 'static> View for EstimatedVirtualStack<Id> {
             && viewport.size.height > 0.0
             && !state.rows.is_empty()
         {
-            next_offset = state.rows.offset_for(
+            next_offset = state.rows.offset_of_id(
                 &self.ids[target.min(self.ids.len() - 1)],
                 viewport.size.height as f64,
             );

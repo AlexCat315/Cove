@@ -24,11 +24,7 @@
 //!   wider than the 260pt sidebar.
 //! - Hover: Rust paints the selected fill on a hovered selection instead of the
 //!   hover state layered over it.
-//! - Row height: Rust rows stretch past a 130pt viewport (11 destinations), so
-//!   the initially revealed row cannot end inside it.
 //! - Focus ring: Rust paints no 2pt `focus_ring` border on a focused row.
-//! - Roving focus: Rust focuses the non-focusable `RovingItem` wrapper, so focus
-//!   stays on the original row after an arrow step.
 //! - The Rust `Sidebar` leaves its first `ScrollView` mounted as a zero-height
 //!   orphan after the first recomposition; `live_nodes` skips it.
 
@@ -524,8 +520,8 @@ fn keyboard_scroll_and_disabled_click() {
         );
         assert_eq!(
             scene.focus.focused().map(|node| node.id()),
-            Some(recent.id()),
-            "GAP: Swift moves focus to `settings` with the selection; Rust focuses the non-focusable roving wrapper, so focus stays on `recent`"
+            Some(row(scene, "Settings").id()),
+            "focus moves to `settings` with the selection"
         );
         let tab_stops = live_nodes(scene)
             .into_iter()
@@ -685,8 +681,8 @@ fn controlled_selection_reveal() {
         );
         let last = row(scene, "Last").absolute_frame();
         assert!(
-            last.height > initial.absolute_frame().height,
-            "GAP: Swift's initially selected row ends inside the 130pt viewport; the Rust rows stretch past it ({last:?} in {:?}), so no reveal can contain it",
+            last.max_y() <= initial.absolute_frame().max_y() + 0.5,
+            "the initially selected row ends inside the 130pt viewport ({last:?} in {:?})",
             initial.absolute_frame()
         );
     });

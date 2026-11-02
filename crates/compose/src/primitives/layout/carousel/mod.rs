@@ -453,7 +453,12 @@ fn build_step_button<Id: PartialEq + Eq + Clone + Send + Sync + 'static>(
             move || actions.move_by(delta),
         )
         .button_style(ghost())
-        .control_size(ControlSize::Small),
+        .control_size(ControlSize::Small)
+        .accessibility_label(if delta < 0 {
+            "Previous page"
+        } else {
+            "Next page"
+        }),
     )
 }
 

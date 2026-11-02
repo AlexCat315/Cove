@@ -10,11 +10,14 @@ use cove_core::scene::{AccessibilityRole, Align, FlexDirection, Wrap};
 
 use crate::BoxView;
 use crate::modifiers::interaction::AccessibilityExt;
-use crate::modifiers::layout::{FlexExt, LayoutFrameExt};
+use crate::modifiers::layout::{FlexExt, FrameDimension, LayoutFrameExt};
 use crate::primitives::controls::button::Button;
 use crate::primitives::overlays::roving_focus::{RovingFocusHost, RovingItem, roving_identity};
 use crate::primitives::text::Text;
-use crate::theme::styles::buttons::{ButtonStyleViewExt, TabButtonStyle};
+use cove_core::TextAlignment;
+use crate::theme::styles::buttons::{
+    ButtonStyle, ButtonStyleConfiguration, ButtonStyleViewExt, TabButtonStyle,
+};
 
 /// The pane presented when a split has room for only one pane.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
@@ -131,6 +134,19 @@ impl View for SplitPaneSelector {
     }
 }
 
+/// A tab that fills its half of the selector, so a long title wraps inside it.
+struct SplitPaneButtonStyle;
+
+impl ButtonStyle for SplitPaneButtonStyle {
+    fn make_body(&self, configuration: ButtonStyleConfiguration) -> AnyView {
+        AnyView::new(
+            TabButtonStyle::new(0.0)
+                .make_body(configuration)
+                .frame(Some(FrameDimension::Percent(100.0)), None, None, None, None, None),
+        )
+    }
+}
+
 fn pane_item(
     pane: SplitPane,
     title: String,
@@ -141,10 +157,11 @@ fn pane_item(
     let action_selection = selection.clone();
     let action_pane = pane;
     let label = Text::new(title.clone())
+        .with_alignment(TextAlignment::Center)
         .frame_min_width(0.0)
         .flex_with(1.0, 1.0, Some(0.0));
     let button = Button::new(label, move || action_selection.set(action_pane))
-        .button_style(TabButtonStyle::new(0.0))
+        .button_style(SplitPaneButtonStyle)
         .accessibility(move |semantics| {
             semantics.role = AccessibilityRole::Tab;
             semantics.label = title.clone();

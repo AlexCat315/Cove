@@ -74,10 +74,24 @@ struct SelectionRegistration {
     scope: RefCell<Weak<RefCell<TextSelectionScope>>>,
 }
 
+impl SelectionRegistration {
+    /// Removes `node` from the scope it joined.
+    fn leave(&self, node: &Node) {
+        let Some(scope) = self.scope.replace(Weak::new()).upgrade() else {
+            return;
+        };
+        let mut scope = scope.borrow_mut();
+        scope.members.remove(&node.id().0);
+        scope.geometry_revision = None;
+    }
+}
+
 impl NodeResource for SelectionRegistration {
     fn mount(&self, _node: &Node) {}
+    /// The node has already released its resources by now, so this cannot go
+    /// through [`TextSelectionScope::unregister`], which looks them up.
     fn unmount(&self, node: &Node) {
-        TextSelectionScope::unregister(node);
+        self.leave(node);
     }
     fn as_any_rc(self: Rc<Self>) -> Rc<dyn Any> {
         self
@@ -178,16 +192,8 @@ impl TextSelectionScope {
     }
 
     pub fn unregister(node: &Node) {
-        let Some(registration) = node.first_resource::<SelectionRegistration>() else {
-            return;
-        };
-        let Some(scope) = registration.scope.borrow().upgrade() else {
-            return;
-        };
-        {
-            let mut scope = scope.borrow_mut();
-            scope.members.remove(&node.id().0);
-            scope.geometry_revision = None;
+        if let Some(registration) = node.first_resource::<SelectionRegistration>() {
+            registration.leave(node);
         }
     }
 

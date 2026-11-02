@@ -32,7 +32,7 @@ use cove_composition::{AnyView, PrimitiveView};
 use cove_core::scene::{Node, NodeResource};
 use cove_ui_compose::primitives::overlays::portal::PortalResource;
 use cove_ui_compose::primitives::overlays::tooltip::{
-    TooltipArbitration, TooltipOptions, TooltipSession,
+    PORTAL_ATTACHMENT, TooltipArbitration, TooltipOptions, TooltipSession,
 };
 use cove_ui_compose::primitives::text::Text;
 
@@ -47,8 +47,9 @@ impl PrimitiveView for Target {
     fn make_node(&self) -> Node {
         let node = Node::new();
         node.set_is_hit_testable(true);
-        let resource: Rc<dyn NodeResource> = PortalResource::new();
-        node.add_resource(resource);
+        let resource = PortalResource::new();
+        node.add_resource(resource.clone());
+        node.set_attachment(PORTAL_ATTACHMENT, resource);
         let session = TooltipSession::new();
         node.add_resource(session.clone());
         session.mount(&node);

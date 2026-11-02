@@ -5,6 +5,14 @@
 use std::ops::Range;
 
 /// Cumulative row offsets for a variable-height list.
+/// Where a scroll offset sits among the rows, kept across row changes.
+#[derive(Clone, Debug, PartialEq)]
+pub struct VirtualRowAnchor<Id> {
+    pub id: Id,
+    pub index: usize,
+    pub inset: f64,
+}
+
 #[derive(Clone, Debug, Default)]
 pub struct VariableRowIndex<Id: Ord + Clone> {
     ids: Vec<Id>,
@@ -120,16 +128,33 @@ impl<Id: Ord + Clone> VariableRowIndex<Id> {
     }
 
     /// Row id at the top of the viewport, used as the scroll anchor.
-    pub fn anchor_at(&self, offset: f64) -> Option<Id> {
-        if self.ids.is_empty() {
-            return None;
-        }
-        self.ids.get(self.row_at(offset)).cloned()
+    pub fn anchor_at(&self, offset: f64) -> Option<VirtualRowAnchor<Id>> {
+        let index = self.row_at(offset);
+        Some(VirtualRowAnchor {
+            id: self.ids.get(index)?.clone(),
+            index,
+            inset: (offset - self.offset_of(index)).max(0.0),
+        })
     }
 
-    /// Offset that brings `anchor` back to the top of the viewport.
-    pub fn offset_for(&self, anchor: &Id, viewport: f64) -> f64 {
-        match self.ids.iter().position(|id| id == anchor) {
+    /// The offset that keeps `anchor` at the same place in the viewport after
+    /// the rows changed. A deleted row falls back to the row now at its index.
+    pub fn offset_for(&self, anchor: &VirtualRowAnchor<Id>, viewport: f64) -> f64 {
+        if self.ids.is_empty() {
+            return 0.0;
+        }
+        let index = self
+            .ids
+            .iter()
+            .position(|id| *id == anchor.id)
+            .unwrap_or_else(|| anchor.index.min(self.ids.len() - 1));
+        let extent = f64::from(self.heights[index]);
+        self.clamp(self.offset_of(index) + anchor.inset.min(extent), viewport)
+    }
+
+    /// The offset that brings the row `id` to the top of the viewport.
+    pub fn offset_of_id(&self, id: &Id, viewport: f64) -> f64 {
+        match self.ids.iter().position(|candidate| candidate == id) {
             Some(row) => self.clamp(self.offset_of(row), viewport),
             None => 0.0,
         }

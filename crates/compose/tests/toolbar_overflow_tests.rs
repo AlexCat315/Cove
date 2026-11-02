@@ -17,19 +17,10 @@
 //!   touch hit area
 //!
 //! Named differences from the Swift suite:
-//! - The Rust overflow trigger cannot present its menu: `ToolbarCommandsBody`
-//!   builds `Popover::new(trigger, menu)` without `.is_presented(..)`, so the
-//!   trigger toggles `Popover::default`'s constant binding. Activating the
-//!   trigger by keyboard, pointer or accessibility action leaves `scene.portal`
-//!   empty and `is_expanded` false, so the menu cases pin the closed menu and
-//!   the disabled/selected rows that never mount.
 //! - Swift's measured container feeds the bar's natural width into
 //!   `ToolbarOverflowLayout`; the Rust row needs `available_width` handed in, so
 //!   the fixture passes the authored width minus the toolbar's 12pt horizontal
 //!   padding.
-//! - The Rust `Toolbar` does not scroll a pinned row to reveal an offscreen
-//!   keyboard target (`ScrollReveal` has no scroller to act on), so the last
-//!   pinned command stays partly outside a 180pt bar after End.
 //! - The Rust bar does not consume the Swift surface's text scale, appearance or
 //!   input modality to change its own geometry; buttons read the environment's
 //!   44pt touch floor, so the density matrix still varies all three.
@@ -375,64 +366,64 @@ fn menu_keyboard() {
         });
         let more_control = trigger_control(scene);
         assert!(
-            !more_control.accepts_subtree_input(),
-            "GAP: Swift exposes an interactive More actions trigger at 390pt; Rust keeps the              retained overflow row hidden"
+            more_control.accepts_subtree_input(),
+            "the More actions trigger is interactive at 390pt"
         );
         scene.focus.focus(Some(&more_control), false);
+        scene.key(Scancode::SPACE, KeyModifiers::default());
+        scene.settle(8, 1.0);
+        assert_eq!(
+            scene.portal.entries().len(),
+            1,
+            "Space presents the overflow menu"
+        );
+        assert_eq!(
+            more_control
+                .accessibility()
+                .and_then(|semantics| semantics.state.is_expanded),
+            Some(true),
+            "the trigger reports the menu expanded"
+        );
+        let rows = menu_rows(scene);
         assert!(
-            scene.focus.focused().is_none(),
-            "GAP: Swift focuses the More actions trigger; Rust's hidden trigger cannot take              focus (focused {:?})",
+            rows.iter().any(|row| row.accessibility().is_some_and(
+                |semantics| semantics.label == "Settings" && semantics.state.is_selected
+            )),
+            "Settings is a selected row"
+        );
+        let disabled = rows
+            .iter()
+            .find(|row| {
+                row.accessibility()
+                    .is_some_and(|semantics| semantics.label == "Unavailable")
+            })
+            .expect("the disabled row mounts");
+        assert!(
+            disabled.accessibility_actions().activate.is_none(),
+            "a disabled row cannot be activated"
+        );
+        scene.key(Scancode::END, KeyModifiers::default());
+        scene.settle(8, 1.0);
+        assert_eq!(
             scene
                 .focus
                 .focused()
                 .and_then(|node| node.accessibility())
-                .map(|semantics| semantics.label)
-        );
-        scene.key(Scancode::SPACE, KeyModifiers::default());
-        assert_eq!(
-            scene.portal.entries().len(),
-            0,
-            "GAP: Swift presents the overflow menu on Space; Rust's trigger toggles              `Popover::default`'s constant binding, so entries are {}",
-            scene.portal.entries().len()
-        );
-        let expanded = more_control
-            .accessibility()
-            .and_then(|semantics| semantics.state.is_expanded);
-        assert_eq!(
-            expanded,
-            Some(false),
-            "GAP: Swift reports the menu expanded; Rust reports {expanded:?}"
-        );
-        let rows = menu_rows(scene);
-        assert!(
-            rows.is_empty(),
-            "GAP: Swift mounts a selected Settings row and a disabled Unavailable row; Rust              mounts {} menu rows",
-            rows.len()
-        );
-        scene.key(Scancode::END, KeyModifiers::default());
-        let focused = scene
-            .focus
-            .focused()
-            .and_then(|node| node.accessibility())
-            .map(|semantics| semantics.label);
-        assert!(
-            focused.is_none(),
-            "GAP: Swift moves focus to the Settings row; Rust has no menu and no trigger focus,              got {focused:?}"
+                .map(|semantics| semantics.label),
+            Some("Settings".to_string()),
+            "End focuses the last enabled row"
         );
         scene.key(Scancode::RETURN, KeyModifiers::default());
-        assert_eq!(
-            harness.calls.get(),
-            0,
-            "GAP: Swift activates Settings for 100000; Rust activates nothing, calls {}",
-            harness.calls.get()
-        );
+        scene.settle(8, 1.0);
+        assert_eq!(harness.calls.get(), 100000, "Return activates Settings");
         assert!(
             scene.portal.entries().is_empty(),
-            "no menu is mounted to close"
+            "activating closes the menu"
         );
-        assert!(
-            scene.focus.focused().is_none(),
-            "GAP: Swift restores focus to the trigger; Rust has no focused node"
+        assert_eq!(
+            scene.focus.focused().map(|node| node.id()),
+            Some(more_control.id()),
+            "focus returns to the trigger"
         );
     });
 }
@@ -459,14 +450,10 @@ fn lifecycle() {
             !share.accepts_subtree_input(),
             "the share command is hidden after shrinking to 180pt"
         );
-        assert!(
-            scene.focus.focused().is_none(),
-            "GAP: Swift transfers hidden focus to the overflow trigger; Rust clears focus              (focused {:?})",
-            scene
-                .focus
-                .focused()
-                .and_then(|node| node.accessibility())
-                .map(|semantics| semantics.label)
+        assert_eq!(
+            scene.focus.focused().map(|node| node.id()),
+            Some(trigger_control(scene).id()),
+            "hidden focus moves to the overflow trigger"
         );
         let root = scene.graph.tree.borrow().root().expect("root node");
         let semantic_nodes: Vec<Node> = AccessibilityTree::snapshot(&root)
@@ -483,9 +470,8 @@ fn lifecycle() {
         scene.settle(8, 1.0);
         assert_eq!(
             scene.portal.entries().len(),
-            0,
-            "GAP: Swift opens the overflow menu on click; Rust opens {} because the retained              overflow row is hidden",
-            scene.portal.entries().len()
+            1,
+            "clicking the trigger opens the overflow menu"
         );
 
         harness.enabled.set(false);
@@ -526,9 +512,8 @@ fn lifecycle() {
         scene.settle(8, 1.0);
         assert_eq!(
             scene.portal.entries().len(),
-            0,
-            "GAP: Swift reopens the menu through the trigger's accessibility action; Rust opens {}",
-            scene.portal.entries().len()
+            1,
+            "the trigger's accessibility action reopens the menu"
         );
 
         scene.install(cove_composition::EmptyView);
@@ -566,9 +551,8 @@ fn no_overflow() {
         scene.settle(8, 1.0);
         assert_eq!(
             scene.portal.entries().len(),
-            0,
-            "GAP: Swift opens the forced overflow menu; Rust opens {}",
-            scene.portal.entries().len()
+            1,
+            "the accessibility action opens the forced overflow menu"
         );
 
         harness.forced_overflow.set(false);
@@ -581,9 +565,10 @@ fn no_overflow() {
             !more.accepts_subtree_input(),
             "the overflow trigger disappears once nothing overflows"
         );
-        assert!(
-            scene.focus.focused().is_none(),
-            "GAP: Swift returns focus to Run; Rust clears focus when the trigger disappears"
+        assert_eq!(
+            scene.focus.focused().map(|node| node.id()),
+            Some(button(scene, "Run").id()),
+            "focus returns to Run when the trigger disappears"
         );
         let focusable = scene
             .all(|node| is_button_host(node) && node.accepts_subtree_input() && node.is_focusable())
@@ -645,9 +630,8 @@ fn primary_scroll() {
             "the revealed command starts at or after the leading edge, got {frame:?}"
         );
         assert!(
-            frame.max_x() > 180.0,
-            "GAP: Swift scrolls the bar to reveal Settings; Rust leaves it at {:.2}..{:.2} in a \
-             180pt bar",
+            frame.max_x() <= 180.0,
+            "the bar scrolls to reveal Settings, got {:.2}..{:.2} in a 180pt bar",
             frame.x,
             frame.max_x()
         );

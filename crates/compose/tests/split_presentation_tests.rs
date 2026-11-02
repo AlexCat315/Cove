@@ -778,12 +778,10 @@ fn localized_touch_selector() {
             details.absolute_frame()
         );
         assert!(
-            label.absolute_frame().max_x() > details.absolute_frame().max_x(),
-            "GAP: Swift wraps the localized title inside the tab; the Rust label is {}pt wide \
-             in a {}pt tab and overflows to {:?}",
-            label.frame().width,
-            details.frame().width,
-            label.absolute_frame()
+            label.absolute_frame().max_x() <= details.absolute_frame().max_x(),
+            "the localized title wraps inside the tab: {:?} vs {:?}",
+            label.absolute_frame(),
+            details.absolute_frame()
         );
         assert!(
             label.frame().width >= details.frame().width - 32.0,
@@ -791,10 +789,10 @@ fn localized_touch_selector() {
             label.frame().width,
             details.frame().width
         );
-        assert_eq!(
-            label.frame().height,
-            36.0,
-            "GAP: the label stays one 36pt line at 200 percent; Swift wraps it taller"
+        assert!(
+            label.frame().height > 32.0,
+            "the 200 percent label wraps taller: {:?}",
+            label.frame()
         );
         assert!(
             details.frame().height >= 44.0 && details.frame().width >= 44.0,

@@ -133,16 +133,15 @@ pub fn spawn(job: impl FnOnce() + Send + 'static) {
 
 /// Block until every job spawned so far has finished, or `timeout` passes.
 /// Returns whether the pool went idle. For hosts flushing before teardown
-/// and for tests that need background results deterministically.
+/// and for tests that need background results deterministically. The jobs stay
+/// on the workers, so waiting never moves blocking work onto the caller's thread.
 pub fn wait_idle(timeout: std::time::Duration) -> bool {
     let deadline = std::time::Instant::now() + timeout;
     while OUTSTANDING.load(Ordering::Acquire) > 0 {
         if std::time::Instant::now() >= deadline {
             return false;
         }
-        if !pool().help() {
-            thread::sleep(std::time::Duration::from_micros(50));
-        }
+        thread::sleep(std::time::Duration::from_micros(50));
     }
     true
 }

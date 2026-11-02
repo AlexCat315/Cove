@@ -462,7 +462,8 @@ impl PrimitiveView for ToolbarRetainedCommand {
             }
         }
 
-        // Once the overflow row lays out, hand focus to its first tab stop.
+        // Once the overflow row lays out, hand focus to its first tab stop. A
+        // hidden row hands it to the first tab stop left in the toolbar.
         if self.is_overflow {
             let focus = self.focus.clone();
             let is_visible = self.is_visible;
@@ -470,7 +471,16 @@ impl PrimitiveView for ToolbarRetainedCommand {
                 let Some(visible) = *focus.pending_visibility.borrow() else {
                     return;
                 };
-                let mut pending = vec![owner.clone()];
+                let mut root = owner.clone();
+                if !is_visible {
+                    while root.accessibility().map(|semantics| semantics.role)
+                        != Some(cove_core::scene::AccessibilityRole::Toolbar)
+                    {
+                        let Some(parent) = root.parent() else { break };
+                        root = parent;
+                    }
+                }
+                let mut pending = vec![root];
                 let mut target = None;
                 while let Some(candidate) = pending.pop() {
                     if !candidate.accepts_subtree_input() {
@@ -482,7 +492,6 @@ impl PrimitiveView for ToolbarRetainedCommand {
                     }
                     pending.extend(candidate.children().into_iter().rev());
                 }
-                let _ = is_visible;
                 if let Some(target) = target {
                     if let Some(chain) = cove_core::scene::FocusChainHolder::current() {
                         chain.focus(Some(&target), visible);

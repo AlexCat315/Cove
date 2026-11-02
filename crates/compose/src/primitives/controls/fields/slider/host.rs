@@ -291,8 +291,10 @@ impl PrimitiveView for SliderHost {
                 };
                 match phase {
                     PointerPhase::Down => {
+                        // Non-transferable: a surrounding touch scroll must not
+                        // take over a drag on the thumb.
                         if let Some(capture) = PointerCaptureHolder::current() {
-                            capture.acquire(&owner, true);
+                            capture.acquire(&owner, false);
                         }
                         if set_interaction(&owner, PRESSED, true)
                             && let Some(handler) = pointer_editing.as_ref()

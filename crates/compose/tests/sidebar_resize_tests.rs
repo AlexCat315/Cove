@@ -18,17 +18,6 @@
 //!   width, and a bounded slider stays discoverable
 //!
 //! Named differences from the Swift suite (each pinned by a `GAP:` assertion):
-//! - No resize lane in the shell: `AdaptiveSidebar` resolves `SidebarGeometry`
-//!   (including `resize_handle_width` / `resize_range`) but never mounts the
-//!   production `SidebarResizeHandle`. `embedded_height` and `shell_matrix`
-//!   pin the missing handle; `drag_and_keyboard`, `lane_lifecycle` and
-//!   `fitting_and_ai` drive the real `SidebarResizeHandle`, `Sidebar` and
-//!   `SidebarToggle` composed against the real `SidebarGeometry` in a
-//!   test-local `Lane`, which is the wiring the shell is missing. The lane's
-//!   44pt touch / 7pt pointer extent therefore lives in the test.
-//! - No docking: Swift places the navigation and the lane beside the page
-//!   (page width = container - navigation - lane, mirrored under RTL); the Rust
-//!   shell lays the page across the whole container at every width.
 //! - Focus handoff: when the lane disappears Swift hands focus to the selected
 //!   rail destination (rail) or the `Open navigation` opener (compact); Rust
 //!   leaves nothing focused.
@@ -687,9 +676,11 @@ fn embedded_height() {
             "an explicit height survives the adaptive shell, saw {}",
             shell.frame().height
         );
+        let lane = resize_lane(scene).expect("the bounded shell mounts a resize lane");
         assert!(
-            resize_lane(scene).is_none(),
-            "GAP: Swift demands a resize lane spanning the same 220pt height; the Rust shell mounts no handle at all, so nothing shares the bounded height"
+            (lane.frame().height - 220.0).abs() < 1.0,
+            "the resize lane shares the bounded height, saw {}",
+            lane.frame().height
         );
         let after = scene
             .named("after-navigation")
@@ -737,6 +728,7 @@ fn shell_matrix() {
         let scroll = scene
             .named("resize-scroll")
             .expect("the scroll view mounts");
+        let resizer = resize_lane(scene).expect("the resize lane mounts at 1280");
         scene.focus.focus(Some(&field), false);
         scene
             .dispatcher()
@@ -810,13 +802,42 @@ fn shell_matrix() {
                             };
                             let page = scene.named("resize-content").expect("page");
                             let expected_width = width - navigation - lane;
-                            let expected_x = if rtl { 0.0 } else { navigation + lane };
+                            let edge = if rtl {
+                                page.absolute_frame().max_x() - expected_width
+                            } else {
+                                page.absolute_frame().x - (navigation + lane)
+                            };
                             assert!(
-                                (page.frame().width - width).abs() < 1.0
-                                    && page.absolute_frame().x.abs() < 1.0,
-                                "GAP: Swift docks the navigation and the resize lane beside the page (width {expected_width}, leading edge {expected_x}); the Rust shell lays the page out across the whole container, saw {:?} ({case})",
+                                (page.frame().width - expected_width).abs() < 1.0
+                                    && edge.abs() < 1.0,
+                                "the navigation and the resize lane dock beside the page, saw {:?} ({case})",
                                 page.absolute_frame()
                             );
+                            if width >= 1000.0 {
+                                assert_eq!(
+                                    resize_lane(scene).map(|node| id(&node)),
+                                    Some(id(&resizer)),
+                                    "the lane keeps its identity ({case})"
+                                );
+                                assert!(
+                                    (resizer.frame().width - lane).abs() < 1.0
+                                        && resizer.frame().height >= 44.0,
+                                    "the lane is {lane}pt wide and touch-tall, saw {:?} ({case})",
+                                    resizer.frame()
+                                );
+                                assert_eq!(
+                                    resizer.accessibility().map(|semantics| semantics.value),
+                                    Some("320 pt".to_string()),
+                                    "the lane reports its width ({case})"
+                                );
+                            } else {
+                                assert!(
+                                    !resizer.is_focusable()
+                                        && !resizer.is_hit_testable()
+                                        && resizer.accessibility().is_none(),
+                                    "a vanished lane is inert ({case})"
+                                );
+                            }
                             assert!(
                                 !scene.graph.recomposer.has_pending(),
                                 "the shell settles without pending work ({case})"
@@ -826,10 +847,6 @@ fn shell_matrix() {
                 }
             }
         }
-        assert!(
-            resize_lane(scene).is_none(),
-            "GAP: Swift finds one stable focusable `Resize navigation` node at 1280 and none below 1000; the Rust shell never mounts a handle, so there is no lane identity to retain"
-        );
     });
 }
 

@@ -7,41 +7,6 @@
 //! - the wide threshold is inclusive and changing it does not require a new
 //!   measurement
 //! - intrinsic mode selects by natural content and retains both branches
-//!
-//! GAP: a `Display::None` branch keeps a stale node frame.
-//! Swift sets `node.layoutNode?.display = isActive ? .flex : .none`
-//! (`ViewThatFits.swift:101`) and reads the resulting frame back, so a hidden
-//! branch reports `.zero`. The Rust `RetainedBranch::update_layout` does the same
-//! `set_display(Display::None)`, and `LayoutNode::arrange` does zero the layout
-//! node's `computed` size — but it returns early without touching
-//! `placement_is_visible`, and only the custom-layout path
-//! (`place_for_custom_layout`) ever clears that flag.
-//! `ViewGraph::write_layout_back_at` gates the published `Node` frame on
-//! `custom_layout_is_visible()`, so because the flag stays `true` the hidden
-//! branch publishes whatever frame it measured before hiding. Measured: the
-//! inactive branch keeps `Rect { width: 700, height: 32 }` instead of collapsing
-//! to zero. Input, opacity and accessibility *are* gated correctly
-//! (`is_interaction_enabled(false)`, `opacity 0`, and `AccessibilityTree`
-//! reports only the active label), so only the published frame is wrong; the
-//! frame assertions are pinned with the Swift values named.
-//!
-//! The same gap has a second half: a branch that is inactive on the very first
-//! frame never materialises its content at all. Swift renders both
-//! `RetainedResponsiveBranch` children unconditionally and only hides one, so
-//! both are mounted from install. In Rust, `Display::None` on the retained
-//! branch prunes its subtree during materialisation, so a container that starts
-//! narrow only ever mounts `compact` — measured `names == ["compact"]` after
-//! settling at 300pt, versus Swift's `["wide", "compact"]`. The narrow assertions
-//! below therefore cannot look for the hidden branch node at all.
-//!
-//! Model difference: Swift attaches the per-branch counter with a `ViewModifier`
-//! writing `node.attachments["test.counter"]`, and activates it through
-//! `wide.accessibilityActions.activate?()`. Rust primitives cannot read a
-//! caller's `Node` attachment through the accessibility API, so the counter is
-//! carried by a `State` exposed from `dynamic_properties` and activated through
-//! the accessibility action attached to the button. The observable contract is
-//! the same: only the selected branch is live, each branch keeps its own count
-//! across a round trip, and the reselected node is the identical node.
 
 use cove_composition::Scope;
 use crate::support;
@@ -314,11 +279,10 @@ fn only_the_measured_branch_lays_out_and_is_exposed() {
             "the selected branch keeps its measured frame, was {:?}",
             wide.frame()
         );
-        // GAP: the hidden branch keeps its stale frame (Swift collapses it to zero).
         assert_eq!(
             compact.frame().width,
-            700.0,
-            "the hidden branch keeps a stale frame; Swift collapses it to 0, was {:?}",
+            0.0,
+            "the hidden branch collapses, was {:?}",
             compact.frame()
         );
         let labels = exposed_labels(&graph);

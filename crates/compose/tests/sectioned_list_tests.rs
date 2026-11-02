@@ -161,7 +161,7 @@ fn sticky_sections() -> Vec<ListSection<&'static str, i32>> {
 
 #[test]
 fn sticky_headers() {
-    InteractiveScene::run(280.0, 700.0, |scene| {
+    InteractiveScene::run(280.0, 340.0, |scene| {
         let selected = State::new(Some(1));
         scene.install(
             SectionedList::new(
@@ -188,7 +188,8 @@ fn sticky_headers() {
             "the first window fills the viewport with a bounded buffer: {initial_rows}"
         );
         assert_eq!(
-            initial_port.height, 300.0,
+            initial_port.height,
+            scene.named("sectioned-list").expect("named list").frame().height,
             "the viewport follows its allocation"
         );
 
