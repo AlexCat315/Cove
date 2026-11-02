@@ -191,7 +191,7 @@ pub fn test_text_environment(size: f32, line_height: f32) -> TextEnvironment {
     if let Some(face) = atlas.font_face() {
         shaper.set_face(face, size);
     }
-    let resolver = TextFontResolver::new("Arial".to_string(), atlas.clone(), 256, 1.0);
+    let resolver = TextFontResolver::new("Arial".to_string(), atlas.clone(), 1.0);
     TextEnvironment::new(
         atlas,
         shaper,

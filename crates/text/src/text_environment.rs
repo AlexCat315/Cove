@@ -1,13 +1,26 @@
 //! Translation of CoveUIText/TextEnvironment.swift.
 use crate::{
-    FontAtlas, SystemFontDefaults, TextCacheLimits, TextCacheSnapshot, TextFontResolver,
-    TextShaper, text_cache::TextCache,
+    FontAtlas, FontRun, PortableRun, SystemFontDefaults, TextCacheLimits, TextCacheSnapshot,
+    TextFontResolver, TextShaper, text_cache::TextCache,
 };
 use cove_core::{
     Color, Font, FontWeight, ShapedGlyph, TextAlignment, TextLayoutCacheKey, TextLayoutOptions,
     TextLayoutResult, TextureId, layout_text,
 };
-use std::{cell::RefCell, collections::HashSet, mem::size_of, sync::Arc};
+use std::{
+    cell::RefCell,
+    collections::{HashMap, HashSet},
+    mem::size_of,
+    rc::Rc,
+    sync::Arc,
+};
+/// Texts queued for the next shaping batch, at most.
+const MAX_PENDING_SHAPES: usize = 4096;
+/// Below this much text a batch is shaped on the calling thread; handing it
+/// to workers would cost more than it saves.
+const PARALLEL_SHAPING_BYTES: usize = 512;
+pub static SHAPE_NANOS: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+pub static SHAPE_CALLS: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
 #[derive(Clone, PartialEq, Eq, Hash)]
 struct ShapeKey {
     text: String,
@@ -24,7 +37,11 @@ pub struct TextEnvironment {
     pub font_resolver: Option<TextFontResolver>,
     shape_cache: Arc<TextCache<ShapeKey, Arc<[ShapedGlyph]>>>,
     layout_cache: Arc<TextCache<TextLayoutCacheKey, Arc<TextLayoutResult>>>,
+    pending_shapes: Rc<RefCell<Vec<ShapeRequest>>>,
 }
+/// A text to shape with the next batch, read when the batch runs so it sees
+/// the font that layout will use. `None` when it no longer needs shaping.
+type ShapeRequest = Box<dyn FnOnce(&TextEnvironment) -> Option<(String, Font)>>;
 impl TextEnvironment {
     #[allow(
         clippy::too_many_arguments,
@@ -56,6 +73,7 @@ impl TextEnvironment {
             font_resolver,
             shape_cache: Arc::new(TextCache::new(limits)),
             layout_cache: Arc::new(TextCache::new(limits)),
+            pending_shapes: Rc::default(),
         }
     }
     pub fn shaping_cache_snapshot(&self) -> TextCacheSnapshot {
@@ -75,7 +93,7 @@ impl TextEnvironment {
             .unwrap_or_else(|| (1024.0 * scale).ceil().max(1024.0) as usize);
         let atlas = FontAtlas::new(edge, edge);
         let mut shaper = TextShaper::default();
-        let resolver = TextFontResolver::new(options.primary_font_name, atlas.clone(), 256, scale);
+        let resolver = TextFontResolver::new(options.primary_font_name, atlas.clone(), scale);
         if let Some(primary) = resolver.prepare_primary_font(&options.default_font) {
             shaper.set_face(primary.face.clone(), options.default_font.size());
             atlas.register_face(primary.face.clone(), 0);
@@ -109,23 +127,113 @@ impl TextEnvironment {
             text: text.into(),
             font: font.clone(),
         };
+        if !self.pending_shapes.borrow().is_empty() && !self.shape_cache.contains(&key) {
+            let requests = self.pending_shapes.take();
+            let mut keys: Vec<ShapeKey> = requests
+                .into_iter()
+                .filter_map(|request| request(self))
+                .map(|(text, font)| ShapeKey { text, font })
+                .collect();
+            keys.push(key.clone());
+            if let Some(glyphs) = self.shape_batch(keys).remove(&key) {
+                return glyphs;
+            }
+        }
         self.shape_cache.value(
             key,
-            |glyphs| {
-                text.len()
-                    .saturating_add(size_of::<ShapeKey>())
-                    .saturating_add(glyphs.len().saturating_mul(size_of::<ShapedGlyph>()))
-            },
-            || {
-                if let Some(resolver) = &self.font_resolver {
-                    let glyphs = resolver.shape(text, &font);
-                    if !glyphs.is_empty() || text.is_empty() {
-                        return glyphs.into();
-                    }
-                }
-                self.shaper.shape_latin(text).into()
-            },
+            |glyphs| shape_cost(text, glyphs),
+            || self.shape_now(text, &font),
         )
+    }
+    /// Queues a text for the next shaping batch: the next [`shape`](Self::shape)
+    /// that misses the cache first calls every queued `request` and shapes
+    /// the texts they return together, running HarfBuzz on worker threads.
+    pub fn request_shape(
+        &self,
+        request: impl FnOnce(&TextEnvironment) -> Option<(String, Font)> + 'static,
+    ) {
+        if self.font_resolver.is_none() || std::env::var_os("ZZ_SERIAL").is_some() {
+            return;
+        }
+        let mut pending = self.pending_shapes.borrow_mut();
+        if pending.len() < MAX_PENDING_SHAPES {
+            pending.push(Box::new(request));
+        }
+    }
+    fn shape_now(&self, text: &str, font: &Font) -> Arc<[ShapedGlyph]> {
+        let __start = std::time::Instant::now();
+        struct __T(std::time::Instant);
+        impl Drop for __T { fn drop(&mut self) { SHAPE_NANOS.fetch_add(self.0.elapsed().as_nanos() as u64, std::sync::atomic::Ordering::Relaxed); SHAPE_CALLS.fetch_add(1, std::sync::atomic::Ordering::Relaxed); } }
+        let _t = __T(__start);
+        if let Some(resolver) = &self.font_resolver {
+            let glyphs = resolver.shape(text, font);
+            if !glyphs.is_empty() || text.is_empty() {
+                return glyphs.into();
+            }
+        }
+        self.shaper.shape_latin(text).into()
+    }
+    /// Shapes the uncached `keys` and caches them. Font fallback runs here,
+    /// so every font is loaded and registered with this thread's atlas before
+    /// a worker shapes with its ID.
+    fn shape_batch(&self, keys: Vec<ShapeKey>) -> HashMap<ShapeKey, Arc<[ShapedGlyph]>> {
+        let __start = std::time::Instant::now();
+        struct __T(std::time::Instant);
+        impl Drop for __T { fn drop(&mut self) { SHAPE_NANOS.fetch_add(self.0.elapsed().as_nanos() as u64, std::sync::atomic::Ordering::Relaxed); } }
+        let _t = __T(__start);
+        let Some(resolver) = &self.font_resolver else {
+            return HashMap::new();
+        };
+        let mut seen = HashSet::with_capacity(keys.len());
+        let keys: Vec<ShapeKey> = keys
+            .into_iter()
+            .filter(|key| {
+                !key.text.is_empty() && !self.shape_cache.contains(key) && seen.insert(key.clone())
+            })
+            .collect();
+        SHAPE_CALLS.fetch_add(keys.len() as u64, std::sync::atomic::Ordering::Relaxed);
+        let runs: Vec<Vec<FontRun>> = keys
+            .iter()
+            .map(|key| resolver.resolve_runs(&key.text, &key.font))
+            .collect();
+        let mut jobs = Vec::new();
+        let slots: Vec<Option<usize>> = runs
+            .iter()
+            .flatten()
+            .map(|run| {
+                run.portable().map(|job| {
+                    jobs.push(job);
+                    jobs.len() - 1
+                })
+            })
+            .collect();
+        let bytes: usize = jobs.iter().map(|job| job.text.len()).sum();
+        let mut shaped = if bytes >= PARALLEL_SHAPING_BYTES {
+            cove_core::work::par_map(&jobs, PortableRun::shape)
+        } else {
+            jobs.iter().map(PortableRun::shape).collect()
+        };
+        let mut slots = slots.into_iter();
+        let mut result = HashMap::with_capacity(keys.len());
+        for (key, runs) in keys.into_iter().zip(&runs) {
+            let mut glyphs = Vec::new();
+            for run in runs {
+                let worker = slots.next().flatten().and_then(|slot| shaped[slot].take());
+                glyphs.extend(worker.unwrap_or_else(|| run.shape()));
+            }
+            if glyphs.is_empty() && !key.text.is_empty() {
+                glyphs = self.shaper.shape_latin(&key.text);
+            }
+            let glyphs: Arc<[ShapedGlyph]> = glyphs.into();
+            let text = key.text.clone();
+            let cached = self.shape_cache.value(
+                key.clone(),
+                |glyphs| shape_cost(&text, glyphs),
+                || glyphs,
+            );
+            result.insert(key, cached);
+        }
+        result
     }
     pub fn cached_layout(
         &self,
@@ -209,6 +317,11 @@ impl TextEnvironment {
             self.atlas.rasterize_glyph(glyph.glyph_id, glyph.font_id);
         }
     }
+}
+fn shape_cost(text: &str, glyphs: &Arc<[ShapedGlyph]>) -> usize {
+    text.len()
+        .saturating_add(size_of::<ShapeKey>())
+        .saturating_add(glyphs.len().saturating_mul(size_of::<ShapedGlyph>()))
 }
 pub struct TextBootstrapOptions {
     pub atlas_texture_id: TextureId,

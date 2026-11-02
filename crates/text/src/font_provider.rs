@@ -3,7 +3,7 @@
 use crate::FontFaceSelector;
 #[cfg(any(target_os = "macos", target_os = "ios"))]
 use crate::native_color_glyph_font::AppleFont;
-use crate::{ColorGlyphSource, FontAtlas, FontFace, TextDirection};
+use crate::{ColorGlyphSource, FontAtlas, FontFace, TextDirection, font_registry};
 use cove_core::{FontWeight, ShapedGlyph};
 #[cfg(not(any(target_os = "macos", target_os = "ios")))]
 use std::path::{Path, PathBuf};
@@ -32,9 +32,87 @@ pub struct FontRun {
     pub utf8_offset: u32,
     pub is_right_to_left: Option<bool>,
 }
+impl FontRun {
+    pub fn shape(&self) -> Vec<ShapedGlyph> {
+        #[cfg(any(target_os = "macos", target_os = "ios"))]
+        if let Some(color) = self.font.face.native_color_font() {
+            return color.shape(&self.text, self.font.id, self.utf8_offset);
+        }
+        shape_text(
+            &self.font.face,
+            &self.text,
+            self.is_right_to_left,
+            self.utf8_offset,
+            self.font.id,
+        )
+    }
+    /// The run as plain data for shaping on another thread, which opens its
+    /// own instance of the font from [`font_registry::open`]. `None` for glyphs
+    /// from a platform color font, which are shaped where the font was loaded.
+    pub fn portable(&self) -> Option<PortableRun> {
+        #[cfg(any(target_os = "macos", target_os = "ios"))]
+        if self.font.face.native_color_font().is_some() {
+            return None;
+        }
+        Some(PortableRun {
+            font_id: self.font.id,
+            text: self.text.clone(),
+            utf8_offset: self.utf8_offset,
+            is_right_to_left: self.is_right_to_left,
+        })
+    }
+}
+/// A [`FontRun`] that any thread can shape.
+#[derive(Clone, Debug)]
+pub struct PortableRun {
+    pub font_id: i64,
+    pub text: String,
+    pub utf8_offset: u32,
+    pub is_right_to_left: Option<bool>,
+}
+impl PortableRun {
+    /// Shapes the run with this thread's instance of its font; the glyphs
+    /// match those of the instance that resolved it.
+    pub fn shape(&self) -> Option<Vec<ShapedGlyph>> {
+        let font = font_registry::open(self.font_id)?;
+        Some(shape_text(
+            &font.face,
+            &self.text,
+            self.is_right_to_left,
+            self.utf8_offset,
+            self.font_id,
+        ))
+    }
+}
+fn shape_text(
+    face: &FontFace,
+    text: &str,
+    is_right_to_left: Option<bool>,
+    utf8_offset: u32,
+    font_id: i64,
+) -> Vec<ShapedGlyph> {
+    face.shape(
+        text,
+        is_right_to_left.map(|rtl| {
+            if rtl {
+                TextDirection::Rtl
+            } else {
+                TextDirection::Ltr
+            }
+        }),
+        None,
+        None,
+        utf8_offset,
+        font_id,
+    )
+}
+/// Loads the fonts for one point size, weight and slant, with fallbacks.
+///
+/// Font IDs come from [`font_registry`], so providers on different threads
+/// give the same font the same ID, and providers on one thread share their
+/// instances.
 pub struct FontProvider {
     fonts: HashMap<String, Rc<ManagedFont>>,
-    next_id: i64,
     size: f32,
     scale: f32,
     primary_name: Option<String>,
@@ -58,10 +136,9 @@ pub struct FontProvider {
     italic: bool,
 }
 impl FontProvider {
-    pub fn new(size: f32, raster_scale: f32, id_base: i64) -> Self {
+    pub fn new(size: f32, raster_scale: f32) -> Self {
         Self {
             fonts: HashMap::new(),
-            next_id: id_base,
             size,
             scale: raster_scale.max(1.0),
             primary_name: None,
@@ -103,38 +180,46 @@ impl FontProvider {
             }
         }
     }
+    /// This thread's instance of `key`, opened by `open` when no provider on
+    /// this thread has it yet, filed under `requested` and `aliases`.
     fn register(
         &mut self,
-        face: FontFace,
+        key: font_registry::FontKey,
         requested: String,
         aliases: &[String],
-    ) -> Rc<ManagedFont> {
-        let id = self.next_id;
-        self.next_id = self
-            .next_id
-            .checked_add(1)
-            .expect("font identity space exhausted");
-        let resolved = if face.post_script_name().is_empty() {
-            requested.clone()
-        } else {
-            face.post_script_name().to_owned()
+        open: impl FnOnce() -> Option<FontFace>,
+    ) -> Option<Rc<ManagedFont>> {
+        let id = font_registry::id(&key);
+        let font = match font_registry::instance(id) {
+            Some(font) => font,
+            None => {
+                let face = open()?;
+                let post_script_name = if face.post_script_name().is_empty() {
+                    requested.clone()
+                } else {
+                    face.post_script_name().to_owned()
+                };
+                let font = Rc::new(ManagedFont {
+                    id,
+                    post_script_name,
+                    point_size: self.size,
+                    raster_scale: self.scale,
+                    face,
+                });
+                font_registry::remember(&font);
+                font
+            }
         };
-        let font = Rc::new(ManagedFont {
-            id,
-            post_script_name: resolved.clone(),
-            point_size: self.size,
-            raster_scale: self.scale,
-            face,
-        });
         self.fonts.insert(requested, font.clone());
-        self.fonts.insert(resolved.clone(), font.clone());
+        self.fonts
+            .insert(font.post_script_name.clone(), font.clone());
         for alias in aliases {
             self.fonts.insert(alias.clone(), font.clone());
         }
         if self.primary_name.is_none() {
-            self.primary_name = Some(resolved);
+            self.primary_name = Some(font.post_script_name.clone());
         }
-        font
+        Some(font)
     }
     pub fn load_primary_font(
         &mut self,
@@ -196,39 +281,32 @@ impl FontProvider {
         result
     }
     pub fn shape_run(&self, run: &FontRun) -> Vec<ShapedGlyph> {
-        #[cfg(any(target_os = "macos", target_os = "ios"))]
-        if let Some(color) = run.font.face.native_color_font() {
-            return color.shape(&run.text, run.font.id, run.utf8_offset);
-        }
-        run.font.face.shape(
-            &run.text,
-            run.is_right_to_left.map(|rtl| {
-                if rtl {
-                    TextDirection::Rtl
-                } else {
-                    TextDirection::Ltr
-                }
-            }),
-            None,
-            None,
-            run.utf8_offset,
-            run.font.id,
-        )
+        run.shape()
     }
     #[cfg(not(any(target_os = "macos", target_os = "ios")))]
     fn load_direct(&mut self, path: &Path, alias: &str) -> Option<Rc<ManagedFont>> {
         if let Some(font) = self.fonts.get(alias) {
             return Some(font.clone());
         }
-        let face = FontFace::from_path(
-            path,
+        let bytes = font_registry::file(path).ok()?;
+        let key = font_registry::FontKey::new(
+            path.to_owned(),
+            FontFaceSelector::default(),
+            &Default::default(),
             self.size,
             self.scale,
-            FontFaceSelector::default(),
-            Default::default(),
-        )
-        .ok()?;
-        Some(self.register(face, alias.into(), &[]))
+        );
+        let (size, scale) = (self.size, self.scale);
+        self.register(key, alias.into(), &[], || {
+            FontFace::from_bytes(
+                bytes,
+                size,
+                scale,
+                FontFaceSelector::default(),
+                Default::default(),
+            )
+            .ok()
+        })
     }
     #[cfg(not(any(target_os = "macos", target_os = "ios")))]
     fn load_primary_direct(&mut self, name: &str) -> Option<Rc<ManagedFont>> {
@@ -350,18 +428,22 @@ impl FontProvider {
             }
             return Some(font);
         }
-        let bytes = std::fs::read(native.path()?).ok()?;
-        let selector = FontFace::probe_selector(&name, &bytes).unwrap_or_default();
-        let face =
-            FontFace::from_bytes(bytes, self.size, self.scale, selector, native.variations())
-                .ok()?;
-        if face.has_color_glyphs()
-            && let Some(color) =
-                crate::NativeColorGlyphFont::new(native.clone(), self.size, self.scale)
-        {
-            face.set_native_color_font(color);
-        }
-        Some(self.register(face, name, aliases))
+        let path = native.path()?;
+        let bytes = font_registry::file(&path).ok()?;
+        let selector = font_registry::selector(&path, &name, &bytes).unwrap_or_default();
+        let variations = native.variations();
+        let key =
+            font_registry::FontKey::new(path, selector, &variations, self.size, self.scale);
+        let (size, scale) = (self.size, self.scale);
+        self.register(key, name, aliases, || {
+            let face = FontFace::from_bytes(bytes, size, scale, selector, variations).ok()?;
+            if face.has_color_glyphs()
+                && let Some(color) = crate::NativeColorGlyphFont::new(native.clone(), size, scale)
+            {
+                face.set_native_color_font(color);
+            }
+            Some(face)
+        })
     }
     #[cfg(any(target_os = "macos", target_os = "ios"))]
     fn covering_apple_font(

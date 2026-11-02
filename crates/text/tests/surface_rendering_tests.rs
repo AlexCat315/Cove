@@ -75,7 +75,7 @@ fn transparent_rounded_borders_do_not_fill_the_control_interior() {
 #[test]
 fn monospaced_fonts_give_code_characters_equal_advances() {
     let atlas = FontAtlas::new(1024, 1024);
-    let resolver = TextFontResolver::new(SystemFontDefaults::primary_font_name(), atlas, 256, 1.0);
+    let resolver = TextFontResolver::new(SystemFontDefaults::primary_font_name(), atlas, 1.0);
     let monospaced = Font::monospaced(14.0, FontWeight::Regular);
     let glyphs = resolver.shape("ilW0", &monospaced);
     assert_eq!(glyphs.len(), 4, "all four code characters shape");

@@ -214,6 +214,27 @@ impl Text {
 
     fn install_measure(layout: &LayoutNode, snapshot: Self) {
         let weak_layout = layout.downgrade();
+        if let Some(environment) = TextEnvironmentHolder::current() {
+            // Let one batch shape every label that this layout pass measures.
+            let weak_layout = weak_layout.clone();
+            let (string, single_line) = (
+                snapshot.string.clone(),
+                snapshot.truncates || snapshot.line_limit == Some(1),
+            );
+            environment.request_shape(move |environment| {
+                let layout = LayoutNode::upgrade(&weak_layout)?;
+                if layout.text_measure().is_some() {
+                    return None;
+                }
+                let font = Self::metrics_for_layout(&layout, environment).font;
+                let text = if single_line {
+                    string.lines().collect::<Vec<_>>().join(" ")
+                } else {
+                    string
+                };
+                Some((text, font))
+            });
+        }
         layout.set_measure_func(Some(Rc::new(
             move |width, width_mode, _height, _height_mode| {
                 let Some(environment) = TextEnvironmentHolder::current() else {

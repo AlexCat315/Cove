@@ -81,26 +81,16 @@ struct ResolverData {
     primary_name: String,
     atlas: FontAtlas,
     scale: f32,
-    block: i64,
-    next_base: i64,
     providers: HashMap<Font, FontProvider>,
 }
 #[derive(Clone)]
 pub struct TextFontResolver(Rc<RefCell<ResolverData>>);
 impl TextFontResolver {
-    pub fn new(
-        primary_name: String,
-        atlas: FontAtlas,
-        provider_id_block_size: i64,
-        scale: f32,
-    ) -> Self {
-        let block = provider_id_block_size.max(32);
+    pub fn new(primary_name: String, atlas: FontAtlas, scale: f32) -> Self {
         Self(Rc::new(RefCell::new(ResolverData {
             primary_name,
             atlas,
             scale: scale.max(1.0),
-            block,
-            next_base: block.max(256),
             providers: HashMap::new(),
         })))
     }
@@ -111,11 +101,7 @@ impl TextFontResolver {
     ) -> R {
         let mut data = self.0.borrow_mut();
         if !data.providers.contains_key(font) {
-            let mut provider = FontProvider::new(font.size(), data.scale, data.next_base);
-            data.next_base = data
-                .next_base
-                .checked_add(data.block)
-                .expect("font provider identity space exhausted");
+            let mut provider = FontProvider::new(font.size(), data.scale);
             let name = font.family().unwrap_or_else(|| {
                 if font.design() == FontDesign::Monospaced {
                     SystemFontDefaults::monospaced_font_name()
@@ -130,7 +116,10 @@ impl TextFontResolver {
         let atlas = data.atlas.clone();
         use_provider(data.providers.get_mut(font).unwrap(), &atlas)
     }
-    pub fn shape(&self, text: &str, font: &Font) -> Vec<ShapedGlyph> {
+    /// The font runs of `text`, after font fallback and bidi splitting. Every
+    /// font they use is loaded and registered with the atlas, so a run can be
+    /// shaped on any thread that opens its font ([`FontRun::portable`]).
+    pub fn resolve_runs(&self, text: &str, font: &Font) -> Vec<FontRun> {
         if self.0.borrow().primary_name.is_empty() {
             return vec![];
         }
@@ -141,10 +130,14 @@ impl TextFontResolver {
                 provider.resolve_runs(text)
             };
             provider.register_all_fonts(atlas);
-            runs.iter()
-                .flat_map(|run| provider.shape_run(run))
-                .collect()
+            runs
         })
+    }
+    pub fn shape(&self, text: &str, font: &Font) -> Vec<ShapedGlyph> {
+        self.resolve_runs(text, font)
+            .iter()
+            .flat_map(FontRun::shape)
+            .collect()
     }
     fn directional_runs(text: &str, provider: &mut FontProvider) -> Vec<FontRun> {
         let bidi = BidiParagraphs::new(text, false);

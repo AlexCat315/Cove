@@ -21,7 +21,7 @@ use cove_text::{FontAtlas, FontProvider, FontRun, SystemFontDefaults};
 const ATLAS_EDGE: usize = 1024;
 
 fn provider(size: f32, raster_scale: f32) -> FontProvider {
-    FontProvider::new(size, raster_scale, 1)
+    FontProvider::new(size, raster_scale)
 }
 
 fn load(provider: &mut FontProvider, weight: FontWeight) -> Rc<cove_text::ManagedFont> {

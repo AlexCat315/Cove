@@ -30,7 +30,7 @@ use cove_text::{FontProvider, SystemFontDefaults};
 /// through `SystemFontDefaults::primary_font_name()`, which is what every host
 /// passes in production.
 fn provider() -> FontProvider {
-    let mut provider = FontProvider::new(14.0, 1.0, 1);
+    let mut provider = FontProvider::new(14.0, 1.0);
     assert!(
         provider
             .load_primary_font(
@@ -45,7 +45,7 @@ fn provider() -> FontProvider {
 }
 
 fn fallback_face(weight: FontWeight) -> (String, i64) {
-    let mut provider = FontProvider::new(14.0, 1.0, 1);
+    let mut provider = FontProvider::new(14.0, 1.0);
     assert!(
         provider
             .load_primary_font(&SystemFontDefaults::primary_font_name(), weight, false)

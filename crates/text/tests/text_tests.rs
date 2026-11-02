@@ -241,7 +241,7 @@ fn hidpi_shaping_preserves_logical_advances() {
 }
 
 fn provider(size: f32, scale: f32) -> FontProvider {
-    FontProvider::new(size, scale, 1)
+    FontProvider::new(size, scale)
 }
 
 fn load_primary(provider: &mut FontProvider) -> String {

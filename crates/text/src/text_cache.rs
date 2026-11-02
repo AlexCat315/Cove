@@ -60,6 +60,13 @@ impl<K: Clone + Eq + Hash, V: Clone> TextCache<K, V> {
         s.entries.clear();
         s.bytes = 0;
     }
+    pub fn contains(&self, key: &K) -> bool {
+        self.storage
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .entries
+            .contains_key(key)
+    }
     pub fn value(&self, key: K, cost: impl FnOnce(&V) -> usize, build: impl FnOnce() -> V) -> V {
         let generation = {
             let mut s = self.storage.lock().unwrap_or_else(|e| e.into_inner());

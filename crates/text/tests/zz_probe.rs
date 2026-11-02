@@ -2,7 +2,7 @@ use cove_core::FontWeight;
 use cove_text::{FontProvider, SystemFontDefaults};
 #[test]
 fn probe() {
-    let mut p = FontProvider::new(14.0, 1.0, 1);
+    let mut p = FontProvider::new(14.0, 1.0);
     let name = SystemFontDefaults::primary_font_name();
     let _ = p.load_primary_font(&name, FontWeight::Regular, false);
     let regular = p

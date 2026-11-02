@@ -21,7 +21,7 @@ const TEXTURE_ID: TextureId = 1;
 use cove_text::{FontAtlas, FontProvider, ShapedGlyph, SystemFontDefaults};
 
 fn pipeline(size: f32, scale: f32) -> (FontProvider, FontAtlas) {
-    let mut provider = FontProvider::new(size, scale, 1);
+    let mut provider = FontProvider::new(size, scale);
     provider
         .load_primary_font(
             &SystemFontDefaults::primary_font_name(),

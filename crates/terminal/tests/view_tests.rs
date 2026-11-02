@@ -112,7 +112,7 @@ fn test_environment() -> TextEnvironment {
         shaper.set_face(face, 13.0);
     }
     let font = Font::monospaced(13.0, FontWeight::Regular);
-    let resolver = TextFontResolver::new("Menlo".to_owned(), atlas.clone(), 256, 1.0);
+    let resolver = TextFontResolver::new("Menlo".to_owned(), atlas.clone(), 1.0);
     TextEnvironment::new(
         atlas,
         shaper,

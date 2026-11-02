@@ -6,6 +6,7 @@ mod font_atlas;
 mod font_collection;
 mod font_face;
 mod font_provider;
+pub mod font_registry;
 pub mod free_type_color_glyphs;
 mod native;
 mod native_color_glyph_font;
