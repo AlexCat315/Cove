@@ -80,6 +80,10 @@ impl RenderObject {
     pub fn children(&self) -> Vec<RenderObject> {
         self.0.borrow().children.clone()
     }
+    /// Whether the object has children, without cloning them.
+    pub fn has_children(&self) -> bool {
+        !self.0.borrow().children.is_empty()
+    }
     pub fn is_layer_root(&self) -> bool {
         self.0.borrow().is_layer_root
     }
@@ -109,6 +113,10 @@ impl RenderObject {
     }
     pub fn last_clip_stack(&self) -> Vec<Clip> {
         self.0.borrow().last_clip_stack.clone()
+    }
+    /// Compares the recorded clip stack without cloning it.
+    pub fn last_clip_stack_eq(&self, clips: &[Clip]) -> bool {
+        self.0.borrow().last_clip_stack == clips
     }
     pub fn set_last_clip_stack(&self, clips: Vec<Clip>) {
         self.0.borrow_mut().last_clip_stack = clips;
@@ -196,7 +204,9 @@ pub struct PaintPlan {
 pub(crate) struct RenderTreeData {
     pub root: Option<RenderObject>,
     by_node: HashMap<Node, RenderObject>,
-    pub flat_order_cache: Option<PaintPlan>,
+    /// Shared: every render of an unchanged tree reuses the same plan
+    /// without copying it.
+    pub flat_order_cache: Option<Rc<PaintPlan>>,
 }
 
 pub struct RenderTree {
@@ -365,14 +375,15 @@ impl RenderTree {
     }
     /// Flat, depth-first, parent-before-child list in final paint order.
     pub fn flat_draw_order(&self) -> Vec<RenderObject> {
-        self.paint_plan().objects
+        self.paint_plan().objects.clone()
     }
-    pub fn paint_plan(&self) -> PaintPlan {
+    pub fn paint_plan(&self) -> Rc<PaintPlan> {
         if let Some(cached) = self.data.borrow().flat_order_cache.clone() {
             return cached;
         }
         let mut plan = PaintPlan::default();
         let Some(root) = self.root() else {
+            let plan = Rc::new(plan);
             self.data.borrow_mut().flat_order_cache = Some(plan.clone());
             return plan;
         };
@@ -405,6 +416,7 @@ impl RenderTree {
                 }
             }
         }
+        let plan = Rc::new(plan);
         self.data.borrow_mut().flat_order_cache = Some(plan.clone());
         plan
     }

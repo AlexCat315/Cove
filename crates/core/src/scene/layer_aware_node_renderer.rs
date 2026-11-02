@@ -26,6 +26,7 @@ use super::render_culling::RenderCulling;
 use super::rendering::{Painter, content_mask, paint_scaled};
 use super::{Affine2D, Node, RenderObject, RenderTree};
 use crate::{Clip, DrawList, LayeredShadow, Point, Rect, RoundedRect};
+use std::rc::Rc;
 
 pub struct LayerAwareNodeRenderer {
     content_placements: Vec<Affine2D>,
@@ -40,8 +41,9 @@ struct OpenNode {
     /// layer whose slice `finish` caches.
     list: Option<DrawList>,
     own: Affine2D,
-    parent_clips: Vec<Clip>,
-    child_clips: Vec<Clip>,
+    /// Shared, so descending into a child that adds no clip costs no copy.
+    parent_clips: Rc<[Clip]>,
+    child_clips: Rc<[Clip]>,
     allows_container_cache: bool,
     first_vertex: usize,
     descendant_start: usize,
@@ -97,8 +99,8 @@ impl LayerAwareNodeRenderer {
             end: usize::MAX,
             list: Some(std::mem::take(frame)),
             own: Affine2D::IDENTITY,
-            parent_clips: Vec::new(),
-            child_clips: Vec::new(),
+            parent_clips: Rc::from([]),
+            child_clips: Rc::from([]),
             allows_container_cache: true,
             first_vertex: 0,
             descendant_start: 0,
@@ -133,7 +135,7 @@ impl LayerAwareNodeRenderer {
             };
             let parent_clips = open
                 .last()
-                .map_or_else(Vec::new, |record| record.child_clips.clone());
+                .map_or_else(|| Rc::from([]), |record| record.child_clips.clone());
             let allows_cache = open
                 .last()
                 .is_none_or(|record| record.allows_container_cache);
@@ -152,7 +154,8 @@ impl LayerAwareNodeRenderer {
                 }
             }
 
-            if !object.children().is_empty() {
+            let has_children = object.has_children();
+            if has_children {
                 placements[index] = if node.content_offset() == Point::default() {
                     own
                 } else {
@@ -178,7 +181,7 @@ impl LayerAwareNodeRenderer {
             let mut inherited_clip_revision = 0;
             if object.is_layer_root() {
                 let placement_unchanged = object.last_placement() == Some(own);
-                let clip_unchanged = object.last_clip_stack() == parent_clips;
+                let clip_unchanged = object.last_clip_stack_eq(&parent_clips);
                 let reused = {
                     let destination = target_list(&mut open);
                     reuse(
@@ -195,7 +198,7 @@ impl LayerAwareNodeRenderer {
                     index = end;
                     continue;
                 }
-                let defer_container = !object.children().is_empty()
+                let defer_container = has_children
                     && (!allows_cache
                         || object.cache_invalid()
                         || !placement_unchanged
@@ -208,7 +211,7 @@ impl LayerAwareNodeRenderer {
                         list.geometry_antialiasing = destination.geometry_antialiasing;
                         list.set_viewport_bounds(destination.viewport_bounds);
                     }
-                    for clip in &parent_clips {
+                    for clip in parent_clips.iter() {
                         list.push_clip(*clip);
                     }
                     inherited_clip_revision = list.clip_revision;
@@ -251,7 +254,7 @@ fn begin(
     end: usize,
     layer: Option<DrawList>,
     own: Affine2D,
-    parent_clips: &[Clip],
+    parent_clips: &Rc<[Clip]>,
     allows_container_cache: bool,
     inherited_clip_revision: u64,
 ) {
@@ -264,17 +267,22 @@ fn begin(
     let clipped = node.clips_to_bounds() && width > 0.0 && height > 0.0;
     let clip = Rect::new(x, y, width, height);
     let mask = content_mask(node, x, y, width, height, radius, border_width);
-    let mut child_clips = parent_clips.to_vec();
-    if clipped {
-        child_clips.push(Clip { rect: clip, mask });
-    }
+    let child_clips: Rc<[Clip]> = if clipped {
+        parent_clips
+            .iter()
+            .copied()
+            .chain(std::iter::once(Clip { rect: clip, mask }))
+            .collect()
+    } else {
+        parent_clips.clone()
+    };
     open.push(OpenNode {
         object: Some(object.clone()),
         node: Some(node.clone()),
         end,
         list: layer,
         own,
-        parent_clips: parent_clips.to_vec(),
+        parent_clips: parent_clips.clone(),
         child_clips,
         allows_container_cache,
         first_vertex: 0,
@@ -362,7 +370,7 @@ fn finish(open: &mut Vec<OpenNode>) {
         return;
     }
     object.set_last_placement(Some(record.own));
-    object.set_last_clip_stack(record.parent_clips.clone());
+    object.set_last_clip_stack(record.parent_clips.to_vec());
     object.set_cache_invalid(false);
     let Some(mut list) = record.list else {
         object.set_cached_layer_list(None);
@@ -372,7 +380,7 @@ fn finish(open: &mut Vec<OpenNode>) {
         list.pop_clip(*clip);
     }
     object.set_cached_layer_uses_local_clips(list.clip_revision != record.inherited_clip_revision);
-    object.set_cached_paint_bounds(if object.children().is_empty() {
+    object.set_cached_paint_bounds(if !object.has_children() {
         RenderCulling::bounds(&list)
     } else {
         None
@@ -409,7 +417,7 @@ fn reuse(
     {
         return false;
     }
-    if object.children().is_empty()
+    if !object.has_children()
         && let Some(bounds) = object.cached_paint_bounds()
         && let Some(old) = object.last_placement()
         && own.a == old.a
@@ -429,7 +437,7 @@ fn reuse(
         let _ = list.append_preclipped(&cached, clips, Point::default());
         return true;
     }
-    if object.children().is_empty()
+    if !object.has_children()
         && !node.clips_to_bounds()
         && !object.cached_layer_uses_local_clips()
         && let Some(old) = object.last_placement()

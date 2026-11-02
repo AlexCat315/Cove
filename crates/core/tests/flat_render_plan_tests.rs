@@ -81,7 +81,7 @@ fn order(tree: &RenderTree) -> Vec<ElementId> {
         .collect()
 }
 
-fn plan(tree: &RenderTree) -> PaintPlan {
+fn plan(tree: &RenderTree) -> std::rc::Rc<PaintPlan> {
     tree.paint_plan()
 }
 
