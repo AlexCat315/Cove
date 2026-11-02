@@ -192,23 +192,22 @@ fn the_tree_story_mounts_with_its_caption() {
         2.0,
         Theme::default_light(),
         |scene, _| {
-            // GAP: no `gallery-tree` viewport node exists; the story names only
-            // `tree-caption`.
             let caption = scene.require_named("tree-caption");
             assert!(
                 caption.frame().width > 0.0 && caption.frame().height > 0.0,
                 "the tree caption has a real box"
             );
+            let tree = scene.require_named("tree-control");
             assert!(
-                scene.named("gallery-tree").is_none(),
-                "GAP: the tree story exposes no gallery-tree viewport"
+                tree.frame().width > 0.0 && tree.frame().height > 0.0,
+                "the tree viewport has a real box"
             );
             assert!(
-                !scene.nodes().iter().any(|node| {
+                scene.nodes().iter().any(|node| {
                     node.accessibility()
                         .is_some_and(|semantics| semantics.role == AccessibilityRole::Tree)
                 }),
-                "the story publishes no tree role"
+                "the story publishes a tree role"
             );
         },
     );

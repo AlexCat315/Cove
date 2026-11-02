@@ -11,15 +11,23 @@
 use cove_composition::Scope;
 use std::collections::BTreeSet;
 
-use cove_core::State;
+use cove_core::scene::{Align, FlexDirection, Justify, Wrap};
+use cove_core::{Binding, State};
+use cove_ui_compose::modifiers::layout::LayoutFrameExt;
 use cove_ui_compose::modifiers::style::SemanticStyleViewExt;
+use cove_ui_compose::primitives::controls::Button;
 use cove_ui_compose::primitives::layout::accordion::{Accordion, AccordionItem};
 use cove_ui_compose::primitives::layout::navigation_components::{
     BreadcrumbItem, PaginationItem, PaginationModel,
 };
+use cove_ui_compose::primitives::navigation::navigation_stack::{
+    NavigationStack, navigation_title,
+};
 use cove_ui_compose::primitives::text::Text;
+use cove_ui_compose::primitives::text::text_buffer::TextBuffer;
+use cove_ui_compose::primitives::text::text_field::TextField;
 use cove_ui_compose::theme::tokens::SemanticColorRef;
-use cove_ui_compose::{AnyView, LayoutDebugExt, View};
+use cove_ui_compose::{AnyView, BoxView, LayoutDebugExt, TupleView, View};
 
 use super::feedback::StorySection;
 use crate::gallery_content::catalog::GalleryOptions;
@@ -894,14 +902,86 @@ impl Default for NavigationStackStory {
 
 impl View for NavigationStackStory {
     fn body(&self, _cx: &Scope) -> AnyView {
+        let root_path = self.path.clone();
+        let root_draft = self.draft.clone();
+        let destination_path = self.path.clone();
+        let stack = AnyView::new(
+            NavigationStack::new(
+                self.path.binding(),
+                move || {
+                    let push_state = root_path.clone();
+                    let draft_state = root_draft.clone();
+                    let name_field: AnyView = AnyView::new(
+                        TextField::new(
+                            "Draft",
+                            Binding::new(
+                                {
+                                    let state = draft_state.clone();
+                                    move || TextBuffer::from(state.get())
+                                },
+                                move |value: TextBuffer|{
+                                    draft_state.set(value.string_value());
+                                },
+                            ),
+                        )
+                        .frame_width(220.0),
+                    );
+                    AnyView::new(navigation_title(
+                        "Root",
+                        AnyView::new(BoxView::new(
+                            FlexDirection::Column,
+                            Align::FlexStart,
+                            Justify::FlexStart,
+                            Wrap::NoWrap,
+                            10.0,
+                            AnyView::new(TupleView::new(vec![
+                                AnyView::new(Text::new("Root page")),
+                                name_field,
+                                AnyView::new(Button::title("Push detail", move || {
+                                    push_state.update(|path| {
+                                        path.push(format!("Detail {}", path.len() + 1));
+                                    });
+                                })),
+                            ])),
+                        )),
+                    ))
+                },
+                move |route: String| {
+                    let pop_state = destination_path.clone();
+                    AnyView::new(navigation_title(
+                        route.clone(),
+                        AnyView::new(BoxView::new(
+                            FlexDirection::Column,
+                            Align::FlexStart,
+                            Justify::FlexStart,
+                            Wrap::NoWrap,
+                            10.0,
+                            AnyView::new(TupleView::new(vec![
+                                AnyView::new(Text::new(format!("Pushed {route}"))),
+                                AnyView::new(Button::title("Pop", move || {
+                                    pop_state.update(|path| {
+                                        path.pop();
+                                    });
+                                })),
+                            ])),
+                        )),
+                    ))
+                },
+            )
+            .frame_size(340.0, 260.0)
+            .debug_name("navigation-stack-control"),
+        );
         AnyView::new(StorySection::new(
             "Page stack",
             "Push and pop keep the root mounted. Only the top page is painted and interactive; the incoming page slides in with a fade, and a non-empty initial path restores the same page on launch.",
-            AnyView::new(
-                Text::new(self.caption())
-                    .semantic_font(cove_ui_compose::theme::SemanticFontRef::caption())
-                    .semantic_foreground(SemanticColorRef::on_surface_muted()),
-            ),
+            AnyView::new(TupleView::new(vec![
+                stack,
+                AnyView::new(
+                    Text::new(self.caption())
+                        .semantic_font(cove_ui_compose::theme::SemanticFontRef::caption())
+                        .semantic_foreground(SemanticColorRef::on_surface_muted()),
+                ),
+            ])),
         ))
     }
 

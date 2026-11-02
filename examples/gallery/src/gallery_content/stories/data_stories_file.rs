@@ -9,14 +9,21 @@
 //! binding; they are ported for completeness but carry no algorithm.
 
 use cove_composition::Scope;
-use std::collections::BTreeSet;
+use std::collections::{BTreeSet, HashSet};
+use std::rc::Rc;
 
-use cove_core::State;
+use cove_core::{Binding, State};
+use cove_ui_compose::modifiers::layout::LayoutFrameExt;
 use cove_ui_compose::modifiers::style::SemanticStyleViewExt;
 use cove_ui_compose::primitives::data::lists::refresh::RefreshOptions;
+use cove_ui_compose::primitives::data::lists::tree::{
+    Tree, TreeOptions, TreeSearch, TreeSelection,
+};
 use cove_ui_compose::primitives::text::Text;
+use cove_ui_compose::primitives::text::text_buffer::TextBuffer;
+use cove_ui_compose::primitives::text::text_field::TextField;
 use cove_ui_compose::theme::tokens::SemanticColorRef;
-use cove_ui_compose::{AnyView, LayoutDebugExt, View, ViewExt};
+use cove_ui_compose::{AnyView, LayoutDebugExt, TupleView, View, ViewExt};
 
 use super::feedback::StorySection;
 use crate::gallery_content::catalog::GalleryOptions;
@@ -219,15 +226,94 @@ impl TreeStory {
 
 impl View for TreeStory {
     fn body(&self, _cx: &Scope) -> AnyView {
+        let expanded_state = self.expanded.clone();
+        let expanded = Binding::new(
+            {
+                let state = expanded_state.clone();
+                move || state.get().into_iter().collect::<HashSet<String>>()
+            },
+            move |set: HashSet<String>| expanded_state.set(set.into_iter().collect()),
+        );
+        let multiple_state = self.selected_ids.clone();
+        let multiple = Binding::new(
+            {
+                let state = multiple_state.clone();
+                move || state.get().into_iter().collect::<HashSet<String>>()
+            },
+            move |set: HashSet<String>| multiple_state.set(set.into_iter().collect()),
+        );
+        let text: Rc<dyn Fn(&SceneNode) -> String> =
+            Rc::new(|node: &SceneNode| format!("{} {}", node.title, node.id));
+        let options = TreeOptions {
+            is_enabled: self.options.is_enabled,
+            selection: TreeSelection {
+                primary: self.selection.binding(),
+                multiple: Some(multiple),
+                expanded: Some(expanded),
+                ..TreeSelection::default()
+            },
+            search: TreeSearch {
+                query: self.query.get(),
+                text: Some(text),
+                ..TreeSearch::default()
+            },
+            ..TreeOptions::default()
+        };
+        let tree = AnyView::new(
+            Tree::new(
+                SceneNode::gallery(),
+                |node: &SceneNode| node.id.to_owned(),
+                |node: &SceneNode| node.children.clone(),
+                None,
+                options,
+                |node: &SceneNode, selected: bool, expands: bool, depth: usize| {
+                    let marker = if node.children.is_empty() {
+                        "·"
+                    } else if expands {
+                        "▾"
+                    } else {
+                        "▸"
+                    };
+                    let row = format!("{}{marker} {}", "  ".repeat(depth), node.title);
+                    let text = Text::new(row);
+                    AnyView::new(if selected {
+                        text.semantic_foreground(SemanticColorRef::info())
+                    } else {
+                        text.semantic_foreground(SemanticColorRef::on_surface())
+                    })
+                },
+            )
+            .frame_size(320.0, 260.0)
+            .debug_name("tree-control"),
+        );
+        let query_state = self.query.clone();
+        let search = AnyView::new(
+            TextField::new(
+                "Filter nodes",
+                Binding::new(
+                    {
+                        let state = query_state.clone();
+                        move || TextBuffer::from(state.get())
+                    },
+                    move |value: TextBuffer| query_state.set(value.string_value()),
+                ),
+            )
+            .frame_width(220.0)
+            .debug_name("tree-search"),
+        );
         AnyView::new(StorySection::new(
             "Scene hierarchy",
             "Search retains matching ancestors. Use arrows, Home and End; Option/Alt + Right expands all and Option/Alt + Left collapses all. Command/Control-click selects multiple nodes.",
-            AnyView::new(
-                Text::new(self.caption())
-                    .semantic_font(cove_ui_compose::theme::SemanticFontRef::caption())
-                    .semantic_foreground(SemanticColorRef::on_surface_muted())
-                    .debug_name("tree-caption"),
-            ),
+            AnyView::new(TupleView::new(vec![
+                search,
+                tree,
+                AnyView::new(
+                    Text::new(self.caption())
+                        .semantic_font(cove_ui_compose::theme::SemanticFontRef::caption())
+                        .semantic_foreground(SemanticColorRef::on_surface_muted())
+                        .debug_name("tree-caption"),
+                ),
+            ])),
         ))
     }
 

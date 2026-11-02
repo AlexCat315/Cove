@@ -13,11 +13,14 @@ pub mod animation_system;
 pub mod avatar_story;
 pub mod calendar;
 pub mod command_story;
+pub mod container_stories;
 pub mod controls;
 pub mod data_stories;
+pub mod data_list_stories;
 pub mod data_stories_file;
 pub mod data_table_story;
 pub mod feedback;
+pub mod field_stories;
 pub mod image_story;
 pub mod intrinsic_fitting;
 pub mod layout;
@@ -29,6 +32,7 @@ pub mod navigation_stories_file;
 pub mod overlay_stories;
 pub mod overlay_stories_file;
 pub mod overview;
+pub mod picker_stories;
 pub mod placement_example;
 pub mod product_stories;
 pub mod rich_text;
@@ -51,7 +55,14 @@ pub use animation_system::{AnimationSystemExamples, DemoPhase};
 pub use avatar_story::AvatarStory;
 pub use calendar::CalendarStory;
 pub use command_story::CommandStory;
+pub use container_stories::{
+    BoundedScrollStory, CarouselStory, PanelStory, ScrollViewStory, SplitViewStory, StatusBarStory,
+    ZStackStory,
+};
 pub use controls::{ButtonStory, CheckboxStory, ToggleStory};
+pub use data_list_stories::{
+    ListStory, PropertyGridStory, ReorderableStory, ScrollbarStory, TimelineStory,
+};
 pub use data_stories::{AdaptiveTableSample, ChartExplorationStory};
 pub use data_stories_file::{
     DragAndDropStory, RefreshListStory, SectionedListStory, SwipeListStory, TreeStory,
@@ -59,6 +70,10 @@ pub use data_stories_file::{
 };
 pub use data_table_story::DataTableStory;
 pub use feedback::{AlertStory, BadgeStory, EmptyStory, ProgressStory, StorySection};
+pub use field_stories::{
+    AssetRefStory, ColorFieldStory, JsonFieldStory, NumberFieldStory, RangeSliderStory,
+    SearchFieldStory, SelectStory, SliderStory, TextAreaStory, TextFieldStory, Vec3FieldStory,
+};
 pub use image_story::ImageStory;
 pub use intrinsic_fitting::{FIT_CHIPS, ViewThatFitsStory};
 pub use layout::{LayoutGridStory, LazyGridStory, MasonrySample, MasonryStory};
@@ -73,6 +88,10 @@ pub use navigation_stories_file::{
 pub use overlay_stories::{HoverCardStory, PopconfirmStory};
 pub use overlay_stories_file::{DisclosureStory, MenuStory, ModalStory, PopoverStory, TabsStory};
 pub use overview::{DashboardCard, IntroductionStory, MetricCard};
+pub use picker_stories::{
+    DatePickerStory, DateRangeStory, IconStory, KeyCapStory, LinkStory, MenuButtonStory,
+    SplitButtonStory, TimeFieldStory,
+};
 pub use placement_example::PlacementExample;
 pub use product_stories::{ComboboxStory, FormStory, NotificationStory, RadioStory, TooltipStory};
 pub use rich_text::RichTextStory;

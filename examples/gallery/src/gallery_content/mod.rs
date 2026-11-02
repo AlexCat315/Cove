@@ -16,4 +16,4 @@ pub use catalog::{
 };
 pub use counter_content::CounterContent;
 pub use gallery_view::{GalleryStorySection, GalleryView, current_entry, size_choices};
-pub use routing::{MigrationPending, StoryDispatch};
+pub use routing::{StoryDispatch, StorySource};

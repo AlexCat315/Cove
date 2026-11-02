@@ -45,6 +45,7 @@ impl View for Harness {
             minimum: self.minimum,
             maximum: self.maximum,
             label: "Time".to_string(),
+            ..TimePickerOptions::default()
         };
         AnyView::new(TimePicker::new(self.time.binding(), options).frame(
             Some(FrameDimension::Points(340.0)),

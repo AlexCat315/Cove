@@ -9,16 +9,45 @@
 //! deliberate failure for one query.
 
 use cove_composition::Scope;
-use cove_core::State;
+use cove_core::{Binding, State};
 use cove_ui_compose::LayoutDebugExt;
 use cove_ui_compose::modifiers::style::SemanticStyleViewExt;
+use cove_ui_compose::primitives::controls::Button;
+use cove_ui_compose::primitives::controls::fields::combobox::{Combobox, ComboboxSearch};
+use cove_ui_compose::primitives::controls::fields::radio_group::{RadioGroup, RadioOption};
+use cove_ui_compose::primitives::controls::fields::select::SelectOption;
+use cove_ui_compose::primitives::controls::form::{Form, FormField};
 use cove_ui_compose::primitives::controls::form_validation::{
     FormController, FormRule, FormSubmissionState,
 };
-use cove_ui_compose::primitives::overlays::toast::controller::ToastController;
+use cove_ui_compose::primitives::overlays::toast::controller::{ToastController, ToastNotification};
+use cove_ui_compose::primitives::overlays::toast::notification_host::NotificationHost;
+use cove_ui_compose::primitives::overlays::tooltip::Tooltip;
 use cove_ui_compose::primitives::text::Text;
+use cove_ui_compose::primitives::text::text_buffer::TextBuffer;
+use cove_ui_compose::primitives::text::text_field::TextField;
+use cove_ui_compose::theme::SemanticFontRef;
 use cove_ui_compose::theme::tokens::SemanticColorRef;
-use cove_ui_compose::{AnyView, View, ViewExt};
+use cove_ui_compose::{AnyView, TupleView, View};
+use std::rc::Rc;
+
+/// A `String` state as a text-field buffer binding.
+fn text_binding(state: &State<String>) -> Binding<TextBuffer> {
+    let read = state.clone();
+    let write = state.clone();
+    Binding::new(
+        move || TextBuffer::from(read.get()),
+        move |value: TextBuffer| write.set(value.string_value()),
+    )
+}
+
+fn caption(text: String) -> AnyView {
+    AnyView::new(
+        Text::new(text)
+            .semantic_font(SemanticFontRef::caption())
+            .semantic_foreground(SemanticColorRef::on_surface_muted()),
+    )
+}
 
 use super::feedback::StorySection;
 use crate::gallery_content::catalog::GalleryOptions;
@@ -256,13 +285,30 @@ impl RadioStory {
 
 impl View for RadioStory {
     fn body(&self, _cx: &Scope) -> AnyView {
-        let caption = Text::new(self.caption())
-            .semantic_font(cove_ui_compose::theme::SemanticFontRef::caption())
-            .semantic_foreground(SemanticColorRef::on_surface_muted());
+        let options = RADIO_CHOICES
+            .iter()
+            .map(|choice| {
+                let option =
+                    RadioOption::new(choice.id.to_owned(), choice.title).enabled(choice.is_enabled);
+                match choice.detail {
+                    Some(detail) => option.detail(detail),
+                    None => option,
+                }
+            })
+            .collect();
+        let group = AnyView::new(
+            RadioGroup::new(self.selection.binding(), options)
+                .enabled(self.options.is_enabled)
+                .horizontal(false)
+                .debug_name("product-radio"),
+        );
         AnyView::new(StorySection::new(
             "Performance preference",
             "Tab enters once. Arrows choose an enabled option and move focus; the disabled option is skipped.",
-            AnyView::new(AnyView::new(caption).debug_name("product-radio-caption")),
+            AnyView::new(TupleView::new(vec![
+                group,
+                AnyView::new(AnyView::new(caption(self.caption())).debug_name("product-radio-caption")),
+            ])),
         ))
     }
 
@@ -281,7 +327,7 @@ pub struct FormStory {
     pub options: GalleryOptions,
     name: State<String>,
     email: State<String>,
-    controller: FormController,
+    controller: Rc<FormController>,
     status: State<String>,
 }
 
@@ -291,7 +337,7 @@ impl FormStory {
             options,
             name: State::new(String::new()),
             email: State::new(String::new()),
-            controller: FormController::new(),
+            controller: Rc::new(FormController::new()),
             status: State::new("Complete the required fields".to_owned()),
         }
     }
@@ -350,14 +396,64 @@ impl FormStory {
 
 impl View for FormStory {
     fn body(&self, _cx: &Scope) -> AnyView {
+        let name_error = self.error("name");
+        let email_error = self.error("email");
+        let fields = vec![
+            FormField::new(
+                "name",
+                "Name",
+                TextField::new("Ada Lovelace", text_binding(&self.name)),
+            )
+            .configure(|presentation| {
+                presentation.is_required = true;
+                presentation.error = name_error.clone();
+            }),
+            FormField::new(
+                "email",
+                "Email",
+                TextField::new("ada@example.com", text_binding(&self.email)),
+            )
+            .configure(|presentation| {
+                presentation.is_required = true;
+                presentation.error = email_error.clone();
+            }),
+        ];
+        let submit = {
+            let controller = self.controller.clone();
+            let status = self.status.clone();
+            let name = self.name.clone();
+            let email = self.email.clone();
+            AnyView::new(Button::title("Create account", move || {
+                let rules = vec![
+                    FormRule::required("name", "Name", {
+                        let name = name.clone();
+                        move || name.get()
+                    }),
+                    FormRule::new("email", "Email", {
+                        let email = email.clone();
+                        move || validate_email(&email.get()).map(str::to_owned)
+                    }),
+                ];
+                if controller.validate(&rules) {
+                    status.set("Account created".to_owned());
+                } else {
+                    status.set("Complete the required fields".to_owned());
+                }
+            }))
+        };
+        let form = AnyView::new(
+            Form::new(
+                fields,
+                Some(self.controller.clone()),
+                |layout| layout.columns = 1,
+                AnyView::new(TupleView::new(vec![submit, caption(self.status())])),
+            )
+            .debug_name("product-form"),
+        );
         AnyView::new(StorySection::new(
             "Create an account",
             "Labels move above their inputs when space is limited. Resize or change text scale while editing; drafts and focus stay intact. Submit to see field errors.",
-            AnyView::new(
-                Text::new(self.status())
-                    .semantic_font(cove_ui_compose::theme::SemanticFontRef::caption())
-                    .semantic_foreground(SemanticColorRef::on_surface_muted()),
-            ),
+            form,
         ))
     }
 
@@ -424,13 +520,70 @@ impl ComboboxStory {
 
 impl View for ComboboxStory {
     fn body(&self, _cx: &Scope) -> AnyView {
-        let caption = Text::new(self.caption())
-            .semantic_font(cove_ui_compose::theme::SemanticFontRef::caption())
-            .semantic_foreground(SemanticColorRef::on_surface_muted());
+        let city_options = CITY_OPTIONS
+            .iter()
+            .map(|(value, label, enabled)| {
+                SelectOption::new((*value).to_owned(), *label, *enabled)
+            })
+            .collect();
+        let local = AnyView::new(
+            Combobox::new(self.city.binding(), city_options)
+                .presentation({
+                    let mut presentation =
+                        cove_ui_compose::primitives::controls::fields::combobox::ComboboxPresentation::default();
+                    presentation.placeholder = "Choose a city".to_owned();
+                    presentation.is_enabled = self.options.is_enabled;
+                    presentation
+                })
+                .debug_name("combobox-local"),
+        );
+
+        let selected_label = self.airport.get().and_then(|code| {
+            AIRPORTS
+                .iter()
+                .find(|airport| airport.code == code)
+                .map(|airport| airport_label(*airport))
+        });
+        let remote = AnyView::new(
+            Combobox::search(
+                self.airport.binding(),
+                selected_label,
+                ComboboxSearch::new(|query: &str| {
+                    search_airports(query)
+                        .map(|airports| {
+                            airports
+                                .into_iter()
+                                .map(|airport| {
+                                    SelectOption::new(
+                                        airport.code.to_owned(),
+                                        airport_label(airport),
+                                        true,
+                                    )
+                                })
+                                .collect()
+                        })
+                        .map_err(str::to_owned)
+                }),
+            )
+            .presentation({
+                let mut presentation =
+                    cove_ui_compose::primitives::controls::fields::combobox::ComboboxPresentation::default();
+                presentation.placeholder = "Search airports".to_owned();
+                presentation.search_placeholder = "Code or city".to_owned();
+                presentation.is_enabled = self.options.is_enabled;
+                presentation
+            })
+            .debug_name("combobox-remote"),
+        );
+
         AnyView::new(StorySection::new(
             "Searchable selection",
-            "Search in English or Chinese, use Up/Down and Return, or clear the selection. Unavailable options cannot be chosen.",
-            AnyView::new(AnyView::new(caption).debug_name("combobox-local-caption")),
+            "Search in English or Chinese, use Up/Down and Return, or clear the selection. Unavailable options cannot be chosen; typing “offline” makes the remote service fail and recover.",
+            AnyView::new(TupleView::new(vec![
+                local,
+                remote,
+                AnyView::new(AnyView::new(caption(self.caption())).debug_name("combobox-local-caption")),
+            ])),
         ))
     }
 
@@ -499,13 +652,48 @@ impl Default for NotificationStory {
 
 impl View for NotificationStory {
     fn body(&self, _cx: &Scope) -> AnyView {
-        let caption = Text::new(self.caption())
-            .semantic_font(cove_ui_compose::theme::SemanticFontRef::caption())
-            .semantic_foreground(SemanticColorRef::on_surface_muted());
+        let post = {
+            let controller = self.controller.clone();
+            let count = self.count.clone();
+            AnyView::new(Button::title("Post notification", move || {
+                count.update(|value| *value += 1);
+                let index = count.get();
+                controller.post(
+                    ToastNotification::new(format!("Saved #{index}"))
+                        .id(format!("saved-{index}"))
+                        .message("The workspace was written to disk.")
+                        .duration(Some(6.0)),
+                );
+            }))
+        };
+        let replace = {
+            let controller = self.controller.clone();
+            AnyView::new(Button::title("Replace stable id", move || {
+                controller.post(
+                    ToastNotification::new("Saving…")
+                        .id("stable")
+                        .message("Uploading changes.")
+                        .duration(None),
+                );
+            }))
+        };
+        let clear = {
+            let controller = self.controller.clone();
+            AnyView::new(Button::title("Clear", move || controller.clear()))
+        };
+        let host = AnyView::new(
+            NotificationHost::new(self.controller.clone())
+                .width(320.0)
+                .debug_name("toast-host"),
+        );
         AnyView::new(StorySection::new(
             "Toast queue",
             "Notifications appear at the window edge. Hover pauses expiry. Add several to see the bounded queue, replace the same stable ID, or use an inline action. Automatic positions the banner at the top trailing edge at every width.",
-            AnyView::new(AnyView::new(caption).debug_name("toast-caption")),
+            AnyView::new(TupleView::new(vec![
+                AnyView::new(TupleView::new(vec![post, replace, clear])),
+                host,
+                AnyView::new(AnyView::new(caption(self.caption())).debug_name("toast-caption")),
+            ])),
         ))
     }
 
@@ -531,14 +719,28 @@ impl TooltipStory {
 
 impl View for TooltipStory {
     fn body(&self, _cx: &Scope) -> AnyView {
+        let enabled = self.options.is_enabled;
+        let short = AnyView::new(
+            Tooltip::new(
+                Button::title("Save", || {}).enabled(enabled),
+                Text::new("Save the current workspace"),
+            )
+            .debug_name("tooltip-short"),
+        );
+        let long = AnyView::new(
+            Tooltip::new(
+                Button::title("Long label", || {}).enabled(enabled),
+                Text::new(
+                    "A long label wraps inside the bubble and keeps its full text for assistive technology.",
+                ),
+            )
+            .configure(|options| options.max_width = 220.0)
+            .debug_name("tooltip-long"),
+        );
         AnyView::new(StorySection::new(
             "Tooltips",
             "Hover or focus a target to reveal its label. Long labels wrap inside the bubble.",
-            AnyView::new(
-                Text::new("Hover a target")
-                    .semantic_font(cove_ui_compose::theme::SemanticFontRef::caption())
-                    .semantic_foreground(SemanticColorRef::on_surface_muted()),
-            ),
+            AnyView::new(TupleView::new(vec![short, long])),
         ))
     }
 

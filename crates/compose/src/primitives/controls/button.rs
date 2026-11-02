@@ -57,6 +57,9 @@ pub struct Button {
     is_icon_only: bool,
     icon_size: Option<f32>,
     pub tooltip: Option<String>,
+    /// The visible title, used as the accessible name when no explicit
+    /// accessibility label is supplied by a wrapper such as `Link`.
+    accessibility_text: Option<String>,
     label: AnyView,
     action: Rc<dyn Fn()>,
     pressed: State<bool>,
@@ -85,6 +88,7 @@ impl Button {
             is_icon_only: false,
             icon_size: None,
             tooltip,
+            accessibility_text: None,
             label: AnyView::new(label),
             action: Rc::new(action),
             pressed: State::new(false),
@@ -94,7 +98,10 @@ impl Button {
     }
 
     pub fn title(title: impl Into<String>, action: impl Fn() + 'static) -> Self {
-        Self::new(Text::new(title).truncated(), action)
+        let title = title.into();
+        let mut button = Self::new(Text::new(title.clone()).truncated(), action);
+        button.accessibility_text = Some(title);
+        button
     }
 
     pub fn localized_title(
@@ -165,6 +172,7 @@ impl View for Button {
             is_enabled: self.is_enabled && !self.is_loading,
             is_selected: self.is_selected,
             is_icon_only: self.is_icon_only,
+            accessibility_text: self.accessibility_text.clone(),
             label,
             action: self.action.clone(),
             tooltip: self.tooltip.clone(),
@@ -276,6 +284,7 @@ struct ButtonHost {
     is_enabled: bool,
     is_selected: bool,
     is_icon_only: bool,
+    accessibility_text: Option<String>,
     label: AnyView,
     action: Rc<dyn Fn()>,
     tooltip: Option<String>,
@@ -340,6 +349,10 @@ impl PrimitiveView for ButtonHost {
         semantics.combines_children = true;
         if let Some(label) = label {
             semantics.label = label;
+        } else if let Some(text) = &self.accessibility_text {
+            // A titled button is announced by its title, matching a native
+            // button whose accessible name is its visible text.
+            semantics.label = text.clone();
         } else if self.is_icon_only {
             semantics.label = self.tooltip.clone().unwrap_or_default();
         }

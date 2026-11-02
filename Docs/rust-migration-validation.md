@@ -24,4 +24,26 @@
 
 测试目标存在、通过本机测试和达到 Swift 行为等价是三个不同的结论。既有测试中存在明确记录的 `GAP` / `Named differences`：例如自适应侧栏的布局、模态焦点及动画，Table/DataTable 的字号缩放，富文本选择及编辑行为。测试固定这些差异，不代表差异已经修复。
 
+## Gallery 页面验收（2026-11-02）
+
+98 个目录页面中 97 个已渲染真实控件，1 个仍无故事：
+
+| 项 | 状态 |
+| --- | --- |
+| `StoryDispatch` 分支 | 97 / 98；`Workspace` 仍为 `Pending` |
+| 「缺失控件」清单 | 已删除：`Slider`、`TextField`、`Combobox`、`Tree`、`TabItem`、`Tooltip`、`PropertyGrid`、`CarouselPage`、`Breadcrumb`、`Pagination`、`Popconfirm`、`CommandPalette`、`HoverCard`、`AppBar`、`Rating`、`WheelPickerOption`、`TimeInput`、`DateRangePicker` 全部存在于 `crates/compose` |
+| 故事来源记录 | `StorySource::entries()` 只记录每页的 Swift 文件，不再声称控件缺失 |
+
+同批修复的行为：`Button::title` 现在以可见标题作为可访问名称；`PlacementExample` 的触发器循环不再停在下标 1；
+`AnimationDemoNote` 补上 `body`；`Tree`、`Tabs`、`NavigationStack`、`TimePicker`、`Combobox`、`Notification`、`Tooltip`、
+`Form` 由文字外壳改为真实控件。
+
+仍然失败的用例：`drawer_tests::the_dedicated_story_opens_a_modal_and_commits_keyboard_navigation_back_into_its_summary`
+——抽屉按回车后关闭，但模态焦点作用域没有释放。该断言此前固定的是「抽屉不关闭」的旧缺陷，现在断言 Swift 的行为，
+因此失败；这是本批唯一未修复的缺陷，需要单独排查 `ModalFocusResource` 的卸载时机。
+
+本批更正的三处过时断言：`inspection_tests` 的百分比内边距（实际按包含块计算，即 CSS 语义，断言仍按自身宽度）、
+`advanced_interaction_tests` 的虚拟栈 `scrollToIndex`（目标行其实已经挂载）、`drawer_tests` 的方向键焦点推进
+（实际已前进到下一个目的地）。
+
 iOS 的 UIKit WebView 与 Android WebView 原生宿主在本次任务开始时已缺失；现有 macOS、Windows、Linux WebView 实现必须保留。所有平台实现与硬件验收应单独判断，不能把配置存在或交叉编译通过写成设备验收通过。

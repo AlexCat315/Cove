@@ -141,9 +141,35 @@ impl cove_ui_compose::View for AnimationStory {
 
 /// Stands in for the Swift `Alert("Animated content", …)` inside the animated
 /// subtree; the alert widget is ported, the story only needs a body.
+/// The retained subtree's body: a small card the exit animation keeps alive.
 struct AnimationDemoNote;
 
-impl cove_ui_compose::View for AnimationDemoNote {}
+impl cove_ui_compose::View for AnimationDemoNote {
+    fn body(&self, _cx: &Scope) -> cove_ui_compose::AnyView {
+        use cove_ui_compose::primitives::text::Text;
+        use cove_ui_compose::theme::tokens::{SemanticColorRef, SemanticStyleViewExt};
+        use cove_ui_compose::{AnyView, BoxView, TupleView};
+
+        AnyView::new(BoxView::new(
+            cove_core::scene::FlexDirection::Column,
+            cove_core::scene::Align::FlexStart,
+            cove_core::scene::Justify::FlexStart,
+            cove_core::scene::Wrap::NoWrap,
+            4.0,
+            AnyView::new(TupleView::new(vec![
+                AnyView::new(Text::new("Content stays mounted")),
+                AnyView::new(
+                    Text::new("The note keeps its identity through the exit animation.")
+                        .semantic_foreground(SemanticColorRef::on_surface_muted()),
+                ),
+            ])),
+        ))
+    }
+
+    fn tag(&self) -> &'static str {
+        "AnimationDemoNote"
+    }
+}
 
 #[cfg(test)]
 mod checks {

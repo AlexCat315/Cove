@@ -189,22 +189,18 @@ fn all_stories_materialize_and_settle_in_light_and_dark_themes() {
                 }
 
                 if page == GalleryPage::Tree {
-                    // GAP(data_stories_file.rs): Swift named the tree viewport
-                    // `gallery-tree` and pinned it to 250pt. The Rust TreeStory
-                    // names only `tree-caption`, so the viewport node and its
-                    // height have no equivalent.
-                    //
-                    // GAP(routing.rs): the Tree page is also not reachable
-                    // through `StoryDispatch::new` — it is dispatched `Pending`
-                    // even though `view()` has a `TreeStory` arm — so this block
-                    // runs against the pending notice, not the story.
+                    assert!(implemented, "the Tree page dispatches to its story");
                     assert!(
-                        !implemented,
-                        "the Tree page still dispatches to the pending notice"
+                        scene.named("tree-control").is_some(),
+                        "the tree viewport mounts"
                     );
                     assert!(
-                        dispatch.pending_message().is_some(),
-                        "the pending notice explains which widgets are missing"
+                        scene.named("tree-search").is_some(),
+                        "the tree filter mounts"
+                    );
+                    assert!(
+                        scene.named("tree-caption").is_some(),
+                        "the selection caption mounts"
                     );
                 }
 
@@ -217,12 +213,9 @@ fn all_stories_materialize_and_settle_in_light_and_dark_themes() {
 
 #[test]
 fn the_gallery_shell_materializes_with_a_selected_story() {
-    // GAP(gallery_view.rs navigation_width): the content pane resolves to 0pt,
-    // so the Swift assertions that `gallery-content` is taller than 500pt and
-    // that its sections are laid out inside it cannot hold. What is asserted is
-    // everything upstream of that: the shell exists at the right size, the pane
-    // exists and is anchored at the sidebar's trailing edge, and the sections
-    // that render are ordered and non-collapsed (covered above).
+    // The shell lays the content pane beside the navigation sidebar: it starts
+    // at the sidebar's trailing edge, keeps a positive width, and stays inside
+    // the window. The story's sections are then laid out inside that pane.
     scene(
         1280.0,
         820.0,
@@ -240,16 +233,21 @@ fn the_gallery_shell_materializes_with_a_selected_story() {
                 "the shell fills the window height"
             );
             let content = scene.require_named("gallery-content");
+            let pane = content.absolute_frame();
             assert!(
-                content.absolute_frame().x >= 1280.0,
-                "the pane starts where the full-width sidebar ends, got x={}",
-                content.absolute_frame().x
+                pane.x >= 240.0,
+                "the pane starts after the navigation sidebar, got x={}",
+                pane.x
             );
-            assert_eq!(
-                content.frame().width,
-                0.0,
-                "GAP: the pane is squeezed to 0pt because the shell never applies \
-             navigation_width; Swift laid it out beside a 240pt sidebar"
+            assert!(
+                pane.width > 0.0,
+                "the pane is laid out beside the sidebar, got width {}",
+                pane.width
+            );
+            assert!(
+                pane.x + pane.width <= 1280.0 + 1.0,
+                "the pane stays inside the window, got {:?}",
+                pane
             );
 
             // The story outlet names two sections for the Button page.
@@ -362,7 +360,9 @@ fn the_placement_playground_keeps_its_trigger_inside_the_story() {
                          at width {width} scale {scale}"
                     );
 
-                    for index in 0..VARIANTS.len() {
+                    for _ in 0..VARIANTS.len() {
+                        scene.settle_n(1);
+                        let before = story.selected();
                         let trigger = scene
                             .all(|node| {
                                 node.accessibility().is_some_and(|semantics| {
@@ -377,8 +377,10 @@ fn the_placement_playground_keeps_its_trigger_inside_the_story() {
                         scene.settle_n(2);
                         assert_eq!(
                             story.selected(),
-                            (index + 1) % VARIANTS.len(),
-                            "the trigger cycles to the next placement"
+                            (before + 1) % VARIANTS.len(),
+                            "the trigger cycles to the next placement (frame {:?}, label {:?})",
+                            trigger.absolute_frame(),
+                            trigger.accessibility().map(|s| s.label)
                         );
                     }
                 },

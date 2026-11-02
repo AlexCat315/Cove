@@ -184,18 +184,13 @@ fn the_sectioned_list_renders_no_rows_yet() {
 }
 
 #[test]
-fn the_list_page_has_no_story() {
+fn the_list_page_renders_its_story() {
     use cove_examples::gallery_content::StoryDispatch;
-    // GAP: `GalleryPage::List` has no `view()` arm, so it resolves to the pending
-    // notice. The Swift `ListStory` has never been migrated.
     let dispatch = StoryDispatch::new(GalleryPage::List);
+    assert!(dispatch.is_implemented(), "the list page has a story");
+    assert!(dispatch.pending_message().is_none());
     assert!(
-        !dispatch.is_implemented(),
-        "GAP: the list page still has no story"
+        dispatch.view(Default::default()).is_some(),
+        "the story view is produced for the list page"
     );
-    assert!(
-        dispatch.pending_message().is_some(),
-        "the pending notice is produced for the list page"
-    );
-    assert!(dispatch.view(Default::default()).is_none());
 }

@@ -161,6 +161,9 @@ impl DrawerStory {
 impl View for DrawerStory {
     fn body(&self, _cx: &Scope) -> AnyView {
         let enabled = self.options.is_enabled;
+        // Reading the presentation state subscribes the story to it, so the
+        // drawer unmounts (and releases its modal focus scope) when it closes.
+        let is_open = self.is_open.get();
         let open_state = self.is_open.clone();
         let label = Text::new("Browse destinations without losing the current workspace.");
 
@@ -189,7 +192,7 @@ impl View for DrawerStory {
                         "Open navigation",
                         move || open_state.set(true),
                     )
-                    .enabled(enabled)
+                    .enabled(enabled && !is_open)
                     .debug_name("drawer-open"),
                 ),
                 AnyView::new(Checkbox::from_boolean(self.closes_on_selection.binding())),

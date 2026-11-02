@@ -4,6 +4,40 @@
 
 ## Unreleased
 
+- **时间控件补全约束与本地化（2026-11-02，破坏性）**：
+  - 修复 `TimePicker::current()` 只把小时夹进 `[minimum, maximum]` 的缺陷：`minimum = 09:30` 时滚轮停在
+    09:00，一提交却跳到 09:30。夹取改为按总秒数进行，`commit()` 与滚轮位置共用
+    `TimePickerOptions::clamped()`，两者不再可能不一致。
+  - `TimePickerOptions` 新增 `period_labels: Option<(String, String)>`，12 小时制的 AM/PM 可换成
+    「上午/下午」；`periods()` 与半日轮的无障碍名称都走它（默认仍为 `AM`/`PM` 与 `AM or PM`）。
+  - `TimePickerOptions` 新增 `disabled_ranges: Vec<(TimeOfDay, TimeOfDay)>`（半开区间），把底层
+    `WheelPickerOption::is_enabled` 透到时间轮上：整小时被覆盖时该小时行置灰，只有部分被覆盖时置灰
+    对应的分钟行；12 小时制的一行同时代表上午与下午，两段都被覆盖才置灰。反序与空区间在 `validate()`
+    中归一化或丢弃。
+  - `TimeFieldOptions` 新增 `hour_cycle` 与 `period_labels`，支持 `hh:mm AM/PM` 的显示与解析（裸
+    `HH:MM` 仍按 24 小时制解读，粘贴 `21:30` 不会被折到上午）；占位符随制式变化。
+  - 两个时间控件的默认分钟步长统一为 `date_values::DEFAULT_MINUTE_STEP`（5 分钟）；`TimeField` 此前
+    是 1，仅影响方向键步进。
+- **Gallery 逐页验收：98 页中 97 页渲染真实控件（2026-11-02，破坏性）**：
+  - 路由表 `StoryDispatch` 从 58 个分支扩到 97 个；`MigrationPending` 更名为 `StorySource`，只记录每页的 Swift
+    来源文件，删除了与仓库不符的「缺失控件」列——`Slider`、`TextField`、`Combobox`、`PropertyGrid`、`TabItem`、
+    `Tooltip`、`CarouselPage` 等此前被列为缺失的控件都早已存在于 `cove-ui-compose`。`Workspace` 是唯一仍无故事的页面。
+  - 新增 39 个真实交互故事：`SliderStory`、`RangeSliderStory`、`TextFieldStory`、`SearchFieldStory`、`TextAreaStory`、
+    `NumberFieldStory`、`Vec3FieldStory`、`ColorFieldStory`、`SelectStory`、`JsonFieldStory`、`AssetRefStory`、
+    `ListStory`、`ReorderableStory`、`ScrollbarStory`、`TimelineStory`、`IconStory`、`MenuButtonStory`、`SplitButtonStory`、
+    `KeyCapStory`、`LinkStory`、`PanelStory`、`SplitViewStory`、`ScrollViewStory`、`BoundedScrollStory`、`PropertyGridStory`、
+    `ZStackStory`、`StatusBarStory`、`CarouselStory`、`DatePickerStory`、`DateRangeStory`、`TimeFieldStory`；
+    `Theme`、`Layout`、`Table`、`Radio`、`Form`、`Combobox`、`Notification`、`Tooltip` 此前已有故事但未接入路由，现已接通。
+  - 空壳故事补齐控件与状态：`TabsStory` 渲染 `TabView`（内容页、分段、可关闭文档）、`TreeStory` 渲染带搜索与多选的
+    `Tree`、`NavigationStackStory` 渲染真实页栈、`TimePickerStory` 渲染 `TimePicker`、`ComboboxStory` 同时接入本地与
+    远程数据源、`NotificationStory` 挂载 `NotificationHost`、`TooltipStory` 附着真实气泡、`FormStory` 使用 `Form` 与校验。
+  - 修复 `Button::title` 不设置无障碍名称的问题：标题按钮现在以可见标题作为可访问名称（此前进度条/触发器被读作空标签）。
+  - 修复 `PlacementExample` 的触发器闭包捕获构建时下标，导致第一次点击后循环不再前进。
+  - 修复 `AnimationDemoNote` 未实现 `body` 导致 Animation 页在文本选择外壳下 panic。
+  - 以真实行为替换固定旧缺陷的断言：Tree/List 页的「尚无故事」、Animation 页的 panic、侧栏内容面板位置、
+    百分比内边距（现按包含块计算）、虚拟栈 `scrollToIndex` 与抽屉方向键焦点。
+  - 抽屉关闭后模态焦点作用域仍未释放，`drawer_tests` 改为断言 Swift 行为后保持失败，记录在
+    `Docs/rust-migration-validation.md`。
 - **绘制遍历去掉逐节点分配（2026-11-02）**：
   - `DrawListResources` 改为写时复制的共享块：合成时追加缓存图层只共享其资源列表（O(块数)），
     去重延后到遍历时（渲染线程每帧一次），指针哈希替代 SipHash；克隆缓存图层列表不再复制哈希集合。

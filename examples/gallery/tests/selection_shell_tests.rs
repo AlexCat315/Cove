@@ -316,14 +316,11 @@ fn every_page_presses_its_labels() {
             panicked.push(page);
         }
     }
-    assert_eq!(
-        panicked,
-        vec![GalleryPage::Animation],
-        "GAP (production panic): mounting the Animation page inside `.text_selection(true)` \
-         panics with \"this view is materialized directly through ViewGraph\" \
-         (AnimationDemoNote::body); Swift mounts every page"
+    assert!(
+        panicked.is_empty(),
+        "every page mounts inside `.text_selection(true)`, panicked: {panicked:?}"
     );
-    assert_eq!(pages, ALL_PAGES.len() - 1, "every other page mounts");
+    assert_eq!(pages, ALL_PAGES.len(), "every page mounts");
     assert!(total > 1000, "only {total} leaf labels across the catalog");
     assert_eq!(
         offenders.len(),

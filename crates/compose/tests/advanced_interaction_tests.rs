@@ -472,9 +472,8 @@ fn virtual_viewport_mounts_only_the_window() {
 
     run_virtual(10_000, Some(9000), |scene| {
         assert!(
-            scene.named("virtual-row-9000").is_none(),
-            "GAP: Swift's scrollToIndex mounts and reveals row 9000 inside the viewport; the Rust \
-             stack keeps its initial window and never mounts the target"
+            scene.named("virtual-row-9000").is_some(),
+            "a scroll target outside the initial window is mounted and revealed"
         );
         let mounted = mounted_rows(scene);
         assert!(

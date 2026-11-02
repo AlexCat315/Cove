@@ -164,24 +164,24 @@ fn the_dedicated_story_opens_a_modal_and_commits_keyboard_navigation_back_into_i
                 scene.focus.has_modal_scope(),
                 "the open drawer keeps a modal scope while browsing"
             );
+            let next = row_by_label(scene, &format!("Destination {}", DRAWER_DEFAULT_SELECTION + 1));
             assert_eq!(
                 scene.focus.focused().map(|node| node.id()),
-                Some(selected.id()),
-                "GAP: Swift's ArrowDown moves focus to Destination 9; Rust focus stays on 8"
+                Some(next.id()),
+                "ArrowDown moves focus to the next destination"
             );
 
             scene.key(Scancode::RETURN);
             run_animations(scene);
             assert_eq!(story.selection(), Some(9), "Return commits destination 9");
+            assert!(!story.is_open(), "Return closes the drawer");
             assert!(
-                scene.focus.has_modal_scope() && story.is_open(),
-                "GAP: Swift closes the drawer and returns focus to the opener after Return; \
-             the Rust drawer stays open with its modal scope"
+                !scene.focus.has_modal_scope(),
+                "closing the drawer releases its modal scope"
             );
             assert!(
-                !scene.has_text("Selected destination: 9"),
-                "GAP: Swift's caption reads \"Selected destination: 9\"; the Rust story body \
-             never re-runs, texts: {:?}",
+                scene.has_text("Selected destination: 9"),
+                "the caption reports the committed destination, texts: {:?}",
                 scene.texts()
             );
         },

@@ -243,15 +243,9 @@ fn inspection_styles_survive_compose_and_clear_to_the_latest_app_style() {
 
 #[test]
 fn padding_overrides_restore_percent_and_logical_rtl_styles_including_new_writes() {
-    // Two named differences from the Swift suite are pinned here rather than
-    // asserted away:
-    //
-    // GAP(layout_node.rs): a percentage inset resolves against the node's OWN
-    // width, not the containing block's. `LayoutInsets::resolve`'s doc comment
-    // claims CSS/Yoga containing-block semantics, but `resolved_style_insets`
-    // passes `owner_width.or(avail_width)` (line 957) and re-resolves with
-    // `Some(width)` (line 1134) — both the node's own width. Swift got 10pt for
-    // a 200pt parent with a 5% inset; Rust gives 5pt.
+    // A percentage inset resolves against the containing block's inline size,
+    // matching `LayoutInsets::resolve`'s documented CSS/Yoga contract: 5% of a
+    // 200pt parent is 10pt, not 5% of the child's own 100pt.
     //
     // GAP(layout_node.rs): one style slot per edge. Swift kept `setPadding` and
     // `setPaddingPercent` as separate values so a later percent did not discard
@@ -272,8 +266,8 @@ fn padding_overrides_restore_percent_and_logical_rtl_styles_including_new_writes
     let resolved = child.resolved_padding();
     assert_eq!(
         (resolved.left, resolved.right),
-        (5.0, 7.0),
-        "5% of the node's own 100pt width, plus the 7pt logical start edge in RTL"
+        (10.0, 7.0),
+        "5% of the 200pt containing block, plus the 7pt logical start edge in RTL"
     );
 
     child.set_debug_padding(Some(LayoutInsets {
@@ -297,12 +291,12 @@ fn padding_overrides_restore_percent_and_logical_rtl_styles_including_new_writes
     let resolved = child.resolved_padding();
     assert_eq!(
         (resolved.left, resolved.right),
-        (6.0, 6.0),
+        (12.0, 12.0),
         "the 6% inset applies on every edge and has replaced the 13pt start edge"
     );
     assert_eq!(
         (resolved.top, resolved.bottom),
-        (6.0, 6.0),
+        (12.0, 12.0),
         "the percent padding covers the vertical edges too"
     );
 }

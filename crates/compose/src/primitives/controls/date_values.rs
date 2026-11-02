@@ -3,6 +3,15 @@ use crate::foundation::{Calendar, CalendarUnit, Date};
 use serde::{Deserialize, Deserializer, Serialize};
 use std::rc::Rc;
 
+/// The minute granularity [`TimeOfDay`] editors share.
+///
+/// [`crate::primitives::controls::time_picker::TimePicker`] steps its minute
+/// wheel by this and
+/// [`crate::primitives::controls::fields::time_field::TimeField`] steps by it
+/// when an arrow key nudges the committed time, so both components agree on
+/// what "one step" means.
+pub const DEFAULT_MINUTE_STEP: i32 = 5;
+
 #[derive(Clone)]
 pub struct DateAvailability {
     pub minimum: Option<Date>,

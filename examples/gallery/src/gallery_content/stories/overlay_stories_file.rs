@@ -12,11 +12,11 @@ use cove_composition::Scope;
 use cove_core::State;
 use cove_ui_compose::modifiers::layout::LayoutFrameExt;
 use cove_ui_compose::modifiers::style::SemanticStyleViewExt;
-use cove_ui_compose::primitives::layout::tab_view::{TabItem, TabOverflow, TabVariant};
+use cove_ui_compose::primitives::layout::tab_view::{TabItem, TabOverflow, TabVariant, TabView};
 use cove_ui_compose::primitives::overlays::menu::{MenuEntry, MenuItem, MenuSubmenu};
 use cove_ui_compose::primitives::text::Text;
 use cove_ui_compose::theme::tokens::SemanticColorRef;
-use cove_ui_compose::{AnyView, LayoutDebugExt, View};
+use cove_ui_compose::{AnyView, BoxView, LayoutDebugExt, TupleView, View};
 
 use super::feedback::StorySection;
 use crate::gallery_content::catalog::GalleryOptions;
@@ -524,14 +524,105 @@ impl TabsStory {
 
 impl View for TabsStory {
     fn body(&self, _cx: &Scope) -> AnyView {
-        let caption = Text::new(format!("Active tab: {}", self.selection()))
-            .semantic_font(cove_ui_compose::theme::SemanticFontRef::caption())
-            .semantic_foreground(SemanticColorRef::on_surface_muted());
-        AnyView::new(StorySection::new(
-            "Content tabs",
-            "The selected tab stays visible. More tabs lists hidden pages. Arrow keys, Home and End reach every enabled tab; long titles retain their full tooltip and name.",
-            AnyView::new(AnyView::new(caption).frame_height(220.0)),
+        let tabs = AnyView::new(
+            TabView::new(self.selection.binding(), self.content_tabs())
+                .variant(self.variant())
+                .overflow(self.overflow())
+                .enabled(self.options.is_enabled)
+                .frame_height(180.0)
+                .debug_name("tabs-content"),
+        );
+
+        let segments = vec![
+            TabItem::new("day".to_owned(), "Day", Text::new("Daily agenda")),
+            TabItem::new("week".to_owned(), "Week", Text::new("Weekly agenda")),
+            TabItem::new("month".to_owned(), "Month", Text::new("Monthly agenda")),
+        ];
+        let segmented = AnyView::new(
+            TabView::new(self.segment.binding(), segments)
+                .variant(TabVariant::Segmented)
+                .enabled(self.options.is_enabled)
+                .frame_height(120.0)
+                .debug_name("tabs-segmented"),
+        );
+
+        let close = {
+            let documents = self.documents.clone();
+            let selection = self.document_selection.clone();
+            AnyView::new(
+                cove_ui_compose::primitives::controls::Button::title("Close selected", move || {
+                    let current = documents.get();
+                    let selected = selection.get();
+                    let index = current.iter().position(|name| *name == selected).unwrap_or(0);
+                    let mut next = current.clone();
+                    if !next.is_empty() {
+                        next.remove(index.min(next.len() - 1));
+                        let fallback = next
+                            .get(index.saturating_sub(1))
+                            .or_else(|| next.first())
+                            .cloned()
+                            .unwrap_or_default();
+                        selection.set(fallback);
+                        documents.set(next);
+                    }
+                })
+                .enabled(self.options.is_enabled && !self.documents.get().is_empty()),
+            )
+        };
+        let document_tabs: Vec<TabItem<String>> = self
+            .documents
+            .get()
+            .into_iter()
+            .map(|name| {
+                let label = name.clone();
+                TabItem::new(name.clone(), label, Text::new(format!("Contents of {name}")))
+            })
+            .collect();
+        let documents = AnyView::new(
+            TabView::new(self.document_selection.binding(), document_tabs)
+                .variant(TabVariant::Card)
+                .overflow(TabOverflow::Scroll)
+                .frame_height(120.0)
+                .debug_name("tabs-documents"),
+        );
+
+        let caption = Text::new(format!(
+            "Active tab: {} · segment: {} · document: {}",
+            self.selection(),
+            self.segment(),
+            self.document_selection()
         ))
+        .semantic_font(cove_ui_compose::theme::SemanticFontRef::caption())
+        .semantic_foreground(SemanticColorRef::on_surface_muted());
+
+        AnyView::new(
+            BoxView::new(
+                cove_core::scene::FlexDirection::Column,
+                cove_core::scene::Align::Stretch,
+                cove_core::scene::Justify::FlexStart,
+                cove_core::scene::Wrap::NoWrap,
+                20.0,
+                AnyView::new(TupleView::new(vec![
+                    AnyView::new(StorySection::new(
+                        "Content tabs",
+                        "The selected tab stays visible. More tabs lists hidden pages. Arrow keys, Home and End reach every enabled tab; long titles retain their full tooltip and name.",
+                        tabs,
+                    )),
+                    AnyView::new(StorySection::new(
+                        "Segmented variant",
+                        "Three exclusive segments keep the same keyboard contract as the bar.",
+                        segmented,
+                    )),
+                    AnyView::new(StorySection::new(
+                        "Closable documents",
+                        "Closing the selected document selects its neighbour, not the first tab.",
+                        AnyView::new(TupleView::new(vec![documents, close])),
+                    )),
+                    AnyView::new(caption),
+                ])),
+            )
+            .debug_name("tabs-story"),
+        )
     }
 
     fn tag(&self) -> &'static str {

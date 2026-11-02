@@ -20,7 +20,7 @@ use crate::adaptive::SurfaceEnvironment;
 use crate::modifiers::layout::LayoutFrameExt;
 use crate::modifiers::style::{AppearanceExt, SemanticStyleViewExt};
 use crate::primitives::controls::adaptive::{apply_touch_control_extent, supports_control_hover};
-use crate::primitives::controls::date_values::TimeOfDay;
+use crate::primitives::controls::date_values::{DEFAULT_MINUTE_STEP, TimeOfDay};
 use crate::primitives::controls::fields::wheel_picker::{WheelPicker, WheelPickerOption};
 use crate::primitives::text::Text;
 use crate::theme::{SemanticColorRef, SemanticFontRef, theme_for_node};
@@ -45,19 +45,32 @@ pub struct TimePickerOptions {
     pub is_enabled: bool,
     pub minimum: TimeOfDay,
     pub maximum: TimeOfDay,
+    /// Accessible name for the wheel group.
     pub label: String,
+    /// Half-day wheel labels as `(am, pm)`.
+    ///
+    /// `None` uses `("AM", "PM")`; a Chinese interface sets `("上午", "下午")`.
+    pub period_labels: Option<(String, String)>,
+    /// Half-open `[start, end)` spans whose rows are disabled in every wheel.
+    ///
+    /// A row is disabled only when every time it can produce falls inside a
+    /// span, so a wheel never offers a row that is only half selectable. Empty
+    /// and reversed spans are dropped by [`TimePickerOptions::validate`].
+    pub disabled_ranges: Vec<(TimeOfDay, TimeOfDay)>,
 }
 
 impl Default for TimePickerOptions {
     fn default() -> Self {
         Self {
             hour_cycle: TimeHourCycle::TwentyFour,
-            minute_step: 5,
+            minute_step: DEFAULT_MINUTE_STEP,
             shows_seconds: false,
             is_enabled: true,
             minimum: TimeOfDay::new(0, 0, 0),
             maximum: TimeOfDay::new(23, 59, 59),
             label: "Time".to_string(),
+            period_labels: None,
+            disabled_ranges: Vec::new(),
         }
     }
 }
@@ -72,11 +85,69 @@ impl TimePickerOptions {
         if self.maximum < self.minimum {
             self.maximum = self.minimum;
         }
+        let authored = std::mem::take(&mut self.disabled_ranges);
+        self.disabled_ranges = authored
+            .into_iter()
+            .filter_map(|(start, end)| {
+                let (start, end) = if end < start { (end, start) } else { (start, end) };
+                (start.seconds() < end.seconds()).then_some((start, end))
+            })
+            .collect();
     }
 
     pub fn validated(mut self) -> Self {
         self.validate();
         self
+    }
+
+    /// `time` clamped into the authored `[minimum, maximum]` range.
+    ///
+    /// Clamping works on the total second count, so a candidate below
+    /// `minimum = 09:30` lands on `09:30` rather than on `09:00`.
+    pub fn clamped(&self, time: TimeOfDay) -> TimeOfDay {
+        let seconds = time
+            .seconds()
+            .clamp(self.minimum.seconds(), self.maximum.seconds());
+        TimeOfDay::new(seconds / 3600, (seconds / 60) % 60, seconds % 60)
+    }
+
+    /// The `(am, pm)` labels the half-day wheel shows.
+    pub fn period_labels(&self) -> (&str, &str) {
+        match self.period_labels.as_ref() {
+            Some((am, pm)) => (am.as_str(), pm.as_str()),
+            None => ("AM", "PM"),
+        }
+    }
+
+    /// Whether `time` falls inside an authored disabled span.
+    pub fn is_time_disabled(&self, time: TimeOfDay) -> bool {
+        let seconds = time.seconds();
+        self.disabled_ranges
+            .iter()
+            .any(|(start, end)| start.seconds() <= seconds && seconds < end.seconds())
+    }
+
+    /// Whether every second in the inclusive `[start, end]` span is disabled.
+    fn is_span_disabled(&self, start: i32, end: i32) -> bool {
+        if start > end {
+            return false;
+        }
+        let mut cursor = start;
+        while cursor <= end {
+            let next = self
+                .disabled_ranges
+                .iter()
+                .filter_map(|(from, to)| {
+                    let (from, to) = (from.seconds(), to.seconds());
+                    (from <= cursor && cursor < to).then_some(to)
+                })
+                .max();
+            match next {
+                Some(to) => cursor = to,
+                None => return false,
+            }
+        }
+        true
     }
 }
 
@@ -126,25 +197,18 @@ impl TimePicker {
         }
     }
 
-    /// The committed time, with its hour clamped into the authored range.
+    /// The committed time, clamped into the authored range.
+    ///
+    /// The whole value is clamped, not just the hour, so the wheels always show
+    /// the time `commit` would write.
     fn current(&self) -> TimeOfDay {
         let candidate = self.selection.get().unwrap_or(self.options.minimum);
-        TimeOfDay::new(
-            candidate
-                .hour
-                .clamp(self.options.minimum.hour, self.options.maximum.hour),
-            candidate.minute,
-            candidate.second,
-        )
+        self.options.clamped(candidate)
     }
 
     /// Writes a time, clamping its second count into the authored range.
     fn commit(&self, time: TimeOfDay) -> TimeOfDay {
-        let seconds = time.seconds().clamp(
-            self.options.minimum.seconds(),
-            self.options.maximum.seconds(),
-        );
-        let next = TimeOfDay::new(seconds / 3600, (seconds / 60) % 60, seconds % 60);
+        let next = self.options.clamped(time);
         if self.selection.get() != Some(next) {
             self.selection.set(Some(next));
         }
@@ -232,28 +296,74 @@ impl TimePicker {
             TimeHourCycle::TwentyFour => 0..=23,
         };
         range
-            .map(|hour| WheelPickerOption::new(hour, format!("{hour:02}")))
+            .map(|hour| {
+                let is_enabled = !self.hour_is_disabled(hour);
+                WheelPickerOption::new(hour, format!("{hour:02}")).enabled(is_enabled)
+            })
             .collect()
     }
 
+    /// Whether every time this hour row can produce is disabled.
+    fn hour_is_disabled(&self, hour: i32) -> bool {
+        let blocked = |hour: i32| {
+            let start = hour * 3600;
+            self.options.is_span_disabled(start, start + 3_599)
+        };
+        match self.options.hour_cycle {
+            TimeHourCycle::TwentyFour => blocked(hour),
+            // A 12-hour row covers the same hour before and after noon, so both
+            // halves have to be blocked before the row goes away.
+            TimeHourCycle::Twelve => blocked(hour % 12) && blocked(hour % 12 + 12),
+        }
+    }
+
     fn minutes(&self) -> Vec<WheelPickerOption<i32>> {
+        let step = self.options.minute_step.max(1);
+        let time = self.current();
         (0..60)
-            .step_by(self.options.minute_step.max(1) as usize)
-            .map(|minute| WheelPickerOption::new(minute, format!("{minute:02}")))
+            .step_by(step as usize)
+            .map(|minute| {
+                let base = time.hour * 3600 + minute * 60;
+                // With seconds hidden the row commits one instant; with them
+                // shown it commits the whole minute.
+                let (start, end) = if self.options.shows_seconds {
+                    (base, base + 59)
+                } else {
+                    (base + time.second, base + time.second)
+                };
+                WheelPickerOption::new(minute, format!("{minute:02}"))
+                    .enabled(!self.options.is_span_disabled(start, end))
+            })
             .collect()
     }
 
     fn seconds(&self) -> Vec<WheelPickerOption<i32>> {
+        let time = self.current();
         (0..=59)
-            .map(|second| WheelPickerOption::new(second, format!("{second:02}")))
+            .map(|second| {
+                let instant = time.hour * 3600 + time.minute * 60 + second;
+                WheelPickerOption::new(second, format!("{second:02}"))
+                    .enabled(!self.options.is_span_disabled(instant, instant))
+            })
             .collect()
     }
 
     fn periods(&self) -> Vec<WheelPickerOption<i32>> {
+        let (am, pm) = self.options.period_labels();
         vec![
-            WheelPickerOption::new(0, "AM"),
-            WheelPickerOption::new(1, "PM"),
+            WheelPickerOption::new(0, am.to_string())
+                .enabled(!self.options.is_span_disabled(0, 43_199)),
+            WheelPickerOption::new(1, pm.to_string())
+                .enabled(!self.options.is_span_disabled(43_200, 86_399)),
         ]
+    }
+
+    /// The accessible name of the half-day wheel.
+    fn period_label(&self) -> String {
+        match self.options.period_labels.as_ref() {
+            Some((am, pm)) => format!("{am}/{pm}"),
+            None => "AM or PM".to_string(),
+        }
     }
 
     fn wheel(
@@ -294,7 +404,7 @@ impl View for TimePicker {
             columns.push(self.wheel("Second", self.seconds(), self.second()));
         }
         if self.options.hour_cycle == TimeHourCycle::Twelve {
-            columns.push(self.wheel("AM or PM", self.periods(), self.period()));
+            columns.push(self.wheel(&self.period_label(), self.periods(), self.period()));
         }
         AnyView::new(TimePickerBody {
             label: self.options.label.clone(),
@@ -689,3 +799,144 @@ impl PrimitiveView for TimeWheel {
     }
 }
 impl_primitive_view!(TimeWheel);
+
+#[cfg(test)]
+mod checks {
+    use super::*;
+    use cove_core::State;
+
+    fn picker_at(selection: TimeOfDay, options: TimePickerOptions) -> TimePicker {
+        let state = State::new(Some(selection));
+        TimePicker::new(state.binding(), options)
+    }
+
+    #[test]
+    fn clamping_uses_the_whole_time_not_just_the_hour() {
+        let mut options = TimePickerOptions::new();
+        options.minimum = TimeOfDay::new(9, 30, 0);
+        options.maximum = TimeOfDay::new(17, 0, 0);
+        assert_eq!(
+            options.clamped(TimeOfDay::new(9, 0, 0)),
+            TimeOfDay::new(9, 30, 0),
+            "a candidate below the minimum lands on the minimum"
+        );
+        assert_eq!(
+            options.clamped(TimeOfDay::new(18, 45, 0)),
+            TimeOfDay::new(17, 0, 0),
+            "a candidate above the maximum lands on the maximum"
+        );
+        assert_eq!(
+            options.clamped(TimeOfDay::new(12, 15, 30)),
+            TimeOfDay::new(12, 15, 30),
+            "a candidate inside the range is untouched"
+        );
+    }
+
+    #[test]
+    fn the_wheels_show_the_clamped_time() {
+        let mut options = TimePickerOptions::new();
+        options.minimum = TimeOfDay::new(9, 30, 0);
+        let picker = picker_at(TimeOfDay::new(9, 0, 0), options);
+        assert_eq!(
+            picker.current(),
+            TimeOfDay::new(9, 30, 0),
+            "the wheel position matches what commit would write"
+        );
+    }
+
+    #[test]
+    fn a_fully_blocked_hour_is_disabled() {
+        let mut options = TimePickerOptions::new();
+        options.disabled_ranges = vec![(TimeOfDay::new(12, 0, 0), TimeOfDay::new(13, 0, 0))];
+        let picker = picker_at(TimeOfDay::new(9, 0, 0), options);
+        let hours = picker.hours();
+        assert!(!hours[12].is_enabled, "the lunch hour cannot be picked");
+        assert!(hours[11].is_enabled);
+        assert!(hours[13].is_enabled);
+    }
+
+    #[test]
+    fn a_partly_blocked_hour_keeps_its_row_and_blocks_minutes() {
+        let mut options = TimePickerOptions::new();
+        options.minute_step = 1;
+        options.disabled_ranges = vec![(TimeOfDay::new(12, 0, 0), TimeOfDay::new(12, 30, 0))];
+        let picker = picker_at(TimeOfDay::new(12, 0, 0), options);
+        assert!(
+            picker.hours()[12].is_enabled,
+            "half of the hour is still selectable"
+        );
+        let minutes = picker.minutes();
+        assert!(!minutes[0].is_enabled, "12:00 is blocked");
+        assert!(!minutes[25].is_enabled, "12:25 is blocked");
+        assert!(minutes[30].is_enabled, "12:30 is the first open minute");
+    }
+
+    /// Whether the hour row showing `hour` is selectable.
+    fn hour_row(picker: &TimePicker, hour: i32) -> bool {
+        picker
+            .hours()
+            .into_iter()
+            .find(|option| option.value == hour)
+            .expect("the hour row exists")
+            .is_enabled
+    }
+
+    #[test]
+    fn a_twelve_hour_row_disappears_only_when_both_halves_are_blocked() {
+        let mut options = TimePickerOptions::new();
+        options.hour_cycle = TimeHourCycle::Twelve;
+        options.disabled_ranges = vec![(TimeOfDay::new(9, 0, 0), TimeOfDay::new(10, 0, 0))];
+        let picker = picker_at(TimeOfDay::new(9, 0, 0), options);
+        assert!(
+            hour_row(&picker, 9),
+            "09:00 PM is still open, so the shared row stays"
+        );
+        let mut options = TimePickerOptions::new();
+        options.hour_cycle = TimeHourCycle::Twelve;
+        options.disabled_ranges = vec![
+            (TimeOfDay::new(9, 0, 0), TimeOfDay::new(10, 0, 0)),
+            (TimeOfDay::new(21, 0, 0), TimeOfDay::new(22, 0, 0)),
+        ];
+        let picker = picker_at(TimeOfDay::new(9, 0, 0), options);
+        assert!(!hour_row(&picker, 9), "both halves are blocked");
+    }
+
+    #[test]
+    fn period_labels_reach_the_half_day_wheel() {
+        let mut options = TimePickerOptions::new();
+        options.hour_cycle = TimeHourCycle::Twelve;
+        options.period_labels = Some(("上午".to_string(), "下午".to_string()));
+        let picker = picker_at(TimeOfDay::new(9, 0, 0), options);
+        let periods = picker.periods();
+        assert_eq!(periods[0].label, "上午");
+        assert_eq!(periods[1].label, "下午");
+        assert_eq!(picker.period_label(), "上午/下午");
+    }
+
+    #[test]
+    fn empty_and_reversed_spans_are_dropped() {
+        let mut options = TimePickerOptions::new();
+        options.disabled_ranges = vec![
+            (TimeOfDay::new(13, 0, 0), TimeOfDay::new(12, 0, 0)),
+            (TimeOfDay::new(15, 0, 0), TimeOfDay::new(15, 0, 0)),
+        ];
+        options.validate();
+        assert_eq!(
+            options.disabled_ranges,
+            vec![(TimeOfDay::new(12, 0, 0), TimeOfDay::new(13, 0, 0))],
+            "a reversed span is normalised and an empty one is dropped"
+        );
+    }
+
+    #[test]
+    fn a_disabled_instant_is_reported() {
+        let mut options = TimePickerOptions::new();
+        options.disabled_ranges = vec![(TimeOfDay::new(12, 0, 0), TimeOfDay::new(13, 0, 0))];
+        assert!(options.is_time_disabled(TimeOfDay::new(12, 30, 0)));
+        assert!(
+            !options.is_time_disabled(TimeOfDay::new(13, 0, 0)),
+            "the end of the span is open"
+        );
+        assert!(!options.is_time_disabled(TimeOfDay::new(11, 59, 59)));
+    }
+}

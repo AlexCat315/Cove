@@ -2,7 +2,7 @@
 //!
 //! Swift source: `GalleryContent/Stories/Controls/ControlStories.swift`
 //! (`ButtonStory`, `CheckboxStory`, `ToggleStory`). The remaining stories in that
-//! Swift file are listed in [`crate::gallery_content::routing::MigrationPending`]
+//! Swift file are listed in [`crate::gallery_content::routing::StorySource`]
 //! because they need widgets that have no view component yet.
 
 use cove_composition::Scope;

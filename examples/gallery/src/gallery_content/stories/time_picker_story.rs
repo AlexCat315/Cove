@@ -12,6 +12,9 @@ use cove_ui_compose::modifiers::layout::FlexExt;
 use cove_ui_compose::modifiers::style::SemanticStyleViewExt;
 use cove_ui_compose::primitives::controls::Checkbox;
 use cove_ui_compose::primitives::controls::date_values::TimeOfDay;
+use cove_ui_compose::primitives::controls::time_picker::{
+    TimeHourCycle, TimePicker, TimePickerOptions,
+};
 use cove_ui_compose::primitives::text::Text;
 use cove_ui_compose::theme::tokens::SemanticColorRef;
 use cove_ui_compose::{AnyView, BoxView, TupleView, View};
@@ -151,6 +154,17 @@ impl View for TimePickerStory {
             ])),
         ));
 
+        let mut picker_options = TimePickerOptions::new();
+        picker_options.hour_cycle = if self.twelve_hour.get() {
+            TimeHourCycle::Twelve
+        } else {
+            TimeHourCycle::TwentyFour
+        };
+        picker_options.shows_seconds = self.shows_seconds.get();
+        picker_options.is_enabled = enabled;
+        picker_options.label = "Start time".to_owned();
+        let picker = AnyView::new(TimePicker::new(self.time.binding(), picker_options));
+
         let header = AnyView::new(BoxView::new(
             cove_core::scene::FlexDirection::Row,
             cove_core::scene::Align::Center,
@@ -167,7 +181,7 @@ impl View for TimePickerStory {
         AnyView::new(StorySection::new(
             "Inline time wheels",
             "The form owns the surface; the picker owns hour, minute, optional seconds and AM/PM. Every wheel is independently keyboard and accessibility adjustable.",
-            AnyView::new(TupleView::new(vec![controls, header])),
+            AnyView::new(TupleView::new(vec![picker, controls, header])),
         ))
     }
 

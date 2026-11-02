@@ -197,7 +197,9 @@ impl View for PlacementExample {
         let selected = self.selected.get();
         let trigger = Button::title(VARIANTS[selected].label, {
             let this = self.selected.clone();
-            move || this.set((selected + 1) % VARIANTS.len())
+            // Read the live index: the press closure outlives one build, so a
+            // captured index would freeze the cycle after the first tap.
+            move || this.update(|index| *index = (*index + 1) % VARIANTS.len())
         })
         .enabled(enabled);
 
