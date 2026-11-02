@@ -63,7 +63,7 @@ pub use controls::{ButtonStory, CheckboxStory, ToggleStory};
 pub use data_list_stories::{
     ListStory, PropertyGridStory, ReorderableStory, ScrollbarStory, TimelineStory,
 };
-pub use data_stories::{AdaptiveTableSample, ChartExplorationStory};
+pub use data_stories::{AdaptiveTableSample, ChartExplorationStory, ChartStory};
 pub use data_stories_file::{
     DragAndDropStory, RefreshListStory, SectionedListStory, SwipeListStory, TreeStory,
     VirtualStackStory,
@@ -78,7 +78,7 @@ pub use image_story::ImageStory;
 pub use intrinsic_fitting::{FIT_CHIPS, ViewThatFitsStory};
 pub use layout::{LayoutGridStory, LazyGridStory, MasonrySample, MasonryStory};
 pub use markdown_story::MarkdownStory;
-pub use media_stories::{RatingSample, SkeletonStory};
+pub use media_stories::{RatingSample, RatingStory, SkeletonStory};
 pub use navigation_layout_stories::{DrawerStory, RailStory};
 pub use navigation_stories::AppBarStory;
 pub use navigation_stories_file::{

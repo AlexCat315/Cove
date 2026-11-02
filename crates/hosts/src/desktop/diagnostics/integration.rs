@@ -38,7 +38,14 @@ pub trait DiagnosticsSession {
     fn overlay(&mut self, list: &mut DrawList);
     fn begin_frame(&mut self);
     fn prepared(&mut self, layout_ms: f64, draw_ms: f64);
-    fn presented(&mut self, tree: &mut NodeTree, list: &DrawList);
+    /// Reports a frame that reached the swapchain. `presented` is false when the
+    /// host skipped presentation (occluded or locked window) and will retry.
+    fn presented(&mut self, tree: &mut NodeTree, list: &DrawList, presented: bool);
+    /// Receives the host's injection point for remote input. Hosts that cannot
+    /// deliver synthetic events keep the default no-op.
+    fn attach_input(&mut self, inject: Rc<dyn Fn(InputEvent)>) {
+        let _ = inject;
+    }
     fn stop(&mut self);
 }
 
@@ -75,6 +82,6 @@ impl DiagnosticsSession for NullDiagnosticsSession {
     fn overlay(&mut self, _list: &mut DrawList) {}
     fn begin_frame(&mut self) {}
     fn prepared(&mut self, _layout_ms: f64, _draw_ms: f64) {}
-    fn presented(&mut self, _tree: &mut NodeTree, _list: &DrawList) {}
+    fn presented(&mut self, _tree: &mut NodeTree, _list: &DrawList, _presented: bool) {}
     fn stop(&mut self) {}
 }

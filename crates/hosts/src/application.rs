@@ -4,6 +4,9 @@ use crate::{Application, ApplicationCallbacks, ApplicationConfiguration};
 use cove_composition::{AnyView, View};
 
 pub use crate::desktop::diagnostics::ApplicationCheckpoint;
+pub use crate::desktop::diagnostics::integration::{
+    DiagnosticsCallbacks, DiagnosticsFactory, DiagnosticsSession,
+};
 
 /// Root content and launch settings shared by desktop, iOS and Android hosts.
 /// Window size and chrome are consumed by desktop/iOS; Android owns its window
@@ -12,6 +15,9 @@ pub struct ApplicationLaunch {
     pub root: AnyView,
     pub configuration: ApplicationConfiguration,
     pub checkpoint: Option<ApplicationCheckpoint>,
+    /// Diagnostics backend installed for this run. A build that links the
+    /// DevTools crate supplies it; otherwise DevTools stays off.
+    pub diagnostics: Option<DiagnosticsFactory>,
 }
 
 impl ApplicationLaunch {
@@ -20,7 +26,15 @@ impl ApplicationLaunch {
             root: AnyView::new(root),
             configuration: ApplicationConfiguration::default(),
             checkpoint: None,
+            diagnostics: None,
         }
+    }
+
+    /// Installs the diagnostics backend the host builds its DevTools session
+    /// from. Ignored unless the configuration enables DevTools.
+    pub fn diagnostics(mut self, factory: DiagnosticsFactory) -> Self {
+        self.diagnostics = Some(factory);
+        self
     }
 
     pub fn configuration(mut self, configuration: ApplicationConfiguration) -> Self {
@@ -41,6 +55,7 @@ impl ApplicationLaunch {
     /// Runs the native window host. Android invokes the registered factory from
     /// its Activity instead of entering this blocking loop.
     pub fn run(self) -> Result<(), String> {
+        crate::desktop::diagnostics::integration::set_diagnostics_factory(self.diagnostics);
         Application::run(
             self.configuration,
             None,

@@ -213,7 +213,12 @@ impl DevToolsConnection for StdConnection {
             .lock()
             .unwrap_or_else(|error| error.into_inner());
         if write_frame(&mut writer.stream, Opcode::Text, text).is_err() {
-            self.close();
+            // `close` takes the same writer lock, so a failure here has to tear
+            // the connection down through the handle already held. Calling
+            // `close` would deadlock the host thread that is sending.
+            self.closed.store(true, Ordering::SeqCst);
+            self.writable.store(false, Ordering::SeqCst);
+            let _ = writer.stream.shutdown(std::net::Shutdown::Both);
         }
     }
 

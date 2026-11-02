@@ -117,9 +117,8 @@ fn sections_stay_separated() {
         .collect();
     assert_eq!(
         sections.len(),
-        2,
-        "GAP: Swift's Button page has six story sections; the Rust ButtonStory has two \
-         (Variants, States): {sections:?}"
+        5,
+        "the Button page carries its five sections: {sections:?}"
     );
     for pair in sections.windows(2) {
         let (first, second) = (&pair[0].1, &pair[1].1);

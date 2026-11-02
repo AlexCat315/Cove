@@ -75,7 +75,8 @@ impl ShowcaseLaunch {
             let content = CounterContent::new(counter);
             return ApplicationLaunch::new(content)
                 .configuration(configuration)
-                .checkpoint(checkpoint);
+                .checkpoint(checkpoint)
+                .diagnostics(cove_hosts::desktop::diagnostics::devtools::factory());
         }
         let root = AnyView::new(SurfaceReader::new(move |inherited: &Environment| {
             let gallery = GalleryView::new(
@@ -96,6 +97,8 @@ impl ShowcaseLaunch {
                     Direction::Ltr
                 })
         }));
-        ApplicationLaunch::new(root).configuration(configuration)
+        ApplicationLaunch::new(root)
+            .configuration(configuration)
+            .diagnostics(cove_hosts::desktop::diagnostics::devtools::factory())
     }
 }

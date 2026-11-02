@@ -8,7 +8,11 @@ use cove_core::scene::{Align, FlexDirection, Justify, Wrap};
 use cove_ui_compose::modifiers::layout::{LayoutFrameExt, PaddingExt};
 use cove_ui_compose::modifiers::style::SemanticStyleViewExt;
 use cove_ui_compose::primitives::controls::fields::Slider;
-use cove_ui_compose::primitives::controls::rating::Rating;
+use cove_ui_compose::primitives::controls::rating::{
+    Rating, RatingAppearance, RatingPrecision, RatingSelection, RatingSymbol,
+};
+use cove_composition::layout::LayoutDirectionExt;
+use cove_ui_compose::theme::ControlSize;
 use cove_ui_compose::primitives::controls::{Button, Checkbox};
 use cove_ui_compose::primitives::data::avatar::Avatar;
 use cove_ui_compose::primitives::media::{Skeleton, SkeletonShape};
@@ -261,5 +265,281 @@ impl View for RatingSample {
 
     fn dynamic_properties(&self) -> Vec<cove_composition::DynamicField> {
         cove_composition::dynamic_fields!(self; value, limit)
+    }
+}
+
+/// `RatingStory`: precision, symbols, states, density and direction.
+#[derive(Clone)]
+pub struct RatingStory {
+    pub options: GalleryOptions,
+    whole: State<f64>,
+    half: State<f64>,
+    fine: State<f64>,
+    rtl: State<f64>,
+}
+
+impl RatingStory {
+    pub fn new(options: GalleryOptions) -> Self {
+        Self {
+            options,
+            whole: State::new(3.0),
+            half: State::new(2.5),
+            fine: State::new(4.4),
+            rtl: State::new(2.5),
+        }
+    }
+
+    pub fn whole(&self) -> f64 {
+        self.whole.get()
+    }
+
+    pub fn half(&self) -> f64 {
+        self.half.get()
+    }
+
+    pub fn fine(&self) -> f64 {
+        self.fine.get()
+    }
+
+    pub fn rtl(&self) -> f64 {
+        self.rtl.get()
+    }
+
+    fn labeled(&self, title: &str, detail: &'static str, body: AnyView) -> AnyView {
+        AnyView::new(StorySection::new(title, detail, body))
+    }
+
+    fn strip(
+        label: &'static str,
+        value: f64,
+        selection: RatingSelection,
+        appearance: RatingAppearance,
+        state: &State<f64>,
+    ) -> AnyView {
+        let setter = state.clone();
+        let rating = Rating::new(label, value, move |next| setter.set(next))
+            .selection(selection)
+            .appearance(appearance);
+        AnyView::new(BoxView::new(
+            FlexDirection::Row,
+            Align::Center,
+            Justify::FlexStart,
+            Wrap::NoWrap,
+            8.0,
+            AnyView::new(TupleView::new(vec![
+                AnyView::new(rating),
+                AnyView::new(
+                    Text::new(format!("{value:.2}"))
+                        .semantic_font(cove_ui_compose::theme::SemanticFontRef::caption())
+                        .semantic_foreground(SemanticColorRef::on_surface_muted()),
+                ),
+            ])),
+        ))
+    }
+}
+
+impl View for RatingStory {
+    fn body(&self, _cx: &Scope) -> AnyView {
+        let enabled = self.options.is_enabled;
+
+        let whole_selection = RatingSelection {
+            is_enabled: enabled,
+            ..RatingSelection::default()
+        };
+        let whole = AnyView::new(
+            Self::strip(
+                "Overall rating",
+                self.whole.get(),
+                whole_selection,
+                RatingAppearance::default(),
+                &self.whole,
+            )
+            .debug_name("rating-strip"),
+        );
+
+        let half = Self::strip(
+            "Half-star rating",
+            self.half.get(),
+            RatingSelection {
+                precision: RatingPrecision::HALF,
+                is_enabled: enabled,
+                ..RatingSelection::default()
+            },
+            RatingAppearance::default(),
+            &self.half,
+        );
+
+        let mut heart = RatingAppearance {
+            symbol: RatingSymbol::heart(),
+            filled: SemanticColorRef::error(),
+            ..RatingAppearance::default()
+        };
+        heart.validate();
+        let fine = Self::strip(
+            "Tenth-star rating",
+            self.fine.get(),
+            RatingSelection {
+                precision: RatingPrecision::divisions(10),
+                is_enabled: enabled,
+                ..RatingSelection::default()
+            },
+            heart,
+            &self.fine,
+        );
+
+        let read_only = {
+            let mut selection = RatingSelection {
+                is_read_only: true,
+                ..RatingSelection::default()
+            };
+            selection.validate();
+            Self::strip(
+                "Average customer score",
+                4.25,
+                selection,
+                RatingAppearance {
+                    filled: SemanticColorRef::success(),
+                    ..RatingAppearance::default()
+                },
+                &self.whole,
+            )
+        };
+        let disabled = Self::strip(
+            "Archived score",
+            3.0,
+            RatingSelection {
+                is_enabled: false,
+                ..RatingSelection::default()
+            },
+            RatingAppearance::default(),
+            &self.whole,
+        );
+
+        let density = AnyView::new(BoxView::new(
+            FlexDirection::Row,
+            Align::Center,
+            Justify::FlexStart,
+            Wrap::Wrap,
+            16.0,
+            AnyView::new(TupleView::new(
+                ControlSize::ALL
+                    .iter()
+                    .map(|size| {
+                        let mut appearance = RatingAppearance {
+                            size: Some(*size),
+                            ..RatingAppearance::default()
+                        };
+                        appearance.validate();
+                        Self::strip(
+                            "Density",
+                            3.5,
+                            RatingSelection {
+                                is_enabled: enabled,
+                                ..RatingSelection::default()
+                            },
+                            appearance,
+                            &self.whole,
+                        )
+                    })
+                    .collect(),
+            )),
+        ));
+
+        let seven = {
+            let mut appearance = RatingAppearance {
+                star_size: Some(28.0),
+                filled: SemanticColorRef::accent_secondary(),
+                ..RatingAppearance::default()
+            };
+            appearance.validate();
+            Self::strip(
+                "Seven stars, minimum half",
+                0.5,
+                RatingSelection {
+                    maximum: 7,
+                    precision: RatingPrecision::HALF,
+                    allows_clear: false,
+                    is_enabled: enabled,
+                    ..RatingSelection::default()
+                },
+                appearance,
+                &self.whole,
+            )
+        };
+
+        let density = AnyView::new(TupleView::new(vec![density, seven]));
+
+        let rtl = AnyView::new(
+            Self::strip(
+                "RTL rating",
+                self.rtl.get(),
+                RatingSelection {
+                    precision: RatingPrecision::HALF,
+                    is_enabled: enabled,
+                    ..RatingSelection::default()
+                },
+                RatingAppearance::default(),
+                &self.rtl,
+            )
+            .layout_direction(cove_core::scene::Direction::Rtl),
+        );
+
+        AnyView::new(
+            BoxView::new(
+                FlexDirection::Column,
+                Align::Stretch,
+                Justify::FlexStart,
+                Wrap::NoWrap,
+                24.0,
+                AnyView::new(TupleView::new(vec![
+                    self.labeled(
+                        "Whole stars",
+                        "Hover previews a score; releasing inside chooses it, and clicking the chosen score clears it.",
+                        whole,
+                    ),
+                    self.labeled(
+                        "Half stars & keyboard",
+                        "One Tab stop per rating; arrows move by the precision step, Home and End reach the bounds.",
+                        half,
+                    ),
+                    self.labeled(
+                        "Fine precision & symbols",
+                        "Precision divides each symbol; any filled/outline icon pair can replace the star.",
+                        fine,
+                    ),
+                    self.labeled(
+                        "Read-only & disabled",
+                        "Read-only scores keep their exact fraction; disabled ratings take no input and leave the Tab order.",
+                        AnyView::new(BoxView::new(
+                            FlexDirection::Row,
+                            Align::Center,
+                            Justify::FlexStart,
+                            Wrap::Wrap,
+                            16.0,
+                            AnyView::new(TupleView::new(vec![read_only, disabled])),
+                        )),
+                    ),
+                    self.labeled(
+                        "Density & appearance",
+                        "Stars rasterize at their actual size and screen density.",
+                        density,
+                    ),
+                    self.labeled(
+                        "RTL",
+                        "Stars run from the trailing edge and the arrow keys mirror.",
+                        rtl,
+                    ),
+                ])),
+            )
+            .debug_name("rating-story"),
+        )
+    }
+
+    fn tag(&self) -> &'static str {
+        "RatingStory"
+    }
+
+    fn dynamic_properties(&self) -> Vec<cove_composition::DynamicField> {
+        cove_composition::dynamic_fields!(self; whole, half, fine, rtl)
     }
 }

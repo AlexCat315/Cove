@@ -115,7 +115,7 @@ impl AndroidDiagnostics {
 
     pub fn presented(&mut self, tree: &mut NodeTree, list: &DrawList) {
         let total = self.frame_start.elapsed().as_secs_f64() * 1000.0;
-        self.session.presented(tree, list);
+        self.session.presented(tree, list, true);
         let _ = total;
     }
 

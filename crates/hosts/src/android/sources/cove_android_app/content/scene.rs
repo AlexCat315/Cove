@@ -169,7 +169,13 @@ impl HostedSceneContent for DeclaredApplicationContent {
 
 pub(crate) fn linked_content() -> Box<dyn HostedSceneContent> {
     if let Some(factory) = crate::android::application() {
-        Box::new(DeclaredApplicationContent(factory()))
+        let launch = factory();
+        // The session is built later on this thread, so the backend the launch
+        // declares has to be installed here rather than in the desktop runner.
+        crate::desktop::diagnostics::integration::set_diagnostics_factory(
+            launch.diagnostics.clone(),
+        );
+        Box::new(DeclaredApplicationContent(launch))
     } else if let Some(factory) = crate::android::application_content() {
         Box::new(ApplicationContent(factory))
     } else {

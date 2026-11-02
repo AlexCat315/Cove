@@ -190,7 +190,7 @@ impl StoryDispatch {
                 Some(AnyView::new(stories::SkeletonStory::new(options)))
             }
             Self::Story(GalleryPage::Rating) => {
-                Some(AnyView::new(stories::RatingSample::new(options)))
+                Some(AnyView::new(stories::RatingStory::new(options)))
             }
             Self::Story(GalleryPage::Popconfirm) => {
                 Some(AnyView::new(stories::PopconfirmStory::new(options)))
@@ -199,7 +199,7 @@ impl StoryDispatch {
                 Some(AnyView::new(stories::HoverCardStory::new(options)))
             }
             Self::Story(GalleryPage::Chart) => {
-                Some(AnyView::new(stories::ChartExplorationStory::new()))
+                Some(AnyView::new(stories::ChartStory::new()))
             }
             Self::Story(GalleryPage::AppBar) => {
                 Some(AnyView::new(stories::AppBarStory::new(options)))

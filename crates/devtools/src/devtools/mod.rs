@@ -39,14 +39,15 @@ pub struct DevTools {
     /// Shared inspector the server adapters read through.
     scene_handle: Rc<RefCell<SceneInspector>>,
     /// Invoked for each `mirror.input` event; the host forwards it to its
-    /// window session.
-    pub input_delivery: RefCell<Option<Rc<dyn Fn(cove_platform::InputEvent)>>>,
+    /// window session. Shared so a host may install it after `new`, which is
+    /// when the wire-up adapters capture their handle.
+    pub input_delivery: Rc<RefCell<Option<Rc<dyn Fn(cove_platform::InputEvent)>>>>,
     /// Invoked when a remote client selects a node.
-    pub on_selection_changed: RefCell<Option<Rc<dyn Fn()>>>,
+    pub on_selection_changed: Rc<RefCell<Option<Rc<dyn Fn()>>>>,
     /// Invoked immediately after `mirror.start` wires the tap.
-    pub on_mirror_start: RefCell<Option<Rc<dyn Fn()>>>,
+    pub on_mirror_start: Rc<RefCell<Option<Rc<dyn Fn()>>>>,
     /// Invoked when a remote client stops mirroring.
-    pub on_mirror_stop: RefCell<Option<Rc<dyn Fn()>>>,
+    pub on_mirror_stop: Rc<RefCell<Option<Rc<dyn Fn()>>>>,
     /// Checkpoint, recording and window providers the host installs.
     pub checkpoint: crate::server::config::DevToolsHostCheckpoint,
     pub recording: crate::server::config::DevToolsHostRecording,
@@ -77,10 +78,10 @@ impl DevTools {
             frame_tap_sink,
             outbound,
             scene_handle,
-            input_delivery: RefCell::new(None),
-            on_selection_changed: RefCell::new(None),
-            on_mirror_start: RefCell::new(None),
-            on_mirror_stop: RefCell::new(None),
+            input_delivery: Rc::new(RefCell::new(None)),
+            on_selection_changed: Rc::new(RefCell::new(None)),
+            on_mirror_start: Rc::new(RefCell::new(None)),
+            on_mirror_stop: Rc::new(RefCell::new(None)),
             checkpoint: Default::default(),
             recording: Default::default(),
             window: Default::default(),

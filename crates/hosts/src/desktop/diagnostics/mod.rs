@@ -1,6 +1,8 @@
 //! Translation of Desktop/Sources/CoveUI/Diagnostics.
 
 pub mod checkpoint;
+#[cfg(feature = "devtools")]
+pub mod devtools;
 pub mod frame_metrics;
 pub mod performance_hud;
 pub mod recording;

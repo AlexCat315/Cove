@@ -13,9 +13,10 @@ use super::services::ApplicationServices;
 use super::typography::{AdaptiveApplicationContent, ApplicationTypography};
 use crate::desktop::diagnostics::checkpoint::ApplicationCheckpoint;
 use crate::desktop::diagnostics::frame_metrics::FrameMetrics;
+use crate::desktop::diagnostics::integration::{DiagnosticsCallbacks, DiagnosticsSession, take_factory};
 use crate::desktop::diagnostics::performance_hud::PerformanceHud;
 use crate::desktop::diagnostics::recording::{InputRecorder, RecordingControl};
-use crate::desktop::diagnostics::session::ApplicationDiagnostics;
+use crate::desktop::diagnostics::session::{ApplicationDiagnostics, DiagnosticsQueries};
 use crate::desktop::display::controls::{MainWindowControls, PresentationControls, WindowControls};
 use crate::desktop::display::{AppAuxiliaryWindowRequest, AppDisplayHandle, DisplayBindings};
 use crate::desktop::rendering::context::AppRenderingContext;
@@ -340,6 +341,7 @@ impl Application {
         }
 
         self.wire_host_callbacks();
+        self.start_diagnostics();
         state
             .recording_control
             .borrow_mut()
@@ -358,6 +360,83 @@ impl Application {
             Some(error) => Err(error),
             None => Ok(()),
         }
+    }
+
+    /// Builds the diagnostics session when the configuration requested DevTools
+    /// and the build installed a backend factory.
+    fn start_diagnostics(&self) {
+        let state = &self.state;
+        let Some(configuration) = state.config.diagnostics.dev_tools.clone() else {
+            return;
+        };
+        let Some(factory) = take_factory() else {
+            LogSystem::logger("com.cove.ui.diagnostics").log(&LogEvent::new(
+                Level::Warning,
+                "DevTools requested but no diagnostics backend is installed",
+            ));
+            return;
+        };
+        let host = state.host.clone();
+        let schedule: Rc<dyn Fn()> = Rc::new(move || host.request_display(None));
+        let callbacks = DiagnosticsCallbacks {
+            invalidate: schedule.clone(),
+            memory: {
+                let application = Application {
+                    state: state.clone(),
+                };
+                Rc::new(move || application.diagnostic_memory_snapshot())
+            },
+        };
+        match factory(
+            configuration,
+            state.composition.tree.clone(),
+            state.composition.graph.clone(),
+            schedule,
+            callbacks,
+        ) {
+            Ok(mut session) => {
+                let injection_host = state.host.clone();
+                session.attach_input(Rc::new(move |event| {
+                    if let Some(session) = injection_host.main_session() {
+                        session.inject_event(event);
+                    }
+                }));
+                let mut diagnostics = state.diagnostics.borrow_mut();
+                diagnostics.queries = Some(DiagnosticsQueries::default());
+                diagnostics.dev_tools = Some(session);
+            }
+            Err(error) => LogSystem::logger("com.cove.ui.diagnostics").log(&LogEvent::new(
+                Level::Error,
+                format!("DevTools failed to start: {error}"),
+            )),
+        }
+    }
+
+    /// Runs `body` against the live session without holding the `RefCell` borrow
+    /// across it: protocol dispatch is synchronous and may re-enter the runtime.
+    fn with_diagnostics(&self, body: impl FnOnce(&mut dyn DiagnosticsSession)) {
+        let mut session = self.state.diagnostics.borrow_mut().dev_tools.take();
+        if let Some(session) = session.as_mut() {
+            body(session.as_mut());
+        }
+        self.state.diagnostics.borrow_mut().dev_tools = session;
+    }
+
+    /// Lets the session consume a platform event before the app dispatcher sees
+    /// it, which is what makes DevTools picking work.
+    fn install_input_interceptor(&self) {
+        let Some(session) = self.state.host.main_session() else {
+            return;
+        };
+        let state = self.state.clone();
+        *session.callbacks.input_interceptor.borrow_mut() = Some(Rc::new(move |event| {
+            let mut session = state.diagnostics.borrow_mut().dev_tools.take();
+            let consumed = session
+                .as_mut()
+                .is_some_and(|session| session.intercept(event));
+            state.diagnostics.borrow_mut().dev_tools = session;
+            consumed
+        }));
     }
 
     fn install_display_bindings(&self) {
@@ -594,6 +673,16 @@ impl Application {
                 Some(Rc::new(move |event: &cove_platform::InputEvent| {
                     state.callbacks.events.publish(event);
                 }));
+        }
+        {
+            // Serviced every loop iteration, not only when a frame is due, so an
+            // idle app still answers DevTools between two display refreshes.
+            let weak: Weak<ApplicationState> = Rc::downgrade(&state);
+            *callbacks.on_tick.borrow_mut() = Some(Rc::new(move || {
+                if let Some(state) = weak.upgrade() {
+                    Application { state }.with_diagnostics(|session| session.drain());
+                }
+            }));
         }
         {
             let state = state.clone();
@@ -841,6 +930,7 @@ impl Application {
 
         self.upload_atlas_if_needed(false)?;
         state.main_window.borrow_mut().last_frame_time = Some(Instant::now());
+        self.install_input_interceptor();
         state.host.request_display(None);
         Ok(())
     }
@@ -964,6 +1054,7 @@ impl Application {
         };
 
         let frame_start = Instant::now();
+        self.with_diagnostics(|session| session.begin_frame());
         let timeline = state.composition.tree.borrow().timeline.clone();
 
         let environment_trace = timeline.borrow().begin();
@@ -1029,11 +1120,15 @@ impl Application {
             if state.config.diagnostics.shows_performance_hud {
                 state.performance_hud.borrow_mut().draw(&mut list);
             }
+            self.with_diagnostics(|session| session.overlay(&mut list));
         }
         let draw_end = Instant::now();
         timeline
             .borrow_mut()
             .end(draw_trace, "draw", "Encode draw list", None, &[]);
+        let prepared_layout_ms = layout_end.duration_since(layout_start).as_secs_f64() * 1000.0;
+        let prepared_draw_ms = draw_end.duration_since(layout_end).as_secs_f64() * 1000.0;
+        self.with_diagnostics(|session| session.prepared(prepared_layout_ms, prepared_draw_ms));
 
         let count_trace = timeline.borrow().begin();
         let frame_node_count = state.composition.tree.borrow_mut().node_count();
@@ -1089,6 +1184,11 @@ impl Application {
                 drawable_w,
                 drawable_h,
             );
+            {
+                let mut tree = state.composition.tree.borrow_mut();
+                let list = state.composition.draw_list.borrow();
+                self.with_diagnostics(|session| session.presented(&mut tree, &list, false));
+            }
             state.host.request_display(None);
             return false;
         }
@@ -1101,6 +1201,11 @@ impl Application {
             state.host.request_display(None);
         }
         state.performance_hud.borrow_mut().presented();
+        {
+            let mut tree = state.composition.tree.borrow_mut();
+            let list = state.composition.draw_list.borrow();
+            self.with_diagnostics(|session| session.presented(&mut tree, &list, true));
+        }
         let present_end = Instant::now();
 
         if fps_log_enabled() {

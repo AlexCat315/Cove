@@ -9,9 +9,12 @@ use cove_ui::composition::{
 };
 
 pub fn application() -> ApplicationLaunch {
-    ApplicationLaunch::new(RootView).configure(|app| {
-        app.window.title = "{{application_name}}".into();
-    })
+    ApplicationLaunch::new(RootView)
+        .configure(|app| {
+            app.window.title = "{{application_name}}".into();
+        })
+        // DevTools stays off until `COVE_DEVTOOLS=1` and a debug build.
+        .diagnostics(cove_ui::hosts::desktop::diagnostics::devtools::factory())
 }
 
 struct RootView;

@@ -6,7 +6,13 @@ rust-version.workspace = true
 license.workspace = true
 description = "Platform application hosts (desktop, Android, iOS)"
 
+[features]
+default = []
+## Links the DevTools crate and exposes `diagnostics::devtools::factory`.
+devtools = ["dep:cove-devtools"]
+
 [dependencies]
+cove-devtools = { path = "../devtools", optional = true }
 cove-runtime.workspace = true
 cove-shell.workspace = true
 cove-composition.workspace = true

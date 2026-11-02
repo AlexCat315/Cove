@@ -200,6 +200,9 @@ pub struct HostCallbacks {
     pub on_init: RefCell<Option<InitCallback>>,
     pub on_resize: RefCell<Option<ResizeCallback>>,
     pub on_event: RefCell<Option<EventCallback>>,
+    /// Runs once per loop iteration whether or not a frame is produced. The
+    /// diagnostic backend uses it to drain its transport while the app is idle.
+    pub on_tick: RefCell<Option<Rc<dyn Fn()>>>,
     pub on_before_commit: RefCell<Option<Rc<dyn Fn(f64)>>>,
     pub on_window_teardown: RefCell<Option<Rc<dyn Fn(WindowId)>>>,
     pub on_window_presentation_changed: RefCell<Option<Rc<dyn Fn(WindowId, bool)>>>,
@@ -657,6 +660,9 @@ impl Sdl3PlatformHost {
         let start = self.now();
         let loop_delta = start - state.last_loop_time.replace(start);
         drain_scene_invalidations();
+        if let Some(tick) = callback(&self.0.callbacks.on_tick) {
+            tick();
+        }
         let events = shell.borrow_mut().poll_window_events();
         let deferred = shell.borrow().take_deferred_callbacks();
         for work in deferred {

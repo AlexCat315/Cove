@@ -11,7 +11,7 @@ description = "Gallery, demo and mobile example content"
 cove-ui-compose = { path = "../../crates/compose" }
 cove-ui-addons = { path = "../../crates/addons" }
 cove-terminal = { path = "../../crates/terminal" }
-cove-hosts = { path = "../../crates/hosts" }
+cove-hosts = { path = "../../crates/hosts", features = ["devtools"] }
 cove-composition.workspace = true
 cove-runtime.workspace = true
 cove-core.workspace = true
@@ -24,12 +24,8 @@ serde.workspace = true
 unicode-segmentation.workspace = true
 
 # The Counter example's inspection suites drive the DevTools scene inspector and
-# the shared scene protocol. Swift's `CounterExampleTests` imported
-# `CoveUIDevToolsScene`/`CoveUIDevToolsProtocol` directly, so the equivalents are
-# dev-dependencies here: they are test-only and must not leak into the example
-# content that ships.
+# the shared scene protocol directly.
 [dev-dependencies]
-cove-devtools = { path = "../../crates/devtools" }
 cove-devtools-protocol.workspace = true
 
 [lints]

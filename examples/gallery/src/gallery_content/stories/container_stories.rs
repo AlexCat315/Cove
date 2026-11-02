@@ -9,7 +9,9 @@ use cove_core::scene::{Align, FlexDirection, Justify, Wrap};
 use cove_core::{Binding, State};
 use cove_ui_compose::modifiers::layout::{LayoutFrameExt, PaddingExt};
 use cove_ui_compose::modifiers::style::AppearanceExt;
-use cove_ui_compose::primitives::layout::carousel::{Carousel, CarouselPage};
+use cove_ui_compose::primitives::layout::carousel::{
+    Carousel, CarouselAutoplay, CarouselIndicator, CarouselPage,
+};
 use cove_ui_compose::primitives::layout::split::{SplitAxis, SplitConstraints, SplitView};
 use cove_ui_compose::primitives::layout::status_bar::{StatusBar, StatusBarText};
 use cove_ui_compose::primitives::layout::{
@@ -400,11 +402,56 @@ impl View for StatusBarStory {
                 .frame_width(420.0)
                 .debug_name("status-bar-control"),
         );
-        AnyView::new(StorySection::new(
-            "Chrome",
-            "One height at every width. When the slots do not fit, the leading text truncates before the trailing counts.",
-            bar,
-        ))
+        let single = AnyView::new(
+            StatusBar::new(
+                AnyView::new(TupleView::new(vec![])),
+                AnyView::new(StatusBarText::new("Ln 1").detail("Col 1").monospaced(true)),
+            )
+            .shows_divider(true)
+            .enabled(self.options.is_enabled)
+            .frame_width(420.0)
+            .debug_name("status-bar-single-slot"),
+        );
+        let long = AnyView::new(
+            StatusBar::new(
+                AnyView::new(TupleView::new(vec![AnyView::new(StatusBarText::new(
+                    "feature/navigation-drawer-accessibility-followups",
+                ))])),
+                AnyView::new(StatusBarText::new("Ln 402").detail("Col 118")),
+            )
+            .shows_divider(true)
+            .enabled(self.options.is_enabled)
+            .frame_width(260.0)
+            .debug_name("status-bar-long-branch"),
+        );
+
+        AnyView::new(
+            BoxView::new(
+                FlexDirection::Column,
+                Align::Stretch,
+                Justify::FlexStart,
+                Wrap::NoWrap,
+                24.0,
+                AnyView::new(TupleView::new(vec![
+                    AnyView::new(StorySection::new(
+                        "Window footer",
+                        "One height at every width. When the slots do not fit, the leading text truncates before the trailing counts.",
+                        bar,
+                    )),
+                    AnyView::new(StorySection::new(
+                        "Single slot",
+                        "A bar with nothing on the leading edge still keeps the trailing counts aligned.",
+                        single,
+                    )),
+                    AnyView::new(StorySection::new(
+                        "Long branch names",
+                        "The leading slot ellipsizes before the trailing counters give up their space.",
+                        long,
+                    )),
+                ])),
+            )
+            .debug_name("status-bar-story"),
+        )
     }
 
     fn tag(&self) -> &'static str {
@@ -416,6 +463,8 @@ impl View for StatusBarStory {
 pub struct CarouselStory {
     pub options: GalleryOptions,
     page: State<String>,
+    autoplay_page: State<String>,
+    many_page: State<String>,
 }
 
 impl CarouselStory {
@@ -426,6 +475,8 @@ impl CarouselStory {
         Self {
             options,
             page: State::new(Self::PAGES[0].to_owned()),
+            autoplay_page: State::new(Self::PAGES[0].to_owned()),
+            many_page: State::new("page-1".to_owned()),
         }
     }
 
@@ -477,11 +528,95 @@ impl View for CarouselStory {
                 .frame_width(360.0)
                 .debug_name("carousel-control"),
         );
-        AnyView::new(StorySection::new(
+        let paged = AnyView::new(StorySection::new(
             "Paged content",
             "Left and Right page the carousel; Home and End jump to the ends. Wrapping is off, so the ends stop.",
             AnyView::new(TupleView::new(vec![carousel, caption(self.readout())])),
-        ))
+        ));
+
+        let autoplay = AnyView::new(
+            Carousel::new(self.pages())
+                .selection(self.autoplay_page.binding())
+                .autoplay(CarouselAutoplay::new(4.0))
+                .indicator(CarouselIndicator::Dots)
+                .height(120.0)
+                .enabled(self.options.is_enabled)
+                .frame_width(360.0)
+                .debug_name("carousel-autoplay"),
+        );
+
+        let many: Vec<CarouselPage<String>> = (1..=12)
+            .map(|index| {
+                let id = format!("page-{index}");
+                CarouselPage::new(
+                    id.clone(),
+                    AnyView::new(card(&id.clone(), "Beyond eight pages the indicator counts", 100.0)),
+                )
+                .caption(id)
+            })
+            .collect();
+        let many = AnyView::new(
+            Carousel::new(many)
+                .selection(self.many_page.binding())
+                .allows_wrap(true)
+                .height(120.0)
+                .enabled(self.options.is_enabled)
+                .frame_width(360.0)
+                .debug_name("carousel-many"),
+        );
+
+        let bare = AnyView::new(
+            Carousel::new(self.pages())
+                .shows_arrows(false)
+                .allows_wrap(false)
+                .indicator(CarouselIndicator::Dots)
+                .height(110.0)
+                .enabled(self.options.is_enabled)
+                .frame_width(360.0)
+                .debug_name("carousel-no-chrome"),
+        );
+
+        let empty = AnyView::new(
+            Carousel::new(Vec::<CarouselPage<String>>::new())
+                .height(72.0)
+                .enabled(self.options.is_enabled)
+                .frame_width(360.0)
+                .debug_name("carousel-empty"),
+        );
+
+        AnyView::new(
+            BoxView::new(
+                FlexDirection::Column,
+                Align::Stretch,
+                Justify::FlexStart,
+                Wrap::NoWrap,
+                24.0,
+                AnyView::new(TupleView::new(vec![
+                    paged,
+                    AnyView::new(StorySection::new(
+                        "Autoplay",
+                        "Pages advance every four seconds; hovering or focusing pauses, a manual page change restarts the interval.",
+                        autoplay,
+                    )),
+                    AnyView::new(StorySection::new(
+                        "Many pages",
+                        "Beyond eight pages dots stop being countable, so the indicator shows a count.",
+                        many,
+                    )),
+                    AnyView::new(StorySection::new(
+                        "No wrap, no chrome",
+                        "Onboarding flows end where the last page ends: wrapping off, arrows removed.",
+                        bare,
+                    )),
+                    AnyView::new(StorySection::new(
+                        "Empty collection",
+                        "An empty carousel has no page action and no keyboard stop.",
+                        empty,
+                    )),
+                ])),
+            )
+            .debug_name("carousel-story"),
+        )
     }
 
     fn tag(&self) -> &'static str {

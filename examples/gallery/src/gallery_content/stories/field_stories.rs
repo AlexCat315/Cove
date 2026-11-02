@@ -22,7 +22,9 @@ use cove_ui_compose::primitives::controls::fields::vec3_field::Vec3Field;
 use cove_ui_compose::primitives::text::Text;
 use cove_ui_compose::primitives::text::text_buffer::TextBuffer;
 use cove_ui_compose::primitives::text::text_field::TextField;
-use cove_ui_compose::primitives::text::text_field::text_field_options::TextFieldBehavior;
+use cove_ui_compose::primitives::text::text_field::text_field_options::{
+    TextFieldBehavior, TextFieldDecoration,
+};
 use cove_ui_compose::theme::SemanticFontRef;
 use cove_ui_compose::theme::tokens::{SemanticColorRef, SemanticStyleViewExt};
 use cove_ui_compose::{AnyView, BoxView, LayoutDebugExt, TupleView, View};
@@ -66,6 +68,8 @@ fn field_grid(fields: Vec<AnyView>) -> AnyView {
 pub struct SliderStory {
     pub options: GalleryOptions,
     value: State<f64>,
+    stepped: State<f64>,
+    disabled_value: State<f64>,
 }
 
 impl SliderStory {
@@ -78,6 +82,8 @@ impl SliderStory {
         Self {
             options,
             value: State::new(0.35),
+            stepped: State::new(2.0),
+            disabled_value: State::new(0.6),
         }
     }
 
@@ -110,11 +116,58 @@ impl View for SliderStory {
                 .frame_width(240.0)
                 .debug_name("slider-control"),
         );
-        AnyView::new(StorySection::new(
-            "Continuous value",
-            "Drag the thumb or use the arrow keys. Home and End jump to the bounds; one step is 1%.",
-            field_row("Opacity", slider, self.readout()),
-        ))
+        let stepped = AnyView::new(
+            Slider::new(self.stepped.binding())
+                .range((0.0, 4.0))
+                .step(0.5)
+                .enabled(self.options.is_enabled)
+                .frame_width(240.0)
+                .debug_name("slider-stepped"),
+        );
+        let disabled = AnyView::new(
+            Slider::new(self.disabled_value.binding())
+                .range(Self::RANGE)
+                .step(Self::STEP)
+                .enabled(false)
+                .frame_width(240.0)
+                .debug_name("slider-disabled"),
+        );
+
+        AnyView::new(
+            BoxView::new(
+                FlexDirection::Column,
+                Align::Stretch,
+                Justify::FlexStart,
+                Wrap::NoWrap,
+                24.0,
+                AnyView::new(TupleView::new(vec![
+                    AnyView::new(StorySection::new(
+                        "Continuous value",
+                        "Drag the thumb or use the arrow keys. Home and End jump to the bounds; one step is 1%.",
+                        field_row("Opacity", slider, self.readout()),
+                    )),
+                    AnyView::new(StorySection::new(
+                        "Stepped",
+                        "A step quantizes every write, so pointer and keyboard land on the same values.",
+                        field_row(
+                            "Priority",
+                            stepped,
+                            format!("{:.1} of 4.0", self.stepped.get()),
+                        ),
+                    )),
+                    AnyView::new(StorySection::new(
+                        "Disabled",
+                        "The value stays readable while the control rejects input and leaves the Tab order.",
+                        field_row(
+                            "Volume",
+                            disabled,
+                            format!("{:.0}%", self.disabled_value.get() * 100.0),
+                        ),
+                    )),
+                ])),
+            )
+            .debug_name("slider-story"),
+        )
     }
 
     fn tag(&self) -> &'static str {
@@ -201,6 +254,10 @@ impl View for RangeSliderStory {
 pub struct TextFieldStory {
     pub options: GalleryOptions,
     text: State<TextBuffer>,
+    secret: State<TextBuffer>,
+    locked: State<TextBuffer>,
+    limited: State<TextBuffer>,
+    unicode: State<TextBuffer>,
 }
 
 impl TextFieldStory {
@@ -208,6 +265,10 @@ impl TextFieldStory {
         Self {
             options,
             text: State::new(TextBuffer::new("Cove")),
+            secret: State::new(TextBuffer::new("correct horse")),
+            locked: State::new(TextBuffer::new("Read only value")),
+            limited: State::new(TextBuffer::new("cove-sdk")),
+            unicode: State::new(TextBuffer::new("Cove 输入法 🙂")),
         }
     }
 
@@ -240,11 +301,134 @@ impl View for TextFieldStory {
                 .frame_width(240.0)
                 .debug_name("text-field-control"),
         );
-        AnyView::new(StorySection::new(
-            "Single line",
-            "Typing writes straight into the story's buffer. Selection, undo and the caret survive a rename of the placeholder.",
-            field_row("Project name", field, self.readout()),
-        ))
+        let disabled = !self.options.is_enabled;
+        let secret = AnyView::new(
+            TextField::new("Password", self.secret.binding())
+                .behavior(TextFieldBehavior {
+                    secure: true,
+                    clearable: true,
+                    disabled,
+                    ..TextFieldBehavior::new()
+                })
+                .frame_width(240.0)
+                .debug_name("text-field-secure"),
+        );
+        let locked = AnyView::new(
+            TextField::new("Read only", self.locked.binding())
+                .behavior(TextFieldBehavior {
+                    read_only: true,
+                    disabled,
+                    ..TextFieldBehavior::new()
+                })
+                .frame_width(240.0)
+                .debug_name("text-field-read-only"),
+        );
+        let limited = AnyView::new(
+            TextField::new("Handle", self.limited.binding())
+                .behavior(TextFieldBehavior {
+                    max_length: Some(12),
+                    clearable: true,
+                    disabled,
+                    ..TextFieldBehavior::new()
+                })
+                .decoration(TextFieldDecoration {
+                    show_word_limit: true,
+                    prefix: Some("@".to_string()),
+                    ..TextFieldDecoration::default()
+                })
+                .frame_width(240.0)
+                .debug_name("text-field-limited"),
+        );
+        let unicode = AnyView::new(
+            TextField::new("Message", self.unicode.binding())
+                .behavior(TextFieldBehavior {
+                    clearable: true,
+                    disabled,
+                    ..TextFieldBehavior::new()
+                })
+                .frame_width(240.0)
+                .debug_name("text-field-unicode"),
+        );
+
+        AnyView::new(
+            BoxView::new(
+                FlexDirection::Column,
+                Align::Stretch,
+                Justify::FlexStart,
+                Wrap::NoWrap,
+                24.0,
+                AnyView::new(TupleView::new(vec![
+                    AnyView::new(StorySection::new(
+                        "Input & clear",
+                        "Typing writes straight into the story's buffer. Selection, undo and the caret survive a rename of the placeholder.",
+                        {
+                            let field = AnyView::new(
+                                TextField::new("Project name", self.text.binding())
+                                    .behavior(TextFieldBehavior {
+                                        clearable: true,
+                                        disabled,
+                                        ..TextFieldBehavior::new()
+                                    })
+                                    .frame_width(240.0)
+                                    .debug_name("text-field-control"),
+                            );
+                            field_row("Project name", field, self.readout())
+                        },
+                    )),
+                    AnyView::new(StorySection::new(
+                        "Password & read-only",
+                        "A secure field never exposes its text; a read-only field keeps its selection and caret.",
+                        AnyView::new(BoxView::new(
+                            FlexDirection::Row,
+                            Align::FlexStart,
+                            Justify::FlexStart,
+                            Wrap::Wrap,
+                            16.0,
+                            AnyView::new(TupleView::new(vec![
+                                field_row(
+                                    "Password",
+                                    secret,
+                                    format!(
+                                        "{} characters",
+                                        self.secret.get().string_value().chars().count()
+                                    ),
+                                ),
+                                field_row(
+                                    "Read only",
+                                    locked,
+                                    self.locked.get().string_value(),
+                                ),
+                            ])),
+                        )),
+                    )),
+                    AnyView::new(StorySection::new(
+                        "Decorations & limits",
+                        "A prefix and a word limit decorate the field; the buffer stops at the limit.",
+                        field_row(
+                            "Handle",
+                            limited,
+                            format!(
+                                "{} / 12",
+                                self.limited.get().string_value().chars().count()
+                            ),
+                        ),
+                    )),
+                    AnyView::new(StorySection::new(
+                        "Unicode editing",
+                        "Grapheme clusters, combining marks and emoji move as one caret step.",
+                        field_row(
+                            "Message",
+                            unicode,
+                            format!(
+                                "{} characters",
+                                self.unicode.get().string_value().chars().count()
+                            ),
+                        ),
+                    )),
+                ])),
+            )
+            .debug_name("text-field-story"),
+        )
     }
 
     fn tag(&self) -> &'static str {

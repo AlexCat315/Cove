@@ -8,7 +8,12 @@
 use cove_composition::Scope;
 use cove_core::scene::{Align, FlexDirection, Justify, Wrap};
 use cove_core::{Binding, State};
+use cove_ui_compose::modifiers::layout::LayoutFrameExt;
 use cove_ui_compose::primitives::controls::Button;
+use cove_ui_compose::primitives::controls::button::{ButtonIcon, ButtonIconSource};
+use cove_ui_compose::primitives::media::ui_icon_catalog as icons;
+use cove_ui_compose::theme::ControlSize;
+use cove_ui_compose::theme::tokens::control_size::ControlSizeViewExt;
 use cove_ui_compose::primitives::controls::toggle::{Checkbox, CheckboxState, Toggle};
 use cove_ui_compose::primitives::text::Text;
 use cove_ui_compose::theme::styles::buttons::button_style::{AnyButtonStyle, ButtonStyleViewExt};
@@ -172,6 +177,99 @@ impl View for ButtonStory {
             ])),
         ));
 
+        let icon_clicks = self.clicks.clone();
+        let icon_row = AnyView::new(BoxView::new(
+            FlexDirection::Row,
+            Align::Center,
+            Justify::FlexStart,
+            Wrap::Wrap,
+            10.0,
+            AnyView::new(TupleView::new(vec![
+                AnyView::new({
+                    let clicks = icon_clicks.clone();
+                    Button::new(
+                        TupleView::new(vec![
+                            AnyView::new(ButtonIcon::new(
+                                ButtonIconSource::resource(icons::action::check()),
+                                None,
+                                None,
+                            )),
+                            AnyView::new(Text::new("Confirm")),
+                        ]),
+                        move || clicks.update(|value| *value += 1),
+                    )
+                    .tooltip("Confirm changes")
+                    .enabled(enabled)
+                }),
+                AnyView::new(
+                    Button::icon_default(ButtonIconSource::resource(icons::action::x()), {
+                        let clicks = icon_clicks.clone();
+                        move || clicks.update(|value| *value += 1)
+                    })
+                    .tooltip("Close")
+                    .button_style(SecondaryButtonStyle)
+                    .debug_name("gallery-icon-button"),
+                ),
+                AnyView::new(
+                    Button::icon(
+                        ButtonIconSource::resource(icons::action::pencil()),
+                        16.0,
+                        {
+                            let clicks = icon_clicks.clone();
+                            move || clicks.update(|value| *value += 1)
+                        },
+                    )
+                    .tooltip("Apply to workspace")
+                    .enabled(enabled)
+                    .button_style(SecondaryButtonStyle),
+                ),
+            ])),
+        ));
+
+        const LONG_LABEL: &str = "Rebuild every cached preview in the current workspace";
+
+        let long_labels = AnyView::new(BoxView::new(
+            FlexDirection::Column,
+            Align::FlexStart,
+            Justify::FlexStart,
+            Wrap::NoWrap,
+            8.0,
+            AnyView::new(TupleView::new(vec![AnyView::new(
+                {
+                    let clicks = self.clicks.clone();
+                    Button::title(LONG_LABEL, move || clicks.update(|value| *value += 1))
+                        .tooltip(LONG_LABEL)
+                        .enabled(enabled)
+                        .debug_name("gallery-long-label-button")
+                }
+                .frame_width(220.0),
+            )])),
+        ));
+
+        let sizes = AnyView::new(BoxView::new(
+            FlexDirection::Row,
+            Align::Center,
+            Justify::FlexStart,
+            Wrap::Wrap,
+            10.0,
+            AnyView::new(TupleView::new(
+                ControlSize::ALL
+                    .iter()
+                    .map(|size| {
+                        let clicks = self.clicks.clone();
+                        let size = *size;
+                        AnyView::new(
+                            Button::title(format!("{size:?}"), move || {
+                                clicks.update(|value| *value += 1)
+                            })
+                            .enabled(enabled)
+                            .control_size(size),
+                        )
+                    })
+                    .collect(),
+            )),
+        ));
+
         AnyView::new(
             BoxView::new(
                 FlexDirection::Column,
@@ -186,9 +284,24 @@ impl View for ButtonStory {
                         variants,
                     )),
                     AnyView::new(StorySection::new(
+                        "Icons & tooltips",
+                        "Labels can carry bundled icons; the icon-only button is announced by its tooltip.",
+                        icon_row,
+                    )),
+                    AnyView::new(StorySection::new(
                         "States",
                         "Loading blocks duplicate activation; selected and disabled states remain distinguishable.",
                         states,
+                    )),
+                    AnyView::new(StorySection::new(
+                        "Long labels",
+                        "A constrained control keeps one line with a trailing ellipsis; the full string stays in the tooltip.",
+                        long_labels,
+                    )),
+                    AnyView::new(StorySection::new(
+                        "Sizes",
+                        "The same control responds to the shared density provider.",
+                        sizes,
                     )),
                 ])),
             )
@@ -397,6 +510,22 @@ impl View for ToggleStory {
             ])),
         ));
 
+        let disabled_settings = AnyView::new(BoxView::new(
+            FlexDirection::Column,
+            Align::Stretch,
+            Justify::FlexStart,
+            Wrap::NoWrap,
+            12.0,
+            AnyView::new(TupleView::new(vec![
+                AnyView::new(Toggle::labeled("Notifications", self.notifications.binding()).enabled(false)),
+                AnyView::new(Toggle::labeled("Usage analytics", self.telemetry.binding()).enabled(false)),
+                AnyView::new(
+                    Text::new(self.values_line())
+                        .semantic_foreground(SemanticColorRef::on_surface_muted()),
+                ),
+            ])),
+        ));
+
         AnyView::new(
             BoxView::new(
                 FlexDirection::Column,
@@ -404,11 +533,18 @@ impl View for ToggleStory {
                 Justify::FlexStart,
                 Wrap::NoWrap,
                 24.0,
-                AnyView::new(TupleView::new(vec![AnyView::new(StorySection::new(
-                    "Settings",
-                    "A switch owns activation and animation; the label slot keeps the setting name beside it, and the application owns the value.",
-                    settings,
-                ))])),
+                AnyView::new(TupleView::new(vec![
+                    AnyView::new(StorySection::new(
+                        "Settings",
+                        "A switch owns activation and animation; the label slot keeps the setting name beside it, and the application owns the value.",
+                        settings,
+                    )),
+                    AnyView::new(StorySection::new(
+                        "Disabled",
+                        "The value stays visible while the setting cannot be changed.",
+                        disabled_settings,
+                    )),
+                ])),
             )
             .debug_name("toggle-story"),
         )

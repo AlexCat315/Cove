@@ -30,7 +30,7 @@ use cove_ui_compose::primitives::media::ui_icon_catalog as icons;
 use cove_ui_compose::primitives::overlays::menu::{MenuEntry, MenuItem};
 use cove_ui_compose::primitives::text::Text;
 use cove_ui_compose::theme::SemanticFontRef;
-use cove_ui_compose::theme::tokens::{SemanticColorRef, SemanticStyleViewExt};
+use cove_ui_compose::theme::tokens::{SemanticColorRef, SemanticIconSize, SemanticStyleViewExt};
 use cove_ui_compose::{AnyView, BoxView, LayoutDebugExt, TupleView, View};
 
 use super::feedback::StorySection;
@@ -396,23 +396,67 @@ impl View for LinkStory {
                     .enabled(enabled),
             )
         };
-        let links = AnyView::new(BoxView::new(
+        let body_copy = AnyView::new(BoxView::new(
+            FlexDirection::Row,
+            Align::Center,
+            Justify::FlexStart,
+            Wrap::Wrap,
+            6.0,
+            AnyView::new(TupleView::new(vec![
+                AnyView::new(Text::new("Read the")),
+                make("release notes", LinkUnderline::Hover),
+                AnyView::new(Text::new("before shipping.")),
+            ])),
+        ));
+        let hover = AnyView::new(BoxView::new(
             FlexDirection::Row,
             Align::Center,
             Justify::FlexStart,
             Wrap::Wrap,
             18.0,
             AnyView::new(TupleView::new(vec![
+                make("Underlined on hover", LinkUnderline::Hover),
                 make("Always underlined", LinkUnderline::Always),
-                make("On hover", LinkUnderline::Hover),
-                make("Never", LinkUnderline::Never),
             ])),
         ));
-        AnyView::new(StorySection::new(
-            "Inline links",
-            "Return activates the focused link. External links carry the arrow glyph and open outside the app.",
-            AnyView::new(TupleView::new(vec![links, caption(self.readout())])),
-        ))
+        let never = AnyView::new(BoxView::new(
+            FlexDirection::Row,
+            Align::Center,
+            Justify::FlexStart,
+            Wrap::Wrap,
+            18.0,
+            AnyView::new(TupleView::new(vec![
+                make("Never underlined", LinkUnderline::Never),
+                make("External", LinkUnderline::Hover),
+            ])),
+        ));
+        AnyView::new(
+            BoxView::new(
+                FlexDirection::Column,
+                Align::Stretch,
+                Justify::FlexStart,
+                Wrap::NoWrap,
+                24.0,
+                AnyView::new(TupleView::new(vec![
+                    AnyView::new(StorySection::new(
+                        "Inside body copy",
+                        "A link sits in the sentence it belongs to and keeps the text baseline.",
+                        body_copy,
+                    )),
+                    AnyView::new(StorySection::new(
+                        "Underline on hover",
+                        "The underline appears while the pointer is over the link and returns on keyboard focus.",
+                        hover,
+                    )),
+                    AnyView::new(StorySection::new(
+                        "Never underlined",
+                        "Chrome-free links keep the link role and colour without a rule.",
+                        AnyView::new(TupleView::new(vec![never, caption(self.readout())])),
+                    )),
+                ])),
+            )
+            .debug_name("link-story"),
+        )
     }
 
     fn tag(&self) -> &'static str {
@@ -422,6 +466,52 @@ impl View for LinkStory {
     fn dynamic_properties(&self) -> Vec<cove_composition::DynamicField> {
         cove_composition::dynamic_fields!(self; opened)
     }
+}
+
+/// One icon resolved through a semantic size role, with its role name below.
+fn sizing_tile(size: SemanticIconSize, name: &'static str) -> AnyView {
+    AnyView::new(BoxView::new(
+        FlexDirection::Column,
+        Align::Center,
+        Justify::FlexEnd,
+        Wrap::NoWrap,
+        4.0,
+        AnyView::new(TupleView::new(vec![
+            AnyView::new(Icon::semantic(icons::action::search(), size)),
+            AnyView::new(
+                Text::new(name)
+                    .semantic_font(SemanticFontRef::caption())
+                    .semantic_foreground(SemanticColorRef::on_surface_muted()),
+            ),
+        ])),
+    ))
+}
+
+/// One glyph tinted with a semantic role.
+fn semantic_tile(
+    resource: cove_imaging::BundleImageResource,
+    color: SemanticColorRef,
+    name: &'static str,
+) -> AnyView {
+    AnyView::new(BoxView::new(
+        FlexDirection::Column,
+        Align::Center,
+        Justify::FlexEnd,
+        Wrap::NoWrap,
+        4.0,
+        AnyView::new(TupleView::new(vec![
+            AnyView::new(Icon::semantic_with_ref(
+                resource,
+                SemanticIconSize::medium(),
+                color,
+            )),
+            AnyView::new(
+                Text::new(name)
+                    .semantic_font(SemanticFontRef::caption())
+                    .semantic_foreground(SemanticColorRef::on_surface_muted()),
+            ),
+        ])),
+    ))
 }
 
 /// `IconStory`: the bundled set at the sizes the gallery uses.
@@ -466,8 +556,8 @@ impl View for IconStory {
                 ))
             })
             .collect();
-        AnyView::new(StorySection::new(
-            "Bundled icons",
+        let catalog = AnyView::new(StorySection::new(
+            "Catalog",
             "Every glyph is a 24 × 24 alpha mask and inherits the current foreground colour.",
             AnyView::new(BoxView::new(
                 FlexDirection::Row,
@@ -477,7 +567,58 @@ impl View for IconStory {
                 20.0,
                 AnyView::new(TupleView::new(tiles)),
             )),
-        ))
+        ));
+
+        let sizing = AnyView::new(BoxView::new(
+            FlexDirection::Row,
+            Align::Center,
+            Justify::FlexStart,
+            Wrap::Wrap,
+            20.0,
+            AnyView::new(TupleView::new(vec![
+                sizing_tile(SemanticIconSize::small(), "small"),
+                sizing_tile(SemanticIconSize::medium(), "medium"),
+                sizing_tile(SemanticIconSize::large(), "large"),
+            ])),
+        ));
+
+        let semantic = AnyView::new(BoxView::new(
+            FlexDirection::Row,
+            Align::Center,
+            Justify::FlexStart,
+            Wrap::Wrap,
+            20.0,
+            AnyView::new(TupleView::new(vec![
+                semantic_tile(icons::status::check_circle(), SemanticColorRef::success(), "success"),
+                semantic_tile(icons::status::alert_triangle(), SemanticColorRef::warning(), "warning"),
+                semantic_tile(icons::status::alert_circle(), SemanticColorRef::error(), "error"),
+                semantic_tile(icons::status::info(), SemanticColorRef::info(), "info"),
+            ])),
+        ));
+
+        AnyView::new(
+            BoxView::new(
+                FlexDirection::Column,
+                Align::Stretch,
+                Justify::FlexStart,
+                Wrap::NoWrap,
+                24.0,
+                AnyView::new(TupleView::new(vec![
+                    AnyView::new(StorySection::new(
+                        "Accessible icon sizing",
+                        "Semantic sizes follow the shared density scale instead of a fixed point value.",
+                        sizing,
+                    )),
+                    AnyView::new(StorySection::new(
+                        "Semantic SVG icons",
+                        "Status glyphs carry the tone of the state they describe.",
+                        semantic,
+                    )),
+                    catalog,
+                ])),
+            )
+            .debug_name("icon-story"),
+        )
     }
 
     fn tag(&self) -> &'static str {

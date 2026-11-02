@@ -93,6 +93,11 @@ license.workspace = true
 repository.workspace = true
 description = "Cove cross-platform UI toolkit"
 
+[features]
+default = ["devtools"]
+## Links the DevTools server so `COVE_DEVTOOLS=1` starts it in debug builds.
+devtools = ["cove-hosts/devtools"]
+
 [dependencies]
 cove-text.workspace = true
 cove-imaging.workspace = true

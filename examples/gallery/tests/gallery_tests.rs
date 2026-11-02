@@ -263,10 +263,13 @@ fn the_gallery_shell_materializes_with_a_selected_story() {
             assert_eq!(
                 sections,
                 vec![
+                    "story-section-Icons & tooltips".to_owned(),
+                    "story-section-Long labels".to_owned(),
+                    "story-section-Sizes".to_owned(),
                     "story-section-States".to_owned(),
-                    "story-section-Variants".to_owned()
+                    "story-section-Variants".to_owned(),
                 ],
-                "the Button story groups its samples into two sections"
+                "the Button story carries the five Swift sections"
             );
             assert!(
                 scene.named("gallery-primary-button").is_some(),

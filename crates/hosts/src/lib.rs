@@ -4,7 +4,10 @@ pub mod application;
 pub mod application_services;
 pub mod desktop;
 
-pub use application::{ApplicationCheckpoint, ApplicationLaunch};
+pub use application::{
+    ApplicationCheckpoint, ApplicationLaunch, DiagnosticsCallbacks, DiagnosticsFactory,
+    DiagnosticsSession,
+};
 pub use application_services::{http::TransportCapabilities, install_platform_services};
 pub use desktop::AppDisplayHandle;
 pub use desktop::application::configuration::ApplicationConfiguration;
