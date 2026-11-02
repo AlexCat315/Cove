@@ -53,8 +53,9 @@
   - 修复 `AnimationDemoNote` 未实现 `body` 导致 Animation 页在文本选择外壳下 panic。
   - 以真实行为替换固定旧缺陷的断言：Tree/List 页的「尚无故事」、Animation 页的 panic、侧栏内容面板位置、
     百分比内边距（现按包含块计算）、虚拟栈 `scrollToIndex` 与抽屉方向键焦点。
-  - 抽屉关闭后模态焦点作用域仍未释放，`drawer_tests` 改为断言 Swift 行为后保持失败，记录在
-    `Docs/rust-migration-validation.md`。
+  - 修复 `drawer_tests` 的 `Shared<V>` 未转发 `dynamic_properties`，造成关闭状态不触发视图重组的测试缺陷；
+    关闭、焦点作用域释放与摘要更新断言现已通过，并补充真实 Gallery 路径的关闭验证。此前对
+    `ModalFocusResource` 卸载时机的归因已在 `Docs/rust-migration-validation.md` 更正。
 - **绘制遍历去掉逐节点分配（2026-11-02）**：
   - `DrawListResources` 改为写时复制的共享块：合成时追加缓存图层只共享其资源列表（O(块数)），
     去重延后到遍历时（渲染线程每帧一次），指针哈希替代 SipHash；克隆缓存图层列表不再复制哈希集合。

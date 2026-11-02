@@ -19,20 +19,8 @@
 //!   (`sidebar-open-drawer`); the Rust SidebarStory mounts no opener control,
 //!   so the case opens the drawer through `open_drawer()` before mounting and
 //!   focus has no opener to return to.
-//! - GAP (state observation): `DrawerStory` and `SidebarStory` declare no
-//!   `dynamic_properties`, so writing `is_open` / `is_drawer_open` after mount
-//!   never re-runs their bodies. Swift's "Open navigation" click presents the
-//!   drawer; in Rust the click flips the story state but no dialog appears
-//!   (pinned in the first test). The presented flow is therefore exercised by
-//!   opening the story before it mounts.
 //! - GAP (drawer geometry): Swift's drawer dialog is the 320x820 leading panel;
 //!   the Rust dialog-role node is the 760x560 modal panel at y=130.
-//! - GAP (keyboard browse): ArrowDown inside the drawer leaves focus on
-//!   "Destination 8" (Swift moves it to 9), though Return still commits 9.
-//! - GAP (commit/close): after Return (Swift: drawer closes, focus returns to
-//!   the opener, caption reads "Selected destination: 9") the Rust drawer keeps
-//!   its modal scope, the story still reports open, and the caption is stale,
-//!   because closing writes a binding nothing observes.
 //! - GAP (sidebar drawer selection): clicking "Projects" in the sidebar drawer
 //!   (Swift: closes the drawer, marks Projects selected, updates the detail
 //!   pane) leaves the drawer open and no Projects row selected.
@@ -57,12 +45,16 @@ use cove_ui_compose::theme::styles::appearance_modifier::Appearance;
 
 use support::GalleryScene;
 
-/// Mounts a shared `GalleryView` so the test body can read its state back.
+/// Shares a view without dropping the state subscriptions used by production.
 struct Shared<V: View>(Rc<V>);
 
 impl<V: View + 'static> View for Shared<V> {
     fn body(&self, cx: &Scope) -> AnyView {
         View::body(self.0.as_ref(), cx)
+    }
+
+    fn dynamic_properties(&self) -> Vec<cove_composition::DynamicField> {
+        self.0.dynamic_properties()
     }
 }
 
@@ -113,6 +105,8 @@ fn the_dedicated_story_opens_a_modal_and_commits_keyboard_navigation_back_into_i
     ));
     GalleryScene::run(1280.0, 820.0, mounted(gallery), |scene| {
         let opener = scene.require_named("drawer-open");
+        let opener_button = row_by_label(scene, "Open navigation");
+        scene.focus.focus(Some(&opener_button), true);
         scene.click(&opener);
         run_animations(scene);
         assert!(
@@ -126,6 +120,23 @@ fn the_dedicated_story_opens_a_modal_and_commits_keyboard_navigation_back_into_i
         assert!(
             AdaptiveControlExamples::new(GalleryPage::NavigationDrawer).supports(),
             "the drawer page has an adaptive preview"
+        );
+
+        let selected = row_by_label(scene, &format!("Destination {DRAWER_DEFAULT_SELECTION}"));
+        scene.focus.focus(Some(&selected), true);
+        scene.key(Scancode::ARROW_DOWN);
+        scene.key(Scancode::RETURN);
+        run_animations(scene);
+        assert!(!scene.focus.has_modal_scope());
+        assert_eq!(scene.focus.focused(), Some(opener_button));
+        assert!(scene.has_text("Selected destination: 9"));
+        assert!(
+            scene
+                .first(|node| node
+                    .accessibility()
+                    .is_some_and(|semantics| semantics.role == AccessibilityRole::Dialog))
+                .is_none(),
+            "the closed drawer leaves the scene tree"
         );
     });
 
@@ -164,7 +175,10 @@ fn the_dedicated_story_opens_a_modal_and_commits_keyboard_navigation_back_into_i
                 scene.focus.has_modal_scope(),
                 "the open drawer keeps a modal scope while browsing"
             );
-            let next = row_by_label(scene, &format!("Destination {}", DRAWER_DEFAULT_SELECTION + 1));
+            let next = row_by_label(
+                scene,
+                &format!("Destination {}", DRAWER_DEFAULT_SELECTION + 1),
+            );
             assert_eq!(
                 scene.focus.focused().map(|node| node.id()),
                 Some(next.id()),

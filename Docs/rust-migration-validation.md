@@ -38,9 +38,16 @@
 `AnimationDemoNote` 补上 `body`；`Tree`、`Tabs`、`NavigationStack`、`TimePicker`、`Combobox`、`Notification`、`Tooltip`、
 `Form` 由文字外壳改为真实控件。
 
-仍然失败的用例：`drawer_tests::the_dedicated_story_opens_a_modal_and_commits_keyboard_navigation_back_into_its_summary`
-——抽屉按回车后关闭，但模态焦点作用域没有释放。该断言此前固定的是「抽屉不关闭」的旧缺陷，现在断言 Swift 的行为，
-因此失败；这是本批唯一未修复的缺陷，需要单独排查 `ModalFocusResource` 的卸载时机。
+抽屉失败用例已修正（2026-11-02）：此前归因为 `ModalFocusResource` 卸载时机不正确，实际原因是
+`drawer_tests` 的 `Shared<V>` 包装只转发 `body`，没有转发 `dynamic_properties`。回车修改了故事状态，
+但没有触发重组，抽屉视图仍挂载，因而焦点作用域也仍存在。补齐测试包装的状态订阅转发后，原有关闭、
+焦点作用域释放与摘要更新断言通过，无需修改生产焦点资源。真实 Gallery 路径另验证回车选中第 9 项、
+移除对话框、释放作用域并恢复开启按钮焦点；`drawer_tests` 三项全部通过。其他 `GAP` 与 `Workspace` 缺少故事仍保留。
+
+本次复查 `cargo check --workspace` 通过。额外运行的
+`cargo test -p cove-ui-compose --test navigation_drawer_tests keyboard_and_selection`
+在旧 GAP 断言处失败：测试仍要求 Space 按下时不打开抽屉，但当前实现已打开；该断言在关闭与焦点恢复检查
+之前失败，与本次 Gallery 测试包装修复无关，不能据此宣称组件套件全绿。
 
 本批更正的三处过时断言：`inspection_tests` 的百分比内边距（实际按包含块计算，即 CSS 语义，断言仍按自身宽度）、
 `advanced_interaction_tests` 的虚拟栈 `scrollToIndex`（目标行其实已经挂载）、`drawer_tests` 的方向键焦点推进
