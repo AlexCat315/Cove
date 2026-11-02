@@ -16,14 +16,7 @@
 //!   Rust `NavigationStack` only mounts the top route's content, so the root's
 //!   subtree (and any `State` it owned) is rebuilt from scratch on pop.
 //!   `popping_back_rebuilds_the_root_instead_of_retaining_it` pins that.
-//! - The mid-transition guard never fires. Swift rejected a second path change
-//!   while a push transition was running and rolled the path back;
-//!   `NavigationState::observe` only rejects when `is_animating` is still true and
-//!   the route count differs, and in practice the `NavigationPathWatcher`'s
-//!   `navigation.path.count` attachment stays at its initial value across pushes,
-//!   so `observe` is never called with a new count at all. Every mid-transition
-//!   path change is therefore accepted.
-//!   `mid_transition_path_changes_are_accepted_not_rejected` pins that.
+//! Scope-owned navigation state preserves the transition guard across parent rebuilds.
 
 use cove_composition::Scope;
 mod support;
@@ -314,12 +307,7 @@ fn a_pushed_page_focuses_its_title_without_a_visible_ring() {
 }
 
 #[test]
-fn mid_transition_path_changes_are_accepted_not_rejected() {
-    // Gap: see the module note. Swift rejected a count-changing push while the
-    // previous transition was running and rolled the path back, then accepted the
-    // same push once the transition had settled. Rust accepts every mid-transition
-    // change, and the count-comparing guard also lets a same-length replacement
-    // through, so both forms are covered here.
+fn mid_transition_push_is_rejected_until_the_transition_settles() {
     GlobalTestLock::with_scheduler(|| {
         support::with_test_text_environment(|| {
             let harness = Harness::new(Vec::new());
@@ -337,10 +325,17 @@ fn mid_transition_path_changes_are_accepted_not_rejected() {
             settle(&graph);
             assert_eq!(
                 path.get(),
-                vec!["details".to_string(), "settings".to_string()],
-                "a mid-transition count-changing push is applied, not rolled back"
+                vec!["details".to_string()],
+                "a second push during the transition is rolled back"
             );
 
+            path.set(vec!["details".to_string(), "settings".to_string()]);
+            settle(&graph);
+            assert_eq!(
+                path.get(),
+                vec!["details".to_string(), "settings".to_string()],
+                "the same push is accepted after settling"
+            );
             path.set(vec!["details".to_string(), "other".to_string()]);
             settle(&graph);
             assert_eq!(

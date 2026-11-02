@@ -28,31 +28,18 @@
 //!   ones out of input (`acceptsSubtreeInput == false`); Rust prunes collapsed
 //!   descendants from the node tree, so `secret` under `Locked group` is never
 //!   mounted either.
-//! - Horizontal keys: Swift's Right/Left disclose, collapse and move between
-//!   parent and child, mirrored under RTL; the Rust roving command maps only
-//!   Up/Down/Home/End with no modifiers.
-//! - Roving focus: Swift moves focus with each roving step; Rust focuses the
-//!   `RovingItem` wrapper, which is not focusable, so focus stays on the
-//!   original row and the next step starts from the last roving target.
-//!   Landing on a branch toggles its disclosure.
-//! - Return: Swift activates on key-down; Rust buttons activate on key-up.
 //! - Reveal on selection: Swift expands the ancestor chain of a programmatic
 //!   or moved selection; Rust leaves the caller's set untouched.
 //! - Focus repair: Swift moves focus to the nearest visible enabled ancestor
 //!   when a row collapses, is removed or becomes disabled; Rust drops focus on
 //!   collapse and, because rows are reconciled by position, leaves focus on the
 //!   reused node that now presents another (disabled) row.
-//! - Node identity: Swift keeps the same row node across collapse/re-reveal,
-//!   rail switches and adaptive width changes; Rust remounts rows in those
-//!   cases (docked 1280pt rows are retained).
-//! - Uncontrolled disclosure: `Sidebar::new` recreates `local_expanded` on
-//!   every body pass, so an uncontrolled sidebar never discloses on a press.
+//! - Node identity: collapse/re-reveal and crossing the compact portal boundary
+//!   remount rows. Rows retain their identity within the docked/rail presentation.
 //! - Item actions: Swift mounts a `sidebar-actions-<id>` ellipsis and wires the
 //!   right-click context menu; Rust only reserves the trailing width.
 //! - Row surface: Swift's row button spans the full sidebar width; the Rust
 //!   button hugs its content (the roving lane around it spans the width).
-//! - Compact shell: Swift takes the closed compact navigation out of input;
-//!   Rust leaves it mounted and input-accepting.
 //!
 //! Harness notes:
 //! - Rows are found by accessible label on the button host (rail rows carry
@@ -560,106 +547,69 @@ fn keyboard_and_pointer() {
         scene.key(Scancode::ARROW_RIGHT, KeyModifiers::default());
         assert_eq!(
             (focused_label(scene), harness.selection.get()),
-            (Some(PROJECTS.to_owned()), Some("overview".to_owned())),
-            "GAP: Swift's Right arrow moves focus into the first child and selects it (`welcome`); the Rust roving command maps only Up/Down/Home/End, so the key is ignored"
+            (Some("Welcome".into()), Some("welcome".into())),
+            "Right enters the expanded branch"
         );
-
         scene.key(Scancode::ARROW_DOWN, KeyModifiers::default());
+        assert_eq!(focused_label(scene).as_deref(), Some("Team"));
         assert_eq!(
             harness.selection.get().as_deref(),
             Some("welcome"),
-            "Down steps the selection to the next visible enabled destination"
-        );
-        assert_eq!(
-            focused_label(scene).as_deref(),
-            Some(PROJECTS),
-            "GAP: Swift moves focus with the roving step (to `team` after Right/Down); Rust focuses the RovingItem wrapper, which is not focusable, so focus stays on the original row"
-        );
-
-        scene.key(Scancode::ARROW_RIGHT, KeyModifiers::default());
-        assert_eq!(
-            harness.expanded.get(),
-            set(&["projects"]),
-            "GAP: Swift's Right arrow discloses the focused branch (`team`); Rust ignores it"
+            "focusing a branch does not navigate"
         );
         scene.key(Scancode::ARROW_RIGHT, KeyModifiers::default());
+        assert_eq!(harness.expanded.get(), set(&["projects", "team"]));
+        scene.key(Scancode::ARROW_RIGHT, KeyModifiers::default());
+        assert_eq!(harness.selection.get().as_deref(), Some("audit"));
+        assert_eq!(focused_label(scene).as_deref(), Some(AUDIT));
+        scene.key(Scancode::ARROW_LEFT, KeyModifiers::default());
+        assert_eq!(focused_label(scene).as_deref(), Some("Team"));
+        scene.key(Scancode::ARROW_LEFT, KeyModifiers::default());
+        assert!(!harness.expanded.get().contains("team") && row(scene, &[AUDIT]).is_none());
         assert_eq!(
             harness.selection.get().as_deref(),
-            Some("welcome"),
-            "GAP: Swift's second Right arrow moves into and selects `audit`; Rust ignores it"
-        );
-        scene.key(Scancode::ARROW_LEFT, KeyModifiers::default());
-        assert_eq!(
-            focused_label(scene).as_deref(),
-            Some(PROJECTS),
-            "GAP: Swift's Left arrow returns focus to the parent branch (`team`); Rust ignores it"
-        );
-        scene.key(Scancode::ARROW_LEFT, KeyModifiers::default());
-        assert!(
-            !harness.expanded.get().contains("team") && row(scene, &[AUDIT]).is_none(),
-            "a collapsed branch keeps its descendants out of input"
+            Some("audit"),
+            "collapse preserves the selected page"
         );
         assert_eq!(
-            harness.selection.get().as_deref(),
-            Some("welcome"),
-            "GAP: Swift's Left arrows leave the selection on `audit`; Rust never reached it"
-        );
-
-        let tab_stops = live_all(scene, |node| {
-            node.attachment::<u64>("__roving.item").is_some()
+            live_all(scene, |node| node
+                .attachment::<u64>("__roving.item")
+                .is_some()
                 && node.is_tab_stop()
-                && node.accepts_subtree_input()
-        });
-        assert_eq!(
-            tab_stops.len(),
+                && node.accepts_subtree_input())
+            .len(),
             1,
-            "the group exposes exactly one tab stop, saw {}",
-            tab_stops.len()
+            "the navigation group has one tab stop"
         );
-
         scene.key(Scancode::ARROW_DOWN, KeyModifiers::default());
         assert_eq!(
             (harness.selection.get().as_deref(), harness.expanded.get()),
-            (Some("welcome"), set(&["projects", "team"])),
-            "GAP: Swift's Down from `team` selects `settings`; Rust steps from the last roving target (`welcome`) onto the `team` branch and toggles it open"
+            (Some("settings"), set(&["projects"]))
         );
         scene.key(Scancode::HOME, KeyModifiers::default());
-        assert_eq!(
-            harness.selection.get().as_deref(),
-            Some("overview"),
-            "Home selects the first destination"
-        );
+        assert_eq!(harness.selection.get().as_deref(), Some("overview"));
         scene.key(Scancode::END, KeyModifiers::default());
-        assert_eq!(
-            harness.selection.get().as_deref(),
-            Some("settings"),
-            "End selects the last destination"
-        );
+        assert_eq!(harness.selection.get().as_deref(), Some("settings"));
         scene.key(Scancode::RETURN, KeyModifiers::default());
         assert_eq!(
             harness.activations.get(),
-            0,
-            "GAP: Swift activates the focused destination on Return key-down (`activations == 1`); Rust buttons activate on key-up and focus never left `projects`"
+            1,
+            "Return activates the focused destination on key-down"
         );
-
         scene.focus.focus(Some(&item(scene, &[PROJECTS])), true);
         scene.key(Scancode::RETURN, KeyModifiers::default());
-        assert!(
-            harness.expanded.get().contains("projects"),
-            "GAP: Swift collapses the focused branch on Return key-down; Rust waits for key-up"
-        );
+        assert!(!harness.expanded.get().contains("projects"));
         key_up(scene, Scancode::RETURN);
         assert!(
             !harness.expanded.get().contains("projects"),
-            "a full Return press on a branch collapses it, saw {:?}",
-            harness.expanded.get()
+            "key-up does not toggle twice"
         );
-        assert_eq!(harness.activations.get(), 0, "a branch never activates");
         assert_eq!(
-            harness.selection.get().as_deref(),
-            Some("settings"),
-            "collapsing never navigates"
+            harness.activations.get(),
+            1,
+            "branches do not activate a page"
         );
+        assert_eq!(harness.selection.get().as_deref(), Some("settings"));
     });
 }
 
@@ -840,14 +790,14 @@ fn local_and_rtl() {
         );
         assert_eq!(
             state_of(&item(scene, &[PROJECTS])).is_expanded,
-            Some(false),
-            "GAP: under RTL Swift's Left arrow discloses the branch locally (`isExpanded == true`); Rust ignores horizontal keys"
+            Some(true),
+            "RTL Left discloses the branch locally"
         );
         scene.key(Scancode::ARROW_LEFT, KeyModifiers::default());
         assert_eq!(
             harness.selection.get().as_deref(),
-            Some("overview"),
-            "GAP: under RTL Swift's second Left arrow moves into and selects `welcome`; Rust ignores it"
+            Some("welcome"),
+            "RTL Left enters the expanded branch and selects welcome"
         );
         scene.key(Scancode::ARROW_RIGHT, KeyModifiers::default());
         assert_eq!(
@@ -858,10 +808,15 @@ fn local_and_rtl() {
         scene.key(Scancode::ARROW_RIGHT, KeyModifiers::LEFT_SHIFT);
         assert_eq!(
             state_of(&item(scene, &[PROJECTS])).is_expanded,
-            Some(false),
-            "GAP: Swift keeps the locally disclosed branch open across a Shift-Right; in Rust it never opened"
+            Some(true),
+            "modified arrows do not change disclosure"
         );
 
+        press(scene, &item(scene, &[PROJECTS]), MouseButton::Left);
+        assert!(
+            row(scene, &["Welcome"]).is_none(),
+            "the pointer collapses the disclosed branch"
+        );
         press(scene, &item(scene, &[PROJECTS]), MouseButton::Left);
         assert!(
             row(scene, &["Welcome"]).is_some() && harness.expanded.get().is_empty(),
@@ -890,8 +845,8 @@ fn local_and_rtl() {
         scene.key(Scancode::ARROW_RIGHT, KeyModifiers::default());
         assert_eq!(
             state_of(&item(scene, &[PROJECTS])).is_expanded,
-            Some(true),
-            "GAP: under RTL Swift's Right arrow collapses the disclosed branch; Rust ignores it"
+            Some(false),
+            "RTL Right collapses the disclosed branch"
         );
     });
 }
@@ -924,6 +879,8 @@ fn adaptive_matrix() {
         );
 
         let original_audit = id(&audit);
+        let mut expected_docked_audit = original_audit;
+        let mut previous_compact = false;
         for width in [1280.0_f32, 720.0, 390.0, 1280.0] {
             for scale in [1.0_f32, 2.0] {
                 for dark in [false, true] {
@@ -944,20 +901,38 @@ fn adaptive_matrix() {
                             harness.input.set(modality);
                             harness.open.set(false);
                             harness.set_width(scene, width);
+                            if width == 390.0 {
+                                assert!(
+                                    row(scene, &[AUDIT, AUDIT_PATH])
+                                        .is_none_or(|node| !node.accepts_subtree_input()),
+                                    "collapsed compact navigation is outside input ({case})"
+                                );
+                                harness.open.set(true);
+                                scene.settle(10, 1.0);
+                            }
                             let audit = item(scene, &[AUDIT, AUDIT_PATH]);
-                            if width == 1280.0 {
+                            if width != 390.0 {
+                                if previous_compact {
+                                    assert_ne!(
+                                        id(&audit),
+                                        original_audit,
+                                        "GAP: leaving the compact portal remounts navigation rows ({case})"
+                                    );
+                                    expected_docked_audit = id(&audit);
+                                }
                                 assert_eq!(
                                     id(&audit),
-                                    original_audit,
-                                    "the docked row is retained ({case})"
+                                    expected_docked_audit,
+                                    "rows are retained within the docked/rail presentation ({case})"
                                 );
                             } else {
                                 assert_ne!(
                                     id(&audit),
                                     original_audit,
-                                    "GAP: Swift retains the same row node at every width; Rust remounts the navigation for rail and compact presentations ({case})"
+                                    "GAP: compact modal presentation remounts row nodes ({case})"
                                 );
                             }
+                            previous_compact = width == 390.0;
                             assert_eq!(
                                 id(&live_named(scene, "hierarchy-document").expect("document")),
                                 id(&document),
@@ -1003,7 +978,7 @@ fn adaptive_matrix() {
                             if width == 390.0 {
                                 assert!(
                                     audit.accepts_subtree_input(),
-                                    "GAP: Swift hid the collapsed compact navigation (`acceptsSubtreeInput == false`); the Rust shell leaves the undocked navigation mounted and input-accepting ({case})"
+                                    "the open compact drawer accepts input ({case})"
                                 );
                                 harness.open.set(true);
                                 scene.settle(10, 1.0);

@@ -4,7 +4,7 @@
 //! (`CalendarStory`).
 
 use cove_composition::Scope;
-use cove_core::State;
+use cove_core::Signal;
 use cove_core::scene::{Align, FlexDirection, Justify, Wrap};
 use cove_ui_compose::foundation::{Date, weekday_of};
 use cove_ui_compose::modifiers::layout::FlexExt;
@@ -14,7 +14,7 @@ use cove_ui_compose::primitives::controls::calendar::{
 use cove_ui_compose::primitives::controls::date_values::DateAvailability;
 use cove_ui_compose::primitives::text::Text;
 use cove_ui_compose::theme::tokens::{SemanticColorRef, SemanticStyleViewExt};
-use cove_ui_compose::{AnyView, BoxView, DynamicField, LayoutDebugExt, TupleView, View};
+use cove_ui_compose::{AnyView, BoxView, LayoutDebugExt, TupleView, View};
 use std::rc::Rc;
 
 use crate::gallery_content::catalog::GalleryOptions;
@@ -76,26 +76,16 @@ pub fn granularity_label(granularity: CalendarGranularity, date: Date) -> String
 /// `CalendarStory`.
 pub struct CalendarStory {
     pub options: GalleryOptions,
-    pub date: State<Option<Date>>,
-    pub week: State<Option<Date>>,
-    pub month: State<Option<Date>>,
-    pub year: State<Option<Date>>,
 }
 
 impl CalendarStory {
     pub fn new(options: GalleryOptions) -> Self {
-        Self {
-            options,
-            date: State::new(None),
-            week: State::new(None),
-            month: State::new(None),
-            year: State::new(None),
-        }
+        Self { options }
     }
 
     /// `No date selected`, or the long-form date.
-    pub fn selected_line(&self) -> String {
-        match self.date.get() {
+    pub fn selected_line(value: Option<Date>) -> String {
+        match value {
             Some(date) => format_date_long(date),
             None => "No date selected".into(),
         }
@@ -127,7 +117,7 @@ pub fn format_date_long(date: Date) -> String {
 }
 
 fn selection_binding(
-    state: &State<Option<Date>>,
+    state: &Signal<Option<Date>>,
 ) -> (Rc<dyn Fn() -> Option<Date>>, Rc<dyn Fn(Option<Date>)>) {
     let read = {
         let state = state.clone();
@@ -144,7 +134,7 @@ struct GranularityCalendar {
     label: &'static str,
     granularity: CalendarGranularity,
     options: GalleryOptions,
-    value: State<Option<Date>>,
+    value: Signal<Option<Date>>,
 }
 
 impl View for GranularityCalendar {
@@ -182,21 +172,21 @@ impl View for GranularityCalendar {
 }
 
 impl View for CalendarStory {
-    fn body(&self, _cx: &Scope) -> AnyView {
-        let (read, write) = selection_binding(&self.date);
+    fn body(&self, cx: &Scope) -> AnyView {
+        let date = cx.state(|| None::<Date>);
+        let week = cx.state(|| None::<Date>);
+        let month = cx.state(|| None::<Date>);
+        let year = cx.state(|| None::<Date>);
+        let (read, write) = selection_binding(&date);
         let day_calendar = AnyView::new(CalendarView::new(
             read,
             write,
             gallery_calendar(self.options.is_enabled, CalendarGranularity::Day),
         ));
         let selected = {
-            let date = self.date.clone();
             AnyView::new(
-                Text::new(match date.get() {
-                    Some(value) => format_date_long(value),
-                    None => "No date selected".into(),
-                })
-                .semantic_foreground(SemanticColorRef::on_surface_muted()),
+                Text::new(Self::selected_line(date.get()))
+                    .semantic_foreground(SemanticColorRef::on_surface_muted()),
             )
         };
 
@@ -211,19 +201,19 @@ impl View for CalendarStory {
                     label: "Week",
                     granularity: CalendarGranularity::Week,
                     options: self.options.clone(),
-                    value: self.week.clone(),
+                    value: week,
                 }),
                 AnyView::new(GranularityCalendar {
                     label: "Month",
                     granularity: CalendarGranularity::Month,
                     options: self.options.clone(),
-                    value: self.month.clone(),
+                    value: month,
                 }),
                 AnyView::new(GranularityCalendar {
                     label: "Year",
                     granularity: CalendarGranularity::Year,
                     options: self.options.clone(),
-                    value: self.year.clone(),
+                    value: year,
                 }),
             ])),
         ));
@@ -258,15 +248,6 @@ impl View for CalendarStory {
             .flex(0.0)
             .debug_name("calendar-story"),
         )
-    }
-
-    fn dynamic_properties(&self) -> Vec<DynamicField> {
-        vec![
-            DynamicField::state("date", &self.date),
-            DynamicField::state("week", &self.week),
-            DynamicField::state("month", &self.month),
-            DynamicField::state("year", &self.year),
-        ]
     }
 }
 
@@ -336,18 +317,10 @@ mod checks {
     #[test]
     fn long_date_format_matches_swift_long_style() {
         assert_eq!(format_date_long(date(19_723)), "January 1, 2024");
-        let story = CalendarStory::new(GalleryOptions::default());
-        assert_eq!(story.selected_line(), "No date selected");
-        story.date.set(Some(date(19_723)));
-        assert_eq!(story.selected_line(), "January 1, 2024");
-    }
-
-    #[test]
-    fn every_granularity_starts_unselected() {
-        let story = CalendarStory::new(GalleryOptions::default());
-        assert!(story.date.get().is_none());
-        assert!(story.week.get().is_none());
-        assert!(story.month.get().is_none());
-        assert!(story.year.get().is_none());
+        assert_eq!(CalendarStory::selected_line(None), "No date selected");
+        assert_eq!(
+            CalendarStory::selected_line(Some(date(19_723))),
+            "January 1, 2024"
+        );
     }
 }

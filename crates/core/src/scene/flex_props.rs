@@ -144,7 +144,15 @@ impl super::Node {
     /// Direction can be applied after a primitive's update pass, so input and
     /// drawing resolve it lazily rather than snapshotting a stale value.
     pub fn resolves_right_to_left(&self) -> bool {
-        let mut layout = self.layout_node();
+        let mut candidate = Some(self.clone());
+        let mut layout = None;
+        while let Some(node) = candidate {
+            if let Some(owner) = node.layout_node() {
+                layout = Some(owner);
+                break;
+            }
+            candidate = node.parent();
+        }
         while let Some(current) = layout {
             if current.direction() != Direction::Inherit {
                 return current.direction() == Direction::Rtl;
@@ -167,6 +175,21 @@ mod tests {
             [Direction::Inherit, Direction::Inherit].into_iter()
         ));
     }
+    #[test]
+    fn layoutless_input_hosts_inherit_direction_from_ancestors() {
+        let root = super::super::Node::new();
+        let layout = super::super::LayoutNode::new();
+        layout.set_direction(Direction::Rtl);
+        root.set_layout_node(Some(&layout));
+        let host = super::super::Node::new();
+        root.add_child(&host);
+        assert!(host.resolves_right_to_left());
+        let override_layout = super::super::LayoutNode::new();
+        override_layout.set_direction(Direction::Ltr);
+        host.set_layout_node(Some(&override_layout));
+        assert!(!host.resolves_right_to_left());
+    }
+
     #[test]
     fn axis_helpers() {
         assert!(FlexDirection::RowReverse.is_row());

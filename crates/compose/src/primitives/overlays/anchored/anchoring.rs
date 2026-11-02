@@ -273,6 +273,27 @@ impl PrimitiveView for AnchoredOverlayHost {
         let Some(resource) = node.first_resource::<PortalResource>() else {
             return;
         };
+        if let Some(registry) = cove_core::scene::InteractionRegistryHolder::current() {
+            let presented = self.is_presented;
+            let dismiss = self.on_dismiss.clone();
+            let anchor = PopoverAnchor::new(node, self.overflow, self.surface, 0.0);
+            registry.set_pointer(
+                node,
+                cove_core::scene::InputHandlerRoute::overlay(),
+                Rc::new(move |event, phase, _| {
+                    if presented
+                        && phase == cove_core::scene::PointerPhase::Down
+                        && event.button == cove_platform::MouseButton::Left
+                        && anchor.frame().contains(Point::new(event.x, event.y))
+                    {
+                        dismiss();
+                        EventResult::Handled
+                    } else {
+                        EventResult::Ignored
+                    }
+                }),
+            );
+        }
         if !self.is_presented {
             resource.dismiss(node);
             return;
@@ -393,6 +414,8 @@ impl PrimitiveView for AnchoredOverlayHost {
         let weak = node.downgrade();
         let placement_for_layout = self.placement;
         let sizing = self.sizing_anchor;
+        let overflow = self.overflow;
+        let surface = self.surface;
         node.set_layout_did_update(Some(Rc::new(move |_owner: &Node| {
             let Some(node) = Node::upgrade(&weak) else {
                 return;
@@ -400,9 +423,7 @@ impl PrimitiveView for AnchoredOverlayHost {
             let Some(resource) = node.first_resource::<PortalResource>() else {
                 return;
             };
-            let margin = if sizing { 12.0 } else { 8.0 };
-            let anchor =
-                PopoverAnchor::new(&node, PopoverOverflow::Flip, PopoverSurface::Bubble, margin);
+            let anchor = PopoverAnchor::new(&node, overflow, surface, margin);
             place(
                 &node,
                 &resource,
@@ -428,13 +449,7 @@ impl PrimitiveView for AnchoredOverlayHost {
             let Some(resource) = owner.first_resource::<PortalResource>() else {
                 return;
             };
-            let margin = if sizing { 12.0 } else { 8.0 };
-            let anchor = PopoverAnchor::new(
-                &owner,
-                PopoverOverflow::Flip,
-                PopoverSurface::Bubble,
-                margin,
-            );
+            let anchor = PopoverAnchor::new(&owner, overflow, surface, margin);
             place(
                 &owner,
                 &resource,
@@ -545,9 +560,9 @@ impl PrimitiveView for PopoverSurfaceHost {
         let maximum = self
             .anchor
             .geometry(Size::default(), self.placement)
-            .maximum_size
-            .height;
-        layout.set_max_height(Some(maximum));
+            .maximum_size;
+        layout.set_max_width(Some(maximum.width));
+        layout.set_max_height(Some(maximum.height));
     }
 
     fn update_node(&self, node: &Node) {
@@ -559,6 +574,8 @@ impl PrimitiveView for PopoverSurfaceHost {
         );
         let weak = node.downgrade();
         let placement = self.placement;
+        let overflow = self.anchor.overflow;
+        let margin = self.anchor.margin;
         node.update_draw(placement, move |list, origin| {
             let Some(owner) = Node::upgrade(&weak) else {
                 return;
@@ -586,9 +603,9 @@ impl PrimitiveView for PopoverSurfaceHost {
             let _ = list.add_rounded_rect_stroke(body, radius, 1.0, border);
             let geometry = PopoverAnchor::new(
                 &owner,
-                super::placement::PopoverOverflow::Flip,
+                overflow,
                 super::placement::PopoverSurface::Bubble,
-                8.0,
+                margin,
             )
             .geometry(
                 Size {

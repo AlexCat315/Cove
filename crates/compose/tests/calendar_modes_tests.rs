@@ -27,15 +27,6 @@
 //!   (Swift: 2024-03-18). Row-band centring is checked per cell box instead.
 //! - Month labels: Swift "March 2024"; Rust's `period_label` repeats the year
 //!   ("March 2024 2024").
-//! - Years paging (production panic): Swift's "Next years" pages twelve years;
-//!   Rust keeps the "Next month" label and pressing it panics with "RefCell
-//!   already borrowed" (`CalendarPeriodPanel` calls `set_month` while holding
-//!   `session.borrow()`, `calendar.rs` ~line 171). The year pick is made on the
-//!   current page (2020) instead of 2031.
-//! - Drilling: Swift's title press ("March 2024, show months") drills up; the
-//!   Rust title is unlabelled and mutates the session without invalidating, so
-//!   the day panel stays on screen while the hidden session moves to months —
-//!   the next day press drills back down instead of selecting.
 //! - Day labels: Swift "Tuesday, September 15, 2026"; Rust omits the weekday.
 //! - `CalendarGranularity.label(for:)` does not exist in Rust; the labels case
 //!   asserts the rendered accessibility labels instead.
@@ -343,20 +334,16 @@ fn year_selection() {
                 "GAP: Swift labels the years-panel arrow \"Next years\"; Rust keeps \"Next month\""
             );
             let next = button(scene, "Next month");
-            let paged = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-                press(scene, &next);
-            }));
+            press(scene, &next);
             assert!(
-                paged.is_err(),
-                "GAP (production panic): Swift pages to the next twelve years; the Rust \
-                 years-panel arrow calls set_month while holding session.borrow(), and the \
-                 RefCell panics with \"already borrowed\""
+                buttons(scene).iter().any(|node| label(node) == "2028"),
+                "paging renders the next twelve years without a borrow panic"
             );
-            press(scene, &button(scene, "2020"));
+            press(scene, &button(scene, "2031"));
             assert_eq!(
                 *store.borrow(),
-                Some(date(2020, 1, 1)),
-                "picking a year selects its first day (Swift picked 2031 after paging)"
+                Some(date(2031, 1, 1)),
+                "selecting a year on the new page commits its start"
             );
         },
     );
@@ -380,38 +367,37 @@ fn drilling() {
             assert!(
                 buttons(scene)
                     .iter()
-                    .any(|node| label(node) == "March 13, 2024")
-                    && buttons(scene)
-                        .iter()
-                        .all(|node| label(node) != "June 2024 2024"),
-                "GAP: Swift's title press drills up to the months panel; the Rust title \
-                 mutates the calendar session without invalidating, so the day panel stays"
-            );
-            assert_eq!(
-                *store.borrow(),
-                Some(date(2024, 3, 13)),
-                "browsing never writes the selection"
+                    .any(|node| label(node) == "June 2024 2024"),
+                "the title drills up to months"
             );
             assert!(
                 buttons(scene)
                     .iter()
-                    .all(|node| !label(node).starts_with("Wednesday")),
-                "GAP: Swift day labels lead with the weekday (\"Tuesday, September 15, 2026\"); \
-                 Rust omits it"
+                    .all(|node| label(node) != "March 13, 2024"),
+                "the day panel is replaced"
             );
-            press(scene, &button(scene, "March 20, 2024"));
             assert_eq!(
                 *store.borrow(),
                 Some(date(2024, 3, 13)),
-                "GAP: the unrendered drill-up still moved the session to the months panel, \
-                 so the first day press only drills back down instead of selecting"
+                "browsing does not commit"
             );
-            press(scene, &button(scene, "March 20, 2024"));
+            press(scene, &button(scene, "June 2024 2024"));
+            assert!(
+                buttons(scene)
+                    .iter()
+                    .any(|node| label(node) == "June 20, 2024"),
+                "choosing a month drills down to its days"
+            );
             assert_eq!(
                 *store.borrow(),
-                Some(date(2024, 3, 20)),
-                "picking a day on the base panel selects it (Swift picked 2026-09-15 after \
-                 drilling, which Rust cannot reach)"
+                Some(date(2024, 3, 13)),
+                "drilling down does not commit"
+            );
+            press(scene, &button(scene, "June 20, 2024"));
+            assert_eq!(
+                *store.borrow(),
+                Some(date(2024, 6, 20)),
+                "a day on the base panel commits"
             );
         },
     );

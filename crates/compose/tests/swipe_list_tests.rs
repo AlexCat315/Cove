@@ -12,15 +12,9 @@
 //! - pointer-only surfaces never swipe; they use the actions button
 //!
 //! Named differences from the Swift suite:
-//! - Rust `SwipeAction` and the row's actions button carry no accessibility
-//!   label (Swift's `Button("Archive")` derives one from its title, and the
-//!   toggle is label-only). Swipes are asserted through the row host's content
-//!   offset, and the action buttons are located structurally inside the row.
 //! - The Swift matrix parameterises `mirroredActions` over RTL and text scale;
 //!   the Rust action extent is authored at 74pt and ignores text scale, and the
 //!   reveal is a physical left shift in both directions.
-//! - At 2x text scale the Rust swipe no longer reveals (settled content offset
-//!   stays 0); `mirrored_actions` pins that per-scale outcome.
 //! - Rust `SwipeRowHost` records its reveal in `content_offset.x` with the
 //!   opposite sign (a 140pt swipe reports `140.0`), which is what `reveal`
 //!   returns.
@@ -28,14 +22,8 @@
 //!   height assertions pin 36 and name the difference.
 //! - The Rust swipe is physical rather than directional: a leftward drag reveals
 //!   in RTL too, and a rightward drag never reveals, which the matrix pins.
-//! - The always-mounted action buttons are hit-testable behind the closed row,
-//!   so a swipe gesture runs `Archive` while it reveals; Escape cannot be
-//!   isolated from that and `mirrored_actions` instead pins that every action
-//!   the gesture ran was an archive activation.
-//! - Pressing the actions button (the 44pt trailing slot) does not open the
-//!   reveal in Rust, and the action buttons only expose an activate action when
-//!   the reveal has been opened by a swipe; `actions_menu` and
-//!   `pointer_does_not_swipe` assert that no action runs from the button press.
+//! Closed actions remain mounted for animation but are excluded from input and
+//! accessibility. The actions button opens the same actions without a swipe.
 
 use cove_composition::Scope;
 mod support;
@@ -167,6 +155,17 @@ fn ancestor_row(node: &Node) -> Option<Node> {
         current = candidate.parent();
     }
     None
+}
+
+fn accessible_action_labels(elements: &[cove_core::scene::AccessibilityElement]) -> Vec<String> {
+    let mut result = Vec::new();
+    for element in elements {
+        if ["Archive", "Delete"].contains(&element.semantics.label.as_str()) {
+            result.push(element.semantics.label.clone());
+        }
+        result.extend(accessible_action_labels(&element.children));
+    }
+    result
 }
 
 fn row_buttons(scene: &InteractiveScene, label: &str) -> Vec<Node> {
@@ -352,17 +351,7 @@ fn mirrored_actions() {
 
                 swipe(scene, &first, -140.0);
                 let opened = reveal(scene, "Item 1");
-                if scale >= 2.0 {
-                    assert_eq!(
-                        opened, 0.0,
-                        "GAP: rtl={rtl} scale={scale} swipe revealed {opened}"
-                    );
-                } else {
-                    assert!(
-                        opened >= 70.0,
-                        "GAP: rtl={rtl} scale={scale} reveal {opened}"
-                    );
-                }
+                assert!(opened >= 70.0, "rtl={rtl} scale={scale} reveal {opened}");
                 assert!(
                     scene.capture.target().is_none(),
                     "GAP: capture held after mirrored swipe"
@@ -374,12 +363,8 @@ fn mirrored_actions() {
                 );
 
                 assert!(
-                    harness
-                        .actions
-                        .borrow()
-                        .iter()
-                        .all(|value| value.starts_with("archive")),
-                    "GAP: rtl={rtl} swipe ran unexpected actions {:?}",
+                    harness.actions.borrow().is_empty(),
+                    "rtl={rtl} swiping must not activate actions {:?}",
                     harness.actions.borrow()
                 );
 
@@ -410,14 +395,21 @@ fn actions_menu() {
             reveal(scene, "Item 2") > 0.0,
             "the actions button expands the row's actions"
         );
-        // GAP: rows that are not revealed still expose their action buttons to
-        // accessibility, so Swift's first "Delete" (the revealed row's) has to be
-        // located within Item 2 here.
+        for title in ["Item 1", "Item 3"] {
+            assert!(
+                accessible_action_labels(&AccessibilityTree::snapshot(&row(scene, title)))
+                    .is_empty(),
+                "closed rows omit hidden actions from accessibility"
+            );
+        }
         let delete = row_buttons(scene, "Item 2")
             .into_iter()
             .find(|node| AccessibilityTree::resolved_label(node) == "Delete")
             .expect("the expanded row offers Delete");
-        (delete.accessibility_actions().activate.expect("Delete exposes activate"))();
+        (delete
+            .accessibility_actions()
+            .activate
+            .expect("Delete exposes activate"))();
         scene.settle(6, 0.05);
         assert_eq!(*harness.actions.borrow(), vec!["delete-1".to_string()]);
     });

@@ -162,6 +162,15 @@ impl<Id: PartialEq + Eq + std::hash::Hash + Clone + Send + Sync + 'static> Primi
 
     fn children(&self, _node: &Node) -> Vec<AnyView> {
         let is_rail = self.presentation.is_rail();
+        let surface =
+            _node.composition_value(&cove_composition::adaptive::SurfaceEnvironment::key());
+        let minimum_height = self.minimum_row_height.max(if is_rail {
+            44.0
+        } else if surface.input.contains(cove_core::InputCapabilities::TOUCH) {
+            surface.minimum_control_extent()
+        } else {
+            0.0
+        });
         let label = if is_rail {
             self.context_label.clone()
         } else {
@@ -288,9 +297,8 @@ impl<Id: PartialEq + Eq + std::hash::Hash + Clone + Send + Sync + 'static> Primi
             is_selected,
             None,
         )
-        .button_style(SidebarItemStyle {
-            minimum_height: self.minimum_row_height,
-        });
+        .button_style(SidebarItemStyle { minimum_height })
+        .frame(None, None, None, Some(minimum_height), None, None);
 
         let row_label = label.clone();
         let mut column: Vec<AnyView> = vec![AnyView::new(AnyView::new(button).with_modifier(

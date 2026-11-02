@@ -12,7 +12,7 @@
 //! [`results_presentation`].
 use crate::Scope;
 use std::rc::Rc;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
 use cove_core::scene::{AccessibilityRole, Align, FlexDirection, Justify, Node, Wrap};
 use cove_core::{Binding, Color};
@@ -119,8 +119,9 @@ impl ComboboxPresentation {
 /// options, while the component debounces, cancels superseded requests and
 /// publishes only the newest generation.
 ///
-/// The reply callback is `Send + Sync` because the request may be delivered from
-/// a worker; hand results back with [`ComboboxSearchSession::deliver`].
+/// Native hosts run the query on a worker and publish through the UI inbox.
+/// Wasm executes the synchronous query callback after the same debounce clock;
+/// generation checks reject superseded and disposed requests on every platform.
 pub struct ComboboxSearch<Value> {
     /// Quiet time after the last keystroke before a request starts. Opening the
     /// list requests immediately.
@@ -166,6 +167,8 @@ struct ComboboxSession<Value> {
     /// The last committed option, so a remote selection keeps its label after
     /// the results change.
     chosen: Option<SelectOption<Value>>,
+    remote: ComboboxSearchSession,
+    remote_options: Vec<SelectOption<Value>>,
 }
 
 impl<Value> Default for ComboboxSession<Value> {
@@ -175,6 +178,8 @@ impl<Value> Default for ComboboxSession<Value> {
             query: String::new(),
             highlighted: None,
             chosen: None,
+            remote: ComboboxSearchSession::new(),
+            remote_options: Vec::new(),
         }
     }
 }
@@ -194,11 +199,7 @@ pub struct Combobox<Value: PartialEq + Clone + Send + Sync + 'static> {
     pub selection: Binding<Option<Value>>,
     pub presentation: ComboboxPresentation,
     source: ComboboxSource<Value>,
-    session: Arc<Mutex<ComboboxSession<Value>>>,
-    /// The request bookkeeping is label-only; this keeps the typed options that
-    /// belong to the accepted generation.
-    remote: Arc<Mutex<ComboboxSearchSession>>,
-    remote_options: Arc<Mutex<Vec<SelectOption<Value>>>>,
+    session: Option<cove_core::Signal<ComboboxSession<Value>>>,
 }
 
 impl<Value: PartialEq + Clone + Send + Sync + 'static> Combobox<Value> {
@@ -217,9 +218,7 @@ impl<Value: PartialEq + Clone + Send + Sync + 'static> Combobox<Value> {
             selection,
             presentation: ComboboxPresentation::default(),
             source: ComboboxSource::Options(options),
-            session: Arc::new(Mutex::new(ComboboxSession::default())),
-            remote: Arc::new(Mutex::new(ComboboxSearchSession::new())),
-            remote_options: Arc::new(Mutex::new(Vec::new())),
+            session: None,
         }
     }
 
@@ -237,9 +236,7 @@ impl<Value: PartialEq + Clone + Send + Sync + 'static> Combobox<Value> {
                 search: search.validated(),
                 selected_label,
             },
-            session: Arc::new(Mutex::new(ComboboxSession::default())),
-            remote: Arc::new(Mutex::new(ComboboxSearchSession::new())),
-            remote_options: Arc::new(Mutex::new(Vec::new())),
+            session: None,
         }
     }
 
@@ -248,14 +245,17 @@ impl<Value: PartialEq + Clone + Send + Sync + 'static> Combobox<Value> {
         self
     }
 
+    fn session(&self) -> cove_core::Signal<ComboboxSession<Value>> {
+        self.session
+            .expect("combobox session is initialized in its composition scope")
+    }
+
     fn snapshot(&self) -> Combobox<Value> {
         Combobox {
             selection: self.selection.clone(),
             presentation: self.presentation.clone(),
             source: self.source.clone(),
-            session: self.session.clone(),
-            remote: self.remote.clone(),
-            remote_options: self.remote_options.clone(),
+            session: self.session,
         }
     }
 
@@ -280,10 +280,8 @@ impl<Value: PartialEq + Clone + Send + Sync + 'static> Combobox<Value> {
         match &self.source {
             ComboboxSource::Options(options) => Self::matching(options, query),
             ComboboxSource::Search { .. } => self
-                .remote_options
-                .lock()
-                .unwrap_or_else(|poisoned| poisoned.into_inner())
-                .clone(),
+                .session()
+                .with(|session| session.remote_options.clone()),
         }
     }
 
@@ -291,11 +289,8 @@ impl<Value: PartialEq + Clone + Send + Sync + 'static> Combobox<Value> {
         match &self.source {
             ComboboxSource::Options(_) => ComboboxSearchPhase::Loaded,
             ComboboxSource::Search { .. } => self
-                .remote
-                .lock()
-                .unwrap_or_else(|poisoned| poisoned.into_inner())
-                .phase()
-                .clone(),
+                .session()
+                .with(|session| session.remote.phase().clone()),
         }
     }
 
@@ -309,20 +304,20 @@ impl<Value: PartialEq + Clone + Send + Sync + 'static> Combobox<Value> {
                 .find(|option| option.value == value)
                 .map(|option| option.label.clone()),
             ComboboxSource::Search { selected_label, .. } => self
-                .remote_options
-                .lock()
-                .unwrap_or_else(|poisoned| poisoned.into_inner())
-                .iter()
-                .find(|option| option.value == value)
-                .map(|option| option.label.clone())
-                .or_else(|| {
-                    self.session
-                        .lock()
-                        .unwrap_or_else(|poisoned| poisoned.into_inner())
-                        .chosen
-                        .as_ref()
-                        .filter(|chosen| chosen.value == value)
-                        .map(|chosen| chosen.label.clone())
+                .session()
+                .with(|session| {
+                    session
+                        .remote_options
+                        .iter()
+                        .find(|option| option.value == value)
+                        .map(|option| option.label.clone())
+                        .or_else(|| {
+                            session
+                                .chosen
+                                .as_ref()
+                                .filter(|chosen| chosen.value == value)
+                                .map(|chosen| chosen.label.clone())
+                        })
                 })
                 .or_else(|| selected_label.clone()),
         }
@@ -333,14 +328,79 @@ impl<Value: PartialEq + Clone + Send + Sync + 'static> Combobox<Value> {
         let ComboboxSource::Search { search, .. } = &self.source else {
             return None;
         };
-        let generation = self
-            .remote
-            .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner())
-            .begin(query, search.minimum_query_length, force)?;
-        // The reply is applied through `deliver`, which drops a superseded
-        // generation.
-        let _ = search.delay_ms;
+        let signal = self.session();
+        let mut generation = None;
+        signal.update(|session| {
+            generation = session
+                .remote
+                .begin(query, search.minimum_query_length, force)
+        });
+        let generation = generation?;
+        let loader = search.results.clone();
+        let query = query.to_owned();
+        let sender = signal.sender();
+        let start = move || {
+            let fail = sender.clone();
+            let work = move || {
+                let result = loader(&query);
+                sender.update(move |session| {
+                    if session.remote.generation() != generation {
+                        return;
+                    }
+                    match result {
+                        Ok(options) => {
+                            let mut unique = Vec::<SelectOption<Value>>::new();
+                            for option in options {
+                                if !unique.iter().any(|previous| previous.value == option.value) {
+                                    unique.push(option);
+                                }
+                            }
+                            session.remote.deliver(
+                                generation,
+                                unique.iter().map(|option| option.label.clone()).collect(),
+                            );
+                            session.highlighted = unique
+                                .iter()
+                                .find(|option| option.is_enabled)
+                                .map(|option| option.value.clone());
+                            session.remote_options = unique;
+                        }
+                        Err(message) => {
+                            session.remote.fail(generation, message);
+                        }
+                    }
+                });
+            };
+            #[cfg(not(target_family = "wasm"))]
+            if let Err(error) = std::thread::Builder::new()
+                .name("cove-combobox".into())
+                .spawn(work)
+            {
+                fail.update(move |session| {
+                    session.remote.fail(generation, error.to_string());
+                });
+            }
+            #[cfg(target_family = "wasm")]
+            {
+                let _ = fail;
+                work();
+            }
+        };
+        if force || search.delay_ms == 0 {
+            start();
+        } else {
+            let timer = ComboboxRequestTimer {
+                remaining: std::cell::Cell::new(search.delay_ms as f64 / 1000.0),
+                valid: Box::new(move || {
+                    signal.is_alive()
+                        && signal
+                            .with_untracked(|session| session.remote.generation() == generation)
+                }),
+                action: std::cell::RefCell::new(Some(Box::new(start))),
+            };
+            cove_core::scene::AnimatorScheduler::current().register(Rc::new(timer));
+            cove_core::scene::wake_scene_thread();
+        }
         Some(generation)
     }
 
@@ -349,14 +409,7 @@ impl<Value: PartialEq + Clone + Send + Sync + 'static> Combobox<Value> {
         if !self.presentation.is_enabled {
             return;
         }
-        let matches = self.matches(
-            &self
-                .session
-                .lock()
-                .unwrap_or_else(|poisoned| poisoned.into_inner())
-                .query
-                .clone(),
-        );
+        let matches = self.matches(&self.session().with(|session| session.query.clone()));
         let Some(option) = matches
             .iter()
             .find(|option| &option.value == value && option.is_enabled)
@@ -365,47 +418,37 @@ impl<Value: PartialEq + Clone + Send + Sync + 'static> Combobox<Value> {
         };
         let option = option.clone();
         {
-            let mut session = self
-                .session
-                .lock()
-                .unwrap_or_else(|poisoned| poisoned.into_inner());
-            session.chosen = Some(option);
-            session.is_presented = false;
+            self.session().update(|session| {
+                session.chosen = Some(option);
+                session.is_presented = false;
+            });
         }
         self.selection.set(Some(value.clone()));
+        self.close();
     }
 
     /// Moves the highlight over the enabled values only.
     fn navigate(&self, command: SelectionNavigation) {
-        let matches = self.matches(
-            &self
-                .session
-                .lock()
-                .unwrap_or_else(|poisoned| poisoned.into_inner())
-                .query
-                .clone(),
-        );
+        let matches = self.matches(&self.session().with(|session| session.query.clone()));
         let enabled: Vec<Value> = matches
             .iter()
             .filter(|option| option.is_enabled)
             .map(|option| option.value.clone())
             .collect();
-        let mut session = self
-            .session
-            .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner());
-        session.highlighted = command.destination(&enabled, session.highlighted.as_ref(), false);
+        self.session().update(|session| {
+            session.highlighted =
+                command.destination(&enabled, session.highlighted.as_ref(), false);
+        });
     }
 
     /// Opens the popover, resetting the query and seeding the highlight.
     fn open(&self) {
         {
-            let mut session = self
-                .session
-                .lock()
-                .unwrap_or_else(|poisoned| poisoned.into_inner());
-            session.query.clear();
-            session.highlighted = self.selection.get();
+            let selected = self.selection.get();
+            self.session().update(|session| {
+                session.query.clear();
+                session.highlighted = selected;
+            });
         }
         // Remote data can change between opens: refresh, keeping the previous
         // results dimmed until the new ones arrive.
@@ -413,17 +456,17 @@ impl<Value: PartialEq + Clone + Send + Sync + 'static> Combobox<Value> {
     }
 
     fn close(&self) {
-        self.remote
-            .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner())
-            .cancel();
+        self.session().update(|session| session.remote.cancel());
     }
 }
 
 impl<Value: PartialEq + Clone + Send + Sync + 'static> View for Combobox<Value> {
-    fn body(&self, _cx: &Scope) -> AnyView {
-        let field = self.snapshot();
-        let selected_label = self.selected_label();
+    fn body(&self, cx: &Scope) -> AnyView {
+        let mut field = self.snapshot();
+        let session = cx.state(ComboboxSession::default);
+        session.track();
+        field.session = Some(session);
+        let selected_label = field.selected_label();
         let title = selected_label
             .clone()
             .unwrap_or_else(|| self.presentation.placeholder.clone());
@@ -431,22 +474,12 @@ impl<Value: PartialEq + Clone + Send + Sync + 'static> View for Combobox<Value> 
         let presented = Binding::new(
             {
                 let field = field.clone();
-                move || {
-                    field
-                        .session
-                        .lock()
-                        .unwrap_or_else(|poisoned| poisoned.into_inner())
-                        .is_presented
-                }
+                move || field.session().with(|session| session.is_presented)
             },
             {
                 let field = field.clone();
                 move |open: bool| {
-                    let was_open = field
-                        .session
-                        .lock()
-                        .unwrap_or_else(|poisoned| poisoned.into_inner())
-                        .is_presented;
+                    let was_open = field.session().with(|session| session.is_presented);
                     if open && !was_open {
                         field.open();
                     }
@@ -454,10 +487,8 @@ impl<Value: PartialEq + Clone + Send + Sync + 'static> View for Combobox<Value> 
                         field.close();
                     }
                     field
-                        .session
-                        .lock()
-                        .unwrap_or_else(|poisoned| poisoned.into_inner())
-                        .is_presented = open;
+                        .session()
+                        .update(|session| session.is_presented = open);
                 }
             },
         );
@@ -608,12 +639,7 @@ impl<Value: PartialEq + Clone + Send + Sync + 'static> PrimitiveView for Combobo
 
     fn children(&self, _node: &Node) -> Vec<AnyView> {
         let field = self.field.clone();
-        let version = field
-            .session
-            .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner())
-            .query
-            .clone();
+        let version = field.session().with(|session| session.query.clone());
         vec![AnyView::new(
             BoxView::new(
                 FlexDirection::Column,
@@ -667,21 +693,16 @@ impl<Value: PartialEq + Clone + Send + Sync + 'static> PrimitiveView
             move || {
                 crate::primitives::text::text_buffer::TextBuffer::new(
                     &field_for_get
-                        .session
-                        .lock()
-                        .unwrap_or_else(|poisoned| poisoned.into_inner())
-                        .query
-                        .clone(),
+                        .session()
+                        .with(|session| session.query.clone()),
                 )
             },
             move |buffer: crate::primitives::text::text_buffer::TextBuffer| {
                 let query = buffer.string_value();
                 {
-                    let mut session = field_for_set
-                        .session
-                        .lock()
-                        .unwrap_or_else(|poisoned| poisoned.into_inner());
-                    session.query = query.clone();
+                    field_for_set
+                        .session()
+                        .update(|session| session.query = query.clone());
                 }
                 let matches = field_for_set.matches(&query);
                 let first_enabled = matches
@@ -689,10 +710,8 @@ impl<Value: PartialEq + Clone + Send + Sync + 'static> PrimitiveView
                     .find(|option| option.is_enabled)
                     .map(|option| option.value.clone());
                 field_for_set
-                    .session
-                    .lock()
-                    .unwrap_or_else(|poisoned| poisoned.into_inner())
-                    .highlighted = first_enabled;
+                    .session()
+                    .update(|session| session.highlighted = first_enabled);
                 field_for_set.request(&query, false);
             },
         );
@@ -708,20 +727,11 @@ impl<Value: PartialEq + Clone + Send + Sync + 'static> PrimitiveView
         })
         .events(crate::primitives::text::text_field::TextFieldEvents {
             on_submit: Some(Rc::new(move || {
-                let matches = submit_field.matches(
-                    &submit_field
-                        .session
-                        .lock()
-                        .unwrap_or_else(|poisoned| poisoned.into_inner())
-                        .query
-                        .clone(),
-                );
+                let matches = submit_field
+                    .matches(&submit_field.session().with(|session| session.query.clone()));
                 let highlighted = submit_field
-                    .session
-                    .lock()
-                    .unwrap_or_else(|poisoned| poisoned.into_inner())
-                    .highlighted
-                    .clone();
+                    .session()
+                    .with(|session| session.highlighted.clone());
                 match highlighted {
                     Some(value)
                         if matches
@@ -779,14 +789,7 @@ impl<Value: PartialEq + Clone + Send + Sync + 'static> PrimitiveView
 
     fn children(&self, _node: &Node) -> Vec<AnyView> {
         let field = &self.field;
-        let matches = field.matches(
-            &field
-                .session
-                .lock()
-                .unwrap_or_else(|poisoned| poisoned.into_inner())
-                .query
-                .clone(),
-        );
+        let matches = field.matches(&field.session().with(|session| session.query.clone()));
         let phase = field.phase();
         let count = matches.len();
         let presentation = results_presentation(&phase, count, &field.presentation.empty_text);
@@ -810,12 +813,8 @@ impl<Value: PartialEq + Clone + Send + Sync + 'static> PrimitiveView
                                 Text::new("Retry").semantic_font(SemanticFontRef::label()),
                             ),
                             move || {
-                                let query = retry_field
-                                    .session
-                                    .lock()
-                                    .unwrap_or_else(|poisoned| poisoned.into_inner())
-                                    .query
-                                    .clone();
+                                let query =
+                                    retry_field.session().with(|session| session.query.clone());
                                 retry_field.request(&query, true);
                             },
                             ButtonRole::Normal,
@@ -951,12 +950,7 @@ impl<Value: PartialEq + Clone + Send + Sync + 'static> PrimitiveView for Combobo
 
     fn children(&self, _node: &Node) -> Vec<AnyView> {
         let field = &self.field;
-        let highlighted = field
-            .session
-            .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner())
-            .highlighted
-            .clone();
+        let highlighted = field.session().with(|session| session.highlighted.clone());
         let selected = field.selection.get();
         self.matches
             .iter()
@@ -1060,5 +1054,41 @@ impl<Value: PartialEq + Clone + Send + Sync + 'static> Combobox<Value> {
     pub fn row_height(&self, theme: &crate::theme::Theme) -> f32 {
         let _ = theme_for_node;
         self.presentation.authored_row_height(theme)
+    }
+}
+
+/// The scene clock drives debounce on every platform, including Wasm.
+struct ComboboxRequestTimer {
+    remaining: std::cell::Cell<f64>,
+    valid: Box<dyn Fn() -> bool>,
+    action: std::cell::RefCell<Option<Box<dyn FnOnce()>>>,
+}
+impl cove_core::scene::AnyAnimationController for ComboboxRequestTimer {
+    fn is_finished(&self) -> bool {
+        self.action.borrow().is_none() || !(self.valid)()
+    }
+    fn tick(&self, delta_time: f64) {
+        if self.is_finished() {
+            self.action.borrow_mut().take();
+            return;
+        }
+        self.remaining.set(self.remaining.get() - delta_time);
+        if self.remaining.get() <= 0.0 {
+            self.finish_immediately();
+        }
+    }
+    fn finish_immediately(&self) {
+        let action = self.action.borrow_mut().take();
+        if (self.valid)() {
+            if let Some(action) = action {
+                action();
+            }
+        }
+    }
+    fn cancel(&self) {
+        self.action.borrow_mut().take();
+    }
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
     }
 }

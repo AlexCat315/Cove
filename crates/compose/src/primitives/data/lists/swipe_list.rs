@@ -17,6 +17,7 @@
 //! - a click inside the row selects it; Escape and selection live on the row
 
 use crate::Scope;
+use crate::modifiers::interaction::{AccessibilityExt, HitTestingExt};
 use std::rc::Rc;
 
 use crate::adaptive::SurfaceEnvironment;
@@ -822,7 +823,15 @@ impl PrimitiveView for SwipeRowHost {
         match &self.action_row {
             Some(actions) => vec![AnyView::new(crate::primitives::layout::ZStack::new(
                 crate::Alignment::Trailing,
-                AnyView::new(TupleView::new(vec![actions.clone(), content])),
+                AnyView::new(TupleView::new(vec![
+                    AnyView::new(
+                        actions
+                            .clone()
+                            .accessibility_hidden(self.reveal.get() >= -0.5 || !self.is_enabled)
+                            .allows_hit_testing(self.reveal.get() < -0.5 && self.is_enabled),
+                    ),
+                    content,
+                ])),
             ))],
             None => vec![content],
         }

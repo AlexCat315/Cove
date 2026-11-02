@@ -19,19 +19,6 @@
 //! - DST: Swift's America/New_York calendar makes 2024-02-15 → 2024-03-15 one
 //!   hour short of 29 days; the Rust `Calendar` is a fixed offset (-5h here) with
 //!   no DST, so the interval is exactly 29 days.
-//! - Keyboard focus: Swift moves real focus to each month-command destination
-//!   and the visible month follows; the Rust calendar records the destination
-//!   in its session without invalidating or focusing, so focus stays on the
-//!   starting day and January stays visible.
-//! - Return: Swift's Return selects the focused day (2024-02-29); Rust has no
-//!   Return handling on calendar cells.
-//! - Disabling: Swift drops focus when the calendar is disabled; Rust keeps it.
-//! - Month window: Swift focuses February 15 in the second displayed month and
-//!   then slides the window; Rust focus stays on January 15 and the window
-//!   never moves.
-//! - DatePicker: Swift's trigger activate opens the calendar popover; the Rust
-//!   `DatePicker` stores `is_presented` in a `RefCell` nothing observes, so
-//!   neither activate nor a click presents it.
 
 use cove_composition::Scope;
 mod support;
@@ -307,19 +294,12 @@ fn keyboard_focus() {
                 let target = date(2024, expected.0, expected.1);
                 assert_eq!(
                     focused_id(scene),
-                    Some(start.id()),
-                    "GAP: Swift moves focus to 2024-{:02}-{:02} on key {code}; the Rust calendar \
-                     records the destination in its session without invalidating, so focus \
-                     stays on January 31 (width {width})",
-                    expected.0,
-                    expected.1
+                    day(scene, target).map(|node| node.id()),
+                    "navigation focuses {target:?} at width {width}"
                 );
                 assert!(
-                    shows_title(scene, &month_title(1, 2024)),
-                    "GAP: Swift's visible month follows the destination to {}; Rust keeps \
-                     January on screen (width {width}, target present: {})",
-                    month_title(expected.0, 2024),
-                    day(scene, target).is_some()
+                    shows_title(scene, &month_title(expected.0, 2024)),
+                    "the visible month follows keyboard focus"
                 );
                 assert_eq!(harness.selection.get(), Some(initial), "keys never select");
                 let focused = scene.focus.focused().expect("a focused day");
@@ -335,9 +315,8 @@ fn keyboard_focus() {
             scene.key(Scancode::RETURN, KeyModifiers::default());
             assert_eq!(
                 harness.selection.get(),
-                Some(initial),
-                "GAP: Swift's Return selects the focused 2024-02-29; Rust has no Return \
-                 handler on calendar cells and focus never left January 31"
+                Some(date(2024, 2, 29)),
+                "Return commits the focused February 29"
             );
             let focused = scene.focus.focused().expect("a focused day");
             assert_eq!(
@@ -357,9 +336,8 @@ fn keyboard_focus() {
             harness.is_enabled.set(false);
             scene.settle(4, 1.0);
             assert!(
-                scene.focus.focused().is_some(),
-                "GAP: Swift drops focus when the calendar is disabled; Rust keeps a focused \
-                 node (width {width})"
+                scene.focus.focused().is_none(),
+                "disabling the calendar clears focus (width {width})"
             );
         });
     }
@@ -419,9 +397,8 @@ fn month_window() {
         );
         assert_eq!(
             focused_id(scene),
-            Some(january.id()),
-            "GAP: Swift focuses February 15 in the second displayed month; Rust focus stays \
-             on January 15"
+            day(scene, date(2024, 2, 15)).map(|node| node.id()),
+            "focus moves to February 15 in the second displayed month"
         );
         assert_eq!(
             day(scene, initial).map(|node| node.id()),
@@ -430,9 +407,8 @@ fn month_window() {
         );
         scene.key(Scancode::PAGE_DOWN, KeyModifiers::default());
         assert!(
-            shows_title(scene, &month_title(1, 2024)) && !shows_title(scene, &month_title(3, 2024)),
-            "GAP: Swift slides the window to February-March when focus leaves it; the Rust \
-             window stays on January-February"
+            shows_title(scene, &month_title(2, 2024)) && shows_title(scene, &month_title(3, 2024)),
+            "the displayed window slides to February-March"
         );
         scene.key(Scancode::PAGE_UP, KeyModifiers::default());
         scene.key(Scancode::PAGE_UP, KeyModifiers::default());
@@ -475,13 +451,26 @@ fn date_picker() {
         scene.settle(4, 1.0);
         let start = day(scene, initial).expect("activate presents the calendar");
         scene.focus.focus(Some(&start), true);
-        assert_eq!(scene.portal.entries().len(), 1, "activate presents one portal");
+        assert_eq!(
+            scene.portal.entries().len(),
+            1,
+            "activate presents one portal"
+        );
         scene.key(Scancode::PAGE_DOWN, KeyModifiers::default());
         assert!(
-            day(scene, date(2024, 2, 29)).is_none(),
-            "GAP: Swift's PageDown moves to Feb 29 and Return commits it; `CalendarView` keeps \
-             its month in a plain `RefCell` session, so the month change never re-renders"
+            day(scene, date(2024, 2, 29)).is_some(),
+            "PageDown renders the February destination without committing it"
         );
         assert_eq!(*selection.borrow(), Some(initial), "nothing is committed");
+        scene.key(Scancode::RETURN, KeyModifiers::default());
+        assert_eq!(
+            *selection.borrow(),
+            Some(date(2024, 2, 29)),
+            "Return commits the focused date"
+        );
+        assert!(
+            scene.portal.entries().is_empty(),
+            "committing closes the picker"
+        );
     });
 }

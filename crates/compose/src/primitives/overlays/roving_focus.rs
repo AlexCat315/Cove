@@ -15,6 +15,7 @@ use cove_platform::KeyEvent;
 const ROVING_ITEM: &str = "__roving.item";
 const ROVING_TAB_STOP: &str = "__roving.tabStop";
 const ROVING_FOCUS_REQUEST: &str = "__roving.focusRequest";
+type DirectionalCommand<Id> = Rc<dyn Fn(&KeyEvent, &Id, &Node) -> Option<Id>>;
 
 /// Navigation command shared by single-selection groups.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -97,6 +98,7 @@ pub struct RovingFocusHost<Id: PartialEq + Clone + 'static> {
     pub wraps: bool,
     pub command: Rc<dyn Fn(&KeyEvent) -> Option<SelectionNavigation>>,
     pub focus_request: Option<Rc<RefCell<RovingFocusRequest>>>,
+    directional_command: Option<DirectionalCommand<Id>>,
     content: AnyView,
     identity: Rc<dyn Fn(&Id) -> u64>,
 }
@@ -116,6 +118,7 @@ impl<Id: PartialEq + Clone + 'static> RovingFocusHost<Id> {
             wraps: true,
             command: Rc::new(|event| SelectionNavigation::command_for(event.scancode)),
             focus_request: None,
+            directional_command: None,
             content: AnyView::new(content),
             identity: Rc::new(identity),
         }
@@ -134,6 +137,15 @@ impl<Id: PartialEq + Clone + 'static> RovingFocusHost<Id> {
         self
     }
 
+    /// Handles tree disclosure before applying linear selection navigation.
+    pub fn directional_command(
+        mut self,
+        handler: impl Fn(&KeyEvent, &Id, &Node) -> Option<Id> + 'static,
+    ) -> Self {
+        self.directional_command = Some(Rc::new(handler));
+        self
+    }
+
     pub fn focus_request(mut self, request: Rc<RefCell<RovingFocusRequest>>) -> Self {
         self.focus_request = Some(request);
         self
@@ -143,8 +155,17 @@ impl<Id: PartialEq + Clone + 'static> RovingFocusHost<Id> {
 fn locate(node: &Node, token: u64) -> Option<Node> {
     let mut pending = vec![node.clone()];
     while let Some(item) = pending.pop() {
-        if item.attachment::<u64>(ROVING_ITEM) == Some(token) && item.is_focusable() {
-            return Some(item);
+        if item.attachment::<u64>(ROVING_ITEM) == Some(token) {
+            if item.is_focusable() {
+                return Some(item);
+            }
+            let mut descendants: Vec<_> = item.children().into_iter().rev().collect();
+            while let Some(child) = descendants.pop() {
+                if child.is_focusable() {
+                    return Some(child);
+                }
+                descendants.extend(child.children().into_iter().rev());
+            }
         }
         pending.extend(item.children().into_iter().rev());
     }
@@ -154,6 +175,9 @@ fn locate(node: &Node, token: u64) -> Option<Node> {
 fn update_tab_stops(node: &Node, target: Option<u64>) {
     if let Some(id) = node.attachment::<u64>(ROVING_ITEM) {
         node.set_is_tab_stop(target == Some(id));
+        if let Some(control) = locate(node, id) {
+            control.set_is_tab_stop(target == Some(id));
+        }
     }
     for child in node.children() {
         update_tab_stops(&child, target);
@@ -216,6 +240,7 @@ impl<Id: PartialEq + Clone + 'static> PrimitiveView for RovingFocusHost<Id> {
                 return;
             };
             let state = request.borrow().clone();
+            update_tab_stops(owner, state.target.or_else(|| tab_stop_fn()));
             let Some(target) = state.target else { return };
             let Some(item) = locate(owner, target) else {
                 return;
@@ -240,6 +265,7 @@ impl<Id: PartialEq + Clone + 'static> PrimitiveView for RovingFocusHost<Id> {
         let key_identity = self.identity.clone();
         let key_on_select = self.on_select.clone();
         let key_command = self.command.clone();
+        let directional_command = self.directional_command.clone();
         let key_wraps = self.wraps;
         let key_node = node.downgrade();
         registry.set_key(
@@ -249,9 +275,6 @@ impl<Id: PartialEq + Clone + 'static> PrimitiveView for RovingFocusHost<Id> {
                 if phase != EventPhase::Bubble {
                     return EventResult::Ignored;
                 }
-                let Some(command) = (key_command)(event) else {
-                    return EventResult::Ignored;
-                };
                 let Some(owner) = Node::upgrade(&key_node) else {
                     return EventResult::Ignored;
                 };
@@ -289,12 +312,25 @@ impl<Id: PartialEq + Clone + 'static> PrimitiveView for RovingFocusHost<Id> {
                         .find(|item| (key_identity)(item) == token)
                         .cloned()
                 });
-                let Some(target) =
-                    command.destination(&key_enabled, source_item.as_ref(), key_wraps)
-                else {
-                    return EventResult::Ignored;
+                let directional_target = source_item.as_ref().and_then(|source| {
+                    directional_command
+                        .as_ref()
+                        .and_then(|handler| handler(event, source, &owner))
+                });
+                let target = if let Some(target) = directional_target {
+                    target
+                } else {
+                    let Some(command) = key_command(event) else {
+                        return EventResult::Ignored;
+                    };
+                    let Some(target) =
+                        command.destination(&key_enabled, source_item.as_ref(), key_wraps)
+                    else {
+                        return EventResult::Ignored;
+                    };
+                    (key_on_select)(target.clone());
+                    target
                 };
-                (key_on_select)(target.clone());
                 let target_token = (key_identity)(&target);
                 {
                     let mut state = key_request.borrow_mut();

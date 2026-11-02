@@ -298,9 +298,8 @@ fn lifecycle() {
         settle(scene);
         assert_eq!(
             scene.portal.entries().len(),
-            1,
-            "GAP: Swift toggles the open bubble closed from its trigger; in Rust the second \
-             press never reaches the trigger while the bubble is open, so it stays open"
+            0,
+            "pressing the open bubble's trigger dismisses it"
         );
         assert_eq!(h.count.get(), 1);
     });
@@ -613,16 +612,8 @@ fn named_sides() {
                     PopoverEdge::Left => surface.max_x() <= anchor.x - 3.0,
                     PopoverEdge::Right => surface.x >= anchor.max_x() + 3.0,
                 };
-                // GAP: with too little room on its side, Swift constrains the
-                // bubble's width so it still clears the trigger; Rust keeps the
-                // authored 300pt and slides it over the trigger instead.
-                let crowded = !edge.is_vertical()
-                    && match edge {
-                        PopoverEdge::Left => anchor.x - 3.0 - 8.0 < 300.0,
-                        _ => h.width.get() - 8.0 - (anchor.max_x() + 3.0) < 300.0,
-                    };
                 assert!(
-                    placed || crowded,
+                    placed,
                     "{placement:?} rtl {rtl} keeps its side: {surface:?} vs {anchor:?}"
                 );
             }
@@ -639,12 +630,19 @@ fn shared_card() {
         settle(scene);
         let surface = panel(scene).expect("the open popover mounts its bubble surface");
         let frame = surface.absolute_frame();
-        assert_eq!(surface.frame().width, 300.0, "the bubble keeps its authored width");
+        assert_eq!(
+            surface.frame().width,
+            300.0,
+            "the bubble keeps its authored width"
+        );
         assert!(
             frame.max_y() <= 237.0,
             "the top placement sits above the trigger: {frame:?}"
         );
-        assert!(surface.draw().is_some(), "the bubble surface paints its own card");
+        assert!(
+            surface.draw().is_some(),
+            "the bubble surface paints its own card"
+        );
         assert_eq!(scene.portal.entries().len(), 1);
         let done = button(scene, "Done").expect("the Done action");
         (done.accessibility_actions().activate.expect("activate"))();

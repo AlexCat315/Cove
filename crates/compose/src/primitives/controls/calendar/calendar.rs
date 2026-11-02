@@ -4,7 +4,7 @@
 //! grid. The title drills up from days to a year of months to twelve years;
 //! picking a cell drills back down to the selection granularity.
 use crate::Scope;
-use std::cell::RefCell;
+use cove_core::Signal;
 use std::rc::Rc;
 
 use crate::foundation::{Calendar as FoundationCalendar, CalendarUnit, Date};
@@ -112,41 +112,31 @@ struct CalendarSession {
     panel: CalendarPanel,
 }
 
+struct CalendarState {
+    selection: Rc<dyn Fn() -> Option<Date>>,
+    set_selection: Rc<dyn Fn(Option<Date>)>,
+    options: CalendarOptions,
+    session: Signal<CalendarSession>,
+}
+
 /// A month, year-of-months or twelve-year grid with one Tab stop per grid.
 pub struct CalendarView {
     pub selection: Rc<dyn Fn() -> Option<Date>>,
     pub set_selection: Rc<dyn Fn(Option<Date>)>,
     pub options: CalendarOptions,
-    session: Rc<RefCell<CalendarSession>>,
 }
-
 impl CalendarView {
     pub fn new(
         selection: Rc<dyn Fn() -> Option<Date>>,
         set_selection: Rc<dyn Fn(Option<Date>)>,
         options: CalendarOptions,
     ) -> Self {
-        let options = options.validated();
-        let initial = selection().unwrap_or(options.today);
-        let panel = options.granularity.base_panel();
-        let cells = CalendarCells::new(panel, options.granularity);
-        let session = CalendarSession {
-            month: crate::primitives::controls::date_values::CalendarGrid::month_start(
-                initial,
-                &options.calendar,
-            ),
-            focused_day: cells.start(initial, &options.calendar),
-            focus_request: 0,
-            panel,
-        };
         Self {
             selection,
             set_selection,
-            options,
-            session: Rc::new(RefCell::new(session)),
+            options: options.validated(),
         }
     }
-
     /// Width of the open calendar for popover hosts.
     pub fn width(cell_size: f32, options: &CalendarOptions) -> f32 {
         let months = if options.granularity.base_panel() == CalendarPanel::Days {
@@ -166,22 +156,25 @@ impl CalendarView {
                 0.0
             }
     }
+}
 
+impl CalendarState {
     fn set_month(&self, next: Date) {
-        let session = self.session.clone();
-        let mut session = session.borrow_mut();
-        session.month = next;
+        self.session.update(|session| session.month = next);
     }
 
     /// A pick on the base panel selects; a pick above it drills down into it.
     fn choose(&self, date: Date) {
+        if !self.options.presentation.is_enabled {
+            return;
+        }
         let calendar = &self.options.calendar;
-        let panel = self.session.borrow().panel;
+        let panel = self.session.get().panel;
         if panel == self.options.granularity.base_panel() {
             let start = granularity_start(self.options.granularity, date, calendar);
             (self.set_selection)(Some(start));
             let focused = CalendarCells::new(panel, self.options.granularity).start(date, calendar);
-            self.session.borrow_mut().focused_day = focused;
+            self.session.update(|session| session.focused_day = focused);
             return;
         }
         let Some(child) = panel.child() else { return };
@@ -189,12 +182,12 @@ impl CalendarView {
     }
 
     fn drill_up(&self) {
-        let panel = self.session.borrow().panel;
+        let panel = self.session.get().panel;
         let Some(parent) = panel.parent() else { return };
         let focus = (self.selection)().unwrap_or_else(|| {
             let calendar = &self.options.calendar;
             CalendarCells::new(parent, self.options.granularity)
-                .start(self.session.borrow().month, calendar)
+                .start(self.session.get().month, calendar)
         });
         self.show(parent, focus);
     }
@@ -204,16 +197,17 @@ impl CalendarView {
         let focused = CalendarCells::new(panel, self.options.granularity).start(date, calendar);
         let month =
             crate::primitives::controls::date_values::CalendarGrid::month_start(date, calendar);
-        let mut session = self.session.borrow_mut();
-        session.panel = panel;
-        session.focused_day = focused;
-        session.month = month;
-        session.focus_request = session.focus_request.saturating_add(1);
+        self.session.update(|session| {
+            session.panel = panel;
+            session.focused_day = focused;
+            session.month = month;
+            session.focus_request = session.focus_request.saturating_add(1);
+        });
     }
 
     fn browse(&self, months: i32) {
         let calendar = &self.options.calendar;
-        let month = self.session.borrow().month;
+        let month = self.session.get().month;
         if let Some(next) = calendar.date_by_adding(CalendarUnit::Month, months, month) {
             self.set_month(next);
         }
@@ -225,7 +219,7 @@ impl CalendarView {
         let Some(selected) = (self.selection)() else {
             return false;
         };
-        let panel = self.session.borrow().panel;
+        let panel = self.session.get().panel;
         if panel != self.options.granularity.base_panel() {
             return false;
         }
@@ -245,27 +239,46 @@ impl CalendarView {
 }
 
 impl View for CalendarView {
-    fn body(&self, _cx: &Scope) -> AnyView {
+    fn body(&self, cx: &Scope) -> AnyView {
+        let session = cx.state(|| {
+            let initial = (self.selection)().unwrap_or(self.options.today);
+            let panel = self.options.granularity.base_panel();
+            CalendarSession {
+                month: crate::primitives::controls::date_values::CalendarGrid::month_start(
+                    initial,
+                    &self.options.calendar,
+                ),
+                focused_day: CalendarCells::new(panel, self.options.granularity)
+                    .start(initial, &self.options.calendar),
+                focus_request: 0,
+                panel,
+            }
+        });
+        session.track();
         AnyView::new(CalendarBody {
-            view: self.snapshot(),
+            view: CalendarState {
+                selection: self.selection.clone(),
+                set_selection: self.set_selection.clone(),
+                options: self.options.clone(),
+                session,
+            },
         })
     }
 }
-
-impl CalendarView {
-    fn snapshot(&self) -> CalendarView {
-        CalendarView {
+impl CalendarState {
+    fn snapshot(&self) -> Self {
+        Self {
             selection: self.selection.clone(),
             set_selection: self.set_selection.clone(),
             options: self.options.clone(),
-            session: self.session.clone(),
+            session: self.session,
         }
     }
 }
 
 /// The whole calendar: header, panels and the key host.
 struct CalendarBody {
-    view: CalendarView,
+    view: CalendarState,
 }
 
 impl PrimitiveView for CalendarBody {
@@ -285,6 +298,42 @@ impl PrimitiveView for CalendarBody {
             label: "Calendar".to_string(),
             ..Default::default()
         }));
+        let state = self.view.session;
+        let enabled = self.view.options.presentation.is_enabled;
+        let weak = node.downgrade();
+        node.set_layout_did_update(Some(Rc::new(move |owner: &Node| {
+            let Some(chain) = cove_core::scene::FocusChainHolder::current() else {
+                return;
+            };
+            if !enabled {
+                if chain
+                    .focused()
+                    .is_some_and(|focused| chain.contains(&focused, owner))
+                {
+                    chain.clear();
+                }
+                return;
+            }
+            let session = state.get_untracked();
+            if session.focus_request == 0
+                || owner.attachment::<u32>("calendar.focusApplied") == Some(session.focus_request)
+            {
+                return;
+            }
+            let mut pending = owner.children();
+            while let Some(candidate) = pending.pop() {
+                if candidate.attachment::<Date>("calendar.day") == Some(session.focused_day)
+                    && candidate.is_focusable()
+                {
+                    chain.focus(Some(&candidate), true);
+                    if let Some(owner) = Node::upgrade(&weak) {
+                        owner.set_attachment("calendar.focusApplied", session.focus_request);
+                    }
+                    break;
+                }
+                pending.extend(candidate.children());
+            }
+        })));
         let Some(registry) = cove_core::scene::InteractionRegistryHolder::current() else {
             return;
         };
@@ -304,6 +353,19 @@ impl PrimitiveView for CalendarBody {
                 let Some(date) = focused.attachment::<Date>("calendar.day") else {
                     return EventResult::Ignored;
                 };
+                if !view.options.presentation.is_enabled {
+                    return EventResult::Ignored;
+                }
+                if matches!(
+                    event.scancode,
+                    crate::Scancode::RETURN
+                        | crate::Scancode::KEYPAD_ENTER
+                        | crate::Scancode::SPACE
+                ) && !event.is_repeat
+                {
+                    view.choose(date);
+                    return EventResult::Handled;
+                }
                 if view.navigate(date, event.scancode) {
                     EventResult::Handled
                 } else {
@@ -315,11 +377,11 @@ impl PrimitiveView for CalendarBody {
 
     fn children(&self, node: &Node) -> Vec<AnyView> {
         let view = self.view.snapshot();
-        let panel = view.session.borrow().panel;
+        let panel = view.session.get().panel;
         let content = if panel == CalendarPanel::Days {
             let months = view.options.presentation.number_of_months;
             let mut columns: Vec<AnyView> = Vec::new();
-            let base = view.session.borrow().month;
+            let base = view.session.get().month;
             // A touch surface raises every cell to the minimum control extent, so
             // the grid stays pointer- and finger-reachable. Swift does this once
             // per body, in `SurfaceReader`.
@@ -365,9 +427,9 @@ impl PrimitiveView for CalendarBody {
 }
 crate::impl_primitive_view!(CalendarBody);
 
-impl CalendarView {
+impl CalendarState {
     fn navigate(&self, date: Date, scancode: u32) -> bool {
-        let panel = self.session.borrow().panel;
+        let panel = self.session.get().panel;
         let cells = CalendarCells::new(panel, self.options.granularity);
         let Some(navigation) = CalendarNavigation::new(scancode, cells.columns) else {
             return false;
@@ -381,9 +443,10 @@ impl CalendarView {
             return true;
         };
         {
-            let mut session = self.session.borrow_mut();
-            session.focused_day = next;
-            session.focus_request = session.focus_request.saturating_add(1);
+            self.session.update(|session| {
+                session.focused_day = next;
+                session.focus_request = session.focus_request.saturating_add(1);
+            });
         }
         self.reveal(next);
         true
@@ -392,11 +455,11 @@ impl CalendarView {
     /// Browses so the focused cell is on screen.
     fn reveal(&self, cell: Date) {
         let calendar = &self.options.calendar;
-        let panel = self.session.borrow().panel;
+        let panel = self.session.get().panel;
         let cells = CalendarCells::new(panel, self.options.granularity);
         match panel {
             CalendarPanel::Days => {
-                let month = self.session.borrow().month;
+                let month = self.session.get().month;
                 let first = crate::primitives::controls::date_values::CalendarGrid::month_start(
                     month, calendar,
                 );
@@ -437,7 +500,7 @@ impl CalendarView {
                 }
             }
             CalendarPanel::Months => {
-                let month = self.session.borrow().month;
+                let month = self.session.get().month;
                 let same_year = calendar.component(CalendarUnit::Year, cell)
                     == calendar.component(CalendarUnit::Year, month);
                 if !same_year {
@@ -445,7 +508,7 @@ impl CalendarView {
                 }
             }
             CalendarPanel::Years => {
-                let month = self.session.borrow().month;
+                let month = self.session.get().month;
                 let (start, end) = year_page(month, calendar);
                 if !(cell >= start && cell < end) {
                     self.set_month(cell);
@@ -457,7 +520,7 @@ impl CalendarView {
 
 /// One month page: header, weekday row and six week rows.
 struct CalendarMonth {
-    view: CalendarView,
+    view: CalendarState,
     month: Date,
     index: usize,
     count: usize,
@@ -623,7 +686,7 @@ impl CalendarMonth {
         candidates.sort();
         candidates.dedup();
         let focused = CalendarCells::new(CalendarPanel::Days, granularity)
-            .start(self.view.session.borrow().focused_day, calendar);
+            .start(self.view.session.get().focused_day, calendar);
         if candidates.contains(&focused) {
             Some(focused)
         } else {
@@ -770,7 +833,7 @@ crate::impl_primitive_view!(CalendarHeader);
 
 /// One day cell.
 struct CalendarDayCell {
-    view: CalendarView,
+    view: CalendarState,
     day: Date,
     month: Date,
     is_tab_stop: bool,
@@ -779,11 +842,28 @@ struct CalendarDayCell {
 
 impl PrimitiveView for CalendarDayCell {
     fn make_node(&self) -> Node {
+        Node::new()
+    }
+
+    fn make_layout_node(&self) -> Option<cove_core::scene::LayoutNode> {
+        let layout = cove_core::scene::LayoutNode::new();
+        layout.set_width(Some(self.cell_size));
+        layout.set_height(Some(self.cell_size));
+        layout.set_flex_shrink(0.0);
+        Some(layout)
+    }
+
+    fn update_layout(&self, layout: &cove_core::scene::LayoutNode) {
+        layout.set_width(Some(self.cell_size));
+        layout.set_height(Some(self.cell_size));
+        layout.set_flex_shrink(0.0);
+    }
+
+    fn update_node(&self, node: &Node) {
         let calendar = &self.view.options.calendar;
         let in_month = interval_start(CalendarUnit::Month, self.day, calendar)
             == interval_start(CalendarUnit::Month, self.month, calendar);
         let is_enabled = in_month && self.is_enabled(self.day);
-        let node = Node::new();
         node.set_attachment("calendar.day", self.day);
         node.set_is_focusable(is_enabled);
         node.set_is_tab_stop(self.is_tab_stop && is_enabled);
@@ -859,24 +939,7 @@ impl PrimitiveView for CalendarDayCell {
             },
             ..Default::default()
         }));
-        node
-    }
 
-    fn make_layout_node(&self) -> Option<cove_core::scene::LayoutNode> {
-        let layout = cove_core::scene::LayoutNode::new();
-        layout.set_width(Some(self.cell_size));
-        layout.set_height(Some(self.cell_size));
-        layout.set_flex_shrink(0.0);
-        Some(layout)
-    }
-
-    fn update_layout(&self, layout: &cove_core::scene::LayoutNode) {
-        layout.set_width(Some(self.cell_size));
-        layout.set_height(Some(self.cell_size));
-        layout.set_flex_shrink(0.0);
-    }
-
-    fn update_node(&self, node: &Node) {
         let calendar = &self.view.options.calendar;
         let is_selected = self.view.is_selected(self.day);
         let is_today = self.view.is_same_day(self.day, self.view.options.today);
@@ -963,7 +1026,7 @@ impl CalendarDayCell {
 
 /// A week row: one button for the whole week, led by its number.
 struct CalendarWeekRow {
-    view: CalendarView,
+    view: CalendarState,
     days: Vec<Date>,
     month: Date,
     tab_cell: Option<Date>,
@@ -1056,7 +1119,7 @@ crate::impl_primitive_view!(CalendarWeekRow);
 
 /// The pressable week row.
 struct CalendarWeekButton {
-    view: CalendarView,
+    view: CalendarState,
     start: Date,
     is_tab_stop: bool,
     available: bool,
@@ -1066,7 +1129,14 @@ struct CalendarWeekButton {
 
 impl PrimitiveView for CalendarWeekButton {
     fn make_node(&self) -> Node {
-        let node = Node::new();
+        Node::new()
+    }
+
+    fn make_layout_node(&self) -> Option<cove_core::scene::LayoutNode> {
+        None
+    }
+
+    fn update_node(&self, node: &Node) {
         node.set_attachment("calendar.day", self.start);
         node.set_is_focusable(self.available);
         node.set_is_tab_stop(self.is_tab_stop && self.available);
@@ -1087,14 +1157,7 @@ impl PrimitiveView for CalendarWeekButton {
             },
             ..Default::default()
         }));
-        node
-    }
 
-    fn make_layout_node(&self) -> Option<cove_core::scene::LayoutNode> {
-        None
-    }
-
-    fn update_node(&self, node: &Node) {
         let theme = theme_for_node(node);
         node.set_corner_radius(theme.radius.md);
         node.set_background_color(if self.is_selected {
@@ -1135,7 +1198,7 @@ crate::impl_primitive_view!(CalendarWeekButton);
 
 /// The months/years panel: twelve cells in a four-by-three page.
 struct CalendarPeriodPanel {
-    view: CalendarView,
+    view: CalendarState,
 }
 
 impl PrimitiveView for CalendarPeriodPanel {
@@ -1154,9 +1217,9 @@ impl PrimitiveView for CalendarPeriodPanel {
     fn children(&self, _node: &Node) -> Vec<AnyView> {
         let view = &self.view;
         let calendar = &view.options.calendar;
-        let panel = view.session.borrow().panel;
+        let panel = view.session.get().panel;
         let is_months = panel == CalendarPanel::Months;
-        let month = view.session.borrow().month;
+        let month = view.session.get().month;
         let (page_start, page_end) = if is_months {
             let start = interval_start(CalendarUnit::Year, month, calendar);
             let end = calendar
@@ -1200,7 +1263,7 @@ impl PrimitiveView for CalendarPeriodPanel {
             })
             .collect();
         let focused = CalendarCells::new(panel, view.options.granularity)
-            .start(view.session.borrow().focused_day, calendar);
+            .start(view.session.get().focused_day, calendar);
         let tab_cell = if available.contains(&focused) {
             Some(focused)
         } else {
@@ -1220,8 +1283,8 @@ impl PrimitiveView for CalendarPeriodPanel {
                     view.set_month(
                         view.options
                             .calendar
-                            .date_by_adding(CalendarUnit::Month, -step, view.session.borrow().month)
-                            .unwrap_or_else(|| view.session.borrow().month),
+                            .date_by_adding(CalendarUnit::Month, -step, view.session.get().month)
+                            .unwrap_or_else(|| view.session.get().month),
                     )
                 })
             },
@@ -1232,8 +1295,8 @@ impl PrimitiveView for CalendarPeriodPanel {
                     view.set_month(
                         view.options
                             .calendar
-                            .date_by_adding(CalendarUnit::Month, step, view.session.borrow().month)
-                            .unwrap_or_else(|| view.session.borrow().month),
+                            .date_by_adding(CalendarUnit::Month, step, view.session.get().month)
+                            .unwrap_or_else(|| view.session.get().month),
                     )
                 })
             },
@@ -1284,7 +1347,7 @@ crate::impl_primitive_view!(CalendarPeriodPanel);
 
 /// One month or year cell.
 struct CalendarPeriodCell {
-    view: CalendarView,
+    view: CalendarState,
     date: Date,
     is_months: bool,
     is_available: bool,
@@ -1295,23 +1358,7 @@ struct CalendarPeriodCell {
 
 impl PrimitiveView for CalendarPeriodCell {
     fn make_node(&self) -> Node {
-        let node = Node::new();
-        node.set_attachment("calendar.day", self.date);
-        node.set_is_focusable(self.is_available);
-        node.set_is_tab_stop(self.is_tab_stop && self.is_available);
-        node.set_is_hit_testable(self.is_available);
-        let label = period_label(self.date, self.is_months, &self.view.options.calendar);
-        node.set_accessibility(Some(AccessibilitySemantics {
-            role: AccessibilityRole::Button,
-            label,
-            state: cove_core::scene::AccessibilityState {
-                is_enabled: self.is_available,
-                is_selected: self.view.is_selected(self.date),
-                ..Default::default()
-            },
-            ..Default::default()
-        }));
-        node
+        Node::new()
     }
 
     fn make_layout_node(&self) -> Option<cove_core::scene::LayoutNode> {
@@ -1329,6 +1376,22 @@ impl PrimitiveView for CalendarPeriodCell {
     }
 
     fn update_node(&self, node: &Node) {
+        node.set_attachment("calendar.day", self.date);
+        node.set_is_focusable(self.is_available);
+        node.set_is_tab_stop(self.is_tab_stop && self.is_available);
+        node.set_is_hit_testable(self.is_available);
+        let label = period_label(self.date, self.is_months, &self.view.options.calendar);
+        node.set_accessibility(Some(AccessibilitySemantics {
+            role: AccessibilityRole::Button,
+            label,
+            state: cove_core::scene::AccessibilityState {
+                is_enabled: self.is_available,
+                is_selected: self.view.is_selected(self.date),
+                ..Default::default()
+            },
+            ..Default::default()
+        }));
+
         let theme = theme_for_node(node);
         node.set_corner_radius(theme.radius.md);
         node.set_background_color(if self.view.is_selected(self.date) {

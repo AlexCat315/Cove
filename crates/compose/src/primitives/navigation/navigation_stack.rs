@@ -84,11 +84,11 @@ pub struct NavigationStack<Route: Hash + Clone + PartialEq + Send + Sync + 'stat
     pub transition_distance: f32,
     root: Rc<dyn Fn() -> AnyView>,
     destination: Rc<dyn Fn(Route) -> AnyView>,
-    last_count: crate::State<usize>,
-    last_routes: crate::State<Vec<Route>>,
-    is_animating: crate::State<bool>,
-    swipe: crate::State<f32>,
-    is_swiping: crate::State<bool>,
+    last_count: Option<cove_core::Signal<usize>>,
+    last_routes: Option<cove_core::Signal<Vec<Route>>>,
+    is_animating: Option<cove_core::Signal<bool>>,
+    swipe: Option<cove_core::Signal<f32>>,
+    is_swiping: Option<cove_core::Signal<bool>>,
 }
 
 pub struct NavigationPages {
@@ -104,17 +104,16 @@ impl<Route: Hash + Clone + PartialEq + Send + Sync + 'static> NavigationStack<Ro
         root: impl Fn() -> AnyView + 'static,
         destination: impl Fn(Route) -> AnyView + 'static,
     ) -> Self {
-        let initial = path.get();
         Self {
             path,
             transition_distance: 32.0,
             root: Rc::new(root),
             destination: Rc::new(destination),
-            last_count: crate::State::new(initial.len()),
-            last_routes: crate::State::new(initial),
-            is_animating: crate::State::new(false),
-            swipe: crate::State::new(0.0_f32),
-            is_swiping: crate::State::new(false),
+            last_count: None,
+            last_routes: None,
+            is_animating: None,
+            swipe: None,
+            is_swiping: None,
         }
     }
 
@@ -139,13 +138,13 @@ impl<Route: Hash + Clone + PartialEq + Send + Sync + 'static> NavigationStack<Ro
         height: f32,
     ) -> AnyView {
         let is_top = depth == 0;
-        let revealed = self.is_swiping.get() && depth == 1;
+        let revealed = self.is_swiping.expect("mounted navigation state").get() && depth == 1;
         let transition = if revealed {
             Transition::identity()
         } else {
             Transition::navigation(self.transition_distance, forward)
         };
-        let swipe = self.swipe.get();
+        let swipe = self.swipe.expect("mounted navigation state").get();
         let shift = if is_top {
             swipe
         } else if revealed {
@@ -153,7 +152,7 @@ impl<Route: Hash + Clone + PartialEq + Send + Sync + 'static> NavigationStack<Ro
         } else {
             0.0
         };
-        let animating = self.is_animating.clone();
+        let animating = self.is_animating.expect("mounted navigation state");
         let content = self.page_content(route.clone(), theme, width, height);
         let is_animating_flag = animating.get();
         let page = AnimatedVisibility::new(
@@ -203,12 +202,12 @@ impl<Route: Hash + Clone + PartialEq + Send + Sync + 'static> NavigationStack<Ro
 
     fn stack_pages(&self, sign: f32, width: f32, height: f32, theme: &Theme) -> AnyView {
         let routes = self.path.get();
-        let forward = routes.len() >= self.last_count.get();
+        let forward = routes.len() >= self.last_count.expect("mounted navigation state").get();
         let mut pages: Vec<AnyView> = Vec::new();
         pages.push(AnyView::new(NavigationPathWatcher {
             count: routes.len(),
             on_change: Rc::new({
-                let state = self.clone_state();
+                let state = self.clone_state(width);
                 move |count, animates| state.observe(count, animates)
             }),
         }));
@@ -239,7 +238,7 @@ impl<Route: Hash + Clone + PartialEq + Send + Sync + 'static> NavigationStack<Ro
             }
             .with_callbacks(
                 Rc::new({
-                    let state = self.clone_state();
+                    let state = self.clone_state(width);
                     move |distance| {
                         if !state.is_swiping.get() {
                             state.is_swiping.set(true);
@@ -248,7 +247,7 @@ impl<Route: Hash + Clone + PartialEq + Send + Sync + 'static> NavigationStack<Ro
                     }
                 }),
                 Rc::new({
-                    let state = self.clone_state();
+                    let state = self.clone_state(width);
                     let theme = theme.clone();
                     move |commit| state.end_swipe(commit, &theme)
                 }),
@@ -256,26 +255,26 @@ impl<Route: Hash + Clone + PartialEq + Send + Sync + 'static> NavigationStack<Ro
         )
     }
 
-    fn clone_state(&self) -> NavigationState<Route> {
+    fn clone_state(&self, width: f32) -> NavigationState<Route> {
         NavigationState {
             path: self.path.clone(),
-            last_count: self.last_count.clone(),
-            last_routes: self.last_routes.clone(),
-            is_animating: self.is_animating.clone(),
-            swipe: self.swipe.clone(),
-            is_swiping: self.is_swiping.clone(),
-            width: 0.0,
+            last_count: self.last_count.expect("mounted navigation state"),
+            last_routes: self.last_routes.expect("mounted navigation state"),
+            is_animating: self.is_animating.expect("mounted navigation state"),
+            swipe: self.swipe.expect("mounted navigation state"),
+            is_swiping: self.is_swiping.expect("mounted navigation state"),
+            width,
         }
     }
 }
 
 struct NavigationState<Route: Hash + Clone + PartialEq + Send + Sync + 'static> {
     path: Binding<Vec<Route>>,
-    last_count: crate::State<usize>,
-    last_routes: crate::State<Vec<Route>>,
-    is_animating: crate::State<bool>,
-    swipe: crate::State<f32>,
-    is_swiping: crate::State<bool>,
+    last_count: cove_core::Signal<usize>,
+    last_routes: cove_core::Signal<Vec<Route>>,
+    is_animating: cove_core::Signal<bool>,
+    swipe: cove_core::Signal<f32>,
+    is_swiping: cove_core::Signal<bool>,
     width: f32,
 }
 
@@ -339,8 +338,15 @@ impl<Route: Hash + Clone + PartialEq + Send + Sync + 'static> View for Navigatio
 }
 
 impl<Route: Hash + Clone + PartialEq + Send + Sync + 'static> View for NavigationStack<Route> {
-    fn body(&self, _cx: &Scope) -> AnyView {
-        let stack = Rc::new(self.snapshot());
+    fn body(&self, cx: &Scope) -> AnyView {
+        let initial = self.path.get();
+        let mut stack = self.snapshot();
+        stack.last_count = Some(cx.state(|| initial.len()));
+        stack.last_routes = Some(cx.state(|| initial));
+        stack.is_animating = Some(cx.state(|| false));
+        stack.swipe = Some(cx.state(|| 0.0_f32));
+        stack.is_swiping = Some(cx.state(|| false));
+        let stack = Rc::new(stack);
         let width_cell = Rc::new(Cell::new(0.0_f32));
         let height_cell = Rc::new(Cell::new(0.0_f32));
         let width = width_cell.clone();
@@ -369,11 +375,11 @@ impl<Route: Hash + Clone + PartialEq + Send + Sync + 'static> NavigationStack<Ro
             transition_distance: self.transition_distance,
             root: self.root.clone(),
             destination: self.destination.clone(),
-            last_count: self.last_count.clone(),
-            last_routes: self.last_routes.clone(),
-            is_animating: self.is_animating.clone(),
-            swipe: self.swipe.clone(),
-            is_swiping: self.is_swiping.clone(),
+            last_count: self.last_count,
+            last_routes: self.last_routes,
+            is_animating: self.is_animating,
+            swipe: self.swipe,
+            is_swiping: self.is_swiping,
         }
     }
 }

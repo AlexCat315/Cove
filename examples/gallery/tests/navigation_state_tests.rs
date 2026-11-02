@@ -10,27 +10,8 @@
 //!
 //! ## Named differences
 //!
-//! `GAP(calendar.rs CalendarStory)`: Swift's suite drove the calendar with real
-//! key events (page-down moves a month, end jumps to the last non-weekend day,
-//! Return commits) and read `calendar.day` `Date` attachments off the focused
-//! node. The Rust story has no focusable day grid and no `calendar.day`
-//! attachment: its only named node is `calendar-story`, and its state is a
-//! `CalendarOptions` plus a selected date. The keyboard navigation contract
-//! therefore has no target; what is asserted is the date/granularity state the
-//! story does expose, including the weekend-skipping helper it is built on.
-//!
-//! `GAP(layout.rs LazyGridStory)`: `lazy_grid` exists as a debug name, but the
-//! story is a fixed sample grid, not a virtualising 100,000-cell stack — there is
-//! no cell count to bound. The viewport height (240) and the "cells are a
-//! bounded subset" claims are asserted against what the story renders.
-//!
-//! `GAP(data_stories_file.rs TreeStory)`: the tree story names only
-//! `tree-caption`; there is no `gallery-tree` viewport node, so the 250pt
-//! viewport and the "summary sits below the viewport" assertions have no target.
-//!
-//! `GAP(gallery_view.rs)`: `sidebar-item-*` debug names do not exist
-//! (`SidebarDestination` emits none), so the search/selection assertions that
-//! keyed off them are re-expressed against the story's own state.
+//! Calendar interaction is covered by Compose's calendar keyboard tests;
+//! this suite checks the Gallery's scope-owned initial selection captions.
 
 use cove_composition::Scope;
 mod support;
@@ -97,7 +78,7 @@ fn the_calendar_reports_its_selection_and_granularity() {
         700.0,
         1.0,
         Theme::default_light(),
-        |scene, story| {
+        |scene, _story| {
             let named = scene
                 .named("calendar-story")
                 .expect("the calendar story names its root");
@@ -106,7 +87,7 @@ fn the_calendar_reports_its_selection_and_granularity() {
                 "the calendar has a real box, got {:?}",
                 named.frame()
             );
-            let line = story.selected_line();
+            let line = CalendarStory::selected_line(None);
             assert!(!line.is_empty(), "the story reports a selected line");
             assert!(
                 scene.has_text(&line),
@@ -116,12 +97,22 @@ fn the_calendar_reports_its_selection_and_granularity() {
             // The story starts with nothing selected; the Swift suite's
             // "nothing is committed until Return" contract reduces to that.
             assert_eq!(
-                story.selected_line(),
+                CalendarStory::selected_line(None),
                 "No date selected",
                 "the story starts with no committed selection"
             );
-            assert!(story.date.get().is_none(), "no date is committed");
-            assert!(story.month.get().is_none(), "no month is committed");
+            assert!(
+                scene.has_text("Week: None"),
+                "week state starts unselected in its scope"
+            );
+            assert!(
+                scene.has_text("Month: None"),
+                "month state starts unselected in its scope"
+            );
+            assert!(
+                scene.has_text("Year: None"),
+                "year state starts unselected in its scope"
+            );
 
             // The weekend predicate the calendar navigation is built on still
             // skips Saturdays and Sundays.
