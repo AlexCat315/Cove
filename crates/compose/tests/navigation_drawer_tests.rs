@@ -23,7 +23,6 @@
 //! - Discovery: `Collapse navigation` is published twice (toggle wrapper and
 //!   button host); Swift returns one node.
 //! - Collapse toggle: 32pt tall (Swift >= 44) and no `isExpanded` state.
-//! - Return/Space: Swift activates on key-down; Rust buttons activate on key-up.
 //! - Swipe dismissal: a long leftward swipe over a row does not dismiss.
 //! - Motion: the Rust drawer is at rest on its first open frame and is
 //!   remounted on every presentation, so a reversal has no node to retain.
@@ -437,8 +436,8 @@ fn keyboard_and_selection() {
         scene.focus.focus(Some(&opener), true);
         scene.key(Scancode::SPACE, KeyModifiers::default());
         assert!(
-            !harness.open.get(),
-            "GAP: Swift opens on Space key-down; Rust buttons activate on key-up"
+            harness.open.get(),
+            "Space key-down opens the drawer"
         );
         key_up(scene, Scancode::SPACE);
         let dialog = panel(scene).expect("the drawer presents a dialog");
