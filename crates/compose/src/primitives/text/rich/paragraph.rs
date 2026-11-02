@@ -9,7 +9,7 @@ use crate::theme::theme_for_node;
 use crate::{AnyView, PrimitiveView, impl_primitive_view};
 use cove_core::scene::{
     AccessibilityRole, AccessibilitySemantics, EventResult, InputHandlerRoute,
-    InteractionRegistryHolder, LayoutNode, Node, PointerPhase, Rect,
+    InteractionRegistryHolder, LayoutNode, MeasureMode, Node, PointerPhase, Rect,
 };
 use cove_core::{Color, Point};
 use cove_platform::{MouseButton, SystemCursor};
@@ -104,10 +104,26 @@ impl PrimitiveView for RichTextSurface {
     }
 
     fn update_layout(&self, layout: &LayoutNode) {
-        // The flow layout sizes the paragraph; the surface fills what it was
-        // given.
-        layout.set_width_percent(100.0);
-        layout.set_height_percent(100.0);
+        let paragraph = self.paragraph.clone();
+        let weak_layout = layout.downgrade();
+        layout.set_measure_func(Some(Rc::new(move |width, mode, _, _| {
+            let Some(environment) = TextEnvironmentHolder::current() else {
+                return cove_core::Size::default();
+            };
+            let limit = if mode == MeasureMode::Undefined {
+                f32::INFINITY
+            } else {
+                width
+            };
+            let paragraph = LayoutNode::upgrade(&weak_layout)
+                .map(|layout| styled_paragraph(&paragraph, &layout))
+                .unwrap_or_else(|| paragraph.clone());
+            let flow = RichTextFlow::layout(&paragraph, limit, &environment);
+            cove_core::Size {
+                width: flow.width,
+                height: flow.height,
+            }
+        })));
     }
 
     fn update_node(&self, node: &Node) {
@@ -153,6 +169,29 @@ impl PrimitiveView for RichTextSurface {
 }
 impl_primitive_view!(RichTextSurface);
 
+fn styled_paragraph(paragraph: &RichParagraph, layout: &LayoutNode) -> RichParagraph {
+    let font = crate::modifiers::style::layout_text_style_font(layout);
+    let line_height = crate::modifiers::style::layout_text_style_line_height(layout);
+    let mut resolved = paragraph.clone();
+    for span in &mut resolved.spans {
+        let ratio = font
+            .as_ref()
+            .map_or(1.0, |font| font.size() / span.font.size().max(1.0));
+        if let Some(font) = &font {
+            span.font = font.clone();
+        }
+        span.line_height = line_height.unwrap_or(span.line_height * ratio);
+    }
+    resolved
+}
+
+fn paragraph_at_node(paragraph: &RichParagraph, node: &Node) -> RichParagraph {
+    node.layout_node().map_or_else(
+        || paragraph.clone(),
+        |layout| styled_paragraph(paragraph, &layout),
+    )
+}
+
 fn paint(
     node: &Node,
     paragraph: &RichParagraph,
@@ -168,7 +207,8 @@ fn paint(
         return;
     }
     let palette = RichTextPalette::resolve(node);
-    let flow = RichTextFlow::layout(paragraph, frame.width, &environment);
+    let paragraph = paragraph_at_node(paragraph, node);
+    let flow = RichTextFlow::layout(&paragraph, frame.width, &environment);
     let opacity = node.opacity();
     let focused_link = node.attachment::<usize>(FOCUSED_LINK);
 
@@ -302,7 +342,8 @@ fn install_pointer(
                 return EventResult::Ignored;
             };
             let frame = owner.absolute_frame();
-            let flow = RichTextFlow::layout(&pointer_paragraph, frame.width, &environment);
+            let resolved = paragraph_at_node(&pointer_paragraph, &owner);
+            let flow = RichTextFlow::layout(&resolved, frame.width, &environment);
             let Some(fragment) = flow.fragment(event.x - frame.x, event.y - frame.y) else {
                 return EventResult::Ignored;
             };
@@ -341,7 +382,8 @@ fn install_pointer(
                     return EventResult::Ignored;
                 };
                 let frame = owner.absolute_frame();
-                let flow = RichTextFlow::layout(&hover_paragraph, frame.width, &environment);
+                let resolved = paragraph_at_node(&hover_paragraph, &owner);
+                let flow = RichTextFlow::layout(&resolved, frame.width, &environment);
                 let over_link = flow
                     .fragment(event.x - frame.x, event.y - frame.y)
                     .and_then(|fragment| hover_paragraph.spans.get(fragment.span))

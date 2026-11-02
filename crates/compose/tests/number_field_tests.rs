@@ -24,8 +24,6 @@ use cove_ui_compose::primitives::text::text_field::TextFieldSize;
 
 use support::GlobalTestLock;
 
-/// Swift's `Scancode.lgui` chord for "select all": macOS scancode 4.
-const SCANCODE_LGUI_CHORD: u32 = 4;
 /// macOS Return.
 const SCANCODE_RETURN: u32 = 40;
 
@@ -130,7 +128,11 @@ fn return_commits_the_parsed_float() {
             rig.focus.focus(Some(&node), false);
             rig.graph.recomposer.commit_all();
 
-            rig.key(&node, SCANCODE_LGUI_CHORD, KeyModifiers::LEFT_GUI);
+            let client: cove_core::scene::TextInputClient = node
+                .attachment(cove_core::scene::TextInputAttachmentKey::CLIENT)
+                .expect("platform text input client");
+            let snapshot = (client.snapshot)();
+            (client.select)(0, snapshot.text.encode_utf16().count() as i32);
             rig.text(&node, "12.5");
             rig.key(&node, SCANCODE_RETURN, KeyModifiers::default());
 
@@ -152,7 +154,11 @@ fn blur_commits_the_parsed_float() {
             rig.focus.focus(Some(&node), false);
             rig.graph.recomposer.commit_all();
 
-            rig.key(&node, SCANCODE_LGUI_CHORD, KeyModifiers::LEFT_GUI);
+            let client: cove_core::scene::TextInputClient = node
+                .attachment(cove_core::scene::TextInputAttachmentKey::CLIENT)
+                .expect("platform text input client");
+            let snapshot = (client.snapshot)();
+            (client.select)(0, snapshot.text.encode_utf16().count() as i32);
             rig.text(&node, "7.25");
             rig.focus.clear();
             rig.graph.recomposer.commit_all();
@@ -175,7 +181,11 @@ fn invalid_blur_keeps_the_previous_value() {
             rig.focus.focus(Some(&node), false);
             rig.graph.recomposer.commit_all();
 
-            rig.key(&node, SCANCODE_LGUI_CHORD, KeyModifiers::LEFT_GUI);
+            let client: cove_core::scene::TextInputClient = node
+                .attachment(cove_core::scene::TextInputAttachmentKey::CLIENT)
+                .expect("platform text input client");
+            let snapshot = (client.snapshot)();
+            (client.select)(0, snapshot.text.encode_utf16().count() as i32);
             rig.text(&node, "abc");
             rig.focus.clear();
             rig.graph.recomposer.commit_all();

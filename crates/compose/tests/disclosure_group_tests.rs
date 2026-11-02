@@ -81,6 +81,21 @@ fn first_chrome(header: &Node) -> Option<Node> {
     best
 }
 
+struct DisclosureHarness {
+    expanded: State<bool>,
+}
+impl cove_composition::View for DisclosureHarness {
+    fn body(&self, _: &cove_composition::Scope) -> AnyView {
+        harness(self.expanded.clone())
+    }
+    fn dynamic_properties(&self) -> Vec<cove_composition::DynamicField> {
+        vec![cove_composition::DynamicField::state(
+            "expanded",
+            &self.expanded,
+        )]
+    }
+}
+
 fn harness(expanded: State<bool>) -> AnyView {
     AnyView::new(BoxView::new(
         FlexDirection::Column,
@@ -106,11 +121,16 @@ fn harness(expanded: State<bool>) -> AnyView {
 
 #[test]
 fn the_header_fills_its_region_and_left_aligns_the_label() {
-    GlobalTestLock::locked(|| {
+    GlobalTestLock::with_scheduler(|| {
         support::with_test_text_environment(|| {
             let expanded = State::new(false);
             let graph = support::graph();
-            graph.install_view(harness(expanded.clone()), Default::default());
+            graph.install(
+                DisclosureHarness {
+                    expanded: expanded.clone(),
+                },
+                Default::default(),
+            );
             for _ in 0..3 {
                 graph.recomposer.commit_all();
                 graph.compute_layout(220.0, 400.0);
@@ -156,13 +176,18 @@ fn the_header_fills_its_region_and_left_aligns_the_label() {
 
 #[test]
 fn return_and_space_toggle_the_content_and_reflow_the_following_row() {
-    GlobalTestLock::locked(|| {
+    GlobalTestLock::with_scheduler(|| {
         let registry = Rc::new(InteractionRegistry::new());
         InteractionRegistryHolder::set_current(Some(registry.clone()));
         support::with_test_text_environment(|| {
             let expanded = State::new(false);
             let graph = support::graph();
-            graph.install_view(harness(expanded.clone()), Default::default());
+            graph.install(
+                DisclosureHarness {
+                    expanded: expanded.clone(),
+                },
+                Default::default(),
+            );
             graph.compute_layout(220.0, 400.0);
 
             let initial_y = graph
@@ -241,7 +266,7 @@ fn return_and_space_toggle_the_content_and_reflow_the_following_row() {
 
 #[test]
 fn a_disabled_disclosure_is_not_focusable() {
-    GlobalTestLock::locked(|| {
+    GlobalTestLock::with_scheduler(|| {
         let registry = Rc::new(InteractionRegistry::new());
         InteractionRegistryHolder::set_current(Some(registry.clone()));
         let expanded = State::new(false);

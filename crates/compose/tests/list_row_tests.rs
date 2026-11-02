@@ -410,7 +410,10 @@ fn matrix() {
                                     title_node == original
                                         && title_node.clips_to_bounds()
                                         && title_node.frame().width > 0.0,
-                                    "{case}: the title is retained, clipped and nonzero"
+                                    "{case}: title retained {}, clipped {}, frame {:?}",
+                                    title_node == original,
+                                    title_node.clips_to_bounds(),
+                                    title_node.frame()
                                 );
                                 let touch = input.contains(InputCapabilities::TOUCH);
                                 let trailing_frame = trailing.absolute_frame();
@@ -482,7 +485,11 @@ fn matrix() {
                                             && label.contains("Synced")
                                             && label.contains("99")
                                     }),
-                                    "{case}: the combined row label carries every slot"
+                                    "{case}: the combined row label carries every slot: {:?}",
+                                    list_items(graph)
+                                        .iter()
+                                        .map(|row| &row.semantics.label)
+                                        .collect::<Vec<_>>()
                                 );
                                 assert!(
                                     harness.selected.get() == Some(1)
@@ -514,13 +521,31 @@ fn actions_and_selection() {
                             .is_some_and(|semantics| semantics.label == "Inspect 0")
                 })
                 .expect("the embedded action");
+            let frame = action.absolute_frame();
+            let hit = cove_core::scene::HitTester::hit_test(
+                &graph.tree.borrow().root().expect("root"),
+                Point::new(frame.x + frame.width / 2.0, frame.y + frame.height / 2.0),
+            )
+            .expect("action hit");
+            assert!(
+                hit.path.iter().any(|node| node.id() == action.id()),
+                "{kind:?}: action receives the hit, path {:?}",
+                hit.path
+                    .iter()
+                    .map(|node| (node.id(), node.frame(), node.accessibility()))
+                    .collect::<Vec<_>>()
+            );
             click(&action, input);
             settle(graph, harness);
             assert!(
                 harness.actions.get() == 1
                     && harness.selected.get() == Some(1)
                     && harness.multiple.get() == BTreeSet::from([1]),
-                "{kind:?}: the action fires without touching selection"
+                "{kind:?}: action {}, selection {:?}, multiple {:?}, frame {:?}",
+                harness.actions.get(),
+                harness.selected.get(),
+                harness.multiple.get(),
+                action.absolute_frame()
             );
             click(&text_node(&title(0), graph), input);
             settle(graph, harness);
@@ -591,7 +616,10 @@ fn overflow() {
             settle(graph, harness);
             assert!(
                 scroll.accessibility().is_none() && scroll.content_offset().x == 0.0,
-                "rtl {rtl}: fitting content drops the scroll semantics"
+                "rtl {rtl}: fitting content drops scroll semantics, frame {:?}, offset {:?}, semantics {:?}",
+                scroll.frame(),
+                scroll.content_offset(),
+                scroll.accessibility()
             );
         }
     });

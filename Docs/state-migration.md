@@ -61,13 +61,10 @@ rg -n '\b(State|DynamicField)\b' crates examples --glob '*.rs'
 - Compose 14 个相关测试目标共 91 项通过，覆盖本批修复、List/Tree 与标签页回归。
 - `cargo clippy -p cove-ui-compose --lib` 通过，仍有仓库既有警告；一并修正近似常量与两处 FFI 安全说明，解除既有 lint 错误。
 
-扩展运行 `menu_hierarchy_tests` 为 9 项通过、3 项失败；在隔离工作树的批次前提交
-`297b96b8` 复现相同失败，未将其计为本批回归通过：
+2026-11-02 GAP 断言清理后，`menu_hierarchy_tests` 12 项通过：
 
-| 用例 | 当前失败 |
-| --- | --- |
-| `rows_wrap_labels_within_their_bounds_at_each_scale` | 仍断言标题应溢出，但实际标题已包含在行内，是过时的 GAP 断言 |
-| `keyboard_navigation_reveals_scaled_multiline_rows` | 行高已达到 132pt，行高与滚动视口的比较仍失败；原“保持最小行高”的 GAP 描述已过时，视口/揭示路径需单独核查 |
-| `scrolling_a_branch_outside_its_viewport_closes_the_child` | 滚轮输入后菜单视口偏移仍为 0 |
+- 包含在行内的多行标题改为包含关系断言，删除“应溢出”的旧预期。
+- 菜单视口的行数预算跟随文字缩放，容纳实际增长的多行行高。
+- `MenuWindowBounds` 合并 ScrollView 原有的布局回调，恢复滚动范围更新；滚轮用例不再停在偏移 0。
 
-这些菜单用例、List 选中背景的水平位置，以及未声明动态字段的内部会话，继续纳入后续审计。
+菜单的其余会话差异、List 选中背景的水平位置，以及未声明动态字段的内部会话继续纳入后续审计。

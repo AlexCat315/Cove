@@ -8,18 +8,6 @@
 //! - with the flag, scrolling the list is the only way to pin a header
 //!
 //! Named differences from the Swift suite:
-//! - The Rust `SectionedList` never establishes a viewport taller than its
-//!   first virtual window: a 240x300 mount measures a 120pt scroll viewport
-//!   (four 30pt entries), the virtual stack's content never exceeds it, and
-//!   the scroll range is therefore zero. Wheel input over the list and an End
-//!   reveal both leave the content offset at 0, so `resolve_sticky_header`
-//!   never returns a pinned header. `sticky_headers` pins that documented
-//!   behaviour (no pinned node, unchanged three-row window) instead of Swift's
-//!   pin/push/hand-off geometry.
-//! - Because only the first window mounts, Swift's inline "Scene" header
-//!   (entry index 9, top 270pt) is absent in the 300pt mount;
-//!   `sticky_headers_disabled` asserts the opt-out itself and the mounted
-//!   "Alpha" header.
 //! - Rust has no `sectioned-list-sticky-band` node and no scrollbar-gutter
 //!   carve-out on the pinned header; the pinned header is a single
 //!   debug-named node, which is why no band width is asserted.
@@ -51,6 +39,13 @@ fn rows(scene: &InteractiveScene) -> Vec<Node> {
         node.accessibility()
             .is_some_and(|semantics| semantics.role == AccessibilityRole::ListItem)
     })
+}
+
+fn sticky_title(node: &Node) -> Option<String> {
+    node.layout_node()
+        .and_then(|layout| layout.text_inputs())
+        .map(|inputs| inputs.text)
+        .or_else(|| node.children().iter().find_map(sticky_title))
 }
 
 fn sticky(scene: &InteractiveScene) -> Option<Node> {
@@ -111,23 +106,28 @@ fn sections_and_keyboard() {
             scene
                 .labelled("Alpha", Some(AccessibilityRole::StaticText))
                 .is_some(),
-            "GAP: header label Alpha is not in the mounted tree"
+            "the inline header mounts"
         );
         assert!(
             scene
                 .labelled("End of Alpha", Some(AccessibilityRole::StaticText))
                 .is_some(),
-            "GAP: footer label is not in the mounted tree"
+            "the footer mounts"
         );
 
         let items = rows(scene);
-        assert_eq!(items.len(), 2, "GAP: list-item rows = {}", items.len());
+        assert_eq!(
+            items.len(),
+            2,
+            "one list-item role per item: {}",
+            items.len()
+        );
 
         scene.click(&items[0], 1);
         assert_eq!(
             selected.get(),
             Some(1),
-            "GAP: click left selection at {:?}",
+            "a click selects the first item: {:?}",
             selected.get()
         );
 
@@ -137,7 +137,7 @@ fn sections_and_keyboard() {
         assert_eq!(
             selected.get(),
             Some(2),
-            "GAP: Down left selection at {:?}",
+            "Down selects the next item: {:?}",
             selected.get()
         );
 
@@ -145,7 +145,7 @@ fn sections_and_keyboard() {
         assert_eq!(
             activated.get(),
             Some(2),
-            "GAP: Return activated {:?}",
+            "Return activates the cursor item: {:?}",
             activated.get()
         );
     });
@@ -177,63 +177,63 @@ fn sticky_headers() {
 
         assert!(
             sticky(scene).is_none(),
-            "GAP: a header pinned at rest at {:?}",
+            "no header pins before scrolling: {:?}",
             sticky(scene).map(|node| node.absolute_frame())
         );
         let port = scroll_port(scene).expect("scroll viewport");
         let initial_port = port.frame();
         let initial_rows = rows(scene).len();
+        assert!(
+            (10..36).contains(&initial_rows),
+            "the first window fills the viewport with a bounded buffer: {initial_rows}"
+        );
         assert_eq!(
-            initial_rows, 3,
-            "GAP: first window mounted {initial_rows} item rows, expected 3"
+            initial_port.height, 300.0,
+            "the viewport follows its allocation"
         );
 
         scroll(scene, 30.0);
         assert_eq!(
-            scroll_port(scene)
-                .expect("scroll viewport")
-                .content_offset(),
-            cove_core::Point::default(),
-            "GAP: wheel moved the content offset, sticky geometry reachable"
+            scroll_port(scene).expect("viewport").content_offset().y,
+            30.0
         );
+        let pinned = sticky(scene).expect("scrolling pins Alpha");
+        assert_eq!(sticky_title(&pinned).as_deref(), Some("Alpha"));
+        assert_eq!(pinned.absolute_frame().y, port.absolute_frame().y);
+        assert_eq!(pinned.frame().width, LIST_WIDTH);
         assert!(
-            sticky(scene).is_none(),
-            "GAP: a pinned header appeared at offset {}",
-            scroll_port(scene)
-                .expect("scroll viewport")
-                .content_offset()
-                .y
+            !pinned.allows_hit_testing(),
+            "the pinned decoration never intercepts rows"
         );
 
+        scroll(scene, 255.0);
+        assert_eq!(
+            sticky_title(&sticky(scene).expect("next pinned header")).as_deref(),
+            Some("Scene")
+        );
         let host = keyboard_host(scene);
         scene.focus.focus(Some(&host), true);
         scene.key(Scancode::END, KeyModifiers::default());
         scene.settle(4, 1.0);
+        assert_eq!(selected.get(), Some(36), "End selects the last item");
         assert_eq!(
-            selected.get(),
-            Some(36),
-            "GAP: End left selection at {:?}",
-            selected.get()
+            sticky_title(&sticky(scene).expect("last pinned header")).as_deref(),
+            Some("Hidden")
         );
-        assert!(
-            sticky(scene).is_none(),
-            "GAP: End reveal pinned a header at offset {}",
-            scroll_port(scene)
-                .expect("scroll viewport")
-                .content_offset()
-                .y
-        );
+        let viewport = scroll_port(scene).expect("viewport");
         assert_eq!(
-            scroll_port(scene).expect("scroll viewport").frame(),
+            viewport.frame(),
             initial_port,
-            "GAP: End reveal resized the {:.0}pt viewport",
-            initial_port.height
+            "revealing a row does not resize the viewport"
         );
-        assert_eq!(
-            rows(scene).len(),
-            initial_rows,
-            "GAP: End reveal mounted a different row window"
+        let last = scene
+            .labelled("Item 36", Some(AccessibilityRole::StaticText))
+            .expect("End mounts the last item");
+        assert!(
+            last.absolute_frame().max_y() <= viewport.absolute_frame().max_y() + 0.5,
+            "End reveals the last item"
         );
+        assert!(rows(scene).len() < 36, "the end window remains bounded");
     });
 }
 
@@ -258,7 +258,7 @@ fn sticky_headers_disabled() {
         scroll(scene, 255.0);
         assert!(
             sticky(scene).is_none(),
-            "GAP: opt-out list pinned a header at offset {}",
+            "an opted-out list never pins at offset {}",
             scroll_port(scene)
                 .expect("scroll viewport")
                 .content_offset()
@@ -266,9 +266,9 @@ fn sticky_headers_disabled() {
         );
         assert!(
             scene
-                .labelled("Alpha", Some(AccessibilityRole::StaticText))
+                .labelled("Scene", Some(AccessibilityRole::StaticText))
                 .is_some(),
-            "GAP: mounted Alpha header disappeared after scrolling"
+            "the inline Scene header stays available after scrolling"
         );
     });
 }

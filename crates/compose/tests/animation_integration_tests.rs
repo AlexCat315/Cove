@@ -19,16 +19,6 @@
 //! - points -> percent cancels the in-flight width controller
 //! - percent -> auto with clamps snaps and clears the animation
 //!
-//! Named difference: the Swift suite expects the `.auto` step of
-//! `layoutPercentToAutoWithClampSnapsAndClears` to resolve to the leaf's
-//! `maxWidth` (80). The Rust layout engine's flex `arrange` path assigns a
-//! stretched cross extent from the container without clamping it against the
-//! child's `max_width` (`crates/core/src/scene/layout_node.rs`, `arrange_flex`), so
-//! the stretched auto width is 200. That is a production gap, recorded here
-//! rather than papered over: the animation half of the assertion (the snap and
-//! the cleared controller) is unchanged, and the size assertion states the
-//! current, documented behaviour.
-
 use cove_composition::Scope;
 mod support;
 
@@ -829,7 +819,7 @@ fn layout_frame_width_updates_over_ticks() {
 
             scheduler.tick(0.5);
             graph.compute_layout(300.0, 120.0);
-            assert_eq!(leaf.frame().width, 120.0);
+            assert!((leaf.frame().width - 120.0).abs() < 0.001);
         });
     });
 }
@@ -894,7 +884,7 @@ fn layout_percent_width_updates_over_ticks() {
 
             scheduler.tick(0.5);
             graph.compute_layout(300.0, 120.0);
-            assert_eq!(leaf.frame().width, 120.0);
+            assert!((leaf.frame().width - 120.0).abs() < 0.001);
         });
     });
 }
@@ -958,7 +948,7 @@ fn layout_percent_height_updates_over_ticks() {
 
             scheduler.tick(0.5);
             graph.compute_layout(300.0, 160.0);
-            assert_eq!(leaf.frame().height, 60.0);
+            assert!((leaf.frame().height - 60.0).abs() < 0.001);
         });
     });
 }
@@ -1099,7 +1089,7 @@ fn points_to_percent_cancels_the_in_flight_width_controller() {
                 0,
                 "points -> percent snaps and releases the controller"
             );
-            assert_eq!(leaf.frame().width, 60.0);
+            assert!((leaf.frame().width - 60.0).abs() < 0.001);
 
             scheduler.tick(0.0);
             assert_eq!(scheduler.active_count(), 0);
@@ -1148,19 +1138,12 @@ fn percent_to_auto_with_clamps_snaps_and_clears_the_animation() {
                 0,
                 "percent -> auto clears the controller"
             );
-            // Documented difference: Swift/Yoga clamps this stretched auto width
-            // to `maxWidth` (80); the Rust layout engine publishes the
-            // container's cross extent instead.
-            assert_eq!(
-                leaf.frame().width,
-                200.0,
-                "the auto width stretches to the container; Swift clamps it to maxWidth"
-            );
+            assert_eq!(leaf.frame().width, 80.0, "the auto width respects maxWidth");
 
             scheduler.tick(0.0);
             assert_eq!(scheduler.active_count(), 0);
             graph.compute_layout(300.0, 160.0);
-            assert_eq!(leaf.frame().width, 200.0);
+            assert_eq!(leaf.frame().width, 80.0);
         });
     });
 }

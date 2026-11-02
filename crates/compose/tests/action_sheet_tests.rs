@@ -412,6 +412,7 @@ fn open_presentation_survives_resize_without_duplicating_portals() {
         scene.install(AnyView::new(harness));
 
         for candidate in [390.0_f32, 720.0, 1280.0, 390.0] {
+            scene.width = candidate;
             width.set(candidate);
             scene.settle(8, 1.0);
             assert!(open.get(), "the drawer stays open across widths");
@@ -421,13 +422,8 @@ fn open_presentation_survives_resize_without_duplicating_portals() {
                 "resizing never duplicates the portal at {candidate}"
             );
             let frame = panel(scene).absolute_frame();
-            // Gap: on a compact surface Swift sets the drawer inset to 0. Rust
-            // keeps the 12pt non-compact inset, so the panel starts 12pt in and
-            // its unclipped width equals the surface width; the visible panel is
-            // clipped to the remaining margin. Bounds are checked with the inset
-            // accounted for, and the inset itself is pinned separately.
             assert!(
-                frame.x >= 0.0 && frame.width + frame.x <= candidate + 12.5,
+                frame.x >= 0.0 && frame.width + frame.x <= candidate + 0.5,
                 "the drawer stays inside the surface at {candidate}: {frame:?}"
             );
             assert!(
@@ -437,6 +433,7 @@ fn open_presentation_survives_resize_without_duplicating_portals() {
         }
 
         // Disabling the sheet closes it.
+        scene.width = 1280.0;
         width.set(1280.0);
         scene.settle(8, 1.0);
         enabled.set(false);
@@ -472,6 +469,7 @@ fn rows_keep_names_targets_and_finite_geometry() {
             for scale in [1.0_f32, 2.0] {
                 for dark in [false, true] {
                     for touch in [false, true] {
+                        scene.width = width_config;
                         width_state.set(width_config);
                         scale_state.set(scale);
                         dark_state.set(dark);
@@ -541,17 +539,14 @@ fn wide_drawer_focuses_the_close_control_first() {
 }
 
 #[test]
-fn compact_drawer_is_not_pushed_to_the_bottom() {
-    // Gap: a `ModalPlacement::Bottom` drawer should sit against the bottom edge.
-    // The modal backdrop sets `Justify::FlexEnd`, but the panel keeps the
-    // content's own height at the surface origin, so the drawer floats at the top.
+fn compact_drawer_sits_against_the_bottom_edge() {
     InteractiveScene::run(390.0, 820.0, |scene| {
         let (harness, _, _) = harness(true, 390.0, true);
         scene.install(AnyView::new(harness));
         let frame = panel(scene).absolute_frame();
-        assert_eq!(
-            frame.y, 0.0,
-            "the bottom-placed drawer currently starts at the surface origin"
+        assert!(
+            (frame.max_y() - scene.height).abs() < 0.5,
+            "the bottom-placed drawer meets the surface edge: {frame:?}"
         );
         assert!(
             frame.height < 500.0,

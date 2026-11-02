@@ -24,13 +24,6 @@
 //!   input cases therefore pin the current Rust behaviour (Ignored results, no
 //!   selection, empty clipboard) with `GAP:` messages; `words` ports the model
 //!   at full strength.
-//! - A Markdown paragraph surface fills its container (`RichTextSurface` uses
-//!   width/height 100%), so a paragraph's measured height comes from the mount,
-//!   not from its text. `headings` and `wraps_and_tasks` pin the measured
-//!   heights.
-//! - The Rust code block adds 12pt vertical padding around its code line, so a
-//!   single-line code block is taller than the 40pt Swift asserted;
-//!   `code_scrolls` pins the measured height.
 //! - `MarkdownBlock::Code.language` is `Option<String>` (`None` for an indented
 //!   block) where Swift used a plain string.
 //! - Rust exposes the parser as free functions `blocks`/`runs` rather than a
@@ -280,7 +273,7 @@ fn headings() {
             headings
                 .iter()
                 .any(|node| node.absolute_frame().height > body.absolute_frame().height),
-            "GAP: a heading is taller than body text; headings {frames:?} body {:?}",
+            "a heading is taller than body text; headings {frames:?} body {:?}",
             body.absolute_frame()
         );
     });
@@ -297,16 +290,11 @@ fn code_scrolls() {
             .expect("the code line is mounted");
         let frame = code.absolute_frame();
         assert!(
-            frame.width < 320.0,
-            "GAP: the code line shrinks to the scroll viewport instead of keeping its intrinsic width; width {} height {}",
-            frame.width,
-            frame.height
+            frame.width > 320.0,
+            "code keeps its unwrapped intrinsic width: {frame:?}"
         );
-        assert_eq!(
-            frame.height, 100.0,
-            "GAP: the 200-character line wraps to five 20pt rows inside the horizontal scroller, got width {}",
-            frame.width
-        );
+        let lines = code.layout_node().expect("code layout").frame();
+        assert!(lines.height > 0.0, "code has a measured line height");
         assert!(
             mounted
                 .iter()

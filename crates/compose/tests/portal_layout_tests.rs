@@ -13,16 +13,31 @@ mod support;
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use cove_composition::{AnyView, LayoutDebugExt, ViewGraph};
+use cove_composition::{AnyView, LayoutDebugExt, ViewExt, ViewGraph};
 use cove_core::Point;
 use cove_core::scene::{Align, FlexDirection, Justify, NodeTree, Recomposer, Wrap};
 use cove_ui_compose::modifiers::layout::{FlexExt, LayoutFrameExt};
 use cove_ui_compose::primitives::overlays::portal::{
-    LayerRoot, PortalHost, PortalStore, PortalStoreHolder,
+    LayerRoot, PortalHost, PortalStore, PortalStoreEnvironment, PortalStoreHolder,
 };
 use cove_ui_compose::{BoxView, LayoutDebugExt as _};
 
 use support::GlobalTestLock;
+
+struct StoreScope(Rc<PortalStore>);
+impl cove_composition::ViewModifier for StoreScope {
+    fn scope_apply(&self, node: &cove_core::scene::Node) -> Option<bool> {
+        let key = PortalStoreEnvironment::key();
+        let changed = node
+            .composition_value(&key)
+            .is_none_or(|store| !Rc::ptr_eq(&store, &self.0));
+        node.set_composition_value(&key, Some(self.0.clone()));
+        Some(changed)
+    }
+    fn is_scope_applying(&self) -> bool {
+        true
+    }
+}
 
 fn empty_box() -> BoxView {
     BoxView::new(
@@ -55,7 +70,8 @@ fn portal_host_keeps_rendering_its_owning_store() {
             LayerRoot::with_portals(
                 AnyView::new(empty_box()).frame_size(300.0, 200.0),
                 PortalHost::new(),
-            ),
+            )
+            .modifier(StoreScope(owning_store.clone())),
             Default::default(),
         );
 

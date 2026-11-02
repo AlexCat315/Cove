@@ -20,13 +20,6 @@
 //! - Swift rows carry the debug name `sidebar-item-<id>`. The Rust `Sidebar`
 //!   publishes none, so rows are found by accessible label — the
 //!   `sidebar_tests.rs` precedent.
-//! - Swift clamps the rail to 72/56 and the authored 400pt icon to the rail
-//!   (`Sidebar.swift` applies `presentation.railWidth`; `RailDestination`
-//!   clamps the extent). The Rust `Sidebar` never applies `rail_width` and the
-//!   rail icon extent passes through unclamped, so every width/height target
-//!   below pins the content-driven geometry with `GAP:` asserts: the lane
-//!   fills its parent (or overflows to the 400pt content at narrow widths)
-//!   and rows hug their content instead of filling the rail.
 //! - Swift's rail label wraps a long title over more than one line; Rust's
 //!   `Text::truncated()` shapes at most one line.
 //! - Swift's row help text `"Destination 5 (123456)"` is not produced by the
@@ -39,10 +32,6 @@
 //!   host moves the selection but leaves focus where it started: `RovingItem`
 //!   sits on the non-focusable destination wrapper, so the host never focuses
 //!   the new row.
-//! - Swift keeps row identity across rail<->expanded switches (rows are keyed
-//!   by item id). The Rust sidebar inserts the section title at index 0 of
-//!   the same list in expanded mode, so crossing that boundary remounts every
-//!   row and focus falls out.
 
 use cove_composition::Scope;
 mod support;
@@ -374,17 +363,7 @@ fn rail_geometry_holds_across_theme_density_and_text() {
                                 "the rail measures {nav_width} at scale {scale}, labels {labels}"
                             );
                             let rail_width = if labels { 72.0 } else { 56.0 };
-                            // GAP: Swift clamps the rail to `railWidth`
-                            // (`Sidebar.swift` applies `presentation.railWidth`);
-                            // the Rust Sidebar never does, so the lane is
-                            // content-driven. The authored 400pt icon on row 5
-                            // therefore widens the whole rail instead of being
-                            // clamped to `railWidth - 16`.
-                            assert!(
-                                nav_width >= 400.0 && nav_width != rail_width,
-                                "GAP: the rail stays content-driven \
-                                 ({nav_width}) instead of Swift's {rail_width}"
-                            );
+                            assert_eq!(nav_width, rail_width, "the rail uses its authored width");
                             assert_eq!(
                                 row(scene, 0).id(),
                                 retained.id(),
@@ -476,7 +455,11 @@ fn rail_geometry_holds_across_theme_density_and_text() {
                                 let measured =
                                     layout.text_measure().expect("the title records a measure");
                                 assert!(text.frame().width > 0.0);
-                                assert!(text.absolute_frame().max_x() <= lane_bounds.max_x() + 0.5);
+                                assert!(
+                                    text.absolute_frame().max_x()
+                                        <= row(scene, 4).absolute_frame().max_x() + 0.5,
+                                    "the caption fits its row; oversized glyphs still widen the row beyond the rail"
+                                );
                                 // GAP: Swift wraps the long title onto more than
                                 // one line; the Rust rail caption truncates to a
                                 // single shaped line.
@@ -534,7 +517,6 @@ fn presentations_retain_identity_header_focus_and_visibility() {
         let selected = row(scene, 29);
         scene.focus.focus(Some(&selected), true);
         let mut tracked = selected.clone();
-        let mut tracked_mode: SidebarPresentation = states.presentation.get();
 
         for mode in [
             SidebarPresentation::Expanded,
@@ -554,43 +536,15 @@ fn presentations_retain_identity_header_focus_and_visibility() {
             let current_header = scene
                 .named("rail-header")
                 .expect("the header survives the presentation swap");
-            if mode.is_rail() == tracked_mode.is_rail() {
-                assert_eq!(
-                    current.id(),
-                    tracked.id(),
-                    "mode {mode:?} keeps row identity"
-                );
-                assert!(
-                    scene
-                        .focus
-                        .focused()
-                        .is_some_and(|focused| focused.id() == tracked.id()),
-                    "mode {mode:?} keeps focus on the selected row"
-                );
-            } else {
-                // GAP: crossing the rail<->expanded boundary inserts or removes
-                // the section title lane inside the same TupleView, so Rust
-                // remounts every row and focus falls out; Swift keys rows with
-                // `.id(entry.item.id)` and retains both. Re-focus to keep the
-                // remaining transitions observable.
-                assert_ne!(
-                    current.id(),
-                    tracked.id(),
-                    "GAP: the cross-presentation switch remounts the row (Swift keeps it)"
-                );
-                assert!(
-                    scene
-                        .focus
-                        .focused()
-                        .is_none_or(|focused| focused.id() != current.id()),
-                    "GAP: focus stays on the detached old row instead of following \
-                     the selection (Swift keeps focus on the retained node)"
-                );
-                scene.focus.focus(Some(&current), true);
-                scene.settle(2, 1.0);
-            }
+            assert_eq!(current.id(), tracked.id(), "mode {mode:?} retains the row");
+            assert!(
+                scene
+                    .focus
+                    .focused()
+                    .is_some_and(|focused| focused.id() == tracked.id()),
+                "mode {mode:?} keeps row focus"
+            );
             tracked = current.clone();
-            tracked_mode = mode;
             assert_eq!(
                 current_header.id(),
                 header.id(),
@@ -606,13 +560,10 @@ fn presentations_retain_identity_header_focus_and_visibility() {
                 .expect("the navigation lane is mounted");
             match mode.rail_width() {
                 Some(rail) => {
-                    // GAP: Swift frames the rail at `railWidth` (72/56); the
-                    // Rust Sidebar never applies it — the lane is content- or
-                    // parent-driven (the unclamped 400pt glyph is the floor).
-                    assert!(
-                        nav.frame().width > rail + 0.5 && nav.frame().width != rail,
-                        "GAP: the rail lane measures {} instead of Swift's {rail}",
-                        nav.frame().width
+                    assert_eq!(
+                        nav.frame().width,
+                        rail,
+                        "the navigation lane follows the presentation width"
                     );
                 }
                 None => {

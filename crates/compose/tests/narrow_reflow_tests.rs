@@ -105,9 +105,6 @@ fn stepper_stacks_on_a_narrow_container_and_keeps_the_axis_aware_keyboard_path()
         ));
         let items = buttons(scene);
         assert_eq!(items.len(), 3, "the stepper mounts three step buttons");
-        // GAP: Swift's stacked stepper spaces the 44pt rows apart; the Rust
-        // compact branch advances by a fixed 24pt, so consecutive steps overlap
-        // even though they are stacked in order.
         let spacing = items[1].absolute_frame().y - items[0].absolute_frame().y;
         assert!(
             spacing > 0.0,
@@ -118,9 +115,8 @@ fn stepper_stacks_on_a_narrow_container_and_keeps_the_axis_aware_keyboard_path()
             "the narrow stepper stacks the third step below the second"
         );
         assert!(
-            spacing < items[0].absolute_frame().height,
-            "GAP: Swift spaces stacked steps without overlap; Rust advances the \
-             next step {spacing}pt while each button is {}pt tall",
+            spacing >= items[0].absolute_frame().height,
+            "stacked steps do not overlap: advance {spacing}pt, height {}pt",
             items[0].absolute_frame().height
         );
         let frame = items[1].frame();

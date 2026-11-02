@@ -397,8 +397,9 @@ impl<Id: PartialEq + Eq + std::hash::Hash + Clone + Send + Sync + 'static> Adapt
 impl<Id: PartialEq + Eq + std::hash::Hash + Clone + Send + Sync + 'static> View
     for AdaptiveSidebar<Id>
 {
-    fn body(&self, _cx: &Scope) -> AnyView {
-        let snapshot = self.snapshot();
+    fn body(&self, cx: &Scope) -> AnyView {
+        let mut snapshot = self.snapshot();
+        snapshot.focus = cx.remember(|| self.focus.clone());
         AnyView::new(AdaptiveShell { snapshot })
     }
 

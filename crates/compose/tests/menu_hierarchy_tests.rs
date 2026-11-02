@@ -34,9 +34,6 @@
 //!   publishes no portal.
 //! - **`MenuTypeahead` does not fold diacritics.** A leading `e` skips
 //!   `Éclair`; the accented case asserts the measured destination.
-//! - **Wrapped rows keep their minimum height.** A multiline title overflows
-//!   its row vertically at 100 % and 200 %, and the row does not grow above two
-//!   reference rows when scaled.
 //! - **Portal slots expose no ownership key.** Rust never attaches
 //!   `PortalOwnership::ENTRY_KEY` to a slot node, so the composed tree holds no
 //!   inspectable slots; placement is read from `PortalStore::frame` instead.
@@ -713,6 +710,19 @@ fn scrolling_a_branch_outside_its_viewport_closes_the_child() {
         );
         let scroll = scroll_viewport(scene);
         let frame = scroll.absolute_frame();
+        let hit = cove_core::scene::HitTester::hit_test(
+            &scene.graph.tree.borrow().root().expect("root"),
+            Point::new(frame.x + frame.width / 2.0, frame.y + frame.height / 2.0),
+        )
+        .expect("the menu viewport is hit-testable");
+        assert!(
+            hit.path.iter().any(|node| node.id() == scroll.id()),
+            "the menu wheel targets its viewport, hit path {:?}",
+            hit.path
+                .iter()
+                .map(|node| (node.id(), node.frame(), node.accessibility()))
+                .collect::<Vec<_>>()
+        );
         scene
             .dispatcher()
             .dispatch(&cove_platform::InputEvent::MouseWheel(
@@ -727,8 +737,16 @@ fn scrolling_a_branch_outside_its_viewport_closes_the_child() {
         scene.settle(5, 1.0);
         assert!(
             scroll.content_offset().y >= 200.0,
-            "the wheel scrolls the level, offset {}",
-            scroll.content_offset().y
+            "the wheel scrolls the level, offset {}, viewport {:?}, rows {:?}",
+            scroll.content_offset().y,
+            scroll.absolute_frame(),
+            scene
+                .nodes()
+                .iter()
+                .filter(|node| node.attachment::<u64>(MENU_ITEM_ID).is_some())
+                .map(|node| node.absolute_frame())
+                .take(3)
+                .collect::<Vec<_>>()
         );
         assert_eq!(
             scene.portal.entries().len(),
@@ -786,11 +804,9 @@ fn rows_wrap_labels_within_their_bounds_at_each_scale() {
                 "the wrapped text fits its node height"
             );
             assert!(!title.clips_to_bounds(), "the title never clips its glyphs");
-            // GAP: the row keeps its minimum height, so the wrapped title
-            // overflows above and below it; Swift grows the row to contain it.
             assert!(
-                !contains_rect(target.absolute_frame(), title.absolute_frame()),
-                "GAP: Rust overflows the wrapped title out of its row (row {:?}, title {:?})",
+                contains_rect(target.absolute_frame(), title.absolute_frame()),
+                "the row contains the wrapped title: row {:?}, title {:?}",
                 target.absolute_frame(),
                 title.absolute_frame()
             );
@@ -884,8 +900,9 @@ fn keyboard_navigation_reveals_scaled_multiline_rows() {
         assert!(lines > 1, "the scaled label wraps, saw {lines} lines");
         assert!(
             last.frame().height >= 52.0 && last.frame().height < scroll.frame().height,
-            "GAP: Swift grows the wrapped scaled row past 52 pt; Rust keeps it at the minimum, height {}",
-            last.frame().height
+            "the scaled multiline row grows and fits the viewport, row {:?}, scroll {:?}",
+            last.frame(),
+            scroll.frame()
         );
         scene.focus.focus(Some(&row(scene, 0)), true);
         key(scene, Scancode::END);

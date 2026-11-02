@@ -33,7 +33,7 @@ use cove_ui_compose::modifiers::layout::LayoutFrameExt;
 use cove_ui_compose::primitives::controls::form::form::{Form, FormField, FormLayout};
 use cove_ui_compose::primitives::controls::form::label_placement::FieldLabelPlacement;
 use cove_ui_compose::primitives::data::property_grid::{
-    PropertyGrid, PropertyGridRow, PropertyGridSection,
+    PropertyGrid, PropertyGridRow, PropertyGridScrollAxes, PropertyGridSection,
 };
 use cove_ui_compose::primitives::text::TextField;
 use cove_ui_compose::primitives::text::text_buffer::TextBuffer;
@@ -120,6 +120,7 @@ fn content(settings: &Settings, name: State<TextBuffer>, email: State<TextBuffer
         section.is_collapsible = true;
         AnyView::new(
             PropertyGrid::new(vec![section])
+                .scroll_axes(PropertyGridScrollAxes::Vertical)
                 .label_width(220.0)
                 .min_value_width(220.0)
                 .label_placement(settings.placement),
@@ -308,6 +309,7 @@ fn container_reflow_preserves_draft_focus_and_identity() {
                                 "grid={grid}/{width}/{scale}/touch={}",
                                 capabilities.contains(InputCapabilities::TOUCH)
                             );
+                            scene.set_density(scale, capabilities);
                             scene.settle(width);
                             let nodes = scene.nodes();
                             let current = fields(&nodes)
@@ -351,7 +353,7 @@ fn container_reflow_preserves_draft_focus_and_identity() {
                             } else {
                                 assert!(
                                     label_frame.max_x() <= field_frame.x,
-                                    "a wide container puts the label beside the field ({context_label})"
+                                    "a wide container puts the label beside the field ({context_label}), label {label_frame:?}, field {field_frame:?}"
                                 );
                                 assert!(
                                     current.frame().width >= 220.0,

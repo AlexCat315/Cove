@@ -415,13 +415,9 @@ fn metadata_edges_wrap_inside_the_row() {
         assert_eq!(event_rows.len(), 2, "both events mount");
         let ready = text_in(&event_rows[0], "Ready");
         let spacing = theme_for_node(&event_rows[0]).spacing.sm;
-        // GAP: Swift reserves `theme.spacing.sm` below a metadata-free title;
-        // Rust's row collapses to the rail height instead.
-        assert_eq!(
-            event_rows[0].frame().height,
-            146.0,
-            "documented gap: a metadata-free row is 146pt tall at 160pt/2x, title {} + spacing {spacing}",
-            ready.frame().height
+        assert!(
+            event_rows[0].frame().height >= ready.frame().height + spacing,
+            "the metadata-free row contains its title and spacing"
         );
 
         let review = text_in(&event_rows[1], "Review");

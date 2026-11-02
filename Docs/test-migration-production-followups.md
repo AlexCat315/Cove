@@ -47,13 +47,16 @@ its own verification pass.
 | 36 | NavigationStack recreated its transition guard on reconstruction, accepting overlapping path changes; its return gesture also used width zero. Both now use retained scope state and the measured page width | `navigation_stack_tests` |
 | 37 | Sidebar row minimum height existed only in an unused style value, leaving rail/touch buttons below their required floor. The actual destination button now applies it | `sidebar_hierarchy_tests::adaptive_matrix` |
 
+| 38 | `MenuWindowBounds` replaced ScrollView's layout callback, preventing scroll-range updates; the viewport budget also ignored text scale. Both callbacks now run and the row budget scales | `menu_hierarchy_tests` |
+| 39 | AdaptiveSidebar and ToolbarCommands recreated focus handoff resources on parent reconstruction; toolbar layout also hid focused commands before recording their focus visibility | `adaptive_sidebar_tests`, `app_bar_tests` |
+| 40 | RichTextSurface had no intrinsic measurement and ignored late font modifiers; Markdown headings never used their heading token and code lines wrapped inside the horizontal scroller | `rich_text_tests`, `markdown_tests` |
+
 Remaining legacy state callers and batch boundaries are tracked in [state-migration.md](state-migration.md).
 
 ## Open (each needs its own change + verification)
 
 | Defect | Why not fixed here |
 | --- | --- |
-| Extended `menu_hierarchy_tests` still has three baseline failures involving stale wrapped-row GAP assertions, the scaled-row viewport comparison, and a wheel offset that remains zero | Reproduced on pre-batch commit `297b96b8`; exact cases and observations are recorded in [state-migration.md](state-migration.md#验证) for a separate menu layout/session pass |
 | List selection fill subtracts both horizontal insets from its width but starts at the viewport's leading edge (0pt instead of 6pt); the old full-width GAP assertion was stale | Requires a separate row layout/placement fix; `list_tree_tests::selected_row_fits_its_slot` records the exact remaining offset |
 | `WorkspaceView` has no view reactivity: `dispatch` bumps `version` but nothing invalidates the scope, so an installed tree never re-renders | Sources-owned; a live host would show a stale workspace forever |
 | `WorkspaceDocument` cannot be serialized: `WorkspaceLayoutNode` derives `Serialize` with `#[serde(tag = "kind")]` on a newtype `Group` variant | Persistence is impossible; decoding works |

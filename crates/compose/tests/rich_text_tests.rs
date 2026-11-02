@@ -30,10 +30,6 @@
 //!   paragraph (the first at y = 200 inside a 400×200 mount), not overlays on
 //!   the link's first fragment: `anchors` pins the stacked frames (400 wide,
 //!   ordered top to bottom) instead of Swift's contained, side-by-side frames.
-//! - `RichTextSurface` fills its container (width/height 100%), so a paragraph
-//!   never measures its own text: both the body and the 40pt paragraph report
-//!   `400×800` in a 400×400 column. `modifiers_apply` pins those frames; the
-//!   Swift suite's taller second paragraph cannot be observed.
 //! - `FocusChain::focus` takes a link anchor, but `RichTextReader::children`
 //!   builds the anchors with `surface: None`, so the paragraph never records
 //!   `FOCUSED_LINK` and paints no ring. Swift's remembered index is
@@ -487,10 +483,13 @@ fn modifiers_apply() {
             assert_eq!(surfaces.len(), 2, "both paragraphs materialise");
             let body = surfaces[0].frame();
             let large = surfaces[1].frame();
-            assert_eq!(
-                (body.width, body.height, large.width, large.height),
-                (400.0, 800.0, 400.0, 800.0),
-                "GAP: paragraphs fill their container instead of measuring their text"
+            assert!(
+                body.width > 0.0 && body.height > 0.0,
+                "body text measures its content"
+            );
+            assert!(
+                large.height > body.height,
+                "the font modifier makes the paragraph taller: body {body:?}, large {large:?}"
             );
         });
     });

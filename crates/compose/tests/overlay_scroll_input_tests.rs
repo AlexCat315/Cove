@@ -7,21 +7,6 @@
 //!   control, a background scroll does not move the scroll area, and no pointer
 //!   capture is left behind
 //!
-//! Recorded gaps:
-//!
-//! - A text-labelled `Button` does not carry its accessible name on the button
-//!   node: `ButtonHost::update_node` reads only
-//!   `ActionControlAccessibility::label`, falling back to the tooltip for
-//!   icon-only buttons. The label text lands on a `StaticText` child, so the
-//!   button's own name is empty where Swift's harness supplies "Clear".
-//! - `Popover` is `Binding`-driven, and a `Binding` keeps only
-//! get/set closures, so it has no observable dependency — writing the binding
-//! after mount never presents the popover. The Swift harness flips
-//! `$presented` after mounting and expects the menu to appear. The cases below
-//! therefore mount the popover already presented, which is the reachable form of
-//! the same interaction contract, and `presentation_binding_does_not_reopen`
-//! pins the gap.
-//!
 //! Name mapping: `LayerRoot { .. }` is `LayerRoot::new(..)`,
 //! `surfaceEnvironment(surface)` is `.surface_environment(surface)`,
 //! `.reducedMotion()` is `.reduced_motion(true)`, and
@@ -107,9 +92,7 @@ impl View for Harness {
                     )
                     .frame_height(220.0),
                 ),
-                AnyView::new(Button::new(Text::new("Clear"), move || {
-                    *clears.borrow_mut() += 1
-                })),
+                AnyView::new(Button::title("Clear", move || *clears.borrow_mut() += 1)),
                 AnyView::new(Text::new("Background content").frame_height(900.0)),
             ])),
         );
@@ -142,7 +125,7 @@ fn option(scene: &InteractiveScene) -> Option<Node> {
 }
 
 #[test]
-fn presentation_binding_does_not_reopen() {
+fn presentation_binding_opens_closes_and_reopens() {
     InteractiveScene::run(390.0, 820.0, |scene| {
         let presented = State::new(false);
         scene.install(AnyView::new(LayerRoot::new(AnyView::new(harness(
@@ -153,11 +136,20 @@ fn presentation_binding_does_not_reopen() {
 
         presented.set(true);
         scene.settle(6, 1.0);
-        // GAP: Swift presents the menu on this write.
         assert!(
-            option(scene).is_none(),
-            "GAP: writing the presentation binding after mount does not open the popover \
-             (Swift: it opens)"
+            option(scene).is_some(),
+            "writing the binding presents the menu"
+        );
+        presented.set(false);
+        scene.settle(6, 1.0);
+        assert!(option(scene).is_none(), "closing removes the menu");
+        presented.set(true);
+        scene.settle(6, 1.0);
+        assert!(option(scene).is_some(), "the menu can reopen");
+        assert_eq!(
+            scene.portal.entries().len(),
+            1,
+            "reopening does not duplicate the portal"
         );
     });
 }
@@ -206,50 +198,19 @@ fn next_touch_is_intact_after_choosing() {
             1,
             "selecting the option runs its action once"
         );
-        // GAP: Swift asserts the popover closes here and the menu leaves the
-        // tree. `close.set(false)` runs, but the `Binding`-driven popover never
-        // observes it, so the menu stays mounted.
         assert!(
             !presented.get(),
-            "the selection action writes `presented = false`"
+            "selection clears the presentation binding"
         );
-        assert!(
-            option(scene).is_some(),
-            "GAP: the popover stays presented after the binding is written \
-             (Swift: it closes)"
-        );
-
-        // GAP: Swift's harness labels the button `.accessibilityLabel("Clear")`,
-        // so the button node itself carries the name. In Rust `ButtonHost` takes
-        // its name only from `ActionControlAccessibility::label` (or the tooltip
-        // for icon-only buttons); the text lives on a `StaticText` child instead,
-        // so the button's own name is empty. Located by role here.
+        assert!(option(scene).is_none(), "the selected menu leaves the tree");
         let clear = scene
-            .first(|node| {
-                node.accessibility().is_some_and(|semantics| {
-                    semantics.role == AccessibilityRole::Button && semantics.label.is_empty()
-                })
-            })
-            .expect("a background button mounts");
-        assert!(
-            scene
-                .first(|node| {
-                    node.accessibility().is_some_and(|semantics| {
-                        semantics.role == AccessibilityRole::Button && semantics.label == "Clear"
-                    })
-                })
-                .is_none(),
-            "GAP: the button node carries no accessible name (Swift: \"Clear\")"
-        );
+            .labelled("Clear", Some(AccessibilityRole::Button))
+            .expect("named background button");
         scene.click(&clear, 1);
-        // GAP: Swift asserts the next touch click still reaches background
-        // content. The popover never closed, so its overlay still covers the
-        // background and swallows the click.
         assert_eq!(
             *clears.borrow(),
-            0,
-            "GAP: the still-present popover overlay intercepts the background click \
-             (Swift: the click lands)"
+            1,
+            "the next touch reaches the background control"
         );
 
         let dispatcher = scene.dispatcher();

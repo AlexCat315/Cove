@@ -1,6 +1,6 @@
 # Rust 迁移验证
 
-日期：2026-11-01。版本：`0.3.0-dev`（未发布）。
+日期：2026-11-02。版本：`0.3.0-dev`（未发布）。
 
 第三批分组文档的 65 个目标已存在；另补入未登记的 `DesignSystemTests.swift` 对应套件。冻结清单保留 914 个生产源文件、411 个测试及辅助文件、23 个 SwiftPM 清单的原路径、行数、SHA-256 与目标。源文件删除后不再按名称猜测或删除历史行。
 
@@ -44,10 +44,13 @@
 焦点作用域释放与摘要更新断言通过，无需修改生产焦点资源。真实 Gallery 路径另验证回车选中第 9 项、
 移除对话框、释放作用域并恢复开启按钮焦点；`drawer_tests` 三项全部通过。其他 `GAP` 与 `Workspace` 缺少故事仍保留。
 
-本次复查 `cargo check --workspace` 通过。额外运行的
-`cargo test -p cove-ui-compose --test navigation_drawer_tests keyboard_and_selection`
-在旧 GAP 断言处失败：测试仍要求 Space 按下时不打开抽屉，但当前实现已打开；该断言在关闭与焦点恢复检查
-之前失败，与本次 Gallery 测试包装修复无关，不能据此宣称组件套件全绿。
+组件测试的旧 GAP 断言已清理（2026-11-02）：`navigation_drawer_tests::keyboard_and_selection`
+验证 Space、Return 与小键盘 Enter 在按下时开启，释放不重复激活，并继续验证关闭、作用域释放与焦点恢复；
+该目标 8 项通过。此前“Space 按下不打开”的失败属于测试预期过时，现已删除该限制记录。
+
+本批还核查组件与 Gallery 的其余测试，更新过时预期并修正夹具的状态订阅、窗口宽度、语言和滚动事件会话。
+菜单窗口尺寸修饰器覆盖 ScrollView 布局回调的问题已修复，`menu_hierarchy_tests` 12 项通过。
+工作区完整复测结果以本批最终验证记录为准；仍有准确记录的行为差异不能计作已修复。
 
 本批更正的三处过时断言：`inspection_tests` 的百分比内边距（实际按包含块计算，即 CSS 语义，断言仍按自身宽度）、
 `advanced_interaction_tests` 的虚拟栈 `scrollToIndex`（目标行其实已经挂载）、`drawer_tests` 的方向键焦点推进

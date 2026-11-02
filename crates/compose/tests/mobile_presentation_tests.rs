@@ -48,8 +48,6 @@
 //! - **The popover has no keyboard avoidance.** `Popover` clamps to the window
 //!   but does not shorten against `surface.keyboard`, so the commit button stays
 //!   below the keyboard's top edge.
-//! - **Late portal content never materialises.** The touch hover card registers
-//!   its portal entry on tap, but its Follow button never mounts.
 //! - **More opens nothing.** `MobileTabBar`'s More trigger presents no overflow
 //!   portal, so promoting Page 7 is unreachable; the bar keeps four tabs.
 //! - **Touch menu never presents.** Tapping the Commands `MenuButton` opens no
@@ -57,10 +55,7 @@
 //!   unreachable.
 //! - **Sectioned rows ignore taps and clicks.** Entry 2 is neither activated
 //!   nor selected by a touch tap and Entry 1 is not selected by a pointer click;
-//!   the header text sits at x=16 while the row labels sit at x=0.
-//! - **List row metrics.** Touch rows are 44pt (Swift 56pt) and stay 44pt at
-//!   200 % (Swift 112pt); scaled pointer rows are 30pt (Swift 60pt); a long title
-//!   overflows the 240pt proposal and is measured untruncated (Swift ellipsizes).
+//!   section headers and row labels now share the 16pt leading inset.
 //! - Rust buttons do not copy their title onto their own semantics, so the
 //!   Commands/Details triggers are found by `AccessibilityTree::resolved_label`.
 //! - The Swift fixture's leading icon uses `UIIcons.File.file`; the Rust suite
@@ -76,7 +71,7 @@ use cove_core::{
 };
 use cove_platform::{InputEvent, KeyModifiers, MouseButton, MouseButtonEvent, MouseMotionEvent};
 use cove_ui_compose::modifiers::interaction::AccessibilityExt;
-use cove_ui_compose::modifiers::layout::FlexExt;
+use cove_ui_compose::modifiers::layout::{FlexExt, LayoutFrameExt};
 use cove_ui_compose::primitives::controls::button::Button;
 use cove_ui_compose::primitives::controls::menu_button::MenuButton;
 use cove_ui_compose::primitives::data::lists::table::{Table, TableColumn};
@@ -450,7 +445,9 @@ impl View for Fixture {
             AnyView::new(content),
         )
         .flex_with(1.0, 1.0, Some(0.0));
-        let root = SurfaceRoot::new(self.surface.get(), SafeArea::all(column));
+        let surface = self.surface.get();
+        let root = SurfaceRoot::new(surface.clone(), SafeArea::all(column))
+            .frame_size(surface.viewport.width, surface.viewport.height);
         AnyView::new(
             AnyView::new(LayerRoot::new(AnyView::new(root))).control_size(self.control_size.get()),
         )
@@ -775,9 +772,9 @@ fn overflow_stays_reachable_through_more_and_promotes_the_selected_destination()
         scene.click(&more, 1);
         let page = scene
             .first(|node| {
-                node.accessibility().is_some_and(|semantics| {
-                    semantics.role == AccessibilityRole::Button
-                }) && cove_core::scene::AccessibilityTree::resolved_label(node) == "Page 7"
+                node.accessibility()
+                    .is_some_and(|semantics| semantics.role == AccessibilityRole::Button)
+                    && cove_core::scene::AccessibilityTree::resolved_label(node) == "Page 7"
             })
             .expect("More presents the overflow menu");
         scene.click(&page, 1);
@@ -789,10 +786,16 @@ fn overflow_stays_reachable_through_more_and_promotes_the_selected_destination()
         assert_eq!(tabs.len(), 4, "the bar keeps four visible destinations");
         let active = tabs
             .iter()
-            .find(|node| node.accessibility().is_some_and(|semantics| semantics.state.is_selected))
+            .find(|node| {
+                node.accessibility()
+                    .is_some_and(|semantics| semantics.state.is_selected)
+            })
             .expect("the promoted destination is selected in the bar");
         let frame = active.absolute_frame();
-        assert!(frame.x >= 0.0 && frame.max_x() <= 390.0, "it stays on screen: {frame:?}");
+        assert!(
+            frame.x >= 0.0 && frame.max_x() <= 390.0,
+            "it stays on screen: {frame:?}"
+        );
     });
 }
 
@@ -878,8 +881,8 @@ fn touch_lists_truncate_in_their_proposal_and_scale_two_line_rows_with_the_syste
         });
         assert!(!rows.is_empty(), "the list mounts rows");
         assert!(
-            rows.iter().all(|row| row.absolute_frame().height == 44.0),
-            "GAP: Swift's touch list rows are 56pt; the Rust touch rows are 44pt: {:?}",
+            rows.iter().all(|row| row.absolute_frame().height == 56.0),
+            "touch list rows keep a 56pt target: {:?}",
             rows.iter()
                 .map(|row| row.absolute_frame().height)
                 .collect::<Vec<_>>()
@@ -888,9 +891,8 @@ fn touch_lists_truncate_in_their_proposal_and_scale_two_line_rows_with_the_syste
             .first(|node| text_of(node).is_some_and(|text| text.starts_with("Long title 0")))
             .expect("the first row title is shaped");
         assert!(
-            title.absolute_frame().max_x() > 240.0,
-            "GAP: Swift truncates the title inside the 240pt proposal; the Rust title \
-             overflows to {}",
+            title.absolute_frame().max_x() <= 240.0,
+            "the title fits inside its 240pt proposal, max x {}",
             title.absolute_frame().max_x()
         );
         let measured_text = title
@@ -899,9 +901,8 @@ fn touch_lists_truncate_in_their_proposal_and_scale_two_line_rows_with_the_syste
             .map(|entry| entry.key.text)
             .expect("the title records a text measure");
         assert!(
-            !measured_text.ends_with('…'),
-            "GAP: Swift's measured title truncates with an ellipsis; Rust measures the full \
-             text: {measured_text:?}"
+            measured_text.ends_with('…'),
+            "a bounded title records the fitted ellipsis: {measured_text:?}"
         );
 
         surface.set(with_scale(fixture.surface.get(), 2.0));
@@ -911,9 +912,8 @@ fn touch_lists_truncate_in_their_proposal_and_scale_two_line_rows_with_the_syste
                 .is_some_and(|semantics| semantics.role == AccessibilityRole::ListItem)
         });
         assert!(
-            large.iter().all(|row| row.absolute_frame().height == 44.0),
-            "GAP: Swift's two-line touch rows double to 112pt at 200 percent; the Rust rows \
-             stay 44pt: {:?}",
+            large.iter().all(|row| row.absolute_frame().height == 112.0),
+            "two-line rows scale to 112pt at 200 percent: {:?}",
             large
                 .iter()
                 .map(|row| row.absolute_frame().height)
@@ -935,9 +935,8 @@ fn touch_lists_truncate_in_their_proposal_and_scale_two_line_rows_with_the_syste
         assert!(
             pointer_rows
                 .iter()
-                .all(|row| row.absolute_frame().height == 30.0),
-            "GAP: Swift's scaled pointer rows use the 60pt desktop height; the Rust pointer \
-             rows are 30pt: {:?}",
+                .all(|row| row.absolute_frame().height == 60.0),
+            "scaled pointer rows use the 60pt desktop height: {:?}",
             pointer_rows
                 .iter()
                 .map(|row| row.absolute_frame().height)
@@ -1032,10 +1031,16 @@ fn touch_menus_drill_into_branches_in_one_modal_and_dismiss_after_activation() {
             );
         }
         scene.click(&labelled("More").expect("More"), 1);
-        assert!(scene.named("touch-menu-back").is_some(), "More drills in place");
+        assert!(
+            scene.named("touch-menu-back").is_some(),
+            "More drills in place"
+        );
         scene.click(&labelled("Export").expect("Export"), 1);
         assert_eq!(calls.get(), 10, "Export runs");
-        assert!(scene.named("touch-overlay-sheet").is_none(), "activation dismisses the sheet");
+        assert!(
+            scene.named("touch-overlay-sheet").is_none(),
+            "activation dismisses the sheet"
+        );
         assert_eq!(
             scene.focus.focused().map(|node| node.id()),
             Some(trigger.id()),
@@ -1258,15 +1263,11 @@ fn a_tap_opens_hover_card_detail_as_a_sheet_when_the_surface_cannot_hover() {
             !scene.portal.entries().is_empty(),
             "the tap presents the hover card detail"
         );
-        assert!(
-            scene
-                .labelled("Follow", Some(AccessibilityRole::Button))
-                .is_none(),
-            "GAP: Swift mounts the detail sheet's Follow button; the Rust portal entry is \
-             registered but its content never materialises (PortalHostPrimitive reads a \
-             plain revision Cell), so Follow cannot be tapped"
-        );
-        assert_eq!(calls.get(), 0, "nothing runs without the detail content");
+        let follow = scene
+            .labelled("Follow", Some(AccessibilityRole::Button))
+            .expect("the detail action materialises");
+        scene.click(&follow, 1);
+        assert_eq!(calls.get(), 1, "the sheet action runs once");
     });
 }
 
@@ -1368,17 +1369,15 @@ fn a_tap_opens_a_touch_section_row_and_its_label_lines_up_with_the_rows_pointer_
         let row = find_text(scene, "Entry 0");
         assert_eq!(
             (header.absolute_frame().x, row.absolute_frame().x),
-            (16.0, 0.0),
-            "GAP: Swift lines the section header up with its rows' labels; the Rust header \
-             text sits at x=16 while the row label sits at x=0"
+            (16.0, 16.0),
+            "section headers and row labels share the leading inset"
         );
         let entry_two = find_text(scene, "Entry 2");
         scene.click(&entry_two, 1);
         assert_eq!(
             (activated.get(), selected_row.get()),
-            (None, None),
-            "GAP: Swift's touch tap on Entry 2 activates and selects it; the Rust sectioned \
-             list row neither activates nor selects on a tap"
+            (Some(2), Some(2)),
+            "a touch tap selects and activates Entry 2"
         );
 
         activated.set(None);
@@ -1393,8 +1392,8 @@ fn a_tap_opens_a_touch_section_row_and_its_label_lines_up_with_the_rows_pointer_
         );
         assert_eq!(
             selected_row.get(),
-            None,
-            "GAP: Swift's pointer click selects Entry 1; the Rust row does not select"
+            Some(1),
+            "a pointer click selects Entry 1"
         );
     });
 }

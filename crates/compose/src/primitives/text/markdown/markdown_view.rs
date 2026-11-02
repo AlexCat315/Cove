@@ -210,7 +210,10 @@ impl PrimitiveView for MarkdownHeading {
         let level = self.level;
         let mut column: Vec<AnyView> = vec![AnyView::new(
             crate::primitives::text::rich::RichText::new(self.runs.clone())
-                .role(crate::primitives::text::rich::RichTextRole::Heading(level)),
+                .role(crate::primitives::text::rich::RichTextRole::Heading(level))
+                .semantic_font(crate::theme::SemanticFontRef::new(move |theme| {
+                    heading_token(level, theme)
+                })),
         )];
         // The two top levels rule off their section, as in most readers.
         if self.level <= 2 {

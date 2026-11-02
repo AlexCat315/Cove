@@ -37,18 +37,6 @@
 //! before building rows. With `textScaler(2)` Swift therefore gets 60pt rows and
 //! a 32pt indent; Rust keeps the unscaled 30pt row and 16pt indent.
 //!
-//! GAP 2: scrolled row content publishes a collapsed absolute Y.
-//! `Node::absolute_transform` walks ancestors and subtracts each one's
-//! `content_offset`, but the layout pass already writes each node's frame at
-//! absolute coordinates (see the comment on
-//! `ViewGraph::write_layout_back_at`). Inside the tree's `ScrollView` the two
-//! corrections compose, so the first row's content lands on `y = 5` and every
-//! later row's content lands on that same `y` instead of 35 and 65. Row *host*
-//! nodes stack correctly (0/30/60); only their measured descendants collapse.
-//! The Swift suite reads `tree-text-N` from `layoutSnapshot()`, which in Rust
-//! reports the same collapsed values. Both gaps are asserted at their current
-//! values below, with the Swift expectation named.
-
 use cove_composition::Scope;
 mod support;
 
@@ -285,15 +273,12 @@ fn the_accordion_keeps_scaled_titles_and_roving_focus_semantics() {
                 "moving focus does not change the expansion"
             );
 
-            // GAP: Rust `Button` activates on key-up, Swift on key-down. A bare
-            // Return key-down only marks the press, so the section does not
-            // expand yet; the key-up that follows performs the activation.
             key(&dispatcher, Scancode::RETURN);
             settle(&graph, WIDTH, HEIGHT);
             assert_eq!(
                 scene.expanded.get(),
-                BTreeSet::from(["first"]),
-                "Rust waits for the key-up before activating; Swift activates on key-down"
+                BTreeSet::from(["second"]),
+                "Return key-down expands the focused section"
             );
             dispatcher.dispatch(&InputEvent::KeyUp(KeyEvent {
                 scancode: Scancode::RETURN,
@@ -307,7 +292,7 @@ fn the_accordion_keeps_scaled_titles_and_roving_focus_semantics() {
             assert_eq!(
                 scene.expanded.get(),
                 BTreeSet::from(["second"]),
-                "Return expands the focused section and collapses the previous one"
+                "Return key-up does not change the expanded section again"
             );
             assert_eq!(
                 first
@@ -569,12 +554,10 @@ fn tree_rows_share_the_scaled_geometry() {
                 root_text.height, 40.0,
                 "the row text itself is scaled to a 40pt line"
             );
-            // GAP 2: the scroll offset is applied twice, so every row's content
-            // collapses onto the first row's absolute Y.
             assert_eq!(
                 child_text.y - root_text.y,
-                0.0,
-                "row content collapses onto one Y; Swift puts the child 60pt lower"
+                rows[0].frame().height,
+                "child text advances by one row in window coordinates"
             );
             assert_eq!(
                 child_text.x - root_text.x,

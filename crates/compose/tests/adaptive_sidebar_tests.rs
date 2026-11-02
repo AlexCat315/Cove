@@ -19,61 +19,9 @@
 //!   scope and pointer capture
 //! - AI discovery sees only available navigation and excludes the blocked page
 //!
-//! The Rust `AdaptiveSidebar` shell resolves `SidebarGeometry` but never applies
-//! `docked_width`, `panel_width` or `resize_handle_width` to any layout node, so
-//! the shell stacks content-then-navigation in one column. Every geometry
-//! assertion below therefore pins the measured Rust frame instead of the Swift
-//! arithmetic; the behavioural assertions (identity retention, roles, modal
-//! scope, keyboard selection, policy validation, capture) are ported verbatim.
-//!
-//! Named differences from the Swift suite:
-//! - Swift located nodes by debug names the sidebar published
-//!   (`sidebar-item-29`). The Rust `Sidebar` publishes none, so rows are found by
-//!   accessible label; the shell's own content views keep their debug names.
-//! - `AdaptiveSidebar` has no `header`/`footer` builder (the fields are private
-//!   and default to `EmptyView`), so the Swift `adaptive-header` slot cannot
-//!   mount; `retention` pins that no header node exists.
-//! - Compact widths mount no `Open navigation` trigger at all (the shell only
-//!   mounts the trigger inside the rail header), so `focus_and_input`,
-//!   `toggle_presentation` and `opener_restoration` pin the missing opener and
-//!   drive presentation through the caller's binding; the rail opener that does
-//!   mount is only 32pt tall for pointer input at 100% text (touch and 200%
-//!   text reach 44pt), and the toggle case runs at the 720pt rail instead.
-//! - Swift drove drawer policy (`closesOnSelection`, `closesOnBackdrop`,
-//!   `closesOnEscape`) and edge swipe through a `configure` closure. The Rust
-//!   `AdaptiveSidebarOptions` has no drawer policy fields, `allows_edge_swipe`
-//!   and `EDGE_SWIPE_WIDTH` are never read, and dismissal is hard-wired to
-//!   `ModalDismissal::default()`; `edge_swipe` and `dismissal_policies` pin that.
-//! - The modal backdrop is laid out with zero height and the navigation renders
-//!   below the viewport, so a pointer press outside the drawer never reaches it;
-//!   `dismissal_policies` pins the measured behaviour.
-//! - Swift's harness opened the drawer without a binding (`localPresentation`).
-//!   The Rust shell keeps `local_presentation` in a `State` that is not declared
-//!   as a dynamic property, so a host recomposition resets it;
-//!   `local_session_and_policy_validation` pins both that reset and the fact the
-//!   retained local session survives a plain layout-only resize.
-//! - Motion: only the backdrop is wrapped in `AnimatedVisibility`; the drawer
-//!   itself has no slide transition, so `animation_and_lifecycle` pins the static
-//!   panel frames instead of the Swift off-screen/reversal frames.
-//! - Node identity: Swift keeps one navigation tree, so rows and the collapse
-//!   toggle keep their node across breakpoints and open/close; Rust remounts
-//!   them on every presentation change (focus follows the row into the rail).
-//! - Modal scope: the presented Rust drawer installs no modal scope, so page
-//!   input is not blocked and `input_enabled_only` discovery still sees it.
-//! - Focus restoration: after Escape, the collapse toggle or a breakpoint
-//!   change Swift returns focus to the opener / selected destination; Rust
-//!   leaves nothing focused, and a docked local session focuses the
-//!   `Collapse sidebar` toggle instead of the row.
-//! - Return: Swift activates on key-down; Rust buttons activate on key-up.
-//! - Collapse toggle: Swift reports `isExpanded == true` and portals the toggle
-//!   to the opener position; Rust publishes no expanded state and never portals.
-//! - Pointer capture survives a breakpoint change under a pressed row in Rust;
-//!   Swift releases it.
-//! - The Rust `Sidebar` leaves its first `ScrollView` mounted as a zero-height
-//!   orphan after the first recomposition; `live_nodes` skips it.
-//! - The AI-toolbox cases run `query_ui_nodes` through the agent toolbox, which
-//!   lives in crates `cove-ui-compose` does not depend on; the same queries run
-//!   over the node tree in `query()` below.
+//! Rows retain identity between docked and rail layouts. Crossing the compact
+//! visibility boundary still remounts navigation; content state must survive.
+//! Discovery uses the same modal input predicate as event dispatch.
 
 use cove_composition::Scope;
 mod support;
@@ -268,6 +216,7 @@ impl View for Harness {
             sections(),
         )
         .options(options)
+        .header(Text::new("Workspace header").debug_name("adaptive-header"))
         .content(self.content.clone());
         let sidebar = if self.local_presentation {
             sidebar
@@ -443,6 +392,7 @@ fn query(scene: &InteractiveScene, text: &str, role: Option<AccessibilityRole>) 
                 && role.is_none_or(|role| semantics.role == role)
         }) && node.is_layout_visible()
             && node.accepts_subtree_input()
+            && scene.focus.permits_input(node)
     })
 }
 
@@ -542,7 +492,6 @@ fn allocated_breakpoints_dialog_geometry_and_targets() {
     InteractiveScene::run(1280.0, 640.0, |scene| {
         let harness = Harness::new(false);
         scene.install(harness.clone());
-        let original = id(&row(scene, 29));
         for scale in [1.0_f32, 2.0] {
             for input in [
                 InputCapabilities::POINTER | InputCapabilities::KEYBOARD,
@@ -557,112 +506,94 @@ fn allocated_breakpoints_dialog_geometry_and_targets() {
                         harness.present(scene, width, false);
                         let case =
                             format!("scale {scale} input {input:?} dark {dark} width {width}");
+                        let docked = if width < 600.0 {
+                            0.0
+                        } else if width < 1000.0 {
+                            72.0
+                        } else {
+                            240.0
+                        };
                         let main = live_named(scene, "adaptive-content").expect("content");
-                        let row_node = row(scene, 29);
-                        assert_ne!(
-                            id(&row_node),
-                            original,
-                            "GAP: Swift keeps the same `sidebar-item-29` node across breakpoints, text scale, theme and input; the Rust shell remounts the navigation on every presentation change ({case})"
-                        );
                         assert_eq!(
                             main.frame().width,
-                            width,
-                            "GAP: Swift docks the navigation and shrinks the page to width-72 / width-240; the Rust shell never applies `docked_width`, so the page keeps the whole allocation ({case})"
+                            width - docked,
+                            "content fits beside navigation ({case})"
                         );
                         assert!(
                             main.frame().height > 400.0 && main.absolute_frame().max_x() <= width,
-                            "the page stays inside the allocation ({case})"
-                        );
-                        assert!(
-                            row_node.accepts_subtree_input(),
-                            "GAP: Swift takes the compact rows out of the interaction graph (`acceptsSubtreeInput == width >= 600`); the Rust shell keeps the undocked navigation mounted and input-accepting at every width ({case})"
+                            "content stays in bounds ({case})"
                         );
                         if width < 1000.0 {
-                            let trigger = toggle_button(scene, "Open navigation");
+                            let trigger = toggle_button(scene, "Open navigation")
+                                .expect("compact and rail opener");
+                            let frame = trigger.absolute_frame();
+                            let minimum =
+                                if input.contains(InputCapabilities::TOUCH) || scale >= 2.0 {
+                                    44.0
+                                } else {
+                                    32.0
+                                };
+                            assert!(
+                                frame.width >= 44.0 && frame.height >= minimum,
+                                "opener meets its input target ({case}): {frame:?}"
+                            );
                             if width < 600.0 {
                                 assert!(
-                                    trigger.is_none(),
-                                    "GAP: Swift mounts a 44pt `Open navigation` opener in the compact breakpoint; the Rust shell only mounts the trigger inside the rail header, so compact widths have none ({case})"
+                                    query(scene, "Destination 29", Some(AccessibilityRole::Button))
+                                        .is_empty(),
+                                    "closed compact navigation is unavailable ({case})"
                                 );
-                                harness.open.set(true);
-                                scene.settle(10, 1.0);
-                            } else {
-                                let trigger = trigger.expect("the rail mounts an opener");
-                                let frame = trigger.absolute_frame();
-                                if input.contains(InputCapabilities::TOUCH) || scale >= 2.0 {
-                                    assert!(
-                                        frame.width >= 44.0 && frame.height >= 44.0,
-                                        "a touch or 200% opener keeps a 44pt target, saw {frame:?} ({case})"
-                                    );
-                                } else {
-                                    assert!(
-                                        frame.width >= 44.0 && frame.height < 44.0,
-                                        "GAP: Swift demands a 44pt opener target for every input; the Rust pointer-only rail toggle at 100% text measures {} x {} ({case})",
-                                        frame.width,
-                                        frame.height
-                                    );
-                                }
-                                activate(&trigger);
-                                scene.settle(10, 1.0);
                             }
+                            activate(&trigger);
+                            scene.settle(10, 1.0);
                             let panel = navigation(scene);
-                            assert_eq!(
-                                role_of(&panel),
-                                AccessibilityRole::Dialog,
-                                "presented navigation is a dialog ({case})"
-                            );
+                            assert_eq!(role_of(&panel), AccessibilityRole::Dialog);
                             assert_eq!(
                                 panel.frame().width,
-                                width,
-                                "GAP: Swift clamps the drawer to min(320, width-56); the Rust shell never applies `panel_width`, so the drawer spans the allocation ({case})"
+                                (width - 56.0).min(320.0),
+                                "drawer width ({case})"
                             );
-                            assert_ne!(
+                            assert_eq!(
                                 panel.frame().height,
                                 640.0,
-                                "GAP: Swift sizes the drawer to the scene height (640); the Rust drawer takes the intrinsic navigation height ({case})"
+                                "drawer fills the height ({case})"
                             );
                             assert_eq!(
                                 live_named(scene, "adaptive-content")
                                     .expect("content")
                                     .frame()
                                     .width,
-                                width,
-                                "GAP: an open drawer leaves the page at its full width in Rust, while Swift shrinks it to width-72 ({case})"
+                                width - docked
                             );
                             assert!(
                                 row(scene, 29).frame().height >= 44.0,
-                                "rows keep a 44pt height in the drawer ({case})"
+                                "drawer row target ({case})"
                             );
                             assert_eq!(
                                 query(scene, "Destination 29", Some(AccessibilityRole::Button))
                                     .len(),
-                                1,
-                                "discovery sees exactly one available destination ({case})"
+                                1
                             );
-                            assert_eq!(
-                                query(scene, "Background", Some(AccessibilityRole::Button)).len(),
-                                1,
-                                "GAP: Swift's modal scope hides the blocked page from `inputEnabledOnly` discovery; Rust blocks nothing, so the background button stays queryable ({case})"
+                            assert!(
+                                query(scene, "Background", Some(AccessibilityRole::Button))
+                                    .is_empty(),
+                                "modal blocks background discovery ({case})"
                             );
+                            assert!(scene.focus.has_modal_scope());
                         } else {
-                            assert_eq!(
-                                role_of(&navigation(scene)),
-                                AccessibilityRole::Group,
-                                "docked navigation is a group ({case})"
-                            );
+                            assert_eq!(role_of(&navigation(scene)), AccessibilityRole::Group);
                             assert!(
                                 row(scene, 29).frame().height
                                     >= if input.contains(InputCapabilities::TOUCH) {
                                         44.0
                                     } else {
                                         38.0
-                                    },
-                                "rows keep the touch floor for touch and the compact height otherwise ({case})"
+                                    }
                             );
                         }
                         assert!(
                             !scene.graph.recomposer.has_pending(),
-                            "the shell settles without pending work ({case})"
+                            "shell settles ({case})"
                         );
                     }
                 }
@@ -680,12 +611,8 @@ fn retention_survives_open_close_and_every_presentation() {
         let field = draft_field(scene);
         let scroll = live_named(scene, "adaptive-scroll").expect("scroll keeps its name");
         assert!(
-            toggle(scene, "Header 0").is_none(),
-            "GAP: Swift mounts an `adaptive-header` slot through the shell's `header:` builder; `AdaptiveSidebar` has no public header builder, so no header node exists"
-        );
-        assert!(
-            live_named(scene, "adaptive-header").is_none(),
-            "GAP: the `adaptive-header` debug name cannot mount without a header builder"
+            live_named(scene, "adaptive-header").is_some(),
+            "the public header builder mounts content"
         );
         scene.focus.focus(Some(&field), false);
         scene
@@ -709,11 +636,13 @@ fn retention_survives_open_close_and_every_presentation() {
         ] {
             harness.present(scene, width, open);
             let case = format!("width {width} open {open}");
-            assert_ne!(
-                id(&row_node),
-                id(&row(scene, 29)),
-                "GAP: Swift retains the row node across open, close and every presentation; the Rust shell remounts the navigation ({case})"
-            );
+            if width == 720.0 && !open {
+                assert_eq!(
+                    id(&row_node),
+                    id(&row(scene, 29)),
+                    "docked and rail rows retain identity ({case})"
+                );
+            }
             assert_eq!(
                 id(&field),
                 id(&draft_field(scene)),
@@ -730,7 +659,7 @@ fn retention_survives_open_close_and_every_presentation() {
                     .content_offset()
                     .y,
                 180.0,
-                "GAP-or-retain: Swift keeps the scroll offset at 180 across every presentation ({case})"
+                "content retains its scroll offset ({case})"
             );
             assert_eq!(
                 harness.selected.get(),
@@ -768,24 +697,21 @@ fn focus_hands_off_at_breakpoints_and_escape_restores_the_opener() {
             Some(id(&rail_row)),
             "focus follows the row into the rail"
         );
-        assert_ne!(
+        assert_eq!(
             id(&rail_row),
             id(&row_node),
-            "GAP: Swift keeps the same row node in the rail; Rust remounts it and hands focus to the new node"
+            "the row is retained in the rail"
         );
         assert!(
             !scene.focus.is_focus_visible(),
             "a pointer scene keeps focus quiet across the breakpoint"
         );
         harness.set_width(scene, 390.0);
-        assert!(
-            toggle_button(scene, "Open navigation").is_none(),
-            "GAP: Swift hands focus from a row to the compact opener; the Rust shell mounts no compact opener"
-        );
+        let opener = toggle_button(scene, "Open navigation").expect("compact opener");
         assert_eq!(
-            scene.focus.focused().map(|node| label(&node)),
-            Some(String::new()),
-            "GAP: with no opener to land on, Rust leaves focus on an unlabelled node"
+            scene.focus.focused().map(|node| node.id()),
+            Some(opener.id()),
+            "focus moves to the compact opener"
         );
         assert!(!scene.focus.is_focus_visible(), "focus stays quiet");
 
@@ -793,8 +719,8 @@ fn focus_hands_off_at_breakpoints_and_escape_restores_the_opener() {
         scene.settle(10, 1.0);
         assert!(harness.open.get(), "the binding presents the drawer");
         assert!(
-            !scene.focus.has_modal_scope(),
-            "GAP: Swift's presented compact drawer owns a modal scope; the Rust drawer installs none"
+            scene.focus.has_modal_scope(),
+            "the compact drawer owns a modal scope"
         );
         let background = live_named(scene, "adaptive-background").expect("background");
         let frame = background.absolute_frame();
@@ -805,9 +731,11 @@ fn focus_hands_off_at_breakpoints_and_escape_restores_the_opener() {
         );
         assert_eq!(
             background.accessibility().expect("semantics").label,
-            "Background 1",
-            "GAP: Swift's modal scope blocks page input, so the background button stays at `Background 0`; Rust blocks nothing, so the press activates it"
+            "Background 0",
+            "the modal blocks background input"
         );
+        harness.open.set(true);
+        scene.settle(10, 1.0);
         scene.focus.focus(Some(&row(scene, 29)), true);
         scene.key(Scancode::HOME, KeyModifiers::default());
         scene.key(Scancode::ARROW_DOWN, KeyModifiers::default());
@@ -823,14 +751,16 @@ fn focus_hands_off_at_breakpoints_and_escape_restores_the_opener() {
             !harness.open.get() && !scene.focus.has_modal_scope(),
             "Escape dismisses the drawer"
         );
-        assert!(
-            scene.focus.focused().is_none(),
-            "GAP: Swift restores focus to the compact opener after Escape; Rust has no opener and leaves nothing focused"
+        assert_eq!(
+            scene.focus.focused().map(|node| node.id()),
+            Some(opener.id()),
+            "Escape restores the opener"
         );
         harness.set_width(scene, 1280.0);
-        assert!(
-            scene.focus.focused().is_none(),
-            "GAP: Swift hands focus to the selected destination (`sidebar-item-3`) once docked; Rust leaves nothing focused"
+        assert_eq!(
+            scene.focus.focused().map(|node| node.id()),
+            Some(row(scene, 3).id()),
+            "docking focuses the selected destination"
         );
         let selected = row(scene, 3);
         let frame = selected.absolute_frame();
@@ -845,116 +775,65 @@ fn focus_hands_off_at_breakpoints_and_escape_restores_the_opener() {
         );
         harness.set_width(scene, 390.0);
         assert!(
-            scene.capture.target().is_some(),
-            "GAP: Swift releases pointer capture when the breakpoint changes under a pressed row; Rust keeps the capture on the reused node"
+            scene.capture.target().is_none(),
+            "a breakpoint change releases pointer capture"
         );
     });
 }
 
 #[test]
-fn open_and_collapse_share_the_leading_toggle_position() {
-    InteractiveScene::run(1280.0, 640.0, |scene| {
+fn opening_and_closing_preserve_input_focus_visibility() {
+    InteractiveScene::run(390.0, 640.0, |scene| {
         let harness = Harness::new(false);
         scene.install(harness.clone());
-        harness.set_width(scene, 390.0);
-        assert!(
-            toggle_button(scene, "Open navigation").is_none(),
-            "GAP: Swift opens the compact drawer from the 44pt opener; the Rust shell mounts no compact opener, so this case runs at the 720pt rail"
-        );
-        harness.set_width(scene, 720.0);
-        let trigger = toggle_button(scene, "Open navigation").expect("the rail mounts an opener");
-        let origin = trigger.absolute_frame();
-        scene.click(&trigger, 1);
-        assert!(
-            harness.open.get() && !scene.focus.is_focus_visible(),
-            "a pointer press presents the drawer and keeps focus quiet"
-        );
-        tick(1.0);
-        scene.settle(10, 1.0);
-        let collapse = toggle_button(scene, "Collapse navigation")
-            .expect("the drawer mounts a collapse toggle");
-        assert!(
-            collapse
-                .first_resource::<cove_ui_compose::primitives::overlays::portal::PortalResource>()
-                .is_none(),
-            "the collapse toggle starts outside any portal entry"
-        );
-        assert_ne!(
-            collapse.absolute_frame(),
-            origin,
-            "GAP: Swift keeps the open and collapse affordances at one leading position; the Rust collapse toggle sits in the drawer header"
-        );
+        let opener = toggle_button(scene, "Open navigation").expect("compact opener");
+        scene.click(&opener, 1);
+        assert!(harness.open.get() && !scene.focus.is_focus_visible());
+        let collapse = toggle_button(scene, "Collapse navigation").expect("collapse");
         assert_eq!(
-            collapse
+            toggle(scene, "Collapse navigation")
+                .expect("toggle semantics")
                 .accessibility()
                 .expect("semantics")
                 .state
                 .is_expanded,
-            None,
-            "GAP: Swift's collapse toggle reports `isExpanded == true`; the Rust toggle publishes no expanded state"
+            Some(true)
         );
-        let backdrop = backdrop(scene).expect("the modal mounts a backdrop");
+        let scrim = backdrop(scene).expect("backdrop");
         assert_eq!(
-            backdrop.background_color(),
-            Some(theme_for_node(&backdrop).colors.overlay),
-            "the backdrop paints the theme overlay"
+            scrim.background_color(),
+            Some(theme_for_node(&scrim).colors.overlay)
         );
         scene.click(&collapse, 1);
-        assert!(
-            !harness.open.get() && !scene.focus.is_focus_visible(),
-            "the collapse toggle dismisses and focus stays quiet"
+        assert!(!harness.open.get() && !scene.focus.is_focus_visible());
+        assert_eq!(
+            scene.focus.focused().map(|node| node.id()),
+            Some(opener.id())
         );
-        assert!(
-            scene.focus.focused().is_none(),
-            "GAP: Swift returns focus to the opener after the collapse toggle; Rust leaves nothing focused"
-        );
-        let trigger = toggle_button(scene, "Open navigation").expect("the opener returns");
-        scene.focus.focus(Some(&trigger), true);
+        scene.focus.focus(Some(&opener), true);
         scene.key(Scancode::RETURN, KeyModifiers::default());
         assert!(
-            !harness.open.get(),
-            "GAP: Swift's opener presents on Return key-down; Rust buttons activate on key-up"
+            harness.open.get() && scene.focus.is_focus_visible(),
+            "Return key-down opens with visible focus"
         );
         scene
             .dispatcher()
             .dispatch(&InputEvent::KeyUp(cove_platform::KeyEvent {
                 scancode: Scancode::RETURN,
                 keycode: 0,
-                modifiers: KeyModifiers::default(),
+                modifiers: Default::default(),
                 is_repeat: false,
             }));
         scene.settle(5, 1.0);
         assert!(
-            harness.open.get() && scene.focus.is_focus_visible(),
-            "the keyboard opens the drawer and keeps focus visible"
-        );
-        let focused = scene.focus.focused().expect("the drawer takes focus");
-        assert_eq!(
-            label(&focused),
-            "Collapse navigation",
-            "focus lands on the collapse toggle"
-        );
-        assert_ne!(
-            id(&focused),
-            id(&collapse),
-            "GAP: Swift reuses the same collapse toggle node; Rust remounts it on every presentation"
-        );
-        tick(1.0);
-        scene.settle(10, 1.0);
-        assert!(
-            focused
-                .first_resource::<cove_ui_compose::primitives::overlays::portal::PortalResource>()
-                .is_none(),
-            "GAP: Swift moves the open toggle into a portal entry once the drawer settles; Rust never portals it"
+            harness.open.get(),
+            "key-up does not activate a second control"
         );
         scene.key(Scancode::ESCAPE, KeyModifiers::default());
-        assert!(
-            !harness.open.get() && scene.focus.is_focus_visible(),
-            "Escape closes the drawer while keyboard focus stays visible"
-        );
-        assert!(
-            scene.focus.focused().is_none(),
-            "GAP: Swift restores focus to the opener after Escape; Rust leaves nothing focused"
+        assert!(!harness.open.get() && scene.focus.is_focus_visible());
+        assert_eq!(
+            scene.focus.focused().map(|node| node.id()),
+            Some(opener.id())
         );
     });
 }
@@ -966,13 +845,6 @@ fn activation_restores_the_opener_after_modal_slots_change() {
         scene.install(harness.clone());
         for width in [390.0_f32, 720.0] {
             harness.present(scene, width, false);
-            if width < 600.0 {
-                assert!(
-                    toggle_button(scene, "Open navigation").is_none(),
-                    "GAP: Swift restores focus to the compact opener after every activation path; the Rust shell has no compact opener"
-                );
-                continue;
-            }
             for semantic in [false, true] {
                 let trigger =
                     toggle_button(scene, "Open navigation").expect("the rail mounts an opener");
@@ -988,8 +860,8 @@ fn activation_restores_the_opener_after_modal_slots_change() {
                     "activation presents the drawer (semantic {semantic})"
                 );
                 assert!(
-                    !scene.focus.has_modal_scope(),
-                    "GAP: Swift's presented rail drawer owns a modal scope; Rust installs none (semantic {semantic})"
+                    scene.focus.has_modal_scope(),
+                    "the drawer owns a modal scope (semantic {semantic})"
                 );
                 scene.key(Scancode::ESCAPE, KeyModifiers::default());
                 assert!(
@@ -997,8 +869,11 @@ fn activation_restores_the_opener_after_modal_slots_change() {
                     "Escape dismisses the drawer (semantic {semantic})"
                 );
                 assert!(
-                    scene.focus.focused().is_none(),
-                    "GAP: Swift restores focus to the opener after Escape; Rust leaves nothing focused (semantic {semantic})"
+                    scene.focus.focused().is_some_and(|node| node.id()
+                        == toggle_button(scene, "Open navigation")
+                            .expect("opener")
+                            .id()),
+                    "Escape restores the opener (semantic {semantic})"
                 );
             }
         }
@@ -1006,7 +881,7 @@ fn activation_restores_the_opener_after_modal_slots_change() {
 }
 
 #[test]
-fn edge_swipe_is_not_wired_to_the_shell() {
+fn edge_swipe_opens_only_in_the_enabled_touch_lane() {
     InteractiveScene::run(1280.0, 640.0, |scene| {
         let harness = Harness::new(false);
         scene.install(harness.clone());
@@ -1015,22 +890,16 @@ fn edge_swipe_is_not_wired_to_the_shell() {
         let background = live_named(scene, "adaptive-background").expect("background");
         let y = background.absolute_frame().y + background.absolute_frame().height / 2.0;
         swipe(scene, 10.0, y, 100.0, 0.0);
-        assert!(
-            !harness.open.get(),
-            "GAP: Swift opens the drawer on a rightward leading-edge swipe (`allowsEdgeSwipe`, `EDGE_SWIPE_WIDTH`); the Rust option is stored and never read, so no gesture opens it"
-        );
+        assert!(harness.open.get(), "a touch edge swipe opens the drawer");
         assert_eq!(
             background.accessibility().expect("semantics").label,
-            "Background 1",
-            "GAP: Swift cancels the underlying tap during an edge swipe; with no swipe recogniser the press falls through and activates the page button"
+            "Background 0",
+            "the edge swipe cancels the underlying tap"
         );
         harness.open.set(true);
         scene.settle(10, 1.0);
         swipe(scene, 200.0, y, -160.0, 0.0);
-        assert!(
-            harness.open.get(),
-            "GAP: a leftward swipe dismisses Swift's drawer; nothing consumes it in Rust"
-        );
+        assert!(!harness.open.get(), "a leftward swipe dismisses the drawer");
         harness.open.set(false);
         scene.settle(10, 1.0);
         swipe(scene, 50.0, y, 100.0, 0.0);
@@ -1058,14 +927,13 @@ fn local_session_and_policy_validation() {
         let harness = Harness::new(true);
         scene.install(harness.clone());
         harness.set_width(scene, 390.0);
-        assert!(
-            toggle_button(scene, "Open navigation").is_none(),
-            "GAP: Swift's `localPresentation` mode opens through the compact opener; with no binding and no compact opener the Rust shell cannot be opened at all in compact"
-        );
-        harness.set_width(scene, 720.0);
-        let trigger = toggle_button(scene, "Open navigation").expect("the rail opener");
+        let trigger = toggle_button(scene, "Open navigation").expect("compact local opener");
         activate(&trigger);
         scene.settle(10, 1.0);
+        assert!(
+            scene.focus.has_modal_scope(),
+            "the local presentation opens without an external binding"
+        );
         let row_node = row(scene, 29);
         scene.focus.focus(Some(&row_node), true);
         harness.set_width(scene, 1280.0);
@@ -1075,28 +943,28 @@ fn local_session_and_policy_validation() {
         );
         assert_eq!(
             scene.focus.focused().map(|node| label(&node)),
-            Some("Collapse sidebar".to_owned()),
-            "GAP: Swift keeps one navigation tree, so the focused row stays focused once docked; Rust hands focus to the docked `Collapse sidebar` toggle"
+            Some("Destination 29".to_owned()),
+            "the selected row keeps focus when docked"
         );
         harness.set_width(scene, 390.0);
         assert!(
-            !scene.focus.has_modal_scope(),
-            "GAP: Swift's retained local session re-opens the drawer at compact; the Rust `local_presentation` state is set by the trigger, so the drawer only returns when the shell recomposes from a live binding"
+            scene.focus.has_modal_scope(),
+            "the local session reopens at compact width"
         );
         harness.compact.set(800.0);
         harness.expanded_minimum.set(900.0);
         harness.set_width(scene, 720.0);
         assert_eq!(
             navigation(scene).frame().width,
-            720.0,
-            "GAP: Swift clamps the drawer to the policy panel width (320 at 720 with compact 800); the shell never applies `panel_width`"
+            320.0,
+            "the drawer follows the updated layout policy"
         );
         harness.rail_labels.set(false);
         harness.set_width(scene, 850.0);
         assert_eq!(
             role_of(&navigation(scene)),
-            AccessibilityRole::Group,
-            "GAP: Swift's retained local session keeps medium navigation a drawer (`dialog`); the Rust local presentation is not retained, so the rail is a docked `group`"
+            AccessibilityRole::Dialog,
+            "the local presentation survives a parent recomposition"
         );
         let mut policy = SidebarLayoutPolicy::default();
         policy.compact_maximum_width = f32::NAN;
@@ -1116,51 +984,30 @@ fn local_session_and_policy_validation() {
 }
 
 #[test]
-fn dismissal_policies_are_hard_wired() {
-    InteractiveScene::run(1280.0, 640.0, |scene| {
+fn default_dismissal_policies_close_and_release_the_modal() {
+    InteractiveScene::run(390.0, 640.0, |scene| {
         let harness = Harness::new(false);
         scene.install(harness.clone());
-        harness.present(scene, 390.0, true);
-        assert!(harness.open.get(), "the caller presents the drawer");
-        press(scene, 370.0, 200.0);
-        assert!(
-            harness.open.get(),
-            "GAP: Swift dismisses on a backdrop press, or ignores it when `closesOnBackdrop` is false; the Rust option set has no drawer policy and the backdrop has zero height, so the press lands on the page and changes nothing"
-        );
-        scene.key(Scancode::ESCAPE, KeyModifiers::default());
-        assert!(
-            !harness.open.get(),
-            "GAP: Swift keeps the drawer open when `closesOnEscape` is false; `AdaptiveSidebarOptions` exposes no escape policy and `ModalDismissal::default()` always closes on Escape"
-        );
-        harness.present(scene, 390.0, true);
-        let row_node = row(scene, 29);
-        scene.focus.focus(Some(&row_node), true);
-        scene.key(Scancode::RETURN, KeyModifiers::default());
-        assert!(
-            harness.open.get(),
-            "Return key-down on a row leaves the drawer open, as Swift's `closesOnSelection == false` does"
-        );
-        scene.key(Scancode::RETURN, KeyModifiers::default());
-        assert!(
-            harness.open.get(),
-            "GAP: with `closesOnSelection` Swift's Return key-down activates the row and closes the drawer; Rust activates on key-up and has no selection policy"
-        );
-        harness.present(scene, 390.0, true);
-        activate(&row(scene, 29));
-        scene.settle(10, 1.0);
-        assert!(
-            !harness.open.get(),
-            "activating a destination always closes the modal drawer"
-        );
-        harness.present(scene, 390.0, true);
-        let backdrop = backdrop(scene).expect("the modal mounts a backdrop");
-        let frame = backdrop.frame();
-        press(scene, frame.x + 1.0, frame.y + 1.0);
-        assert!(
-            harness.open.get(),
-            "GAP: with `closesOnBackdrop` Swift taps the backdrop to dismiss; the Rust backdrop measures {:?}, so no press can dismiss through it",
-            frame
-        );
+        for path in 0..4 {
+            harness.present(scene, 390.0, true);
+            assert!(scene.focus.has_modal_scope());
+            match path {
+                0 => press(scene, 370.0, 200.0),
+                1 => scene.key(Scancode::ESCAPE, KeyModifiers::default()),
+                2 => {
+                    scene.focus.focus(Some(&row(scene, 29)), true);
+                    scene.key(Scancode::RETURN, KeyModifiers::default());
+                }
+                _ => {
+                    activate(&row(scene, 29));
+                    scene.settle(10, 1.0);
+                }
+            }
+            assert!(
+                !harness.open.get() && !scene.focus.has_modal_scope(),
+                "dismissal path {path} closes and releases the modal"
+            );
+        }
     });
 }
 
@@ -1188,11 +1035,12 @@ fn motion_and_lifecycle() {
             0.0,
             "the panel rests at the leading edge"
         );
+        let row_before_exit = row(scene, 29);
         harness.open.set(false);
         scene.settle(1, 0.0);
         assert!(
-            row(scene, 29).accepts_subtree_input(),
-            "GAP: Swift takes the rows out of the interaction graph the moment presentation drops; Rust keeps the undocked navigation input-accepting"
+            !panel.accepts_subtree_input(),
+            "a leaving panel stops accepting input immediately"
         );
         tick(0.05);
         scene.settle(10, 1.0);
@@ -1203,10 +1051,10 @@ fn motion_and_lifecycle() {
         );
         harness.open.set(true);
         scene.settle(10, 1.0);
-        assert_eq!(
+        assert_ne!(
             id(&row(scene, 29)),
-            id(&row(scene, 29)),
-            "the reversal retains the row"
+            id(&row_before_exit),
+            "reopening after the settled exit remounts the row"
         );
         harness.set_width(scene, 1280.0);
         assert_eq!(
@@ -1259,8 +1107,8 @@ fn ai_discovery_sees_available_navigation() {
         );
         assert_eq!(
             query(scene, "Background", Some(AccessibilityRole::Button)).len(),
-            1,
-            "GAP: Swift's `input_enabled_only` query hides the page blocked by the modal scope; Rust blocks nothing, so the background button stays discoverable"
+            0,
+            "the modal blocks background discovery"
         );
         for (text, role) in [
             ("Workspace", AccessibilityRole::Dialog),
@@ -1281,8 +1129,8 @@ fn ai_discovery_sees_available_navigation() {
         harness.present(scene, 390.0, false);
         assert_eq!(
             query(scene, "Destination 29", Some(AccessibilityRole::Button)).len(),
-            1,
-            "GAP: Swift drops the dismissed drawer out of `visibleOnly` discovery; the Rust shell leaves the undocked navigation mounted and visible, so the destination is still returned"
+            0,
+            "dismissed compact navigation is unavailable"
         );
         assert_eq!(
             query(scene, "Background", Some(AccessibilityRole::Button)).len(),

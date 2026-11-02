@@ -43,13 +43,9 @@
 //!   instead of a configuration closure.
 //! - `HoverCard` and `Link` are configured with builder methods instead of
 //!   `configure:` closures; `Link` takes its title as a `Text` view.
-//! - Portal content registered after the graph mounted never materialises:
-//!   `PortalHostPrimitive` reads a plain revision `Cell` in `children`, so the
-//!   observer bump does not dirty the host and the presented card's nodes are
-//!   absent until an unrelated recomposition. The hover-card cases therefore
-//!   assert the store entries, focus and scheduler state and pin the missing
-//!   card nodes with `GAP:` messages. In production this can leave a
-//!   hover-triggered card blank until some other view recomposes.
+//! - Hover-card content now mounts after presentation. Its portal still does
+//!   not join the trigger's modal focus scope, so the action is rendered but
+//!   unavailable to scoped keyboard input; that remaining difference is explicit.
 //! - `CommandPalette` mounts every result row: the thousand-command case
 //!   measures 1000 rows where Swift virtualizes to fewer than 60.
 //! - `CommandPalette`'s body (`primitives/overlays/command_palette.rs`) declares
@@ -62,8 +58,6 @@
 //!   focus chain has a modal scope (`EventDispatcher::dispatch_key`), so the
 //!   card's registered key handler is invoked directly; Swift's dispatch
 //!   reaches it.
-//! - A Rust button activates on key-up, so the link case dispatches Return's
-//!   `KeyUp` as well as `KeyDown`; Swift's button activates on `keyDown` alone.
 
 use cove_composition::Scope;
 mod support;
@@ -660,21 +654,26 @@ fn hover_card_actions_stay_in_the_trigger_modal_scope() {
             .first_resource::<PortalResource>()
             .and_then(|resource| resource.entry_id())
             .expect("the card owns a portal entry");
-        // GAP: the card's own nodes never materialise, so its Follow action
-        // cannot take focus, contribute an accessory root or run on Return.
         assert_eq!(
             buttons(scene).len(),
-            1,
-            "GAP: only the trigger's sibling is mounted; Swift also mounts the card's Follow action"
+            2,
+            "the card action materialises alongside the sibling"
+        );
+        let follow = scene
+            .labelled("Follow", Some(AccessibilityRole::Button))
+            .expect("card action");
+        assert!(
+            !scene.focus.permits_input(&follow),
+            "GAP: the rendered hover card is still excluded from its trigger's modal focus scope"
         );
         assert_eq!(
             actions.get(),
             0,
-            "GAP: the card action cannot run; Swift records one activation"
+            "no action ran while the card was presented"
         );
         assert!(
             scene.focus.accessory_roots().is_empty(),
-            "GAP: no card accessory root exists; Swift reports exactly one"
+            "GAP: the card still contributes no accessory root to the focus scope"
         );
 
         dispatcher.dispatch(&InputEvent::KeyDown(key(Scancode::ESCAPE)));
@@ -765,8 +764,9 @@ fn link_keeps_its_frame_while_hovering_and_activates() {
 
         let dispatcher = scene.dispatcher();
         dispatcher.dispatch(&InputEvent::KeyDown(key(Scancode::RETURN)));
+        assert_eq!(calls.get(), 1, "Return key-down activates the focused link");
         dispatcher.dispatch(&InputEvent::KeyUp(key(Scancode::RETURN)));
-        assert_eq!(calls.get(), 1, "Return activates the focused link");
+        assert_eq!(calls.get(), 1, "Return key-up does not activate again");
     });
 }
 

@@ -461,7 +461,7 @@ fn unspecified_axes_accept_intrinsic_extents_and_empty_stacks_stay_empty() {
 }
 
 #[test]
-fn hosts_overflow_the_owner_without_an_authored_height() {
+fn auto_height_contains_the_chosen_vertical_layout() {
     // Gap: see the module note. A `LayoutContainer` with only a width has no
     // height for the selected candidate, so vertically stacked children are
     // placed past its bottom edge.
@@ -501,8 +501,8 @@ fn hosts_overflow_the_owner_without_an_authored_height() {
 
             let owner = named(&graph, "real-font-candidates").absolute_frame();
             assert_eq!(
-                owner.height, 32.0,
-                "the auto-height container stays one row tall"
+                owner.height, 120.0,
+                "the auto-height container grows to fit three rows and two gaps"
             );
             let hosts: Vec<Node> = nodes(&named(&graph, "real-font-candidates"))
                 .into_iter()
@@ -515,8 +515,8 @@ fn hosts_overflow_the_owner_without_an_authored_height() {
             assert_eq!(hosts.len(), 3, "all three buttons mount");
             let last = hosts[2].absolute_frame();
             assert!(
-                last.max_y() > owner.max_y(),
-                "the last host reaches past the owner's bottom edge: host {last:?} owner {owner:?}"
+                last.max_y() <= owner.max_y(),
+                "the last host stays inside the auto-height owner: host {last:?} owner {owner:?}"
             );
         });
     });

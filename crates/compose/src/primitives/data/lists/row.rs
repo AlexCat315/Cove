@@ -93,114 +93,204 @@ impl View for ListRow {
         let options = self.options.clone();
         let leading = self.leading.clone();
         let trailing = self.trailing.clone();
-        AnyView::new(ThemeReader::new(move |theme: &crate::theme::Theme| {
-            let touch = false;
-            let title_color = if options.role == ButtonRole::Destructive {
-                theme.colors.error
-            } else {
-                theme.colors.on_surface
-            };
-            let title_content = match options.subtitle.clone() {
-                Some(subtitle) => AnyView::new(BoxView::new(
-                    FlexDirection::Column,
-                    Align::FlexStart,
-                    Justify::FlexStart,
-                    Wrap::NoWrap,
-                    4.0,
-                    AnyView::new(TupleView::new(vec![
-                        AnyView::new(
+        AnyView::new(crate::adaptive::SurfaceReader::new(
+            move |surface: &cove_core::Environment| {
+                let touch = surface.input.contains(cove_core::InputCapabilities::TOUCH);
+                let title = title.clone();
+                let options = options.clone();
+                let leading = leading.clone();
+                let trailing = trailing.clone();
+                AnyView::new(ThemeReader::new(move |theme: &crate::theme::Theme| {
+                    let title_color = if options.role == ButtonRole::Destructive {
+                        theme.colors.error
+                    } else {
+                        theme.colors.on_surface
+                    };
+                    let title_content = match options.subtitle.clone() {
+                        Some(subtitle) => AnyView::new(BoxView::new(
+                            FlexDirection::Column,
+                            Align::Stretch,
+                            Justify::FlexStart,
+                            Wrap::NoWrap,
+                            4.0,
+                            AnyView::new(TupleView::new(vec![
+                                AnyView::new(
+                                    Text::new(title.clone())
+                                        .truncated()
+                                        .clipped()
+                                        .foreground_color(title_color),
+                                ),
+                                AnyView::new(
+                                    Text::new(subtitle)
+                                        .truncated()
+                                        .clipped()
+                                        .semantic_font(SemanticFontRef::caption())
+                                        .semantic_foreground(
+                                            crate::theme::SemanticColorRef::on_surface_muted(),
+                                        ),
+                                ),
+                            ])),
+                        )),
+                        None => AnyView::new(
                             Text::new(title.clone())
                                 .truncated()
+                                .clipped()
                                 .foreground_color(title_color),
                         ),
-                        AnyView::new(
-                            Text::new(subtitle)
-                                .truncated()
-                                .semantic_font(SemanticFontRef::caption())
-                                .semantic_foreground(
-                                    crate::theme::SemanticColorRef::on_surface_muted(),
-                                ),
-                        ),
-                    ])),
-                )),
-                None => AnyView::new(
-                    Text::new(title.clone())
-                        .truncated()
-                        .foreground_color(title_color),
-                ),
-            };
-            let trailing_content = if options.shows_disclosure {
-                AnyView::new(BoxView::new(
-                    FlexDirection::Row,
-                    Align::Center,
-                    Justify::FlexStart,
-                    Wrap::NoWrap,
-                    8.0,
-                    AnyView::new(TupleView::new(vec![
-                        AnyView::new(trailing.clone().flex(0.0).shrink(0.0)),
-                        AnyView::new(AnyView::new(ListDisclosure).modifier(
-                            crate::modifiers::interaction::AccessibilityModifier::new(
-                                |semantics| semantics.is_hidden = true,
-                            ),
-                        )),
-                    ])),
-                ))
-            } else {
-                AnyView::new(BoxView::new(
-                    FlexDirection::Row,
-                    Align::Center,
-                    Justify::FlexStart,
-                    Wrap::NoWrap,
-                    0.0,
-                    trailing.clone(),
-                ))
-            };
-            let contents = AnyView::new(
-                BoxView::new(
-                    FlexDirection::Row,
-                    Align::Center,
-                    Justify::FlexStart,
-                    Wrap::NoWrap,
-                    0.0,
-                    AnyView::new(TupleView::new(vec![
+                    };
+                    let trailing_content = if options.shows_disclosure {
+                        AnyView::new(BoxView::new(
+                            FlexDirection::Row,
+                            Align::Center,
+                            Justify::FlexStart,
+                            Wrap::NoWrap,
+                            8.0,
+                            AnyView::new(TupleView::new(vec![
+                                AnyView::new(trailing.clone().flex(0.0).shrink(0.0)),
+                                AnyView::new(AnyView::new(ListDisclosure).modifier(
+                                    crate::modifiers::interaction::AccessibilityModifier::new(
+                                        |semantics| semantics.is_hidden = true,
+                                    ),
+                                )),
+                            ])),
+                        ))
+                    } else {
                         AnyView::new(BoxView::new(
                             FlexDirection::Row,
                             Align::Center,
                             Justify::FlexStart,
                             Wrap::NoWrap,
                             0.0,
-                            leading.clone(),
-                        )),
-                        title_content,
-                        trailing_content,
-                    ])),
-                )
-                .frame(
-                    None,
-                    None,
-                    None,
-                    if touch { Some(44.0) } else { None },
-                    None,
-                    None,
-                )
-                .accessibility(|semantics| semantics.combines_children = true),
+                            trailing.clone(),
+                        ))
+                    };
+                    let contents = AnyView::new(
+                        crate::LayoutContainer::new(
+                            ListRowSlots { touch },
+                            TupleView::new(vec![
+                                AnyView::new(BoxView::new(
+                                    FlexDirection::Row,
+                                    Align::Center,
+                                    Justify::FlexStart,
+                                    Wrap::NoWrap,
+                                    0.0,
+                                    leading.clone(),
+                                )),
+                                title_content,
+                                trailing_content,
+                            ]),
+                        )
+                        .accessibility(|semantics| semantics.combines_children = true),
+                    );
+                    let scroll = ScrollView::new(ScrollAxis::Horizontal, contents)
+                        .combine_accessibility(true)
+                        .scroll_enabled(!touch);
+                    AnyView::new(AnyView::new(scroll).frame(
+                        if touch {
+                            Some(crate::modifiers::layout::FrameDimension::Percent(100.0))
+                        } else {
+                            None
+                        },
+                        None,
+                        Some(0.0),
+                        None,
+                        None,
+                        None,
+                    ))
+                }))
+            },
+        ))
+    }
+}
+
+/// Measure fixed slots before assigning the title its remaining width.
+#[derive(Clone, Copy)]
+struct ListRowSlots {
+    touch: bool,
+}
+
+impl ListRowSlots {
+    fn sizes(
+        &self,
+        width: Option<f32>,
+        children: &[crate::LayoutSubview],
+    ) -> (f32, Vec<cove_core::Size>) {
+        if children.len() != 3 {
+            return (0.0, Vec::new());
+        }
+        let natural: Vec<_> = children
+            .iter()
+            .map(|child| child.size_that_fits(crate::ProposedViewSize::UNSPECIFIED))
+            .collect();
+        let floor = natural[1].width.min(80.0);
+        let natural_width = natural.iter().map(|size| size.width).sum();
+        let width = width.unwrap_or(natural_width);
+        let width = if self.touch {
+            width
+        } else {
+            width.max(natural[0].width + floor + natural[2].width)
+        };
+        let leading = natural[0].width.min(width);
+        let trailing = if self.touch {
+            natural[2].width.min((width - leading - floor).max(0.0))
+        } else {
+            natural[2].width
+        };
+        let title = (width - leading - trailing).max(0.0);
+        let sizes = [leading, title, trailing]
+            .into_iter()
+            .zip(children)
+            .map(|(width, child)| {
+                let size = child.size_that_fits(crate::ProposedViewSize::new(Some(width), None));
+                cove_core::Size {
+                    width,
+                    height: size.height,
+                }
+            })
+            .collect();
+        (width, sizes)
+    }
+}
+
+impl crate::Layout for ListRowSlots {
+    fn size_that_fits(
+        &self,
+        proposal: crate::ProposedViewSize,
+        children: &[crate::LayoutSubview],
+    ) -> cove_core::Size {
+        let (width, sizes) = self.sizes(proposal.width, children);
+        cove_core::Size {
+            width,
+            height: sizes
+                .iter()
+                .map(|size| size.height)
+                .fold(if self.touch { 44.0 } else { 0.0 }, f32::max),
+        }
+    }
+    fn place_subviews(
+        &self,
+        bounds: cove_core::Rect,
+        _: crate::ProposedViewSize,
+        children: &[crate::LayoutSubview],
+    ) {
+        let (_, sizes) = self.sizes(Some(bounds.width), children);
+        let rtl = children
+            .first()
+            .is_some_and(|child| child.layout_direction == cove_core::scene::Direction::Rtl);
+        let mut cursor = if rtl { bounds.max_x() } else { bounds.x };
+        for (child, size) in children.iter().zip(sizes) {
+            if rtl {
+                cursor -= size.width;
+            }
+            child.place(
+                cove_core::Point::new(cursor, bounds.y + (bounds.height - size.height) / 2.0),
+                crate::ProposedViewSize::new(Some(size.width), Some(size.height)),
+                true,
             );
-            let scroll = ScrollView::new(ScrollAxis::Horizontal, contents)
-                .combine_accessibility(true)
-                .scroll_enabled(!touch);
-            AnyView::new(AnyView::new(scroll).frame(
-                if touch {
-                    Some(crate::modifiers::layout::FrameDimension::Percent(100.0))
-                } else {
-                    None
-                },
-                None,
-                Some(0.0),
-                None,
-                None,
-                None,
-            ))
-        }))
+            if !rtl {
+                cursor += size.width;
+            }
+        }
     }
 }
 

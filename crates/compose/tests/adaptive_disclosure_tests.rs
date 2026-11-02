@@ -10,9 +10,6 @@
 //!   disclosure state
 //!
 //! Named differences from the Swift suite:
-//! - **Space activates on key-up.** Rust `Button` marks the press on key-down
-//!   and activates on key-up; Swift activates on key-down. The suite asserts the
-//!   key-down press does not toggle yet, then dispatches the key-up that does.
 //! - **The leading column is expressed as `Align::Stretch`.** A Rust flex column
 //!   with `Align::FlexStart` hands children their intrinsic cross width, so an
 //!   in-trinsic-wider header never truncates; Swift's `Column(alignment: .leading)`
@@ -154,14 +151,13 @@ fn long_headers_keep_one_line_and_keyboard_activation_at_both_text_scales() {
                         let expanded_before = expanded.get();
                         let disclosure_before = disclosure.get();
                         scene.focus.focus(Some(header), false);
-                        // GAP: Rust activates on key-up; Swift activates on
-                        // key-down. The key-down only marks the press.
                         scene.key(Scancode::SPACE, KeyModifiers::default());
-                        assert_eq!(
+                        assert_ne!(
                             (expanded.get(), disclosure.get()),
                             (expanded_before, disclosure_before),
-                            "the key-down press does not activate yet ({context_label})"
+                            "Space key-down activates the focused header ({context_label})"
                         );
+                        let after_key_down = (expanded.get(), disclosure.get());
                         scene.dispatcher().dispatch(&InputEvent::KeyUp(KeyEvent {
                             scancode: Scancode::SPACE,
                             keycode: 0,
@@ -169,6 +165,11 @@ fn long_headers_keep_one_line_and_keyboard_activation_at_both_text_scales() {
                             is_repeat: false,
                         }));
                         scene.settle(5, 1.0);
+                        assert_eq!(
+                            (expanded.get(), disclosure.get()),
+                            after_key_down,
+                            "Space key-up does not activate again ({context_label})"
+                        );
                     }
 
                     assert_eq!(

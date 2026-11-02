@@ -84,13 +84,13 @@ impl GlobalTestLock {
         }
         HELD.set(true);
         let _release = Release;
-        body()
+        pin_english_locale(body)()
     }
 
     /// Runs `body` with exclusive access and a fresh animation scheduler
     /// installed for the duration, matching `$current.withValue`.
     pub fn with_scheduler<T>(body: impl FnOnce() -> T) -> T {
-        Self::locked(|| AnimatorScheduler::default().with_current(pin_english_locale(body)))
+        Self::locked(|| AnimatorScheduler::default().with_current(body))
     }
 }
 
@@ -98,7 +98,15 @@ impl GlobalTestLock {
 /// `LANG`. A test that wants another locale pins it before entering a scene.
 fn pin_english_locale<T>(body: impl FnOnce() -> T) -> impl FnOnce() -> T {
     move || {
-        if cove_ui_compose::i18n::locale_override().is_none() {
+        struct RestoreLocale(Option<String>);
+        impl Drop for RestoreLocale {
+            fn drop(&mut self) {
+                cove_ui_compose::i18n::set_locale_override(self.0.as_deref());
+            }
+        }
+        let previous = cove_ui_compose::i18n::locale_override();
+        let _restore = RestoreLocale(previous.clone());
+        if previous.is_none() {
             cove_ui_compose::i18n::set_locale_override(Some("en"));
         }
         body()

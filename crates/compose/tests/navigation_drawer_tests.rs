@@ -429,69 +429,75 @@ fn fitting_and_retention() {
 
 #[test]
 fn keyboard_and_selection() {
-    InteractiveScene::run(390.0, 640.0, |scene| {
-        let harness = Harness::new();
-        scene.install(harness.clone());
-        let opener = control(scene, "Open navigation").expect("opener");
-        scene.focus.focus(Some(&opener), true);
-        scene.key(Scancode::SPACE, KeyModifiers::default());
-        assert!(
-            harness.open.get(),
-            "Space key-down opens the drawer"
-        );
-        key_up(scene, Scancode::SPACE);
-        let dialog = panel(scene).expect("the drawer presents a dialog");
-        let focused = scene.focus.focused().expect("the drawer takes focus");
-        assert!(
-            scene.focus.has_modal_scope() && scene.focus.contains(&focused, &dialog),
-            "the modal scope owns focus"
-        );
-        for step in 0..8 {
-            scene.key(Scancode::TAB, KeyModifiers::default());
-            let focused = scene.focus.focused().expect("focus stays somewhere");
-            assert!(
-                scene.focus.contains(&focused, &dialog),
-                "Tab stays trapped in the drawer (step {step}, focused {:?})",
-                label(&focused)
+    for activation_key in [Scancode::SPACE, Scancode::RETURN, Scancode::KEYPAD_ENTER] {
+        InteractiveScene::run(390.0, 640.0, |scene| {
+            let harness = Harness::new();
+            scene.install(harness.clone());
+            let opener = control(scene, "Open navigation").expect("opener");
+            scene.focus.focus(Some(&opener), true);
+            scene.key(activation_key, KeyModifiers::default());
+            assert!(harness.open.get(), "activation key-down opens the drawer");
+            let opened_dialog = panel(scene).expect("key-down presents the dialog");
+            key_up(scene, activation_key);
+            assert!(harness.open.get(), "key-up keeps the drawer open");
+            assert_eq!(
+                panel(scene).expect("dialog remains").id(),
+                opened_dialog.id(),
+                "key-up does not present a second dialog"
             );
-        }
-        let selected = row(scene, 29).expect("row 29");
-        scene.focus.focus(Some(&selected), true);
-        scene.key(Scancode::HOME, KeyModifiers::default());
-        assert!(
-            harness.selection.get() == Some(0) && harness.open.get(),
-            "Home selects the first row"
-        );
-        scene.key(Scancode::ARROW_DOWN, KeyModifiers::default());
-        scene.key(Scancode::ARROW_DOWN, KeyModifiers::default());
-        assert!(
-            harness.selection.get() == Some(3) && harness.open.get(),
-            "Down skips the disabled destination"
-        );
-        scene.key(Scancode::END, KeyModifiers::default());
-        assert_eq!(
-            query(scene, "Destination 29", AccessibilityRole::Button).len(),
-            1,
-            "End reveals the last destination"
-        );
-        press_key(scene, Scancode::RETURN);
-        assert!(
-            !harness.open.get()
-                && scene.portal.entries().is_empty()
-                && !scene.focus.has_modal_scope(),
-            "activation closes the drawer and releases the modal"
-        );
-        assert_eq!(
-            scene.focus.focused().map(|node| node.id()),
-            Some(opener.id()),
-            "focus returns to the opener"
-        );
-        assert_eq!(
-            harness.selection.get(),
-            Some(29),
-            "the activated destination is selected"
-        );
-    });
+            let dialog = panel(scene).expect("the drawer presents a dialog");
+            let focused = scene.focus.focused().expect("the drawer takes focus");
+            assert!(
+                scene.focus.has_modal_scope() && scene.focus.contains(&focused, &dialog),
+                "the modal scope owns focus"
+            );
+            for step in 0..8 {
+                scene.key(Scancode::TAB, KeyModifiers::default());
+                let focused = scene.focus.focused().expect("focus stays somewhere");
+                assert!(
+                    scene.focus.contains(&focused, &dialog),
+                    "Tab stays trapped in the drawer (step {step}, focused {:?})",
+                    label(&focused)
+                );
+            }
+            let selected = row(scene, 29).expect("row 29");
+            scene.focus.focus(Some(&selected), true);
+            scene.key(Scancode::HOME, KeyModifiers::default());
+            assert!(
+                harness.selection.get() == Some(0) && harness.open.get(),
+                "Home selects the first row"
+            );
+            scene.key(Scancode::ARROW_DOWN, KeyModifiers::default());
+            scene.key(Scancode::ARROW_DOWN, KeyModifiers::default());
+            assert!(
+                harness.selection.get() == Some(3) && harness.open.get(),
+                "Down skips the disabled destination"
+            );
+            scene.key(Scancode::END, KeyModifiers::default());
+            assert_eq!(
+                query(scene, "Destination 29", AccessibilityRole::Button).len(),
+                1,
+                "End reveals the last destination"
+            );
+            press_key(scene, Scancode::RETURN);
+            assert!(
+                !harness.open.get()
+                    && scene.portal.entries().is_empty()
+                    && !scene.focus.has_modal_scope(),
+                "activation closes the drawer and releases the modal"
+            );
+            assert_eq!(
+                scene.focus.focused().map(|node| node.id()),
+                Some(opener.id()),
+                "focus returns to the opener"
+            );
+            assert_eq!(
+                harness.selection.get(),
+                Some(29),
+                "the activated destination is selected"
+            );
+        });
+    }
 }
 
 #[test]

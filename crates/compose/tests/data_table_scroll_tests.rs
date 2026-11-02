@@ -164,9 +164,31 @@ impl Harness {
 
     /// The table's frozen pane, found by its 100pt column width.
     fn frozen_pane(&self) -> Option<Node> {
-        nodes(&self.graph)
-            .into_iter()
-            .find(|node| (node.frame().width - 100.0).abs() < 0.5)
+        nodes(&self.graph).into_iter().find(|node| {
+            if !node
+                .accessibility()
+                .is_some_and(|semantics| semantics.role == AccessibilityRole::Cell)
+                || (node.frame().width - 100.0).abs() >= 0.5
+            {
+                return false;
+            }
+            let mut parent = node.parent();
+            while let Some(ancestor) = parent {
+                if ancestor.attachment::<bool>("dataTable.input") == Some(true) {
+                    let frame = node.absolute_frame();
+                    let point = cove_core::Point::new(
+                        frame.x + frame.width / 2.0,
+                        frame.y + frame.height / 2.0,
+                    );
+                    let root = self.graph.tree.borrow().root().expect("root");
+                    return cove_core::scene::HitTester::hit_test(&root, point).is_some_and(
+                        |hit| hit.path.iter().any(|candidate| candidate.id() == node.id()),
+                    );
+                }
+                parent = ancestor.parent();
+            }
+            false
+        })
     }
 
     fn dispatcher(&self, context: &PlatformInputContext) -> EventDispatcher {

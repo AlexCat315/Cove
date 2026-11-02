@@ -243,38 +243,14 @@ fn return_activates_the_button_and_a_repeat_does_not() {
                 cove_core::scene::EventPhase::Target,
             )
         };
-        // Rust's button acts on key release (key-down arms the press), matching
-        // the pointer path; Swift activates on key-down. The observable
-        // invariant is the same: one press, one action.
         assert_eq!(
             press(false),
             EventResult::Handled,
-            "Return is handled by arming the press"
-        );
-        let key_up = registry
-            .handlers(&host)
-            .key_up
-            .expect("the button registers a key-up handler");
-        assert_eq!(
-            key_up(
-                &KeyEvent {
-                    scancode: 40,
-                    keycode: 0,
-                    modifiers: Default::default(),
-                    is_repeat: false,
-                },
-                cove_core::scene::EventPhase::Target,
-            ),
-            EventResult::Handled,
-            "releasing Return activates"
+            "Return key-down activates the button"
         );
         assert_eq!(fired.get(), 1, "one press fires the action once");
 
-        assert_eq!(
-            press(true),
-            EventResult::Ignored,
-            "a key repeat never arms the press"
-        );
+        assert_eq!(press(true), EventResult::Ignored, "a key repeat is ignored");
         assert_eq!(fired.get(), 1, "a key repeat does not fire again");
     });
 }

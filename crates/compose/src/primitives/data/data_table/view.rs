@@ -2484,6 +2484,35 @@ impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 
         let metrics = self.metrics.clone();
         let moving_width = self.moving_width;
         let viewport_height = self.viewport_height;
+        // Frozen cells are siblings of the moving ScrollView. Route their
+        // wheel input through the same offset, including at either boundary.
+        let wheel_controller = controller.clone();
+        let wheel_plan = plan.clone();
+        let wheel_metrics = metrics.clone();
+        registry.set_wheel(
+            node,
+            InputHandlerRoute::control(),
+            Rc::new(move |event, phase| {
+                if phase == EventPhase::Capture {
+                    return EventResult::Ignored;
+                }
+                let overflows_x = wheel_plan.geometry.moving_width() > moving_width;
+                let overflows_y = wheel_metrics.total() > viewport_height;
+                if !(event.x != 0.0 && overflows_x || event.y != 0.0 && overflows_y) {
+                    return EventResult::Ignored;
+                }
+                let (dx, dy) = event.displacement(30.0, moving_width, viewport_height);
+                let current = wheel_controller.offset.get();
+                wheel_controller.offset.set(wheel_controller.clamped_offset(
+                    Point::new(current.x - dx, current.y - dy),
+                    &wheel_plan,
+                    &wheel_metrics,
+                    moving_width,
+                    viewport_height,
+                ));
+                EventResult::Handled
+            }),
+        );
         let input = self.input.clone();
         registry.set_key(
             node,

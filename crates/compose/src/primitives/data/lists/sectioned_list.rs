@@ -275,7 +275,9 @@ where
                         move |environment: &Environment| surface.render(size, environment)
                     })
                 }
-            }),
+            })
+            .flex_with(1.0, 1.0, Some(0.0))
+            .frame(None, None, Some(0.0), Some(0.0), None, None),
             true,
             move |event: &KeyEvent| keys.handle_key(event),
         ))
@@ -506,7 +508,14 @@ where
 
         let list = AnyView::new(
             AnyView::new(stack)
-                .frame(None, None, Some(0.0), Some(0.0), None, None)
+                .frame(
+                    Some(FrameDimension::Percent(100.0)),
+                    Some(FrameDimension::Percent(100.0)),
+                    Some(0.0),
+                    Some(0.0),
+                    None,
+                    None,
+                )
                 .flex_with(1.0, 1.0, Some(0.0)),
         );
 
@@ -534,6 +543,14 @@ where
                 crate::Alignment::TopLeading,
                 AnyView::new(TupleView::new(layers)),
             ))
+            .frame(
+                Some(FrameDimension::Percent(100.0)),
+                Some(FrameDimension::Percent(100.0)),
+                Some(0.0),
+                Some(0.0),
+                None,
+                None,
+            )
             .clipped()
             .flex_with(1.0, 1.0, Some(0.0)),
         )
@@ -622,6 +639,9 @@ where
             let handler = on_activate.clone();
             let cursor = cursor.clone();
             let selection = selection.clone();
+            let pointer_cursor = cursor.clone();
+            let pointer_selection = selection.clone();
+            let pointer_id = id.clone();
             let on_activate: Rc<dyn Fn()> = Rc::new({
                 let id = id.clone();
                 move || {
@@ -632,12 +652,20 @@ where
                     }
                 }
             });
+            let touch_activate = on_activate.clone();
             AnyView::new(ListRowHost {
                 id: 0,
                 is_selected: selected,
                 row_height: height,
                 on_activate,
-                on_tap: None,
+                on_tap: Some(Rc::new(move |_| {
+                    if touch {
+                        touch_activate();
+                    } else {
+                        pointer_cursor.set(Some(pointer_id.clone()));
+                        pointer_selection.set(Some(pointer_id.clone()));
+                    }
+                })),
                 content: view,
             })
         }

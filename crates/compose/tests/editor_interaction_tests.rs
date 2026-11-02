@@ -746,10 +746,8 @@ fn virtual_list_mounts_a_bounded_row_set_with_the_full_extent() {
         settle(scene, 240.0, 300.0);
         assert_eq!(
             scroll.content_offset().y,
-            0.0,
-            "GAP: Swift lands a -200 line wheel at offset 6000 (row 200); Rust's fixed \
-             VirtualStack publishes no scroll extent to its scroll view (maximum offset 0), \
-             so the wheel does not move the window"
+            6000.0,
+            "the wheel reveals row 200 using the full virtual extent"
         );
         assert!(rows().len() < 25, "the row set stays bounded");
         let names: Vec<String> = rows()
@@ -757,10 +755,9 @@ fn virtual_list_mounts_a_bounded_row_set_with_the_full_extent() {
             .filter_map(|row| support::debug_name(&row))
             .collect();
         assert!(
-            !names.iter().any(|name| name == "virtual-row-200")
-                && names.iter().any(|name| name == "virtual-row-0"),
-            "GAP: Swift mounts row 200 and unmounts row 0 after the scroll; Rust's window \
-             stays at the top: {names:?}"
+            names.iter().any(|name| name == "virtual-row-200")
+                && !names.iter().any(|name| name == "virtual-row-0"),
+            "the virtual window follows the scroll offset: {names:?}"
         );
     });
 }

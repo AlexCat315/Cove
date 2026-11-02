@@ -147,17 +147,13 @@ fn stable_gutter_reserves_the_trailing_lane() {
     let non_hover = ScrollView::stable_gutter_width(false);
     let hover = ScrollView::stable_gutter_width(true);
 
-    assert!(
-        non_hover > 0.0,
-        "a stable gutter reserves a non-zero lane (got {non_hover})"
+    assert_eq!(
+        non_hover, 0.0,
+        "touch surfaces leave the full content width available"
     );
+    assert!(hover > 0.0, "hovering surfaces reserve a scrollbar lane");
     assert!(
-        non_hover >= hover,
-        "a non-hovering surface reserves at least as much as a hovering one \
-         ({non_hover} vs {hover})"
-    );
-    assert!(
-        non_hover < viewport.width / 2.0,
+        hover < viewport.width / 2.0,
         "the reserved lane stays a small fraction of the viewport (got {non_hover})"
     );
 

@@ -55,6 +55,7 @@ fn sized(width: f32, height: f32) -> AnyView {
 }
 
 struct Fixture {
+    dispatcher: EventDispatcher,
     graph: Rc<cove_composition::ViewGraph>,
     registry: Rc<InteractionRegistry>,
     capture: Rc<PointerCapture>,
@@ -155,7 +156,15 @@ impl Fixture {
         let root = graph.tree.borrow().root().expect("root");
         let outer = find_named(&root, "nested-outer").expect("the outer scroll view is mounted");
         let inner = find_named(&root, "nested-inner").expect("the inner scroll view is mounted");
+        let dispatcher = EventDispatcher::new(
+            graph.tree.clone(),
+            registry.clone(),
+            capture.clone(),
+            focus.clone(),
+            WindowId::MAIN,
+        );
         Self {
+            dispatcher,
             graph,
             registry,
             capture,
@@ -166,13 +175,7 @@ impl Fixture {
     }
 
     fn wheel(&self, x: f32, y: f32, pointer_y: f32, input: ScrollInput) {
-        let dispatcher = EventDispatcher::new(
-            self.graph.tree.clone(),
-            self.registry.clone(),
-            self.capture.clone(),
-            self.focus.clone(),
-            WindowId::MAIN,
-        );
+        let dispatcher = &self.dispatcher;
         dispatcher.dispatch(&InputEvent::MouseMotion(MouseMotionEvent {
             x: 40.0,
             y: pointer_y,
@@ -247,6 +250,8 @@ fn phased_continuation_does_not_chain() {
     GlobalTestLock::locked(|| {
         let fixture = Fixture::new(500.0, ScrollAxis::Vertical, None);
         let continuous = |phase, momentum_phase| ScrollInput {
+            unit: cove_platform::ScrollUnit::Points,
+            device: cove_platform::ScrollDevice::Continuous,
             phase,
             momentum_phase,
             ..ScrollInput::default()

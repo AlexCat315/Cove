@@ -165,10 +165,15 @@ impl cove_composition::ViewModifier for MenuWindowBounds {
             node.composition_value(&crate::theme::ControlSizeEnvironment::key())
                 .button_height(),
         );
-        let preferred = self.max_visible_rows as f32 * row_height;
+        let preferred = self.max_visible_rows as f32
+            * row_height
+            * crate::theme::node_text_scaler(node).factor();
         let weak = node.downgrade();
-        let max_visible_rows = self.max_visible_rows;
+        let previous_update = node.layout_did_update();
         node.set_layout_did_update(Some(Rc::new(move |owner: &Node| {
+            if let Some(update) = &previous_update {
+                update(owner);
+            }
             let Some(node) = Node::upgrade(&weak) else {
                 return;
             };
@@ -180,7 +185,6 @@ impl cove_composition::ViewModifier for MenuWindowBounds {
             if layout.max_height() != Some(height) {
                 layout.set_max_height(Some(height));
             }
-            let _ = (owner, max_visible_rows);
         }) as cove_core::scene::LayoutUpdateHook));
         layout.set_max_height(Some(preferred));
     }

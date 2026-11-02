@@ -186,14 +186,15 @@ impl cove_composition::ViewModifier for ActionControlLabel {
 }
 
 impl View for ToolbarCommands {
-    fn body(&self, _cx: &Scope) -> AnyView {
+    fn body(&self, cx: &Scope) -> AnyView {
         if !self.is_enabled {
             if self.is_presented.get() {
                 self.is_presented.set(false);
             }
             *self.overflow_focus.pending_visibility.borrow_mut() = None;
         }
-        let commands = self.snapshot();
+        let mut commands = self.snapshot();
+        commands.overflow_focus = cx.remember(|| self.overflow_focus.clone());
         let vertical = self.axis == ToolbarAxis::Vertical;
         let reader = crate::adaptive::ContainerSizeReader::new(move |size: cove_core::Size| {
             let mut commands = commands.snapshot();
@@ -275,6 +276,7 @@ impl PrimitiveView for ToolbarCommandsBody {
             children.push(AnyView::new(ToolbarRetainedCommand {
                 is_visible: visible,
                 is_overflow: false,
+                command_id: Some(item.command.id),
                 focus: self.overflow_focus.clone(),
                 content: AnyView::new(commands.command(item).frame(
                     None,
@@ -347,6 +349,7 @@ impl PrimitiveView for ToolbarCommandsBody {
         children.push(AnyView::new(ToolbarRetainedCommand {
             is_visible: !overflow.is_empty(),
             is_overflow: true,
+            command_id: None,
             focus: self.overflow_focus.clone(),
             content: AnyView::new(popover),
         }));
@@ -370,6 +373,20 @@ impl PrimitiveView for ToolbarCommandsBody {
                 .filter_map(|index| items_for_layout.get(*index).map(|item| item.command.id))
                 .collect();
             if next != overflow_for_layout.get() {
+                if let Some(chain) = cove_core::scene::FocusChainHolder::current() {
+                    let mut ancestor = chain.focused();
+                    while let Some(node) = ancestor {
+                        if node
+                            .attachment::<u64>("toolbar.commandID")
+                            .is_some_and(|id| next.contains(&id))
+                        {
+                            *focus_for_layout.pending_visibility.borrow_mut() =
+                                Some(chain.is_focus_visible());
+                            break;
+                        }
+                        ancestor = node.parent();
+                    }
+                }
                 if presented_for_layout.get() && next.is_empty() {
                     // Closing the menu because nothing overflowed hands focus back
                     // to the bar with the visibility it had.
@@ -402,6 +419,7 @@ struct ToolbarRetainedCommand {
     is_visible: bool,
     /// Set on the overflow representation, which is what receives focus back.
     is_overflow: bool,
+    command_id: Option<u64>,
     focus: Rc<crate::primitives::layout::split::SplitFocusTransfer>,
     content: AnyView,
 }
@@ -414,6 +432,9 @@ impl PrimitiveView for ToolbarRetainedCommand {
     }
 
     fn update_node(&self, node: &Node) {
+        if let Some(id) = self.command_id {
+            node.set_attachment("toolbar.commandID", id);
+        }
         node.set_is_interaction_enabled(self.is_visible);
         node.set_opacity(if self.is_visible { 1.0 } else { 0.0 });
         node.set_accessibility(Some(cove_core::scene::AccessibilitySemantics {

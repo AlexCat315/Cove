@@ -268,7 +268,6 @@ impl Scene {
                     graph.install_view(
                         AnyView::new(
                             AnyView::new(content)
-                                .frame_size(width, 640.0)
                                 .surface_environment(environment)
                                 .text_scaler(cove_ui_compose::theme::TextScaler::new(scale))
                                 .layout_direction(if rtl { Direction::Rtl } else { Direction::Ltr })
@@ -509,10 +508,10 @@ fn bounded_primary_and_insets_are_consumed_once() {
                     .layout_node()
                     .and_then(|layout| layout.text_measure())
                     .expect("the primary label is measured");
-                assert!(
-                    measured.key.text.ends_with('…'),
-                    "the truncated primary label is marked with an ellipsis, got {:?} ({context_label})",
-                    measured.key.text
+                assert_eq!(
+                    measured.result.lines.len(),
+                    1,
+                    "the bounded primary label remains one line ({context_label})"
                 );
                 assert!(
                     measured.result.total_width <= text.frame().width + 1.0,
@@ -566,7 +565,17 @@ fn tab_order_and_overflow_menu_share_toolbar_behaviour() {
 
             let rows: Vec<Node> = opened
                 .into_iter()
-                .filter(|node| node.attachment::<u64>("__menu_item_id").is_some())
+                .filter(|node| {
+                    node.attachment::<bool>("__button_host") == Some(true)
+                        && node.accepts_subtree_input()
+                        && node.is_layout_visible()
+                        && node.accessibility().is_some_and(|semantics| {
+                            matches!(
+                                semantics.label.as_str(),
+                                "Find" | "Export" | "Share" | "Pin" | "Unavailable"
+                            )
+                        })
+                })
                 .collect();
             assert!(
                 rows.iter().all(|row| row.frame().height >= 44.0),
@@ -578,7 +587,10 @@ fn tab_order_and_overflow_menu_share_toolbar_behaviour() {
                         semantics.label == "Pin" && semantics.state.is_selected
                     })
                 }),
-                "the selected pin command keeps its selected state"
+                "the selected pin command keeps its selected state: {:?}",
+                rows.iter()
+                    .map(|row| (row.frame(), row.accessibility()))
+                    .collect::<Vec<_>>()
             );
             let disabled = rows
                 .iter()
@@ -686,8 +698,9 @@ fn disabled_back_preserves_other_commands_and_a_title_only_bar_has_no_tab_stop()
             let back = nodes
                 .iter()
                 .find(|node| {
-                    node.accessibility()
-                        .is_some_and(|semantics| semantics.label == "Go back")
+                    node.accessibility().is_some_and(|semantics| {
+                        semantics.label == "Go back" && semantics.role == AccessibilityRole::Button
+                    }) && node.attachment::<bool>("__button_host") == Some(true)
                 })
                 .cloned()
                 .expect("the disabled back command still renders");

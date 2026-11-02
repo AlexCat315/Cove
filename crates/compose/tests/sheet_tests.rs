@@ -10,20 +10,6 @@
 //! - once the exit settles the portal is empty, the modal scope is gone, and
 //!   focus returns to the opener
 //!
-//! GAP: the sheet has no exit transition.
-//! Swift keeps the modal mounted through its exit animation with
-//! `@State private var retained` (`Modal/Modal.swift:21-25`): presenting sets it,
-//! `onExited` clears it, and the `@State` write recomposes the presenter so the
-//! panel keeps painting while it animates out. The Rust `Modal`
-//! (`primitives/overlays/modal/modal.rs`) holds the same flag in a
-//! `cove_core::State<bool>` but never returns it from `dynamic_properties`, so
-//! `retained.set(false)` from `AnimatedVisibility`'s `on_finished` invalidates
-//! nothing. Dismissal therefore unmounts the portal immediately: the panel is
-//! gone before any exit frame runs. The Escape half, the settled geometry, the
-//! modal scope and the focus restoration are all migrated at full strength; the
-//! exit-motion assertions are pinned to the current behaviour and name the Swift
-//! values they should reach.
-//!
 //! Model difference: Swift's `Harness` owns `@State var open` and mutates it via
 //! `harness.$open.wrappedValue`. The Rust harness exposes that flag as a
 //! `cove_core::State` returned from `dynamic_properties`, which is the
@@ -154,7 +140,7 @@ fn clear_holders() {
 
 #[test]
 fn all_four_edges_place_animate_dismiss_and_restore_focus() {
-    GlobalTestLock::locked(|| {
+    GlobalTestLock::with_scheduler(|| {
         support::with_test_text_environment(|| {
             for edge in [
                 ModalPlacement::Leading,
@@ -262,27 +248,29 @@ fn all_four_edges_place_animate_dismiss_and_restore_focus() {
                 }));
                 layout(&graph);
                 assert!(!flag.get(), "Escape dismisses the sheet");
-                // Dismissal tears the panel out of the live graph immediately, so
-                // nothing accepts input. Swift keeps the node mounted but gates it
-                // with `isInteractionEnabled`; either way no live dialog remains.
                 assert!(
                     !all(&graph).iter().any(|node| {
                         node.accessibility()
                             .is_some_and(|s| s.role == AccessibilityRole::Dialog)
+                            && node.accepts_subtree_input()
                     }),
-                    "no live dialog accepts input after dismissal"
+                    "a leaving dialog accepts no input"
                 );
 
                 cove_core::scene::AnimatorScheduler::current().tick(0.05);
-                // GAP: no exit transition. Swift retains the panel through the
-                // exit and moves it outward for one 0.05s frame before releasing
-                // the portal a full second later. Rust releases it at dismissal.
-                let portal_after_dismiss = PortalStoreHolder::current();
+                layout(&graph);
                 assert!(
-                    portal_after_dismiss.entries().is_empty(),
-                    "the portal is released at dismissal; Swift keeps it through the exit, still had {}",
-                    portal_after_dismiss.entries().len()
+                    !PortalStoreHolder::current().entries().is_empty(),
+                    "the exit keeps painting the sheet"
                 );
+                let leaving = panel.absolute_frame();
+                match edge {
+                    ModalPlacement::Leading => assert!(leaving.x < settled.x),
+                    ModalPlacement::Trailing => assert!(leaving.x > settled.x),
+                    ModalPlacement::Top => assert!(leaving.y < settled.y),
+                    ModalPlacement::Bottom => assert!(leaving.y > settled.y),
+                    ModalPlacement::Center => unreachable!(),
+                }
 
                 cove_core::scene::AnimatorScheduler::current().tick(1.0);
                 layout(&graph);

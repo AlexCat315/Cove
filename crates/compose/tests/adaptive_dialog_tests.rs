@@ -12,16 +12,6 @@
 //!   a second activation on the closed dialog is ignored
 //!
 //! Named differences from the Swift suite:
-//! - **GAP: compact alert panels keep 420pt.** Swift refits a presented alert
-//!   to the 390pt window (374pt with 8pt margins). Rust stores the 390pt window
-//!   bounds on the modal presenter after layout, but the portal panel keeps the
-//!   420pt width it chose before the first layout and overhangs the window.
-//! - **GAP: footer action frames are footer-local.** Swift reports the Cancel /
-//!   Confirm absolute frames in window space below the message. Rust's
-//!   `absolute_frame()` for buttons inside the dialog's `ActionGroupLayout`
-//!   resolves to the footer's 14pt top inset, so the message's max y lies
-//!   below Cancel's reported y. The stacking and inside-panel checks still run
-//!   against those reported frames.
 //! - **No `ButtonHost.markerKey` attachment.** Rust button hosts publish no
 //!   marker attachment; action nodes are located by their accessibility role
 //!   (`Button`), and the close button of the `Dialog` is included in the
@@ -263,22 +253,12 @@ fn dialogs_fit_compact_windows_and_stack_the_same_accessible_actions() {
                         })
                         .cloned()
                         .expect("the alert presents a labelled dialog panel");
-                    if width == 390.0 {
-                        assert!(
-                            (panel.frame().width - 420.0).abs() < 1.0,
-                            "GAP: Swift refits a presented alert to the compact window \
-                             (390 - 2 x 8 = 374pt); Rust records the 390pt window bounds on \
-                             the presenter after layout but the portal panel keeps the 420pt \
-                             width chosen before the first layout (got {}, {context_label})",
-                            panel.frame().width
-                        );
-                    } else {
-                        assert!(
-                            (panel.frame().width - 420.0).abs() < 1.0,
-                            "the panel keeps its 420pt width ({} vs 420, {context_label})",
-                            panel.frame().width
-                        );
-                    }
+                    let expected_width = (width - 16.0).min(420.0);
+                    assert!(
+                        (panel.frame().width - expected_width).abs() < 1.0,
+                        "the panel fits the window ({} vs {expected_width}, {context_label})",
+                        panel.frame().width
+                    );
 
                     let cancel = button_with_text(&nodes, "Cancel")
                         .expect("the alert mounts a Cancel button");
@@ -339,14 +319,8 @@ fn dialogs_fit_compact_windows_and_stack_the_same_accessible_actions() {
                         "the message occupies vertical space ({context_label})"
                     );
                     assert!(
-                        message.absolute_frame().max_y() > cancel.absolute_frame().y
-                            && (cancel.absolute_frame().y - 14.0).abs() < 1.0,
-                        "GAP: Swift places the actions below the message in window space; \
-                         Rust reports the action-group buttons' absolute frames relative to \
-                         the footer (top inset 14pt), so the message (max y {}) appears below \
-                         Cancel (y {}) ({context_label})",
-                        message.absolute_frame().max_y(),
-                        cancel.absolute_frame().y
+                        message.absolute_frame().max_y() <= cancel.absolute_frame().y,
+                        "the actions follow the message in window coordinates ({context_label})"
                     );
                     for node in &nodes {
                         assert!(

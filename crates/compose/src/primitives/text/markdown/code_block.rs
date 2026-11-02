@@ -138,9 +138,12 @@ impl PrimitiveView for MarkdownCodeBlockBody {
         let scroll = ScrollView::new(
             ScrollAxis::Horizontal,
             AnyView::new(
-                Text::new(self.text.clone())
-                    .semantic_font(SemanticFontRef::mono())
-                    .padding_edges(14.0, 12.0),
+                crate::primitives::text::rich::RichText::new(vec![
+                    crate::primitives::text::rich::run::RichTextRun::new(self.text.clone()),
+                ])
+                .role(crate::primitives::text::rich::RichTextRole::CodeBlock)
+                .semantic_font(SemanticFontRef::mono())
+                .padding_edges(14.0, 12.0),
             ),
         )
         .scrollbar_gutter(ScrollbarGutter::Overlay)

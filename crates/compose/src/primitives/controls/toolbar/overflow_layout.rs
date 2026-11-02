@@ -180,6 +180,11 @@ impl ToolbarOverflowLayout {
         } else {
             bounds.x
         };
+        // Remember focus before a hidden placement removes it from the tree's
+        // visible input order.
+        if let Some(on_overflow) = self.on_overflow.as_ref() {
+            on_overflow(&plan.hidden);
+        }
         for index in 0..subviews.len() {
             let size = plan.sizes[index];
             if !plan.visible.contains(&index) {
@@ -212,9 +217,6 @@ impl ToolbarOverflowLayout {
                 );
                 cursor += (if reversed { -1.0 } else { 1.0 }) * (size.width + self.spacing);
             }
-        }
-        if let Some(on_overflow) = self.on_overflow.as_ref() {
-            on_overflow(&plan.hidden);
         }
         if let Some(on_content_extent) = self.on_content_extent.as_ref() {
             let total = plan

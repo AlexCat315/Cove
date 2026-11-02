@@ -451,8 +451,8 @@ fn touch_data_table_paging_reveals_the_last_row() {
         tops.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap());
         assert_eq!(
             (tops[1].1 - tops[0].1).abs(),
-            39.0,
-            "GAP: the frozen lane row sits 39pt below the moving row (header chrome); tops {:?}",
+            0.0,
+            "the frozen and moving lanes align on the same row: {:?}",
             tops
         );
         assert!(

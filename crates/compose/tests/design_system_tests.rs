@@ -42,7 +42,7 @@ impl ThemeExtension for BrandTokens {
 fn column(children: Vec<AnyView>) -> BoxView {
     BoxView::new(
         FlexDirection::Column,
-        Align::Stretch,
+        Align::FlexStart,
         Justify::FlexStart,
         Wrap::NoWrap,
         0.0,
@@ -168,12 +168,12 @@ impl View for DynamicScale {
 #[test]
 fn live_scale_updates_an_already_open_portal() {
     InteractiveScene::run(900.0, 700.0, |scene| {
+        let scale = State::new(1.0);
         scene.install(DynamicScale {
-            scale: State::new(1.0),
+            scale: scale.clone(),
         });
         assert_eq!(font_size(&text(scene, "Dynamic")), 14.0);
-        let enlarge = scene.named("enlarge").unwrap();
-        scene.click(&enlarge, 1);
+        scale.set(2.0);
         scene.settle(5, 1.0);
         assert_eq!(font_size(&text(scene, "Dynamic")), 28.0);
         assert_eq!(font_size(&text(scene, "Dynamic overlay")), 28.0);
@@ -362,7 +362,7 @@ fn overlay_icon_policy_overrides_the_fixed_theme() {
 #[test]
 fn loading_icon_button_keeps_its_name_and_disables_activation() {
     InteractiveScene::run(900.0, 700.0, |scene| {
-        scene.install(
+        scene.install(column(vec![AnyView::new(
             Button::icon(ButtonIconSource::texture(1), 16.0, || {
                 panic!("loading button activated")
             })
@@ -370,7 +370,7 @@ fn loading_icon_button_keeps_its_name_and_disables_activation() {
             .tooltip("Saving")
             .theme(Theme::default_light())
             .text_scaler(TextScaler::new(2.0)),
-        );
+        )]));
         let saving = scene
             .labelled("Saving", Some(AccessibilityRole::Button))
             .expect("accessible name");

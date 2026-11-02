@@ -415,51 +415,43 @@ fn buffered_scroll(stack: AnyView, counts: Rc<RefCell<Counts>>) {
                 .len()
         };
 
-        let initial_mounted = mounted();
         assert!(
-            initial_mounted <= 2,
-            "GAP: Swift mounts 130..=136 rows for a 1_000pt viewport; Rust mounts \
-             {initial_mounted} because the stack never learns its scroll viewport"
-        );
-        let initial_rows = counts.borrow().rows.clone();
-        let previous_offset = scroll.content_offset().y;
-
-        dispatcher.dispatch(&InputEvent::MouseWheel(wheel_event(2_000.0)));
-        scene.settle(5, 1.0);
-        assert!(
-            mounted() <= 2,
-            "GAP: after a 2_000pt wheel Swift mounts 130..=136 rows; Rust still mounts \
-             {} because the window never widens",
+            (100..=140).contains(&mounted()),
+            "the initial window covers the viewport with a bounded buffer: {}",
             mounted()
         );
+        dispatcher.dispatch(&InputEvent::MouseWheel(wheel_event(2_000.0)));
+        scene.settle(5, 1.0);
         assert_eq!(
             scroll.content_offset().y,
-            previous_offset,
-            "GAP: a 2_000pt wheel leaves the offset at {} instead of scrolling",
-            scroll.content_offset().y
+            2_000.0,
+            "the fixed stack scrolls using its full extent"
         );
-
+        assert!(
+            (100..=140).contains(&mounted()),
+            "the scrolled row window remains bounded"
+        );
+        assert!(
+            scene.named("preload-row-200").is_some(),
+            "the scrolled visible row mounts"
+        );
+        let rows_after_refill = counts.borrow().rows.clone();
         dispatcher.dispatch(&InputEvent::MouseWheel(wheel_event(1.0)));
         scene.settle(5, 1.0);
         assert_eq!(
             scroll.content_offset().y,
-            previous_offset,
-            "GAP: Swift advances the offset 1pt inside the buffer; Rust cannot move at offset {}",
-            scroll.content_offset().y
+            2_001.0,
+            "scrolling within the buffer advances the offset"
         );
-        assert!(
-            counts.borrow().rows == initial_rows,
-            "no row is rebuilt while the window is stuck"
+        assert_eq!(
+            counts.borrow().rows,
+            rows_after_refill,
+            "a 1pt move reuses buffered rows"
         );
-
         dispatcher.dispatch(&InputEvent::MouseWheel(wheel_event(100.0)));
         scene.settle(5, 1.0);
-        assert!(
-            counts.borrow().rows == initial_rows,
-            "GAP: Swift only constructs rows entering 200..300 after a 100pt wheel; \
-             Rust constructs no row because the window never moves"
-        );
-
+        assert_eq!(scroll.content_offset().y, 2_101.0);
+        assert!((100..=140).contains(&mounted()), "refilling stays bounded");
         dispatcher.dispatch(&InputEvent::MouseWheel(wheel_event(2_000.0)));
         dispatcher.dispatch(&InputEvent::MouseWheel(wheel_event(-2_000.0)));
         scene.settle(5, 1.0);
@@ -469,10 +461,8 @@ fn buffered_scroll(stack: AnyView, counts: Rc<RefCell<Counts>>) {
         assert!(
             scene
                 .named(&format!("preload-row-{}", first_visible + 1))
-                .is_none(),
-            "GAP: returning to offset {} leaves row {} unmounted because no refill runs",
-            scroll.content_offset().y,
-            first_visible + 1
+                .is_some(),
+            "returning to an offset refills its visible rows"
         );
     });
 }

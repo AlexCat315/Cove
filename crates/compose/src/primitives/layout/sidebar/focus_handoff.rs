@@ -57,10 +57,20 @@ impl SidebarFocusHandoff {
         chain: Option<std::rc::Rc<FocusChain>>,
     ) {
         let previous_mode = self.mode.get();
+        let was_modal = self.is_modal.get();
         self.mode.set(Some(next));
         self.is_modal.set(is_modal);
         let Some(chain) = chain else { return };
         *self.chain.borrow_mut() = Some(chain.clone());
+        if was_modal && !is_modal {
+            self.visible.set(chain.is_focus_visible());
+            self.destination.set(Some(if next == SidebarMode::Expanded {
+                HandoffDestination::Navigation
+            } else {
+                HandoffDestination::Trigger
+            }));
+            return;
+        }
         let previous_mode = match previous_mode {
             Some(mode) => mode,
             None => return,
@@ -135,12 +145,16 @@ impl SidebarFocusHandoff {
             return;
         };
         let target = match destination {
-            HandoffDestination::Trigger => self.trigger.borrow().clone(),
+            HandoffDestination::Trigger => self
+                .trigger
+                .borrow()
+                .as_ref()
+                .and_then(|root| Self::focusables(root).into_iter().next()),
             HandoffDestination::Navigation => self.first_focusable_in_navigation(),
         };
-        self.destination.set(None);
-        *self.previous.borrow_mut() = None;
         if let Some(target) = target {
+            self.destination.set(None);
+            *self.previous.borrow_mut() = None;
             chain.focus(Some(&target), self.visible.get());
         }
     }
@@ -171,19 +185,28 @@ impl SidebarFocusHandoff {
     }
 
     fn first_focusable_in_navigation(&self) -> Option<Node> {
-        Self::focusables(self.navigation.borrow().as_ref()?)
-            .into_iter()
-            .next()
+        let candidates = Self::focusables(self.navigation.borrow().as_ref()?);
+        candidates
+            .iter()
+            .find(|node| {
+                node.accessibility()
+                    .is_some_and(|semantics| semantics.state.is_selected)
+            })
+            .cloned()
+            .or_else(|| candidates.into_iter().next())
     }
 
     fn focusables(root: &Node) -> Vec<Node> {
         let mut result = Vec::new();
         let mut pending = vec![root.clone()];
         while let Some(candidate) = pending.pop() {
+            if !candidate.accepts_subtree_input() {
+                continue;
+            }
             if candidate.is_focusable() {
                 result.push(candidate.clone());
             }
-            pending.extend(candidate.children());
+            pending.extend(candidate.children().into_iter().rev());
         }
         result
     }
