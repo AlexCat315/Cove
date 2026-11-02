@@ -538,42 +538,60 @@ fn combobox_list_scales_once_and_search_focus_survives_a_resize() {
         scene.click(&trigger, 1);
         scene.settle(10, 1.0);
 
-        // GAP: the combobox cannot present its popup, so the search field never
-        // mounts and no option rows exist to measure.
+        let search = scene
+            .focus
+            .focused()
+            .expect("the popup focuses its search field");
+        assert_eq!(
+            search.accessibility().map(|semantics| semantics.label),
+            Some("Search…".to_string()),
+            "focus lands in the search field"
+        );
+        // GAP: Swift exposes the option rows as `ListItem`; Rust's rows are buttons.
+        let rows = scene.all(|node| {
+            node.accessibility()
+                .is_some_and(|semantics| semantics.role == AccessibilityRole::Button)
+                && cove_core::scene::AccessibilityTree::resolved_label(node).starts_with("Option ")
+        });
+        assert!(!rows.is_empty(), "option rows mount");
+        for row in &rows {
+            assert!(
+                (row.frame().height - 96.0).abs() < 1.0,
+                "GAP: Swift scales the rows once to 64pt at 200% with the touch floor; \
+                 Rust's rows are {}pt",
+                row.frame().height
+            );
+        }
+        state.width.set(720.0);
+        state.field_width.set(400.0);
+        scene.settle(10, 1.0);
+        assert_eq!(
+            scene.focus.focused().map(|node| node.id()),
+            Some(search.id()),
+            "search focus survives the resize"
+        );
+        scene
+            .dispatcher()
+            .dispatch(&cove_platform::InputEvent::TextInput(
+                "Option 11".to_string(),
+            ));
+        scene.settle(10, 1.0);
+        key(scene, Scancode::RETURN);
+        scene.settle(10, 1.0);
+        assert_eq!(state.selection.get(), Some(11), "Return commits the match");
         assert!(
             scene.portal.entries().is_empty(),
-            "documented gap: the combobox does not present its popup"
+            "committing closes the popup"
         );
         assert!(
             scene
-                .focus
-                .focused()
-                .is_some_and(|focused| focused.id() == trigger.id()),
-            "focus stays on the trigger because search never mounts"
-        );
-        assert!(
-            scene
-                .all(|node| {
-                    node.accessibility().is_some_and(|semantics| {
-                        semantics.role == AccessibilityRole::Button
-                            && semantics.label.starts_with("Option ")
-                    })
-                })
-                .is_empty(),
-            "no option row mounts while the popup is closed"
-        );
-        assert!(
-            scene
-                .all(|node| {
+                .first(|node| {
                     node.accessibility()
                         .is_some_and(|semantics| semantics.label == "Clear selection")
                 })
-                .is_empty(),
-            "the clear control only exists inside the popup"
-        );
-        assert!(
-            !scene.graph.recomposer.has_pending(),
-            "the closed combobox leaves no recomposition pending"
+                .is_none(),
+            "GAP: Swift's committed combobox shows a 44pt Clear selection control; Rust \
+             mounts none after the commit"
         );
     });
 }

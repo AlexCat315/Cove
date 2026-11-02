@@ -47,6 +47,9 @@ impl Bounds {
 /// the seam. Every method mirrors one branch of the Swift compile-time
 /// `#if COVE_ANDROID_SHOWCASE` / `#if COVE_ANDROID_UI` selection.
 pub trait HostedSceneContent {
+    fn configuration(&self) -> Option<&crate::ApplicationConfiguration> {
+        None
+    }
     /// Restores authored state from the checkpoint document.
     fn restore_checkpoint(
         &mut self,
@@ -122,6 +125,58 @@ impl HostedSceneContent for ApplicationContent {
     }
 }
 
+/// One factory call owns both the root and the state captured by its checkpoint.
+pub struct DeclaredApplicationContent(pub crate::ApplicationLaunch);
+
+impl HostedSceneContent for DeclaredApplicationContent {
+    fn configuration(&self) -> Option<&crate::ApplicationConfiguration> {
+        Some(&self.0.configuration)
+    }
+
+    fn restore_checkpoint(
+        &mut self,
+        checkpoint: &str,
+        mode: SceneLaunchMode,
+    ) -> Result<(), String> {
+        if mode != SceneLaunchMode::Application || checkpoint.is_empty() {
+            return Ok(());
+        }
+        let values: BTreeMap<String, String> = serde_json::from_str(checkpoint)
+            .map_err(|error| format!("invalid application checkpoint: {error}"))?;
+        if let Some(hooks) = &self.0.checkpoint
+            && !hooks.restore(&values)
+        {
+            return Err("application rejected the checkpoint".into());
+        }
+        Ok(())
+    }
+
+    fn root(&mut self, mode: SceneLaunchMode, scale: f32) -> Result<AnyView, String> {
+        if mode == SceneLaunchMode::Application {
+            Ok(self.0.root.clone())
+        } else {
+            UnlinkedContent.root(mode, scale)
+        }
+    }
+
+    fn checkpoint(&self) -> BTreeMap<String, String> {
+        self.0
+            .checkpoint
+            .as_ref()
+            .map_or_else(BTreeMap::new, |hooks| hooks.capture())
+    }
+}
+
+pub(crate) fn linked_content() -> Box<dyn HostedSceneContent> {
+    if let Some(factory) = crate::android::application() {
+        Box::new(DeclaredApplicationContent(factory()))
+    } else if let Some(factory) = crate::android::application_content() {
+        Box::new(ApplicationContent(factory))
+    } else {
+        Box::new(UnlinkedContent)
+    }
+}
+
 /// Hosts application or showcase content.
 pub struct HostedScene {
     launch: SceneLaunch,
@@ -139,11 +194,7 @@ impl HostedScene {
         scale: f32,
         _device: Arc<Device>,
     ) -> Result<Self, String> {
-        let content: Box<dyn HostedSceneContent> = match crate::android::application_content() {
-            Some(factory) => Box::new(ApplicationContent(factory)),
-            None => Box::new(UnlinkedContent),
-        };
-        Self::with_content(checkpoint, launch, scale, content)
+        Self::with_content(checkpoint, launch, scale, linked_content())
     }
 
     pub fn with_content(
@@ -153,6 +204,7 @@ impl HostedScene {
         content_source: Box<dyn HostedSceneContent>,
     ) -> Result<Self, String> {
         let mut content_source = content_source;
+        let configuration = content_source.configuration().cloned();
         content_source.restore_checkpoint(checkpoint, launch.mode)?;
         let root = content_source.root(launch.mode, scale)?;
         let rendering = if launch.mode == SceneLaunchMode::Counter {
@@ -160,9 +212,15 @@ impl HostedScene {
         } else {
             Rendering::Layers
         };
+        let content = match configuration {
+            Some(configuration) => {
+                AndroidContentSession::with_configuration(scale, rendering, root, configuration)
+            }
+            None => AndroidContentSession::new(scale, rendering, root),
+        };
         Ok(Self {
             launch,
-            content: AndroidContentSession::new(scale, rendering, root),
+            content,
             drawing: DrawList::default(),
             frames: 0,
             session_id: new_session_id(),

@@ -1,5 +1,6 @@
 //! Translation of Desktop/Sources/CoveUI/Rendering/Context.swift.
 
+use super::render_thread::ThreadedWindowRenderer;
 use crate::desktop::application::configuration::{AppWindowRendering, ApplicationConfiguration};
 use crate::desktop::window::native_renderer::{
     AppWindowRenderSettings, AppWindowRenderer, NativeAppWindowRenderer,
@@ -7,7 +8,6 @@ use crate::desktop::window::native_renderer::{
 use cove_core::{GeometryAntialiasing, TextureId};
 use cove_graphics::rhi::{Device, RhiResult, TextureFormat};
 use cove_graphics::ui::{FontAtlasUpload, NativeDrawListRenderer};
-use super::render_thread::ThreadedWindowRenderer;
 use cove_text::FontAtlas;
 use std::sync::Arc;
 

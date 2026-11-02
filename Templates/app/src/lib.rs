@@ -1,4 +1,4 @@
 mod app;
 mod resources;
 
-cove_ui::application!(app::make_application_content);
+cove_ui::application!(launch = app::application);

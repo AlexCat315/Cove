@@ -301,4 +301,3 @@ impl AppWindowRenderer for NativeAppWindowRenderer {
         Ok(())
     }
 }
-

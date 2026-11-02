@@ -5,7 +5,6 @@ use super::environment::SceneEnvironment;
 use super::surface::SurfaceState;
 use super::touch_input::TouchInput;
 use crate::desktop::diagnostics::integration::{DevToolsConfiguration, DiagnosticMemorySnapshot};
-use cove_composition::adaptive::SurfaceEnvironmentExt;
 use cove_composition::{
     AnyView, LayoutDebugAttachmentKey, PrimitiveView, View, ViewGraph, ViewKind,
 };
@@ -20,7 +19,7 @@ use cove_platform::{
     InputEvent, KeyEvent, KeyModifiers, MouseButton, MouseButtonEvent, MouseMotionEvent,
     MouseWheelEvent, ScrollDevice, ScrollInput, ScrollUnit, TextEditingEvent,
 };
-use cove_ui_compose::theme::surface_theme;
+use cove_ui_compose::theme::{TextScalerViewExt, surface_theme};
 use std::cell::{Cell, OnceCell, RefCell};
 use std::rc::Rc;
 use std::time::Instant;
@@ -47,7 +46,10 @@ impl PrimitiveView for AndroidAdaptiveSurface {
     fn children(&self, _node: &cove_core::scene::Node) -> Vec<AnyView> {
         let environment = self.environment.get();
         vec![AnyView::new(
-            cove_composition::AnyView::new(self.content.clone()).surface_environment(environment),
+            cove_ui_compose::primitives::layout::SurfaceRoot::new(
+                environment,
+                self.content.clone(),
+            ),
         )]
     }
 }
@@ -92,6 +94,7 @@ pub struct AndroidContentSession {
     render_root: Option<cove_core::scene::Node>,
     render_structure_version: u64,
     surface: SurfaceState,
+    performance_hud: Option<crate::desktop::diagnostics::PerformanceHud>,
 }
 
 /// How the content session turns the node tree into a draw list.
@@ -103,14 +106,54 @@ pub enum Rendering {
 
 impl AndroidContentSession {
     pub fn new(scale: f32, rendering: Rendering, content: AnyView) -> Self {
+        Self::configured(scale, rendering, content, None)
+    }
+
+    pub fn with_configuration(
+        scale: f32,
+        rendering: Rendering,
+        content: AnyView,
+        configuration: crate::ApplicationConfiguration,
+    ) -> Self {
+        Self::configured(scale, rendering, content, Some(configuration))
+    }
+
+    fn configured(
+        scale: f32,
+        rendering: Rendering,
+        content: AnyView,
+        configuration: Option<crate::ApplicationConfiguration>,
+    ) -> Self {
         let tree = Rc::new(RefCell::new(NodeTree::new()));
         let recomposer = Rc::new(Recomposer::new());
         let context = Rc::new(PlatformInputContext::new());
         let surface = SurfaceState::new(scale);
         let mut environment = SceneEnvironment::new();
+        if let Some(configuration) = &configuration {
+            environment.configure_application(configuration);
+        }
         environment.configure(surface.scale());
         let mut draw_list = DrawList::default();
-        draw_list.geometry_antialiasing = GeometryAntialiasing::Analytic;
+        draw_list.geometry_antialiasing =
+            configuration
+                .as_ref()
+                .map_or(GeometryAntialiasing::Analytic, |value| {
+                    value
+                        .window
+                        .rendering
+                        .geometry_antialiasing
+                        .unwrap_or(value.rendering.geometry_antialiasing)
+                });
+        let performance_hud = configuration
+            .as_ref()
+            .filter(|value| value.diagnostics.shows_performance_hud)
+            .map(|_| crate::desktop::diagnostics::PerformanceHud::default());
+        let content = match &configuration {
+            Some(configuration) => {
+                AnyView::new(content.text_scaler(configuration.typography.scaler.clone()))
+            }
+            None => content,
+        };
 
         let session = Self {
             tree,
@@ -131,6 +174,7 @@ impl AndroidContentSession {
             render_root: None,
             render_structure_version: 0,
             surface,
+            performance_hud,
         };
         session.with_current(|| {
             let graph = session.graph.get_or_init(|| {
@@ -373,6 +417,7 @@ impl AndroidContentSession {
         let render_structure_version = &mut self.render_structure_version;
         let diagnostics = &mut self.diagnostics;
         let needs_update = &self.needs_update;
+        let performance_hud = &mut self.performance_hud;
         let (width, height) = (surface.logical_size().0, surface.logical_size().1);
 
         let frame_start = Instant::now();
@@ -416,6 +461,10 @@ impl AndroidContentSession {
                             }
                             layers.borrow_mut().render(render_tree, draw_list);
                         }
+                        if let Some(hud) = performance_hud {
+                            hud.tick();
+                            hud.draw(draw_list);
+                        }
                         tree.timeline.borrow_mut().end(
                             trace,
                             "draw",
@@ -449,6 +498,9 @@ impl AndroidContentSession {
     }
 
     pub fn did_present(&mut self) {
+        if let Some(hud) = &mut self.performance_hud {
+            hud.presented();
+        }
         let mut tree = self.tree.borrow_mut();
         if let Some(diagnostics) = self.diagnostics.borrow_mut().as_mut() {
             diagnostics.presented(&mut tree, &self.draw_list);

@@ -9,6 +9,9 @@
 //! when it parses as `i32` inside `1...8192`, flags are presence-tested, and a
 //! `--component` value that names no page falls back to the introduction.
 
+mod application;
+pub use application::application;
+
 use crate::gallery_content::{GalleryCatalog, GalleryPage};
 
 /// The showcase window title.

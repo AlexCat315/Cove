@@ -3,5 +3,5 @@
 pub mod frame_clock;
 pub mod launch;
 
-pub use frame_clock::DisplayFrameClock;
+pub use frame_clock::{DisplayFrameClock, DisplayFramePacer};
 pub use launch::{SceneLaunch, SceneLaunchMode};

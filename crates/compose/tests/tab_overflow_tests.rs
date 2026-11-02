@@ -460,19 +460,17 @@ fn hidden_keyboard_target() {
         let focused = scene
             .focus
             .focused()
-            .and_then(|node| node.accessibility().map(|semantics| semantics.label));
+            .map(|node| cove_core::scene::AccessibilityTree::resolved_label(&node));
         assert_eq!(
             focused.as_deref(),
-            Some("Overview"),
-            "GAP: Swift moves focus to Assets; Rust keeps focus on Overview while the \
-             roving tab stop moves"
+            Some("Assets"),
+            "focus follows the roving tab stop to Assets"
         );
         scene.key(Scancode::ARROW_LEFT, KeyModifiers::default());
         assert_eq!(
             panels(scene),
-            vec!["Panel 5".to_string()],
-            "GAP: Swift's second ArrowLeft moves 4 to 2, skipping the disabled tab; Rust \
-             resolves the arrow from the still-focused Overview and wraps to History"
+            vec!["Panel 2".to_string()],
+            "the second ArrowLeft moves from 4 to 2, skipping the disabled tab"
         );
     });
 }

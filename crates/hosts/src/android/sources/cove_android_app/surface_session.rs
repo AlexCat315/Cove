@@ -4,7 +4,7 @@ use super::AndroidApplication;
 use super::content::scene::HostedScene;
 use super::frame::gpu_timings::GpuTimingReporter;
 use super::frame::timings::{FrameTimings, Phase};
-use crate::android::contract::frame_clock::DisplayFrameClock;
+use crate::android::contract::frame_clock::DisplayFramePacer;
 use cove_core::DrawList;
 use cove_graphics::rhi::{
     CommandBuffer, Device, QueueClass, RenderColorTarget, RhiResult, SurfaceDescriptor, Swapchain,
@@ -22,7 +22,7 @@ pub struct SurfaceSession {
     application: Rc<AndroidApplication>,
     swapchain: Swapchain,
     pixels: (usize, usize),
-    clock: DisplayFrameClock,
+    clock: DisplayFramePacer,
     timings: FrameTimings,
     gpu_timings: GpuTimingReporter,
     framebuffer: Option<TextureResource>,
@@ -70,7 +70,7 @@ impl SurfaceSession {
             application,
             swapchain,
             pixels: (width, height),
-            clock: DisplayFrameClock::new(),
+            clock: DisplayFramePacer::default(),
             timings,
             gpu_timings,
             framebuffer: None,
@@ -102,12 +102,14 @@ impl SurfaceSession {
     }
 
     pub fn frame(&mut self, timestamp: u64) -> Result<bool, String> {
-        let delta_time = self.clock.advance(timestamp);
         let needs_frame =
             self.application.runtime().benchmark || self.application.scene().borrow().needs_frame();
-        if !needs_frame {
+        let Some(delta_time) =
+            self.clock
+                .advance(timestamp, needs_frame, self.application.target_frame_rate())
+        else {
             return Ok(false);
-        }
+        };
         let scale = self.scale();
         let pixels = self.pixels;
         self.timings.begin();
@@ -190,7 +192,7 @@ impl SurfaceSession {
                 let frame = renderer.record(
                     &list,
                     &mut commands,
-                    RenderColorTarget::clearing(target_texture, [0.025, 0.035, 0.06, 1.0]),
+                    RenderColorTarget::clearing(target_texture, self.application.clear_color()),
                     viewport,
                     framebuffer_texture,
                 )?;

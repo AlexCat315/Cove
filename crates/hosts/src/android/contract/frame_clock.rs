@@ -33,3 +33,37 @@ impl DisplayFrameClock {
         self.previous
     }
 }
+
+/// Caps rendered frames while advancing the display clock on idle callbacks.
+#[derive(Clone, Debug, Default)]
+pub struct DisplayFramePacer {
+    clock: DisplayFrameClock,
+    last_frame: Option<u64>,
+    accumulated_delta: f64,
+}
+
+impl DisplayFramePacer {
+    pub fn advance(
+        &mut self,
+        timestamp: u64,
+        needs_frame: bool,
+        target_rate: Option<f64>,
+    ) -> Option<f64> {
+        let delta = self.clock.advance(timestamp);
+        if !needs_frame {
+            self.accumulated_delta = 0.0;
+            return None;
+        }
+        self.accumulated_delta = (self.accumulated_delta + delta).min(0.1);
+        if let (Some(previous), Some(rate)) = (
+            self.last_frame,
+            target_rate.filter(|rate| rate.is_finite() && *rate > 0.0),
+        ) && timestamp.saturating_sub(previous) as f64 + 1.0
+            < 1_000_000_000.0 / rate.clamp(1.0, 240.0)
+        {
+            return None;
+        }
+        self.last_frame = Some(timestamp);
+        Some(std::mem::take(&mut self.accumulated_delta))
+    }
+}

@@ -678,18 +678,21 @@ fn roving_navigation_skips_wraps_and_separates_activation() {
             Some(3),
             "down arrows skip the disabled row 2"
         );
-        // GAP: Swift moves focus with the selection while browsing. The Rust
-        // roving host updates the selection but focus stays on the node it
-        // started on — `RovingItem` is attached to the non-focusable
-        // destination wrapper, so the host cannot focus the new row.
+        let focused = scene
+            .focus
+            .focused()
+            .expect("a row keeps focus while browsing");
+        let mut cursor = Some(focused.clone());
+        while let Some(node) = cursor.clone() {
+            if node.id() == third.id() {
+                break;
+            }
+            cursor = node.parent();
+        }
         assert!(
-            scene
-                .focus
-                .focused()
-                .is_some_and(|focused| focused.id() == start.id()),
-            "GAP: focus stays on the row browsing started on instead of \
-             following the selection to row 3 ({:?})",
-            third.accessibility().map(|semantics| semantics.label),
+            cursor.is_some(),
+            "focus follows the selection to row 3, saw {:?}",
+            focused.accessibility().map(|semantics| semantics.label)
         );
         assert_eq!(states.activations.get(), 0, "browsing does not activate");
 

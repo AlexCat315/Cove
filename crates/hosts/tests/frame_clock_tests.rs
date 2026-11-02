@@ -8,6 +8,28 @@
 //! - a new surface starts a fresh clock
 
 use cove_hosts::android::contract::DisplayFrameClock;
+use cove_hosts::android::contract::DisplayFramePacer;
+
+#[test]
+fn capped_frames_accumulate_animation_time_without_advancing_during_idle() {
+    let mut pacer = DisplayFramePacer::default();
+    assert!(pacer.advance(1_000_000_000, true, Some(30.0)).is_some());
+    assert!(pacer.advance(1_016_666_667, true, Some(30.0)).is_none());
+    let delta = pacer.advance(1_033_333_334, true, Some(30.0)).unwrap();
+    assert!((delta - 1.0 / 30.0).abs() < 0.000001);
+    for index in 3..=60 {
+        assert!(
+            pacer
+                .advance(1_000_000_000 + index * 16_666_667, false, Some(30.0))
+                .is_none()
+        );
+    }
+    let delta = pacer.advance(2_016_666_687, true, Some(30.0)).unwrap();
+    assert!(
+        (delta - 1.0 / 60.0).abs() < 0.000001,
+        "idle callbacks do not accumulate animation time"
+    );
+}
 
 /// Timestamps are nanoseconds; the comparison tolerance mirrors the Swift
 /// `abs(...) < 0.00000001` helper.

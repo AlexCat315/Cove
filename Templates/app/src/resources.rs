@@ -8,7 +8,11 @@ use std::sync::OnceLock;
 fn bundle() -> Option<&'static ResourceBundle> {
     static BUNDLE: OnceLock<Option<ResourceBundle>> = OnceLock::new();
     BUNDLE
-        .get_or_init(|| ResourceBundle::beside_executable(&["AppContent"]).ok().flatten())
+        .get_or_init(|| {
+            ResourceBundle::beside_executable(&["AppContent"])
+                .ok()
+                .flatten()
+        })
         .as_ref()
 }
 

@@ -240,12 +240,25 @@ mod tests {
                 ..Default::default()
             }
         }
-        fn configure(&mut self, _: NativeRenderSurface, size: (u32, u32), _: bool) -> RhiResult<()> {
-            self.0.lock().unwrap().events.push(format!("configure {}x{}", size.0, size.1));
+        fn configure(
+            &mut self,
+            _: NativeRenderSurface,
+            size: (u32, u32),
+            _: bool,
+        ) -> RhiResult<()> {
+            self.0
+                .lock()
+                .unwrap()
+                .events
+                .push(format!("configure {}x{}", size.0, size.1));
             Ok(())
         }
         fn resize(&mut self, size: (u32, u32), _: bool) -> RhiResult<()> {
-            self.0.lock().unwrap().events.push(format!("resize {}x{}", size.0, size.1));
+            self.0
+                .lock()
+                .unwrap()
+                .events
+                .push(format!("resize {}x{}", size.0, size.1));
             Ok(())
         }
         fn draw(&mut self, list: &mut DrawList, _: (f32, f32)) -> RhiResult<bool> {
@@ -259,7 +272,11 @@ mod tests {
             Ok(())
         }
         fn set_presentation_active(&mut self, active: bool) -> RhiResult<()> {
-            self.0.lock().unwrap().events.push(format!("active {active}"));
+            self.0
+                .lock()
+                .unwrap()
+                .events
+                .push(format!("active {active}"));
             Ok(())
         }
         fn close(&mut self) -> RhiResult<()> {
@@ -280,7 +297,11 @@ mod tests {
             let mut list = DrawList::default();
             list.pixel_scale = scale;
             assert!(renderer.draw(&mut list, (10.0, 10.0)).unwrap());
-            assert_eq!(list.pixel_scale, if scale == 1.0 { 0.0 } else { scale - 1.0 }, "the list comes back recycled");
+            assert_eq!(
+                list.pixel_scale,
+                if scale == 1.0 { 0.0 } else { scale - 1.0 },
+                "the list comes back recycled"
+            );
         }
         renderer.resize((20, 20), true).unwrap();
         assert_eq!(
@@ -291,8 +312,19 @@ mod tests {
         let log = log.lock().unwrap();
         assert_eq!(
             log.events,
-            ["configure 10x10", "draw 1", "draw 2", "draw 3", "resize 20x20", "close"]
+            [
+                "configure 10x10",
+                "draw 1",
+                "draw 2",
+                "draw 3",
+                "resize 20x20",
+                "close"
+            ]
         );
-        assert!(log.threads.iter().all(|thread| *thread != std::thread::current().id()));
+        assert!(
+            log.threads
+                .iter()
+                .all(|thread| *thread != std::thread::current().id())
+        );
     }
 }

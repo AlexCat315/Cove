@@ -14,6 +14,8 @@ pub struct SceneEnvironment {
     text: Option<TextEnvironment>,
     raster_scale: Option<f32>,
     work: Rc<RefCell<Vec<Rc<dyn Fn()>>>>,
+    typography: Option<crate::desktop::application::configuration::TypographyConfiguration>,
+    cache_limits: cove_text::TextCacheLimits,
 }
 
 impl SceneEnvironment {
@@ -23,6 +25,8 @@ impl SceneEnvironment {
             text: None,
             raster_scale: None,
             work: Rc::new(RefCell::new(Vec::new())),
+            typography: None,
+            cache_limits: cove_text::TextCacheLimits::default(),
         }
     }
 
@@ -38,6 +42,13 @@ impl SceneEnvironment {
         !self.work.borrow().is_empty()
     }
 
+    pub fn configure_application(&mut self, configuration: &crate::ApplicationConfiguration) {
+        self.typography = Some(configuration.typography.clone());
+        self.cache_limits = configuration.memory.text;
+        self.images.set_limits(configuration.memory.images);
+        self.raster_scale = None;
+    }
+
     pub fn configure(&mut self, scale: f32) {
         let raster_scale = scale.clamp(1.0, 4.0);
         if self.raster_scale == Some(raster_scale) {
@@ -46,11 +57,25 @@ impl SceneEnvironment {
         self.raster_scale = Some(raster_scale);
         self.text = Some(TextEnvironment::bootstrapped(TextBootstrapOptions {
             atlas_texture_id: 1,
-            primary_font_name: SystemFontDefaults::primary_font_name(),
-            default_font: Font::system(16.0, FontWeight::Regular),
-            default_line_height: 22.0,
+            primary_font_name: self
+                .typography
+                .as_ref()
+                .map_or_else(SystemFontDefaults::primary_font_name, |value| {
+                    value.primary_font_name.clone()
+                }),
+            default_font: Font::system(
+                self.typography
+                    .as_ref()
+                    .map_or(16.0, |value| value.font_size),
+                FontWeight::Regular,
+            ),
+            default_line_height: self
+                .typography
+                .as_ref()
+                .map_or(22.0, |value| value.line_height),
             raster_scale,
             atlas_edge: Some(2048),
+            cache_limits: self.cache_limits,
             ..TextBootstrapOptions::default()
         }));
     }
