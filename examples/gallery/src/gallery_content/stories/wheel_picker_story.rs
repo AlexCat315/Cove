@@ -9,7 +9,7 @@ use cove_composition::Scope;
 use cove_core::State;
 use cove_ui_compose::modifiers::layout::FlexExt;
 use cove_ui_compose::modifiers::style::SemanticStyleViewExt;
-use cove_ui_compose::primitives::controls::Checkbox;
+use cove_ui_compose::primitives::controls::{Button, Checkbox};
 use cove_ui_compose::primitives::controls::fields::{
     WheelPicker, WheelPickerModel, WheelPickerOption,
 };
@@ -103,7 +103,7 @@ impl WheelPickerStory {
         self.is_enabled.get()
     }
 
-    /// Restores the authored defaults, which is what the Reset button does.
+    /// Restores the authored defaults.
     pub fn reset(&self) {
         self.hour.set(9);
         self.minute.set(30);
@@ -214,10 +214,58 @@ impl View for WheelPickerStory {
             ])),
         ));
 
+        let committed = AnyView::new(
+            Text::new(format!(
+                "Committed: {}:{} {} · volume {}",
+                self.hour_wheel().selected_label().unwrap_or("--"),
+                self.minute_wheel().selected_label().unwrap_or("--"),
+                self.period_wheel().selected_label().unwrap_or("--"),
+                self.volume_wheel().selected_label().unwrap_or("--"),
+            ))
+            .semantic_font(cove_ui_compose::theme::SemanticFontRef::caption())
+            .semantic_foreground(SemanticColorRef::on_surface_muted()),
+        );
+
+        let reset = {
+            let story = Self {
+                options: self.options.clone(),
+                hour: self.hour.clone(),
+                minute: self.minute.clone(),
+                period: self.period.clone(),
+                volume: self.volume.clone(),
+                is_enabled: self.is_enabled.clone(),
+            };
+            AnyView::new(Button::title("Reset", move || story.reset()).enabled(enabled))
+        };
+        let snap = {
+            let story = Self {
+                options: self.options.clone(),
+                hour: self.hour.clone(),
+                minute: self.minute.clone(),
+                period: self.period.clone(),
+                volume: self.volume.clone(),
+                is_enabled: self.is_enabled.clone(),
+            };
+            AnyView::new(
+                Button::title("Read 13:47 on a 24-hour clock", move || {
+                    story.set_time_24h(13, 47)
+                })
+                .enabled(enabled),
+            )
+        };
+        let controls = AnyView::new(BoxView::new(
+            cove_core::scene::FlexDirection::Row,
+            cove_core::scene::Align::Center,
+            cove_core::scene::Justify::FlexStart,
+            cove_core::scene::Wrap::Wrap,
+            12.0,
+            AnyView::new(TupleView::new(vec![reset, snap, committed])),
+        ));
+
         AnyView::new(StorySection::new(
             "Wheel selection",
             "Scroll, drag, click a row or use arrow keys / Home / End. The center band marks the committed value; disabled rows are skipped.",
-            AnyView::new(TupleView::new(vec![toggle, header, wheels])),
+            AnyView::new(TupleView::new(vec![toggle, header, wheels, controls])),
         ))
     }
 

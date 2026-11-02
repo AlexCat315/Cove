@@ -156,6 +156,12 @@ pub struct ThreadedWindowRenderer {
     snapshot: Arc<Mutex<AppWindowMemorySnapshot>>,
     configured: bool,
     closed: bool,
+    /// Frames refused because every slot was in flight.
+    dropped: u32,
+    /// A refused frame is still waiting for a slot. Cleared when the caller
+    /// retries it, so the scene thread can be woken the instant capacity frees
+    /// instead of polling for it.
+    retry_pending: bool,
 }
 
 impl ThreadedWindowRenderer {
@@ -208,6 +214,8 @@ impl ThreadedWindowRenderer {
             snapshot,
             configured: false,
             closed: false,
+            dropped: 0,
+            retry_pending: false,
         };
         (this, worker)
     }
@@ -322,6 +330,31 @@ impl ThreadedWindowRenderer {
         self.in_flight < MAX_FRAMES_IN_FLIGHT
     }
 
+    /// Frames refused because every slot was in flight, since construction.
+    pub fn dropped_frames(&self) -> u32 {
+        self.dropped
+    }
+
+    /// Records that a frame was refused for lack of a slot, without submitting
+    /// one. The caller does this when it can see capacity is gone before it has
+    /// anything to submit.
+    pub fn note_frame_dropped(&mut self) {
+        self.dropped = self.dropped.saturating_add(1);
+        self.retry_pending = true;
+    }
+
+    /// Reports a refused frame that can now be retried, once. The caller turns
+    /// this into a display request, which is the wake the drop path must not be
+    /// able to lose: capacity frees on the render thread, and this is how that
+    /// becomes a scene-thread wake instead of a silent stall.
+    pub fn take_retry_pending(&mut self) -> bool {
+        if self.retry_pending && self.has_frame_capacity() {
+            self.retry_pending = false;
+            return true;
+        }
+        false
+    }
+
     /// Hands `list` to the render thread and returns at once; `list` is left
     /// holding a recycled buffer. `None` means every frame is in flight, the
     /// frame was dropped and `list` is untouched.
@@ -331,8 +364,12 @@ impl ThreadedWindowRenderer {
         logical: (f32, f32),
     ) -> RhiResult<Option<FrameToken>> {
         if !self.has_frame_capacity() {
+            // Refusing the frame is a pacing decision, not a failure: remember
+            // that one is owed so the caller can retry the moment a slot frees.
+            self.note_frame_dropped();
             return Ok(None);
         }
+        self.retry_pending = false;
         let mut frame = self.recycled.pop().unwrap_or_default();
         std::mem::swap(&mut frame, list);
         // Settings that outlive one frame stay with the recording side.

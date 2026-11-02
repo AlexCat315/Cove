@@ -13,10 +13,7 @@
 //! once and placed in each branch, which is what the Swift `wide`/`compact`
 //! builder pairs did.
 use cove_composition::Scope;
-use cove_composition::{
-    AnyView, LayoutDebugAttachmentKey, LayoutDebugExt, PrimitiveView, View, ViewExt,
-    impl_primitive_view,
-};
+use cove_composition::{AnyView, LayoutDebugExt, View, ViewExt};
 use cove_core::scene::{Align, FlexDirection, Justify, LayoutNode, Node, Wrap};
 use cove_core::{Binding, State};
 use cove_ui_compose::modifiers::layout::{FlexExt, LayoutFrameExt, PaddingExt};
@@ -396,27 +393,6 @@ impl GalleryThemeToggle {
     }
 }
 
-/// Docks the navigation pane at its authored width.
-///
-/// `navigation_width` was declared, initialised and cloned but **never read**, so
-/// the docked `Sidebar` went into the `ViewThatFits` row unconstrained and
-/// stretched to the whole window — `gallery-content` then resolved to 0pt wide at
-/// 1280pt. Swift passes the same state to `AdaptiveSidebar(width:)`
-/// (`GalleryView.swift:34`). This is the seam that replaces it.
-struct GallerySidebarFrame {
-    width: f32,
-}
-
-impl cove_composition::ViewModifier for GallerySidebarFrame {
-    fn apply_layout(&self, layout: &LayoutNode) {
-        layout.set_flex_shrink(0.0);
-        layout.set_min_width(Some(0.0));
-        if self.width.is_finite() && self.width > 0.0 {
-            layout.set_width(Some(self.width));
-        }
-    }
-}
-
 struct GalleryCompactFooterFrame;
 
 impl cove_composition::ViewModifier for GalleryCompactFooterFrame {
@@ -436,46 +412,6 @@ impl cove_composition::ViewModifier for GalleryShellFrame {
         layout.set_min_height(Some(0.0));
     }
 }
-
-/// Row of navigation plus content. `Sidebar` owns its own width, so this only
-/// stretches both children.
-struct WorkspaceSplitRow {
-    sidebar: AnyView,
-    content: GalleryPagePane,
-}
-
-impl PrimitiveView for WorkspaceSplitRow {
-    fn make_node(&self) -> Node {
-        let node = Node::new();
-        node.set_is_hit_testable(false);
-        node
-    }
-    fn update_node(&self, _node: &Node) {}
-    fn make_layout_node(&self) -> Option<LayoutNode> {
-        let layout = LayoutNode::new();
-        layout.set_flex_direction(FlexDirection::Row);
-        layout.set_align_items(Align::Stretch);
-        layout.set_min_width(Some(0.0));
-        layout.set_min_height(Some(0.0));
-        Some(layout)
-    }
-    fn children(&self, _node: &Node) -> Vec<AnyView> {
-        vec![
-            self.sidebar.clone(),
-            erased(
-                AnyView::new(GalleryPagePane {
-                    page: self.content.page.clone(),
-                    options: self.content.options.clone(),
-                    reset_generation: self.content.reset_generation.clone(),
-                    text_scale: self.content.text_scale.clone(),
-                })
-                .flex_with(1.0, 1.0, Some(0.0))
-                .frame_min_width(0.0),
-            ),
-        ]
-    }
-}
-impl_primitive_view!(WorkspaceSplitRow);
 
 /// Page selection is read inside the outlet, away from the adaptive shell.
 struct GalleryPagePane {

@@ -1,30 +1,22 @@
-//! Translation of `Examples/Tests/GalleryContentTests/SplitTests.swift`.
+//! Behaviour tests for the split-view story.
 //!
-//! Behaviour checklist:
-//! - the `splitView` page declares an adaptive sample at both preview widths
-//! - the story mounts at both text scales without collapsing
-//! - the adaptive preview caption is rendered
-//! - the two preview width bands resolve the documented sample size
+//! Translation of `Examples/Tests/GalleryContentTests/SplitTests.swift`, minus
+//! the fixed-width adaptive previews Swift wrapped around the story. Swift
+//! mounted `AdaptiveControlExamples(page: .splitView, options:)` to place two
+//! copies of the story inside 390pt and 720pt containers and then located them
+//! by debug name (`adaptive-splitView-narrow` / `-wide`). That preview shell is
+//! not ported, so the story is mounted directly and the same contracts are
+//! asserted where they live: the three authored splits, their authored
+//! fractions, and the divider bounds.
 //!
 //! ## Named differences
 //!
-//! `GAP(adaptive_examples.rs AdaptiveControlExamples)`: Swift's suite mounted
-//! `AdaptiveControlExamples(page: .splitView, options:)` and then located two
-//! real split-view previews by debug name (`adaptive-splitView-narrow` and
-//! `adaptive-splitView-wide`). Inside each it asserted:
-//!   - a `Details` tab whose `acceptsSubtreeInput` is true only for the narrow
-//!     preview;
-//!   - a focusable text field that is initially unreachable in the narrow
-//!     preview and becomes reachable after activating `Details`;
-//!   - typing "Edited " through a real `EventDispatcher` updates the field's
-//!     accessibility value, and that value survives switching to `Navigation`
-//!     and back, with the field keeping its element id.
-//! The Rust `AdaptiveControlExamples::body` renders a single caption
-//! (`adaptive-preview-caption`); it does not render either preview, any tab, or
-//! any text field. `sample_size` and `adaptive_debug_name` exist as pure
-//! functions but nothing in the view tree uses them. Everything that is
-//! reachable — the declared sample height, both width bands, the caption and the
-//! mount at both scales — is asserted at full strength.
+//! - Swift's per-preview tabs and text field (`Details` / `Navigation`) belong to
+//!   a split-view *demo* that never shipped in the Rust story; the Rust page
+//!   shows three splits instead, so those focus assertions have no target.
+//! - The adaptive sample tables (`supports`, per-page sample heights, preview
+//!   widths) were deleted with `adaptive_examples.rs`; the previews are not part
+//!   of the port.
 
 use cove_composition::Scope;
 mod support;
@@ -32,17 +24,15 @@ mod support;
 use std::rc::Rc;
 
 use cove_composition::AnyView;
-use cove_examples::gallery_content::catalog::{GalleryOptions, GalleryPage};
-use cove_examples::gallery_content::stories::adaptive_examples::{
-    AdaptiveControlExamples, FRAME_PADDING, PREVIEW_WIDTHS, frame_height,
-};
+use cove_examples::gallery_content::catalog::GalleryOptions;
+use cove_examples::gallery_content::stories::SplitViewStory;
 use cove_ui_compose::theme::TextScalerViewExt;
 use cove_ui_compose::theme::tokens::TextScaler;
 
 use support::GalleryScene;
 
 struct Mounted {
-    story: Rc<AdaptiveControlExamples>,
+    story: Rc<SplitViewStory>,
     scale: f32,
 }
 
@@ -54,7 +44,7 @@ impl cove_composition::View for Mounted {
     }
 }
 
-struct StoryView(Rc<AdaptiveControlExamples>);
+struct StoryView(Rc<SplitViewStory>);
 
 impl cove_composition::View for StoryView {
     fn body(&self, cx: &Scope) -> AnyView {
@@ -62,8 +52,8 @@ impl cove_composition::View for StoryView {
     }
 }
 
-fn scene(scale: f32, body: impl FnOnce(&GalleryScene, &AdaptiveControlExamples)) {
-    let story = Rc::new(AdaptiveControlExamples::new(GalleryPage::SplitView));
+fn scene(scale: f32, body: impl FnOnce(&GalleryScene, &SplitViewStory)) {
+    let story = Rc::new(SplitViewStory::new(GalleryOptions::default()));
     let mounted = story.clone();
     GalleryScene::run(
         900.0,
@@ -82,87 +72,46 @@ fn scene(scale: f32, body: impl FnOnce(&GalleryScene, &AdaptiveControlExamples))
 }
 
 #[test]
-fn the_split_view_page_declares_an_adaptive_sample_at_both_widths() {
-    assert!(
-        GalleryPage::SplitView.has_adaptive_sample(),
-        "splitView is in the supported set"
-    );
-    assert_eq!(
-        GalleryPage::SplitView.adaptive_sample_height(),
-        Some(220.0),
-        "the split preview reserves the authored 220pt"
-    );
-    assert_eq!(
-        frame_height(GalleryPage::SplitView),
-        Some(220.0 + FRAME_PADDING),
-        "the frame height adds the authored label padding"
-    );
-
-    for width in PREVIEW_WIDTHS {
-        // Both bands resolve a definite size, so the preview is measurable.
-        assert!(
-            AdaptiveControlExamples::new(GalleryPage::SplitView)
-                .sample_size(width)
-                .1
-                .is_some(),
-            "the {width}pt preview has a definite height"
-        );
-        let name = GalleryPage::SplitView.adaptive_debug_name(width);
-        assert!(
-            name.starts_with("adaptive-splitView-"),
-            "the preview carries its page name, got {name:?}"
-        );
-    }
-    assert_eq!(
-        GalleryPage::SplitView.adaptive_debug_name(390.0),
-        "adaptive-splitView-narrow"
-    );
-    assert_eq!(
-        GalleryPage::SplitView.adaptive_debug_name(720.0),
-        "adaptive-splitView-wide"
-    );
-}
-
-#[test]
-fn the_preview_caption_renders_at_both_text_scales() {
+fn the_story_mounts_every_authored_split() {
     for scale in [1.0f32, 2.0] {
-        scene(scale, |scene, story| {
-            assert!(story.supports(), "splitView has something to preview");
-            assert_eq!(
-                story.captions(),
-                ["390 pt · Pointer", "720 pt · Pointer"],
-                "the story lists both preview bands"
-            );
-
-            let caption = scene
-                .named("adaptive-preview-caption")
-                .unwrap_or_else(|| panic!("no preview caption at scale {scale}"));
-            assert!(
-                caption.frame().width > 0.0 && caption.frame().height > 0.0,
-                "the caption has a real box at scale {scale}, got {:?}",
-                caption.frame()
-            );
-            assert!(
-                scene.has_text("390 pt · Pointer"),
-                "the caption renders the narrow band at scale {scale}, texts: {:?}",
-                scene.texts()
-            );
+        scene(scale, |scene, _story| {
+            for name in ["split-control", "split-proportional", "split-vertical"] {
+                let node = scene
+                    .named(name)
+                    .unwrap_or_else(|| panic!("no {name} at scale {scale}"));
+                let frame = node.frame();
+                assert!(
+                    frame.width > 0.0 && frame.height > 0.0,
+                    "{name} has a real box at scale {scale}, got {frame:?}"
+                );
+            }
         });
     }
 }
 
 #[test]
-fn the_story_reports_the_split_sample_size_for_each_band() {
-    let story = AdaptiveControlExamples::new(GalleryPage::SplitView);
-    assert_eq!(
-        story.sample_size(390.0),
-        (390.0, Some(252.0)),
-        "the narrow preview is 390pt wide plus the 32pt label band"
-    );
-    assert_eq!(
-        story.sample_size(720.0),
-        (720.0, Some(252.0)),
-        "the wide preview is 720pt wide plus the 32pt label band"
-    );
-    let _ = GalleryOptions::default();
+fn the_authored_frames_are_preserved() {
+    scene(1.0, |scene, _story| {
+        let resizable = scene.require_named("split-control").frame();
+        assert_eq!(resizable.width, 420.0, "the resizable split keeps 420pt");
+        assert_eq!(resizable.height, 160.0, "the resizable split keeps 160pt");
+        let vertical = scene.require_named("split-vertical").frame();
+        assert_eq!(vertical.width, 320.0, "the vertical split keeps 320pt");
+        assert_eq!(vertical.height, 180.0, "the vertical split keeps 180pt");
+    });
+}
+
+#[test]
+fn the_resizable_fraction_stays_inside_its_bounds() {
+    let story = SplitViewStory::new(GalleryOptions::default());
+    assert_eq!(story.fraction(), 0.5, "the divider starts centred");
+    assert_eq!(story.readout(), "50 / 50");
+
+    story.set_fraction(0.95);
+    assert_eq!(story.fraction(), SplitViewStory::RANGE.1, "clamped at the top");
+    assert_eq!(story.readout(), "80 / 20");
+
+    story.set_fraction(0.05);
+    assert_eq!(story.fraction(), SplitViewStory::RANGE.0, "clamped at the bottom");
+    assert_eq!(story.readout(), "20 / 80");
 }

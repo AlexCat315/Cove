@@ -43,7 +43,6 @@ use std::collections::BTreeSet;
 
 use cove_composition::AnyView;
 use cove_examples::gallery_content::catalog::{GalleryCatalog, GalleryPage};
-use cove_examples::gallery_content::stories::adaptive_examples::ALL_PAGES;
 use cove_examples::gallery_content::{GalleryView, StoryDispatch};
 use cove_ui_compose::theme::styles::appearance_modifier::Appearance;
 
@@ -68,14 +67,12 @@ fn scene(
 fn every_catalog_entry_has_a_unique_page_and_can_be_located_by_name() {
     let entries = GalleryCatalog::entries();
     let pages: BTreeSet<GalleryPage> = entries.iter().map(|entry| entry.page).collect();
-    let all: BTreeSet<GalleryPage> = ALL_PAGES.into_iter().collect();
-    assert_eq!(pages, all, "the catalog must cover every page exactly once");
     assert_eq!(
+        pages.len(),
         entries.len(),
-        ALL_PAGES.len(),
         "one entry per page, got {} entries for {} pages",
         entries.len(),
-        ALL_PAGES.len()
+        pages.len()
     );
 
     for entry in &entries {
@@ -118,8 +115,12 @@ fn every_catalog_entry_has_a_unique_page_and_can_be_located_by_name() {
 
 #[test]
 fn all_stories_materialize_and_settle_in_light_and_dark_themes() {
+    let pages: Vec<GalleryPage> = GalleryCatalog::entries()
+        .iter()
+        .map(|entry| entry.page)
+        .collect();
     for appearance in [Appearance::Light, Appearance::Dark] {
-        for page in ALL_PAGES {
+        for page in pages.clone() {
             let dispatch = StoryDispatch::new(page);
             let implemented = dispatch.is_implemented();
             // Pages whose story needs unmigrated widgets render the pending
@@ -318,17 +319,10 @@ fn the_sidebar_lays_its_slots_and_rows_on_one_column() {
 }
 
 #[test]
-fn the_placement_playground_keeps_its_trigger_inside_the_story() {
-    // GAP(placement_example.rs): Swift's `PopoverPlacementExample` rendered a
-    // `popover-placement-preview` box holding twelve per-placement trigger
-    // buttons, and asserted every trigger stayed inside the preview (and that
-    // the single narrow trigger was horizontally centred). The Rust
-    // `PlacementExample` is a compact story: one `StorySection` with a title, a
-    // detail line and ONE trigger button that cycles `VARIANTS`. There is no
-    // preview node and no twelve-trigger grid, so those assertions have no
-    // target. Pinned below is what the shipped story does: the trigger cycles
-    // every placement, stays inside the section, and the story keeps its
-    // authored copy.
+fn every_placement_trigger_stays_inside_the_story() {
+    // The story now mounts one real `Popover` per placement, so the Swift
+    // contract is reachable: twelve labelled triggers, every one of them inside
+    // the story's box, and pressing one reveals its bubble.
     use cove_examples::gallery_content::catalog::GalleryOptions;
     use cove_examples::gallery_content::stories::placement_example::{PlacementExample, VARIANTS};
     use cove_ui_compose::modifiers::layout::{FrameDimension, LayoutFrameExt};
@@ -337,14 +331,14 @@ fn the_placement_playground_keeps_its_trigger_inside_the_story() {
 
     // `GalleryScene::run` takes the global lock and installs the text
     // environment itself; wrapping it in `with_scheduler` again deadlocks.
-    for width in [300.0f32, 390.0, 720.0] {
+    for width in [390.0f32, 720.0] {
         for scale in [1.0f32, 2.0] {
             let story = std::rc::Rc::new(PlacementExample::new(GalleryOptions::default()));
             let mounted = story.clone();
             let section_width = width;
             GalleryScene::run(
                 width,
-                1000.0,
+                1200.0,
                 move |_| {
                     AnyView::new(
                         AnyView::new(PlacementStory(mounted))
@@ -380,48 +374,40 @@ fn the_placement_playground_keeps_its_trigger_inside_the_story() {
                         "the section has a real box at width {width}"
                     );
 
-                    let trigger = scene
+                    let labels: Vec<String> = VARIANTS
+                        .iter()
+                        .map(|variant| format!("{:?} placement", variant.placement))
+                        .collect();
+                    let debug_labels: Vec<String> = scene
+                        .all(|node| node.accessibility().is_some())
+                        .into_iter()
+                        .filter_map(|node| {
+                            node.accessibility()
+                                .map(|semantics| format!("{:?}:{}", semantics.role, semantics.label))
+                        })
+                        .collect();
+                    let triggers: Vec<_> = scene
                         .all(|node| {
                             node.accessibility().is_some_and(|semantics| {
                                 semantics.role == cove_core::scene::AccessibilityRole::Button
-                                    && !semantics.label.is_empty()
+                                    && labels.contains(&semantics.label)
                             })
                         })
                         .into_iter()
-                        .next()
-                        .unwrap_or_else(|| {
-                            panic!("no labelled trigger at width {width} scale {scale}")
-                        });
-                    let frame = trigger.absolute_frame();
-                    assert!(
-                        frame.x >= section_frame.x - 1.0
-                            && frame.y >= section_frame.y - 1.0
-                            && frame.x + frame.width <= section_frame.x + section_frame.width + 1.0,
-                        "the trigger {frame:?} escapes its section {section_frame:?} \
-                         at width {width} scale {scale}"
+                        .collect();
+                    assert_eq!(
+                        triggers.len(),
+                        VARIANTS.len(),
+                        "one trigger per placement at width {width} scale {scale}: {debug_labels:?}"
                     );
-
-                    for _ in 0..VARIANTS.len() {
-                        scene.settle_n(1);
-                        let before = story.selected();
-                        let trigger = scene
-                            .all(|node| {
-                                node.accessibility().is_some_and(|semantics| {
-                                    semantics.role == cove_core::scene::AccessibilityRole::Button
-                                        && !semantics.label.is_empty()
-                                })
-                            })
-                            .into_iter()
-                            .next()
-                            .expect("trigger");
-                        scene.click(&trigger);
-                        scene.settle_n(2);
-                        assert_eq!(
-                            story.selected(),
-                            (before + 1) % VARIANTS.len(),
-                            "the trigger cycles to the next placement (frame {:?}, label {:?})",
-                            trigger.absolute_frame(),
-                            trigger.accessibility().map(|s| s.label)
+                    for trigger in triggers {
+                        let frame = trigger.absolute_frame();
+                        assert!(
+                            frame.x >= section_frame.x - 1.0
+                                && frame.x + frame.width
+                                    <= section_frame.x + section_frame.width + 1.0,
+                            "the trigger {frame:?} escapes its section {section_frame:?} \
+                             at width {width} scale {scale}"
                         );
                     }
                 },

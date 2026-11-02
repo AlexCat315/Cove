@@ -18,14 +18,20 @@ use cove_ui_compose::modifiers::style::SemanticStyleViewExt;
 use cove_ui_compose::primitives::data::lists::RowState;
 use cove_ui_compose::primitives::data::lists::Selection;
 use cove_ui_compose::primitives::data::lists::refresh::RefreshOptions;
+use cove_ui_compose::primitives::data::lists::swipe_list::SwipeList;
 use cove_ui_compose::primitives::data::lists::tree::{
     Tree, TreeOptions, TreeSearch, TreeSelection,
 };
+use cove_ui_compose::primitives::controls::Button;
+use cove_ui_compose::primitives::data::{List, ListSection, SectionedList, SwipeAction};
+use cove_ui_compose::primitives::feedback::StatusTone;
+use cove_ui_compose::primitives::interaction::{DragScope, Draggable, DropTarget};
+use cove_ui_compose::primitives::layout::virtualization::FixedVirtualStack;
 use cove_ui_compose::primitives::text::Text;
 use cove_ui_compose::primitives::text::text_buffer::TextBuffer;
 use cove_ui_compose::primitives::text::text_field::TextField;
 use cove_ui_compose::theme::tokens::SemanticColorRef;
-use cove_ui_compose::{AnyView, LayoutDebugExt, TupleView, View, ViewExt};
+use cove_ui_compose::{AnyView, BoxView, LayoutDebugExt, TupleView, View};
 
 use super::feedback::StorySection;
 use crate::gallery_content::catalog::GalleryOptions;
@@ -362,15 +368,55 @@ impl Default for VirtualStackStory {
     }
 }
 
+impl VirtualStackStory {
+    fn handle(&self) -> Self {
+        Self {
+            target: self.target.clone(),
+        }
+    }
+}
+
 impl View for VirtualStackStory {
     fn body(&self, _cx: &Scope) -> AnyView {
+        let ids: Vec<usize> = (0..VIRTUAL_STACK_COUNT).collect();
+        let stack = AnyView::new(
+            FixedVirtualStack::new(ids, VIRTUAL_ROW_HEIGHT, |index: &usize| {
+                AnyView::new(Text::new(Self::row_label(*index)))
+            })
+            .scroll_to_index(self.target())
+            .frame_height(220.0)
+            .debug_name("virtual-stack"),
+        );
+        let first = self.handle();
+        let middle = self.handle();
+        let last = self.handle();
+        let controls = AnyView::new(BoxView::new(
+            cove_core::scene::FlexDirection::Row,
+            cove_core::scene::Align::Center,
+            cove_core::scene::Justify::FlexStart,
+            cove_core::scene::Wrap::Wrap,
+            12.0,
+            AnyView::new(TupleView::new(vec![
+                AnyView::new(Button::title("First", move || first.scroll_to_first())),
+                AnyView::new(Button::title("Middle", move || middle.scroll_to_middle())),
+                AnyView::new(Button::title("Last", move || last.scroll_to_last())),
+                AnyView::new(
+                    Text::new(Self::row_label(self.target()))
+                        .semantic_font(cove_ui_compose::theme::SemanticFontRef::caption()),
+                ),
+            ])),
+        ));
         AnyView::new(StorySection::new(
             "Scroll to index",
             "The viewport materializes rows around the requested index.",
-            AnyView::new(
-                Text::new(Self::row_label(self.target()))
-                    .semantic_font(cove_ui_compose::theme::SemanticFontRef::caption()),
-            ),
+            AnyView::new(cove_ui_compose::BoxView::new(
+                cove_core::scene::FlexDirection::Column,
+                cove_core::scene::Align::Stretch,
+                cove_core::scene::Justify::FlexStart,
+                cove_core::scene::Wrap::NoWrap,
+                12.0,
+                AnyView::new(TupleView::new(vec![controls, stack])),
+            )),
         ))
     }
 
@@ -452,14 +498,54 @@ impl Default for SwipeListStory {
 
 impl View for SwipeListStory {
     fn body(&self, _cx: &Scope) -> AnyView {
+        let actions_log = self.log.clone();
+        let activate_log = self.log.clone();
+        let rows = (0..SWIPE_ROWS.len()).collect::<Vec<usize>>();
+        let list = AnyView::new(
+            SwipeList::new(rows, |index: &usize| *index, |index: &usize, _: RowState| {
+                AnyView::new(Text::new(SWIPE_ROWS[*index]))
+            })
+            .selection(Selection::single(self.selection.binding()))
+            .actions(move |index: &usize| {
+                let row = SWIPE_ROWS[*index];
+                let archive = actions_log.clone();
+                let delete = actions_log.clone();
+                vec![
+                    SwipeAction::new(*index as u64 * 10 + 1, "Archive", move || {
+                        archive.set(format!("Archived {row}"))
+                    }),
+                    SwipeAction::new(*index as u64 * 10 + 2, "Delete", move || {
+                        delete.set(format!("Deleted {row}"))
+                    })
+                    .tone(StatusTone::Danger),
+                ]
+            })
+            .on_activate(move |index: &usize| {
+                activate_log.set(format!("Opened {}", SWIPE_ROWS[*index]));
+            })
+            .row_height(44.0)
+            .row_label(|index: &usize| SWIPE_ROWS[*index].to_owned())
+            .frame_height(240.0)
+            .debug_name("swipe-list"),
+        );
         AnyView::new(StorySection::new(
             "Swipe actions",
             "Touch rows reveal up to two trailing actions. Every row also has an actions button and a right-click menu, so pointer, keyboard and assistive clients can run the same commands without swiping.",
-            AnyView::new(
-                Text::new(self.log())
-                    .semantic_font(cove_ui_compose::theme::SemanticFontRef::caption())
-                    .debug_name("swipe-log"),
-            ),
+            AnyView::new(cove_ui_compose::BoxView::new(
+                cove_core::scene::FlexDirection::Column,
+                cove_core::scene::Align::Stretch,
+                cove_core::scene::Justify::FlexStart,
+                cove_core::scene::Wrap::NoWrap,
+                12.0,
+                AnyView::new(TupleView::new(vec![
+                    list,
+                    AnyView::new(
+                        Text::new(self.log())
+                            .semantic_font(cove_ui_compose::theme::SemanticFontRef::caption())
+                            .debug_name("swipe-log"),
+                    ),
+                ])),
+            )),
         ))
     }
 
@@ -512,11 +598,23 @@ impl RefreshListStory {
         self.is_refreshing.set(false);
     }
 
-    /// The refresh options the list receives.
+    /// The refresh options the list receives. A pull calls back into the story,
+    /// which owns the in-flight flag.
     pub fn options(&self) -> RefreshOptions {
-        RefreshOptions::new(|| {})
-            .threshold(REFRESH_THRESHOLD)
-            .refreshing(self.is_refreshing.get())
+        let story = self.handle();
+        RefreshOptions::new(move || {
+            story.start_refresh();
+        })
+        .threshold(REFRESH_THRESHOLD)
+        .label("Refreshing…")
+        .refreshing(self.is_refreshing.get())
+    }
+
+    fn handle(&self) -> Self {
+        Self {
+            is_refreshing: self.is_refreshing.clone(),
+            refreshes: self.refreshes.clone(),
+        }
     }
 }
 
@@ -528,14 +626,58 @@ impl Default for RefreshListStory {
 
 impl View for RefreshListStory {
     fn body(&self, _cx: &Scope) -> AnyView {
+        let rows = (0..REFRESH_ROWS.len()).collect::<Vec<usize>>();
+        let list = AnyView::new(
+            List::new(rows, |index: &usize, _: RowState| {
+                AnyView::new(Text::new(REFRESH_ROWS[*index]))
+            })
+            .row_height(44.0)
+            .refresh(self.options())
+            .frame_height(240.0)
+            .debug_name("refresh-list"),
+        );
+        let start = self.handle();
+        let refresh = AnyView::new(
+            Button::title("Refresh", move || {
+                start.start_refresh();
+            })
+            .enabled(!self.is_refreshing()),
+        );
+        let finish = self.handle();
+        let done = AnyView::new(
+            Button::title("Finish", move || finish.finish_refresh())
+                .enabled(self.is_refreshing()),
+        );
+        let indicator = AnyView::new(
+            Text::new(if self.is_refreshing() {
+                "Refreshing…".to_owned()
+            } else {
+                format!("Refreshes: {}", self.refreshes())
+            })
+            .semantic_font(cove_ui_compose::theme::SemanticFontRef::caption())
+            .debug_name("refresh-count"),
+        );
         AnyView::new(StorySection::new(
             "Pull to refresh",
             "Touch pull past 64pt starts the caller-owned refresh; the indicator holds until the binding clears and freezes under reduced motion. Cmd+R or Ctrl+R is the keyboard path, and the explicit button is the pointer path.",
-            AnyView::new(
-                Text::new(format!("Refreshes: {}", self.refreshes()))
-                    .semantic_font(cove_ui_compose::theme::SemanticFontRef::caption())
-                    .debug_name("refresh-count"),
-            ),
+            AnyView::new(cove_ui_compose::BoxView::new(
+                cove_core::scene::FlexDirection::Column,
+                cove_core::scene::Align::Stretch,
+                cove_core::scene::Justify::FlexStart,
+                cove_core::scene::Wrap::NoWrap,
+                12.0,
+                AnyView::new(TupleView::new(vec![
+                    list,
+                    AnyView::new(cove_ui_compose::BoxView::new(
+                        cove_core::scene::FlexDirection::Row,
+                        cove_core::scene::Align::Center,
+                        cove_core::scene::Justify::FlexStart,
+                        cove_core::scene::Wrap::Wrap,
+                        12.0,
+                        AnyView::new(TupleView::new(vec![refresh, done, indicator])),
+                    )),
+                ])),
+            )),
         ))
     }
 
@@ -596,17 +738,94 @@ impl Default for DragAndDropStory {
 
 impl View for DragAndDropStory {
     fn body(&self, _cx: &Scope) -> AnyView {
+        let lane_a = self.lane_a.clone();
+        let lane_b = self.lane_b.clone();
+        let chip = |title: &'static str, payload: u64| {
+            AnyView::new(Draggable::new(
+                payload,
+                AnyView::new(Text::new(title)),
+                AnyView::new(AnyView::new(Text::new(title)).frame_size(120.0, 36.0)),
+            ))
+        };
+        let lane = |title: &'static str, accepts: u64, on_drop: Rc<dyn Fn(u64)>| {
+            let drop_title = title;
+            AnyView::new(
+                DropTarget::new(
+                    move |payload: &u64| *payload == accepts,
+                    move |payload| on_drop(payload),
+                    AnyView::new(
+                        AnyView::new(Text::new(drop_title))
+                            .frame_size(160.0, 80.0)
+                            .debug_name("drop-lane"),
+                    ),
+                )
+                .debug_name("drop-target"),
+            )
+        };
+        let into_a = {
+            let lane_a = lane_a.clone();
+            Rc::new(move |payload: u64| {
+                lane_a.set(Some(if payload == 1 { "Design" } else { "Billing" }.to_owned()));
+            }) as Rc<dyn Fn(u64)>
+        };
+        let into_b = {
+            let lane_b = lane_b.clone();
+            Rc::new(move |payload: u64| {
+                lane_b.set(Some(if payload == 1 { "Design" } else { "Billing" }.to_owned()));
+            }) as Rc<dyn Fn(u64)>
+        };
+        let scope = AnyView::new(DragScope::new(cove_ui_compose::BoxView::new(
+            cove_core::scene::FlexDirection::Column,
+            cove_core::scene::Align::FlexStart,
+            cove_core::scene::Justify::FlexStart,
+            cove_core::scene::Wrap::NoWrap,
+            16.0,
+            AnyView::new(TupleView::new(vec![
+                AnyView::new(cove_ui_compose::BoxView::new(
+                    cove_core::scene::FlexDirection::Row,
+                    cove_core::scene::Align::Center,
+                    cove_core::scene::Justify::FlexStart,
+                    cove_core::scene::Wrap::Wrap,
+                    12.0,
+                    AnyView::new(TupleView::new(vec![
+                        chip("Design", 1),
+                        chip("Billing", 2),
+                    ])),
+                )),
+                AnyView::new(cove_ui_compose::BoxView::new(
+                    cove_core::scene::FlexDirection::Row,
+                    cove_core::scene::Align::FlexStart,
+                    cove_core::scene::Justify::FlexStart,
+                    cove_core::scene::Wrap::Wrap,
+                    12.0,
+                    AnyView::new(TupleView::new(vec![
+                        lane("Design lane", 1, into_a),
+                        lane("Billing lane", 2, into_b),
+                    ])),
+                )),
+            ])),
+        )));
         AnyView::new(StorySection::new(
             "Typed payloads",
             "Drag a tag into either lane. The preview is portal-rendered, the target highlights while hovered, and only a matching payload calls its drop closure. Escape is not required for a cancelled drag: releasing outside every target drops nothing.",
-            AnyView::new(
-                Text::new(format!(
-                    "A: {} · B: {}",
-                    self.lane_a().unwrap_or_else(|| "empty".to_owned()),
-                    self.lane_b().unwrap_or_else(|| "empty".to_owned())
-                ))
-                .semantic_font(cove_ui_compose::theme::SemanticFontRef::caption()),
-            ),
+            AnyView::new(cove_ui_compose::BoxView::new(
+                cove_core::scene::FlexDirection::Column,
+                cove_core::scene::Align::Stretch,
+                cove_core::scene::Justify::FlexStart,
+                cove_core::scene::Wrap::NoWrap,
+                12.0,
+                AnyView::new(TupleView::new(vec![
+                    scope,
+                    AnyView::new(
+                        Text::new(format!(
+                            "A: {} · B: {}",
+                            self.lane_a().unwrap_or_else(|| "empty".to_owned()),
+                            self.lane_b().unwrap_or_else(|| "empty".to_owned())
+                        ))
+                        .semantic_font(cove_ui_compose::theme::SemanticFontRef::caption()),
+                    ),
+                ])),
+            )),
         ))
     }
 
@@ -618,6 +837,16 @@ impl View for DragAndDropStory {
         cove_composition::dynamic_fields!(self; lane_a, lane_b)
     }
 }
+
+/// The six rows the sectioned list spreads over three sections.
+pub const SECTIONED_ROWS: [&str; 6] = [
+    "Design review",
+    "Release notes",
+    "Billing",
+    "Research",
+    "Archive",
+    "Inbox",
+];
 
 /// `SectionedListStory`: three sections with independent headers.
 pub struct SectionedListStory {
@@ -649,13 +878,42 @@ impl Default for SectionedListStory {
 
 impl View for SectionedListStory {
     fn body(&self, _cx: &Scope) -> AnyView {
+        let sections = self
+            .sections()
+            .into_iter()
+            .enumerate()
+            .map(|(index, title)| {
+                let rows = (index * 2..index * 2 + 2).collect::<Vec<usize>>();
+                ListSection::new(index, rows).title(title)
+            })
+            .collect();
+        let list = AnyView::new(
+            SectionedList::new(sections, |index: &usize| *index, |index: &usize, _: RowState| {
+                AnyView::new(Text::new(SECTIONED_ROWS[*index]))
+            })
+            .selection(Selection::single(self.selection.binding()))
+            .sticky_headers(true)
+            .row_height(Some(36.0))
+            .frame_height(260.0)
+            .debug_name("sectioned-list"),
+        );
         AnyView::new(StorySection::new(
             "Sectioned list",
             "Headers stay with their first row while scrolling.",
-            AnyView::new(
-                Text::new(format!("{} sections", self.sections().len()))
-                    .semantic_font(cove_ui_compose::theme::SemanticFontRef::caption()),
-            ),
+            AnyView::new(cove_ui_compose::BoxView::new(
+                cove_core::scene::FlexDirection::Column,
+                cove_core::scene::Align::Stretch,
+                cove_core::scene::Justify::FlexStart,
+                cove_core::scene::Wrap::NoWrap,
+                12.0,
+                AnyView::new(TupleView::new(vec![
+                    list,
+                    AnyView::new(
+                        Text::new(format!("{} sections", self.sections().len()))
+                            .semantic_font(cove_ui_compose::theme::SemanticFontRef::caption()),
+                    ),
+                ])),
+            )),
         ))
     }
 

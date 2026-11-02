@@ -4,11 +4,14 @@
 //! pie labels. Text placement is resolved at layout time when the plot rect is
 //! known; the label primitive carries its strings for the text host (the
 //! `Text` primitive has no Rust counterpart yet).
-use crate::{Layout, LayoutSubview, PrimitiveView, ProposedViewSize, impl_primitive_view};
-use cove_core::scene::{Align, FlexDirection, LayoutNode, Node, Point, Rect, Size};
-
-use crate::theme::tokens::SemanticColorRef;
-use crate::theme::{Theme, theme_for_node};
+use crate::LayoutDebugExt;
+use crate::modifiers::layout::PaddingExt;
+use crate::modifiers::style::AppearanceExt;
+use crate::primitives::text::Text;
+use crate::theme::tokens::{SemanticColorRef, SemanticFontRef, SemanticStyleViewExt};
+use crate::theme::{Theme, ThemeMetric};
+use crate::{AnyView, BoxView, Layout, LayoutSubview, ProposedViewSize, TupleView, View};
+use cove_core::scene::{Align, FlexDirection, Justify, Point, Rect, Size, Wrap};
 
 use super::axis::ChartText;
 use super::cache::ChartResolutionCache;
@@ -203,68 +206,91 @@ impl Layout for ChartOverlayLayout {
 }
 
 /// The text of one overlay item. Every kind shares one structure so only the
-/// styling differs; strings are exposed through attachments until `Text` lands.
+/// styling differs.
 #[derive(Clone)]
 pub struct ChartOverlayLabel {
     pub item: ChartOverlayItem,
 }
-impl PrimitiveView for ChartOverlayLabel {
-    fn make_node(&self) -> Node {
-        let node = Node::new();
-        node.set_is_hit_testable(false);
-        node
-    }
-    fn make_layout_node(&self) -> Option<LayoutNode> {
-        let layout = LayoutNode::new();
-        layout.set_flex_direction(FlexDirection::Column);
-        layout.set_align_items(if self.item.kind == ChartOverlayKind::Callout {
-            Align::FlexStart
-        } else {
-            Align::Center
-        });
-        layout.set_gap(2.0, cove_core::scene::Gutter::Row);
-        if self.item.is_card() {
-            layout.set_padding(8.0, cove_core::scene::Edge::Horizontal);
-            layout.set_padding(5.0, cove_core::scene::Edge::Vertical);
-        } else if self.item.kind == ChartOverlayKind::Annotation {
-            layout.set_padding(5.0, cove_core::scene::Edge::Horizontal);
-            layout.set_padding(2.0, cove_core::scene::Edge::Vertical);
+impl View for ChartOverlayLabel {
+    fn body(&self, _cx: &crate::Scope) -> AnyView {
+        let item = &self.item;
+        let mut lines: Vec<AnyView> = Vec::new();
+        lines.push(AnyView::new(
+            AnyView::new(Text::new(item.title.clone()))
+                .semantic_font(if item.is_card() {
+                    SemanticFontRef::body_strong()
+                } else {
+                    SemanticFontRef::caption()
+                })
+                .semantic_foreground(SemanticColorRef::on_surface()),
+        ));
+        if !item.subtitle.is_empty() {
+            lines.push(AnyView::new(
+                AnyView::new(Text::new(item.subtitle.clone()))
+                    .semantic_font(SemanticFontRef::caption())
+                    .semantic_foreground(SemanticColorRef::on_surface_variant()),
+            ));
         }
-        Some(layout)
-    }
-    fn update_node(&self, node: &Node) {
-        node.set_attachment("chart.label.title", self.item.title.clone());
-        node.set_attachment("chart.label.subtitle", self.item.subtitle.clone());
-        node.set_attachment(
-            "chart.label.rows",
-            self.item
-                .rows
-                .iter()
-                .map(|row| (row.title.clone(), row.value.clone()))
-                .collect::<Vec<_>>(),
+        for row in &item.rows {
+            lines.push(AnyView::new(BoxView::new(
+                FlexDirection::Row,
+                Align::Center,
+                Justify::SpaceBetween,
+                Wrap::NoWrap,
+                8.0,
+                AnyView::new(TupleView::new(vec![
+                    AnyView::new(
+                        AnyView::new(Text::new(row.title.clone()))
+                            .semantic_font(SemanticFontRef::caption())
+                            .semantic_foreground(SemanticColorRef::on_surface_variant()),
+                    ),
+                    AnyView::new(
+                        AnyView::new(Text::new(row.value.clone()))
+                            .semantic_font(SemanticFontRef::caption())
+                            .semantic_foreground(SemanticColorRef::on_surface()),
+                    ),
+                ])),
+            )));
+        }
+
+        let column = BoxView::new(
+            FlexDirection::Column,
+            if item.is_card() {
+                Align::FlexStart
+            } else {
+                Align::Center
+            },
+            Justify::FlexStart,
+            Wrap::NoWrap,
+            2.0,
+            AnyView::new(TupleView::new(lines)),
         );
-        let theme = theme_for_node(node);
-        match self.item.kind {
-            ChartOverlayKind::Callout => {
-                node.set_background_color(Some(theme.colors.surface_floating));
-                node.set_corner_radius(theme.radius.md);
-                node.set_border_color(Some(theme.colors.border));
-                node.set_border_width(1.0);
-            }
+        let content = AnyView::new(column);
+        let label: AnyView = match item.kind {
+            ChartOverlayKind::Callout => content
+                .padding_edges(8.0, 5.0)
+                .semantic_background(SemanticColorRef::surface_floating())
+                .semantic_border(SemanticColorRef::border(), 1.0)
+                .corner_radius_metric(ThemeMetric::group_radius()),
             ChartOverlayKind::Annotation => {
-                node.set_background_color(Some(theme.colors.surface_floating));
-                node.set_corner_radius(4.0);
-                node.set_border_color(Some(
-                    self.item
-                        .tint
-                        .as_ref()
-                        .map(|tint| tint.resolve(&theme))
-                        .unwrap_or(theme.colors.accent),
-                ));
-                node.set_border_width(1.0);
+                let border = item
+                    .tint
+                    .clone()
+                    .unwrap_or(SemanticColorRef::accent());
+                AnyView::new(
+                    content
+                        .padding_edges(5.0, 2.0)
+                        .semantic_background(SemanticColorRef::surface_floating())
+                        .semantic_border(border, 1.0)
+                        .corner_radius(4.0),
+                )
             }
-            _ => {}
-        }
+            _ => AnyView::new(content.padding_edges(5.0, 2.0)),
+        };
+        AnyView::new(AnyView::new(label).debug_name("chart-overlay-label"))
+    }
+
+    fn dynamic_properties(&self) -> Vec<crate::DynamicField> {
+        Vec::new()
     }
 }
-impl_primitive_view!(ChartOverlayLabel);

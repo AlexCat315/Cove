@@ -12,11 +12,12 @@ use cove_ui_compose::LayoutDebugExt;
 use cove_ui_compose::modifiers::style::SemanticStyleViewExt;
 use cove_ui_compose::primitives::controls::Button;
 use cove_ui_compose::primitives::overlays::{
-    CommandEntry, CommandItem, destination, display_entries, ranked, record_recent,
+    CommandEntry, CommandItem, CommandPalette, PaletteCommand, destination, display_entries,
+    ranked, record_recent,
 };
 use cove_ui_compose::primitives::text::Text;
 use cove_ui_compose::theme::tokens::SemanticColorRef;
-use cove_ui_compose::{AnyView, BoxView, TupleView, View, ViewExt};
+use cove_ui_compose::{AnyView, BoxView, TupleView, View};
 
 use super::feedback::StorySection;
 use crate::gallery_content::catalog::GalleryOptions;
@@ -137,6 +138,45 @@ impl CommandStory {
     ) -> Option<usize> {
         destination(count, current, delta, wraps)
     }
+
+    /// The catalogue as palette rows, each action recording its run.
+    pub fn palette_commands(&self) -> Vec<PaletteCommand> {
+        let last_run = self.last_run.clone();
+        let recent = self.recent.clone();
+        let is_presented = self.is_presented.clone();
+        let is_custom_presented = self.is_custom_presented.clone();
+        commands()
+            .into_iter()
+            .map(|item| {
+                let id = item.id.clone();
+                let title = item.title.clone();
+                let group = item.group.clone();
+                let keywords = item.keywords.clone();
+                let is_enabled = item.is_enabled;
+                let last_run = last_run.clone();
+                let recent = recent.clone();
+                let is_presented = is_presented.clone();
+                let is_custom_presented = is_custom_presented.clone();
+                let command_id = id.clone();
+                let command_title = title.clone();
+                PaletteCommand::new(title, move || {
+                    if !is_enabled {
+                        return;
+                    }
+                    last_run.set(command_title.clone());
+                    let mut list = recent.get();
+                    record_recent(&mut list, &command_id, RECENT_LIMIT);
+                    recent.set(list);
+                    is_presented.set(false);
+                    is_custom_presented.set(false);
+                })
+                .id(id)
+                .group(group)
+                .keywords(keywords)
+                .enabled(is_enabled)
+            })
+            .collect()
+    }
 }
 
 impl View for CommandStory {
@@ -149,28 +189,56 @@ impl View for CommandStory {
             .semantic_font(cove_ui_compose::theme::SemanticFontRef::caption())
             .semantic_foreground(SemanticColorRef::on_surface_muted());
 
+        let palette = AnyView::new(
+            CommandPalette::new(self.is_presented.binding(), self.palette_commands())
+                .placeholder("Search commands")
+                .debug_name("command-palette"),
+        );
+        let footer = AnyView::new(
+            Text::new("Project commands run against the open workspace.")
+                .semantic_font(cove_ui_compose::theme::SemanticFontRef::caption())
+                .semantic_foreground(SemanticColorRef::on_surface_muted()),
+        );
+        let custom_palette = AnyView::new(
+            CommandPalette::new(self.is_custom_presented.binding(), self.palette_commands())
+                .placeholder("Search project commands")
+                .footer(footer)
+                .debug_name("command-palette-footer"),
+        );
+
         let rows = AnyView::new(BoxView::new(
-            cove_core::scene::FlexDirection::Row,
-            cove_core::scene::Align::Center,
+            cove_core::scene::FlexDirection::Column,
+            cove_core::scene::Align::FlexStart,
             cove_core::scene::Justify::FlexStart,
-            cove_core::scene::Wrap::Wrap,
+            cove_core::scene::Wrap::NoWrap,
             12.0,
             AnyView::new(TupleView::new(vec![
-                AnyView::new(
-                    AnyView::new(
-                        Button::title("Open command palette", move || open.set(true))
-                            .enabled(enabled),
-                    )
-                    .debug_name("command-open"),
-                ),
-                AnyView::new(
-                    AnyView::new(
-                        Button::title("Open with project footer", move || open_custom.set(true))
-                            .enabled(enabled),
-                    )
-                    .debug_name("command-open-custom"),
-                ),
-                AnyView::new(caption),
+                palette,
+                custom_palette,
+                AnyView::new(BoxView::new(
+                    cove_core::scene::FlexDirection::Row,
+                    cove_core::scene::Align::Center,
+                    cove_core::scene::Justify::FlexStart,
+                    cove_core::scene::Wrap::Wrap,
+                    12.0,
+                    AnyView::new(TupleView::new(vec![
+                        AnyView::new(
+                            AnyView::new(
+                                Button::title("Open command palette", move || open.set(true))
+                                    .enabled(enabled),
+                            )
+                            .debug_name("command-open"),
+                        ),
+                        AnyView::new(
+                            AnyView::new(
+                                Button::title("Open with project footer", move || open_custom.set(true))
+                                    .enabled(enabled),
+                            )
+                            .debug_name("command-open-custom"),
+                        ),
+                        AnyView::new(caption),
+                    ])),
+                )),
             ])),
         ));
 

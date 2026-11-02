@@ -24,9 +24,9 @@
 //! - GAP (sidebar drawer selection): clicking "Projects" in the sidebar drawer
 //!   (Swift: closes the drawer, marks Projects selected, updates the detail
 //!   pane) leaves the drawer open and no Projects row selected.
-//! - Swift checked `adaptive-navigationDrawer-narrow/wide` preview debug names;
-//!   the Rust `AdaptiveControlExamples` emits only `adaptive-preview-caption`.
-//!   Pinned by `the_adaptive_previews_emit_only_a_caption`.
+//! - Swift checked `adaptive-navigationDrawer-narrow/wide` preview debug names.
+//!   The fixed-width adaptive previews are not part of the port (§5.3 of the
+//!   Swift-migration audit), so there are no preview nodes to locate.
 
 use cove_composition::Scope;
 mod support;
@@ -37,7 +37,6 @@ use cove_composition::{AnyView, View};
 use cove_core::scene::{AccessibilityRole, Node};
 use cove_examples::gallery_content::GalleryView;
 use cove_examples::gallery_content::catalog::GalleryPage;
-use cove_examples::gallery_content::stories::AdaptiveControlExamples;
 use cove_examples::gallery_content::stories::navigation_layout_stories::DRAWER_DEFAULT_SELECTION;
 use cove_examples::gallery_content::stories::sidebar_story::SidebarStory;
 use cove_ui_compose::Scancode;
@@ -117,11 +116,6 @@ fn the_dedicated_story_opens_a_modal_and_commits_keyboard_navigation_back_into_i
                 .is_some(),
             "the opener click presents the drawer dialog"
         );
-        assert!(
-            AdaptiveControlExamples::new(GalleryPage::NavigationDrawer).supports(),
-            "the drawer page has an adaptive preview"
-        );
-
         let selected = row_by_label(scene, &format!("Destination {DRAWER_DEFAULT_SELECTION}"));
         scene.focus.focus(Some(&selected), true);
         scene.key(Scancode::ARROW_DOWN);
@@ -248,30 +242,6 @@ fn the_sidebar_and_its_drawer_share_selection_and_restore_the_explicit_opener() 
                     .any(|node| node.accessibility().is_some_and(|s| s.state.is_selected)),
                 "GAP: Swift marks the chosen Projects destination selected; no Rust Projects row is"
             );
-        },
-    );
-}
-
-#[test]
-fn the_adaptive_previews_emit_only_a_caption() {
-    // Swift asserted `adaptive-navigationDrawer-narrow` and
-    // `adaptive-navigationDrawer-wide` debug names. The Rust
-    // `AdaptiveControlExamples` renders a single caption node, so those names
-    // never appear.
-    GalleryScene::run(
-        1280.0,
-        820.0,
-        |_| AnyView::new(AdaptiveControlExamples::new(GalleryPage::NavigationDrawer)),
-        |scene| {
-            assert!(scene.named("adaptive-preview-caption").is_some());
-            for width in ["narrow", "wide"] {
-                assert!(
-                    scene
-                        .named(&format!("adaptive-navigationDrawer-{width}"))
-                        .is_none(),
-                    "GAP: Swift renders the {width} adaptive preview; Rust emits only a caption"
-                );
-            }
         },
     );
 }

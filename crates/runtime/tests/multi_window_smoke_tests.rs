@@ -39,7 +39,7 @@ use cove_platform::{
     InputEvent, MouseButton, MouseButtonEvent, MouseMotionEvent, SystemCursor, TextInputArea,
     WindowId, WindowInputEvent,
 };
-use cove_runtime::{PlatformFrameRateMode, PlatformWindowSession, Sdl3PlatformHost};
+use cove_runtime::{FrameOutcome, PlatformFrameRateMode, PlatformWindowSession, Sdl3PlatformHost};
 use cove_shell::{
     DialogCompletion, DisplayRefreshTick, FileDialogFilter, NativeRenderSurface,
     NativeWindowReference, Shell, ShellError, WindowChromeHitTest, WindowHandle, WindowOptions,
@@ -477,7 +477,7 @@ fn count_frames(session: &Rc<PlatformWindowSession>) -> Rc<Cell<usize>> {
     let counter = frames.clone();
     *session.callbacks.on_frame.borrow_mut() = Some(Rc::new(move |_: NativeRenderSurface| {
         counter.set(counter.get() + 1);
-        true
+        FrameOutcome::Rendered
     }));
     frames
 }
@@ -803,7 +803,7 @@ fn render_dirty_triggers_frame() {
                 frame_leaf.set_opacity(0.5);
                 frame_session.request_display();
             }
-            true
+            FrameOutcome::Rendered
         }));
 
         harness.run();
@@ -913,7 +913,11 @@ fn failed_frame_callbacks_retry() {
         let counter = attempts.clone();
         *session.callbacks.on_frame.borrow_mut() = Some(Rc::new(move |_: NativeRenderSurface| {
             counter.set(counter.get() + 1);
-            counter.get() >= 2
+            if counter.get() >= 2 {
+                FrameOutcome::Rendered
+            } else {
+                FrameOutcome::Skipped
+            }
         }));
 
         let time = Rc::new(Cell::new(0.0_f64));
@@ -951,6 +955,48 @@ fn failed_frame_callbacks_retry() {
 }
 
 #[test]
+fn a_failing_frame_never_parks_the_session() {
+    // Regression: a frame that could not be produced used to park the window on
+    // a deadline that could never come due, so it stopped rendering entirely and
+    // the loop sat in its wait instead. Retrying is the whole contract: as long
+    // as a frame is owed, the host must keep asking for one.
+    GlobalTestLock::locked(|| {
+        let harness = harness(4);
+        let tree = Rc::new(RefCell::new(NodeTree::new()));
+        let session = harness.open_tree("A", &tree);
+        tree.borrow_mut().set_root(Some(Node::new()));
+        harness.shell.set_surface(session.id, MOCK_SURFACE);
+
+        let attempts = Rc::new(Cell::new(0));
+        let counter = attempts.clone();
+        *session.callbacks.on_frame.borrow_mut() = Some(Rc::new(move |_: NativeRenderSurface| {
+            counter.set(counter.get() + 1);
+            FrameOutcome::Failed
+        }));
+
+        let time = Rc::new(Cell::new(0.0_f64));
+        let clock = time.clone();
+        harness.host.set_frame_clock(move || clock.get());
+        let tick = time.clone();
+        let wait_time = time.clone();
+        harness
+            .shell
+            .set_poll(Box::new(move || tick.set(tick.get() + 0.01)));
+        harness.shell.set_wait(Box::new(move |timeout| {
+            wait_time.set(wait_time.get() + timeout.as_secs_f64());
+            false
+        }));
+
+        harness.run();
+        assert!(
+            attempts.get() >= 3,
+            "a frame that keeps failing must keep being retried, not park the window (got {})",
+            attempts.get()
+        );
+    });
+}
+
+#[test]
 fn unavailable_surface_preserves_dirty_work() {
     GlobalTestLock::locked(|| {
         let harness = harness(4);
@@ -975,7 +1021,7 @@ fn unavailable_surface_preserves_dirty_work() {
         let counter = attempts.clone();
         *session.callbacks.on_frame.borrow_mut() = Some(Rc::new(move |_: NativeRenderSurface| {
             counter.set(counter.get() + 1);
-            false
+            FrameOutcome::Skipped
         }));
 
         harness.run();

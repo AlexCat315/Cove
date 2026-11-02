@@ -19,7 +19,7 @@ use cove_ui_compose::primitives::data::avatar::{
 use cove_ui_compose::primitives::text::Text;
 use cove_ui_compose::theme::ControlSize;
 use cove_ui_compose::theme::tokens::SemanticColorRef;
-use cove_ui_compose::{AnyView, BoxView, LayoutDebugExt, TupleView, View, ViewExt};
+use cove_ui_compose::{AnyView, BoxView, LayoutDebugExt, TupleView, View};
 
 use super::feedback::StorySection;
 use crate::gallery_content::catalog::GalleryOptions;

@@ -11,10 +11,12 @@ use cove_core::State;
 use cove_core::scene::{Align, FlexDirection, Justify, Wrap};
 use cove_ui_compose::modifiers::style::SemanticStyleViewExt;
 use cove_ui_compose::primitives::controls::Button;
-use cove_ui_compose::primitives::overlays::PopoverPlacement;
+use cove_ui_compose::primitives::overlays::{
+    Popover, PopoverPlacement, PopoverTriggerDescription,
+};
 use cove_ui_compose::primitives::text::Text;
 use cove_ui_compose::theme::tokens::SemanticColorRef;
-use cove_ui_compose::{AnyView, BoxView, TupleView, View};
+use cove_ui_compose::{AnyView, BoxView, LayoutDebugExt, TupleView, View};
 
 use super::feedback::StorySection;
 use crate::gallery_content::catalog::GalleryOptions;
@@ -143,6 +145,8 @@ pub struct PlacementExample {
     pub options: GalleryOptions,
     selected: State<usize>,
     last_action: State<String>,
+    /// One presentation flag per variant, so each trigger owns its popover.
+    is_presented: State<Vec<bool>>,
 }
 
 impl PlacementExample {
@@ -151,6 +155,7 @@ impl PlacementExample {
             options,
             selected: State::new(1),
             last_action: State::new(String::new()),
+            is_presented: State::new(vec![false; VARIANTS.len()]),
         }
     }
 
@@ -181,6 +186,24 @@ impl PlacementExample {
     }
 }
 
+impl PlacementExample {
+    /// The presentation binding of the variant at `index`.
+    fn presentation(&self, index: usize) -> cove_core::Binding<bool> {
+        let read = self.is_presented.clone();
+        let write = self.is_presented.clone();
+        cove_core::Binding::new(
+            move || read.get().get(index).copied().unwrap_or(false),
+            move |value: bool| {
+                write.update(|states| {
+                    if let Some(slot) = states.get_mut(index) {
+                        *slot = value;
+                    }
+                });
+            },
+        )
+    }
+}
+
 impl View for PlacementExample {
     fn body(&self, _cx: &Scope) -> AnyView {
         let enabled = self.options.is_enabled;
@@ -192,16 +215,49 @@ impl View for PlacementExample {
         .semantic_font(cove_ui_compose::theme::SemanticFontRef::caption())
         .semantic_foreground(SemanticColorRef::on_surface_muted());
 
-        // The grid is only shown when the container is wide enough; below that
-        // the compact selector takes over.
-        let selected = self.selected.get();
-        let trigger = Button::title(VARIANTS[selected].label, {
-            let this = self.selected.clone();
-            // Read the live index: the press closure outlives one build, so a
-            // captured index would freeze the cycle after the first tap.
-            move || this.update(|index| *index = (*index + 1) % VARIANTS.len())
-        })
-        .enabled(enabled);
+        let record = self.last_action.clone();
+        let grid = VARIANTS
+            .iter()
+            .enumerate()
+            .map(|(index, variant)| {
+                let record = record.clone();
+                let content = AnyView::new(BoxView::new(
+                    FlexDirection::Column,
+                    Align::FlexStart,
+                    Justify::FlexStart,
+                    Wrap::NoWrap,
+                    4.0,
+                    AnyView::new(TupleView::new(vec![
+                        AnyView::new(Text::new(format!("{:?}", variant.placement))),
+                        AnyView::new(
+                            Text::new("The bubble keeps this side of the trigger.")
+                                .semantic_font(cove_ui_compose::theme::SemanticFontRef::caption())
+                                .semantic_foreground(SemanticColorRef::on_surface_muted()),
+                        ),
+                        AnyView::new(Button::title("Move to Projects", move || {
+                            record.set("Move to Projects".to_owned())
+                        })),
+                    ])),
+                ));
+                AnyView::new(
+                    Popover::new(Text::new(variant.label), content)
+                        .is_presented(self.presentation(index))
+                        .placement(variant.placement)
+                        .width(240.0)
+                        .trigger_description(PopoverTriggerDescription {
+                            label: format!("{:?} placement", variant.placement),
+                            value: String::new(),
+                            help: None,
+                        })
+                        .enabled(enabled)
+                        .debug_name("placement-popover"),
+                )
+            })
+            .collect();
+
+        let last = Text::new(format!("Last action: {}", self.last_action()))
+            .semantic_font(cove_ui_compose::theme::SemanticFontRef::caption())
+            .semantic_foreground(SemanticColorRef::on_surface_muted());
 
         AnyView::new(StorySection::new(
             "Placement playground",
@@ -215,7 +271,15 @@ impl View for PlacementExample {
                 AnyView::new(TupleView::new(vec![
                     AnyView::new(title),
                     AnyView::new(detail),
-                    AnyView::new(trigger),
+                    AnyView::new(BoxView::new(
+                        FlexDirection::Row,
+                        Align::Center,
+                        Justify::FlexStart,
+                        Wrap::Wrap,
+                        8.0,
+                        AnyView::new(TupleView::new(grid)),
+                    )),
+                    AnyView::new(last),
                 ])),
             )),
         ))
@@ -226,6 +290,6 @@ impl View for PlacementExample {
     }
 
     fn dynamic_properties(&self) -> Vec<cove_composition::DynamicField> {
-        cove_composition::dynamic_fields!(self; selected, last_action)
+        cove_composition::dynamic_fields!(self; selected, last_action, is_presented)
     }
 }

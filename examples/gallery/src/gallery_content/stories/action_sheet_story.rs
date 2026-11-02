@@ -17,7 +17,7 @@ use cove_ui_compose::primitives::overlays::modal::action_sheet::{
 };
 use cove_ui_compose::primitives::text::Text;
 use cove_ui_compose::theme::tokens::SemanticColorRef;
-use cove_ui_compose::{AnyView, LayoutDebugExt, View, ViewExt};
+use cove_ui_compose::{AnyView, LayoutDebugExt, View};
 
 use crate::gallery_content::catalog::GalleryOptions;
 

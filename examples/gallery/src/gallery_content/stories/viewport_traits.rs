@@ -9,8 +9,10 @@
 
 use cove_composition::Scope;
 use cove_core::scene::{Align, FlexDirection, Justify, Wrap};
-use cove_core::{Environment, Idiom, Orientation, SizeClass};
+use cove_core::{Environment, Idiom, Insets, Orientation, SizeClass};
 use cove_ui_compose::adaptive::SurfaceReader;
+use cove_ui_compose::modifiers::layout::{LayoutFrameExt, PaddingExt};
+use cove_ui_compose::primitives::layout::{SafeArea, SafeAreaEdges, SurfaceRoot};
 use cove_ui_compose::primitives::text::Text;
 use cove_ui_compose::theme::tokens::{SemanticColorRef, SemanticStyleViewExt};
 use cove_ui_compose::{AnyView, BoxView, LayoutDebugExt, TupleView, View};
@@ -144,7 +146,7 @@ impl View for ViewportTraitsStory {
                         .debug_name(name),
                 )
             };
-            AnyView::new(StorySection::new(
+            let traits_section = AnyView::new(StorySection::new(
                 "Viewport traits",
                 "Current host surface.",
                 AnyView::new(BoxView::new(
@@ -175,6 +177,15 @@ impl View for ViewportTraitsStory {
                         line(THRESHOLD_CAPTION.to_string(), "viewport-thresholds"),
                     ])),
                 )),
+            ));
+
+            AnyView::new(BoxView::new(
+                FlexDirection::Column,
+                Align::Stretch,
+                Justify::FlexStart,
+                Wrap::NoWrap,
+                24.0,
+                AnyView::new(TupleView::new(vec![traits_section, safe_area_section()])),
             ))
         }))
     }
@@ -301,4 +312,43 @@ mod checks {
             "Compact < 600 · Medium 600–999 · Expanded ≥ 1000"
         );
     }
+}
+
+/// A surface that declares insets, so `SafeArea` has something to consume.
+///
+/// `SurfaceRoot` publishes the host facts for its subtree and never pads by
+/// itself; each logical edge is consumed once by the innermost `SafeArea` that
+/// asks for it, which is what the nested container below demonstrates.
+fn safe_area_section() -> AnyView {
+    let mut environment = Environment::default();
+    environment.safe_area = Insets {
+        top: 24.0,
+        bottom: 16.0,
+        leading: 12.0,
+        trailing: 12.0,
+    };
+    let inner = AnyView::new(SafeArea::new(
+        SafeAreaEdges::ALL,
+        AnyView::new(
+            AnyView::new(Text::new("Inside the safe area"))
+                .padding(8.0)
+                .semantic_background(SemanticColorRef::surface_variant()),
+        ),
+    ));
+    AnyView::new(StorySection::new(
+        "Safe area",
+        "The surface declares 24/16 points and 12/12 insets. SafeArea consumes them along the edges it selects, and a nested container only sees what is left.",
+        AnyView::new(
+            BoxView::new(
+                FlexDirection::Column,
+                Align::Stretch,
+                Justify::FlexStart,
+                Wrap::NoWrap,
+                0.0,
+                AnyView::new(SurfaceRoot::new(environment, inner)),
+            )
+            .frame_size(320.0, 140.0)
+            .debug_name("safe-area-surface"),
+        ),
+    ))
 }

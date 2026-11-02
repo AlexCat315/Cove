@@ -27,7 +27,7 @@ use std::rc::Rc;
 use cove_composition::{AnyView, View};
 use cove_examples::gallery_content::GalleryView;
 use cove_examples::gallery_content::catalog::{GalleryOptions, GalleryPage};
-use cove_examples::gallery_content::stories::{AdaptiveControlExamples, RailStory};
+use cove_examples::gallery_content::stories::RailStory;
 use cove_ui_compose::primitives::overlays::portal::LayerRoot;
 use cove_ui_compose::theme::styles::appearance_modifier::Appearance;
 
@@ -66,8 +66,8 @@ fn story() {
             ] {
                 assert!(
                     scene.named(missing).is_none(),
-                    "GAP: Swift's rail story mounts `{missing}`; the Rust RailStory renders \
-                     only the Show labels checkbox"
+                    "named difference: Swift's rail story mounts `{missing}`; the Rust \
+                     RailStory mounts one real `NavigationRail` as `navigation-rail`"
                 );
             }
             assert!(
@@ -75,17 +75,9 @@ fn story() {
                 "the labels toggle is mounted"
             );
             assert!(
-                AdaptiveControlExamples::new(GalleryPage::NavigationRail).supports(),
-                "the rail page is adaptive-supported"
+                scene.named("navigation-rail").is_some(),
+                "the real NavigationRail is mounted"
             );
-            for suffix in ["narrow", "wide"] {
-                assert!(
-                    scene
-                        .named(&format!("adaptive-navigationRail-{suffix}"))
-                        .is_none(),
-                    "GAP: Swift previews the {suffix} rail; Rust renders no adaptive preview names"
-                );
-            }
         },
     );
 

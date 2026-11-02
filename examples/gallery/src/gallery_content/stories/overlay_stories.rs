@@ -5,13 +5,15 @@
 use cove_composition::Scope;
 use cove_core::State;
 use cove_core::scene::{Align, FlexDirection, Justify, Wrap};
+use cove_ui_compose::modifiers::layout::PaddingExt;
 use cove_ui_compose::modifiers::style::SemanticStyleViewExt;
 use cove_ui_compose::primitives::controls::Button;
 use cove_ui_compose::primitives::controls::ButtonRole;
 use cove_ui_compose::primitives::data::avatar::Avatar;
 use cove_ui_compose::primitives::media::Icon;
 use cove_ui_compose::primitives::media::ui_icon_catalog as icons;
-use cove_ui_compose::primitives::overlays::Popconfirm;
+use cove_ui_compose::primitives::overlays::menu::{MenuEntry, MenuItem, MenuSubmenu};
+use cove_ui_compose::primitives::overlays::{ContextMenuExt, Popconfirm};
 use cove_ui_compose::primitives::overlays::PopoverPlacement;
 use cove_ui_compose::primitives::overlays::hover_card::HoverCard;
 use cove_ui_compose::primitives::text::Text;
@@ -300,5 +302,105 @@ impl View for HoverCardStory {
 
     fn dynamic_properties(&self) -> Vec<cove_composition::DynamicField> {
         cove_composition::dynamic_fields!(self; following)
+    }
+}
+
+/// The right-click target the context-menu story annotates.
+pub const CONTEXT_TARGET: &str = "Right-click this card";
+/// The last command the context menu reported.
+pub const CONTEXT_INITIAL: &str = "No command yet";
+
+/// `ContextMenuStory`: a right-click target with a real menu tree.
+///
+/// The menu is the `Menu` surface the sidebar rows use, opened by a secondary
+/// click (or Control-click) on the card, with the same keyboard path.
+pub struct ContextMenuStory {
+    pub options: GalleryOptions,
+    last_action: State<String>,
+}
+
+impl ContextMenuStory {
+    pub fn new(options: GalleryOptions) -> Self {
+        Self {
+            options,
+            last_action: State::new(CONTEXT_INITIAL.to_owned()),
+        }
+    }
+
+    pub fn last_action(&self) -> String {
+        self.last_action.get()
+    }
+
+    /// The entries the card offers, in authored order.
+    pub fn entries(&self) -> Vec<MenuEntry> {
+        let record = self.last_action.clone();
+        vec![
+            MenuEntry::Item(
+                MenuItem::new(201, "Open", {
+                    let record = record.clone();
+                    move || record.set("Open".to_owned())
+                })
+                .enabled(self.options.is_enabled),
+            ),
+            MenuEntry::Item(MenuItem::new(202, "Duplicate", {
+                let record = record.clone();
+                move || record.set("Duplicate".to_owned())
+            })),
+            MenuEntry::separator(203),
+            MenuEntry::Submenu(MenuSubmenu {
+                id: 204,
+                title: "Move to".to_owned(),
+                entries: vec![
+                    MenuEntry::Item(MenuItem::new(205, "Projects", {
+                        let record = record.clone();
+                        move || record.set("Move to Projects".to_owned())
+                    })),
+                    MenuEntry::Item(MenuItem::new(206, "Archive", {
+                        let record = record.clone();
+                        move || record.set("Move to Archive".to_owned())
+                    })),
+                ],
+                is_enabled: self.options.is_enabled,
+                width: 200.0,
+                icon: None,
+            }),
+            MenuEntry::Item(MenuItem::new(207, "Delete", || {}).enabled(false)),
+        ]
+    }
+}
+
+impl View for ContextMenuStory {
+    fn body(&self, _cx: &Scope) -> AnyView {
+        let target = AnyView::new(
+            AnyView::new(
+                AnyView::new(Text::new(CONTEXT_TARGET))
+                    .padding_edges(16.0, 24.0)
+                    .semantic_background(SemanticColorRef::surface_variant()),
+            )
+            .context_menu(self.entries()),
+        );
+        AnyView::new(StorySection::new(
+            "Right-click menu",
+            "Control-click or right-click the card for the menu. Submenus open on hover or Right, Escape dismisses the innermost level first, and unavailable commands stay visible but skipped.",
+            AnyView::new(BoxView::new(
+                FlexDirection::Column,
+                Align::FlexStart,
+                Justify::FlexStart,
+                Wrap::NoWrap,
+                12.0,
+                AnyView::new(TupleView::new(vec![
+                    target,
+                    caption(format!("Last command: {}", self.last_action())),
+                ])),
+            )),
+        ))
+    }
+
+    fn tag(&self) -> &'static str {
+        "ContextMenuStory"
+    }
+
+    fn dynamic_properties(&self) -> Vec<cove_composition::DynamicField> {
+        cove_composition::dynamic_fields!(self; last_action)
     }
 }

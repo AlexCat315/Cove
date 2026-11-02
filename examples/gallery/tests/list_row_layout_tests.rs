@@ -149,9 +149,9 @@ fn the_sectioned_list_reports_its_three_headers() {
 }
 
 #[test]
-fn the_sectioned_list_renders_no_rows_yet() {
-    // Pins the GAP above as a checked fact rather than prose: the story's whole
-    // observable surface is its caption, with no list items and no badge.
+fn the_sectioned_list_renders_its_rows() {
+    // The story now mounts the real `SectionedList`, so the Swift row contract is
+    // reachable: at least two list items, each with a positive box.
     let story = Rc::new(SectionedListStory::new());
     let mounted = story.clone();
     GalleryScene::run(
@@ -165,20 +165,26 @@ fn the_sectioned_list_renders_no_rows_yet() {
                 "the story renders the section count caption, texts: {:?}",
                 scene.texts()
             );
-            assert!(
-                !scene.nodes().iter().any(|node| {
+            let rows: Vec<_> = scene
+                .nodes()
+                .into_iter()
+                .filter(|node| {
                     node.accessibility()
                         .is_some_and(|semantics| semantics.role == AccessibilityRole::ListItem)
-                }),
-                "GAP: the story materialises no list rows"
-            );
+                })
+                .collect();
             assert!(
-                !scene.nodes().iter().any(|node| {
-                    node.accessibility()
-                        .is_some_and(|semantics| semantics.label == "Selected")
-                }),
-                "GAP: the story renders no Selected badge"
+                rows.len() >= 2,
+                "the sectioned list materialises its rows, found {}",
+                rows.len()
             );
+            for row in rows {
+                let frame = row.frame();
+                assert!(
+                    frame.width > 0.0 && frame.height > 0.0,
+                    "every row has a real box {frame:?}"
+                );
+            }
         },
     );
 }

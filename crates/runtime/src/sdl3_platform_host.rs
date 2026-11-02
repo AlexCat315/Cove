@@ -20,11 +20,104 @@ use std::{
     time::Duration,
 };
 type EventCallback = Rc<dyn Fn(&InputEvent)>;
-type FrameCallback = Rc<dyn Fn(NativeRenderSurface) -> bool>;
+type FrameCallback = Rc<dyn Fn(NativeRenderSurface) -> FrameOutcome>;
 type InitCallback = Rc<dyn Fn(NativeRenderSurface, u32, u32)>;
 type ResizeCallback = Rc<dyn Fn(u32, u32)>;
+
+/// What one `on_frame` call managed to do.
+///
+/// The host paces retries differently for each case, and conflating them is what
+/// let a refused frame park a window forever: "no slot available" is pacing,
+/// "rendering failed" is an error, and only the latter may wait on an external
+/// event before trying again.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum FrameOutcome {
+    /// A frame was produced and submitted.
+    Rendered,
+    /// Nothing was produced, but nothing went wrong: every in-flight slot was
+    /// taken, the renderer was not configured yet, or there was no root view.
+    /// Retry as soon as capacity allows.
+    Skipped,
+    /// Rendering reported an error; the run loop has already been failed.
+    Failed,
+}
+
+impl FrameOutcome {
+    /// Merges two handlers' results: any failure wins, then any success, and a
+    /// skip only survives when nothing else happened.
+    fn merge(self, other: Self) -> Self {
+        match (self, other) {
+            (Self::Failed, _) | (_, Self::Failed) => Self::Failed,
+            (Self::Rendered, _) | (_, Self::Rendered) => Self::Rendered,
+            _ => Self::Skipped,
+        }
+    }
+}
+
+/// When a session may render again.
+///
+/// This replaced a bare `f64` deadline whose "wait for the next display tick"
+/// case was spelled `f64::INFINITY`. `now >= INFINITY` is never true, so once a
+/// window entered that state it stopped rendering until something else happened
+/// to reset the field — and the event-driven loop is allowed to switch the tick
+/// source off, which turned a dropped frame into a permanent freeze.
+///
+/// `AwaitTick` now states that intent explicitly, and the one place that can
+/// switch ticks off must release it; see `release_tick_gates`.
+#[derive(Clone, Copy, Debug, PartialEq)]
+enum RenderGate {
+    /// Render on the next loop iteration.
+    Due,
+    /// Render once the host clock passes this deadline. Always finite: the only
+    /// constructor is [`RenderGate::after`], which rejects non-finite intervals.
+    NotBefore(f64),
+    /// Render only when a display-refresh tick arrives.
+    AwaitTick,
+}
+
+impl RenderGate {
+    fn is_due(self, now: f64) -> bool {
+        match self {
+            Self::Due => true,
+            Self::NotBefore(at) => now >= at,
+            Self::AwaitTick => false,
+        }
+    }
+
+    /// The self-imposed deadline, if any. `AwaitTick` has none: it is woken by a
+    /// tick, never by the clock.
+    fn deadline(self) -> Option<f64> {
+        match self {
+            Self::Due => Some(0.0),
+            Self::NotBefore(at) => Some(at),
+            Self::AwaitTick => None,
+        }
+    }
+
+    /// Paces a retry one interval out. The interval always comes from a clamped
+    /// refresh rate, and the assert keeps it that way: a gate that can never
+    /// come due must not be expressible.
+    fn after(now: f64, interval: f64) -> Self {
+        debug_assert!(
+            interval.is_finite() && interval >= 0.0,
+            "a render retry interval must be finite and non-negative"
+        );
+        Self::NotBefore(now + interval.max(0.0))
+    }
+}
+
 fn callback<T: Clone>(slot: &RefCell<Option<T>>) -> Option<T> {
     slot.borrow().clone()
+}
+
+/// Refresh rate used to pace a retry, clamped to something a display can do.
+fn display_hz(shell: Rc<RefCell<Box<dyn Shell>>>, id: WindowId) -> f64 {
+    shell
+        .borrow()
+        .display_refresh_rate(Some(id))
+        .filter(|hz| hz.is_finite() && *hz >= 30.0)
+        .unwrap_or(60.0)
+        .clamp(1.0, 240.0)
 }
 #[derive(Default)]
 pub struct SessionCallbacks {
@@ -48,7 +141,10 @@ pub struct PlatformWindowSession {
     last_text_cursor_tick: Cell<f64>,
     needs_display: Cell<bool>,
     injected_press_held: Cell<bool>,
-    next_render_attempt: Cell<f64>,
+    gate: Cell<RenderGate>,
+    /// When a display request started waiting for a frame that never came, used
+    /// by the stall watchdog. `None` while nothing is pending.
+    stall_since: Cell<Option<f64>>,
     presentation_active: Cell<bool>,
     keep_rendering: Cell<bool>,
     drawable_size: Cell<(u32, u32)>,
@@ -89,7 +185,8 @@ impl PlatformWindowSession {
             last_text_cursor_tick: Cell::new(0.0),
             needs_display: Cell::new(true),
             injected_press_held: Cell::new(false),
-            next_render_attempt: Cell::new(0.0),
+            gate: Cell::new(RenderGate::Due),
+            stall_since: Cell::new(None),
             presentation_active: Cell::new(true),
             keep_rendering: Cell::new(false),
             drawable_size: Cell::new(handle.drawable_size()),
@@ -102,6 +199,41 @@ impl PlatformWindowSession {
     }
     pub fn request_display(&self) {
         self.needs_display.set(true);
+    }
+
+    fn gate_is_due(&self, now: f64) -> bool {
+        self.gate.get().is_due(now)
+    }
+
+    fn gate_deadline(&self) -> Option<f64> {
+        self.gate.get().deadline()
+    }
+
+    fn set_gate(&self, gate: RenderGate) {
+        self.gate.set(gate);
+    }
+
+    /// Parks the session until the next display-refresh tick.
+    ///
+    /// Every caller must be paired with a release path: `release_tick_gates`
+    /// runs wherever ticks can be switched off, so a parked session can never
+    /// outlive its wake source.
+    fn park_on_tick(&self) {
+        self.gate.set(RenderGate::AwaitTick);
+    }
+
+    /// Releases a tick-parked session, reporting whether it was parked at all.
+    fn release_tick_gate(&self) -> bool {
+        if self.gate.get() == RenderGate::AwaitTick {
+            self.gate.set(RenderGate::Due);
+            return true;
+        }
+        false
+    }
+
+    fn note_frame_rendered(&self) {
+        self.gate.set(RenderGate::Due);
+        self.stall_since.set(None);
     }
     pub fn drawable_size(&self) -> (u32, u32) {
         self.drawable_size.get()
@@ -162,7 +294,7 @@ impl PlatformWindowSession {
         if self.presentation_active.replace(active) == active {
             return false;
         }
-        self.next_render_attempt.set(0.0);
+        self.set_gate(RenderGate::Due);
         if active {
             self.request_display();
         }
@@ -583,7 +715,7 @@ impl Sdl3PlatformHost {
             .filter(|hz| *hz >= 30.0)
             .unwrap_or(60.0);
         session.request_display();
-        session.next_render_attempt.set(self.now() + 1.0 / hz);
+        session.set_gate(RenderGate::after(self.now(), 1.0 / hz));
         self.wake_event_loop();
     }
     pub fn request_display(&self, id: Option<WindowId>) {
@@ -910,7 +1042,7 @@ impl Sdl3PlatformHost {
             let is_main = Some(session.id) == self.main_window();
             if session.update_metrics(&*handle) {
                 session.request_display();
-                session.next_render_attempt.set(0.0);
+                session.set_gate(RenderGate::Due);
                 let (w, h) = session.drawable_size();
                 if let Some(handler) = callback(&session.callbacks.on_resize) {
                     handler(w, h);
@@ -937,11 +1069,11 @@ impl Sdl3PlatformHost {
             let native = native_windows.contains(&session.id);
             let tick = ticks.contains_key(&session.id);
             if native && tick {
-                session.next_render_attempt.set(0.0);
+                session.set_gate(RenderGate::Due);
             }
             let should_render = (session.presentation_active.get() || session.keep_rendering.get())
                 && (session.needs_display.get() || dirty)
-                && start >= session.next_render_attempt.get()
+                && session.gate_is_due(start)
                 && (!cadence || tick || (!native && fallback_due))
                 && (cadence || !native || tick || session.needs_display.get());
             if should_render && let Some(surface) = handle.render_surface() {
@@ -952,29 +1084,42 @@ impl Sdl3PlatformHost {
                 } else {
                     None
                 };
-                let mut rendered = local.is_none() && main.is_none();
+                let mut outcome = if local.is_none() && main.is_none() {
+                    FrameOutcome::Rendered
+                } else {
+                    FrameOutcome::Skipped
+                };
                 if let Some(handler) = local {
-                    rendered = handler(surface) || rendered;
+                    outcome = outcome.merge(handler(surface));
                 }
                 if let Some(handler) = main {
-                    rendered = handler(surface) || rendered;
+                    outcome = outcome.merge(handler(surface));
                 }
-                if rendered {
-                    session.next_render_attempt.set(0.0);
-                    session.with_current(|| session.tree.borrow_mut().flush());
-                } else {
-                    session.request_display();
-                    let hz = shell
-                        .borrow()
-                        .display_refresh_rate(Some(session.id))
-                        .filter(|hz| hz.is_finite() && *hz >= 30.0)
-                        .unwrap_or(60.0)
-                        .clamp(1.0, 240.0);
-                    session.next_render_attempt.set(if native {
-                        f64::INFINITY
-                    } else {
-                        self.now() + 1.0 / hz
-                    });
+                match outcome {
+                    FrameOutcome::Rendered => {
+                        session.note_frame_rendered();
+                        session.with_current(|| session.tree.borrow_mut().flush());
+                    }
+                    FrameOutcome::Skipped => {
+                        // Pacing, not failure: every slot was in flight or the
+                        // renderer was not ready. Retry one interval out, and
+                        // the renderer's own backpressure wake makes that
+                        // interval the upper bound rather than the only chance.
+                        session.request_display();
+                        let hz = display_hz(shell.clone(), session.id);
+                        session.set_gate(RenderGate::after(self.now(), 1.0 / hz));
+                    }
+                    FrameOutcome::Failed => {
+                        session.request_display();
+                        let hz = display_hz(shell.clone(), session.id);
+                        if native {
+                            // The tick is the retry source. `release_tick_gates`
+                            // guarantees one still exists whenever ticks stop.
+                            session.park_on_tick();
+                        } else {
+                            session.set_gate(RenderGate::after(self.now(), 1.0 / hz));
+                        }
+                    }
                 }
             }
             let area = session.focused_text_area();
@@ -991,8 +1136,49 @@ impl Sdl3PlatformHost {
                 for id in &native_windows {
                     shell.borrow().set_display_refresh_enabled(*id, false);
                 }
+                // Ticks just stopped, so anything parked on one has lost its
+                // wake source. Release it here, where that fact is known.
+                for session in self.sessions() {
+                    if session.release_tick_gate() {
+                        crate::log::log(
+                            cove_logging::Level::Warning,
+                            "released a render gate parked on a display tick that was switched off",
+                        );
+                    }
+                }
             }
             let now = self.now();
+            // Stall watchdog. A display request that produces no frame for this
+            // long is parked on a wake that never arrived. Nothing should reach
+            // that state; if something does, a forced redraw beats a frozen
+            // window, and the warning names the window so the cause is findable.
+            const STALL_WATCHDOG_SECS: f64 = 0.75;
+            for session in self.sessions() {
+                if !(session.presentation_active.get() || session.keep_rendering.get()) {
+                    continue;
+                }
+                if !session.needs_display.get() {
+                    session.stall_since.set(None);
+                    continue;
+                }
+                let since = session.stall_since.get().unwrap_or(now);
+                session.stall_since.set(Some(since));
+                if now - since < STALL_WATCHDOG_SECS {
+                    continue;
+                }
+                let was_parked = session.release_tick_gate();
+                session.set_gate(RenderGate::Due);
+                session.stall_since.set(Some(now));
+                crate::log::log(
+                    cove_logging::Level::Warning,
+                    &format!(
+                        "render stall watchdog: window {:?} asked for a frame {:.0}ms ago and produced none{}; forcing a redraw",
+                        session.id,
+                        (now - since) * 1000.0,
+                        if was_parked { " (it was parked on a display tick)" } else { "" }
+                    ),
+                );
+            }
             let starts_animation = mode == PlatformFrameRateMode::EventDriven
                 && !animations_were_active
                 && scheduler.has_active_animations();
@@ -1004,7 +1190,7 @@ impl Sdl3PlatformHost {
                                 && (s.needs_display.get()
                                     || (s.tree.borrow().has_render_updates()
                                         && !native_windows.contains(&s.id)))
-                                && now >= s.next_render_attempt.get()))
+                                && s.gate_is_due(now)))
                 });
             let mut timeout = if immediate {
                 0.0
@@ -1020,7 +1206,9 @@ impl Sdl3PlatformHost {
                     && !native_windows.contains(&session.id)
                     && (session.needs_display.get() || session.tree.borrow().has_render_updates())
                 {
-                    timeout = timeout.min((session.next_render_attempt.get() - now).max(0.001));
+                    if let Some(deadline) = session.gate_deadline() {
+                        timeout = timeout.min((deadline - now).max(0.001));
+                    }
                 }
             }
             if timeout > 0.0 && timeout.is_finite() {

@@ -38,8 +38,7 @@ use cove_core::scene::{
 };
 use cove_core::{Environment, InputCapabilities, Point, Rect};
 use cove_examples::gallery_content::GalleryView;
-use cove_examples::gallery_content::catalog::GalleryPage;
-use cove_examples::gallery_content::stories::adaptive_examples::ALL_PAGES;
+use cove_examples::gallery_content::catalog::{GalleryCatalog, GalleryPage};
 use cove_platform::{
     InputEvent, KeyEvent, KeyModifiers, MouseButton, MouseButtonEvent, MouseMotionEvent,
 };
@@ -248,7 +247,11 @@ fn every_page_presses_its_labels() {
     let mut total = 0;
     let mut pages = 0;
     let mut panicked = Vec::new();
-    for page in ALL_PAGES {
+    let all_pages: Vec<GalleryPage> = GalleryCatalog::entries()
+        .iter()
+        .map(|entry| entry.page)
+        .collect();
+    for page in all_pages.clone() {
         let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
             GalleryScene::run(
                 1280.0,
@@ -319,7 +322,7 @@ fn every_page_presses_its_labels() {
         panicked.is_empty(),
         "every page mounts inside `.text_selection(true)`, panicked: {panicked:?}"
     );
-    assert_eq!(pages, ALL_PAGES.len(), "every page mounts");
+    assert_eq!(pages, all_pages.len(), "every page mounts");
     assert!(total > 1000, "only {total} leaf labels across the catalog");
     assert_eq!(
         offenders.len(),

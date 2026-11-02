@@ -15,7 +15,7 @@ use cove_ui_compose::primitives::layout::sidebar::{SidebarItem, SidebarSection};
 use cove_ui_compose::primitives::media::ui_icon_catalog as icons;
 use cove_ui_compose::primitives::text::Text;
 use cove_ui_compose::theme::tokens::SemanticColorRef;
-use cove_ui_compose::{AnyView, BoxView, LayoutDebugExt, TupleView, View, ViewExt};
+use cove_ui_compose::{AnyView, BoxView, LayoutDebugExt, TupleView, View};
 
 use super::feedback::StorySection;
 use super::sidebar_stories::{NestedSidebarExample, ResizableSidebarExample};

@@ -12,7 +12,7 @@
 //! encodes is preserved: flex weights, divider hairlines, the negative-margin
 //! hit slop and the reserve arithmetic.
 use super::controller::{WorkspaceCommand, WorkspaceController, WorkspaceTarget};
-use super::drag::{self, DRAG_OVERLAY_ROOT_KEY};
+use super::drag::{self, DRAG_OVERLAY_ROOT_KEY, DRAG_THRESHOLD};
 use super::ids::{
     WorkspaceEdge, WorkspaceFloatingWindowID, WorkspacePanelID, WorkspaceSlotID,
     WorkspaceSplitAxis, WorkspaceTabGroupID,
@@ -61,7 +61,6 @@ const TAB_PRESS_KEY: &str = "__workspace_tab_press";
 const FLOATING_DRAG_KEY: &str = "__workspace_floating_window_drag";
 const LAYOUT_PHASE_KEY: &str = "workspace.layout.phase";
 const RAIL_THICKNESS: f32 = 40.0;
-const DRAG_THRESHOLD: f32 = 4.0;
 const FLOATING_TITLE_HEIGHT: f32 = 30.0;
 
 /// Panel content factory: a panel id maps to the view the host authored for it.

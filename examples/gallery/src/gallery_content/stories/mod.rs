@@ -6,7 +6,6 @@
 //! been migrated yet is listed in `MIGRATION_PENDING` rather than stubbed.
 
 pub mod action_sheet_story;
-pub mod adaptive_examples;
 pub mod animation;
 pub mod animation_curves;
 pub mod animation_system;
@@ -48,7 +47,6 @@ pub mod web_story;
 pub mod wheel_picker_story;
 
 pub use action_sheet_story::ActionSheetStory;
-pub use adaptive_examples::AdaptiveControlExamples;
 pub use animation::AnimationStory;
 pub use animation_curves::{AnimationCurveExamples, CurveChoice};
 pub use animation_system::{AnimationSystemExamples, DemoPhase};
@@ -85,7 +83,7 @@ pub use navigation_stories_file::{
     AccordionStory, AlertDialogStory, BottomSheetStory, BreadcrumbStory, ButtonGroupStory,
     DialogStory, LabelStory, NavigationStackStory, PaginationStory, SheetStory, TagStory,
 };
-pub use overlay_stories::{HoverCardStory, PopconfirmStory};
+pub use overlay_stories::{ContextMenuStory, HoverCardStory, PopconfirmStory};
 pub use overlay_stories_file::{DisclosureStory, MenuStory, ModalStory, PopoverStory, TabsStory};
 pub use overview::{DashboardCard, IntroductionStory, MetricCard};
 pub use picker_stories::{

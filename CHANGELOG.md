@@ -4,6 +4,14 @@
 
 ## Unreleased
 
+- **Swift 迁移遗留与 Gallery 覆盖补齐（2026-11-02）**：
+  - `ChartOverlayLabel` 从 attachment 字符串改为真实文字排版：标题、副标题与每行键值都按主题渲染，callout 与 annotation 的卡片边框和圆角随之生效。
+  - 删除 `workspace/view.rs` 中重复移植的 tab bar、rail、split divider 与布局节点子树；`DRAG_THRESHOLD` 只保留 `drag.rs` 一处定义。
+  - Gallery 占位页替换为真实组件：Popover、Modal、Disclosure、Dialog、AlertDialog、Sheet、BottomSheet、CommandPalette、DataTable、VirtualStack、SwipeList、RefreshableList、DragAndDrop、SectionedList、NavigationRail、Accordion、Breadcrumb、Pagination、ButtonGroup、Label、ContextMenu。ContextMenu 页改为真实的右键菜单演示并与 Menu 页分开。
+  - `PlacementExample` 每个放置方向一个真实 `Popover` 触发器；懒加载网格、Masonry 样例和 `Divider` 接入 Layout 页。
+  - TimePicker 的 "Now" 读取系统时钟，WheelPicker 补上 Reset 与已提交值读数；侧栏示例重新绑定草稿输入框；TextField 页删除被丢弃的重复控件。
+
+
 - **Compose 组件 API（破坏性）**。应用可导入 `cove_ui::prelude::*`，组件在所属分组中显式导出。使用旧实现模块路径的代码请改从分组导入。
   - `DatePicker`、`DateRangePicker` 和 `CalendarView` 通过 `new(binding)` 直接读写选中日期。`Image` 的构造器接收逻辑尺寸 `Size`，颜色和渲染模式通过 builder 设置。
   - `Spinner::new()`、`Divider::new()` 和 `ZStack::new(content)` 采用默认外观。`Sheet`、`BottomSheet`、`Dialog`、`Tooltip` 使用 `configure` 增量修改选项。

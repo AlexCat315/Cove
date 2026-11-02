@@ -10,6 +10,8 @@
 use cove_composition::Scope;
 use cove_core::State;
 use cove_ui_compose::primitives::layout::sidebar::{SidebarItem, SidebarSection};
+use cove_ui_compose::primitives::text::text_buffer::TextBuffer;
+use cove_ui_compose::primitives::text::text_field::TextField;
 use cove_ui_compose::primitives::overlays::menu::MenuEntry;
 
 use crate::gallery_content::catalog::GalleryOptions;
@@ -29,7 +31,7 @@ pub struct ResizableSidebarExample {
     pub options: GalleryOptions,
     width: State<f32>,
     selected: State<Option<usize>>,
-    draft: State<String>,
+    draft: State<TextBuffer>,
 }
 
 impl ResizableSidebarExample {
@@ -38,7 +40,7 @@ impl ResizableSidebarExample {
             options,
             width: State::new(DEFAULT_SIDEBAR_WIDTH),
             selected: State::new(Some(0)),
-            draft: State::new("A retained document draft".to_owned()),
+            draft: State::new(TextBuffer::new("A retained document draft")),
         }
     }
 
@@ -77,7 +79,19 @@ impl cove_ui_compose::View for ResizableSidebarExample {
     fn body(&self, _cx: &Scope) -> cove_ui_compose::AnyView {
         use cove_ui_compose::modifiers::layout::LayoutFrameExt;
 
-        let content = cove_ui_compose::primitives::text::Text::new(self.requested_width_label());
+        let content = cove_ui_compose::AnyView::new(cove_ui_compose::BoxView::new(
+            cove_core::scene::FlexDirection::Column,
+            cove_core::scene::Align::Stretch,
+            cove_core::scene::Justify::FlexStart,
+            cove_core::scene::Wrap::NoWrap,
+            8.0,
+            cove_ui_compose::AnyView::new(cove_ui_compose::TupleView::new(vec![
+                cove_ui_compose::AnyView::new(cove_ui_compose::primitives::text::Text::new(
+                    self.requested_width_label(),
+                )),
+                cove_ui_compose::AnyView::new(TextField::new("Draft", self.draft.binding())),
+            ])),
+        ));
         let sidebar = cove_ui_compose::primitives::layout::sidebar::AdaptiveSidebar::try_new(
             "Document navigation",
             self.selected.binding(),
@@ -115,7 +129,7 @@ pub struct NestedSidebarExample {
     selection: State<Option<String>>,
     expanded: State<Vec<String>>,
     is_open: State<bool>,
-    draft: State<String>,
+    draft: State<TextBuffer>,
     last_action: State<String>,
 }
 
@@ -126,7 +140,7 @@ impl NestedSidebarExample {
             selection: State::new(Some(NESTED_DEFAULT_SELECTION.to_owned())),
             expanded: State::new(vec![NESTED_DEFAULT_EXPANDED.to_owned()]),
             is_open: State::new(false),
-            draft: State::new("A retained nested document".to_owned()),
+            draft: State::new(TextBuffer::new("A retained nested document")),
             last_action: State::new("None".to_owned()),
         }
     }
@@ -227,9 +241,18 @@ impl cove_ui_compose::View for NestedSidebarExample {
         use cove_ui_compose::modifiers::layout::LayoutFrameExt;
 
         let selection = self.selection.get();
-        let content = cove_ui_compose::primitives::text::Text::new(format!(
-            "Last action: {}",
-            self.last_action()
+        let content = cove_ui_compose::AnyView::new(cove_ui_compose::BoxView::new(
+            cove_core::scene::FlexDirection::Column,
+            cove_core::scene::Align::Stretch,
+            cove_core::scene::Justify::FlexStart,
+            cove_core::scene::Wrap::NoWrap,
+            8.0,
+            cove_ui_compose::AnyView::new(cove_ui_compose::TupleView::new(vec![
+                cove_ui_compose::AnyView::new(cove_ui_compose::primitives::text::Text::new(
+                    format!("Last action: {}", self.last_action()),
+                )),
+                cove_ui_compose::AnyView::new(TextField::new("Document draft", self.draft.binding())),
+            ])),
         ));
         let sidebar = cove_ui_compose::primitives::layout::sidebar::AdaptiveSidebar::try_new(
             "Nested workspace",

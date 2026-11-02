@@ -22,7 +22,8 @@ pub use frame_drive::PlatformFrameRateMode;
 pub use native_accessibility::NativeAccessibility;
 pub use platform_host::PlatformHost;
 pub use sdl3_platform_host::{
-    HostCallbacks, HostWorkSender, PlatformWindowSession, Sdl3PlatformHost, SessionCallbacks,
+    FrameOutcome, HostCallbacks, HostWorkSender, PlatformWindowSession, Sdl3PlatformHost,
+    SessionCallbacks,
 };
 pub use surface_factory::SurfaceFactory;
 pub struct CoveUIRuntime;

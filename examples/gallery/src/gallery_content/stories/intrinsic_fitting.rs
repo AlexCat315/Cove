@@ -22,8 +22,6 @@ use cove_ui_compose::theme::styles::buttons::SecondaryButtonStyle;
 use cove_ui_compose::theme::styles::buttons::button_style::ButtonStyleViewExt;
 use cove_ui_compose::theme::tokens::{SemanticColorRef, SemanticStyleViewExt};
 use cove_ui_compose::{Alignment, AnyView, BoxView, DynamicField, LayoutDebugExt, TupleView, View};
-use std::rc::Rc;
-
 use crate::gallery_content::stories::StorySection;
 
 /// The three chips the story lays out in both branches.

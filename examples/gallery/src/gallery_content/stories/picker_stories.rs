@@ -5,8 +5,6 @@
 //! `GalleryContent/Stories/Controls/ControlStories.swift` and
 //! `GalleryContent/Stories/Layout/NavigationStories.swift`.
 
-use std::rc::Rc;
-
 use cove_composition::Scope;
 use cove_core::State;
 use cove_core::scene::{Align, FlexDirection, Justify, Wrap};

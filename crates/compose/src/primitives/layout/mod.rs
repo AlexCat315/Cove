@@ -50,6 +50,7 @@ pub(crate) mod api {
     pub use super::horizontal_scroll_origin::HorizontalScrollOrigin;
     pub use super::insets::{SafeArea, SafeAreaEdges, SurfaceRoot, safe_area_insets};
     pub use super::masonry::{Masonry, MasonryLayout};
+    pub use super::mobile_tab_bar::{MobileTabBar, MobileTabStyle};
     pub use super::navigation_components::{Breadcrumb, BreadcrumbItem, Pagination};
     pub use super::navigation_rail::NavigationRail;
     pub use super::overlay::{Overlay, OverlayLayout};

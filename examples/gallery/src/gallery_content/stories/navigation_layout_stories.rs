@@ -10,8 +10,10 @@
 use cove_composition::Scope;
 use cove_core::State;
 use cove_core::scene::{Align, FlexDirection, Justify, Wrap};
+use cove_ui_compose::modifiers::layout::LayoutFrameExt;
 use cove_ui_compose::modifiers::style::SemanticStyleViewExt;
 use cove_ui_compose::primitives::controls::Checkbox;
+use cove_ui_compose::primitives::layout::NavigationRail;
 use cove_ui_compose::primitives::layout::sidebar::drawer::{
     NavigationDrawer, NavigationDrawerOptions,
 };
@@ -20,7 +22,7 @@ use cove_ui_compose::primitives::layout::sidebar::{SidebarItem, SidebarSection};
 use cove_ui_compose::primitives::media::ui_icon_catalog as icons;
 use cove_ui_compose::primitives::text::Text;
 use cove_ui_compose::theme::tokens::SemanticColorRef;
-use cove_ui_compose::{AnyView, BoxView, LayoutDebugExt, TupleView, View, ViewExt};
+use cove_ui_compose::{AnyView, BoxView, LayoutDebugExt, TupleView, View};
 
 use super::feedback::StorySection;
 use crate::gallery_content::catalog::GalleryOptions;
@@ -316,6 +318,17 @@ impl RailStory {
 
 impl View for RailStory {
     fn body(&self, _cx: &Scope) -> AnyView {
+        let enabled = self.options.is_enabled;
+        let shows_labels = self.shows_labels();
+        let rail = AnyView::new(
+            NavigationRail::try_new(self.selection.binding(), self.items())
+                .expect("unique rail destinations")
+                .shows_labels(shows_labels)
+                .on_activate(|_| {})
+                .debug_name("navigation-rail")
+                .frame_width(if shows_labels { 72.0 } else { 56.0 })
+                .frame_height(320.0),
+        );
         let labels = Text::new("Show labels")
             .semantic_font(cove_ui_compose::theme::SemanticFontRef::caption());
         let rows = AnyView::new(BoxView::new(
@@ -330,13 +343,28 @@ impl View for RailStory {
                         .debug_name("rail-show-labels"),
                 ),
                 AnyView::new(labels),
+                AnyView::new(
+                    Text::new(match self.selection() {
+                        Some(index) => format!("Selected: {}", RAIL_DESTINATIONS[index].0),
+                        None => "Selected: none".to_owned(),
+                    })
+                    .semantic_font(cove_ui_compose::theme::SemanticFontRef::caption()),
+                ),
             ])),
         ));
+        let _ = enabled;
 
         AnyView::new(StorySection::new(
             "Rail destinations",
             "The 72-point rail keeps labels; hiding them uses 56 points and retains complete names in tooltips and accessibility. Use Up / Down and Home / End. Disabled destinations are skipped; badges keep their full value.",
-            rows,
+            AnyView::new(BoxView::new(
+                FlexDirection::Row,
+                Align::FlexStart,
+                Justify::FlexStart,
+                Wrap::Wrap,
+                20.0,
+                AnyView::new(TupleView::new(vec![rail, rows])),
+            )),
         ))
     }
 

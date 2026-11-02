@@ -496,8 +496,12 @@ impl<C: PrototypeContent> BrowserPrototype<C> {
                 if self.recorder.is_recording() {
                     fail(&mut response, "Already recording");
                 } else {
-                    self.recorder
+                    let started = self
+                        .recorder
                         .start(self.content.checkpoint(), self.focused_name());
+                    if let Err(error) = started {
+                        fail(&mut response, error);
+                    }
                 }
             }
             "input.record.stop" => match self.recorder.stop() {

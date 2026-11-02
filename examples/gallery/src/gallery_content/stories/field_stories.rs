@@ -292,15 +292,6 @@ impl TextFieldStory {
 
 impl View for TextFieldStory {
     fn body(&self, _cx: &Scope) -> AnyView {
-        let field = AnyView::new(
-            TextField::new("Project name", self.text.binding())
-                .behavior(TextFieldBehavior {
-                    disabled: !self.options.is_enabled,
-                    ..TextFieldBehavior::new()
-                })
-                .frame_width(240.0)
-                .debug_name("text-field-control"),
-        );
         let disabled = !self.options.is_enabled;
         let secret = AnyView::new(
             TextField::new("Password", self.secret.binding())

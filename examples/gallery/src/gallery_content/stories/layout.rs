@@ -10,10 +10,11 @@ use cove_core::{State, TextScale};
 use cove_ui_compose::modifiers::layout::{LayoutFrameExt, PaddingExt};
 use cove_ui_compose::modifiers::style::AppearanceExt;
 use cove_ui_compose::prelude::LazyGridOptions;
+use cove_ui_compose::primitives::layout::Overlay;
 use cove_ui_compose::primitives::controls::Button;
 use cove_ui_compose::primitives::layout::grid::{Grid, GridColumn, GridRowHeights, LazyGrid};
 use cove_ui_compose::primitives::layout::masonry::masonry::Masonry;
-use cove_ui_compose::primitives::text::Text;
+use cove_ui_compose::primitives::text::{Divider, Text};
 use cove_ui_compose::theme::styles::buttons::button_style::ButtonStyleViewExt;
 use cove_ui_compose::theme::styles::buttons::{GhostButtonStyle, SecondaryButtonStyle};
 use cove_ui_compose::theme::tokens::{SemanticColorRef, SemanticStyleViewExt};
@@ -365,6 +366,71 @@ impl View for LayoutGridStory {
                             12.0,
                             AnyView::new(TupleView::new(vec![measured, adaptive])),
                         )),
+                    )),
+                    AnyView::new(LazyGridStory),
+                    AnyView::new(StorySection::new(
+                        "Masonry sample",
+                        "The compact two-card variant the adaptive matrix reuses.",
+                        AnyView::new(MasonrySample),
+                    )),
+                    AnyView::new(StorySection::new(
+                        "Dividers",
+                        "Horizontal and vertical hairlines take their colour and thickness from the caller.",
+                        AnyView::new(BoxView::new(
+                            FlexDirection::Column,
+                            Align::Stretch,
+                            Justify::FlexStart,
+                            Wrap::NoWrap,
+                            12.0,
+                            AnyView::new(TupleView::new(vec![
+                                AnyView::new(Text::new("Above")),
+                                AnyView::new(Divider::horizontal()),
+                                AnyView::new(Text::new("Below")),
+                                AnyView::new(
+                                    AnyView::new(BoxView::new(
+                                        FlexDirection::Row,
+                                        Align::Center,
+                                        Justify::FlexStart,
+                                        Wrap::NoWrap,
+                                        12.0,
+                                        AnyView::new(TupleView::new(vec![
+                                            AnyView::new(Text::new("Left")),
+                                            AnyView::new(Divider::vertical().frame_height(24.0)),
+                                            AnyView::new(Text::new("Right")),
+                                        ])),
+                                    ))
+                                    .frame_height(24.0),
+                                ),
+                            ])),
+                        )),
+                    )),
+                    AnyView::new(StorySection::new(
+                        "Overlay",
+                        "Content placed on top keeps the base's measured size; alignment decides where it lands.",
+                        AnyView::new(Overlay::new(
+                            AnyView::new(
+                                AnyView::new(
+                                    Text::new("Base")
+                                        .semantic_font(
+                                            cove_ui_compose::theme::SemanticFontRef::body_strong(),
+                                        )
+                                        .semantic_foreground(SemanticColorRef::on_surface()),
+                                )
+                                .padding(12.0),
+                            )
+                            .frame_size(260.0, 140.0)
+                            .semantic_background(SemanticColorRef::surface_variant())
+                            .corner_radius(6.0),
+                            AnyView::new(
+                                AnyView::new(Text::new("Overlay"))
+                                    .padding_edges(8.0, 4.0)
+                                    .semantic_background(SemanticColorRef::accent())
+                                    .corner_radius(4.0),
+                            )
+                            .padding(8.0),
+                            Alignment::TopTrailing,
+                        )
+                        .debug_name("layout-overlay")),
                     )),
                 ])),
             )

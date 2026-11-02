@@ -14,7 +14,7 @@ use cove_ui_compose::primitives::controls::Button;
 use cove_ui_compose::primitives::media::{AsyncImage, AsyncImagePhase, ImageContentMode};
 use cove_ui_compose::primitives::text::Text;
 use cove_ui_compose::theme::tokens::SemanticColorRef;
-use cove_ui_compose::{AnyView, TupleView, View, ViewExt};
+use cove_ui_compose::{AnyView, TupleView, View};
 
 use super::feedback::StorySection;
 use crate::gallery_content::catalog::GalleryOptions;

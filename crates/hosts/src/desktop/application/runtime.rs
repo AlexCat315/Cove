@@ -37,7 +37,9 @@ use cove_graphics::rhi::Device;
 use cove_imaging::ImageAssetRegistryHolder;
 use cove_logging::{Level, LogEvent, LogSystem};
 use cove_platform::WindowId;
-use cove_runtime::{NativeAccessibility, PlatformFrameRateMode, PlatformHost, Sdl3PlatformHost};
+use cove_runtime::{
+    FrameOutcome, NativeAccessibility, PlatformFrameRateMode, PlatformHost, Sdl3PlatformHost,
+};
 use cove_shell::{NativeRenderSurface, WindowChromeHitTest, WindowOptions};
 use cove_text::{TextBootstrapOptions, TextEnvironment, TextEnvironmentHolder};
 use cove_ui_compose::primitives::overlays::portal::portal_registry::{
@@ -119,6 +121,9 @@ struct ApplicationState {
     window_renderer: RefCell<Option<ThreadedWindowRenderer>>,
     /// Render-thread cost of the latest finished frame.
     last_render_ms: Cell<f64>,
+    /// Frames refused for lack of an in-flight slot, reported with the next
+    /// `[cove.fps]` line so a stall that produces no frames is still visible.
+    frame_drops: Cell<u32>,
     main_window: RefCell<MainWindowState>,
     typography: RefCell<ApplicationTypography>,
     auxiliary_windows: RefCell<HashMap<WindowId, AuxiliaryAppWindow>>,
@@ -237,6 +242,7 @@ impl Application {
             rendering,
             window_renderer: RefCell::new(None),
             last_render_ms: Cell::new(0.0),
+            frame_drops: Cell::new(0),
             main_window: RefCell::new(MainWindowState::new(is_vsync)),
             typography: RefCell::new(ApplicationTypography::default()),
             auxiliary_windows: RefCell::new(HashMap::new()),
@@ -773,10 +779,10 @@ impl Application {
             let state = state.clone();
             let weak: Weak<ApplicationState> = Rc::downgrade(&state);
             *callbacks.on_frame.borrow_mut() =
-                Some(Rc::new(move |_native: NativeRenderSurface| -> bool {
+                Some(Rc::new(move |_native: NativeRenderSurface| -> FrameOutcome {
                     match weak.upgrade() {
                         Some(state) => Application { state }.handle_frame(),
-                        None => false,
+                        None => FrameOutcome::Skipped,
                     }
                 }));
         }
@@ -842,6 +848,17 @@ impl Application {
                 }
             }
             Err(error) => self.fail_run_loop(&error.to_string(), "Frame rendering"),
+        }
+        // A refused frame becomes retryable the moment a slot frees, and slots
+        // free here. Turning that into a display request is the wake the drop
+        // path depends on: it can no longer be lost, because the render thread
+        // is what reports it.
+        let retry = match state.window_renderer.borrow_mut().as_mut() {
+            Some(renderer) => renderer.take_retry_pending(),
+            None => false,
+        };
+        if retry {
+            state.host.retry_display(None);
         }
         let mut failed = Vec::new();
         let mut retry = Vec::new();
@@ -1156,19 +1173,26 @@ impl Application {
         self.sync_auxiliary_windows();
     }
 
-    fn handle_frame(&self) -> bool {
+    fn handle_frame(&self) -> FrameOutcome {
         let state = &self.state;
         {
-            let renderer = state.window_renderer.borrow();
-            let Some(renderer) = renderer.as_ref() else {
-                return false;
+            let mut renderer = state.window_renderer.borrow_mut();
+            let Some(renderer) = renderer.as_mut() else {
+                return FrameOutcome::Skipped;
             };
-            if !renderer.is_configured() || !renderer.has_frame_capacity() {
-                return false;
+            if !renderer.is_configured() {
+                return FrameOutcome::Skipped;
+            }
+            if !renderer.has_frame_capacity() {
+                // Every slot is in flight. This is pacing, not failure, and the
+                // renderer owes us a wake once a slot frees.
+                renderer.note_frame_dropped();
+                state.frame_drops.set(state.frame_drops.get().saturating_add(1));
+                return FrameOutcome::Skipped;
             }
         }
         let Some(root) = state.composition.tree.borrow().root() else {
-            return false;
+            return FrameOutcome::Skipped;
         };
 
         let frame_start = Instant::now();
@@ -1263,7 +1287,7 @@ impl Application {
             && let Err(error) = self.upload_atlas_if_needed(true)
         {
             self.fail_run_loop(&error, "Font atlas upload");
-            return false;
+            return FrameOutcome::Failed;
         }
 
         {
@@ -1285,7 +1309,7 @@ impl Application {
         let submitted = {
             let mut renderer = state.window_renderer.borrow_mut();
             let Some(renderer) = renderer.as_mut() else {
-                return false;
+                return FrameOutcome::Skipped;
             };
             let mut list = state.composition.draw_list.borrow_mut();
             renderer.submit(&mut list, (logical_w, logical_h))
@@ -1301,10 +1325,14 @@ impl Application {
         }
         match submitted {
             Ok(Some(_)) => {}
-            Ok(None) => return false,
+            Ok(None) => {
+                // Lost the race for a slot between the check above and here.
+                state.frame_drops.set(state.frame_drops.get().saturating_add(1));
+                return FrameOutcome::Skipped;
+            }
             Err(error) => {
                 self.fail_run_loop(&error.to_string(), "Frame rendering");
-                return false;
+                return FrameOutcome::Failed;
             }
         }
         if state.config.frames.policy == AppFrameDrivePolicy::Continuous
@@ -1322,15 +1350,21 @@ impl Application {
             state.host.request_display(None);
         }
         state.performance_hud.borrow_mut().presented();
+        // Read-and-reset either way, so a window measured later does not report
+        // drops that happened while the log was off.
+        let dropped = state.frame_drops.replace(0);
         if fps_log_enabled() {
+            let frame_ms = frame_start.elapsed().as_secs_f64() * 1000.0;
             state.metrics.borrow_mut().record(
                 layout_end.duration_since(layout_start).as_secs_f64() * 1000.0,
                 draw_end.duration_since(layout_end).as_secs_f64() * 1000.0,
                 state.last_render_ms.get(),
+                frame_ms,
+                dropped,
             );
         }
-        let _ = (frame_start, frame_node_count);
-        true
+        let _ = frame_node_count;
+        FrameOutcome::Rendered
     }
 
     // MARK: - Presentation
@@ -1578,7 +1612,7 @@ impl Application {
         {
             let state = state.clone();
             *session.callbacks.on_frame.borrow_mut() =
-                Some(Rc::new(move |_native: NativeRenderSurface| -> bool {
+                Some(Rc::new(move |_native: NativeRenderSurface| -> FrameOutcome {
                     Application {
                         state: state.clone(),
                     }
@@ -1629,16 +1663,21 @@ impl Application {
         )
     }
 
-    fn auxiliary_frame(&self, window_id: WindowId) -> bool {
+    fn auxiliary_frame(&self, window_id: WindowId) -> FrameOutcome {
         let mut windows = self.state.auxiliary_windows.borrow_mut();
         let Some(window) = windows.get_mut(&window_id) else {
-            return false;
+            return FrameOutcome::Skipped;
         };
-        window.handle_frame(
+        if window.handle_frame(
             &self.state.host,
             &|scale| self.configure_text_environment(scale),
             &|force| self.upload_atlas_if_needed(force),
-        )
+        ) {
+            FrameOutcome::Rendered
+        } else {
+            // An auxiliary window that cannot draw yet is pacing, not failure.
+            FrameOutcome::Skipped
+        }
     }
 
     pub fn close_auxiliary_window(&self, window_id: WindowId) {

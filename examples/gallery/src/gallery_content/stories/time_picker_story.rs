@@ -24,6 +24,23 @@ use crate::gallery_content::catalog::GalleryOptions;
 pub const DEFAULT_HOUR: i32 = 9;
 pub const DEFAULT_MINUTE: i32 = 30;
 
+/// The current wall-clock time.
+///
+/// The gallery has no local-timezone source, so this reads UTC from the system
+/// clock rather than pretending to know the offset.
+pub fn now() -> Option<TimeOfDay> {
+    let seconds = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .ok()?
+        .as_secs()
+        % 86_400;
+    Some(TimeOfDay::new(
+        (seconds / 3_600) as i32,
+        ((seconds % 3_600) / 60) as i32,
+        (seconds % 60) as i32,
+    ))
+}
+
 /// Formats a time the way the story's badge shows it.
 ///
 /// A 12-hour clock maps 0 and 12 to `12` and appends `AM`/`PM`; a 24-hour clock
@@ -133,7 +150,7 @@ impl View for TimePickerStory {
             AnyView::new(TupleView::new(vec![
                 AnyView::new(
                     cove_ui_compose::primitives::controls::Button::title("Now", move || {
-                        state.set(Some(TimeOfDay::new(DEFAULT_HOUR, DEFAULT_MINUTE, 0)))
+                        state.set(now())
                     })
                     .enabled(enabled),
                 ),

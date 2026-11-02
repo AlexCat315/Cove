@@ -13,9 +13,15 @@ use cove_core::State;
 use cove_core::scene::{Align, FlexDirection, Justify, Wrap};
 use cove_ui_compose::modifiers::layout::LayoutFrameExt;
 use cove_ui_compose::modifiers::style::SemanticStyleViewExt;
-use cove_ui_compose::primitives::layout::{TabItem, TabOverflow, TabVariant, TabView};
+use cove_ui_compose::primitives::controls::Button;
+use cove_ui_compose::primitives::layout::{
+    DisclosureGroup, MobileTabBar, TabItem, TabOverflow, TabVariant, TabView,
+};
 use cove_ui_compose::primitives::overlays::menu::{MenuEntry, MenuItem, MenuSubmenu};
+use cove_ui_compose::primitives::overlays::{Modal, ModalOptions, Popover};
 use cove_ui_compose::primitives::text::Text;
+use cove_ui_compose::primitives::text::text_buffer::TextBuffer;
+use cove_ui_compose::primitives::text::text_field::TextField;
 use cove_ui_compose::theme::tokens::SemanticColorRef;
 use cove_ui_compose::{AnyView, BoxView, LayoutDebugExt, TupleView, View};
 
@@ -31,6 +37,8 @@ pub const SUBMENU_WIDTH: f32 = 240.0;
 /// The modal's declared geometry.
 pub const MODAL_WIDTH: f32 = 440.0;
 pub const MODAL_HEIGHT: f32 = 220.0;
+/// The popover's declared width.
+pub const POPOVER_WIDTH: f32 = 260.0;
 
 /// The initial document tabs.
 pub const INITIAL_DOCUMENTS: [&str; 3] = ["Scene.cove", "Material.cove", "Notes.md"];
@@ -391,7 +399,7 @@ impl View for MenuStory {
 pub struct PopoverStory {
     pub options: GalleryOptions,
     is_open: State<bool>,
-    name: State<String>,
+    name: State<TextBuffer>,
 }
 
 impl PopoverStory {
@@ -399,7 +407,7 @@ impl PopoverStory {
         Self {
             options,
             is_open: State::new(false),
-            name: State::new("New project".to_owned()),
+            name: State::new(TextBuffer::new("New project")),
         }
     }
 
@@ -417,23 +425,65 @@ impl PopoverStory {
     }
 
     pub fn name(&self) -> String {
-        self.name.get()
+        self.name.get().string_value()
     }
 
-    pub fn set_name(&self, value: impl Into<String>) {
-        self.name.set(value.into());
+    pub fn set_name(&self, value: impl AsRef<str>) {
+        self.name.set(TextBuffer::new(value.as_ref()));
     }
 }
 
 impl View for PopoverStory {
     fn body(&self, _cx: &Scope) -> AnyView {
-        let caption = Text::new(format!("Name: {}", self.name()))
-            .semantic_font(cove_ui_compose::theme::SemanticFontRef::caption())
-            .semantic_foreground(SemanticColorRef::on_surface_muted());
-        AnyView::new(StorySection::new(
+        let done = {
+            let is_open = self.is_open.clone();
+            move || is_open.set(false)
+        };
+        let form = AnyView::new(BoxView::new(
+            FlexDirection::Column,
+            Align::Stretch,
+            Justify::FlexStart,
+            Wrap::NoWrap,
+            12.0,
+            AnyView::new(TupleView::new(vec![
+                AnyView::new(TextField::new("Project name", self.name.binding())),
+                AnyView::new(Button::title("Done", done)),
+            ])),
+        ));
+
+        let popover = AnyView::new(
+            Popover::new(Text::new("New project"), form)
+                .is_presented(self.is_open.binding())
+                .width(POPOVER_WIDTH)
+                .enabled(self.options.is_enabled)
+                .debug_name("popover-anchored"),
+        );
+
+        let caption = Text::new(format!(
+            "Name: {} · {}",
+            self.name(),
+            if self.is_open() { "open" } else { "closed" }
+        ))
+        .semantic_font(cove_ui_compose::theme::SemanticFontRef::caption())
+        .semantic_foreground(SemanticColorRef::on_surface_muted());
+
+        let form = AnyView::new(StorySection::new(
             "Anchored form",
             "The overlay escapes clipping and repositions near viewport edges.",
-            AnyView::new(caption),
+            AnyView::new(TupleView::new(vec![popover, AnyView::new(caption)])),
+        ));
+        AnyView::new(BoxView::new(
+            FlexDirection::Column,
+            Align::Stretch,
+            Justify::FlexStart,
+            Wrap::NoWrap,
+            24.0,
+            AnyView::new(TupleView::new(vec![
+                form,
+                AnyView::new(super::placement_example::PlacementExample::new(
+                    self.options.clone(),
+                )),
+            ])),
         ))
     }
 
@@ -451,7 +501,7 @@ pub struct ModalStory {
     pub options: GalleryOptions,
     is_open: State<bool>,
     status: State<String>,
-    name: State<String>,
+    name: State<TextBuffer>,
 }
 
 impl ModalStory {
@@ -460,7 +510,7 @@ impl ModalStory {
             options,
             is_open: State::new(false),
             status: State::new("No changes".to_owned()),
-            name: State::new("Untitled".to_owned()),
+            name: State::new(TextBuffer::new("Untitled")),
         }
     }
 
@@ -479,7 +529,7 @@ impl ModalStory {
 
     /// Creating records the draft's name and closes.
     pub fn create(&self) {
-        self.status.set(format!("Created {}", self.name.get()));
+        self.status.set(format!("Created {}", self.name()));
         self.is_open.set(false);
     }
 
@@ -487,20 +537,75 @@ impl ModalStory {
         self.status.get()
     }
 
-    pub fn set_name(&self, value: impl Into<String>) {
-        self.name.set(value.into());
+    pub fn name(&self) -> String {
+        self.name.get().string_value()
+    }
+
+    pub fn set_name(&self, value: impl AsRef<str>) {
+        self.name.set(TextBuffer::new(value.as_ref()));
     }
 }
 
 impl View for ModalStory {
     fn body(&self, _cx: &Scope) -> AnyView {
+        let cancel = {
+            let is_open = self.is_open.clone();
+            move || is_open.set(false)
+        };
+        let create = {
+            let is_open = self.is_open.clone();
+            let status = self.status.clone();
+            let name = self.name.clone();
+            move || {
+                status.set(format!("Created {}", name.get().string_value()));
+                is_open.set(false);
+            }
+        };
+        let open = {
+            let is_open = self.is_open.clone();
+            move || is_open.set(true)
+        };
+
+        let mut options = ModalOptions::new();
+        options.geometry.width = MODAL_WIDTH;
+        options.geometry.height = MODAL_HEIGHT;
+
+        let dialog = AnyView::new(
+            Modal::new(
+                self.is_open.binding(),
+                BoxView::new(
+                    FlexDirection::Column,
+                    Align::Stretch,
+                    Justify::FlexStart,
+                    Wrap::NoWrap,
+                    16.0,
+                    AnyView::new(TupleView::new(vec![
+                        AnyView::new(TextField::new("Name", self.name.binding())),
+                        AnyView::new(TupleView::new(vec![
+                            AnyView::new(Button::title("Cancel", cancel)),
+                            AnyView::new(Button::title("Create", create).enabled(
+                                self.options.is_enabled && !self.name().trim().is_empty(),
+                            )),
+                        ])),
+                    ])),
+                ),
+            )
+            .options(options)
+            .debug_name("modal-dialog"),
+        );
+
         let status = Text::new(self.status())
             .semantic_font(cove_ui_compose::theme::SemanticFontRef::caption())
             .semantic_foreground(SemanticColorRef::on_surface_muted());
+
         AnyView::new(StorySection::new(
             "Dialog",
             "Open the dialog, cycle focus with Tab, then close with Escape or the cancel action.",
-            AnyView::new(AnyView::new(status).debug_name("modal-status")),
+            AnyView::new(TupleView::new(vec![
+                AnyView::new(Button::title("New project", open).enabled(self.options.is_enabled)),
+                dialog,
+                AnyView::new(AnyView::new(status).debug_name("modal-status")),
+            ])),
         ))
     }
 
@@ -517,7 +622,7 @@ impl View for ModalStory {
 pub struct DisclosureStory {
     pub options: GalleryOptions,
     is_expanded: State<bool>,
-    draft: State<String>,
+    draft: State<TextBuffer>,
 }
 
 impl DisclosureStory {
@@ -525,7 +630,7 @@ impl DisclosureStory {
         Self {
             options,
             is_expanded: State::new(true),
-            draft: State::new("The draft survives collapse".to_owned()),
+            draft: State::new(TextBuffer::new("The draft survives collapse")),
         }
     }
 
@@ -540,23 +645,40 @@ impl DisclosureStory {
     }
 
     pub fn draft(&self) -> String {
-        self.draft.get()
+        self.draft.get().string_value()
     }
 
-    pub fn set_draft(&self, value: impl Into<String>) {
-        self.draft.set(value.into());
+    pub fn set_draft(&self, value: impl AsRef<str>) {
+        self.draft.set(TextBuffer::new(value.as_ref()));
     }
 }
 
 impl View for DisclosureStory {
     fn body(&self, _cx: &Scope) -> AnyView {
+        let group = AnyView::new(
+            DisclosureGroup::title(
+                self.is_expanded.binding(),
+                "Advanced settings",
+                AnyView::new(TextField::new("Draft", self.draft.binding())),
+            )
+            .enabled(self.options.is_enabled)
+            .debug_name("disclosure-group"),
+        );
+        let caption = Text::new(format!(
+            "{} · draft: {}",
+            if self.is_expanded() {
+                "expanded"
+            } else {
+                "collapsed"
+            },
+            self.draft()
+        ))
+        .semantic_font(cove_ui_compose::theme::SemanticFontRef::caption())
+        .semantic_foreground(SemanticColorRef::on_surface_muted());
         AnyView::new(StorySection::new(
             "Collapsible content",
             "Expansion is caller-owned, so search and Expand All can control it.",
-            AnyView::new(
-                Text::new(self.draft())
-                    .semantic_font(cove_ui_compose::theme::SemanticFontRef::caption()),
-            ),
+            AnyView::new(TupleView::new(vec![group, AnyView::new(caption)])),
         ))
     }
 
@@ -576,6 +698,7 @@ pub struct TabsStory {
     segment: State<String>,
     documents: State<Vec<String>>,
     document_selection: State<String>,
+    mobile_selection: State<String>,
 }
 
 impl TabsStory {
@@ -591,6 +714,7 @@ impl TabsStory {
                     .collect(),
             ),
             document_selection: State::new("Scene.cove".to_owned()),
+            mobile_selection: State::new("home".to_owned()),
         }
     }
 
@@ -608,6 +732,30 @@ impl TabsStory {
 
     pub fn document_selection(&self) -> String {
         self.document_selection.get()
+    }
+
+    pub fn mobile_selection(&self) -> String {
+        self.mobile_selection.get()
+    }
+
+    /// Six touch destinations: four stay visible, the rest move under `More`.
+    pub fn mobile_tabs(&self) -> Vec<TabItem<String>> {
+        [
+            ("home", "Home", None),
+            ("search", "Search", Some("3")),
+            ("library", "Library", None),
+            ("studio", "Studio", None),
+            ("activity", "Activity", Some("7")),
+            ("profile", "Profile", None),
+        ]
+        .into_iter()
+        .map(|(id, label, badge)| {
+            let mut tab = TabItem::new(id.to_owned(), label, Text::new(label));
+            tab.badge = badge.map(|value| value.to_owned());
+            tab.is_enabled = self.options.is_enabled || id == "home";
+            tab
+        })
+        .collect()
     }
 
     /// The five content tabs, one of which is disabled.
@@ -789,6 +937,16 @@ impl View for TabsStory {
                         "Closable documents",
                         "Closing the selected document selects its neighbour, not the first tab.",
                         AnyView::new(TupleView::new(vec![documents, close])),
+                    )),
+                    AnyView::new(StorySection::new(
+                        "Mobile tab bar",
+                        "Up to four touch destinations stay visible; with six the fourth slot follows the selection and the rest open from More. The bar reserves the bottom safe area.",
+                        AnyView::new(MobileTabBar::new(
+                            self.mobile_tabs(),
+                            self.mobile_selection.binding(),
+                            true,
+                        ))
+                        .debug_name("tabs-mobile"),
                     )),
                     AnyView::new(caption),
                 ])),

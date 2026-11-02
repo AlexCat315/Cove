@@ -2,7 +2,8 @@
 
 - 日期：2026-11-02
 - 范围：`crates/compose`、`crates/addons`、`examples/gallery`
-- 方法：`cargo check --workspace --all-targets` 全量警告提取 + 逐项源码验证（只读审计，未修改任何代码）
+- 方法：`cargo check --workspace --all-targets` 全量警告提取 + 逐项源码验证
+- 状态：审计结论保留为记录；§5.3 占位页、§3.1 缺陷 5、§6 孤立状态与 §2 警告已按 §8 顺序修复，已在对应段落就地标注。**AdaptiveControlExamples 不再移植**（见 §5.3 末条）。
 
 ---
 
@@ -224,7 +225,9 @@ Button / Checkbox / Toggle / Slider / RangeSlider / TextField / NumberField / Ve
 | NavigationRail | `navigation_layout_stories.rs:318-340` | 只有一个 "Show labels" Checkbox；`items()/presentation()` 从不渲染；`selection`（:244）死状态 |
 | ContextMenu | `routing.rs:243-245` 路由到 MenuStory | 与 Menu 页内容完全相同，无右键目标演示 |
 
-另：**AdaptiveControlExamples**（adaptive_examples.rs:326-338）和 **PlacementExample**（placement_example.rs:185-221）本身就是占位且不可达。仓库测试已自我记录：`tests/split_tests.rs:11` `GAP(adaptive_examples.rs ...)`、`tests/gallery_tests.rs:322` `GAP(placement_example.rs)`。
+另：**PlacementExample**（placement_example.rs:185-221）当时是占位且不可达——已修复：每个放置方向一个真实 `Popover`（带 `trigger_description` 可访问名），并接入 Popover 页；`tests/gallery_tests.rs` 的 GAP 断言翻转为 12 个触发器逐个校验。
+
+**AdaptiveControlExamples（已删除，不再移植）**。Swift 原件 `Stories/Foundation/AdaptiveExamples.swift`（551 行）由两部分组成：一层外壳（把页面塞进 390pt / 720pt 定宽容器，用 `.surfaceEnvironment(...)` 覆写 viewport 与输入能力）和一份 `AdaptiveControlSample` 大 switch（为 97 个页面各手写一份最小样例）。Rust 侧只有外壳的数据表（`SUPPORTED`、`PREVIEW_WIDTHS`、`frame_height`、`captions`）与一行 caption 的 `body`，从未被任何页面路由。**决定**：定宽预览外壳不进入 Rust 画廊——它复刻的是 Swift 宿主窗口的伪环境，而 Rust 每个页面已有真实 story，再套一层固定宽度需要嵌套 `LayerRoot` 才能容纳 portal，收益不足以支付这部分复杂度。因此删除整个 `adaptive_examples.rs`（含 `GalleryPage::has_adaptive_sample` / `adaptive_sample_height` / `adaptive_debug_name` 扩展方法与相关属性测试），`tests/split_tests.rs` 重写为直接挂载 `SplitViewStory`（断言三个分割视图、作者尺寸与夹紧区间），`tests/rail_tests.rs` 去掉 adaptive 断言并改为断言真实 `navigation-rail`。
 
 ### 5.4 完全无 Gallery 覆盖的公开组件
 
@@ -303,8 +306,10 @@ Button / Checkbox / Toggle / Slider / RangeSlider / TextField / NumberField / Ve
 - ColumnVisibilityPickerModel / ColumnPickerEntry — `columns/picker.rs`
 - ColumnVisibilityPlan / ColumnVisibilityTrack — `columns/mod.rs`
 
-**已导出但路由不可达的 story（4 个）**：
-`AdaptiveControlExamples`（stories/mod.rs:51）、`PlacementExample`（:95）、`LazyGridStory`（layout.rs:415）、`MasonrySample`（layout.rs:212）——只被测试引用，用户永远看不到。
+**已导出但路由不可达的 story（4 个）** —— 已处理：
+- `AdaptiveControlExamples`：删除（不移植，见 §5.3 末条）。
+- `PlacementExample`：成为真实组件并接入 Popover 页。
+- `LazyGridStory`、`MasonrySample`：接入 Layout 页（懒加载网格、Masonry 样例两节）。
 
 ---
 
@@ -370,9 +375,9 @@ let field = AnyView::new(TextField::new("Project name", self.text.binding()) ...
 | **P1** | 决策：实现 workspace_view 释放-重停靠手势，或修正错误注释并删除死 key（缺陷 4） | 注释与实现矛盾 |
 | **P1** | 逐一处理 16 处 `expect(dead_code, "not wired in yet")`：接线或删除（重点 §4 中标"真缺陷"的 6 处：touch_menu tab-stop、resize 键盘、set_collapsed、variable_stack viewport、lazy_grid key、data_table column_id） | 不产生警告、最易被再次忽略 |
 | **P1** | Gallery 占位页替换为真实组件渲染（§5.3 的 20 页；Accordion 最省力——`accordion()` 已写好，body 调用即可）；修复 §6.1 孤立 State 与 §6.2 丢弃的 TextField、§6.3 Now 按钮 | Gallery 是组件质量的门面 |
-| **P2** | Chart overlay label 文字渲染落地（缺陷 5） | 已知意图性 stub |
+| **P2** | ~~Chart overlay label 文字渲染落地（缺陷 5）~~（已完成） | 已知意图性 stub |
 | **P2** | 清理重复移植：删除 `view.rs` 死子树、slider snap/increment 三副本合一、`DRAG_THRESHOLD` 单一定义、Timeline 助手与内联副本合一 | 消除漂移风险，顺带消掉大部分现存警告 |
-| **P2** | 路由接入 4 个不可达 story；ContextMenu 页改为真实右键演示；Divider/CompletionPopover/FormLayout/TreeTable/MobileTabBar 等补页（§5.4） | 覆盖缺口 |
+| **P2** | ~~路由接入不可达 story；ContextMenu 页改为真实右键演示~~（已完成：PlacementExample 接入 Popover 页、懒加载网格/Masonry/Divider 接入 Layout 页、ContextMenu 独立演示；AdaptiveControlExamples 判定不移植并删除） | 覆盖缺口 |
 | **P3** | story body 中 `expect()` 的系统性替换；原生侧 CVDisplayLink 废弃 API 与 cove-text 恒假比较警告单独立项 | 健壮性/跨平台 |
 
 ---

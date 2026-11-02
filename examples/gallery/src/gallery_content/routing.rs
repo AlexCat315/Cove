@@ -241,7 +241,7 @@ impl StoryDispatch {
             Self::Story(GalleryPage::Web) => Some(AnyView::new(stories::WebStory::new(options))),
             Self::Story(GalleryPage::Menu) => Some(AnyView::new(stories::MenuStory::new(options))),
             Self::Story(GalleryPage::ContextMenu) => {
-                Some(AnyView::new(stories::MenuStory::new(options)))
+                Some(AnyView::new(stories::ContextMenuStory::new(options)))
             }
             Self::Story(GalleryPage::Popover) => {
                 Some(AnyView::new(stories::PopoverStory::new(options)))
