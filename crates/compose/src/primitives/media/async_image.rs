@@ -7,12 +7,14 @@ use crate::Scope;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
+use std::sync::Arc;
 
 use crate::impl_primitive_view;
 use crate::primitives::media::image_data_download::AsyncImageError;
 use crate::primitives::media::image_geometry::{ImageContentMode, ImageRenderingMode};
 use crate::primitives::media::image_load_services::{
-    ImageInflightLoads, ImageLoadRequest, ImageLoadServices, ImagePayload, ImageProgress,
+    ImageDecodeExecution, ImageInflightLoads, ImageLoadRequest, ImageLoadServices, ImagePayload,
+    ImageProgress,
 };
 use crate::primitives::media::{Image, ImageSource};
 use crate::{AnyView, PrimitiveView, View};
@@ -150,6 +152,15 @@ pub struct AsyncImageSession {
     phase: RefCell<AsyncImageStatus>,
     frame: RefCell<usize>,
     is_preview: RefCell<bool>,
+    /// Readers subscribe; every publication (including one that arrives from
+    /// a background decode) re-runs them.
+    changed: cove_core::Signal<()>,
+}
+
+impl Drop for AsyncImageSession {
+    fn drop(&mut self) {
+        self.changed.dispose();
+    }
 }
 
 impl AsyncImageSession {
@@ -159,11 +170,13 @@ impl AsyncImageSession {
             phase: RefCell::new(AsyncImageStatus::Empty),
             frame: RefCell::new(0),
             is_preview: RefCell::new(false),
+            changed: cove_core::Signal::detached(()),
         })
     }
 
     /// Current animation frame; playback writes it, the body reads it.
     pub fn frame_index(&self) -> usize {
+        self.changed.track();
         *self.frame.borrow()
     }
 
@@ -175,10 +188,12 @@ impl AsyncImageSession {
         if let Some(node) = node {
             node.mark_render_dirty(InvalidationSource::style_set("asyncImage.frame"));
         }
+        self.changed.notify();
     }
 
     /// The animation published for the current request.
     pub fn animation(&self) -> Option<Rc<AsyncImageAnimation>> {
+        self.changed.track();
         match &*self.phase.borrow() {
             AsyncImageStatus::Animated(animation) => Some(animation.clone()),
             _ => None,
@@ -186,6 +201,7 @@ impl AsyncImageSession {
     }
 
     pub fn is_previewing(&self, request: &ImageLoadRequest) -> bool {
+        self.changed.track();
         self.request.borrow().as_ref() == Some(request) && *self.is_preview.borrow()
     }
 
@@ -195,9 +211,11 @@ impl AsyncImageSession {
         *self.request.borrow_mut() = Some(request.clone());
         *self.phase.borrow_mut() = AsyncImageStatus::Success(asset);
         *self.is_preview.borrow_mut() = true;
+        self.changed.notify();
     }
 
     pub fn status(&self, request: &ImageLoadRequest) -> AsyncImageStatus {
+        self.changed.track();
         if self.request.borrow().as_ref() == Some(request) {
             self.phase.borrow().clone()
         } else if request.url.is_none() {
@@ -227,6 +245,7 @@ impl AsyncImageSession {
         if let Some(node) = node {
             node.mark_render_dirty(InvalidationSource::style_set("asyncImage.phase"));
         }
+        self.changed.notify();
     }
 }
 
@@ -328,9 +347,12 @@ fn pixel_extent(points: f32, is_fill: bool) -> u32 {
 }
 
 impl View for AsyncImage {
-    fn body(&self, _cx: &Scope) -> AnyView {
+    fn body(&self, cx: &Scope) -> AnyView {
+        // The session outlives parent rebuilds; a rebuilt value's fresh session
+        // would never receive the in-flight result.
+        let session = cx.remember(|| self.session.clone());
         let request = self.request();
-        let phase = match self.session.status(&request) {
+        let phase = match session.status(&request) {
             AsyncImageStatus::Empty => AsyncImagePhase::Empty,
             AsyncImageStatus::Loading => AsyncImagePhase::Loading,
             AsyncImageStatus::Success(asset) => AsyncImagePhase::Success(image_for_asset(
@@ -344,7 +366,7 @@ impl View for AsyncImage {
                     .frames
                     .len()
                     .saturating_sub(1)
-                    .min(self.session.frame_index());
+                    .min(session.frame_index());
                 AsyncImagePhase::Success(image_for_asset(
                     animation.frames[index].clone(),
                     self.width,
@@ -356,7 +378,7 @@ impl View for AsyncImage {
         };
         let content = (self.content)(phase);
         AnyView::new(AsyncImageHost {
-            session: self.session.clone(),
+            session: session.clone(),
             request,
             content,
         })
@@ -491,91 +513,110 @@ impl AsyncImageResource {
             return;
         }
         session.publish(AsyncImageStatus::Loading, request, node.as_ref());
-        let generation = *self.generation.borrow();
-        let session_inner = session.clone();
-        let request_inner = request.clone();
-        let node_inner = node.clone();
-        let shared_key = key.clone();
-        let progress: ImageProgress = {
-            let session = session_inner.clone();
-            let request = request_inner.clone();
-            let node = node_inner.clone();
-            Rc::new(move |image: cove_imaging::DecodedImage| {
-                // Previews of a progressive image show until the final decode
-                // lands.
-                let session = session.clone();
-                let request = request.clone();
-                let node = node.clone();
-                let enqueue = ImageLoadServices::current().map(|services| services.enqueue.clone());
-                if let Some(enqueue) = enqueue {
-                    enqueue(Rc::new(move || {
-                        let loading = session.status(&request).is_loading()
-                            || session.is_previewing(&request);
-                        if !loading {
-                            return;
-                        }
-                        if let Ok(asset) = ImageAsset::new(image.clone()) {
-                            session.publish_preview(asset, &request);
-                            if let Some(node) = node.as_ref() {
-                                node.mark_render_dirty(InvalidationSource::style_set(
-                                    "asyncImage.phase",
-                                ));
-                            }
-                        }
-                    }));
+
+        // Previews of a progressive image show until the final decode lands.
+        // The decode may run on a worker, so previews come back through the
+        // UI thread's inbox.
+        let (preview_sender, preview_receiver) = {
+            let session = session.clone();
+            let request = request.clone();
+            let node = node.clone();
+            cove_core::work::ui_channel(move |image: cove_imaging::DecodedImage| {
+                let loading =
+                    session.status(&request).is_loading() || session.is_previewing(&request);
+                if !loading {
+                    return;
+                }
+                if let Ok(asset) = ImageAsset::new(image) {
+                    session.publish_preview(asset, &request);
+                    if let Some(node) = node.as_ref() {
+                        node.mark_render_dirty(InvalidationSource::style_set("asyncImage.phase"));
+                    }
                 }
             })
         };
-        let result = ImageInflightLoads::shared().load(&shared_key, || {
-            (services.decode)(request, Some(progress.clone()))
-        });
-        let _ = generation;
-        let Some(node) = node else { return };
-        match result {
-            Ok(ImagePayload::Still(decoded)) => match ImageAsset::new(decoded) {
-                Ok(asset) => {
-                    if let Ok(registered) = (services.register)(&key, clone_asset_image(&asset)) {
-                        session.publish(
-                            AsyncImageStatus::Success(registered),
-                            request,
-                            Some(&node),
-                        );
-                    } else {
-                        session.publish(AsyncImageStatus::Success(asset), request, Some(&node));
-                    }
-                }
-                Err(error) => session.publish(
-                    AsyncImageStatus::Failure(AsyncImageError::DecodeFailed(error.to_string())),
-                    request,
-                    Some(&node),
-                ),
-            },
-            Ok(ImagePayload::Animation(decoded)) => {
-                let mut frames = Vec::with_capacity(decoded.frames.len());
-                for (index, frame) in decoded.frames.into_iter().enumerate() {
-                    let frame_key = format!("{key}#frame-{index}");
-                    match (services.register)(&frame_key, frame) {
-                        Ok(asset) => frames.push(asset),
-                        Err(error) => {
-                            session.publish(
-                                AsyncImageStatus::Failure(AsyncImageError::DecodeFailed(error)),
-                                request,
-                                Some(&node),
-                            );
-                            return;
-                        }
-                    }
-                }
-                let animation = Rc::new(AsyncImageAnimation::new(
-                    frames,
-                    decoded.durations,
-                    decoded.loop_count as i32,
-                ));
-                AsyncImageAnimationCache::shared().store(animation.clone(), &key);
-                session.publish(AsyncImageStatus::Animated(animation), request, Some(&node));
+        let progress: ImageProgress = Arc::new(move |image| preview_sender.send(image));
+
+        let finish = {
+            let session = session.clone();
+            let request = request.clone();
+            let services = services.clone();
+            let key = key.clone();
+            move |result: Result<ImagePayload, AsyncImageError>| {
+                drop(preview_receiver);
+                let Some(node) = node else { return };
+                publish_result(&session, &request, &services, &key, &node, result);
             }
-            Err(error) => session.publish(AsyncImageStatus::Failure(error), request, Some(&node)),
+        };
+        match services.execution {
+            ImageDecodeExecution::Inline => {
+                let result = ImageInflightLoads::shared().load(&key, || {
+                    (services.decode)(request, Some(progress.clone()))
+                });
+                finish(result);
+            }
+            ImageDecodeExecution::Background => {
+                let decode = services.decode.clone();
+                let job_request = request.clone();
+                ImageInflightLoads::shared().load_in_background(
+                    &key,
+                    move || decode(&job_request, Some(progress)),
+                    finish,
+                );
+            }
         }
+    }
+}
+
+/// Registers a finished decode and publishes it to the session.
+fn publish_result(
+    session: &Rc<AsyncImageSession>,
+    request: &ImageLoadRequest,
+    services: &ImageLoadServices,
+    key: &str,
+    node: &Node,
+    result: Result<ImagePayload, AsyncImageError>,
+) {
+    match result {
+        Ok(ImagePayload::Still(decoded)) => match ImageAsset::new(decoded) {
+            Ok(asset) => {
+                if let Ok(registered) = (services.register)(key, clone_asset_image(&asset)) {
+                    session.publish(AsyncImageStatus::Success(registered), request, Some(node));
+                } else {
+                    session.publish(AsyncImageStatus::Success(asset), request, Some(node));
+                }
+            }
+            Err(error) => session.publish(
+                AsyncImageStatus::Failure(AsyncImageError::DecodeFailed(error.to_string())),
+                request,
+                Some(node),
+            ),
+        },
+        Ok(ImagePayload::Animation(decoded)) => {
+            let mut frames = Vec::with_capacity(decoded.frames.len());
+            for (index, frame) in decoded.frames.into_iter().enumerate() {
+                let frame_key = format!("{key}#frame-{index}");
+                match (services.register)(&frame_key, frame) {
+                    Ok(asset) => frames.push(asset),
+                    Err(error) => {
+                        session.publish(
+                            AsyncImageStatus::Failure(AsyncImageError::DecodeFailed(error)),
+                            request,
+                            Some(node),
+                        );
+                        return;
+                    }
+                }
+            }
+            let animation = Rc::new(AsyncImageAnimation::new(
+                frames,
+                decoded.durations,
+                decoded.loop_count as i32,
+            ));
+            AsyncImageAnimationCache::shared().store(animation.clone(), key);
+            session.publish(AsyncImageStatus::Animated(animation), request, Some(node));
+        }
+        Err(error) => session.publish(AsyncImageStatus::Failure(error), request, Some(node)),
     }
 }
 

@@ -218,7 +218,7 @@ fn collect(node: &Node, into: &mut Vec<Node>) {
 
 #[test]
 fn http_transport() {
-    let transport = Rc::new(ScriptedTransport::new());
+    let transport = std::sync::Arc::new(ScriptedTransport::new());
     transport.respond(request("ok"), b"image data", Some("image/png"));
     transport.fail(request("missing"), AsyncImageError::HttpStatus(404));
     transport.respond(request("large"), &vec![0u8; 4096], Some("image/png"));
@@ -387,4 +387,72 @@ fn local_and_remote_extension_hints() {
         "",
         "a path without an extension yields no hint rather than the whole URL"
     );
+}
+
+/// The production services download and decode on a worker thread and publish
+/// on the UI thread's next frame.
+#[test]
+fn production_loads_decode_off_the_ui_thread() {
+    struct RecordingTransport {
+        threads: Mutex<Vec<std::thread::ThreadId>>,
+    }
+    impl ImageDownloadTransport for RecordingTransport {
+        fn fetch(
+            &self,
+            _url: &str,
+            _limit: usize,
+        ) -> Result<(Vec<u8>, Option<String>), AsyncImageError> {
+            self.threads
+                .lock()
+                .unwrap()
+                .push(std::thread::current().id());
+            let svg = br#"<svg xmlns="http://www.w3.org/2000/svg" width="8" height="8"><rect width="8" height="8" fill="red"/></svg>"#;
+            Ok((svg.to_vec(), Some("image/svg+xml".to_string())))
+        }
+    }
+    support::GlobalTestLock::locked(|| {
+        let registry = std::sync::Arc::new(ImageAssetRegistry::new(ImageCacheLimits::default()));
+        ImageAssetRegistryHolder::set_current(Some(registry));
+        let transport = std::sync::Arc::new(RecordingTransport {
+            threads: Mutex::new(Vec::new()),
+        });
+        ImageDownloadTransportHolder::set(Some(transport.clone()));
+
+        let phases: Rc<std::cell::RefCell<Vec<&'static str>>> = Rc::default();
+        let recorder = phases.clone();
+        let image = AsyncImage::new(
+            Some(request("background")),
+            24.0,
+            24.0,
+            move |phase: AsyncImagePhase| {
+                recorder.borrow_mut().push(match phase {
+                    AsyncImagePhase::Empty => "empty",
+                    AsyncImagePhase::Loading => "loading",
+                    AsyncImagePhase::Success(_) => "success",
+                    AsyncImagePhase::Failure(_) => "failure",
+                });
+                AnyView::new(cove_composition::EmptyView)
+            },
+        );
+        let graph = support::graph();
+        graph.install_view(AnyView::new(image), Default::default());
+        graph.compute_layout(100.0, 100.0);
+        assert!(
+            !phases.borrow().contains(&"success"),
+            "the install pass does not block on the decode"
+        );
+        for _ in 0..4 {
+            cove_core::work::wait_idle(std::time::Duration::from_secs(5));
+            cove_core::scene::drain_scene_invalidations();
+            graph.recomposer.commit_all();
+            graph.compute_layout(100.0, 100.0);
+        }
+        assert_eq!(phases.borrow().last(), Some(&"success"), "{:?}", phases.borrow());
+        let threads = transport.threads.lock().unwrap().clone();
+        assert_eq!(threads.len(), 1, "one download for the request");
+        assert_ne!(threads[0], std::thread::current().id(), "the download ran on a worker");
+
+        ImageDownloadTransportHolder::set(None);
+        ImageAssetRegistryHolder::set_current(None);
+    });
 }

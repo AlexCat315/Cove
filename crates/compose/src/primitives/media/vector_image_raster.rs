@@ -5,6 +5,7 @@
 //! needs no recompose.
 
 use std::cell::RefCell;
+use std::rc::Rc;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
@@ -43,10 +44,16 @@ impl Key {
 }
 
 /// Cache of the raster variant used at the current draw size.
+///
+/// The source it starts with was rasterized at the authored size. A later size
+/// or density change keeps drawing the previous raster (scaled) and
+/// rasterizes the new one on the worker pool; `on_ready` asks for a repaint
+/// once it lands.
 pub struct VectorImageRaster {
     path: PathBuf,
     key: RefCell<Key>,
     asset: RefCell<ImageSource>,
+    pending: RefCell<Option<Key>>,
 }
 
 impl VectorImageRaster {
@@ -55,6 +62,8 @@ impl VectorImageRaster {
             path: path.into(),
             key: RefCell::new(Key::new(width, height)),
             asset: RefCell::new(initial),
+            // The initial source is already rasterized at this size.
+            pending: RefCell::new(None),
         }
     }
 
@@ -66,6 +75,41 @@ impl VectorImageRaster {
             *self.asset.borrow_mut() = Image::resolve_path(&self.path, width, height);
             *self.key.borrow_mut() = next;
         }
+        self.asset.borrow().clone()
+    }
+
+    /// Like [`resolve`](Self::resolve), but a re-raster at a new size runs in
+    /// the background while the current raster keeps painting.
+    pub fn resolve_async(
+        self: &Rc<Self>,
+        width: f32,
+        height: f32,
+        on_ready: impl Fn() + 'static,
+    ) -> ImageSource {
+        let next = Key::new(width, height);
+        if next == *self.key.borrow() || self.pending.borrow().as_ref() == Some(&next) {
+            return self.asset.borrow().clone();
+        }
+        *self.pending.borrow_mut() = Some(next);
+        let path = self.path.clone();
+        let target = Image::raster_target(&path, width, height, cove_core::content_scale());
+        let registry = ImageAssetRegistryHolder::current();
+        let raster = Rc::downgrade(self);
+        let job_path = path.clone();
+        cove_core::work::spawn_then(
+            move || Image::rasterize(registry, &job_path, target),
+            move |result| {
+                let Some(raster) = raster.upgrade() else { return };
+                // A newer size superseded this one; its own job will land.
+                if raster.pending.borrow().as_ref() != Some(&next) {
+                    return;
+                }
+                raster.pending.borrow_mut().take();
+                *raster.asset.borrow_mut() = Image::source_for(&path, result);
+                *raster.key.borrow_mut() = next;
+                on_ready();
+            },
+        );
         self.asset.borrow().clone()
     }
 

@@ -7,7 +7,6 @@
 //! cancellation and MIME-to-format policy identical.
 use std::cell::RefCell;
 use std::path::PathBuf;
-use std::rc::Rc;
 use std::sync::Arc;
 
 /// Bytes plus the transport hint that selects a decoder.
@@ -110,7 +109,7 @@ impl AsyncImageError {
 }
 
 /// Receives the bytes received so far, at most once per 64 KiB.
-pub type DownloadProgress = Rc<dyn Fn(&[u8])>;
+pub type DownloadProgress = Arc<dyn Fn(&[u8]) + Send + Sync>;
 
 /// Host-supplied byte transport. Returns the full response body and declares
 /// the MIME type so [`DownloadedImage`] can pick the decoder hint.
@@ -122,21 +121,26 @@ pub type DownloadProgress = Rc<dyn Fn(&[u8])>;
 /// WinHTTP, Linux std + the platform TLS stack). Without an installed
 /// transport, `http`/`https` loads fail with
 /// [`AsyncImageError::HostUnavailable`]; `file:` URLs never need one.
-pub trait ImageDownloadTransport {
+pub trait ImageDownloadTransport: Send + Sync {
     fn fetch(&self, url: &str, limit: usize) -> Result<(Vec<u8>, Option<String>), AsyncImageError>;
 }
 
-thread_local! {
-    static TRANSPORT: RefCell<Option<Rc<dyn ImageDownloadTransport>>> = const { RefCell::new(None) };
-}
+/// Process-wide, so downloads run on worker threads instead of the UI thread.
+static TRANSPORT: std::sync::RwLock<Option<Arc<dyn ImageDownloadTransport>>> =
+    std::sync::RwLock::new(None);
 
 pub struct ImageDownloadTransportHolder;
 impl ImageDownloadTransportHolder {
-    pub fn set(transport: Option<Rc<dyn ImageDownloadTransport>>) {
-        TRANSPORT.with(|slot| *slot.borrow_mut() = transport);
+    pub fn set(transport: Option<Arc<dyn ImageDownloadTransport>>) {
+        *TRANSPORT
+            .write()
+            .unwrap_or_else(std::sync::PoisonError::into_inner) = transport;
     }
-    pub fn current() -> Option<Rc<dyn ImageDownloadTransport>> {
-        TRANSPORT.with(|slot| slot.borrow().clone())
+    pub fn current() -> Option<Arc<dyn ImageDownloadTransport>> {
+        TRANSPORT
+            .read()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .clone()
     }
 }
 

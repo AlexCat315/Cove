@@ -8,7 +8,7 @@ use cove_http::{Client, ClientConfig, HttpError, Request};
 use cove_ui_compose::primitives::media::image_data_download::{
     AsyncImageError, ImageDownloadTransport, ImageDownloadTransportHolder,
 };
-use std::rc::Rc;
+use std::sync::Arc;
 use std::time::Duration;
 
 /// What the platform transport can serve.
@@ -82,13 +82,13 @@ impl ImageDownloadTransport for HttpImageTransport {
     }
 }
 
-/// Installs the image transport process-wide (for this UI thread). Returns
+/// Installs the image transport process-wide. Returns
 /// `false` on a target with no HTTP stack, leaving `http`/`https` loads
 /// reporting `HostUnavailable`.
 pub fn install_image_transport(timeout_seconds: f64) -> bool {
     let installed = Client::capabilities().http;
-    let transport: Option<Rc<dyn ImageDownloadTransport>> =
-        installed.then(|| Rc::new(HttpImageTransport::new(timeout_seconds)) as _);
+    let transport: Option<Arc<dyn ImageDownloadTransport>> =
+        installed.then(|| Arc::new(HttpImageTransport::new(timeout_seconds)) as _);
     ImageDownloadTransportHolder::set(transport);
     installed
 }

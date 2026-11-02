@@ -6,7 +6,8 @@ use crate::desktop::window::native_renderer::{
 };
 use cove_core::{GeometryAntialiasing, TextureId};
 use cove_graphics::rhi::{Device, RhiResult, TextureFormat};
-use cove_graphics::ui::NativeDrawListRenderer;
+use cove_graphics::ui::{FontAtlasUpload, NativeDrawListRenderer};
+use super::render_thread::ThreadedWindowRenderer;
 use cove_text::FontAtlas;
 use std::sync::Arc;
 
@@ -70,11 +71,21 @@ impl AppRenderingContext {
                 settings.samples as usize,
             )
         })?;
-        Ok(Box::new(NativeAppWindowRenderer::new(
-            device,
-            presentation,
-            settings,
-        )))
+        let renderer = Box::new(NativeAppWindowRenderer::new(device, presentation, settings));
+        if std::env::var_os("COVE_SYNC_RENDER").is_some_and(|value| value == "1") {
+            return Ok(renderer);
+        }
+        Ok(Box::new(ThreadedWindowRenderer::spawn(renderer, "window")))
+    }
+
+    /// Copies the atlas's pending regions for a window renderer to upload in
+    /// order with its frames.
+    pub fn take_font_atlas_upload(
+        &self,
+        atlas: &FontAtlas,
+        texture_id: TextureId,
+    ) -> RhiResult<Option<FontAtlasUpload>> {
+        FontAtlasUpload::take(atlas, texture_id)
     }
 
     pub fn upload_font_atlas(&self, atlas: &FontAtlas, texture_id: TextureId) -> RhiResult<()> {

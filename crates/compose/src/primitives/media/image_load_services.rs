@@ -26,7 +26,23 @@ pub enum ImagePayload {
 }
 
 /// Receives low-resolution previews while a progressive image downloads.
-pub type ImageProgress = Rc<dyn Fn(DecodedImage)>;
+/// Called on whichever thread runs the decode.
+pub type ImageProgress = Arc<dyn Fn(DecodedImage) + Send + Sync>;
+
+/// Downloads and decodes one request; runs on a worker thread in production.
+pub type ImageDecode = Arc<
+    dyn Fn(&ImageLoadRequest, Option<ImageProgress>) -> Result<ImagePayload, AsyncImageError>
+        + Send
+        + Sync,
+>;
+
+/// Where a decode runs. Hosts decode on the shared worker pool and publish on
+/// the UI thread's next frame; injected services may decode inline.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ImageDecodeExecution {
+    Inline,
+    Background,
+}
 
 /// Frame ceiling for animated decodes, matching the reference decoder budget.
 const MAXIMUM_FRAMES: usize = 512;
@@ -78,22 +94,17 @@ impl ImageLoadRequest {
 /// publication.
 pub struct ImageLoadServices {
     pub cached: Rc<dyn Fn(&str) -> Option<Arc<ImageAsset>>>,
-    pub decode: Rc<
-        dyn Fn(&ImageLoadRequest, Option<ImageProgress>) -> Result<ImagePayload, AsyncImageError>,
-    >,
+    pub decode: ImageDecode,
     pub register: Rc<dyn Fn(&str, DecodedImage) -> Result<Arc<ImageAsset>, String>>,
     pub enqueue: Rc<dyn Fn(Rc<dyn Fn()>)>,
+    pub execution: ImageDecodeExecution,
 }
 
 impl ImageLoadServices {
+    /// Services that decode inline on the calling thread.
     pub fn new(
         cached: Rc<dyn Fn(&str) -> Option<Arc<ImageAsset>>>,
-        decode: Rc<
-            dyn Fn(
-                &ImageLoadRequest,
-                Option<ImageProgress>,
-            ) -> Result<ImagePayload, AsyncImageError>,
-        >,
+        decode: ImageDecode,
         register: Rc<dyn Fn(&str, DecodedImage) -> Result<Arc<ImageAsset>, String>>,
         enqueue: Rc<dyn Fn(Rc<dyn Fn()>)>,
     ) -> Self {
@@ -102,17 +113,24 @@ impl ImageLoadServices {
             decode,
             register,
             enqueue,
+            execution: ImageDecodeExecution::Inline,
         }
     }
 
+    pub fn execution(mut self, execution: ImageDecodeExecution) -> Self {
+        self.execution = execution;
+        self
+    }
+
     /// Services backed by the installed image registry and UI work scheduler.
+    /// Downloads and decodes run on the worker pool.
     pub fn current() -> Option<Rc<Self>> {
         ImageAssetRegistryHolder::current()?;
         Some(Rc::new(Self {
             cached: Rc::new(|key| {
                 ImageAssetRegistryHolder::current().and_then(|registry| registry.cached(key))
             }),
-            decode: Rc::new(decode_request),
+            decode: Arc::new(decode_request),
             register: Rc::new(|key, decoded| {
                 let registry = ImageAssetRegistryHolder::current()
                     .ok_or_else(|| AsyncImageError::HostUnavailable.to_string())?;
@@ -125,6 +143,7 @@ impl ImageLoadServices {
                     Rc::new(|next: Rc<dyn Fn()>| UIWorkSchedulerHolder::schedule(next));
                 ImagePublicationQueue::shared().enqueue(work, scheduler);
             }),
+            execution: ImageDecodeExecution::Background,
         }))
     }
 }
@@ -139,7 +158,7 @@ fn decode_request(
     let bounds = request.bounds();
     let maximum_source_pixels = request.policy.maximum_source_pixels;
     let preview: Option<super::image_data_download::DownloadProgress> = progress.map(|progress| {
-        Rc::new(move |partial: &[u8]| {
+        Arc::new(move |partial: &[u8]| {
             if let Some(image) =
                 ImageDecoder::decode_partial(partial, bounds, maximum_source_pixels)
             {
@@ -237,9 +256,13 @@ impl ImagePublicationQueue {
     }
 }
 
+type LoadResult = Result<ImagePayload, AsyncImageError>;
+
 struct InflightLoad {
     payload: Option<ImagePayload>,
     waiters: usize,
+    /// Completions of background loads joined while the decode runs.
+    pending: Vec<Box<dyn FnOnce(LoadResult)>>,
 }
 
 /// One download and decode per cache key, shared by every node that asks for
@@ -282,6 +305,7 @@ impl ImageInflightLoads {
             InflightLoad {
                 payload: None,
                 waiters: 1,
+                pending: Vec::new(),
             },
         );
         let result = start();
@@ -292,6 +316,42 @@ impl ImageInflightLoads {
         }
         self.leave(key);
         result
+    }
+
+    /// Joins the in-flight background load for `key`, or starts `job` on the
+    /// worker pool. Every joined `done` runs on this thread with the result.
+    pub fn load_in_background(
+        self: &Rc<Self>,
+        key: &str,
+        job: impl FnOnce() -> LoadResult + Send + 'static,
+        done: impl FnOnce(LoadResult) + 'static,
+    ) {
+        if let Some(load) = self.loads.borrow_mut().get_mut(key) {
+            load.waiters += 1;
+            load.pending.push(Box::new(done));
+            return;
+        }
+        self.loads.borrow_mut().insert(
+            key.to_string(),
+            InflightLoad {
+                payload: None,
+                waiters: 1,
+                pending: vec![Box::new(done)],
+            },
+        );
+        let loads = self.clone();
+        let key = key.to_string();
+        cove_core::work::spawn_then(job, move |result| {
+            let pending = loads
+                .loads
+                .borrow_mut()
+                .remove(&key)
+                .map(|load| load.pending)
+                .unwrap_or_default();
+            for done in pending {
+                done(result.clone());
+            }
+        });
     }
 
     fn join(&self, key: &str) -> Option<Result<ImagePayload, AsyncImageError>> {

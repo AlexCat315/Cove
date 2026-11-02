@@ -163,6 +163,10 @@ impl GalleryScene {
     /// Recomposes, lays out and commits `count` times at the scene size.
     pub fn settle_n(&self, count: usize) {
         for _ in 0..count {
+            // Like the host loop: finish background work and apply what it
+            // posted back before recomposing.
+            cove_core::work::wait_idle(std::time::Duration::from_secs(5));
+            cove_core::scene::drain_scene_invalidations();
             self.graph.recomposer.commit_all();
             self.graph.compute_layout(self.width, self.height);
         }

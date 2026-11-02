@@ -9,10 +9,8 @@ use super::{
 use crate::rhi::*;
 use cove_core::{DrawBatch, DrawList, Reveal, TextureId, Vertex};
 use std::{
-    cell::RefCell,
     collections::HashMap,
-    rc::Rc,
-    sync::{Arc, Mutex},
+    sync::{Arc, Mutex, PoisonError},
 };
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct NativeUIDrawStatistics {
@@ -27,10 +25,10 @@ pub struct NativeUIDrawFrame {
     _pipeline: Arc<NativeUIPipeline>,
     _textures: Vec<Arc<TextureSlot>>,
     _store: Arc<Mutex<NativeUITextureStore>>,
-    _backdrop: Option<Rc<RefCell<NativeUIBackdropPass>>>,
+    _backdrop: Option<Arc<Mutex<NativeUIBackdropPass>>>,
     commits: Vec<(Arc<TextureSlot>, u64)>,
     atlas_sequence: u64,
-    presentation_commit: Option<Box<dyn FnOnce()>>,
+    presentation_commit: Option<Box<dyn FnOnce() + Send>>,
 }
 impl NativeUIDrawFrame {
     /// Call only after successful submission. Abandoned tokens keep patches queued.
@@ -83,12 +81,12 @@ pub struct NativeDrawListRenderer {
     pub(super) texture_store: Arc<Mutex<NativeUITextureStore>>,
     geometry: Option<NativeUIGeometry>,
     pipeline: Option<Arc<NativeUIPipeline>>,
-    backdrop: Option<Rc<RefCell<NativeUIBackdropPass>>>,
+    backdrop: Option<Arc<Mutex<NativeUIBackdropPass>>>,
     raster: Option<NativeUIRasterWorkspace>,
     pipelines: HashMap<PipelineKey, Arc<NativeUIPipeline>>,
-    backdrops: HashMap<PipelineKey, Rc<RefCell<NativeUIBackdropPass>>>,
+    backdrops: HashMap<PipelineKey, Arc<Mutex<NativeUIBackdropPass>>>,
     configured: Option<PipelineKey>,
-    presentation: Rc<RefCell<PresentationState>>,
+    presentation: Arc<Mutex<PresentationState>>,
     record_sequence: u64,
 }
 impl NativeDrawListRenderer {
@@ -124,7 +122,7 @@ impl NativeDrawListRenderer {
             pipelines: HashMap::new(),
             backdrops: HashMap::new(),
             configured: None,
-            presentation: Rc::new(RefCell::new(PresentationState::default())),
+            presentation: Arc::new(Mutex::new(PresentationState::default())),
             record_sequence: 0,
         }
     }
@@ -143,7 +141,7 @@ impl NativeDrawListRenderer {
         let backdrop = if let Some(p) = self.backdrops.get(&key) {
             p.clone()
         } else {
-            let p = Rc::new(RefCell::new(NativeUIBackdropPass::new(
+            let p = Arc::new(Mutex::new(NativeUIBackdropPass::new(
                 self.device.clone(),
                 self.backdrop_shaders.clone(),
                 format,
@@ -158,10 +156,10 @@ impl NativeDrawListRenderer {
         self.raster = None;
         for (other, pass) in &self.backdrops {
             if *other != key {
-                pass.borrow_mut().trim_scratch();
+                pass.lock().unwrap_or_else(PoisonError::into_inner).trim_scratch();
             }
         }
-        let mut state = self.presentation.borrow_mut();
+        let mut state = self.presentation.lock().unwrap_or_else(PoisonError::into_inner);
         state.epoch = state.epoch.wrapping_add(1);
         state.reveal = None;
         state.last_extent = None;
@@ -196,7 +194,7 @@ impl NativeDrawListRenderer {
     pub fn estimated_presentation_texture_bytes(&self) -> usize {
         self.backdrops
             .values()
-            .map(|p| p.borrow().estimated_scratch_bytes())
+            .map(|p| p.lock().unwrap_or_else(PoisonError::into_inner).estimated_scratch_bytes())
             .sum::<usize>()
             + self.raster.as_ref().map_or(0, |r| r.estimated_bytes())
     }
@@ -218,9 +216,9 @@ impl NativeDrawListRenderer {
         self.geometry = None;
         self.raster = None;
         for pass in self.backdrops.values() {
-            pass.borrow_mut().trim_scratch();
+            pass.lock().unwrap_or_else(PoisonError::into_inner).trim_scratch();
         }
-        let mut state = self.presentation.borrow_mut();
+        let mut state = self.presentation.lock().unwrap_or_else(PoisonError::into_inner);
         state.epoch = state.epoch.wrapping_add(1);
         state.reveal = None;
         state.last_extent = None;
@@ -237,7 +235,7 @@ impl NativeDrawListRenderer {
             .ok_or_else(|| {
                 RhiError::invalid_argument("configure the renderer before recording a blit")
             })?
-            .borrow_mut()
+            .lock().unwrap_or_else(PoisonError::into_inner)
             .record_blit(source, target, size, commands)
     }
     pub fn synchronize_textures(&self, source: &Self) -> RhiResult<()> {
@@ -368,7 +366,7 @@ impl NativeDrawListRenderer {
         if let (Some(backdrop), Some(source), Some(reveal)) =
             (&self.backdrop, backdrop_source, list.reveal)
         {
-            let state = self.presentation.borrow();
+            let state = self.presentation.lock().unwrap_or_else(PoisonError::into_inner);
             if state
                 .reveal
                 .is_none_or(|old| old.sequence != reveal.sequence)
@@ -376,7 +374,7 @@ impl NativeDrawListRenderer {
                 if state.last_extent == Some(viewport) {
                     retained = Some(
                         backdrop
-                            .borrow_mut()
+                            .lock().unwrap_or_else(PoisonError::into_inner)
                             .record_reveal_capture(source, viewport, commands)?,
                     );
                 }
@@ -471,7 +469,7 @@ impl NativeDrawListRenderer {
             });
         }
         let backdrop = self.backdrop.clone();
-        let mut backdrop = backdrop.as_ref().map(|p| p.borrow_mut());
+        let mut backdrop = backdrop.as_ref().map(|p| p.lock().unwrap_or_else(PoisonError::into_inner));
         if let Some(pass) = &mut backdrop {
             pass.begin_captures();
         }
@@ -537,9 +535,9 @@ impl NativeDrawListRenderer {
             .checked_add(1)
             .ok_or_else(|| RhiError::invalid_argument("UI frame sequence exhausted"))?;
         let sequence = self.record_sequence;
-        let state = Rc::downgrade(&self.presentation);
-        let epoch = self.presentation.borrow().epoch;
-        let weak_pass = self.backdrop.as_ref().map(Rc::downgrade);
+        let state = Arc::downgrade(&self.presentation);
+        let epoch = self.presentation.lock().unwrap_or_else(PoisonError::into_inner).epoch;
+        let weak_pass = self.backdrop.as_ref().map(Arc::downgrade);
         Ok(NativeUIDrawFrame {
             statistics,
             _pipeline: pipeline,
@@ -550,13 +548,13 @@ impl NativeDrawListRenderer {
             atlas_sequence,
             presentation_commit: Some(Box::new(move || {
                 if let Some(state) = state.upgrade() {
-                    let mut state = state.borrow_mut();
+                    let mut state = state.lock().unwrap_or_else(PoisonError::into_inner);
                     if state.epoch == epoch && sequence >= state.submitted_sequence {
                         state.submitted_sequence = sequence;
                         state.reveal = next_reveal;
                         state.last_extent = Some(viewport);
                         if let Some(pass) = weak_pass.and_then(|p| p.upgrade()) {
-                            let mut pass = pass.borrow_mut();
+                            let mut pass = pass.lock().unwrap_or_else(PoisonError::into_inner);
                             pass.finish_captures();
                             if next_reveal.is_none() {
                                 pass.clear_reveal_capture();

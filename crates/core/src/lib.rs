@@ -41,6 +41,7 @@ mod text_measure_slot;
 mod text_scale;
 mod ui_reveal;
 mod ui_shader;
+pub mod work;
 
 pub use adaptive_environment::*;
 pub use analytic_clipper::GeometryAntialiasing;

@@ -205,6 +205,22 @@ pub fn batch<R>(body: impl FnOnce() -> R) -> R {
     body()
 }
 
+/// A handle other threads use to run work on this thread's next drain.
+#[derive(Clone)]
+pub(crate) struct ThreadInbox(Arc<Mutex<Vec<Posted>>>);
+
+impl ThreadInbox {
+    /// The inbox of the calling thread.
+    pub(crate) fn current() -> Self {
+        Self(RUNTIME.with(|runtime| runtime.inbox.clone()))
+    }
+
+    pub(crate) fn post(&self, work: Posted) {
+        self.0.lock().unwrap_or_else(|e| e.into_inner()).push(work);
+        crate::scene::wake_scene_thread();
+    }
+}
+
 /// Apply every update other threads posted through a [`SignalSender`].
 /// Called by the scene loop when it drains invalidations.
 pub fn drain_posted_signal_updates() {

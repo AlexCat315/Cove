@@ -330,6 +330,10 @@ impl InteractiveScene {
     /// once more — the Swift `settle` loop.
     pub fn settle(&self, ticks: usize, delta: f64) {
         for _ in 0..ticks {
+            // Like the host loop: finish background work and apply what it
+            // posted back before recomposing.
+            cove_core::work::wait_idle(std::time::Duration::from_secs(5));
+            cove_core::scene::drain_scene_invalidations();
             self.graph.recomposer.commit_all();
             self.graph.compute_layout(self.width, self.height);
             AnimatorScheduler::current().tick(delta);

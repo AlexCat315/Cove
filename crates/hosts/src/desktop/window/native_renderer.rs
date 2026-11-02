@@ -1,8 +1,10 @@
 //! Translation of Desktop/Sources/CoveUI/Window/Renderer.swift and
 //! Window/NativeRenderer.swift.
 //!
-//! Presentation ownership is separate from layout and input. All calls occur on
-//! the UI thread; the renderer also coordinates scene frames.
+//! Presentation ownership is separate from layout and input. A renderer is
+//! `Send`: hosts run it on a dedicated render thread
+//! ([`super::super::rendering::render_thread::ThreadedWindowRenderer`]) and hand
+//! it each frame's draw list.
 
 use super::super::application::memory::{AppWindowMemorySnapshot, AppWindowRendererState};
 use cove_core::DrawList;
@@ -10,7 +12,7 @@ use cove_graphics::rhi::{
     CommandBuffer, Device, RenderColorTarget, RhiResult, Swapchain, TextureDescriptor,
     TextureFormat, TextureResource, TextureUsage,
 };
-use cove_graphics::ui::{NativeDrawListRenderer, NativeUIViewport};
+use cove_graphics::ui::{FontAtlasUpload, NativeDrawListRenderer, NativeUIViewport};
 use cove_runtime::SurfaceFactory;
 use cove_shell::NativeRenderSurface;
 use std::sync::Arc;
@@ -33,7 +35,11 @@ pub trait AppWindowRenderer {
         vsync: bool,
     ) -> RhiResult<()>;
     fn resize(&mut self, size: (u32, u32), vsync: bool) -> RhiResult<()>;
-    fn draw(&mut self, list: &DrawList, logical: (f32, f32)) -> RhiResult<bool>;
+    /// Present `list`. A threaded renderer takes the list's contents and hands
+    /// back a recycled buffer, so callers reset the list before reusing it.
+    fn draw(&mut self, list: &mut DrawList, logical: (f32, f32)) -> RhiResult<bool>;
+    /// Write copied font-atlas regions before the next frame is encoded.
+    fn upload_font_atlas(&mut self, upload: FontAtlasUpload) -> RhiResult<()>;
     fn set_presentation_active(&mut self, active: bool) -> RhiResult<()>;
     fn close(&mut self) -> RhiResult<()>;
 }
@@ -150,7 +156,13 @@ impl AppWindowRenderer for NativeAppWindowRenderer {
         })
     }
 
-    fn draw(&mut self, list: &DrawList, logical: (f32, f32)) -> RhiResult<bool> {
+    fn upload_font_atlas(&mut self, upload: FontAtlasUpload) -> RhiResult<()> {
+        let device = self.device.clone();
+        device.with_frame_session(|| self.renderer.apply_font_atlas_upload(upload))
+    }
+
+    fn draw(&mut self, list: &mut DrawList, logical: (f32, f32)) -> RhiResult<bool> {
+        let list: &DrawList = list;
         let Some(native) = self.native else {
             return Ok(false);
         };
@@ -289,3 +301,4 @@ impl AppWindowRenderer for NativeAppWindowRenderer {
         Ok(())
     }
 }
+

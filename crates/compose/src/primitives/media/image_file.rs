@@ -6,6 +6,7 @@
 use std::cell::RefCell;
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
+use std::sync::Arc;
 
 use cove_imaging::{
     BundleImageResource, ImageAsset, ImageAssetRegistryHolder, ImageDecodeError, ImageDecoder,
@@ -84,28 +85,54 @@ impl Image {
     /// resolution so they stay crisp on HiDPI displays.
     pub fn resolve_path(path: impl AsRef<Path>, width: f32, height: f32) -> ImageSource {
         let path = path.as_ref();
+        let target = Self::raster_target(path, width, height, cove_core::content_scale());
+        Self::source_for(
+            path,
+            Self::rasterize(ImageAssetRegistryHolder::current(), path, target),
+        )
+    }
+
+    /// The pixel size a vector source rasterizes to at `density`; `None` for
+    /// bitmaps, which decode at their own size.
+    pub(crate) fn raster_target(
+        path: &Path,
+        width: f32,
+        height: f32,
+        density: f32,
+    ) -> Option<PixelSize> {
         let extension = path
             .extension()
             .and_then(|value| value.to_str())
             .unwrap_or("")
             .to_ascii_lowercase();
-        let target = if extension == "svg" || extension == "pdf" {
-            let density = cove_core::content_scale();
-            let scale = if density.is_finite() {
-                density.max(1.0)
-            } else {
-                1.0
-            };
-            let width = ((width * scale).round().max(1.0) as u32).min(16_384);
-            let height = ((height * scale).round().max(1.0) as u32).min(16_384);
-            PixelSize::new(width, height).ok()
+        if extension != "svg" && extension != "pdf" {
+            return None;
+        }
+        let scale = if density.is_finite() {
+            density.max(1.0)
         } else {
-            None
+            1.0
         };
-        let result = match ImageAssetRegistryHolder::current() {
+        let width = ((width * scale).round().max(1.0) as u32).min(16_384);
+        let height = ((height * scale).round().max(1.0) as u32).min(16_384);
+        PixelSize::new(width, height).ok()
+    }
+
+    /// Decodes or rasterizes `path`. Thread-safe, so it may run on a worker.
+    pub(crate) fn rasterize(
+        registry: Option<Arc<cove_imaging::ImageAssetRegistry>>,
+        path: &Path,
+        target: Option<PixelSize>,
+    ) -> Result<Arc<ImageAsset>, String> {
+        match registry {
             Some(registry) => registry.texture(path, target),
             None => ImageDecoder::decode(path, target).and_then(ImageAsset::new),
-        };
+        }
+        .map_err(|error| error.to_string())
+    }
+
+    /// The image source for a finished raster, reporting a failed decode.
+    pub(crate) fn source_for(path: &Path, result: Result<Arc<ImageAsset>, String>) -> ImageSource {
         match result {
             Ok(asset) => ImageSource::Asset(asset),
             Err(error) => {

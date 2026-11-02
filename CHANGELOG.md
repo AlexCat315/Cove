@@ -4,6 +4,23 @@
 
 ## Unreleased
 
+- **线程化：工作线程池、后台图片解码、独立渲染线程（2026-11-02，破坏性）**：
+  - 新增 `cove_core::work`：进程级工作线程池（核数减一），`spawn`、`spawn_then`（结果回投发起线程的
+    收件箱，在下一帧开头由 `drain_scene_invalidations` 统一应用）、`ui_channel`/`UiSender`（跨线程向
+    UI 线程回调）、`par_map`（按序保持的切片数据并行，调用线程参与处理，可在工作线程内嵌套）以及
+    `wait_idle`。
+  - `AsyncImage` 的下载与解码改在工作线程执行，同一缓存键的并发请求共用一次解码；渐进预览经
+    `UiSender` 回投。`ImageLoadServices::decode` 改为 `Send + Sync` 的 `ImageDecode`，新增
+    `ImageDecodeExecution`（注入的服务默认内联执行）。`AsyncImageSession` 变为可观察，并在作用域内
+    跨父视图重建保留，后台结果到达后会重组内容。
+  - `ImageDownloadTransport` 要求 `Send + Sync`，`ImageDownloadTransportHolder` 改为进程级（`Arc`）。
+  - 矢量图在尺寸或密度变化后改在后台重新栅格化，期间继续绘制上一份栅格。
+  - 每个桌面窗口的呈现移到独立渲染线程（`ThreadedWindowRenderer`）：UI 线程交出一帧 `DrawList`
+    后即可开始下一帧，最多一帧在途，缓冲区循环复用；配置、缩放、关闭与字形图集上传按通道顺序执行。
+    `AppWindowRenderer::draw` 改为接收 `&mut DrawList`，新增 `upload_font_atlas`；
+    `NativeDrawListRenderer` 的共享状态改为 `Arc<Mutex>`，可跨线程移动。设置 `COVE_SYNC_RENDER=1`
+    可回到同线程呈现。
+  - 测试场景的 `settle` 与宿主循环一致，先等待后台任务并排空收件箱。
 - **作用域状态迁移与交互修复（2026-11-02，破坏性）**：
   - `CalendarView`、`Combobox`、`NavigationStack`、`Sidebar` 及 Gallery 日历示例改用 `cx.state`；
     父视图重建保留浏览月份、搜索会话、导航过渡和本地展开状态。删除 `Sidebar::local_expanded` 与日历示例的旧状态字段。

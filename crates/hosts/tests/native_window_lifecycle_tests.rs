@@ -85,11 +85,11 @@ fn drawing_before_configure_presents_nothing() {
         eprintln!("no Metal device available; skipping the native window lifecycle test");
         return;
     };
-    let list = window_list();
+    let mut list = window_list();
 
     assert!(
         !window
-            .draw(&list, (64.0, 64.0))
+            .draw(&mut list, (64.0, 64.0))
             .expect("draw before configure"),
         "an unconfigured window cannot present"
     );
@@ -106,7 +106,7 @@ fn suspend_and_resize_without_a_surface_stay_safe() {
         eprintln!("no Metal device available; skipping the native window lifecycle test");
         return;
     };
-    let list = window_list();
+    let mut list = window_list();
 
     window
         .set_presentation_active(false)
@@ -117,7 +117,7 @@ fn suspend_and_resize_without_a_surface_stay_safe() {
 
     assert!(
         !window
-            .draw(&list, (64.0, 64.0))
+            .draw(&mut list, (64.0, 64.0))
             .expect("draw while suspended"),
         "a suspended window draws without presenting"
     );

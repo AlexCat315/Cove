@@ -9,6 +9,7 @@ mod shader_resources;
 mod texture_image;
 mod texture_store;
 mod viewport;
+pub use atlas_upload::FontAtlasUpload;
 pub use draw_list_renderer::{NativeDrawListRenderer, NativeUIDrawFrame, NativeUIDrawStatistics};
 pub use texture_image::{NativeTextureImageBacking, texture_image};
 pub use viewport::NativeUIViewport;

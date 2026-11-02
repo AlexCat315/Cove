@@ -307,11 +307,11 @@ impl AuxiliaryAppWindow {
             return false;
         }
 
-        let list = self.draw_list.borrow();
+        let mut list = self.draw_list.borrow_mut();
         let Some(renderer) = &mut self.window_renderer else {
             return false;
         };
-        match renderer.draw(&list, (logical.0 as f32, logical.1 as f32)) {
+        match renderer.draw(&mut list, (logical.0 as f32, logical.1 as f32)) {
             Ok(presented) => {
                 if !presented {
                     self.session.request_display();

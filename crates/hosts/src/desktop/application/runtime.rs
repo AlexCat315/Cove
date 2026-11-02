@@ -751,10 +751,25 @@ impl Application {
             return Ok(());
         }
         let texture_id = state.typography.borrow().texture_id;
-        state
-            .rendering
-            .upload_font_atlas(&atlas, texture_id)
-            .map_err(|error| error.to_string())
+        // With a window renderer the upload is queued on its render thread, in
+        // order with the frames that sample the new glyphs.
+        let mut renderer = state.window_renderer.borrow_mut();
+        match renderer.as_mut() {
+            Some(renderer) => match state
+                .rendering
+                .take_font_atlas_upload(&atlas, texture_id)
+                .map_err(|error| error.to_string())?
+            {
+                Some(upload) => renderer
+                    .upload_font_atlas(upload)
+                    .map_err(|error| error.to_string()),
+                None => Ok(()),
+            },
+            None => state
+                .rendering
+                .upload_font_atlas(&atlas, texture_id)
+                .map_err(|error| error.to_string()),
+        }
     }
 
     // MARK: - Lifecycle callbacks
@@ -1047,8 +1062,8 @@ impl Application {
             let Some(renderer) = renderer.as_mut() else {
                 return false;
             };
-            let list = state.composition.draw_list.borrow();
-            renderer.draw(&list, (logical_w, logical_h))
+            let mut list = state.composition.draw_list.borrow_mut();
+            renderer.draw(&mut list, (logical_w, logical_h))
         };
         let presented = match presented {
             Ok(presented) => presented,
