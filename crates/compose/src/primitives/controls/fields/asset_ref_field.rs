@@ -468,7 +468,7 @@ impl View for AssetPicker {
             .trigger_style(GhostButtonStyle)
             .trigger_description(
                 crate::primitives::overlays::popover::PopoverTriggerDescription {
-                    label: "Choose asset".to_string(),
+                    label: crate::i18n::tr("Choose asset"),
                     value: current
                         .map(|value| value.name)
                         .unwrap_or_else(|| self.field.placeholder.clone()),

@@ -89,7 +89,7 @@ impl Default for ToolbarOptions {
         Self {
             divider: ToolbarDividerEdge::Bottom,
             is_enabled: true,
-            label: "Toolbar".to_string(),
+            label: crate::i18n::tr("Toolbar"),
             axis: ToolbarAxis::Horizontal,
         }
     }

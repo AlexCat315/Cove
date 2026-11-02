@@ -1073,7 +1073,7 @@ impl PrimitiveView for DataTableChrome {
         node.set_opacity(if self.is_enabled { 1.0 } else { 0.55 });
         node.set_accessibility(Some(AccessibilitySemantics {
             role: AccessibilityRole::Table,
-            label: "Data table".to_string(),
+            label: crate::i18n::tr("Data table"),
             value: format!("{} rows, {} columns", self.model_rows, self.columns),
             state: AccessibilityState {
                 is_enabled: self.is_enabled,
@@ -2453,7 +2453,7 @@ impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 
         node.set_is_hit_testable(false);
         node.set_accessibility(Some(AccessibilitySemantics {
             role: AccessibilityRole::Group,
-            label: "Data table input".to_string(),
+            label: crate::i18n::tr("Data table input"),
             ..Default::default()
         }));
         node

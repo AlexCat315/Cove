@@ -881,7 +881,7 @@ fn update_accessibility(node: &Node, view: &ScrollViewObservers) {
         role: AccessibilityRole::ScrollArea,
         label,
         value,
-        help: "Use arrow keys, Page Up/Down, Home and End to scroll".to_string(),
+        help: crate::i18n::tr("Use arrow keys, Page Up/Down, Home and End to scroll"),
         combines_children: view.combines_accessibility,
         ..Default::default()
     }));

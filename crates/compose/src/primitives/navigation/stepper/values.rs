@@ -101,7 +101,7 @@ impl Default for StepperOptions {
             axis: StepperAxis::Horizontal,
             is_enabled: true,
             allows_wrap: false,
-            label: "Steps".to_string(),
+            label: crate::i18n::tr("Steps"),
             minimum_horizontal_step_width: 148.0,
         }
     }

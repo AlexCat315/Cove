@@ -38,7 +38,7 @@ impl Default for AppBarOptions {
     fn default() -> Self {
         Self {
             is_enabled: true,
-            label: "Application bar".to_string(),
+            label: crate::i18n::tr("Application bar"),
             compact_maximum_width: DEFAULT_COMPACT_MAXIMUM_WIDTH,
             divider: ToolbarDividerEdge::Bottom,
         }

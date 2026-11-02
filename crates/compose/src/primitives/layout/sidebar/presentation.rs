@@ -52,7 +52,7 @@ impl Default for SidebarResizeOptions {
             minimum_width: 180.0,
             maximum_width: 480.0,
             minimum_content_width: 320.0,
-            label: "Resize navigation".to_string(),
+            label: crate::i18n::tr("Resize navigation"),
         }
     }
 }

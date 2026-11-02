@@ -103,7 +103,7 @@ impl PrimitiveView for ProgressView {
         let percent = (resolved * 100.0).round() as i64;
         node.set_accessibility(Some(AccessibilitySemantics {
             role: AccessibilityRole::Progress,
-            label: "Progress".to_string(),
+            label: crate::i18n::tr("Progress"),
             value: if indeterminate {
                 "In progress".to_string()
             } else {

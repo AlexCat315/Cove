@@ -141,8 +141,7 @@ impl PrimitiveView for EditorHeightHandle {
             role: AccessibilityRole::Slider,
             label: self.label.clone(),
             value: format!("{} pt", current.round() as i64),
-            help: "Use Up/Down to resize, Shift for larger steps, Home/End for the limits"
-                .to_string(),
+            help: crate::i18n::tr("Use Up/Down to resize, Shift for larger steps, Home/End for the limits"),
             ..Default::default()
         }));
 

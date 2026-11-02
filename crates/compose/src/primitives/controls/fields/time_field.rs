@@ -396,7 +396,7 @@ impl crate::PrimitiveView for TimeFieldLabel {
     fn update_node(&self, node: &cove_core::scene::Node) {
         node.set_accessibility(Some(cove_core::scene::AccessibilitySemantics {
             role: cove_core::scene::AccessibilityRole::Group,
-            label: "Time".to_string(),
+            label: crate::i18n::tr("Time"),
             ..Default::default()
         }));
     }

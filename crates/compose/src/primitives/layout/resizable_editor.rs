@@ -25,7 +25,7 @@ impl ResizableEditor {
         let limits = EditorHeightLimits::new(96.0, 520.0);
         Self {
             limits,
-            resize_label: "Editor height".to_string(),
+            resize_label: crate::i18n::tr("Editor height"),
             is_resizable: true,
             initial_height: 160.0,
             content: AnyView::new(content),

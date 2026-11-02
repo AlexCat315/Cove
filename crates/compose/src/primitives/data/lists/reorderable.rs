@@ -622,7 +622,7 @@ impl<Id: Eq + std::hash::Hash + Clone + Send + Sync + 'static> PrimitiveView for
             role: AccessibilityRole::Slider,
             label: self.label.clone(),
             value: format!("Position {} of {count}", index + 1),
-            help: "Drag the handle, or use Up and Down to move this row.".to_string(),
+            help: crate::i18n::tr("Drag the handle, or use Up and Down to move this row."),
             state: cove_core::scene::AccessibilityState {
                 is_enabled: self.is_enabled,
                 is_selected: self.is_dragging,

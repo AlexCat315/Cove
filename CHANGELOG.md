@@ -4,6 +4,23 @@
 
 ## Unreleased
 
+- **本地化落地：目录、Calendar 与无障碍文案（2026-11-02，破坏性）**：
+  - 新增 `crates/compose/resources/Locales/en.json` 与 `zh-Hans.json`，以 `include_str!` 编入 crate。
+    `LocalizedStringKey::resolved()` 现在真的能查到译文：先查调用方指定的 bundle，再查内置目录，再查
+    可执行文件旁的资源文件，最后回退到英文目录与 key 本身。此前机制齐全但仓库内没有任何语言资源，
+    `resolved()` 永远返回 key 原文。
+  - 新增 `i18n::tr(key)`、`i18n::format_template(template, values)` 与线程级 `set_locale_override`；
+    场景测试统一固定 `en`，标签断言不再依赖 `LANG`。
+  - `calendar` 模块导出 `month_name`、`month_abbreviation`、`weekday_symbol`、`month_title`、
+    `long_date`、`medium_date`，月份与星期名走目录：中文渲染「2026年3月」与「日一二三四五六」，英文
+    保持「March 2024」与「S M T W T F S」。`date_picker` 与 `date_range` 里三份重复的月份名表改为
+    调用它们。
+  - 修复 `CalendarPeriodCell` 无障碍名重复年份（「March 2024 2024」）；`calendar_modes_tests` 中四处
+    记录该缺陷的断言同步改为正确值。
+  - 30 个文件里 38 处 `label:` / `help:` 英文字面量改为 `i18n::tr()`，覆盖侧栏、工具栏、分栏、滚动条、
+    图表、数据表格、进度、评分等；`TimePicker` 的 `Hour` / `Minute` / `Second` / `AM or PM` 轮名同样
+    走目录，`Rating` 的「4.5 out of 5」改为模板键 `rating.out_of`。
+  - 新增 `localization_tests`：分别以 `zh-Hans` 与 `en` 挂载月历，断言标题与星期行确实按语言渲染。
 - **时间控件补全约束与本地化（2026-11-02，破坏性）**：
   - 修复 `TimePicker::current()` 只把小时夹进 `[minimum, maximum]` 的缺陷：`minimum = 09:30` 时滚轮停在
     09:00，一提交却跳到 09:30。夹取改为按总秒数进行，`commit()` 与滚轮位置共用

@@ -86,9 +86,9 @@ impl Default for AdaptiveSidebarOptions {
         Self {
             layout: SidebarLayoutPolicy::default(),
             resizing: SidebarResizeOptions::default(),
-            open_label: "Open navigation".to_string(),
-            collapse_label: "Collapse sidebar".to_string(),
-            expand_label: "Expand sidebar".to_string(),
+            open_label: crate::i18n::tr("Open navigation"),
+            collapse_label: crate::i18n::tr("Collapse sidebar"),
+            expand_label: crate::i18n::tr("Expand sidebar"),
             allows_edge_swipe: false,
         }
     }

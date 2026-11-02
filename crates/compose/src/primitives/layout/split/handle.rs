@@ -124,7 +124,7 @@ impl PrimitiveView for SplitHandle {
         let current = self.current(node);
         node.set_accessibility(Some(AccessibilitySemantics {
             role: AccessibilityRole::Slider,
-            label: "Resize split".to_string(),
+            label: crate::i18n::tr("Resize split"),
             value: format!("{}%", (current * 100.0).round() as i64),
             ..Default::default()
         }));

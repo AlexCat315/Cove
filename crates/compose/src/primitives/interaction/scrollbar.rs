@@ -70,7 +70,7 @@ impl Scrollbar {
             viewport_extent: viewport_extent.max(0.0),
             thickness: 12.0,
             minimum_thumb_extent: 32.0,
-            label: "Scrollbar".to_string(),
+            label: crate::i18n::tr("Scrollbar"),
         }
     }
 
@@ -254,7 +254,7 @@ impl PrimitiveView for Scrollbar {
             role: AccessibilityRole::Slider,
             label: self.label.clone(),
             value: format!("{percent}%"),
-            help: "Use arrow keys, Page Up/Down, Home and End to scroll".to_string(),
+            help: crate::i18n::tr("Use arrow keys, Page Up/Down, Home and End to scroll"),
             ..Default::default()
         }));
 

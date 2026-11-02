@@ -495,7 +495,7 @@ impl PrimitiveView for OverflowButton {
         node.set_is_hit_testable(false);
         node.set_accessibility(Some(cove_core::scene::AccessibilitySemantics {
             role: cove_core::scene::AccessibilityRole::Button,
-            label: "More actions".to_string(),
+            label: crate::i18n::tr("More actions"),
             state: cove_core::scene::AccessibilityState {
                 is_enabled: self.is_enabled,
                 is_expanded: Some(self.is_presented),

@@ -493,7 +493,7 @@ impl Default for ChartConfiguration {
             accessibility: Accessibility::default(),
             viewport: Viewport::default(),
             animation: None,
-            label: "Chart".to_string(),
+            label: crate::i18n::tr("Chart"),
         }
     }
 }

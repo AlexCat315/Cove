@@ -322,7 +322,7 @@ impl PrimitiveView for RangeSliderHost {
         let current = self.current();
         node.set_accessibility(Some(AccessibilitySemantics {
             role: AccessibilityRole::Group,
-            label: "Range".to_string(),
+            label: crate::i18n::tr("Range"),
             state: AccessibilityState {
                 is_enabled: self.is_enabled,
                 ..Default::default()

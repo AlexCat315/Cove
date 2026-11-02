@@ -37,7 +37,7 @@ impl Default for NavigationDrawerOptions {
             dismissal: ModalDismissal::default(),
             closes_on_selection: true,
             allows_swipe_dismissal: true,
-            close_label: "Collapse navigation".to_string(),
+            close_label: crate::i18n::tr("Collapse navigation"),
         }
     }
 }

@@ -65,7 +65,7 @@ impl Vec3Field {
             is_enabled: true,
             constraints: Vec3Constraints::default(),
             mixed_axes: HashSet::new(),
-            mixed_value_label: "Mixed value".to_string(),
+            mixed_value_label: crate::i18n::tr("Mixed value"),
             minimum_axis_width: 88.0,
             on_copy: None,
             on_paste: None,

@@ -25,8 +25,8 @@
 //!   the Rust `CalendarWeekButton` has no layout node (zero frame), is labelled
 //!   "Week 11", and cannot be clicked, so activating Week 12 selects nothing
 //!   (Swift: 2024-03-18). Row-band centring is checked per cell box instead.
-//! - Month labels: Swift "March 2024"; Rust's `period_label` repeats the year
-//!   ("March 2024 2024").
+//! - Month labels: Swift "March 2024"; Rust now matches it (the period label
+//!   used to repeat the year).
 //! - Day labels: Swift "Tuesday, September 15, 2026"; Rust omits the weekday.
 //! - `CalendarGranularity.label(for:)` does not exist in Rust; the labels case
 //!   asserts the rendered accessibility labels instead.
@@ -289,24 +289,23 @@ fn month_selection() {
             assert!(
                 buttons(scene)
                     .iter()
-                    .all(|node| label(node) != "March 2024"),
-                "GAP: Swift labels a month cell \"March 2024\"; Rust's period_label \
-                 appends the year twice"
+                    .all(|node| label(node) != "March 2024 2024"),
+                "the period label carries the year once"
             );
-            let march = button(scene, "March 2024 2024");
+            let march = button(scene, "March 2024");
             assert_eq!(
                 march.accessibility().map(|s| s.state.is_selected),
                 Some(true),
                 "the selection's month is selected"
             );
             assert_eq!(
-                button(scene, "February 2024 2024")
+                button(scene, "February 2024")
                     .accessibility()
                     .map(|s| s.state.is_enabled),
                 Some(false),
                 "a month with no available day is disabled"
             );
-            press(scene, &button(scene, "June 2024 2024"));
+            press(scene, &button(scene, "June 2024"));
             assert_eq!(*store.borrow(), Some(date(2024, 6, 1)));
         },
     );
@@ -367,7 +366,7 @@ fn drilling() {
             assert!(
                 buttons(scene)
                     .iter()
-                    .any(|node| label(node) == "June 2024 2024"),
+                    .any(|node| label(node) == "June 2024"),
                 "the title drills up to months"
             );
             assert!(
@@ -381,7 +380,7 @@ fn drilling() {
                 Some(date(2024, 3, 13)),
                 "browsing does not commit"
             );
-            press(scene, &button(scene, "June 2024 2024"));
+            press(scene, &button(scene, "June 2024"));
             assert!(
                 buttons(scene)
                     .iter()
@@ -477,8 +476,8 @@ fn labels() {
             assert!(
                 buttons(scene)
                     .iter()
-                    .any(|node| label(node) == "March 2024 2024"),
-                "GAP: Swift's month label is \"March 2024\"; Rust repeats the year"
+                    .any(|node| label(node) == "March 2024"),
+                "the month label carries the year once"
             );
         },
     );

@@ -68,7 +68,7 @@ impl Default for TimePickerOptions {
             is_enabled: true,
             minimum: TimeOfDay::new(0, 0, 0),
             maximum: TimeOfDay::new(23, 59, 59),
-            label: "Time".to_string(),
+            label: crate::i18n::tr("Time"),
             period_labels: None,
             disabled_ranges: Vec::new(),
         }
@@ -362,7 +362,7 @@ impl TimePicker {
     fn period_label(&self) -> String {
         match self.options.period_labels.as_ref() {
             Some((am, pm)) => format!("{am}/{pm}"),
-            None => "AM or PM".to_string(),
+            None => crate::i18n::tr("AM or PM"),
         }
     }
 
@@ -395,13 +395,13 @@ impl TimePicker {
 impl View for TimePicker {
     fn body(&self, _cx: &Scope) -> AnyView {
         let mut columns: Vec<AnyView> = vec![
-            self.wheel("Hour", self.hours(), self.hour()),
+            self.wheel(&crate::i18n::tr("Hour"), self.hours(), self.hour()),
             Self::separator(),
-            self.wheel("Minute", self.minutes(), self.minute()),
+            self.wheel(&crate::i18n::tr("Minute"), self.minutes(), self.minute()),
         ];
         if self.options.shows_seconds {
             columns.push(Self::separator());
-            columns.push(self.wheel("Second", self.seconds(), self.second()));
+            columns.push(self.wheel(&crate::i18n::tr("Second"), self.seconds(), self.second()));
         }
         if self.options.hour_cycle == TimeHourCycle::Twelve {
             columns.push(self.wheel(&self.period_label(), self.periods(), self.period()));
@@ -568,7 +568,7 @@ impl PrimitiveView for TimeWheel {
             role: AccessibilityRole::Slider,
             label: self.label.clone(),
             value: self.value_label(&picker),
-            help: "Use arrow keys, Home or End to choose a value".to_string(),
+            help: crate::i18n::tr("Use arrow keys, Home or End to choose a value"),
             state: AccessibilityState {
                 is_enabled: self.is_enabled,
                 ..Default::default()

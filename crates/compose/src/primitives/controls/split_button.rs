@@ -51,7 +51,7 @@ impl SplitButton {
             entries,
             is_enabled: true,
             menu_width: None,
-            menu_accessibility_label: "More actions".to_string(),
+            menu_accessibility_label: crate::i18n::tr("More actions"),
         }
     }
 

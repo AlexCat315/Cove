@@ -115,35 +115,17 @@ fn period_label(
 ) -> String {
     let parts = calendar.parts(date);
     match granularity {
-        CalendarGranularity::Day => {
-            format!("{} {}, {}", month_name(parts.month), parts.day, parts.year)
-        }
+        CalendarGranularity::Day => crate::primitives::controls::calendar::long_date(date, calendar),
         CalendarGranularity::Week => {
             let (year, week) = crate::foundation::iso_week_of(
                 crate::foundation::DateParts::new(parts.year, parts.month, parts.day).epoch_day(),
             );
             format!("Week {week}, {year}")
         }
-        CalendarGranularity::Month => format!("{} {}", month_name(parts.month), parts.year),
+        CalendarGranularity::Month => {
+            crate::primitives::controls::calendar::month_title(date, calendar)
+        }
         CalendarGranularity::Year => parts.year.to_string(),
-    }
-}
-
-fn month_name(month: u32) -> &'static str {
-    match month {
-        1 => "January",
-        2 => "February",
-        3 => "March",
-        4 => "April",
-        5 => "May",
-        6 => "June",
-        7 => "July",
-        8 => "August",
-        9 => "September",
-        10 => "October",
-        11 => "November",
-        12 => "December",
-        _ => "",
     }
 }
 

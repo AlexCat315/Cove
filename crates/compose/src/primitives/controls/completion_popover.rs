@@ -140,7 +140,7 @@ impl PrimitiveView for CompletionPanel {
     fn update_node(&self, node: &Node) {
         node.set_accessibility(Some(AccessibilitySemantics {
             role: AccessibilityRole::List,
-            label: "Completions".to_string(),
+            label: crate::i18n::tr("Completions"),
             ..Default::default()
         }));
     }

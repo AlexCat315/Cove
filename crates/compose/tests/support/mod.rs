@@ -90,7 +90,18 @@ impl GlobalTestLock {
     /// Runs `body` with exclusive access and a fresh animation scheduler
     /// installed for the duration, matching `$current.withValue`.
     pub fn with_scheduler<T>(body: impl FnOnce() -> T) -> T {
-        Self::locked(|| AnimatorScheduler::default().with_current(body))
+        Self::locked(|| AnimatorScheduler::default().with_current(pin_english_locale(body)))
+    }
+}
+
+/// Defaults every scene test to English so label assertions do not depend on
+/// `LANG`. A test that wants another locale pins it before entering a scene.
+fn pin_english_locale<T>(body: impl FnOnce() -> T) -> impl FnOnce() -> T {
+    move || {
+        if cove_ui_compose::i18n::locale_override().is_none() {
+            cove_ui_compose::i18n::set_locale_override(Some("en"));
+        }
+        body()
     }
 }
 

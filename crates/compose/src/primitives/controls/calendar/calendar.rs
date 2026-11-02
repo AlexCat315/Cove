@@ -295,7 +295,7 @@ impl PrimitiveView for CalendarBody {
     fn update_node(&self, node: &Node) {
         node.set_accessibility(Some(AccessibilitySemantics {
             role: AccessibilityRole::Group,
-            label: "Calendar".to_string(),
+            label: crate::i18n::tr("Calendar"),
             ..Default::default()
         }));
         let state = self.view.session;
@@ -695,41 +695,60 @@ impl CalendarMonth {
     }
 }
 
-/// The month title, rendered as the month and year.
-fn month_title(date: Date, calendar: &FoundationCalendar) -> String {
-    const NAMES: [&str; 12] = [
-        "January",
-        "February",
-        "March",
-        "April",
-        "May",
-        "June",
-        "July",
-        "August",
-        "September",
-        "October",
-        "November",
-        "December",
-    ];
-    let parts = calendar.parts(date);
-    let name = NAMES
-        .get(parts.month.saturating_sub(1) as usize)
-        .copied()
-        .unwrap_or("January");
-    format!("{name} {}", parts.year)
+/// The month name for a one-based month number.
+pub fn month_name(month: u32) -> String {
+    crate::i18n::tr(&format!("calendar.month.{}", month.clamp(1, 12)))
 }
 
-/// Very short weekday symbol for a Sunday-based index.
-fn weekday_symbol(index: u32) -> &'static str {
-    match index {
-        0 => "S",
-        1 => "M",
-        2 => "T",
-        3 => "W",
-        4 => "T",
-        5 => "F",
-        _ => "S",
-    }
+/// The abbreviated month name for a one-based month number.
+pub fn month_abbreviation(month: u32) -> String {
+    crate::i18n::tr(&format!("calendar.month_short.{}", month.clamp(1, 12)))
+}
+
+/// The very short weekday symbol for a Sunday-based index.
+pub fn weekday_symbol(index: u32) -> String {
+    crate::i18n::tr(&format!(
+        "calendar.weekday.{}",
+        index % DAYS_PER_WEEK as u32
+    ))
+}
+
+/// The month title: the localized month and the year.
+pub fn month_title(date: Date, calendar: &FoundationCalendar) -> String {
+    let parts = calendar.parts(date);
+    crate::i18n::format_template(
+        &crate::i18n::tr("calendar.month_title"),
+        &[
+            ("month", &month_name(parts.month)),
+            ("year", &parts.year.to_string()),
+        ],
+    )
+}
+
+/// A long date: `January 5, 2026` in English, `2026年1月5日` in Chinese.
+pub fn long_date(date: Date, calendar: &FoundationCalendar) -> String {
+    let parts = calendar.parts(date);
+    crate::i18n::format_template(
+        &crate::i18n::tr("calendar.date_long"),
+        &[
+            ("month", &month_name(parts.month)),
+            ("day", &parts.day.to_string()),
+            ("year", &parts.year.to_string()),
+        ],
+    )
+}
+
+/// A medium date: `Jan 5, 2026` in English, `2026年1月5日` in Chinese.
+pub fn medium_date(date: Date, calendar: &FoundationCalendar) -> String {
+    let parts = calendar.parts(date);
+    crate::i18n::format_template(
+        &crate::i18n::tr("calendar.date_medium"),
+        &[
+            ("month_short", &month_abbreviation(parts.month)),
+            ("day", &parts.day.to_string()),
+            ("year", &parts.year.to_string()),
+        ],
+    )
 }
 
 /// Panel header: browse arrows, a title, and the drill-up target above the base
@@ -1426,7 +1445,7 @@ impl PrimitiveView for CalendarPeriodCell {
 
     fn children(&self, _node: &Node) -> Vec<AnyView> {
         let text: String = if self.is_months {
-            short_month_name(self.view.options.calendar.parts(self.date).month).to_string()
+            short_month_name(self.view.options.calendar.parts(self.date).month)
         } else {
             self.view.options.calendar.parts(self.date).year.to_string()
         };
@@ -1445,29 +1464,14 @@ impl PrimitiveView for CalendarPeriodCell {
 }
 crate::impl_primitive_view!(CalendarPeriodCell);
 
-fn short_month_name(month: u32) -> &'static str {
-    match month {
-        1 => "Jan",
-        2 => "Feb",
-        3 => "Mar",
-        4 => "Apr",
-        5 => "May",
-        6 => "Jun",
-        7 => "Jul",
-        8 => "Aug",
-        9 => "Sep",
-        10 => "Oct",
-        11 => "Nov",
-        12 => "Dec",
-        _ => "",
-    }
+fn short_month_name(month: u32) -> String {
+    month_abbreviation(month)
 }
 
 fn period_label(date: Date, is_months: bool, calendar: &FoundationCalendar) -> String {
-    let parts = calendar.parts(date);
     if is_months {
-        format!("{} {}", month_title(date, calendar), parts.year)
+        month_title(date, calendar)
     } else {
-        parts.year.to_string()
+        calendar.parts(date).year.to_string()
     }
 }

@@ -36,7 +36,7 @@ impl Default for AvatarGroupOptions {
             overlap: 0.3,
             size: None,
             diameter: None,
-            label: "Members".to_string(),
+            label: crate::i18n::tr("Members"),
             member_list: None,
         }
     }

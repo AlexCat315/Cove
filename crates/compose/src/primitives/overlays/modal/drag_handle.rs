@@ -83,7 +83,7 @@ impl PrimitiveView for SheetDragHandle {
         node.set_is_hit_testable(true);
         node.set_accessibility(Some(AccessibilitySemantics {
             role: AccessibilityRole::Button,
-            label: "Resize sheet".to_string(),
+            label: crate::i18n::tr("Resize sheet"),
             ..Default::default()
         }));
         let state = node

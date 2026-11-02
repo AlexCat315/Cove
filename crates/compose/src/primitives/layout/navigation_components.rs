@@ -108,7 +108,7 @@ impl<Id: PartialEq + Clone + std::hash::Hash + 'static> PrimitiveView for Breadc
         node.set_is_hit_testable(false);
         node.set_accessibility(Some(AccessibilitySemantics {
             role: AccessibilityRole::Group,
-            label: "Breadcrumb".to_string(),
+            label: crate::i18n::tr("Breadcrumb"),
             ..Default::default()
         }));
         node
@@ -376,7 +376,7 @@ impl PrimitiveView for PaginationBody {
         node.set_is_hit_testable(false);
         node.set_accessibility(Some(AccessibilitySemantics {
             role: AccessibilityRole::Group,
-            label: "Pagination".to_string(),
+            label: crate::i18n::tr("Pagination"),
             ..Default::default()
         }));
         node

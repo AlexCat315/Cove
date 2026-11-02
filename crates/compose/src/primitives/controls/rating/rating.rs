@@ -427,10 +427,12 @@ impl PrimitiveView for RatingBody {
             },
             label: rating.label.clone(),
             value: format_value(configuration.value),
-            help: format!(
-                "{} out of {}",
-                format_value(configuration.value),
-                rating.selection.maximum
+            help: crate::i18n::format_template(
+                &crate::i18n::tr("rating.out_of"),
+                &[
+                    ("value", &format_value(configuration.value)),
+                    ("maximum", &rating.selection.maximum.to_string()),
+                ],
             ),
             state: cove_core::scene::AccessibilityState {
                 is_enabled: rating.selection.is_enabled,

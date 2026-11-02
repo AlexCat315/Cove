@@ -374,7 +374,7 @@ impl PrimitiveView for DateRangeCalendarBody {
     fn update_node(&self, node: &Node) {
         node.set_accessibility(Some(cove_core::scene::AccessibilitySemantics {
             role: cove_core::scene::AccessibilityRole::Group,
-            label: "Date range".to_string(),
+            label: crate::i18n::tr("Date range"),
             ..Default::default()
         }));
         let Some(registry) = cove_core::scene::InteractionRegistryHolder::current() else {
@@ -492,7 +492,7 @@ impl PrimitiveView for PresetBar {
     fn update_node(&self, node: &Node) {
         node.set_accessibility(Some(cove_core::scene::AccessibilitySemantics {
             role: cove_core::scene::AccessibilityRole::Group,
-            label: "Presets".to_string(),
+            label: crate::i18n::tr("Presets"),
             ..Default::default()
         }));
     }
@@ -684,38 +684,11 @@ impl PrimitiveView for MonthCard {
 impl_primitive_view!(MonthCard);
 
 fn month_title(date: Date, calendar: &crate::foundation::Calendar) -> String {
-    const NAMES: [&str; 12] = [
-        "January",
-        "February",
-        "March",
-        "April",
-        "May",
-        "June",
-        "July",
-        "August",
-        "September",
-        "October",
-        "November",
-        "December",
-    ];
-    let parts = calendar.parts(date);
-    let name = NAMES
-        .get(parts.month.saturating_sub(1) as usize)
-        .copied()
-        .unwrap_or("January");
-    format!("{name} {}", parts.year)
+    crate::primitives::controls::calendar::month_title(date, calendar)
 }
 
-fn weekday_symbol(index: u32) -> &'static str {
-    match index {
-        0 => "S",
-        1 => "M",
-        2 => "T",
-        3 => "W",
-        4 => "T",
-        5 => "F",
-        _ => "S",
-    }
+fn weekday_symbol(index: u32) -> String {
+    crate::primitives::controls::calendar::weekday_symbol(index)
 }
 
 /// One day, with range fill and start/end selection.
@@ -875,26 +848,7 @@ impl PrimitiveView for DayCell {
 impl_primitive_view!(DayCell);
 
 fn full_date_label(day: Date, calendar: &crate::foundation::Calendar) -> String {
-    const NAMES: [&str; 12] = [
-        "January",
-        "February",
-        "March",
-        "April",
-        "May",
-        "June",
-        "July",
-        "August",
-        "September",
-        "October",
-        "November",
-        "December",
-    ];
-    let parts = calendar.parts(day);
-    let month = NAMES
-        .get(parts.month.saturating_sub(1) as usize)
-        .copied()
-        .unwrap_or("January");
-    format!("{month} {}, {}", parts.day, parts.year)
+    crate::primitives::controls::calendar::long_date(day, calendar)
 }
 
 /// A trigger that opens the range calendar.
@@ -932,16 +886,7 @@ impl DateRangePicker {
 }
 
 fn medium_date(date: Date, options: &CalendarOptions) -> String {
-    let parts = options.calendar.parts(date);
-    format!(
-        "{} {}, {}",
-        month_title(date, &options.calendar)
-            .split(' ')
-            .next()
-            .unwrap_or("Jan"),
-        parts.day,
-        parts.year
-    )
+    crate::primitives::controls::calendar::medium_date(date, &options.calendar)
 }
 
 impl View for DateRangePicker {
