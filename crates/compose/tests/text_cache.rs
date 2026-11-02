@@ -10,7 +10,7 @@
 //! - a long run of dynamic text and width changes keeps the environment's own
 //!   caches within their default bounds, and trimming leaves them usable
 
-mod support;
+use crate::support;
 
 use cove_text::{TextCache, TextCacheLimits};
 

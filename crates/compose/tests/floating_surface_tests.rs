@@ -13,7 +13,7 @@
 //! `colors.border` instead, so [`floating_surface_wiring`] asserts the helper's
 //! value where the two agree and records the divergence with a `GAP:` assert.
 
-mod support;
+use crate::support;
 
 use cove_composition::ViewModifier;
 use cove_core::scene::Node;

@@ -2,7 +2,7 @@
 //! through a `Binding` subscribe the reader, and primitives materialised by a
 //! component see writes the component itself never read.
 
-mod support;
+use crate::support;
 
 use std::cell::Cell;
 use std::rc::Rc;

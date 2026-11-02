@@ -16,7 +16,7 @@
 //!   step, so those two cases assert the layout node the same authored values
 //!   produce instead.
 
-mod support;
+use crate::support;
 
 use cove_composition::VerticalAlignment;
 use cove_composition::{AnyView, PrimitiveView};

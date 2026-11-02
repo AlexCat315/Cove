@@ -19,7 +19,7 @@
 //! against the window model those handlers call, which is the contract the
 //! assertions actually test.
 
-mod support;
+use crate::support;
 
 use cove_core::scene::AnimationCurve;
 use cove_core::{Point, Size};

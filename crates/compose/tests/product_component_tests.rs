@@ -19,8 +19,6 @@
 //!   bookkeeping, `Binding`-driven presentation) that the `Binding` gap already
 //!   blocks; they are recorded rather than restated.
 
-mod support;
-
 use cove_ui_compose::primitives::controls::date_values::TimeOfDay;
 use cove_ui_compose::primitives::layout::navigation_components::{PaginationItem, PaginationModel};
 

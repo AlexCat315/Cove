@@ -29,7 +29,7 @@
 //! - **No published document layout.** `__textfield_document_layout` is never
 //!   attached, so shaped-line bounds cannot be observed.
 
-mod support;
+use crate::support;
 
 use std::cell::RefCell;
 use std::rc::Rc;

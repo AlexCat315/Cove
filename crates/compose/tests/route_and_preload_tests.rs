@@ -41,7 +41,7 @@
 //!   measurements with `GAP:` messages.
 
 use cove_composition::Scope;
-mod support;
+use crate::support;
 
 use std::cell::RefCell;
 use std::collections::HashMap;

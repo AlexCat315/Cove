@@ -7,8 +7,6 @@
 //!   offscreen depths are bounded
 //! - soft-wrapped words do not receive a guide through their first glyph
 
-mod support;
-
 use cove_core::{TextLayoutResult, TextLine};
 use cove_ui_compose::primitives::text::text_buffer::TextBuffer;
 use cove_ui_compose::primitives::text::text_field::indent_guides::TextIndentGuides;

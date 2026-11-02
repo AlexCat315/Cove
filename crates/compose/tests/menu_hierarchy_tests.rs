@@ -42,7 +42,7 @@
 //!   menu with a single tap (no hover), which publishes no back row.
 
 use cove_composition::Scope;
-mod support;
+use crate::support;
 
 use std::cell::Cell;
 use std::rc::Rc;

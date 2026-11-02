@@ -2,7 +2,7 @@
 //! Application tokens, local overrides, scaled controls and detached portals.
 
 use cove_composition::Scope;
-mod support;
+use crate::support;
 
 use cove_composition::{AnyView, LayoutDebugExt, View};
 use cove_core::scene::{AccessibilityRole, Align, FlexDirection, Justify, Node, Wrap};

@@ -42,7 +42,7 @@
 //! those two attachment types. The geometry, focus and overflow assertions are
 //! unchanged.
 
-mod support;
+use crate::support;
 
 use cove_composition::{AnyView, ViewExt};
 use cove_core::scene::{AccessibilityRole, FocusChainHolder, Node};

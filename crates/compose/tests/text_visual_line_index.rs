@@ -6,8 +6,6 @@
 //! - the run tree stays balanced under thousands of edits (`height < 32`)
 //! - a very large unwrapped document collapses to a single run
 
-mod support;
-
 use cove_ui_compose::primitives::text::text_field::text_visual_line_index::TextVisualLineIndex;
 
 #[test]

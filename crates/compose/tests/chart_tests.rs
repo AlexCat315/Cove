@@ -26,7 +26,7 @@
 //! - a histogram bins samples into even widths, honours a range, and survives
 //!   identical samples
 
-mod support;
+use crate::support;
 
 use std::rc::Rc;
 

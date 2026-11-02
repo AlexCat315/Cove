@@ -41,7 +41,7 @@
 //!   the binding it reads at build time and exposes the same portal lifetime.
 
 use cove_composition::Scope;
-mod support;
+use crate::support;
 
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;

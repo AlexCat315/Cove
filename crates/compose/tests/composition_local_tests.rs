@@ -14,7 +14,7 @@
 //! `compositionValue(of:)` is `composition_value(..)`, and
 //! `setCompositionValue` is `set_composition_value(..)`.
 
-mod support;
+use crate::support;
 
 use std::rc::Rc;
 

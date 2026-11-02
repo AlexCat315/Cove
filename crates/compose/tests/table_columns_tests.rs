@@ -43,7 +43,7 @@
 //!   at 390pt, that query names `Category`.
 
 use cove_composition::Scope;
-mod support;
+use crate::support;
 
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::rc::Rc;

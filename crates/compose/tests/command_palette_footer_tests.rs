@@ -15,7 +15,7 @@
 //! footer the palette still lays out a footer band, but that band is not
 //! identifiable by name.
 
-mod support;
+use crate::support;
 
 use std::cell::RefCell;
 use std::rc::Rc;

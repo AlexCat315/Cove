@@ -15,7 +15,7 @@
 //! attachment, which Rust keeps private. The `__button_host` marker the host
 //! writes in `update_node` is the same node, so the lookup uses that instead.
 
-mod support;
+use crate::support;
 
 use std::cell::Cell;
 use std::rc::Rc;

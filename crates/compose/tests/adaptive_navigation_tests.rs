@@ -25,7 +25,7 @@
 //!   `strip_height_ignores_the_touch_control_extent` records the gap.
 
 use cove_composition::Scope;
-mod support;
+use crate::support;
 
 use std::cell::RefCell;
 use std::rc::Rc;

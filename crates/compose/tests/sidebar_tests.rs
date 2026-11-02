@@ -23,7 +23,7 @@
 //!   Swift authors a full-bleed row inset 10pt on both sides. The two geometry
 //!   cases pin the measured widths with `GAP:` asserts.
 
-mod support;
+use crate::support;
 
 use std::rc::Rc;
 

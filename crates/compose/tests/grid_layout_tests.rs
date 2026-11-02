@@ -15,7 +15,7 @@
 //! `GridTrackResolver::widths(&columns, available_width, spacing, &[])`, and
 //! `Grid(columns:columnSpacing:rowSpacing:)` is `Grid::new(..)`.
 
-mod support;
+use crate::support;
 
 use std::collections::HashMap;
 

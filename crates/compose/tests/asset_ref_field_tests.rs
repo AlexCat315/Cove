@@ -10,7 +10,7 @@
 //! `AssetDropRegistry.drop(_:atX:y:)` is [`AssetDropRegistry::drop`] taking a
 //! [`Point`]; both are straight renames.
 
-mod support;
+use crate::support;
 
 use std::collections::BTreeSet;
 use std::rc::Rc;

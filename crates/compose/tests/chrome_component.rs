@@ -6,7 +6,7 @@
 //!   the component); one without the divider measures `HEIGHT`
 //! - the height is identical whether the bar carries one slot or several
 
-mod support;
+use crate::support;
 
 use std::cell::Cell;
 

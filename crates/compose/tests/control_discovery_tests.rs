@@ -32,7 +32,7 @@
 //!   record contains the draft. The assertion below pins the measured leak and
 //!   names the Swift expectation.
 
-mod support;
+use crate::support;
 
 use serde_json::{Value, json};
 

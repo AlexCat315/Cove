@@ -41,7 +41,7 @@
 //!   compares the painted texture ids instead.
 
 use cove_composition::Scope;
-mod support;
+use crate::support;
 
 use std::cell::RefCell;
 use std::collections::HashSet;

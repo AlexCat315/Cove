@@ -6,7 +6,7 @@
 //! - clicking the trigger mounts one portal entry, and activating an item runs
 //!   it and closes the menu
 
-mod support;
+use crate::support;
 
 use cove_composition::AnyView;
 use cove_core::scene::{AccessibilityRole, AccessibilityTree, Node};

@@ -31,7 +31,7 @@
 //! - `CalendarGranularity.label(for:)` does not exist in Rust; the labels case
 //!   asserts the rendered accessibility labels instead.
 
-mod support;
+use crate::support;
 
 use std::cell::RefCell;
 use std::rc::Rc;

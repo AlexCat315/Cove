@@ -29,7 +29,7 @@
 //!   Swift describes.
 
 use cove_composition::Scope;
-mod support;
+use crate::support;
 
 use std::collections::HashSet;
 

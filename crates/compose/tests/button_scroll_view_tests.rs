@@ -31,7 +31,7 @@
 //! - GAP `menu_hover_commit`: Swift commits a menu row's pointer highlight
 //!   through state (one pending recomposition); Rust's hover is render-only.
 
-mod support;
+use crate::support;
 
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;

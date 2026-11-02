@@ -28,7 +28,7 @@
 //!   through the `List` case, which uses the identical selection-paint path.
 
 use cove_composition::Scope;
-mod support;
+use crate::support;
 
 use cove_composition::{AnyView, DynamicField, View};
 use cove_core::State;

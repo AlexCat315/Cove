@@ -10,7 +10,7 @@
 //! - an empty Combobox trigger spans its width instead of hugging a placeholder
 //! - a Select trigger keeps its input border
 
-mod support;
+use crate::support;
 
 use cove_composition::AnyView;
 use cove_core::scene::{AccessibilityRole, Align, FlexDirection, Justify, Node, Wrap};

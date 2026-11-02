@@ -28,7 +28,7 @@
 //!   mark or joined flag counts 3 characters and insertion advances the caret
 //!   by the inserted scalar count.
 
-mod support;
+use crate::support;
 
 use std::cell::RefCell;
 use std::rc::Rc;

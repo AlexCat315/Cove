@@ -17,7 +17,7 @@
 //! - a long panel title stays on one line at both a narrow and a wide panel, and
 //!   the narrow title is genuinely narrower so the accessory keeps its space
 
-mod support;
+use crate::support;
 
 use cove_composition::AnyView;
 use cove_core::scene::Node;

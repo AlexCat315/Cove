@@ -12,7 +12,7 @@
 //! - the field label's text aligns to the label's leading edge (mirrored in RTL)
 //! - activating the field label focuses the field named by `target_id`
 
-mod support;
+use crate::support;
 
 use cove_composition::layout::LayoutDirectionExt;
 use cove_composition::{AnyView, LayoutDebugExt, PrimitiveView, View, ViewKind};

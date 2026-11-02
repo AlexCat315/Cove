@@ -13,7 +13,7 @@
 //! Covers both the single-date and the date-range calendar, at five widths and
 //! both text scales.
 
-mod support;
+use crate::support;
 
 use std::rc::Rc;
 

@@ -14,7 +14,7 @@
 //! - a resized embedded card keeps the same focused action nodes, their
 //!   callbacks and the focus, and Return activates them
 
-mod support;
+use crate::support;
 
 use std::cell::Cell;
 use std::rc::Rc;

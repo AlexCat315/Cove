@@ -8,7 +8,7 @@
 //!   header keeps its 40pt, the fill takes the remaining 160pt, the portal layer
 //!   spans the full 200pt viewport, and its entry sits at its authored origin
 
-mod support;
+use crate::support;
 
 use std::cell::RefCell;
 use std::rc::Rc;

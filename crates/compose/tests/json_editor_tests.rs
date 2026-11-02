@@ -21,8 +21,7 @@
 //!   focus stays on Expand.
 
 use cove_composition::Scope;
-#[allow(dead_code)]
-mod support;
+use crate::support;
 
 use std::rc::Rc;
 use std::sync::Arc;

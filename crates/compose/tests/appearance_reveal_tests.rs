@@ -16,7 +16,7 @@
 //! `Node::reveal_request()` — the identical value the renderer consumes.
 
 use cove_composition::Scope;
-mod support;
+use crate::support;
 
 use std::rc::Rc;
 

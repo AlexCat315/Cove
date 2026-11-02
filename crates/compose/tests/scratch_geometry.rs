@@ -6,7 +6,7 @@
 //! column, given a percentage width) and turns it into a smoke test that
 //! verifies the option label materialises as measured text.
 
-mod support;
+use crate::support;
 
 use cove_core::Binding;
 use cove_core::scene::{Align, FlexDirection, Justify, Wrap};

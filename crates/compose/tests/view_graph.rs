@@ -13,7 +13,7 @@
 //! - a modifier re-applies to the reused node when its value changes
 
 use cove_composition::Scope;
-mod support;
+use crate::support;
 
 use std::cell::Cell;
 use std::rc::Rc;

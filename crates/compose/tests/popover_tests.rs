@@ -19,7 +19,7 @@
 //!   surface rather than authoring `.content` explicitly.
 
 use cove_composition::Scope;
-mod support;
+use crate::support;
 
 use std::cell::RefCell;
 use std::rc::Rc;

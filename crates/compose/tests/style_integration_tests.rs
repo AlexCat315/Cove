@@ -23,7 +23,7 @@
 //! `.buttonStyle(.primary)` / `.buttonStyle(.destructive)` are
 //! `.button_style(PrimaryButtonStyle)` / `.button_style(DestructiveButtonStyle)`.
 
-mod support;
+use crate::support;
 
 use std::cell::RefCell;
 use std::rc::Rc;

@@ -32,7 +32,7 @@
 //! only hit target and never lets a title link take focus — asserted separately
 //! in the first test. Only the stored value differs, and that half is pinned.
 
-mod support;
+use crate::support;
 
 use cove_composition::AnyView;
 use cove_core::Rect;

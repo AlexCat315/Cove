@@ -9,7 +9,7 @@
 //! - a group bounds its children, keeps stable IDs, stacks earlier members on top
 //! - zero limits, hidden overflow and empty groups use their natural bounds
 
-mod support;
+use crate::support;
 
 use cove_composition::AnyView;
 use cove_core::Color;

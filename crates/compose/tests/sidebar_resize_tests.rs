@@ -45,7 +45,7 @@
 //!   and the following document subtree went missing.
 
 use cove_composition::Scope;
-mod support;
+use crate::support;
 
 use cove_composition::layout::LayoutDirectionExt;
 use cove_composition::{AnyView, EmptyView, LayoutDebugExt, Scancode, TupleView, View};

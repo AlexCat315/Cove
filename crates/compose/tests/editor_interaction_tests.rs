@@ -40,7 +40,7 @@
 //!   where the Swift rig used 12/16; no assertion here depends on glyph metrics.
 
 use cove_composition::Scope;
-mod support;
+use crate::support;
 
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;

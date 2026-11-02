@@ -21,7 +21,7 @@
 //!   fade back-to-back without an animation context, so the chrome stays at 0.
 
 use cove_composition::Scope;
-mod support;
+use crate::support;
 
 use cove_composition::adaptive::SurfaceEnvironmentExt;
 use cove_composition::{AnyView, DynamicField, View, ViewGraph};

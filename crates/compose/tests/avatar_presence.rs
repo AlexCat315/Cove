@@ -12,7 +12,7 @@
 //! content and trigger that the popover would host — the same members, labels,
 //! values and selection callback — rather than faking a presentation.
 
-mod support;
+use crate::support;
 
 use std::cell::RefCell;
 use std::rc::Rc;

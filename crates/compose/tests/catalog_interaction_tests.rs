@@ -22,7 +22,7 @@
 //!   [`loading_blocks_activation`] for the loading path, which Rust does expose.
 
 use cove_composition::Scope;
-mod support;
+use crate::support;
 
 use std::cell::RefCell;
 use std::rc::Rc;

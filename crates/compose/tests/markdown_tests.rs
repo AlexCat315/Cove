@@ -30,8 +30,7 @@
 //!   `MarkdownParser` type, and `MarkdownTable::rows` nests runs per cell, so
 //!   the table comparison is against `Vec<Vec<Vec<RichTextRun>>>`.
 
-#[allow(dead_code)]
-mod support;
+use crate::support;
 
 use std::cell::RefCell;
 use std::rc::Rc;

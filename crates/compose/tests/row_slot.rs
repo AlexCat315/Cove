@@ -10,7 +10,7 @@
 //! recorded rather than faked. `List` rows are covered here in their place
 //! because `List` does exist and exercises the same row-host contract.
 
-mod support;
+use crate::support;
 
 use cove_composition::AnyView;
 use cove_core::scene::{AccessibilityRole, Node};

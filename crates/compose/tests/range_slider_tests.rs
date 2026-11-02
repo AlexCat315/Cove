@@ -18,7 +18,7 @@
 //! `focus_state_does_not_change_the_painted_vertices` records the current
 //! behaviour so the missing ring is visible rather than silently dropped.
 
-mod support;
+use crate::support;
 
 use std::cell::RefCell;
 use std::rc::Rc;

@@ -4,8 +4,6 @@
 //! - each edge interpolates independently
 //! - the endpoints are exact (t = 0 returns `from`, t = 1 returns `to`)
 
-mod support;
-
 use cove_core::scene::Interpolatable;
 use cove_ui_compose::modifiers::layout::EdgeInsets;
 

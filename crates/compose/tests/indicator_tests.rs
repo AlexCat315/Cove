@@ -14,7 +14,7 @@
 //! `InputCapabilities` composition value, and the scroll view reads it through
 //! `supports_control_hover`. The gutter and indicator assertions below use the
 //! values production actually derives from that capability.
-mod support;
+use crate::support;
 
 use std::rc::Rc;
 

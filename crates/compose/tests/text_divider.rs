@@ -7,7 +7,7 @@
 //! - a vertical `Divider` is a 1xN (or Nx1) strip
 //! - a line limit keeps text on a single line under a narrow constraint
 
-mod support;
+use crate::support;
 
 use cove_composition::AnyView;
 use cove_composition::layout::LayoutDirectionExt;

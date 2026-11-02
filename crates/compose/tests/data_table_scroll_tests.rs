@@ -20,7 +20,7 @@
 //! parent's own offset binding) and whether the parent's offset moved. The
 //! parent's offset *is* observable, so "did it reach the parent" is exact.
 
-mod support;
+use crate::support;
 
 use std::cell::RefCell;
 use std::rc::Rc;

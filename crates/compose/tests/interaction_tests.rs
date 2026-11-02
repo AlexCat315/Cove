@@ -17,7 +17,7 @@
 //! entry points themselves are still exercised through the real registry
 //! handlers.
 
-mod support;
+use crate::support;
 
 use std::cell::Cell;
 use std::rc::Rc;

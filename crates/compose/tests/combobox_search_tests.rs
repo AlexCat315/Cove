@@ -23,8 +23,6 @@
 //! - "no host fails visibly" (`enqueue: nil`) has none either, because the Rust
 //!   host always supplies the enqueue step by construction.
 
-mod support;
-
 use cove_ui_compose::primitives::controls::fields::combobox_model::{
     ComboboxSearchPhase, ComboboxSearchSession,
 };

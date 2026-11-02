@@ -19,7 +19,7 @@
 //! Scope-owned navigation state preserves the transition guard across parent rebuilds.
 
 use cove_composition::Scope;
-mod support;
+use crate::support;
 
 use std::cell::RefCell;
 use std::rc::Rc;

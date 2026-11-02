@@ -14,7 +14,7 @@
 //! `set_is_tab_stop`, so both zones are always Tab stops.
 //! `both_zones_are_tab_stops` pins that.
 
-mod support;
+use crate::support;
 
 use std::cell::Cell;
 use std::rc::Rc;

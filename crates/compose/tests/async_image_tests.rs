@@ -28,7 +28,7 @@
 //!   HTTP-status, streamed-limit, cancellation and remote-SVG cases are covered
 //!   through a scripted in-process transport rather than a socket.
 
-mod support;
+use crate::support;
 
 use std::collections::HashMap;
 use std::rc::Rc;

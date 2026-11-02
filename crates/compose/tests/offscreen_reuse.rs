@@ -7,7 +7,7 @@
 //! - after trimming memory, the rebuilt geometry keeps the same x positions
 
 use cove_composition::Scope;
-mod support;
+use crate::support;
 
 use cove_core::State;
 use cove_ui_compose::modifiers::layout::{FrameDimension, LayoutFrameExt};

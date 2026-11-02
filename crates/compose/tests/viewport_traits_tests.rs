@@ -6,7 +6,7 @@
 //!   surface environment, and recompose when it changes
 
 use cove_composition::Scope;
-mod support;
+use crate::support;
 
 use std::rc::Rc;
 

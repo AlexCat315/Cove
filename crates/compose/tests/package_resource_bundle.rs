@@ -5,8 +5,6 @@
 //! - the dropdown trigger ships both wider arrow variants, not only the
 //!   navigation chevron
 
-mod support;
-
 use cove_ui_compose::primitives::media::ui_icon_catalog;
 
 #[test]

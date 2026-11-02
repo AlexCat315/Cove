@@ -5,7 +5,7 @@
 //! - clicking a day before the pending start swaps the bounds so the earlier
 //!   day becomes the lower bound
 
-mod support;
+use crate::support;
 
 use cove_composition::AnyView;
 use cove_core::State;

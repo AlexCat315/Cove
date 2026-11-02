@@ -11,8 +11,6 @@
 //!   non-positive values
 //! - a percent stack stays linear even when the axis asks for log
 
-mod support;
-
 use cove_core::Rect;
 use cove_ui_compose::primitives::data::chart::{
     Axis, ChartRange, ChartScale, ChartScaleKind, ChartSeries, ChartStack, ChartStacking,

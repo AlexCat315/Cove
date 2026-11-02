@@ -6,8 +6,6 @@
 //! - redraws reuse a cached pair and edits invalidate it, including for a
 //!   document that has no match at all
 
-mod support;
-
 use cove_ui_compose::primitives::text::text_buffer::TextBuffer;
 use cove_ui_compose::primitives::text::text_field::bracket_matching::{
     BracketPair, TextBracketMatching,

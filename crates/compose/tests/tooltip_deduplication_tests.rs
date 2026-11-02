@@ -23,7 +23,7 @@
 //!   `only_when_truncated` gate, which the first three tests below exercise at full
 //!   strength instead.
 
-mod support;
+use crate::support;
 
 use std::cell::Cell;
 use std::rc::Rc;

@@ -14,8 +14,6 @@
 //! plain methods (`entries`, `handle_key`, `select`), so these tests drive them
 //! directly — the same inputs and the same expected selection/expansion.
 
-mod support;
-
 use std::cell::RefCell;
 use std::collections::HashSet;
 use std::rc::Rc;

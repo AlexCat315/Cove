@@ -15,7 +15,7 @@
 //! case asserts the parts of the contract that do hold: every control keeps its
 //! complete accessible name, and each one is built from a truncating `Text`.
 
-mod support;
+use crate::support;
 
 use std::rc::Rc;
 

@@ -20,7 +20,7 @@
 //! matching behaviour the Swift suite asserted: the int target accepts 42, and a
 //! second target that rejects it never fires.
 
-mod support;
+use crate::support;
 
 use std::cell::RefCell;
 use std::rc::Rc;

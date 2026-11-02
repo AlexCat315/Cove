@@ -38,7 +38,7 @@
 //! a 32pt indent; Rust keeps the unscaled 30pt row and 16pt indent.
 //!
 use cove_composition::Scope;
-mod support;
+use crate::support;
 
 use std::collections::{BTreeSet, HashSet};
 use std::rc::Rc;

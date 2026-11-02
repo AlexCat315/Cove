@@ -34,7 +34,7 @@
 //!   Rust behaviour (no portal, no selection, no action) with `GAP:` messages.
 
 use cove_composition::Scope;
-mod support;
+use crate::support;
 
 use std::cell::Cell;
 use std::rc::Rc;

@@ -27,7 +27,7 @@
 //! - **No diagnostic draw fringe to exclude.** Vertex `y` replaces Swift's
 //!   `posY`, and the draw uses the same 1pt zig-zag rows.
 
-mod support;
+use crate::support;
 
 use std::cell::RefCell;
 use std::rc::Rc;

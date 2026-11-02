@@ -14,7 +14,7 @@
 //! `commandPalette.panel` debug name, so geometry is read from the modal dialog
 //! node instead.
 
-mod support;
+use crate::support;
 
 use std::rc::Rc;
 

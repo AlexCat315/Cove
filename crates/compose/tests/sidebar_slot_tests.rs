@@ -20,7 +20,7 @@
 //! production view's observable surface, so it is tracked centrally rather than
 //! done here.
 
-mod support;
+use crate::support;
 
 use cove_core::Binding;
 use cove_core::scene::Node;

@@ -9,7 +9,7 @@
 //! - reposting during an exit rejects the stale completion, and rapid changes
 //!   keep a bounded tree
 
-mod support;
+use crate::support;
 
 use std::rc::Rc;
 

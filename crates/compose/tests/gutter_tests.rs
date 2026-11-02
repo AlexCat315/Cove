@@ -38,7 +38,7 @@
 //!   negative).
 
 use cove_composition::Scope;
-mod support;
+use crate::support;
 
 use std::collections::BTreeSet;
 use std::rc::Rc;

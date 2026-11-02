@@ -12,7 +12,7 @@
 //! - `DefaultDividerStyle` paints a divider in the theme's divider colour
 //! - all five style environments resolve to their `Default*` implementation
 
-mod support;
+use crate::support;
 
 use cove_composition::{AnyView, EmptyView};
 use cove_core::InputCapabilities;

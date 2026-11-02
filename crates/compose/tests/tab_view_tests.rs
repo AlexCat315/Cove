@@ -30,7 +30,7 @@
 //!    also reads `Count 1`. Fixed: content is now identified per tab, so each tab
 
 use cove_composition::Scope;
-mod support;
+use crate::support;
 
 use std::cell::RefCell;
 use std::rc::Rc;

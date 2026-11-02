@@ -34,7 +34,7 @@
 //!    for whoever eventually wires it.
 
 use cove_composition::Scope;
-mod support;
+use crate::support;
 
 use std::cell::RefCell;
 use std::rc::Rc;

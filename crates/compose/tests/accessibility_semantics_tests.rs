@@ -8,7 +8,7 @@
 //! - `Select` and `Combobox` triggers expose the combo-box role with their
 //!   selected label, a collapsed state and an activate action
 
-mod support;
+use crate::support;
 
 use std::cell::RefCell;
 use std::rc::Rc;

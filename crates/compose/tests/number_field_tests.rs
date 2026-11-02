@@ -5,7 +5,7 @@
 //! - losing focus commits the parsed float to the bound value
 //! - an unparseable edit is discarded on blur, leaving the previous number
 
-mod support;
+use crate::support;
 
 use std::cell::RefCell;
 use std::rc::Rc;

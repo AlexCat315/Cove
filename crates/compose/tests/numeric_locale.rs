@@ -13,8 +13,6 @@
 //! the same input the locale resolves to. Each case below names the locale it
 //! mirrors in a comment.
 
-mod support;
-
 use cove_ui_compose::primitives::controls::fields::numeric::text_format::NumericTextFormat;
 
 /// `en_US_POSIX`, `de_DE`, `fr_FR`, `ar_EG` and `sv_SE` all resolve to one of

@@ -10,7 +10,7 @@
 //!
 //! Every widget below must simply mount. A panic is the failure.
 
-mod support;
+use crate::support;
 
 use cove_composition::AnyView;
 use cove_core::Binding;

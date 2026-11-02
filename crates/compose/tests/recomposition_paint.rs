@@ -6,7 +6,7 @@
 //! - changing the value that feeds the draw identity repaints
 
 use cove_composition::Scope;
-mod support;
+use crate::support;
 
 use std::cell::Cell;
 use std::rc::Rc;

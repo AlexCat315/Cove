@@ -1,5 +1,5 @@
 //! Localized rendering: the embedded catalogs reach the composed scene.
-mod support;
+use crate::support;
 
 use std::cell::RefCell;
 use std::rc::Rc;

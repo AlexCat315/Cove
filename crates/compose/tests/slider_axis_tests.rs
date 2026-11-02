@@ -8,7 +8,7 @@
 //! - a horizontal RTL slider maps the leading edge to zero and reverses the
 //!   horizontal keys
 
-mod support;
+use crate::support;
 
 use std::cell::RefCell;
 use std::rc::Rc;

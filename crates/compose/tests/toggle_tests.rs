@@ -12,7 +12,7 @@
 //! - Space and Return toggle the focused control
 //! - `Checkbox` shares the same boolean activation semantics
 
-mod support;
+use crate::support;
 
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};

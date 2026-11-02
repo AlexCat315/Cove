@@ -43,7 +43,7 @@
 //!   while still being at least the 28pt minimum.
 
 use cove_composition::Scope;
-mod support;
+use crate::support;
 
 use cove_composition::{AnyView, DynamicField, LayoutDebugExt, TupleView, View};
 use cove_core::scene::{AccessibilityRole, Align, FlexDirection, Justify, Node, Wrap};

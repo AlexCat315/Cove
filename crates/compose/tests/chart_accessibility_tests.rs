@@ -33,7 +33,7 @@
 //!   `selection.point`) has no Rust counterpart: `ChartConfiguration::selection`
 //!   is not a `Binding` here, so there is no `stepsTheBinding` case to port.
 
-mod support;
+use crate::support;
 
 use support::GlobalTestLock;
 

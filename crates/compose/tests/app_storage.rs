@@ -13,7 +13,7 @@
 //! recomposition half is asserted through the shared value and the store
 //! contents rather than an annotated property.
 
-mod support;
+use crate::support;
 
 use std::sync::Arc;
 

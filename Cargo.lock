@@ -334,14 +334,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "cove-mobile-example"
-version = "0.1.0"
-dependencies = [
- "cove-examples",
- "cove-ui",
-]
-
-[[package]]
 name = "cove-native-build"
 version = "0.3.0-dev"
 dependencies = [

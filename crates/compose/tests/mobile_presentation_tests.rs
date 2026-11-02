@@ -62,7 +62,7 @@
 //!   omits it because nothing under test asserts it.
 
 use cove_composition::Scope;
-mod support;
+use crate::support;
 
 use cove_composition::{AnyView, DynamicField, LayoutDebugExt, View};
 use cove_core::scene::{AccessibilityRole, Align, FlexDirection, Justify, Node, Wrap};

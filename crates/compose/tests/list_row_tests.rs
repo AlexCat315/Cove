@@ -16,7 +16,7 @@
 //!   and a stable title node
 
 use cove_composition::Scope;
-mod support;
+use crate::support;
 
 use std::collections::BTreeSet;
 

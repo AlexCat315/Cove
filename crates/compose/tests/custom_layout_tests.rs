@@ -13,7 +13,7 @@
 //!
 //! Logical edges and nested frames follow the current Taffy layout contract.
 
-mod support;
+use crate::support;
 
 use std::cell::Cell;
 use std::rc::Rc;

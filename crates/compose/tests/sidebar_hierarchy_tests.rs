@@ -52,7 +52,7 @@
 //!   applies the same predicate to the node tree.
 
 use cove_composition::Scope;
-mod support;
+use crate::support;
 
 use std::collections::HashSet;
 

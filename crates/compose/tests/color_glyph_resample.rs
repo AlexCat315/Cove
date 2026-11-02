@@ -4,7 +4,7 @@
 //! - box resampling averages coverage and weights colour by alpha
 //! - a face without colour tables reports no colour source
 
-mod support;
+use crate::support;
 
 use cove_text::{FontAtlas, FreeTypeColorGlyphFace};
 

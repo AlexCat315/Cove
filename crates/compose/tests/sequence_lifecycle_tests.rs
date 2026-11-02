@@ -13,7 +13,7 @@
 //! observable behaviour — resting at 0 and completing at 1 — is unchanged.
 
 use cove_composition::Scope;
-mod support;
+use crate::support;
 
 use cove_composition::{AnyView, LayoutDebugExt, TupleView, View};
 use cove_core::State;

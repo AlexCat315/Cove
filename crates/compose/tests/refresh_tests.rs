@@ -20,7 +20,7 @@
 //!   `@State`; the model tests below exercise the same rules through the value
 //!   API that does exist.
 
-mod support;
+use crate::support;
 
 use std::cell::RefCell;
 use std::rc::Rc;

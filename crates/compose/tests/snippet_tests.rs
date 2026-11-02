@@ -10,7 +10,7 @@
 //!   exact carets
 //! - horizontal culling keeps only the glyphs near the viewport of a long row
 
-mod support;
+use crate::support;
 
 use cove_core::{PositionedGlyph, TextLayoutResult};
 use cove_platform::{KeyEvent, KeyModifiers};

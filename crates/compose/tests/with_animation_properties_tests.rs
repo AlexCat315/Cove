@@ -28,7 +28,7 @@
 //!   the scheduler lifecycle instead of attachment presence.
 
 use cove_composition::Scope;
-mod support;
+use crate::support;
 
 use std::rc::Rc;
 

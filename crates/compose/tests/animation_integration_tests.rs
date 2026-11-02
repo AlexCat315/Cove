@@ -20,7 +20,7 @@
 //! - percent -> auto with clamps snaps and clears the animation
 //!
 use cove_composition::Scope;
-mod support;
+use crate::support;
 
 use std::rc::Rc;
 

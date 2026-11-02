@@ -19,7 +19,7 @@
 //!   marker attachment; the headers are located by their published accessibility
 //!   role (`Button` with `is_expanded`), the same contract the sample suites use.
 
-mod support;
+use crate::support;
 
 use std::collections::BTreeSet;
 

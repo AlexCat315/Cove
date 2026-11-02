@@ -44,7 +44,7 @@
 //! across a round trip, and the reselected node is the identical node.
 
 use cove_composition::Scope;
-mod support;
+use crate::support;
 
 use std::rc::Rc;
 

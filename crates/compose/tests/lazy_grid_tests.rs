@@ -9,7 +9,7 @@
 //! - a variable-height grid keeps its full extent with a partial last row
 
 use cove_composition::Scope;
-mod support;
+use crate::support;
 
 use std::rc::Rc;
 

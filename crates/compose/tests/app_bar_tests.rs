@@ -19,7 +19,7 @@
 //! and that an overflowed command is not offered — is covered here by asserting
 //! the heading's exact label and the inline/overflow split directly.
 
-mod support;
+use crate::support;
 
 use std::cell::Cell;
 use std::rc::Rc;

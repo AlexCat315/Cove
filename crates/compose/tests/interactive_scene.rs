@@ -5,7 +5,7 @@
 //! restored afterwards, `settle` produces layout, name lookup works, and real
 //! pointer dispatch reaches a host in the graph.
 
-mod support;
+use crate::support;
 
 use std::cell::Cell;
 use std::rc::Rc;

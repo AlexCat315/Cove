@@ -6,7 +6,7 @@
 //! - the safe area is consumed once, and an open IME replaces the bottom inset
 //!   only when it is taller than the safe-area floor
 
-mod support;
+use crate::support;
 
 use cove_composition::{AnyView, LayoutDebugExt, PrimitiveView, View, ViewKind};
 use cove_core::TextScaleSample;

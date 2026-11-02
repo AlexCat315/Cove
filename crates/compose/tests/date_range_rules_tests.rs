@@ -27,7 +27,7 @@
 //!   completes 10...13; Rust records 15...15 and then 13...13.
 
 use cove_composition::Scope;
-mod support;
+use crate::support;
 
 use std::sync::{Arc, Mutex};
 

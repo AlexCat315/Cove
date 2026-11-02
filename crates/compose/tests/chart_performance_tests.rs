@@ -10,7 +10,7 @@
 //! - the two spaces a chart lives in keep separate cache entries
 //! - new data drops the cached geometry; a new selection keeps it
 
-mod support;
+use crate::support;
 
 use std::cell::RefCell;
 use std::rc::Rc;

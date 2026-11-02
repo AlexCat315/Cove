@@ -7,7 +7,7 @@
 //! - `.appearance(.dark)` installs the dark preset on the subtree
 //! - an inner `.appearance` overrides the outer one for descendants
 
-mod support;
+use crate::support;
 
 use cove_composition::AnyView;
 use cove_core::scene::{Align, FlexDirection, Justify, Wrap};

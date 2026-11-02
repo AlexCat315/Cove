@@ -12,8 +12,6 @@
 //! that half is covered by the flow's own geometry rather than a synthesized
 //! glyph table.
 
-mod support;
-
 use cove_platform::{MouseButton, MouseButtonEvent, MouseMotionEvent, PointerKind};
 use cove_ui_compose::primitives::text::rich::text_selection::TextBoundaries;
 

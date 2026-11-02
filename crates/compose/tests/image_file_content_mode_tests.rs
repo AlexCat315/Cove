@@ -9,7 +9,7 @@
 //! - a missing bundle resource emits a `ResourceNotFound` diagnostic and
 //!   reports `NO_TEXTURE`
 
-mod support;
+use crate::support;
 
 use std::cell::RefCell;
 use std::rc::Rc;

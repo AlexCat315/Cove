@@ -13,7 +13,7 @@
 //! `CollectionSelection::multiple(..)` and `rows(vec![..])` and keeps the same
 //! selection binding.
 
-mod support;
+use crate::support;
 
 use std::collections::BTreeSet;
 

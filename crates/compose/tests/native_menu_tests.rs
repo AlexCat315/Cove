@@ -18,7 +18,7 @@
 //!   `None`, so the fourth test asserts no icon and marks the missing raster
 //!   path with `GAP:`.
 
-mod support;
+use crate::support;
 
 use std::cell::Cell;
 use std::rc::Rc;

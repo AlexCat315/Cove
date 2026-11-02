@@ -37,8 +37,7 @@
 //! - Link anchors are `RichTextLinkAnchor` children of the paragraph; they are
 //!   focusable and not hit-testable, exactly as Swift's `LinkAnchor`.
 
-#[allow(dead_code)]
-mod support;
+use crate::support;
 
 use std::cell::RefCell;
 use std::rc::Rc;

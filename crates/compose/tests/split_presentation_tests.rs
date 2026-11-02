@@ -52,7 +52,7 @@
 //!   retained hidden field's value is asserted to be unchanged instead.
 
 use cove_composition::Scope;
-mod support;
+use crate::support;
 
 use std::rc::Rc;
 

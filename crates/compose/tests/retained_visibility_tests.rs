@@ -9,7 +9,7 @@
 //! - the painter keeps the same element identity across every toggle
 
 use cove_composition::Scope;
-mod support;
+use crate::support;
 
 use std::cell::Cell;
 use std::rc::Rc;

@@ -13,7 +13,7 @@
 //! `Al`, `En`, `An`, `Es`, `Et`, `Cs`, `Ws`, `B`, `Nsm`, `On`; both are
 //! straight renames, not gaps.
 
-mod support;
+use crate::support;
 
 use cove_core::{BidiClass, BidiParagraphs, PositionedGlyph};
 use cove_text::TextEnvironment;

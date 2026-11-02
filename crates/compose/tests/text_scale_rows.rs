@@ -35,7 +35,7 @@
 //!   the same measure on the layout node and the assertion is kept as-is.
 
 use cove_composition::Scope;
-mod support;
+use crate::support;
 
 use std::rc::Rc;
 

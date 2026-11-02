@@ -28,7 +28,7 @@
 //!   `ColorSwatch` never applies that debug name, so the readout is located by
 //!   its `#FFFFFF` value instead.
 
-mod support;
+use crate::support;
 
 use std::rc::Rc;
 

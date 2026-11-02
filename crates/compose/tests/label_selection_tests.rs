@@ -24,7 +24,7 @@
 //! The chrome geometry and the scope's own model, which Rust does implement, are
 //! ported at full strength; `the_model_is_not_driven_by_input` pins the gap.
 
-mod support;
+use crate::support;
 
 use std::cell::RefCell;
 use std::rc::Rc;

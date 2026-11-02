@@ -16,7 +16,7 @@
 //! `@State` does.
 
 use cove_composition::Scope;
-mod support;
+use crate::support;
 
 use cove_composition::{AnyView, TupleView, View, ViewExt};
 use cove_core::State;

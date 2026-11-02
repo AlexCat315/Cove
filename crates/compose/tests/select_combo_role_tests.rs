@@ -8,7 +8,7 @@
 //! - `Select` and `Combobox` publish those through the same composition locals
 //!   the `Button` reads, which a wrapper node could not do
 
-mod support;
+use crate::support;
 
 use cove_core::Binding;
 use cove_core::scene::AccessibilityRole;

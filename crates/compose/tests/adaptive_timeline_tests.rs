@@ -22,8 +22,7 @@
 //!   `a_metadata_free_row_adds_no_blank_line` pins the current height.
 
 use cove_composition::Scope;
-#[allow(dead_code)]
-mod support;
+use crate::support;
 
 use std::rc::Rc;
 

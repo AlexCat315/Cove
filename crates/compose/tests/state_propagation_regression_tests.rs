@@ -15,7 +15,7 @@
 //! length instead of a frame coordinate and still needs no layout pass.
 
 use cove_composition::Scope;
-mod support;
+use crate::support;
 
 use std::rc::Rc;
 

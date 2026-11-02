@@ -7,7 +7,7 @@
 //! - both the value and the following row stay inside the grid width
 //! - the row's intrinsic height is exactly its content height
 
-mod support;
+use crate::support;
 
 use std::cell::RefCell;
 use std::rc::Rc;

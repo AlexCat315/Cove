@@ -20,7 +20,7 @@
 //!   `.text_field_style(EditorTextFieldStyle)` has no effect: no sunken surface
 //!   and no suppressed border. `focused_surface` pins that with `GAP:` asserts.
 
-mod support;
+use crate::support;
 
 use cove_composition::AnyView;
 use cove_core::scene::Node;

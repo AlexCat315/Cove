@@ -16,7 +16,7 @@
 //!   mouse wheel over the list (the same `on_viewport_change` report path a
 //!   real wheel uses).
 
-mod support;
+use crate::support;
 
 use std::cell::Cell;
 use std::rc::Rc;

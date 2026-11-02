@@ -9,7 +9,7 @@
 //! - Page/Home/End scrolls a focused viewport
 //! - a desktop pointer drag does not scroll content
 
-mod support;
+use crate::support;
 
 use std::cell::RefCell;
 use std::rc::Rc;

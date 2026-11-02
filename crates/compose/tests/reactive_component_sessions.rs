@@ -1,5 +1,5 @@
 //! Mounted session state survives parent reconstruction and drives real input.
-mod support;
+use crate::support;
 use cove_composition::{AnyView, Scope, View};
 use cove_core::scene::{AccessibilityRole, AccessibilityTree, AnimatorScheduler, Node};
 use cove_core::{Binding, Owner, Signal};

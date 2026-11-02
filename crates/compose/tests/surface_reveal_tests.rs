@@ -34,7 +34,7 @@
 //!   `u64`, so the command row is looked up as row id 0.
 
 use cove_composition::Scope;
-mod support;
+use crate::support;
 
 use std::cell::Cell;
 use std::rc::Rc;

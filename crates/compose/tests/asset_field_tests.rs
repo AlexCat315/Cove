@@ -10,7 +10,7 @@
 //! - clearing the value removes the clear action but keeps the picker
 //! - a disabled field exposes no activation path and never mutates the value
 
-mod support;
+use crate::support;
 
 use std::collections::BTreeSet;
 

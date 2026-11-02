@@ -26,7 +26,7 @@
 //! retained-child and reselection assertions are unchanged.
 
 use cove_composition::Scope;
-mod support;
+use crate::support;
 
 use std::cell::RefCell;
 use std::rc::Rc;

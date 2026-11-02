@@ -11,7 +11,7 @@
 //!   scheduler is idle again
 
 use cove_composition::Scope;
-mod support;
+use crate::support;
 
 use cove_composition::{AnyView, View};
 use cove_core::State;

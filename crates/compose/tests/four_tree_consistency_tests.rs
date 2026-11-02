@@ -11,7 +11,7 @@
 //! Phase 7 removed the input mirror, so there is no input tree to assert; the
 //! Rust port has the same shape (`Node` + `RenderTree` only).
 
-mod support;
+use crate::support;
 
 use std::rc::Rc;
 

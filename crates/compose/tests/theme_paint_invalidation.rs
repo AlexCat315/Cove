@@ -12,7 +12,7 @@
 //! that half is recorded rather than faked; the heading and pinned-theme halves
 //! are migrated with their exact colour assertions.
 
-mod support;
+use crate::support;
 
 use cove_composition::AnyView;
 use cove_core::scene::{Align, DrawList, FlexDirection, Justify, Node, NodeRenderer, Wrap};

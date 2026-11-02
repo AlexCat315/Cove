@@ -23,7 +23,7 @@
 //!   ("writes schedule nothing") rather than an internal counter.
 
 use cove_composition::Scope;
-mod support;
+use crate::support;
 
 use std::cell::Cell;
 use std::rc::Rc;

@@ -26,7 +26,7 @@
 //! accessibility. The actions button opens the same actions without a swipe.
 
 use cove_composition::Scope;
-mod support;
+use crate::support;
 
 use std::cell::RefCell;
 use std::rc::Rc;

@@ -17,7 +17,7 @@
 //! from layout, so the scene is laid out at 100x32 instead. The pointer
 //! coordinates and the resulting paint are unchanged.
 
-mod support;
+use crate::support;
 
 use std::cell::Cell;
 use std::rc::Rc;

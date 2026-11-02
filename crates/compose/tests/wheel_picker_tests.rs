@@ -35,7 +35,7 @@
 //!   `TimePicker`, so only the height is comparable.
 
 use cove_composition::Scope;
-mod support;
+use crate::support;
 
 use cove_composition::{AnyView, View};
 use cove_core::scene::AccessibilityRole;

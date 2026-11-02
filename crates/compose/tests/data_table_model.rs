@@ -15,8 +15,6 @@
 //! pending flag only brackets the build), so these tests assert the settled
 //! state directly instead of polling.
 
-mod support;
-
 use std::rc::Rc;
 
 use cove_platform::KeyModifiers;

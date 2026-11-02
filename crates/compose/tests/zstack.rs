@@ -7,7 +7,7 @@
 //! - later children receive pointer input first (topmost wins hit testing)
 //! - content stays inside its own Box instead of a padded sibling
 
-mod support;
+use crate::support;
 
 use std::cell::RefCell;
 use std::rc::Rc;

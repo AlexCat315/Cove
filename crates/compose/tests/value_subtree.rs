@@ -13,7 +13,7 @@
 //! no direct Rust counterpart because `body` is not re-entered, so the counter
 //! assertion carries that half of the Swift test.
 
-mod support;
+use crate::support;
 
 use std::cell::Cell;
 use std::rc::Rc;

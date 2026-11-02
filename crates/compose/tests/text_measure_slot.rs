@@ -4,7 +4,7 @@
 //! - measuring a `Text` populates the layout node's typed text inputs
 //! - `LayoutTree::reset_caches` clears the measure slot across the subtree
 
-mod support;
+use crate::support;
 
 use cove_composition::AnyView;
 use cove_ui_compose::primitives::text::Text;

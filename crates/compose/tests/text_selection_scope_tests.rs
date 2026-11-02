@@ -21,7 +21,7 @@
 //!   counterparts of the Swift pair, so the render-pass boundary is modelled
 //!   exactly: `flush` walks from the root and clears every reachable flag.
 
-mod support;
+use crate::support;
 
 use std::cell::RefCell;
 use std::rc::Rc;

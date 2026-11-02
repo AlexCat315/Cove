@@ -5,8 +5,6 @@
 //! - the primary modifier renders as Control on Windows and Linux
 //! - adding shift inserts the shift glyph/word in the right place
 
-mod support;
-
 use cove_ui_compose::primitives::controls::fields::select::{
     KeyboardShortcut, KeyboardShortcutPlatform,
 };

@@ -13,8 +13,6 @@
 //! projection as pure functions, so those are asserted directly with the same
 //! inputs and the same expected numbers.
 
-mod support;
-
 use cove_ui_compose::primitives::data::data_table::{
     DataTableColumnGeometry, DataTableColumnOrder, DataTableRowMetrics, RowHeightKey,
     row_height_key_matches, variable_row_heights,

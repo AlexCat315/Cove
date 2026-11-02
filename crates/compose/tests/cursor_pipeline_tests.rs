@@ -6,7 +6,7 @@
 //! - a text field writes the ibeam cursor
 //! - `.cursor(_:)` overrides the cursor the primitive wrote
 
-mod support;
+use crate::support;
 
 use cove_composition::{View, ViewGraph};
 use cove_core::scene::Node;

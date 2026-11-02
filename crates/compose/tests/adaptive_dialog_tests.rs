@@ -22,7 +22,7 @@
 //!   asserts the measurement, matching the Swift `layoutNode.textInputs` checks.
 
 use cove_composition::Scope;
-mod support;
+use crate::support;
 
 use std::rc::Rc;
 use std::sync::Arc;

@@ -9,7 +9,7 @@
 //! - the `.composition_local` modifier writes onto the wrapper node
 //! - descendants resolve a provider by walking up
 
-mod support;
+use crate::support;
 
 use cove_composition::AnyView;
 use cove_core::scene::{CompositionLocal, Node};

@@ -9,8 +9,6 @@
 //! - horizontal navigation moves the moving pane and leaves frozen cells put
 //! - scrolled-out cells are never mounted
 
-mod support;
-
 use cove_core::Point;
 use cove_ui_compose::primitives::data::data_table::{
     DataTableColumnGeometry, DataTableRowMetrics, DataTableWindows,

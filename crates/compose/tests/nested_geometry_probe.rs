@@ -1,7 +1,7 @@
 //! Regression: `Node::frame` is parent-relative (as in the Swift `LayoutPass`),
 //! so `absolute_frame` must compose ancestor origins exactly once.
 
-mod support;
+use crate::support;
 
 use cove_composition::{AnyView, TupleView};
 use cove_core::scene::{Align, FlexDirection, Justify, Node, Wrap};

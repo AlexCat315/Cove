@@ -8,7 +8,7 @@
 //! - a semantic font writes both the font and its line height
 //! - a nearer `.theme(_)` overrides an outer one for descendants
 
-mod support;
+use crate::support;
 
 use cove_composition::AnyView;
 use cove_core::Color;

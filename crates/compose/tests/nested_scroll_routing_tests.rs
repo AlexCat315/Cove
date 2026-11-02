@@ -15,7 +15,7 @@
 //! The Swift `Fixture` struct is a support shape for this one suite, so it is
 //! folded in here rather than registered as its own target.
 
-mod support;
+use crate::support;
 
 use std::rc::Rc;
 

@@ -12,7 +12,7 @@
 //! `AnyView` rather than a `@ViewBuilder` result, so the cells are built as a
 //! `TupleView` here. No assertion is relaxed.
 
-mod support;
+use crate::support;
 
 use cove_composition::layout::LayoutDirectionExt;
 use cove_composition::{AnyView, LayoutDebugExt, TupleView};

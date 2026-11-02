@@ -15,8 +15,6 @@
 //! scene-level wiring that turns them into nodes is covered by
 //! `data_table_layout.rs` and the host markers asserted here.
 
-mod support;
-
 use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 

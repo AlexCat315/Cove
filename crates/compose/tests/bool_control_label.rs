@@ -8,7 +8,7 @@
 //! - the label text materialises as a measured text input
 //! - the accessibility activate action drives the caller's binding
 
-mod support;
+use crate::support;
 
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};

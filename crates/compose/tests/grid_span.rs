@@ -6,8 +6,6 @@
 //! - a multi-row cell grows the last row it spans by its deficit
 //! - lazy grids pack spans per row and window columns of a wide grid
 
-mod support;
-
 use cove_ui_compose::primitives::layout::grid::{
     GridRowHeights, GridSpan, GridSpanPlacement, LazyGrid, LazyGridRows,
 };

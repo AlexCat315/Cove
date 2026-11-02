@@ -28,7 +28,7 @@
 //!   scroller keeps item-local frames.
 
 use cove_composition::Scope;
-mod support;
+use crate::support;
 
 use std::cell::RefCell;
 use std::rc::Rc;

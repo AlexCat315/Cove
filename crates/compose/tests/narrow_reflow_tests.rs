@@ -24,7 +24,7 @@
 //!   The Rust prefix is a plain `Text` and the numeric inputs expose a
 //!   `TextField` role with an empty label, so the axes are located by role.
 
-mod support;
+use crate::support;
 
 use cove_composition::AnyView;
 use cove_core::scene::{AccessibilityRole, Node};

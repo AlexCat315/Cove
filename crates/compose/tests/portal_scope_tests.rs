@@ -9,7 +9,7 @@
 //! - nested scopes restore the outer store on exit, and the outermost scope
 //!   restores the previous store
 
-mod support;
+use crate::support;
 
 use std::rc::Rc;
 

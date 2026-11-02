@@ -28,8 +28,7 @@
 //!   still reports `is_enabled`.
 
 use cove_composition::Scope;
-#[allow(dead_code)]
-mod support;
+use crate::support;
 
 use std::cell::RefCell;
 use std::rc::Rc;

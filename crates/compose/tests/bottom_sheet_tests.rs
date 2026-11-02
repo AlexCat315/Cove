@@ -30,7 +30,7 @@
 //! Drag-to-dismiss is unaffected because it writes the `is_presented` binding,
 //! which is observable, so that half of the suite is migrated unchanged.
 
-mod support;
+use crate::support;
 
 use cove_composition::AnyView;
 use cove_core::scene::{AccessibilityRole, Align, FlexDirection, Justify, Node, Wrap};

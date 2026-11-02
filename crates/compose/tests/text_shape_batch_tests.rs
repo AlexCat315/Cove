@@ -1,7 +1,6 @@
 //! Labels queued for batch shaping must use the font that layout reads.
 
-#[allow(dead_code)]
-mod support;
+use crate::support;
 
 use cove_composition::{AnyView, HorizontalAlignment, TupleView};
 use cove_core::{Font, FontWeight};

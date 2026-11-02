@@ -6,7 +6,7 @@
 //! - the layout density floor preserves authored minima and their changes while
 //!   active, and restores the authored minima when cleared
 
-mod support;
+use crate::support;
 
 use std::cell::RefCell;
 use std::rc::Rc;

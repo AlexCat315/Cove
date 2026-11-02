@@ -24,7 +24,7 @@
 //! pause/resume/focus/reduced-motion cases assert the state machine that really
 //! exists.
 
-mod support;
+use crate::support;
 
 use std::cell::RefCell;
 use std::rc::Rc;

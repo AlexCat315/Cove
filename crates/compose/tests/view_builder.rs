@@ -8,7 +8,7 @@
 //! - a false `if` expands to nothing
 //! - `if`/`else` produces conditional content that picks exactly one branch
 
-mod support;
+use crate::support;
 
 use cove_composition::{
     AnyView, ConditionalContent, EmptyView, SourceLocatedView, TupleView, View, ViewKind,

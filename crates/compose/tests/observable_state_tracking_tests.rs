@@ -35,7 +35,7 @@
 //!   Rust does track.
 
 use cove_composition::Scope;
-mod support;
+use crate::support;
 
 use std::cell::{Cell, RefCell};
 use std::collections::BTreeMap;

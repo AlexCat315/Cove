@@ -12,7 +12,7 @@
 //! - caret and hit testing round-trip on every grapheme stop of a mixed line
 //! - a secure geometry masks the same grapheme stops
 
-mod support;
+use crate::support;
 
 use cove_core::TextLayoutResult;
 use cove_text::{TextEnvironment, TextEnvironmentHolder};

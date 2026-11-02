@@ -38,7 +38,7 @@
 //!   border is drawn".
 
 use cove_composition::Scope;
-mod support;
+use crate::support;
 
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;

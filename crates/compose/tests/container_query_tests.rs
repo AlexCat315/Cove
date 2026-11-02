@@ -13,7 +13,7 @@
 //! - sub-tolerance jitter does not republish
 
 use cove_composition::Scope;
-mod support;
+use crate::support;
 
 use std::cell::RefCell;
 use std::rc::Rc;

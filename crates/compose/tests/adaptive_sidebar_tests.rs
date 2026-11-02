@@ -24,7 +24,7 @@
 //! Discovery uses the same modal input predicate as event dispatch.
 
 use cove_composition::Scope;
-mod support;
+use crate::support;
 
 use cove_composition::{AnyView, LayoutDebugExt, Scancode, View};
 use cove_core::scene::{AccessibilityRole, ElementId, Node};

@@ -22,7 +22,7 @@
 //! - `ButtonHost.pressedKey` is private in Rust; the host is found by the public
 //!   `__button_host` marker, which `ButtonHost::update_node` writes.
 
-mod support;
+use crate::support;
 
 use std::cell::RefCell;
 use std::rc::Rc;

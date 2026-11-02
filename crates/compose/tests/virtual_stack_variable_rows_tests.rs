@@ -30,7 +30,7 @@
 //!   surface difference, not a behaviour gap: every number Swift asserts holds.
 
 use cove_composition::Scope;
-mod support;
+use crate::support;
 
 use std::rc::Rc;
 

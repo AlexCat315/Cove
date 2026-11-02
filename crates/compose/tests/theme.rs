@@ -8,7 +8,7 @@
 //! - `Theme` is a value type: mutating a copy leaves the default untouched
 //! - a theme flows through a `CompositionLocal`
 
-mod support;
+use crate::support;
 
 use cove_core::Color;
 use cove_core::scene::{CompositionLocal, Node};

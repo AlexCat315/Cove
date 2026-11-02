@@ -11,7 +11,7 @@
 //! `theme_for_node`, so the ring colour is read from the same source the style
 //! uses.
 
-mod support;
+use crate::support;
 
 use std::rc::Rc;
 

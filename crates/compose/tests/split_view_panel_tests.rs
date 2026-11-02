@@ -22,7 +22,7 @@
 //! maths, the divider geometry and the minimum-share behaviour at the *first*
 //! extent are all asserted at full strength.
 
-mod support;
+use crate::support;
 
 use std::rc::Rc;
 

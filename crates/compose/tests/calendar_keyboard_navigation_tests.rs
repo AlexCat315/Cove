@@ -21,7 +21,7 @@
 //!   no DST, so the interval is exactly 29 days.
 
 use cove_composition::Scope;
-mod support;
+use crate::support;
 
 use std::cell::RefCell;
 use std::rc::Rc;

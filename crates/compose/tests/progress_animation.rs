@@ -7,7 +7,7 @@
 //! - switching to indeterminate and back snaps to each new value
 //! - reduced motion snaps rather than animating
 
-mod support;
+use crate::support;
 
 use cove_composition::PrimitiveView;
 use cove_core::scene::{ActiveAnimationContext, NodeTree};

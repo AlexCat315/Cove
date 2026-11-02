@@ -45,8 +45,7 @@
 //!   sibling; Swift kept three rows.
 
 use cove_composition::Scope;
-#[allow(dead_code)]
-mod support;
+use crate::support;
 
 use std::cell::RefCell;
 use std::collections::HashSet;

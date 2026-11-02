@@ -14,7 +14,7 @@
 //! that follows from the missing wiring, so it fails loudly once the host is
 //! connected.
 
-mod support;
+use crate::support;
 
 use std::cell::RefCell;
 use std::rc::Rc;

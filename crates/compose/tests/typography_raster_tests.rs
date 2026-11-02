@@ -20,7 +20,7 @@
 //! `ImageLoadDiagnostics::set_on_event`, and `Image.resolve(path:)` to
 //! `Image::resolve_path`.
 
-mod support;
+use crate::support;
 
 use std::cell::Cell;
 use std::path::PathBuf;

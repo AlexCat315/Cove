@@ -17,7 +17,7 @@
 //! - a nested scroll edge consumes outward input while its axis overflows
 //! - reduced motion disables momentum and rubber band
 
-mod support;
+use crate::support;
 
 use std::cell::Cell;
 use std::rc::Rc;

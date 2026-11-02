@@ -17,7 +17,7 @@
 //! key never re-enters `start`, and the table empties afterwards); the
 //! cancellation invariant has no Rust analogue and is recorded here.
 
-mod support;
+use crate::support;
 
 use std::sync::Arc;
 

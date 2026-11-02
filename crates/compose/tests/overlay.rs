@@ -6,7 +6,7 @@
 //! - the default alignment centers overlay content inside the base
 //! - overlay content receives pointer input before the base
 
-mod support;
+use crate::support;
 
 use std::cell::RefCell;
 use std::rc::Rc;

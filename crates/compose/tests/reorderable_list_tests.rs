@@ -24,7 +24,7 @@
 //!   both axes reach 44.
 
 use cove_composition::Scope;
-mod support;
+use crate::support;
 
 use std::cell::RefCell;
 use std::rc::Rc;

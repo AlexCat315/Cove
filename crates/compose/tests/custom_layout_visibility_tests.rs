@@ -11,7 +11,7 @@
 //!   keeps the same retained node, which hit testing finds again
 
 use cove_composition::Scope;
-mod support;
+use crate::support;
 
 use std::cell::Cell;
 use std::rc::Rc;

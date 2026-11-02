@@ -32,7 +32,7 @@
 //!   the whole string is never shaped. `zero_width_still_shapes_the_whole_string`
 //!   pins the Rust behaviour.
 
-mod support;
+use crate::support;
 
 use std::rc::Rc;
 

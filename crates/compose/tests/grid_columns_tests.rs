@@ -43,8 +43,7 @@
 //!   control, so `owned_popup` clicks the node carrying the trigger label.
 
 use cove_composition::Scope;
-#[allow(dead_code)]
-mod support;
+use crate::support;
 
 use std::collections::HashMap;
 use std::rc::Rc;

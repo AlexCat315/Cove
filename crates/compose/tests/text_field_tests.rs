@@ -49,7 +49,7 @@
 //!   background and border with the glyph, so the hook emits more than the one
 //!   glyph quad Swift counted.
 
-mod support;
+use crate::support;
 
 use std::cell::RefCell;
 use std::rc::Rc;

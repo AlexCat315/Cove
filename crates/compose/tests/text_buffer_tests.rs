@@ -44,8 +44,6 @@
 //! assertion is dropped; the retained-snapshot half still compares chunk
 //! identities across an edit.
 
-mod support;
-
 use std::collections::HashSet;
 use std::sync::Arc;
 use std::time::{Duration, Instant};

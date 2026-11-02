@@ -11,7 +11,7 @@
 //! - PageUp/PageDown move by ten steps and clamp
 //! - discrete ticks add one mark per step
 
-mod support;
+use crate::support;
 
 use std::rc::Rc;
 use std::sync::Arc;

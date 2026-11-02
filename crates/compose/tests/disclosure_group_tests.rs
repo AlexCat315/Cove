@@ -21,7 +21,7 @@
 //!   Everything else matches Swift: a disabled disclosure drops out of the focus
 //!   order entirely, so `first_focusable` is `None` exactly as in Swift.
 
-mod support;
+use crate::support;
 
 use std::rc::Rc;
 

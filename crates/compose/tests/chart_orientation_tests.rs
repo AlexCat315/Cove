@@ -14,7 +14,7 @@
 //! - a plot resolves its geometry in the style's orientation
 //! - an area fills to the baseline along the value axis, whichever way it runs
 
-mod support;
+use crate::support;
 
 use std::rc::Rc;
 

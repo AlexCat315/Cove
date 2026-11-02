@@ -18,7 +18,7 @@
 //! no key while exactly one descendant does, which is what "the anchor keeps the
 //! child's key local" means.
 
-mod support;
+use crate::support;
 
 use std::cell::RefCell;
 use std::rc::Rc;

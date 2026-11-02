@@ -12,7 +12,7 @@
 //!   state layer, also unanimated
 //! - a first render leaves no animation controller active
 
-mod support;
+use crate::support;
 
 use std::rc::Rc;
 
