@@ -324,6 +324,7 @@ impl AsyncImage {
             pixel_width: pixel_extent(self.width, self.content_mode == ImageContentMode::Fill),
             pixel_height: pixel_extent(self.height, self.content_mode == ImageContentMode::Fill),
             policy: self.policy.clone(),
+            retry_id: self.retry_id,
         }
     }
 }

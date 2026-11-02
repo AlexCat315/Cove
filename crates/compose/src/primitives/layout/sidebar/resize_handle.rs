@@ -87,7 +87,23 @@ impl SidebarResizeHandle {
         proposed.clamp(self.range.0, self.range.1)
     }
 
-    #[expect(dead_code, reason = "ported from Swift but not wired in yet")]
+    /// Owned writer so every interaction closure shares one guarded path.
+    fn writer(&self) -> ResizeWriter {
+        ResizeWriter {
+            value: self.value.clone(),
+            range: self.range,
+        }
+    }
+}
+
+/// Writes a proposed width back, guarded by the lane's input state.
+#[derive(Clone)]
+struct ResizeWriter {
+    value: Option<Binding<f32>>,
+    range: (f32, f32),
+}
+
+impl ResizeWriter {
     fn write(&self, node: &Node, proposed: f32) {
         if !node.accepts_subtree_input() || !proposed.is_finite() {
             return;
@@ -98,6 +114,15 @@ impl SidebarResizeHandle {
         {
             binding.set(next);
         }
+    }
+
+    fn current(&self) -> f32 {
+        let proposed = self
+            .value
+            .as_ref()
+            .map(|binding| binding.get())
+            .unwrap_or(self.range.0);
+        proposed.clamp(self.range.0, self.range.1)
     }
 }
 
@@ -208,47 +233,31 @@ impl PrimitiveView for SidebarResizeHandle {
             ..Default::default()
         }));
 
-        let increment_value = self.value.clone();
-        let increment_range = self.range;
+        let writer = self.writer();
         let increment_node = node.downgrade();
-        let decrement_value = self.value.clone();
-        let decrement_range = self.range;
         let decrement_node = node.downgrade();
-        let set_value = self.value.clone();
-        let set_range = self.range;
         let set_node = node.downgrade();
+        let increment_writer = writer.clone();
+        let decrement_writer = writer.clone();
+        let set_value_writer = writer.clone();
         node.set_accessibility_actions(AccessibilityActions {
             increment: Some(Rc::new(move || {
-                if let (Some(owner), Some(binding)) =
-                    (Node::upgrade(&increment_node), increment_value.as_ref())
-                {
-                    let _ = owner;
-                    let next = (binding.get() + 16.0).clamp(increment_range.0, increment_range.1);
-                    binding.set(next);
+                if let Some(owner) = Node::upgrade(&increment_node) {
+                    increment_writer.write(&owner, increment_writer.current() + 16.0);
                 }
             })),
             decrement: Some(Rc::new(move || {
-                if let (Some(owner), Some(binding)) =
-                    (Node::upgrade(&decrement_node), decrement_value.as_ref())
-                {
-                    let _ = owner;
-                    let next = (binding.get() - 16.0).clamp(decrement_range.0, decrement_range.1);
-                    binding.set(next);
+                if let Some(owner) = Node::upgrade(&decrement_node) {
+                    decrement_writer.write(&owner, decrement_writer.current() - 16.0);
                 }
             })),
             set_value: Some(Rc::new(move |text: &str| {
                 let cleaned = text.replace("pt", "");
-                let trimmed = cleaned.trim();
-                let Ok(next) = trimmed.parse::<f32>() else {
+                let Ok(next) = cleaned.trim().parse::<f32>() else {
                     return;
                 };
-                if !next.is_finite() {
-                    return;
-                }
-                if let (Some(binding), Some(owner)) = (set_value.as_ref(), Node::upgrade(&set_node))
-                {
-                    let _ = owner;
-                    binding.set(next.clamp(set_range.0, set_range.1));
+                if let Some(owner) = Node::upgrade(&set_node) {
+                    set_value_writer.write(&owner, next);
                 }
             })),
             ..Default::default()
@@ -314,12 +323,9 @@ impl PrimitiveView for SidebarResizeHandle {
                 );
             },
         );
-        let _ = hover_node;
-
         let Some(registry) = InteractionRegistryHolder::current() else {
             return;
         };
-        let hover_node = node.downgrade();
         registry.set_hover(
             node,
             Rc::new(move |phase| {
@@ -375,8 +381,7 @@ impl PrimitiveView for SidebarResizeHandle {
             }),
         );
 
-        let motion_value = self.value.clone();
-        let motion_range = self.range;
+        let motion_writer = self.writer();
         let motion_node = node.downgrade();
         registry.set_motion(
             node,
@@ -401,17 +406,12 @@ impl PrimitiveView for SidebarResizeHandle {
                     return EventResult::Ignored;
                 };
                 let delta = (event.x - start.x) * if is_rtl(&owner) { -1.0 } else { 1.0 };
-                let next = (start.width + delta).clamp(motion_range.0, motion_range.1);
-                if let Some(binding) = motion_value.as_ref()
-                    && binding.get() != next
-                {
-                    binding.set(next);
-                }
+                motion_writer.write(&owner, start.width + delta);
                 EventResult::Handled
             }),
         );
 
-        let key_value = self.value.clone();
+        let key_writer = self.writer();
         let key_range = self.range;
         let key_node = node.downgrade();
         registry.set_key(
@@ -435,10 +435,7 @@ impl PrimitiveView for SidebarResizeHandle {
                 } else {
                     16.0
                 };
-                let current = key_value
-                    .as_ref()
-                    .map(|binding| binding.get())
-                    .unwrap_or(key_range.0);
+                let current = key_writer.current();
                 let rtl = is_rtl(&owner);
                 let next = match event.scancode {
                     crate::Scancode::ARROW_LEFT => current + if rtl { step } else { -step },
@@ -449,21 +446,13 @@ impl PrimitiveView for SidebarResizeHandle {
                         let Some(start) = owner.attachment::<ResizeStart>(START) else {
                             return EventResult::Ignored;
                         };
-                        let restored = start.width.clamp(key_range.0, key_range.1);
-                        if let Some(binding) = key_value.as_ref() {
-                            binding.set(restored);
-                        }
+                        key_writer.write(&owner, start.width);
                         release(&owner);
                         return EventResult::Handled;
                     }
                     _ => return EventResult::Ignored,
                 };
-                let next = next.clamp(key_range.0, key_range.1);
-                if let Some(binding) = key_value.as_ref()
-                    && binding.get() != next
-                {
-                    binding.set(next);
-                }
+                key_writer.write(&owner, next);
                 EventResult::Handled
             }),
         );

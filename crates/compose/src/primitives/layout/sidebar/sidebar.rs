@@ -11,13 +11,11 @@ use std::rc::Rc;
 use crate::modifiers::interaction::AccessibilityExt;
 use crate::modifiers::layout::{FlexExt, FrameDimension, LayoutFrameExt, PaddingExt};
 use crate::modifiers::style::{AppearanceExt, SemanticStyleViewExt};
-use crate::primitives::controls::button::{Button, ButtonRole};
 use crate::primitives::overlays::roving_focus::{
     RovingFocusHost, RovingItem, SelectionNavigation, roving_identity,
 };
 use crate::primitives::text::Text;
 use crate::theme::SemanticFontRef;
-use crate::theme::styles::buttons::ButtonStyleViewExt;
 use crate::{AnyView, BoxView, PrimitiveView, TupleView, View, impl_primitive_view};
 use cove_core::Binding;
 use cove_core::scene::{AccessibilityRole, Align, FlexDirection, Justify, Node, Wrap};
@@ -383,117 +381,6 @@ impl PrimitiveView for SectionIdentity {
     }
 }
 impl_primitive_view!(SectionIdentity);
-
-/// Applies the roving identity and row semantics to one row button.
-///
-/// The row is rebuilt from primitives on each pass: `Button` is not `Clone` and
-/// `button_style` returns `ModifiedContent`, so storing either would leave a
-/// value that cannot be re-emitted per frame.
-#[expect(dead_code, reason = "ported from Swift but not wired in yet")]
-struct SidebarRowBody<Id: PartialEq + Eq + std::hash::Hash + Clone + Send + Sync + 'static> {
-    label: AnyView,
-    is_enabled: bool,
-    is_selected: bool,
-    minimum_height: f32,
-    is_branch: bool,
-    selection: Binding<Option<Id>>,
-    on_activate: Rc<dyn Fn(Id)>,
-    expanded: Option<Binding<HashSet<Id>>>,
-    local_expanded: cove_core::Signal<HashSet<Id>>,
-    expanded_now: HashSet<Id>,
-    id: Id,
-    row_id: Id,
-    is_tab_stop: bool,
-    identity: Rc<dyn Fn(&Id) -> u64>,
-}
-
-impl<Id: PartialEq + Eq + std::hash::Hash + Clone + Send + Sync + 'static> PrimitiveView
-    for SidebarRowBody<Id>
-{
-    fn make_node(&self) -> Node {
-        let node = Node::new();
-        node.set_is_hit_testable(false);
-        node
-    }
-
-    fn make_layout_node(&self) -> Option<cove_core::scene::LayoutNode> {
-        None
-    }
-
-    fn update_node(&self, _node: &Node) {}
-
-    fn children(&self, _node: &Node) -> Vec<AnyView> {
-        let activation = {
-            let id = self.id.clone();
-            let selection = self.selection.clone();
-            let on_activate = self.on_activate.clone();
-            let expanded = self.expanded.clone();
-            let local_expanded = self.local_expanded;
-            let expanded_now = self.expanded_now.clone();
-            let is_branch = self.is_branch;
-            move || {
-                if is_branch {
-                    let mut next = expanded_now.clone();
-                    if !next.remove(&id) {
-                        next.insert(id.clone());
-                    }
-                    match expanded.as_ref() {
-                        Some(binding) => binding.set(next),
-                        None => local_expanded.set(next),
-                    }
-                } else {
-                    selection.set(Some(id.clone()));
-                    on_activate(id.clone());
-                }
-            }
-        };
-        let button = Button::with_options(
-            self.label.clone(),
-            activation,
-            ButtonRole::Normal,
-            self.is_enabled,
-            false,
-            self.is_selected,
-            None,
-        )
-        .button_style(SidebarItemStyle {
-            minimum_height: self.minimum_height,
-        });
-        let styled = button.button_style(SidebarItemStyle {
-            minimum_height: self.minimum_height,
-        });
-        let roving = RovingItem::new(self.row_id.clone(), self.is_tab_stop, self.identity.clone());
-        vec![AnyView::new(AnyView::new(styled).with_modifier(roving))]
-    }
-}
-
-impl<Id: PartialEq + Eq + std::hash::Hash + Clone + Send + Sync + 'static> View
-    for SidebarRowBody<Id>
-{
-    fn kind(&self) -> crate::ViewKind<'_> {
-        crate::ViewKind::Primitive(self)
-    }
-}
-
-/// Row semantics: label, badge value and branch expanded state.
-#[expect(dead_code, reason = "ported from Swift but not wired in yet")]
-struct SidebarRowSemantics {
-    label: String,
-    value: String,
-    is_expanded: Option<bool>,
-}
-
-impl cove_composition::ViewModifier for SidebarRowSemantics {
-    fn apply_node(&self, node: &Node) {
-        let mut semantics = node.accessibility().unwrap_or_else(|| {
-            cove_core::scene::AccessibilitySemantics::new(AccessibilityRole::Button)
-        });
-        semantics.label = self.label.clone();
-        semantics.value = self.value.clone();
-        semantics.state.is_expanded = self.is_expanded;
-        node.set_accessibility(Some(semantics));
-    }
-}
 
 /// The painted row, built in one pass so the modifier chain never needs erasing.
 struct SidebarChromeRow {

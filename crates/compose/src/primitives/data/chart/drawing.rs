@@ -120,8 +120,6 @@ impl<'a> ChartPaint<'a> {
     /// Gutter placements for every tick label and axis title. The text host
     /// consumes these; the draw list itself cannot rasterize glyphs yet.
     pub fn axis_label_layouts(&self) -> Vec<(String, Point)> {
-        let color_slot = ();
-        color_slot;
         let mut result = Vec::new();
         let bounds = self.frame.bounds;
         let plot = self.frame.plot;

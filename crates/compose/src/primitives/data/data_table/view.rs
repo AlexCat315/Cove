@@ -2105,7 +2105,6 @@ struct DraftEditor<
 > {
     controller: DataTableController<Record, Id>,
     plan: DataTablePlan<Record>,
-    #[expect(dead_code, reason = "ported from Swift but not wired in yet")]
     column_id: String,
     buffer: String,
     title: String,
@@ -2173,6 +2172,7 @@ impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 
         let semantics = AccessibilitySemantics {
             role: AccessibilityRole::TextField,
             label: format!("Edit {}", self.title),
+            identifier: self.column_id.clone(),
             state: AccessibilityState {
                 is_invalid: self.error.is_some(),
                 is_enabled: self.is_enabled,

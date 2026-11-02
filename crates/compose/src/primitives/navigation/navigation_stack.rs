@@ -91,13 +91,6 @@ pub struct NavigationStack<Route: Hash + Clone + PartialEq + Send + Sync + 'stat
     is_swiping: Option<cove_core::Signal<bool>>,
 }
 
-pub struct NavigationPages {
-    pub width: f32,
-    pub height: f32,
-    pub sign: f32,
-    pub forward: bool,
-}
-
 impl<Route: Hash + Clone + PartialEq + Send + Sync + 'static> NavigationStack<Route> {
     pub fn new(
         path: Binding<Vec<Route>>,

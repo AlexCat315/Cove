@@ -140,18 +140,14 @@ impl ChartFrame {
             0.0
         };
 
-        let mut left = 0.0_f32;
-        let mut right = 0.0_f32;
-        let mut top = 0.0_f32;
-        let mut bottom = 0.0_f32;
-        match orientation {
+        let (left, right, top, bottom) = match orientation {
             ChartOrientation::Vertical => {
-                left = if axis.y.is_labeled {
+                let left = if axis.y.is_labeled {
                     value_width + Self::LABEL_GAP
                 } else {
                     0.0
                 };
-                right = if has_secondary {
+                let right = if has_secondary {
                     secondary_width + Self::LABEL_GAP
                 } else {
                     0.0
@@ -162,8 +158,8 @@ impl ChartFrame {
                     0.0
                 };
                 let title = value_title_height.max(secondary_title_height);
-                top = if title > 0.0 { title + pad + 2.0 } else { pad };
-                bottom = (if has_categories {
+                let top = if title > 0.0 { title + pad + 2.0 } else { pad };
+                let bottom = (if has_categories {
                     line_height + 4.0
                 } else {
                     0.0
@@ -172,14 +168,15 @@ impl ChartFrame {
                 } else {
                     0.0
                 };
+                (left, right, top, bottom)
             }
             ChartOrientation::Horizontal => {
-                left = if has_categories {
+                let left = if has_categories {
                     category_width + Self::LABEL_GAP
                 } else {
                     0.0
                 };
-                bottom = (if axis.y.is_labeled {
+                let bottom = (if axis.y.is_labeled {
                     line_height + 4.0
                 } else {
                     0.0
@@ -193,13 +190,15 @@ impl ChartFrame {
                     0.0
                 };
                 let title = category_title_height.max(secondary_title_height);
-                top = (if has_secondary {
+                let top = (if has_secondary {
                     line_height / 2.0 + line_height + Self::LABEL_GAP
                 } else {
                     0.0
                 }) + if title > 0.0 { title + 2.0 } else { 0.0 };
+                // A horizontal chart has no secondary axis on the trailing edge.
+                (left, 0.0, top, bottom)
             }
-        }
+        };
         let left_inset = left.min(bounds.width * 0.4);
         let right_inset = right.min(bounds.width * 0.3);
         let top_inset = top.min(bounds.height * 0.35);

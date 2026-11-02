@@ -79,17 +79,26 @@ impl<Id: std::hash::Hash + PartialEq + Clone + 'static> Stepper<Id> {
         let connectors = self.items.len().saturating_sub(1) as f32 * 32.0;
         self.items.len() as f32 * budget + connectors
     }
+}
 
-    #[expect(dead_code, reason = "ported from Swift but not wired in yet")]
-    fn select(&self, id: &Id) {
-        if !self.enabled().contains(id) {
-            return;
-        }
-        if self.selection.get().as_ref() == Some(id) {
-            return;
-        }
-        self.selection.set(Some(id.clone()));
+/// Select `id` through the binding, honouring the controlled contract: a
+/// disabled step never becomes selectable, and re-tapping the current step is
+/// a no-op. Shared by the pointer and roving-keyboard paths.
+fn select_step<Id: PartialEq + Clone + 'static>(
+    enabled: &[Id],
+    selection: &Binding<Option<Id>>,
+    id: Id,
+) {
+    if !enabled.contains(&id) {
+        return;
     }
+    if selection.get().as_ref() == Some(&id) {
+        return;
+    }
+    selection.set(Some(id));
+}
+
+impl<Id: std::hash::Hash + PartialEq + Clone + 'static> Stepper<Id> {
 
     fn content(&self, vertical: bool) -> AnyView {
         let enabled = self.enabled();
@@ -117,11 +126,7 @@ impl<Id: std::hash::Hash + PartialEq + Clone + 'static> Stepper<Id> {
             enabled.clone(),
             move || selection_for_host.get(),
             move |id: Id| {
-                if enabled_for_host.contains(&id)
-                    && selection_for_select.get().as_ref() != Some(&id)
-                {
-                    selection_for_select.set(Some(id));
-                }
+                select_step(&enabled_for_host, &selection_for_select, id);
             },
             move |id: &Id| identity_for_host(id),
             AnyView::new(BoxView::new(
@@ -232,9 +237,7 @@ impl<Id: std::hash::Hash + PartialEq + Clone + 'static> Stepper<Id> {
         let button = Button::with_options(
             label,
             move || {
-                if enabled.contains(&id) && selection.get().as_ref() != Some(&id) {
-                    selection.set(Some(id.clone()));
-                }
+                select_step(&enabled, &selection, id.clone());
             },
             ButtonRole::Normal,
             is_enabled,

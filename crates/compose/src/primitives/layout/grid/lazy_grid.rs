@@ -603,7 +603,6 @@ struct LazyGridCell {
     x: f32,
     width: f32,
     height: f32,
-    #[expect(dead_code, reason = "ported from Swift but not wired in yet")]
     key: String,
     content: AnyView,
 }
@@ -613,7 +612,14 @@ impl PrimitiveView for LazyGridCell {
         node.set_is_hit_testable(false);
         node
     }
-    fn update_node(&self, _node: &cove_core::scene::Node) {}
+    fn update_node(&self, node: &cove_core::scene::Node) {
+        // The item identity survives windowing: a cell that scrolls out and
+        // back keeps the same name for the inspector and for tests.
+        node.set_attachment(
+            cove_composition::LayoutDebugAttachmentKey::DEBUG_NAME,
+            self.key.clone(),
+        );
+    }
     fn make_layout_node(&self) -> Option<LayoutNode> {
         let layout = LayoutNode::new();
         layout.set_position_type(cove_core::scene::PositionType::Absolute);

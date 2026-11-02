@@ -207,6 +207,7 @@ impl View for MarkdownTableView {
                 cell_views.push(AnyView::new(TableTextCell {
                     runs: content,
                     alignment: self.cell_alignment(column),
+                    on_open_link: self.on_open_link.clone(),
                 }));
             }
         }
@@ -253,6 +254,7 @@ crate::impl_primitive_view!(TableHeaderTint);
 struct TableTextCell {
     runs: Vec<crate::primitives::text::rich::run::RichTextRun>,
     alignment: TextAlignment,
+    on_open_link: Option<Rc<dyn Fn(&str)>>,
 }
 
 impl crate::PrimitiveView for TableTextCell {
@@ -282,10 +284,16 @@ impl crate::PrimitiveView for TableTextCell {
 
     fn children(&self, _node: &Node) -> Vec<AnyView> {
         // Real runs, so a cell keeps per-run bold, code and links.
+        let text = crate::primitives::text::rich::RichText::new(self.runs.clone());
+        let text = match &self.on_open_link {
+            Some(handler) => {
+                let handler = handler.clone();
+                text.on_open_link(move |link| handler(link))
+            }
+            None => text,
+        };
         vec![AnyView::new(
-            crate::primitives::text::rich::RichText::new(self.runs.clone())
-                .alignment(self.alignment)
-                .display_only(true),
+            text.alignment(self.alignment).display_only(true),
         )]
     }
 }

@@ -252,7 +252,6 @@ impl Timeline {
             .collect()
     }
 
-    #[expect(dead_code, reason = "ported from Swift but not wired in yet")]
     fn is_collapsed(&self, id: &str) -> bool {
         match &self.collapsed_groups {
             Some(binding) => binding.get().iter().any(|value| value == id),
@@ -264,30 +263,6 @@ impl Timeline {
         }
     }
 
-    #[expect(dead_code, reason = "ported from Swift but not wired in yet")]
-    fn toggle_collapsed(&self, id: &str) {
-        match &self.collapsed_groups {
-            Some(binding) => {
-                let mut next = binding.get();
-                if let Some(index) = next.iter().position(|value| value == id) {
-                    next.remove(index);
-                } else {
-                    next.push(id.to_string());
-                }
-                binding.set(next);
-            }
-            None => {
-                let mut local = self.local_collapsed.borrow_mut();
-                if let Some(index) = local.iter().position(|value| value == id) {
-                    local.remove(index);
-                } else {
-                    local.push(id.to_string());
-                }
-            }
-        }
-    }
-
-    #[expect(dead_code, reason = "ported from Swift but not wired in yet")]
     fn zoom_factor(&self) -> f32 {
         self.zoom
             .as_ref()
@@ -310,21 +285,12 @@ impl View for Timeline {
         if let Some(zoom) = zoom.clone() {
             column.push(zoom_controls(zoom));
         }
+        let factor = self.zoom_factor();
         for (group_index, group) in groups.iter().enumerate() {
             let is_last_group = group_index + 1 == group_count;
             let is_collapsed = !group.title.is_empty()
                 && group.is_collapsible
-                && match &collapsed_binding {
-                    Some(binding) => binding.get().iter().any(|value| value == &group.id),
-                    None => local_collapsed
-                        .borrow()
-                        .iter()
-                        .any(|value| value == &group.id),
-                };
-            let factor = zoom
-                .as_ref()
-                .map(|zoom| zoom.clamped(zoom.factor.get()))
-                .unwrap_or(1.0);
+                && self.is_collapsed(&group.id);
 
             let mut group_column: Vec<AnyView> = Vec::new();
             if !group.title.is_empty() {

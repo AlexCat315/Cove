@@ -45,6 +45,7 @@ impl Default for CarouselAutoplay {
 #[derive(Default)]
 pub struct CarouselAutoplaySession {
     user_paused: Cell<Option<bool>>,
+    reduced_motion: Cell<bool>,
     elapsed: Cell<f64>,
     is_hovered: Cell<bool>,
     page_index: Cell<Option<Int>>,
@@ -61,6 +62,19 @@ impl CarouselAutoplaySession {
     /// Before the viewer chooses, reduced motion means paused.
     pub fn is_paused(&self, reduced_motion: bool) -> bool {
         self.user_paused.get().unwrap_or(reduced_motion)
+    }
+
+    /// The live preference, so `toggle_paused` can resolve the default.
+    pub fn set_reduced_motion(&self, reduced_motion: bool) {
+        self.reduced_motion.set(reduced_motion);
+    }
+
+    /// Flips the viewer's choice against the current effective state; a
+    /// control built during a recomposition must not replay its captured
+    /// flag, which would make resuming impossible.
+    pub fn toggle_paused(&self) {
+        let paused = self.is_paused(self.reduced_motion.get());
+        self.set_paused(!paused);
     }
 
     pub fn set_paused(&self, paused: bool) {
@@ -155,6 +169,7 @@ impl PrimitiveView for CarouselAutoplayHost {
                 self.interval,
                 self.advance.clone(),
                 self.page.clone(),
+                node.prefers_reduced_motion(),
             );
         }
     }
@@ -169,6 +184,7 @@ struct CarouselClock {
     node: RefCell<Option<Node>>,
     session: RefCell<Option<Rc<CarouselAutoplaySession>>>,
     interval: Cell<f64>,
+    reduced_motion: Cell<bool>,
     advance: RefCell<Rc<dyn Fn()>>,
     page: RefCell<Rc<dyn Fn() -> Int>>,
     is_finished: Cell<bool>,
@@ -180,6 +196,7 @@ impl CarouselClock {
             node: RefCell::new(None),
             session: RefCell::new(None),
             interval: Cell::new(5.0),
+            reduced_motion: Cell::new(false),
             advance: RefCell::new(Rc::new(|| {})),
             page: RefCell::new(Rc::new(|| 0)),
             is_finished: Cell::new(true),
@@ -192,10 +209,12 @@ impl CarouselClock {
         interval: Option<f64>,
         advance: Rc<dyn Fn()>,
         page: Rc<dyn Fn() -> Int>,
+        reduced_motion: bool,
     ) {
         *self.session.borrow_mut() = Some(session);
         *self.advance.borrow_mut() = advance;
         *self.page.borrow_mut() = page;
+        self.reduced_motion.set(reduced_motion);
         let Some(interval) = interval else {
             Self::stop(self);
             return;
@@ -265,6 +284,9 @@ impl AnyAnimationController for CarouselClock {
             return;
         };
         session.observe((self.page.borrow())());
+        if session.is_paused(self.reduced_motion.get()) {
+            return;
+        }
         if session.is_hovered.get() || Self::contains_focus(&node) {
             return;
         }
@@ -291,35 +313,3 @@ impl AnyAnimationController for CarouselClock {
         self
     }
 }
-
-/// Reads the reduced-motion preference without adding a layout node.
-pub(crate) struct ReducedMotionReader {
-    content: Rc<dyn Fn(bool) -> AnyView>,
-}
-
-impl ReducedMotionReader {
-    pub fn new(content: impl Fn(bool) -> AnyView + 'static) -> Self {
-        Self {
-            content: Rc::new(content),
-        }
-    }
-}
-
-impl PrimitiveView for ReducedMotionReader {
-    fn make_node(&self) -> Node {
-        let node = Node::new();
-        node.set_is_hit_testable(false);
-        node
-    }
-
-    fn make_layout_node(&self) -> Option<LayoutNode> {
-        None
-    }
-
-    fn update_node(&self, _node: &Node) {}
-
-    fn children(&self, node: &Node) -> Vec<AnyView> {
-        vec![(self.content)(node.prefers_reduced_motion())]
-    }
-}
-impl_primitive_view!(ReducedMotionReader);

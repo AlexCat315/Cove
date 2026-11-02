@@ -104,7 +104,6 @@ impl<Id: PartialEq + Eq + std::hash::Hash + Clone + Send + Sync + 'static> Adapt
         }
     }
 
-    #[expect(dead_code, reason = "ported from Swift but not wired in yet")]
     fn set_collapsed(&self, value: bool) {
         match self.collapse.as_ref() {
             Some(binding) => {
@@ -132,17 +131,16 @@ impl<Id: PartialEq + Eq + std::hash::Hash + Clone + Send + Sync + 'static> Adapt
         let focus = self.focus.clone();
         let label = self.options.open_label.clone();
         let is_presented = self.presented();
-        let presentation = self.presentation.clone();
-        let local = self.local_presentation.clone();
+        let open = {
+            let snapshot = self.clone();
+            move || snapshot.set_presented(true)
+        };
         let button = SidebarToggle::new(label.clone(), is_presented, {
             let focus = focus.clone();
             let label = label.clone();
             move || {
                 focus.focus_opener(&label);
-                match presentation.as_ref() {
-                    Some(binding) => binding.set(true),
-                    None => local.set(true),
-                }
+                open();
             }
         });
         AnyView::new(SidebarTriggerHost::new(focus, AnyView::new(button)))
@@ -152,15 +150,14 @@ impl<Id: PartialEq + Eq + std::hash::Hash + Clone + Send + Sync + 'static> Adapt
         if !geometry.is_collapsed {
             return self.open_button();
         }
-        let collapse = self.collapse.clone();
-        let local = self.local_collapse.clone();
+        let expand = {
+            let snapshot = self.clone();
+            move || snapshot.set_collapsed(false)
+        };
         AnyView::new(SidebarToggle::new(
             self.options.expand_label.clone(),
             false,
-            move || match collapse.as_ref() {
-                Some(binding) => binding.set(false),
-                None => local.set(false),
-            },
+            expand,
         ))
     }
 
@@ -179,11 +176,13 @@ impl<Id: PartialEq + Eq + std::hash::Hash + Clone + Send + Sync + 'static> Adapt
             header_children.push(self.rail_button(geometry));
         }
         if is_modal {
-            let presentation = self.presentation.clone();
-            let local = self.local_presentation.clone();
             let title = self.title.clone();
             let focus = self.focus.clone();
             let open_label = self.options.open_label.clone();
+            let dismiss = {
+                let snapshot = self.clone();
+                move || snapshot.set_presented(false)
+            };
             header_children.push(AnyView::new(
                 BoxView::new(
                     FlexDirection::Row,
@@ -193,10 +192,7 @@ impl<Id: PartialEq + Eq + std::hash::Hash + Clone + Send + Sync + 'static> Adapt
                     8.0,
                     AnyView::new(TupleView::new(vec![
                         AnyView::new(SidebarToggle::new("Collapse navigation", true, move || {
-                            match presentation.as_ref() {
-                                Some(binding) => binding.set(false),
-                                None => local.set(false),
-                            }
+                            dismiss();
                             focus.focus_opener(&open_label);
                         })),
                         AnyView::new(AnyView::new(
@@ -211,8 +207,10 @@ impl<Id: PartialEq + Eq + std::hash::Hash + Clone + Send + Sync + 'static> Adapt
         // The top row: the application's identity with the collapse toggle at its
         // trailing edge, where the opener sits once the pane is a rail.
         if geometry.mode == SidebarMode::Expanded {
-            let collapse = self.collapse.clone();
-            let local = self.local_collapse.clone();
+            let collapse = {
+                let snapshot = self.clone();
+                move || snapshot.set_collapsed(true)
+            };
             header_children.push(AnyView::new(
                 BoxView::new(
                     FlexDirection::Row,
@@ -236,10 +234,7 @@ impl<Id: PartialEq + Eq + std::hash::Hash + Clone + Send + Sync + 'static> Adapt
                         AnyView::new(SidebarToggle::new(
                             self.options.collapse_label.clone(),
                             true,
-                            move || match collapse.as_ref() {
-                                Some(binding) => binding.set(true),
-                                None => local.set(true),
-                            },
+                            collapse,
                         )),
                     ])),
                 )
@@ -252,17 +247,16 @@ impl<Id: PartialEq + Eq + std::hash::Hash + Clone + Send + Sync + 'static> Adapt
 
         let selection = self.selection.clone();
         let sections = self.sections.clone();
-        let presentation_binding = self.presentation.clone();
-        let local_presentation = self.local_presentation.clone();
+        let dismiss = {
+            let snapshot = self.clone();
+            move || snapshot.set_presented(false)
+        };
         let mut sidebar = Sidebar::from_sections(selection, sections)
             .presentation(presentation)
             .minimum_row_height(row_height)
             .on_activate(move |_id: Id| {
                 if is_modal {
-                    match presentation_binding.as_ref() {
-                        Some(binding) => binding.set(false),
-                        None => local_presentation.set(false),
-                    }
+                    dismiss();
                 }
             })
             .header(AnyView::new(TupleView::new(header_children)))
@@ -630,15 +624,14 @@ impl<Id: PartialEq + Eq + std::hash::Hash + Clone + Send + Sync + 'static> Adapt
             AnyView::new(TupleView::new(vec![main, AnyView::new(handle_view), layer])),
         )));
 
-        let presentation = self.presentation.clone();
-        let local = self.local_presentation.clone();
+        let present = {
+            let snapshot = self.clone();
+            move || snapshot.set_presented(true)
+        };
         let swipe = HorizontalSwipe::new(
             move |direction: HorizontalSwipeDirection| {
                 if direction == HorizontalSwipeDirection::Right {
-                    match presentation.as_ref() {
-                        Some(binding) => binding.set(true),
-                        None => local.set(true),
-                    }
+                    present();
                 }
             },
             row,

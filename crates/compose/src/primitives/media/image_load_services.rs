@@ -54,6 +54,7 @@ pub struct ImageLoadRequest {
     pub pixel_width: u32,
     pub pixel_height: u32,
     pub policy: ImageLoadingPolicy,
+    pub retry_id: i32,
 }
 
 impl ImageLoadRequest {
@@ -63,6 +64,7 @@ impl ImageLoadRequest {
             pixel_width: pixel_width.clamp(1, 8192),
             pixel_height: pixel_height.clamp(1, 8192),
             policy: ImageLoadingPolicy::default(),
+            retry_id: 0,
         }
     }
 
@@ -82,8 +84,13 @@ impl ImageLoadRequest {
     pub fn cache_key(&self) -> Option<String> {
         ImageAssetRegistryHolder::current()?;
         self.url.as_ref().map(|url| {
+            let retry = if self.retry_id == 0 {
+                String::new()
+            } else {
+                format!("#retry-{}", self.retry_id)
+            };
             format!(
-                "{url}#{}x{}#aspect-thumbnail",
+                "{url}#{}x{}#aspect-thumbnail{retry}",
                 self.pixel_width, self.pixel_height
             )
         })

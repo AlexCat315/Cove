@@ -207,6 +207,10 @@ impl<Id: PartialEq + Clone + 'static> PrimitiveView for RovingFocusHost<Id> {
     fn make_node(&self) -> Node {
         let node = Node::new();
         node.set_is_hit_testable(false);
+        // Leaving the tree must not leave a focus request or a tab-stop query
+        // behind on the host node.
+        let lifetime: Rc<dyn NodeResource> = Rc::new(RovingFocusLifetime);
+        node.add_resource(lifetime);
         node
     }
 

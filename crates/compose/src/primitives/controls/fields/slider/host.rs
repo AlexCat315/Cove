@@ -51,23 +51,6 @@ impl SliderHost {
     pub fn clamped_value(&self, raw: f64) -> f64 {
         raw.min(self.range.1).max(self.range.0)
     }
-
-    /// Snap to the nearest step, if any, then clamp.
-    pub fn snap(&self, raw: f64) -> f64 {
-        let Some(step) = self.step.filter(|step| *step > 0.0) else {
-            return self.clamped_value(raw);
-        };
-        let low = self.range.0;
-        let count = ((raw - low) / step).round();
-        self.clamped_value(low + count * step)
-    }
-
-    #[expect(dead_code, reason = "ported from Swift but not wired in yet")]
-    fn increment(&self) -> f64 {
-        self.step
-            .filter(|step| step.is_finite() && *step > 0.0)
-            .unwrap_or((self.range.1 - self.range.0) / 100.0)
-    }
 }
 
 fn set_interaction(node: &Node, key: &str, value: bool) -> bool {

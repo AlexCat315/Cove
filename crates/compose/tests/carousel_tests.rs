@@ -12,17 +12,13 @@
 //!   rotation stops on the last page
 //! - reduced motion starts paused with a visible start control
 //!
-//! Named difference (reported as a production gap, not fixed here):
-//! `CarouselAutoplayHost` — the only thing that mounts a `CarouselClock` and
-//! registers it with the `AnimatorScheduler` — is exported from
-//! `primitives/layout/carousel/mod.rs:29` but never constructed. `Carousel::body`
-//! builds its subtree directly through `CarouselBodyHost`, so no clock ever
-//! exists and rotation cannot advance no matter how many ticks pass. The pause
-//! control still renders and still flips its own session flag, which is why the
-//! control half of the Swift suite is observable while the timing half is not.
-//! `rotation_never_advances_because_no_clock_mounts` pins the behaviour; the
-//! pause/resume/focus/reduced-motion cases assert the state machine that really
-//! exists.
+//! Named difference (resolved): the Rust port initially never constructed
+//! `CarouselAutoplayHost`, so no `CarouselClock` was registered and rotation
+//! could not advance. The carousel now mounts the host around its subtree;
+//! the timing half of the Swift suite is observable again, and the pause
+//! control toggles against the live session rather than its build-time flag.
+//! One gap remains: toggling pause does not recompose the subtree, so the
+//! control's label keeps its build-time text.
 
 use crate::support;
 
@@ -333,14 +329,14 @@ fn autoplay_advances_and_a_manual_change_restarts_the_interval() {
         tick(0.6, graph);
         assert_eq!(
             page.get(),
-            "page-0",
-            "documented gap: no autoplay clock mounts, so the interval never advances"
+            "page-1",
+            "crossing the interval advances one page"
         );
         tick(60.0, graph);
         assert_eq!(
             page.get(),
-            "page-0",
-            "documented gap: rotation never advances however long the clock runs"
+            "page-2",
+            "one advance per clock tick, however long the tick"
         );
 
         // The manual path still works, which is what the controls drive.
@@ -351,7 +347,7 @@ fn autoplay_advances_and_a_manual_change_restarts_the_interval() {
             &key(Scancode::ARROW_RIGHT), EventPhase::Target
         );
         settle(graph);
-        assert_eq!(page.get(), "page-1", "the manual change advances one page");
+        assert_eq!(page.get(), "page-0", "advancing past the last page wraps");
     });
 }
 
@@ -396,8 +392,8 @@ fn hover_and_the_pause_control_stop_rotation() {
         tick(2.1, graph);
         assert_eq!(
             page.get(),
-            "page-0",
-            "documented gap: leaving would resume rotation, but no clock is mounted"
+            "page-1",
+            "leaving resumes rotation, and the held interval fires once"
         );
 
         let pause = labelled(graph, "Pause automatic rotation").expect("the pause control mounts");
@@ -407,7 +403,7 @@ fn hover_and_the_pause_control_stop_rotation() {
             .expect("the pause control is actionable")();
         settle(graph);
         tick(5.0, graph);
-        assert_eq!(page.get(), "page-0", "the viewer paused rotation");
+        assert_eq!(page.get(), "page-1", "the viewer paused rotation");
         // The session flag flips, but nothing recomposes the subtree that
         // labels the control, so the visible label cannot change.
         assert!(
@@ -425,11 +421,16 @@ fn hover_and_the_pause_control_stop_rotation() {
             .expect("the pause control is actionable")();
         settle(graph);
         tick(2.1, graph);
+        assert_eq!(
+            page.get(),
+            "page-2",
+            "resuming advances again"
+        );
         tick(10.0, graph);
         assert_eq!(
             page.get(),
-            "page-0",
-            "documented gap: resuming cannot advance without a mounted clock"
+            "page-2",
+            "without wrapping, rotation stops on the last page"
         );
     });
 }
@@ -459,11 +460,12 @@ fn keyboard_focus_inside_the_carousel_pauses_rotation() {
             let paused_with_focus = page.get();
             focus.clear();
             tick(2.1, graph);
-            assert_eq!(
+            assert_ne!(
                 page.get(),
                 paused_with_focus,
-                "documented gap: clearing focus cannot resume a clock that never mounted"
+                "clearing focus resumes the mounted clock"
             );
+            assert_eq!(page.get(), "page-1", "rotation advanced one page");
         });
         FocusChainHolder::set_current(previous_focus);
     });
@@ -590,7 +592,7 @@ fn indicators_use_dots_up_to_eight_pages_and_a_count_beyond() {
 }
 
 #[test]
-fn rotation_never_advances_because_no_clock_mounts() {
+fn a_mounted_clock_advances_rotation_and_wraps() {
     with_scene(|graph, _, _| {
         let page = Rc::new(cove_core::State::new("page-0".to_string()));
         graph.install_view(
@@ -601,17 +603,16 @@ fn rotation_never_advances_because_no_clock_mounts() {
         );
         settle(graph);
 
-        assert_eq!(
-            AnimatorScheduler::current().active_count(),
-            0,
-            "documented gap: an autoplay carousel registers no animation controller"
+        assert!(
+            AnimatorScheduler::current().active_count() > 0,
+            "an autoplay carousel registers its rotation clock"
         );
 
-        tick(30.0, graph);
-        assert_eq!(
-            page.get(),
-            "page-0",
-            "documented gap: thirty seconds of ticking advances nothing"
-        );
+        tick(2.0, graph);
+        assert_eq!(page.get(), "page-1", "one interval advances one page");
+        tick(2.0, graph);
+        assert_eq!(page.get(), "page-2");
+        tick(2.0, graph);
+        assert_eq!(page.get(), "page-0", "rotation wraps past the last page");
     });
 }

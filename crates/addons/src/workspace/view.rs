@@ -30,8 +30,6 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 const TAB_PRESS_KEY: &str = "__workspace_tab_press";
-const FLOATING_DRAG_KEY: &str = "__workspace_floating_window_drag";
-const FLOATING_REDOCK_KEY: &str = "__workspace_floating_window_redock";
 pub(crate) const RESIZE_GEOMETRY_KEY: &str = "workspace.resize.geometry";
 const RAIL_THICKNESS: f32 = 40.0;
 
@@ -43,12 +41,6 @@ struct TabPressState {
     last_x: f32,
     last_y: f32,
     did_drag: bool,
-}
-
-struct FloatingDragState {
-    start_x: f32,
-    start_y: f32,
-    frame: super::sizing::WorkspaceRect,
 }
 
 /// Shared geometry for a splitter: which container measured it and how far the

@@ -15,7 +15,7 @@ use super::document::{
     MarkdownAlignment, MarkdownBlock, MarkdownList, MarkdownListItem, MarkdownTable,
 };
 
-/// Documents cached by source, so recomposition re-reads the same text.
+// Documents cached by source, so recomposition re-reads the same text.
 thread_local! {
     static CACHE: RefCell<HashMap<String, Vec<MarkdownBlock>>> = RefCell::new(HashMap::new());
 }
@@ -307,6 +307,19 @@ fn convert<'a>(events: impl Iterator<Item = Event<'a>>) -> Vec<MarkdownBlock> {
                     code = Some((language, String::new()));
                 }
                 Tag::FootnoteDefinition(_) => {}
+                // Inline formatting is not a block frame: forward it to the
+                // open inline sink so traits and link destinations survive.
+                Tag::Emphasis
+                | Tag::Strong
+                | Tag::Strikethrough
+                | Tag::Link { .. }
+                | Tag::Image { .. } => {
+                    match stack.last_mut() {
+                        Some(Frame::Heading { inline, .. }) => inline.start(tag),
+                        Some(Frame::Table(table)) => table.inline.start(tag),
+                        _ => inline.start(tag),
+                    }
+                }
                 _ => {}
             },
             Event::End(tag) => match tag {
@@ -398,6 +411,17 @@ fn convert<'a>(events: impl Iterator<Item = Event<'a>>) -> Vec<MarkdownBlock> {
                         );
                     }
                 }
+                TagEnd::Emphasis
+                | TagEnd::Strong
+                | TagEnd::Strikethrough
+                | TagEnd::Link
+                | TagEnd::Image => {
+                    match stack.last_mut() {
+                        Some(Frame::Heading { inline, .. }) => inline.end(tag),
+                        Some(Frame::Table(table)) => table.inline.end(tag),
+                        _ => inline.end(tag),
+                    }
+                }
                 _ => {}
             },
             Event::Text(text) => {
@@ -446,7 +470,6 @@ fn convert<'a>(events: impl Iterator<Item = Event<'a>>) -> Vec<MarkdownBlock> {
             Event::InlineMath(math) | Event::DisplayMath(math) => {
                 inline.push_traits(&math, RichTextTraits::CODE)
             }
-            Event::Start(_) | Event::End(_) => {}
         }
     }
     blocks

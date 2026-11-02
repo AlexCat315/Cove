@@ -463,3 +463,111 @@ fn production_loads_decode_off_the_ui_thread() {
         ImageAssetRegistryHolder::set_current(None);
     });
 }
+
+/// A bumped retry identity busts the cache and refetches; the same retry
+/// identity is served from the cache.
+#[test]
+fn retry_id_busts_the_cache_and_refetches() {
+    struct CountingTransport {
+        fetches: Mutex<usize>,
+    }
+    impl ImageDownloadTransport for CountingTransport {
+        fn fetch(
+            &self,
+            _url: &str,
+            _limit: usize,
+        ) -> Result<(Vec<u8>, Option<String>), AsyncImageError> {
+            *self.fetches.lock().unwrap() += 1;
+            let svg = br#"<svg xmlns="http://www.w3.org/2000/svg" width="8" height="8"><rect width="8" height="8" fill="red"/></svg>"#;
+            Ok((svg.to_vec(), Some("image/svg+xml".to_string())))
+        }
+    }
+    support::GlobalTestLock::locked(|| {
+        let registry = std::sync::Arc::new(ImageAssetRegistry::new(ImageCacheLimits::default()));
+        ImageAssetRegistryHolder::set_current(Some(registry));
+        let transport = std::sync::Arc::new(CountingTransport {
+            fetches: Mutex::new(0),
+        });
+        ImageDownloadTransportHolder::set(Some(transport.clone()));
+
+        let settle = |graph: &cove_composition::ViewGraph| {
+            for _ in 0..4 {
+                cove_core::work::wait_idle(std::time::Duration::from_secs(5));
+                cove_core::scene::drain_scene_invalidations();
+                graph.recomposer.commit_all();
+                graph.compute_layout(100.0, 100.0);
+            }
+        };
+        let record = || {
+            let phases: Rc<std::cell::RefCell<Vec<&'static str>>> = Rc::default();
+            let recorder = phases.clone();
+            let out: Rc<dyn Fn(AsyncImagePhase) -> AnyView> = Rc::new(move |phase| {
+                recorder.borrow_mut().push(match phase {
+                    AsyncImagePhase::Empty => "empty",
+                    AsyncImagePhase::Loading => "loading",
+                    AsyncImagePhase::Success(_) => "success",
+                    AsyncImagePhase::Failure(_) => "failure",
+                });
+                AnyView::new(cove_composition::EmptyView)
+            });
+            (phases, out)
+        };
+
+        let (phases_a, view_a) = record();
+        let graph_a = support::graph();
+        graph_a.install_view(
+            AnyView::new(
+                AsyncImage::new(Some(request("retry")), 24.0, 24.0, move |p| (view_a)(p))
+                    .retry_id(0),
+            ),
+            Default::default(),
+        );
+        graph_a.compute_layout(100.0, 100.0);
+        settle(&graph_a);
+        assert_eq!(phases_a.borrow().last(), Some(&"success"));
+        assert_eq!(*transport.fetches.lock().unwrap(), 1);
+
+        let (phases_b, view_b) = record();
+        let graph_b = support::graph();
+        graph_b.install_view(
+            AnyView::new(
+                AsyncImage::new(Some(request("retry")), 24.0, 24.0, move |p| (view_b)(p))
+                    .retry_id(1),
+            ),
+            Default::default(),
+        );
+        graph_b.compute_layout(100.0, 100.0);
+        settle(&graph_b);
+        assert_eq!(
+            phases_b.borrow().last(),
+            Some(&"success"),
+            "{:?}",
+            phases_b.borrow()
+        );
+        assert_eq!(
+            *transport.fetches.lock().unwrap(),
+            2,
+            "a bumped retry id busts the cache and refetches"
+        );
+
+        let (_phases_c, view_c) = record();
+        let graph_c = support::graph();
+        graph_c.install_view(
+            AnyView::new(
+                AsyncImage::new(Some(request("retry")), 24.0, 24.0, move |p| (view_c)(p))
+                    .retry_id(1),
+            ),
+            Default::default(),
+        );
+        graph_c.compute_layout(100.0, 100.0);
+        settle(&graph_c);
+        assert_eq!(
+            *transport.fetches.lock().unwrap(),
+            2,
+            "the same retry id is served from the cache"
+        );
+
+        ImageDownloadTransportHolder::set(None);
+        ImageAssetRegistryHolder::set_current(None);
+    });
+}

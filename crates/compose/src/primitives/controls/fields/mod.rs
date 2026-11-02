@@ -22,7 +22,7 @@ pub use wheel_picker::{WheelPicker, WheelPickerModel, WheelPickerOption};
 pub mod search_field;
 pub use search_field::SearchField;
 pub mod search_field_model;
-pub use search_field_model::{SearchAction, SearchFieldState, SearchKey, SearchKeyOutcome};
+pub use search_field_model::{SearchAction, SearchFieldState, SearchKey};
 pub mod time_input;
 pub use time_input::TimeInput;
 pub mod time_field;

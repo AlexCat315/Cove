@@ -181,11 +181,6 @@ impl AnchoredOverlayHost {
         self
     }
 
-    pub fn width(mut self, width: f32) -> Self {
-        self.width = Some(width);
-        self
-    }
-
     pub fn sizing_anchor(mut self, sizing_anchor: bool) -> Self {
         self.sizing_anchor = sizing_anchor;
         self
@@ -203,15 +198,6 @@ impl AnchoredOverlayHost {
 
     pub fn on_dismiss(mut self, handler: impl Fn() + 'static) -> Self {
         self.on_dismiss = Rc::new(handler);
-        self
-    }
-
-    pub fn key_handler(
-        mut self,
-        handler: impl Fn(&cove_platform::KeyEvent, cove_core::scene::EventPhase) -> EventResult
-        + 'static,
-    ) -> Self {
-        self.key_handler = Some(Rc::new(handler));
         self
     }
 }

@@ -15,18 +15,6 @@
 //! - Return chooses the highlighted suggestion, else submits
 //! - choosing suppresses the list so it does not immediately reopen
 
-/// Which key a `handle` call consumed.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-#[allow(dead_code)]
-pub enum SearchKeyOutcome {
-    /// The key was not ours; the field should process it normally.
-    Passthrough,
-    /// Redraw with the same text (the highlight moved or the list closed).
-    Redraw,
-    /// The text was replaced; callers holding a buffer must write it.
-    ReplaceText(&'static str),
-}
-
 /// Result of handling one key.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum SearchAction {

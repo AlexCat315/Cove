@@ -325,7 +325,7 @@ fn build_controls<Id: PartialEq + Eq + Clone + Send + Sync + 'static>(
             false,
             false,
             Some(if paused { "Play" } else { "Pause" }.to_string()),
-            move || toggle_rotation.set_paused(!paused),
+            move || toggle_rotation.toggle_paused(),
         )
         .button_style(ghost())
         .control_size(ControlSize::Mini)
@@ -471,6 +471,7 @@ fn build_subtree<Id: PartialEq + Eq + Clone + Send + Sync + 'static>(
 ) -> AnyView {
     let theme = theme_for_node(node);
     let reduced_motion = node.prefers_reduced_motion();
+    rotation.set_reduced_motion(reduced_motion);
     let paused = rotation.is_paused(reduced_motion);
     let viewport_index = actions.current_index();
 
@@ -556,12 +557,24 @@ impl<Id: PartialEq + Eq + Clone + Send + Sync + 'static> PrimitiveView for Carou
     fn update_node(&self, _node: &Node) {}
 
     fn children(&self, node: &Node) -> Vec<AnyView> {
-        vec![build_subtree(
+        let content = build_subtree(
             node,
             self.actions.clone(),
             self.rotation.clone(),
             self.config,
-        )]
+        );
+        // The clock lives beside the subtree: a `None` interval (no autoplay,
+        // disabled, nothing to advance) leaves it mounted but stopped, and a
+        // later recomposition that re-enables rotation restarts it.
+        let advance_actions = self.actions.clone();
+        let page_actions = self.actions.clone();
+        vec![AnyView::new(autoplay::CarouselAutoplayHost::new(
+            self.rotation.clone(),
+            running_interval(&self.config, &self.actions),
+            move || advance_actions.move_by(1),
+            move || page_actions.current_index() as i64,
+            content,
+        ))]
     }
 }
 impl<Id: PartialEq + Eq + Clone + Send + Sync + 'static> View for CarouselBodyHost<Id> {

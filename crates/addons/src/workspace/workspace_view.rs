@@ -2782,7 +2782,8 @@ impl cove_composition::ViewModifier for WorkspaceFloatingWindowModifier {
 }
 
 /// `_WorkspaceFloatingWindowDragModifier`: dragging the title band moves the
-/// window; releasing redocks it onto the center group.
+/// window; releasing over the center group's tab band redocks it onto that
+/// group, the same destination as the Attach button.
 fn install_floating_drag(
     node: &Node,
     window: &WorkspaceFloatingWindow,
@@ -2831,13 +2832,38 @@ fn install_floating_drag(
                     cove_core::scene::EventResult::Handled
                 }
                 cove_core::scene::PointerPhase::Up => {
+                    let state = pointer_node.attachment::<TabPressState>(FLOATING_DRAG_KEY);
                     pointer_node.remove_attachment(FLOATING_DRAG_KEY);
                     if let Some(capture) = PointerCaptureHolder::current()
                         && capture.target().as_ref() == Some(&pointer_node)
                     {
                         capture.release();
                     }
-                    let _ = (&pointer_window, &pointer_controller);
+                    let got_drag = state.as_ref().is_some_and(|state| state.did_drag);
+                    if got_drag && let Some(root) = drag::workspace_root(&pointer_node) {
+                        let center_id = WorkspaceTabGroupID::new("center");
+                        let band = {
+                            let controller = pointer_controller.borrow();
+                            controller
+                                .document()
+                                .groups
+                                .get(&center_id)
+                                .and_then(|group| drag::tab_band(group, &root))
+                        };
+                        let point = cove_core::Point { x: event.x, y: event.y };
+                        if band.is_some_and(|band| band.contains(point)) {
+                            pointer_controller
+                                .borrow_mut()
+                                .dispatch(WorkspaceCommand::RedockFloatingWindow {
+                                    window_id: pointer_window.id.clone(),
+                                    target: WorkspaceTarget::tab_group(
+                                        WorkspaceSlotID::center(),
+                                        center_id,
+                                        None,
+                                    ),
+                                });
+                        }
+                    }
                     cove_core::scene::EventResult::Handled
                 }
             }
@@ -2861,6 +2887,20 @@ fn install_floating_drag(
             let Some(state) = motion_node.attachment::<TabPressState>(FLOATING_DRAG_KEY) else {
                 return cove_core::scene::EventResult::Ignored;
             };
+            if !state.did_drag {
+                let dx = event.x - state.down_x;
+                let dy = event.y - state.down_y;
+                if dx.abs().max(dy.abs()) >= DRAG_THRESHOLD {
+                    motion_node.set_attachment(
+                        FLOATING_DRAG_KEY,
+                        TabPressState {
+                            down_x: state.down_x,
+                            down_y: state.down_y,
+                            did_drag: true,
+                        },
+                    );
+                }
+            }
             let next = super::sizing::WorkspaceRect::new(
                 motion_window.frame.x + event.x - state.down_x,
                 motion_window.frame.y + event.y - state.down_y,

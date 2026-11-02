@@ -709,35 +709,6 @@ impl ViewGraph {
 
     // MARK: - Internal
 
-    /// Ported from `ViewGraph.swift`'s `dropScope(for:)`. The Swift original is
-    /// also never called; kept so the two ports stay line-for-line comparable.
-    #[expect(dead_code)]
-    pub(crate) fn drop_scope(&self, anchor: &Node) {
-        if let Some(scope) = self.scopes.borrow_mut().remove(&anchor.id()) {
-            ViewScope::uninstall(&scope, self);
-        }
-    }
-
-    /// Remove a node's layout node from the layout tree and forget it. The
-    /// caller passes the LayoutNode parent because LayoutNode has no parent
-    /// lookup requirement; recursion follows the Node tree.
-    ///
-    /// Ported from `ViewGraph.swift`'s `forgetSubtreeLayout(_:parentLayout:)`,
-    /// which is likewise unused in the Swift original.
-    #[expect(dead_code)]
-    pub(crate) fn forget_subtree_layout(&self, node: &Node, parent_layout: Option<&LayoutNode>) {
-        let my_layout = self.layout_of.borrow_mut().remove(&node.id());
-        if let Some(layout) = &my_layout
-            && let Some(parent) = parent_layout
-        {
-            parent.remove_child(layout);
-        }
-        let next_parent = my_layout.as_ref().or(parent_layout);
-        for child in node.children() {
-            self.forget_subtree_layout(&child, next_parent);
-        }
-    }
-
     fn top_level_layouts(&self, node: &Node) -> Vec<LayoutNode> {
         if let Some(layout) = self.layout_of.borrow().get(&node.id()).cloned() {
             return vec![layout];

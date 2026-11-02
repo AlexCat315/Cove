@@ -142,8 +142,6 @@ struct ScrollbarDragState {
     pointer_start: f32,
     offset_start: f32,
     max_offset: f32,
-    #[expect(dead_code, reason = "ported from Swift but not wired in yet")]
-    track_start: f32,
     track_length: f32,
     thumb_length: f32,
 }
@@ -634,7 +632,6 @@ fn begin_scrollbar_drag(
             DragAxis::Horizontal => offset.x,
         },
         max_offset,
-        track_start: track_start(axis, track),
         track_length: track_length(axis, track),
         thumb_length: track_length(axis, thumb),
     })

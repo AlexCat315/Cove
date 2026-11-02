@@ -74,13 +74,31 @@ fn inline_runs() {
     );
     let plain = &paragraph[0];
     assert_eq!(
-        plain.text, "A bold both ",
-        "GAP: bold and nested italic lose their traits in the block parser, so both spans merge into the leading plain run"
+        plain.text, "A ",
+        "the plain lead-in ends where the strong span opens, got {paragraph:?}"
     );
     assert_eq!(
         plain.traits,
         RichTextTraits::from_raw(0),
-        "GAP: the strong and emphasis traits are dropped by `parse::convert`"
+        "the lead-in carries no traits"
+    );
+    let bold = paragraph
+        .iter()
+        .find(|run| run.text.contains("bold"))
+        .expect("the bold word survives as text");
+    assert_eq!(
+        bold.traits,
+        RichTextTraits::BOLD,
+        "the strong trait survives the block parser"
+    );
+    let both = paragraph
+        .iter()
+        .find(|run| run.text == "both")
+        .expect("the nested word survives");
+    assert_eq!(
+        both.traits,
+        RichTextTraits::BOLD.union(RichTextTraits::ITALIC),
+        "nested emphasis inside strong keeps both traits"
     );
     let struck = paragraph
         .iter()
@@ -88,12 +106,17 @@ fn inline_runs() {
         .expect("the struck word survives as text");
     assert_eq!(
         struck.traits,
-        RichTextTraits::from_raw(0),
-        "GAP: strikethrough is dropped by the block parser"
+        RichTextTraits::STRIKETHROUGH,
+        "strikethrough survives the block parser"
     );
-    assert!(
-        paragraph.iter().all(|run| run.link.is_none()),
-        "GAP: link destinations are dropped by the block parser, got {paragraph:?}"
+    let link = paragraph
+        .iter()
+        .find(|run| run.text.contains("site"))
+        .expect("the link label survives as text");
+    assert_eq!(
+        link.link.as_deref(),
+        Some("https://a.b"),
+        "the link destination survives the block parser"
     );
     assert!(
         !paragraph
@@ -380,6 +403,61 @@ fn table_columns() {
             );
         },
     );
+}
+
+#[test]
+fn heading_paragraph_and_table_links_report_opens() {
+    GlobalTestLock::locked(|| {
+        support::with_test_text_environment(|| {
+            let graph = support::graph();
+            let opened: Rc<RefCell<Vec<String>>> = Rc::default();
+            let sink = opened.clone();
+            let source = concat!(
+                "# [Title](https://example.com/title)\n\n",
+                "See [docs](https://example.com/docs).\n\n",
+                "| [cell](https://example.com/cell) |\n| ---- |\n| plain |\n",
+            );
+            graph.install_view(
+                AnyView::new(
+                    MarkdownView::new(source)
+                        .on_open_link(move |link| sink.borrow_mut().push(link.to_string())),
+                ),
+                Default::default(),
+            );
+            graph.compute_layout(320.0, 2000.0);
+            let collected = nodes(&graph);
+            let links: Vec<Node> = collected
+                .iter()
+                .filter(|node| role(node) == Some(AccessibilityRole::Link))
+                .cloned()
+                .collect();
+            assert_eq!(
+                links.len(),
+                3,
+                "heading, paragraph and table cells each expose a link anchor"
+            );
+            for node in &links {
+                node.accessibility_actions()
+                    .activate
+                    .as_ref()
+                    .expect("a link anchor with an opener is actionable")();
+            }
+            let urls = opened.borrow();
+            assert!(
+                urls.contains(&"https://example.com/title".to_string()),
+                "the heading link reports: {urls:?}"
+            );
+            assert!(
+                urls.contains(&"https://example.com/docs".to_string()),
+                "the paragraph link reports: {urls:?}"
+            );
+            assert!(
+                urls.contains(&"https://example.com/cell".to_string()),
+                "the table cell link reports: {urls:?}"
+            );
+            graph.install_view(AnyView::new(EmptyView), Default::default());
+        });
+    });
 }
 
 struct Document {
@@ -674,12 +752,7 @@ fn runs_parser_matches_blocks_paragraph() {
         "the inline entry point keeps the strong trait, got {inline:?}"
     );
     assert_eq!(
-        paragraph.len(),
-        1,
-        "GAP: the block parser flattens the same source into one plain run, got {paragraph:?}"
-    );
-    assert_eq!(
-        paragraph[0].text, "A bold word",
-        "GAP: the block parser keeps the words but loses the strong span"
+        paragraph, &inline,
+        "the block parser shapes the same runs as the inline entry point, got {paragraph:?}"
     );
 }

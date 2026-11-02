@@ -110,8 +110,8 @@ pub fn tab_frames(group: &WorkspaceTabGroup, rooted_at: &Node) -> Vec<(Workspace
 
 fn inset(rect: Rect, dx: f32, dy: f32) -> Rect {
     Rect::new(
-        rect.x - dx,
-        rect.y - dy,
+        rect.x + dx,
+        rect.y + dy,
         (rect.width - dx * 2.0).max(0.0),
         (rect.height - dy * 2.0).max(0.0),
     )

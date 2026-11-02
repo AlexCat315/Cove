@@ -206,25 +206,6 @@ impl PrimitiveView for CodeBlockCard {
 impl_primitive_view!(CodeBlockCard);
 impl_primitive_view!(MarkdownCodeBlockBody);
 
-/// Sunken card chrome and group semantics for one code block.
-#[expect(dead_code, reason = "ported from Swift but not wired in yet")]
-struct CodeBlockChrome;
-
-impl cove_composition::ViewModifier for CodeBlockChrome {
-    fn apply_node(&self, node: &Node) {
-        let theme = theme_for_node(node);
-        node.set_background_color(Some(theme.colors.surface_sunken));
-        node.set_corner_radius(10.0);
-        node.set_border_color(Some(theme.colors.border));
-        node.set_border_width(1.0);
-        node.set_clips_to_bounds(true);
-        node.set_accessibility(Some(AccessibilitySemantics {
-            role: AccessibilityRole::Group,
-            ..Default::default()
-        }));
-    }
-}
-
 /// Calls `on_reset` once `after` seconds have passed while `is_active`, used for
 /// short-lived confirmations such as "Copied".
 pub struct DelayedReset {

@@ -67,7 +67,7 @@ struct EstimatedState<Id: Ord + Clone> {
     rows: VariableRowIndex<Id>,
     window: VirtualWindow,
     previous_target: Option<usize>,
-    revision: u64,
+    width: f32,
 }
 
 /// Vertically scrolling stack whose row heights are measured as rows mount.
@@ -82,6 +82,8 @@ pub struct EstimatedVirtualStack<Id: Ord + Clone + 'static> {
     state: Rc<RefCell<EstimatedState<Id>>>,
     offset: cove_core::State<Point>,
     viewport: cove_core::State<ScrollViewport>,
+    /// Bumped by a new measurement so the next frame recomputes the window.
+    revision: cove_core::State<u64>,
 }
 
 impl<Id: Ord + Clone + 'static> EstimatedVirtualStack<Id> {
@@ -107,10 +109,11 @@ impl<Id: Ord + Clone + 'static> EstimatedVirtualStack<Id> {
                 rows: VariableRowIndex::new(),
                 window: VirtualWindow::default(),
                 previous_target: None,
-                revision: 0,
+                width: -1.0,
             })),
             offset: cove_core::State::new(Point::default()),
             viewport: cove_core::State::new(ScrollViewport::default()),
+            revision: cove_core::State::new(0),
         }
     }
 
@@ -138,24 +141,55 @@ impl<Id: Ord + Clone + 'static> EstimatedVirtualStack<Id> {
         self
     }
 
-    /// Rebuild the index from the current measurements.
-    pub fn synchronize(&self, width: f32, viewport: ScrollViewport) {
+    /// Rebuild the index from the current measurements. Heights were measured at
+    /// one width, so a width change drops them and the estimate takes over.
+    pub fn synchronize(&self, width: f32) {
         let mut state = self.state.borrow_mut();
+        if state.width != width {
+            state.metrics = EstimatedRowMetrics::new();
+            state.width = width;
+        }
         let heights: Vec<f32> = self
             .ids
             .iter()
             .map(|id| state.metrics.height_of(id, self.estimate))
             .collect();
         state.rows.replace(&self.ids, &heights, self.spacing);
-        state.revision = state.metrics.revision();
-        let _ = (width, viewport);
+    }
+
+    /// Each mounted row reports its laid-out height so the next window uses it.
+    fn measured_rows(&self) -> Rc<dyn Fn(&Id) -> AnyView> {
+        let state = self.state.clone();
+        let revision = self.revision.clone();
+        let row_content = self.row_content.clone();
+        Rc::new(move |id: &Id| {
+            let id = id.clone();
+            let content_id = id.clone();
+            let on_height: Rc<dyn Fn(f32)> = {
+                let state = state.clone();
+                let revision = revision.clone();
+                Rc::new(move |height: f32| {
+                    let changed = state.borrow_mut().metrics.record(id.clone(), height);
+                    if changed {
+                        revision.set(state.borrow().metrics.revision());
+                    }
+                })
+            };
+            AnyView::new(EstimatedRowHost {
+                on_height,
+                content: (row_content)(&content_id),
+            })
+        })
     }
 }
 
 impl<Id: Ord + Clone + 'static> View for EstimatedVirtualStack<Id> {
     fn body(&self, _cx: &Scope) -> AnyView {
         let viewport = self.viewport.get();
-        self.synchronize(viewport.size.width, viewport);
+        let _ = self.revision.get();
+        if viewport.size.width > 0.0 {
+            self.synchronize(viewport.size.width);
+        }
         let mut state = self.state.borrow_mut();
         let mut next_offset = state.window.offset.y as f64;
         if self.scroll_to_index.is_none() {
@@ -192,6 +226,7 @@ impl<Id: Ord + Clone + 'static> View for EstimatedVirtualStack<Id> {
         let offset = self.offset.get();
         let viewport_state = self.viewport.clone();
         let offset_state = self.offset.clone();
+        let measured = self.measured_rows();
         virtual_scroll(
             &rows,
             &self.ids,
@@ -200,7 +235,7 @@ impl<Id: Ord + Clone + 'static> View for EstimatedVirtualStack<Id> {
             self.overscan,
             self.preload,
             1,
-            &self.row_content,
+            &measured,
             Some(Rc::new(move |next: Point| {
                 if offset_state.get() != next {
                     offset_state.set(next);
@@ -214,13 +249,14 @@ impl<Id: Ord + Clone + 'static> View for EstimatedVirtualStack<Id> {
         )
     }
 
-    /// `body` reads `offset`, `viewport` from `State`, so the
+    /// `body` reads `offset`, `viewport` and `revision` from `State`, so the
     /// scope must declare those dependencies. Without this the writes never
     /// subscribe and the view keeps its first layout forever.
     fn dynamic_properties(&self) -> Vec<crate::DynamicField> {
         vec![
             crate::DynamicField::state("offset", &self.offset),
             crate::DynamicField::state("viewport", &self.viewport),
+            crate::DynamicField::state("revision", &self.revision),
         ]
     }
 }
@@ -247,9 +283,7 @@ impl PrimitiveView for EstimatedRowHost {
 
     fn update_node(&self, node: &Node) {
         let on_height = self.on_height.clone();
-        let weak = node.downgrade();
         node.set_layout_did_update(Some(Rc::new(move |owner: &Node| {
-            let _ = Node::upgrade(&weak);
             on_height(owner.frame().height);
         }) as cove_core::scene::LayoutUpdateHook));
     }

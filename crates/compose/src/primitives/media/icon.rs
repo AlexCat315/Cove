@@ -20,6 +20,18 @@ enum IconFill {
     Concrete(Color),
 }
 
+impl IconFill {
+    /// Concrete tint for this fill, or `None` when the icon inherits its
+    /// foreground.
+    fn resolved(&self, theme: &Theme) -> Option<Color> {
+        match self {
+            IconFill::Inherited => None,
+            IconFill::Semantic(reference) => Some(reference.resolve(theme)),
+            IconFill::Concrete(color) => Some(*color),
+        }
+    }
+}
+
 #[derive(Clone)]
 enum IconSize {
     Points(f32),
@@ -93,15 +105,6 @@ impl Icon {
             fill: IconFill::Semantic(color),
         }
     }
-
-    #[expect(dead_code, reason = "ported from Swift but not wired in yet")]
-    fn resolved_fill(&self, theme: &Theme) -> Option<Color> {
-        match &self.fill {
-            IconFill::Inherited => None,
-            IconFill::Semantic(reference) => Some(reference.resolve(theme)),
-            IconFill::Concrete(color) => Some(*color),
-        }
-    }
 }
 
 impl View for Icon {
@@ -130,10 +133,9 @@ impl View for Icon {
                 )
                 .content_mode(ImageContentMode::Fit)
                 .rendering_mode(ImageRenderingMode::AlphaMask);
-                let image = match &fill {
-                    IconFill::Inherited => image,
-                    IconFill::Semantic(reference) => image.foreground(reference.resolve(&theme)),
-                    IconFill::Concrete(color) => image.foreground(*color),
+                let image = match fill.resolved(&theme) {
+                    Some(color) => image.foreground(color),
+                    None => image,
                 };
                 // Keep layout slots/padding separate from the SVG's own size.
                 // A surrounding frame is a container, not a glyph resize.

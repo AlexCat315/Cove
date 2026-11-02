@@ -107,10 +107,14 @@ pub fn markdown_block(
     on_open_link: Option<Rc<dyn Fn(&str)>>,
 ) -> AnyView {
     match block {
-        MarkdownBlock::Paragraph(runs) => AnyView::new(ParagraphText { runs: runs.clone() }),
+        MarkdownBlock::Paragraph(runs) => AnyView::new(ParagraphText {
+            runs: runs.clone(),
+            on_open_link,
+        }),
         MarkdownBlock::Heading { level, runs } => AnyView::new(MarkdownHeading {
             level: *level,
             runs: runs.clone(),
+            on_open_link: on_open_link.clone(),
         }),
         MarkdownBlock::Quote(blocks) => AnyView::new(MarkdownQuote {
             blocks: blocks.clone(),
@@ -151,6 +155,7 @@ fn markdown_list_view(
 /// affect the whole paragraph preserved.
 struct ParagraphText {
     runs: Vec<RichTextRun>,
+    on_open_link: Option<Rc<dyn Fn(&str)>>,
 }
 
 impl PrimitiveView for ParagraphText {
@@ -168,19 +173,35 @@ impl PrimitiveView for ParagraphText {
 
     fn children(&self, _node: &Node) -> Vec<AnyView> {
         // Real runs, so inline bold, code and links survive.
-        vec![AnyView::new(
-            crate::primitives::text::rich::RichText::new(self.runs.clone())
-                .alignment(TextAlignment::Leading),
-        )]
+        let text = rich_text_with_links(self.runs.clone(), &self.on_open_link)
+            .alignment(TextAlignment::Leading);
+        vec![AnyView::new(text)]
     }
 }
 crate::impl_primitive_view!(ParagraphText);
+
+/// Plain runs with the viewer's link opener attached, so every block that
+/// renders runs — paragraph, heading, table cell — reports clicks.
+fn rich_text_with_links(
+    runs: Vec<RichTextRun>,
+    on_open_link: &Option<Rc<dyn Fn(&str)>>,
+) -> crate::primitives::text::rich::RichText {
+    let text = crate::primitives::text::rich::RichText::new(runs);
+    match on_open_link {
+        Some(handler) => {
+            let handler = handler.clone();
+            text.on_open_link(move |link| handler(link))
+        }
+        None => text,
+    }
+}
 
 /// A heading: its type token widens with level, and the top two levels rule off
 /// their section.
 struct MarkdownHeading {
     level: usize,
     runs: Vec<RichTextRun>,
+    on_open_link: Option<Rc<dyn Fn(&str)>>,
 }
 
 impl PrimitiveView for MarkdownHeading {
@@ -204,7 +225,7 @@ impl PrimitiveView for MarkdownHeading {
     fn children(&self, _node: &Node) -> Vec<AnyView> {
         let level = self.level;
         let mut column: Vec<AnyView> = vec![AnyView::new(
-            crate::primitives::text::rich::RichText::new(self.runs.clone())
+            rich_text_with_links(self.runs.clone(), &self.on_open_link)
                 .role(crate::primitives::text::rich::RichTextRole::Heading(level))
                 .semantic_font(crate::theme::SemanticFontRef::new(move |theme| {
                     heading_token(level, theme)
@@ -239,7 +260,7 @@ pub fn heading_token(level: usize, theme: &crate::theme::Theme) -> crate::theme:
                     .headline
                     .font
                     .with_weight(cove_core::FontWeight::Bold)
-                    .resized(size),
+                    .with_size(size),
                 (size * 1.3).round(),
                 typography.headline.letter_spacing,
             )
@@ -252,38 +273,11 @@ pub fn heading_token(level: usize, theme: &crate::theme::Theme) -> crate::theme:
                 typography.body.font.size()
             };
             crate::theme::TextStyleToken::new(
-                typography.body_strong.font.resized(size),
+                typography.body_strong.font.with_size(size),
                 typography.body.line_height + 2.0,
                 typography.body.letter_spacing,
             )
         }
-    }
-}
-
-trait ResizedFont {
-    fn resized(&self, size: f32) -> cove_core::Font;
-    fn with_weight(&self, weight: cove_core::FontWeight) -> cove_core::Font;
-}
-
-impl ResizedFont for cove_core::Font {
-    fn resized(&self, size: f32) -> cove_core::Font {
-        cove_core::Font::new(
-            size,
-            self.weight(),
-            self.design(),
-            self.family().map(str::to_string),
-            self.is_italic(),
-        )
-    }
-
-    fn with_weight(&self, weight: cove_core::FontWeight) -> cove_core::Font {
-        cove_core::Font::new(
-            self.size(),
-            weight,
-            self.design(),
-            self.family().map(str::to_string),
-            self.is_italic(),
-        )
     }
 }
 

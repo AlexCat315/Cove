@@ -3,7 +3,7 @@
 //! How a `SurfaceShadow` becomes geometry. Both node painters share this so the
 //! cheap-blur approximation and the rim geometry have exactly one
 //! implementation.
-use crate::{Color, DrawError, DrawList, LayeredShadow, Point, Rect, SurfaceShadow};
+use crate::{Color, DrawList, LayeredShadow, Point, Rect, SurfaceShadow};
 
 /// Distance between neighbouring rects in the stack. A quarter of a point is
 /// half a pixel on a 2x display, so the edges blend into each other instead of
@@ -327,11 +327,6 @@ fn bands_around(hole: Rect, outer: Rect) -> Vec<Rect> {
         .filter(|rect| rect.width > 0.0 && rect.height > 0.0)
         .collect()
 }
-
-/// Errors from shadow geometry are dropped: a full draw buffer already surfaces
-/// on the next primitive that fits, and a shadow must never abort a frame.
-#[allow(dead_code)]
-fn ignore(_: Result<(), DrawError>) {}
 
 #[cfg(test)]
 mod tests {

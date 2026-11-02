@@ -487,6 +487,29 @@ impl<Id: PartialEq + Eq + std::hash::Hash + Clone + Send + Sync + 'static> Primi
             .frame_size(self.icon_extent, self.icon_extent)
             .flex_with(0.0, 0.0, None),
         )];
+        // A branch keeps its disclosure marker in the rail, where there is no
+        // gutter lane for it.
+        if let Some(is_expanded) = self.is_expanded {
+            column.push(AnyView::new(
+                BoxView::new(
+                    FlexDirection::Row,
+                    Align::Center,
+                    Justify::Center,
+                    Wrap::NoWrap,
+                    0.0,
+                    AnyView::new(ButtonIcon::new(
+                        ButtonIconSource::resource(if is_expanded {
+                            crate::primitives::media::ui_icon_catalog::action::minus()
+                        } else {
+                            crate::primitives::media::ui_icon_catalog::action::plus()
+                        }),
+                        Some(10.0),
+                        Some(tint),
+                    )),
+                )
+                .flex_with(0.0, 0.0, None),
+            ));
+        }
         if self.shows_labels {
             column.push(AnyView::new(
                 Text::new(self.item.title.clone())
@@ -496,7 +519,6 @@ impl<Id: PartialEq + Eq + std::hash::Hash + Clone + Send + Sync + 'static> Primi
                     .semantic_foreground(crate::theme::SemanticColorRef::on_surface_variant()),
             ));
         }
-        let _ = self.is_expanded;
         vec![AnyView::new(
             BoxView::new(
                 FlexDirection::Column,

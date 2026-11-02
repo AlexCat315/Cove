@@ -27,6 +27,7 @@
 //! - a floating group renders above the workspace without changing regions
 //! - dragging a floating window moves only the floating frame
 //! - redocking a floating window returns the group to its workspace slot
+//! - releasing a dragged floating window over the center tab band redocks it
 //! - dragging a tab to a group edge creates an adjacent group
 //! - dragging a tab shows a drop indicator before release
 //! - the drag preview survives a host renaming the workspace
@@ -1500,6 +1501,38 @@ fn dragging_floating_window_moves_only_floating_frame() {
 }
 
 #[test]
+fn releasing_floating_window_over_the_center_tab_band_redocks_it() {
+    let mut rig = status_bar_rig(1000.0, 640.0);
+
+    rig.dispatch(WorkspaceCommand::FloatGroup {
+        group_id: WorkspaceTabGroupID::new("trailing"),
+        window_id: WorkspaceFloatingWindowID::new("inspector-window"),
+        frame: WorkspaceRect::new(120.0, 88.0, 360.0, 260.0),
+    });
+    let floating_before = rig.frame("workspace-floating-window-inspector-window");
+    let handle = Point {
+        x: floating_before.x + 40.0,
+        y: floating_before.y + 20.0,
+    };
+    // The title band owns the drag; releasing over the center group's tab
+    // strip redocks the window the same way the Attach button does.
+    rig.drag(handle, center_of(rig.frame("workspace-tab-viewport")));
+
+    assert!(
+        rig.document().floating_windows.is_empty(),
+        "releasing over the center tab band redocks the window"
+    );
+    assert_eq!(
+        rig.group_ids(WorkspaceSlotID::center()),
+        vec![
+            WorkspaceTabGroupID::new("center"),
+            WorkspaceTabGroupID::new("trailing")
+        ],
+        "the dragged group lands in the center slot"
+    );
+}
+
+#[test]
 fn redocking_floating_window_returns_group_to_workspace_slot() {
     let mut rig = status_bar_rig(1000.0, 640.0);
 
@@ -1508,8 +1541,8 @@ fn redocking_floating_window_returns_group_to_workspace_slot() {
         window_id: WorkspaceFloatingWindowID::new("inspector-window"),
         frame: WorkspaceRect::new(120.0, 88.0, 360.0, 260.0),
     });
-    // GAP: there is no `workspace-floating-redock-*` node; the title bar's
-    // Attach button dispatches exactly this command.
+    // The title bar's Attach button dispatches exactly this command; the
+    // release-over-the-tab-band gesture is covered separately.
     rig.dispatch(WorkspaceCommand::RedockFloatingWindow {
         window_id: WorkspaceFloatingWindowID::new("inspector-window"),
         target: WorkspaceTarget::tab_group(

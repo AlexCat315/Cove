@@ -4,15 +4,6 @@
 //! - unknown heights start from the estimate and converge to measured rows
 //! - metrics replace estimates by id and forget them when the width changes
 //! - a long reorderable list mounts only the viewport window
-//!
-//! Production gap (reported, not fixed): `EstimatedRowHost` exists in
-//! `primitives/layout/virtualization/estimated_stack.rs`, but
-//! `EstimatedVirtualStack::body` never wraps a row in it, so no measured height
-//! ever reaches `EstimatedRowMetrics::record`. A row keeps the estimate for its
-//! slot while its content lays out at its natural height, and the two disagree.
-//! `estimated_rows` asserts the windowing half (which works) and pins the drift
-//! that follows from the missing wiring, so it fails loudly once the host is
-//! connected.
 
 use crate::support;
 
@@ -79,12 +70,11 @@ fn estimated_rows() {
             first.frame().height
         );
 
-        // Swift asserts the second row starts at `first.absoluteFrame.maxY`
-        // (50). Without the measurement the index keeps the 30pt estimate, so
-        // the second row starts there and the two rows overlap.
+        // Each mounted row reports its laid-out height, so the index replaces the
+        // estimate and the next window spaces rows by the measurement.
         assert!(
-            (second.absolute_frame().y - 30.0).abs() < 1.0,
-            "GAP: rows are spaced by the estimate, not by the measured height (got {})",
+            (second.absolute_frame().y - 50.0).abs() < 1.0,
+            "the second row starts where the measured first row ends (got {})",
             second.absolute_frame().y
         );
     });

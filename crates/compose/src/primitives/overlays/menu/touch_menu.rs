@@ -21,11 +21,11 @@ use crate::modifiers::layout::{FlexExt, LayoutFrameExt, PaddingExt};
 use crate::modifiers::style::SemanticStyleViewExt;
 use crate::primitives::media::ui_icon_catalog;
 use crate::primitives::overlays::menu::{MenuEntry, MenuItemRole, MenuRowPresentation};
-use crate::primitives::overlays::roving_focus::{RovingFocusHost, SelectionNavigation};
+use crate::primitives::overlays::roving_focus::{RovingFocusHost, RovingItem, SelectionNavigation};
 use crate::primitives::text::Text;
 use crate::theme::styles::buttons::{ButtonRole, ButtonStyleViewExt};
 use crate::theme::{SemanticColorRef, SemanticFontRef};
-use crate::{AnyView, BoxView, TupleView, View};
+use crate::{AnyView, BoxView, TupleView, View, ViewExt};
 use cove_composition::LayoutDebugExt;
 use cove_composition::Scancode;
 use cove_core::Signal;
@@ -148,13 +148,17 @@ impl TouchMenu {
         let label = row.title.clone();
         let value = row.content.detail.clone().unwrap_or_default();
         let is_selected = row.is_selected;
+        let is_tab_stop = active == Some(row.id);
+        let identity: Rc<dyn Fn(&u64) -> u64> = Rc::new(|id: &u64| *id);
 
         AnyView::new(
-            AnyView::new(TouchMenuRow {
-                row: row.clone(),
-                is_tab_stop: active == Some(row.id),
-                activate,
-            })
+            AnyView::new(
+                TouchMenuRow {
+                    row: row.clone(),
+                    activate,
+                }
+                .modifier(RovingItem::new(row.id, is_tab_stop, identity)),
+            )
             .accessibility(move |semantics: &mut AccessibilitySemantics| {
                 semantics.role = role;
                 semantics.label = label.clone();
@@ -295,10 +299,10 @@ impl View for TouchMenu {
 }
 
 /// One actionable sheet row: icon, title/detail, and a trailing affordance.
+/// The roving focus host (via the `RovingItem` modifier in `entry_view`) owns
+/// the tab-stop policy, so the row itself carries no focus-state field.
 struct TouchMenuRow {
     row: MenuRowPresentation,
-    #[expect(dead_code, reason = "ported from Swift but not wired in yet")]
-    is_tab_stop: bool,
     activate: Rc<dyn Fn()>,
 }
 
