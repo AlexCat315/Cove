@@ -1,7 +1,9 @@
 //! Static text and divider primitives from `Primitives/Text/Text.swift`.
+use super::rich::text_selection::{TextSelectionChrome, TextSelectionScope};
+use super::text_document_layout::MeasuredTextLine;
 use crate::modifiers::style::{
-    LETTER_SPACING, TEXT_STYLE_SCALER, layout_text_style_font, layout_text_style_line_height,
-    text_style_font, text_style_letter_spacing, text_style_line_height,
+    FONT, LETTER_SPACING, LINE_HEIGHT, TEXT_STYLE_SCALER, inherited_layout_style, text_style_font,
+    text_style_letter_spacing, text_style_line_height,
 };
 use crate::theme::{TextScaler, TextStyleToken, theme_for_node};
 use crate::{PrimitiveView, impl_primitive_view};
@@ -80,19 +82,24 @@ impl Text {
         let scaler = layout
             .attachment::<TextScaler>(TEXT_STYLE_SCALER)
             .unwrap_or_default();
-        let font = layout_text_style_font(layout)
-            .or_else(|| token.as_ref().map(|token| scaler.scale_font(&token.font)))
-            .unwrap_or_else(|| environment.default_font.clone());
-        let line_height = layout_text_style_line_height(layout)
+        let authored_font = inherited_layout_style::<Font>(layout, FONT);
+        let font = scaler.scale_font(
+            authored_font
+                .as_ref()
+                .or_else(|| token.as_ref().map(|token| &token.font))
+                .unwrap_or(&environment.default_font),
+        );
+        let line_height = inherited_layout_style(layout, LINE_HEIGHT)
             .or_else(|| {
                 token
                     .as_ref()
-                    .map(|token| scaler.scale(token.line_height_for(Some(&font))))
+                    .map(|token| token.line_height_for(authored_font.as_ref()))
             })
+            .map(|height| scaler.scale(height))
             .unwrap_or_else(|| environment.resolved_line_height(&font, None));
-        let letter_spacing = layout
-            .attachment::<f32>(LETTER_SPACING)
-            .or_else(|| token.map(|token| scaler.scale(token.letter_spacing)))
+        let letter_spacing = inherited_layout_style(layout, LETTER_SPACING)
+            .or_else(|| token.map(|token| token.letter_spacing))
+            .map(|spacing| scaler.scale(spacing))
             .unwrap_or(0.0);
         TextMetrics {
             font,
@@ -113,6 +120,49 @@ impl Text {
             line_height,
             letter_spacing,
         }
+    }
+
+    fn update_selection(&self, node: &Node) {
+        let Some(handle) = node
+            .composition_value(&TextSelectionScope::key())
+            .filter(|_| !TextSelectionChrome::is_inside_control(node))
+        else {
+            if node.attachment::<bool>("__selectable_text") == Some(true) {
+                super::selection_input::disable(node);
+                node.remove_attachment("__selectable_text");
+            }
+            return;
+        };
+        let owner = node.downgrade();
+        let string = self.string.clone();
+        TextSelectionScope::register(
+            &handle.0,
+            node,
+            Rc::new(move || string.clone()),
+            Rc::new(move |point| {
+                let Some(node) = Node::upgrade(&owner) else {
+                    return 0;
+                };
+                let Some(layout) = node.layout_node() else {
+                    return 0;
+                };
+                let Some(entry) = layout.text_measure() else {
+                    return 0;
+                };
+                let padding = layout.resolved_padding();
+                let frame = node.absolute_frame();
+                let text = &entry.key.text;
+                let measured =
+                    MeasuredTextLine::new(text, text, &entry.result, entry.key.line_height);
+                let row = ((point.y - frame.y - padding.top) / entry.key.line_height) as usize;
+                let index = measured.character(row, point.x - frame.x - padding.left);
+                text.char_indices()
+                    .nth(index)
+                    .map_or(text.len(), |(offset, _)| offset)
+            }),
+        );
+        super::selection_input::install(node, &handle.0);
+        node.set_attachment("__selectable_text", true);
     }
 
     fn layout_result(
@@ -310,6 +360,7 @@ impl PrimitiveView for Text {
 
     fn update_node(&self, node: &Node) {
         crate::theme::sync_text_style_environment(node);
+        self.update_selection(node);
         if node.accessibility().is_none_or(|semantics| {
             semantics.role != AccessibilityRole::StaticText || semantics.label != self.string
         }) {
@@ -349,6 +400,36 @@ impl PrimitiveView for Text {
                 .or_else(|| node.inherited_foreground_color())
                 .unwrap_or_else(|| theme_for_node(&node).colors.on_surface)
                 .multiplied_alpha(node.opacity());
+            if let Some(scope) = node.composition_value(&TextSelectionScope::key())
+                && let Some(range) = scope.0.borrow_mut().range_for(&node)
+            {
+                let text = &snapshot.string;
+                let measured = MeasuredTextLine::new(text, text, &result, metrics.line_height);
+                let color = theme_for_node(&node)
+                    .colors
+                    .selection
+                    .multiplied_alpha(node.opacity());
+                for (index, line) in result.lines.iter().enumerate() {
+                    let start = range.start.max(line.start_cluster as usize);
+                    let end = range.end.min(line.end_cluster as usize);
+                    if start >= end {
+                        continue;
+                    }
+                    let (x1, _) =
+                        measured.caret(measured.display_character_index_for_byte(start), false);
+                    let (x2, _) =
+                        measured.caret(measured.display_character_index_for_byte(end), true);
+                    let _ = list.add_rect(
+                        cove_core::Rect::new(
+                            origin.x + padding.left + x1.min(x2),
+                            origin.y + padding.top + measured.rows[index].top_y,
+                            (x2 - x1).abs(),
+                            metrics.line_height,
+                        ),
+                        color,
+                    );
+                }
+            }
             let _ = list.add_text(
                 &result,
                 cove_core::Point::new(origin.x + padding.left, origin.y + padding.top),

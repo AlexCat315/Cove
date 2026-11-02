@@ -161,3 +161,51 @@ fn dashboard_text_updates_retained_glyph_colors_on_every_appearance_switch() {
 fn tree_text_updates_retained_glyph_colors_on_every_appearance_switch() {
     run(GalleryPage::Tree, "Tree");
 }
+
+#[test]
+fn theme_preview_reserves_space_for_the_lines_it_draws() {
+    for (width, scale) in [(1280.0, 1.0), (840.0, 2.0)] {
+        GalleryScene::run(
+            width,
+            900.0,
+            |_| {
+                AnyView::new(GalleryView::new(
+                    GalleryPage::Theme,
+                    Appearance::Light,
+                    scale,
+                ))
+            },
+            |scene| {
+                for prefix in ["Project settings", "A body role belongs", "changes saved"] {
+                    let node = scene
+                        .first(|node| {
+                            node.layout_node()
+                                .and_then(|layout| layout.text_inputs())
+                                .is_some_and(|inputs| inputs.text.starts_with(prefix))
+                        })
+                        .expect("preview text is mounted");
+                    node.draw().unwrap()(&mut DrawList::default(), Default::default());
+                    let painted = node.layout_node().unwrap().text_measure().unwrap();
+                    assert_eq!(painted.key.font.size(), 16.0 * scale as f32);
+                    let painted = painted.result;
+                    if prefix == "A body role belongs" {
+                        let field = scene.require_named("theme-preview-input").absolute_frame();
+                        assert!(
+                            node.absolute_frame().y + painted.total_height <= field.y,
+                            "the input overlaps the preview paragraph at {width}pt, {scale}x"
+                        );
+                    }
+                    assert!(
+                        painted.total_height <= node.frame().height + 0.01,
+                        "{prefix:?} paints {}pt in a {}pt frame at width {width}, scale {scale}",
+                        painted.total_height,
+                        node.frame().height
+                    );
+                    if width == 1280.0 && prefix != "A body role belongs" {
+                        assert_eq!(painted.lines.len(), 1, "{prefix:?} fits on one line");
+                    }
+                }
+            },
+        );
+    }
+}

@@ -941,12 +941,14 @@ impl View for TabsStory {
                     AnyView::new(StorySection::new(
                         "Mobile tab bar",
                         "Up to four touch destinations stay visible; with six the fourth slot follows the selection and the rest open from More. The bar reserves the bottom safe area.",
-                        AnyView::new(MobileTabBar::new(
-                            self.mobile_tabs(),
-                            self.mobile_selection.binding(),
-                            true,
-                        ))
-                        .debug_name("tabs-mobile"),
+                        AnyView::new(
+                            MobileTabBar::new(
+                                self.mobile_tabs(),
+                                self.mobile_selection.binding(),
+                                true,
+                            )
+                            .debug_name("tabs-mobile"),
+                        ),
                     )),
                     AnyView::new(caption),
                 ])),

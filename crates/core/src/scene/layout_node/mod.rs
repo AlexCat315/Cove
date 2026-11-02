@@ -531,6 +531,9 @@ impl LayoutNode {
             .attachments
             .insert(key.to_owned(), Rc::new(value));
     }
+    pub fn remove_attachment(&self, key: &str) {
+        self.data_mut().attachments.remove(key);
+    }
     pub fn text_measure(&self) -> Option<TextLayoutCacheEntry> {
         self.data().text_measure.clone()
     }

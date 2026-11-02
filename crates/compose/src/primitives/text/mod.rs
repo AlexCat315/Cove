@@ -3,6 +3,7 @@ pub mod code;
 pub mod markdown;
 pub mod rich;
 pub mod rope;
+mod selection_input;
 pub mod single_line;
 pub(crate) mod text;
 pub mod text_buffer;

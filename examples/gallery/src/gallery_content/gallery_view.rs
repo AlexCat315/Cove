@@ -31,6 +31,7 @@ use cove_ui_compose::primitives::layout::sidebar::{
 use cove_ui_compose::primitives::media::ui_icon_catalog as icons;
 use cove_ui_compose::primitives::overlays::portal::LayerRoot;
 use cove_ui_compose::primitives::text::Text;
+use cove_ui_compose::primitives::text::rich::text_selection::TextSelectionViewExt;
 use cove_ui_compose::primitives::text::text_buffer::TextBuffer;
 use cove_ui_compose::theme::styles::appearance_modifier::{Appearance, AppearanceViewExt};
 use cove_ui_compose::theme::styles::buttons::{
@@ -38,7 +39,7 @@ use cove_ui_compose::theme::styles::buttons::{
 };
 use cove_ui_compose::theme::styles::circular_appearance::ThemeTransition;
 use cove_ui_compose::theme::tokens::{SemanticColorRef, SemanticFontRef, SemanticStyleViewExt};
-use cove_ui_compose::theme::{TextScalerReader, theme_for_node};
+use cove_ui_compose::theme::{TextScalerReader, TextScalerViewExt, theme_for_node};
 
 use crate::gallery_content::catalog::{
     CowSize, GalleryCatalog, GalleryEntry, GalleryOptions, GalleryPage,
@@ -186,7 +187,7 @@ impl View for GalleryView {
             self.navigation_footer(),
             self.navigation_footer_compact(),
         ))
-        .content(content);
+        .content(content.text_selection(true));
         let shell = AnyView::new(navigation)
             .flex_with(1.0, 1.0, Some(0.0))
             .frame(None, None, None, Some(0.0), None, None)
@@ -441,10 +442,8 @@ impl View for GalleryPagePane {
                 move |inherited| {
                     erased(
                         AnyView::new(story.clone())
-                            .modifier(GalleryStoryFrame {
-                                inherited: inherited.factor(),
-                                authored: scale,
-                            })
+                            .modifier(GalleryStoryFrame)
+                            .text_scaler(inherited.multiplied(scale))
                             .debug_name(&format!("{}-{generation}", page.raw_value())),
                     )
                 }
@@ -519,10 +518,7 @@ impl cove_composition::ViewModifier for GalleryPageFrame {
     }
 }
 
-struct GalleryStoryFrame {
-    inherited: f32,
-    authored: f32,
-}
+struct GalleryStoryFrame;
 
 impl cove_composition::ViewModifier for GalleryStoryFrame {
     fn apply_layout(&self, layout: &LayoutNode) {
@@ -532,8 +528,6 @@ impl cove_composition::ViewModifier for GalleryStoryFrame {
         layout.set_padding(24.0, cove_core::scene::Edge::Right);
         layout.set_padding(24.0, cove_core::scene::Edge::Top);
         layout.set_padding(24.0, cove_core::scene::Edge::Bottom);
-        let scale = self.inherited * self.authored;
-        layout.set_attachment("cove.gallery.story.textScale", scale);
     }
 }
 

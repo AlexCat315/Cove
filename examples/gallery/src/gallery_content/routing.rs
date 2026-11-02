@@ -109,6 +109,30 @@ impl StoryDispatch {
                 Some(AnyView::new(stories::KeyCapStory::new(options)))
             }
             Self::Story(GalleryPage::Link) => Some(AnyView::new(stories::LinkStory::new(options))),
+            Self::Story(GalleryPage::SingleLineText) => {
+                Some(AnyView::new(stories::SingleLineTextStory::new(options)))
+            }
+            Self::Story(GalleryPage::CompletionPopover) => {
+                Some(AnyView::new(stories::CompletionPopoverStory::new(options)))
+            }
+            Self::Story(GalleryPage::RouteOutlet) => {
+                Some(AnyView::new(stories::RouteOutletStory::new(options)))
+            }
+            Self::Story(GalleryPage::ProgressValue) => {
+                Some(AnyView::new(stories::ProgressValueStory::new(options)))
+            }
+            Self::Story(GalleryPage::HorizontalSwipe) => {
+                Some(AnyView::new(stories::HorizontalSwipeStory::new(options)))
+            }
+            Self::Story(GalleryPage::EdgeAutoScroll) => {
+                Some(AnyView::new(stories::EdgeAutoScrollStory::new(options)))
+            }
+            Self::Story(GalleryPage::ScrollReveal) => {
+                Some(AnyView::new(stories::ScrollRevealStory::new(options)))
+            }
+            Self::Story(GalleryPage::ActionGroupLayout) => {
+                Some(AnyView::new(stories::ActionGroupLayoutStory::new(options)))
+            }
             Self::Story(GalleryPage::Timeline) => {
                 Some(AnyView::new(stories::TimelineStory::new(options)))
             }
@@ -415,6 +439,29 @@ impl StorySource {
             (GalleryPage::Timeline, "Data/DataStories.swift"),
             (GalleryPage::Toolbar, "Controls/ToolbarStory.swift"),
             (GalleryPage::Link, "Controls/ControlStories.swift"),
+            (GalleryPage::SingleLineText, "Text/SingleLineText.swift"),
+            (GalleryPage::CompletionPopover, "Controls/CompletionPopover.swift"),
+            (GalleryPage::RouteOutlet, "Navigation/RouteOutlet.swift"),
+            (
+                GalleryPage::ProgressValue,
+                "Feedback/FeedbackStories.swift",
+            ),
+            (
+                GalleryPage::HorizontalSwipe,
+                "Primitives/Interaction/HorizontalSwipe.swift",
+            ),
+            (
+                GalleryPage::EdgeAutoScroll,
+                "Primitives/Interaction/EdgeAutoScroll.swift",
+            ),
+            (
+                GalleryPage::ScrollReveal,
+                "Primitives/Layout/ScrollReveal.swift",
+            ),
+            (
+                GalleryPage::ActionGroupLayout,
+                "Layout/Responsive/ActionGroupLayout.swift",
+            ),
             (GalleryPage::StatusBar, "Layout/LayoutStories.swift"),
             (GalleryPage::Carousel, "Layout/LayoutStories.swift"),
             (GalleryPage::Skeleton, "Feedback/SkeletonStory.swift"),
@@ -440,7 +487,7 @@ mod checks {
     #[test]
     fn every_catalog_page_has_exactly_one_entry() {
         let entries = StorySource::entries();
-        assert_eq!(entries.len(), 98, "one row per catalog page");
+        assert_eq!(entries.len(), 106, "one row per catalog page");
         for entry in GalleryCatalog::entries() {
             assert!(
                 entries.iter().any(|(page, _)| *page == entry.page),
@@ -449,7 +496,7 @@ mod checks {
             );
         }
         let unique: std::collections::BTreeSet<_> = entries.iter().map(|(page, _)| *page).collect();
-        assert_eq!(unique.len(), 98, "no page appears twice");
+        assert_eq!(unique.len(), 106, "no page appears twice");
     }
 
     #[test]

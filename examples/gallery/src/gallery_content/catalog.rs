@@ -107,6 +107,14 @@ pub enum GalleryPage {
     ViewThatFits,
     RichText,
     Markdown,
+    SingleLineText,
+    CompletionPopover,
+    RouteOutlet,
+    ProgressValue,
+    HorizontalSwipe,
+    EdgeAutoScroll,
+    ScrollReveal,
+    ActionGroupLayout,
 }
 
 impl GalleryPage {
@@ -211,6 +219,14 @@ impl GalleryPage {
             Self::ViewThatFits => "viewThatFits",
             Self::RichText => "richText",
             Self::Markdown => "markdown",
+            Self::SingleLineText => "singleLineText",
+            Self::CompletionPopover => "completionPopover",
+            Self::RouteOutlet => "routeOutlet",
+            Self::ProgressValue => "progressValue",
+            Self::HorizontalSwipe => "horizontalSwipe",
+            Self::EdgeAutoScroll => "edgeAutoScroll",
+            Self::ScrollReveal => "scrollReveal",
+            Self::ActionGroupLayout => "actionGroupLayout",
         }
     }
 
@@ -850,6 +866,54 @@ impl GalleryCatalog {
                 "Navigation",
                 "Controlled workflow steps, independent outcomes, locked steps and keyboard navigation.",
             ),
+            GalleryEntry::new(
+                GalleryPage::SingleLineText,
+                "SingleLineText",
+                "Controls",
+                "Single-line fitting: measure, truncate and fold line breaks before layout.",
+            ),
+            GalleryEntry::new(
+                GalleryPage::CompletionPopover,
+                "CompletionPopover",
+                "Controls",
+                "Nonmodal completion list with a scrolling window that follows the highlight.",
+            ),
+            GalleryEntry::new(
+                GalleryPage::RouteOutlet,
+                "RouteOutlet",
+                "Navigation",
+                "A composition boundary that rebuilds its subtree for the selected route.",
+            ),
+            GalleryEntry::new(
+                GalleryPage::ProgressValue,
+                "ProgressValue",
+                "Feedback",
+                "The shared animated value behind the progress controls: repaint, never relayout.",
+            ),
+            GalleryEntry::new(
+                GalleryPage::HorizontalSwipe,
+                "HorizontalSwipe",
+                "Controls",
+                "A horizontal drag turns one page; taps inside still reach their button.",
+            ),
+            GalleryEntry::new(
+                GalleryPage::EdgeAutoScroll,
+                "EdgeAutoScroll",
+                "Data",
+                "Drag-while-scrolling near a viewport edge, with speed that grows quadratically.",
+            ),
+            GalleryEntry::new(
+                GalleryPage::ScrollReveal,
+                "ScrollReveal",
+                "Layout",
+                "The scroll delta that brings a row into view inside its scroll ancestor.",
+            ),
+            GalleryEntry::new(
+                GalleryPage::ActionGroupLayout,
+                "ActionGroupLayout",
+                "Layout",
+                "Action controls that stack as soon as their natural widths overflow.",
+            ),
         ]
     }
 
@@ -967,15 +1031,15 @@ mod checks {
     #[test]
     fn catalog_has_one_entry_per_page_in_swift_order() {
         let entries = GalleryCatalog::entries();
-        // `GalleryPage` declares 98 cases and the Swift catalog lists them all.
-        assert_eq!(entries.len(), 98);
+        // `GalleryPage` declares 106 cases and the catalog lists them all.
+        assert_eq!(entries.len(), 106);
         assert_eq!(
             entries
                 .iter()
                 .map(|entry| entry.page)
                 .collect::<BTreeSet<_>>()
                 .len(),
-            98,
+            106,
             "every page appears exactly once"
         );
         assert_eq!(entries[0].page, GalleryPage::Introduction);
@@ -1026,7 +1090,7 @@ mod checks {
         assert!(GalleryCatalog::search("zzzznotathing").is_empty());
         assert_eq!(
             GalleryCatalog::search("").len(),
-            98,
+            106,
             "an empty query matches everything"
         );
     }

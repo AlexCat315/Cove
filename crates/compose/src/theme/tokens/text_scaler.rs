@@ -107,11 +107,16 @@ pub fn sync_text_style_environment(node: &Node) {
         || layout.attachment::<super::TextStyleToken>(
             crate::theme::ThemeEnvironment::BODY_STYLE_ATTACHMENT,
         ) != body;
-    layout.set_attachment(TEXT_SCALER_ATTACHMENT, scaler);
-    layout.set_attachment(crate::theme::ThemeEnvironment::BODY_STYLE_ATTACHMENT, body);
-    if changed {
-        crate::modifiers::style::invalidate_text_measurements(&layout);
+    if !changed {
+        return;
     }
+    layout.set_attachment(TEXT_SCALER_ATTACHMENT, scaler);
+    if let Some(body) = body {
+        layout.set_attachment(crate::theme::ThemeEnvironment::BODY_STYLE_ATTACHMENT, body);
+    } else {
+        layout.remove_attachment(crate::theme::ThemeEnvironment::BODY_STYLE_ATTACHMENT);
+    }
+    crate::modifiers::style::invalidate_text_measurements(&layout);
 }
 
 /// For layout with explicit row heights, resolve the same scale as text.

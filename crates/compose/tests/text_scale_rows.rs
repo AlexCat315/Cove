@@ -19,9 +19,6 @@
 //!   its layout with `touch = false` and its mounted surface ignores the
 //!   `textScaler` modifier, so rows stay at 36pt at every scale and input
 //!   instead of Swift's `max(authored * scale, 44)`.
-//! - **GAP: lazy-grid rows scale but their text measure does not.** Rust
-//!   doubles the row heights and gaps, yet the cell's recorded text measure
-//!   stays at the base font size at 2x.
 //! - **GAP: grid cells report `y = 0`.** Row offsets are applied by the scroll
 //!   transform, not the cell frame, so Swift's absolute `minY`/`maxY`
 //!   assertions are replaced by mounted-range assertions.
@@ -304,8 +301,9 @@ fn collection_geometry_scales_once_and_retains_identity() {
                         })
                         .expect("the fixed cell keeps a text measure");
                     assert_eq!(
-                        remeasured, base_font,
-                        "GAP: fixed grid text measure stays at {base_font}pt at {value}x                          although row heights scale"
+                        remeasured,
+                        base_font * value,
+                        "fixed grid text should scale once at {value}x"
                     );
                     assert_eq!(
                         selection.get(),

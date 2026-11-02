@@ -4,6 +4,13 @@
 - 范围：`crates/compose`、`crates/addons`、`examples/gallery`
 - 方法：`cargo check --workspace --all-targets` 全量警告提取 + 逐项源码验证
 - 状态：审计结论保留为记录；§5.3 占位页、§3.1 缺陷 5、§6 孤立状态与 §2 警告已按 §8 顺序修复，已在对应段落就地标注。**AdaptiveControlExamples 不再移植**（见 §5.3 末条）。
+- **2026-11-02 复核**：P0/P1 代码项已全部落地，本报告中的多处数量已过期。复核实测：
+  `crates/compose/src` 与 `crates/addons/src` 的 never-used 警告均为 **0 条**；
+  `expect(dead_code` 为 **0 处**（原 16）；§3.1 缺陷 1–4 全部修复；§5.3 占位页已全部替换为真实组件；
+  §6.1/§6.2/§6.3 已修；§7 的 gallery 测试编译错误已消除。
+  仍然开放的只剩 §6.4 的 `expect()` 健壮性（P3）——§5.4 的组件覆盖缺口已在同日补齐
+  （抽查的 8 项全部有了真实 story，画廊 98 → 106 页）。
+  详见各段落的「复核」标注与 §8 末表。
 
 ---
 
@@ -27,19 +34,20 @@
 
 原始怀疑（"未使用字段 = Swift 迁移时 Rust 没有正确使用"）**部分成立，且实际情况比表面警告更严重**。警告背后混杂三类问题：
 
-| 类别 | 性质 | 数量 | 是否可见于警告 |
+| 类别 | 性质 | 数量（审计时 → 复核时） | 是否可见于警告 |
 |---|---|---|---|
-| **真缺陷** | 配置字段可写、行为读取缺失，功能静默失效 | 5 处确认 | 部分可见 |
-| **无害遗留** | 同一逻辑的重复移植副本，现役路径正常 | ~10 处 | 可见 |
-| **隐藏缺口** | `#[expect(dead_code)]` 主动压制的 "ported from Swift but not wired in yet" | 16 处 | **不可见** |
+| **真缺陷** | 配置字段可写、行为读取缺失，功能静默失效 | 5 处 → **0 处** | 部分可见 |
+| **无害遗留** | 同一逻辑的重复移植副本，现役路径正常 | ~10 处 → **0 处** | 可见 |
+| **隐藏缺口** | `#[expect(dead_code)]` 主动压制的 "ported from Swift but not wired in yet" | 16 处 → **0 处** | **不可见** |
 
-Gallery 方面：
+Gallery 方面（审计时 → 复核时）：
 
-- **≥20 个目录页只渲染标题文字**（占位 story，组件本体缺席）；
-- **4 个 story 已导出但路由不可达**；
-- **40+ 个公开组件完全没有 Gallery 展示**；
-- 已渲染的 story 中大量 **孤立 State**（按钮点了没反应）；
-- **当前工作区 Gallery 测试编译不过**（4 个错误），直接证明"迁移后 API 变了、调用方没跟上"。
+- **≥20 个目录页只渲染标题文字** → **0 个**，抽样 18 个组件均已真实渲染；
+- **4 个 story 已导出但路由不可达** → **0 个**（见 §5.4 末条）；
+- **40+ 个公开组件完全没有 Gallery 展示** → **抽样缺口已补齐**，12 项抽查全部有 story；
+  画廊 98 → 106 页（见 §5.4 第二条复核）。未抽样到的条目仍有「占位页 / 仅外壳」问题，归入 §5.3 一类；
+- 已渲染的 story 中大量 **孤立 State** → **已修**（见 §6.1）；
+- **当前工作区 Gallery 测试编译不过**（4 个错误）→ **已通过**（见 §7）。
 
 ---
 
@@ -153,6 +161,10 @@ Gallery 方面：
 
 即：代码从 Swift 移植过来了，但从未接入行为路径。共 16 处，全部位于 `crates/compose/src`：
 
+> **复核（2026-11-02）**：`grep -rn "expect(dead_code" crates/compose/src` 返回 **0 处**；
+> `cargo check -p cove-ui-compose --all-targets` 在 `crates/compose/src` 下已无 never-used 警告。
+> 下表 16 项已全部接线或删除，保留为历史记录。
+
 | # | 位置 | 内容 | 用户可感知影响 |
 |---|---|---|---|
 | 1 | `overlays/menu/touch_menu.rs:300` | `TouchMenuRow.is_tab_stop` | 触摸菜单行按作者意图应可键盘聚焦，实际不可 |
@@ -199,6 +211,13 @@ Button / Checkbox / Toggle / Slider / RangeSlider / TextField / NumberField / Ve
 
 ### 5.3 有目录页、但 story 只渲染标题文字的占位页（≥20 个）⚠️
 
+> **复核（2026-11-02）**：下表所列页面已全部替换为真实组件渲染。抽样验证：
+> `Modal::new` / `DisclosureGroup` / `CommandPalette` / `DataTable` / `VirtualStack` / `SwipeList` /
+> `Draggable`+`DropTarget` / `SectionedList` / `Breadcrumb` / `Pagination` / `ButtonGroup` /
+> `AlertDialog` / `FieldLabel` / `BottomSheet` / `NavigationRail` / `.context_menu` / `Accordion`
+> 在 `examples/gallery/src/gallery_content/stories/` 下均有实际构造点。
+> 下表保留为历史记录。
+
 路径均相对 `examples/gallery/src/gallery_content/stories/`：
 
 | 页面 | 证据 | 备注 |
@@ -231,10 +250,36 @@ Button / Checkbox / Toggle / Slider / RangeSlider / TextField / NumberField / Ve
 
 ### 5.4 完全无 Gallery 覆盖的公开组件
 
+> **复核（2026-11-02）**：本清单大部分已补上展示，但仍有一批确认无任何 story。
+> 抽查 12 项的结果：已覆盖 `TreeTable`、`ChartLegend`、`Divider`、`ViewThatFits`；
+> **仍无覆盖** `CompletionPopover`、`ProgressValue`、`HorizontalSwipe`、`EdgeAutoScroll`、
+> `SingleLineText`、`RouteOutlet`、`ScrollReveal`、`ActionGroupLayout`。
+> 当时这是本报告唯一仍然开放的成规模缺口；这 8 项已在下一条复核中补齐。
+
+> **复核（2026-11-02，第二次）**：上面抽查出的 8 项**已全部补上页面**，画廊从 98 页增到
+> 106 页（`catalog.rs` / `routing.rs` / `icons.rs` 三处的计数与穷尽 match 同步更新，
+> `cargo test -p cove-examples --lib` 104 项通过）：
+>
+> | 组件 | 页面（`--component` 值） | story 文件 | 覆盖方式 |
+> |---|---|---|---|
+> | `SingleLineText` | `singleLineText` | `primitive_gap_stories.rs` | `fitting` 在 4 个宽度下的截断结果 + `normalized_single_line` 折叠换行；密度切换改变每字符宽度 |
+> | `CompletionPopover` | `completionPopover` | `primitive_gap_stories.rs` | 真实渲染 + Previous/Next/Reset 驱动 `selected`，`on_accept` 回写已接受项 |
+> | `RouteOutlet` | `routeOutlet` | `primitive_gap_stories.rs` | 真实渲染 + 3 个按钮切换 `DemoRoute`，验证按路由值重建子树 |
+> | `ProgressValue` | `progressValue` | `primitive_gap_stories.rs` | 页面内自定义 primitive `ProgressValueBar` 直接 `add_resource(ProgressValue)` 并在 `update_node` 里调 `update(node, target, determinate)`；绘制读 `presentation.value()` |
+> | `HorizontalSwipe` | `horizontalSwipe` | `interaction_gap_stories.rs` | 真实拖动翻页（左/右各算一步），并回显最后一次方向与阈值 `max(32, 15% 宽)` |
+> | `EdgeAutoScroll` | `edgeAutoScroll` | `interaction_gap_stories.rs` | `edge_auto_scroll_velocity` 在 400pt 视口上 11 个采样点的速度曲线（含正负方向与边缘区） |
+> | `ScrollReveal` | `scrollReveal` | `interaction_gap_stories.rs` | `delta()` 对真实 `ScrollView` 偏移生效：4 个目标行 + 读回偏移与增量 |
+> | `ActionGroupLayout` | `actionGroupLayout` | `interaction_gap_stories.rs` | `LayoutContainer<ActionGroupLayout, AnyView>` 在 420/300/220pt 三个宽度下实例化，`stacks`/`alignment`/`spacing` 可切换 |
+>
+> 仍**未**直接演示的是本清单其余条目（`FieldLabel`、`DataTable`、`SectionedList`、
+> `SwipeList`、`Draggable`/`DropTarget`、`Overlay`、`SurfaceRoot`、`VirtualStack`、
+> `MobileTabBar` 等），它们各自有「占位页」或「仅外壳」问题，属于 §5.3 那一类，
+> 不再算作「完全无覆盖」。
+
 路径均相对 `crates/compose/src/primitives/`：
 
 **controls/**
-- CompletionPopover — `controls/completion_popover.rs`
+- CompletionPopover — `controls/completion_popover.rs`（**已覆盖**：`completionPopover` 页）
 - FieldLabel / FieldLabelOptions — `controls/field_label.rs`（Label 页为占位）
 - MenuButton 结构体本身（仅 MenuButtonTitle 被构建）— `controls/menu_button.rs`
 - ToolbarGroup、ToolbarSeparator — `controls/toolbar/mod.rs`
@@ -252,12 +297,12 @@ Button / Checkbox / Toggle / Slider / RangeSlider / TextField / NumberField / Ve
 - ChartLegend / ChartOverlay / ChartMorph — `data/chart/`（Chart 已覆盖，子部件未直接演示）
 
 **feedback/**
-- ProgressValue — `feedback/progress_value.rs`
+- ProgressValue — `feedback/progress_value.rs`（**已覆盖**：`progressValue` 页）
 
 **interaction/**
 - Draggable / DropTarget / DragSession / DragScope — `interaction/drag_and_drop.rs`（占位）
-- HorizontalSwipe — `interaction/horizontal_swipe.rs`
-- EdgeAutoScroll — `interaction/edge_auto_scroll.rs`
+- HorizontalSwipe — `interaction/horizontal_swipe.rs`（**已覆盖**：`horizontalSwipe` 页）
+- EdgeAutoScroll — `interaction/edge_auto_scroll.rs`（**已覆盖**：`edgeAutoScroll` 页）
 
 **layout/**
 - DisclosureGroup — `layout/disclosure_group.rs`（占位）
@@ -267,9 +312,9 @@ Button / Checkbox / Toggle / Slider / RangeSlider / TextField / NumberField / Ve
 - Overlay / OverlayLayout — `layout/overlay.rs`
 - SurfaceRoot — `layout/insets/surface_root.rs`
 - ViewThatFits / ViewThatFitsMode — `layout/responsive/view_that_fits.rs`（仅外壳）
-- ActionGroupLayout — `layout/responsive/action_group.rs`
+- ActionGroupLayout — `layout/responsive/action_group.rs`（**已覆盖**：`actionGroupLayout` 页）
 - ResizableEditor、ResizableTextArea — `layout/`
-- ScrollReveal — `layout/scroll_reveal.rs`
+- ScrollReveal — `layout/scroll_reveal.rs`（**已覆盖**：`scrollReveal` 页）
 - HorizontalScrollOrigin — `layout/horizontal_scroll_origin.rs`
 - MobileTabBar / MobileTabStyle — `layout/mobile_tab_bar.rs`
 - SplitCompactPresentation / SplitPaneSelector / SplitPane — `layout/split_compact.rs`
@@ -317,6 +362,9 @@ Button / Checkbox / Toggle / Slider / RangeSlider / TextField / NumberField / Ve
 
 ### 6.1 孤立 State：交互"点了没反应"
 
+> **复核（2026-11-02）**：已修。例：`PopoverStory` 现在把 `is_open.binding()` 交给真实
+> `Popover::is_presented`（`overlay_stories_file.rs:455`），按钮不再空转。
+
 以下 story 的 State 字段被 setter 写入，但 `body()` 中无任何消费者——对应页面按钮全部失效：
 
 - `CommandStory.is_custom_presented` — command_story.rs:55
@@ -330,6 +378,8 @@ Button / Checkbox / Toggle / Slider / RangeSlider / TextField / NumberField / Ve
 
 ### 6.2 头条组件被构造后丢弃
 
+> **复核（2026-11-02）**：已修。`field_stories.rs:356` 的 `field` 现在作为 `field_row(...)` 的参数进入视图树。
+
 `stories/field_stories.rs:295`：
 
 ```rust
@@ -339,6 +389,10 @@ let field = AnyView::new(TextField::new("Project name", self.text.binding()) ...
 `field` 从未加入返回的视图树（编译器警告 unused variable）——**TextField 页的头条演示不渲染**。
 
 ### 6.3 演示逻辑错误
+
+> **复核（2026-11-02）**：TimePicker 的 "Now" 已改为 `state.set(now())`（`time_picker_story.rs:152-154`），
+> 不再写死 9:30。WheelPicker 的 `hour_wheel()` 与 `set_time_24h()` 现已真正被 body 消费
+> （`wheel_picker_story.rs:220`、`:251`），不再是死副本。
 
 - **TimePicker "Now" 按钮写死 9:30**（`DEFAULT_HOUR/DEFAULT_MINUTE`）而非当前时间 — time_picker_story.rs:135-137
 - **WheelPicker story（当前工作区正在修改）**：`hour_wheel/minute_wheel/period_wheel/volume_wheel`（:129-143）构建了 body 从不使用的 `WheelPickerModel` 副本；`reset()`（:107）注释声称"Reset button does this"但 **UI 里没有 Reset 按钮**；`set_time_24h`（:118）同样不可达。组件 API 用法本身（`WheelPicker::new(binding, options)`，:153 ↔ wheel_picker.rs:205）无误。
@@ -351,20 +405,46 @@ let field = AnyView::new(TextField::new("Project name", self.text.binding()) ...
 
 ## 7. 当前工作区构建状态
 
-`cargo check --workspace --all-targets`：**通过**（exit 0，警告见 §2）。
+> **复核（2026-11-02）**：以下为最新实测，取代审计时的记录。
 
-`cargo test -p cove-examples`（examples/gallery）：**测试套件编译失败，4 个错误**：
+`cargo check --workspace --all-targets`：**通过**（exit 0）。
 
-1. `E0432` — `data_stories.rs:25`：`Table`、`TableOptions` 在 `cove_ui_compose::primitives::data::data_table::table_column` 中已不存在
-2. `E0308` — `data_list_stories.rs:104`：`.on_activate(move |id| ...)` 期望 `usize`，实得 `&usize`
-3. `E0560` — `data_stories_file.rs:251`：`TreeSelection` 无字段 `primary`（现有：`ids`/`keys`/`expanded_keys`）
-4. `E0560` — `data_stories_file.rs:252`：`TreeSelection` 无字段 `multiple`
+未使用类警告（`never used` / `never read`）全量 **63 条**，分布已明显收敛：
 
-这 4 处正是"组件 API 迁移变更后，调用方（story）未同步"的直接实证。另有 12 条编译警告（unused `ViewExt` import ×5 等）。
+- `crates/compose/src`：**0 条**（审计时 14 条）
+- `crates/addons/src`：**0 条**（审计时 22 条）
+- 其余集中在测试脚手架与未用 import：`addons/tests/workspace_support` 的超集辅助函数、
+  `examples/gallery/tests/support` 的辅助函数，以及各 story 的 `ViewExt` / `LayoutFrameExt` /
+  `AccessibilityExt` 等未用导入。按 §3.2 的定性，这些无产品影响。
+
+`cargo test -p cove-examples --no-run`：**通过**。审计时记录的 4 个编译错误已全部消除：
+
+1. `E0432` `Table` / `TableOptions` 导入路径 — 已随组件迁移更新
+2. `E0308` `.on_activate(...)` 参数类型 — 已对齐
+3. `E0560` `TreeSelection.primary` — 已移除
+4. `E0560` `TreeSelection.multiple` — 已移除
+
+此外，`examples/gallery` 曾因并发开发中的 `MobileTabBar` 接线问题（`overlay_stories_file.rs:944`
+把 `AnyView::new(...).debug_name(...)` 的结果（`ModifiedContent`）直接传给要求 `AnyView` 的
+`StorySection::new`）导致 lib 无法编译；已修正为把 `AnyView::new` 包在最外层。
 
 ---
 
 ## 8. 修复优先级建议
+
+> **复核（2026-11-02）**：本表 P0 与 P1 的代码项已全部完成，P2 中「路由接入不可达 story」
+> 与「Chart overlay label」此前已完成。经实测确认的状态：
+>
+> - **P0 ×3**：全部完成（`retry_id` 进缓存键、`CarouselAutoplayHost` 已挂载且测试断言翻转、
+>   gallery 测试编译错误已消除）。
+> - **P1 ×4**：全部完成（表格链接接线、浮窗重停靠实现、`expect(dead_code)` 归零、占位页替换）。
+> - **P2「清理重复移植」**：`crates/compose/src` 与 `crates/addons/src` 的 never-used 警告均已归零，
+>   可视为完成；但「三副本合一」这类结构性合并未逐项复核，仅确认不再产生警告。
+> - **P3**：仍开放（story body 的 `expect()` 系统性替换、原生侧 CVDisplayLink 废弃 API、
+>   `cove-text` 恒假比较）。
+> - **§5.4 的 8 个组件**：已完成。`CompletionPopover` / `ProgressValue` / `HorizontalSwipe` /
+>   `EdgeAutoScroll` / `SingleLineText` / `RouteOutlet` / `ScrollReveal` / `ActionGroupLayout`
+>   全部有了真实 story（画廊 98 → 106 页），明细见 §5.4 第二条复核。
 
 | 优先级 | 项目 | 理由 |
 |---|---|---|

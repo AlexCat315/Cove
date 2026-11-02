@@ -325,11 +325,14 @@ pub fn invalidate_text_style(node: &Node) {
     }
 }
 
-fn raw_font_on_layout(layout: &LayoutNode) -> Option<Font> {
+pub(crate) fn inherited_layout_style<T: Clone + 'static>(
+    layout: &LayoutNode,
+    key: &str,
+) -> Option<T> {
     let mut cursor = Some(layout.clone());
     while let Some(current) = cursor {
-        if let Some(font) = current.attachment::<Font>(FONT) {
-            return Some(font);
+        if let Some(value) = current.attachment::<T>(key) {
+            return Some(value);
         }
         cursor = current.parent();
     }
@@ -341,32 +344,17 @@ fn raw_scaler(layout: &LayoutNode) -> TextScaler {
         .unwrap_or_default()
 }
 pub fn layout_text_style_font(layout: &LayoutNode) -> Option<Font> {
-    raw_font_on_layout(layout).map(|font| raw_scaler(layout).scale_font(&font))
+    inherited_layout_style(layout, FONT).map(|font| raw_scaler(layout).scale_font(&font))
 }
 pub fn layout_text_style_line_height(layout: &LayoutNode) -> Option<f32> {
-    let mut cursor = Some(layout.clone());
-    while let Some(current) = cursor {
-        if let Some(value) = current.attachment::<f32>(LINE_HEIGHT) {
-            return Some(raw_scaler(&current).scale(value));
-        }
-        cursor = current.parent();
-    }
-    None
+    inherited_layout_style(layout, LINE_HEIGHT).map(|value| raw_scaler(layout).scale(value))
 }
 
 pub fn apply_system_text_scale(layout: &LayoutNode, scale: TextScale) {
-    let mut changed = false;
-    if let Some(token) =
-        layout.attachment::<TextStyleToken>(crate::theme::ThemeEnvironment::BODY_STYLE_ATTACHMENT)
-    {
-        let resolved = TextScaler::identity().applying_system_scale(scale.clone());
-        layout.set_attachment(crate::modifiers::style::TEXT_STYLE_SCALER, resolved.clone());
-        layout.set_attachment(FONT, resolved.scale_font(&token.font));
-        layout.set_attachment(LINE_HEIGHT, resolved.scale(token.line_height));
-        layout.set_attachment(LETTER_SPACING, resolved.scale(token.letter_spacing));
-        changed = true;
-    }
-    if changed {
+    let scaler = raw_scaler(layout);
+    let resolved = scaler.applying_system_scale(scale);
+    if scaler != resolved {
+        layout.set_attachment(crate::modifiers::style::TEXT_STYLE_SCALER, resolved);
         layout.mark_dirty();
     }
 }

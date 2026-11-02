@@ -107,6 +107,14 @@ impl GalleryPage {
             Self::AppBar => icons::navigation::arrow_up(),
             Self::Link => icons::action::link(),
             Self::StatusBar => icons::action::minus(),
+            Self::SingleLineText => icons::text::type_(),
+            Self::CompletionPopover => icons::text::list(),
+            Self::RouteOutlet => icons::navigation::corner_down_right(),
+            Self::ProgressValue => icons::action::target(),
+            Self::HorizontalSwipe => icons::editor::repeat_(),
+            Self::EdgeAutoScroll => icons::data::timer(),
+            Self::ScrollReveal => icons::navigation::circle_arrow_down(),
+            Self::ActionGroupLayout => icons::layout::outdent(),
         }
     }
 }

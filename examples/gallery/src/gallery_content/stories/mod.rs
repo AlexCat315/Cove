@@ -19,6 +19,8 @@ pub mod data_list_stories;
 pub mod data_stories_file;
 pub mod data_table_story;
 pub mod feedback;
+pub mod interaction_gap_stories;
+pub mod primitive_gap_stories;
 pub mod field_stories;
 pub mod image_story;
 pub mod intrinsic_fitting;
@@ -68,6 +70,12 @@ pub use data_stories_file::{
 };
 pub use data_table_story::DataTableStory;
 pub use feedback::{AlertStory, BadgeStory, EmptyStory, ProgressStory, StorySection};
+pub use primitive_gap_stories::{
+    CompletionPopoverStory, DemoRoute, ProgressValueStory, RouteOutletStory, SingleLineTextStory,
+};
+pub use interaction_gap_stories::{
+    ActionGroupLayoutStory, EdgeAutoScrollStory, HorizontalSwipeStory, ScrollRevealStory,
+};
 pub use field_stories::{
     AssetRefStory, ColorFieldStory, JsonFieldStory, NumberFieldStory, RangeSliderStory,
     SearchFieldStory, SelectStory, SliderStory, TextAreaStory, TextFieldStory, Vec3FieldStory,
