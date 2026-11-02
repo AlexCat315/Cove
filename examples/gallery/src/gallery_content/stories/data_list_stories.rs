@@ -6,22 +6,24 @@
 
 use cove_composition::Scope;
 use cove_core::State;
+use cove_core::scene::{Align, FlexDirection, Justify, Wrap};
 use cove_ui_compose::modifiers::layout::LayoutFrameExt;
 use cove_ui_compose::primitives::controls::fields::slider::Slider;
 use cove_ui_compose::primitives::data::lists::{
     CollectionSelection, List, ListRow, ListRowOptions, ReorderableList,
 };
 use cove_ui_compose::primitives::data::{
-    PropertyGrid, PropertyGridRow, PropertyGridSection, Timeline, TimelineEvent, TimelineSpacing,
-    TimelineZoom,
+    PropertyGrid, PropertyGridRow, PropertyGridSection, Timeline, TimelineEvent, TimelineGroup,
+    TimelineSpacing, TimelineZoom,
 };
 use cove_ui_compose::primitives::interaction::scrollbar::{Scrollbar, ScrollbarAxis};
+use cove_ui_compose::primitives::feedback::StatusTone;
 use cove_ui_compose::primitives::text::Text;
 use cove_ui_compose::primitives::text::text_buffer::TextBuffer;
 use cove_ui_compose::primitives::text::text_field::TextField;
 use cove_ui_compose::theme::SemanticFontRef;
 use cove_ui_compose::theme::tokens::{SemanticColorRef, SemanticStyleViewExt};
-use cove_ui_compose::{AnyView, LayoutDebugExt, TupleView, View};
+use cove_ui_compose::{AnyView, BoxView, LayoutDebugExt, TupleView, View};
 
 use super::feedback::StorySection;
 use crate::gallery_content::catalog::GalleryOptions;
@@ -419,15 +421,65 @@ impl View for TimelineStory {
                 .frame_width(180.0)
                 .debug_name("timeline-zoom"),
         );
-        AnyView::new(StorySection::new(
-            "Events",
-            "Spacing is proportional to the gap between dates. The slider scales the whole track without reordering events.",
-            AnyView::new(TupleView::new(vec![
-                timeline,
-                zoom,
-                caption(self.readout()),
-            ])),
-        ))
+        let grouped = AnyView::new(
+            Timeline::groups(vec![
+                TimelineGroup::new(
+                    "Today",
+                    vec![
+                        TimelineEvent::new("Review requested")
+                            .id("review")
+                            .date(Self::START + 10_800.0)
+                            .tone(StatusTone::Warning),
+                        TimelineEvent::new("Checks passed")
+                            .id("checks")
+                            .date(Self::START + 14_400.0)
+                            .tone(StatusTone::Success),
+                    ],
+                )
+                .id("today")
+                .is_collapsible(true),
+                TimelineGroup::new(
+                    "Yesterday",
+                    vec![
+                        TimelineEvent::new("Build failed")
+                            .id("failed")
+                            .date(Self::START + 1_800.0)
+                            .tone(StatusTone::Danger),
+                    ],
+                )
+                .id("yesterday")
+                .is_collapsible(true),
+            ])
+            .frame_width(420.0)
+            .debug_name("timeline-grouped"),
+        );
+
+        AnyView::new(
+            BoxView::new(
+                FlexDirection::Column,
+                Align::Stretch,
+                Justify::FlexStart,
+                Wrap::NoWrap,
+                24.0,
+                AnyView::new(TupleView::new(vec![
+                    AnyView::new(StorySection::new(
+                        "Event sequence",
+                        "Spacing is proportional to the gap between dates. The slider scales the whole track without reordering events.",
+                        AnyView::new(TupleView::new(vec![
+                            timeline,
+                            zoom,
+                            caption(self.readout()),
+                        ])),
+                    )),
+                    AnyView::new(StorySection::new(
+                        "Groups, collapse and zoom",
+                        "Groups keep their own headings and outcomes; collapsing a group hides its events without touching the others.",
+                        grouped,
+                    )),
+                ])),
+            )
+            .debug_name("timeline-story"),
+        )
     }
 
     fn tag(&self) -> &'static str {

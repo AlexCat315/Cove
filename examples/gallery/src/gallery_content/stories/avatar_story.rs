@@ -14,9 +14,10 @@ use cove_ui_compose::modifiers::style::SemanticStyleViewExt;
 use cove_ui_compose::primitives::controls::fields::Slider;
 use cove_ui_compose::primitives::data::avatar::{
     Avatar, AvatarGroup, AvatarGroupGeometry, AvatarGroupOptions, AvatarMemberList, AvatarOverflow,
-    AvatarStatus,
+    AvatarShape, AvatarStatus,
 };
 use cove_ui_compose::primitives::text::Text;
+use cove_ui_compose::theme::ControlSize;
 use cove_ui_compose::theme::tokens::SemanticColorRef;
 use cove_ui_compose::{AnyView, BoxView, LayoutDebugExt, TupleView, View, ViewExt};
 
@@ -245,6 +246,42 @@ impl View for AvatarStory {
                     "Presence & members",
                     "Status sits on the outline at the logical bottom-trailing corner, uses a distinct shape per state and is read with the name. The overflow marker opens the member list.",
                     status_row,
+                )),
+                AnyView::new(StorySection::new(
+                    "Sizes & shapes",
+                    "Named control sizes and the three shapes share one geometry, so a rounded square keeps its radius at every diameter.",
+                    AnyView::new(BoxView::new(
+                        FlexDirection::Row,
+                        Align::Center,
+                        Justify::FlexStart,
+                        Wrap::Wrap,
+                        16.0,
+                        AnyView::new(TupleView::new({
+                            let mut tiles: Vec<AnyView> = ControlSize::ALL
+                                .iter()
+                                .map(|size| {
+                                    let size = *size;
+                                    AnyView::new(
+                                        Avatar::new("Ada Lovelace").configure(move |appearance| {
+                                            appearance.size = Some(size);
+                                        }),
+                                    )
+                                })
+                                .collect();
+                            for shape in [
+                                AvatarShape::Circle,
+                                AvatarShape::RoundedRectangle(10.0),
+                                AvatarShape::Square,
+                            ] {
+                                tiles.push(AnyView::new(
+                                    Avatar::new("Ada Lovelace").configure(move |appearance| {
+                                        appearance.shape = shape.clone();
+                                    }),
+                                ));
+                            }
+                            tiles
+                        })),
+                    )),
                 )),
                 AnyView::new(
                     Text::new(format!("Selected member: {}", self.selected_member()))

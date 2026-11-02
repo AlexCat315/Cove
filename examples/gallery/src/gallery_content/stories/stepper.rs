@@ -227,6 +227,21 @@ impl View for StepperStory {
                         "Up/Down follow the vertical axis. The status glyph and text describe the outcome without relying on color.",
                         vertical,
                     )),
+                    AnyView::new(StorySection::new(
+                        "No steps",
+                        "An empty workflow renders nothing and takes no keyboard stop instead of collapsing the layout.",
+                        AnyView::new(
+                            Stepper::new(Vec::<StepperItem<String>>::new(), {
+                                Binding::new(|| None, |_| {})
+                            })
+                            .options(StepperOptions {
+                                is_enabled: enabled,
+                                ..StepperOptions::default()
+                            })
+                            .frame_width(360.0)
+                            .debug_name("stepper-empty"),
+                        ),
+                    )),
                 ])),
             )
             .flex(0.0)

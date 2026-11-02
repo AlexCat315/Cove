@@ -111,11 +111,38 @@ impl View for PanelStory {
             .frame_size(320.0, 220.0)
             .debug_name("panel-control"),
         );
-        AnyView::new(StorySection::new(
-            "Titled surface",
-            "The header keeps its title and accessory on one line. An active panel draws the accent border.",
-            AnyView::new(TupleView::new(vec![panel, caption(self.readout())])),
-        ))
+        let long = AnyView::new(
+            Panel::new(
+                "Selection inspector with a title long enough to need truncation",
+                AnyView::new(card("Selection", "Nothing selected", 120.0)),
+            )
+            .active(false)
+            .frame_size(320.0, 220.0)
+            .debug_name("panel-long-title"),
+        );
+
+        AnyView::new(
+            BoxView::new(
+                FlexDirection::Column,
+                Align::Stretch,
+                Justify::FlexStart,
+                Wrap::NoWrap,
+                24.0,
+                AnyView::new(TupleView::new(vec![
+                    AnyView::new(StorySection::new(
+                        "Panel slots",
+                        "The header keeps its title and accessory on one line. An active panel draws the accent border.",
+                        AnyView::new(TupleView::new(vec![panel, caption(self.readout())])),
+                    )),
+                    AnyView::new(StorySection::new(
+                        "Long titles",
+                        "A long title truncates before the accessory, which keeps its full size.",
+                        long,
+                    )),
+                ])),
+            )
+            .debug_name("panel-story"),
+        )
     }
 
     fn tag(&self) -> &'static str {
@@ -176,11 +203,53 @@ impl View for SplitViewStory {
             .frame_size(420.0, 160.0)
             .debug_name("split-control"),
         );
-        AnyView::new(StorySection::new(
-            "Resizable split",
-            "Drag the divider or focus it and use the arrow keys. The fraction stays inside its authored bounds.",
-            AnyView::new(TupleView::new(vec![split, caption(self.readout())])),
-        ))
+        let proportional = AnyView::new(
+            SplitView::new(
+                SplitAxis::Horizontal,
+                0.35,
+                AnyView::new(card("Sidebar", "35%", 140.0)),
+                AnyView::new(card("Content", "65%", 140.0)),
+            )
+            .spacing(0.0)
+            .divider_thickness(0.0)
+            .frame_size(420.0, 140.0)
+            .debug_name("split-proportional"),
+        );
+        let vertical = AnyView::new(
+            SplitView::new(
+                SplitAxis::Vertical,
+                0.5,
+                AnyView::new(card("Top", "50%", 90.0)),
+                AnyView::new(card("Bottom", "50%", 90.0)),
+            )
+            .spacing(0.0)
+            .divider_thickness(0.0)
+            .frame_size(320.0, 180.0)
+            .debug_name("split-vertical"),
+        );
+
+        AnyView::new(
+            BoxView::new(
+                FlexDirection::Column,
+                Align::Stretch,
+                Justify::FlexStart,
+                Wrap::NoWrap,
+                24.0,
+                AnyView::new(TupleView::new(vec![
+                    AnyView::new(StorySection::new(
+                        "Proportional split",
+                        "A fixed fraction divides the pane with no divider and no drag target.",
+                        AnyView::new(TupleView::new(vec![proportional, vertical])),
+                    )),
+                    AnyView::new(StorySection::new(
+                        "Resizable and compact split",
+                        "Drag the divider or focus it and use the arrow keys. The fraction stays inside its authored bounds.",
+                        AnyView::new(TupleView::new(vec![split, caption(self.readout())])),
+                    )),
+                ])),
+            )
+            .debug_name("split-story"),
+        )
     }
 
     fn tag(&self) -> &'static str {
@@ -294,6 +363,7 @@ impl View for BoundedScrollStory {
 pub struct ZStackStory {
     pub options: GalleryOptions,
     alignment: State<usize>,
+    hits: State<u32>,
 }
 
 impl ZStackStory {
@@ -308,7 +378,12 @@ impl ZStackStory {
         Self {
             options,
             alignment: State::new(1),
+            hits: State::new(0),
         }
+    }
+
+    pub fn hits(&self) -> u32 {
+        self.hits.get()
     }
 
     pub fn alignment_index(&self) -> usize {
@@ -349,15 +424,56 @@ impl View for ZStackStory {
                 },
             ))
         };
-        AnyView::new(StorySection::new(
-            "Layers",
-            "Children are drawn in order and aligned inside the stack's bounds. The stack measures to its largest child.",
-            AnyView::new(TupleView::new(vec![
-                stack,
-                button,
-                caption(self.readout()),
-            ])),
-        ))
+        let hits = self.hits.clone();
+        let hit_target = AnyView::new(
+            ZStack::new(
+                Alignment::Center,
+                AnyView::new(TupleView::new(vec![
+                    AnyView::new(
+                        AnyView::new(card("Backdrop", "240 × 120", 120.0)).frame_width(240.0),
+                    ),
+                    AnyView::new(
+                        cove_ui_compose::primitives::controls::Button::title("Tap target", move || {
+                            hits.update(|count| *count += 1)
+                        })
+                        .enabled(self.options.is_enabled),
+                    ),
+                ])),
+            )
+            .frame_size(240.0, 120.0)
+            .debug_name("zstack-hit-testing"),
+        );
+        let hit_readout = format!("{} taps reached the front layer", self.hits.get());
+
+        AnyView::new(
+            BoxView::new(
+                FlexDirection::Column,
+                Align::Stretch,
+                Justify::FlexStart,
+                Wrap::NoWrap,
+                24.0,
+                AnyView::new(TupleView::new(vec![
+                    AnyView::new(StorySection::new(
+                        "Layered content",
+                        "Children are drawn in order and aligned inside the stack's bounds. The stack measures to its largest child.",
+                        AnyView::new(TupleView::new(vec![
+                            stack,
+                            button,
+                            caption(self.readout()),
+                        ])),
+                    )),
+                    AnyView::new(StorySection::new(
+                        "Hit testing",
+                        "Only the topmost child under the pointer takes the press; background layers stay inert.",
+                        AnyView::new(TupleView::new(vec![
+                            hit_target,
+                            caption(hit_readout),
+                        ])),
+                    )),
+                ])),
+            )
+            .debug_name("zstack-story"),
+        )
     }
 
     fn tag(&self) -> &'static str {
@@ -365,7 +481,7 @@ impl View for ZStackStory {
     }
 
     fn dynamic_properties(&self) -> Vec<cove_composition::DynamicField> {
-        cove_composition::dynamic_fields!(self; alignment)
+        cove_composition::dynamic_fields!(self; alignment, hits)
     }
 }
 

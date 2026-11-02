@@ -16,6 +16,9 @@ use cove_core::{Binding, State};
 use cove_ui_compose::modifiers::layout::LayoutFrameExt;
 use cove_ui_compose::modifiers::style::SemanticStyleViewExt;
 use cove_ui_compose::primitives::controls::Button;
+use cove_ui_compose::primitives::controls::tag::{Tag, TagVariant};
+use cove_ui_compose::primitives::feedback::StatusTone;
+use cove_ui_compose::primitives::media::ui_icon_catalog as icons;
 use cove_ui_compose::primitives::layout::accordion::{Accordion, AccordionItem};
 use cove_ui_compose::primitives::layout::navigation_components::{
     BreadcrumbItem, PaginationItem, PaginationModel,
@@ -393,6 +396,51 @@ impl View for ButtonGroupStory {
     }
 }
 
+/// One static chip in a tone and variant.
+fn tone_tag(tone: StatusTone, variant: TagVariant) -> AnyView {
+    let title = match tone {
+        StatusTone::Neutral => "Neutral",
+        StatusTone::Info => "Info",
+        StatusTone::Success => "Success",
+        StatusTone::Warning => "Warning",
+        StatusTone::Danger => "Danger",
+    };
+    AnyView::new(
+        Tag::new(title)
+            .configure(move |tag| {
+                tag.tone = tone;
+                tag.variant = variant;
+            })
+            .debug_name("tag-variant"),
+    )
+}
+
+/// Dot- and glyph-bearing chips.
+fn glyph_row() -> AnyView {
+    AnyView::new(BoxView::new(
+        FlexDirection::Row,
+        Align::Center,
+        Justify::FlexStart,
+        Wrap::Wrap,
+        8.0,
+        AnyView::new(TupleView::new(vec![
+            AnyView::new(Tag::new("Live").configure(|tag| {
+                tag.tone = StatusTone::Success;
+                tag.shows_dot = true;
+            })),
+            AnyView::new(Tag::new("Synced").configure(|tag| {
+                tag.tone = StatusTone::Info;
+                tag.icon = Some(icons::status::check_circle());
+            })),
+            AnyView::new(Tag::new("At risk").configure(|tag| {
+                tag.tone = StatusTone::Warning;
+                tag.icon = Some(icons::status::alert_triangle());
+            })),
+            AnyView::new(Tag::new("Archived").configure(|tag| tag.is_enabled = false)),
+        ])),
+    ))
+}
+
 /// `TagStory`: removable tags whose remove controls are independent.
 pub struct TagStory {
     pub options: GalleryOptions,
@@ -463,16 +511,129 @@ impl TagStory {
     }
 }
 
+impl TagStory {
+    /// One removable tag wired to the story's list.
+    fn removable_tag(&self, title: &str) -> AnyView {
+        let story = TagStory {
+            options: self.options.clone(),
+            tags: self.tags.clone(),
+            filters: self.filters.clone(),
+        };
+        let owned = title.to_owned();
+        let enabled = self.options.is_enabled;
+        AnyView::new(
+            Tag::new(title)
+                .configure(move |tag| {
+                    tag.is_enabled = enabled;
+                    tag.on_remove = Some(std::rc::Rc::new(move || {
+                        story.remove_tag(&owned);
+                    }));
+                })
+                .debug_name("tag-removable"),
+        )
+    }
+}
+
 impl View for TagStory {
     fn body(&self, _cx: &Scope) -> AnyView {
-        let caption = Text::new(format!("{} tags", self.tags.get().len()))
-            .semantic_font(cove_ui_compose::theme::SemanticFontRef::caption())
-            .semantic_foreground(SemanticColorRef::on_surface_muted());
-        AnyView::new(StorySection::new(
+        let mut chips: Vec<AnyView> = self
+            .tags
+            .get()
+            .iter()
+            .map(|title| self.removable_tag(title))
+            .collect();
+        if chips.is_empty() {
+            chips.push(AnyView::new(
+                Text::new("No tags selected")
+                    .semantic_font(cove_ui_compose::theme::SemanticFontRef::caption())
+                    .semantic_foreground(SemanticColorRef::on_surface_muted()),
+            ));
+        }
+        let reset = {
+            let story = TagStory {
+                options: self.options.clone(),
+                tags: self.tags.clone(),
+                filters: self.filters.clone(),
+            };
+            AnyView::new(Button::title("Reset", move || story.reset()))
+        };
+        let caption = AnyView::new(
+            Text::new(format!("{} tags", self.tags.get().len()))
+                .semantic_font(cove_ui_compose::theme::SemanticFontRef::caption())
+                .semantic_foreground(SemanticColorRef::on_surface_muted()),
+        );
+        let removable = AnyView::new(StorySection::new(
             "Removable tags",
             "Each remove action is an independent control. Reset restores the tags.",
-            AnyView::new(caption),
-        ))
+            AnyView::new(BoxView::new(
+                FlexDirection::Column,
+                Align::FlexStart,
+                Justify::FlexStart,
+                Wrap::NoWrap,
+                12.0,
+                AnyView::new(TupleView::new(vec![
+                    AnyView::new(BoxView::new(
+                        FlexDirection::Row,
+                        Align::Center,
+                        Justify::FlexStart,
+                        Wrap::Wrap,
+                        8.0,
+                        AnyView::new(TupleView::new(chips)),
+                    )),
+                    AnyView::new(BoxView::new(
+                        FlexDirection::Row,
+                        Align::Center,
+                        Justify::FlexStart,
+                        Wrap::Wrap,
+                        12.0,
+                        AnyView::new(TupleView::new(vec![reset, caption])),
+                    )),
+                ])),
+            )),
+        ));
+
+        let variants = AnyView::new(BoxView::new(
+            FlexDirection::Row,
+            Align::Center,
+            Justify::FlexStart,
+            Wrap::Wrap,
+            8.0,
+            AnyView::new(TupleView::new(
+                [
+                    StatusTone::Neutral,
+                    StatusTone::Info,
+                    StatusTone::Success,
+                    StatusTone::Warning,
+                    StatusTone::Danger,
+                ]
+                .into_iter()
+                .flat_map(|tone| {
+                    [TagVariant::Soft, TagVariant::Solid, TagVariant::Outline]
+                        .into_iter()
+                        .map(move |variant| tone_tag(tone, variant))
+                })
+                .collect(),
+            )),
+        ));
+
+        AnyView::new(
+            BoxView::new(
+                FlexDirection::Column,
+                Align::Stretch,
+                Justify::FlexStart,
+                Wrap::NoWrap,
+                24.0,
+                AnyView::new(TupleView::new(vec![
+                    removable,
+                    AnyView::new(StorySection::new(
+                        "Variants & glyphs",
+                        "Soft, solid and outline chips per tone; a dot or a glyph can carry the state without a label.",
+                        AnyView::new(TupleView::new(vec![variants, glyph_row()])),
+                    )),
+                ])),
+            )
+            .debug_name("tag-story"),
+        )
     }
 
     fn tag(&self) -> &'static str {

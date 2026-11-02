@@ -10,6 +10,7 @@
 
 use cove_composition::Scope;
 use cove_core::State;
+use cove_core::scene::{Align, FlexDirection, Justify, Wrap};
 use cove_ui_compose::modifiers::layout::LayoutFrameExt;
 use cove_ui_compose::modifiers::style::SemanticStyleViewExt;
 use cove_ui_compose::primitives::layout::tab_view::{TabItem, TabOverflow, TabVariant, TabView};
@@ -164,6 +165,8 @@ pub struct MenuStory {
     pub options: GalleryOptions,
     status: State<String>,
     checked: State<bool>,
+    columns: State<u32>,
+    view_mode: State<u32>,
 }
 
 impl MenuStory {
@@ -172,6 +175,8 @@ impl MenuStory {
             options,
             status: State::new("Choose a command".to_owned()),
             checked: State::new(true),
+            columns: State::new(0b101),
+            view_mode: State::new(0),
         }
     }
 
@@ -199,18 +204,181 @@ impl MenuStory {
     pub fn many(&self) -> Vec<MenuEntry> {
         many_entries()
     }
+
+    /// The column check boxes: each selection toggles one bit.
+    fn column_entries(&self, enabled: bool) -> Vec<MenuEntry> {
+        const COLUMNS: [&str; 4] = ["Name", "Status", "Owner", "Updated"];
+        let mask = self.columns.get();
+        COLUMNS
+            .iter()
+            .enumerate()
+            .map(|(index, title)| {
+                let columns = self.columns.clone();
+                let bit = 1u32 << index;
+                MenuEntry::Item(
+                    MenuItem::new(200 + index as u64, *title, move || {
+                        columns.update(|mask| {
+                            if *mask & bit == 0 {
+                                *mask |= bit;
+                            } else {
+                                *mask &= !bit;
+                            }
+                        })
+                    })
+                    .enabled(enabled)
+                    .selected(mask & bit != 0),
+                )
+            })
+            .collect()
+    }
+
+    /// An exclusive selection rendered as check marks.
+    fn view_entries(&self, enabled: bool) -> Vec<MenuEntry> {
+        const MODES: [&str; 3] = ["Comfortable", "Compact", "Gallery"];
+        let current = self.view_mode.get();
+        MODES
+            .iter()
+            .enumerate()
+            .map(|(index, title)| {
+                let mode = self.view_mode.clone();
+                MenuEntry::Item(
+                    MenuItem::new(300 + index as u64, *title, move || {
+                        mode.set(index as u32)
+                    })
+                    .enabled(enabled)
+                    .selected(current == index as u32),
+                )
+            })
+            .collect()
+    }
 }
 
 impl View for MenuStory {
     fn body(&self, _cx: &Scope) -> AnyView {
-        let status = Text::new(self.status())
-            .semantic_font(cove_ui_compose::theme::SemanticFontRef::caption())
-            .semantic_foreground(SemanticColorRef::on_surface_muted());
-        AnyView::new(StorySection::new(
-            "Native menu",
-            "The system menu opens at the button's corner. It supports labels, separators, submenus, disabled and destructive actions, check marks and keyboard shortcuts.",
-            AnyView::new(AnyView::new(status).debug_name("menu-status")),
-        ))
+        let enabled = self.options.is_enabled;
+        let caption = |text: String| {
+            AnyView::new(
+                Text::new(text)
+                    .semantic_font(cove_ui_compose::theme::SemanticFontRef::caption())
+                    .semantic_foreground(SemanticColorRef::on_surface_muted()),
+            )
+        };
+
+        let copy = {
+            let status = self.status.clone();
+            MenuItem::new(101, "Copy", move || status.set("Copied".to_owned())).enabled(enabled)
+        };
+        let pin = {
+            let status = self.status.clone();
+            let checked = self.checked.clone();
+            MenuItem::new(102, "Pin item", move || {
+                checked.update(|value| *value = !*value);
+                status.set("Pinned".to_owned());
+            })
+            .enabled(enabled)
+            .selected(self.checked.get())
+        };
+        let native_entries = vec![
+            MenuEntry::Label {
+                id: 100,
+                title: "Workspace".to_owned(),
+            },
+            MenuEntry::Item(copy),
+            MenuEntry::Item(pin),
+            MenuEntry::separator(103),
+            MenuEntry::Submenu(MenuSubmenu {
+                id: 104,
+                title: "Settings".to_owned(),
+                entries: vec![
+                    MenuEntry::Item(MenuItem::new(105, "General", || {})),
+                    MenuEntry::Item(MenuItem::new(111, "Restricted", || {}).enabled(false)),
+                    MenuEntry::Item(
+                        MenuItem::new(112, "Delete project", || {}).enabled(enabled),
+                    ),
+                ],
+                is_enabled: enabled,
+                width: SUBMENU_WIDTH,
+                icon: None,
+            }),
+        ];
+        let native = AnyView::new(
+            cove_ui_compose::primitives::controls::menu_button::MenuButtonTitle::new(
+                "Workspace",
+                native_entries,
+            )
+            .enabled(enabled)
+            .width(220.0)
+            .debug_name("menu-native"),
+        );
+
+        let columns = AnyView::new(BoxView::new(
+            FlexDirection::Row,
+            Align::Center,
+            Justify::FlexStart,
+            Wrap::Wrap,
+            12.0,
+            AnyView::new(TupleView::new(vec![
+                AnyView::new(
+                    cove_ui_compose::primitives::controls::menu_button::MenuButtonTitle::new(
+                        "Columns",
+                        self.column_entries(enabled),
+                    )
+                    .enabled(enabled)
+                    .width(200.0)
+                    .debug_name("menu-columns"),
+                ),
+                AnyView::new(
+                    cove_ui_compose::primitives::controls::menu_button::MenuButtonTitle::new(
+                        "View",
+                        self.view_entries(enabled),
+                    )
+                    .enabled(enabled)
+                    .width(200.0)
+                    .debug_name("menu-selection"),
+                ),
+            ])),
+        ));
+
+        let scrollable = AnyView::new(
+            cove_ui_compose::primitives::controls::menu_button::MenuButtonTitle::new(
+                "Commands",
+                self.many(),
+            )
+            .enabled(enabled)
+            .width(220.0)
+            .debug_name("menu-scrollable"),
+        );
+
+        AnyView::new(
+            BoxView::new(
+                FlexDirection::Column,
+                Align::Stretch,
+                Justify::FlexStart,
+                Wrap::NoWrap,
+                24.0,
+                AnyView::new(TupleView::new(vec![
+                    AnyView::new(StorySection::new(
+                        "Native menu",
+                        "The system menu opens at the button's corner. It supports labels, separators, submenus, disabled and destructive actions, check marks and keyboard shortcuts.",
+                        AnyView::new(TupleView::new(vec![
+                            native,
+                            AnyView::new(AnyView::new(caption(self.status())).debug_name("menu-status")),
+                        ])),
+                    )),
+                    AnyView::new(StorySection::new(
+                        "Selection columns",
+                        "A check mark marks the chosen option in each column and the menu stays open until a choice is made.",
+                        columns,
+                    )),
+                    AnyView::new(StorySection::new(
+                        "Scrollable menu",
+                        "Beyond the visible row budget the menu scrolls and keeps the highlighted row inside the viewport.",
+                        scrollable,
+                    )),
+                ])),
+            )
+            .debug_name("menu-story"),
+        )
     }
 
     fn tag(&self) -> &'static str {
@@ -218,7 +386,7 @@ impl View for MenuStory {
     }
 
     fn dynamic_properties(&self) -> Vec<cove_composition::DynamicField> {
-        cove_composition::dynamic_fields!(self; status, checked)
+        cove_composition::dynamic_fields!(self; status, checked, columns, view_mode)
     }
 }
 
