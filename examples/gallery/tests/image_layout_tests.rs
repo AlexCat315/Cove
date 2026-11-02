@@ -231,14 +231,9 @@ fn switching_to_remote_exposes_a_url_and_enables_retry() {
             story.set_source(ImageSourceKind::Remote);
             scene.settle_n(4);
             assert_eq!(story.source(), ImageSourceKind::Remote);
-            // GAP: no `dynamic_properties`, so the caption cannot follow.
             assert!(
-                !scene.recomposer_has_pending(),
-                "the source switch schedules no recomposition"
-            );
-            assert!(
-                scene.has_text("Source: Bundled"),
-                "the caption still shows the mounted source, texts: {:?}",
+                scene.has_text("Source: Remote"),
+                "the caption follows the source switch, texts: {:?}",
                 scene.texts()
             );
             assert!(
@@ -269,10 +264,9 @@ fn switching_to_remote_exposes_a_url_and_enables_retry() {
                 before + 1,
                 "Retry starts a new request"
             );
-            // GAP: the request caption is likewise not reactive.
             assert!(
-                scene.has_text("Request: 1"),
-                "the request caption stays at its mounted value, texts: {:?}",
+                scene.has_text(&format!("Request: {}", before + 1)),
+                "the request caption follows the retry, texts: {:?}",
                 scene.texts()
             );
         },

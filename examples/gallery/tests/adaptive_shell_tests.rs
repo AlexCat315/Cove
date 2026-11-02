@@ -76,19 +76,15 @@ fn control(scene: &GalleryScene, label: &str) -> Option<Node> {
 #[test]
 fn page_switch_isolation() {
     scene(|gallery, scene| {
+        // Modified views carry their content's identity in the view tag, so the
+        // sidebar destinations are visible to recomposition metrics as in Swift.
         assert!(
             scene
                 .first(|node| node
                     .view_tag()
-                    .is_some_and(|tag| tag.contains("GalleryView")))
-                .is_none()
-                && scene
-                    .first(|node| node
-                        .view_tag()
-                        .is_some_and(|tag| tag.contains("SidebarDestination<")))
-                    .is_none(),
-            "GAP: Swift measures recomposition on the GalleryView shell and >80 \
-             SidebarDestination rows; Rust exposes neither view tag"
+                    .is_some_and(|tag| tag.contains("SidebarDestination<")))
+                .is_some(),
+            "sidebar destinations expose their view tag"
         );
         assert!(
             scene.named("gallery-size").is_none(),
@@ -173,7 +169,10 @@ fn navigation_session() {
         let open = control(scene, "Open navigation").expect("the compact shell offers navigation");
         scene.click(&open);
         settle_at(scene, 390.0);
-        assert!(scene.focus.has_modal_scope(), "the drawer opens as a modal scope");
+        assert!(
+            scene.focus.has_modal_scope(),
+            "the drawer opens as a modal scope"
+        );
         assert!(
             search.is_some() && scene.named("gallery-search").is_some(),
             "the search field stays mounted"

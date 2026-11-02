@@ -149,3 +149,29 @@ fn menu_button_opens_and_an_item_closes_it() {
         );
     });
 }
+
+#[test]
+fn a_trigger_description_names_the_popover_trigger() {
+    use cove_ui_compose::primitives::overlays::popover::{Popover, PopoverTriggerDescription};
+    use cove_ui_compose::primitives::text::Text;
+    InteractiveScene::run(400.0, 300.0, |scene| {
+        scene.install(AnyView::new(LayerRoot::new(AnyView::new(
+            Popover::new(Text::new("Open"), Text::new("Body")).trigger_description(
+                PopoverTriggerDescription {
+                    label: "Described".to_string(),
+                    value: "now".to_string(),
+                    help: None,
+                },
+            ),
+        ))));
+        let trigger = scene
+            .first(|node| {
+                node.accessibility()
+                    .is_some_and(|semantics| semantics.role == AccessibilityRole::Button)
+            })
+            .expect("the trigger is mounted");
+        let semantics = trigger.accessibility().expect("semantics");
+        assert_eq!(semantics.label, "Described");
+        assert_eq!(semantics.value, "now");
+    });
+}

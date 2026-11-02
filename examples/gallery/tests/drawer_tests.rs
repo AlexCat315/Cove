@@ -120,9 +120,8 @@ fn the_dedicated_story_opens_a_modal_and_commits_keyboard_navigation_back_into_i
                 .first(|node| node
                     .accessibility()
                     .is_some_and(|semantics| semantics.role == AccessibilityRole::Dialog))
-                .is_none(),
-            "GAP: Swift's opener click presents the drawer dialog; DrawerStory declares no \
-             dynamic properties, so the is_open write never re-renders it"
+                .is_some(),
+            "the opener click presents the drawer dialog"
         );
         assert!(
             AdaptiveControlExamples::new(GalleryPage::NavigationDrawer).supports(),
