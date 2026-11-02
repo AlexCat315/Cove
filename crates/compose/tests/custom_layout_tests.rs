@@ -387,7 +387,7 @@ fn at_most_proposals_preserve_intrinsic_widths_and_minimums() {
 fn nested_percentage_children_stay_finite_under_repeated_measurement() {
     GlobalTestLock::locked(|| {
         let graph = support::graph();
-        let grid = Grid::new(
+        let grid = Grid::try_new(
             vec![
                 GridColumn::Flexible {
                     minimum: 100.0,
@@ -395,11 +395,6 @@ fn nested_percentage_children_stay_finite_under_repeated_measurement() {
                 },
                 GridColumn::flexible(120.0, f32::INFINITY),
             ],
-            12.0,
-            0.0,
-            cove_composition::Alignment::TopLeading,
-            None,
-            false,
             AnyView::new(TupleView::new(vec![
                 AnyView::new(
                     AnyView::new(empty_box())
@@ -453,7 +448,10 @@ fn nested_percentage_children_stay_finite_under_repeated_measurement() {
                     ),
                 ),
             ])),
-        );
+        )
+        .expect("valid grid columns")
+        .spacing(12.0, 0.0)
+        .enabled(false);
         graph.install_view(
             AnyView::new(
                 Column::new(

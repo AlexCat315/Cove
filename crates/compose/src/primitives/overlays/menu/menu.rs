@@ -440,11 +440,7 @@ impl MenuLevel {
                                     crate::theme::SemanticColorRef::on_surface_muted(),
                                 ),
                         ),
-                        _ => AnyView::new(crate::primitives::text::Divider::new(
-                            None,
-                            1.0,
-                            crate::primitives::text::DividerAxis::Horizontal,
-                        )),
+                        _ => AnyView::new(crate::primitives::text::Divider::horizontal()),
                     };
                 };
                 let session = self.session.clone();

@@ -212,11 +212,7 @@ impl View for MarkdownTableView {
         }
         let row_count = rows.len();
         for _ in 0..row_count.saturating_sub(1) {
-            cell_views.push(AnyView::new(crate::primitives::text::Divider::new(
-                None,
-                1.0,
-                crate::primitives::text::DividerAxis::Horizontal,
-            )));
+            cell_views.push(AnyView::new(crate::primitives::text::Divider::horizontal()));
         }
         let layout = MarkdownTableLayout::new(columns, row_count);
         AnyView::new(

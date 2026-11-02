@@ -12,7 +12,6 @@
 //! tint matching the shader's `color * texture` path).
 
 use std::path::PathBuf;
-use std::rc::Rc;
 use std::sync::Arc;
 
 use crate::{PrimitiveView, impl_primitive_view};
@@ -141,38 +140,43 @@ struct PaintIdentity {
 }
 
 impl Image {
-    pub fn from_texture(texture_id: TextureId, width: f32, height: f32) -> Self {
+    pub fn from_texture(texture_id: TextureId, size: Size) -> Self {
         Self::new(
             ImageSource::Texture {
                 texture_id,
                 size: None,
             },
-            width,
-            height,
-            Color::WHITE,
-            ImageContentMode::Stretch,
-            ImageRenderingMode::Color,
+            size,
         )
     }
 
-    pub fn new(
-        source: ImageSource,
-        width: f32,
-        height: f32,
-        tint: Color,
-        content_mode: ImageContentMode,
-        rendering_mode: ImageRenderingMode,
-    ) -> Self {
+    /// Draw the source at the given logical size.
+    pub fn new(source: ImageSource, size: Size) -> Self {
         Self {
             source,
-            width,
-            height,
-            tint,
-            content_mode,
-            rendering_mode,
+            width: size.width,
+            height: size.height,
+            tint: Color::WHITE,
+            content_mode: ImageContentMode::Stretch,
+            rendering_mode: ImageRenderingMode::Color,
             foreground: None,
             vector_source_url: None,
         }
+    }
+
+    pub fn tint(mut self, tint: Color) -> Self {
+        self.tint = tint;
+        self
+    }
+
+    pub fn content_mode(mut self, mode: ImageContentMode) -> Self {
+        self.content_mode = mode;
+        self
+    }
+
+    pub fn rendering_mode(mut self, mode: ImageRenderingMode) -> Self {
+        self.rendering_mode = mode;
+        self
     }
 
     /// Explicit fill for alpha-mask glyphs.
@@ -337,18 +341,4 @@ pub fn texture_source(texture_id: TextureId, size: Option<Size>) -> ImageSource 
 /// Identity helper used by host galleries.
 pub fn image_is_same_source(lhs: &ImageSource, rhs: &ImageSource) -> bool {
     lhs == rhs
-}
-
-/// Compatibility alias for the Swift nested `Image.Source`.
-pub type Source = ImageSource;
-
-/// Compatibility alias for the Swift nested `Image.ContentMode`.
-pub type ContentMode = ImageContentMode;
-
-/// Compatibility alias for the Swift nested `Image.RenderingMode`.
-pub type RenderingMode = ImageRenderingMode;
-
-#[allow(dead_code)]
-fn _rc_identity<T>(value: &Rc<T>) -> usize {
-    Rc::as_ptr(value) as *const () as usize
 }

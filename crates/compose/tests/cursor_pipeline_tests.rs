@@ -12,7 +12,7 @@ use cove_composition::{View, ViewGraph};
 use cove_core::scene::Node;
 use cove_platform::SystemCursor;
 use cove_ui_compose::modifiers::interaction::CursorExt;
-use cove_ui_compose::primitives::controls::button::Button;
+use cove_ui_compose::primitives::controls::Button;
 use cove_ui_compose::primitives::text::text_buffer::TextBuffer;
 use cove_ui_compose::primitives::text::{Text, TextField};
 

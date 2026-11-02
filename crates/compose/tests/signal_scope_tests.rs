@@ -10,7 +10,7 @@ use std::rc::Rc;
 use cove_composition::{AnyView, PrimitiveView, Scope, View, impl_primitive_view};
 use cove_core::scene::{AccessibilityRole, AccessibilityTree, LayoutNode, Node};
 use cove_core::{Binding, Signal};
-use cove_ui_compose::primitives::controls::menu_button::MenuButtonTitle;
+use cove_ui_compose::primitives::controls::MenuButtonTitle;
 use cove_ui_compose::primitives::overlays::menu::{MenuEntry, MenuItem};
 use cove_ui_compose::primitives::overlays::portal::LayerRoot;
 
@@ -152,7 +152,7 @@ fn menu_button_opens_and_an_item_closes_it() {
 
 #[test]
 fn a_trigger_description_names_the_popover_trigger() {
-    use cove_ui_compose::primitives::overlays::popover::{Popover, PopoverTriggerDescription};
+    use cove_ui_compose::primitives::overlays::{Popover, PopoverTriggerDescription};
     use cove_ui_compose::primitives::text::Text;
     InteractiveScene::run(400.0, 300.0, |scene| {
         scene.install(AnyView::new(LayerRoot::new(AnyView::new(

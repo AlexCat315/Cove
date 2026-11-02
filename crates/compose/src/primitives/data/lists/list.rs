@@ -35,7 +35,7 @@ const ROW_ID: &str = "__list_row_id";
 
 /// Row host: owns tap handling and resolves the active row style on every
 /// recompose.
-pub struct ListRowHost {
+pub(crate) struct ListRowHost {
     pub id: u64,
     pub is_selected: bool,
     pub row_height: f32,

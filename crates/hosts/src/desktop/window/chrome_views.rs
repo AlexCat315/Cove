@@ -27,7 +27,7 @@ use cove_core::scene::{
 };
 use cove_platform::MouseButton;
 use cove_shell::WindowChromeHitTest;
-use cove_ui_compose::primitives::controls::button::{ButtonIcon, ButtonIconSource};
+use cove_ui_compose::primitives::controls::{ButtonIcon, ButtonIconSource};
 use cove_ui_compose::primitives::media::ui_icon_catalog as icons;
 use std::rc::Rc;
 

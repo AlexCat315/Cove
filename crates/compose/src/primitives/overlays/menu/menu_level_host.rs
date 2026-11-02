@@ -21,7 +21,7 @@ use super::menu_navigation::{
 /// an even edge on every side. Revealing a row preserves it.
 pub const PANEL_INSET: f32 = 4.0;
 
-pub struct MenuLevelHost {
+pub(crate) struct MenuLevelHost {
     pub session: Rc<MenuSession>,
     pub width: Option<f32>,
     pub max_visible_rows: usize,

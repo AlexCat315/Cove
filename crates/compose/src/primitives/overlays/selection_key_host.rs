@@ -8,7 +8,7 @@ use cove_core::scene::{
 use cove_platform::KeyEvent;
 use std::rc::Rc;
 
-pub struct SelectionKeyHost {
+pub(crate) struct SelectionKeyHost {
     is_enabled: bool,
     on_key: Rc<dyn Fn(&KeyEvent) -> bool>,
     content: AnyView,

@@ -21,7 +21,7 @@ use super::adaptive_options::SidebarGeometry;
 use super::focus_handoff::SidebarFocusHandoff;
 
 /// Owns focus preparation and completion around a presentation change.
-pub struct SidebarShellHost {
+pub(crate) struct SidebarShellHost {
     pub geometry: SidebarGeometry,
     pub focus: Rc<SidebarFocusHandoff>,
     content: AnyView,
@@ -173,7 +173,7 @@ impl PrimitiveView for SidebarLayer {
 crate::impl_primitive_view!(SidebarLayer);
 
 /// Focus return target for the compact trigger.
-pub struct SidebarTriggerHost {
+pub(crate) struct SidebarTriggerHost {
     pub focus: Rc<SidebarFocusHandoff>,
     content: AnyView,
 }

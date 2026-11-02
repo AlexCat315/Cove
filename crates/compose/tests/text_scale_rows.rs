@@ -34,8 +34,9 @@
 //! - Swift reads the fixed grid cell's `textMeasure.font.size`; Rust records
 //!   the same measure on the layout node and the assertion is kept as-is.
 
-use cove_composition::Scope;
 use crate::support;
+use cove_composition::Scope;
+use cove_ui_compose::prelude::LazyGridOptions;
 
 use std::rc::Rc;
 
@@ -125,33 +126,33 @@ impl View for GeometryHarness {
         .rows(records.clone())
         .row_height(30.0)
         .row_spacing(3.0);
-        let model = DataTableModel::new(records.clone(), |record| *record);
-        let data_table = DataTable::new(model, columns()).options(DataTableOptions {
-            selection: None,
-            layout: TableLayout {
-                row_height: 36.0,
-                ..TableLayout::default()
-            },
-            ..DataTableOptions::default()
-        });
-        let grid = LazyGrid::new(
+        let model = DataTableModel::try_new(records.clone(), |record| *record)
+            .expect("unique data table row IDs");
+        let data_table = DataTable::try_new(model, columns())
+            .expect("unique data table column IDs")
+            .options(DataTableOptions {
+                selection: None,
+                layout: TableLayout {
+                    row_height: 36.0,
+                    ..TableLayout::default()
+                },
+                ..DataTableOptions::default()
+            });
+        let grid = LazyGrid::try_new(
             (0..20_000).collect::<Vec<usize>>(),
-            Rc::new(|index: &usize| index.to_string()),
-            2,
-            GridRowHeights::fixed(30.0),
-            0.0,
-            5.0,
-            0,
-            None,
-            None,
-            None,
-            Rc::new(|index: &usize| {
+            |index: &usize| index.to_string(),
+            LazyGridOptions {
+                row_spacing: 5.0,
+                ..LazyGridOptions::new(2, GridRowHeights::fixed(30.0))
+            },
+            |index: &usize| {
                 AnyView::new(
                     AnyView::new(Text::new(index.to_string()))
                         .debug_name(&format!("fixed-cell-{index}")),
                 )
-            }),
-        );
+            },
+        )
+        .expect("valid grid layout");
         let mut surface = Environment::default();
         surface.input = self.input.get();
         surface.viewport.width = 1280.0;
@@ -319,24 +320,22 @@ struct VariableGridHarness {
 
 impl View for VariableGridHarness {
     fn body(&self, _cx: &Scope) -> AnyView {
-        let grid = LazyGrid::new(
+        let grid = LazyGrid::try_new(
             (0..7).collect::<Vec<usize>>(),
-            Rc::new(|index: &usize| index.to_string()),
-            2,
-            GridRowHeights::variable(&[20.0, 30.0, 40.0, 50.0]),
-            0.0,
-            5.0,
-            0,
-            Some(Rc::new(self.offset.clone())),
-            None,
-            None,
-            Rc::new(|index: &usize| {
+            |index: &usize| index.to_string(),
+            LazyGridOptions {
+                row_spacing: 5.0,
+                ..LazyGridOptions::new(2, GridRowHeights::variable(&[20.0, 30.0, 40.0, 50.0]))
+            },
+            |index: &usize| {
                 AnyView::new(
                     AnyView::new(Text::new(format!("Cell {index}")))
                         .debug_name(&format!("variable-cell-{index}")),
                 )
-            }),
-        );
+            },
+        )
+        .expect("valid grid layout")
+        .scroll_offset(Rc::new(self.offset.clone()));
         AnyView::new(
             AnyView::new(grid)
                 .frame_width(200.0)
@@ -468,8 +467,11 @@ struct NavigationHarness {
 
 impl View for NavigationHarness {
     fn body(&self, _cx: &Scope) -> AnyView {
-        let model = DataTableModel::new((0..1_000).collect::<Vec<usize>>(), |record| *record);
-        let table = DataTable::new(model, columns()).frame_height(310.0);
+        let model = DataTableModel::try_new((0..1_000).collect::<Vec<usize>>(), |record| *record)
+            .expect("unique data table row IDs");
+        let table = DataTable::try_new(model, columns())
+            .expect("unique data table column IDs")
+            .frame_height(310.0);
         AnyView::new(
             AnyView::new(table)
                 .frame_width(390.0)

@@ -29,7 +29,7 @@ use std::rc::Rc;
 
 use cove_composition::{AnyView, View};
 use cove_core::scene::{AccessibilityRole, AnimatorScheduler, Node};
-use cove_ui_compose::primitives::controls::button::Button;
+use cove_ui_compose::primitives::controls::Button;
 use cove_ui_compose::primitives::text::Text;
 use cove_ui_compose::primitives::text::text_field::text_field::TextField;
 use cove_ui_compose::primitives::text::text_field::text_field_options::{

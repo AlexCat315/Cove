@@ -116,20 +116,6 @@ pub fn format_date_long(date: Date) -> String {
     format!("{month} {}, {}", parts.day, parts.year)
 }
 
-fn selection_binding(
-    state: &Signal<Option<Date>>,
-) -> (Rc<dyn Fn() -> Option<Date>>, Rc<dyn Fn(Option<Date>)>) {
-    let read = {
-        let state = state.clone();
-        move || state.get()
-    };
-    let write = {
-        let state = state.clone();
-        move |value: Option<Date>| state.set(value)
-    };
-    (Rc::new(read), Rc::new(write))
-}
-
 struct GranularityCalendar {
     label: &'static str,
     granularity: CalendarGranularity,
@@ -139,12 +125,9 @@ struct GranularityCalendar {
 
 impl View for GranularityCalendar {
     fn body(&self, _cx: &Scope) -> AnyView {
-        let (read, write) = selection_binding(&self.value);
-        let calendar = CalendarView::new(
-            read,
-            write,
-            gallery_calendar(self.options.is_enabled, self.granularity),
-        );
+        let calendar = CalendarView::new(self.value.binding()).configure(|options| {
+            *options = gallery_calendar(self.options.is_enabled, self.granularity)
+        });
         let caption = {
             let value = self.value.clone();
             let granularity = self.granularity;
@@ -177,12 +160,9 @@ impl View for CalendarStory {
         let week = cx.state(|| None::<Date>);
         let month = cx.state(|| None::<Date>);
         let year = cx.state(|| None::<Date>);
-        let (read, write) = selection_binding(&date);
-        let day_calendar = AnyView::new(CalendarView::new(
-            read,
-            write,
-            gallery_calendar(self.options.is_enabled, CalendarGranularity::Day),
-        ));
+        let day_calendar = AnyView::new(CalendarView::new(date.binding()).configure(|options| {
+            *options = gallery_calendar(self.options.is_enabled, CalendarGranularity::Day)
+        }));
         let selected = {
             AnyView::new(
                 Text::new(Self::selected_line(date.get()))

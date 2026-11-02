@@ -104,39 +104,37 @@ impl FormField {
 
 /// Layout and field descriptions; values, validation policy and submission remain application-owned.
 pub struct Form {
-    pub fields: Vec<FormField>,
+    fields: Vec<FormField>,
     pub controller: Option<Rc<FormController>>,
     pub layout: FormLayout,
     footer: AnyView,
 }
 
 impl Form {
-    pub fn new(
-        fields: Vec<FormField>,
-        controller: Option<Rc<FormController>>,
-        configure: impl FnOnce(&mut FormLayout),
-        footer: impl View + 'static,
-    ) -> Self {
-        let mut layout = FormLayout::default();
-        configure(&mut layout);
-        layout.validate();
-        let unique: std::collections::HashSet<&str> =
-            fields.iter().map(|field| field.id.as_str()).collect();
-        assert_eq!(unique.len(), fields.len(), "Form field IDs must be unique");
-        Self {
+    pub fn try_new(fields: Vec<FormField>) -> Result<Self, crate::primitives::DuplicateId> {
+        crate::primitives::check_ids(fields.iter().map(|field| &field.id), "Form field")?;
+        Ok(Self {
             fields,
-            controller,
-            layout,
-            footer: AnyView::new(footer),
-        }
+            controller: None,
+            layout: FormLayout::default(),
+            footer: AnyView::new(crate::EmptyView),
+        })
     }
 
-    pub fn without_footer(
-        fields: Vec<FormField>,
-        controller: Option<Rc<FormController>>,
-        configure: impl FnOnce(&mut FormLayout),
-    ) -> Self {
-        Self::new(fields, controller, configure, crate::EmptyView)
+    pub fn controller(mut self, controller: Rc<FormController>) -> Self {
+        self.controller = Some(controller);
+        self
+    }
+
+    pub fn configure(mut self, configure: impl FnOnce(&mut FormLayout)) -> Self {
+        configure(&mut self.layout);
+        self.layout.validate();
+        self
+    }
+
+    pub fn footer(mut self, footer: impl View + 'static) -> Self {
+        self.footer = AnyView::new(footer);
+        self
     }
 }
 
@@ -190,15 +188,14 @@ impl View for Form {
                     .id(field_id),
                 ));
             }
-            stack.push(AnyView::new(Grid::new(
-                vec![GridColumn::flexible(0.0, f32::INFINITY); columns],
-                layout.spacing,
-                layout.spacing,
-                crate::Alignment::TopLeading,
-                None,
-                true,
-                AnyView::new(TupleView::new(cells)),
-            )));
+            stack.push(AnyView::new(
+                Grid::try_new(
+                    vec![GridColumn::flexible(0.0, f32::INFINITY); columns],
+                    AnyView::new(TupleView::new(cells)),
+                )
+                .expect("valid grid columns")
+                .spacing(layout.spacing, layout.spacing),
+            ));
             stack.push(AnyView::new(BoxView::new(
                 FlexDirection::Row,
                 Align::Center,

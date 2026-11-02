@@ -14,12 +14,12 @@ use std::rc::Rc;
 use cove_core::scene::{Align, FlexDirection, Justify, Wrap};
 use cove_ui_compose::modifiers::layout::LayoutFrameExt;
 use cove_ui_compose::modifiers::style::SemanticStyleViewExt;
-use cove_ui_compose::primitives::controls::button::Button;
+use cove_ui_compose::primitives::controls::Button;
 use cove_ui_compose::primitives::data::chart::{
-    Chart, ChartAnnotation, ChartBand, ChartConfiguration, ChartContent, ChartDataTable, ChartDatum,
-    ChartGuides, ChartHistogram, ChartLegendPlacementState, ChartMark, ChartOrientation, ChartPlot,
-    ChartPoint, ChartScaleKind, ChartSeries, ChartSeriesStyle, ChartSlice, ChartStacking, ChartStyle,
-    ChartThreshold, ChartValueAxis, ChartXDomain, PieCenter,
+    Chart, ChartAnnotation, ChartBand, ChartConfiguration, ChartContent, ChartDataTable,
+    ChartDatum, ChartGuides, ChartHistogram, ChartLegendPlacementState, ChartMark,
+    ChartOrientation, ChartPlot, ChartPoint, ChartScaleKind, ChartSeries, ChartSeriesStyle,
+    ChartSlice, ChartStacking, ChartStyle, ChartThreshold, ChartValueAxis, ChartXDomain, PieCenter,
 };
 use cove_ui_compose::primitives::data::lists::table::{
     ColumnVisibility, ComparisonResult, Table, TableColumn, TableColumnLayout, TableOptions,
@@ -782,7 +782,9 @@ impl View for AdaptiveTableSample {
         let (columns, options) = adaptive_table_columns(enabled);
         let rows: Vec<usize> = (0..ADAPTIVE_TABLE_ROWS).collect();
         // Both flavours share the authored columns; only the container differs.
-        let table = Table::new(rows, |row: &usize| *row, columns).options(options);
+        let table = Table::try_new(rows, |row: &usize| *row, columns)
+            .expect("unique table column IDs")
+            .options(options);
         let _ = self.data;
         AnyView::new(table)
     }

@@ -65,7 +65,7 @@ use cove_core::{Binding, Environment, InputCapabilities, Point, State};
 use cove_platform::{InputEvent, KeyModifiers, MouseButton, MouseButtonEvent};
 use cove_ui_compose::adaptive::SurfaceEnvironmentExt;
 use cove_ui_compose::modifiers::layout::{FlexExt, FrameDimension, LayoutFrameExt};
-use cove_ui_compose::primitives::layout::scroll_view::ScrollView;
+use cove_ui_compose::primitives::layout::ScrollView;
 use cove_ui_compose::primitives::layout::sidebar::{
     AdaptiveSidebar, AdaptiveSidebarOptions, Sidebar, SidebarItem, SidebarPresentation,
     SidebarSection,
@@ -259,7 +259,8 @@ impl View for Harness {
         let sidebar = if self.adaptive {
             let mut options = AdaptiveSidebarOptions::default();
             options.layout.shows_rail_labels = false;
-            let sidebar = AdaptiveSidebar::new("Workspace", binding(&self.selection), sections)
+            let sidebar = AdaptiveSidebar::try_new("Workspace", binding(&self.selection), sections)
+                .expect("unique sidebar IDs")
                 .options(options)
                 .presentation(binding(&self.open))
                 .content(Document::new());
@@ -270,7 +271,8 @@ impl View for Harness {
             };
             AnyView::new(sidebar)
         } else {
-            let sidebar = Sidebar::new(binding(&self.selection), sections)
+            let sidebar = Sidebar::try_new(binding(&self.selection), sections)
+                .expect("unique sidebar IDs")
                 .presentation(if self.rail.get() {
                     SidebarPresentation::Rail {
                         shows_labels: false,

@@ -23,7 +23,7 @@ use cove_core::scene::{
     EventPhase, EventResult, InteractionRegistry, InteractionRegistryHolder, Node, PointerPhase,
 };
 use cove_platform::{KeyEvent, MouseButton, MouseButtonEvent};
-use cove_ui_compose::primitives::controls::toggle::{Checkbox, Toggle};
+use cove_ui_compose::primitives::controls::{Checkbox, Toggle};
 
 use support::GlobalTestLock;
 

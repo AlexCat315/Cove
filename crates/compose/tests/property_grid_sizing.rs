@@ -16,7 +16,7 @@ use cove_composition::{AnyView, LayoutDebugExt};
 use cove_core::scene::{Align, FlexDirection, Justify, Node, Wrap};
 use cove_ui_compose::BoxView;
 use cove_ui_compose::modifiers::layout::LayoutFrameExt;
-use cove_ui_compose::primitives::data::property_grid::{
+use cove_ui_compose::primitives::data::{
     PropertyGrid, PropertyGridRow, PropertyGridRowLayout, PropertyGridRowSizing,
     PropertyGridScrollAxes, PropertyGridSection,
 };

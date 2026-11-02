@@ -4,6 +4,7 @@
 //! grid. The title drills up from days to a year of months to twelve years;
 //! picking a cell drills back down to the selection granularity.
 use crate::Scope;
+use cove_core::Binding;
 use cove_core::Signal;
 use std::rc::Rc;
 
@@ -113,29 +114,28 @@ struct CalendarSession {
 }
 
 struct CalendarState {
-    selection: Rc<dyn Fn() -> Option<Date>>,
-    set_selection: Rc<dyn Fn(Option<Date>)>,
+    selection: Binding<Option<Date>>,
     options: CalendarOptions,
     session: Signal<CalendarSession>,
 }
 
 /// A month, year-of-months or twelve-year grid with one Tab stop per grid.
 pub struct CalendarView {
-    pub selection: Rc<dyn Fn() -> Option<Date>>,
-    pub set_selection: Rc<dyn Fn(Option<Date>)>,
-    pub options: CalendarOptions,
+    selection: Binding<Option<Date>>,
+    options: CalendarOptions,
 }
 impl CalendarView {
-    pub fn new(
-        selection: Rc<dyn Fn() -> Option<Date>>,
-        set_selection: Rc<dyn Fn(Option<Date>)>,
-        options: CalendarOptions,
-    ) -> Self {
+    pub fn new(selection: Binding<Option<Date>>) -> Self {
         Self {
             selection,
-            set_selection,
-            options: options.validated(),
+            options: CalendarOptions::default().validated(),
         }
+    }
+
+    pub fn configure(mut self, configure: impl FnOnce(&mut CalendarOptions)) -> Self {
+        configure(&mut self.options);
+        self.options = self.options.validated();
+        self
     }
     /// Width of the open calendar for popover hosts.
     pub fn width(cell_size: f32, options: &CalendarOptions) -> f32 {
@@ -172,7 +172,7 @@ impl CalendarState {
         let panel = self.session.get().panel;
         if panel == self.options.granularity.base_panel() {
             let start = granularity_start(self.options.granularity, date, calendar);
-            (self.set_selection)(Some(start));
+            self.selection.set(Some(start));
             let focused = CalendarCells::new(panel, self.options.granularity).start(date, calendar);
             self.session.update(|session| session.focused_day = focused);
             return;
@@ -184,7 +184,7 @@ impl CalendarState {
     fn drill_up(&self) {
         let panel = self.session.get().panel;
         let Some(parent) = panel.parent() else { return };
-        let focus = (self.selection)().unwrap_or_else(|| {
+        let focus = self.selection.get().unwrap_or_else(|| {
             let calendar = &self.options.calendar;
             CalendarCells::new(parent, self.options.granularity)
                 .start(self.session.get().month, calendar)
@@ -216,7 +216,7 @@ impl CalendarState {
     /// Selected when the cell lies in the selected period, and only at the
     /// granularity's own panel.
     fn is_selected(&self, date: Date) -> bool {
-        let Some(selected) = (self.selection)() else {
+        let Some(selected) = self.selection.get() else {
             return false;
         };
         let panel = self.session.get().panel;
@@ -241,7 +241,7 @@ impl CalendarState {
 impl View for CalendarView {
     fn body(&self, cx: &Scope) -> AnyView {
         let session = cx.state(|| {
-            let initial = (self.selection)().unwrap_or(self.options.today);
+            let initial = self.selection.get().unwrap_or(self.options.today);
             let panel = self.options.granularity.base_panel();
             CalendarSession {
                 month: crate::primitives::controls::date_values::CalendarGrid::month_start(
@@ -258,7 +258,7 @@ impl View for CalendarView {
         AnyView::new(CalendarBody {
             view: CalendarState {
                 selection: self.selection.clone(),
-                set_selection: self.set_selection.clone(),
+
                 options: self.options.clone(),
                 session,
             },
@@ -269,7 +269,7 @@ impl CalendarState {
     fn snapshot(&self) -> Self {
         Self {
             selection: self.selection.clone(),
-            set_selection: self.set_selection.clone(),
+
             options: self.options.clone(),
             session: self.session,
         }

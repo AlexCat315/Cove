@@ -27,7 +27,7 @@ use cove_core::scene::{
 use cove_ui_compose::animation::content::animated_visibility::AnimatedVisibility;
 use cove_ui_compose::animation::transition::Transition;
 use cove_ui_compose::modifiers::layout::LayoutFrameExt;
-use cove_ui_compose::primitives::controls::button::Button;
+use cove_ui_compose::primitives::controls::Button;
 use cove_ui_compose::primitives::text::Text;
 use cove_ui_compose::theme::tokens::reduced_motion_environment::ReducedMotionViewExt;
 

@@ -32,8 +32,8 @@ use cove_core::{Binding, Environment, InputCapabilities, State};
 use cove_ui_compose::Scancode;
 use cove_ui_compose::adaptive::SurfaceEnvironmentExt;
 use cove_ui_compose::modifiers::layout::LayoutFrameExt;
-use cove_ui_compose::primitives::controls::button_group::{ButtonGroup, ButtonGroupItem};
 use cove_ui_compose::primitives::controls::fields::Vec3Field;
+use cove_ui_compose::primitives::controls::{ButtonGroup, ButtonGroupItem};
 use cove_ui_compose::primitives::navigation::stepper::{StepStatus, Stepper, StepperItem};
 use cove_ui_compose::theme::styles::buttons::builtin_button_chrome::BUTTON_HOST_MARKER_KEY;
 
@@ -94,7 +94,7 @@ fn stepper_stacks_on_a_narrow_container_and_keeps_the_axis_aware_keyboard_path()
     let (selected, binding) = selection();
     let narrow = {
         let binding = binding.clone();
-        AnyView::new(Stepper::new(steps(), binding))
+        AnyView::new(Stepper::try_new(steps(), binding).expect("unique stepper item IDs"))
     };
     InteractiveScene::run(390.0, 600.0, |scene| {
         scene.install(layout(
@@ -145,7 +145,7 @@ fn stepper_stacks_on_a_narrow_container_and_keeps_the_axis_aware_keyboard_path()
     selected.set(Some("first".to_string()));
     let wide = {
         let binding = binding.clone();
-        AnyView::new(Stepper::new(steps(), binding))
+        AnyView::new(Stepper::try_new(steps(), binding).expect("unique stepper item IDs"))
     };
     InteractiveScene::run(720.0, 600.0, |scene| {
         scene.install(layout(
@@ -195,7 +195,10 @@ fn button_group_wraps_segments_instead_of_shrinking_them() {
             width,
             400.0,
             InputCapabilities::TOUCH | InputCapabilities::KEYBOARD,
-            AnyView::new(ButtonGroup::new(items, Binding::constant(Some(0)))),
+            AnyView::new(
+                ButtonGroup::try_new(items, Binding::constant(Some(0)))
+                    .expect("unique button group IDs"),
+            ),
         )
     };
 

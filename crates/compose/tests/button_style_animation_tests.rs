@@ -23,7 +23,7 @@ use cove_core::scene::{
     PointerPhase, Recomposer,
 };
 use cove_platform::MouseButtonEvent;
-use cove_ui_compose::primitives::controls::button::Button;
+use cove_ui_compose::primitives::controls::Button;
 use cove_ui_compose::primitives::text::Text;
 use cove_ui_compose::theme::styles::buttons::{ButtonStyleViewExt, DestructiveButtonStyle};
 use cove_ui_compose::theme::{Theme, ThemeViewExt};

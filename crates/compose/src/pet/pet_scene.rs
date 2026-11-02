@@ -24,7 +24,7 @@ impl View for PetScene {
             self.content.clone(),
             AnyView::new(PetOverlay::new(self.world.clone())),
         ]);
-        let stack = ZStack::new(Alignment::TopLeading, AnyView::new(layers));
+        let stack = ZStack::new(AnyView::new(layers)).alignment(Alignment::TopLeading);
         AnyView::new(provide_pet_world(stack, self.world.clone()))
     }
 }

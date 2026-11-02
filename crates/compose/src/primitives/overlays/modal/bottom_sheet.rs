@@ -107,7 +107,7 @@ impl BottomSheetState {
 /// Bottom sheet with detents and drag-to-dismiss.
 pub struct BottomSheet {
     pub is_presented: Binding<bool>,
-    pub options: BottomSheetOptions,
+    pub(crate) options: BottomSheetOptions,
     content: AnyView,
     state: Rc<BottomSheetState>,
 }
@@ -124,12 +124,7 @@ impl BottomSheet {
         }
     }
 
-    pub fn options(mut self, options: BottomSheetOptions) -> Self {
-        self.options = options.validated();
-        self.state = BottomSheetState::new(self.options.initial_detent, self.options.detents.len());
-        self
-    }
-
+    /// Edit the current options in builder order. Earlier edits to other fields are retained.
     pub fn configure(mut self, configure: impl FnOnce(&mut BottomSheetOptions)) -> Self {
         configure(&mut self.options);
         self.options = self.options.validated();

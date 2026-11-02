@@ -27,8 +27,8 @@ use cove_core::scene::{
 use cove_ui_compose::BoxView;
 use cove_ui_compose::modifiers::interaction::AccessibilityExt;
 use cove_ui_compose::modifiers::layout::{FrameDimension, LayoutFrameExt};
-use cove_ui_compose::primitives::controls::button::Button;
-use cove_ui_compose::primitives::layout::scroll_view::{ScrollAxis, ScrollView};
+use cove_ui_compose::primitives::controls::Button;
+use cove_ui_compose::primitives::layout::{ScrollAxis, ScrollView};
 
 use support::GlobalTestLock;
 

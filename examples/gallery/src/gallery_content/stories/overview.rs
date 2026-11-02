@@ -13,7 +13,7 @@ use cove_core::{Color, State};
 use cove_ui_compose::modifiers::layout::{FlexExt, LayoutFrameExt, PaddingExt};
 use cove_ui_compose::modifiers::style::AppearanceExt;
 use cove_ui_compose::primitives::controls::Button;
-use cove_ui_compose::primitives::controls::button_group::{ButtonGroup, ButtonGroupItem};
+use cove_ui_compose::primitives::controls::{ButtonGroup, ButtonGroupItem};
 use cove_ui_compose::primitives::data::chart::{
     ChartContent, ChartGuides, ChartMark, ChartOrientation, ChartPlot, ChartSeries,
     ChartSeriesStyle, ChartStacking, ChartStyle, ChartValueAxis, ChartXDomain,
@@ -379,13 +379,14 @@ impl View for IntroductionStory {
             },
         );
         let period_group = AnyView::new(
-            ButtonGroup::new(
+            ButtonGroup::try_new(
                 vec![
                     ButtonGroupItem::new("today".to_string(), "Today"),
                     ButtonGroupItem::new("week".to_string(), "This week"),
                 ],
                 period_selection,
             )
+            .expect("unique button group IDs")
             .enabled(enabled),
         );
         let period_group = AnyView::new(period_group.debug_name("dashboard-period"));

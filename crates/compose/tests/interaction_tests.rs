@@ -36,7 +36,7 @@ use cove_ui_compose::animation::interaction::spring_drag::{
 use cove_ui_compose::modifiers::layout::{
     AbsolutePositionModifier, FrameDimension, LayoutFrameExt,
 };
-use cove_ui_compose::primitives::controls::button::Button;
+use cove_ui_compose::primitives::controls::Button;
 use cove_ui_compose::theme::styles::buttons::builtin_button_chrome::BUTTON_HOST_MARKER_KEY;
 use cove_ui_compose::theme::{Theme, ThemeViewExt};
 

@@ -14,13 +14,13 @@ use cove_ui_compose::LayoutDebugExt;
 use cove_ui_compose::modifiers::style::SemanticStyleViewExt;
 use cove_ui_compose::primitives::controls::Button;
 use cove_ui_compose::primitives::controls::fields::combobox::{Combobox, ComboboxSearch};
-use cove_ui_compose::primitives::controls::fields::radio_group::{RadioGroup, RadioOption};
 use cove_ui_compose::primitives::controls::fields::select::SelectOption;
 use cove_ui_compose::primitives::controls::form::{Form, FormField};
-use cove_ui_compose::primitives::controls::form_validation::{
-    FormController, FormRule, FormSubmissionState,
+use cove_ui_compose::primitives::controls::{FormController, FormRule, FormSubmissionState};
+use cove_ui_compose::primitives::controls::{RadioGroup, RadioOption};
+use cove_ui_compose::primitives::overlays::toast::controller::{
+    ToastController, ToastNotification,
 };
-use cove_ui_compose::primitives::overlays::toast::controller::{ToastController, ToastNotification};
 use cove_ui_compose::primitives::overlays::toast::notification_host::NotificationHost;
 use cove_ui_compose::primitives::overlays::tooltip::Tooltip;
 use cove_ui_compose::primitives::text::Text;
@@ -297,7 +297,8 @@ impl View for RadioStory {
             })
             .collect();
         let group = AnyView::new(
-            RadioGroup::new(self.selection.binding(), options)
+            RadioGroup::try_new(self.selection.binding(), options)
+                .expect("unique radio option IDs")
                 .enabled(self.options.is_enabled)
                 .horizontal(false)
                 .debug_name("product-radio"),
@@ -442,13 +443,15 @@ impl View for FormStory {
             }))
         };
         let form = AnyView::new(
-            Form::new(
-                fields,
-                Some(self.controller.clone()),
-                |layout| layout.columns = 1,
-                AnyView::new(TupleView::new(vec![submit, caption(self.status())])),
-            )
-            .debug_name("product-form"),
+            Form::try_new(fields)
+                .expect("unique form field IDs")
+                .controller(self.controller.clone())
+                .configure(|layout| layout.columns = 1)
+                .footer(AnyView::new(TupleView::new(vec![
+                    submit,
+                    caption(self.status()),
+                ])))
+                .debug_name("product-form"),
         );
         AnyView::new(StorySection::new(
             "Create an account",
@@ -522,12 +525,10 @@ impl View for ComboboxStory {
     fn body(&self, _cx: &Scope) -> AnyView {
         let city_options = CITY_OPTIONS
             .iter()
-            .map(|(value, label, enabled)| {
-                SelectOption::new((*value).to_owned(), *label, *enabled)
-            })
+            .map(|(value, label, enabled)| SelectOption::new((*value).to_owned(), *label, *enabled))
             .collect();
         let local = AnyView::new(
-            Combobox::new(self.city.binding(), city_options)
+            Combobox::try_new(self.city.binding(), city_options).expect("unique combobox IDs")
                 .presentation({
                     let mut presentation =
                         cove_ui_compose::primitives::controls::fields::combobox::ComboboxPresentation::default();

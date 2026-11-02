@@ -32,7 +32,7 @@ use cove_core::scene::Node;
 use cove_ui_compose::BoxView;
 use cove_ui_compose::modifiers::layout::LayoutFrameExt;
 use cove_ui_compose::modifiers::style::AppearanceExt;
-use cove_ui_compose::primitives::layout::panel::Panel;
+use cove_ui_compose::primitives::layout::Panel;
 use cove_ui_compose::primitives::layout::split::{SplitAxis, SplitConstraints, SplitView};
 
 use support::GlobalTestLock;

@@ -205,10 +205,13 @@ fn an_empty_combobox_trigger_spans_its_width() {
     GlobalTestLock::locked(|| {
         with_test_text_environment(|| {
             let graph = render(
-                boxed(AnyView::new(Combobox::new(
-                    Binding::constant(None::<i32>),
-                    vec![SelectOption::new(1, "One", true)],
-                ))),
+                boxed(AnyView::new(
+                    Combobox::try_new(
+                        Binding::constant(None::<i32>),
+                        vec![SelectOption::new(1, "One", true)],
+                    )
+                    .expect("unique combobox IDs"),
+                )),
                 600.0,
             );
             let chrome = nodes(&graph)

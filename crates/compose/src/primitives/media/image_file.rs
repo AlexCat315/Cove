@@ -15,8 +15,8 @@ use cove_imaging::{
 
 use super::image::Image;
 use super::image::ImageSource;
-use super::image_geometry::{ImageContentMode, ImageRenderingMode};
 use super::vector_image_raster::VectorImageRaster;
+use cove_core::Size;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ImageLoadFailureReason {
@@ -170,17 +170,10 @@ impl Image {
         }
     }
 
-    pub fn from_file(
-        path: impl AsRef<Path>,
-        width: f32,
-        height: f32,
-        tint: cove_core::Color,
-        content_mode: ImageContentMode,
-        rendering_mode: ImageRenderingMode,
-    ) -> Self {
+    pub fn from_file(path: impl AsRef<Path>, size: Size) -> Self {
         let path = path.as_ref();
-        let source = Self::resolve_path(path, width, height);
-        let mut image = Self::new(source, width, height, tint, content_mode, rendering_mode);
+        let source = Self::resolve_path(path, size.width, size.height);
+        let mut image = Self::new(source, size);
         if matches!(
             path.extension()
                 .and_then(|value| value.to_str())
@@ -194,16 +187,9 @@ impl Image {
         image
     }
 
-    pub fn from_resource(
-        resource: &BundleImageResource,
-        width: f32,
-        height: f32,
-        tint: cove_core::Color,
-        content_mode: ImageContentMode,
-        rendering_mode: ImageRenderingMode,
-    ) -> Self {
+    pub fn from_resource(resource: &BundleImageResource, size: Size) -> Self {
         match resource.path() {
-            Some(path) => Self::from_file(path, width, height, tint, content_mode, rendering_mode),
+            Some(path) => Self::from_file(path, size),
             None => {
                 ImageLoadDiagnostics::emit(
                     resource.name.clone(),
@@ -215,25 +201,14 @@ impl Image {
                         texture_id: 0,
                         size: None,
                     },
-                    width,
-                    height,
-                    tint,
-                    content_mode,
-                    rendering_mode,
+                    size,
                 )
             }
         }
     }
 
-    pub fn from_url(
-        url: impl AsRef<Path>,
-        width: f32,
-        height: f32,
-        tint: cove_core::Color,
-        content_mode: ImageContentMode,
-        rendering_mode: ImageRenderingMode,
-    ) -> Self {
-        Self::from_file(url, width, height, tint, content_mode, rendering_mode)
+    pub fn from_url(url: impl AsRef<Path>, size: Size) -> Self {
+        Self::from_file(url, size)
     }
 
     /// Vector helper retained so `VectorImageRaster` can share the same path.

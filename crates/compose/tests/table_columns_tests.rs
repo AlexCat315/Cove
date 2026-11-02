@@ -57,7 +57,7 @@ use cove_ui_compose::Scancode;
 use cove_ui_compose::adaptive::SurfaceEnvironmentExt;
 use cove_ui_compose::modifiers::interaction::AccessibilityExt;
 use cove_ui_compose::modifiers::layout::{FlexExt, LayoutFrameExt};
-use cove_ui_compose::primitives::controls::button::Button;
+use cove_ui_compose::primitives::controls::Button;
 use cove_ui_compose::primitives::data::data_table::{
     DataTable, DataTableModel, DataTableNavigation, DataTableOptions, DataTableSelection,
 };
@@ -170,7 +170,8 @@ impl Harness {
         Self {
             data,
             controlled,
-            model: DataTableModel::new(records(100), |record| record.id),
+            model: DataTableModel::try_new(records(100), |record| record.id)
+                .expect("unique data table row IDs"),
             width: State::new(720.0),
             scale: State::new(1.0),
             input: State::new(InputCapabilities::POINTER | InputCapabilities::KEYBOARD),
@@ -192,7 +193,8 @@ impl View for Harness {
         let enabled = self.enabled.get();
         let table: AnyView = if self.data {
             AnyView::new(
-                DataTable::new(self.model.clone(), columns(true))
+                DataTable::try_new(self.model.clone(), columns(true))
+                    .expect("unique data table column IDs")
                     .options(DataTableOptions {
                         selection: Some(bind(&self.selection)),
                         column_widths: Some(widths),
@@ -205,7 +207,8 @@ impl View for Harness {
             )
         } else {
             AnyView::new(
-                Table::new(records(10), |record: &Record| record.id, columns(false))
+                Table::try_new(records(10), |record: &Record| record.id, columns(false))
+                    .expect("unique table column IDs")
                     .options(TableOptions {
                         selection: Some(bind(&self.selected)),
                         sort: Some(bind(&self.sort)),
@@ -862,7 +865,7 @@ fn empty_and_frozen() {
             "a 200pt viewport keeps only the frozen column"
         );
 
-        harness.model.replace_rows(vec![]);
+        harness.model.replace_rows(vec![]).unwrap();
         resize(scene, &harness, 720.0);
         for title in ["Name", "Notes", "Quantity", "Category"] {
             assert!(

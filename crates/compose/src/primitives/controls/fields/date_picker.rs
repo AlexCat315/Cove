@@ -3,7 +3,6 @@
 //! A labelled trigger that opens a calendar in a popover. The trigger shows the
 //! selected period; clearing writes `None` without opening the popover.
 use crate::Scope;
-use std::rc::Rc;
 
 use crate::foundation::Date;
 use crate::modifiers::layout::{FlexExt, LayoutFrameExt};
@@ -16,9 +15,9 @@ use crate::primitives::text::Text;
 use crate::theme::SemanticFontRef;
 use crate::theme::styles::buttons::{ButtonStyleViewExt, GhostButtonStyle};
 use crate::{AnyView, BoxView, PrimitiveView, Row, TupleView, VerticalAlignment, View};
-use cove_core::Signal;
 use cove_core::scene::{AccessibilityRole, AccessibilitySemantics};
 use cove_core::scene::{Align, FlexDirection, Justify, Wrap};
+use cove_core::{Binding, Signal};
 
 /// Trigger presentation values.
 #[derive(Clone, Debug, PartialEq)]
@@ -71,32 +70,29 @@ impl DatePickerOptions {
 }
 
 /// A trigger that opens a calendar popover.
+#[derive(Clone)]
 pub struct DatePicker {
-    pub selection: Rc<dyn Fn() -> Option<Date>>,
-    pub set_selection: Rc<dyn Fn(Option<Date>)>,
-    pub options: DatePickerOptions,
-    pub cell_size: f32,
+    selection: Binding<Option<Date>>,
+    options: DatePickerOptions,
 }
 
 impl DatePicker {
-    pub fn new(
-        selection: Rc<dyn Fn() -> Option<Date>>,
-        set_selection: Rc<dyn Fn(Option<Date>)>,
-        options: DatePickerOptions,
-    ) -> Self {
-        let options = options.validated();
-        let cell_size = options.calendar.presentation.cell_size;
+    pub fn new(selection: Binding<Option<Date>>) -> Self {
         Self {
             selection,
-            set_selection,
-            options,
-            cell_size,
+            options: DatePickerOptions::default().validated(),
         }
+    }
+
+    pub fn configure(mut self, configure: impl FnOnce(&mut DatePickerOptions)) -> Self {
+        configure(&mut self.options);
+        self.options = self.options.validated();
+        self
     }
 
     /// Label for the selected period, or the placeholder.
     fn label(&self) -> String {
-        match (self.selection)() {
+        match self.selection.get() {
             Some(date) => period_label(
                 self.options.calendar.granularity,
                 date,
@@ -132,20 +128,9 @@ fn period_label(
 impl View for DatePicker {
     fn body(&self, cx: &Scope) -> AnyView {
         AnyView::new(DatePickerBody {
-            picker: self.snapshot(),
+            picker: self.clone(),
             is_presented: cx.state(|| false),
         })
-    }
-}
-
-impl DatePicker {
-    fn snapshot(&self) -> DatePicker {
-        DatePicker {
-            selection: self.selection.clone(),
-            set_selection: self.set_selection.clone(),
-            options: self.options.clone(),
-            cell_size: self.cell_size,
-        }
     }
 }
 
@@ -170,7 +155,7 @@ impl PrimitiveView for DatePickerBody {
         node.set_accessibility(Some(AccessibilitySemantics {
             role: AccessibilityRole::Button,
             label: picker.options.presentation.placeholder.clone(),
-            value: match (picker.selection)() {
+            value: match picker.selection.get() {
                 Some(date) => period_label(
                     picker.options.calendar.granularity,
                     date,
@@ -188,9 +173,9 @@ impl PrimitiveView for DatePickerBody {
     }
 
     fn children(&self, _node: &cove_core::scene::Node) -> Vec<AnyView> {
-        let picker = self.picker.snapshot();
+        let picker = self.picker.clone();
         let label = picker.label();
-        let has_selection = (picker.selection)().is_some();
+        let has_selection = picker.selection.get().is_some();
 
         let mut trigger: Vec<AnyView> = vec![AnyView::new(
             Text::new(label.clone())
@@ -199,7 +184,7 @@ impl PrimitiveView for DatePickerBody {
                 .flex_with(1.0, 1.0, Some(0.0)),
         )];
         if picker.options.presentation.is_clearable && has_selection {
-            let set_selection = picker.set_selection.clone();
+            let set_selection = picker.selection.clone();
             trigger.push(AnyView::new(
                 Button::icon_with_options(
                     ButtonIconSource::resource(
@@ -212,7 +197,7 @@ impl PrimitiveView for DatePickerBody {
                     false,
                     false,
                     Some("Clear date".to_string()),
-                    move || set_selection(None),
+                    move || set_selection.set(None),
                 )
                 .button_style(GhostButtonStyle),
             ));
@@ -233,24 +218,20 @@ impl PrimitiveView for DatePickerBody {
         });
 
         let calendar_options = picker.options.calendar.clone();
-        let set_selection = picker.set_selection.clone();
+        let set_selection = picker.selection.clone();
         let presented = self.is_presented;
-        let calendar = CalendarView::new(
-            picker.selection.clone(),
-            {
-                let set_selection = set_selection.clone();
-                Rc::new(move |value: Option<Date>| {
-                    set_selection(value);
-                    // A pick closes the popover.
-                    presented.set(false);
-                })
+        let calendar = CalendarView::new(Binding::new(
+            move || picker.selection.get(),
+            move |value| {
+                set_selection.set(value);
+                presented.set(false);
             },
-            calendar_options,
-        );
+        ))
+        .configure(|options| *options = calendar_options);
         let popover = Popover::new(AnyView::new(trigger_view), AnyView::new(calendar))
             .is_presented(presented.into())
             .width(CalendarView::width(
-                picker.cell_size,
+                picker.options.calendar.presentation.cell_size,
                 &picker.options.calendar,
             ))
             .surface(PopoverSurface::Content)

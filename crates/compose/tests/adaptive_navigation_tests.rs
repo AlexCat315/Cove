@@ -35,10 +35,8 @@ use cove_core::scene::{AccessibilityRole, AccessibilityTree, Node};
 use cove_core::{Binding, Environment, InputCapabilities, State};
 use cove_ui_compose::adaptive::SurfaceEnvironmentExt;
 use cove_ui_compose::modifiers::layout::LayoutFrameExt;
-use cove_ui_compose::primitives::controls::button::Button;
-use cove_ui_compose::primitives::layout::tab_view::{
-    TabItem, TabOverflow, TabStripPlacement, TabView,
-};
+use cove_ui_compose::primitives::controls::Button;
+use cove_ui_compose::primitives::layout::{TabItem, TabOverflow, TabStripPlacement, TabView};
 use cove_ui_compose::primitives::text::Text;
 
 use support::GlobalTestLock;
@@ -131,13 +129,14 @@ fn harness(
     count: State<i32>,
     clicks: Rc<RefCell<i32>>,
 ) -> AnyView {
-    let mut tabs = TabView::new(
+    let mut tabs = TabView::try_new(
         Binding::constant(0_u8),
         vec![
             TabItem::new(0_u8, "Overview", Panel { count, clicks }),
             TabItem::new(1_u8, "Details", cove_composition::EmptyView),
         ],
-    );
+    )
+    .expect("unique tab IDs");
     tabs.placement = placement;
     tabs.overflow = TabOverflow::Scroll;
     tabs.compact = compact;

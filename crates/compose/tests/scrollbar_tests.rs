@@ -34,7 +34,7 @@ use cove_platform::{
 };
 use cove_ui_compose::Scancode;
 use cove_ui_compose::modifiers::layout::LayoutFrameExt;
-use cove_ui_compose::primitives::interaction::scrollbar::{Scrollbar, ScrollbarAxis};
+use cove_ui_compose::primitives::interaction::{Scrollbar, ScrollbarAxis};
 use cove_ui_compose::theme::tokens::reduced_motion_environment::ReducedMotionViewExt;
 
 use support::GlobalTestLock;

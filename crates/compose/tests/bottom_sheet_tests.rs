@@ -117,7 +117,7 @@ fn dragging_the_handle_down_dismisses_the_first_detent() {
                     },
                     AnyView::new(full_size_box()),
                 )
-                .options(sheet_options),
+                .configure(|options| *options = sheet_options),
             )
             .surface_environment(environment(390.0, 600.0, InputCapabilities::TOUCH)),
         ))));
@@ -143,7 +143,7 @@ fn dragging_up_does_not_yet_expand_the_sheet() {
         scene.install(AnyView::new(AnyView::new(LayerRoot::new(
             AnyView::new(
                 BottomSheet::new(Binding::constant(true), AnyView::new(full_size_box()))
-                    .options(sheet_options),
+                    .configure(|options| *options = sheet_options),
             )
             .surface_environment(environment(390.0, 600.0, InputCapabilities::TOUCH)),
         ))));
@@ -175,7 +175,7 @@ fn an_expanded_surface_degrades_to_a_centered_dialog() {
         scene.install(AnyView::new(AnyView::new(LayerRoot::new(
             AnyView::new(
                 BottomSheet::new(Binding::constant(true), AnyView::new(full_size_box()))
-                    .options(sheet_options),
+                    .configure(|options| *options = sheet_options),
             )
             .surface_environment(environment(
                 1280.0,

@@ -121,10 +121,12 @@ impl View for StepperStory {
         let enabled = self.options.is_enabled;
 
         let horizontal = AnyView::new(
-            Stepper::new(self.items(), self.selection_binding()).options(StepperOptions {
-                is_enabled: enabled,
-                ..StepperOptions::default()
-            }),
+            Stepper::try_new(self.items(), self.selection_binding())
+                .expect("unique stepper item IDs")
+                .options(StepperOptions {
+                    is_enabled: enabled,
+                    ..StepperOptions::default()
+                }),
         );
 
         let start = {
@@ -192,7 +194,8 @@ impl View for StepperStory {
         };
 
         let vertical = AnyView::new(
-            Stepper::new(self.items(), self.selection_binding())
+            Stepper::try_new(self.items(), self.selection_binding())
+                .expect("unique stepper item IDs")
                 .options(StepperOptions {
                     axis: StepperAxis::Vertical,
                     is_enabled: enabled,
@@ -231,9 +234,9 @@ impl View for StepperStory {
                         "No steps",
                         "An empty workflow renders nothing and takes no keyboard stop instead of collapsing the layout.",
                         AnyView::new(
-                            Stepper::new(Vec::<StepperItem<String>>::new(), {
+                            Stepper::try_new(Vec::<StepperItem<String>>::new(), {
                                 Binding::new(|| None, |_| {})
-                            })
+                            }).expect("unique stepper item IDs")
                             .options(StepperOptions {
                                 is_enabled: enabled,
                                 ..StepperOptions::default()

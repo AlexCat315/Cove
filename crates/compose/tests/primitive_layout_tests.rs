@@ -26,8 +26,8 @@ use cove_core::{Color, DrawList, Rect};
 use cove_ui_compose::BoxView;
 use cove_ui_compose::modifiers::layout::LayoutFrameExt;
 use cove_ui_compose::modifiers::style::AppearanceExt;
-use cove_ui_compose::primitives::media::image::{Image, ImageSource};
-use cove_ui_compose::primitives::media::image_geometry::{ImageContentMode, ImageRenderingMode};
+use cove_ui_compose::primitives::media::ImageContentMode;
+use cove_ui_compose::primitives::media::{Image, ImageSource};
 
 use support::GlobalTestLock;
 
@@ -314,12 +314,12 @@ fn image_node(
                 height: 100.0,
             }),
         },
-        100.0,
-        100.0,
-        Color::WHITE,
-        content_mode,
-        ImageRenderingMode::Color,
-    );
+        cove_core::Size {
+            width: 100.0,
+            height: 100.0,
+        },
+    )
+    .content_mode(content_mode);
     graph.install_view(AnyView::new(image), Default::default());
     graph.compute_layout(100.0, 100.0);
     let root = graph.tree.borrow().root().expect("root");

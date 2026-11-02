@@ -8,8 +8,9 @@
 //! - a large collection mounts only the viewport and clamps after a data shrink
 //! - a variable-height grid keeps its full extent with a partial last row
 
-use cove_composition::Scope;
 use crate::support;
+use cove_composition::Scope;
+use cove_ui_compose::prelude::LazyGridOptions;
 
 use std::rc::Rc;
 
@@ -97,7 +98,7 @@ fn fixed_rows_find_the_viewport_without_scanning_all_rows() {
 #[test]
 fn variable_rows_use_prefix_offsets_with_spacing_and_exact_boundaries() {
     let rows = GridRowHeights::variable(&[10.0, 30.0, 20.0, 40.0]);
-    rows.validate(4);
+    assert!(rows.matches_count(4));
     assert_eq!(rows.offset(2, 5.0), 50.0, "prefix offsets include spacing");
     assert_eq!(
         rows.total_height(4, 5.0),
@@ -167,19 +168,21 @@ impl View for Harness {
             AnyView::new(cell_box().debug_name(&format!("lazy-cell-{index}")))
         };
         AnyView::new(
-            AnyView::new(LazyGrid::new(
-                (0..self.count.get()).collect::<Vec<usize>>(),
-                Rc::new(|index: &usize| index.to_string()),
-                3,
-                GridRowHeights::fixed(20.0),
-                6.0,
-                5.0,
-                2,
-                Some(Rc::new(self.offset.clone())),
-                None,
-                None,
-                Rc::new(content),
-            ))
+            AnyView::new(
+                LazyGrid::try_new(
+                    (0..self.count.get()).collect::<Vec<usize>>(),
+                    |index: &usize| index.to_string(),
+                    LazyGridOptions {
+                        column_spacing: 6.0,
+                        row_spacing: 5.0,
+                        overscan: 2,
+                        ..LazyGridOptions::new(3, GridRowHeights::fixed(20.0))
+                    },
+                    content,
+                )
+                .expect("valid grid layout")
+                .scroll_offset(Rc::new(self.offset.clone())),
+            )
             .frame_width(300.0)
             .frame_height(100.0),
         )
@@ -337,21 +340,16 @@ fn large_collections_mount_a_bounded_number_of_cells() {
 fn variable_height_grid_keeps_full_extent_with_a_partial_last_row() {
     GlobalTestLock::locked(|| {
         let graph = support::graph();
-        let grid = LazyGrid::new(
+        let grid = LazyGrid::try_new(
             (0..7usize).collect::<Vec<usize>>(),
-            Rc::new(|index: &usize| index.to_string()),
-            2,
-            GridRowHeights::variable(&[15.0, 35.0, 25.0, 45.0]),
-            0.0,
-            5.0,
-            0,
-            None,
-            None,
-            None,
-            Rc::new(|index: &usize| {
-                AnyView::new(cell_box().debug_name(&format!("lazy-cell-{index}")))
-            }),
-        );
+            |index: &usize| index.to_string(),
+            LazyGridOptions {
+                row_spacing: 5.0,
+                ..LazyGridOptions::new(2, GridRowHeights::variable(&[15.0, 35.0, 25.0, 45.0]))
+            },
+            |index: &usize| AnyView::new(cell_box().debug_name(&format!("lazy-cell-{index}"))),
+        )
+        .expect("valid grid layout");
         graph.install_view(
             AnyView::new(AnyView::new(grid).frame_width(200.0).frame_height(50.0)),
             Default::default(),
@@ -418,4 +416,23 @@ fn variable_height_grid_keeps_full_extent_with_a_partial_last_row() {
             "the content keeps the full extent of all four rows, including the partial last one"
         );
     });
+}
+
+#[test]
+fn invalid_grid_geometry_is_reported_at_construction() {
+    use cove_ui_compose::prelude::*;
+    let grid = |columns| {
+        LazyGrid::try_new(
+            vec![1, 2],
+            i32::to_string,
+            LazyGridOptions::new(columns, GridRowHeights::variable(&[20.0])),
+            |_| AnyView::new(Divider::horizontal()),
+        )
+    };
+    assert!(matches!(grid(0), Err(LazyGridError::NoColumns)));
+    assert!(matches!(
+        grid(1),
+        Err(LazyGridError::RowHeightCount { rows: 2 })
+    ));
+    assert!(grid(2).is_ok());
 }

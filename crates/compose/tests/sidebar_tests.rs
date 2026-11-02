@@ -64,7 +64,7 @@ fn mounted(
         let chain = Rc::new(FocusChain::new());
         FocusChainHolder::set_current(Some(chain.clone()));
         let graph = support::graph();
-        let mut sidebar = Sidebar::new(
+        let mut sidebar = Sidebar::try_new(
             Binding::constant(Some("button")),
             vec![
                 SidebarSection::new(
@@ -76,7 +76,8 @@ fn mounted(
                 )
                 .title("Controls"),
             ],
-        );
+        )
+        .expect("unique sidebar IDs");
         sidebar.presentation = presentation;
         graph.install_view(cove_composition::AnyView::new(sidebar), Default::default());
         graph.compute_layout(226.0, 400.0);
@@ -235,13 +236,14 @@ fn leaving_the_rail_restores_the_pane_width() {
     struct Pane(Rc<Cell<SidebarPresentation>>);
     impl cove_composition::View for Pane {
         fn body(&self, _cx: &cove_composition::Scope) -> cove_composition::AnyView {
-            let mut sidebar = Sidebar::new(
+            let mut sidebar = Sidebar::try_new(
                 Binding::constant(Some("button")),
                 vec![SidebarSection::new(
                     "controls",
                     vec![SidebarItem::new("button", "Button")],
                 )],
-            );
+            )
+            .expect("unique sidebar IDs");
             sidebar.presentation = self.0.get();
             cove_composition::AnyView::new(sidebar)
         }

@@ -28,8 +28,8 @@ use cove_core::scene::{
 use cove_core::{Binding, Environment, InputCapabilities, Point};
 use cove_ui_compose::adaptive::SurfaceEnvironmentExt;
 use cove_ui_compose::modifiers::layout::{LayoutFrameExt, PaddingExt};
-use cove_ui_compose::primitives::overlays::command_palette::{CommandPalette, PaletteCommand};
 use cove_ui_compose::primitives::overlays::portal::{LayerRoot, PortalStoreAmbient};
+use cove_ui_compose::primitives::overlays::{CommandPalette, PaletteCommand};
 use cove_ui_compose::primitives::text::Text;
 use cove_ui_compose::{BoxView, LayoutDebugExt};
 

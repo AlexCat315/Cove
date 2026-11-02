@@ -67,11 +67,10 @@ fn narrow_calendars_scroll_whole_months_with_touch_sized_cells() {
                                 DateRangeRules::default(),
                             ))
                         } else {
-                            AnyView::new(CalendarView::new(
-                                Rc::new(move || read.get()),
-                                Rc::new(move |value| write.set(value)),
-                                CalendarOptions::default(),
-                            ))
+                            AnyView::new(CalendarView::new(cove_core::Binding::new(
+                                move || read.get(),
+                                move |value| write.set(value),
+                            )))
                         };
 
                         let graph = Rc::new(cove_composition::ViewGraph::new(

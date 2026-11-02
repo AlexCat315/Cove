@@ -44,9 +44,7 @@ use cove_ui_compose::adaptive::SurfaceEnvironmentExt;
 use cove_ui_compose::modifiers::layout::{FrameDimension, LayoutFrameExt};
 use cove_ui_compose::primitives::controls::date_values::TimeOfDay;
 use cove_ui_compose::primitives::controls::fields::{WheelPicker, WheelPickerOption};
-use cove_ui_compose::primitives::controls::time_picker::{
-    TimeHourCycle, TimePicker, TimePickerOptions,
-};
+use cove_ui_compose::primitives::controls::{TimeHourCycle, TimePicker, TimePickerOptions};
 
 use support::InteractiveScene;
 

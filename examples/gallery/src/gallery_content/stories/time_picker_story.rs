@@ -12,9 +12,7 @@ use cove_ui_compose::modifiers::layout::FlexExt;
 use cove_ui_compose::modifiers::style::SemanticStyleViewExt;
 use cove_ui_compose::primitives::controls::Checkbox;
 use cove_ui_compose::primitives::controls::date_values::TimeOfDay;
-use cove_ui_compose::primitives::controls::time_picker::{
-    TimeHourCycle, TimePicker, TimePickerOptions,
-};
+use cove_ui_compose::primitives::controls::{TimeHourCycle, TimePicker, TimePickerOptions};
 use cove_ui_compose::primitives::text::Text;
 use cove_ui_compose::theme::tokens::SemanticColorRef;
 use cove_ui_compose::{AnyView, BoxView, TupleView, View};
@@ -134,14 +132,13 @@ impl View for TimePickerStory {
             12.0,
             AnyView::new(TupleView::new(vec![
                 AnyView::new(
-                    cove_ui_compose::primitives::controls::button::Button::title(
-                        "Now",
-                        move || state.set(Some(TimeOfDay::new(DEFAULT_HOUR, DEFAULT_MINUTE, 0))),
-                    )
+                    cove_ui_compose::primitives::controls::Button::title("Now", move || {
+                        state.set(Some(TimeOfDay::new(DEFAULT_HOUR, DEFAULT_MINUTE, 0)))
+                    })
                     .enabled(enabled),
                 ),
                 AnyView::new(
-                    cove_ui_compose::primitives::controls::button::Button::title("Clear", {
+                    cove_ui_compose::primitives::controls::Button::title("Clear", {
                         let state = self.time.clone();
                         move || state.set(None)
                     })

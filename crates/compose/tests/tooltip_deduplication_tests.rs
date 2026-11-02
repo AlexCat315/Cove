@@ -221,14 +221,14 @@ fn no_derived_tooltip_predicate() {
     // Rust counterpart, so a caller cannot ask whether a tooltip would add
     // information for a given host.
     GlobalTestLock::locked(|| {
-        use cove_ui_compose::primitives::controls::button::Button;
+        use cove_ui_compose::primitives::controls::Button;
 
         let graph = support::graph();
         graph.install_view(
             AnyView::new(Button::with_options(
                 Text::new("Medium"),
                 || {},
-                cove_ui_compose::primitives::controls::button::ButtonRole::Normal,
+                cove_ui_compose::primitives::controls::ButtonRole::Normal,
                 true,
                 false,
                 false,

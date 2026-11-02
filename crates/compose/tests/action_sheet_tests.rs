@@ -111,12 +111,13 @@ impl View for Harness {
             ]
         };
 
-        let question = ActionSheetQuestion::new(
+        let question = ActionSheetQuestion::try_new(
             "Project actions",
             "Choose what happens to this project.",
             actions,
             self.close_label.get(),
-        );
+        )
+        .expect("unique action sheet action IDs");
         let sheet = ActionSheet::new(self.open.binding(), question, Text::new("More actions"))
             .is_enabled(self.enabled.get());
 

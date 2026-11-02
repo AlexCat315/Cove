@@ -170,7 +170,8 @@ impl View for CollectionHarness {
     fn body(&self, _cx: &Scope) -> AnyView {
         let authored = self.authored.get();
         let records = records();
-        let model = DataTableModel::new(records.clone(), |record| *record);
+        let model = DataTableModel::try_new(records.clone(), |record| *record)
+            .expect("unique data table row IDs");
         let tree = Tree::new(
             records.clone(),
             |record: &usize| *record,
@@ -193,22 +194,24 @@ impl View for CollectionHarness {
                 AnyView::new(Text::new(value.to_string()))
             },
         );
-        let table = Table::new(records.clone(), |record: &usize| *record, columns()).options(
-            TableOptions {
+        let table = Table::try_new(records.clone(), |record: &usize| *record, columns())
+            .expect("unique table column IDs")
+            .options(TableOptions {
                 layout: TableLayout {
                     row_height: authored,
                     ..TableLayout::default()
                 },
                 ..TableOptions::default()
-            },
-        );
-        let data_table = DataTable::new(model, columns()).options(DataTableOptions {
-            layout: TableLayout {
-                row_height: authored,
-                ..TableLayout::default()
-            },
-            ..DataTableOptions::default()
-        });
+            });
+        let data_table = DataTable::try_new(model, columns())
+            .expect("unique data table column IDs")
+            .options(DataTableOptions {
+                layout: TableLayout {
+                    row_height: authored,
+                    ..TableLayout::default()
+                },
+                ..DataTableOptions::default()
+            });
         let mut surface = Environment::default();
         surface.input = self.input.get();
         surface.viewport.width = 1280.0;
@@ -388,8 +391,11 @@ struct TableHarness {
 
 impl View for TableHarness {
     fn body(&self, _cx: &Scope) -> AnyView {
-        let model = DataTableModel::new(records(), |record| *record);
-        let table = DataTable::new(model, columns()).frame_height(310.0);
+        let model = DataTableModel::try_new(records(), |record| *record)
+            .expect("unique data table row IDs");
+        let table = DataTable::try_new(model, columns())
+            .expect("unique data table column IDs")
+            .frame_height(310.0);
         let mut surface = Environment::default();
         surface.input = self.input.get();
         surface.viewport.width = 390.0;

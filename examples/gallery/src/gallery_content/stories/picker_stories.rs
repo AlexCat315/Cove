@@ -8,23 +8,21 @@
 use std::rc::Rc;
 
 use cove_composition::Scope;
-use cove_core::scene::{Align, FlexDirection, Justify, Wrap};
 use cove_core::State;
+use cove_core::scene::{Align, FlexDirection, Justify, Wrap};
 use cove_ui_compose::foundation::{Calendar, Date};
 use cove_ui_compose::modifiers::layout::LayoutFrameExt;
-use cove_ui_compose::primitives::controls::button::Button;
+use cove_ui_compose::primitives::controls::Button;
+use cove_ui_compose::primitives::controls::DatePicker;
+use cove_ui_compose::primitives::controls::KeyCap;
+use cove_ui_compose::primitives::controls::MenuButtonTitle;
+use cove_ui_compose::primitives::controls::SplitButton;
 use cove_ui_compose::primitives::controls::date_values::TimeOfDay;
-use cove_ui_compose::primitives::controls::fields::date_picker::{
-    DatePicker, DatePickerOptions, DatePickerPresentation,
-};
 use cove_ui_compose::primitives::controls::fields::date_range::{
     DateRange, DateRangePicker, DateRangePickerOptions,
 };
 use cove_ui_compose::primitives::controls::fields::time_field::{TimeField, TimeFieldOptions};
-use cove_ui_compose::primitives::controls::key_cap::KeyCap;
-use cove_ui_compose::primitives::controls::link::{Link, LinkUnderline};
-use cove_ui_compose::primitives::controls::menu_button::MenuButtonTitle;
-use cove_ui_compose::primitives::controls::split_button::SplitButton;
+use cove_ui_compose::primitives::controls::{Link, LinkUnderline};
 use cove_ui_compose::primitives::media::Icon;
 use cove_ui_compose::primitives::media::ui_icon_catalog as icons;
 use cove_ui_compose::primitives::overlays::menu::{MenuEntry, MenuItem};
@@ -97,22 +95,14 @@ impl DatePickerStory {
 
 impl View for DatePickerStory {
     fn body(&self, _cx: &Scope) -> AnyView {
-        let mut options = DatePickerOptions::new();
-        options.presentation = DatePickerPresentation {
-            placeholder: "Choose a day".to_owned(),
-            is_clearable: true,
-            is_enabled: self.options.is_enabled,
-            width: 200.0,
-        };
-        options.calendar.calendar.set_first_weekday(2);
-        let selection = self.selection.clone();
-        let read = Rc::new(move || selection.get());
-        let write = {
-            let selection = self.selection.clone();
-            Rc::new(move |date: Option<Date>| selection.set(date))
-        };
         let field = AnyView::new(
-            DatePicker::new(read, write, options)
+            DatePicker::new(self.selection.binding())
+                .configure(|options| {
+                    options.presentation.placeholder = "Choose a day".to_owned();
+                    options.presentation.is_enabled = self.options.is_enabled;
+                    options.presentation.width = 200.0;
+                    options.calendar.calendar.set_first_weekday(2);
+                })
                 .frame_width(200.0)
                 .debug_name("date-picker-control"),
         );
@@ -175,7 +165,7 @@ impl View for DateRangeStory {
         options.calendar.calendar.set_first_weekday(2);
         options.presentation.is_enabled = self.options.is_enabled;
         let field = AnyView::new(
-            DateRangePicker::new(self.range.binding(), options)
+            DateRangePicker::new(self.range.binding()).configure(|picker| *picker = options)
                 .frame_width(220.0)
                 .debug_name("date-range-control"),
         );

@@ -1,20 +1,20 @@
 //! Translation of `Tests/CoveUIComposeTests/DesignSystemTests.swift`.
 //! Application tokens, local overrides, scaled controls and detached portals.
 
-use cove_composition::Scope;
 use crate::support;
+use cove_composition::Scope;
 
 use cove_composition::{AnyView, LayoutDebugExt, View};
 use cove_core::scene::{AccessibilityRole, Align, FlexDirection, Justify, Node, Wrap};
 use cove_core::{Binding, Font, FontWeight, State};
 use cove_ui_compose::modifiers::style::SemanticStyleViewExt;
-use cove_ui_compose::primitives::controls::button::{Button, ButtonIcon, ButtonIconSource};
 use cove_ui_compose::primitives::controls::fields::combobox::{Combobox, ComboboxSearch};
 use cove_ui_compose::primitives::controls::fields::select::SelectOption;
-use cove_ui_compose::primitives::media::icon::Icon;
+use cove_ui_compose::primitives::controls::{Button, ButtonIcon, ButtonIconSource};
+use cove_ui_compose::primitives::media::Icon;
 use cove_ui_compose::primitives::media::ui_icon_catalog::action;
+use cove_ui_compose::primitives::overlays::Popover;
 use cove_ui_compose::primitives::overlays::menu::{Menu, MenuEntry, MenuItem};
-use cove_ui_compose::primitives::overlays::popover::Popover;
 use cove_ui_compose::primitives::overlays::portal::LayerRoot;
 use cove_ui_compose::primitives::text::Text;
 use cove_ui_compose::theme::{
@@ -404,13 +404,14 @@ fn menu_rows_follow_scaled_body_typography() {
 fn combobox_keeps_its_selection_and_accessible_role_when_scaled() {
     InteractiveScene::run(900.0, 700.0, |scene| {
         scene.install(LayerRoot::new(
-            Combobox::new(
+            Combobox::try_new(
                 Binding::constant(Some(1)),
                 vec![
                     SelectOption::new(1, "Paris", true),
                     SelectOption::new(2, "Bern", true),
                 ],
             )
+            .expect("unique combobox IDs")
             .theme(Theme::default_light())
             .text_scaler(TextScaler::new(2.0)),
         ));

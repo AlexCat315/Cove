@@ -47,11 +47,11 @@ use cove_platform::MouseButton;
 use cove_ui_compose::modifiers::layout::{FlexExt, LayoutFrameExt};
 use cove_ui_compose::modifiers::style::AppearanceExt;
 use cove_ui_compose::primitives::controls::Button;
-use cove_ui_compose::primitives::layout::scroll_view::ScrollView;
+use cove_ui_compose::primitives::layout::ScrollView;
+use cove_ui_compose::primitives::overlays::Popover;
 use cove_ui_compose::primitives::overlays::anchored::PopoverPlacement;
 use cove_ui_compose::primitives::overlays::menu::{Menu, MenuEntry, MenuItem};
-use cove_ui_compose::primitives::overlays::popover::Popover;
-use cove_ui_compose::primitives::text::{Divider, DividerAxis, Text};
+use cove_ui_compose::primitives::text::{Divider, Text};
 use cove_ui_compose::theme::theme_for_node;
 use cove_ui_compose::theme::tokens::{SemanticColorRef, SemanticFontRef, SemanticStyleViewExt};
 use std::cell::RefCell;
@@ -3003,7 +3003,7 @@ impl View for WorkspaceCompactView {
             AnyView::new(
                 WorkspaceBox::column()
                     .child(picker)
-                    .child(Divider::new(None, 1.0, DividerAxis::Horizontal))
+                    .child(Divider::horizontal())
                     .child(panel.flex_with(1.0, 1.0, Some(0.0)).frame_min_width(0.0))
                     .boxed(),
             )

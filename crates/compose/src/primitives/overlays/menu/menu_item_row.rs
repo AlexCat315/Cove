@@ -44,7 +44,7 @@ struct PaintIdentity {
 }
 
 /// One menu row.
-pub struct MenuItemRowHost {
+pub(crate) struct MenuItemRowHost {
     pub item: MenuRowPresentation,
     pub is_highlighted: bool,
     pub shows_selection_column: bool,

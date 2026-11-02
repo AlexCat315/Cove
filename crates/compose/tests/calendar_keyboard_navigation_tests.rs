@@ -39,7 +39,7 @@ use cove_ui_compose::primitives::controls::calendar::navigation::{
 };
 use cove_ui_compose::primitives::controls::calendar::period::{CalendarGranularity, CalendarPanel};
 use cove_ui_compose::primitives::controls::date_values::DateAvailability;
-use cove_ui_compose::primitives::controls::fields::date_picker::{DatePicker, DatePickerOptions};
+use cove_ui_compose::primitives::controls::{DatePicker, DatePickerOptions};
 use cove_ui_compose::primitives::overlays::portal::LayerRoot;
 
 use support::InteractiveScene;
@@ -258,11 +258,13 @@ impl View for HarnessView {
         let read = harness.selection.clone();
         let write = harness.selection.clone();
         AnyView::new(
-            AnyView::new(CalendarView::new(
-                Rc::new(move || read.get()),
-                Rc::new(move |value| write.set(value)),
-                options,
-            ))
+            AnyView::new(
+                CalendarView::new(cove_core::Binding::new(
+                    move || read.get(),
+                    move |value| write.set(value),
+                ))
+                .configure(|calendar| *calendar = options),
+            )
             .surface_environment(surface),
         )
     }
@@ -434,11 +436,13 @@ fn date_picker() {
         options.calendar.today = initial;
         let read = selection.clone();
         let write = selection.clone();
-        scene.install(LayerRoot::new(AnyView::new(DatePicker::new(
-            Rc::new(move || *read.borrow()),
-            Rc::new(move |value| *write.borrow_mut() = value),
-            options,
-        ))));
+        scene.install(LayerRoot::new(AnyView::new(
+            DatePicker::new(cove_core::Binding::new(
+                move || *read.borrow(),
+                move |value| *write.borrow_mut() = value,
+            ))
+            .configure(|picker| *picker = options),
+        )));
         let button = scene
             .first(|node| node.attachment::<bool>("__button_host") == Some(true))
             .expect("the picker trigger");

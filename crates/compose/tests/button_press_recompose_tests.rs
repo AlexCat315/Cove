@@ -28,7 +28,7 @@ use cove_core::scene::{
     InteractionRegistryHolder, Node, PointerCapture, PointerCaptureHolder, PointerPhase,
 };
 use cove_platform::{MouseButton, MouseButtonEvent, MouseMotionEvent};
-use cove_ui_compose::primitives::controls::button::Button;
+use cove_ui_compose::primitives::controls::Button;
 use cove_ui_compose::primitives::text::Text;
 
 use support::GlobalTestLock;

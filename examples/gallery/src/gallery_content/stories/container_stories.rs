@@ -13,16 +13,12 @@ use cove_ui_compose::primitives::layout::carousel::{
     Carousel, CarouselAutoplay, CarouselIndicator, CarouselPage,
 };
 use cove_ui_compose::primitives::layout::split::{SplitAxis, SplitConstraints, SplitView};
-use cove_ui_compose::primitives::layout::status_bar::{StatusBar, StatusBarText};
-use cove_ui_compose::primitives::layout::{
-    BoundedScrollView, Panel, ScrollView, ZStack,
-};
+use cove_ui_compose::primitives::layout::{BoundedScrollView, Panel, ScrollView, ZStack};
+use cove_ui_compose::primitives::layout::{StatusBar, StatusBarText};
 use cove_ui_compose::primitives::text::Text;
 use cove_ui_compose::theme::SemanticFontRef;
 use cove_ui_compose::theme::tokens::{SemanticColorRef, SemanticStyleViewExt};
-use cove_ui_compose::{
-    Alignment, AnyView, BoxView, LayoutDebugExt, TupleView, View,
-};
+use cove_ui_compose::{Alignment, AnyView, BoxView, LayoutDebugExt, TupleView, View};
 
 use super::feedback::StorySection;
 use crate::gallery_content::catalog::GalleryOptions;
@@ -404,13 +400,15 @@ impl View for ZStackStory {
     fn body(&self, _cx: &Scope) -> AnyView {
         let (_, alignment) = Self::ALIGNMENTS[self.alignment.get() % Self::ALIGNMENTS.len()];
         let stack = AnyView::new(
-            ZStack::new(
-                alignment,
-                AnyView::new(TupleView::new(vec![
-                    AnyView::new(AnyView::new(card("Back layer", "240 × 120", 120.0)).frame_width(240.0)),
-                    AnyView::new(AnyView::new(card("Front layer", "120 × 60", 60.0)).frame_width(120.0)),
-                ])),
-            )
+            ZStack::new(AnyView::new(TupleView::new(vec![
+                AnyView::new(
+                    AnyView::new(card("Back layer", "240 × 120", 120.0)).frame_width(240.0),
+                ),
+                AnyView::new(
+                    AnyView::new(card("Front layer", "120 × 60", 60.0)).frame_width(120.0),
+                ),
+            ])))
+            .alignment(alignment)
             .frame_size(240.0, 120.0)
             .debug_name("zstack-control"),
         );
@@ -419,27 +417,21 @@ impl View for ZStackStory {
             AnyView::new(cove_ui_compose::primitives::controls::Button::title(
                 "Next alignment",
                 move || {
-                    alignments
-                        .update(|index| *index = (*index + 1) % ZStackStory::ALIGNMENTS.len())
+                    alignments.update(|index| *index = (*index + 1) % ZStackStory::ALIGNMENTS.len())
                 },
             ))
         };
         let hits = self.hits.clone();
         let hit_target = AnyView::new(
-            ZStack::new(
-                Alignment::Center,
-                AnyView::new(TupleView::new(vec![
-                    AnyView::new(
-                        AnyView::new(card("Backdrop", "240 × 120", 120.0)).frame_width(240.0),
-                    ),
-                    AnyView::new(
-                        cove_ui_compose::primitives::controls::Button::title("Tap target", move || {
-                            hits.update(|count| *count += 1)
-                        })
-                        .enabled(self.options.is_enabled),
-                    ),
-                ])),
-            )
+            ZStack::new(AnyView::new(TupleView::new(vec![
+                AnyView::new(AnyView::new(card("Backdrop", "240 × 120", 120.0)).frame_width(240.0)),
+                AnyView::new(
+                    cove_ui_compose::primitives::controls::Button::title("Tap target", move || {
+                        hits.update(|count| *count += 1)
+                    })
+                    .enabled(self.options.is_enabled),
+                ),
+            ])))
             .frame_size(240.0, 120.0)
             .debug_name("zstack-hit-testing"),
         );

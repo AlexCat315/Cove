@@ -229,7 +229,7 @@ fn folders() -> Vec<Folder> {
 fn flatten(roots: &[Folder], expanded: &[&str]) -> Vec<(String, usize, bool, bool)> {
     let expanded: std::collections::BTreeSet<String> =
         expanded.iter().map(|id| id.to_string()).collect();
-    cove_ui_compose::primitives::data::tree_table::flatten_tree_table(
+    cove_ui_compose::primitives::data::flatten_tree_table(
         roots,
         &|folder: &Folder| folder.children.clone(),
         &|folder: &Folder| folder.id.clone(),

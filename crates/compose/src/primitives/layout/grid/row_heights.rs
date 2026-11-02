@@ -41,13 +41,10 @@ impl GridRowHeights {
         }
     }
 
-    pub fn validate(&self, row_count: usize) {
-        if let GridRowHeightStorage::Variable(offsets) = &self.storage {
-            assert_eq!(
-                offsets.len(),
-                row_count + 1,
-                "LazyGrid requires one variable height per row, including the last partial row"
-            );
+    pub fn matches_count(&self, row_count: usize) -> bool {
+        match &self.storage {
+            GridRowHeightStorage::Fixed(_) => true,
+            GridRowHeightStorage::Variable(offsets) => offsets.len() - 1 == row_count,
         }
     }
 

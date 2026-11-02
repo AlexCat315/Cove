@@ -22,9 +22,9 @@ use cove_core::scene::{
 use cove_ui_compose::BoxView;
 use cove_ui_compose::modifiers::interaction::AccessibilityExt;
 use cove_ui_compose::modifiers::layout::LayoutFrameExt;
-use cove_ui_compose::primitives::controls::button::Button;
+use cove_ui_compose::primitives::controls::Button;
 use cove_ui_compose::primitives::controls::fields::{Combobox, Select, SelectOption};
-use cove_ui_compose::primitives::layout::scroll_view::{ScrollAxis, ScrollView};
+use cove_ui_compose::primitives::layout::{ScrollAxis, ScrollView};
 use cove_ui_compose::primitives::text::Text;
 
 use support::GlobalTestLock;
@@ -230,7 +230,7 @@ fn select_and_combobox_triggers_use_the_combo_box_role_and_full_name() {
                         SelectOption::new(2, "Two", true),
                     ],
                 );
-                let combobox = Combobox::new(
+                let combobox = Combobox::try_new(
                     Binding::new(
                         {
                             let combo = combo.clone();
@@ -245,7 +245,8 @@ fn select_and_combobox_triggers_use_the_combo_box_role_and_full_name() {
                         SelectOption::new(1, "Alpha", true),
                         SelectOption::new(2, "Beta", true),
                     ],
-                );
+                )
+                .expect("unique combobox IDs");
 
                 let root = AnyView::new(
                     BoxView::new(

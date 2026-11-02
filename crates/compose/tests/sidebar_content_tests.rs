@@ -40,7 +40,7 @@ use cove_ui_compose::modifiers::layout::{FlexExt, FrameDimension, LayoutFrameExt
 use cove_ui_compose::primitives::layout::sidebar::{Sidebar, SidebarItem, SidebarSection};
 use cove_ui_compose::primitives::media::Icon;
 use cove_ui_compose::primitives::media::ui_icon_catalog::{action, file, shape, status};
-use cove_ui_compose::primitives::text::{Divider, DividerAxis, Text};
+use cove_ui_compose::primitives::text::{Divider, Text};
 use cove_ui_compose::theme::styles::components::selection_appearance::{
     SelectionAppearance, SelectionRole,
 };
@@ -115,10 +115,11 @@ impl View for SidebarScene {
             )
             .badge("999"),
         ];
-        let sidebar = Sidebar::new(
+        let sidebar = Sidebar::try_new(
             self.selected.binding(),
             vec![SidebarSection::new("workspace", items)],
-        );
+        )
+        .expect("unique sidebar IDs");
         AnyView::new(
             AnyView::new(
                 AnyView::new(sized(sidebar, 260.0, self.viewport))
@@ -177,10 +178,10 @@ impl View for SlotScene {
                 ),
                 "sidebar-slot-header",
             )),
-            AnyView::new(Divider::new(None, 1.0, DividerAxis::Horizontal)),
+            AnyView::new(Divider::horizontal()),
         ]));
         let footer = AnyView::new(TupleView::new(vec![
-            AnyView::new(Divider::new(None, 1.0, DividerAxis::Horizontal)),
+            AnyView::new(Divider::horizontal()),
             AnyView::new(cove_composition::LayoutDebugExt::debug_name(
                 AnyView::new(
                     row(
@@ -205,13 +206,14 @@ impl View for SlotScene {
                 "sidebar-slot-footer",
             )),
         ]));
-        let sidebar = Sidebar::new(
+        let sidebar = Sidebar::try_new(
             Binding::constant(Some("project".to_owned())),
             vec![SidebarSection::new(
                 "main",
                 vec![SidebarItem::new("project".to_owned(), "Project")],
             )],
         )
+        .expect("unique sidebar IDs")
         .header(header)
         .footer(footer);
         AnyView::new(
@@ -262,7 +264,7 @@ fn subtree(root: &Node) -> Vec<Node> {
 
 fn is_image(node: &Node) -> bool {
     node.view_tag()
-        .is_some_and(|tag| tag.ends_with("primitives::media::image::Image"))
+        .is_some_and(|tag| tag.ends_with(std::any::type_name::<cove_ui_compose::prelude::Image>()))
 }
 
 fn row(scene: &InteractiveScene, title: &str) -> Node {
@@ -665,10 +667,11 @@ fn controlled_selection_reveal() {
         items.push(SidebarItem::new("last".to_owned(), "Last"));
         scene.install(
             AnyView::new(sized(
-                Sidebar::new(
+                Sidebar::try_new(
                     Binding::constant(Some("last".to_owned())),
                     vec![SidebarSection::new("many", items)],
-                ),
+                )
+                .expect("unique sidebar IDs"),
                 260.0,
                 130.0,
             ))

@@ -539,10 +539,10 @@ where
         }
 
         AnyView::new(
-            AnyView::new(crate::primitives::layout::ZStack::new(
-                crate::Alignment::TopLeading,
-                AnyView::new(TupleView::new(layers)),
-            ))
+            AnyView::new(
+                crate::primitives::layout::ZStack::new(AnyView::new(TupleView::new(layers)))
+                    .alignment(crate::Alignment::TopLeading),
+            )
             .frame(
                 Some(FrameDimension::Percent(100.0)),
                 Some(FrameDimension::Percent(100.0)),

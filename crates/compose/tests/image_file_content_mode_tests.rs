@@ -17,17 +17,17 @@ use std::rc::Rc;
 use cove_composition::AnyView;
 use cove_core::TextureId;
 use cove_core::scene::Node;
-use cove_core::{Color, DrawList, Point, Rect};
+use cove_core::{DrawList, Point, Rect};
 use cove_imaging::{BundleImageResource, ImageAssetRegistryHolder};
 use cove_ui_compose::modifiers::layout::LayoutFrameExt;
 
 /// The empty texture id the fallback source paints.
 const NO_TEXTURE: TextureId = 0;
-use cove_ui_compose::primitives::media::image::Image;
-use cove_ui_compose::primitives::media::image_file::{
+use cove_ui_compose::primitives::media::Image;
+use cove_ui_compose::primitives::media::ImageContentMode;
+use cove_ui_compose::primitives::media::{
     ImageLoadDiagnostic, ImageLoadDiagnostics, ImageLoadFailureReason,
 };
-use cove_ui_compose::primitives::media::image_geometry::{ImageContentMode, ImageRenderingMode};
 
 use support::GlobalTestLock;
 
@@ -154,12 +154,12 @@ fn fit_uses_the_decoded_size_without_a_registry() {
         let list = draw_image(
             Image::from_file(
                 &png,
-                100.0,
-                100.0,
-                Color::WHITE,
-                ImageContentMode::Fit,
-                ImageRenderingMode::Color,
-            ),
+                cove_core::Size {
+                    width: 100.0,
+                    height: 100.0,
+                },
+            )
+            .content_mode(ImageContentMode::Fit),
             100.0,
             100.0,
         );
@@ -192,12 +192,12 @@ fn fill_covers_the_box_and_crops_the_source() {
         let list = draw_image(
             Image::from_file(
                 &png,
-                100.0,
-                100.0,
-                Color::WHITE,
-                ImageContentMode::Fill,
-                ImageRenderingMode::Color,
-            ),
+                cove_core::Size {
+                    width: 100.0,
+                    height: 100.0,
+                },
+            )
+            .content_mode(ImageContentMode::Fill),
             100.0,
             100.0,
         );
@@ -241,12 +241,12 @@ fn a_decode_failure_emits_a_diagnostic_and_uses_the_empty_texture() {
 
         let image = Image::from_file(
             "/path/that/does/not/exist.png",
-            32.0,
-            32.0,
-            Color::WHITE,
-            ImageContentMode::Fit,
-            ImageRenderingMode::Color,
-        );
+            cove_core::Size {
+                width: 32.0,
+                height: 32.0,
+            },
+        )
+        .content_mode(ImageContentMode::Fit);
         ImageLoadDiagnostics::set_on_event(None);
 
         assert!(
@@ -284,12 +284,12 @@ fn a_missing_bundle_resource_emits_a_diagnostic_and_the_empty_texture() {
         );
         let image = Image::from_resource(
             &resource,
-            24.0,
-            24.0,
-            Color::WHITE,
-            ImageContentMode::Fit,
-            ImageRenderingMode::Color,
-        );
+            cove_core::Size {
+                width: 24.0,
+                height: 24.0,
+            },
+        )
+        .content_mode(ImageContentMode::Fit);
         ImageLoadDiagnostics::set_on_event(None);
 
         assert_eq!(

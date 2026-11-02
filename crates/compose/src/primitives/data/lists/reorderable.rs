@@ -415,10 +415,10 @@ where
         let scroll_session = session.clone();
         let scroll = ScrollView::new(
             ScrollAxis::Vertical,
-            AnyView::new(crate::primitives::layout::ZStack::new(
-                crate::Alignment::TopLeading,
-                AnyView::new(TupleView::new(layers)),
-            )),
+            AnyView::new(
+                crate::primitives::layout::ZStack::new(AnyView::new(TupleView::new(layers)))
+                    .alignment(crate::Alignment::TopLeading),
+            ),
         )
         .scrollbar_gutter(ScrollbarGutter::Stable)
         .on_viewport_change(move |viewport: ScrollViewport| {

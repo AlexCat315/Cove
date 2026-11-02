@@ -18,7 +18,7 @@
 
 use crate::Scope;
 use std::cell::RefCell;
-use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::rc::Rc;
 
 use crate::modifiers::interaction::AccessibilityExt;
@@ -154,7 +154,8 @@ impl<Record> TreeTableColumn<Record> {
 /// Depth-first projection of expanded branches.
 ///
 /// Children of collapsed branches are never visited, so cost follows the
-/// visible rows rather than the whole forest.
+/// visible rows rather than the whole forest. A repeated ID refers to the first
+/// visible occurrence, including cycles in a dynamic child provider.
 pub fn flatten_tree_table<Record, Id>(
     roots: &[Record],
     children: &dyn Fn(&Record) -> Option<Vec<Record>>,
@@ -171,14 +172,19 @@ where
         children: &dyn Fn(&Record) -> Option<Vec<Record>>,
         id_of: &dyn Fn(&Record) -> Id,
         expanded: &BTreeSet<Id>,
+        visited: &mut BTreeSet<Id>,
         result: &mut Vec<TreeTableRow<Record>>,
     ) where
         Record: Clone,
         Id: Ord + Clone,
     {
         for record in records {
+            let id = id_of(record);
+            if !visited.insert(id.clone()) {
+                continue;
+            }
             let kids = children(record);
-            let is_expanded = kids.is_some() && expanded.contains(&id_of(record));
+            let is_expanded = kids.is_some() && expanded.contains(&id);
             result.push(TreeTableRow::new(
                 record.clone(),
                 depth,
@@ -186,12 +192,20 @@ where
                 is_expanded,
             ));
             if is_expanded && let Some(kids) = kids {
-                visit(&kids, depth + 1, children, id_of, expanded, result);
+                visit(&kids, depth + 1, children, id_of, expanded, visited, result);
             }
         }
     }
     let mut result = Vec::new();
-    visit(roots, 0, children, id_of, expanded, &mut result);
+    visit(
+        roots,
+        0,
+        children,
+        id_of,
+        expanded,
+        &mut BTreeSet::new(),
+        &mut result,
+    );
     result
 }
 
@@ -224,24 +238,16 @@ where
     Record: Clone + 'static,
     Id: Ord + std::hash::Hash + Clone + Send + Sync + 'static,
 {
-    pub fn new(
+    pub fn try_new(
         roots: Vec<Record>,
         id_of: impl Fn(&Record) -> Id + 'static,
         children: impl Fn(&Record) -> Option<Vec<Record>> + 'static,
-        columns: Vec<TreeTableColumn<Record>>,
-    ) -> Self {
-        assert!(
-            !columns.is_empty(),
-            "TreeTable requires at least one column"
-        );
-        let mut seen = HashSet::new();
-        for column in &columns {
-            assert!(
-                seen.insert(column.id.clone()),
-                "TreeTable column IDs must be unique"
-            );
-        }
-        Self {
+        first: TreeTableColumn<Record>,
+        rest: impl IntoIterator<Item = TreeTableColumn<Record>>,
+    ) -> Result<Self, crate::primitives::DuplicateId> {
+        let columns: Vec<_> = std::iter::once(first).chain(rest).collect();
+        crate::primitives::check_ids(columns.iter().map(|column| &column.id), "Tree table column")?;
+        Ok(Self {
             roots,
             id_of: Rc::new(id_of),
             children: Rc::new(children),
@@ -252,7 +258,7 @@ where
             local_selection: State::new(DataTableSelection::new()),
             navigation: State::new(DataTableNavigation::new()),
             model: RefCell::new(None),
-        }
+        })
     }
 
     pub fn options(mut self, options: TreeTableOptions<Id>) -> Self {
@@ -309,7 +315,9 @@ where
             return model.clone();
         }
         let id_of = self.id_of.clone();
-        let model = DataTableModel::new(rows, move |row: &TreeTableRow<Record>| id_of(&row.record));
+        let model =
+            DataTableModel::try_new(rows, move |row: &TreeTableRow<Record>| id_of(&row.record))
+                .expect("unique data table row IDs");
         *self.model.borrow_mut() = Some((ids, states, model.clone()));
         model
     }
@@ -489,7 +497,9 @@ where
         table_options.frozen_column_count = 1;
         table_options.navigation = self.navigation.get();
 
-        let mut table = DataTable::new(model.clone(), mapped).options(table_options);
+        let mut table = DataTable::try_new(model.clone(), mapped)
+            .expect("unique data table column IDs")
+            .options(table_options);
         if let Some(handler) = &self.on_activate {
             let handler = handler.clone();
             table = table.on_activate(move |row: &TreeTableRow<Record>| handler(&row.record));

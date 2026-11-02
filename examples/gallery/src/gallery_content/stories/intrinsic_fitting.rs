@@ -92,19 +92,16 @@ impl View for ViewThatFitsStory {
         );
 
         // The candidate layouts: wide row first, compact column as the fallback.
-        let candidates: Vec<Rc<dyn cove_ui_compose::Layout>> = vec![
-            Rc::new(StackLayout::new(
-                StackAxis::Horizontal,
-                8.0,
-                Alignment::TopLeading,
-            )),
-            Rc::new(StackLayout::new(
-                StackAxis::Vertical,
-                8.0,
-                Alignment::TopLeading,
-            )),
-        ];
-        let fitting = LayoutThatFits::new(candidates);
+        let fitting = LayoutThatFits::new(StackLayout::new(
+            StackAxis::Horizontal,
+            8.0,
+            Alignment::TopLeading,
+        ))
+        .or(StackLayout::new(
+            StackAxis::Vertical,
+            8.0,
+            Alignment::TopLeading,
+        ));
 
         // `ContainerSizeReader` supplies the measured width; the branch follows
         // whether the wide row fits inside it.
@@ -261,18 +258,16 @@ mod checks {
     #[test]
     fn layout_that_fits_keeps_the_last_candidate_as_fallback() {
         // The story relies on this contract: wide first, compact last.
-        let fitting = LayoutThatFits::new(vec![
-            Rc::new(StackLayout::new(
-                StackAxis::Horizontal,
-                8.0,
-                Alignment::TopLeading,
-            )),
-            Rc::new(StackLayout::new(
-                StackAxis::Vertical,
-                8.0,
-                Alignment::TopLeading,
-            )),
-        ]);
+        let fitting = LayoutThatFits::new(StackLayout::new(
+            StackAxis::Horizontal,
+            8.0,
+            Alignment::TopLeading,
+        ))
+        .or(StackLayout::new(
+            StackAxis::Vertical,
+            8.0,
+            Alignment::TopLeading,
+        ));
         let _ = &fitting;
         let candidates = 2;
         assert_eq!(candidates, 2, "wide then compact");

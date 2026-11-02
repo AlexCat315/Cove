@@ -129,7 +129,7 @@ fn visible_columns_clamp_and_handle_degenerate_inputs() {
 #[test]
 fn row_heights_report_offsets_with_spacing() {
     let heights = GridRowHeights::variable(&[20.0, 40.0, 30.0]);
-    heights.validate(3);
+    assert!(heights.matches_count(3));
     assert_eq!(
         heights.height(1),
         40.0,

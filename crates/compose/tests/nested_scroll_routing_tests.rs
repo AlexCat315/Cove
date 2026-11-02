@@ -29,7 +29,7 @@ use cove_core::scene::{
 use cove_platform::{InputEvent, MouseMotionEvent, MouseWheelEvent, ScrollInput, WindowId};
 use cove_ui_compose::BoxView;
 use cove_ui_compose::modifiers::layout::{FlexExt, FrameDimension, LayoutFrameExt};
-use cove_ui_compose::primitives::layout::scroll_view::{ScrollAxis, ScrollView};
+use cove_ui_compose::primitives::layout::{ScrollAxis, ScrollView};
 
 use support::GlobalTestLock;
 

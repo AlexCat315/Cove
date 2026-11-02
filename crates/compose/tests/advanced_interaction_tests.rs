@@ -63,16 +63,16 @@ use cove_platform::{
 use cove_ui_compose::animation::content::animated_visibility::AnimatedVisibility;
 use cove_ui_compose::animation::transition::{Transition, TransitionEdge};
 use cove_ui_compose::modifiers::layout::LayoutFrameExt;
-use cove_ui_compose::primitives::controls::button::Button;
-use cove_ui_compose::primitives::layout::resizable_editor::ResizableEditor;
+use cove_ui_compose::primitives::controls::Button;
+use cove_ui_compose::primitives::layout::ResizableEditor;
 use cove_ui_compose::primitives::layout::virtualization::VirtualStack;
-use cove_ui_compose::primitives::overlays::context_menu::ContextMenu;
+use cove_ui_compose::primitives::overlays::ContextMenu;
+use cove_ui_compose::primitives::overlays::ShortcutHost;
 use cove_ui_compose::primitives::overlays::menu::{MenuEntry, MenuItem};
 use cove_ui_compose::primitives::overlays::modal::{Modal, ModalGeometry, ModalOptions};
 use cove_ui_compose::primitives::overlays::portal::{
     LayerRoot, PortalHost, PortalPlacement, PortalPlacementMode,
 };
-use cove_ui_compose::primitives::overlays::shortcut_host::ShortcutHost;
 use cove_ui_compose::primitives::text::Text;
 use cove_ui_compose::primitives::text::text_buffer::TextBuffer;
 use cove_ui_compose::primitives::text::text_edit_history::{

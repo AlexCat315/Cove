@@ -2,6 +2,7 @@
 //!
 //! Controlled selection with one Tab stop and wrapping arrow-key navigation.
 use crate::Scope;
+use crate::primitives::{DuplicateId, check_ids};
 use std::rc::Rc;
 
 use crate::modifiers::layout::{FlexExt, LayoutFrameExt, PaddingExt};
@@ -56,26 +57,26 @@ impl<Value: PartialEq + Clone> RadioOption<Value> {
 /// Controlled single-selection group.
 pub struct RadioGroup<Value: PartialEq + Clone + std::hash::Hash + Send + Sync + 'static> {
     pub selection: Binding<Option<Value>>,
-    pub options: Vec<RadioOption<Value>>,
+    pub(crate) options: Vec<RadioOption<Value>>,
     pub is_enabled: bool,
     pub is_horizontal: bool,
 }
 
 impl<Value: PartialEq + Clone + std::hash::Hash + Send + Sync + 'static> RadioGroup<Value> {
-    pub fn new(selection: Binding<Option<Value>>, options: Vec<RadioOption<Value>>) -> Self {
-        assert!(
-            options.iter().enumerate().all(|(index, option)| options
-                .iter()
-                .enumerate()
-                .all(|(other, candidate)| other == index || candidate.value != option.value)),
-            "Radio option values must be unique"
-        );
-        Self {
+    pub fn try_new(
+        selection: Binding<Option<Value>>,
+        options: Vec<RadioOption<Value>>,
+    ) -> Result<Self, DuplicateId>
+    where
+        Value: Eq,
+    {
+        check_ids(options.iter().map(|item| &item.value), "Radio option")?;
+        Ok(Self {
             selection,
             options,
             is_enabled: true,
             is_horizontal: false,
-        }
+        })
     }
 
     pub fn enabled(mut self, is_enabled: bool) -> Self {

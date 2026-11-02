@@ -8,7 +8,7 @@ pub mod virtual_stack;
 pub mod virtual_stack_body;
 pub mod virtual_window;
 
-pub use estimated_stack::{EstimatedRowHost, EstimatedRowMetrics, EstimatedVirtualStack};
+pub use estimated_stack::{EstimatedRowMetrics, EstimatedVirtualStack};
 pub use fixed_stack::{FixedVirtualStack, total_extent, visible_range};
 pub use row_index::VariableRowIndex;
 pub use row_metrics::VariableRowMetrics;

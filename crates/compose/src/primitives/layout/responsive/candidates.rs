@@ -8,12 +8,15 @@ pub struct LayoutThatFits {
 }
 
 impl LayoutThatFits {
-    pub fn new(candidates: Vec<Rc<dyn Layout>>) -> Self {
-        assert!(
-            !candidates.is_empty(),
-            "LayoutThatFits requires at least one candidate"
-        );
-        Self { candidates }
+    pub fn new(first: impl Layout + 'static) -> Self {
+        Self {
+            candidates: vec![Rc::new(first)],
+        }
+    }
+
+    pub fn or(mut self, fallback: impl Layout + 'static) -> Self {
+        self.candidates.push(Rc::new(fallback));
+        self
     }
 
     fn selection(&self, proposal: ProposedViewSize, subviews: &[LayoutSubview]) -> (usize, Size) {

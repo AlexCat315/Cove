@@ -2,7 +2,8 @@
 pub mod anchoring;
 pub mod placement;
 
-pub use anchoring::{AnchoredOverlayHost, MenuKeyHost, PopoverAnchor, PopoverSurfaceHost};
+pub use anchoring::PopoverAnchor;
+pub(crate) use anchoring::{AnchoredOverlayHost, MenuKeyHost};
 pub use placement::{
     PopoverEdge, PopoverGeometry, PopoverOverflow, PopoverPlacement, PopoverSurface,
 };

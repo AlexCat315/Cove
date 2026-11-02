@@ -23,8 +23,8 @@ use cove_composition::AnyView;
 use cove_core::scene::Node;
 use cove_ui_compose::modifiers::layout::{FlexExt, LayoutFrameExt};
 use cove_ui_compose::primitives::feedback::StatusTone;
-use cove_ui_compose::primitives::layout::panel::Panel;
-use cove_ui_compose::primitives::layout::status_bar::{StatusBar, StatusBarText};
+use cove_ui_compose::primitives::layout::Panel;
+use cove_ui_compose::primitives::layout::{StatusBar, StatusBarText};
 use cove_ui_compose::primitives::text::Text;
 
 use support::GlobalTestLock;

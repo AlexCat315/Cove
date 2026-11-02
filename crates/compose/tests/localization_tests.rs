@@ -6,7 +6,7 @@ use std::rc::Rc;
 
 use cove_composition::AnyView;
 use cove_core::scene::{AccessibilityRole, Node};
-use cove_ui_compose::foundation::{Calendar, Date, DateParts};
+use cove_ui_compose::foundation::{Calendar, DateParts};
 use cove_ui_compose::i18n;
 use cove_ui_compose::primitives::controls::calendar::calendar::{CalendarOptions, CalendarView};
 use cove_ui_compose::primitives::controls::calendar::period::CalendarGranularity;
@@ -33,11 +33,13 @@ fn render(
         let store = Rc::new(RefCell::new(Some(selection)));
         let read = store.clone();
         let write = store.clone();
-        scene.install(AnyView::new(CalendarView::new(
-            Rc::new(move || *read.borrow()),
-            Rc::new(move |value| *write.borrow_mut() = value),
-            options,
-        )));
+        scene.install(AnyView::new(
+            CalendarView::new(cove_core::Binding::new(
+                move || *read.borrow(),
+                move |value| *write.borrow_mut() = value,
+            ))
+            .configure(|calendar| *calendar = options),
+        ));
         test(scene);
     });
     i18n::set_locale_override(None);

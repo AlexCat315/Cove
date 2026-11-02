@@ -13,7 +13,7 @@
 //!
 //! Name mapping: `GridTrackResolver.widths(columns:availableWidth:spacing:)` is
 //! `GridTrackResolver::widths(&columns, available_width, spacing, &[])`, and
-//! `Grid(columns:columnSpacing:rowSpacing:)` is `Grid::new(..)`.
+//! `Grid(columns:columnSpacing:rowSpacing:)` is `Grid::try_new(..)`.
 
 use crate::support;
 
@@ -183,15 +183,10 @@ fn grid_node(
     alignment: Alignment,
     content: Vec<AnyView>,
 ) -> Grid {
-    Grid::new(
-        columns,
-        column_spacing,
-        row_spacing,
-        alignment,
-        None,
-        true,
-        AnyView::new(TupleView::new(content)),
-    )
+    Grid::try_new(columns, AnyView::new(TupleView::new(content)))
+        .expect("valid grid columns")
+        .spacing(column_spacing, row_spacing)
+        .alignment(alignment)
 }
 
 #[test]

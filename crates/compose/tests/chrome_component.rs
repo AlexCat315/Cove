@@ -13,7 +13,7 @@ use std::cell::Cell;
 use cove_core::scene::{AccessibilityRole, Node};
 use cove_ui_compose::primitives::controls::Link;
 use cove_ui_compose::primitives::feedback::StatusTone;
-use cove_ui_compose::primitives::layout::status_bar::{StatusBar, StatusBarMetrics, StatusBarText};
+use cove_ui_compose::primitives::layout::{StatusBar, StatusBarMetrics, StatusBarText};
 use cove_ui_compose::primitives::media::ui_icon_catalog;
 use cove_ui_compose::{AnyView, TupleView};
 

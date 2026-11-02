@@ -4,6 +4,7 @@
 //! wrapping arrow-key navigation, so the group reads as one control to the
 //! keyboard while each segment keeps its authored width.
 use crate::Scope;
+use crate::primitives::{DuplicateId, check_ids};
 use std::rc::Rc;
 
 use crate::primitives::controls::button::{Button, ButtonRole};
@@ -38,25 +39,25 @@ impl<Id: PartialEq + Clone> ButtonGroupItem<Id> {
 
 /// Segmented single-selection control.
 pub struct ButtonGroup<Id: PartialEq + Clone + std::hash::Hash + Send + Sync + 'static> {
-    pub items: Vec<ButtonGroupItem<Id>>,
+    pub(crate) items: Vec<ButtonGroupItem<Id>>,
     pub selection: Binding<Option<Id>>,
     pub is_enabled: bool,
 }
 
 impl<Id: PartialEq + Clone + std::hash::Hash + Send + Sync + 'static> ButtonGroup<Id> {
-    pub fn new(items: Vec<ButtonGroupItem<Id>>, selection: Binding<Option<Id>>) -> Self {
-        assert!(
-            items.iter().enumerate().all(|(index, item)| items
-                .iter()
-                .enumerate()
-                .all(|(other, candidate)| other == index || candidate.id != item.id)),
-            "Button group IDs must be unique"
-        );
-        Self {
+    pub fn try_new(
+        items: Vec<ButtonGroupItem<Id>>,
+        selection: Binding<Option<Id>>,
+    ) -> Result<Self, DuplicateId>
+    where
+        Id: Eq,
+    {
+        check_ids(items.iter().map(|item| &item.id), "Button group")?;
+        Ok(Self {
             items,
             selection,
             is_enabled: true,
-        }
+        })
     }
 
     pub fn enabled(mut self, is_enabled: bool) -> Self {

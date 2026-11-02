@@ -77,24 +77,24 @@ use cove_platform::{
 };
 use cove_ui_compose::Scancode;
 use cove_ui_compose::modifiers::layout::LayoutFrameExt;
-use cove_ui_compose::primitives::controls::button::Button;
-use cove_ui_compose::primitives::controls::link::{Link, LinkUnderline};
+use cove_ui_compose::primitives::controls::Button;
 use cove_ui_compose::primitives::controls::toolbar::{
     Toolbar, ToolbarGroup, ToolbarOptions, ToolbarSeparator,
 };
-use cove_ui_compose::primitives::interaction::horizontal_swipe::HorizontalSwipeSession;
+use cove_ui_compose::primitives::controls::{Link, LinkUnderline};
+use cove_ui_compose::primitives::interaction::HorizontalSwipeSession;
 use cove_ui_compose::primitives::layout::carousel::{Carousel, CarouselPage};
 use cove_ui_compose::primitives::media::LoadingAnimationClock;
-use cove_ui_compose::primitives::media::skeleton::{Skeleton, SkeletonShape};
+use cove_ui_compose::primitives::media::{Skeleton, SkeletonShape};
 use cove_ui_compose::primitives::navigation::stepper::{
     StepStatus, Stepper, StepperAxis, StepperItem, StepperOptions,
 };
-use cove_ui_compose::primitives::overlays::command_palette::{CommandPalette, PaletteCommand};
-use cove_ui_compose::primitives::overlays::focus_scope::FocusScope;
+use cove_ui_compose::primitives::overlays::FocusScope;
 use cove_ui_compose::primitives::overlays::portal::{LayerRoot, PortalResource};
 use cove_ui_compose::primitives::overlays::{
     CommandEntry, CommandItem, destination, entries, hover_card::HoverCard, ranked,
 };
+use cove_ui_compose::primitives::overlays::{CommandPalette, PaletteCommand};
 use cove_ui_compose::primitives::text::Text;
 use cove_ui_compose::primitives::text::text_buffer::TextBuffer;
 use cove_ui_compose::primitives::text::text_field::TextField;
@@ -1113,7 +1113,9 @@ fn stepper_owns_one_tab_stop_and_preserves_outcomes() {
     InteractiveScene::run(900.0, 700.0, |scene| {
         let selected = State::new(Some("first".to_string()));
         let steps = stepper_items();
-        scene.install(Stepper::new(steps.clone(), selected.binding()));
+        scene.install(
+            Stepper::try_new(steps.clone(), selected.binding()).expect("unique stepper item IDs"),
+        );
         scene.settle(12, 1.0 / 60.0);
 
         let items: Vec<Node> = buttons(scene)
@@ -1209,10 +1211,12 @@ fn stepper_owns_one_tab_stop_and_preserves_outcomes() {
         );
 
         scene.install(
-            Stepper::new(steps.clone(), selected.binding()).options(StepperOptions {
-                axis: StepperAxis::Vertical,
-                ..StepperOptions::default()
-            }),
+            Stepper::try_new(steps.clone(), selected.binding())
+                .expect("unique stepper item IDs")
+                .options(StepperOptions {
+                    axis: StepperAxis::Vertical,
+                    ..StepperOptions::default()
+                }),
         );
         scene.settle(12, 1.0 / 60.0);
         let vertical: Vec<Node> = buttons(scene)
@@ -1239,10 +1243,12 @@ fn stepper_owns_one_tab_stop_and_preserves_outcomes() {
         );
 
         scene.install(
-            Stepper::new(steps.clone(), selected.binding()).options(StepperOptions {
-                is_enabled: false,
-                ..StepperOptions::default()
-            }),
+            Stepper::try_new(steps.clone(), selected.binding())
+                .expect("unique stepper item IDs")
+                .options(StepperOptions {
+                    is_enabled: false,
+                    ..StepperOptions::default()
+                }),
         );
         scene.settle(12, 1.0 / 60.0);
         assert!(
@@ -1250,7 +1256,10 @@ fn stepper_owns_one_tab_stop_and_preserves_outcomes() {
             "a disabled stepper exposes no focusable control"
         );
 
-        scene.install(Stepper::<String>::new(vec![], Binding::constant(None)));
+        scene.install(
+            Stepper::<String>::try_new(vec![], Binding::constant(None))
+                .expect("unique stepper item IDs"),
+        );
         scene.settle(12, 1.0 / 60.0);
         assert!(
             buttons(scene).is_empty(),

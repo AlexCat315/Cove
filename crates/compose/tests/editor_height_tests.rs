@@ -44,12 +44,12 @@ use cove_platform::{
 use cove_ui_compose::adaptive::SurfaceEnvironmentExt;
 use cove_ui_compose::modifiers::interaction::AccessibilityExt;
 use cove_ui_compose::modifiers::layout::LayoutFrameExt;
-use cove_ui_compose::primitives::controls::button::Button;
+use cove_ui_compose::primitives::controls::Button;
 use cove_ui_compose::primitives::controls::fields::json_field::JsonField;
 use cove_ui_compose::primitives::controls::fields::json_field_model::JsonFieldLabels;
-use cove_ui_compose::primitives::layout::resizable_editor::ResizableEditor;
-use cove_ui_compose::primitives::layout::resizable_text_area::ResizableTextArea;
-use cove_ui_compose::primitives::layout::scroll_view::{ScrollAxis, ScrollView};
+use cove_ui_compose::primitives::layout::ResizableEditor;
+use cove_ui_compose::primitives::layout::ResizableTextArea;
+use cove_ui_compose::primitives::layout::{ScrollAxis, ScrollView};
 use cove_ui_compose::primitives::text::text_buffer::TextBuffer;
 use cove_ui_compose::primitives::text::text_field::text_field::{FieldState, TextField};
 use cove_ui_compose::primitives::text::text_field::text_field_options::{

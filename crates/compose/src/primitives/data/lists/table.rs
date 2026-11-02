@@ -6,6 +6,7 @@
 //! system. Cell content may include editors; embedded controls receive input
 //! before row selection.
 use crate::Scope;
+use crate::primitives::{DuplicateId, check_ids};
 use std::cell::RefCell;
 use std::collections::BTreeMap;
 use std::rc::Rc;
@@ -348,9 +349,9 @@ impl<Id> Default for TableSession<Id> {
 
 /// A fixed header and virtualized rows sharing one horizontal scroll.
 pub struct Table<Record: 'static, Id: PartialEq + Clone + 'static> {
-    pub records: Rc<Vec<Record>>,
-    pub row_id: Rc<dyn Fn(&Record) -> Id>,
-    pub columns: Vec<TableColumn<Record>>,
+    records: Rc<Vec<Record>>,
+    row_id: Rc<dyn Fn(&Record) -> Id>,
+    columns: Vec<TableColumn<Record>>,
     pub options: TableOptions<Id>,
     pub on_activate: Option<Rc<dyn Fn(&Record)>>,
     session: Rc<RefCell<TableSession<Id>>>,
@@ -359,35 +360,25 @@ pub struct Table<Record: 'static, Id: PartialEq + Clone + 'static> {
 impl<Record: 'static, Id: PartialEq + Clone + 'static> Table<Record, Id> {
     ///
     /// Column and row IDs must be unique.
-    pub fn new(
+    pub fn try_new(
         records: Vec<Record>,
         row_id: impl Fn(&Record) -> Id + 'static,
         columns: Vec<TableColumn<Record>>,
-    ) -> Self {
-        assert!(
-            columns.iter().enumerate().all(|(index, column)| columns
-                .iter()
-                .enumerate()
-                .all(|(other, other_column)| other == index || other_column.id != column.id)),
-            "Table column IDs must be unique"
-        );
+    ) -> Result<Self, DuplicateId>
+    where
+        Id: Eq + std::hash::Hash,
+    {
+        check_ids(columns.iter().map(|item| &item.id), "Table column")?;
+        check_ids(records.iter().map(&row_id), "Table row")?;
         let row_id = Rc::new(row_id);
-        let ids: Vec<Id> = records.iter().map(|record| row_id(record)).collect();
-        assert!(
-            ids.iter().enumerate().all(|(index, id)| ids
-                .iter()
-                .enumerate()
-                .all(|(other, candidate)| other == index || candidate != id)),
-            "Table row IDs must be unique"
-        );
-        Self {
+        Ok(Self {
             records: Rc::new(records),
             row_id,
             columns,
             options: TableOptions::default(),
             on_activate: None,
             session: Rc::new(RefCell::new(TableSession::default())),
-        }
+        })
     }
 
     pub fn options(mut self, options: TableOptions<Id>) -> Self {
@@ -657,11 +648,7 @@ impl<Record: 'static, Id: PartialEq + Clone + 'static> View for Table<Record, Id
             ScrollAxis::Horizontal,
             AnyView::new(TupleView::new(vec![
                 header,
-                AnyView::new(crate::primitives::text::Divider::new(
-                    None,
-                    1.0,
-                    crate::primitives::text::DividerAxis::Horizontal,
-                )),
+                AnyView::new(crate::primitives::text::Divider::horizontal()),
                 AnyView::new(
                     ScrollView::vertical(AnyView::new(BoxView::new(
                         FlexDirection::Column,

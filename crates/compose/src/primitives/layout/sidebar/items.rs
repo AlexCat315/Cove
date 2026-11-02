@@ -143,3 +143,28 @@ impl<Id: PartialEq + Clone> SidebarSection<Id> {
         self
     }
 }
+
+/// Checked once when navigation is authored and shared by all presentations.
+#[derive(Clone)]
+pub(crate) struct SidebarSections<Id: Eq + Clone>(pub(super) std::rc::Rc<[SidebarSection<Id>]>);
+
+impl<Id: Eq + std::hash::Hash + Clone> SidebarSections<Id> {
+    pub(crate) fn new(
+        sections: Vec<SidebarSection<Id>>,
+    ) -> Result<Self, crate::primitives::DuplicateId> {
+        use crate::primitives::{DuplicateId, check_ids};
+        check_ids(
+            sections.iter().map(|section| &section.id),
+            "Sidebar section",
+        )?;
+        let mut seen = std::collections::HashSet::new();
+        let mut pending: Vec<_> = sections.iter().flat_map(|section| &section.items).collect();
+        while let Some(item) = pending.pop() {
+            if !seen.insert(&item.id) {
+                return Err(DuplicateId("Sidebar item"));
+            }
+            pending.extend(&item.children);
+        }
+        Ok(Self(sections.into()))
+    }
+}

@@ -123,12 +123,13 @@ impl View for Icon {
                 let themed = theme.icons.resolve(&resource);
                 let image = Image::from_resource(
                     &themed,
-                    resolved,
-                    resolved,
-                    Color::WHITE,
-                    ImageContentMode::Fit,
-                    ImageRenderingMode::AlphaMask,
-                );
+                    cove_core::Size {
+                        width: resolved,
+                        height: resolved,
+                    },
+                )
+                .content_mode(ImageContentMode::Fit)
+                .rendering_mode(ImageRenderingMode::AlphaMask);
                 let image = match &fill {
                     IconFill::Inherited => image,
                     IconFill::Semantic(reference) => image.foreground(reference.resolve(&theme)),

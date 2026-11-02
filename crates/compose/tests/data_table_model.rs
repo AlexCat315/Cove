@@ -45,7 +45,7 @@ fn comparator() -> Option<Rc<dyn Fn(&TableTestRow, &TableTestRow) -> ComparisonR
 
 #[test]
 fn large_projection_is_stable_and_lookup_is_constant_time() {
-    let model = DataTableModel::new(
+    let model = DataTableModel::try_new(
         (0..200_000)
             .map(|index| TableTestRow {
                 id: index,
@@ -53,7 +53,8 @@ fn large_projection_is_stable_and_lookup_is_constant_time() {
             })
             .collect::<Vec<_>>(),
         |row: &TableTestRow| row.id,
-    );
+    )
+    .expect("unique data table row IDs");
 
     model.set_sort(Some(TableSort::new("value")), comparator());
     assert!(
@@ -131,7 +132,7 @@ fn large_projection_is_stable_and_lookup_is_constant_time() {
 
 #[test]
 fn edits_and_replacement_preserve_the_latest_data() {
-    let model = DataTableModel::new(
+    let model = DataTableModel::try_new(
         (0..10_000)
             .map(|index| TableTestRow {
                 id: index,
@@ -139,7 +140,8 @@ fn edits_and_replacement_preserve_the_latest_data() {
             })
             .collect::<Vec<_>>(),
         |row: &TableTestRow| row.id,
-    );
+    )
+    .expect("unique data table row IDs");
     model.set_sort(Some(TableSort::new("value")), comparator());
 
     // Editing before the projection settles must be reflected in it.
@@ -156,10 +158,12 @@ fn edits_and_replacement_preserve_the_latest_data() {
     );
 
     model.set_sort(Some(TableSort::new("value").descending()), comparator());
-    model.replace_rows(vec![
-        TableTestRow { id: 80, value: 2 },
-        TableTestRow { id: 90, value: 3 },
-    ]);
+    model
+        .replace_rows(vec![
+            TableTestRow { id: 80, value: 2 },
+            TableTestRow { id: 90, value: 3 },
+        ])
+        .unwrap();
     assert_eq!(model.count(), 2, "replacement swaps the whole row set");
     assert_eq!(
         model.row_id_at(0),
@@ -183,7 +187,7 @@ fn edits_and_replacement_preserve_the_latest_data() {
 
 #[test]
 fn range_selection_follows_display_order() {
-    let model = DataTableModel::new(
+    let model = DataTableModel::try_new(
         (0..12)
             .map(|index| TableTestRow {
                 id: index,
@@ -191,7 +195,8 @@ fn range_selection_follows_display_order() {
             })
             .collect::<Vec<_>>(),
         |row: &TableTestRow| row.id,
-    );
+    )
+    .expect("unique data table row IDs");
     model.set_sort(Some(TableSort::new("value")), comparator());
 
     let mut selection: DataTableSelection<usize> = DataTableSelection::new();
@@ -249,7 +254,7 @@ fn range_selection_follows_display_order() {
 
 #[test]
 fn deletion_cleanup_drops_ids_that_left_the_model() {
-    let model = DataTableModel::new(
+    let model = DataTableModel::try_new(
         (0..12)
             .map(|index| TableTestRow {
                 id: index,
@@ -257,7 +262,8 @@ fn deletion_cleanup_drops_ids_that_left_the_model() {
             })
             .collect::<Vec<_>>(),
         |row: &TableTestRow| row.id,
-    );
+    )
+    .expect("unique data table row IDs");
     model.set_sort(Some(TableSort::new("value")), comparator());
 
     let mut selection: DataTableSelection<usize> = DataTableSelection::new();
@@ -270,7 +276,9 @@ fn deletion_cleanup_drops_ids_that_left_the_model() {
     );
     assert!(!selection.selected_ids.is_empty(), "the range is selected");
 
-    model.replace_rows(vec![TableTestRow { id: 99, value: 0 }]);
+    model
+        .replace_rows(vec![TableTestRow { id: 99, value: 0 }])
+        .unwrap();
     selection.retain_existing(&model);
 
     assert!(
@@ -312,7 +320,7 @@ fn hundreds_of_columns_window_by_width_with_independent_frozen_columns() {
 
 #[test]
 fn descending_sorts_do_not_reverse_ties() {
-    let model = DataTableModel::new(
+    let model = DataTableModel::try_new(
         (0..6)
             .map(|index| TableTestRow {
                 id: index,
@@ -320,7 +328,8 @@ fn descending_sorts_do_not_reverse_ties() {
             })
             .collect::<Vec<_>>(),
         |row: &TableTestRow| row.id,
-    );
+    )
+    .expect("unique data table row IDs");
     model.set_sort(Some(TableSort::new("value").descending()), comparator());
 
     let ids: Vec<usize> = (0..6)
@@ -335,14 +344,15 @@ fn descending_sorts_do_not_reverse_ties() {
 
 #[test]
 fn a_replaced_row_set_rebuilds_the_active_projection() {
-    let model = DataTableModel::new(
+    let model = DataTableModel::try_new(
         vec![
             TableTestRow { id: 1, value: 30 },
             TableTestRow { id: 2, value: 10 },
             TableTestRow { id: 3, value: 20 },
         ],
         |row: &TableTestRow| row.id,
-    );
+    )
+    .expect("unique data table row IDs");
     model.set_sort(Some(TableSort::new("value")), comparator());
     assert_eq!(
         [model.row_id_at(0), model.row_id_at(1), model.row_id_at(2)],
@@ -350,10 +360,12 @@ fn a_replaced_row_set_rebuilds_the_active_projection() {
         "the initial rows sort ascending"
     );
 
-    model.replace_rows(vec![
-        TableTestRow { id: 4, value: 50 },
-        TableTestRow { id: 5, value: 40 },
-    ]);
+    model
+        .replace_rows(vec![
+            TableTestRow { id: 4, value: 50 },
+            TableTestRow { id: 5, value: 40 },
+        ])
+        .unwrap();
     assert_eq!(
         [model.row_id_at(0), model.row_id_at(1)],
         [Some(5), Some(4)],
@@ -368,10 +380,22 @@ fn a_replaced_row_set_rebuilds_the_active_projection() {
 
 #[test]
 fn an_empty_model_reports_no_rows() {
-    let model = DataTableModel::new(Vec::<TableTestRow>::new(), |row: &TableTestRow| row.id);
+    let model = DataTableModel::try_new(Vec::<TableTestRow>::new(), |row: &TableTestRow| row.id)
+        .expect("unique data table row IDs");
     assert_eq!(model.count(), 0);
     assert_eq!(model.row_id_at(0), None, "no row exists at index 0");
     assert_eq!(model.index_for(&0), None, "no id resolves");
     model.set_sort(Some(TableSort::new("value")), comparator());
     assert_eq!(model.count(), 0, "sorting an empty model is a no-op");
+}
+
+#[test]
+fn invalid_row_identity_leaves_the_current_model_intact() {
+    let model = DataTableModel::try_new(vec![1, 2], |row| *row).unwrap();
+    let revision = model.revision();
+    assert!(model.replace_rows(vec![3, 3]).is_err());
+    assert!(!model.update_row(&1, |row| *row = 2));
+    assert_eq!(model.row_id_at(0), Some(1));
+    assert_eq!(model.index_for(&2), Some(1));
+    assert_eq!(model.revision(), revision);
 }

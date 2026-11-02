@@ -821,9 +821,8 @@ impl PrimitiveView for SwipeRowHost {
         );
 
         match &self.action_row {
-            Some(actions) => vec![AnyView::new(crate::primitives::layout::ZStack::new(
-                crate::Alignment::Trailing,
-                AnyView::new(TupleView::new(vec![
+            Some(actions) => vec![AnyView::new(
+                crate::primitives::layout::ZStack::new(AnyView::new(TupleView::new(vec![
                     AnyView::new(
                         actions
                             .clone()
@@ -831,8 +830,9 @@ impl PrimitiveView for SwipeRowHost {
                             .allows_hit_testing(self.reveal.get() < -0.5 && self.is_enabled),
                     ),
                     content,
-                ])),
-            ))],
+                ])))
+                .alignment(crate::Alignment::Trailing),
+            )],
             None => vec![content],
         }
     }

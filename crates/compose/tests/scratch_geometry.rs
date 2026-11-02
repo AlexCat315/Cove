@@ -28,13 +28,14 @@ fn combobox_graph_materialises_option_label() {
     GlobalTestLock::locked(|| {
         with_test_text_environment(|| {
             let long_label = "Workspace permissions and international collaboration 👩🏽‍💻";
-            let combobox = Combobox::new(
+            let combobox = Combobox::try_new(
                 Binding::constant(Some(0)),
                 vec![
                     SelectOption::new(0, long_label, true),
                     SelectOption::new(1, "Personal workspace", true),
                 ],
             )
+            .expect("unique combobox IDs")
             .frame(
                 Some(FrameDimension::Percent(100.0)),
                 None,

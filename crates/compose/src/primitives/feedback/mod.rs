@@ -1,12 +1,12 @@
 //! Feedback primitives (alerts, progress, toasts).
-pub mod alert;
-pub mod badge;
-pub mod empty_state;
-pub mod progress;
-pub mod progress_circle;
-pub mod progress_value;
-pub mod spinner;
-pub mod status_tone;
+pub(crate) mod alert;
+pub(crate) mod badge;
+pub(crate) mod empty_state;
+pub(crate) mod progress;
+pub(crate) mod progress_circle;
+pub(crate) mod progress_value;
+pub(crate) mod spinner;
+pub(crate) mod status_tone;
 
 pub use alert::{Alert, AlertTone};
 pub use badge::{Badge, BadgeVariant};

@@ -13,7 +13,7 @@ use cove_core::scene::{
     Recomposer,
 };
 use cove_platform::{KeyEvent, KeyModifiers};
-use cove_ui_compose::primitives::overlays::shortcut_host::ShortcutHost;
+use cove_ui_compose::primitives::overlays::ShortcutHost;
 
 fn find_shortcut_node(node: &Node, registry: &InteractionRegistry) -> Option<Node> {
     if registry.handlers(node).key_route == Some(InputHandlerRoute::shortcut()) {

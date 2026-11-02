@@ -56,10 +56,10 @@ use cove_platform::{
 };
 use cove_ui_compose::BoxView;
 use cove_ui_compose::modifiers::layout::LayoutFrameExt;
-use cove_ui_compose::primitives::controls::button::Button;
+use cove_ui_compose::primitives::controls::Button;
 use cove_ui_compose::primitives::layout::sidebar::{Sidebar, SidebarItem, SidebarSection};
 use cove_ui_compose::primitives::layout::virtualization::{VirtualStack, VirtualWindow};
-use cove_ui_compose::primitives::navigation::route_outlet::RouteOutlet;
+use cove_ui_compose::primitives::navigation::RouteOutlet;
 use cove_ui_compose::primitives::text::Text;
 use cove_ui_compose::theme::{TextScaler, TextScalerViewExt};
 
@@ -273,7 +273,7 @@ fn explicit_memoization_skips_equal_parent_updates_but_keeps_local_invalidation(
 #[test]
 fn sidebar_focus_survives_a_hover_without_changing_selection() {
     InteractiveScene::run(260.0, 400.0, |scene| {
-        let sidebar = Sidebar::new(
+        let sidebar = Sidebar::try_new(
             Binding::constant(Some(0_i32)),
             vec![SidebarSection::new(
                 "main",
@@ -281,7 +281,8 @@ fn sidebar_focus_survives_a_hover_without_changing_selection() {
                     .map(|index| SidebarItem::new(index, format!("Item {index}")))
                     .collect(),
             )],
-        );
+        )
+        .expect("unique sidebar IDs");
         scene.install(sidebar.frame_size(260.0, 400.0));
 
         let row = scene

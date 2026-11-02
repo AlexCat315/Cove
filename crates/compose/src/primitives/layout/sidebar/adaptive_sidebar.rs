@@ -5,6 +5,8 @@
 //! belongs to the caller's session and survives a temporary return to the
 //! expanded layout.
 use crate::Scope;
+use crate::primitives::DuplicateId;
+use crate::primitives::layout::sidebar::items::SidebarSections;
 use std::collections::HashSet;
 use std::rc::Rc;
 
@@ -45,7 +47,7 @@ pub struct AdaptiveSidebar<Id: PartialEq + Eq + std::hash::Hash + Clone + Send +
     pub selection: Binding<Option<Id>>,
     pub width: Option<Binding<f32>>,
     pub expanded: Option<Binding<HashSet<Id>>>,
-    pub sections: Vec<SidebarSection<Id>>,
+    sections: SidebarSections<Id>,
     pub options: AdaptiveSidebarOptions,
     pub local_presentation: cove_core::State<bool>,
     pub local_collapse: cove_core::State<bool>,
@@ -65,7 +67,7 @@ struct AdaptiveSnapshot<Id: PartialEq + Eq + std::hash::Hash + Clone + Send + Sy
     selection: Binding<Option<Id>>,
     width: Option<Binding<f32>>,
     expanded: Option<Binding<HashSet<Id>>>,
-    sections: Vec<SidebarSection<Id>>,
+    sections: SidebarSections<Id>,
     options: AdaptiveSidebarOptions,
     local_presentation: cove_core::State<bool>,
     local_collapse: cove_core::State<bool>,
@@ -256,7 +258,7 @@ impl<Id: PartialEq + Eq + std::hash::Hash + Clone + Send + Sync + 'static> Adapt
         let sections = self.sections.clone();
         let presentation_binding = self.presentation.clone();
         let local_presentation = self.local_presentation.clone();
-        let mut sidebar = Sidebar::new(selection, sections)
+        let mut sidebar = Sidebar::from_sections(selection, sections)
             .presentation(presentation)
             .minimum_row_height(row_height)
             .on_activate(move |_id: Id| {
@@ -327,19 +329,13 @@ impl<Id: PartialEq + Eq + std::hash::Hash + Clone + Send + Sync + 'static> Adapt
     ///
     /// The header and footer default to empty views; callers add them with the
     /// builders below. Section IDs must be unique, matching `Sidebar`.
-    pub fn new(
+    pub fn try_new(
         title: impl Into<String>,
         selection: Binding<Option<Id>>,
         sections: Vec<SidebarSection<Id>>,
-    ) -> Self {
-        assert!(
-            sections.iter().enumerate().all(|(index, section)| sections
-                .iter()
-                .enumerate()
-                .all(|(other, candidate)| other == index || candidate.id != section.id)),
-            "AdaptiveSidebar section IDs must be unique"
-        );
-        Self {
+    ) -> Result<Self, DuplicateId> {
+        let sections = SidebarSections::new(sections)?;
+        Ok(Self {
             title: title.into(),
             presentation: None,
             collapse: None,
@@ -355,7 +351,7 @@ impl<Id: PartialEq + Eq + std::hash::Hash + Clone + Send + Sync + 'static> Adapt
             header: AnyView::new(cove_composition::EmptyView),
             footer: AnyView::new(cove_composition::EmptyView),
             content: AnyView::new(cove_composition::EmptyView),
-        }
+        })
     }
 
     /// The pane the sidebar navigates.

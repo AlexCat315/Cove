@@ -10,8 +10,10 @@ pub use columns::{
     ColumnVisibility, GridColumn, GridTrackResolver, GridTracks, GridTracksGroup,
     GridTracksIterator,
 };
-pub use grid::{Grid, GridInteractionHost, GridLayout, named_column_plan};
-pub use lazy_grid::{LazyGrid, LazyGridRows, LazyGridView};
-pub use named_columns::{ColumnVisibilityPlan, ColumnVisibilityTrack, GridNamedColumns};
+pub use grid::{Grid, GridLayout, named_column_plan};
+pub use lazy_grid::{LazyGrid, LazyGridError, LazyGridOptions, LazyGridRows, LazyGridView};
+pub use named_columns::{
+    ColumnVisibilityPlan, ColumnVisibilityTrack, GridColumnError, GridNamedColumns,
+};
 pub use row_heights::GridRowHeights;
 pub use span::{GridSpan, GridSpanCell, GridSpanKey, GridSpanPlacement};

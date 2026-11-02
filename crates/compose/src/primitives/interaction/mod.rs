@@ -1,10 +1,16 @@
 //! Interactive primitives.
-pub mod drag_and_drop;
+pub(crate) mod drag_and_drop;
 pub mod edge_auto_scroll;
-pub mod horizontal_swipe;
-pub mod scrollbar;
+pub(crate) mod horizontal_swipe;
+pub(crate) mod scrollbar;
 
-pub use drag_and_drop::{DragScope, DragSession, Draggable, DropTarget};
-pub use edge_auto_scroll::{EdgeAutoScroll, velocity as edge_auto_scroll_velocity};
-pub use horizontal_swipe::{HorizontalSwipe, HorizontalSwipeDirection, HorizontalSwipeSession};
-pub use scrollbar::{Scrollbar, ScrollbarAxis};
+pub use api::*;
+
+pub(crate) mod api {
+    pub use super::drag_and_drop::{DragScope, DragSession, Draggable, DropTarget};
+    pub use super::edge_auto_scroll::{EdgeAutoScroll, velocity as edge_auto_scroll_velocity};
+    pub use super::horizontal_swipe::{
+        HorizontalSwipe, HorizontalSwipeDirection, HorizontalSwipeSession,
+    };
+    pub use super::scrollbar::{Scrollbar, ScrollbarAxis};
+}

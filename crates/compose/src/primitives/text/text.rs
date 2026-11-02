@@ -404,11 +404,40 @@ pub enum DividerAxis {
     Vertical,
 }
 impl Divider {
-    pub fn new(color: Option<Color>, thickness: f32, axis: DividerAxis) -> Self {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn horizontal() -> Self {
+        Self::new()
+    }
+
+    pub fn vertical() -> Self {
+        Self::new().axis(DividerAxis::Vertical)
+    }
+
+    pub fn axis(mut self, axis: DividerAxis) -> Self {
+        self.axis = axis;
+        self
+    }
+
+    pub fn color(mut self, color: impl Into<Option<Color>>) -> Self {
+        self.color = color.into();
+        self
+    }
+
+    pub fn thickness(mut self, thickness: f32) -> Self {
+        self.thickness = thickness.max(0.0);
+        self
+    }
+}
+
+impl Default for Divider {
+    fn default() -> Self {
         Self {
-            color,
-            thickness: thickness.max(0.0),
-            axis,
+            color: None,
+            thickness: 1.0,
+            axis: DividerAxis::Horizontal,
         }
     }
 }

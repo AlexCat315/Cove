@@ -78,11 +78,12 @@ impl cove_ui_compose::View for ResizableSidebarExample {
         use cove_ui_compose::modifiers::layout::LayoutFrameExt;
 
         let content = cove_ui_compose::primitives::text::Text::new(self.requested_width_label());
-        let sidebar = cove_ui_compose::primitives::layout::sidebar::AdaptiveSidebar::new(
+        let sidebar = cove_ui_compose::primitives::layout::sidebar::AdaptiveSidebar::try_new(
             "Document navigation",
             self.selected.binding(),
             self.sections(),
         )
+        .expect("unique sidebar IDs")
         .content(content)
         .width(self.width.binding())
         .options(sidebar_options());
@@ -230,11 +231,12 @@ impl cove_ui_compose::View for NestedSidebarExample {
             "Last action: {}",
             self.last_action()
         ));
-        let sidebar = cove_ui_compose::primitives::layout::sidebar::AdaptiveSidebar::new(
+        let sidebar = cove_ui_compose::primitives::layout::sidebar::AdaptiveSidebar::try_new(
             "Nested workspace",
             self.selection.binding(),
             self.sections(),
         )
+        .expect("unique sidebar IDs")
         .content(content)
         .presentation(self.is_open.binding())
         .options(sidebar_options());

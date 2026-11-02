@@ -23,8 +23,8 @@ use cove_core::scene::{AccessibilityRole, Node, PlatformInputContext};
 use cove_core::{Binding, Environment, InputCapabilities};
 use cove_ui_compose::adaptive::SurfaceEnvironmentExt;
 use cove_ui_compose::modifiers::layout::LayoutFrameExt;
-use cove_ui_compose::primitives::overlays::command_palette::{CommandPalette, PaletteCommand};
 use cove_ui_compose::primitives::overlays::portal::{LayerRoot, PortalStore, PortalStoreAmbient};
+use cove_ui_compose::primitives::overlays::{CommandPalette, PaletteCommand};
 
 use support::GlobalTestLock;
 

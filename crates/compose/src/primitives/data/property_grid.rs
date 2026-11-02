@@ -912,7 +912,6 @@ impl PrimitiveView for PropertyGridRowHost {
     fn make_node(&self) -> Node {
         let node = Node::new();
         node.set_is_hit_testable(true);
-        node.set_corner_radius(4.0);
         node
     }
 
@@ -928,6 +927,7 @@ impl PrimitiveView for PropertyGridRowHost {
         let paint: Rc<dyn Fn()> = Rc::new(move || {
             let hovered = paint_node.attachment::<bool>(ROW_HOVERED) == Some(true);
             let theme = theme_for_node(&paint_node);
+            paint_node.set_corner_radius(theme.radius.sm);
             paint_node.set_background_color(Some(if hovered {
                 theme.colors.state_layer_hover
             } else {

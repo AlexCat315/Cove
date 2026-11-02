@@ -36,7 +36,7 @@ struct PaintIdentity {
 }
 
 /// One slider surface.
-pub struct SliderHost {
+pub(crate) struct SliderHost {
     pub value: Binding<f64>,
     pub range: (f64, f64),
     pub step: Option<f64>,

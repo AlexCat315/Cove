@@ -8,6 +8,7 @@ pub mod i18n;
 pub mod modifiers;
 pub mod observed;
 pub mod pet;
+pub mod prelude;
 pub mod primitives;
 pub mod rendering;
 pub mod resource_bundle;

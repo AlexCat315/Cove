@@ -10,7 +10,7 @@ use cove_composition::Scope;
 use cove_core::State;
 use cove_ui_compose::LayoutDebugExt;
 use cove_ui_compose::modifiers::style::SemanticStyleViewExt;
-use cove_ui_compose::primitives::controls::button::Button;
+use cove_ui_compose::primitives::controls::Button;
 use cove_ui_compose::primitives::overlays::{
     CommandEntry, CommandItem, destination, display_entries, ranked, record_recent,
 };

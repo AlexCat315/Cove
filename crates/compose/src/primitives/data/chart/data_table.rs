@@ -22,7 +22,7 @@ use crate::modifiers::layout::{FlexExt, PaddingExt};
 use crate::modifiers::style::SemanticStyleViewExt;
 use crate::primitives::data::chart::{ChartSeries, ChartSlice, ChartXDomain, Selection};
 use crate::primitives::text::TextAlignment;
-use crate::primitives::text::{Divider, DividerAxis, Text};
+use crate::primitives::text::{Divider, Text};
 use crate::theme::{SemanticColorRef, SemanticFontRef};
 use crate::{AnyView, BoxView, TupleView, View};
 use cove_core::scene::{
@@ -254,10 +254,7 @@ impl View for ChartDataTable {
             .semantic_background(SemanticColorRef::surface_variant()),
         );
 
-        let mut children = vec![
-            header,
-            AnyView::new(Divider::new(None, 1.0, DividerAxis::Horizontal)),
-        ];
+        let mut children = vec![header, AnyView::new(Divider::horizontal())];
         for row in &self.rows {
             children.push(AnyView::new(ChartDataTableRow {
                 label: row.label.clone(),

@@ -37,7 +37,7 @@ use cove_composition::{
 };
 use cove_core::scene::Node;
 use cove_core::{Binding, Color};
-use cove_ui_compose::primitives::controls::button::Button;
+use cove_ui_compose::primitives::controls::Button;
 use cove_ui_compose::primitives::controls::fields::ColorField;
 use cove_ui_compose::primitives::controls::fields::color_field_model::hex_string;
 use cove_ui_compose::primitives::text::text_buffer::TextBuffer;

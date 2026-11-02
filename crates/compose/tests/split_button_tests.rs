@@ -21,7 +21,7 @@ use std::rc::Rc;
 
 use cove_composition::AnyView;
 use cove_core::scene::AccessibilityRole;
-use cove_ui_compose::primitives::controls::split_button::SplitButton;
+use cove_ui_compose::primitives::controls::SplitButton;
 use cove_ui_compose::primitives::overlays::menu::{MenuEntry, MenuItem};
 use cove_ui_compose::primitives::overlays::portal::LayerRoot;
 

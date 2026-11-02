@@ -854,15 +854,21 @@ fn full_date_label(day: Date, calendar: &crate::foundation::Calendar) -> String 
 /// A trigger that opens the range calendar.
 pub struct DateRangePicker {
     pub selection: Binding<Option<DateRange>>,
-    pub options: DateRangePickerOptions,
+    options: DateRangePickerOptions,
 }
 
 impl DateRangePicker {
-    pub fn new(selection: Binding<Option<DateRange>>, options: DateRangePickerOptions) -> Self {
+    pub fn new(selection: Binding<Option<DateRange>>) -> Self {
         Self {
             selection,
-            options: options.validated(),
+            options: DateRangePickerOptions::default().validated(),
         }
+    }
+
+    pub fn configure(mut self, configure: impl FnOnce(&mut DateRangePickerOptions)) -> Self {
+        configure(&mut self.options);
+        self.options = self.options.validated();
+        self
     }
 
     fn snapshot(&self) -> DateRangePicker {

@@ -1361,10 +1361,13 @@ impl PrimitiveView for TreeRow {
         );
 
         match guides {
-            Some(guides) => vec![AnyView::new(crate::primitives::layout::ZStack::new(
-                crate::Alignment::Leading,
-                AnyView::new(TupleView::new(vec![AnyView::new(guides), row])),
-            ))],
+            Some(guides) => vec![AnyView::new(
+                crate::primitives::layout::ZStack::new(AnyView::new(TupleView::new(vec![
+                    AnyView::new(guides),
+                    row,
+                ])))
+                .alignment(crate::Alignment::Leading),
+            )],
             None => vec![row],
         }
     }

@@ -26,7 +26,7 @@ use std::rc::Rc;
 use cove_composition::AnyView;
 use cove_core::scene::{AccessibilityRole, NativeMenuPresenter};
 use cove_platform::NativeMenuKind;
-use cove_ui_compose::primitives::controls::menu_button::MenuButtonTitle;
+use cove_ui_compose::primitives::controls::MenuButtonTitle;
 use cove_ui_compose::primitives::media::ui_icon_catalog;
 use cove_ui_compose::primitives::overlays::menu::native_menu_bridge::NativeMenuBuilder;
 use cove_ui_compose::primitives::overlays::menu::{

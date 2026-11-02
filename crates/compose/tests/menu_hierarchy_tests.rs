@@ -53,11 +53,11 @@ use cove_core::{Binding, Point, Rect, Size, State};
 use cove_platform::KeyModifiers;
 use cove_ui_compose::Scancode;
 use cove_ui_compose::modifiers::layout::AbsolutePositionModifier;
+use cove_ui_compose::primitives::overlays::Popover;
 use cove_ui_compose::primitives::overlays::anchored::{PopoverOverflow, PopoverSurface};
 use cove_ui_compose::primitives::overlays::menu::{
     Menu, MenuEntry, MenuItem, MenuSubmenu, MenuTypeahead, MenuTypeaheadRow,
 };
-use cove_ui_compose::primitives::overlays::popover::Popover;
 use cove_ui_compose::primitives::overlays::portal::portal_registry::PortalOwnership;
 use cove_ui_compose::primitives::overlays::portal::{
     LayerRoot, PortalPlacement, PortalPlacementMode,

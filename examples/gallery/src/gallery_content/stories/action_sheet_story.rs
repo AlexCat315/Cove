@@ -9,7 +9,7 @@
 use cove_composition::Scope;
 use cove_core::State;
 use cove_ui_compose::modifiers::style::SemanticStyleViewExt;
-use cove_ui_compose::primitives::controls::button::ButtonRole;
+use cove_ui_compose::primitives::controls::ButtonRole;
 use cove_ui_compose::primitives::data::lists::table::ComparisonResult;
 use cove_ui_compose::primitives::media::ui_icon_catalog as icons;
 use cove_ui_compose::primitives::overlays::modal::action_sheet::{
@@ -100,12 +100,13 @@ impl ActionSheetStory {
     }
 
     pub fn project_question(&self) -> ActionSheetQuestion {
-        ActionSheetQuestion::new(
+        ActionSheetQuestion::try_new(
             "Aurora project",
             "Choose an action for this project.",
             self.project_actions(),
             "Close project actions",
         )
+        .expect("unique action sheet action IDs")
     }
 
     /// The generated shortcut commands, numbered from one.
@@ -133,12 +134,13 @@ impl View for ActionSheetStory {
 
         let long_sheet = ActionSheet::new(
             self.many_open.binding(),
-            ActionSheetQuestion::new(
+            ActionSheetQuestion::try_new(
                 "Workspace shortcuts",
                 "The list scrolls while the close control remains visible.",
                 self.shortcut_actions(),
                 "Close workspace actions",
-            ),
+            )
+            .expect("unique action sheet action IDs"),
             Text::new("Browse workspace actions"),
         )
         .is_enabled(enabled);

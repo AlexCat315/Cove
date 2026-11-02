@@ -162,11 +162,7 @@ impl PrimitiveView for MarkdownCodeBlockBody {
                 0.0,
                 AnyView::new(TupleView::new(vec![
                     header,
-                    AnyView::new(crate::primitives::text::Divider::new(
-                        None,
-                        1.0,
-                        crate::primitives::text::DividerAxis::Horizontal,
-                    )),
+                    AnyView::new(crate::primitives::text::Divider::horizontal()),
                     code,
                 ])),
             )),

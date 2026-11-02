@@ -19,7 +19,7 @@ use crate::primitives::media::ui_icon_catalog;
 use crate::primitives::overlays::modal::{
     Modal, ModalDismissal, ModalGeometry, ModalOptions, ModalPlacement, SheetDragHandle, uses_sheet,
 };
-use crate::primitives::text::{Divider, DividerAxis, Text};
+use crate::primitives::text::{Divider, Text};
 use crate::theme::styles::buttons::{ButtonStyleViewExt, GhostButtonStyle};
 use crate::theme::{ControlSize, ControlSizeViewExt, SemanticColorRef, SemanticFontRef};
 use crate::{AnyView, BoxView, TupleView, View};
@@ -57,7 +57,7 @@ impl DialogOptions {
 pub struct Dialog {
     pub is_presented: Binding<bool>,
     pub title: String,
-    pub options: DialogOptions,
+    pub(crate) options: DialogOptions,
     content: AnyView,
     footer: Option<AnyView>,
 }
@@ -82,11 +82,7 @@ impl Dialog {
         self
     }
 
-    pub fn options(mut self, options: DialogOptions) -> Self {
-        self.options = options;
-        self
-    }
-
+    /// Edit the current options in builder order. Earlier edits to other fields are retained.
     pub fn configure(mut self, configure: impl FnOnce(&mut DialogOptions)) -> Self {
         configure(&mut self.options);
         self
@@ -202,11 +198,7 @@ impl View for Dialog {
             ));
 
             if !sheet {
-                column.push(AnyView::new(Divider::new(
-                    None,
-                    1.0,
-                    DividerAxis::Horizontal,
-                )));
+                column.push(AnyView::new(Divider::horizontal()));
             }
 
             let body_insets = if sheet {
@@ -236,11 +228,7 @@ impl View for Dialog {
             ));
 
             if !sheet {
-                column.push(AnyView::new(Divider::new(
-                    None,
-                    1.0,
-                    DividerAxis::Horizontal,
-                )));
+                column.push(AnyView::new(Divider::horizontal()));
             }
 
             if let Some(footer) = footer.clone() {
@@ -418,7 +406,7 @@ impl View for AlertDialog {
             };
             dialog_options.shows_close_button = false;
             dialog_options.adapts_to_touch = false;
-            dialog = dialog.options(dialog_options);
+            dialog = dialog.configure(|options| *options = dialog_options);
             AnyView::new(dialog)
         }))
     }

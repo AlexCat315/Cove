@@ -42,7 +42,7 @@ use cove_platform::{InputEvent, KeyModifiers, MouseButton, MouseButtonEvent, Mou
 use cove_ui_compose::adaptive::SurfaceEnvironmentExt;
 use cove_ui_compose::modifiers::interaction::AccessibilityExt;
 use cove_ui_compose::modifiers::layout::PaddingExt;
-use cove_ui_compose::primitives::controls::button::Button;
+use cove_ui_compose::primitives::controls::Button;
 use cove_ui_compose::primitives::layout::sidebar::{
     NavigationDrawer, NavigationDrawerOptions, SidebarItem, SidebarSection,
 };
@@ -129,12 +129,13 @@ impl View for Harness {
         ];
         let open = self.open.clone();
         let calls = self.background_calls.clone();
-        let drawer = NavigationDrawer::new(
+        let drawer = NavigationDrawer::try_new(
             "Workspace navigation",
             self.open.binding(),
             self.selection.binding(),
             sections,
         )
+        .expect("unique drawer IDs")
         .options(options)
         .header(self.header.clone())
         .footer(Text::new("Navigation footer").padding(12.0));

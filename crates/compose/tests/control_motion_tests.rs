@@ -42,7 +42,7 @@ use std::rc::Rc;
 use cove_composition::{AnyView, View};
 use cove_core::scene::{AnimatorScheduler, Node, NodeTree, PlatformInputContext, Recomposer};
 use cove_core::{Binding, State};
-use cove_ui_compose::primitives::controls::toggle::Toggle;
+use cove_ui_compose::primitives::controls::Toggle;
 use cove_ui_compose::primitives::text::TextField;
 use cove_ui_compose::primitives::text::text_buffer::TextBuffer;
 use cove_ui_compose::theme::{Theme, ThemeViewExt};

@@ -3,6 +3,8 @@
 //! Navigation chrome with independent header/footer slots and one Tab stop among
 //! enabled destinations.
 use crate::Scope;
+use crate::primitives::DuplicateId;
+use crate::primitives::layout::sidebar::items::SidebarSections;
 use std::collections::HashSet;
 use std::rc::Rc;
 
@@ -28,7 +30,7 @@ use super::presentation::SidebarPresentation;
 /// Navigation chrome with header and footer slots.
 pub struct Sidebar<Id: PartialEq + Eq + std::hash::Hash + Clone + Send + Sync + 'static> {
     pub selection: Binding<Option<Id>>,
-    pub sections: Vec<SidebarSection<Id>>,
+    sections: SidebarSections<Id>,
     pub presentation: SidebarPresentation,
     pub expanded: Option<Binding<HashSet<Id>>>,
     pub minimum_row_height: f32,
@@ -40,27 +42,20 @@ pub struct Sidebar<Id: PartialEq + Eq + std::hash::Hash + Clone + Send + Sync + 
 }
 
 impl<Id: PartialEq + Eq + std::hash::Hash + Clone + Send + Sync + 'static> Sidebar<Id> {
-    pub fn new(selection: Binding<Option<Id>>, sections: Vec<SidebarSection<Id>>) -> Self {
-        assert!(
-            sections.iter().enumerate().all(|(index, section)| sections
-                .iter()
-                .enumerate()
-                .all(|(other, candidate)| other == index || candidate.id != section.id)),
-            "Sidebar section IDs must be unique"
-        );
-        let hierarchy = SidebarHierarchy::new(&sections);
-        let ids: Vec<Id> = hierarchy
-            .entries()
-            .into_iter()
-            .map(|entry| entry.item.id)
-            .collect();
-        assert!(
-            ids.iter().enumerate().all(|(index, id)| ids
-                .iter()
-                .enumerate()
-                .all(|(other, candidate)| other == index || candidate != id)),
-            "Sidebar item IDs must be unique"
-        );
+    pub fn try_new(
+        selection: Binding<Option<Id>>,
+        sections: Vec<SidebarSection<Id>>,
+    ) -> Result<Self, DuplicateId> {
+        Ok(Self::from_sections(
+            selection,
+            SidebarSections::new(sections)?,
+        ))
+    }
+
+    pub(crate) fn from_sections(
+        selection: Binding<Option<Id>>,
+        sections: SidebarSections<Id>,
+    ) -> Self {
         Self {
             selection,
             sections,
@@ -122,7 +117,7 @@ impl<Id: PartialEq + Eq + std::hash::Hash + Clone + Send + Sync + 'static> Sideb
 impl<Id: PartialEq + Eq + std::hash::Hash + Clone + Send + Sync + 'static> View for Sidebar<Id> {
     fn body(&self, cx: &Scope) -> AnyView {
         let local_expanded = cx.state(HashSet::<Id>::new);
-        let hierarchy = SidebarHierarchy::new(&self.sections);
+        let hierarchy = SidebarHierarchy::new(&self.sections.0);
         let expanded = self
             .expanded
             .as_ref()
@@ -153,7 +148,7 @@ impl<Id: PartialEq + Eq + std::hash::Hash + Clone + Send + Sync + 'static> View 
         };
 
         let mut section_views: Vec<AnyView> = Vec::new();
-        for (index, section) in self.sections.iter().enumerate() {
+        for (index, section) in self.sections.0.iter().enumerate() {
             let entries: Vec<SidebarEntry<Id>> =
                 hierarchy.groups.get(index).cloned().unwrap_or_default();
             let icon_width = self.icon_lane_resolved(&entries);

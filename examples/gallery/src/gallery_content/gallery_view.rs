@@ -22,24 +22,24 @@ use cove_core::{Binding, State};
 use cove_ui_compose::modifiers::layout::{FlexExt, LayoutFrameExt, PaddingExt};
 use cove_ui_compose::modifiers::style::AppearanceExt;
 use cove_ui_compose::primitives::controls::Button;
-use cove_ui_compose::primitives::controls::button::{ButtonIcon, ButtonIconSource};
+use cove_ui_compose::primitives::controls::Checkbox;
 use cove_ui_compose::primitives::controls::fields::select::{Select, SelectOption};
-use cove_ui_compose::primitives::controls::toggle::Checkbox;
-use cove_ui_compose::primitives::layout::responsive::view_that_fits::ViewThatFits;
-use cove_ui_compose::primitives::layout::scroll_view::ScrollView;
+use cove_ui_compose::primitives::controls::{ButtonIcon, ButtonIconSource};
+use cove_ui_compose::primitives::layout::ScrollView;
 use cove_ui_compose::primitives::layout::insets::SafeArea;
+use cove_ui_compose::primitives::layout::responsive::view_that_fits::ViewThatFits;
 use cove_ui_compose::primitives::layout::sidebar::{
     AdaptiveSidebar, AdaptiveSidebarOptions, SidebarItem, SidebarItemStyle, SidebarSection,
 };
-use cove_ui_compose::primitives::overlays::portal::LayerRoot;
 use cove_ui_compose::primitives::media::ui_icon_catalog as icons;
+use cove_ui_compose::primitives::overlays::portal::LayerRoot;
 use cove_ui_compose::primitives::text::Text;
 use cove_ui_compose::primitives::text::text_buffer::TextBuffer;
 use cove_ui_compose::theme::styles::appearance_modifier::{Appearance, AppearanceViewExt};
-use cove_ui_compose::theme::styles::circular_appearance::ThemeTransition;
 use cove_ui_compose::theme::styles::buttons::{
     ButtonStyleViewExt, GhostButtonStyle, SecondaryButtonStyle,
 };
+use cove_ui_compose::theme::styles::circular_appearance::ThemeTransition;
 use cove_ui_compose::theme::tokens::{SemanticColorRef, SemanticFontRef, SemanticStyleViewExt};
 use cove_ui_compose::theme::{TextScalerReader, theme_for_node};
 
@@ -168,11 +168,12 @@ impl View for GalleryView {
         let mut options = AdaptiveSidebarOptions::default();
         options.allows_edge_swipe = true;
         options.layout.shows_rail_labels = false;
-        let navigation = AdaptiveSidebar::new(
+        let navigation = AdaptiveSidebar::try_new(
             "CoveUI navigation",
             self.selection_binding(),
             self.navigation_sections(),
         )
+        .expect("unique sidebar IDs")
         .presentation(self.navigation_open.binding())
         .collapse(self.navigation_collapsed.binding())
         .width(self.navigation_width.binding())
@@ -360,7 +361,7 @@ impl GalleryView {
         erased(
             AnyView::new(
                 Button::icon(
-                    cove_ui_compose::primitives::controls::button::ButtonIconSource::resource(icon),
+                    cove_ui_compose::primitives::controls::ButtonIconSource::resource(icon),
                     16.0,
                     move || view.toggle_theme(),
                 )

@@ -34,8 +34,8 @@ use cove_platform::{InputEvent, KeyModifiers, MouseButton, MouseButtonEvent, Mou
 use cove_ui_compose::adaptive::SurfaceEnvironmentExt;
 use cove_ui_compose::modifiers::interaction::AccessibilityExt;
 use cove_ui_compose::modifiers::layout::{FlexExt, LayoutFrameExt};
-use cove_ui_compose::primitives::controls::button::Button;
-use cove_ui_compose::primitives::layout::scroll_view::ScrollView;
+use cove_ui_compose::primitives::controls::Button;
+use cove_ui_compose::primitives::layout::ScrollView;
 use cove_ui_compose::primitives::layout::sidebar::{
     AdaptiveSidebar, AdaptiveSidebarOptions, SidebarItem, SidebarLayoutPolicy, SidebarSection,
 };
@@ -199,7 +199,7 @@ impl View for Harness {
         options.layout.shows_rail_labels = self.rail_labels.get();
         options.allows_edge_swipe = self.edge.get();
         let selected = self.selected.clone();
-        let sidebar = AdaptiveSidebar::new(
+        let sidebar = AdaptiveSidebar::try_new(
             "Workspace",
             Binding::new(
                 {
@@ -215,6 +215,7 @@ impl View for Harness {
             ),
             sections(),
         )
+        .expect("unique sidebar IDs")
         .options(options)
         .header(Text::new("Workspace header").debug_name("adaptive-header"))
         .content(self.content.clone());

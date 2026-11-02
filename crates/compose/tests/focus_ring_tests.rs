@@ -17,11 +17,11 @@ use std::rc::Rc;
 
 use cove_composition::{AnyView, LayoutDebugExt};
 use cove_core::scene::{FocusChain, FocusChainHolder, Node};
-use cove_ui_compose::primitives::controls::button::Button;
+use cove_ui_compose::primitives::controls::Button;
+use cove_ui_compose::primitives::controls::Toggle;
 use cove_ui_compose::primitives::controls::fields::range_slider::RangeSlider;
 use cove_ui_compose::primitives::controls::fields::range_slider::RangeValue as RangeSliderValue;
 use cove_ui_compose::primitives::controls::fields::slider::Slider;
-use cove_ui_compose::primitives::controls::toggle::Toggle;
 use cove_ui_compose::primitives::text::Text;
 use cove_ui_compose::theme::styles::buttons::{
     ButtonStyle, ButtonStyleConfiguration, ButtonStyleViewExt,

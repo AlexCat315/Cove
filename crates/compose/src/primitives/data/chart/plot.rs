@@ -240,7 +240,7 @@ impl PrimitiveView for ChartPlot {
 impl_primitive_view!(ChartPlot);
 
 /// Absolutely positioned overlay plane that hosts every label.
-pub struct ChartOverlayHost {
+pub(crate) struct ChartOverlayHost {
     pub plot: ChartPlot,
     pub theme: Theme,
     pub cache: Option<Rc<RefCell<ChartResolutionCache>>>,

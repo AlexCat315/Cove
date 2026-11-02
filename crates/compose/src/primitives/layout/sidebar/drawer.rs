@@ -4,6 +4,8 @@
 //! lifecycle. The application owns presentation and selection, so resizing never
 //! resets them.
 use crate::Scope;
+use crate::primitives::DuplicateId;
+use crate::primitives::layout::sidebar::items::SidebarSections;
 use std::collections::HashSet;
 
 use crate::modifiers::layout::PaddingExt;
@@ -48,20 +50,21 @@ pub struct NavigationDrawer<Id: PartialEq + Eq + std::hash::Hash + Clone + Send 
     pub is_presented: Binding<bool>,
     pub selection: Binding<Option<Id>>,
     pub expanded: Option<Binding<HashSet<Id>>>,
-    pub sections: Vec<SidebarSection<Id>>,
+    sections: SidebarSections<Id>,
     pub options: NavigationDrawerOptions,
     header: AnyView,
     footer: AnyView,
 }
 
 impl<Id: PartialEq + Eq + std::hash::Hash + Clone + Send + Sync + 'static> NavigationDrawer<Id> {
-    pub fn new(
+    pub fn try_new(
         title: impl Into<String>,
         is_presented: Binding<bool>,
         selection: Binding<Option<Id>>,
         sections: Vec<SidebarSection<Id>>,
-    ) -> Self {
-        Self {
+    ) -> Result<Self, DuplicateId> {
+        let sections = SidebarSections::new(sections)?;
+        Ok(Self {
             title: title.into(),
             is_presented,
             selection,
@@ -70,7 +73,7 @@ impl<Id: PartialEq + Eq + std::hash::Hash + Clone + Send + Sync + 'static> Navig
             options: NavigationDrawerOptions::default(),
             header: AnyView::new(crate::EmptyView),
             footer: AnyView::new(crate::EmptyView),
-        }
+        })
     }
 
     pub fn expanded(mut self, expanded: Binding<HashSet<Id>>) -> Self {
@@ -122,7 +125,7 @@ impl<Id: PartialEq + Eq + std::hash::Hash + Clone + Send + Sync + 'static> View
         let header = self.header.clone();
         let footer = self.footer.clone();
 
-        let mut sidebar = Sidebar::new(selection, sections)
+        let mut sidebar = Sidebar::from_sections(selection, sections)
             .minimum_row_height(44.0)
             .on_activate(move |_id: Id| {
                 if closes_on_selection {

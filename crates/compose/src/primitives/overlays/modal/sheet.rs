@@ -117,7 +117,7 @@ impl SheetOptions {
 /// Rounded panel flush to one window edge.
 pub struct Sheet {
     pub is_presented: Binding<bool>,
-    pub options: SheetOptions,
+    pub(crate) options: SheetOptions,
     content: AnyView,
 }
 
@@ -130,11 +130,7 @@ impl Sheet {
         }
     }
 
-    pub fn options(mut self, options: SheetOptions) -> Self {
-        self.options = options.validated();
-        self
-    }
-
+    /// Edit the current options in builder order. Earlier edits to other fields are retained.
     pub fn configure(mut self, configure: impl FnOnce(&mut SheetOptions)) -> Self {
         configure(&mut self.options);
         self.options.validate();

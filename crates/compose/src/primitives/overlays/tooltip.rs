@@ -700,7 +700,7 @@ impl cove_core::scene::ScopedAmbient for TooltipArbitrationAmbient {
 /// An arbitrary target and non-interactive description, presented outside
 /// clipping through the portal.
 pub struct Tooltip {
-    pub options: TooltipOptions,
+    pub(crate) options: TooltipOptions,
     /// Explicitly anchored tips are already debounced by their producer (for
     /// example LSP hover), so presentation follows `is_presented` directly.
     pub anchor: Option<TooltipAnchor>,
@@ -735,11 +735,7 @@ impl Tooltip {
         }
     }
 
-    pub fn options(mut self, options: TooltipOptions) -> Self {
-        self.options = options.validated();
-        self
-    }
-
+    /// Edit the current options in builder order. Earlier edits to other fields are retained.
     pub fn configure(mut self, configure: impl FnOnce(&mut TooltipOptions)) -> Self {
         configure(&mut self.options);
         self.options.validate();

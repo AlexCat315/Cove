@@ -34,7 +34,7 @@ use cove_platform::{InputEvent, MouseButton, MouseButtonEvent, MouseWheelEvent, 
 use cove_ui_compose::modifiers::layout::LayoutFrameExt;
 use cove_ui_compose::primitives::data::data_table::{DataTable, DataTableModel, DataTableOptions};
 use cove_ui_compose::primitives::data::lists::table::{TableColumn, TableColumnLayout};
-use cove_ui_compose::primitives::layout::scroll_view::{ScrollAxis, ScrollView};
+use cove_ui_compose::primitives::layout::{ScrollAxis, ScrollView};
 use cove_ui_compose::primitives::text::Text;
 use cove_ui_compose::{BoxView, Scancode};
 
@@ -56,7 +56,8 @@ fn nodes(graph: &Rc<ViewGraph>) -> Vec<Node> {
 }
 
 fn table_model(row_count: usize) -> Rc<DataTableModel<usize, usize>> {
-    DataTableModel::new((0..row_count).collect(), |record| *record)
+    DataTableModel::try_new((0..row_count).collect(), |record| *record)
+        .expect("unique data table row IDs")
 }
 
 fn columns() -> Vec<TableColumn<usize>> {
@@ -95,8 +96,11 @@ impl Harness {
         let binding = Binding::new(move || read.get(), move |next| write.set(next));
 
         let table = AnyView::new(
-            AnyView::new(DataTable::new(table_model(row_count), columns()))
-                .frame_size(500.0, 180.0),
+            AnyView::new(
+                DataTable::try_new(table_model(row_count), columns())
+                    .expect("unique data table column IDs"),
+            )
+            .frame_size(500.0, 180.0),
         );
 
         let content = AnyView::new(BoxView::new(

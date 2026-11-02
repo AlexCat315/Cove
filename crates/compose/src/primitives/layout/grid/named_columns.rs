@@ -109,67 +109,75 @@ impl ColumnVisibilityPlan {
     }
 }
 
+#[derive(Debug, PartialEq, Eq, thiserror::Error)]
+pub enum GridColumnError {
+    #[error("named and anonymous columns cannot be mixed")]
+    MixedColumns,
+    #[error("a named column requires a nonempty ID and title")]
+    MissingLabel,
+    #[error("a named column requires fixed or flexible sizing")]
+    InvalidSizing,
+    #[error(transparent)]
+    Duplicate(#[from] crate::primitives::DuplicateId),
+}
+
 pub struct GridNamedColumns;
 impl GridNamedColumns {
-    pub fn tracks(columns: &[GridColumn]) -> Option<Vec<ColumnVisibilityTrack>> {
-        let tracks: Vec<ColumnVisibilityTrack> = columns
+    pub fn tracks(
+        columns: &[GridColumn],
+    ) -> Result<Option<Vec<ColumnVisibilityTrack>>, GridColumnError> {
+        if !columns
             .iter()
-            .filter_map(|column| {
-                let GridColumn::Named {
-                    id,
-                    title,
-                    sizing,
-                    visibility,
-                } = column
-                else {
-                    return None;
-                };
-                assert!(
-                    !id.is_empty() && !title.is_empty(),
-                    "Named Grid columns require an ID and title"
-                );
-                match sizing.as_ref() {
-                    GridColumn::Fixed(_) | GridColumn::Flexible { .. } => {}
-                    GridColumn::Adaptive { .. } | GridColumn::Named { .. } => {
-                        panic!("Named Grid columns use fixed or flexible sizing")
-                    }
-                }
-                Some(ColumnVisibilityTrack {
-                    id: id.clone(),
-                    title: title.clone(),
-                    visibility: *visibility,
-                    width: GridTrackResolver::minimum_width(&[sizing.as_ref().clone()], 0.0),
-                })
-            })
-            .collect();
-        if tracks.is_empty() {
-            return None;
+            .any(|column| matches!(column, GridColumn::Named { .. }))
+        {
+            return Ok(None);
         }
-        assert_eq!(
-            tracks.len(),
-            columns.len(),
-            "Use named columns for every field in a named Grid"
-        );
-        let unique: HashSet<&String> = tracks.iter().map(|track| &track.id).collect();
-        assert_eq!(unique.len(), tracks.len(), "Grid column IDs must be unique");
-        Some(tracks)
+        let mut tracks = Vec::with_capacity(columns.len());
+        for column in columns {
+            let GridColumn::Named {
+                id,
+                title,
+                sizing,
+                visibility,
+            } = column
+            else {
+                return Err(GridColumnError::MixedColumns);
+            };
+            if id.is_empty() || title.is_empty() {
+                return Err(GridColumnError::MissingLabel);
+            }
+            if !matches!(
+                sizing.as_ref(),
+                GridColumn::Fixed(_) | GridColumn::Flexible { .. }
+            ) {
+                return Err(GridColumnError::InvalidSizing);
+            }
+            tracks.push(ColumnVisibilityTrack {
+                id: id.clone(),
+                title: title.clone(),
+                visibility: *visibility,
+                width: GridTrackResolver::minimum_width(std::slice::from_ref(sizing), 0.0),
+            });
+        }
+        crate::primitives::check_ids(tracks.iter().map(|track| &track.id), "Grid column")?;
+        Ok(Some(tracks))
     }
 
     pub fn minimum_width(
         columns: &[GridColumn],
         overrides: &std::collections::HashMap<String, bool>,
         spacing: f32,
-    ) -> f32 {
-        let Some(tracks) = Self::tracks(columns) else {
-            return GridTrackResolver::minimum_width(columns, spacing);
+    ) -> Result<f32, GridColumnError> {
+        let Some(tracks) = Self::tracks(columns)? else {
+            return Ok(GridTrackResolver::minimum_width(columns, spacing));
         };
         let required =
             ColumnVisibilityPlan::resolve(&tracks, overrides, 0.0, spacing, &HashSet::new());
-        required
+        Ok(required
             .indices
             .iter()
             .map(|&index| tracks[index].width)
             .sum::<f32>()
-            + spacing * required.indices.len().saturating_sub(1) as f32
+            + spacing * required.indices.len().saturating_sub(1) as f32)
     }
 }

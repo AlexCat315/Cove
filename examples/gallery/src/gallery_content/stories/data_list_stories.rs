@@ -16,8 +16,8 @@ use cove_ui_compose::primitives::data::{
     PropertyGrid, PropertyGridRow, PropertyGridSection, Timeline, TimelineEvent, TimelineGroup,
     TimelineSpacing, TimelineZoom,
 };
-use cove_ui_compose::primitives::interaction::scrollbar::{Scrollbar, ScrollbarAxis};
 use cove_ui_compose::primitives::feedback::StatusTone;
+use cove_ui_compose::primitives::interaction::{Scrollbar, ScrollbarAxis};
 use cove_ui_compose::primitives::text::Text;
 use cove_ui_compose::primitives::text::text_buffer::TextBuffer;
 use cove_ui_compose::primitives::text::text_field::TextField;

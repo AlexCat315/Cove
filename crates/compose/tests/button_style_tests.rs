@@ -28,7 +28,7 @@ use cove_core::scene::{
 };
 use cove_platform::{KeyEvent, MouseButton, MouseButtonEvent};
 use cove_ui_compose::modifiers::style::AppearanceExt;
-use cove_ui_compose::primitives::controls::button::Button;
+use cove_ui_compose::primitives::controls::Button;
 use cove_ui_compose::primitives::media::Icon;
 use cove_ui_compose::primitives::text::Text;
 use cove_ui_compose::theme::styles::appearance_modifier::{Appearance, AppearanceViewExt};

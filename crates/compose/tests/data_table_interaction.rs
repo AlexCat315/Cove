@@ -42,7 +42,7 @@ struct GridRow {
 }
 
 fn model(rows: usize) -> Rc<DataTableModel<GridRow, usize>> {
-    DataTableModel::new(
+    DataTableModel::try_new(
         (0..rows)
             .map(|index| GridRow {
                 id: index,
@@ -51,6 +51,7 @@ fn model(rows: usize) -> Rc<DataTableModel<GridRow, usize>> {
             .collect::<Vec<_>>(),
         |row: &GridRow| row.id,
     )
+    .expect("unique data table row IDs")
 }
 
 fn geometry() -> DataTableColumnGeometry {

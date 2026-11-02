@@ -28,7 +28,7 @@ use cove_core::{Environment, InputCapabilities};
 use cove_ui_compose::BoxView;
 use cove_ui_compose::adaptive::SurfaceEnvironmentExt;
 use cove_ui_compose::modifiers::layout::{FrameDimension, LayoutFrameExt};
-use cove_ui_compose::primitives::layout::scroll_view::{ScrollAxis, ScrollView, ScrollbarGutter};
+use cove_ui_compose::primitives::layout::{ScrollAxis, ScrollView, ScrollbarGutter};
 
 use support::GlobalTestLock;
 

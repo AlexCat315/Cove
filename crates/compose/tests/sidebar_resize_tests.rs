@@ -47,7 +47,7 @@ use cove_ui_compose::BoxView;
 use cove_ui_compose::adaptive::SurfaceEnvironmentExt;
 use cove_ui_compose::modifiers::interaction::HitTestingExt;
 use cove_ui_compose::modifiers::layout::{FlexExt, FrameDimension, LayoutFrameExt};
-use cove_ui_compose::primitives::layout::scroll_view::ScrollView;
+use cove_ui_compose::primitives::layout::ScrollView;
 use cove_ui_compose::primitives::layout::sidebar::Sidebar;
 use cove_ui_compose::primitives::layout::sidebar::{
     AdaptiveSidebar, AdaptiveSidebarOptions, SidebarGeometry, SidebarItem, SidebarLayoutPolicy,
@@ -277,11 +277,12 @@ impl View for Shell {
     fn body(&self, _cx: &Scope) -> AnyView {
         let mut options = AdaptiveSidebarOptions::default();
         options.layout = shell_policy(false, self.always_expanded.get());
-        let sidebar = AdaptiveSidebar::new(
+        let sidebar = AdaptiveSidebar::try_new(
             "Workspace",
             selected_binding(&self.selected),
             vec![SidebarSection::new("items", items())],
         )
+        .expect("unique sidebar IDs")
         .options(options)
         .content(self.document.clone());
         let sidebar = if self.adjustable.get() {
@@ -387,10 +388,11 @@ impl View for Lane {
     fn body(&self, _cx: &Scope) -> AnyView {
         let policy = shell_policy(false, self.always_expanded.get());
         let geometry = self.geometry(self.document_frame_width());
-        let sidebar = Sidebar::new(
+        let sidebar = Sidebar::try_new(
             selected_binding(&self.selected),
             vec![SidebarSection::new("items", items())],
         )
+        .expect("unique sidebar IDs")
         .presentation(geometry.presentation(policy.shows_rail_labels))
         .minimum_row_height(
             if geometry.mode == cove_ui_compose::primitives::layout::sidebar::SidebarMode::Expanded
@@ -600,11 +602,12 @@ fn embedded_height() {
                 let mut options = AdaptiveSidebarOptions::default();
                 options.layout.shows_rail_labels = false;
                 options.layout.expanded_minimum_width = 600.0;
-                let sidebar = AdaptiveSidebar::new(
+                let sidebar = AdaptiveSidebar::try_new(
                     "Embedded",
                     selected_binding(&self.selected),
                     vec![SidebarSection::new("items", items())],
                 )
+                .expect("unique sidebar IDs")
                 .options(options)
                 .width(width_binding(&self.requested))
                 .content(Document::new());

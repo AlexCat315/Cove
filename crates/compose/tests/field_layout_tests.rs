@@ -32,7 +32,7 @@ use cove_ui_compose::modifiers::interaction::AccessibilityExt;
 use cove_ui_compose::modifiers::layout::LayoutFrameExt;
 use cove_ui_compose::primitives::controls::form::form::{Form, FormField, FormLayout};
 use cove_ui_compose::primitives::controls::form::label_placement::FieldLabelPlacement;
-use cove_ui_compose::primitives::data::property_grid::{
+use cove_ui_compose::primitives::data::{
     PropertyGrid, PropertyGridRow, PropertyGridScrollAxes, PropertyGridSection,
 };
 use cove_ui_compose::primitives::text::TextField;
@@ -128,20 +128,19 @@ fn content(settings: &Settings, name: State<TextBuffer>, email: State<TextBuffer
     } else {
         let columns = settings.columns;
         let placement = settings.placement;
-        AnyView::new(Form::new(
-            vec![
+        AnyView::new(
+            Form::try_new(vec![
                 FormField::new("name", DISPLAY_NAME, name_field()),
                 FormField::new("email", "Email", email_field()),
-            ],
-            None,
-            move |layout: &mut FormLayout| {
+            ])
+            .expect("unique form field IDs")
+            .configure(move |layout: &mut FormLayout| {
                 layout.columns = columns;
                 layout.label_width = 220.0;
                 layout.min_value_width = 220.0;
                 layout.label_placement = placement;
-            },
-            cove_composition::EmptyView,
-        ))
+            }),
+        )
     }
 }
 
@@ -513,26 +512,22 @@ fn associated_labels_resolve_duplicate_ids_within_their_own_form() {
         let focus_hits = Rc::new(Cell::new(0u32));
         let _ = focus_hits;
 
-        let first = AnyView::new(Form::new(
-            vec![FormField::new(
+        let first = AnyView::new(
+            Form::try_new(vec![FormField::new(
                 "name",
                 "Name",
                 TextField::new("First", Binding::constant(TextBuffer::new("first"))),
-            )],
-            None,
-            |_| {},
-            cove_composition::EmptyView,
-        ));
-        let second = AnyView::new(Form::new(
-            vec![FormField::new(
+            )])
+            .expect("unique form field IDs"),
+        );
+        let second = AnyView::new(
+            Form::try_new(vec![FormField::new(
                 "name",
                 "Name",
                 TextField::new("Second", Binding::constant(TextBuffer::new("second"))),
-            )],
-            None,
-            |_| {},
-            cove_composition::EmptyView,
-        ));
+            )])
+            .expect("unique form field IDs"),
+        );
         let column = AnyView::new(cove_composition::TupleView::new(vec![first, second]));
         scene.graph.install_view(
             AnyView::new(AnyView::new(column).frame_width(720.0)),

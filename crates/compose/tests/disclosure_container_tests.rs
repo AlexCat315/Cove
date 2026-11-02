@@ -146,27 +146,30 @@ impl AccordionScene {
     }
 
     fn view(&self) -> AnyView {
-        AnyView::new(Accordion::new(
-            vec![
-                AccordionItem::new(
-                    "first",
-                    "Project preferences with a wrapping title",
-                    AnyView::new(TextField::new(
-                        "Draft",
-                        Binding::constant(TextBuffer::from("Draft")),
-                    ))
-                    .debug_name("accordion-draft"),
-                ),
-                AccordionItem::new("disabled", "Unavailable", AnyView::new(EmptyView))
-                    .enabled(false),
-                AccordionItem::new(
-                    "second",
-                    "Activity",
-                    AnyView::new(Text::new("Recent changes")),
-                ),
-            ],
-            self.expanded.binding(),
-        ))
+        AnyView::new(
+            Accordion::try_new(
+                vec![
+                    AccordionItem::new(
+                        "first",
+                        "Project preferences with a wrapping title",
+                        AnyView::new(TextField::new(
+                            "Draft",
+                            Binding::constant(TextBuffer::from("Draft")),
+                        ))
+                        .debug_name("accordion-draft"),
+                    ),
+                    AccordionItem::new("disabled", "Unavailable", AnyView::new(EmptyView))
+                        .enabled(false),
+                    AccordionItem::new(
+                        "second",
+                        "Activity",
+                        AnyView::new(Text::new("Recent changes")),
+                    ),
+                ],
+                self.expanded.binding(),
+            )
+            .expect("unique accordion IDs"),
+        )
     }
 }
 

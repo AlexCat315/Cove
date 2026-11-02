@@ -15,7 +15,7 @@ use cove_composition::{AnyView, LayoutDebugExt};
 use cove_core::scene::{Align, EventDispatcher, FlexDirection, Justify, Node, Wrap};
 use cove_platform::{InputEvent, MouseButton, MouseButtonEvent, WindowId};
 use cove_ui_compose::modifiers::layout::LayoutFrameExt;
-use cove_ui_compose::primitives::controls::button::Button;
+use cove_ui_compose::primitives::controls::Button;
 use cove_ui_compose::primitives::layout::overlay::OverlayViewExt;
 use cove_ui_compose::{Alignment, BoxView, Row, VerticalAlignment};
 

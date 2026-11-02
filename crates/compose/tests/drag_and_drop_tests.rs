@@ -29,7 +29,7 @@ use cove_composition::AnyView;
 use cove_core::scene::{Node, PointerCaptureHolder};
 use cove_platform::{InputEvent, KeyModifiers, MouseButton, MouseButtonEvent, MouseMotionEvent};
 use cove_ui_compose::modifiers::layout::LayoutFrameExt;
-use cove_ui_compose::primitives::interaction::drag_and_drop::{DragScope, Draggable, DropTarget};
+use cove_ui_compose::primitives::interaction::{DragScope, Draggable, DropTarget};
 use cove_ui_compose::primitives::overlays::portal::LayerRoot;
 use cove_ui_compose::primitives::text::Text;
 use cove_ui_compose::{Column, HorizontalAlignment};

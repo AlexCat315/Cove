@@ -13,7 +13,7 @@ use crate::modifiers::layout::{FlexExt, LayoutFrameExt, PaddingExt};
 use crate::modifiers::style::{AppearanceExt, SemanticStyleViewExt};
 use crate::primitives::feedback::StatusTone;
 use crate::primitives::media::Icon;
-use crate::primitives::text::{Divider, DividerAxis, Text};
+use crate::primitives::text::{Divider, Text};
 use crate::theme::{SemanticColorRef, SemanticFontRef, Theme, ThemeReader};
 use crate::{BoxView, Row, TupleView};
 
@@ -70,11 +70,7 @@ impl View for StatusBar {
         let content = ThemeReader::new(move |theme: &Theme| {
             let mut column_items: Vec<AnyView> = Vec::new();
             if shows_divider {
-                column_items.push(AnyView::new(Divider::new(
-                    None,
-                    1.0,
-                    DividerAxis::Horizontal,
-                )));
+                column_items.push(AnyView::new(Divider::horizontal()));
             }
             let leading_row = Row::new(
                 crate::VerticalAlignment::Center,

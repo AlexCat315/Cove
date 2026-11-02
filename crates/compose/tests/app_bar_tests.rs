@@ -32,9 +32,9 @@ use cove_platform::{InputEvent, KeyEvent, KeyModifiers, MouseButton, MouseButton
 use cove_ui_compose::adaptive::SurfaceEnvironmentExt;
 use cove_ui_compose::modifiers::interaction::AccessibilityExt;
 use cove_ui_compose::modifiers::layout::{FlexExt, LayoutFrameExt};
-use cove_ui_compose::primitives::controls::app_bar::{AppBar, AppBarOptions};
-use cove_ui_compose::primitives::controls::button::Button;
+use cove_ui_compose::primitives::controls::Button;
 use cove_ui_compose::primitives::controls::toolbar::{ToolbarItem, ToolbarItemPlacement};
+use cove_ui_compose::primitives::controls::{AppBar, AppBarOptions};
 use cove_ui_compose::primitives::layout::insets::safe_area::{
     SafeArea, SafeAreaEdges, safe_area_insets,
 };
@@ -126,6 +126,7 @@ fn view(fixture: &Fixture) -> AnyView {
                 .enabled(fixture.back_enabled),
         );
     }
+    let mut primary = None;
     if fixture.primary && !fixture.bare {
         let counter = calls.clone();
         let label = if fixture.text_primary {
@@ -138,12 +139,10 @@ fn view(fixture: &Fixture) -> AnyView {
         }));
         if !fixture.text_primary {
             item = item.icon(
-                cove_ui_compose::primitives::controls::button::ButtonIconSource::resource(
-                    action::check(),
-                ),
+                cove_ui_compose::primitives::controls::ButtonIconSource::resource(action::check()),
             );
         }
-        bar_view = bar_view.primary(item);
+        primary = Some(item);
     }
     if !fixture.bare {
         let mut actions = Vec::new();
@@ -153,9 +152,7 @@ fn view(fixture: &Fixture) -> AnyView {
                 counter.set(counter.get() + 100)
             }))
             .icon(
-                cove_ui_compose::primitives::controls::button::ButtonIconSource::resource(
-                    action::search(),
-                ),
+                cove_ui_compose::primitives::controls::ButtonIconSource::resource(action::search()),
             )
             .placement(ToolbarItemPlacement::Automatic),
         );
@@ -165,7 +162,7 @@ fn view(fixture: &Fixture) -> AnyView {
                 counter.set(counter.get() + 1_000)
             }))
             .icon(
-                cove_ui_compose::primitives::controls::button::ButtonIconSource::resource(
+                cove_ui_compose::primitives::controls::ButtonIconSource::resource(
                     action::download(),
                 ),
             ),
@@ -176,9 +173,7 @@ fn view(fixture: &Fixture) -> AnyView {
                 counter.set(counter.get() + 10_000)
             }))
             .icon(
-                cove_ui_compose::primitives::controls::button::ButtonIconSource::resource(
-                    action::share(),
-                ),
+                cove_ui_compose::primitives::controls::ButtonIconSource::resource(action::share()),
             ),
         );
         let counter = calls.clone();
@@ -196,7 +191,7 @@ fn view(fixture: &Fixture) -> AnyView {
             })
             .enabled(false),
         ));
-        bar_view = bar_view.actions(actions);
+        bar_view = bar_view.try_commands(primary, actions).unwrap();
     }
     bar_view = bar_view.options(AppBarOptions {
         is_enabled: fixture.enabled,

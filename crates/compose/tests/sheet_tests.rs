@@ -32,8 +32,8 @@ use cove_core::scene::{
 use cove_platform::{InputEvent, KeyEvent, KeyModifiers, WindowId};
 use cove_ui_compose::Scancode;
 use cove_ui_compose::modifiers::layout::PaddingExt;
-use cove_ui_compose::primitives::controls::button::Button;
-use cove_ui_compose::primitives::overlays::modal::{ModalPlacement, Sheet, SheetOptions};
+use cove_ui_compose::primitives::controls::Button;
+use cove_ui_compose::prelude::{ModalPlacement, Sheet};
 use cove_ui_compose::primitives::overlays::portal::LayerRoot;
 use cove_ui_compose::primitives::overlays::portal::PortalStoreHolder;
 use cove_ui_compose::primitives::text::Text;
@@ -100,11 +100,8 @@ impl View for Harness {
                             .padding(16.0),
                         ),
                     )
-                    .options(SheetOptions {
-                        edge: self.edge,
-                        extent: 200.0,
-                        ..SheetOptions::default()
-                    }),
+                    .configure(|options| options.edge = self.edge)
+                    .configure(|options| options.extent = 200.0),
                 ),
             ]),
         ))))

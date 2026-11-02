@@ -19,3 +19,4 @@ pub use cove_hosts::{
 pub use cove_terminal as terminal;
 pub use cove_ui_addons as addons;
 pub use cove_ui_compose as compose;
+pub use cove_ui_compose::prelude;

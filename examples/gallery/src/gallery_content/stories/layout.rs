@@ -9,6 +9,7 @@ use cove_core::scene::{Align, FlexDirection, Justify, Wrap};
 use cove_core::{State, TextScale};
 use cove_ui_compose::modifiers::layout::{LayoutFrameExt, PaddingExt};
 use cove_ui_compose::modifiers::style::AppearanceExt;
+use cove_ui_compose::prelude::LazyGridOptions;
 use cove_ui_compose::primitives::controls::Button;
 use cove_ui_compose::primitives::layout::grid::{Grid, GridColumn, GridRowHeights, LazyGrid};
 use cove_ui_compose::primitives::layout::masonry::masonry::Masonry;
@@ -288,7 +289,7 @@ impl View for LayoutGridStory {
         let enabled = self.options.is_enabled;
         // Fixed 100pt, then two flexible tracks with a 120pt minimum.
         let measured = AnyView::new(
-            Grid::new(
+            Grid::try_new(
                 vec![
                     GridColumn::Fixed(100.0),
                     GridColumn::Flexible {
@@ -300,11 +301,6 @@ impl View for LayoutGridStory {
                         maximum: f32::INFINITY,
                     },
                 ],
-                12.0,
-                12.0,
-                Alignment::TopLeading,
-                None,
-                enabled,
                 AnyView::new(cove_ui_compose::TupleView::new(vec![
                     AnyView::new(GridCell::new("Fixed", "100 points")),
                     AnyView::new(GridCell::new("Flexible", "Natural row height")),
@@ -320,21 +316,19 @@ impl View for LayoutGridStory {
                     AnyView::new(GridCell::new("More", "One view per cell")),
                 ])),
             )
+            .expect("valid grid columns")
+            .spacing(12.0, 12.0)
+            .enabled(enabled)
             .debug_name("layout-measured-grid"),
         );
 
         // One adaptive track with a 150pt minimum: 1..n columns.
         let adaptive = AnyView::new(
-            Grid::new(
+            Grid::try_new(
                 vec![GridColumn::Adaptive {
                     minimum: 150.0,
                     maximum: f32::INFINITY,
                 }],
-                12.0,
-                12.0,
-                Alignment::TopLeading,
-                None,
-                enabled,
                 AnyView::new(cove_ui_compose::TupleView::new(
                     (1..=6)
                         .map(|index| {
@@ -346,6 +340,9 @@ impl View for LayoutGridStory {
                         .collect(),
                 )),
             )
+            .expect("valid grid columns")
+            .spacing(12.0, 12.0)
+            .enabled(enabled)
             .debug_name("layout-adaptive-grid"),
         );
 
@@ -421,40 +418,40 @@ impl View for LazyGridStory {
     fn body(&self, _cx: &Scope) -> AnyView {
         // 100,000 cells in 4 fixed-height columns.
         let dense = AnyView::new(
-            LazyGrid::new(
+            LazyGrid::try_new(
                 (0..100_000u64).collect::<Vec<_>>(),
-                std::rc::Rc::new(|index: &u64| format!("dense-{index}")),
-                4,
-                GridRowHeights::fixed(48.0),
-                8.0,
-                8.0,
-                2,
-                None,
-                None,
-                None,
-                std::rc::Rc::new(|_: &u64| AnyView::new(LazyCell::new("Cell"))),
+                |index: &u64| format!("dense-{index}"),
+                LazyGridOptions {
+                    column_spacing: 8.0,
+                    row_spacing: 8.0,
+                    overscan: 2,
+                    ..LazyGridOptions::new(4, GridRowHeights::fixed(48.0))
+                },
+                |_: &u64| AnyView::new(LazyCell::new("Cell")),
             )
+            .expect("valid grid layout")
             .frame_height(240.0)
             .debug_name("layout-lazy-grid"),
         );
 
         // 200 columns x 200 rows, every seventh item spanning two columns.
         let wide = AnyView::new(
-            LazyGrid::new(
+            LazyGrid::try_new(
                 (0..40_000u64).collect::<Vec<_>>(),
-                std::rc::Rc::new(|index: &u64| format!("wide-{index}")),
-                200,
-                GridRowHeights::fixed(40.0),
-                6.0,
-                6.0,
-                2,
-                None,
-                Some(90.0),
-                Some(std::rc::Rc::new(|index: &u64| {
-                    if index.is_multiple_of(7) { 2 } else { 1 }
-                })),
-                std::rc::Rc::new(|index: &u64| AnyView::new(LazyCell::new(format!("#{index}")))),
+                |index: &u64| format!("wide-{index}"),
+                LazyGridOptions {
+                    column_spacing: 6.0,
+                    row_spacing: 6.0,
+                    overscan: 2,
+                    column_width: Some(90.0),
+                    column_span: Some(std::rc::Rc::new(|index: &u64| {
+                        if index.is_multiple_of(7) { 2 } else { 1 }
+                    })),
+                    ..LazyGridOptions::new(200, GridRowHeights::fixed(40.0))
+                },
+                |index: &u64| AnyView::new(LazyCell::new(format!("#{index}"))),
             )
+            .expect("valid grid layout")
             .frame_height(220.0)
             .debug_name("layout-wide-lazy-grid"),
         );

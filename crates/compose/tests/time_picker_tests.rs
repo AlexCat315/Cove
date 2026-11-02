@@ -11,17 +11,15 @@
 //! (`Hour`, `Minute`, `Second`, `AM or PM`) with role `Slider`, so the wheels are
 //! located the same way.
 
-use cove_composition::Scope;
 use crate::support;
+use cove_composition::Scope;
 
 use cove_composition::{AnyView, View};
 use cove_core::State;
 use cove_core::scene::{AccessibilityRole, Node};
 use cove_ui_compose::modifiers::layout::{FrameDimension, LayoutFrameExt};
 use cove_ui_compose::primitives::controls::date_values::TimeOfDay;
-use cove_ui_compose::primitives::controls::time_picker::{
-    TimeHourCycle, TimePicker, TimePickerOptions,
-};
+use cove_ui_compose::primitives::controls::{TimeHourCycle, TimePicker, TimePickerOptions};
 
 use support::InteractiveScene;
 

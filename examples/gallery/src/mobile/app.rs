@@ -10,7 +10,7 @@ use cove_composition::Scope;
 use cove_core::State;
 use cove_ui_compose::modifiers::layout::{FlexExt, LayoutFrameExt};
 use cove_ui_compose::modifiers::style::SemanticStyleViewExt;
-use cove_ui_compose::primitives::layout::tab_view::TabView;
+use cove_ui_compose::primitives::layout::TabView;
 use cove_ui_compose::primitives::layout::{SafeArea, SafeAreaEdges};
 use cove_ui_compose::primitives::media::ui_icon_catalog;
 use cove_ui_compose::primitives::overlays::portal::LayerRoot;
@@ -80,13 +80,13 @@ pub fn make_application_content() -> MobileRoot {
 impl View for MobileRoot {
     fn body(&self, _cx: &Scope) -> AnyView {
         let tabs = vec![
-            cove_ui_compose::primitives::layout::tab_view::TabItem::new(
+            cove_ui_compose::primitives::layout::TabItem::new(
                 MobileTab::Today,
                 MobileTab::Today.label(),
                 TodayScreen::new(self.model.binding()),
             )
             .icon(ui_icon_catalog::shape::home()),
-            cove_ui_compose::primitives::layout::tab_view::TabItem::new(
+            cove_ui_compose::primitives::layout::TabItem::new(
                 MobileTab::Settings,
                 MobileTab::Settings.label(),
                 SettingsScreen::new(self.model.get()),
@@ -94,7 +94,7 @@ impl View for MobileRoot {
             .icon(ui_icon_catalog::action::settings()),
         ];
 
-        let mut tabs_view = TabView::new(self.tab.binding(), tabs);
+        let mut tabs_view = TabView::try_new(self.tab.binding(), tabs).expect("unique tab IDs");
         tabs_view.mobile = true;
         let view = tabs_view.flex_with(1.0, 1.0, Some(0.0)).frame(
             None,

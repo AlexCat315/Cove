@@ -13,19 +13,17 @@ pub struct Spinner {
 }
 
 impl Spinner {
-    pub fn new(size: f32) -> Self {
-        Self::with_animation(size, true)
+    pub fn new() -> Self {
+        Self::default()
     }
 
-    pub fn with_animation(size: f32, is_animating: bool) -> Self {
-        Self {
-            size: if size.is_finite() {
-                size.max(8.0)
-            } else {
-                16.0
-            },
-            is_animating,
-        }
+    pub fn size(mut self, size: f32) -> Self {
+        self.size = if size.is_finite() {
+            size.max(8.0)
+        } else {
+            16.0
+        };
+        self
     }
 
     pub fn animating(mut self, is_animating: bool) -> Self {
@@ -36,7 +34,10 @@ impl Spinner {
 
 impl Default for Spinner {
     fn default() -> Self {
-        Self::new(16.0)
+        Self {
+            size: 16.0,
+            is_animating: true,
+        }
     }
 }
 

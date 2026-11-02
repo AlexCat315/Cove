@@ -7,7 +7,7 @@
 //!   surface and leaving the scheduler idle
 //!
 //! Name mapping: Swift's `List(items, selection:)` is `List::new(selection, ..)
-//! .rows(ids)`, `TabView(selection:tabs:)` is `TabView::new(selection, tabs)`,
+//! .rows(ids)`, `TabView(selection:tabs:)` is `TabView::try_new(selection, tabs)`,
 //! and `.animation(value:)` is `.animation_value(..)`.
 //!
 //! Recorded differences (reported, not fixed):
@@ -36,7 +36,7 @@ use cove_core::scene::{Animation, AnimationCurve, AnimatorScheduler, Node};
 use cove_ui_compose::modifiers::animation_value::AnimationValueExt;
 use cove_ui_compose::primitives::data::lists::list::List;
 use cove_ui_compose::primitives::data::lists::selection::CollectionSelection;
-use cove_ui_compose::primitives::layout::tab_view::{TabItem, TabView};
+use cove_ui_compose::primitives::layout::{TabItem, TabView};
 use cove_ui_compose::theme::Theme;
 use cove_ui_compose::theme::styles::appearance_modifier::{Appearance, AppearanceViewExt};
 
@@ -90,13 +90,14 @@ impl View for TabHarness {
     fn body(&self, _cx: &Scope) -> AnyView {
         let appearance = self.appearance.get();
         let selection = State::new(0i32);
-        let tabs = TabView::new(
+        let tabs = TabView::try_new(
             selection.binding(),
             vec![
                 TabItem::new(0i32, "A", cove_composition::EmptyView),
                 TabItem::new(1i32, "B", cove_composition::EmptyView),
             ],
-        );
+        )
+        .expect("unique tab IDs");
         AnyView::new(
             AnyView::new(tabs)
                 .appearance(appearance, Default::default())

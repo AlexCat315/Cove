@@ -53,7 +53,7 @@ use cove_platform::{InputEvent, KeyEvent, KeyModifiers, WindowId};
 use cove_text::TextEnvironmentHolder;
 use cove_ui_compose::adaptive::SurfaceEnvironmentExt;
 use cove_ui_compose::modifiers::layout::LayoutFrameExt;
-use cove_ui_compose::primitives::controls::button::Button;
+use cove_ui_compose::primitives::controls::Button;
 use cove_ui_compose::primitives::media::ui_icon_catalog::editor;
 use cove_ui_compose::primitives::overlays::portal::LayerRoot;
 use cove_ui_compose::primitives::text::code::{

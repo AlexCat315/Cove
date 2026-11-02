@@ -18,7 +18,7 @@ use cove_core::Binding;
 use cove_core::scene::{AccessibilityRole, Align, FlexDirection, Justify, Node, Wrap};
 use cove_ui_compose::BoxView;
 use cove_ui_compose::modifiers::layout::LayoutFrameExt;
-use cove_ui_compose::primitives::controls::toggle::{Checkbox, CheckboxState, Toggle};
+use cove_ui_compose::primitives::controls::{Checkbox, CheckboxState, Toggle};
 
 use support::GlobalTestLock;
 

@@ -34,7 +34,7 @@ use cove_ui_compose::BoxView;
 use cove_ui_compose::adaptive::SurfaceEnvironmentExt;
 use cove_ui_compose::modifiers::interaction::AccessibilityExt;
 use cove_ui_compose::modifiers::layout::LayoutFrameExt;
-use cove_ui_compose::primitives::controls::button::Button;
+use cove_ui_compose::primitives::controls::Button;
 use cove_ui_compose::primitives::data::{Timeline, TimelineEvent};
 use cove_ui_compose::theme::styles::appearance_modifier::{Appearance, AppearanceViewExt};
 use cove_ui_compose::theme::styles::circular_appearance::ThemeTransition;

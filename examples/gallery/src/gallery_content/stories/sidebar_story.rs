@@ -320,12 +320,13 @@ impl View for SidebarStory {
         .frame_width(PREVIEW_WIDTH)
         .frame_height(PREVIEW_HEIGHT);
 
-        let drawer = NavigationDrawer::new(
+        let drawer = NavigationDrawer::try_new(
             "Cove workspace",
             self.is_drawer_open.binding(),
             self.selection.binding(),
             self.sections(),
-        );
+        )
+        .expect("unique drawer IDs");
 
         AnyView::new(TupleView::new(vec![
             AnyView::new(StorySection::new(

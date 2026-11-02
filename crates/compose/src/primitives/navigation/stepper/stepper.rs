@@ -4,6 +4,7 @@
 //! availability. Lock future steps with `StepperItem::is_enabled`; completing or
 //! selecting a step never changes another step's status.
 use crate::Scope;
+use crate::primitives::{DuplicateId, check_ids};
 use std::rc::Rc;
 
 use crate::adaptive::ContainerSizeReader;
@@ -32,27 +33,25 @@ use super::values::{StepStatus, StepperAxis, StepperItem, StepperOptions};
 
 /// A controlled workflow navigator.
 pub struct Stepper<Id: std::hash::Hash + PartialEq + Clone + 'static> {
-    pub items: Vec<StepperItem<Id>>,
+    pub(crate) items: Vec<StepperItem<Id>>,
     pub selection: Binding<Option<Id>>,
     pub options: StepperOptions,
 }
 
 impl<Id: std::hash::Hash + PartialEq + Clone + 'static> Stepper<Id> {
-    pub fn new(items: Vec<StepperItem<Id>>, selection: Binding<Option<Id>>) -> Self {
-        assert!(
-            items.iter().enumerate().all(|(index, item)| {
-                items
-                    .iter()
-                    .enumerate()
-                    .all(|(other, candidate)| other == index || candidate.id != item.id)
-            }),
-            "Stepper item IDs must be unique"
-        );
-        Self {
+    pub fn try_new(
+        items: Vec<StepperItem<Id>>,
+        selection: Binding<Option<Id>>,
+    ) -> Result<Self, DuplicateId>
+    where
+        Id: Eq,
+    {
+        check_ids(items.iter().map(|item| &item.id), "Stepper item")?;
+        Ok(Self {
             items,
             selection,
             options: StepperOptions::default(),
-        }
+        })
     }
 
     pub fn options(mut self, options: StepperOptions) -> Self {
@@ -573,9 +572,9 @@ impl PrimitiveView for StepperMarker {
                 Some(diameter * 0.5),
                 Some(color),
             )),
-            StepStatus::InProgress => {
-                AnyView::new(AnyView::new(Spinner::new(diameter * 0.55)).foreground_color(color))
-            }
+            StepStatus::InProgress => AnyView::new(
+                AnyView::new(Spinner::new().size(diameter * 0.55)).foreground_color(color),
+            ),
             StepStatus::Pending => AnyView::new(
                 Text::new(self.number.to_string())
                     .semantic_font(SemanticFontRef::label())

@@ -464,7 +464,7 @@ fn set_interaction(node: &Node, key: &str, value: bool) {
 }
 
 /// Stateful boolean control surface shared by the switch and the check box.
-pub struct BoolControlHost {
+pub(crate) struct BoolControlHost {
     pub is_on: Binding<bool>,
     pub is_enabled: bool,
     pub variant: BoolControlVariant,

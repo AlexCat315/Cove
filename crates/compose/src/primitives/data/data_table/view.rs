@@ -22,6 +22,7 @@
 //! - a navigation request reveals its cell once per request identity
 
 use crate::Scope;
+use crate::primitives::{DuplicateId, check_ids};
 use std::cell::RefCell;
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::rc::Rc;
@@ -54,7 +55,7 @@ use crate::primitives::text::text_buffer::TextBuffer;
 use crate::primitives::text::text_field::{
     TextField, TextFieldBehavior, TextFieldEvents, TextFieldNavigationRequest,
 };
-use crate::primitives::text::{Divider, DividerAxis, Text};
+use crate::primitives::text::{Divider, Text};
 use crate::theme::{SemanticFontRef, node_text_scaler, theme_for_node};
 use crate::{AnyView, BoxView, PrimitiveView, TupleView, View, impl_primitive_view};
 
@@ -177,7 +178,7 @@ pub struct DataTable<
     Id: Ord + std::hash::Hash + Clone + Send + Sync + 'static,
 > {
     pub model: Rc<DataTableModel<Record, Id>>,
-    pub columns: Vec<TableColumn<Record>>,
+    columns: Vec<TableColumn<Record>>,
     pub options: DataTableOptions<Id>,
     pub on_activate: Option<Rc<dyn Fn(&Record)>>,
     /// Per-record logical height, scaled with text. `None` keeps every row at
@@ -192,17 +193,14 @@ pub struct DataTable<
 impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 'static>
     DataTable<Record, Id>
 {
-    pub fn new(model: Rc<DataTableModel<Record, Id>>, columns: Vec<TableColumn<Record>>) -> Self {
-        let mut ids: HashSet<&str> = HashSet::new();
-        for column in &columns {
-            assert!(
-                ids.insert(&column.id),
-                "DataTable column IDs must be unique"
-            );
-        }
+    pub fn try_new(
+        model: Rc<DataTableModel<Record, Id>>,
+        columns: Vec<TableColumn<Record>>,
+    ) -> Result<Self, DuplicateId> {
+        check_ids(columns.iter().map(|item| &item.id), "Data table column")?;
         let mut options = DataTableOptions::default();
         options.layout.validate();
-        Self {
+        Ok(Self {
             model,
             columns,
             options,
@@ -211,7 +209,7 @@ impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 
             row_key_handler: None,
             session: State::new(DataTableSession::default()),
             offset: State::new(Point::default()),
-        }
+        })
     }
 
     pub fn options(mut self, options: DataTableOptions<Id>) -> Self {
@@ -1188,7 +1186,7 @@ impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 
                 0.0,
                 AnyView::new(TupleView::new(vec![
                     AnyView::new(AnyView::new(header).frame(None, None, None, None, None, None)),
-                    AnyView::new(Divider::new(None, 1.0, DividerAxis::Horizontal)),
+                    AnyView::new(Divider::horizontal()),
                     body,
                 ])),
             )

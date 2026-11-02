@@ -49,7 +49,7 @@ impl<Id: PartialEq + Clone> AccordionItem<Id> {
 
 /// Disclosure list of collapsible sections.
 pub struct Accordion<Id: PartialEq + Clone + Ord + std::hash::Hash + Send + Sync + 'static> {
-    pub items: Vec<AccordionItem<Id>>,
+    items: Vec<AccordionItem<Id>>,
     pub expanded: Binding<BTreeSet<Id>>,
     pub allows_multiple: bool,
     pub is_enabled: bool,
@@ -57,21 +57,18 @@ pub struct Accordion<Id: PartialEq + Clone + Ord + std::hash::Hash + Send + Sync
 }
 
 impl<Id: PartialEq + Clone + Ord + std::hash::Hash + Send + Sync + 'static> Accordion<Id> {
-    pub fn new(items: Vec<AccordionItem<Id>>, expanded: Binding<BTreeSet<Id>>) -> Self {
-        assert!(
-            items.iter().enumerate().all(|(index, item)| items
-                .iter()
-                .enumerate()
-                .all(|(other, candidate)| other == index || candidate.id != item.id)),
-            "Accordion IDs must be unique"
-        );
-        Self {
+    pub fn try_new(
+        items: Vec<AccordionItem<Id>>,
+        expanded: Binding<BTreeSet<Id>>,
+    ) -> Result<Self, crate::primitives::DuplicateId> {
+        crate::primitives::check_ids(items.iter().map(|item| &item.id), "Accordion")?;
+        Ok(Self {
             items,
             expanded,
             allows_multiple: false,
             is_enabled: true,
             focused: cove_core::State::new(None),
-        }
+        })
     }
 
     pub fn allows_multiple(mut self, allows_multiple: bool) -> Self {
@@ -209,11 +206,7 @@ impl<Id: PartialEq + Clone + Ord + std::hash::Hash + Send + Sync + 'static> View
                 AnyView::new(item.content.clone().padding(12.0)),
             )));
             if index + 1 < item_count {
-                column.push(AnyView::new(crate::primitives::text::Divider::new(
-                    None,
-                    1.0,
-                    crate::primitives::text::DividerAxis::Horizontal,
-                )));
+                column.push(AnyView::new(crate::primitives::text::Divider::horizontal()));
             }
             sections.push(AnyView::new(BoxView::new(
                 FlexDirection::Column,

@@ -1,35 +1,43 @@
 //! Media primitives.
-pub mod async_image;
-pub mod icon;
-pub mod image;
+pub(crate) mod async_image;
+pub(crate) mod icon;
+pub(crate) mod image;
 pub mod image_data_download;
-pub mod image_file;
-pub mod image_geometry;
-pub mod image_load_services;
-pub mod loading_animation_clock;
-pub mod skeleton;
+pub(crate) mod image_file;
+pub(crate) mod image_geometry;
+pub(crate) mod image_load_services;
+pub(crate) mod loading_animation_clock;
+pub(crate) mod skeleton;
 pub mod ui_icon_catalog;
 pub mod ui_icons;
-pub mod vector_image_raster;
+pub(crate) mod vector_image_raster;
 
-pub use async_image::{
-    AsyncImage, AsyncImageAnimation, AsyncImageAnimationCache, AsyncImagePhase, AsyncImageSession,
-    ImageLoadingPolicy,
-};
-pub use icon::Icon;
-pub use image::*;
+pub use api::*;
+pub use async_image::{AsyncImageAnimation, AsyncImageAnimationCache, AsyncImageSession};
+
+pub use image::{ContentScaleHolder, image_is_same_source, texture_source};
 pub use image_data_download::{
     AsyncImageError, DownloadProgressReporter, DownloadedImage, ImageDataDownload,
     ImageDownloadTransport, ImageDownloadTransportHolder,
 };
-pub use image_file::*;
-pub use image_geometry::*;
-pub use image_load_services::{
-    ImageInflightLoads, ImageLoadRequest, ImageLoadServices, ImagePayload, ImageProgress,
-    ImagePublicationQueue,
+pub use image_file::{
+    ImageLoadDiagnostic, ImageLoadDiagnostics, ImageLoadFailureReason, decode_image,
 };
-pub use loading_animation_clock::*;
-pub use skeleton::{Skeleton, SkeletonAppearance, SkeletonMotion, SkeletonShape};
-pub use ui_icon_catalog::*;
-pub use ui_icons::UIIcons;
-pub use vector_image_raster::*;
+pub use image_geometry::ImageGeometry;
+pub use image_load_services::{
+    ImageDecode, ImageDecodeExecution, ImageInflightLoads, ImageLoadRequest, ImageLoadServices,
+    ImagePayload, ImageProgress, ImagePublicationQueue,
+};
+pub use loading_animation_clock::LoadingAnimationClock;
+pub use ui_icon_catalog::UIIconEntry;
+
+pub use vector_image_raster::VectorImageRaster;
+
+pub(crate) mod api {
+    pub use super::async_image::{AsyncImage, AsyncImagePhase, ImageLoadingPolicy};
+    pub use super::icon::Icon;
+    pub use super::image::{Image, ImageSource};
+    pub use super::image_geometry::{ImageContentMode, ImageRenderingMode};
+    pub use super::skeleton::{Skeleton, SkeletonAppearance, SkeletonMotion, SkeletonShape};
+    pub use super::ui_icons::UIIcons;
+}

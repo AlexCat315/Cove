@@ -144,16 +144,14 @@ impl View for Button {
                 let icon_size = self.icon_size;
                 AnyView::new(IconMetricsReader::new(move |node| {
                     let metrics = IconMetrics::new(node);
-                    crate::primitives::feedback::Spinner::new(
-                        metrics.size(icon_size.unwrap_or(metrics.theme().icons.medium)),
-                    )
+                    crate::primitives::feedback::Spinner::new()
+                        .size(metrics.size(icon_size.unwrap_or(metrics.theme().icons.medium)))
                 }))
             } else {
                 let spinner = AnyView::new(IconMetricsReader::new(|node| {
                     let metrics = IconMetrics::new(node);
-                    crate::primitives::feedback::Spinner::new(
-                        metrics.size(metrics.theme().icons.medium),
-                    )
+                    crate::primitives::feedback::Spinner::new()
+                        .size(metrics.size(metrics.theme().icons.medium))
                 }));
                 AnyView::new(BoxView::new(
                     FlexDirection::Row,
@@ -244,30 +242,33 @@ impl View for ButtonIcon {
                         texture_id: *texture_id,
                         size: None,
                     },
-                    size,
-                    size,
-                    Color::WHITE,
-                    ImageContentMode::Fit,
-                    ImageRenderingMode::AlphaMask,
-                ),
+                    cove_core::Size {
+                        width: size,
+                        height: size,
+                    },
+                )
+                .content_mode(ImageContentMode::Fit)
+                .rendering_mode(ImageRenderingMode::AlphaMask),
                 ButtonIconSource::File(path) => Image::from_file(
                     path,
-                    size,
-                    size,
-                    Color::WHITE,
-                    ImageContentMode::Fit,
-                    ImageRenderingMode::AlphaMask,
-                ),
+                    cove_core::Size {
+                        width: size,
+                        height: size,
+                    },
+                )
+                .content_mode(ImageContentMode::Fit)
+                .rendering_mode(ImageRenderingMode::AlphaMask),
                 ButtonIconSource::Resource(resource) => {
                     let resolved = metrics.theme().icons.resolve(resource);
                     Image::from_resource(
                         &resolved,
-                        size,
-                        size,
-                        Color::WHITE,
-                        ImageContentMode::Fit,
-                        ImageRenderingMode::AlphaMask,
+                        cove_core::Size {
+                            width: size,
+                            height: size,
+                        },
                     )
+                    .content_mode(ImageContentMode::Fit)
+                    .rendering_mode(ImageRenderingMode::AlphaMask)
                 }
             };
             if let Some(tint) = tint {

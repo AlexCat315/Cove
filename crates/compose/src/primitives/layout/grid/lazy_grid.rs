@@ -84,60 +84,103 @@ impl LazyGridRows {
     }
 }
 
-/// A vertically scrolling, equal-column grid that constructs only visible
-/// rows plus overscan. Row heights are explicit so scrolling never measures
-/// the full collection.
-pub struct LazyGrid<T> {
-    pub data: Vec<T>,
-    pub id: Rc<dyn Fn(&T) -> String>,
+#[derive(Debug, PartialEq, Eq, thiserror::Error)]
+pub enum LazyGridError {
+    #[error("a grid requires at least one column")]
+    NoColumns,
+    #[error("the grid requires a height for each of its {rows} rows")]
+    RowHeightCount { rows: usize },
+}
+
+/// Layout inputs used to pack and validate all rows together.
+pub struct LazyGridOptions<T> {
     pub columns: usize,
     pub row_heights: GridRowHeights,
     pub column_spacing: f32,
     pub row_spacing: f32,
     pub overscan: usize,
-    pub scroll_offset: Option<Rc<State<Point>>>,
     pub column_width: Option<f32>,
     pub column_span: Option<Rc<dyn Fn(&T) -> usize>>,
-    pub content: Rc<dyn Fn(&T) -> AnyView>,
+}
+
+impl<T> LazyGridOptions<T> {
+    pub fn new(columns: usize, row_heights: GridRowHeights) -> Self {
+        Self {
+            columns,
+            row_heights,
+            column_spacing: 0.0,
+            row_spacing: 0.0,
+            overscan: 0,
+            column_width: None,
+            column_span: None,
+        }
+    }
+}
+
+/// A vertically scrolling, equal-column grid that constructs only visible
+/// rows plus overscan. Row heights are explicit so scrolling never measures
+/// the full collection.
+pub struct LazyGrid<T> {
+    data: Vec<T>,
+    id: Rc<dyn Fn(&T) -> String>,
+    columns: usize,
+    row_heights: GridRowHeights,
+    column_spacing: f32,
+    row_spacing: f32,
+    overscan: usize,
+    scroll_offset: Option<Rc<State<Point>>>,
+    column_width: Option<f32>,
+    rows: Rc<LazyGridRows>,
+    content: Rc<dyn Fn(&T) -> AnyView>,
     visible_rows: State<Range<usize>>,
     visible_columns: State<Range<usize>>,
 }
 impl<T: Clone + 'static> LazyGrid<T> {
-    #[allow(clippy::too_many_arguments)]
-    pub fn new(
+    pub fn try_new(
         data: Vec<T>,
-        id: Rc<dyn Fn(&T) -> String>,
-        columns: usize,
-        row_heights: GridRowHeights,
-        column_spacing: f32,
-        row_spacing: f32,
-        overscan: usize,
-        scroll_offset: Option<Rc<State<Point>>>,
-        column_width: Option<f32>,
-        column_span: Option<Rc<dyn Fn(&T) -> usize>>,
-        content: Rc<dyn Fn(&T) -> AnyView>,
-    ) -> Self {
-        assert!(columns > 0, "LazyGrid requires at least one column");
+        id: impl Fn(&T) -> String + 'static,
+        options: LazyGridOptions<T>,
+        content: impl Fn(&T) -> AnyView + 'static,
+    ) -> Result<Self, LazyGridError> {
+        let LazyGridOptions {
+            columns,
+            row_heights,
+            column_spacing,
+            row_spacing,
+            overscan,
+            column_width,
+            column_span,
+        } = options;
+        if columns == 0 {
+            return Err(LazyGridError::NoColumns);
+        }
         let spans: Option<Vec<usize>> = column_span
             .as_ref()
             .map(|span| data.iter().map(|item| (span)(item)).collect());
         let rows = LazyGridRows::new(data.len(), columns, spans.as_deref());
-        row_heights.validate(rows.count);
-        Self {
+        if !row_heights.matches_count(rows.count) {
+            return Err(LazyGridError::RowHeightCount { rows: rows.count });
+        }
+        Ok(Self {
             data,
-            id,
+            id: Rc::new(id),
             columns,
             row_heights,
             column_spacing: super::columns::GridTrackResolver::finite_nonnegative(column_spacing),
             row_spacing: super::columns::GridTrackResolver::finite_nonnegative(row_spacing),
             overscan,
-            scroll_offset,
+            scroll_offset: None,
             column_width: column_width.filter(|width| width.is_finite() && *width > 0.0),
-            column_span,
-            content,
+            rows: Rc::new(rows),
+            content: Rc::new(content),
             visible_rows: State::new(0..1),
             visible_columns: State::new(0..1),
-        }
+        })
+    }
+
+    pub fn scroll_offset(mut self, offset: Rc<State<Point>>) -> Self {
+        self.scroll_offset = Some(offset);
+        self
     }
 
     pub fn visible_columns(
@@ -181,7 +224,7 @@ impl<T: Clone + 'static> LazyGrid<T> {
             overscan: self.overscan,
             scroll_offset: self.scroll_offset.clone(),
             column_width: self.column_width,
-            column_span: self.column_span.clone(),
+            rows: self.rows.clone(),
             content: self.content.clone(),
             visible_rows: self.visible_rows.clone(),
             visible_columns: self.visible_columns.clone(),
@@ -201,7 +244,7 @@ pub struct LazyGridView<T> {
     overscan: usize,
     scroll_offset: Option<Rc<State<Point>>>,
     column_width: Option<f32>,
-    column_span: Option<Rc<dyn Fn(&T) -> usize>>,
+    rows: Rc<LazyGridRows>,
     content: Rc<dyn Fn(&T) -> AnyView>,
     visible_rows: State<Range<usize>>,
     visible_columns: State<Range<usize>>,
@@ -220,24 +263,16 @@ impl<T: Clone + 'static> LazyGridView<T> {
             overscan: self.overscan,
             scroll_offset: self.scroll_offset.clone(),
             column_width: self.column_width,
-            column_span: self.column_span.clone(),
+            rows: self.rows.clone(),
             content: self.content.clone(),
             visible_rows: self.visible_rows.clone(),
             visible_columns: self.visible_columns.clone(),
         }
     }
-
-    fn rows(&self) -> LazyGridRows {
-        let spans: Option<Vec<usize>> = self
-            .column_span
-            .as_ref()
-            .map(|span| self.data.iter().map(|item| (span)(item)).collect());
-        LazyGridRows::new(self.data.len(), self.columns, spans.as_deref())
-    }
 }
 impl<T: Clone + 'static> View for LazyGridView<T> {
     fn body(&self, _cx: &Scope) -> AnyView {
-        let rows = self.rows();
+        let rows = self.rows.clone();
         let row_count = rows.count;
         let visible = self.visible_rows.get();
         let lower = row_count.min(visible.start);
@@ -398,15 +433,11 @@ impl<T: Clone + 'static> LazyGridView<T> {
                 cells.push(content);
             }
         }
-        AnyView::new(Grid::new(
-            columns,
-            self.column_spacing,
-            0.0,
-            crate::Alignment::TopLeading,
-            None,
-            true,
-            AnyView::new(crate::TupleView::new(cells)),
-        ))
+        AnyView::new(
+            Grid::try_new(columns, AnyView::new(crate::TupleView::new(cells)))
+                .expect("valid grid columns")
+                .spacing(self.column_spacing, 0.0),
+        )
     }
 }
 

@@ -27,7 +27,7 @@ use cove_platform::{InputEvent, KeyEvent, KeyModifiers, WindowId};
 use cove_ui_compose::adaptive::SurfaceEnvironmentExt;
 use cove_ui_compose::modifiers::interaction::AccessibilityExt;
 use cove_ui_compose::modifiers::layout::LayoutFrameExt;
-use cove_ui_compose::primitives::controls::button::Button;
+use cove_ui_compose::primitives::controls::Button;
 use cove_ui_compose::primitives::feedback::{Alert, AlertTone, StatusTone};
 use cove_ui_compose::primitives::text::Text;
 use cove_ui_compose::theme::TextScalerViewExt;

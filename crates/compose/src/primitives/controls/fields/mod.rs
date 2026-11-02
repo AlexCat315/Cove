@@ -1,7 +1,7 @@
 //! Form fields: selects, sliders and radio groups.
-pub mod date_picker;
+mod date_picker;
 pub mod numeric;
-pub mod radio_group;
+pub(crate) mod radio_group;
 pub mod range_slider;
 pub mod select;
 pub mod slider;
@@ -16,7 +16,7 @@ pub use range_slider::{RangeSlider, RangeThumb, RangeValue};
 pub use select::{
     KeyboardShortcut, KeyboardShortcutModifier, KeyboardShortcutPlatform, Select, SelectOption,
 };
-pub use slider::{Slider, SliderAxis, SliderGeometry, SliderHost};
+pub use slider::{Slider, SliderAxis, SliderGeometry};
 pub mod wheel_picker;
 pub use wheel_picker::{WheelPicker, WheelPickerOption};
 pub mod search_field;

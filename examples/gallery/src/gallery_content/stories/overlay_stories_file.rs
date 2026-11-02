@@ -13,7 +13,7 @@ use cove_core::State;
 use cove_core::scene::{Align, FlexDirection, Justify, Wrap};
 use cove_ui_compose::modifiers::layout::LayoutFrameExt;
 use cove_ui_compose::modifiers::style::SemanticStyleViewExt;
-use cove_ui_compose::primitives::layout::tab_view::{TabItem, TabOverflow, TabVariant, TabView};
+use cove_ui_compose::primitives::layout::{TabItem, TabOverflow, TabVariant, TabView};
 use cove_ui_compose::primitives::overlays::menu::{MenuEntry, MenuItem, MenuSubmenu};
 use cove_ui_compose::primitives::text::Text;
 use cove_ui_compose::theme::tokens::SemanticColorRef;
@@ -302,7 +302,7 @@ impl View for MenuStory {
             }),
         ];
         let native = AnyView::new(
-            cove_ui_compose::primitives::controls::menu_button::MenuButtonTitle::new(
+            cove_ui_compose::primitives::controls::MenuButtonTitle::new(
                 "Workspace",
                 native_entries,
             )
@@ -319,7 +319,7 @@ impl View for MenuStory {
             12.0,
             AnyView::new(TupleView::new(vec![
                 AnyView::new(
-                    cove_ui_compose::primitives::controls::menu_button::MenuButtonTitle::new(
+                    cove_ui_compose::primitives::controls::MenuButtonTitle::new(
                         "Columns",
                         self.column_entries(enabled),
                     )
@@ -328,7 +328,7 @@ impl View for MenuStory {
                     .debug_name("menu-columns"),
                 ),
                 AnyView::new(
-                    cove_ui_compose::primitives::controls::menu_button::MenuButtonTitle::new(
+                    cove_ui_compose::primitives::controls::MenuButtonTitle::new(
                         "View",
                         self.view_entries(enabled),
                     )
@@ -340,13 +340,10 @@ impl View for MenuStory {
         ));
 
         let scrollable = AnyView::new(
-            cove_ui_compose::primitives::controls::menu_button::MenuButtonTitle::new(
-                "Commands",
-                self.many(),
-            )
-            .enabled(enabled)
-            .width(220.0)
-            .debug_name("menu-scrollable"),
+            cove_ui_compose::primitives::controls::MenuButtonTitle::new("Commands", self.many())
+                .enabled(enabled)
+                .width(220.0)
+                .debug_name("menu-scrollable"),
         );
 
         AnyView::new(
@@ -693,7 +690,8 @@ impl TabsStory {
 impl View for TabsStory {
     fn body(&self, _cx: &Scope) -> AnyView {
         let tabs = AnyView::new(
-            TabView::new(self.selection.binding(), self.content_tabs())
+            TabView::try_new(self.selection.binding(), self.content_tabs())
+                .expect("unique tab IDs")
                 .variant(self.variant())
                 .overflow(self.overflow())
                 .enabled(self.options.is_enabled)
@@ -707,7 +705,8 @@ impl View for TabsStory {
             TabItem::new("month".to_owned(), "Month", Text::new("Monthly agenda")),
         ];
         let segmented = AnyView::new(
-            TabView::new(self.segment.binding(), segments)
+            TabView::try_new(self.segment.binding(), segments)
+                .expect("unique tab IDs")
                 .variant(TabVariant::Segmented)
                 .enabled(self.options.is_enabled)
                 .frame_height(120.0)
@@ -743,11 +742,16 @@ impl View for TabsStory {
             .into_iter()
             .map(|name| {
                 let label = name.clone();
-                TabItem::new(name.clone(), label, Text::new(format!("Contents of {name}")))
+                TabItem::new(
+                    name.clone(),
+                    label,
+                    Text::new(format!("Contents of {name}")),
+                )
             })
             .collect();
         let documents = AnyView::new(
-            TabView::new(self.document_selection.binding(), document_tabs)
+            TabView::try_new(self.document_selection.binding(), document_tabs)
+                .expect("unique tab IDs")
                 .variant(TabVariant::Card)
                 .overflow(TabOverflow::Scroll)
                 .frame_height(120.0)

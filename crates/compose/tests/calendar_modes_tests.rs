@@ -133,11 +133,13 @@ fn render(
         options.today = date(2024, 3, 13);
         let read = store.clone();
         let write = store.clone();
-        scene.install(AnyView::new(CalendarView::new(
-            Rc::new(move || *read.borrow()),
-            Rc::new(move |value| *write.borrow_mut() = value),
-            options,
-        )));
+        scene.install(AnyView::new(
+            CalendarView::new(cove_core::Binding::new(
+                move || *read.borrow(),
+                move |value| *write.borrow_mut() = value,
+            ))
+            .configure(|calendar| *calendar = options),
+        ));
         test(scene, &store);
     });
 }

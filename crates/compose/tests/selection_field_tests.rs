@@ -43,12 +43,12 @@ use cove_platform::KeyModifiers;
 use cove_ui_compose::adaptive::SurfaceEnvironmentExt;
 use cove_ui_compose::modifiers::interaction::AccessibilityExt;
 use cove_ui_compose::modifiers::layout::{EdgeInsets, LayoutFrameExt, PaddingExt};
-use cove_ui_compose::primitives::controls::button::Button;
+use cove_ui_compose::primitives::controls::Button;
 use cove_ui_compose::primitives::controls::fields::combobox::{Combobox, ComboboxPresentation};
 use cove_ui_compose::primitives::controls::fields::select::{Select, SelectOption};
 use cove_ui_compose::primitives::overlays::anchored::{PopoverOverflow, PopoverSurface};
-use cove_ui_compose::primitives::overlays::popover::{Popover, PopoverSizing};
 use cove_ui_compose::primitives::overlays::portal::LayerRoot;
+use cove_ui_compose::primitives::overlays::{Popover, PopoverSizing};
 use cove_ui_compose::primitives::text::Text;
 use cove_ui_compose::theme::styles::appearance_modifier::{Appearance, AppearanceViewExt};
 use cove_ui_compose::theme::styles::circular_appearance::ThemeTransition;
@@ -61,7 +61,7 @@ use support::InteractiveScene;
 const TITLE: &str = "Workspace permissions 👩🏽‍💻 and international collaboration settings";
 const PLACEHOLDER: &str = "Choose a workspace with international collaboration permissions";
 
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
 enum Kind {
     Select,
     Combobox,
@@ -126,7 +126,9 @@ impl View for SelectionHarness {
                     presentation.width = width;
                 }
                 AnyView::new(
-                    Combobox::new(state.selection.binding(), options).presentation(presentation),
+                    Combobox::try_new(state.selection.binding(), options)
+                        .expect("unique combobox IDs")
+                        .presentation(presentation),
                 )
             }
         };

@@ -17,6 +17,7 @@
 //! one to mount. Nothing here builds a tab's body lazily, and nothing here holds
 //! a builder closure, so the caller owns materialisation and lifecycle.
 use crate::Scope;
+use crate::primitives::{DuplicateId, check_ids};
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -148,7 +149,7 @@ impl<Id: PartialEq + Clone + 'static> TabItem<Id> {
 /// Multi-panel container with a single active panel.
 pub struct TabView<Id: PartialEq + Clone + std::hash::Hash + 'static> {
     pub selection: Binding<Id>,
-    pub tabs: Vec<TabItem<Id>>,
+    pub(crate) tabs: Vec<TabItem<Id>>,
     pub variant: TabVariant,
     pub placement: TabStripPlacement,
     pub overflow: TabOverflow,
@@ -161,15 +162,12 @@ pub struct TabView<Id: PartialEq + Clone + std::hash::Hash + 'static> {
 impl<Id: PartialEq + Clone + std::hash::Hash + 'static> TabView<Id> {
     ///
     /// Tab IDs must be unique.
-    pub fn new(selection: Binding<Id>, tabs: Vec<TabItem<Id>>) -> Self {
-        assert!(
-            tabs.iter().enumerate().all(|(index, tab)| tabs
-                .iter()
-                .enumerate()
-                .all(|(other, candidate)| other == index || candidate.id != tab.id)),
-            "Tab IDs must be unique"
-        );
-        Self {
+    pub fn try_new(selection: Binding<Id>, tabs: Vec<TabItem<Id>>) -> Result<Self, DuplicateId>
+    where
+        Id: Eq,
+    {
+        check_ids(tabs.iter().map(|item| &item.id), "Tab")?;
+        Ok(Self {
             selection,
             tabs,
             variant: TabVariant::Bar,
@@ -181,7 +179,7 @@ impl<Id: PartialEq + Clone + std::hash::Hash + 'static> TabView<Id> {
             focus_request: Rc::new(RefCell::new(
                 crate::primitives::overlays::roving_focus::RovingFocusRequest::new(),
             )),
-        }
+        })
     }
 
     pub fn variant(mut self, variant: TabVariant) -> Self {
@@ -636,10 +634,11 @@ mod tests {
 
     fn view(selection: &str, tabs: Vec<TabItem<String>>) -> TabView<String> {
         let selected = selection.to_string();
-        TabView::new(
+        TabView::try_new(
             Binding::new(move || selected.clone(), |_value: String| {}),
             tabs,
         )
+        .expect("unique tab IDs")
     }
 
     #[test]

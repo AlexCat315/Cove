@@ -37,7 +37,7 @@ use cove_composition::{Alignment, AnyView, LayoutDebugExt, View};
 use cove_core::State;
 use cove_core::scene::{Direction, Node};
 use cove_ui_compose::modifiers::layout::LayoutFrameExt;
-use cove_ui_compose::primitives::controls::button::Button;
+use cove_ui_compose::primitives::controls::Button;
 use cove_ui_compose::primitives::layout::responsive::candidates::LayoutThatFits;
 use cove_ui_compose::primitives::layout::responsive::stack::{StackAxis, StackLayout};
 use cove_ui_compose::primitives::text::Text;
@@ -87,18 +87,16 @@ impl View for Harness {
         let width = self.width.get();
         AnyView::new(
             AnyView::new(LayoutContainer::new(
-                LayoutThatFits::new(vec![
-                    Rc::new(StackLayout::new(
-                        StackAxis::Horizontal,
-                        10.0,
-                        Alignment::TopLeading,
-                    )),
-                    Rc::new(StackLayout::new(
-                        StackAxis::Vertical,
-                        10.0,
-                        Alignment::TopLeading,
-                    )),
-                ]),
+                LayoutThatFits::new(StackLayout::new(
+                    StackAxis::Horizontal,
+                    10.0,
+                    Alignment::TopLeading,
+                ))
+                .or(StackLayout::new(
+                    StackAxis::Vertical,
+                    10.0,
+                    Alignment::TopLeading,
+                )),
                 AnyView::new(cove_composition::TupleView::new(vec![
                     AnyView::new(boxed(70.0, 20.0).debug_name("candidate-first")),
                     AnyView::new(boxed(60.0, 30.0).debug_name("candidate-second")),
@@ -302,24 +300,22 @@ fn candidate_evaluation_stops_at_the_first_fit() {
         graph.install_view(
             AnyView::new(
                 AnyView::new(LayoutContainer::new(
-                    LayoutThatFits::new(vec![
-                        Rc::new(Candidate {
-                            id: 0,
-                            size: cove_core::Size {
-                                width: 80.0,
-                                height: 20.0,
-                            },
-                            decisions: decisions.clone(),
-                        }),
-                        Rc::new(Candidate {
-                            id: 1,
-                            size: cove_core::Size {
-                                width: 10.0,
-                                height: 10.0,
-                            },
-                            decisions: decisions.clone(),
-                        }),
-                    ]),
+                    LayoutThatFits::new(Candidate {
+                        id: 0,
+                        size: cove_core::Size {
+                            width: 80.0,
+                            height: 20.0,
+                        },
+                        decisions: decisions.clone(),
+                    })
+                    .or(Candidate {
+                        id: 1,
+                        size: cove_core::Size {
+                            width: 10.0,
+                            height: 10.0,
+                        },
+                        decisions: decisions.clone(),
+                    }),
                     AnyView::new(boxed(10.0, 10.0)),
                 ))
                 .frame_width(100.0)
@@ -357,24 +353,22 @@ fn every_candidate_overflowing_falls_back_to_the_last_one() {
         graph.install_view(
             AnyView::new(
                 AnyView::new(LayoutContainer::new(
-                    LayoutThatFits::new(vec![
-                        Rc::new(Candidate {
-                            id: 0,
-                            size: cove_core::Size {
-                                width: 120.0,
-                                height: 20.0,
-                            },
-                            decisions: decisions.clone(),
-                        }),
-                        Rc::new(Candidate {
-                            id: 1,
-                            size: cove_core::Size {
-                                width: 80.0,
-                                height: 120.0,
-                            },
-                            decisions: decisions.clone(),
-                        }),
-                    ]),
+                    LayoutThatFits::new(Candidate {
+                        id: 0,
+                        size: cove_core::Size {
+                            width: 120.0,
+                            height: 20.0,
+                        },
+                        decisions: decisions.clone(),
+                    })
+                    .or(Candidate {
+                        id: 1,
+                        size: cove_core::Size {
+                            width: 80.0,
+                            height: 120.0,
+                        },
+                        decisions: decisions.clone(),
+                    }),
                     AnyView::new(boxed(10.0, 10.0)),
                 ))
                 .frame_width(100.0)
@@ -404,24 +398,22 @@ fn unspecified_axes_accept_intrinsic_extents_and_empty_stacks_stay_empty() {
             measurements: RefCell::new(Vec::new()),
             placements: RefCell::new(Vec::new()),
         });
-        let layout = LayoutThatFits::new(vec![
-            Rc::new(Candidate {
-                id: 0,
-                size: cove_core::Size {
-                    width: 300.0,
-                    height: 20.0,
-                },
-                decisions: decisions.clone(),
-            }),
-            Rc::new(Candidate {
-                id: 1,
-                size: cove_core::Size {
-                    width: 10.0,
-                    height: 10.0,
-                },
-                decisions: decisions.clone(),
-            }),
-        ]);
+        let layout = LayoutThatFits::new(Candidate {
+            id: 0,
+            size: cove_core::Size {
+                width: 300.0,
+                height: 20.0,
+            },
+            decisions: decisions.clone(),
+        })
+        .or(Candidate {
+            id: 1,
+            size: cove_core::Size {
+                width: 10.0,
+                height: 10.0,
+            },
+            decisions: decisions.clone(),
+        });
 
         let measured = layout.size_that_fits(ProposedViewSize::new(None, Some(30.0)), &[]);
         assert_eq!(
@@ -471,18 +463,16 @@ fn auto_height_contains_the_chosen_vertical_layout() {
             graph.install_view(
                 AnyView::new(AnyView::new(
                     AnyView::new(LayoutContainer::new(
-                        LayoutThatFits::new(vec![
-                            Rc::new(StackLayout::new(
-                                StackAxis::Horizontal,
-                                12.0,
-                                Alignment::TopLeading,
-                            )),
-                            Rc::new(StackLayout::new(
-                                StackAxis::Vertical,
-                                12.0,
-                                Alignment::TopLeading,
-                            )),
-                        ]),
+                        LayoutThatFits::new(StackLayout::new(
+                            StackAxis::Horizontal,
+                            12.0,
+                            Alignment::TopLeading,
+                        ))
+                        .or(StackLayout::new(
+                            StackAxis::Vertical,
+                            12.0,
+                            Alignment::TopLeading,
+                        )),
                         AnyView::new(cove_composition::TupleView::new(vec![
                             AnyView::new(Button::new(Text::new("Files"), || {})),
                             AnyView::new(Button::new(Text::new("Preview"), || {})),
@@ -533,18 +523,16 @@ fn real_font_button_labels_keep_one_line_and_stay_inside_their_host() {
                         AnyView::new(
                             AnyView::new(
                                 AnyView::new(LayoutContainer::new(
-                                    LayoutThatFits::new(vec![
-                                        Rc::new(StackLayout::new(
-                                            StackAxis::Horizontal,
-                                            12.0,
-                                            Alignment::TopLeading,
-                                        )),
-                                        Rc::new(StackLayout::new(
-                                            StackAxis::Vertical,
-                                            12.0,
-                                            Alignment::TopLeading,
-                                        )),
-                                    ]),
+                                    LayoutThatFits::new(StackLayout::new(
+                                        StackAxis::Horizontal,
+                                        12.0,
+                                        Alignment::TopLeading,
+                                    ))
+                                    .or(StackLayout::new(
+                                        StackAxis::Vertical,
+                                        12.0,
+                                        Alignment::TopLeading,
+                                    )),
                                     AnyView::new(cove_composition::TupleView::new(vec![
                                         AnyView::new(Button::new(Text::new("Files"), || {})),
                                         AnyView::new(Button::new(Text::new("Preview"), || {})),

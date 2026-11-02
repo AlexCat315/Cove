@@ -127,14 +127,9 @@ pub fn markdown_block(
             }
             None => MarkdownTableView::new(table.clone()),
         }),
-        MarkdownBlock::Rule => AnyView::new(
-            crate::primitives::text::Divider::new(
-                None,
-                1.0,
-                crate::primitives::text::DividerAxis::Horizontal,
-            )
-            .padding_edges(0.0, 4.0),
-        ),
+        MarkdownBlock::Rule => {
+            AnyView::new(crate::primitives::text::Divider::horizontal().padding_edges(0.0, 4.0))
+        }
     }
 }
 
@@ -217,11 +212,7 @@ impl PrimitiveView for MarkdownHeading {
         )];
         // The two top levels rule off their section, as in most readers.
         if self.level <= 2 {
-            column.push(AnyView::new(crate::primitives::text::Divider::new(
-                None,
-                1.0,
-                crate::primitives::text::DividerAxis::Horizontal,
-            )));
+            column.push(AnyView::new(crate::primitives::text::Divider::horizontal()));
         }
         vec![AnyView::new(BoxView::new(
             FlexDirection::Column,

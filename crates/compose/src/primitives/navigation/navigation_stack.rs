@@ -229,10 +229,12 @@ impl<Route: Hash + Clone + PartialEq + Send + Sync + 'static> NavigationStack<Ro
                 is_enabled: !routes.is_empty(),
                 sign,
                 width,
-                content: AnyView::new(crate::primitives::layout::ZStack::new(
-                    crate::Alignment::TopLeading,
-                    AnyView::new(crate::TupleView::new(pages)),
-                )),
+                content: AnyView::new(
+                    crate::primitives::layout::ZStack::new(AnyView::new(crate::TupleView::new(
+                        pages,
+                    )))
+                    .alignment(crate::Alignment::TopLeading),
+                ),
                 on_change: None,
                 on_end: None,
             }
@@ -313,7 +315,7 @@ impl<Route: Hash + Clone + PartialEq + Send + Sync + 'static> NavigationState<Ro
 }
 
 /// Size and direction context resolved by the navigation host.
-pub struct NavigationStackHost<Route: Hash + Clone + PartialEq + Send + Sync + 'static> {
+pub(crate) struct NavigationStackHost<Route: Hash + Clone + PartialEq + Send + Sync + 'static> {
     pub stack: Rc<NavigationStack<Route>>,
     pub width: f32,
     pub height: f32,

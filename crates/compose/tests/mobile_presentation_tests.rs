@@ -72,22 +72,22 @@ use cove_core::{
 use cove_platform::{InputEvent, KeyModifiers, MouseButton, MouseButtonEvent, MouseMotionEvent};
 use cove_ui_compose::modifiers::interaction::AccessibilityExt;
 use cove_ui_compose::modifiers::layout::{FlexExt, LayoutFrameExt};
-use cove_ui_compose::primitives::controls::button::Button;
-use cove_ui_compose::primitives::controls::menu_button::MenuButton;
+use cove_ui_compose::primitives::controls::Button;
+use cove_ui_compose::primitives::controls::MenuButton;
 use cove_ui_compose::primitives::data::lists::table::{Table, TableColumn};
 use cove_ui_compose::primitives::data::lists::{
     CollectionSelection, List, ListRow, ListRowOptions, ListSection, SectionedList,
 };
 use cove_ui_compose::primitives::layout::insets::{SafeArea, SurfaceRoot};
 use cove_ui_compose::primitives::layout::mobile_tab_bar::MobileTabBar;
-use cove_ui_compose::primitives::layout::tab_view::{TabItem, TabVariant, TabView};
-use cove_ui_compose::primitives::navigation::navigation_stack::NavigationStack;
-use cove_ui_compose::primitives::overlays::context_menu::ContextMenu;
+use cove_ui_compose::primitives::layout::{TabItem, TabVariant, TabView};
+use cove_ui_compose::primitives::navigation::NavigationStack;
+use cove_ui_compose::primitives::overlays::ContextMenu;
 use cove_ui_compose::primitives::overlays::hover_card::HoverCard;
 use cove_ui_compose::primitives::overlays::menu::{MenuEntry, MenuItem, MenuSubmenu};
 use cove_ui_compose::primitives::overlays::modal::Dialog;
-use cove_ui_compose::primitives::overlays::popover::{Popover, PopoverTriggerDescription};
 use cove_ui_compose::primitives::overlays::portal::LayerRoot;
+use cove_ui_compose::primitives::overlays::{Popover, PopoverTriggerDescription};
 use cove_ui_compose::primitives::text::Text;
 use cove_ui_compose::theme::{ControlSize, ControlSizeViewExt};
 use cove_ui_compose::{BoxView, Scancode, TupleView};
@@ -238,7 +238,9 @@ impl Fixture {
     fn tab_panel(&self) -> AnyView {
         if self.document_tabs.get() {
             AnyView::new(
-                TabView::new(self.selection.binding(), self.tabs(true)).variant(TabVariant::Bar),
+                TabView::try_new(self.selection.binding(), self.tabs(true))
+                    .expect("unique tab IDs")
+                    .variant(TabVariant::Bar),
             )
         } else {
             AnyView::new(
@@ -818,7 +820,7 @@ fn nonlinear_text_scaling_keeps_a_table_action_inside_its_authored_row() {
                 scaled_size: 42.0,
             },
         ]);
-        let table = Table::new(
+        let table = Table::try_new(
             vec![1, 2],
             |value: &i32| *value,
             vec![TableColumn::new("action", "Action", |_record: &i32| {
@@ -826,7 +828,8 @@ fn nonlinear_text_scaling_keeps_a_table_action_inside_its_authored_row() {
                     Button::new(Text::new("Open"), || {}).accessibility_label("Table action"),
                 )
             })],
-        );
+        )
+        .expect("unique table column IDs");
         scene.install(
             SurfaceRoot::new(surface, SafeArea::all(AnyView::new(table))).flex_with(
                 1.0,

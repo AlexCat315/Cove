@@ -105,7 +105,7 @@ impl CarouselAutoplaySession {
 }
 
 /// Hosts the clock for one carousel; adds no layout of its own.
-pub struct CarouselAutoplayHost {
+pub(crate) struct CarouselAutoplayHost {
     session: Rc<CarouselAutoplaySession>,
     /// `None` stops the clock: no autoplay, paused, disabled or nothing to
     /// advance.
@@ -293,7 +293,7 @@ impl AnyAnimationController for CarouselClock {
 }
 
 /// Reads the reduced-motion preference without adding a layout node.
-pub struct ReducedMotionReader {
+pub(crate) struct ReducedMotionReader {
     content: Rc<dyn Fn(bool) -> AnyView>,
 }
 

@@ -23,7 +23,7 @@ use cove_ui_compose::{Row, VerticalAlignment};
 
 use support::InteractiveScene;
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 enum Mode {
     Overview,
     Details,
@@ -84,7 +84,10 @@ fn select_trigger_reads_as_a_combo_box_with_the_selected_name() {
 #[test]
 fn combobox_trigger_reads_as_a_combo_box_with_its_title() {
     InteractiveScene::run(400.0, 300.0, |scene| {
-        scene.install(Combobox::new(Binding::constant(None::<Mode>), options()));
+        scene.install(
+            Combobox::try_new(Binding::constant(None::<Mode>), options())
+                .expect("unique combobox IDs"),
+        );
         let trigger = trigger(scene);
         let semantics = trigger
             .accessibility()

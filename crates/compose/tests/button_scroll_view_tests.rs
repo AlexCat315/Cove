@@ -50,15 +50,13 @@ use cove_platform::{
 };
 use cove_text::TextEnvironmentHolder;
 use cove_ui_compose::modifiers::layout::{FlexExt, LayoutFrameExt, PaddingExt};
-use cove_ui_compose::primitives::controls::button::Button;
-use cove_ui_compose::primitives::data::property_grid::{
-    PropertyGrid, PropertyGridRow, PropertyGridSection,
-};
-use cove_ui_compose::primitives::layout::panel::Panel;
-use cove_ui_compose::primitives::layout::scroll_view::{ScrollAxis, ScrollView};
+use cove_ui_compose::primitives::controls::Button;
+use cove_ui_compose::primitives::data::{PropertyGrid, PropertyGridRow, PropertyGridSection};
+use cove_ui_compose::primitives::layout::Panel;
+use cove_ui_compose::primitives::layout::{ScrollAxis, ScrollView};
 use cove_ui_compose::primitives::overlays::menu::{Menu, MenuEntry, MenuItem};
+use cove_ui_compose::primitives::text::Divider;
 use cove_ui_compose::primitives::text::Text;
-use cove_ui_compose::primitives::text::text::{Divider, DividerAxis};
 use cove_ui_compose::primitives::text::text_buffer::TextBuffer;
 use cove_ui_compose::primitives::text::text_field::{FieldState, TextField};
 use cove_ui_compose::theme::Theme;
@@ -785,7 +783,7 @@ fn inspector_like_content(sections: Vec<PropertyGridSection>) -> AnyView {
                     )
                     .padding_edges(10.0, 9.0),
                 ),
-                AnyView::new(Divider::new(None, 1.0, DividerAxis::Horizontal)),
+                AnyView::new(Divider::horizontal()),
                 AnyView::new(property_grid(sections).flex(1.0)),
             ],
         )

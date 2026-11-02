@@ -16,16 +16,14 @@ use cove_core::{Binding, State};
 use cove_ui_compose::modifiers::layout::LayoutFrameExt;
 use cove_ui_compose::modifiers::style::SemanticStyleViewExt;
 use cove_ui_compose::primitives::controls::Button;
-use cove_ui_compose::primitives::controls::tag::{Tag, TagVariant};
+use cove_ui_compose::primitives::controls::{Tag, TagVariant};
 use cove_ui_compose::primitives::feedback::StatusTone;
-use cove_ui_compose::primitives::media::ui_icon_catalog as icons;
-use cove_ui_compose::primitives::layout::accordion::{Accordion, AccordionItem};
 use cove_ui_compose::primitives::layout::navigation_components::{
     BreadcrumbItem, PaginationItem, PaginationModel,
 };
-use cove_ui_compose::primitives::navigation::navigation_stack::{
-    NavigationStack, navigation_title,
-};
+use cove_ui_compose::primitives::layout::{Accordion, AccordionItem};
+use cove_ui_compose::primitives::media::ui_icon_catalog as icons;
+use cove_ui_compose::primitives::navigation::{NavigationStack, navigation_title};
 use cove_ui_compose::primitives::text::Text;
 use cove_ui_compose::primitives::text::text_buffer::TextBuffer;
 use cove_ui_compose::primitives::text::text_field::TextField;
@@ -141,7 +139,8 @@ impl AccordionStory {
                 AccordionItem::new(id.to_owned(), title, Text::new("")).enabled(is_enabled)
             })
             .collect();
-        Accordion::new(items, self.expanded.binding())
+        Accordion::try_new(items, self.expanded.binding())
+            .expect("unique accordion IDs")
             .allows_multiple(self.allows_multiple.get())
             .enabled(self.options.is_enabled)
     }

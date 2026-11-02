@@ -67,10 +67,11 @@ fn decorative_slots_sit_inside_the_row_and_stay_out_of_the_name() {
             trailing: Some(cove_composition::AnyView::new(Text::new("12"))),
             ..SidebarItemSlots::new()
         };
-        let mut sidebar = Sidebar::new(
+        let mut sidebar = Sidebar::try_new(
             selection,
             section_with(vec![inbox, SidebarItem::new("plain", "Plain")]),
-        );
+        )
+        .expect("unique sidebar IDs");
         sidebar.presentation = SidebarPresentation::Expanded;
         scene.install(sidebar);
 
@@ -135,10 +136,11 @@ fn the_leading_lane_is_shared_across_the_section() {
             leading: Some(cove_composition::AnyView::new(cove_composition::EmptyView)),
             ..SidebarItemSlots::new()
         };
-        let mut sidebar = Sidebar::new(
+        let mut sidebar = Sidebar::try_new(
             selection,
             section_with(vec![inbox, SidebarItem::new("plain", "Plain")]),
-        );
+        )
+        .expect("unique sidebar IDs");
         sidebar.presentation = SidebarPresentation::Expanded;
         scene.install(sidebar);
 
@@ -173,12 +175,13 @@ fn an_accessory_reserves_width_and_stays_independently_clickable() {
         );
         layer.slots = SidebarItemSlots {
             accessory: Some(cove_composition::AnyView::new(
-                cove_ui_compose::primitives::controls::button::Button::title("Toggle", || {}),
+                cove_ui_compose::primitives::controls::Button::title("Toggle", || {}),
             )),
             accessory_width: 40.0,
             ..SidebarItemSlots::new()
         };
-        let mut sidebar = Sidebar::new(selection, section_with(vec![layer]));
+        let mut sidebar =
+            Sidebar::try_new(selection, section_with(vec![layer])).expect("unique sidebar IDs");
         sidebar.presentation = SidebarPresentation::Expanded;
         scene.install(sidebar);
 

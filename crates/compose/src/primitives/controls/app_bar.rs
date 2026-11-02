@@ -69,8 +69,8 @@ pub struct AppBar {
     pub title: String,
     pub subtitle: Option<String>,
     pub back: Option<MenuItem>,
-    pub primary: Option<ToolbarItem>,
-    pub actions: Vec<ToolbarItem>,
+    primary: Option<ToolbarItem>,
+    actions: Vec<ToolbarItem>,
     pub options: AppBarOptions,
     /// Measured width of the command row, reported after layout.
     pub command_width: Rc<RefCell<Option<f32>>>,
@@ -80,17 +80,12 @@ pub struct AppBar {
 
 impl AppBar {
     pub fn new(title: impl Into<String>) -> Self {
-        let actions: Vec<ToolbarItem> = Vec::new();
-        assert!(
-            has_unique_ids(None, &actions),
-            "AppBar command IDs must be unique"
-        );
         Self {
             title: title.into(),
             subtitle: None,
             back: None,
             primary: None,
-            actions,
+            actions: Vec::new(),
             options: AppBarOptions::default().validated(),
             command_width: Rc::new(RefCell::new(None)),
             width: Rc::new(RefCell::new(0.0)),
@@ -107,18 +102,18 @@ impl AppBar {
         self
     }
 
-    pub fn primary(mut self, item: ToolbarItem) -> Self {
-        self.primary = Some(item);
-        self
-    }
-
-    pub fn actions(mut self, actions: Vec<ToolbarItem>) -> Self {
-        assert!(
-            has_unique_ids(self.primary.as_ref(), &actions),
-            "AppBar command IDs must be unique"
-        );
+    pub fn try_commands(
+        mut self,
+        primary: Option<ToolbarItem>,
+        actions: Vec<ToolbarItem>,
+    ) -> Result<Self, crate::primitives::DuplicateId> {
+        crate::primitives::check_ids(
+            primary.iter().chain(&actions).map(|item| item.command.id),
+            "App bar command",
+        )?;
+        self.primary = primary;
         self.actions = actions;
-        self
+        Ok(self)
     }
 
     pub fn options(mut self, options: AppBarOptions) -> Self {
@@ -173,15 +168,6 @@ impl AppBar {
             width: self.width.clone(),
         }
     }
-}
-
-fn has_unique_ids(primary: Option<&ToolbarItem>, actions: &[ToolbarItem]) -> bool {
-    let mut ids: Vec<u64> = primary.map(|item| item.command.id).into_iter().collect();
-    ids.extend(actions.iter().map(|item| item.command.id));
-    let count = ids.len();
-    ids.sort_unstable();
-    ids.dedup();
-    ids.len() == count
 }
 
 impl View for AppBar {
@@ -283,7 +269,7 @@ impl PrimitiveView for AppBarHost {
         let commands_width = measured.unwrap_or(budget).min(budget);
         let item_count = items.len();
 
-        let commands = ToolbarCommands::new(
+        let commands = ToolbarCommands::from_unique_items(
             items,
             bar.options.is_enabled,
             crate::primitives::controls::ToolbarAxis::Horizontal,

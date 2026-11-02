@@ -28,8 +28,8 @@ use cove_core::scene::{
 use cove_core::{Reveal, State};
 use cove_ui_compose::BoxView;
 use cove_ui_compose::modifiers::layout::{AbsolutePositionModifier, LayoutFrameExt};
-use cove_ui_compose::primitives::controls::button::Button;
-use cove_ui_compose::primitives::controls::toggle::Toggle;
+use cove_ui_compose::primitives::controls::Button;
+use cove_ui_compose::primitives::controls::Toggle;
 use cove_ui_compose::theme::styles::appearance_modifier::{Appearance, AppearanceViewExt};
 use cove_ui_compose::theme::styles::buttons::builtin_button_chrome::BUTTON_HOST_MARKER_KEY;
 use cove_ui_compose::theme::styles::circular_appearance::ThemeTransition;

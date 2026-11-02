@@ -122,11 +122,7 @@ impl TouchMenu {
                     )
                     .padding(12.0),
                 ),
-                _ => AnyView::new(crate::primitives::text::Divider::new(
-                    None,
-                    1.0,
-                    crate::primitives::text::DividerAxis::Horizontal,
-                )),
+                _ => AnyView::new(crate::primitives::text::Divider::horizontal()),
             };
         };
 
@@ -257,11 +253,7 @@ impl View for TouchMenu {
                 })
                 .debug_name("touch-menu-back"),
             ));
-            children.push(AnyView::new(crate::primitives::text::Divider::new(
-                None,
-                1.0,
-                crate::primitives::text::DividerAxis::Horizontal,
-            )));
+            children.push(AnyView::new(crate::primitives::text::Divider::horizontal()));
         }
 
         for entry in &level.entries {

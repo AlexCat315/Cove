@@ -47,7 +47,7 @@ use cove_platform::{
 use cove_ui_compose::adaptive::SurfaceEnvironmentExt;
 use cove_ui_compose::modifiers::interaction::AccessibilityExt;
 use cove_ui_compose::modifiers::layout::{FlexExt, FrameDimension, LayoutFrameExt};
-use cove_ui_compose::primitives::controls::button::Button;
+use cove_ui_compose::primitives::controls::Button;
 use cove_ui_compose::primitives::layout::NavigationRail;
 use cove_ui_compose::primitives::layout::sidebar::{
     Sidebar, SidebarItem, SidebarPresentation, SidebarSection,
@@ -192,7 +192,8 @@ impl View for HarnessView {
         };
         let navigation = if self.facade {
             AnyView::new(
-                NavigationRail::new(selection, items(self.enabled.get()))
+                NavigationRail::try_new(selection, items(self.enabled.get()))
+                    .expect("unique rail IDs")
                     .shows_labels(presentation.shows_labels())
                     .on_activate(on_activate)
                     .header(header)
@@ -200,10 +201,11 @@ impl View for HarnessView {
             )
         } else {
             AnyView::new(
-                Sidebar::new(
+                Sidebar::try_new(
                     selection,
                     vec![SidebarSection::new("main", items(self.enabled.get())).title("Workspace")],
                 )
+                .expect("unique sidebar IDs")
                 .presentation(presentation)
                 .on_activate(on_activate)
                 .header(header)
@@ -885,13 +887,14 @@ fn discovery_finds_full_names_without_disabled_targets() {
             graph.install_view(
                 AnyView::new(
                     AnyView::new(
-                        NavigationRail::new(
+                        NavigationRail::try_new(
                             Binding::constant(Some(0)),
                             vec![
                                 SidebarItem::new(0, "Workspace notifications").badge("999"),
                                 SidebarItem::new(1, "Unavailable").enabled(false),
                             ],
                         )
+                        .expect("unique rail IDs")
                         .shows_labels(false),
                     )
                     .frame_height(180.0),

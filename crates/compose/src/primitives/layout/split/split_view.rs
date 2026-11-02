@@ -317,11 +317,12 @@ impl SplitView {
                 constraints: self.constraints,
                 spacing: self.spacing,
             }),
-            None => AnyView::new(Divider::new(
-                self.divider_color,
-                self.divider_thickness,
-                self.axis.divider_axis(),
-            )),
+            None => AnyView::new(
+                Divider::new()
+                    .axis(self.axis.divider_axis())
+                    .color(self.divider_color)
+                    .thickness(self.divider_thickness),
+            ),
         }
     }
 }

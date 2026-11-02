@@ -42,7 +42,7 @@ use cove_core::{Binding, Rect};
 use cove_ui_compose::BoxView;
 use cove_ui_compose::modifiers::interaction::AccessibilityExt;
 use cove_ui_compose::modifiers::layout::LayoutFrameExt;
-use cove_ui_compose::primitives::controls::button::Button;
+use cove_ui_compose::primitives::controls::Button;
 use cove_ui_compose::primitives::controls::form::form::{Form, FormField};
 use cove_ui_compose::primitives::text::Text;
 use cove_ui_compose::primitives::text::TextField;
@@ -308,16 +308,13 @@ fn explicit_groups_preserve_zero_one_and_multiple_action_roles() {
 }
 
 fn form_view() -> impl cove_composition::View + 'static {
-    Form::new(
-        vec![FormField::new(
-            "name",
-            "Display name",
-            TextField::new("Name", Binding::constant(TextBuffer::new(DRAFT))),
-        )],
-        None,
-        |_| {},
-        Button::new(Text::new("Save changes"), || {}).accessibility_label("Save changes"),
-    )
+    Form::try_new(vec![FormField::new(
+        "name",
+        "Display name",
+        TextField::new("Name", Binding::constant(TextBuffer::new(DRAFT))),
+    )])
+    .expect("unique form field IDs")
+    .footer(Button::new(Text::new("Save changes"), || {}).accessibility_label("Save changes"))
     .frame_size(640.0, 400.0)
 }
 

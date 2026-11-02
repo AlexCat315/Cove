@@ -9,8 +9,8 @@ use cove_composition::Scope;
 use cove_core::scene::{Align, FlexDirection, Justify, Wrap};
 use cove_ui_compose::modifiers::style::SemanticStyleViewExt;
 use cove_ui_compose::primitives::controls::Checkbox;
-use cove_ui_compose::primitives::controls::app_bar::{AppBar, AppBarOptions};
 use cove_ui_compose::primitives::controls::toolbar::{ToolbarItem, ToolbarItemPlacement};
+use cove_ui_compose::primitives::controls::{AppBar, AppBarOptions};
 use cove_ui_compose::primitives::media::ui_icon_catalog as icons;
 use cove_ui_compose::primitives::overlays::menu::MenuItem;
 use cove_ui_compose::primitives::text::Text;
@@ -80,7 +80,7 @@ impl AppBarStory {
                 record.set("Find".to_owned());
             }))
             .icon(
-                cove_ui_compose::primitives::controls::button::ButtonIconSource::Resource(
+                cove_ui_compose::primitives::controls::ButtonIconSource::Resource(
                     icons::action::search(),
                 ),
             )
@@ -90,7 +90,7 @@ impl AppBarStory {
                 move || record.set("Exported".to_owned())
             }))
             .icon(
-                cove_ui_compose::primitives::controls::button::ButtonIconSource::Resource(
+                cove_ui_compose::primitives::controls::ButtonIconSource::Resource(
                     icons::action::download(),
                 ),
             ),
@@ -99,7 +99,7 @@ impl AppBarStory {
                 move || record.set("Shared".to_owned())
             }))
             .icon(
-                cove_ui_compose::primitives::controls::button::ButtonIconSource::Resource(
+                cove_ui_compose::primitives::controls::ButtonIconSource::Resource(
                     icons::action::share(),
                 ),
             ),
@@ -156,17 +156,20 @@ impl View for AppBarStory {
             .back(MenuItem::new(10, "Back to projects", move || {
                 record_back.set("Back".to_owned());
             }))
-            .primary(
-                ToolbarItem::new(MenuItem::new(11, "Save workspace", move || {
-                    record_save.set("Saved".to_owned());
-                }))
-                .icon(
-                    cove_ui_compose::primitives::controls::button::ButtonIconSource::Resource(
-                        icons::action::check(),
+            .try_commands(
+                Some(
+                    ToolbarItem::new(MenuItem::new(11, "Save workspace", move || {
+                        record_save.set("Saved".to_owned());
+                    }))
+                    .icon(
+                        cove_ui_compose::primitives::controls::ButtonIconSource::Resource(
+                            icons::action::check(),
+                        ),
                     ),
                 ),
+                self.actions(),
             )
-            .actions(self.actions())
+            .expect("unique app bar commands")
             .options(AppBarOptions {
                 is_enabled: enabled,
                 ..AppBarOptions::default()

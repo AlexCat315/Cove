@@ -36,7 +36,7 @@ use crate::primitives::text::text_buffer::TextBuffer;
 use crate::primitives::text::text_field::{
     TextField, TextFieldDecoration, TextFieldEvents, TextFieldSize,
 };
-use crate::primitives::text::{Divider, DividerAxis, Text};
+use crate::primitives::text::{Divider, Text};
 use crate::theme::styles::buttons::{ButtonStyleViewExt, GhostButtonStyle};
 use crate::theme::{SemanticColorRef, SemanticFontRef};
 use crate::{AnyView, BoxView, Row, Spacer, TupleView, VerticalAlignment, View};
@@ -575,7 +575,7 @@ impl View for PaletteBody {
                 AnyView::new(TupleView::new(vec![
                     AnyView::new(settled),
                     search,
-                    AnyView::new(Divider::new(None, 1.0, DividerAxis::Horizontal)),
+                    AnyView::new(Divider::horizontal()),
                     results,
                     separator,
                     footer,

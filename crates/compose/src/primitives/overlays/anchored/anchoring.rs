@@ -148,7 +148,7 @@ struct AnchoredIdentity {
 }
 
 /// The shared portal boundary for popovers, confirmation bubbles and menus.
-pub struct AnchoredOverlayHost {
+pub(crate) struct AnchoredOverlayHost {
     pub is_presented: bool,
     pub width: Option<f32>,
     pub placement: PopoverPlacement,
@@ -475,7 +475,7 @@ impl PrimitiveView for AnchoredOverlayHost {
 impl_primitive_view!(AnchoredOverlayHost);
 
 /// Key host that owns Escape dismissal for an anchored overlay.
-pub struct MenuKeyHost {
+pub(crate) struct MenuKeyHost {
     on_key: Rc<dyn Fn(&cove_platform::KeyEvent) -> bool>,
     content: AnyView,
 }
@@ -531,7 +531,7 @@ impl PrimitiveView for MenuKeyHost {
 impl_primitive_view!(MenuKeyHost);
 
 /// The bubble painter: card, pointer triangle and border.
-pub struct PopoverSurfaceHost {
+pub(crate) struct PopoverSurfaceHost {
     pub anchor: Rc<PopoverAnchor>,
     pub placement: PopoverPlacement,
     pub content: AnyView,

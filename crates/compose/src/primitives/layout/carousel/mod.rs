@@ -26,9 +26,7 @@ use crate::theme::{
 };
 use crate::{AnyView, BoxView, Node, PrimitiveView, Row, TupleView, View};
 
-pub use autoplay::{
-    CarouselAutoplay, CarouselAutoplayHost, CarouselAutoplaySession, ReducedMotionReader,
-};
+pub use autoplay::{CarouselAutoplay, CarouselAutoplaySession};
 pub use indicator::{CarouselIndicator, CarouselProgressDot};
 
 /// One page of a [`Carousel`].

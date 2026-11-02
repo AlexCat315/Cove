@@ -33,8 +33,8 @@ use cove_core::{Point, Rect};
 use cove_platform::{InputEvent, MouseButton, MouseButtonEvent};
 use cove_ui_compose::BoxView;
 use cove_ui_compose::modifiers::layout::LayoutFrameExt;
-use cove_ui_compose::primitives::controls::button::Button;
-use cove_ui_compose::primitives::layout::scroll_view::{ScrollAxis, ScrollView, ScrollbarGutter};
+use cove_ui_compose::primitives::controls::Button;
+use cove_ui_compose::primitives::layout::{ScrollAxis, ScrollView, ScrollbarGutter};
 use cove_ui_compose::primitives::text::Text;
 
 use support::InteractiveScene;

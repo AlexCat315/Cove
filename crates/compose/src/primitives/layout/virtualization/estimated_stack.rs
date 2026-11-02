@@ -220,7 +220,7 @@ impl<Id: Ord + Clone + 'static> View for EstimatedVirtualStack<Id> {
 }
 
 /// Reports its laid-out height so the estimate can be replaced.
-pub struct EstimatedRowHost {
+pub(crate) struct EstimatedRowHost {
     pub on_height: Rc<dyn Fn(f32)>,
     pub content: AnyView,
 }

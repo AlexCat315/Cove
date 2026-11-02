@@ -42,15 +42,15 @@
 //! - The Rust `Popover` trigger is a plain labelled text node, not a focusable
 //!   control, so `owned_popup` clicks the node carrying the trigger label.
 
-use cove_composition::Scope;
 use crate::support;
+use cove_composition::Scope;
 
 use std::collections::HashMap;
 use std::rc::Rc;
 
 use cove_composition::layout::LayoutDirectionExt;
 use cove_composition::{
-    Alignment, AnyView, DynamicField, EmptyView, LayoutDebugExt, TupleView, View,
+    AnyView, DynamicField, EmptyView, LayoutDebugExt, TupleView, View,
 };
 use cove_core::scene::{
     AccessibilityElement, AccessibilityRole, AccessibilityTree, Align, Direction, FlexDirection,
@@ -62,7 +62,7 @@ use cove_ui_compose::adaptive::SurfaceEnvironmentExt;
 use cove_ui_compose::modifiers::interaction::AccessibilityExt;
 use cove_ui_compose::modifiers::layout::{FlexExt, LayoutFrameExt};
 use cove_ui_compose::primitives::columns::ColumnVisibilityPlan;
-use cove_ui_compose::primitives::controls::button::Button;
+use cove_ui_compose::primitives::controls::Button;
 use cove_ui_compose::primitives::layout::ScrollReveal;
 use cove_ui_compose::primitives::layout::grid::{
     ColumnVisibility, Grid, GridColumn, GridNamedColumns,
@@ -247,15 +247,14 @@ impl View for Harness {
             Text::new("Quantity two").accessibility_label("Quantity two"),
         ));
 
-        let grid = Grid::new(
+        let grid = Grid::try_new(
             if self.empty.get() { vec![] } else { columns() },
-            10.0,
-            8.0,
-            Alignment::TopLeading,
-            self.controlled.then(|| Rc::new(self.overrides.clone())),
-            self.enabled.get(),
             AnyView::new(TupleView::new(content)),
-        );
+        )
+        .expect("valid grid columns")
+        .spacing(10.0, 8.0)
+        .column_visibility(self.controlled.then(|| Rc::new(self.overrides.clone())))
+        .enabled(self.enabled.get());
         let after = Button::title("After grid", || {}).accessibility_label("After grid");
         let mut surface = Environment::default();
         surface.input = self.input.get();
@@ -560,6 +559,7 @@ fn menu() {
     // the entries are asserted on the shared model and the mount is pinned.
     let tracks: Vec<cove_ui_compose::primitives::columns::ColumnVisibilityTrack> =
         GridNamedColumns::tracks(&columns())
+            .expect("valid grid columns")
             .expect("named tracks")
             .into_iter()
             .map(|track| {
@@ -868,4 +868,25 @@ fn initially_hidden() {
             "the restored field keeps its authored text"
         );
     });
+}
+
+#[test]
+fn malformed_named_columns_are_rejected_before_layout() {
+    use cove_ui_compose::prelude::{GridColumnError, GridLayout};
+    let named = || {
+        GridColumn::named(
+            "name",
+            "Name",
+            GridColumn::Fixed(20.0),
+            ColumnVisibility::Required,
+        )
+    };
+    assert!(matches!(
+        GridLayout::try_new(vec![named(), named()]),
+        Err(GridColumnError::Duplicate(_))
+    ));
+    assert!(matches!(
+        GridLayout::try_new(vec![named(), GridColumn::Fixed(30.0)]),
+        Err(GridColumnError::MixedColumns)
+    ));
 }

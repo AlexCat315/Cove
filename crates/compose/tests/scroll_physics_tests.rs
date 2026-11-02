@@ -34,7 +34,7 @@ use cove_platform::{
     ScrollPhase, ScrollUnit,
 };
 use cove_ui_compose::modifiers::layout::{FlexExt, LayoutFrameExt};
-use cove_ui_compose::primitives::layout::scroll_view::{ScrollAxis, ScrollView};
+use cove_ui_compose::primitives::layout::{ScrollAxis, ScrollView};
 use cove_ui_compose::primitives::text::Text;
 use cove_ui_compose::scrolling::ScrollPhysicsExt;
 use cove_ui_compose::theme::tokens::reduced_motion_environment::ReducedMotionViewExt;

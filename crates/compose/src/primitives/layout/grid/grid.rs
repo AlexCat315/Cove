@@ -11,7 +11,9 @@ use cove_core::scene::{Direction, LayoutNode, Node, Point, Rect, Size};
 use cove_core::{Size as CoreSize, State};
 
 use super::columns::{GridColumn, GridTrackResolver};
-use super::named_columns::{ColumnVisibilityPlan, ColumnVisibilityTrack, GridNamedColumns};
+use super::named_columns::{
+    ColumnVisibilityPlan, ColumnVisibilityTrack, GridColumnError, GridNamedColumns,
+};
 use super::span::GridSpanKey;
 
 /// A general row-major grid built on the public measurement and placement
@@ -19,28 +21,21 @@ use super::span::GridSpanKey;
 /// Children may cover several cells with `.gridCellSpan(columns:rows:)`.
 #[derive(Clone, Debug)]
 pub struct GridLayout {
-    pub columns: Vec<GridColumn>,
+    columns: Vec<GridColumn>,
+    named: Option<Vec<ColumnVisibilityTrack>>,
     pub column_spacing: f32,
     pub row_spacing: f32,
     pub alignment: Alignment,
     pub column_visibility: HashMap<String, bool>,
 }
 impl GridLayout {
-    pub fn new(
-        columns: Vec<GridColumn>,
-        column_spacing: f32,
-        row_spacing: f32,
-        alignment: Alignment,
-        column_visibility: HashMap<String, bool>,
-    ) -> Self {
-        let _ = GridNamedColumns::tracks(&columns);
-        Self {
+    pub fn try_new(columns: Vec<GridColumn>) -> Result<Self, GridColumnError> {
+        let named = GridNamedColumns::tracks(&columns)?;
+        Ok(Self {
             columns,
-            column_spacing,
-            row_spacing,
-            alignment,
-            column_visibility,
-        }
+            named,
+            ..Default::default()
+        })
     }
 
     fn alignment_components(&self) -> (HorizontalAlignment, VerticalAlignment) {
@@ -90,7 +85,7 @@ impl GridLayout {
             };
         }
         let gap = GridTrackResolver::finite_nonnegative(self.column_spacing);
-        let named = GridNamedColumns::tracks(&self.columns);
+        let named = &self.named;
         let visible: Vec<usize> = named
             .as_ref()
             .map(|tracks| {
@@ -209,7 +204,14 @@ impl GridLayout {
 }
 impl Default for GridLayout {
     fn default() -> Self {
-        Self::new(vec![], 0.0, 0.0, Alignment::TopLeading, HashMap::new())
+        Self {
+            columns: Vec::new(),
+            named: None,
+            column_spacing: 0.0,
+            row_spacing: 0.0,
+            alignment: Alignment::TopLeading,
+            column_visibility: HashMap::new(),
+        }
     }
 }
 impl Layout for GridLayout {
@@ -344,36 +346,46 @@ pub struct Grid {
     pub local_visibility: State<HashMap<String, bool>>,
 }
 impl Grid {
-    pub fn new(
+    pub fn try_new(
         columns: Vec<GridColumn>,
-        column_spacing: f32,
-        row_spacing: f32,
-        alignment: Alignment,
-        column_visibility: Option<Rc<State<HashMap<String, bool>>>>,
-        is_enabled: bool,
-        content: AnyView,
-    ) -> Self {
-        Self {
-            layout: GridLayout::new(
-                columns,
-                column_spacing,
-                row_spacing,
-                alignment,
-                HashMap::new(),
-            ),
-            content,
-            column_visibility,
-            is_enabled,
+        content: impl View + 'static,
+    ) -> Result<Self, GridColumnError> {
+        Ok(Self {
+            layout: GridLayout::try_new(columns)?,
+            content: AnyView::new(content),
+            column_visibility: None,
+            is_enabled: true,
             local_visibility: State::new(HashMap::new()),
-        }
+        })
+    }
+
+    pub fn spacing(mut self, column: f32, row: f32) -> Self {
+        self.layout.column_spacing = column;
+        self.layout.row_spacing = row;
+        self
+    }
+
+    pub fn alignment(mut self, alignment: Alignment) -> Self {
+        self.layout.alignment = alignment;
+        self
+    }
+
+    pub fn column_visibility(
+        mut self,
+        visibility: Option<Rc<State<HashMap<String, bool>>>>,
+    ) -> Self {
+        self.column_visibility = visibility;
+        self
+    }
+
+    pub fn enabled(mut self, enabled: bool) -> Self {
+        self.is_enabled = enabled;
+        self
     }
 }
 impl View for Grid {
     fn body(&self, _cx: &Scope) -> AnyView {
-        let columns = self.layout.columns.clone();
-        let column_spacing = self.layout.column_spacing;
-        let row_spacing = self.layout.row_spacing;
-        let alignment = self.layout.alignment;
+        let layout = self.layout.clone();
         let content = self.content.clone();
         let is_enabled = self.is_enabled;
         let overrides = self.column_visibility.clone();
@@ -383,14 +395,8 @@ impl View for Grid {
                 .as_ref()
                 .map(|state| state.get())
                 .unwrap_or_else(|| local.get());
-            let mut algorithm = GridLayout::new(
-                columns.clone(),
-                column_spacing,
-                row_spacing,
-                alignment,
-                values,
-            );
-            algorithm.column_visibility = algorithm.column_visibility.clone();
+            let mut algorithm = layout.clone();
+            algorithm.column_visibility = values;
             let grid = LayoutContainer::<GridLayout, AnyView>::with_erased_content(
                 algorithm,
                 content.clone(),
@@ -421,7 +427,7 @@ impl View for Grid {
 }
 
 /// Disables hit testing and drops capture/focus inside a disabled grid.
-pub struct GridInteractionHost {
+pub(crate) struct GridInteractionHost {
     pub is_enabled: bool,
     pub content: AnyView,
 }

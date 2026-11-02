@@ -39,8 +39,8 @@ use cove_composition::{AnyView, DynamicField, PrimitiveView, View, ViewGraph, Vi
 use cove_core::State;
 use cove_core::scene::{AccessibilityRole, LayoutNode, Node, NodeTree, Recomposer};
 use cove_ui_compose::modifiers::layout::LayoutFrameExt;
-use cove_ui_compose::primitives::controls::button::Button;
-use cove_ui_compose::primitives::layout::tab_view::{TabItem, TabView};
+use cove_ui_compose::primitives::controls::Button;
+use cove_ui_compose::primitives::layout::{TabItem, TabView};
 use cove_ui_compose::primitives::text::Text;
 
 use support::GlobalTestLock;
@@ -106,10 +106,11 @@ fn probe_tabs(selection: State<i32>) -> (TabView<i32>, State<i32>) {
         TabItem::new(1, "B", AnyView::new(ProbeView { id: 200 })),
     ];
     (
-        TabView::new(
+        TabView::try_new(
             cove_core::Binding::new(move || read.get(), move |next| write.set(next)),
             tabs,
-        ),
+        )
+        .expect("unique tab IDs"),
         selection,
     )
 }
@@ -160,10 +161,13 @@ impl View for SwitchingTabs {
             ),
         ];
         AnyView::new(
-            AnyView::new(TabView::new(
-                cove_core::Binding::new(move || read.get(), move |next| write.set(next)),
-                tabs,
-            ))
+            AnyView::new(
+                TabView::try_new(
+                    cove_core::Binding::new(move || read.get(), move |next| write.set(next)),
+                    tabs,
+                )
+                .expect("unique tab IDs"),
+            )
             .frame_size(390.0, 220.0),
         )
     }
@@ -373,4 +377,19 @@ fn the_tab_strip_exposes_no_tab_roles() {
             "both tab labels are rendered (got {labels:?})"
         );
     });
+}
+
+#[test]
+fn dynamic_tabs_report_duplicate_ids_and_allow_empty_input() {
+    use cove_ui_compose::prelude::*;
+    let selection = Binding::constant(1);
+    let result = TabView::try_new(
+        selection.clone(),
+        vec![
+            TabItem::new(1, "First", Spinner::new()),
+            TabItem::new(1, "Again", Divider::new()),
+        ],
+    );
+    assert!(matches!(result, Err(DuplicateId("Tab"))));
+    assert!(TabView::try_new(selection, vec![]).is_ok());
 }

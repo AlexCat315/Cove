@@ -17,8 +17,8 @@ use cove_composition::{Alignment, AnyView, LayoutDebugExt, TupleView, ViewGraph}
 use cove_core::scene::{Align, Direction, EventDispatcher, FlexDirection, Justify, Node, Wrap};
 use cove_platform::{InputEvent, MouseButton, MouseButtonEvent, PointerKind, WindowId};
 use cove_ui_compose::modifiers::layout::LayoutFrameExt;
-use cove_ui_compose::primitives::controls::button::Button;
-use cove_ui_compose::primitives::layout::zstack::ZStack;
+use cove_ui_compose::primitives::controls::Button;
+use cove_ui_compose::primitives::layout::ZStack;
 use cove_ui_compose::{BoxView, Row, VerticalAlignment};
 
 use support::GlobalTestLock;
@@ -71,13 +71,13 @@ fn measures_and_aligns() {
         // the root's stretch-fit, so it would measure 300 instead of its largest
         // child's 100. Inside a row it is measured as content.
         let stack = AnyView::new(row(vec![AnyView::new(
-            AnyView::new(ZStack::new(
-                Alignment::TopLeading,
-                AnyView::new(TupleView::new(vec![
+            AnyView::new(
+                ZStack::new(AnyView::new(TupleView::new(vec![
                     sized(100.0, 40.0, "large"),
                     sized(20.0, 20.0, "small"),
-                ])),
-            ))
+                ])))
+                .alignment(Alignment::TopLeading),
+            )
             .debug_name("stack"),
         )]));
         graph.install_view(stack, Default::default());
@@ -102,13 +102,10 @@ fn measures_and_aligns() {
 
         // The default alignment centers the small child within the large one.
         let stack = AnyView::new(row(vec![AnyView::new(
-            AnyView::new(ZStack::new(
-                Alignment::Center,
-                AnyView::new(TupleView::new(vec![
-                    AnyView::new(unsized_box().frame_width(100.0).frame_height(40.0)),
-                    sized(20.0, 20.0, "small"),
-                ])),
-            ))
+            AnyView::new(ZStack::new(AnyView::new(TupleView::new(vec![
+                AnyView::new(unsized_box().frame_width(100.0).frame_height(40.0)),
+                sized(20.0, 20.0, "small"),
+            ]))))
             .debug_name("stack"),
         )]));
         graph.install_view(stack, Default::default());
@@ -135,13 +132,11 @@ fn rtl_alignment() {
         // wrapper node rather than to the stack's own layout node — so the
         // children would still read the inherited direction.
         let stack = AnyView::new(row(vec![AnyView::new(
-            ZStack::new(
-                Alignment::TopLeading,
-                AnyView::new(TupleView::new(vec![
-                    AnyView::new(unsized_box().frame_width(100.0).frame_height(40.0)),
-                    sized(20.0, 20.0, "small"),
-                ])),
-            )
+            ZStack::new(AnyView::new(TupleView::new(vec![
+                AnyView::new(unsized_box().frame_width(100.0).frame_height(40.0)),
+                sized(20.0, 20.0, "small"),
+            ])))
+            .alignment(Alignment::TopLeading)
             .layout_direction(Direction::Rtl),
         )]));
         graph.install_view(stack, Default::default());
@@ -167,13 +162,10 @@ fn topmost_child_wins_hit_testing() {
         let front = Button::new(unsized_box(), move || front_hits.borrow_mut().push("front"));
         let back = Button::new(unsized_box(), move || back_hits.borrow_mut().push("back"));
         let stack = AnyView::new(
-            AnyView::new(ZStack::new(
-                Alignment::Center,
-                AnyView::new(TupleView::new(vec![
-                    AnyView::new(back.frame_width(100.0).frame_height(100.0)),
-                    AnyView::new(front.frame_width(100.0).frame_height(100.0)),
-                ])),
-            ))
+            AnyView::new(ZStack::new(AnyView::new(TupleView::new(vec![
+                AnyView::new(back.frame_width(100.0).frame_height(100.0)),
+                AnyView::new(front.frame_width(100.0).frame_height(100.0)),
+            ]))))
             .frame_width(100.0)
             .frame_height(100.0),
         );
@@ -234,10 +226,10 @@ fn card_content_stays_inside_its_box() {
             );
             let stack = AnyView::new(
                 AnyView::new(
-                    AnyView::new(ZStack::new(
-                        Alignment::TopLeading,
-                        AnyView::new(TupleView::new(vec![accent])),
-                    ))
+                    AnyView::new(
+                        ZStack::new(AnyView::new(TupleView::new(vec![accent])))
+                            .alignment(Alignment::TopLeading),
+                    )
                     .frame_width(320.0)
                     .frame_height(180.0),
                 )

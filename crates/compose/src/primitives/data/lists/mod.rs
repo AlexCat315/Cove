@@ -11,7 +11,7 @@ pub mod table;
 pub mod tree;
 
 pub use inset_group::ListGroup;
-pub use list::{List, ListRowHost};
+pub use list::List;
 pub use refresh::RefreshOptions;
 pub use reorderable::{ReorderSession, ReorderableList};
 pub use row::{ListRow, ListRowOptions};

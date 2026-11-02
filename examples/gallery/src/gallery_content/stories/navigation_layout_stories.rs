@@ -167,12 +167,13 @@ impl View for DrawerStory {
         let open_state = self.is_open.clone();
         let label = Text::new("Browse destinations without losing the current workspace.");
 
-        let drawer = NavigationDrawer::new(
+        let drawer = NavigationDrawer::try_new(
             "Cove workspace",
             self.is_open.binding(),
             self.selection.binding(),
             self.sections(),
         )
+        .expect("unique drawer IDs")
         .options(self.drawer_options())
         .header(label);
 
@@ -188,7 +189,7 @@ impl View for DrawerStory {
             16.0,
             AnyView::new(TupleView::new(vec![
                 AnyView::new(
-                    cove_ui_compose::primitives::controls::button::Button::title(
+                    cove_ui_compose::primitives::controls::Button::title(
                         "Open navigation",
                         move || open_state.set(true),
                     )

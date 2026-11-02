@@ -37,13 +37,13 @@ use cove_platform::KeyModifiers;
 use cove_ui_compose::Scancode;
 use cove_ui_compose::adaptive::SurfaceEnvironmentExt;
 use cove_ui_compose::modifiers::layout::{AbsolutePositionModifier, LayoutFrameExt};
-use cove_ui_compose::primitives::controls::button::{Button, ButtonRole};
+use cove_ui_compose::primitives::controls::{Button, ButtonRole};
 use cove_ui_compose::primitives::media::ui_icon_catalog;
+use cove_ui_compose::primitives::overlays::Popconfirm;
+use cove_ui_compose::primitives::overlays::Popover;
 use cove_ui_compose::primitives::overlays::anchored::{
     PopoverEdge, PopoverGeometry, PopoverOverflow, PopoverPlacement,
 };
-use cove_ui_compose::primitives::overlays::popconfirm::Popconfirm;
-use cove_ui_compose::primitives::overlays::popover::Popover;
 use cove_ui_compose::primitives::overlays::portal::LayerRoot;
 use cove_ui_compose::primitives::text::Text;
 use cove_ui_compose::theme::TextScaler;

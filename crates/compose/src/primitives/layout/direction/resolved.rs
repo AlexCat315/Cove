@@ -49,7 +49,7 @@ impl<Content: View + 'static> View for ResolvedLayoutDirection<Content> {
 }
 
 /// Reads the nearest explicit direction from the node ancestry after layout.
-pub struct LayoutDirectionObserver {
+pub(crate) struct LayoutDirectionObserver {
     content: AnyView,
     on_change: Rc<dyn Fn(Direction)>,
 }

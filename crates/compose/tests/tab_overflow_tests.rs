@@ -56,8 +56,8 @@ use cove_core::{Binding, State};
 use cove_platform::{InputEvent, KeyEvent, KeyModifiers};
 use cove_ui_compose::Scancode;
 use cove_ui_compose::modifiers::layout::LayoutFrameExt;
-use cove_ui_compose::primitives::controls::button::Button;
-use cove_ui_compose::primitives::layout::tab_view::{TabItem, TabOverflow, TabVariant, TabView};
+use cove_ui_compose::primitives::controls::Button;
+use cove_ui_compose::primitives::layout::{TabItem, TabOverflow, TabVariant, TabView};
 use cove_ui_compose::primitives::text::Text;
 
 use support::InteractiveScene;
@@ -168,7 +168,8 @@ impl View for Harness {
 
         AnyView::new(
             AnyView::new(
-                TabView::new(self.selection_binding(), tabs)
+                TabView::try_new(self.selection_binding(), tabs)
+                    .expect("unique tab IDs")
                     .variant(self.variant.get())
                     .overflow(self.overflow.get())
                     .enabled(self.enabled.get()),

@@ -9,6 +9,7 @@
 //! writes interface copy such as "Cancel" or "Close" itself.
 
 use crate::Scope;
+use crate::primitives::{DuplicateId, check_ids};
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 
@@ -26,7 +27,7 @@ use crate::primitives::overlays::modal::{
 use crate::primitives::overlays::roving_focus::{
     RovingFocusHost, RovingItem, SelectionNavigation, roving_identity,
 };
-use crate::primitives::text::{Divider, DividerAxis, Text};
+use crate::primitives::text::{Divider, Text};
 use crate::theme::styles::buttons::{
     ButtonStyle, ButtonStyleConfiguration, ButtonStyleViewExt, GhostButtonStyle,
     SecondaryButtonStyle,
@@ -95,30 +96,24 @@ impl ActionSheetAction {
 pub struct ActionSheetQuestion {
     pub title: String,
     pub message: String,
-    pub actions: Vec<ActionSheetAction>,
+    pub(crate) actions: Vec<ActionSheetAction>,
     pub close_label: String,
 }
 
 impl ActionSheetQuestion {
-    pub fn new(
+    pub fn try_new(
         title: impl Into<String>,
         message: impl Into<String>,
         actions: Vec<ActionSheetAction>,
         close_label: impl Into<String>,
-    ) -> Self {
-        let mut seen = std::collections::HashSet::new();
-        for action in &actions {
-            assert!(
-                seen.insert(action.id.clone()),
-                "ActionSheet action IDs must be unique"
-            );
-        }
-        Self {
+    ) -> Result<Self, DuplicateId> {
+        check_ids(actions.iter().map(|item| &item.id), "Action sheet action")?;
+        Ok(Self {
             title: title.into(),
             message: message.into(),
             actions,
             close_label: close_label.into(),
-        }
+        })
     }
 
     fn enabled_ids(&self) -> Vec<String> {
@@ -421,11 +416,7 @@ impl PrimitiveView for ActionSheetContent {
             .padding_insets(EdgeInsets::new(8.0, 12.0, 10.0, 12.0))
             .frame(None, None, None, Some(44.0), None, None),
         ));
-        column.push(AnyView::new(Divider::new(
-            None,
-            1.0,
-            DividerAxis::Horizontal,
-        )));
+        column.push(AnyView::new(Divider::horizontal()));
 
         let rows = self.rows(&enabled, current.as_deref());
         let roving = RovingFocusHost::new(
@@ -494,11 +485,7 @@ impl ActionSheetContent {
                 identity,
             )))));
             if index < self.question.actions.len() - 1 {
-                items.push(AnyView::new(Divider::new(
-                    None,
-                    1.0,
-                    DividerAxis::Horizontal,
-                )));
+                items.push(AnyView::new(Divider::horizontal()));
             }
         }
         AnyView::new(

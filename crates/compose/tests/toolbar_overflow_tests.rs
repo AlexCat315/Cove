@@ -42,7 +42,7 @@ use cove_platform::KeyModifiers;
 use cove_ui_compose::Scancode;
 use cove_ui_compose::adaptive::SurfaceEnvironmentExt;
 use cove_ui_compose::modifiers::layout::LayoutFrameExt;
-use cove_ui_compose::primitives::controls::button::ButtonIconSource;
+use cove_ui_compose::primitives::controls::ButtonIconSource;
 use cove_ui_compose::primitives::controls::toolbar::{
     Toolbar, ToolbarAxis, ToolbarCommandPresentation, ToolbarCommands, ToolbarItem,
     ToolbarItemPlacement, ToolbarOptions,
@@ -194,7 +194,8 @@ impl Harness {
         let mut environment = Environment::default();
         environment.viewport.width = width;
         environment.input = self.input.get();
-        let commands = ToolbarCommands::new(self.items(), enabled, ToolbarAxis::Horizontal)
+        let commands = ToolbarCommands::try_new(self.items(), enabled, ToolbarAxis::Horizontal)
+            .expect("unique toolbar command IDs")
             .available_width((width - 12.0).max(0.0))
             .presentation(ToolbarCommandPresentation {
                 minimum_extent: Some(44.0),
@@ -651,7 +652,7 @@ fn icon_command() {
         environment.input = InputCapabilities::TOUCH;
         scene.install(AnyView::new(
             AnyView::new(Toolbar::new(
-                ToolbarCommands::new(
+                ToolbarCommands::try_new(
                     vec![
                         ToolbarItem::new(MenuItem::new(1, "Run the project", move || {
                             counter.set(counter.get() + 1)
@@ -662,6 +663,7 @@ fn icon_command() {
                     true,
                     ToolbarAxis::Horizontal,
                 )
+                .expect("unique toolbar command IDs")
                 .available_width(378.0)
                 .presentation(ToolbarCommandPresentation {
                     minimum_extent: Some(44.0),

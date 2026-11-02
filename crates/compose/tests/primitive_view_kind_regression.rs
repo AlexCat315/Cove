@@ -18,8 +18,8 @@ use cove_core::scene::AccessibilityRole;
 use cove_ui_compose::primitives::layout::sidebar::{
     Sidebar, SidebarItem, SidebarPresentation, SidebarSection,
 };
-use cove_ui_compose::primitives::layout::tab_view::{TabItem, TabView};
-use cove_ui_compose::primitives::overlays::roving_focus::RovingFocusHost;
+use cove_ui_compose::primitives::layout::{TabItem, TabView};
+use cove_ui_compose::primitives::overlays::RovingFocusHost;
 
 use support::InteractiveScene;
 
@@ -27,13 +27,14 @@ use support::InteractiveScene;
 fn sidebar_mounts_without_a_primitive_view_panic() {
     InteractiveScene::run(400.0, 400.0, |scene| {
         let selection = Binding::constant(Some(1_i32));
-        let mut sidebar = Sidebar::new(
+        let mut sidebar = Sidebar::try_new(
             selection,
             vec![SidebarSection::new(
                 "Group",
                 vec![SidebarItem::new(1_i32, "One"), SidebarItem::new(2, "Two")],
             )],
-        );
+        )
+        .expect("unique sidebar IDs");
         sidebar.presentation = SidebarPresentation::Expanded;
         scene.install(sidebar);
         assert!(
@@ -46,13 +47,16 @@ fn sidebar_mounts_without_a_primitive_view_panic() {
 #[test]
 fn tab_view_mounts_without_a_primitive_view_panic() {
     InteractiveScene::run(400.0, 300.0, |scene| {
-        scene.install(TabView::new(
-            Binding::constant(0_u8),
-            vec![
-                TabItem::new(0_u8, "A", cove_composition::EmptyView),
-                TabItem::new(1_u8, "B", cove_composition::EmptyView),
-            ],
-        ));
+        scene.install(
+            TabView::try_new(
+                Binding::constant(0_u8),
+                vec![
+                    TabItem::new(0_u8, "A", cove_composition::EmptyView),
+                    TabItem::new(1_u8, "B", cove_composition::EmptyView),
+                ],
+            )
+            .expect("unique tab IDs"),
+        );
         assert!(
             scene.nodes().len() > 1,
             "a TabView must materialise its strip"
@@ -78,7 +82,7 @@ fn roving_focus_host_mounts() {
 fn sidebar_rows_publish_navigation_semantics() {
     InteractiveScene::run(400.0, 400.0, |scene| {
         let selection = Binding::constant(Some(1_i32));
-        let mut sidebar = Sidebar::new(
+        let mut sidebar = Sidebar::try_new(
             selection,
             vec![SidebarSection::new(
                 "Group",
@@ -87,7 +91,8 @@ fn sidebar_rows_publish_navigation_semantics() {
                     SidebarItem::new(2, "Beta"),
                 ],
             )],
-        );
+        )
+        .expect("unique sidebar IDs");
         sidebar.presentation = SidebarPresentation::Expanded;
         scene.install(sidebar);
 

@@ -363,7 +363,7 @@ impl View for ProgressStory {
                                     Wrap::NoWrap,
                                     12.0,
                                     AnyView::new(TupleView::new(vec![
-                                        AnyView::new(Spinner::new(16.0)),
+                                        AnyView::new(Spinner::new()),
                                         AnyView::new(Text::new("Working…")),
                                     ])),
                                 )),

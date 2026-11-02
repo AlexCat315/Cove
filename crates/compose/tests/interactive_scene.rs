@@ -15,7 +15,7 @@ use cove_core::Point;
 use cove_core::scene::{Align, FlexDirection, FocusChainHolder, Justify, Wrap};
 use cove_ui_compose::BoxView;
 use cove_ui_compose::modifiers::layout::LayoutFrameExt;
-use cove_ui_compose::primitives::controls::button::Button;
+use cove_ui_compose::primitives::controls::Button;
 
 use support::InteractiveScene;
 

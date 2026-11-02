@@ -254,7 +254,7 @@ fn format_value(value: f64) -> String {
 }
 
 /// The leaf range slider: one hit-testable node owning both thumbs.
-pub struct RangeSliderHost {
+pub(crate) struct RangeSliderHost {
     pub values: Binding<RangeValue>,
     pub range: (f64, f64),
     pub step: Option<f64>,

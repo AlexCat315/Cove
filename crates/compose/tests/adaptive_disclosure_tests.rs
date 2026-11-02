@@ -80,14 +80,17 @@ fn long_headers_keep_one_line_and_keyboard_activation_at_both_text_scales() {
                         Wrap::NoWrap,
                         20.0,
                         AnyView::new(TupleView::new(vec![
-                            AnyView::new(Accordion::new(
-                                vec![AccordionItem::new(
-                                    1i32,
-                                    TITLE,
-                                    AnyView::new(Text::new("Accordion content")),
-                                )],
-                                expanded.binding(),
-                            )),
+                            AnyView::new(
+                                Accordion::try_new(
+                                    vec![AccordionItem::new(
+                                        1i32,
+                                        TITLE,
+                                        AnyView::new(Text::new("Accordion content")),
+                                    )],
+                                    expanded.binding(),
+                                )
+                                .expect("unique accordion IDs"),
+                            ),
                             AnyView::new(DisclosureGroup::title(
                                 disclosure.binding(),
                                 TITLE,

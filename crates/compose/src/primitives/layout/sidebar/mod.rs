@@ -14,7 +14,7 @@ pub mod resize_handle;
 pub mod resizing;
 pub mod sidebar;
 
-pub use adaptive_hosts::{SidebarBackdrop, SidebarLayer, SidebarShellHost, SidebarTriggerHost};
+pub use adaptive_hosts::{SidebarBackdrop, SidebarLayer};
 pub use adaptive_options::{
     AdaptiveSidebarOptions, SidebarGeometry, SidebarLayoutPolicy, SidebarMode,
 };

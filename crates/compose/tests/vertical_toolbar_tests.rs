@@ -49,10 +49,10 @@ use cove_core::scene::{AccessibilityRole, FocusChainHolder, Node};
 use cove_ui_compose::Scancode;
 use cove_ui_compose::modifiers::interaction::AccessibilityExt;
 use cove_ui_compose::modifiers::layout::LayoutFrameExt;
-use cove_ui_compose::primitives::controls::button::{Button, ButtonIconSource};
 use cove_ui_compose::primitives::controls::toolbar::{
     Toolbar, ToolbarAxis, ToolbarGroup, ToolbarItem, ToolbarOptions, ToolbarSeparator,
 };
+use cove_ui_compose::primitives::controls::{Button, ButtonIconSource};
 use cove_ui_compose::primitives::media::ui_icon_catalog::action;
 use cove_ui_compose::primitives::overlays::menu::MenuItem;
 use cove_ui_compose::primitives::overlays::portal::LayerRoot;
@@ -184,11 +184,12 @@ fn a_command_list_overflows_by_height_into_a_beside_menu() {
 
         scene.install(AnyView::new(LayerRoot::new(AnyView::new(AnyView::new(
             Toolbar::new(
-                cove_ui_compose::primitives::controls::toolbar::ToolbarCommands::new(
+                cove_ui_compose::primitives::controls::toolbar::ToolbarCommands::try_new(
                     items,
                     true,
                     ToolbarAxis::Vertical,
                 )
+                .expect("unique toolbar command IDs")
                 // Swift reads this budget from its container; the Rust row
                 // needs it handed in, so give it the 220pt frame height.
                 .available_width(220.0),

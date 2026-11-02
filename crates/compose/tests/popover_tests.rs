@@ -27,8 +27,8 @@ use std::rc::Rc;
 use cove_composition::{AnyView, DynamicField, View};
 use cove_core::State;
 use cove_ui_compose::modifiers::layout::LayoutFrameExt;
+use cove_ui_compose::primitives::overlays::Popover;
 use cove_ui_compose::primitives::overlays::menu::{Menu, MenuEntry, MenuItem};
-use cove_ui_compose::primitives::overlays::popover::Popover;
 use cove_ui_compose::primitives::overlays::portal::{LayerRoot, PortalStoreHolder};
 use cove_ui_compose::primitives::text::Text;
 

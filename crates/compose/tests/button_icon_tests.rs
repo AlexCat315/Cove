@@ -27,7 +27,7 @@ use cove_core::scene::{
 use cove_core::{Environment, InputCapabilities};
 use cove_platform::MouseButtonEvent;
 use cove_ui_compose::adaptive::SurfaceEnvironmentExt;
-use cove_ui_compose::primitives::controls::button::{Button, ButtonIconSource};
+use cove_ui_compose::primitives::controls::{Button, ButtonIconSource};
 
 use support::GlobalTestLock;
 

@@ -3,6 +3,7 @@
 //! Measure commands at their natural size, then move lower-priority commands into
 //! a menu. Icon commands retain their full title as help and semantics.
 use crate::Scope;
+use crate::primitives::{DuplicateId, check_ids};
 use std::rc::Rc;
 
 use crate::modifiers::layout::{LayoutFrameExt, PaddingExt};
@@ -29,7 +30,7 @@ pub struct ToolbarCommandPresentation {
 
 /// Measure, inline and overflow one run of commands.
 pub struct ToolbarCommands {
-    pub items: Vec<ToolbarItem>,
+    pub(crate) items: Vec<ToolbarItem>,
     pub is_enabled: bool,
     pub available_width: Option<f32>,
     pub presentation: ToolbarCommandPresentation,
@@ -42,18 +43,20 @@ pub struct ToolbarCommands {
 }
 
 impl ToolbarCommands {
-    pub fn new(items: Vec<ToolbarItem>, is_enabled: bool, axis: ToolbarAxis) -> Self {
-        assert!(
-            items
-                .iter()
-                .enumerate()
-                .all(|(index, item)| items
-                    .iter()
-                    .enumerate()
-                    .all(|(other, candidate)| other == index
-                        || candidate.command.id != item.command.id)),
-            "Toolbar command IDs must be unique"
-        );
+    pub fn try_new(
+        items: Vec<ToolbarItem>,
+        is_enabled: bool,
+        axis: ToolbarAxis,
+    ) -> Result<Self, DuplicateId> {
+        check_ids(items.iter().map(|item| &item.command.id), "Toolbar command")?;
+        Ok(Self::from_unique_items(items, is_enabled, axis))
+    }
+
+    pub(crate) fn from_unique_items(
+        items: Vec<ToolbarItem>,
+        is_enabled: bool,
+        axis: ToolbarAxis,
+    ) -> Self {
         Self {
             items,
             is_enabled,

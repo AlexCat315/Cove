@@ -4,6 +4,13 @@
 
 ## Unreleased
 
+- **Compose 组件 API（破坏性）**。应用可导入 `cove_ui::prelude::*`，组件在所属分组中显式导出。使用旧实现模块路径的代码请改从分组导入。
+  - `DatePicker`、`DateRangePicker` 和 `CalendarView` 通过 `new(binding)` 直接读写选中日期。`Image` 的构造器接收逻辑尺寸 `Size`，颜色和渲染模式通过 builder 设置。
+  - `Spinner::new()`、`Divider::new()` 和 `ZStack::new(content)` 采用默认外观。`Sheet`、`BottomSheet`、`Dialog`、`Tooltip` 使用 `configure` 增量修改选项。
+  - 标签页、侧栏、分段按钮、单选组、步骤条、表单、折叠面板、表格等集合组件使用 `try_new` 报告重复 ID。`AppBar::try_commands` 一次检查主命令和其他动作。`DataTableModel::replace_rows` 返回校验结果，失败时保留旧数据。
+  - `LayoutThatFits::new(first).or(fallback)` 要求至少一个布局。`TreeTable::try_new` 要求首列。`LazyGrid::try_new` 使用 `LazyGridOptions` 并报告无效列数或行高数量。`Grid::try_new(columns, content)` 在布局前校验命名列。
+  - 属性表格行圆角跟随当前主题的 `radius.sm`。
+
 - **下拉菜单、侧边栏、默认主题与 DevTools 帧回读（2026-11-02，破坏性）**：
   - 修复下拉点击无反应、切页才出现：主窗口的 portal store 现在在挂载前就绪，`PortalHost` 与弹层使用同一个
     store；`Select`、`ColorField` 的展开状态归各自 scope 持有，不再共享，也不会被其他面板带开。

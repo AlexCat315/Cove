@@ -5,6 +5,8 @@
 //! same destination nodes as the expanded sidebar, so switching presentation
 //! preserves selection and drafts.
 use crate::Scope;
+use crate::primitives::DuplicateId;
+use crate::primitives::layout::sidebar::items::SidebarSections;
 use std::collections::HashSet;
 
 use cove_core::Binding;
@@ -20,7 +22,7 @@ use crate::{AnyView, BoxView, View};
 /// Compact destination navigation.
 pub struct NavigationRail<Id: PartialEq + Eq + std::hash::Hash + Clone + Send + Sync + 'static> {
     pub selection: Binding<Option<Id>>,
-    pub items: Vec<SidebarItem<Id>>,
+    sections: SidebarSections<Id>,
     pub shows_labels: bool,
     pub expanded: Option<Binding<HashSet<Id>>>,
     pub on_activate: std::rc::Rc<dyn Fn(Id)>,
@@ -29,16 +31,20 @@ pub struct NavigationRail<Id: PartialEq + Eq + std::hash::Hash + Clone + Send + 
 }
 
 impl<Id: PartialEq + Eq + std::hash::Hash + Clone + Send + Sync + 'static> NavigationRail<Id> {
-    pub fn new(selection: Binding<Option<Id>>, items: Vec<SidebarItem<Id>>) -> Self {
-        Self {
+    pub fn try_new(
+        selection: Binding<Option<Id>>,
+        items: Vec<SidebarItem<Id>>,
+    ) -> Result<Self, DuplicateId> {
+        let sections = SidebarSections::new(vec![SidebarSection::new("rail", items)])?;
+        Ok(Self {
             selection,
-            items,
+            sections,
             shows_labels: true,
             expanded: None,
             on_activate: std::rc::Rc::new(|_| {}),
             header: AnyView::new(crate::EmptyView),
             footer: AnyView::new(crate::EmptyView),
-        }
+        })
     }
 
     pub fn shows_labels(mut self, shows_labels: bool) -> Self {
@@ -71,19 +77,16 @@ impl<Id: PartialEq + Eq + std::hash::Hash + Clone + Send + Sync + 'static> View
     for NavigationRail<Id>
 {
     fn body(&self, _cx: &Scope) -> AnyView {
-        let mut sidebar = Sidebar::new(
-            self.selection.clone(),
-            vec![SidebarSection::new("rail", self.items.clone())],
-        )
-        .presentation(SidebarPresentation::Rail {
-            shows_labels: self.shows_labels,
-        })
-        .on_activate({
-            let handler = self.on_activate.clone();
-            move |id| handler(id)
-        })
-        .header(self.header.clone())
-        .footer(self.footer.clone());
+        let mut sidebar = Sidebar::from_sections(self.selection.clone(), self.sections.clone())
+            .presentation(SidebarPresentation::Rail {
+                shows_labels: self.shows_labels,
+            })
+            .on_activate({
+                let handler = self.on_activate.clone();
+                move |id| handler(id)
+            })
+            .header(self.header.clone())
+            .footer(self.footer.clone());
         if let Some(expanded) = self.expanded.clone() {
             sidebar = sidebar.expanded(expanded);
         }

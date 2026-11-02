@@ -50,7 +50,7 @@ impl<Id: PartialEq + Clone> BreadcrumbItem<Id> {
 
 /// A trail of ancestors, with a collapsed middle when it is too long.
 pub struct Breadcrumb<Id: PartialEq + Clone + std::hash::Hash + 'static> {
-    pub items: Vec<BreadcrumbItem<Id>>,
+    items: Vec<BreadcrumbItem<Id>>,
     pub on_select: Rc<dyn Fn(Id)>,
     pub max_visible_items: usize,
     is_presented: Rc<RefCell<bool>>,
@@ -59,24 +59,21 @@ pub struct Breadcrumb<Id: PartialEq + Clone + std::hash::Hash + 'static> {
 impl<Id: PartialEq + Clone + std::hash::Hash + 'static> Breadcrumb<Id> {
     ///
     /// IDs must be unique.
-    pub fn new(
+    pub fn try_new(
         items: Vec<BreadcrumbItem<Id>>,
         max_visible_items: usize,
         on_select: impl Fn(Id) + 'static,
-    ) -> Self {
-        assert!(
-            items.iter().enumerate().all(|(index, item)| items
-                .iter()
-                .enumerate()
-                .all(|(other, candidate)| other == index || candidate.id != item.id)),
-            "Breadcrumb IDs must be unique"
-        );
-        Self {
+    ) -> Result<Self, crate::primitives::DuplicateId>
+    where
+        Id: Eq,
+    {
+        crate::primitives::check_ids(items.iter().map(|item| &item.id), "Breadcrumb")?;
+        Ok(Self {
             items,
             on_select: Rc::new(on_select),
             max_visible_items: max_visible_items.max(2),
             is_presented: Rc::new(RefCell::new(false)),
-        }
+        })
     }
 
     fn snapshot(&self) -> Breadcrumb<Id> {

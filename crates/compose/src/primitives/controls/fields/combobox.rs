@@ -204,22 +204,20 @@ pub struct Combobox<Value: PartialEq + Clone + Send + Sync + 'static> {
 
 impl<Value: PartialEq + Clone + Send + Sync + 'static> Combobox<Value> {
     /// Fixed options, filtered locally.
-    pub fn new(selection: Binding<Option<Value>>, options: Vec<SelectOption<Value>>) -> Self {
-        for (index, option) in options.iter().enumerate() {
-            assert!(
-                options
-                    .iter()
-                    .enumerate()
-                    .all(|(other, candidate)| other == index || candidate.value != option.value),
-                "Combobox values must be unique"
-            );
-        }
-        Self {
+    pub fn try_new(
+        selection: Binding<Option<Value>>,
+        options: Vec<SelectOption<Value>>,
+    ) -> Result<Self, crate::primitives::DuplicateId>
+    where
+        Value: Eq + std::hash::Hash,
+    {
+        crate::primitives::check_ids(options.iter().map(|item| &item.value), "Combobox")?;
+        Ok(Self {
             selection,
             presentation: ComboboxPresentation::default(),
             source: ComboboxSource::Options(options),
             session: None,
-        }
+        })
     }
 
     /// Remote options. `selected_label` names the current value while it is not
@@ -799,7 +797,7 @@ impl<Value: PartialEq + Clone + Send + Sync + 'static> PrimitiveView
                 icon: None,
                 text: "Searching…".to_string(),
                 tone: SemanticColorRef::on_surface_muted(),
-                accessory: Some(AnyView::new(Spinner::new(14.0))),
+                accessory: Some(AnyView::new(Spinner::new().size(14.0))),
             })],
             ComboboxResultsPresentation::Failed(message) => {
                 let retry_field = field.clone();

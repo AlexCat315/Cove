@@ -135,9 +135,6 @@ impl FormController {
     }
 
     pub fn validate(&self, rules: &[FormRule]) -> bool {
-        let unique: std::collections::HashSet<&str> =
-            rules.iter().map(|rule| rule.field_id.as_str()).collect();
-        assert_eq!(unique.len(), rules.len(), "Form field IDs must be unique");
         let issues: Vec<FormIssue> = rules
             .iter()
             .filter_map(|rule| {

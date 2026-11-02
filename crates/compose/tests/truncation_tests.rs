@@ -23,12 +23,12 @@ use cove_composition::{AnyView, Column, TupleView, ViewGraph};
 use cove_core::scene::{AccessibilityRole, Node, PlatformInputContext};
 use cove_ui_compose::BoxView;
 use cove_ui_compose::modifiers::layout::LayoutFrameExt;
-use cove_ui_compose::primitives::controls::button::Button;
-use cove_ui_compose::primitives::controls::fields::date_picker::{
+use cove_ui_compose::primitives::controls::Button;
+use cove_ui_compose::primitives::controls::Link;
+use cove_ui_compose::primitives::controls::MenuButton;
+use cove_ui_compose::primitives::controls::{
     DatePicker, DatePickerOptions, DatePickerPresentation,
 };
-use cove_ui_compose::primitives::controls::link::Link;
-use cove_ui_compose::primitives::controls::menu_button::MenuButton;
 use cove_ui_compose::primitives::overlays::menu::{MenuEntry, MenuItem};
 use cove_ui_compose::primitives::text::Text;
 
@@ -80,7 +80,8 @@ fn titles_ellipsize_while_their_accessible_name_stays_complete() {
                     width: 220.0,
                     ..DatePickerPresentation::default()
                 };
-                let picker = DatePicker::new(Rc::new(|| None), Rc::new(|_| {}), options);
+                let picker = DatePicker::new(cove_core::Binding::constant(None))
+                    .configure(|picker| *picker = options);
 
                 let harness = AnyView::new(
                     AnyView::new(Column::new(

@@ -11,7 +11,7 @@ use std::sync::Arc;
 
 use crate::impl_primitive_view;
 use crate::primitives::media::image_data_download::AsyncImageError;
-use crate::primitives::media::image_geometry::{ImageContentMode, ImageRenderingMode};
+use crate::primitives::media::image_geometry::ImageContentMode;
 use crate::primitives::media::image_load_services::{
     ImageDecodeExecution, ImageInflightLoads, ImageLoadRequest, ImageLoadServices, ImagePayload,
     ImageProgress,
@@ -214,7 +214,7 @@ impl AsyncImageSession {
         self.changed.notify();
     }
 
-    pub fn status(&self, request: &ImageLoadRequest) -> AsyncImageStatus {
+    fn status(&self, request: &ImageLoadRequest) -> AsyncImageStatus {
         self.changed.track();
         if self.request.borrow().as_ref() == Some(request) {
             self.phase.borrow().clone()
@@ -225,12 +225,7 @@ impl AsyncImageSession {
         }
     }
 
-    pub fn publish(
-        &self,
-        phase: AsyncImageStatus,
-        request: &ImageLoadRequest,
-        node: Option<&Node>,
-    ) {
+    fn publish(&self, phase: AsyncImageStatus, request: &ImageLoadRequest, node: Option<&Node>) {
         let unchanged = self.request.borrow().as_ref() == Some(request)
             && status_eq(&self.phase.borrow(), &phase);
         if unchanged {
@@ -391,14 +386,8 @@ fn image_for_asset(
     height: f32,
     content_mode: ImageContentMode,
 ) -> Image {
-    Image::new(
-        ImageSource::Asset(asset),
-        width,
-        height,
-        cove_core::Color::WHITE,
-        content_mode,
-        ImageRenderingMode::Color,
-    )
+    Image::new(ImageSource::Asset(asset), cove_core::Size { width, height })
+        .content_mode(content_mode)
 }
 
 struct AsyncImageHost {

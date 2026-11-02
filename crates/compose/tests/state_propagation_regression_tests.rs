@@ -26,7 +26,7 @@ use cove_core::scene::{
     InteractionRegistryHolder, Node, NodeTree, PointerPhase, Recomposer,
 };
 use cove_platform::{MouseButton, MouseButtonEvent};
-use cove_ui_compose::primitives::controls::button::Button;
+use cove_ui_compose::primitives::controls::Button;
 use cove_ui_compose::primitives::text::Text;
 use cove_ui_compose::primitives::text::text_buffer::TextBuffer;
 use cove_ui_compose::primitives::text::text_field::{TextField, TextFieldEvents};

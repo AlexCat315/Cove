@@ -319,18 +319,10 @@ impl PrimitiveView for Toolbar {
         );
         let mut column: Vec<AnyView> = Vec::new();
         if self.options.divider == ToolbarDividerEdge::Top {
-            column.push(AnyView::new(crate::primitives::text::Divider::new(
-                None,
-                1.0,
-                crate::primitives::text::DividerAxis::Horizontal,
-            )));
+            column.push(AnyView::new(crate::primitives::text::Divider::horizontal()));
         }
         if self.options.divider == ToolbarDividerEdge::Leading {
-            column.push(AnyView::new(crate::primitives::text::Divider::new(
-                None,
-                1.0,
-                crate::primitives::text::DividerAxis::Vertical,
-            )));
+            column.push(AnyView::new(crate::primitives::text::Divider::vertical()));
         }
         column.push(if vertical {
             AnyView::new(
@@ -362,18 +354,10 @@ impl PrimitiveView for Toolbar {
             )
         });
         if self.options.divider == ToolbarDividerEdge::Trailing {
-            column.push(AnyView::new(crate::primitives::text::Divider::new(
-                None,
-                1.0,
-                crate::primitives::text::DividerAxis::Vertical,
-            )));
+            column.push(AnyView::new(crate::primitives::text::Divider::vertical()));
         }
         if self.options.divider == ToolbarDividerEdge::Bottom {
-            column.push(AnyView::new(crate::primitives::text::Divider::new(
-                None,
-                1.0,
-                crate::primitives::text::DividerAxis::Horizontal,
-            )));
+            column.push(AnyView::new(crate::primitives::text::Divider::horizontal()));
         }
         vec![AnyView::new(ToolbarChrome {
             axis: self.options.axis,
@@ -558,23 +542,15 @@ impl PrimitiveView for ToolbarSeparator {
             node.composition_value(&ToolbarAxisEnvironment::axis()) == ToolbarAxis::Vertical;
         let divider = if vertical {
             AnyView::new(
-                crate::primitives::text::Divider::new(
-                    None,
-                    1.0,
-                    crate::primitives::text::DividerAxis::Horizontal,
-                )
-                .frame_size(18.0, 1.0)
-                .padding_edges(0.0, theme.spacing.xs),
+                crate::primitives::text::Divider::horizontal()
+                    .frame_size(18.0, 1.0)
+                    .padding_edges(0.0, theme.spacing.xs),
             )
         } else {
             AnyView::new(
-                crate::primitives::text::Divider::new(
-                    None,
-                    1.0,
-                    crate::primitives::text::DividerAxis::Vertical,
-                )
-                .frame_size(1.0, 18.0)
-                .padding_edges(theme.spacing.xs, 0.0),
+                crate::primitives::text::Divider::vertical()
+                    .frame_size(1.0, 18.0)
+                    .padding_edges(theme.spacing.xs, 0.0),
             )
         };
         vec![AnyView::new(divider.with_modifier(

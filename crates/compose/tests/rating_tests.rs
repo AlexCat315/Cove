@@ -56,7 +56,7 @@ use cove_platform::{
 };
 use cove_ui_compose::Scancode;
 use cove_ui_compose::modifiers::layout::{LayoutFrameExt, PaddingExt};
-use cove_ui_compose::primitives::controls::button::Button;
+use cove_ui_compose::primitives::controls::Button;
 use cove_ui_compose::primitives::controls::rating::{
     Rating, RatingAppearance, RatingPrecision, RatingSelection, RatingSession, RatingSymbol,
 };

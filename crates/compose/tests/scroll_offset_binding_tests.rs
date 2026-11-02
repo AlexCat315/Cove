@@ -31,7 +31,7 @@ use cove_core::{Point, State};
 use cove_platform::{InputEvent, MouseWheelEvent, WindowId};
 use cove_ui_compose::BoxView;
 use cove_ui_compose::modifiers::layout::{FlexExt, LayoutFrameExt};
-use cove_ui_compose::primitives::layout::scroll_view::{ScrollAxis, ScrollRequest, ScrollView};
+use cove_ui_compose::primitives::layout::{ScrollAxis, ScrollRequest, ScrollView};
 use cove_ui_compose::primitives::text::Text;
 use cove_ui_compose::theme::tokens::reduced_motion_environment::ReducedMotionViewExt;
 

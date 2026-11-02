@@ -37,15 +37,13 @@ use std::sync::Mutex;
 use cove_composition::{AnyView, LayoutDebugExt};
 use cove_core::scene::Node;
 use cove_imaging::{ImageAssetRegistry, ImageAssetRegistryHolder, ImageCacheLimits, PixelSize};
-use cove_ui_compose::primitives::media::async_image::{
-    AsyncImage, AsyncImagePhase, AsyncImageSession,
-};
-use cove_ui_compose::primitives::media::image::ContentScaleHolder;
+use cove_ui_compose::primitives::media::ContentScaleHolder;
+use cove_ui_compose::primitives::media::ImageLoadRequest;
 use cove_ui_compose::primitives::media::image_data_download::{
     AsyncImageError, DownloadedImage, ImageDataDownload, ImageDownloadTransport,
     ImageDownloadTransportHolder, ImageLoadingPolicy,
 };
-use cove_ui_compose::primitives::media::image_load_services::ImageLoadRequest;
+use cove_ui_compose::primitives::media::{AsyncImage, AsyncImagePhase, AsyncImageSession};
 
 mod async_image_support {
     use super::*;

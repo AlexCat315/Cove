@@ -13,7 +13,7 @@ use cove_composition::AnyView;
 use cove_composition::layout::LayoutDirectionExt;
 use cove_core::scene::{Align, FlexDirection, Justify, Node, Wrap};
 use cove_ui_compose::modifiers::layout::LayoutFrameExt;
-use cove_ui_compose::primitives::text::text::{Divider, DividerAxis, Text};
+use cove_ui_compose::primitives::text::{Divider, Text};
 use cove_ui_compose::{BoxView, Row, VerticalAlignment};
 
 use support::GlobalTestLock;
@@ -105,11 +105,7 @@ fn horizontal_divider_spans_the_cross_axis_at_its_thickness() {
     GlobalTestLock::locked(|| {
         let graph = support::graph();
         graph.install_view(
-            divider_column(vec![AnyView::new(Divider::new(
-                None,
-                1.0,
-                DividerAxis::Horizontal,
-            ))]),
+            divider_column(vec![AnyView::new(Divider::horizontal())]),
             Default::default(),
         );
         graph.compute_layout(200.0, 200.0);
@@ -132,7 +128,7 @@ fn horizontal_divider_spans_the_cross_axis_at_its_thickness() {
 fn vertical_divider_is_a_thin_strip() {
     GlobalTestLock::locked(|| {
         let graph = support::graph();
-        let divider = AnyView::new(Divider::new(None, 2.0, DividerAxis::Vertical));
+        let divider = AnyView::new(Divider::vertical().thickness(2.0));
         let row = AnyView::new(
             AnyView::new(Row::new(VerticalAlignment::Center, 0.0, divider))
                 .frame_width(200.0)
@@ -229,8 +225,7 @@ fn layout_direction_does_not_change_divider_geometry() {
     GlobalTestLock::locked(|| {
         let graph = support::graph();
         let divider = AnyView::new(
-            AnyView::new(Divider::new(None, 1.0, DividerAxis::Horizontal))
-                .layout_direction(cove_core::scene::Direction::Rtl),
+            AnyView::new(Divider::horizontal()).layout_direction(cove_core::scene::Direction::Rtl),
         );
         graph.install_view(divider, Default::default());
         graph.compute_layout(160.0, 100.0);

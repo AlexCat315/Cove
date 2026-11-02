@@ -2,7 +2,7 @@
 use crate::Scope;
 use crate::{
     Alignment, AnyView, HorizontalAlignment, Layout, LayoutContainer, LayoutSubview,
-    ProposedViewSize, VerticalAlignment, View,
+    ProposedViewSize, TupleView, VerticalAlignment, View,
 };
 use cove_core::scene::{Direction, Point, Rect, Size};
 
@@ -89,8 +89,25 @@ pub struct ZStack {
     pub content: AnyView,
 }
 impl ZStack {
-    pub fn new(alignment: Alignment, content: AnyView) -> Self {
-        Self { alignment, content }
+    pub fn new(content: impl View + 'static) -> Self {
+        Self {
+            alignment: Alignment::Center,
+            content: AnyView::new(content),
+        }
+    }
+
+    pub fn alignment(mut self, alignment: Alignment) -> Self {
+        self.alignment = alignment;
+        self
+    }
+}
+
+impl Default for ZStack {
+    fn default() -> Self {
+        Self {
+            alignment: Alignment::Center,
+            content: AnyView::new(TupleView::new(Vec::new())),
+        }
     }
 }
 impl View for ZStack {

@@ -10,17 +10,17 @@ use cove_core::scene::{Align, FlexDirection, Justify, Wrap};
 use cove_core::{Binding, State};
 use cove_ui_compose::modifiers::layout::LayoutFrameExt;
 use cove_ui_compose::primitives::controls::Button;
-use cove_ui_compose::primitives::controls::button::{ButtonIcon, ButtonIconSource};
+use cove_ui_compose::primitives::controls::{ButtonIcon, ButtonIconSource};
+use cove_ui_compose::primitives::controls::{Checkbox, CheckboxState, Toggle};
 use cove_ui_compose::primitives::media::ui_icon_catalog as icons;
-use cove_ui_compose::theme::ControlSize;
-use cove_ui_compose::theme::tokens::control_size::ControlSizeViewExt;
-use cove_ui_compose::primitives::controls::toggle::{Checkbox, CheckboxState, Toggle};
 use cove_ui_compose::primitives::text::Text;
+use cove_ui_compose::theme::ControlSize;
 use cove_ui_compose::theme::styles::buttons::button_style::{AnyButtonStyle, ButtonStyleViewExt};
 use cove_ui_compose::theme::styles::buttons::{
     DestructiveButtonStyle, GhostButtonStyle, SecondaryButtonStyle, StatusButtonStyle,
     ToggleButtonStyle,
 };
+use cove_ui_compose::theme::tokens::control_size::ControlSizeViewExt;
 use cove_ui_compose::theme::tokens::{SemanticColorRef, SemanticStyleViewExt};
 use cove_ui_compose::{AnyView, BoxView, DynamicField, LayoutDebugExt, TupleView, View};
 

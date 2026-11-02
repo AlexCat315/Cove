@@ -36,12 +36,12 @@ use cove_platform::{
 use cove_ui_compose::adaptive::SurfaceEnvironmentExt;
 use cove_ui_compose::modifiers::interaction::AccessibilityExt;
 use cove_ui_compose::modifiers::layout::LayoutFrameExt;
-use cove_ui_compose::primitives::controls::button::Button;
+use cove_ui_compose::primitives::controls::Button;
 use cove_ui_compose::primitives::data::lists::{
     CollectionSelection, List, ListRow, ListSection, SectionedList,
 };
 use cove_ui_compose::primitives::feedback::{Badge, StatusTone};
-use cove_ui_compose::primitives::media::icon::Icon;
+use cove_ui_compose::primitives::media::Icon;
 use cove_ui_compose::primitives::media::ui_icon_catalog::{file, status};
 use cove_ui_compose::primitives::overlays::portal::LayerRoot;
 use cove_ui_compose::primitives::text::Text;

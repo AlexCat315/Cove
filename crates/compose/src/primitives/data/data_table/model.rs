@@ -14,6 +14,7 @@
 //! - a cached projection is reused instead of rebuilt
 //! - every accepted mutation bumps the revision
 
+use crate::primitives::DuplicateId;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
@@ -64,9 +65,12 @@ impl<Record: 'static, Id: Eq + std::hash::Hash + Clone + 'static> ObservableObje
 }
 
 impl<Record: 'static, Id: Eq + std::hash::Hash + Clone + 'static> DataTableModel<Record, Id> {
-    pub fn new(records: Vec<Record>, id: impl Fn(&Record) -> Id + 'static) -> Rc<Self> {
-        let storage = RowStorage::new(records, Rc::new(id));
-        Rc::new(Self {
+    pub fn try_new(
+        records: Vec<Record>,
+        id: impl Fn(&Record) -> Id + 'static,
+    ) -> Result<Rc<Self>, DuplicateId> {
+        let storage = RowStorage::try_new(records, Rc::new(id))?;
+        Ok(Rc::new(Self {
             storage: RefCell::new(storage),
             projection: RefCell::new(None),
             cache: RefCell::new(Vec::new()),
@@ -76,7 +80,7 @@ impl<Record: 'static, Id: Eq + std::hash::Hash + Clone + 'static> DataTableModel
             sorting: RefCell::new(DataTableSortingStatus::default()),
             revision: RefCell::new(0),
             publisher: ObservablePublisher::default(),
-        })
+        }))
     }
 
     pub fn count(&self) -> usize {
@@ -129,20 +133,25 @@ impl<Record: 'static, Id: Eq + std::hash::Hash + Clone + 'static> DataTableModel
     }
 
     /// Replaces every row. An active sort is reapplied to the new rows.
-    pub fn replace_rows(&self, records: Vec<Record>) {
+    pub fn replace_rows(&self, records: Vec<Record>) -> Result<(), DuplicateId> {
         let id = self.storage.borrow().id.clone();
-        *self.storage.borrow_mut() = RowStorage::new(records, id);
+        let next = RowStorage::try_new(records, id)?;
+        *self.storage.borrow_mut() = next;
         *self.projection.borrow_mut() = None;
         self.cache.borrow_mut().clear();
         *self.generation.borrow_mut() += 1;
         self.rebuild_projection();
+        Ok(())
     }
 
-    /// Mutates one row in place. Returns `false` when the ID is unknown.
+    /// Mutates one row in place. Returns `false` when the ID is unknown or the edit changes it.
     ///
     /// The updater must preserve the row's identity; that is what keeps
     /// selection, viewport and an open draft pointing at the same row.
-    pub fn update_row(&self, id: &Id, update: impl FnOnce(&mut Record)) -> bool {
+    pub fn update_row(&self, id: &Id, update: impl FnOnce(&mut Record)) -> bool
+    where
+        Record: Clone,
+    {
         let source = match self.storage.borrow().positions.get(id).copied() {
             Some(source) => source,
             None => return false,
@@ -153,9 +162,12 @@ impl<Record: 'static, Id: Eq + std::hash::Hash + Clone + 'static> DataTableModel
             let Some(record) = storage.records.get_mut(source) else {
                 return false;
             };
-            update(record);
-            let preserved = id_fn(record) == *id;
-            assert!(preserved, "Editing a row must preserve its ID");
+            let mut next = record.clone();
+            update(&mut next);
+            if id_fn(&next) != *id {
+                return false;
+            }
+            *record = next;
         }
         self.cache.borrow_mut().clear();
         *self.generation.borrow_mut() += 1;
@@ -249,21 +261,20 @@ impl<Record: 'static, Id: Eq + std::hash::Hash + Clone + 'static> DataTableModel
 }
 
 impl<Record, Id: Eq + std::hash::Hash + Clone> RowStorage<Record, Id> {
-    fn new(records: Vec<Record>, id: Rc<dyn Fn(&Record) -> Id>) -> Self {
+    fn try_new(records: Vec<Record>, id: Rc<dyn Fn(&Record) -> Id>) -> Result<Self, DuplicateId> {
         let ids: Vec<Id> = records.iter().map(|record| id(record)).collect();
         let mut positions = HashMap::with_capacity(records.len());
         for (index, value) in ids.iter().enumerate() {
-            assert!(
-                positions.insert(value.clone(), index).is_none(),
-                "DataTable row IDs must be unique"
-            );
+            if positions.insert(value.clone(), index).is_some() {
+                return Err(DuplicateId("Data table row"));
+            }
         }
-        Self {
+        Ok(Self {
             records,
             id,
             ids,
             positions,
-        }
+        })
     }
 }
 
