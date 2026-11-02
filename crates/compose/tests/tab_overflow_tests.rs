@@ -47,8 +47,8 @@
 //!   icon; `TabItem` takes a `BundleImageResource` that the suite does not
 //!   source.
 
-use cove_composition::Scope;
 use crate::support;
+use cove_composition::Scope;
 
 use cove_composition::{AnyView, DynamicField, View};
 use cove_core::scene::AccessibilityRole;

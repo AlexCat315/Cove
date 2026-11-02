@@ -15,8 +15,8 @@
 //! `dynamic_properties`, so writing them recomposes the tree exactly as Swift's
 //! `@State` does.
 
-use cove_composition::Scope;
 use crate::support;
+use cove_composition::Scope;
 
 use cove_composition::{AnyView, TupleView, View, ViewExt};
 use cove_core::State;

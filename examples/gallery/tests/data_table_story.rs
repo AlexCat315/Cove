@@ -12,7 +12,7 @@ use cove_examples::gallery_content::stories::data_table_story::{
     apply_quantity, compare_names, compare_quantities, group_thousands, validate_name,
     validate_quantity, visible_tree_rows,
 };
-use cove_ui_compose::primitives::data::lists::table::ComparisonResult;
+use cove_ui_compose::primitives::data::data_table::table_column::ComparisonResult;
 
 fn story() -> DataTableStory {
     DataTableStory::new(GalleryOptions::default())

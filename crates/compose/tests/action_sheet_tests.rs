@@ -37,8 +37,8 @@
 //!   fill assertion is kept and the border assertion becomes "no focus-ring
 //!   border is drawn".
 
-use cove_composition::Scope;
 use crate::support;
+use cove_composition::Scope;
 
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;

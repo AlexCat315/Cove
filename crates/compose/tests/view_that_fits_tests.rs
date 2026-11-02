@@ -8,8 +8,8 @@
 //!   measurement
 //! - intrinsic mode selects by natural content and retains both branches
 
-use cove_composition::Scope;
 use crate::support;
+use cove_composition::Scope;
 
 use std::rc::Rc;
 

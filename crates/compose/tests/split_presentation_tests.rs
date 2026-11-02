@@ -51,8 +51,8 @@
 //!   directly. The toolbox's draft redaction cannot be exercised here; the
 //!   retained hidden field's value is asserted to be unchanged instead.
 
-use cove_composition::Scope;
 use crate::support;
+use cove_composition::Scope;
 
 use std::rc::Rc;
 

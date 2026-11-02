@@ -12,8 +12,8 @@
 //! percentages and divided back to an opacity in the content closure. The
 //! observable behaviour — resting at 0 and completing at 1 — is unchanged.
 
-use cove_composition::Scope;
 use crate::support;
+use cove_composition::Scope;
 
 use cove_composition::{AnyView, LayoutDebugExt, TupleView, View};
 use cove_core::State;

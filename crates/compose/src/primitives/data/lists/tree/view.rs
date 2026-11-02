@@ -25,6 +25,7 @@ use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
 
+use super::super::selection::{CollectionId, RowState};
 use super::options::{TreeOptions, TreeSelection};
 use super::{TreeDropPosition, TreeNodeKey, TreeSearchFilterPolicy};
 use crate::modifiers::interaction::AccessibilityExt;
@@ -125,6 +126,38 @@ where
     Element: Clone,
     Id: std::hash::Hash + Eq + Clone,
 {
+    flatten_visible(
+        roots,
+        id_of,
+        children,
+        has_children,
+        expanded,
+        expanded_keys,
+        search,
+        filters,
+        None,
+    )
+}
+
+/// The one depth-first projection behind `Tree` and `TreeTable`. With `seen`, a
+/// repeated ID refers to its first visible occurrence, which also stops a cycle
+/// in a dynamic child provider.
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn flatten_visible<Element, Id>(
+    roots: &[Element],
+    id_of: &dyn Fn(&Element) -> Id,
+    children: &dyn Fn(&Element) -> Vec<Element>,
+    has_children: Option<&dyn Fn(&Element) -> bool>,
+    expanded: &HashSet<Id>,
+    expanded_keys: &HashSet<TreeNodeKey<Id>>,
+    search: Option<(&dyn Fn(&Element) -> String, &str)>,
+    filters: bool,
+    mut seen: Option<&mut HashSet<Id>>,
+) -> Vec<TreeEntry<Element, Id>>
+where
+    Element: Clone,
+    Id: std::hash::Hash + Eq + Clone,
+{
     let query = search
         .map(|(_, query)| query.trim().to_lowercase())
         .unwrap_or_default();
@@ -203,6 +236,7 @@ where
         expanded_keys: &HashSet<TreeNodeKey<Id>>,
         metadata: Option<&TreeSearchMetadata<Id>>,
         filter_active: bool,
+        seen: &mut Option<&mut HashSet<Id>>,
         out: &mut Vec<TreeEntry<Element, Id>>,
     ) where
         Element: Clone,
@@ -226,6 +260,11 @@ where
 
         for (visible_index, (original_index, node)) in visible.iter().enumerate() {
             let id = id_of(node);
+            if let Some(seen) = seen.as_mut()
+                && !seen.insert(id.clone())
+            {
+                continue;
+            }
             let mut path = path_prefix.to_vec();
             path.push(*original_index);
             let key = TreeNodeKey::new(id.clone(), path.clone());
@@ -287,6 +326,7 @@ where
                     expanded_keys,
                     metadata,
                     filter_active,
+                    seen,
                     out,
                 );
             }
@@ -308,6 +348,7 @@ where
         expanded_keys,
         metadata.as_ref(),
         filter_active,
+        &mut seen,
         &mut out,
     );
     out
@@ -317,8 +358,8 @@ where
 pub struct Tree<Element, Id, RowContent>
 where
     Element: Clone + 'static,
-    Id: std::hash::Hash + Eq + Clone + Send + Sync + 'static,
-    RowContent: Fn(&Element, bool, bool, usize) -> AnyView + 'static,
+    Id: CollectionId,
+    RowContent: Fn(&Element, RowState) -> AnyView + 'static,
 {
     pub roots: Vec<Element>,
     pub options: TreeOptions<Element, Id>,
@@ -326,6 +367,8 @@ where
     id_of: Rc<dyn Fn(&Element) -> Id>,
     children: Rc<dyn Fn(&Element) -> Vec<Element>>,
     has_children: Option<Rc<dyn Fn(&Element) -> bool>>,
+    anchor: State<Option<TreeNodeKey<Id>>>,
+    cursor: State<Option<TreeNodeKey<Id>>>,
     local_expanded: State<HashSet<Id>>,
     hovered: State<Option<TreeNodeKey<Id>>>,
     modifiers: RefCell<KeyModifiers>,
@@ -336,32 +379,43 @@ where
 impl<Element, Id, RowContent> Tree<Element, Id, RowContent>
 where
     Element: Clone + 'static,
-    Id: std::hash::Hash + Eq + Clone + Send + Sync + 'static,
-    RowContent: Fn(&Element, bool, bool, usize) -> AnyView + 'static,
+    Id: CollectionId,
+    RowContent: Fn(&Element, RowState) -> AnyView + 'static,
 {
     pub fn new(
         roots: Vec<Element>,
         id_of: impl Fn(&Element) -> Id + 'static,
         children: impl Fn(&Element) -> Vec<Element> + 'static,
-        has_children: Option<Rc<dyn Fn(&Element) -> bool>>,
-        options: TreeOptions<Element, Id>,
         row_content: RowContent,
     ) -> Self {
-        let mut options = options;
-        options.layout.validate();
         Self {
             roots,
-            options,
+            options: TreeOptions::default(),
             row_content,
             id_of: Rc::new(id_of),
             children: Rc::new(children),
-            has_children,
+            has_children: None,
+            anchor: State::new(None),
+            cursor: State::new(None),
             local_expanded: State::new(HashSet::new()),
             hovered: State::new(None),
             modifiers: RefCell::new(KeyModifiers(0)),
             drag_source: State::new(None),
             drag_target: State::new(None),
         }
+    }
+
+    pub fn options(mut self, options: TreeOptions<Element, Id>) -> Self {
+        self.options = options;
+        self.options.layout.validate();
+        self
+    }
+
+    /// A cheap branch predicate, so a synchronous provider can defer child
+    /// construction until expansion.
+    pub fn has_children(mut self, has_children: impl Fn(&Element) -> bool + 'static) -> Self {
+        self.has_children = Some(Rc::new(has_children));
+        self
     }
 
     fn expanded_ids(&self) -> HashSet<Id> {
@@ -417,26 +471,16 @@ where
 
     fn selection_state(&self) -> (HashSet<Id>, HashSet<TreeNodeKey<Id>>) {
         let selection: &TreeSelection<Id> = &self.options.selection;
-        if let Some(binding) = &selection.multiple_keys {
-            let keys = binding.get();
+        if let Some(keys) = &selection.keys {
+            let keys: HashSet<TreeNodeKey<Id>> = keys.ids().into_iter().collect();
             let ids = keys.iter().map(|key| key.id.clone()).collect();
             return (ids, keys);
         }
-        if let Some(binding) = &selection.multiple {
-            return (binding.get(), HashSet::new());
-        }
-        if let Some(key) = selection.primary_key.get() {
-            return (HashSet::from([key.id.clone()]), HashSet::from([key]));
-        }
-        match selection.primary.get() {
-            Some(id) => (HashSet::from([id]), HashSet::new()),
-            None => (HashSet::new(), HashSet::new()),
-        }
+        (selection.ids.ids().into_iter().collect(), HashSet::new())
     }
 
     fn uses_key_selection(&self) -> bool {
-        self.options.selection.multiple_keys.is_some()
-            || self.options.selection.primary_key.get().is_some()
+        self.options.selection.keys.is_some()
     }
 
     /// The row actions, cloned so row closures do not borrow `self`.
@@ -445,14 +489,9 @@ where
             entries: Rc::new(RefCell::new(self.entries())),
             expanded: self.local_expanded.clone(),
             expanded_keys: self.options.selection.expanded_keys.clone(),
-            selection: TreeSelection {
-                primary: self.options.selection.primary.clone(),
-                multiple: self.options.selection.multiple.clone(),
-                expanded: self.options.selection.expanded.clone(),
-                primary_key: self.options.selection.primary_key.clone(),
-                multiple_keys: self.options.selection.multiple_keys.clone(),
-                expanded_keys: self.options.selection.expanded_keys.clone(),
-            },
+            selection: self.options.selection.clone(),
+            anchor: self.anchor.clone(),
+            cursor: self.cursor.clone(),
             events: super::options::TreeEvents {
                 on_key_command: self.options.events.on_key_command.clone(),
                 on_select: self.options.events.on_select.clone(),
@@ -540,29 +579,11 @@ where
         .collect()
 }
 
-fn ids_between<Element, Id>(a: &Id, b: &Id, entries: &[TreeEntry<Element, Id>]) -> HashSet<Id>
-where
-    Element: Clone,
-    Id: std::hash::Hash + Eq + Clone,
-{
-    let Some(ia) = entries.iter().position(|entry| &entry.id == a) else {
-        return HashSet::new();
-    };
-    let Some(ib) = entries.iter().position(|entry| &entry.id == b) else {
-        return HashSet::new();
-    };
-    let (lower, upper) = if ia <= ib { (ia, ib) } else { (ib, ia) };
-    entries[lower..=upper]
-        .iter()
-        .map(|entry| entry.id.clone())
-        .collect()
-}
-
 impl<Element, Id, RowContent> View for Tree<Element, Id, RowContent>
 where
     Element: Clone + 'static,
-    Id: std::hash::Hash + Eq + Clone + Send + Sync + 'static,
-    RowContent: Fn(&Element, bool, bool, usize) -> AnyView + 'static,
+    Id: CollectionId,
+    RowContent: Fn(&Element, RowState) -> AnyView + 'static,
 {
     fn body(&self, _cx: &Scope) -> AnyView {
         let entries = self.entries();
@@ -587,8 +608,15 @@ where
                 let id = entry.id.clone();
                 let has_next_sibling = entry.has_next_sibling;
                 let ancestor = entry.ancestor_has_next_siblings.clone();
-                let content =
-                    (self.row_content)(&entry.element, is_selected, entry.is_expanded, entry.depth);
+                let content = (self.row_content)(
+                    &entry.element,
+                    RowState {
+                        is_selected,
+                        is_expanded: entry.is_expanded,
+                        is_dragging: false,
+                        depth: entry.depth,
+                    },
+                );
 
                 let drop_position = drag_target
                     .as_ref()
@@ -736,12 +764,14 @@ where
 struct TreeActions<Element, Id>
 where
     Element: Clone + 'static,
-    Id: std::hash::Hash + Eq + Clone + Send + Sync + 'static,
+    Id: CollectionId,
 {
     entries: Rc<RefCell<Vec<TreeEntry<Element, Id>>>>,
     expanded: State<HashSet<Id>>,
     expanded_keys: Option<Binding<HashSet<TreeNodeKey<Id>>>>,
     selection: TreeSelection<Id>,
+    anchor: State<Option<TreeNodeKey<Id>>>,
+    cursor: State<Option<TreeNodeKey<Id>>>,
     events: super::options::TreeEvents<Element, Id>,
     modifiers: Rc<RefCell<KeyModifiers>>,
     roots: Rc<Vec<Element>>,
@@ -753,21 +783,16 @@ where
 impl<Element, Id> Clone for TreeActions<Element, Id>
 where
     Element: Clone + 'static,
-    Id: std::hash::Hash + Eq + Clone + Send + Sync + 'static,
+    Id: CollectionId,
 {
     fn clone(&self) -> Self {
         Self {
             entries: self.entries.clone(),
             expanded: self.expanded.clone(),
             expanded_keys: self.expanded_keys.clone(),
-            selection: TreeSelection {
-                primary: self.selection.primary.clone(),
-                multiple: self.selection.multiple.clone(),
-                expanded: self.selection.expanded.clone(),
-                primary_key: self.selection.primary_key.clone(),
-                multiple_keys: self.selection.multiple_keys.clone(),
-                expanded_keys: self.selection.expanded_keys.clone(),
-            },
+            selection: self.selection.clone(),
+            anchor: self.anchor.clone(),
+            cursor: self.cursor.clone(),
             events: super::options::TreeEvents {
                 on_key_command: self.events.on_key_command.clone(),
                 on_select: self.events.on_select.clone(),
@@ -784,7 +809,7 @@ where
 impl<Element, Id> TreeActions<Element, Id>
 where
     Element: Clone + 'static,
-    Id: std::hash::Hash + Eq + Clone + Send + Sync + 'static,
+    Id: CollectionId,
 {
     fn toggle(&self, entry: &TreeEntry<Element, Id>) {
         if let Some(binding) = &self.selection.expanded_keys {
@@ -863,76 +888,44 @@ where
         }
     }
 
+    fn allows_multiple(&self) -> bool {
+        self.selection.ids.allows_multiple()
+            || self
+                .selection
+                .keys
+                .as_ref()
+                .is_some_and(|keys| keys.allows_multiple())
+    }
+
     fn select(&self, entry: &TreeEntry<Element, Id>, modifiers: KeyModifiers) {
         *self.modifiers.borrow_mut() = modifiers;
-        let entries = self.entries.borrow();
-        let single = |entry: &TreeEntry<Element, Id>| {
-            if let Some(binding) = &self.selection.multiple_keys {
-                binding.set(HashSet::from([entry.key.clone()]));
+        let multiple = self.allows_multiple();
+        let ids = &self.selection.ids;
+        let keys = self.selection.keys.as_ref();
+        if multiple && modifiers.has_shift() {
+            let anchor = self.anchor.get().unwrap_or_else(|| entry.key.clone());
+            let mut range = keys_between(&anchor, &entry.key, &self.entries.borrow());
+            if range.is_empty() {
+                range.insert(entry.key.clone());
             }
-            if let Some(binding) = &self.selection.multiple {
-                binding.set(HashSet::from([entry.id.clone()]));
+            ids.replace(range.iter().map(|key| key.id.clone()));
+            if let Some(keys) = keys {
+                keys.replace(range);
             }
-            self.selection.primary.set(Some(entry.id.clone()));
-            self.selection.primary_key.set(Some(entry.key.clone()));
-        };
-        if self.selection.multiple.is_none() && self.selection.multiple_keys.is_none() {
-            single(entry);
-            if let Some(handler) = &self.events.on_select {
-                handler(entry.element.clone());
+        } else if multiple && (modifiers.has_gui() || modifiers.has_ctrl()) {
+            ids.toggle(entry.id.clone());
+            if let Some(keys) = keys {
+                keys.toggle(entry.key.clone());
             }
-            return;
+            self.anchor.set(Some(entry.key.clone()));
+        } else {
+            ids.replace([entry.id.clone()]);
+            if let Some(keys) = keys {
+                keys.replace([entry.key.clone()]);
+            }
+            self.anchor.set(Some(entry.key.clone()));
         }
-        let extending = modifiers.has_shift();
-        let toggling = modifiers.has_gui() || modifiers.has_ctrl();
-        if let Some(binding) = &self.selection.multiple_keys {
-            let mut next = binding.get();
-            if extending {
-                let anchor = self
-                    .selection
-                    .primary_key
-                    .get()
-                    .unwrap_or_else(|| entry.key.clone());
-                let keys = keys_between(&anchor, &entry.key, &entries);
-                next = if keys.is_empty() {
-                    HashSet::from([entry.key.clone()])
-                } else {
-                    keys
-                };
-            } else if toggling {
-                if !next.remove(&entry.key) {
-                    next.insert(entry.key.clone());
-                }
-            } else {
-                next = HashSet::from([entry.key.clone()]);
-            }
-            binding.set(next);
-        }
-        if let Some(binding) = &self.selection.multiple {
-            let mut next = binding.get();
-            if extending {
-                let anchor = self
-                    .selection
-                    .primary
-                    .get()
-                    .unwrap_or_else(|| entry.id.clone());
-                let ids = ids_between(&anchor, &entry.id, &entries);
-                next = if ids.is_empty() {
-                    HashSet::from([entry.id.clone()])
-                } else {
-                    ids
-                };
-            } else if toggling {
-                if !next.remove(&entry.id) {
-                    next.insert(entry.id.clone());
-                }
-            } else {
-                next = HashSet::from([entry.id.clone()]);
-            }
-            binding.set(next);
-        }
-        self.selection.primary.set(Some(entry.id.clone()));
-        self.selection.primary_key.set(Some(entry.key.clone()));
+        self.cursor.set(Some(entry.key.clone()));
         if let Some(handler) = &self.events.on_select {
             handler(entry.element.clone());
         }
@@ -1010,18 +1003,30 @@ where
                 _ => {}
             }
         }
-        let current = self
-            .selection
-            .primary_key
+        // Single selection follows the binding, so an outside write moves the
+        // keyboard too.
+        let by_cursor = self
+            .cursor
             .get()
+            .and_then(|key| entries.iter().find(|entry| entry.key == key).cloned());
+        let by_selection = self
+            .selection
+            .keys
+            .as_ref()
+            .and_then(|keys| keys.first())
             .and_then(|key| entries.iter().find(|entry| entry.key == key).cloned())
             .or_else(|| {
                 self.selection
-                    .primary
-                    .get()
+                    .ids
+                    .first()
                     .and_then(|id| entries.iter().find(|entry| entry.id == id).cloned())
-            })
-            .or_else(|| entries.first().cloned());
+            });
+        let current = if self.allows_multiple() {
+            by_cursor.or(by_selection)
+        } else {
+            by_selection.or(by_cursor)
+        }
+        .or_else(|| entries.first().cloned());
         let Some(current) = current else { return false };
         *self.modifiers.borrow_mut() = event.modifiers;
 

@@ -9,8 +9,9 @@ use cove_core::State;
 use cove_core::scene::{Align, FlexDirection, Justify, Wrap};
 use cove_ui_compose::modifiers::layout::LayoutFrameExt;
 use cove_ui_compose::primitives::controls::fields::slider::Slider;
+use cove_ui_compose::primitives::data::lists::RowState;
 use cove_ui_compose::primitives::data::lists::{
-    CollectionSelection, List, ListRow, ListRowOptions, ReorderableList,
+    List, ListRow, ListRowOptions, ReorderableList, Selection,
 };
 use cove_ui_compose::primitives::data::{
     PropertyGrid, PropertyGridRow, PropertyGridSection, Timeline, TimelineEvent, TimelineGroup,
@@ -86,8 +87,11 @@ impl View for ListStory {
         let activated = self.activated.clone();
         let list = AnyView::new(
             List::new(
-                CollectionSelection::single(self.selection.binding()),
-                |id: usize, is_selected: bool| {
+                (0..Self::ROWS.len()).collect(),
+                |id: &usize, state: RowState| {
+                    let id = *id;
+                    let is_selected = state.is_selected;
+
                     let (title, subtitle) = Self::ROWS[id];
                     AnyView::new(
                         ListRow::new(title).options(
@@ -98,9 +102,9 @@ impl View for ListStory {
                     )
                 },
             )
-            .rows((0..Self::ROWS.len()).collect())
+            .selection(Selection::single(self.selection.binding()))
             .row_height(40.0)
-            .on_activate(move |id| activated.set(Some(id)))
+            .on_activate(move |id: &usize| activated.set(Some(*id)))
             .frame_size(320.0, 240.0)
             .debug_name("list-control"),
         );
@@ -169,30 +173,30 @@ impl View for ReorderableStory {
             ReorderableList::new(
                 self.items.get(),
                 |item: &String| item.clone(),
-                {
-                    let items = items.clone();
-                    move |from: usize, to: usize| {
-                        let mut current = items.get();
-                        if from >= current.len() || to > current.len() {
-                            return;
-                        }
-                        let item = current.remove(from);
-                        current.insert(to.min(current.len()), item);
-                        items.set(current);
-                    }
-                },
-                |item: &String, is_dragging: bool| {
-                    AnyView::new(
-                        ListRow::new(item.clone()).options(ListRowOptions::new().subtitle(
-                            if is_dragging {
-                                "Moving"
-                            } else {
-                                "Drag to reorder"
-                            },
-                        )),
-                    )
+                |item: &String, state: RowState| {
+                    let is_dragging = state.is_dragging;
+
+                    AnyView::new(ListRow::new(item.clone()).options(
+                        ListRowOptions::new().subtitle(if is_dragging {
+                            "Moving"
+                        } else {
+                            "Drag to reorder"
+                        }),
+                    ))
                 },
             )
+            .on_move({
+                let items = items.clone();
+                move |from: usize, to: usize| {
+                    let mut current = items.get();
+                    if from >= current.len() || to > current.len() {
+                        return;
+                    }
+                    let item = current.remove(from);
+                    current.insert(to.min(current.len()), item);
+                    items.set(current);
+                }
+            })
             .row_height(36.0)
             .is_enabled(self.options.is_enabled)
             .frame_size(320.0, 220.0)
@@ -250,11 +254,7 @@ impl View for PropertyGridStory {
                 "General",
                 vec![
                     PropertyGridRow::new("name", "Name", name_field),
-                    PropertyGridRow::new(
-                        "kind",
-                        "Kind",
-                        AnyView::new(Text::new("Workspace")),
-                    ),
+                    PropertyGridRow::new("kind", "Kind", AnyView::new(Text::new("Workspace"))),
                 ],
             )
             .collapsible(true)

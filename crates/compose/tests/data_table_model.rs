@@ -18,10 +18,10 @@
 use std::rc::Rc;
 
 use cove_platform::KeyModifiers;
+use cove_ui_compose::primitives::data::data_table::table_column::{ComparisonResult, TableSort};
 use cove_ui_compose::primitives::data::data_table::{
     DataTableColumnGeometry, DataTableModel, DataTableSelection, DataTableSelectionMode,
 };
-use cove_ui_compose::primitives::data::lists::table::{ComparisonResult, TableSort};
 
 #[derive(Clone, Debug, PartialEq)]
 struct TableTestRow {

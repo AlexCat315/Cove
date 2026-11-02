@@ -27,7 +27,7 @@ use cove_core::{Color, Environment, InputCapabilities};
 use cove_platform::{KeyEvent, MouseButton, SystemCursor};
 
 use super::refresh::RefreshOptions;
-use super::selection::CollectionSelection;
+use super::selection::{CollectionId, ListCore, RowState, Selection};
 
 const ROW_PRESSED: &str = "__list_row_pressed";
 const ROW_HOVERED: &str = "__list_row_hovered";
@@ -228,27 +228,24 @@ impl PrimitiveView for ListRowHost {
 impl_primitive_view!(ListRowHost);
 
 /// Vertical, virtualized list with single or multiple selection.
-pub struct List<Id: Ord + std::hash::Hash + Clone + Send + Sync + 'static> {
+pub struct List<Id: CollectionId> {
     pub ids: Rc<[Id]>,
-    pub selection: CollectionSelection<Id>,
+    pub selection: Selection<Id>,
     /// Authored logical height, before text scaling and the touch density floor.
     pub row_height: Option<f32>,
     pub row_spacing: f32,
-    pub on_activate: Option<Rc<dyn Fn(Id)>>,
+    pub on_activate: Option<Rc<dyn Fn(&Id)>>,
     pub refresh: Option<RefreshOptions>,
-    pub row_content: Rc<dyn Fn(Id, bool) -> AnyView>,
+    pub row_content: Rc<dyn Fn(&Id, RowState) -> AnyView>,
     anchor: cove_core::State<Option<Id>>,
     cursor: cove_core::State<Option<Id>>,
 }
 
-impl<Id: Ord + std::hash::Hash + Clone + Send + Sync + 'static> List<Id> {
-    pub fn new(
-        selection: CollectionSelection<Id>,
-        row_content: impl Fn(Id, bool) -> AnyView + 'static,
-    ) -> Self {
+impl<Id: CollectionId> List<Id> {
+    pub fn new(ids: Vec<Id>, row_content: impl Fn(&Id, RowState) -> AnyView + 'static) -> Self {
         Self {
-            ids: Rc::from([]),
-            selection,
+            ids: ids.into(),
+            selection: Selection::none(),
             row_height: None,
             row_spacing: 0.0,
             on_activate: None,
@@ -259,8 +256,8 @@ impl<Id: Ord + std::hash::Hash + Clone + Send + Sync + 'static> List<Id> {
         }
     }
 
-    pub fn rows(mut self, ids: Vec<Id>) -> Self {
-        self.ids = ids.into();
+    pub fn selection(mut self, selection: Selection<Id>) -> Self {
+        self.selection = selection;
         self
     }
 
@@ -278,7 +275,7 @@ impl<Id: Ord + std::hash::Hash + Clone + Send + Sync + 'static> List<Id> {
         self
     }
 
-    pub fn on_activate(mut self, handler: impl Fn(Id) + 'static) -> Self {
+    pub fn on_activate(mut self, handler: impl Fn(&Id) + 'static) -> Self {
         self.on_activate = Some(Rc::new(handler));
         self
     }
@@ -288,104 +285,19 @@ impl<Id: Ord + std::hash::Hash + Clone + Send + Sync + 'static> List<Id> {
         self
     }
 
-    fn index_of(&self, target: &Id) -> Option<usize> {
-        self.ids.iter().position(|id| id == target)
-    }
-
-    fn ids_between(&self, first: &Id, second: &Id) -> Option<Vec<Id>> {
-        let start = self.index_of(first)?;
-        let end = self.index_of(second)?;
-        let (low, high) = (start.min(end), start.max(end));
-        Some(self.ids[low..=high].to_vec())
-    }
-
-    fn tap(&self, id: Id, modifiers: cove_platform::KeyModifiers) {
-        if modifiers.has_shift()
-            && let Some(anchor) = self.anchor.get()
-            && let Some(range) = self.ids_between(&anchor, &id)
-        {
-            self.selection.replace(range);
-        } else if modifiers.has_gui() || modifiers.has_ctrl() {
-            self.selection.toggle(id.clone());
-            self.anchor.set(Some(id.clone()));
-        } else {
-            self.selection.replace([id.clone()]);
-            self.anchor.set(Some(id.clone()));
-        }
-        self.cursor.set(Some(id));
-    }
-
-    fn activate(&self, id: Id) {
-        self.selection.replace([id.clone()]);
-        self.anchor.set(Some(id.clone()));
-        self.cursor.set(Some(id.clone()));
-        if let Some(handler) = self.on_activate.as_ref() {
-            handler(id);
+    fn core(&self) -> ListCore<Id> {
+        ListCore {
+            ids: self.ids.clone(),
+            selection: self.selection.clone(),
+            anchor: self.anchor.clone(),
+            cursor: self.cursor.clone(),
+            on_activate: self.on_activate.clone(),
         }
     }
 
     /// Keyboard handling for the cursor row.
     pub fn handle_key(&self, event: &KeyEvent) -> bool {
-        if self.ids.is_empty() {
-            return false;
-        }
-        let multiple = self.selection.allows_multiple();
-        let current = (if multiple { self.cursor.get() } else { None })
-            .and_then(|id| self.index_of(&id))
-            .or_else(|| self.selection.first().and_then(|id| self.index_of(&id)));
-        if multiple
-            && (event.modifiers.has_gui() || event.modifiers.has_ctrl())
-            && event.scancode == crate::Scancode::A
-        {
-            self.selection.replace(self.ids.iter().cloned());
-            self.anchor.set(self.ids.first().cloned());
-            self.cursor.set(self.ids.last().cloned());
-            return true;
-        }
-        if multiple
-            && event.scancode == crate::Scancode::SPACE
-            && let Some(current) = current
-        {
-            let value = self.ids[current].clone();
-            self.selection.toggle(value.clone());
-            self.anchor.set(Some(value.clone()));
-            self.cursor.set(Some(value));
-            return true;
-        }
-        let next = match event.scancode {
-            crate::Scancode::ARROW_DOWN => {
-                (current.map_or(0, |index| index + 1)).min(self.ids.len() - 1)
-            }
-            crate::Scancode::ARROW_UP => {
-                current.map_or(self.ids.len() - 1, |index| index.saturating_sub(1))
-            }
-            crate::Scancode::HOME => 0,
-            crate::Scancode::END => self.ids.len() - 1,
-            crate::Scancode::RETURN | crate::Scancode::KEYPAD_ENTER => {
-                let Some(current) = current else { return false };
-                let value = self.ids[current].clone();
-                if multiple {
-                    self.activate(value);
-                } else if let Some(handler) = self.on_activate.as_ref() {
-                    handler(value);
-                }
-                return true;
-            }
-            _ => return false,
-        };
-        let value = self.ids[next].clone();
-        if multiple
-            && event.modifiers.has_shift()
-            && let Some(anchor) = self.anchor.get()
-            && let Some(range) = self.ids_between(&anchor, &value)
-        {
-            self.selection.replace(range);
-        } else {
-            self.selection.replace([value.clone()]);
-            self.anchor.set(Some(value.clone()));
-        }
-        self.cursor.set(Some(value));
-        true
+        self.core().handle_key(event)
     }
 
     fn rows_view(&self) -> AnyView {
@@ -401,19 +313,16 @@ impl<Id: Ord + std::hash::Hash + Clone + Send + Sync + 'static> List<Id> {
             TextScalerReader::new(move |scaler| {
                 let authored = list.row_height.unwrap_or(if touch { 56.0 } else { 30.0 });
                 let height = scaler.scale(authored).max(minimum);
-                let target = list
-                    .cursor
-                    .get()
-                    .or_else(|| list.selection.first())
-                    .and_then(|id| list.index_of(&id));
-                let rows = list.snapshot();
+                let core = list.core();
+                let target = core.target();
+                let rows = list.row_content.clone();
                 let mut stack =
                     FixedVirtualStack::new(list.ids.to_vec(), height, move |id: &Id| {
-                        let selected = rows.selection.contains(id);
-                        let activate = rows.snapshot();
+                        let selected = core.selection.contains(id);
+                        let activate = core.clone();
                         let activate_id = id.clone();
-                        let on_tap = rows.selection.allows_multiple().then(|| {
-                            let tap = rows.snapshot();
+                        let on_tap = core.selection.allows_multiple().then(|| {
+                            let tap = core.clone();
                             let tap_id = id.clone();
                             Rc::new(move |modifiers: cove_platform::KeyModifiers| {
                                 tap.tap(tap_id.clone(), modifiers)
@@ -426,7 +335,7 @@ impl<Id: Ord + std::hash::Hash + Clone + Send + Sync + 'static> List<Id> {
                             row_height: height,
                             on_activate: Rc::new(move || activate.activate(activate_id.clone())),
                             on_tap,
-                            content: (rows.row_content)(id.clone(), selected),
+                            content: rows(id, RowState::selected(selected)),
                         })
                     })
                     .spacing(scaler.scale(list.row_spacing));
@@ -441,12 +350,12 @@ impl<Id: Ord + std::hash::Hash + Clone + Send + Sync + 'static> List<Id> {
     }
 }
 
-impl<Id: Ord + std::hash::Hash + Clone + Send + Sync + 'static> View for List<Id> {
+impl<Id: CollectionId> View for List<Id> {
     fn body(&self, _cx: &Scope) -> AnyView {
         let rows = self.rows_view();
-        let list = self.snapshot();
+        let core = self.core();
         let host = AnyView::new(SelectionKeyHost::new(rows, true, move |event| {
-            list.handle_key(event)
+            core.handle_key(event)
         }));
         AnyView::new(
             host.flex(1.0)
@@ -464,7 +373,7 @@ impl<Id: Ord + std::hash::Hash + Clone + Send + Sync + 'static> View for List<Id
     }
 }
 
-impl<Id: Ord + std::hash::Hash + Clone + Send + Sync + 'static> List<Id> {
+impl<Id: CollectionId> List<Id> {
     fn snapshot(&self) -> List<Id> {
         List {
             ids: self.ids.clone(),

@@ -32,13 +32,9 @@ use cove_core::scene::{
     EventPhase, EventResult, FlexDirection, FocusChainHolder, HoverPhase, InputHandlerRoute,
     InteractionRegistryHolder, Justify, LayoutNode, Node, PointerCaptureHolder, PointerPhase, Wrap,
 };
-use cove_core::{Binding, Point, Size, State};
+use cove_core::{Binding, Color, Point, Size, State};
 use cove_platform::{KeyEvent, KeyModifiers, MouseButton, SystemCursor};
 
-use super::super::lists::table::{
-    ColumnVisibility, TableColumn, TableColumnLayout, TableColumnPlan, TableLayout, TableSort,
-    TableSortDirection,
-};
 use super::column_order::DataTableColumnOrder;
 use super::data_table_geometry::DataTableColumnGeometry;
 use super::editing_model::{CellEditing, DataTableEditingState, EditableColumn};
@@ -47,8 +43,13 @@ use super::row_metrics::{
     DataTableRowMetrics, RowHeightKey, row_height_key_matches, variable_row_heights,
 };
 use super::selection_model::{DataTableNavigation, DataTableSelection, DataTableSelectionMode};
+use super::table_column::{
+    ColumnVisibility, TableColumn, TableColumnLayout, TableColumnPlan, TableLayout, TableSort,
+    TableSortDirection,
+};
 use crate::modifiers::layout::{FlexExt, LayoutFrameExt, PaddingExt};
 use crate::modifiers::style::{AppearanceExt, SemanticStyleViewExt};
+use crate::primitives::data::lists::selection::Selection;
 use crate::primitives::feedback::EmptyState;
 use crate::primitives::layout::{ScrollAxis, ScrollView, ScrollbarGutter};
 use crate::primitives::text::text_buffer::TextBuffer;
@@ -58,19 +59,75 @@ use crate::primitives::text::text_field::{
 use crate::primitives::text::{Divider, Text};
 use crate::theme::{SemanticFontRef, node_text_scaler, theme_for_node};
 use crate::{AnyView, BoxView, PrimitiveView, TupleView, View, impl_primitive_view};
+use cove_core::scene::ObservableObject;
 
 const INPUT_MARKER: &str = "dataTable.input";
 const ROW_INDEX_MARKER: &str = "dataTable.rowIndex";
 const METRICS_CACHE: &str = "dataTable.metrics";
-#[expect(dead_code, reason = "ported from Swift but not wired in yet")]
-const ROW_HOVERED: &str = "__dataTable.rowHovered";
-#[expect(dead_code, reason = "ported from Swift but not wired in yet")]
 const COLUMN_DRAG: &str = "dataTable.columnDrag";
+/// Pointer travel before a header press becomes a column drag.
+const COLUMN_DRAG_SLOP: f32 = 4.0;
+
+/// The hovered row, painted directly on its nodes so entering a row recomposes
+/// nothing. The frozen and moving lanes each mount a node for the same row.
+#[derive(Default)]
+pub struct DataTableRowHover {
+    row: std::cell::Cell<Option<usize>>,
+    nodes: RefCell<HashMap<usize, Vec<(cove_core::scene::NodeWeak, Color, bool)>>>,
+}
+
+impl DataTableRowHover {
+    fn register(&self, row: usize, node: &Node, fill: Color, is_selected: bool) {
+        let mut nodes = self.nodes.borrow_mut();
+        let lane = nodes.entry(row).or_default();
+        lane.retain(|(weak, _, _)| Node::upgrade(weak).is_some_and(|known| known != *node));
+        lane.push((node.downgrade(), fill, is_selected));
+    }
+
+    fn paint(&self, row: usize, hovered: bool) {
+        let mut nodes = self.nodes.borrow_mut();
+        let Some(lane) = nodes.get_mut(&row) else {
+            return;
+        };
+        lane.retain(|(weak, _, _)| Node::upgrade(weak).is_some());
+        for (weak, fill, is_selected) in lane.iter() {
+            let Some(node) = Node::upgrade(weak) else {
+                continue;
+            };
+            let paint = if hovered && !*is_selected {
+                theme_for_node(&node).colors.state_layer_hover
+            } else {
+                *fill
+            };
+            node.set_background_color(Some(paint));
+        }
+    }
+
+    fn set(&self, row: Option<usize>) {
+        let previous = self.row.replace(row);
+        if previous == row {
+            return;
+        }
+        if let Some(previous) = previous {
+            self.paint(previous, false);
+        }
+        if let Some(row) = row {
+            self.paint(row, true);
+        }
+    }
+
+    fn current(&self) -> Option<usize> {
+        self.row.get()
+    }
+}
 
 /// Authored options for a `DataTable`.
 pub struct DataTableOptions<Id: Ord + Clone> {
-    pub selection: Option<Binding<DataTableSelection<Id>>>,
-    pub selection_mode: DataTableSelectionMode,
+    /// The selected rows; session-local multiple selection when `None`.
+    pub selection: Option<Selection<Id>>,
+    /// The cell cursor, for a caller that observes or moves it. Its selected
+    /// rows follow `selection`.
+    pub cursor: Option<Binding<DataTableSelection<Id>>>,
     pub column_widths: Option<Binding<BTreeMap<String, f32>>>,
     pub column_visibility: Option<Binding<HashMap<String, bool>>>,
     /// Display order by column id; header drags and Alt+Left/Right write it.
@@ -85,7 +142,7 @@ impl<Id: Ord + Clone> Default for DataTableOptions<Id> {
     fn default() -> Self {
         Self {
             selection: None,
-            selection_mode: DataTableSelectionMode::Multiple,
+            cursor: None,
             column_widths: None,
             column_visibility: None,
             column_order: None,
@@ -188,11 +245,28 @@ pub struct DataTable<
     pub row_key_handler: Option<Rc<dyn Fn(&KeyEvent, &Id) -> bool>>,
     session: State<DataTableSession<Id>>,
     offset: State<Point>,
+    /// Rows from `from_records`, poured into the model the view retains.
+    records: Option<Rc<Vec<Record>>>,
 }
 
 impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 'static>
     DataTable<Record, Id>
 {
+    /// A table over plain records. The view keeps its own model, so sorting
+    /// survives the parent passing a new array.
+    ///
+    /// Column and row IDs must be unique.
+    pub fn from_records(
+        records: Vec<Record>,
+        row_id: impl Fn(&Record) -> Id + 'static,
+        columns: Vec<TableColumn<Record>>,
+    ) -> Result<Self, DuplicateId> {
+        let model = DataTableModel::try_new(records.clone(), row_id)?;
+        let mut table = Self::try_new(model, columns)?;
+        table.records = Some(Rc::new(records));
+        Ok(table)
+    }
+
     pub fn try_new(
         model: Rc<DataTableModel<Record, Id>>,
         columns: Vec<TableColumn<Record>>,
@@ -209,6 +283,7 @@ impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 
             row_key_handler: None,
             session: State::new(DataTableSession::default()),
             offset: State::new(Point::default()),
+            records: None,
         })
     }
 
@@ -240,8 +315,9 @@ impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 
             layout: self.options.layout.clone(),
             frozen_column_count: self.options.frozen_column_count,
             is_enabled: self.options.is_enabled,
-            selection_mode: self.options.selection_mode,
             selection: self.options.selection.clone(),
+            cursor: self.options.cursor.clone(),
+            row_hover: Rc::default(),
             column_widths: self.options.column_widths.clone(),
             column_visibility: self.options.column_visibility.clone(),
             column_order: self.options.column_order.clone(),
@@ -253,8 +329,38 @@ impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 
 impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 'static> View
     for DataTable<Record, Id>
 {
-    fn body(&self, _cx: &Scope) -> AnyView {
-        let controller = self.controller();
+    fn body(&self, cx: &Scope) -> AnyView {
+        let mut controller = self.controller();
+        controller.row_hover = cx.remember(Rc::<DataTableRowHover>::default);
+        if let Some(records) = &self.records {
+            let retained = cx.remember(|| self.model.clone());
+            let poured = cx.remember(|| Rc::new(RefCell::new(None::<Rc<Vec<Record>>>)));
+            let is_new = !poured
+                .borrow()
+                .as_ref()
+                .is_some_and(|last| Rc::ptr_eq(last, records));
+            if is_new && !Rc::ptr_eq(&retained, &self.model) {
+                // `from_records` validated these IDs against the same rule.
+                let _ = retained.replace_rows(records.as_ref().clone());
+            }
+            *poured.borrow_mut() = Some(records.clone());
+            controller.model = retained;
+        }
+        // Sorting and row edits publish through the model.
+        let revision = cx.state(|| 0_u64);
+        let _ = revision.get();
+        let subscription =
+            cx.remember(|| Rc::new(RefCell::new(None::<ModelSubscription<Record, Id>>)));
+        let is_subscribed = subscription
+            .borrow()
+            .as_ref()
+            .is_some_and(|current| Rc::ptr_eq(&current.model, &controller.model));
+        if !is_subscribed {
+            *subscription.borrow_mut() = Some(ModelSubscription::new(
+                controller.model.clone(),
+                Rc::new(move || revision.set(revision.get_untracked().wrapping_add(1))),
+            ));
+        }
         let probe = controller.clone();
         AnyView::new(crate::adaptive::ContainerSizeReader::new(
             move |size: Size| DataTableSurface {
@@ -269,6 +375,27 @@ impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 
             crate::DynamicField::state("session", &self.session),
             crate::DynamicField::state("offset", &self.offset),
         ]
+    }
+}
+
+/// Holds the table's observer on a model for as long as the view is mounted.
+struct ModelSubscription<Record: 'static, Id: Eq + std::hash::Hash + Clone + 'static> {
+    model: Rc<DataTableModel<Record, Id>>,
+    token: u64,
+}
+
+impl<Record: 'static, Id: Eq + std::hash::Hash + Clone + 'static> ModelSubscription<Record, Id> {
+    fn new(model: Rc<DataTableModel<Record, Id>>, handler: Rc<dyn Fn()>) -> Self {
+        let token = model.register_observer(handler);
+        Self { model, token }
+    }
+}
+
+impl<Record: 'static, Id: Eq + std::hash::Hash + Clone + 'static> Drop
+    for ModelSubscription<Record, Id>
+{
+    fn drop(&mut self) {
+        self.model.unregister_observer(self.token);
     }
 }
 
@@ -287,8 +414,9 @@ pub struct DataTableController<
     pub layout: TableLayout,
     pub frozen_column_count: usize,
     pub is_enabled: bool,
-    pub selection_mode: DataTableSelectionMode,
-    pub selection: Option<Binding<DataTableSelection<Id>>>,
+    pub selection: Option<Selection<Id>>,
+    pub cursor: Option<Binding<DataTableSelection<Id>>>,
+    row_hover: Rc<DataTableRowHover>,
     pub column_widths: Option<Binding<BTreeMap<String, f32>>>,
     pub column_visibility: Option<Binding<HashMap<String, bool>>>,
     pub column_order: Option<Binding<Vec<String>>>,
@@ -310,8 +438,9 @@ impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 
             layout: self.layout.clone(),
             frozen_column_count: self.frozen_column_count,
             is_enabled: self.is_enabled,
-            selection_mode: self.selection_mode,
             selection: self.selection.clone(),
+            cursor: self.cursor.clone(),
+            row_hover: self.row_hover.clone(),
             column_widths: self.column_widths.clone(),
             column_visibility: self.column_visibility.clone(),
             column_order: self.column_order.clone(),
@@ -323,15 +452,31 @@ impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 
 impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 'static>
     DataTableController<Record, Id>
 {
-    fn selection(&self, session: &DataTableSession<Id>) -> DataTableSelection<Id> {
+    fn selection_mode(&self) -> DataTableSelectionMode {
         match self.selection.as_ref() {
-            Some(binding) => binding.get(),
-            None => session.selection.clone(),
+            Some(Selection::Single(_)) => DataTableSelectionMode::Single,
+            _ => DataTableSelectionMode::Multiple,
         }
     }
 
+    /// The cursor from whichever store owns it, with the selected rows from the
+    /// caller's selection.
+    fn selection(&self, session: &DataTableSession<Id>) -> DataTableSelection<Id> {
+        let mut state = match self.cursor.as_ref() {
+            Some(binding) => binding.get(),
+            None => session.selection.clone(),
+        };
+        if let Some(selection) = self.selection.as_ref() {
+            state.selected_ids = selection.ids();
+        }
+        state
+    }
+
     fn write_selection(&self, next: DataTableSelection<Id>) {
-        match self.selection.as_ref() {
+        if let Some(selection) = self.selection.as_ref() {
+            selection.replace(next.selected_ids.iter().cloned());
+        }
+        match self.cursor.as_ref() {
             Some(binding) => binding.set(next),
             None => {
                 let mut session = self.session.get();
@@ -460,7 +605,15 @@ impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 
     /// text scale changes.
     fn metrics(&self, node: &Node) -> DataTableRowMetrics {
         let count = self.model.count();
-        let minimum = self.layout.row_height;
+        let surface = node.composition_value(&crate::adaptive::SurfaceEnvironment::key());
+        let minimum = self
+            .layout
+            .resolved(
+                node_text_scaler(node).factor(),
+                surface.input.contains(cove_core::InputCapabilities::TOUCH),
+                surface.minimum_control_extent(),
+            )
+            .row_height;
         let key = RowHeightKey {
             revision: self.model.revision(),
             count,
@@ -716,13 +869,24 @@ impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 
         if !(0..plan.columns.len() as i64).contains(&target) {
             return false;
         }
+        self.move_column_to(plan, index, target as usize);
+        true
+    }
+
+    /// Writes `index` next to `target` in the display order. A column stays in
+    /// its own lane, frozen or moving.
+    fn move_column_to(&self, plan: &DataTablePlan<Record>, index: usize, target: usize) {
+        let frozen = plan.geometry.frozen_count;
+        if index == target || (index < frozen) != (target < frozen) {
+            return;
+        }
+        let (Some(source), Some(destination)) = (plan.columns.get(index), plan.columns.get(target))
+        else {
+            return;
+        };
         let session = self.session.get();
         let order = self.display_order(&session);
-        let next = DataTableColumnOrder::move_id(
-            &plan.columns[index].id,
-            &plan.columns[target as usize].id,
-            &order,
-        );
+        let next = DataTableColumnOrder::move_id(&source.id, &destination.id, &order);
         match self.column_order.as_ref() {
             Some(binding) => binding.set(next),
             None => {
@@ -731,7 +895,6 @@ impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 
                 self.session.set(session);
             }
         }
-        true
     }
 
     /// Keyboard grid navigation. Returns whether the event was consumed.
@@ -780,7 +943,7 @@ impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 
         }
         if event.scancode == crate::Scancode::A
             && (event.modifiers.has_gui() || event.modifiers.has_ctrl())
-            && self.selection_mode == DataTableSelectionMode::Multiple
+            && self.selection_mode() == DataTableSelectionMode::Multiple
         {
             selection.select_all(&self.model);
             self.write_selection(selection);
@@ -837,7 +1000,7 @@ impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 
             _ => return false,
         };
 
-        selection.select(row, &self.model, self.selection_mode, event.modifiers);
+        selection.select(row, &self.model, self.selection_mode(), event.modifiers);
         selection.focused_column_id = Some(plan.columns[next_column].id.clone());
         self.write_selection(selection);
         self.reveal(
@@ -904,7 +1067,7 @@ impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 
         selection.select(
             row,
             &self.model,
-            self.selection_mode,
+            self.selection_mode(),
             KeyModifiers::default(),
         );
         self.write_selection(selection);
@@ -920,7 +1083,7 @@ impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 
     ) {
         let session = self.session.get();
         let mut selection = self.selection(&session);
-        selection.select(row, &self.model, self.selection_mode, modifiers);
+        selection.select(row, &self.model, self.selection_mode(), modifiers);
         if let Some(target) = plan.columns.get(column) {
             selection.focused_column_id = Some(target.id.clone());
         }
@@ -1630,6 +1793,7 @@ impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 
         }
         AnyView::new(DataTableRowHost {
             row: self.row,
+            hover: self.controller.row_hover.clone(),
             is_selected,
             is_striped: self.layout.is_striped,
             is_enabled: self.controller.is_enabled,
@@ -1653,6 +1817,7 @@ impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 
 /// One body row: paint, hairline separator and the row marker.
 struct DataTableRowHost {
     row: usize,
+    hover: Rc<DataTableRowHover>,
     is_selected: bool,
     is_striped: bool,
     is_enabled: bool,
@@ -1677,13 +1842,41 @@ impl PrimitiveView for DataTableRowHost {
     fn update_node(&self, node: &Node) {
         node.set_attachment(ROW_INDEX_MARKER, self.row);
         let theme = theme_for_node(node);
-        node.set_background_color(Some(if self.is_selected {
+        let fill = if self.is_selected {
             theme.colors.accent
         } else if self.is_striped && self.row % 2 == 1 {
             theme.colors.surface.multiplied_alpha(0.6)
         } else {
             theme.colors.background
+        };
+        self.hover.register(self.row, node, fill, self.is_selected);
+        let is_hovered = self.is_enabled && self.hover.current() == Some(self.row);
+        node.set_background_color(Some(if is_hovered && !self.is_selected {
+            theme.colors.state_layer_hover
+        } else {
+            fill
         }));
+        if let Some(registry) = InteractionRegistryHolder::current() {
+            let hover = self.hover.clone();
+            let row = self.row;
+            let is_enabled = self.is_enabled;
+            let weak = node.downgrade();
+            registry.set_hover(
+                node,
+                Rc::new(move |phase| {
+                    let supports = Node::upgrade(&weak).is_some_and(|owner| {
+                        crate::primitives::controls::adaptive::supports_control_hover(&owner)
+                    });
+                    if phase == HoverPhase::Enter {
+                        if is_enabled && supports {
+                            hover.set(Some(row));
+                        }
+                    } else if hover.current() == Some(row) {
+                        hover.set(None);
+                    }
+                }),
+            );
+        }
         node.set_accessibility(Some(AccessibilitySemantics {
             role: if self.is_frozen_lane {
                 AccessibilityRole::Group
@@ -2028,10 +2221,8 @@ struct HeaderCell<
     Id: Ord + std::hash::Hash + Clone + Send + Sync + 'static,
 > {
     controller: DataTableController<Record, Id>,
-    #[expect(dead_code, reason = "ported from Swift but not wired in yet")]
     plan: DataTablePlan<Record>,
     column: TableColumn<Record>,
-    #[expect(dead_code, reason = "ported from Swift but not wired in yet")]
     index: usize,
     width: f32,
     height: f32,
@@ -2084,6 +2275,9 @@ impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 
         );
         let mut cells: Vec<AnyView> = vec![AnyView::new(HeaderCellHost {
             controller: controller.clone(),
+            plan: self.plan.clone(),
+            index: self.index,
+            is_enabled: self.is_enabled,
             column_id,
             title: self.column.title.clone(),
             width: self.width,
@@ -2123,6 +2317,9 @@ struct HeaderCellHost<
     Id: Ord + std::hash::Hash + Clone + Send + Sync + 'static,
 > {
     controller: DataTableController<Record, Id>,
+    plan: DataTablePlan<Record>,
+    index: usize,
+    is_enabled: bool,
     column_id: String,
     title: String,
     width: f32,
@@ -2138,7 +2335,7 @@ impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 
 {
     fn make_node(&self) -> Node {
         let node = Node::new();
-        node.set_is_hit_testable(self.sortable);
+        node.set_is_hit_testable(self.is_enabled);
         node
     }
 
@@ -2179,13 +2376,18 @@ impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 
         let Some(registry) = InteractionRegistryHolder::current() else {
             return;
         };
-        if !self.sortable {
+        node.set_is_hit_testable(self.is_enabled);
+        if !self.is_enabled {
             registry.remove(node);
             return;
         }
         node.set_cursor(Some(SystemCursor::Pointer));
         let controller = self.controller.clone();
         let column_id = self.column_id.clone();
+        let plan = self.plan.clone();
+        let index = self.index;
+        let sortable = self.sortable;
+        let pointer_node = node.downgrade();
         registry.set_pointer(
             node,
             InputHandlerRoute::control(),
@@ -2193,11 +2395,63 @@ impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 
                 if event_phase == EventPhase::Capture || event.button != MouseButton::Left {
                     return EventResult::Ignored;
                 }
-                if phase == PointerPhase::Up {
-                    controller.cycle_sort(&column_id);
-                    return EventResult::Handled;
+                let Some(owner) = Node::upgrade(&pointer_node) else {
+                    return EventResult::Ignored;
+                };
+                match phase {
+                    PointerPhase::Down => {
+                        owner.set_attachment(COLUMN_DRAG, (event.x, false));
+                        if let Some(capture) = PointerCaptureHolder::current() {
+                            capture.acquire(&owner, false);
+                        }
+                        EventResult::Handled
+                    }
+                    PointerPhase::Up => {
+                        let drag = owner.attachment::<(f32, bool)>(COLUMN_DRAG);
+                        owner.remove_attachment(COLUMN_DRAG);
+                        owner.set_content_offset(Point::default());
+                        if PointerCaptureHolder::current()
+                            .and_then(|capture| capture.target())
+                            .is_some_and(|target| target == owner)
+                            && let Some(capture) = PointerCaptureHolder::current()
+                        {
+                            capture.release();
+                        }
+                        match drag {
+                            Some((start, true)) => {
+                                let target = DataTableColumnOrder::target(
+                                    index,
+                                    event.x - start,
+                                    &plan.geometry,
+                                );
+                                controller.move_column_to(&plan, index, target);
+                            }
+                            Some((_, false)) if sortable => controller.cycle_sort(&column_id),
+                            _ => {}
+                        }
+                        EventResult::Handled
+                    }
                 }
-                EventResult::Ignored
+            }),
+        );
+        let motion_node = node.downgrade();
+        registry.set_motion(
+            node,
+            InputHandlerRoute::control(),
+            Rc::new(move |event, _phase| {
+                let Some(owner) = Node::upgrade(&motion_node) else {
+                    return EventResult::Ignored;
+                };
+                let Some((start, dragging)) = owner.attachment::<(f32, bool)>(COLUMN_DRAG) else {
+                    return EventResult::Ignored;
+                };
+                let travel = event.x - start;
+                if dragging || travel.abs() >= COLUMN_DRAG_SLOP {
+                    owner.set_attachment(COLUMN_DRAG, (start, true));
+                    // The label follows the pointer until the drop reorders.
+                    owner.set_content_offset(Point::new(-travel, 0.0));
+                }
+                EventResult::Handled
             }),
         );
     }

@@ -21,8 +21,8 @@
 //!   a child node; the suite finds the buttons by a descendant text node and
 //!   asserts the measurement, matching the Swift `layoutNode.textInputs` checks.
 
-use cove_composition::Scope;
 use crate::support;
+use cove_composition::Scope;
 
 use std::rc::Rc;
 use std::sync::Arc;

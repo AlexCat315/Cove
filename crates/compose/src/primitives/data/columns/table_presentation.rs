@@ -20,7 +20,9 @@ use crate::modifiers::style::SemanticStyleViewExt;
 use crate::primitives::columns::{
     ColumnVisibilityPickerModel, ColumnVisibilityPlan, ColumnVisibilityTrack,
 };
-use crate::primitives::data::lists::table::{ColumnVisibility, TableColumn, TableColumnPlan};
+use crate::primitives::data::data_table::table_column::{
+    ColumnVisibility, TableColumn, TableColumnPlan,
+};
 use crate::primitives::layout::scroll_view::ScrollView as ScrollViewPrimitive;
 use crate::{AnyView, BoxView, View};
 use cove_core::Binding;

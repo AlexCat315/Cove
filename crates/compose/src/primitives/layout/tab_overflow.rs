@@ -5,13 +5,14 @@
 //! the selected header may shrink; its non-text chrome stays intact. Tabs that do
 //! not fit are collected into a "more" menu.
 use crate::Scope;
+use std::cell::RefCell;
 use std::collections::HashSet;
 use std::rc::Rc;
 
 use crate::{Layout, LayoutContainer, LayoutSubview, ProposedViewSize};
 use cove_composition::{AnyView, View};
+use cove_core::Binding;
 use cove_core::scene::{Align, Direction, FlexDirection, Point, Rect, Size, Wrap};
-use cove_core::{Binding, Signal};
 
 use crate::modifiers::layout::{FlexExt, LayoutFrameExt};
 use crate::primitives::controls::button::{Button, ButtonIconSource};
@@ -22,7 +23,7 @@ use crate::primitives::media::ui_icon_catalog;
 use crate::primitives::overlays::anchored::PopoverPlacement;
 use crate::primitives::overlays::menu::{MenuEntry, MenuItem};
 use crate::primitives::overlays::popover::Popover;
-use crate::primitives::overlays::roving_focus::{RovingItem, roving_identity};
+use crate::primitives::overlays::roving_focus::{RovingFocusRequest, RovingItem, roving_identity};
 use crate::theme::styles::buttons::ButtonStyleViewExt;
 use crate::{BoxView, TupleView};
 
@@ -184,50 +185,52 @@ struct Plan {
 }
 
 /// Horizontal strip that keeps fitting tabs and lists the rest in a menu.
-pub struct TabOverflowStrip<Id: std::hash::Hash + Eq + Clone + PartialEq + 'static> {
+pub struct TabOverflowStrip<Id: std::hash::Hash + Clone + PartialEq + 'static> {
     tabs: Vec<TabItem<Id>>,
     selection: Binding<Id>,
+    tab_stop: Option<Id>,
     is_enabled: bool,
     variant: TabVariant,
     indicator: IndicatorPlacement,
+    focus_request: Rc<RefCell<RovingFocusRequest>>,
 }
 
-impl<Id: std::hash::Hash + Eq + Clone + PartialEq + 'static> TabOverflowStrip<Id> {
+impl<Id: std::hash::Hash + Clone + PartialEq + 'static> TabOverflowStrip<Id> {
     pub fn new(
         tabs: Vec<TabItem<Id>>,
         selection: Binding<Id>,
+        tab_stop: Option<Id>,
         is_enabled: bool,
         variant: TabVariant,
         indicator: IndicatorPlacement,
+        focus_request: Rc<RefCell<RovingFocusRequest>>,
     ) -> Self {
         Self {
             tabs,
             selection,
+            tab_stop,
             is_enabled,
             variant,
             indicator,
+            focus_request,
         }
-    }
-
-    #[expect(dead_code, reason = "ported from Swift but not wired in yet")]
-    fn selected_index(&self) -> Option<usize> {
-        self.tabs
-            .iter()
-            .position(|tab| tab.id == self.selection.get())
     }
 }
 
-impl<Id: std::hash::Hash + Eq + Clone + PartialEq + Send + Sync + 'static> View
-    for TabOverflowStrip<Id>
-{
+impl<Id: std::hash::Hash + Clone + PartialEq + 'static> View for TabOverflowStrip<Id> {
     fn body(&self, cx: &Scope) -> AnyView {
         let tabs = self.tabs.clone();
         let selection = self.selection.clone();
         let is_enabled = self.is_enabled;
         let variant = self.variant;
         let indicator = self.indicator;
+        let tab_stop = self.tab_stop.clone();
+        let focus_request = self.focus_request.clone();
         let hidden_state = cx.state(Vec::<usize>::new);
         let presented_state = cx.state(|| false);
+        if !is_enabled && presented_state.get() {
+            presented_state.set(false);
+        }
 
         let reader = crate::adaptive::ContainerSizeReader::new(move |size: Size| {
             let spacing = if variant == TabVariant::Segmented {
@@ -250,8 +253,21 @@ impl<Id: std::hash::Hash + Eq + Clone + PartialEq + Send + Sync + 'static> View
             let selected_index = tabs.iter().position(|tab| tab.id == selection.get());
 
             let layout_hidden = hidden_state.clone();
+            let layout_presented = presented_state.clone();
+            let layout_selection = selection.clone();
+            let layout_focus = focus_request.clone();
             let layout = TabOverflowLayout::new(selected_index, spacing, move |indices| {
-                layout_hidden.set(indices.to_vec())
+                if layout_hidden.get() == indices {
+                    return;
+                }
+                // A resize that reshuffles the menu closes it and returns focus
+                // to the selected tab.
+                if layout_presented.get() {
+                    layout_focus.borrow_mut().target =
+                        Some(roving_identity(&layout_selection.get()));
+                    layout_presented.set(false);
+                }
+                layout_hidden.set(indices.to_vec());
             });
 
             let mut content_items: Vec<AnyView> = Vec::new();
@@ -272,9 +288,10 @@ impl<Id: std::hash::Hash + Eq + Clone + PartialEq + Send + Sync + 'static> View
                     indicator,
                     is_selected,
                 );
+                let is_tab_stop = tab_stop.as_ref() == Some(&tab.id);
                 let item = crate::ModifiedContent::new(
                     AnyView::new(item),
-                    RovingItem::new(tab.id.clone(), is_selected, identity_roving.clone()),
+                    RovingItem::new(tab.id.clone(), is_tab_stop, identity_roving.clone()),
                 );
                 let mut item_view = AnyView::new(item);
                 if maximum_header_width.is_finite() {
@@ -325,6 +342,7 @@ impl<Id: std::hash::Hash + Eq + Clone + PartialEq + Send + Sync + 'static> View
                     button_presented.set(next);
                 },
             )
+            .enabled(is_enabled)
             .button_style(crate::theme::styles::buttons::ghost())
             .frame(None, None, Some(44.0), Some(44.0), None, None);
             let more_column = BoxView::new(
@@ -362,7 +380,9 @@ impl<Id: std::hash::Hash + Eq + Clone + PartialEq + Send + Sync + 'static> View
                 )
                 .flex_with(0.0, 0.0, None);
 
-            let scrolled = ScrollView::horizontal(fitted).flex_with(0.0, 0.0, None);
+            let scrolled = ScrollView::horizontal(fitted)
+                .scrollbar_gutter(crate::primitives::layout::ScrollbarGutter::Overlay)
+                .flex_with(0.0, 0.0, None);
             AnyView::new(scrolled)
         });
         AnyView::new(reader)

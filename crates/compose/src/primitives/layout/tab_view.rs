@@ -16,6 +16,7 @@
 //! `TabItem.init` does with `AnyView(content())`; this view only decides *which*
 //! one to mount. Nothing here builds a tab's body lazily, and nothing here holds
 //! a builder closure, so the caller owns materialisation and lifecycle.
+use super::tab_overflow::TabOverflowStrip;
 use crate::Scope;
 use crate::primitives::{DuplicateId, check_ids};
 use std::cell::RefCell;
@@ -28,7 +29,7 @@ use crate::primitives::media::Icon;
 use crate::primitives::overlays::roving_focus::{RovingFocusHost, RovingItem, roving_identity};
 use crate::primitives::text::Text;
 use crate::theme::styles::buttons::{ButtonStyleViewExt, TabButtonStyle};
-use crate::theme::{SemanticColorRef, SemanticFontRef, ThemeMetric, theme_for_node};
+use crate::theme::{SemanticColorRef, SemanticFontRef, theme_for_node};
 use crate::{AnyView, BoxView, PrimitiveView, TupleView, View, ViewExt};
 use cove_core::Binding;
 use cove_core::scene::{Align, FlexDirection, Justify, Node, Wrap};
@@ -302,10 +303,15 @@ impl<Id: PartialEq + Clone + std::hash::Hash + 'static> PrimitiveView for TabVie
         let placement = view.resolved_placement();
         let indicator = view.indicator(placement);
 
-        // Strip items, each with its roving identity.
+        // Strip items, each with its roving identity. A menu strip builds its own.
         let identity: Rc<dyn Fn(&Id) -> u64> = Rc::new(|id: &Id| roving_identity(id));
         let mut strip_items: Vec<AnyView> = Vec::new();
-        for tab in &view.tabs {
+        let tabs_in_strip: &[TabItem<Id>] = if view.overflow == TabOverflow::Menu {
+            &[]
+        } else {
+            &view.tabs
+        };
+        for tab in tabs_in_strip {
             let is_tab_stop = tab_stop.as_ref() == Some(&tab.id);
             let item = TabStripItem {
                 tab: tab.clone(),
@@ -324,22 +330,34 @@ impl<Id: PartialEq + Clone + std::hash::Hash + 'static> PrimitiveView for TabVie
         let strip = AnyView::new(TabStrip {
             variant: view.variant,
             overflow: view.overflow,
-            content: AnyView::new(BoxView::new(
-                FlexDirection::Row,
-                Align::Center,
-                Justify::FlexStart,
-                if view.overflow == TabOverflow::Wrap {
-                    Wrap::Wrap
-                } else {
-                    Wrap::NoWrap
-                },
-                if view.variant == TabVariant::Segmented {
-                    2.0
-                } else {
-                    0.0
-                },
-                AnyView::new(TupleView::new(strip_items)),
-            )),
+            content: if view.overflow == TabOverflow::Menu {
+                AnyView::new(TabOverflowStrip::new(
+                    view.tabs.clone(),
+                    view.selection.clone(),
+                    tab_stop.clone(),
+                    view.is_enabled,
+                    view.variant,
+                    indicator,
+                    view.focus_request.clone(),
+                ))
+            } else {
+                AnyView::new(BoxView::new(
+                    FlexDirection::Row,
+                    Align::Center,
+                    Justify::FlexStart,
+                    if view.overflow == TabOverflow::Wrap {
+                        Wrap::Wrap
+                    } else {
+                        Wrap::NoWrap
+                    },
+                    if view.variant == TabVariant::Segmented {
+                        2.0
+                    } else {
+                        0.0
+                    },
+                    AnyView::new(TupleView::new(strip_items)),
+                ))
+            },
         });
 
         // Only the active tab's content is mounted; the rest were already built
@@ -403,7 +421,6 @@ impl<Id: PartialEq + Clone + std::hash::Hash + 'static> PrimitiveView for TabVie
             )),
         );
         host.focus_request = Some(focus_request);
-        let _ = tab_stop;
         vec![AnyView::new(host)]
     }
 }
@@ -447,7 +464,6 @@ impl PrimitiveView for TabStrip {
         };
         let styled =
             AnyView::new(AnyView::new(self.content.clone()).padding_edges(padding, padding));
-        let _ = ThemeMetric::control_radius();
         if self.overflow == TabOverflow::Scroll {
             // A strip that must stay one line scrolls rather than wrapping.
             return vec![AnyView::new(

@@ -4,14 +4,14 @@
 //! a disabled row is a real bug — the row is visible, so the selection looks
 //! valid while being unconmittable. These pin the skip and clamp rules.
 
-use cove_ui_compose::primitives::controls::fields::{WheelPicker, WheelPickerOption};
+use cove_ui_compose::primitives::controls::fields::{WheelPickerModel, WheelPickerOption};
 
-fn volumes() -> WheelPicker<i32> {
+fn volumes() -> WheelPickerModel<i32> {
     // 0…10 with the top row disabled, matching the story's volume wheel.
     let options = (0..=10)
         .map(|value| WheelPickerOption::new(value, format!("{value}")).enabled(value != 10))
         .collect();
-    WheelPicker::new(options, Some(6))
+    WheelPickerModel::new(options, Some(6))
 }
 
 #[test]
@@ -25,7 +25,7 @@ fn the_wheel_starts_on_the_requested_value() {
 fn a_disabled_starting_value_falls_back_to_the_first_enabled_row() {
     let wheel = volumes();
     let options = wheel.options.clone();
-    let restart = WheelPicker::new(options, Some(10));
+    let restart = WheelPickerModel::new(options, Some(10));
     assert_eq!(
         restart.value(),
         Some(&0),
@@ -39,7 +39,7 @@ fn an_unknown_starting_value_falls_back_to_the_first_enabled_row() {
         WheelPickerOption::new(1, "one"),
         WheelPickerOption::new(2, "two"),
     ];
-    let wheel = WheelPicker::new(options, Some(99));
+    let wheel = WheelPickerModel::new(options, Some(99));
     assert_eq!(wheel.value(), Some(&1));
 }
 
@@ -104,7 +104,7 @@ fn disabled_rows_are_not_selectable() {
 fn a_wheel_with_no_enabled_rows_has_no_selection() {
     let options: Vec<WheelPickerOption<i32>> =
         vec![WheelPickerOption::new(0, "off").enabled(false)];
-    let mut wheel = WheelPicker::new(options, None);
+    let mut wheel = WheelPickerModel::new(options, None);
     assert_eq!(wheel.value(), None);
     assert!(!wheel.step(1));
     assert!(!wheel.select_first());
@@ -145,7 +145,7 @@ fn options_are_identified_by_value_not_label() {
         WheelPickerOption::new(0, "same"),
         WheelPickerOption::new(1, "same"),
     ];
-    let wheel = WheelPicker::new(options, Some(1));
+    let wheel = WheelPickerModel::new(options, Some(1));
     assert_eq!(wheel.index_of(&1), Some(1));
     assert_eq!(wheel.selected_label(), Some("same"));
 }

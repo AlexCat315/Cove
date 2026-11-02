@@ -179,16 +179,11 @@ impl<Id: PartialEq + Eq + std::hash::Hash + Clone + Send + Sync + 'static> Adapt
             header_children.push(self.rail_button(geometry));
         }
         if is_modal {
-            let close = {
-                let focus = self.focus.clone();
-                move || {
-                    let _ = &focus;
-                }
-            };
-            let _ = close;
             let presentation = self.presentation.clone();
             let local = self.local_presentation.clone();
             let title = self.title.clone();
+            let focus = self.focus.clone();
+            let open_label = self.options.open_label.clone();
             header_children.push(AnyView::new(
                 BoxView::new(
                     FlexDirection::Row,
@@ -202,6 +197,7 @@ impl<Id: PartialEq + Eq + std::hash::Hash + Clone + Send + Sync + 'static> Adapt
                                 Some(binding) => binding.set(false),
                                 None => local.set(false),
                             }
+                            focus.focus_opener(&open_label);
                         })),
                         AnyView::new(AnyView::new(
                             AnyView::new(crate::primitives::text::Text::new(title).truncated())

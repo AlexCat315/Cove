@@ -20,5 +20,5 @@ pub use gutter_options::{
     TextGutterMarker,
 };
 pub use gutter_session::{TextFoldSession, TextGutterSession};
-pub use minimap::{MinimapGeometry, MinimapRow};
+pub use minimap::{MINIMAP_WIDTH, MinimapGeometry, ink_runs};
 pub use occurrences::draw_occurrences;

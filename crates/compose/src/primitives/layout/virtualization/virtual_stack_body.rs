@@ -201,14 +201,15 @@ pub fn virtual_scroll<Id: Clone + 'static>(
     let scroll = ScrollView::new(ScrollAxis::Vertical, content)
         .scrollbar_gutter(ScrollbarGutter::Stable)
         .scroll_offset(binding);
-    let scroll = match on_viewport_change.clone() {
-        Some(handler) => scroll.on_viewport_change(move |next| handler(next)),
-        None => scroll,
-    };
-    let scroll = match on_offset_change {
-        Some(handler) => scroll.on_viewport_change(move |next| handler(next.offset)),
-        None => scroll,
-    };
+    // The builder keeps one handler, so both observers share it.
+    let scroll = scroll.on_viewport_change(move |next: ScrollViewport| {
+        if let Some(handler) = on_viewport_change.as_ref() {
+            handler(next);
+        }
+        if let Some(handler) = on_offset_change.as_ref() {
+            handler(next.offset);
+        }
+    });
     AnyView::new(AnyView::new(scroll).frame(None, None, Some(0.0), Some(0.0), None, None))
 }
 

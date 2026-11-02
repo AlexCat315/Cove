@@ -26,8 +26,8 @@
 //!   start is lost. Swift keeps 10...10 after pressing the over-limit 15 and then
 //!   completes 10...13; Rust records 15...15 and then 13...13.
 
-use cove_composition::Scope;
 use crate::support;
+use cove_composition::Scope;
 
 use std::sync::{Arc, Mutex};
 

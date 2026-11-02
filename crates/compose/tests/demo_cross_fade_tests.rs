@@ -10,8 +10,8 @@
 //! - when the animation finishes the background is the new colour and the
 //!   scheduler is idle again
 
-use cove_composition::Scope;
 use crate::support;
+use cove_composition::Scope;
 
 use cove_composition::{AnyView, View};
 use cove_core::State;

@@ -2,7 +2,7 @@
 //!
 //! Inline wheel time editor: hour, minute and optional second/AM-PM columns.
 //! Each column is a [`TimeWheel`] leaf whose option list, stepping and visible
-//! window come from the shared [`WheelPicker`] model, so disabled rows and
+//! window come from the shared [`WheelPickerModel`] model, so disabled rows and
 //! end-stopping behave the same as a standalone wheel.
 use crate::Scope;
 use std::rc::Rc;
@@ -21,7 +21,7 @@ use crate::modifiers::layout::LayoutFrameExt;
 use crate::modifiers::style::{AppearanceExt, SemanticStyleViewExt};
 use crate::primitives::controls::adaptive::{apply_touch_control_extent, supports_control_hover};
 use crate::primitives::controls::date_values::{DEFAULT_MINUTE_STEP, TimeOfDay};
-use crate::primitives::controls::fields::wheel_picker::{WheelPicker, WheelPickerOption};
+use crate::primitives::controls::fields::wheel_picker::{WheelPickerModel, WheelPickerOption};
 use crate::primitives::text::Text;
 use crate::theme::{SemanticColorRef, SemanticFontRef, theme_for_node};
 use crate::{
@@ -89,7 +89,11 @@ impl TimePickerOptions {
         self.disabled_ranges = authored
             .into_iter()
             .filter_map(|(start, end)| {
-                let (start, end) = if end < start { (end, start) } else { (start, end) };
+                let (start, end) = if end < start {
+                    (end, start)
+                } else {
+                    (start, end)
+                };
                 (start.seconds() < end.seconds()).then_some((start, end))
             })
             .collect();
@@ -475,8 +479,8 @@ impl TimeWheel {
         }
     }
 
-    fn picker(&self) -> WheelPicker<i32> {
-        WheelPicker::new(self.options.clone(), Some(self.value.get()))
+    fn picker(&self) -> WheelPickerModel<i32> {
+        WheelPickerModel::new(self.options.clone(), Some(self.value.get()))
     }
 
     fn choose(&self, index: usize) {
@@ -516,7 +520,7 @@ impl TimeWheel {
         }
     }
 
-    fn value_label(&self, picker: &WheelPicker<i32>) -> String {
+    fn value_label(&self, picker: &WheelPickerModel<i32>) -> String {
         picker.selected_label().unwrap_or_default().to_string()
     }
 

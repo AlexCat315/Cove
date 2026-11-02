@@ -25,8 +25,8 @@
 //! drives the same geometry through a `State<f32>` read in `body()`, so the
 //! retained-child and reselection assertions are unchanged.
 
-use cove_composition::Scope;
 use crate::support;
+use cove_composition::Scope;
 
 use std::cell::RefCell;
 use std::rc::Rc;

@@ -33,7 +33,7 @@ pub enum TreeDropPosition {
 
 /// Stable identity of a row: its model id plus the index path that locates it,
 /// so the same id appearing in two branches stays distinct.
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct TreeNodeKey<ID: std::hash::Hash + Eq> {
     pub id: ID,
     pub path: Vec<usize>,

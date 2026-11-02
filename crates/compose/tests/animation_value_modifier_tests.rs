@@ -7,8 +7,8 @@
 //! - `frame(width:)`, `frame(maxWidth:)`, `frame(maxHeight:)` animate implicitly
 //! - `frame(width: .percent())` and `frame(height: .percent())` animate implicitly
 
-use cove_composition::Scope;
 use crate::support;
+use cove_composition::Scope;
 
 use cove_composition::{AnyView, DynamicField, View};
 use cove_core::State;

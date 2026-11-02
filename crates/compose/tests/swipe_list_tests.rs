@@ -25,8 +25,8 @@
 //! Closed actions remain mounted for animation but are excluded from input and
 //! accessibility. The actions button opens the same actions without a swipe.
 
-use cove_composition::Scope;
 use crate::support;
+use cove_composition::Scope;
 
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -38,6 +38,8 @@ use cove_core::{Environment, InputCapabilities, Point, State};
 use cove_platform::{InputEvent, MouseButton, MouseButtonEvent, MouseMotionEvent};
 use cove_ui_compose::adaptive::SurfaceEnvironmentExt;
 use cove_ui_compose::modifiers::layout::LayoutFrameExt;
+use cove_ui_compose::primitives::data::lists::RowState;
+use cove_ui_compose::primitives::data::lists::Selection;
 use cove_ui_compose::primitives::data::lists::swipe_list::{SwipeAction, SwipeList};
 use cove_ui_compose::primitives::feedback::StatusTone;
 use cove_ui_compose::primitives::overlays::portal::LayerRoot;
@@ -86,23 +88,23 @@ impl View for Harness {
         let list = SwipeList::new(
             (0..count as i32).collect::<Vec<i32>>(),
             |item: &i32| *item,
-            move |item: &i32| {
-                let index = *item;
-                let archive = log_archive.clone();
-                let delete = log_delete.clone();
-                vec![
-                    SwipeAction::new(index as u64 * 10 + 1, "Archive", move || {
-                        archive.borrow_mut().push(format!("archive-{index}"));
-                    }),
-                    SwipeAction::new(index as u64 * 10 + 2, "Delete", move || {
-                        delete.borrow_mut().push(format!("delete-{index}"));
-                    })
-                    .tone(StatusTone::Danger),
-                ]
-            },
-            |item: &i32, _selected| AnyView::new(Text::new(format!("Item {}", item + 1))),
+            |item: &i32, _: RowState| AnyView::new(Text::new(format!("Item {}", item + 1))),
         )
-        .selection(selection.binding())
+        .actions(move |item: &i32| {
+            let index = *item;
+            let archive = log_archive.clone();
+            let delete = log_delete.clone();
+            vec![
+                SwipeAction::new(index as u64 * 10 + 1, "Archive", move || {
+                    archive.borrow_mut().push(format!("archive-{index}"));
+                }),
+                SwipeAction::new(index as u64 * 10 + 2, "Delete", move || {
+                    delete.borrow_mut().push(format!("delete-{index}"));
+                })
+                .tone(StatusTone::Danger),
+            ]
+        })
+        .selection(Selection::single(selection.binding()))
         .is_enabled(enabled)
         .row_label(|item: &i32| format!("Item {}", item + 1));
         let mut environment = Environment {

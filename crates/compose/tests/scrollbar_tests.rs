@@ -20,8 +20,8 @@
 //!   and fades it after the content rests; Rust applies the reveal and the
 //!   fade back-to-back without an animation context, so the chrome stays at 0.
 
-use cove_composition::Scope;
 use crate::support;
+use cove_composition::Scope;
 
 use cove_composition::adaptive::SurfaceEnvironmentExt;
 use cove_composition::{AnyView, DynamicField, View, ViewGraph};

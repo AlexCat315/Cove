@@ -27,6 +27,7 @@ use super::reorder_model::{
     ReorderDragSession, ReorderPreviewOffset, ReorderableListModel, drop_indicator_y,
     reorder_row_height,
 };
+use super::selection::{CollectionId, RowState};
 use crate::modifiers::interaction::{AccessibilityExt, HitTestingExt};
 use crate::modifiers::layout::{AbsolutePositionModifier, FlexExt, LayoutFrameExt};
 use crate::modifiers::style::{AppearanceExt, SemanticStyleViewExt};
@@ -62,13 +63,13 @@ pub struct ReorderSession<Id> {
     window: State<std::ops::Range<usize>>,
     width: State<f32>,
     ids: Rc<RefCell<Vec<Id>>>,
-    on_move: Rc<dyn Fn(usize, usize)>,
+    on_move: Rc<RefCell<Rc<dyn Fn(usize, usize)>>>,
     is_enabled: bool,
     row_height: f32,
     row_spacing: f32,
 }
 
-impl<Id: Eq + std::hash::Hash + Clone + Send + Sync + 'static> Clone for ReorderSession<Id> {
+impl<Id: CollectionId> Clone for ReorderSession<Id> {
     fn clone(&self) -> Self {
         Self {
             session: self.session.clone(),
@@ -86,7 +87,7 @@ impl<Id: Eq + std::hash::Hash + Clone + Send + Sync + 'static> Clone for Reorder
     }
 }
 
-impl<Id: Eq + std::hash::Hash + Clone + Send + Sync + 'static> ReorderSession<Id> {
+impl<Id: CollectionId> ReorderSession<Id> {
     /// The count of authored rows, as the last projection saw them.
     pub fn count(&self) -> usize {
         self.ids.borrow().len()
@@ -149,7 +150,8 @@ impl<Id: Eq + std::hash::Hash + Clone + Send + Sync + 'static> ReorderSession<Id
             return;
         };
         if let Some(destination) = ReorderableListModel::destination(source, boundary) {
-            (self.on_move)(source, destination);
+            let on_move = self.on_move.borrow().clone();
+            on_move(source, destination);
         }
     }
 
@@ -169,7 +171,8 @@ impl<Id: Eq + std::hash::Hash + Clone + Send + Sync + 'static> ReorderSession<Id
             return;
         };
         self.retained.set(self.ids.borrow().get(index).cloned());
-        (self.on_move)(index, destination);
+        let on_move = self.on_move.borrow().clone();
+        on_move(index, destination);
     }
 
     pub fn visible_boundary(&self) -> Option<usize> {
@@ -206,8 +209,8 @@ impl<Id: Eq + std::hash::Hash + Clone + Send + Sync + 'static> ReorderSession<Id
 pub struct ReorderableList<Item, Id, RowContent>
 where
     Item: Clone + 'static,
-    Id: Eq + std::hash::Hash + Clone + Send + Sync + 'static,
-    RowContent: Fn(&Item, bool) -> AnyView + 'static,
+    Id: CollectionId,
+    RowContent: Fn(&Item, RowState) -> AnyView + 'static,
 {
     pub data: Vec<Item>,
     /// Authored logical row height, before text scaling and the touch floor.
@@ -215,8 +218,6 @@ where
     /// Authored logical row spacing, before text scaling.
     pub row_spacing: f32,
     pub is_enabled: bool,
-    /// Called with `(from, to)`, where `to` is the final index after removal.
-    pub on_move: Rc<dyn Fn(usize, usize)>,
     pub row_label: Rc<dyn Fn(&Item) -> String>,
     pub row_content: RowContent,
     id_of: Rc<dyn Fn(&Item) -> Id>,
@@ -227,13 +228,12 @@ where
 impl<Item, Id, RowContent> ReorderableList<Item, Id, RowContent>
 where
     Item: Clone + 'static,
-    Id: Eq + std::hash::Hash + Clone + Send + Sync + 'static,
-    RowContent: Fn(&Item, bool) -> AnyView + 'static,
+    Id: CollectionId,
+    RowContent: Fn(&Item, RowState) -> AnyView + 'static,
 {
     pub fn new(
         data: Vec<Item>,
         id_of: impl Fn(&Item) -> Id + 'static,
-        on_move: impl Fn(usize, usize) + 'static,
         row_content: RowContent,
     ) -> Self {
         let id_of = Rc::new(id_of);
@@ -246,7 +246,7 @@ where
             window: State::new(0..24),
             width: State::new(0.0),
             ids: Rc::new(RefCell::new(ids)),
-            on_move: Rc::new(on_move),
+            on_move: Rc::new(RefCell::new(Rc::new(|_, _| {}))),
             is_enabled: true,
             row_height: 36.0,
             row_spacing: 0.0,
@@ -256,13 +256,18 @@ where
             row_height: 36.0,
             row_spacing: 0.0,
             is_enabled: true,
-            on_move: session.on_move.clone(),
             row_label: Rc::new(|_| String::new()),
             row_content,
             id_of,
             session,
             preview_offset: ReorderPreviewOffset::new(),
         }
+    }
+
+    /// Called with `(from, to)`, where `to` is the final index after removal.
+    pub fn on_move(self, on_move: impl Fn(usize, usize) + 'static) -> Self {
+        *self.session.on_move.borrow_mut() = Rc::new(on_move);
+        self
     }
 
     pub fn row_height(mut self, row_height: f32) -> Self {
@@ -324,8 +329,8 @@ where
 impl<Item, Id, RowContent> View for ReorderableList<Item, Id, RowContent>
 where
     Item: Clone + 'static,
-    Id: Eq + std::hash::Hash + Clone + Send + Sync + 'static,
-    RowContent: Fn(&Item, bool) -> AnyView + 'static,
+    Id: CollectionId,
+    RowContent: Fn(&Item, RowState) -> AnyView + 'static,
 {
     fn body(&self, _cx: &Scope) -> AnyView {
         self.publish();
@@ -344,7 +349,13 @@ where
                 let id = (self.id_of)(&item);
                 let is_dragging = dragging.as_ref() == Some(&id);
                 let label = self.handle_label(index);
-                let content = (self.row_content)(&item, is_dragging);
+                let content = (self.row_content)(
+                    &item,
+                    RowState {
+                        is_dragging,
+                        ..RowState::default()
+                    },
+                );
                 Some(AnyView::new(ReorderRowSlot {
                     index,
                     row_stride,
@@ -448,7 +459,13 @@ where
         if let Some(dragging) = dragging
             && let Some(item) = self.data.iter().find(|item| (self.id_of)(item) == dragging)
         {
-            let preview = (self.row_content)(item, true);
+            let preview = (self.row_content)(
+                item,
+                RowState {
+                    is_dragging: true,
+                    ..RowState::default()
+                },
+            );
             surface.push(AnyView::new(
                 AnyView::new(ReorderPreviewHost {
                     offset: self.preview_offset.clone(),
@@ -481,10 +498,7 @@ where
     }
 }
 
-fn mounted_window<Id: Eq + std::hash::Hash + Clone + Send + Sync + 'static>(
-    session: &Rc<ReorderSession<Id>>,
-    count: usize,
-) -> Vec<usize> {
+fn mounted_window<Id: CollectionId>(session: &Rc<ReorderSession<Id>>, count: usize) -> Vec<usize> {
     let mut retained = Vec::new();
     if let Some(id) = session.dragging.get()
         && let Some(index) = session.index_of(&id)
@@ -502,7 +516,7 @@ fn mounted_window<Id: Eq + std::hash::Hash + Clone + Send + Sync + 'static>(
 
 /// One row: content plus its drag handle, absolutely positioned so offscreen
 /// rows take no layout space.
-struct ReorderRowSlot<Id: Eq + std::hash::Hash + Clone + Send + Sync + 'static> {
+struct ReorderRowSlot<Id: CollectionId> {
     index: usize,
     row_stride: f32,
     row_height: f32,
@@ -511,9 +525,7 @@ struct ReorderRowSlot<Id: Eq + std::hash::Hash + Clone + Send + Sync + 'static> 
     content: AnyView,
 }
 
-impl<Id: Eq + std::hash::Hash + Clone + Send + Sync + 'static> PrimitiveView
-    for ReorderRowSlot<Id>
-{
+impl<Id: CollectionId> PrimitiveView for ReorderRowSlot<Id> {
     fn make_node(&self) -> Node {
         let node = Node::new();
         node.set_is_hit_testable(false);
@@ -562,7 +574,7 @@ impl<Id: Eq + std::hash::Hash + Clone + Send + Sync + 'static> PrimitiveView
     }
 }
 
-impl<Id: Eq + std::hash::Hash + Clone + Send + Sync + 'static> View for ReorderRowSlot<Id> {
+impl<Id: CollectionId> View for ReorderRowSlot<Id> {
     fn kind(&self) -> crate::ViewKind<'_> {
         crate::ViewKind::Primitive(self)
     }
@@ -574,7 +586,7 @@ impl<Id: Eq + std::hash::Hash + Clone + Send + Sync + 'static> View for ReorderR
 /// Drag/focus handle behind one reorderable row. Interaction state lives on the
 /// node so a parent recompose mid-drag keeps the pointer transaction.
 #[derive(Clone)]
-struct ReorderHandle<Id: Eq + std::hash::Hash + Clone + Send + Sync + 'static> {
+struct ReorderHandle<Id: CollectionId> {
     index: usize,
     count: usize,
     label: String,
@@ -584,7 +596,7 @@ struct ReorderHandle<Id: Eq + std::hash::Hash + Clone + Send + Sync + 'static> {
     session: Rc<ReorderSession<Id>>,
 }
 
-impl<Id: Eq + std::hash::Hash + Clone + Send + Sync + 'static> PrimitiveView for ReorderHandle<Id> {
+impl<Id: CollectionId> PrimitiveView for ReorderHandle<Id> {
     fn make_node(&self) -> Node {
         let node = Node::new();
         node.set_is_hit_testable(true);
@@ -823,7 +835,7 @@ impl<Id: Eq + std::hash::Hash + Clone + Send + Sync + 'static> PrimitiveView for
     }
 }
 
-impl<Id: Eq + std::hash::Hash + Clone + Send + Sync + 'static> View for ReorderHandle<Id> {
+impl<Id: CollectionId> View for ReorderHandle<Id> {
     fn kind(&self) -> crate::ViewKind<'_> {
         crate::ViewKind::Primitive(self)
     }
@@ -835,7 +847,7 @@ impl<Id: Eq + std::hash::Hash + Clone + Send + Sync + 'static> View for ReorderH
 /// Covers the list viewport and paints the lifted row at the session's
 /// position through its content offset, so following the pointer neither
 /// relayouts nor recomposes. It never takes input.
-struct ReorderPreviewHost<Id: Eq + std::hash::Hash + Clone + Send + Sync + 'static> {
+struct ReorderPreviewHost<Id: CollectionId> {
     offset: ReorderPreviewOffset,
     session: Rc<ReorderSession<Id>>,
     row_height: f32,
@@ -843,9 +855,7 @@ struct ReorderPreviewHost<Id: Eq + std::hash::Hash + Clone + Send + Sync + 'stat
     content: AnyView,
 }
 
-impl<Id: Eq + std::hash::Hash + Clone + Send + Sync + 'static> PrimitiveView
-    for ReorderPreviewHost<Id>
-{
+impl<Id: CollectionId> PrimitiveView for ReorderPreviewHost<Id> {
     fn make_node(&self) -> Node {
         let node = Node::new();
         node.set_is_hit_testable(false);
@@ -912,7 +922,7 @@ impl<Id: Eq + std::hash::Hash + Clone + Send + Sync + 'static> PrimitiveView
     }
 }
 
-impl<Id: Eq + std::hash::Hash + Clone + Send + Sync + 'static> View for ReorderPreviewHost<Id> {
+impl<Id: CollectionId> View for ReorderPreviewHost<Id> {
     fn kind(&self) -> crate::ViewKind<'_> {
         crate::ViewKind::Primitive(self)
     }

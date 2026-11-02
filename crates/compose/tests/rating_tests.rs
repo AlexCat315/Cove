@@ -40,8 +40,8 @@
 //!   `rating.paint` attachment; Rust has none, so the custom-symbol case
 //!   compares the painted texture ids instead.
 
-use cove_composition::Scope;
 use crate::support;
+use cove_composition::Scope;
 
 use std::cell::RefCell;
 use std::collections::HashSet;

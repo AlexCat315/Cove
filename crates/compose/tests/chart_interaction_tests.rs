@@ -28,8 +28,8 @@
 //!   resolves against the painted ring, so only the hole-clear path behaves as
 //!   Swift describes.
 
-use cove_composition::Scope;
 use crate::support;
+use cove_composition::Scope;
 
 use std::collections::HashSet;
 

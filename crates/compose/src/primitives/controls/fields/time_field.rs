@@ -225,10 +225,12 @@ impl TimeField {
                 session.changed = false;
             }
             None => {
-                session.error = format!(
-                    "Enter a valid time from {} to {}.",
-                    self.options.format(self.options.minimum),
-                    self.options.format(self.options.maximum),
+                session.error = crate::i18n::format_template(
+                    &crate::i18n::tr("Enter a valid time from {minimum} to {maximum}."),
+                    &[
+                        ("minimum", &self.options.format(self.options.minimum)),
+                        ("maximum", &self.options.format(self.options.maximum)),
+                    ],
                 );
             }
         }
@@ -334,8 +336,7 @@ impl View for TimeField {
                             .session
                             .lock()
                             .unwrap_or_else(|poisoned| poisoned.into_inner());
-                        session.draft =
-                            TextBuffer::new(&field.options.format(next));
+                        session.draft = TextBuffer::new(&field.options.format(next));
                         session.changed = false;
                         session.error.clear();
                         true

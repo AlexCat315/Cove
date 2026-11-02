@@ -5,9 +5,9 @@ use crate::support;
 use cove_composition::{AnyView, HorizontalAlignment, TupleView};
 use cove_core::{Font, FontWeight};
 use cove_text::TextEnvironmentHolder;
+use cove_ui_compose::Column;
 use cove_ui_compose::modifiers::style::AppearanceExt;
 use cove_ui_compose::primitives::text::Text;
-use cove_ui_compose::Column;
 use support::GlobalTestLock;
 
 fn labels(words: &[&str], font: &Font) -> AnyView {

@@ -33,8 +33,8 @@
 //!    consumed by nothing, which `field_chrome_style_is_inert` pins as a canary
 //!    for whoever eventually wires it.
 
-use cove_composition::Scope;
 use crate::support;
+use cove_composition::Scope;
 
 use std::cell::RefCell;
 use std::rc::Rc;

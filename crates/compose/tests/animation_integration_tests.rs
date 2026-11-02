@@ -19,8 +19,8 @@
 //! - points -> percent cancels the in-flight width controller
 //! - percent -> auto with clamps snaps and clears the animation
 //!
-use cove_composition::Scope;
 use crate::support;
+use cove_composition::Scope;
 
 use std::rc::Rc;
 

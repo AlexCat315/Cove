@@ -26,6 +26,7 @@ use cove_platform::{KeyEvent, KeyModifiers};
 use cove_ui_compose::primitives::data::lists::tree::{
     Tree, TreeOptions, TreeSearch, TreeSearchFilterPolicy, TreeSelection, flatten_tree,
 };
+use cove_ui_compose::primitives::data::lists::{RowState, Selection};
 
 /// Minimal primitive standing in for the Swift row's `Text`, which carries the
 /// row label. Keeps the projection tests free of the text environment.
@@ -121,13 +122,13 @@ fn tree(
     primary: Binding<Option<usize>>,
     query: &str,
     is_enabled: bool,
-) -> Tree<Item, usize, impl Fn(&Item, bool, bool, usize) -> AnyView + 'static> {
+) -> Tree<Item, usize, impl Fn(&Item, RowState) -> AnyView + 'static> {
     let children_reads = reads.clone();
     let text_children = reads.clone();
     let mut options: TreeOptions<Item, usize> = TreeOptions::default();
     options.is_enabled = is_enabled;
     options.selection = TreeSelection {
-        primary,
+        ids: Selection::single(primary),
         expanded: Some(expanded),
         ..TreeSelection::default()
     };
@@ -143,12 +144,10 @@ fn tree(
         vec![Item { id: 0 }],
         |item: &Item| item.id,
         move |item: &Item| children_reads.children(item),
-        Some(Rc::new(|item: &Item| item.is_branch())),
-        options,
-        |item: &Item, _selected: bool, _expanded: bool, _depth: usize| {
-            AnyView::new(TreeRowText(item.id))
-        },
+        |item: &Item, _: RowState| AnyView::new(TreeRowText(item.id)),
     )
+    .options(options)
+    .has_children(|item: &Item| item.is_branch())
 }
 
 fn key(scancode: u32, modifiers: KeyModifiers) -> KeyEvent {
@@ -347,7 +346,7 @@ fn a_highlight_only_policy_keeps_every_row_mounted() {
     let primary = Binding::constant(Some(0usize));
     let mut options: TreeOptions<Item, usize> = TreeOptions::default();
     options.selection = TreeSelection {
-        primary: primary.clone(),
+        ids: Selection::single(primary.clone()),
         expanded: Some(expanded),
         ..TreeSelection::default()
     };
@@ -361,10 +360,10 @@ fn a_highlight_only_policy_keeps_every_row_mounted() {
         vec![Item { id: 0 }],
         |item: &Item| item.id,
         move |item: &Item| search_reads.children(item),
-        Some(Rc::new(|item: &Item| item.is_branch())),
-        options,
-        |_: &Item, _: bool, _: bool, _: usize| AnyView::new(cove_composition::EmptyView),
-    );
+        |_: &Item, _: RowState| AnyView::new(cove_composition::EmptyView),
+    )
+    .options(options)
+    .has_children(|item: &Item| item.is_branch());
 
     let entries = tree.entries();
     let visible: Vec<usize> = entries.iter().map(|entry| entry.id).collect();

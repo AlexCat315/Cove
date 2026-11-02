@@ -29,8 +29,8 @@
 //!    measured: after bumping tab A to `Count 1` and switching to tab B, tab B
 //!    also reads `Count 1`. Fixed: content is now identified per tab, so each tab
 
-use cove_composition::Scope;
 use crate::support;
+use cove_composition::Scope;
 
 use std::cell::RefCell;
 use std::rc::Rc;

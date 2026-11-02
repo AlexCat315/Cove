@@ -27,8 +27,8 @@
 //! - **Disabled state.** A disabled handle drops focus and hit testing but
 //!   still reports `is_enabled`.
 
-use cove_composition::Scope;
 use crate::support;
+use cove_composition::Scope;
 
 use std::cell::RefCell;
 use std::rc::Rc;

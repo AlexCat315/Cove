@@ -7,11 +7,11 @@
 
 use std::rc::Rc;
 
+use cove_ui_compose::primitives::data::data_table::table_column::{
+    ComparisonResult, TableSort, TableSortDirection,
+};
 use cove_ui_compose::primitives::data::data_table::{
     DataTableRowMetrics, DataTableSortRequest, accepts_projection,
-};
-use cove_ui_compose::primitives::data::lists::table::{
-    ComparisonResult, TableSort, TableSortDirection,
 };
 use cove_ui_compose::primitives::layout::virtualization::VariableRowIndex;
 

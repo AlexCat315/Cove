@@ -2,14 +2,14 @@
 //! typing or deleting at the end of the same identifier; every edit range is
 //! moved through UTF-8 so grapheme joins cannot leave stale character indexes.
 //!
-//! The completion request/item models live in `Primitives/Controls/
-//! CompletionPopover.swift`; their Rust counterparts are not present yet, so
-//! the fields this rebase consumes are mirrored here.
+//! The completion request and item models live here too, because the text field
+//! consumes them without depending on the popover view.
 
 use super::text_buffer::{TextBuffer, TextEditDelta};
 use std::ops::Range;
 
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+/// How a completion's insert text is interpreted.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
 pub enum TextInsertFormat {
     #[default]
     PlainText,
@@ -101,6 +101,17 @@ impl TextCompletionItem {
         }
     }
 }
+
+/// Asks the host for candidates for one request, then delivers them.
+///
+/// The reply closure runs on the UI thread, at most once; a provider that never
+/// answers leaves the list as it was.
+pub type TextCompletionProvider =
+    std::rc::Rc<dyn Fn(TextCompletionRequest, Box<dyn FnOnce(Vec<TextCompletionItem>)>)>;
+
+/// Answers with the item, its documentation filled in when there is any.
+pub type TextCompletionResolver =
+    std::rc::Rc<dyn Fn(TextCompletionItem, Box<dyn FnOnce(TextCompletionItem)>)>;
 
 pub struct TextCompletionRebase;
 

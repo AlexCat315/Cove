@@ -59,8 +59,8 @@
 //!   card's registered key handler is invoked directly; Swift's dispatch
 //!   reaches it.
 
-use cove_composition::Scope;
 use crate::support;
+use cove_composition::Scope;
 
 use std::cell::Cell;
 use std::rc::Rc;
@@ -354,13 +354,7 @@ fn command_palette_virtualizes_large_result_sets() {
             })
             .count();
         assert!(rows > 0, "the virtualized list still renders rows");
-        // GAP: Swift mounts fewer than sixty rows for a thousand commands.
-        // Rust mounts all of them, so the row count is pinned to the measured
-        // behaviour instead of the virtualized window.
-        assert_eq!(
-            rows, 1_000,
-            "GAP: a thousand-command palette mounts every row; Swift mounts < 60"
-        );
+        assert!(rows < 60, "a thousand commands mount {rows} rows");
     });
 }
 

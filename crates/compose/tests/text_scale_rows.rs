@@ -37,6 +37,7 @@
 use crate::support;
 use cove_composition::Scope;
 use cove_ui_compose::prelude::LazyGridOptions;
+use cove_ui_compose::primitives::data::lists::RowState;
 
 use std::rc::Rc;
 
@@ -46,9 +47,9 @@ use cove_core::{Binding, Environment, InputCapabilities, Point, State};
 use cove_platform::KeyModifiers;
 use cove_ui_compose::adaptive::SurfaceEnvironmentExt;
 use cove_ui_compose::modifiers::layout::LayoutFrameExt;
+use cove_ui_compose::primitives::data::data_table::table_column::{TableColumn, TableLayout};
 use cove_ui_compose::primitives::data::data_table::{DataTable, DataTableModel, DataTableOptions};
-use cove_ui_compose::primitives::data::lists::table::{TableColumn, TableLayout};
-use cove_ui_compose::primitives::data::lists::{CollectionSelection, List};
+use cove_ui_compose::primitives::data::lists::{List, Selection};
 use cove_ui_compose::primitives::layout::grid::{GridRowHeights, LazyGrid};
 use cove_ui_compose::primitives::text::Text;
 use cove_ui_compose::theme::styles::appearance_modifier::{Appearance, AppearanceViewExt};
@@ -116,14 +117,14 @@ impl View for GeometryHarness {
         let selection = self.selection.clone();
         let get = selection.clone();
         let set = selection.clone();
-        let list = List::new(
-            CollectionSelection::single(Binding::new(
-                move || get.get(),
-                move |value| set.set(value),
-            )),
-            |value: usize, _selected| AnyView::new(Text::new(value.to_string())),
-        )
-        .rows(records.clone())
+        let list = List::new(records.clone(), |value: &usize, _: RowState| {
+            let value = value.clone();
+            AnyView::new(Text::new(value.to_string()))
+        })
+        .selection(Selection::single(Binding::new(
+            move || get.get(),
+            move |value| set.set(value),
+        )))
         .row_height(30.0)
         .row_spacing(3.0);
         let model = DataTableModel::try_new(records.clone(), |record| *record)
@@ -249,8 +250,12 @@ fn collection_geometry_scales_once_and_retains_identity() {
                     for cell in &cells {
                         assert_eq!(
                             cell.frame().height,
-                            36.0,
-                            "GAP: data-table rows ignore the text scaler and touch floor (actual {})",
+                            (36.0 * value).max(if capabilities.contains(TOUCH) {
+                                44.0
+                            } else {
+                                0.0
+                            }),
+                            "data-table rows follow the text scaler and touch floor (actual {})",
                             cell.frame().height
                         );
                     }
@@ -517,8 +522,8 @@ fn data_table_paging_follows_live_text_scale() {
             for row in &last {
                 assert_eq!(
                     row.frame().height,
-                    36.0,
-                    "GAP: data-table rows ignore the live scale at {value}x (actual {})",
+                    36.0 * value,
+                    "data-table rows follow the live scale at {value}x (actual {})",
                     row.frame().height
                 );
                 assert!(

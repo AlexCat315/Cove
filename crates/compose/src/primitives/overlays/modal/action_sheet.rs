@@ -161,8 +161,7 @@ impl PrimitiveView for ActionSheetTrigger {
         let drag_state = self.drag_state.clone();
         let label = self.label.clone();
         let enabled = self.is_enabled;
-        let expanded = Cell::new(false);
-        let _ = &expanded;
+        let is_expanded = enabled && is_presented.get();
         vec![AnyView::new(
             Button::with_options(
                 label,
@@ -176,7 +175,8 @@ impl PrimitiveView for ActionSheetTrigger {
                 false,
                 None,
             )
-            .button_style(SecondaryButtonStyle),
+            .button_style(SecondaryButtonStyle)
+            .composition_local(ActionControlAccessibility::expanded(), Some(is_expanded)),
         )]
     }
 }

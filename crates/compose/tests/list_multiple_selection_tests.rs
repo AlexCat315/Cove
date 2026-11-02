@@ -9,8 +9,8 @@
 //!
 //! Model difference: Swift builds the list with `List(ids, id: \\.self,
 //! selection:)` and a row closure; the Rust `List` takes a
-//! `CollectionSelection` and a `rows(ids)` builder, so the harness passes
-//! `CollectionSelection::multiple(..)` and `rows(vec![..])` and keeps the same
+//! `Selection` and a `rows(ids)` builder, so the harness passes
+//! `Selection::multiple(..)` and `rows(vec![..])` and keeps the same
 //! selection binding.
 
 use crate::support;
@@ -23,7 +23,8 @@ use cove_core::{Binding, State};
 use cove_platform::{KeyEvent, KeyModifiers, MouseButtonEvent};
 use cove_ui_compose::Scancode;
 use cove_ui_compose::modifiers::layout::LayoutFrameExt;
-use cove_ui_compose::primitives::data::lists::{CollectionSelection, List};
+use cove_ui_compose::primitives::data::lists::RowState;
+use cove_ui_compose::primitives::data::lists::{List, Selection};
 use cove_ui_compose::primitives::text::Text;
 
 use support::InteractiveScene;
@@ -32,20 +33,20 @@ const ROWS: [i32; 4] = [10, 20, 30, 40];
 
 fn harness(selection: State<BTreeSet<i32>>) -> AnyView {
     AnyView::new(
-        List::new(
-            CollectionSelection::multiple(Binding::new(
-                {
-                    let selection = selection.clone();
-                    move || selection.get()
-                },
-                {
-                    let selection = selection.clone();
-                    move |value| selection.set(value)
-                },
-            )),
-            |item: i32, _is_selected: bool| AnyView::new(Text::new(format!("{item}"))),
-        )
-        .rows(ROWS.to_vec())
+        List::new(ROWS.to_vec(), |item: &i32, _: RowState| {
+            let item = item.clone();
+            AnyView::new(Text::new(format!("{item}")))
+        })
+        .selection(Selection::multiple(Binding::new(
+            {
+                let selection = selection.clone();
+                move || selection.get()
+            },
+            {
+                let selection = selection.clone();
+                move |value| selection.set(value)
+            },
+        )))
         .frame_size(200.0, 500.0),
     )
 }

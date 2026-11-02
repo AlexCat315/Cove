@@ -29,8 +29,8 @@
 //!   contract from those and the case asserts the same values. Recorded as a
 //!   surface difference, not a behaviour gap: every number Swift asserts holds.
 
-use cove_composition::Scope;
 use crate::support;
+use cove_composition::Scope;
 
 use std::rc::Rc;
 
@@ -167,7 +167,10 @@ fn height_changes_insertions_and_deletion_retain_the_anchor() {
         .anchor_at(59.0)
         .expect("an offset inside the list has an anchor");
     assert_eq!(anchor.id, 2, "offset 59 sits inside row 2");
-    assert_eq!(anchor.inset, 5.0, "the anchor records a 5pt inset into row 2");
+    assert_eq!(
+        anchor.inset, 5.0,
+        "the anchor records a 5pt inset into row 2"
+    );
 
     // A taller first row pushes the anchor down.
     rows.replace(&[0, 1, 2, 3], &[70.0, 30.0, 40.0, 200.0], 2.0);

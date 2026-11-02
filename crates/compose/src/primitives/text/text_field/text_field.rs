@@ -10,6 +10,10 @@ use crate::Scope;
 use std::cell::RefCell;
 use std::rc::Rc;
 
+use crate::primitives::overlays::portal::PortalResource;
+use crate::primitives::text::code::minimap::{
+    MINIMAP_WIDTH, MinimapGeometry, ink_runs, strip_color,
+};
 use crate::primitives::text::text_buffer::TextBuffer;
 use crate::primitives::text::text_document_layout::TextDocumentLayout;
 use crate::theme::styles::components::AnyTextFieldStyle;
@@ -23,8 +27,11 @@ use cove_core::scene::{
 use cove_core::{Binding, Color, Point, Rect};
 use cove_platform::{MouseButton, MouseWheelEvent, SystemCursor};
 use cove_text::{DrawListText, TextEnvironment, TextEnvironmentHolder};
+use unicode_segmentation::UnicodeSegmentation;
 
 use super::indent_guides::TextIndentGuides;
+use super::snippet::TextSnippetSession;
+use super::text_completion_session::TextCompletionSession;
 use super::text_field_code_editing::indented_newline;
 use super::text_field_layout_engine::{
     FIELD_STATE_KEY, FieldCompositionState, FieldLayoutInputs, FieldScrollState,
@@ -40,6 +47,8 @@ use super::text_field_options::{
 const SCROLLBAR_HOVERED: &str = "__textfield_scrollbar_hovered";
 const FOCUS_REQUEST_ID: &str = "__textfield_focus_request_id";
 const CARET_REQUEST_ID: &str = "__textfield_caret_request_id";
+const MINIMAP_GEOMETRY: &str = "__textfield_minimap_geometry";
+const MINIMAP_DRAGGING: &str = "__textfield_minimap_dragging";
 /// One line increment for a wheel notch in a multiline field.
 pub const MULTILINE_WHEEL_STEP: f32 = 30.0;
 pub const SCROLLBAR_TRACK_THICKNESS: f32 = 6.0;
@@ -248,6 +257,15 @@ impl TextField {
         ((field - line_height) / 2.0).max(4.0)
     }
 
+    /// Width the overview takes from the text column.
+    fn minimap_reservation(&self) -> f32 {
+        if self.code_editing.shows_minimap && self.layout.axis == TextFieldAxis::Vertical {
+            MINIMAP_WIDTH
+        } else {
+            0.0
+        }
+    }
+
     fn inputs(&self, theme: &Theme) -> FieldLayoutInputs {
         FieldLayoutInputs {
             is_vertical: self.layout.axis == TextFieldAxis::Vertical,
@@ -269,6 +287,10 @@ impl View for TextField {
 }
 
 impl TextField {
+    pub(super) fn clone_for_session(&self) -> TextField {
+        self.snapshot()
+    }
+
     fn snapshot(&self) -> TextField {
         TextField {
             text: self.text.clone(),
@@ -307,6 +329,11 @@ impl PrimitiveView for TextFieldHost {
         node.set_is_hit_testable(!self.field.behavior.disabled);
         node.set_is_focusable(!self.field.behavior.disabled);
         node.set_clips_to_bounds(true);
+        let portal = PortalResource::new();
+        let snippet = TextSnippetSession::new();
+        node.add_resource(portal.clone());
+        node.add_resource(snippet.clone());
+        node.add_resource(TextCompletionSession::new(portal, snippet));
         node
     }
 
@@ -396,6 +423,9 @@ impl PrimitiveView for TextFieldHost {
             state.move_cursor(index, false, None);
         }
 
+        if let Some(session) = node.first_resource::<TextCompletionSession>() {
+            session.configure(self.field.snapshot(), state_handle.clone());
+        }
         install_interaction(node, &self.field, state_handle.clone());
 
         let draw_node = node.downgrade();
@@ -524,6 +554,9 @@ fn install_interaction(node: &Node, field: &TextField, state: Rc<RefCell<FieldSt
             let Some(owner) = Node::upgrade(&report_node) else {
                 return;
             };
+            if !focused && let Some(session) = owner.first_resource::<TextCompletionSession>() {
+                session.dismiss();
+            }
             if !focused && report_composing.get() {
                 if let Some(handle) = owner.attachment::<Rc<RefCell<FieldState>>>(FIELD_STATE_KEY) {
                     handle.borrow_mut().clear_composition();
@@ -554,6 +587,16 @@ fn install_interaction(node: &Node, field: &TextField, state: Rc<RefCell<FieldSt
             };
             match phase {
                 PointerPhase::Down => {
+                    if let Some(session) = owner.first_resource::<TextCompletionSession>() {
+                        session.dismiss();
+                    }
+                    if scroll_minimap(&owner, &pointer_state, event.x, event.y, true) {
+                        owner.set_attachment(MINIMAP_DRAGGING, true);
+                        if let Some(capture) = PointerCaptureHolder::current() {
+                            capture.acquire(&owner, true);
+                        }
+                        return EventResult::Handled;
+                    }
                     if behavior.clearable
                         && owner
                             .attachment::<f32>("__textfield_clear_hit")
@@ -589,6 +632,7 @@ fn install_interaction(node: &Node, field: &TextField, state: Rc<RefCell<FieldSt
                     EventResult::Handled
                 }
                 PointerPhase::Up => {
+                    owner.set_attachment(MINIMAP_DRAGGING, false);
                     pointer_state.borrow_mut().is_dragging = false;
                     if PointerCaptureHolder::current()
                         .and_then(|capture| capture.target())
@@ -600,6 +644,24 @@ fn install_interaction(node: &Node, field: &TextField, state: Rc<RefCell<FieldSt
                     EventResult::Handled
                 }
             }
+        }),
+    );
+
+    // A drag that began on the overview follows the pointer anywhere.
+    let motion_node = node.downgrade();
+    let motion_state = state.clone();
+    registry.set_motion(
+        node,
+        InputHandlerRoute::text_input(),
+        Rc::new(move |event, _phase| {
+            let Some(owner) = Node::upgrade(&motion_node) else {
+                return EventResult::Ignored;
+            };
+            if owner.attachment::<bool>(MINIMAP_DRAGGING) != Some(true) {
+                return EventResult::Ignored;
+            }
+            scroll_minimap(&owner, &motion_state, event.x, event.y, false);
+            EventResult::Handled
         }),
     );
 
@@ -621,6 +683,7 @@ fn install_interaction(node: &Node, field: &TextField, state: Rc<RefCell<FieldSt
             let Some(owner) = Node::upgrade(&text_node) else {
                 return EventResult::Ignored;
             };
+            text_state.borrow_mut().normalize(&text_binding.get());
             crate::primitives::text::text_field::text_field_editing::insert_replacing_selection(
                 &mut text_state.borrow_mut(),
                 incoming,
@@ -636,6 +699,9 @@ fn install_interaction(node: &Node, field: &TextField, state: Rc<RefCell<FieldSt
             if let Some(handler) = owner.attachment::<Rc<dyn Fn(&TextBuffer)>>("__textfield_change")
             {
                 handler(&buffer);
+            }
+            if let Some(session) = owner.first_resource::<TextCompletionSession>() {
+                session.activity(false);
             }
             EventResult::Handled
         }),
@@ -677,6 +743,7 @@ fn install_interaction(node: &Node, field: &TextField, state: Rc<RefCell<FieldSt
     let key_node = node.downgrade();
     let key_state = state;
     let key_behavior = field.behavior.clone();
+    let key_binding = field.text.clone();
     let key_vertical = field.layout.axis == TextFieldAxis::Vertical;
     let indentation = field.code_editing.indentation_width;
     registry.set_key(
@@ -692,74 +759,121 @@ fn install_interaction(node: &Node, field: &TextField, state: Rc<RefCell<FieldSt
             {
                 return EventResult::Handled;
             }
-            let mut state = key_state.borrow_mut();
-            match event.scancode {
-                crate::Scancode::ARROW_LEFT => {
-                    let target = state.selection.cursor_index.saturating_sub(1);
-                    state.move_cursor(target, event.modifiers.has_shift(), None);
-                    EventResult::Handled
-                }
-                crate::Scancode::ARROW_RIGHT => {
-                    let target =
-                        (state.selection.cursor_index + 1).min(state.buffer.character_count());
-                    state.move_cursor(target, event.modifiers.has_shift(), None);
-                    EventResult::Handled
-                }
-                crate::Scancode::HOME => {
-                    let line = state
-                        .buffer
-                        .line_index_for_character_index(state.selection.cursor_index);
-                    let start = state.buffer.line_range(line).start;
-                    state.move_cursor(start, event.modifiers.has_shift(), None);
-                    EventResult::Handled
-                }
-                crate::Scancode::END => {
-                    let line = state
-                        .buffer
-                        .line_index_for_character_index(state.selection.cursor_index);
-                    let end = state.buffer.line_range(line).end;
-                    state.move_cursor(end, event.modifiers.has_shift(), None);
-                    EventResult::Handled
-                }
-                crate::Scancode::RETURN | crate::Scancode::KEYPAD_ENTER => {
-                    if key_vertical {
-                        let newline = indented_newline(
-                            &state.buffer.string_value(),
-                            state.selection.cursor_index,
-                            indentation,
-                            true,
-                        );
-                        insert_replacing_selection(&mut state, &newline);
-                        EventResult::Handled
-                    } else if let Some(submit) =
-                        owner.attachment::<Rc<dyn Fn()>>("__textfield_submit")
-                    {
-                        drop(state);
-                        submit();
-                        EventResult::Handled
-                    } else {
-                        EventResult::Ignored
-                    }
-                }
-                crate::Scancode::BACKSPACE | crate::Scancode::DELETE => {
-                    if key_behavior.read_only {
-                        return EventResult::Handled;
-                    }
-                    if state.selection_range().is_none() {
-                        let cursor = state.selection.cursor_index;
-                        if cursor > 0 {
-                            let buffer = state.buffer.delete((cursor - 1)..cursor);
-                            state.buffer = buffer;
-                            state.selection.cursor_index = cursor - 1;
-                            state.record_activity();
-                        }
-                    } else {
-                        delete_selection(&mut state);
-                    }
-                    EventResult::Handled
-                }
-                _ => EventResult::Ignored,
+            let session = owner.first_resource::<TextCompletionSession>();
+            if !key_behavior.read_only
+                && session
+                    .as_ref()
+                    .is_some_and(|session| session.handle_key(event))
+            {
+                return EventResult::Handled;
             }
+            if let Some(snippet) = owner.first_resource::<TextSnippetSession>() {
+                let buffer = key_state.borrow().buffer.clone();
+                if let Some(command) = snippet.command(event, &buffer) {
+                    if let Some((start, end)) = command {
+                        let mut state = key_state.borrow_mut();
+                        state.selection.anchor = (start != end).then_some(start);
+                        state.selection.cursor_index = end;
+                        state.record_activity();
+                    }
+                    return EventResult::Handled;
+                }
+            }
+            let edit = || {
+                let mut state = key_state.borrow_mut();
+                // The caller may have rewritten the text since the last pass. Editing
+                // the old copy would write it back over theirs.
+                state.normalize(&key_binding.get());
+                match event.scancode {
+                    crate::Scancode::ARROW_LEFT => {
+                        let target = grapheme_before(&state.buffer, state.selection.cursor_index);
+                        state.move_cursor(target, event.modifiers.has_shift(), None);
+                        EventResult::Handled
+                    }
+                    crate::Scancode::ARROW_RIGHT => {
+                        let target = grapheme_after(&state.buffer, state.selection.cursor_index);
+                        state.move_cursor(target, event.modifiers.has_shift(), None);
+                        EventResult::Handled
+                    }
+                    crate::Scancode::HOME => {
+                        let line = state
+                            .buffer
+                            .line_index_for_character_index(state.selection.cursor_index);
+                        let start = state.buffer.line_range(line).start;
+                        state.move_cursor(start, event.modifiers.has_shift(), None);
+                        EventResult::Handled
+                    }
+                    crate::Scancode::END => {
+                        let line = state
+                            .buffer
+                            .line_index_for_character_index(state.selection.cursor_index);
+                        let end = state.buffer.line_range(line).end;
+                        state.move_cursor(end, event.modifiers.has_shift(), None);
+                        EventResult::Handled
+                    }
+                    crate::Scancode::RETURN | crate::Scancode::KEYPAD_ENTER => {
+                        let is_primary = event.modifiers.has_gui() || event.modifiers.has_ctrl();
+                        if key_vertical && !is_primary {
+                            if key_behavior.read_only {
+                                return EventResult::Handled;
+                            }
+                            let newline = indented_newline(
+                                &state.buffer.string_value(),
+                                state.selection.cursor_index,
+                                indentation,
+                                true,
+                            );
+                            insert_replacing_selection(&mut state, &newline);
+                            EventResult::Handled
+                        } else if let Some(submit) =
+                            owner.attachment::<Rc<dyn Fn()>>("__textfield_submit")
+                        {
+                            drop(state);
+                            submit();
+                            EventResult::Handled
+                        } else {
+                            EventResult::Ignored
+                        }
+                    }
+                    crate::Scancode::BACKSPACE | crate::Scancode::DELETE => {
+                        if key_behavior.read_only {
+                            return EventResult::Handled;
+                        }
+                        if state.selection_range().is_none() {
+                            let cursor = state.selection.cursor_index;
+                            if cursor > 0 {
+                                let start = grapheme_before(&state.buffer, cursor);
+                                let buffer = state.buffer.delete(start..cursor);
+                                state.buffer = buffer;
+                                state.selection.cursor_index = start;
+                                state.record_activity();
+                            }
+                        } else {
+                            delete_selection(&mut state);
+                        }
+                        EventResult::Handled
+                    }
+                    _ => EventResult::Ignored,
+                }
+            };
+            let result = edit();
+            if result == EventResult::Handled {
+                // Edits reach the caller's binding; otherwise the next pass reads
+                // the old text back over them.
+                let buffer = key_state.borrow().buffer.clone();
+                if !buffer.has_same_contents(&key_binding.get()) {
+                    key_binding.set(buffer.clone());
+                    if let Some(handler) =
+                        owner.attachment::<Rc<dyn Fn(&TextBuffer)>>("__textfield_change")
+                    {
+                        handler(&buffer);
+                    }
+                }
+                if let Some(session) = session {
+                    session.activity(false);
+                }
+            }
+            result
         }),
     );
 
@@ -786,6 +900,134 @@ fn install_interaction(node: &Node, field: &TextField, state: Rc<RefCell<FieldSt
             EventResult::Ignored
         }),
     );
+}
+
+/// Characters the caret steps by inspect at most this far around it, which covers
+/// the longest emoji sequences.
+const GRAPHEME_WINDOW: usize = 64;
+
+/// The start of the user-perceived character before `index`.
+fn grapheme_before(buffer: &TextBuffer, index: usize) -> usize {
+    let start = index.saturating_sub(GRAPHEME_WINDOW);
+    let text = buffer.substring(start..index);
+    let last = text
+        .graphemes(true)
+        .next_back()
+        .map_or(0, |grapheme| grapheme.chars().count());
+    index.saturating_sub(last.max(usize::from(index > 0)))
+}
+
+/// The end of the user-perceived character after `index`.
+fn grapheme_after(buffer: &TextBuffer, index: usize) -> usize {
+    let count = buffer.character_count();
+    let text = buffer.substring(index..(index + GRAPHEME_WINDOW).min(count));
+    let first = text
+        .graphemes(true)
+        .next()
+        .map_or(0, |grapheme| grapheme.chars().count());
+    (index + first.max(1)).min(count)
+}
+
+/// Scrolls so the visible region centres on the overview point. With
+/// `requires_hit`, only a point on the overview scrolls.
+fn scroll_minimap(
+    node: &Node,
+    state: &Rc<RefCell<FieldState>>,
+    x: f32,
+    y: f32,
+    requires_hit: bool,
+) -> bool {
+    let Some(geometry) = node.attachment::<MinimapGeometry>(MINIMAP_GEOMETRY) else {
+        return false;
+    };
+    if requires_hit && !geometry.contains(x, y) {
+        return false;
+    }
+    let mut state = state.borrow_mut();
+    state.scroll.offset_y = geometry.offset_at(y, state.scroll.visible_height, state.scroll.max_y);
+    state.scroll.needs_caret_reveal = false;
+    state.needs_caret_reveal = false;
+    drop(state);
+    if let Some(session) = node.first_resource::<TextCompletionSession>() {
+        session.dismiss();
+    }
+    node.mark_render_dirty(cove_core::scene::InvalidationSource::style_set(
+        "textFieldMinimap",
+    ));
+    true
+}
+
+/// Paints the overview over the trailing reservation and records where it went
+/// for pointer hits.
+fn draw_minimap(
+    node: &Node,
+    field: &TextField,
+    state: &FieldState,
+    document: &TextDocumentLayout,
+    buffer: &TextBuffer,
+    list: &mut cove_core::DrawList,
+    origin: Point,
+    line_height: f32,
+    text_color: Color,
+    theme: &Theme,
+) {
+    let reservation = field.minimap_reservation();
+    if reservation <= 0.0 {
+        node.remove_attachment(MINIMAP_GEOMETRY);
+        return;
+    }
+    let frame = node.frame();
+    let rect = Rect::new(
+        origin.x + frame.width - reservation,
+        origin.y,
+        reservation,
+        frame.height,
+    );
+    let rows = document.index().row_count();
+    let geometry = MinimapGeometry::new(
+        rect,
+        rows,
+        state.scroll.offset_y,
+        state.scroll.max_y,
+        line_height,
+    );
+    let absolute = node.absolute_frame();
+    let mut hit = geometry;
+    hit.rect.x = absolute.x + frame.width - reservation;
+    hit.rect.y = absolute.y;
+    node.set_attachment(MINIMAP_GEOMETRY, hit);
+
+    list.push_clip_rect(rect);
+    let opacity = node.opacity();
+    let tab_width = field.code_editing.indentation_width.unwrap_or(4);
+    let columns = geometry.columns();
+    let syntax = field.code_editing.syntax_color_at_utf8_offset.as_ref();
+    for row in geometry.visible_rows(rows) {
+        let (line, subrow) = document.index().location_at_row(row);
+        if subrow != 0 {
+            continue;
+        }
+        let characters = buffer.line_range(line);
+        let start = buffer.utf8_offset_for_character_index(characters.start);
+        let end = buffer
+            .utf8_offset_for_character_index(characters.end)
+            .min(start + columns);
+        if end <= start {
+            continue;
+        }
+        let bytes = buffer.utf8_bytes(start..end);
+        for (run, offset) in ink_runs(&bytes, tab_width, columns) {
+            let color = syntax
+                .and_then(|lookup| lookup(buffer, start + offset))
+                .unwrap_or(text_color);
+            let _ = list.add_rect(geometry.strip(row, run), strip_color(color, opacity));
+        }
+    }
+    let _ = list.add_rect(
+        geometry.visible_band(state.scroll.offset_y, state.scroll.visible_height),
+        theme.colors.on_surface.multiplied_alpha(opacity * 0.08),
+    );
+    list.pop_clip_rect();
 }
 
 fn insert_replacing_selection(state: &mut FieldState, incoming: &str) {
@@ -886,7 +1128,7 @@ fn render(
         &field.placeholder,
         is_focused,
     );
-    let available_width = (frame.width - inset * 2.0).max(1.0);
+    let available_width = (frame.width - inset * 2.0 - field.minimap_reservation()).max(1.0);
     let is_vertical = field.layout.axis == TextFieldAxis::Vertical;
     let geometry = document_geometry(
         &metrics,
@@ -993,6 +1235,15 @@ fn render(
         );
         let caret_color = field.decoration.cursor_color.unwrap_or(theme.colors.accent);
         let top = text_origin.y + (row as f32 - first_row as f32) * line_height;
+        if let Some(session) = node.first_resource::<TextCompletionSession>() {
+            let absolute = node.absolute_frame();
+            session.update_anchor(Rect::new(
+                absolute.x + (text_origin.x - origin.x) + x,
+                absolute.y + (top - origin.y),
+                1.0,
+                line_height,
+            ));
+        }
         let _ = list.add_rect(
             Rect::new(text_origin.x + x, top, 1.0, line_height),
             caret_color,
@@ -1002,6 +1253,19 @@ fn render(
     if state.scroll.needs_caret_reveal {
         state.scroll.needs_caret_reveal = false;
     }
+
+    draw_minimap(
+        node,
+        field,
+        &state,
+        &document,
+        &render_state.buffer,
+        list,
+        origin,
+        line_height,
+        text_color,
+        &theme,
+    );
 }
 
 fn draw_range(

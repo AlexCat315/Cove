@@ -111,7 +111,9 @@ fn period_label(
 ) -> String {
     let parts = calendar.parts(date);
     match granularity {
-        CalendarGranularity::Day => crate::primitives::controls::calendar::long_date(date, calendar),
+        CalendarGranularity::Day => {
+            crate::primitives::controls::calendar::long_date(date, calendar)
+        }
         CalendarGranularity::Week => {
             let (year, week) = crate::foundation::iso_week_of(
                 crate::foundation::DateParts::new(parts.year, parts.month, parts.day).epoch_day(),

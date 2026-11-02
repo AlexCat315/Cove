@@ -70,5 +70,11 @@
   "Use Up/Down to resize, Shift for larger steps, Home/End for the limits": "Use Up/Down to resize, Shift for larger steps, Home/End for the limits",
   "Use arrow keys, Page Up/Down, Home and End to scroll": "Use arrow keys, Page Up/Down, Home and End to scroll",
   "Use arrow keys, Home or End to choose a value": "Use arrow keys, Home or End to choose a value",
-  "Drag the handle, or use Up and Down to move this row.": "Drag the handle, or use Up and Down to move this row."
+  "Drag the handle, or use Up and Down to move this row.": "Drag the handle, or use Up and Down to move this row.",
+  "Wheel picker": "Wheel picker",
+  "No options": "No options",
+  "Enter a valid time from {minimum} to {maximum}.": "Enter a valid time from {minimum} to {maximum}.",
+  "Copy Vector": "Copy Vector",
+  "Paste Vector": "Paste Vector",
+  "Reset Vector": "Reset Vector"
 }

@@ -17,8 +17,8 @@
 //!   400 instead of 520. `scroll_anchor` pins both the anchored result (through
 //!   a local marker modifier) and the unmarked result.
 
-use cove_composition::Scope;
 use crate::support;
+use cove_composition::Scope;
 
 use std::rc::Rc;
 

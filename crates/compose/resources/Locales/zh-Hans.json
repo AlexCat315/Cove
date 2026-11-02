@@ -70,5 +70,11 @@
   "Use Up/Down to resize, Shift for larger steps, Home/End for the limits": "上下方向键调整大小，按住 Shift 步进更大，Home/End 跳到边界",
   "Use arrow keys, Page Up/Down, Home and End to scroll": "方向键滚动，Page Up/Down 翻页，Home/End 跳到首尾",
   "Use arrow keys, Home or End to choose a value": "方向键选择数值，Home/End 跳到首尾",
-  "Drag the handle, or use Up and Down to move this row.": "拖动手柄，或用上下方向键移动此行"
+  "Drag the handle, or use Up and Down to move this row.": "拖动手柄，或用上下方向键移动此行",
+  "Wheel picker": "滚轮选择器",
+  "No options": "无选项",
+  "Enter a valid time from {minimum} to {maximum}.": "请输入 {minimum} 到 {maximum} 之间的有效时间。",
+  "Copy Vector": "复制向量",
+  "Paste Vector": "粘贴向量",
+  "Reset Vector": "重置向量"
 }

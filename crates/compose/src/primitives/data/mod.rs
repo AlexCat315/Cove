@@ -20,13 +20,14 @@ pub(crate) mod api {
         ChartGuides, ChartMark, ChartSeries, ChartSlice, ChartStyle, ChartXDomain,
     };
     pub use super::columns::TableColumns;
-    pub use super::data_table::{DataTable, DataTableModel, DataTableOptions};
+    pub use super::data_table::{
+        DataTable, DataTableModel, DataTableOptions, TableColumn, TableColumnLayout, TableLayout,
+        TableSort, TableSortDirection, TableTextEditing,
+    };
     pub use super::lists::{
-        CollectionSelection, List, ListGroup, ListRow, ListRowOptions, ListSection, RefreshOptions,
-        ReorderSession, ReorderableList, SectionedEntryId, SectionedList, StickyHeader,
-        SwipeAction, SwipeList, Table, TableColumn, TableColumnLayout, TableLayout, TableOptions,
-        TableSort, TableSortDirection, TableTextEditing, Tree, TreeEntry, TreeSearchMetadata,
-        flatten_tree,
+        CollectionId, List, ListGroup, ListRow, ListRowOptions, ListSection, RefreshOptions,
+        ReorderSession, ReorderableList, RowState, SectionedEntryId, SectionedList, Selection,
+        StickyHeader, SwipeAction, SwipeList, Tree, TreeEntry, TreeSearchMetadata, flatten_tree,
     };
     pub use super::property_grid::{
         PropertyGrid, PropertyGridRow, PropertyGridRowLayout, PropertyGridRowSizing,

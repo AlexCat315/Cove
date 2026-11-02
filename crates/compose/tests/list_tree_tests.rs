@@ -9,8 +9,7 @@
 //!   `SelectionAppearance`, and the data-row role keeps the same fill with no
 //!   rounding
 //! - tree disclosure toggles the expanded binding and reveals child rows
-//! - tree child taps update primary selection; cmd-click updates the multi
-//!   selection and re-derives the primary
+//! - tree child taps update the selection; cmd-click toggles in a multi selection
 //! - tree rows register hover handlers and hover repaints without requiring a
 //!   structural recompose
 //! - key selection disambiguates duplicate ids by path; filtered search keeps
@@ -27,7 +26,7 @@
 //! - The Rust `Tree` row closure receives `(element, selected, expanded,
 //!   depth)`; the tests do not assert row colours, which Rust derives from the
 //!   row style rather than the closure.
-//! - `List` takes a `CollectionSelection` plus `.rows(ids)` instead of Swift's
+//! - `List` takes its IDs and a `.selection(..)` builder instead of Swift's
 //!   `List(items, selection:)` initializer.
 //! - The selection fill subtracts both horizontal insets from its width, but
 //!   starts at the viewport's leading edge rather than at the leading inset.
@@ -38,17 +37,15 @@
 //!   built but does not rebuild the visible projection in the same pass, so
 //!   `tree_selection` mounts the tree already expanded through that binding;
 //!   `tree_expansion` covers disclosure-driven growth with local state.
-//! - Cmd-clicking the primary tree row removes it from the multi selection but
-//!   leaves `primary` unchanged in Rust; Swift promotes the remaining member.
 //! - Under `FilterAndAutoExpand` the Rust projection keeps only the matching
 //!   leaf and its ancestors (Group, Second), dropping the non-matching
 //!   sibling; Swift kept three rows.
 
-use cove_composition::Scope;
 use crate::support;
+use cove_composition::Scope;
 
 use std::cell::RefCell;
-use std::collections::HashSet;
+use std::collections::{BTreeSet, HashSet};
 use std::rc::Rc;
 
 use cove_composition::{AnyView, LayoutDebugExt, TupleView, View};
@@ -61,6 +58,7 @@ use cove_platform::{KeyModifiers, MouseButton, MouseButtonEvent};
 use cove_ui_compose::BoxView;
 use cove_ui_compose::adaptive::SurfaceEnvironmentExt;
 use cove_ui_compose::modifiers::layout::LayoutFrameExt;
+use cove_ui_compose::primitives::data::lists::RowState;
 use cove_ui_compose::primitives::data::lists::tree::options::{
     TreeDragOperations, TreeSearch, TreeSelection,
 };
@@ -68,7 +66,7 @@ use cove_ui_compose::primitives::data::lists::tree::options::{TreeLayout, TreeOp
 use cove_ui_compose::primitives::data::lists::tree::{
     Tree, TreeDropPosition, TreeNodeKey, TreeSearchFilterPolicy,
 };
-use cove_ui_compose::primitives::data::lists::{CollectionSelection, List};
+use cove_ui_compose::primitives::data::lists::{List, Selection};
 use cove_ui_compose::primitives::text::Text;
 use cove_ui_compose::theme::Theme;
 use cove_ui_compose::theme::styles::components::selection_appearance::{
@@ -180,11 +178,11 @@ impl View for ListTestHarness {
     fn body(&self, _cx: &Scope) -> AnyView {
         let _ = self.selection.get();
         AnyView::new(
-            List::new(
-                CollectionSelection::single(bind(&self.selection)),
-                |id: i32, _selected: bool| AnyView::new(Text::new(format!("Document {id}"))),
-            )
-            .rows(self.rows.clone())
+            List::new(self.rows.clone(), |id: &i32, _: RowState| {
+                let id = id.clone();
+                AnyView::new(Text::new(format!("Document {id}")))
+            })
+            .selection(Selection::single(bind(&self.selection)))
             .frame_size(240.0, self.height),
         )
     }
@@ -200,13 +198,12 @@ fn sized_list_harness(selection: State<Option<i32>>, rows: Vec<i32>) -> AnyView 
             12.0,
             AnyView::new(TupleView::new(vec![
                 AnyView::new(
-                    List::new(
-                        CollectionSelection::single(bind(&selection)),
-                        |id: i32, _selected: bool| {
-                            AnyView::new(Text::new(format!("Document {id}")))
-                        },
-                    )
-                    .rows(rows)
+                    List::new(rows, |id: &i32, _: RowState| {
+                        let id = id.clone();
+
+                        AnyView::new(Text::new(format!("Document {id}")))
+                    })
+                    .selection(Selection::single(bind(&selection)))
                     .frame_height(260.0),
                 ),
                 AnyView::new(AnyView::new(Text::new("caption")).debug_name("sized-list-caption")),
@@ -226,18 +223,19 @@ fn tree_harness(
         roots,
         |item: &Item| item.id.to_string(),
         |item: &Item| item.children.clone(),
-        None,
-        TreeOptions {
-            selection,
-            search,
-            drag,
-            layout: TreeLayout::default(),
-            ..TreeOptions::default()
-        },
-        |item: &Item, _selected: bool, _expanded: bool, depth: usize| {
+        |item: &Item, state: RowState| {
+            let depth = state.depth;
+
             AnyView::new(Text::new(format!("{depth}: {}", item.title)))
         },
-    );
+    )
+    .options(TreeOptions {
+        selection,
+        search,
+        drag,
+        layout: TreeLayout::default(),
+        ..TreeOptions::default()
+    });
     AnyView::new(tree.frame_size(280.0, 220.0))
 }
 
@@ -441,7 +439,7 @@ fn tree_selection() {
     let selection = State::new(None);
     let expanded = State::new(HashSet::from(["scene".to_string()]));
     let tree_selection = TreeSelection {
-        primary: bind(&selection),
+        ids: Selection::single(bind(&selection)),
         expanded: Some(bind(&expanded)),
         ..TreeSelection::default()
     };
@@ -479,11 +477,9 @@ fn tree_multi_selection_updates_primary_selection() {
         item("light", "Light", vec![]),
         item("mesh", "Mesh", vec![]),
     ];
-    let selection = State::new(None);
-    let multiple = State::new(HashSet::new());
+    let multiple = State::new(BTreeSet::new());
     let tree_selection = TreeSelection {
-        primary: bind(&selection),
-        multiple: Some(bind(&multiple)),
+        ids: Selection::multiple(bind(&multiple)),
         ..TreeSelection::default()
     };
     InteractiveScene::run(280.0, 220.0, |scene| {
@@ -497,14 +493,9 @@ fn tree_multi_selection_updates_primary_selection() {
         assert_eq!(rows.len(), 3, "three rows mount");
         click(scene, &rows[1], KeyModifiers::default());
         assert_eq!(
-            selection.get(),
-            Some("light".to_string()),
-            "plain click sets the primary selection"
-        );
-        assert_eq!(
             multiple.get(),
-            HashSet::from(["light".to_string()]),
-            "plain click also sets the multi selection"
+            BTreeSet::from(["light".to_string()]),
+            "plain click replaces the multi selection"
         );
     });
 }
@@ -516,11 +507,9 @@ fn tree_multi_selection_toggle_off_does_not_reselect_removed_item() {
         item("light", "Light", vec![]),
         item("mesh", "Mesh", vec![]),
     ];
-    let selection = State::new(None);
-    let multiple = State::new(HashSet::new());
+    let multiple = State::new(BTreeSet::new());
     let tree_selection = TreeSelection {
-        primary: bind(&selection),
-        multiple: Some(bind(&multiple)),
+        ids: Selection::multiple(bind(&multiple)),
         ..TreeSelection::default()
     };
     InteractiveScene::run(280.0, 220.0, |scene| {
@@ -537,27 +526,15 @@ fn tree_multi_selection_toggle_off_does_not_reselect_removed_item() {
         click(scene, &rows[1], KeyModifiers::LEFT_GUI);
         assert_eq!(
             multiple.get(),
-            HashSet::from(["camera".to_string(), "light".to_string()]),
+            BTreeSet::from(["camera".to_string(), "light".to_string()]),
             "cmd-click adds Light to the multi selection"
-        );
-        assert_eq!(
-            selection.get(),
-            Some("light".to_string()),
-            "primary is Light"
         );
 
         click(scene, &rows[1], KeyModifiers::LEFT_GUI);
         assert_eq!(
             multiple.get(),
-            HashSet::from(["camera".to_string()]),
-            "cmd-clicking the primary removes it"
-        );
-        assert_eq!(
-            selection.get(),
-            Some("light".to_string()),
-            "GAP: Rust leaves primary unchanged when the clicked primary is removed; \
-             Swift promotes the remaining member, got {:?}",
-            selection.get()
+            BTreeSet::from(["camera".to_string()]),
+            "cmd-clicking a selected row removes it"
         );
     });
 }
@@ -712,15 +689,13 @@ fn tree_drag_with_duplicate_ids_is_deterministic() {
 
 fn keyed_tree(
     roots: Vec<Item>,
-    primary: State<Option<TreeNodeKey<String>>>,
-    multiple: State<HashSet<TreeNodeKey<String>>>,
+    multiple: State<BTreeSet<TreeNodeKey<String>>>,
     search: TreeSearch<Item>,
 ) -> AnyView {
     tree_harness(
         roots,
         TreeSelection {
-            primary_key: bind(&primary),
-            multiple_keys: Some(bind(&multiple)),
+            keys: Some(Selection::multiple(bind(&multiple))),
             ..TreeSelection::default()
         },
         search,
@@ -730,12 +705,10 @@ fn keyed_tree(
 
 #[test]
 fn tree_node_key_selection_disambiguates_duplicate_ids() {
-    let primary = State::new(None);
-    let multiple = State::new(HashSet::new());
+    let multiple = State::new(BTreeSet::new());
     InteractiveScene::run(280.0, 220.0, |scene| {
         scene.install(keyed_tree(
             vec![item("dup", "First", vec![]), item("dup", "Second", vec![])],
-            primary.clone(),
             multiple.clone(),
             TreeSearch::default(),
         ));
@@ -745,22 +718,16 @@ fn tree_node_key_selection_disambiguates_duplicate_ids() {
         click(scene, &rows[1], KeyModifiers::default());
         let second = TreeNodeKey::new("dup".to_string(), vec![1]);
         assert_eq!(
-            primary.get(),
-            Some(second.clone()),
-            "clicking the second duplicate stores path [1], got {:?}",
-            primary.get()
-        );
-        assert_eq!(
             multiple.get(),
-            HashSet::from([second.clone()]),
-            "multi selection stores the same key"
+            BTreeSet::from([second.clone()]),
+            "the selection stores the path"
         );
 
         click(scene, &rows[0], KeyModifiers::LEFT_GUI);
         let first = TreeNodeKey::new("dup".to_string(), vec![0]);
         assert_eq!(
             multiple.get(),
-            HashSet::from([first, second]),
+            BTreeSet::from([first, second]),
             "cmd-click adds the path-[0] sibling"
         );
     });
@@ -768,8 +735,7 @@ fn tree_node_key_selection_disambiguates_duplicate_ids() {
 
 #[test]
 fn filtered_tree_node_key_paths_remain_stable() {
-    let primary = State::new(None);
-    let multiple = State::new(HashSet::new());
+    let multiple = State::new(BTreeSet::new());
     let roots = vec![
         item("unmatched-root", "Other", vec![]),
         item(
@@ -787,7 +753,7 @@ fn filtered_tree_node_key_paths_remain_stable() {
         policy: TreeSearchFilterPolicy::FilterAndAutoExpand,
     };
     InteractiveScene::run(280.0, 160.0, |scene| {
-        scene.install(keyed_tree(roots, primary.clone(), multiple.clone(), search));
+        scene.install(keyed_tree(roots, multiple.clone(), search));
         let rows = tree_rows(scene);
         assert_eq!(
             rows.len(),
@@ -799,13 +765,7 @@ fn filtered_tree_node_key_paths_remain_stable() {
         let last = rows.last().expect("rows exist");
         click(scene, last, KeyModifiers::default());
         let expected = TreeNodeKey::new("second".to_string(), vec![1, 1]);
-        assert_eq!(
-            primary.get(),
-            Some(expected.clone()),
-            "filtered selection keeps the pre-filter path [1, 1], got {:?}",
-            primary.get()
-        );
-        assert_eq!(multiple.get(), HashSet::from([expected]));
+        assert_eq!(multiple.get(), BTreeSet::from([expected]));
     });
 }
 

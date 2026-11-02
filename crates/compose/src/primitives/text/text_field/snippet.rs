@@ -11,13 +11,7 @@ use crate::primitives::text::text_buffer::TextBuffer;
 use cove_core::scene::{Node, NodeResource};
 use cove_platform::KeyEvent;
 
-/// How a completion's insert text is interpreted.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
-pub enum TextInsertFormat {
-    #[default]
-    PlainText,
-    Snippet,
-}
+pub use crate::primitives::text::text_completion_rebase::TextInsertFormat;
 
 /// One visited snippet position.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

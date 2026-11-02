@@ -15,8 +15,8 @@
 //! request and again on the draw list, so these tests read
 //! `Node::reveal_request()` — the identical value the renderer consumes.
 
-use cove_composition::Scope;
 use crate::support;
+use cove_composition::Scope;
 
 use std::rc::Rc;
 

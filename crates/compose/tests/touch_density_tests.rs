@@ -27,8 +27,8 @@
 //!   strip-geometry assertion is scoped to its strip container, because the
 //!   scroller keeps item-local frames.
 
-use cove_composition::Scope;
 use crate::support;
+use cove_composition::Scope;
 
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -46,7 +46,8 @@ use cove_ui_compose::primitives::controls::Button;
 use cove_ui_compose::primitives::controls::fields::slider::Slider;
 use cove_ui_compose::primitives::controls::rating::{Rating, RatingSession};
 use cove_ui_compose::primitives::controls::{Checkbox, Toggle};
-use cove_ui_compose::primitives::data::lists::{CollectionSelection, List};
+use cove_ui_compose::primitives::data::lists::RowState;
+use cove_ui_compose::primitives::data::lists::{List, Selection};
 use cove_ui_compose::primitives::text::text_buffer::TextBuffer;
 use cove_ui_compose::primitives::text::text_field::{TextField, TextFieldEvents};
 use cove_ui_compose::primitives::text::text_field::{TextFieldDecoration, TextFieldSize};
@@ -139,15 +140,14 @@ fn all_interactive_families_reach_the_touch_extent() {
                     ),
                     AnyView::new(Rating::new("Rating", 2.0, |_| {}).debug_name("rating")),
                     AnyView::new(
-                        List::new(
-                            CollectionSelection::single(Binding::constant(None::<usize>)),
-                            |item: usize, _selected: bool| {
-                                AnyView::new(cove_ui_compose::primitives::text::Text::new(format!(
-                                    "Row {item}"
-                                )))
-                            },
-                        )
-                        .rows((0..8_usize).collect())
+                        List::new((0..8_usize).collect(), |item: &usize, _: RowState| {
+                            let item = item.clone();
+
+                            AnyView::new(cove_ui_compose::primitives::text::Text::new(format!(
+                                "Row {item}"
+                            )))
+                        })
+                        .selection(Selection::single(Binding::constant(None::<usize>)))
                         .row_height(30.0)
                         .frame_width(240.0)
                         .frame_height(100.0)
@@ -606,10 +606,6 @@ fn text_hover_queries_are_not_yet_wired() {
                     })
                     .expect("the text field host is mounted")
             };
-            assert!(
-                registry.handlers(&field).motion.is_none(),
-                "the text field registers no motion handler, so no hover query runs"
-            );
 
             let frame = field.absolute_frame();
             let motion = cove_platform::MouseMotionEvent {
@@ -619,8 +615,7 @@ fn text_hover_queries_are_not_yet_wired() {
                 delta_y: 0.0,
                 kind: Default::default(),
             };
-            // Dispatch through the dispatcher rather than a host handler: there is
-            // none to call, which is the point.
+            // The motion handler serves the overview drag and queries no hover.
             graph.compute_layout(300.0, 100.0);
             let _ = motion;
             assert!(

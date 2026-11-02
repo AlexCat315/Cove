@@ -12,8 +12,8 @@
 //! - exactly half a point of change is still published
 //! - sub-tolerance jitter does not republish
 
-use cove_composition::Scope;
 use crate::support;
+use cove_composition::Scope;
 
 use std::cell::RefCell;
 use std::rc::Rc;

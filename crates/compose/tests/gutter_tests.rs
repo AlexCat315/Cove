@@ -37,8 +37,8 @@
 //!   every authored region by its first line (and `usize` lines cannot be
 //!   negative).
 
-use cove_composition::Scope;
 use crate::support;
+use cove_composition::Scope;
 
 use std::collections::BTreeSet;
 use std::rc::Rc;
@@ -152,7 +152,9 @@ impl View for Harness {
         let completions = self.completion_calls.clone();
         let code_editing = TextFieldCodeEditing {
             shows_line_numbers: self.code.get(),
-            on_request_completion: Some(Rc::new(move |_| completions.update(|value| *value += 1))),
+            on_request_completion: Some(Rc::new(move |_, _| {
+                completions.update(|value| *value += 1)
+            })),
             gutter: self.gutter(),
             folding: self.folding(),
             ..TextFieldCodeEditing::default()

@@ -16,7 +16,9 @@ use crate::primitives::controls::toolbar::{
 use crate::primitives::media::ui_icon_catalog;
 use crate::primitives::overlays::menu::MenuItem;
 use crate::primitives::text::Text;
-use crate::theme::{SemanticColorRef, SemanticFontRef, theme_for_node};
+use crate::theme::{
+    ControlSize, ControlSizeEnvironment, SemanticColorRef, SemanticFontRef, theme_for_node,
+};
 use crate::{AnyView, BoxView, PrimitiveView, TupleView, View};
 use cove_core::scene::{
     AccessibilityRole, AccessibilitySemantics, Align, FlexDirection, Justify, Node, Wrap,
@@ -24,6 +26,8 @@ use cove_core::scene::{
 
 /// Width below which the bar is compact.
 pub const DEFAULT_COMPACT_MAXIMUM_WIDTH: f32 = 600.0;
+/// A bar never gets shorter than this, whatever the control density.
+const MINIMUM_BAR_HEIGHT: f32 = 48.0;
 
 /// Authored application-bar options.
 #[derive(Clone, Debug, PartialEq)]
@@ -210,7 +214,7 @@ impl PrimitiveView for AppBarHost {
 
     fn update_node(&self, _node: &Node) {}
 
-    fn children(&self, _node: &Node) -> Vec<AnyView> {
+    fn children(&self, node: &Node) -> Vec<AnyView> {
         let bar = &self.bar;
         let compact = self.width < bar.options.compact_maximum_width;
         let items = bar.items(compact);
@@ -297,7 +301,9 @@ impl PrimitiveView for AppBarHost {
             .frame(None, None, None, None, Some(commands_width), None),
         ));
 
-        let _ = toolbar_height(crate::theme::ControlSize::Regular);
+        let size = node
+            .composition_value_here(&ControlSizeEnvironment::key())
+            .unwrap_or(ControlSize::Regular);
         vec![AnyView::new(
             Toolbar::new(AnyView::new(TupleView::new(children)))
                 .options(ToolbarOptions {
@@ -306,7 +312,7 @@ impl PrimitiveView for AppBarHost {
                     label: bar.options.label.clone(),
                     axis: crate::primitives::controls::ToolbarAxis::Horizontal,
                 })
-                .minimum_height(48.0)
+                .minimum_height(toolbar_height(size).max(MINIMUM_BAR_HEIGHT))
                 .vertical_padding(2.0),
         )]
     }

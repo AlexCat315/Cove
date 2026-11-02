@@ -21,8 +21,8 @@
 //!   focus and registering no handlers — is asserted in
 //!   [`loading_blocks_activation`] for the loading path, which Rust does expose.
 
-use cove_composition::Scope;
 use crate::support;
+use cove_composition::Scope;
 
 use std::cell::RefCell;
 use std::rc::Rc;

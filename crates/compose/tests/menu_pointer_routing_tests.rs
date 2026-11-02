@@ -33,8 +33,8 @@
 //!   menu and moves the tree selection here. The second test asserts the current
 //!   Rust behaviour (no portal, no selection, no action) with `GAP:` messages.
 
-use cove_composition::Scope;
 use crate::support;
+use cove_composition::Scope;
 
 use std::cell::Cell;
 use std::rc::Rc;
@@ -47,8 +47,9 @@ use cove_core::{Binding, State};
 use cove_platform::{InputEvent, MouseButton, MouseButtonEvent};
 use cove_ui_compose::modifiers::layout::{FlexExt, LayoutFrameExt};
 use cove_ui_compose::primitives::controls::Button;
+use cove_ui_compose::primitives::data::lists::RowState;
 use cove_ui_compose::primitives::data::lists::list::List;
-use cove_ui_compose::primitives::data::lists::selection::CollectionSelection;
+use cove_ui_compose::primitives::data::lists::selection::Selection;
 use cove_ui_compose::primitives::data::lists::tree::{Tree, TreeOptions, TreeSelection};
 use cove_ui_compose::primitives::overlays::ContextMenu;
 use cove_ui_compose::primitives::overlays::Popover;
@@ -113,24 +114,7 @@ impl View for Harness {
             vec![Item { id: 1 }],
             |item: &Item| item.id,
             |_item: &Item| Vec::<Item>::new(),
-            None,
-            TreeOptions {
-                selection: TreeSelection {
-                    primary: Binding::new(
-                        {
-                            let selection = selection.clone();
-                            move || selection.get()
-                        },
-                        {
-                            let selection = selection.clone();
-                            move |value: Option<u64>| selection.set(value)
-                        },
-                    ),
-                    ..Default::default()
-                },
-                ..Default::default()
-            },
-            move |item: &Item, _is_expanded, _is_selected, _depth| {
+            move |item: &Item, _: RowState| {
                 let item_id = item.id;
                 let probe = row_probe.clone();
                 let selection = row_selection.clone();
@@ -148,7 +132,23 @@ impl View for Harness {
                     .on_open(move || selection.set(Some(item_id))),
                 )
             },
-        );
+        )
+        .options(TreeOptions {
+            selection: TreeSelection {
+                ids: Selection::single(Binding::new(
+                    {
+                        let selection = selection.clone();
+                        move || selection.get()
+                    },
+                    {
+                        let selection = selection.clone();
+                        move |value: Option<u64>| selection.set(value)
+                    },
+                )),
+                ..Default::default()
+            },
+            ..Default::default()
+        });
 
         AnyView::new(LayerRoot::new(AnyView::new(BoxView::new(
             FlexDirection::Column,
@@ -276,19 +276,20 @@ fn nested_button_in_a_tree_row_receives_its_own_clicks() {
     InteractiveScene::run(400.0, 300.0, |scene| {
         let probe = Rc::new(Cell::new(0));
         let action_probe = probe.clone();
-        scene.install(AnyView::new(LayerRoot::new(AnyView::new(Tree::new(
-            vec![Item { id: 1 }],
-            |item: &Item| item.id,
-            |_item: &Item| Vec::<Item>::new(),
-            None,
-            TreeOptions::default(),
-            move |_item: &Item, _is_expanded, _is_selected, _depth| {
-                AnyView::new(Button::new(Text::new("Action"), {
-                    let probe = action_probe.clone();
-                    move || probe.set(probe.get() + 1)
-                }))
-            },
-        )))));
+        scene.install(AnyView::new(LayerRoot::new(AnyView::new(
+            Tree::new(
+                vec![Item { id: 1 }],
+                |item: &Item| item.id,
+                |_item: &Item| Vec::<Item>::new(),
+                move |_item: &Item, _: RowState| {
+                    AnyView::new(Button::new(Text::new("Action"), {
+                        let probe = action_probe.clone();
+                        move || probe.set(probe.get() + 1)
+                    }))
+                },
+            )
+            .options(TreeOptions::default()),
+        ))));
 
         let button = trigger(scene, "Action");
         scene.click(&button, 1);
@@ -306,16 +307,13 @@ fn nested_button_in_a_list_row_receives_its_own_clicks() {
         let probe = Rc::new(Cell::new(0));
         let action_probe = probe.clone();
         scene.install(AnyView::new(LayerRoot::new(AnyView::new(
-            List::new(
-                CollectionSelection::single(Binding::constant(None)),
-                move |_id: u64, _is_selected| {
-                    AnyView::new(Button::new(Text::new("Action"), {
-                        let probe = action_probe.clone();
-                        move || probe.set(probe.get() + 1)
-                    }))
-                },
-            )
-            .rows(vec![1]),
+            List::new(vec![1], move |_id: &u64, _: RowState| {
+                AnyView::new(Button::new(Text::new("Action"), {
+                    let probe = action_probe.clone();
+                    move || probe.set(probe.get() + 1)
+                }))
+            })
+            .selection(Selection::single(Binding::constant(None))),
         ))));
 
         let button = trigger(scene, "Action");

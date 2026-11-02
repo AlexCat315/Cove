@@ -201,9 +201,15 @@ impl<Id: Ord + Clone + 'static> View for EstimatedVirtualStack<Id> {
             self.preload,
             1,
             &self.row_content,
-            Some(Rc::new(move |next: Point| offset_state.set(next))),
+            Some(Rc::new(move |next: Point| {
+                if offset_state.get() != next {
+                    offset_state.set(next);
+                }
+            })),
             Some(Rc::new(move |next: ScrollViewport| {
-                viewport_state.set(next)
+                if viewport_state.get() != next {
+                    viewport_state.set(next);
+                }
             })),
         )
     }

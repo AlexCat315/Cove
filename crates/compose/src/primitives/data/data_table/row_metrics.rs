@@ -19,7 +19,9 @@ use std::collections::HashMap;
 use std::rc::Rc;
 
 use super::super::super::layout::virtualization::VariableRowIndex;
-use crate::primitives::data::lists::table::{ComparisonResult, TableSort, TableSortDirection};
+use crate::primitives::data::data_table::table_column::{
+    ComparisonResult, TableSort, TableSortDirection,
+};
 
 /// Row geometry for the display order.
 #[derive(Clone, Debug)]

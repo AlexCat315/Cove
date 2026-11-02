@@ -15,6 +15,8 @@ use std::rc::Rc;
 use cove_core::{Binding, State};
 use cove_ui_compose::modifiers::layout::LayoutFrameExt;
 use cove_ui_compose::modifiers::style::SemanticStyleViewExt;
+use cove_ui_compose::primitives::data::lists::RowState;
+use cove_ui_compose::primitives::data::lists::Selection;
 use cove_ui_compose::primitives::data::lists::refresh::RefreshOptions;
 use cove_ui_compose::primitives::data::lists::tree::{
     Tree, TreeOptions, TreeSearch, TreeSelection,
@@ -234,21 +236,12 @@ impl View for TreeStory {
             },
             move |set: HashSet<String>| expanded_state.set(set.into_iter().collect()),
         );
-        let multiple_state = self.selected_ids.clone();
-        let multiple = Binding::new(
-            {
-                let state = multiple_state.clone();
-                move || state.get().into_iter().collect::<HashSet<String>>()
-            },
-            move |set: HashSet<String>| multiple_state.set(set.into_iter().collect()),
-        );
         let text: Rc<dyn Fn(&SceneNode) -> String> =
             Rc::new(|node: &SceneNode| format!("{} {}", node.title, node.id));
         let options = TreeOptions {
             is_enabled: self.options.is_enabled,
             selection: TreeSelection {
-                primary: self.selection.binding(),
-                multiple: Some(multiple),
+                ids: Selection::multiple(self.selected_ids.binding()),
                 expanded: Some(expanded),
                 ..TreeSelection::default()
             },
@@ -264,9 +257,11 @@ impl View for TreeStory {
                 SceneNode::gallery(),
                 |node: &SceneNode| node.id.to_owned(),
                 |node: &SceneNode| node.children.clone(),
-                None,
-                options,
-                |node: &SceneNode, selected: bool, expands: bool, depth: usize| {
+                |node: &SceneNode, state: RowState| {
+                    let selected = state.is_selected;
+                    let expands = state.is_expanded;
+                    let depth = state.depth;
+
                     let marker = if node.children.is_empty() {
                         "·"
                     } else if expands {
@@ -283,6 +278,7 @@ impl View for TreeStory {
                     })
                 },
             )
+            .options(options)
             .frame_size(320.0, 260.0)
             .debug_name("tree-control"),
         );

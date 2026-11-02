@@ -3,15 +3,16 @@
 //! Nonmodal completion list. Keyboard focus stays in the editor while the
 //! highlighted row and the scroll window follow Up/Down, Return, Tab and Escape.
 //!
-//! The request and item models already live in
-//! `primitives::text::text_completion_rebase`; this module re-exports them
-//! alongside the provider/resolver callback types and the view half.
+//! The request and item models live in
+//! `primitives::text::text_completion_rebase`; `TextCompletionSession` presents
+//! this view from the field.
 use crate::Scope;
 use std::ops::Range;
-use std::sync::Arc;
+use std::rc::Rc;
 
 pub use crate::primitives::text::text_completion_rebase::{
-    TextCompletionEdit, TextCompletionItem, TextCompletionRequest, TextInsertFormat,
+    TextCompletionEdit, TextCompletionItem, TextCompletionProvider, TextCompletionRequest,
+    TextCompletionResolver, TextInsertFormat,
 };
 
 use crate::modifiers::layout::{FlexExt, PaddingExt};
@@ -26,18 +27,6 @@ use cove_core::scene::{
     EventPhase, EventResult, FlexDirection, InputHandlerRoute, InteractionRegistryHolder, Justify,
     LayoutNode, Node, Wrap,
 };
-
-/// Answers with the item, its documentation filled in when there is any.
-pub type TextCompletionResolver =
-    Arc<dyn Fn(TextCompletionItem, Box<dyn FnOnce(TextCompletionItem)>) + Send + Sync>;
-
-/// Asks the host for candidates for one request, then delivers them.
-///
-/// The reply closure is invoked once; a caller that never answers simply leaves
-/// the list as it was.
-pub type TextCompletionProvider = Arc<
-    dyn Fn(TextCompletionRequest, Box<dyn FnOnce(Vec<TextCompletionItem>) + Send>) + Send + Sync,
->;
 
 /// Rows shown before the list scrolls.
 const VISIBLE_ROWS: usize = 10;
@@ -55,7 +44,7 @@ const DOCUMENTATION_LINES: usize = 8;
 pub struct CompletionPopover {
     pub items: Vec<TextCompletionItem>,
     pub selected_index: usize,
-    pub on_accept: Option<Arc<dyn Fn(TextCompletionItem) + Send + Sync>>,
+    pub on_accept: Option<Rc<dyn Fn(TextCompletionItem)>>,
 }
 
 impl CompletionPopover {
@@ -68,11 +57,8 @@ impl CompletionPopover {
         }
     }
 
-    pub fn on_accept(
-        mut self,
-        handler: impl Fn(TextCompletionItem) + Send + Sync + 'static,
-    ) -> Self {
-        self.on_accept = Some(Arc::new(handler));
+    pub fn on_accept(mut self, handler: impl Fn(TextCompletionItem) + 'static) -> Self {
+        self.on_accept = Some(Rc::new(handler));
         self
     }
 
@@ -204,7 +190,7 @@ impl_primitive_view!(CompletionPanel);
 struct CompletionRow {
     item: TextCompletionItem,
     is_selected: bool,
-    on_accept: Option<Arc<dyn Fn(TextCompletionItem) + Send + Sync>>,
+    on_accept: Option<Rc<dyn Fn(TextCompletionItem)>>,
 }
 
 impl PrimitiveView for CompletionRow {
@@ -239,7 +225,7 @@ impl PrimitiveView for CompletionRow {
         node.set_accessibility_actions(AccessibilityActions {
             activate: accept.clone().map(|handler| {
                 let item = activate_item.clone();
-                std::rc::Rc::new(move || handler(item.clone())) as std::rc::Rc<dyn Fn()>
+                Rc::new(move || handler(item.clone())) as Rc<dyn Fn()>
             }),
             ..Default::default()
         });
@@ -250,7 +236,7 @@ impl PrimitiveView for CompletionRow {
         registry.set_pointer(
             node,
             InputHandlerRoute::control(),
-            std::rc::Rc::new(move |event, phase, event_phase| {
+            Rc::new(move |event, phase, event_phase| {
                 if event.button != cove_platform::MouseButton::Left
                     || phase != cove_core::scene::PointerPhase::Down
                     || event_phase == EventPhase::Capture

@@ -20,8 +20,8 @@
 //!   and the transaction test asserts that no Apply exists, nothing commits and
 //!   focus stays on Expand.
 
-use cove_composition::Scope;
 use crate::support;
+use cove_composition::Scope;
 
 use std::rc::Rc;
 use std::sync::Arc;

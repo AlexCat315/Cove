@@ -5,8 +5,8 @@
 //! - recomposing because an unrelated state (`tick`) changed does not repaint
 //! - changing the value that feeds the draw identity repaints
 
-use cove_composition::Scope;
 use crate::support;
+use cove_composition::Scope;
 
 use std::cell::Cell;
 use std::rc::Rc;

@@ -14,8 +14,8 @@
 //! attachment, which survives materialisation; `max_marker` reads the label
 //! length instead of a frame coordinate and still needs no layout pass.
 
-use cove_composition::Scope;
 use crate::support;
+use cove_composition::Scope;
 
 use std::rc::Rc;
 

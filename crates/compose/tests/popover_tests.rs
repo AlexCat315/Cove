@@ -18,8 +18,8 @@
 //! - `PopoverSurface` is private in Rust, so the harness uses the default
 //!   surface rather than authoring `.content` explicitly.
 
-use cove_composition::Scope;
 use crate::support;
+use cove_composition::Scope;
 
 use std::cell::RefCell;
 use std::rc::Rc;

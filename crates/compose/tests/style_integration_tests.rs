@@ -19,7 +19,7 @@
 //!
 //! Name mapping: Swift's `Box { EmptyView() }` is `BoxView`, `.background(_:)` is
 //! `.semantic_background(..)`, `List(items, selection:)` is
-//! `List::new(CollectionSelection::single(..), ..).rows(..)`, and
+//! `List::new(.., ..).selection(Selection::single(..))`, and
 //! `.buttonStyle(.primary)` / `.buttonStyle(.destructive)` are
 //! `.button_style(PrimaryButtonStyle)` / `.button_style(DestructiveButtonStyle)`.
 
@@ -34,7 +34,7 @@ use cove_core::{Binding, State};
 use cove_ui_compose::modifiers::style::SemanticStyleViewExt;
 use cove_ui_compose::primitives::controls::{Button, ButtonRole};
 use cove_ui_compose::primitives::data::lists::list::List;
-use cove_ui_compose::primitives::data::lists::selection::CollectionSelection;
+use cove_ui_compose::primitives::data::lists::selection::Selection;
 use cove_ui_compose::primitives::layout::Panel;
 use cove_ui_compose::primitives::text::text_buffer::TextBuffer;
 use cove_ui_compose::primitives::text::{Text, TextField};
@@ -182,11 +182,10 @@ fn list_row_selection_follows_theme() {
     GlobalTestLock::locked(|| {
         support::with_test_text_environment(|| {
             let graph = graph();
-            let list = List::<i32>::new(
-                CollectionSelection::single(State::new(Some(2i32)).binding()),
-                |id: i32, _selected: bool| AnyView::new(Text::new(format!("{id}"))),
-            )
-            .rows(vec![1, 2]);
+            let list = List::<i32>::new(vec![1, 2], |id: &i32, _| {
+                AnyView::new(Text::new(format!("{id}")))
+            })
+            .selection(Selection::single(State::new(Some(2i32)).binding()));
             graph.install_view(
                 AnyView::new(AnyView::new(list).appearance(Appearance::Light, Default::default())),
                 Default::default(),

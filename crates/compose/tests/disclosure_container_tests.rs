@@ -37,8 +37,8 @@
 //! before building rows. With `textScaler(2)` Swift therefore gets 60pt rows and
 //! a 32pt indent; Rust keeps the unscaled 30pt row and 16pt indent.
 //!
-use cove_composition::Scope;
 use crate::support;
+use cove_composition::Scope;
 
 use std::collections::{BTreeSet, HashSet};
 use std::rc::Rc;
@@ -54,6 +54,8 @@ use cove_platform::{InputEvent, KeyEvent, KeyModifiers, MouseButton, MouseButton
 use cove_ui_compose::Scancode;
 use cove_ui_compose::modifiers::layout::LayoutFrameExt;
 use cove_ui_compose::modifiers::style::SemanticStyleViewExt;
+use cove_ui_compose::primitives::data::lists::RowState;
+use cove_ui_compose::primitives::data::lists::Selection;
 use cove_ui_compose::primitives::data::lists::tree::{Tree, TreeOptions, TreeSelection};
 use cove_ui_compose::primitives::layout::{Accordion, AccordionItem, DisclosureGroup, Panel};
 use cove_ui_compose::primitives::text::Text;
@@ -464,7 +466,7 @@ fn tree_rows_share_the_scaled_geometry() {
 
             let mut options: TreeOptions<i32, i32> = TreeOptions::default();
             options.selection = TreeSelection {
-                primary: Binding::new(
+                ids: Selection::single(Binding::new(
                     move || {
                         let value = primary_read.load(std::sync::atomic::Ordering::Relaxed);
                         (value != i32::MIN).then_some(value)
@@ -475,7 +477,7 @@ fn tree_rows_share_the_scaled_geometry() {
                             std::sync::atomic::Ordering::Relaxed,
                         );
                     },
-                ),
+                )),
                 expanded: Some(Binding::new(
                     move || {
                         expanded_read
@@ -498,9 +500,7 @@ fn tree_rows_share_the_scaled_geometry() {
                 |value| {
                     if *value == 0 { vec![1, 2] } else { Vec::new() }
                 },
-                None,
-                options,
-                |value: &i32, _selected, _focused_for_row, _depth| {
+                |value: &i32, _: RowState| {
                     AnyView::new(
                         AnyView::new(
                             Text::new(format!("Node {value}"))
@@ -509,7 +509,8 @@ fn tree_rows_share_the_scaled_geometry() {
                         .debug_name(&format!("tree-text-{value}")),
                     )
                 },
-            );
+            )
+            .options(options);
 
             let graph = support::graph();
             graph.install_view(

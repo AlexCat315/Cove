@@ -17,8 +17,8 @@
 //! asserted directly on `absolute_frame()`, which is what the diagnostics query
 //! reports.
 
-use cove_composition::Scope;
 use crate::support;
+use cove_composition::Scope;
 
 use std::cell::Cell;
 use std::rc::Rc;

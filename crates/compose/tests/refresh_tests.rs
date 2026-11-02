@@ -29,7 +29,8 @@ use cove_composition::AnyView;
 use cove_core::{Binding, Environment, InputCapabilities};
 use cove_ui_compose::adaptive::SurfaceEnvironmentExt;
 use cove_ui_compose::modifiers::layout::LayoutFrameExt;
-use cove_ui_compose::primitives::data::lists::{CollectionSelection, List, RefreshOptions};
+use cove_ui_compose::primitives::data::lists::RowState;
+use cove_ui_compose::primitives::data::lists::{List, RefreshOptions, Selection};
 
 use support::GlobalTestLock;
 
@@ -120,16 +121,15 @@ fn list_never_consults_its_refresh_options() {
             let mut environment = Environment::default();
             environment.viewport.width = 360.0;
             environment.input = InputCapabilities::TOUCH;
-            let list = List::new(
-                CollectionSelection::single(Binding::constant(None::<usize>)),
-                |index: usize, _selected: bool| {
-                    AnyView::new(cove_ui_compose::primitives::text::Text::new(format!(
-                        "Row {}",
-                        index + 1
-                    )))
-                },
-            )
-            .rows((0..20_usize).collect())
+            let list = List::new((0..20_usize).collect(), |index: &usize, _: RowState| {
+                let index = index.clone();
+
+                AnyView::new(cove_ui_compose::primitives::text::Text::new(format!(
+                    "Row {}",
+                    index + 1
+                )))
+            })
+            .selection(Selection::single(Binding::constant(None::<usize>)))
             .refresh(RefreshOptions::new(move || *counter.borrow_mut() += 1))
             .frame_width(320.0)
             .frame_height(300.0);

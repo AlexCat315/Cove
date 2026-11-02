@@ -3,6 +3,7 @@ pub mod bracket_matching;
 pub mod indent_guides;
 pub mod platform_input;
 pub mod snippet;
+pub mod text_completion_session;
 pub mod text_field;
 pub mod text_field_code_editing;
 pub mod text_field_editing;

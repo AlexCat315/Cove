@@ -7,7 +7,7 @@ use cove_examples::gallery_content::stories::data_stories::{
     AdaptiveTableSample, CHART_FOCUS_RANGE, CHART_SAMPLE_COUNT, ChartExplorationStory,
     numeric_comparison,
 };
-use cove_ui_compose::primitives::data::lists::table::ComparisonResult;
+use cove_ui_compose::primitives::data::data_table::table_column::ComparisonResult;
 
 #[test]
 fn the_chart_starts_at_the_full_domain() {

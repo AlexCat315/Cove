@@ -18,7 +18,7 @@ pub use select::{
 };
 pub use slider::{Slider, SliderAxis, SliderGeometry};
 pub mod wheel_picker;
-pub use wheel_picker::{WheelPicker, WheelPickerOption};
+pub use wheel_picker::{WheelPicker, WheelPickerModel, WheelPickerOption};
 pub mod search_field;
 pub use search_field::SearchField;
 pub mod search_field_model;

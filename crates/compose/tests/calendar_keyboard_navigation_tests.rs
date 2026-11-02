@@ -20,8 +20,8 @@
 //!   hour short of 29 days; the Rust `Calendar` is a fixed offset (-5h here) with
 //!   no DST, so the interval is exactly 29 days.
 
-use cove_composition::Scope;
 use crate::support;
+use cove_composition::Scope;
 
 use std::cell::RefCell;
 use std::rc::Rc;

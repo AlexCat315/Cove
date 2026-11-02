@@ -15,8 +15,8 @@
 //! - title-only, leading-only and conditional-trailing rows keep nonzero text
 //!   and a stable title node
 
-use cove_composition::Scope;
 use crate::support;
+use cove_composition::Scope;
 
 use std::collections::BTreeSet;
 
@@ -37,8 +37,9 @@ use cove_ui_compose::adaptive::SurfaceEnvironmentExt;
 use cove_ui_compose::modifiers::interaction::AccessibilityExt;
 use cove_ui_compose::modifiers::layout::LayoutFrameExt;
 use cove_ui_compose::primitives::controls::Button;
+use cove_ui_compose::primitives::data::lists::RowState;
 use cove_ui_compose::primitives::data::lists::{
-    CollectionSelection, List, ListRow, ListSection, SectionedList,
+    List, ListRow, ListSection, SectionedList, Selection,
 };
 use cove_ui_compose::primitives::feedback::{Badge, StatusTone};
 use cove_ui_compose::primitives::media::Icon;
@@ -154,23 +155,23 @@ impl Harness {
             Kind::Single => {
                 let this = self.clone();
                 AnyView::new(
-                    List::new(
-                        CollectionSelection::single(self.selected.binding()),
-                        move |index, _| this.row(index),
-                    )
-                    .rows((0..count).collect())
-                    .on_activate(move |id| activated.set(Some(id))),
+                    List::new((0..count).collect(), move |index, _: RowState| {
+                        let index = index.clone();
+                        this.row(index)
+                    })
+                    .selection(Selection::single(self.selected.binding()))
+                    .on_activate(move |id| activated.set(Some(*id))),
                 )
             }
             Kind::Multiple => {
                 let this = self.clone();
                 AnyView::new(
-                    List::new(
-                        CollectionSelection::multiple(self.multiple.binding()),
-                        move |index, _| this.row(index),
-                    )
-                    .rows((0..count).collect())
-                    .on_activate(move |id| activated.set(Some(id))),
+                    List::new((0..count).collect(), move |index, _: RowState| {
+                        let index = index.clone();
+                        this.row(index)
+                    })
+                    .selection(Selection::multiple(self.multiple.binding()))
+                    .on_activate(move |id| activated.set(Some(*id))),
                 )
             }
             Kind::Sections => {
@@ -184,9 +185,9 @@ impl Harness {
                                 .title("Scene"),
                         ],
                         |item: &i32| *item,
-                        move |item, _| this.row(*item),
+                        move |item, _: RowState| this.row(*item),
                     )
-                    .selection(self.selected.binding())
+                    .selection(Selection::single(self.selected.binding()))
                     .sticky_headers(true)
                     .on_activate(move |item| activated.set(Some(*item))),
                 )

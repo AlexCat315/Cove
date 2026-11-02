@@ -22,8 +22,8 @@
 //!   locates leaves by their recorded label attachment and walks to the parent
 //!   instead; the asserted classification, identity and ordering are unchanged.
 
-use cove_composition::Scope;
 use crate::support;
+use cove_composition::Scope;
 
 use std::collections::HashMap;
 

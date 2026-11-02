@@ -14,8 +14,8 @@
 //! - unmounting a transitioning subtree releases its scheduler entry without
 //!   reporting completion
 
-use cove_composition::Scope;
 use crate::support;
+use cove_composition::Scope;
 
 use std::rc::Rc;
 

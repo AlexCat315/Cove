@@ -10,8 +10,8 @@
 //! - re-showing it restores painting, keeps the authored subtree opacity, and
 //!   keeps the same retained node, which hit testing finds again
 
-use cove_composition::Scope;
 use crate::support;
+use cove_composition::Scope;
 
 use std::cell::Cell;
 use std::rc::Rc;

@@ -60,6 +60,10 @@ fn modifier_targets(node: &Node, graph: &ViewGraph) -> Vec<Node> {
 
 fn apply_modifier(modifier: &Rc<dyn crate::ViewModifier>, node: &Node, graph: &Rc<ViewGraph>) {
     retain_modifier(modifier, node, graph);
+    write_modifier(modifier, node, graph);
+}
+
+fn write_modifier(modifier: &Rc<dyn crate::ViewModifier>, node: &Node, graph: &ViewGraph) {
     for target in modifier_targets(node, graph) {
         modifier.apply_node(&target);
         if let Some(layout) = graph.layout_node(&target) {
@@ -75,17 +79,20 @@ fn retain_modifier(modifier: &Rc<dyn crate::ViewModifier>, node: &Node, graph: &
     if graph.layout_node(node).is_some() || node.children().is_empty() {
         return;
     }
-    // The replay list lives on the node itself; keep a separate handle for the
-    // callback so the borrow needed by `install` ends before the move.
-    let target = node.clone();
-    let replay_target = node.clone();
+    // The replay list lives on the node itself, so the callback holds it weakly.
+    // A replay only writes: the declaration is already in the list, and adding it
+    // again from here would double the list on every recomposition.
+    let replay_target = node.downgrade();
     let graph = Rc::downgrade(graph);
     let modifier = modifier.clone();
     ModifierReplay::install(
-        &target,
+        node,
         Rc::new(move || {
-            let Some(graph) = graph.upgrade() else { return };
-            apply_modifier(&modifier, &replay_target, &graph);
+            let (Some(graph), Some(target)) = (graph.upgrade(), Node::upgrade(&replay_target))
+            else {
+                return;
+            };
+            write_modifier(&modifier, &target, &graph);
         }),
     );
 }

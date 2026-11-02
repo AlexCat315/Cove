@@ -32,8 +32,8 @@
 //! - The Rust `Sidebar` leaves its first `ScrollView` mounted as a zero-height
 //!   orphan after the first recomposition; `live_nodes` skips it.
 
-use cove_composition::Scope;
 use crate::support;
+use cove_composition::Scope;
 
 use cove_composition::{AnyView, DynamicField, Scancode, TupleView, View};
 use cove_core::scene::{AccessibilityRole, Node};
@@ -653,14 +653,18 @@ fn animation_lifecycle() {
             0.0,
             "the drawer rests at the leading edge"
         );
+        // Stop mid-exit: once the animation ends the panel unmounts and frees its
+        // ancestors, and a detached node has no input state left to check.
         harness.open.set(false);
-        scene.settle(8, 1.0);
+        scene.settle(1, 0.0);
         assert!(
             !dialog.accepts_subtree_input(),
             "a leaving drawer takes no input"
         );
-        tick(0.05);
-        scene.settle(8, 1.0);
+        for _ in 0..6 {
+            tick(0.02);
+            scene.settle(1, 0.0);
+        }
         assert!(
             dialog.absolute_frame().x < 0.0,
             "the leaving drawer moves off the leading edge"
@@ -669,10 +673,10 @@ fn animation_lifecycle() {
         scene.settle(8, 1.0);
         tick(1.0);
         scene.settle(8, 1.0);
-        assert_ne!(
+        assert_eq!(
             panel(scene).expect("dialog").id(),
             dialog.id(),
-            "GAP: Swift reverses the exit in place and keeps the dialog node; Rust mounts a new one"
+            "reopening mid-exit reverses in place and keeps the dialog node"
         );
         let close = control(scene, "Collapse navigation").expect("collapse");
         let frame = close.absolute_frame();

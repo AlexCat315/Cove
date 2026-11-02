@@ -40,8 +40,8 @@
 //! - **Popover surface and presentation.** The Rust `Popover` is presented from
 //!   the binding it reads at build time and exposes the same portal lifetime.
 
-use cove_composition::Scope;
 use crate::support;
+use cove_composition::Scope;
 
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
@@ -610,8 +610,8 @@ fn code_indentation() {
         key_handler(scene, &node, &plain(Scancode::RETURN));
         assert_eq!(
             string_value(),
-            "甲\n乙  if true {",
-            "GAP: Return edits only the field's internal buffer, so the bound text keeps no newline and no carried indent (Swift: \"  if true {{\\n    \")"
+            "甲\n乙  if true {\n  ",
+            "GAP: Return carries the indent but adds no level after the brace, and Primary-A does not replace the text (Swift: \"  if true {{\\n    \")"
         );
     });
 }

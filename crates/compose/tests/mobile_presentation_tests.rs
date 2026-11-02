@@ -61,8 +61,8 @@
 //! - The Swift fixture's leading icon uses `UIIcons.File.file`; the Rust suite
 //!   omits it because nothing under test asserts it.
 
-use cove_composition::Scope;
 use crate::support;
+use cove_composition::Scope;
 
 use cove_composition::{AnyView, DynamicField, LayoutDebugExt, View};
 use cove_core::scene::{AccessibilityRole, Align, FlexDirection, Justify, Node, Wrap};
@@ -74,9 +74,11 @@ use cove_ui_compose::modifiers::interaction::AccessibilityExt;
 use cove_ui_compose::modifiers::layout::{FlexExt, LayoutFrameExt};
 use cove_ui_compose::primitives::controls::Button;
 use cove_ui_compose::primitives::controls::MenuButton;
-use cove_ui_compose::primitives::data::lists::table::{Table, TableColumn};
+use cove_ui_compose::primitives::data::data_table::DataTable;
+use cove_ui_compose::primitives::data::data_table::table_column::TableColumn;
+use cove_ui_compose::primitives::data::lists::RowState;
 use cove_ui_compose::primitives::data::lists::{
-    CollectionSelection, List, ListRow, ListRowOptions, ListSection, SectionedList,
+    List, ListRow, ListRowOptions, ListSection, SectionedList, Selection,
 };
 use cove_ui_compose::primitives::layout::insets::{SafeArea, SurfaceRoot};
 use cove_ui_compose::primitives::layout::mobile_tab_bar::MobileTabBar;
@@ -264,23 +266,22 @@ impl Fixture {
     fn list(&self) -> AnyView {
         let selection = self.selected_row.binding();
         AnyView::new(
-            List::new(
-                CollectionSelection::single(selection),
-                |value: usize, _selected| {
-                    AnyView::new(
-                        ListRow::new(format!(
-                            "Long title {value} with enough words to truncate on a phone"
-                        ))
-                        .options(
-                            ListRowOptions::new()
-                                .subtitle("Secondary detail")
-                                .disclosure(true),
-                        )
-                        .trailing(AnyView::new(Text::new("Synced").truncated())),
+            List::new((0..30).collect(), |value: &usize, _: RowState| {
+                let value = value.clone();
+
+                AnyView::new(
+                    ListRow::new(format!(
+                        "Long title {value} with enough words to truncate on a phone"
+                    ))
+                    .options(
+                        ListRowOptions::new()
+                            .subtitle("Secondary detail")
+                            .disclosure(true),
                     )
-                },
-            )
-            .rows((0..30).collect())
+                    .trailing(AnyView::new(Text::new("Synced").truncated())),
+                )
+            })
+            .selection(Selection::single(selection))
             .flex_with(1.0, 1.0, Some(0.0)),
         )
     }
@@ -388,9 +389,9 @@ impl Fixture {
             SectionedList::new(
                 vec![ListSection::new("recent", (0..4).collect::<Vec<i32>>()).title("Recent")],
                 |entry: &i32| *entry as usize,
-                |entry: &i32, _selected| AnyView::new(ListRow::new(format!("Entry {entry}"))),
+                |entry: &i32, _: RowState| AnyView::new(ListRow::new(format!("Entry {entry}"))),
             )
-            .selection(selection)
+            .selection(Selection::single(selection))
             .on_activate(move |entry: &i32| activated.set(Some(*entry)))
             .flex_with(1.0, 1.0, Some(0.0)),
         )
@@ -820,7 +821,7 @@ fn nonlinear_text_scaling_keeps_a_table_action_inside_its_authored_row() {
                 scaled_size: 42.0,
             },
         ]);
-        let table = Table::try_new(
+        let table = DataTable::from_records(
             vec![1, 2],
             |value: &i32| *value,
             vec![TableColumn::new("action", "Action", |_record: &i32| {

@@ -12,8 +12,8 @@
 //! `.reducedMotion()` is `.reduced_motion(true)`, and
 //! `scroll.contentOffset` is `node.content_offset()`.
 
-use cove_composition::Scope;
 use crate::support;
+use cove_composition::Scope;
 
 use std::cell::RefCell;
 use std::rc::Rc;

@@ -45,7 +45,8 @@ pub(crate) mod api {
         DateRangeRules, JsonField, KeyboardShortcut, KeyboardShortcutModifier,
         KeyboardShortcutPlatform, NumberField, RadioGroup, RadioOption, RangeSlider, RangeValue,
         SearchField, Select, SelectOption, Slider, SliderAxis, TimeField, TimeFieldOptions,
-        TimeInput, Vec3, Vec3Axis, Vec3Constraints, Vec3Field, WheelPicker, WheelPickerOption,
+        TimeInput, Vec3, Vec3Axis, Vec3Constraints, Vec3Field, WheelPicker, WheelPickerModel,
+        WheelPickerOption,
     };
     pub use super::form::{Form, FormField, FormFieldPresentation, FormLayout};
     pub use super::form_validation::{FormController, FormIssue, FormRule, FormSubmissionState};
@@ -60,7 +61,8 @@ pub(crate) mod api {
     pub use super::time_picker::{TimeHourCycle, TimePicker, TimePickerOptions};
     pub use super::toggle::{BoolControlVariant, Checkbox, CheckboxState, Toggle};
     pub use super::toolbar::{
-        Toolbar, ToolbarCommands, ToolbarAxis, ToolbarAxisEnvironment, ToolbarDividerEdge, ToolbarGroup,
-        ToolbarItem, ToolbarItemPlacement, ToolbarOptions, ToolbarSeparator, toolbar_height,
+        Toolbar, ToolbarAxis, ToolbarAxisEnvironment, ToolbarCommands, ToolbarDividerEdge,
+        ToolbarGroup, ToolbarItem, ToolbarItemPlacement, ToolbarOptions, ToolbarSeparator,
+        toolbar_height,
     };
 }

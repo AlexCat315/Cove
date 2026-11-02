@@ -1,15 +1,20 @@
 //! Translation of `Primitives/Data/Avatar/Avatar.swift`.
 //!
-//! Person image, Unicode initials or an anonymous fallback. The Swift version
-//! delegates the fallback glyph to `Text`/`Icon` and the photograph to
-//! `AsyncImage`; those primitives have no Rust counterpart yet, so the caller
-//! may supply an erased fallback/content view. Identity initials, palette
-//! derivation, sizing, accessibility and status composition are preserved.
+//! Person image, Unicode initials or an anonymous fallback. The photograph loads
+//! through `AsyncImage`; the fallback stays on screen while it is absent, loading
+//! or failed. A caller may also supply an erased image or fallback view.
 
+use crate::modifiers::interaction::AccessibilityExt;
+use crate::modifiers::style::AppearanceExt;
+use crate::primitives::media::{AsyncImage, AsyncImagePhase, Icon, ImageContentMode, ui_icons};
+use crate::primitives::text::Text;
 use crate::theme::theme_environment::theme_for_node;
 use crate::theme::tokens::control_size::{ControlSize, ControlSizeEnvironment};
+use crate::theme::tokens::icons::{IconScaling, IconScalingViewExt};
+use crate::theme::tokens::text_scaler::{TextScaler, TextScalerViewExt};
 use crate::{AnyView, PrimitiveView, View, impl_primitive_view};
 use cove_core::scene::{AccessibilityRole, AccessibilitySemantics, LayoutNode, Node};
+use cove_core::{Font, FontWeight};
 
 use super::status::{AvatarStatus, AvatarStatusGeometry, AvatarStatusIndicator};
 
@@ -123,8 +128,7 @@ pub struct Avatar {
     pub id: Option<String>,
     pub image_url: Option<String>,
     pub appearance: AvatarAppearance,
-    /// Erased image content. When `None`, the generated initials fallback is
-    /// used. `AsyncImage` has no Rust counterpart yet.
+    /// Erased image content, which wins over `image_url`.
     pub image: Option<AnyView>,
     /// Optional caller-provided fallback. Replaces the text/icon fallback while
     /// preserving the avatar frame, clipping and accessibility.
@@ -267,9 +271,27 @@ impl PrimitiveView for Avatar {
                 icon: appearance.placeholder.clone(),
             }),
         };
-        // Swift wraps the visual in `.accessibilityHidden()` because the avatar
-        // node already publishes image semantics.
-        let mut children = vec![fallback];
+        // The avatar node already publishes image semantics.
+        let visual = match (&self.image, &self.image_url) {
+            (Some(image), _) => AnyView::new(image.clone().corner_radius(radius).clipped()),
+            (None, Some(url)) => {
+                let fallback = fallback.clone();
+                AnyView::new(
+                    AsyncImage::new(Some(url.clone()), inner, inner, move |phase| match phase {
+                        AsyncImagePhase::Success(image) => {
+                            AnyView::new(image.corner_radius(radius))
+                        }
+                        AsyncImagePhase::Empty
+                        | AsyncImagePhase::Loading
+                        | AsyncImagePhase::Failure(_) => fallback.clone(),
+                    })
+                    .content_mode(ImageContentMode::Fill)
+                    .retry_id(appearance.retry_id as i32),
+                )
+            }
+            (None, None) => fallback,
+        };
+        let mut children = vec![AnyView::new(visual.accessibility_hidden(true))];
         if let Some(status) = appearance.status {
             children.push(AnyView::new(AvatarStatusIndicator::new(
                 status,
@@ -281,7 +303,8 @@ impl PrimitiveView for Avatar {
 }
 impl_primitive_view!(Avatar);
 
-/// Solid identity disc used while an image is absent, loading or failed.
+/// Identity disc shown while an image is absent, loading or failed: the
+/// initials, or the placeholder icon for an anonymous person.
 pub struct AvatarFallback {
     pub initials: String,
     pub diameter: f32,
@@ -302,18 +325,36 @@ impl PrimitiveView for AvatarFallback {
         node.set_background_color(Some(self.colors.background));
         node.set_corner_radius(self.radius);
         node.set_clips_to_bounds(true);
-        // `Text`/`Icon` are unavailable: expose the initials to a future text
-        // host and keep the disc's contrast semantics local.
-        node.set_attachment("avatar.fallback.initials", self.initials.clone());
-        node.set_attachment("avatar.fallback.icon", self.icon.clone());
-        node.set_attachment("avatar.fallback.foreground", self.colors.foreground);
         let mut semantics = AccessibilitySemantics::new(AccessibilityRole::Image);
         semantics.is_hidden = true;
         node.set_accessibility(Some(semantics));
         if let Some(layout) = node.layout_node() {
             layout.set_width(Some(self.diameter));
             layout.set_height(Some(self.diameter));
+            layout.set_flex_direction(cove_core::scene::FlexDirection::Row);
+            layout.set_align_items(cove_core::scene::Align::Center);
+            layout.set_justify_content(cove_core::scene::Justify::Center);
         }
+    }
+    fn children(&self, _node: &Node) -> Vec<AnyView> {
+        let glyph = if self.initials.is_empty() {
+            match ui_icons::icon(&self.icon) {
+                Some(resource) => AnyView::new(
+                    Icon::with_color(resource, self.diameter * 0.6, self.colors.foreground)
+                        .icon_scaling(IconScaling::Fixed),
+                ),
+                None => return Vec::new(),
+            }
+        } else {
+            AnyView::new(
+                Text::new(self.initials.clone())
+                    .line_limit(Some(1))
+                    .font(Font::system(self.diameter * 0.36, FontWeight::Semibold))
+                    .foreground_color(self.colors.foreground)
+                    .text_scaler(TextScaler::identity()),
+            )
+        };
+        vec![glyph]
     }
 }
 impl View for AvatarFallback {

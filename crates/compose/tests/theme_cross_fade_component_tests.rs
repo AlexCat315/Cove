@@ -6,7 +6,7 @@
 //! - the tab bar chrome cross-fades on an appearance toggle, landing on the new
 //!   surface and leaving the scheduler idle
 //!
-//! Name mapping: Swift's `List(items, selection:)` is `List::new(selection, ..)
+//! Name mapping: Swift's `List(items, selection:)` is `List::new(Vec::new(), ..).selection(selection)
 //! .rows(ids)`, `TabView(selection:tabs:)` is `TabView::try_new(selection, tabs)`,
 //! and `.animation(value:)` is `.animation_value(..)`.
 //!
@@ -27,15 +27,15 @@
 //!   reason as the `TextField` marker: the row tint it looked up is reached
 //!   through the `List` case, which uses the identical selection-paint path.
 
-use cove_composition::Scope;
 use crate::support;
+use cove_composition::Scope;
 
 use cove_composition::{AnyView, DynamicField, View};
 use cove_core::State;
 use cove_core::scene::{Animation, AnimationCurve, AnimatorScheduler, Node};
 use cove_ui_compose::modifiers::animation_value::AnimationValueExt;
 use cove_ui_compose::primitives::data::lists::list::List;
-use cove_ui_compose::primitives::data::lists::selection::CollectionSelection;
+use cove_ui_compose::primitives::data::lists::selection::Selection;
 use cove_ui_compose::primitives::layout::{TabItem, TabView};
 use cove_ui_compose::theme::Theme;
 use cove_ui_compose::theme::styles::appearance_modifier::{Appearance, AppearanceViewExt};
@@ -62,15 +62,12 @@ struct ListHarness {
 impl View for ListHarness {
     fn body(&self, _cx: &Scope) -> AnyView {
         let appearance = self.appearance.get();
-        let list = List::<u64>::new(
-            CollectionSelection::single(State::new(Some(2u64)).binding()),
-            |id: u64, _selected: bool| {
-                AnyView::new(cove_ui_compose::primitives::text::Text::new(format!(
-                    "{id}"
-                )))
-            },
-        )
-        .rows(vec![1, 2]);
+        let list = List::<u64>::new(vec![1, 2], |id: &u64, _| {
+            AnyView::new(cove_ui_compose::primitives::text::Text::new(format!(
+                "{id}"
+            )))
+        })
+        .selection(Selection::single(State::new(Some(2u64)).binding()));
         AnyView::new(
             AnyView::new(list)
                 .appearance(appearance, Default::default())

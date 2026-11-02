@@ -18,19 +18,20 @@
 
 use crate::Scope;
 use std::cell::RefCell;
-use std::collections::{BTreeMap, BTreeSet, HashMap};
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::rc::Rc;
 
 use crate::modifiers::interaction::AccessibilityExt;
 use crate::modifiers::layout::{FlexExt, LayoutFrameExt};
 use crate::primitives::controls::button::{Button, ButtonIcon, ButtonIconSource};
-use crate::primitives::data::data_table::{
-    DataTable, DataTableModel, DataTableNavigation, DataTableOptions, DataTableSelection,
-    DataTableSelectionMode,
-};
-use crate::primitives::data::lists::table::{
+use crate::primitives::data::data_table::table_column::{
     ColumnVisibility, TableColumn, TableColumnLayout, TableLayout,
 };
+use crate::primitives::data::data_table::{
+    DataTable, DataTableModel, DataTableNavigation, DataTableOptions, DataTableSelection,
+};
+use crate::primitives::data::lists::selection::{CollectionId, Selection};
+use crate::primitives::data::lists::tree::view::flatten_visible;
 use crate::primitives::media::ui_icon_catalog;
 use crate::theme::TextScalerReader;
 use crate::theme::styles::buttons::{ButtonRole, ButtonStyleViewExt};
@@ -67,8 +68,8 @@ impl<Record> TreeTableRow<Record> {
 pub struct TreeTableOptions<Id: Ord + Clone> {
     /// Expanded branch ids; session-local when `None`.
     pub expanded: Option<Binding<BTreeSet<Id>>>,
-    pub selection: Option<Binding<DataTableSelection<Id>>>,
-    pub selection_mode: DataTableSelectionMode,
+    /// The selected rows; session-local single selection when `None`.
+    pub selection: Option<Selection<Id>>,
     pub column_widths: Option<Binding<BTreeMap<String, f32>>>,
     pub column_visibility: Option<Binding<HashMap<String, bool>>>,
     pub column_order: Option<Binding<Vec<String>>>,
@@ -83,7 +84,6 @@ impl<Id: Ord + Clone> Default for TreeTableOptions<Id> {
         Self {
             expanded: None,
             selection: None,
-            selection_mode: DataTableSelectionMode::Single,
             column_widths: None,
             column_visibility: None,
             column_order: None,
@@ -164,56 +164,39 @@ pub fn flatten_tree_table<Record, Id>(
 ) -> Vec<TreeTableRow<Record>>
 where
     Record: Clone,
-    Id: Ord + Clone,
+    Id: Ord + std::hash::Hash + Clone,
 {
-    fn visit<Record, Id>(
-        records: &[Record],
-        depth: usize,
-        children: &dyn Fn(&Record) -> Option<Vec<Record>>,
-        id_of: &dyn Fn(&Record) -> Id,
-        expanded: &BTreeSet<Id>,
-        visited: &mut BTreeSet<Id>,
-        result: &mut Vec<TreeTableRow<Record>>,
-    ) where
-        Record: Clone,
-        Id: Ord + Clone,
-    {
-        for record in records {
-            let id = id_of(record);
-            if !visited.insert(id.clone()) {
-                continue;
-            }
-            let kids = children(record);
-            let is_expanded = kids.is_some() && expanded.contains(&id);
-            result.push(TreeTableRow::new(
-                record.clone(),
-                depth,
-                kids.is_some(),
-                is_expanded,
-            ));
-            if is_expanded && let Some(kids) = kids {
-                visit(&kids, depth + 1, children, id_of, expanded, visited, result);
-            }
-        }
-    }
-    let mut result = Vec::new();
-    visit(
+    let expanded: HashSet<Id> = expanded.iter().cloned().collect();
+    let branches = |record: &Record| children(record).is_some();
+    let kids = |record: &Record| children(record).unwrap_or_default();
+    flatten_visible(
         roots,
-        0,
-        children,
         id_of,
-        expanded,
-        &mut BTreeSet::new(),
-        &mut result,
-    );
-    result
+        &kids,
+        Some(&branches),
+        &expanded,
+        &HashSet::new(),
+        None,
+        false,
+        Some(&mut HashSet::new()),
+    )
+    .into_iter()
+    .map(|entry| {
+        TreeTableRow::new(
+            entry.element,
+            entry.depth,
+            entry.has_children,
+            entry.has_children && entry.is_expanded,
+        )
+    })
+    .collect()
 }
 
 /// A `DataTable` whose first column carries the hierarchy.
 pub struct TreeTable<Record, Id>
 where
     Record: Clone + 'static,
-    Id: Ord + std::hash::Hash + Clone + Send + Sync + 'static,
+    Id: CollectionId,
 {
     roots: Vec<Record>,
     id_of: Rc<dyn Fn(&Record) -> Id>,
@@ -222,7 +205,8 @@ where
     pub options: TreeTableOptions<Id>,
     pub on_activate: Option<Rc<dyn Fn(&Record)>>,
     local_expanded: State<BTreeSet<Id>>,
-    local_selection: State<DataTableSelection<Id>>,
+    local_selection: State<Option<Id>>,
+    cursor: State<DataTableSelection<Id>>,
     navigation: State<DataTableNavigation<Id>>,
     model: RefCell<
         Option<(
@@ -236,7 +220,7 @@ where
 impl<Record, Id> TreeTable<Record, Id>
 where
     Record: Clone + 'static,
-    Id: Ord + std::hash::Hash + Clone + Send + Sync + 'static,
+    Id: CollectionId,
 {
     pub fn try_new(
         roots: Vec<Record>,
@@ -255,7 +239,8 @@ where
             options: TreeTableOptions::default(),
             on_activate: None,
             local_expanded: State::new(BTreeSet::new()),
-            local_selection: State::new(DataTableSelection::new()),
+            local_selection: State::new(None),
+            cursor: State::new(DataTableSelection::new()),
             navigation: State::new(DataTableNavigation::new()),
             model: RefCell::new(None),
         })
@@ -279,10 +264,10 @@ where
         }
     }
 
-    fn selection_binding(&self) -> Binding<DataTableSelection<Id>> {
+    fn selection(&self) -> Selection<Id> {
         match &self.options.selection {
-            Some(binding) => binding.clone(),
-            None => self.local_selection.binding(),
+            Some(selection) => selection.clone(),
+            None => Selection::single(self.local_selection.binding()),
         }
     }
 
@@ -479,7 +464,7 @@ fn next_navigation_request_id() -> u64 {
 impl<Record, Id> View for TreeTable<Record, Id>
 where
     Record: Clone + 'static,
-    Id: Ord + std::hash::Hash + Clone + Send + Sync + 'static,
+    Id: CollectionId,
 {
     fn body(&self, _cx: &Scope) -> AnyView {
         let model = self.model();
@@ -487,8 +472,8 @@ where
         let options = &self.options;
 
         let mut table_options: DataTableOptions<Id> = DataTableOptions::new();
-        table_options.selection = Some(self.selection_binding());
-        table_options.selection_mode = options.selection_mode;
+        table_options.selection = Some(self.selection());
+        table_options.cursor = Some(self.cursor.binding());
         table_options.column_widths = options.column_widths.clone();
         table_options.column_visibility = options.column_visibility.clone();
         table_options.column_order = options.column_order.clone();
@@ -518,6 +503,7 @@ where
         vec![
             crate::DynamicField::state("expanded", &self.local_expanded),
             crate::DynamicField::state("selection", &self.local_selection),
+            crate::DynamicField::state("cursor", &self.cursor),
             crate::DynamicField::state("navigation", &self.navigation),
         ]
     }
@@ -526,7 +512,7 @@ where
 impl<Record, Id> TreeTable<Record, Id>
 where
     Record: Clone + 'static,
-    Id: Ord + std::hash::Hash + Clone + Send + Sync + 'static,
+    Id: CollectionId,
 {
     /// The row-navigation handler. It owns clones of every store it may write,
     /// so it cannot borrow `self` for the node's lifetime.
@@ -537,7 +523,8 @@ where
         let is_enabled = self.options.is_enabled;
         let expanded_binding = self.options.expanded.clone();
         let fallback = self.local_expanded.clone();
-        let selection = self.selection_binding();
+        let selection = self.selection();
+        let cursor = self.cursor.clone();
         let navigation = self.navigation.clone();
         let first_column = self.columns.first().map(|column| column.id.clone());
 
@@ -573,12 +560,13 @@ where
                 write_expanded(next);
             };
             let focus = |target: &Id| {
-                let mut next_selection = selection.get();
-                next_selection.selected_ids = BTreeSet::from([target.clone()]);
-                next_selection.focused_id = Some(target.clone());
-                next_selection.anchor_id = Some(target.clone());
-                next_selection.focused_column_id = first_column.clone();
-                selection.set(next_selection);
+                selection.replace([target.clone()]);
+                let mut next_cursor = cursor.get();
+                next_cursor.selected_ids = BTreeSet::from([target.clone()]);
+                next_cursor.focused_id = Some(target.clone());
+                next_cursor.anchor_id = Some(target.clone());
+                next_cursor.focused_column_id = first_column.clone();
+                cursor.set(next_cursor);
 
                 let mut request = DataTableNavigation::new();
                 request.request_id = Some(next_navigation_request_id());

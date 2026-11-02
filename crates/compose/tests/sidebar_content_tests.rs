@@ -28,8 +28,8 @@
 //! - The Rust `Sidebar` leaves its first `ScrollView` mounted as a zero-height
 //!   orphan after the first recomposition; `live_nodes` skips it.
 
-use cove_composition::Scope;
 use crate::support;
+use cove_composition::Scope;
 
 use cove_composition::{AnyView, DynamicField, Scancode, TupleView, View};
 use cove_core::scene::{AccessibilityRole, Align, FlexDirection, Justify, Node, Wrap};

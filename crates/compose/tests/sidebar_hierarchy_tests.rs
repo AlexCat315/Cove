@@ -51,8 +51,8 @@
 //!   DevTools crate; `cove-ui-compose` does not depend on it, so `query()`
 //!   applies the same predicate to the node tree.
 
-use cove_composition::Scope;
 use crate::support;
+use cove_composition::Scope;
 
 use std::collections::HashSet;
 

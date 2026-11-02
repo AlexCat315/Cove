@@ -8,8 +8,8 @@
 //!   re-showing
 //! - the painter keeps the same element identity across every toggle
 
-use cove_composition::Scope;
 use crate::support;
+use cove_composition::Scope;
 
 use std::cell::Cell;
 use std::rc::Rc;

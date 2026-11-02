@@ -8,8 +8,8 @@
 //! - with no callback the scheduler is untouched
 //! - enabling reduced motion finishes the current target and its completion
 
-use cove_composition::Scope;
 use crate::support;
+use cove_composition::Scope;
 
 use cove_composition::{AnyView, DynamicField, View};
 use cove_core::State;

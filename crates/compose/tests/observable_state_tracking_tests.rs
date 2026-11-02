@@ -34,8 +34,8 @@
 //!   the remaining dependency-replacement cases use direct body reads, which
 //!   Rust does track.
 
-use cove_composition::Scope;
 use crate::support;
+use cove_composition::Scope;
 
 use std::cell::{Cell, RefCell};
 use std::collections::BTreeMap;

@@ -8,6 +8,7 @@ description = "CoveUI widget layer (Compose)"
 autotests = false
 
 [dependencies]
+unicode-segmentation.workspace = true
 cove-composition.workspace = true
 cove-core.workspace = true
 cove-platform.workspace = true

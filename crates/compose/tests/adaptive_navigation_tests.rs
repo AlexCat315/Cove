@@ -24,8 +24,8 @@
 //!   item is 32pt, so no strip node reaches 44pt on a touch surface.
 //!   `strip_height_ignores_the_touch_control_extent` records the gap.
 
-use cove_composition::Scope;
 use crate::support;
+use cove_composition::Scope;
 
 use std::cell::RefCell;
 use std::rc::Rc;

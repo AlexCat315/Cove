@@ -5,8 +5,8 @@
 //! - `WidthClassReader`, `HeightClassReader` and `OrientationReader` report the
 //!   surface environment, and recompose when it changes
 
-use cove_composition::Scope;
 use crate::support;
+use cove_composition::Scope;
 
 use std::rc::Rc;
 

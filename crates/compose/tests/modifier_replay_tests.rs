@@ -16,8 +16,8 @@
 //! returns the same values from `dynamic_properties`, which is the equivalent
 //! recomposition trigger. The asserted frames are Swift's own.
 
-use cove_composition::Scope;
 use crate::support;
+use cove_composition::Scope;
 
 use cove_composition::{AnyView, DynamicField, LayoutDebugExt, View};
 use cove_core::scene::{Align, FlexDirection, Justify, Node, Wrap};

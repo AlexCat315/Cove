@@ -18,8 +18,8 @@
 //!   `popping_back_rebuilds_the_root_instead_of_retaining_it` pins that.
 //! Scope-owned navigation state preserves the transition guard across parent rebuilds.
 
-use cove_composition::Scope;
 use crate::support;
+use cove_composition::Scope;
 
 use std::cell::RefCell;
 use std::rc::Rc;

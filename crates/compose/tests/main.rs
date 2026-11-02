@@ -62,6 +62,7 @@ mod combobox_search_tests;
 mod command_palette_adaptive_tests;
 mod command_palette_footer_tests;
 mod command_palette_model;
+mod component_wiring_tests;
 mod composition_local_compose;
 mod composition_local_tests;
 mod container_query_tests;
@@ -261,7 +262,10 @@ fn every_test_file_is_declared() {
     let directory = concat!(env!("CARGO_MANIFEST_DIR"), "/tests");
     for entry in std::fs::read_dir(directory).expect("the test directory") {
         let path = entry.expect("a directory entry").path();
-        let stem = path.file_stem().and_then(|stem| stem.to_str()).unwrap_or("");
+        let stem = path
+            .file_stem()
+            .and_then(|stem| stem.to_str())
+            .unwrap_or("");
         if path.extension().is_some_and(|extension| extension == "rs") && stem != "main" {
             assert!(
                 include_str!("main.rs").contains(&format!("\nmod {stem};\n")),

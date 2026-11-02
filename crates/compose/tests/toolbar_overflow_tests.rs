@@ -29,8 +29,8 @@
 //!   a disabled bar clears focus and pointer capture the way the lifecycle case
 //!   expects.
 
-use cove_composition::Scope;
 use crate::support;
+use cove_composition::Scope;
 
 use std::cell::Cell;
 use std::rc::Rc;
@@ -387,9 +387,11 @@ fn menu_keyboard() {
         );
         let rows = menu_rows(scene);
         assert!(
-            rows.iter().any(|row| row.accessibility().is_some_and(
-                |semantics| semantics.label == "Settings" && semantics.state.is_selected
-            )),
+            rows.iter().any(
+                |row| row.accessibility().is_some_and(
+                    |semantics| semantics.label == "Settings" && semantics.state.is_selected
+                )
+            ),
             "Settings is a selected row"
         );
         let disabled = rows

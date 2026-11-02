@@ -30,8 +30,8 @@
 //!   rendered. Rust's text measure is recorded on the layout node during layout,
 //!   so the same evidence is read without rendering.
 
-use cove_composition::Scope;
 use crate::support;
+use cove_composition::Scope;
 
 use std::rc::Rc;
 
@@ -487,7 +487,10 @@ fn select_commits_through_its_menu_and_releases_a_disabled_popup() {
 
         key(scene, Scancode::ESCAPE);
         scene.settle(10, 1.0);
-        assert!(scene.portal.entries().is_empty(), "Escape dismisses the menu");
+        assert!(
+            scene.portal.entries().is_empty(),
+            "Escape dismisses the menu"
+        );
 
         let trigger = target(scene, TITLE);
         scene.click(&trigger, 1);
@@ -505,7 +508,11 @@ fn select_commits_through_its_menu_and_releases_a_disabled_popup() {
             "a disabled select owns no popup"
         );
         assert_eq!(state.selection.get(), Some(1), "disabling keeps the value");
-        assert_eq!(expanded(scene), Some(false), "the closed trigger reports collapsed");
+        assert_eq!(
+            expanded(scene),
+            Some(false),
+            "the closed trigger reports collapsed"
+        );
     });
 }
 

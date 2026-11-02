@@ -16,8 +16,8 @@
 //! equivalent recomposition trigger, so the same open/close drive the same
 //! layout passes.
 
-use cove_composition::Scope;
 use crate::support;
+use cove_composition::Scope;
 
 use std::rc::Rc;
 
@@ -32,8 +32,8 @@ use cove_core::scene::{
 use cove_platform::{InputEvent, KeyEvent, KeyModifiers, WindowId};
 use cove_ui_compose::Scancode;
 use cove_ui_compose::modifiers::layout::PaddingExt;
-use cove_ui_compose::primitives::controls::Button;
 use cove_ui_compose::prelude::{ModalPlacement, Sheet};
+use cove_ui_compose::primitives::controls::Button;
 use cove_ui_compose::primitives::overlays::portal::LayerRoot;
 use cove_ui_compose::primitives::overlays::portal::PortalStoreHolder;
 use cove_ui_compose::primitives::text::Text;

@@ -32,8 +32,8 @@ use cove_core::scene::{
 use cove_core::{Binding, Point};
 use cove_platform::{InputEvent, MouseButton, MouseButtonEvent, MouseWheelEvent, WindowId};
 use cove_ui_compose::modifiers::layout::LayoutFrameExt;
+use cove_ui_compose::primitives::data::data_table::table_column::{TableColumn, TableColumnLayout};
 use cove_ui_compose::primitives::data::data_table::{DataTable, DataTableModel, DataTableOptions};
-use cove_ui_compose::primitives::data::lists::table::{TableColumn, TableColumnLayout};
 use cove_ui_compose::primitives::layout::{ScrollAxis, ScrollView};
 use cove_ui_compose::primitives::text::Text;
 use cove_ui_compose::{BoxView, Scancode};

@@ -19,11 +19,10 @@
 //! - **Hover is never requested.** `TextFieldCodeEditing::on_request_hover` is
 //!   declared but nothing reads it, so F1 produces no anchor; only focus and
 //!   the untouched read-only text are observable.
-//! - **No completion session.** The field never calls
-//!   `on_request_completion`, mounts no `TextCompletionSession` resource and
-//!   opens no portal, so debounce, prefix filtering, arrow selection, Tab,
-//!   Escape, blur and undo are unobservable. `TextField::new` also has no
-//!   `TextField`-owned surface marker; the host publishes `__textfield_state`.
+//! - **No undo for a completion.** The field does not record edits in
+//!   `edit_history`, so the accepted edit is not one undo step.
+//! - `TextField::new` has no `TextField`-owned surface marker; the host publishes
+//!   `__textfield_state`.
 //! - **No diagnostic draw fringe to exclude.** Vertex `y` replaces Swift's
 //!   `posY`, and the draw uses the same 1pt zig-zag rows.
 
@@ -45,6 +44,7 @@ use cove_ui_compose::primitives::text::Text;
 use cove_ui_compose::primitives::text::text_buffer::TextBuffer;
 use cove_ui_compose::primitives::text::text_completion_rebase::{
     TextCompletionEdit, TextCompletionItem, TextCompletionRebase, TextCompletionRequest,
+    TextInsertFormat,
 };
 use cove_ui_compose::primitives::text::text_diagnostic::{
     TextDiagnostic, TextDiagnosticGeometry, TextDiagnosticSeverity, TextDiagnostics,
@@ -52,10 +52,13 @@ use cove_ui_compose::primitives::text::text_diagnostic::{
 use cove_ui_compose::primitives::text::text_document_layout::{
     TextDocumentLayout, TextLineGeometry,
 };
+use cove_ui_compose::primitives::text::text_field::text_completion_session::{
+    TextCompletionSession, apply_completion,
+};
 use cove_ui_compose::primitives::text::text_field::text_field::{FieldState, TextField};
 use cove_ui_compose::primitives::text::text_field::text_field_observation::TextFieldHoverAnchor;
 use cove_ui_compose::primitives::text::text_field::text_field_options::{
-    TextFieldBehavior, TextFieldCodeEditing, TextFieldCompletionRequest, TextFieldNavigationRequest,
+    TextFieldBehavior, TextFieldCodeEditing, TextFieldNavigationRequest,
 };
 use cove_ui_compose::theme::Theme;
 
@@ -261,60 +264,159 @@ fn diagnostics_select_overlapping_rows_clusters_and_empty_positions() {
     });
 }
 
+/// A field bound to `text`, answering every request with `items`.
+fn completion_field(
+    scene: &mut InteractiveScene,
+    text: &str,
+    caret: usize,
+    items: Vec<TextCompletionItem>,
+) -> (
+    Arc<Mutex<TextBuffer>>,
+    Rc<RefCell<Vec<TextCompletionRequest>>>,
+) {
+    let buffer = Arc::new(Mutex::new(TextBuffer::new(text)));
+    let requests: Rc<RefCell<Vec<TextCompletionRequest>>> = Rc::new(RefCell::new(Vec::new()));
+    let read = buffer.clone();
+    let write = buffer.clone();
+    let seen = requests.clone();
+    let mut code_editing = TextFieldCodeEditing::default();
+    code_editing.on_request_completion = Some(Rc::new(move |request, reply| {
+        seen.borrow_mut().push(request);
+        reply(items.clone());
+    }));
+    let mut field = TextField::new(
+        "",
+        cove_core::Binding::new(
+            move || read.lock().unwrap().clone(),
+            move |value| *write.lock().unwrap() = value,
+        ),
+    )
+    .code_editing(code_editing);
+    field.navigation = TextFieldNavigationRequest {
+        focus_request_id: None,
+        caret_request_id: Some(1),
+        caret_request_index: Some(caret),
+    };
+    scene.install(field.frame_size(500.0, 40.0));
+    (buffer, requests)
+}
+
+fn type_text(scene: &InteractiveScene, text: &str) {
+    scene
+        .dispatcher()
+        .dispatch(&cove_platform::InputEvent::TextInput(text.to_string()));
+    scene.settle(1, 0.0);
+}
+
+fn session_items(scene: &InteractiveScene) -> Vec<String> {
+    field_surface(scene)
+        .first_resource::<TextCompletionSession>()
+        .expect("the field owns a completion session")
+        .items()
+        .into_iter()
+        .map(|item| item.label)
+        .collect()
+}
+
 #[test]
 fn completion_debounce_prefix_filtering_and_keys() {
     InteractiveScene::run(500.0, 40.0, |scene| {
-        let buffer = Arc::new(Mutex::new(TextBuffer::new("pri")));
-        let requests: Rc<RefCell<Vec<TextFieldCompletionRequest>>> =
-            Rc::new(RefCell::new(Vec::new()));
-        let read = buffer.clone();
-        let write = buffer.clone();
-        let seen = requests.clone();
-        let mut code_editing = TextFieldCodeEditing::default();
-        code_editing.on_request_completion = Some(Rc::new(move |request| {
-            seen.borrow_mut().push(request.clone());
-        }));
-
-        scene.install(
-            TextField::new(
-                "",
-                cove_core::Binding::new(
-                    move || read.lock().unwrap().clone(),
-                    move |value| *write.lock().unwrap() = value,
-                ),
-            )
-            .code_editing(code_editing)
-            .frame_size(500.0, 40.0),
-        );
-
+        let items = vec![
+            TextCompletionItem::new("print", "print", "print "),
+            TextCompletionItem::new("private", "private", "private "),
+            TextCompletionItem::new("return", "return", "return "),
+        ];
+        let (buffer, requests) = completion_field(scene, "", 0, items);
         let node = field_surface(scene);
         scene.focus.focus(Some(&node), false);
+
+        type_text(scene, "pri");
         cove_core::scene::AnimatorScheduler::current().tick(0.29);
         assert!(
             requests.borrow().is_empty(),
             "no request inside the debounce window"
         );
         cove_core::scene::AnimatorScheduler::current().tick(0.02);
-
+        assert_eq!(requests.borrow().len(), 1, "one request after the pause");
+        assert_eq!(requests.borrow()[0].prefix, "pri");
         assert_eq!(
-            requests.borrow().len(),
-            0,
-            "GAP: Swift debounces one completion request after 0.31s of typing; Rust's TextField never calls TextFieldCodeEditing::on_request_completion"
+            session_items(scene),
+            vec!["print".to_string(), "private".to_string()],
+            "the reply is filtered by the prefix"
         );
-        assert!(
-            scene.portal.entries().is_empty(),
-            "GAP: Swift opens a completion portal holding the filtered list; Rust opens none"
+        assert_eq!(
+            scene.portal.entries().len(),
+            1,
+            "the list opens in a portal"
         );
+
+        scene.key(Scancode::ARROW_DOWN, Default::default());
         scene.key(Scancode::TAB, Default::default());
         assert_eq!(
             buffer.lock().unwrap().string_value(),
-            "pri",
-            "GAP: Swift accepts the highlighted completion on Tab (private ); Rust has no completion to accept"
+            "private ",
+            "Tab accepts the highlighted row"
+        );
+        assert!(
+            scene.portal.entries().is_empty(),
+            "accepting closes the list"
         );
         assert!(
             scene.focus.focused() == Some(node.clone()),
-            "the editor keeps focus without a popup"
+            "the editor keeps focus"
         );
+    });
+}
+
+#[test]
+fn escape_and_blur_close_the_completion_list() {
+    InteractiveScene::run(500.0, 40.0, |scene| {
+        let items = vec![TextCompletionItem::new("print", "print", "print")];
+        let (buffer, _) = completion_field(scene, "pri", 3, items);
+        let node = field_surface(scene);
+        scene.focus.focus(Some(&node), false);
+        scene.settle(1, 0.0);
+
+        let explicit = cove_platform::KeyModifiers::LEFT_CTRL;
+        scene.key(Scancode::SPACE, explicit);
+        assert_eq!(session_items(scene), vec!["print".to_string()]);
+        scene.key(Scancode::ESCAPE, Default::default());
+        assert!(session_items(scene).is_empty(), "Escape closes the list");
+        assert!(scene.portal.entries().is_empty());
+        assert_eq!(buffer.lock().unwrap().string_value(), "pri");
+
+        scene.key(Scancode::SPACE, explicit);
+        assert_eq!(session_items(scene).len(), 1);
+        scene.focus.focus(None, false);
+        scene.settle(1, 0.0);
+        assert!(session_items(scene).is_empty(), "blur closes the list");
+    });
+}
+
+#[test]
+fn a_snippet_completion_visits_its_tab_stops() {
+    InteractiveScene::run(500.0, 40.0, |scene| {
+        let mut item = TextCompletionItem::new("for", "for", "for ${1:item} in ${2:list} {$0}");
+        item.insert_text_format = TextInsertFormat::Snippet;
+        let (buffer, _) = completion_field(scene, "fo", 2, vec![item]);
+        let node = field_surface(scene);
+        scene.focus.focus(Some(&node), false);
+        scene.settle(1, 0.0);
+        let state = node
+            .attachment::<Rc<RefCell<FieldState>>>("__textfield_state")
+            .expect("field state");
+
+        scene.key(Scancode::SPACE, cove_platform::KeyModifiers::LEFT_CTRL);
+        scene.key(Scancode::RETURN, Default::default());
+        assert_eq!(buffer.lock().unwrap().string_value(), "for item in list {}");
+        assert_eq!(state.borrow().selection_range(), Some((4, 8)));
+
+        scene.key(Scancode::TAB, Default::default());
+        assert_eq!(state.borrow().selection_range(), Some((12, 16)));
+
+        scene.key(Scancode::TAB, Default::default());
+        assert_eq!(state.borrow().selection_range(), None);
+        assert_eq!(state.borrow().selection.cursor_index, 18, "the final stop");
     });
 }
 
@@ -419,66 +521,49 @@ fn coordinate_tooltips_fit_at_the_viewport_corner_and_unregister() {
 #[test]
 fn completion_replaces_the_suffix_and_inserts_an_import() {
     InteractiveScene::run(500.0, 40.0, |scene| {
-        let buffer = Arc::new(Mutex::new(TextBuffer::new("priTail")));
-        let original = buffer.lock().unwrap().clone();
-        let requested: Rc<RefCell<Vec<TextFieldCompletionRequest>>> =
-            Rc::new(RefCell::new(Vec::new()));
-        let read = buffer.clone();
-        let write = buffer.clone();
-        let seen = requested.clone();
-        let mut code_editing = TextFieldCodeEditing::default();
-        code_editing.on_request_completion = Some(Rc::new(move |request| {
-            seen.borrow_mut().push(request.clone())
-        }));
-        code_editing.on_accept_completion = Some(Rc::new(|_item| {}));
-
-        let mut field = TextField::new(
-            "",
-            cove_core::Binding::new(
-                move || read.lock().unwrap().clone(),
-                move |value| *write.lock().unwrap() = value,
-            ),
-        )
-        .code_editing(code_editing);
-        field.navigation = TextFieldNavigationRequest {
-            focus_request_id: None,
-            caret_request_id: Some(1),
-            caret_request_index: Some(3),
-        };
-        scene.install(field.frame_size(500.0, 40.0));
-
-        cove_core::scene::AnimatorScheduler::current().tick(0.31);
-        assert_eq!(
-            requested.borrow().len(),
-            0,
-            "GAP: Swift asks the provider for completions at the requested caret 3; Rust never calls on_request_completion"
-        );
         let mut item = TextCompletionItem::new("print", "print", "print(value)");
         item.replacement = Some(0..7);
         item.additional_edits = vec![TextCompletionEdit::new(0..0, "import Foundation\n")];
-
+        let (buffer, requests) = completion_field(scene, "priTail", 3, vec![item]);
         let node = field_surface(scene);
+        scene.focus.focus(Some(&node), false);
+        scene.settle(1, 0.0);
         let state = node
             .attachment::<Rc<RefCell<FieldState>>>("__textfield_state")
             .expect("field state");
+
+        scene.key(Scancode::SPACE, cove_platform::KeyModifiers::LEFT_CTRL);
+        assert_eq!(requests.borrow()[0].caret_index, 3);
+        scene.key(Scancode::RETURN, Default::default());
+
         assert_eq!(
             buffer.lock().unwrap().string_value(),
-            "priTail",
-            "no reply is accepted, so the binding keeps its value; Swift accepts {item:?} on Return and writes `import Foundation\\nprint(value)`"
+            "import Foundation\nprint(value)",
+            "the suffix is replaced and the import inserted"
         );
         assert_eq!(
             state.borrow().selection.cursor_index,
-            3,
-            "GAP: Swift moves the caret to the end of the accepted `import Foundation\\nprint(value)`; Rust never accepts a reply, so the caret stays at the requested index 3"
-        );
-        let has_undo = state.borrow().buffer.has_same_contents(&original)
-            && state
-                .borrow()
-                .buffer
-                .has_same_contents(&buffer.lock().unwrap());
-        assert!(
-            has_undo,
-            "GAP: Swift records the replacement and the import as one undo step; Rust's FieldState keeps no transaction history"
+            "import Foundation\nprint(value)".chars().count(),
+            "the caret lands after the inserted text"
         );
     });
+}
+
+#[test]
+fn a_rejected_edit_set_leaves_the_text_alone() {
+    let request = TextCompletionRequest::new(TextBuffer::new("priTail"), 3);
+    let mut overlapping = TextCompletionItem::new("print", "print", "print");
+    overlapping.additional_edits = vec![TextCompletionEdit::new(1..2, "x")];
+    assert_eq!(apply_completion(&request, &overlapping, None), None);
+
+    let mut outside = TextCompletionItem::new("print", "print", "print");
+    outside.replacement = Some(0..99);
+    assert_eq!(apply_completion(&request, &outside, None), None);
+
+    let plain = TextCompletionItem::new("print", "print", "print");
+    assert_eq!(
+        apply_completion(&request, &plain, Some(3)),
+        None,
+        "the result would exceed the field's maximum length"
+    );
 }

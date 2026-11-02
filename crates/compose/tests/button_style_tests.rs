@@ -14,8 +14,8 @@
 //! - the toggle style pairs an accent fill with an on-accent foreground when
 //!   selected, and paints no fill when unselected
 
-use cove_composition::Scope;
 use crate::support;
+use cove_composition::Scope;
 
 use std::cell::RefCell;
 use std::rc::Rc;

@@ -1,7 +1,8 @@
 //! Translation of Primitives/Data/Lists/SectionedList.swift.
 //!
 //! Vertically virtualized list with flat section headers and footers. Selection
-//! and keyboard navigation only visit item rows; headers are non-focusable.
+//! and keyboard navigation follow `List` and only visit item rows; headers are
+//! non-focusable.
 //! With sticky headers, the active section title stays pinned to the top of the
 //! viewport and is pushed out by the next section header.
 //!
@@ -17,6 +18,7 @@ use crate::Scope;
 use std::rc::Rc;
 
 use super::list::ListRowHost;
+use super::selection::{CollectionId, ListCore, RowState, Selection};
 use crate::adaptive::{ContainerSizeReader, SurfaceReader};
 use crate::modifiers::interaction::AccessibilityExt;
 use crate::modifiers::interaction::HitTestingExt;
@@ -29,11 +31,11 @@ use crate::primitives::overlays::selection_key_host::SelectionKeyHost;
 use crate::primitives::text::Text;
 use crate::theme::{SemanticColorRef, SemanticFontRef};
 use crate::{AnyView, BoxView, TupleView, View, ViewExt};
-use cove_composition::{LayoutDebugExt, Scancode};
+use cove_composition::LayoutDebugExt;
 use cove_core::scene::{
     AccessibilityRole, AccessibilitySemantics, Align, FlexDirection, Justify, Wrap,
 };
-use cove_core::{Binding, Environment, InputCapabilities, Point, Size};
+use cove_core::{Environment, InputCapabilities, Point, Size};
 use cove_platform::KeyEvent;
 
 /// One flat section in a [`SectionedList`]. Headers and footers are optional;
@@ -154,18 +156,19 @@ pub struct SectionedList<SectionId, Item, ItemId>
 where
     SectionId: Clone + Eq + std::hash::Hash + Send + Sync + 'static,
     Item: Clone + 'static,
-    ItemId: Ord + Clone + Eq + std::hash::Hash + Send + Sync + 'static,
+    ItemId: CollectionId,
 {
     pub sections: Vec<ListSection<SectionId, Item>>,
-    pub selection: Binding<Option<ItemId>>,
+    pub selection: Selection<ItemId>,
     /// Authored logical row height; `None` uses the surface-dependent default.
     pub row_height: Option<f32>,
     pub row_spacing: f32,
     pub sticky_headers: bool,
     pub sticky_header_background: SemanticColorRef,
     pub on_activate: Option<Rc<dyn Fn(&Item)>>,
-    pub row_content: Rc<dyn Fn(&Item, bool) -> AnyView>,
+    pub row_content: Rc<dyn Fn(&Item, RowState) -> AnyView>,
     id_of: Rc<dyn Fn(&Item) -> ItemId>,
+    anchor: cove_core::State<Option<ItemId>>,
     cursor: cove_core::State<Option<ItemId>>,
     scroll_offset: cove_core::State<f32>,
 }
@@ -174,16 +177,16 @@ impl<SectionId, Item, ItemId> SectionedList<SectionId, Item, ItemId>
 where
     SectionId: Clone + Eq + std::hash::Hash + Send + Sync + 'static,
     Item: Clone + 'static,
-    ItemId: Ord + Clone + Eq + std::hash::Hash + Send + Sync + 'static,
+    ItemId: CollectionId,
 {
     pub fn new(
         sections: Vec<ListSection<SectionId, Item>>,
         id_of: impl Fn(&Item) -> ItemId + 'static,
-        row_content: impl Fn(&Item, bool) -> AnyView + 'static,
+        row_content: impl Fn(&Item, RowState) -> AnyView + 'static,
     ) -> Self {
         Self {
             sections,
-            selection: Binding::constant(None),
+            selection: Selection::none(),
             row_height: None,
             row_spacing: 0.0,
             sticky_headers: false,
@@ -191,12 +194,13 @@ where
             on_activate: None,
             row_content: Rc::new(row_content),
             id_of: Rc::new(id_of),
+            anchor: cove_core::State::new(None),
             cursor: cove_core::State::new(None),
             scroll_offset: cove_core::State::new(0.0),
         }
     }
 
-    pub fn selection(mut self, selection: Binding<Option<ItemId>>) -> Self {
+    pub fn selection(mut self, selection: Selection<ItemId>) -> Self {
         self.selection = selection;
         self
     }
@@ -237,7 +241,7 @@ impl<SectionId, Item, ItemId> View for SectionedList<SectionId, Item, ItemId>
 where
     SectionId: Clone + Eq + std::hash::Hash + Send + Sync + 'static,
     Item: Clone + 'static,
-    ItemId: Ord + Clone + Eq + std::hash::Hash + Send + Sync + 'static,
+    ItemId: CollectionId,
 {
     fn body(&self, _cx: &Scope) -> AnyView {
         let entries = flatten(&self.sections);
@@ -250,21 +254,45 @@ where
             })
             .collect();
 
-        let surface = SectionedListSurface {
-            entries: Rc::new(entries),
-            ids,
-            cursor: self.cursor.clone(),
+        let item_ids: Vec<ItemId> = entries
+            .iter()
+            .filter_map(|entry| match entry {
+                Entry::Item(item) => Some((self.id_of)(item)),
+                _ => None,
+            })
+            .collect();
+        let entries = Rc::new(entries);
+        let core = ListCore {
+            ids: item_ids.into(),
             selection: self.selection.clone(),
+            anchor: self.anchor.clone(),
+            cursor: self.cursor.clone(),
+            on_activate: self.on_activate.clone().map(|handler| {
+                let entries = entries.clone();
+                let id_of = self.id_of.clone();
+                Rc::new(move |id: &ItemId| {
+                    let item = entries.iter().find_map(|entry| match entry {
+                        Entry::Item(item) if id_of(item) == *id => Some(item),
+                        _ => None,
+                    });
+                    if let Some(item) = item {
+                        handler(item);
+                    }
+                }) as Rc<dyn Fn(&ItemId)>
+            }),
+        };
+        let surface = SectionedListSurface {
+            entries,
+            ids,
+            core: core.clone(),
             offset: self.scroll_offset.clone(),
             sticky_headers: self.sticky_headers,
             sticky_background: self.sticky_header_background.clone(),
             row_height: self.row_height,
             row_spacing: self.row_spacing,
-            on_activate: self.on_activate.clone(),
             row_content: self.row_content.clone(),
             id_of: self.id_of.clone(),
         };
-        let keys = surface.clone_for_keys();
         AnyView::new(SelectionKeyHost::new(
             ContainerSizeReader::new({
                 let surface = surface.clone();
@@ -279,106 +307,12 @@ where
             .flex_with(1.0, 1.0, Some(0.0))
             .frame(None, None, Some(0.0), Some(0.0), None, None),
             true,
-            move |event: &KeyEvent| keys.handle_key(event),
+            move |event: &KeyEvent| core.handle_key(event),
         ))
     }
 
     fn dynamic_properties(&self) -> Vec<crate::DynamicField> {
-        crate::dynamic_fields!(self; cursor, scroll_offset)
-    }
-}
-
-/// The session values the keyboard boundary and the rendered surface share.
-#[derive(Clone)]
-struct SectionedListKeys<SectionId, Item, ItemId>
-where
-    SectionId: Clone + Eq + std::hash::Hash + Send + Sync + 'static,
-    Item: Clone + 'static,
-    ItemId: Ord + Clone + Eq + std::hash::Hash + Send + Sync + 'static,
-{
-    entries: Rc<Vec<Entry<SectionId, Item>>>,
-    id_of: Rc<dyn Fn(&Item) -> ItemId>,
-    cursor: cove_core::State<Option<ItemId>>,
-    selection: Binding<Option<ItemId>>,
-    on_activate: Option<Rc<dyn Fn(&Item)>>,
-}
-
-impl<SectionId, Item, ItemId> SectionedListKeys<SectionId, Item, ItemId>
-where
-    SectionId: Clone + Eq + std::hash::Hash + Send + Sync + 'static,
-    Item: Clone + 'static,
-    ItemId: Ord + Clone + Eq + std::hash::Hash + Send + Sync + 'static,
-{
-    fn item_positions(&self) -> Vec<usize> {
-        self.entries
-            .iter()
-            .enumerate()
-            .filter_map(|(index, entry)| matches!(entry, Entry::Item(_)).then_some(index))
-            .collect()
-    }
-
-    fn id_at(&self, position: usize) -> Option<ItemId> {
-        match self.entries.get(position) {
-            Some(Entry::Item(item)) => Some((self.id_of)(item)),
-            _ => None,
-        }
-    }
-
-    fn handle_key(&self, event: &KeyEvent) -> bool {
-        let items = self.item_positions();
-        if items.is_empty() {
-            return false;
-        }
-        let position_of = |id: &ItemId| {
-            items
-                .iter()
-                .copied()
-                .find(|position| self.id_at(*position).as_ref() == Some(id))
-        };
-        let current = self
-            .cursor
-            .get()
-            .as_ref()
-            .and_then(position_of)
-            .or_else(|| self.selection.get().as_ref().and_then(position_of));
-
-        if event.scancode == Scancode::RETURN || event.scancode == Scancode::KEYPAD_ENTER {
-            let Some(position) = current else {
-                return false;
-            };
-            let Some(Entry::Item(item)) = self.entries.get(position) else {
-                return false;
-            };
-            let id = (self.id_of)(item);
-            self.cursor.set(Some(id.clone()));
-            self.selection.set(Some(id));
-            if let Some(handler) = &self.on_activate {
-                handler(item);
-            }
-            return true;
-        }
-
-        let target = match event.scancode {
-            Scancode::ARROW_DOWN => {
-                let next = current.map(|value| value + 1).unwrap_or(0);
-                items[next.min(items.len() - 1)]
-            }
-            Scancode::ARROW_UP => {
-                let next = current
-                    .and_then(|value| value.checked_sub(1))
-                    .unwrap_or(items.len() - 1);
-                items[next.min(items.len() - 1)]
-            }
-            Scancode::HOME => items[0],
-            Scancode::END => items[items.len() - 1],
-            _ => return false,
-        };
-
-        if let Some(id) = self.id_at(target) {
-            self.cursor.set(Some(id.clone()));
-            self.selection.set(Some(id));
-        }
-        true
+        crate::dynamic_fields!(self; anchor, cursor, scroll_offset)
     }
 }
 
@@ -387,19 +321,17 @@ struct SectionedListSurface<SectionId, Item, ItemId>
 where
     SectionId: Clone + Eq + std::hash::Hash + Send + Sync + 'static,
     Item: Clone + 'static,
-    ItemId: Ord + Clone + Eq + std::hash::Hash + Send + Sync + 'static,
+    ItemId: CollectionId,
 {
     entries: Rc<Vec<Entry<SectionId, Item>>>,
     ids: Vec<SectionedEntryId<SectionId, ItemId>>,
-    cursor: cove_core::State<Option<ItemId>>,
-    selection: Binding<Option<ItemId>>,
+    core: ListCore<ItemId>,
     offset: cove_core::State<f32>,
     sticky_headers: bool,
     sticky_background: SemanticColorRef,
     row_height: Option<f32>,
     row_spacing: f32,
-    on_activate: Option<Rc<dyn Fn(&Item)>>,
-    row_content: Rc<dyn Fn(&Item, bool) -> AnyView>,
+    row_content: Rc<dyn Fn(&Item, RowState) -> AnyView>,
     id_of: Rc<dyn Fn(&Item) -> ItemId>,
 }
 
@@ -407,20 +339,18 @@ impl<SectionId, Item, ItemId> Clone for SectionedListSurface<SectionId, Item, It
 where
     SectionId: Clone + Eq + std::hash::Hash + Send + Sync + 'static,
     Item: Clone + 'static,
-    ItemId: Ord + Clone + Eq + std::hash::Hash + Send + Sync + 'static,
+    ItemId: CollectionId,
 {
     fn clone(&self) -> Self {
         Self {
             entries: self.entries.clone(),
             ids: self.ids.clone(),
-            cursor: self.cursor.clone(),
-            selection: self.selection.clone(),
+            core: self.core.clone(),
             offset: self.offset.clone(),
             sticky_headers: self.sticky_headers,
             sticky_background: self.sticky_background.clone(),
             row_height: self.row_height,
             row_spacing: self.row_spacing,
-            on_activate: self.on_activate.clone(),
             row_content: self.row_content.clone(),
             id_of: self.id_of.clone(),
         }
@@ -431,20 +361,10 @@ impl<SectionId, Item, ItemId> SectionedListSurface<SectionId, Item, ItemId>
 where
     SectionId: Clone + Eq + std::hash::Hash + Send + Sync + 'static,
     Item: Clone + 'static,
-    ItemId: Ord + Clone + Eq + std::hash::Hash + Send + Sync + 'static,
+    ItemId: CollectionId,
 {
-    fn clone_for_keys(&self) -> SectionedListKeys<SectionId, Item, ItemId> {
-        SectionedListKeys {
-            entries: self.entries.clone(),
-            id_of: self.id_of.clone(),
-            cursor: self.cursor.clone(),
-            selection: self.selection.clone(),
-            on_activate: self.on_activate.clone(),
-        }
-    }
-
     fn cursor_index(&self) -> Option<usize> {
-        let id = self.cursor.get()?;
+        let id = self.core.cursor.get()?;
         self.ids
             .iter()
             .position(|entry| *entry == SectionedEntryId::Item(id.clone()))
@@ -469,11 +389,9 @@ where
 
         let ids = self.ids.clone();
         let rows = self.entries.clone();
-        let selection = self.selection.clone();
-        let cursor = self.cursor.clone();
+        let core = self.core.clone();
         let content = self.row_content.clone();
         let id_of = self.id_of.clone();
-        let on_activate = self.on_activate.clone();
 
         let mut stack = FixedVirtualStack::new(
             ids.clone(),
@@ -482,17 +400,7 @@ where
                 let Some(position) = ids.iter().position(|entry| entry == id) else {
                     return AnyView::new(crate::EmptyView);
                 };
-                entry_view(
-                    &rows,
-                    position,
-                    height,
-                    touch,
-                    &selection,
-                    &cursor,
-                    &id_of,
-                    &content,
-                    &on_activate,
-                )
+                entry_view(&rows, position, height, touch, &core, &id_of, &content)
             },
         )
         .spacing(spacing);
@@ -563,15 +471,13 @@ fn entry_view<SectionId, Item, ItemId>(
     position: usize,
     height: f32,
     touch: bool,
-    selection: &Binding<Option<ItemId>>,
-    cursor: &cove_core::State<Option<ItemId>>,
+    core: &ListCore<ItemId>,
     id_of: &Rc<dyn Fn(&Item) -> ItemId>,
-    content: &Rc<dyn Fn(&Item, bool) -> AnyView>,
-    on_activate: &Option<Rc<dyn Fn(&Item)>>,
+    content: &Rc<dyn Fn(&Item, RowState) -> AnyView>,
 ) -> AnyView
 where
     Item: Clone + 'static,
-    ItemId: Ord + Clone + Eq + std::hash::Hash + Send + Sync + 'static,
+    ItemId: CollectionId,
 {
     match rows.get(position) {
         Some(Entry::Header(_id, title)) => {
@@ -633,37 +539,21 @@ where
         }
         Some(Entry::Item(item)) => {
             let id = (id_of)(item);
-            let selected = selection.get().as_ref() == Some(&id);
-            let view = content(item, selected);
-            let activate_item = item.clone();
-            let handler = on_activate.clone();
-            let cursor = cursor.clone();
-            let selection = selection.clone();
-            let pointer_cursor = cursor.clone();
-            let pointer_selection = selection.clone();
-            let pointer_id = id.clone();
-            let on_activate: Rc<dyn Fn()> = Rc::new({
-                let id = id.clone();
-                move || {
-                    cursor.set(Some(id.clone()));
-                    selection.set(Some(id.clone()));
-                    if let Some(handler) = &handler {
-                        handler(&activate_item);
-                    }
-                }
-            });
-            let touch_activate = on_activate.clone();
+            let selected = core.selection.contains(&id);
+            let view = content(item, RowState::selected(selected));
+            let activate = core.clone();
+            let activate_id = id.clone();
+            let tap = core.clone();
             AnyView::new(ListRowHost {
                 id: 0,
                 is_selected: selected,
                 row_height: height,
-                on_activate,
-                on_tap: Some(Rc::new(move |_| {
+                on_activate: Rc::new(move || activate.activate(activate_id.clone())),
+                on_tap: Some(Rc::new(move |modifiers| {
                     if touch {
-                        touch_activate();
+                        tap.activate(id.clone());
                     } else {
-                        pointer_cursor.set(Some(pointer_id.clone()));
-                        pointer_selection.set(Some(pointer_id.clone()));
+                        tap.tap(id.clone(), modifiers);
                     }
                 })),
                 content: view,

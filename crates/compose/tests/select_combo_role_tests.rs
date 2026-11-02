@@ -137,13 +137,25 @@ fn a_click_opens_only_the_select_it_landed_on() {
         scene.click(&triggers[0], 1);
         scene.settle(1, 1.0 / 60.0);
         let triggers = combo_boxes(scene);
-        assert_eq!(expanded(&triggers[0]), Some(true), "the clicked select opens");
-        assert_eq!(expanded(&triggers[1]), Some(false), "its neighbour stays shut");
+        assert_eq!(
+            expanded(&triggers[0]),
+            Some(true),
+            "the clicked select opens"
+        );
+        assert_eq!(
+            expanded(&triggers[1]),
+            Some(false),
+            "its neighbour stays shut"
+        );
         assert_eq!(scene.portal.entries().len(), 1, "the popup is mounted");
 
         scene.click(&triggers[0], 1);
         scene.settle(1, 1.0 / 60.0);
-        assert_eq!(expanded(&combo_boxes(scene)[0]), Some(false), "a second click closes it");
+        assert_eq!(
+            expanded(&combo_boxes(scene)[0]),
+            Some(false),
+            "a second click closes it"
+        );
     });
 }
 
@@ -157,7 +169,11 @@ fn a_narrow_select_sizes_its_trigger_and_keeps_every_option_on_one_line() {
             Select::new(Binding::constant("100%"), options).width(86.0),
         )));
         let trigger = combo_boxes(scene).remove(0);
-        assert_eq!(trigger.absolute_frame().width, 86.0, "width sizes the trigger");
+        assert_eq!(
+            trigger.absolute_frame().width,
+            86.0,
+            "width sizes the trigger"
+        );
 
         scene.click(&trigger, 1);
         scene.settle(4, 1.0 / 60.0);
@@ -171,7 +187,10 @@ fn a_narrow_select_sizes_its_trigger_and_keeps_every_option_on_one_line() {
             rows.iter().all(|row| row.height == rows[0].height),
             "no option wraps: {rows:?}"
         );
-        assert!(rows[0].width >= 86.0 - 8.0, "the popup is at least the trigger");
+        assert!(
+            rows[0].width >= 86.0 - 8.0,
+            "the popup is at least the trigger"
+        );
     });
 }
 
@@ -212,11 +231,13 @@ fn the_highlight_moves_with_the_pointer_and_the_arrows() {
         assert!(!lit(scene, 1));
 
         let target = row(scene, 1).absolute_frame();
-        scene.dispatcher().dispatch(&InputEvent::MouseMotion(MouseMotionEvent {
-            x: target.x + target.width / 2.0,
-            y: target.y + target.height / 2.0,
-            ..Default::default()
-        }));
+        scene
+            .dispatcher()
+            .dispatch(&InputEvent::MouseMotion(MouseMotionEvent {
+                x: target.x + target.width / 2.0,
+                y: target.y + target.height / 2.0,
+                ..Default::default()
+            }));
         scene.settle(2, 1.0 / 60.0);
         assert!(lit(scene, 1), "the highlight follows the pointer");
         assert!(!lit(scene, 0), "one row is highlighted at a time");

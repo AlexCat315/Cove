@@ -334,11 +334,7 @@ fn backspace_deletes() {
         let handler = rig.handlers(&node).key.expect("key handler");
         let result = handler(&plain(Scancode::BACKSPACE), EventPhase::Target);
         assert!(result == EventResult::Handled, "handled {result:?}");
-        assert_eq!(
-            rig.text(),
-            "abc",
-            "GAP: Swift writes `ab` through the binding; Rust's Backspace edits only the field's internal buffer and never writes the binding"
-        );
+        assert_eq!(rig.text(), "ab", "Backspace writes through the binding");
         assert_eq!(
             state_of(&node).unwrap().borrow().buffer.string_value(),
             "ab",
@@ -363,8 +359,8 @@ fn arrows_move_cursor() {
         key_handler(&plain(Scancode::BACKSPACE), EventPhase::Target);
         assert_eq!(
             rig.text(),
-            "heXllo",
-            "GAP: Swift Backspace restores `hello` through the binding; Rust's Backspace edits only the field's internal buffer and never writes the binding"
+            "hello",
+            "Backspace restores `hello` through the binding"
         );
     });
 }
@@ -542,8 +538,8 @@ fn multiline_return_inserts_newline() {
         (rig.handlers(&node).key.unwrap())(&plain(Scancode::RETURN), EventPhase::Target);
         assert_eq!(
             rig.text(),
-            "abc",
-            "GAP: Swift writes `abc\\n` through the binding; Rust inserts the newline only into the internal buffer"
+            "abc\n",
+            "Return writes the newline through the binding"
         );
         assert_eq!(
             state_of(&node).unwrap().borrow().buffer.string_value(),
@@ -570,10 +566,7 @@ fn multiline_primary_return_submits() {
             EventPhase::Target,
         );
         assert!(rig.text() == "abc", "unchanged {:?}", rig.text());
-        assert!(
-            !submitted.get(),
-            "GAP: Swift submits a vertical field on Primary-Return; Rust treats every Return in a vertical field as a newline"
-        );
+        assert!(submitted.get(), "Primary-Return submits a vertical field");
     });
 }
 
@@ -689,8 +682,8 @@ fn backspace_removes_grapheme() {
         k(&plain(Scancode::BACKSPACE), EventPhase::Target);
         assert_eq!(
             rig.text(),
-            "a😀b",
-            "GAP: Swift deletes `b` through the binding; Rust's Backspace edits only the field's internal buffer and never writes the binding"
+            "a😀",
+            "Backspace deletes `b` through the binding"
         );
         assert_eq!(
             state_of(&node).unwrap().borrow().buffer.string_value(),
@@ -700,8 +693,8 @@ fn backspace_removes_grapheme() {
         k(&plain(Scancode::BACKSPACE), EventPhase::Target);
         assert_eq!(
             rig.text(),
-            "a😀b",
-            "GAP: Swift deletes the whole emoji through the binding; Rust edits only the field's internal buffer and never writes the binding"
+            "a",
+            "Backspace deletes the whole emoji through the binding"
         );
         assert_eq!(
             state_of(&node).unwrap().borrow().buffer.string_value(),
@@ -1051,8 +1044,8 @@ fn primary_a_select_all() {
         k(&plain(Scancode::BACKSPACE), EventPhase::Target);
         assert_eq!(
             rig.text(),
-            "hello",
-            "GAP: Swift selects all on Primary-A and Backspace clears through the binding; Rust has no Primary-A and its Backspace never writes the binding"
+            "hell",
+            "GAP: Swift selects all on Primary-A and Backspace clears; Rust has no Primary-A, so Backspace deletes one character"
         );
     });
 }
@@ -1204,8 +1197,8 @@ fn triple_click_selects_all() {
         (handlers.key.clone().unwrap())(&plain(Scancode::BACKSPACE), EventPhase::Target);
         assert_eq!(
             rig.text(),
-            "hello world",
-            "GAP: Swift selects the whole field on a triple click and Backspace clears it; Rust ignores the click count and its Backspace never writes the binding"
+            "hello worl",
+            "GAP: Swift selects the whole field on a triple click and Backspace clears it; Rust ignores the click count, so Backspace deletes one character"
         );
     });
 }
@@ -1255,10 +1248,18 @@ fn motion_ignored_without_drag() {
         rig.set("abc");
         rig.install(TextField::new("", rig.binding()));
         let node = rig.field();
-        let motion = rig.handlers(&node).motion;
-        assert!(
-            motion.is_none(),
-            "GAP: Swift registers a motion handler that ignores motion without a drag; Rust registers no motion handler, so drag selection does not exist"
+        let motion = rig.handlers(&node).motion.expect("motion handler");
+        let event = MouseMotionEvent {
+            x: 40.0,
+            y: 10.0,
+            delta_x: 4.0,
+            delta_y: 0.0,
+            kind: Default::default(),
+        };
+        assert_eq!(
+            motion(&event, EventPhase::Target),
+            EventResult::Ignored,
+            "motion without a drag is ignored"
         );
     });
 }
@@ -1291,8 +1292,8 @@ fn option_word_navigation() {
         t("Y", EventPhase::Target);
         assert_eq!(
             rig.text(),
-            "hello brave worlXYd",
-            "GAP: Swift moves to the line start and then one word right (helloY); Rust ignores both modifiers and writes its stale internal buffer back over the reset value"
+            "hello brave worldY",
+            "GAP: Swift moves to the line start and then one word right (helloY); Rust ignores both modifiers"
         );
         rig.set("hello brave world");
         k(&primary(Scancode::ARROW_RIGHT), EventPhase::Target);
@@ -1302,8 +1303,8 @@ fn option_word_navigation() {
         );
         assert_eq!(
             rig.text(),
-            "hello brave world",
-            "GAP: Swift deletes the trailing word on Option-Backspace; Rust's Backspace never writes the binding"
+            "hello brave worl",
+            "GAP: Swift deletes the trailing word on Option-Backspace; Rust deletes one character"
         );
     });
 }
@@ -1327,8 +1328,8 @@ fn command_line_navigation() {
         k(&primary(Scancode::BACKSPACE), EventPhase::Target);
         assert_eq!(
             rig.text(),
-            "hellXo",
-            "GAP: Swift deletes to the line start on Command-Backspace; Rust's Backspace never writes the binding"
+            "hellX",
+            "GAP: Swift deletes to the line start on Command-Backspace; Rust deletes one character"
         );
     });
 }
@@ -1364,8 +1365,8 @@ fn caret_move_marks_render_dirty() {
             );
         }
         assert!(
-            handlers.motion.is_none() && !rig.graph.tree.borrow().has_render_updates(),
-            "GAP: Swift's drag-selection motion invalidates render; Rust registers no motion handler"
+            !rig.graph.tree.borrow().has_render_updates(),
+            "GAP: Swift's drag-selection motion invalidates render; Rust motion only drives the overview"
         );
     });
 }
@@ -1382,16 +1383,16 @@ fn stale_indices_are_clamped() {
         k(&plain(Scancode::BACKSPACE), EventPhase::Target);
         assert_eq!(
             rig.text(),
-            "hi",
-            "GAP: Swift clamps the stale caret and deletes through the binding (h); Rust's Backspace never writes the binding"
+            "h",
+            "the stale caret clamps and Backspace deletes through the binding"
         );
         k(&primary(Scancode::A), EventPhase::Target);
         rig.set("");
         (handlers.text.clone().unwrap())("x", EventPhase::Target);
         assert_eq!(
             rig.text(),
-            "hello worlx",
-            "GAP: Swift collapses the stale selection over the externally emptied text (x); Rust has no Primary-A and its text handler writes its stale internal buffer back over the external value"
+            "x",
+            "the stale caret collapses over the externally emptied text"
         );
     });
 }

@@ -33,8 +33,8 @@
 //!   `SidebarToggle`) the positional reconciler reused nodes across the switch
 //!   and the following document subtree went missing.
 
-use cove_composition::Scope;
 use crate::support;
+use cove_composition::Scope;
 
 use cove_composition::layout::LayoutDirectionExt;
 use cove_composition::{AnyView, EmptyView, LayoutDebugExt, Scancode, TupleView, View};

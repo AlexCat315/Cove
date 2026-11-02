@@ -243,13 +243,13 @@ fn color_emoji_caret() {
         press(&handler, Scancode::BACKSPACE, KeyModifiers::default());
         assert_eq!(
             store.lock().unwrap().string_value(),
-            "A👩🏽‍💻中🙂B",
-            "GAP: Swift deletes the joined emoji through the binding (A中🙂B); Rust's Backspace never writes the binding"
+            "A中🙂B",
+            "Backspace deletes the joined emoji through the binding"
         );
         assert_eq!(
             state.borrow().buffer.string_value(),
-            "A🏽\u{200d}💻中🙂B",
-            "GAP: Swift caret index 2 sits after the joined emoji and Backspace removes it whole; Rust indexes Unicode scalars, so index 2 is inside the sequence and Backspace removes only 👩"
+            "A中🙂B",
+            "the caret steps over the joined emoji and Backspace removes it whole"
         );
         assert!(
             state.borrow().selection.cursor_index == 1,
@@ -258,8 +258,8 @@ fn color_emoji_caret() {
         );
         press(&handler, Scancode::Z, KeyModifiers::LEFT_GUI);
         assert!(
-            *store.lock().unwrap() == original,
-            "undo leaves the bound text at the original"
+            *store.lock().unwrap() != original,
+            "GAP: Swift Command-Z restores the original; the field records no edit history"
         );
         assert_eq!(
             state.borrow().selection.cursor_index,
@@ -312,8 +312,8 @@ fn logical_lines() {
         press(&handler, Scancode::BACKSPACE, KeyModifiers::LEFT_GUI);
         assert_eq!(
             store.lock().unwrap().string_value(),
-            "first\r\nAé👩🏽‍💻中Z\r\nlast",
-            "GAP: Swift Command-Backspace deletes to the line start through the binding (first\\r\\n\\r\\nlast); Rust deletes one character from its internal buffer only"
+            "first\r\nAé👩🏽‍💻中\r\nlast",
+            "GAP: Swift Command-Backspace deletes to the line start (first\\r\\n\\r\\nlast); Rust deletes one character"
         );
         assert_eq!(
             state.borrow().buffer.string_value(),
@@ -321,7 +321,12 @@ fn logical_lines() {
             "the internal buffer drops one character"
         );
         press(&handler, Scancode::Z, KeyModifiers::LEFT_GUI);
-        assert!(*store.lock().unwrap() == original, "undo");
+        assert!(
+            *store.lock().unwrap() != original,
+            "GAP: Swift Command-Z restores the original; the field records no edit history"
+        );
+        store.lock().unwrap().clone_from(&original);
+        state.borrow_mut().normalize(&original);
         press(&handler, Scancode::HOME, KeyModifiers::LEFT_CTRL);
         assert_eq!(
             cursor(),
@@ -332,13 +337,13 @@ fn logical_lines() {
         let count = state.borrow().buffer.character_count();
         assert_eq!(
             cursor(),
-            range.end - 1,
+            range.end,
             "GAP: Swift Control-End moves to the document end ({count}); Rust treats it as End on the current line"
         );
         press(&handler, Scancode::ARROW_UP, KeyModifiers::LEFT_GUI);
         assert_eq!(
             cursor(),
-            range.end - 1,
+            range.end,
             "GAP: Swift Command-Up moves to the document start; Rust ignores it"
         );
         press(

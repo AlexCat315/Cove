@@ -5,8 +5,8 @@
 //! actions. Every row also carries an actions menu, so the same commands are
 //! reachable with a pointer, a keyboard or a screen reader.
 //!
-//! The list mounts all rows (like `ReorderableList`); use it for settings,
-//! inbox rows and playlists rather than unbounded collections.
+//! Rows are virtualized, so a row's reveal closes once it scrolls out of the
+//! window.
 //!
 //! Behaviour checklist:
 //! - at most two actions appear on the swipe surface; the menu lists every one
@@ -20,14 +20,17 @@ use crate::Scope;
 use crate::modifiers::interaction::{AccessibilityExt, HitTestingExt};
 use std::rc::Rc;
 
+use super::selection::{CollectionId, ListCore, RowState, Selection};
 use crate::adaptive::SurfaceEnvironment;
 use crate::modifiers::layout::{FlexExt, LayoutFrameExt};
 use crate::modifiers::style::{AppearanceExt, SemanticStyleViewExt};
 use crate::primitives::controls::button::{Button, ButtonIcon, ButtonIconSource};
 use crate::primitives::feedback::StatusTone;
+use crate::primitives::layout::virtualization::FixedVirtualStack;
 use crate::primitives::media::ui_icon_catalog;
 use crate::primitives::overlays::ContextMenu;
 use crate::primitives::overlays::menu::{MenuEntry, MenuItem, MenuItemRole};
+use crate::primitives::overlays::selection_key_host::SelectionKeyHost;
 use crate::primitives::text::Text;
 use crate::theme::SemanticFontRef;
 use crate::theme::styles::buttons::{AnyButtonStyle, ButtonStyleViewExt};
@@ -38,7 +41,7 @@ use cove_core::scene::{
     EventResult, FlexDirection, HoverPhase, InputHandlerRoute, InteractionRegistryHolder, Justify,
     LayoutNode, Node, PointerCaptureAttachmentKey, PointerCaptureHolder, PointerPhase, Wrap,
 };
-use cove_core::{Binding, Environment, InputCapabilities, Signal, State};
+use cove_core::{InputCapabilities, Signal, State};
 use cove_platform::{KeyEvent, MouseButton, SystemCursor};
 
 /// One trailing action on a `SwipeList` row.
@@ -109,51 +112,58 @@ pub fn swipe_snap_target(reveal: f32, max_reveal: f32) -> f32 {
 pub struct SwipeList<Item, Id, RowContent>
 where
     Item: Clone + 'static,
-    Id: Ord + Clone + Send + Sync + 'static,
-    RowContent: Fn(&Item, bool) -> AnyView + 'static,
+    Id: CollectionId,
+    RowContent: Fn(&Item, RowState) -> AnyView + 'static,
 {
     pub data: Vec<Item>,
-    pub selection: Binding<Option<Id>>,
+    pub selection: Selection<Id>,
     pub row_height: f32,
     pub row_spacing: f32,
     pub is_enabled: bool,
     pub row_label: Rc<dyn Fn(&Item) -> String>,
     pub actions: Rc<dyn Fn(&Item) -> Vec<SwipeAction>>,
     pub on_activate: Option<Rc<dyn Fn(&Item)>>,
-    pub row_content: RowContent,
+    pub row_content: Rc<RowContent>,
     id_of: Rc<dyn Fn(&Item) -> Id>,
+    anchor: State<Option<Id>>,
     cursor: State<Option<Id>>,
 }
 
 impl<Item, Id, RowContent> SwipeList<Item, Id, RowContent>
 where
     Item: Clone + 'static,
-    Id: Ord + Clone + Send + Sync + 'static,
-    RowContent: Fn(&Item, bool) -> AnyView + 'static,
+    Id: CollectionId,
+    RowContent: Fn(&Item, RowState) -> AnyView + 'static,
 {
     pub fn new(
         data: Vec<Item>,
         id_of: impl Fn(&Item) -> Id + 'static,
-        actions: impl Fn(&Item) -> Vec<SwipeAction> + 'static,
         row_content: RowContent,
     ) -> Self {
         Self {
             data,
-            selection: Binding::constant(None),
+            selection: Selection::none(),
             row_height: 36.0,
             row_spacing: 0.0,
             is_enabled: true,
             row_label: Rc::new(|_| String::new()),
-            actions: Rc::new(actions),
+            actions: Rc::new(|_| Vec::new()),
             on_activate: None,
-            row_content,
+            row_content: Rc::new(row_content),
             id_of: Rc::new(id_of),
+            anchor: State::new(None),
             cursor: State::new(None),
         }
     }
 
-    pub fn selection(mut self, selection: Binding<Option<Id>>) -> Self {
+    pub fn selection(mut self, selection: Selection<Id>) -> Self {
         self.selection = selection;
+        self
+    }
+
+    /// The trailing actions of each row.
+    pub fn actions(mut self, actions: impl Fn(&Item) -> Vec<SwipeAction> + 'static) -> Self {
+        self.actions = Rc::new(actions);
         self
     }
 
@@ -182,183 +192,91 @@ where
         self
     }
 
-    pub fn select(&self, item: &Item) {
-        let id = (self.id_of)(item);
-        self.cursor.set(Some(id.clone()));
-        self.selection.set(Some(id));
-    }
-
-    pub fn activate(&self, item: &Item) {
-        self.select(item);
-        if let Some(handler) = &self.on_activate {
-            handler(item);
+    fn core(&self) -> ListCore<Id> {
+        let data = self.data.clone();
+        let id_of = self.id_of.clone();
+        ListCore {
+            ids: self.data.iter().map(|item| (self.id_of)(item)).collect(),
+            selection: self.selection.clone(),
+            anchor: self.anchor.clone(),
+            cursor: self.cursor.clone(),
+            on_activate: self.on_activate.clone().map(|handler| {
+                Rc::new(move |id: &Id| {
+                    if let Some(item) = data.iter().find(|item| id_of(item) == *id) {
+                        handler(item);
+                    }
+                }) as Rc<dyn Fn(&Id)>
+            }),
         }
     }
 
     /// Down/Up/Home/End move the selection; Return activates it.
     pub fn handle_key(&self, event: &KeyEvent) -> bool {
-        if !self.is_enabled || self.data.is_empty() {
-            return false;
-        }
-        let position_of = |id: &Id| self.data.iter().position(|item| &(self.id_of)(item) == id);
-        let current = self
-            .cursor
-            .get()
-            .as_ref()
-            .and_then(position_of)
-            .or_else(|| self.selection.get().as_ref().and_then(position_of));
-
-        if event.scancode == Scancode::RETURN || event.scancode == Scancode::KEYPAD_ENTER {
-            let Some(current) = current else { return false };
-            let item = self.data[current].clone();
-            self.activate(&item);
-            return true;
-        }
-
-        let next = match event.scancode {
-            Scancode::ARROW_DOWN => current.map(|value| value + 1).unwrap_or(0),
-            Scancode::ARROW_UP => current
-                .and_then(|value| value.checked_sub(1))
-                .unwrap_or(self.data.len() - 1),
-            Scancode::HOME => 0,
-            Scancode::END => self.data.len() - 1,
-            _ => return false,
-        };
-        let next = next.min(self.data.len() - 1);
-        let item = self.data[next].clone();
-        self.select(&item);
-        true
+        self.is_enabled && self.core().handle_key(event)
     }
 }
 
 impl<Item, Id, RowContent> View for SwipeList<Item, Id, RowContent>
 where
     Item: Clone + 'static,
-    Id: Ord + Clone + Send + Sync + 'static,
-    RowContent: Fn(&Item, bool) -> AnyView + 'static,
+    Id: CollectionId,
+    RowContent: Fn(&Item, RowState) -> AnyView + 'static,
 {
     fn body(&self, _cx: &Scope) -> AnyView {
-        let total_height: f32 = {
-            let count = self.data.len() as f32;
-            (count * (self.row_height + self.row_spacing) - self.row_spacing).max(0.0)
-        };
-        let rows: Vec<AnyView> = self
-            .data
-            .iter()
-            .map(|item| {
-                let id = (self.id_of)(item);
-                let selected = self.selection.get().as_ref() == Some(&id);
-                let label = (self.row_label)(item);
-                let actions = if self.is_enabled {
-                    (self.actions)(item)
+        let core = self.core();
+        let keys = core.clone();
+        let is_enabled = self.is_enabled;
+        let row_height = self.row_height;
+        let row_spacing = self.row_spacing;
+        let row_label = self.row_label.clone();
+        let actions = self.actions.clone();
+        let row_content = self.row_content.clone();
+        let items: Rc<std::collections::BTreeMap<Id, Item>> = Rc::new(
+            self.data
+                .iter()
+                .map(|item| ((self.id_of)(item), item.clone()))
+                .collect(),
+        );
+        let mut stack = FixedVirtualStack::new(core.ids.to_vec(), row_height, move |id: &Id| {
+            let Some(item) = items.get(id) else {
+                return AnyView::new(crate::EmptyView);
+            };
+            let selected = core.selection.contains(id);
+            let select = core.clone();
+            let select_id = id.clone();
+            AnyView::new(SwipeRow {
+                label: row_label(item),
+                is_selected: selected,
+                is_enabled,
+                row_height,
+                actions: if is_enabled {
+                    actions(item)
                 } else {
                     Vec::new()
-                };
-                let content = (self.row_content)(item, selected);
-                let item = item.clone();
-                let cursor = self.cursor.clone();
-                let selection = self.selection.clone();
-                let on_activate = self.on_activate.clone();
-                let id_of = self.id_of.clone();
-                let select: Rc<dyn Fn()> = Rc::new(move || {
-                    let id = id_of(&item);
-                    cursor.set(Some(id.clone()));
-                    selection.set(Some(id));
-                    if let Some(handler) = &on_activate {
-                        handler(&item);
-                    }
-                });
-                AnyView::new(SwipeRow {
-                    label,
-                    is_selected: selected,
-                    is_enabled: self.is_enabled,
-                    row_height: self.row_height,
-                    actions,
-                    on_select: select,
-                    content,
-                })
+                },
+                on_select: Rc::new(move || select.activate(select_id.clone())),
+                content: row_content(item, RowState::selected(selected)),
             })
-            .collect();
-
-        AnyView::new(crate::adaptive::SurfaceReader::new({
-            let row_spacing = self.row_spacing;
-            let on_key = {
-                let data = self.data.clone();
-                let id_of = self.id_of.clone();
-                let is_enabled = self.is_enabled;
-                let cursor = self.cursor.clone();
-                let selection = self.selection.clone();
-                let on_activate = self.on_activate.clone();
-                move |event: &KeyEvent| -> bool {
-                    if !is_enabled || data.is_empty() {
-                        return false;
-                    }
-                    let position_of = |id: &Id| data.iter().position(|item| &id_of(item) == id);
-                    let current = cursor
-                        .get()
-                        .as_ref()
-                        .and_then(position_of)
-                        .or_else(|| selection.get().as_ref().and_then(position_of));
-                    if event.scancode == Scancode::RETURN
-                        || event.scancode == Scancode::KEYPAD_ENTER
-                    {
-                        let Some(position) = current else {
-                            return false;
-                        };
-                        let item = data[position].clone();
-                        let id = id_of(&item);
-                        cursor.set(Some(id.clone()));
-                        selection.set(Some(id));
-                        if let Some(handler) = &on_activate {
-                            handler(&item);
-                        }
-                        return true;
-                    }
-                    let next = match event.scancode {
-                        Scancode::ARROW_DOWN => current.map(|value| value + 1).unwrap_or(0),
-                        Scancode::ARROW_UP => current
-                            .and_then(|value| value.checked_sub(1))
-                            .unwrap_or(data.len() - 1),
-                        Scancode::HOME => 0,
-                        Scancode::END => data.len() - 1,
-                        _ => return false,
-                    };
-                    let next = next.min(data.len() - 1);
-                    let id = id_of(&data[next]);
-                    cursor.set(Some(id.clone()));
-                    selection.set(Some(id));
-                    true
-                }
-            };
-            move |environment: &Environment| {
-                let touch = environment.input.contains(InputCapabilities::TOUCH);
-                let floor = if touch {
-                    environment.minimum_control_extent()
-                } else {
-                    0.0
-                };
-                let _ = floor;
-                let _ = &on_key;
-                let column = AnyView::new(BoxView::new(
-                    FlexDirection::Column,
-                    Align::Stretch,
-                    Justify::FlexStart,
-                    Wrap::NoWrap,
-                    row_spacing,
-                    AnyView::new(TupleView::new(rows.clone())),
-                ))
-                .frame(None, None, None, Some(total_height.max(1.0)), None, None);
-
-                AnyView::new(crate::primitives::layout::ScrollView::new(
-                    crate::primitives::layout::ScrollAxis::Vertical,
-                    column,
-                ))
-            }
-        }))
+        })
+        .spacing(row_spacing);
+        if let Some(index) = keys.target() {
+            stack = stack.scroll_to_index(index);
+        }
+        AnyView::new(
+            AnyView::new(SelectionKeyHost::new(
+                AnyView::new(stack)
+                    .flex(1.0)
+                    .frame(None, None, Some(0.0), Some(0.0), None, None),
+                is_enabled,
+                move |event| keys.handle_key(event),
+            ))
+            .flex(1.0)
+            .frame(None, None, Some(0.0), Some(0.0), None, None),
+        )
     }
 
     fn dynamic_properties(&self) -> Vec<crate::DynamicField> {
-        crate::dynamic_fields!(self; cursor)
+        crate::dynamic_fields!(self; anchor, cursor)
     }
 }
 

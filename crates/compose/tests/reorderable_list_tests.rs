@@ -23,8 +23,8 @@
 //! - the touch handle measures 44pt wide but only 36pt tall, where Swift asserts
 //!   both axes reach 44.
 
-use cove_composition::Scope;
 use crate::support;
+use cove_composition::Scope;
 
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -34,6 +34,7 @@ use cove_core::State;
 use cove_core::scene::{AccessibilityRole, Node};
 use cove_core::{Point, Rect};
 use cove_ui_compose::modifiers::layout::LayoutFrameExt;
+use cove_ui_compose::primitives::data::lists::RowState;
 use cove_ui_compose::primitives::data::lists::reorderable::ReorderableList;
 use cove_ui_compose::primitives::interaction::edge_auto_scroll::{MAXIMUM_SPEED, velocity};
 use cove_ui_compose::primitives::text::Text;
@@ -56,17 +57,9 @@ impl View for Harness {
         let list = ReorderableList::new(
             items,
             |id: &u64| *id,
-            move |from, to| {
-                moves.borrow_mut().push((from, to));
-                let mut next = reordered.get();
-                if from < next.len() && to <= next.len() {
-                    let moved = next.remove(from);
-                    let index = to.min(next.len());
-                    next.insert(index, moved);
-                    reordered.set(next);
-                }
-            },
-            |id: &u64, dragging: bool| {
+            |id: &u64, state: RowState| {
+                let dragging = state.is_dragging;
+
                 use cove_ui_compose::modifiers::style::AppearanceExt;
                 AnyView::new(
                     AnyView::new(Text::new(format!("Item {}", id + 1)).foreground_color(
@@ -80,6 +73,16 @@ impl View for Harness {
                 )
             },
         )
+        .on_move(move |from, to| {
+            moves.borrow_mut().push((from, to));
+            let mut next = reordered.get();
+            if from < next.len() && to <= next.len() {
+                let moved = next.remove(from);
+                let index = to.min(next.len());
+                next.insert(index, moved);
+                reordered.set(next);
+            }
+        })
         .row_height(ROW_HEIGHT)
         .row_label(|id: &u64| format!("Item {}", id + 1));
 

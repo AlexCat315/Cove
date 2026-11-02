@@ -39,8 +39,8 @@
 //! - **Text metrics.** The shared harness installs an 16/20 text environment
 //!   where the Swift rig used 12/16; no assertion here depends on glyph metrics.
 
-use cove_composition::Scope;
 use crate::support;
+use cove_composition::Scope;
 
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;

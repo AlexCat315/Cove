@@ -33,8 +33,8 @@
 //! - Swift's `MenuItem` identity is a string; Rust menu rows are keyed by
 //!   `u64`, so the command row is looked up as row id 0.
 
-use cove_composition::Scope;
 use crate::support;
+use cove_composition::Scope;
 
 use std::cell::Cell;
 use std::rc::Rc;

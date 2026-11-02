@@ -6,6 +6,7 @@ pub mod hosts_model;
 pub mod model;
 pub mod row_metrics;
 pub mod selection_model;
+pub mod table_column;
 pub mod view;
 
 pub use column_order::DataTableColumnOrder;
@@ -24,4 +25,8 @@ pub use row_metrics::{
     accepts_projection, row_height_key_matches, variable_row_heights,
 };
 pub use selection_model::{DataTableNavigation, DataTableSelection, DataTableSelectionMode};
+pub use table_column::{
+    ColumnVisibility, ComparisonResult, TableColumn, TableColumnLayout, TableColumnPlan,
+    TableLayout, TableSort, TableSortDirection, TableTextEditing,
+};
 pub use view::{DataTable, DataTableOptions, DataTableWindows};

@@ -22,8 +22,8 @@
 //!   Swift suite's dependency-cleaner counter becomes the observable outcome
 //!   ("writes schedule nothing") rather than an internal counter.
 
-use cove_composition::Scope;
 use crate::support;
+use cove_composition::Scope;
 
 use std::cell::Cell;
 use std::rc::Rc;

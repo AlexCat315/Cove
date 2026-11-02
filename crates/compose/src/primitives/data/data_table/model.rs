@@ -21,8 +21,8 @@ use std::rc::Rc;
 
 use cove_core::scene::{ObservableObject, ObservablePublisher};
 
-use super::super::lists::table::{ComparisonResult, TableSort, TableSortDirection};
 use super::row_metrics::DataTableProjection;
+use super::table_column::{ComparisonResult, TableSort, TableSortDirection};
 
 /// Background-sort telemetry, surfaced so a caller can show progress.
 #[derive(Clone, Copy, Debug, Default, PartialEq)]

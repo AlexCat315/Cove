@@ -10,7 +10,9 @@ use cove_core::State;
 use cove_ui_compose::modifiers::layout::FlexExt;
 use cove_ui_compose::modifiers::style::SemanticStyleViewExt;
 use cove_ui_compose::primitives::controls::Checkbox;
-use cove_ui_compose::primitives::controls::fields::{WheelPicker, WheelPickerOption};
+use cove_ui_compose::primitives::controls::fields::{
+    WheelPicker, WheelPickerModel, WheelPickerOption,
+};
 use cove_ui_compose::primitives::text::Text;
 use cove_ui_compose::theme::tokens::SemanticColorRef;
 use cove_ui_compose::{AnyView, BoxView, TupleView, View};
@@ -124,20 +126,37 @@ impl WheelPickerStory {
         time_label(self.hour.get(), self.minute.get(), self.period.get())
     }
 
-    pub fn hour_wheel(&self) -> WheelPicker<i32> {
-        WheelPicker::new(hour_options(), Some(self.hour.get()))
+    pub fn hour_wheel(&self) -> WheelPickerModel<i32> {
+        WheelPickerModel::new(hour_options(), Some(self.hour.get()))
     }
 
-    pub fn minute_wheel(&self) -> WheelPicker<i32> {
-        WheelPicker::new(minute_options(), Some(self.minute.get()))
+    pub fn minute_wheel(&self) -> WheelPickerModel<i32> {
+        WheelPickerModel::new(minute_options(), Some(self.minute.get()))
     }
 
-    pub fn period_wheel(&self) -> WheelPicker<i32> {
-        WheelPicker::new(period_options(), Some(self.period.get()))
+    pub fn period_wheel(&self) -> WheelPickerModel<i32> {
+        WheelPickerModel::new(period_options(), Some(self.period.get()))
     }
 
-    pub fn volume_wheel(&self) -> WheelPicker<i32> {
-        WheelPicker::new(volume_options(), Some(self.volume.get()))
+    pub fn volume_wheel(&self) -> WheelPickerModel<i32> {
+        WheelPickerModel::new(volume_options(), Some(self.volume.get()))
+    }
+
+    fn wheel_column(
+        &self,
+        title: &str,
+        selection: cove_core::Binding<i32>,
+        options: Vec<WheelPickerOption<i32>>,
+    ) -> AnyView {
+        let enabled = self.options.is_enabled && self.is_enabled.get();
+        AnyView::new(
+            AnyView::new(
+                WheelPicker::new(selection, options)
+                    .enabled(enabled)
+                    .label(title.to_owned()),
+            )
+            .flex(1.0),
+        )
     }
 }
 
@@ -181,10 +200,24 @@ impl View for WheelPickerStory {
             ])),
         ));
 
+        let wheels = AnyView::new(BoxView::new(
+            cove_core::scene::FlexDirection::Row,
+            cove_core::scene::Align::Center,
+            cove_core::scene::Justify::FlexStart,
+            cove_core::scene::Wrap::NoWrap,
+            8.0,
+            AnyView::new(TupleView::new(vec![
+                self.wheel_column("Hour", self.hour.binding(), hour_options()),
+                self.wheel_column("Minute", self.minute.binding(), minute_options()),
+                self.wheel_column("Period", self.period.binding(), period_options()),
+                self.wheel_column("Volume", self.volume.binding(), volume_options()),
+            ])),
+        ));
+
         AnyView::new(StorySection::new(
             "Wheel selection",
             "Scroll, drag, click a row or use arrow keys / Home / End. The center band marks the committed value; disabled rows are skipped.",
-            AnyView::new(TupleView::new(vec![toggle, header])),
+            AnyView::new(TupleView::new(vec![toggle, header, wheels])),
         ))
     }
 

@@ -19,14 +19,9 @@
 //!   is `Required`/`Optional`/`Hidden` and every `Optional` resolves as priority
 //!   0, so automatic columns survive in authored order. At 378pt the plan keeps
 //!   `Notes` and drops `Category` where Swift keeps `Category` and drops `Notes`.
-//! - Neither Rust table mounts a "Column visibility" trigger or an "Automatic
-//!   columns" menu entry, and `Table` (the non-`DataTable` path) never mounts a
-//!   "Resize <title> column" grip. Choices are driven through the
-//!   `column_visibility` binding instead; the missing affordances are pinned.
-//! - The Rust `Table` does not consult `TableColumnPlan` at all: it only applies
-//!   explicit `column_visibility` overrides, so it mounts every column at 390pt
-//!   (Swift keeps `Name`, `Quantity`, `Category`). Its body lane also collapses
-//!   inside the horizontal scroll view, so body cells mount with zero geometry.
+//! - The table mounts no "Column visibility" trigger or "Automatic columns" menu
+//!   entry. Choices are driven through the `column_visibility` binding instead;
+//!   the missing affordance is pinned.
 //! - `DataTable` rows come from the authored 36pt height: neither text scale nor
 //!   touch input raises them, so touch cells stay below Swift's 44pt floor.
 //! - An empty `DataTable` replaces the whole table with `EmptyState`, so the
@@ -42,8 +37,8 @@
 //!   tree. Because authored-order planning hides `Category` rather than `Notes`
 //!   at 390pt, that query names `Category`.
 
-use cove_composition::Scope;
 use crate::support;
+use cove_composition::Scope;
 
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::rc::Rc;
@@ -58,13 +53,14 @@ use cove_ui_compose::adaptive::SurfaceEnvironmentExt;
 use cove_ui_compose::modifiers::interaction::AccessibilityExt;
 use cove_ui_compose::modifiers::layout::{FlexExt, LayoutFrameExt};
 use cove_ui_compose::primitives::controls::Button;
+use cove_ui_compose::primitives::data::data_table::table_column::{
+    ColumnVisibility, ComparisonResult, TableColumn, TableColumnLayout, TableColumnPlan, TableSort,
+    TableTextEditing,
+};
 use cove_ui_compose::primitives::data::data_table::{
     DataTable, DataTableModel, DataTableNavigation, DataTableOptions, DataTableSelection,
 };
-use cove_ui_compose::primitives::data::lists::table::{
-    ColumnVisibility, ComparisonResult, Table, TableColumn, TableColumnLayout, TableColumnPlan,
-    TableOptions, TableSort, TableTextEditing,
-};
+use cove_ui_compose::primitives::data::lists::Selection;
 use cove_ui_compose::primitives::overlays::portal::LayerRoot;
 use cove_ui_compose::primitives::text::Text;
 use cove_ui_compose::theme::styles::appearance_modifier::{Appearance, AppearanceViewExt};
@@ -90,7 +86,7 @@ fn records(count: i32) -> Vec<Record> {
         .collect()
 }
 
-fn columns(data: bool) -> Vec<TableColumn<Record>> {
+fn columns() -> Vec<TableColumn<Record>> {
     ["Name", "Notes", "Quantity", "Category"]
         .iter()
         .enumerate()
@@ -108,11 +104,7 @@ fn columns(data: bool) -> Vec<TableColumn<Record>> {
                 width: if index == 0 { 140.0 } else { 100.0 },
                 ..TableColumnLayout::default()
             };
-            column.visibility = if index == 0 && !data {
-                ColumnVisibility::Required
-            } else {
-                ColumnVisibility::Optional
-            };
+            column.visibility = ColumnVisibility::Optional;
             column.compare = Some(Rc::new(|lhs: &Record, rhs: &Record| {
                 match lhs.id.cmp(&rhs.id) {
                     std::cmp::Ordering::Equal => ComparisonResult::Same,
@@ -138,18 +130,8 @@ fn bind<T: Clone + Send + 'static>(state: &State<T>) -> Binding<T> {
     Binding::new(move || read.get(), move |value| write.set(value))
 }
 
-fn table_overrides(state: &State<HashMap<String, bool>>) -> Binding<BTreeMap<String, bool>> {
-    let read = state.clone();
-    let write = state.clone();
-    Binding::new(
-        move || read.get().into_iter().collect(),
-        move |value: BTreeMap<String, bool>| write.set(value.into_iter().collect()),
-    )
-}
-
 #[derive(Clone)]
 struct Harness {
-    data: bool,
     controlled: bool,
     model: Rc<DataTableModel<Record, i32>>,
     width: State<f32>,
@@ -161,14 +143,12 @@ struct Harness {
     widths: State<BTreeMap<String, f32>>,
     selection: State<DataTableSelection<i32>>,
     selected: State<Option<i32>>,
-    sort: State<Option<TableSort>>,
     navigation: State<DataTableNavigation<i32>>,
 }
 
 impl Harness {
-    fn new(data: bool, controlled: bool) -> Self {
+    fn new(controlled: bool) -> Self {
         Self {
-            data,
             controlled,
             model: DataTableModel::try_new(records(100), |record| record.id)
                 .expect("unique data table row IDs"),
@@ -181,7 +161,6 @@ impl Harness {
             widths: State::new(BTreeMap::new()),
             selection: State::new(DataTableSelection::new()),
             selected: State::new(None),
-            sort: State::new(None),
             navigation: State::new(DataTableNavigation::default()),
         }
     }
@@ -191,39 +170,20 @@ impl View for Harness {
     fn body(&self, _cx: &Scope) -> AnyView {
         let widths = bind(&self.widths);
         let enabled = self.enabled.get();
-        let table: AnyView = if self.data {
-            AnyView::new(
-                DataTable::try_new(self.model.clone(), columns(true))
-                    .expect("unique data table column IDs")
-                    .options(DataTableOptions {
-                        selection: Some(bind(&self.selection)),
-                        column_widths: Some(widths),
-                        column_visibility: self.controlled.then(|| bind(&self.overrides)),
-                        navigation: self.navigation.get(),
-                        is_enabled: enabled,
-                        ..DataTableOptions::default()
-                    })
-                    .flex_with(1.0, 1.0, Some(0.0)),
-            )
-        } else {
-            AnyView::new(
-                Table::try_new(records(10), |record: &Record| record.id, columns(false))
-                    .expect("unique table column IDs")
-                    .options(TableOptions {
-                        selection: Some(bind(&self.selected)),
-                        sort: Some(bind(&self.sort)),
-                        column_widths: Some(widths),
-                        column_visibility: self
-                            .controlled
-                            .then(|| table_overrides(&self.overrides)),
-                        is_enabled: enabled,
-                        ..TableOptions::default()
-                    })
-                    // The Rust Table collapses inside a flex column unless it is
-                    // given a height; Swift's flex basis 0 sized it.
-                    .frame_height(HEIGHT - 44.0),
-            )
-        };
+        let table = AnyView::new(
+            DataTable::try_new(self.model.clone(), columns())
+                .expect("unique data table column IDs")
+                .options(DataTableOptions {
+                    selection: Some(Selection::single(bind(&self.selected))),
+                    cursor: Some(bind(&self.selection)),
+                    column_widths: Some(widths),
+                    column_visibility: self.controlled.then(|| bind(&self.overrides)),
+                    navigation: self.navigation.get(),
+                    is_enabled: enabled,
+                    ..DataTableOptions::default()
+                })
+                .flex_with(1.0, 1.0, Some(0.0)),
+        );
         let after = Button::title("After table", || {}).accessibility_label("After table");
 
         let mut surface = Environment::default();
@@ -272,7 +232,6 @@ impl View for Harness {
             DynamicField::state("widths", &self.widths),
             DynamicField::state("selection", &self.selection),
             DynamicField::state("selected", &self.selected),
-            DynamicField::state("sort", &self.sort),
             DynamicField::state("navigation", &self.navigation),
         ]
     }
@@ -323,7 +282,7 @@ fn type_text(scene: &InteractiveScene, text: &str) {
 
 #[test]
 fn plans() {
-    let columns = columns(true);
+    let columns = columns();
     let plan = |width: f32, overrides: HashMap<String, bool>, pinned: BTreeSet<&str>| {
         TableColumnPlan::resolve(
             &columns,
@@ -433,9 +392,9 @@ fn plans() {
 
 #[test]
 fn matrix() {
-    for data in [false, true] {
+    {
         InteractiveScene::run(720.0, HEIGHT, |scene| {
-            let harness = Harness::new(data, true);
+            let harness = Harness::new(true);
             scene.install(harness.clone());
 
             for width in [390.0f32, 720.0, 1280.0] {
@@ -455,10 +414,9 @@ fn matrix() {
                             scene.width = width;
                             scene.settle(10, 1.0);
 
-                            // The Rust DataTable drops Category at 390pt because
-                            // all automatic columns share priority 0; the Rust
-                            // Table ignores the plan and keeps all four.
-                            let expected: BTreeSet<String> = if data && width == 390.0 {
+                            // Category drops at 390pt because all automatic
+                            // columns share priority 0.
+                            let expected: BTreeSet<String> = if width == 390.0 {
                                 ["Name", "Notes", "Quantity"]
                                     .into_iter()
                                     .map(str::to_string)
@@ -472,59 +430,48 @@ fn matrix() {
                             assert_eq!(
                                 cell_labels(scene),
                                 expected,
-                                "data={data} width={width} keeps the planned columns"
+                                "width={width} keeps the planned columns"
                             );
 
                             assert!(
                                 labelled(scene, "Column visibility").is_none(),
-                                "GAP: Swift mounts a 44pt Column visibility picker; the Rust table mounts none (data={data}, {width}pt)"
+                                "GAP: Swift mounts a 44pt Column visibility picker; the Rust table mounts none ({width}pt)"
                             );
 
-                            if data {
-                                // GAP: the Rust DataTable resolves its rows from
-                                // the authored height and ignores text scaling.
-                                let expected_height = 36.0;
-                                for cell in cells(scene) {
-                                    let frame = cell.frame();
-                                    assert!(
-                                        frame.height >= expected_height - 0.5,
-                                        "cell {:?} keeps its {expected_height}pt lane ({frame:?})",
-                                        cell.accessibility().map(|semantics| semantics.label)
-                                    );
-                                    assert!(
-                                        frame.width > 0.0 && frame.width.is_finite(),
-                                        "cell keeps a finite width ({frame:?})"
-                                    );
-                                }
-                                if scale == 1.0 {
-                                    assert!(
-                                        cells(scene).iter().all(|cell| cell.frame().height < 44.0),
-                                        "GAP: neither touch nor text scale raises the 36pt density floor"
-                                    );
-                                }
-                            } else {
-                                // GAP: the Rust Table's body lane collapses inside
-                                // the horizontal scroll view, so every body cell
-                                // publishes a zero frame. The header still lays out.
+                            // GAP: the Rust DataTable resolves its rows from
+                            // the authored height and ignores text scaling.
+                            let expected_height = 36.0;
+                            for cell in cells(scene) {
+                                let frame = cell.frame();
                                 assert!(
-                                    cells(scene).iter().all(|cell| cell.frame().height == 0.0),
-                                    "GAP: the Rust Table body rows mount with zero geometry at {width}pt"
+                                    frame.height >= expected_height - 0.5,
+                                    "cell {:?} keeps its {expected_height}pt lane ({frame:?})",
+                                    cell.accessibility().map(|semantics| semantics.label)
                                 );
-                                let header =
-                                    labelled(scene, "Sort by Name").expect("the header lays out");
                                 assert!(
-                                    header.frame().width > 0.0 && header.frame().height > 0.0,
-                                    "the header keeps its geometry ({:?})",
-                                    header.frame()
+                                    frame.width > 0.0 && frame.width.is_finite(),
+                                    "cell keeps a finite width ({frame:?})"
                                 );
                             }
+                            let floor = if input.contains(InputCapabilities::TOUCH) {
+                                44.0
+                            } else {
+                                0.0
+                            };
+                            assert!(
+                                cells(scene)
+                                    .iter()
+                                    .all(|cell| cell.frame().height
+                                        >= (36.0 * scale).max(floor) - 0.5),
+                                "rows follow the text scale and the touch floor"
+                            );
                             assert!(
                                 cells(scene).len() < 80,
-                                "data={data} mounts fewer than 80 cells at {width}pt"
+                                "mounts fewer than 80 cells at {width}pt"
                             );
                             assert!(
                                 !scene.graph.recomposer.has_pending(),
-                                "data={data} settles without pending work at {width}pt"
+                                "settles without pending work at {width}pt"
                             );
                         }
                     }
@@ -536,33 +483,29 @@ fn matrix() {
 
 #[test]
 fn picker() {
-    for data in [false, true] {
+    {
         InteractiveScene::run(720.0, HEIGHT, |scene| {
-            let harness = Harness::new(data, true);
+            let harness = Harness::new(true);
             scene.install(harness.clone());
             resize(scene, &harness, 390.0);
             harness
                 .widths
                 .set(BTreeMap::from([("c2".to_string(), 110.0)]));
-            harness.selection.set(DataTableSelection {
-                selected_ids: BTreeSet::from([2]),
-                ..DataTableSelection::new()
-            });
             harness.selected.set(Some(2));
             scene.settle(10, 1.0);
 
             assert!(
                 labelled(scene, "Column visibility").is_none(),
-                "GAP: data={data} mounts no Column visibility trigger, so the menu cannot open"
+                "GAP: mounts no Column visibility trigger, so the menu cannot open"
             );
             assert!(
                 scene.portal.entries().is_empty(),
-                "no picker means no portal entry (data={data})"
+                "no picker means no portal entry"
             );
 
             assert!(
                 cell_labels(scene).contains("Notes"),
-                "GAP: at 390pt authored-order planning already keeps Notes (data={data})"
+                "GAP: at 390pt authored-order planning already keeps Notes"
             );
             harness
                 .overrides
@@ -570,33 +513,25 @@ fn picker() {
             scene.settle(10, 1.0);
             assert!(
                 cell_labels(scene).contains("Category"),
-                "data={data} forcing Category shown mounts its cells"
+                "forcing Category shown mounts its cells"
             );
             assert_eq!(
                 harness.widths.get().get("c2"),
                 Some(&110.0),
-                "data={data} revealing a column keeps the resized width"
+                "revealing a column keeps the resized width"
             );
             assert_eq!(
-                harness.selection.get().selected_ids,
-                BTreeSet::from([2]),
-                "data={data} revealing a column keeps the selection"
+                harness.selected.get(),
+                Some(2),
+                "revealing a column keeps the selection"
             );
-            assert_eq!(harness.selected.get(), Some(2));
 
             harness.overrides.set(HashMap::new());
             scene.settle(10, 1.0);
-            if data {
-                assert!(
-                    !cell_labels(scene).contains("Category"),
-                    "clearing the overrides returns the DataTable to the 390pt plan"
-                );
-            } else {
-                assert!(
-                    cell_labels(scene).contains("Category"),
-                    "GAP: the Rust Table ignores the width plan, so Category stays at 390pt"
-                );
-            }
+            assert!(
+                !cell_labels(scene).contains("Category"),
+                "clearing the overrides returns the DataTable to the 390pt plan"
+            );
 
             harness.enabled.set(false);
             scene.settle(10, 1.0);
@@ -604,7 +539,7 @@ fn picker() {
             assert!(scene.capture.target().is_none());
             assert!(
                 labelled(scene, "Column visibility").is_none(),
-                "a disabled table still mounts no picker (data={data})"
+                "a disabled table still mounts no picker"
             );
         });
     }
@@ -613,7 +548,7 @@ fn picker() {
 #[test]
 fn edit_and_navigation() {
     InteractiveScene::run(720.0, HEIGHT, |scene| {
-        let harness = Harness::new(true, true);
+        let harness = Harness::new(true);
         scene.install(harness.clone());
 
         let host = scene
@@ -690,47 +625,31 @@ fn edit_and_navigation() {
 #[test]
 fn sort_and_focus() {
     InteractiveScene::run(720.0, HEIGHT, |scene| {
-        let harness = Harness::new(false, true);
+        let harness = Harness::new(true);
         scene.install(harness.clone());
-        harness.sort.set(Some(TableSort::new("c1").descending()));
         harness.selected.set(Some(3));
         scene.settle(10, 1.0);
 
+        let sort = labelled(scene, "Sort by Notes").expect("the header mounts");
+        scene.click(&sort, 1);
+        let sort = labelled(scene, "Sort by Notes").expect("the header stays mounted");
+        scene.click(&sort, 1);
+        scene.settle(10, 1.0);
         let first = scene
-            .named("column-value-0-9")
-            .expect("the descending sort mounts Record 9 first");
-        assert_eq!(
-            harness.sort.get(),
-            Some(TableSort::new("c1").descending()),
-            "the sort binding still names the hidden column"
-        );
-
-        assert!(
-            labelled(scene, "Resize Notes column").is_none(),
-            "GAP: the Rust Table mounts no resize grip, so pointer capture cannot start"
-        );
-        assert!(
-            labelled(scene, "Column visibility").is_none(),
-            "GAP: the Rust Table mounts no picker to hand focus to"
-        );
+            .named("column-value-0-99")
+            .expect("the descending sort mounts the last record first");
 
         resize(scene, &harness, 390.0);
-        assert!(scene.capture.target().is_none(), "no grip means no capture");
-        assert!(
-            labelled(scene, "Column visibility").is_none(),
-            "GAP: focus cannot hand off to a picker the Rust Table does not mount"
-        );
         assert_eq!(
-            scene.named("column-value-0-9"),
+            scene.named("column-value-0-99"),
             Some(first.clone()),
             "the surviving cell keeps its node across the narrowing"
         );
-        assert_eq!(harness.sort.get(), Some(TableSort::new("c1").descending()));
         assert_eq!(harness.selected.get(), Some(3));
 
         resize(scene, &harness, 720.0);
         assert_eq!(
-            scene.named("column-value-0-9"),
+            scene.named("column-value-0-99"),
             Some(first),
             "widening again keeps the same node"
         );
@@ -739,37 +658,30 @@ fn sort_and_focus() {
 
 #[test]
 fn local_session() {
-    for data in [false, true] {
+    {
         InteractiveScene::run(720.0, HEIGHT, |scene| {
-            let harness = Harness::new(data, false);
+            let harness = Harness::new(false);
             scene.install(harness.clone());
             resize(scene, &harness, 390.0);
 
             assert!(
                 labelled(scene, "Column visibility").is_none(),
-                "GAP: an unbound table mounts no picker, so it cannot record a local choice (data={data})"
+                "GAP: an unbound table mounts no picker, so it cannot record a local choice"
             );
-            if data {
-                assert!(
-                    cell_labels(scene).contains("Notes"),
-                    "GAP: authored-order planning keeps Notes at 390pt instead of hiding it"
-                );
-                assert!(
-                    !cell_labels(scene).contains("Category"),
-                    "the unbound DataTable applies its automatic plan"
-                );
-            } else {
-                assert!(
-                    cell_labels(scene).contains("Notes"),
-                    "GAP: the unbound Table ignores the width plan entirely"
-                );
-            }
+            assert!(
+                cell_labels(scene).contains("Notes"),
+                "GAP: authored-order planning keeps Notes at 390pt instead of hiding it"
+            );
+            assert!(
+                !cell_labels(scene).contains("Category"),
+                "the unbound DataTable applies its automatic plan"
+            );
 
             resize(scene, &harness, 720.0);
             resize(scene, &harness, 390.0);
             assert!(
                 cell_labels(scene).contains("Notes"),
-                "the plan is stable across a width round trip (data={data})"
+                "the plan is stable across a width round trip"
             );
 
             scene.graph.install(EmptyView, Default::default());
@@ -777,11 +689,11 @@ fn local_session() {
             scene.settle(10, 1.0);
             assert!(
                 labelled(scene, "Column visibility").is_none(),
-                "GAP: remounting cannot reset choices the picker never recorded (data={data})"
+                "GAP: remounting cannot reset choices the picker never recorded"
             );
             assert!(
                 cell_labels(scene).contains("Notes"),
-                "GAP: notes visibility is unchanged after remount (data={data})"
+                "GAP: notes visibility is unchanged after remount"
             );
         });
     }
@@ -790,7 +702,7 @@ fn local_session() {
 #[test]
 fn ai_queries() {
     InteractiveScene::run(720.0, HEIGHT, |scene| {
-        let harness = Harness::new(true, true);
+        let harness = Harness::new(true);
         scene.install(harness.clone());
         resize(scene, &harness, 390.0);
 
@@ -836,7 +748,7 @@ fn ai_queries() {
 #[test]
 fn empty_and_frozen() {
     InteractiveScene::run(720.0, HEIGHT, |scene| {
-        let harness = Harness::new(true, true);
+        let harness = Harness::new(true);
         scene.install(harness.clone());
         resize(scene, &harness, 200.0);
 
@@ -880,7 +792,7 @@ fn empty_and_frozen() {
 #[test]
 fn frozen_edit() {
     InteractiveScene::run(720.0, HEIGHT, |scene| {
-        let harness = Harness::new(true, true);
+        let harness = Harness::new(true);
         scene.install(harness.clone());
 
         let host = scene

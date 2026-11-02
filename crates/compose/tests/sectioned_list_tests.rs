@@ -27,6 +27,8 @@ use cove_core::scene::{AccessibilityRole, Node};
 use cove_platform::{InputEvent, KeyModifiers, MouseWheelEvent, ScrollInput, ScrollUnit};
 use cove_ui_compose::Scancode;
 use cove_ui_compose::modifiers::layout::LayoutFrameExt;
+use cove_ui_compose::primitives::data::lists::RowState;
+use cove_ui_compose::primitives::data::lists::Selection;
 use cove_ui_compose::primitives::data::lists::{ListSection, SectionedList};
 use cove_ui_compose::primitives::text::Text;
 
@@ -95,9 +97,9 @@ fn sections_and_keyboard() {
                         .footer("End of Alpha"),
                 ],
                 |item: &i32| *item,
-                |item: &i32, _selected| AnyView::new(Text::new(format!("Item {item}"))),
+                |item: &i32, _: RowState| AnyView::new(Text::new(format!("Item {item}"))),
             )
-            .selection(selected.binding())
+            .selection(Selection::single(selected.binding()))
             .on_activate(move |item: &i32| activated_handler.set(Some(*item)))
             .frame_size(LIST_WIDTH, 600.0),
         );
@@ -167,9 +169,9 @@ fn sticky_headers() {
             SectionedList::new(
                 sticky_sections(),
                 |item: &i32| *item,
-                |item: &i32, _selected| AnyView::new(Text::new(format!("Item {item}"))),
+                |item: &i32, _: RowState| AnyView::new(Text::new(format!("Item {item}"))),
             )
-            .selection(selected.binding())
+            .selection(Selection::single(selected.binding()))
             .sticky_headers(true)
             .frame_size(LIST_WIDTH, 300.0)
             .debug_name("sectioned-list"),
@@ -189,7 +191,11 @@ fn sticky_headers() {
         );
         assert_eq!(
             initial_port.height,
-            scene.named("sectioned-list").expect("named list").frame().height,
+            scene
+                .named("sectioned-list")
+                .expect("named list")
+                .frame()
+                .height,
             "the viewport follows its allocation"
         );
 
@@ -249,9 +255,9 @@ fn sticky_headers_disabled() {
                     ListSection::new("b", (9..=16).collect()).title("Scene"),
                 ],
                 |item: &i32| *item,
-                |item: &i32, _selected| AnyView::new(Text::new(format!("Item {item}"))),
+                |item: &i32, _: RowState| AnyView::new(Text::new(format!("Item {item}"))),
             )
-            .selection(selected.binding())
+            .selection(Selection::single(selected.binding()))
             .frame_size(LIST_WIDTH, 300.0)
             .debug_name("sectioned-list"),
         );

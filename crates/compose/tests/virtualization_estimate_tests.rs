@@ -23,6 +23,7 @@ use cove_composition::{AnyView, LayoutDebugExt};
 use cove_core::scene::{Align, FlexDirection, Justify, Wrap};
 use cove_ui_compose::BoxView;
 use cove_ui_compose::modifiers::layout::LayoutFrameExt;
+use cove_ui_compose::primitives::data::lists::RowState;
 use cove_ui_compose::primitives::data::lists::reorderable::ReorderableList;
 use cove_ui_compose::primitives::layout::virtualization::{
     EstimatedRowMetrics, EstimatedVirtualStack, VariableRowIndex,
@@ -152,18 +153,18 @@ fn reorder_window() {
         let list = ReorderableList::new(
             current,
             |item: &u64| *item,
-            move |from, to| {
-                let mut items = reordered.borrow_mut();
-                let moved = items.remove(from);
-                items.insert(to, moved);
-            },
-            |item: &u64, _dragging: bool| {
+            |item: &u64, _: RowState| {
                 AnyView::new(
                     AnyView::new(Text::new(format!("Item {item}")))
                         .debug_name(&format!("reorder-row-{item}")),
                 )
             },
         )
+        .on_move(move |from, to| {
+            let mut items = reordered.borrow_mut();
+            let moved = items.remove(from);
+            items.insert(to, moved);
+        })
         .row_height(36.0)
         .row_label(|item: &u64| format!("Item {item}"));
 

@@ -27,6 +27,7 @@ use crate::primitives::controls::button::{Button, ButtonRole};
 use crate::primitives::controls::fields::select::{KeyboardShortcut, KeyboardShortcutPlatform};
 use crate::primitives::controls::key_cap::KeyCap;
 use crate::primitives::feedback::{EmptyState, EmptyStateProminence};
+use crate::primitives::layout::virtualization::VariableVirtualStack;
 use crate::primitives::media::ui_icon_catalog::{action, navigation};
 use crate::primitives::overlays::command_palette_model::{
     CommandEntry, CommandItem, destination, display_entries, ranked, record_recent,
@@ -637,6 +638,64 @@ struct PaletteResults {
     on_highlight: Rc<dyn Fn(String)>,
 }
 
+impl PaletteResults {
+    fn snapshot(&self) -> Self {
+        Self {
+            commands: self.commands.clone(),
+            entries: self.entries.clone(),
+            effective: self.effective.clone(),
+            empty_title: self.empty_title.clone(),
+            empty_message: self.empty_message.clone(),
+            scroll_to: self.scroll_to,
+            on_run: self.on_run.clone(),
+            on_highlight: self.on_highlight.clone(),
+        }
+    }
+
+    fn row(&self, entry: &CommandEntry) -> AnyView {
+        match entry {
+            CommandEntry::Header(title) => AnyView::new(
+                AnyView::new(
+                    AnyView::new(
+                        Text::new(title.clone())
+                            .semantic_font(SemanticFontRef::caption())
+                            .semantic_foreground(SemanticColorRef::on_surface_muted()),
+                    )
+                    .padding_edges(14.0, 0.0)
+                    .frame_height(CommandPalette::HEADER_HEIGHT),
+                )
+                .accessibility(|semantics| {
+                    semantics.role = AccessibilityRole::StaticText;
+                }),
+            ),
+            CommandEntry::Item(item) => {
+                let is_highlighted = self.effective.as_ref() == Some(&item.id);
+                let command = self
+                    .commands
+                    .iter()
+                    .find(|command| command.id == item.id)
+                    .cloned()
+                    .unwrap_or_else(|| PaletteCommand::new(item.title.clone(), || {}));
+                let row = CommandRow {
+                    item: item.clone(),
+                    command,
+                    is_highlighted,
+                    on_run: self.on_run.clone(),
+                    on_highlight: self.on_highlight.clone(),
+                };
+                AnyView::new(AnyView::new(row).frame(
+                    None,
+                    None,
+                    None,
+                    Some(CommandPalette::ROW_HEIGHT),
+                    None,
+                    None,
+                ))
+            }
+        }
+    }
+}
+
 impl View for PaletteResults {
     fn body(&self, _cx: &Scope) -> AnyView {
         if self.entries.is_empty() {
@@ -649,65 +708,30 @@ impl View for PaletteResults {
                     .frame(None, None, None, Some(0.0), None, None),
             );
         }
-        let rows: Vec<AnyView> = self
-            .entries
-            .iter()
-            .map(|entry| match entry {
-                CommandEntry::Header(title) => AnyView::new(
-                    AnyView::new(
-                        AnyView::new(
-                            Text::new(title.clone())
-                                .semantic_font(SemanticFontRef::caption())
-                                .semantic_foreground(SemanticColorRef::on_surface_muted()),
-                        )
-                        .padding_edges(14.0, 0.0)
-                        .frame_height(CommandPalette::HEADER_HEIGHT),
-                    )
-                    .accessibility(|semantics| {
-                        semantics.role = AccessibilityRole::StaticText;
-                    }),
-                ),
-                CommandEntry::Item(item) => {
-                    let is_highlighted = self.effective.as_ref() == Some(&item.id);
-                    let command = self
-                        .commands
-                        .iter()
-                        .find(|command| command.id == item.id)
-                        .cloned()
-                        .unwrap_or_else(|| PaletteCommand::new(item.title.clone(), || {}));
-                    let row = CommandRow {
-                        item: item.clone(),
-                        command,
-                        is_highlighted,
-                        on_run: self.on_run.clone(),
-                        on_highlight: self.on_highlight.clone(),
-                    };
-                    AnyView::new(AnyView::new(row).frame(
-                        None,
-                        None,
-                        None,
-                        Some(CommandPalette::ROW_HEIGHT),
-                        None,
-                        None,
-                    ))
-                }
-            })
-            .collect();
-        let _ = self.scroll_to;
-        let mut column: Vec<AnyView> = rows;
-        column.push(AnyView::new(Spacer::new(0.0)));
+        // Rows are keyed by entry position: filtering rebuilds the list anyway,
+        // and a header's title need not be unique.
+        let entries = self.entries.clone();
+        let heights = self.entries.clone();
+        let results = self.snapshot();
+        let mut stack = VariableVirtualStack::new(
+            (0..entries.len()).collect(),
+            move |index: &usize, _width, _scale| match heights.get(*index) {
+                Some(CommandEntry::Header(_)) => CommandPalette::HEADER_HEIGHT,
+                _ => CommandPalette::ROW_HEIGHT,
+            },
+            move |index: &usize| match entries.get(*index) {
+                Some(entry) => results.row(entry),
+                None => AnyView::new(crate::EmptyView),
+            },
+        );
+        if let Some(index) = self.scroll_to {
+            stack = stack.scroll_to_index(index);
+        }
         AnyView::new(
-            BoxView::new(
-                FlexDirection::Column,
-                Align::Stretch,
-                Justify::FlexStart,
-                Wrap::NoWrap,
-                0.0,
-                AnyView::new(TupleView::new(column)),
-            )
-            .padding_edges(8.0, 0.0)
-            .flex_with(1.0, 1.0, Some(0.0))
-            .frame(None, None, None, Some(0.0), None, None),
+            AnyView::new(stack)
+                .padding_edges(8.0, 0.0)
+                .flex_with(1.0, 1.0, Some(0.0))
+                .frame(None, None, None, Some(0.0), None, None),
         )
     }
 

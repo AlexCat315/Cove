@@ -15,11 +15,7 @@ use cove_ui_compose::primitives::controls::date_values::DateAvailability;
 use support::InteractiveScene;
 
 /// Mounts a March 2024 calendar at `granularity` under `locale`.
-fn render(
-    locale: &str,
-    granularity: CalendarGranularity,
-    test: impl FnOnce(&InteractiveScene),
-) {
+fn render(locale: &str, granularity: CalendarGranularity, test: impl FnOnce(&InteractiveScene)) {
     i18n::set_locale_override(Some(locale));
     InteractiveScene::run(720.0, 900.0, |scene| {
         let mut calendar = Calendar::new();

@@ -44,8 +44,8 @@
 //!   and placement mode, and `Transition::asymmetric` takes two `Transition`
 //!   values rather than Swift's `AnyTransition`.
 
-use cove_composition::Scope;
 use crate::support;
+use cove_composition::Scope;
 
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;

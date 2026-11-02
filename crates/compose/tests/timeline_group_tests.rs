@@ -21,8 +21,8 @@
 //! Row heights are additive: each row contributes its own height, so the tests
 //! compare gaps *between* configurations instead of absolute row offsets.
 
-use cove_composition::Scope;
 use crate::support;
+use cove_composition::Scope;
 
 use cove_composition::{AnyView, View, ViewExt};
 use cove_core::scene::{AccessibilityRole, Node};

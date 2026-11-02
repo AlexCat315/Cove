@@ -19,9 +19,6 @@ use super::virtual_window::VirtualWindow;
 struct VariableState<Id: Ord + Clone> {
     metrics: VariableRowMetrics<Id>,
     window: VirtualWindow,
-    #[expect(dead_code, reason = "ported from Swift but not wired in yet")]
-    viewport: ScrollViewport,
-    previous_target: Option<usize>,
     generation: u64,
 }
 
@@ -37,6 +34,7 @@ pub struct VariableVirtualStack<Id: Ord + Clone + 'static> {
     state: Rc<RefCell<VariableState<Id>>>,
     offset: cove_core::State<Point>,
     viewport: cove_core::State<ScrollViewport>,
+    previous_target: cove_core::State<Option<usize>>,
 }
 
 impl<Id: Ord + Clone + 'static> VariableVirtualStack<Id> {
@@ -56,12 +54,11 @@ impl<Id: Ord + Clone + 'static> VariableVirtualStack<Id> {
             state: Rc::new(RefCell::new(VariableState {
                 metrics: VariableRowMetrics::new(),
                 window: VirtualWindow::default(),
-                viewport: ScrollViewport::default(),
-                previous_target: None,
                 generation: 1,
             })),
             offset: cove_core::State::new(Point::default()),
             viewport: cove_core::State::new(ScrollViewport::default()),
+            previous_target: cove_core::State::new(None),
         }
     }
 
@@ -97,7 +94,7 @@ impl<Id: Ord + Clone + 'static> View for VariableVirtualStack<Id> {
         // twice during initial mount (first at zero, then at the viewport).
         let width = viewport.size.width.max(0.0);
         let mut state = self.state.borrow_mut();
-        let mut next_offset = state.window.offset.y as f64;
+        let mut next_offset = f64::from(self.offset.get().y);
         if width > 0.0 {
             let heights: Vec<f32> = self
                 .ids
@@ -116,19 +113,26 @@ impl<Id: Ord + Clone + 'static> View for VariableVirtualStack<Id> {
                 viewport.size.height as f64,
             );
         }
-        if self.scroll_to_index.is_none() {
-            state.previous_target = None;
+        // Reveal once per target, and only when the row is not already in view.
+        if self.scroll_to_index.is_none() && self.previous_target.get().is_some() {
+            self.previous_target.set(None);
         }
         if let Some(target) = self.scroll_to_index
-            && state.previous_target != Some(target)
+            && self.previous_target.get() != Some(target)
             && viewport.size.height > 0.0
             && !state.metrics.rows().is_empty()
         {
-            next_offset = state.metrics.rows().offset_of_id(
-                &self.ids[target.min(self.ids.len() - 1)],
-                viewport.size.height as f64,
-            );
-            state.previous_target = Some(target);
+            self.previous_target.set(Some(target));
+            let rows = state.metrics.rows();
+            let index = target.min(self.ids.len() - 1);
+            let top = rows.offset_of(index);
+            let bottom = top + f64::from(rows.height_of(index));
+            let height = f64::from(viewport.size.height);
+            if top < next_offset {
+                next_offset = top;
+            } else if bottom > next_offset + height {
+                next_offset = bottom - height;
+            }
         }
         state.window.offset.y = next_offset as f32;
         let visible = state
@@ -148,7 +152,11 @@ impl<Id: Ord + Clone + 'static> View for VariableVirtualStack<Id> {
         let rows = state.metrics.rows().clone();
         drop(state);
 
-        let offset = self.offset.get();
+        let mut offset = self.offset.get();
+        if (f64::from(offset.y) - next_offset).abs() > 0.25 {
+            offset.y = next_offset as f32;
+            self.offset.set(offset);
+        }
         let viewport_state = self.viewport.clone();
         let offset_state = self.offset.clone();
         virtual_scroll(
@@ -160,9 +168,17 @@ impl<Id: Ord + Clone + 'static> View for VariableVirtualStack<Id> {
             self.preload,
             1,
             &self.row_content,
-            Some(Rc::new(move |next: Point| offset_state.set(next))),
+            // The scroll view reports after every layout. Writing an unchanged
+            // value would invalidate this body and lay out again.
+            Some(Rc::new(move |next: Point| {
+                if offset_state.get() != next {
+                    offset_state.set(next);
+                }
+            })),
             Some(Rc::new(move |next: ScrollViewport| {
-                viewport_state.set(next)
+                if viewport_state.get() != next {
+                    viewport_state.set(next);
+                }
             })),
         )
     }
@@ -174,6 +190,7 @@ impl<Id: Ord + Clone + 'static> View for VariableVirtualStack<Id> {
         vec![
             crate::DynamicField::state("offset", &self.offset),
             crate::DynamicField::state("viewport", &self.viewport),
+            crate::DynamicField::state("previous_target", &self.previous_target),
         ]
     }
 }

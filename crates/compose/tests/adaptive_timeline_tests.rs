@@ -21,8 +21,8 @@
 //!   label with no reserved slot, so the row is exactly the title's height.
 //!   `a_metadata_free_row_adds_no_blank_line` pins the current height.
 
-use cove_composition::Scope;
 use crate::support;
+use cove_composition::Scope;
 
 use std::rc::Rc;
 

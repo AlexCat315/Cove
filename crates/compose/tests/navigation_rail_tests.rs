@@ -33,8 +33,8 @@
 //!   sits on the non-focusable destination wrapper, so the host never focuses
 //!   the new row.
 
-use cove_composition::Scope;
 use crate::support;
+use cove_composition::Scope;
 
 use std::rc::Rc;
 

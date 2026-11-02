@@ -21,6 +21,8 @@ use crate::primitives::controls::fields::numeric::number_field::{NumberField, Nu
 use crate::primitives::controls::fields::vec3_model::{
     Vec3, Vec3Axis, Vec3Codec, Vec3Constraints, minimum_axis_width, shows_mixed,
 };
+use crate::primitives::overlays::context_menu::ContextMenu;
+use crate::primitives::overlays::menu::{MenuEntry, MenuItem};
 use crate::primitives::text::text_field::TextFieldSize;
 use crate::theme::SemanticColorRef;
 use crate::{AnyView, BoxView, PrimitiveView, TupleView, View, impl_primitive_view};
@@ -185,6 +187,31 @@ impl Vec3Field {
         }
     }
 
+    /// The row's context menu. Paste is available only while the clipboard
+    /// parses as a vector.
+    fn menu(&self) -> Vec<MenuEntry> {
+        let copy = self.snapshot();
+        let mut entries = vec![MenuEntry::Item(
+            MenuItem::new(1, crate::i18n::tr("Copy Vector"), move || copy.copy())
+                .enabled(self.on_copy.is_some()),
+        )];
+        let paste = self.snapshot();
+        let can_paste =
+            self.is_enabled && self.on_paste.as_ref().is_some_and(|read| read().is_some());
+        entries.push(MenuEntry::Item(
+            MenuItem::new(2, crate::i18n::tr("Paste Vector"), move || paste.paste())
+                .enabled(can_paste),
+        ));
+        if self.constraints.reset.is_some() {
+            let reset = self.snapshot();
+            entries.push(MenuEntry::Item(
+                MenuItem::new(3, crate::i18n::tr("Reset Vector"), move || reset.reset())
+                    .enabled(self.is_enabled),
+            ));
+        }
+        entries
+    }
+
     fn axis(&self, axis: Vec3Axis, value: Binding<f32>) -> AnyView {
         let mixed = shows_mixed(&self.mixed_axes, axis);
         let reset = self.constraints.reset.map(|reset| reset.get(axis));
@@ -217,14 +244,16 @@ impl View for Vec3Field {
             self.axis(Vec3Axis::Y, self.y.clone()),
             self.axis(Vec3Axis::Z, self.z.clone()),
         ];
-        AnyView::new(Vec3Row {
+        let row = Vec3Row {
             minimum_width: self.resolved_minimum_width(1.0),
             axes: AnyView::new(TupleView::new(
                 axes.into_iter()
                     .map(|axis| AnyView::new(AnyView::new(axis).frame_width(AXIS_BASIS)))
                     .collect(),
             )),
-        })
+        };
+        let field = self.snapshot();
+        AnyView::new(ContextMenu::new(move || field.menu(), row).width(220.0))
     }
 }
 

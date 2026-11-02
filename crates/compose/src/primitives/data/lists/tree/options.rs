@@ -6,28 +6,39 @@ use cove_composition::AnyView;
 use cove_core::Binding;
 use cove_platform::KeyEvent;
 
+use super::super::selection::{CollectionId, Selection};
 use super::{TreeDropPosition, TreeNodeKey};
 use crate::theme::TextScaler;
 
 /// Caller-owned selection and expansion, independent of transient pointer/drag state.
-pub struct TreeSelection<ID: std::hash::Hash + Eq + Clone + Send + Sync + 'static> {
-    pub primary: Binding<Option<ID>>,
-    pub multiple: Option<Binding<HashSet<ID>>>,
+pub struct TreeSelection<ID: CollectionId> {
+    /// The selected rows by ID.
+    pub ids: Selection<ID>,
     pub expanded: Option<Binding<HashSet<ID>>>,
-    pub primary_key: Binding<Option<TreeNodeKey<ID>>>,
-    pub multiple_keys: Option<Binding<HashSet<TreeNodeKey<ID>>>>,
+    /// The selected rows by path, for a hierarchy that repeats IDs. When present
+    /// it decides which occurrences are selected.
+    pub keys: Option<Selection<TreeNodeKey<ID>>>,
     pub expanded_keys: Option<Binding<HashSet<TreeNodeKey<ID>>>>,
 }
 
-impl<ID: std::hash::Hash + Eq + Clone + Send + Sync + 'static> Default for TreeSelection<ID> {
+impl<ID: CollectionId> Default for TreeSelection<ID> {
     fn default() -> Self {
         Self {
-            primary: Binding::constant(None),
-            multiple: None,
+            ids: Selection::none(),
             expanded: None,
-            primary_key: Binding::constant(None),
-            multiple_keys: None,
+            keys: None,
             expanded_keys: None,
+        }
+    }
+}
+
+impl<ID: CollectionId> Clone for TreeSelection<ID> {
+    fn clone(&self) -> Self {
+        Self {
+            ids: self.ids.clone(),
+            expanded: self.expanded.clone(),
+            keys: self.keys.clone(),
+            expanded_keys: self.expanded_keys.clone(),
         }
     }
 }
@@ -169,10 +180,7 @@ impl<Element: Clone + 'static> Default for TreeDragOperations<Element> {
 }
 
 /// Configuration consists of independently reusable groups.
-pub struct TreeOptions<
-    Element: Clone + 'static,
-    ID: std::hash::Hash + Eq + Clone + Send + Sync + 'static,
-> {
+pub struct TreeOptions<Element: Clone + 'static, ID: CollectionId> {
     pub is_enabled: bool,
     pub selection: TreeSelection<ID>,
     pub layout: TreeLayout,
@@ -182,9 +190,7 @@ pub struct TreeOptions<
     pub drag: TreeDragOperations<Element>,
 }
 
-impl<Element: Clone + 'static, ID: std::hash::Hash + Eq + Clone + Send + Sync + 'static> Default
-    for TreeOptions<Element, ID>
-{
+impl<Element: Clone + 'static, ID: CollectionId> Default for TreeOptions<Element, ID> {
     fn default() -> Self {
         Self {
             is_enabled: true,

@@ -445,10 +445,19 @@ fn production_loads_decode_off_the_ui_thread() {
             graph.recomposer.commit_all();
             graph.compute_layout(100.0, 100.0);
         }
-        assert_eq!(phases.borrow().last(), Some(&"success"), "{:?}", phases.borrow());
+        assert_eq!(
+            phases.borrow().last(),
+            Some(&"success"),
+            "{:?}",
+            phases.borrow()
+        );
         let threads = transport.threads.lock().unwrap().clone();
         assert_eq!(threads.len(), 1, "one download for the request");
-        assert_ne!(threads[0], std::thread::current().id(), "the download ran on a worker");
+        assert_ne!(
+            threads[0],
+            std::thread::current().id(),
+            "the download ran on a worker"
+        );
 
         ImageDownloadTransportHolder::set(None);
         ImageAssetRegistryHolder::set_current(None);

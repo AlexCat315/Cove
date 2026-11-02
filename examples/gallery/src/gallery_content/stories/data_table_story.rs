@@ -20,7 +20,7 @@ use std::rc::Rc;
 
 use cove_core::State;
 use cove_ui_compose::modifiers::style::SemanticStyleViewExt;
-use cove_ui_compose::primitives::data::lists::table::ComparisonResult;
+use cove_ui_compose::primitives::data::data_table::table_column::ComparisonResult;
 use cove_ui_compose::primitives::text::Text;
 use cove_ui_compose::theme::tokens::SemanticColorRef;
 use cove_ui_compose::{AnyView, LayoutDebugExt, TupleView, View, ViewExt};

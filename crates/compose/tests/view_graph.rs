@@ -12,8 +12,8 @@
 //! - a tag mismatch tears the node down
 //! - a modifier re-applies to the reused node when its value changes
 
-use cove_composition::Scope;
 use crate::support;
+use cove_composition::Scope;
 
 use std::cell::Cell;
 use std::rc::Rc;

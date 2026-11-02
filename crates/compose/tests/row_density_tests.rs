@@ -11,22 +11,8 @@
 //!   focusable, and pointer input restores the compact anchored row
 //!
 //! Named differences from the Swift suite:
-//! - **GAP: no table or tree takes the touch floor.** Rust's `DataTableSurface`
-//!   resolves its layout with `touch = false`, `Table` rows are never laid out
-//!   at all, and `Tree` reports the authored height even on touch, so all three
-//!   stay below Swift's `max(authored, 44)`.
-//! - **GAP: `Table` body cells report a 0pt frame.** The non-`DataTable` table
-//!   mounts all 2,000 cell placeholders but lays none of them out, at any
-//!   width, density or input. The matrix pins the placeholders and the zero
-//!   height; the geometry cannot be asserted.
-//! - **GAP: the data-table session is private.** Swift reads
-//!   `table.session.selection.focusedID`, `viewport.size` and `offset.y`.
-//!   Rust exposes no accessor, so paging is asserted through the mounted row
-//!   window after the same key sequence: the last row is revealed with both
-//!   cells at the row top and inside the body.
-//! - Swift selects rows through `accessibilityActions.activate`; Rust rows
-//!   carry no activation closure, so identity is asserted with `Node::id`
-//!   across input changes instead of a selected flag.
+//! - **GAP: `Tree` reports the authored height even on touch**, below Swift's
+//!   `max(authored, 44)`.
 //! - **GAP: a touch menu is not a modal layer.** Rust's `Menu` mounts inside
 //!   whatever host it is given; there is no `touch-menu-back` or
 //!   `touch-overlay-sheet` debug node and no level change. The touch floor on
@@ -42,8 +28,8 @@
 //!   the pointer row is asserted as the measured compact height below 44
 //!   while still being at least the 28pt minimum.
 
-use cove_composition::Scope;
 use crate::support;
+use cove_composition::Scope;
 
 use cove_composition::{AnyView, DynamicField, LayoutDebugExt, TupleView, View};
 use cove_core::scene::{AccessibilityRole, Align, FlexDirection, Justify, Node, Wrap};
@@ -51,10 +37,9 @@ use cove_core::{Environment, InputCapabilities, State};
 use cove_platform::KeyModifiers;
 use cove_ui_compose::adaptive::SurfaceEnvironmentExt;
 use cove_ui_compose::modifiers::layout::{FlexExt, LayoutFrameExt};
+use cove_ui_compose::primitives::data::data_table::table_column::{TableColumn, TableLayout};
 use cove_ui_compose::primitives::data::data_table::{DataTable, DataTableModel, DataTableOptions};
-use cove_ui_compose::primitives::data::lists::table::{
-    Table, TableColumn, TableLayout, TableOptions,
-};
+use cove_ui_compose::primitives::data::lists::RowState;
 use cove_ui_compose::primitives::data::lists::tree::{Tree, TreeLayout, TreeOptions};
 use cove_ui_compose::primitives::overlays::menu::{Menu, MenuEntry, MenuItem, MenuSubmenu};
 use cove_ui_compose::primitives::overlays::portal::LayerRoot;
@@ -182,26 +167,23 @@ impl View for CollectionHarness {
                     Vec::new()
                 }
             },
-            None,
-            TreeOptions {
-                layout: TreeLayout {
-                    row_height: authored,
-                    ..TreeLayout::default()
-                },
-                ..TreeOptions::default()
+            |value: &usize, _: RowState| AnyView::new(Text::new(value.to_string())),
+        )
+        .options(TreeOptions {
+            layout: TreeLayout {
+                row_height: authored,
+                ..TreeLayout::default()
             },
-            |value: &usize, _expanded, _selected, _depth| {
-                AnyView::new(Text::new(value.to_string()))
-            },
-        );
-        let table = Table::try_new(records.clone(), |record: &usize| *record, columns())
+            ..TreeOptions::default()
+        });
+        let table = DataTable::from_records(records.clone(), |record: &usize| *record, columns())
             .expect("unique table column IDs")
-            .options(TableOptions {
+            .options(DataTableOptions {
                 layout: TableLayout {
                     row_height: authored,
                     ..TableLayout::default()
                 },
-                ..TableOptions::default()
+                ..DataTableOptions::default()
             });
         let data_table = DataTable::try_new(model, columns())
             .expect("unique data table column IDs")
@@ -315,27 +297,23 @@ fn collection_rows_share_density_and_retain_identity() {
                     );
                     let table = scene.named("table").expect("table mounted");
                     let cells = rows_with(&table, AccessibilityRole::Cell);
-                    assert_eq!(
-                        cells.len(),
-                        2_000,
-                        "GAP: table mounts all 2000 cell placeholders instead of a window"
-                    );
                     assert!(
-                        cells.iter().all(|cell| cell.frame().height == 0.0),
-                        "GAP: table body cells are never laid out (all heights 0), so authored                          height and the touch floor cannot apply (actual {:?})",
-                        cells
-                            .iter()
-                            .map(|cell| cell.frame().height)
-                            .collect::<Vec<_>>()
+                        !cells.is_empty() && cells.len() < 200,
+                        "the table mounts a window of cells, got {}",
+                        cells.len()
                     );
                     check_rows(
                         scene,
                         "data-table",
                         AccessibilityRole::Cell,
-                        authored,
+                        if capabilities.contains(TOUCH) {
+                            authored.max(44.0)
+                        } else {
+                            authored
+                        },
                         40,
                         false,
-                        "GAP: data-table has no touch floor",
+                        "data-table takes the touch floor",
                     );
                     let data_table = scene.named("data-table").expect("data-table mounted");
                     for role in [AccessibilityRole::Group, AccessibilityRole::Row] {
@@ -354,14 +332,26 @@ fn collection_rows_share_density_and_retain_identity() {
                         for row in &marker_rows {
                             assert_eq!(
                                 row.frame().height,
-                                authored,
+                                if capabilities.contains(TOUCH) {
+                                    authored.max(44.0)
+                                } else {
+                                    authored
+                                },
                                 "data-table {role:?} row height (actual {})",
                                 row.frame().height
                             );
                         }
                         let tops = row_tops(&marker_rows);
                         for pair in tops.windows(2) {
-                            assert_eq!(pair[1] - pair[0], authored, "data-table {role:?} row tops");
+                            assert_eq!(
+                                pair[1] - pair[0],
+                                if capabilities.contains(TOUCH) {
+                                    authored.max(44.0)
+                                } else {
+                                    authored
+                                },
+                                "data-table {role:?} row tops"
+                            );
                         }
                     }
                     assert_eq!(
@@ -438,8 +428,8 @@ fn touch_data_table_paging_reveals_the_last_row() {
         for row in &last_rows {
             assert_eq!(
                 row.frame().height,
-                36.0,
-                "GAP: touch data-table rows keep the 36pt authored height (actual {})",
+                44.0,
+                "touch data-table rows rise to the control floor (actual {})",
                 row.frame().height
             );
         }
@@ -491,12 +481,9 @@ impl View for ScaledHarness {
             (0..20).collect::<Vec<usize>>(),
             |record: &usize| *record,
             |_record: &usize| Vec::new(),
-            None,
-            TreeOptions::default(),
-            |value: &usize, _expanded, _selected, _depth| {
-                AnyView::new(Text::new(value.to_string()))
-            },
-        );
+            |value: &usize, _: RowState| AnyView::new(Text::new(value.to_string())),
+        )
+        .options(TreeOptions::default());
         let menu = Menu::new(vec![MenuEntry::Item(MenuItem::new(1, "Command", || {}))])
             .width(320.0)
             .max_visible_rows(2);

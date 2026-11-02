@@ -366,9 +366,7 @@ fn drilling() {
             );
             press(scene, &button_with_text(scene, "March 2024"));
             assert!(
-                buttons(scene)
-                    .iter()
-                    .any(|node| label(node) == "June 2024"),
+                buttons(scene).iter().any(|node| label(node) == "June 2024"),
                 "the title drills up to months"
             );
             assert!(

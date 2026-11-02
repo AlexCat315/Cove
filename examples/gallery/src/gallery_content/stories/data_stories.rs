@@ -21,9 +21,10 @@ use cove_ui_compose::primitives::data::chart::{
     ChartOrientation, ChartPlot, ChartPoint, ChartScaleKind, ChartSeries, ChartSeriesStyle,
     ChartSlice, ChartStacking, ChartStyle, ChartThreshold, ChartValueAxis, ChartXDomain, PieCenter,
 };
-use cove_ui_compose::primitives::data::lists::table::{
-    ColumnVisibility, ComparisonResult, Table, TableColumn, TableColumnLayout, TableOptions,
+use cove_ui_compose::primitives::data::data_table::table_column::{
+    ColumnVisibility, ComparisonResult, TableColumn, TableColumnLayout,
 };
+use cove_ui_compose::primitives::data::data_table::{DataTable, DataTableOptions};
 use cove_ui_compose::primitives::text::Text;
 use cove_ui_compose::theme::tokens::SemanticColorRef;
 use cove_ui_compose::{AnyView, BoxView, LayoutDebugExt, TupleView, View};
@@ -206,7 +207,9 @@ const CHART_REVENUE: [f32; 12] = [
 const CHART_SIGNUPS: [f32; 12] = [
     8.0, 12.0, 10.0, 17.0, 14.0, 20.0, 18.0, 23.0, 27.0, 24.0, 30.0, 28.0,
 ];
-const CHART_LATENCY: [f32; 10] = [120.0, 180.0, 240.0, 310.0, 360.0, 420.0, 470.0, 520.0, 610.0, 700.0];
+const CHART_LATENCY: [f32; 10] = [
+    120.0, 180.0, 240.0, 310.0, 360.0, 420.0, 470.0, 520.0, 610.0, 700.0,
+];
 const CHART_ERRORS: [f32; 10] = [1.2, 1.6, 2.1, 2.0, 2.9, 3.4, 3.1, 4.2, 4.8, 5.6];
 const CHART_GAINS: [f32; 6] = [18.0, -6.0, 22.0, -9.0, 14.0, -11.0];
 const CHART_VISITS: [f32; 12] = [
@@ -221,8 +224,8 @@ const CHART_STATES: [&str; 4] = [
 const CHART_SESSIONS: [f32; 4] = [42.0, 31.0, 18.0, 9.0];
 const CHART_SESSIONS_LAST_YEAR: [f32; 4] = [38.0, 26.0, 21.0, 5.0];
 const CHART_DURATIONS: [f32; 26] = [
-    42.0, 55.0, 61.0, 63.0, 68.0, 70.0, 72.0, 74.0, 75.0, 77.0, 78.0, 79.0, 80.0, 81.0, 82.0,
-    84.0, 85.0, 86.0, 88.0, 90.0, 92.0, 95.0, 98.0, 104.0, 112.0, 118.0,
+    42.0, 55.0, 61.0, 63.0, 68.0, 70.0, 72.0, 74.0, 75.0, 77.0, 78.0, 79.0, 80.0, 81.0, 82.0, 84.0,
+    85.0, 86.0, 88.0, 90.0, 92.0, 95.0, 98.0, 104.0, 112.0, 118.0,
 ];
 
 impl Default for ChartStory {
@@ -273,19 +276,21 @@ impl ChartStory {
     }
 
     fn section(title: &'static str, detail: &'static str, body: AnyView) -> AnyView {
-        AnyView::new(StorySection::new(title, detail, body).debug_name(match title {
-            "Trend" => "chart-trend",
-            "Grouped and stacked bars" => "chart-bars",
-            "Below the baseline" => "chart-baseline",
-            "Dual axis" => "chart-dual-axis",
-            "Log axis" => "chart-log",
-            "Histogram" => "chart-histogram",
-            "Scatter" => "chart-scatter",
-            "Donut" => "chart-donut",
-            "Sparkline" => "chart-sparkline",
-            "Horizontal bars" => "chart-horizontal",
-            _ => "chart-data-table",
-        }))
+        AnyView::new(
+            StorySection::new(title, detail, body).debug_name(match title {
+                "Trend" => "chart-trend",
+                "Grouped and stacked bars" => "chart-bars",
+                "Below the baseline" => "chart-baseline",
+                "Dual axis" => "chart-dual-axis",
+                "Log axis" => "chart-log",
+                "Histogram" => "chart-histogram",
+                "Scatter" => "chart-scatter",
+                "Donut" => "chart-donut",
+                "Sparkline" => "chart-sparkline",
+                "Horizontal bars" => "chart-horizontal",
+                _ => "chart-data-table",
+            }),
+        )
     }
 
     fn trend(&self) -> AnyView {
@@ -297,7 +302,9 @@ impl ChartStory {
         band.color = SemanticColorRef::info();
         band.label = "Slow".to_string();
         guides.bands.push(band);
-        guides.annotations.push(ChartAnnotation::new("Launch", 1, 3));
+        guides
+            .annotations
+            .push(ChartAnnotation::new("Launch", 1, 3));
 
         let mut configuration = ChartConfiguration::default();
         configuration.label = "Monthly revenue and signups".to_string();
@@ -344,13 +351,10 @@ impl ChartStory {
         } else {
             ChartStacking::None
         };
-        let toggle = Button::title(
-            if self.stacked.get() { "Group" } else { "Stack" },
-            {
-                let this = self.clone();
-                move || this.toggle_stacked()
-            },
-        )
+        let toggle = Button::title(if self.stacked.get() { "Group" } else { "Stack" }, {
+            let this = self.clone();
+            move || this.toggle_stacked()
+        })
         .debug_name("chart-bars-toggle");
 
         let mut configuration = ChartConfiguration::default();
@@ -664,7 +668,11 @@ impl ChartStory {
             .rows()
             .iter()
             .map(|row| {
-                AnyView::new(Text::new(format!("{} · {}", row.label, row.cells.join(" · "))))
+                AnyView::new(Text::new(format!(
+                    "{} · {}",
+                    row.label,
+                    row.cells.join(" · ")
+                )))
             })
             .collect();
         Self::section(
@@ -719,7 +727,7 @@ pub const ADAPTIVE_TABLE_ROWS: usize = 30;
 ///
 /// `quantity` and `category` are optional: a narrow table drops them rather than
 /// clipping, which is what makes the sample "adaptive".
-pub fn adaptive_table_columns(is_enabled: bool) -> (Vec<TableColumn<usize>>, TableOptions<usize>) {
+pub fn adaptive_table_columns() -> Vec<TableColumn<usize>> {
     let sized = |width: f32| {
         let mut layout = TableColumnLayout::default();
         layout.width = width;
@@ -748,11 +756,7 @@ pub fn adaptive_table_columns(is_enabled: bool) -> (Vec<TableColumn<usize>>, Tab
         .layout(sized(130.0))
         .visibility(ColumnVisibility::Optional),
     ];
-    let options = TableOptions {
-        is_enabled,
-        ..TableOptions::default()
-    };
-    (columns, options)
+    columns
 }
 
 /// `AdaptiveTableSample`: the same columns rendered as either table flavour.
@@ -779,13 +783,12 @@ impl AdaptiveTableSample {
 impl View for AdaptiveTableSample {
     fn body(&self, _cx: &Scope) -> AnyView {
         let enabled = self.options.is_enabled;
-        let (columns, options) = adaptive_table_columns(enabled);
         let rows: Vec<usize> = (0..ADAPTIVE_TABLE_ROWS).collect();
-        // Both flavours share the authored columns; only the container differs.
-        let table = Table::try_new(rows, |row: &usize| *row, columns)
+        let mut options = DataTableOptions::default();
+        options.is_enabled = enabled;
+        let table = DataTable::from_records(rows, |row: &usize| *row, adaptive_table_columns())
             .expect("unique table column IDs")
             .options(options);
-        let _ = self.data;
         AnyView::new(table)
     }
 

@@ -10,8 +10,8 @@
 //! Name mapping: `layoutNode.textMeasure` is `LayoutNode::text_measure()`
 //! returning a `TextLayoutCacheEntry` whose `key.text` is the measured string.
 
-use cove_composition::Scope;
 use crate::support;
+use cove_composition::Scope;
 
 use std::rc::Rc;
 

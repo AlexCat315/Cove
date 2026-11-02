@@ -41,8 +41,8 @@
 //! - Rust has no touch `Popover` surface; the touch case drives the pointer
 //!   menu with a single tap (no hover), which publishes no back row.
 
-use cove_composition::Scope;
 use crate::support;
+use cove_composition::Scope;
 
 use std::cell::Cell;
 use std::rc::Rc;

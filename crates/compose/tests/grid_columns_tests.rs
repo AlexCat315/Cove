@@ -49,9 +49,7 @@ use std::collections::HashMap;
 use std::rc::Rc;
 
 use cove_composition::layout::LayoutDirectionExt;
-use cove_composition::{
-    AnyView, DynamicField, EmptyView, LayoutDebugExt, TupleView, View,
-};
+use cove_composition::{AnyView, DynamicField, EmptyView, LayoutDebugExt, TupleView, View};
 use cove_core::scene::{
     AccessibilityElement, AccessibilityRole, AccessibilityTree, Align, Direction, FlexDirection,
     Justify, Node, Wrap,

@@ -27,8 +27,8 @@
 //!   tests assert the measured `LayoutStyleValue::Percent` the spec writes and
 //!   the scheduler lifecycle instead of attachment presence.
 
-use cove_composition::Scope;
 use crate::support;
+use cove_composition::Scope;
 
 use std::rc::Rc;
 

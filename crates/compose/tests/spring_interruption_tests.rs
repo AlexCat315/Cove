@@ -13,8 +13,8 @@
 //! `cornerRadius(_)` is `corner_radius(..)`, and `SpringSolution.position(at:)`
 //! threads an explicit `start`/`velocity`/`target`.
 
-use cove_composition::Scope;
 use crate::support;
+use cove_composition::Scope;
 
 use std::cell::Cell;
 use std::rc::Rc;

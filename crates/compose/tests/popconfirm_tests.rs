@@ -23,8 +23,8 @@
 //! - Trigger and action buttons carry no accessibility label of their own; they
 //!   are found by `AccessibilityTree::resolved_label`.
 
-use cove_composition::Scope;
 use crate::support;
+use cove_composition::Scope;
 
 use std::cell::Cell;
 use std::rc::Rc;
