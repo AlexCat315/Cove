@@ -124,12 +124,15 @@ impl TextFontResolver {
             return vec![];
         }
         self.with_provider(font, |provider, atlas| {
+            let loaded = provider.loaded_font_count();
             let runs = if BidiParagraphs::contains_right_to_left(text) {
                 Self::directional_runs(text, provider)
             } else {
                 provider.resolve_runs(text)
             };
-            provider.register_all_fonts(atlas);
+            if provider.loaded_font_count() != loaded {
+                provider.register_all_fonts(atlas);
+            }
             runs
         })
     }

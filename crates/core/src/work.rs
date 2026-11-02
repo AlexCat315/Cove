@@ -249,18 +249,23 @@ pub fn ui_channel<T: Send + 'static>(callback: impl Fn(T) + 'static) -> (UiSende
 const PARALLEL_THRESHOLD: usize = 4;
 
 /// Map `items` through `transform` across the pool, preserving order.
+///
+/// Runners claim small ranges as they go rather than owning a fixed share, so
+/// a thread on a slower core or one that starts late does not hold up the rest.
 pub fn par_map<T: Sync, R: Send, F: Fn(&T) -> R + Sync>(items: &[T], transform: F) -> Vec<R> {
     let pool = pool();
     if items.len() < PARALLEL_THRESHOLD || pool.threads() < 2 {
         return items.iter().map(transform).collect();
     }
-    let chunks = (pool.threads() + 1).min(items.len());
-    let chunk_size = items.len().div_ceil(chunks);
+    let runners = (pool.threads() + 1).min(items.len());
+    let grain = (items.len() / (runners * 8)).max(1);
 
     struct Shared<'a, T, R, F> {
         items: &'a [T],
         results: &'a [Mutex<Option<R>>],
         transform: &'a F,
+        grain: usize,
+        next: AtomicUsize,
         pending: AtomicUsize,
         done: (Mutex<()>, Condvar),
         panic: Mutex<Option<Box<dyn Any + Send>>>,
@@ -270,22 +275,27 @@ pub fn par_map<T: Sync, R: Send, F: Fn(&T) -> R + Sync>(items: &[T], transform: 
         items,
         results: &slots,
         transform: &transform,
-        pending: AtomicUsize::new(chunks),
+        grain,
+        next: AtomicUsize::new(0),
+        pending: AtomicUsize::new(runners),
         done: (Mutex::new(()), Condvar::new()),
         panic: Mutex::new(None),
     };
 
-    fn run_chunk<T: Sync, R: Send, F: Fn(&T) -> R + Sync>(
-        shared: &Shared<'_, T, R, F>,
-        start: usize,
-        end: usize,
-    ) {
+    fn run<T: Sync, R: Send, F: Fn(&T) -> R + Sync>(shared: &Shared<'_, T, R, F>) {
         let outcome = catch_unwind(AssertUnwindSafe(|| {
-            for index in start..end {
-                let value = (shared.transform)(&shared.items[index]);
-                *shared.results[index]
-                    .lock()
-                    .unwrap_or_else(PoisonError::into_inner) = Some(value);
+            loop {
+                let start = shared.next.fetch_add(shared.grain, Ordering::Relaxed);
+                if start >= shared.items.len() {
+                    break;
+                }
+                let end = (start + shared.grain).min(shared.items.len());
+                for index in start..end {
+                    let value = (shared.transform)(&shared.items[index]);
+                    *shared.results[index]
+                        .lock()
+                        .unwrap_or_else(PoisonError::into_inner) = Some(value);
+                }
             }
         }));
         if let Err(payload) = outcome {
@@ -301,25 +311,23 @@ pub fn par_map<T: Sync, R: Send, F: Fn(&T) -> R + Sync>(items: &[T], transform: 
         }
     }
 
-    // The calling thread takes the first chunk; the rest go to the pool.
-    for chunk in 1..chunks {
-        let start = chunk * chunk_size;
-        let end = (start + chunk_size).min(items.len());
+    // The calling thread is one runner; the rest go to the pool.
+    for _ in 1..runners {
         let address = &shared as *const Shared<'_, T, R, F> as usize;
         let job: Box<dyn FnOnce() + Send + '_> = Box::new(move || {
             // SAFETY: `shared` lives on the caller's stack until `pending`
             // reaches zero, and the caller does not return before that, so the
             // pointer stays valid for the whole job.
             let shared = unsafe { &*(address as *const Shared<'_, T, R, F>) };
-            run_chunk(shared, start, end);
+            run(shared);
         });
         // SAFETY: the job only borrows data the caller keeps alive until every
-        // chunk has finished (the wait below), so extending its lifetime to
+        // runner has finished (the wait below), so extending its lifetime to
         // `'static` for the queue cannot let it outlive what it borrows.
         let job: Job = unsafe { std::mem::transmute::<Box<dyn FnOnce() + Send + '_>, Job>(job) };
         pool.queue.push(job);
     }
-    run_chunk(&shared, 0, chunk_size.min(items.len()));
+    run(&shared);
     while shared.pending.load(Ordering::Acquire) > 0 {
         // Keep the queue moving instead of idling; this also makes nested
         // calls from inside a worker safe.
@@ -346,7 +354,7 @@ pub fn par_map<T: Sync, R: Send, F: Fn(&T) -> R + Sync>(items: &[T], transform: 
         .map(|slot| {
             slot.into_inner()
                 .unwrap_or_else(PoisonError::into_inner)
-                .expect("every chunk filled its results")
+                .expect("every item has a result")
         })
         .collect()
 }

@@ -212,29 +212,32 @@ impl Text {
         (result, truncated)
     }
 
+    /// Queues the label for the next shaping batch, so one batch shapes every
+    /// label that a layout pass measures.
+    fn request_shape(&self, layout: &LayoutNode) {
+        let Some(environment) = TextEnvironmentHolder::current() else {
+            return;
+        };
+        let weak_layout = layout.downgrade();
+        let string = self.string.clone();
+        let single_line = self.truncates || self.line_limit == Some(1);
+        environment.request_shape(move |environment| {
+            let layout = LayoutNode::upgrade(&weak_layout)?;
+            if layout.text_measure().is_some() {
+                return None;
+            }
+            let font = Self::metrics_for_layout(&layout, environment).font;
+            let text = if single_line {
+                string.lines().collect::<Vec<_>>().join(" ")
+            } else {
+                string
+            };
+            Some((text, font))
+        });
+    }
+
     fn install_measure(layout: &LayoutNode, snapshot: Self) {
         let weak_layout = layout.downgrade();
-        if let Some(environment) = TextEnvironmentHolder::current() {
-            // Let one batch shape every label that this layout pass measures.
-            let weak_layout = weak_layout.clone();
-            let (string, single_line) = (
-                snapshot.string.clone(),
-                snapshot.truncates || snapshot.line_limit == Some(1),
-            );
-            environment.request_shape(move |environment| {
-                let layout = LayoutNode::upgrade(&weak_layout)?;
-                if layout.text_measure().is_some() {
-                    return None;
-                }
-                let font = Self::metrics_for_layout(&layout, environment).font;
-                let text = if single_line {
-                    string.lines().collect::<Vec<_>>().join(" ")
-                } else {
-                    string
-                };
-                Some((text, font))
-            });
-        }
         layout.set_measure_func(Some(Rc::new(
             move |width, width_mode, _height, _height_mode| {
                 let Some(environment) = TextEnvironmentHolder::current() else {
@@ -365,6 +368,7 @@ impl PrimitiveView for Text {
             alignment: self.alignment,
             line_limit: self.line_limit,
         }));
+        self.request_shape(&layout);
         Some(layout)
     }
 
@@ -379,6 +383,9 @@ impl PrimitiveView for Text {
             layout.set_text_inputs(Some(next));
             layout.set_text_measure(None);
             layout.mark_dirty();
+        }
+        if layout.text_measure().is_none() {
+            self.request_shape(layout);
         }
     }
 }

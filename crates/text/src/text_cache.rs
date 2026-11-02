@@ -47,6 +47,9 @@ impl<K: Clone + Eq + Hash, V: Clone> TextCache<K, V> {
             }),
         }
     }
+    pub fn limits(&self) -> TextCacheLimits {
+        self.limits
+    }
     pub fn snapshot(&self) -> TextCacheSnapshot {
         let s = self.storage.lock().unwrap_or_else(|e| e.into_inner());
         TextCacheSnapshot {

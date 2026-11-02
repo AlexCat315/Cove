@@ -163,6 +163,10 @@ impl FontProvider {
     pub fn primary_font(&self) -> Option<Rc<ManagedFont>> {
         self.fonts.get(self.primary_name.as_ref()?).cloned()
     }
+    /// Grows when font fallback loads a font or names one under a new alias.
+    pub fn loaded_font_count(&self) -> usize {
+        self.fonts.len()
+    }
     pub fn all_fonts(&self) -> Vec<Rc<ManagedFont>> {
         let mut seen = HashSet::new();
         self.fonts

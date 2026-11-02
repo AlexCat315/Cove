@@ -24,7 +24,6 @@ members = [
     "xtask",
     "crates/browser",
     "examples/gallery",
-    "examples/counter",
     "examples/mobile",
 ]
 resolver = "3"
