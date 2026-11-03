@@ -51,7 +51,7 @@ impl GalleryPage {
             Self::Image => icons::media::image(),
             Self::Carousel => icons::editor::skip_forward(),
             Self::Web => icons::shape::globe(),
-            Self::RichText => icons::text::pilcrow(),
+            Self::TextRuns => icons::text::pilcrow(),
             Self::Markdown => icons::text::heading(),
             Self::Avatar => icons::user::user(),
             Self::Menu => icons::action::more_horizontal(),

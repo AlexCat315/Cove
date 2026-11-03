@@ -10,9 +10,9 @@
 use cove_composition::Scope;
 use cove_core::State;
 use cove_ui_compose::primitives::layout::sidebar::{SidebarItem, SidebarSection};
+use cove_ui_compose::primitives::overlays::menu::MenuEntry;
 use cove_ui_compose::primitives::text::text_buffer::TextBuffer;
 use cove_ui_compose::primitives::text::text_field::TextField;
-use cove_ui_compose::primitives::overlays::menu::MenuEntry;
 
 use crate::gallery_content::catalog::GalleryOptions;
 
@@ -251,7 +251,10 @@ impl cove_ui_compose::View for NestedSidebarExample {
                 cove_ui_compose::AnyView::new(cove_ui_compose::primitives::text::Text::new(
                     format!("Last action: {}", self.last_action()),
                 )),
-                cove_ui_compose::AnyView::new(TextField::new("Document draft", self.draft.binding())),
+                cove_ui_compose::AnyView::new(TextField::new(
+                    "Document draft",
+                    self.draft.binding(),
+                )),
             ])),
         ));
         let sidebar = cove_ui_compose::primitives::layout::sidebar::AdaptiveSidebar::try_new(

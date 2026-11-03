@@ -9,6 +9,7 @@ use cove_composition::Scope;
 use cove_core::scene::{Align, FlexDirection, Justify, Wrap};
 use cove_core::{Binding, Color, State};
 use cove_ui_compose::modifiers::layout::LayoutFrameExt;
+use cove_ui_compose::modifiers::style::AppearanceExt;
 use cove_ui_compose::primitives::controls::fields::asset_ref_field::AssetRefField;
 use cove_ui_compose::primitives::controls::fields::asset_ref_model::AssetRef;
 use cove_ui_compose::primitives::controls::fields::color_field::ColorField;
@@ -23,9 +24,12 @@ use cove_ui_compose::primitives::text::Text;
 use cove_ui_compose::primitives::text::text_buffer::TextBuffer;
 use cove_ui_compose::primitives::text::text_field::TextField;
 use cove_ui_compose::primitives::text::text_field::text_field_options::{
-    TextFieldBehavior, TextFieldDecoration,
+    TextFieldAxis, TextFieldBehavior, TextFieldDecoration, TextFieldLayout,
 };
 use cove_ui_compose::theme::SemanticFontRef;
+use cove_ui_compose::theme::styles::components::{
+    AnyTextFieldStyle, EditorTextFieldStyle, TextFieldStyle, TextFieldStyleConfiguration,
+};
 use cove_ui_compose::theme::tokens::{SemanticColorRef, SemanticStyleViewExt};
 use cove_ui_compose::{AnyView, BoxView, LayoutDebugExt, TupleView, View};
 
@@ -345,6 +349,44 @@ pub struct TextFieldStory {
     locked: State<TextBuffer>,
     limited: State<TextBuffer>,
     unicode: State<TextBuffer>,
+    history: State<TextBuffer>,
+    styled: State<TextBuffer>,
+}
+
+struct EditingFieldStyle;
+
+impl TextFieldStyle for EditingFieldStyle {
+    fn make_body(&self, configuration: TextFieldStyleConfiguration) -> AnyView {
+        let inputs = configuration.theme.inputs;
+        let background = if !configuration.is_enabled {
+            inputs.background_disabled
+        } else if configuration.is_editing {
+            configuration.theme.colors.focus_ring.multiplied_alpha(0.08)
+        } else {
+            inputs.background
+        };
+        let border = if !configuration.is_enabled {
+            inputs.border_disabled
+        } else if configuration.is_focused {
+            inputs.border_focused
+        } else {
+            inputs.border_color
+        };
+        AnyView::new(
+            configuration
+                .content
+                .background_color(background)
+                .border_color(
+                    border,
+                    if configuration.is_focused {
+                        inputs.focus_ring_width
+                    } else {
+                        inputs.border_width
+                    },
+                )
+                .corner_radius(inputs.radius),
+        )
+    }
 }
 
 impl TextFieldStory {
@@ -355,7 +397,11 @@ impl TextFieldStory {
             secret: State::new(TextBuffer::new("correct horse")),
             locked: State::new(TextBuffer::new("Read only value")),
             limited: State::new(TextBuffer::new("cove-sdk")),
-            unicode: State::new(TextBuffer::new("Cove 输入法 🙂")),
+            unicode: State::new(TextBuffer::new("Cove e\u{301} 👩🏽‍💻 🇨🇳")),
+            history: State::new(TextBuffer::new(
+                "First draft line\nSecond line with more words\nThird line\nFourth line",
+            )),
+            styled: State::new(TextBuffer::new("Draft")),
         }
     }
 
@@ -368,11 +414,11 @@ impl TextFieldStory {
     }
 
     pub fn readout(&self) -> String {
-        let text = self.text.get().string_value();
+        let text = self.text.get();
         if text.is_empty() {
             "Empty".to_owned()
         } else {
-            format!("{} characters", text.chars().count())
+            format!("{} characters", text.character_count())
         }
     }
 }
@@ -468,7 +514,7 @@ impl View for TextFieldStory {
                                     secret,
                                     format!(
                                         "{} characters",
-                                        self.secret.get().string_value().chars().count()
+                                        self.secret.get().character_count()
                                     ),
                                 ),
                                 field_row(
@@ -487,9 +533,50 @@ impl View for TextFieldStory {
                             limited,
                             format!(
                                 "{} / 12",
-                                self.limited.get().string_value().chars().count()
+                                self.limited.get().character_count()
                             ),
                         ),
+                    )),
+                    AnyView::new(StorySection::new(
+                        "Navigation & history",
+                        "Primary-Z undoes a typing run and Primary-Shift-Z redoes it. Option-arrows move by word, Command-arrows by line, PageUp/PageDown by viewport; Home and End stop on the displayed row.",
+                        field_row(
+                            "Draft",
+                            AnyView::new(
+                                TextField::new("Release notes", self.history.binding())
+                                    .layout(TextFieldLayout {
+                                        axis: TextFieldAxis::Vertical,
+                                        max_visible_lines: 4,
+                                        ..TextFieldLayout::default()
+                                    })
+                                    .behavior(TextFieldBehavior {
+                                        clearable: true,
+                                        disabled,
+                                        ..TextFieldBehavior::new()
+                                    })
+                                    .frame_width(320.0)
+                                    .debug_name("text-field-history"),
+                            ),
+                            format!(
+                                "{} lines · {} characters",
+                                self.history.get().line_count(),
+                                self.history.get().character_count()
+                            ),
+                        ),
+                    )),
+                    AnyView::new(StorySection::new(
+                        "Styles",
+                        "Focus and editing update the chrome while keeping the input and selection.",
+                        field_grid(vec![
+                            field_row("Editing highlight", AnyView::new(TextField::new("Styled text", self.styled.binding())
+                                .behavior(TextFieldBehavior { disabled, ..Default::default() })
+                                .style(AnyTextFieldStyle::new(EditingFieldStyle))
+                                .frame_width(240.0).debug_name("text-field-styled")), format!("{} characters", self.styled.get().character_count())),
+                            field_row("Editor", AnyView::new(TextField::new("Editor style", self.styled.binding())
+                                .behavior(TextFieldBehavior { disabled, ..Default::default() })
+                                .style(AnyTextFieldStyle::new(EditorTextFieldStyle))
+                                .frame_width(240.0).debug_name("text-field-editor-style")), format!("{} characters", self.styled.get().character_count())),
+                        ]),
                     )),
                     AnyView::new(StorySection::new(
                         "Unicode editing",
@@ -499,7 +586,7 @@ impl View for TextFieldStory {
                             unicode,
                             format!(
                                 "{} characters",
-                                self.unicode.get().string_value().chars().count()
+                                self.unicode.get().character_count()
                             ),
                         ),
                     )),
@@ -514,7 +601,7 @@ impl View for TextFieldStory {
     }
 
     fn dynamic_properties(&self) -> Vec<cove_composition::DynamicField> {
-        cove_composition::dynamic_fields!(self; text)
+        cove_composition::dynamic_fields!(self; text, secret, locked, limited, unicode, history, styled)
     }
 }
 

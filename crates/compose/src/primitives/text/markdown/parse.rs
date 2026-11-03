@@ -9,7 +9,7 @@ use std::collections::HashMap;
 
 use pulldown_cmark::{CodeBlockKind, Event, HeadingLevel, Options, Parser, Tag, TagEnd};
 
-use crate::primitives::text::rich::run::{RichTextRun, RichTextTraits};
+use crate::primitives::text::rich::run::{TextRun, TextTraits};
 
 use super::document::{
     MarkdownAlignment, MarkdownBlock, MarkdownList, MarkdownListItem, MarkdownTable,
@@ -45,7 +45,7 @@ pub fn blocks(source: &str) -> Vec<MarkdownBlock> {
 }
 
 /// Inline runs for one span of text, parsed as an inline-only document.
-pub fn runs(source: &str) -> Vec<RichTextRun> {
+pub fn runs(source: &str) -> Vec<TextRun> {
     let mut inline = InlineState::default();
     for event in Parser::new_ext(source, options()) {
         inline.event(event);
@@ -89,20 +89,20 @@ struct ListItemFrame {
 
 struct TableFrame {
     alignments: Vec<MarkdownAlignment>,
-    header: Vec<Vec<RichTextRun>>,
-    rows: Vec<Vec<Vec<RichTextRun>>>,
-    row: Vec<Vec<RichTextRun>>,
+    header: Vec<Vec<TextRun>>,
+    rows: Vec<Vec<Vec<TextRun>>>,
+    row: Vec<Vec<TextRun>>,
     inline: InlineState,
     in_head: bool,
 }
 
 #[derive(Default)]
 struct InlineState {
-    runs: Vec<RichTextRun>,
-    traits: RichTextTraits,
+    runs: Vec<TextRun>,
+    traits: TextTraits,
     link: Option<String>,
     /// One entry per open emphasis/strong/strike/link span.
-    stack: Vec<(RichTextTraits, Option<String>)>,
+    stack: Vec<(TextTraits, Option<String>)>,
     literal: String,
 }
 
@@ -110,19 +110,19 @@ impl InlineState {
     fn event(&mut self, event: Event<'_>) {
         match event {
             Event::Text(text) => self.push(&text),
-            Event::Code(code) => self.push_traits(&code, RichTextTraits::CODE),
+            Event::Code(code) => self.push_traits(&code, TextTraits::CODE),
             Event::SoftBreak => self.push(" "),
             Event::HardBreak => {
                 self.flush();
-                self.runs.push(RichTextRun {
+                self.runs.push(TextRun {
                     text: "\n".to_string(),
                     traits: self.traits,
                     link: self.link.clone(),
                 });
             }
             Event::Rule => {}
-            Event::Html(html) => self.push_traits(&html, RichTextTraits::CODE),
-            Event::InlineHtml(html) => self.push_traits(&html, RichTextTraits::CODE),
+            Event::Html(html) => self.push_traits(&html, TextTraits::CODE),
+            Event::InlineHtml(html) => self.push_traits(&html, TextTraits::CODE),
             Event::Start(tag) => self.start(tag),
             Event::End(tag) => self.end(tag),
             _ => {}
@@ -131,9 +131,9 @@ impl InlineState {
 
     fn start(&mut self, tag: Tag<'_>) {
         match tag {
-            Tag::Emphasis => self.open(RichTextTraits::ITALIC),
-            Tag::Strong => self.open(RichTextTraits::BOLD),
-            Tag::Strikethrough => self.open(RichTextTraits::STRIKETHROUGH),
+            Tag::Emphasis => self.open(TextTraits::ITALIC),
+            Tag::Strong => self.open(TextTraits::BOLD),
+            Tag::Strikethrough => self.open(TextTraits::STRIKETHROUGH),
             Tag::Link { dest_url, .. } => {
                 self.flush();
                 self.stack.push((self.traits, self.link.clone()));
@@ -143,7 +143,7 @@ impl InlineState {
                 // Images render as their alternative text, linked to the source.
                 self.flush();
                 self.stack.push((
-                    self.traits.union(RichTextTraits::ITALIC),
+                    self.traits.union(TextTraits::ITALIC),
                     Some(dest_url.to_string()),
                 ));
             }
@@ -161,7 +161,7 @@ impl InlineState {
         }
     }
 
-    fn open(&mut self, trait_bit: RichTextTraits) {
+    fn open(&mut self, trait_bit: TextTraits) {
         self.flush();
         self.stack.push((self.traits, self.link.clone()));
         self.traits = self.traits.union(trait_bit);
@@ -179,12 +179,12 @@ impl InlineState {
         self.literal.push_str(text);
     }
 
-    fn push_traits(&mut self, text: &str, trait_bit: RichTextTraits) {
+    fn push_traits(&mut self, text: &str, trait_bit: TextTraits) {
         self.flush();
         if text.is_empty() {
             return;
         }
-        self.runs.push(RichTextRun {
+        self.runs.push(TextRun {
             text: text.to_string(),
             traits: self.traits.union(trait_bit),
             link: self.link.clone(),
@@ -196,18 +196,18 @@ impl InlineState {
             return;
         }
         let text = std::mem::take(&mut self.literal);
-        self.runs.push(RichTextRun {
+        self.runs.push(TextRun {
             text,
             traits: self.traits,
             link: self.link.clone(),
         });
     }
 
-    fn finish(mut self) -> Vec<RichTextRun> {
+    fn finish(mut self) -> Vec<TextRun> {
         self.flush();
         // Adjacent runs with the same style become one, so text shapes in fewer
         // pieces.
-        let mut merged: Vec<RichTextRun> = Vec::new();
+        let mut merged: Vec<TextRun> = Vec::new();
         for run in self.runs {
             if run.text.is_empty() {
                 continue;
@@ -313,13 +313,11 @@ fn convert<'a>(events: impl Iterator<Item = Event<'a>>) -> Vec<MarkdownBlock> {
                 | Tag::Strong
                 | Tag::Strikethrough
                 | Tag::Link { .. }
-                | Tag::Image { .. } => {
-                    match stack.last_mut() {
-                        Some(Frame::Heading { inline, .. }) => inline.start(tag),
-                        Some(Frame::Table(table)) => table.inline.start(tag),
-                        _ => inline.start(tag),
-                    }
-                }
+                | Tag::Image { .. } => match stack.last_mut() {
+                    Some(Frame::Heading { inline, .. }) => inline.start(tag),
+                    Some(Frame::Table(table)) => table.inline.start(tag),
+                    _ => inline.start(tag),
+                },
                 _ => {}
             },
             Event::End(tag) => match tag {
@@ -415,13 +413,11 @@ fn convert<'a>(events: impl Iterator<Item = Event<'a>>) -> Vec<MarkdownBlock> {
                 | TagEnd::Strong
                 | TagEnd::Strikethrough
                 | TagEnd::Link
-                | TagEnd::Image => {
-                    match stack.last_mut() {
-                        Some(Frame::Heading { inline, .. }) => inline.end(tag),
-                        Some(Frame::Table(table)) => table.inline.end(tag),
-                        _ => inline.end(tag),
-                    }
-                }
+                | TagEnd::Image => match stack.last_mut() {
+                    Some(Frame::Heading { inline, .. }) => inline.end(tag),
+                    Some(Frame::Table(table)) => table.inline.end(tag),
+                    _ => inline.end(tag),
+                },
                 _ => {}
             },
             Event::Text(text) => {
@@ -437,11 +433,11 @@ fn convert<'a>(events: impl Iterator<Item = Event<'a>>) -> Vec<MarkdownBlock> {
             }
             Event::Code(text) => {
                 if let Some(Frame::Heading { inline, .. }) = stack.last_mut() {
-                    inline.push_traits(&text, RichTextTraits::CODE);
+                    inline.push_traits(&text, TextTraits::CODE);
                 } else if let Some(Frame::Table(table)) = stack.last_mut() {
-                    table.inline.push_traits(&text, RichTextTraits::CODE);
+                    table.inline.push_traits(&text, TextTraits::CODE);
                 } else {
-                    inline.push_traits(&text, RichTextTraits::CODE);
+                    inline.push_traits(&text, TextTraits::CODE);
                 }
             }
             Event::SoftBreak => inline.push(" "),
@@ -464,11 +460,11 @@ fn convert<'a>(events: impl Iterator<Item = Event<'a>>) -> Vec<MarkdownBlock> {
                     );
                 }
             }
-            Event::InlineHtml(html) => inline.push_traits(&html, RichTextTraits::CODE),
+            Event::InlineHtml(html) => inline.push_traits(&html, TextTraits::CODE),
             Event::Rule => emit(&mut stack, &mut blocks, MarkdownBlock::Rule),
             Event::FootnoteReference(name) => inline.push(&name),
             Event::InlineMath(math) | Event::DisplayMath(math) => {
-                inline.push_traits(&math, RichTextTraits::CODE)
+                inline.push_traits(&math, TextTraits::CODE)
             }
         }
     }

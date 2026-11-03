@@ -35,7 +35,7 @@ impl Theme {
     ) -> Self {
         let inputs = inputs.unwrap_or_else(|| {
             InputAppearance::new(
-                colors.surface,
+                colors.surface_sunken,
                 colors.surface_variant,
                 colors.border,
                 colors.border_strong,

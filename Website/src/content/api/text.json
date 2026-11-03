@@ -808,85 +808,100 @@
   "id": "text",
   "name": "Text",
   "kind": "struct",
-  "declaration": "public struct Text: _PrimitiveView",
-  "abstract": "Static text primitive. Participates in flexbox layout via Taffy's measure callback so a label sized by its parent will wrap; an unconstrained label reports its natural single-line width.",
+  "declaration": "pub struct Text",
+  "abstract": "普通文字与样式片段共用的 Rust 文本组件，使用同一节点、构建方法和选择交互。",
   "discussion": [],
   "availability": [],
   "conforms": [
-   "View"
+   "PrimitiveView",
+   "Clone"
   ],
   "members": [
    {
-    "name": "string",
-    "kind": "let",
-    "declaration": "public let string: String",
+    "name": "new",
+    "kind": "func",
+    "declaration": "pub fn new(string: impl Into<String>) -> Text",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "runs",
+    "kind": "func",
+    "declaration": "pub fn runs(runs: Vec<TextRun>) -> Text",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "localized",
+    "kind": "func",
+    "declaration": "pub fn localized(key: impl Into<LocalizedStringKey>) -> Text",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "plain_text",
+    "kind": "func",
+    "declaration": "pub fn plain_text(&self) -> &str",
     "abstract": "",
     "discussion": []
    },
    {
     "name": "alignment",
-    "kind": "let",
-    "declaration": "public let alignment: TextAlignment",
+    "kind": "func",
+    "declaration": "pub fn alignment(self, alignment: TextAlignment) -> Text",
     "abstract": "",
     "discussion": []
    },
    {
     "name": "color",
-    "kind": "let",
-    "declaration": "public let color: Color?",
-    "abstract": "",
-    "discussion": []
-   },
-   {
-    "name": "lineLimit",
-    "kind": "let",
-    "declaration": "public let lineLimit: Int?",
-    "abstract": "",
-    "discussion": []
-   },
-   {
-    "name": "Text",
-    "kind": "init",
-    "declaration": "public init(_ string: String, alignment: TextAlignment = .leading, color: Color? = nil, lineLimit: Int? = nil)",
-    "abstract": "",
-    "discussion": []
-   },
-   {
-    "name": "Text",
-    "kind": "init",
-    "declaration": "public init(_ key: LocalizedStringKey, alignment: TextAlignment = .leading, color: Color? = nil, lineLimit: Int? = nil)",
-    "abstract": "",
-    "discussion": []
-   },
-   {
-    "name": "lineLimit",
     "kind": "func",
-    "declaration": "public func lineLimit(_ limit: Int?) -> Text",
+    "declaration": "pub fn color(self, color: Color) -> Text",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "line_limit",
+    "kind": "func",
+    "declaration": "pub fn line_limit(self, limit: Option<usize>) -> Text",
     "abstract": "",
     "discussion": []
    },
    {
     "name": "truncated",
     "kind": "func",
-    "declaration": "public func truncated() -> some View",
-    "abstract": "A single line with a trailing ellipsis, a full-text tooltip and the original accessible name. Truncation never splits a grapheme cluster. The tooltip appears only when the line actually had to clip.",
+    "declaration": "pub fn truncated(self) -> Text",
+    "abstract": "",
     "discussion": []
    },
    {
-    "name": "textSelectionEnabled",
+    "name": "display_only",
     "kind": "func",
-    "declaration": "public func textSelectionEnabled(_ enabled: Bool = true) -> Text",
-    "abstract": "Enables text selection for this label when it is inside a `textSelection()` region, so its content can be copied like a `RichText`.",
+    "declaration": "pub fn display_only(self, display_only: bool) -> Text",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "role",
+    "kind": "func",
+    "declaration": "pub fn role(self, role: TextRole) -> Text",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "on_open_link",
+    "kind": "func",
+    "declaration": "pub fn on_open_link(self, handler: impl Fn(&str) + 'static) -> Text",
+    "abstract": "",
     "discussion": []
    }
   ],
   "module": "CoveUICompose",
   "category": "text",
-  "file": "Compose/Sources/CoveUICompose/Primitives/Text/Text.swift",
-  "line": 8,
+  "file": "crates/compose/src/primitives/text/text.rs",
+  "line": 22,
   "owner": "",
   "overloads": [
-   "public struct Text: _PrimitiveView"
+   "pub struct Text"
   ]
  },
  {

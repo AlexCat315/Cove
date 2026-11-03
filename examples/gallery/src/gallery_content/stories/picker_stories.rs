@@ -163,7 +163,8 @@ impl View for DateRangeStory {
         options.calendar.calendar.set_first_weekday(2);
         options.presentation.is_enabled = self.options.is_enabled;
         let field = AnyView::new(
-            DateRangePicker::new(self.range.binding()).configure(|picker| *picker = options)
+            DateRangePicker::new(self.range.binding())
+                .configure(|picker| *picker = options)
                 .frame_width(220.0)
                 .debug_name("date-range-control"),
         );
@@ -577,9 +578,21 @@ impl View for IconStory {
             Wrap::Wrap,
             20.0,
             AnyView::new(TupleView::new(vec![
-                semantic_tile(icons::status::check_circle(), SemanticColorRef::success(), "success"),
-                semantic_tile(icons::status::alert_triangle(), SemanticColorRef::warning(), "warning"),
-                semantic_tile(icons::status::alert_circle(), SemanticColorRef::error(), "error"),
+                semantic_tile(
+                    icons::status::check_circle(),
+                    SemanticColorRef::success(),
+                    "success",
+                ),
+                semantic_tile(
+                    icons::status::alert_triangle(),
+                    SemanticColorRef::warning(),
+                    "warning",
+                ),
+                semantic_tile(
+                    icons::status::alert_circle(),
+                    SemanticColorRef::error(),
+                    "error",
+                ),
                 semantic_tile(icons::status::info(), SemanticColorRef::info(), "info"),
             ])),
         ));

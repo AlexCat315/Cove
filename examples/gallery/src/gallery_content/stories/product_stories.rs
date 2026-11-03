@@ -308,7 +308,9 @@ impl View for RadioStory {
             "Tab enters once. Arrows choose an enabled option and move focus; the disabled option is skipped.",
             AnyView::new(TupleView::new(vec![
                 group,
-                AnyView::new(AnyView::new(caption(self.caption())).debug_name("product-radio-caption")),
+                AnyView::new(
+                    AnyView::new(caption(self.caption())).debug_name("product-radio-caption"),
+                ),
             ])),
         ))
     }
@@ -583,7 +585,9 @@ impl View for ComboboxStory {
             AnyView::new(TupleView::new(vec![
                 local,
                 remote,
-                AnyView::new(AnyView::new(caption(self.caption())).debug_name("combobox-local-caption")),
+                AnyView::new(
+                    AnyView::new(caption(self.caption())).debug_name("combobox-local-caption"),
+                ),
             ])),
         ))
     }

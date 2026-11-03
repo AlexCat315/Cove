@@ -344,6 +344,24 @@ impl TextSelectionScope {
     }
 
     pub fn select(&mut self, anchor: TextSelectionPosition, focus: TextSelectionPosition) {
+        // Layout adapters report UTF-8 bytes. Keep the selection model safe
+        // even when a fitted display (for example an ellipsis) has a different
+        // byte length from its source, or a caller supplies an interior offset.
+        let bounded = |mut position: TextSelectionPosition| {
+            if let Some(member) = self.members.get(&position.member) {
+                let text = member.text();
+                position.offset = text
+                    .grapheme_indices(true)
+                    .map(|(offset, _)| offset)
+                    .chain(std::iter::once(text.len()))
+                    .take_while(|offset| *offset <= position.offset)
+                    .last()
+                    .unwrap_or(0);
+            }
+            position
+        };
+        let anchor = bounded(anchor);
+        let focus = bounded(focus);
         if self.anchor == Some(anchor) && self.focus == Some(focus) {
             return;
         }
@@ -594,6 +612,22 @@ impl TextSelectionScope {
         self.range_at(index, self.selection_span(), &ids)
     }
 
+    /// UTF-8 offsets of the document's two visible endpoints in this member.
+    /// Interior paragraphs have no endpoint markers, including reverse drags.
+    pub(crate) fn endpoint_offsets(&mut self, node: &Node) -> (Option<usize>, Option<usize>) {
+        self.update_order();
+        let Some(index) = self.member_indices.get(&node.id().0).copied() else {
+            return (None, None);
+        };
+        let Some(span) = self.selection_span() else {
+            return (None, None);
+        };
+        (
+            (index == span.lower).then_some(span.start),
+            (index == span.upper).then_some(span.end),
+        )
+    }
+
     /// Paragraphs on one row (table cells) join with tabs, rows with newlines.
     pub fn selected_text(&mut self) -> String {
         if !self.has_selection() {
@@ -760,6 +794,34 @@ impl TextSelectionChrome {
         None
     }
 
+    /// Short rounded stems at opposite edges: the start hangs below the
+    /// selection, the end rises above it, matching Swift's endpoint direction.
+    pub fn draw_endpoint_bars(
+        list: &mut DrawList,
+        origin: Point,
+        start: Option<Rect>,
+        end: Option<Rect>,
+        color: Color,
+    ) {
+        for (caret, is_start) in [(start, true), (end, false)] {
+            let Some(caret) = caret else {
+                continue;
+            };
+            let length = ((caret.height * 0.3).clamp(5.0, 8.0) * 2.0).round() * 0.5;
+            let overlap = 2.0_f32.min(caret.height * 0.1);
+            let top = if is_start {
+                caret.y + caret.height - overlap
+            } else {
+                caret.y - length + overlap
+            };
+            let _ = list.add_rounded_rect(
+                Rect::new(origin.x + caret.x - 0.75, origin.y + top, 1.5, length),
+                0.75,
+                color,
+            );
+        }
+    }
+
     pub fn draw_handles(
         list: &mut DrawList,
         origin: Point,
@@ -887,9 +949,9 @@ impl TextBoundaries {
             }
         }
         let mut lower = 0usize;
-        for character in text.chars() {
-            let upper = lower + character.len_utf8();
-            if offset >= lower && offset < upper {
+        for grapheme in text.graphemes(true) {
+            let upper = lower + grapheme.len();
+            if offset >= lower && (offset < upper || offset == upper && upper == text.len()) {
                 return lower..upper;
             }
             lower = upper;
@@ -928,21 +990,34 @@ impl TextSelectionRoot {
     }
 }
 
+struct MountedSelectionScope(SharedTextSelectionScope);
+impl NodeResource for MountedSelectionScope {
+    fn mount(&self, _node: &Node) {}
+    fn unmount(&self, _node: &Node) {}
+    fn as_any_rc(self: Rc<Self>) -> Rc<dyn Any> {
+        self
+    }
+}
+
 impl cove_composition::PrimitiveView for TextSelectionRoot {
     fn make_node(&self) -> Node {
-        Node::new()
+        let node = Node::new();
+        node.add_resource(Rc::new(MountedSelectionScope(self.scope.clone())));
+        node
     }
     fn update_node(&self, _node: &Node) {}
     fn make_layout_node(&self) -> Option<cove_core::scene::LayoutNode> {
         None
     }
-    fn children(&self, _node: &Node) -> Vec<cove_composition::AnyView> {
+    fn children(&self, node: &Node) -> Vec<cove_composition::AnyView> {
         use cove_composition::ViewExt;
+        let scope = node
+            .first_resource::<MountedSelectionScope>()
+            .map_or_else(|| self.scope.clone(), |mounted| mounted.0.clone());
         vec![cove_composition::AnyView::new(
-            self.content.clone().composition_local(
-                TextSelectionScope::key(),
-                Some(TextSelectionHandle(self.scope.clone())),
-            ),
+            self.content
+                .clone()
+                .composition_local(TextSelectionScope::key(), Some(TextSelectionHandle(scope))),
         )]
     }
 }

@@ -2,11 +2,11 @@
 
 use std::ops::{BitOr, BitOrAssign};
 
-/// Inline presentation traits of one `RichTextRun`.
+/// Inline presentation traits of one `TextRun`.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
-pub struct RichTextTraits(u8);
+pub struct TextTraits(u8);
 
-impl RichTextTraits {
+impl TextTraits {
     pub const BOLD: Self = Self(1 << 0);
     pub const ITALIC: Self = Self(1 << 1);
     /// Monospaced type on a tinted chip, as for inline code.
@@ -34,40 +34,40 @@ impl RichTextTraits {
     }
 }
 
-impl BitOr for RichTextTraits {
+impl BitOr for TextTraits {
     type Output = Self;
     fn bitor(self, rhs: Self) -> Self {
         Self(self.0 | rhs.0)
     }
 }
 
-impl BitOrAssign for RichTextTraits {
+impl BitOrAssign for TextTraits {
     fn bitor_assign(&mut self, rhs: Self) {
         self.0 |= rhs.0;
     }
 }
 
-/// One styled span of a `RichText` paragraph. Runs wrap together as a single
+/// One styled span of a `Text` paragraph. Runs wrap together as a single
 /// paragraph; a `"\n"` inside a run is a hard line break.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub struct RichTextRun {
+pub struct TextRun {
     pub text: String,
-    pub traits: RichTextTraits,
-    /// The destination handed to `RichText`'s link handler. Adjacent runs with
+    pub traits: TextTraits,
+    /// The destination handed to `Text`'s link handler. Adjacent runs with
     /// the same destination form one link.
     pub link: Option<String>,
 }
 
-impl RichTextRun {
+impl TextRun {
     pub fn new(text: impl Into<String>) -> Self {
         Self {
             text: text.into(),
-            traits: RichTextTraits::default(),
+            traits: TextTraits::default(),
             link: None,
         }
     }
 
-    pub fn with_traits(text: impl Into<String>, traits: RichTextTraits) -> Self {
+    pub fn with_traits(text: impl Into<String>, traits: TextTraits) -> Self {
         Self {
             text: text.into(),
             traits,

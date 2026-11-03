@@ -19,11 +19,10 @@
 //! - clicking blank canvas blurs the field and commits the number draft
 //!
 //! Named differences from the Swift suite:
-//! - **No surface marker or resolved-style helper.** The Rust `TextField` keeps
-//!   its editing state under `__textfield_state` and paints from the theme's
-//!   body token rather than the node's style attachments, so `resolvedFont` /
-//!   `resolvedLineHeight` have no Rust counterpart. The font and line-height
-//!   case asserts the attachments the surface receives.
+//! - **No surface marker.** The surface node is found by its `__textfield_state`
+//!   attachment. `resolvedFont` / `resolvedLineHeight` map to the shared
+//!   `text_style_font` / `text_style_line_height` resolvers, which read the
+//!   authored attachments off the node ancestry the way `textStyleValue` does.
 //! - **Tab and Shift-Tab do not edit a code field.** The field's key handler has
 //!   no Tab arm even though `indent_lines` exists, so selected lines are never
 //!   indented or outdented; Return still carries the block indentation.
@@ -55,9 +54,7 @@ use cove_core::scene::{EventPhase, Node};
 use cove_core::{Binding, Font, FontWeight, Point, State};
 use cove_platform::{KeyEvent, KeyModifiers, MouseButtonEvent};
 use cove_ui_compose::modifiers::layout::LayoutFrameExt;
-use cove_ui_compose::modifiers::style::{
-    AppearanceExt, FONT as FONT_KEY, LINE_HEIGHT as LINE_HEIGHT_KEY,
-};
+use cove_ui_compose::modifiers::style::{AppearanceExt, text_style_font, text_style_line_height};
 use cove_ui_compose::primitives::controls::fields::numeric::number_field::NumberField;
 use cove_ui_compose::primitives::controls::fields::numeric::text_format::NumericTextFormat;
 use cove_ui_compose::primitives::controls::{Button, ButtonIconSource, ButtonRole};
@@ -331,14 +328,14 @@ fn font_and_line_height_reach_the_styled_multiline_field_surface() {
             })
             .expect("the field mounts a surface");
         assert_eq!(
-            surface.attachment::<Font>(FONT_KEY),
+            text_style_font(&surface),
             Some(Font::monospaced(17.0, FontWeight::Regular)),
-            "the authored monospaced font reaches the surface"
+            "the authored monospaced font resolves for the surface"
         );
         assert_eq!(
-            surface.attachment::<f32>(LINE_HEIGHT_KEY),
+            text_style_line_height(&surface),
             Some(25.0),
-            "the authored line height reaches the surface"
+            "the authored line height resolves for the surface"
         );
     });
 }

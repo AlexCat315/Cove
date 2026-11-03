@@ -21,24 +21,11 @@
 //! host publishes its editing state under `__textfield_state` instead, and that
 //! attachment identifies the same surface node.
 //!
-//! Named differences from the Swift suite (each pinned by a `GAP:` assertion):
-//! - **Shift-Return in a single-line field** submits instead of inserting a
-//!   newline; Primary-Return submits in a vertical field.
-//! - **Escape and focus requests.** `on_cancel` is never invoked and Escape
-//!   bubbles; a focus request does not select the value.
-//! - **Text field styles are never applied.** `TextFieldHost` ignores the
-//!   `TextFieldStyle`, so the style never sees focus or editing state.
-//! - **Hover scrollbar overlay.** A capped field scrolls but draws no overlay.
-//! - **Line-number gutter.** Syntax colours paint per glyph; the gutter colour
-//!   is still not painted.
-//!
 //! Undo/redo, measurement and wheel scrolling, word/line/vertical navigation,
 //! affixes, the word counter and the length limit follow the Swift behaviour.
 //! Pointer geometry needs a text environment; real drag/multi-click selection is
 //! covered by Gallery's component_acceptance tests.
-//! - **Chrome in the field draw hook.** The bootstrapped CJK field draws its
-//!   background and border with the glyph, so the hook emits more than the one
-//!   glyph quad Swift counted.
+//! The style owns chrome; the surface draw hook owns glyphs and editing marks.
 
 use crate::support;
 
@@ -297,6 +284,28 @@ fn platform_editor_selection() {
 }
 
 #[test]
+fn platform_offsets_round_to_complete_graphemes() {
+    use cove_ui_compose::primitives::text::text_field::platform_input::{
+        character_index, utf16_offset,
+    };
+    let buffer = TextBuffer::new("a\u{301}👩🏽‍💻\r\n🇨🇳中");
+    let boundaries = [0, 2, 9, 11, 15, 16];
+    for units in 0..=16 {
+        assert_eq!(
+            character_index(&buffer, units, false),
+            boundaries.partition_point(|boundary| *boundary <= units) - 1
+        );
+        assert_eq!(
+            character_index(&buffer, units, true),
+            boundaries.partition_point(|boundary| *boundary < units)
+        );
+    }
+    for (index, units) in boundaries.into_iter().enumerate() {
+        assert_eq!(utf16_offset(&buffer, index), units);
+    }
+}
+
+#[test]
 fn text_input_inserts() {
     with_rig(|rig| {
         rig.install(TextField::new("placeholder", rig.binding()));
@@ -452,14 +461,15 @@ fn focus_state_updates_without_draw() {
                 .text_field_style(ProbingStyle(probe.clone())),
         );
         let node = rig.field();
-        assert!(
-            probe.focused.borrow().is_empty(),
-            "GAP: Swift renders the field through the TextFieldStyle and reports is_focused; Rust's TextFieldHost never calls the style: {:?}",
-            probe.focused.borrow()
+        assert_eq!(
+            probe.focused.borrow().last(),
+            Some(&false),
+            "the style sees the initial is_focused"
         );
-        assert!(
-            probe.editing.borrow().is_empty(),
-            "GAP: Swift reports is_editing through the style; Rust never calls it"
+        assert_eq!(
+            probe.editing.borrow().last(),
+            Some(&false),
+            "the style sees the initial is_editing"
         );
         rig.focus.focus(Some(&node), false);
         rig.graph.recomposer.commit_all();
@@ -469,13 +479,15 @@ fn focus_state_updates_without_draw() {
             focus_count.get(),
             blur_count.get()
         );
-        assert!(
-            probe.focused.borrow().is_empty(),
-            "GAP: Swift restyles with is_focused = true after focus; Rust never calls the style"
+        assert_eq!(
+            probe.focused.borrow().last(),
+            Some(&true),
+            "focus recomposes the style with is_focused = true"
         );
-        assert!(
-            probe.editing.borrow().is_empty(),
-            "GAP: Swift restyles with is_editing = true after focus; Rust never calls the style"
+        assert_eq!(
+            probe.editing.borrow().last(),
+            Some(&true),
+            "focus recomposes the style with is_editing = true"
         );
         rig.focus.clear();
         rig.graph.recomposer.commit_all();
@@ -485,10 +497,77 @@ fn focus_state_updates_without_draw() {
             focus_count.get(),
             blur_count.get()
         );
-        assert!(
-            probe.focused.borrow().is_empty(),
-            "GAP: Swift restyles with is_focused = false after blur; Rust never calls the style"
+        assert_eq!(
+            probe.focused.borrow().last(),
+            Some(&false),
+            "blur recomposes the style with is_focused = false"
         );
+        assert_eq!(
+            probe.editing.borrow().last(),
+            Some(&false),
+            "blur clears is_editing"
+        );
+    });
+}
+
+#[test]
+fn style_tracks_composition_commit_cancel_and_rebuild_without_drawing() {
+    with_rig(|rig| {
+        let probe = Rc::new(Probe {
+            focused: RefCell::new(Vec::new()),
+            editing: RefCell::new(Vec::new()),
+        });
+        rig.install(
+            TextField::new("", rig.binding()).text_field_style(ProbingStyle(probe.clone())),
+        );
+        let node = rig.field();
+        // Direct delivery isolates composition from the focused=true editing
+        // state, which would otherwise hide a disconnected composition sink.
+        let editing = rig.handlers(&node).editing.unwrap();
+        editing(
+            &TextEditingEvent {
+                text: "👩🏽‍💻e\u{301}中".into(),
+                start: 4,
+                length: 2,
+            },
+            EventPhase::Target,
+        );
+        rig.graph.recomposer.commit_all();
+        assert_eq!(probe.focused.borrow().last(), Some(&false));
+        assert_eq!(probe.editing.borrow().last(), Some(&true));
+        assert_eq!(state_of(&node).unwrap().borrow().composition.start, 1);
+        assert_eq!(state_of(&node).unwrap().borrow().composition.length, 1);
+        assert_eq!(
+            rig.field(),
+            node,
+            "style updates retain the editing surface"
+        );
+        let text = rig.handlers(&node).text.unwrap();
+        text("好", EventPhase::Target);
+        rig.graph.recomposer.commit_all();
+        assert_eq!(probe.editing.borrow().last(), Some(&false));
+        assert_eq!(rig.text(), "好");
+
+        rig.focus.focus(Some(&node), false);
+        let editing = rig.handlers(&node).editing.unwrap();
+        editing(
+            &TextEditingEvent {
+                text: "候选".into(),
+                start: 1,
+                length: 0,
+            },
+            EventPhase::Target,
+        );
+        rig.graph.recomposer.commit_all();
+        rig.focus.clear();
+        rig.graph.recomposer.commit_all();
+        assert!(
+            !state_of(&node).unwrap().borrow().composition.is_active(),
+            "blur clears composition after a style rebuild"
+        );
+        assert_eq!(probe.focused.borrow().last(), Some(&false));
+        assert_eq!(probe.editing.borrow().last(), Some(&false));
+        assert_eq!(rig.text(), "好", "cancelled composition never commits");
     });
 }
 
@@ -977,10 +1056,10 @@ fn renders_cjk_glyphs_in_bootstrapped_demo_environment() {
                 .atlas
                 .rasterize_glyph(glyph.glyph_id, glyph.font_id)
         });
-        assert!(
-            list.indices().len() > 6,
-            "GAP: Swift's field draw emits only the one glyph quad (6 indices); Rust paints the field background and border in the same hook: {}",
-            list.indices().len()
+        assert_eq!(
+            list.indices().len(),
+            6,
+            "the field draw emits only the glyph quad; the owning style paints the chrome"
         );
         assert!(glyph.is_some_and(|glyph| glyph.glyph_id != 0), "{glyph:?}");
         assert!(
@@ -1207,19 +1286,21 @@ fn triple_click_selects_all() {
 fn double_click_selects_word() {
     with_rig(|rig| {
         rig.set("hello   world");
+        TextEnvironmentHolder::set_current(Some(test_text_environment(16.0, 20.0)));
         rig.install(TextField::new("", rig.binding()));
+        rig.graph.compute_layout(200.0, 32.0);
         let node = rig.field();
         let handlers = rig.handlers(&node);
         (handlers.pointer.clone().unwrap())(
-            &press(0.0, 5.0, 2),
+            &press(2.0, 6.0, 2),
             PointerPhase::Down,
             EventPhase::Target,
         );
         (handlers.text.clone().unwrap())("X", EventPhase::Target);
         assert_eq!(
             rig.text(),
-            "hello   worldX",
-            "GAP: Swift selects the word under a double click (X   world); Rust ignores the click count and inserts at the caret"
+            "X   world",
+            "a double click selects the word under the pointer"
         );
     });
 }
@@ -1319,11 +1400,7 @@ fn command_line_navigation() {
         let k = handlers.key.clone().unwrap();
         k(&primary(Scancode::ARROW_LEFT), EventPhase::Target);
         (handlers.text.clone().unwrap())("X", EventPhase::Target);
-        assert_eq!(
-            rig.text(),
-            "Xhello",
-            "Command-Left moves to the line start"
-        );
+        assert_eq!(rig.text(), "Xhello", "Command-Left moves to the line start");
         k(&primary(Scancode::ARROW_RIGHT), EventPhase::Target);
         k(&primary(Scancode::BACKSPACE), EventPhase::Target);
         assert_eq!(
@@ -1416,6 +1493,71 @@ fn max_length_stops_typed_text() {
 }
 
 #[test]
+fn max_length_allows_a_combining_insertion_at_the_limit() {
+    with_rig(|rig| {
+        rig.set("e");
+        rig.install(
+            TextField::new("", rig.binding()).behavior(TextFieldBehavior {
+                max_length: Some(1),
+                ..Default::default()
+            }),
+        );
+        let node = rig.field();
+        (rig.handlers(&node).text.unwrap())("\u{301}", EventPhase::Target);
+        assert_eq!(rig.text(), "e\u{301}");
+        assert_eq!(
+            state_of(&node).unwrap().borrow().buffer.character_count(),
+            1
+        );
+        assert_eq!(state_of(&node).unwrap().borrow().selection.cursor_index, 1);
+        let editing = rig.handlers(&node).editing.unwrap();
+        editing(
+            &TextEditingEvent {
+                text: "\u{302}".into(),
+                start: 1,
+                length: 0,
+            },
+            EventPhase::Target,
+        );
+        let client: TextInputClient = node.attachment(TextInputAttachmentKey::CLIENT).unwrap();
+        (client.select)(0, 0);
+        assert_eq!(
+            rig.text(),
+            "e\u{301}\u{302}",
+            "native composition commits through the same grapheme limit"
+        );
+    });
+}
+
+#[test]
+fn field_style_overrides_the_inherited_style() {
+    with_rig(|rig| {
+        let local = Rc::new(Probe {
+            focused: RefCell::new(Vec::new()),
+            editing: RefCell::new(Vec::new()),
+        });
+        let inherited = Rc::new(Probe {
+            focused: RefCell::new(Vec::new()),
+            editing: RefCell::new(Vec::new()),
+        });
+        rig.install(
+            TextField::new("", rig.binding())
+                .style(
+                    cove_ui_compose::theme::styles::components::AnyTextFieldStyle::new(
+                        ProbingStyle(local.clone()),
+                    ),
+                )
+                .text_field_style(ProbingStyle(inherited.clone())),
+        );
+        let node = rig.field();
+        rig.focus.focus(Some(&node), false);
+        rig.graph.recomposer.commit_all();
+        assert_eq!(local.focused.borrow().last(), Some(&true));
+        assert!(inherited.focused.borrow().is_empty());
+    });
+}
+
+#[test]
 fn affixes_and_counter_paint() {
     with_rig(|rig| {
         rig.set("ab");
@@ -1442,6 +1584,49 @@ fn affixes_and_counter_paint() {
         assert!(
             decorated > plain,
             "the prefix, suffix and counter add glyphs ({decorated} vs {plain})"
+        );
+    });
+}
+
+#[test]
+fn selection_paints_the_authored_alpha_once() {
+    with_rig(|rig| {
+        rig.set("e\u{301} 👩🏽‍💻 selected");
+        TextEnvironmentHolder::set_current(Some(test_text_environment(16.0, 20.0)));
+        let selection = Color::from_rgba8(91, 121, 151, 96);
+        let endpoint = Color::from_rgba8(139, 47, 73, 255);
+        rig.install(
+            TextField::new("", rig.binding()).decoration(TextFieldDecoration {
+                selection_color: Some(selection),
+                cursor_color: Some(endpoint),
+                ..Default::default()
+            }),
+        );
+        rig.graph.compute_layout(320.0, 60.0);
+        let node = rig.field();
+        rig.focus.focus(Some(&node), false);
+        let state = state_of(&node).unwrap();
+        state.borrow_mut().selection.anchor = Some(0);
+        let selected = draw(&node);
+        assert!(
+            selected
+                .vertices()
+                .iter()
+                .any(|vertex| vertex.color == selection.rgba8()),
+            "selection must preserve the authored opacity rather than dim it again"
+        );
+        let mut xs: Vec<f32> = selected
+            .vertices()
+            .iter()
+            .filter(|v| v.color == endpoint.rgba8())
+            .map(|v| v.x)
+            .collect();
+        xs.sort_by(f32::total_cmp);
+        let groups =
+            usize::from(!xs.is_empty()) + xs.windows(2).filter(|p| p[1] - p[0] > 3.0).count();
+        assert_eq!(
+            groups, 2,
+            "selection has two stable endpoint bars and no blinking insertion caret"
         );
     });
 }

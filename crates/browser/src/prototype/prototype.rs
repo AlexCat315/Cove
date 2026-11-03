@@ -348,11 +348,7 @@ impl<C: PrototypeContent> BrowserPrototype<C> {
             return;
         }
         let event = if editing {
-            PlatformInputEvent::TextEditing(TextEditingEvent {
-                text: text.to_owned(),
-                start: 0,
-                length: 0,
-            })
+            PlatformInputEvent::TextEditing(TextEditingEvent::from_utf16(text, 0, 0))
         } else {
             PlatformInputEvent::TextInput(text.to_owned())
         };

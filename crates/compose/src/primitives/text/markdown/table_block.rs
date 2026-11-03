@@ -185,7 +185,7 @@ impl View for MarkdownTableView {
         let mut cell_views: Vec<AnyView> = Vec::new();
         // Tinted header backdrop.
         cell_views.push(AnyView::new(TableHeaderTint));
-        let mut rows: Vec<Vec<Vec<crate::primitives::text::rich::run::RichTextRun>>> =
+        let mut rows: Vec<Vec<Vec<crate::primitives::text::rich::run::TextRun>>> =
             vec![self.table.header.clone()];
         rows.extend(self.table.rows.clone());
         for (row_index, row) in rows.iter().enumerate() {
@@ -193,11 +193,11 @@ impl View for MarkdownTableView {
                 let runs = row.get(column).cloned().unwrap_or_default();
                 let content = if row_index == 0 {
                     runs.into_iter()
-                        .map(|run| crate::primitives::text::rich::run::RichTextRun {
+                        .map(|run| crate::primitives::text::rich::run::TextRun {
                             text: run.text,
                             traits: run
                                 .traits
-                                .union(crate::primitives::text::rich::run::RichTextTraits::BOLD),
+                                .union(crate::primitives::text::rich::run::TextTraits::BOLD),
                             link: run.link,
                         })
                         .collect()
@@ -252,7 +252,7 @@ crate::impl_primitive_view!(TableHeaderTint);
 /// One table cell: text that fills its column so centring and trailing
 /// alignment apply.
 struct TableTextCell {
-    runs: Vec<crate::primitives::text::rich::run::RichTextRun>,
+    runs: Vec<crate::primitives::text::rich::run::TextRun>,
     alignment: TextAlignment,
     on_open_link: Option<Rc<dyn Fn(&str)>>,
 }
@@ -284,7 +284,7 @@ impl crate::PrimitiveView for TableTextCell {
 
     fn children(&self, _node: &Node) -> Vec<AnyView> {
         // Real runs, so a cell keeps per-run bold, code and links.
-        let text = crate::primitives::text::rich::RichText::new(self.runs.clone());
+        let text = crate::primitives::text::Text::runs(self.runs.clone());
         let text = match &self.on_open_link {
             Some(handler) => {
                 let handler = handler.clone();

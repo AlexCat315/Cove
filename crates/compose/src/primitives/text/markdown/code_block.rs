@@ -138,10 +138,10 @@ impl PrimitiveView for MarkdownCodeBlockBody {
         let scroll = ScrollView::new(
             ScrollAxis::Horizontal,
             AnyView::new(
-                crate::primitives::text::rich::RichText::new(vec![
-                    crate::primitives::text::rich::run::RichTextRun::new(self.text.clone()),
+                crate::primitives::text::Text::runs(vec![
+                    crate::primitives::text::rich::run::TextRun::new(self.text.clone()),
                 ])
-                .role(crate::primitives::text::rich::RichTextRole::CodeBlock)
+                .role(crate::primitives::text::TextRole::CodeBlock)
                 .semantic_font(SemanticFontRef::mono())
                 .padding_edges(14.0, 12.0),
             ),

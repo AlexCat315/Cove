@@ -32,7 +32,11 @@ impl TextCompletionRequest {
             let Some(character) = buffer.character_at(start - 1) else {
                 break;
             };
-            if character.is_alphanumeric() || character == '_' {
+            if character
+                .chars()
+                .next()
+                .is_some_and(|scalar| scalar.is_alphanumeric() || scalar == '_')
+            {
                 start -= 1;
             } else {
                 break;

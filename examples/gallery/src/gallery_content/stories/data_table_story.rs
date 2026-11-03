@@ -288,10 +288,7 @@ impl DataTableStory {
             order: State::new(Vec::new()),
             // The sample tree opens with `engine` expanded.
             expanded: State::new(vec!["engine".to_owned()]),
-            tree_expanded: State::new(BTreeSet::from([
-                "scene".to_owned(),
-                "lights".to_owned(),
-            ])),
+            tree_expanded: State::new(BTreeSet::from(["scene".to_owned(), "lights".to_owned()])),
             tree_selected: State::new(Some("camera".to_owned())),
         }
     }
@@ -508,7 +505,8 @@ impl View for DataTableStory {
             12.0,
             AnyView::new(TupleView::new(vec![
                 AnyView::new(
-                    Button::title("Load 1,000 rows", move || small.load(SMALL_LOAD)).enabled(enabled),
+                    Button::title("Load 1,000 rows", move || small.load(SMALL_LOAD))
+                        .enabled(enabled),
                 ),
                 AnyView::new(
                     Button::title("Load 200,000 rows", move || large.load(LARGE_LOAD))
@@ -543,12 +541,10 @@ impl View for DataTableStory {
                     .as_ref()
                     .map(|node| node.name.to_owned())
                     .unwrap_or_else(|| id.clone());
-                let indented = AnyView::new(AnyView::new(Text::new(format!(
-                    "{}{}",
-                    "···".repeat(depth),
-                    title
-                )))
-                .frame_min_width(0.0));
+                let indented = AnyView::new(
+                    AnyView::new(Text::new(format!("{}{}", "···".repeat(depth), title)))
+                        .frame_min_width(0.0),
+                );
                 match is_expandable {
                     true => {
                         let story = self.handle();
@@ -602,7 +598,9 @@ impl View for DataTableStory {
                                 cove_core::scene::Wrap::Wrap,
                                 12.0,
                                 AnyView::new(TupleView::new(vec![
-                                    AnyView::new(AnyView::new(status).debug_name("gallery-data-table")),
+                                    AnyView::new(
+                                        AnyView::new(status).debug_name("gallery-data-table"),
+                                    ),
                                     AnyView::new(order),
                                 ])),
                             )),
@@ -725,9 +723,7 @@ impl View for TreeTableSample {
             TreeTable::try_new(
                 AssetNode::sample(),
                 |node: &AssetNode| node.id.clone(),
-                |node: &AssetNode| {
-                    (!node.children.is_empty()).then(|| node.children.clone())
-                },
+                |node: &AssetNode| (!node.children.is_empty()).then(|| node.children.clone()),
                 TreeTableColumn::new("name", "Name", |node: &AssetNode| {
                     AnyView::new(Text::new(node.name.clone()))
                 }),

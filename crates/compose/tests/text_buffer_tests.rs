@@ -17,29 +17,17 @@
 //! - a 100K-line document retains shared leaves and logarithmic depth through
 //!   middle edits
 //!
-//! GAP: the rope indexes Unicode scalars, not extended grapheme clusters.
-//! Swift's `RopeLeaf.init` walks `text.enumerated()` (`Character` values, i.e.
-//! grapheme clusters) to build `characterBoundaries`, and its newline scan asks
-//! `character.isNewline` — so a CRLF pair is one break and an emoji with a ZWJ
-//! sequence is one character. The Rust `RopeLeaf::new`
-//! (`primitives/text/rope/rope_storage.rs:29-46`) iterates `text.chars()`
-//! (Unicode scalars) and flags `'\r'` and `'\n'` separately, so every
-//! `character_count`, `line_count`, `line_range`, `character_index_for_*`,
-//! `substring(character_range:)` and `point_for_utf8_offset` shifts wherever a
-//! string contains a multi-scalar grapheme or a CRLF.
-//! Measured: `TextBuffer::new("👩🏽‍💻").character_count()` is 4 (Swift: 1);
-//! `TextBuffer::new("x\r\n").line_count()` is 3 (Swift: 2).
-//! The module header of `text_buffer.rs` claims "Character indexes are extended
-//! grapheme clusters", which the implementation does not honour. Every assertion
-//! below is pinned to the current scalar behaviour with the Swift value named
-//! in the message; the byte-level, delta, balance and sharing contracts are
-//! migrated unchanged because they are grapheme-independent.
+//! Character indexes are Swift extended grapheme clusters: `RopeLeaf::new`
+//! walks `grapheme_indices(true)` (the equivalent of `text.enumerated()` over
+//! `Character` values), so CRLF is one break and an emoji ZWJ sequence is one
+//! character. UTF-16 conversion still walks Unicode scalars, and
+//! `parser_point` still counts LF bytes.
 //!
 //! Model difference: Swift reaches into the rope with `buffer.root` and walks
 //! `RopeNode.storage` to assert leaf validity and AVL balance. Rust keeps
 //! `TextBuffer.root` private, so the same invariants are asserted through the
 //! public surface: every visible chunk decodes as a UTF-8 leaf of at most
-//! `RopeNode::MAX_LEAF_BYTES` unless it holds one character, and depth is
+//! `RopeNode::MAX_LEAF_BYTES` unless it holds one grapheme, and depth is
 //! bounded by the shared-leaf count plus the measured allocation ceiling. No
 //! assertion is dropped; the retained-snapshot half still compares chunk
 //! identities across an edit.
@@ -48,8 +36,10 @@ use std::collections::HashSet;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
+use cove_core::line_breaks::is_newline;
 use cove_ui_compose::primitives::text::rope::rope_storage::RopeNode;
 use cove_ui_compose::primitives::text::text_buffer::{TextBuffer, TextBufferPoint, TextEditDelta};
+use unicode_segmentation::UnicodeSegmentation;
 
 const LEAF_CEILING: usize = RopeNode::MAX_LEAF_BYTES;
 
@@ -63,6 +53,10 @@ fn replay(delta: &TextEditDelta, previous: &TextBuffer) -> String {
     String::from_utf8(bytes).expect("every edit keeps the buffer valid UTF-8")
 }
 
+fn grapheme_count(text: &str) -> usize {
+    text.graphemes(true).count()
+}
+
 /// The public-surface replacement for Swift's `assertBalanced`.
 fn assert_chunks_intact(buffer: &TextBuffer) {
     let chunks = buffer.visible_chunks(0..buffer.utf8_length());
@@ -70,10 +64,10 @@ fn assert_chunks_intact(buffer: &TextBuffer) {
         let text = std::str::from_utf8(&chunk.bytes)
             .unwrap_or_else(|error| panic!("leaf is not valid UTF-8: {error}"));
         assert!(
-            chunk.bytes.len() <= LEAF_CEILING || text.chars().count() == 1,
-            "a leaf holds {} bytes, over the {LEAF_CEILING}-byte ceiling with {} characters",
+            chunk.bytes.len() <= LEAF_CEILING || grapheme_count(text) == 1,
+            "a leaf holds {} bytes, over the {LEAF_CEILING}-byte ceiling with {} graphemes",
             chunk.bytes.len(),
-            text.chars().count()
+            grapheme_count(text)
         );
     }
 }
@@ -83,61 +77,60 @@ fn assert_indexes(buffer: &TextBuffer, source: &str) {
     let mut byte = 0usize;
     let mut utf16 = 0usize;
     let mut index = 0usize;
-    for character in source.chars() {
+    for grapheme in source.graphemes(true) {
         assert_eq!(
             buffer.utf8_offset_for_character_index(index),
             byte,
-            "character {index} starts at byte {byte}"
+            "grapheme {index} starts at byte {byte}"
         );
         assert_eq!(
             buffer.utf16_offset_for_character_index(index),
             utf16,
-            "character {index} starts at UTF-16 unit {utf16}"
+            "grapheme {index} starts at UTF-16 unit {utf16}"
         );
         assert_eq!(
             buffer.character_index_for_utf8_offset(byte),
             index,
-            "byte {byte} maps back to character {index}"
+            "byte {byte} maps back to grapheme {index}"
         );
-        let width = character.len_utf8();
-        for offset in (byte + 1)..(byte + width) {
+        for offset in (byte + 1)..(byte + grapheme.len()) {
             assert_eq!(
                 buffer.character_index_for_utf8_offset(offset),
                 index + 1,
-                "a mid-character byte {offset} rounds up to the next character"
+                "a byte inside the grapheme {offset} rounds up to the next grapheme"
             );
         }
-        byte += width;
-        utf16 += character.len_utf16();
+        byte += grapheme.len();
+        utf16 += grapheme.encode_utf16().count();
         index += 1;
     }
     assert_eq!(
         buffer.utf8_offset_for_character_index(index),
         byte,
-        "the end character maps to the byte length"
+        "the end grapheme maps to the byte length"
     );
     assert_eq!(byte, buffer.utf8_length(), "the byte length matches");
     assert_eq!(
         buffer.character_index_for_utf8_offset(byte),
         index,
-        "the byte length maps to the character count"
+        "the byte length maps to the grapheme count"
     );
     assert_eq!(
         index,
         buffer.character_count(),
-        "the character count matches"
+        "the grapheme count matches"
     );
     assert_eq!(buffer.utf16_length(), utf16, "the UTF-16 length matches");
 
     let mut ranges: Vec<std::ops::Range<usize>> = Vec::new();
     let mut start = 0usize;
-    for (position, character) in source.chars().enumerate() {
-        if character == '\n' || character == '\r' {
+    for (position, grapheme) in source.graphemes(true).enumerate() {
+        if is_newline(grapheme) {
             ranges.push(start..position);
             start = position + 1;
         }
     }
-    ranges.push(start..source.chars().count());
+    ranges.push(start..grapheme_count(source));
     assert_eq!(
         buffer.line_count(),
         ranges.len(),
@@ -147,7 +140,7 @@ fn assert_indexes(buffer: &TextBuffer, source: &str) {
         assert_eq!(
             buffer.line_range(line),
             range.clone(),
-            "line {line} covers its characters but not its separator"
+            "line {line} covers its graphemes but not its separator"
         );
         assert_eq!(
             buffer.character_index_for_line(line, usize::MAX),
@@ -157,7 +150,7 @@ fn assert_indexes(buffer: &TextBuffer, source: &str) {
         assert_eq!(
             buffer.line_index_for_character_index(range.start),
             line,
-            "the first character of line {line} reports that line"
+            "the first grapheme of line {line} reports that line"
         );
     }
 }
@@ -219,22 +212,19 @@ fn content_equality_is_separate_from_revision_identity() {
 
 #[test]
 fn leaves_preserve_utf8_and_grapheme_clusters_at_the_chunk_boundary() {
-    for tail in ["界", "😀", "👩🏽‍💻", "á", "🇨🇳"] {
+    for tail in ["界", "😀", "👩🏽‍💻", "a\u{301}", "🇨🇳"] {
         let source = format!("{}end", "a".repeat(1023) + tail);
         let buffer = TextBuffer::new(&source);
         assert_eq!(buffer.string_value(), source, "the source round-trips");
         assert_eq!(
             buffer.character_count(),
-            source.chars().count(),
+            grapheme_count(&source),
             "the character count uses grapheme-aware counting"
         );
-        // GAP: `substring(character_range:)` indexes scalars, so a multi-scalar
-        // grapheme is split. Swift returns the whole cluster.
-        let first_scalar = tail.chars().next().expect("the tail is non-empty");
         assert_eq!(
             buffer.substring(1023..1024),
-            first_scalar.to_string(),
-            "the indexed character is one scalar; Swift returns the whole cluster {tail:?}"
+            tail,
+            "the indexed grapheme stays whole at the chunk boundary: {tail:?}"
         );
         assert_chunks_intact(&buffer);
     }
@@ -244,13 +234,7 @@ fn leaves_preserve_utf8_and_grapheme_clusters_at_the_chunk_boundary() {
 fn line_lookup_spans_leaves_and_excludes_separators() {
     let first = "x".repeat(3000);
     let buffer = TextBuffer::new(&format!("{first}\r\n中文\n\rfinal\n"));
-    // GAP: CR and LF count as two separators, so this is 6 lines where Swift
-    // sees 5 (Swift treats the CRLF pair as one break).
-    assert_eq!(
-        buffer.line_count(),
-        6,
-        "each CR and LF splits a line; Swift pairs the CRLF and reports 5"
-    );
+    assert_eq!(buffer.line_count(), 5, "CRLF pairs into one separator");
     assert_eq!(
         buffer.line_range(0),
         0..3000,
@@ -258,21 +242,16 @@ fn line_lookup_spans_leaves_and_excludes_separators() {
     );
     assert_eq!(
         buffer.line_range(1),
-        3001..3001,
-        "the empty span between CR and LF; Swift has no such line"
+        3001..3003,
+        "line 1 holds the two CJK graphemes"
     );
-    assert_eq!(buffer.line_range(2), 3002..3004, "the two CJK characters");
-    assert_eq!(
-        buffer.line_range(3),
-        3005..3005,
-        "the empty span between LF and CR; Swift has no such line"
-    );
-    assert_eq!(buffer.line_range(4), 3006..3011, "the final word");
-    assert_eq!(buffer.line_range(5), 3012..3012, "the trailing empty line");
+    assert_eq!(buffer.line_range(2), 3004..3004, "the empty LF/CR span");
+    assert_eq!(buffer.line_range(3), 3005..3010, "the final word");
+    assert_eq!(buffer.line_range(4), 3011..3011, "the trailing empty line");
     assert_eq!(
         buffer.line_index_for_character_index(3001),
         1,
-        "the character after the CR starts line 1"
+        "the grapheme after the CRLF starts line 1"
     );
 }
 
@@ -301,13 +280,13 @@ fn deterministic_unicode_edits_match_string() {
     for edit in 0..1500usize {
         let old = buffer.clone();
         let old_source = source.clone();
-        let start = random.next(source.chars().count() + 1);
-        let remaining = source.chars().count() - start;
+        let start = random.next(grapheme_count(&source) + 1);
+        let remaining = grapheme_count(&source) - start;
         let length = random.next(remaining.min(8) + 1);
         let insertion = tokens[random.next(tokens.len())];
 
-        let lower = byte_of_char(&source, start);
-        let upper = byte_of_char(&source, start + length);
+        let lower = byte_of_grapheme(&source, start);
+        let upper = byte_of_grapheme(&source, start + length);
         source.replace_range(lower..upper, insertion);
         buffer = buffer.replace(start..(start + length), insertion);
 
@@ -318,8 +297,8 @@ fn deterministic_unicode_edits_match_string() {
         );
         assert_eq!(
             buffer.character_count(),
-            source.chars().count(),
-            "edit {edit} keeps the character count"
+            grapheme_count(&source),
+            "edit {edit} keeps the grapheme count"
         );
         assert_eq!(
             old.string_value(),
@@ -348,9 +327,9 @@ fn deterministic_unicode_edits_match_string() {
     assert_chunks_intact(&buffer);
 }
 
-/// Byte offset of the `index`-th character, the Swift `String.index` helper.
-fn byte_of_char(text: &str, index: usize) -> usize {
-    text.char_indices()
+/// Byte offset of the `index`-th grapheme, the Swift `String.index` helper.
+fn byte_of_grapheme(text: &str, index: usize) -> usize {
+    text.grapheme_indices(true)
         .nth(index)
         .map(|(offset, _)| offset)
         .unwrap_or(text.len())
@@ -364,7 +343,7 @@ fn regional_indicators_repair_across_leaves_and_graphemes_stay_intact() {
     assert_eq!(buffer.string_value(), expected, "the insertion round-trips");
     assert_eq!(
         buffer.character_count(),
-        expected.chars().count(),
+        grapheme_count(&expected),
         "regional indicators re-pair across the leaf boundary"
     );
     assert_indexes(&buffer, &expected);
@@ -372,36 +351,52 @@ fn regional_indicators_repair_across_leaves_and_graphemes_stay_intact() {
 
     let large = format!("a{}", "\u{301}".repeat(2000));
     let combined = TextBuffer::new(&format!("{large}b")).insert("\u{301}", 1);
-    // GAP: scalars again — 2001 base scalars plus the inserted mark plus 'b'.
     assert_eq!(
         combined.character_count(),
-        2003,
-        "each scalar is its own character; Swift keeps the cluster as 2"
+        2,
+        "the oversized combining grapheme stays one character"
     );
     assert_eq!(
         combined.substring(0..1),
-        "a",
-        "one character is one scalar; Swift returns the whole combining cluster"
+        format!("{large}\u{301}"),
+        "one character is the whole combining cluster"
     );
     assert_chunks_intact(&combined);
 
     let crlf = TextBuffer::new("x\ny").insert("\r", 1);
-    // GAP: the inserted CR and the existing LF are two separators, so 3 lines.
-    assert_eq!(
-        crlf.line_count(),
-        3,
-        "CR and LF each split a line; Swift pairs them and reports 2"
-    );
+    assert_eq!(crlf.line_count(), 2, "CR and LF pair into one separator");
     assert_eq!(
         crlf.character_count(),
-        4,
-        "the buffer holds four scalars (x, CR, LF, y); Swift counts 3 graphemes"
+        3,
+        "the buffer holds three graphemes (x, CRLF, y)"
     );
-    assert_eq!(
-        crlf.line_range(1),
-        2..2,
-        "the empty span between CR and LF; Swift puts line 1 at 2..<3"
-    );
+    assert_eq!(crlf.line_range(1), 2..3, "line 1 holds the trailing y");
+}
+
+#[test]
+fn scalar_split_insertions_restore_grapheme_boundaries_at_rope_seams() {
+    let padding = "x".repeat(1023);
+    for pattern in [
+        "a\u{301}",
+        "👩🏽‍💻",
+        "🇨🇳🇺🇸🇬",
+        "\u{600}a",
+        "\u{1100}\u{1161}\u{11a8}",
+        "क्‍ष",
+        "\r\n",
+    ] {
+        let expected = format!("{padding}{pattern}tail");
+        for (split, _) in pattern.char_indices().skip(1) {
+            let prefix = TextBuffer::new(&format!("{padding}{}", &pattern[..split]));
+            let joined = prefix.insert(
+                &format!("{}tail", &pattern[split..]),
+                prefix.character_count(),
+            );
+            assert_eq!(joined.string_value(), expected);
+            assert_indexes(&joined, &expected);
+            assert_chunks_intact(&joined);
+        }
+    }
 }
 
 #[test]
@@ -450,19 +445,16 @@ fn deltas_across_revisions_undo_and_reloads_replay_exactly() {
 
     let before = TextBuffer::new("a");
     let after = before.insert("\u{301}", 1).insert("b", 1);
-    // GAP: inserting at "character" 1 lands between the scalars, so the second
-    // edit places 'b' before the combining mark. Swift indexes graphemes, so the
-    // sequence becomes "á" followed by "b".
     assert_eq!(
         replay(&after.edit_delta(&before).expect("a delta exists"), &before),
-        "ab\u{301}",
-        "scalar indexing puts the insertion before the combining mark; Swift yields \"a\u{301}b\""
+        "a\u{301}b",
+        "grapheme indexing keeps the combining mark attached to a"
     );
 }
 
 #[test]
 fn protocol_coordinates_respect_scalars_graphemes_and_crlf() {
-    let buffer = TextBuffer::new("á😀\r\n界\rtext".replace('á', "a\u{301}").as_str());
+    let buffer = TextBuffer::new("a\u{301}😀\r\n界\rtext");
     assert_eq!(
         buffer.utf8_offset_for_utf16_offset(1),
         1,
@@ -496,15 +488,13 @@ fn protocol_coordinates_respect_scalars_graphemes_and_crlf() {
         },
         "the parser keeps CRLF as one line break at byte 8"
     );
-    // GAP: the editor point counts the CR of a CRLF as its own break, so byte 8
-    // already opens row 1. Swift reports row 0, column 8.
     assert_eq!(
         buffer.point_for_utf8_offset(8),
         TextBufferPoint {
-            row: 1,
-            column_utf8: 0,
+            row: 0,
+            column_utf8: 8,
         },
-        "the editor point starts a row after the CR; Swift reports row 0, column 8"
+        "the editor point also stays on row 0 inside CRLF"
     );
     assert_eq!(
         buffer.parser_point(9),
@@ -522,15 +512,13 @@ fn protocol_coordinates_respect_scalars_graphemes_and_crlf() {
         },
         "byte 13 is four bytes into row 1"
     );
-    // GAP: both CR and LF of the CRLF counted, so this is row 3. Swift's editor
-    // also counts the lone CR but pairs the CRLF, giving row 2.
     assert_eq!(
         buffer.point_for_utf8_offset(13),
         TextBufferPoint {
-            row: 3,
+            row: 2,
             column_utf8: 0,
         },
-        "both halves of the CRLF counted as breaks; Swift reports row 2, column 0"
+        "the lone CR opens row 2 for the editor"
     );
 }
 
@@ -548,11 +536,11 @@ fn unequal_height_joins_and_replacements_preserve_structure() {
         };
         let enlarged = buffer.insert(&block, start);
         assert_chunks_intact(&enlarged);
-        buffer = enlarged.delete(start..(start + block.chars().count()));
+        buffer = enlarged.delete(start..(start + grapheme_count(&block)));
         assert_eq!(
             buffer.character_count(),
             original.character_count(),
-            "step {step} restores the character count"
+            "step {step} restores the grapheme count"
         );
         assert_chunks_intact(&buffer);
     }

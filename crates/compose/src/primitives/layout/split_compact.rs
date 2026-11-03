@@ -14,10 +14,10 @@ use crate::modifiers::layout::{FlexExt, FrameDimension, LayoutFrameExt};
 use crate::primitives::controls::button::Button;
 use crate::primitives::overlays::roving_focus::{RovingFocusHost, RovingItem, roving_identity};
 use crate::primitives::text::Text;
-use cove_core::TextAlignment;
 use crate::theme::styles::buttons::{
     ButtonStyle, ButtonStyleConfiguration, ButtonStyleViewExt, TabButtonStyle,
 };
+use cove_core::TextAlignment;
 
 /// The pane presented when a split has room for only one pane.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
@@ -139,11 +139,14 @@ struct SplitPaneButtonStyle;
 
 impl ButtonStyle for SplitPaneButtonStyle {
     fn make_body(&self, configuration: ButtonStyleConfiguration) -> AnyView {
-        AnyView::new(
-            TabButtonStyle::new(0.0)
-                .make_body(configuration)
-                .frame(Some(FrameDimension::Percent(100.0)), None, None, None, None, None),
-        )
+        AnyView::new(TabButtonStyle::new(0.0).make_body(configuration).frame(
+            Some(FrameDimension::Percent(100.0)),
+            None,
+            None,
+            None,
+            None,
+            None,
+        ))
     }
 }
 
@@ -157,7 +160,7 @@ fn pane_item(
     let action_selection = selection.clone();
     let action_pane = pane;
     let label = Text::new(title.clone())
-        .with_alignment(TextAlignment::Center)
+        .alignment(TextAlignment::Center)
         .frame_min_width(0.0)
         .flex_with(1.0, 1.0, Some(0.0));
     let button = Button::new(label, move || action_selection.set(action_pane))

@@ -336,7 +336,9 @@ impl FocusChain {
             .is_some_and(|(previous, tree_root)| {
                 is_descendant(previous, tree_root)
                     && previous.parent().is_some()
-                    && previous.is_focusable()
+                    // A style host wraps the focusable surface; restoring the
+                    // wrapper keeps the editor's focus target reachable.
+                    && (previous.is_focusable() || !self.focusables(previous).is_empty())
                     && previous.accepts_subtree_input()
                     && self.permits_input(previous)
             });

@@ -136,10 +136,11 @@ pub enum CharKind {
 
 /// Translation of `TextField.wordKind(_:)`: letters, digits and `_` form a word
 /// run; whitespace is skipped first; everything else is punctuation.
-pub fn char_kind(character: char) -> CharKind {
-    if character.is_alphanumeric() || character == '_' {
+pub fn char_kind(character: &str) -> CharKind {
+    let scalar = character.chars().next();
+    if scalar.is_some_and(|value| value.is_alphanumeric() || value == '_') {
         CharKind::Word
-    } else if character.is_whitespace() {
+    } else if scalar.is_some_and(char::is_whitespace) {
         CharKind::Space
     } else {
         CharKind::Other
@@ -151,14 +152,25 @@ pub fn char_kind(character: char) -> CharKind {
 pub fn word_boundary_before(buffer: &TextBuffer, offset: usize) -> usize {
     let count = buffer.character_count();
     let mut cursor = offset.min(count);
-    while cursor > 0 && buffer.character_at(cursor - 1).is_some_and(is_space) {
+    while cursor > 0
+        && buffer
+            .character_at(cursor - 1)
+            .is_some_and(|c| is_space(&c))
+    {
         cursor -= 1;
     }
-    let Some(previous) = cursor.checked_sub(1).and_then(|index| buffer.character_at(index)) else {
+    let Some(previous) = cursor
+        .checked_sub(1)
+        .and_then(|index| buffer.character_at(index))
+    else {
         return 0;
     };
-    let kind = char_kind(previous);
-    while cursor > 0 && buffer.character_at(cursor - 1).is_some_and(|c| char_kind(c) == kind) {
+    let kind = char_kind(&previous);
+    while cursor > 0
+        && buffer
+            .character_at(cursor - 1)
+            .is_some_and(|c| char_kind(&c) == kind)
+    {
         cursor -= 1;
     }
     cursor
@@ -169,20 +181,24 @@ pub fn word_boundary_before(buffer: &TextBuffer, offset: usize) -> usize {
 pub fn word_boundary_after(buffer: &TextBuffer, offset: usize) -> usize {
     let count = buffer.character_count();
     let mut cursor = offset.min(count);
-    while cursor < count && buffer.character_at(cursor).is_some_and(is_space) {
+    while cursor < count && buffer.character_at(cursor).is_some_and(|c| is_space(&c)) {
         cursor += 1;
     }
     let Some(next) = buffer.character_at(cursor) else {
         return count;
     };
-    let kind = char_kind(next);
-    while cursor < count && buffer.character_at(cursor).is_some_and(|c| char_kind(c) == kind) {
+    let kind = char_kind(&next);
+    while cursor < count
+        && buffer
+            .character_at(cursor)
+            .is_some_and(|c| char_kind(&c) == kind)
+    {
         cursor += 1;
     }
     cursor
 }
 
-fn is_space(character: char) -> bool {
+fn is_space(character: &str) -> bool {
     char_kind(character) == CharKind::Space
 }
 

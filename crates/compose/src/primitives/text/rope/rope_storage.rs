@@ -3,18 +3,11 @@
 //! combining marks); preserving that grapheme takes precedence over the
 //! 1024-byte packing target.
 
+pub use cove_core::line_breaks::is_newline;
 use std::cell::RefCell;
 use std::rc::Rc;
 use std::sync::Arc;
-
-/// Returns whether the character is newline according to the Unicode
-/// `White_Space`-adjacent definition used by Swift's `Character.isNewline`.
-pub fn is_newline(character: char) -> bool {
-    matches!(
-        character,
-        '\n' | '\r' | '\u{000B}' | '\u{000C}' | '\u{0085}' | '\u{2028}' | '\u{2029}'
-    )
-}
+use unicode_segmentation::UnicodeSegmentation;
 
 /// A single immutable leaf of the rope.
 pub struct RopeLeaf {
@@ -31,16 +24,16 @@ impl RopeLeaf {
         let text = text.into();
         let bytes = text.as_bytes().to_vec();
         let utf16_length = text.encode_utf16().count();
-        let mut boundaries = Vec::with_capacity(text.chars().count() + 1);
+        // Swift's `text.enumerated()` yields `Character` values (extended
+        // grapheme clusters); CRLF is one character and one newline.
+        let mut boundaries = Vec::with_capacity(text.graphemes(true).count() + 1);
         boundaries.push(0);
         let mut newlines = Vec::new();
-        let mut byte = 0usize;
-        for (index, character) in text.chars().enumerate() {
-            if is_newline(character) {
+        for (index, (byte, grapheme)) in text.grapheme_indices(true).enumerate() {
+            if is_newline(grapheme) {
                 newlines.push(index);
             }
-            byte += character.len_utf8();
-            boundaries.push(byte);
+            boundaries.push(byte + grapheme.len());
         }
         let line_feed_bytes = bytes
             .iter()
@@ -166,15 +159,17 @@ impl RopeNode {
         let mut leaves: Vec<RopeHandle> = Vec::new();
         let mut text = String::new();
         let mut byte_count = 0usize;
-        for character in string.chars() {
-            let size = character.len_utf8();
+        // Cut only at extended grapheme boundaries; a single oversized cluster
+        // is kept whole even when it exceeds the packing target.
+        for grapheme in string.graphemes(true) {
+            let size = grapheme.len();
             if byte_count > 0 && byte_count + size > Self::MAX_LEAF_BYTES {
                 leaves.push(Arc::new(RopeNode::with_leaf(Arc::new(RopeLeaf::new(
                     std::mem::take(&mut text),
                 )))));
                 byte_count = 0;
             }
-            text.push(character);
+            text.push_str(grapheme);
             byte_count += size;
         }
         if !text.is_empty() {

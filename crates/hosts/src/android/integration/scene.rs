@@ -623,11 +623,11 @@ impl AndroidContentSession {
         let dispatcher = self.dispatcher();
         self.with_current(|| {
             if composing {
-                dispatcher.dispatch(&InputEvent::TextEditing(TextEditingEvent {
-                    text: string.to_owned(),
-                    start: 0,
-                    length: string.encode_utf16().count() as i32,
-                }));
+                dispatcher.dispatch(&InputEvent::TextEditing(TextEditingEvent::from_utf16(
+                    string,
+                    0,
+                    string.encode_utf16().count() as i32,
+                )));
             } else {
                 dispatcher.dispatch(&InputEvent::TextInput(string.to_owned()));
             }

@@ -22,13 +22,13 @@
 //!
 //! GAP: `MenuItemContent::new` keeps links on rich-title runs.
 //! Swift's `MenuItemContent.init` maps every run through
-//! `RichTextRun($0.text, traits: $0.traits)` (`RowContent.swift:24`), which
+//! `TextRun($0.text, traits: $0.traits)` (`RowContent.swift:24`), which
 //! drops the run's link because that initializer takes no destination, so
 //! `richTitle.first?.link` is always `nil`. The Rust
 //! `MenuItemContent::new` (`primitives/overlays/menu/row_content.rs:28`) stores
 //! the runs unchanged, so the link survives in the value. The *behaviour* Swift
 //! wanted still holds: the row renders its runs through
-//! `RichText::display_only(true)` (`menu_item_row.rs`), which keeps the row the
+//! `Text::display_only(true)` (`menu_item_row.rs`), which keeps the row the
 //! only hit target and never lets a title link take focus — asserted separately
 //! in the first test. Only the stored value differs, and that half is pinned.
 
@@ -44,7 +44,7 @@ use cove_ui_compose::primitives::overlays::menu::{
     Menu, MenuEntry, MenuItem, MenuItemContent, MenuPointerIntent, MenuSubmenu, MenuTypeahead,
 };
 use cove_ui_compose::primitives::overlays::portal::LayerRoot;
-use cove_ui_compose::primitives::text::rich::run::{RichTextRun, RichTextTraits};
+use cove_ui_compose::primitives::text::rich::run::{TextRun, TextTraits};
 
 use support::InteractiveScene;
 
@@ -91,8 +91,8 @@ fn rich_rows_share_an_icon_lane_and_links_announce_as_links() {
         let docs_content = MenuItemContent::new(
             None,
             vec![
-                RichTextRun::new("Read the "),
-                RichTextRun::with_traits("docs", RichTextTraits::BOLD),
+                TextRun::new("Read the "),
+                TextRun::with_traits("docs", TextTraits::BOLD),
             ],
             Some("Opens in the browser".to_string()),
             Some("https://example.com/docs".to_string()),
@@ -189,7 +189,7 @@ fn type_ahead_matches_the_plain_title_and_ignores_empty_links() {
 
     let empty_link = MenuItemContent::new(None, Vec::new(), None, Some(String::new()));
     assert_eq!(empty_link.link, None, "an empty link string is not a link");
-    let nested = MenuItemContent::new(None, vec![RichTextRun::new("x").link("y")], None, None);
+    let nested = MenuItemContent::new(None, vec![TextRun::new("x").link("y")], None, None);
     // GAP: Swift's initializer strips the run link; Rust keeps it in the value.
     assert_eq!(
         nested.rich_title.first().and_then(|run| run.link.clone()),

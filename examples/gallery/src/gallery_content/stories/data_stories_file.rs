@@ -15,6 +15,7 @@ use std::rc::Rc;
 use cove_core::{Binding, State};
 use cove_ui_compose::modifiers::layout::LayoutFrameExt;
 use cove_ui_compose::modifiers::style::SemanticStyleViewExt;
+use cove_ui_compose::primitives::controls::Button;
 use cove_ui_compose::primitives::data::lists::RowState;
 use cove_ui_compose::primitives::data::lists::Selection;
 use cove_ui_compose::primitives::data::lists::refresh::RefreshOptions;
@@ -22,7 +23,6 @@ use cove_ui_compose::primitives::data::lists::swipe_list::SwipeList;
 use cove_ui_compose::primitives::data::lists::tree::{
     Tree, TreeOptions, TreeSearch, TreeSelection,
 };
-use cove_ui_compose::primitives::controls::Button;
 use cove_ui_compose::primitives::data::{List, ListSection, SectionedList, SwipeAction};
 use cove_ui_compose::primitives::feedback::StatusTone;
 use cove_ui_compose::primitives::interaction::{DragScope, Draggable, DropTarget};
@@ -502,9 +502,11 @@ impl View for SwipeListStory {
         let activate_log = self.log.clone();
         let rows = (0..SWIPE_ROWS.len()).collect::<Vec<usize>>();
         let list = AnyView::new(
-            SwipeList::new(rows, |index: &usize| *index, |index: &usize, _: RowState| {
-                AnyView::new(Text::new(SWIPE_ROWS[*index]))
-            })
+            SwipeList::new(
+                rows,
+                |index: &usize| *index,
+                |index: &usize, _: RowState| AnyView::new(Text::new(SWIPE_ROWS[*index])),
+            )
             .selection(Selection::single(self.selection.binding()))
             .actions(move |index: &usize| {
                 let row = SWIPE_ROWS[*index];
@@ -645,8 +647,7 @@ impl View for RefreshListStory {
         );
         let finish = self.handle();
         let done = AnyView::new(
-            Button::title("Finish", move || finish.finish_refresh())
-                .enabled(self.is_refreshing()),
+            Button::title("Finish", move || finish.finish_refresh()).enabled(self.is_refreshing()),
         );
         let indicator = AnyView::new(
             Text::new(if self.is_refreshing() {
@@ -765,13 +766,17 @@ impl View for DragAndDropStory {
         let into_a = {
             let lane_a = lane_a.clone();
             Rc::new(move |payload: u64| {
-                lane_a.set(Some(if payload == 1 { "Design" } else { "Billing" }.to_owned()));
+                lane_a.set(Some(
+                    if payload == 1 { "Design" } else { "Billing" }.to_owned(),
+                ));
             }) as Rc<dyn Fn(u64)>
         };
         let into_b = {
             let lane_b = lane_b.clone();
             Rc::new(move |payload: u64| {
-                lane_b.set(Some(if payload == 1 { "Design" } else { "Billing" }.to_owned()));
+                lane_b.set(Some(
+                    if payload == 1 { "Design" } else { "Billing" }.to_owned(),
+                ));
             }) as Rc<dyn Fn(u64)>
         };
         let scope = AnyView::new(DragScope::new(cove_ui_compose::BoxView::new(
@@ -787,10 +792,7 @@ impl View for DragAndDropStory {
                     cove_core::scene::Justify::FlexStart,
                     cove_core::scene::Wrap::Wrap,
                     12.0,
-                    AnyView::new(TupleView::new(vec![
-                        chip("Design", 1),
-                        chip("Billing", 2),
-                    ])),
+                    AnyView::new(TupleView::new(vec![chip("Design", 1), chip("Billing", 2)])),
                 )),
                 AnyView::new(cove_ui_compose::BoxView::new(
                     cove_core::scene::FlexDirection::Row,
@@ -888,9 +890,11 @@ impl View for SectionedListStory {
             })
             .collect();
         let list = AnyView::new(
-            SectionedList::new(sections, |index: &usize| *index, |index: &usize, _: RowState| {
-                AnyView::new(Text::new(SECTIONED_ROWS[*index]))
-            })
+            SectionedList::new(
+                sections,
+                |index: &usize| *index,
+                |index: &usize, _: RowState| AnyView::new(Text::new(SECTIONED_ROWS[*index])),
+            )
             .selection(Selection::single(self.selection.binding()))
             .sticky_headers(true)
             .row_height(Some(36.0))

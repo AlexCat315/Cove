@@ -177,6 +177,11 @@ fn caret_and_hit_testing_share_grapheme_stops() {
                     TextDocumentLayout::new(buffer.clone(), geometry(env, f32::INFINITY, secure));
                 let result = visible(&mut layout, 0, 10, env);
                 assert_eq!(result.lines.len(), 3, "three visual rows");
+                let (end_x, _) = layout.caret(first_line_end, false, env);
+                assert!(
+                    (end_x - result.lines[0].width).abs() < 0.01,
+                    "the grapheme end caret reaches the end of the shaped line (secure {secure})"
+                );
 
                 for character in 0..=first_line_end {
                     let (x, row) = layout.caret(character, false, env);

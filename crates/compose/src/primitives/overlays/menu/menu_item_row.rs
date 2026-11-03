@@ -452,7 +452,7 @@ impl PrimitiveView for MenuItemRowHost {
             // Styled spans render as real runs, display-only: the row is the only
             // hit target, so links inside a title must not take focus.
             labels.push(AnyView::new(
-                crate::primitives::text::rich::RichText::new(self.item.content.rich_title.clone())
+                crate::primitives::text::Text::runs(self.item.content.rich_title.clone())
                     .display_only(true),
             ));
         }

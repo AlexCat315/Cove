@@ -1,10 +1,14 @@
 # Gallery 逐项验收记录
 
-更新：2026-11-03。目录共 106 页；本轮先处理搜索、Slider / RangeSlider、Rating 与共享文本选择，随后补齐 TextField 的撤销/重做、多行测量与滚轮、词/垂直导航、语法配色、前后缀与长度限制；再补行号栏、横向滚动、滚轮包含、hover 滚动条、文档布局发布、Escape 取消与 Control-Home/End、Shift-Return。
+更新：2026-11-03。目录共 106 页；先处理搜索、Slider / RangeSlider、Rating 与共享文本选择，随后补齐 TextField 编辑能力；本轮继续完成 TextFieldStyle 焦点/编辑接入与 TextBuffer 字素索引。
 
 Swift 源码逐页对照见文末《Swift 源码对照（逐页差异清单）》。
 
 ## 本轮结论
+
+API 收敛：删除 RichText 类型与导出，无兼容别名。普通文字与样式片段统一为 Text::new / Text::runs，TextRun / TextTraits；字体、颜色、对齐、行数、截断、正文读取共用同一 Text 配置与节点。Gallery 的 RichText 页改为 Text，SingleLineText 页标为 Text · Truncation；目录仍为 106 个能力页面。用户文档：`Website/src/content/components/text.md`。
+
+2026-11-03 主题与选区追加：默认浅/深色改为中性桌面配色，圆角 0/4/6/8/12；正文/样式片段/输入框选区共用轻微圆角与两端短竖线，输入框移除重复透明度。Text 样式片段补齐共享选择注册、键盘扩展、独立选择与 display-only；跨链接拖选不激活链接。选择 scope 随挂载节点保留。触控长按已复用；圆形手柄与放大镜尚未接线，未宣称已完成。鼠标问题：用户确认浏览器也会闪回箭头，Codex 正常，暂不能归因 Cove；不添加推测性的原生光标覆盖。应用 I 形指针节点及焦点/拖选/重建路径另行回归，操作系统实际光标仍待系统恢复后原生复核。用户文档：`Website/src/content/components/theme.md` 与 `text-selection.md`。
 
 | 项目 | 原因 / 实现状态 | 修复与展示 | 用户文档 |
 | --- | --- | --- | --- |
@@ -16,10 +20,12 @@ Swift 源码逐页对照见文末《Swift 源码对照（逐页差异清单）�
 | 平台输入接口修改丢失或拆开 emoji | select / delete_surrounding 只写内部状态，UTF-16 按标量映射 | 选区对齐字素边界，删除/组合提交写回绑定并重绘；全选/复制/剪切与异步系统粘贴共享绑定 | Website/src/content/components/text-field.md |
 | TextField 迁移未完成 | 撤销/重做、多行测量与滚轮、词/垂直导航、语法配色、前后缀与长度限制只有 Swift 实现；工作区因半成品改动无法编译 | 编辑事务历史（相邻输入合并、选中态随文本恢复、外部改写清空栈）接到菜单与快捷键；行/页/文档级光标移动与软换行行亲和；逐字素着色的语法颜色；前置/后置/前缀/后缀/字数计数绘制与命中区；输入、粘贴与 IME 提交遵守 `max_length`；平台删除与组合提交进入历史 | Website/src/content/components/text-field.md |
 | 代码编辑器行号、横向滚动、覆盖层与取消 | 行号栏、长行横向揭示与横向滚轮、`__textfield_document_layout`、Escape 取消、hover 滚动条都只有 Swift 实现；更新阶段还不发布滚动界限 | 三数位行号栏（可配前景与背景色）参与测量与命中；绘制阶段按光标揭示双向滚动并发布滚动界限与文档布局；横向滚轮与纵向一致按 30pt 步进；溢出字段独占滚轮（含边界），聚焦时设置 `PreferFocused`；hover 时绘制滚动条覆盖层；Escape 调用 `on_cancel` 并把焦点交还最近的焦点祖先；Control-Home/End 到文档首尾；单行字段 Shift-Return 插入换行 | Website/src/content/components/text-field.md |
+| TextFieldStyle 焦点/编辑状态与字素计数 | 样式响应式状态链未接完；rope、光标映射和部分调用方仍计标量 | 样式处理焦点、hover、IME 组合/提交/取消并保留输入节点；禁用复位；rope 与光标/密码/正文选择/snippet/补全统一字素；CRLF 与编辑接缝正确合并；Gallery 新增样式示例与实时字素计数 | Website/src/content/components/text-field-style.md、text-buffer.md |
 
 ## 已确认、仍待逐项修复的缺失
 
-- TextField 的撤销/重做、多行测量与滚轮、词/垂直导航、语法配色、前后缀与长度限制、行号栏、横向滚动、滚轮包含、hover 滚动条、文档布局发布、Escape 取消、Control-Home/End 与 Shift-Return 均已补齐，`cargo test -p cove-ui-compose --test compose` 1545 项通过，`cargo test -p cove-examples` 全部通过。TextField 页仍未整体通过：`TextFieldStyle` 的焦点/编辑状态接入，以及 IME 区域的失效重发布、组合预览缓存、`TextBuffer` 的字素（而非标量）计数、双击选词仍是 `GAP:` 断言的未实现项。
+- TextFieldStyle 焦点/编辑状态接入、TextBuffer 字素计数本轮已补齐。当前测试还验证了 IME 区域重发布、组合预览缓存和真实文本环境下的双击选词，旧缺失说明已清理。代码编辑器 F1 悬停请求、诊断及补全的完整能力仍属于后续页级核对范围；不据此声称整个编辑器或全部 106 页已完成验收。
+- iOS 原生组合预览事件的宿主路径仍需单独核对：本地 SDL UIKit 未发现 `SDL_SendEditingText` 发送路径。本轮共享 Rust 的样式/字素处理已实现，不能据此声称 iOS 原生 IME 预览已设备验收。
 - 现有测试中一部分 `GAP:` 断言验证的是当前缺失行为。全套测试通过不能证明 Swift 能力已迁移完成；修复相关能力时，应改为验证预期结果，补真实文本环境或原生操作的验收。
 
 ## 验收范围
@@ -32,12 +38,14 @@ Swift 源码逐页对照见文末《Swift 源码对照（逐页差异清单）�
 - 单元/场景验证不等于所有页面已做视觉和交互验收；原生 Windows、Linux、iOS、Android 尚未设备实测。修改位于共享 Rust 实现，未增加平台空实现。
 - `clippedOverflow` 是诊断线索，包含可能有意裁剪的控件，不直接认定为缺陷；DataTable、WheelPicker、Carousel、SwipeList、Tree 的线索仍待逐项观察。
 
-本轮检查结果：
+本轮检查结果（TextFieldStyle / TextBuffer）：
 
-- Compose：1543 项通过；其中仍有旧 `GAP` 断言记录未实现行为，见上方缺失列表。
+- Compose：1550 项通过；Core / Platform：495 项通过；Gallery：490 项通过。其他页面仍存在旧 `GAP` 断言，不代表全部能力完成。
+- Windows SDL 的 UTF-16 组合位置已在 Rust 宿主入口转换，Android / 浏览器沿用同一规范化入口；新增构造器的 surrogate / emoji / 未指定位置测试通过，Platform / Shell 共 20 项通过。`cargo check --workspace --lib --locked` 通过。
 - Gallery 组件验收：4 项通过，覆盖逐字搜索/IME 预览/清空、真实文本度量下点击与拖选/多次点击、独立评分状态、LTR/RTL 双端点边界与焦点。
 - Gallery 选择页壳：8 项通过；Rating 布局：2 项通过；目录宽/窄屏布局：212 场景通过。
-- Website：类型检查与生产构建通过；7 段 Rust 示例使用公共 `cove_ui::prelude` 编译通过。
+- Website：类型检查与生产构建通过；新增 TextFieldStyle / TextBuffer 两段 Rust 示例编译通过。
+- macOS DevTools：同一 Styled text 节点在焦点高亮、编辑、禁用/启用后保持 ID；`é👩🏽‍💻🇨🇳` 显示 3 characters，删除国旗后剩两个字素，左移再删除重音字母后只剩完整 emoji。焦点操作 CPU trace 记录 66 个事件、0 丢失；不据此推断 GPU 性能。
 - 严格 Clippy（`-D warnings`）仍被仓库已有的模块同名、参数数量、枚举尺寸等问题阻断；未把它记为通过。
 
 复跑：
@@ -61,7 +69,7 @@ cargo test -p cove-ui-compose --test compose --locked
 | Slider | 5 | 0 / 0 | 本轮组件/页面修复；文档已写 |
 | RangeSlider | 4 | 0 / 0 | 本轮组件/页面修复；文档已写 |
 | Rating | 6 | 0 / 0 | 本轮组件/页面修复；文档已写 |
-| TextField | 4 | 0 / 0 | 输入、选择、撤销/重做、多行测量与滚轮、词/垂直导航、语法配色、前后缀与长度限制、行号栏、横向滚动与覆盖层已修复；样式接入与 IME 区域重发布未完成 |
+| TextField | 6 | 0 / 0 | 已补齐样式焦点/编辑接入与字素索引；新增样式、Unicode 实时计数；跨平台设备与编辑器扩展能力继续独立验收 |
 | SearchField | 0 | 0 / 0 | 搜索与输入链路修复；文档已写 |
 | TextArea | 0 | 0 / 0 | 挂载/几何基础检查通过；待逐项交互和视觉验收 |
 | Text Editor | 0 | 0 / 0 | 挂载/几何基础检查通过；待逐项交互和视觉验收 |
@@ -83,7 +91,7 @@ cargo test -p cove-ui-compose --test compose --locked
 | Icon | 3 | 0 / 0 | 挂载/几何基础检查通过；待逐项交互和视觉验收 |
 | Avatar | 4 | 0 / 0 | 挂载/几何基础检查通过；待逐项交互和视觉验收 |
 | Image | 0 | 0 / 0 | 挂载/几何基础检查通过；待逐项交互和视觉验收 |
-| RichText | 4 | 0 / 0 | 挂载/几何基础检查通过；待逐项交互和视觉验收 |
+| Text | 4 | 0 / 0 | 已补齐选区注册、两端标记、Shift 扩选与链接拖选；链接锚点布局/焦点已接入；触控圆形手柄与放大镜仍待完善；用户文档已写 |
 | Markdown | 2 | 0 / 0 | 挂载/几何基础检查通过；待逐项交互和视觉验收 |
 | WebView | 0 | 0 / 0 | 挂载/几何基础检查通过；待逐项交互和视觉验收 |
 | Menu | 3 | 0 / 0 | 挂载/几何基础检查通过；待逐项交互和视觉验收 |
@@ -351,7 +359,7 @@ cargo test -p cove-ui-compose --test compose --locked
 | Rating | 6 | 6 | 6 | 0 | 0 | 段落数持平 |
 | RefreshableList | 1 | 1 | 1 | 0 | 0 | 段落数持平 |
 | ReorderableList | 2 | 1 | 0 | 0 | 2 | 段落少 1 段 |
-| RichText | 4 | 4 | 4 | 0 | 0 | 段落数持平 |
+| Text | 4 | 4 | 4 | 0 | 0 | 段落数持平 |
 | Scrollbar | 1 | 1 | 1 | 0 | 0 | 段落数持平 |
 | ScrollView | 1 | 1 | 0 | 0 | 1 | 段落数持平 |
 | SearchField | 1 | 1 | 0 | 0 | 1 | 段落数持平 |

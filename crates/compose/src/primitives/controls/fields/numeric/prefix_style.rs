@@ -3,8 +3,10 @@
 //! Field chrome for a numeric field with a prefix chip: one rounded input whose
 //! leading addon slab is the scrub chip, separated by a hairline. The border,
 //! hover and focus ring wrap chip and text together.
+use crate::modifiers::animation_value::AnimationValueExt;
 use crate::modifiers::layout::{FlexExt, LayoutFrameExt};
 use crate::modifiers::style::AppearanceExt;
+use crate::theme::SemanticMotionRef;
 use crate::theme::styles::components::{TextFieldStyle, TextFieldStyleConfiguration};
 use crate::{AnyView, BoxView, PrimitiveView, TupleView, View};
 use cove_core::Color;
@@ -54,20 +56,26 @@ impl TextFieldStyle for NumericPrefixFieldStyle {
         } else {
             0.55
         };
-        AnyView::new(NumericPrefixChrome {
-            chip: self.chip.clone(),
-            content: configuration.content.clone(),
-            border,
-            border_width: width,
-            background: if configuration.is_enabled {
-                theme.inputs.background
-            } else {
-                theme.inputs.background_disabled
-            },
-            divider: theme.inputs.divider_color,
-            radius: theme.inputs.radius,
-            alpha,
-        })
+        // Swift keys the implicit fast transition on the whole interaction
+        // snapshot, including isEditing from IME composition.
+        let key = configuration.interaction_key();
+        AnyView::new(
+            AnyView::new(NumericPrefixChrome {
+                chip: self.chip.clone(),
+                content: configuration.content.clone(),
+                border,
+                border_width: width,
+                background: if configuration.is_enabled {
+                    theme.inputs.background
+                } else {
+                    theme.inputs.background_disabled
+                },
+                divider: theme.inputs.divider_color,
+                radius: theme.inputs.radius,
+                alpha,
+            })
+            .animation_motion(SemanticMotionRef::fast(), key),
+        )
     }
 }
 
@@ -96,10 +104,43 @@ impl PrimitiveView for NumericPrefixChrome {
     }
 
     fn update_node(&self, node: &Node) {
-        node.set_background_color(Some(self.background));
+        let weak = node.downgrade();
+        let background = self.background;
+        node.animatable_set_optional(
+            "numericPrefix.background",
+            node.background_color(),
+            Some(background),
+            move |value| {
+                if let Some(owner) = Node::upgrade(&weak) {
+                    owner.set_background_color(value);
+                }
+            },
+        );
+        let weak = node.downgrade();
+        let border = self.border;
+        node.animatable_set_optional(
+            "numericPrefix.borderColor",
+            node.border_color(),
+            Some(border),
+            move |value| {
+                if let Some(owner) = Node::upgrade(&weak) {
+                    owner.set_border_color(value);
+                }
+            },
+        );
+        let weak = node.downgrade();
+        let border_width = self.border_width;
+        node.animatable_set_with(
+            "numericPrefix.borderWidth",
+            node.border_width(),
+            border_width,
+            move |value| {
+                if let Some(owner) = Node::upgrade(&weak) {
+                    owner.set_border_width(value);
+                }
+            },
+        );
         node.set_corner_radius(self.radius);
-        node.set_border_color(Some(self.border));
-        node.set_border_width(self.border_width);
         node.set_opacity(self.alpha);
         node.set_clips_to_bounds(true);
     }

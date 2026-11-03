@@ -697,10 +697,14 @@ fn decode_event(e: &native::Event) -> Option<InputEvent> {
         12 => InputEvent::KeyDown(key()),
         13 => InputEvent::KeyUp(key()),
         14 => InputEvent::TextInput(e.string()),
-        15 => InputEvent::TextEditing(TextEditingEvent {
-            text: e.string(),
-            start: e.a,
-            length: e.b,
+        15 => InputEvent::TextEditing(if cfg!(target_os = "windows") {
+            TextEditingEvent::from_utf16(e.string(), e.a, e.b)
+        } else {
+            TextEditingEvent {
+                text: e.string(),
+                start: e.a,
+                length: e.b,
+            }
         }),
         16 => InputEvent::MouseMotion(MouseMotionEvent {
             x: e.x,

@@ -377,7 +377,7 @@ impl View for ChartDataTableCell {
         let text = AnyView::new(
             AnyView::new(
                 Text::new(self.text.clone())
-                    .with_alignment(alignment)
+                    .alignment(alignment)
                     .line_limit(Some(1))
                     .semantic_font(if self.is_header {
                         SemanticFontRef::label()

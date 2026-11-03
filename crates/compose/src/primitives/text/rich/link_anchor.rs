@@ -37,15 +37,11 @@ impl PrimitiveView for RichTextLinkAnchor {
     }
 
     fn make_layout_node(&self) -> Option<LayoutNode> {
-        Some(LayoutNode::new())
-    }
-
-    fn update_layout(&self, layout: &LayoutNode) {
-        layout.set_width_percent(100.0);
-        layout.set_height_percent(100.0);
+        None
     }
 
     fn update_node(&self, node: &Node) {
+        node.set_attachment("__text_link_index", self.index);
         let open = self.on_open_link.as_ref().map(|handler| {
             let handler = handler.clone();
             let destination = self.destination.clone();
@@ -68,12 +64,12 @@ impl PrimitiveView for RichTextLinkAnchor {
             ..Default::default()
         });
 
-        let surface = self.surface.clone();
+        let surface = self.surface.as_ref().map(Node::downgrade);
         let index = self.index;
         node.set_attachment(
             TextInputAttachmentKey::FOCUS_CHANGE_HANDLER,
             Rc::new(move |focused: bool| {
-                let Some(surface) = surface.as_ref() else {
+                let Some(surface) = surface.as_ref().and_then(Node::upgrade) else {
                     return;
                 };
                 let current = surface.attachment::<usize>(FOCUSED_LINK);

@@ -211,14 +211,10 @@ impl View for ButtonStory {
                     .debug_name("gallery-icon-button"),
                 ),
                 AnyView::new(
-                    Button::icon(
-                        ButtonIconSource::resource(icons::action::pencil()),
-                        16.0,
-                        {
-                            let clicks = icon_clicks.clone();
-                            move || clicks.update(|value| *value += 1)
-                        },
-                    )
+                    Button::icon(ButtonIconSource::resource(icons::action::pencil()), 16.0, {
+                        let clicks = icon_clicks.clone();
+                        move || clicks.update(|value| *value += 1)
+                    })
                     .tooltip("Apply to workspace")
                     .enabled(enabled)
                     .button_style(SecondaryButtonStyle),
@@ -517,8 +513,12 @@ impl View for ToggleStory {
             Wrap::NoWrap,
             12.0,
             AnyView::new(TupleView::new(vec![
-                AnyView::new(Toggle::labeled("Notifications", self.notifications.binding()).enabled(false)),
-                AnyView::new(Toggle::labeled("Usage analytics", self.telemetry.binding()).enabled(false)),
+                AnyView::new(
+                    Toggle::labeled("Notifications", self.notifications.binding()).enabled(false),
+                ),
+                AnyView::new(
+                    Toggle::labeled("Usage analytics", self.telemetry.binding()).enabled(false),
+                ),
                 AnyView::new(
                     Text::new(self.values_line())
                         .semantic_foreground(SemanticColorRef::on_surface_muted()),

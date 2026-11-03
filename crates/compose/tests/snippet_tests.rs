@@ -85,6 +85,19 @@ fn snippet_syntax_expands_placeholders_choices_and_escapes() {
 }
 
 #[test]
+fn unicode_snippet_stops_follow_complete_graphemes() {
+    let snippet = TextSnippet::new("e\u{301}👩🏽‍💻${1:🇨🇳}${VAR:é}${2:中}$0");
+    assert_eq!(snippet.text, "e\u{301}👩🏽‍💻🇨🇳é中");
+    assert_eq!(ranges(&snippet), [(2, 3), (4, 5), (5, 5)]);
+    let joined = TextSnippet::new("a${1:\u{301}}$0");
+    assert_eq!(
+        ranges(&joined),
+        [(0, 1), (1, 1)],
+        "a placeholder joining the preceding grapheme selects the complete result"
+    );
+}
+
+#[test]
 fn tab_visits_stops_and_edits_shift_the_later_ones() {
     let session = TextSnippetSession::new();
     let snippet = TextSnippet::new("f(${1:a}, ${2:b})$0");

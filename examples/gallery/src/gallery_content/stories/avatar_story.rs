@@ -261,11 +261,11 @@ impl View for AvatarStory {
                                 .iter()
                                 .map(|size| {
                                     let size = *size;
-                                    AnyView::new(
-                                        Avatar::new("Ada Lovelace").configure(move |appearance| {
+                                    AnyView::new(Avatar::new("Ada Lovelace").configure(
+                                        move |appearance| {
                                             appearance.size = Some(size);
-                                        }),
-                                    )
+                                        },
+                                    ))
                                 })
                                 .collect();
                             for shape in [
@@ -273,11 +273,11 @@ impl View for AvatarStory {
                                 AvatarShape::RoundedRectangle(10.0),
                                 AvatarShape::Square,
                             ] {
-                                tiles.push(AnyView::new(
-                                    Avatar::new("Ada Lovelace").configure(move |appearance| {
+                                tiles.push(AnyView::new(Avatar::new("Ada Lovelace").configure(
+                                    move |appearance| {
                                         appearance.shape = shape.clone();
-                                    }),
-                                ));
+                                    },
+                                )));
                             }
                             tiles
                         })),

@@ -23,7 +23,11 @@ import rangeSlider from '@/content/components/range-slider.md?raw'
 import rating from '@/content/components/rating.md?raw'
 import searchField from '@/content/components/search-field.md?raw'
 import textField from '@/content/components/text-field.md?raw'
+import textFieldStyle from '@/content/components/text-field-style.md?raw'
+import textBuffer from '@/content/components/text-buffer.md?raw'
 import textSelection from '@/content/components/text-selection.md?raw'
+import theme from '@/content/components/theme.md?raw'
+import text from '@/content/components/text.md?raw'
 
 export const docGroups: DocGroup[] = [
   {
@@ -38,6 +42,7 @@ export const docGroups: DocGroup[] = [
     items: [
       { slug: 'views', title: '视图与布局', raw: views },
       { slug: 'native-rhi', title: 'NativeRHI', raw: nativeRhi },
+      { slug: 'theme', title: '默认主题', raw: theme },
     ],
   },
   {
@@ -49,7 +54,10 @@ export const docGroups: DocGroup[] = [
       { slug: 'rating', title: 'Rating', raw: rating },
       { slug: 'search-field', title: 'SearchField', raw: searchField },
       { slug: 'text-field', title: 'TextField', raw: textField },
+      { slug: 'text-field-style', title: 'TextFieldStyle', raw: textFieldStyle },
+      { slug: 'text-buffer', title: 'TextBuffer', raw: textBuffer },
       { slug: 'text-selection', title: '文本选择', raw: textSelection },
+      { slug: 'text', title: 'Text', raw: text },
     ],
   },
   {

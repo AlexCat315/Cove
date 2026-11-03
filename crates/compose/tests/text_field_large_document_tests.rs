@@ -16,13 +16,6 @@
 //! `field.deleteSelection` map to the free functions in `text_field_editing`,
 //! which edit a `FieldState` directly.
 //!
-//! Named differences from the Swift suite (each pinned by a `GAP:` assertion):
-//! - **No preview cache.** A composition preview is not stored in the render
-//!   draft, so redraws rebuild it.
-//! - **Scalar indices.** `TextBuffer` counts Unicode scalars, so a combining
-//!   mark or joined flag counts 3 characters and insertion advances the caret
-//!   by the inserted scalar count.
-//!
 //! The draw reveals the caret in both axes, the wheel scrolls a long row, the
 //! shaped document is published under `__textfield_document_layout`, and
 //! Primary-Z undoes through the shared history.
@@ -170,10 +163,12 @@ fn horizontal_caret_reveal() {
             offset > 500.0,
             "the draw reveals the caret on the 200-character row (offset {offset})"
         );
-        let area = node.attachment::<TextInputArea>(TextInputAttachmentKey::AREA);
+        let area = node
+            .attachment::<TextInputArea>(TextInputAttachmentKey::AREA)
+            .expect("the invalidated field publishes its IME anchor");
         assert!(
-            area.is_none(),
-            "GAP: Swift maps the IME anchor into the visible row (50 < x < 310) and back to the caret index; Rust publishes no text input area"
+            area.cursor_x > 0.0 && area.cursor_x <= area.width,
+            "the anchor maps the caret into the visible row: {area:?}"
         );
         assert!(draws.current_clip().is_none(), "clip balanced");
         assert!(
@@ -276,6 +271,11 @@ fn middle_editing() {
             store.lock().unwrap().substring(middle..middle + 100)
         );
         let committed = store.lock().unwrap().clone();
+        if let Some(chain) = FocusChainHolder::current() {
+            chain.focus(Some(&node), true);
+        }
+        scene.graph.recomposer.commit_all();
+        scene.graph.compute_layout(600.0, 240.0);
         (handlers.editing.clone().unwrap())(
             &TextEditingEvent {
                 text: "你".into(),
@@ -286,10 +286,29 @@ fn middle_editing() {
         );
         let _ = draw(&node);
         assert!(state.borrow().composition.is_active(), "composing");
-        let preview = state.borrow().draft.preview.clone();
+        let preview = state
+            .borrow()
+            .draft
+            .preview
+            .clone()
+            .expect("cached preview");
+        assert_eq!(
+            preview.text, "你",
+            "the cached preview holds the composing text"
+        );
+        let cached = preview.buffer.clone();
+        for _ in 0..3 {
+            let _ = draw(&node);
+        }
+        let reused = state
+            .borrow()
+            .draft
+            .preview
+            .clone()
+            .expect("preview survives redraws");
         assert!(
-            preview.is_none(),
-            "GAP: Swift caches the composition preview buffer in its render draft; Rust's draw builds no cached preview (and the field keeps no undo history to assert)"
+            reused.buffer.identity() == cached.identity(),
+            "redraws reuse the cached preview buffer instead of rebuilding it"
         );
         for _ in 0..50 {
             let _ = draw(&node);
@@ -308,13 +327,12 @@ fn joining_graphemes() {
         state.selection.cursor_index = 1;
         insert_replacing_selection(&mut state, "\u{301}");
         assert!(
-            state.buffer.string_value() == "e\u{301}Z" && state.buffer.character_count() == 3,
-            "GAP: Swift counts 2 characters after a combining insertion; Rust TextBuffer counts Unicode scalars (3): {}",
-            state.buffer.character_count()
+            state.buffer.string_value() == "e\u{301}Z" && state.buffer.character_count() == 2,
+            "the combining mark joins the base grapheme"
         );
         assert_eq!(
-            state.selection.cursor_index, 2,
-            "GAP: Swift leaves the caret at the joined grapheme endpoint (1); Rust advances by the inserted scalar count"
+            state.selection.cursor_index, 1,
+            "the caret sits at the joined grapheme endpoint"
         );
         insert_replacing_selection(&mut state, "!");
         assert!(
@@ -327,9 +345,8 @@ fn joining_graphemes() {
         state.selection.cursor_index = 2;
         delete_selection(&mut state);
         assert!(
-            state.buffer.string_value() == "🇨🇳Z" && state.buffer.character_count() == 3,
-            "GAP: Swift counts the joined flag as one character (2); Rust counts scalars (3): {}",
-            state.buffer.character_count()
+            state.buffer.string_value() == "🇨🇳Z" && state.buffer.character_count() == 2,
+            "the two regional indicators form one flag"
         );
         assert!(
             state.selection.cursor_index == 1,

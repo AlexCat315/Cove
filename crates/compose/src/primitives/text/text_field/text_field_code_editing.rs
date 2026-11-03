@@ -2,6 +2,10 @@
 //!
 //! Newline and block-indent editing for code-shaped fields. Both operate on the
 //! bound buffer and the live selection, so they share one edit transaction.
+//! Character indexes are extended grapheme clusters, as in Swift.
+
+use cove_core::line_breaks::is_newline;
+use unicode_segmentation::UnicodeSegmentation;
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum TextEditKind {
@@ -25,22 +29,22 @@ pub fn indented_newline(
     if !vertical {
         return "\n".to_string();
     }
-    let characters: Vec<char> = buffer.chars().collect();
+    let characters: Vec<&str> = buffer.graphemes(true).collect();
     let caret = caret.min(characters.len());
     let line_start = characters[..caret]
         .iter()
-        .rposition(|character| *character == '\n')
+        .rposition(|character| is_newline(character))
         .map_or(0, |index| index + 1);
-    let line: String = characters[line_start..caret].iter().collect();
+    let line: String = characters[line_start..caret].concat();
     let indent: String = line
-        .chars()
-        .take_while(|character| *character == ' ' || *character == '\t')
+        .graphemes(true)
+        .take_while(|character| *character == " " || *character == "\t")
         .collect();
     let last = line
-        .chars()
+        .graphemes(true)
         .rev()
-        .find(|character| !character.is_whitespace());
-    let extra = if matches!(last, Some('{') | Some('[')) {
+        .find(|character| !character.chars().all(char::is_whitespace));
+    let extra = if matches!(last, Some("{") | Some("[")) {
         " ".repeat(width)
     } else {
         String::new()
@@ -68,26 +72,26 @@ pub fn indent_lines(
     removing: bool,
     max_length: Option<usize>,
 ) -> IndentResult {
-    let mut characters: Vec<char> = buffer.chars().collect();
+    let mut characters: Vec<String> = buffer.graphemes(true).map(str::to_owned).collect();
     let mut caret = caret.min(characters.len());
     let mut anchor = anchor.map(|value| value.min(characters.len()));
     let selection =
         selection.map(|(low, high)| (low.min(characters.len()), high.min(characters.len())));
     let lower = selection.map_or(caret, |(low, _)| low);
     let upper = selection.map_or(lower, |(low, high)| low.max(high.saturating_sub(1)));
-    let line_index = |characters: &[char], index: usize| -> usize {
+    let line_index = |characters: &[String], index: usize| -> usize {
         characters[..index.min(characters.len())]
             .iter()
-            .filter(|character| **character == '\n')
+            .filter(|character| is_newline(character))
             .count()
     };
-    let line_start = |characters: &[char], line: usize| -> usize {
+    let line_start = |characters: &[String], line: usize| -> usize {
         if line == 0 {
             return 0;
         }
         let mut seen = 0;
         for (index, character) in characters.iter().enumerate() {
-            if *character == '\n' {
+            if is_newline(character) {
                 seen += 1;
                 if seen == line {
                     return index + 1;
@@ -102,10 +106,14 @@ pub fn indent_lines(
         let start = line_start(&characters, line);
         let (removed, insertion): (usize, String) = if removing {
             let mut count = 0;
-            while count < width && characters.get(start + count) == Some(&' ') {
+            while count < width
+                && characters
+                    .get(start + count)
+                    .is_some_and(|value| value == " ")
+            {
                 count += 1;
             }
-            if count == 0 && characters.get(start) == Some(&'\t') {
+            if count == 0 && characters.get(start).is_some_and(|value| value == "\t") {
                 count = 1;
             }
             (count, String::new())
@@ -122,8 +130,11 @@ pub fn indent_lines(
             start
         };
         let removed_end = (offset + removed).min(characters.len());
-        characters.splice(offset..removed_end, insertion.chars());
-        let shift = insertion.chars().count() as isize - removed as isize;
+        characters.splice(
+            offset..removed_end,
+            insertion.graphemes(true).map(str::to_owned),
+        );
+        let shift = insertion.graphemes(true).count() as isize - removed as isize;
         let moved = |index: usize| -> usize {
             if index < offset {
                 index
@@ -134,7 +145,7 @@ pub fn indent_lines(
         caret = moved(caret);
         anchor = anchor.map(moved);
     }
-    let text: String = characters.iter().collect();
+    let text: String = characters.join("");
     if let Some(max_length) = max_length
         && characters.len() > max_length
     {

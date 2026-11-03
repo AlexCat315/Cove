@@ -10,13 +10,6 @@
 //!
 //! Named differences from the Swift suite (both reported as production gaps,
 //! neither fixed here):
-//! - `SingleLineText::fitting` (`primitives/text/single_line.rs`) binary-searches
-//!   over **Unicode scalars** (`text.chars()`), while Swift binary-searches over
-//!   `Array(text)`, i.e. **extended grapheme clusters**. A width that lands
-//!   inside a multi-scalar cluster therefore leaves a dangling joiner in Rust:
-//!   fitting `"A👩🏽‍💻e◌́🇨🇳B"` to 3 units yields `"A👩🏽‍…"` (a stray ZWJ) where
-//!   Swift yields `"A👩🏽‍💻…"`. `ellipsis_splits_inside_a_joined_cluster` pins
-//!   the current behaviour; all the widths that do not split a cluster match.
 //! - `Text::make_layout_node`/`update_layout` record
 //!   `TextMeasureInputs { line_limit: self.line_limit, .. }`, so a `truncated()`
 //!   label reports `line_limit == None`. Swift records
@@ -42,6 +35,7 @@ use cove_core::scene::{LayoutNode, Node};
 use cove_ui_compose::modifiers::layout::LayoutFrameExt;
 use cove_ui_compose::primitives::text::{Text, single_line::SingleLineText};
 use cove_ui_compose::theme::tokens::text_scaler::{TextScaler, TextScalerViewExt};
+use unicode_segmentation::UnicodeSegmentation;
 
 use support::{GlobalTestLock, with_test_text_environment};
 
@@ -251,18 +245,15 @@ fn truncated_text_marks_its_node_only_when_really_clipped() {
 }
 
 #[test]
-fn ellipsis_splits_inside_a_joined_cluster() {
-    // Reported gap: the Rust search runs over scalars, so a width that lands
-    // inside an emoji ZWJ sequence cuts it and leaves a dangling joiner.
+fn ellipsis_keeps_a_joined_cluster_whole() {
     let text = "A\u{1F469}\u{1F3FD}\u{200D}\u{1F4BB}e\u{301}\u{1F1E8}\u{1F1F3}B";
-    let fitted = SingleLineText::fitting(text, 3.0, |candidate| grapheme_count(candidate) as f32);
+    // Swift measures in `Character` units, i.e. extended grapheme clusters.
+    let fitted = SingleLineText::fitting(text, 3.0, |candidate| {
+        candidate.graphemes(true).count() as f32
+    });
     assert_eq!(
-        fitted, "A\u{1F469}\u{1F3FD}\u{200D}\u{2026}",
-        "the scalar search keeps a trailing zero-width joiner where Swift keeps the cluster"
-    );
-    assert!(
-        !fitted.ends_with("\u{1F4BB}\u{2026}"),
-        "the cluster is not preserved the way Swift's grapheme search would"
+        fitted, "A\u{1F469}\u{1F3FD}\u{200D}\u{1F4BB}\u{2026}",
+        "the search keeps the whole joined cluster instead of a dangling ZWJ"
     );
 }
 

@@ -543,3 +543,105 @@ fn large_pages_keep_lookup_and_endpoint_updates_responsive() {
         );
     });
 }
+
+#[test]
+fn endpoint_marks_bracket_only_the_two_outer_paragraphs_and_survive_rebuild() {
+    use cove_composition::{AnyView, Column, HorizontalAlignment, TupleView};
+    use cove_core::scene::AccessibilityRole;
+    use cove_core::{DrawList, Point};
+    use cove_ui_compose::primitives::text::Text;
+    use cove_ui_compose::primitives::text::rich::text_selection::TextSelectionRoot;
+    use cove_ui_compose::theme::theme_for_node;
+    fn region() -> TextSelectionRoot {
+        TextSelectionRoot::new(AnyView::new(Column::new(
+            HorizontalAlignment::Leading,
+            8.0,
+            AnyView::new(TupleView::new(vec![
+                AnyView::new(Text::new("first paragraph")),
+                AnyView::new(Text::new("middle paragraph")),
+                AnyView::new(Text::new("last paragraph")),
+            ])),
+        )))
+    }
+    struct RefreshingRegion(cove_core::State<u32>);
+    impl cove_composition::View for RefreshingRegion {
+        fn body(&self, _cx: &cove_composition::Scope) -> AnyView {
+            let _ = self.0.get();
+            AnyView::new(region())
+        }
+    }
+    fn marks(node: &Node) -> usize {
+        let mut drawing = DrawList::default();
+        node.draw().unwrap()(&mut drawing, Point::default());
+        let color = theme_for_node(node).colors.accent.rgba8();
+        let mut xs: Vec<f32> = drawing
+            .vertices()
+            .iter()
+            .filter(|v| v.color == color)
+            .map(|v| v.x)
+            .collect();
+        xs.sort_by(f32::total_cmp);
+        usize::from(!xs.is_empty()) + xs.windows(2).filter(|pair| pair[1] - pair[0] > 3.0).count()
+    }
+    support::InteractiveScene::run(400.0, 120.0, |scene| {
+        let generation = cove_core::State::new(0);
+        scene.install(RefreshingRegion(generation.clone()));
+        let first = scene
+            .labelled("first paragraph", Some(AccessibilityRole::StaticText))
+            .unwrap();
+        let middle = scene
+            .labelled("middle paragraph", Some(AccessibilityRole::StaticText))
+            .unwrap();
+        let last = scene
+            .labelled("last paragraph", Some(AccessibilityRole::StaticText))
+            .unwrap();
+        let scope = first
+            .composition_value(&TextSelectionScope::key())
+            .unwrap()
+            .0;
+        for reversed in [false, true] {
+            let (a, f) = (position(&first, 2), position(&last, 4));
+            scope
+                .borrow_mut()
+                .select(if reversed { f } else { a }, if reversed { a } else { f });
+            assert_eq!(
+                [marks(&first), marks(&middle), marks(&last)],
+                [1, 0, 1],
+                "a document selection has two outer endpoints, not a pair on every line"
+            );
+        }
+        generation.set(1);
+        scene.settle(2, 1.0);
+        let first = scene
+            .labelled("first paragraph", Some(AccessibilityRole::StaticText))
+            .unwrap();
+        let mounted = first.composition_value(&TextSelectionScope::key()).unwrap();
+        assert!(
+            Rc::ptr_eq(&scope, &mounted.0),
+            "rebuilding the wrapper preserves its mounted scope"
+        );
+        assert!(scope.borrow().has_selection());
+    });
+}
+
+#[test]
+fn selection_adapters_cannot_leave_endpoints_inside_a_joined_grapheme() {
+    GlobalTestLock::locked(|| {
+        let scope = new_scope();
+        let root = Node::new();
+        let node = paragraph(
+            &scope,
+            "e\u{301}👩🏽‍💻x",
+            Rect::new(0.0, 0.0, 160.0, 20.0),
+            &root,
+        );
+        scope
+            .borrow_mut()
+            .select(position(&node, 0), position(&node, 6));
+        assert_eq!(scope.borrow_mut().selected_text(), "e\u{301}");
+        scope
+            .borrow_mut()
+            .select(position(&node, 1), position(&node, 18));
+        assert_eq!(scope.borrow_mut().selected_text(), "e\u{301}👩🏽‍💻");
+    });
+}

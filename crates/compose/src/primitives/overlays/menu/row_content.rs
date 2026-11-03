@@ -7,7 +7,7 @@ use cove_core::Rect;
 use cove_core::scene::Point;
 use cove_imaging::BundleImageResource;
 
-use crate::primitives::text::rich::run::RichTextRun;
+use crate::primitives::text::rich::run::TextRun;
 
 /// Optional presentation for one menu row.
 #[derive(Clone, Default)]
@@ -15,7 +15,7 @@ pub struct MenuItemContent {
     /// Leading glyph. Any icon in a menu level reserves one shared lane.
     pub icon: Option<BundleImageResource>,
     /// Styled visual title. Run links are ignored: the row is the only target.
-    pub rich_title: Vec<RichTextRun>,
+    pub rich_title: Vec<TextRun>,
     /// Secondary line under the title.
     pub detail: Option<String>,
     /// Marks the row as a link to the destination. Activation still runs the
@@ -27,7 +27,7 @@ pub struct MenuItemContent {
 impl MenuItemContent {
     pub fn new(
         icon: Option<BundleImageResource>,
-        rich_title: Vec<RichTextRun>,
+        rich_title: Vec<TextRun>,
         detail: Option<String>,
         link: Option<String>,
     ) -> Self {

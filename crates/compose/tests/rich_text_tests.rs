@@ -19,21 +19,14 @@
 //! - `caret_rect` tracks the line a selection endpoint sits on
 //!
 //! Named differences from the Swift suite:
-//! - The Rust paragraph opens a link on pointer *up* only; a press returns
-//!   `EventResult::Ignored` where Swift returns `.handled`. `link_activation`
-//!   pins the Rust result.
+//! - Link presses share capture with selection; release opens the link only
+//!   when no text range was dragged.
 //! - The Rust paragraph registers a motion handler instead of a hover handler,
 //!   so the `hover(.leave)` step of Swift's link test does not exist; the
 //!   `link_activation` test moves the pointer off the link instead.
 //! - `RichTextFlow::layout` returns an `Rc<RichTextFlow>`; the tests deref it.
-//! - Rust link anchors are full-width, paragraph-height nodes stacked below the
-//!   paragraph (the first at y = 200 inside a 400×200 mount), not overlays on
-//!   the link's first fragment: `anchors` pins the stacked frames (400 wide,
-//!   ordered top to bottom) instead of Swift's contained, side-by-side frames.
-//! - `FocusChain::focus` takes a link anchor, but `RichTextReader::children`
-//!   builds the anchors with `surface: None`, so the paragraph never records
-//!   `FOCUSED_LINK` and paints no ring. Swift's remembered index is
-//!   unobservable; `anchors` pins the empty attachment after focusing.
+//! - Link anchors are semantic overlays over the first fragment and report
+//!   focus to the same Text node that paints selection and glyphs.
 //! - Link anchors are `RichTextLinkAnchor` children of the paragraph; they are
 //!   focusable and not hit-testable, exactly as Swift's `LinkAnchor`.
 
@@ -54,23 +47,24 @@ use cove_platform::{
 };
 use cove_text::{TextEnvironment, TextEnvironmentHolder};
 use cove_ui_compose::modifiers::style::AppearanceExt;
-use cove_ui_compose::primitives::text::rich::RichText;
+use cove_ui_compose::primitives::text::Text;
+use cove_ui_compose::primitives::text::TextSelectionViewExt;
 use cove_ui_compose::primitives::text::rich::flow::{
     RichParagraph, RichParagraphSpan, RichTextFlow,
 };
 use cove_ui_compose::primitives::text::rich::link_anchor::FOCUSED_LINK;
-use cove_ui_compose::primitives::text::rich::run::{RichTextRun, RichTextTraits};
+use cove_ui_compose::primitives::text::rich::run::{TextRun, TextTraits};
 use cove_ui_compose::theme::TextScaler;
 use cove_ui_compose::{Column, Scancode};
 
 use support::GlobalTestLock;
 
-fn paragraph(spans: Vec<(&str, RichTextTraits, Option<usize>)>) -> RichParagraph {
+fn paragraph(spans: Vec<(&str, TextTraits, Option<usize>)>) -> RichParagraph {
     RichParagraph::new(
         spans
             .into_iter()
             .map(|(text, traits, link)| {
-                let font = if traits.contains(RichTextTraits::CODE) {
+                let font = if traits.contains(TextTraits::CODE) {
                     Font::monospaced(15.0, FontWeight::Regular)
                 } else {
                     Font::system(16.0, FontWeight::Regular)
@@ -88,7 +82,7 @@ fn paragraph(spans: Vec<(&str, RichTextTraits, Option<usize>)>) -> RichParagraph
 }
 
 fn plain(text: &str) -> RichParagraph {
-    paragraph(vec![(text, RichTextTraits::from_raw(0), None)])
+    paragraph(vec![(text, TextTraits::from_raw(0), None)])
 }
 
 fn environment() -> TextEnvironment {
@@ -154,11 +148,11 @@ fn wraps_across_runs() {
         let env = environment();
         let flow = RichTextFlow::layout(
             &paragraph(vec![
-                ("The quick ", RichTextTraits::from_raw(0), None),
-                ("brown", RichTextTraits::BOLD, None),
-                (" fox jumps over the ", RichTextTraits::from_raw(0), None),
-                ("lazy", RichTextTraits::ITALIC, None),
-                (" dog again and again", RichTextTraits::from_raw(0), None),
+                ("The quick ", TextTraits::from_raw(0), None),
+                ("brown", TextTraits::BOLD, None),
+                (" fox jumps over the ", TextTraits::from_raw(0), None),
+                ("lazy", TextTraits::ITALIC, None),
+                (" dog again and again", TextTraits::from_raw(0), None),
             ]),
             120.0,
             &env,
@@ -203,8 +197,8 @@ fn intrinsic_width() {
         let env = environment();
         let flow = RichTextFlow::layout(
             &paragraph(vec![
-                ("one ", RichTextTraits::from_raw(0), None),
-                ("two", RichTextTraits::BOLD, None),
+                ("one ", TextTraits::from_raw(0), None),
+                ("two", TextTraits::BOLD, None),
             ]),
             f32::INFINITY,
             &env,
@@ -269,16 +263,16 @@ fn code_padding() {
         let env = environment();
         let plain_flow = RichTextFlow::layout(
             &paragraph(vec![
-                ("x ", RichTextTraits::from_raw(0), None),
-                ("code", RichTextTraits::from_raw(0), None),
+                ("x ", TextTraits::from_raw(0), None),
+                ("code", TextTraits::from_raw(0), None),
             ]),
             f32::INFINITY,
             &env,
         );
         let code_flow = RichTextFlow::layout(
             &paragraph(vec![
-                ("x ", RichTextTraits::from_raw(0), None),
-                ("code", RichTextTraits::CODE, None),
+                ("x ", TextTraits::from_raw(0), None),
+                ("code", TextTraits::CODE, None),
             ]),
             f32::INFINITY,
             &env,
@@ -360,12 +354,13 @@ fn link_activation() {
             let sink = opened.clone();
             let graph = support::graph();
             graph.install(
-                RichText::new(vec![
-                    RichTextRun::new("Read the "),
-                    RichTextRun::new("style guide").link("guide://style"),
-                    RichTextRun::new(" today."),
+                Text::runs(vec![
+                    TextRun::new("Read the "),
+                    TextRun::new("style guide").link("guide://style"),
+                    TextRun::new(" today."),
                 ])
-                .on_open_link(move |target| sink.borrow_mut().push(target.to_string())),
+                .on_open_link(move |target| sink.borrow_mut().push(target.to_string()))
+                .text_selection(true),
                 Default::default(),
             );
             graph.compute_layout(400.0, 200.0);
@@ -407,8 +402,8 @@ fn link_activation() {
             );
             assert_eq!(
                 down,
-                cove_core::scene::EventResult::Ignored,
-                "the Rust paragraph opens on release, not on press"
+                cove_core::scene::EventResult::Handled,
+                "the paragraph captures the press; release chooses a link or selection"
             );
             pointer(
                 &press(link_x + 4.0, y),
@@ -468,9 +463,9 @@ fn modifiers_apply() {
                     HorizontalAlignment::Center,
                     0.0,
                     AnyView::new(TupleView::new(vec![
-                        AnyView::new(RichText::new(vec![RichTextRun::new("Body")])),
+                        AnyView::new(Text::runs(vec![TextRun::new("Body")])),
                         AnyView::new(
-                            RichText::new(vec![RichTextRun::new("Large")])
+                            Text::runs(vec![TextRun::new("Large")])
                                 .font(Font::system(40.0, FontWeight::Regular)),
                         ),
                     ])),
@@ -507,15 +502,16 @@ fn anchors() {
             let sink = opened.clone();
             let graph = support::graph();
             graph.install(
-                RichText::new(vec![
-                    RichTextRun::new("Read the "),
-                    RichTextRun::new("style ").link("guide://style"),
-                    RichTextRun::with_traits("guide", RichTextTraits::BOLD).link("guide://style"),
-                    RichTextRun::new(" or the "),
-                    RichTextRun::new("faq").link("guide://faq"),
-                    RichTextRun::new("."),
+                Text::runs(vec![
+                    TextRun::new("Read the "),
+                    TextRun::new("style ").link("guide://style"),
+                    TextRun::with_traits("guide", TextTraits::BOLD).link("guide://style"),
+                    TextRun::new(" or the "),
+                    TextRun::new("faq").link("guide://faq"),
+                    TextRun::new("."),
                 ])
-                .on_open_link(move |target| sink.borrow_mut().push(target.to_string())),
+                .on_open_link(move |target| sink.borrow_mut().push(target.to_string()))
+                .text_selection(true),
                 Default::default(),
             );
             graph.compute_layout(400.0, 200.0);
@@ -545,15 +541,19 @@ fn anchors() {
                 .expect("the paragraph surface")
                 .absolute_frame();
             let frames: Vec<_> = links.iter().map(|link| link.absolute_frame()).collect();
-            for (index, frame) in frames.iter().enumerate() {
+            for frame in &frames {
                 assert!(
-                    frame.width >= paragraph.width - 0.5,
-                    "the anchor spans the paragraph width: link {index} {frame:?} paragraph {paragraph:?}"
+                    frame.width > 0.0 && frame.width < paragraph.width,
+                    "a link anchor follows its inline fragment: {frame:?}"
+                );
+                assert!(
+                    frame.y >= paragraph.y && frame.max_y() <= paragraph.max_y() + 0.5,
+                    "semantic links stay inside the text instead of adding rows: {frames:?}"
                 );
             }
             assert!(
-                frames[0].y >= paragraph.max_y() && frames[1].y >= frames[0].max_y(),
-                "GAP: Rust anchors stack below the paragraph: {frames:?} paragraph {paragraph:?}"
+                frames[0].max_x() < frames[1].x,
+                "links follow their reading positions"
             );
 
             let key_handler = registry
@@ -591,8 +591,8 @@ fn anchors() {
             );
             assert_eq!(
                 surface.attachment::<usize>(FOCUSED_LINK),
-                None,
-                "GAP: the anchor is built with surface: None, so the paragraph never records the focused link"
+                Some(1),
+                "the single Text surface tracks its focused inline link"
             );
             focus.focus(None, false);
             assert_eq!(
@@ -612,9 +612,9 @@ fn inert_links() {
             InteractionRegistryHolder::set_current(Some(registry.clone()));
             let graph = support::graph();
             graph.install(
-                RichText::new(vec![
-                    RichTextRun::new("see "),
-                    RichTextRun::new("docs").link("guide://docs"),
+                Text::runs(vec![
+                    TextRun::new("see "),
+                    TextRun::new("docs").link("guide://docs"),
                 ]),
                 Default::default(),
             );
@@ -677,5 +677,198 @@ fn caret_rect() {
                 );
             }
         });
+    });
+}
+
+#[test]
+fn selectable_rich_text_drags_without_opening_links_and_paints_both_edges() {
+    use cove_core::scene::EventDispatcher;
+    use cove_core::{DrawList, Point};
+    use cove_ui_compose::primitives::text::rich::text_selection::TextSelectionScope;
+    use cove_ui_compose::theme::theme_for_node;
+    support::InteractiveScene::run(400.0, 100.0, |scene| {
+        let opened = Rc::new(RefCell::new(Vec::new()));
+        let sink = opened.clone();
+        scene.install(
+            Text::runs(vec![
+                TextRun::new("Read "),
+                TextRun::new("the guide").link("guide://style"),
+                TextRun::new(" today"),
+            ])
+            .on_open_link(move |target| sink.borrow_mut().push(target.to_string()))
+            .text_selection(true),
+        );
+        let node = scene
+            .labelled("Read the guide today", Some(AccessibilityRole::StaticText))
+            .unwrap();
+        let bounds = node.absolute_frame();
+        scene.drag(
+            Point::new(bounds.x + 3.0, bounds.y + 8.0),
+            Point::new(bounds.x + 110.0, bounds.y + 8.0),
+            8,
+        );
+        let scope = node.composition_value(&TextSelectionScope::key()).unwrap();
+        assert!(scope.0.borrow().has_selection());
+        assert!(!scope.0.borrow_mut().selected_text().is_empty());
+        assert!(
+            opened.borrow().is_empty(),
+            "dragging over a link must not activate it"
+        );
+        let mut drawing = DrawList::default();
+        node.draw().unwrap()(&mut drawing, Point::default());
+        let palette = theme_for_node(&node).colors;
+        assert!(
+            drawing
+                .vertices()
+                .iter()
+                .any(|v| v.color == palette.selection.rgba8())
+        );
+        let edges: Vec<_> = drawing
+            .vertices()
+            .iter()
+            .filter(|v| v.color == palette.accent.rgba8())
+            .collect();
+        assert!(
+            !edges.is_empty(),
+            "two endpoint marks paint over the selected run"
+        );
+        let before = scope.0.borrow_mut().selected_text();
+        let dispatcher: EventDispatcher = scene.dispatcher();
+        dispatcher.dispatch(&cove_platform::InputEvent::KeyDown(KeyEvent {
+            scancode: Scancode::ARROW_RIGHT,
+            keycode: 0,
+            modifiers: KeyModifiers::LEFT_SHIFT,
+            is_repeat: false,
+        }));
+        assert!(
+            scope.0.borrow().has_selection(),
+            "keyboard refinement keeps the same selection scope"
+        );
+        assert_ne!(
+            scope.0.borrow_mut().selected_text(),
+            before,
+            "Shift-Right extends the selected run"
+        );
+    });
+}
+
+#[test]
+fn display_only_rich_text_does_not_register_a_selection_member() {
+    use cove_ui_compose::primitives::text::rich::text_selection::{
+        TextSelectionRoot, TextSelectionScope,
+    };
+    support::InteractiveScene::run(320.0, 60.0, |scene| {
+        scene.install(TextSelectionRoot::new(AnyView::new(
+            Text::new("Display only").display_only(true),
+        )));
+        let node = scene
+            .labelled("Display only", Some(AccessibilityRole::StaticText))
+            .unwrap();
+        assert!(!node.is_focusable());
+        assert_eq!(
+            node.cursor().unwrap_or(SystemCursor::Arrow),
+            SystemCursor::Arrow
+        );
+        let scope = node.composition_value(&TextSelectionScope::key()).unwrap();
+        assert!(scope.0.borrow_mut().range_for(&node).is_none());
+    });
+}
+
+#[test]
+fn one_text_node_keeps_selection_when_switching_between_plain_and_runs() {
+    use cove_core::State;
+    use cove_ui_compose::primitives::text::rich::text_selection::{
+        TextSelectionPosition, TextSelectionScope,
+    };
+    struct Mode(State<bool>);
+    impl cove_composition::View for Mode {
+        fn body(&self, _cx: &cove_composition::Scope) -> AnyView {
+            let text: Text = if self.0.get() {
+                Text::runs(vec![TextRun::with_traits("same content", TextTraits::BOLD)])
+            } else {
+                Text::new("same content")
+            };
+            AnyView::new(text)
+        }
+    }
+    support::InteractiveScene::run(320.0, 80.0, |scene| {
+        let mode = State::new(false);
+        scene.install(Mode(mode.clone()).text_selection(true));
+        let first = scene
+            .labelled("same content", Some(AccessibilityRole::StaticText))
+            .unwrap();
+        let scope = first
+            .composition_value(&TextSelectionScope::key())
+            .unwrap()
+            .0;
+        scope.borrow_mut().select(
+            TextSelectionPosition {
+                member: first.id().0,
+                offset: 0,
+            },
+            TextSelectionPosition {
+                member: first.id().0,
+                offset: 4,
+            },
+        );
+        for styled in [true, false, true] {
+            mode.set(styled);
+            scene.settle(2, 1.0);
+            let current = scene
+                .labelled("same content", Some(AccessibilityRole::StaticText))
+                .unwrap();
+            assert_eq!(
+                current.id(),
+                first.id(),
+                "plain and styled text are one primitive"
+            );
+            assert_eq!(scope.borrow_mut().selected_text(), "same");
+            assert_eq!(current.cursor(), Some(SystemCursor::Ibeam));
+        }
+    });
+}
+
+#[test]
+fn unified_text_applies_line_limits_and_truncation_to_styled_runs() {
+    use cove_core::{DrawList, Point};
+    use cove_ui_compose::modifiers::layout::LayoutFrameExt;
+    support::InteractiveScene::run(160.0, 160.0, |scene| {
+        let text = "A long e\u{301} 👩🏽‍💻 paragraph with enough words to wrap over multiple rows";
+        scene.install(Column::new(
+            HorizontalAlignment::Leading,
+            8.0,
+            AnyView::new(TupleView::new(vec![
+                AnyView::new(
+                    Text::runs(vec![TextRun::with_traits(text, TextTraits::BOLD)])
+                        .line_limit(Some(2))
+                        .frame_width(120.0),
+                ),
+                AnyView::new(
+                    Text::runs(vec![TextRun::with_traits(text, TextTraits::ITALIC)])
+                        .truncated()
+                        .frame_width(90.0),
+                ),
+            ])),
+        ));
+        let texts = scene.all(|node| {
+            node.accessibility()
+                .is_some_and(|a| a.role == AccessibilityRole::StaticText)
+        });
+        assert_eq!(texts.len(), 2);
+        assert!(
+            texts[0].frame().height <= 40.1,
+            "line_limit applies to styled text"
+        );
+        assert!(
+            texts[1].frame().height <= 20.1,
+            "truncation stays on one line"
+        );
+        let mut draw = DrawList::default();
+        texts[1].draw().unwrap()(&mut draw, Point::default());
+        assert!(!draw.vertices().is_empty());
+        assert!(
+            draw.vertices().iter().all(|v| v.x <= 92.0),
+            "fitting preserves complete styled graphemes inside the available width"
+        );
     });
 }

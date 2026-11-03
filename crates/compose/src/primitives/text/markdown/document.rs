@@ -1,7 +1,7 @@
 //! Translation of Primitives/Text/Markdown/Document.swift.
 //!
 //! The rendered subset of a Markdown document, independent of the parser.
-use crate::primitives::text::rich::run::RichTextRun;
+use crate::primitives::text::rich::run::TextRun;
 
 /// Alignment of one table column.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
@@ -32,17 +32,17 @@ pub struct MarkdownList {
 #[derive(Clone, Debug, PartialEq)]
 pub struct MarkdownTable {
     pub alignments: Vec<MarkdownAlignment>,
-    pub header: Vec<Vec<RichTextRun>>,
-    pub rows: Vec<Vec<Vec<RichTextRun>>>,
+    pub header: Vec<Vec<TextRun>>,
+    pub rows: Vec<Vec<Vec<TextRun>>>,
 }
 
 /// The rendered subset of a Markdown document.
 #[derive(Clone, Debug, PartialEq)]
 pub enum MarkdownBlock {
-    Paragraph(Vec<RichTextRun>),
+    Paragraph(Vec<TextRun>),
     Heading {
         level: usize,
-        runs: Vec<RichTextRun>,
+        runs: Vec<TextRun>,
     },
     Quote(Vec<MarkdownBlock>),
     List(MarkdownList),
@@ -56,6 +56,6 @@ pub enum MarkdownBlock {
 
 impl MarkdownBlock {
     pub fn paragraph(text: impl Into<String>) -> Self {
-        Self::Paragraph(vec![RichTextRun::new(text)])
+        Self::Paragraph(vec![TextRun::new(text)])
     }
 }

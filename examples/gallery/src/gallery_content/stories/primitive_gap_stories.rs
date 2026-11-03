@@ -9,14 +9,12 @@
 //! - `CompletionPopover` and `RouteOutlet` are views and are rendered for real.
 
 use cove_composition::{PrimitiveView, Scope};
+use cove_core::Rect;
 use cove_core::State;
 use cove_core::scene::{Align, FlexDirection, Justify, LayoutNode, Node, NodeResource, Wrap};
-use cove_core::Rect;
 use cove_ui_compose::impl_primitive_view;
 use cove_ui_compose::modifiers::layout::LayoutFrameExt;
-use cove_ui_compose::primitives::controls::{
-    Button, CompletionPopover, TextCompletionItem,
-};
+use cove_ui_compose::primitives::controls::{Button, CompletionPopover, TextCompletionItem};
 use cove_ui_compose::primitives::feedback::ProgressValue;
 use cove_ui_compose::primitives::navigation::RouteOutlet;
 use cove_ui_compose::primitives::text::Text;
@@ -50,8 +48,7 @@ impl SingleLineTextStory {
     }
 
     /// The sample sentence the page fits into each width.
-    pub const SOURCE: &'static str =
-        "CoveUI keeps every label on one line and truncates the tail";
+    pub const SOURCE: &'static str = "CoveUI keeps every label on one line and truncates the tail";
 
     /// Approximate advance per character for the page's current density. The
     /// gallery's density toggle changes this, so the truncation points move.
@@ -228,11 +225,7 @@ pub enum DemoRoute {
 }
 
 impl DemoRoute {
-    pub const ALL: [DemoRoute; 3] = [
-        DemoRoute::Overview,
-        DemoRoute::Detail,
-        DemoRoute::Settings,
-    ];
+    pub const ALL: [DemoRoute; 3] = [DemoRoute::Overview, DemoRoute::Detail, DemoRoute::Settings];
 
     pub fn title(self) -> &'static str {
         match self {
@@ -278,8 +271,7 @@ impl View for RouteOutletStory {
                 let selection = self.route.clone();
                 let target = *route;
                 AnyView::new(
-                    Button::title(route.title(), move || selection.set(target))
-                        .enabled(is_enabled),
+                    Button::title(route.title(), move || selection.set(target)).enabled(is_enabled),
                 )
             })
             .collect::<Vec<_>>();

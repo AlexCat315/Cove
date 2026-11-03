@@ -14,15 +14,14 @@ pub mod calendar;
 pub mod command_story;
 pub mod container_stories;
 pub mod controls;
-pub mod data_stories;
 pub mod data_list_stories;
+pub mod data_stories;
 pub mod data_stories_file;
 pub mod data_table_story;
 pub mod feedback;
-pub mod interaction_gap_stories;
-pub mod primitive_gap_stories;
 pub mod field_stories;
 pub mod image_story;
+pub mod interaction_gap_stories;
 pub mod intrinsic_fitting;
 pub mod layout;
 pub mod markdown_story;
@@ -35,6 +34,7 @@ pub mod overlay_stories_file;
 pub mod overview;
 pub mod picker_stories;
 pub mod placement_example;
+pub mod primitive_gap_stories;
 pub mod product_stories;
 pub mod rich_text;
 pub mod sidebar_stories;
@@ -70,17 +70,14 @@ pub use data_stories_file::{
 };
 pub use data_table_story::DataTableStory;
 pub use feedback::{AlertStory, BadgeStory, EmptyStory, ProgressStory, StorySection};
-pub use primitive_gap_stories::{
-    CompletionPopoverStory, DemoRoute, ProgressValueStory, RouteOutletStory, SingleLineTextStory,
-};
-pub use interaction_gap_stories::{
-    ActionGroupLayoutStory, EdgeAutoScrollStory, HorizontalSwipeStory, ScrollRevealStory,
-};
 pub use field_stories::{
     AssetRefStory, ColorFieldStory, JsonFieldStory, NumberFieldStory, RangeSliderStory,
     SearchFieldStory, SelectStory, SliderStory, TextAreaStory, TextFieldStory, Vec3FieldStory,
 };
 pub use image_story::ImageStory;
+pub use interaction_gap_stories::{
+    ActionGroupLayoutStory, EdgeAutoScrollStory, HorizontalSwipeStory, ScrollRevealStory,
+};
 pub use intrinsic_fitting::{FIT_CHIPS, ViewThatFitsStory};
 pub use layout::{LayoutGridStory, LazyGridStory, MasonrySample, MasonryStory};
 pub use markdown_story::MarkdownStory;
@@ -99,8 +96,11 @@ pub use picker_stories::{
     SplitButtonStory, TimeFieldStory,
 };
 pub use placement_example::PlacementExample;
+pub use primitive_gap_stories::{
+    CompletionPopoverStory, DemoRoute, ProgressValueStory, RouteOutletStory, SingleLineTextStory,
+};
 pub use product_stories::{ComboboxStory, FormStory, NotificationStory, RadioStory, TooltipStory};
-pub use rich_text::RichTextStory;
+pub use rich_text::TextStory;
 pub use sidebar_stories::{NestedSidebarExample, ResizableSidebarExample};
 pub use sidebar_story::SidebarStory;
 pub use stepper::StepperStory;

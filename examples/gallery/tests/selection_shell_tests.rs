@@ -357,7 +357,7 @@ fn dragged_label_copies_on_each_shell() {
         GalleryPage::SplitView,
         GalleryPage::ScrollView,
         GalleryPage::Workspace,
-        GalleryPage::RichText,
+        GalleryPage::TextRuns,
         GalleryPage::Markdown,
     ];
     let window = Rect::new(0.0, 0.0, 1280.0, 820.0);

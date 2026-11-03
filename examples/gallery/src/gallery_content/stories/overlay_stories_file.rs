@@ -250,11 +250,9 @@ impl MenuStory {
             .map(|(index, title)| {
                 let mode = self.view_mode.clone();
                 MenuEntry::Item(
-                    MenuItem::new(300 + index as u64, *title, move || {
-                        mode.set(index as u32)
-                    })
-                    .enabled(enabled)
-                    .selected(current == index as u32),
+                    MenuItem::new(300 + index as u64, *title, move || mode.set(index as u32))
+                        .enabled(enabled)
+                        .selected(current == index as u32),
                 )
             })
             .collect()
@@ -300,9 +298,7 @@ impl View for MenuStory {
                 entries: vec![
                     MenuEntry::Item(MenuItem::new(105, "General", || {})),
                     MenuEntry::Item(MenuItem::new(111, "Restricted", || {}).enabled(false)),
-                    MenuEntry::Item(
-                        MenuItem::new(112, "Delete project", || {}).enabled(enabled),
-                    ),
+                    MenuEntry::Item(MenuItem::new(112, "Delete project", || {}).enabled(enabled)),
                 ],
                 is_enabled: enabled,
                 width: SUBMENU_WIDTH,
@@ -610,7 +606,9 @@ impl View for ModalStory {
                 Wrap::NoWrap,
                 12.0,
                 AnyView::new(TupleView::new(vec![
-                    AnyView::new(Button::title("New project", open).enabled(self.options.is_enabled)),
+                    AnyView::new(
+                        Button::title("New project", open).enabled(self.options.is_enabled),
+                    ),
                     dialog,
                     AnyView::new(AnyView::new(status).debug_name("modal-status")),
                 ])),
@@ -877,7 +875,10 @@ impl View for TabsStory {
                 cove_ui_compose::primitives::controls::Button::title("Close selected", move || {
                     let current = documents.get();
                     let selected = selection.get();
-                    let index = current.iter().position(|name| *name == selected).unwrap_or(0);
+                    let index = current
+                        .iter()
+                        .position(|name| *name == selected)
+                        .unwrap_or(0);
                     let mut next = current.clone();
                     if !next.is_empty() {
                         next.remove(index.min(next.len() - 1));

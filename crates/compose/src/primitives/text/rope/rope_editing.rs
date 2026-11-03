@@ -2,6 +2,7 @@
 
 use super::rope_storage::{RopeHandle, RopeLeaf, RopeNode, RopeStorage, empty_node};
 use std::sync::Arc;
+use unicode_segmentation::UnicodeSegmentation;
 
 /// Height-aware AVL join visits only the taller tree's boundary path.
 pub fn join(left: RopeHandle, right: RopeHandle) -> RopeHandle {
@@ -110,16 +111,19 @@ pub fn concatenate(left: RopeHandle, right: RopeHandle) -> RopeHandle {
 }
 
 fn stable_boundary(left: &str, right: &str) -> bool {
-    let (Some(last), Some(first)) = (left.chars().next_back(), right.chars().next()) else {
+    let (Some(last), Some(first)) = (
+        left.graphemes(true).next_back(),
+        right.graphemes(true).next(),
+    ) else {
         return true;
     };
     // Counting alone misses RI re-pairing (three indicators still form two
     // characters). The first cluster's exact bytes must remain unchanged.
-    let mut boundary = String::new();
-    boundary.push(last);
-    boundary.push(first);
-    match boundary.chars().next() {
-        Some(cluster) => cluster.to_string().as_bytes() == last.to_string().as_bytes(),
+    let mut boundary = String::with_capacity(last.len() + first.len());
+    boundary.push_str(last);
+    boundary.push_str(first);
+    match boundary.graphemes(true).next() {
+        Some(cluster) => cluster.as_bytes() == last.as_bytes(),
         None => true,
     }
 }

@@ -173,11 +173,16 @@ impl SplitViewStory {
 
     /// Writes a clamped split fraction.
     pub fn set_fraction(&self, fraction: f32) {
-        self.fraction.set(fraction.clamp(Self::RANGE.0, Self::RANGE.1));
+        self.fraction
+            .set(fraction.clamp(Self::RANGE.0, Self::RANGE.1));
     }
 
     pub fn readout(&self) -> String {
-        format!("{:.0} / {:.0}", self.fraction.get() * 100.0, (1.0 - self.fraction.get()) * 100.0)
+        format!(
+            "{:.0} / {:.0}",
+            self.fraction.get() * 100.0,
+            (1.0 - self.fraction.get()) * 100.0
+        )
     }
 }
 
@@ -492,17 +497,9 @@ impl View for StatusBarStory {
     fn body(&self, _cx: &Scope) -> AnyView {
         let leading = AnyView::new(TupleView::new(vec![
             AnyView::new(StatusBarText::new("main")),
-            AnyView::new(
-                StatusBarText::new("UTF-8")
-                    .monospaced(true)
-                    .detail("LF"),
-            ),
+            AnyView::new(StatusBarText::new("UTF-8").monospaced(true).detail("LF")),
         ]));
-        let trailing = AnyView::new(
-            StatusBarText::new("Ln 12")
-                .detail("Col 4")
-                .monospaced(true),
-        );
+        let trailing = AnyView::new(StatusBarText::new("Ln 12").detail("Col 4").monospaced(true));
         let bar = AnyView::new(
             StatusBar::new(leading, trailing)
                 .shows_divider(true)
@@ -658,7 +655,11 @@ impl View for CarouselStory {
                 let id = format!("page-{index}");
                 CarouselPage::new(
                     id.clone(),
-                    AnyView::new(card(&id.clone(), "Beyond eight pages the indicator counts", 100.0)),
+                    AnyView::new(card(
+                        &id.clone(),
+                        "Beyond eight pages the indicator counts",
+                        100.0,
+                    )),
                 )
                 .caption(id)
             })

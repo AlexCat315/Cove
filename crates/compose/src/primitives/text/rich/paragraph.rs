@@ -17,10 +17,11 @@ use cove_text::{DrawListText, TextEnvironmentHolder};
 
 use super::flow::{RichParagraph, RichTextFlow};
 use super::link_anchor::{FOCUSED_LINK, RichTextLinkAnchor};
+use super::text_selection::{TextSelectionChrome, TextSelectionScope};
 
 /// How a paragraph participates in its document.
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Default)]
-pub enum RichTextRole {
+pub enum TextRole {
     #[default]
     Paragraph,
     Heading(usize),
@@ -63,31 +64,39 @@ struct PaintIdentity {
     paragraph: RichParagraph,
     palette: RichTextPalette,
     focused_link: Option<usize>,
+    line_limit: Option<usize>,
+    truncates: bool,
 }
 
 /// Paints one paragraph and hit-tests pointers against the same flow.
 pub struct RichTextSurface {
     pub paragraph: RichParagraph,
-    pub role: RichTextRole,
+    pub role: TextRole,
     /// Link destinations, indexed by each span's `link`.
     pub destinations: Vec<String>,
     pub on_open_link: Option<Rc<dyn Fn(&str)>>,
+    pub line_limit: Option<usize>,
+    pub truncates: bool,
+    pub is_selectable: bool,
 }
 
 impl RichTextSurface {
     pub fn new(paragraph: RichParagraph) -> Self {
         Self {
             paragraph,
-            role: RichTextRole::Paragraph,
+            role: TextRole::Paragraph,
             destinations: Vec::new(),
             on_open_link: None,
+            line_limit: None,
+            truncates: false,
+            is_selectable: true,
         }
     }
 
     fn accessibility_role(&self) -> AccessibilityRole {
         match self.role {
-            RichTextRole::Paragraph | RichTextRole::CodeBlock => AccessibilityRole::StaticText,
-            RichTextRole::Heading(_) => AccessibilityRole::Heading,
+            TextRole::Paragraph | TextRole::CodeBlock => AccessibilityRole::StaticText,
+            TextRole::Heading(_) => AccessibilityRole::Heading,
         }
     }
 }
@@ -106,6 +115,8 @@ impl PrimitiveView for RichTextSurface {
     fn update_layout(&self, layout: &LayoutNode) {
         let paragraph = self.paragraph.clone();
         let weak_layout = layout.downgrade();
+        let line_limit = self.line_limit;
+        let truncates = self.truncates;
         layout.set_measure_func(Some(Rc::new(move |width, mode, _, _| {
             let Some(environment) = TextEnvironmentHolder::current() else {
                 return cove_core::Size::default();
@@ -118,6 +129,13 @@ impl PrimitiveView for RichTextSurface {
             let paragraph = LayoutNode::upgrade(&weak_layout)
                 .map(|layout| styled_paragraph(&paragraph, &layout))
                 .unwrap_or_else(|| paragraph.clone());
+            let paragraph = super::display::visible_paragraph(
+                &paragraph,
+                limit,
+                line_limit,
+                truncates,
+                &environment,
+            );
             let flow = RichTextFlow::layout(&paragraph, limit, &environment);
             cove_core::Size {
                 width: flow.width,
@@ -127,12 +145,13 @@ impl PrimitiveView for RichTextSurface {
     }
 
     fn update_node(&self, node: &Node) {
+        node.set_attachment("__text_display_options", (self.line_limit, self.truncates));
         let text = self.paragraph.text();
         node.set_accessibility(Some(AccessibilitySemantics {
             role: self.accessibility_role(),
             label: text,
             value: match self.role {
-                RichTextRole::Heading(level) => format!("level {level}"),
+                TextRole::Heading(level) => format!("level {level}"),
                 _ => String::new(),
             },
             ..Default::default()
@@ -148,6 +167,48 @@ impl PrimitiveView for RichTextSurface {
             self.destinations.clone(),
             self.on_open_link.clone(),
         );
+        let scope = node
+            .composition_value(&TextSelectionScope::key())
+            .filter(|_| self.is_selectable && !TextSelectionChrome::is_inside_control(node));
+        if let Some(scope) = scope {
+            let source = self.paragraph.clone();
+            let owner = node.downgrade();
+            TextSelectionScope::register(
+                &scope.0,
+                node,
+                Rc::new(move || source.text()),
+                Rc::new({
+                    let paragraph = self.paragraph.clone();
+                    move |point| {
+                        let (Some(owner), Some(environment)) =
+                            (Node::upgrade(&owner), TextEnvironmentHolder::current())
+                        else {
+                            return 0;
+                        };
+                        let frame = owner.absolute_frame();
+                        RichTextFlow::layout(
+                            &paragraph_at_node(&paragraph, &owner),
+                            frame.width,
+                            &environment,
+                        )
+                        .offset(point.x - frame.x, point.y - frame.y)
+                    }
+                }),
+            );
+            install_selection(node, &scope.0);
+            node.set_attachment("__selectable_text", true);
+        } else {
+            TextSelectionScope::unregister(node);
+            node.remove_attachment("__selectable_text");
+            node.set_cursor(Some(SystemCursor::Arrow));
+            if TextSelectionChrome::is_inside_control(node) {
+                if let Some(registry) = InteractionRegistryHolder::current() {
+                    registry.remove(node);
+                }
+                node.set_is_hit_testable(false);
+                node.set_cursor(None);
+            }
+        }
 
         let weak = node.downgrade();
         let paragraph = self.paragraph.clone();
@@ -157,6 +218,8 @@ impl PrimitiveView for RichTextSurface {
                 paragraph: self.paragraph.clone(),
                 palette: RichTextPalette::resolve(node),
                 focused_link: node.attachment::<usize>(FOCUSED_LINK),
+                line_limit: self.line_limit,
+                truncates: self.truncates,
             },
             move |list, origin| {
                 let Some(owner) = Node::upgrade(&weak) else {
@@ -186,10 +249,25 @@ fn styled_paragraph(paragraph: &RichParagraph, layout: &LayoutNode) -> RichParag
 }
 
 fn paragraph_at_node(paragraph: &RichParagraph, node: &Node) -> RichParagraph {
-    node.layout_node().map_or_else(
+    let resolved = node.layout_node().map_or_else(
         || paragraph.clone(),
         |layout| styled_paragraph(paragraph, &layout),
-    )
+    );
+    let (limit, truncates) = node
+        .attachment::<(Option<usize>, bool)>("__text_display_options")
+        .unwrap_or_default();
+    if limit.is_none() && !truncates {
+        return resolved;
+    }
+    TextEnvironmentHolder::current().map_or(resolved.clone(), |environment| {
+        super::display::visible_paragraph(
+            &resolved,
+            node.frame().width,
+            limit,
+            truncates,
+            &environment,
+        )
+    })
 }
 
 fn paint(
@@ -219,7 +297,7 @@ fn paint(
         };
         if !span
             .traits
-            .contains(crate::primitives::text::rich::run::RichTextTraits::CODE)
+            .contains(crate::primitives::text::rich::run::TextTraits::CODE)
         {
             continue;
         }
@@ -238,6 +316,24 @@ fn paint(
         );
     }
 
+    let scope = node.composition_value(&TextSelectionScope::key());
+    let (selection, endpoints) = scope
+        .as_ref()
+        .map(|scope| {
+            let mut scope = scope.0.borrow_mut();
+            (scope.range_for(node), scope.endpoint_offsets(node))
+        })
+        .unwrap_or((None, (None, None)));
+    if let Some(range) = selection {
+        for (x, y, width, height) in flow.selection_rects(range) {
+            crate::primitives::text::selection_input::paint_selection(
+                list,
+                Rect::new(origin.x + x, origin.y + y, width, height),
+                palette.selection.multiplied_alpha(opacity),
+            );
+        }
+    }
+
     // The shaped glyph run.
     let _ = list.add_text(
         &flow.glyphs,
@@ -254,6 +350,18 @@ fn paint(
                 None
             }
         }),
+    );
+
+    let caret = |offset, trailing| {
+        let (x, y, width, height) = flow.caret_rect_with_affinity(offset, trailing);
+        Rect::new(x, y, width, height)
+    };
+    TextSelectionChrome::draw_endpoint_bars(
+        list,
+        origin,
+        endpoints.0.map(|offset| caret(offset, false)),
+        endpoints.1.map(|offset| caret(offset, true)),
+        theme_for_node(node).colors.accent.multiplied_alpha(opacity),
     );
 
     // Link underlines, plus a focus ring on the focused link's fragments.
@@ -289,7 +397,7 @@ fn paint(
         };
         if !span
             .traits
-            .contains(crate::primitives::text::rich::run::RichTextTraits::STRIKETHROUGH)
+            .contains(crate::primitives::text::rich::run::TextTraits::STRIKETHROUGH)
         {
             continue;
         }
@@ -393,10 +501,54 @@ fn install_pointer(
                     owner.set_cursor(Some(if over_link {
                         SystemCursor::Pointer
                     } else {
-                        SystemCursor::Ibeam
+                        if owner.is_focusable() {
+                            SystemCursor::Ibeam
+                        } else {
+                            SystemCursor::Arrow
+                        }
                     }));
                 }
                 EventResult::Ignored
+            }),
+        );
+    }
+}
+
+/// A press may become either a link activation or a selection. The selection
+/// owns capture; an actual range on release suppresses opening the link.
+fn install_selection(node: &Node, scope: &super::text_selection::SharedTextSelectionScope) {
+    let Some(registry) = InteractionRegistryHolder::current() else {
+        return;
+    };
+    let links = registry.handlers(node);
+    crate::primitives::text::selection_input::install(node, scope);
+    let selection = registry.handlers(node);
+    if let Some(pointer) = selection.pointer {
+        let scope = scope.clone();
+        registry.set_pointer(
+            node,
+            InputHandlerRoute::text_input(),
+            Rc::new(move |event, phase, event_phase| {
+                let selected = pointer(event, phase, event_phase);
+                if phase == PointerPhase::Up
+                    && !scope.borrow().has_selection()
+                    && let Some(link) = &links.pointer
+                {
+                    return link(event, phase, event_phase);
+                }
+                selected
+            }),
+        );
+    }
+    if let Some(motion) = selection.motion {
+        registry.set_motion(
+            node,
+            InputHandlerRoute::text_input(),
+            Rc::new(move |event, phase| {
+                if let Some(link) = &links.motion {
+                    let _ = link(event, phase);
+                }
+                motion(event, phase)
             }),
         );
     }
@@ -430,4 +582,35 @@ pub fn link_anchors(
         }));
     }
     anchors
+}
+
+/// Link anchors are semantic overlays and never participate in text layout.
+pub(crate) fn update_link_frames(node: &Node, paragraph: &RichParagraph) {
+    let Some(environment) = TextEnvironmentHolder::current() else {
+        return;
+    };
+    let paragraph = paragraph_at_node(paragraph, node);
+    let flow = RichTextFlow::layout(&paragraph, node.frame().width, &environment);
+    for child in node.children() {
+        let Some(index) = child.attachment::<usize>("__text_link_index") else {
+            continue;
+        };
+        let frame = flow
+            .fragments
+            .iter()
+            .find_map(|fragment| {
+                if paragraph.spans.get(fragment.span)?.link != Some(index) {
+                    return None;
+                }
+                let line = flow.lines.get(fragment.line)?;
+                Some(Rect::new(
+                    fragment.min_x,
+                    line.top,
+                    fragment.max_x - fragment.min_x,
+                    line.height,
+                ))
+            })
+            .unwrap_or_default();
+        child.set_frame(frame);
+    }
 }

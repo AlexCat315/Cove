@@ -56,8 +56,51 @@ pub struct KeyEvent {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct TextEditingEvent {
     pub text: String,
+    /// Selection offsets in Unicode scalars, matching SDL's UTF-32 positions.
     pub start: i32,
     pub length: i32,
+}
+
+impl TextEditingEvent {
+    /// Normalize native UTF-16 positions before delivery to scalar-based input
+    /// handlers. Windows SDL uses WCHAR positions; Cocoa/X11/Wayland SDL
+    /// already publish scalar positions.
+    pub fn from_utf16(text: impl Into<String>, start: i32, length: i32) -> Self {
+        let text = text.into();
+        if start < 0 {
+            return Self {
+                text,
+                start,
+                length,
+            };
+        }
+        let scalar = |target: i32, round_up: bool| {
+            let mut units = 0;
+            let mut index = 0;
+            for character in text.chars() {
+                let next = units + character.len_utf16() as i32;
+                if target < next {
+                    return index + i32::from(round_up && target > units);
+                }
+                units = next;
+                index += 1;
+            }
+            index
+        };
+        let first = scalar(start, false);
+        let length = if length < 0 {
+            length
+        } else if length == 0 {
+            0
+        } else {
+            scalar(start.saturating_add(length), true) - first
+        };
+        Self {
+            text,
+            start: first,
+            length,
+        }
+    }
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Serialize, Deserialize)]
@@ -301,6 +344,17 @@ pub struct NativeMenuIcon {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn utf16_composition_positions_normalize_before_dispatch() {
+        let event = TextEditingEvent::from_utf16("👩🏽‍💻e\u{301}中", 7, 2);
+        assert_eq!((event.start, event.length), (4, 2));
+        let caret = TextEditingEvent::from_utf16("😀x", 1, 0);
+        assert_eq!((caret.start, caret.length), (0, 0));
+        let selected = TextEditingEvent::from_utf16("😀x", 0, 1);
+        assert_eq!((selected.start, selected.length), (0, 1));
+        let unknown = TextEditingEvent::from_utf16("text", -1, -1);
+        assert_eq!((unknown.start, unknown.length), (-1, -1));
+    }
     #[test]
     fn either_side_of_modifier_matches_chord() {
         for modifiers in [

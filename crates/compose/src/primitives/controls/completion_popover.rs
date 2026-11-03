@@ -352,6 +352,7 @@ impl TextCompletionRequest {
     /// Whether the caret sits after a member-access dot, which opens the list
     /// even without a prefix.
     pub fn follows_dot(&self) -> bool {
-        self.caret_index > 0 && self.buffer.character_at(self.caret_index - 1) == Some('.')
+        self.caret_index > 0
+            && self.buffer.character_at(self.caret_index - 1).as_deref() == Some(".")
     }
 }

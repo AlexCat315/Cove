@@ -2579,9 +2579,10 @@
    "name": "Text",
    "kind": "struct",
    "category": "text",
-   "abstract": "Static text primitive. Participates in flexbox layout via Taffy's measure callback so a label sized by its parent will wrap; an unconstrained label reports its natural single-line width.",
+   "abstract": "普通文字与样式片段共用的 Rust 文本组件，使用同一节点、构建方法和选择交互。",
    "conforms": [
-    "View"
+    "PrimitiveView",
+    "Clone"
    ],
    "module": "CoveUICompose"
   },

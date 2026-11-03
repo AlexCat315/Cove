@@ -12,6 +12,7 @@ use crate::primitives::text::text_field::text_field_horizontal_scroll::Horizonta
 use cove_core::scene::{Node, Point, Rect};
 use cove_core::{Font, TextLayoutResult, TextLine};
 use cove_text::TextEnvironment;
+use unicode_segmentation::UnicodeSegmentation;
 
 pub const RENDER_CACHE_KEY: &str = "__textfield_render_cache";
 pub const DOCUMENT_LAYOUT_KEY: &str = "__textfield_document_layout";
@@ -80,6 +81,11 @@ pub struct FieldScrollState {
     pub visible_height: f32,
     pub content_height: f32,
     pub needs_caret_reveal: bool,
+    /// Frame size the IME anchor was last resolved for.
+    pub committed_size: (u32, u32),
+    /// Whether the field has held focus at least once. A field that never had
+    /// focus publishes no anchor, so the host does not enable input on mount.
+    pub has_been_focused: bool,
 }
 
 impl FieldScrollState {
@@ -207,15 +213,16 @@ pub fn make_render_state(
     };
     let start_byte = current.utf8_offset_for_character_index(range.0);
     let end_byte = start_byte + composition.text.len();
+    let count = composition.text.graphemes(true).count();
     let offset = if composition.length > 0 {
         composition.start + composition.length
     } else {
-        composition.text.chars().count()
+        count
     };
     let prefix: String = composition
         .text
-        .chars()
-        .take(offset.min(composition.text.chars().count()))
+        .graphemes(true)
+        .take(offset.min(count))
         .collect();
     let caret_byte = start_byte + prefix.len();
     let mut first = preview.character_index_for_utf8_offset(start_byte);

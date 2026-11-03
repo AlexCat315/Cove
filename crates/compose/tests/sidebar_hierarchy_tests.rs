@@ -1010,6 +1010,9 @@ fn adaptive_matrix() {
                                 harness.open.set(false);
                                 scene.settle(10, 1.0);
                                 scene.focus.focus(Some(&field), true);
+                                // Focus recomposes the field's style host, the
+                                // way Swift's @State invalidates its chrome.
+                                scene.settle(10, 1.0);
                             }
                             assert_eq!(
                                 scene.focus.focused().map(|node| id(&node)),

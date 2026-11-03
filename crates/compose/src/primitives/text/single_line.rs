@@ -1,7 +1,8 @@
 //! Chooses source text before shaping the visible line, preserving ligatures,
 //! fallback fonts and extended grapheme clusters instead of slicing glyphs.
 
-use super::rope::rope_storage::is_newline;
+use cove_core::line_breaks::is_newline;
+use unicode_segmentation::UnicodeSegmentation;
 
 pub struct SingleLineText;
 
@@ -20,12 +21,12 @@ impl SingleLineText {
         if measure("\u{2026}") > width {
             return String::new();
         }
-        let characters: Vec<char> = text.chars().collect();
+        let characters: Vec<&str> = text.graphemes(true).collect();
         let mut lower = 0usize;
         let mut upper = characters.len();
         while lower < upper {
             let count = (lower + upper).div_ceil(2);
-            let mut candidate: String = characters[..count].iter().collect();
+            let mut candidate: String = characters[..count].concat();
             candidate.push('\u{2026}');
             if measure(&candidate) <= width {
                 lower = count;
@@ -33,7 +34,7 @@ impl SingleLineText {
                 upper = count - 1;
             }
         }
-        let mut result: String = characters[..lower].iter().collect();
+        let mut result: String = characters[..lower].concat();
         result.push('\u{2026}');
         result
     }
@@ -44,13 +45,13 @@ impl SingleLineText {
 pub fn normalized_single_line(source: &str) -> String {
     let mut parts: Vec<String> = Vec::new();
     let mut current = String::new();
-    for character in source.chars() {
-        if is_newline(character) {
+    for grapheme in source.graphemes(true) {
+        if is_newline(grapheme) {
             if !current.is_empty() {
                 parts.push(std::mem::take(&mut current));
             }
         } else {
-            current.push(character);
+            current.push_str(grapheme);
         }
     }
     if !current.is_empty() {

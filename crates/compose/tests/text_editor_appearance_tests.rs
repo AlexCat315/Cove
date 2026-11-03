@@ -9,11 +9,10 @@
 //! The gutter reserves three digit slots plus a 24pt gap, paints the authored
 //! line-number colour and keeps the document column still.
 //!
-//! Production gap (reported, not fixed): `TextField::body` stores `self.style`
-//! and hands it to `TextFieldHost`, but `TextFieldHost` never calls
-//! `AnyTextFieldStyle::make_body`, so `.text_field_style(EditorTextFieldStyle)`
-//! has no effect: no sunken surface and no suppressed border.
-//! `focused_surface` pins that with `GAP:` asserts.
+//! `TextField::body` resolves the field's `TextFieldStyle` through the style
+//! host, so `.style(EditorTextFieldStyle)` and `.text_field_style(...)` both
+//! reach the surface: `focused_surface` checks the sunken surface and the
+//! suppressed border.
 
 use crate::support;
 
@@ -181,19 +180,15 @@ fn focused_surface() {
                 let root = graph.tree.borrow().root().expect("root");
                 let nodes = descendants(&root);
 
-                // GAP: Swift asserts `TextFieldHost` paints `surfaceSunken` and
-                // suppresses the border for the editor style. Rust never calls
-                // `AnyTextFieldStyle::make_body`, so neither happens.
                 assert!(
-                    !nodes.iter().any(|node| {
-                        node.background_color() == Some(theme.colors.surface_sunken)
-                    }),
-                    "GAP: the editor does not paint the sunken surface (light = {light})"
+                    nodes
+                        .iter()
+                        .any(|node| node.background_color() == Some(theme.colors.surface_sunken)),
+                    "the editor style paints the sunken surface (light = {light})"
                 );
                 assert!(
                     !nodes.iter().any(|node| node.border_width() > 0.0),
-                    "no node carries a border width (light = {light}); Swift's editor \
-                     suppresses it and its ordinary field draws one"
+                    "the editor style suppresses the border (light = {light})"
                 );
             }
         });

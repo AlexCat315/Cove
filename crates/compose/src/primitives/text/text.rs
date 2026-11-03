@@ -1,4 +1,6 @@
 //! Static text and divider primitives from `Primitives/Text/Text.swift`.
+use super::rich::paragraph::TextRole;
+use super::rich::run::TextRun;
 use super::rich::text_selection::{TextSelectionChrome, TextSelectionScope};
 use super::text_document_layout::MeasuredTextLine;
 use crate::modifiers::style::{
@@ -14,14 +16,19 @@ use cove_core::{
 };
 use cove_text::{DrawListText, TextEnvironment, TextEnvironmentHolder};
 use std::rc::Rc;
+use unicode_segmentation::UnicodeSegmentation;
 
 #[derive(Clone)]
 pub struct Text {
-    pub string: String,
-    pub alignment: TextAlignment,
-    pub color: Option<Color>,
-    pub line_limit: Option<usize>,
-    truncates: bool,
+    pub(crate) string: String,
+    pub(crate) alignment: TextAlignment,
+    pub(crate) color: Option<Color>,
+    pub(crate) line_limit: Option<usize>,
+    pub(crate) truncates: bool,
+    pub(crate) runs: Option<Vec<TextRun>>,
+    pub(crate) on_open_link: Option<Rc<dyn Fn(&str)>>,
+    pub(crate) role: TextRole,
+    pub(crate) is_selectable: bool,
 }
 
 #[derive(Clone, PartialEq)]
@@ -34,10 +41,10 @@ struct PaintIdentity {
 }
 
 #[derive(Clone)]
-struct TextMetrics {
-    font: Font,
-    line_height: f32,
-    letter_spacing: f32,
+pub(crate) struct TextMetrics {
+    pub(crate) font: Font,
+    pub(crate) line_height: f32,
+    pub(crate) letter_spacing: f32,
 }
 
 impl Text {
@@ -48,19 +55,52 @@ impl Text {
             color: None,
             line_limit: None,
             truncates: false,
+            runs: None,
+            on_open_link: None,
+            role: TextRole::Paragraph,
+            is_selectable: true,
         }
+    }
+
+    /// Styled runs use the same Text component, builders and selection engine.
+    pub fn runs(runs: Vec<TextRun>) -> Self {
+        Self {
+            string: runs.iter().map(|run| run.text.as_str()).collect(),
+            runs: Some(runs),
+            ..Self::new("")
+        }
+    }
+
+    pub fn on_open_link(mut self, handler: impl Fn(&str) + 'static) -> Self {
+        self.on_open_link = Some(Rc::new(handler));
+        self
+    }
+
+    pub fn role(mut self, role: TextRole) -> Self {
+        self.role = role;
+        self
+    }
+
+    /// Prevent this text from joining its enclosing reading selection.
+    pub fn display_only(mut self, display_only: bool) -> Self {
+        self.is_selectable = !display_only;
+        self
+    }
+
+    pub fn plain_text(&self) -> &str {
+        &self.string
     }
 
     pub fn localized(key: impl Into<crate::i18n::LocalizedStringKey>) -> Self {
         Self::new(key.into().resolved())
     }
 
-    pub fn with_alignment(mut self, alignment: TextAlignment) -> Self {
+    pub fn alignment(mut self, alignment: TextAlignment) -> Self {
         self.alignment = alignment;
         self
     }
 
-    pub fn with_color(mut self, color: Color) -> Self {
+    pub fn color(mut self, color: Color) -> Self {
         self.color = Some(color);
         self
     }
@@ -108,7 +148,7 @@ impl Text {
         }
     }
 
-    fn metrics_for_node(node: &Node, environment: &TextEnvironment) -> TextMetrics {
+    pub(crate) fn metrics_for_node(node: &Node, environment: &TextEnvironment) -> TextMetrics {
         let font = text_style_font(node).unwrap_or_else(|| {
             crate::theme::node_text_scaler(node).scale_font(&environment.default_font)
         });
@@ -125,7 +165,7 @@ impl Text {
     fn update_selection(&self, node: &Node) {
         let Some(handle) = node
             .composition_value(&TextSelectionScope::key())
-            .filter(|_| !TextSelectionChrome::is_inside_control(node))
+            .filter(|_| self.is_selectable && !TextSelectionChrome::is_inside_control(node))
         else {
             if node.attachment::<bool>("__selectable_text") == Some(true) {
                 super::selection_input::disable(node);
@@ -156,7 +196,7 @@ impl Text {
                     MeasuredTextLine::new(text, text, &entry.result, entry.key.line_height);
                 let row = ((point.y - frame.y - padding.top) / entry.key.line_height) as usize;
                 let index = measured.character(row, point.x - frame.x - padding.left);
-                text.char_indices()
+                text.grapheme_indices(true)
                     .nth(index)
                     .map_or(text.len(), |(offset, _)| offset)
             }),
@@ -209,7 +249,7 @@ impl Text {
         } else {
             normalized
         };
-        let layout_width = if single_line {
+        let layout_width = if single_line || self.role == TextRole::CodeBlock {
             f32::INFINITY
         } else {
             max_width
@@ -351,6 +391,38 @@ impl Text {
     }
 }
 
+impl Text {
+    fn install_runs_measure(layout: &LayoutNode, text: Text) {
+        let weak = layout.downgrade();
+        layout.set_measure_func(Some(Rc::new(move |width, mode, _, _| {
+            let (Some(environment), Some(layout)) =
+                (TextEnvironmentHolder::current(), LayoutNode::upgrade(&weak))
+            else {
+                return cove_core::Size::default();
+            };
+            let metrics = Self::metrics_for_layout(&layout, &environment);
+            let width = if mode == MeasureMode::Undefined {
+                f32::INFINITY
+            } else {
+                width
+            };
+            let paragraph = text.runs_paragraph(metrics.font, metrics.line_height);
+            let paragraph = super::rich::display::visible_paragraph(
+                &paragraph,
+                width,
+                text.line_limit,
+                text.truncates,
+                &environment,
+            );
+            let flow = super::rich::flow::RichTextFlow::layout(&paragraph, width, &environment);
+            cove_core::Size {
+                width: flow.width,
+                height: flow.height,
+            }
+        })));
+    }
+}
+
 impl PrimitiveView for Text {
     fn make_node(&self) -> Node {
         let node = Node::new();
@@ -360,12 +432,43 @@ impl PrimitiveView for Text {
 
     fn update_node(&self, node: &Node) {
         crate::theme::sync_text_style_environment(node);
+        node.set_foreground_color(self.color);
+        if self.runs.is_some() {
+            node.set_attachment("__text_runs", true);
+            node.set_is_hit_testable(true);
+            let surface = self.runs_surface(node);
+            surface.update_node(node);
+            let paragraph = surface.paragraph.clone();
+            node.set_layout_did_update(Some(Rc::new(move |node| {
+                super::rich::paragraph::update_link_frames(node, &paragraph);
+            })));
+            return;
+        }
+        if node.attachment::<bool>("__text_runs") == Some(true) {
+            if let Some(registry) = cove_core::scene::InteractionRegistryHolder::current() {
+                registry.remove(node);
+            }
+            node.set_cursor(None);
+            node.set_is_hit_testable(false);
+            node.set_is_focusable(false);
+            node.remove_attachment("__text_runs");
+            node.set_layout_did_update(None);
+        }
         self.update_selection(node);
+        let role = match self.role {
+            TextRole::Heading(_) => AccessibilityRole::Heading,
+            _ => AccessibilityRole::StaticText,
+        };
+        let value = match self.role {
+            TextRole::Heading(level) => format!("level {level}"),
+            _ => String::new(),
+        };
         if node.accessibility().is_none_or(|semantics| {
-            semantics.role != AccessibilityRole::StaticText || semantics.label != self.string
+            semantics.role != role || semantics.label != self.string || semantics.value != value
         }) {
-            let mut semantics = AccessibilitySemantics::new(AccessibilityRole::StaticText);
+            let mut semantics = AccessibilitySemantics::new(role);
             semantics.label.clone_from(&self.string);
+            semantics.value = value;
             node.set_accessibility(Some(semantics));
         }
         let snapshot = self.clone();
@@ -400,9 +503,14 @@ impl PrimitiveView for Text {
                 .or_else(|| node.inherited_foreground_color())
                 .unwrap_or_else(|| theme_for_node(&node).colors.on_surface)
                 .multiplied_alpha(node.opacity());
-            if let Some(scope) = node.composition_value(&TextSelectionScope::key())
-                && let Some(range) = scope.0.borrow_mut().range_for(&node)
-            {
+            let (selection, endpoints) = node
+                .composition_value(&TextSelectionScope::key())
+                .map(|scope| {
+                    let mut scope = scope.0.borrow_mut();
+                    (scope.range_for(&node), scope.endpoint_offsets(&node))
+                })
+                .unwrap_or((None, (None, None)));
+            if let Some(range) = selection {
                 let text = &snapshot.string;
                 let measured = MeasuredTextLine::new(text, text, &result, metrics.line_height);
                 let color = theme_for_node(&node)
@@ -419,7 +527,8 @@ impl PrimitiveView for Text {
                         measured.caret(measured.display_character_index_for_byte(start), false);
                     let (x2, _) =
                         measured.caret(measured.display_character_index_for_byte(end), true);
-                    let _ = list.add_rect(
+                    super::selection_input::paint_selection(
+                        list,
                         cove_core::Rect::new(
                             origin.x + padding.left + x1.min(x2),
                             origin.y + padding.top + measured.rows[index].top_y,
@@ -438,11 +547,37 @@ impl PrimitiveView for Text {
                 Some(&environment.atlas),
                 None,
             );
+            if endpoints.0.is_some() || endpoints.1.is_some() {
+                let text = &snapshot.string;
+                let measured = MeasuredTextLine::new(text, text, &result, metrics.line_height);
+                let caret = |offset, trailing| {
+                    let (x, row) =
+                        measured.caret(measured.display_character_index_for_byte(offset), trailing);
+                    measured
+                        .rows
+                        .get(row)
+                        .map(|row| cove_core::Rect::new(x, row.top_y, 0.0, metrics.line_height))
+                };
+                TextSelectionChrome::draw_endpoint_bars(
+                    list,
+                    cove_core::Point::new(origin.x + padding.left, origin.y + padding.top),
+                    endpoints.0.and_then(|offset| caret(offset, false)),
+                    endpoints.1.and_then(|offset| caret(offset, true)),
+                    theme_for_node(&node)
+                        .colors
+                        .accent
+                        .multiplied_alpha(node.opacity()),
+                );
+            }
         });
     }
 
     fn make_layout_node(&self) -> Option<LayoutNode> {
         let layout = LayoutNode::new();
+        if self.runs.is_some() {
+            Self::install_runs_measure(&layout, self.clone());
+            return Some(layout);
+        }
         Self::install_measure(&layout, self.clone());
         layout.set_text_inputs(Some(TextMeasureInputs {
             text: self.string.clone(),
@@ -453,7 +588,26 @@ impl PrimitiveView for Text {
         Some(layout)
     }
 
+    fn children(&self, node: &Node) -> Vec<crate::AnyView> {
+        if self.runs.is_none() {
+            return vec![];
+        }
+        let surface = self.runs_surface(node);
+        super::rich::paragraph::link_anchors(
+            &surface.paragraph,
+            &surface.destinations,
+            self.on_open_link.clone(),
+            Some(node.clone()),
+        )
+    }
+
     fn update_layout(&self, layout: &LayoutNode) {
+        if self.runs.is_some() {
+            Self::install_runs_measure(layout, self.clone());
+            layout.set_text_inputs(None);
+            layout.set_text_measure(None);
+            return;
+        }
         Self::install_measure(layout, self.clone());
         let next = TextMeasureInputs {
             text: self.string.clone(),

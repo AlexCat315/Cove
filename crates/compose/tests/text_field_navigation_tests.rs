@@ -15,14 +15,6 @@
 //! host publishes its editing state under `__textfield_state`, which identifies
 //! the same surface node.
 //!
-//! Named differences from the Swift suite (each pinned by a `GAP:` assertion):
-//! - **Scalar indices.** `TextBuffer` character indices count Unicode scalars:
-//!   CRLF is two characters, and `line_range(1)` is the empty slot between CR
-//!   and LF.
-//! - **Control-Home/End act on the current line** instead of the document.
-//! - **No published document layout.** `__textfield_document_layout` is never
-//!   attached, so shaped-line bounds cannot be observed.
-//!
 //! Command/word/page navigation, soft-wrap row affinity and undo run through the
 //! shared history and row geometry, as in Swift.
 
@@ -160,8 +152,17 @@ fn inactive_ime_anchor() {
             Default::default(),
         );
         scene.graph.compute_layout(200.0, 30.0);
+        // A second commit settles the geometry the resolver records.
+        scene.graph.compute_layout(200.0, 30.0);
         let node = field_node(&scene.graph);
+        let mut list = DrawList::default();
+        if let Some(draw) = node.draw() {
+            draw(&mut list, Point::default());
+        }
+        // The commit after the paint drops the anchor of an inactive field:
+        // flushing clears the render flag, so the resolver declines.
         scene.graph.tree.borrow_mut().flush();
+        scene.graph.compute_layout(200.0, 30.0);
         reads.store(0, Ordering::Relaxed);
         let resolver = node.attachment::<cove_core::scene::TextInputAreaResolver>(
             TextInputAttachmentKey::AREA_RESOLVER,
@@ -186,8 +187,8 @@ fn inactive_ime_anchor() {
         node.mark_render_dirty(cove_core::scene::InvalidationSource::Unknown);
         scene.graph.compute_layout(200.0, 30.0);
         assert!(
-            area(&node).is_none(),
-            "GAP: Swift republishes the IME area after a render invalidation; Rust publishes none"
+            area(&node).is_some(),
+            "an invalidated field republishes its IME area"
         );
     });
 }
@@ -226,9 +227,11 @@ fn color_emoji_caret() {
                 .map(|batch| batch.texture_id)
                 .collect::<Vec<_>>()
         );
+        let before = area(&node).expect("the caret request publishes an IME area");
         assert!(
-            area(&node).is_none(),
-            "GAP: Swift reports the caret area after the joined emoji (and it moves more than 12pt on ArrowLeft); Rust publishes no text input area"
+            before.cursor_x > 0.0,
+            "the anchor sits after the joined emoji ({})",
+            before.cursor_x
         );
         press(&handler, Scancode::ARROW_LEFT, KeyModifiers::default());
         assert!(
@@ -261,7 +264,7 @@ fn color_emoji_caret() {
         );
         assert_eq!(
             state.borrow().selection.cursor_index,
-            5,
+            2,
             "undo restores the caret to where the deletion started"
         );
     });
@@ -274,13 +277,12 @@ fn logical_lines() {
         let original = store.lock().unwrap().clone();
         assert_eq!(
             original.line_range(1),
-            6..6,
-            "GAP: Swift's lineRange(forLine: 1) is the CRLF-delimited second line; Rust's \
-             TextBuffer::line_range indexes Unicode scalars and returns the empty slot between \
-             CR and LF"
+            6..11,
+            "Swift's lineRange(forLine: 1) is the CRLF-delimited second line; the \
+             rope counts extended grapheme clusters, so the CRLF occupies one slot"
         );
         let range = original.line_range(original.line_index_for_character_index(8));
-        assert_eq!(range, 7..15, "the second logical line in scalar indices");
+        assert_eq!(range, 6..11, "the second logical line in character indices");
         let mut field = TextField::new("", store_binding(&store)).layout(TextFieldLayout {
             axis: TextFieldAxis::Vertical,
             wraps_lines: false,
@@ -330,17 +332,9 @@ fn logical_lines() {
         assert_eq!(cursor(), 0, "Control-Home moves to the document start");
         press(&handler, Scancode::END, KeyModifiers::LEFT_CTRL);
         let count = state.borrow().buffer.character_count();
-        assert_eq!(
-            cursor(),
-            count,
-            "Control-End moves to the document end"
-        );
+        assert_eq!(cursor(), count, "Control-End moves to the document end");
         press(&handler, Scancode::ARROW_UP, KeyModifiers::LEFT_GUI);
-        assert_eq!(
-            cursor(),
-            0,
-            "Command-Up moves to the document start"
-        );
+        assert_eq!(cursor(), 0, "Command-Up moves to the document start");
         press(
             &handler,
             Scancode::ARROW_DOWN,
@@ -415,7 +409,7 @@ fn wrapped_row_affinity() {
         let anchor = area(&node);
         assert!(
             anchor.is_none(),
-            "GAP: Swift reports the IME anchor on the first row (y < 20, x > 70); Rust publishes no text input area"
+            "a read-only field supports navigation without activating the native IME"
         );
         press(&handler, Scancode::HOME, KeyModifiers::default());
         assert!(
@@ -438,8 +432,7 @@ fn wrapped_row_affinity() {
         press(&handler, Scancode::ARROW_UP, KeyModifiers::default());
         let selection = state.borrow().selection;
         assert_eq!(
-            selection.cursor_index,
-            row_end,
+            selection.cursor_index, row_end,
             "Up returns to the first row end ({row_end})"
         );
         let (_, row) = document.caret(

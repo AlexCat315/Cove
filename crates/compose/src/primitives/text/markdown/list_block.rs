@@ -123,7 +123,7 @@ impl PrimitiveView for MarkdownListRow {
             None => match self.render_block {
                 _ if self.number > 0 && self.gutter > BULLET_GUTTER => AnyView::new(
                     Text::new(format!("{}.", self.number))
-                        .with_alignment(cove_core::TextAlignment::Trailing)
+                        .alignment(cove_core::TextAlignment::Trailing)
                         .semantic_font(SemanticFontRef::body())
                         .semantic_foreground(SemanticColorRef::on_surface_muted()),
                 ),

@@ -16,10 +16,9 @@
 //! - word boundaries cover Latin words, lone punctuation and CJK text
 //!
 //! Named differences from the Swift suite:
-//! - `MarkdownView` in Rust has no text-selection root and no selection input
-//!   wiring: `RichTextSurface` installs only a link pointer handler and a
-//!   cursor motion handler, never a key handler, so a drag selects nothing, no
-//!   paragraph takes focus, and Cmd+C / Cmd+A / Escape never reach the text.
+//! - Text selection uses the shared Text input route for styled and plain text.
+//!   Cross-block drags, copying, click granularity and touch long-press are
+//!   verified below with actual scope and clipboard postconditions.
 //!   `TextSelectionScope::register` has no production caller at all. The three
 //!   input cases therefore pin the current Rust behaviour (Ignored results, no
 //!   selection, empty clipboard) with `GAP:` messages; `words` ports the model
@@ -28,7 +27,7 @@
 //!   block) where Swift used a plain string.
 //! - Rust exposes the parser as free functions `blocks`/`runs` rather than a
 //!   `MarkdownParser` type, and `MarkdownTable::rows` nests runs per cell, so
-//!   the table comparison is against `Vec<Vec<Vec<RichTextRun>>>`.
+//!   the table comparison is against `Vec<Vec<Vec<TextRun>>>`.
 
 use crate::support;
 
@@ -42,20 +41,20 @@ use cove_core::scene::{
     InteractionRegistryHolder, Node, PointerCapture, PointerCaptureHolder, PointerPhase,
 };
 use cove_core::{Environment, InputCapabilities};
-use cove_platform::{KeyModifiers, MouseButton, MouseButtonEvent, MouseMotionEvent};
+use cove_platform::{KeyEvent, KeyModifiers, MouseButton, MouseButtonEvent, MouseMotionEvent};
 use cove_ui_compose::adaptive::SurfaceEnvironmentExt;
 use cove_ui_compose::primitives::text::markdown::{
     MarkdownAlignment, MarkdownBlock, MarkdownView, blocks, runs,
 };
-use cove_ui_compose::primitives::text::rich::run::{RichTextRun, RichTextTraits};
+use cove_ui_compose::primitives::text::rich::run::{TextRun, TextTraits};
 use cove_ui_compose::primitives::text::rich::text_selection::{
     SharedTextSelectionScope, TextBoundaries, TextSelectionRoot,
 };
 
 use support::GlobalTestLock;
 
-fn run_with(text: &str, traits: RichTextTraits) -> RichTextRun {
-    RichTextRun::with_traits(text, traits)
+fn run_with(text: &str, traits: TextTraits) -> TextRun {
+    TextRun::with_traits(text, traits)
 }
 
 #[test]
@@ -65,7 +64,7 @@ fn inline_runs() {
         panic!("expected a paragraph, got {:?}", parsed.first());
     };
     assert!(
-        paragraph.contains(&run_with("code", RichTextTraits::CODE)),
+        paragraph.contains(&run_with("code", TextTraits::CODE)),
         "inline code keeps the code trait, got {paragraph:?}"
     );
     assert!(
@@ -79,7 +78,7 @@ fn inline_runs() {
     );
     assert_eq!(
         plain.traits,
-        RichTextTraits::from_raw(0),
+        TextTraits::from_raw(0),
         "the lead-in carries no traits"
     );
     let bold = paragraph
@@ -88,7 +87,7 @@ fn inline_runs() {
         .expect("the bold word survives as text");
     assert_eq!(
         bold.traits,
-        RichTextTraits::BOLD,
+        TextTraits::BOLD,
         "the strong trait survives the block parser"
     );
     let both = paragraph
@@ -97,7 +96,7 @@ fn inline_runs() {
         .expect("the nested word survives");
     assert_eq!(
         both.traits,
-        RichTextTraits::BOLD.union(RichTextTraits::ITALIC),
+        TextTraits::BOLD.union(TextTraits::ITALIC),
         "nested emphasis inside strong keeps both traits"
     );
     let struck = paragraph
@@ -106,7 +105,7 @@ fn inline_runs() {
         .expect("the struck word survives as text");
     assert_eq!(
         struck.traits,
-        RichTextTraits::STRIKETHROUGH,
+        TextTraits::STRIKETHROUGH,
         "strikethrough survives the block parser"
     );
     let link = paragraph
@@ -151,7 +150,7 @@ fn block_structure() {
         parsed[0],
         MarkdownBlock::Heading {
             level: 1,
-            runs: vec![RichTextRun::new("Title")],
+            runs: vec![TextRun::new("Title")],
         },
         "the first heading"
     );
@@ -159,7 +158,7 @@ fn block_structure() {
         parsed[1],
         MarkdownBlock::Heading {
             level: 2,
-            runs: vec![RichTextRun::new("Sub")],
+            runs: vec![TextRun::new("Sub")],
         },
         "the second heading"
     );
@@ -221,10 +220,7 @@ fn block_structure() {
     assert_eq!(table.header.len(), 2, "two header cells");
     assert_eq!(
         table.rows,
-        vec![vec![
-            vec![RichTextRun::new("1")],
-            vec![RichTextRun::new("2")]
-        ]],
+        vec![vec![vec![TextRun::new("1")], vec![TextRun::new("2")]]],
         "the body row holds one run list per cell"
     );
 }
@@ -564,45 +560,34 @@ fn drag_across_blocks_copies_in_reading_order() {
         "# Title\n\nFirst paragraph.\n\nSecond one.",
         InputCapabilities::POINTER | InputCapabilities::KEYBOARD,
         |document| {
-            let title = document.paragraph("Title").expect("the title paragraph");
-            let second = document
-                .paragraph("Second one.")
-                .expect("the second paragraph");
+            let title = document.paragraph("Title").unwrap();
+            let second = document.paragraph("Second one.").unwrap();
             let handlers = document.registry.handlers(&title);
-            let pointer = handlers.pointer.clone().expect("a pointer handler");
+            let pointer = handlers.pointer.unwrap();
             let start = title.absolute_frame();
             let end = second.absolute_frame();
-            let down = pointer(
-                &press(
-                    start.x + 1.0,
-                    start.y + start.height / 2.0,
-                    1,
-                    KeyModifiers::default(),
+            assert_eq!(
+                pointer(
+                    &press(
+                        start.x + 1.0,
+                        start.y + start.height / 2.0,
+                        1,
+                        KeyModifiers::default()
+                    ),
+                    PointerPhase::Down,
+                    EventPhase::Target
                 ),
-                PointerPhase::Down,
-                EventPhase::Target,
+                EventResult::Handled
             );
+            assert_eq!(document.focus.focused(), Some(title.clone()));
             assert_eq!(
-                down,
-                EventResult::Ignored,
-                "GAP: a press on a Markdown paragraph starts no selection (Swift returns .handled)"
+                handlers.motion.unwrap()(
+                    &motion(end.x + 40.0, end.y + end.height / 2.0),
+                    EventPhase::Target
+                ),
+                EventResult::Handled
             );
-            assert_eq!(
-                document.focus.focused(),
-                None,
-                "GAP: the drag takes no focus, because no selection region enrols the paragraph"
-            );
-            let motion_handler = handlers.motion.clone().expect("a motion handler");
-            let moved = motion_handler(
-                &motion(end.x + 40.0, end.y + end.height / 2.0),
-                EventPhase::Target,
-            );
-            assert_eq!(
-                moved,
-                EventResult::Ignored,
-                "GAP: motion over the captured paragraph is left unhandled"
-            );
-            let _ = pointer(
+            pointer(
                 &press(
                     end.x + 40.0,
                     end.y + end.height / 2.0,
@@ -612,19 +597,22 @@ fn drag_across_blocks_copies_in_reading_order() {
                 PointerPhase::Up,
                 EventPhase::Target,
             );
+            assert!(document.capture.target().is_none());
+            let selected = document.scope.borrow_mut().selected_text();
             assert!(
-                document.capture.target().is_none(),
-                "GAP: the paragraph never takes pointer capture, so no drag transaction exists"
+                selected.starts_with("Title\nFirst paragraph.\n"),
+                "selection follows document reading order: {selected:?}"
             );
-            assert!(
-                !document.scope.borrow().has_selection(),
-                "GAP: the scope holds no selection after the drag"
+            document.registry.handlers(&title).key.unwrap()(
+                &KeyEvent {
+                    scancode: cove_ui_compose::Scancode::C,
+                    keycode: 0,
+                    modifiers: KeyModifiers::LEFT_CTRL,
+                    is_repeat: false,
+                },
+                EventPhase::Target,
             );
-            assert!(
-                document.registry.handlers(&title).key.is_none(),
-                "GAP: the paragraph installs no key handler, so Cmd+C never copies"
-            );
-            assert_eq!(document.copied(), "", "GAP: nothing reaches the clipboard");
+            assert_eq!(document.copied(), selected);
         },
     );
 }
@@ -635,40 +623,66 @@ fn click_granularity() {
         "alpha beta gamma\n\nnext",
         InputCapabilities::POINTER | InputCapabilities::KEYBOARD,
         |document| {
-            let paragraph = document
-                .paragraph("alpha beta gamma")
-                .expect("the paragraph");
-            let pointer = document
-                .registry
-                .handlers(&paragraph)
-                .pointer
-                .clone()
-                .expect("a pointer handler");
+            let paragraph = document.paragraph("alpha beta gamma").unwrap();
+            let handlers = document.registry.handlers(&paragraph);
+            let pointer = handlers.pointer.unwrap();
             let frame = paragraph.absolute_frame();
-            let x = frame.x + frame.width * 0.5;
-            let y = frame.y + frame.height / 2.0;
-            for clicks in [2u8, 3] {
+            for clicks in [2, 3] {
                 for phase in [PointerPhase::Down, PointerPhase::Up] {
-                    let _ = pointer(
-                        &press(x, y, clicks, KeyModifiers::default()),
+                    pointer(
+                        &press(
+                            frame.x + 5.0,
+                            frame.y + frame.height / 2.0,
+                            clicks,
+                            KeyModifiers::default(),
+                        ),
                         phase,
                         EventPhase::Target,
                     );
                 }
+                assert_eq!(
+                    document.scope.borrow_mut().selected_text(),
+                    if clicks == 2 {
+                        "alpha"
+                    } else {
+                        "alpha beta gamma"
+                    }
+                );
             }
-            assert!(
-                document.registry.handlers(&paragraph).key.is_none(),
-                "GAP: no key handler exists, so copy, Select All and Escape are unreachable"
+            let key = document.registry.handlers(&paragraph).key.unwrap();
+            key(
+                &KeyEvent {
+                    scancode: cove_ui_compose::Scancode::C,
+                    keycode: 0,
+                    modifiers: KeyModifiers::LEFT_CTRL,
+                    is_repeat: false,
+                },
+                EventPhase::Target,
+            );
+            assert_eq!(document.copied(), "alpha beta gamma");
+            key(
+                &KeyEvent {
+                    scancode: cove_ui_compose::Scancode::A,
+                    keycode: 0,
+                    modifiers: KeyModifiers::LEFT_CTRL,
+                    is_repeat: false,
+                },
+                EventPhase::Target,
             );
             assert_eq!(
-                document.copied(),
-                "",
-                "GAP: double and triple click select nothing to copy"
+                document.scope.borrow_mut().selected_text(),
+                "alpha beta gamma\nnext"
             );
-            assert!(
-                !document.scope.borrow().has_selection(),
-                "GAP: the selection scope never learns about the clicks"
+            key(
+                &KeyEvent {
+                    scancode: cove_ui_compose::Scancode::ESCAPE,
+                    keycode: 0,
+                    modifiers: KeyModifiers::default(),
+                    is_repeat: false,
+                },
+                EventPhase::Target,
             );
+            assert!(!document.scope.borrow().has_selection());
         },
     );
 }
@@ -676,45 +690,42 @@ fn click_granularity() {
 #[test]
 fn touch_long_press_selects_the_word() {
     with_document("alpha beta", InputCapabilities::TOUCH, |document| {
-        let paragraph = document.paragraph("alpha beta").expect("the paragraph");
-        let pointer = document
-            .registry
-            .handlers(&paragraph)
-            .pointer
-            .clone()
-            .expect("a pointer handler");
+        let paragraph = document.paragraph("alpha beta").unwrap();
+        let pointer = document.registry.handlers(&paragraph).pointer.unwrap();
         let frame = paragraph.absolute_frame();
-        let point = press(
+        let mut point = press(
             frame.x + 4.0,
             frame.y + frame.height / 2.0,
             1,
             KeyModifiers::default(),
         );
+        point.kind = cove_platform::PointerKind::Touch;
         assert_eq!(
             pointer(&point, PointerPhase::Down, EventPhase::Target),
-            EventResult::Ignored,
-            "GAP: a touch press is ignored, so scrolling keeps the gesture"
+            EventResult::Ignored
         );
         assert_eq!(
             pointer(&point, PointerPhase::Up, EventPhase::Target),
-            EventResult::Ignored,
-            "GAP: a quick tap selects nothing, as in Swift"
-        );
-        let _ = pointer(&point, PointerPhase::Down, EventPhase::Target);
-        assert_eq!(
-            pointer(&point, PointerPhase::Up, EventPhase::Target),
-            EventResult::Ignored,
-            "GAP: Rust has no long-press timer, so the release never selects"
+            EventResult::Ignored
         );
         assert!(
             !document.scope.borrow().has_selection(),
-            "GAP: no word becomes selected"
+            "quick taps leave scrolling and links available"
         );
-        assert!(
-            document.registry.handlers(&paragraph).key.is_none(),
-            "GAP: there is no Cmd+C path to copy the word"
+        pointer(&point, PointerPhase::Down, EventPhase::Target);
+        paragraph.set_attachment(
+            "__text_selection_touch",
+            (
+                std::time::Instant::now() - std::time::Duration::from_millis(500),
+                cove_core::Point::new(point.x, point.y),
+            ),
         );
-        assert_eq!(document.copied(), "", "GAP: the clipboard stays empty");
+        assert_eq!(
+            pointer(&point, PointerPhase::Up, EventPhase::Target),
+            EventResult::Handled
+        );
+        assert_eq!(document.scope.borrow_mut().selected_text(), "alpha");
+        assert_eq!(document.focus.focused(), Some(paragraph));
     });
 }
 
@@ -748,7 +759,7 @@ fn runs_parser_matches_blocks_paragraph() {
         panic!("expected a paragraph");
     };
     assert!(
-        inline.contains(&run_with("bold", RichTextTraits::BOLD)),
+        inline.contains(&run_with("bold", TextTraits::BOLD)),
         "the inline entry point keeps the strong trait, got {inline:?}"
     );
     assert_eq!(

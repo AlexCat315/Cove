@@ -197,9 +197,11 @@ impl AccordionStory {
 impl View for AccordionStory {
     fn body(&self, _cx: &Scope) -> AnyView {
         let enabled = self.options.is_enabled;
-        let accordion = AnyView::new(AnyView::new(self.accordion()).debug_name("accordion-control"));
+        let accordion =
+            AnyView::new(AnyView::new(self.accordion()).debug_name("accordion-control"));
         let story = self.handle();
-        let toggle_all = AnyView::new(Button::title("Toggle all", move || story.toggle_all()).enabled(enabled));
+        let toggle_all =
+            AnyView::new(Button::title("Toggle all", move || story.toggle_all()).enabled(enabled));
         let multiple = AnyView::new(
             Toggle::labeled("Multiple sections", self.allows_multiple.binding()).enabled(enabled),
         );
@@ -365,7 +367,8 @@ impl View for PaginationStory {
                 .enabled(enabled)
                 .debug_name("pagination-control"),
         );
-        let previous = AnyView::new(Button::title("Previous", move || story.previous()).enabled(enabled));
+        let previous =
+            AnyView::new(Button::title("Previous", move || story.previous()).enabled(enabled));
         let story = Self {
             options: self.options.clone(),
             page: self.page.clone(),
@@ -1073,13 +1076,11 @@ impl Default for LabelStory {
 
 impl View for LabelStory {
     fn body(&self, _cx: &Scope) -> AnyView {
-        let label = AnyView::new(
-            FieldLabel::new("Project name").configure(|options| {
-                options.is_required = true;
-                options.help = "Shown in the project switcher".to_owned();
-                options.target_id = Some("label-story-name".to_owned());
-            }),
-        );
+        let label = AnyView::new(FieldLabel::new("Project name").configure(|options| {
+            options.is_required = true;
+            options.help = "Shown in the project switcher".to_owned();
+            options.target_id = Some("label-story-name".to_owned());
+        }));
         let chip = if self.shows_tag() {
             let shows_tag = self.shows_tag.clone();
             AnyView::new(Tag::new("Cove").configure(move |tag| {
@@ -1225,13 +1226,20 @@ impl View for SheetStory {
                 })
                 .debug_name("sheet-control"),
         );
-        let edges = [ModalEdge::Leading, ModalEdge::Trailing, ModalEdge::Top, ModalEdge::Bottom]
-            .into_iter()
-            .map(|edge| {
-                let story = self.handle();
-                AnyView::new(Button::title(format!("{edge:?}"), move || story.open_from(edge)))
-            })
-            .collect();
+        let edges = [
+            ModalEdge::Leading,
+            ModalEdge::Trailing,
+            ModalEdge::Top,
+            ModalEdge::Bottom,
+        ]
+        .into_iter()
+        .map(|edge| {
+            let story = self.handle();
+            AnyView::new(Button::title(format!("{edge:?}"), move || {
+                story.open_from(edge)
+            }))
+        })
+        .collect();
         AnyView::new(StorySection::new(
             "Edge sheets",
             "Each panel enters and leaves through its chosen edge, with modal focus confinement and restoration.",
@@ -1360,7 +1368,10 @@ impl View for BottomSheetStory {
             12.0,
             AnyView::new(TupleView::new(vec![
                 AnyView::new(Text::new(format!("Detent {}", self.detent()))),
-                AnyView::new(Toggle::labeled("Notifications", self.notifications.binding())),
+                AnyView::new(Toggle::labeled(
+                    "Notifications",
+                    self.notifications.binding(),
+                )),
             ])),
         ));
         let sheet = AnyView::new(
@@ -1371,19 +1382,13 @@ impl View for BottomSheetStory {
         let opener = self.handle();
         let open = AnyView::new(Button::title("Show sheet", move || opener.open()));
         let up = self.handle();
-        let drag_up = AnyView::new(Button::title(
-            "Drag up",
-            move || {
-                up.drag(BOTTOM_SHEET_DETENTS[1] - BOTTOM_SHEET_DETENTS[0]);
-            },
-        ));
+        let drag_up = AnyView::new(Button::title("Drag up", move || {
+            up.drag(BOTTOM_SHEET_DETENTS[1] - BOTTOM_SHEET_DETENTS[0]);
+        }));
         let down = self.handle();
-        let drag_down = AnyView::new(Button::title(
-            "Drag down",
-            move || {
-                down.drag(-DRAG_DISMISS_THRESHOLD);
-            },
-        ));
+        let drag_down = AnyView::new(Button::title("Drag down", move || {
+            down.drag(-DRAG_DISMISS_THRESHOLD);
+        }));
         AnyView::new(StorySection::new(
             "Bottom sheet",
             "Open the sheet, then drag its handle up for the larger detent or down to dismiss. On wide surfaces it degrades to a centered dialog-sized panel; Escape and the backdrop still dismiss through the modal contract.",
@@ -1504,7 +1509,7 @@ impl View for NavigationStackStory {
                                     let state = draft_state.clone();
                                     move || TextBuffer::from(state.get())
                                 },
-                                move |value: TextBuffer|{
+                                move |value: TextBuffer| {
                                     draft_state.set(value.string_value());
                                 },
                             ),

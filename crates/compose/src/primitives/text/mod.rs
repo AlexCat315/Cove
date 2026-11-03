@@ -18,7 +18,8 @@ pub use api::*;
 
 pub(crate) mod api {
     pub use super::markdown::MarkdownView;
-    pub use super::rich::RichText;
+    pub use super::rich::paragraph::TextRole;
+    pub use super::rich::run::{TextRun, TextTraits};
     pub use super::rich::text_selection::{TextSelectionRoot, TextSelectionViewExt};
     pub use super::text::{Divider, DividerAxis, Text};
     pub use super::text_buffer::TextBuffer;

@@ -16,7 +16,7 @@ fn project_name(cx: &Scope) -> impl View {
 }
 ```
 
-点击定位光标，拖动选择；双击选择词语，三击选择全部文字。Shift 配合方向键扩展选区。Home / End 移到当前显示行的首尾：软换行时停在行尾并保留行尾亲和，下一次上下移动仍回到该行末。输入和移动后光标重新开始闪烁计时。
+点击定位光标，拖动选择；双击选择词语，三击选择全部文字。非空选区两端显示错位的短竖线：起点贴下缘、终点贴上缘，采用细线与圆头，插入光标在此时暂停绘制，避免与选区端点重叠闪烁。Shift 配合方向键扩展选区。Home / End 移到当前显示行的首尾：软换行时停在行尾并保留行尾亲和，下一次上下移动仍回到该行末。输入和移动后光标重新开始闪烁计时。
 
 macOS 使用 Command，其他桌面平台使用 Ctrl：A 全选、C 复制、X 剪切、V 粘贴。粘贴支持异步系统剪贴板。`secure: true` 隐藏显示内容并阻止复制和剪切；`read_only: true` 保留选择和复制，禁止修改；`disabled: true` 禁止交互。
 
@@ -71,7 +71,7 @@ let code = TextFieldCodeEditing {
 
 `prefix` / `suffix` 排在文字列内，`prepend` / `append` 是两端的独立色块；文本区宽度、光标位置和点击命中都会扣除这些占位。`show_word_limit` 配合 `max_length` 在尾部显示 `n / limit` 计数。
 
-`max_length` 按字符计数，输入、粘贴与 IME 提交都受它约束：替换选区时先扣除被替换的字符，剩余容量为零则整体不写入。
+`max_length` 按完整字素计数，输入、粘贴与 IME 提交都受它约束。替换选区时先扣除被替换的字符；组合重音或 ZWJ 与原有文字合并且没有增加字符数时，即使已到上限也可以写入。
 
 ```rust
 fn price(cx: &Scope) -> impl View {
@@ -116,4 +116,8 @@ let editor = TextField::new("", code.binding())
 
 平台输入接口使用 UTF-16 偏移。选区落入组合 emoji 或重音字母内部时，会回退到完整字素的边界；删除范围向完整字素扩展，避免留下半个字符。IME 组合提交与删除同样进入撤销历史，并遵守 `max_length`。
 
-尚未完成的迁移：`TextFieldStyle` 的焦点/编辑状态接入、IME 区域在失效后的重发布、组合预览缓存、`TextBuffer` 的字素（而非标量）计数、双击选词。搜索和建议列表使用 [SearchField](/docs/search-field)；正文拖选使用[文本选择区域](/docs/text-selection)。
+SDL / Android 的组合事件使用 Unicode 标量偏移，字段会转换到完整字素边界；组合预览缓存可在重绘时复用。失焦取消未提交的组合文字。
+
+自定义宿主从 UTF-16 位置产生组合事件时，使用 `TextEditingEvent::from_utf16` 统一单位；Windows SDL 的入口也会先做此转换。浏览器当前只传入组合文本和零偏移。
+
+样式的焦点/编辑接入见 [TextFieldStyle](/docs/text-field-style)，字符和协议索引约定见 [TextBuffer](/docs/text-buffer)。搜索和建议列表使用 [SearchField](/docs/search-field)；正文拖选使用[文本选择区域](/docs/text-selection)。

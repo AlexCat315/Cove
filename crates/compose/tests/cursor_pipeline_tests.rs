@@ -101,3 +101,64 @@ fn cursor_modifier_overrides_the_primitive() {
         );
     });
 }
+
+#[test]
+fn text_cursor_survives_focus_drag_and_recomposition() {
+    use cove_core::Point;
+    use cove_platform::{InputEvent, MouseButtonEvent, MouseMotionEvent};
+    use cove_ui_compose::primitives::text::TextSelectionViewExt;
+    use support::InteractiveScene;
+
+    fn motion(point: Point) -> InputEvent {
+        InputEvent::MouseMotion(MouseMotionEvent {
+            x: point.x,
+            y: point.y,
+            delta_x: 0.0,
+            delta_y: 0.0,
+            kind: Default::default(),
+        })
+    }
+    for field in [false, true] {
+        InteractiveScene::run(320.0, 100.0, |scene| {
+            if field {
+                scene.install(TextField::new(
+                    "Type here",
+                    cove_core::Binding::new(TextBuffer::empty, |_| {}),
+                ));
+            } else {
+                scene.install(Text::new("Selectable text").text_selection(true));
+            }
+            let text = scene
+                .first(|node| node.cursor() == Some(SystemCursor::Ibeam))
+                .unwrap();
+            let bounds = text.absolute_frame();
+            let inside = Point::new(bounds.x + 4.0, bounds.y + bounds.height * 0.5);
+            let events = scene.dispatcher();
+            events.dispatch(&motion(inside));
+            assert_eq!(events.cursor(), SystemCursor::Ibeam);
+            let press = MouseButtonEvent {
+                x: inside.x,
+                y: inside.y,
+                button: cove_platform::MouseButton::Left,
+                clicks: 1,
+                modifiers: Default::default(),
+                kind: Default::default(),
+            };
+            events.dispatch(&InputEvent::MouseButtonDown(press.clone()));
+            scene.settle(2, 1.0);
+            events.dispatch(&motion(Point::new(inside.x + 20.0, inside.y)));
+            assert_eq!(
+                events.cursor(),
+                SystemCursor::Ibeam,
+                "focus, capture and recompose keep the text cursor"
+            );
+            events.dispatch(&InputEvent::MouseButtonUp(press));
+            events.dispatch(&motion(Point::new(-10.0, -10.0)));
+            assert_eq!(
+                events.cursor(),
+                SystemCursor::Arrow,
+                "leaving text restores the arrow"
+            );
+        });
+    }
+}

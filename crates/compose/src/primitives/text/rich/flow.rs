@@ -1,7 +1,7 @@
 //! Measured lines, glyphs and span fragments of one rich paragraph at one
 //! width. Offsets are UTF-8 byte offsets into the paragraph text.
 
-use super::run::RichTextTraits;
+use super::run::TextTraits;
 use cove_core::{
     BidiParagraphs, Font, PositionedGlyph, TextAlignment, TextLayoutResult, TextLine,
     line_break_opportunities,
@@ -18,7 +18,7 @@ pub struct RichParagraphSpan {
     pub text: String,
     pub font: Font,
     pub line_height: f32,
-    pub traits: RichTextTraits,
+    pub traits: TextTraits,
     /// Index into the paragraph's link destinations.
     pub link: Option<usize>,
 }
@@ -181,14 +181,25 @@ impl RichTextFlow {
 
     /// Zero-width caret rectangle at a UTF-8 offset, in paragraph-local space.
     pub fn caret_rect(&self, offset: usize) -> (f32, f32, f32, f32) {
+        self.caret_rect_with_affinity(offset, false)
+    }
+
+    /// At a soft wrap the start belongs to the next row, while a selected
+    /// range's trailing edge belongs to the preceding row.
+    pub fn caret_rect_with_affinity(&self, offset: usize, trailing: bool) -> (f32, f32, f32, f32) {
         if self.lines.is_empty() {
             return (0.0, 0.0, 0.0, 0.0);
         }
-        let index = self
-            .lines
-            .iter()
-            .rposition(|line| line.start_offset <= offset)
-            .unwrap_or(0);
+        let index = if trailing {
+            self.lines
+                .iter()
+                .position(|line| offset > line.start_offset && offset <= line.end_offset)
+        } else {
+            self.lines
+                .iter()
+                .rposition(|line| line.start_offset <= offset)
+        }
+        .unwrap_or(0);
         let line = &self.lines[index];
         (self.caret_x(offset, index), line.top, 0.0, line.height)
     }
@@ -403,7 +414,7 @@ impl FlowBuilder {
         let breaks: HashSet<usize> = line_break_opportunities(text);
         let mut items: Vec<Item> = Vec::new();
         for (index, span) in self.paragraph.spans.iter().enumerate() {
-            let pad: f32 = if span.traits.contains(RichTextTraits::CODE) {
+            let pad: f32 = if span.traits.contains(TextTraits::CODE) {
                 (span.font.size() * 0.32).round()
             } else {
                 0.0

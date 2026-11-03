@@ -95,7 +95,7 @@ fn text_field_style_override_reaches_the_subtree() {
             let body = resolved.make_body(text_field_configuration());
             let rendered = body.storage.as_any().downcast_ref::<Text>();
             assert!(
-                rendered.is_some_and(|text| text.string == "probe"),
+                rendered.is_some_and(|text| text.plain_text() == "probe"),
                 "the override's body is the one that renders"
             );
         });

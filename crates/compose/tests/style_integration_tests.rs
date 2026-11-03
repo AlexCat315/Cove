@@ -236,30 +236,18 @@ fn text_field_uses_theme_chrome() {
             let theme = Theme::default_dark();
             let fill = theme.inputs.background;
             let nodes = all_nodes(&graph);
-            assert!(
-                !nodes
-                    .iter()
-                    .any(|node| node.background_color() == Some(fill)),
-                "GAP: Swift's TextField chrome sets the node's backgroundColor to \
-                 inputs.background (and cornerRadius to radius.md); the Rust field \
-                 leaves the node background unset and paints the fill from its draw hook"
-            );
-            let painted = nodes.iter().find(|node| {
-                node.draw().is_some_and(|draw| {
-                    let mut list = cove_core::DrawList::default();
-                    draw(&mut list, cove_core::Point::default());
-                    list.vertices()
-                        .iter()
-                        .any(|vertex| vertex.color == fill.rgba8())
-                })
-            });
-            assert!(
-                painted.is_some(),
-                "the field's draw hook paints the dark theme's input fill"
+            let chrome = nodes
+                .iter()
+                .find(|node| node.background_color() == Some(fill))
+                .expect("Swift's TextField chrome sets the node's backgroundColor");
+            assert_eq!(
+                chrome.corner_radius(),
+                theme.inputs.radius,
+                "the chrome uses the input radius"
             );
             assert_eq!(
                 theme.inputs.radius, theme.radius.md,
-                "the painted chrome uses the input radius, which equals radius.md"
+                "the input radius equals radius.md"
             );
         });
     });

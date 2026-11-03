@@ -514,7 +514,7 @@ impl<Id: PartialEq + Eq + std::hash::Hash + Clone + Send + Sync + 'static> Primi
             column.push(AnyView::new(
                 Text::new(self.item.title.clone())
                     .truncated()
-                    .with_alignment(cove_core::TextAlignment::Center)
+                    .alignment(cove_core::TextAlignment::Center)
                     .semantic_font(SemanticFontRef::caption())
                     .semantic_foreground(crate::theme::SemanticColorRef::on_surface_variant()),
             ));

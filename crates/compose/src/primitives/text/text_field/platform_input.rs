@@ -18,29 +18,21 @@ use crate::primitives::text::text_edit_history::TextEditKind;
 /// UTF-16 offset of a character index, clamped so a stale index cannot run past
 /// the buffer.
 pub fn utf16_offset(buffer: &TextBuffer, character: usize) -> i32 {
-    let clamped = character.min(buffer.character_count());
-    buffer.substring(0..clamped).encode_utf16().count() as i32
+    i32::try_from(buffer.utf16_offset_for_character_index(character)).unwrap_or(i32::MAX)
 }
 
-/// Scalar index at a user-perceived character boundary for a UTF-16 offset.
-/// The rope uses scalar indices; native selections must not split a grapheme.
+/// Grapheme index at a user-perceived character boundary for a UTF-16 offset,
+/// matching Swift's `character(_:roundUp:)` walk over `String.enumerated()`.
+/// Native selections must not split a grapheme.
 pub fn character_index(buffer: &TextBuffer, offset: i32, round_up: bool) -> usize {
     let target = offset.max(0) as usize;
-    let mut units = 0usize;
-    let mut index = 0;
-    for grapheme in buffer.string_value().graphemes(true) {
-        let next = units + grapheme.encode_utf16().count();
-        if target < next {
-            return if round_up && target > units {
-                index + grapheme.chars().count()
-            } else {
-                index
-            };
-        }
-        units = next;
-        index += grapheme.chars().count();
+    let byte = buffer.utf8_offset_for_utf16_offset(target);
+    let index = buffer.character_index_for_utf8_offset(byte);
+    if !round_up && buffer.utf16_offset_for_character_index(index) > target {
+        index.saturating_sub(1)
+    } else {
+        index
     }
-    buffer.character_count()
 }
 
 /// Build the platform input client for one field and its editing state.
@@ -77,9 +69,9 @@ pub fn platform_input_client(
                 let caret = base
                     + composition
                         .text
-                        .chars()
+                        .graphemes(true)
                         .take(composition.start + composition.length)
-                        .map(char::len_utf16)
+                        .map(|grapheme| grapheme.encode_utf16().count())
                         .sum::<usize>() as i32;
                 snapshot.selection_start = caret;
                 snapshot.selection_end = caret;
@@ -95,7 +87,7 @@ pub fn platform_input_client(
                 // window instead of replacing the text, which is what IMEs expect
                 // when they re-place the caret mid-composition.
                 let buffer = state.buffer.clone();
-                let (low, high) = state
+                let (low, _) = state
                     .selection_range()
                     .unwrap_or((state.selection.cursor_index, state.selection.cursor_index));
                 let base = utf16_offset(&buffer, low);
@@ -104,13 +96,13 @@ pub fn platform_input_client(
                 if start >= base && end >= base && start <= limit && end <= limit {
                     let position = |units: i32| -> usize {
                         let mut consumed = 0i32;
-                        for (index, character) in pending.chars().enumerate() {
-                            consumed += character.len_utf16() as i32;
+                        for (index, grapheme) in pending.graphemes(true).enumerate() {
+                            consumed += grapheme.encode_utf16().count() as i32;
                             if units < consumed {
                                 return index;
                             }
                         }
-                        pending.chars().count()
+                        pending.graphemes(true).count()
                     };
                     let lower = position(start.min(end) - base);
                     state.composition.start = lower;
@@ -119,20 +111,12 @@ pub fn platform_input_client(
                 }
                 // Outside the marked range the composition commits first, as
                 // one undo step and clipped to the authored length limit.
-                let limit = behavior.max_length;
-                let removed = high - low;
-                let capacity = limit.map(|limit| {
-                    limit.saturating_sub(state.buffer.character_count().saturating_sub(removed))
-                });
-                let committed: String = match capacity {
-                    Some(capacity) => pending.chars().take(capacity).collect(),
-                    None => pending.clone(),
-                };
-                state.begin_edit(&buffer, TextEditKind::Atomic);
-                state.buffer = buffer.replace(low..high, &committed);
+                super::text_field_editing::insert_replacing_selection_limited(
+                    &mut state,
+                    &pending,
+                    behavior.max_length,
+                );
                 state.clear_composition();
-                state.selection.cursor_index = state.selection.cursor_index.min(state.buffer.character_count());
-                state.end_edit();
             }
             let buffer = state.buffer.clone();
             let low_index = character_index(&buffer, start.max(0), false);

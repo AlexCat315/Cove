@@ -6,18 +6,11 @@
 //! - a flat tab underline is a real 2pt band under the tab's content instead of
 //!   a zero-width empty view
 //! - control sizing is inherited by buttons from their container
-//! - an explicit `TextField` size wins over the inherited one
+//! - a text field resolves an automatic size from the inherited control size,
+//!   while an explicit `TextField` size wins over it
 //! - the colour picker width follows the viewport and keeps its minimum
 //!
 //! Named differences from the Swift suite:
-//! - Swift resolves an `Automatic` `TextField` size from
-//!   `ControlSizeEnvironment` inside `TextFieldHost._children`
-//!   (`Primitives/Text/TextField/TextFieldHost.swift:76-78`). The Rust
-//!   `TextFieldHost` never reads that composition local, so
-//!   `minimum_field_height()` always reports the regular 32pt for `.automatic`
-//!   and an inherited `.small` does not shrink the field.
-//!   `inherited_control_size_does_not_reach_a_text_field` pins the current
-//!   behaviour.
 //! - Swift asserts the `tab-selection-indicator` width equals the `selected-tab`
 //!   debug node's width. The indicator is padded by the `SelectionAppearance`
 //!   horizontal inset on both edges, so it spans the tab's content row rather
@@ -234,6 +227,11 @@ fn control_sizing_is_inherited_by_buttons_and_explicit_sizes_win() {
                 "a button inherits the container's small size"
             );
             assert_eq!(
+                field_frame(&graph, "inherited-field"),
+                28.0,
+                "an automatic field resolves its size from the inherited control size"
+            );
+            assert_eq!(
                 field_frame(&graph, "explicit-field"),
                 40.0,
                 "an explicit large size wins over the inherited small one"
@@ -242,35 +240,6 @@ fn control_sizing_is_inherited_by_buttons_and_explicit_sizes_win() {
                 field_frame(&graph, "large-button"),
                 40.0,
                 "an explicit large control size wins over the inherited one"
-            );
-        });
-    });
-}
-
-#[test]
-fn inherited_control_size_does_not_reach_a_text_field() {
-    GlobalTestLock::locked(|| {
-        support::with_test_text_environment(|| {
-            let graph = support::graph();
-            graph.install_view(
-                AnyView::new(
-                    Column::new(
-                        cove_composition::HorizontalAlignment::Leading,
-                        4.0,
-                        AnyView::new(
-                            AnyView::new(TextField::new("Find", empty_text_binding()))
-                                .debug_name("inherited-field"),
-                        ),
-                    )
-                    .control_size(ControlSize::Small),
-                ),
-                Default::default(),
-            );
-            graph.compute_layout(320.0, 240.0);
-            assert_eq!(
-                field_frame(&graph, "inherited-field"),
-                32.0,
-                "documented gap: Swift shrinks this to 28pt, the Rust host keeps the regular 32pt"
             );
         });
     });

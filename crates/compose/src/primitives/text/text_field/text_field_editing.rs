@@ -6,6 +6,7 @@
 //! so the call sites read the same.
 use crate::primitives::text::text_buffer::TextBuffer;
 use crate::primitives::text::text_edit_history::TextEditKind;
+use unicode_segmentation::UnicodeSegmentation;
 
 use super::text_field::FieldState;
 use super::text_field_observation::TextFieldCaretState;
@@ -14,7 +15,10 @@ use super::text_field_observation::TextFieldCaretState;
 /// adjacent transactions in.
 pub fn edit_clock() -> f64 {
     static START: std::sync::OnceLock<std::time::Instant> = std::sync::OnceLock::new();
-    START.get_or_init(std::time::Instant::now).elapsed().as_secs_f64()
+    START
+        .get_or_init(std::time::Instant::now)
+        .elapsed()
+        .as_secs_f64()
 }
 
 /// Delete the active selection, if any. Returns `true` when something was
@@ -58,11 +62,31 @@ pub fn insert_replacing_selection_limited(
     let removed = selection.map_or(0, |(low, high)| high - low);
     // A single non-newline character with no selection is typing: it coalesces
     // with the neighbouring keystrokes into one undo step.
-    let typing = incoming.chars().count() == 1
+    let typing = incoming.graphemes(true).count() == 1
         && !incoming.contains('\n')
         && selection.is_none()
         && !state.composition.is_active();
     let current = state.buffer.clone();
+    let range = cursor..(cursor + removed);
+    let mut next = current.replace(range.clone(), incoming);
+    // Check the resulting buffer first: an accent or ZWJ can join existing
+    // text without using another character of the authored limit.
+    let insertion: String = if max_length.is_some_and(|limit| next.character_count() > limit) {
+        let capacity = max_length
+            .unwrap()
+            .saturating_sub(current.character_count() - removed);
+        let prefix: String = incoming.graphemes(true).take(capacity).collect();
+        next = current.replace(range, &prefix);
+        prefix
+    } else {
+        incoming.to_owned()
+    };
+    if insertion.is_empty() {
+        return;
+    }
+    if max_length.is_some_and(|limit| next.character_count() > limit) {
+        return;
+    }
     state.begin_edit(
         &current,
         if typing {
@@ -71,17 +95,8 @@ pub fn insert_replacing_selection_limited(
             TextEditKind::Atomic
         },
     );
-    let capacity = max_length.map(|limit| limit.saturating_sub(state.buffer.character_count() - removed));
-    let insertion: String = match capacity {
-        Some(capacity) => incoming.chars().take(capacity).collect(),
-        None => incoming.to_string(),
-    };
-    if insertion.is_empty() {
-        state.end_edit();
-        return;
-    }
     let start_byte = state.buffer.utf8_offset_for_character_index(cursor);
-    state.buffer = state.buffer.replace(cursor..(cursor + removed), &insertion);
+    state.buffer = next;
     state.clear_composition();
     // A combining scalar or regional indicator joins the neighbouring grapheme.
     // The inserted byte endpoint is still the caret the user expects.

@@ -10,28 +10,12 @@
 //! - reversing mid-flight continues from the current progress instead of
 //!   snapping, and settles back at 0
 //!
-//! Model difference (production gaps, reported):
-//!
-//! 1. **Border interpolation is not ported.** The Swift suite asserts that a
-//!    hover drives `node.borderColor` from the resting colour, through an
-//!    intermediate value, to `inputs.borderHover` under `motion.fast`. Rust has
-//!    no node-level chrome for a text field at all: `TextFieldHost` computes
-//!    `border_color_for(...)` locally and passes the colour straight into
-//!    `render(...)`, calling `add_rounded_rect_stroke` per draw. `node.border_color()`
-//!    is therefore permanently `None`, so there is nothing for the animator to
-//!    interpolate. `DefaultTextFieldStyle`'s `TextFieldChrome` modifier does
-//!    write `border_color` and animate it, but `TextFieldHost::make_body` is
-//!    never called (`make_body` appears zero times in `text_field.rs`).
-//! 2. **The style path is inert, and deliberately left so here.** Wiring
-//!    `make_body` would not be a refactor: Swift's style additionally carries an
-//!    error state (`inputs.borderError`) and a disabled alpha (`0.55`), neither
-//!    of which Rust's `TextField` has (`TextFieldBehavior` has no `error` field
-//!    and `isError` is `false` at the Swift host), and it would move fill/stroke
-//!    from draw-time painting to node compositing. That is an appearance change,
-//!    so it is recorded rather than made. `NumberField` already sets
-//!    `TextFieldStyleEnvironment` (`number_field.rs:509`) and that local is
-//!    consumed by nothing, which `field_chrome_style_is_inert` pins as a canary
-//!    for whoever eventually wires it.
+//! Field chrome is owned by the resolved `TextFieldStyle`, as in Swift:
+//! `DefaultTextFieldStyle` writes background, border colour and border width
+//! onto the surface node and keys the semantic fast transition on the visual
+//! state, so hover/focus interpolate instead of being painted per draw.
+//! `NumberField`'s `TextFieldStyleEnvironment` override is consumed by the
+//! style host.
 
 use crate::support;
 use cove_composition::Scope;
@@ -177,11 +161,10 @@ fn field_hover_preserves_the_bound_value() {
     });
 }
 
-/// Canary for the unported chrome animation: the style environment exists, is
-/// set by `NumberField`, and is consumed by nothing, so no text field node ever
-/// carries a node-level border colour for the animator to drive.
+/// The style host resolves the field-style environment and the default style
+/// owns the node-level chrome that the animator drives.
 #[test]
-fn field_chrome_style_is_inert() {
+fn field_chrome_style_is_live() {
     GlobalTestLock::locked(|| {
         support::with_test_text_environment(|| {
             let theme = Theme::default_dark();
@@ -210,8 +193,8 @@ fn field_chrome_style_is_inert() {
 
             assert_eq!(
                 field.border_color(),
-                None,
-                "the chrome is draw-time only, so the animator has no border to drive"
+                Some(theme.inputs.border_color),
+                "the default style owns the node-level border colour"
             );
             let style: cove_ui_compose::theme::styles::components::AnyTextFieldStyle = field
                 .composition_value(
@@ -222,7 +205,7 @@ fn field_chrome_style_is_inert() {
                     == cove_ui_compose::theme::styles::components::AnyTextFieldStyle::new(
                         cove_ui_compose::theme::styles::components::DefaultTextFieldStyle
                     ),
-                "the environment still resolves its default, it simply is not consumed"
+                "the environment resolves its default and the style host consumes it"
             );
         });
     });

@@ -9,6 +9,7 @@
 //! width probe) plus `LayoutThatFits` (which owns the candidate selection and
 //! the "last candidate wins" fallback), so both halves are exercised here.
 
+use crate::gallery_content::stories::StorySection;
 use cove_composition::Scope;
 use cove_core::scene::{Align, FlexDirection, Justify, Wrap};
 use cove_core::{Binding, State};
@@ -22,7 +23,6 @@ use cove_ui_compose::theme::styles::buttons::SecondaryButtonStyle;
 use cove_ui_compose::theme::styles::buttons::button_style::ButtonStyleViewExt;
 use cove_ui_compose::theme::tokens::{SemanticColorRef, SemanticStyleViewExt};
 use cove_ui_compose::{Alignment, AnyView, BoxView, DynamicField, LayoutDebugExt, TupleView, View};
-use crate::gallery_content::stories::StorySection;
 
 /// The three chips the story lays out in both branches.
 pub const FIT_CHIPS: [&str; 3] = ["Files", "Preview", "Settings"];

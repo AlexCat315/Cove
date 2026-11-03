@@ -13,7 +13,7 @@ use std::rc::Rc;
 
 use crate::modifiers::layout::PaddingExt;
 use crate::modifiers::style::SemanticStyleViewExt;
-use crate::primitives::text::rich::run::RichTextRun;
+use crate::primitives::text::rich::run::TextRun;
 use crate::{AnyView, BoxView, PrimitiveView, TupleView, View};
 use cove_core::TextAlignment;
 use cove_core::scene::{Align, FlexDirection, Justify, Node, Wrap};
@@ -154,7 +154,7 @@ fn markdown_list_view(
 /// A plain paragraph: its runs flattened to text with the inline traits that
 /// affect the whole paragraph preserved.
 struct ParagraphText {
-    runs: Vec<RichTextRun>,
+    runs: Vec<TextRun>,
     on_open_link: Option<Rc<dyn Fn(&str)>>,
 }
 
@@ -183,10 +183,10 @@ crate::impl_primitive_view!(ParagraphText);
 /// Plain runs with the viewer's link opener attached, so every block that
 /// renders runs — paragraph, heading, table cell — reports clicks.
 fn rich_text_with_links(
-    runs: Vec<RichTextRun>,
+    runs: Vec<TextRun>,
     on_open_link: &Option<Rc<dyn Fn(&str)>>,
-) -> crate::primitives::text::rich::RichText {
-    let text = crate::primitives::text::rich::RichText::new(runs);
+) -> crate::primitives::text::Text {
+    let text = crate::primitives::text::Text::runs(runs);
     match on_open_link {
         Some(handler) => {
             let handler = handler.clone();
@@ -200,7 +200,7 @@ fn rich_text_with_links(
 /// their section.
 struct MarkdownHeading {
     level: usize,
-    runs: Vec<RichTextRun>,
+    runs: Vec<TextRun>,
     on_open_link: Option<Rc<dyn Fn(&str)>>,
 }
 
@@ -226,7 +226,7 @@ impl PrimitiveView for MarkdownHeading {
         let level = self.level;
         let mut column: Vec<AnyView> = vec![AnyView::new(
             rich_text_with_links(self.runs.clone(), &self.on_open_link)
-                .role(crate::primitives::text::rich::RichTextRole::Heading(level))
+                .role(crate::primitives::text::TextRole::Heading(level))
                 .semantic_font(crate::theme::SemanticFontRef::new(move |theme| {
                     heading_token(level, theme)
                 })),

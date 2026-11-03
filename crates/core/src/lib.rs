@@ -26,7 +26,7 @@ mod font;
 mod geometry;
 mod geometry_kernels;
 mod glyph_metrics;
-mod line_breaks;
+pub mod line_breaks;
 mod linear_gradient;
 pub mod reactive;
 mod rounded_clip;
@@ -57,7 +57,9 @@ pub use geometry::*;
 pub use glyph_metrics::*;
 pub use line_breaks::*;
 pub use linear_gradient::*;
-pub use reactive::{AnySignal, Observer, Owner, Signal, SignalSender, ThreadPoster, batch, untrack};
+pub use reactive::{
+    AnySignal, Observer, Owner, Signal, SignalSender, ThreadPoster, batch, untrack,
+};
 pub use rounded_clip::*;
 pub use scene::*;
 pub use shaped_glyph::*;

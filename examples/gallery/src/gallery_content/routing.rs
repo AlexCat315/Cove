@@ -136,7 +136,9 @@ impl StoryDispatch {
             Self::Story(GalleryPage::Timeline) => {
                 Some(AnyView::new(stories::TimelineStory::new(options)))
             }
-            Self::Story(GalleryPage::Panel) => Some(AnyView::new(stories::PanelStory::new(options))),
+            Self::Story(GalleryPage::Panel) => {
+                Some(AnyView::new(stories::PanelStory::new(options)))
+            }
             Self::Story(GalleryPage::SplitView) => {
                 Some(AnyView::new(stories::SplitViewStory::new(options)))
             }
@@ -149,7 +151,9 @@ impl StoryDispatch {
             Self::Story(GalleryPage::PropertyGrid) => {
                 Some(AnyView::new(stories::PropertyGridStory::new(options)))
             }
-            Self::Story(GalleryPage::ZStack) => Some(AnyView::new(stories::ZStackStory::new(options))),
+            Self::Story(GalleryPage::ZStack) => {
+                Some(AnyView::new(stories::ZStackStory::new(options)))
+            }
             Self::Story(GalleryPage::StatusBar) => {
                 Some(AnyView::new(stories::StatusBarStory::new(options)))
             }
@@ -173,9 +177,9 @@ impl StoryDispatch {
             Self::Story(GalleryPage::Tooltip) => {
                 Some(AnyView::new(stories::TooltipStory::new(options)))
             }
-            Self::Story(GalleryPage::Table) => {
-                Some(AnyView::new(stories::AdaptiveTableSample::new(options, true)))
-            }
+            Self::Story(GalleryPage::Table) => Some(AnyView::new(
+                stories::AdaptiveTableSample::new(options, true),
+            )),
             Self::Story(GalleryPage::DatePicker) => {
                 Some(AnyView::new(stories::DatePickerStory::new(options)))
             }
@@ -188,7 +192,7 @@ impl StoryDispatch {
             Self::Story(GalleryPage::Masonry) => {
                 Some(AnyView::new(stories::MasonryStory::new(options)))
             }
-            Self::Story(GalleryPage::RichText) => Some(AnyView::new(stories::RichTextStory::new())),
+            Self::Story(GalleryPage::TextRuns) => Some(AnyView::new(stories::TextStory::new())),
             Self::Story(GalleryPage::Calendar) => {
                 Some(AnyView::new(stories::CalendarStory::new(options)))
             }
@@ -222,9 +226,7 @@ impl StoryDispatch {
             Self::Story(GalleryPage::HoverCard) => {
                 Some(AnyView::new(stories::HoverCardStory::new(options)))
             }
-            Self::Story(GalleryPage::Chart) => {
-                Some(AnyView::new(stories::ChartStory::new()))
-            }
+            Self::Story(GalleryPage::Chart) => Some(AnyView::new(stories::ChartStory::new())),
             Self::Story(GalleryPage::AppBar) => {
                 Some(AnyView::new(stories::AppBarStory::new(options)))
             }
@@ -255,7 +257,9 @@ impl StoryDispatch {
             Self::Story(GalleryPage::CommandPalette) => {
                 Some(AnyView::new(stories::CommandStory::new(options)))
             }
-            Self::Story(GalleryPage::Image) => Some(AnyView::new(stories::ImageStory::new(options))),
+            Self::Story(GalleryPage::Image) => {
+                Some(AnyView::new(stories::ImageStory::new(options)))
+            }
             Self::Story(GalleryPage::Sidebar) => {
                 Some(AnyView::new(stories::SidebarStory::new(options)))
             }
@@ -298,7 +302,9 @@ impl StoryDispatch {
             Self::Story(GalleryPage::AlertDialog) => {
                 Some(AnyView::new(stories::AlertDialogStory::new()))
             }
-            Self::Story(GalleryPage::Sheet) => Some(AnyView::new(stories::SheetStory::new(options))),
+            Self::Story(GalleryPage::Sheet) => {
+                Some(AnyView::new(stories::SheetStory::new(options)))
+            }
             Self::Story(GalleryPage::BottomSheet) => {
                 Some(AnyView::new(stories::BottomSheetStory::new(options)))
             }
@@ -369,8 +375,14 @@ impl StorySource {
             (GalleryPage::SwipeList, "Data/DataStories.swift"),
             (GalleryPage::RefreshableList, "Data/DataStories.swift"),
             (GalleryPage::Scrollbar, "Data/DataStories.swift"),
-            (GalleryPage::ViewportTraits, "Foundation/SurfaceTraits.swift"),
-            (GalleryPage::ViewThatFits, "Foundation/IntrinsicFitting.swift"),
+            (
+                GalleryPage::ViewportTraits,
+                "Foundation/SurfaceTraits.swift",
+            ),
+            (
+                GalleryPage::ViewThatFits,
+                "Foundation/IntrinsicFitting.swift",
+            ),
             (GalleryPage::DragAndDrop, "Data/DataStories.swift"),
             (GalleryPage::Tree, "Data/DataStories.swift"),
             (GalleryPage::VirtualStack, "Data/DataStories.swift"),
@@ -379,7 +391,7 @@ impl StorySource {
             (GalleryPage::Avatar, "Feedback/AvatarStory.swift"),
             (GalleryPage::Image, "Layout/ImageStory.swift"),
             (GalleryPage::Web, "Data/WebStory.swift"),
-            (GalleryPage::RichText, "Data/RichTextStory.swift"),
+            (GalleryPage::TextRuns, "Data/RichTextStory.swift"),
             (GalleryPage::Markdown, "Data/MarkdownStory.swift"),
             (GalleryPage::Menu, "Layout/OverlayStories.swift"),
             (GalleryPage::MenuButton, "Controls/ControlStories.swift"),
@@ -416,7 +428,10 @@ impl StorySource {
             (GalleryPage::DataTable, "Data/DataTableStory.swift"),
             (GalleryPage::Calendar, "Data/DateTableStories.swift"),
             (GalleryPage::DatePicker, "Data/DateTableStories.swift"),
-            (GalleryPage::DateRangePicker, "Controls/ControlStories.swift"),
+            (
+                GalleryPage::DateRangePicker,
+                "Controls/ControlStories.swift",
+            ),
             (GalleryPage::TimeField, "Data/DateTableStories.swift"),
             (GalleryPage::TimePicker, "Controls/TimePickerStory.swift"),
             (GalleryPage::Popconfirm, "Overlays/PopconfirmStory.swift"),
@@ -434,18 +449,21 @@ impl StorySource {
             (GalleryPage::Sheet, "Layout/NavigationStories.swift"),
             (GalleryPage::BottomSheet, "Layout/NavigationStories.swift"),
             (GalleryPage::CommandPalette, "Overlays/CommandStory.swift"),
-            (GalleryPage::NavigationStack, "Layout/NavigationStories.swift"),
+            (
+                GalleryPage::NavigationStack,
+                "Layout/NavigationStories.swift",
+            ),
             (GalleryPage::HoverCard, "Overlays/HoverStory.swift"),
             (GalleryPage::Timeline, "Data/DataStories.swift"),
             (GalleryPage::Toolbar, "Controls/ToolbarStory.swift"),
             (GalleryPage::Link, "Controls/ControlStories.swift"),
             (GalleryPage::SingleLineText, "Text/SingleLineText.swift"),
-            (GalleryPage::CompletionPopover, "Controls/CompletionPopover.swift"),
-            (GalleryPage::RouteOutlet, "Navigation/RouteOutlet.swift"),
             (
-                GalleryPage::ProgressValue,
-                "Feedback/FeedbackStories.swift",
+                GalleryPage::CompletionPopover,
+                "Controls/CompletionPopover.swift",
             ),
+            (GalleryPage::RouteOutlet, "Navigation/RouteOutlet.swift"),
+            (GalleryPage::ProgressValue, "Feedback/FeedbackStories.swift"),
             (
                 GalleryPage::HorizontalSwipe,
                 "Primitives/Interaction/HorizontalSwipe.swift",

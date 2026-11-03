@@ -3,7 +3,9 @@
 //! Recessed field chrome for dense desktop forms. The resting fill is a sunken
 //! surface so inspector rows and toolbar fields read as inputs rather than as
 //! generic cards.
+use crate::modifiers::animation_value::AnimationValueExt;
 use crate::modifiers::style::AppearanceExt;
+use crate::theme::SemanticMotionRef;
 use crate::{AnyView, ViewExt};
 use cove_core::Color;
 use cove_core::scene::Node;
@@ -43,6 +45,9 @@ impl TextFieldStyle for DefaultTextFieldStyle {
         } else {
             0.55
         };
+        // Swift keys the implicit fast transition on this visual state, so a
+        // focus or hover change interpolates the border instead of snapping.
+        let visual_key = (background, border, border_width, alpha);
         AnyView::new(
             configuration
                 .content
@@ -53,7 +58,8 @@ impl TextFieldStyle for DefaultTextFieldStyle {
                     border_width,
                     radius: inputs.radius,
                 })
-                .opacity(alpha),
+                .opacity(alpha)
+                .animation_motion(SemanticMotionRef::fast(), visual_key),
         )
     }
 }

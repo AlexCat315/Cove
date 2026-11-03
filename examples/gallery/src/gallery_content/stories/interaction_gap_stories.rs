@@ -181,7 +181,10 @@ impl View for HorizontalSwipeStory {
                         Self::threshold(320.0)
                     ),
                     column(
-                        vec![AnyView::new(readout), button("Reset", self.options.is_enabled, reset)],
+                        vec![
+                            AnyView::new(readout),
+                            button("Reset", self.options.is_enabled, reset),
+                        ],
                         10.0,
                     ),
                 )),
@@ -434,10 +437,9 @@ impl View for ActionGroupLayoutStory {
                     let pressed = pressed.clone();
                     let label = title.to_string();
                     AnyView::new(
-                        cove_ui_compose::primitives::controls::Button::title(
-                            *title,
-                            move || pressed.set(label.clone()),
-                        )
+                        cove_ui_compose::primitives::controls::Button::title(*title, move || {
+                            pressed.set(label.clone())
+                        })
                         .enabled(self.options.is_enabled),
                     )
                 })
@@ -465,10 +467,7 @@ impl View for ActionGroupLayoutStory {
                     .frame_width(*width),
                 );
                 AnyView::new(column(
-                    vec![
-                        AnyView::new(Text::new(format!("{width:.0}pt wide"))),
-                        group,
-                    ],
+                    vec![AnyView::new(Text::new(format!("{width:.0}pt wide"))), group],
                     6.0,
                 ))
             })

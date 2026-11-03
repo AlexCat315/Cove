@@ -44,6 +44,16 @@ impl ControlSize {
             Self::Large => 24.0,
         }
     }
+    /// Field size an `Automatic` decoration resolves to, as Swift's
+    /// `ControlSize.textFieldSize` does.
+    pub fn text_field_size(self) -> crate::primitives::text::text_field::TextFieldSize {
+        use crate::primitives::text::text_field::TextFieldSize;
+        match self {
+            Self::Mini | Self::Small => TextFieldSize::Small,
+            Self::Regular => TextFieldSize::Regular,
+            Self::Large => TextFieldSize::Large,
+        }
+    }
 }
 
 pub struct ControlSizeEnvironment;

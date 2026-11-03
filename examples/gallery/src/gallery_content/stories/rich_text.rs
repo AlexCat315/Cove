@@ -7,78 +7,74 @@ use cove_core::scene::{Align, FlexDirection, Justify, Wrap};
 use cove_core::{State, TextAlignment};
 use cove_ui_compose::modifiers::layout::FlexExt;
 use cove_ui_compose::primitives::text::Text;
-use cove_ui_compose::primitives::text::rich::rich_text::RichText;
-use cove_ui_compose::primitives::text::rich::run::{RichTextRun, RichTextTraits};
+use cove_ui_compose::primitives::text::rich::run::{TextRun, TextTraits};
 use cove_ui_compose::theme::tokens::{SemanticColorRef, SemanticStyleViewExt};
 use cove_ui_compose::{AnyView, BoxView, DynamicField, LayoutDebugExt, TupleView, View};
 
 use crate::gallery_content::stories::StorySection;
 
 /// The "Inline styles" sample paragraph.
-pub fn inline_styles_sample() -> Vec<RichTextRun> {
+pub fn inline_styles_sample() -> Vec<TextRun> {
     vec![
-        RichTextRun::new("CoveUI lays out "),
-        RichTextRun::with_traits("bold", RichTextTraits::BOLD),
-        RichTextRun::new(", "),
-        RichTextRun::with_traits("italic", RichTextTraits::ITALIC),
-        RichTextRun::new(", "),
-        RichTextRun::with_traits(
-            "both at once",
-            RichTextTraits::BOLD | RichTextTraits::ITALIC,
-        ),
-        RichTextRun::new(", "),
-        RichTextRun::with_traits("inline code", RichTextTraits::CODE),
-        RichTextRun::new(" and "),
-        RichTextRun::with_traits("struck text", RichTextTraits::STRIKETHROUGH),
-        RichTextRun::new(" in one paragraph. Links such as the "),
-        RichTextRun::new("layout guide").link("guide://layout"),
-        RichTextRun::new(" wrap with the words around them, even when a long link like "),
-        RichTextRun::new("https://github.com/swiftlang/swift-markdown")
+        TextRun::new("CoveUI lays out "),
+        TextRun::with_traits("bold", TextTraits::BOLD),
+        TextRun::new(", "),
+        TextRun::with_traits("italic", TextTraits::ITALIC),
+        TextRun::new(", "),
+        TextRun::with_traits("both at once", TextTraits::BOLD | TextTraits::ITALIC),
+        TextRun::new(", "),
+        TextRun::with_traits("inline code", TextTraits::CODE),
+        TextRun::new(" and "),
+        TextRun::with_traits("struck text", TextTraits::STRIKETHROUGH),
+        TextRun::new(" in one paragraph. Links such as the "),
+        TextRun::new("layout guide").link("guide://layout"),
+        TextRun::new(" wrap with the words around them, even when a long link like "),
+        TextRun::new("https://github.com/swiftlang/swift-markdown")
             .link("https://github.com/swiftlang/swift-markdown"),
-        RichTextRun::new(" has to break across lines."),
+        TextRun::new(" has to break across lines."),
     ]
 }
 
 /// The "Mixed scripts" sample paragraph.
-pub fn mixed_script_sample() -> Vec<RichTextRun> {
+pub fn mixed_script_sample() -> Vec<TextRun> {
     vec![
-        RichTextRun::new("中文段落按字断行，标点不会出现在行首。混排 "),
-        RichTextRun::with_traits("English words", RichTextTraits::BOLD),
-        RichTextRun::new(" 时仍在空格处断开，"),
-        RichTextRun::with_traits("RichTextRun", RichTextTraits::CODE),
-        RichTextRun::new(" 与"),
-        RichTextRun::new("链接").link("guide://cjk"),
-        RichTextRun::new("也一起换行。"),
+        TextRun::new("中文段落按字断行，标点不会出现在行首。混排 "),
+        TextRun::with_traits("English words", TextTraits::BOLD),
+        TextRun::new(" 时仍在空格处断开，"),
+        TextRun::with_traits("TextRun", TextTraits::CODE),
+        TextRun::new(" 与"),
+        TextRun::new("链接").link("guide://cjk"),
+        TextRun::new("也一起换行。"),
     ]
 }
 
 /// The three right-to-left paragraphs.
-pub fn right_to_left_samples() -> Vec<Vec<RichTextRun>> {
+pub fn right_to_left_samples() -> Vec<Vec<TextRun>> {
     vec![
         vec![
-            RichTextRun::new("שלום "),
-            RichTextRun::with_traits("CoveUI", RichTextTraits::BOLD),
-            RichTextRun::new(" — גרסה 2.0 זמינה עכשיו."),
+            TextRun::new("שלום "),
+            TextRun::with_traits("CoveUI", TextTraits::BOLD),
+            TextRun::new(" — גרסה 2.0 זמינה עכשיו."),
         ],
         vec![
-            RichTextRun::new("مرحبا بالعالم: "),
-            RichTextRun::with_traits("RichText", RichTextTraits::CODE),
-            RichTextRun::new(" يدعم 123 رقمًا."),
+            TextRun::new("مرحبا بالعالم: "),
+            TextRun::with_traits("Text", TextTraits::CODE),
+            TextRun::new(" يدعم 123 رقمًا."),
         ],
         vec![
-            RichTextRun::new("An English line that mentions "),
-            RichTextRun::with_traits("עברית", RichTextTraits::ITALIC),
-            RichTextRun::new(" stays left aligned."),
+            TextRun::new("An English line that mentions "),
+            TextRun::with_traits("עברית", TextTraits::ITALIC),
+            TextRun::new(" stays left aligned."),
         ],
     ]
 }
 
-/// `RichTextStory`.
-pub struct RichTextStory {
+/// `TextStory`.
+pub struct TextStory {
     pub last_opened: State<String>,
 }
 
-impl RichTextStory {
+impl TextStory {
     pub fn new() -> Self {
         Self {
             last_opened: State::new("none".into()),
@@ -95,17 +91,17 @@ impl RichTextStory {
     }
 }
 
-impl Default for RichTextStory {
+impl Default for TextStory {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl View for RichTextStory {
+impl View for TextStory {
     fn body(&self, _cx: &Scope) -> AnyView {
         let opened = self.last_opened.clone();
         let inline = AnyView::new(
-            RichText::new(inline_styles_sample())
+            Text::runs(inline_styles_sample())
                 .on_open_link(move |destination| opened.set(destination.to_string())),
         );
         let opened_caption = {
@@ -119,7 +115,7 @@ impl View for RichTextStory {
         let mixed = {
             let opened = self.last_opened.clone();
             AnyView::new(
-                RichText::new(mixed_script_sample())
+                Text::runs(mixed_script_sample())
                     .on_open_link(move |destination| opened.set(destination.to_string())),
             )
         };
@@ -136,7 +132,7 @@ impl View for RichTextStory {
                         .into_iter()
                         .map(|runs| {
                             let opened = self.last_opened.clone();
-                            AnyView::new(RichText::new(runs).on_open_link(move |destination| {
+                            AnyView::new(Text::runs(runs).on_open_link(move |destination| {
                                 opened.set(destination.to_string())
                             }))
                         })
@@ -152,24 +148,25 @@ impl View for RichTextStory {
             Wrap::NoWrap,
             10.0,
             AnyView::new(TupleView::new(vec![
-                AnyView::new(RichText::new(vec![
-                    RichTextRun::new("A "),
-                    RichTextRun::with_traits("headline", RichTextTraits::ITALIC),
-                    RichTextRun::new(" paragraph"),
+                AnyView::new(Text::new("A plain paragraph")),
+                AnyView::new(Text::runs(vec![
+                    TextRun::new("A "),
+                    TextRun::with_traits("headline", TextTraits::ITALIC),
+                    TextRun::new(" paragraph"),
                 ])),
                 AnyView::new(
-                    RichText::new(vec![
-                        RichTextRun::new("A muted caption with "),
-                        RichTextRun::with_traits("code", RichTextTraits::CODE),
-                        RichTextRun::new("."),
+                    Text::runs(vec![
+                        TextRun::new("A muted caption with "),
+                        TextRun::with_traits("code", TextTraits::CODE),
+                        TextRun::new("."),
                     ])
                     .semantic_foreground(SemanticColorRef::on_surface_muted()),
                 ),
                 AnyView::new(
-                    RichText::new(vec![
-                        RichTextRun::new("Centred text, with "),
-                        RichTextRun::with_traits("emphasis", RichTextTraits::BOLD),
-                        RichTextRun::new("."),
+                    Text::runs(vec![
+                        TextRun::new("Centred text, with "),
+                        TextRun::with_traits("emphasis", TextTraits::BOLD),
+                        TextRun::new("."),
                     ])
                     .alignment(TextAlignment::Center),
                 ),
@@ -214,7 +211,7 @@ impl View for RichTextStory {
                 ])),
             )
             .flex(0.0)
-            .debug_name("rich-text-story"),
+            .debug_name("text-story"),
         )
     }
 
@@ -233,14 +230,14 @@ mod checks {
         assert_eq!(runs.len(), 15);
         assert_eq!(runs[0].text, "CoveUI lays out ");
         assert_eq!(runs[1].text, "bold");
-        assert!(runs[1].traits.contains(RichTextTraits::BOLD));
-        assert!(!runs[1].traits.contains(RichTextTraits::ITALIC));
+        assert!(runs[1].traits.contains(TextTraits::BOLD));
+        assert!(!runs[1].traits.contains(TextTraits::ITALIC));
         // "both at once" carries both traits.
         assert_eq!(runs[5].text, "both at once");
-        assert!(runs[5].traits.contains(RichTextTraits::BOLD));
-        assert!(runs[5].traits.contains(RichTextTraits::ITALIC));
-        assert!(runs[7].traits.contains(RichTextTraits::CODE));
-        assert!(runs[9].traits.contains(RichTextTraits::STRIKETHROUGH));
+        assert!(runs[5].traits.contains(TextTraits::BOLD));
+        assert!(runs[5].traits.contains(TextTraits::ITALIC));
+        assert!(runs[7].traits.contains(TextTraits::CODE));
+        assert!(runs[9].traits.contains(TextTraits::STRIKETHROUGH));
         // Links carry their destination.
         assert_eq!(runs[11].link.as_deref(), Some("guide://layout"));
         assert_eq!(
@@ -248,7 +245,7 @@ mod checks {
             Some("https://github.com/swiftlang/swift-markdown")
         );
         // Untrait-ed runs stay plain.
-        assert_eq!(runs[0].traits, RichTextTraits::default());
+        assert_eq!(runs[0].traits, TextTraits::default());
         assert_eq!(runs[0].link, None);
     }
 
@@ -257,8 +254,8 @@ mod checks {
         let runs = mixed_script_sample();
         assert_eq!(runs.len(), 7);
         assert!(runs[0].text.starts_with("中文段落"));
-        assert!(runs[1].traits.contains(RichTextTraits::BOLD));
-        assert!(runs[3].traits.contains(RichTextTraits::CODE));
+        assert!(runs[1].traits.contains(TextTraits::BOLD));
+        assert!(runs[3].traits.contains(TextTraits::CODE));
         assert_eq!(runs[5].link.as_deref(), Some("guide://cjk"));
     }
 
@@ -270,12 +267,12 @@ mod checks {
         assert!(samples[0][0].text.starts_with('ש'));
         assert!(samples[1][0].text.starts_with('م'));
         assert!(samples[2][0].text.starts_with("An English"));
-        assert!(samples[2][1].traits.contains(RichTextTraits::ITALIC));
+        assert!(samples[2][1].traits.contains(TextTraits::ITALIC));
     }
 
     #[test]
     fn link_handling_records_the_destination() {
-        let story = RichTextStory::new();
+        let story = TextStory::new();
         assert_eq!(story.last_opened_line(), "Last opened: none");
         story.open("guide://layout");
         assert_eq!(story.last_opened_line(), "Last opened: guide://layout");

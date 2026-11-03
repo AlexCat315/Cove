@@ -197,7 +197,7 @@ fn explicit_color_overrides_the_theme_tint() {
         support::with_test_text_environment(|| {
             let graph = support::graph();
             graph.install_view(
-                AnyView::new(Text::new("Hello").with_color(cove_core::Color::BLACK)),
+                AnyView::new(Text::new("Hello").color(cove_core::Color::BLACK)),
                 Default::default(),
             );
             graph.compute_layout(200.0, 100.0);

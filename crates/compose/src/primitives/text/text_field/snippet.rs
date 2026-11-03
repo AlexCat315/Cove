@@ -71,7 +71,7 @@ impl TextSnippet {
                     return text;
                 }
                 if character == '$' {
-                    let start = *length + text.chars().count();
+                    let start = *length + text.len();
                     let saved = std::mem::take(output);
                     let saved_length = *length;
                     *length = start;
@@ -130,7 +130,7 @@ impl TextSnippet {
                     *index += 1;
                     let placeholder = read_placeholder(characters, index, output, length, found);
                     output.push_str(&placeholder);
-                    *length += placeholder.chars().count();
+                    *length += placeholder.len();
                     found.entry(number).or_insert((start, *length));
                 } else if *index < characters.len() && characters[*index] == '|' {
                     *index += 1;
@@ -153,7 +153,7 @@ impl TextSnippet {
                     *index = (*index + 2).min(characters.len());
                     let inserted = first.unwrap_or(choice);
                     output.push_str(&inserted);
-                    *length += inserted.chars().count();
+                    *length += inserted.len();
                     found.entry(number).or_insert((start, *length));
                 } else {
                     if *index < characters.len() && characters[*index] == '}' {
@@ -173,7 +173,7 @@ impl TextSnippet {
                 *index += 1;
                 let placeholder = read_placeholder(characters, index, output, length, found);
                 output.push_str(&placeholder);
-                *length += placeholder.chars().count();
+                *length += placeholder.len();
             } else if *index < characters.len() && characters[*index] == '}' {
                 *index += 1;
             }
@@ -186,7 +186,7 @@ impl TextSnippet {
                 && matches!(characters[index + 1], '$' | '}' | '\\')
             {
                 output.push(characters[index + 1]);
-                length += 1;
+                length += characters[index + 1].len_utf8();
                 index += 2;
                 continue;
             }
@@ -201,20 +201,31 @@ impl TextSnippet {
                 continue;
             }
             output.push(character);
-            length += 1;
+            length += character.len_utf8();
             index += 1;
         }
 
         let mut numbered: Vec<usize> = found.keys().copied().filter(|number| *number > 0).collect();
+        // Parse syntax in scalars, retain positions in bytes, then map the
+        // completed expansion once. Graphemes can join across placeholders.
+        let buffer = TextBuffer::new(&output);
+        let range = |start, end| {
+            let mut lower = buffer.character_index_for_utf8_offset(start);
+            if start != end && buffer.utf8_offset_for_character_index(lower) > start {
+                lower = lower.saturating_sub(1);
+            }
+            (lower, buffer.character_index_for_utf8_offset(end))
+        };
         numbered.sort_unstable();
         let mut stops: Vec<TextSnippetStop> = numbered
             .into_iter()
             .map(|number| {
-                let (start, end) = found[&number];
+                let (start, end) = range(found[&number].0, found[&number].1);
                 TextSnippetStop { number, start, end }
             })
             .collect();
         let (start, end) = found.get(&0).copied().unwrap_or((length, length));
+        let (start, end) = range(start, end);
         stops.push(TextSnippetStop {
             number: 0,
             start,
@@ -336,7 +347,7 @@ impl TextSnippetSession {
         if delta.character_range.start < stop.0 || delta.character_range.end > stop.1 {
             return false;
         }
-        let shift = delta.new_text.chars().count() as isize - delta.character_range.len() as isize;
+        let shift = next.character_count() as isize - previous.character_count() as isize;
         let mut stops = self.stops.borrow_mut();
         for (index, range) in stops.iter_mut().enumerate() {
             if index == current {

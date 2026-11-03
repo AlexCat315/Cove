@@ -88,8 +88,8 @@ fn spacing_scale_matches_the_authored_steps() {
     let radius = Theme::default_dark().radius;
     assert_eq!(
         [radius.none, radius.sm, radius.md, radius.lg, radius.xl],
-        [0.0, 6.0, 8.0, 12.0, 16.0],
-        "the authored 0/6/8/12/16 ramp"
+        [0.0, 4.0, 6.0, 8.0, 12.0],
+        "the compact desktop 0/4/6/8/12 ramp"
     );
     assert!(radius.pill >= 9999.0, "pill is the fully rounded sentinel");
 }
@@ -191,4 +191,33 @@ fn light_and_dark_presets_differ() {
         sum(light.colors.background) > sum(dark.colors.background),
         "the light preset has the brighter background"
     );
+}
+
+#[test]
+fn desktop_presets_keep_text_and_selected_text_readable() {
+    fn luminance(color: Color) -> f32 {
+        fn linear(value: f32) -> f32 {
+            if value <= 0.04045 {
+                value / 12.92
+            } else {
+                ((value + 0.055) / 1.055).powf(2.4)
+            }
+        }
+        0.2126 * linear(color.r) + 0.7152 * linear(color.g) + 0.0722 * linear(color.b)
+    }
+    fn contrast(a: Color, b: Color) -> f32 {
+        let a = luminance(a);
+        let b = luminance(b);
+        (a.max(b) + 0.05) / (a.min(b) + 0.05)
+    }
+    for theme in [Theme::default_light(), Theme::default_dark()] {
+        let colors = theme.colors;
+        assert!(contrast(colors.on_accent, colors.accent) >= 4.5);
+        for background in [colors.background, colors.surface_sunken] {
+            assert!(contrast(colors.on_surface, background) >= 4.5);
+            assert!(contrast(colors.on_surface, colors.selection.composited(background)) >= 4.5);
+        }
+        assert_eq!(theme.inputs.background, colors.surface_sunken);
+        assert!(theme.inputs.border_width <= 1.0 && theme.inputs.focus_ring_width <= 1.0);
+    }
 }

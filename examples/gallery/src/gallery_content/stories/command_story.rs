@@ -231,8 +231,10 @@ impl View for CommandStory {
                         ),
                         AnyView::new(
                             AnyView::new(
-                                Button::title("Open with project footer", move || open_custom.set(true))
-                                    .enabled(enabled),
+                                Button::title("Open with project footer", move || {
+                                    open_custom.set(true)
+                                })
+                                .enabled(enabled),
                             )
                             .debug_name("command-open-custom"),
                         ),

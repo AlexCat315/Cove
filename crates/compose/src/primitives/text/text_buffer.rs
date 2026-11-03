@@ -121,11 +121,12 @@ impl TextBuffer {
         String::from_utf8(bytes).unwrap_or_default()
     }
 
-    pub fn character_at(&self, index: usize) -> Option<char> {
+    /// The extended grapheme cluster at `index`, matching Swift's `Character?`.
+    pub fn character_at(&self, index: usize) -> Option<String> {
         if index >= self.character_count() {
             return None;
         }
-        self.substring(index..(index + 1)).chars().next()
+        Some(self.substring(index..(index + 1)))
     }
 
     pub fn insert(&self, string: &str, at_character_index: usize) -> TextBuffer {

@@ -6,6 +6,7 @@ use super::text_field::text_visual_line_index::TextVisualLineIndex;
 use cove_core::{Font, PositionedGlyph, TextAlignment, TextLayoutResult, TextLine};
 use cove_text::TextEnvironment;
 use std::collections::HashMap;
+use unicode_segmentation::UnicodeSegmentation;
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct TextLineGeometry {
@@ -125,7 +126,7 @@ impl TextDocumentLayout {
         }
         let source = self.buffer.substring(self.buffer.line_range(row));
         let text = if self.geometry.secure {
-            "\u{2022}".repeat(source.chars().count())
+            "\u{2022}".repeat(source.graphemes(true).count())
         } else {
             source.clone()
         };
@@ -213,10 +214,10 @@ impl TextDocumentLayout {
         };
 
         while cursor < text.len() {
-            let character = text[cursor..].chars().next().unwrap_or('\0');
-            let next = cursor + character.len_utf8();
-            pending += character.len_utf8();
-            if character == ' ' {
+            let grapheme = text[cursor..].graphemes(true).next().unwrap_or("");
+            let next = cursor + grapheme.len();
+            pending += grapheme.len();
+            if grapheme == " " {
                 last_space = Some(next);
             }
             if pending >= Self::SEGMENT_BYTES / 2 {
@@ -396,10 +397,8 @@ impl MeasuredTextLine {
     pub fn new(source: &str, display: &str, layout: &TextLayoutResult, line_height: f32) -> Self {
         let _ = source;
         let mut boundaries = vec![0usize];
-        let mut offset = 0usize;
-        for character in display.chars() {
-            offset += character.len_utf8();
-            boundaries.push(offset);
+        for (offset, grapheme) in display.grapheme_indices(true) {
+            boundaries.push(offset + grapheme.len());
         }
         let rows = if layout.lines.is_empty() {
             vec![TextLine {
