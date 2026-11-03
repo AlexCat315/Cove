@@ -377,13 +377,10 @@ fn escape_cancels() {
             (rig.handlers(&node).key.unwrap())(&plain(Scancode::ESCAPE), EventPhase::Target);
         assert_eq!(
             result,
-            EventResult::Ignored,
-            "GAP: Swift consumes Escape when on_cancel is set; Rust's key handler has no Escape branch"
+            EventResult::Handled,
+            "Escape is consumed while on_cancel is set"
         );
-        assert!(
-            !canceled.get(),
-            "GAP: Swift invokes on_cancel on Escape; Rust never reads TextFieldEvents::on_cancel"
-        );
+        assert!(canceled.get(), "Escape invokes on_cancel");
     });
     with_rig(|rig| {
         rig.install(TextField::new("", rig.binding()));
@@ -409,8 +406,8 @@ fn focus_request_selects_all() {
         assert!(rig.focus.focused() == Some(node.clone()), "focused");
         assert_eq!(
             state.borrow().selection.anchor,
-            None,
-            "GAP: Swift selects the whole value on a focus request (anchor 0); Rust only focuses and leaves the caret at the end"
+            Some(0),
+            "a focus request selects the whole value"
         );
         assert!(
             state.borrow().selection.cursor_index == 11,
@@ -566,13 +563,10 @@ fn shift_return_inserts_newline() {
         );
         assert_eq!(
             rig.text(),
-            "abc",
-            "GAP: Swift inserts a newline on Shift-Return in a single-line field; Rust submits instead and leaves the text unchanged"
+            "abc\n",
+            "Shift-Return inserts a newline in a single-line field"
         );
-        assert!(
-            submitted.get(),
-            "GAP: Swift does not submit on Shift-Return; Rust ignores the modifier and submits"
-        );
+        assert!(!submitted.get(), "Shift-Return does not submit");
     });
 }
 
@@ -757,8 +751,8 @@ fn multiline_auto_grow_caps_and_scrolls() {
             hook(&mut hovered, Point::default());
         }
         assert!(
-            hovered.indices().is_empty(),
-            "GAP: Swift draws a hover scrollbar overlay on a capped field; Rust installs no overlay draw"
+            !hovered.indices().is_empty(),
+            "a hovered capped field draws its scrollbar overlay"
         );
         let wheel_handler = rig.handlers(&node).wheel;
         assert!(wheel_handler.is_some(), "wheel handler");
@@ -906,8 +900,8 @@ fn line_numbers_and_syntax_colors_render() {
             "the number run keeps its syntax colour"
         );
         assert!(
-            !colors.contains(&gutter.rgba8()),
-            "GAP: Swift paints the line-number gutter colour; Rust draws no gutter"
+            colors.contains(&gutter.rgba8()),
+            "the line numbers paint in the authored colour"
         );
     });
 }

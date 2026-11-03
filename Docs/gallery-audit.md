@@ -1,6 +1,6 @@
 # Gallery 逐项验收记录
 
-更新：2026-11-03。目录共 106 页；本轮先处理搜索、Slider / RangeSlider、Rating 与共享文本选择，随后补齐 TextField 的撤销/重做、多行测量与滚轮、词/垂直导航、语法配色、前后缀与长度限制。
+更新：2026-11-03。目录共 106 页；本轮先处理搜索、Slider / RangeSlider、Rating 与共享文本选择，随后补齐 TextField 的撤销/重做、多行测量与滚轮、词/垂直导航、语法配色、前后缀与长度限制；再补行号栏、横向滚动、滚轮包含、hover 滚动条、文档布局发布、Escape 取消与 Control-Home/End、Shift-Return。
 
 Swift 源码逐页对照见文末《Swift 源码对照（逐页差异清单）》。
 
@@ -15,10 +15,11 @@ Swift 源码逐页对照见文末《Swift 源码对照（逐页差异清单）�
 | 文本选择不一致 | 正文选择区域与控件手势边界需要分开；键盘扩展原先按 Unicode 标量而非字素移动 | 所有 106 页选择区域结构检查、15 种页壳的拖选复制检查；组合 emoji/重音字母按完整字素移动；输入框补上点击定位、拖选、双击词/三击全选、快捷键和及时重绘；导出 TextSelectionViewExt | Website/src/content/components/text-selection.md |
 | 平台输入接口修改丢失或拆开 emoji | select / delete_surrounding 只写内部状态，UTF-16 按标量映射 | 选区对齐字素边界，删除/组合提交写回绑定并重绘；全选/复制/剪切与异步系统粘贴共享绑定 | Website/src/content/components/text-field.md |
 | TextField 迁移未完成 | 撤销/重做、多行测量与滚轮、词/垂直导航、语法配色、前后缀与长度限制只有 Swift 实现；工作区因半成品改动无法编译 | 编辑事务历史（相邻输入合并、选中态随文本恢复、外部改写清空栈）接到菜单与快捷键；行/页/文档级光标移动与软换行行亲和；逐字素着色的语法颜色；前置/后置/前缀/后缀/字数计数绘制与命中区；输入、粘贴与 IME 提交遵守 `max_length`；平台删除与组合提交进入历史 | Website/src/content/components/text-field.md |
+| 代码编辑器行号、横向滚动、覆盖层与取消 | 行号栏、长行横向揭示与横向滚轮、`__textfield_document_layout`、Escape 取消、hover 滚动条都只有 Swift 实现；更新阶段还不发布滚动界限 | 三数位行号栏（可配前景与背景色）参与测量与命中；绘制阶段按光标揭示双向滚动并发布滚动界限与文档布局；横向滚轮与纵向一致按 30pt 步进；溢出字段独占滚轮（含边界），聚焦时设置 `PreferFocused`；hover 时绘制滚动条覆盖层；Escape 调用 `on_cancel` 并把焦点交还最近的焦点祖先；Control-Home/End 到文档首尾；单行字段 Shift-Return 插入换行 | Website/src/content/components/text-field.md |
 
 ## 已确认、仍待逐项修复的缺失
 
-- TextField 的撤销/重做、多行测量与滚轮滚动、词/垂直导航、语法配色、前后缀和长度限制已补齐，`cargo test -p cove-ui-compose --test compose` 1545 项通过。TextField 页仍未整体通过：行号栏配色、横向滚轮与横向光标揭示、`__textfield_document_layout` 发布、`TextFieldStyle` 状态接入、Escape/`on_cancel`、hover 滚动条覆盖层仍是 `GAP:` 断言的未实现项。
+- TextField 的撤销/重做、多行测量与滚轮、词/垂直导航、语法配色、前后缀与长度限制、行号栏、横向滚动、滚轮包含、hover 滚动条、文档布局发布、Escape 取消、Control-Home/End 与 Shift-Return 均已补齐，`cargo test -p cove-ui-compose --test compose` 1545 项通过，`cargo test -p cove-examples` 全部通过。TextField 页仍未整体通过：`TextFieldStyle` 的焦点/编辑状态接入，以及 IME 区域的失效重发布、组合预览缓存、`TextBuffer` 的字素（而非标量）计数、双击选词仍是 `GAP:` 断言的未实现项。
 - 现有测试中一部分 `GAP:` 断言验证的是当前缺失行为。全套测试通过不能证明 Swift 能力已迁移完成；修复相关能力时，应改为验证预期结果，补真实文本环境或原生操作的验收。
 
 ## 验收范围
@@ -60,7 +61,7 @@ cargo test -p cove-ui-compose --test compose --locked
 | Slider | 5 | 0 / 0 | 本轮组件/页面修复；文档已写 |
 | RangeSlider | 4 | 0 / 0 | 本轮组件/页面修复；文档已写 |
 | Rating | 6 | 0 / 0 | 本轮组件/页面修复；文档已写 |
-| TextField | 4 | 0 / 0 | 输入、选择、撤销/重做、多行测量与滚轮、词/垂直导航、语法配色、前后缀与长度限制已修复；行号栏与横向滚动未完成 |
+| TextField | 4 | 0 / 0 | 输入、选择、撤销/重做、多行测量与滚轮、词/垂直导航、语法配色、前后缀与长度限制、行号栏、横向滚动与覆盖层已修复；样式接入与 IME 区域重发布未完成 |
 | SearchField | 0 | 0 / 0 | 搜索与输入链路修复；文档已写 |
 | TextArea | 0 | 0 / 0 | 挂载/几何基础检查通过；待逐项交互和视觉验收 |
 | Text Editor | 0 | 0 / 0 | 挂载/几何基础检查通过；待逐项交互和视觉验收 |

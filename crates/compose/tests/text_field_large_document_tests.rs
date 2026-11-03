@@ -17,16 +17,15 @@
 //! which edit a `FieldState` directly.
 //!
 //! Named differences from the Swift suite (each pinned by a `GAP:` assertion):
-//! - **No scroll reveal.** The field draw never scrolls horizontally to a long
-//!   row's caret or vertically to a mid-document caret request, and the wheel
-//!   never scrolls.
-//! - **No IME anchor, document layout or preview cache.** No text input area,
-//!   no `__textfield_document_layout` attachment (so shaping bounds cannot be
-//!   observed) and no cached composition preview.
-//! - **No undo.** Primary-Z does nothing and `FieldState` has no history.
+//! - **No preview cache.** A composition preview is not stored in the render
+//!   draft, so redraws rebuild it.
 //! - **Scalar indices.** `TextBuffer` counts Unicode scalars, so a combining
 //!   mark or joined flag counts 3 characters and insertion advances the caret
 //!   by the inserted scalar count.
+//!
+//! The draw reveals the caret in both axes, the wheel scrolls a long row, the
+//! shaped document is published under `__textfield_document_layout`, and
+//! Primary-Z undoes through the shared history.
 
 use crate::support;
 
@@ -167,9 +166,9 @@ fn horizontal_caret_reveal() {
         (handlers.text.clone().unwrap())(&"x".repeat(200), EventPhase::Target);
         let draws = draw(&node);
         let offset = state.borrow().scroll.horizontal.offset;
-        assert_eq!(
-            offset, 0.0,
-            "GAP: Swift reveals the caret on the 200-character row (horizontal offset > 500); Rust's field draw never updates the horizontal scroll"
+        assert!(
+            offset > 500.0,
+            "the draw reveals the caret on the 200-character row (offset {offset})"
         );
         let area = node.attachment::<TextInputArea>(TextInputAttachmentKey::AREA);
         assert!(
@@ -178,8 +177,8 @@ fn horizontal_caret_reveal() {
         );
         assert!(draws.current_clip().is_none(), "clip balanced");
         assert!(
-            document(&node).is_none(),
-            "GAP: Swift publishes `__textfield_document_layout` (fewer than 25 shaped lines, unchanged by a horizontal wheel); Rust keeps the document local to the draw"
+            document(&node).is_some(),
+            "the draw publishes the shaped document layout"
         );
         let prior = state.borrow().scroll.horizontal.offset;
         if let Some(wheel) = handlers.wheel.clone() {
@@ -195,10 +194,9 @@ fn horizontal_caret_reveal() {
             );
         }
         let _ = draw(&node);
-        assert_eq!(
-            state.borrow().scroll.horizontal.offset,
-            prior,
-            "GAP: Swift scrolls the long row left on a horizontal wheel; Rust's wheel handler never scrolls"
+        assert!(
+            state.borrow().scroll.horizontal.offset < prior,
+            "a horizontal wheel scrolls the long row"
         );
         let line_start = store.lock().unwrap().line_range(100_000).start;
         state.borrow_mut().move_cursor(line_start, false, None);
@@ -253,13 +251,13 @@ fn middle_editing() {
         let _ = draw(&node);
         let state = state_of(&node).unwrap();
         assert!(
-            document(&node).is_none(),
-            "GAP: Swift publishes `__textfield_document_layout` (shaped lines < 30, UTF-8 < 600, +1 per typed line); Rust keeps the document local, so shaping bounds cannot be observed"
+            document(&node).is_some(),
+            "the draw publishes the shaped document layout"
         );
         let offset = state.borrow().scroll.offset_y;
-        assert_eq!(
-            offset, 0.0,
-            "GAP: Swift scrolls to the mid-document caret request (offset > 1_000_000); Rust's draw clears the reveal request without scrolling"
+        assert!(
+            offset > 1_000_000.0,
+            "the draw scrolls to the mid-document caret request (offset {offset})"
         );
         let handlers = scene.registry.handlers(&node);
         let start = std::time::Instant::now();

@@ -959,9 +959,8 @@ fn nested_text_field_boundary_contains_wheel() {
         assert_eq!(field.content_offset().y, previous);
         assert_eq!(
             scroll.content_offset().y,
-            30.0,
-            "GAP: Swift contains a boundary wheel inside the overflowing field (parent \
-             stays 0); Rust's field ignores wheel input, so the parent scrolls a notch"
+            0.0,
+            "an overflowing field keeps the boundary wheel instead of forwarding it"
         );
 
         for (y, phase) in [(-12.0, ScrollPhase::Began), (-8.0, ScrollPhase::Changed)] {
@@ -982,9 +981,8 @@ fn nested_text_field_boundary_contains_wheel() {
         assert_eq!(field.content_offset().y, previous);
         assert_eq!(
             scroll.content_offset().y,
-            50.0,
-            "GAP: Swift contains the continuous gesture inside the field (parent stays \
-             0); Rust forwards both precise deltas to the parent"
+            0.0,
+            "the continuous gesture stays inside the overflowing field"
         );
     });
 }
@@ -1175,10 +1173,9 @@ fn focused_text_field_wheel_uses_pointer_region() {
         }
         assert_eq!(
             field.attachment::<WheelRoutingPriority>(WheelRoutingAttachmentKey::PRIORITY),
-            None,
-            "GAP: Swift marks a focused, overflowing text field with \
-             `WheelRoutingPriority.preferFocused`; Rust's text field never sets a wheel \
-             routing priority"
+            Some(WheelRoutingPriority::PreferFocused),
+            "a focused, overflowing field asks the router for the wheel whenever the \
+             pointer is over it"
         );
 
         let dispatcher = dispatcher(&graph, registry, &Rc::new(PointerCapture::new()), focus);

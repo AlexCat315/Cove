@@ -4,6 +4,12 @@
 
 ## Unreleased
 
+- **TextField 行号、横向滚动与覆盖层（2026-11-03）**：
+  - 行号栏接入排版：三位数固定列加 24pt 间距，`line_number_color` / `line_number_gutter_color` 分别控制数字与栏底，行号不随横向滚动移动，文档列在位数变化时保持不动。
+  - 绘制阶段按光标揭示双向滚动并发布 `__textfield_document_layout`；横向滚轮与纵向共用 30pt 步进，溢出字段独占滚轮（含边界），聚焦且溢出时声明 `WheelRoutingPriority::PreferFocused`，hover 时绘制滚动条覆盖层。
+  - Escape 在 `on_cancel` 存在时被消费并把焦点交还最近的焦点祖先；焦点请求选中当前值；Control-Home/End 到文档首尾；单行字段 Shift-Return 插入换行、垂直字段 Return 换行 / Primary-Return 提交。
+  - 更新阶段也发布滚动界限，嵌套字段在首次绘制前就能独占滚轮；修复滚动界限为零时滚轮被外层吞掉的回归。
+  - 测试改回验证预期行为：`cargo test -p cove-ui-compose --test compose` 1545 项通过，`cargo test -p cove-examples` 全部通过；`Docs/gallery-audit.md` 与用户文档同步更新，剩余项为 `TextFieldStyle` 状态接入、IME 区域重发布、组合预览缓存、字素计数与双击选词。
 - **TextField 迁移收尾（2026-11-03）**：
   - 编辑事务历史接入字段：相邻输入与连续删除各合并为一步，粘贴/IME 提交/选区替换各为独立一步；撤销连选区一并恢复，新编辑清空重做分支，外部改写绑定的文本清空两侧栈。菜单与本字段快捷键（Primary-Z、Primary-Shift-Z、Primary-Y）读取同一份历史，不再把 Primary-Z 漏给外层快捷键宿主。
   - 补上多行测量与滚轮：垂直字段按行盒增高到 `max_visible_lines`，显式换行同样让默认字段增高；溢出后滚轮按 30pt 一格移动视口，未溢出时继续传给外层滚动视图。滚动界限在更新阶段发布，嵌套字段在首次绘制前就知道自己能否滚动。

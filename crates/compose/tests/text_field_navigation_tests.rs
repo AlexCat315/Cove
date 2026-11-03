@@ -327,17 +327,13 @@ fn logical_lines() {
         store.lock().unwrap().clone_from(&original);
         state.borrow_mut().normalize(&original);
         press(&handler, Scancode::HOME, KeyModifiers::LEFT_CTRL);
-        assert_eq!(
-            cursor(),
-            range.start,
-            "GAP: Swift Control-Home moves to the document start; Rust treats it as Home on the current line"
-        );
+        assert_eq!(cursor(), 0, "Control-Home moves to the document start");
         press(&handler, Scancode::END, KeyModifiers::LEFT_CTRL);
         let count = state.borrow().buffer.character_count();
         assert_eq!(
             cursor(),
-            range.end,
-            "GAP: Swift Control-End moves to the document end ({count}); Rust treats it as End on the current line"
+            count,
+            "Control-End moves to the document end"
         );
         press(&handler, Scancode::ARROW_UP, KeyModifiers::LEFT_GUI);
         assert_eq!(
@@ -506,8 +502,8 @@ fn page_navigation() {
         let document =
             node.attachment::<Rc<RefCell<TextDocumentLayout>>>("__textfield_document_layout");
         assert!(
-            document.is_none(),
-            "GAP: Swift publishes `__textfield_document_layout` with fewer than 25 shaped lines; Rust's field draw keeps its document local"
+            document.is_some(),
+            "the draw publishes the shaped document layout"
         );
     });
 }

@@ -90,8 +90,30 @@ fn price(cx: &Scope) -> impl View {
 }
 ```
 
+## 行号与横向滚动
+
+`shows_line_numbers` 打开行号栏：三位数宽度的固定列加上 24pt 间距，`line_number_color` 是数字颜色，`line_number_gutter_color` 填充栏底。文档列不会因为行号位数变化而移动，行号也不随横向滚动移动。
+
+长行溢出时，绘制阶段会把光标揭示进可见区域；横向滚轮按 30pt 步进（与纵向一致），同时支持触控板的精确增量。字段只要有一条轴溢出，就独占滚轮（包括滚到边界），不会把剩余增量转给外层滚动视图；聚焦且溢出的字段会声明 `WheelRoutingPriority::PreferFocused`，指针位于字段内时优先接收滚轮。hover 时在尾端绘制滚动条覆盖层。
+
+```rust
+let editor = TextField::new("", code.binding())
+    .layout(TextFieldLayout { axis: TextFieldAxis::Vertical, ..Default::default() })
+    .code_editing(TextFieldCodeEditing {
+        shows_line_numbers: true,
+        line_number_color: Some(Color::hex(0x9AA4B2)),
+        ..Default::default()
+    });
+```
+
+绘制时会把当前形状布局发布到 `__textfield_document_layout`，诊断和测试可以读取已排版行的边界。
+
+## 回车与取消
+
+单行字段的 Return 提交；Shift-Return 在任意字段插入换行；垂直字段的 Return 插入换行，Primary-Return 提交。设置了 `on_cancel` 时 Escape 会被消费并调用回调，随后把焦点交还最近的焦点祖先，编辑器的容器因此可以继续处理快捷键。
+
 ## 平台输入
 
 平台输入接口使用 UTF-16 偏移。选区落入组合 emoji 或重音字母内部时，会回退到完整字素的边界；删除范围向完整字素扩展，避免留下半个字符。IME 组合提交与删除同样进入撤销历史，并遵守 `max_length`。
 
-尚未完成的迁移：行号栏配色、横向滚轮与长行横向光标揭示、`TextFieldStyle` 的焦点/编辑状态接入、Escape 的 `on_cancel` 回调、溢出字段的 hover 滚动条覆盖层。搜索和建议列表使用 [SearchField](/docs/search-field)；正文拖选使用[文本选择区域](/docs/text-selection)。
+尚未完成的迁移：`TextFieldStyle` 的焦点/编辑状态接入、IME 区域在失效后的重发布、组合预览缓存、`TextBuffer` 的字素（而非标量）计数、双击选词。搜索和建议列表使用 [SearchField](/docs/search-field)；正文拖选使用[文本选择区域](/docs/text-selection)。

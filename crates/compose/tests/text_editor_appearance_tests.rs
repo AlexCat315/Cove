@@ -6,19 +6,14 @@
 //! - the editor style leaves the document on a sunken surface with no border,
 //!   and an ordinary field still draws its chrome
 //!
-//! Production gaps (reported, not fixed):
+//! The gutter reserves three digit slots plus a 24pt gap, paints the authored
+//! line-number colour and keeps the document column still.
 //!
-//! - `TextFieldCodeEditing` declares `shows_line_numbers`, `line_number_color`
-//!   and `syntax_color_at_utf8_offset`, but nothing reads them: the field's draw
-//!   hook never paints a gutter or a syntax tint. The Swift assertions about a
-//!   gutter that reserves stable space and stays 24pt clear of the document
-//!   therefore cannot be observed. `stable_gutter` asserts the reachable half
-//!   (the document paints, the origin is stable) and pins the missing gutter
-//!   with `GAP:` asserts carrying the Swift expectations.
-//! - `TextField::body` stores `self.style` and hands it to `TextFieldHost`, but
-//!   `TextFieldHost` never calls `AnyTextFieldStyle::make_body`, so
-//!   `.text_field_style(EditorTextFieldStyle)` has no effect: no sunken surface
-//!   and no suppressed border. `focused_surface` pins that with `GAP:` asserts.
+//! Production gap (reported, not fixed): `TextField::body` stores `self.style`
+//! and hands it to `TextFieldHost`, but `TextFieldHost` never calls
+//! `AnyTextFieldStyle::make_body`, so `.text_field_style(EditorTextFieldStyle)`
+//! has no effect: no sunken surface and no suppressed border.
+//! `focused_surface` pins that with `GAP:` asserts.
 
 use crate::support;
 
@@ -109,8 +104,7 @@ fn stable_gutter() {
                     "the field paints something at {count} lines"
                 );
 
-                // The syntax tint is per glyph. GAP: the gutter is still not
-                // painted, so the authored line-number colour never appears.
+                // The syntax tint is per glyph.
                 assert!(
                     list.vertices()
                         .iter()
@@ -119,13 +113,13 @@ fn stable_gutter() {
                         > 0,
                     "the authored syntax colour is painted at {count} lines"
                 );
-                assert_eq!(
+                assert!(
                     list.vertices()
                         .iter()
                         .filter(|vertex| vertex.color == number_color.rgba8())
-                        .count(),
-                    0,
-                    "GAP: the authored line-number colour is never painted at {count} lines"
+                        .count()
+                        > 0,
+                    "the authored line-number colour is painted at {count} lines"
                 );
                 paint_counts.push(list.vertices().len());
             }

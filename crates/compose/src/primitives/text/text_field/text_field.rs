@@ -25,7 +25,7 @@ use cove_core::scene::{
     AccessibilityRole, AccessibilitySemantics, AccessibilityState, EventResult, FocusChainHolder,
     HoverPhase, InputHandlerRoute, InteractionRegistryHolder, LayoutNode, MeasureMode, Node,
     NodeResource, Overflow, PointerCaptureHolder, PointerPhase, TextEditCommand,
-    TextInputAttachmentKey,
+    TextInputAttachmentKey, WheelRoutingAttachmentKey, WheelRoutingPriority,
 };
 use cove_core::{Binding, Color, Point, Rect, Size, TextAlignment};
 use cove_platform::{MouseButton, MouseWheelEvent, SystemCursor};
@@ -40,8 +40,9 @@ use super::text_field_editing::{
     delete_selection, edit_clock, insert_replacing_selection, insert_replacing_selection_limited,
 };
 use super::text_field_layout_engine::{
-    FIELD_STATE_KEY, FieldCompositionState, FieldLayoutInputs, FieldScrollState,
-    FieldSelectionState, RenderDraftState, document_geometry, make_render_state, selection_range,
+    DOCUMENT_LAYOUT_KEY, FIELD_STATE_KEY, FieldCompositionState, FieldLayoutInputs,
+    FieldScrollState, FieldSelectionState, RenderDraftState, document_geometry,
+    horizontal_scrollbar_metrics, make_render_state, scrollbar_metrics, selection_range,
     update_scroll,
 };
 use super::text_field_navigation::{
@@ -63,6 +64,8 @@ const MEASURE_INPUTS_KEY: &str = "__textfield_measure_inputs";
 const MEASURE_DOCUMENT_KEY: &str = "__textfield_measure_document";
 /// One line increment for a wheel notch in a multiline field.
 pub const MULTILINE_WHEEL_STEP: f32 = 30.0;
+/// Space between the line-number column and the document text.
+const GUTTER_GAP: f32 = 24.0;
 pub const SCROLLBAR_TRACK_THICKNESS: f32 = 6.0;
 pub const SCROLLBAR_INSET: f32 = 3.0;
 
@@ -94,6 +97,8 @@ pub struct AddonMetrics {
     pub clear: f32,
     /// Word-limit counter and its gap.
     pub counter: f32,
+    /// Line-number gutter and its gap to the document.
+    pub gutter: f32,
 }
 
 /// Measured decorations for one pass: the shapes to paint and the space they
@@ -124,7 +129,7 @@ impl AddonLayouts {
 
     /// Space taken on the leading edge, before the editable text.
     pub fn leading(&self) -> f32 {
-        self.metrics.prepend + self.metrics.icon + self.metrics.prefix
+        self.metrics.gutter + self.metrics.prepend + self.metrics.icon + self.metrics.prefix
     }
 
     /// Space taken on the trailing edge, after the editable text.
@@ -439,6 +444,7 @@ impl TextField {
         line_height: f32,
         letter_spacing: f32,
         character_count: usize,
+        rows: usize,
     ) -> AddonLayouts {
         let inset = self.horizontal_inset(theme);
         let has_text = character_count > 0;
@@ -478,7 +484,19 @@ impl TextField {
             .map(measure);
         let counter_text = self.counter_text(character_count);
         let counter = counter_text.as_deref().map(measure);
+        // Three digit slots keep the document column still while the visible
+        // line numbers grow; narrower documents never need more.
+        let gutter = if self.code_editing.shows_line_numbers
+            && self.layout.axis == TextFieldAxis::Vertical
+        {
+            let digits = rows.max(1).to_string().len().max(3);
+            let slot = measure("0").total_width.max(1.0);
+            slot * digits as f32 + GUTTER_GAP
+        } else {
+            0.0
+        };
         let metrics = AddonMetrics {
+            gutter,
             prepend: prepend
                 .as_ref()
                 .map_or(0.0, |layout| layout.total_width + inset * 2.0 + theme.spacing.sm),
@@ -523,7 +541,10 @@ impl TextField {
 
     /// Leading reservation: the authored slabs, icon and inline prefix.
     fn leading_addon(&self, addons: &AddonLayouts) -> f32 {
-        addons.metrics.prepend + addons.metrics.icon + addons.metrics.prefix
+        addons.metrics.gutter
+            + addons.metrics.prepend
+            + addons.metrics.icon
+            + addons.metrics.prefix
     }
 
     /// Text-column width for a frame, after every reservation.
@@ -708,6 +729,11 @@ impl PrimitiveView for TextFieldHost {
             if let Some(chain) = FocusChainHolder::current() {
                 chain.focus(Some(node), true);
             }
+            // A focus request selects the current value so typing replaces it.
+            let mut state = state_handle.borrow_mut();
+            state.selection.anchor = Some(0);
+            state.selection.cursor_index = state.buffer.character_count();
+            state.record_activity();
         }
         if let (Some(request), Some(index)) = (
             self.field.navigation.caret_request_id,
@@ -725,6 +751,22 @@ impl PrimitiveView for TextFieldHost {
             session.configure(self.field.snapshot(), state_handle.clone());
         }
         install_interaction(node, &self.field, state_handle.clone());
+
+        let overlay_node = node.downgrade();
+        node.update_overlay_draw(
+            (
+                is_focused,
+                is_hovered,
+                state_handle.borrow().scroll.max_y.to_bits(),
+                state_handle.borrow().scroll.horizontal.maximum().to_bits(),
+            ),
+            move |list, origin| {
+                let Some(owner) = Node::upgrade(&overlay_node) else {
+                    return;
+                };
+                draw_scrollbar_overlay(&owner, list, origin);
+            },
+        );
 
         let draw_node = node.downgrade();
         let field = self.field.snapshot();
@@ -1090,6 +1132,7 @@ fn input_area(
         line_height,
         token.letter_spacing,
         state.buffer.character_count(),
+        state.buffer.line_count(),
     );
     let inset = field.horizontal_inset(&theme);
     let width = field.available_text_width(&theme, node.frame().width, &addons);
@@ -1170,6 +1213,7 @@ fn pointer_character(
         line_height,
         token.letter_spacing,
         state.buffer.character_count(),
+        state.buffer.line_count(),
     );
     let leading = field.horizontal_inset(&theme) + addons.leading();
     let width = field.available_text_width(&theme, node.frame().width, &addons);
@@ -1229,6 +1273,9 @@ fn install_interaction(node: &Node, field: &TextField, state: Rc<RefCell<FieldSt
     if let Some(handler) = field.events.on_change.clone() {
         node.set_attachment("__textfield_change", handler);
     }
+    if let Some(handler) = field.events.on_cancel.clone() {
+        node.set_attachment("__textfield_cancel", handler);
+    }
     if let Some(handler) = field.events.on_focus.clone() {
         node.set_attachment("__textfield_focus", handler);
     }
@@ -1261,6 +1308,8 @@ fn install_interaction(node: &Node, field: &TextField, state: Rc<RefCell<FieldSt
             let Some(owner) = Node::upgrade(&hover_node) else {
                 return;
             };
+            // Touch surfaces never send a hover phase, so the event itself is
+            // the capability signal; the overlay simply stays hidden there.
             let hovered = phase == HoverPhase::Enter
                 && owner
                     .composition_value(&crate::adaptive::SurfaceEnvironment::key())
@@ -1608,6 +1657,29 @@ fn install_interaction(node: &Node, field: &TextField, state: Rc<RefCell<FieldSt
                     return EventResult::Handled;
                 }
             }
+            // Escape cancels through the caller's callback without holding the
+            // editing state, so the callback may safely recompose this field.
+            if event.scancode == crate::Scancode::ESCAPE
+                && let Some(cancel) = owner.attachment::<Rc<dyn Fn()>>("__textfield_cancel")
+            {
+                if let Ok(mut state) = key_state.try_borrow_mut() {
+                    state.clear_composition();
+                }
+                cancel();
+                // Resigning focus hands the container back its focus, the way
+                // Swift returns focus when the editor closes.
+                if let Some(chain) = FocusChainHolder::current() {
+                    let mut ancestor = owner.parent();
+                    while let Some(node) = ancestor {
+                        if node.is_focusable() {
+                            chain.focus(Some(&node), false);
+                            break;
+                        }
+                        ancestor = node.parent();
+                    }
+                }
+                return EventResult::Handled;
+            }
             let primary = event.modifiers.has_gui() || event.modifiers.has_ctrl();
             // Undo / redo take priority over every other binding. Primary-Z
             // steps back, Primary-Y and Primary-Shift-Z step forward — the
@@ -1659,13 +1731,14 @@ fn install_interaction(node: &Node, field: &TextField, state: Rc<RefCell<FieldSt
                 }));
                 return EventResult::Handled;
             }
-            // Return submits unless a vertical field is going to take the
-            // newline: Primary-Return always submits, Shift-Return inserts in a
-            // multiline field, which is what the Swift suite asserts.
+            // Return submits unless Shift asks for a newline in the buffer:
+            // Primary-Return always submits, Shift-Return inserts anywhere, and
+            // a vertical field takes the newline for a plain Return.
             if matches!(
                 event.scancode,
                 crate::Scancode::RETURN | crate::Scancode::KEYPAD_ENTER
-            ) && (key_field.layout.axis != TextFieldAxis::Vertical || primary)
+            ) && !event.modifiers.has_shift()
+                && (key_field.layout.axis != TextFieldAxis::Vertical || primary)
             {
                 return match owner.attachment::<Rc<dyn Fn()>>("__textfield_submit") {
                     Some(submit) => {
@@ -1758,26 +1831,24 @@ fn install_interaction(node: &Node, field: &TextField, state: Rc<RefCell<FieldSt
                 return EventResult::Ignored;
             }
             let frame = owner.frame();
-            let (_, dy) = event.displacement(
+            let (dx, dy) = event.displacement(
                 MULTILINE_WHEEL_STEP,
                 frame.width,
                 frame.height.max(1.0),
             );
             // Wheel deltas report content movement; the viewport moves the
             // other way, matching the scroll view's convention.
-            let delta = -dy;
-            if delta == 0.0 {
-                return EventResult::Ignored;
-            }
+            let (delta_x, delta_y) = (-dx, -dy);
+            let max_x = state.scroll.horizontal.maximum();
             let max_y = state.scroll.max_y.max(0.0);
-            if max_y <= 0.0 {
+            if (max_x <= 0.0 && max_y <= 0.0) || (delta_x == 0.0 && delta_y == 0.0) {
                 return EventResult::Ignored;
             }
-            let previous = state.scroll.offset_y;
-            state.scroll.offset_y = (state.scroll.offset_y + delta).clamp(0.0, max_y);
-            if state.scroll.offset_y == previous {
-                return EventResult::Ignored;
-            }
+            let previous = (state.scroll.horizontal.offset, state.scroll.offset_y);
+            state.scroll.horizontal.offset =
+                (state.scroll.horizontal.offset + delta_x).clamp(0.0, max_x);
+            state.scroll.offset_y = (state.scroll.offset_y + delta_y).clamp(0.0, max_y);
+            let changed = previous != (state.scroll.horizontal.offset, state.scroll.offset_y);
             // The wheel moves the viewport, not the caret: the next paint must
             // not snap the visible region back to the caret.
             state.scroll.needs_caret_reveal = false;
@@ -1787,9 +1858,13 @@ fn install_interaction(node: &Node, field: &TextField, state: Rc<RefCell<FieldSt
             if let Some(session) = owner.first_resource::<TextCompletionSession>() {
                 session.dismiss();
             }
-            owner.mark_render_dirty(cove_core::scene::InvalidationSource::style_set(
-                "textFieldWheel",
-            ));
+            if changed {
+                owner.mark_render_dirty(cove_core::scene::InvalidationSource::style_set(
+                    "textFieldWheel",
+                ));
+            }
+            // An overflowing field keeps the wheel at its boundary instead of
+            // forwarding the leftover delta to the enclosing scroll view.
             EventResult::Handled
         }),
     );
@@ -1822,6 +1897,7 @@ fn navigation_context(
         line_height,
         token.letter_spacing,
         state.buffer.character_count(),
+        state.buffer.line_count(),
     );
     let width = field.available_text_width(&theme, node.frame().width, &addons);
     let geometry = document_geometry(
@@ -1843,6 +1919,36 @@ fn navigation_context(
         line_height,
         vertical_inset: field.vertical_inset(line_height),
     })
+}
+
+/// Hover scrollbar: the thumb appears while the pointer rests on a field whose
+/// rows or columns overflow.
+fn draw_scrollbar_overlay(node: &Node, list: &mut cove_core::DrawList, origin: Point) {
+    if node.attachment::<bool>(SCROLLBAR_HOVERED) != Some(true) {
+        return;
+    }
+    let Some(state) = node.attachment::<Rc<RefCell<FieldState>>>(FIELD_STATE_KEY) else {
+        return;
+    };
+    let state = state.borrow();
+    if state.scroll.max_y <= 0.0 && state.scroll.horizontal.maximum() <= 0.0 {
+        return;
+    }
+    let theme = theme_for_node(node);
+    let thickness = 3.0;
+    let inset = theme.spacing.xs;
+    let track = theme.colors.on_surface_muted.multiplied_alpha(0.18);
+    let thumb = theme.colors.on_surface_muted.multiplied_alpha(0.55);
+    if let Some(metrics) = scrollbar_metrics(&state.scroll, node, origin, thickness, inset) {
+        let _ = list.add_rounded_rect(metrics.track_rect, thickness * 0.5, track);
+        let _ = list.add_rounded_rect(metrics.thumb_rect, thickness * 0.5, thumb);
+    }
+    if let Some(metrics) =
+        horizontal_scrollbar_metrics(&state.scroll, node, origin, thickness, inset)
+    {
+        let _ = list.add_rounded_rect(metrics.track_rect, thickness * 0.5, track);
+        let _ = list.add_rounded_rect(metrics.thumb_rect, thickness * 0.5, thumb);
+    }
 }
 
 /// Fill the scroll limits from the laid-out rows when no paint has run yet.
@@ -2058,6 +2164,18 @@ fn apply_key(
         }
         crate::Scancode::HOME | crate::Scancode::END => {
             let ending = scancode == crate::Scancode::END;
+            // Primary-Home/End reach the document bounds; the plain and Shift
+            // spellings stop at the current line.
+            if primary && (command || event.modifiers.has_ctrl()) {
+                let target = if ending {
+                    state.buffer.character_count()
+                } else {
+                    0
+                };
+                state.move_cursor(target, shift, None);
+                state.selection.line_end_affinity = false;
+                return EventResult::Handled;
+            }
             let target = match context.as_mut() {
                 Some(ctx) => {
                     let document = &mut ctx.document;
@@ -2126,7 +2244,7 @@ fn apply_key(
             EventResult::Handled
         }
         crate::Scancode::RETURN | crate::Scancode::KEYPAD_ENTER => {
-            if !vertical || primary || field.behavior.read_only {
+            if primary || field.behavior.read_only {
                 return EventResult::Handled;
             }
             let newline = indented_newline(
@@ -2331,6 +2449,7 @@ fn render(
         line_height,
         token.letter_spacing,
         current.character_count(),
+        current.line_count(),
     );
     let inset = field.horizontal_inset(&theme);
     let metrics = field.inputs(&theme);
@@ -2364,20 +2483,56 @@ fn render(
         },
         render_state.shows_placeholder,
     );
-    let mut document = TextDocumentLayout::new(render_state.buffer.clone(), geometry);
+    let mut document = TextDocumentLayout::new(render_state.buffer.clone(), geometry.clone());
     let vertical_inset = field.vertical_inset(line_height);
     state.scroll.visible_height = (frame.height - vertical_inset * 2.0).max(line_height);
     update_scroll(&mut state.scroll, &document, line_height);
+    // Reveal the caret before windowing so the painted rows match the scroll a
+    // fresh caret position asks for.
+    let mut reveal = None;
+    if state.scroll.needs_caret_reveal {
+        let (caret_x, caret_row) = document.caret(
+            render_state.cursor_index,
+            !render_state.is_composing && selection.line_end_affinity,
+            &environment,
+        );
+        let top = caret_row as f32 * line_height;
+        if top < state.scroll.offset_y {
+            state.scroll.offset_y = top;
+        }
+        if top + line_height > state.scroll.offset_y + state.scroll.visible_height {
+            state.scroll.offset_y = (top + line_height - state.scroll.visible_height).max(0.0);
+        }
+        state.scroll.offset_y = state.scroll.offset_y.clamp(0.0, state.scroll.max_y);
+        reveal = Some(caret_x);
+    }
+    let first_row =
+        ((state.scroll.offset_y / line_height.max(1.0)).floor() as usize).saturating_sub(1);
+    let row_count = ((state.scroll.visible_height / line_height.max(1.0)).ceil() as usize) + 3;
+    let layout = document.visible_layout(first_row, row_count, &environment);
+    state.scroll.horizontal.synchronize(
+        &render_state.buffer,
+        &geometry,
+        available_width,
+        layout.total_width,
+        reveal,
+    );
+    state.scroll.needs_caret_reveal = false;
     // Mirror the viewport so hit testing, accessibility and tests observe the
     // same scroll the glyphs were painted with.
     node.set_content_offset(Point::new(
         state.scroll.horizontal.offset,
         state.scroll.offset_y,
     ));
-    let first_row =
-        ((state.scroll.offset_y / line_height.max(1.0)).floor() as usize).saturating_sub(1);
-    let row_count = ((state.scroll.visible_height / line_height.max(1.0)).ceil() as usize) + 3;
-    let layout = document.visible_layout(first_row, row_count, &environment);
+    let scrollable = state.scroll.max_y > 0.0 || state.scroll.horizontal.maximum() > 0.0;
+    if is_focused && scrollable {
+        node.set_attachment(
+            WheelRoutingAttachmentKey::PRIORITY,
+            WheelRoutingPriority::PreferFocused,
+        );
+    } else {
+        node.remove_attachment(WheelRoutingAttachmentKey::PRIORITY);
+    }
 
     let text_origin = Point::new(
         origin.x + inset + addons.leading() - state.scroll.horizontal.offset,
@@ -2395,6 +2550,54 @@ fn render(
     let clip_left = origin.x + inset + addons.leading();
     let text_column_right = clip_left + available_width;
     list.push_clip_rect(Rect::new(clip_left, origin.y, available_width, frame.height));
+
+    // Line numbers: the gutter keeps its column while the horizontal scroll
+    // moves the document underneath.
+    if is_vertical && field.code_editing.shows_line_numbers && addons.metrics.gutter > 0.0 {
+        if let Some(background) = field.code_editing.line_number_gutter_color {
+            let _ = list.add_rect(
+                Rect::new(
+                    origin.x + inset,
+                    origin.y,
+                    addons.metrics.gutter,
+                    frame.height,
+                ),
+                background,
+            );
+        }
+        let number_color = field
+            .code_editing
+            .line_number_color
+            .unwrap_or(theme.colors.on_surface_muted);
+        let first = ((state.scroll.offset_y / line_height.max(1.0)).floor() as usize).max(1) - 1;
+        let visible_rows = ((state.scroll.visible_height / line_height.max(1.0)).ceil() as usize) + 1;
+        for offset in 0..visible_rows {
+            let row = first + offset;
+            if row >= document.index().row_count() {
+                break;
+            }
+            let (line, _) = document.index().location_at_row(row);
+            let label = (line + 1).to_string();
+            let number = environment.cached_layout(
+                &label,
+                Some(&font),
+                Some(line_height),
+                f32::INFINITY,
+                TextAlignment::Trailing,
+                token.letter_spacing,
+            );
+            let right = origin.x + inset + addons.metrics.gutter - GUTTER_GAP;
+            let y = origin.y + vertical_inset + row as f32 * line_height - state.scroll.offset_y;
+            let _ = list.add_text(
+                &number,
+                Point::new(right - number.total_width, y),
+                number_color,
+                environment.atlas_texture_id,
+                Some(&environment.atlas),
+                None,
+            );
+        }
+    }
 
     // Indent guides sit under the glyphs so they never dim text.
     if is_vertical && field.code_editing.indentation_width.is_some() {
@@ -2524,10 +2727,6 @@ fn render(
         );
     }
 
-    if state.scroll.needs_caret_reveal {
-        state.scroll.needs_caret_reveal = false;
-    }
-
     list.pop_clip_rect();
 
     // Trailing reservations, outermost first: `append` slab, word-limit
@@ -2612,6 +2811,7 @@ fn render(
         text_color,
         &theme,
     );
+    node.set_attachment(DOCUMENT_LAYOUT_KEY, Rc::new(RefCell::new(document)));
 }
 
 /// Paint one sourced slab (`prepend` / `append`) with its glyphs centred
