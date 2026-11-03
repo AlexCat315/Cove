@@ -48,7 +48,7 @@ const columns = [
             </svg>
             <span>Cove</span>
           </div>
-          <p>Swift 跨平台 UI 框架，一套声明式代码，抵达每一块屏幕。</p>
+          <p>Rust 跨平台 UI 框架，一套声明式代码，抵达每一块屏幕。</p>
           <div class="socials">
             <a href="https://github.com/AlexCat315/Cove" target="_blank" rel="noopener" aria-label="GitHub">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
@@ -74,7 +74,7 @@ const columns = [
 
       <div class="footer-bottom">
         <span>© {{ year }} Cove. Apache License 2.0</span>
-        <span>Built with Swift · Metal · DX12 · Vulkan</span>
+        <span>Built with Rust · Metal · DX12 · Vulkan</span>
       </div>
     </div>
   </footer>

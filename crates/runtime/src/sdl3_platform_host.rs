@@ -324,10 +324,20 @@ impl PlatformWindowSession {
         true
     }
     fn focused_text_area(&self) -> Option<TextInputArea> {
-        self.input_context
-            .focus_chain
-            .focused()
-            .and_then(|node| node.attachment(TextInputAttachmentKey::AREA))
+        self.input_context.focus_chain.focused().and_then(|node| {
+            let area = match node.attachment::<cove_core::scene::TextInputAreaResolver>(
+                TextInputAttachmentKey::AREA_RESOLVER,
+            ) {
+                Some(resolve) => resolve(&node, node.absolute_origin()),
+                None => node.attachment(TextInputAttachmentKey::AREA),
+            };
+            if let Some(area) = area {
+                node.set_attachment(TextInputAttachmentKey::AREA, area);
+            } else {
+                node.remove_attachment(TextInputAttachmentKey::AREA);
+            }
+            area
+        })
     }
 }
 #[derive(Default)]

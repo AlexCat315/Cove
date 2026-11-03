@@ -14,6 +14,7 @@ use std::any::Any;
 use std::cell::RefCell;
 use std::ops::Range;
 use std::rc::{Rc, Weak};
+use unicode_segmentation::UnicodeSegmentation;
 
 /// Mirrors `CTextSelection.CoveSelectionFrame`.
 #[repr(C)]
@@ -485,11 +486,11 @@ impl TextSelectionScope {
             return None;
         }
         if delta > 0 {
-            let character = text[offset..].chars().next()?;
-            Some(offset + character.len_utf8())
+            let cluster = text[offset..].graphemes(true).next()?;
+            Some(offset + cluster.len())
         } else {
-            let character = text[..offset].chars().next_back()?;
-            Some(offset - character.len_utf8())
+            let cluster = text[..offset].graphemes(true).next_back()?;
+            Some(offset - cluster.len())
         }
     }
 

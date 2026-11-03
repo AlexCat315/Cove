@@ -4,6 +4,14 @@
 
 ## Unreleased
 
+- **Gallery 首轮逐项验收与组件文档（2026-11-03）**：
+  - 修复 TextField 缺失原生输入区域 resolver，导致点击搜索后普通文字无法输入、删除键仍有效、光标不闪烁；共享 Rust 实现补齐焦点状态、IME anchor、光标闪烁、搜索图标和清空绑定，Gallery 侧栏改用 SearchField。平台选区/删除/组合提交写回绑定，UTF-16 不拆开字素；补上点击定位、拖选、多次点击、全选/复制/剪切/异步粘贴和及时重绘。
+  - Slider 的阴影只绘制在滑块上，不再给整个轨道加灰底；Slider / RangeSlider 共享密度与清晰轮廓，RangeSlider 增加局部阴影、独立键盘焦点环、端点可访问边界、点击端点焦点和 RTL 输入/绘制映射。两种控件分别保持单值与双端点类型。
+  - Rating 绘制列表保留 SVG 图片，修复评分方块；复用已挂载会话，正确更新只读/禁用输入标志；密度与自定义示例各自持有真实状态，恢复十颗星、清空与窄窗口横向滚动。
+  - Slider 页补上刻度、垂直方向与编辑状态；RangeSlider 页补上步长、最小间距与禁用示例。文本选择按完整字素扩展，公共 prelude 导出 TextBuffer 和 TextSelectionViewExt。
+  - Website 新增 Gallery、Slider、RangeSlider、Rating、SearchField、TextField、文本选择的 Rust 用户文档；`Docs/gallery-audit.md` 记录 106 页队列、212 个宽屏/窄屏几何场景及未完成的逐页视觉/功能验收，明确已有 GAP 测试不能替代能力验收。
+  - 破坏性：`SliderStyleConfiguration` 增加 `size: ControlSize`；自定义构造需提供大小。
+
 - **DevTools MCP 可直接使用（2026-11-03）**：
   - 新增独立 Rust `cove-devtools-cli` / `cove-devtools mcp` stdio 服务及项目 `.mcp.json`，启动前可发现工具和指南，支持端口、WebSocket 地址与认证会话文件；持久连接后台读取，失败不重放写操作。
   - 补齐语义选择器点击、填值、键盘、拖拽/滚动、条件等待、截图、窗口调整、选择、临时样式和日志工具，以及跨调用 CPU trace、分页、比较和帧耗时采集；同一套工具可由 CLI 调用。

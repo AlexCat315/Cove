@@ -15,6 +15,12 @@ pub struct DefaultSliderStyle;
 
 impl SliderStyle for DefaultSliderStyle {
     fn resolve(&self, configuration: &SliderStyleConfiguration, theme: &Theme) -> SliderAppearance {
+        let scale = match configuration.size {
+            crate::theme::ControlSize::Mini => 0.75,
+            crate::theme::ControlSize::Small => 0.875,
+            crate::theme::ControlSize::Regular => 1.0,
+            crate::theme::ControlSize::Large => 1.25,
+        };
         let track = if configuration.is_enabled {
             theme.colors.border
         } else {
@@ -37,19 +43,19 @@ impl SliderStyle for DefaultSliderStyle {
             track
         };
         SliderAppearance::new(
-            6.0,
+            6.0 * scale,
             track_color,
             fill,
-            16.0,
-            Some(20.0),
+            16.0 * scale,
+            Some(20.0 * scale),
             knob,
             // Keyboard focus draws a 2-px ring around the white capsule knob.
             if configuration.is_focused {
                 Some(theme.colors.focus_ring)
             } else {
-                None
+                Some(theme.colors.border_strong.multiplied_alpha(0.45))
             },
-            if configuration.is_focused { 2.0 } else { 0.0 },
+            if configuration.is_focused { 2.0 } else { 1.0 },
             Some(SurfaceShadow {
                 color: Some(Color::from_rgba8(0, 0, 0, 64)),
                 offset_x: 0.0,

@@ -170,8 +170,8 @@ fn inactive_ime_anchor() {
             TextInputAttachmentKey::AREA_RESOLVER,
         );
         assert!(
-            resolver.is_none(),
-            "GAP: Swift resolves the IME anchor through committedTextInputArea; Rust's TextField installs no text input area resolver"
+            resolver.is_some(),
+            "the field installs a commit-phase IME resolver"
         );
         assert!(area(&node).is_none(), "inactive field has no area");
         assert!(
@@ -182,8 +182,8 @@ fn inactive_ime_anchor() {
         scene.focus.focus(Some(&node), false);
         scene.graph.compute_layout(200.0, 30.0);
         assert!(
-            area(&node).is_none(),
-            "GAP: Swift publishes an IME area for the focused field; Rust publishes none"
+            area(&node).is_some(),
+            "focused fields publish an IME area without needing a draw"
         );
         scene.focus.clear();
         node.mark_render_dirty(cove_core::scene::InvalidationSource::Unknown);

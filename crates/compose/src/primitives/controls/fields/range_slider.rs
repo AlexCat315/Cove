@@ -12,9 +12,10 @@ use crate::Scope;
 use std::rc::Rc;
 
 use cove_core::scene::{
-    AccessibilityActions, AccessibilityRole, AccessibilitySemantics, AccessibilityState,
+    AccessibilityActions, AccessibilityRole, AccessibilitySemantics, AccessibilityState, Edge,
     EventPhase, EventResult, FocusChainHolder, HoverPhase, InputHandlerRoute,
-    InteractionRegistryHolder, LayoutNode, Node, PointerCaptureHolder, PointerPhase, Rect,
+    InteractionRegistryHolder, LayoutNode, LayoutStyleValue, Node, PointerCaptureHolder,
+    PointerPhase, PositionType, Rect,
 };
 use cove_core::{Binding, Point};
 use cove_platform::{MouseButton, SystemCursor};
@@ -341,7 +342,9 @@ impl PrimitiveView for RangeSliderHost {
                 capture.release();
             }
             if let Some(chain) = FocusChainHolder::current()
-                && chain.focused().is_some_and(|focused| focused == *node)
+                && chain.focused().is_some_and(|focused| {
+                    focused == *node || focused.parent().as_ref() == Some(node)
+                })
             {
                 chain.clear();
             }
@@ -506,6 +509,14 @@ impl RangeSliderHost {
             RangeThumb::Upper
         };
         node.set_attachment(ACTIVE, thumb.key());
+        if let Some(stop) = node
+            .children()
+            .into_iter()
+            .find(|child| child.attachment::<&'static str>("range.thumb") == Some(thumb.key()))
+            && let Some(chain) = FocusChainHolder::current()
+        {
+            chain.focus(Some(&stop), false);
+        }
     }
 
     /// Writes the active thumb to the pointer's position.
@@ -539,6 +550,14 @@ impl RangeSliderHost {
                 RangeThumb::Upper => current.upper,
             });
             child.set_accessibility(Some(semantics));
+            if let Some(layout) = child.layout_node() {
+                let value = match thumb {
+                    RangeThumb::Lower => current.lower,
+                    RangeThumb::Upper => current.upper,
+                };
+                let fraction = self.geometry().fraction(value) as f32;
+                position_thumb(&layout, fraction);
+            }
         }
     }
 
@@ -549,6 +568,7 @@ impl RangeSliderHost {
         let active = active_thumb(node);
         let appearance = style.resolve(
             &SliderStyleConfiguration {
+                size: node.composition_value(&crate::theme::ControlSizeEnvironment::key()),
                 value: match active {
                     RangeThumb::Lower => current.lower,
                     RangeThumb::Upper => current.upper,
@@ -580,18 +600,42 @@ impl RangeSliderHost {
             appearance.track_corner_radius,
             appearance.track_color,
         );
-        let lower_x = origin.x + geometry.fraction(current.lower) as f32 * width;
-        let upper_x = origin.x + geometry.fraction(current.upper) as f32 * width;
-        let fill_width = (upper_x - lower_x).max(0.0);
+        let position = |value| {
+            let fraction = geometry.fraction(value) as f32;
+            origin.x
+                + if node.resolves_right_to_left() {
+                    1.0 - fraction
+                } else {
+                    fraction
+                } * width
+        };
+        let lower_x = position(current.lower);
+        let upper_x = position(current.upper);
+        let fill_width = (upper_x - lower_x).abs();
         if fill_width > 0.0 {
             let _ = list.add_rounded_rect(
-                Rect::new(lower_x, track_y, fill_width, appearance.track_height),
+                Rect::new(
+                    lower_x.min(upper_x),
+                    track_y,
+                    fill_width,
+                    appearance.track_height,
+                ),
                 appearance.track_corner_radius,
                 appearance.fill_color,
             );
         }
         let half = appearance.thumb_length * 0.5;
-        for centre in [lower_x, upper_x] {
+        let focused_thumb = FocusChainHolder::current().and_then(|chain| {
+            if !chain.is_focus_visible() {
+                return None;
+            }
+            chain
+                .focused()
+                .filter(|focused| focused.parent().as_ref() == Some(node))
+                .and_then(|focused| focused.attachment::<&'static str>("range.thumb"))
+                .and_then(RangeThumb::from_key)
+        });
+        for (thumb, centre) in [(RangeThumb::Lower, lower_x), (RangeThumb::Upper, upper_x)] {
             let clamped = centre.clamp(origin.x + half, origin.x + width - half);
             let rect = Rect::new(
                 clamped - half,
@@ -600,6 +644,9 @@ impl RangeSliderHost {
                 appearance.thumb_diameter,
             );
             let corner = rect.width.min(rect.height) * 0.5;
+            if let Some(shadow) = appearance.thumb_shadow {
+                list.add_shadow_layer(shadow, rect, corner, node.opacity(), None, Some(rect));
+            }
             if let Some(border) = appearance.thumb_border_color
                 && appearance.thumb_border_width > 0.0
             {
@@ -616,6 +663,19 @@ impl RangeSliderHost {
                 );
             }
             let _ = list.add_rounded_rect(rect, corner, appearance.thumb_color);
+            if focused_thumb == Some(thumb) {
+                let _ = list.add_rounded_rect_stroke(
+                    Rect::new(
+                        rect.x - 3.0,
+                        rect.y - 3.0,
+                        rect.width + 6.0,
+                        rect.height + 6.0,
+                    ),
+                    corner + 3.0,
+                    2.0,
+                    theme.colors.focus_ring,
+                );
+            }
         }
     }
 }
@@ -625,7 +685,12 @@ fn local_fraction(node: &Node, x: f32) -> f64 {
     let origin = node.absolute_origin();
     let width = node.frame().width.max(1.0);
     let local = x - origin.x;
-    (local / width).clamp(0.0, 1.0) as f64
+    let fraction = (local / width).clamp(0.0, 1.0) as f64;
+    if node.resolves_right_to_left() {
+        1.0 - fraction
+    } else {
+        fraction
+    }
 }
 
 /// One thumb's focus stop.
@@ -637,6 +702,15 @@ struct RangeThumbStop {
     range: (f64, f64),
     step: Option<f64>,
     minimum_span: f64,
+}
+
+fn position_thumb(layout: &LayoutNode, fraction: f32) {
+    // Keep a real accessible box around each painted thumb without letting the
+    // focus stops participate in the track's flex layout.
+    layout.set_position_value(
+        LayoutStyleValue::calc(fraction * 100.0, -TRACK_HEIGHT * 0.5),
+        Edge::Start,
+    );
 }
 
 impl RangeThumbStop {
@@ -685,7 +759,17 @@ impl PrimitiveView for RangeThumbStop {
     }
 
     fn make_layout_node(&self) -> Option<LayoutNode> {
-        None
+        let layout = LayoutNode::new();
+        layout.set_position_type(PositionType::Absolute);
+        layout.set_width(Some(TRACK_HEIGHT));
+        layout.set_height(Some(TRACK_HEIGHT));
+        layout.set_position(0.0, Edge::Top);
+        self.update_layout(&layout);
+        Some(layout)
+    }
+
+    fn update_layout(&self, layout: &LayoutNode) {
+        position_thumb(layout, self.geometry().fraction(self.value()) as f32);
     }
 
     fn update_node(&self, node: &Node) {
@@ -726,6 +810,7 @@ impl PrimitiveView for RangeThumbStop {
 
         let key = self.snapshot();
         let increment = key.geometry().increment();
+        let key_node = node.downgrade();
         registry.set_key(
             node,
             InputHandlerRoute::control(),
@@ -734,12 +819,26 @@ impl PrimitiveView for RangeThumbStop {
                     return EventResult::Ignored;
                 }
                 match event.scancode {
-                    crate::Scancode::ARROW_LEFT | crate::Scancode::ARROW_DOWN => {
-                        key.move_by(-increment)
-                    }
-                    crate::Scancode::ARROW_RIGHT | crate::Scancode::ARROW_UP => {
-                        key.move_by(increment)
-                    }
+                    crate::Scancode::ARROW_LEFT => key.move_by(
+                        if Node::upgrade(&key_node)
+                            .is_some_and(|node| node.resolves_right_to_left())
+                        {
+                            increment
+                        } else {
+                            -increment
+                        },
+                    ),
+                    crate::Scancode::ARROW_RIGHT => key.move_by(
+                        if Node::upgrade(&key_node)
+                            .is_some_and(|node| node.resolves_right_to_left())
+                        {
+                            -increment
+                        } else {
+                            increment
+                        },
+                    ),
+                    crate::Scancode::ARROW_DOWN => key.move_by(-increment),
+                    crate::Scancode::ARROW_UP => key.move_by(increment),
                     crate::Scancode::HOME => key.move_to(key.range.0),
                     crate::Scancode::END => key.move_to(key.range.1),
                     _ => return EventResult::Ignored,

@@ -7,7 +7,7 @@ const router = createRouter({
       path: '/',
       name: 'home',
       component: () => import('@/views/HomeView.vue'),
-      meta: { title: 'Cove · Swift 跨平台 UI 框架' },
+      meta: { title: 'Cove · Rust 跨平台 UI 框架' },
     },
     {
       path: '/showcase',

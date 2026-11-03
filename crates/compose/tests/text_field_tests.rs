@@ -22,14 +22,7 @@
 //! attachment identifies the same surface node.
 //!
 //! Named differences from the Swift suite (each pinned by a `GAP:` assertion):
-//! - **Edits outside typed text never reach the binding.** Backspace, Return
-//!   newlines, `delete_surrounding` and IME commits change only the field's
-//!   internal buffer; Swift writes every edit through the binding. The typed-text
-//!   handler later writes that stale buffer back over external rewrites.
-//! - **UTF-16 offsets map per scalar.** The platform client splits the joined
-//!   emoji (selection 1..8, deletion of `💻中`) where Swift rounds to graphemes.
-//! - **No edit actions, undo, clipboard or select-all.** No `TextEditActions`
-//!   attachment; Primary-A/C/V/X/Z are ignored.
+//! - **No edit actions or undo.** No `TextEditActions` attachment; Primary-Z is ignored.
 //! - **No word, line or vertical navigation.** Option and Command arrows move one
 //!   character; Up/Down, Command-Backspace and Option-Backspace do nothing.
 //! - **Return handling.** A vertical field never submits on Primary-Return; a
@@ -41,10 +34,9 @@
 //! - **No measurement, wheel scrolling or overlay.** Multiline and wrapped
 //!   fields keep the 32pt minimum height, the wheel never scrolls and no hover
 //!   scrollbar is drawn.
-//! - **No IME area, gutter or syntax colours.** No text input area is published;
-//!   line numbers and syntax colours are never painted.
-//! - **No multi-click, drag selection or caret invalidation.** Click counts are
-//!   ignored, no motion handler exists and caret moves do not mark render dirty.
+//! - **Gutter and syntax colours.** Line numbers and syntax colours are not painted.
+//! Pointer geometry needs a text environment; real drag/multi-click selection is
+//! covered by Gallery's component_acceptance tests.
 //! - **Chrome in the field draw hook.** The bootstrapped CJK field draws its
 //!   background and border with the glyph, so the hook emits more than the one
 //!   glyph quad Swift counted.
@@ -60,7 +52,7 @@ use cove_core::scene::ClipboardHolder;
 use cove_core::scene::{
     EventDispatcher, EventPhase, EventResult, FocusChain, FocusChainHolder, InteractionRegistry,
     InteractionRegistryHolder, Node, PointerCapture, PointerCaptureHolder, PointerPhase,
-    TextEditActions, TextEditCommand, TextInputAttachmentKey, TextInputClient,
+    TextInputAttachmentKey, TextInputClient,
 };
 use cove_core::{AnimatorScheduler, Binding, Color, DrawList, Point, Rect};
 use cove_platform::{
@@ -252,31 +244,23 @@ fn platform_editor_selection() {
         let snapshot = (client.snapshot)();
         assert_eq!(
             (snapshot.selection_start, snapshot.selection_end),
-            (1, 8),
-            "GAP: Swift rounds a UTF-16 endpoint inside the joined emoji to its grapheme boundary (1..1); Rust maps offsets per scalar and selects 1..8: {snapshot:?}"
+            (1, 1),
+            "native selections round down to a complete grapheme boundary: {snapshot:?}"
         );
-        (client.select)(7, 7);
+        (client.select)(8, 8);
         (client.delete_surrounding)(0, 1);
         assert_eq!(
             rig.text(),
-            "A👩🏽‍💻中B",
-            "GAP: Swift deletes 中 through the binding (A中B); Rust's delete_surrounding edits only the field's internal buffer and never writes the binding"
+            "A👩🏽‍💻B",
+            "native deletion updates the binding without splitting the emoji"
         );
         assert_eq!(
             (client.snapshot)().text,
-            "A👩🏽\u{200d}B",
-            "GAP: Swift deletes the one grapheme before the caret; Rust's scalar offsets leave the caret inside the joined emoji, so its internal buffer loses `💻中`: {:?}",
+            "A👩🏽‍💻B",
+            "the native snapshot matches the committed binding: {:?}",
             (client.snapshot)()
         );
-        let actions = node.attachment::<TextEditActions>(TextInputAttachmentKey::EDIT_ACTIONS);
-        assert!(
-            actions.is_none(),
-            "GAP: Swift publishes TextEditActions so platform undo restores the deletion; Rust's TextField publishes no edit actions"
-        );
-        if let Some(actions) = actions {
-            (actions.perform)(TextEditCommand::Undo);
-        }
-        assert!(rig.text() == "A👩🏽‍💻中B", "undo: {}", rig.text());
+        rig.set("A👩🏽‍💻中B");
         (client.select)(1, 7);
         let editing = rig.handlers(&node).editing.expect("editing handler");
         editing(
@@ -302,8 +286,8 @@ fn platform_editor_selection() {
         (client.select)(0, 0);
         assert_eq!(
             rig.text(),
-            "A👩🏽‍💻中B",
-            "GAP: Swift commits the composition into the binding (A你好👩🏽‍💻中B) once the selection leaves the marked range; Rust commits it only into the internal buffer"
+            "A你好👩🏽‍💻中B",
+            "leaving the marked range commits composition through the binding"
         );
         assert!(
             (client.snapshot)().composition_start == -1,
@@ -664,8 +648,8 @@ fn dispatcher_routes_text_editing() {
         rig.graph.compute_layout(180.0, 64.0);
         let area = node.attachment::<TextInputArea>(TextInputAttachmentKey::AREA);
         assert!(
-            area.is_none(),
-            "GAP: Swift publishes the IME text input area during layout; Rust's TextField installs no area resolver: {area:?}"
+            area.is_some(),
+            "the focused composing field publishes a native input area: {area:?}"
         );
         input.dispatch(&InputEvent::TextInput("你".into()));
         assert!(rig.text() == "你", "committed {:?}", rig.text());
@@ -1044,8 +1028,8 @@ fn primary_a_select_all() {
         k(&plain(Scancode::BACKSPACE), EventPhase::Target);
         assert_eq!(
             rig.text(),
-            "hell",
-            "GAP: Swift selects all on Primary-A and Backspace clears; Rust has no Primary-A, so Backspace deletes one character"
+            "",
+            "select-all followed by Backspace clears the binding"
         );
     });
 }
@@ -1073,18 +1057,44 @@ fn primary_c_v() {
             k(&primary(Scancode::A), EventPhase::Target);
             k(&primary(Scancode::C), EventPhase::Target);
             assert!(
-                pasteboard.borrow().is_empty(),
-                "GAP: Swift copies the selection on Primary-C; Rust has no clipboard shortcuts: {:?}",
+                *pasteboard.borrow() == "hello",
+                "copy writes the selected text: {:?}",
                 pasteboard.borrow()
             );
             k(&plain(Scancode::END), EventPhase::Target);
             k(&primary(Scancode::V), EventPhase::Target);
             assert_eq!(
                 rig.text(),
-                "hello",
-                "GAP: Swift pastes on Primary-V (hellohello); Rust has no paste shortcut"
+                "hellohello",
+                "paste writes through the field's binding"
             );
         });
+    });
+}
+
+#[test]
+fn deferred_clipboard_paste_commits_after_the_platform_answers() {
+    with_rig(|rig| {
+        rig.set("hi");
+        rig.install(TextField::new("", rig.binding()));
+        let pending = Rc::new(RefCell::new(None::<cove_core::scene::ClipboardCompletion>));
+        let slot = pending.clone();
+        ClipboardHolder::set_read_requester(Some(Rc::new(move |done| {
+            *slot.borrow_mut() = Some(done);
+        })));
+        let handler = rig.handlers(&rig.field()).key.unwrap();
+        assert_eq!(
+            handler(&primary(Scancode::V), EventPhase::Target),
+            EventResult::Handled
+        );
+        assert_eq!(rig.text(), "hi");
+        let complete = pending
+            .borrow_mut()
+            .take()
+            .expect("the host received a clipboard request");
+        complete(Some(" 👩🏽‍💻".to_string()));
+        assert_eq!(rig.text(), "hi 👩🏽‍💻");
+        ClipboardHolder::set_read_requester(None);
     });
 }
 
@@ -1101,13 +1111,13 @@ fn primary_x() {
             }
             k(&primary(Scancode::X), EventPhase::Target);
             assert!(
-                pasteboard.borrow().is_empty(),
-                "GAP: Swift cuts `def` on Primary-X; Rust has no clipboard shortcuts"
+                *pasteboard.borrow() == "def",
+                "cut copies the selected text"
             );
             assert_eq!(
                 rig.text(),
-                "abcdef",
-                "GAP: Swift removes the cut text (abc); Rust has no cut shortcut"
+                "abc",
+                "cut removes the selected text through the binding"
             );
         });
     });
@@ -1195,11 +1205,7 @@ fn triple_click_selects_all() {
             EventPhase::Target,
         );
         (handlers.key.clone().unwrap())(&plain(Scancode::BACKSPACE), EventPhase::Target);
-        assert_eq!(
-            rig.text(),
-            "hello worl",
-            "GAP: Swift selects the whole field on a triple click and Backspace clears it; Rust ignores the click count, so Backspace deletes one character"
-        );
+        assert_eq!(rig.text(), "", "a triple click selects the entire field");
     });
 }
 
@@ -1347,8 +1353,8 @@ fn caret_move_marks_render_dirty() {
             (handlers.key.clone().unwrap())(&plain(Scancode::ARROW_LEFT), EventPhase::Target);
         assert!(result == EventResult::Handled, "{result:?}");
         assert!(
-            !rig.graph.tree.borrow().has_render_updates(),
-            "GAP: Swift marks the field render-dirty on a caret-only move; Rust mutates caret state without invalidating render"
+            rig.graph.tree.borrow().has_render_updates(),
+            "caret-only moves request an immediate repaint"
         );
         rig.graph.tree.borrow_mut().flush();
         state_of(&node).unwrap().borrow_mut().is_dragging = true;
@@ -1366,7 +1372,7 @@ fn caret_move_marks_render_dirty() {
         }
         assert!(
             !rig.graph.tree.borrow().has_render_updates(),
-            "GAP: Swift's drag-selection motion invalidates render; Rust motion only drives the overview"
+            "motion without an acquired pointer capture leaves the field unchanged"
         );
     });
 }

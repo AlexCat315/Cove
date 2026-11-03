@@ -531,8 +531,8 @@ fn retained_cells() {
         );
         assert_eq!(
             notes.resolved_accessibility_value(),
-            "Original noteKeep this draft",
-            "GAP: without Cmd+A select-all the typed draft appends to the authored text and the hidden field retains the whole value (Swift replaces the selection with \"Keep this draft\")"
+            "Keep this draft",
+            "select-all replaces the value and hidden cells retain the draft"
         );
 
         harness.empty.set(true);

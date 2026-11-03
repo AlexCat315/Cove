@@ -70,6 +70,9 @@ pub struct SliderStory {
     value: State<f64>,
     stepped: State<f64>,
     disabled_value: State<f64>,
+    ticks: State<f64>,
+    vertical: State<f64>,
+    editing: State<bool>,
 }
 
 impl SliderStory {
@@ -84,6 +87,9 @@ impl SliderStory {
             value: State::new(0.35),
             stepped: State::new(2.0),
             disabled_value: State::new(0.6),
+            ticks: State::new(40.0),
+            vertical: State::new(0.5),
+            editing: State::new(false),
         }
     }
 
@@ -93,8 +99,7 @@ impl SliderStory {
 
     /// Writes a value clamped to the slider's bounds.
     pub fn set_value(&self, value: f64) {
-        self.value
-            .set(value.clamp(Self::RANGE.0, Self::RANGE.1));
+        self.value.set(value.clamp(Self::RANGE.0, Self::RANGE.1));
     }
 
     pub fn readout(&self) -> String {
@@ -108,10 +113,11 @@ impl SliderStory {
 
 impl View for SliderStory {
     fn body(&self, _cx: &Scope) -> AnyView {
+        let editing = self.editing.clone();
         let slider = AnyView::new(
             Slider::new(self.binding())
                 .range(Self::RANGE)
-                .step(Self::STEP)
+                .on_editing_changed(move |active| editing.set(active))
                 .enabled(self.options.is_enabled)
                 .frame_width(240.0)
                 .debug_name("slider-control"),
@@ -143,8 +149,8 @@ impl View for SliderStory {
                 AnyView::new(TupleView::new(vec![
                     AnyView::new(StorySection::new(
                         "Continuous value",
-                        "Drag the thumb or use the arrow keys. Home and End jump to the bounds; one step is 1%.",
-                        field_row("Opacity", slider, self.readout()),
+                        "Drag, use arrow keys, or jump to an endpoint with Home and End.",
+                        field_row("Opacity", slider, format!("{}{}", self.readout(), if self.editing.get() { " · Editing" } else { "" })),
                     )),
                     AnyView::new(StorySection::new(
                         "Stepped",
@@ -154,6 +160,16 @@ impl View for SliderStory {
                             stepped,
                             format!("{:.1} of 4.0", self.stepped.get()),
                         ),
+                    )),
+                    AnyView::new(StorySection::new(
+                        "Ticks",
+                        "Discrete positions share one step for pointer and keyboard input.",
+                        field_row("Level", AnyView::new(Slider::new(self.ticks.binding()).range((0.0, 100.0)).step(10.0).shows_ticks(true).enabled(self.options.is_enabled).frame_width(240.0).debug_name("slider-ticks")), format!("{:.0}", self.ticks.get())),
+                    )),
+                    AnyView::new(StorySection::new(
+                        "Vertical",
+                        "Higher values appear at the top.",
+                        field_row("Gain", AnyView::new(Slider::new(self.vertical.binding()).axis(cove_ui_compose::primitives::controls::fields::SliderAxis::Vertical).enabled(self.options.is_enabled).frame_size(32.0, 160.0).debug_name("slider-vertical")), format!("{:.0}%", self.vertical.get() * 100.0)),
                     )),
                     AnyView::new(StorySection::new(
                         "Disabled",
@@ -175,7 +191,7 @@ impl View for SliderStory {
     }
 
     fn dynamic_properties(&self) -> Vec<cove_composition::DynamicField> {
-        cove_composition::dynamic_fields!(self; value)
+        cove_composition::dynamic_fields!(self; value, stepped, disabled_value, ticks, vertical, editing)
     }
 }
 
@@ -183,6 +199,9 @@ impl View for SliderStory {
 pub struct RangeSliderStory {
     pub options: GalleryOptions,
     values: State<RangeValue>,
+    stepped: State<RangeValue>,
+    bounded: State<RangeValue>,
+    disabled: State<RangeValue>,
 }
 
 impl RangeSliderStory {
@@ -197,6 +216,9 @@ impl RangeSliderStory {
         Self {
             options,
             values: State::new(RangeValue::new(20.0, 65.0)),
+            stepped: State::new(RangeValue::new(20.0, 80.0)),
+            bounded: State::new(RangeValue::new(20.0, 65.0)),
+            disabled: State::new(RangeValue::new(30.0, 70.0)),
         }
     }
 
@@ -213,7 +235,8 @@ impl RangeSliderStory {
         } else {
             (upper, lower)
         };
-        let upper = upper.max(lower + Self::MINIMUM_SPAN);
+        let lower = lower.min(Self::RANGE.1 - Self::MINIMUM_SPAN);
+        let upper = upper.max(lower + Self::MINIMUM_SPAN).min(Self::RANGE.1);
         self.values.set(RangeValue::new(lower, upper));
     }
 
@@ -234,10 +257,74 @@ impl View for RangeSliderStory {
                 .frame_width(240.0)
                 .debug_name("range-slider-control"),
         );
-        AnyView::new(StorySection::new(
-            "Bounded span",
-            "Each thumb is independently focusable. The upper thumb cannot pass the lower one plus the minimum span.",
-            field_row("Visible range", slider, self.readout()),
+        AnyView::new(BoxView::new(
+            FlexDirection::Column,
+            Align::Stretch,
+            Justify::FlexStart,
+            Wrap::NoWrap,
+            24.0,
+            AnyView::new(TupleView::new(vec![
+                AnyView::new(StorySection::new(
+                    "Range",
+                    "Two independently focusable endpoints.",
+                    field_row("Visible range", slider, self.readout()),
+                )),
+                AnyView::new(StorySection::new(
+                    "Stepped",
+                    "Endpoints move in increments of ten.",
+                    field_row(
+                        "Range",
+                        AnyView::new(
+                            RangeSlider::new(self.stepped.binding())
+                                .range(Self::RANGE)
+                                .step(10.0)
+                                .enabled(self.options.is_enabled)
+                                .frame_width(240.0)
+                                .debug_name("range-slider-stepped"),
+                        ),
+                        format!(
+                            "{:.0} – {:.0}",
+                            self.stepped.get().lower,
+                            self.stepped.get().upper
+                        ),
+                    ),
+                )),
+                AnyView::new(StorySection::new(
+                    "Minimum span",
+                    "Keep at least twenty units between endpoints.",
+                    field_row(
+                        "Range",
+                        AnyView::new(
+                            RangeSlider::new(self.bounded.binding())
+                                .range(Self::RANGE)
+                                .minimum_span(20.0)
+                                .enabled(self.options.is_enabled)
+                                .frame_width(240.0)
+                                .debug_name("range-slider-bounded"),
+                        ),
+                        format!(
+                            "{:.0} – {:.0}",
+                            self.bounded.get().lower,
+                            self.bounded.get().upper
+                        ),
+                    ),
+                )),
+                AnyView::new(StorySection::new(
+                    "Disabled",
+                    "Values remain visible without accepting input.",
+                    field_row(
+                        "Range",
+                        AnyView::new(
+                            RangeSlider::new(self.disabled.binding())
+                                .range(Self::RANGE)
+                                .enabled(false)
+                                .frame_width(240.0)
+                                .debug_name("range-slider-disabled"),
+                        ),
+                        "30 – 70".into(),
+                    ),
+                )),
+            ])),
         ))
     }
 
@@ -246,7 +333,7 @@ impl View for RangeSliderStory {
     }
 
     fn dynamic_properties(&self) -> Vec<cove_composition::DynamicField> {
-        cove_composition::dynamic_fields!(self; values)
+        cove_composition::dynamic_fields!(self; values, stepped, bounded, disabled)
     }
 }
 
@@ -351,7 +438,7 @@ impl View for TextFieldStory {
                 AnyView::new(TupleView::new(vec![
                     AnyView::new(StorySection::new(
                         "Input & clear",
-                        "Typing writes straight into the story's buffer. Selection, undo and the caret survive a rename of the placeholder.",
+                        "Type, select or clear text to update the bound value.",
                         {
                             let field = AnyView::new(
                                 TextField::new("Project name", self.text.binding())
@@ -770,7 +857,12 @@ impl Vec3FieldStory {
     }
 
     pub fn readout(&self) -> String {
-        format!("x {:.2} · y {:.2} · z {:.2}", self.x.get(), self.y.get(), self.z.get())
+        format!(
+            "x {:.2} · y {:.2} · z {:.2}",
+            self.x.get(),
+            self.y.get(),
+            self.z.get()
+        )
     }
 }
 

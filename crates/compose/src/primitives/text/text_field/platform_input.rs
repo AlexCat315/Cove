@@ -6,6 +6,7 @@
 //! the marked range, and `select` moves the composition window instead of
 //! replacing text.
 use std::rc::Rc;
+use unicode_segmentation::UnicodeSegmentation;
 
 use crate::primitives::text::text_buffer::TextBuffer;
 use cove_core::scene::TextInputClient;
@@ -20,21 +21,23 @@ pub fn utf16_offset(buffer: &TextBuffer, character: usize) -> i32 {
     buffer.substring(0..clamped).encode_utf16().count() as i32
 }
 
-/// Character index for a UTF-16 offset. `round_up` places an offset inside a
-/// surrogate pair at the following character.
+/// Scalar index at a user-perceived character boundary for a UTF-16 offset.
+/// The rope uses scalar indices; native selections must not split a grapheme.
 pub fn character_index(buffer: &TextBuffer, offset: i32, round_up: bool) -> usize {
     let target = offset.max(0) as usize;
     let mut units = 0usize;
-    for (index, character) in buffer.string_value().chars().enumerate() {
-        let next = units + character.len_utf16();
+    let mut index = 0;
+    for grapheme in buffer.string_value().graphemes(true) {
+        let next = units + grapheme.encode_utf16().count();
         if target < next {
             return if round_up && target > units {
-                index + 1
+                index + grapheme.chars().count()
             } else {
                 index
             };
         }
         units = next;
+        index += grapheme.chars().count();
     }
     buffer.character_count()
 }
@@ -119,8 +122,8 @@ pub fn platform_input_client(
             }
             let buffer = state.buffer.clone();
             let low_index = character_index(&buffer, start.max(0), false);
-            let high_index = character_index(&buffer, end.max(0), true);
-            state.selection.anchor = Some(low_index);
+            let high_index = character_index(&buffer, end.max(0), false);
+            state.selection.anchor = (low_index != high_index).then_some(low_index);
             state.selection.cursor_index = high_index;
             state.record_activity();
         },

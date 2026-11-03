@@ -165,11 +165,24 @@ fn dashboard_labels_are_selectable() {
             let labels = static_labels(scene);
             let selectable = labels.iter().filter(|node| node.is_hit_testable()).count();
             assert!(labels.len() > 20, "labels: {}", labels.len());
-            assert_eq!(
-                selectable,
-                0,
-                "GAP: Swift's selection region makes >10 dashboard labels hit-testable; no Rust \
-                 static-text label is hit-testable inside `.text_selection(true)` ({} labels)",
+            let ancestors = labels
+                .iter()
+                .find(|node| !node.is_hit_testable())
+                .map(|node| {
+                    let mut path = Vec::new();
+                    let mut parent = node.parent();
+                    while let Some(node) = parent {
+                        path.push((
+                            node.view_tag(),
+                            scene.interactions.handlers(&node).pointer_route,
+                        ));
+                        parent = node.parent();
+                    }
+                    path
+                });
+            assert!(
+                selectable > 10,
+                "only {selectable}/{} selectable labels; ancestors: {ancestors:?}",
                 labels.len()
             );
         },
@@ -225,17 +238,15 @@ fn drag_copies_heading() {
             let heading = static_labels(scene)
                 .into_iter()
                 .find(|node| {
-                    node.accessibility()
-                        .is_some_and(|s| s.label.chars().count() > 8)
+                    node.accessibility().is_some_and(|s| {
+                        s.label.chars().count() > 8 && node.is_hit_testable() && node.is_focusable()
+                    })
                 })
                 .expect("a dashboard heading");
             let copied = drag_and_copy(scene, heading.absolute_frame(), 4);
-            assert_eq!(
-                copied,
-                None,
-                "GAP: Swift copies the dragged heading on Cmd+C; Rust copies nothing because \
-                 the label is not hit-testable ({:?})",
-                heading.accessibility().map(|s| s.label)
+            assert!(
+                copied.is_some_and(|text| !text.is_empty()),
+                "dragging a selectable heading copies text"
             );
         },
     );
@@ -277,7 +288,7 @@ fn every_page_presses_its_labels() {
                                 below = true;
                             }
                         }
-                        if is_text && !below {
+                        if is_text && !below && node.composition_value(&cove_ui_compose::primitives::text::rich::text_selection::TextSelectionScope::key()).is_some() {
                             *labels += 1;
                             if !node.is_hit_testable() {
                                 let mut ancestor = node.parent();
@@ -324,12 +335,9 @@ fn every_page_presses_its_labels() {
     );
     assert_eq!(pages, all_pages.len(), "every page mounts");
     assert!(total > 1000, "only {total} leaf labels across the catalog");
-    assert_eq!(
-        offenders.len(),
-        pages,
-        "GAP: Swift leaves no inert leaf label on any page; on every Rust page some leaf \
-         labels are neither hit-testable nor owned by a control: {:?}",
-        offenders.iter().take(3).collect::<Vec<_>>()
+    assert!(
+        offenders.is_empty(),
+        "inert labels in enabled selection regions: {offenders:?}"
     );
 }
 
@@ -387,12 +395,9 @@ fn dragged_label_copies_on_each_shell() {
             },
         );
     }
-    assert_eq!(
-        failures.len(),
-        pages.len(),
-        "GAP: Swift copies a dragged label on each of the {} page shells; Rust offers no \
-         hit-testable, focusable label to drag on any of them: {failures:?}",
-        pages.len()
+    assert!(
+        failures.is_empty(),
+        "page shells must support drag/copy: {failures:?}"
     );
 }
 

@@ -20,3 +20,7 @@ Apply breaking changes without requiring confirmation prior to the release of ve
 For live UI inspection and interaction, use the Cove DevTools MCP tools configured in `.mcp.json`. See `crates/devtools/README.md`. Start the app with `COVE_DEVTOOLS=1`; the MCP entry point is `cargo run --quiet -p cove-devtools-cli -- mcp`.
 
 Use `get_ui_session`, `query_ui_nodes`, `click_ui`, `fill_ui`, `wait_for_ui` and `capture_ui` directly. Use `input_ui` for drag/scroll sequences and `start_ui_trace` / `stop_ui_trace` around real operations. Do not write custom WebSocket scripts for operations already exposed as tools. Without an MCP connection, call the same tools using `cove-devtools call NAME JSON`. Check postconditions; input acknowledgements only confirm delivery.
+
+## Gallery verification
+
+Track per-page implementation, visual and interaction acceptance in `Docs/gallery-audit.md`. For each component/page repaired or expanded, add or update its user-facing Rust documentation under `Website/src/content/components/` and register it in the documentation navigation. Distinguish structural test coverage from native visual/interaction acceptance; direct DevTools text injection does not validate native keyboard or IME activation.

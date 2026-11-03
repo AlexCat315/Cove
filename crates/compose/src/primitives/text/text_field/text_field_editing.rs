@@ -88,9 +88,7 @@ pub fn normalize_indices(state: &mut FieldState) {
 /// Every caret/selection mutation funnels through here: it resets the blink
 /// phase, requests a reveal and reports the new caret.
 pub fn record_caret_activity(state: &mut FieldState) {
-    state.selection.line_end_affinity = false;
-    state.needs_caret_reveal = true;
-    state.scroll.needs_caret_reveal = true;
+    state.record_activity();
 }
 
 /// The caret/selection snapshot for reporting.

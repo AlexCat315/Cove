@@ -174,21 +174,20 @@ fn undo_selection_replacement_restores_text_before_scene_shortcuts() {
         dispatcher.dispatch(&InputEvent::TextInput("中文🙂".into()));
         assert_eq!(
             text(&store),
-            "alpha中文🙂",
-            "GAP: Swift selects all on Primary-A and replaces it (中文🙂); Rust has no select-all, so the typed text appends"
+            "中文🙂",
+            "select-all replaces the original value"
         );
 
         dispatcher.dispatch(&InputEvent::KeyDown(primary(Scancode::Z)));
         assert_eq!(
             text(&store),
-            "alpha中文🙂",
+            "中文🙂",
             "GAP: Swift undoes to `alpha` on Primary-Z; Rust's field records no history"
         );
         assert_eq!(
             actions.get(),
-            2,
-            "GAP: Swift's editor consumes Primary-A and Primary-Z (0 app shortcuts); Rust \
-             leaves both to the ShortcutHost"
+            1,
+            "GAP: the field consumes select-all but undo still reaches the scene shortcut"
         );
 
         dispatcher.dispatch(&InputEvent::KeyDown(key(
@@ -197,7 +196,7 @@ fn undo_selection_replacement_restores_text_before_scene_shortcuts() {
         )));
         assert_eq!(
             text(&store),
-            "alpha中文🙂",
+            "中文🙂",
             "GAP: Swift redoes to 中文🙂 on Primary-Shift-Z; Rust has no redo"
         );
 
@@ -209,8 +208,8 @@ fn undo_selection_replacement_restores_text_before_scene_shortcuts() {
         )));
         assert_eq!(
             text(&store),
-            "alpha中文🙂beta",
-            "GAP: Swift writes `beta` here; Rust only has typed text appended at the caret"
+            "中文🙂beta",
+            "GAP: without undo the subsequent typing appends to the replacement"
         );
     });
 }
@@ -241,8 +240,8 @@ fn invalid_json_draft_survives_blur_and_refocus() {
         let node = field_node(scene);
         assert_eq!(
             state(&node).borrow().buffer.string_value(),
-            "{}{ invalid",
-            "GAP: Swift's draft reads `{{ invalid` after select-all; Rust has no select-all, so the typed text follows the caret at the end"
+            "{ invalid",
+            "an invalid replacement draft survives blur and refocus"
         );
 
         dispatcher.dispatch(&InputEvent::KeyDown(primary(Scancode::A)));
@@ -251,8 +250,8 @@ fn invalid_json_draft_survives_blur_and_refocus() {
         scene.graph.recomposer.commit_all();
         assert_eq!(
             text(&store),
-            "{}",
-            "GAP: Swift replaces the draft on select-all and commits {{\"ok\":true}}; Rust appends, leaving an invalid draft that is never committed"
+            "{\"ok\":true}",
+            "a valid replacement commits on blur"
         );
     });
 }
@@ -278,7 +277,7 @@ fn platform_text_commands_share_keyboard_history() {
         let dispatcher = scene.dispatcher();
         dispatcher.dispatch(&InputEvent::KeyDown(primary(Scancode::A)));
         dispatcher.dispatch(&InputEvent::TextInput("replacement".into()));
-        assert_eq!(text(&store), "alphareplacement");
+        assert_eq!(text(&store), "replacement");
         assert_eq!(
             scene.focus.text_edit_availability(TextEditCommand::Undo),
             None,
@@ -288,7 +287,7 @@ fn platform_text_commands_share_keyboard_history() {
             !scene.focus.perform_text_edit(TextEditCommand::Undo),
             "GAP: Swift undoes to `alpha`; Rust cannot"
         );
-        assert_eq!(text(&store), "alphareplacement");
+        assert_eq!(text(&store), "replacement");
 
         *store.lock().unwrap() = TextBuffer::new("external document");
         assert_eq!(

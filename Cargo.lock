@@ -304,6 +304,7 @@ dependencies = [
  "cove-ui-addons",
  "cove-ui-compose",
  "serde",
+ "serde_json",
  "unicode-segmentation",
 ]
 

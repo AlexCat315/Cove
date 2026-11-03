@@ -3,6 +3,7 @@
 //! Swift sources: `GalleryContent/Stories/Feedback/{SkeletonStory,RatingSample}.swift`.
 
 use cove_composition::Scope;
+use cove_composition::layout::LayoutDirectionExt;
 use cove_core::State;
 use cove_core::scene::{Align, FlexDirection, Justify, Wrap};
 use cove_ui_compose::modifiers::layout::{LayoutFrameExt, PaddingExt};
@@ -11,12 +12,11 @@ use cove_ui_compose::primitives::controls::fields::Slider;
 use cove_ui_compose::primitives::controls::rating::{
     Rating, RatingAppearance, RatingPrecision, RatingSelection, RatingSymbol,
 };
-use cove_composition::layout::LayoutDirectionExt;
-use cove_ui_compose::theme::ControlSize;
 use cove_ui_compose::primitives::controls::{Button, Checkbox};
 use cove_ui_compose::primitives::data::avatar::Avatar;
 use cove_ui_compose::primitives::media::{Skeleton, SkeletonShape};
 use cove_ui_compose::primitives::text::Text;
+use cove_ui_compose::theme::ControlSize;
 use cove_ui_compose::theme::tokens::SemanticColorRef;
 use cove_ui_compose::{AnyView, BoxView, LayoutDebugExt, TupleView, View};
 
@@ -276,6 +276,9 @@ pub struct RatingStory {
     half: State<f64>,
     fine: State<f64>,
     rtl: State<f64>,
+    densities: [State<f64>; 4],
+    custom: State<f64>,
+    ten: State<f64>,
 }
 
 impl RatingStory {
@@ -286,6 +289,9 @@ impl RatingStory {
             half: State::new(2.5),
             fine: State::new(4.4),
             rtl: State::new(2.5),
+            densities: std::array::from_fn(|_| State::new(3.5)),
+            custom: State::new(0.5),
+            ten: State::new(7.0),
         }
     }
 
@@ -320,20 +326,36 @@ impl RatingStory {
         let rating = Rating::new(label, value, move |next| setter.set(next))
             .selection(selection)
             .appearance(appearance);
-        AnyView::new(BoxView::new(
+        let mut details = vec![AnyView::new(
+            Text::new(format!("{value:.2}"))
+                .semantic_font(cove_ui_compose::theme::SemanticFontRef::caption())
+                .semantic_foreground(SemanticColorRef::on_surface_muted()),
+        )];
+        if selection.is_interactive() && selection.allows_clear {
+            use cove_ui_compose::theme::styles::buttons::{ButtonStyleViewExt, GhostButtonStyle};
+            let value = state.clone();
+            details.push(AnyView::new(
+                Button::title("Clear", move || value.set(0.0)).button_style(GhostButtonStyle),
+            ));
+        }
+        let details = AnyView::new(BoxView::new(
             FlexDirection::Row,
             Align::Center,
             Justify::FlexStart,
+            Wrap::Wrap,
+            8.0,
+            AnyView::new(TupleView::new(details)),
+        ));
+        let strip = AnyView::new(cove_ui_compose::primitives::layout::ScrollView::horizontal(
+            AnyView::new(rating).padding_edges(6.0, 0.0),
+        ));
+        AnyView::new(BoxView::new(
+            FlexDirection::Column,
+            Align::Stretch,
+            Justify::FlexStart,
             Wrap::NoWrap,
             8.0,
-            AnyView::new(TupleView::new(vec![
-                AnyView::new(rating),
-                AnyView::new(
-                    Text::new(format!("{value:.2}"))
-                        .semantic_font(cove_ui_compose::theme::SemanticFontRef::caption())
-                        .semantic_foreground(SemanticColorRef::on_surface_muted()),
-                ),
-            ])),
+            AnyView::new(TupleView::new(vec![strip, details])),
         ))
     }
 }
@@ -368,6 +390,28 @@ impl View for RatingStory {
             RatingAppearance::default(),
             &self.half,
         );
+        let ten = Self::strip(
+            "Ten-star rating",
+            self.ten.get(),
+            RatingSelection {
+                maximum: 10,
+                is_enabled: enabled,
+                ..Default::default()
+            },
+            RatingAppearance {
+                size: Some(ControlSize::Small),
+                ..Default::default()
+            },
+            &self.ten,
+        );
+        let half = AnyView::new(BoxView::new(
+            FlexDirection::Column,
+            Align::Stretch,
+            Justify::FlexStart,
+            Wrap::NoWrap,
+            12.0,
+            AnyView::new(TupleView::new(vec![half, ten])),
+        ));
 
         let mut heart = RatingAppearance {
             symbol: RatingSymbol::heart(),
@@ -424,21 +468,27 @@ impl View for RatingStory {
             AnyView::new(TupleView::new(
                 ControlSize::ALL
                     .iter()
-                    .map(|size| {
+                    .enumerate()
+                    .map(|(index, size)| {
                         let mut appearance = RatingAppearance {
                             size: Some(*size),
                             ..RatingAppearance::default()
                         };
                         appearance.validate();
                         Self::strip(
-                            "Density",
-                            3.5,
+                            [
+                                "Mini rating",
+                                "Small rating",
+                                "Regular rating",
+                                "Large rating",
+                            ][index],
+                            self.densities[index].get(),
                             RatingSelection {
                                 is_enabled: enabled,
                                 ..RatingSelection::default()
                             },
                             appearance,
-                            &self.whole,
+                            &self.densities[index],
                         )
                     })
                     .collect(),
@@ -454,7 +504,7 @@ impl View for RatingStory {
             appearance.validate();
             Self::strip(
                 "Seven stars, minimum half",
-                0.5,
+                self.custom.get(),
                 RatingSelection {
                     maximum: 7,
                     precision: RatingPrecision::HALF,
@@ -463,7 +513,7 @@ impl View for RatingStory {
                     ..RatingSelection::default()
                 },
                 appearance,
-                &self.whole,
+                &self.custom,
             )
         };
 
@@ -540,6 +590,14 @@ impl View for RatingStory {
     }
 
     fn dynamic_properties(&self) -> Vec<cove_composition::DynamicField> {
-        cove_composition::dynamic_fields!(self; whole, half, fine, rtl)
+        let mut fields =
+            cove_composition::dynamic_fields!(self; whole, half, fine, rtl, custom, ten);
+        for (index, state) in self.densities.iter().enumerate() {
+            fields.push(cove_composition::DynamicField::state(
+                format!("density-{index}"),
+                state,
+            ));
+        }
+        fields
     }
 }

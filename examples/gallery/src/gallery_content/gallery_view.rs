@@ -265,10 +265,12 @@ impl GalleryView {
 
     fn navigation_header(&self) -> AnyView {
         let search = erased(
-            AnyView::new(cove_ui_compose::primitives::text::TextField::new(
-                "Search components…",
-                self.search_binding(),
-            ))
+            AnyView::new(
+                cove_ui_compose::primitives::controls::fields::SearchField::new(
+                    self.search_binding(),
+                )
+                .placeholder("Search components…"),
+            )
             .debug_name("gallery-search"),
         );
 
@@ -333,7 +335,11 @@ impl GalleryView {
                     Some(16.0),
                     None,
                 )),
-                AnyView::new(Text::new(title).truncated().semantic_font(SemanticFontRef::label())),
+                AnyView::new(
+                    Text::new(title)
+                        .truncated()
+                        .semantic_font(SemanticFontRef::label()),
+                ),
             ])),
         )
         .padding_edges(10.0, 0.0);

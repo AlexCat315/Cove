@@ -530,8 +530,8 @@ fn numeric_step_does_not_round_authored_values_and_steps_from_the_draft() {
         let current = || f32::from_bits(value.load(Ordering::SeqCst));
         assert_eq!(
             current(),
-            0.5,
-            "GAP: Primary-A is ignored, so the draft becomes \"0.50.75\", fails to parse and Return keeps 0.5 (Swift: 0.75)"
+            0.75,
+            "select-all replaces the numeric draft before Return commits it"
         );
 
         key_handler(
@@ -541,8 +541,8 @@ fn numeric_step_does_not_round_authored_values_and_steps_from_the_draft() {
         );
         assert_eq!(
             current(),
-            10.5,
-            "GAP: Shift-Up steps by ten from the still-committed 0.5 (Swift: 10.75 from the 0.75 draft)"
+            10.75,
+            "Shift-Up steps by ten from the committed draft"
         );
         assert_eq!(
             NumericTextFormat::invariant(2).format(-0.00001),
@@ -610,8 +610,8 @@ fn code_indentation() {
         key_handler(scene, &node, &plain(Scancode::RETURN));
         assert_eq!(
             string_value(),
-            "甲\n乙  if true {\n  ",
-            "GAP: Return carries the indent but adds no level after the brace, and Primary-A does not replace the text (Swift: \"  if true {{\\n    \")"
+            "  if true {\n    ",
+            "replacing the buffer preserves code indentation after a brace"
         );
     });
 }
@@ -699,8 +699,8 @@ fn clicking_blank_canvas_blurs_and_commits_a_number_draft() {
         assert_eq!(scene.focus.focused(), None, "blank canvas blurs the field");
         assert_eq!(
             f32::from_bits(value.load(Ordering::SeqCst)),
-            10.75,
-            "GAP: Primary-A is ignored, so typing 0.75 appends to \"1\" and the blur commits 10.75 (Swift: 0.75)"
+            0.75,
+            "clicking outside commits the replacement numeric draft"
         );
     });
 }

@@ -119,6 +119,7 @@ impl Default for RatingSelection {
 impl RatingSelection {
     pub fn validate(&mut self) {
         self.maximum = self.maximum.clamp(1, 20);
+        self.precision = RatingPrecision::divisions(self.precision.divisions);
     }
 
     pub fn is_interactive(&self) -> bool {
@@ -385,7 +386,14 @@ impl PrimitiveView for RatingBody {
     }
 
     fn update_node(&self, node: &Node) {
-        let rating = &self.rating;
+        let mut rating = self.rating.snapshot();
+        // The mounted node owns the gesture session through parent rebuilds.
+        rating.session = node
+            .attachment::<Rc<RatingSession>>(RATING_SESSION)
+            .unwrap_or_else(|| rating.session.clone());
+        let rating = &rating;
+        node.set_is_hit_testable(rating.selection.is_interactive());
+        node.set_is_focusable(rating.selection.is_interactive());
         let density = node.composition_value(&ControlSizeEnvironment::key());
         let geometry =
             RatingGeometry::new(&rating.appearance, &rating.selection, density, false, 0.0);
@@ -467,6 +475,21 @@ impl PrimitiveView for RatingBody {
 
         let palette = RatingPalette::resolve(node, &rating.appearance, &rating.selection);
         let appearance = rating.appearance.clone();
+        let raster = node
+            .attachment::<Rc<RatingPaint>>("rating.paint")
+            .filter(|paint| {
+                paint.symbol == appearance.symbol && paint.star_size == geometry.star_size
+            })
+            .unwrap_or_else(|| {
+                let paint = Rc::new(RatingPaint {
+                    symbol: appearance.symbol.clone(),
+                    star_size: geometry.star_size,
+                    outline: icon_raster(appearance.symbol.empty, geometry.star_size),
+                    filled: icon_raster(appearance.symbol.filled, geometry.star_size),
+                });
+                node.set_attachment("rating.paint", paint.clone());
+                paint
+            });
         let session_for_draw = session.clone();
         let weak = node.downgrade();
         let geometry_for_draw = geometry;
@@ -485,7 +508,7 @@ impl PrimitiveView for RatingBody {
                     value,
                     geometry_for_draw,
                     palette,
-                    &appearance.symbol,
+                    &raster,
                     origin,
                     list,
                 );
@@ -544,12 +567,19 @@ fn icon_raster(slug: &str, size: f32) -> Option<VectorImageRaster> {
     Some(VectorImageRaster::new(path, initial, size, size))
 }
 
+struct RatingPaint {
+    symbol: RatingSymbol,
+    star_size: f32,
+    outline: Option<VectorImageRaster>,
+    filled: Option<VectorImageRaster>,
+}
+
 fn paint(
     node: &Node,
     value: f64,
     geometry: RatingGeometry,
     palette: RatingPalette,
-    symbol: &RatingSymbol,
+    raster: &RatingPaint,
     origin: Point,
     list: &mut cove_core::DrawList,
 ) {
@@ -559,15 +589,21 @@ fn paint(
     }
     let opacity = node.opacity();
     let right_to_left = node.resolves_right_to_left();
-    let outline = icon_raster(symbol.empty, geometry.star_size);
-    let filled = icon_raster(symbol.filled, geometry.star_size);
+    let outline = raster
+        .outline
+        .as_ref()
+        .map(|raster| raster.resolve(geometry.star_size, geometry.star_size));
+    let filled = raster
+        .filled
+        .as_ref()
+        .map(|raster| raster.resolve(geometry.star_size, geometry.star_size));
+    for asset in outline.iter().chain(filled.iter()) {
+        asset.retain(list);
+    }
     let bounds = Rect::new(origin.x, origin.y, frame.width, frame.height);
     for index in 0..geometry.maximum {
         let rect = geometry.star_rect(index, origin, frame.height, right_to_left);
-        if let Some(asset) = outline
-            .as_ref()
-            .map(|raster| raster.resolve(geometry.star_size, geometry.star_size))
-        {
+        if let Some(asset) = outline.as_ref() {
             let _ = list.add_image_mask_quad(
                 rect,
                 asset.texture_id(),
@@ -580,7 +616,7 @@ fn paint(
         if fraction > 0.0
             && let Some(ref raster) = filled
         {
-            let asset = raster.resolve(geometry.star_size, geometry.star_size);
+            let asset = raster;
             if fraction < 1.0 {
                 let filled_width = rect.width * fraction;
                 let clip_x = if right_to_left {

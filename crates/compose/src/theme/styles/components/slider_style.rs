@@ -13,6 +13,7 @@ use super::default_slider_style::DefaultSliderStyle;
 /// Snapshot of state passed to `SliderStyle::resolve` on every recompose.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct SliderStyleConfiguration {
+    pub size: crate::theme::ControlSize,
     pub value: f64,
     pub range: (f64, f64),
     pub is_pressed: bool,

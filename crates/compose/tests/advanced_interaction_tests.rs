@@ -23,13 +23,12 @@
 //!   removes its children once settled
 //!
 //! Named differences from the Swift suite:
-//! - GAP: the Rust `TextField` has no Primary-Z undo, Primary-V paste or
-//!   Primary-A select-all. `CoveUICompose` declares `TextField::edit_history`
+//! - GAP: the Rust `TextField` has no Primary-Z undo.
+//!   `CoveUICompose` declares `TextField::edit_history`
 //!   but never reads it, so the field ignores Primary-Z, the `ShortcutHost`
-//!   fallback runs instead (Swift expects zero scene undos), and the clipboard
-//!   is never consulted. `field_undo_routing` pins those measured outcomes.
-//! - GAP: because paste never happens, the post-paste selection is not restored;
-//!   the field keeps the caret at the end of the typed text with no anchor.
+//!   fallback runs instead (Swift expects zero scene undos).
+//! - GAP: undo after paste does not restore the pre-paste selection;
+//!   the field keeps the caret at the end of the pasted text with no anchor.
 //! - GAP: a wheel notch dispatched at the stack does not move its window, and
 //!   `VirtualStack::scroll_to_index` does not reveal the requested row on its
 //!   first mount. The Rust stack keeps its initial mounted range (row 0 stays
@@ -212,8 +211,8 @@ fn field_undo_routing() {
         scene.settle(1, 1.0);
         assert_eq!(
             text.get().string_value(),
-            "中😀ab",
-            "GAP: Swift pastes the clipboard as one transaction (粘贴\\n值); Rust has no Primary-V"
+            "粘贴\n值",
+            "paste replaces the selected value"
         );
         input.dispatch(&InputEvent::KeyDown(key(
             Scancode::Z,
@@ -222,8 +221,8 @@ fn field_undo_routing() {
         scene.settle(1, 1.0);
         assert_eq!(
             text.get().string_value(),
-            "中😀ab",
-            "the text after the failed paste round trip is unchanged"
+            "粘贴\n值",
+            "GAP: undo is not yet wired to the field's history"
         );
         ClipboardHolder::set_read(None);
 
@@ -238,7 +237,7 @@ fn field_undo_routing() {
             (anchor, cursor),
             (None, 4),
             "GAP: Swift restores the pre-paste selection (anchor 0, cursor 4); Rust keeps an \
-             unanchored caret at the end of 中😀ab"
+             unanchored caret at the end of the pasted value"
         );
     });
 }

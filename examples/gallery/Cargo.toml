@@ -28,6 +28,7 @@ unicode-segmentation.workspace = true
 [dev-dependencies]
 cove-devtools = { path = "../../crates/devtools" }
 cove-devtools-protocol.workspace = true
+serde_json.workspace = true
 
 [lints]
 workspace = true

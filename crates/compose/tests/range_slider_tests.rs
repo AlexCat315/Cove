@@ -8,16 +8,6 @@
 //! - both thumbs are independent tab stops with their own accessibility values
 //! - the focus ring is drawn only while focus is visible
 //!
-//! Model difference (production gap, reported): the range slider paints no
-//! focus ring at all. Swift's `RangeSlider.swift:341-356` strokes each thumb in
-//! `colors.focusRing` (a 2pt stroke inset 3pt outside the knob) when that thumb
-//! owns visible focus. The Rust `RangeSliderHost::render`
-//! (`range_slider.rs:550-620`) reads `is_focused` into the style configuration
-//! but never asks the style for a ring, and grep for `focus_ring` across
-//! `range_slider.rs`, `slider/paint.rs` and `slider_style.rs` returns nothing.
-//! `focus_state_does_not_change_the_painted_vertices` records the current
-//! behaviour so the missing ring is visible rather than silently dropped.
-
 use crate::support;
 
 use std::cell::RefCell;
@@ -426,7 +416,7 @@ fn both_thumbs_are_independent_tab_stops() {
 }
 
 #[test]
-fn focus_state_does_not_change_the_painted_vertices() {
+fn keyboard_focus_paints_a_ring_on_the_focused_thumb() {
     with_scene(|scene| {
         let values = cove_core::State::new(RangeValue::new(20.0, 80.0));
         let read = values.clone();
@@ -480,10 +470,9 @@ fn focus_state_does_not_change_the_painted_vertices() {
         );
 
         scene.focus.focus(Some(&lower), true);
-        assert_eq!(
-            ring_vertices(),
-            pointer_focus_ring,
-            "documented gap: visible keyboard focus paints no ring either"
+        assert!(
+            ring_vertices() > pointer_focus_ring,
+            "visible keyboard focus paints a ring"
         );
     });
 }

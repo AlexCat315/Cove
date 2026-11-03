@@ -463,6 +463,19 @@ fn painted_textures(node: &Node) -> Vec<u32> {
     if let Some(draw) = node.draw() {
         draw(&mut list, Point::default());
     }
+    let mut retained = HashSet::new();
+    list.resources
+        .for_each_retained::<cove_imaging::ImageAsset>(|asset| {
+            retained.insert(asset.texture_id);
+        });
+    for batch in list.batches() {
+        if batch.texture_id != 0 {
+            assert!(
+                retained.contains(&batch.texture_id),
+                "each painted SVG must reach the renderer's asset residency upload"
+            );
+        }
+    }
     list.batches()
         .iter()
         .map(|batch| batch.texture_id)
@@ -752,9 +765,8 @@ fn accessibility() {
             harness.rerender(scene);
             let node = host(scene);
             assert!(
-                node.is_focusable() && node.is_hit_testable(),
-                "GAP: Swift's update clears isFocusable/isHitTestable on an inactive rating \
-                 ({read_only}); Rust sets them only in make_node, so the reused node keeps them"
+                !node.is_focusable() && !node.is_hit_testable(),
+                "an inactive rating leaves pointer and keyboard interaction ({read_only})"
             );
             assert!(scene.registry.handlers(&node).pointer.is_none());
             let actions = node.accessibility_actions();
@@ -821,7 +833,7 @@ fn cleanup() {
 }
 
 #[test]
-fn a_rebuilt_rating_drops_its_press_session() {
+fn a_rebuilt_rating_keeps_its_press_session() {
     InteractiveScene::run(500.0, 100.0, |scene| {
         let tick = State::new(0_u32);
         struct Rebuilt(State<u32>);
@@ -848,10 +860,8 @@ fn a_rebuilt_rating_drops_its_press_session() {
         scene.settle(2, 0.0);
         down(scene, &pointer(&node, 3, 0.75, 0.0));
         assert!(
-            scene.capture.target().is_none(),
-            "GAP: Swift's rating session survives `_updateNode`; `Rating::new` builds a fresh \
-             RatingSession that is never mounted on the reused node, so after a parent \
-             re-render a press no longer captures the pointer"
+            same(scene.capture.target(), &node),
+            "parent recomposition retains the mounted gesture session"
         );
     });
 }

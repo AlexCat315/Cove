@@ -97,6 +97,10 @@ fn width_only_slider_keeps_intrinsic_height_and_paints() {
         let hook = slider.draw().expect("the slider paints");
         hook(&mut draw, cove_core::Point::default());
         assert!(!draw.vertices().is_empty(), "the slider paints geometry");
+        assert!(
+            slider.shadow().is_empty(),
+            "painting the thumb must not install a shadow on the whole track node"
+        );
     });
 }
 

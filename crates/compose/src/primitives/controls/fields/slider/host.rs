@@ -494,6 +494,7 @@ fn render(node: &Node, snapshot: &Snapshot, list: &mut cove_core::DrawList, orig
     let is_enabled = node.is_focusable();
     let appearance = style.resolve(
         &SliderStyleConfiguration {
+            size: node.composition_value(&crate::theme::ControlSizeEnvironment::key()),
             value: snapshot.clamped(value),
             range: snapshot.range,
             is_pressed: node.attachment::<bool>(PRESSED) == Some(true),
@@ -560,7 +561,14 @@ fn render(node: &Node, snapshot: &Snapshot, list: &mut cove_core::DrawList, orig
         origin,
     );
     if let Some(shadow) = appearance.thumb_shadow {
-        node.set_shadow(shadow);
+        list.add_shadow_layer(
+            shadow,
+            thumb,
+            thumb.height.min(thumb.width) / 2.0,
+            node.opacity(),
+            None,
+            Some(thumb),
+        );
     }
     let _ = list.add_rounded_rect(
         thumb,

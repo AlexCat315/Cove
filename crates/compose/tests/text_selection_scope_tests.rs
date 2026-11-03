@@ -45,6 +45,29 @@ fn position(node: &Node, offset: usize) -> TextSelectionPosition {
     }
 }
 
+#[test]
+fn keyboard_selection_preserves_joined_emoji_and_combining_characters() {
+    GlobalTestLock::locked(|| {
+        let scope = new_scope();
+        let root = Node::new();
+        let node = paragraph(
+            &scope,
+            "A👩🏽‍💻e\u{301}B",
+            Rect::new(0.0, 0.0, 200.0, 20.0),
+            &root,
+        );
+        scope
+            .borrow_mut()
+            .select(position(&node, 1), position(&node, 1));
+        assert!(scope.borrow_mut().extend_focus(1));
+        assert_eq!(scope.borrow_mut().selected_text(), "👩🏽‍💻");
+        assert!(scope.borrow_mut().extend_focus(1));
+        assert_eq!(scope.borrow_mut().selected_text(), "👩🏽‍💻e\u{301}");
+        assert!(scope.borrow_mut().extend_focus(-1));
+        assert_eq!(scope.borrow_mut().selected_text(), "👩🏽‍💻");
+    });
+}
+
 /// Registers one paragraph that reports `text` and a clamped caret offset.
 fn paragraph(
     scope: &SharedTextSelectionScope,
