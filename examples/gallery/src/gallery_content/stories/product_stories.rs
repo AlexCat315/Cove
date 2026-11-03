@@ -298,7 +298,7 @@ impl View for RadioStory {
             .collect();
         let group = AnyView::new(
             RadioGroup::try_new(self.selection.binding(), options)
-                .expect("unique radio option IDs")
+                .expect("the gallery radio options are static with unique ids")
                 .enabled(self.options.is_enabled)
                 .horizontal(false)
                 .debug_name("product-radio"),
@@ -444,7 +444,7 @@ impl View for FormStory {
         };
         let form = AnyView::new(
             Form::try_new(fields)
-                .expect("unique form field IDs")
+                .expect("the gallery form fields are static with unique ids")
                 .controller(self.controller.clone())
                 .configure(|layout| layout.columns = 1)
                 .footer(AnyView::new(TupleView::new(vec![
@@ -528,7 +528,7 @@ impl View for ComboboxStory {
             .map(|(value, label, enabled)| SelectOption::new((*value).to_owned(), *label, *enabled))
             .collect();
         let local = AnyView::new(
-            Combobox::try_new(self.city.binding(), city_options).expect("unique combobox IDs")
+            Combobox::try_new(self.city.binding(), city_options).expect("the gallery combobox options are static with unique ids")
                 .presentation({
                     let mut presentation =
                         cove_ui_compose::primitives::controls::fields::combobox::ComboboxPresentation::default();

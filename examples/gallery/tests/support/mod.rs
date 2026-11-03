@@ -80,6 +80,11 @@ impl GlobalTestLock {
 ///
 /// Swift wrote this as
 /// `TextEnvironment.bootstrapped(atlasTextureID: 1, primaryFontName: SystemFontDefaults.primaryFontName)`.
+///
+/// The previous environment is restored through a guard rather than after
+/// `body()`, so a panicking page cannot leak the bootstrapped environment into
+/// the pages that follow it. Per-page panic isolation in `gallery_tests`
+/// depends on this.
 pub fn with_text_environment<T>(body: impl FnOnce() -> T) -> T {
     let previous = TextEnvironmentHolder::current();
     TextEnvironmentHolder::set_current(Some(TextEnvironment::bootstrapped(TextBootstrapOptions {

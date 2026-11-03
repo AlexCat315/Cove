@@ -386,7 +386,7 @@ impl View for IntroductionStory {
                 ],
                 period_selection,
             )
-            .expect("unique button group IDs")
+            .expect("the gallery segments are static with unique ids")
             .enabled(enabled),
         );
         let period_group = AnyView::new(period_group.debug_name("dashboard-period"));

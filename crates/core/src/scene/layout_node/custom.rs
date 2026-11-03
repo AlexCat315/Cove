@@ -107,7 +107,16 @@ impl LayoutNode {
         }
         let size = engine::layout_probe(self, width, height, owner.custom_layout_direction());
         self.place_custom_layouts();
-        self.data_mut().placed_frame = Some(Rect::new(at.x, at.y, size.width, size.height));
+        // The probe reports the child's intrinsic size, which can be narrower
+        // than the slot the algorithm assigned it. Honour an explicit proposal
+        // so the frame matches the box the layout measured against; otherwise
+        // a wrapped cell reports the height of a wider box and clips its last
+        // line.
+        let placed = Size {
+            width: width.unwrap_or(size.width),
+            height: height.unwrap_or(size.height),
+        };
+        self.data_mut().placed_frame = Some(Rect::new(at.x, at.y, placed.width, placed.height));
     }
     pub(super) fn prepare_custom_layouts(&self) {
         if !self.subtree_is_dirty() {

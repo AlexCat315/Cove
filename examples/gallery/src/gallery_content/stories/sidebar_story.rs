@@ -326,7 +326,7 @@ impl View for SidebarStory {
             self.selection.binding(),
             self.sections(),
         )
-        .expect("unique drawer IDs");
+        .expect("the gallery drawer destinations are static with unique ids");
 
         AnyView::new(TupleView::new(vec![
             AnyView::new(StorySection::new(

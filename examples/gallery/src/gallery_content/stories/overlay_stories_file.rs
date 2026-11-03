@@ -839,7 +839,7 @@ impl View for TabsStory {
     fn body(&self, _cx: &Scope) -> AnyView {
         let tabs = AnyView::new(
             TabView::try_new(self.selection.binding(), self.content_tabs())
-                .expect("unique tab IDs")
+                .expect("the gallery tabs are a static list with unique ids")
                 .variant(self.variant())
                 .overflow(self.overflow())
                 .enabled(self.options.is_enabled)
@@ -854,7 +854,7 @@ impl View for TabsStory {
         ];
         let segmented = AnyView::new(
             TabView::try_new(self.segment.binding(), segments)
-                .expect("unique tab IDs")
+                .expect("the gallery tabs are a static list with unique ids")
                 .variant(TabVariant::Segmented)
                 .enabled(self.options.is_enabled)
                 .frame_height(120.0)
@@ -899,7 +899,7 @@ impl View for TabsStory {
             .collect();
         let documents = AnyView::new(
             TabView::try_new(self.document_selection.binding(), document_tabs)
-                .expect("unique tab IDs")
+                .expect("the gallery tabs are a static list with unique ids")
                 .variant(TabVariant::Card)
                 .overflow(TabOverflow::Scroll)
                 .frame_height(120.0)

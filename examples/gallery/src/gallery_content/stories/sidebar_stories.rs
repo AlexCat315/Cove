@@ -97,7 +97,7 @@ impl cove_ui_compose::View for ResizableSidebarExample {
             self.selected.binding(),
             self.sections(),
         )
-        .expect("unique sidebar IDs")
+        .expect("the gallery sidebar sections are static with unique ids")
         .content(content)
         .width(self.width.binding())
         .options(sidebar_options());
@@ -259,7 +259,7 @@ impl cove_ui_compose::View for NestedSidebarExample {
             self.selection.binding(),
             self.sections(),
         )
-        .expect("unique sidebar IDs")
+        .expect("the gallery sidebar sections are static with unique ids")
         .content(content)
         .presentation(self.is_open.binding())
         .options(sidebar_options());

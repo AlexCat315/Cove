@@ -113,103 +113,143 @@ fn every_catalog_entry_has_a_unique_page_and_can_be_located_by_name() {
     );
 }
 
+/// Mounts one page in one appearance and asserts the invariants every story
+/// must hold: the shell keeps the window height, no node carries a non-finite
+/// or negative frame, and story sections stay ordered and non-collapsed.
+fn check_page_materializes(page: GalleryPage, appearance: Appearance) {
+    let dispatch = StoryDispatch::new(page);
+    let implemented = dispatch.is_implemented();
+    // Pages whose story needs unmigrated widgets render the pending notice
+    // instead. Both are legitimate mounts; the invariant under test is that
+    // whichever runs produces a well-formed tree.
+    scene(1280.0, 820.0, page, appearance, |scene| {
+        let root = scene
+            .graph
+            .tree
+            .borrow()
+            .root()
+            .unwrap_or_else(|| panic!("{page:?} has no root"));
+        let shell = scene
+            .named("gallery-shell")
+            .unwrap_or_else(|| panic!("{page:?} has no gallery-shell"));
+        assert_eq!(
+            shell.frame().height,
+            820.0,
+            "{page:?}: the application root must not collapse, got {}",
+            shell.frame().height
+        );
+
+        for node in scene.nodes() {
+            let frame = node.frame();
+            assert!(
+                frame.width.is_finite() && frame.height.is_finite(),
+                "{page:?} node {} tag {:?} has an invalid frame {frame:?}",
+                node.id().0,
+                node.view_tag()
+            );
+            assert!(
+                frame.width >= 0.0 && frame.height >= 0.0,
+                "{page:?} node {} tag {:?} has a negative size {frame:?}",
+                node.id().0,
+                node.view_tag()
+            );
+        }
+
+        let sections: Vec<_> = scene
+            .graph
+            .layout_snapshot()
+            .into_iter()
+            .filter(|entry| {
+                entry
+                    .debug_name
+                    .as_deref()
+                    .is_some_and(|name| name.starts_with("story-section-"))
+            })
+            .collect();
+        for section in &sections {
+            assert!(
+                section.frame.height > 60.0,
+                "{page:?} section {:?} collapsed to {}",
+                section.debug_name,
+                section.frame.height
+            );
+        }
+        for pair in sections.windows(2) {
+            let (first, second) = (&pair[0], &pair[1]);
+            assert!(
+                first.absolute_frame.y + first.absolute_frame.height <= second.absolute_frame.y,
+                "{page:?}: {:?} overlaps {:?}",
+                first.debug_name,
+                second.debug_name
+            );
+        }
+
+        if page == GalleryPage::Tree {
+            assert!(implemented, "the Tree page dispatches to its story");
+            assert!(
+                scene.named("tree-control").is_some(),
+                "the tree viewport mounts"
+            );
+            assert!(
+                scene.named("tree-search").is_some(),
+                "the tree filter mounts"
+            );
+            assert!(
+                scene.named("tree-caption").is_some(),
+                "the selection caption mounts"
+            );
+        }
+
+        let _ = root;
+        scene.scheduler.tick(1.0);
+    });
+}
+
+/// The message of a caught panic, so it can be attributed to a page.
+fn panic_message(payload: &(dyn std::any::Any + Send)) -> String {
+    if let Some(message) = payload.downcast_ref::<&'static str>() {
+        return (*message).to_string();
+    }
+    if let Some(message) = payload.downcast_ref::<String>() {
+        return message.clone();
+    }
+    "non-string panic payload".to_string()
+}
+
 #[test]
 fn all_stories_materialize_and_settle_in_light_and_dark_themes() {
     let pages: Vec<GalleryPage> = GalleryCatalog::entries()
         .iter()
         .map(|entry| entry.page)
         .collect();
-    for appearance in [Appearance::Light, Appearance::Dark] {
-        for page in pages.clone() {
-            let dispatch = StoryDispatch::new(page);
-            let implemented = dispatch.is_implemented();
-            // Pages whose story needs unmigrated widgets render the pending
-            // notice instead. Both are legitimate mounts; the invariant under
-            // test is that whichever runs produces a well-formed tree.
-            scene(1280.0, 820.0, page, appearance, |scene| {
-                let root = scene
-                    .graph
-                    .tree
-                    .borrow()
-                    .root()
-                    .unwrap_or_else(|| panic!("{page:?} has no root"));
-                let shell = scene
-                    .named("gallery-shell")
-                    .unwrap_or_else(|| panic!("{page:?} has no gallery-shell"));
-                assert_eq!(
-                    shell.frame().height,
-                    820.0,
-                    "{page:?}: the application root must not collapse, got {}",
-                    shell.frame().height
-                );
 
-                for node in scene.nodes() {
-                    let frame = node.frame();
-                    assert!(
-                        frame.width.is_finite() && frame.height.is_finite(),
-                        "{page:?} node {} tag {:?} has an invalid frame {frame:?}",
-                        node.id().0,
-                        node.view_tag()
-                    );
-                    assert!(
-                        frame.width >= 0.0 && frame.height >= 0.0,
-                        "{page:?} node {} tag {:?} has a negative size {frame:?}",
-                        node.id().0,
-                        node.view_tag()
-                    );
-                }
-
-                let sections: Vec<_> = scene
-                    .graph
-                    .layout_snapshot()
-                    .into_iter()
-                    .filter(|entry| {
-                        entry
-                            .debug_name
-                            .as_deref()
-                            .is_some_and(|name| name.starts_with("story-section-"))
-                    })
-                    .collect();
-                for section in &sections {
-                    assert!(
-                        section.frame.height > 60.0,
-                        "{page:?} section {:?} collapsed to {}",
-                        section.debug_name,
-                        section.frame.height
-                    );
-                }
-                for pair in sections.windows(2) {
-                    let (first, second) = (&pair[0], &pair[1]);
-                    assert!(
-                        first.absolute_frame.y + first.absolute_frame.height
-                            <= second.absolute_frame.y,
-                        "{page:?}: {:?} overlaps {:?}",
-                        first.debug_name,
-                        second.debug_name
-                    );
-                }
-
-                if page == GalleryPage::Tree {
-                    assert!(implemented, "the Tree page dispatches to its story");
-                    assert!(
-                        scene.named("tree-control").is_some(),
-                        "the tree viewport mounts"
-                    );
-                    assert!(
-                        scene.named("tree-search").is_some(),
-                        "the tree filter mounts"
-                    );
-                    assert!(
-                        scene.named("tree-caption").is_some(),
-                        "the selection caption mounts"
-                    );
-                }
-
-                let _ = root;
-                scene.scheduler.tick(1.0);
-            });
+    // Every page runs behind `catch_unwind`, because a story fixture that trips
+    // an invariant — a duplicate id reaching a `try_new(...).expect(...)`, say —
+    // must report *which* page it was. Without the isolation the sweep aborts on
+    // the first panic with a bare invariant message, and the failing page has to
+    // be bisected out of a hundred-odd candidates.
+    let mut failures: Vec<String> = Vec::new();
+    for (appearance, label) in [(Appearance::Light, "light"), (Appearance::Dark, "dark")] {
+        for page in pages.iter().copied() {
+            let outcome = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                check_page_materializes(page, appearance);
+            }));
+            if let Err(payload) = outcome {
+                failures.push(format!(
+                    "{} ({label}): {}",
+                    page.raw_value(),
+                    panic_message(payload.as_ref())
+                ));
+            }
         }
     }
+
+    assert!(
+        failures.is_empty(),
+        "{} page mount(s) failed:\n  {}",
+        failures.len(),
+        failures.join("\n  ")
+    );
 }
 
 #[test]

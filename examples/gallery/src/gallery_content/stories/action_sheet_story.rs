@@ -106,7 +106,7 @@ impl ActionSheetStory {
             self.project_actions(),
             "Close project actions",
         )
-        .expect("unique action sheet action IDs")
+        .expect("the gallery action sheet actions are static with unique ids")
     }
 
     /// The generated shortcut commands, numbered from one.
@@ -140,7 +140,7 @@ impl View for ActionSheetStory {
                 self.shortcut_actions(),
                 "Close workspace actions",
             )
-            .expect("unique action sheet action IDs"),
+            .expect("the gallery action sheet actions are static with unique ids"),
             Text::new("Browse workspace actions"),
         )
         .is_enabled(enabled);

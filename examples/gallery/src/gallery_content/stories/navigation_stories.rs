@@ -169,7 +169,7 @@ impl View for AppBarStory {
                 ),
                 self.actions(),
             )
-            .expect("unique app bar commands")
+            .expect("the gallery app bar commands are static with unique ids")
             .options(AppBarOptions {
                 is_enabled: enabled,
                 ..AppBarOptions::default()

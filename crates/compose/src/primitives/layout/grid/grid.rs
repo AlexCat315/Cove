@@ -166,12 +166,10 @@ impl GridLayout {
             }
             let view = subview.clone();
             proxy.set_measure_func(Some(Rc::new(move |width, mode, _, _| {
-                let width = if mode == MeasureMode::Undefined {
-                    None
-                } else {
-                    Some(width)
-                };
-                view.size_that_fits(ProposedViewSize::new(width, None))
+                if mode == MeasureMode::Undefined {
+                    return view.size_that_fits(ProposedViewSize::new(None, None));
+                }
+                cell_size(&view, width)
             })));
             root.add_child(&proxy);
             proxies.push((proxy, is_visible));
@@ -234,7 +232,7 @@ impl Layout for GridLayout {
                 view.place(Point::new(0.0, 0.0), ProposedViewSize::ZERO, false);
                 continue;
             };
-            let size = view.size_that_fits(ProposedViewSize::new(Some(frame.width), None));
+            let size = cell_size(view, frame.width);
             view.place(
                 Point::new(
                     bounds.x
@@ -253,6 +251,19 @@ impl Layout for GridLayout {
 struct NativeArrangement {
     frames: Vec<Option<Rect>>,
     size: Size,
+}
+
+/// A grid cell can shrink below its track: the probe lays children out at
+/// their intrinsic width. Wrapped text then needs more lines than the row was
+/// measured against the track width, so the row reserves too little height and
+/// the last line is clipped. Re-measure at the width the cell will actually
+/// occupy so the reported width and height agree.
+fn cell_size(view: &LayoutSubview, track_width: f32) -> Size {
+    let fitted = view.size_that_fits(ProposedViewSize::new(Some(track_width), None));
+    if fitted.width + 0.01 >= track_width {
+        return fitted;
+    }
+    view.size_that_fits(ProposedViewSize::new(Some(fitted.width), None))
 }
 
 fn native_track(column: &GridColumn) -> cove_core::scene::GridTrack {

@@ -787,7 +787,7 @@ impl View for AdaptiveTableSample {
         let mut options = DataTableOptions::default();
         options.is_enabled = enabled;
         let table = DataTable::from_records(rows, |row: &usize| *row, adaptive_table_columns())
-            .expect("unique table column IDs")
+            .expect("the gallery table columns are static with unique ids")
             .options(options);
         AnyView::new(table)
     }

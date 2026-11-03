@@ -122,7 +122,7 @@ impl View for StepperStory {
 
         let horizontal = AnyView::new(
             Stepper::try_new(self.items(), self.selection_binding())
-                .expect("unique stepper item IDs")
+                .expect("the gallery stepper steps are static with unique ids")
                 .options(StepperOptions {
                     is_enabled: enabled,
                     ..StepperOptions::default()
@@ -195,7 +195,7 @@ impl View for StepperStory {
 
         let vertical = AnyView::new(
             Stepper::try_new(self.items(), self.selection_binding())
-                .expect("unique stepper item IDs")
+                .expect("the gallery stepper steps are static with unique ids")
                 .options(StepperOptions {
                     axis: StepperAxis::Vertical,
                     is_enabled: enabled,
@@ -236,7 +236,7 @@ impl View for StepperStory {
                         AnyView::new(
                             Stepper::try_new(Vec::<StepperItem<String>>::new(), {
                                 Binding::new(|| None, |_| {})
-                            }).expect("unique stepper item IDs")
+                            }).expect("an empty stepper has no ids to collide")
                             .options(StepperOptions {
                                 is_enabled: enabled,
                                 ..StepperOptions::default()

@@ -144,7 +144,7 @@ impl AccordionStory {
             })
             .collect();
         Accordion::try_new(items, self.expanded.binding())
-            .expect("unique accordion IDs")
+            .expect("the gallery accordion items are static with unique ids")
             .allows_multiple(self.allows_multiple.get())
             .enabled(self.options.is_enabled)
     }
@@ -283,7 +283,7 @@ impl View for BreadcrumbStory {
         };
         let trail = AnyView::new(
             Breadcrumb::try_new(self.items(), 4, move |id: String| story.open(&id))
-                .expect("unique breadcrumb IDs")
+                .expect("the gallery breadcrumb trail is static with unique ids")
                 .debug_name("breadcrumb-control"),
         );
         let caption = Text::new(format!("Opened: {}", self.opened()))
@@ -474,7 +474,7 @@ impl View for ButtonGroupStory {
                     .collect(),
                 self.mode.binding(),
             )
-            .expect("unique button group IDs")
+            .expect("the gallery segments are static with unique ids")
             .enabled(enabled)
             .debug_name("button-group-mode"),
         );
@@ -488,7 +488,7 @@ impl View for ButtonGroupStory {
                     .collect(),
                 self.category.binding(),
             )
-            .expect("unique button group IDs")
+            .expect("the gallery segments are static with unique ids")
             .enabled(enabled)
             .debug_name("button-group-category"),
         );

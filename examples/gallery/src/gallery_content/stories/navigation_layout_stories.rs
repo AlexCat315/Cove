@@ -175,7 +175,7 @@ impl View for DrawerStory {
             self.selection.binding(),
             self.sections(),
         )
-        .expect("unique drawer IDs")
+        .expect("the gallery drawer destinations are static with unique ids")
         .options(self.drawer_options())
         .header(label);
 
@@ -322,7 +322,7 @@ impl View for RailStory {
         let shows_labels = self.shows_labels();
         let rail = AnyView::new(
             NavigationRail::try_new(self.selection.binding(), self.items())
-                .expect("unique rail destinations")
+                .expect("the gallery rail destinations are static with unique ids")
                 .shows_labels(shows_labels)
                 .on_activate(|_| {})
                 .debug_name("navigation-rail")

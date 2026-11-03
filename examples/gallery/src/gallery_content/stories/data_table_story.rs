@@ -489,7 +489,7 @@ impl View for DataTableStory {
         let activate = self.handle();
         let table = AnyView::new(
             DataTable::from_records(self.rows(), |row: &WarehouseRow| row.id, self.columns())
-                .expect("unique table column IDs")
+                .expect("the gallery table columns are static with unique ids")
                 .options(options)
                 .on_activate(move |row: &WarehouseRow| activate.activate(row.id))
                 .frame_height(320.0)
@@ -740,7 +740,7 @@ impl View for TreeTableSample {
                     }),
                 ],
             )
-            .expect("unique tree-table column IDs")
+            .expect("the gallery tree-table columns are static with unique ids")
             .options(options)
             .frame_height(240.0)
             .debug_name("tree-table"),

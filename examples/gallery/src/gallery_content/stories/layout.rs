@@ -317,7 +317,7 @@ impl View for LayoutGridStory {
                     AnyView::new(GridCell::new("More", "One view per cell")),
                 ])),
             )
-            .expect("valid grid columns")
+            .expect("the gallery grid columns are a static, valid set")
             .spacing(12.0, 12.0)
             .enabled(enabled)
             .debug_name("layout-measured-grid"),
@@ -341,7 +341,7 @@ impl View for LayoutGridStory {
                         .collect(),
                 )),
             )
-            .expect("valid grid columns")
+            .expect("the gallery grid columns are a static, valid set")
             .spacing(12.0, 12.0)
             .enabled(enabled)
             .debug_name("layout-adaptive-grid"),
@@ -495,7 +495,7 @@ impl View for LazyGridStory {
                 },
                 |_: &u64| AnyView::new(LazyCell::new("Cell")),
             )
-            .expect("valid grid layout")
+            .expect("the gallery grid geometry is a static, valid set")
             .frame_height(240.0)
             .debug_name("layout-lazy-grid"),
         );
@@ -517,7 +517,7 @@ impl View for LazyGridStory {
                 },
                 |index: &u64| AnyView::new(LazyCell::new(format!("#{index}"))),
             )
-            .expect("valid grid layout")
+            .expect("the gallery grid geometry is a static, valid set")
             .frame_height(220.0)
             .debug_name("layout-wide-lazy-grid"),
         );
