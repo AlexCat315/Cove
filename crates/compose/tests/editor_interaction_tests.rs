@@ -181,13 +181,13 @@ fn undo_selection_replacement_restores_text_before_scene_shortcuts() {
         dispatcher.dispatch(&InputEvent::KeyDown(primary(Scancode::Z)));
         assert_eq!(
             text(&store),
-            "中文🙂",
-            "GAP: Swift undoes to `alpha` on Primary-Z; Rust's field records no history"
+            "alpha",
+            "Primary-Z undoes the selection replacement"
         );
         assert_eq!(
             actions.get(),
-            1,
-            "GAP: the field consumes select-all but undo still reaches the scene shortcut"
+            0,
+            "the field consumes Primary-Z before the scene shortcut"
         );
 
         dispatcher.dispatch(&InputEvent::KeyDown(key(
@@ -197,7 +197,7 @@ fn undo_selection_replacement_restores_text_before_scene_shortcuts() {
         assert_eq!(
             text(&store),
             "中文🙂",
-            "GAP: Swift redoes to 中文🙂 on Primary-Shift-Z; Rust has no redo"
+            "Primary-Shift-Z redoes the replacement"
         );
 
         dispatcher.dispatch(&InputEvent::KeyDown(primary(Scancode::Z)));
@@ -208,8 +208,8 @@ fn undo_selection_replacement_restores_text_before_scene_shortcuts() {
         )));
         assert_eq!(
             text(&store),
-            "中文🙂beta",
-            "GAP: without undo the subsequent typing appends to the replacement"
+            "beta",
+            "undo restores the select-all anchor, so the next typing replaces the value and clears redo"
         );
     });
 }
@@ -266,12 +266,12 @@ fn platform_text_commands_share_keyboard_history() {
 
         assert_eq!(
             scene.focus.text_edit_availability(TextEditCommand::Undo),
-            None,
-            "GAP: Swift reports false before any edit; Rust's TextField publishes no TextEditActions, so availability is None"
+            Some(false),
+            "undo is unavailable before the first edit"
         );
         assert!(
-            !scene.focus.perform_text_edit(TextEditCommand::Undo),
-            "GAP: Swift performs the (no-op) undo and returns true; Rust has no edit actions to perform"
+            scene.focus.perform_text_edit(TextEditCommand::Undo),
+            "the command is performed and reports handled even with nothing to undo"
         );
 
         let dispatcher = scene.dispatcher();
@@ -280,20 +280,20 @@ fn platform_text_commands_share_keyboard_history() {
         assert_eq!(text(&store), "replacement");
         assert_eq!(
             scene.focus.text_edit_availability(TextEditCommand::Undo),
-            None,
-            "GAP: Swift reports true after an edit; Rust never publishes undo availability"
+            Some(true),
+            "undo becomes available after an edit"
         );
         assert!(
-            !scene.focus.perform_text_edit(TextEditCommand::Undo),
-            "GAP: Swift undoes to `alpha`; Rust cannot"
+            scene.focus.perform_text_edit(TextEditCommand::Undo),
+            "the platform command undoes the edit"
         );
-        assert_eq!(text(&store), "replacement");
+        assert_eq!(text(&store), "alpha");
 
         *store.lock().unwrap() = TextBuffer::new("external document");
         assert_eq!(
             scene.focus.text_edit_availability(TextEditCommand::Undo),
-            None,
-            "GAP: Swift drops undo and redo after an external rewrite; Rust never had either"
+            Some(false),
+            "an external rewrite drops the history"
         );
         scene.focus.clear();
         assert_eq!(

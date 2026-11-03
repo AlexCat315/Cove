@@ -22,10 +22,12 @@ impl Snapshot {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum TextEditKind {
     Typing,
     Deletion,
+    /// One command that never coalesces with its neighbours.
+    #[default]
     Atomic,
 }
 
@@ -42,6 +44,15 @@ pub struct TextEditHistory {
     undo_stack: VecDeque<Transaction>,
     redo_stack: Vec<Transaction>,
     current_buffer: Option<TextBuffer>,
+}
+
+impl std::fmt::Debug for TextEditHistory {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("TextEditHistory")
+            .field("undo", &self.undo_stack.len())
+            .field("redo", &self.redo_stack.len())
+            .finish()
+    }
 }
 
 impl Clone for TextEditHistory {

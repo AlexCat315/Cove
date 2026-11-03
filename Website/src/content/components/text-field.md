@@ -16,10 +16,82 @@ fn project_name(cx: &Scope) -> impl View {
 }
 ```
 
-点击定位光标，拖动选择；双击选择词语，三击选择全部文字。Shift 配合方向键扩展选区。Home / End 移到当前逻辑行的首尾。光标在焦点内闪烁，输入和移动后重新开始计时。
+点击定位光标，拖动选择；双击选择词语，三击选择全部文字。Shift 配合方向键扩展选区。Home / End 移到当前显示行的首尾：软换行时停在行尾并保留行尾亲和，下一次上下移动仍回到该行末。输入和移动后光标重新开始闪烁计时。
 
 macOS 使用 Command，其他桌面平台使用 Ctrl：A 全选、C 复制、X 剪切、V 粘贴。粘贴支持异步系统剪贴板。`secure: true` 隐藏显示内容并阻止复制和剪切；`read_only: true` 保留选择和复制，禁止修改；`disabled: true` 禁止交互。
 
-平台输入接口使用 UTF-16 偏移。选区落入组合 emoji 或重音字母内部时，会回退到完整字素的边界；删除范围向完整字素扩展，避免留下半个字符。
+## 撤销与重做
 
-当前完成的是基础输入与选择。撤销/重做、多行自动测量与滚轮滚动、完整文字样式及前后缀装饰仍在迁移验收中，暂不作为已完成能力列出。搜索和建议列表使用 [SearchField](/docs/search-field)；正文拖选使用[文本选择区域](/docs/text-selection)。
+相邻的单字符输入合并成一步，连续删除同样合并；一次粘贴、IME 提交或选择替换是独立一步。撤销连选区一起恢复，新编辑丢弃重做分支，外部改写绑定的文本会清空两侧栈。
+
+```rust
+fn editor(cx: &Scope) -> impl View {
+    let text = cx.state(|| TextBuffer::new(""));
+    // Primary-Z 撤销，Primary-Shift-Z / Primary-Y 重做。
+    TextField::new("Notes", text.binding()).multiline()
+}
+```
+
+字段同时发布 `TextEditActions`，菜单栏的撤销/重做项和场景级快捷键读取同一份历史，不会把 Primary-Z 漏给外层快捷键宿主。
+
+## 多行测量与滚动
+
+垂直字段按行盒测量，随内容增高到 `max_visible_lines`，之后固定高度并滚动。显式换行也会让默认横向字段增高，直到同一个上限。滚动到上限后，滚轮以 `MULTILINE_WHEEL_STEP`（30pt）为一格移动视口；未溢出时滚轮继续传给外层滚动视图。
+
+```rust
+fn notes(cx: &Scope) -> impl View {
+    let text = cx.state(|| TextBuffer::new(""));
+    TextField::new("Notes", text.binding())
+        .layout(TextFieldLayout {
+            axis: TextFieldAxis::Vertical,
+            max_visible_lines: 8,
+            ..Default::default()
+        })
+}
+```
+
+## 词与行间导航
+
+Option+Left/Right（Windows 为 Ctrl+Left/Right）按词移动，Option+Backspace / Option+Delete 按词删除；Command+Left/Right 到行首行尾，Command+Up/Down 到文档首尾，Command+Backspace / Command+Delete 删除到行首行尾。Up/Down 逐显示行移动并保持目标列，PageUp/PageDown 移动一个视口（保留七行可见区域中的一行作为上下文）。没有文字环境时按逻辑行计算，列位置同样保持。
+
+## 逐段文字样式
+
+`TextFieldCodeEditing::syntax_color_at_utf8_offset` 按 UTF-8 偏移返回颜色，文字按字形着色，未命中的字形使用字段的正文颜色。占位文本不参与着色。
+
+```rust
+let code = TextFieldCodeEditing {
+    syntax_color_at_utf8_offset: Some(std::rc::Rc::new(|buffer: &TextBuffer, offset: usize| {
+        (offset < 3).then(|| Color::hex(0xCC33E6))
+    })),
+    ..Default::default()
+};
+```
+
+## 前后缀与长度限制
+
+`prefix` / `suffix` 排在文字列内，`prepend` / `append` 是两端的独立色块；文本区宽度、光标位置和点击命中都会扣除这些占位。`show_word_limit` 配合 `max_length` 在尾部显示 `n / limit` 计数。
+
+`max_length` 按字符计数，输入、粘贴与 IME 提交都受它约束：替换选区时先扣除被替换的字符，剩余容量为零则整体不写入。
+
+```rust
+fn price(cx: &Scope) -> impl View {
+    let text = cx.state(|| TextBuffer::new("12"));
+    TextField::new("Amount", text.binding())
+        .behavior(TextFieldBehavior {
+            max_length: Some(6),
+            ..Default::default()
+        })
+        .decoration(TextFieldDecoration {
+            prefix: Some("¥".into()),
+            suffix: Some("kg".into()),
+            show_word_limit: true,
+            ..Default::default()
+        })
+}
+```
+
+## 平台输入
+
+平台输入接口使用 UTF-16 偏移。选区落入组合 emoji 或重音字母内部时，会回退到完整字素的边界；删除范围向完整字素扩展，避免留下半个字符。IME 组合提交与删除同样进入撤销历史，并遵守 `max_length`。
+
+尚未完成的迁移：行号栏配色、横向滚轮与长行横向光标揭示、`TextFieldStyle` 的焦点/编辑状态接入、Escape 的 `on_cancel` 回调、溢出字段的 hover 滚动条覆盖层。搜索和建议列表使用 [SearchField](/docs/search-field)；正文拖选使用[文本选择区域](/docs/text-selection)。

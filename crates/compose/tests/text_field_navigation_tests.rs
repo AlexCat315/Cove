@@ -16,18 +16,15 @@
 //! the same surface node.
 //!
 //! Named differences from the Swift suite (each pinned by a `GAP:` assertion):
-//! - **No IME anchor.** The field installs no text input area resolver, so no
-//!   area is published for a focused, dirty or wrapped field.
 //! - **Scalar indices.** `TextBuffer` character indices count Unicode scalars:
-//!   CRLF is two characters, `line_range(1)` is the empty slot between CR and
-//!   LF, and a caret index inside a joined emoji lets Backspace delete one scalar.
-//! - **No document, Command, Control or page navigation.** Command-Left moves one
-//!   character, Control-Home/End act on the current line, Command-Up/Down,
-//!   PageUp/PageDown and Up/Down are ignored, and End ignores soft-wrapped rows.
-//! - **Edits stay internal and there is no undo.** Backspace and
-//!   Command-Backspace edit only the internal buffer; Command-Z does nothing.
+//!   CRLF is two characters, and `line_range(1)` is the empty slot between CR
+//!   and LF.
+//! - **Control-Home/End act on the current line** instead of the document.
 //! - **No published document layout.** `__textfield_document_layout` is never
 //!   attached, so shaped-line bounds cannot be observed.
+//!
+//! Command/word/page navigation, soft-wrap row affinity and undo run through the
+//! shared history and row geometry, as in Swift.
 
 use crate::support;
 
@@ -257,14 +254,15 @@ fn color_emoji_caret() {
             state.borrow().selection.cursor_index
         );
         press(&handler, Scancode::Z, KeyModifiers::LEFT_GUI);
-        assert!(
-            *store.lock().unwrap() != original,
-            "GAP: Swift Command-Z restores the original; the field records no edit history"
+        assert_eq!(
+            *store.lock().unwrap(),
+            original,
+            "Command-Z restores the deleted emoji"
         );
         assert_eq!(
             state.borrow().selection.cursor_index,
-            1,
-            "GAP: Swift undo restores the caret to 2; Rust has no undo"
+            5,
+            "undo restores the caret to where the deletion started"
         );
     });
 }
@@ -304,26 +302,27 @@ fn logical_lines() {
         );
         press(&handler, Scancode::ARROW_LEFT, KeyModifiers::LEFT_GUI);
         assert!(
-            cursor() == range.end - 1 && state.borrow().selection.anchor.is_none(),
-            "GAP: Swift Command-Left moves to the line start; Rust moves one character left: {}",
+            cursor() == range.start && state.borrow().selection.anchor.is_none(),
+            "Command-Left moves to the line start: {}",
             cursor()
         );
         press(&handler, Scancode::ARROW_RIGHT, KeyModifiers::LEFT_GUI);
         press(&handler, Scancode::BACKSPACE, KeyModifiers::LEFT_GUI);
         assert_eq!(
             store.lock().unwrap().string_value(),
-            "first\r\nAé👩🏽‍💻中\r\nlast",
-            "GAP: Swift Command-Backspace deletes to the line start (first\\r\\n\\r\\nlast); Rust deletes one character"
+            "first\r\n\r\nlast",
+            "Command-Backspace deletes to the line start"
         );
         assert_eq!(
             state.borrow().buffer.string_value(),
-            "first\r\nAé👩🏽‍💻中\r\nlast",
-            "the internal buffer drops one character"
+            "first\r\n\r\nlast",
+            "the same edit reaches the internal buffer"
         );
         press(&handler, Scancode::Z, KeyModifiers::LEFT_GUI);
-        assert!(
-            *store.lock().unwrap() != original,
-            "GAP: Swift Command-Z restores the original; the field records no edit history"
+        assert_eq!(
+            *store.lock().unwrap(),
+            original,
+            "Command-Z restores the deleted line"
         );
         store.lock().unwrap().clone_from(&original);
         state.borrow_mut().normalize(&original);
@@ -343,8 +342,8 @@ fn logical_lines() {
         press(&handler, Scancode::ARROW_UP, KeyModifiers::LEFT_GUI);
         assert_eq!(
             cursor(),
-            range.end,
-            "GAP: Swift Command-Up moves to the document start; Rust ignores it"
+            0,
+            "Command-Up moves to the document start"
         );
         press(
             &handler,
@@ -353,8 +352,8 @@ fn logical_lines() {
         );
         assert_eq!(
             state.borrow().selection_range(),
-            None,
-            "GAP: Swift Command-Shift-Down selects to the document end; Rust ignores it"
+            Some((0, count)),
+            "Command-Shift-Down selects to the document end"
         );
     });
 }
@@ -412,9 +411,9 @@ fn wrapped_row_affinity() {
 
         press(&handler, Scancode::END, KeyModifiers::default());
         assert!(
-            state.borrow().selection.cursor_index == buffer.character_count()
-                && !state.borrow().selection.line_end_affinity,
-            "GAP: Swift End stops at the displayed row end ({row_end}) with line-end affinity; Rust moves to the logical line end: {:?}",
+            state.borrow().selection.cursor_index == row_end
+                && state.borrow().selection.line_end_affinity,
+            "End stops at the displayed row end ({row_end}) with line-end affinity: {:?}",
             state.borrow().selection
         );
         let anchor = area(&node);
@@ -437,25 +436,22 @@ fn wrapped_row_affinity() {
             &environment,
         );
         assert_eq!(
-            row, 7,
-            "GAP: Swift Down from the first row end lands on row 1; Rust ignores Down and the caret stays at the document end (row 7)"
+            row, 1,
+            "Down from the first row end lands on the next displayed row"
         );
         press(&handler, Scancode::ARROW_UP, KeyModifiers::default());
         let selection = state.borrow().selection;
         assert_eq!(
             selection.cursor_index,
-            buffer.character_count(),
-            "GAP: Swift Up returns to the first row end ({row_end}); Rust ignores Up"
+            row_end,
+            "Up returns to the first row end ({row_end})"
         );
         let (_, row) = document.caret(
             selection.cursor_index,
             selection.line_end_affinity,
             &environment,
         );
-        assert_eq!(
-            row, 7,
-            "GAP: Swift Up lands on row 0; Rust leaves the caret on the last row"
-        );
+        assert_eq!(row, 0, "Up lands on the first displayed row");
     });
 }
 
@@ -485,14 +481,16 @@ fn page_navigation() {
         let handler = scene.registry.handlers(&node).key.expect("key handler");
         press(&handler, Scancode::PAGE_DOWN, KeyModifiers::LEFT_SHIFT);
         let (line, column) = buffer.line_and_column(state.borrow().selection.cursor_index);
+        // 160pt frame, 20pt rows, 6pt insets: seven visible rows, one kept as
+        // context, so a page step is six rows.
         assert!(
-            line == 100_000 && column == 7,
-            "GAP: Swift Shift-PageDown moves one viewport (line 100001..100020) keeping column 7; Rust ignores PageDown: {line}:{column}"
+            line == 100_006 && column == 7,
+            "Shift-PageDown moves one viewport keeping the column: {line}:{column}"
         );
         assert_eq!(
             state.borrow().selection.anchor,
-            None,
-            "GAP: Swift Shift-PageDown anchors the selection at the start; Rust ignores it"
+            Some(middle),
+            "Shift-PageDown anchors the selection where it started"
         );
         press(&handler, Scancode::PAGE_UP, KeyModifiers::default());
         assert!(

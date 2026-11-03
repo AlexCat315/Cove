@@ -854,10 +854,9 @@ fn initially_hidden() {
             target(scene, "Notes draft") == draft,
             "the first-layout field returns with its node"
         );
-        assert_eq!(
-            draft.frame().width,
-            0.0,
-            "GAP: the restored field still has zero width ({:?}); a fresh 720pt mount reports 0.0 too",
+        assert!(
+            draft.frame().width > 0.0,
+            "the restored field resumes its laid-out width ({:?})",
             draft.frame()
         );
         assert!(

@@ -109,18 +109,15 @@ fn stable_gutter() {
                     "the field paints something at {count} lines"
                 );
 
-                // GAP: Swift asserts the syntax tint and the gutter are
-                // painted in the authored colours, at least 24pt apart, with
-                // the text origin stable across one to three digits. Rust never
-                // reads `syntax_color_at_utf8_offset` or `line_number_color`, so
-                // neither colour appears in the draw list.
-                assert_eq!(
+                // The syntax tint is per glyph. GAP: the gutter is still not
+                // painted, so the authored line-number colour never appears.
+                assert!(
                     list.vertices()
                         .iter()
                         .filter(|vertex| vertex.color == text_color.rgba8())
-                        .count(),
-                    0,
-                    "GAP: the authored syntax colour is never painted at {count} lines"
+                        .count()
+                        > 0,
+                    "the authored syntax colour is painted at {count} lines"
                 );
                 assert_eq!(
                     list.vertices()

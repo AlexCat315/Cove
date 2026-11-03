@@ -4,6 +4,14 @@
 
 ## Unreleased
 
+- **TextField 迁移收尾（2026-11-03）**：
+  - 编辑事务历史接入字段：相邻输入与连续删除各合并为一步，粘贴/IME 提交/选区替换各为独立一步；撤销连选区一并恢复，新编辑清空重做分支，外部改写绑定的文本清空两侧栈。菜单与本字段快捷键（Primary-Z、Primary-Shift-Z、Primary-Y）读取同一份历史，不再把 Primary-Z 漏给外层快捷键宿主。
+  - 补上多行测量与滚轮：垂直字段按行盒增高到 `max_visible_lines`，显式换行同样让默认字段增高；溢出后滚轮按 30pt 一格移动视口，未溢出时继续传给外层滚动视图。滚动界限在更新阶段发布，嵌套字段在首次绘制前就知道自己能否滚动。
+  - 补上词/行/文档级光标移动：Option（Windows 为 Ctrl）按词移动与删除，Command-Left/Right 到行首行尾，Command-Up/Down 到文档首尾，Command-Backspace/Delete 删除到行首行尾，Up/Down 逐显示行保持列，PageUp/PageDown 移动一个视口，Home/End 停在显示行的首尾并保留软换行行尾亲和。
+  - 补上逐段文字样式：`syntax_color_at_utf8_offset` 按字形着色，占位文本不参与；前后缀、两端色块、字数计数按测得宽度参与排版、命中与绘制，`max_length` 同时约束输入、粘贴与 IME 提交。
+  - 平台输入的删除与组合提交进入撤销历史并遵守 `max_length`；修复工作区无法编译的半成品改动（重复的选区删除、未定义的按键分发、缺失的字体类型、隐式默认值）。
+  - 测试从 `GAP:` 断言改为验证预期行为，`cargo test -p cove-ui-compose --test compose` 1545 项通过，`cargo test -p cove-examples` 全部通过；`Docs/gallery-audit.md` 与 TextField 用户文档同步更新，注明行号栏配色、横向滚动、`TextFieldStyle` 状态、Escape 回调与 hover 滚动条仍未完成。
+
 - **Gallery 首轮逐项验收与组件文档（2026-11-03）**：
   - 修复 TextField 缺失原生输入区域 resolver，导致点击搜索后普通文字无法输入、删除键仍有效、光标不闪烁；共享 Rust 实现补齐焦点状态、IME anchor、光标闪烁、搜索图标和清空绑定，Gallery 侧栏改用 SearchField。平台选区/删除/组合提交写回绑定，UTF-16 不拆开字素；补上点击定位、拖选、多次点击、全选/复制/剪切/异步粘贴和及时重绘。
   - Slider 的阴影只绘制在滑块上，不再给整个轨道加灰底；Slider / RangeSlider 共享密度与清晰轮廓，RangeSlider 增加局部阴影、独立键盘焦点环、端点可访问边界、点击端点焦点和 RTL 输入/绘制映射。两种控件分别保持单值与双端点类型。

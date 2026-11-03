@@ -13,6 +13,7 @@ use cove_core::scene::TextInputClient;
 
 use super::text_field::FieldState;
 use super::text_field_options::{TextFieldAxis, TextFieldBehavior};
+use crate::primitives::text::text_edit_history::TextEditKind;
 
 /// UTF-16 offset of a character index, clamped so a stale index cannot run past
 /// the buffer.
@@ -116,9 +117,22 @@ pub fn platform_input_client(
                     state.composition.length = position(start.max(end) - base) - lower;
                     return;
                 }
-                // Outside the marked range the composition commits first.
-                state.buffer = buffer.replace(low..high, &pending);
+                // Outside the marked range the composition commits first, as
+                // one undo step and clipped to the authored length limit.
+                let limit = behavior.max_length;
+                let removed = high - low;
+                let capacity = limit.map(|limit| {
+                    limit.saturating_sub(state.buffer.character_count().saturating_sub(removed))
+                });
+                let committed: String = match capacity {
+                    Some(capacity) => pending.chars().take(capacity).collect(),
+                    None => pending.clone(),
+                };
+                state.begin_edit(&buffer, TextEditKind::Atomic);
+                state.buffer = buffer.replace(low..high, &committed);
                 state.clear_composition();
+                state.selection.cursor_index = state.selection.cursor_index.min(state.buffer.character_count());
+                state.end_edit();
             }
             let buffer = state.buffer.clone();
             let low_index = character_index(&buffer, start.max(0), false);
@@ -141,10 +155,15 @@ pub fn platform_input_client(
             let end_units = utf16_offset(&buffer, high) + after.max(0);
             let start_index = character_index(&buffer, start_units.max(0), false);
             let end_index = character_index(&buffer, end_units, true).max(start_index);
+            if end_index <= start_index {
+                return;
+            }
+            state.begin_edit(&buffer, TextEditKind::Deletion);
             state.buffer = buffer.delete(start_index..end_index);
             state.selection.anchor = None;
             state.selection.cursor_index = start_index;
             state.record_activity();
+            state.end_edit();
         },
     )
 }

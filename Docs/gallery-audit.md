@@ -1,6 +1,8 @@
 # Gallery 逐项验收记录
 
-更新：2026-11-03。目录共 106 页；本轮先处理搜索、Slider / RangeSlider、Rating 与共享文本选择。
+更新：2026-11-03。目录共 106 页；本轮先处理搜索、Slider / RangeSlider、Rating 与共享文本选择，随后补齐 TextField 的撤销/重做、多行测量与滚轮、词/垂直导航、语法配色、前后缀与长度限制。
+
+Swift 源码逐页对照见文末《Swift 源码对照（逐页差异清单）》。
 
 ## 本轮结论
 
@@ -12,10 +14,11 @@
 | Rating 方块、重建后交互失效、密度示例无变化 | 绘制列表未保留 SVG 图片；重建使用了未挂载的新 session；示例回调写错状态且显示常量 | 保留资源与挂载 session，禁用/只读更新命中标志；独立示例值，恢复十颗星、清空和横向滚动 | Website/src/content/components/rating.md |
 | 文本选择不一致 | 正文选择区域与控件手势边界需要分开；键盘扩展原先按 Unicode 标量而非字素移动 | 所有 106 页选择区域结构检查、15 种页壳的拖选复制检查；组合 emoji/重音字母按完整字素移动；输入框补上点击定位、拖选、双击词/三击全选、快捷键和及时重绘；导出 TextSelectionViewExt | Website/src/content/components/text-selection.md |
 | 平台输入接口修改丢失或拆开 emoji | select / delete_surrounding 只写内部状态，UTF-16 按标量映射 | 选区对齐字素边界，删除/组合提交写回绑定并重绘；全选/复制/剪切与异步系统粘贴共享绑定 | Website/src/content/components/text-field.md |
+| TextField 迁移未完成 | 撤销/重做、多行测量与滚轮、词/垂直导航、语法配色、前后缀与长度限制只有 Swift 实现；工作区因半成品改动无法编译 | 编辑事务历史（相邻输入合并、选中态随文本恢复、外部改写清空栈）接到菜单与快捷键；行/页/文档级光标移动与软换行行亲和；逐字素着色的语法颜色；前置/后置/前缀/后缀/字数计数绘制与命中区；输入、粘贴与 IME 提交遵守 `max_length`；平台删除与组合提交进入历史 | Website/src/content/components/text-field.md |
 
 ## 已确认、仍待逐项修复的缺失
 
-- TextField 的撤销/重做、完整多行测量与滚轮滚动、词/垂直导航、部分文字样式、前后缀和长度限制，存在尚未完成的迁移。TextField 页没有标记为整体通过。
+- TextField 的撤销/重做、多行测量与滚轮滚动、词/垂直导航、语法配色、前后缀和长度限制已补齐，`cargo test -p cove-ui-compose --test compose` 1545 项通过。TextField 页仍未整体通过：行号栏配色、横向滚轮与横向光标揭示、`__textfield_document_layout` 发布、`TextFieldStyle` 状态接入、Escape/`on_cancel`、hover 滚动条覆盖层仍是 `GAP:` 断言的未实现项。
 - 现有测试中一部分 `GAP:` 断言验证的是当前缺失行为。全套测试通过不能证明 Swift 能力已迁移完成；修复相关能力时，应改为验证预期结果，补真实文本环境或原生操作的验收。
 
 ## 验收范围
@@ -57,7 +60,7 @@ cargo test -p cove-ui-compose --test compose --locked
 | Slider | 5 | 0 / 0 | 本轮组件/页面修复；文档已写 |
 | RangeSlider | 4 | 0 / 0 | 本轮组件/页面修复；文档已写 |
 | Rating | 6 | 0 / 0 | 本轮组件/页面修复；文档已写 |
-| TextField | 4 | 0 / 0 | 基础输入、平台同步与选择已修复并写文档；多行、样式、撤销等未完成 |
+| TextField | 4 | 0 / 0 | 输入、选择、撤销/重做、多行测量与滚轮、词/垂直导航、语法配色、前后缀与长度限制已修复；行号栏与横向滚动未完成 |
 | SearchField | 0 | 0 / 0 | 搜索与输入链路修复；文档已写 |
 | TextArea | 0 | 0 / 0 | 挂载/几何基础检查通过；待逐项交互和视觉验收 |
 | Text Editor | 0 | 0 / 0 | 挂载/几何基础检查通过；待逐项交互和视觉验收 |
@@ -156,3 +159,241 @@ cargo test -p cove-ui-compose --test compose --locked
 | EdgeAutoScroll | 2 | 0 / 0 | 挂载/几何基础检查通过；待逐项交互和视觉验收 |
 | ScrollReveal | 2 | 0 / 0 | 挂载/几何基础检查通过；待逐项交互和视觉验收 |
 | ActionGroupLayout | 2 | 0 / 0 | 挂载/几何基础检查通过；待逐项交互和视觉验收 |
+
+## Swift 源码对照（逐页差异清单）
+
+更新：2026-11-03。对照对象：`swift/`（Swift 树最后一个完整提交 `9738de61`，删除发生在 `1d633f78`）与当前 `examples/gallery`。
+
+口径：
+
+- 统计单位是 `StorySection`：页面内的一组能力（标题 + 说明 + 示例）。Swift 取 `StorySection("…")`；Rust 取 `StorySection::new("…")` 及同文件内的包装函数（`self.labeled(...)`、`section(...)`），并跟进页面组合的子视图类型。
+- 每个 Swift 段落用标题词比对 Rust 段落：同页 ≥50% 词重合算同页有对应；同页对不上但其他页面 ≥80% 算被挪走；都没有算无对应。
+- 段数不等于功能数量。Rust 常把一个 Swift 段落拆成多段（Slider 3 → 5），段数多不代表能力更全。
+- 另查“孤儿 story”：Rust 里存在、自带段落，但没有被 `StoryDispatch::view` 任何分支引用、也没有被已挂页面组合的类型，即为已实现但没有页面展示。
+- 本清单是静态源码比对，不是运行时验收。当前工作区因 `crates/compose/src/primitives/text/text_field/` 未完成的改动无法编译（17 个错误），`catalog_audit` 跑不起来，所以本轮没有运行时段落节点数据。
+
+### 结论
+
+- 目录：Swift 98 页全部进入 Rust catalog（106 页），没有丢页；标题、分类、摘要逐字一致（0 处文案差异）。
+- 段落：Swift 191 段，Rust 169 段；同页有对应 143 段，被挪到其他页面 2 段，全库找不到对应 46 段。
+- 页面级缺口：5 页在 Rust 侧完全没有分段标题；15 页段落数少于 Swift；1 页（Workspace）未分派 story，页面无内容。
+- 已实现但没有页面展示的 story：1 个（2 段），见下表。
+- 结论：不是整页没迁移。少的是页面内的能力分组、说明和示例密度；部分能力被挪到新页面，部分只是段落标题改了措辞。
+
+### Rust 无分段结构的页面
+
+这些页面在 Swift 里由 1–2 个带标题和说明的段落组成，Rust 侧内容是平铺的，没有分组标题，看起来就是"比 Swift 少"。
+
+| 页面 | Rust story | Swift 段 | Swift 段落标题 |
+| --- | --- | ---: | --- |
+| ActionSheet | `ActionSheetStory` | 2 | Project actions、Long action lists |
+| Alert | `AlertStory` | 2 | Actions & dismissal、Inline feedback |
+| EmptyState | `EmptyStory` | 1 | Empty content |
+| Table | `AdaptiveTableSample` | 2 | Inventory · 10,000 rows、Empty data |
+| Toolbar | `ToolbarStory` | 1 | Toolbar |
+| Workspace / Dock | 未分派（`StoryDispatch::Pending`） | 1 | Dock workspace |
+
+### 已实现但没有页面展示的 story
+
+这些类型带着分段和说明存在于 Rust 源码，`StoryDispatch::view` 没有引用它们，所以 Gallery 里看不到。
+
+| story 类型 | 源文件 | 段 | 段落标题 |
+| --- | --- | ---: | --- |
+| `LazyGridStory` | layout.rs | 2 | Lazy grid · 100,000 cells、Wide lazy grid · 200 × 200 |
+
+### 段落数少于 Swift 的页面
+
+| 页面 | Swift 段 | Rust 段 | Swift 段落标题 | Rust 现有段落标题 |
+| --- | ---: | ---: | --- | --- |
+| Box / Row / Column | 10 | 4 | Flex layout、Measured grid、Candidate layouts、Container queries、Intrinsic fitting、Logical edges and safe area、Lazy grid · 100,000 cells、Wide lazy grid · 200 × 200、Estimated rows · 10,000 items、Variable rows · 100,000 items | Measured grid、Masonry sample、Dividers、Overlay |
+| Animation | 6 | 4 | Animated visibility、Timing curves、Tracks & phases、Shared geometry、Spring release、Numbers & completion | Animated visibility、Timing curves、Tracks & phases、Numbers & completion |
+| Sidebar | 3 | 1 | Workspace navigation、Resizable navigation、Nested navigation | Workspace navigation |
+| AppBar / NavigationBar | 2 | 1 | Application header、Host safe area | Application header |
+| Chart | 13 | 12 | Trend、Grouped and stacked bars、Below the baseline、Dual axis、Log axis、Histogram、Large series、Scatter、Donut、Sparkline、Horizontal bars、Data table、Explore | Trend、Grouped and stacked bars、Below the baseline、Dual axis、Log axis、Histogram、Scatter、Donut、Sparkline、Horizontal bars、Data table、Explore |
+| Checkbox | 2 | 1 | Selection、Disabled | Selection |
+| Combobox | 2 | 1 | Searchable selection、Remote results | Searchable selection |
+| Command Palette | 2 | 1 | Command palette、Custom footer | Command palette |
+| Image | 2 | 1 | Content modes、Asynchronous loading | Asynchronous loading |
+| Label | 2 | 1 | Content labels、Associated field labels | Content labels |
+| List | 2 | 1 | Selectable list、Multiple selection | Selectable rows |
+| NavigationRail | 2 | 1 | Rail destinations、Retained presentations | Rail destinations |
+| NumberField | 2 | 1 | Numeric editing、Locale decimals | Bounded number |
+| ReorderableList | 2 | 1 | Reorderable list、Long list | Reordering |
+| TimePicker | 2 | 1 | Inline time wheels、Segmented time input | Inline time wheels |
+
+### 同页对不上、但在其他页面能找到的 Swift 段落
+
+能力还在 Rust 里，只是 Swift 原页面不再展示；对照时容易被误判为缺失。
+
+| 原页面 | Swift 段落 | Rust 现所在页面 |
+| --- | --- | --- |
+| Box / Row / Column | Intrinsic fitting | ViewThatFits |
+| Checkbox | Disabled | RangeSlider、Rating、Slider、Toggle / Switch |
+
+### 同页和其他页都找不到对应的 Swift 段落
+
+最可能是真的没展示或没迁移，需要逐条判定后再决定补实现还是补示例。
+
+| 页面 | Swift 段落 | 本页源码关键词命中 | 说明 |
+| --- | --- | --- | --- |
+| ActionSheet | Project actions | 2/2 | 出现在本页源码，未单独成段 |
+| ActionSheet | Long action lists | 3/3 | 出现在本页源码，未单独成段 |
+| Alert | Actions & dismissal | 2/2 | 出现在本页源码，未单独成段 |
+| Alert | Inline feedback | 1/2 | 未出现：inline |
+| Animation | Shared geometry | 2/2 | 出现在本页源码，未单独成段 |
+| Animation | Spring release | 0/2 | 未出现：spring、release |
+| AppBar / NavigationBar | Host safe area | 0/3 | 未出现：safe、area、host |
+| Box / Row / Column | Flex layout | 2/2 | 出现在本页源码，未单独成段 |
+| Box / Row / Column | Candidate layouts | 1/2 | 未出现：candidate |
+| Box / Row / Column | Container queries | 0/2 | 未出现：container、querie |
+| Box / Row / Column | Logical edges and safe area | 1/4 | 未出现：safe、logical、area |
+| Box / Row / Column | Lazy grid · 100,000 cells | 3/3 | 出现在本页源码，未单独成段 |
+| Box / Row / Column | Wide lazy grid · 200 × 200 | 3/3 | 出现在本页源码，未单独成段 |
+| Box / Row / Column | Estimated rows · 10,000 items | 1/2 | 未出现：estimated |
+| Box / Row / Column | Variable rows · 100,000 items | 1/2 | 未出现：variable |
+| Chart | Large series | 2/2 | 出现在本页源码，未单独成段 |
+| ColorField | Color picker | 2/2 | 出现在本页源码，未单独成段 |
+| Combobox | Remote results | 2/2 | 出现在本页源码，未单独成段 |
+| Command Palette | Custom footer | 2/2 | 出现在本页源码，未单独成段 |
+| ContextMenu | Context actions | 2/2 | 出现在本页源码，未单独成段 |
+| DataTable | TreeTable | 1/1 | 出现在本页源码，未单独成段 |
+| DatePicker | Date input | 1/2 | 未出现：input |
+| EmptyState | Empty content | 2/2 | 出现在本页源码，未单独成段 |
+| Image | Content modes | 2/2 | 出现在本页源码，未单独成段 |
+| JsonField | Structured input | 1/2 | 未出现：structured |
+| Kbd / KeyCap | Keyboard hints | 1/2 | 未出现：hint |
+| Label | Associated field labels | 2/3 | 未出现：associated |
+| List | Multiple selection | 1/2 | 未出现：multiple |
+| NavigationRail | Retained presentations | 1/2 | 未出现：retained |
+| NumberField | Numeric editing | 2/2 | 出现在本页源码，未单独成段 |
+| NumberField | Locale decimals | 1/2 | 未出现：locale |
+| PropertyGrid | Inspector | 0/1 | 未出现：inspector |
+| ReorderableList | Reorderable list | 2/2 | 出现在本页源码，未单独成段 |
+| ReorderableList | Long list | 2/2 | 出现在本页源码，未单独成段 |
+| ScrollView | Native scroll stream | 1/3 | 未出现：native、stream |
+| SearchField | Search input | 2/2 | 出现在本页源码，未单独成段 |
+| Select | Typed options | 2/2 | 出现在本页源码，未单独成段 |
+| Table | Inventory · 10,000 rows | 0/1 | 未出现：inventory |
+| Table | Empty data | 1/2 | 未出现：empty |
+| TextArea | Resizable text area | 2/3 | 未出现：resizable |
+| TimeField | Time input | 1/2 | 未出现：input |
+| TimePicker | Segmented time input | 1/3 | 未出现：input、segmented |
+| Toolbar | Toolbar | 1/1 | 出现在本页源码，未单独成段 |
+| Tooltip | Managed descriptions | 0/2 | 未出现：managed、description |
+| Vec3Field | Transform | 0/1 | 未出现：transform |
+| Workspace / Dock | Dock workspace | 0/2 | 未出现：workspace、dock |
+
+### 逐页统计
+
+两侧都是 0 段的页面使用内联组合，没有分段标题，不构成差异。
+
+| 页面 | Swift 段 | Rust 段 | 同页对应 | 挪走 | 无对应 | 判定 |
+| --- | ---: | ---: | ---: | ---: | ---: | --- |
+| Accordion | 1 | 1 | 1 | 0 | 0 | 段落数持平 |
+| ActionSheet | 2 | 0 | 0 | 0 | 2 | Rust 无段落结构 |
+| Alert | 2 | 0 | 0 | 0 | 2 | Rust 无段落结构 |
+| AlertDialog | 1 | 1 | 1 | 0 | 0 | 段落数持平 |
+| Animation | 6 | 4 | 4 | 0 | 2 | 段落少 2 段 |
+| AppBar / NavigationBar | 2 | 1 | 1 | 0 | 1 | 段落少 1 段 |
+| AssetRef / DropTarget | 1 | 1 | 1 | 0 | 0 | 段落数持平 |
+| Avatar | 5 | 5 | 5 | 0 | 0 | 段落数持平 |
+| Badge | 4 | 4 | 4 | 0 | 0 | 段落数持平 |
+| BottomSheet | 1 | 1 | 1 | 0 | 0 | 段落数持平 |
+| BoundedScrollView | 1 | 1 | 1 | 0 | 0 | 段落数持平 |
+| Box / Row / Column | 10 | 4 | 1 | 1 | 8 | 段落少 6 段 |
+| Breadcrumb | 1 | 1 | 1 | 0 | 0 | 段落数持平 |
+| Button | 5 | 5 | 5 | 0 | 0 | 段落数持平 |
+| ButtonGroup | 1 | 1 | 1 | 0 | 0 | 段落数持平 |
+| Calendar | 2 | 2 | 2 | 0 | 0 | 段落数持平 |
+| Carousel | 5 | 5 | 5 | 0 | 0 | 段落数持平 |
+| Chart | 13 | 12 | 12 | 0 | 1 | 段落少 1 段 |
+| Checkbox | 2 | 1 | 1 | 1 | 0 | 段落少 1 段 |
+| ColorField | 1 | 1 | 0 | 0 | 1 | 段落数持平 |
+| Combobox | 2 | 1 | 1 | 0 | 1 | 段落少 1 段 |
+| Command Palette | 2 | 1 | 1 | 0 | 1 | 段落少 1 段 |
+| ContextMenu | 1 | 1 | 0 | 0 | 1 | 段落数持平 |
+| Dashboard | 0 | 0 | 0 | 0 | 0 | Rust 无段落结构 |
+| DataTable | 2 | 3 | 1 | 0 | 1 | 段落多于 Swift |
+| DatePicker | 1 | 1 | 0 | 0 | 1 | 段落数持平 |
+| DateRangePicker | 1 | 1 | 1 | 0 | 0 | 段落数持平 |
+| Dialog | 1 | 1 | 1 | 0 | 0 | 段落数持平 |
+| DisclosureGroup | 1 | 1 | 1 | 0 | 0 | 段落数持平 |
+| Drag & Drop | 1 | 1 | 1 | 0 | 0 | 段落数持平 |
+| EmptyState | 1 | 0 | 0 | 0 | 1 | Rust 无段落结构 |
+| Form | 1 | 1 | 1 | 0 | 0 | 段落数持平 |
+| HoverCard | 1 | 1 | 1 | 0 | 0 | 段落数持平 |
+| Icon | 3 | 3 | 3 | 0 | 0 | 段落数持平 |
+| Image | 2 | 1 | 1 | 0 | 1 | 段落少 1 段 |
+| JsonField | 1 | 1 | 0 | 0 | 1 | 段落数持平 |
+| Kbd / KeyCap | 1 | 1 | 0 | 0 | 1 | 段落数持平 |
+| Label | 2 | 1 | 1 | 0 | 1 | 段落少 1 段 |
+| Link | 3 | 3 | 3 | 0 | 0 | 段落数持平 |
+| List | 2 | 1 | 1 | 0 | 1 | 段落少 1 段 |
+| Markdown | 2 | 2 | 2 | 0 | 0 | 段落数持平 |
+| Masonry | 1 | 1 | 1 | 0 | 0 | 段落数持平 |
+| Menu | 3 | 3 | 3 | 0 | 0 | 段落数持平 |
+| MenuButton | 1 | 1 | 1 | 0 | 0 | 段落数持平 |
+| Modal | 1 | 1 | 1 | 0 | 0 | 段落数持平 |
+| NavigationDrawer | 1 | 1 | 1 | 0 | 0 | 段落数持平 |
+| NavigationRail | 2 | 1 | 1 | 0 | 1 | 段落少 1 段 |
+| NavigationStack | 1 | 1 | 1 | 0 | 0 | 段落数持平 |
+| Notification | 1 | 1 | 1 | 0 | 0 | 段落数持平 |
+| NumberField | 2 | 1 | 0 | 0 | 2 | 段落少 1 段 |
+| Pagination | 1 | 1 | 1 | 0 | 0 | 段落数持平 |
+| Panel | 2 | 2 | 2 | 0 | 0 | 段落数持平 |
+| Popconfirm | 1 | 1 | 1 | 0 | 0 | 段落数持平 |
+| Popover | 1 | 2 | 1 | 0 | 0 | 段落多于 Swift |
+| Progress / Spinner | 2 | 2 | 2 | 0 | 0 | 段落数持平 |
+| PropertyGrid | 1 | 1 | 0 | 0 | 1 | 段落数持平 |
+| RadioGroup | 1 | 1 | 1 | 0 | 0 | 段落数持平 |
+| RangeSlider | 1 | 4 | 1 | 0 | 0 | 段落多于 Swift |
+| Rating | 6 | 6 | 6 | 0 | 0 | 段落数持平 |
+| RefreshableList | 1 | 1 | 1 | 0 | 0 | 段落数持平 |
+| ReorderableList | 2 | 1 | 0 | 0 | 2 | 段落少 1 段 |
+| RichText | 4 | 4 | 4 | 0 | 0 | 段落数持平 |
+| Scrollbar | 1 | 1 | 1 | 0 | 0 | 段落数持平 |
+| ScrollView | 1 | 1 | 0 | 0 | 1 | 段落数持平 |
+| SearchField | 1 | 1 | 0 | 0 | 1 | 段落数持平 |
+| SectionedList | 1 | 1 | 1 | 0 | 0 | 段落数持平 |
+| Select | 1 | 1 | 0 | 0 | 1 | 段落数持平 |
+| Sheet | 1 | 1 | 1 | 0 | 0 | 段落数持平 |
+| Sidebar | 3 | 1 | 3 | 0 | 0 | 段落少 2 段 |
+| Skeleton | 2 | 2 | 2 | 0 | 0 | 段落数持平 |
+| Slider | 3 | 5 | 3 | 0 | 0 | 段落多于 Swift |
+| SplitButton | 1 | 1 | 1 | 0 | 0 | 段落数持平 |
+| SplitView | 2 | 2 | 2 | 0 | 0 | 段落数持平 |
+| StatusBar | 3 | 3 | 3 | 0 | 0 | 段落数持平 |
+| Stepper | 3 | 3 | 3 | 0 | 0 | 段落数持平 |
+| SwipeList | 1 | 1 | 1 | 0 | 0 | 段落数持平 |
+| Table | 2 | 0 | 0 | 0 | 2 | Rust 无段落结构 |
+| TabView | 3 | 4 | 3 | 0 | 0 | 段落多于 Swift |
+| Tag | 2 | 3 | 2 | 0 | 0 | 段落多于 Swift |
+| Text Editor | 1 | 1 | 1 | 0 | 0 | 段落数持平 |
+| TextArea | 1 | 1 | 0 | 0 | 1 | 段落数持平 |
+| TextField | 4 | 4 | 4 | 0 | 0 | 段落数持平 |
+| Theme / Typography | 2 | 2 | 2 | 0 | 0 | 段落数持平 |
+| TimeField | 1 | 1 | 0 | 0 | 1 | 段落数持平 |
+| Timeline | 2 | 2 | 2 | 0 | 0 | 段落数持平 |
+| TimePicker | 2 | 1 | 1 | 0 | 1 | 段落少 1 段 |
+| Toggle / Switch | 2 | 2 | 2 | 0 | 0 | 段落数持平 |
+| Toolbar | 1 | 0 | 0 | 0 | 1 | Rust 无段落结构 |
+| Tooltip | 1 | 1 | 0 | 0 | 1 | 段落数持平 |
+| Tree | 1 | 1 | 1 | 0 | 0 | 段落数持平 |
+| Vec3Field | 1 | 1 | 0 | 0 | 1 | 段落数持平 |
+| Viewport Traits | 1 | 1 | 1 | 0 | 0 | 段落数持平 |
+| ViewThatFits | 1 | 1 | 1 | 0 | 0 | 段落数持平 |
+| VirtualStack | 1 | 1 | 1 | 0 | 0 | 段落数持平 |
+| WebView | 1 | 1 | 1 | 0 | 0 | 段落数持平 |
+| WheelPicker | 1 | 1 | 1 | 0 | 0 | 段落数持平 |
+| Workspace / Dock | 1 | 0 | 0 | 0 | 1 | Rust 未分派 story |
+| ZStack / Overlay | 2 | 2 | 2 | 0 | 0 | 段落数持平 |
+
+### Rust 独有页面
+
+Swift 目录没有、Rust 新增的 8 页：SingleLineText、CompletionPopover、RouteOutlet、ProgressValue、HorizontalSwipe、EdgeAutoScroll、ScrollReveal、ActionGroupLayout。
+
+### 已知限制
+
+- 静态解析会漏掉变量标题、循环生成或运行时拼接的段落；Swift 侧无法运行，没有交叉验证。
+- 标题比对按词重合度，措辞改动大时会被记成"无对应"，需要人工确认。
+- 不比控件变体数量、尺寸、间距、颜色和交互；这些要靠 DevTools 逐页做视觉与交互验收。

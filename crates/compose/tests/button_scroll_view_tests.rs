@@ -882,11 +882,9 @@ fn nested_text_field_consumes_wheel_before_parent_scroll_view() {
         let scroll = scroll_node(&graph, registry);
         let field = field_node(&graph);
         let state = field_state(&field);
-        assert_eq!(
-            state.borrow().scroll.max_y,
-            0.0,
-            "GAP: Swift measures the field's scroll bounds during layout, so `maxY > 0` \
-             right after `computeLayout`; Rust measures them only in the draw pass"
+        assert!(
+            state.borrow().scroll.max_y > 0.0,
+            "the field publishes its scroll bounds before the first paint"
         );
         draw_field(&field);
         assert!(
@@ -912,10 +910,8 @@ fn nested_text_field_consumes_wheel_before_parent_scroll_view() {
 
         assert_eq!(
             (field.content_offset().y, scroll.content_offset().y),
-            (0.0, 30.0),
-            "GAP: Swift's text field consumes the wheel and scrolls itself (field > 0, \
-             parent 0); Rust's text field wheel handler always returns Ignored, so the \
-             notch bubbles to the parent scroll view"
+            (30.0, 0.0),
+            "the field consumes the wheel and scrolls itself before the parent view"
         );
     });
 }
@@ -932,11 +928,9 @@ fn nested_text_field_boundary_contains_wheel() {
         let scroll = scroll_node(&graph, registry);
         let field = field_node(&graph);
         let state = field_state(&field);
-        assert_eq!(
-            state.borrow().scroll.max_y,
-            0.0,
-            "GAP: Swift measures the field's scroll bounds during layout, so `maxY > 0` \
-             right after `computeLayout`; Rust measures them only in the draw pass"
+        assert!(
+            state.borrow().scroll.max_y > 0.0,
+            "the field publishes its scroll bounds before the first paint"
         );
         draw_field(&field);
         assert!(state.borrow().scroll.max_y > 0.0);
@@ -1166,11 +1160,9 @@ fn focused_text_field_wheel_uses_pointer_region() {
 
         let scroll = scroll_node(&graph, registry);
         let field = field_node(&graph);
-        assert_eq!(
-            field_state(&field).borrow().scroll.max_y,
-            0.0,
-            "GAP: Swift measures the field's scroll bounds during layout, so `maxY > 0` \
-             right after `computeLayout`; Rust measures them only in the draw pass"
+        assert!(
+            field_state(&field).borrow().scroll.max_y > 0.0,
+            "the field publishes its scroll bounds before the first paint"
         );
         draw_field(&field);
         assert!(field_state(&field).borrow().scroll.max_y > 0.0);

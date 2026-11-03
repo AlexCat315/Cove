@@ -218,9 +218,10 @@ fn horizontal_caret_reveal() {
             EventPhase::Target,
         );
         let _ = draw(&node);
-        assert!(
-            *store.lock().unwrap() != original,
-            "GAP: Swift Primary-Z undoes the 200-character insertion; Rust has no undo"
+        assert_eq!(
+            *store.lock().unwrap(),
+            original,
+            "Primary-Z undoes the 200-character insertion"
         );
         assert!(
             state.borrow().scroll.horizontal.offset == 0.0

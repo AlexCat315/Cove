@@ -179,13 +179,13 @@ fn field_undo_routing() {
         scene.settle(1, 1.0);
         assert_eq!(
             text.get().string_value(),
-            "中😀ab",
-            "GAP: Swift undoes the typing group to 中😀; the Rust field has no Primary-Z"
+            "中😀",
+            "Primary-Z undoes the typing group"
         );
         assert_eq!(
             scene_undos.get(),
-            1,
-            "GAP: Swift's field consumes Primary-Z (0 scene undos); the Rust shortcut host runs"
+            0,
+            "the field consumes Primary-Z before the scene shortcut host"
         );
 
         input.dispatch(&InputEvent::KeyDown(key(
@@ -221,8 +221,8 @@ fn field_undo_routing() {
         scene.settle(1, 1.0);
         assert_eq!(
             text.get().string_value(),
-            "粘贴\n值",
-            "GAP: undo is not yet wired to the field's history"
+            "中😀ab",
+            "undo restores the text the paste replaced"
         );
         ClipboardHolder::set_read(None);
 
@@ -235,9 +235,8 @@ fn field_undo_routing() {
         };
         assert_eq!(
             (anchor, cursor),
-            (None, 4),
-            "GAP: Swift restores the pre-paste selection (anchor 0, cursor 4); Rust keeps an \
-             unanchored caret at the end of the pasted value"
+            (Some(0), 4),
+            "undo restores the pre-paste selection"
         );
     });
 }

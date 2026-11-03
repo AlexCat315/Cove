@@ -22,19 +22,18 @@
 //! attachment identifies the same surface node.
 //!
 //! Named differences from the Swift suite (each pinned by a `GAP:` assertion):
-//! - **No edit actions or undo.** No `TextEditActions` attachment; Primary-Z is ignored.
-//! - **No word, line or vertical navigation.** Option and Command arrows move one
-//!   character; Up/Down, Command-Backspace and Option-Backspace do nothing.
-//! - **Return handling.** A vertical field never submits on Primary-Return; a
-//!   single-line field submits on Shift-Return instead of inserting a newline.
+//! - **Shift-Return in a single-line field** submits instead of inserting a
+//!   newline; Primary-Return submits in a vertical field.
 //! - **Escape and focus requests.** `on_cancel` is never invoked and Escape
 //!   bubbles; a focus request does not select the value.
 //! - **Text field styles are never applied.** `TextFieldHost` ignores the
 //!   `TextFieldStyle`, so the style never sees focus or editing state.
-//! - **No measurement, wheel scrolling or overlay.** Multiline and wrapped
-//!   fields keep the 32pt minimum height, the wheel never scrolls and no hover
-//!   scrollbar is drawn.
-//! - **Gutter and syntax colours.** Line numbers and syntax colours are not painted.
+//! - **Hover scrollbar overlay.** A capped field scrolls but draws no overlay.
+//! - **Line-number gutter.** Syntax colours paint per glyph; the gutter colour
+//!   is still not painted.
+//!
+//! Undo/redo, measurement and wheel scrolling, word/line/vertical navigation,
+//! affixes, the word counter and the length limit follow the Swift behaviour.
 //! Pointer geometry needs a text environment; real drag/multi-click selection is
 //! covered by Gallery's component_acceptance tests.
 //! - **Chrome in the field draw hook.** The bootstrapped CJK field draws its
@@ -69,7 +68,7 @@ use cove_ui_compose::primitives::text::text_field::text_field_layout_engine::{
     FieldLayoutInputs, RenderDraftState, make_render_state,
 };
 use cove_ui_compose::primitives::text::text_field::text_field_options::{
-    TextFieldAxis, TextFieldBehavior, TextFieldCodeEditing, TextFieldLayout,
+    TextFieldAxis, TextFieldBehavior, TextFieldCodeEditing, TextFieldDecoration, TextFieldLayout,
     TextFieldNavigationRequest,
 };
 use cove_ui_compose::theme::styles::components::text_field_style::{
@@ -592,16 +591,16 @@ fn up_down_arrows_preserve_column() {
         t("X", EventPhase::Target);
         assert_eq!(
             rig.text(),
-            "abcd\na\nabcX",
-            "GAP: Swift moves up two lines keeping the column (abcXd); Rust ignores Up/Down, so X lands at the end"
+            "abcXd\na\nabc",
+            "two Up presses keep the column across the short middle line"
         );
         k(&plain(Scancode::HOME), EventPhase::Target);
         k(&plain(Scancode::ARROW_DOWN), EventPhase::Target);
         t("Y", EventPhase::Target);
         assert_eq!(
             rig.text(),
-            "abcd\na\nYabcX",
-            "GAP: Swift moves Down to the next line (Ya); Rust ignores Down, so Y lands at the start of the last line"
+            "abcXd\nYa\nabc",
+            "Home in a single-line field reaches the text start, so Down lands on the next row's first column"
         );
     });
 }
@@ -713,8 +712,8 @@ fn multiline_measures_taller() {
         let node = rig.field();
         assert_eq!(
             node.frame().height,
-            32.0,
-            "GAP: Swift measures a three-line vertical field taller than 32pt; Rust's host has no text measure and keeps its 32pt minimum"
+            72.0,
+            "three 20pt rows plus the field's vertical insets"
         );
     });
 }
@@ -733,8 +732,8 @@ fn multiline_auto_grow_caps_and_scrolls() {
         let node = rig.field();
         assert_eq!(
             node.frame().height,
-            32.0,
-            "GAP: Swift auto-grows the default field for explicit lines; Rust keeps the 32pt minimum"
+            132.0,
+            "the default field grows for explicit lines up to its six-row cap"
         );
         assert!(
             node.frame().height < 12.0 * 20.0 + 12.0,
@@ -764,12 +763,13 @@ fn multiline_auto_grow_caps_and_scrolls() {
         let wheel_handler = rig.handlers(&node).wheel;
         assert!(wheel_handler.is_some(), "wheel handler");
         if let Some(handler) = wheel_handler {
-            handler(&wheel(-1.0), EventPhase::Target);
+            let result = handler(&wheel(-1.0), EventPhase::Target);
+            assert!(result == EventResult::Handled, "wheel consumed, {result:?}");
         }
-        assert_eq!(
-            node.content_offset().y,
-            0.0,
-            "GAP: Swift scrolls the capped field on wheel; Rust's wheel handler always returns Ignored"
+        assert!(
+            node.content_offset().y > 0.0,
+            "the capped field scrolls on wheel, got {}",
+            node.content_offset().y
         );
     });
 }
@@ -787,9 +787,9 @@ fn wheel_survives_redraw(focus: bool) {
         let handler = rig.handlers(&node).wheel.unwrap();
         handler(&wheel(-1.0), EventPhase::Target);
         let scrolled = node.content_offset().y;
-        assert_eq!(
-            scrolled, 0.0,
-            "GAP: Swift wheel-scrolls a capped field; Rust's wheel handler never scrolls"
+        assert!(
+            scrolled > 0.0,
+            "a capped field wheel-scrolls, got {scrolled}"
         );
         let _ = draw(&node);
         assert!(
@@ -818,10 +818,10 @@ fn vertical_axis_soft_wraps_long_lines() {
         rig.install(TextField::new("", rig.binding()).layout(vertical()));
         rig.graph.compute_layout(96.0, 240.0);
         let node = rig.field();
-        assert_eq!(
-            node.frame().height,
-            32.0,
-            "GAP: Swift soft-wraps and grows past 32pt at 96pt width; Rust keeps the 32pt minimum"
+        assert!(
+            node.frame().height > 32.0,
+            "soft-wrapped rows grow the field, got {}",
+            node.frame().height
         );
     });
 }
@@ -840,8 +840,8 @@ fn multiline_visible_line_limit_can_expand() {
         let node = rig.field();
         assert_eq!(
             node.frame().height,
-            32.0,
-            "GAP: Swift grows a 24-line limit past 250pt; Rust keeps the 32pt minimum"
+            492.0,
+            "24 rows at 20pt plus the field's vertical insets"
         );
     });
 }
@@ -898,12 +898,12 @@ fn line_numbers_and_syntax_colors_render() {
         let colors: std::collections::HashSet<u32> =
             list.vertices().iter().map(|v| v.color).collect();
         assert!(
-            !colors.contains(&keyword.rgba8()),
-            "GAP: Swift paints the keyword syntax colour; Rust never reads syntax_color_at_utf8_offset"
+            colors.contains(&keyword.rgba8()),
+            "the keyword run keeps its syntax colour"
         );
         assert!(
-            !colors.contains(&number.rgba8()),
-            "GAP: Swift paints the number syntax colour; Rust never reads syntax_color_at_utf8_offset"
+            colors.contains(&number.rgba8()),
+            "the number run keeps its syntax colour"
         );
         assert!(
             !colors.contains(&gutter.rgba8()),
@@ -925,8 +925,8 @@ fn down_arrow_traverses_soft_wrapped_lines() {
         (handlers.key.clone().unwrap())(&plain(Scancode::ARROW_DOWN), EventPhase::Target);
         (handlers.text.clone().unwrap())("X", EventPhase::Target);
         assert!(
-            rig.text().starts_with("Xalpha"),
-            "GAP: Swift moves Down to the next soft-wrapped row; Rust ignores Down, so X lands at the start: {:?}",
+            !rig.text().starts_with("Xalpha") && rig.text().contains('X'),
+            "Down moves into the next soft-wrapped row: {:?}",
             rig.text()
         );
     });
@@ -1286,8 +1286,8 @@ fn option_word_navigation() {
         t("X", EventPhase::Target);
         assert_eq!(
             rig.text(),
-            "hello brave worlXd",
-            "GAP: Swift moves by word on Option-Left (Xworld); Rust moves one character"
+            "hello brave Xworld",
+            "Option-Left moves to the start of the previous word"
         );
         rig.set("hello brave world");
         k(&primary(Scancode::ARROW_LEFT), EventPhase::Target);
@@ -1298,8 +1298,8 @@ fn option_word_navigation() {
         t("Y", EventPhase::Target);
         assert_eq!(
             rig.text(),
-            "hello brave worldY",
-            "GAP: Swift moves to the line start and then one word right (helloY); Rust ignores both modifiers"
+            "helloY brave world",
+            "Command-Left reaches the line start, Option-Right the end of the first word"
         );
         rig.set("hello brave world");
         k(&primary(Scancode::ARROW_RIGHT), EventPhase::Target);
@@ -1309,8 +1309,8 @@ fn option_word_navigation() {
         );
         assert_eq!(
             rig.text(),
-            "hello brave worl",
-            "GAP: Swift deletes the trailing word on Option-Backspace; Rust deletes one character"
+            "hello brave ",
+            "Option-Backspace deletes the trailing word"
         );
     });
 }
@@ -1327,15 +1327,15 @@ fn command_line_navigation() {
         (handlers.text.clone().unwrap())("X", EventPhase::Target);
         assert_eq!(
             rig.text(),
-            "hellXo",
-            "GAP: Swift moves to the line start on Command-Left (Xhello); Rust moves one character"
+            "Xhello",
+            "Command-Left moves to the line start"
         );
         k(&primary(Scancode::ARROW_RIGHT), EventPhase::Target);
         k(&primary(Scancode::BACKSPACE), EventPhase::Target);
         assert_eq!(
             rig.text(),
-            "hellX",
-            "GAP: Swift deletes to the line start on Command-Backspace; Rust deletes one character"
+            "",
+            "Command-Backspace deletes to the line start"
         );
     });
 }
@@ -1399,6 +1399,55 @@ fn stale_indices_are_clamped() {
             rig.text(),
             "x",
             "the stale caret collapses over the externally emptied text"
+        );
+    });
+}
+
+#[test]
+fn max_length_stops_typed_text() {
+    with_rig(|rig| {
+        rig.install(
+            TextField::new("", rig.binding()).behavior(TextFieldBehavior {
+                max_length: Some(3),
+                ..TextFieldBehavior::default()
+            }),
+        );
+        let node = rig.field();
+        let text = rig.handlers(&node).text.expect("text handler");
+        text("abcd", EventPhase::Target);
+        assert_eq!(rig.text(), "abc", "typing stops at the authored limit");
+        text("e", EventPhase::Target);
+        assert_eq!(rig.text(), "abc", "a full field ignores further typing");
+    });
+}
+
+#[test]
+fn affixes_and_counter_paint() {
+    with_rig(|rig| {
+        rig.set("ab");
+        TextEnvironmentHolder::set_current(Some(test_text_environment(16.0, 20.0)));
+        rig.install(TextField::new("", rig.binding()));
+        rig.graph.compute_layout(240.0, 60.0);
+        let plain = draw(&rig.field()).vertices().len();
+
+        rig.install(
+            TextField::new("", rig.binding())
+                .behavior(TextFieldBehavior {
+                    max_length: Some(10),
+                    ..TextFieldBehavior::default()
+                })
+                .decoration(TextFieldDecoration {
+                    prefix: Some("$".into()),
+                    suffix: Some("kg".into()),
+                    show_word_limit: true,
+                    ..TextFieldDecoration::default()
+                }),
+        );
+        rig.graph.compute_layout(240.0, 60.0);
+        let decorated = draw(&rig.field()).vertices().len();
+        assert!(
+            decorated > plain,
+            "the prefix, suffix and counter add glyphs ({decorated} vs {plain})"
         );
     });
 }

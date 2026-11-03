@@ -26,6 +26,9 @@ zig-out/
 .compare/
 skills-lock.json
 
+# Swift reference tree restored for parity comparison (not built, not tracked)
+/swift/
+
 # Python bytecode from the migration tooling
 __pycache__/
 *.pyc

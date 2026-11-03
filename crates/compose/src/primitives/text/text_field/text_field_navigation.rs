@@ -80,11 +80,20 @@ pub fn move_cursor_vertically(
             let row = (line as isize + line_delta)
                 .clamp(0, buffer.line_count().saturating_sub(1) as isize)
                 as usize;
+            // Without shaping there is no pixel column to preserve, so the
+            // preferred column travels in `preferred_caret_x` as a character
+            // index: a tall line visited first keeps the column of a short line
+            // on the way back.
+            let desired = preferred_caret_x
+                .map(|x| x.max(0.0) as usize)
+                .unwrap_or(column);
+            let range = buffer.line_range(row);
+            let target = buffer.character_index_for_line(row, desired.min(range.end - range.start));
             CaretMove {
-                target: buffer.character_index_for_line(row, column),
+                target,
                 extend_selection: false,
                 line_end_affinity: false,
-                preferred_caret_x: None,
+                preferred_caret_x: Some((desired as f32).to_bits()),
             }
         }
     }
@@ -115,6 +124,66 @@ pub fn move_cursor_by_page(
         env,
     );
     Some(moved)
+}
+
+/// How one character participates in word motion.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum CharKind {
+    Word,
+    Space,
+    Other,
+}
+
+/// Translation of `TextField.wordKind(_:)`: letters, digits and `_` form a word
+/// run; whitespace is skipped first; everything else is punctuation.
+pub fn char_kind(character: char) -> CharKind {
+    if character.is_alphanumeric() || character == '_' {
+        CharKind::Word
+    } else if character.is_whitespace() {
+        CharKind::Space
+    } else {
+        CharKind::Other
+    }
+}
+
+/// Option+Left / Option+Backspace target: skip the whitespace immediately
+/// before the caret, then the run of same-kind characters before it.
+pub fn word_boundary_before(buffer: &TextBuffer, offset: usize) -> usize {
+    let count = buffer.character_count();
+    let mut cursor = offset.min(count);
+    while cursor > 0 && buffer.character_at(cursor - 1).is_some_and(is_space) {
+        cursor -= 1;
+    }
+    let Some(previous) = cursor.checked_sub(1).and_then(|index| buffer.character_at(index)) else {
+        return 0;
+    };
+    let kind = char_kind(previous);
+    while cursor > 0 && buffer.character_at(cursor - 1).is_some_and(|c| char_kind(c) == kind) {
+        cursor -= 1;
+    }
+    cursor
+}
+
+/// Option+Right / Option+Delete target: skip the whitespace ahead, then the run
+/// of same-kind characters after it.
+pub fn word_boundary_after(buffer: &TextBuffer, offset: usize) -> usize {
+    let count = buffer.character_count();
+    let mut cursor = offset.min(count);
+    while cursor < count && buffer.character_at(cursor).is_some_and(is_space) {
+        cursor += 1;
+    }
+    let Some(next) = buffer.character_at(cursor) else {
+        return count;
+    };
+    let kind = char_kind(next);
+    while cursor < count && buffer.character_at(cursor).is_some_and(|c| char_kind(c) == kind) {
+        cursor += 1;
+    }
+    cursor
+}
+
+fn is_space(character: char) -> bool {
+    char_kind(character) == CharKind::Space
 }
 
 /// The visible window a text origin maps to, used by hit testing.

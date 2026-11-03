@@ -16,15 +16,18 @@ use crate::primitives::text::code::minimap::{
 };
 use crate::primitives::text::text_buffer::TextBuffer;
 use crate::primitives::text::text_document_layout::TextDocumentLayout;
+use crate::primitives::text::text_edit_history::{Snapshot, TextEditHistory, TextEditKind};
+use crate::primitives::text::text_editing_commands::TextEditingCommands;
 use crate::theme::styles::components::AnyTextFieldStyle;
 use crate::theme::{SemanticFontRef, Theme, theme_for_node};
 use crate::{AnyView, PrimitiveView, View, impl_primitive_view};
 use cove_core::scene::{
     AccessibilityRole, AccessibilitySemantics, AccessibilityState, EventResult, FocusChainHolder,
-    HoverPhase, InputHandlerRoute, InteractionRegistryHolder, LayoutNode, Node, NodeResource,
-    Overflow, PointerCaptureHolder, PointerPhase, TextInputAttachmentKey,
+    HoverPhase, InputHandlerRoute, InteractionRegistryHolder, LayoutNode, MeasureMode, Node,
+    NodeResource, Overflow, PointerCaptureHolder, PointerPhase, TextEditCommand,
+    TextInputAttachmentKey,
 };
-use cove_core::{Binding, Color, Point, Rect};
+use cove_core::{Binding, Color, Point, Rect, Size, TextAlignment};
 use cove_platform::{MouseButton, MouseWheelEvent, SystemCursor};
 use cove_text::{DrawListText, TextEnvironment, TextEnvironmentHolder};
 use unicode_segmentation::UnicodeSegmentation;
@@ -33,10 +36,17 @@ use super::indent_guides::TextIndentGuides;
 use super::snippet::TextSnippetSession;
 use super::text_completion_session::TextCompletionSession;
 use super::text_field_code_editing::indented_newline;
+use super::text_field_editing::{
+    delete_selection, edit_clock, insert_replacing_selection, insert_replacing_selection_limited,
+};
 use super::text_field_layout_engine::{
     FIELD_STATE_KEY, FieldCompositionState, FieldLayoutInputs, FieldScrollState,
     FieldSelectionState, RenderDraftState, document_geometry, make_render_state, selection_range,
     update_scroll,
+};
+use super::text_field_navigation::{
+    line_boundary, move_cursor_by_page, move_cursor_vertically, word_boundary_after,
+    word_boundary_before,
 };
 use super::text_field_observation::{TextFieldCaretState, TextFieldHoverAnchor};
 use super::text_field_options::{
@@ -49,10 +59,79 @@ const FOCUS_REQUEST_ID: &str = "__textfield_focus_request_id";
 const CARET_REQUEST_ID: &str = "__textfield_caret_request_id";
 const MINIMAP_GEOMETRY: &str = "__textfield_minimap_geometry";
 const MINIMAP_DRAGGING: &str = "__textfield_minimap_dragging";
+const MEASURE_INPUTS_KEY: &str = "__textfield_measure_inputs";
+const MEASURE_DOCUMENT_KEY: &str = "__textfield_measure_document";
 /// One line increment for a wheel notch in a multiline field.
 pub const MULTILINE_WHEEL_STEP: f32 = 30.0;
 pub const SCROLLBAR_TRACK_THICKNESS: f32 = 6.0;
 pub const SCROLLBAR_INSET: f32 = 3.0;
+
+/// One open `begin_edit` … `end_edit` bracket. Nested brackets coalesce into
+/// the outermost transaction, so a helper that records its own edit inside a
+/// caller's bracket does not split the undo step.
+#[derive(Clone, Debug, Default)]
+struct EditTransaction {
+    history: TextEditHistory,
+    depth: usize,
+    before: Option<Snapshot>,
+    kind: TextEditKind,
+}
+
+/// Widths the authored decorations reserve from the text column.
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct AddonMetrics {
+    /// `prepend` slab, including both of its paddings.
+    pub prepend: f32,
+    /// `append` slab, including both of its paddings.
+    pub append: f32,
+    /// Inline `prefix` glyphs and their gap.
+    pub prefix: f32,
+    /// Inline `suffix` glyphs and their gap.
+    pub suffix: f32,
+    /// Decorative leading glyph and its gap.
+    pub icon: f32,
+    /// Trailing clear affordance.
+    pub clear: f32,
+    /// Word-limit counter and its gap.
+    pub counter: f32,
+}
+
+/// Measured decorations for one pass: the shapes to paint and the space they
+/// take.
+pub struct AddonLayouts {
+    pub metrics: AddonMetrics,
+    pub prepend: Option<std::sync::Arc<cove_core::TextLayoutResult>>,
+    pub append: Option<std::sync::Arc<cove_core::TextLayoutResult>>,
+    pub prefix: Option<std::sync::Arc<cove_core::TextLayoutResult>>,
+    pub suffix: Option<std::sync::Arc<cove_core::TextLayoutResult>>,
+    pub counter: Option<std::sync::Arc<cove_core::TextLayoutResult>>,
+    pub counter_text: Option<String>,
+}
+
+impl AddonLayouts {
+    /// No decorations: the plain field chrome.
+    pub fn empty() -> Self {
+        Self {
+            metrics: AddonMetrics::default(),
+            prepend: None,
+            append: None,
+            prefix: None,
+            suffix: None,
+            counter: None,
+            counter_text: None,
+        }
+    }
+
+    /// Space taken on the leading edge, before the editable text.
+    pub fn leading(&self) -> f32 {
+        self.metrics.prepend + self.metrics.icon + self.metrics.prefix
+    }
+
+    /// Space taken on the trailing edge, after the editable text.
+    pub fn trailing(&self) -> f32 {
+        self.metrics.suffix + self.metrics.append
+    }
+}
 
 /// Editing state owned by the surface node and shared across recompositions.
 pub struct FieldState {
@@ -66,6 +145,7 @@ pub struct FieldState {
     pub last_draw_origin: Point,
     pub clear_hit_x: Option<f32>,
     pub needs_caret_reveal: bool,
+    transaction: EditTransaction,
     last_activity: std::time::Instant,
 }
 
@@ -85,12 +165,90 @@ impl FieldState {
             last_draw_origin: Point::default(),
             clear_hit_x: None,
             needs_caret_reveal: true,
+            transaction: EditTransaction::default(),
             last_activity: std::time::Instant::now(),
         }
     }
 
     pub fn clear_composition(&mut self) {
         self.composition = FieldCompositionState::default();
+    }
+
+    /// Adopt the caller's history when one is authored. Swift replaces the
+    /// session history every pass so the same object backs `canUndo` and the
+    /// menu bridge.
+    pub fn adopt_history(&mut self, history: Option<TextEditHistory>) {
+        if let Some(history) = history {
+            self.transaction.history = history;
+        }
+    }
+
+    pub fn history(&self) -> &TextEditHistory {
+        &self.transaction.history
+    }
+
+    pub fn history_mut(&mut self) -> &mut TextEditHistory {
+        &mut self.transaction.history
+    }
+
+    /// Open an undo bracket at the current text. `kind` decides whether the
+    /// transaction may coalesce with the previous one.
+    pub fn begin_edit(&mut self, current: &TextBuffer, kind: TextEditKind) {
+        if self.transaction.depth == 0 {
+            self.normalize(current);
+            let bound = self.buffer.clone();
+            self.transaction.history.synchronize(&bound);
+            self.transaction.before = Some(Snapshot::new(
+                bound,
+                self.selection.cursor_index,
+                self.selection.anchor,
+            ));
+            self.transaction.kind = kind;
+        }
+        self.transaction.depth += 1;
+    }
+
+    /// Close the bracket opened by `begin_edit` and record the difference.
+    pub fn end_edit(&mut self) {
+        self.transaction.depth = self.transaction.depth.saturating_sub(1);
+        if self.transaction.depth != 0 {
+            return;
+        }
+        let Some(before) = self.transaction.before.take() else {
+            return;
+        };
+        let after = Snapshot::new(
+            self.buffer.clone(),
+            self.selection.cursor_index,
+            self.selection.anchor,
+        );
+        self.transaction
+            .history
+            .record(before, after, self.transaction.kind, edit_clock());
+    }
+
+    /// Restore the previous (or next) snapshot. Returns the restored buffer so
+    /// the caller can publish it through the binding.
+    pub fn restore_history(&mut self, redo: bool) -> Option<TextBuffer> {
+        let bound = self.buffer.clone();
+        self.transaction.history.synchronize(&bound);
+        let snapshot = if redo {
+            self.transaction.history.redo()
+        } else {
+            self.transaction.history.undo()
+        }?;
+        self.clear_composition();
+        self.buffer = snapshot.buffer.clone();
+        self.selection.cursor_index = snapshot.cursor.min(self.buffer.character_count());
+        self.selection.anchor = snapshot.anchor;
+        self.selection.set_preferred_caret_x(None);
+        self.record_activity();
+        Some(snapshot.buffer)
+    }
+
+    /// End the current coalescing run: the next edit starts a new undo step.
+    pub fn break_history_group(&mut self) {
+        self.transaction.history.break_group();
     }
 
     /// Clamp persisted indices into the current text. State outlives recompose
@@ -255,22 +413,130 @@ impl TextField {
         }
     }
 
-    fn leading_inset(&self, theme: &Theme) -> f32 {
-        self.horizontal_inset(theme)
-            + if self.decoration.leading_icon.is_some() {
-                22.0
-            } else {
-                0.0
-            }
+    /// Decorative leading glyph size, scaled with the line box.
+    fn leading_icon_size(&self, line_height: f32) -> f32 {
+        (line_height * 0.8).max(12.0)
     }
 
-    fn trailing_inset(&self, theme: &Theme, has_text: bool) -> f32 {
-        self.horizontal_inset(theme)
-            + if self.behavior.clearable && !self.behavior.read_only && has_text {
-                22.0
+    /// The `n / limit` counter text, or `None` while no limit is authored or
+    /// shown.
+    fn counter_text(&self, character_count: usize) -> Option<String> {
+        if !self.decoration.show_word_limit {
+            return None;
+        }
+        let limit = self.behavior.max_length?;
+        Some(format!("{character_count}/{limit}"))
+    }
+
+    /// Measure the authored decorations once per pass. Every consumer of the
+    /// text column — hit testing, the IME anchor, the caret and the paint —
+    /// reads these same reservations so nothing collides.
+    fn addon_layouts(
+        &self,
+        theme: &Theme,
+        env: &TextEnvironment,
+        font: &cove_core::Font,
+        line_height: f32,
+        letter_spacing: f32,
+        character_count: usize,
+    ) -> AddonLayouts {
+        let inset = self.horizontal_inset(theme);
+        let has_text = character_count > 0;
+        let measure = |text: &str| -> std::sync::Arc<cove_core::TextLayoutResult> {
+            env.cached_layout(
+                text,
+                Some(font),
+                Some(line_height),
+                f32::INFINITY,
+                TextAlignment::Leading,
+                letter_spacing,
+            )
+        };
+        let prepend = self
+            .decoration
+            .prepend
+            .as_deref()
+            .filter(|text| !text.is_empty())
+            .map(measure);
+        let append = self
+            .decoration
+            .append
+            .as_deref()
+            .filter(|text| !text.is_empty())
+            .map(measure);
+        let prefix = self
+            .decoration
+            .prefix
+            .as_deref()
+            .filter(|text| !text.is_empty())
+            .map(measure);
+        let suffix = self
+            .decoration
+            .suffix
+            .as_deref()
+            .filter(|text| !text.is_empty())
+            .map(measure);
+        let counter_text = self.counter_text(character_count);
+        let counter = counter_text.as_deref().map(measure);
+        let metrics = AddonMetrics {
+            prepend: prepend
+                .as_ref()
+                .map_or(0.0, |layout| layout.total_width + inset * 2.0 + theme.spacing.sm),
+            append: append
+                .as_ref()
+                .map_or(0.0, |layout| layout.total_width + inset * 2.0 + theme.spacing.sm),
+            prefix: prefix
+                .as_ref()
+                .map_or(0.0, |layout| layout.total_width + theme.spacing.xs),
+            suffix: suffix
+                .as_ref()
+                .map_or(0.0, |layout| layout.total_width + theme.spacing.xs),
+            icon: if self.decoration.leading_icon.is_some() {
+                self.leading_icon_size(line_height) + theme.spacing.xs
             } else {
                 0.0
-            }
+            },
+            clear: if self.shows_clear_affordance(has_text) {
+                line_height + theme.spacing.xs
+            } else {
+                0.0
+            },
+            counter: counter
+                .as_ref()
+                .map_or(0.0, |layout| layout.total_width + theme.spacing.xs),
+        };
+        AddonLayouts {
+            metrics,
+            prepend,
+            append,
+            prefix,
+            suffix,
+            counter,
+            counter_text,
+        }
+    }
+
+    /// The trailing clear glyph is offered while the field can be emptied.
+    fn shows_clear_affordance(&self, has_text: bool) -> bool {
+        self.behavior.clearable && !self.behavior.read_only && !self.behavior.disabled && has_text
+    }
+
+    /// Leading reservation: the authored slabs, icon and inline prefix.
+    fn leading_addon(&self, addons: &AddonLayouts) -> f32 {
+        addons.metrics.prepend + addons.metrics.icon + addons.metrics.prefix
+    }
+
+    /// Text-column width for a frame, after every reservation.
+    fn available_text_width(&self, theme: &Theme, frame_width: f32, addons: &AddonLayouts) -> f32 {
+        (frame_width
+            - self.horizontal_inset(theme) * 2.0
+            - self.leading_addon(addons)
+            - addons.metrics.suffix
+            - addons.metrics.append
+            - addons.metrics.clear
+            - addons.metrics.counter
+            - self.minimap_reservation())
+        .max(1.0)
     }
 
     fn vertical_inset(&self, line_height: f32) -> f32 {
@@ -362,12 +628,14 @@ impl PrimitiveView for TextFieldHost {
         let layout = LayoutNode::new();
         layout.set_min_height(Some(self.field.minimum_field_height()));
         layout.set_overflow(Overflow::Hidden);
+        install_measure(&layout, self.field.snapshot());
         Some(layout)
     }
 
     fn update_layout(&self, layout: &LayoutNode) {
         layout.set_min_height(Some(self.field.minimum_field_height()));
         layout.set_overflow(Overflow::Hidden);
+        install_measure(layout, self.field.snapshot());
     }
 
     fn update_node(&self, node: &Node) {
@@ -396,7 +664,16 @@ impl PrimitiveView for TextFieldHost {
         {
             let mut state = state_handle.borrow_mut();
             state.normalize(&current);
+            // An external rewrite of the bound text invalidates both stacks;
+            // the session adopts the caller's history when one is authored.
+            state.adopt_history(self.field.code_editing.edit_history.clone());
+            let bound = current.clone();
+            state.history_mut().synchronize(&bound);
         }
+        install_history_commands(node, &self.field, state_handle.clone());
+        // Publish the scroll limits during the update pass as well, so a
+        // nested field knows it can scroll before its first paint.
+        refresh_scroll_metrics(node, &self.field, &state_handle);
 
         let is_focused = FocusChainHolder::current()
             .and_then(|chain| chain.focused())
@@ -472,6 +749,255 @@ impl PrimitiveView for TextFieldHost {
     }
 }
 impl_primitive_view!(TextFieldHost);
+
+/// Inputs that change the measured size of a field. Cached on the layout node
+/// so a text edit can mark the node dirty instead of silently keeping a stale
+/// height.
+#[derive(Clone, PartialEq)]
+struct MeasureInputs {
+    text: String,
+    placeholder: String,
+    axis: TextFieldAxis,
+    wraps_lines: bool,
+    max_visible_lines: usize,
+    secure: bool,
+}
+
+/// Install the intrinsic-size measure for a text field.
+///
+/// A vertical field grows with its content up to `max_visible_lines`; a
+/// horizontal one keeps one line but still grows while the text carries
+/// explicit newlines. Both clamp to the authored maximum, after which the
+/// field scrolls.
+fn install_measure(layout: &LayoutNode, field: TextField) {
+    let inputs = MeasureInputs {
+        text: field.text.get().string_value(),
+        placeholder: field.placeholder.clone(),
+        axis: field.layout.axis,
+        wraps_lines: field.layout.wraps_lines,
+        max_visible_lines: field.layout.max_visible_lines,
+        secure: field.behavior.secure,
+    };
+    let previous = layout.attachment::<MeasureInputs>(MEASURE_INPUTS_KEY);
+    if previous.as_ref() == Some(&inputs) {
+        return;
+    }
+    if previous.is_some() {
+        // Only a change after the first measure invalidates: the initial pass
+        // already measured the value it was installed with.
+        layout.mark_dirty();
+    }
+    layout.set_attachment(MEASURE_INPUTS_KEY, inputs);
+
+    let weak_layout = layout.downgrade();
+    layout.set_measure_func(Some(Rc::new(
+        move |width, width_mode, _height, _height_mode| {
+            let Some(layout) = cove_core::scene::LayoutNode::upgrade(&weak_layout) else {
+                return Size::default();
+            };
+            measure_field(&field, &layout, width, width_mode)
+        },
+    )));
+}
+
+/// Default line-box inset used while measuring, before a theme is resolvable.
+const MEASURE_INSET_X: f32 = 16.0;
+
+fn measure_field(
+    field: &TextField,
+    layout: &LayoutNode,
+    width: f32,
+    width_mode: MeasureMode,
+) -> Size {
+    let minimum = field.minimum_field_height();
+    let Some(environment) = TextEnvironmentHolder::current() else {
+        return Size {
+            width: width.max(0.0),
+            height: minimum,
+        };
+    };
+    let font = environment.default_font.clone();
+    let line_height = environment.resolved_line_height(&font, None);
+    let inset_y = field.vertical_inset(line_height);
+    let maximum = (line_height * field.layout.max_visible_lines as f32 + inset_y * 2.0).max(minimum);
+    if field.layout.axis != TextFieldAxis::Vertical {
+        let ideal = if field.layout.ideal_width.is_finite() {
+            field.layout.ideal_width.max(1.0)
+        } else {
+            160.0
+        };
+        let resolved = match width_mode {
+            MeasureMode::Exactly => width,
+            MeasureMode::AtMost | MeasureMode::MinContent => ideal.min(width.max(0.0)),
+            MeasureMode::Undefined => ideal,
+        };
+        let current = field.text.get();
+        let buffer = if current.is_empty() {
+            TextBuffer::new(&field.placeholder)
+        } else {
+            current
+        };
+        let content = buffer.line_count() as f32 * line_height;
+        return Size {
+            width: resolved,
+            height: (content + inset_y * 2.0).clamp(minimum, maximum),
+        };
+    }
+    let current = field.text.get();
+    let is_empty = current.is_empty();
+    let buffer = if is_empty {
+        TextBuffer::new(&field.placeholder)
+    } else {
+        current
+    };
+    let width_limit = if matches!(width_mode, MeasureMode::Undefined) || !field.layout.wraps_lines {
+        f32::INFINITY
+    } else {
+        (width - MEASURE_INSET_X).max(1.0)
+    };
+    let inputs = FieldLayoutInputs {
+        is_vertical: true,
+        wraps_lines: field.layout.wraps_lines,
+        secure: field.behavior.secure,
+        horizontal_inset: MEASURE_INSET_X * 0.5,
+        vertical_inset: inset_y,
+        text_origin_y_offset: 0.0,
+    };
+    let geometry = document_geometry(
+        &inputs,
+        font.clone(),
+        line_height,
+        0.0,
+        environment.atlas_texture_id as u64,
+        width_limit,
+        is_empty,
+    );
+    let document =
+        layout.attachment::<Rc<RefCell<TextDocumentLayout>>>(MEASURE_DOCUMENT_KEY);
+    let document = document.unwrap_or_else(|| {
+        let document = Rc::new(RefCell::new(TextDocumentLayout::new(
+            buffer.clone(),
+            geometry.clone(),
+        )));
+        layout.set_attachment(MEASURE_DOCUMENT_KEY, document.clone());
+        document
+    });
+    document.borrow_mut().update(buffer.clone(), geometry);
+    let rows = document
+        .borrow_mut()
+        .visible_layout(0, field.layout.max_visible_lines + 1, &environment);
+    let content_height = rows.total_height.max(line_height);
+    let measured_width = rows.total_width + MEASURE_INSET_X;
+    let resolved_width = match width_mode {
+        MeasureMode::Exactly => width,
+        MeasureMode::AtMost | MeasureMode::MinContent => measured_width.min(width.max(0.0)),
+        MeasureMode::Undefined => measured_width,
+    };
+    Size {
+        width: resolved_width,
+        height: (content_height + inset_y * 2.0).clamp(minimum, maximum),
+    }
+}
+
+/// Publish the undo/redo bridge the platform menu and the scene shortcuts read.
+///
+/// Swift installs both the plain closures and a `TextEditActions` pair
+/// (`TextField.swift:236,262`); without them `TextEditingCommands::undo` finds
+/// nothing on the command target and a Primary-Z falls through to the scene
+/// fallback.
+fn install_history_commands(node: &Node, field: &TextField, state: Rc<RefCell<FieldState>>) {
+    let keys = [
+        TextEditingCommands::UNDO_KEY,
+        TextEditingCommands::REDO_KEY,
+        TextEditingCommands::CAN_UNDO_KEY,
+        TextEditingCommands::CAN_REDO_KEY,
+    ];
+    if field.behavior.disabled || field.behavior.read_only {
+        for key in keys {
+            node.remove_attachment(key);
+        }
+        return;
+    }
+    let binding = field.text.clone();
+    let undo_node = node.downgrade();
+    let undo_state = state.clone();
+    let undo_binding = binding.clone();
+    node.set_attachment(
+        TextEditingCommands::UNDO_KEY,
+        Rc::new(move || {
+            if let Some(owner) = Node::upgrade(&undo_node) {
+                restore_history(&owner, &undo_state, &undo_binding, false);
+            }
+        }) as Rc<dyn Fn()>,
+    );
+    let redo_node = node.downgrade();
+    let redo_state = state.clone();
+    let redo_binding = binding.clone();
+    node.set_attachment(
+        TextEditingCommands::REDO_KEY,
+        Rc::new(move || {
+            if let Some(owner) = Node::upgrade(&redo_node) {
+                restore_history(&owner, &redo_state, &redo_binding, true);
+            }
+        }) as Rc<dyn Fn()>,
+    );
+    let can_undo_state = state.clone();
+    node.set_attachment(
+        TextEditingCommands::CAN_UNDO_KEY,
+        Rc::new(move || can_undo_state.borrow().history().can_undo()) as Rc<dyn Fn() -> bool>,
+    );
+    let can_redo_state = state.clone();
+    node.set_attachment(
+        TextEditingCommands::CAN_REDO_KEY,
+        Rc::new(move || can_redo_state.borrow().history().can_redo()) as Rc<dyn Fn() -> bool>,
+    );
+    let actions_node = node.downgrade();
+    let query_state = state.clone();
+    let query_binding = binding.clone();
+    let actions_state = state;
+    let actions_binding = binding;
+    node.set_attachment(
+        TextInputAttachmentKey::EDIT_ACTIONS,
+        cove_core::scene::TextEditActions::new(
+            move |command| {
+                let mut state = query_state.borrow_mut();
+                let bound = query_binding.get();
+                state.history_mut().synchronize(&bound);
+                match command {
+                    TextEditCommand::Undo => state.history().can_undo(),
+                    TextEditCommand::Redo => state.history().can_redo(),
+                }
+            },
+            move |command| {
+                let Some(owner) = Node::upgrade(&actions_node) else {
+                    return;
+                };
+                restore_history(&owner, &actions_state, &actions_binding, command == TextEditCommand::Redo);
+            },
+        ),
+    );
+}
+
+/// Restore one history snapshot and publish it through the caller's binding.
+fn restore_history(
+    node: &Node,
+    state: &Rc<RefCell<FieldState>>,
+    binding: &Binding<TextBuffer>,
+    redo: bool,
+) {
+    let Some(buffer) = state.borrow_mut().restore_history(redo) else {
+        return;
+    };
+    if !buffer.has_same_contents(&binding.get()) {
+        binding.set(buffer.clone());
+        if let Some(handler) = node.attachment::<Rc<dyn Fn(&TextBuffer)>>("__textfield_change") {
+            handler(&buffer);
+        }
+    }
+    node.mark_render_dirty(cove_core::scene::InvalidationSource::style_set(
+        "textFieldUndo",
+    ));
+}
 
 fn install_text_input_client(node: &Node, field: &TextField, state: &Rc<RefCell<FieldState>>) {
     if field.behavior.disabled {
@@ -555,14 +1081,18 @@ fn input_area(
     let theme = theme_for_node(node);
     let token = SemanticFontRef::body().resolve(&theme);
     let line_height = token.line_height;
-    let inset = field.leading_inset(&theme);
     let vertical = field.layout.axis == TextFieldAxis::Vertical;
-    let width = (node.frame().width
-        - inset
-        - field.trailing_inset(&theme, !state.borrow().buffer.is_empty())
-        - field.minimap_reservation())
-    .max(1.0);
     let mut state = state.borrow_mut();
+    let addons = field.addon_layouts(
+        &theme,
+        &environment,
+        &token.font,
+        line_height,
+        token.letter_spacing,
+        state.buffer.character_count(),
+    );
+    let inset = field.horizontal_inset(&theme);
+    let width = field.available_text_width(&theme, node.frame().width, &addons);
     let selection = state.selection;
     let composition = state.composition.clone();
     let current = state.buffer.clone();
@@ -591,6 +1121,11 @@ fn input_area(
         &environment,
     );
     let height = (node.frame().height - 2.0 * field.vertical_inset(line_height)).max(line_height);
+    state.scroll.visible_height = height;
+    state.scroll.content_height = document.index().row_count() as f32 * line_height;
+    state.scroll.max_y = (state.scroll.content_height - height).max(0.0);
+    state.scroll.horizontal.viewport_width = width;
+    state.scroll.horizontal.leading_inset = inset + addons.leading();
     if state.scroll.needs_caret_reveal {
         if caret_x - state.scroll.horizontal.offset > width - 1.0 {
             state.scroll.horizontal.offset = (caret_x - width + 1.0).max(0.0);
@@ -605,9 +1140,10 @@ fn input_area(
         if top + line_height > state.scroll.offset_y + height {
             state.scroll.offset_y = (top + line_height - height).max(0.0);
         }
+        state.scroll.offset_y = state.scroll.offset_y.clamp(0.0, state.scroll.max_y);
     }
     Some(cove_platform::TextInputArea {
-        x: origin.x + inset,
+        x: origin.x + inset + addons.leading(),
         y: origin.y + field.vertical_inset(line_height) + row as f32 * line_height
             - state.scroll.offset_y,
         width,
@@ -627,11 +1163,16 @@ fn pointer_character(
     let token = SemanticFontRef::body().resolve(&theme);
     let line_height = token.line_height;
     let mut state = state.borrow_mut();
-    let width = (node.frame().width
-        - field.leading_inset(&theme)
-        - field.trailing_inset(&theme, !state.buffer.is_empty())
-        - field.minimap_reservation())
-    .max(1.0);
+    let addons = field.addon_layouts(
+        &theme,
+        &environment,
+        &token.font,
+        line_height,
+        token.letter_spacing,
+        state.buffer.character_count(),
+    );
+    let leading = field.horizontal_inset(&theme) + addons.leading();
+    let width = field.available_text_width(&theme, node.frame().width, &addons);
     let current = state.buffer.clone();
     let selection = state.selection;
     let composition = state.composition.clone();
@@ -662,7 +1203,7 @@ fn pointer_character(
     );
     let mut document = TextDocumentLayout::new(rendered.buffer, geometry);
     let origin = node.absolute_origin();
-    let x = point.x - origin.x - field.leading_inset(&theme) + state.scroll.horizontal.offset;
+    let x = point.x - origin.x - leading + state.scroll.horizontal.offset;
     let row = ((point.y - origin.y - field.vertical_inset(line_height) + state.scroll.offset_y)
         .max(0.0)
         / line_height.max(1.0)) as usize;
@@ -953,6 +1494,7 @@ fn install_interaction(node: &Node, field: &TextField, state: Rc<RefCell<FieldSt
     let text_node = node.downgrade();
     let text_state = state.clone();
     let text_behavior = field.behavior.clone();
+    let text_limit = field.behavior.max_length;
     let text_binding = field.text.clone();
     registry.set_text(
         node,
@@ -965,11 +1507,11 @@ fn install_interaction(node: &Node, field: &TextField, state: Rc<RefCell<FieldSt
                 return EventResult::Ignored;
             };
             text_state.borrow_mut().normalize(&text_binding.get());
-            crate::primitives::text::text_field::text_field_editing::insert_replacing_selection(
+            insert_replacing_selection_limited(
                 &mut text_state.borrow_mut(),
                 incoming,
+                text_limit,
             );
-            text_state.borrow_mut().record_activity();
             // Publish the edit back to the caller's binding. Nothing ever wrote
             // `field.text`, so `TextFieldHost::update_node` re-read the unchanged
             // binding on the next pass and normalised the internal buffer back —
@@ -1028,10 +1570,10 @@ fn install_interaction(node: &Node, field: &TextField, state: Rc<RefCell<FieldSt
     );
 
     let key_node = node.downgrade();
-    let key_state = state;
+    let key_state = state.clone();
     let key_behavior = field.behavior.clone();
     let key_binding = field.text.clone();
-    let key_vertical = field.layout.axis == TextFieldAxis::Vertical;
+    let key_field = field.snapshot();
     let indentation = field.code_editing.indentation_width;
     registry.set_key(
         node,
@@ -1067,6 +1609,24 @@ fn install_interaction(node: &Node, field: &TextField, state: Rc<RefCell<FieldSt
                 }
             }
             let primary = event.modifiers.has_gui() || event.modifiers.has_ctrl();
+            // Undo / redo take priority over every other binding. Primary-Z
+            // steps back, Primary-Y and Primary-Shift-Z step forward — the
+            // latter is the Windows/Linux spelling, and Swift accepts both
+            // (`TextField.swift:450`).
+            if primary
+                && (event.scancode == crate::Scancode::Z || event.scancode == crate::Scancode::Y)
+            {
+                if key_behavior.read_only {
+                    return EventResult::Handled;
+                }
+                restore_history(
+                    &owner,
+                    &key_state,
+                    &key_binding,
+                    event.scancode == crate::Scancode::Y || event.modifiers.has_shift(),
+                );
+                return EventResult::Handled;
+            }
             if primary && event.scancode == crate::Scancode::V {
                 if key_behavior.read_only {
                     return EventResult::Handled;
@@ -1074,6 +1634,7 @@ fn install_interaction(node: &Node, field: &TextField, state: Rc<RefCell<FieldSt
                 let paste_state = key_state.clone();
                 let paste_binding = key_binding.clone();
                 let paste_node = owner.downgrade();
+                let paste_limit = key_behavior.max_length;
                 cove_core::scene::ClipboardHolder::request_read(Box::new(move |text| {
                     let (Some(text), Some(owner)) = (text, Node::upgrade(&paste_node)) else {
                         return;
@@ -1081,7 +1642,7 @@ fn install_interaction(node: &Node, field: &TextField, state: Rc<RefCell<FieldSt
                     let buffer = {
                         let mut state = paste_state.borrow_mut();
                         state.normalize(&paste_binding.get());
-                        insert_replacing_selection(&mut state, &text);
+                        insert_replacing_selection_limited(&mut state, &text, paste_limit);
                         state.buffer.clone()
                     };
                     if !buffer.has_same_contents(&paste_binding.get()) {
@@ -1098,101 +1659,49 @@ fn install_interaction(node: &Node, field: &TextField, state: Rc<RefCell<FieldSt
                 }));
                 return EventResult::Handled;
             }
+            // Return submits unless a vertical field is going to take the
+            // newline: Primary-Return always submits, Shift-Return inserts in a
+            // multiline field, which is what the Swift suite asserts.
+            if matches!(
+                event.scancode,
+                crate::Scancode::RETURN | crate::Scancode::KEYPAD_ENTER
+            ) && (key_field.layout.axis != TextFieldAxis::Vertical || primary)
+            {
+                return match owner.attachment::<Rc<dyn Fn()>>("__textfield_submit") {
+                    Some(submit) => {
+                        submit();
+                        EventResult::Handled
+                    }
+                    None => EventResult::Ignored,
+                };
+            }
             let edit = || {
                 let mut state = key_state.borrow_mut();
                 // The caller may have rewritten the text since the last pass. Editing
                 // the old copy would write it back over theirs.
                 state.normalize(&key_binding.get());
-                match event.scancode {
-                    crate::Scancode::A if primary => {
-                        state.selection.anchor = Some(0);
-                        state.selection.cursor_index = state.buffer.character_count();
-                        state.record_activity();
-                        EventResult::Handled
-                    }
-                    crate::Scancode::C | crate::Scancode::X if primary => {
-                        if !key_behavior.secure
-                            && let Some((low, high)) = state.selection_range()
-                        {
-                            cove_core::scene::ClipboardHolder::write(
-                                &state.buffer.substring(low..high),
-                            );
-                            if event.scancode == crate::Scancode::X && !key_behavior.read_only {
-                                delete_selection(&mut state);
-                            }
-                        }
-                        EventResult::Handled
-                    }
-                    crate::Scancode::ARROW_LEFT => {
-                        let target = grapheme_before(&state.buffer, state.selection.cursor_index);
-                        state.move_cursor(target, event.modifiers.has_shift(), None);
-                        EventResult::Handled
-                    }
-                    crate::Scancode::ARROW_RIGHT => {
-                        let target = grapheme_after(&state.buffer, state.selection.cursor_index);
-                        state.move_cursor(target, event.modifiers.has_shift(), None);
-                        EventResult::Handled
-                    }
-                    crate::Scancode::HOME => {
-                        let line = state
-                            .buffer
-                            .line_index_for_character_index(state.selection.cursor_index);
-                        let start = state.buffer.line_range(line).start;
-                        state.move_cursor(start, event.modifiers.has_shift(), None);
-                        EventResult::Handled
-                    }
-                    crate::Scancode::END => {
-                        let line = state
-                            .buffer
-                            .line_index_for_character_index(state.selection.cursor_index);
-                        let end = state.buffer.line_range(line).end;
-                        state.move_cursor(end, event.modifiers.has_shift(), None);
-                        EventResult::Handled
-                    }
-                    crate::Scancode::RETURN | crate::Scancode::KEYPAD_ENTER => {
-                        let is_primary = event.modifiers.has_gui() || event.modifiers.has_ctrl();
-                        if key_vertical && !is_primary {
-                            if key_behavior.read_only {
-                                return EventResult::Handled;
-                            }
-                            let newline = indented_newline(
-                                &state.buffer.string_value(),
-                                state.selection.cursor_index,
-                                indentation,
-                                true,
-                            );
-                            insert_replacing_selection(&mut state, &newline);
-                            EventResult::Handled
-                        } else if let Some(submit) =
-                            owner.attachment::<Rc<dyn Fn()>>("__textfield_submit")
-                        {
-                            drop(state);
-                            submit();
-                            EventResult::Handled
-                        } else {
-                            EventResult::Ignored
-                        }
-                    }
-                    crate::Scancode::BACKSPACE | crate::Scancode::DELETE => {
-                        if key_behavior.read_only {
-                            return EventResult::Handled;
-                        }
-                        if state.selection_range().is_none() {
-                            let cursor = state.selection.cursor_index;
-                            if cursor > 0 {
-                                let start = grapheme_before(&state.buffer, cursor);
-                                let buffer = state.buffer.delete(start..cursor);
-                                state.buffer = buffer;
-                                state.selection.cursor_index = start;
-                                state.record_activity();
-                            }
-                        } else {
-                            delete_selection(&mut state);
-                        }
-                        EventResult::Handled
-                    }
-                    _ => EventResult::Ignored,
-                }
+                // Backspace and Delete coalesce with the neighbouring deletion;
+                // every other command is its own undo step.
+                let kind = if !primary
+                    && matches!(
+                        event.scancode,
+                        crate::Scancode::BACKSPACE | crate::Scancode::DELETE
+                    ) {
+                    TextEditKind::Deletion
+                } else {
+                    TextEditKind::Atomic
+                };
+                state.begin_edit(&key_binding.get(), kind);
+                let result = apply_key(
+                    &mut state,
+                    &owner,
+                    &key_field,
+                    event,
+                    indentation,
+                    primary,
+                );
+                state.end_edit();
+                result
             };
             let result = edit();
             if result == EventResult::Handled {
@@ -1219,17 +1728,19 @@ fn install_interaction(node: &Node, field: &TextField, state: Rc<RefCell<FieldSt
     );
 
     let wheel_node = node.downgrade();
+    let wheel_state = state.clone();
+    let wheel_field = field.snapshot();
     registry.set_wheel(
         node,
         InputHandlerRoute::text_input(),
         Rc::new(move |event: &MouseWheelEvent, _phase| {
-            let Some(_owner) = Node::upgrade(&wheel_node) else {
+            let Some(owner) = Node::upgrade(&wheel_node) else {
                 return EventResult::Ignored;
             };
             if !event.input.is_continuation()
                 && let (Some(mouse_x), Some(mouse_y)) = (event.mouse_x, event.mouse_y)
             {
-                let frame = _owner.absolute_frame();
+                let frame = owner.absolute_frame();
                 if mouse_x < frame.x
                     || mouse_x > frame.x + frame.width
                     || mouse_y < frame.y
@@ -1238,9 +1749,397 @@ fn install_interaction(node: &Node, field: &TextField, state: Rc<RefCell<FieldSt
                     return EventResult::Ignored;
                 }
             }
-            EventResult::Ignored
+            // A field consumes the wheel only while its rows overflow the
+            // frame — the same condition that caps a growing field. Anything
+            // shorter keeps bubbling to the enclosing scroll view.
+            refresh_scroll_metrics(&owner, &wheel_field, &wheel_state);
+            let mut state = wheel_state.borrow_mut();
+            if state.composition.is_active() {
+                return EventResult::Ignored;
+            }
+            let frame = owner.frame();
+            let (_, dy) = event.displacement(
+                MULTILINE_WHEEL_STEP,
+                frame.width,
+                frame.height.max(1.0),
+            );
+            // Wheel deltas report content movement; the viewport moves the
+            // other way, matching the scroll view's convention.
+            let delta = -dy;
+            if delta == 0.0 {
+                return EventResult::Ignored;
+            }
+            let max_y = state.scroll.max_y.max(0.0);
+            if max_y <= 0.0 {
+                return EventResult::Ignored;
+            }
+            let previous = state.scroll.offset_y;
+            state.scroll.offset_y = (state.scroll.offset_y + delta).clamp(0.0, max_y);
+            if state.scroll.offset_y == previous {
+                return EventResult::Ignored;
+            }
+            // The wheel moves the viewport, not the caret: the next paint must
+            // not snap the visible region back to the caret.
+            state.scroll.needs_caret_reveal = false;
+            let offset = Point::new(state.scroll.horizontal.offset, state.scroll.offset_y);
+            drop(state);
+            owner.set_content_offset(offset);
+            if let Some(session) = owner.first_resource::<TextCompletionSession>() {
+                session.dismiss();
+            }
+            owner.mark_render_dirty(cove_core::scene::InvalidationSource::style_set(
+                "textFieldWheel",
+            ));
+            EventResult::Handled
         }),
     );
+}
+
+/// Displayed-row geometry for caret commands that step by row instead of by
+/// logical line: soft-wrapped fields, Home/End affinity and page moves.
+struct NavigationContext {
+    document: TextDocumentLayout,
+    environment: TextEnvironment,
+    line_height: f32,
+    vertical_inset: f32,
+}
+
+/// Build the row geometry from the live buffer, so navigation sees the text as
+/// typed instead of the last painted pass.
+fn navigation_context(
+    node: &Node,
+    field: &TextField,
+    state: &FieldState,
+) -> Option<NavigationContext> {
+    let environment = TextEnvironmentHolder::current()?;
+    let theme = theme_for_node(node);
+    let token = SemanticFontRef::body().resolve(&theme);
+    let line_height = token.line_height;
+    let addons = field.addon_layouts(
+        &theme,
+        &environment,
+        &token.font,
+        line_height,
+        token.letter_spacing,
+        state.buffer.character_count(),
+    );
+    let width = field.available_text_width(&theme, node.frame().width, &addons);
+    let geometry = document_geometry(
+        &field.inputs(&theme),
+        token.font.clone(),
+        line_height,
+        token.letter_spacing,
+        environment.atlas_texture_id as u64,
+        if field.layout.axis == TextFieldAxis::Vertical && field.layout.wraps_lines {
+            width
+        } else {
+            f32::INFINITY
+        },
+        state.buffer.is_empty(),
+    );
+    Some(NavigationContext {
+        document: TextDocumentLayout::new(state.buffer.clone(), geometry),
+        environment,
+        line_height,
+        vertical_inset: field.vertical_inset(line_height),
+    })
+}
+
+/// Fill the scroll limits from the laid-out rows when no paint has run yet.
+///
+/// The wheel can arrive before the first draw of a freshly mounted field;
+/// without this the viewport claims zero content and swallows the gesture.
+fn refresh_scroll_metrics(node: &Node, field: &TextField, state: &Rc<RefCell<FieldState>>) {
+    if state.borrow().scroll.max_y > 0.0 {
+        return;
+    }
+    let context = {
+        let borrowed = state.borrow();
+        navigation_context(node, field, &borrowed)
+    };
+    let Some(context) = context else {
+        return;
+    };
+    let rows = context.document.index().row_count() as f32;
+    let visible = (node.frame().height - 2.0 * context.vertical_inset).max(context.line_height);
+    let content = rows * context.line_height;
+    let mut state = state.borrow_mut();
+    state.scroll.visible_height = visible;
+    state.scroll.content_height = content;
+    state.scroll.max_y = (content - visible).max(0.0);
+}
+
+/// Logical-line fallback for Home/End when no row geometry is available.
+fn logical_line_boundary(buffer: &TextBuffer, caret: usize, ending: bool, vertical: bool) -> usize {
+    if !vertical {
+        return if ending { buffer.character_count() } else { 0 };
+    }
+    let range = buffer.line_range(buffer.line_index_for_character_index(caret));
+    if ending { range.end } else { range.start }
+}
+
+/// Apply one command key to the editing state.
+///
+/// The caller has already opened an undo bracket and normalised the buffer, so
+/// every buffer mutation here is one step in the history.
+#[allow(
+    clippy::too_many_arguments,
+    reason = "one dispatch table mirrors the Swift key switch"
+)]
+fn apply_key(
+    state: &mut FieldState,
+    owner: &Node,
+    field: &TextField,
+    event: &cove_platform::KeyEvent,
+    indentation: Option<usize>,
+    primary: bool,
+) -> EventResult {
+    let shift = event.modifiers.has_shift();
+    let command = event.modifiers.has_gui();
+    let word = event.modifiers.has_alt() || (event.modifiers.has_ctrl() && !command);
+    let vertical = field.layout.axis == TextFieldAxis::Vertical;
+    let scancode = event.scancode;
+    let caret = state.selection.cursor_index;
+    let preferred_x = state.selection.preferred_caret_x();
+    let mut context = if vertical {
+        navigation_context(owner, field, state)
+    } else {
+        None
+    };
+
+    match scancode {
+        crate::Scancode::A if primary => {
+            state.selection.anchor = Some(0);
+            state.selection.cursor_index = state.buffer.character_count();
+            state.record_activity();
+            EventResult::Handled
+        }
+        crate::Scancode::C | crate::Scancode::X if primary => {
+            if !field.behavior.secure
+                && let Some((low, high)) = state.selection_range()
+            {
+                let text = state.buffer.substring(low..high);
+                cove_core::scene::ClipboardHolder::write(&text);
+                if scancode == crate::Scancode::X && !field.behavior.read_only {
+                    delete_selection(state);
+                }
+            }
+            EventResult::Handled
+        }
+        crate::Scancode::ARROW_LEFT | crate::Scancode::ARROW_RIGHT => {
+            let forward = scancode == crate::Scancode::ARROW_RIGHT;
+            let target = if command {
+                // Command-arrow spans one line, not the whole document:
+                // Command-Up/Down own the document bounds.
+                match context.as_mut() {
+                    Some(ctx) => {
+                        let document = &mut ctx.document;
+                        let environment = &ctx.environment;
+                        line_boundary(
+                            &state.buffer,
+                            caret,
+                            forward,
+                            vertical,
+                            field.layout.wraps_lines,
+                            Some(document),
+                            environment,
+                            state.selection.line_end_affinity,
+                        )
+                    }
+                    None => logical_line_boundary(&state.buffer, caret, forward, vertical),
+                }
+            } else if word {
+                if forward {
+                    word_boundary_after(&state.buffer, caret)
+                } else {
+                    word_boundary_before(&state.buffer, caret)
+                }
+            } else if forward {
+                grapheme_after(&state.buffer, caret)
+            } else {
+                grapheme_before(&state.buffer, caret)
+            };
+            state.move_cursor(target, shift, None);
+            EventResult::Handled
+        }
+        crate::Scancode::ARROW_UP | crate::Scancode::ARROW_DOWN => {
+            let delta = if scancode == crate::Scancode::ARROW_UP {
+                -1
+            } else {
+                1
+            };
+            if command {
+                let target = if delta < 0 {
+                    0
+                } else {
+                    state.buffer.character_count()
+                };
+                state.move_cursor(target, shift, None);
+                return EventResult::Handled;
+            }
+            let moved = match context.as_mut() {
+                Some(ctx) => {
+                    let document = &mut ctx.document;
+                    let environment = &ctx.environment;
+                    move_cursor_vertically(
+                        &state.buffer,
+                        caret,
+                        delta,
+                        preferred_x,
+                        state.selection.line_end_affinity,
+                        Some(document),
+                        Some(environment),
+                    )
+                }
+                None => move_cursor_vertically(
+                    &state.buffer,
+                    caret,
+                    delta,
+                    preferred_x,
+                    state.selection.line_end_affinity,
+                    None,
+                    None,
+                ),
+            };
+            state.move_cursor(
+                moved.target,
+                shift,
+                moved.preferred_caret_x.map(f32::from_bits),
+            );
+            state.selection.line_end_affinity = moved.line_end_affinity;
+            EventResult::Handled
+        }
+        crate::Scancode::PAGE_UP | crate::Scancode::PAGE_DOWN => {
+            let direction = if scancode == crate::Scancode::PAGE_UP {
+                -1
+            } else {
+                1
+            };
+            let frame_height = owner.frame().height;
+            let moved = match context.as_mut() {
+                Some(ctx) => {
+                    let line_height = ctx.line_height;
+                    let vertical_inset = ctx.vertical_inset;
+                    let document = &mut ctx.document;
+                    let environment = &ctx.environment;
+                    move_cursor_by_page(
+                        &state.buffer,
+                        caret,
+                        direction,
+                        frame_height,
+                        line_height,
+                        vertical_inset,
+                        preferred_x,
+                        Some(document),
+                        Some(environment),
+                    )
+                }
+                None => move_cursor_by_page(
+                    &state.buffer,
+                    caret,
+                    direction,
+                    frame_height,
+                    16.0,
+                    0.0,
+                    preferred_x,
+                    None,
+                    None,
+                ),
+            };
+            if let Some(moved) = moved {
+                state.move_cursor(
+                    moved.target,
+                    shift,
+                    moved.preferred_caret_x.map(f32::from_bits),
+                );
+                state.selection.line_end_affinity = moved.line_end_affinity;
+            }
+            EventResult::Handled
+        }
+        crate::Scancode::HOME | crate::Scancode::END => {
+            let ending = scancode == crate::Scancode::END;
+            let target = match context.as_mut() {
+                Some(ctx) => {
+                    let document = &mut ctx.document;
+                    let environment = &ctx.environment;
+                    line_boundary(
+                        &state.buffer,
+                        caret,
+                        ending,
+                        vertical,
+                        field.layout.wraps_lines,
+                        Some(document),
+                        environment,
+                        state.selection.line_end_affinity,
+                    )
+                }
+                None => logical_line_boundary(&state.buffer, caret, ending, vertical),
+            };
+            state.move_cursor(target, shift, None);
+            // A wrapped row keeps its displayed row for the next vertical move.
+            state.selection.line_end_affinity = ending && vertical;
+            EventResult::Handled
+        }
+        crate::Scancode::BACKSPACE | crate::Scancode::DELETE => {
+            if field.behavior.read_only {
+                return EventResult::Handled;
+            }
+            if state.selection_range().is_some() {
+                delete_selection(state);
+                return EventResult::Handled;
+            }
+            let forward = scancode == crate::Scancode::DELETE;
+            let (low, high) = if forward {
+                let end = if command {
+                    let line = state
+                        .buffer
+                        .line_index_for_character_index(caret);
+                    state.buffer.line_range(line).end
+                } else if word {
+                    word_boundary_after(&state.buffer, caret)
+                } else {
+                    grapheme_after(&state.buffer, caret)
+                };
+                (caret, end)
+            } else {
+                let start = if command {
+                    let line = state
+                        .buffer
+                        .line_index_for_character_index(caret);
+                    state.buffer.line_range(line).start
+                } else if word {
+                    word_boundary_before(&state.buffer, caret)
+                } else {
+                    grapheme_before(&state.buffer, caret)
+                };
+                (start, caret)
+            };
+            if high <= low {
+                return EventResult::Handled;
+            }
+            state.buffer = state.buffer.delete(low..high);
+            state.clear_composition();
+            state.selection.anchor = None;
+            state.selection.cursor_index = low;
+            state.selection.set_preferred_caret_x(None);
+            state.record_activity();
+            EventResult::Handled
+        }
+        crate::Scancode::RETURN | crate::Scancode::KEYPAD_ENTER => {
+            if !vertical || primary || field.behavior.read_only {
+                return EventResult::Handled;
+            }
+            let newline = indented_newline(
+                &state.buffer.string_value(),
+                state.selection.cursor_index,
+                indentation,
+                true,
+            );
+            insert_replacing_selection(state, &newline);
+            EventResult::Handled
+        }
+        _ => EventResult::Ignored,
+    }
 }
 
 /// Characters the caret steps by inspect at most this far around it, which covers
@@ -1371,33 +2270,6 @@ fn draw_minimap(
     list.pop_clip_rect();
 }
 
-fn insert_replacing_selection(state: &mut FieldState, incoming: &str) {
-    if incoming.is_empty() {
-        return;
-    }
-    let selection = state.selection_range();
-    let cursor = selection.map_or(state.selection.cursor_index, |(low, _)| low);
-    let removed = selection.map_or(0, |(low, high)| high - low);
-    state.buffer = state.buffer.replace(cursor..(cursor + removed), incoming);
-    state.clear_composition();
-    state.selection.cursor_index =
-        (cursor + incoming.chars().count()).min(state.buffer.character_count());
-    state.selection.anchor = None;
-    state.selection.set_preferred_caret_x(None);
-    state.record_activity();
-}
-
-fn delete_selection(state: &mut FieldState) -> bool {
-    let Some((low, high)) = state.selection_range() else {
-        return false;
-    };
-    state.buffer = state.buffer.delete(low..high);
-    state.selection.cursor_index = low;
-    state.selection.anchor = None;
-    state.record_activity();
-    true
-}
-
 /// Advance width of one space in `font`, used to align indent guides.
 fn space_width_for(font: &cove_core::Font, environment: &TextEnvironment) -> f32 {
     let shaped = environment.shape(" ", Some(font));
@@ -1448,12 +2320,20 @@ fn render(
     let token = SemanticFontRef::body().resolve(&theme);
     let line_height = token.line_height;
     let font = token.font.clone();
-    let inset = field.leading_inset(&theme);
-    let metrics = field.inputs(&theme);
     let mut state = state_handle.borrow_mut();
     state.last_draw_origin = origin;
     let current = field.text.get();
     state.normalize(&current);
+    let addons = field.addon_layouts(
+        &theme,
+        &environment,
+        &font,
+        line_height,
+        token.letter_spacing,
+        current.character_count(),
+    );
+    let inset = field.horizontal_inset(&theme);
+    let metrics = field.inputs(&theme);
 
     // Split borrows: `make_render_state` needs the draft mutably while the
     // selection and composition are read from the same struct.
@@ -1469,11 +2349,7 @@ fn render(
         &field.placeholder,
         is_focused,
     );
-    let available_width = (frame.width
-        - inset
-        - field.trailing_inset(&theme, !current.is_empty())
-        - field.minimap_reservation())
-    .max(1.0);
+    let available_width = field.available_text_width(&theme, frame.width, &addons);
     let is_vertical = field.layout.axis == TextFieldAxis::Vertical;
     let geometry = document_geometry(
         &metrics,
@@ -1492,13 +2368,19 @@ fn render(
     let vertical_inset = field.vertical_inset(line_height);
     state.scroll.visible_height = (frame.height - vertical_inset * 2.0).max(line_height);
     update_scroll(&mut state.scroll, &document, line_height);
+    // Mirror the viewport so hit testing, accessibility and tests observe the
+    // same scroll the glyphs were painted with.
+    node.set_content_offset(Point::new(
+        state.scroll.horizontal.offset,
+        state.scroll.offset_y,
+    ));
     let first_row =
         ((state.scroll.offset_y / line_height.max(1.0)).floor() as usize).saturating_sub(1);
     let row_count = ((state.scroll.visible_height / line_height.max(1.0)).ceil() as usize) + 3;
     let layout = document.visible_layout(first_row, row_count, &environment);
 
     let text_origin = Point::new(
-        origin.x + inset - state.scroll.horizontal.offset,
+        origin.x + inset + addons.leading() - state.scroll.horizontal.offset,
         origin.y + vertical_inset - state.scroll.offset_y,
     );
     let text_color = field
@@ -1510,12 +2392,9 @@ fn render(
         .decoration
         .placeholder_color
         .unwrap_or(theme.colors.on_surface_muted);
-    list.push_clip_rect(Rect::new(
-        origin.x + inset,
-        origin.y,
-        available_width,
-        frame.height,
-    ));
+    let clip_left = origin.x + inset + addons.leading();
+    let text_column_right = clip_left + available_width;
+    list.push_clip_rect(Rect::new(clip_left, origin.y, available_width, frame.height));
 
     // Indent guides sit under the glyphs so they never dim text.
     if is_vertical && field.code_editing.indentation_width.is_some() {
@@ -1564,6 +2443,45 @@ fn render(
         );
     }
 
+    // Inline prefix sits in the text column; the glyphs after it start at the
+    // shifted text origin so the caret and hit testing agree.
+    if let Some(prefix) = &addons.prefix
+        && !render_state.shows_placeholder
+    {
+        let _ = list.add_text(
+            prefix,
+            Point::new(clip_left, text_origin.y),
+            theme.colors.on_surface_muted,
+            environment.atlas_texture_id,
+            Some(&environment.atlas),
+            None,
+        );
+    }
+    if let Some(suffix) = &addons.suffix
+        && !render_state.shows_placeholder
+    {
+        let x = text_column_right - suffix.total_width;
+        let _ = list.add_text(
+            suffix,
+            Point::new(x, text_origin.y),
+            theme.colors.on_surface_muted,
+            environment.atlas_texture_id,
+            Some(&environment.atlas),
+            None,
+        );
+    }
+
+    // Per-glyph colouring: a code-editing lookup may recolour part of the text
+    // (keywords, literals, diagnostics) while the rest keeps the field colour.
+    let syntax = field
+        .code_editing
+        .syntax_color_at_utf8_offset
+        .as_ref()
+        .filter(|_| !render_state.shows_placeholder);
+    let colors = syntax.map(|lookup| {
+        let buffer = &render_state.buffer;
+        move |glyph: &cove_core::PositionedGlyph| lookup(buffer, glyph.cluster as usize)
+    });
     if let Ok(()) = list.add_text(
         &layout,
         text_origin,
@@ -1574,7 +2492,9 @@ fn render(
         },
         environment.atlas_texture_id,
         Some(&environment.atlas),
-        None,
+        colors
+            .as_ref()
+            .map(|resolve| resolve as &dyn Fn(&cove_core::PositionedGlyph) -> Option<Color>),
     ) {}
 
     // Caret: a one-pixel bar at the shaped caret position.
@@ -1609,6 +2529,32 @@ fn render(
     }
 
     list.pop_clip_rect();
+
+    // Trailing reservations, outermost first: `append` slab, word-limit
+    // counter, then the clear affordance. Each one was subtracted from the
+    // text column above, so painting here cannot overlap the glyphs.
+    let mut edge = origin.x + frame.width - field.minimap_reservation();
+    if let Some(append) = &addons.append {
+        let x = edge - field.horizontal_inset(&theme) - append.total_width;
+        paint_slab(list, append, x, origin.y, frame.height, &theme, &environment, placeholder_color);
+        edge = x - theme.spacing.sm;
+    }
+    if let Some(counter) = &addons.counter {
+        let x = edge - field.horizontal_inset(&theme) - counter.total_width;
+        let _ = list.add_text(
+            counter,
+            Point::new(x, origin.y + (frame.height - counter.total_height) * 0.5),
+            theme.colors.on_surface_muted,
+            environment.atlas_texture_id,
+            Some(&environment.atlas),
+            None,
+        );
+        edge = x - theme.spacing.xs;
+    }
+    if let Some(prepend) = &addons.prepend {
+        let x = origin.x + field.horizontal_inset(&theme);
+        paint_slab(list, prepend, x, origin.y, frame.height, &theme, &environment, placeholder_color);
+    }
     if let Some(resource) = &field.decoration.leading_icon {
         let image = crate::primitives::media::image::Image::resolve_resource(resource, 16.0, 16.0);
         image.retain(list);
@@ -1630,7 +2576,7 @@ fn render(
         && !field.behavior.read_only
         && !current.is_empty()
     {
-        let start = frame.width - field.horizontal_inset(&theme) - 20.0;
+        let start = edge - 20.0;
         node.set_attachment("__textfield_clear_hit", node.absolute_origin().x + start);
         let image = crate::primitives::media::image::Image::resolve_resource(
             &crate::primitives::media::ui_icon_catalog::action::x(),
@@ -1665,6 +2611,43 @@ fn render(
         line_height,
         text_color,
         &theme,
+    );
+}
+
+/// Paint one sourced slab (`prepend` / `append`) with its glyphs centred
+/// vertically in the field.
+#[allow(
+    clippy::too_many_arguments,
+    reason = "slab paint needs the measured run plus the field's chrome metrics"
+)]
+fn paint_slab(
+    list: &mut cove_core::DrawList,
+    layout: &cove_core::TextLayoutResult,
+    x: f32,
+    top: f32,
+    height: f32,
+    theme: &Theme,
+    environment: &TextEnvironment,
+    text_color: Color,
+) {
+    let padding = theme.spacing.xs;
+    let _ = list.add_rounded_rect(
+        Rect::new(
+            x,
+            top + 2.0,
+            layout.total_width + padding * 2.0,
+            (height - 4.0).max(0.0),
+        ),
+        theme.inputs.radius,
+        theme.colors.surface_variant,
+    );
+    let _ = list.add_text(
+        layout,
+        Point::new(x + padding, top + (height - layout.total_height) * 0.5),
+        text_color,
+        environment.atlas_texture_id,
+        Some(&environment.atlas),
+        None,
     );
 }
 
