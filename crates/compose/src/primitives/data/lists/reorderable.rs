@@ -31,6 +31,7 @@ use super::selection::{CollectionId, RowState};
 use crate::modifiers::interaction::{AccessibilityExt, HitTestingExt};
 use crate::modifiers::layout::{AbsolutePositionModifier, FlexExt, LayoutFrameExt};
 use crate::modifiers::style::{AppearanceExt, SemanticStyleViewExt};
+use crate::primitives::controls::adaptive::apply_touch_control_extent;
 use crate::primitives::interaction::edge_auto_scroll::EdgeAutoScroll;
 use crate::primitives::layout::virtualization::fixed_stack::visible_range;
 use crate::primitives::layout::{ScrollAxis, ScrollView, ScrollViewport, ScrollbarGutter};
@@ -404,9 +405,11 @@ where
         let mut layers = vec![column];
         if let Some(boundary) = session.visible_boundary() {
             let y = drop_indicator_y(boundary, count, row_stride, content_height);
+            // A spacer rather than `EmptyView`: an empty view materialises no
+            // node, so the rule would never be laid out or painted.
             layers.push(AnyView::new(
                 AnyView::new(
-                    AnyView::new(crate::EmptyView)
+                    AnyView::new(crate::Spacer::new(0.0))
                         .frame_height(2.0)
                         .semantic_background(crate::theme::SemanticColorRef::accent())
                         .corner_radius(1.0)
@@ -495,6 +498,20 @@ where
             ))
             .flex_with(1.0, 1.0, Some(0.0)),
         )
+    }
+
+    /// Swift keeps the drag, viewport and mount window in `@State`; declaring
+    /// them carries the values over when the parent rebuilds and repaints the
+    /// list when the viewport reports a new width or window.
+    fn dynamic_properties(&self) -> Vec<crate::DynamicField> {
+        let session = self.session.clone();
+        vec![
+            crate::DynamicField::state("dragging", &session.dragging),
+            crate::DynamicField::state("boundary", &session.boundary),
+            crate::DynamicField::state("retained", &session.retained),
+            crate::DynamicField::state("window", &session.window),
+            crate::DynamicField::state("width", &session.width),
+        ]
     }
 }
 
@@ -619,6 +636,9 @@ impl<Id: CollectionId> PrimitiveView for ReorderHandle<Id> {
         let count = self.count;
         let is_enabled = self.is_enabled;
 
+        // A touch surface reserves a finger-sized target on both axes, so the
+        // 44pt-wide grip also grows to 44pt tall.
+        apply_touch_control_extent(node, self.is_enabled);
         node.set_corner_radius(6.0);
         node.set_is_focusable(self.is_enabled);
         node.set_cursor(if self.is_enabled {

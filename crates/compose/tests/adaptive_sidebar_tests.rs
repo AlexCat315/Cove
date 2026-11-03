@@ -19,9 +19,9 @@
 //!   scope and pointer capture
 //! - AI discovery sees only available navigation and excludes the blocked page
 //!
-//! Rows retain identity between docked and rail layouts. Crossing the compact
-//! visibility boundary still remounts navigation; content state must survive.
-//! Discovery uses the same modal input predicate as event dispatch.
+//! Rows retain identity between docked and rail layouts. Content state must
+//! survive crossing the compact visibility boundary. Discovery uses the same
+//! modal input predicate as event dispatch.
 
 use crate::support;
 use cove_composition::Scope;
@@ -1022,11 +1022,13 @@ fn motion_and_lifecycle() {
         tick(1.0);
         scene.settle(10, 1.0);
         harness.open.set(true);
-        scene.settle(10, 1.0);
+        // Recompose without advancing the clock so the entry transition is
+        // still at its first frame.
+        scene.settle(2, 0.0);
         let panel = navigation(scene);
         assert!(
-            panel.absolute_frame().x == 0.0,
-            "GAP: Swift slides the drawer in from x = -panelWidth, so the first frame is off-screen; the Rust navigation has no slide transition and is at rest immediately ({:?})",
+            panel.absolute_frame().x < -0.5,
+            "the drawer slides in from off the leading edge, first frame {:?}",
             panel.absolute_frame()
         );
         tick(1.0);
@@ -1034,7 +1036,7 @@ fn motion_and_lifecycle() {
         assert_eq!(
             panel.absolute_frame().x,
             0.0,
-            "the panel rests at the leading edge"
+            "the panel reaches rest at the leading edge"
         );
         let row_before_exit = row(scene, 29);
         harness.open.set(false);
@@ -1044,18 +1046,26 @@ fn motion_and_lifecycle() {
             "a leaving panel stops accepting input immediately"
         );
         tick(0.05);
-        scene.settle(10, 1.0);
-        assert_eq!(
-            panel.absolute_frame().x,
-            0.0,
-            "GAP: Swift leaves the drawer sliding out at a negative x; with no transition the Rust panel never moves, so a reversal has nothing to retain"
+        // Recompose without advancing the clock so the exit is still part-way.
+        scene.settle(2, 0.0);
+        let leaving_x = panel.absolute_frame().x;
+        assert!(
+            leaving_x < 0.0 && leaving_x > -320.0,
+            "the departing drawer sits part-way off the leading edge, saw {leaving_x}"
         );
         harness.open.set(true);
+        scene.settle(2, 0.0);
+        assert!(
+            (panel.absolute_frame().x - leaving_x).abs() < 0.5,
+            "reopening mid-exit reverses in place, saw {:?} from {leaving_x}",
+            panel.absolute_frame()
+        );
+        tick(1.0);
         scene.settle(10, 1.0);
-        assert_ne!(
+        assert_eq!(
             id(&row(scene, 29)),
             id(&row_before_exit),
-            "reopening after the settled exit remounts the row"
+            "the reversal retains the row node"
         );
         harness.set_width(scene, 1280.0);
         assert_eq!(

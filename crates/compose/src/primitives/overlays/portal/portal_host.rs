@@ -27,14 +27,14 @@ use cove_core::scene::{
 use cove_core::{Point, Rect, Signal, Size};
 
 use super::portal_placement::{PortalPlacement, portal_window_bounds};
-use super::portal_registry::{PortalEntry, PortalStore, PortalStoreEnvironment, PortalStoreHolder};
+use super::portal_registry::{
+    PortalEntry, PortalOwnership, PortalStore, PortalStoreEnvironment, PortalStoreHolder,
+};
 
 /// Node attachment carrying the store this host bound its observer to.
 const BOUND_STORE: &str = "CoveUICompose.portalHost.store";
 /// Node attachment carrying the observer token so it can be released.
 const OBSERVER_TOKEN: &str = "CoveUICompose.portalHost.token";
-/// Node attachment marking a slot node as owning a portal entry.
-const ENTRY_OWNER: &str = "CoveUICompose.portalHost.entry";
 
 /// Renders the portal entries registered in the owning window's store.
 #[derive(Default)]
@@ -208,7 +208,7 @@ impl PrimitiveView for PortalEntrySlot {
             LayoutDebugAttachmentKey::LAYOUT_ROLE,
             "portal-entry".to_owned(),
         );
-        node.set_attachment(ENTRY_OWNER, self.entry.id.clone());
+        node.set_attachment(PortalOwnership::ENTRY_KEY, self.entry.id.clone());
         node.set_attachment(LayoutDebugAttachmentKey::DEBUG_NAME, self.entry.id.clone());
         node.set_attachment(
             WheelRoutingAttachmentKey::PRIORITY,

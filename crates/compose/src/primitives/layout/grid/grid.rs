@@ -394,6 +394,32 @@ impl Grid {
         self
     }
 }
+
+/// The grid's own tracks re-expressed through the shared columns contract, so
+/// the picker and the layout read one visibility type.
+fn shared_tracks(
+    tracks: &[ColumnVisibilityTrack],
+) -> Vec<crate::primitives::columns::ColumnVisibilityTrack> {
+    tracks
+        .iter()
+        .map(|track| {
+            crate::primitives::columns::ColumnVisibilityTrack::new(
+                track.id.clone(),
+                track.title.clone(),
+                match track.visibility {
+                    super::columns::ColumnVisibility::Required => {
+                        crate::primitives::columns::ColumnVisibility::Required
+                    }
+                    super::columns::ColumnVisibility::Automatic { priority } => {
+                        crate::primitives::columns::ColumnVisibility::Automatic { priority }
+                    }
+                },
+                track.width,
+            )
+        })
+        .collect()
+}
+
 impl View for Grid {
     fn body(&self, _cx: &Scope) -> AnyView {
         let layout = self.layout.clone();
@@ -401,25 +427,56 @@ impl View for Grid {
         let is_enabled = self.is_enabled;
         let overrides = self.column_visibility.clone();
         let local = self.local_visibility.clone();
-        let reader = crate::adaptive::ContainerSizeReader::new(move |_size: CoreSize| {
+        let reader = crate::adaptive::ContainerSizeReader::new(move |size: CoreSize| {
             let values = overrides
                 .as_ref()
                 .map(|state| state.get())
                 .unwrap_or_else(|| local.get());
             let mut algorithm = layout.clone();
-            algorithm.column_visibility = values;
+            algorithm.column_visibility = values.clone();
             let grid = LayoutContainer::<GridLayout, AnyView>::with_erased_content(
                 algorithm,
                 content.clone(),
             );
             let scroll = crate::ScrollView::new(crate::ScrollAxis::Horizontal, AnyView::new(grid));
+            let spacing = GridTrackResolver::finite_nonnegative(layout.column_spacing);
+            // Named columns publish a picker above the grid, so hiding a
+            // column is reachable without the host wiring its own menu.
+            let picker = GridNamedColumns::tracks(&layout.columns)
+                .ok()
+                .flatten()
+                .map(|tracks| {
+                    let shared = shared_tracks(&tracks);
+                    let plan = crate::primitives::columns::ColumnVisibilityPlan::resolve(
+                        &shared,
+                        &values,
+                        size.width,
+                        spacing,
+                        &Default::default(),
+                    );
+                    let picker = crate::primitives::columns::ColumnVisibilityPicker::new(
+                        shared,
+                        plan,
+                        overrides
+                            .as_ref()
+                            .map(|state| state.binding())
+                            .unwrap_or_else(|| local.binding()),
+                        is_enabled,
+                    );
+                    AnyView::new(picker)
+                });
+            let mut children: Vec<AnyView> = Vec::new();
+            if let Some(picker) = picker {
+                children.push(picker);
+            }
+            children.push(AnyView::new(scroll));
             let body = AnyView::new(BoxView::new(
                 cove_core::scene::FlexDirection::Column,
                 cove_core::scene::Align::Stretch,
                 cove_core::scene::Justify::FlexStart,
                 cove_core::scene::Wrap::NoWrap,
                 0.0,
-                AnyView::new(scroll),
+                AnyView::new(crate::TupleView::new(children)),
             ));
             AnyView::new(GridInteractionHost {
                 is_enabled,

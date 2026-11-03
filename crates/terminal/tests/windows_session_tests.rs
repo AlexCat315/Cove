@@ -11,12 +11,6 @@
 //! `TerminalCommand`, `TerminalSession` and `SessionStatus` are still compiled
 //! and type-checked on every platform by `cargo test --no-run`.
 //!
-//! Named difference (`GAP:`): the Swift helper ran on a `@MainActor` and applied
-//! output through `DispatchQueue.main.async`. The Rust session hands output to
-//! its host through `cove_core::scene::LocalInvalidationHandle`, which queues
-//! invalidations for the UI thread rather than running them, so the helper calls
-//! `TerminalSession::pump()` in its wait loop exactly as a host's invalidation
-//! wake does.
 
 use cove_terminal::process::TerminalCommand;
 use cove_terminal::session::{SessionStatus, TerminalSession};

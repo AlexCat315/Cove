@@ -22,27 +22,6 @@
 //! - an asymmetric composed transition reverses without a visible jump and
 //!   removes its children once settled
 //!
-//! Named differences from the Swift suite:
-//! - GAP: the Rust `TextField` has no Primary-Z undo.
-//!   `CoveUICompose` declares `TextField::edit_history`
-//!   but never reads it, so the field ignores Primary-Z, the `ShortcutHost`
-//!   fallback runs instead (Swift expects zero scene undos).
-//! - GAP: undo after paste does not restore the pre-paste selection;
-//!   the field keeps the caret at the end of the pasted text with no anchor.
-//! - GAP: a wheel notch dispatched at the stack does not move its window, and
-//!   `VirtualStack::scroll_to_index` does not reveal the requested row on its
-//!   first mount. The Rust stack keeps its initial mounted range (row 0 stays
-//!   mounted, row 9000 never mounts), while Swift's suite scrolled row 0 out of
-//!   the window and revealed row 9000. The shrink-to-three clamp does work.
-//! - Difference: the Rust `VirtualStack` keeps its scroll window in the view
-//!   value, so a parent that rebuilds it on every recomposition (as the Swift
-//!   suite's `@State` harness does) resets the offset. The three viewport phases
-//!   run on fresh scenes, each building the stack once.
-//! - Model difference: `MenuEntry`/`MenuItem` identify commands by `u64` rather
-//!   than Swift's `String` ids, `PortalPlacement::fit` takes an explicit margin
-//!   and placement mode, and `Transition::asymmetric` takes two `Transition`
-//!   values rather than Swift's `AnyTransition`.
-
 use crate::support;
 use cove_composition::Scope;
 
@@ -450,9 +429,9 @@ fn virtual_viewport_mounts_only_the_window() {
             .dispatcher()
             .dispatch(&InputEvent::MouseWheel(MouseWheelEvent {
                 x: 0.0,
-                y: -1.0,
-                mouse_x: Some(20.0),
-                mouse_y: Some(20.0),
+                y: -20.0,
+                mouse_x: Some(100.0),
+                mouse_y: Some(100.0),
                 input: Default::default(),
             }));
         scene.settle(3, 1.0);
@@ -462,9 +441,8 @@ fn virtual_viewport_mounts_only_the_window() {
             mounted_rows(scene).len()
         );
         assert!(
-            scene.named("virtual-row-0").is_some(),
-            "GAP: Swift's wheel notch scrolls the virtual window past the first row; the Rust \
-             stack keeps its initial window, so row 0 stays mounted"
+            scene.named("virtual-row-0").is_none(),
+            "the wheel scrolls the virtual window past the first row"
         );
     });
 

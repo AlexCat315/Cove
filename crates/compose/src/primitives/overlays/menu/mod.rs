@@ -12,6 +12,7 @@ pub use menu::{
 pub use menu_descriptor::{MenuDescriptor, MenuItemDescriptor};
 pub mod native_menu_bridge;
 pub mod touch_menu;
+pub use menu_item_row::minimum_row_height;
 pub use menu_level_host::PANEL_INSET;
 pub use menu_navigation::{
     MenuHoverIntent, MenuNavigationState, MenuRowEvents, MenuRowPresentation, MenuSession,

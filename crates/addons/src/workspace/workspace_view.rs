@@ -29,6 +29,7 @@ use super::view::{
     renderable_layout, visible_chrome_rail_slots, visible_groups,
 };
 use cove_composition::Scope;
+use cove_composition::LayoutDebugExt;
 use cove_composition::{
     AnyView, EmptyView, LayoutDebugAttachmentKey, PrimitiveView, View, ViewExt, impl_primitive_view,
 };
@@ -71,6 +72,7 @@ pub type WorkspaceContent = Rc<dyn Fn(WorkspacePanelID) -> AnyView>;
 /// The maximized presentation short-circuits the whole shell, the compact
 /// presentation replaces it below the expanded width class, and the docked shell
 /// otherwise renders the four regions plus rails, dividers and floating windows.
+#[derive(Clone)]
 pub struct WorkspaceView {
     pub controller: Rc<RefCell<WorkspaceController>>,
     pub content: WorkspaceContent,
@@ -118,11 +120,10 @@ impl View for WorkspaceView {
             return self.maximized(&panel_id, &document);
         }
 
-        let themed = AnyView::new(WorkspaceThemeProvider {
-            theme: WorkspaceTheme::default(),
-            content: AnyView::new(self.surface(&document)),
-        });
-        erased(themed.modifier(WorkspaceDragOverlayModifier))
+        let view = self.clone();
+        AnyView::new(WorkspaceMetricsReader { build: Rc::new(move |metrics| {
+            erased(view.surface(&document, metrics).modifier(WorkspaceDragOverlayModifier))
+        }) })
     }
 }
 
@@ -166,7 +167,7 @@ impl WorkspaceView {
     }
 
     /// `SurfaceReader` branch: `compact || width class != expanded`.
-    fn surface(&self, document: &WorkspaceDocument) -> AnyView {
+    fn surface(&self, document: &WorkspaceDocument, metrics: WorkspaceLayoutMetrics) -> AnyView {
         let compact = self.compact;
         let document = document.clone();
         let controller = self.controller.clone();
@@ -197,7 +198,7 @@ impl WorkspaceView {
                                 document: document.clone(),
                                 controller: controller.clone(),
                                 content: content.clone(),
-                                metrics: WorkspaceLayoutMetrics::default(),
+                                metrics,
                             })
                             .child(WorkspaceFloatingLayer {
                                 document: document.clone(),
@@ -230,8 +231,8 @@ impl View for WorkspaceSurfaceReader {
         let build = self.build.clone();
         // The workspace fills its container, so the reader must not hug its content.
         erased(
-            AnyView::new(cove_composition::adaptive::ContainerSizeReader::new(
-                move |size: cove_core::Size| build(size.width),
+            AnyView::new(cove_composition::adaptive::SurfaceReader::new(
+                move |surface| build(surface.viewport.width),
             ))
             .modifier(WorkspaceFillModifier),
         )
@@ -239,23 +240,6 @@ impl View for WorkspaceSurfaceReader {
 }
 
 // MARK: - Modifiers
-
-/// `ThemeReader` around a workspace subtree: provides [`WorkspaceTheme`] to every
-/// descendant.
-struct WorkspaceThemeProvider {
-    theme: WorkspaceTheme,
-    content: AnyView,
-}
-
-impl View for WorkspaceThemeProvider {
-    fn body(&self, _cx: &Scope) -> AnyView {
-        erased(
-            self.content
-                .clone()
-                .composition_local(super::theme::WorkspaceThemeEnvironment::key(), self.theme),
-        )
-    }
-}
 
 struct WorkspaceFillModifier;
 
@@ -399,18 +383,10 @@ impl cove_composition::ViewModifier for WorkspaceResizeGeometryModifier {
 /// `WorkspaceExtentObserver`: reports the measured extent so a region can
 /// resolve splits against its real allocation. Installed once per node; the
 /// hook chain is preserved so repeated recompositions never stack callbacks.
-struct WorkspaceExtent {
-    extent: cove_core::State<f32>,
-}
+struct WorkspaceExtent;
 
 impl WorkspaceExtent {
-    fn new() -> Self {
-        Self {
-            extent: cove_core::State::new(0.0),
-        }
-    }
-
-    fn measure(horizontal: bool, extent: &cove_core::State<f32>, node: &Node) {
+    fn measure(horizontal: bool, extent: &cove_core::Signal<f32>, node: &Node) {
         let frame = node.frame();
         let value = if horizontal {
             frame.width
@@ -427,7 +403,7 @@ impl WorkspaceExtent {
 /// that value.
 struct WorkspaceExtentBody {
     horizontal: bool,
-    extent: cove_core::State<f32>,
+    extent: cove_core::Signal<f32>,
     build: Rc<dyn Fn(f32) -> AnyView>,
 }
 
@@ -440,13 +416,9 @@ impl PrimitiveView for WorkspaceExtentBody {
 
     fn update_node(&self, node: &Node) {
         node.set_clips_to_bounds(false);
-        let previous = node.layout_did_update();
         let extent = self.extent.clone();
         let horizontal = self.horizontal;
         node.set_layout_did_update(Some(Rc::new(move |node| {
-            if let Some(previous) = &previous {
-                previous(node);
-            }
             WorkspaceExtent::measure(horizontal, &extent, node);
         })));
     }
@@ -491,7 +463,7 @@ struct WorkspaceShell {
 
 impl View for WorkspaceShell {
     fn body(&self, _cx: &Scope) -> AnyView {
-        let extent = WorkspaceExtent::new();
+        let extent = _cx.state(|| 0.0_f32);
         let document = self.document.clone();
         let controller = self.controller.clone();
         let content = self.content.clone();
@@ -499,7 +471,7 @@ impl View for WorkspaceShell {
         erased(
             AnyView::new(WorkspaceExtentBody {
                 horizontal: false,
-                extent: extent.extent.clone(),
+                extent: extent.clone(),
                 build: Rc::new(move |height| {
                     build_shell(
                         document.clone(),
@@ -668,7 +640,7 @@ struct WorkspaceMainRow {
 
 impl View for WorkspaceMainRow {
     fn body(&self, _cx: &Scope) -> AnyView {
-        let extent = WorkspaceExtent::new();
+        let extent = _cx.state(|| 0.0_f32);
         let document = self.document.clone();
         let controller = self.controller.clone();
         let content = self.content.clone();
@@ -676,7 +648,7 @@ impl View for WorkspaceMainRow {
         erased(
             AnyView::new(WorkspaceExtentBody {
                 horizontal: true,
-                extent: extent.extent.clone(),
+                extent: extent.clone(),
                 build: Rc::new(move |width| {
                     build_main_row(
                         document.clone(),
@@ -894,7 +866,7 @@ struct WorkspaceCenterColumn {
 
 impl View for WorkspaceCenterColumn {
     fn body(&self, _cx: &Scope) -> AnyView {
-        let extent = WorkspaceExtent::new();
+        let extent = _cx.state(|| 0.0_f32);
         let document = self.document.clone();
         let controller = self.controller.clone();
         let content = self.content.clone();
@@ -902,7 +874,7 @@ impl View for WorkspaceCenterColumn {
         erased(
             AnyView::new(WorkspaceExtentBody {
                 horizontal: false,
-                extent: extent.extent.clone(),
+                extent: extent.clone(),
                 build: Rc::new(move |height| {
                     build_center_column(
                         document.clone(),
@@ -1746,7 +1718,8 @@ impl View for WorkspaceTabGroupView {
             ))
             .flex_with(1.0, 1.0, Some(0.0))
             .frame_min_width(0.0)
-            .clipped();
+            .clipped()
+            .debug_name(&format!("workspace-panel-scroll-{}", active_id.raw_value()));
             let title = self
                 .document
                 .panels
@@ -1759,6 +1732,7 @@ impl View for WorkspaceTabGroupView {
                 AnyView::new(WorkspaceBox::column().child(scrolled).boxed())
                     .flex_with(1.0, 1.0, Some(0.0))
                     .frame_min_width(0.0)
+                    .clipped()
                     .modifier(WorkspaceSemanticsModifier(semantics))
                     .modifier(WorkspaceRoleModifier::new(
                         "workspace-panel-content",
@@ -1826,24 +1800,31 @@ impl View for WorkspaceTabBar {
                 .boxed(),
         )
         .modifier(WorkspaceSemanticsModifier(list));
-        let scroller = AnyView::new(ScrollView::horizontal(row)).flex_with(1.0, 1.0, Some(0.0));
-        erased(
+        let scroller = AnyView::new(ScrollView::horizontal(row).debug_name(&format!("workspace-tabs-scroll-{}", self.group.id.raw_value()))).flex_with(1.0, 1.0, Some(0.0));
+        let group = self.group.clone();
+        let document = self.document.clone();
+        let controller = self.controller.clone();
+        erased(WorkspaceMetricsReader { build: Rc::new(move |metrics| {
+            let scroller = scroller.clone();
+        let content = erased(
             AnyView::new(
                 WorkspaceBox::row()
                     .align(Align::Center)
                     .child(scroller)
                     .child(WorkspaceTabOverflow {
-                        group: self.group.clone(),
-                        document: self.document.clone(),
-                        controller: self.controller.clone(),
+                        group: group.clone(),
+                        document: document.clone(),
+                        controller: controller.clone(),
                         presented: cove_core::State::new(false),
                     })
                     .boxed(),
             )
             .modifier(WorkspaceTabBarModifier {
-                metrics: WorkspaceLayoutMetrics::default(),
+                metrics: metrics,
             }),
-        )
+        );
+            content
+        }) })
     }
 }
 
@@ -2047,6 +2028,7 @@ impl PrimitiveView for WorkspaceTabButton {
             .map(|index| format!("Tab {} of {count}", index + 1))
             .unwrap_or_default();
         semantics.identifier = self.panel_id.raw_value().to_string();
+        node.set_is_tab_stop(self.is_active);
         semantics.state.is_selected = self.is_active;
         semantics.combines_children = true;
         node.set_accessibility(Some(semantics));
@@ -2217,6 +2199,8 @@ impl PrimitiveView for WorkspaceTabButton {
         let activate_controller = self.controller.clone();
         let activate_group = self.group_id.clone();
         let activate_panel = self.panel_id.clone();
+        let key_node = node.downgrade();
+        let key_panels = self.document.groups.get(&self.group_id).map(|g| g.panels.clone()).unwrap_or_default();
         registry.set_key(
             node,
             InputHandlerRoute::new(
@@ -2233,6 +2217,36 @@ impl PrimitiveView for WorkspaceTabButton {
                     || event.modifiers.has_alt()
                 {
                     return cove_core::scene::EventResult::Ignored;
+                }
+                if let Some(owner) = Node::upgrade(&key_node) {
+                    let mut layout = owner.layout_node();
+                    let mut rtl = false;
+                    while let Some(current) = layout {
+                        if current.direction() != cove_core::scene::Direction::Inherit { rtl = current.direction() == cove_core::scene::Direction::Rtl; break; }
+                        layout = current.parent();
+                    }
+                    if let Some(command) = workspace_tab_command(event.scancode, rtl) {
+                        let index = key_panels.iter().position(|id| id == &activate_panel).unwrap_or(0);
+                        let next = match command {
+                            WorkspaceTabCommand::Previous => index.saturating_sub(1),
+                            WorkspaceTabCommand::Next => (index + 1).min(key_panels.len().saturating_sub(1)),
+                            WorkspaceTabCommand::First => 0,
+                            WorkspaceTabCommand::Last => key_panels.len().saturating_sub(1),
+                        };
+                        if let Some(panel) = key_panels.get(next) {
+                            activate_controller.borrow_mut().dispatch(WorkspaceCommand::SetActivePanel { group_id: activate_group.clone(), panel_id: panel.clone() });
+                            let mut root = owner.clone();
+                            while let Some(parent) = root.parent() {
+                                root = parent;
+                                if root.accessibility().is_some_and(|s| s.role == AccessibilityRole::TabList) { break; }
+                            }
+                            if let Some(target) = super::drag::first_node(&root, &format!("workspace-tab-{}", panel.raw_value())) {
+                                if let Some(chain) = FocusChainHolder::current() { chain.focus(Some(&target), true); }
+                                cove_ui_compose::primitives::layout::ScrollReveal::reveal(&target, false);
+                            }
+                        }
+                        return cove_core::scene::EventResult::Handled;
+                    }
                 }
                 if event.scancode == cove_composition::Scancode::RETURN
                     || event.scancode == cove_composition::Scancode::SPACE
@@ -2365,7 +2379,8 @@ impl View for WorkspaceRailButton {
             });
             controller.dispatch(WorkspaceCommand::Expand(group_id.clone()));
         })
-        .tooltip(self.title.clone());
+        .tooltip(self.title.clone())
+        .debug_name(&format!("workspace-restore-{}", self.panel_id.raw_value()));
         let mut semantics = AccessibilitySemantics::new(AccessibilityRole::Button);
         semantics.label = self.title.clone();
         erased(
@@ -2893,13 +2908,14 @@ fn install_floating_drag(
                     motion_node.set_attachment(
                         FLOATING_DRAG_KEY,
                         TabPressState {
-                            down_x: state.down_x,
-                            down_y: state.down_y,
+                            down_x: event.x,
+                            down_y: event.y,
                             did_drag: true,
                         },
                     );
                 }
             }
+            motion_node.set_attachment(FLOATING_DRAG_KEY, TabPressState { down_x: event.x, down_y: event.y, did_drag: true });
             let next = super::sizing::WorkspaceRect::new(
                 motion_window.frame.x + event.x - state.down_x,
                 motion_window.frame.y + event.y - state.down_y,
@@ -3112,4 +3128,28 @@ mod tests {
         let view = WorkspaceView::new(controller, Rc::new(|_| AnyView::new(EmptyView)));
         let _ = view.body(&Scope::detached());
     }
+}
+
+struct WorkspaceMetricsReader { build: Rc<dyn Fn(WorkspaceLayoutMetrics) -> AnyView> }
+impl PrimitiveView for WorkspaceMetricsReader {
+    fn make_node(&self) -> Node { let n = Node::new(); n.set_is_hit_testable(false); n }
+    fn make_layout_node(&self) -> Option<LayoutNode> { None }
+    fn update_node(&self, _node: &Node) {}
+    fn children(&self, node: &Node) -> Vec<AnyView> {
+        vec![(self.build)(WorkspaceLayoutMetrics::new(&super::theme::resolve_workspace_theme(node), cove_ui_compose::theme::node_text_scaler(node).scale(1.0)))]
+    }
+}
+impl_primitive_view!(WorkspaceMetricsReader);
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum WorkspaceTabCommand { Previous, Next, First, Last }
+pub fn workspace_tab_command(scancode: u32, right_to_left: bool) -> Option<WorkspaceTabCommand> {
+    use cove_composition::Scancode;
+    Some(match scancode {
+        Scancode::ARROW_LEFT => if right_to_left { WorkspaceTabCommand::Next } else { WorkspaceTabCommand::Previous },
+        Scancode::ARROW_RIGHT => if right_to_left { WorkspaceTabCommand::Previous } else { WorkspaceTabCommand::Next },
+        Scancode::HOME => WorkspaceTabCommand::First,
+        Scancode::END => WorkspaceTabCommand::Last,
+        _ => return None,
+    })
 }

@@ -62,3 +62,5 @@ fn title() -> impl View {
 ```
 
 本次为破坏性整理：删除 `RichText`，不提供兼容别名。原 `RichText::new(runs)` 改为 `Text::runs(runs)`，原 `RichTextRun` / `RichTextTraits` 改为 `TextRun` / `TextTraits`。`with_alignment` / `with_color` 改为 `alignment` / `color`。
+
+CJK 回退按字体家族匹配当前字重和斜体；同一段内容切换粗体时重新选择对应字面。

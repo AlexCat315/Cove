@@ -81,7 +81,10 @@ impl LayoutNode {
         if let Some(state) = &owner.data().custom {
             state.invalidate();
         }
-        let size = engine::layout_probe(self, width, height, direction, engine::Probe::Measure);
+        let mut size = engine::layout_probe(self, width, height, direction, engine::Probe::Measure);
+        if width.is_some_and(|slot| size.width > slot + 0.01) {
+            size = engine::layout_probe(self, width, height, direction, engine::Probe::Place);
+        }
         self.0
             .engine
             .store_measurement(width, height, direction, size);

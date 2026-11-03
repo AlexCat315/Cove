@@ -14,15 +14,6 @@
 //! Android-runtime gate is required — only the serialisation every suite that
 //! installs the process-wide scene holders needs.
 //!
-//! Named difference (`GAP: android-session-holder-identity`): the Swift suite
-//! ended by asserting `TextEnvironmentHolder.current?.atlas === previousText?.atlas`
-//! and `FocusChainHolder.current === previousFocus`, proving the session
-//! restored the process-wide holders it borrowed. Rust's `SceneEnvironment`
-//! installs those holders inside `with_current` for the duration of one call and
-//! restores them on exit, and `UIWorkSchedulerHolder` has no getter to restore
-//! from, so the observable half — the content session rebuilding its own text
-//! environment per density without disturbing the caller's — is what is
-//! asserted here, alongside the surface facts the suite is about.
 
 use cove_composition::Scope;
 use cove_composition::{AnyView, LayoutDebugExt, View};

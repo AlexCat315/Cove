@@ -15,13 +15,11 @@
 //!   the overflowing field until it is widened
 //!
 //! Named differences from the Swift suite:
-//! - The Rust `Grid` has no column-visibility picker. Swift's
-//!   `ColumnVisibilityPicker` mounts a "Column visibility" trigger and an
-//!   "Automatic columns" menu; the Rust `Grid` body is only the interaction
-//!   host, the horizontal scroll view and the layout. `menu` therefore asserts
-//!   the shared `ColumnVisibilityPickerModel` contract (which the Rust tables
-//!   do consume) and pins the missing trigger; overrides are driven through the
-//!   `Rc<State<HashMap<String, bool>>>` binding everywhere else.
+//! - `Grid` mounts the shared `ColumnVisibilityPicker` above its scroll view,
+//!   so a "Column visibility" trigger and its menu are present. Menu rows are
+//!   the shared menu's height rather than Swift's `MenuRowMetrics` override,
+//!   and the trigger also carries the visible-column summary Swift keeps
+//!   beside it.
 //! - Swift's `UIDiagnostics`/agent toolbox lives in crates `cove-ui-compose`
 //!   does not depend on. `ai_queries` runs the same `query_ui_nodes` filters
 //!   over the node tree: role/label plus `accepts_subtree_input`.
@@ -387,13 +385,11 @@ fn matrix() {
         let quantity = target(scene, "Quantity one 0");
         let notes = target(scene, "Notes draft");
 
+        let picker = labelled(scene, "Column visibility");
         assert!(
-            scene
-                .first(|node| node
-                    .accessibility()
-                    .is_some_and(|semantics| semantics.label == "Column visibility"))
-                .is_none(),
-            "GAP: Swift mounts a 44pt \"Column visibility\" picker above the grid; the Rust Grid mounts none"
+            picker.frame().width >= 44.0 && picker.frame().height >= 44.0,
+            "the Column visibility picker is at least 44pt: {:?}",
+            picker.frame()
         );
 
         let inputs = [
@@ -616,13 +612,19 @@ fn menu() {
     InteractiveScene::run(720.0, GRID_HEIGHT, |scene| {
         let harness = Harness::new(true, false, None);
         scene.install(harness.clone());
+        let picker = target(scene, "Column visibility");
+        scene.click(&picker, 1);
+        let name = scene
+            .first(|node| {
+                node.accessibility().is_some_and(|semantics| {
+                    semantics.label == "Name" && semantics.role == AccessibilityRole::Button
+                })
+            })
+            .expect("the menu lists Name");
+        let semantics = name.accessibility().expect("Name carries semantics");
         assert!(
-            scene
-                .first(|node| node
-                    .accessibility()
-                    .is_some_and(|semantics| semantics.label == "Column visibility"))
-                .is_none(),
-            "GAP: the Rust Grid mounts no Column visibility trigger"
+            !semantics.state.is_enabled && semantics.state.is_selected,
+            "the required and shown Name is disabled and selected"
         );
 
         harness.width.set(390.0);
@@ -757,30 +759,29 @@ fn ai_queries() {
 
 #[test]
 fn local_session() {
-    // The picker that would write the grid's local visibility does not exist in
-    // Rust, so no choice can be made and the local map stays empty.
     InteractiveScene::run(390.0, GRID_HEIGHT, |scene| {
         let harness = Harness::new(false, false, None);
         scene.install(harness.clone());
         resize(scene, &harness, 390.0);
         assert!(
-            scene
-                .first(|node| node
-                    .accessibility()
-                    .is_some_and(|semantics| semantics.label == "Column visibility"))
-                .is_none(),
-            "GAP: an uncontrolled grid mounts no picker, so it has no local choices"
-        );
-        assert!(
             !visible_to_input(scene, "Notes draft"),
-            "GAP: the empty local map leaves Notes on the automatic 390pt plan"
+            "the automatic 390pt plan hides Notes"
+        );
+
+        // With no binding the picker writes this mount's own visibility, so the
+        // choice lives as long as the mounted grid and nowhere else.
+        scene.click(&target(scene, "Column visibility"), 1);
+        scene.click(&labelled(scene, "Notes"), 1);
+        assert!(
+            visible_to_input(scene, "Notes draft"),
+            "selecting Notes reveals its draft"
         );
 
         scene.graph.install(EmptyView, Default::default());
         scene.install(harness.clone());
         assert!(
             !visible_to_input(scene, "Notes draft"),
-            "remounting keeps the automatic plan"
+            "remounting resets the local choices to the automatic plan"
         );
     });
 }

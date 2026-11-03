@@ -8,16 +8,6 @@
 //! - missing executables fail before forking and say so on screen
 //! - user input returns the viewport to the live screen
 //!
-//! Named difference (`GAP:`): the Swift suite ran the session on a `@MainActor`
-//! and applied output through `DispatchQueue.main.async`, so its `screen(_:)`
-//! helper read a frame the main queue had already drained. The Rust session
-//! hands output to its host through
-//! `cove_core::scene::LocalInvalidationHandle`, which queues invalidations for
-//! the UI thread instead of running them. The tests below therefore call
-//! `TerminalSession::pump()` themselves inside the wait loop, which is exactly
-//! what a host's invalidation wake does (`Session::pump` on the UI thread). The
-//! observable contract — output applied on the owning thread, `status` moving to
-//! `Exited(code)`, events delivered to `on_event` — is unchanged.
 
 #![cfg(unix)]
 

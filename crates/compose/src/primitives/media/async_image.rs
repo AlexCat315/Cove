@@ -448,7 +448,8 @@ impl PrimitiveView for AsyncImageHost {
     }
 
     fn children(&self, _node: &Node) -> Vec<AnyView> {
-        vec![self.content.clone()]
+        use crate::modifiers::layout::LayoutFrameExt;
+        vec![AnyView::new(self.content.clone().frame_size(self.width, self.height))]
     }
 }
 

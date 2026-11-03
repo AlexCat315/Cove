@@ -252,15 +252,13 @@ fn button_group_wraps_segments_instead_of_shrinking_them() {
     });
 }
 
-// GAP: Swift tags the axis chips as static text with an "X"/"Y"/"Z" label; the
-// Rust `Vec3Field` renders the prefix as a plain `Text` and its inputs expose a
-// `TextField` role with an empty label, so the axes are found by role.
 fn axis_fields(scene: &InteractiveScene) -> Vec<Node> {
     let mut fields: Vec<Node> = scene.all(|node| {
         node.accessibility()
-            .is_some_and(|semantics| semantics.role == AccessibilityRole::TextField)
+            .is_some_and(|semantics| semantics.role == AccessibilityRole::StaticText
+                && ["X", "Y", "Z"].contains(&semantics.label.as_str()))
     });
-    fields.sort_by_key(|node| node.absolute_frame().x.round() as i64);
+    fields.sort_by_key(|node| node.accessibility().map(|s| s.label));
     fields
 }
 
@@ -283,18 +281,14 @@ fn vec3_field_never_leaves_x_y_over_z_when_a_row_cannot_keep_the_axis_width() {
     InteractiveScene::run(220.0, 200.0, |scene| {
         scene.install(field(220.0));
         let axes = axis_fields(scene);
-        assert_eq!(axes.len(), 3, "every axis mounts an input");
-        // GAP: Swift stacks X, Y, Z in order on a 220pt container. The Rust
-        // wrapping row keeps X and Z together on the first line and pushes only
-        // Y onto the second, so the reading order becomes X / Y / Z vertically
-        // but Z is not the wrapped item.
+        assert_eq!(axes.len(), 3, "every axis mounts its labelled chip");
         assert!(
             axes[1].absolute_frame().y >= axes[0].absolute_frame().max_y(),
             "one axis drops below the first when the row cannot hold three"
         );
         assert!(
-            (axes[2].absolute_frame().y - axes[0].absolute_frame().y).abs() < 0.5,
-            "GAP: Swift keeps Z on its own row; Rust keeps Z beside X (y {} and {})",
+            axes[2].absolute_frame().y >= axes[1].absolute_frame().max_y(),
+            "the Z axis stacks below Y at narrow widths (y {} and {})",
             axes[2].absolute_frame().y,
             axes[0].absolute_frame().y
         );
@@ -303,7 +297,7 @@ fn vec3_field_never_leaves_x_y_over_z_when_a_row_cannot_keep_the_axis_width() {
     InteractiveScene::run(420.0, 200.0, |scene| {
         scene.install(field(420.0));
         let axes = axis_fields(scene);
-        assert_eq!(axes.len(), 3, "every axis mounts an input");
+        assert_eq!(axes.len(), 3, "every axis mounts its labelled chip");
         assert!(
             (axes[0].absolute_frame().y - axes[1].absolute_frame().y).abs() < 0.5,
             "a 420pt container keeps X and Y on one row"

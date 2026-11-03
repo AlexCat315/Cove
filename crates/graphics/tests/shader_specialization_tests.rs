@@ -20,7 +20,6 @@
 //! - a caller override replaces the default and remaps the threadgroup size
 //! - an undeclared id, a mistyped value and a duplicate id are all rejected
 //! - the artifact round-trips through JSON and still resolves
-//! - GAP: the Slang-compiled dispatch case is gated on `SLANGC`
 
 use cove_graphics::{
     ReflectedShaderConstant, ShaderArtifact, ShaderConstantType, ShaderConstantValue, ShaderFormat,
@@ -139,7 +138,7 @@ fn dispatch_case_is_gated_on_the_slang_compiler() {
         std::env::var("COVE_DEV")
             .map(|value| !value.is_empty())
             .unwrap_or(false),
-        "GAP: with SLANGC set the dispatch case also needs COVE_DEV pointing at \
+        "with SLANGC set the dispatch case also needs COVE_DEV pointing at \
          the cove-dev shader tool; the Rust tree has no equivalent artifact builder",
     );
 }

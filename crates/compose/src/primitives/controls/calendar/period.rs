@@ -34,6 +34,35 @@ impl CalendarGranularity {
             Self::Year => CalendarPanel::Years,
         }
     }
+
+    /// Trigger and accessibility text for a selected period.
+    pub fn label(self, date: Date, calendar: &Calendar) -> String {
+        match self {
+            Self::Day => super::calendar::medium_date(date, calendar),
+            Self::Week => crate::i18n::format_template(
+                &crate::i18n::tr("calendar.week_period"),
+                &[
+                    (
+                        "week",
+                        &calendar
+                            .component(CalendarUnit::WeekOfYear, date)
+                            .to_string(),
+                    ),
+                    (
+                        "year",
+                        &calendar
+                            .component(CalendarUnit::YearForWeekOfYear, date)
+                            .to_string(),
+                    ),
+                ],
+            ),
+            Self::Month => super::calendar::month_title(date, calendar),
+            Self::Year => crate::i18n::format_template(
+                &crate::i18n::tr("calendar.year_period"),
+                &[("year", &calendar.component(CalendarUnit::Year, date).to_string())],
+            ),
+        }
+    }
 }
 
 /// The browsing level: a month of days, a year of months, or twelve years.

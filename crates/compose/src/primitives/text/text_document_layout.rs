@@ -261,6 +261,11 @@ impl TextDocumentLayout {
         }
     }
 
+    /// The source-line ranges a collapse hides, as the row index projects them.
+    pub fn hidden_lines(&self) -> &[std::ops::Range<usize>] {
+        &self.hidden_lines
+    }
+
     pub fn set_hidden_lines(&mut self, ranges: Vec<std::ops::Range<usize>>) {
         if self.hidden_lines == ranges {
             return;

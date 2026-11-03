@@ -128,7 +128,7 @@ impl DiagnosticCompactNode {
             id: item.node.id.clone(),
             parent_id: item.parent_id.clone(),
             role: semantics
-                .map(|semantics| format!("{:?}", semantics.role))
+                .map(|semantics| crate::inspection::inspector::role_name(semantics.role))
                 .or_else(|| item.node.semantic_role.clone()),
             label: semantics
                 .map(|semantics| semantics.label.clone())
@@ -331,6 +331,16 @@ impl Diagnostics {
                     let preview: String = value.chars().take(4097).collect();
                     truncated = Some(preview.chars().count() > 4096);
                     semantics.value = preview.chars().take(4096).collect();
+                } else if matches!(
+                    semantics.role,
+                    cove_core::scene::AccessibilityRole::TextField
+                ) && !semantics.state.is_secure
+                {
+                    // A field's draft is private: the default record reports the
+                    // meaning, not what the user has typed. Reading it takes an
+                    // explicit `include_value` request. A secure field keeps its
+                    // redaction marker so clients can tell it apart.
+                    semantics.value.clear();
                 }
                 meanings.insert(id, semantics);
             }
@@ -360,7 +370,9 @@ impl Diagnostics {
                 });
             }
             let id = summary.id.clone();
-            for child in children {
+            // `stack` is LIFO, so push children in reverse to visit them in
+            // document order.
+            for child in children.into_iter().rev() {
                 stack.push((child, Some(id.clone())));
             }
         }
@@ -636,6 +648,17 @@ impl Diagnostics {
         self.traces.borrow_mut().capture(&self.tree, duration_ms)
     }
 
+    /// Open a capture window without blocking. The host keeps running, emits
+    /// spans, then calls [`Self::finish_capture`] within `duration_ms`.
+    pub fn begin_capture(&self, duration_ms: u64) -> Result<(), DiagnosticError> {
+        self.traces.borrow_mut().begin(&self.tree, duration_ms)
+    }
+
+    /// Close the window opened by [`Self::begin_capture`] and publish its spans.
+    pub fn finish_capture(&self) -> Result<TraceCapture, DiagnosticError> {
+        self.traces.borrow_mut().finish(&self.tree)
+    }
+
     pub fn query_trace(
         &self,
         id: &str,
@@ -662,6 +685,15 @@ impl Diagnostics {
     pub fn handle_read_request(&self, request: &Envelope) -> Envelope {
         match self.read_payload(request) {
             Ok(payload) => {
+                // Swift validates every tool result at one boundary: it has to
+                // be valid JSON within the result budget. Clients cannot hold a
+                // payload the model could not have received.
+                let oversized = serde_json::to_vec(&payload)
+                    .map(|bytes| bytes.len() > crate::agent::MAX_TOOL_RESULT_BYTES)
+                    .unwrap_or(true);
+                if oversized {
+                    return request.error("bad_request", &DiagnosticError::InvalidResult.message());
+                }
                 let mut response = request.ok().unwrap_or_else(|| {
                     Envelope::new(format!("{}.ok", request.r#type), request.id, None)
                 });
@@ -1003,7 +1035,10 @@ fn collect_overflow(root: &Node) -> Vec<DiagnosticOverflowIssue> {
                 });
             }
         }
-        stack.extend(node.children());
+        // LIFO stack: push in reverse so siblings keep document order.
+        for child in node.children().into_iter().rev() {
+            stack.push(child);
+        }
     }
     issues
 }
@@ -1194,6 +1229,9 @@ struct TraceRecord {
 struct TraceStore {
     records: Vec<TraceRecord>,
     generation: u64,
+    /// An open `begin_capture` window: the sequence cursor it started after and
+    /// the instant it opened. `None` when no capture is in flight.
+    pending: Option<(u64, std::time::Instant)>,
 }
 
 /// Bounded retention: at most eight captures.
@@ -1203,27 +1241,56 @@ impl TraceStore {
     fn reset(&mut self) {
         self.generation = self.generation.wrapping_add(1);
         self.records.clear();
+        self.pending = None;
     }
 
-    /// Sample the timeline for `milliseconds`. The caller must be on the UI
-    /// thread; the sampling loop yields so the host keeps presenting frames.
-    fn capture(
+    /// Open a capture window and return immediately. Spans the host emits while
+    /// the window is open are collected by [`Self::finish`].
+    fn begin(
         &mut self,
         tree: &Rc<RefCell<NodeTree>>,
         milliseconds: u64,
-    ) -> Result<TraceCapture, DiagnosticError> {
-        if !(50..=5000).contains(&milliseconds) {
+    ) -> Result<(), DiagnosticError> {
+        self.check_duration(milliseconds)?;
+        if self.pending.is_some() {
             return Err(DiagnosticError::InvalidConfiguration(
                 "Capture duration must be 50–5000 ms; only one capture may run at a time.".into(),
             ));
         }
-        let started = std::time::Instant::now();
         let after = tree.borrow().timeline.borrow().latest_sequence();
-        // The recording window is enabled for the whole capture so spans
-        // produced by the host are retained even if the timeline was idle.
         tree.borrow().timeline.borrow_mut().begin_recording();
-        std::thread::sleep(std::time::Duration::from_millis(milliseconds));
+        self.pending = Some((after, std::time::Instant::now()));
+        Ok(())
+    }
+
+    /// Close an open window and publish the spans recorded inside it.
+    fn finish(&mut self, tree: &Rc<RefCell<NodeTree>>) -> Result<TraceCapture, DiagnosticError> {
+        let Some((after, started)) = self.pending.take() else {
+            return Err(DiagnosticError::InvalidConfiguration(
+                "No capture is recording; open one first.".into(),
+            ));
+        };
         tree.borrow().timeline.borrow_mut().end_recording();
+        self.publish(tree, after, started)
+    }
+
+    fn check_duration(&self, milliseconds: u64) -> Result<(), DiagnosticError> {
+        if (50..=5000).contains(&milliseconds) {
+            Ok(())
+        } else {
+            Err(DiagnosticError::InvalidConfiguration(
+                "Capture duration must be 50–5000 ms; only one capture may run at a time.".into(),
+            ))
+        }
+    }
+
+    /// Gather the spans after `after`, summarise them by phase and retain them.
+    fn publish(
+        &mut self,
+        tree: &Rc<RefCell<NodeTree>>,
+        after: u64,
+        started: std::time::Instant,
+    ) -> Result<TraceCapture, DiagnosticError> {
         let dropped_before = tree.borrow().timeline.borrow().dropped();
         let events = tree.borrow().timeline.borrow().events_after(after);
         let elapsed = started.elapsed().as_secs_f64() * 1000.0;
@@ -1271,6 +1338,30 @@ impl TraceStore {
             events,
         });
         Ok(summary)
+    }
+
+    /// Sample the timeline for `milliseconds` on the calling thread. Usable
+    /// without a host pumping frames; a host-driven session should pair
+    /// [`Self::begin`] with [`Self::finish`] so its spans land in the window.
+    fn capture(
+        &mut self,
+        tree: &Rc<RefCell<NodeTree>>,
+        milliseconds: u64,
+    ) -> Result<TraceCapture, DiagnosticError> {
+        self.check_duration(milliseconds)?;
+        if self.pending.is_some() {
+            return Err(DiagnosticError::InvalidConfiguration(
+                "Capture duration must be 50–5000 ms; only one capture may run at a time.".into(),
+            ));
+        }
+        let started = std::time::Instant::now();
+        let after = tree.borrow().timeline.borrow().latest_sequence();
+        // The recording window is enabled for the whole capture so spans
+        // produced by the host are retained even if the timeline was idle.
+        tree.borrow().timeline.borrow_mut().begin_recording();
+        std::thread::sleep(std::time::Duration::from_millis(milliseconds));
+        tree.borrow().timeline.borrow_mut().end_recording();
+        self.publish(tree, after, started)
     }
 
     fn record(&self, id: &str) -> Result<&TraceRecord, DiagnosticError> {

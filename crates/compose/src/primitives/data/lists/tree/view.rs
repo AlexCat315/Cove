@@ -43,13 +43,16 @@ use cove_composition::Scancode;
 use cove_core::scene::{
     AccessibilityActions, AccessibilityRole, AccessibilitySemantics, Align, DrawHook, EventPhase,
     EventResult, FlexDirection, HoverPhase, InputHandlerRoute, InteractionRegistryHolder, Justify,
-    LayoutNode, Node, PointerPhase, Wrap,
+    LayoutNode, Node, PointerCaptureHolder, PointerPhase, Wrap,
 };
-use cove_core::{Binding, Color, Rect, State};
+use cove_core::scene::NodeWeak;
+use cove_core::{Binding, Color, Point, Rect, State};
 use cove_platform::{KeyEvent, KeyModifiers, MouseButton, SystemCursor};
 
 const PRESSED: &str = "__tree_row_pressed";
 const HOVERED: &str = "__tree_row_hovered";
+const DRAG_PRESS: &str = "__tree_row_drag_press";
+const ROW_GUTTER: &str = "__tree_row_gutter";
 const GUIDE_MARKER: &str = "__tree_guide";
 
 /// One visible row: the element plus its place in the hierarchy.
@@ -374,6 +377,7 @@ where
     modifiers: RefCell<KeyModifiers>,
     drag_source: State<Option<TreeNodeKey<Id>>>,
     drag_target: State<Option<(TreeNodeKey<Id>, TreeDropPosition)>>,
+    drag_registry: Rc<TreeDragRegistry<Id>>,
 }
 
 impl<Element, Id, RowContent> Tree<Element, Id, RowContent>
@@ -402,6 +406,7 @@ where
             modifiers: RefCell::new(KeyModifiers(0)),
             drag_source: State::new(None),
             drag_target: State::new(None),
+            drag_registry: Rc::new(TreeDragRegistry::default()),
         }
     }
 
@@ -501,6 +506,9 @@ where
             id_of: self.id_of.clone(),
             children: self.children.clone(),
             has_children: self.has_children.clone(),
+            drag: self.options.drag.clone(),
+            drag_source: self.drag_source.clone(),
+            drag_target: self.drag_target.clone(),
         }
     }
 
@@ -649,6 +657,33 @@ where
                     let tree = self.session_actions();
                     Rc::new(move || tree.expand(&entry))
                 };
+                let row_drag = self.options.drag.on_drop.as_ref().map(|_| {
+                    let tree = self.session_actions();
+                    let registry = self.drag_registry.clone();
+                    let entry = entry.clone();
+                    TreeRowDrag {
+                        register: {
+                            let key = key.clone();
+                            let registry = registry.clone();
+                            Rc::new(move |node: &Node| registry.register(node, key.clone()))
+                        },
+                        on_start: {
+                            let key = key.clone();
+                            let tree = tree.clone();
+                            Rc::new(move || tree.drag_source.set(Some(key.clone())))
+                        },
+                        on_move: {
+                            let key = key.clone();
+                            let registry = registry.clone();
+                            let tree = tree.clone();
+                            Rc::new(move |x: f32, y: f32| tree.update_drag(&key, x, y, &registry))
+                        },
+                        on_end: {
+                            let tree = tree.clone();
+                            Rc::new(move || tree.commit_drag(&entry))
+                        },
+                    }
+                });
                 let on_hover: Rc<dyn Fn(bool)> = {
                     let hovered = hovered.clone();
                     Rc::new(move |entered| {
@@ -696,6 +731,7 @@ where
                     is_drag_source,
                     content,
                     trailing_slot: trailing.clone(),
+                    drag: row_drag,
                     on_toggle,
                     on_select,
                     on_move,
@@ -752,10 +788,11 @@ where
     }
 
     fn dynamic_properties(&self) -> Vec<crate::DynamicField> {
-        vec![crate::DynamicField::state(
-            "expansion",
-            &self.local_expanded,
-        )]
+        vec![
+            crate::DynamicField::state("expansion", &self.local_expanded),
+            crate::DynamicField::state("dragSource", &self.drag_source),
+            crate::DynamicField::state("dragTarget", &self.drag_target),
+        ]
     }
 }
 
@@ -778,6 +815,9 @@ where
     id_of: Rc<dyn Fn(&Element) -> Id>,
     children: Rc<dyn Fn(&Element) -> Vec<Element>>,
     has_children: Option<Rc<dyn Fn(&Element) -> bool>>,
+    drag: super::options::TreeDragOperations<Element>,
+    drag_source: State<Option<TreeNodeKey<Id>>>,
+    drag_target: State<Option<(TreeNodeKey<Id>, TreeDropPosition)>>,
 }
 
 impl<Element, Id> Clone for TreeActions<Element, Id>
@@ -802,6 +842,9 @@ where
             id_of: self.id_of.clone(),
             children: self.children.clone(),
             has_children: self.has_children.clone(),
+            drag: self.drag.clone(),
+            drag_source: self.drag_source.clone(),
+            drag_target: self.drag_target.clone(),
         }
     }
 }
@@ -928,6 +971,61 @@ where
         self.cursor.set(Some(entry.key.clone()));
         if let Some(handler) = &self.events.on_select {
             handler(entry.element.clone());
+        }
+    }
+
+    /// Records the row the pointer is over and the band it lands in. Invalid or
+    /// self targets keep the source row marked but clear the drop target.
+    fn update_drag(&self, source: &TreeNodeKey<Id>, x: f32, y: f32, registry: &TreeDragRegistry<Id>) {
+        let target = registry.hit(Point::new(x, y));
+        let entries = self.entries.borrow();
+        let source_entry = entries.iter().find(|entry| &entry.key == source).cloned();
+        let target_entry = target
+            .as_ref()
+            .and_then(|(key, _)| entries.iter().find(|entry| &entry.key == key).cloned());
+        drop(entries);
+        let (Some(source_entry), Some((target_key, frame))) = (source_entry, target) else {
+            self.drag_target.set(None);
+            return;
+        };
+        let Some(target_entry) = target_entry else {
+            self.drag_target.set(None);
+            return;
+        };
+        if &target_key == source {
+            self.drag_target.set(None);
+            return;
+        }
+        let position = drop_position(y, frame);
+        if self
+            .drag
+            .can_drop
+            .as_ref()
+            .is_some_and(|can_drop| !can_drop(&source_entry.element, &target_entry.element, position))
+        {
+            self.drag_target.set(None);
+            return;
+        }
+        self.drag_target.set(Some((target_key, position)));
+    }
+
+    /// Reports the drop for the current target, then clears the session. A
+    /// release with no target reports nothing.
+    fn commit_drag(&self, source: &TreeEntry<Element, Id>) {
+        let target = self.drag_target.get();
+        self.drag_source.set(None);
+        self.drag_target.set(None);
+        let Some((target_key, position)) = target else {
+            return;
+        };
+        let entries = self.entries.borrow();
+        let target_entry = entries.iter().find(|entry| entry.key == target_key).cloned();
+        drop(entries);
+        let Some(target_entry) = target_entry else {
+            return;
+        };
+        if let Some(on_drop) = &self.drag.on_drop {
+            on_drop(source.element.clone(), target_entry.element.clone(), position);
         }
     }
 
@@ -1102,6 +1200,8 @@ struct TreeRow {
     is_drag_source: bool,
     content: AnyView,
     trailing_slot: Option<AnyView>,
+    /// The armed drag surface, `None` when `on_drop` is unset.
+    drag: Option<TreeRowDrag>,
     on_toggle: Rc<dyn Fn()>,
     on_select: Rc<dyn Fn(KeyModifiers)>,
     on_move: Rc<dyn Fn(i64)>,
@@ -1130,6 +1230,15 @@ impl PrimitiveView for TreeRow {
     fn update_node(&self, node: &Node) {
         node.set_is_hit_testable(self.is_enabled);
         node.set_cursor(Some(SystemCursor::Pointer));
+        // The drag hit zone covers the indent gutter and disclosure slot, so a
+        // drop over indented columns still resolves this row.
+        node.set_attachment(
+            ROW_GUTTER,
+            (self.depth as f32 * self.indentation + self.disclosure_width).max(0.0),
+        );
+        if let Some(drag) = &self.drag {
+            (drag.register)(node);
+        }
         node.set_opacity(if self.is_drag_source { 0.38 } else { 1.0 });
         node.set_corner_radius(4.0);
         if let Some(position) = self.drop_position {
@@ -1181,19 +1290,30 @@ impl PrimitiveView for TreeRow {
         let paint: Rc<dyn Fn()> = Rc::new(move || {
             let hovered = paint_node.attachment::<bool>(HOVERED) == Some(true);
             let theme = theme_for_node(&paint_node);
+            paint_node.set_corner_radius(theme.radius.sm);
             paint_node.set_background_color(Some(if hovered && !is_selected && !is_search_hit {
                 theme.colors.state_layer_hover
             } else {
                 Color::CLEAR
             }));
         });
-        node.set_attachment(HOVERED, self.is_hovered);
+        // A custom style watches its own hover and has to rebuild on a change; the
+        // default one keeps the chrome on this node. A caller-supplied trailing
+        // slot also reads the flag, so it keeps the state in sync either way.
+        let style = node.composition_value(&TreeRowStyleEnvironment::key());
+        let propagates_hover = self.trailing_slot.is_some() || style.requires_hover_recompose();
+        if propagates_hover {
+            node.set_attachment(HOVERED, self.is_hovered);
+        } else if node.attachment::<bool>(HOVERED).is_none() {
+            node.set_attachment(HOVERED, false);
+        }
         paint();
 
         let Some(registry) = InteractionRegistryHolder::current() else {
             return;
         };
 
+        let hover_node = node.downgrade();
         let hover_paint = paint.clone();
         let hover_action = self.on_hover.clone();
         let hover_enabled = self.is_enabled;
@@ -1203,13 +1323,22 @@ impl PrimitiveView for TreeRow {
                 if !hover_enabled {
                     return;
                 }
-                hover_action(phase == HoverPhase::Enter);
+                let entered = phase == HoverPhase::Enter;
+                // Paint from the handler so the row answers the pointer in the
+                // same frame; the default style never needs a recompose for it.
+                if let Some(owner) = Node::upgrade(&hover_node) {
+                    owner.set_attachment(HOVERED, entered);
+                }
                 hover_paint();
+                if propagates_hover {
+                    hover_action(entered);
+                }
             }),
         );
 
         let pointer_select = self.on_select.clone();
         let pointer_node = node.clone();
+        let pointer_drag = self.drag.clone();
         registry.set_pointer(
             node,
             InputHandlerRoute::control(),
@@ -1223,11 +1352,37 @@ impl PrimitiveView for TreeRow {
                     match phase {
                         PointerPhase::Down => {
                             pointer_node.set_attachment(PRESSED, true);
+                            // An armed drag surface captures the pointer so motion
+                            // keeps arriving after the row recomposes.
+                            if pointer_drag.is_some() {
+                                pointer_node.set_attachment(
+                                    DRAG_PRESS,
+                                    TreeDragPress {
+                                        down_x: event.x,
+                                        down_y: event.y,
+                                        did_drag: false,
+                                    },
+                                );
+                                if let Some(capture) = PointerCaptureHolder::current() {
+                                    capture.acquire(&pointer_node, false);
+                                }
+                            }
                             EventResult::Handled
                         }
                         PointerPhase::Up => {
                             let was = pointer_node.attachment::<bool>(PRESSED) == Some(true);
                             pointer_node.set_attachment(PRESSED, false);
+                            let press = pointer_node.attachment::<TreeDragPress>(DRAG_PRESS);
+                            pointer_node.remove_attachment(DRAG_PRESS);
+                            if pointer_drag.is_some() {
+                                PointerCaptureHolder::release_current();
+                            }
+                            if press.is_some_and(|press| press.did_drag) {
+                                if let Some(drag) = &pointer_drag {
+                                    (drag.on_end)();
+                                }
+                                return EventResult::Handled;
+                            }
                             if was {
                                 pointer_select(event.modifiers);
                                 return EventResult::Handled;
@@ -1238,6 +1393,53 @@ impl PrimitiveView for TreeRow {
                 },
             ),
         );
+
+        if let Some(drag) = &self.drag {
+            let drag = drag.clone();
+            let motion_node = node.downgrade();
+            registry.set_motion(
+                node,
+                InputHandlerRoute::control(),
+                Rc::new(
+                    move |event: &cove_platform::MouseMotionEvent, phase: EventPhase| {
+                        if phase == EventPhase::Capture {
+                            return EventResult::Ignored;
+                        }
+                        let Some(owner) = Node::upgrade(&motion_node) else {
+                            return EventResult::Ignored;
+                        };
+                        let Some(target) = PointerCaptureHolder::current_target() else {
+                            return EventResult::Ignored;
+                        };
+                        if target != owner {
+                            return EventResult::Ignored;
+                        }
+                        let mut press = owner
+                            .attachment::<TreeDragPress>(DRAG_PRESS)
+                            .unwrap_or(TreeDragPress {
+                                down_x: event.x,
+                                down_y: event.y,
+                                did_drag: false,
+                            });
+                        let dx = event.x - press.down_x;
+                        let dy = event.y - press.down_y;
+                        // A small dead zone keeps a click from becoming a drag.
+                        if !press.did_drag && dx.abs().max(dy.abs()) >= 4.0 {
+                            press.did_drag = true;
+                            owner.set_attachment(PRESSED, false);
+                            (drag.on_start)();
+                        }
+                        if press.did_drag {
+                            owner.set_attachment(DRAG_PRESS, press);
+                            (drag.on_move)(event.x, event.y);
+                        } else {
+                            owner.set_attachment(DRAG_PRESS, press);
+                        }
+                        EventResult::Handled
+                    },
+                ),
+            );
+        }
 
         let key_node = node.clone();
         let on_key = self.on_key_command();
@@ -1416,6 +1618,26 @@ impl TreeRow {
     }
 }
 
+/// The pointer-drag callbacks armed on a row: start when the dead zone is
+/// crossed, move with the pointer, and commit on release.
+#[derive(Clone)]
+struct TreeRowDrag {
+    /// Registers this row's node under its token so pointer motion can resolve
+    /// the row and the drop band it is over.
+    register: Rc<dyn Fn(&Node)>,
+    on_start: Rc<dyn Fn()>,
+    on_move: Rc<dyn Fn(f32, f32)>,
+    on_end: Rc<dyn Fn()>,
+}
+
+/// Press bookkeeping that turns a click into a drag only after the dead zone.
+#[derive(Clone, Copy)]
+struct TreeDragPress {
+    down_x: f32,
+    down_y: f32,
+    did_drag: bool,
+}
+
 impl View for TreeRow {
     fn kind(&self) -> crate::ViewKind<'_> {
         crate::ViewKind::Primitive(self)
@@ -1514,6 +1736,21 @@ impl View for TreeGuideOverlay {
     }
 }
 
+/// Top and bottom sixth-scale bands drop before/after; the middle drops inside,
+/// matching the Swift `dropPosition(for:frame:)` bands.
+fn drop_position(pointer_y: f32, frame: Rect) -> TreeDropPosition {
+    let local_y = pointer_y - frame.y;
+    let top_band = (frame.height * 0.28).max(6.0);
+    let bottom_band_start = frame.height - top_band;
+    if local_y <= top_band {
+        TreeDropPosition::Before
+    } else if local_y >= bottom_band_start {
+        TreeDropPosition::After
+    } else {
+        TreeDropPosition::Inside
+    }
+}
+
 /// The drop affordance: an insertion rule before/after, or a highlighted row
 /// for a drop inside.
 fn draw_drop_indicator(
@@ -1561,5 +1798,49 @@ fn draw_drop_indicator(
             );
             let _ = list.add_rect(Rect::new(frame.x, y - 1.0, 6.0, 4.0), accent);
         }
+    }
+}
+
+/// Rows registered for drag hit-testing, keyed by their row token. The row
+/// itself is a weak handle so a released row drops out on the next lookup.
+struct TreeDragRegistry<Id: std::hash::Hash + Eq> {
+    entries: RefCell<Vec<(NodeWeak, TreeNodeKey<Id>)>>,
+}
+
+impl<Id: std::hash::Hash + Eq + Clone> Default for TreeDragRegistry<Id> {
+    fn default() -> Self {
+        Self {
+            entries: RefCell::new(Vec::new()),
+        }
+    }
+}
+
+impl<Id: std::hash::Hash + Eq + Clone> TreeDragRegistry<Id> {
+    fn register(&self, node: &Node, key: TreeNodeKey<Id>) {
+        let mut entries = self.entries.borrow_mut();
+        let weak = node.downgrade();
+        if let Some(existing) = entries.iter_mut().find(|(other, _)| other.strong_count() > 0 && Node::upgrade(other).as_ref() == Some(node)) {
+            *existing = (weak, key);
+        } else {
+            entries.push((weak, key));
+        }
+    }
+
+    /// The row token under `point`, with the row's absolute frame extended left
+    /// by its indent gutter so a drop over indented columns still resolves a
+    /// target.
+    fn hit(&self, point: Point) -> Option<(TreeNodeKey<Id>, Rect)> {
+        let entries = self.entries.borrow();
+        let mut found = None;
+        for (weak, key) in entries.iter() {
+            let Some(node) = Node::upgrade(weak) else { continue };
+            let frame = node.absolute_frame();
+            let gutter = node.attachment::<f32>(ROW_GUTTER).unwrap_or(0.0);
+            let expanded = Rect::new(frame.x - gutter, frame.y, frame.width + gutter, frame.height);
+            if expanded.contains(point) {
+                found = Some((key.clone(), expanded));
+            }
+        }
+        found
     }
 }

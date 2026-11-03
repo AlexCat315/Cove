@@ -9,12 +9,6 @@ use super::divider_style::{DividerOrientation, DividerStyle, DividerStyleConfigu
 /// Divider default: 1-px line drawn with the `divider` color slot. Spans 100 %
 /// of the cross-axis.
 ///
-/// GAP: Swift returns the legacy `Divider` primitive directly
-/// (Primitives/Text/Text.swift). That primitive has no Rust counterpart yet,
-/// so `DividerLine` reproduces its documented layout contract here: width 100 %
-/// for horizontal dividers, height 100 % for vertical ones, thickness on the
-/// cross axis. When `crate::primitives::Divider` lands this body should return
-/// it instead.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct DefaultDividerStyle;
 

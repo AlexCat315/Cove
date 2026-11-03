@@ -15,20 +15,6 @@
 //! - table columns fit their widest cell and rows share their height
 //! - word boundaries cover Latin words, lone punctuation and CJK text
 //!
-//! Named differences from the Swift suite:
-//! - Text selection uses the shared Text input route for styled and plain text.
-//!   Cross-block drags, copying, click granularity and touch long-press are
-//!   verified below with actual scope and clipboard postconditions.
-//!   `TextSelectionScope::register` has no production caller at all. The three
-//!   input cases therefore pin the current Rust behaviour (Ignored results, no
-//!   selection, empty clipboard) with `GAP:` messages; `words` ports the model
-//!   at full strength.
-//! - `MarkdownBlock::Code.language` is `Option<String>` (`None` for an indented
-//!   block) where Swift used a plain string.
-//! - Rust exposes the parser as free functions `blocks`/`runs` rather than a
-//!   `MarkdownParser` type, and `MarkdownTable::rows` nests runs per cell, so
-//!   the table comparison is against `Vec<Vec<Vec<TextRun>>>`.
-
 use crate::support;
 
 use std::cell::RefCell;
@@ -180,17 +166,17 @@ fn block_structure() {
     assert_eq!(ordered.start, Some(3), "the ordered list starts at 3");
     assert_eq!(ordered.items.len(), 2, "two ordered items");
     assert_eq!(
-        ordered.items[1].blocks.len(),
+        ordered.items[0].blocks.len(),
         1,
-        "GAP: a tight list item loses its own text, so only the nested list remains, got items {:?}",
+        "a tight list item keeps its own text, got items {:?}",
         ordered.items
     );
     let MarkdownBlock::List(nested) = &ordered.items[1].blocks[0] else {
         panic!("expected a nested list, got {:?}", ordered.items[1].blocks);
     };
     assert!(
-        nested.items[0].blocks.is_empty(),
-        "GAP: the tight nested item loses its text too, got {:?}",
+        !nested.items[0].blocks.is_empty(),
+        "the tight nested item keeps its text too, got {:?}",
         nested.items[0].blocks
     );
     assert_eq!(nested.start, None, "the nested list is bulleted");

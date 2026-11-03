@@ -204,6 +204,7 @@ pub struct WorkspaceController {
     maximized_panel_id: Option<WorkspacePanelID>,
     focused_panel_id: Option<WorkspacePanelID>,
     version: u64,
+    changed: cove_core::Signal<()>,
     subscribers: BTreeMap<SubscriptionToken, Box<dyn FnMut(&WorkspaceController)>>,
     next_subscriber_id: u64,
 }
@@ -215,6 +216,7 @@ impl WorkspaceController {
             maximized_panel_id: None,
             focused_panel_id: None,
             version: 0,
+            changed: cove_core::Signal::detached(()),
             subscribers: BTreeMap::new(),
             next_subscriber_id: 0,
         };
@@ -223,6 +225,7 @@ impl WorkspaceController {
     }
 
     pub fn document(&self) -> &WorkspaceDocument {
+        self.changed.track();
         &self.document
     }
     pub fn maximized_panel_id(&self) -> Option<&WorkspacePanelID> {
@@ -274,6 +277,7 @@ impl WorkspaceController {
         if let Some(panel_id) = result.focus_panel_id.clone() {
             self.focused_panel_id = Some(panel_id);
         }
+        self.changed.notify();
         self.notify_change();
         result
     }
@@ -1389,3 +1393,5 @@ mod tests {
         assert_eq!(hits.get(), 1);
     }
 }
+
+impl Drop for WorkspaceController { fn drop(&mut self) { self.changed.dispose(); } }

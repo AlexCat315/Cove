@@ -67,10 +67,15 @@ impl ViewModifier for FloatingSurfaceModifier {
             let node = node.clone();
             move |value| node.set_corner_radius(value)
         });
-        node.animatable_set_optional("borderColor", node.border_color(), Some(colors.border), {
-            let node = node.clone();
-            move |value| node.set_border_color(value)
-        });
+        node.animatable_set_optional(
+            "borderColor",
+            node.border_color(),
+            Some(crate::theme::floating_outline(&colors)),
+            {
+                let node = node.clone();
+                move |value| node.set_border_color(value)
+            },
+        );
         node.animatable_set_with("borderWidth", node.border_width(), 1.0, {
             let node = node.clone();
             move |value| node.set_border_width(value)

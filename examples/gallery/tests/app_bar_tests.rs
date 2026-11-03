@@ -62,6 +62,7 @@ impl View for StoryView {
     fn body(&self, cx: &Scope) -> AnyView {
         View::body(self.0.as_ref(), cx)
     }
+    fn dynamic_properties(&self) -> Vec<cove_composition::DynamicField> { self.0.dynamic_properties() }
 }
 
 struct Mounted(Rc<AppBarStory>, Appearance);
@@ -162,14 +163,8 @@ fn the_primary_action_commits_into_the_result_line() {
             "Saved",
             "the primary action records itself"
         );
-        // GAP: `last_action` is an `Rc<RefCell<String>>` read inside `body()` with
-        // no `dynamic_properties`, so the result line cannot republish it.
         assert!(
-            !scene.recomposer_has_pending(),
-            "the action schedules no recomposition, which is why the caption stays stale"
-        );
-        assert!(
-            scene.has_text("No action yet"),
+            scene.has_text("Saved"),
             "the result line still shows the initial caption, texts: {:?}",
             scene.texts()
         );
@@ -196,17 +191,7 @@ fn the_long_title_toggle_switches_the_authored_title() {
         scene.settle_n(2);
         let short = story.title();
         assert_ne!(short, long, "the toggle switches the story's title state");
-        // GAP: the untracked `State` read means the header keeps rendering the
-        // previous title even though the state moved.
-        assert!(
-            !scene.recomposer_has_pending(),
-            "the toggle schedules no recomposition"
-        );
-        assert!(
-            scene.has_text(long),
-            "the header still renders the original title, texts: {:?}",
-            scene.texts()
-        );
+        assert!(scene.has_text(short), "the header republishes the short title");
 
         let toggle = scene.require_named("appbar-long-title");
         scene.click(&toggle);

@@ -9,16 +9,9 @@
 //!
 //! The Swift suite located the expand button, expanded editor and actions by
 //! the `json-expand`, `json-expanded-editor`, `json-apply` and `json-cancel`
-//! debug names. Rust publishes none of them, so the expand button is found by
-//! its accessibility label and the actions by their title text.
-//!
-//! Named difference from the Swift suite (pinned by `GAP:` assertions):
-//! - **GAP: Expand never presents the editor.** Rust's `JsonField` stores
-//!   `is_expanded` in a mutex-held draft that no `State` observes, so pressing
-//!   Expand never recomposes the field and its `Modal` is never presented. The
-//!   matrix therefore asserts the retained expand button and the absent modal,
-//!   and the transaction test asserts that no Apply exists, nothing commits and
-//!   focus stays on Expand.
+//! debug names. Rust publishes the dialog and footer names; the expand button
+//! is found by its accessibility label, the dialog by its `Dialog` role and the
+//! actions by their title text.
 
 use crate::support;
 use cove_composition::Scope;
@@ -204,12 +197,16 @@ fn matrix() {
             expand_button(scene, &labels.expand).expect("the expand button carries its label");
         scene.click(&expand, 1);
         settle(scene);
-        assert!(
-            dialog(scene).is_none() && scene.portal.entries().is_empty(),
-            "GAP: Swift presents the expanded editor in one portal on Expand; Rust's JsonField \
-             keeps `is_expanded` in a mutex-held draft that no State observes, so the click never \
-             recomposes and no modal is presented (portals {})",
-            scene.portal.entries().len()
+        let presented = dialog(scene).expect("Expand presents the expanded editor");
+        assert_eq!(
+            presented.accessibility().map(|semantics| semantics.label),
+            Some(labels.expand.clone()),
+            "the dialog is labelled with the expand label"
+        );
+        assert_eq!(
+            scene.portal.entries().len(),
+            1,
+            "the expanded editor owns exactly one portal entry"
         );
         for width in [390.0_f32, 720.0, 1280.0] {
             for scale in [1.0_f32, 2.0] {
@@ -236,12 +233,23 @@ fn matrix() {
                             "the expand button is retained ({context})"
                         );
                         assert!(!scene.graph.recomposer.has_pending(), "settled ({context})");
+                        let kept = dialog(scene).unwrap_or_else(|| {
+                            panic!("the expanded editor stays presented ({context})")
+                        });
+                        assert_eq!(
+                            kept.accessibility().map(|semantics| semantics.label),
+                            Some(labels.expand.clone()),
+                            "the dialog keeps the expand label ({context})"
+                        );
+                        assert_eq!(
+                            scene.portal.entries().len(),
+                            1,
+                            "one portal entry across the matrix ({context})"
+                        );
                         assert!(
-                            dialog(scene).is_none() && scene.portal.entries().is_empty(),
-                            "GAP: Swift keeps the expanded editor (dialog labelled with the expand \
-                             label, heading, Apply/Cancel below a >150pt field, 44pt touch actions, \
-                             full width inside the 24/34pt safe area at 390pt) across the matrix; \
-                             Rust never presents it ({context})"
+                            action(scene, &labels.apply).is_some()
+                                && action(scene, &labels.cancel).is_some(),
+                            "Apply and Cancel stay mounted ({context})"
                         );
                     }
                 }
@@ -259,9 +267,12 @@ fn transactions() {
         settle(scene);
         assert!(scene.focus.focused().is_some(), "the click focuses a node");
         assert!(
-            scene.portal.entries().is_empty(),
-            "GAP: Swift presents the expanded editor and focuses its field; Rust presents nothing \
-             because the expanded flag lives in an unobserved draft"
+            !scene.portal.entries().is_empty(),
+            "Expand presents the expanded editor in a portal"
+        );
+        assert!(
+            dialog(scene).is_some(),
+            "the expanded editor is a dialog"
         );
         key(scene, Scancode::A, true);
         scene
@@ -282,25 +293,22 @@ fn transactions() {
             scene.width = width;
             settle(scene);
         }
+        let apply = action(scene, &labels.apply).expect("the invalid draft keeps an Apply action");
         assert!(
-            action(scene, &labels.apply).is_none(),
-            "GAP: Swift shows a disabled Apply for the invalid draft and commits a valid one once; \
-             Rust mounts no Apply action because the expanded editor is never presented"
+            apply
+                .accessibility()
+                .is_some_and(|semantics| !semantics.state.is_enabled),
+            "an invalid draft disables Apply"
         );
         assert_eq!(
             state.commits.load(Ordering::Relaxed),
             0,
-            "GAP: Swift commits once on Apply; Rust cannot reach Apply"
+            "a disabled Apply never commits"
         );
         assert!(
-            scene
-                .focus
-                .focused()
-                .is_some_and(|node| node.id() == expand.id()),
-            "focus stays on the expand button"
+            dialog(scene).is_some(),
+            "the expanded editor survives a resize with an invalid draft"
         );
-        scene.click(&expand, 1);
-        settle(scene);
         key(scene, Scancode::ESCAPE, false);
         settle(scene);
         assert!(

@@ -26,36 +26,13 @@
 //! - a touch section row both selects and activates, while a pointer click only
 //!   selects, and the header lines up with its rows
 //!
-//! Named differences from the Swift suite:
-//! - **`mobile-tab-bar` has no debug name.** The Rust fixture composes
-//!   `MobileTabBar` directly because `TabView` never mounts it on a phone
-//!   surface; the bar itself publishes no `debugName`, so the suite locates the
-//!   bar as the smallest ancestor of the destination buttons that spans the
-//!   window. The Swift `TabView` also published `"mobile-tab-bar"`.
-//! - **More has no `"More tabs"` label.** `MobileTabBar`'s trigger hides its
-//!   caption from accessibility and publishes no label, so the suite locates it
-//!   as the rightmost button in the bar.
-//! - **Document tabs have no `"Close Home"` control.** `TabView`'s close
-//!   control is an unhidden 10pt icon button with no label; the assertion pins
-//!   its absence.
-//! - **No `touch-overlay-sheet` debug node.** Neither the touch menu, the touch
-//!   dialog, nor the touch hover card publish that name; the suite asserts the
-//!   presented state through `portal.entries()` and the modal focus scope.
-//! - **`Table` body cells are never laid out.** As recorded by
-//!   `text_scale_rows.rs` and `row_density_tests.rs`, the non-`DataTable`
-//!   `Table` mounts placeholder cells whose frames stay 0pt, so the column
-//!   buttons have no cell ancestor to be contained by.
-//! - **The popover has no keyboard avoidance.** `Popover` clamps to the window
-//!   but does not shorten against `surface.keyboard`, so the commit button stays
-//!   below the keyboard's top edge.
-//! - **More opens nothing.** `MobileTabBar`'s More trigger presents no overflow
-//!   portal, so promoting Page 7 is unreachable; the bar keeps four tabs.
-//! - **Touch menu never presents.** Tapping the Commands `MenuButton` opens no
-//!   portal or modal scope, so the drill-in, Export action and focus return are
-//!   unreachable.
-//! - **Sectioned rows ignore taps and clicks.** Entry 2 is neither activated
-//!   nor selected by a touch tap and Entry 1 is not selected by a pointer click;
-//!   section headers and row labels now share the 16pt leading inset.
+//! The fixture composes `MobileTabBar` directly for the bar cases; the bar
+//! publishes `mobile-tab-bar`, labels its More trigger `"More tabs"`, disables
+//! a disabled destination and opens its overflow menu. `TabView` labels each
+//! close control `"Close <title>"` at a 44pt target, and a touch hover card
+//! presents through the shared `touch-overlay-sheet`.
+//!
+//! Differences that remain:
 //! - Rust buttons do not copy their title onto their own semantics, so the
 //!   Commands/Details triggers are found by `AccessibilityTree::resolved_label`.
 //! - The Swift fixture's leading icon uses `UIIcons.File.file`; the Rust suite
@@ -571,7 +548,7 @@ fn touch_button_geometry_includes_typography_and_chrome_and_pointer_changes_reta
             descendants(&button)
                 .into_iter()
                 .any(|child| child.corner_radius() >= 12.0),
-            "GAP: the Rust button chrome rounds at {}pt, below the 12pt design radius",
+            "a touch button's chrome rounds at the 12pt design radius; measured {}",
             descendants(&button)
                 .into_iter()
                 .map(|child| child.corner_radius())
@@ -644,8 +621,8 @@ fn phone_navigation_uses_equal_bottom_items_with_badges_in_portrait_and_landscap
     InteractiveScene::run(390.0, 844.0, |scene| {
         scene.install(fixture.clone());
         assert!(
-            scene.named("mobile-tab-bar").is_none(),
-            "GAP: MobileTabBar publishes no mobile-tab-bar debug name"
+            scene.named("mobile-tab-bar").is_some(),
+            "the phone bar publishes its mobile-tab-bar debug name"
         );
         let home = scene
             .labelled("Home", Some(AccessibilityRole::Tab))
@@ -682,9 +659,8 @@ fn phone_navigation_uses_equal_bottom_items_with_badges_in_portrait_and_landscap
         scene.click(&unavailable, 1);
         assert_eq!(
             selection.get(),
-            2,
-            "GAP: MobileTabBar publishes the disabled state but never disables the button, so \
-             the disabled destination still activates"
+            1,
+            "a disabled destination never activates; the selection stays on Search"
         );
         let search = scene
             .labelled("Search", Some(AccessibilityRole::Tab))
@@ -720,16 +696,14 @@ fn phone_navigation_uses_equal_bottom_items_with_badges_in_portrait_and_landscap
         document_tabs.set(true);
         scene.settle(5, 1.0);
         assert!(
-            scene
-                .labelled("Home", Some(AccessibilityRole::Tab))
-                .is_none(),
+            scene.named("mobile-tab-bar").is_none(),
             "document tabs replace the bottom bar"
         );
         assert!(
             scene
                 .labelled("Close Home", Some(AccessibilityRole::Button))
-                .is_none(),
-            "GAP: TabView's close control is an unlabelled 10pt icon button"
+                .is_some(),
+            "a document tab exposes its labelled Close Home control"
         );
     });
 }
@@ -745,8 +719,8 @@ fn overflow_stays_reachable_through_more_and_promotes_the_selected_destination()
         assert!(
             scene
                 .labelled("More tabs", Some(AccessibilityRole::Button))
-                .is_none(),
-            "GAP: the More trigger publishes no More tabs label"
+                .is_some(),
+            "the More trigger carries its More tabs label"
         );
         let bar = ancestor_at_least(
             scene,
@@ -846,8 +820,7 @@ fn nonlinear_text_scaling_keeps_a_table_action_inside_its_authored_row() {
         assert_eq!(
             buttons.len(),
             2,
-            "GAP: Table body cells are never laid out, so the two action buttons have no \
-             measurable cell ancestor; measured {} buttons",
+            "every record mounts its action button; measured {} buttons",
             buttons.len()
         );
         for button in buttons {
@@ -1074,7 +1047,7 @@ fn popover_sheets_avoid_the_keyboard_and_restore_anchored_presentation_for_point
             .expect("the popover content is mounted");
         assert!(
             commit.absolute_frame().max_y() <= 544.0,
-            "GAP: the popover ignores the 300pt keyboard, so Commit ends at {}",
+            "the popover shortens above the 300pt keyboard, so Commit ends at {}",
             commit.absolute_frame().max_y()
         );
         scene.click(&commit, 1);
@@ -1260,8 +1233,8 @@ fn a_tap_opens_hover_card_detail_as_a_sheet_when_the_surface_cannot_hover() {
         dump(scene);
         dump(scene);
         assert!(
-            scene.named("touch-overlay-sheet").is_none(),
-            "GAP: the touch hover card sheet publishes no touch-overlay-sheet debug name"
+            scene.named("touch-overlay-sheet").is_some(),
+            "the touch hover card presents as a touch-overlay-sheet"
         );
         assert!(
             !scene.portal.entries().is_empty(),

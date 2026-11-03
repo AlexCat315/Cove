@@ -169,7 +169,7 @@ impl Tool {
                     )]),
                     Vec::new(),
                 ),
-                false,
+                true,
             ),
             Self::GetUiTrace => AgentTool::new(
                 self.name(),

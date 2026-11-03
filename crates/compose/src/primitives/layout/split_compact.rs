@@ -132,6 +132,7 @@ impl View for SplitPaneSelector {
             semantics.label = "Choose split pane".to_string();
         }))
     }
+
 }
 
 /// A tab that fills its half of the selector, so a long title wraps inside it.

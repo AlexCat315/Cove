@@ -11,7 +11,7 @@ use cove_core::State;
 use cove_ui_compose::modifiers::layout::LayoutFrameExt;
 use cove_ui_compose::modifiers::style::SemanticStyleViewExt;
 use cove_ui_compose::primitives::layout::sidebar::drawer::NavigationDrawer;
-use cove_ui_compose::primitives::layout::sidebar::{SidebarItem, SidebarSection};
+use cove_ui_compose::primitives::layout::sidebar::{Sidebar, SidebarItem, SidebarSection};
 use cove_ui_compose::primitives::media::ui_icon_catalog as icons;
 use cove_ui_compose::primitives::text::Text;
 use cove_ui_compose::theme::tokens::SemanticColorRef;
@@ -211,7 +211,9 @@ impl SidebarStory {
                     badge: Option<&str>,
                     is_enabled: bool| {
             let mut row =
-                SidebarItem::new(id.to_owned(), title.to_owned()).enabled(enabled && is_enabled);
+                SidebarItem::new(id.to_owned(), title.to_owned())
+                    .enabled(enabled && is_enabled)
+                    .debug_name(format!("sidebar-item-{id}"));
             if icons_on && let Some(icon) = icon {
                 row = row.icon(icon);
             }
@@ -320,6 +322,18 @@ impl View for SidebarStory {
         .frame_width(PREVIEW_WIDTH)
         .frame_height(PREVIEW_HEIGHT);
 
+        let sidebar = Sidebar::try_new(self.selection.binding(), self.sections())
+            .expect("the gallery sidebar destinations are unique")
+            .frame_width(PREVIEW_WIDTH)
+            .frame_height(PREVIEW_HEIGHT);
+        let preview = BoxView::new(
+            cove_core::scene::FlexDirection::Row,
+            cove_core::scene::Align::Stretch,
+            cove_core::scene::Justify::FlexStart,
+            cove_core::scene::Wrap::Wrap,
+            16.0,
+            AnyView::new(TupleView::new(vec![AnyView::new(sidebar), AnyView::new(pane)])),
+        );
         let drawer = NavigationDrawer::try_new(
             "Cove workspace",
             self.is_drawer_open.binding(),
@@ -333,7 +347,10 @@ impl View for SidebarStory {
                 "Workspace navigation",
                 "Native SidebarItem icons follow IconTheme and Scale. Up / Down and Home / End select enabled destinations and reveal them inside the scrolling pane.",
                 AnyView::new(TupleView::new(vec![
-                    AnyView::new(pane),
+                    AnyView::new(preview),
+                    AnyView::new(cove_ui_compose::primitives::controls::Button::title("Open navigation", {
+                        let open = self.is_drawer_open.clone(); move || open.set(true)
+                    }).debug_name("sidebar-open-drawer")),
                     AnyView::new(drawer),
                 ])),
             )),

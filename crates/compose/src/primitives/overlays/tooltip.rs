@@ -858,10 +858,15 @@ impl CoordinateTooltipHost {
         resource.present(
             Some(PortalStoreHolder::current()),
             Point::new(anchor.x, anchor.y + anchor.height + options.gap),
-            None,
+            // The tip occupies its authored maximum width so a long message
+            // wraps inside it instead of collapsing to one character next to
+            // the window edge.
+            Some(options.max_width),
             content,
             false,
-            PortalPlacementMode::Fixed,
+            // Below the anchor, flipping above it when the window has no room
+            // underneath — the same fit rule every anchored overlay uses.
+            PortalPlacementMode::BelowAnchor,
             Some(Rc::new(move |_size: Size| {
                 Point::new(anchor.x, anchor.y + anchor.height + options.gap)
             })),

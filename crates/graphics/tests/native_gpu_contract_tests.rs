@@ -217,7 +217,7 @@ fn fixture_dispatch_cases_are_gated_on_the_slang_toolchain() {
     }
     assert!(
         has_tool,
-        "GAP: with SLANGC set the dispatch cases also need COVE_DEV pointing at \
+        "with SLANGC set the dispatch cases also need COVE_DEV pointing at \
          the cove-dev shader tool; this tree has no Rust artifact builder",
     );
 }

@@ -18,12 +18,14 @@
 //! a builder closure, so the caller owns materialisation and lifecycle.
 use super::tab_overflow::TabOverflowStrip;
 use crate::Scope;
+use crate::ViewModifier;
 use crate::primitives::{DuplicateId, check_ids};
 use std::cell::RefCell;
 use std::rc::Rc;
 
+use crate::modifiers::interaction::AccessibilityExt;
 use crate::modifiers::layout::{FlexExt, LayoutFrameExt, PaddingExt};
-use crate::modifiers::style::SemanticStyleViewExt;
+use crate::modifiers::style::{AppearanceExt, SemanticStyleViewExt};
 use crate::primitives::controls::button::{Button, ButtonRole};
 use crate::primitives::media::Icon;
 use crate::primitives::overlays::roving_focus::{RovingFocusHost, RovingItem, roving_identity};
@@ -32,7 +34,7 @@ use crate::theme::styles::buttons::{ButtonStyleViewExt, TabButtonStyle};
 use crate::theme::{SemanticColorRef, SemanticFontRef, theme_for_node};
 use crate::{AnyView, BoxView, PrimitiveView, TupleView, View, ViewExt};
 use cove_core::Binding;
-use cove_core::scene::{Align, FlexDirection, Justify, Node, Wrap};
+use cove_core::scene::{AccessibilityRole, Align, FlexDirection, Justify, Node, Wrap};
 use cove_imaging::BundleImageResource;
 
 /// Visual treatment of a tab strip.
@@ -271,10 +273,16 @@ impl<Id: PartialEq + Clone + std::hash::Hash + 'static> TabView<Id> {
 }
 
 impl<Id: PartialEq + Clone + std::hash::Hash + 'static> View for TabView<Id> {
-    fn body(&self, _cx: &Scope) -> AnyView {
-        AnyView::new(TabViewBody {
-            tabs_view: self.snapshot(),
-        })
+    fn body(&self, cx: &Scope) -> AnyView {
+        // Swift holds this in `@State`, so it survives recomposition and the
+        // request the key handler writes is the one the layout hook reads. A
+        // fresh request per body split the two: the handler stored a target the
+        // hook never saw, and a tab revealed by the overflow menu never took
+        // focus.
+        let request = cx.remember(|| self.focus_request.clone());
+        let mut view = self.snapshot();
+        view.focus_request = request;
+        AnyView::new(TabViewBody { tabs_view: view })
     }
 }
 
@@ -304,28 +312,53 @@ impl<Id: PartialEq + Clone + std::hash::Hash + 'static> PrimitiveView for TabVie
         let indicator = view.indicator(placement);
 
         // Strip items, each with its roving identity. A menu strip builds its own.
+        // Swift measures the strip first and passes the result as the header's
+        // `maximumWidth` (`TabView.swift:133`, `:148`).
         let identity: Rc<dyn Fn(&Id) -> u64> = Rc::new(|id: &Id| roving_identity(id));
-        let mut strip_items: Vec<AnyView> = Vec::new();
-        let tabs_in_strip: &[TabItem<Id>] = if view.overflow == TabOverflow::Menu {
-            &[]
-        } else {
-            &view.tabs
+        let build_strip_items = {
+            let view = view.snapshot();
+            let active = active.clone();
+            let tab_stop = tab_stop.clone();
+            let identity = identity.clone();
+            move |strip_width: f32| -> Vec<AnyView> {
+                let mut strip_items: Vec<AnyView> = Vec::new();
+                let tabs_in_strip: &[TabItem<Id>] =
+                    if view.overflow == TabOverflow::Menu {
+                        &[]
+                    } else {
+                        &view.tabs
+                    };
+                let reserved = if view.variant == TabVariant::Segmented {
+                    6.0
+                } else {
+                    0.0
+                };
+                let maximum = if strip_width > 0.0 {
+                    (strip_width - reserved).max(44.0)
+                } else {
+                    f32::MAX
+                };
+                for tab in tabs_in_strip {
+                    let is_tab_stop = tab_stop.as_ref() == Some(&tab.id);
+                    let item = TabStripItem {
+                        tab: tab.clone(),
+                        selection: view.selection.clone(),
+                        is_enabled: view.is_enabled && tab.is_enabled,
+                        variant: view.variant,
+                        indicator,
+                        is_selected: active.as_ref() == Some(&tab.id),
+                        minimum_width: 44.0,
+                        maximum_width: f32::MAX,
+                    }
+                    .maximum_width(maximum);
+                    strip_items.push(AnyView::new(crate::ModifiedContent::new(
+                        AnyView::new(item),
+                        RovingItem::new(tab.id.clone(), is_tab_stop, identity.clone()),
+                    )));
+                }
+                strip_items
+            }
         };
-        for tab in tabs_in_strip {
-            let is_tab_stop = tab_stop.as_ref() == Some(&tab.id);
-            let item = TabStripItem {
-                tab: tab.clone(),
-                selection: view.selection.clone(),
-                is_enabled: view.is_enabled && tab.is_enabled,
-                variant: view.variant,
-                indicator,
-                is_selected: active.as_ref() == Some(&tab.id),
-            };
-            strip_items.push(AnyView::new(crate::ModifiedContent::new(
-                AnyView::new(item),
-                RovingItem::new(tab.id.clone(), is_tab_stop, identity.clone()),
-            )));
-        }
 
         let strip = AnyView::new(TabStrip {
             variant: view.variant,
@@ -341,21 +374,21 @@ impl<Id: PartialEq + Clone + std::hash::Hash + 'static> PrimitiveView for TabVie
                     view.focus_request.clone(),
                 ))
             } else {
-                AnyView::new(BoxView::new(
-                    FlexDirection::Row,
-                    Align::Center,
-                    Justify::FlexStart,
-                    if view.overflow == TabOverflow::Wrap {
-                        Wrap::Wrap
-                    } else {
-                        Wrap::NoWrap
+                let builder = build_strip_items.clone();
+                let is_wrap = view.overflow == TabOverflow::Wrap;
+                let is_segmented = view.variant == TabVariant::Segmented;
+                AnyView::new(cove_composition::adaptive::ContainerSizeReader::new(
+                    move |size: cove_core::Size| {
+                        let items = builder(size.width);
+                        AnyView::new(BoxView::new(
+                            FlexDirection::Row,
+                            Align::Center,
+                            Justify::FlexStart,
+                            if is_wrap { Wrap::Wrap } else { Wrap::NoWrap },
+                            if is_segmented { 2.0 } else { 0.0 },
+                            AnyView::new(TupleView::new(items)),
+                        ))
                     },
-                    if view.variant == TabVariant::Segmented {
-                        2.0
-                    } else {
-                        0.0
-                    },
-                    AnyView::new(TupleView::new(strip_items)),
                 ))
             },
         });
@@ -451,7 +484,7 @@ impl PrimitiveView for TabStrip {
             node.set_background_color(Some(theme.colors.surface_variant));
             node.set_corner_radius(theme.radius.md);
         } else {
-            node.set_background_color(Some(theme_for_node(node).colors.surface));
+            crate::theme::tokens::SemanticBackgroundModifier::new(crate::theme::SemanticColorRef::surface()).apply_node(node);
             node.set_corner_radius(0.0);
         }
     }
@@ -488,6 +521,10 @@ pub(crate) struct TabStripItem<Id: PartialEq + Clone + 'static> {
     variant: TabVariant,
     indicator: IndicatorPlacement,
     is_selected: bool,
+    /// Width the header's own chrome needs, before padding.
+    minimum_width: f32,
+    /// Longest width this header may take in the strip.
+    maximum_width: f32,
 }
 
 impl<Id: PartialEq + Clone + std::hash::Hash + 'static> TabStripItem<Id> {
@@ -506,7 +543,14 @@ impl<Id: PartialEq + Clone + std::hash::Hash + 'static> TabStripItem<Id> {
             variant,
             indicator,
             is_selected,
+            minimum_width: 44.0,
+            maximum_width: f32::MAX,
         }
+    }
+
+    pub(crate) fn maximum_width(mut self, maximum_width: f32) -> Self {
+        self.maximum_width = maximum_width;
+        self
     }
 }
 
@@ -527,21 +571,33 @@ impl<Id: PartialEq + Clone + std::hash::Hash + 'static> PrimitiveView for TabStr
     fn children(&self, _node: &Node) -> Vec<AnyView> {
         let mut label_row: Vec<AnyView> = Vec::new();
         if let Some(icon) = self.tab.icon.clone() {
-            label_row.push(AnyView::new(Icon::new(icon, 14.0)));
+            label_row.push(AnyView::new(Icon::new(icon, 14.0).accessibility_hidden(true)));
         }
+        // Swift hides the title from accessibility and carries it on the tab's
+        // own semantics instead (`TabView.swift:193`).
         label_row.push(AnyView::new(
-            Text::new(self.tab.label.clone()).semantic_font(SemanticFontRef::label()),
+            AnyView::new(
+                Text::new(self.tab.label.clone())
+                    .truncated()
+                    .semantic_font(SemanticFontRef::label())
+                    .accessibility_hidden(true),
+            )
+            .flex_with(0.0, 1.0, Some(0.0)),
         ));
         if let Some(badge) = self.tab.badge.clone() {
             label_row.push(AnyView::new(
                 Text::new(badge)
                     .semantic_font(SemanticFontRef::caption())
-                    .semantic_foreground(SemanticColorRef::on_surface_muted()),
+                    .semantic_foreground(SemanticColorRef::on_surface_muted())
+                    .accessibility_hidden(true),
             ));
         }
 
         let selection = self.selection.clone();
         let id = self.tab.id.clone();
+        let label = self.tab.label.clone();
+        let is_selected = self.is_selected;
+        let is_enabled = self.is_enabled;
         let button = Button::with_options(
             AnyView::new(
                 BoxView::new(
@@ -552,20 +608,33 @@ impl<Id: PartialEq + Clone + std::hash::Hash + 'static> PrimitiveView for TabStr
                     6.0,
                     AnyView::new(TupleView::new(label_row)),
                 )
-                .padding_edges(self.variant.horizontal_padding(), 0.0),
+                .padding_edges(self.variant.horizontal_padding(), 0.0)
+                .frame(None, None, Some(0.0), None, None, None)
+                .clipped(),
             ),
             move || selection.set(id.clone()),
             ButtonRole::Normal,
             self.is_enabled,
             false,
             self.is_selected,
-            None,
+            Some(label.clone()),
         )
-        .button_style(TabButtonStyle::default());
+        .button_style(TabButtonStyle::default())
+        // The strip item is a tab, not a plain button: assistive clients and the
+        // query surface both resolve `role=tab` from here (`TabView.swift:221`).
+        .accessibility(move |semantics| {
+            semantics.role = AccessibilityRole::Tab;
+            semantics.label = label.clone();
+            semantics.state.is_selected = is_selected;
+            semantics.state.is_enabled = is_enabled;
+        });
         let button = AnyView::new(button);
 
         let mut row: Vec<AnyView> = vec![button];
         if let Some(on_close) = self.tab.on_close.clone() {
+            // Swift labels the control `"Close <title>"` and keeps it a 44pt
+            // touch target (`TabView.swift:205`).
+            let close_label = format!("Close {}", self.tab.label);
             let close = Button::with_options(
                 AnyView::new(crate::primitives::media::Icon::with_semantic(
                     crate::primitives::media::ui_icon_catalog::action::x(),
@@ -577,12 +646,18 @@ impl<Id: PartialEq + Clone + std::hash::Hash + 'static> PrimitiveView for TabStr
                 self.is_enabled,
                 false,
                 false,
-                Some("Close tab".to_string()),
-            );
+                Some(close_label.clone()),
+            )
+            .accessibility_label(close_label)
+            .frame(None, None, Some(44.0), Some(44.0), None, None);
             row.push(AnyView::new(close));
         }
 
-        vec![AnyView::new(TabItemChrome {
+        // Swift clamps a header to `max(44, stripWidth - 6?)`: the selected
+        // long title must stay inside the strip rather than overflow it
+        // (`TabView.swift:148`, `:220`).
+        let maximum = self.maximum_width;
+        let chrome = AnyView::new(TabItemChrome {
             content: AnyView::new(BoxView::new(
                 FlexDirection::Row,
                 Align::Center,
@@ -594,7 +669,15 @@ impl<Id: PartialEq + Clone + std::hash::Hash + 'static> PrimitiveView for TabStr
             indicator: self.indicator,
             is_selected: self.is_selected,
             variant: self.variant,
-        })]
+        });
+        vec![AnyView::new(chrome.frame(
+            None,
+            None,
+            Some(44.0_f32.max(self.minimum_width)),
+            None,
+            Some(maximum.max(44.0_f32.max(self.minimum_width))),
+            None,
+        ))]
     }
 }
 impl<Id: PartialEq + Clone + std::hash::Hash + 'static> View for TabStripItem<Id> {
@@ -621,7 +704,7 @@ impl PrimitiveView for TabItemChrome {
     fn update_node(&self, node: &Node) {
         let theme = theme_for_node(node);
         if self.variant == TabVariant::Card && self.is_selected {
-            node.set_background_color(Some(theme.colors.surface));
+            crate::theme::tokens::SemanticBackgroundModifier::new(crate::theme::SemanticColorRef::surface()).apply_node(node);
             node.set_corner_radius(theme.radius.md);
         }
         if self.indicator != IndicatorPlacement::None && self.is_selected {

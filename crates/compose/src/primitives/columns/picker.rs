@@ -1,7 +1,24 @@
-//! State and menu entries for the column visibility picker.
-//! The adaptive menu presentation is pending the Rust menu/overlay controls.
+//! State and menu entries for the column visibility picker, plus the picker
+//! trigger that both the `Grid` and the table presentations mount above their
+//! content.
+//!
+//! Translation of `Primitives/Columns/Picker.swift`.
+use crate::modifiers::interaction::AccessibilityExt;
+use crate::modifiers::layout::{FlexExt, LayoutFrameExt};
+use crate::primitives::overlays::{MenuEntry, MenuItem};
+use crate::theme::SemanticStyleViewExt;
+use crate::theme::styles::buttons::ButtonStyleViewExt;
+use crate::{View, ViewExt};
+use cove_core::Binding;
+
 use super::{ColumnVisibilityPlan, ColumnVisibilityTrack};
 use std::collections::{HashMap, HashSet};
+
+/// Label advertised by the picker trigger, so one query finds it in every
+/// column container.
+pub const COLUMN_VISIBILITY_LABEL: &str = "Column visibility";
+/// The menu entry that clears every override.
+pub const AUTOMATIC_COLUMNS_TITLE: &str = "Automatic columns";
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum ColumnPickerEntry {
@@ -72,5 +89,151 @@ impl ColumnVisibilityPickerModel {
 
     pub fn set_column_visible(id: &str, visible: bool, overrides: &mut HashMap<String, bool>) {
         overrides.insert(id.to_owned(), visible);
+    }
+}
+
+/// The picker both column containers mount above their content: a 44pt
+/// "Column visibility" trigger that opens a menu with the automatic reset and
+/// one entry per column.
+///
+/// Translation of `Primitives/Columns/Picker.swift`. The trigger is a real
+/// `Button`, so it inherits the touch control extent and the disabled state
+/// instead of re-deriving them, and the menu is presented through `Popover`,
+/// which owns the portal and dismisses itself when the container is disabled
+/// while open.
+pub struct ColumnVisibilityPicker {
+    columns: Vec<ColumnVisibilityTrack>,
+    plan: ColumnVisibilityPlan,
+    overrides: Binding<HashMap<String, bool>>,
+    is_enabled: bool,
+}
+
+impl ColumnVisibilityPicker {
+    pub fn new(
+        columns: Vec<ColumnVisibilityTrack>,
+        plan: ColumnVisibilityPlan,
+        overrides: Binding<HashMap<String, bool>>,
+        is_enabled: bool,
+    ) -> Self {
+        Self {
+            columns,
+            plan,
+            overrides,
+            is_enabled,
+        }
+    }
+
+    /// Menu entries in the order Swift authors them: the automatic reset, a
+    /// separator, then one entry per column.
+    fn entries(&self, model: &ColumnVisibilityPickerModel) -> Vec<MenuEntry> {
+        let entries: Vec<MenuEntry> = model
+            .entries
+            .iter()
+            .enumerate()
+            .map(|(index, entry)| match entry {
+                ColumnPickerEntry::Automatic { is_enabled } => {
+                    let overrides = self.overrides.clone();
+                    MenuEntry::Item(
+                        MenuItem::new(index as u64, AUTOMATIC_COLUMNS_TITLE, move || {
+                            let mut next = overrides.get();
+                            if ColumnVisibilityPickerModel::reset_to_automatic(&mut next) {
+                                overrides.set(next);
+                            }
+                        })
+                        .enabled(*is_enabled),
+                    )
+                }
+                ColumnPickerEntry::Separator => MenuEntry::separator(index as u64),
+                ColumnPickerEntry::Column {
+                    id,
+                    title,
+                    is_enabled,
+                    is_selected,
+                } => {
+                    let column_id = id.clone();
+                    let shown = *is_selected;
+                    let overrides = self.overrides.clone();
+                    MenuEntry::Item(
+                        MenuItem::new(index as u64, title.clone(), move || {
+                            let mut next = overrides.get();
+                            ColumnVisibilityPickerModel::set_column_visible(
+                                &column_id, !shown, &mut next,
+                            );
+                            overrides.set(next);
+                        })
+                        .enabled(*is_enabled)
+                        .selected(*is_selected),
+                    )
+                }
+            })
+            .collect();
+        entries
+    }
+}
+
+impl View for ColumnVisibilityPicker {
+    fn body(&self, cx: &crate::Scope) -> crate::AnyView {
+        let model = ColumnVisibilityPickerModel::new(
+            &self.columns,
+            &self.plan,
+            &self.overrides.get(),
+            self.is_enabled,
+            false,
+        );
+        let entries = self.entries(&model);
+        // Scope-owned, so the presentation survives the recomposition the
+        // choice itself triggers.
+        let presented = cx.state(|| false);
+        let toggle = presented.clone();
+        let trigger = crate::primitives::controls::Button::with_options(
+            crate::primitives::text::Text::new("Columns"),
+            move || toggle.set(!toggle.get()),
+            crate::primitives::controls::button::ButtonRole::Normal,
+            self.is_enabled,
+            false,
+            presented.get(),
+            None,
+        )
+        .button_style(crate::theme::styles::buttons::SecondaryButtonStyle)
+        .composition_local(
+            crate::primitives::controls::button::ActionControlAccessibility::label(),
+            Some(COLUMN_VISIBILITY_LABEL.to_string()),
+        )
+        .frame(None, None, Some(44.0), Some(44.0), None, None);
+        let summary = crate::primitives::text::Text::new(model.summary.clone())
+            .semantic_font(crate::theme::SemanticFontRef::caption())
+            .semantic_foreground(crate::theme::SemanticColorRef::on_surface_muted())
+            .accessibility(|semantics| {
+                semantics.role = cove_core::scene::AccessibilityRole::Status;
+            })
+            .flex_with(1.0, 1.0, Some(0.0))
+            .frame(None, None, Some(0.0), None, None, None);
+        let dismiss = presented.clone();
+        let menu = crate::primitives::overlays::Menu::new(entries)
+            .on_item_activated(move || dismiss.set(false));
+        let popover = crate::primitives::overlays::Popover::new(trigger, menu)
+            .is_presented(presented.binding())
+            .enabled(self.is_enabled)
+            .placement(crate::primitives::overlays::PopoverPlacement::BottomLeading)
+            .trigger_style(crate::theme::styles::buttons::SecondaryButtonStyle)
+            .width(220.0);
+        crate::AnyView::new(
+            crate::AnyView::new(crate::BoxView::new(
+                cove_core::scene::FlexDirection::Row,
+                cove_core::scene::Align::Center,
+                cove_core::scene::Justify::FlexStart,
+                cove_core::scene::Wrap::NoWrap,
+                8.0,
+                crate::AnyView::new(crate::TupleView::new(vec![
+                    crate::AnyView::new(crate::AnyView::new(popover).flex_with(0.0, 0.0, None)),
+                    crate::AnyView::new(summary),
+                ])),
+            ))
+            .frame_min_width(0.0),
+        )
+    }
+
+    fn tag(&self) -> &'static str {
+        std::any::type_name::<Self>()
     }
 }

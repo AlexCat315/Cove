@@ -24,14 +24,9 @@
 //! - `ContextMenu` is a wrapper view rather than a `.contextMenu` modifier, and
 //!   its anchor is the `"context-menu-anchor"` attachment instead of a debug
 //!   name. The suite locates the same host node.
-//! - **A secondary press never opens a `ContextMenu`.** `ContextMenuHost`'s
-//!   pointer route (`primitives/overlays/context_menu.rs:152-161`) returns
-//!   `EventResult::Handled` for every secondary press regardless of delivery
-//!   phase, while `on_open` is gated on `EventPhase::Target`. The dispatcher's
-//!   CHROME capture sweep therefore consumes the press before target delivery,
-//!   so `on_open` never runs and no portal entry is published. Swift opens the
-//!   menu and moves the tree selection here. The second test asserts the current
-//!   Rust behaviour (no portal, no selection, no action) with `GAP:` messages.
+//! - `ContextMenuHost` installs its pointer route at
+//!   `InputRoutingPriority::CHROME`, but a secondary press only consumes after
+//!   target delivery, so the press still reaches the host and `on_open` runs.
 
 use crate::support;
 use cove_composition::Scope;
@@ -150,17 +145,22 @@ impl View for Harness {
             ..Default::default()
         });
 
-        AnyView::new(LayerRoot::new(AnyView::new(BoxView::new(
-            FlexDirection::Column,
-            Align::Stretch,
-            Justify::FlexStart,
-            Wrap::NoWrap,
-            0.0,
-            AnyView::new(TupleView::new(vec![
-                AnyView::new(popover),
-                AnyView::new(AnyView::new(tree).flex_with(1.0, 1.0, Some(0.0))),
-            ])),
-        ))))
+        // The column has to claim the window height, otherwise the tree below the
+        // trigger has no space to lay out and its rows are never hit-testable.
+        AnyView::new(LayerRoot::new(AnyView::new(
+            BoxView::new(
+                FlexDirection::Column,
+                Align::Stretch,
+                Justify::FlexStart,
+                Wrap::NoWrap,
+                0.0,
+                AnyView::new(TupleView::new(vec![
+                    AnyView::new(popover),
+                    AnyView::new(AnyView::new(tree).flex_with(1.0, 1.0, Some(0.0))),
+                ])),
+            )
+            .flex_with(1.0, 1.0, None),
+        )))
     }
 
     fn dynamic_properties(&self) -> Vec<DynamicField> {
@@ -248,25 +248,28 @@ fn right_click_selecting_a_tree_row_retains_and_activates_its_context_menu() {
             .first(|node| node.attachment::<bool>("context-menu-anchor") == Some(true))
             .expect("the tree row's context menu host is mounted");
         click_with_button(scene, &row, MouseButton::Right);
-        // GAP: Swift opens one portal entry here and the row's selection moves
-        // through `onOpen`. Rust's `ContextMenuHost` pointer route returns
-        // `Handled` for any secondary press, including the CHROME capture sweep
-        // that runs before target delivery, so the `EventPhase::Target`-gated
-        // `on_open` never fires: the press is swallowed and no menu exists.
         assert_eq!(
             scene.portal.entries().len(),
-            0,
-            "GAP: the context menu never opens; the secondary press is consumed during the CHROME capture sweep"
+            1,
+            "the secondary press opens the row's context menu"
         );
         assert_eq!(
             selection.get(),
-            None,
-            "GAP: `on_open` never fires, so the tree selection is not moved to the right-clicked row"
+            Some(1),
+            "`on_open` moves the tree selection to the right-clicked row"
         );
+        assert_eq!(probe.get(), 0, "opening the menu runs no context item yet");
+
+        let action = item(scene, 2);
+        scene.click(&action, 1);
         assert_eq!(
             probe.get(),
-            0,
-            "GAP: the context item's action cannot run because the menu never opens"
+            1,
+            "the context item's action runs once when activated"
+        );
+        assert!(
+            scene.portal.entries().is_empty(),
+            "the activated context menu leaves no portal behind"
         );
     });
 }

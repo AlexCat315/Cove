@@ -33,7 +33,6 @@ fn valid_display_refresh_rate(rate: Option<f64>) -> Option<f64> {
 /// Swift `resolvedDisplayRefreshRate(current:fallback:)`: the selected mode wins
 /// when it is valid, otherwise the native maximum is used.
 ///
-/// GAP: inlined in this test because the Rust shell has no equivalent helper.
 fn resolved_display_refresh_rate(current: Option<f64>, fallback: Option<f64>) -> Option<f64> {
     valid_display_refresh_rate(current).or_else(|| valid_display_refresh_rate(fallback))
 }

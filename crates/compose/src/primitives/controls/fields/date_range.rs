@@ -342,9 +342,11 @@ impl DateRangeCalendar {
 }
 
 impl View for DateRangeCalendar {
-    fn body(&self, _cx: &Scope) -> AnyView {
+    fn body(&self, cx: &Scope) -> AnyView {
+        let mut view = self.snapshot();
+        view.session = cx.remember(|| self.session.clone());
         AnyView::new(DateRangeCalendarBody {
-            view: self.snapshot(),
+            view,
         })
     }
 }
@@ -772,6 +774,14 @@ impl PrimitiveView for DayCell {
     }
 
     fn update_node(&self, node: &Node) {
+        let enabled = self.in_month() && self.view.is_selectable(self.day);
+        node.set_is_focusable(enabled);
+        node.set_is_tab_stop(self.tab_day == Some(self.day) && enabled);
+        node.set_is_hit_testable(enabled);
+        let mut semantics = node.accessibility().unwrap_or_default();
+        semantics.state.is_enabled = enabled;
+        semantics.state.is_selected = self.is_start() || self.is_end();
+        node.set_accessibility(Some(semantics));
         let theme = theme_for_node(node);
         let in_month = self.in_month();
         let is_today = self.view.options.calendar.start_of_day(self.day)

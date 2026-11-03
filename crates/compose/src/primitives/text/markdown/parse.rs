@@ -343,6 +343,12 @@ fn convert<'a>(events: impl Iterator<Item = Event<'a>>) -> Vec<MarkdownBlock> {
                     }
                 }
                 TagEnd::Item => {
+                    // A tight list item has no paragraph wrapper, so its text
+                    // is still pending in the inline buffer when the item ends.
+                    let runs = std::mem::take(&mut inline).finish();
+                    if !runs.is_empty() {
+                        emit(&mut stack, &mut blocks, MarkdownBlock::Paragraph(runs));
+                    }
                     if let Some(Frame::Item(item)) = stack.pop()
                         && let Some(Frame::List(list)) = stack.last_mut()
                     {

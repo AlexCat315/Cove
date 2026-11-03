@@ -20,14 +20,11 @@
 //! - Swift rows carry the debug name `sidebar-item-<id>`. The Rust `Sidebar`
 //!   publishes none, so rows are found by accessible label — the
 //!   `sidebar_tests.rs` precedent.
-//! - Swift's rail label wraps a long title over more than one line; Rust's
-//!   `Text::truncated()` shapes at most one line.
-//! - Swift's row help text `"Destination 5 (123456)"` is not produced by the
-//!   Rust row (it publishes label + value only).
-//! - Swift paints a 40pt `rail-selection-tile` centered on the row and swaps
-//!   the glyph tint on hover. Rust has no tile node: the selection band is a
-//!   whole-row fill on the selected row, and hovering an unselected rail row
-//!   paints nothing.
+//! - Swift's rail label wraps a long title over more than one line; the Rust
+//!   rail caption wraps too, because it is laid out at the rail's width instead
+//!   of being truncated.
+//! - Swift's row help text `"Destination 5 (123456)"` is the rail row tooltip;
+//!   the Rust rail row publishes the same breadcrumb-plus-badge help string.
 //! - Swift's arrow browsing moves focus with the selection. The Rust roving
 //!   host moves the selection but leaves focus where it started: `RovingItem`
 //!   sits on the non-focusable destination wrapper, so the host never focuses
@@ -76,6 +73,14 @@ fn text_of(node: &Node) -> Option<String> {
     node.layout_node()
         .and_then(|layout| layout.text_inputs())
         .map(|inputs| inputs.text)
+}
+
+fn mid_x(rect: cove_core::Rect) -> f32 {
+    rect.x + rect.width / 2.0
+}
+
+fn mid_y(rect: cove_core::Rect) -> f32 {
+    rect.y + rect.height / 2.0
 }
 
 fn glyph(node: &Node) -> Node {
@@ -374,27 +379,13 @@ fn rail_geometry_holds_across_theme_density_and_text() {
                             let current = row(scene, 5);
                             let row_width = current.frame().width;
                             let row_glyph_width = glyph(&current).frame().width;
-                            // GAP: Swift rail rows fill the rail width; the
-                            // Rust row is content-driven — it hugs its
-                            // (unclamped) glyph, shrunk to whatever the lane
-                            // and the icon metrics allow, never equal to
-                            // Swift's clamped rail
-                            // (`sidebar_tests.rs` documents the same
-                            // row-fills-lane gap).
-                            assert!(
-                                row_width <= row_glyph_width + 0.5
-                                    && (row_width - rail_width).abs() > 0.5,
-                                "GAP: the row measures {row_width} content-driven inside a \
-                                 {nav_width} lane with a {row_glyph_width} glyph; Swift fills \
-                                 every rail row with the {rail_width} rail width",
+                            assert_eq!(
+                                row_width, rail_width,
+                                "the rail row fills the {rail_width} rail, glyph {row_glyph_width}"
                             );
-                            // GAP: Swift floors rows at 44pt via the rail touch
-                            // target; Rust uses `minimum_row_height` (38) and,
-                            // unclamped, the 400pt icon drives the height.
                             assert!(
-                                current.frame().height >= 38.0,
-                                "GAP: the row is {} tall; the Rust floor is the \
-                                 38pt minimum row height, Swift floors rail rows at 44",
+                                current.frame().height >= 44.0,
+                                "rail rows floor at the 44pt touch target, saw {}",
                                 current.frame().height
                             );
                             let semantics = current
@@ -405,43 +396,26 @@ fn rail_geometry_holds_across_theme_density_and_text() {
                                 semantics.value, "123456",
                                 "the badge lands on the accessibility value"
                             );
-                            assert_ne!(
+                            assert_eq!(
                                 semantics.help, "Destination 5 (123456)",
-                                "GAP: the Rust row publishes label + value only; \
-                                 Swift composes the help string 'Destination 5 (123456)'"
+                                "the rail row composes the breadcrumb plus badge help string"
                             );
 
                             let glyph = glyph(&current);
-                            // GAP: Swift clamps the glyph to `railWidth - 16`;
-                            // the Rust rail passes the authored 400pt extent
-                            // through (scaled by the icon metrics).
+                            let clamp = rail_width - 16.0;
                             assert!(
-                                glyph.frame().width > rail_width - 16.0,
-                                "GAP: the glyph is {} wide instead of clamped to {}",
-                                glyph.frame().width,
-                                rail_width - 16.0
+                                glyph.frame().width <= clamp + 0.5,
+                                "the glyph clamps to railWidth - 16 ({clamp}), saw {}",
+                                glyph.frame().width
                             );
                             let bounds = glyph.absolute_frame();
                             let lane_bounds = nav.absolute_frame();
-                            // GAP: Swift clamps the glyph to `railWidth - 16`;
-                            // the Rust rail passes the authored 400pt extent
-                            // through (scaled by the icon metrics), centred on the
-                            // lane, so it overhangs the lane on both sides.
                             assert!(
-                                (glyph.frame().width - 400.0 * scale).abs() < 1.0,
-                                "GAP: the glyph is {} wide at scale {scale}; Swift clamps it \
-                                 to {} while the Rust rail keeps the authored 400pt extent",
-                                glyph.frame().width,
-                                rail_width - 16.0,
-                            );
-                            assert!(
-                                ((bounds.x + bounds.max_x()) / 2.0 - nav_width / 2.0).abs() < 1.0,
-                                "GAP: the {} glyph spans [{}, {}] inside the {} lane [{}, {}] \
-                                 at scale {scale}; Swift clamps it inside the rail",
-                                row_glyph_width,
+                                bounds.x >= lane_bounds.x - 0.5
+                                    && bounds.max_x() <= lane_bounds.max_x() + 0.5,
+                                "the glyph stays inside the rail: glyph [{}, {}], rail [{}, {}]",
                                 bounds.x,
                                 bounds.max_x(),
-                                nav_width,
                                 lane_bounds.x,
                                 lane_bounds.max_x(),
                             );
@@ -458,16 +432,12 @@ fn rail_geometry_holds_across_theme_density_and_text() {
                                 assert!(text.frame().width > 0.0);
                                 assert!(
                                     text.absolute_frame().max_x()
-                                        <= row(scene, 4).absolute_frame().max_x() + 0.5,
-                                    "the caption fits its row; oversized glyphs still widen the row beyond the rail"
+                                        <= nav.absolute_frame().max_x() + 0.5,
+                                    "the caption stays inside the rail at scale {scale}"
                                 );
-                                // GAP: Swift wraps the long title onto more than
-                                // one line; the Rust rail caption truncates to a
-                                // single shaped line.
                                 assert!(
-                                    measured.result.lines.len() <= 1,
-                                    "GAP: the title shapes {} line(s); Swift wraps it \
-                                     onto more than one",
+                                    measured.result.lines.len() > 1,
+                                    "the long title wraps onto more than one line, saw {}",
                                     measured.result.lines.len()
                                 );
                                 for line in &measured.result.lines {
@@ -579,19 +549,13 @@ fn presentations_retain_identity_header_focus_and_visibility() {
                 .first(|node| node.scroll_reveal().is_some())
                 .expect("the rail body is scrollable");
             let viewport = scroller.absolute_frame();
-            let frame = current.absolute_frame();
-            let visible = frame.y.max(viewport.y)..frame.max_y().min(viewport.max_y());
+            let frame = current.absolute_frame();            let visible = frame.y.max(viewport.y)..frame.max_y().min(viewport.max_y());
             let visible_height = (visible.end - visible.start).max(0.0);
-            // GAP: with the unclamped 400pt icons a row is taller than the
-            // scroll viewport, so "fully revealed" can only mean "fills the
-            // viewport" in Rust. Swift's rows are compact and it asserts
-            // `visibleFrame.height >= frame.height - 1`.
             assert!(
-                visible_height >= frame.height - 1.0 || visible_height >= viewport.height - 1.0,
-                "the selected row is revealed inside the viewport \
-                 (visible {visible_height} of {}, viewport {})",
+                visible_height >= frame.height - 1.0,
+                "the selected row is fully revealed inside the viewport \
+                 (visible {visible_height} of {})",
                 frame.height,
-                viewport.height
             );
             assert_eq!(states.selected.get(), Some(29));
             assert_eq!(
@@ -684,14 +648,20 @@ fn roving_navigation_skips_wraps_and_separates_activation() {
         assert_eq!(tab_stops, 1, "the rail exposes exactly one roving tab stop");
 
         let selected = row(scene, 0);
-        for banned in ["rail-selection-indicator", "rail-selection-tile"] {
-            assert!(
-                nodes_of(&selected)
-                    .iter()
-                    .all(|node| support::debug_name(node).as_deref() != Some(banned)),
-                "the selected row carries no {banned} chrome node"
-            );
-        }
+        assert!(
+            nodes_of(&selected)
+                .iter()
+                .all(|node| support::debug_name(node).as_deref()
+                    != Some("rail-selection-indicator")),
+            "the selected row carries no accent-lane chrome node"
+        );
+        assert!(
+            nodes_of(&selected)
+                .iter()
+                .all(|node| support::debug_name(node).as_deref()
+                    != Some("rail-selection-tile")),
+            "a labelled rail uses the full-width pill, not the icon-only tile"
+        );
     });
 }
 
@@ -707,25 +677,39 @@ fn icon_only_rail_marks_selection_and_hovers_without_an_accent_lane() {
         scene.install(states.harness(false));
 
         let selected = row(scene, 0);
-        let bands: Vec<Node> = nodes_of(&selected)
+        let theme = Theme::default_dark();
+        let tile = nodes_of(&selected)
             .into_iter()
-            .filter(|node| {
-                node.background_color()
-                    .is_some_and(|color| color != Color::CLEAR)
-            })
-            .collect();
-        assert!(
-            !bands.is_empty(),
-            "the selected row paints a selection band"
+            .find(|node| support::debug_name(node).as_deref() == Some("rail-selection-tile"))
+            .expect("the icon-only rail floats a rail-selection-tile");
+        assert_eq!(
+            (tile.frame().width, tile.frame().height),
+            (40.0, 40.0),
+            "the tile measures 40x40"
         );
-        // GAP: Swift requires a dedicated 40x40 `rail-selection-tile` centered
-        // on the row. The Rust rail has no tile node at all — the whole-row
-        // fill above is the only selection chrome.
+        let row_frame = selected.absolute_frame();
+        let tile_frame = tile.absolute_frame();
         assert!(
-            nodes_of(&selected)
-                .iter()
-                .all(|node| support::debug_name(node).as_deref() != Some("rail-selection-tile")),
-            "GAP: no 40pt rail-selection-tile exists; Swift centers one on the row"
+            (mid_x(tile_frame) - mid_x(row_frame)).abs() < 0.5
+                && (mid_y(tile_frame) - mid_y(row_frame)).abs() < 0.5,
+            "the tile centres on the row: tile {tile_frame:?}, row {row_frame:?}"
+        );
+        let selected_glyph = glyph(&selected);
+        let glyph_frame = selected_glyph.absolute_frame();
+        assert!(
+            (mid_x(glyph_frame) - mid_x(tile_frame)).abs() < 0.5
+                && (mid_y(glyph_frame) - mid_y(tile_frame)).abs() < 0.5,
+            "the glyph centres in the tile: glyph {glyph_frame:?}, tile {tile_frame:?}"
+        );
+        assert_eq!(
+            tile.background_color(),
+            Some(theme.colors.surface_variant),
+            "the resting tile paints the neutral selection fill"
+        );
+        assert_eq!(
+            selected_glyph.inherited_foreground_color(),
+            Some(theme.colors.on_surface),
+            "a selected glyph brightens to onSurface"
         );
         assert!(
             !nodes_of(&selected).iter().any(|node| {
@@ -735,53 +719,36 @@ fn icon_only_rail_marks_selection_and_hovers_without_an_accent_lane() {
         );
 
         let hovered = row(scene, 1);
-        let glyph = glyph(&hovered);
-        let theme = Theme::default_dark();
         assert_eq!(
-            glyph.inherited_foreground_color(),
+            glyph(&hovered).inherited_foreground_color(),
             Some(theme.colors.on_surface_variant),
             "enabled glyphs carry the variant tint"
         );
-
-        // GAP: the unclamped 400pt icons push row 1 below the viewport, so the
-        // hover probe first reveals the row and aims at its bottom edge (Swift
-        // hovers the row centre directly).
-        cove_ui_compose::primitives::layout::ScrollReveal::reveal(&hovered, false);
-        scene.settle(4, 1.0);
-        let hovered = row(scene, 1);
         let bounds = hovered.absolute_frame();
         scene
             .dispatcher()
             .dispatch(&InputEvent::MouseMotion(MouseMotionEvent {
-                x: bounds.x + bounds.width / 2.0,
-                y: bounds.max_y() - 4.0,
+                x: mid_x(bounds),
+                y: mid_y(bounds),
                 delta_x: 0.0,
                 delta_y: 0.0,
                 kind: Default::default(),
             }));
         scene.settle(4, 1.0);
         let hovered = row(scene, 1);
-        let hovers: Vec<Node> = nodes_of(&hovered)
+        let hover_tile = nodes_of(&hovered)
             .into_iter()
-            .filter(|node| {
-                node.background_color()
-                    .is_some_and(|color| color != Color::CLEAR)
-            })
-            .collect();
-        // GAP: Swift swaps the tile background to `stateLayerHover` and
-        // brightens the glyph to `onSurface`. The Rust rail has no tile and
-        // painting the row does not happen either: hovering the row paints
-        // nothing at all.
-        assert!(
-            hovers.is_empty(),
-            "GAP: hovering a rail row paints no hover band at all; Swift swaps \
-             the 40pt tile to the hover state layer"
+            .find(|node| support::debug_name(node).as_deref() == Some("rail-selection-tile"))
+            .expect("the hovered row keeps its tile");
+        assert_eq!(
+            hover_tile.background_color(),
+            Some(theme.colors.state_layer_hover),
+            "hovering swaps the tile to the hover state layer"
         );
         assert_eq!(
-            glyph.inherited_foreground_color(),
-            Some(theme.colors.on_surface_variant),
-            "GAP: the glyph keeps the variant tint on hover; Swift brightens it \
-             to onSurface"
+            glyph(&hovered).inherited_foreground_color(),
+            Some(theme.colors.on_surface),
+            "hovering brightens the glyph to onSurface"
         );
     });
 }
@@ -798,16 +765,11 @@ fn touch_activation_releases_capture_on_disable_and_unmount() {
         scene.install(states.harness(false));
         let row = row(scene, 0);
         let bounds = row.absolute_frame();
-        // GAP: with the unclamped 400pt icons the row's bottom edge sits below
-        // the viewport, so the bottom-left probe is clamped to the visible
-        // fold (Swift's compact rows put the corner inside the viewport).
-        let viewport = scene
-            .first(|node| node.scroll_reveal().is_some())
-            .expect("the rail body is scrollable")
-            .absolute_frame();
+        // The clamps keep every rail row inside the viewport, so the probe can
+        // aim at the row's own bottom-left corner.
         let point = Point {
             x: bounds.x + 1.0,
-            y: (bounds.max_y() - 1.0).min(viewport.max_y() - 1.0),
+            y: bounds.max_y() - 1.0,
         };
         scene.click_at_point(point, 1);
         assert_eq!(

@@ -19,21 +19,6 @@
 //! observes the value without needing a text environment. The assertions never
 //! depend on the rendered string.
 //!
-//! Named differences from the Swift suite:
-//! - Swift's `@Observable`/`Observed` property wrapper keeps its subscription in
-//!   storage that survives a parent rebuild. Rust holds the subscription in the
-//!   `Observed` value created by each `body` pass; the old value drops during
-//!   reconciliation and unregisters, so the observable contract (one observer,
-//!   no accumulation) is the same.
-//! - GAP: reads performed inside a reader closure (Swift's `ThemeReader`) are
-//!   not attributed to the enclosing view. Rust evaluates the closure while it
-//!   materialises the primitive's children, after the enclosing body's
-//!   `ObservableStateTracking` scope has been popped, so
-//!   `ObservableStateRegistrar::access` finds no scope and records nothing. The
-//!   second test pins that measured behaviour and names the Swift expectation;
-//!   the remaining dependency-replacement cases use direct body reads, which
-//!   Rust does track.
-
 use crate::support;
 use cove_composition::Scope;
 
@@ -366,27 +351,27 @@ fn reader_closure_read_invalidates_the_enclosing_scope() {
 
         store.set_value(1);
         assert!(
-            !graph.recomposer.has_pending(),
-            "GAP: Swift attributes a reader-closure read to the enclosing view; \
+            graph.recomposer.has_pending(),
+            "Swift attributes a reader-closure read to the enclosing view; \
              Rust evaluates the closure outside the body scope and records no dependency"
         );
         graph.recomposer.commit_all();
         assert_eq!(
             counter.get(),
-            1,
-            "GAP: the enclosing view is not rebuilt because it never subscribed"
+            2,
+            "the enclosing view is not rebuilt because it never subscribed"
         );
 
         store.set_value(2);
         assert!(
-            !graph.recomposer.has_pending(),
-            "GAP: a dependency that was never recorded cannot survive a recomposition"
+            graph.recomposer.has_pending(),
+            "a dependency that was never recorded cannot survive a recomposition"
         );
         graph.recomposer.commit_all();
         assert_eq!(
             counter.get(),
-            1,
-            "GAP: the reader closure's write never recomposes its view"
+            3,
+            "the reader closure's write never recomposes its view"
         );
     });
 }

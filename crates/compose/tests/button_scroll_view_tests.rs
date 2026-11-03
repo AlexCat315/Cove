@@ -385,8 +385,8 @@ fn scroll_view_scrollbar_chrome_follows_hover() {
             hover(HoverPhase::Enter);
             assert_eq!(
                 (scheduler.active_count(), overlay_drawn(&scroll)),
-                (0, true),
-                "GAP: Swift schedules a chrome fade-in on hover (one active animation); \
+                (1, false),
+                "Swift schedules a chrome fade-in on hover (one active animation); \
                  Rust writes the opacity outside an animation context, so it snaps visible"
             );
             scheduler.tick(1.0);
@@ -395,8 +395,8 @@ fn scroll_view_scrollbar_chrome_follows_hover() {
             hover(HoverPhase::Leave);
             assert_eq!(
                 (scheduler.active_count(), overlay_drawn(&scroll)),
-                (0, false),
-                "GAP: Swift schedules a chrome fade-out on leave; Rust hides it at once"
+                (1, true),
+                "Swift schedules a chrome fade-out on leave; Rust hides it at once"
             );
             scheduler.tick(1.0);
             assert!(!overlay_drawn(&scroll), "leave hides the chrome");

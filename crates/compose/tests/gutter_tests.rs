@@ -16,27 +16,6 @@
 //! - Escape from a gutter control returns focus to the editor
 //! - nested collapsed state survives an outer toggle; reveal unfolds a line
 //!
-//! Named differences:
-//! - GAP `field_gutter_not_mounted`: Swift's `TextField` mounts a
-//!   `TextGutterSession` and its breakpoint, marker, fold and touch line-menu
-//!   controls whenever `codeEditing.showsLineNumbers` is on. Rust's `TextField`
-//!   never reads `code_editing.gutter`/`code_editing.folding`; the session and
-//!   `TextGutterControls` exist only as standalone types, so no gutter control
-//!   is mounted, and pointer, touch-menu, Tab-stop and IME assertions against
-//!   those controls have nothing to act on. The session-level operations are
-//!   exercised directly instead.
-//! - GAP `gutter_f9_scancode`: Swift binds breakpoints to `Scancode.f9` (66).
-//!   Rust's `TextGutterSession` uses `74 + 4 = 78`, which is `Scancode::PAGE_DOWN`,
-//!   so F9 is ignored and Page Down toggles a breakpoint.
-//! - GAP `fold_caret_target`: Swift moves a caret hidden by a collapse to the
-//!   fold's header line; Rust's `toggle_fold` returns the region's last line.
-//! - GAP `fold_hidden_lines`: Swift's `TextFoldSession.hiddenLines` projects the
-//!   collapsed regions to hidden line ranges; Rust has no such projection.
-//! - GAP `fold_region_validation`: Swift drops invalid (negative), single-line
-//!   and crossing regions, keeping only properly nested headers; Rust keys
-//!   every authored region by its first line (and `usize` lines cannot be
-//!   negative).
-
 use crate::support;
 use cove_composition::Scope;
 
@@ -135,7 +114,8 @@ impl Harness {
 
     fn folding(&self) -> TextEditorFolding {
         let mut folding = TextEditorFolding::new();
-        folding.regions = vec![TextFoldRegion::new(0, 7), TextFoldRegion::new(3, 5)];
+        let shift = usize::from(self.text.get().string_value().starts_with("// before\n"));
+        folding.regions = vec![TextFoldRegion::new(shift, 7 + shift), TextFoldRegion::new(3 + shift, 5 + shift)];
         folding.collapsed_lines = Some(self.collapsed.binding());
         folding
     }
@@ -257,14 +237,15 @@ fn settle(graph: &ViewGraph, harness: &Harness) {
     }
 }
 
-fn assert_no_gutter_controls(graph: &ViewGraph, case: &str) {
-    for label in GUTTER_LABELS {
-        assert!(
-            control(label, graph).is_none(),
-            "GAP: {case}: Swift's code field mounts the gutter control {label:?}; Rust's \
-             TextField never mounts gutter controls"
-        );
+fn assert_gutter_controls(graph: &ViewGraph, case: &str) {
+    let root = graph.tree.borrow().root().expect("root");
+    let mut pending = vec![root];
+    let mut found = 0;
+    while let Some(node) = pending.pop() {
+        if support::debug_name(&node).is_some_and(|name| name.starts_with("editor-gutter-")) { found += 1; }
+        pending.extend(node.children());
     }
+    assert!(found > 0, "{case}: code fields mount interactive gutter controls");
 }
 
 fn scene(work: impl FnOnce(&Harness, &ViewGraph, &PlatformInputContext, &EventDispatcher)) {
@@ -344,7 +325,7 @@ fn geometry() {
                         assert_eq!(surface.frame().width, width, "{case}");
                         assert_eq!(harness.text.get().string_value(), SAMPLE, "{case}");
                         assert!(!graph.recomposer.has_pending(), "{case}: settled");
-                        assert_no_gutter_controls(graph, &case);
+                        assert_gutter_controls(graph, &case);
                     }
                 }
             }
@@ -355,7 +336,7 @@ fn geometry() {
 #[test]
 fn pointer_actions() {
     scene(|harness, graph, _, _| {
-        assert_no_gutter_controls(graph, "pointer actions");
+        assert_gutter_controls(graph, "pointer actions");
         let state = field(graph)
             .attachment::<Rc<std::cell::RefCell<FieldState>>>(FIELD_STATE)
             .expect("field state");
@@ -386,9 +367,8 @@ fn pointer_actions() {
         assert_eq!(harness.collapsed.get(), BTreeSet::from([3]));
         assert_eq!(
             caret_line,
-            Some(5),
-            "GAP: Swift moves a caret hidden by the collapse to the header line (3); \
-             Rust's toggle_fold returns the region's last line"
+            Some(3),
+            "a caret hidden by the collapse moves to the header line"
         );
         session.toggle_fold(3);
         assert!(harness.collapsed.get().is_empty());
@@ -399,28 +379,21 @@ fn pointer_actions() {
 #[test]
 fn equivalent_inputs() {
     scene(|harness, graph, _, _| {
-        assert_no_gutter_controls(graph, "equivalent inputs");
+        assert_gutter_controls(graph, "equivalent inputs");
         let session = session(harness);
         let none = KeyModifiers::default();
         assert!(
-            !session.handle_key(&key_event(Scancode::F9, none), 3, SAMPLE.len(), false),
-            "GAP: Swift toggles a breakpoint on F9 (scancode 66); Rust's gutter session \
-             compares against 78 and ignores F9"
+            !session.handle_key(&key_event(Scancode::PAGE_DOWN, none), 3, SAMPLE.len(), false),
+            "Page Down is not a gutter chord"
         );
         assert!(!has_breakpoint(harness, 3));
         assert!(
-            session.handle_key(
-                &key_event(Scancode::PAGE_DOWN, none),
-                3,
-                SAMPLE.len(),
-                false
-            ),
-            "GAP: Rust's gutter F9 constant equals Scancode::PAGE_DOWN, so Page Down \
-             toggles the breakpoint"
+            session.handle_key(&key_event(Scancode::F9, none), 3, SAMPLE.len(), false),
+            "F9 toggles the breakpoint on the cursor line"
         );
         assert!(has_breakpoint(harness, 3));
         assert!(session.handle_key(
-            &key_event(Scancode::PAGE_DOWN, KeyModifiers::LEFT_SHIFT),
+            &key_event(Scancode::F9, KeyModifiers::LEFT_SHIFT),
             3,
             SAMPLE.len(),
             false
@@ -436,7 +409,7 @@ fn equivalent_inputs() {
             "the shifted chord disables the breakpoint"
         );
         assert!(session.handle_key(
-            &key_event(Scancode::PAGE_DOWN, KeyModifiers::LEFT_SHIFT),
+            &key_event(Scancode::F9, KeyModifiers::LEFT_SHIFT),
             3,
             SAMPLE.len(),
             false
@@ -472,7 +445,7 @@ fn equivalent_inputs() {
 #[test]
 fn gutter_focus_and_completion() {
     scene(|harness, graph, context, input| {
-        assert_no_gutter_controls(graph, "gutter focus");
+        assert_gutter_controls(graph, "gutter focus");
         let surface = field(graph);
         let session = session(harness);
         session.mount(surface.clone());
@@ -519,7 +492,7 @@ fn configuration_and_composition() {
     assert_eq!((copy.gutter.labels.add_breakpoint)(1), "断点 1");
 
     scene(|harness, graph, _, _| {
-        assert_no_gutter_controls(graph, "IME composition");
+        assert_gutter_controls(graph, "IME composition");
         assert_eq!(harness.text.get().string_value(), SAMPLE);
     });
 }
@@ -539,7 +512,7 @@ fn editing_and_lifetime() {
     assert_eq!(annotations.collapsed_lines, BTreeSet::from([4]));
 
     scene(|harness, graph, _, _| {
-        assert_no_gutter_controls(graph, "stale actions");
+        assert_gutter_controls(graph, "stale actions");
         let session = session(harness);
         harness.enabled.set(false);
         settle(graph, harness);
@@ -597,7 +570,7 @@ fn large_fold() {
 #[test]
 fn hidden_editing() {
     scene(|harness, graph, _, _| {
-        assert_no_gutter_controls(graph, "hidden editing");
+        assert_gutter_controls(graph, "hidden editing");
         let session = session(harness);
         session.toggle_fold(3);
         assert_eq!(harness.collapsed.get(), BTreeSet::from([3]));
@@ -651,7 +624,7 @@ fn controlled_annotations_and_keyboard() {
         );
         assert_eq!(harness.collapsed.get(), BTreeSet::from([4]));
 
-        assert_no_gutter_controls(graph, "gutter Tab stop");
+        assert_gutter_controls(graph, "gutter Tab stop");
         let surface = field(graph);
         session.mount(surface.clone());
         let other = nodes(graph)
@@ -717,10 +690,9 @@ fn anchor_affinity_and_parser_readiness() {
     folds.synchronize(&options, &original);
     assert_eq!(stored.get(), BTreeSet::from([0]));
     assert_eq!(
-        folds.regions().keys().copied().collect::<Vec<_>>(),
-        vec![0],
-        "GAP: Swift projects the collapsed region to `hiddenLines == [1..<8]`; Rust's \
-         fold session exposes only the keyed regions and the collapsed set"
+        folds.hidden_lines(),
+        vec![1..8],
+        "the collapsed region projects to the hidden lines after its header"
     );
 }
 
@@ -738,19 +710,25 @@ fn nested_regions() {
     folds.synchronize(&options, &TextBuffer::from(SAMPLE));
     assert_eq!(
         folds.regions().keys().copied().collect::<BTreeSet<_>>(),
-        BTreeSet::from([0, 1, 3, 4, 7]),
-        "GAP: Swift drops invalid, single-line and crossing regions and keeps headers \
-         {{0, 3}}; Rust keys every authored region"
+        BTreeSet::from([0, 3]),
+        "invalid, single-line and crossing regions are dropped"
     );
     folds.toggle(3);
     folds.toggle(0);
     assert_eq!(folds.collapsed(), BTreeSet::from([0, 3]));
+    assert_eq!(
+        folds.hidden_lines(),
+        vec![1..8],
+        "the outer collapse dominates the projection"
+    );
     folds.toggle(0);
     assert_eq!(
         folds.collapsed(),
         BTreeSet::from([3]),
         "the nested fold survives"
     );
+    assert_eq!(folds.hidden_lines(), vec![4..6]);
     assert!(folds.reveal(4));
     assert!(folds.collapsed().is_empty());
+    assert!(folds.hidden_lines().is_empty());
 }

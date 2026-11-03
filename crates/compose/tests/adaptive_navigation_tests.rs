@@ -366,9 +366,9 @@ fn strip_height_ignores_the_touch_control_extent() {
 }
 
 #[test]
-fn strip_items_are_buttons_not_tabs() {
-    // Gap: `TabView` never publishes `AccessibilityRole::Tab`, so a strip item is
-    // announced as a button where Swift announced a tab.
+fn strip_items_are_tabs() {
+    // `TabView` publishes `AccessibilityRole::Tab` for each strip item, matching
+    // `TabView.swift:221`.
     GlobalTestLock::with_scheduler(|| {
         let graph = install(
             800.0,
@@ -378,14 +378,16 @@ fn strip_items_are_buttons_not_tabs() {
             Rc::new(RefCell::new(0)),
         );
         let root = graph.tree.borrow().root().expect("root");
-        let role = strip_item(&root, "Overview")
-            .accessibility()
-            .expect("the strip item is semantic")
-            .role;
+        let item = strip_item(&root, "Overview");
+        let semantics = item.accessibility().expect("the strip item is semantic");
         assert_eq!(
-            role,
-            AccessibilityRole::Button,
-            "Rust strip items are buttons; Swift published .tab"
+            semantics.role,
+            AccessibilityRole::Tab,
+            "a strip item is announced as a tab"
+        );
+        assert_eq!(
+            semantics.label, "Overview",
+            "the tab carries its own label"
         );
     });
 }

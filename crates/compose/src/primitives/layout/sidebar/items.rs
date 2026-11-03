@@ -51,6 +51,7 @@ impl SidebarItemSlots {
 #[derive(Clone)]
 pub struct SidebarItem<Id: PartialEq + Clone> {
     pub id: Id,
+    pub debug_name: Option<String>,
     pub title: String,
     /// Uses the active icon theme, including resource replacements and scaling.
     pub icon: Option<BundleImageResource>,
@@ -70,6 +71,7 @@ impl<Id: PartialEq + Clone> SidebarItem<Id> {
     pub fn new(id: Id, title: impl Into<String>) -> Self {
         Self {
             id,
+            debug_name: None,
             title: title.into(),
             icon: None,
             icon_size: SemanticIconSize::medium(),
@@ -80,6 +82,8 @@ impl<Id: PartialEq + Clone> SidebarItem<Id> {
             slots: SidebarItemSlots::new(),
         }
     }
+
+    pub fn debug_name(mut self, name: impl Into<String>) -> Self { self.debug_name = Some(name.into()); self }
 
     pub fn icon(mut self, icon: BundleImageResource) -> Self {
         self.icon = Some(icon);

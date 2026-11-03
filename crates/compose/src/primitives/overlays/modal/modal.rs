@@ -356,7 +356,13 @@ impl PrimitiveView for ModalBackdropView {
                         None,
                         None,
                     )
-                    .accessibility(|semantics| semantics.role = AccessibilityRole::Dialog)
+                    .accessibility({
+                        let label = self.options.label.clone();
+                        move |semantics| {
+                            semantics.role = AccessibilityRole::Dialog;
+                            semantics.label = label.clone();
+                        }
+                    })
                     .semantic_background(self.options.surface.clone())
                     .corner_radius(self.options.geometry.corner_radius)
                     // The modal lift: a wide, deep shadow.

@@ -182,7 +182,9 @@ impl SplitView {
 impl View for SplitView {
     fn body(&self, _cx: &Scope) -> AnyView {
         let thickness = match self.fraction {
-            // A user-resizable divider needs a real grab target on touch.
+            // A user-resizable divider needs a real grab target. The handle
+            // widens itself to the surface's 44pt touch extent; this is the
+            // pointer floor, also used for the fraction clamp.
             None => self.divider_thickness,
             Some(_) => self.divider_thickness.max(7.0),
         };
@@ -208,7 +210,9 @@ impl View for SplitView {
                     FlexDirection::Column,
                     SplitPaneSelector::new(presentation, pane_selection),
                 )
-                .flex_with(0.0, 0.0, Some(0.0)),
+                // Natural height: a zero basis collapsed the selector and let
+                // the pane start at the same y.
+                .flex_with(0.0, 0.0, None),
             ));
         }
 
@@ -234,7 +238,10 @@ impl View for SplitView {
                 self.axis.flex_direction(),
                 self.divider(thickness),
             )
-            .flex_with(0.0, 0.0, Some(0.0)),
+            // Auto basis, so the region is as wide as the handle it holds.
+            // A zero basis let the handle overflow its slot and the second pane
+            // start on top of it.
+            .flex_with(0.0, 0.0, None),
         );
 
         let second = AnyView::new(
@@ -255,14 +262,20 @@ impl View for SplitView {
             .frame(None, None, Some(0.0), Some(0.0), None, None),
         );
 
-        let panes = AnyView::new(BoxView::new(
-            self.axis.flex_direction(),
-            Align::Stretch,
-            Justify::FlexStart,
-            Wrap::NoWrap,
-            self.spacing,
-            AnyView::new(TupleView::new(vec![first, divider, second])),
-        ));
+        let panes = AnyView::new(
+            AnyView::new(BoxView::new(
+                self.axis.flex_direction(),
+                Align::Stretch,
+                Justify::FlexStart,
+                Wrap::NoWrap,
+                self.spacing,
+                AnyView::new(TupleView::new(vec![first, divider, second])),
+            ))
+            // The row fills the marker, so the panes and the divider span the
+            // split's whole extent instead of hugging a single pane's height.
+            .flex_with(1.0, 1.0, Some(0.0))
+            .frame(None, None, Some(0.0), Some(0.0), None, None),
+        );
 
         column.push(AnyView::new(
             AnyView::new(SplitContainerMarker { content: panes })
@@ -275,14 +288,17 @@ impl View for SplitView {
         let measured = AnyView::new(SplitExtentObserver {
             axis,
             extent: extent_state.clone(),
-            content: AnyView::new(BoxView::new(
-                FlexDirection::Column,
-                Align::Stretch,
-                Justify::FlexStart,
-                Wrap::NoWrap,
-                0.0,
-                AnyView::new(TupleView::new(column)),
-            )),
+            content: AnyView::new(
+                AnyView::new(BoxView::new(
+                    FlexDirection::Column,
+                    Align::Stretch,
+                    Justify::FlexStart,
+                    Wrap::NoWrap,
+                    0.0,
+                    AnyView::new(TupleView::new(column)),
+                ))
+                .flex_with(1.0, 1.0, Some(0.0)),
+            ),
         });
 
         AnyView::new(SplitFocusHandoffWrap {
@@ -299,10 +315,12 @@ impl View for SplitView {
     /// scope must declare those dependencies. Without this the writes never
     /// subscribe and the view keeps its first layout forever.
     fn dynamic_properties(&self) -> Vec<crate::DynamicField> {
-        vec![crate::DynamicField::state(
-            "measured_extent",
-            &self.measured_extent,
-        )]
+        vec![
+            crate::DynamicField::state("measured_extent", &self.measured_extent),
+            // An unbound split owns its own selection, so a selector change has
+            // to repaint: without this the state moved and the panes did not.
+            crate::DynamicField::state("selected_pane", &self.selected_pane),
+        ]
     }
 }
 
@@ -310,6 +328,7 @@ impl SplitView {
     fn divider(&self, thickness: f32) -> AnyView {
         match self.fraction.clone() {
             Some(fraction) => AnyView::new(SplitHandle {
+                resolved_thickness: std::cell::Cell::new(None),
                 axis: self.axis,
                 thickness,
                 color: self.divider_color,
@@ -339,8 +358,20 @@ impl PrimitiveView for SplitContainerMarker {
         node
     }
 
+    /// A layout node so the pane row sits below a compact selector instead of
+    /// starting at the same y.
     fn make_layout_node(&self) -> Option<LayoutNode> {
-        None
+        let layout = LayoutNode::new();
+        layout.set_flex_grow(1.0);
+        layout.set_flex_shrink(1.0);
+        layout.set_align_items(Align::Stretch);
+        Some(layout)
+    }
+
+    fn update_layout(&self, layout: &LayoutNode) {
+        layout.set_flex_grow(1.0);
+        layout.set_flex_shrink(1.0);
+        layout.set_align_items(Align::Stretch);
     }
 
     fn update_node(&self, node: &Node) {
@@ -367,8 +398,22 @@ impl PrimitiveView for SplitExtentObserver {
         node
     }
 
+    /// A layout node, so the observer actually receives a frame. Without one
+    /// the measured extent stayed 0 and every positive threshold read as
+    /// compact.
     fn make_layout_node(&self) -> Option<LayoutNode> {
-        None
+        let layout = LayoutNode::new();
+        layout.set_flex_grow(1.0);
+        layout.set_flex_shrink(1.0);
+        layout.set_align_items(Align::Stretch);
+        Some(layout)
+    }
+
+    fn update_layout(&self, layout: &LayoutNode) {
+        layout.set_flex_direction(FlexDirection::Column);
+        layout.set_flex_grow(1.0);
+        layout.set_flex_shrink(1.0);
+        layout.set_align_items(Align::Stretch);
     }
 
     fn update_node(&self, node: &Node) {
@@ -406,8 +451,22 @@ impl PrimitiveView for SplitFocusHandoffWrap {
         node
     }
 
+    /// A pass-through layout node: without one the observer's children were laid
+    /// out against a different parent and every pane collapsed to 0pt.
     fn make_layout_node(&self) -> Option<LayoutNode> {
-        None
+        let layout = LayoutNode::new();
+        layout.set_flex_direction(FlexDirection::Column);
+        layout.set_flex_grow(1.0);
+        layout.set_flex_shrink(1.0);
+        layout.set_align_items(Align::Stretch);
+        Some(layout)
+    }
+
+    fn update_layout(&self, layout: &LayoutNode) {
+        layout.set_flex_direction(FlexDirection::Column);
+        layout.set_flex_grow(1.0);
+        layout.set_flex_shrink(1.0);
+        layout.set_align_items(Align::Stretch);
     }
 
     fn update_node(&self, _node: &Node) {}
@@ -438,7 +497,19 @@ impl PrimitiveView for SplitFocusHandoffHost {
     }
 
     fn make_layout_node(&self) -> Option<LayoutNode> {
-        None
+        let layout = LayoutNode::new();
+        layout.set_flex_direction(FlexDirection::Column);
+        layout.set_flex_grow(1.0);
+        layout.set_flex_shrink(1.0);
+        layout.set_align_items(Align::Stretch);
+        Some(layout)
+    }
+
+    fn update_layout(&self, layout: &LayoutNode) {
+        layout.set_flex_direction(FlexDirection::Column);
+        layout.set_flex_grow(1.0);
+        layout.set_flex_shrink(1.0);
+        layout.set_align_items(Align::Stretch);
     }
 
     fn update_node(&self, node: &Node) {
@@ -450,6 +521,14 @@ impl PrimitiveView for SplitFocusHandoffHost {
                 return;
             };
             *focus.pending_visibility.borrow_mut() = None;
+            // A pane that is still shown owns its focus: only hand off when the
+            // previously focused pane is actually gone from the input graph.
+            if is_compact
+                && let Some(chain) = FocusChainHolder::current()
+                && chain.focused().is_some_and(|node| node.accepts_subtree_input())
+            {
+                return;
+            }
             let handoff = SplitFocusHandoff::new(focus.clone(), is_compact, selection);
             let target = handoff
                 .locate_in(node, true)

@@ -12,16 +12,19 @@ use crate::theme::{SemanticFontRef, theme_for_node};
 use crate::{
     AnyView, BoxView, PrimitiveView, Row, TupleView, VerticalAlignment, impl_primitive_view,
 };
-use cove_core::Color;
 use cove_core::scene::{
     AccessibilityActions, AccessibilityRole, AccessibilitySemantics, AccessibilityState, Align,
     EventResult, FlexDirection, FocusChainHolder, HoverPhase, InputHandlerRoute,
     InteractionRegistryHolder, Justify, LayoutNode, Node, PointerCaptureHolder, PointerPhase, Wrap,
 };
+use cove_core::{Color, Point};
 use cove_platform::{MouseButton, SystemCursor};
 
 use super::menu::MenuItemRole;
 use super::menu_navigation::{MENU_ITEM_ID, MenuRowEvents, MenuRowPresentation};
+use crate::primitives::overlays::portal::{
+    PortalPlacementMode, PortalResource, PortalStoreEnvironment, PortalStoreHolder,
+};
 
 const HOVERED: &str = "__menu_item_hovered";
 const PRESSED: &str = "__menu_item_pressed";
@@ -31,8 +34,30 @@ const ENABLED: &str = "__menu_enabled";
 const VISUAL_FILL: &str = "__menu_visual_fill";
 const REVEAL_TOKEN: &str = "__menu.revealToken";
 
-/// Minimum row height, before touch extents and text scaling.
-const MINIMUM_ROW_HEIGHT: f32 = 28.0;
+/// Default minimum row height, before touch extents and text scaling.
+const MINIMUM_ROW_HEIGHT: f32 = 30.0;
+
+/// `MenuRowMetrics.minimumHeight`: a menu row's minimum height. Swift declares
+/// it as a `CompositionLocal` defaulting to 30, so a caller can ask for taller
+/// rows — a picker with 44-pt entries — without reimplementing the row.
+pub fn minimum_row_height() -> Rc<cove_core::scene::CompositionLocal<f32>> {
+    thread_local! {
+        static KEY: Rc<cove_core::scene::CompositionLocal<f32>> =
+            Rc::new(cove_core::scene::CompositionLocal::new(|| 30.0));
+    }
+    KEY.with(|key| key.clone())
+}
+
+/// The row's resolved minimum height: the authored metric, raised to the
+/// surface's touch extent when the input is a finger.
+fn resolved_row_height(node: &Node) -> f32 {
+    let authored = node.composition_value(&minimum_row_height()).max(0.0);
+    let touch = node
+        .composition_value(&crate::adaptive::SurfaceEnvironment::key())
+        .input
+        .contains(cove_core::InputCapabilities::TOUCH);
+    if touch { authored.max(44.0) } else { authored }
+}
 
 #[derive(Clone, Copy, PartialEq)]
 struct PaintIdentity {
@@ -110,6 +135,9 @@ impl PrimitiveView for MenuItemRowHost {
         let node = Node::new();
         node.set_is_hit_testable(true);
         node.set_is_focusable(true);
+        if self.item.has_submenu {
+            node.add_resource(PortalResource::new());
+        }
         node
     }
 
@@ -119,11 +147,12 @@ impl PrimitiveView for MenuItemRowHost {
         Some(layout)
     }
 
-    fn update_layout(&self, layout: &LayoutNode) {
-        layout.set_min_height(Some(MINIMUM_ROW_HEIGHT));
-    }
+    fn update_layout(&self, _layout: &LayoutNode) {}
 
     fn update_node(&self, node: &Node) {
+        if let Some(layout) = node.layout_node() {
+            layout.set_min_height(Some(resolved_row_height(node)));
+        }
         node.set_is_focusable(self.item.is_enabled);
         node.set_is_tab_stop(self.item.is_enabled && self.is_highlighted);
         let focus_events = self.events.focus.clone();
@@ -152,8 +181,15 @@ impl PrimitiveView for MenuItemRowHost {
             if has_submenu && !anchor_is_visible(&node) {
                 close_submenu();
             }
-            let _ = owner;
+            if has_submenu && let Some(resource) = owner.first_resource::<PortalResource>() {
+                resource.update_position(Point::new(
+                    node.absolute_frame().x + node.absolute_frame().width,
+                    node.absolute_frame().y,
+                ));
+            }
         }) as cove_core::scene::LayoutUpdateHook));
+
+        self.synchronize_submenu(node);
 
         let role = if self.item.is_link() {
             AccessibilityRole::Link
@@ -370,15 +406,7 @@ impl PrimitiveView for MenuItemRowHost {
 
     fn children(&self, node: &Node) -> Vec<AnyView> {
         let theme = theme_for_node(node);
-        let touch = node
-            .composition_value(&crate::adaptive::SurfaceEnvironment::key())
-            .input
-            .contains(cove_core::InputCapabilities::TOUCH);
-        let minimum_height = if touch {
-            MINIMUM_ROW_HEIGHT.max(44.0)
-        } else {
-            MINIMUM_ROW_HEIGHT
-        };
+        let minimum_height = resolved_row_height(node);
         let title_color = if !self.item.is_enabled {
             theme
                 .text_emphasis
@@ -514,4 +542,40 @@ impl PrimitiveView for MenuItemRowHost {
         )]
     }
 }
+impl MenuItemRowHost {
+    fn synchronize_submenu(&self, node: &Node) {
+        let Some(resource) = node.first_resource::<PortalResource>() else {
+            return;
+        };
+        let Some(submenu) = self.submenu.clone().filter(|_| self.item.is_enabled) else {
+            cove_core::scene::NodeResource::unmount(resource.as_ref(), node);
+            return;
+        };
+        let frame = node.absolute_frame();
+        let store = node
+            .composition_value(&PortalStoreEnvironment::key())
+            .unwrap_or_else(PortalStoreHolder::current);
+        let on_close = self.events.close_submenu.clone();
+        resource.present(
+            Some(store),
+            Point::new(frame.x + frame.width, frame.y),
+            None,
+            submenu,
+            false,
+            PortalPlacementMode::BesideAnchor,
+            None,
+            None,
+        );
+        let anchor = node.downgrade();
+        resource.set_dismissal(
+            Rc::new(move || {
+                Node::upgrade(&anchor)
+                    .map(|node| node.absolute_frame())
+                    .unwrap_or_default()
+            }),
+            on_close,
+        );
+    }
+}
+
 impl_primitive_view!(MenuItemRowHost);

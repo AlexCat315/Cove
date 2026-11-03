@@ -296,6 +296,7 @@ impl PrimitiveView for ActionSheetDrawer {
         let action_viewport = 88.0_f32.max(window_height - top_clearance - safe_bottom - chrome);
 
         let mut modal_options = ModalOptions::default();
+        modal_options.label = self.question.title.clone();
         modal_options.geometry.placement = ModalPlacement::Bottom;
         modal_options.geometry.inset = inset;
         modal_options.geometry.width = width;

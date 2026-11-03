@@ -165,6 +165,7 @@ impl<Element: 'static, ID: std::hash::Hash + Eq + 'static> Default for TreeEvent
 }
 
 /// Drag-and-drop operations between rows.
+#[derive(Clone)]
 pub struct TreeDragOperations<Element: Clone + 'static> {
     pub can_drop: Option<Rc<dyn Fn(&Element, &Element, TreeDropPosition) -> bool>>,
     pub on_drop: Option<Rc<dyn Fn(Element, Element, TreeDropPosition)>>,

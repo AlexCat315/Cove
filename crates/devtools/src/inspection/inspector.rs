@@ -27,6 +27,16 @@ impl DebugAttachmentKey {
     pub const SEMANTIC_ROLE: &'static str = "CoveUI.semantic.role";
 }
 
+/// The role spelling clients read: Swift publishes the enum's raw value
+/// (`listItem`), not its `Debug` name (`ListItem`). The serde rename is the
+/// single source of truth for that spelling.
+pub(crate) fn role_name(role: cove_core::scene::AccessibilityRole) -> String {
+    serde_json::to_value(role)
+        .ok()
+        .and_then(|value| value.as_str().map(str::to_string))
+        .unwrap_or_else(|| format!("{role:?}"))
+}
+
 /// Search for a node by its stable identity. Both the `0x…` content hash from
 /// `identifier` and the raw element id are accepted, so a client may use either.
 pub(crate) fn find_in(node: &Node, id: &str) -> Option<Node> {
@@ -204,7 +214,7 @@ fn summarize(node: &Node, owner_scope_id: Option<&str>) -> NodeSummary {
             .attachment::<String>(DebugAttachmentKey::SEMANTIC_ROLE)
             .or_else(|| {
                 node.accessibility()
-                    .map(|semantics| format!("{:?}", semantics.role))
+                    .map(|semantics| crate::inspection::inspector::role_name(semantics.role))
             }),
         flags: NodeFlags {
             hit_testable: node.is_hit_testable(),

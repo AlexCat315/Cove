@@ -204,6 +204,101 @@ bool decode_svg(const uint8_t* data,
 
 } // namespace
 
+// MARK: - Template icon PNG
+
+namespace {
+
+struct PngBuffer {
+    std::vector<uint8_t> bytes;
+    bool overflowed = false;
+};
+
+void append_png_bytes(void* closure, void* data, int size) {
+    auto* buffer = static_cast<PngBuffer*>(closure);
+    if (buffer == nullptr || data == nullptr || size <= 0) {
+        return;
+    }
+    constexpr size_t limit = 4 * 1024 * 1024;
+    if (buffer->bytes.size() + static_cast<size_t>(size) > limit) {
+        buffer->overflowed = true;
+        return;
+    }
+    const auto* start = static_cast<const uint8_t*>(data);
+    buffer->bytes.insert(buffer->bytes.end(), start, start + size);
+}
+
+bool fail_template(CoveImageTemplatePngResult* result, const char* message) {
+    if (result) {
+        result->png = nullptr;
+        result->png_size = 0;
+        result->error_message = copy_message(message);
+    }
+    return false;
+}
+
+bool template_png_impl(const uint8_t* data,
+                       size_t data_size,
+                       const char* extension,
+                       int32_t points,
+                       CoveImageTemplatePngResult* result) {
+    if (result == nullptr) {
+        return false;
+    }
+    result->png = nullptr;
+    result->png_size = 0;
+    result->error_message = nullptr;
+    if (data == nullptr || data_size == 0 || data_size > INT_MAX) {
+        return fail_template(result, "empty icon data");
+    }
+    const std::string ext = lower_extension(extension);
+    if (ext != "svg") {
+        return fail_template(result, "template icons require an SVG alpha mask");
+    }
+    if (points <= 0 || points > 512) {
+        return fail_template(result, "invalid template icon size");
+    }
+    auto document = lunasvg::Document::loadFromData(reinterpret_cast<const char*>(data), data_size);
+    if (document == nullptr) {
+        return fail_template(result, "lunasvg failed to parse the icon SVG");
+    }
+    // Rasterize at 2x so the template keeps its edge on a HiDPI menu.
+    const int pixels = points * 2;
+    auto bitmap = document->renderToBitmap(pixels, pixels, 0x00000000);
+    if (bitmap.isNull()) {
+        return fail_template(result, "lunasvg failed to rasterize the icon SVG");
+    }
+    // The glyph is an alpha mask: keep only the coverage and paint the fill
+    // black. The surface is premultiplied ARGB, so masking off the colour
+    // channels leaves a black pixel whose alpha is the original coverage.
+    const int width = bitmap.width();
+    const int height = bitmap.height();
+    const int stride = bitmap.stride();
+    uint8_t* icon_pixels = bitmap.data();
+    if (icon_pixels == nullptr || width <= 0 || height <= 0 || stride < width * 4) {
+        return fail_template(result, "lunasvg produced an unusable icon bitmap");
+    }
+    for (int y = 0; y < height; ++y) {
+        auto* row = reinterpret_cast<uint32_t*>(icon_pixels + static_cast<size_t>(y) * stride);
+        for (int x = 0; x < width; ++x) {
+            row[x] &= 0xFF000000u;
+        }
+    }
+    PngBuffer buffer;
+    if (!bitmap.writeToPng(append_png_bytes, &buffer) || buffer.overflowed || buffer.bytes.empty()) {
+        return fail_template(result, "failed to encode the template icon PNG");
+    }
+    auto* png = static_cast<uint8_t*>(std::malloc(buffer.bytes.size()));
+    if (png == nullptr) {
+        return fail_template(result, "failed to allocate the template icon PNG");
+    }
+    std::memcpy(png, buffer.bytes.data(), buffer.bytes.size());
+    result->png = png;
+    result->png_size = buffer.bytes.size();
+    return true;
+}
+
+} // namespace
+
 static bool decode_memory_impl(const uint8_t* data,
                                            size_t data_size,
                                            const char* extension,
@@ -477,4 +572,17 @@ extern "C" bool cove_image_decode_animation_memory(const uint8_t* data, size_t c
 extern "C" bool cove_image_dimensions_memory(const uint8_t* data, size_t count, const char* extension, int32_t* width, int32_t* height) {
     try { return dimensions_memory_impl(data, count, extension, width, height); }
     catch (...) { return false; }
+}
+
+extern "C" void cove_image_template_png_free(CoveImageTemplatePngResult* result) {
+    if (result == nullptr) return;
+    std::free(result->png);
+    std::free(result->error_message);
+    *result = CoveImageTemplatePngResult{};
+}
+
+extern "C" bool cove_image_template_png_memory(const uint8_t* data, size_t count, const char* extension, int32_t points, CoveImageTemplatePngResult* out) {
+    try { return template_png_impl(data, count, extension, points, out); }
+    catch (const std::exception& error) { if (out) cove_image_template_png_free(out); return fail_template(out, error.what()); }
+    catch (...) { if (out) cove_image_template_png_free(out); return fail_template(out, "native template icon exception"); }
 }

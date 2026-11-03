@@ -14,14 +14,11 @@
 //! fallback resolve to `PingFangSC-Regular`, identical to the regular request, so
 //! Swift's `bold != regular` / `weight(bold) > weight(regular)` assertions cannot
 //! hold. The reload-stability and run-coverage behaviours do hold and are
-//! asserted below; the bold-CJK assertion is recorded as `GAP:` against the
-//! current, documented behaviour.
 //!
 //! Behaviour checklist:
 //! - reloading the primary font refreshes the cached fallback style
 //! - a reload back to regular reuses the same fallback font identity
 //! - resolved runs concatenate back to the original text
-//! - GAP: bold CJK text does not select a heavier CJK face
 
 use cove_core::FontWeight;
 use cove_text::{FontProvider, SystemFontDefaults};
@@ -95,9 +92,9 @@ fn primary_style_change() {
 
     // Swift asserts the CJK fallback becomes heavier here. It does not: see the
     // module-level named difference.
-    assert_eq!(
+    assert_ne!(
         bold, regular.0,
-        "GAP: bold CJK falls back to the same face as regular ({bold}); Swift \
+        "bold CJK falls back to the same face as regular ({bold}); Swift \
          FontProvider.swift:435-448 copies the primary's kCTFontWeightTrait into \
          the styled fallback descriptor and expects a heavier PingFang face",
     );
@@ -140,9 +137,9 @@ fn bold_fallback() {
     // Swift asserts `regular != bold`, `weight(regular) <= 0.05` and
     // `weight(bold) > weight(regular)`, plus a shared family prefix. Only the
     // family invariant survives in the current port.
-    assert_eq!(
+    assert_ne!(
         regular_name, bold_name,
-        "GAP: regular and bold CJK both fall back to {regular_name}; Swift expects \
+        "regular and bold CJK both fall back to {regular_name}; Swift expects \
          distinct faces of the same family (bold heavier than regular)",
     );
     let family = |name: &str| {

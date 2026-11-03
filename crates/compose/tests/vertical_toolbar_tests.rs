@@ -5,43 +5,8 @@
 //!   button shares one column
 //! - a command list overflows by height into a menu opened beside the bar
 //!
-//! GAP: a `ToolbarCommands` row built without an explicit `available_width`
-//! never overflows.
-//! Swift wraps the run in a `ContainerSizeReader` and feeds the measured
-//! `size.height` (vertical) or `size.width` (horizontal) into
-//! `ToolbarOverflowLayout` (`Toolbar/Commands.swift:73-76`), so a bar that is
-//! shorter than its command list parks the extras in the menu. The Rust
-//! `ToolbarCommandsBody::children` (`primitives/controls/toolbar/commands.rs`)
-//! branches on `available_width`: with a value it builds the overflow layout,
-//! and without one it emits `ToolbarCommandProbe`, which measures the row but
-//! never reports the extent back, so `available_extent` stays `0.0` and
-//! `ToolbarOverflowLayout::arrangement` never hides anything. `ToolbarCommands::
-//! available_width(..)` exists, but only `AppBar` calls it. The second test
-//! supplies the height budget explicitly (the equivalent of Swift's measured
-//! container) and asserts the overflow contract at full strength; the pinned
-//! behaviour without a budget is recorded in the module doc only, because Swift
-//! has no such state.
 //!
-//! GAP: the overflow menu cannot open.
-//! Swift drives the overflow menu's `Popover` from the same `@State
-//! isPresented` the trigger and menu callbacks share
-//! (`Toolbar/Commands.swift:94` `Popover(isPresented: $isPresented, ...)`).
-//! The Rust `ToolbarCommandsBody::children`
-//! (`primitives/controls/toolbar/commands.rs:274`) builds `Popover::new(trigger,
-//! menu)` and never calls `.is_presented(..)`, so the popover keeps
-//! `Popover::default`'s `Binding::constant(false)`: the trigger can never
-//! present, and the local `is_presented` flag the menu callbacks write is
-//! disconnected from it. The test therefore asserts the overflow *split* (which
-//! commands inline, which the bar parks in the menu) at full Swift strength, and
-//! pins the closed popover as the documented current behaviour.
 //!
-//! Model difference: Swift reads the axis from a typed attachment
-//! (`$0.attachments["toolbar.axis"] as? ToolbarAxis`) and the chrome rows by
-//! `ButtonHost.markerKey`. Rust publishes the axis as a `u8` (`1` for vertical)
-//! and the button host marker as `BUTTON_HOST_MARKER_KEY`, so the lookups read
-//! those two attachment types. The geometry, focus and overflow assertions are
-//! unchanged.
-
 use crate::support;
 
 use cove_composition::{AnyView, ViewExt};
@@ -233,13 +198,11 @@ fn a_command_list_overflows_by_height_into_a_beside_menu() {
             "the 220pt budget must park at least one command in the menu"
         );
         scene.click(&more, 1);
+        scene.settle(8, 1.0);
         let menu_rows = scene.all(|node| node.attachment::<u64>("__menu_item_id").is_some());
-        // GAP: the popover is never bound to the command row's presentation
-        // flag, so clicking the trigger leaves the menu closed. Swift mounts
-        // `expected_overflow` rows here.
         assert!(
-            menu_rows.is_empty(),
-            "the overflow menu does not open; Swift mounts {expected_overflow} rows, saw {}",
+            menu_rows.len() == expected_overflow,
+            "the overflow menu mounts {expected_overflow} rows, saw {}",
             menu_rows.len()
         );
     });

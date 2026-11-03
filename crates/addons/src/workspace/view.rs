@@ -201,6 +201,7 @@ impl PrimitiveView for WorkspacePane {
             Some(semantic) => semantic.resolve(&cove_ui_compose::theme::theme_for_node(node)),
             None => self.fill,
         };
+        node.set_clips_to_bounds(true);
         node.set_background_color(Some(fill));
         node.set_corner_radius(theme_radius_lg(node));
         if let Some(name) = &self.debug_name {
@@ -305,8 +306,38 @@ impl PrimitiveView for WorkspaceRegionTransition {
                 capture.release();
             }
         }
-        node.set_opacity(if self.is_visible { 1.0 } else { 0.0 });
+        let theme = super::theme::resolve_workspace_theme(node);
+        let target = if self.is_visible { self.sizing.extent(&theme) } else { 0.0 };
+        let previous = node.attachment::<f32>("workspace.region.extent");
+        let old_visible = node.attachment::<bool>("workspace.region.visible");
+        node.set_attachment("workspace.region.visible", self.is_visible);
+        if self.is_visible && let Some(content) = &self.content {
+            node.set_attachment("workspace.region.content", content.clone());
+        }
+        let revision = node.attachment::<cove_core::Signal<u64>>("workspace.region.revision").unwrap_or_else(|| {
+            let signal = cove_core::Signal::detached(0);
+            node.set_attachment("workspace.region.revision", signal);
+            signal
+        });
+        let weak = node.downgrade();
+        let horizontal = self.horizontal;
+        let sizing = self.sizing;
+        let visible = self.is_visible;
+        let animate = theme.animates_layout && (old_visible.is_some_and(|old| old != visible) || node.has_animation_controller("workspace.region.extent"));
+        if let (Some(extent), Some(layout)) = (previous, node.layout_node()) { apply_region_extent(&layout, sizing, horizontal, extent, &theme); }
+        cove_core::scene::with_animation(animate.then(|| cove_ui_compose::theme::SemanticMotionRef::medium().resolve(&cove_ui_compose::theme::theme_for_node(node))), || {
+            node.animatable_set_with("workspace.region.extent", previous.unwrap_or(target), target, move |extent| {
+                let Some(owner) = Node::upgrade(&weak) else { return };
+                owner.set_attachment("workspace.region.extent", extent);
+                owner.set_opacity(if extent > 0.0001 { 1.0 } else { 0.0 });
+                if let Some(layout) = owner.layout_node() {
+                    apply_region_extent(&layout, sizing, horizontal, extent, &theme);
+                }
+                if !visible && extent <= 0.0001 { revision.notify(); }
+            });
+        });
     }
+
     fn make_layout_node(&self) -> Option<LayoutNode> {
         let layout = LayoutNode::new();
         layout.set_flex_direction(FlexDirection::Column);
@@ -320,11 +351,12 @@ impl PrimitiveView for WorkspaceRegionTransition {
     fn update_layout(&self, layout: &LayoutNode) {
         self.apply_extent(layout);
     }
-    fn children(&self, _node: &Node) -> Vec<AnyView> {
-        if !self.is_visible {
-            return Vec::new();
-        }
-        self.content.iter().cloned().collect()
+    fn children(&self, node: &Node) -> Vec<AnyView> {
+        if let Some(revision) = node.attachment::<cove_core::Signal<u64>>("workspace.region.revision") { revision.track(); }
+        if self.is_visible { return self.content.iter().cloned().collect(); }
+        if node.attachment::<f32>("workspace.region.extent").unwrap_or(0.0) > 0.0001 {
+            node.attachment::<AnyView>("workspace.region.content").into_iter().collect()
+        } else { Vec::new() }
     }
 }
 
@@ -335,7 +367,11 @@ impl WorkspaceRegionTransition {
         } else {
             0.0
         };
-        match self.sizing {
+        apply_region_extent(layout, self.sizing, self.horizontal, target, &WorkspaceTheme::default());
+    }
+}
+fn apply_region_extent(layout: &LayoutNode, sizing: WorkspaceRegionSizing, horizontal: bool, target: f32, theme: &WorkspaceTheme) {
+        match sizing {
             WorkspaceRegionSizing::Fraction(_) => {
                 layout.set_flex_basis(0.0);
                 layout.set_flex_grow(target);
@@ -343,7 +379,7 @@ impl WorkspaceRegionTransition {
             WorkspaceRegionSizing::Points(_) => {
                 layout.set_flex_grow(0.0);
                 layout.set_flex_shrink(0.0);
-                if self.horizontal {
+                if horizontal {
                     layout.set_width(Some(target));
                 } else {
                     layout.set_height(Some(target));
@@ -355,9 +391,9 @@ impl WorkspaceRegionTransition {
                 // neighbouring cards instead of pushing them apart.
                 layout.set_flex_grow(0.0);
                 layout.set_flex_shrink(0.0);
-                let slop = WorkspaceTheme::default().split_divider_hit_slop;
+                let slop = theme.split_divider_hit_slop;
                 let span = target + 2.0 * slop;
-                if self.horizontal {
+                if horizontal {
                     layout.set_width(Some(span));
                     layout.set_margin(-slop, cove_core::scene::Edge::Left);
                     layout.set_margin(-slop, cove_core::scene::Edge::Right);
@@ -368,8 +404,8 @@ impl WorkspaceRegionTransition {
                 }
             }
         }
-    }
 }
+
 impl_primitive_view!(WorkspaceRegionTransition);
 
 /// Text label. The Compose `Text` primitive is unavailable, so this records the

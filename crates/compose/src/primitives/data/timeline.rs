@@ -339,7 +339,7 @@ impl View for Timeline {
                         shows_trailing_connector,
                     };
                     group_column.push(AnyView::new(
-                        AnyView::new(row).padding_insets(EdgeInsets::new(0.0, 0.0, gap, 0.0)),
+                        AnyView::new(AnyView::new(row).padding_insets(EdgeInsets::new(0.0, 0.0, gap, 0.0))).id(event.id.clone()),
                     ));
                 }
             }

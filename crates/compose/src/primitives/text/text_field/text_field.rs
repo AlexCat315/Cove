@@ -42,6 +42,7 @@ use super::text_field_editing::{
 };
 use super::text_field_layout_engine::{
     DOCUMENT_LAYOUT_KEY, FIELD_STATE_KEY, FieldCompositionState, FieldLayoutInputs,
+    RENDER_CACHE_KEY, RenderCacheEntry, RenderCacheKey,
     FieldScrollState, FieldSelectionState, RenderDraftState, document_geometry,
     horizontal_scrollbar_metrics, make_render_state, scrollbar_metrics, selection_range,
     update_scroll,
@@ -766,6 +767,7 @@ impl PrimitiveView for TextFieldHost {
         node.add_resource(portal.clone());
         node.add_resource(snippet.clone());
         node.add_resource(TextCompletionSession::new(portal, snippet));
+        node.add_resource(Rc::new(crate::primitives::text::code::TextGutterSession::new()));
         node
     }
 
@@ -908,6 +910,11 @@ impl PrimitiveView for TextFieldHost {
             session.configure(self.field.snapshot(), state_handle.clone());
         }
         install_interaction(node, &self.field, state_handle.clone(), &self.interaction);
+        if let Some(gutter) = node.first_resource::<crate::primitives::text::code::TextGutterSession>() {
+            gutter.configure(self.field.code_editing.gutter.clone(), &self.field.code_editing.folding, &current);
+            let field = self.field.snapshot();
+            node.set_layout_did_update(Some(Rc::new(move |owner| update_gutter_controls(owner, &field))));
+        }
 
         let overlay_node = node.downgrade();
         node.update_overlay_draw(
@@ -944,8 +951,64 @@ impl PrimitiveView for TextFieldHost {
             },
         );
     }
+    fn children(&self, node: &Node) -> Vec<AnyView> {
+        use crate::primitives::text::code::{TextGutterControls, TextGutterSession};
+        let Some(session) = node.first_resource::<TextGutterSession>() else { return Vec::new() };
+        if !self.field.code_editing.shows_line_numbers || self.field.behavior.secure || self.field.layout.axis != TextFieldAxis::Vertical { return Vec::new() }
+        let current = self.field.text.get();
+        let cursor = node.attachment::<Rc<RefCell<FieldState>>>(FIELD_STATE_KEY).map_or(0, |s| s.borrow().selection.cursor_index);
+        vec![AnyView::new(TextGutterControls::new(session, self.field.code_editing.gutter.clone())
+            .is_enabled(!self.field.behavior.disabled)
+            .caret(current.line_index_for_character_index(cursor), current.character_count(), self.field.behavior.read_only))]
+    }
 }
 impl_primitive_view!(TextFieldHost);
+
+fn update_gutter_controls(node: &Node, field: &TextField) {
+    use crate::primitives::text::code::{TextGutterSession, TextGutterControl, TextGutterControlKind as Kind, TextGutterGeometry};
+    let Some(session) = node.first_resource::<TextGutterSession>() else { return };
+    if !field.code_editing.shows_line_numbers || field.behavior.secure || field.layout.axis != TextFieldAxis::Vertical {
+        session.update(Vec::new()); return;
+    }
+    let buffer = field.text.get();
+    let style = resolved_text_style(node, &theme_for_node(node));
+    let gutter = &field.code_editing.gutter;
+    let touch = !crate::primitives::controls::adaptive::supports_control_hover(node);
+    let geometry = TextGutterGeometry::new(gutter.is_enabled(), gutter.breakpoints.is_some(), gutter.execution_line.is_some(), !field.code_editing.folding.regions.is_empty(), 24.0, &style.font, &theme_for_node(node), touch);
+    let offset = node.attachment::<Rc<RefCell<FieldState>>>(FIELD_STATE_KEY).map_or(0.0, |s| s.borrow().scroll.offset_y);
+    let hidden = session.folds().hidden_lines();
+    let mut controls = Vec::new();
+    let line_height = style.line_height.max(1.0);
+    let first_row = ((offset - 8.0) / line_height).floor().max(0.0) as usize;
+    let end_row = ((offset + node.frame().height - 8.0) / line_height).ceil().max(0.0) as usize;
+    let mut line = first_row;
+    // Translate the first visible row through the merged folded ranges, then
+    // visit only the viewport's rows even for a large document.
+    for range in &hidden {
+        if range.start <= line { line += range.len(); } else { break; }
+    }
+    let markers = session.markers_by_line();
+    let mut row = first_row;
+    while line < buffer.line_count() && row < end_row {
+        if let Some(range) = hidden.iter().find(|r| r.contains(&line)) {
+            line = range.end;
+            continue;
+        }
+        let y = 8.0 + row as f32 * line_height - offset;
+        let mut push = |kind, x| controls.push(TextGutterControl::new(line, kind, x, y, geometry.control_width, style.line_height.max(if touch { 44.0 } else { 24.0 }), 0));
+        if geometry.combined {
+            push(Kind::Combined, 0.0);
+        } else {
+            if let Some(x) = geometry.breakpoint_x { push(Kind::Breakpoint, x); }
+            if let Some(x) = geometry.marker_x && markers.contains_key(&line) { push(Kind::Markers, x); }
+            if let Some(x) = geometry.fold_x && session.folds().region(line).is_some() { push(Kind::Fold, x); }
+        }
+        line += 1;
+        row += 1;
+    }
+    session.update(controls);
+}
+
 
 /// Inputs that change the measured size of a field. Cached on the layout node
 /// so a text edit can mark the node dirty instead of silently keeping a stale
@@ -1273,6 +1336,22 @@ fn input_area(
     origin: Point,
 ) -> Option<cove_platform::TextInputArea> {
     if field.behavior.disabled || field.behavior.read_only || !node.is_layout_visible() {
+        return None;
+    }
+    committed_input_area(node, field, state, origin)
+}
+
+/// The caret's committed text area, also for a read-only editor.
+///
+/// A read-only code field still answers F1 with the visible caret so a hover
+/// card can anchor there; nothing is inserted either way.
+fn committed_input_area(
+    node: &Node,
+    field: &TextField,
+    state: &Rc<RefCell<FieldState>>,
+    origin: Point,
+) -> Option<cove_platform::TextInputArea> {
+    if field.behavior.disabled || !node.is_layout_visible() {
         return None;
     }
     let focused = FocusChainHolder::current()
@@ -1868,6 +1947,30 @@ fn install_interaction(
                     return EventResult::Handled;
                 }
             }
+            // F1 asks the language service for documentation at the visible
+            // caret. A read-only code editor still answers it, since nothing is
+            // mutated and reviewers read code they cannot edit.
+            if event.scancode == crate::Scancode::F1
+                && event.modifiers.is_empty()
+                && let Some(request) = key_field.code_editing.on_request_hover.clone()
+                && let Some(area) = committed_input_area(
+                    &owner,
+                    &key_field,
+                    &key_state,
+                    owner.absolute_origin(),
+                )
+            {
+                let character_index = key_state.borrow().selection.cursor_index;
+                // The anchor sits on the caret itself: the area's column
+                // origin plus the caret's offset inside the scrolled column,
+                // and its bottom edge is the caret's baseline.
+                request(TextFieldHoverAnchor::new(
+                    character_index,
+                    area.x + area.cursor_x,
+                    area.y + area.height,
+                ));
+                return EventResult::Handled;
+            }
             // Escape cancels through the caller's callback without holding the
             // editing state, so the callback may safely recompose this field.
             if event.scancode == crate::Scancode::ESCAPE
@@ -2221,6 +2324,35 @@ fn apply_key(
     };
 
     match scancode {
+        // A code field consumes Tab to indent; every other field yields it to
+        // focus traversal.
+        crate::Scancode::TAB
+            if vertical && indentation.is_some() && !primary =>
+        {
+            let width = indentation.unwrap_or(4);
+            if field.behavior.read_only {
+                return EventResult::Handled;
+            }
+            let selection = state.selection_range();
+            let result = super::text_field_code_editing::indent_lines(
+                &state.buffer.string_value(),
+                state.selection.cursor_index,
+                state.selection.anchor,
+                selection,
+                width,
+                shift,
+                field.behavior.max_length,
+            );
+            if result.changed {
+                state.buffer = TextBuffer::new(&result.text);
+                state.selection.cursor_index = result.caret;
+                state.selection.anchor = result.anchor;
+                state.clear_composition();
+                state.selection.set_preferred_caret_x(None);
+                state.record_activity();
+            }
+            EventResult::Handled
+        }
         crate::Scancode::A if primary => {
             state.selection.anchor = Some(0);
             state.selection.cursor_index = state.buffer.character_count();
@@ -2651,6 +2783,7 @@ fn render(
         render_state.shows_placeholder,
     );
     let mut document = TextDocumentLayout::new(render_state.buffer.clone(), geometry.clone());
+    if let Some(gutter) = node.first_resource::<crate::primitives::text::code::TextGutterSession>() { document.set_hidden_lines(gutter.folds().hidden_lines()); }
     let vertical_inset = field.vertical_inset(line_height);
     state.scroll.visible_height = (frame.height - vertical_inset * 2.0).max(line_height);
     update_scroll(&mut state.scroll, &document, line_height);
@@ -3003,7 +3136,31 @@ fn render(
         text_color,
         &theme,
     );
-    node.set_attachment(DOCUMENT_LAYOUT_KEY, Rc::new(RefCell::new(document)));
+    let shared_document = Rc::new(RefCell::new(document));
+    node.set_attachment(DOCUMENT_LAYOUT_KEY, shared_document.clone());
+    // The last measure pass, keyed by everything that changes its glyphs. A
+    // later pass reuses it instead of reshaping, and observers can read what
+    // the field actually shaped with (the authored tracking included).
+    node.set_attachment(
+        RENDER_CACHE_KEY,
+        RenderCacheEntry {
+            key: RenderCacheKey {
+                root: first_row,
+                visible_first_row: first_row,
+                visible_row_count: row_count,
+                total_rows: shared_document.borrow().index().row_count(),
+                font: font.clone(),
+                line_height,
+                letter_spacing: token.letter_spacing,
+                atlas: environment.atlas_texture_id as u64,
+                available_text_width: available_width,
+                secure: field.behavior.secure,
+                hidden_lines: shared_document.borrow().hidden_lines().to_vec(),
+            },
+            layout,
+            document: shared_document.clone(),
+        },
+    );
 }
 
 /// Paint one sourced slab (`prepend` / `append`) with its glyphs centred

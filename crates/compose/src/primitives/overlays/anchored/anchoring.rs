@@ -324,43 +324,56 @@ impl PrimitiveView for AnchoredOverlayHost {
         let content = self.content.clone();
         let margin_for_key = margin;
         let dismissed = on_dismiss.clone();
-        let inner = AnyView::new(FocusScope::new(AnyView::new(MenuKeyHost {
-            on_key: Rc::new(move |event: &cove_platform::KeyEvent| {
-                if event.scancode == crate::Scancode::ESCAPE {
-                    dismissed();
-                    return true;
-                }
-                key_handler.as_ref().is_some_and(|handler| {
-                    handler(event, cove_core::scene::EventPhase::Target) == EventResult::Handled
-                })
-            }),
-            content: match surface {
-                PopoverSurface::Bubble => AnyView::new(PopoverSurfaceHost {
-                    anchor: Rc::new(PopoverAnchor::new(node, self.overflow, surface, margin)),
-                    placement,
-                    content: content.clone(),
+        // A transient overlay restores commands: it traps focus for traversal
+        // but must not wall the pointer off from the control that opened it.
+        let inner = AnyView::new(FocusScope::with_restoring_commands(
+            true,
+            AnyView::new(MenuKeyHost {
+                on_key: Rc::new(move |event: &cove_platform::KeyEvent| {
+                    if event.scancode == crate::Scancode::ESCAPE {
+                        dismissed();
+                        return true;
+                    }
+                    key_handler.as_ref().is_some_and(|handler| {
+                        handler(event, cove_core::scene::EventPhase::Target) == EventResult::Handled
+                    })
                 }),
-                PopoverSurface::Content => AnyView::new(
-                    BoxView::new(
-                        cove_core::scene::FlexDirection::Column,
-                        cove_core::scene::Align::Stretch,
-                        cove_core::scene::Justify::FlexStart,
-                        cove_core::scene::Wrap::NoWrap,
-                        0.0,
-                        content.clone(),
-                    )
-                    .padding_insets(crate::modifiers::layout::EdgeInsets::new(
-                        4.0, 0.0, 0.0, 0.0,
-                    )),
-                ),
-            },
-        })));
+                content: match surface {
+                    PopoverSurface::Bubble => AnyView::new(PopoverSurfaceHost {
+                        anchor: Rc::new(PopoverAnchor::new(node, self.overflow, surface, margin)),
+                        placement,
+                        content: content.clone(),
+                    }),
+                    PopoverSurface::Content => AnyView::new(
+                        BoxView::new(
+                            cove_core::scene::FlexDirection::Column,
+                            cove_core::scene::Align::Stretch,
+                            cove_core::scene::Justify::FlexStart,
+                            cove_core::scene::Wrap::NoWrap,
+                            0.0,
+                            content.clone(),
+                        )
+                        .padding_insets(
+                            crate::modifiers::layout::EdgeInsets::new(4.0, 0.0, 0.0, 0.0),
+                        ),
+                    ),
+                },
+            }),
+        ));
         let store = Some(
             node.composition_value(&PortalStoreEnvironment::key())
                 .unwrap_or_else(PortalStoreHolder::current),
         );
         let placement_anchor = Rc::new(PopoverAnchor::new(node, self.overflow, surface, margin));
         let placement_for_size = placement_anchor.clone();
+        // The reveal grows from the trigger corner: a bubble scales from its
+        // own centre, content from the corner the panel is attached to.
+        let scale_anchor = if surface == PopoverSurface::Bubble {
+            Point::new(0.5, 0.5)
+        } else {
+            Point::new(if placement.alignment() > 0 { 1.0 } else { 0.0 }, 0.0)
+        };
+        let theme = crate::theme::theme_for_node(node);
         resource.present(
             store,
             Point::new(geometry.frame.x, geometry.frame.y),
@@ -372,14 +385,18 @@ impl PrimitiveView for AnchoredOverlayHost {
                 let frame = placement_for_size.geometry(size, placement).frame;
                 Point::new(frame.x, frame.y)
             })),
-            Some(Transition::opacity().combined(Transition::offset(
-                0.0,
-                if surface == PopoverSurface::Content {
-                    -6.0
-                } else {
-                    0.0
-                },
-            ))),
+            Some(
+                Transition::opacity()
+                    .combined(Transition::offset(
+                        0.0,
+                        if surface == PopoverSurface::Content {
+                            -6.0
+                        } else {
+                            0.0
+                        },
+                    ))
+                    .combined(PortalResource::surface_reveal(scale_anchor, &theme)),
+            ),
         );
         let dismissal_anchor = Rc::new(PopoverAnchor::new(node, self.overflow, surface, margin));
         let dismissal_anchor_inner = dismissal_anchor.clone();

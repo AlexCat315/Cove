@@ -254,6 +254,7 @@ impl View for Dialog {
                 ));
             }
 
+            modal_options.label = title.clone();
             let label = title.clone();
             let help = options.description.clone();
             let body = AnyView::new(BoxView::new(

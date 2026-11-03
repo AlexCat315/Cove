@@ -10,28 +10,6 @@
 //! - pointer travel toward an open submenu stays inside the safe triangle
 //! - submenu icons reserve the lane in their parent level
 //!
-//! Model differences:
-//! - `MenuTypeahead::destination` takes `&[MenuTypeaheadRow]` (id + title) rather
-//!   than Swift's `[MenuRowPresentation]`, and returns `Option<u64>` rather than
-//!   `AnyHashable`. The test builds the same two rows and asserts the same
-//!   destination row.
-//! - `MenuItemContent::new` filters empty `detail`/`link` at construction instead
-//!   of exposing a computed `link` that returns `nil` for `""`. The assertions
-//!   read the stored fields and check the same filtering.
-//! - `MenuPointerIntent::triangle` is the free function `triangle_contains`.
-//!
-//! GAP: `MenuItemContent::new` keeps links on rich-title runs.
-//! Swift's `MenuItemContent.init` maps every run through
-//! `TextRun($0.text, traits: $0.traits)` (`RowContent.swift:24`), which
-//! drops the run's link because that initializer takes no destination, so
-//! `richTitle.first?.link` is always `nil`. The Rust
-//! `MenuItemContent::new` (`primitives/overlays/menu/row_content.rs:28`) stores
-//! the runs unchanged, so the link survives in the value. The *behaviour* Swift
-//! wanted still holds: the row renders its runs through
-//! `Text::display_only(true)` (`menu_item_row.rs`), which keeps the row the
-//! only hit target and never lets a title link take focus — asserted separately
-//! in the first test. Only the stored value differs, and that half is pinned.
-
 use crate::support;
 
 use cove_composition::AnyView;
@@ -190,11 +168,10 @@ fn type_ahead_matches_the_plain_title_and_ignores_empty_links() {
     let empty_link = MenuItemContent::new(None, Vec::new(), None, Some(String::new()));
     assert_eq!(empty_link.link, None, "an empty link string is not a link");
     let nested = MenuItemContent::new(None, vec![TextRun::new("x").link("y")], None, None);
-    // GAP: Swift's initializer strips the run link; Rust keeps it in the value.
     assert_eq!(
         nested.rich_title.first().and_then(|run| run.link.clone()),
-        Some("y".to_string()),
-        "Rust keeps the run link in the value; Swift's initializer drops it"
+        None,
+        "menu titles strip nested link targets"
     );
 }
 

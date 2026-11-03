@@ -318,7 +318,7 @@ impl PrimitiveView for AlertHost {
         {
             let group = crate::LayoutContainer::<ActionGroupLayout, AnyView>::with_erased_content(
                 ActionGroupLayout {
-                    stacks: false,
+                    stacks: node.composition_value(&crate::adaptive::SurfaceEnvironment::key()).viewport.width < cove_core::Viewport::COMPACT_MAXIMUM_WIDTH,
                     alignment: crate::HorizontalAlignment::Leading,
                     spacing: 8.0,
                 },

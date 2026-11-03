@@ -14,6 +14,7 @@ use cove_platform::KeyEvent;
 
 const ROVING_ITEM: &str = "__roving.item";
 const ROVING_TAB_STOP: &str = "__roving.tabStop";
+const ROVING_OWNED_FOCUS: &str = "__roving.ownedFocus";
 const ROVING_FOCUS_REQUEST: &str = "__roving.focusRequest";
 type DirectionalCommand<Id> = Rc<dyn Fn(&KeyEvent, &Id, &Node) -> Option<Id>>;
 
@@ -98,6 +99,11 @@ pub struct RovingFocusHost<Id: PartialEq + Clone + 'static> {
     pub wraps: bool,
     pub command: Rc<dyn Fn(&KeyEvent) -> Option<SelectionNavigation>>,
     pub focus_request: Option<Rc<RefCell<RovingFocusRequest>>>,
+    /// Where focus belongs when the focused row leaves the interaction graph.
+    recovery: Option<Rc<dyn Fn(Option<&Id>) -> Option<Id>>>,
+    /// Every authored id, so a row that just left the enabled set is still
+    /// identifiable when focus repairs.
+    recovery_members: Option<Rc<Vec<Id>>>,
     directional_command: Option<DirectionalCommand<Id>>,
     content: AnyView,
     identity: Rc<dyn Fn(&Id) -> u64>,
@@ -118,6 +124,8 @@ impl<Id: PartialEq + Clone + 'static> RovingFocusHost<Id> {
             wraps: true,
             command: Rc::new(|event| SelectionNavigation::command_for(event.scancode)),
             focus_request: None,
+            recovery: None,
+            recovery_members: None,
             directional_command: None,
             content: AnyView::new(content),
             identity: Rc::new(identity),
@@ -148,6 +156,21 @@ impl<Id: PartialEq + Clone + 'static> RovingFocusHost<Id> {
 
     pub fn focus_request(mut self, request: Rc<RefCell<RovingFocusRequest>>) -> Self {
         self.focus_request = Some(request);
+        self
+    }
+
+    /// Resolves where focus should go when the row that owns it becomes
+    /// unreachable. The id is taken from the group's full membership, so a row
+    /// that just left the enabled set still has a name to fall back from.
+    pub fn recovery(mut self, resolve: impl Fn(Option<&Id>) -> Option<Id> + 'static) -> Self {
+        self.recovery = Some(Rc::new(resolve));
+        self
+    }
+
+    /// Every authored id, so a row that just left the enabled set is still
+    /// identifiable when focus repairs.
+    pub fn recovery_members(mut self, members: Vec<Id>) -> Self {
+        self.recovery_members = Some(Rc::new(members));
         self
     }
 }
@@ -243,6 +266,14 @@ impl<Id: PartialEq + Clone + 'static> PrimitiveView for RovingFocusHost<Id> {
         let selection = self.selection.clone();
         let identity = self.identity.clone();
         let enabled = self.enabled_items.clone();
+        let enabled_ids = Rc::new(self.enabled_items.clone());
+        let recovery = self.recovery.clone();
+        let repair_identity = self.identity.clone();
+        let recovery_members = self
+            .recovery_members
+            .clone()
+            .unwrap_or_else(|| Rc::new(self.enabled_items.clone()));
+
         let tab_stop_fn: Rc<dyn Fn() -> Option<u64>> = Rc::new(move || {
             let selected = selection().map(|item| identity(&item));
             selected
@@ -251,7 +282,18 @@ impl<Id: PartialEq + Clone + 'static> PrimitiveView for RovingFocusHost<Id> {
         });
         node.set_attachment(ROVING_TAB_STOP, tab_stop_fn.clone());
 
+        // Remember which row owns focus while it is still reachable: by the time
+        // layout runs, a collapsing row may already have dropped it. The token
+        // comes from the focus chain, which still names the old row during the
+        // pass that removes it.
+        if let Some(token) = focused_token(node) {
+            node.set_attachment(ROVING_OWNED_FOCUS, token);
+        }
+
         let weak = node.downgrade();
+        let hook_identity = repair_identity.clone();
+        let hook_enabled_ids = enabled_ids.clone();
+        let hook_members = recovery_members.clone();
         node.set_layout_did_update(Some(Rc::new(move |owner: &Node| {
             let Some(owner_node) = Node::upgrade(&weak) else {
                 return;
@@ -261,13 +303,63 @@ impl<Id: PartialEq + Clone + 'static> PrimitiveView for RovingFocusHost<Id> {
             else {
                 return;
             };
+            let identity = hook_identity.as_ref();
+            let enabled_ids = hook_enabled_ids.as_ref();
             let state = request.borrow().clone();
-            let target = state
-                .target
+            // Focus repair: a group whose focused row has just left the input
+            // graph (collapsed subtree, removed row, disabled branch) is asked
+            // to recover, so focus never stays on a row the person cannot use.
+            let focused_now = focused_token(owner);
+            if let Some(token) = focused_now { owner.set_attachment(ROVING_OWNED_FOCUS, token); }
+            // The row that owned focus before this pass, so a row that vanished
+            // still has an identity to fall back from.
+            let remembered = owner.attachment::<u64>(ROVING_OWNED_FOCUS);
+            // The row focus was on before this pass. A remembered row that has
+            // since left the enabled set is the row that actually became
+            // unusable; otherwise the live focus wins.
+            let owned = focused_now.or(remembered);
+            let unreachable = owned.and_then(|token| {
+                enabled_ids
+                    .iter()
+                    .chain(hook_members.iter())
+                    .find(|id| identity(id) == token)
+                    .cloned()
+            });
+            // Repair only a group that owned focus and lost its row: the row is
+            // gone, is no longer one of the enabled items (a disabled branch, or
+            // a removed row whose position now presents a disabled one), or no
+            // longer takes input. A group nobody was in must not pull focus away
+            // from elsewhere in the page.
+            let needs_repair = match owned {
+                None => false,
+                Some(token) => {
+                    !enabled_tokens.contains(&token)
+                        || locate(owner, token)
+                            .is_none_or(|item| !item.accepts_subtree_input())
+                }
+            };
+            let repair_target = if needs_repair {
+                let recovered = recovery
+                    .as_ref()
+                    .and_then(|resolve| resolve(unreachable.as_ref()))
+                    .map(|id| identity(&id));
+                recovered
+                    .or(state.target)
+                    .or_else(|| tab_stop_fn())
+                    .filter(|token| {
+                        locate(owner, *token).is_some_and(|item| item.accepts_subtree_input())
+                    })
+            } else {
+                None
+            };
+            let target = repair_target
+                .or(state.target)
                 .or_else(|| focused_token(owner).filter(|token| enabled_tokens.contains(token)))
                 .or_else(|| tab_stop_fn());
             update_tab_stops(owner, target);
-            let Some(target) = state.target else { return };
+            let Some(target) = repair_target.or(state.target) else {
+                return;
+            };
             let Some(item) = locate(owner, target) else {
                 return;
             };
@@ -275,7 +367,15 @@ impl<Id: PartialEq + Clone + 'static> PrimitiveView for RovingFocusHost<Id> {
                 return;
             }
             if let Some(chain) = FocusChainHolder::current() {
-                chain.focus(Some(&item), state.visible);
+                // A repaired focus keeps the current focus visibility: a
+                // programmatic collapse must not start painting a focus ring.
+                let visible = if repair_target.is_some() {
+                    chain.is_focus_visible()
+                } else {
+                    state.visible
+                };
+                chain.focus(Some(&item), visible);
+                owner.set_attachment(ROVING_OWNED_FOCUS, target);
             }
             crate::primitives::layout::ScrollReveal::reveal(&item, false);
             request.borrow_mut().target = None;
@@ -422,6 +522,11 @@ impl<Id: PartialEq + Clone + 'static> cove_composition::ViewModifier for RovingI
         }
         node.set_is_tab_stop(self.is_tab_stop);
     }
+}
+
+/// The roving token a node currently publishes, if it belongs to a group.
+pub fn roving_token(node: &Node) -> Option<u64> {
+    node.attachment::<u64>(ROVING_ITEM)
 }
 
 /// Convenience: hashes any hashable identity to the token used by the group.

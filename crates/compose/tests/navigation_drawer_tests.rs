@@ -13,19 +13,7 @@
 //! - motion and unmount release the scope, the portal and pointer capture
 //! - diagnostics distinguish the visible modal from its blocked background
 //!
-//! Named differences from the Swift suite (each pinned by a `GAP:` assertion):
-//! - Panel geometry: Swift fits the drawer to `(0, 0, min(320, width-56), 640)`;
-//!   the Rust leading modal keeps a fixed 560pt height offset 40pt from the top
-//!   and does not follow the host width (390pt at every width), so a press at x=350 lands inside the drawer and
-//!   never reaches the backdrop.
-//! - Panel name: the Rust dialog node publishes an empty label instead of
-//!   `Workspace navigation` (the title sits on an outer group).
-//! - Discovery: `Collapse navigation` is published twice (toggle wrapper and
-//!   button host); Swift returns one node.
-//! - Collapse toggle: 32pt tall (Swift >= 44) and no `isExpanded` state.
-//! - Swipe dismissal: a long leftward swipe over a row does not dismiss.
-//! - Motion: the Rust drawer is at rest on its first open frame and is
-//!   remounted on every presentation, so a reversal has no node to retain.
+//! Named differences from the Swift suite:
 //! - AI toolbox calls (`UIDiagnostics`, `query_ui_nodes`) live in crates
 //!   `cove-ui-compose` does not depend on; `query()` applies the same
 //!   predicate (layout visible, input accepted, permitted by the modal scope).
@@ -371,14 +359,14 @@ fn fitting_and_retention() {
                         );
                         assert_eq!(
                             label(&current),
-                            "",
-                            "GAP: Swift names the dialog `Workspace navigation`; the Rust dialog node is unlabelled ({case})"
+                            "Workspace navigation",
+                            "the dialog is named after the drawer title ({case})"
                         );
                         let frame = current.absolute_frame();
                         let swift = Rect::new(0.0, 0.0, (width - 56.0).min(320.0), 640.0);
-                        assert!(
-                            frame != swift && frame.height == 560.0 && frame.y == 40.0,
-                            "GAP: Swift fits the drawer to {swift:?}; the Rust leading modal keeps a fixed 560pt height 40pt from the top and does not follow the host width, saw {frame:?} ({case})"
+                        assert_eq!(
+                            frame, swift,
+                            "the drawer fits the host as (0, 0, min(320, width-56), 640) ({case})"
                         );
                         assert!(
                             harness.open.get() && harness.selection.get() == Some(29),
@@ -405,14 +393,11 @@ fn fitting_and_retention() {
                             "drawer rows keep a 44pt target ({case})"
                         );
                         let collapse = control(scene, "Collapse navigation").expect("collapse");
-                        if collapse.frame().height < 44.0 {
-                            assert!(
-                                input == (InputCapabilities::POINTER | InputCapabilities::KEYBOARD)
-                                    || scale < 2.0,
-                                "GAP: Swift keeps a 44pt collapse toggle; the Rust toggle measures {:?} ({case})",
-                                collapse.frame()
-                            );
-                        }
+                        assert!(
+                            collapse.frame().height >= 44.0,
+                            "the collapse toggle keeps its 44pt target, saw {:?} ({case})",
+                            collapse.frame()
+                        );
                         assert!(
                             query(scene, "Destination 29", AccessibilityRole::Button).len() <= 1,
                             "editing the header never duplicates the selected destination ({case})"
@@ -530,15 +515,28 @@ fn dismissal_policies() {
         assert!(harness.open.get(), "a secondary press never dismisses");
         click(scene, OUTSIDE, MouseButton::Left);
         assert!(
-            harness.open.get() && !scene.portal.entries().is_empty(),
-            "GAP: Swift dismisses on a backdrop press at x=350; the Rust drawer spans the 390pt host, so the press lands inside the panel"
+            !harness.open.get() && scene.portal.entries().is_empty(),
+            "a backdrop press at x=350 dismisses the fitted drawer"
         );
+        harness.open.set(true);
+        scene.settle(8, 1.0);
         let backdrop_node = backdrop(scene).expect("the modal mounts a backdrop");
-        click(scene, backdrop_node.absolute_frame(), MouseButton::Left);
+        let backdrop_frame = backdrop_node.absolute_frame();
+        // The backdrop spans the window; only the strip beyond the fitted panel
+        // (min(320, 390 - 56) = 320pt wide) is reachable by the pointer.
+        click(
+            scene,
+            Rect {
+                x: backdrop_frame.max_x() - 20.0,
+                y: backdrop_frame.y + 300.0,
+                width: 10.0,
+                height: 10.0,
+            },
+            MouseButton::Left,
+        );
         assert!(
-            harness.open.get(),
-            "GAP: the Rust backdrop sits under the full-width panel ({:?}), so no press reaches it",
-            backdrop_node.absolute_frame()
+            !harness.open.get(),
+            "the backdrop strip past the panel dismisses, backdrop at {backdrop_frame:?}"
         );
         harness.closes_on_escape.set(true);
         scene.settle(8, 1.0);
@@ -579,8 +577,8 @@ fn pointer_presentation() {
         let toggle = control(scene, "Collapse navigation").expect("collapse");
         assert_eq!(
             toggle.accessibility().expect("semantics").state.is_expanded,
-            None,
-            "GAP: Swift's collapse toggle reports `isExpanded == true`; the Rust toggle publishes no expanded state"
+            Some(true),
+            "the collapse toggle reports isExpanded == true"
         );
         let backdrop_node = backdrop(scene).expect("the modal mounts a scrim");
         assert_eq!(
@@ -639,12 +637,11 @@ fn animation_lifecycle() {
         harness.reduced.set(false);
         scene.settle(8, 1.0);
         harness.open.set(true);
-        scene.settle(8, 1.0);
+        scene.settle(8, 0.0);
         let dialog = panel(scene).expect("dialog");
-        assert_eq!(
-            dialog.absolute_frame().x,
-            0.0,
-            "GAP: Swift starts the drawer off-screen (maxX <= 0.5) and slides it in; the Rust drawer is at rest on its first frame"
+        assert!(
+            dialog.absolute_frame().max_x() <= 0.5,
+            "the drawer enters from outside the leading edge"
         );
         tick(1.0);
         scene.settle(8, 1.0);
@@ -741,13 +738,13 @@ fn validated_modal_tools() {
         scene.settle(8, 1.0);
         assert_eq!(
             query(scene, "Workspace navigation", AccessibilityRole::Dialog).len(),
-            0,
-            "GAP: Swift finds one `Workspace navigation` dialog; the Rust dialog node is unlabelled"
+            1,
+            "discovery finds exactly one named drawer dialog"
         );
         assert_eq!(
             query(scene, "Collapse navigation", AccessibilityRole::Button).len(),
-            2,
-            "GAP: Swift's query finds one `Collapse navigation` button; Rust publishes the label on both the toggle wrapper and its button host"
+            1,
+            "the collapse toggle is published exactly once"
         );
         assert_eq!(
             query(scene, "Background action", AccessibilityRole::Button).len(),

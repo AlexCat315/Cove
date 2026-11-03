@@ -17,15 +17,6 @@
 //! the text by `TextField.surfaceMarkerKey`. Rust publishes neither; the handle
 //! is the `Slider` carrying the resize label and the text is the node holding
 //! `__textfield_state`.
-//!
-//! Named differences from the Swift suite (each pinned by a `GAP:` assertion):
-//! - **The scroll view steals the handle press.** A press on the handle is
-//!   captured by the enclosing `ScrollView`, so dragging does not resize and
-//!   the capture outlives Escape and disabling.
-//! - **Slider value unit.** The handle value reads `"<n> pt"`, not the bare
-//!   height.
-//! - **Disabled state.** A disabled handle drops focus and hit testing but
-//!   still reports `is_enabled`.
 
 use crate::support;
 use cove_composition::Scope;
@@ -348,8 +339,8 @@ fn matrix() {
                             );
                             assert_eq!(
                                 semantics.value,
-                                format!("{} pt", text.frame().height.round() as i64),
-                                "GAP: Swift exposes the bare viewport height as the slider value; Rust appends a ` pt` unit ({context})"
+                                format!("{}", text.frame().height.round() as i64),
+                                "the slider value is the bare viewport height ({context})"
                             );
                             assert!(
                                 grip.is_focusable()
@@ -381,20 +372,17 @@ fn interactions() {
             moved(scene, point, 60.0);
             settle(scene);
             assert!(
-                height(scene) == before
-                    && captured(scene).is_some_and(|node| node
-                        .accessibility()
-                        .is_some_and(|semantics| semantics.role == AccessibilityRole::ScrollArea)),
-                "GAP: Swift captures the drag on the handle and grows the viewport by 60pt; Rust's enclosing ScrollView captures the press, so the viewport stays {before} ({kind:?})"
+                height(scene) == before + 60.0
+                    && captured(scene).is_some_and(|node| node.id() == grip.id()),
+                "{kind:?} the handle captures the drag and grows the viewport by 60pt: {} vs {before}",
+                height(scene)
             );
             key(scene, Scancode::ESCAPE, false);
             settle(scene);
             assert!(
-                height(scene) == before
-                    && captured(scene).is_some_and(|node| node
-                        .accessibility()
-                        .is_some_and(|semantics| semantics.role == AccessibilityRole::ScrollArea)),
-                "GAP: Swift Escape rolls back and releases the handle capture; Rust's scroll view still holds the capture ({kind:?})"
+                height(scene) == before && captured(scene).is_none(),
+                "{kind:?} Escape rolls back and releases the handle capture: {}",
+                height(scene)
             );
             let click = down(scene, &grip);
             scene
@@ -495,14 +483,12 @@ fn lifecycle() {
             settle(scene);
             let disabled_height = height(scene);
             assert!(
-                captured(scene).is_some_and(|node| node
-                    .accessibility()
-                    .is_some_and(|semantics| semantics.role == AccessibilityRole::ScrollArea))
+                captured(scene).is_none()
                     && scene
                         .focus
                         .focused()
                         .is_none_or(|node| node.id() != grip.id()),
-                "GAP: Swift releases the handle capture when disabled; Rust's scroll view captured the press and keeps it ({kind:?})"
+                "{kind:?} disabling releases the handle capture and focus"
             );
             let semantics = grip.accessibility();
             assert!(
@@ -510,8 +496,8 @@ fn lifecycle() {
                     && !grip.is_hit_testable()
                     && semantics
                         .as_ref()
-                        .is_some_and(|semantics| semantics.state.is_enabled),
-                "GAP: Swift reports the disabled handle as not enabled; Rust drops focus and hit testing but leaves accessibility state enabled ({kind:?})"
+                        .is_some_and(|semantics| !semantics.state.is_enabled),
+                "{kind:?} the disabled handle reports a disabled accessibility state"
             );
             if let Some(action) = old_action.as_ref() {
                 action();

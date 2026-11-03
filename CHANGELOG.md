@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+- **Swift 行为回归（2026-11-03）**：修正 reader 读取追踪、范围选择会话、菜单样式标题、图片占位尺寸、滚动条动画及公共滚动锚点；补齐向量字段布局、时间线标识、浮层焦点和代码行号控件。工作区控制器通知保留视图树，尺寸约束、缩放、RTL 标签导航和可反转离场动画使用共享 Rust 实现。CJK 回退按字重和斜体匹配家族，终端选区立即使缓存帧失效。迁移断言改为验证预期结果，组件文档与 Gallery 验收记录同步更新。
+
 - **统一 Text API（2026-11-03，破坏性）**：
   - 删除 `RichText` 组件及导出，不保留兼容别名；普通文字使用 `Text::new`，样式片段使用 `Text::runs`，`TextRun` / `TextTraits` 替代带 Rich 前缀的片段类型。
   - 两种内容由同一个 `Text` 节点处理，统一字体、颜色、对齐、行数、截断和选择配置；切换纯文本与样式片段保留节点与有效选区。构建方法统一为 `alignment` / `color`，正文用 `plain_text()` 读取。
@@ -36,7 +38,7 @@
   - 补上词/行/文档级光标移动：Option（Windows 为 Ctrl）按词移动与删除，Command-Left/Right 到行首行尾，Command-Up/Down 到文档首尾，Command-Backspace/Delete 删除到行首行尾，Up/Down 逐显示行保持列，PageUp/PageDown 移动一个视口，Home/End 停在显示行的首尾并保留软换行行尾亲和。
   - 补上逐段文字样式：`syntax_color_at_utf8_offset` 按字形着色，占位文本不参与；前后缀、两端色块、字数计数按测得宽度参与排版、命中与绘制，`max_length` 同时约束输入、粘贴与 IME 提交。
   - 平台输入的删除与组合提交进入撤销历史并遵守 `max_length`；修复工作区无法编译的半成品改动（重复的选区删除、未定义的按键分发、缺失的字体类型、隐式默认值）。
-  - 测试从 `GAP:` 断言改为验证预期行为，`cargo test -p cove-ui-compose --test compose` 1545 项通过，`cargo test -p cove-examples` 全部通过；`Docs/gallery-audit.md` 与 TextField 用户文档同步更新，注明行号栏配色、横向滚动、`TextFieldStyle` 状态、Escape 回调与 hover 滚动条仍未完成。
+  - 测试从 缺失行为 断言改为验证预期行为，`cargo test -p cove-ui-compose --test compose` 1545 项通过，`cargo test -p cove-examples` 全部通过；`Docs/gallery-audit.md` 与 TextField 用户文档同步更新，注明行号栏配色、横向滚动、`TextFieldStyle` 状态、Escape 回调与 hover 滚动条仍未完成。
 
 - **Gallery 首轮逐项验收与组件文档（2026-11-03）**：
   - 修复 TextField 缺失原生输入区域 resolver，导致点击搜索后普通文字无法输入、删除键仍有效、光标不闪烁；共享 Rust 实现补齐焦点状态、IME anchor、光标闪烁、搜索图标和清空绑定，Gallery 侧栏改用 SearchField。平台选区/删除/组合提交写回绑定，UTF-16 不拆开字素；补上点击定位、拖选、多次点击、全选/复制/剪切/异步粘贴和及时重绘。

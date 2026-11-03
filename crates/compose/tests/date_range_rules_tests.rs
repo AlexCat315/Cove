@@ -187,23 +187,23 @@ fn calendar_interaction() {
             "the fifth day from a pending start stays enabled"
         );
         assert!(
-            is_enabled(15) && is_enabled(5),
-            "GAP: Swift disables days beyond the maximum once a start is pending \
+            !is_enabled(15) && !is_enabled(5),
+            "Swift disables days beyond the maximum once a start is pending \
              (15 and 5 here); the Rust day cells keep their enabled semantics"
         );
         scene.click(&day(15), 1);
         assert_eq!(
             *recorded.lock().unwrap(),
-            Some(DateRange::new(oct(15), oct(15))),
-            "GAP: Swift ignores the over-limit day and keeps the pending 10...10; the Rust \
+            Some(DateRange::new(oct(10), oct(10))),
+            "Swift ignores the over-limit day and keeps the pending 10...10; the Rust \
              harness re-render rebuilds DateRangeCalendar with a fresh session, so the \
              pending start is lost and 15 starts a new range"
         );
         scene.click(&day(13), 1);
         assert_eq!(
             *recorded.lock().unwrap(),
-            Some(DateRange::new(oct(13), oct(13))),
-            "GAP: Swift completes 10...13; Rust starts yet another single-day range at 13"
+            Some(DateRange::new(oct(10), oct(13))),
+            "Swift completes 10...13; Rust starts yet another single-day range at 13"
         );
 
         let preset = |title: &str| -> Node {

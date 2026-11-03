@@ -83,3 +83,5 @@ pub(crate) mod api {
     };
     pub use super::zstack::{ZStack, ZStackLayout};
 }
+
+pub use scroll_view::{ScrollAnchorModifier, ScrollAnchorViewExt};

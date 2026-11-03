@@ -35,6 +35,9 @@ struct DragStart {
 pub struct SplitHandle {
     pub axis: SplitAxis,
     pub thickness: f32,
+    /// The grab extent this mount resolved from the surface. `update_layout`
+    /// runs after `update_node`, so the touch width has to survive there.
+    pub resolved_thickness: std::cell::Cell<Option<f32>>,
     pub color: Option<Color>,
     pub fraction: Binding<f32>,
     pub constraints: SplitConstraints,
@@ -103,19 +106,28 @@ impl PrimitiveView for SplitHandle {
     fn update_layout(&self, layout: &LayoutNode) {
         layout.set_flex_shrink(0.0);
         layout.set_align_self(cove_core::scene::Align::Stretch);
+        let thickness = self.resolved_thickness.get().unwrap_or(self.thickness);
         match self.axis {
             SplitAxis::Horizontal => {
-                layout.set_width(Some(self.thickness));
+                layout.set_width(Some(thickness));
                 layout.set_height(None);
             }
             SplitAxis::Vertical => {
-                layout.set_height(Some(self.thickness));
+                layout.set_height(Some(thickness));
                 layout.set_width(None);
             }
         }
     }
 
     fn update_node(&self, node: &Node) {
+        let thickness = self.resolve_thickness(node);
+        self.resolved_thickness.set(Some(thickness));
+        if let Some(layout) = node.layout_node() {
+            match self.axis {
+                SplitAxis::Horizontal => layout.set_width(Some(thickness)),
+                SplitAxis::Vertical => layout.set_height(Some(thickness)),
+            }
+        }
         node.set_is_hit_testable(true);
         node.set_is_focusable(true);
         node.set_is_tab_stop(true);
@@ -334,8 +346,23 @@ impl PrimitiveView for SplitHandle {
 impl_primitive_view!(SplitHandle);
 
 impl SplitHandle {
+    /// A touch surface needs the full 44pt grab extent; the painted line stays a
+    /// hairline. Swift reaches the same extent through `minimumControlExtent`.
+    fn resolve_thickness(&self, node: &Node) -> f32 {
+        let environment = node.composition_value(&crate::adaptive::SurfaceEnvironment::key());
+        if environment
+            .input
+            .contains(cove_core::InputCapabilities::TOUCH)
+        {
+            self.thickness.max(environment.minimum_control_extent())
+        } else {
+            self.thickness
+        }
+    }
+
     fn clone_for_actions(&self) -> SplitHandle {
         SplitHandle {
+            resolved_thickness: std::cell::Cell::new(self.resolved_thickness.get()),
             axis: self.axis,
             thickness: self.thickness,
             color: self.color,

@@ -11,12 +11,15 @@ use std::rc::Rc;
 use crate::foundation::{Calendar as FoundationCalendar, CalendarUnit, Date};
 use crate::modifiers::layout::{FlexExt, LayoutFrameExt, PaddingExt};
 use crate::modifiers::style::{AppearanceExt, SemanticStyleViewExt};
-use crate::primitives::controls::button::{Button, ButtonIconSource, ButtonRole};
+use crate::primitives::controls::button::{
+    ActionControlAccessibility, Button, ButtonIconSource, ButtonRole,
+};
 use crate::primitives::layout::{ScrollAxis, ScrollView, ScrollbarGutter};
 use crate::primitives::text::Text;
 use crate::theme::styles::buttons::{ButtonStyleViewExt, GhostButtonStyle};
 use crate::theme::{SemanticColorRef, SemanticFontRef, theme_for_node};
 use crate::{AnyView, BoxView, PrimitiveView, Row, TupleView, VerticalAlignment, View};
+use cove_composition::ViewExt;
 use cove_composition::adaptive::SurfaceEnvironment;
 use cove_core::scene::{AccessibilityRole, AccessibilitySemantics};
 use cove_core::scene::{Align, EventResult, FlexDirection, Justify, Node, Wrap};
@@ -562,6 +565,7 @@ impl PrimitiveView for CalendarMonth {
             can_next,
             show_drill_up: true,
             is_enabled: view.options.presentation.is_enabled,
+            panel: CalendarPanel::Days,
             on_previous: {
                 let view = view.snapshot();
                 Rc::new(move || view.browse(-1))
@@ -759,6 +763,7 @@ struct CalendarHeader {
     can_next: bool,
     show_drill_up: bool,
     is_enabled: bool,
+    panel: CalendarPanel,
     on_previous: Rc<dyn Fn()>,
     on_next: Rc<dyn Fn()>,
     on_drill_up: Rc<dyn Fn()>,
@@ -778,6 +783,13 @@ impl PrimitiveView for CalendarHeader {
     fn update_node(&self, _node: &Node) {}
 
     fn children(&self, _node: &Node) -> Vec<AnyView> {
+        // Swift names the arrows after the level they page: months within a
+        // year at the days panel, years at the months/years panels.
+        let (previous_label, next_label) = match self.panel {
+            CalendarPanel::Days => ("Previous month", "Next month"),
+            CalendarPanel::Months => ("Previous year", "Next year"),
+            CalendarPanel::Years => ("Previous years", "Next years"),
+        };
         let previous = Button::icon_with_options(
             ButtonIconSource::resource(
                 crate::primitives::media::ui_icon_catalog::navigation::chevron_left(),
@@ -788,7 +800,7 @@ impl PrimitiveView for CalendarHeader {
             self.is_enabled && self.can_previous,
             false,
             false,
-            Some("Previous month".to_string()),
+            Some(previous_label.to_string()),
             {
                 let on_previous = self.on_previous.clone();
                 move || on_previous()
@@ -805,7 +817,7 @@ impl PrimitiveView for CalendarHeader {
             self.is_enabled && self.can_next,
             false,
             false,
-            Some("Next month".to_string()),
+            Some(next_label.to_string()),
             {
                 let on_next = self.on_next.clone();
                 move || on_next()
@@ -814,6 +826,11 @@ impl PrimitiveView for CalendarHeader {
         .button_style(GhostButtonStyle);
         let title: AnyView = if self.show_drill_up {
             let on_drill_up = self.on_drill_up.clone();
+            // Swift labels the drill-up target with what it opens.
+            let drill_label = match self.panel {
+                CalendarPanel::Days => "show months",
+                _ => "show years",
+            };
             AnyView::new(
                 Button::with_options(
                     AnyView::new(
@@ -826,7 +843,13 @@ impl PrimitiveView for CalendarHeader {
                     false,
                     None,
                 )
-                .button_style(GhostButtonStyle),
+                .button_style(GhostButtonStyle)
+                // The visible title alone would announce only "March 2024";
+                // the accessible name says what activating it opens.
+                .composition_local(
+                    ActionControlAccessibility::label(),
+                    Some(format!("{}, {}", self.title, drill_label)),
+                ),
             )
         } else {
             AnyView::new(
@@ -984,6 +1007,13 @@ impl PrimitiveView for CalendarDayCell {
         };
         let view = self.view.snapshot();
         let day = self.day;
+        if is_enabled {
+            let choose = view.snapshot();
+            node.set_accessibility_actions(cove_core::scene::AccessibilityActions {
+                activate: Some(Rc::new(move || choose.choose(day))),
+                ..Default::default()
+            });
+        }
         registry.set_pointer(
             node,
             cove_core::scene::InputHandlerRoute::control(),
@@ -1152,7 +1182,14 @@ impl PrimitiveView for CalendarWeekButton {
     }
 
     fn make_layout_node(&self) -> Option<cove_core::scene::LayoutNode> {
-        None
+        let layout = cove_core::scene::LayoutNode::new();
+        self.update_layout(&layout);
+        Some(layout)
+    }
+
+    fn update_layout(&self, layout: &cove_core::scene::LayoutNode) {
+        layout.set_height(Some(self.view.options.presentation.cell_size.max(26.0)));
+        layout.set_align_self(Align::Stretch);
     }
 
     fn update_node(&self, node: &Node) {
@@ -1163,11 +1200,31 @@ impl PrimitiveView for CalendarWeekButton {
         node.set_accessibility(Some(AccessibilitySemantics {
             role: AccessibilityRole::Button,
             label: format!(
-                "Week {}",
+                "Week {}, {}",
                 self.view
                     .options
                     .calendar
-                    .component(CalendarUnit::WeekOfYear, self.start)
+                    .component(CalendarUnit::WeekOfYear, self.start),
+                crate::i18n::format_template(
+                    &crate::i18n::tr("calendar.date_range"),
+                    &[
+                        (
+                            "start",
+                            &medium_date(self.start, &self.view.options.calendar)
+                        ),
+                        (
+                            "end",
+                            &medium_date(
+                                self.view
+                                    .options
+                                    .calendar
+                                    .date_by_adding(CalendarUnit::Day, 6, self.start)
+                                    .unwrap_or(self.start),
+                                &self.view.options.calendar
+                            )
+                        ),
+                    ],
+                )
             ),
             state: cove_core::scene::AccessibilityState {
                 is_enabled: self.available,
@@ -1193,6 +1250,11 @@ impl PrimitiveView for CalendarWeekButton {
         }
         let view = self.view.snapshot();
         let start = self.start;
+        let choose = view.snapshot();
+        node.set_accessibility_actions(cove_core::scene::AccessibilityActions {
+            activate: Some(Rc::new(move || choose.choose(start))),
+            ..Default::default()
+        });
         registry.set_pointer(
             node,
             cove_core::scene::InputHandlerRoute::control(),
@@ -1295,6 +1357,7 @@ impl PrimitiveView for CalendarPeriodPanel {
             can_next: true,
             show_drill_up: !is_months || panel != CalendarPanel::Years,
             is_enabled: view.options.presentation.is_enabled,
+            panel,
             on_previous: {
                 let view = view.snapshot();
                 let step = if is_months { 12 } else { 144 };

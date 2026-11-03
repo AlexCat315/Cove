@@ -10,17 +10,6 @@
 //!   the new timestamp as their accessible value
 //! - removing every event removes every row and leaves no recomposition
 //!
-//! Named differences from the Swift suite:
-//! - Swift queries rows through `UIDiagnostics.query_ui_nodes`; that type lives
-//!   in `CoveUIAgent`, which is not a Compose dependency. The same rows are
-//!   located directly on the node tree with the equivalent role and label
-//!   predicate, which is what the diagnostics query filters on.
-//! - **GAP: a row with no trailing metadata has no extra line.** Swift asserts
-//!   `row.height - title.height == theme.spacing.sm` for an event without
-//!   `trailing`. Rust's `TimelineRow` stacks the title and the optional trailing
-//!   label with no reserved slot, so the row is exactly the title's height.
-//!   `a_metadata_free_row_adds_no_blank_line` pins the current height.
-
 use crate::support;
 use cove_composition::Scope;
 
@@ -367,11 +356,8 @@ fn reorder_retains_nodes_and_publishes_updated_timestamps() {
         state.events.set(reordered);
         scene.settle(5, 1.0);
 
-        // GAP: `Timeline` does not key its event rows by `TimelineEvent::id`,
-        // so reordering rebuilds the rows positionally and the moved title
-        // takes the node of the row that used to sit in that slot.
         assert!(
-            text(scene, LONG_TITLE).id() != title.id(),
+            text(scene, LONG_TITLE).id() == title.id(),
             "the reordered title does not keep its previous node"
         );
         let event_rows = rows(scene);
@@ -415,7 +401,7 @@ fn metadata_edges_wrap_inside_the_row() {
         let ready = text_in(&event_rows[0], "Ready");
         let spacing = theme_for_node(&event_rows[0]).spacing.sm;
         assert!(
-            event_rows[0].frame().height >= ready.frame().height + spacing,
+            (event_rows[0].frame().height - ready.frame().height - spacing).abs() < 1.0,
             "the metadata-free row contains its title and spacing"
         );
 

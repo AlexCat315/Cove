@@ -15,11 +15,9 @@
 //!    Rust's `TabsView::active` (`tab_view.rs:230-237`) returns
 //!    `enabled.first()` when the selection is absent, so tab A mounts instead.
 //!    `a_selection_matching_no_tab_mounts_the_first_enabled_tab` records this.
-//! 2. **Tab strip items carry no `Tab` accessibility role.** `TabStripItem::make_node`
-//!    (`tab_view.rs:491-496`) only sets a `tab.id` attachment; nothing sets
-//!    `AccessibilityRole::Tab`, and grep for `AccessibilityRole` in `tab_view.rs`
-//!    returns nothing, so a tab strip exposes no `Tab` elements to assistive
-//!    technology. `the_tab_strip_exposes_no_tab_roles` records this.
+//! 2. ~~Tab strip items carry no `Tab` accessibility role.~~ Fixed: each strip
+//!    item publishes `AccessibilityRole::Tab` with its own label, matching
+//!    `TabView.swift:221`. `the_tab_strip_exposes_tab_roles` verifies it.
 //! 3. **Two tabs hosting the same panel type share one panel state.** Swift's
 //!    `SwiftObservationTests`-style assertion here is that each tab keeps its own
 //!    `@State`, so a bumped first tab still leaves the second at `Count 0`.
@@ -341,7 +339,7 @@ fn a_selection_matching_no_tab_renders_no_content() {
 }
 
 #[test]
-fn the_tab_strip_exposes_no_tab_roles() {
+fn the_tab_strip_exposes_tab_roles() {
     GlobalTestLock::locked(|| {
         let (view, _selection) = probe_tabs(State::new(0));
         let graph = graph();
@@ -351,30 +349,22 @@ fn the_tab_strip_exposes_no_tab_roles() {
         let root = graph.tree.borrow().root().expect("root");
         let mut nodes = Vec::new();
         all_nodes(&root, &mut nodes);
-        let tabs: Vec<&Node> = nodes
-            .iter()
-            .filter(|node| {
-                node.accessibility()
-                    .is_some_and(|semantics| semantics.role == AccessibilityRole::Tab)
-            })
-            .collect();
-        assert!(
-            tabs.is_empty(),
-            "documented gap: no strip item publishes the Tab role (got {})",
-            tabs.len()
-        );
-        // The strip still renders its labels, so the tabs are reachable as text.
+        // Swift publishes each strip item as a tab (`TabView.swift:221`), so the
+        // role and its label are reachable rather than the title being plain
+        // text.
         let labels: Vec<String> = nodes
             .iter()
             .filter_map(|node| {
-                node.accessibility()
-                    .map(|semantics| semantics.label)
-                    .filter(|label| label == "A" || label == "B")
+                let semantics = node.accessibility()?;
+                (semantics.role == AccessibilityRole::Tab
+                    && (semantics.label == "A" || semantics.label == "B"))
+                .then_some(semantics.label)
             })
             .collect();
-        assert!(
-            labels.len() >= 2,
-            "both tab labels are rendered (got {labels:?})"
+        assert_eq!(
+            labels,
+            vec!["A".to_string(), "B".to_string()],
+            "both strip items publish the Tab role with their labels (got {labels:?})"
         );
     });
 }

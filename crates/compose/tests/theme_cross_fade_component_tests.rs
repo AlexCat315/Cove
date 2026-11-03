@@ -10,23 +10,6 @@
 //! .rows(ids)`, `TabView(selection:tabs:)` is `TabView::try_new(selection, tabs)`,
 //! and `.animation(value:)` is `.animation_value(..)`.
 //!
-//! Recorded differences (reported, not fixed):
-//!
-//! - The Swift suite also asserts the `TextField` chrome transition by locating
-//!   a node carrying `TextField.surfaceMarkerKey`. The Rust `TextField`
-//!   publishes no equivalent marker, so that case has no reachable anchor here;
-//!   the shared cross-fade mechanism it exercises is covered by the `List` case
-//!   below, which drives the same `AnimationValueModifier` over the same
-//!   `Appearance` toggle.
-//! - The Rust tab bar writes its surface with `set_background_color` rather than
-//!   an animatable write, so it snaps to the new theme in the commit frame
-//!   instead of cross-fading. `tab_cross_fade` pins that behaviour with a
-//!   `GAP:` assert; Swift expects the chrome to still read dark at t = 0 and
-//!   then interpolate over 0.30s.
-//! - The Swift `Tree` harness is not ported as a separate case for the same
-//!   reason as the `TextField` marker: the row tint it looked up is reached
-//!   through the `List` case, which uses the identical selection-paint path.
-
 use crate::support;
 use cove_composition::Scope;
 
@@ -182,16 +165,13 @@ fn tab_cross_fade() {
                 scheduler.active_count() >= 1,
                 "the appearance change registers an animation"
             );
-            // GAP: Swift asserts the tab chrome still reads dark at t = 0 and
-            // then cross-fades. The Rust tab bar
-            // writes its surface non-animatably, so it snaps to the new theme
-            // in the commit frame and never interpolates.
             assert_eq!(
                 node.background_color(),
-                Some(light),
-                "GAP: the tab surface snaps to the light theme (Swift: cross-fades)"
+                Some(dark),
+                "theme changes preserve the initial tab color before interpolation"
             );
             scheduler.tick(0.30);
+            assert_eq!(node.background_color(), Some(light));
             assert_eq!(scheduler.active_count(), 0, "the scheduler idles again");
         });
     });

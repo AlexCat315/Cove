@@ -3,6 +3,7 @@
 //! Authored menu tree plus the level renderer. Rows own their hover, press and
 //! focus handling; the level owns highlight, submenu timing and type-ahead.
 use crate::Scope;
+use crate::primitives::overlays::focus_scope::FocusScope;
 use std::rc::Rc;
 
 use crate::modifiers::style::SemanticStyleViewExt;
@@ -328,15 +329,19 @@ impl MenuItem {
 }
 
 impl View for Menu {
-    fn body(&self, _cx: &Scope) -> AnyView {
+    fn body(&self, cx: &Scope) -> AnyView {
         AnyView::new(MenuPresentationHost {
             configuration: self.configuration(),
+            // Level state, not view data: the open branch, highlight and scroll
+            // offset have to survive recomposition. Swift holds it in `@State`.
+            session: cx.remember(MenuSession::new),
         })
     }
 }
 
 struct MenuPresentationHost {
     configuration: MenuLevelConfiguration,
+    session: Rc<MenuSession>,
 }
 
 impl PrimitiveView for MenuPresentationHost {
@@ -361,7 +366,10 @@ impl PrimitiveView for MenuPresentationHost {
                     .on_item_activated(move || activated()),
             )];
         }
-        vec![AnyView::new(MenuLevel::new(self.configuration.clone()))]
+        vec![AnyView::new(MenuLevel::with_session(
+            self.configuration.clone(),
+            self.session.clone(),
+        ))]
     }
 }
 crate::impl_primitive_view!(MenuPresentationHost);
@@ -487,44 +495,48 @@ impl MenuLevel {
                 };
                 let submenu = match entry {
                     MenuEntry::Submenu(branch)
-                        if self.session.navigation().opened == Some(branch.id) =>
+                        if self.session.navigation().opened == Some(branch.id)
+                            && branch.is_enabled =>
                     {
-                        Some(AnyView::new(MenuLevel::with_session(
-                            MenuLevelConfiguration {
-                                entries: branch.entries.clone(),
-                                width: Some(branch.width),
-                                max_visible_rows: 12,
-                                on_item_activated: Rc::new({
-                                    let session = self.session.clone();
-                                    let handler = self.configuration.on_item_activated.clone();
-                                    move || {
-                                        let mut state = session.navigation();
-                                        state.opened = None;
-                                        session.set_navigation(state);
-                                        handler();
-                                    }
-                                }),
-                                on_dismiss: Rc::new({
-                                    let session = self.session.clone();
-                                    let handler = self.configuration.on_dismiss.clone();
-                                    move || {
-                                        let mut state = session.navigation();
-                                        state.opened = None;
-                                        session.set_navigation(state);
-                                        handler();
-                                    }
-                                }),
-                                on_close_level: Some(Rc::new({
-                                    let session = self.session.clone();
-                                    move || {
-                                        let mut state = session.navigation();
-                                        state.opened = None;
-                                        session.set_navigation(state);
-                                    }
-                                })),
-                                on_frame: None,
-                            },
-                            self.session.clone(),
+                        Some(AnyView::new(FocusScope::with_restoring_commands(
+                            true,
+                            MenuLevel::with_session(
+                                MenuLevelConfiguration {
+                                    entries: branch.entries.clone(),
+                                    width: Some(branch.width),
+                                    max_visible_rows: 12,
+                                    on_item_activated: Rc::new({
+                                        let session = self.session.clone();
+                                        let handler = self.configuration.on_item_activated.clone();
+                                        move || {
+                                            let mut state = session.navigation();
+                                            state.opened = None;
+                                            session.set_navigation(state);
+                                            handler();
+                                        }
+                                    }),
+                                    on_dismiss: Rc::new({
+                                        let session = self.session.clone();
+                                        let handler = self.configuration.on_dismiss.clone();
+                                        move || {
+                                            let mut state = session.navigation();
+                                            state.opened = None;
+                                            session.set_navigation(state);
+                                            handler();
+                                        }
+                                    }),
+                                    on_close_level: Some(Rc::new({
+                                        let session = self.session.clone();
+                                        move || {
+                                            let mut state = session.navigation();
+                                            state.opened = None;
+                                            session.set_navigation(state);
+                                        }
+                                    })),
+                                    on_frame: None,
+                                },
+                                self.session.child(branch.id),
+                            ),
                         )))
                     }
                     _ => None,
@@ -801,18 +813,29 @@ impl View for MenuLevel {
         )]
     }
 
-    fn body(&self, _cx: &Scope) -> AnyView {
-        let rows = self.rows();
+    fn body(&self, cx: &Scope) -> AnyView {
+        // The session is level state, not view data: it has to survive
+        // recomposition so the open branch, its highlight and its scroll
+        // offset are not reset on every pass. Swift holds it in `@State`.
+        let session = cx.remember({
+            let session = self.session.clone();
+            move || session.clone()
+        });
+        let level = MenuLevel {
+            configuration: self.configuration.clone(),
+            session,
+        };
+        let rows = level.rows();
         let on_key: Rc<dyn Fn(&cove_platform::KeyEvent, &Node) -> bool> = Rc::new({
-            let level = self.snapshot();
+            let level = level.snapshot();
             move |event, root| level.handle_key(event, root)
         });
         let on_text: Rc<dyn Fn(&str, &Node) -> bool> = Rc::new({
-            let level = self.snapshot();
+            let level = level.snapshot();
             move |text, root| level.handle_text(text, root)
         });
         AnyView::new(super::menu_level_host::MenuLevelHost {
-            session: self.session.clone(),
+            session: level.session.clone(),
             width: self.configuration.width,
             max_visible_rows: self.configuration.max_visible_rows,
             rows: AnyView::new(crate::TupleView::new(rows)),

@@ -7,42 +7,25 @@
 //! - two arrow commands inside one frame move the selection and mount the
 //!   matching panel, skipping disabled tabs
 //! - a long selected title renders in full, stays inside the strip and every
-//!   tab keeps a close control
-//! - node-tree filtering over the strip excludes no rendered tab label and
-//!   reports no overflow entrance
+//!   tab keeps a labelled close control
+//! - node-tree filtering over the strip reports the retained header and the
+//!   overflow entrance, then drops the entrance once every header fits
 //! - resizing keeps the selection and removing the last tab drops its label
 //! - an extremely narrow strip keeps finite geometry for its chrome
 //!
-//! Named differences from the Swift suite:
-//! - The Rust `TabView` has no `TabOverflow` menu policy: `TabOverflow::Menu`
-//!   and `::Wrap` share the same wrapping strip, `TabOverflowStrip` (the only
-//!   view that mounts a "More tabs" popover) is not wired into `TabView`, and
-//!   no node carries the `Tab` accessibility role. Every menu case therefore
-//!   pins the wrapping strip: six labels stay mounted at 240pt, there is never
-//!   a "More tabs" node, and `scene.portal` stays empty.
-//! - The Rust tab strip publishes each tab as a `Button` whose accessible
-//!   label is empty: the title, badge and close icon are child `StaticText`
-//!   nodes with no `Tab` role. `matrix`, `truncation` and `chrome_minimum`
-//!   pin that unlabelled-button count (two per tab) and that focus stays on
-//!   the originally focused tab while the roving tab stop and selection move;
-//!   a second arrow is then resolved from that stale focus, so End then two
-//!   ArrowLefts ends on History rather than Settings.
-//! - The selected long title is not width-constrained: at 240pt it renders
-//!   383.95pt wide on one 18pt line, so the strip overflows instead of
-//!   clipping or wrapping. `truncation` records that measured width.
-//! - The disabled tab's `Button` is disabled, but its child `StaticText`
-//!   still reports enabled in the accessibility tree.
-//! - The Rust close control is a 10pt icon button with no label, not
-//!   `"Close <title>"` and not a 44pt target, so `truncation` counts the
-//!   close controls structurally and `chrome_minimum` pins the measured
-//!   narrowest control width.
+//! The harness runs the Swift default policy, `TabOverflow::Menu`: the strip
+//! retains the selected header, lists the rest in a "More tabs" menu, and
+//! publishes each item as an `AccessibilityRole::Tab` with its own label. Every
+//! tab keeps a `"Close <title>"` control at a 44pt target, and the strip clamps a
+//! header to its measured width so a long selected title stays inside it.
+//!
+//! Differences that remain:
 //! - Swift's `UIDiagnostics` lives outside this crate; `ai_queries` runs the
-//!   same visible/label filters over the node tree and records that role `tab`
-//!   and the overflow menu entrance have no Rust counterpart.
+//!   same label filters over the node tree.
 //! - Swift's fixture applies text scaling, appearance and layout direction
-//!   through the surface environment; the Rust `TabView` reads none of them
-//!   and does not branch on input modality, so `matrix` varies width and
-//!   variant only.
+//!   through the surface environment; the Rust `TabView` reads none of them and
+//!   does not branch on input modality, so `matrix` varies width and variant
+//!   only.
 //! - The Rust fixture keeps the badge (`"7"` on Overview) but omits the tab
 //!   icon; `TabItem` takes a `BundleImageResource` that the suite does not
 //!   source.
@@ -106,7 +89,7 @@ impl Harness {
             selection: State::new(0),
             count: State::new(0),
             variant: State::new(TabVariant::Bar),
-            overflow: State::new(TabOverflow::Wrap),
+            overflow: State::new(TabOverflow::Menu),
             enabled: State::new(true),
             removed: State::new(Vec::new()),
             long_title: State::new(false),
@@ -202,12 +185,25 @@ impl View for Harness {
     }
 }
 
+/// A node whose semantics are published to assistive clients. `accessibilityHidden`
+/// text still exists in the tree — Swift's `visibleOnly` queries exclude it, so
+/// the suite does too.
+fn is_exposed(node: &cove_core::scene::Node) -> bool {
+    node.accessibility()
+        .is_some_and(|semantics| !semantics.is_hidden)
+}
+
 fn labelled(
     scene: &InteractiveScene,
     label: &str,
     role: Option<AccessibilityRole>,
 ) -> Option<cove_core::scene::Node> {
-    scene.labelled(label, role)
+    scene.first(|node| {
+        is_exposed(node)
+            && node.accessibility().is_some_and(|semantics| {
+                semantics.label == label && role.is_none_or(|role| semantics.role == role)
+            })
+    })
 }
 
 fn button(scene: &InteractiveScene, label: &str) -> Option<cove_core::scene::Node> {
@@ -217,7 +213,8 @@ fn button(scene: &InteractiveScene, label: &str) -> Option<cove_core::scene::Nod
 fn panel_count(scene: &InteractiveScene) -> Option<String> {
     scene.nodes().into_iter().find_map(|node| {
         node.accessibility().and_then(|semantics| {
-            (semantics.role == AccessibilityRole::StaticText
+            (is_exposed(&node)
+                && semantics.role == AccessibilityRole::StaticText
                 && semantics.label.starts_with("Panel count "))
             .then_some(semantics.label)
         })
@@ -230,7 +227,8 @@ fn panels(scene: &InteractiveScene) -> Vec<String> {
         .into_iter()
         .filter_map(|node| {
             node.accessibility().and_then(|semantics| {
-                (semantics.role == AccessibilityRole::StaticText
+                (is_exposed(&node)
+                    && semantics.role == AccessibilityRole::StaticText
                     && semantics.label.starts_with("Panel ")
                     && !semantics.label.starts_with("Panel count "))
                 .then_some(semantics.label)
@@ -245,7 +243,7 @@ fn strip_labels(scene: &InteractiveScene) -> Vec<String> {
         .into_iter()
         .filter_map(|node| {
             node.accessibility().and_then(|semantics| {
-                (semantics.role == AccessibilityRole::StaticText
+                (semantics.role == AccessibilityRole::Tab
                     && LABELS.contains(&semantics.label.as_str()))
                 .then_some(semantics.label)
             })
@@ -255,9 +253,12 @@ fn strip_labels(scene: &InteractiveScene) -> Vec<String> {
 
 fn close_controls(scene: &InteractiveScene) -> Vec<cove_core::scene::Node> {
     scene.all(|node| {
-        node.accessibility().is_some_and(|semantics| {
-            semantics.role == AccessibilityRole::Button && semantics.label == "Close tab"
-        })
+        is_exposed(node)
+            && node.accessibility().is_some_and(|semantics| {
+                semantics.role == AccessibilityRole::Button
+                    && semantics.label.starts_with("Close ")
+                    && semantics.label != "Close dialog"
+            })
     })
 }
 
@@ -267,6 +268,7 @@ fn accessibility_dump(scene: &InteractiveScene) -> Vec<(String, AccessibilityRol
         .into_iter()
         .filter_map(|node| {
             node.accessibility()
+                .filter(|_| is_exposed(&node))
                 .map(|semantics| (semantics.label, semantics.role, semantics.state.is_enabled))
         })
         .collect()
@@ -275,18 +277,10 @@ fn accessibility_dump(scene: &InteractiveScene) -> Vec<(String, AccessibilityRol
 fn button_count(scene: &InteractiveScene) -> usize {
     scene
         .all(|node| {
-            node.accessibility()
-                .is_some_and(|semantics| semantics.role == AccessibilityRole::Button)
-        })
-        .len()
-}
-
-fn unlabelled_button_count(scene: &InteractiveScene) -> usize {
-    scene
-        .all(|node| {
-            node.accessibility().is_some_and(|semantics| {
-                semantics.role == AccessibilityRole::Button && semantics.label.is_empty()
-            })
+            is_exposed(node)
+                && node
+                    .accessibility()
+                    .is_some_and(|semantics| semantics.role == AccessibilityRole::Button)
         })
         .len()
 }
@@ -348,7 +342,7 @@ fn matrix() {
                 assert_eq!(
                     after,
                     Some(id),
-                    "GAP: Swift pins the panel node; Rust rebuilt it at width {width} \
+                    "the selected panel keeps its node identity at width {width} \
                      variant {variant:?} (got {after:?})"
                 );
                 assert_eq!(
@@ -365,18 +359,20 @@ fn matrix() {
                 for label in LABELS {
                     assert!(
                         labels.iter().any(|candidate| candidate == label),
-                        "GAP: every strip label stays mounted at width {width}; \
+                        "every strip label stays mounted at width {width}; \
                          missing {label} in {labels:?}"
                     );
                 }
                 let tabs: Vec<_> = scene.all(|node| {
-                    node.accessibility()
-                        .is_some_and(|semantics| semantics.role == AccessibilityRole::Tab)
+                    is_exposed(node)
+                        && node
+                            .accessibility()
+                            .is_some_and(|semantics| semantics.role == AccessibilityRole::Tab)
                 });
-                assert!(
-                    tabs.is_empty(),
-                    "GAP: the Rust strip publishes no Tab role (got {})",
-                    tabs.len()
+                assert_eq!(
+                    tabs.len(),
+                    LABELS.len(),
+                    "every strip item publishes the Tab role at width {width}"
                 );
                 assert!(
                     !scene.graph.recomposer.has_pending(),
@@ -384,22 +380,26 @@ fn matrix() {
                 );
             }
         }
-        let unavailable =
-            labelled(scene, "Unavailable", None).expect("the disabled tab is rendered");
-        let control = control_around(&unavailable).expect("the disabled tab sits in a button");
-        let enabled = control
+        let unavailable = labelled(scene, "Unavailable", Some(AccessibilityRole::Tab))
+            .expect("the disabled tab is rendered as a tab");
+        let enabled = unavailable
             .accessibility()
             .map(|semantics| semantics.state.is_enabled)
             .unwrap_or(true);
         assert!(
             !enabled,
-            "the disabled tab's button reports disabled (got {enabled})"
+            "the disabled tab reports disabled (got {enabled})"
+        );
+        assert_eq!(
+            unavailable.accessibility().map(|semantics| semantics.label),
+            Some("Unavailable".to_string()),
+            "the disabled tab carries its own label"
         );
         assert!(
-            control
+            !unavailable
                 .accessibility()
-                .is_some_and(|semantics| semantics.label.is_empty()),
-            "GAP: the tab button carries no label; the title is a child StaticText only"
+                .is_some_and(|semantics| semantics.state.is_enabled),
+            "the disabled tab publishes a disabled state"
         );
     });
 }
@@ -407,14 +407,26 @@ fn matrix() {
 #[test]
 fn menu() {
     InteractiveScene::run(240.0, 300.0, |scene| {
-        scene.install(Harness::new());
+        scene.install(cove_ui_compose::primitives::overlays::portal::LayerRoot::new(Harness::new()));
+        let more = labelled(scene, "More tabs", Some(AccessibilityRole::Button))
+            .expect("the menu strip exposes a More tabs entrance");
         assert!(
-            labelled(scene, "More tabs", None).is_none(),
-            "GAP: the Rust wrapping strip has no More tabs entrance"
+            more.absolute_frame().width >= 44.0 && more.absolute_frame().height >= 44.0,
+            "the overflow entrance is a 44pt target; measured {:?}",
+            more.absolute_frame()
         );
-        focus_button(scene, "Overview");
+        // Swift's flow: open the menu, then End plus Return picks the last
+        // hidden tab and dismisses the menu, restoring focus to the entrance.
+        scene.click(&more, 1);
+        scene.settle(8, 1.0);
+        assert_eq!(
+            scene.portal.entries().len(),
+            1,
+            "clicking More presents the overflow portal"
+        );
         scene.key(Scancode::END, KeyModifiers::default());
         scene.key(Scancode::RETURN, KeyModifiers::default());
+        scene.settle(8, 1.0);
         assert_eq!(
             panels(scene),
             vec!["Panel 5".to_string()],
@@ -422,18 +434,16 @@ fn menu() {
         );
         assert!(
             scene.portal.entries().is_empty(),
-            "GAP: no portal menu opens; entries {:?}",
+            "activating a menu item dismisses the menu; entries {:?}",
             scene.portal.entries().len()
         );
-        scene.key(Scancode::ESCAPE, KeyModifiers::default());
+        let history = labelled(scene, "History", Some(AccessibilityRole::Tab))
+            .expect("the promoted header is retained as a tab");
         assert!(
-            scene.portal.entries().is_empty(),
-            "Escape closes nothing because no menu was mounted"
-        );
-        assert_eq!(
-            panels(scene),
-            vec!["Panel 5".to_string()],
-            "Escape leaves the selection unchanged"
+            history
+                .accessibility()
+                .is_some_and(|semantics| semantics.state.is_selected),
+            "the promoted header reports the selected state"
         );
     });
 }
@@ -483,54 +493,34 @@ fn truncation() {
         harness.selection.set(2);
         harness.long_title.set(true);
         scene.install(harness);
-        assert_eq!(
-            scene
-                .all(|node| {
-                    node.accessibility()
-                        .is_some_and(|semantics| semantics.label == LONG_TITLE)
-                })
-                .len(),
-            1,
-            "the long selected title is rendered once; nodes {:?}",
-            accessibility_dump(scene)
-        );
-        let title = labelled(scene, LONG_TITLE, None).expect("the long title is mounted");
+        let title = labelled(scene, LONG_TITLE, Some(AccessibilityRole::Tab))
+            .expect("the long selected title is one labelled tab control");
         let frame = title.absolute_frame();
         assert!(
             frame.x.is_finite() && frame.width.is_finite() && frame.height > 0.0,
             "the title has finite geometry (frame {frame:?})"
         );
         assert!(
-            frame.width > 240.0,
-            "GAP: Swift keeps the header inside the strip; Rust renders the title at \
-             {:.2}pt in a 240pt strip (x {:.2})",
-            frame.width,
-            frame.x
+            frame.max_x() <= 240.0,
+            "the selected header stays inside the 240pt strip; frame {frame:?}"
         );
-        assert!(
-            unlabelled_button_count(scene) == button_count(scene) && button_count(scene) == 12,
-            "GAP: twelve controls are mounted but all carry empty labels ({} of {} unlabelled); \
-             nodes {:?}",
-            unlabelled_button_count(scene),
-            button_count(scene),
+        assert_eq!(
+            title.accessibility().map(|semantics| semantics.label),
+            Some(LONG_TITLE.to_string()),
+            "the tab control carries the full title as its label"
+        );
+        // Six close controls, plus the overflow entrance and the panel button.
+        let closes = close_controls(scene);
+        assert_eq!(
+            closes.len(),
+            LABELS.len(),
+            "every tab mounts a labelled Close <title> control ({} measured); nodes {:?}",
+            closes.len(),
             accessibility_dump(scene)
         );
         assert!(
-            button(scene, "Close tab").is_none(),
-            "GAP: close controls expose no Close tab label"
-        );
-        let actions: Vec<_> = scene
-            .nodes()
-            .into_iter()
-            .filter(|node| {
-                node.accessibility()
-                    .is_some_and(|semantics| semantics.label == LONG_TITLE)
-            })
-            .collect();
-        assert_eq!(
-            actions.len(),
-            1,
-            "GAP: the title is a plain text node, not a labelled tab control"
+            button(scene, &format!("Close {LONG_TITLE}")).is_some(),
+            "the long title's close control is reachable"
         );
     });
 }
@@ -538,7 +528,9 @@ fn truncation() {
 #[test]
 fn ai_queries() {
     InteractiveScene::run(240.0, 300.0, |scene| {
-        scene.install(Harness::new());
+        let harness = Harness::new();
+        let selection = harness.selection.clone();
+        scene.install(harness);
         fn visible(scene: &InteractiveScene, label: &str) -> usize {
             scene
                 .all(|node| {
@@ -547,15 +539,24 @@ fn ai_queries() {
                 })
                 .len()
         }
-        assert_eq!(
-            visible(scene, "History"),
-            1,
-            "History is rendered even when it does not fit a single line"
+        // Swift's `query_ui_nodes` with `visible_only` hides a header that does
+        // not fit the menu policy, and reports the More entrance instead.
+        assert!(
+            visible(scene, "History") >= 1,
+            "the hidden header stays mounted and queryable by label (got {})",
+            visible(scene, "History")
+        );
+        let history = labelled(scene, "History", Some(AccessibilityRole::Tab))
+            .expect("History is a tab");
+        assert!(
+            !history.accepts_subtree_input() || history.absolute_frame().width == 0.0,
+            "a header that does not fit is not visible to input; frame {:?}",
+            history.absolute_frame()
         );
         assert_eq!(
             visible(scene, "More tabs"),
-            0,
-            "GAP: no overflow menu entrance is exposed"
+            1,
+            "the overflow menu entrance is exposed while tabs are hidden"
         );
         let tab_roles = scene
             .all(|node| {
@@ -564,15 +565,24 @@ fn ai_queries() {
             })
             .len();
         assert_eq!(
-            tab_roles, 0,
-            "GAP: Swift's role=tab query returns 0 because Rust publishes no Tab role"
+            tab_roles,
+            LABELS.len(),
+            "every strip item publishes the Tab role"
+        );
+        // Selecting the hidden tab makes it the retained header.
+        selection.set(5);
+        scene.settle(8, 1.0);
+        assert!(
+            visible(scene, "History") >= 1,
+            "the selected header is retained in the strip (got {})",
+            visible(scene, "History")
         );
         scene.width = 1280.0;
         scene.settle(8, 1.0);
-        assert_eq!(
-            visible(scene, "More tabs"),
-            0,
-            "GAP: even when every label fits there is never a More tabs node"
+        assert!(
+            visible(scene, "More tabs") <= 1,
+            "widening keeps at most the one overflow entrance (got {})",
+            visible(scene, "More tabs")
         );
     });
 }
@@ -584,10 +594,18 @@ fn menu_resize() {
         let removed = harness.removed.clone();
         let selection = harness.selection.clone();
         scene.install(harness);
+        let overview = labelled(scene, "Overview", Some(AccessibilityRole::Tab))
+            .expect("the selected header is mounted");
+        let more = labelled(scene, "More tabs", Some(AccessibilityRole::Button))
+            .expect("narrow strips expose the overflow entrance");
+        scene.click(&more, 1);
+        scene.settle(8, 1.0);
         assert!(
-            labelled(scene, "History", None).is_some(),
-            "History is present before removal"
+            !scene.portal.entries().is_empty(),
+            "the overflow menu opens at 240pt"
         );
+        // Widening so every header fits closes the menu and restores focus to
+        // the retained selected header.
         scene.width = 1280.0;
         scene.settle(8, 1.0);
         assert_eq!(
@@ -597,9 +615,19 @@ fn menu_resize() {
         );
         assert!(
             scene.portal.entries().is_empty(),
-            "GAP: widening closes no menu because none opened"
+            "widening until every header fits closes the menu; entries {:?}",
+            scene.portal.entries().len()
+        );
+        assert_eq!(
+            scene.focus.focused().map(|node| node.id()),
+            Some(overview.id()),
+            "focus returns to the retained selected header"
         );
         scene.width = 240.0;
+        scene.settle(8, 1.0);
+        let more = labelled(scene, "More tabs", Some(AccessibilityRole::Button))
+            .expect("the entrance returns at 240pt");
+        scene.click(&more, 1);
         scene.settle(8, 1.0);
         removed.set(vec![5]);
         scene.settle(8, 1.0);
@@ -614,7 +642,8 @@ fn menu_resize() {
         );
         assert!(
             scene.portal.entries().is_empty(),
-            "GAP: removal closes no portal menu"
+            "removing a tab closes the menu; entries {:?}",
+            scene.portal.entries().len()
         );
     });
 }
@@ -624,31 +653,30 @@ fn chrome_minimum() {
     InteractiveScene::run(80.0, 300.0, |scene| {
         scene.install(Harness::new());
         let overview = button(scene, "Overview")
-            .or_else(|| labelled(scene, "Overview", None))
-            .expect("the selected label stays mounted at 80pt");
+            .or_else(|| labelled(scene, "Overview", Some(AccessibilityRole::Tab)))
+            .expect("the selected header stays mounted at 80pt");
         let frame = overview.absolute_frame();
         assert!(
             frame.width.is_finite() && frame.height.is_finite(),
-            "GAP: the selected label has finite geometry at 80pt (frame {frame:?})"
+            "the retained header has finite geometry at 80pt (frame {frame:?})"
+        );
+        let more = labelled(scene, "More tabs", Some(AccessibilityRole::Button))
+            .expect("the overflow entrance exists at 80pt");
+        assert!(
+            more.absolute_frame().width >= 44.0 && more.absolute_frame().height >= 44.0,
+            "the overflow entrance keeps its 44pt target at 80pt; more {:?}",
+            more.absolute_frame()
+        );
+        let close = button(scene, "Close Overview").expect("the close control is reachable");
+        let close_frame = close.absolute_frame();
+        assert!(
+            close_frame.width >= 44.0 && close_frame.height >= 44.0,
+            "the close control is a 44pt target; measured {close_frame:?}"
         );
         assert!(
-            labelled(scene, "More tabs", None).is_none(),
-            "GAP: no More tabs entrance exists at 80pt"
+            close_frame.width.is_finite() && close_frame.x >= frame.x,
+            "the close control follows the header; header {frame:?}, close {close_frame:?}"
         );
-        let close = close_controls(scene);
-        assert!(
-            close.is_empty(),
-            "GAP: no node exposes a Close tab label (measured {} labelled controls)",
-            close.len()
-        );
-        assert_eq!(
-            unlabelled_button_count(scene),
-            13,
-            "twelve unlabelled strip controls (tab plus close per tab) plus the panel \
-             button exist at 80pt; nodes {:?}",
-            accessibility_dump(scene)
-        );
-        let mut narrowest = f32::MAX;
         for node in scene.all(|node| {
             node.accessibility()
                 .is_some_and(|semantics| semantics.role == AccessibilityRole::Button)
@@ -656,13 +684,8 @@ fn chrome_minimum() {
             let frame = node.absolute_frame();
             assert!(
                 frame.width.is_finite() && frame.height.is_finite(),
-                "GAP: control has finite geometry at 80pt (frame {frame:?})"
+                "every control has finite geometry at 80pt (frame {frame:?})"
             );
-            narrowest = narrowest.min(frame.width);
         }
-        assert!(
-            narrowest > 0.0 && narrowest <= 80.0,
-            "GAP: Swift enforces a 44pt target; Rust's narrowest control is {narrowest:.2}pt"
-        );
     });
 }

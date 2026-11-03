@@ -124,7 +124,7 @@ impl GalleryView {
                     .iter()
                     .filter(|entry| entry.category == category)
                     .map(|entry| {
-                        SidebarItem::new(entry.page, entry.title).icon(entry.page.navigation_icon())
+                        SidebarItem::new(entry.page, entry.title).icon(entry.page.navigation_icon()).debug_name(format!("sidebar-item-{}", entry.page.raw_value()))
                     })
                     .collect();
                 (!items.is_empty()).then(|| SidebarSection::new(category, items).title(category))
@@ -347,6 +347,7 @@ impl GalleryView {
             AnyView::new(Button::new(label, move || view.toggle_theme()))
                 .button_style(SidebarItemStyle {
                     minimum_height: 38.0,
+                    presentation: cove_ui_compose::primitives::layout::sidebar::SidebarPresentation::Expanded
                 })
                 .debug_name("gallery-theme"),
         )
@@ -631,7 +632,7 @@ impl GalleryToolbar {
                 SelectOption::new(CowSize::Large, "Large", true),
             ],
         )
-        .width(118.0);
+        .width(118.0).debug_name("gallery-size");
         let scale_select = Select::new(
             self.text_scale.binding(),
             TEXT_SCALE_CHOICES

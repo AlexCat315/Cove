@@ -44,6 +44,9 @@ pub struct SidebarResizeHandle {
     pub viewport: f32,
     pub resolved_width: f32,
     pub label: String,
+    /// Shell-boundary focus memory, so the shell can hand focus off when the
+    /// lane disappears at a breakpoint.
+    pub focus: Option<Rc<super::focus_handoff::SidebarFocusHandoff>>,
 }
 
 impl SidebarResizeHandle {
@@ -55,7 +58,13 @@ impl SidebarResizeHandle {
             viewport,
             resolved_width,
             label: crate::i18n::tr("Resize navigation"),
+            focus: None,
         }
+    }
+
+    pub fn focus(mut self, focus: Rc<super::focus_handoff::SidebarFocusHandoff>) -> Self {
+        self.focus = Some(focus);
+        self
     }
 
     pub fn value(mut self, value: Binding<f32>) -> Self {
@@ -79,12 +88,11 @@ impl SidebarResizeHandle {
     }
 
     fn current(&self) -> f32 {
-        let proposed = self
-            .value
-            .as_ref()
-            .map(|binding| binding.get())
-            .unwrap_or(self.range.0);
-        proposed.clamp(self.range.0, self.range.1)
+        resolve_current(
+            self.value.as_ref(),
+            self.range,
+            self.resolved_width,
+        )
     }
 
     /// Owned writer so every interaction closure shares one guarded path.
@@ -92,8 +100,22 @@ impl SidebarResizeHandle {
         ResizeWriter {
             value: self.value.clone(),
             range: self.range,
+            resolved_width: self.resolved_width,
         }
     }
+}
+
+/// The width the lane reports: the caller's request, or the width the layout
+/// actually resolved when that request is missing or non-finite. Clamped to the
+/// lane's own movable range so the handle never advertises an unusable width.
+fn resolve_current(value: Option<&Binding<f32>>, range: (f32, f32), resolved_width: f32) -> f32 {
+    let proposed = value.map(|binding| binding.get()).unwrap_or(range.0);
+    let proposed = if proposed.is_finite() {
+        proposed
+    } else {
+        resolved_width
+    };
+    proposed.clamp(range.0, range.1)
 }
 
 /// Writes a proposed width back, guarded by the lane's input state.
@@ -101,6 +123,7 @@ impl SidebarResizeHandle {
 struct ResizeWriter {
     value: Option<Binding<f32>>,
     range: (f32, f32),
+    resolved_width: f32,
 }
 
 impl ResizeWriter {
@@ -117,12 +140,7 @@ impl ResizeWriter {
     }
 
     fn current(&self) -> f32 {
-        let proposed = self
-            .value
-            .as_ref()
-            .map(|binding| binding.get())
-            .unwrap_or(self.range.0);
-        proposed.clamp(self.range.0, self.range.1)
+        resolve_current(self.value.as_ref(), self.range, self.resolved_width)
     }
 }
 
@@ -172,6 +190,9 @@ impl PrimitiveView for SidebarResizeHandle {
     }
 
     fn update_node(&self, node: &Node) {
+        if let Some(focus) = self.focus.as_ref() {
+            focus.set_resizer(node);
+        }
         let basis = ResizeBasis {
             low: self.range.0,
             high: self.range.1,

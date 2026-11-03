@@ -11,23 +11,6 @@
 //!   "Projects" closes the modal, marks the row selected and updates the
 //!   destination pane
 //!
-//! Named differences from the Swift suite:
-//! - Swift found drawer rows by debug name (`sidebar-item-8`,
-//!   `sidebar-item-projects`); the Rust sidebar emits no `sidebar-item-*` debug
-//!   names, so rows are found by their accessibility label instead.
-//! - GAP (opener): Swift found the drawer opener by name
-//!   (`sidebar-open-drawer`); the Rust SidebarStory mounts no opener control,
-//!   so the case opens the drawer through `open_drawer()` before mounting and
-//!   focus has no opener to return to.
-//! - GAP (drawer geometry): Swift's drawer dialog is the 320x820 leading panel;
-//!   the Rust dialog-role node is the 760x560 modal panel at y=130.
-//! - GAP (sidebar drawer selection): clicking "Projects" in the sidebar drawer
-//!   (Swift: closes the drawer, marks Projects selected, updates the detail
-//!   pane) leaves the drawer open and no Projects row selected.
-//! - Swift checked `adaptive-navigationDrawer-narrow/wide` preview debug names.
-//!   The fixed-width adaptive previews are not part of the port (§5.3 of the
-//!   Swift-migration audit), so there are no preview nodes to locate.
-
 use cove_composition::Scope;
 mod support;
 
@@ -157,8 +140,8 @@ fn the_dedicated_story_opens_a_modal_and_commits_keyboard_navigation_back_into_i
             let frame = dialog.absolute_frame();
             assert_eq!(
                 (frame.width, frame.height),
-                (760.0, 560.0),
-                "GAP: Swift's drawer dialog is 320x820; the Rust dialog node is {frame:?}"
+                (320.0, 820.0),
+                "the drawer fills the host height at 320pt width: {frame:?}"
             );
 
             let selected = row_by_label(scene, &format!("Destination {DRAWER_DEFAULT_SELECTION}"));
@@ -201,20 +184,22 @@ fn the_sidebar_and_its_drawer_share_selection_and_restore_the_explicit_opener() 
     let story = Rc::new(SidebarStory::new(
         cove_examples::gallery_content::catalog::GalleryOptions::default(),
     ));
-    story.open_drawer();
     GalleryScene::run(
         1280.0,
         820.0,
         mounted_in_layer_root(story.clone()),
         |scene| {
+            let opener = scene.require_named("sidebar-open-drawer");
+            scene.focus.focus(Some(&opener), true);
+            scene.click(&opener);
             run_animations(scene);
             assert!(
                 scene.focus.has_modal_scope(),
                 "presenting the drawer opens a modal scope"
             );
             assert!(
-                scene.named("sidebar-open-drawer").is_none(),
-                "GAP: Swift's SidebarStory mounts a `sidebar-open-drawer` opener; Rust mounts none"
+                scene.named("sidebar-open-drawer").is_some(),
+                "the sidebar provides its drawer opener"
             );
 
             let row = scene
@@ -230,17 +215,20 @@ fn the_sidebar_and_its_drawer_share_selection_and_restore_the_explicit_opener() 
             run_animations(scene);
 
             assert!(
-                scene.focus.has_modal_scope() && story.is_drawer_open(),
-                "GAP: Swift closes the drawer after a destination is chosen; Rust keeps it open"
+                !scene.focus.has_modal_scope() && !story.is_drawer_open(),
+                "destination activation closes the drawer"
             );
+            assert_eq!(scene.focus.focused(), Some(opener));
+            assert_eq!(story.selection().as_deref(), Some("projects"));
+            assert!(scene.has_text("Projects"));
             assert!(
-                !scene
+                scene
                     .all(|node| node
                         .accessibility()
                         .is_some_and(|semantics| semantics.label == "Projects"))
                     .iter()
                     .any(|node| node.accessibility().is_some_and(|s| s.state.is_selected)),
-                "GAP: Swift marks the chosen Projects destination selected; no Rust Projects row is"
+                "the selected destination is published"
             );
         },
     );

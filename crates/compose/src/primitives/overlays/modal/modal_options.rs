@@ -118,6 +118,8 @@ pub struct ModalOptions {
     pub surface: SemanticColorRef,
     pub fits_content_height: bool,
     pub translation_y: f32,
+    /// Accessible name for the dialog panel; empty leaves the panel unnamed.
+    pub label: String,
 }
 
 impl std::fmt::Debug for ModalOptions {
@@ -129,6 +131,7 @@ impl std::fmt::Debug for ModalOptions {
             .field("backdrop", &self.backdrop)
             .field("fits_content_height", &self.fits_content_height)
             .field("translation_y", &self.translation_y)
+            .field("label", &self.label)
             .finish()
     }
 }
@@ -142,6 +145,7 @@ impl PartialEq for ModalOptions {
             && self.backdrop == other.backdrop
             && self.fits_content_height == other.fits_content_height
             && self.translation_y == other.translation_y
+            && self.label == other.label
     }
 }
 
@@ -154,6 +158,7 @@ impl Default for ModalOptions {
             surface: SemanticColorRef::surface_floating(),
             fits_content_height: false,
             translation_y: 0.0,
+            label: String::new(),
         }
     }
 }

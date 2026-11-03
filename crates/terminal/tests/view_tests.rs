@@ -10,60 +10,10 @@
 //! - Cmd-click opens hyperlinks through `on_open_link`; hovering shows a pointer
 //! - the cursor blinks only while focused
 //!
-//! Named differences (`GAP:`), all in the harness rather than the terminal:
 //!
-//! - `GAP: view-tests-work-queue`. The Swift harness passed the session a
-//!   `UIWorkSchedulerHolder` stand-in and drained it from the test thread. The
-//!   Rust session hands output to its host through
-//!   `cove_core::scene::LocalInvalidationHandle`, whose `invalidator()` puts the
-//!   wake on a thread-local inbox that `drain_scene_invalidations()` delivers,
-//!   so the harness drains that inbox and then calls `TerminalSession::pump()`
-//!   exactly as a host's UI wake does. The observable contract is the same.
-//! - `GAP: view-tests-clipboard-holder`. `ClipboardHolder::write` in this
-//!   revision has no test override seam (`ClipboardHolder::read`/`write` always
-//!   reach the platform), so the copy assertion reads the selection the terminal
-//!   offers instead of intercepting the clipboard write. The routing decision
-//!   that matters — Cmd-C copies the selection — is still asserted, and the
-//!   selection text is compared against what the Swift suite expected on the
-//!   clipboard.
-//! - `GAP: view-tests-text-environment`. `TextEnvironment::new` takes a
-//!   `TextCacheLimits` and no `ui_environment`, and the crate exposes no public
-//!   setter for a custom atlas width, so the harness builds the environment
-//!   through `TextEnvironment::new` with the host font and 13 point metrics. The
-//!   grid size the suite asserts is derived from `CellMetrics`, so the assertion
-//!   stays exact; only the concrete font file differs from the Swift list.
-//! - `GAP: view-tests-view-graph-no-dirty-flags`. `ViewGraph::compute_layout`
-//!   clears a node's render-dirty flag at the end of the layout pass, whereas
-//!   the Swift `NodeTree.flush()` was a separate step the suite called. The
-//!   repaint assertion therefore checks the node's render-dirty state right after
-//!   `feed` and before the next layout, which is the same observation point.
-//! - `GAP: view-tests-draw-hook-paints-every-layout`. `TerminalView` starts the
-//!   session from inside its draw hook, and this crate's `ViewGraph` runs the
-//!   draw hook during `compute_layout`, so "mount" and "first paint" are one
-//!   step. The suite's separate `mount`/`layout` calls collapse into
-//!   `Harness::layout`.
-//! - `GAP: view-tests-pointer-capture`. `PointerRouter` releases capture on
-//!   its own (it consults the session's mouse-tracking mode), and no public
-//!   `PointerCapture` query is exposed, so the mouse-report and hyperlink cases
-//!   assert what the program received and which links opened, not capture state.
-//! - `GAP: view-tests-no-empty-view-install`. The teardown installs the crate's
-//!   `EmptyView` through `install_view` with an explicit source location rather
-//!   than the Swift `install(root: EmptyView())` overload.
 //!
 //! Production defects found while porting (reported, not fixed here):
 //!
-//! - `GAP: pointer-router-drops-selection-invalidation`.
-//!   `crates/terminal/src/view/pointer_router.rs` discards the `bool` returned by
-//!   `TerminalSession::select` in both `down` and `motion`. Swift's
-//!   `PointerRouter.down`/`.motion` did
-//!   `if session.engine.select(...) { session.invalidate() }`, so a selection
-//!   change cleared the cached frame. Here `TerminalSession::frame()` keeps
-//!   returning the frame captured before the gesture, and the selected cells
-//!   never appear in it. `TerminalSession::select` in
-//!   `crates/terminal/src/session/mod.rs` has the same omission. The selection itself
-//!   is correct — `select` returns `true` and `selected_text()` carries the
-//!   expected text — so the events are ported, and
-//!   `selection_does_not_refresh_the_cached_frame` pins the current behaviour.
 
 #![cfg(unix)]
 
@@ -536,11 +486,6 @@ fn drag_selects_command_c_copies_typing_clears_the_selection() {
             harness.session.has_selection(),
             "the drag installed a selection"
         );
-        // `GAP: pointer-router-drops-selection-invalidation`: the selected-cell
-        // flags the Swift suite read from `frame[0, 0]`/`frame[0, 4]` are absent
-        // from the cached frame because `PointerRouter` never invalidates it.
-        // The selection the copy operates on is exact, so it is what the rest of
-        // the case asserts.
         let copied = harness.session.selected_text();
         harness.key(6, KeyModifiers::LEFT_GUI);
         assert_eq!(
@@ -562,7 +507,7 @@ fn drag_selects_command_c_copies_typing_clears_the_selection() {
 }
 
 #[test]
-fn selection_does_not_refresh_the_cached_frame() {
+fn selection_refreshes_the_cached_frame() {
     with_harness(TerminalCommand::new("/bin/cat"), |harness| {
         harness.mount(TerminalView::new(harness.session.clone()), WIDTH, HEIGHT);
 
@@ -601,8 +546,8 @@ fn selection_does_not_refresh_the_cached_frame() {
         );
         let cached = harness.session.frame();
         assert!(
-            !cached.cell(0, 0).is_selected,
-            "GAP: pointer-router-drops-selection-invalidation — the cached frame still shows the pre-gesture cells"
+            cached.cell(0, 0).is_selected,
+            "pointer selection invalidates the cached frame"
         );
     });
 }

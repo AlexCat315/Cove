@@ -16,11 +16,6 @@
 //!   undo step
 //!
 //! Named differences from the Swift suite:
-//! - **Hover is never requested.** `TextFieldCodeEditing::on_request_hover` is
-//!   declared but nothing reads it, so F1 produces no anchor; only focus and
-//!   the untouched read-only text are observable.
-//! - **No undo for a completion.** The field does not record edits in
-//!   `edit_history`, so the accepted edit is not one undo step.
 //! - `TextField::new` has no `TextField`-owned surface marker; the host publishes
 //!   `__textfield_state`.
 //! - **No diagnostic draw fringe to exclude.** Vertex `y` replaces Swift's
@@ -118,10 +113,21 @@ fn keyboard_hover_uses_the_scrolled_visible_caret() {
         scene.key(Scancode::F1, Default::default());
 
         let anchor = requested.borrow().to_owned();
+        let anchor = anchor.expect("F1 requests a hover anchor");
+        assert_eq!(
+            anchor.character_index,
+            buffer.character_count(),
+            "the anchor names the visible caret"
+        );
         assert!(
-            anchor.is_none(),
-            "GAP: Swift requests a hover anchor at character {} with windowX in (100, 300) and windowY in (0, 40); Rust never calls TextFieldCodeEditing::on_request_hover, got {anchor:?}",
-            buffer.character_count()
+            anchor.window_x > 100.0 && anchor.window_x < 300.0,
+            "the anchor sits inside the scrolled text column: {}",
+            anchor.window_x
+        );
+        assert!(
+            anchor.window_y >= 0.0 && anchor.window_y <= 40.0,
+            "the anchor sits under the caret's row: {}",
+            anchor.window_y
         );
         assert!(
             scene.focus.focused() == Some(node.clone()),
@@ -188,7 +194,7 @@ fn diagnostics_select_overlapping_rows_clusters_and_empty_positions() {
             let window = document.visible_layout(0, 3, &environment);
 
             let emoji = buffer.utf8_offset_for_character_index(12);
-            let blank = buffer.line_range(1).start;
+            let blank = buffer.utf8_offset_for_character_index(buffer.line_range(1).start);
             let values = TextDiagnostics::new(&[
                 TextDiagnostic::new(emoji..(emoji + 4), TextDiagnosticSeverity::Error, "Emoji"),
                 TextDiagnostic::new(blank..blank, TextDiagnosticSeverity::Warning, "Blank"),
@@ -213,13 +219,14 @@ fn diagnostics_select_overlapping_rows_clusters_and_empty_positions() {
                 emoji_span.width
             );
             assert_eq!(emoji_span.baseline_y, 18.0);
+            eprintln!("DBG segs {:?}", segments.iter().map(|s| (s.diagnostic.message.clone(), s.diagnostic.utf8_range.clone(), s.baseline_y)).collect::<Vec<_>>());
             assert_eq!(
                 segments
                     .iter()
                     .find(|segment| segment.diagnostic.message == "Blank")
                     .map(|segment| segment.baseline_y),
-                Some(18.0),
-                "GAP: Swift attaches the zero-width diagnostic on the blank row to row two (baseline 38); Rust's line spans include the trailing newline, so the empty range at the row start also overlaps row one (baseline 18)"
+                Some(38.0),
+                "the zero-width diagnostic attaches to the blank row, not the row whose span ends with its newline"
             );
 
             let theme = Theme::default_dark();
@@ -506,8 +513,8 @@ fn coordinate_tooltips_fit_at_the_viewport_corner_and_unregister() {
             "the tooltip stays inside the 400x300 viewport with a 6pt margin: {frame:?}"
         );
         assert!(
-            frame.max_y() > 280.0,
-            "GAP: Swift flips the tooltip above the 280..295 anchored range (maxY <= 280); Rust keeps it below the anchor, clamped to the viewport bottom: {frame:?}"
+            frame.max_y() <= 280.0,
+            "the tooltip flips above the 280..295 anchored range: {frame:?}"
         );
 
         scene.install(cove_composition::EmptyView);

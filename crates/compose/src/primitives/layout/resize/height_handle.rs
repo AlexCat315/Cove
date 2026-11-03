@@ -6,7 +6,7 @@ use std::rc::Rc;
 
 use cove_core::Binding;
 use cove_core::scene::{
-    AccessibilityActions, AccessibilityRole, AccessibilitySemantics, Display, EventPhase,
+    AccessibilityActions, AccessibilityRole, AccessibilitySemantics, AccessibilityState, Display, EventPhase,
     EventResult, FocusChainHolder, HoverPhase, InputHandlerRoute, InteractionRegistryHolder,
     LayoutNode, Node, NodeResource, PointerCaptureAttachmentKey, PointerCaptureHolder,
     PointerPhase,
@@ -140,8 +140,12 @@ impl PrimitiveView for EditorHeightHandle {
         node.set_accessibility(Some(AccessibilitySemantics {
             role: AccessibilityRole::Slider,
             label: self.label.clone(),
-            value: format!("{} pt", current.round() as i64),
+            value: format!("{}", current.round() as i64),
             help: crate::i18n::tr("Use Up/Down to resize, Shift for larger steps, Home/End for the limits"),
+            state: AccessibilityState {
+                is_enabled: self.is_enabled,
+                ..Default::default()
+            },
             ..Default::default()
         }));
 
@@ -349,7 +353,9 @@ impl PrimitiveView for EditorHeightHandle {
                             },
                         );
                         if let Some(capture) = PointerCaptureHolder::current() {
-                            capture.acquire(&owner, true);
+                            // A resize drag keeps exclusive capture: an ancestor
+                            // scroll gesture must not steal the press.
+                            capture.acquire(&owner, false);
                         }
                     }
                     PointerPhase::Up => {

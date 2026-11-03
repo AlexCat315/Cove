@@ -507,14 +507,15 @@ impl TerminalSession {
         pointer: &TerminalPointer,
         rectangle: bool,
     ) -> bool {
-        self.inner
-            .engine
-            .borrow_mut()
-            .select(phase, pointer, rectangle)
+        let changed = self.inner.engine.borrow_mut().select(phase, pointer, rectangle);
+        if changed { Session::invalidate(&self.inner); }
+        changed
     }
 
     pub fn clear_selection(&self) -> bool {
-        self.inner.engine.borrow_mut().clear_selection()
+        let changed = self.inner.engine.borrow_mut().clear_selection();
+        if changed { Session::invalidate(&self.inner); }
+        changed
     }
 
     pub fn image_pixels(&self, image_id: u32) -> Option<cove_imaging::DecodedImage> {

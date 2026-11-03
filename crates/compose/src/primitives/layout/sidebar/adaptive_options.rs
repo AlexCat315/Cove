@@ -204,13 +204,16 @@ impl SidebarGeometry {
         &self,
         shows_rail_labels: bool,
     ) -> super::presentation::SidebarPresentation {
+        // Only a docked rail narrows: a modal drawer is always a full sidebar,
+        // so its rows keep their titles, badges and trailing accessories.
         match self.mode {
             SidebarMode::Expanded => super::presentation::SidebarPresentation::Expanded,
-            SidebarMode::Rail | SidebarMode::Compact => {
+            SidebarMode::Rail if !self.is_modal => {
                 super::presentation::SidebarPresentation::Rail {
                     shows_labels: shows_rail_labels,
                 }
             }
+            _ => super::presentation::SidebarPresentation::Expanded,
         }
     }
 }

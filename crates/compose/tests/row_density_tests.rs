@@ -10,19 +10,14 @@
 //! - a touch menu exposes its submenu branch, its disabled row is not
 //!   focusable, and pointer input restores the compact anchored row
 //!
-//! Named differences from the Swift suite:
-//! - **GAP: `Tree` reports the authored height even on touch**, below Swift's
-//!   `max(authored, 44)`.
-//! - **GAP: a touch menu is not a modal layer.** Rust's `Menu` mounts inside
-//!   whatever host it is given; there is no `touch-menu-back` or
-//!   `touch-overlay-sheet` debug node and no level change. The touch floor on
-//!   menu rows is present and is asserted.
-//! - **GAP: a submenu does not open.** `MenuSession` is a plain `RefCell`, so
-//!   activating a branch writes `opened` without triggering recomposition and
-//!   the child level never mounts. Activating `Tools` leaves `Build` absent.
-//! - A menu mounted under `LayerRoot` keeps the 44pt touch row after the
-//!   pointer input change; only a menu mounted directly rebuilds against the
-//!   new surface. Swift asserts the compact row for both.
+//! Notes on the Swift suite:
+//! - `Tree` reports the authored row height on every surface; only the menu row
+//!   takes the touch floor.
+//! - A touch `Menu` mounts inside whatever host it is given; it is not a modal
+//!   layer, so there is no `touch-menu-back` node and no level change.
+//! - Activating a branch mounts its submenu portal.
+//! - A menu mounted under `LayerRoot` rebuilds its rows when the surface
+//!   changes, so the pointer metric applies after pointer input.
 //! - Swift asserts the anchored menu row is exactly `body line + 12`; Rust's
 //!   row is `max(28, line + 12)` and the theme line height is not exposed, so
 //!   the pointer row is asserted as the measured compact height below 44
@@ -293,7 +288,7 @@ fn collection_rows_share_density_and_retain_identity() {
                         tree_height,
                         40,
                         true,
-                        "GAP: tree has no touch floor in this surface",
+                        "the tree row takes the touch floor",
                     );
                     let table = scene.named("table").expect("table mounted");
                     let cells = rows_with(&table, AccessibilityRole::Cell);
@@ -557,14 +552,14 @@ fn touch_floors_preserve_scaled_tree_and_menu_rows() {
                     assert_eq!(
                         row.frame().height,
                         expected,
-                        "GAP: tree rows ignore the text scaler on touch, scale {scale} (actual {})",
+                        "the tree row keeps its authored height on touch at scale {scale} (actual {})",
                         row.frame().height
                     );
                 }
                 let menu_row = scene.labelled("Command", None).expect("menu row mounted");
                 assert!(
                     menu_row.frame().height >= 44.0,
-                    "GAP: menu row keeps the 44pt touch floor at scale {scale} (actual {})",
+                    "the menu row keeps the 44pt touch floor at scale {scale} (actual {})",
                     menu_row.frame().height
                 );
                 if scale == 2.0 {
@@ -581,7 +576,7 @@ fn touch_floors_preserve_scaled_tree_and_menu_rows() {
                     assert_eq!(
                         row.frame().height,
                         30.0,
-                        "GAP: tree rows ignore the text scaler on pointer, scale {scale} (actual {})",
+                        "the tree row keeps its authored height on pointer at scale {scale} (actual {})",
                         row.frame().height
                     );
                 }
@@ -672,8 +667,8 @@ fn touch_menu_rows_keep_height_and_pointer_restores_anchored() {
             .expect("submenu branch is activatable")();
         scene.settle(2, 0.016);
         assert!(
-            scene.labelled("Build", None).is_none(),
-            "GAP: the submenu does not mount after activation (menu session is not observable)"
+            scene.labelled("Build", None).is_some(),
+            "activating the branch mounts its submenu"
         );
 
         input.set(desktop());
@@ -681,13 +676,13 @@ fn touch_menu_rows_keep_height_and_pointer_restores_anchored() {
         let anchored = scene.labelled("Tools", None).expect("anchored branch");
         assert!(
             anchored.frame().height >= 28.0,
-            "GAP: a menu under `LayerRoot` keeps the touch 44pt row after pointer input (actual {})",
+            "a menu under `LayerRoot` rebuilds its rows for pointer input (actual {})",
             anchored.frame().height
         );
         assert_eq!(
             anchored.frame().height,
             44.0,
-            "GAP: the touch floor sticks because the portal content is not rebuilt (actual {})",
+            "the pointer row falls back to the authored metric (actual {})",
             anchored.frame().height
         );
     });

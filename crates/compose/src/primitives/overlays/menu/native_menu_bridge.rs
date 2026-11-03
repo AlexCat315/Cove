@@ -48,6 +48,9 @@ impl NativeMenuBuild {
 /// Converts the in-app menu model into a platform-neutral snapshot.
 pub struct NativeMenuBuilder;
 
+/// The authored glyph size, in points. The template raster is emitted at 2x.
+const ICON_POINTS: f32 = 16.0;
+
 impl NativeMenuBuilder {
     pub fn build(entries: &[MenuEntry]) -> NativeMenuBuild {
         let mut next_id: i64 = 0;
@@ -167,13 +170,21 @@ impl NativeMenuBuilder {
 
     /// The template glyph for an item.
     ///
-    /// The Swift version rasterizes the alpha-mask SVG through CoreGraphics and
-    /// re-encodes it as a black-on-transparent template PNG. That path is
-    /// platform image work, so the vector resource is carried through to the
-    /// shell instead and the native layer resolves it in its own colour space.
-    /// No PNG bytes are synthesized here.
-    fn make_icon(_resource: Option<&cove_imaging::BundleImageResource>) -> Option<NativeMenuIcon> {
-        None
+    /// The bundle glyph is an alpha-mask SVG. It is rasterized into a
+    /// black-on-transparent PNG and marked as a template so the native menu can
+    /// tint it alongside the item text. An item with no icon, or one whose glyph
+    /// cannot be resolved, carries no icon.
+    fn make_icon(resource: Option<&cove_imaging::BundleImageResource>) -> Option<NativeMenuIcon> {
+        let resource = resource?;
+        let path = resource.path()?;
+        let data = std::fs::read(path).ok()?;
+        let png =
+            cove_imaging::ImageDecoder::template_png(&data, &resource.file_extension, ICON_POINTS)
+                .ok()?;
+        Some(NativeMenuIcon {
+            png,
+            is_template: true,
+        })
     }
 }
 

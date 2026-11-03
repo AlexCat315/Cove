@@ -7,11 +7,11 @@ use std::rc::Rc;
 use crate::modifiers::layout::{LayoutFrameExt, PaddingExt};
 use crate::modifiers::style::{FloatingSurfaceElevation, SurfaceStyleExt};
 use crate::{AnyView, BoxView, PrimitiveView, ViewExt, impl_primitive_view};
-use cove_core::Point;
 use cove_core::scene::{
     Align, EventResult, FlexDirection, InputHandlerRoute, InteractionRegistryHolder, Justify, Node,
     Wrap,
 };
+use cove_core::{Binding, Point};
 
 use super::menu_navigation::{
     MENU_LEVEL_MARKER, MENU_SCROLL_INSET, MENU_SCROLL_MARKER, MenuSession,
@@ -106,6 +106,14 @@ impl PrimitiveView for MenuLevelHost {
         // Overlay, not `stable`: a reserved lane is a right-only inset, so every
         // row highlight would sit closer to one edge. Menus fill their panel
         // edge to edge and only need the bar while the pointer is over them.
+        // The reveal offset the level computes for Home/End/type-ahead drives
+        // this viewport, so revealing a row really scrolls the stack.
+        let read_session = self.session.clone();
+        let write_session = self.session.clone();
+        let offset = Binding::new(
+            move || read_session.scroll_offset(),
+            move |value: Point| write_session.set_scroll_offset(value),
+        );
         let scroller = crate::primitives::layout::ScrollView::vertical(AnyView::new(
             BoxView::new(
                 FlexDirection::Column,
@@ -117,6 +125,7 @@ impl PrimitiveView for MenuLevelHost {
             )
             .padding(PANEL_INSET),
         ))
+        .scroll_offset(offset)
         .scrollbar_gutter(crate::primitives::layout::ScrollbarGutter::Overlay)
         .consume_policy(cove_core::scene::ScrollConsumePolicy::Always);
         let marked = scroller
@@ -161,10 +170,14 @@ impl cove_composition::ViewModifier for MenuWindowBounds {
         let Some(layout) = node.layout_node() else {
             return;
         };
-        let row_height = 30.0_f32.max(
-            node.composition_value(&crate::theme::ControlSizeEnvironment::key())
-                .button_height(),
-        );
+        // The viewport budget uses the same row metric the rows lay out with,
+        // so a taller authored row cannot overflow the clip.
+        let row_height = node
+            .composition_value(&super::menu_item_row::minimum_row_height())
+            .max(
+                node.composition_value(&crate::theme::ControlSizeEnvironment::key())
+                    .button_height(),
+            );
         let preferred = self.max_visible_rows as f32
             * row_height
             * crate::theme::node_text_scaler(node).factor();

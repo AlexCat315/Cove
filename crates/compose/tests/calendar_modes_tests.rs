@@ -145,17 +145,22 @@ fn render(
 }
 
 #[test]
-fn cells_have_no_accessibility_activate() {
+fn cells_expose_accessibility_activate() {
     render(
         Some(date(2024, 3, 13)),
         CalendarGranularity::Day,
         DateAvailability::default(),
-        |scene, _| {
+        |scene, store| {
             let day = button(scene, "March 14, 2024");
-            assert!(
-                day.accessibility_actions().activate.is_none(),
-                "GAP: Swift calendar cells expose accessibilityActions.activate; \
-                 Rust cells only install a pointer handler"
+            let activate = day
+                .accessibility_actions()
+                .activate
+                .expect("a day cell offers an activate action");
+            activate();
+            assert_eq!(
+                *store.borrow(),
+                Some(date(2024, 3, 14)),
+                "activating the cell selects its day"
             );
         },
     );
@@ -177,28 +182,28 @@ fn week_selection() {
                 .iter()
                 .find(|node| node.accessibility().is_some_and(|s| s.state.is_selected))
                 .expect("the selection's week is selected");
-            assert_eq!(
-                label(selected),
-                "Week 11",
-                "GAP: Swift labels the week \"Week 11, 2024\"; Rust omits the year"
+            assert!(
+                label(selected).starts_with("Week 11, "),
+                "the selected week names its number and date range, got {:?}",
+                label(selected)
             );
             let next = weeks
                 .iter()
-                .find(|node| label(node) == "Week 12")
+                .find(|node| label(node).starts_with("Week 12, "))
                 .expect("week 12 row")
                 .clone();
             let frame = next.absolute_frame();
             assert!(
-                frame.width == 0.0 && frame.height == 0.0,
-                "GAP: Swift's week row is a laid-out button; the Rust CalendarWeekButton has \
-                 no layout node, so its frame is {frame:?}"
+                frame.width > 0.0 && frame.height > 0.0,
+                "the week row is laid out, got {frame:?}"
             );
-            press(scene, &next);
+            next.accessibility_actions()
+                .activate
+                .expect("the week row offers an activate action")();
             assert_eq!(
                 *store.borrow(),
-                Some(date(2024, 3, 13)),
-                "GAP: Swift selects 2024-03-18 when Week 12 is activated; the zero-sized Rust \
-                 row cannot be hit and has no accessibility activate, so nothing is selected"
+                Some(date(2024, 3, 18)),
+                "activating week 12 selects its first day"
             );
         },
     );
@@ -219,10 +224,8 @@ fn week_row_alignment() {
             assert_eq!(texts.len(), 8, "a week number plus seven days");
             let row_frame = row.absolute_frame();
             assert!(
-                row_frame.width == 0.0 && row_frame.height == 0.0,
-                "GAP: Swift measures against the week row band; the Rust row button has no \
-                 layout node and a zero frame ({row_frame:?}), so each number is checked \
-                 against its cell box instead"
+                row_frame.width > 0.0 && row_frame.height > 0.0,
+                "the week row band is laid out, got {row_frame:?}"
             );
             let first_mid = {
                 let frame = texts[0].absolute_frame();
@@ -328,13 +331,7 @@ fn year_selection() {
                     .all(|node| label(node) != "2015" && label(node) != "2028"),
                 "the page holds exactly twelve aligned years"
             );
-            assert!(
-                buttons(scene)
-                    .iter()
-                    .all(|node| label(node) != "Next years"),
-                "GAP: Swift labels the years-panel arrow \"Next years\"; Rust keeps \"Next month\""
-            );
-            let next = button(scene, "Next month");
+            let next = button(scene, "Next years");
             press(scene, &next);
             assert!(
                 buttons(scene).iter().any(|node| label(node) == "2028"),
@@ -360,9 +357,8 @@ fn drilling() {
             assert!(
                 buttons(scene)
                     .iter()
-                    .all(|node| label(node) != "March 2024, show months"),
-                "GAP: Swift labels the drill-up title \"March 2024, show months\"; \
-                 the Rust title button carries no such label"
+                    .any(|node| label(node) == "March 2024, show months"),
+                "the drill-up title names what it opens"
             );
             press(scene, &button_with_text(scene, "March 2024"));
             assert!(
@@ -462,9 +458,10 @@ fn labels() {
         DateAvailability::default(),
         |scene, _| {
             assert!(
-                buttons(scene).iter().any(|node| label(node) == "Week 12"),
-                "GAP: Swift's CalendarGranularity.week.label is \"Week 12, 2024\"; \
-                 Rust has no label(for:) and the row reads \"Week 12\""
+                buttons(scene)
+                    .iter()
+                    .any(|node| label(node).starts_with("Week 12, ")),
+                "the week row names its number and date range"
             );
         },
     );

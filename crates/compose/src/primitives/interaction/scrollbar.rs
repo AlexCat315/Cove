@@ -135,6 +135,8 @@ fn apply_desired_visibility(node: &Node) {
 fn set_chrome_visible(node: &Node, visible: bool) {
     let current = node.attachment::<f32>(CHROME_OPACITY).unwrap_or(0.0);
     let weak = node.downgrade();
+    cove_core::scene::with_animation(
+        Some(crate::theme::SemanticMotionRef::fast().resolve(&crate::theme::theme_for_node(node))), || {
     node.animatable_set_with(
         CHROME_OPACITY,
         current,
@@ -148,6 +150,7 @@ fn set_chrome_visible(node: &Node, visible: bool) {
             }
         },
     );
+    });
 }
 
 /// Scrolling reveals the bar even when nothing holds it: it appears at once and
@@ -175,13 +178,15 @@ fn flash_if_unheld(node: &Node) {
         return;
     }
     let weak = node.downgrade();
-    node.animatable_set_with("__scrollbar.fade", 1.0_f32, 0.0_f32, move |opacity| {
+    cove_core::scene::with_animation(Some(cove_core::scene::Animation::new(0.3, cove_core::scene::AnimationCurve::EaseOut).with_delay(0.7)), || {
+    node.animatable_set_with(CHROME_OPACITY, 1.0_f32, 0.0_f32, move |opacity| {
         if let Some(owner) = Node::upgrade(&weak) {
             owner.set_attachment(CHROME_OPACITY, opacity);
             owner.mark_render_dirty(cove_core::scene::InvalidationSource::style_set(
                 "scrollbarChromeOpacity",
             ));
         }
+    });
     });
 }
 

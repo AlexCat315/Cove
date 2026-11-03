@@ -26,15 +26,6 @@
 //! crate, so "the compiler is still blocked at this instant" is expressed as
 //! "the preparation has not finished yet", which is what the gate guaranteed.
 //!
-//! GAP: Swift's cancellation case asserted that the *earlier* step's native
-//! resources were discarded (`backend.counts.buffers == 0`). Rust's
-//! `ResourcePreparationContext::discard_owned` only runs cleanups registered
-//! through `ResourcePreparationContext::acquired`, and `Device::make_buffer` /
-//! `make_texture` / `make_shader_module` never register ownership, so a buffer
-//! created in an earlier step stays alive after the preparation is cancelled.
-//! The cancellation case below therefore asserts the observable contract that
-//! does hold (cancelled error, `cancelled` phase, no published object, later
-//! steps never created) and records the leaked earlier resource as this gap.
 
 #![cfg(target_os = "macos")]
 
@@ -129,14 +120,14 @@ fn cancellation_discards_native_work_and_publishes_the_cancelled_phase() {
     };
     let (events, on_progress) = record();
 
-    let mut created = false;
+    let mut created = None;
     let result: RhiResult<cove_graphics::rhi::ShaderModule> =
         device.prepare_resources("Test", Some(2), on_progress, |context| {
             context
                 .step("Buffer", || {
                     device
                         .make_buffer(BufferDescriptor::new(64, BufferUsage::VERTEX))
-                        .map(|_| created = true)
+                        .map(|buffer| created = Some(buffer))
                 })
                 .expect("first step");
             context.cancel();
@@ -144,7 +135,10 @@ fn cancellation_discards_native_work_and_publishes_the_cancelled_phase() {
             Ok(shader)
         });
 
-    assert!(created, "the first step really created its native buffer");
+    let buffer = created.expect("the first step really created its native buffer");
+    device.wait_until_idle().expect("drain cancelled resources");
+    assert!(device.read_buffer_data(buffer, 0, &mut [0; 4]).is_err(),
+        "cancellation releases the buffer created by the earlier step");
     match result {
         Err(RhiError::Cancelled) => {}
         other => panic!("a cancelled preparation reports cancellation, got {other:?}"),

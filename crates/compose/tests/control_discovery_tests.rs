@@ -18,26 +18,22 @@
 //!   reproduces the shipped `query_nodes` predicate, its presentation projection
 //!   and its record shape locally, the same approach as
 //!   `sidebar_hierarchy_tests.rs`, and asserts the contract on `Node`.
-//! - Role filters use the Rust spelling. The shipped filter compares
-//!   `format!("{:?}", semantics.role)`, so `"Group"`, `"Button"` and
-//!   `"TextField"` match where Swift filters `"group"`, `"button"` and
-//!   `"textField"` (documented as GAP 1 in `crates/devtools/tests/diagnostics_tests.rs`).
+//! - Role filters use the raw-value spelling (`"group"`, `"button"`,
+//!   `"textField"`), matching Swift's `role.rawValue` comparison.
 //! - A Rust `Button` does not derive its accessible label from its title text,
 //!   so the harness labels each button explicitly; the Swift suite relied on the
 //!   implicit label.
-//! - GAP: Swift's default node record omits a field's private value and only
-//!   includes it for `include_value` with an explicit `node_id`. Rust's
-//!   `TextField` publishes its draft in `AccessibilitySemantics.value`, and the
-//!   shipped default record serialises semantics unchanged, so the default
-//!   record contains the draft. The assertion below pins the measured leak and
-//!   names the Swift expectation.
+//! - A field's draft is private: the default record omits it and only an
+//!   `include_value` request with an explicit `node_id` reads it.
 
 use crate::support;
 
 use serde_json::{Value, json};
 
 use cove_composition::ViewGraph;
-use cove_core::scene::{AccessibilitySemantics, Align, FlexDirection, Justify, Node, Wrap};
+use cove_core::scene::{
+    AccessibilityRole, AccessibilitySemantics, Align, FlexDirection, Justify, Node, Wrap,
+};
 use cove_core::{Binding, Rect};
 use cove_ui_compose::BoxView;
 use cove_ui_compose::modifiers::interaction::AccessibilityExt;
@@ -86,10 +82,26 @@ impl Page {
     }
 }
 
+/// The wire spelling of a role: Swift publishes the raw value (`textField`).
+fn role_name(role: AccessibilityRole) -> String {
+    serde_json::to_value(role)
+        .ok()
+        .and_then(|value| value.as_str().map(str::to_string))
+        .unwrap_or_else(|| format!("{role:?}"))
+}
+
 impl Record {
     fn json(&self, include_value: bool) -> Value {
+        // A field's draft is only read on an explicit request; the default
+        // record reports the meaning.
         let value = if include_value {
             self.node.resolved_accessibility_value()
+        } else if self
+            .semantics
+            .as_ref()
+            .is_some_and(|semantics| semantics.role == AccessibilityRole::TextField)
+        {
+            String::new()
         } else {
             self.semantics
                 .as_ref()
@@ -99,7 +111,7 @@ impl Record {
         json!({
             "node": { "id": self.node.id().0.to_string() },
             "semantics": {
-                "role": self.semantics.as_ref().map(|s| format!("{:?}", s.role)),
+                "role": self.semantics.as_ref().map(|s| role_name(s.role)),
                 "label": self.semantics.as_ref().map(|s| s.label.clone()),
                 "value": value,
             },
@@ -343,17 +355,11 @@ fn validated_tools_discover_form_fields_and_buttons_without_private_values() {
 
                 let default_json = page.json(false).to_string();
                 if role == "TextField" {
+                    // A field's draft is private; the default record reports the
+                    // meaning only. Reading it takes an explicit value request.
                     assert!(
-                        item.semantics
-                            .as_ref()
-                            .is_some_and(|semantics| semantics.value == DRAFT),
-                        "GAP: Swift keeps `{text}`'s private draft out of the default record, \
-                         but Rust publishes it through AccessibilitySemantics.value"
-                    );
-                    assert!(
-                        default_json.contains(DRAFT),
-                        "GAP: Swift keeps `{text}`'s private draft out of the default record; \
-                         the shipped Rust projection serialises it: {default_json}"
+                        !default_json.contains(DRAFT),
+                        "the default projection omits the draft: {default_json}"
                     );
                 } else {
                     assert!(

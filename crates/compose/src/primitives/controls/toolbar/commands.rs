@@ -591,7 +591,7 @@ impl PrimitiveView for OverflowButton {
                 0.0,
                 AnyView::new(crate::primitives::media::Icon::new(icon, 20.0)),
             )
-            .frame_size(self.minimum_extent, self.minimum_extent),
+            .frame(None, None, Some(self.minimum_extent), Some(self.minimum_extent), None, None),
         )]
     }
 }

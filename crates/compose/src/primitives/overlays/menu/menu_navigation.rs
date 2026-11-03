@@ -65,7 +65,9 @@ impl MenuTypeahead {
             self.prefix.clear();
         }
         self.last_input = time;
-        let input = text.to_lowercase();
+        // Swift folds case and diacritics here, so a leading "e" matches
+        // "Éclair" as well as "Echo".
+        let input = super::super::command_palette_model::normalize(text);
         if self.prefix == input && input.chars().count() == 1 {
             self.prefix = input;
         } else {
@@ -77,7 +79,8 @@ impl MenuTypeahead {
             .map_or(0, |index| index + 1);
         for distance in 0..rows.len() {
             let row = &rows[(start + distance) % rows.len()];
-            if row.title.to_lowercase().starts_with(&self.prefix) {
+            if super::super::command_palette_model::normalize(&row.title).starts_with(&self.prefix)
+            {
                 return Some(row.id);
             }
         }
@@ -102,6 +105,11 @@ pub struct MenuSession {
     pub hover_intent: Rc<MenuHoverIntent>,
     pub typeahead: RefCell<MenuTypeahead>,
     pub pointer: RefCell<super::row_content::MenuPointerIntent>,
+    /// One navigation slot per open branch. Swift gives every `MenuLevel` its
+    /// own `@State session`, so a child level opening a branch of its own never
+    /// overwrites its parent's `opened`; caching by branch id keeps that
+    /// identity across recomposition without sharing one slot tree-wide.
+    children: RefCell<std::collections::HashMap<u64, Rc<MenuSession>>>,
 }
 
 impl MenuSession {
@@ -113,7 +121,19 @@ impl MenuSession {
             hover_intent: MenuHoverIntent::new(),
             typeahead: RefCell::new(MenuTypeahead::new()),
             pointer: RefCell::new(super::row_content::MenuPointerIntent::new()),
+            children: RefCell::new(std::collections::HashMap::new()),
         })
+    }
+
+    /// The navigation slot for the branch level rooted at `id`, created once and
+    /// then retained for as long as the level stays open.
+    pub fn child(&self, id: u64) -> Rc<MenuSession> {
+        if let Some(existing) = self.children.borrow().get(&id) {
+            return existing.clone();
+        }
+        let session = MenuSession::new();
+        self.children.borrow_mut().insert(id, session.clone());
+        session
     }
 
     pub fn navigation(&self) -> MenuNavigationState {
@@ -125,7 +145,8 @@ impl MenuSession {
             return;
         }
         *self.navigation.borrow_mut() = value;
-        self.revision.update(|revision| *revision = revision.wrapping_add(1));
+        self.revision
+            .update(|revision| *revision = revision.wrapping_add(1));
     }
 
     pub fn scroll_offset(&self) -> cove_core::Point {

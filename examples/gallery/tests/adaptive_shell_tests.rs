@@ -87,8 +87,8 @@ fn page_switch_isolation() {
             "sidebar destinations expose their view tag"
         );
         assert!(
-            scene.named("gallery-size").is_none(),
-            "GAP: Swift's toolbar names its size control `gallery-size`; Rust does not"
+            scene.named("gallery-size").is_some(),
+            "the size control has its stable identifier"
         );
         let toolbar = scene.require_named("gallery-toolbar");
         gallery.select_page(GalleryPage::Slider);
@@ -108,8 +108,8 @@ fn page_switch_isolation() {
             "select_page mounts the Slider story"
         );
         assert!(
-            scene.named("sidebar-item-slider").is_none(),
-            "GAP: Swift selects `sidebar-item-slider`; Rust emits no sidebar-item names"
+            scene.named("sidebar-item-slider").is_some(),
+            "the selected sidebar destination has its stable identifier"
         );
     });
 }

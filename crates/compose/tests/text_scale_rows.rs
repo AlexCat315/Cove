@@ -11,23 +11,16 @@
 //!   lanes inside the body at 2x and 1x
 //!
 //! Named differences from the Swift suite:
-//! - **GAP: `Table` body cells are never laid out.** The non-`DataTable` table
-//!   mounts placeholder cells whose frames stay 0pt at every scale, so Swift's
-//!   scaled table row leg has no Rust counterpart here; the identical defect is
-//!   pinned by `row_density_tests`.
-//! - **GAP: the data table neither scales nor floors.** `DataTable` resolves
-//!   its layout with `touch = false` and its mounted surface ignores the
-//!   `textScaler` modifier, so rows stay at 36pt at every scale and input
-//!   instead of Swift's `max(authored * scale, 44)`.
-//! - **GAP: grid cells report `y = 0`.** Row offsets are applied by the scroll
-//!   transform, not the cell frame, so Swift's absolute `minY`/`maxY`
-//!   assertions are replaced by mounted-range assertions.
-//! - Swift asserts a "Resize First column" grip at `max(38 * scale, 44)`;
-//!   Rust's tables mount no resize grip, so the leg is removed and recorded
-//!   here rather than asserted.
-//! - **GAP: the data-table session is private.** Swift reads
-//!   `focusedID`, `viewport.size` and `offset.y`; Rust exposes no accessor, so
-//!   paging is asserted through the mounted last-row window.
+//! - The non-`DataTable` `Table` primitive is not implemented in Rust; only
+//!   `DataTable` exists, and it covers the scaled row, frozen lane and paging
+//!   legs below. Swift's separate `Table` row leg therefore has no counterpart
+//!   here.
+//! - Swift asserts a "Resize First column" grip at `max(38 * scale, 44)`; the
+//!   Rust `DataTable` mounts no per-column resize grip, so the leg is removed
+//!   and recorded here rather than asserted.
+//! - Swift reads the data-table session's `focusedID`, `viewport.size` and
+//!   `offset.y`. The Rust session is private, so paging is asserted through the
+//!   mounted last-row window instead.
 //! - Swift reads the fixed grid cell's `textMeasure.font.size`; Rust records
 //!   the same measure on the layout node and the assertion is kept as-is.
 
@@ -430,10 +423,10 @@ fn variable_grid_scales_cached_prefixes_and_clamps() {
         );
         assert_eq!(last.frame().height, 100.0, "the last row doubles");
         assert_eq!(
-            last.frame().height,
-            100.0,
-            "GAP: grid cell frames report y = 0 because row offsets live in the scroll transform              (last y {})",
-            last.frame().y
+            last.absolute_frame().max_y(),
+            120.0,
+            "the partial last row ends at the viewport edge (last frame {:?})",
+            last.absolute_frame()
         );
 
         scale.set(1.0);

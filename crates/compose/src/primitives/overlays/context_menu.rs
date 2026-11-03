@@ -308,6 +308,12 @@ impl PrimitiveView for ContextMenuHost {
                     if !secondary || !interested(here) {
                         return EventResult::Ignored;
                     }
+                    // The chrome capture sweep runs before target delivery. A
+                    // secondary press must reach the target so it can open the
+                    // menu; only the delivered press is consumed.
+                    if event_phase == EventPhase::Capture {
+                        return EventResult::Ignored;
+                    }
                     if phase == PointerPhase::Down {
                         on_open(here);
                     }

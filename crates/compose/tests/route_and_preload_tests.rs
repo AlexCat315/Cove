@@ -14,32 +14,6 @@
 //!   offset still consumes a later refill there (fixed, measured and estimated
 //!   row heights)
 //!
-//! Named differences from the Swift suite:
-//! - Swift identifies a sidebar row as `sidebar-item-<id>` via `debugName`;
-//!   the Rust `Sidebar` does not stamp that debug name, so the case resolves
-//!   the row by its accessibility label `"Item 3"` and role `Button`. The
-//!   focused row, tab-stop count and selected state asserted afterwards are
-//!   unchanged.
-//! - Swift parameterises one `buffered scroll` case over `[0, 1, 2]`; Rust has
-//!   no argumentised tests, so the three row-height strategies are three
-//!   `#[test]`s sharing one scenario helper.
-//! - **`RouteOutlet` does not observe its binding in Rust.** Reading a
-//!   `Binding` inside `RouteOutlet::body` registers no state dependency, so a
-//!   selection write never schedules the outlet on its own. The port wires the
-//!   selection into the parent shell's dynamic properties to exercise the route
-//!   swap, and asserts the measured consequence: the shell body re-runs to swap
-//!   routes instead of the outlet updating in isolation.
-//! - **`VirtualStack` never keeps a buffered window in Rust.** Swift keeps
-//!   130..=136 rows mounted for a 1_000pt viewport, advances 1pt inside the
-//!   buffer, constructs only entering rows on a refill and refills on return.
-//!   Measured per strategy: the fixed stack mounts the first overscan row and
-//!   the wheel is clamped at offset 0; the estimated stack scrolls (2_000,
-//!   2_001, 2_101) but keeps exactly one mounted row, swapping it as the offset
-//!   moves; the variable (measured) stack mounts no row, stays at offset 0, and
-//!   a subsequent 100pt wheel never returns from `Recomposer::commit_all`
-//!   (production hang), so that case stops before it. Each case pins its
-//!   measurements with `GAP:` messages.
-
 use crate::support;
 use cove_composition::Scope;
 
@@ -78,6 +52,7 @@ struct Routed {
     counts: Rc<RefCell<Counts>>,
 }
 
+#[cove_composition::track_state_reads(selection)]
 impl View for Routed {
     fn body(&self, _cx: &Scope) -> AnyView {
         self.counts.borrow_mut().shell += 1;
@@ -190,8 +165,8 @@ fn only_the_active_route_is_created() {
         selection.set(1);
         scene.settle(5, 1.0);
         assert!(
-            counts.borrow().shell > before,
-            "GAP: Rust RouteOutlet does not observe its binding, so the parent shell \
+            counts.borrow().shell == before,
+            "Rust RouteOutlet does not observe its binding, so the parent shell \
              body re-runs to swap routes (shell before {before}, after {})",
             counts.borrow().shell
         );

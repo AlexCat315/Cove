@@ -601,6 +601,7 @@ fn discovery_finds_the_drawer_then_loses_it_after_dismissal() {
     InteractiveScene::run(1280.0, 820.0, |scene| {
         let (harness, open, _) = harness(true, 1280.0, false);
         scene.install(AnyView::new(harness));
+        scene.settle(6, 1.0);
 
         assert_eq!(
             query(scene, AccessibilityRole::Dialog, "Project actions"),

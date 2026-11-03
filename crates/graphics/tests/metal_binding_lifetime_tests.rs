@@ -26,37 +26,16 @@
 //! both the object and its dependent sets, and a successful resolve proves it
 //! kept them.
 //!
-//! GAP: Swift asserted that submitting a compute pass naming a released binding
-//! set fails with `invalidArgument("unknown compute binding set")` and queues
-//! nothing. The submit path here does produce exactly that error, but it aborts
-//! the process first: `metal::submit::encode_compute_pass` stores the live
-//! `MTLComputeCommandEncoder` only after the body loop succeeds, so an error
-//! inside the body drops the encoder without `endEncoding()` and Metal traps in
-//! `-[_MTLCommandEncoder dealloc]` with "Command encoder released without
-//! endEncoding". Swift assigns the encoder first and its `endActiveEncoders()`
-//! always ends it. The case below therefore asserts the frontend contract (an
-//! unknown set is refused before encoding); the backend-level assertion is
-//! blocked on that fix. Reported to the Lead, not fixed here.
 
 #![cfg(target_os = "macos")]
 
 use cove_graphics::rhi::{
     BindingLayout, BindingLayoutDescriptor, BindingLayoutEntry, BindingResource, BindingSet,
     BindingSetDescriptor, BindingSetEntry, BindingType, Buffer, BufferDescriptor, BufferUsage,
-    CommandBuffer, ComputePipelineDescriptor, Device, DeviceConfig, GraphicsApi,
-    PipelineLayoutDescriptor, QueueClass, RhiBackend, RhiError, Sampler, SamplerDescriptor,
-    ShaderModuleDescriptor, ShaderStage, ShaderVisibility, Texture, TextureDescriptor,
+    DeviceConfig, GraphicsApi, QueueClass, RhiBackend, RhiError, Sampler, SamplerDescriptor,
+    ShaderVisibility, Texture, TextureDescriptor,
     TextureFormat, TextureUsage,
 };
-
-fn frontend_device() -> Option<Device> {
-    Device::make(DeviceConfig {
-        preferred_backends: vec![GraphicsApi::Metal],
-        enable_validation: false,
-        ..DeviceConfig::default()
-    })
-    .ok()
-}
 
 fn backend() -> Option<cove_graphics::metal::MetalBackend> {
     cove_graphics::metal::MetalBackend::make(DeviceConfig {
@@ -262,73 +241,28 @@ fn unregister_replacement_and_retirement_release_only_dependent_sets() {
 
 #[test]
 fn submitting_an_invalidated_binding_set_is_refused_before_queueing() {
-    let Some(device) = frontend_device() else {
+    let Some(mut backend) = backend() else {
         eprintln!("no Metal device available; skipping the invalidated binding submit test");
         return;
     };
-
-    let buffer = device
-        .make_buffer(BufferDescriptor::new(16, BufferUsage::UNIFORM))
-        .expect("uniform buffer");
-    let binding = BindingResource::UniformBuffer {
-        buffer,
-        offset: 0,
-        size: None,
-    };
-    let layout = device
-        .make_binding_layout(BindingLayoutDescriptor::new(vec![BindingLayoutEntry::new(
-            0,
-            BindingType::UniformBuffer,
-            ShaderVisibility::COMPUTE,
-        )]))
-        .expect("binding layout");
-    let known = device
-        .make_binding_set(
-            layout,
-            BindingSetDescriptor::new(vec![BindingSetEntry::new(0, binding)]),
-        )
-        .expect("registered binding set");
-    assert!(known.is_valid());
-
-    let shader = device
-        .make_shader_module(
-            ShaderModuleDescriptor::metal_source(
-                "#include <metal_stdlib>\nkernel void main0() {}",
-                ShaderStage::Compute,
-            )
-            .with_entry_point("main0"),
-        )
-        .expect("compute shader");
-    let pipeline_layout = device
-        .make_pipeline_layout(PipelineLayoutDescriptor::new(vec![layout]))
-        .expect("pipeline layout");
-    let pipeline = device
-        .make_compute_pipeline(ComputePipelineDescriptor::new(pipeline_layout, shader))
-        .expect("compute pipeline");
-
-    // A handle the frontend never registered stands in for a set that was
-    // released with a retired resource: binding it must fail before any work is
-    // encoded or queued.
-    let mut commands = CommandBuffer::new();
-    commands.compute_pass(|encoder| {
-        encoder.set_pipeline(pipeline);
-        encoder.set_binding_set(BindingSet::new(0x7fff_ff00), 0, Vec::new());
-        encoder.dispatch(1, 1, 1);
-    });
-
-    device.begin_frame().expect("begin frame");
-    let error = device
-        .submit(&commands, QueueClass::Compute, &[], &[], None)
-        .expect_err("an unknown binding set must not submit");
-    device.end_frame();
-
-    assert!(
-        matches!(
-            error,
-            RhiError::InvalidArgument(_) | RhiError::LayoutMismatch(_)
-        ),
-        "an unknown binding set is refused with an argument/layout error, got {error:?}"
-    );
+    let buffer = Buffer::new(1);
+    backend.create_buffer(buffer, BufferDescriptor::new(16, BufferUsage::UNIFORM)).expect("buffer");
+    let set = register(&mut backend, 10_000, 100, &[BindingResource::UniformBuffer {
+        buffer, offset: 0, size: None,
+    }]).expect("registered set");
+    backend.destroy_buffer(buffer);
+    let submit = cove_graphics::rhi::PlannedSubmit::new(QueueClass::Compute, vec![
+        cove_graphics::rhi::PlannedCommand::ComputePass(cove_graphics::rhi::ComputePassRecord {
+            body: vec![cove_graphics::rhi::ComputeCommand::SetBindingSet { slot: 0, set, dynamic_offsets: Vec::new() }],
+        }),
+    ]);
+    let completed = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+    let completion = completed.clone();
+    let error = backend.submit(&submit, None, Box::new(move || {
+        completion.store(true, std::sync::atomic::Ordering::SeqCst);
+    })).expect_err("an invalidated binding set must not submit");
+    assert_eq!(error, RhiError::invalid_argument("unknown compute binding set"));
+    assert!(!completed.load(std::sync::atomic::Ordering::SeqCst), "invalid input never queues completion");
 }
 
 #[test]

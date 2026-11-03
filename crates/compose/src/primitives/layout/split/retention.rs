@@ -90,6 +90,9 @@ impl PrimitiveView for SplitRetainedRegion {
 
     fn update_node(&self, node: &Node) {
         node.set_attachment(PANE_MARKER, self.pane);
+        // A pane clips its own content, so an overflowing child can never
+        // answer a hit that belongs to the divider beside it.
+        node.set_clips_to_bounds(true);
         node.set_is_interaction_enabled(self.is_visible);
         node.set_opacity(if self.is_visible { 1.0 } else { 0.0 });
         node.set_accessibility(Some(AccessibilitySemantics {

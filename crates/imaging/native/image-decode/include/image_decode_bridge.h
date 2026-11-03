@@ -23,6 +23,23 @@ bool cove_image_decode_memory(const uint8_t* data,
                                int32_t target_height,
                                CoveImageDecodeResult* out_result);
 
+/// Rasterizes an alpha-mask vector (SVG) into a black-on-transparent template
+/// PNG. The glyph's coverage becomes the alpha channel and the fill is forced
+/// to black, so a native menu can tint it alongside the item title.
+typedef struct CoveImageTemplatePngResult {
+    uint8_t* png;
+    size_t png_size;
+    char* error_message;
+} CoveImageTemplatePngResult;
+
+bool cove_image_template_png_memory(const uint8_t* data,
+                                     size_t data_size,
+                                     const char* extension,
+                                     int32_t points,
+                                     CoveImageTemplatePngResult* out_result);
+
+void cove_image_template_png_free(CoveImageTemplatePngResult* result);
+
 /// Read intrinsic dimensions without allocating a decoded bitmap.
 bool cove_image_dimensions_memory(const uint8_t* data, size_t data_size,
                                    const char* extension, int32_t* width, int32_t* height);

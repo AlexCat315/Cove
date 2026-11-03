@@ -6,12 +6,6 @@
 //! - `floating_surface()` asks for the whole material, not part of it
 //! - light panels keep a neutral hairline; dark ones use the palette border
 //! - a menu panel is the panel material, like every other floating panel
-//!
-//! Note on the border token: Swift's `FloatingSurfaceModifier` writes
-//! `colors.floatingOutline`, and Rust exposes the same value through
-//! `theme::floating_outline(&colors)`. The Rust modifier writes
-//! `colors.border` instead, so [`floating_surface_wiring`] asserts the helper's
-//! value where the two agree and records the divergence with a `GAP:` assert.
 
 use crate::support;
 
@@ -106,17 +100,12 @@ fn floating_surface_wiring() {
         assert_eq!(node.corner_radius(), 7.0, "the authored radius applies");
         assert_eq!(node.border_width(), 1.0, "the material carries a hairline");
 
-        // GAP: Swift asserts the outline is `colors.floatingOutline`. The Rust
-        // modifier writes `colors.border`; the dedicated helper
-        // `floating_outline(&colors)` produces the Swift value but is not used
-        // here, so the two differ on the dark preset.
         let expected = floating_outline(&theme.colors);
-        assert!(theme.colors.border != Color::CLEAR);
-        assert!(
-            node.border_color() == Some(theme.colors.border)
-                || node.border_color() == Some(expected),
-            "GAP: the outline is the palette border ({:?}); Swift uses floatingOutline ({expected:?})",
-            node.border_color()
+        assert_ne!(theme.colors.border, Color::CLEAR);
+        assert_eq!(
+            node.border_color(),
+            Some(expected),
+            "the outline is the floating hairline"
         );
 
         assert_eq!(

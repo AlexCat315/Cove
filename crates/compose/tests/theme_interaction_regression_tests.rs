@@ -23,9 +23,6 @@
 //!   attachment. `resolvedFont` / `resolvedLineHeight` map to the shared
 //!   `text_style_font` / `text_style_line_height` resolvers, which read the
 //!   authored attachments off the node ancestry the way `textStyleValue` does.
-//! - **Tab and Shift-Tab do not edit a code field.** The field's key handler has
-//!   no Tab arm even though `indent_lines` exists, so selected lines are never
-//!   indented or outdented; Return still carries the block indentation.
 //! - **No select-all, clipboard or edit actions.** Primary-A is ignored by the
 //!   field, so the numeric cases append the typed digits to the committed text
 //!   ("0.5" becomes "0.50.75") and the code case types at the caret instead
@@ -33,9 +30,6 @@
 //! - **Numeric stepping reads the binding, not the draft.** `adjust` uses the
 //!   committed value, so Shift-Up always steps the bound number even while an
 //!   uncommitted draft is showing. The Swift suite steps from the draft.
-//! - **Popover dismissal consumes the press.** An outside click closes the
-//!   popover and empties the portal store, but the press never reaches the
-//!   button underneath, so its action does not fire. Escape dismissal matches.
 //! - **Popover surface and presentation.** The Rust `Popover` is presented from
 //!   the binding it reads at build time and exposes the same portal lifetime.
 
@@ -425,8 +419,8 @@ fn outside_click_dismisses_a_popover_and_activates_the_underlying_button() {
         );
         assert_eq!(
             activations.get(),
-            0,
-            "GAP: the outside click dismisses the popover but its capture consumes the press, so the button underneath never activates (Swift: 1)"
+            1,
+            "the press dismisses the popover and still activates the button underneath"
         );
 
         presented.set(true);
@@ -588,14 +582,14 @@ fn code_indentation() {
         key_handler(scene, &node, &plain(43));
         assert_eq!(
             string_value(),
-            "甲\n乙",
-            "GAP: Rust's field ignores Tab, so selected lines are not indented (Swift: \"  甲\\n  乙\")"
+            "  甲\n  乙",
+            "Tab indents every selected line"
         );
         key_handler(scene, &node, &key_event(43, KeyModifiers::LEFT_SHIFT));
         assert_eq!(
             string_value(),
             "甲\n乙",
-            "GAP: Shift-Tab is ignored too, so outdenting is a no-op (Swift: restores the buffer)"
+            "Shift-Tab outdents the selected lines"
         );
 
         key_handler(

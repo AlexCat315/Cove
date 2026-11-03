@@ -8,6 +8,7 @@ use crate::primitives::layout::sidebar::items::SidebarSections;
 use std::collections::HashSet;
 use std::rc::Rc;
 
+use crate::animation::{AnimatedVisibility, Transition};
 use crate::modifiers::interaction::AccessibilityExt;
 use crate::modifiers::layout::{FlexExt, FrameDimension, LayoutFrameExt, PaddingExt};
 use crate::modifiers::style::{AppearanceExt, SemanticStyleViewExt};
@@ -16,9 +17,9 @@ use crate::primitives::overlays::roving_focus::{
 };
 use crate::primitives::text::Text;
 use crate::theme::SemanticFontRef;
-use crate::{AnyView, BoxView, PrimitiveView, TupleView, View, impl_primitive_view};
+use crate::{AnyView, BoxView, LayoutDebugExt, PrimitiveView, TupleView, View, impl_primitive_view};
 use cove_core::Binding;
-use cove_core::scene::{AccessibilityRole, Align, FlexDirection, Justify, Node, Wrap};
+use cove_core::scene::{AccessibilityRole, Align, FlexDirection, FocusChainHolder, Justify, Node, Wrap};
 use cove_platform::KeyEvent;
 
 use super::hierarchy::{SidebarEntry, SidebarHierarchy};
@@ -116,17 +117,43 @@ impl<Id: PartialEq + Eq + std::hash::Hash + Clone + Send + Sync + 'static> View 
     fn body(&self, cx: &Scope) -> AnyView {
         let local_expanded = cx.state(HashSet::<Id>::new);
         let hierarchy = SidebarHierarchy::new(&self.sections.0);
-        let expanded = self
+        let expanded_binding = self
             .expanded
-            .as_ref()
-            .map_or_else(|| local_expanded.get(), |value| value.get());
+            .clone()
+            .unwrap_or_else(|| local_expanded.binding());
+        // A programmatic or moved selection reveals its ancestor chain once, so
+        // a destination the caller selects is reachable without the caller also
+        // having to expand every branch above it.
+        let revealed = cx.state(|| None::<(Option<Id>, Vec<Id>)>);
+        let selection = self.selection.get();
+        let path = selection.as_ref().map(|id| hierarchy.path_to(id)).unwrap_or_default();
+        let reveal_signature = (selection.clone(), path);
+        if revealed.get() != Some(reveal_signature.clone()) {
+            revealed.set(Some(reveal_signature));
+            if let Some(selected_id) = selection.as_ref() {
+                let ancestors: HashSet<Id> = hierarchy
+                    .path_to(selected_id)
+                    .into_iter()
+                    .take_while(|id| id != selected_id)
+                    .collect();
+                if !ancestors.is_empty() {
+                    let mut next = expanded_binding.get();
+                    if !ancestors.is_subset(&next) {
+                        next.extend(ancestors);
+                        expanded_binding.set(next);
+                    }
+                }
+            }
+        }
+        let expanded = expanded_binding.get();
+
         let enabled = hierarchy.visible_enabled(&expanded);
         let tab_stop = self
             .selection
             .get()
             .filter(|selected| enabled.contains(selected))
             .or_else(|| enabled.first().cloned());
-        let selected = self.selection.get();
+        let selected = selection;
         let presentation = self.presentation;
         let minimum_row_height = self.minimum_row_height;
         let gutter = presentation.gutter();
@@ -161,9 +188,10 @@ impl<Id: PartialEq + Eq + std::hash::Hash + Clone + Send + Sync + 'static> View 
                 ));
             }
             for entry in &entries {
-                if !entry.is_visible(&expanded) {
-                    continue;
-                }
+                // Swift mounts every authored row and takes the hidden ones out
+                // of the interaction graph, so collapsing keeps row nodes (and
+                // their focus) alive instead of dropping them.
+                let is_visible = entry.is_visible(&expanded);
                 let is_selected = selected.as_ref() == Some(&entry.item.id);
                 let is_expanded = expanded.contains(&entry.item.id);
                 let item_tab_stop = tab_stop.as_ref() == Some(&entry.item.id);
@@ -196,9 +224,25 @@ impl<Id: PartialEq + Eq + std::hash::Hash + Clone + Send + Sync + 'static> View 
                     disclosure_lane: section_has_branches,
                     context_label: hierarchy.context(entry),
                 };
-                rows.push(AnyView::new(AnyView::new(destination).with_modifier(
-                    RovingItem::new(entry.item.id.clone(), item_tab_stop, identity),
-                )));
+                // One retained visibility host per row: a collapsed subtree
+                // keeps its node (and draft) but is display-none and out of the
+                // interaction graph, the way Swift's `acceptsSubtreeInput ==
+                // false` row behaves.
+                rows.push(AnyView::new(
+                    AnimatedVisibility::new(
+                        is_visible,
+                        Transition::identity(),
+                        None,
+                        false,
+                        None,
+                        AnyView::new(AnyView::new(destination).with_modifier(RovingItem::new(
+                            entry.item.id.clone(),
+                            item_tab_stop,
+                            identity,
+                        ))),
+                    )
+                    .retaining_content(true),
+                ));
             }
             let identity = section.id.clone();
             let column = AnyView::new(BoxView::new(
@@ -233,6 +277,45 @@ impl<Id: PartialEq + Eq + std::hash::Hash + Clone + Send + Sync + 'static> View 
                 }
             });
         let selection_for_host = selection.clone();
+        let recovery_hierarchy = hierarchy.clone();
+        let recovery_expanded = expanded_binding.clone();
+        // Remember the tree as it was when a row still owned focus, so a row that
+        // is removed outright still has ancestors to fall back along.
+        let recovery_path = cx.remember(|| Rc::new(std::cell::RefCell::new(Vec::<Id>::new())));
+
+        let old_paths = cx.remember(|| Rc::new(std::cell::RefCell::new(Vec::<(Id, Vec<Id>)>::new())));
+        let previous_paths = old_paths.borrow().clone();
+        *old_paths.borrow_mut() = hierarchy.entries().into_iter().map(|entry| (entry.item.id.clone(), hierarchy.path_to(&entry.item.id))).collect();
+        let focused_id = FocusChainHolder::current()
+            .and_then(|chain| chain.focused())
+            .and_then(|focused| {
+                // The focused node sits inside its row, so the roving token is
+                // published by an ancestor.
+                let mut candidate = Some(focused);
+                let mut token = None;
+                while let Some(node) = candidate {
+                    if let Some(found) =
+                        crate::primitives::overlays::roving_focus::roving_token(&node)
+                    {
+                        token = Some(found);
+                        break;
+                    }
+                    candidate = node.parent();
+                }
+                let token = token?;
+                hierarchy
+                    .entries()
+                    .into_iter()
+                    .find(|entry| roving_identity(&entry.item.id) == token)
+                    .map(|entry| entry.item.id)
+                    .or_else(|| previous_paths.iter().find(|(id, _)| roving_identity(id) == token).map(|(id, _)| id.clone()))
+            });
+        if let Some(focused_id) = focused_id.as_ref() {
+            let mut chain = hierarchy.path_to(focused_id);
+            if chain.is_empty() { chain = previous_paths.iter().find(|(id, _)| id == focused_id).map(|(_, path)| path.clone()).unwrap_or_default(); }
+            *recovery_path.borrow_mut() = chain;
+        }
+        let remembered_path = recovery_path.borrow().clone();
         let keyboard_hierarchy = hierarchy.clone();
         let keyboard_expanded = self
             .expanded
@@ -269,6 +352,38 @@ impl<Id: PartialEq + Eq + std::hash::Hash + Clone + Send + Sync + 'static> View 
                 )
                 .padding_edges(gutter, 4.0),
             ),
+        )
+        .recovery({
+            let hierarchy = recovery_hierarchy.clone();
+            let expanded = recovery_expanded.clone();
+            let path_for = remembered_path.clone();
+            move |previous: Option<&Id>| {
+                let previous = previous.or_else(|| path_for.last())?;
+                let expanded = expanded.get();
+                // The path the focused row had when it was last reachable.
+                let path = if path_for.ends_with(&[previous.clone()]) {
+                    path_for.clone()
+                } else {
+                    hierarchy.path_to(previous)
+                };
+                for parent in path.iter().rev().skip(1) {
+                    if let Some(found) = hierarchy.entry(parent)
+                        && found.is_enabled
+                        && found.is_visible(&expanded)
+                    {
+                        return Some(parent.clone());
+                    }
+                }
+                hierarchy.fallback(previous, &expanded, None)
+            }
+        })
+        .recovery_members(
+            hierarchy
+                .entries()
+                .into_iter()
+                .map(|entry| entry.item.id)
+                .chain(previous_paths.iter().map(|(id, _)| id.clone()))
+                .collect::<Vec<Id>>(),
         )
         .command(move |event: &KeyEvent| command(event))
         .directional_command(move |event, source, owner| {
@@ -389,6 +504,8 @@ struct SidebarChromeRow {
     fill: cove_core::Color,
     ink: cove_core::Color,
     radius: f32,
+    ring: cove_core::Color,
+    ring_width: f32,
 }
 
 impl PrimitiveView for SidebarChromeRow {
@@ -416,12 +533,91 @@ impl PrimitiveView for SidebarChromeRow {
         .foreground_color(self.ink)
         .background_color(self.fill)
         .corner_radius(self.radius)
+        .border_color(self.ring, self.ring_width)
         .flex_with(1.0, 1.0, None)
         .frame(None, None, Some(0.0), Some(self.minimum_height), None, None);
         vec![AnyView::new(row)]
     }
 }
 crate::impl_primitive_view!(SidebarChromeRow);
+
+/// The icon-only rail paints one compact, centered tile instead of a full-width
+/// band. The button keeps the whole row as its hit target; only the visible
+/// highlight shrinks to a square around the glyph.
+const RAIL_ICON_TILE_EXTENT: f32 = 40.0;
+
+/// The rail row: a full-rail band. Without labels the visible highlight shrinks
+/// to a centered 40pt tile; with labels the whole row is the pill, so the glyph
+/// and its wrapped caption share one aligned surface.
+struct RailChromeRow {
+    label: AnyView,
+    minimum_height: f32,
+    fill: cove_core::Color,
+    ink: cove_core::Color,
+    radius: f32,
+    ring: cove_core::Color,
+    ring_width: f32,
+    shows_labels: bool,
+}
+
+impl PrimitiveView for RailChromeRow {
+    fn make_node(&self) -> Node {
+        let node = Node::new();
+        node.set_is_hit_testable(false);
+        node
+    }
+
+    fn make_layout_node(&self) -> Option<cove_core::scene::LayoutNode> {
+        None
+    }
+
+    fn update_node(&self, _node: &Node) {}
+
+    fn children(&self, _node: &Node) -> Vec<AnyView> {
+        let label = AnyView::new(self.label.clone());
+        let label = if self.shows_labels {
+            AnyView::new(label.flex_with(1.0, 1.0, Some(0.0)))
+        } else {
+            label
+        };
+        let surface = BoxView::new(
+            FlexDirection::Row,
+            Align::Center,
+            Justify::Center,
+            Wrap::NoWrap,
+            0.0,
+            label,
+        )
+        .foreground_color(self.ink)
+        .background_color(self.fill)
+        .corner_radius(self.radius)
+        .border_color(self.ring, self.ring_width);
+        let surface = if self.shows_labels {
+            surface.flex_with(1.0, 1.0, None)
+        } else {
+            AnyView::new(surface.debug_name("rail-selection-tile")).frame(
+                Some(FrameDimension::Points(RAIL_ICON_TILE_EXTENT)),
+                Some(FrameDimension::Points(RAIL_ICON_TILE_EXTENT)),
+                None,
+                None,
+                None,
+                None,
+            )
+        };
+        let row = BoxView::new(
+            FlexDirection::Row,
+            Align::Center,
+            Justify::Center,
+            Wrap::NoWrap,
+            0.0,
+            AnyView::new(surface),
+        )
+        .flex_with(1.0, 1.0, None)
+        .frame(None, None, Some(0.0), Some(self.minimum_height), None, None);
+        vec![AnyView::new(row)]
+    }
+}
+crate::impl_primitive_view!(RailChromeRow);
 
 /// Lets the label absorb the remaining row width.
 struct FlexGrowOne;
@@ -434,9 +630,11 @@ impl cove_composition::ViewModifier for FlexGrowOne {
 }
 
 /// Destination row chrome: a selection band that fills the row and does not move
-/// the text.
+/// the text. A rail row fills the rail and floats a 40pt tile around its glyph;
+/// both ring for the keyboard the way Swift's destination and rail styles do.
 pub struct SidebarItemStyle {
     pub minimum_height: f32,
+    pub presentation: SidebarPresentation,
 }
 
 impl crate::theme::styles::buttons::ButtonStyle for SidebarItemStyle {
@@ -456,18 +654,50 @@ impl crate::theme::styles::buttons::ButtonStyle for SidebarItemStyle {
             configuration.is_pressed,
         );
         let ink = if !configuration.is_enabled {
-            theme.colors.on_surface_muted
-        } else if configuration.is_selected {
+            theme
+                .text_emphasis
+                .disabled
+                .unwrap_or(theme.colors.on_surface_muted)
+        } else if configuration.is_selected || configuration.is_hovered {
             theme.colors.on_surface
         } else {
             theme.colors.on_surface_variant
         };
+        let ring = if configuration.is_focused {
+            theme.colors.focus_ring
+        } else {
+            cove_core::Color::CLEAR
+        };
+        if self.presentation.is_rail() {
+            // A rail floors its rows at the 44pt touch target regardless of the
+            // authored row height.
+            return AnyView::new(RailChromeRow {
+                label: configuration.label.clone(),
+                minimum_height: self.minimum_height.max(44.0),
+                fill,
+                ink,
+                radius: appearance.corner_radius,
+                ring,
+                ring_width: if configuration.is_focused {
+                    1.0
+                } else {
+                    0.0
+                },
+                shows_labels: self.presentation.shows_labels(),
+            });
+        }
         AnyView::new(SidebarChromeRow {
             label: configuration.label.clone(),
             minimum_height: self.minimum_height,
             fill,
             ink,
             radius: appearance.corner_radius,
+            ring,
+            ring_width: if configuration.is_focused {
+                2.0
+            } else {
+                0.0
+            },
         })
     }
 }

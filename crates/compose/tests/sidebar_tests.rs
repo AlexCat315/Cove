@@ -11,13 +11,6 @@
 //! `sidebar-item-<id>`. The Rust `Sidebar` publishes no such debug name, so rows
 //! are identified by their accessible label — the same node Swift found, reached
 //! structurally instead of by attachment.
-//!
-//! Production gaps (reported, not fixed):
-//!
-//! - `SidebarItemStyle::make_body` builds a `SidebarChromeRow` with a fill and an
-//!   ink colour but no border, so a destination never rings for keyboard focus.
-//!   Swift's `Destination`/`RailDestination` draw a 2pt (expanded) / 1pt (rail)
-//!   `focusRing` border. The three ring cases pin that with `GAP:` asserts.
 
 use crate::support;
 
@@ -144,11 +137,9 @@ fn ring_follows_the_keyboard_expanded() {
         chain.focus(Some(&item), true);
         graph.recomposer.commit_all();
         graph.compute_layout(226.0, 400.0);
-        // GAP: Swift asserts a 2pt focus ring here. `SidebarItemStyle` never
-        // sets a border, so no node rings.
         assert!(
-            !rings(graph).iter().any(|node| node.border_width() == 2.0),
-            "GAP: an expanded destination draws no 2pt keyboard ring"
+            rings(graph).iter().any(|node| node.border_width() == 2.0),
+            "an expanded destination draws a 2pt keyboard ring"
         );
 
         chain.focus(Some(&item), false);
@@ -178,11 +169,9 @@ fn ring_follows_the_keyboard_rail_with_labels() {
             chain.focus(Some(&item), true);
             graph.recomposer.commit_all();
             graph.compute_layout(226.0, 400.0);
-            // GAP: Swift asserts a 1pt focus ring here; the Rust row never sets
-            // a border, so no node rings.
             assert!(
-                !rings(graph).iter().any(|node| node.border_width() == 1.0),
-                "GAP: a rail destination draws no 1pt keyboard ring"
+                rings(graph).iter().any(|node| node.border_width() == 1.0),
+                "a rail destination draws a 1pt keyboard ring"
             );
 
             chain.focus(Some(&item), false);
@@ -210,11 +199,9 @@ fn ring_follows_the_keyboard_rail_without_labels() {
             chain.focus(Some(&item), true);
             graph.recomposer.commit_all();
             graph.compute_layout(226.0, 400.0);
-            // GAP: Swift asserts a 1pt focus ring here; the Rust row never sets
-            // a border, so no node rings.
             assert!(
-                !rings(graph).iter().any(|node| node.border_width() == 1.0),
-                "GAP: a label-less rail destination draws no 1pt keyboard ring"
+                rings(graph).iter().any(|node| node.border_width() == 1.0),
+                "a label-less rail destination draws a 1pt keyboard ring"
             );
 
             chain.focus(Some(&item), false);
@@ -258,7 +245,11 @@ fn leaving_the_rail_restores_the_pane_width() {
             Default::default(),
         );
         graph.compute_layout(226.0, 400.0);
-        assert_eq!(row_for(&graph, "Button").absolute_frame().width, 44.0);
+        assert_eq!(
+            row_for(&graph, "Button").absolute_frame().width,
+            56.0,
+            "a label-less rail row fills the rail's authored width"
+        );
 
         presentation.set(SidebarPresentation::Expanded);
         graph.install_view(

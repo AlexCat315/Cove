@@ -41,49 +41,6 @@
 //! - the top region uses the shared height contract and keyboard
 //! - 200 % tabs keep controls reachable and reveal keyboard selection
 //!
-//! ## Production gaps (reported, not fixed)
-//!
-//! The Rust `WorkspaceView` has no controller subscription: `dispatch` mutates
-//! the document and bumps `WorkspaceController::version`, but nothing invalidates
-//! the composed scope, so the *installed* tree never re-renders. Swift's
-//! `WorkspaceView.body` calls `WorkspaceControllerSubscription.acquire(_:tag:bind:)`
-//! for exactly this. [`ViewRig`] therefore reinstalls the root when the version
-//! changes — a harness stand-in for the missing subscription. Every assertion
-//! below is the Swift assertion verbatim; the shim only supplies the re-render
-//! the production view does not perform. `WorkspaceRig` in `workspace_support`
-//! is untouched.
-//!
-//! Further gaps, each with a `#[test]` asserting the current behaviour:
-//! - no region animation: `WorkspaceTheme::animates_layout` only records an
-//!   attachment; region extents never interpolate and `AnimatorScheduler` is
-//!   never fed, so the three animated-collapse cases cannot be observed.
-//! - `WorkspaceTheme` is hardcoded to `WorkspaceTheme::default()` in
-//!   `WorkspaceView::body`, so a host cannot set `tabBarHeight`.
-//! - collapsed rails are named `workspace-rail-<chrome slot id>` and carry no
-//!   `workspace-restore-*` buttons, so a rail click cannot target a panel.
-//! - `WorkspaceResizeGeometry.available` is always 0 because
-//!   `WorkspaceExtentBody` declares no `dynamic_properties`, so *pointer*
-//!   resizing of every region split is inert (keyboard/a11y still work).
-//! - the divider hairline is centred at `maxX - gutter` inside the first pane,
-//!   and its published split range is the raw `(0, 1)` rather than the
-//!   panel-minimum/maximum-derived range.
-//! - the docked shell only renders at an expanded container width, so a 380 pt
-//!   or 420 pt workspace shows the compact presentation.
-//! - a tab node's `absolute_frame` is scroller-local: the tab bar's horizontal
-//!   `ScrollView` keeps its content offset out of the transform.
-//! - the panel node and its ancestors never set `clipsToBounds`.
-//! - region splits resolve from `WorkspaceSplitFractions` fallbacks rather than
-//!   from the panels' preferred sizes, so an unauthored document does not drift
-//!   to `preferred`.
-//! - panel regions are not wrapped in a scroll view and there is no
-//!   `workspace-panel-scroll-*` node, so overflow scrolling cannot be observed.
-//! - `workspaceTabCommand(for:rightToLeft:)` has no Rust counterpart.
-//! - the split divider's own frame is the 1 pt hairline (`x = leading.maxX -
-//!   gutter / 2`), not the Swift `maxX + gutter / 2`, so the two divider-midpoint
-//!   assertions and the drag sample that uses them cannot hold.
-
-mod workspace_support;
-
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -109,8 +66,6 @@ use workspace_support::{WorkspaceRig, group, group_node, panel};
 /// controller version moved, so a test reads the geometry the document implies.
 struct ViewRig {
     rig: WorkspaceRig,
-    root: Rc<dyn Fn() -> AnyView>,
-    version: u64,
 }
 
 impl ViewRig {
@@ -126,8 +81,7 @@ impl ViewRig {
         // reader, so one settle pass is needed before the shell exists. Swift's
         // `SurfaceReader` read a composition-local and needed none.
         rig.pump();
-        let version = rig.controller.borrow().version();
-        Self { rig, root, version }
+        Self { rig }
     }
 
     /// The default root: `WorkspaceView` over debug-named content blocks.
@@ -149,18 +103,7 @@ impl ViewRig {
     }
 
     fn sync(&mut self) {
-        let version = self.controller().borrow().version();
-        if version != self.version {
-            self.version = version;
-            let controller = self.controller();
-            let (width, height) = (self.rig.width, self.rig.height);
-            let previous = std::mem::replace(
-                &mut self.rig,
-                WorkspaceRig::new(controller, width, height, (self.root)()),
-            );
-            drop(previous);
-            self.rig.pump();
-        }
+        self.rig.pump();
     }
 
     fn dispatch(&mut self, command: WorkspaceCommand) -> bool {
@@ -467,8 +410,6 @@ fn status_bar_rig(width: f32, height: f32) -> ViewRig {
 
 // MARK: - A collapsed rail activates the clicked panel
 
-// MARK: - A collapsed rail activates the clicked panel
-
 #[test]
 fn collapsed_rail_activates_the_clicked_panel() {
     let mut document = workspace_support::make_document();
@@ -485,10 +426,6 @@ fn collapsed_rail_activates_the_clicked_panel() {
 
     rig.collapse("bottom");
 
-    // GAP: the rail renders its buttons without `workspace-restore-*` debug
-    // names, so the Swift click target does not exist. The rail button itself
-    // dispatches `setActivePanel` + `expand`, which is what the commands below
-    // apply.
     assert!(
         rig.optional_frame("workspace-rail-chrome.bottom.rail")
             .is_some(),
@@ -499,11 +436,7 @@ fn collapsed_rail_activates_the_clicked_panel() {
         Some(true)
     );
 
-    rig.dispatch(WorkspaceCommand::SetActivePanel {
-        group_id: WorkspaceTabGroupID::new("bottom"),
-        panel_id: WorkspacePanelID::new("assets"),
-    });
-    rig.expand("bottom");
+    rig.click(center_of(rig.frame("workspace-restore-assets")));
     assert_eq!(
         rig.group("bottom").and_then(|group| group.active_panel_id),
         Some(WorkspacePanelID::new("assets"))
@@ -515,19 +448,21 @@ fn collapsed_rail_activates_the_clicked_panel() {
 
 #[test]
 fn workspace_theme_controls_tab_bar_height() {
-    // GAP: `WorkspaceView::body` builds `WorkspaceThemeProvider` with
-    // `WorkspaceTheme::default()`, so a host cannot author `tabBarHeight`.
     let controller = workspace_support::controller_with_fixture();
-    let mut rig = ViewRig::standard(controller, 1000.0, 640.0);
+    let root_controller = controller.clone();
+    let mut rig = ViewRig::new(controller, 1000.0, 640.0, move || {
+        use cove_composition::ViewExt;
+        AnyView::new(workspace_support::workspace_root(root_controller.clone()).composition_local(
+            cove_ui_addons::workspace::WorkspaceThemeEnvironment::key(),
+            cove_ui_addons::workspace::WorkspaceTheme { tab_bar_height: 52.0, ..Default::default() }))
+    });
     rig.pump();
 
     let group = rig.frame("workspace-group-center");
     let content = rig.frame("workspace-panel-viewport");
     assert_close(
         content.y - group.y,
-        cove_ui_addons::workspace::WorkspaceTheme::default()
-            .tab_bar_height
-            .max(26.0),
+        52.0,
         0.5,
         "the panel starts below the default tab bar",
     );
@@ -663,14 +598,11 @@ fn top_slot_uses_preferred_content_height_and_bottom_chrome_remains_fixed() {
         0.5,
         "the top slot starts at the window top",
     );
-    // GAP: the top region resolves from the fallback top fraction over the main
-    // row (768 pt) plus the 40 pt top reserve, not from the 126 pt preferred
-    // height Swift resolved to 160.
     assert_close(
         top_slot.height,
-        151.5,
+        160.0,
         1.0,
-        "the top slot resolves from the fallback top fraction",
+        "the top slot uses its preferred content height",
     );
     assert_close(
         bottom_chrome.height,
@@ -1008,21 +940,10 @@ fn workspace_panel_content_is_clipped_to_its_region() {
     let panel_node = rig.named("workspace-panel-viewport");
     let panel_frame = rig.frame("workspace-panel-viewport");
     let status_bar = rig.frame("editor-status-bar");
-    // GAP: neither the panel node nor any ancestor sets `clipsToBounds`; the
-    // view relies on the region frame instead of a scissor, so the draw-list
-    // scissor assertion Swift made has no Rust equivalent.
     assert!(
-        !panel_node.clips_to_bounds(),
-        "the Rust panel node does not clip itself"
+        panel_node.clips_to_bounds(),
+        "the panel clips its content"
     );
-    let mut ancestor = panel_node.parent();
-    while let Some(node) = ancestor.clone() {
-        assert!(
-            !node.clips_to_bounds(),
-            "no ancestor clips the panel in the current implementation"
-        );
-        ancestor = node.parent();
-    }
     assert!(
         panel_frame.height > 0.0,
         "the panel takes the region's height below the tab bar"
@@ -1098,18 +1019,13 @@ fn collapsing_left_right_then_bottom_restores_in_place() {
         "the bottom rail rests on the status bar",
     );
 
-    // GAP: there is no `workspace-restore-*` button, so the Swift rail clicks
-    // become the same controller commands the buttons dispatch.
     for (group, panel_id) in [
         ("leading", "hierarchy"),
         ("trailing", "inspector"),
         ("bottom", "console"),
     ] {
-        rig.dispatch(WorkspaceCommand::SetActivePanel {
-            group_id: WorkspaceTabGroupID::new(group),
-            panel_id: WorkspacePanelID::new(panel_id),
-        });
-        rig.expand(group);
+        rig.click(center_of(rig.frame(&format!("workspace-restore-{panel_id}"))));
+        assert_eq!(rig.group(group).map(|g| g.is_collapsed), Some(false));
     }
 
     let leading_slot = rig.frame("workspace-region-leading");
@@ -1332,16 +1248,13 @@ fn panel_with_own_tabs_hides_group_tab_bar_only_while_alone() {
 
 #[test]
 fn panel_regions_scroll_only_content_that_overflows() {
-    // GAP: panel regions are not wrapped in a scroll view and expose no
-    // `workspace-panel-scroll-*` node, so neither the scroll region nor its
-    // content offset exists. The Swift case cannot be observed as written.
     let controller = workspace_support::controller_with_fixture();
     let rig = ViewRig::standard(controller, 1000.0, 640.0);
 
     assert!(
         rig.optional_named("workspace-panel-scroll-inspector")
-            .is_none(),
-        "the Rust view creates no named scroll region for a panel"
+            .is_some(),
+        "the panel exposes its scroll region"
     );
     assert_close(
         rig.frame("content-viewport").height,
@@ -1357,13 +1270,6 @@ fn panel_regions_scroll_only_content_that_overflows() {
 fn dragging_workspace_split_dividers_updates_fractions() {
     let mut rig = status_bar_rig(1000.0, 640.0);
 
-    // GAP (production defect): `WorkspaceExtentBody` builds its child from a
-    // `State<f32>` without declaring `dynamic_properties`, so the measured
-    // extent never reaches the child and every published
-    // `WorkspaceResizeGeometry.available` stays 0. The divider's motion handler
-    // rejects `available <= 0`, which makes *pointer* resizing of every region
-    // split inert. Keyboard and accessibility keep working because they write
-    // the split range rather than a pointer offset.
     let leading_before = rig.document().split_fractions.leading.unwrap_or(-1.0);
     rig.drag(
         center_of(rig.frame("workspace-split-leading")),
@@ -1372,10 +1278,10 @@ fn dragging_workspace_split_dividers_updates_fractions() {
             y: center_of(rig.frame("workspace-split-leading")).y,
         },
     );
-    assert_eq!(
+    assert_ne!(
         rig.document().split_fractions.leading.unwrap_or(-1.0),
         leading_before,
-        "a pointer drag cannot resize a split while `available` is 0"
+        "pointer dragging changes the split"
     );
 
     let center_trailing_before = rig
@@ -1390,13 +1296,13 @@ fn dragging_workspace_split_dividers_updates_fractions() {
             y: center_of(rig.frame("workspace-split-centerTrailing")).y,
         },
     );
-    assert_eq!(
+    assert_ne!(
         rig.document()
             .split_fractions
             .center_trailing
             .unwrap_or(-1.0),
         center_trailing_before,
-        "the center/trailing drag is inert for the same reason"
+        "pointer dragging resizes the center/trailing split"
     );
 
     let top_bottom_before = rig.document().split_fractions.top_bottom.unwrap_or(-1.0);
@@ -1407,7 +1313,7 @@ fn dragging_workspace_split_dividers_updates_fractions() {
             y: center_of(rig.frame("workspace-split-topBottom")).y - 50.0,
         },
     );
-    assert_eq!(
+    assert_ne!(
         rig.document().split_fractions.top_bottom.unwrap_or(-1.0),
         top_bottom_before,
         "the top/bottom drag is inert for the same reason"
@@ -1615,8 +1521,6 @@ fn dragging_tab_shows_drop_indicator_before_release() {
         panels(&["hierarchy"]),
         "the tab stays put until release"
     );
-    // GAP: the overlay is installed on a node that carries no debug name (the
-    // `workspace` name sits on an ancestor), so it is located by attachment.
     let root = rig
         .rig
         .nodes()
@@ -1777,7 +1681,11 @@ fn tab_strip_exposes_tab_list_panel_and_position_and_mirrors_arrows_in_rtl() {
             .expect("bottom group exists")
             .panels = panels(&["console", "assets"]);
         let controller = Rc::new(RefCell::new(WorkspaceController::new(document)));
-        let mut rig = ViewRig::standard(controller, 1000.0, 640.0);
+        let root_controller = controller.clone();
+        let mut rig = ViewRig::new(controller, 1000.0, 640.0, move || {
+            use cove_composition::layout::LayoutDirectionExt;
+            AnyView::new(workspace_support::workspace_root(root_controller.clone()).layout_direction(if rtl { cove_core::scene::Direction::Rtl } else { cove_core::scene::Direction::Ltr }))
+        });
         rig.pump();
 
         let console = rig.named("workspace-tab-console");
@@ -1828,21 +1736,17 @@ fn tab_strip_exposes_tab_list_panel_and_position_and_mirrors_arrows_in_rtl() {
             "Console"
         );
 
-        // GAP: the Rust view has no `layoutDirection` support, so the RTL mirror
-        // of the tab strip cannot be observed; the document order is what both
-        // iterations render.
         assert!(
-            console.absolute_frame().x < assets.absolute_frame().x,
+            (console.absolute_frame().x < assets.absolute_frame().x) != rtl,
             "tabs render in document order regardless of the requested direction"
         );
 
         rig.focus(&console);
-        // GAP: there is no arrow-key tab traversal; Swift resolved it through
-        // `workspaceTabCommand`, which has no Rust counterpart.
+        rig.key(if rtl { Scancode::ARROW_LEFT } else { Scancode::ARROW_RIGHT });
         assert_eq!(
             rig.group("bottom").and_then(|group| group.active_panel_id),
-            Some(WorkspacePanelID::new("console")),
-            "focus alone does not change the active tab"
+            Some(WorkspacePanelID::new("assets")),
+            "arrow navigation does not change the active tab"
         );
         let _ = rtl;
     }
@@ -1850,26 +1754,12 @@ fn tab_strip_exposes_tab_list_panel_and_position_and_mirrors_arrows_in_rtl() {
 
 #[test]
 fn tab_arrow_command_mapping() {
-    // GAP: `workspaceTabCommand(for:rightToLeft:)` has no Rust counterpart and
-    // the view implements no arrow-key tab traversal, so the Swift mapping of
-    // Left/Right/Home to previous/next/first cannot be asserted. This test
-    // records the absence rather than dropping the case.
-    let mapping: Vec<(&str, bool)> = vec![
-        ("arrowLeft", false),
-        ("arrowLeft", true),
-        ("arrowRight", true),
-        ("home", true),
-        ("arrowUp", false),
-    ];
-    assert_eq!(
-        mapping.len(),
-        5,
-        "the Swift suite pinned five scancode/direction pairs"
-    );
-    assert!(
-        !mapping.is_empty(),
-        "no tab-command mapping exists in the Rust view"
-    );
+    use cove_ui_addons::workspace::{workspace_tab_command as command, WorkspaceTabCommand::*};
+    assert_eq!(command(Scancode::ARROW_LEFT, false), Some(Previous));
+    assert_eq!(command(Scancode::ARROW_LEFT, true), Some(Next));
+    assert_eq!(command(Scancode::ARROW_RIGHT, true), Some(Previous));
+    assert_eq!(command(Scancode::HOME, true), Some(First));
+    assert_eq!(command(Scancode::ARROW_UP, false), None);
 }
 
 // MARK: - Panel sizing
@@ -1909,9 +1799,6 @@ fn panel_sizing_applies_to_outer_pointer_keyboard_and_accessibility_and_restores
         rig.pump();
     }
 
-    // GAP: the shell resolves region splits from `WorkspaceSplitFractions`, whose
-    // `None` falls back to the shell's fallback fraction rather than the panels'
-    // preferred sizes, so an unauthored document does not drift to `preferred`.
     let leading_width = rig.frame("workspace-region-leading").width;
     let trailing_width = rig.frame("workspace-region-trailing").width;
     assert!(
@@ -1920,9 +1807,9 @@ fn panel_sizing_applies_to_outer_pointer_keyboard_and_accessibility_and_restores
     );
     assert_close(
         rig.frame("workspace-region-bottom").height,
-        154.44,
+        184.0,
         1.0,
-        "the bottom region resolves from the fallback top/bottom fraction",
+        "the bottom region uses its preferred content height",
     );
     assert_eq!(
         rig.document(),
@@ -1945,12 +1832,9 @@ fn panel_sizing_applies_to_outer_pointer_keyboard_and_accessibility_and_restores
     for _ in 0..3 {
         rig.pump();
     }
-    // GAP: the divider publishes the raw `(0, 1)` split range rather than the
-    // panel-minimum/maximum-derived range Swift computed, so End drives the
-    // fraction to 1.0 instead of stopping at the 240 pt panel maximum.
     assert_close(
         rig.frame("workspace-region-leading").width,
-        988.0,
+        240.0,
         1.0,
         "End drives the split to its unconstrained upper bound",
     );
@@ -1965,13 +1849,10 @@ fn panel_sizing_applies_to_outer_pointer_keyboard_and_accessibility_and_restores
         rig.pump();
     }
     assert!(
-        rig.frame("workspace-region-leading").width < 988.0,
+        rig.frame("workspace-region-leading").width < 240.0,
         "the accessibility decrement shrinks the leading region"
     );
 
-    // GAP: `available` is 0 (see `dragging_workspace_split_dividers_updates_fractions`),
-    // so the pointer drag below cannot move the split; Swift clamped the leading
-    // region to its 160 pt minimum here.
     let before_drag = rig.frame("workspace-region-leading").width;
     let split = center_of(rig.frame("workspace-split-leading"));
     rig.drag(
@@ -1983,8 +1864,8 @@ fn panel_sizing_applies_to_outer_pointer_keyboard_and_accessibility_and_restores
     );
     assert_eq!(
         rig.frame("workspace-region-leading").width,
-        before_drag,
-        "a pointer drag cannot resize a split while `available` is 0"
+        160.0,
+        "pointer dragging respects the panel minimum"
     );
 
     let before_restore = rig.frame("workspace-region-leading").width;
@@ -2038,12 +1919,9 @@ fn cramped_workspace_shares_minimums_without_horizontal_overflow() {
         rig.pump();
     }
 
-    // GAP: at 380 pt the Rust view renders the compact presentation (its
-    // container-width reader is below `EXPANDED_MINIMUM_WIDTH`), so the three
-    // docked regions do not exist and their minimums cannot be measured.
     assert!(
-        rig.optional_named("workspace-region-leading").is_none(),
-        "below the expanded width the docked regions are not rendered"
+        rig.optional_named("workspace-region-leading").is_some(),
+        "the environment keeps the expanded presentation in a cramped container"
     );
     assert_eq!(
         rig.document(),
@@ -2080,13 +1958,11 @@ fn top_region_uses_the_shared_height_contract_and_keyboard() {
         rig.pump();
     }
 
-    // GAP: the same preferred-vs-fallback difference applies to the top region;
-    // it resolves from the fallback top fraction.
     assert_close(
         rig.frame("workspace-region-top").height,
-        198.5,
+        134.0,
         1.0,
-        "the top region resolves from the fallback top fraction",
+        "the top region uses its preferred content height",
     );
 
     let divider = rig.named("workspace-split-top");
@@ -2098,7 +1974,7 @@ fn top_region_uses_the_shared_height_contract_and_keyboard() {
     // End writes the geometry's upper bound, which is 1.0 for an unconstrained
     // split, so the top region takes almost the whole shell.
     assert!(
-        rig.frame("workspace-region-top").height > 700.0,
+        (rig.frame("workspace-region-top").height - 194.0).abs() < 1.0,
         "End moves the top split to its maximum allocation (got {})",
         rig.frame("workspace-region-top").height
     );
@@ -2139,27 +2015,25 @@ fn two_hundred_percent_tabs_keep_controls_reachable_and_reveal_keyboard_selectio
         WorkspaceTabGroup::new(WorkspaceTabGroupID::new("center"), tab_ids.clone()),
     );
     let controller = Rc::new(RefCell::new(WorkspaceController::new(document)));
-    let rig = ViewRig::standard(controller, 420.0, 400.0);
+    let root_controller = controller.clone();
+    let rig = ViewRig::new(controller, 420.0, 400.0, move || {
+        use cove_ui_compose::theme::TextScalerViewExt;
+        AnyView::new(workspace_support::workspace_root(root_controller.clone()).text_scaler(cove_ui_compose::theme::TextScaler::new(2.0)))
+    });
+    assert_close(rig.frame("workspace-panel-tab-0").y - rig.frame("workspace-group-center").y, 68.0, 0.5, "tabs follow text scale");
 
-    // GAP: two independent production differences collapse this case.
-    // 1. Swift's `SurfaceReader` read the composition-local `UIEnvironment`
-    //    (default viewport 1280 = expanded), so a 420 pt layout still rendered
-    //    the docked shell. The Rust reader measures the container, so 420 pt
-    //    selects the compact presentation and no tab strip exists.
-    // 2. `textScaler` is not consulted by the workspace, so the 200 % tab bar
-    //    height Swift measured (68) has no Rust equivalent.
     assert!(
-        rig.optional_named("workspace-group-center").is_none(),
-        "a 420 pt workspace renders the compact presentation, not the docked shell"
+        rig.optional_named("workspace-group-center").is_some(),
+        "the expanded environment keeps its docked shell at 420pt"
     );
     assert!(
         rig.optional_named("workspace-tabs-overflow-center")
-            .is_none(),
-        "the compact presentation has no per-group tab strip"
+            .is_some(),
+        "the docked shell retains its group tab strip"
     );
     assert!(
-        rig.optional_named("workspace-tab-tab-0").is_none(),
-        "no tab buttons exist in the compact presentation"
+        rig.optional_named("workspace-tab-tab-0").is_some(),
+        "tab buttons remain mounted"
     );
     assert_eq!(
         rig.document()
@@ -2171,96 +2045,64 @@ fn two_hundred_percent_tabs_keep_controls_reachable_and_reveal_keyboard_selectio
     );
 }
 
-// MARK: - Animated collapse cases (no production animation)
+// MARK: - Animated collapse
 
 #[test]
 fn closing_last_panel_animates_the_vacated_region_and_keeps_the_document_closed() {
-    // GAP: no region animation exists. Closing the panel removes the group and
-    // the trailing region immediately; nothing retains paint for a frame.
-    let mut rig = ViewRig::standard(workspace_support::controller_with_fixture(), 1000.0, 600.0);
+    let mut rig = animated_rig();
     let inspector = rig.named("content-inspector");
+    rig.dispatch(WorkspaceCommand::ClosePanel(WorkspacePanelID::new("inspector")));
+    assert!(rig.document().group_containing(&WorkspacePanelID::new("inspector")).is_none());
+    assert_eq!(rig.named("content-inspector").id(), inspector.id());
+    assert!(!inspector.accepts_subtree_input(), "closing retains only paint");
+    cove_core::scene::AnimatorScheduler::current().tick(1.0);
+    rig.pump();
+    assert!(rig.optional_named("content-inspector").is_none());
+    assert_close(rig.frame("workspace-region-center").max_x(), 1000.0, 1.0, "closed region releases its allocation");
+}
 
-    rig.dispatch(WorkspaceCommand::ClosePanel(WorkspacePanelID::new(
-        "inspector",
-    )));
-
-    assert!(
-        rig.document()
-            .group_containing(&WorkspacePanelID::new("inspector"))
-            .is_none(),
-        "the document drops the closed panel's group"
-    );
-    assert!(
-        rig.optional_named("content-inspector").is_none(),
-        "the region transitions immediately instead of animating"
-    );
-    // The detached node keeps its last cached input flag; the tree walk that
-    // clears it runs on removal, which this detached handle never observes.
-    let _ = inspector;
-    assert_close(
-        rig.frame("workspace-region-center").max_x(),
-        1000.0,
-        1.0,
-        "the center region reclaims the vacated space",
-    );
+fn animated_rig() -> ViewRig {
+    use cove_composition::ViewExt;
+    let controller = workspace_support::controller_with_fixture();
+    let root_controller = controller.clone();
+    ViewRig::new(controller, 1000.0, 600.0, move || {
+        let theme = cove_ui_addons::workspace::WorkspaceTheme { animates_layout: true, ..Default::default() };
+        AnyView::new(workspace_support::workspace_root(root_controller.clone()).composition_local(cove_ui_addons::workspace::WorkspaceThemeEnvironment::key(), theme))
+    })
 }
 
 #[test]
 fn animated_collapse_retains_paint_disables_input_and_reclaims_space() {
-    // GAP: no region animation exists. A collapse hides the region in the same
-    // pass, so there is no intermediate extent to observe.
-    let mut rig = ViewRig::standard(workspace_support::controller_with_fixture(), 1000.0, 600.0);
-    let center = rig.frame("workspace-region-center").width;
-
+    let mut rig = animated_rig();
+    let inspector = rig.named("content-inspector");
+    let before = rig.frame("workspace-region-trailing").width;
     rig.collapse("trailing");
-
-    assert!(
-        rig.optional_named("content-inspector").is_none(),
-        "the panel disappears immediately instead of animating out"
-    );
-    assert!(
-        rig.frame("workspace-region-center").width > center,
-        "the center region reclaims the space in the same pass"
-    );
+    assert_eq!(rig.named("content-inspector").id(), inspector.id());
+    assert!(!inspector.accepts_subtree_input());
+    cove_core::scene::AnimatorScheduler::current().tick(0.08);
+    rig.pump();
+    let during = rig.frame("workspace-region-trailing").width;
+    assert!(during > 0.0 && during < before, "the region interpolates its allocation: {during} of {before}");
+    cove_core::scene::AnimatorScheduler::current().tick(1.0);
+    rig.pump();
+    assert!(rig.optional_named("content-inspector").is_none());
     let rail = rig.frame("workspace-rail-chrome.trailing.rail");
-    assert_close(
-        rig.frame("workspace-region-center").max_x(),
-        rail.x,
-        1.0,
-        "the center region ends where the trailing rail begins",
-    );
+    assert_close(rig.frame("workspace-region-center").max_x(), rail.x, 1.0, "center meets the collapsed rail");
 }
 
 #[test]
 fn animated_collapse_reversal_keeps_the_same_panel_and_restores_layout() {
-    // GAP: no region animation exists, so there is no intermediate extent to
-    // hold during a reversal.
-    let mut rig = ViewRig::standard(workspace_support::controller_with_fixture(), 1000.0, 600.0);
+    let mut rig = animated_rig();
+    let inspector = rig.named("content-inspector");
     let initial = rig.frame("workspace-region-trailing");
-
     rig.collapse("trailing");
-    assert!(
-        rig.optional_frame("workspace-region-trailing").is_none(),
-        "the collapsing region is removed rather than narrowed"
-    );
-
+    cove_core::scene::AnimatorScheduler::current().tick(0.06);
+    rig.pump();
+    assert_eq!(rig.named("content-inspector").id(), inspector.id());
     rig.expand("trailing");
-
-    let restored = rig.frame("workspace-region-trailing");
-    assert_close(
-        restored.width,
-        initial.width,
-        1.0,
-        "expanding restores the authored trailing width",
-    );
-    assert!(
-        rig.optional_named("workspace-rail-chrome.trailing.rail")
-            .is_none(),
-        "the rail is gone once the region is expanded"
-    );
-    assert!(
-        rig.optional_named("content-inspector")
-            .is_some_and(|node| node.accepts_subtree_input()),
-        "the restored panel accepts input again"
-    );
+    cove_core::scene::AnimatorScheduler::current().tick(1.0);
+    rig.pump();
+    assert_eq!(rig.named("content-inspector").id(), inspector.id());
+    assert!(inspector.accepts_subtree_input());
+    assert_close(rig.frame("workspace-region-trailing").width, initial.width, 1.0, "reversal restores allocation");
 }

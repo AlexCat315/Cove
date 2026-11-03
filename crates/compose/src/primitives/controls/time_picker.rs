@@ -16,7 +16,7 @@ use cove_core::scene::{
 use cove_core::{Binding, InputCapabilities, Rect};
 use cove_platform::{MouseButton, SystemCursor};
 
-use crate::adaptive::SurfaceEnvironment;
+use crate::adaptive::SurfaceReader;
 use crate::modifiers::layout::LayoutFrameExt;
 use crate::modifiers::style::{AppearanceExt, SemanticStyleViewExt};
 use crate::primitives::controls::adaptive::{apply_touch_control_extent, supports_control_hover};
@@ -376,15 +376,20 @@ impl TimePicker {
         options: Vec<WheelPickerOption<i32>>,
         value: Binding<i32>,
     ) -> AnyView {
-        AnyView::new(
-            TimeWheel {
-                label: label.to_string(),
-                options,
-                value,
-                is_enabled: self.options.is_enabled,
-            }
-            .frame_width(WHEEL_WIDTH),
-        )
+        let label = label.to_string();
+        let is_enabled = self.options.is_enabled;
+        AnyView::new(SurfaceReader::new(move |surface: &cove_core::Environment| {
+            AnyView::new(
+                TimeWheel {
+                    label: label.clone(),
+                    options: options.clone(),
+                    value: value.clone(),
+                    is_enabled,
+                    row_height: row_height(surface),
+                }
+                .frame_width(WHEEL_WIDTH),
+            )
+        }))
     }
 
     fn separator() -> AnyView {
@@ -461,6 +466,7 @@ struct TimeWheel {
     options: Vec<WheelPickerOption<i32>>,
     value: Binding<i32>,
     is_enabled: bool,
+    row_height: f32,
 }
 
 impl Clone for TimeWheel {
@@ -476,6 +482,7 @@ impl TimeWheel {
             options: self.options.clone(),
             value: self.value.clone(),
             is_enabled: self.is_enabled,
+            row_height: self.row_height,
         }
     }
 
@@ -545,7 +552,7 @@ impl PrimitiveView for TimeWheel {
     }
 
     fn update_layout(&self, layout: &LayoutNode) {
-        layout.set_height(Some(AUTHORED_ROW_HEIGHT * VISIBLE_ROWS as f32));
+        layout.set_height(Some(self.row_height * VISIBLE_ROWS as f32));
     }
 
     fn update_node(&self, node: &Node) {
@@ -560,8 +567,7 @@ impl PrimitiveView for TimeWheel {
             SystemCursor::NotAllowed
         }));
 
-        let environment = node.composition_value(&SurfaceEnvironment::key());
-        let height = row_height(&environment);
+        let height = self.row_height;
         node.set_attachment(WHEEL_ROW_HEIGHT, height);
         if let Some(layout) = node.layout_node() {
             layout.set_height(Some(height * VISIBLE_ROWS as f32));

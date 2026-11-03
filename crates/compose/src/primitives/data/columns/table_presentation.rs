@@ -16,9 +16,9 @@ use std::rc::Rc;
 
 use crate::adaptive::{ContainerSizeReader, SurfaceReader};
 use crate::modifiers::layout::{FlexExt, LayoutFrameExt};
-use crate::modifiers::style::SemanticStyleViewExt;
 use crate::primitives::columns::{
-    ColumnVisibilityPickerModel, ColumnVisibilityPlan, ColumnVisibilityTrack,
+    ColumnVisibilityPicker, ColumnVisibilityPickerModel, ColumnVisibilityPlan,
+    ColumnVisibilityTrack,
 };
 use crate::primitives::data::data_table::table_column::{
     ColumnVisibility, TableColumn, TableColumnPlan,
@@ -191,18 +191,19 @@ impl<Record: 'static> View for TableColumns<Record> {
                     });
 
                     let mut children = Vec::new();
-                    if let Some(picker) = picker {
-                        // The menu host for these entries is the toolbar command
-                        // surface; the model is the shared contract both tables read.
-                        let summary = picker.summary.clone();
+                    if picker.is_some() {
+                        let tracks = shared_tracks(&columns, &widths);
+                        let shared = ColumnVisibilityPlan {
+                            indices: plan.indices.clone(),
+                            required_ids: plan.required_ids.clone(),
+                        };
                         children.push(AnyView::new(
-                            AnyView::new(
-                                crate::primitives::text::Text::new(summary)
-                                    .semantic_font(crate::theme::SemanticFontRef::caption())
-                                    .semantic_foreground(
-                                        crate::theme::SemanticColorRef::on_surface_muted(),
-                                    ),
-                            )
+                            AnyView::new(ColumnVisibilityPicker::new(
+                                tracks,
+                                shared,
+                                overrides.clone(),
+                                is_enabled,
+                            ))
                             .flex_with(0.0, 0.0, None),
                         ));
                     }

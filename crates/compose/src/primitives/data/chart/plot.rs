@@ -821,20 +821,25 @@ impl ChartPlot {
         let Some(first) = tracks.first().copied() else {
             return from;
         };
-        let start = from.unwrap_or(ChartPoint::new(
-            first.0,
-            if delta > 0 { 0 } else { first.1 },
-        ));
-        // A negative starting index cannot be represented; clamp to the track.
-        let track = tracks
-            .iter()
-            .find(|(series, _)| *series == start.series)
-            .copied()
+        let track = from
+            .and_then(|point| {
+                tracks
+                    .iter()
+                    .find(|(series, _)| *series == point.series)
+                    .copied()
+            })
             .unwrap_or(first);
-        let mut next = ChartPoint::new(track.0, start.index);
+        // The unselected cursor starts one step outside the track so the first
+        // press lands on the edge instead of skipping past it.
+        let mut index = match from {
+            Some(point) => point.index as i64,
+            None if delta > 0 => -1,
+            None => track.1 as i64,
+        };
+        let mut next = ChartPoint::new(track.0, 0);
         loop {
-            next.index = (next.index as i64 + delta as i64)
-                .clamp(0, track.1.saturating_sub(1) as i64) as usize;
+            index = (index + delta as i64).clamp(0, track.1.saturating_sub(1) as i64);
+            next.index = index as usize;
             if self.is_visible_point(next) || next.index == 0 || next.index >= track.1 - 1 {
                 break;
             }
@@ -957,7 +962,7 @@ impl ChartPlot {
             values
         } else {
             format!("{}: {}", callout.title, values)
-        };
+        }.replace(" · ", ", ");
         let count = self.track_count(point);
         if count <= 1 || self.names_position_in_title(point) {
             return Some(head);

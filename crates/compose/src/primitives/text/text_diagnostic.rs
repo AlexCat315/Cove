@@ -186,7 +186,24 @@ impl TextDiagnosticGeometry {
         for line in &layout.lines {
             let first = line.start_cluster as usize;
             let last = line.end_cluster as usize;
-            for diagnostic in diagnostics.overlapping(first..first.max(last)) {
+            // A row's span excludes its trailing newline, so a zero-width
+            // diagnostic at the next row's start attaches there instead of to
+            // the row that ends with that newline.
+            // A row's span stops before its trailing newline, so a zero-width
+            // diagnostic at the next row's start belongs there. An empty row
+            // keeps a one-byte span so its own marker still attaches.
+            let end = if last > first + 1 {
+                last - 1
+            } else {
+                first + 1
+            };
+            for diagnostic in diagnostics.overlapping(first..end) {
+                // A zero-width marker marks a position, so it belongs to the
+                // row that starts there rather than every row whose span
+                // contains it.
+                if diagnostic.utf8_range.is_empty() && diagnostic.utf8_range.start != first {
+                    continue;
+                }
                 let x = |byte: usize| -> f32 {
                     if byte <= first {
                         return 0.0;

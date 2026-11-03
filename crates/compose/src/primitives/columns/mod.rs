@@ -2,7 +2,10 @@
 use std::collections::{HashMap, HashSet};
 
 pub mod picker;
-pub use picker::{ColumnPickerEntry, ColumnVisibilityPickerModel};
+pub use picker::{
+    AUTOMATIC_COLUMNS_TITLE, COLUMN_VISIBILITY_LABEL, ColumnPickerEntry, ColumnVisibilityPicker,
+    ColumnVisibilityPickerModel,
+};
 
 /// Required columns are never removed by width fitting or user overrides.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

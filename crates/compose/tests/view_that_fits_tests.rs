@@ -313,8 +313,6 @@ fn only_the_measured_branch_lays_out_and_is_exposed() {
             "the selected branch keeps its frame, was {:?}",
             compact.frame()
         );
-        // GAP: a branch that starts inactive is never mounted, so there is no
-        // wide node to inspect here. Swift mounts both and hides one.
         assert!(
             named(&graph2, "wide").is_none(),
             "a branch inactive from the first frame is never materialised; Swift mounts both"

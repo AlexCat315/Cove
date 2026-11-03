@@ -194,15 +194,10 @@ fn placeholder_initializer() {
             (40.0, 30.0),
             "the host reserves the eventual image's box"
         );
-        // GAP: Swift asserts the placeholder content fills that box (40x30).
-        // Rust's `debug_name` materialises its own layout node below the host,
-        // and an empty `Box` does not stretch into a centering host, so the
-        // content measures 0x0. Pinned, not weakened — flip to the host size
-        // once the modifier stops introducing a zero-sized wrapper.
         assert_eq!(
             (placeholder.frame().width, placeholder.frame().height),
-            (0.0, 0.0),
-            "GAP: the placeholder content measures 0x0 inside the 40x30 host (Swift: 40x30)"
+            (40.0, 30.0),
+            "placeholder content fills the reserved image box"
         );
     });
 }

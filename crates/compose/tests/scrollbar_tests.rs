@@ -304,8 +304,8 @@ fn auto_hide_follows_hover() {
         hover(context, bar, HoverPhase::Enter);
         assert_eq!(
             (scheduler.active_count(), chrome_opacity(bar)),
-            (0, 1.0),
-            "GAP: Swift schedules a fade-in on hover (one active animation, opacity \
+            (1, 0.0),
+            "Swift schedules a fade-in on hover (one active animation, opacity \
              still 0); Rust writes the chrome opacity outside an animation context, so \
              it snaps to 1 with nothing scheduled"
         );
@@ -332,13 +332,13 @@ fn scroll_flash() {
         assert_ne!(value(bar), "0%");
         assert_eq!(
             (chrome_opacity(bar), drawn(bar), scheduler.active_count()),
-            (0.0, false, 0),
-            "GAP: Swift flashes the chrome to opacity 1 and schedules one delayed fade \
+            (1.0, true, 1),
+            "Swift flashes the chrome to opacity 1 and schedules one delayed fade \
              that holds through 0.5s; Rust snaps the reveal and then the fade in the \
              same update with no animation context, so the flash is never visible"
         );
         scheduler.tick(0.5);
-        assert_eq!(chrome_opacity(bar), 0.0);
+        assert_eq!(chrome_opacity(bar), 1.0);
         scheduler.tick(1.0);
         assert_eq!(chrome_opacity(bar), 0.0);
         assert!(!drawn(bar));

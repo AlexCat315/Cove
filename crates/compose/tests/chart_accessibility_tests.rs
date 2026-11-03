@@ -17,22 +17,6 @@
 //! pie callout (`"3, 75%"` with `"Slice 1 of 2"`), gap skipping, and the
 //! `accessibility.exposesValues` opt-out.
 //!
-//! Named differences (production gaps, recorded rather than fixed):
-//! - **The first increment skips the first point.** `Plot::stepped_index` seeds its
-//!   start from `ChartPoint::new(first.0, 0)` and then adds `delta`, so the first
-//!   `increment` reads index 1. Swift seeded `index: delta > 0 ? -1 : first.count`
-//!   and clamped, so its first increment read index 0. Every Rust stop is
-//!   therefore one ahead of the Swift suite's expectation.
-//!   `the_first_increment_skips_the_first_point` pins it.
-//! - **The pie readout keeps the callout's middle dot.** Swift rewrote
-//!   `" · "` to `", "` in the accessible sentence (a middle dot is silent when
-//!   spoken, so `3 · 75%` slurred together). Rust's `Plot::readout` joins with the
-//!   callout separator unchanged, producing `"Mobile: 1 · 25%. Slice 2 of 2"`.
-//!   `the_pie_readout_keeps_the_middle_dot` pins it.
-//! - The Swift `Harness(binds:)` distinction (a bound vs unbound
-//!   `selection.point`) has no Rust counterpart: `ChartConfiguration::selection`
-//!   is not a `Binding` here, so there is no `stepsTheBinding` case to port.
-
 use crate::support;
 
 use support::GlobalTestLock;
@@ -295,33 +279,31 @@ fn a_chart_reads_one_value_at_a_time() {
                 .increment
                 .expect("the chart offers an increment action");
             increment();
-            // Gap: the first increment reads index 1, not index 0 (see the module
-            // note). The readout format itself matches Swift exactly.
             let first = plot.accessibility().expect("semantic plot").value;
             assert!(
-                first.starts_with("Feb: Revenue 2, Signups 4"),
+                first.starts_with("Jan: Revenue 1, Signups 2"),
                 "the first increment names the category and every series, was {first:?}"
             );
             assert!(
-                first.contains("Point 2 of 4"),
+                first.contains("Point 1 of 4"),
                 "the readout says which point it is, was {first:?}"
             );
 
             plot.accessibility_actions().increment.expect("increment")();
             let second = plot.accessibility().expect("semantic plot").value;
             assert!(
-                second.starts_with("Mar:"),
+                second.starts_with("Feb:"),
                 "the second stop advances, was {second:?}"
             );
             assert!(
-                second.contains("Point 3 of 4"),
+                second.contains("Point 2 of 4"),
                 "the second stop counts too, was {second:?}"
             );
 
             plot.accessibility_actions().decrement.expect("decrement")();
             let back = plot.accessibility().expect("semantic plot").value;
             assert!(
-                back.starts_with("Feb:"),
+                back.starts_with("Jan:"),
                 "decrementing steps back one stop, was {back:?}"
             );
         });
@@ -381,8 +363,8 @@ fn stepping_skips_a_gap() {
                     .expect("the plot publishes an image-role node")
             };
 
-            // Gap: the first increment starts one ahead (see the module note), so
-            // with February as a gap the first stop already reads March.
+            plot.accessibility_actions().increment.expect("increment")();
+            assert!(plot.accessibility().unwrap().value.starts_with("Jan:"));
             plot.accessibility_actions().increment.expect("increment")();
             let first = plot.accessibility().expect("semantic plot").value;
             assert!(
@@ -448,20 +430,18 @@ fn a_pie_reads_one_slice_at_a_time_with_its_share() {
                     .expect("the plot publishes an image-role node")
             };
 
-            // Gap: the first increment starts one ahead, so index 1 (Mobile).
             plot.accessibility_actions().increment.expect("increment")();
             let value = plot.accessibility().expect("semantic plot").value;
             assert!(
-                value.contains("Mobile"),
+                value.contains("Desktop"),
                 "the slice readout names the slice it landed on, was {value:?}"
             );
-            // Gap: the callout's middle dot survives into the spoken value.
             assert!(
-                value.contains("1 · 25%"),
+                value.contains("3, 75%"),
                 "the share currently follows the value with a middle dot, was {value:?}"
             );
             assert!(
-                value.contains("Slice 2 of 2"),
+                value.contains("Slice 1 of 2"),
                 "the readout counts slices, was {value:?}"
             );
         });
@@ -535,11 +515,7 @@ fn turning_value_exposure_off_leaves_the_summary_and_offers_no_stepping() {
 }
 
 #[test]
-fn the_first_increment_skips_the_first_point() {
-    // Gap: `Plot::stepped_index` seeds `ChartPoint::new(first.0, 0)` then adds
-    // `delta`, so the first increment lands on index 1. Swift seeded `-1` and
-    // clamped, so its first stop was index 0. This is the single root cause behind
-    // every "one ahead" assertion above.
+fn the_first_increment_reads_the_first_point() {
     GlobalTestLock::locked(|| {
         support::with_test_text_environment(|| {
             use cove_composition::AnyView;
@@ -590,18 +566,15 @@ fn the_first_increment_skips_the_first_point() {
             plot.accessibility_actions().increment.expect("increment")();
             let value = plot.accessibility().expect("semantic plot").value;
             assert!(
-                value.starts_with("Feb:"),
-                "the first increment lands on the second point, was {value:?}"
+                value.starts_with("Jan:"),
+                "the first increment lands on the first point, was {value:?}"
             );
         });
     });
 }
 
 #[test]
-fn the_pie_readout_keeps_the_middle_dot() {
-    // Gap: Swift replaced the callout's `" · "` with `", "` before speaking the
-    // sentence, because a middle dot is silent. Rust speaks it verbatim, so the
-    // value runs into its share.
+fn the_pie_readout_speaks_a_comma_separator() {
     GlobalTestLock::locked(|| {
         support::with_test_text_environment(|| {
             use cove_composition::AnyView;
@@ -647,12 +620,12 @@ fn the_pie_readout_keeps_the_middle_dot() {
             plot.accessibility_actions().increment.expect("increment")();
             let value = plot.accessibility().expect("semantic plot").value;
             assert!(
-                value.contains('·'),
-                "the middle dot is not rewritten, was {value:?}"
+                !value.contains('·'),
+                "the spoken readout replaces the middle dot, was {value:?}"
             );
             assert!(
-                !value.contains(", 25%"),
-                "no comma-separated share is produced, was {value:?}"
+                value.contains(", 75%"),
+                "the share uses a comma separator, was {value:?}"
             );
         });
     });

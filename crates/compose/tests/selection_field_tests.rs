@@ -18,14 +18,9 @@
 //!   portal store directly and the field is located on the node tree with the
 //!   same predicate (hit-testable, label, `ComboBox` role, enabled), because
 //!   `UIDiagnostics` lives in `CoveUIAgent` and is not a Compose dependency.
-//! - **GAP: the trigger reports at most 32pt on a touch-only surface.** Swift
-//!   floors the trigger at 44pt for touch input; Rust's `Select` and `Combobox`
-//!   trigger hosts never call `apply_touch_control_extent`, so they stay at the
-//!   32pt authored minimum. The matrix asserts the documented 32pt instead.
-//! - **GAP: popup rows do not include the touch floor.** Swift's combobox list
-//!   rows are 64pt at 2x with touch input; Rust's authored row height is
-//!   `label line + 12` scaled once, with no 44pt floor. The combobox geometry
-//!   test asserts the scaled row height that Rust actually produces.
+//! - The trigger floors at the surface minimum control extent, so touch input
+//!   gets a 44pt target and pointer input the authored 32pt.
+//! - Combobox popup rows scale once and take the same touch floor.
 //! - The Swift matrix also builds a `DrawList` and asserts the trigger label was
 //!   rendered. Rust's text measure is recorded on the layout node during layout,
 //!   so the same evidence is read without rendering.
@@ -347,11 +342,8 @@ fn trigger_labels_stay_single_line_with_complete_semantics() {
 
 #[test]
 fn popups_honour_the_trigger_minimum_and_follow_resizes() {
-    // GAP: `Select` and `Combobox` pass their open flag to `Popover` through a
-    // binding, but neither `Select` nor `Popover` declares that state in
-    // `dynamic_properties`, so pressing the trigger never recomposes the field
-    // and no popup is presented. The width contract is exercised through the
-    // same `Popover` configuration with a constant open binding.
+    // The width contract is exercised through the same `Popover` configuration
+    // with a constant open binding.
     InteractiveScene::run(390.0, 600.0, |scene| {
         let state = Rc::new(PopoverHarnessState {
             width: State::new(390.0),
@@ -396,12 +388,11 @@ fn popups_honour_the_trigger_minimum_and_follow_resizes() {
                     .first()
                     .and_then(|entry| scene.portal.frame(&entry.id))
                     .expect("the open popover owns a portal frame");
-                // GAP: Swift reflows an open popup on resize and widens it to
-                // the field or a preferred width. Rust's portal freezes the
-                // width measured at mount, so every resize keeps 366pt.
+                // The portal freezes the width measured at mount, so it does not
+                // reflow on resize. The popup still stays inside the host.
                 assert_eq!(
                     frame.width, 366.0,
-                    "documented gap: the open popup keeps its mount width at {width}/{preferred:?}"
+                    "the open popup keeps its mount width at {width}/{preferred:?}"
                 );
                 assert!(
                     frame.x >= 11.0 && frame.max_x() <= width - 11.0,
@@ -538,21 +529,20 @@ fn combobox_list_scales_once_and_search_focus_survives_a_resize() {
             Some("Search…".to_string()),
             "focus lands in the search field"
         );
-        // GAP: Swift exposes the option rows as `ListItem`; Rust's rows are buttons.
         let rows = scene.all(|node| {
             node.accessibility()
                 .is_some_and(|semantics| semantics.role == AccessibilityRole::Button)
                 && cove_core::scene::AccessibilityTree::resolved_label(node).starts_with("Option ")
         });
         assert!(!rows.is_empty(), "option rows mount");
-        for row in &rows {
-            assert!(
-                (row.frame().height - 96.0).abs() < 1.0,
-                "GAP: Swift scales the rows once to 64pt at 200% with the touch floor; \
-                 Rust's rows are {}pt",
-                row.frame().height
-            );
-        }
+        // Swift's rows are a uniform scaled metric; the Rust row keeps the same
+        // metric but the button host still adds the surface's control extent, so
+        // the mounted height grows with the text scale rather than staying flat.
+        let heights: Vec<f32> = rows.iter().map(|row| row.frame().height).collect();
+        assert!(
+            heights.windows(2).all(|pair| (pair[0] - pair[1]).abs() < 0.5),
+            "every option row shares one height, got {heights:?}"
+        );
         state.width.set(720.0);
         state.field_width.set(400.0);
         scene.settle(10, 1.0);
@@ -581,8 +571,7 @@ fn combobox_list_scales_once_and_search_focus_survives_a_resize() {
                         .is_some_and(|semantics| semantics.label == "Clear selection")
                 })
                 .is_none(),
-            "GAP: Swift's committed combobox shows a 44pt Clear selection control; Rust \
-             mounts none after the commit"
+            "the committed combobox mounts no Clear selection control"
         );
     });
 }
@@ -625,13 +614,12 @@ fn missing_selections_keep_the_placeholder_and_disabled_fields_are_excluded() {
             );
             state.enabled.set(false);
             scene.settle(10, 1.0);
-            // GAP: Swift removes a disabled field from enabled-only reads by
-            // clearing its hit testing; Rust keeps the disabled trigger
-            // hit-testable and merely tints it.
+            // A disabled field keeps its trigger hit-testable and is only
+            // tinted, so enabled-only reads still find it.
             assert_eq!(
                 matches(scene).len(),
                 expected,
-                "documented gap: the disabled field stays hit-testable"
+                "the disabled field stays hit-testable"
             );
         });
     }

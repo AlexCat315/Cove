@@ -13,23 +13,12 @@
 //! - a context menu press leaves no portal entry and nothing animating
 //!
 //! Named differences from the Swift suite:
-//! - Swift's surface reveal is a 0.94 scale transition anchored at the trigger
-//!   corner (`surface_reveal`). `PortalResource::surface_reveal` exists in Rust
-//!   but is never called: popovers are presented with a fade plus vertical
-//!   offset (`AnchoredOverlayHost`) and context menus with a fade only. No node
-//!   ever carries a non-identity transform, so every scale/anchor assertion is
-//!   kept but asserts the measured absence of a reveal host and is prefixed
-//!   `GAP:`.
 //! - `ContextMenuHost` installs its pointer route at
-//!   `InputRoutingPriority::CHROME` and returns `Handled` for any secondary
-//!   press, including the capture sweep that runs before target delivery.
-//!   `on_open` is gated on `EventPhase::Target`, so a right click never opens
-//!   the menu; the context case asserts the measured no-op and is prefixed
-//!   `GAP:`.
-//! - After activation Rust swaps the portal content synchronously, so the row
-//!   node is already detached; a detached node still reports
-//!   `accepts_subtree_input() == true`, where Swift's exiting host reports
-//!   false.
+//!   `InputRoutingPriority::CHROME`; the secondary press consumes at target
+//!   delivery, so the menu opens before any chrome sweep can swallow it.
+//! - After activation Rust swaps the portal content synchronously, so the
+//!   presenting row is detached. A detached subtree accepts no input, matching
+//!   Swift's exiting host.
 //! - Swift's `MenuItem` identity is a string; Rust menu rows are keyed by
 //!   `u64`, so the command row is looked up as row id 0.
 
@@ -41,7 +30,7 @@ use std::rc::Rc;
 
 use cove_composition::{AnyView, DynamicField, View, ViewExt};
 use cove_core::scene::{AnimatorScheduler, Node};
-use cove_core::{Binding, State};
+use cove_core::{Binding, Point, State};
 use cove_platform::{InputEvent, MouseButton, MouseButtonEvent};
 use cove_ui_compose::modifiers::layout::{AbsolutePositionModifier, LayoutFrameExt};
 use cove_ui_compose::primitives::overlays::ContextMenu;
@@ -166,10 +155,28 @@ fn menu_reveal() {
                 harness.shown.set(true);
                 settle(scene);
 
-                assert!(
-                    reveal_host(scene).is_none(),
-                    "GAP: Swift scales the surface from 0.94 anchored at the trigger corner; Rust presents a fade with no transform host (trailing={trailing})"
-                );
+                if reduced {
+                    assert!(
+                        reveal_host(scene).is_none(),
+                        "reduced motion presents the surface without a scale host (trailing={trailing})"
+                    );
+                } else {
+                    let host = reveal_host(scene).expect("the surface grows from a transform host");
+                    assert!(
+                        (host.transform().scale - 0.94).abs() < 0.0001,
+                        "the surface starts at a 0.94 scale, saw {} (trailing={trailing})",
+                        host.transform().scale
+                    );
+                    assert_eq!(
+                        host.transform().anchor,
+                        Point::new(if trailing { 1.0 } else { 0.0 }, 0.0),
+                        "the reveal is anchored at the trigger corner (trailing={trailing})"
+                    );
+                    assert!(
+                        !host.transform().scales_shadow,
+                        "the reveal does not scale elevation (trailing={trailing})"
+                    );
+                }
                 let scheduler = AnimatorScheduler::current();
                 if reduced {
                     assert_eq!(
@@ -226,8 +233,8 @@ fn menu_reveal() {
                         "the activated row leaves the tree with the swapped portal content"
                     );
                     assert!(
-                        command.accepts_subtree_input(),
-                        "GAP: Swift keeps the exiting host in the tree and stops accepting subtree input; Rust detaches the row and a detached node still reports accepting input"
+                        !command.accepts_subtree_input(),
+                        "the exiting row takes no input after activation"
                     );
                 }
 

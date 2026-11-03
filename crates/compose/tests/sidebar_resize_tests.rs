@@ -17,13 +17,6 @@
 //! - temporary constraints and invalid requests never overwrite the authored
 //!   width, and a bounded slider stays discoverable
 //!
-//! Named differences from the Swift suite (each pinned by a `GAP:` assertion):
-//! - Focus handoff: when the lane disappears Swift hands focus to the selected
-//!   rail destination (rail) or the `Open navigation` opener (compact); Rust
-//!   leaves nothing focused.
-//! - Invalid request: Swift's handle shows and steps from the resolved fallback
-//!   width (`240 pt`, then 256); `SidebarResizeHandle::current()` clamps the raw
-//!   NaN binding (`0 pt`) and increments it to NaN.
 //!
 //! Harness notes:
 //! - Rows are found by accessible label; the Rust `Sidebar` publishes no
@@ -953,7 +946,8 @@ fn drag_and_keyboard() {
 #[test]
 fn lane_lifecycle() {
     InteractiveScene::run(1280.0, 600.0, |scene| {
-        let lane = Lane::new(320.0);
+        let lane = Shell::new();
+        lane.requested.set(320.0);
         scene.install(lane.clone());
         lane.rtl.set(true);
         scene.settle(8, 1.0);
@@ -976,7 +970,7 @@ fn lane_lifecycle() {
             368.0,
             "RTL dragging leftward grows the navigation"
         );
-        lane.set_viewport(scene, 720.0);
+        scene.width = 720.0; scene.settle(8, 1.0);
         assert!(
             scene.capture.target().is_none(),
             "leaving the docked layout releases the capture"
@@ -988,17 +982,17 @@ fn lane_lifecycle() {
         );
         assert_eq!(
             scene.focus.focused().map(|node| label(&node)),
-            None,
-            "GAP: Swift's shell hands focus from the vanished lane to the selected rail destination (`Documents`); Rust has no lane-to-destination handoff, so nothing holds focus"
+            Some("Documents".to_string()),
+            "leaving the resize lane hands focus to the selected destination"
         );
-        lane.set_viewport(scene, 1280.0);
+        scene.width = 1280.0; scene.settle(8, 1.0);
         assert_eq!(
             resize_lane(scene).map(|node| id(&node)),
             Some(id(&resize)),
             "returning to the docked layout restores the same lane node"
         );
         grab(scene, &resize);
-        lane.set_viewport(scene, 390.0);
+        scene.width = 390.0; scene.settle(8, 1.0);
         assert!(
             scene.capture.target().is_none(),
             "a compact container releases the lane"
@@ -1009,12 +1003,12 @@ fn lane_lifecycle() {
         );
         assert_eq!(
             scene.focus.focused().map(|node| label(&node)),
-            None,
-            "GAP: Swift's compact shell hands focus to the `Open navigation` opener; Rust has no lane-to-opener handoff, so nothing holds focus"
+            Some("Open navigation".to_string()),
+            "compact navigation hands focus to its opener"
         );
-        lane.set_viewport(scene, 1280.0);
+        scene.width = 1280.0; scene.settle(8, 1.0);
         grab(scene, &resize);
-        lane.touch.set(true);
+        lane.input.set(InputCapabilities::TOUCH | InputCapabilities::KEYBOARD);
         scene.settle(8, 1.0);
         assert!(
             scene.capture.target().is_none(),
@@ -1151,8 +1145,8 @@ fn fitting_and_ai() {
         );
         assert_eq!(
             resize.accessibility().expect("semantics").value,
-            "0 pt",
-            "GAP: Swift's handle reports the resolved fallback width (`240 pt`); `SidebarResizeHandle::current()` clamps the raw NaN binding and formats it as `0 pt`"
+            "240 pt",
+            "the handle reports the resolved fallback width, not the raw NaN binding"
         );
         let increment = resize
             .accessibility_actions()
@@ -1160,9 +1154,10 @@ fn fitting_and_ai() {
             .expect("the slider offers increment");
         increment();
         scene.settle(8, 1.0);
-        assert!(
-            lane.requested.get().is_nan(),
-            "GAP: Swift steps from the resolved fallback (`256`); the Rust increment adds to the raw NaN binding, which stays NaN"
+        assert_eq!(
+            lane.requested.get(),
+            256.0,
+            "the increment steps from the resolved fallback width"
         );
         let query = |scene: &InteractiveScene, value: &str| {
             scene
@@ -1176,8 +1171,8 @@ fn fitting_and_ai() {
         };
         assert_eq!(
             query(scene, "256 pt"),
-            0,
-            "GAP: Swift discovery finds the slider at `256 pt`; the Rust slider still reads `0 pt`"
+            1,
+            "discovery finds the slider at its stepped width"
         );
         lane.requested.set(256.0);
         scene.settle(8, 1.0);

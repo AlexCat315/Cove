@@ -12,12 +12,6 @@
 //! - an empty option set keeps an empty value and exposes no usable actions
 //! - five visible rows reserve 32pt each on a pointer surface and 44pt each on
 //!   a touch surface
-//!
-//! Named differences from the Swift suite:
-//! - GAP: the touch row height does not reach the `TimePicker` wheel column.
-//!   `TimeWheel` reads the surface environment once in `update_node` and caches
-//!   the row height plus the layout height there, so a touch surface still
-//!   measures 160pt for five rows instead of 220pt.
 
 use crate::support;
 use cove_composition::Scope;
@@ -180,13 +174,12 @@ fn five_visible_rows_reserve_the_authored_row_metric() {
     let pointer = wheel_height(300.0, 300.0, InputCapabilities::POINTER);
     assert!(
         (pointer - 160.0).abs() < 0.5,
-        "GAP: five pointer rows reserve 32pt each (expected 160, actual {pointer})"
+        "five pointer rows reserve 32pt each (expected 160, actual {pointer})"
     );
     let touch = wheel_height(300.0, 300.0, InputCapabilities::TOUCH);
     assert!(
-        (touch - 160.0).abs() < 0.5,
-        "GAP: a touch surface should reserve 44pt per row (220); the wheel column \
-         still measures 32pt rows (actual {touch})"
+        (touch - 220.0).abs() < 0.5,
+        "a touch surface reserves 44pt per row (expected 220, actual {touch})"
     );
 }
 

@@ -26,39 +26,6 @@
 //!   preserves authored outcomes, and a disabled or empty stepper exposes no
 //!   controls
 //!
-//! Named differences from the Swift suite:
-//! - `HoverCardSession` (`primitives/overlays/hover_card.rs`) is private, so
-//!   `setTriggerHovered`, `setCardHovered`, `dismiss` and `configure` are not
-//!   reachable from a test. The hover lifecycle case drives the same session
-//!   through the registered `InteractionRegistry` hover handler, a dispatched
-//!   mouse motion over the presented card, the registered key handler for
-//!   Escape, and a fresh mount for invalid timing. The asserted portal and
-//!   scheduler states are unchanged.
-//! - `HorizontalSwipeSession::pointer`/`motion` are private; the carousel case
-//!   calls the pointer and motion handlers the swipe host registers, which are
-//!   the ones the dispatcher would invoke. `configure` is public with an extra
-//!   `should_begin` argument.
-//! - `Stepper` takes its axis and availability through `StepperOptions` rather
-//!   than a trailing closure, and `StepperItem` is built with chained setters
-//!   instead of a configuration closure.
-//! - `HoverCard` and `Link` are configured with builder methods instead of
-//!   `configure:` closures; `Link` takes its title as a `Text` view.
-//! - Hover-card content now mounts after presentation. Its portal still does
-//!   not join the trigger's modal focus scope, so the action is rendered but
-//!   unavailable to scoped keyboard input; that remaining difference is explicit.
-//! - `CommandPalette` mounts every result row: the thousand-command case
-//!   measures 1000 rows where Swift virtualizes to fewer than 60.
-//! - `CommandPalette`'s body (`primitives/overlays/command_palette.rs`) declares
-//!   only `focus_token` as a dynamic property. Neither the query nor the
-//!   highlighted id is subscribed, so the rendered rows never re-filter and the
-//!   rendered selection never moves, even though the session state does: Return
-//!   still runs the correct command. The command-input case keeps every Swift
-//!   assertion and records the stale projection with `GAP:` messages.
-//! - A dispatched Escape is dropped before global shortcut delivery when the
-//!   focus chain has a modal scope (`EventDispatcher::dispatch_key`), so the
-//!   card's registered key handler is invoked directly; Swift's dispatch
-//!   reaches it.
-
 use crate::support;
 use cove_composition::Scope;
 
@@ -297,8 +264,8 @@ fn command_palette_filters_through_real_input() {
 
         assert_eq!(
             labelled("Go Disabled"),
-            1,
-            "GAP: the disabled command stays in the results; Swift removes it"
+            0,
+            "disabled commands are omitted from results"
         );
 
         dispatcher.dispatch(&InputEvent::KeyDown(key(Scancode::PAGE_UP)));
@@ -426,22 +393,10 @@ fn hover_card_cancels_pending_work_and_survives_the_gap() {
             "a leave shorter than the close delay keeps the card"
         );
 
-        // GAP: the presented card's nodes never materialise (see the module
-        // doc), so hovering onto the card cannot reach `setCardHovered`. The
-        // trigger's own close delay is the only observable path.
+        let card_hover = scene.first(|node| node.attachment::<bool>("hoverCard.content") == Some(true)).expect("card content hover host");
+        scene.registry.handlers(&card_hover).hover.unwrap()(HoverPhase::Enter);
         AnimatorScheduler::current().tick(1.0);
-        assert!(
-            scene.portal.entries().is_empty(),
-            "GAP: the card cannot stay open on card hover; Swift keeps it presented"
-        );
-
-        hover(HoverPhase::Enter);
-        AnimatorScheduler::current().tick(0.31);
-        assert_eq!(
-            scene.portal.entries().len(),
-            1,
-            "the card reopens on a fresh trigger hover"
-        );
+        assert_eq!(scene.portal.entries().len(), 1, "card hover holds presentation");
 
         let dismiss = scene
             .registry
@@ -657,8 +612,8 @@ fn hover_card_actions_stay_in_the_trigger_modal_scope() {
             .labelled("Follow", Some(AccessibilityRole::Button))
             .expect("card action");
         assert!(
-            !scene.focus.permits_input(&follow),
-            "GAP: the rendered hover card is still excluded from its trigger's modal focus scope"
+            scene.focus.permits_input(&follow),
+            "card actions belong to the trigger focus scope"
         );
         assert_eq!(
             actions.get(),
@@ -666,25 +621,15 @@ fn hover_card_actions_stay_in_the_trigger_modal_scope() {
             "no action ran while the card was presented"
         );
         assert!(
-            scene.focus.accessory_roots().is_empty(),
-            "GAP: the card still contributes no accessory root to the focus scope"
+            !scene.focus.accessory_roots().is_empty(),
+            "the card registers an accessory focus root"
         );
 
         dispatcher.dispatch(&InputEvent::KeyDown(key(Scancode::ESCAPE)));
         scene.settle(5, 1.0);
         assert!(
-            scene.portal.contains(&card_id),
-            "GAP: a dispatched Escape never reaches the card inside a focus scope; Swift dismisses it"
-        );
-        let dismiss = scene
-            .registry
-            .handlers(&trigger)
-            .key
-            .expect("the trigger registers the card's Escape handler");
-        assert_eq!(
-            dismiss(&key(Scancode::ESCAPE), EventPhase::Target),
-            EventResult::Handled,
-            "the card's Escape handler dismisses it"
+            !scene.portal.contains(&card_id),
+            "dispatched Escape dismisses the card"
         );
         scene.settle(5, 1.0);
         assert!(

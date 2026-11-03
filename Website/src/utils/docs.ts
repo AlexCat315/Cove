@@ -29,6 +29,24 @@ import textSelection from '@/content/components/text-selection.md?raw'
 import theme from '@/content/components/theme.md?raw'
 import text from '@/content/components/text.md?raw'
 
+import component0 from '@/content/components/sidebar.md?raw'
+import component1 from '@/content/components/navigation-drawer.md?raw'
+import component2 from '@/content/components/workspace.md?raw'
+import component3 from '@/content/components/scroll-view.md?raw'
+import component4 from '@/content/components/scrollbar.md?raw'
+import component5 from '@/content/components/route-outlet.md?raw'
+import component6 from '@/content/components/async-image.md?raw'
+import component7 from '@/content/components/hover-card.md?raw'
+import component8 from '@/content/components/command-palette.md?raw'
+import component9 from '@/content/components/menu.md?raw'
+import component10 from '@/content/components/toolbar.md?raw'
+import component11 from '@/content/components/vec3-field.md?raw'
+import component12 from '@/content/components/timeline.md?raw'
+import component13 from '@/content/components/tab-view.md?raw'
+import component14 from '@/content/components/date-range.md?raw'
+
+import terminal from '@/content/components/terminal.md?raw'
+
 export const docGroups: DocGroup[] = [
   {
     group: '指南',
@@ -58,6 +76,22 @@ export const docGroups: DocGroup[] = [
       { slug: 'text-buffer', title: 'TextBuffer', raw: textBuffer },
       { slug: 'text-selection', title: '文本选择', raw: textSelection },
       { slug: 'text', title: 'Text', raw: text },
+      { slug: 'terminal', title: 'Terminal', raw: terminal },
+      { slug: 'sidebar', title: 'Sidebar / AdaptiveSidebar', raw: component0 },
+      { slug: 'navigation-drawer', title: 'NavigationDrawer', raw: component1 },
+      { slug: 'workspace', title: 'WorkspaceView', raw: component2 },
+      { slug: 'scroll-view', title: 'ScrollView', raw: component3 },
+      { slug: 'scrollbar', title: 'Scrollbar', raw: component4 },
+      { slug: 'route-outlet', title: 'RouteOutlet', raw: component5 },
+      { slug: 'async-image', title: 'AsyncImage', raw: component6 },
+      { slug: 'hover-card', title: 'HoverCard', raw: component7 },
+      { slug: 'command-palette', title: 'CommandPalette', raw: component8 },
+      { slug: 'menu', title: 'Menu / MenuItemContent', raw: component9 },
+      { slug: 'toolbar', title: 'Toolbar / AppBar', raw: component10 },
+      { slug: 'vec3-field', title: 'Vec3Field', raw: component11 },
+      { slug: 'timeline', title: 'Timeline', raw: component12 },
+      { slug: 'tab-view', title: 'TabView', raw: component13 },
+      { slug: 'date-range', title: 'DateRangeCalendar', raw: component14 },
     ],
   },
   {

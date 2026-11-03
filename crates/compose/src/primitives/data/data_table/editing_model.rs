@@ -158,6 +158,10 @@ pub struct CellDraft<Id> {
     pub original: String,
     pub buffer: String,
     pub error: Option<String>,
+    /// Identity of this editing session. The editor asks for focus once per
+    /// token, so a second `F2` on the same cell moves focus back into the field
+    /// instead of being swallowed as a repeated request.
+    pub token: u64,
 }
 
 impl<Id: Clone + Eq> CellDraft<Id> {
@@ -176,11 +180,15 @@ impl<Id: Clone + Eq> CellDraft<Id> {
 #[derive(Clone, Debug, Default)]
 pub struct CellEditing<Id> {
     pub draft: Option<CellDraft<Id>>,
+    next_token: u64,
 }
 
 impl<Id: Clone + Eq> CellEditing<Id> {
     pub fn new() -> Self {
-        Self { draft: None }
+        Self {
+            draft: None,
+            next_token: 0,
+        }
     }
 
     pub fn is_editing(&self, row_id: &Id, column_id: &str) -> bool {
@@ -200,12 +208,14 @@ impl<Id: Clone + Eq> CellEditing<Id> {
     /// Opens a draft for one cell, replacing any other.
     pub fn begin(&mut self, row_id: Id, column_id: impl Into<String>, initial: impl Into<String>) {
         let initial = initial.into();
+        self.next_token = self.next_token.wrapping_add(1).max(1);
         self.draft = Some(CellDraft {
             row_id,
             column_id: column_id.into(),
             original: initial.clone(),
             buffer: initial,
             error: None,
+            token: self.next_token,
         });
     }
 

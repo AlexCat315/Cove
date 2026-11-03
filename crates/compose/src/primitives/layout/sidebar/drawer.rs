@@ -8,7 +8,7 @@ use crate::primitives::DuplicateId;
 use crate::primitives::layout::sidebar::items::SidebarSections;
 use std::collections::HashSet;
 
-use crate::modifiers::layout::PaddingExt;
+use crate::modifiers::layout::{FrameDimension, LayoutFrameExt, PaddingExt};
 use crate::modifiers::style::SemanticStyleViewExt;
 use crate::primitives::interaction::horizontal_swipe::{HorizontalSwipe, HorizontalSwipeDirection};
 use crate::primitives::overlays::modal::{
@@ -107,10 +107,11 @@ impl<Id: PartialEq + Eq + std::hash::Hash + Clone + Send + Sync + 'static> View
         geometry.placement = ModalPlacement::Leading;
         geometry.inset = 0.0;
         geometry.corner_radius = 0.0;
-        geometry.height = 560.0;
+        geometry.height = 0.0;
         let modal_options = ModalOptions {
             geometry,
             dismissal: self.options.dismissal,
+            label: self.title.clone(),
             ..ModalOptions::default()
         };
 
@@ -175,7 +176,7 @@ impl<Id: PartialEq + Eq + std::hash::Hash + Clone + Send + Sync + 'static> View
                     swipe_presented.set(false);
                 }
             },
-            AnyView::new(sidebar),
+            AnyView::new(sidebar).frame(None, Some(FrameDimension::Percent(100.0)), None, None, None, None),
         )
         .enabled(allows_swipe);
 
@@ -187,7 +188,14 @@ impl<Id: PartialEq + Eq + std::hash::Hash + Clone + Send + Sync + 'static> View
 
         AnyView::new(SwipeToggleAccessibility {
             content: AnyView::new(
-                Modal::new(self.is_presented.clone(), titled).options(modal_options),
+                Modal::new(self.is_presented.clone(), titled)
+                    .options(modal_options)
+                    // Swift fits the drawer to the host: at most 320pt wide and
+                    // `window.width - 56`, as tall as the window.
+                    .fitting_geometry(|geometry, window| {
+                        geometry.width = 320.0_f32.min((window.width - 56.0).max(0.0));
+                        geometry.height = window.height;
+                    }),
             ),
             label: self.title.clone(),
             is_enabled: true,

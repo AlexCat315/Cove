@@ -34,3 +34,5 @@ fn branded_content() -> impl View {
 ```
 
 需要统一调整输入底色或圆角时，修改 `theme.inputs.background` / `theme.inputs.radius`。自定义 [TextFieldStyle](/docs/text-field-style) 可以消费同一组 token，或为业务场景提供专属外观。
+
+`ThemeReader` 闭包中读取的可观察状态属于外层视图的读取依赖；重建后会重新订阅，移除视图时释放依赖。

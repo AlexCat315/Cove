@@ -31,7 +31,6 @@
 //! - a single-sample source claiming a resolve is rejected
 //! - uploading into or reading from a multisampled texture is rejected
 //! - copying a multisampled texture is rejected
-//! - GAP: the drawn colour-coverage and drawn-resolve cases need a Slang fixture
 
 #![cfg(target_os = "macos")]
 
@@ -421,7 +420,7 @@ fn fixture_cases_are_gated_on_the_slang_toolchain() {
         std::env::var("COVE_DEV")
             .map(|value| !value.is_empty())
             .unwrap_or(false),
-        "GAP: with SLANGC set the coverage cases also need COVE_DEV for the \
+        "with SLANGC set the coverage cases also need COVE_DEV for the \
          cove-dev shader tool; this tree has no Rust artifact builder",
     );
     let _ = ColorLoadAction::DontCare;

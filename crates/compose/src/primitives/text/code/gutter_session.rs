@@ -18,6 +18,7 @@
 
 use std::cell::{Cell, RefCell};
 use std::collections::{BTreeMap, BTreeSet};
+use std::ops::Range;
 use std::rc::Rc;
 
 use crate::primitives::text::code::folding_options::{TextEditorFolding, TextFoldRegion};
@@ -37,6 +38,8 @@ pub struct TextFoldSession {
     regions: RefCell<BTreeMap<usize, TextFoldRegion>>,
     collapsed: RefCell<BTreeSet<usize>>,
     binding: RefCell<Option<Binding<BTreeSet<usize>>>>,
+    authored: RefCell<Vec<TextFoldRegion>>,
+    hidden_lines: RefCell<Vec<Range<usize>>>,
 }
 
 impl TextFoldSession {
@@ -64,25 +67,85 @@ impl TextFoldSession {
         self.collapsed().contains(&header)
     }
 
+    /// The line ranges a collapsed fold hides, excluding each header. Adjacent
+    /// or overlapping ranges merge, so the row index consumes one projection.
+    pub fn hidden_lines(&self) -> Vec<Range<usize>> {
+        self.hidden_lines.borrow().clone()
+    }
+
+    /// Recomputes the hidden-line projection from the collapsed headers.
+    fn update_projection(&self) {
+        let collapsed = self.collapsed();
+        let regions = self.regions.borrow();
+        let mut projected: Vec<Range<usize>> = Vec::new();
+        for header in collapsed.iter().copied() {
+            let Some(region) = regions.get(&header) else {
+                continue;
+            };
+            let range = (header + 1)..(region.last_line + 1);
+            match projected.last_mut() {
+                Some(last) if range.start <= last.end => {
+                    last.end = last.end.max(range.end);
+                }
+                _ => projected.push(range),
+            }
+        }
+        *self.hidden_lines.borrow_mut() = projected;
+    }
+
     /// Installs the authored configuration. A missing bound set keeps the
     /// node-local session.
-    pub fn synchronize(&self, folding: &TextEditorFolding, _buffer: &TextBuffer) {
+    ///
+    /// Invalid (single-line), out-of-document and crossing regions are dropped;
+    /// properly nested regions keep their own header.
+    pub fn synchronize(&self, folding: &TextEditorFolding, buffer: &TextBuffer) {
         *self.binding.borrow_mut() = folding.collapsed_lines.clone();
-        *self.regions.borrow_mut() = folding
-            .regions
-            .iter()
-            .map(|region| (region.first_line, *region))
-            .collect();
-        if folding.collapsed_lines.is_none() {
-            let keep: BTreeSet<usize> = self
-                .collapsed
-                .borrow()
-                .iter()
-                .copied()
-                .filter(|line| self.regions.borrow().contains_key(line))
-                .collect();
-            *self.collapsed.borrow_mut() = keep;
+        let line_count = buffer.line_count();
+        if *self.authored.borrow() != folding.regions {
+            let mut regions = BTreeMap::new();
+            let mut ancestors: Vec<TextFoldRegion> = Vec::new();
+            let mut sorted = folding.regions.clone();
+            sorted.sort_by(|left, right| {
+                left.first_line.cmp(&right.first_line).then_with(|| {
+                    right
+                        .last_line
+                        .cmp(&left.last_line)
+                })
+            });
+            for region in sorted {
+                if region.first_line >= region.last_line
+                    || region.last_line >= line_count
+                    || regions.contains_key(&region.first_line)
+                {
+                    continue;
+                }
+                while ancestors
+                    .last()
+                    .is_some_and(|parent| region.first_line > parent.last_line)
+                {
+                    ancestors.pop();
+                }
+                if ancestors
+                    .last()
+                    .is_some_and(|parent| region.last_line > parent.last_line)
+                {
+                    continue;
+                }
+                regions.insert(region.first_line, region);
+                ancestors.push(region);
+            }
+            *self.regions.borrow_mut() = regions;
+            *self.authored.borrow_mut() = folding.regions.clone();
         }
+        if folding.is_ready {
+            let mut collapsed = self.collapsed();
+            collapsed.retain(|line| self.regions.borrow().contains_key(line));
+            match &*self.binding.borrow() {
+                Some(binding) => { if binding.get() != collapsed { binding.set(collapsed); } },
+                None => *self.collapsed.borrow_mut() = collapsed,
+            }
+        }
+        self.update_projection();
     }
 
     pub fn toggle(&self, header: usize) -> bool {
@@ -97,6 +160,7 @@ impl TextFoldSession {
             Some(binding) => binding.set(next),
             None => *self.collapsed.borrow_mut() = next,
         }
+        self.update_projection();
         true
     }
 
@@ -121,12 +185,13 @@ impl TextFoldSession {
                 Some(binding) => binding.set(next),
                 None => *self.collapsed.borrow_mut() = next,
             }
+            self.update_projection();
         }
         changed
     }
 }
 
-const F9: u32 = 74 + 4;
+const F9: u32 = Scancode::F9;
 
 /// Node-owned gutter session.
 pub struct TextGutterSession {
@@ -136,6 +201,7 @@ pub struct TextGutterSession {
     controls: RefCell<Vec<TextGutterControl>>,
     markers_by_line: RefCell<BTreeMap<usize, Vec<TextGutterMarker>>>,
     revision: Cell<u64>,
+    changed: cove_core::Signal<()>,
     previous_breakpoints: RefCell<Vec<TextBreakpoint>>,
     pub selected_control: RefCell<Option<String>>,
     subscribers: RefCell<Vec<Rc<dyn Fn()>>>,
@@ -150,6 +216,7 @@ impl TextGutterSession {
             controls: RefCell::new(Vec::new()),
             markers_by_line: RefCell::new(BTreeMap::new()),
             revision: Cell::new(0),
+            changed: cove_core::Signal::detached(()),
             previous_breakpoints: RefCell::new(Vec::new()),
             selected_control: RefCell::new(None),
             subscribers: RefCell::new(Vec::new()),
@@ -171,6 +238,7 @@ impl TextGutterSession {
     }
 
     pub fn controls(&self) -> Vec<TextGutterControl> {
+        self.changed.track();
         self.controls.borrow().clone()
     }
 
@@ -242,6 +310,7 @@ impl TextGutterSession {
     }
 
     fn publish(&self) {
+        self.changed.notify();
         self.revision.set(self.revision.get().wrapping_add(1));
         for handler in self.subscribers.borrow().iter() {
             handler();
@@ -326,13 +395,15 @@ impl TextGutterSession {
 
     /// Toggles the fold whose header is `line`. A caret inside the region moves
     /// to the header's end so it does not land in hidden text.
+    ///
+    /// Returns the line the caret must move to when the collapse hid it.
     pub fn toggle_fold(&self, line: usize) -> Option<usize> {
         let region = self.folds.region(line)?;
         if !self.folds.toggle(line) {
             return None;
         }
         if self.folds.is_collapsed(line) {
-            Some(region.last_line)
+            Some(region.first_line)
         } else {
             None
         }
@@ -438,3 +509,11 @@ impl Default for TextGutterSession {
         Self::new()
     }
 }
+
+impl cove_core::scene::NodeResource for TextGutterSession {
+    fn mount(&self, node: &Node) { TextGutterSession::mount(self, node.clone()); }
+    fn unmount(&self, _node: &Node) { TextGutterSession::unmount(self); }
+    fn as_any_rc(self: Rc<Self>) -> Rc<dyn std::any::Any> { self }
+}
+
+impl Drop for TextGutterSession { fn drop(&mut self) { self.changed.dispose(); } }

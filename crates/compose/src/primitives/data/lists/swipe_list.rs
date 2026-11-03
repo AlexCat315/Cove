@@ -9,8 +9,14 @@
 //! window.
 //!
 //! Behaviour checklist:
+//! - a touch row is at least 44pt tall and spans the list width, matching
+//!   `max(TextScaler.scale(rowHeight), touch ? minimumControlExtent : 0)`
 //! - at most two actions appear on the swipe surface; the menu lists every one
 //! - a horizontal drag past 8pt activates the swipe and captures the pointer
+//! - the swipe is directional: it follows the logical leading edge, so RTL
+//!   reveals on a rightward drag and a drag toward the trailing edge never
+//!   reveals
+//! - the action extent is `max(44, min(scaler.scale(74), rowWidth / count))`
 //! - a mostly vertical drag abandons the swipe so the list can scroll
 //! - the reveal snaps open past 45% of its extent, otherwise closed
 //! - Escape closes an open row; reduced motion snaps without animating
@@ -32,8 +38,8 @@ use crate::primitives::overlays::ContextMenu;
 use crate::primitives::overlays::menu::{MenuEntry, MenuItem, MenuItemRole};
 use crate::primitives::overlays::selection_key_host::SelectionKeyHost;
 use crate::primitives::text::Text;
-use crate::theme::SemanticFontRef;
 use crate::theme::styles::buttons::{AnyButtonStyle, ButtonStyleViewExt};
+use crate::theme::{SemanticFontRef, TextScalerReader};
 use crate::{AnyView, BoxView, PrimitiveView, TupleView, View};
 use cove_composition::Scancode;
 use cove_core::scene::{
@@ -86,6 +92,8 @@ const SWIPE_HOVERED: &str = "__swipe.hovered";
 pub const SWIPE_ACTION_WIDTH: f32 = 74.0;
 pub const SWIPE_MAX_ACTIONS: usize = 2;
 pub const SWIPE_TRAILING_SLOT: f32 = 44.0;
+/// Authored row height, before text scaling and the touch control extent.
+pub const SWIPE_ROW_HEIGHT: f32 = 36.0;
 /// Horizontal travel past which a press becomes a swipe.
 pub const SWIPE_ACTIVATION_DISTANCE: f32 = 8.0;
 /// Vertical travel past which a press is abandoned to the list's scrolling.
@@ -93,10 +101,23 @@ pub const SWIPE_REJECTION_DISTANCE: f32 = 4.0;
 /// Fraction of the extent past which the reveal snaps open.
 pub const SWIPE_SNAP_THRESHOLD: f32 = 0.45;
 
+/// The resolved row height: `max(scaler.scale(rowHeight), touch ? extent : 0)`,
+/// exactly as `SwipeList.body` computes it in Swift.
+pub fn swipe_row_height(scaled: f32, is_touch: bool, minimum_control_extent: f32) -> f32 {
+    scaled.max(if is_touch { minimum_control_extent } else { 0.0 })
+}
+
 /// The action extent for `count` actions within `row_width`.
+///
+/// Swift: `max(44, min(scaler.scale(actionWidth), rowWidth / count))`.
 pub fn swipe_action_extent(row_width: f32, count: usize) -> f32 {
+    swipe_action_extent_for(row_width, count, SWIPE_ACTION_WIDTH)
+}
+
+/// The action extent for an explicitly scaled action width.
+pub fn swipe_action_extent_for(row_width: f32, count: usize, action_width: f32) -> f32 {
     let count = count.max(1) as f32;
-    44.0_f32.max((SWIPE_ACTION_WIDTH).min(row_width / count))
+    44.0_f32.max(action_width.min(row_width / count))
 }
 
 /// The snapped reveal for a live `reveal` value.
@@ -226,7 +247,7 @@ where
         let core = self.core();
         let keys = core.clone();
         let is_enabled = self.is_enabled;
-        let row_height = self.row_height;
+        let authored_height = self.row_height;
         let row_spacing = self.row_spacing;
         let row_label = self.row_label.clone();
         let actions = self.actions.clone();
@@ -237,42 +258,72 @@ where
                 .map(|item| ((self.id_of)(item), item.clone()))
                 .collect(),
         );
-        let mut stack = FixedVirtualStack::new(core.ids.to_vec(), row_height, move |id: &Id| {
-            let Some(item) = items.get(id) else {
-                return AnyView::new(crate::EmptyView);
-            };
-            let selected = core.selection.contains(id);
-            let select = core.clone();
-            let select_id = id.clone();
-            AnyView::new(SwipeRow {
-                label: row_label(item),
-                is_selected: selected,
-                is_enabled,
-                row_height,
-                actions: if is_enabled {
-                    actions(item)
-                } else {
-                    Vec::new()
-                },
-                on_select: Rc::new(move || select.activate(select_id.clone())),
-                content: row_content(item, RowState::selected(selected)),
-            })
-        })
-        .spacing(row_spacing);
-        if let Some(index) = keys.target() {
-            stack = stack.scroll_to_index(index);
-        }
-        AnyView::new(
-            AnyView::new(SelectionKeyHost::new(
-                AnyView::new(stack)
-                    .flex(1.0)
-                    .frame(None, None, Some(0.0), Some(0.0), None, None),
-                is_enabled,
-                move |event| keys.handle_key(event),
-            ))
-            .flex(1.0)
-            .frame(None, None, Some(0.0), Some(0.0), None, None),
-        )
+        // Swift reads the surface for the touch extent and the scaler for the
+        // authored row height, then takes the larger of the two
+        // (`SwipeList.swift:86`).
+        let surface = cove_composition::adaptive::SurfaceReader::new(
+            move |environment: &cove_core::Environment| {
+                let is_touch = environment.input.contains(InputCapabilities::TOUCH);
+                let minimum = environment.minimum_control_extent();
+                let scaler_core = core.clone();
+                let scaler_keys = keys.clone();
+                let items = items.clone();
+                let row_label = row_label.clone();
+                let actions = actions.clone();
+                let row_content = row_content.clone();
+                let content_scaler = TextScalerReader::new(move |scaler: crate::theme::TextScaler| {
+                    let height = swipe_row_height(scaler.scale(authored_height), is_touch, minimum);
+                    let spacing = scaler.scale(row_spacing);
+                    let action_width = scaler.scale(SWIPE_ACTION_WIDTH);
+                    let row_core = scaler_core.clone();
+                    let row_items = items.clone();
+                    let row_label = row_label.clone();
+                    let row_actions = actions.clone();
+                    let row_content = row_content.clone();
+                    let mut stack =
+                        FixedVirtualStack::new(scaler_core.ids.to_vec(), height, move |id: &Id| {
+                            let Some(item) = row_items.get(id) else {
+                                return AnyView::new(crate::EmptyView);
+                            };
+                            let selected = row_core.selection.contains(id);
+                            let select = row_core.clone();
+                            let select_id = id.clone();
+                            AnyView::new(SwipeRow {
+                                label: row_label(item),
+                                is_selected: selected,
+                                is_enabled,
+                                row_height: height,
+                                action_width,
+                                actions: if is_enabled {
+                                    row_actions(item)
+                                } else {
+                                    Vec::new()
+                                },
+                                on_select: Rc::new(move || select.activate(select_id.clone())),
+                                content: row_content(item, RowState::selected(selected)),
+                            })
+                        })
+                        .spacing(spacing);
+                    if let Some(index) = scaler_keys.target() {
+                        stack = stack.scroll_to_index(index);
+                    }
+                    let key_core = scaler_keys.clone();
+                    AnyView::new(
+                        AnyView::new(SelectionKeyHost::new(
+                            AnyView::new(stack)
+                                .flex(1.0)
+                                .frame(None, None, Some(0.0), Some(0.0), None, None),
+                            is_enabled,
+                            move |event| key_core.handle_key(event),
+                        ))
+                        .flex(1.0)
+                        .frame(None, None, Some(0.0), Some(0.0), None, None),
+                    )
+                });
+                AnyView::new(content_scaler)
+            },
+        );
+        AnyView::new(surface)
     }
 
     fn dynamic_properties(&self) -> Vec<crate::DynamicField> {
@@ -287,6 +338,9 @@ struct SwipeRow {
     is_selected: bool,
     is_enabled: bool,
     row_height: f32,
+    /// The action width after text scaling; the extent itself also depends on
+    /// the row's own width.
+    action_width: f32,
     actions: Vec<SwipeAction>,
     on_select: Rc<dyn Fn()>,
     content: AnyView,
@@ -300,11 +354,69 @@ impl SwipeRow {
 
 impl View for SwipeRow {
     fn body(&self, cx: &Scope) -> AnyView {
-        let actions = self.visible_actions().to_vec();
-        let max_reveal = swipe_action_extent(1000.0, actions.len()) * actions.len() as f32;
+        // The action extent depends on the row's own width: Swift clamps it to
+        // `rowWidth / count` (`SwipeList.swift:194`).
+        let reveal = cx.state(|| 0.0_f32);
+        let row = SwipeRowBody {
+            label: self.label.clone(),
+            is_selected: self.is_selected,
+            is_enabled: self.is_enabled,
+            row_height: self.row_height,
+            row_width: 0.0,
+            action_width: self.action_width,
+            actions: self.visible_actions().to_vec(),
+            on_select: self.on_select.clone(),
+            content: self.content.clone(),
+            reveal,
+        };
+        AnyView::new(cove_composition::adaptive::ContainerSizeReader::new(
+            move |size: cove_core::Size| {
+                let mut row = row.clone();
+                row.row_width = size.width;
+                row
+            },
+        ))
+    }
+}
+
+struct SwipeRowBody {
+    label: String,
+    is_selected: bool,
+    is_enabled: bool,
+    row_height: f32,
+    row_width: f32,
+    action_width: f32,
+    actions: Vec<SwipeAction>,
+    on_select: Rc<dyn Fn()>,
+    content: AnyView,
+    reveal: Signal<f32>,
+}
+
+impl Clone for SwipeRowBody {
+    fn clone(&self) -> Self {
+        Self {
+            label: self.label.clone(),
+            is_selected: self.is_selected,
+            is_enabled: self.is_enabled,
+            row_height: self.row_height,
+            row_width: self.row_width,
+            action_width: self.action_width,
+            actions: self.actions.clone(),
+            on_select: self.on_select.clone(),
+            content: self.content.clone(),
+            reveal: self.reveal.clone(),
+        }
+    }
+}
+
+impl View for SwipeRowBody {
+    fn body(&self, _cx: &Scope) -> AnyView {
+        let actions = self.actions.clone();
         let row_height = self.row_height;
         let is_enabled = self.is_enabled;
-        let reveal = cx.state(|| 0.0_f32);
+        let reveal = self.reveal.clone();
+        let extent = swipe_action_extent_for(self.row_width, actions.len(), self.action_width);
+        let max_reveal = extent * actions.len() as f32;
 
         let actions_menu: Rc<dyn Fn() -> Vec<MenuEntry>> = {
             let actions = self.actions.clone();
@@ -361,10 +473,18 @@ impl View for SwipeRow {
                                 run();
                             },
                         )
-                        .enabled(enabled),
+                        .enabled(enabled)
+                        .accessibility_label(title.clone()),
                     )
                     .button_style_any(style)
-                    .frame_height(row_height),
+                    .frame(
+                        Some(crate::modifiers::layout::FrameDimension::Points(extent)),
+                        Some(crate::modifiers::layout::FrameDimension::Points(row_height)),
+                        None,
+                        None,
+                        None,
+                        None,
+                    ),
                 )
             })
             .collect();
@@ -474,6 +594,7 @@ impl PrimitiveView for SwipeRowHost {
     }
 
     fn update_node(&self, node: &Node) {
+        let reveal_value = self.reveal.get();
         let reveal = self.reveal.clone();
         node.set_corner_radius(6.0);
         node.set_cursor(Some(if self.is_enabled {
@@ -506,7 +627,14 @@ impl PrimitiveView for SwipeRowHost {
             ..Default::default()
         });
 
-        node.set_content_offset(cove_core::Point::new(-reveal.get(), 0.0));
+        // Swift stores a negative `reveal` and offsets the row by
+        // `rtl ? reveal : -reveal`, so the strip slides toward the logical
+        // leading edge in both directions (`SwipeList.swift:298`).
+        let rtl = node.resolves_right_to_left();
+        node.set_content_offset(cove_core::Point::new(
+            if rtl { reveal_value } else { -reveal_value },
+            0.0,
+        ));
 
         let Some(registry) = InteractionRegistryHolder::current() else {
             return;
@@ -677,10 +805,17 @@ impl PrimitiveView for SwipeRowHost {
                         }
                         motion_paint();
                     }
-                    let next = (base + dx).min(0.0).max(-max_reveal);
+                    let rtl = motion_node.resolves_right_to_left();
+                    // A swipe follows the logical leading edge, so the travel is
+                    // mirrored in RTL (`SwipeList.swift:388`).
+                    let direction = if rtl { -1.0 } else { 1.0 };
+                    let next = (base + dx * direction).min(0.0).max(-max_reveal);
                     if (next - motion_reveal.get()).abs() > f32::EPSILON {
                         motion_reveal.set(next);
-                        motion_node.set_content_offset(cove_core::Point::new(-next, 0.0));
+                        motion_node.set_content_offset(cove_core::Point::new(
+                            if rtl { next } else { -next },
+                            0.0,
+                        ));
                     }
                     EventResult::Handled
                 },

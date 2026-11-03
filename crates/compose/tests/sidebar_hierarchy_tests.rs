@@ -23,23 +23,6 @@
 //! theme/direction/modality loops are kept inside `adaptive_matrix`, so the
 //! `#[test]` count still matches one-to-one.
 //!
-//! Named differences from the Swift suite (each pinned by a `GAP:` assertion):
-//! - Collapsed descendants: Swift mounts every authored row and takes hidden
-//!   ones out of input (`acceptsSubtreeInput == false`); Rust prunes collapsed
-//!   descendants from the node tree, so `secret` under `Locked group` is never
-//!   mounted either.
-//! - Reveal on selection: Swift expands the ancestor chain of a programmatic
-//!   or moved selection; Rust leaves the caller's set untouched.
-//! - Focus repair: Swift moves focus to the nearest visible enabled ancestor
-//!   when a row collapses, is removed or becomes disabled; Rust drops focus on
-//!   collapse and, because rows are reconciled by position, leaves focus on the
-//!   reused node that now presents another (disabled) row.
-//! - Node identity: collapse/re-reveal and crossing the compact portal boundary
-//!   remount rows. Rows retain their identity within the docked/rail presentation.
-//! - Item actions: Swift mounts a `sidebar-actions-<id>` ellipsis and wires the
-//!   right-click context menu; Rust only reserves the trailing width.
-//! - Row surface: Swift's row button spans the full sidebar width; the Rust
-//!   button hugs its content (the roving lane around it spans the width).
 //!
 //! Harness notes:
 //! - Rows are found by accessible label on the button host (rail rows carry
@@ -427,6 +410,18 @@ fn item(scene: &InteractiveScene, names: &[&str]) -> Node {
     row(scene, names).unwrap_or_else(|| panic!("{names:?} row is mounted"))
 }
 
+/// The trailing actions trigger for `title`. Rust publishes no
+/// `sidebar-actions-<id>` debug name (it has no `Id` string form), so the
+/// trigger is reached by the accessible name it publishes, the same way rows
+/// are found here.
+fn actions_trigger(scene: &InteractiveScene, title: &str) -> Option<Node> {
+    let expected = format!("Actions for {title}");
+    live_first(scene, |node| {
+        node.accessibility()
+            .is_some_and(|semantics| semantics.label == expected)
+    })
+}
+
 fn title_node(scene: &InteractiveScene, names: &[&str], title: &str) -> Node {
     let host = item(scene, names);
     subtree(&host)
@@ -519,8 +514,8 @@ fn keyboard_and_pointer() {
         scene.install(harness.clone());
         let projects = item(scene, &[PROJECTS]);
         assert!(
-            row(scene, &[AUDIT]).is_none(),
-            "GAP: Swift keeps a collapsed descendant mounted with `acceptsSubtreeInput == false`; the Rust sidebar never mounts it"
+            row(scene, &[AUDIT]).is_some_and(|node| !node.accepts_subtree_input()),
+            "a collapsed descendant stays mounted but outside the interaction graph"
         );
         assert_eq!(
             state_of(&projects).is_expanded,
@@ -567,7 +562,11 @@ fn keyboard_and_pointer() {
         scene.key(Scancode::ARROW_LEFT, KeyModifiers::default());
         assert_eq!(focused_label(scene).as_deref(), Some("Team"));
         scene.key(Scancode::ARROW_LEFT, KeyModifiers::default());
-        assert!(!harness.expanded.get().contains("team") && row(scene, &[AUDIT]).is_none());
+        assert!(
+            !harness.expanded.get().contains("team")
+                && row(scene, &[AUDIT]).is_some_and(|node| !node.accepts_subtree_input()),
+            "collapsing team keeps the audit row mounted but out of input"
+        );
         assert_eq!(
             harness.selection.get().as_deref(),
             Some("audit"),
@@ -631,13 +630,14 @@ fn controlled_disclosure() {
         scene.install(harness.clone());
         harness.selection.set(Some("audit".to_owned()));
         scene.settle(10, 1.0);
-        assert!(
-            row(scene, &[AUDIT]).is_none(),
-            "GAP: Swift revealed the ancestor chain for a programmatic selection (`expanded == [projects, team]`); the Rust sidebar has no reveal-on-selection, so the row stays unmounted"
+        assert_eq!(
+            harness.expanded.get(),
+            set(&["projects", "team"]),
+            "a programmatic selection reveals its ancestor chain once"
         );
         assert!(
-            harness.expanded.get().is_empty(),
-            "the binding is untouched"
+            row(scene, &[AUDIT]).is_some_and(|node| node.accepts_subtree_input()),
+            "the revealed row is mounted and takes input"
         );
 
         harness.expand(scene, &["projects", "team"]);
@@ -666,13 +666,13 @@ fn controlled_disclosure() {
             "collapse is caller owned"
         );
         assert!(
-            row(scene, &[AUDIT]).is_none(),
-            "GAP: Swift keeps the collapsed row mounted without input; Rust unmounts it"
+            row(scene, &[AUDIT]).is_some_and(|node| !node.accepts_subtree_input()),
+            "the collapsed row stays mounted without input"
         );
         assert_eq!(
-            focused_label(scene),
-            None,
-            "GAP: Swift hands focus to the nearest visible ancestor (`projects`); Rust drops focus with the unmounted row"
+            focused_label(scene).as_deref(),
+            Some(PROJECTS),
+            "focus moves to the nearest visible ancestor"
         );
         assert!(
             !scene.focus.is_focus_visible(),
@@ -688,17 +688,17 @@ fn controlled_disclosure() {
         scene.settle(10, 1.0);
         assert_eq!(
             harness.expanded.get(),
-            set(&["team"]),
-            "GAP: Swift re-revealed [projects, team] for the new selection; Rust leaves the caller's set alone"
+            set(&["projects", "team"]),
+            "a new selection re-reveals its whole ancestor chain"
         );
 
         harness.expand(scene, &["projects", "team"]);
         let title = title_node(scene, &[AUDIT], AUDIT);
         let projects_title = title_node(scene, &[PROJECTS], PROJECTS);
-        assert_ne!(
+        assert_eq!(
             id(&item(scene, &[AUDIT])),
             id(&audit),
-            "GAP: Swift retains the same row node across collapse and re-reveal; Rust remounts it"
+            "collapse and re-reveal retain the same row node"
         );
         assert!(
             title.absolute_frame().x > projects_title.absolute_frame().x,
@@ -716,9 +716,10 @@ fn changing_data() {
         scene.install(harness.clone());
         harness.selection.set(Some("audit".to_owned()));
         scene.settle(10, 1.0);
-        assert!(
-            harness.expanded.get().is_empty(),
-            "GAP: Swift reveals the selected row's ancestors (`expanded == [projects, team]`); Rust leaves the caller's set empty"
+        assert_eq!(
+            harness.expanded.get(),
+            set(&["projects", "team"]),
+            "the selected row's ancestors are revealed"
         );
         harness.expand(scene, &["projects", "team"]);
         let audit = item(scene, &[AUDIT]);
@@ -736,16 +737,16 @@ fn changing_data() {
         );
         assert_eq!(
             focused_label(scene).as_deref(),
-            Some("Billing"),
-            "GAP: Swift moves focus to the nearest visible enabled ancestor (`team`); Rust rows are matched by position, so focus stays on the reused node that now presents the disabled `Billing` row"
+            Some("Team"),
+            "removing the focused row moves focus to the nearest visible enabled ancestor"
         );
 
         harness.disabled.set(true);
         scene.settle(10, 1.0);
         assert_eq!(
             focused_label(scene).as_deref(),
-            Some("Billing"),
-            "GAP: Swift moves focus to the first usable row (`overview`) once the branch is disabled; Rust leaves it on the disabled row"
+            Some("Overview"),
+            "disabling the branch moves focus to the first usable row"
         );
         for name in [PROJECTS, "Welcome", "Team", "Billing", "Locked group"] {
             let row_node = item(scene, &[name]);
@@ -754,9 +755,10 @@ fn changing_data() {
                 "every descendant of a disabled branch shares its disabled state, saw {name}"
             );
         }
+        let secret = item(scene, &["Secret"]);
         assert!(
-            row(scene, &["Secret"]).is_none(),
-            "GAP: Swift mounts `secret` under the collapsed `Locked group` (and asserts it disabled); Rust never mounts collapsed descendants"
+            !secret.accepts_subtree_input() && !state_of(&secret).is_enabled,
+            "secret stays mounted under the collapsed Locked group and reports disabled"
         );
 
         harness.disabled.set(false);
@@ -764,9 +766,14 @@ fn changing_data() {
         harness.moved.set(true);
         harness.expanded.set(HashSet::new());
         scene.settle(10, 1.0);
+        assert_eq!(
+            harness.expanded.get(),
+            set(&["projects"]),
+            "the moved selection's new ancestors are revealed"
+        );
         assert!(
-            harness.expanded.get().is_empty() && row(scene, &[AUDIT]).is_none(),
-            "GAP: Swift reveals the moved selection's new ancestors (`expanded == [projects]`); Rust leaves the set empty and the row hidden"
+            row(scene, &[AUDIT]).is_some_and(|node| node.accepts_subtree_input()),
+            "the moved row is mounted and takes input"
         );
         harness.expand(scene, &["projects"]);
         let moved_audit = item(scene, &[AUDIT]);
@@ -825,12 +832,13 @@ fn local_and_rtl() {
 
         press(scene, &item(scene, &[PROJECTS]), MouseButton::Left);
         assert!(
-            row(scene, &["Welcome"]).is_none(),
+            row(scene, &["Welcome"]).is_some_and(|node| !node.accepts_subtree_input()),
             "the pointer collapses the disclosed branch"
         );
         press(scene, &item(scene, &[PROJECTS]), MouseButton::Left);
         assert!(
-            row(scene, &["Welcome"]).is_some() && harness.expanded.get().is_empty(),
+            row(scene, &["Welcome"]).is_some_and(|node| node.accepts_subtree_input())
+                && harness.expanded.get().is_empty(),
             "an uncontrolled sidebar keeps local disclosure state: the press discloses the branch"
         );
 
@@ -924,10 +932,10 @@ fn adaptive_matrix() {
                             let audit = item(scene, &[AUDIT, AUDIT_PATH]);
                             if width != 390.0 {
                                 if previous_compact {
-                                    assert_ne!(
+                                    assert_eq!(
                                         id(&audit),
                                         original_audit,
-                                        "GAP: leaving the compact portal remounts navigation rows ({case})"
+                                        "navigation rows retain identity across compact presentation ({case})"
                                     );
                                     expected_docked_audit = id(&audit);
                                 }
@@ -937,10 +945,10 @@ fn adaptive_matrix() {
                                     "rows are retained within the docked/rail presentation ({case})"
                                 );
                             } else {
-                                assert_ne!(
+                                assert_eq!(
                                     id(&audit),
                                     original_audit,
-                                    "GAP: compact modal presentation remounts row nodes ({case})"
+                                    "compact navigation reuses the same row ({case})"
                                 );
                             }
                             previous_compact = width == 390.0;
@@ -1086,29 +1094,41 @@ fn item_actions() {
         harness.expand(scene, &["projects", "team"]);
         harness.selection.set(Some("audit".to_owned()));
         scene.settle(10, 1.0);
-        assert!(
-            live_named(scene, "sidebar-actions-audit").is_none(),
-            "GAP: Swift published a `sidebar-actions-audit` ellipsis trigger; the Rust sidebar only reserves `actions_width` for a context menu and mounts no trigger"
-        );
-        let audit = item(scene, &[AUDIT]);
-        press(scene, &audit, MouseButton::Right);
+        let actions = actions_trigger(scene, AUDIT)
+            .expect("the row mounts its actions trigger");
+        press(scene, &actions, MouseButton::Left);
         assert_eq!(
             harness.archived.get(),
             0,
-            "a right click opens no menu in Rust"
+            "opening the menu does not run an action"
         );
-        assert!(
-            scene
-                .first(|node| { label(node) == "Archive" && node.is_hit_testable() })
-                .is_none(),
-            "GAP: `SidebarItem::context_menu` entries are never rendered, so no `Archive` item exists to click"
+        let archive = scene
+            .first(|node| label(node) == "Archive" && node.is_hit_testable())
+            .expect("the authored context menu item is rendered");
+        press(scene, &archive, MouseButton::Left);
+        assert_eq!(
+            harness.archived.get(),
+            1,
+            "the ellipsis reaches the authored action"
         );
+        let audit = item(scene, &[AUDIT]);
         assert_eq!(
             audit.accessibility().map(|semantics| semantics.value),
             Some("12".to_owned()),
             "the authored badge still reaches the row's accessible value"
         );
-        assert_eq!(harness.archived.get(), 0, "nothing fired the menu action");
+
+        // The right-click path opens the same menu.
+        press(scene, &audit, MouseButton::Right);
+        let context_archive = scene
+            .first(|node| label(node) == "Archive" && node.is_hit_testable())
+            .expect("the row's context menu opens");
+        press(scene, &context_archive, MouseButton::Left);
+        assert_eq!(
+            harness.archived.get(),
+            2,
+            "the right-click menu reaches the same action"
+        );
     });
 }
 
@@ -1122,14 +1142,17 @@ fn compact_item_actions() {
         harness.input.set(InputCapabilities::TOUCH);
         harness.open.set(true);
         harness.set_width(scene, 390.0);
+        let actions = actions_trigger(scene, AUDIT)
+            .expect("the compact drawer mounts the actions trigger");
         assert!(
-            live_named(scene, "sidebar-actions-audit").is_none(),
-            "GAP: Swift asserted the compact drawer's actions trigger is at least 44pt tall; the Rust sidebar mounts no such trigger"
+            actions.frame().height >= 44.0,
+            "the compact drawer's actions trigger keeps a 44pt target, saw {:?}",
+            actions.frame()
         );
         let audit = item(scene, &[AUDIT, AUDIT_PATH]);
         assert!(
             audit.frame().height >= 44.0,
-            "the row the trigger belonged to keeps the 44pt touch floor, saw {:?}",
+            "the row the trigger belongs to keeps the 44pt touch floor, saw {:?}",
             audit.frame()
         );
     });

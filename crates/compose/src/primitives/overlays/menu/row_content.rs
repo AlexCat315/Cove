@@ -33,7 +33,7 @@ impl MenuItemContent {
     ) -> Self {
         Self {
             icon,
-            rich_title,
+            rich_title: rich_title.into_iter().map(|mut run| { run.link = None; run }).collect(),
             detail: detail.filter(|value| !value.is_empty()),
             link: link.filter(|value| !value.is_empty()),
         }

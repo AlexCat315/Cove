@@ -508,6 +508,26 @@ impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 
         }
     }
 
+    /// The override map as a binding: the caller's when one is supplied,
+    /// otherwise this mount's session, so an unbound choice resets on unmount.
+    fn visibility_binding(&self) -> Binding<HashMap<String, bool>> {
+        match self.column_visibility.as_ref() {
+            Some(binding) => binding.clone(),
+            None => {
+                let session = self.session.clone();
+                let read = session.clone();
+                Binding::new(
+                    move || read.get().visibility,
+                    move |value| {
+                        let mut next = session.get();
+                        next.visibility = value;
+                        session.set(next);
+                    },
+                )
+            }
+        }
+    }
+
     fn stored_widths(&self) -> BTreeMap<String, f32> {
         match self.column_widths.as_ref() {
             Some(binding) => binding.get(),
@@ -754,8 +774,23 @@ impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 
         focus_node(input);
     }
 
+    /// Commits a draft the person left by clicking elsewhere. Focus already
+    /// moved to whatever they clicked, so this path leaves it alone.
+    fn commit_editing_without_focus(&self, input: &Rc<RefCell<Option<Node>>>) -> bool {
+        let restore = false;
+        self.commit_editing_inner(input, restore)
+    }
+
     /// Validates and closes the open draft. Returns whether it closed.
     fn commit_editing(&self, input: &Rc<RefCell<Option<Node>>>) -> bool {
+        self.commit_editing_inner(input, true)
+    }
+
+    fn commit_editing_inner(
+        &self,
+        input: &Rc<RefCell<Option<Node>>>,
+        restore_focus: bool,
+    ) -> bool {
         let mut session = self.session.get();
         let Some(draft) = session.editing.draft.clone() else {
             return true;
@@ -793,7 +828,9 @@ impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 
             self.model
                 .update_row(&row_id, |record| editing.apply(record, &value));
         }
-        focus_node(input);
+        if restore_focus {
+            focus_node(input);
+        }
         true
     }
 
@@ -1099,6 +1136,31 @@ impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 
     }
 }
 
+/// The table's own tracks re-expressed through the shared columns contract, so
+/// the picker and the planner read one visibility type.
+fn shared_tracks(
+    tracks: &[crate::primitives::layout::grid::ColumnVisibilityTrack],
+) -> Vec<crate::primitives::columns::ColumnVisibilityTrack> {
+    tracks
+        .iter()
+        .map(|track| {
+            crate::primitives::columns::ColumnVisibilityTrack::new(
+                track.id.clone(),
+                track.title.clone(),
+                match track.visibility {
+                    crate::primitives::layout::grid::ColumnVisibility::Required => {
+                        crate::primitives::columns::ColumnVisibility::Required
+                    }
+                    crate::primitives::layout::grid::ColumnVisibility::Automatic { priority } => {
+                        crate::primitives::columns::ColumnVisibility::Automatic { priority }
+                    }
+                },
+                track.width,
+            )
+        })
+        .collect()
+}
+
 fn plan_available_width<Record>(plan: &DataTablePlan<Record>, moving_width: f32) -> f32 {
     plan.geometry.frozen_width() + moving_width
 }
@@ -1159,7 +1221,12 @@ impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 
     fn children(&self, node: &Node) -> Vec<AnyView> {
         let controller = &self.controller;
         let scale = node_text_scaler(node).factor();
-        let layout = controller.layout.clone().resolved(scale, false, 28.0);
+        let surface = node.composition_value(&crate::adaptive::SurfaceEnvironment::key());
+        let layout = controller.layout.clone().resolved(
+            scale,
+            surface.input.contains(cove_core::InputCapabilities::TOUCH),
+            surface.minimum_control_extent(),
+        );
         let session = controller.session.get();
         let vertical_chrome = layout.header_height + 1.0;
         let viewport_height = (self.size.height - vertical_chrome).max(1.0);
@@ -1178,35 +1245,74 @@ impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 
             3,
         );
         let session = controller.session.get();
+        // The picker reads the same session, before the lanes take ownership.
+        let picker_session = controller.session.get();
 
         let input: Rc<RefCell<Option<Node>>> = Rc::new(RefCell::new(None));
-        let content = if controller.model.count() == 0 {
-            AnyView::new(EmptyState::new(
-                layout.empty_title.clone(),
-                "Change your filters or add a record.",
+        // The header stays mounted for an empty dataset, so the sort controls
+        // and column titles remain reachable; only the body is replaced.
+        let content = AnyView::new(DataTableLanes {
+            controller: controller.clone(),
+            plan: plan.clone(),
+            metrics: metrics.clone(),
+            window,
+            offset,
+            moving_width,
+            viewport_height,
+            layout,
+            session,
+            input: input.clone(),
+        });
+
+        // The picker sits above the table and shares the plan the body uses.
+        let picker = if controller
+            .ordered_columns(&picker_session)
+            .iter()
+            .any(|column| column.visibility != ColumnVisibility::Required)
+        {
+            let ordered = controller.ordered_columns(&picker_session);
+            let stored = controller.stored_widths();
+            let widths: BTreeMap<String, f32> = ordered
+                .iter()
+                .map(|column| (column.id.clone(), controller.width_of(column, &stored)))
+                .collect();
+            let overrides = controller.visibility(&picker_session);
+            let resolved = TableColumnPlan::resolve(
+                &ordered,
+                &widths,
+                &overrides,
+                self.size.width,
+                controller.frozen_column_count,
+                &Default::default(),
+            );
+            let tracks = TableColumnPlan::tracks(&ordered, &widths);
+            Some(AnyView::new(
+                AnyView::new(crate::primitives::columns::ColumnVisibilityPicker::new(
+                    shared_tracks(&tracks),
+                    crate::primitives::columns::ColumnVisibilityPlan {
+                        indices: resolved.indices.clone(),
+                        required_ids: resolved.required_ids.clone(),
+                    },
+                    controller.visibility_binding(),
+                    controller.is_enabled,
+                ))
+                .flex_with(0.0, 0.0, None),
             ))
         } else {
-            AnyView::new(DataTableLanes {
-                controller: controller.clone(),
-                plan: plan.clone(),
-                metrics: metrics.clone(),
-                window,
-                offset,
-                moving_width,
-                viewport_height,
-                layout,
-                session,
-                input: input.clone(),
-            })
+            None
         };
-
-        vec![AnyView::new(DataTableChrome {
+        let mut children: Vec<AnyView> = Vec::new();
+        if let Some(picker) = picker {
+            children.push(picker);
+        }
+        children.push(AnyView::new(DataTableChrome {
             content,
             is_enabled: controller.is_enabled,
             header_height: self.size.height,
             model_rows: controller.model.count(),
             columns: controller.columns.len(),
-        })]
+        }));
+        children
     }
 }
 
@@ -1287,6 +1393,7 @@ impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 
             &self.session,
             self.viewport_height,
             self.moving_width,
+            self.input.clone(),
         );
         let moving = build_moving_lane(
             &self.controller,
@@ -1298,6 +1405,7 @@ impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 
             &self.session,
             self.moving_width,
             self.viewport_height,
+            self.input.clone(),
         );
 
         let frozen_width = self.plan.geometry.frozen_width();
@@ -1328,17 +1436,27 @@ impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 
             Some(0.0),
         )));
 
-        let body = AnyView::new(
-            BoxView::new(
-                FlexDirection::Row,
-                Align::Stretch,
-                Justify::FlexStart,
-                Wrap::NoWrap,
-                0.0,
-                AnyView::new(TupleView::new(body_children)),
+        let body = if self.controller.model.count() == 0 {
+            AnyView::new(
+                AnyView::new(EmptyState::new(
+                    self.layout.empty_title.clone(),
+                    "Change your filters or add a record.",
+                ))
+                .flex_with(1.0, 1.0, Some(0.0)),
             )
-            .frame(None, None, Some(0.0), Some(0.0), None, None),
-        );
+        } else {
+            AnyView::new(
+                BoxView::new(
+                    FlexDirection::Row,
+                    Align::Stretch,
+                    Justify::FlexStart,
+                    Wrap::NoWrap,
+                    0.0,
+                    AnyView::new(TupleView::new(body_children)),
+                )
+                .frame(None, None, Some(0.0), Some(0.0), None, None),
+            )
+        };
 
         let column = AnyView::new(
             BoxView::new(
@@ -1508,6 +1626,7 @@ fn build_frozen_lane<
     session: &DataTableSession<Id>,
     viewport_height: f32,
     moving_width: f32,
+    input: Rc<RefCell<Option<Node>>>,
 ) -> AnyView {
     let frozen_count = plan.geometry.frozen_count.min(plan.columns.len());
     if frozen_count == 0 {
@@ -1524,6 +1643,7 @@ fn build_frozen_lane<
         session: session.clone(),
         viewport_height,
         moving_width,
+        input,
     })
 }
 
@@ -1540,6 +1660,7 @@ fn build_moving_lane<
     session: &DataTableSession<Id>,
     moving_width: f32,
     viewport_height: f32,
+    input: Rc<RefCell<Option<Node>>>,
 ) -> AnyView {
     let frozen_count = plan.geometry.frozen_count.min(plan.columns.len());
     let columns = window.columns(plan.columns.len());
@@ -1556,6 +1677,7 @@ fn build_moving_lane<
         session: session.clone(),
         viewport_height,
         moving_width,
+        input,
     });
 
     let scroll = ScrollView::new(ScrollAxis::Both, content)
@@ -1585,6 +1707,7 @@ struct LaneRows<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Sen
     session: DataTableSession<Id>,
     viewport_height: f32,
     moving_width: f32,
+    input: Rc<RefCell<Option<Node>>>,
 }
 
 impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 'static> View
@@ -1616,6 +1739,7 @@ impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 
                 columns: self.columns.clone(),
                 layout: self.layout.clone(),
                 session: self.session.clone(),
+                input: self.input.clone(),
             }));
         }
         let total = self.metrics.total();
@@ -1663,6 +1787,7 @@ struct FrozenLane<
     session: DataTableSession<Id>,
     viewport_height: f32,
     moving_width: f32,
+    input: Rc<RefCell<Option<Node>>>,
 }
 
 impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 'static> View
@@ -1679,6 +1804,7 @@ impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 
             session: self.session.clone(),
             viewport_height: self.viewport_height,
             moving_width: self.moving_width,
+            input: self.input.clone(),
         })
     }
 }
@@ -1697,6 +1823,7 @@ struct MovingRows<
     session: DataTableSession<Id>,
     viewport_height: f32,
     moving_width: f32,
+    input: Rc<RefCell<Option<Node>>>,
 }
 
 impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 'static> View
@@ -1714,6 +1841,7 @@ impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 
                 session: self.session.clone(),
                 viewport_height: self.viewport_height,
                 moving_width: self.moving_width,
+                input: self.input.clone(),
             })
             .frame_width(self.plan.geometry.moving_width().max(self.moving_width)),
         )
@@ -1732,6 +1860,7 @@ struct DataTableRow<
     columns: std::ops::Range<usize>,
     layout: TableLayout,
     session: DataTableSession<Id>,
+    input: Rc<RefCell<Option<Node>>>,
 }
 
 impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 'static> View
@@ -1789,6 +1918,7 @@ impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 
                 width,
                 height: self.height,
                 session: self.session.clone(),
+                input: self.input.clone(),
             }));
         }
         AnyView::new(DataTableRowHost {
@@ -1922,6 +2052,7 @@ struct DataTableCell<
     width: f32,
     height: f32,
     session: DataTableSession<Id>,
+    input: Rc<RefCell<Option<Node>>>,
 }
 
 impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 'static> View
@@ -1936,6 +2067,13 @@ impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 
             Some(buffer) => AnyView::new(DraftEditor {
                 controller: self.controller.clone(),
                 plan: self.plan.clone(),
+                input: self.input.clone(),
+                token: self
+                    .session
+                    .editing
+                    .draft
+                    .as_ref()
+                    .map_or(0, |draft| draft.token),
                 column_id: self.column.id.clone(),
                 buffer,
                 title: title.clone(),
@@ -2023,6 +2161,9 @@ impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 
 
     fn update_node(&self, node: &Node) {
         let theme = theme_for_node(node);
+        // A disabled table removes its cells from input-enabled discovery, so
+        // an accessibility read cannot reach a control the pointer cannot.
+        node.set_allows_hit_testing(self.is_enabled);
         node.set_border_width(if self.is_active { 1.0 } else { 0.0 });
         node.set_border_color(Some(theme.colors.focus_ring));
         node.set_clips_to_bounds(true);
@@ -2105,6 +2246,10 @@ struct DraftEditor<
 > {
     controller: DataTableController<Record, Id>,
     plan: DataTablePlan<Record>,
+    /// The table's keyboard host, which regains focus once the draft closes.
+    input: Rc<RefCell<Option<Node>>>,
+    /// One-per-open-editor identity, so the field requests focus exactly once.
+    token: u64,
     column_id: String,
     buffer: String,
     title: String,
@@ -2118,7 +2263,9 @@ impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 
     fn body(&self, _cx: &Scope) -> AnyView {
         let controller = self.controller.clone();
         let plan = self.plan.clone();
-        let input: Rc<RefCell<Option<Node>>> = Rc::new(RefCell::new(None));
+        // The table's own keyboard host, so committing hands focus back to the
+        // table instead of dropping it.
+        let input = self.input.clone();
         let buffer = self.buffer.clone();
         let _write_controller = controller.clone();
         // `Binding` requires `Send + Sync`; the draft buffer itself lives on the
@@ -2144,6 +2291,8 @@ impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 
         let tab_controller = controller.clone();
         let tab_plan = plan.clone();
         let tab_input = input.clone();
+        let blur_controller = controller.clone();
+        let blur_input = input.clone();
         let mut field = TextField::new("", text)
             .behavior(TextFieldBehavior {
                 disabled: !self.is_enabled,
@@ -2158,6 +2307,11 @@ impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 
                 })),
                 on_change: Some(Rc::new(move |value: &TextBuffer| {
                     change_controller.set_draft_buffer(value.string_value());
+                })),
+                // Clicking away commits the draft. Focus already moved to
+                // whatever the person clicked, so this path does not restore it.
+                on_blur: Some(Rc::new(move || {
+                    blur_controller.commit_editing_without_focus(&blur_input);
                 })),
                 on_key_down: Some(Rc::new(move |event: &KeyEvent| {
                     if event.scancode != crate::Scancode::TAB {
@@ -2184,7 +2338,12 @@ impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 
                 .unwrap_or_else(|| "Return commits, Escape cancels".to_string()),
             ..Default::default()
         };
-        field.navigation = TextFieldNavigationRequest::default();
+        // Opening the editor moves focus into the field, and the request
+        // selects the whole value so typing replaces it.
+        field.navigation = TextFieldNavigationRequest {
+            focus_request_id: (self.token > 0).then_some(self.token),
+            ..Default::default()
+        };
         AnyView::new(TextFieldShell {
             field: AnyView::new(field.padding_edges(4.0, 2.0)),
             semantics,
@@ -2354,6 +2513,7 @@ impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 
     }
 
     fn update_node(&self, node: &Node) {
+        node.set_allows_hit_testing(self.is_enabled);
         node.set_accessibility(Some(AccessibilitySemantics {
             role: AccessibilityRole::Button,
             label: format!("Sort by {}", self.title),

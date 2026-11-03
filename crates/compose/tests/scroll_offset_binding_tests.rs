@@ -9,14 +9,6 @@
 //! - a visible scroll anchor keeps its viewport position when content is
 //!   prepended
 //!
-//! Named differences:
-//! - GAP `scroll_anchor_modifier`: Swift exposes `.scrollAnchor()` on any view.
-//!   Rust has the anchor-preserving logic inside `ScrollView` (it reads the
-//!   `__scrollview_anchor` attachment) but no public modifier sets that marker,
-//!   so rows built only from public API do not anchor and the offset stays at
-//!   400 instead of 520. `scroll_anchor` pins both the anchored result (through
-//!   a local marker modifier) and the unmarked result.
-
 use crate::support;
 use cove_composition::Scope;
 
@@ -101,7 +93,7 @@ impl View for AnchorHarness {
                 if self.marks_anchors {
                     AnyView::new(text.modifier(AnchorMarker).id(row))
                 } else {
-                    AnyView::new(text.id(row))
+                    { use cove_ui_compose::primitives::layout::ScrollAnchorViewExt; AnyView::new(text.scroll_anchor().id(row)) }
                 }
             })
             .collect();
@@ -367,8 +359,8 @@ fn scroll_anchor() {
     let (offset, bound) = prepend_rows(false);
     assert_eq!(
         (offset, bound),
-        (400.0, 400.0),
-        "GAP: Swift's public `.scrollAnchor()` modifier marks rows so prepending keeps \
+        (520.0, 520.0),
+        "Swift's public `.scrollAnchor()` modifier marks rows so prepending keeps \
          them in place (520); Rust has no public anchor modifier, so rows built from \
          public API do not anchor and the offset stays at 400"
     );

@@ -251,20 +251,19 @@ fn keyboard_selection() {
         let chart = plot(scene);
         scene.focus.focus(Some(&chart), true);
 
-        // GAP: Swift's first Right press reads index 0. Rust seeds the forward
-        // step at the next index, so the opening press already advances.
+        // The first Right press opens the cursor on the leading index.
         scene.key(cove_ui_compose::Scancode::ARROW_RIGHT, Default::default());
         assert_eq!(
             point.get(),
-            Some(ChartPoint::new(0, 1)),
-            "GAP: the first Right press reads index 1 (Swift: index 0)"
+            Some(ChartPoint::new(0, 0)),
+            "the first Right press reads index 0"
         );
 
         scene.key(cove_ui_compose::Scancode::ARROW_RIGHT, Default::default());
         scene.key(cove_ui_compose::Scancode::ARROW_DOWN, Default::default());
         assert_eq!(
             point.get(),
-            Some(ChartPoint::new(1, 2)),
+            Some(ChartPoint::new(1, 1)),
             "Right then Down steps to the next series at the advanced index"
         );
 
@@ -362,7 +361,7 @@ fn legend() {
         scene.key(cove_ui_compose::Scancode::ARROW_DOWN, Default::default());
         assert_eq!(
             point.get(),
-            Some(ChartPoint::new(2, 1)),
+            Some(ChartPoint::new(2, 0)),
             "stepping down skips the hidden Signups series and lands on Conversion"
         );
     });
@@ -370,13 +369,17 @@ fn legend() {
 
 #[test]
 fn pie_touch() {
-    InteractiveScene::run(300.0, 240.0, |scene| {
+    // Matches the Swift harness: a 600x220 pie inside the 600x300 window. The
+    // donut hole is a fraction of the radius, so the surface has to be wide
+    // enough for the tap below to land on the ring rather than in the hole.
+    support::with_test_text_environment(|| InteractiveScene::run(600.0, 300.0, |scene| {
         let point = State::new(None);
         let mut configuration = ChartConfiguration::default();
         configuration.selection = Selection {
             point: Some(point.binding()),
             ..Selection::default()
         };
+        configuration.legend.placement = cove_ui_compose::primitives::data::chart::model::ChartLegendPlacementState::bottom();
         let chart = Chart::pie(
             vec![
                 cove_ui_compose::primitives::data::chart::ChartSlice::new("Desktop", 3.0, None),
@@ -390,7 +393,7 @@ fn pie_touch() {
         surface.input = InputCapabilities::TOUCH;
         scene.install(AnyView::new(
             AnyView::new(chart)
-                .frame_size(300.0, 240.0)
+                .frame_size(600.0, 220.0)
                 .surface_environment(surface),
         ));
         scene.settle(6, 1.0);
@@ -402,32 +405,26 @@ fn pie_touch() {
             frame.x + frame.width / 2.0 + 40.0,
             frame.y + frame.height / 2.0 + 40.0,
         );
-        // GAP: Swift asserts `ChartPoint(series: 0, index: 0)` here. The slice
-        // hit test never resolves, so the tap selects nothing.
         assert_eq!(
             point.get(),
-            None,
-            "GAP: tapping a slice selects nothing (Swift: ChartPoint(0, 0))"
+            Some(ChartPoint::new(0, 0)),
+            "tapping a slice selects it"
+        );
+        let value = plot(scene)
+            .accessibility()
+            .map(|semantics| semantics.value)
+            .unwrap_or_default();
+        assert!(
+            value.contains("Desktop") && value.contains("75"),
+            "the value names the tapped slice with its share (got {value:?})"
         );
 
-        // The hole still selects nothing, which is the reachable half.
+        // The hole still selects nothing.
         press(
             scene,
             frame.x + frame.width / 2.0,
             frame.y + frame.height / 2.0,
         );
         assert_eq!(point.get(), None, "tapping the hole selects nothing");
-
-        // GAP: Swift asserts the value names the tapped slice. No selection is
-        // ever made, so the summary stays as published.
-        let value = plot(scene)
-            .accessibility()
-            .map(|semantics| semantics.value)
-            .unwrap_or_default();
-        assert!(
-            !value.contains('%'),
-            "GAP: no slice is ever selected, so the value carries no slice readout \
-             (got {value:?}; Swift: \"Desktop: 3, 75%\")"
-        );
-    });
+    }));
 }

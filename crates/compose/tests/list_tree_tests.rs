@@ -12,15 +12,13 @@
 //! - tree child taps update the selection; cmd-click toggles in a multi selection
 //! - tree rows register hover handlers and hover repaints without requiring a
 //!   structural recompose
+//! - dragging a row onto another row reports an inside drop resolved by row
+//!   token, so duplicate ids stay deterministic
 //! - key selection disambiguates duplicate ids by path; filtered search keeps
 //!   the original paths
 //! - indent guides are subtle 1pt vertical strokes with ancestor continuations
 //!
 //! Named differences from the Swift suite:
-//! - The Rust `Tree` stores `TreeDragOperations` but never wires pointer motion
-//!   to them: rows register no motion handler, so a drag cannot dispatch
-//!   `on_drop`. The two drag tests pin that current behaviour (no drop event,
-//!   no motion handler) instead of the Swift drop payload.
 //! - Rust selection is configured through `TreeSelection` bindings rather than
 //!   Swift's `configure` closure; the harness is otherwise the same.
 //! - The Rust `Tree` row closure receives `(element, selected, expanded,
@@ -28,18 +26,10 @@
 //!   row style rather than the closure.
 //! - `List` takes its IDs and a `.selection(..)` builder instead of Swift's
 //!   `List(items, selection:)` initializer.
-//! - The selection fill subtracts both horizontal insets from its width, but
-//!   starts at the viewport's leading edge rather than at the leading inset.
-//! - Tree hover repaints through the row's hover handler without a pending
-//!   recompose, but the row stays clear instead of painting the hover fill;
-//!   the test pins that current behaviour.
 //! - A caller-owned `TreeSelection::expanded` binding is read when the tree is
-//!   built but does not rebuild the visible projection in the same pass, so
+//!   built and rebuilds the visible projection on the next pass, so
 //!   `tree_selection` mounts the tree already expanded through that binding;
 //!   `tree_expansion` covers disclosure-driven growth with local state.
-//! - Under `FilterAndAutoExpand` the Rust projection keeps only the matching
-//!   leaf and its ancestors (Group, Second), dropping the non-matching
-//!   sibling; Swift kept three rows.
 
 use crate::support;
 use cove_composition::Scope;
@@ -143,6 +133,52 @@ fn click(scene: &InteractiveScene, node: &Node, modifiers: KeyModifiers) {
     let _ = pointer(&event, PointerPhase::Down, EventPhase::Target);
     let _ = pointer(&event, PointerPhase::Up, EventPhase::Target);
     scene.settle(1, 1.0);
+}
+
+/// Drags one row onto another through real pointer events: press on the source,
+/// move past the dead zone to the target's middle, then release.
+fn drag(scene: &InteractiveScene, source: &Node, target: &Node) {
+    let start = source.absolute_frame();
+    let end = target.absolute_frame();
+    let dispatcher = scene.dispatcher();
+    dispatcher.dispatch(&cove_platform::InputEvent::MouseButtonDown(
+        MouseButtonEvent {
+            button: MouseButton::Left,
+            x: start.x + start.width / 2.0,
+            y: start.y + start.height / 2.0,
+            clicks: 1,
+            modifiers: KeyModifiers::default(),
+            kind: Default::default(),
+        },
+    ));
+    scene.settle(2, 1.0);
+    let to = Point::new(end.x + end.width / 2.0, end.y + end.height / 2.0);
+    for step in 1..=6 {
+        let t = step as f32 / 6.0;
+        dispatcher.dispatch(&cove_platform::InputEvent::MouseMotion(
+            cove_platform::MouseMotionEvent {
+                x: start.x + start.width / 2.0
+                    + (to.x - (start.x + start.width / 2.0)) * t,
+                y: start.y + start.height / 2.0
+                    + (to.y - (start.y + start.height / 2.0)) * t,
+                delta_x: 0.0,
+                delta_y: 0.0,
+                kind: Default::default(),
+            },
+        ));
+        scene.settle(2, 1.0);
+    }
+    dispatcher.dispatch(&cove_platform::InputEvent::MouseButtonUp(
+        MouseButtonEvent {
+            button: MouseButton::Left,
+            x: to.x,
+            y: to.y,
+            clicks: 1,
+            modifiers: KeyModifiers::default(),
+            kind: Default::default(),
+        },
+    ));
+    scene.settle(2, 1.0);
 }
 
 fn paints(node: &Node) -> bool {
@@ -285,19 +321,19 @@ fn list_respects_caller_height() {
         scene.install(sized_list_harness(selection.clone(), (1..=30).collect()));
         let caption = scene
             .named("sized-list-caption")
-            .expect("GAP: sized-list-caption must mount");
+            .expect("the caption below the list mounts");
         let viewport = scene
             .first(|node| node.clips_to_bounds() && node.frame().width > 200.0)
-            .expect("GAP: the list must mount a clipping viewport wider than 200pt");
+            .expect("the list mounts a clipping viewport wider than 200pt");
         let frame = viewport.absolute_frame();
         assert!(
             (frame.height - 260.0).abs() < 0.5,
-            "GAP: viewport height must be the caller's 260pt frame, got {}",
+            "the viewport is the caller's 260pt frame, got {}",
             frame.height
         );
         assert!(
             (caption.frame().y - 272.0).abs() < 0.5,
-            "GAP: caption must sit 12pt below the 260pt list, got {}",
+            "the caption sits 12pt below the 260pt list, got {}",
             caption.frame().y
         );
     });
@@ -326,18 +362,18 @@ fn selected_row_fits_its_slot() {
         let expected_height = 30.0 - 2.0 * appearance.vertical_inset;
         assert!(
             (fill.frame().height - expected_height).abs() < 0.5,
-            "GAP: highlight height must stay inside the 30pt row (expected {expected_height}), got {}",
+            "the highlight stays inside the 30pt row (expected {expected_height}), got {}",
             fill.frame().height
         );
         assert!(
             (fill.corner_radius() - appearance.corner_radius).abs() < 0.01,
-            "GAP: highlight radius must be {}, got {}",
+            "the highlight uses the navigation radius {}, got {}",
             appearance.corner_radius,
             fill.corner_radius()
         );
         let viewport = scene
             .first(|node| node.clips_to_bounds() && node.frame().width > 200.0)
-            .expect("GAP: the list must mount a clipping viewport");
+            .expect("the list mounts a clipping viewport");
         let viewport_width = viewport.absolute_frame().width;
         assert!(
             (viewport_width - 2.0 * appearance.horizontal_inset - fill.absolute_frame().width)
@@ -348,10 +384,12 @@ fn selected_row_fits_its_slot() {
             viewport_width,
             fill.absolute_frame().width
         );
+        // Swift paints `.background(fill)` before `.padding(horizontal:)`, so the
+        // band spans the whole row slot and only the content is inset.
         assert!(
             (fill.absolute_frame().x - viewport.absolute_frame().x).abs() < 0.5,
-            "GAP: the fill width respects both insets, but its leading position is still zero rather than {}",
-            appearance.horizontal_inset
+            "the fill spans the row slot from its leading edge, got offset {}",
+            fill.absolute_frame().x - viewport.absolute_frame().x
         );
 
         assert_eq!(
@@ -394,7 +432,7 @@ fn tree_expansion() {
                     .partial_cmp(&b.frame().width)
                     .unwrap_or(std::cmp::Ordering::Equal)
             })
-            .expect("GAP: a disclosure button must mount");
+            .expect("a disclosure button mounts");
         let disclosure_y = disclosure.absolute_frame().y;
         click(scene, &disclosure, KeyModifiers::default());
 
@@ -420,7 +458,7 @@ fn tree_expansion() {
             indented_text
                 .as_ref()
                 .is_some_and(|node| node.absolute_frame().x > 0.0),
-            "GAP: a depth-1 row label must be indented past the root, found {:?}",
+            "a depth-1 row label is indented past the root, found {:?}",
             indented_text.map(|node| node.absolute_frame())
         );
     });
@@ -454,12 +492,12 @@ fn tree_selection() {
         assert_eq!(
             rows.len(),
             3,
-            "GAP: the caller-owned expansion must mount expanded"
+            "the caller-owned expansion mounts expanded"
         );
         let child = rows
             .into_iter()
             .nth(1)
-            .expect("GAP: the expanded child row must mount");
+            .expect("the expanded child row mounts");
         click(scene, &child, KeyModifiers::default());
         assert_eq!(
             selection.get(),
@@ -555,7 +593,7 @@ fn tree_rows_register_hover_handlers() {
                     .partial_cmp(&b.frame().width)
                     .unwrap_or(std::cmp::Ordering::Equal)
             })
-            .expect("GAP: a disclosure button must mount");
+            .expect("a disclosure button mounts");
         let disclosure_frame = disclosure.frame();
         let row_hosts: Vec<Node> = tree_rows(scene)
             .into_iter()
@@ -565,7 +603,7 @@ fn tree_rows_register_hover_handlers() {
         for row in &row_hosts {
             assert!(
                 scene.registry.handlers(row).hover.is_some(),
-                "GAP: every tree row host must register a hover handler"
+                "every tree row host registers a hover handler"
             );
         }
     });
@@ -589,28 +627,33 @@ fn default_tree_row_hover_does_not_recompose_tree() {
                     .partial_cmp(&b.frame().width)
                     .unwrap_or(std::cmp::Ordering::Equal)
             })
-            .expect("GAP: a disclosure button must mount");
+            .expect("a disclosure button mounts");
         let disclosure_frame = disclosure.frame();
         let row = tree_rows(scene)
             .into_iter()
             .find(|row| row.frame() != disclosure_frame)
-            .expect("GAP: a row host must mount");
+            .expect("a row host mounts");
         let hover = scene
             .registry
             .handlers(&row)
             .hover
-            .expect("GAP: the row registers a hover handler");
+            .expect("the row registers a hover handler");
 
         assert!(!paints(&row), "a resting row paints no background");
         hover(cove_core::scene::HoverPhase::Enter);
         assert!(
             !scene.graph.recomposer.has_pending(),
-            "GAP: Rust hover must repaint without scheduling a structural recompose"
+            "hover repaints without scheduling a structural recompose"
+        );
+        assert!(
+            paints(&row),
+            "entering paints the hover fill on the row host, got {:?}",
+            row.background_color()
         );
         scene.settle(1, 1.0);
         assert!(
-            !paints(&row),
-            "GAP: Rust keeps the row clear after hover (Swift paints the hover fill); got {:?}",
+            paints(&row),
+            "the hover fill survives a recompose, got {:?}",
             row.background_color()
         );
         hover(cove_core::scene::HoverPhase::Leave);
@@ -649,17 +692,20 @@ fn tree_drag_dispatches_inside_drop() {
         ));
         let rows = tree_rows(scene);
         assert_eq!(rows.len(), 2, "two rows mount");
-        let motion = scene.registry.handlers(&rows[1]).motion;
         assert!(
-            motion.is_none(),
-            "GAP: Rust tree rows register no motion handler, so drag never dispatches \
-             (motion registered: {})",
-            motion.is_some()
+            scene.registry.handlers(&rows[1]).motion.is_some(),
+            "an armed tree row registers a pointer-motion handler"
         );
-        click(scene, &rows[1], KeyModifiers::default());
-        assert!(
-            done.borrow().is_none(),
-            "GAP: pointer interaction cannot produce a drop in the Rust tree, got {:?}",
+
+        drag(scene, &rows[1], &rows[0]);
+        assert_eq!(
+            done.borrow().as_ref().map(|(source, target, position)| (
+                source.as_str(),
+                target.as_str(),
+                *position
+            )),
+            Some(("B", "A", TreeDropPosition::Inside)),
+            "dragging B onto A's middle reports an inside drop, got {:?}",
             *done.borrow()
         );
     });
@@ -676,13 +722,19 @@ fn tree_drag_with_duplicate_ids_is_deterministic() {
         ));
         let rows = tree_rows(scene);
         assert_eq!(rows.len(), 2, "two rows mount");
-        assert!(
-            done.borrow().is_none(),
-            "GAP: duplicate-id drags stay inert while Tree has no motion wiring"
-        );
-        assert!(
-            !scene.registry.handlers(&rows[0]).motion.is_some(),
-            "GAP: row tokens are never used for drag because no motion handler exists"
+
+        // Both roots share the id "dup"; the drop resolves by row token, so the
+        // second row is the source and the first is the target.
+        drag(scene, &rows[1], &rows[0]);
+        assert_eq!(
+            done.borrow().as_ref().map(|(source, target, position)| (
+                source.as_str(),
+                target.as_str(),
+                *position
+            )),
+            Some(("Second", "First", TreeDropPosition::Inside)),
+            "duplicate ids resolve by row token, got {:?}",
+            *done.borrow()
         );
     });
 }
@@ -755,11 +807,12 @@ fn filtered_tree_node_key_paths_remain_stable() {
     InteractiveScene::run(280.0, 160.0, |scene| {
         scene.install(keyed_tree(roots, multiple.clone(), search));
         let rows = tree_rows(scene);
+        // Swift's three pointer nodes are these two rows plus Group's
+        // disclosure; the non-matching sibling is dropped in both suites.
         assert_eq!(
             rows.len(),
             2,
-            "GAP: the filtered projection keeps Group and Second only (Swift kept a \
-             non-matching sibling too), got {}",
+            "the filtered projection keeps Group and Second only, got {}",
             rows.len()
         );
         let last = rows.last().expect("rows exist");
@@ -801,12 +854,12 @@ fn expand_two_levels(scene: &InteractiveScene) {
     let first = disclosures(scene)
         .into_iter()
         .next()
-        .expect("GAP: root disclosure must mount");
+        .expect("the root disclosure mounts");
     click(scene, &first, KeyModifiers::default());
     let second = disclosures(scene)
         .into_iter()
         .nth(1)
-        .expect("GAP: child disclosure must mount after expanding the root");
+        .expect("the child disclosure mounts after expanding the root");
     click(scene, &second, KeyModifiers::default());
 }
 
@@ -825,7 +878,7 @@ fn tree_guide_lines_are_pixel_aligned() {
         let rects: Vec<(f32, f32)> = guides.iter().flat_map(stroke_rects).collect();
         assert!(
             !rects.is_empty(),
-            "GAP: expanding two levels must draw guide strokes"
+            "expanding two levels draws guide strokes"
         );
         for (width, height) in &rects {
             assert_eq!(
@@ -845,7 +898,7 @@ fn tree_guide_lines_are_pixel_aligned() {
                 let alpha = ((vertex.color >> 24) & 0xFF) as f32 / 255.0;
                 assert!(
                     alpha <= 0.25,
-                    "GAP: guide ink must stay subtle (alpha <= 0.25), got {alpha}"
+                    "guide ink stays subtle (alpha <= 0.25), got {alpha}"
                 );
             }
         }
@@ -874,7 +927,7 @@ fn tree_guide_lines_include_ancestor_continuations() {
             rects
                 .iter()
                 .any(|(width, height)| *width == 1.0 && *height == 30.0),
-            "GAP: an ancestor continuation stem must span the full 30pt row, got {rects:?}"
+            "an ancestor continuation stem spans the full 30pt row, got {rects:?}"
         );
     });
 }

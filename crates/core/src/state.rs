@@ -178,9 +178,12 @@ impl<T: Send + 'static> State<T> {
         tracking.readers.remove(&scope);
     }
     fn track(&self, key: Option<ReadKey>, field: Option<FieldRead<T>>) {
+        self.track_access(key, field, false);
+    }
+    fn track_access(&self, key: Option<ReadKey>, field: Option<FieldRead<T>>, binding: bool) {
         let (scope, first) = {
             let mut tracking = self.0.tracking.lock().unwrap_or_else(|e| e.into_inner());
-            if !tracking.precise {
+            if !tracking.precise && !binding {
                 return;
             }
             let Some(scope) = current_read_scope(tracking.owner.as_ref()) else {
@@ -234,7 +237,11 @@ impl<T: Send + 'static> State<T> {
     {
         let read = self.clone();
         let write = self.clone();
-        Binding::new(move || read.get(), move |value| write.set(value))
+        Binding::new(move || {
+            let value = read.0.value.lock().unwrap_or_else(|e| e.into_inner());
+            read.track_access(None, None, true);
+            value.0.clone()
+        }, move |value| write.set(value))
     }
     /// Projections are pure and must not recursively lock this state.
     pub fn read_field<F: SnapshotValue>(
@@ -502,5 +509,26 @@ mod tests {
         drop(subscription);
         state.set(0);
         assert_eq!(calls.load(Ordering::Relaxed), 4000);
+    }
+}
+
+#[cfg(test)]
+mod binding_read_tests {
+    use super::*;
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    #[test]
+    fn binding_reads_subscribe_without_a_dynamic_property_owner() {
+        let value = State::new(1);
+        let binding = value.binding();
+        let hits = Arc::new(AtomicUsize::new(0));
+        let count = hits.clone();
+        let scope = ReadScope::new(move |_| { count.fetch_add(1, Ordering::SeqCst); });
+        crate::state_read_tracking::with_read_scope(&scope, || assert_eq!(binding.get(), 1));
+        value.set(2);
+        assert_eq!(hits.load(Ordering::SeqCst), 1);
+        crate::state_read_tracking::with_read_scope(&scope, || {});
+        value.set(3);
+        assert_eq!(hits.load(Ordering::SeqCst), 1);
+        crate::state_read_tracking::remove_read_scope(scope.id);
     }
 }

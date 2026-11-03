@@ -19,27 +19,9 @@
 //! - a row highlight is inset equally on both sides of the panel
 //!
 //! Named differences from the Swift suite:
-//! - **Open branches never publish a child portal.** `MenuLevel` records
-//!   `opened` on its `MenuSession` but never invalidates the composition
-//!   scope, so keyboard Right, hover intent and taps all leave the root portal
-//!   as the only entry. The cases assert the measured portal count with a
-//!   `GAP:` message instead of the Swift-level count.
-//! - **Menu reveal offsets never reach the scroll view.** `MenuSession`
-//!   stores the offset and `reveal_row` updates it, but `MenuLevelHost` never
-//!   binds it to the `ScrollView`, so End/Home/type-ahead move focus without
-//!   scrolling. Tests pin the zero offset and the row remaining below the
-//!   viewport.
-//! - **`Select` cannot open.** Its presentation flag lives in an undeclared
-//!   thread-local `State`, so writing it invalidates no scope and Return
-//!   publishes no portal.
-//! - **`MenuTypeahead` does not fold diacritics.** A leading `e` skips
-//!   `Éclair`; the accented case asserts the measured destination.
-//! - **Portal slots expose no ownership key.** Rust never attaches
-//!   `PortalOwnership::ENTRY_KEY` to a slot node, so the composed tree holds no
-//!   inspectable slots; placement is read from `PortalStore::frame` instead.
-//! - **Unregistering the owning portal leaves its focus scope active.**
 //! - Rust has no touch `Popover` surface; the touch case drives the pointer
-//!   menu with a single tap (no hover), which publishes no back row.
+//!   menu with a single tap, and the tap navigates the branch in place rather
+//!   than pushing a level, so it publishes no back row.
 
 use crate::support;
 use cove_composition::Scope;
@@ -250,44 +232,64 @@ fn nested_keyboard_menus_restore_each_branch_and_activate_once() {
         key(scene, Scancode::ARROW_UP);
         assert!(focused(scene, &row(scene, 3)), "Up returns to Settings");
         key(scene, Scancode::ARROW_RIGHT);
-        // GAP: MenuLevel updates its session's `opened` flag but does not
-        // invalidate the composition scope, so the child level is never rebuilt
-        // and no submenu portal is published.
+        assert_eq!(
+            scene.portal.entries().len(),
+            2,
+            "Right on Settings opens a second portal for the branch"
+        );
+        assert!(
+            focused(scene, &row(scene, 4)),
+            "Right moves focus into the Appearance level"
+        );
+        key(scene, Scancode::ARROW_RIGHT);
+        assert_eq!(
+            scene.portal.entries().len(),
+            3,
+            "Right on Appearance opens a third portal for its leaf level"
+        );
+        assert!(
+            focused(scene, &row(scene, 5)),
+            "Right moves focus onto the Dark theme leaf"
+        );
+        key(scene, Scancode::ESCAPE);
+        assert_eq!(
+            scene.portal.entries().len(),
+            2,
+            "Escape closes only the deepest level"
+        );
+        assert!(
+            harness.shown_state().get(),
+            "Escape inside a branch keeps the popover presented"
+        );
+        assert!(
+            focused(scene, &row(scene, 4)),
+            "Escape restores focus to the Appearance row"
+        );
+        key(scene, Scancode::ARROW_LEFT);
         assert_eq!(
             scene.portal.entries().len(),
             1,
-            "GAP: Swift opens a second portal for Settings; Rust keeps the root portal only"
+            "Left closes the Appearance level"
         );
         assert!(
-            scene
-                .first(|node| node.attachment::<u64>(MENU_ITEM_ID) == Some(4))
-                .is_none(),
-            "GAP: the Appearance level never materialises in Rust"
-        );
-        key(scene, Scancode::ESCAPE);
-        assert!(
-            scene.portal.entries().is_empty(),
-            "Escape at the root dismisses the whole menu"
-        );
-        scene.settle(5, 1.0);
-        assert!(
-            focused(scene, &trigger),
-            "the trigger regains focus after the root dismisses"
+            harness.shown_state().get(),
+            "Left inside a branch keeps the popover presented"
         );
         assert!(
-            scene.focus.active_scope_root().is_none(),
-            "no focus scope stays active after dismissal"
+            focused(scene, &row(scene, 3)),
+            "Left restores focus to the Settings row"
         );
-        harness.shown_state().set(true);
-        scene.settle(5, 1.0);
-        assert!(focused(scene, &row(scene, 3)), "reopening focuses Settings");
-        key(scene, Scancode::ARROW_DOWN);
-        assert!(focused(scene, &row(scene, 6)), "Down reaches Last again");
+        key(scene, Scancode::ARROW_RIGHT);
+        key(scene, Scancode::ARROW_RIGHT);
         key(scene, Scancode::RETURN);
-        assert_eq!(probe.get(), 10, "Last activates exactly once");
+        assert_eq!(probe.get(), 1, "the leaf activates exactly once");
+        assert!(
+            !harness.shown_state().get(),
+            "activating the leaf dismisses the popover"
+        );
         assert!(
             scene.portal.entries().is_empty(),
-            "activating a row closes every portal"
+            "activating the leaf closes every portal"
         );
         scene.settle(5, 1.0);
         assert!(
@@ -322,14 +324,10 @@ fn a_tap_opens_a_submenu_without_hover() {
             .expect("the Tools row is mounted");
         scene.click(&parent, 1);
         scene.settle(5, 0.2);
-        // GAP: tapping a branch records `opened` on the menu session but the
-        // level is not invalidated, so the child portal never appears. Swift's
-        // touch surface showed one portal plus a back row; Rust shows the root
-        // portal only.
         assert_eq!(
             scene.portal.entries().len(),
-            1,
-            "GAP: Rust publishes no branch portal after a tap, root portal only"
+            2,
+            "the tap opens the branch's child portal without a hover delay"
         );
         assert!(
             scene.named("touch-menu-back").is_none(),
@@ -338,13 +336,15 @@ fn a_tap_opens_a_submenu_without_hover() {
         assert!(
             scene
                 .first(|node| node.attachment::<u64>(MENU_ITEM_ID) == Some(2))
-                .is_none(),
-            "GAP: the tapped branch's leaf level never materialises"
+                .is_some(),
+            "the tapped branch's leaf level materialises"
         );
-        assert_eq!(
-            probe.get(),
-            0,
-            "with the branch absent the leaf cannot be tapped"
+        let leaf = row(scene, 2);
+        scene.click(&leaf, 1);
+        assert_eq!(probe.get(), 1, "the leaf runs its action exactly once");
+        assert!(
+            scene.portal.entries().is_empty(),
+            "activating the leaf closes every portal"
         );
     });
 }
@@ -366,19 +366,21 @@ fn home_end_and_typeahead_reveal_offscreen_rows() {
         let last = row(scene, 99);
         assert!(focused(scene, &last), "End focuses the last row");
         let scroll = scroll_viewport(scene);
-        // GAP: `MenuLevel` stores the reveal offset on `MenuSession` but never
-        // feeds it to the scroll view, so revealing a row moves focus without
-        // scrolling the stack.
-        assert_eq!(
-            scroll.content_offset().y,
-            0.0,
-            "GAP: Swift scrolls past 2700 pt to reveal row 99; Rust never scrolls"
+        // 100 rows at the reference row metric, minus the viewport.
+        assert!(
+            scroll.content_offset().y > 2700.0,
+            "End scrolls past 2700 pt to reveal row 99, saw {}",
+            scroll.content_offset().y
         );
         let last_frame = last.absolute_frame();
         let viewport = scroll.absolute_frame();
         assert!(
-            last_frame.y + last_frame.height > viewport.y + viewport.height + 1.0,
-            "GAP: row 99 stays below the viewport because the reveal offset is not applied"
+            last_frame.y >= viewport.y - 1.0,
+            "the last row is revealed from the top edge, row {last_frame:?}, viewport {viewport:?}"
+        );
+        assert!(
+            last_frame.y + last_frame.height <= viewport.y + viewport.height + 1.0,
+            "the last row's full height is inside the viewport, row {last_frame:?}, viewport {viewport:?}"
         );
         key(scene, Scancode::HOME);
         assert!(focused(scene, &row(scene, 0)), "Home focuses the first row");
@@ -394,13 +396,8 @@ fn home_end_and_typeahead_reveal_offscreen_rows() {
         let found_frame = found.absolute_frame();
         let viewport = scroll.absolute_frame();
         assert!(
-            found_frame.y + found_frame.height > viewport.y + viewport.height + 1.0,
-            "GAP: the matched row is focused but not revealed, so it stays below the viewport"
-        );
-        assert_eq!(
-            scroll.content_offset().y,
-            0.0,
-            "GAP: type-ahead does not scroll the stack either"
+            found_frame.y + found_frame.height <= viewport.y + viewport.height + 1.0,
+            "type-ahead reveals the matched row, row {found_frame:?}, viewport {viewport:?}"
         );
     });
 }
@@ -464,23 +461,24 @@ fn hover_intent_cancels_and_dismissals_leave_no_portals() {
         );
         hover(cove_core::scene::HoverPhase::Enter);
         scene.settle(3, 0.2);
-        // GAP: the hover timer records `opened` on the menu session but the
-        // level is never invalidated, so the branch portal is never published.
         assert_eq!(
             scene.portal.entries().len(),
-            1,
-            "GAP: Swift publishes a second portal after the hover delay; Rust keeps the root only"
-        );
-        assert!(
-            scene
-                .first(|node| node.attachment::<u64>(MENU_ITEM_ID) == Some(2))
-                .is_none(),
-            "GAP: the hovered branch's leaf level never materialises"
+            2,
+            "the hover delay publishes the branch portal"
         );
         assert_eq!(
-            probe.get(),
-            0,
-            "the leaf is unreachable, so its action never runs"
+            target
+                .accessibility()
+                .and_then(|semantics| semantics.state.is_expanded),
+            Some(true),
+            "the hovered branch reports itself expanded"
+        );
+        let leaf = row(scene, 2);
+        scene.click(&leaf, 1);
+        assert_eq!(probe.get(), 1, "the leaf runs its action once");
+        assert!(
+            scene.portal.entries().is_empty(),
+            "activating the leaf closes every portal"
         );
         scene.settle(5, 1.0);
         harness.shown_state().set(true);
@@ -490,8 +488,8 @@ fn hover_intent_cancels_and_dismissals_leave_no_portals() {
         key(scene, Scancode::ARROW_RIGHT);
         assert_eq!(
             scene.portal.entries().len(),
-            1,
-            "GAP: Swift reopens a branch portal with Right; Rust keeps the root only"
+            2,
+            "Right reopens the branch portal"
         );
         harness.branch_disabled.set(true);
         scene.settle(5, 1.0);
@@ -588,11 +586,10 @@ fn typeahead_folds_accents_cycles_letters_and_resets() {
             title: "Tools".to_string(),
         },
     ];
-    // GAP: Rust lowercases but does not fold diacritics, so "e" skips Éclair.
     assert_eq!(
         search.destination("e", &rows, None, 1.0),
-        Some(1),
-        "GAP: Swift folds Éclair to match the leading e; Rust lowercases only and lands on Echo"
+        Some(0),
+        "the leading e folds the accent and matches Éclair"
     );
     assert_eq!(
         search.destination("e", &rows, Some(0), 1.2),
@@ -633,22 +630,20 @@ fn four_portal_levels_flip_at_the_edge_and_leave_with_the_popup() {
         for _ in 0..3 {
             key(scene, Scancode::ARROW_RIGHT);
         }
-        // GAP: open branches are recorded on the menu session only; no child
-        // level is rebuilt, so three arrow presses leave one portal.
         assert_eq!(
             scene.portal.entries().len(),
-            1,
-            "GAP: Swift publishes four nested portals; Rust publishes the root only"
+            4,
+            "three Right presses open three branch portals above the root"
         );
-        // GAP: Rust never attaches `PortalOwnership::ENTRY_KEY` to a slot node,
-        // so the composed tree exposes no portal slots to inspect.
         let slots: Vec<Node> = scene.all(|node| {
             node.attachment::<String>(PortalOwnership::ENTRY_KEY)
                 .is_some()
         });
-        assert!(
-            slots.is_empty(),
-            "GAP: Swift exposes four owned slot nodes; Rust exposes none"
+        assert_eq!(
+            slots.len(),
+            4,
+            "every live portal owns one slot node, saw {}",
+            slots.len()
         );
         let viewport = Rect::new(5.0, 5.0, 630.0, 390.0);
         let root_id = scene
@@ -702,8 +697,8 @@ fn scrolling_a_branch_outside_its_viewport_closes_the_child() {
         key(scene, Scancode::ARROW_RIGHT);
         assert_eq!(
             scene.portal.entries().len(),
-            1,
-            "GAP: Swift opens a branch portal here; Rust never rebuilds the level"
+            2,
+            "Right on the branch opens its child portal"
         );
         let scroll = scroll_viewport(scene);
         let frame = scroll.absolute_frame();
@@ -904,16 +899,20 @@ fn keyboard_navigation_reveals_scaled_multiline_rows() {
         scene.focus.focus(Some(&row(scene, 0)), true);
         key(scene, Scancode::END);
         assert!(focused(scene, &last), "End focuses the last scaled row");
-        assert_eq!(
-            scroll.content_offset().y,
-            0.0,
-            "GAP: the scaled stack never scrolls because the reveal offset is not applied"
+        assert!(
+            scroll.content_offset().y > 0.0,
+            "End scrolls the scaled stack, saw {}",
+            scroll.content_offset().y
         );
         let last_frame = last.absolute_frame();
         let viewport = scroll.absolute_frame();
         assert!(
-            last_frame.y + last_frame.height > viewport.y + viewport.height + 1.0,
-            "GAP: the last scaled row stays below the viewport, so its full height is never revealed"
+            last_frame.y >= viewport.y - 1.0,
+            "the scaled row is revealed from the top edge, row {last_frame:?}, viewport {viewport:?}"
+        );
+        assert!(
+            last_frame.y + last_frame.height <= viewport.y + viewport.height + 1.0,
+            "the scaled row's full height is inside the viewport, row {last_frame:?}, viewport {viewport:?}"
         );
         key(scene, Scancode::HOME);
         assert!(focused(scene, &row(scene, 0)), "Home focuses the first row");

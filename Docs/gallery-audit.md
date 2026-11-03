@@ -26,7 +26,7 @@ API 收敛：删除 RichText 类型与导出，无兼容别名。普通文字与
 
 - TextFieldStyle 焦点/编辑状态接入、TextBuffer 字素计数本轮已补齐。当前测试还验证了 IME 区域重发布、组合预览缓存和真实文本环境下的双击选词，旧缺失说明已清理。代码编辑器 F1 悬停请求、诊断及补全的完整能力仍属于后续页级核对范围；不据此声称整个编辑器或全部 106 页已完成验收。
 - iOS 原生组合预览事件的宿主路径仍需单独核对：本地 SDL UIKit 未发现 `SDL_SendEditingText` 发送路径。本轮共享 Rust 的样式/字素处理已实现，不能据此声称 iOS 原生 IME 预览已设备验收。
-- 现有测试中一部分 `GAP:` 断言验证的是当前缺失行为。全套测试通过不能证明 Swift 能力已迁移完成；修复相关能力时，应改为验证预期结果，补真实文本环境或原生操作的验收。
+- 本轮将迁移断言改为验证 Swift 预期行为。结构与场景测试不替代原生视觉、键盘及 IME 验收。
 
 ## 验收范围
 
@@ -40,7 +40,7 @@ API 收敛：删除 RichText 类型与导出，无兼容别名。普通文字与
 
 本轮检查结果（TextFieldStyle / TextBuffer）：
 
-- Compose：1550 项通过；Core / Platform：495 项通过；Gallery：490 项通过。其他页面仍存在旧 `GAP` 断言，不代表全部能力完成。
+- Compose：1550 项通过；Core / Platform：495 项通过；Gallery：490 项通过。该数字是此前阶段记录；本轮结果另见下表，不代表全部能力已原生验收。
 - Windows SDL 的 UTF-16 组合位置已在 Rust 宿主入口转换，Android / 浏览器沿用同一规范化入口；新增构造器的 surrogate / emoji / 未指定位置测试通过，Platform / Shell 共 20 项通过。`cargo check --workspace --lib --locked` 通过。
 - Gallery 组件验收：4 项通过，覆盖逐字搜索/IME 预览/清空、真实文本度量下点击与拖选/多次点击、独立评分状态、LTR/RTL 双端点边界与焦点。
 - Gallery 选择页壳：8 项通过；Rating 布局：2 项通过；目录宽/窄屏布局：212 场景通过。
@@ -406,3 +406,28 @@ Swift 目录没有、Rust 新增的 8 页：SingleLineText、CompletionPopover�
 - 静态解析会漏掉变量标题、循环生成或运行时拼接的段落；Swift 侧无法运行，没有交叉验证。
 - 标题比对按词重合度，措辞改动大时会被记成"无对应"，需要人工确认。
 - 不比控件变体数量、尺寸、间距、颜色和交互；这些要靠 DevTools 逐页做视觉与交互验收。
+
+## 2026-11-03 Swift 行为断言清理
+
+逐项对照 `swift/Compose/Sources/CoveUICompose/`、`swift/Sources/CoveUIWorkspace/WorkspaceView.swift`、`swift/Text/Sources/CoveUIText/FontProvider.swift` 与 `swift/Terminal/`。测试说明中的平台桥接、命名和构建依赖差异不作为错误行为断言保留。
+
+| 页面/组件 | 实现与自动化验收 | 原生视觉/交互验收 | Rust 文档 |
+| --- | --- | --- | --- |
+| Sidebar / AdaptiveSidebar | 共享 Rust 行为与场景回归 | 本轮未作原生设备验收 | Website/src/content/components/sidebar.md |
+| NavigationDrawer | 共享 Rust 行为与场景回归 | 本轮未作原生设备验收 | Website/src/content/components/navigation-drawer.md |
+| WorkspaceView | 共享 Rust 行为与场景回归 | 本轮未作原生设备验收 | Website/src/content/components/workspace.md |
+| ScrollView | 共享 Rust 行为与场景回归 | 本轮未作原生设备验收 | Website/src/content/components/scroll-view.md |
+| Scrollbar | 共享 Rust 行为与场景回归 | 本轮未作原生设备验收 | Website/src/content/components/scrollbar.md |
+| RouteOutlet | 共享 Rust 行为与场景回归 | 本轮未作原生设备验收 | Website/src/content/components/route-outlet.md |
+| AsyncImage | 共享 Rust 行为与场景回归 | 本轮未作原生设备验收 | Website/src/content/components/async-image.md |
+| HoverCard | 共享 Rust 行为与场景回归 | 本轮未作原生设备验收 | Website/src/content/components/hover-card.md |
+| CommandPalette | 共享 Rust 行为与场景回归 | 本轮未作原生设备验收 | Website/src/content/components/command-palette.md |
+| Menu / MenuItemContent | 共享 Rust 行为与场景回归 | 本轮未作原生设备验收 | Website/src/content/components/menu.md |
+| Toolbar / AppBar | 共享 Rust 行为与场景回归 | 本轮未作原生设备验收 | Website/src/content/components/toolbar.md |
+| Vec3Field | 共享 Rust 行为与场景回归 | 本轮未作原生设备验收 | Website/src/content/components/vec3-field.md |
+| Timeline | 共享 Rust 行为与场景回归 | 本轮未作原生设备验收 | Website/src/content/components/timeline.md |
+| TabView | 共享 Rust 行为与场景回归 | 本轮未作原生设备验收 | Website/src/content/components/tab-view.md |
+| DateRangeCalendar | 共享 Rust 行为与场景回归 | 本轮未作原生设备验收 | Website/src/content/components/date-range.md |
+| TextField / Code gutter | 挂载真实行号控件，折叠布局与键盘接口 | 本轮未作原生键盘或 IME 验收 | Website/src/content/components/text-field.md |
+
+未增加按平台跳过的生产实现；原生 Windows、Linux、iOS、Android 的设备验收继续独立跟踪。

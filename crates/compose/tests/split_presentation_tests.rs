@@ -17,34 +17,6 @@
 //!   hidden draft without publishing input, and does not redact its value
 //!
 //! Named differences from the Swift suite:
-//! - **Compactness never clears.** `SplitExtentObserver` (`split_view.rs`) has
-//!   no layout node, so its `layout_did_update` never receives a non-zero
-//!   frame: `measured_extent` stays 0 and any positive threshold always takes
-//!   the compact branch. At the authored 600pt threshold the suite is compact
-//!   even at 720/1280pt. Wide layout is only reachable with `threshold(0.0)`;
-//!   the divider cases force that value.
-//! - **Compact stack overlaps.** `SplitRetainedRegion` for the selector does
-//!   get a layout node, but the compact column still places the pane at y=0,
-//!   under the 40pt selector row. Swift asserts the selector above the pane;
-//!   the selector here overlaps it.
-//! - **No touch grab extent.** Swift widens the divider to
-//!   `minimumControlExtent` (44pt) on touch and gives the selector a 44pt
-//!   target. Rust always uses `max(dividerThickness, 7)` and the selector tab
-//!   measures 40pt tall at 100 percent text.
-//! - **Divider is not pointer-reachable.** The wide row places the second pane
-//!   over the 7pt divider, so a press at the divider centre hit-tests the
-//!   pane's scroll content. No capture starts and no drag writes the fraction;
-//!   the divider still accepts focus and ArrowRight.
-//! - **Minimums are not enforced.** `SplitConstraints::clamp` is only applied
-//!   to the fraction, not to the laid-out pane widths; at 390pt wide the first
-//!   pane is 134pt, below its 150pt minimum.
-//! - **Long titles do not wrap.** The 200 percent label measures 401pt inside
-//!   a 195pt tab and overflows instead of wrapping.
-//! - **Local selection does not repaint.** Swift's `@State selectedPane` drives
-//!   recomposition. Rust's `SplitView` reads its internal `selected_pane` in
-//!   `body` but only declares `measured_extent` through `dynamic_properties`,
-//!   so activating a selector tab without an external binding changes the
-//!   `State` and never re-renders.
 //! - **Diagnostics.** Swift queried `UIDiagnostics` / `query_ui_nodes`; the
 //!   Compose crate does not depend on the agent toolbox, so discovery is
 //!   asserted by walking `AccessibilitySemantics` and `accepts_subtree_input`
@@ -286,10 +258,14 @@ fn selector_group(scene: &InteractiveScene) -> Node {
 }
 
 fn handle(scene: &InteractiveScene) -> Node {
+    // The retained region is a 0pt wrapper; the handle itself is the node that
+    // carries the slider semantics and the grab extent.
     scene
         .first(|node| {
-            node.accessibility()
-                .is_some_and(|semantics| semantics.label == "Resize split")
+            node.accessibility().is_some_and(|semantics| {
+                semantics.label == "Resize split"
+                    && semantics.role == AccessibilityRole::Slider
+            })
         })
         .expect("the divider mounts")
 }
@@ -334,9 +310,11 @@ fn settle(scene: &InteractiveScene) {
     scene.settle(8, 1.0);
 }
 
-fn apply_size(scene: &InteractiveScene, h: &Harness, width: f32, height: f32) {
+fn apply_size(scene: &mut InteractiveScene, h: &Harness, width: f32, height: f32) {
     h.width.set(width);
     h.height.set(height);
+    scene.width = width;
+    scene.height = height;
     settle(scene);
 }
 
@@ -388,64 +366,97 @@ fn geometry_and_discovery() {
                         );
                         let divider = handle(scene);
                         let navigation = tab(scene, "Navigation");
+                        let compact = width < 600.0;
                         assert!(
                             first.accepts_subtree_input(),
                             "first pane accepts input ({case})"
                         );
-                        assert!(
-                            navigation.accepts_subtree_input(),
-                            "GAP: Swift is wide at 720/1280 so the selector is hidden; Rust's \
-                             measured extent stays 0, so every positive threshold stays compact \
-                             ({case})"
+                        assert_eq!(
+                            second.accepts_subtree_input(),
+                            !compact,
+                            "the second pane is live only when wide ({case})"
                         );
-                        assert!(
-                            !second.accepts_subtree_input() && !divider.accepts_subtree_input(),
-                            "GAP: Swift shows the second pane and an interactive divider above \
-                             600pt; the always-compact Rust split hides both ({case})"
+                        assert_eq!(
+                            divider.accepts_subtree_input(),
+                            !compact,
+                            "the divider is live only when wide ({case})"
+                        );
+                        assert_eq!(
+                            navigation.accepts_subtree_input(),
+                            compact,
+                            "the selector is reachable only when compact ({case})"
                         );
                         let frame = first.absolute_frame();
                         assert!(
                             frame.x >= 0.0 && frame.max_x() <= width,
                             "the first pane stays inside the window ({case}): {frame:?}"
                         );
-                        assert!(
-                            (first.frame().width - width).abs() < 1.0,
-                            "the retained pane fills the compact width ({case}): {} vs {width}",
-                            first.frame().width
-                        );
-                        let group = selector_group(scene);
-                        assert_eq!(
-                            group.absolute_frame().y,
-                            first.absolute_frame().y,
-                            "GAP: Swift puts the selector above the pane; the Rust compact \
-                             column starts both at the same y ({case})"
-                        );
-                        assert!(
-                            group.absolute_frame().max_y() > first.absolute_frame().y,
-                            "GAP: the {case} selector overlaps the retained pane: {:?} vs {:?}",
-                            group.absolute_frame(),
-                            first.absolute_frame()
-                        );
-                        for title in ["Navigation", "Details"] {
-                            let item = tab(scene, title);
-                            let item_frame = item.absolute_frame();
+                        if compact {
                             assert!(
-                                item_frame.x >= 0.0 && item_frame.max_x() <= width,
-                                "the {title} selector stays inside the width ({case}): \
-                                 {item_frame:?}"
+                                (first.frame().width - width).abs() < 1.0,
+                                "the retained pane fills the compact width ({case}): {} vs {width}",
+                                first.frame().width
                             );
-                            if capabilities.contains(InputCapabilities::TOUCH) {
+                            let group = selector_group(scene);
+                            {
+                                let root = scene.graph.tree.borrow().root().expect("root");
+                                fn walk(n: &Node, d: usize) {
+                                    let tag = n.view_tag().unwrap_or_default();
+                                    let short = tag.rsplit("::").next().unwrap_or("");
+                                    if d < 16
+                                        && (short.contains("Split")
+                                            || short.contains("Box")
+                                            || short.contains("Tuple")
+                                            || short.contains("Divider"))
+                                    {
+                                        eprintln!("P d={d} {short} f={:?}", n.frame());
+                                    }
+                                    for c in n.children() {
+                                        walk(&c, d + 1);
+                                    }
+                                }
+                                walk(&root, 0);
+                            }
+                            assert!(
+                                group.absolute_frame().max_y() <= first.absolute_frame().y + 0.5,
+                                "the {case} selector sits above the retained pane: {:?} vs {:?}",
+                                group.absolute_frame(),
+                                first.absolute_frame()
+                            );
+                        } else {
+                            assert!(
+                                first.frame().width >= 149.0 && second.frame().width >= 219.0,
+                                "both panes keep their minimums ({case}): {} / {}",
+                                first.frame().width,
+                                second.frame().width
+                            );
+                            let expected = if capabilities.contains(InputCapabilities::TOUCH) {
+                                44.0
+                            } else {
+                                7.0
+                            };
+                            assert!(
+                                divider.frame().width >= expected - 0.5,
+                                "the divider is a {expected}pt grab target ({case}): {:?}",
+                                divider.frame()
+                            );
+                        }
+                        if compact {
+                            for title in ["Navigation", "Details"] {
+                                let item = tab(scene, title);
+                                let item_frame = item.absolute_frame();
                                 assert!(
-                                    item.frame().width >= 44.0,
-                                    "the {title} touch target is at least 44pt wide ({case}): {:?}",
-                                    item.frame()
+                                    item_frame.x >= 0.0 && item_frame.max_x() <= width,
+                                    "the {title} selector stays inside the width ({case}): \
+                                     {item_frame:?}"
                                 );
-                                assert!(
-                                    item.frame().height >= 40.0,
-                                    "GAP: Swift requires a 44pt touch target; the Rust selector \
-                                     tab is {}pt tall ({case})",
-                                    item.frame().height
-                                );
+                                if capabilities.contains(InputCapabilities::TOUCH) {
+                                    assert!(
+                                        item.frame().width >= 44.0 && item.frame().height >= 44.0,
+                                        "the {title} touch target is 44pt ({case}): {:?}",
+                                        item.frame()
+                                    );
+                                }
                             }
                         }
                         assert_eq!(
@@ -455,8 +466,8 @@ fn geometry_and_discovery() {
                         );
                         assert_eq!(
                             visible_fields(scene, "Second draft"),
-                            0,
-                            "the hidden second draft never takes input ({case})"
+                            usize::from(!compact),
+                            "the second draft takes input exactly when shown ({case})"
                         );
                         let retained = retained_fields(scene, "Second draft");
                         assert_eq!(
@@ -464,9 +475,10 @@ fn geometry_and_discovery() {
                             1,
                             "the second draft stays retained ({case})"
                         );
-                        assert!(
-                            !retained[0].accepts_subtree_input(),
-                            "the retained draft publishes no input ({case})"
+                        assert_eq!(
+                            retained[0].accepts_subtree_input(),
+                            !compact,
+                            "the retained draft publishes input only when shown ({case})"
                         );
                         assert!(
                             !scene.graph.recomposer.has_pending(),
@@ -483,7 +495,8 @@ fn geometry_and_discovery() {
 fn interaction_and_retention() {
     InteractiveScene::run(720.0, 400.0, |scene| {
         let h = Harness::new(SplitAxis::Horizontal, true);
-        h.pane.set(SplitPane::Second);
+        // Both panes are live at 720, so the second can be edited without
+        // selecting it first.
         scene.install(HarnessView(h.clone()));
         settle(scene);
 
@@ -510,9 +523,10 @@ fn interaction_and_retention() {
         );
         named(scene, "scroll-Second").set_content_offset(Point::new(0.0, 180.0));
 
+        // Narrowing makes the split compact, which hides the second pane and
+        // hands its focus to the selected selector tab.
+        apply_size(scene, &h, 390.0, 400.0);
         let navigation = tab(scene, "Navigation");
-        h.pane.set(SplitPane::First);
-        settle(scene);
         assert_eq!(
             scene.focus.focused().map(|node| node.id()),
             Some(navigation.id()),
@@ -581,11 +595,27 @@ fn interaction_and_retention() {
         );
 
         h.pane.set(SplitPane::First);
-        settle(scene);
+        // Swift is already wide again here; widen so the loop starts from the
+        // same state instead of retaining the collapse from the leg above.
+        apply_size(scene, &h, 720.0, 400.0);
         let first_field = field(scene, "field-First");
         scene.focus.focus(Some(&first_field), false);
+        // Swift focuses the field right before the loop; the panes are already
+        // wide here, so no visibility handoff is pending.
+        assert!(
+            named(scene, "pane-First").accepts_subtree_input()
+                && named(scene, "pane-Second").accepts_subtree_input(),
+            "the split is wide before the retention loop"
+        );
         for width in [390.0_f32, 720.0, 390.0] {
             apply_size(scene, &h, width, 400.0);
+            let f = scene.focus.focused();
+            eprintln!("PROBE w={width} focused={:?} role={:?} label={:?} first_field={:?} first_input={:?}",
+                f.as_ref().map(|n| n.id()),
+                f.as_ref().and_then(|n| n.accessibility().map(|s| s.role)),
+                f.as_ref().and_then(|n| n.accessibility().map(|s| s.label.clone())),
+                first_field.id(),
+                named(scene,"pane-First").accepts_subtree_input());
             assert_eq!(
                 scene.focus.focused().map(|node| node.id()),
                 Some(first_field.id()),
@@ -593,13 +623,11 @@ fn interaction_and_retention() {
             );
         }
 
-        h.threshold.set(0.0);
         apply_size(scene, &h, 720.0, 400.0);
         assert!(
             named(scene, "pane-First").accepts_subtree_input()
                 && named(scene, "pane-Second").accepts_subtree_input(),
-            "GAP: Swift shows both panes at 720; Rust needs threshold(0) because the measured \
-             extent never leaves compact"
+            "720pt clears the 600pt threshold, so both panes are live"
         );
         assert!(
             named(scene, "pane-First").frame().width >= 149.0
@@ -612,18 +640,27 @@ fn interaction_and_retention() {
         assert_eq!(
             divider.frame().width,
             7.0,
-            "GAP: Swift widens the resizable divider to the 44pt touch extent; Rust keeps 7pt"
+            "a pointer surface keeps the 7pt grab extent"
         );
         let before_drag = h.fraction.get();
         let event = mouse_event(&divider, 1);
         let dispatcher = scene.dispatcher();
         dispatcher.dispatch(&InputEvent::MouseButtonDown(event.clone()));
-        assert!(
-            scene.capture.target().is_none(),
-            "GAP: Swift's divider press captures the pointer; the Rust wide row places the \
-             second pane over the 7pt divider, so the press hit-tests pane content instead \
-             (divider {:?})",
-            divider.absolute_frame()
+        {
+            let root = scene.graph.tree.borrow().root().expect("root");
+            let hit = cove_core::scene::input::HitTester::hit_test(&root, Point::new(event.x, event.y));
+            eprintln!("PROBE hit={:?} divider={:?} div_input={:?} has_pointer={:?}",
+                hit.as_ref().map(|h| h.node.id()), divider.id(), divider.accepts_subtree_input(),
+                scene.registry.handlers(&divider).pointer.is_some());
+        }
+        eprintln!("PROBE geo div={:?} pane1={:?} pane2={:?}",
+            divider.absolute_frame(),
+            named(scene, "pane-First").absolute_frame(),
+            named(scene, "pane-Second").absolute_frame());
+        assert_eq!(
+            scene.capture.target().map(|node| node.id()),
+            Some(divider.id()),
+            "the divider press captures the pointer"
         );
         dispatcher.dispatch(&InputEvent::MouseMotion(MouseMotionEvent {
             x: event.x + 30.0,
@@ -632,11 +669,11 @@ fn interaction_and_retention() {
             delta_y: 0.0,
             kind: Default::default(),
         }));
-        assert_eq!(
-            h.fraction.get(),
-            before_drag,
-            "GAP: without capture the drag never writes the fraction, Swift expects {}",
-            before_drag + 30.0 / (720.0 - 7.0 - 6.0)
+        let expected = before_drag + 30.0 / (720.0 - 7.0 - 6.0);
+        assert!(
+            (h.fraction.get() - expected).abs() < 0.0001,
+            "the drag writes the fraction: {} vs {expected}",
+            h.fraction.get()
         );
         dispatcher.dispatch(&InputEvent::MouseButtonUp(event));
 
@@ -694,6 +731,9 @@ fn vertical_and_local_selection() {
         let h = Harness::new(SplitAxis::Vertical, false);
         h.threshold.set(300.0);
         h.height.set(299.0);
+        // Swift lays out at the harness's own size, so the window matches it.
+        scene.width = h.width.get();
+        scene.height = 299.0;
         scene.install(HarnessView(h.clone()));
         settle(scene);
 
@@ -702,31 +742,29 @@ fn vertical_and_local_selection() {
         scene.key(Scancode::SPACE, KeyModifiers::default());
         settle(scene);
         assert!(
-            !named(scene, "pane-Second").accepts_subtree_input(),
-            "GAP: Swift keeps the local selection in `@State`, so Space selects the \
-             second pane; Rust's `SplitView` never declares `selected_pane` through \
-             `dynamic_properties`, so the change does not repaint and pane-Second stays hidden"
+            named(scene, "pane-Second").accepts_subtree_input(),
+            "Space selects the second pane through the split's own state"
         );
         assert!(
-            !details
+            tab(scene, "Details")
                 .accessibility()
                 .is_some_and(|semantics| semantics.state.is_selected),
-            "GAP: the selector never re-renders, so Details is not reported selected"
+            "the selector reports Details as selected"
         );
 
         for height in [300.0_f32, 299.0, 301.0, 299.0] {
             apply_size(scene, &h, 720.0, height);
             let details = tab(scene, "Details");
-            assert!(
+            assert_eq!(
                 details.accepts_subtree_input(),
-                "GAP: Swift is wide at 300pt and above, so the selector is hidden; the Rust \
-                 measured extent stays 0, so the selector is reachable at height {height}"
+                height < 300.0,
+                "the selector is reachable only below 300pt (height {height})"
             );
             assert!(
-                !details
+                details
                     .accessibility()
                     .is_some_and(|semantics| semantics.state.is_selected),
-                "GAP: the local selection resets to First on every repaint at height {height}"
+                "the local selection survives a repaint at height {height}"
             );
             assert!(
                 !scene.graph.recomposer.has_pending(),
@@ -814,20 +852,16 @@ fn localized_touch_selector() {
         settle(scene);
         assert_eq!(
             h.pane.get(),
-            SplitPane::First,
-            "GAP: Swift's corner touch selects details; in Rust the compact pane starts at the \
-             same y as the selector, so the press at ({}, {}) lands on pane content and the \
-             retained pane stays First",
-            details.absolute_frame().x + 2.0,
-            details.absolute_frame().y + 2.0
+            SplitPane::Second,
+            "a corner touch on the Details tab selects the second pane"
         );
         assert!(
-            named(scene, "pane-First").accepts_subtree_input(),
-            "the first pane stays shown"
+            named(scene, "pane-Second").accepts_subtree_input(),
+            "the second pane becomes shown"
         );
         assert!(
-            !named(scene, "pane-Second").accepts_subtree_input(),
-            "the second pane stays hidden"
+            !named(scene, "pane-First").accepts_subtree_input(),
+            "the first pane is retained but hidden"
         );
     });
 }

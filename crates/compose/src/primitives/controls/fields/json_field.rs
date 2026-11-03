@@ -11,16 +11,17 @@ use crate::Scope;
 use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 
-use cove_core::Binding;
 use cove_core::scene::{Align, FlexDirection, Justify, Node, Wrap};
+use cove_core::Binding;
 
 use crate::modifiers::layout::{FlexExt, LayoutFrameExt, PaddingExt};
+use cove_composition::LayoutDebugExt;
 use crate::primitives::controls::button::{Button, ButtonIconSource, ButtonRole};
 use crate::primitives::controls::fields::json_field_model::{
     JsonFieldLabels, JsonFieldValidation, normalized_commit_text, pretty_printed, validate,
 };
 use crate::primitives::layout::resizable_text_area::ResizableTextArea;
-use crate::primitives::overlays::modal::Modal;
+use crate::primitives::overlays::modal::{Modal, ModalOptions};
 use crate::primitives::text::Text;
 use crate::primitives::text::text_buffer::TextBuffer;
 use crate::primitives::text::text_field::TextFieldCodeEditing;
@@ -267,9 +268,30 @@ impl JsonField {
 }
 
 impl View for JsonField {
-    fn body(&self, _cx: &Scope) -> AnyView {
-        let field = self.snapshot();
-        let validation = self.validation();
+    fn body(&self, cx: &Scope) -> AnyView {
+        // The edit session outlives every body: callers rebuild their
+        // `JsonField` value on each recomposition, so the draft lives in this
+        // scope. Swift keeps it in `@State`.
+        let draft = cx.remember(|| self.draft.clone());
+        let draft_handle = draft.clone();
+        let field = JsonField {
+            text: self.text.clone(),
+            placeholder: self.placeholder.clone(),
+            min_height: self.min_height,
+            is_enabled: self.is_enabled,
+            labels: self.labels.clone(),
+            on_commit: self.on_commit.clone(),
+            draft,
+        };
+        let validation = field.validation();
+        // The presented flag must be reactive: writing it from the Expand
+        // button has to recompose this body so the `Modal` presents.
+        let is_expanded = cx.state(|| {
+            draft_handle
+                .lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner())
+                .is_expanded
+        });
 
         let format = {
             let field = field.clone();
@@ -314,6 +336,7 @@ impl View for JsonField {
         };
         let expand = {
             let field = field.clone();
+            let expanded_flag = is_expanded.clone();
             Button::icon_with_options(
                 ButtonIconSource::resource(
                     crate::primitives::media::ui_icon_catalog::navigation::expand(),
@@ -333,6 +356,8 @@ impl View for JsonField {
                         .unwrap_or_else(|poisoned| poisoned.into_inner());
                     draft.expanded = current;
                     draft.is_expanded = true;
+                    drop(draft);
+                    expanded_flag.set(true);
                 },
             )
             .button_style(GhostButtonStyle)
@@ -355,7 +380,7 @@ impl View for JsonField {
         header.push(AnyView::new(revert));
         header.push(AnyView::new(expand));
 
-        let draft = self.draft.clone();
+        let draft = draft_handle.clone();
         let submit = {
             let field = field.clone();
             Rc::new(move || {
@@ -418,59 +443,66 @@ impl View for JsonField {
             ));
         }
 
-        let is_expanded = self
-            .draft
-            .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner())
-            .is_expanded;
+        // Reading the flag here subscribes this body, so a write from Expand
+        // recomposes it and the `Modal` presents; the draft keeps the mirror
+        // the buttons consult.
+        let _ = is_expanded.get();
         let expanded_binding = Binding::new(
             {
-                let draft = self.draft.clone();
-                move || {
-                    draft
-                        .lock()
-                        .unwrap_or_else(|poisoned| poisoned.into_inner())
-                        .is_expanded
-                }
+                let flag = is_expanded.clone();
+                move || flag.get()
             },
             {
-                let draft = self.draft.clone();
+                let draft = draft_handle.clone();
+                let flag = is_expanded.clone();
                 move |value: bool| {
                     draft
                         .lock()
                         .unwrap_or_else(|poisoned| poisoned.into_inner())
                         .is_expanded = value;
+                    flag.set(value);
                 }
             },
         );
-        let _ = is_expanded;
         let modal_field = field.clone();
-        let expanded_text = Binding::new(
-            {
-                let draft = self.draft.clone();
-                move || {
-                    draft
-                        .lock()
-                        .unwrap_or_else(|poisoned| poisoned.into_inner())
-                        .expanded
-                        .clone()
-                }
-            },
-            {
-                let draft = self.draft.clone();
+        // The expanded draft is reactive state: the modal's footer must follow
+        // it so Apply enables only while the text parses.
+        let expanded_state = cx.state(|| {
+            draft_handle
+                .lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner())
+                .expanded
+                .clone()
+        });
+        let expanded_text = {
+            let mirror = draft_handle.clone();
+            let state = expanded_state.clone();
+            Binding::new(
+                {
+                    let state = state.clone();
+                    move || state.get()
+                },
                 move |value: TextBuffer| {
-                    draft
+                    mirror
                         .lock()
                         .unwrap_or_else(|poisoned| poisoned.into_inner())
-                        .expanded = value;
-                }
-            },
-        );
+                        .expanded = value.clone();
+                    state.set(value);
+                },
+            )
+        };
         let labels = self.labels.clone();
+        // The dialog is named by the expand label, the way Swift labels its
+        // `json-expanded-editor` panel with `labels.expand`.
+        let modal_options = ModalOptions {
+            label: labels.expand.clone(),
+            ..ModalOptions::default()
+        };
         let modal = Modal::new(
             expanded_binding,
             AnyView::new(JsonExpandedEditor {
                 text: expanded_text,
+                draft: expanded_state.clone(),
                 labels,
                 apply: {
                     let field = modal_field.clone();
@@ -478,16 +510,19 @@ impl View for JsonField {
                 },
                 cancel: {
                     let field = modal_field.clone();
+                    let flag = is_expanded.clone();
                     Rc::new(move || {
                         field
                             .draft
                             .lock()
                             .unwrap_or_else(|poisoned| poisoned.into_inner())
                             .is_expanded = false;
+                        flag.set(false);
                     })
                 },
             }),
-        );
+        )
+        .options(modal_options);
 
         column.push(AnyView::new(modal));
         AnyView::new(
@@ -559,12 +594,36 @@ impl_primitive_view!(RestorableEditor);
 /// The expanded editor shown in the modal.
 struct JsonExpandedEditor {
     text: Binding<TextBuffer>,
+    /// The observed draft, read by the footer so Apply tracks validity.
+    draft: cove_core::Signal<TextBuffer>,
     labels: JsonFieldLabels,
     apply: Rc<dyn Fn()>,
     cancel: Rc<dyn Fn()>,
 }
 
-impl PrimitiveView for JsonExpandedEditor {
+impl View for JsonExpandedEditor {
+    fn body(&self, _cx: &Scope) -> AnyView {
+        // A body, not a primitive's `children`, so the footer follows the
+        // draft: Apply enables only once the text parses.
+        AnyView::new(JsonExpandedEditorBody {
+            text: self.text.clone(),
+            draft: self.draft.clone(),
+            labels: self.labels.clone(),
+            apply: self.apply.clone(),
+            cancel: self.cancel.clone(),
+        })
+    }
+}
+
+struct JsonExpandedEditorBody {
+    text: Binding<TextBuffer>,
+    draft: cove_core::Signal<TextBuffer>,
+    labels: JsonFieldLabels,
+    apply: Rc<dyn Fn()>,
+    cancel: Rc<dyn Fn()>,
+}
+
+impl PrimitiveView for JsonExpandedEditorBody {
     fn make_node(&self) -> Node {
         let node = Node::new();
         node.set_is_hit_testable(false);
@@ -620,27 +679,35 @@ impl PrimitiveView for JsonExpandedEditor {
                                     false,
                                     None,
                                 )
-                                .button_style(GhostButtonStyle),
+                                .button_style(GhostButtonStyle)
+                                    .debug_name("json-cancel"),
                             ),
-                            AnyView::new(Button::with_options(
-                                AnyView::new(Text::new(self.labels.apply.clone())),
-                                move || apply(),
-                                ButtonRole::Normal,
-                                true,
-                                false,
-                                false,
-                                None,
-                            )),
+                            AnyView::new(
+                                Button::with_options(
+                                    AnyView::new(Text::new(self.labels.apply.clone())),
+                                    move || apply(),
+                                    ButtonRole::Normal,
+                                    // The draft decides: invalid text cannot commit, so
+                                    // Apply announces itself as disabled (Swift:
+                                    // `isEnabled: validation.isAcceptable`).
+                                    validate(&self.draft.get().string_value()).is_acceptable(),
+                                    false,
+                                    false,
+                                    None,
+                                )
+                                .debug_name("json-apply"),
+                            ),
                         ])),
                     )),
                 ])),
             )
             .padding(16.0)
-            .frame_min_width(0.0),
+            .frame_min_width(0.0)
+            .debug_name("json-expanded-editor"),
         )]
     }
 }
-impl_primitive_view!(JsonExpandedEditor);
+impl_primitive_view!(JsonExpandedEditorBody);
 
 impl JsonField {
     /// Whether the current text may be committed.

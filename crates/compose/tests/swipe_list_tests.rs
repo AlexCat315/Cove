@@ -4,24 +4,15 @@
 //! - a touch row is at least 44pt tall and spans the list width
 //! - a left swipe reveals trailing actions without holding pointer capture, and
 //!   activating an action runs its handler
-//! - trailing actions reveal in RTL and at larger text scales under the same
-//!   physical leftward drag, and a rightward drag never reveals
+//! - trailing actions reveal in RTL on a rightward drag and at larger text
+//!   scales, and a drag toward the trailing edge never reveals
 //! - the actions button expands the non-swipe path
 //! - a vertical drag scrolls the list instead of revealing actions
 //! - disabled rows expose neither swipe actions nor an actions button
 //! - pointer-only surfaces never swipe; they use the actions button
 //!
-//! Named differences from the Swift suite:
-//! - The Swift matrix parameterises `mirroredActions` over RTL and text scale;
-//!   the Rust action extent is authored at 74pt and ignores text scale, and the
-//!   reveal is a physical left shift in both directions.
-//! - Rust `SwipeRowHost` records its reveal in `content_offset.x` with the
-//!   opposite sign (a 140pt swipe reports `140.0`), which is what `reveal`
-//!   returns.
-//! - A touch row measures 36pt in Rust (Swift asserts at least 44), so the
-//!   height assertions pin 36 and name the difference.
-//! - The Rust swipe is physical rather than directional: a leftward drag reveals
-//!   in RTL too, and a rightward drag never reveals, which the matrix pins.
+//! `SwipeRowHost` records its reveal in `content_offset.x`, which `reveal`
+//! returns; the strip slides toward the logical leading edge in both directions.
 //! Closed actions remain mounted for animation but are excluded from input and
 //! accessibility. The actions button opens the same actions without a swipe.
 
@@ -281,33 +272,36 @@ fn swipe_action() {
         scene.install(harness.clone());
         let first = row(scene, "Item 1");
         assert!(
-            first.frame().height >= 36.0,
-            "GAP: touch row height {} (Swift expects >= 44)",
+            first.frame().height >= 44.0,
+            "a touch row reaches the 44pt control extent; measured {}",
             first.frame().height
         );
         assert!(
             (first.frame().width - 320.0).abs() < 0.5,
-            "GAP: row width {}",
+            "the row spans the list width; measured {}",
             first.frame().width
         );
 
         swipe(scene, &first, -140.0);
         let opened = reveal(scene, "Item 1");
-        assert!(opened >= 70.0, "GAP: reveal after swipe = {opened}");
+        assert!(
+            opened >= 70.0,
+            "the left swipe reveals the trailing actions; reveal {opened}"
+        );
         assert!(
             scene.capture.target().is_none(),
-            "GAP: pointer capture still held after swipe"
+            "the swipe releases pointer capture once it settles"
         );
 
         let buttons = row_buttons(scene, "Item 1");
         assert!(
             !buttons.is_empty(),
-            "GAP: revealed row exposes no action buttons"
+            "the revealed row exposes its action buttons"
         );
         for button in &buttons {
             assert!(
-                button.frame().height >= 36.0,
-                "GAP: action height {} (Swift expects >= 44)",
+                button.frame().height >= 44.0,
+                "an action is a 44pt touch target; measured {}",
                 button.frame().height
             );
         }
@@ -321,7 +315,7 @@ fn swipe_action() {
                 .borrow()
                 .first()
                 .is_some_and(|value| value.starts_with("archive") || value.starts_with("delete")),
-            "GAP: actions after activating the first button = {:?}",
+            "activating the first action runs its handler; ran {:?}",
             harness.actions.borrow()
         );
     });
@@ -340,33 +334,43 @@ fn mirrored_actions() {
                 let width = first.frame().width;
                 assert!(
                     (width - 320.0).abs() < 0.5,
-                    "GAP: rtl={rtl} scale={scale} row width {width}"
+                    "rtl={rtl} scale={scale}: the row spans the list width; measured {width}"
                 );
 
-                swipe(scene, &first, 140.0);
+                // Swift swipes by `direction == .rtl ? 140 : -140` and then by
+                // the negation, so the reveal always follows the logical leading
+                // edge (`SwipeListTests.swift:129`).
+                let delta = if rtl { 140.0 } else { -140.0 };
+                swipe(scene, &first, -delta);
                 assert_eq!(
                     reveal(scene, "Item 1"),
                     0.0,
-                    "GAP: rtl={rtl} rightward swipe revealed {}",
-                    reveal(scene, "Item 1")
+                    "rtl={rtl} scale={scale}: a drag toward the trailing edge never reveals"
                 );
 
-                swipe(scene, &first, -140.0);
+                swipe(scene, &first, delta);
+                // `content_offset.x` runs the same physical way as the gesture,
+                // so the sign follows the writing direction and the open amount
+                // is its magnitude (`SwipeList.swift:298`).
                 let opened = reveal(scene, "Item 1");
-                assert!(opened >= 70.0, "rtl={rtl} scale={scale} reveal {opened}");
+                let opened = if rtl { -opened } else { opened };
+                assert!(
+                    opened >= 70.0,
+                    "rtl={rtl} scale={scale}: a drag toward the leading edge reveals; reveal {opened}"
+                );
                 assert!(
                     scene.capture.target().is_none(),
-                    "GAP: capture held after mirrored swipe"
+                    "rtl={rtl} scale={scale}: the mirrored swipe releases capture"
                 );
                 let buttons = row_buttons(scene, "Item 1");
                 assert!(
                     !buttons.is_empty(),
-                    "GAP: rtl={rtl} scale={scale} mirrored row exposes no buttons"
+                    "rtl={rtl} scale={scale}: the mirrored row exposes its action buttons"
                 );
 
                 assert!(
                     harness.actions.borrow().is_empty(),
-                    "rtl={rtl} swiping must not activate actions {:?}",
+                    "rtl={rtl}: swiping must not activate actions {:?}",
                     harness.actions.borrow()
                 );
 
@@ -375,7 +379,7 @@ fn mirrored_actions() {
                 assert_eq!(
                     harness.actions.borrow().len(),
                     actions_before,
-                    "GAP: rtl={rtl} actions button ran {:?}",
+                    "rtl={rtl}: the actions button only expands the row; ran {:?}",
                     harness.actions.borrow()
                 );
             });
@@ -390,7 +394,7 @@ fn actions_menu() {
         scene.install(harness.clone());
         assert!(
             !row_buttons(scene, "Item 2").is_empty(),
-            "GAP: row exposes no actions button"
+            "every row mounts its actions button"
         );
         click(scene, &toggle(scene, "Item 2"));
         assert!(
@@ -426,14 +430,14 @@ fn vertical_drag() {
         assert_eq!(
             reveal(scene, "Item 4"),
             0.0,
-            "GAP: row started revealed: {}",
+            "the row starts closed: {}",
             reveal(scene, "Item 4")
         );
         drag_vertically(scene, &fourth, -90.0);
         assert_eq!(
             reveal(scene, "Item 4"),
             0.0,
-            "GAP: vertical drag revealed actions: {}",
+            "a vertical drag reveals no actions: {}",
             reveal(scene, "Item 4")
         );
         let scroll = scene
@@ -441,7 +445,7 @@ fn vertical_drag() {
             .expect("scroll view");
         assert!(
             scroll.content_offset().y > 0.0,
-            "GAP: vertical drag left the scroll offset at {}",
+            "the vertical drag scrolls the list; offset {}",
             scroll.content_offset().y
         );
     });
@@ -459,12 +463,12 @@ fn disabled() {
         assert_eq!(
             reveal(scene, "Item 1"),
             0.0,
-            "GAP: disabled row revealed actions: {}",
+            "a disabled row never reveals actions: {}",
             reveal(scene, "Item 1")
         );
         assert!(
             row_buttons(scene, "Item 1").is_empty(),
-            "GAP: disabled row exposed {} buttons",
+            "a disabled row exposes no buttons; measured {}",
             row_buttons(scene, "Item 1").len()
         );
     });
@@ -480,24 +484,24 @@ fn pointer_does_not_swipe() {
         assert_eq!(
             reveal(scene, "Item 1"),
             0.0,
-            "GAP: pointer-only swipe revealed actions: {}",
+            "a pointer-only swipe reveals no actions: {}",
             reveal(scene, "Item 1")
         );
         assert!(
             !row_buttons(scene, "Item 1").is_empty(),
-            "GAP: pointer-only row exposes no actions button"
+            "a pointer-only row still exposes its actions button"
         );
         let actions_before = harness.actions.borrow().len();
         click(scene, &toggle(scene, "Item 1"));
         assert_eq!(
             harness.actions.borrow().len(),
             actions_before,
-            "GAP: pointer actions button ran {:?}",
+            "the pointer actions button only expands the row; ran {:?}",
             harness.actions.borrow()
         );
         assert!(
             !row_buttons(scene, "Item 1").is_empty(),
-            "GAP: pointer actions disappeared after the button press"
+            "the pointer actions button stays mounted after the press"
         );
     });
 }

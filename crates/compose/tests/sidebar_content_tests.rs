@@ -14,17 +14,11 @@
 //! Swift's parameterised `semanticsAndColor(dark:)` runs both themes inside
 //! one `#[test]`.
 //!
-//! Named differences from the Swift suite (each pinned by a `GAP:` assertion):
+//! Named differences from the Swift suite:
 //! - Lookups: Swift found rows, titles, badges and glyphs by the debug names the
 //!   sidebar published (`sidebar-item-*`, `sidebar-title-*`, `sidebar-badge-*`);
 //!   Rust publishes none, so rows are the labelled button host, titles its
 //!   `StaticText`, badges its `Badge` node and glyphs its `Image` node.
-//! - Text scale: long titles truncate on one line at 200% instead of wrapping.
-//! - Row geometry: the Rust row button hugs its content, so the long row is
-//!   wider than the 260pt sidebar.
-//! - Hover: Rust paints the selected fill on a hovered selection instead of the
-//!   hover state layered over it.
-//! - Focus ring: Rust paints no 2pt `focus_ring` border on a focused row.
 //! - The Rust `Sidebar` leaves its first `ScrollView` mounted as a zero-height
 //!   orphan after the first recomposition; `live_nodes` skips it.
 
@@ -386,8 +380,8 @@ fn scaled_alignment() {
         let long_title = title(scene, LONG);
         let long_badge = badge(scene, LONG);
         assert!(
-            long_title.height <= 36.0,
-            "GAP: Swift wraps the long title over several lines at 200% (> 36pt); Rust truncates it to one line, saw {long_title:?}"
+            long_title.height > 36.0,
+            "the long title wraps onto several lines at 200%, saw {long_title:?}"
         );
         assert!(
             contains(long_row, long_title) && contains(long_row, long_badge),
@@ -466,11 +460,11 @@ fn semantics_and_color() {
                 "focus keeps the destination semantics (dark {dark})"
             );
             assert!(
-                !subtree(&projects).iter().any(|node| {
+                subtree(&projects).iter().any(|node| {
                     node.border_color() == Some(theme.colors.focus_ring)
                         && node.border_width() == 2.0
                 }),
-                "GAP: Swift paints a 2pt focus ring on the focused row; the Rust sidebar row paints none (dark {dark})"
+                "the focused row paints a 2pt focus ring (dark {dark})"
             );
             let frame = projects.absolute_frame();
             scene

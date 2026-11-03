@@ -121,3 +121,7 @@ SDL / Android 的组合事件使用 Unicode 标量偏移，字段会转换到完
 自定义宿主从 UTF-16 位置产生组合事件时，使用 `TextEditingEvent::from_utf16` 统一单位；Windows SDL 的入口也会先做此转换。浏览器当前只传入组合文本和零偏移。
 
 样式的焦点/编辑接入见 [TextFieldStyle](/docs/text-field-style)，字符和协议索引约定见 [TextBuffer](/docs/text-buffer)。搜索和建议列表使用 [SearchField](/docs/search-field)；正文拖选使用[文本选择区域](/docs/text-selection)。
+
+## 代码行号栏
+
+`TextFieldCodeEditing::gutter` 将断点、执行行和 marker 接入实际输入框，`folding` 控制折叠。显示行号的纵向字段挂载 `TextGutterControls`，断点、marker、折叠与触摸行操作共用可见行几何。折叠的正文行从文档布局索引中隐藏；gutter 的 Escape 把焦点交回编辑器。

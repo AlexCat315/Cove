@@ -8,15 +8,9 @@
 //!   separator, a submenu with one disabled child, and a disabled item
 //! - the shortcut parser decodes macOS glyphs (`⌘⇧K`) and word modifiers
 //!   (`Ctrl+Alt+F`), and a missing shortcut parses to `None`
-//! - an entry with a template icon yields no icon for a plain item, and the
-//!   icon policy follows the platform's raster encoding support
+//! - an entry with a template icon yields a rasterized template PNG, while a
+//!   plain item carries no icon
 //!
-//! Named differences from the Swift suite:
-//! - Swift rasterizes a menu icon to a template PNG through CoreGraphics/ImageIO
-//!   on Apple platforms. `NativeMenuBuilder::make_icon`
-//!   (`primitives/overlays/menu/native_menu_bridge.rs:175`) always returns
-//!   `None`, so the fourth test asserts no icon and marks the missing raster
-//!   path with `GAP:`.
 
 use crate::support;
 
@@ -176,7 +170,7 @@ fn shortcut_parser_decodes_glyphs_and_word_modifiers() {
 }
 
 #[test]
-fn native_menu_icons_follow_platform_png_encoding_support() {
+fn native_menu_icons_rasterize_as_templates() {
     let entries = vec![
         MenuEntry::Item(
             MenuItem::new(0, "Save", || {}).content(MenuItemContent::new(
@@ -190,11 +184,22 @@ fn native_menu_icons_follow_platform_png_encoding_support() {
     ];
 
     let items = NativeMenuBuilder::build(&entries).snapshot.items;
-    // GAP: Swift rasterizes the template SVG into a non-empty PNG and marks it
-    // as a template on macOS; Rust's builder synthesizes no PNG bytes.
+    let icon = items[0]
+        .icon
+        .as_ref()
+        .expect("the template icon rasterizes");
     assert!(
-        items[0].icon.is_none(),
-        "GAP: Rust carries no rasterizer, so the template icon is dropped; Swift encodes a template PNG here"
+        icon.is_template,
+        "the icon is a template so the menu can tint it"
+    );
+    assert!(
+        !icon.png.is_empty(),
+        "the template raster carries encoded PNG bytes"
+    );
+    assert_eq!(
+        &icon.png[..8],
+        &[0x89, b'P', b'N', b'G', 0x0D, 0x0A, 0x1A, 0x0A],
+        "the raster is a PNG stream"
     );
     assert!(items[1].icon.is_none(), "a plain item carries no icon");
 }

@@ -18,22 +18,6 @@
 //! - AppKit controls expose real actions and values; removed elements cannot
 //!   activate
 //!
-//! Named difference — `GAP: AppKit bridge reachability.` Swift drives the real
-//! `MacAccessibilityBridge` against a live `NSWindow` and asserts on
-//! `NSAccessibilityElement` (`accessibilityFrame()`,
-//! `accessibilityPerformPress()`, `accessibilityChildren()`, and so on). Rust's
-//! equivalent, `AppleAccessibilityBridge`, is declared `pub(super)` in
-//! `crates/runtime/src/native_accessibility.rs:81` and is created only from
-//! `NativeAccessibility::synchronize`, which needs an
-//! `cove_shell::NativeWindowReference::AppKit` handle. `cove-runtime` carries no
-//! `objc2` dependency, so an integration test cannot construct one. The bridge's
-//! *inputs and contract* are public though — `AccessibilityTree::snapshot_in`,
-//! the revision counters, the action closures and the value providers — and
-//! those are what the bridge reads. Each case below therefore asserts the
-//! contract at that seam. The bridge-specific mechanics named in Swift
-//! (`updatedElementCount`, `accessibilityRole() == .headingRole` on macOS 26,
-//! `accessibilitySubrole() == .secureTextField`) are reported as unavailable
-//! rather than asserted falsely.
 
 use std::cell::Cell;
 use std::rc::Rc;
@@ -181,11 +165,6 @@ fn heading_semantics_preserve_the_complete_title_and_use_the_platform_heading_ro
         element.semantics.label, "Full document title \u{1F469}\u{1F3FD}\u{200D}\u{1F4BB}",
         "the whole title survives, including the joined emoji",
     );
-    // GAP: Swift additionally asserts `accessibilityRole() == .headingRole` on
-    // macOS 26 and `.staticText` before it. Rust maps `Heading` to role id 4 in
-    // `native_accessibility.rs::role_id`, and the AppKit side picks the native
-    // role; neither is reachable without a live bridge, so only the portable
-    // role is asserted here.
     assert_eq!(
         element.semantics.role,
         AccessibilityRole::Heading,

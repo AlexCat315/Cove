@@ -15,13 +15,8 @@
 //!   `EdgeAutoScroll` exposes the same pure velocity contract, which
 //!   [`edge_velocity`] asserts; the two interaction scenarios are recorded.
 //!
-//! Remaining differences (reported, not fixed):
-//!
-//! - a pointer drag still reports no move, even though the session now
-//!   recomposes; keyboard moves, focus retention and handle renumbering all
-//!   match Swift.
-//! - the touch handle measures 44pt wide but only 36pt tall, where Swift asserts
-//!   both axes reach 44.
+//! Deviations are limited to lookup mechanics and the two interaction scenarios
+//! that need `EnclosingScroll`; every assertion below states the Swift contract.
 
 use crate::support;
 use cove_composition::Scope;
@@ -47,6 +42,8 @@ const ROW_HEIGHT: f32 = 36.0;
 struct Harness {
     items: State<Vec<u64>>,
     moves: Rc<RefCell<Vec<(usize, usize)>>>,
+    /// The Swift suite installs `[.touch, .keyboard]` for the handle size test.
+    touch: bool,
 }
 
 impl View for Harness {
@@ -86,7 +83,16 @@ impl View for Harness {
         .row_height(ROW_HEIGHT)
         .row_label(|id: &u64| format!("Item {}", id + 1));
 
-        AnyView::new(AnyView::new(list).frame_size(280.0, 500.0))
+        let list = AnyView::new(AnyView::new(list).frame_size(280.0, 500.0));
+        if self.touch {
+            use cove_ui_compose::adaptive::SurfaceEnvironmentExt;
+            let mut environment = cove_core::Environment::default();
+            environment.input = cove_core::InputCapabilities::TOUCH
+                | cove_core::InputCapabilities::KEYBOARD;
+            AnyView::new(list.surface_environment(environment))
+        } else {
+            list
+        }
     }
     fn dynamic_properties(&self) -> Vec<DynamicField> {
         vec![DynamicField::state("items", &self.items)]
@@ -94,10 +100,19 @@ impl View for Harness {
 }
 
 fn install(scene: &mut InteractiveScene, count: u64) -> Rc<RefCell<Vec<(usize, usize)>>> {
+    install_with(scene, count, false)
+}
+
+fn install_with(
+    scene: &mut InteractiveScene,
+    count: u64,
+    touch: bool,
+) -> Rc<RefCell<Vec<(usize, usize)>>> {
     let moves = Rc::new(RefCell::new(Vec::new()));
     scene.install(Harness {
         items: State::new((0..count).collect()),
         moves: moves.clone(),
+        touch,
     });
     scene.settle(8, 1.0);
     moves
@@ -194,13 +209,20 @@ fn pointer_reorder() {
             indicator(scene).is_none(),
             "the drop indicator is cleared once the drag ends"
         );
-        // GAP: Swift asserts the row lands one position down and the move is
-        // reported once as (0, 1). The drag session now recomposes (the drop
-        // indicator paints), but the pointer travel never reaches `update_drag`
-        // with the values `finish_drag` needs, so no move is reported.
-        assert!(
-            moves.borrow().is_empty(),
-            "GAP: a pointer drag reports no move (Swift: one move from 0 to 1)"
+        assert_eq!(
+            moves.borrow().as_slice(),
+            [(0, 1)],
+            "dragging the first row one stride down reports a single move"
+        );
+        assert_eq!(
+            positions(scene),
+            [
+                "Position 1 of 4".to_string(),
+                "Position 2 of 4".to_string(),
+                "Position 3 of 4".to_string(),
+                "Position 4 of 4".to_string(),
+            ],
+            "every handle reports its position after the pointer move"
         );
     });
 }
@@ -237,11 +259,9 @@ fn escape_cancels() {
         ));
         scene.settle(6, 1.0);
 
-        // GAP: Swift asserts an in-flight drag shows the drop line. The
-        // session's `boundary` state never recomposes, so none is painted.
         assert!(
-            indicator(scene).is_none(),
-            "GAP: an in-flight drag paints no drop line (Swift: it does)"
+            indicator(scene).is_some(),
+            "an in-flight drag paints the drop line"
         );
 
         scene.key(cove_ui_compose::Scancode::ESCAPE, Default::default());
@@ -258,7 +278,7 @@ fn escape_cancels() {
 #[test]
 fn touch_handle() {
     InteractiveScene::run(320.0, 520.0, |scene| {
-        install(scene, 4);
+        install_with(scene, 4, true);
 
         let handle = handle(scene, 0, 4);
         let frame = handle.frame();
@@ -267,11 +287,9 @@ fn touch_handle() {
             "a touch handle is at least 44pt wide (got {})",
             frame.width
         );
-        // GAP: Swift asserts `handle.frame.height >= 44`. The Rust handle lays
-        // out at the authored 36pt row height even on a touch surface.
         assert!(
-            frame.height < 44.0,
-            "GAP: the touch handle is {:.0}pt tall (Swift: at least 44)",
+            frame.height >= 44.0,
+            "a touch handle is at least 44pt tall (got {})",
             frame.height
         );
 

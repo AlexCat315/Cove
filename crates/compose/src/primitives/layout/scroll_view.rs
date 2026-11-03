@@ -641,6 +641,8 @@ fn set_scrollbar_chrome_visible(node: &Node, visible: bool) {
     let current = node.attachment::<f32>(CHROME_OPACITY).unwrap_or(0.0);
     let target = if visible { 1.0 } else { 0.0 };
     let weak = node.downgrade();
+    cove_core::scene::with_animation(
+        Some(crate::theme::SemanticMotionRef::fast().resolve(&crate::theme::theme_for_node(node))), || {
     node.animatable_set_with(CHROME_OPACITY, current, target, move |opacity| {
         if let Some(owner) = Node::upgrade(&weak) {
             owner.set_attachment(CHROME_OPACITY, opacity);
@@ -648,6 +650,7 @@ fn set_scrollbar_chrome_visible(node: &Node, visible: bool) {
                 "scrollbarChromeOpacity",
             ));
         }
+    });
     });
 }
 
@@ -1807,3 +1810,13 @@ impl PrimitiveView for ScrollView {
     }
 }
 impl_primitive_view!(ScrollView);
+
+/// Keeps a marked row at its viewport position when preceding content changes.
+pub struct ScrollAnchorModifier;
+impl crate::ViewModifier for ScrollAnchorModifier {
+    fn apply_node(&self, node: &Node) { node.set_attachment(ANCHOR_MARKER, true); }
+}
+pub trait ScrollAnchorViewExt: crate::ViewExt + Sized + 'static {
+    fn scroll_anchor(self) -> crate::ModifiedContent { self.modifier(ScrollAnchorModifier) }
+}
+impl<T: crate::ViewExt + Sized + 'static> ScrollAnchorViewExt for T {}

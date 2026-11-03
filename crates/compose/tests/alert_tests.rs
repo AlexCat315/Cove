@@ -285,7 +285,7 @@ fn actions_fit_the_card_and_keep_alignment_and_semantics() {
                                     if width == 390.0 {
                                         assert!(
                                             stacks,
-                                            "the narrow card stacks its actions ({context_label})"
+                                            "the narrow card stacks its actions ({context_label}) {retry_frame:?} {offline_frame:?}"
                                         );
                                     }
                                     if width == 1280.0 || (width == 720.0 && scale == 1.0) {

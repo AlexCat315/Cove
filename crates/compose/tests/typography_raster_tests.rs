@@ -10,12 +10,6 @@
 //! - clearing the image registry refreshes the raster while geometry retained
 //!   in a draw list keeps the old asset
 //!
-//! Named difference from the Swift suite:
-//! - **GAP: no field render cache.** Swift's `TextField` publishes
-//!   `__textfield_render_cache` carrying the authored letter spacing; the Rust
-//!   field keeps no render cache attachment and its draw shapes with the theme
-//!   body token, so `input_tracking` pins the missing cache.
-//!
 //! The Swift `ImageLoadDiagnostics.onEvent` hook maps to
 //! `ImageLoadDiagnostics::set_on_event`, and `Image.resolve(path:)` to
 //! `Image::resolve_path`.
@@ -132,7 +126,8 @@ fn semantic_measurement() {
 #[test]
 fn input_tracking() {
     GlobalTestLock::locked(|| {
-        with_environment(bootstrapped(), || {
+        let environment = bootstrapped();
+        with_environment(environment.clone(), || {
             let graph = support::graph();
             graph.install(
                 TextField::new("", Binding::constant(TextBuffer::new("AB")))
@@ -154,12 +149,23 @@ fn input_tracking() {
             let cached = node
                 .attachment::<cove_ui_compose::primitives::text::text_field::RenderCacheEntry>(
                     "__textfield_render_cache",
-                );
-            assert!(
-                cached.is_none(),
-                "GAP: Swift publishes `__textfield_render_cache` with letter spacing 2 matching the \
-                 environment's cached layout; Rust's field draw keeps no render cache and shapes with \
-                 the theme body tracking, ignoring the letter_spacing modifier"
+                )
+                .expect("the draw publishes its render cache");
+            assert_eq!(
+                cached.key.letter_spacing, 2.0,
+                "the cache records the authored tracking"
+            );
+            let expected = environment.cached_layout(
+                "AB",
+                Some(&cached.key.font),
+                Some(cached.key.line_height),
+                f32::INFINITY,
+                TextAlignment::Leading,
+                2.0,
+            );
+            assert_eq!(
+                cached.layout.total_width, expected.total_width,
+                "the painted layout matches the environment's cached layout"
             );
         });
     });

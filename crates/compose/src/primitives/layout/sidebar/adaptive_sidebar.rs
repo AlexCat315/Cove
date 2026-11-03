@@ -485,6 +485,7 @@ impl<Id: PartialEq + Eq + std::hash::Hash + Clone + Send + Sync + 'static> Adapt
             7.0
         };
         let geometry = self.geometry(width, handle);
+        self.focus.prepare(geometry.mode, geometry.is_modal, cove_core::scene::FocusChainHolder::current());
         let fill = |view: AnyView| {
             AnyView::new(view.flex_with(1.0, 1.0, Some(0.0)).frame(
                 None,
@@ -539,7 +540,8 @@ impl<Id: PartialEq + Eq + std::hash::Hash + Clone + Send + Sync + 'static> Adapt
             geometry.docked_width,
         )
         .extent(geometry.resize_handle_width)
-        .label(self.options.resizing.label.clone());
+        .label(self.options.resizing.label.clone())
+        .focus(self.focus.clone());
         if let Some(width) = self.width.clone() {
             handle_view = handle_view.value(width);
         }
@@ -592,7 +594,7 @@ impl<Id: PartialEq + Eq + std::hash::Hash + Clone + Send + Sync + 'static> Adapt
                 false,
                 None,
                 fill(self.navigation(geometry)),
-            )),
+            ).retaining_content(true)),
             geometry.panel_width,
         );
         let layer = AnyView::new(

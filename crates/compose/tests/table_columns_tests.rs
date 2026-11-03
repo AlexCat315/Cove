@@ -15,27 +15,16 @@
 //!   cell; a frozen draft survives narrowing and cancels on Escape
 //!
 //! Named differences from the Swift suite:
-//! - Rust `TableColumn` has no per-column automatic priority: `ColumnVisibility`
-//!   is `Required`/`Optional`/`Hidden` and every `Optional` resolves as priority
-//!   0, so automatic columns survive in authored order. At 378pt the plan keeps
-//!   `Notes` and drops `Category` where Swift keeps `Category` and drops `Notes`.
-//! - The table mounts no "Column visibility" trigger or "Automatic columns" menu
-//!   entry. Choices are driven through the `column_visibility` binding instead;
-//!   the missing affordance is pinned.
-//! - `DataTable` rows come from the authored 36pt height: neither text scale nor
-//!   touch input raises them, so touch cells stay below Swift's 44pt floor.
-//! - An empty `DataTable` replaces the whole table with `EmptyState`, so the
-//!   header and its "Sort by ..." buttons disappear with the cells.
-//! - `F2` mounts the cell editor but leaves focus on the table host, and the
-//!   Rust `TextField` has no select-all, so the tests focus the field and select
-//!   with Shift+Home. `Return` commits but leaves focus unset, and clicking away
-//!   does not commit (the draft is discarded with the model untouched).
-//! - A disabled `DataTable` keeps its cells in input-enabled discovery, unlike
-//!   the disabled grid.
+//! - The shared `ColumnVisibilityPicker` supplies the "Column visibility"
+//!   trigger and the "Automatic columns" menu entry. Menu rows are the shared
+//!   menu's own height rather than Swift's `MenuRowMetrics` override, and the
+//!   trigger carries the visible-column summary Swift keeps beside it.
+//! - `F2` mounts the cell editor and moves focus into it, but the Rust
+//!   `TextField` has no select-all chord, so the tests select with
+//!   Shift+Home. `Return` and clicking away both commit; `Escape` cancels.
 //! - `UIDiagnostics` lives in crates this one does not depend on, so
 //!   `ai_queries` applies the same role/label/input-enabled filters to the node
-//!   tree. Because authored-order planning hides `Category` rather than `Notes`
-//!   at 390pt, that query names `Category`.
+//!   tree.
 
 use crate::support;
 use cove_composition::Scope;
@@ -105,6 +94,8 @@ fn columns() -> Vec<TableColumn<Record>> {
                 ..TableColumnLayout::default()
             };
             column.visibility = ColumnVisibility::Optional;
+            // Swift's [-100, 0, 10, 5]: Notes leaves the plan after Category.
+            column.priority = [-100, 0, 10, 5][index];
             column.compare = Some(Rc::new(|lhs: &Record, rhs: &Record| {
                 match lhs.id.cmp(&rhs.id) {
                     std::cmp::Ordering::Equal => ComparisonResult::Same,
@@ -298,12 +289,10 @@ fn plans() {
         plan(720.0, HashMap::new(), BTreeSet::new()).indices,
         [0, 1, 2, 3]
     );
-    // GAP: Rust has no per-column priority, so authored order decides and
-    // Category drops before Notes. Swift resolves [0, 2, 3] here.
     assert_eq!(
         plan(378.0, HashMap::new(), BTreeSet::new()).indices,
-        [0, 1, 2],
-        "equal priorities keep authored order"
+        [0, 2, 3],
+        "the lowest priority column leaves the plan first"
     );
     assert_eq!(plan(200.0, HashMap::new(), BTreeSet::new()).indices, [0]);
     assert_eq!(
@@ -414,10 +403,8 @@ fn matrix() {
                             scene.width = width;
                             scene.settle(10, 1.0);
 
-                            // Category drops at 390pt because all automatic
-                            // columns share priority 0.
                             let expected: BTreeSet<String> = if width == 390.0 {
-                                ["Name", "Notes", "Quantity"]
+                                ["Name", "Quantity", "Category"]
                                     .into_iter()
                                     .map(str::to_string)
                                     .collect()
@@ -433,14 +420,26 @@ fn matrix() {
                                 "width={width} keeps the planned columns"
                             );
 
+                            let picker = labelled(scene, "Column visibility")
+                                .expect("the table mounts the Column visibility picker");
                             assert!(
-                                labelled(scene, "Column visibility").is_none(),
-                                "GAP: Swift mounts a 44pt Column visibility picker; the Rust table mounts none ({width}pt)"
+                                picker.frame().width >= 44.0 && picker.frame().height >= 44.0,
+                                "the picker is a 44pt target at {width}pt: {:?}",
+                                picker.frame()
+                            );
+                            assert!(
+                                picker.absolute_frame().max_x() <= width,
+                                "the picker stays inside {width}pt: {:?}",
+                                picker.absolute_frame()
                             );
 
-                            // GAP: the Rust DataTable resolves its rows from
-                            // the authored height and ignores text scaling.
-                            let expected_height = 36.0;
+                            let expected_height = 36.0 * scale;
+                            let touch_floor = if input.contains(InputCapabilities::TOUCH) {
+                                44.0
+                            } else {
+                                0.0
+                            };
+                            let expected_height = expected_height.max(touch_floor);
                             for cell in cells(scene) {
                                 let frame = cell.frame();
                                 assert!(
@@ -453,18 +452,6 @@ fn matrix() {
                                     "cell keeps a finite width ({frame:?})"
                                 );
                             }
-                            let floor = if input.contains(InputCapabilities::TOUCH) {
-                                44.0
-                            } else {
-                                0.0
-                            };
-                            assert!(
-                                cells(scene)
-                                    .iter()
-                                    .all(|cell| cell.frame().height
-                                        >= (36.0 * scale).max(floor) - 0.5),
-                                "rows follow the text scale and the touch floor"
-                            );
                             assert!(
                                 cells(scene).len() < 80,
                                 "mounts fewer than 80 cells at {width}pt"
@@ -494,18 +481,41 @@ fn picker() {
             harness.selected.set(Some(2));
             scene.settle(10, 1.0);
 
-            assert!(
-                labelled(scene, "Column visibility").is_none(),
-                "GAP: mounts no Column visibility trigger, so the menu cannot open"
-            );
+            let picker = labelled(scene, "Column visibility")
+                .expect("the table mounts the Column visibility picker");
             assert!(
                 scene.portal.entries().is_empty(),
-                "no picker means no portal entry"
+                "a closed picker presents nothing"
+            );
+            scene.click(&picker, 1);
+            assert!(
+                !scene.portal.entries().is_empty(),
+                "the picker opens a menu"
+            );
+            let name = scene
+                .first(|node| {
+                    node.accessibility().is_some_and(|semantics| {
+                        semantics.label == "Name"
+                            && semantics.role == cove_core::scene::AccessibilityRole::Button
+                    })
+                })
+                .expect("the menu lists the required Name column");
+            let semantics = name.accessibility().expect("Name carries semantics");
+            assert!(
+                !semantics.state.is_enabled && semantics.state.is_selected,
+                "the required and shown Name is disabled and selected"
             );
 
             assert!(
-                cell_labels(scene).contains("Notes"),
-                "GAP: at 390pt authored-order planning already keeps Notes"
+                !cell_labels(scene).contains("Notes"),
+                "the automatic 390pt plan hides Notes"
+            );
+            scene.click(&labelled(scene, "Notes").expect("the menu lists Notes"), 1);
+            scene.settle(10, 1.0);
+            assert_eq!(
+                harness.overrides.get().get("c1"),
+                Some(&true),
+                "choosing Notes forces the column shown"
             );
             harness
                 .overrides
@@ -526,20 +536,34 @@ fn picker() {
                 "revealing a column keeps the selection"
             );
 
-            harness.overrides.set(HashMap::new());
+            let picker = labelled(scene, "Column visibility").expect("the picker stays mounted");
+            scene.click(&picker, 1);
+            scene.click(
+                &labelled(scene, "Automatic columns").expect("the menu offers the automatic reset"),
+                1,
+            );
             scene.settle(10, 1.0);
             assert!(
-                !cell_labels(scene).contains("Category"),
+                harness.overrides.get().is_empty(),
+                "Automatic columns clears every override"
+            );
+            assert!(
+                !cell_labels(scene).contains("Notes"),
                 "clearing the overrides returns the DataTable to the 390pt plan"
             );
 
             harness.enabled.set(false);
             scene.settle(10, 1.0);
-            assert!(scene.portal.entries().is_empty());
-            assert!(scene.capture.target().is_none());
             assert!(
-                labelled(scene, "Column visibility").is_none(),
-                "a disabled table still mounts no picker"
+                scene.portal.entries().is_empty() && scene.capture.target().is_none(),
+                "disabling the table closes the menu and releases capture"
+            );
+            let picker = labelled(scene, "Column visibility").expect("the picker stays mounted");
+            assert!(
+                !picker
+                    .accessibility()
+                    .is_some_and(|semantics| semantics.state.is_enabled),
+                "a disabled table disables its picker"
             );
         });
     }
@@ -559,11 +583,12 @@ fn edit_and_navigation() {
         scene.key(Scancode::ARROW_RIGHT, KeyModifiers::default());
         scene.key(Scancode::F2, KeyModifiers::default());
 
-        // GAP: F2 mounts the editor but leaves focus on the table host; Swift
-        // moves focus into the field, so the test focuses it explicitly.
         let field = editor_field(scene);
-        scene.focus.focus(Some(&field), false);
-        scene.key(Scancode::HOME, KeyModifiers::LEFT_SHIFT);
+        assert_eq!(
+            scene.focus.focused(),
+            Some(field.clone()),
+            "F2 hands focus into the cell editor"
+        );
         type_text(scene, "Draft");
         assert!(
             labelled(scene, "Edit Notes").is_some(),
@@ -599,8 +624,8 @@ fn edit_and_navigation() {
         );
         assert_eq!(
             scene.focus.focused(),
-            None,
-            "GAP: Swift returns focus to the table host after commit; the Rust commit leaves focus unset"
+            Some(host.clone()),
+            "committing returns focus to the table host"
         );
         assert_eq!(
             harness.selection.get().focused_column_id.as_deref(),
@@ -665,35 +690,37 @@ fn local_session() {
             resize(scene, &harness, 390.0);
 
             assert!(
-                labelled(scene, "Column visibility").is_none(),
-                "GAP: an unbound table mounts no picker, so it cannot record a local choice"
+                !cell_labels(scene).contains("Notes"),
+                "the unbound DataTable applies its automatic 390pt plan"
             );
+            assert!(cell_labels(scene).contains("Category"));
+
+            // An unbound choice belongs to this mounted table, so the picker
+            // writes the session and nothing outside it.
+            scene.click(
+                &labelled(scene, "Column visibility").expect("the picker mounts"),
+                1,
+            );
+            scene.click(&labelled(scene, "Notes").expect("the menu lists Notes"), 1);
+            scene.settle(10, 1.0);
             assert!(
                 cell_labels(scene).contains("Notes"),
-                "GAP: authored-order planning keeps Notes at 390pt instead of hiding it"
-            );
-            assert!(
-                !cell_labels(scene).contains("Category"),
-                "the unbound DataTable applies its automatic plan"
+                "the local choice reveals Notes"
             );
 
             resize(scene, &harness, 720.0);
             resize(scene, &harness, 390.0);
             assert!(
                 cell_labels(scene).contains("Notes"),
-                "the plan is stable across a width round trip"
+                "the local choice survives a width round trip"
             );
 
             scene.graph.install(EmptyView, Default::default());
             scene.install(harness.clone());
             scene.settle(10, 1.0);
             assert!(
-                labelled(scene, "Column visibility").is_none(),
-                "GAP: remounting cannot reset choices the picker never recorded"
-            );
-            assert!(
-                cell_labels(scene).contains("Notes"),
-                "GAP: notes visibility is unchanged after remount"
+                !cell_labels(scene).contains("Notes"),
+                "remounting resets the local choices"
             );
         });
     }
@@ -720,27 +747,26 @@ fn ai_queries() {
                 .count()
         };
 
-        // GAP: the authored-order plan hides Category, not Notes, at 390pt.
         assert_eq!(
-            count(scene, "Category"),
+            count(scene, "Notes"),
             0,
             "the automatically hidden column is not discovered"
         );
         harness
             .overrides
-            .set(HashMap::from([("c3".to_string(), true)]));
+            .set(HashMap::from([("c1".to_string(), true)]));
         scene.settle(10, 1.0);
         assert!(
-            count(scene, "Category") > 0,
+            count(scene, "Notes") > 0,
             "the explicitly revealed column is discovered"
         );
 
         harness.enabled.set(false);
         scene.settle(10, 1.0);
-        assert!(
-            count(scene, "Category") > 0,
-            "GAP: a disabled Rust DataTable keeps its cells in input-enabled discovery ({} found)",
-            count(scene, "Category")
+        assert_eq!(
+            count(scene, "Notes"),
+            0,
+            "a disabled DataTable drops its cells from input-enabled discovery"
         );
     });
 }
@@ -781,8 +807,8 @@ fn empty_and_frozen() {
         resize(scene, &harness, 720.0);
         for title in ["Name", "Notes", "Quantity", "Category"] {
             assert!(
-                labelled(scene, &format!("Sort by {title}")).is_none(),
-                "GAP: an empty Rust table drops the header, so no Sort by {title} button remains"
+                labelled(scene, &format!("Sort by {title}")).is_some(),
+                "an empty table keeps the Sort by {title} header button"
             );
         }
         assert!(cells(scene).is_empty(), "an empty dataset mounts no cells");
@@ -801,10 +827,12 @@ fn frozen_edit() {
         scene.focus.focus(Some(&host), false);
         scene.key(Scancode::ARROW_DOWN, KeyModifiers::default());
         scene.key(Scancode::F2, KeyModifiers::default());
-        // GAP: F2 leaves focus on the table host; focus the field explicitly.
         let field = editor_field(scene);
-        scene.focus.focus(Some(&field), false);
-        scene.key(Scancode::HOME, KeyModifiers::LEFT_SHIFT);
+        assert_eq!(
+            scene.focus.focused(),
+            Some(field.clone()),
+            "F2 hands focus into the frozen editor"
+        );
         type_text(scene, "Uncommitted");
 
         resize(scene, &harness, 150.0);
@@ -832,16 +860,14 @@ fn frozen_edit() {
 
         scene.key(Scancode::F2, KeyModifiers::default());
         let field = editor_field(scene);
-        scene.focus.focus(Some(&field), false);
-        scene.key(Scancode::HOME, KeyModifiers::LEFT_SHIFT);
         type_text(scene, "Committed by blur");
         let after = labelled(scene, "After table").expect("the trailing button is mounted");
         scene.click(&after, 1);
         scene.settle(10, 1.0);
         assert_eq!(
             harness.model.record_for(&0).map(|record| record.name),
-            Some("Record 0".to_string()),
-            "GAP: the Rust editor does not commit on blur; the draft is dropped with the model untouched"
+            Some("Committed by blur".to_string()),
+            "clicking away commits the draft"
         );
         assert_eq!(
             scene.focus.focused(),

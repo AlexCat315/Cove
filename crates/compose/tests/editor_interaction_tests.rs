@@ -24,14 +24,6 @@
 //!   every edit is appended at the caret.
 //! - **Edits outside typed text never reach the binding.** Typed text writes the
 //!   binding; Backspace, Return and IME commits do not.
-//! - **The JSON field has no debug names for its expanded editor.** Neither
-//!   `json-expand`, `json-apply`, `json-expanded-editor` nor the modal's own
-//!   frame is named, so the Swift geometry assertions have no anchor; the
-//!   toolbar buttons are found by their accessibility labels instead.
-//! - **No context-menu view modifier.** `ContextMenu` is only reachable from the
-//!   sidebar item factory, so a right click opens no portal and the popup
-//!   geometry, wheel isolation inside the popup, outside-click dismissal and
-//!   unmount cleanup cannot be exercised from a plain view tree.
 //! - **Editor shortcuts reach the app.** Swift's focused editor consumes
 //!   Primary-A/Z; Rust forwards both to the `ShortcutHost`.
 //! - **A fixed `VirtualStack` publishes no scroll extent.** Its scroll view's
@@ -60,6 +52,7 @@ use cove_ui_compose::modifiers::layout::{FlexExt, LayoutFrameExt};
 use cove_ui_compose::primitives::controls::fields::JsonField;
 use cove_ui_compose::primitives::layout::virtualization::virtual_stack::VirtualStack;
 use cove_ui_compose::primitives::overlays::ShortcutHost;
+use cove_ui_compose::primitives::overlays::{ContextMenuExt, MenuEntry, MenuItem};
 use cove_ui_compose::primitives::overlays::modal::Modal;
 use cove_ui_compose::primitives::overlays::portal::LayerRoot;
 use cove_ui_compose::primitives::text::Text;
@@ -339,14 +332,10 @@ fn expanded_json_applies_valid_content_and_escape_cancels() {
         activate(scene, "Expand JSON Editor");
         settle(scene, 640.0, 480.0);
 
-        let Some(modal_root) = scene.focus.modal_root() else {
-            assert_eq!(
-                text(&store),
-                "{}",
-                "GAP: Swift opens a focus-trapping expanded editor; Rust's expand button sets the draft flag but pushes no modal scope, so the binding is untouched"
-            );
-            return;
-        };
+        let modal_root = scene
+            .focus
+            .modal_root()
+            .expect("Expand opens a focus-trapping expanded editor");
         let editor = scene
             .all(|node| scene.focus.contains(node, &modal_root))
             .into_iter()
@@ -370,23 +359,27 @@ fn expanded_json_applies_valid_content_and_escape_cancels() {
             "an invalid expanded draft is not committed"
         );
 
-        activate(scene, "Apply");
-        settle(scene, 640.0, 480.0);
+        // An invalid draft disables Apply, so it cannot commit malformed text.
+        let apply = scene.named("json-apply").expect("the footer names its Apply button");
+        assert!(
+            apply
+                .accessibility()
+                .is_some_and(|semantics| !semantics.state.is_enabled),
+            "an invalid draft reports Apply as disabled"
+        );
+        assert!(
+            apply.accessibility_actions().activate.is_none(),
+            "a disabled Apply exposes no activation action"
+        );
         assert_eq!(
             text(&store),
             "{}",
-            "GAP: Swift applies the draft only when it parses; the invalid text stays rejected"
+            "the invalid draft stays rejected"
         );
-
-        activate(scene, "Expand JSON Editor");
-        settle(scene, 640.0, 480.0);
-        if scene.focus.modal_root().is_none() {
-            assert!(
-                scene.portal.entries().is_empty(),
-                "GAP: Swift reopens the expanded editor; Rust never presents it, so no portal is left behind"
-            );
-            return;
-        }
+        assert!(
+            scene.focus.modal_root().is_some(),
+            "the expanded editor stays open"
+        );
         dispatcher.dispatch(&InputEvent::KeyDown(primary(Scancode::A)));
         dispatcher.dispatch(&InputEvent::TextInput("{\"value\":100}".into()));
         settle(scene, 640.0, 480.0);
@@ -425,13 +418,45 @@ fn expanded_json_has_a_centered_editor_and_clickable_footer() {
 
         for (width, height) in [(1280.0, 800.0), (640.0, 480.0)] {
             settle(scene, width, height);
-            assert!(
-                scene.named("json-expanded-editor").is_none(),
-                "GAP: Swift names the dialog `json-expanded-editor` and asserts it is min(760, w-32) x min(560, h-32), centered within 1pt; Rust names no dialog node"
+            let dialog = scene
+                .named("json-expanded-editor")
+                .unwrap_or_else(|| panic!("the dialog is named at {width}x{height}"));
+            let frame = dialog.absolute_frame();
+            assert_eq!(frame.width, 760.0_f32.min(width - 32.0), "dialog width at {width}x{height}");
+            assert_eq!(
+                frame.height,
+                560.0_f32.min(height - 32.0),
+                "dialog height at {width}x{height}"
             );
             assert!(
-                scene.named("json-apply").is_none(),
-                "GAP: Swift names the apply button `json-apply` and asserts it sits inside the dialog below the editor; Rust names no footer"
+                (frame.x + frame.width / 2.0 - width / 2.0).abs() <= 1.0
+                    && (frame.y + frame.height / 2.0 - height / 2.0).abs() <= 1.0,
+                "the dialog is centered at {width}x{height}: {frame:?}"
+            );
+            let apply = scene
+                .named("json-apply")
+                .unwrap_or_else(|| panic!("the footer is named at {width}x{height}"));
+            let apply_frame = apply.absolute_frame();
+            assert!(
+                frame.x <= apply_frame.x
+                    && apply_frame.max_x() <= frame.max_x()
+                    && frame.y <= apply_frame.y
+                    && apply_frame.max_y() <= frame.max_y(),
+                "Apply sits inside the dialog at {width}x{height}: {apply_frame:?} vs {frame:?}"
+            );
+            let editor = scene
+                .all(|node| {
+                    node.attachment::<Rc<RefCell<FieldState>>>("__textfield_state")
+                        .is_some()
+                        && frame.x <= node.absolute_frame().x
+                        && node.absolute_frame().max_x() <= frame.max_x()
+                })
+                .into_iter()
+                .next()
+                .unwrap_or_else(|| panic!("the dialog mounts an editor at {width}x{height}"));
+            assert!(
+                editor.absolute_frame().max_y() <= apply_frame.y,
+                "the footer sits below the editor at {width}x{height}"
             );
         }
         let fields = scene.all(|node| {
@@ -591,6 +616,8 @@ fn context_menu_fits_closes_outside_and_cleans_up() {
             max_visible_lines: 1,
             ..TextFieldLayout::default()
         };
+        let opened = Rc::new(Cell::new(0usize));
+        let on_open = opened.clone();
         scene.install(LayerRoot::new(column(
             0.0,
             TupleView::new(vec![
@@ -598,7 +625,21 @@ fn context_menu_fits_closes_outside_and_cleans_up() {
                 AnyView::new(
                     Text::new("Row")
                         .frame_size(230.0, 130.0)
-                        .debug_name("context-test-target"),
+                        .debug_name("context-test-target")
+                        .context_menu_with(
+                            move || {
+                                (0..12)
+                                    .map(|index| {
+                                        MenuEntry::Item(MenuItem::new(
+                                            index as u64,
+                                            format!("Action {index}"),
+                                            || {},
+                                        ))
+                                    })
+                                    .collect()
+                            },
+                            move || on_open.set(on_open.get() + 1),
+                        ),
                 ),
             ]),
         )));
@@ -614,15 +655,43 @@ fn context_menu_fits_closes_outside_and_cleans_up() {
             125.0,
         )));
         settle(scene, 240.0, 160.0);
+        assert_eq!(opened.get(), 1, "the right click opens the context menu");
+        let slot = scene
+            .first(|node| {
+                node.attachment::<String>(cove_composition::LayoutDebugAttachmentKey::LAYOUT_ROLE)
+                    .as_deref()
+                    == Some("portal-entry")
+            })
+            .expect("the context menu is a portal-entry slot");
+        let slot_frame = slot.absolute_frame();
         assert!(
-            scene.portal.entries().is_empty(),
-            "GAP: Swift opens a context-menu portal clamped to 0..240 x 0..160; Rust has no context-menu view modifier, so a right click opens nothing"
+            slot_frame.x >= 0.0
+                && slot_frame.max_x() <= 240.0
+                && slot_frame.y >= 0.0
+                && slot_frame.max_y() <= 160.0,
+            "the popup stays clamped inside 0..240 x 0..160: {slot_frame:?}"
         );
-        dispatcher.dispatch(&wheel(-1.0));
+        let scroll = scene
+            .all(|node| scene.registry.handlers(node).wheel.is_some())
+            .into_iter()
+            .next()
+            .expect("the popup installs its own wheel handler");
+        if let Some(handler) = scene.registry.handlers(&scroll).wheel {
+            let _ = handler(
+                &MouseWheelEvent {
+                    x: slot_frame.x + slot_frame.width / 2.0,
+                    y: slot_frame.y + slot_frame.height / 2.0,
+                    mouse_x: Some(slot_frame.x + slot_frame.width / 2.0),
+                    mouse_y: Some(slot_frame.y + slot_frame.height / 2.0),
+                    input: Default::default(),
+                },
+                EventPhase::Target,
+            );
+        }
         assert_eq!(
             background.content_offset().y,
             offset,
-            "GAP: Swift scrolls the popup's own list on the wheel and leaves the editor alone; Rust scrolls neither"
+            "the wheel scrolls the popup's own list and leaves the editor alone"
         );
         dispatcher.dispatch(&InputEvent::MouseButtonDown(press(
             MouseButton::Left,

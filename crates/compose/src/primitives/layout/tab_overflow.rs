@@ -14,6 +14,7 @@ use cove_composition::{AnyView, View};
 use cove_core::Binding;
 use cove_core::scene::{Align, Direction, FlexDirection, Point, Rect, Size, Wrap};
 
+use crate::modifiers::interaction::AccessibilityExt;
 use crate::modifiers::layout::{FlexExt, LayoutFrameExt};
 use crate::primitives::controls::button::{Button, ButtonIconSource};
 use crate::primitives::layout::scroll_view::ScrollView;
@@ -287,7 +288,8 @@ impl<Id: std::hash::Hash + Clone + PartialEq + 'static> View for TabOverflowStri
                     variant,
                     indicator,
                     is_selected,
-                );
+                )
+                .maximum_width(maximum_header_width);
                 let is_tab_stop = tab_stop.as_ref() == Some(&tab.id);
                 let item = crate::ModifiedContent::new(
                     AnyView::new(item),
@@ -333,18 +335,8 @@ impl<Id: std::hash::Hash + Clone + PartialEq + 'static> View for TabOverflowStri
                 .selected(item_selected);
                 menu_entries.push(MenuEntry::Item(item));
             }
-            let button_presented = presented_state.clone();
-            let more_button = Button::icon(
-                ButtonIconSource::resource(ui_icon_catalog::action::more_horizontal()),
-                16.0,
-                move || {
-                    let next = !button_presented.get();
-                    button_presented.set(next);
-                },
-            )
-            .enabled(is_enabled)
-            .button_style(crate::theme::styles::buttons::ghost())
-            .frame(None, None, Some(44.0), Some(44.0), None, None);
+            let more_button = crate::primitives::media::Icon::new(ui_icon_catalog::action::more_horizontal(), 16.0)
+                .frame(None, None, Some(44.0), Some(44.0), None, None);
             let more_column = BoxView::new(
                 FlexDirection::Column,
                 Align::FlexStart,
@@ -357,6 +349,11 @@ impl<Id: std::hash::Hash + Clone + PartialEq + 'static> View for TabOverflowStri
                         AnyView::new(crate::primitives::overlays::menu::Menu::new(menu_entries)),
                     )
                     .is_presented(more_presented)
+                    .enabled(is_enabled)
+                    .trigger_style(MoreTabsTriggerStyle)
+                    .trigger_description(crate::primitives::overlays::popover::PopoverTriggerDescription {
+                        label: "More tabs".to_string(), value: String::new(), help: Some("More tabs".to_string()),
+                    })
                     .placement(PopoverPlacement::BottomTrailing)
                     .width(220.0),
                 ),
@@ -386,5 +383,13 @@ impl<Id: std::hash::Hash + Clone + PartialEq + 'static> View for TabOverflowStri
             AnyView::new(scrolled)
         });
         AnyView::new(reader)
+    }
+}
+
+struct MoreTabsTriggerStyle;
+impl crate::theme::styles::buttons::ButtonStyle for MoreTabsTriggerStyle {
+    fn make_body(&self, configuration: crate::theme::styles::buttons::ButtonStyleConfiguration) -> AnyView {
+        let body = crate::theme::styles::buttons::ButtonStyle::make_body(&crate::theme::styles::buttons::GhostButtonStyle, configuration);
+        AnyView::new(body.frame(None, None, Some(44.0), Some(44.0), None, None))
     }
 }

@@ -2,9 +2,12 @@
 //!
 //! Present the same destination nodes as a full sidebar or a narrow rail.
 use crate::Scope;
-use crate::primitives::controls::button::{Button, ButtonIconSource};
+use crate::modifiers::layout::LayoutFrameExt;
+use crate::primitives::controls::button::{
+    ActionControlAccessibility, Button, ButtonIconSource,
+};
 use crate::theme::styles::buttons::{ButtonRole, ButtonStyleViewExt, GhostButtonStyle};
-use crate::{AnyView, PrimitiveView, View};
+use crate::{AnyView, PrimitiveView, View, ViewExt};
 
 /// Full sidebar or narrow rail presentation.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Default)]
@@ -25,11 +28,12 @@ impl SidebarPresentation {
     }
 
     /// Canvas between the pane's edges and everything it lays out, so rows,
-    /// section titles and the header and footer slots share one column.
+    /// section titles and the header and footer slots share one column. A rail
+    /// spends its whole width on the row, which keeps its own inner padding.
     pub fn gutter(self) -> f32 {
         match self {
             Self::Expanded => 10.0,
-            Self::Rail { .. } => 6.0,
+            Self::Rail { .. } => 0.0,
         }
     }
 
@@ -130,7 +134,8 @@ impl View for SidebarToggle {
     }
 }
 
-/// Sizes the toggle, builds its button and owns the expanded state.
+/// Sizes the toggle and builds its button. The button host is the one node that
+/// carries the accessible name, so the toggle is named exactly once.
 struct SidebarToggleBody {
     label: String,
     is_expanded: bool,
@@ -148,28 +153,22 @@ impl PrimitiveView for SidebarToggleBody {
         None
     }
 
-    fn update_node(&self, node: &cove_core::scene::Node) {
-        let mut semantics = node.accessibility().unwrap_or_else(|| {
-            cove_core::scene::AccessibilitySemantics::new(
-                cove_core::scene::AccessibilityRole::Button,
-            )
-        });
-        semantics.label = self.label.clone();
-        semantics.state.is_expanded = Some(self.is_expanded);
-        node.set_accessibility(Some(semantics));
-    }
+    fn update_node(&self, _node: &cove_core::scene::Node) {}
 
     fn children(&self, _node: &cove_core::scene::Node) -> Vec<AnyView> {
-        let label = self.label.clone();
-        let action = self.action.clone();
-        vec![AnyView::new(SidebarToggleSized { label, action })]
+        vec![AnyView::new(SidebarToggleSized {
+            label: self.label.clone(),
+            is_expanded: self.is_expanded,
+            action: self.action.clone(),
+        })]
     }
 }
 crate::impl_primitive_view!(SidebarToggleBody);
 
-/// Applies the 44-point touch floor without nesting another `AnyView`.
+/// Builds the ghost icon button and applies the 44-point touch floor to it.
 struct SidebarToggleSized {
     label: String,
+    is_expanded: bool,
     action: std::rc::Rc<dyn Fn()>,
 }
 
@@ -187,8 +186,9 @@ impl PrimitiveView for SidebarToggleSized {
     fn update_node(&self, _node: &cove_core::scene::Node) {}
 
     fn children(&self, _node: &cove_core::scene::Node) -> Vec<AnyView> {
-        let label = self.label.clone();
         let action = self.action.clone();
+        let is_expanded = self.is_expanded;
+        let label = self.label.clone();
         let styled = Button::icon_with_options(
             ButtonIconSource::resource(
                 crate::primitives::media::ui_icon_catalog::layout::panel_left(),
@@ -199,47 +199,14 @@ impl PrimitiveView for SidebarToggleSized {
             true,
             false,
             false,
-            Some(label),
+            Some(label.clone()),
             move || action(),
         )
-        .button_style(GhostButtonStyle);
-        vec![AnyView::new(SidebarToggleFloor {
-            content: AnyView::new(styled),
-        })]
+        .button_style(GhostButtonStyle)
+        .composition_local(ActionControlAccessibility::label(), Some(label))
+        .composition_local(ActionControlAccessibility::expanded(), Some(is_expanded))
+        .frame(None, None, Some(44.0), Some(44.0), None, None);
+        vec![AnyView::new(styled)]
     }
 }
 crate::impl_primitive_view!(SidebarToggleSized);
-
-/// Touch floor for the toggle.
-struct SidebarToggleFloor {
-    content: AnyView,
-}
-
-impl PrimitiveView for SidebarToggleFloor {
-    fn make_node(&self) -> cove_core::scene::Node {
-        let node = cove_core::scene::Node::new();
-        node.set_is_hit_testable(false);
-        node
-    }
-
-    fn make_layout_node(&self) -> Option<cove_core::scene::LayoutNode> {
-        let layout = cove_core::scene::LayoutNode::new();
-        layout.set_min_width(Some(44.0));
-        layout.set_min_height(Some(44.0));
-        layout.set_justify_content(cove_core::scene::Justify::Center);
-        Some(layout)
-    }
-
-    fn update_layout(&self, layout: &cove_core::scene::LayoutNode) {
-        layout.set_min_width(Some(44.0));
-        layout.set_min_height(Some(44.0));
-        layout.set_justify_content(cove_core::scene::Justify::Center);
-    }
-
-    fn update_node(&self, _node: &cove_core::scene::Node) {}
-
-    fn children(&self, _node: &cove_core::scene::Node) -> Vec<AnyView> {
-        vec![self.content.clone()]
-    }
-}
-crate::impl_primitive_view!(SidebarToggleFloor);

@@ -945,10 +945,19 @@ impl ViewScope {
     /// Evaluate `run` under this scope's observer: the body and the
     /// primitives it materialises directly subscribe to the signals they read.
     fn observed<R>(scope: &Rc<RefCell<Self>>, run: impl FnOnce() -> R) -> R {
-        let observer = scope.borrow().observer.clone();
-        match observer {
+        let (observer, tracking) = {
+            let scope = scope.borrow();
+            (scope.observer.clone(), scope.read_invalidation.as_ref().map(|reads| (
+                cove_core::ReadScopeId(scope.anchor.id().0), reads.invalidator(), reads.tracked(),
+            )))
+        };
+        let evaluate = || match observer {
             Some(observer) => observer.track(run),
             None => run(),
+        };
+        match tracking {
+            Some((id, invalidate, tracked)) => ObservableStateTracking::with_scope(id, invalidate, Some(tracked), evaluate),
+            None => evaluate(),
         }
     }
 
@@ -1155,30 +1164,15 @@ impl ViewScope {
     }
 
     fn body(scope: &Rc<RefCell<Self>>) -> AnyView {
-        let (view, cx, tracking) = {
+        let (view, cx) = {
             let scope = scope.borrow();
-            let tracking = scope.read_invalidation.as_ref().map(|read_invalidation| {
-                (
-                    cove_core::ReadScopeId(scope.anchor.id().0),
-                    read_invalidation.invalidator(),
-                    read_invalidation.tracked(),
-                )
-            });
-            (scope.view.clone(), scope.cx.clone(), tracking)
+            (scope.view.clone(), scope.cx.clone())
         };
-        let evaluate = || {
-            if Self::is_materialised_directly(view.storage.as_ref()) {
-                view.clone()
-            } else {
-                cx.begin();
-                view.body(&cx)
-            }
-        };
-        match tracking {
-            Some((scope_id, invalidate, tracked)) => {
-                ObservableStateTracking::with_scope(scope_id, invalidate, Some(tracked), evaluate)
-            }
-            None => evaluate(),
+        if Self::is_materialised_directly(view.storage.as_ref()) {
+            view.clone()
+        } else {
+            cx.begin();
+            view.body(&cx)
         }
     }
 

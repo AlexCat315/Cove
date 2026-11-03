@@ -21,25 +21,13 @@
 //! - AI input filtering follows nested modal scopes and accessory ownership
 //!   without blocking another scene
 //!
-//! Named differences (production gaps, not fixed here — reported to the Lead):
+//! Wire contracts:
+//! - roles serialise with their raw value (`button`, `textField`), matching
+//!   Swift's `role.rawValue` comparison
+//! - attachment keys match Swift's `CoveUI.semantic.role`
+//! - the immediate read and `execute_read_json` share one code path, so their
+//!   bytes agree
 //!
-//! `GAP 1 — no asynchronous toolbox.` Swift's `diagnostics.toolbox()` returns an
-//! SDK whose `execute(name:input:)` runs the *same* tool over the wire, and two
-//! cases compare the wire JSON with the SDK JSON. Rust's `Diagnostics` has no
-//! toolbox: `handle_read_request` is the only entry point. The corresponding
-//! assertions therefore compare the immediate read against `execute_read_json`,
-//! which is the function the wire handler calls, so the bytes still have to
-//! agree — just through the synchronous path.
-//!
-//! `GAP 2 — role spelling.` `DiagnosticCompactNode::role` and the `role` filter
-//! use `format!("{:?}", role)`, giving `"Button"`. Swift compares
-//! `role.rawValue` (`"button"`). Where Swift filters `role: "button"`, these use
-//! the current `"Button"` spelling and say so at the assertion.
-//!
-//! `GAP 3 — `SF Symbols` / attachment key naming.` Swift writes
-//! `root.attachments["CoveUI.semantic.role"]`. Rust exposes the same key as
-//! `DebugAttachmentKey::SEMANTIC_ROLE`, which the tests use.
-
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 
@@ -75,12 +63,12 @@ fn total(response: &Envelope) -> u64 {
         .unwrap_or_default()
 }
 
-/// The current Rust spelling of an accessibility role, as the wire reports it.
+/// The wire spelling of an accessibility role, matching Swift's raw value.
 fn role_name(role: AccessibilityRole) -> &'static str {
     match role {
-        AccessibilityRole::Button => "Button",
-        AccessibilityRole::StaticText => "StaticText",
-        AccessibilityRole::TextField => "TextField",
+        AccessibilityRole::Button => "button",
+        AccessibilityRole::StaticText => "staticText",
+        AccessibilityRole::TextField => "textField",
         _ => panic!("no spelling recorded for {role:?}"),
     }
 }
@@ -433,8 +421,8 @@ fn clipped_visible_bounds_include_scroll_offsets_and_input_availability_inherits
     let tree = scene(root.clone());
 
     let diagnostics = Diagnostics::new(tree, None);
-    // GAP 4: no role filter — see the module doc for why `{ text, role }` misses
-    // a composite control.
+    // Select by text: a composite control publishes its meaning on the outer
+    // node, so a role filter would not match the inner label.
     let result = diagnostics
         .query_nodes(None, Some("Run"), None, None, true, false, false, 0, 50)
         .expect("the query succeeds")
@@ -516,8 +504,7 @@ fn offscreen_and_retained_branches_are_inspectable_without_being_suggested_as_vi
     let tree = scene(root);
 
     let diagnostics = Diagnostics::new(tree, None);
-    // GAP 4: select by text only; a role filter would miss every composite
-    // control. The three authored controls are all inspectable.
+    // The three authored controls are all inspectable by text.
     assert_eq!(
         diagnostics
             .query_nodes(None, Some("Share"), None, None, false, false, false, 0, 50)

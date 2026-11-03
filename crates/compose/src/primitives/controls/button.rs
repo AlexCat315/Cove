@@ -55,6 +55,9 @@ pub struct Button {
     pub is_loading: bool,
     pub is_selected: bool,
     is_icon_only: bool,
+    /// Rows that own their height opt out of the touch extent floor, which
+    /// would otherwise inflate a list row past its scaled metric.
+    ignores_touch_extent: bool,
     icon_size: Option<f32>,
     pub tooltip: Option<String>,
     /// The visible title, used as the accessible name when no explicit
@@ -86,6 +89,7 @@ impl Button {
             is_loading,
             is_selected,
             is_icon_only: false,
+            ignores_touch_extent: false,
             icon_size: None,
             tooltip,
             accessibility_text: None,
@@ -95,6 +99,12 @@ impl Button {
             hovered: State::new(false),
             focused: State::new(false),
         }
+    }
+
+    /// Keep the authored height even on a touch surface.
+    pub fn ignoring_touch_extent(mut self) -> Self {
+        self.ignores_touch_extent = true;
+        self
     }
 
     pub fn title(title: impl Into<String>, action: impl Fn() + 'static) -> Self {
@@ -170,6 +180,7 @@ impl View for Button {
             is_enabled: self.is_enabled && !self.is_loading,
             is_selected: self.is_selected,
             is_icon_only: self.is_icon_only,
+            ignores_touch_extent: self.ignores_touch_extent,
             accessibility_text: self.accessibility_text.clone(),
             label,
             action: self.action.clone(),
@@ -285,6 +296,7 @@ struct ButtonHost {
     is_enabled: bool,
     is_selected: bool,
     is_icon_only: bool,
+    ignores_touch_extent: bool,
     accessibility_text: Option<String>,
     label: AnyView,
     action: Rc<dyn Fn()>,
@@ -326,7 +338,10 @@ impl PrimitiveView for ButtonHost {
     }
 
     fn update_node(&self, node: &Node) {
-        crate::primitives::controls::adaptive::apply_touch_control_extent(node, self.is_enabled);
+        crate::primitives::controls::adaptive::apply_touch_control_extent(
+            node,
+            self.is_enabled && !self.ignores_touch_extent,
+        );
         let style: AnyButtonStyle = node.composition_value(&ButtonStyleEnvironment::key());
         let recompose = style.requires_interaction_recompose;
         node.set_attachment(HOST_MARKER, true);

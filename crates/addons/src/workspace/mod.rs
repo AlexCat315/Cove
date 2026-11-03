@@ -54,3 +54,5 @@ pub use ids::{
     WorkspaceEdge, WorkspaceFloatingWindowID, WorkspacePanelID, WorkspacePlacementKind,
     WorkspaceSlotID, WorkspaceSplitAxis, WorkspaceSplitID, WorkspaceTabGroupID,
 };
+
+pub use workspace_view::{workspace_tab_command, WorkspaceTabCommand};

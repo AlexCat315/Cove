@@ -5,14 +5,18 @@
 //! edge so they never shrink a short destination's hover band.
 use std::rc::Rc;
 
-use crate::modifiers::layout::{FlexExt, LayoutFrameExt, PaddingExt};
+use crate::Scope;
+use crate::modifiers::layout::{FlexExt, FrameDimension, LayoutFrameExt, PaddingExt};
 use crate::modifiers::style::SemanticStyleViewExt;
 use crate::primitives::controls::button::{Button, ButtonIcon, ButtonIconSource, ButtonRole};
+use crate::primitives::overlays::context_menu::ContextMenu;
+use crate::primitives::overlays::{Popover, PopoverTriggerDescription};
 use crate::primitives::feedback::Badge;
 use crate::primitives::text::Text;
 use crate::theme::styles::buttons::ButtonStyleViewExt;
+use crate::theme::tokens::{IconScaling, IconScalingViewExt};
 use crate::theme::{SemanticFontRef, theme_for_node};
-use crate::{AnyView, BoxView, PrimitiveView, TupleView, View, impl_primitive_view};
+use crate::{AnyView, BoxView, LayoutDebugExt, PrimitiveView, TupleView, View, impl_primitive_view};
 use cove_core::Binding;
 use cove_core::scene::{
     AccessibilityRole, Align, Edge, FlexDirection, Justify, Node, PositionType, Wrap,
@@ -187,10 +191,16 @@ impl<Id: PartialEq + Eq + std::hash::Hash + Clone + Send + Sync + 'static> Primi
         let is_enabled = self.entry.is_enabled;
 
         let content = if is_rail {
+            // Swift clamps the glyph to `railWidth - 16` so an oversized
+            // authored icon cannot widen or overhang the rail.
+            let icon_extent = self.presentation.rail_width().map_or(
+                self.icon_extent,
+                |rail_width| self.icon_extent.min(rail_width - 16.0),
+            );
             AnyView::new(RailDestinationLabel {
                 item: self.entry.item.clone(),
                 shows_labels: self.presentation.shows_labels(),
-                icon_extent: self.icon_extent,
+                icon_extent,
                 is_expanded: is_branch.then_some(is_expanded),
             })
         } else {
@@ -245,8 +255,9 @@ impl<Id: PartialEq + Eq + std::hash::Hash + Clone + Send + Sync + 'static> Primi
                 ));
             }
             lanes.push(AnyView::new(
+                // The destination title wraps inside its row instead of
+                // truncating, so a long name stays readable at 200% text.
                 Text::new(self.entry.item.title.clone())
-                    .truncated()
                     .semantic_font(SemanticFontRef::label())
                     .flex_with(1.0, 1.0, None)
                     .frame_min_width(0.0),
@@ -295,12 +306,22 @@ impl<Id: PartialEq + Eq + std::hash::Hash + Clone + Send + Sync + 'static> Primi
             is_enabled,
             false,
             is_selected,
-            None,
+            // A rail row has no title text, so its tooltip carries the whole
+            // breadcrumb and, when present, the badge count.
+            is_rail.then(|| match self.entry.item.badge.as_ref() {
+                Some(badge) => format!("{} ({badge})", self.context_label),
+                None => self.context_label.clone(),
+            }),
         )
-        .button_style(SidebarItemStyle { minimum_height })
+        .button_style(SidebarItemStyle {
+            minimum_height,
+            presentation: self.presentation,
+        })
         .flex_with(1.0, 1.0, None)
         .frame(None, None, Some(0.0), Some(minimum_height), None, None);
 
+        let button = AnyView::new(button);
+        let button = match &self.entry.item.debug_name { Some(name) => AnyView::new(button.debug_name(name)), None => button };
         let row_label = label.clone();
         let mut column: Vec<AnyView> = vec![AnyView::new(AnyView::new(button).with_modifier(
             SidebarRowIdentity {
@@ -318,7 +339,18 @@ impl<Id: PartialEq + Eq + std::hash::Hash + Clone + Send + Sync + 'static> Primi
                 trailing: self.actions_width(),
             }));
         }
-        vec![AnyView::new(
+        if !is_rail && !self.entry.item.context_menu.is_empty() {
+            column.push(AnyView::new(SidebarActionsTrigger {
+                entries: self.entry.item.context_menu.clone(),
+                is_enabled: self.entry.is_enabled,
+                title: self.entry.item.title.clone(),
+                name: format!(
+                    "sidebar-actions-{}",
+                    crate::primitives::overlays::roving_focus::roving_identity(&self.entry.item.id)
+                ),
+            }));
+        }
+        let row = AnyView::new(
             BoxView::new(
                 FlexDirection::Row,
                 Align::Stretch,
@@ -328,9 +360,134 @@ impl<Id: PartialEq + Eq + std::hash::Hash + Clone + Send + Sync + 'static> Primi
                 AnyView::new(TupleView::new(column)),
             )
             .frame(None, None, Some(0.0), None, None, None),
-        )]
+        );
+        // A right-click anywhere on the row opens the same menu the ellipsis
+        // does, so the actions stay reachable without hunting for the trigger.
+        if self.entry.item.context_menu.is_empty() {
+            vec![row]
+        } else {
+            vec![AnyView::new(
+                ContextMenu::new(
+                    {
+                        let entries = self.entry.item.context_menu.clone();
+                        move || entries.clone()
+                    },
+                    row,
+                )
+                .width(220.0),
+            )]
+        }
     }
 }
+
+/// The trailing ellipsis that opens one destination's actions.
+struct SidebarActionsTrigger {
+    entries: Vec<crate::primitives::overlays::menu::MenuEntry>,
+    is_enabled: bool,
+    title: String,
+    name: String,
+}
+
+impl SidebarActionsTrigger {
+    const WIDTH: f32 = ACTIONS_WIDTH;
+}
+
+impl View for SidebarActionsTrigger {
+    fn body(&self, cx: &Scope) -> AnyView {
+        // Presentation belongs to the composition scope, so the menu survives a
+        // recompose instead of reopening on every pass.
+        let presented = cx.state(|| false);
+        let entries = self.entries.clone();
+        let title = self.title.clone();
+        let is_enabled = self.is_enabled;
+        let toggle = presented.clone();
+        let dismiss = presented.clone();
+        let menu = crate::primitives::overlays::menu::Menu::new(entries)
+            .width(220.0)
+            .on_dismiss(move || dismiss.set(false));
+        let trigger = AnyView::new(
+            Button::with_options(
+                AnyView::new(ButtonIcon::new(
+                    ButtonIconSource::resource(
+                        crate::primitives::media::ui_icon_catalog::action::more_horizontal(),
+                    ),
+                    Some(16.0),
+                    None,
+                )),
+                move || toggle.set(!toggle.get()),
+                ButtonRole::Normal,
+                is_enabled,
+                false,
+                false,
+                Some(format!("Actions for {title}")),
+            )
+            .button_style(crate::theme::styles::buttons::GhostButtonStyle),
+        );
+        let popover = Popover::new(trigger, menu)
+            .width(220.0)
+            .placement(crate::primitives::overlays::PopoverPlacement::BottomTrailing)
+            .enabled(is_enabled)
+            .trigger_description(PopoverTriggerDescription {
+                label: format!("Actions for {title}"),
+                help: Some(crate::i18n::tr("Open item actions")),
+                ..Default::default()
+            })
+            .is_presented(Binding::new(
+                {
+                    let presented = presented.clone();
+                    move || presented.get()
+                },
+                move |value: bool| presented.set(value),
+            ));
+        AnyView::new(SidebarActionsLane {
+            content: AnyView::new(popover.debug_name(&self.name)),
+        })
+    }
+}
+
+/// Absolutely placed trailing lane that hosts the actions trigger.
+struct SidebarActionsLane {
+    content: AnyView,
+}
+
+impl PrimitiveView for SidebarActionsLane {
+    fn make_node(&self) -> Node {
+        let node = Node::new();
+        node.set_is_hit_testable(false);
+        node
+    }
+
+    fn make_layout_node(&self) -> Option<cove_core::scene::LayoutNode> {
+        Some(Self::layout())
+    }
+
+    fn update_layout(&self, layout: &cove_core::scene::LayoutNode) {
+        Self::apply(layout);
+    }
+
+    fn update_node(&self, _node: &Node) {}
+
+    fn children(&self, _node: &Node) -> Vec<AnyView> {
+        vec![self.content.clone()]
+    }
+}
+
+impl SidebarActionsLane {
+    fn layout() -> cove_core::scene::LayoutNode {
+        let layout = cove_core::scene::LayoutNode::new();
+        Self::apply(&layout);
+        layout
+    }
+
+    fn apply(layout: &cove_core::scene::LayoutNode) {
+        layout.set_position_type(PositionType::Absolute);
+        layout.set_position(0.0, Edge::Top);
+        layout.set_position(0.0, Edge::End);
+        layout.set_position(0.0, Edge::Bottom);
+        layout.set_width(Some(SidebarActionsTrigger::WIDTH));
+    }
+}
+impl_primitive_view!(SidebarActionsLane);
 
 const REVEAL_STATE: &str = "__sidebar.revealState";
 
@@ -464,16 +621,21 @@ impl<Id: PartialEq + Eq + std::hash::Hash + Clone + Send + Sync + 'static> Primi
             theme.colors.on_surface_muted
         };
         let glyph = match self.item.icon.clone() {
-            Some(icon) => AnyView::new(ButtonIcon::new(
-                ButtonIconSource::resource(icon),
-                Some(self.icon_extent),
-                Some(tint),
-            )),
-            None => AnyView::new(ButtonIcon::new(
-                ButtonIconSource::resource(crate::primitives::media::ui_icon_catalog::file::file()),
-                Some(self.icon_extent),
-                Some(tint),
-            )),
+            Some(icon) => AnyView::new(
+                // `.iconScaling(.fixed)`: the authored extent has already been
+                // resolved against the icon roles and clamped to the rail, so a
+                // second application of text scaling would grow it again.
+                ButtonIcon::new(ButtonIconSource::resource(icon), Some(self.icon_extent), Some(tint))
+                    .icon_scaling(IconScaling::Fixed),
+            ),
+            None => AnyView::new(
+                ButtonIcon::new(
+                    ButtonIconSource::resource(crate::primitives::media::ui_icon_catalog::file::file()),
+                    Some(self.icon_extent),
+                    Some(tint),
+                )
+                .icon_scaling(IconScaling::Fixed),
+            ),
         };
         let mut column: Vec<AnyView> = vec![AnyView::new(
             BoxView::new(
@@ -512,11 +674,22 @@ impl<Id: PartialEq + Eq + std::hash::Hash + Clone + Send + Sync + 'static> Primi
         }
         if self.shows_labels {
             column.push(AnyView::new(
-                Text::new(self.item.title.clone())
-                    .truncated()
-                    .alignment(cove_core::TextAlignment::Center)
-                    .semantic_font(SemanticFontRef::caption())
-                    .semantic_foreground(crate::theme::SemanticColorRef::on_surface_variant()),
+                // The rail caption wraps onto as many lines as the rail needs;
+                // it is not truncated the way an expanded row's title is.
+                AnyView::new(
+                    Text::new(self.item.title.clone())
+                        .alignment(cove_core::TextAlignment::Center)
+                        .semantic_font(SemanticFontRef::caption())
+                        .semantic_foreground(crate::theme::SemanticColorRef::on_surface_variant()),
+                )
+                .frame(
+                    Some(FrameDimension::Percent(100.0)),
+                    None,
+                    None,
+                    None,
+                    None,
+                    None,
+                ),
             ));
         }
         vec![AnyView::new(
@@ -528,7 +701,14 @@ impl<Id: PartialEq + Eq + std::hash::Hash + Clone + Send + Sync + 'static> Primi
                 4.0,
                 AnyView::new(TupleView::new(column)),
             )
-            .frame(None, None, Some(0.0), None, None, None),
+            .frame(
+                Some(FrameDimension::Percent(100.0)),
+                None,
+                Some(0.0),
+                None,
+                None,
+                None,
+            ),
         )]
     }
 }

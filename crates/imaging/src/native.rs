@@ -18,6 +18,13 @@ pub(crate) struct AnimationResult {
     pub loop_count: i32,
     pub error_message: *mut c_char,
 }
+#[repr(C)]
+#[derive(Default)]
+pub(crate) struct TemplatePngResult {
+    pub png: *mut u8,
+    pub png_size: usize,
+    pub error_message: *mut c_char,
+}
 unsafe extern "C" {
     pub fn cove_image_decode_memory(
         data: *const u8,
@@ -45,6 +52,14 @@ unsafe extern "C" {
         result: *mut AnimationResult,
     ) -> bool;
     fn cove_image_animation_free(result: *mut AnimationResult);
+    pub fn cove_image_template_png_memory(
+        data: *const u8,
+        count: usize,
+        extension: *const c_char,
+        points: i32,
+        result: *mut TemplatePngResult,
+    ) -> bool;
+    fn cove_image_template_png_free(result: *mut TemplatePngResult);
     pub fn cove_image_orient_rgba(
         input: *const u8,
         width: usize,
@@ -75,6 +90,12 @@ impl Drop for AnimationResult {
     fn drop(&mut self) {
         // SAFETY: the bridge initializes and owns these allocations.
         unsafe { cove_image_animation_free(self) };
+    }
+}
+impl Drop for TemplatePngResult {
+    fn drop(&mut self) {
+        // SAFETY: the bridge initializes and owns these allocations.
+        unsafe { cove_image_template_png_free(self) };
     }
 }
 pub(crate) fn message(value: *const c_char) -> String {

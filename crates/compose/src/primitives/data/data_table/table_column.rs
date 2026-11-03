@@ -159,6 +159,10 @@ pub struct TableColumn<Record> {
     pub title: String,
     pub layout: TableColumnLayout,
     pub visibility: ColumnVisibility,
+    /// Automatic-order rank. Lower priorities leave the plan first, so a
+    /// secondary detail column drops before the column that anchors the row.
+    /// Ignored for `Required` and `Hidden` columns.
+    pub priority: i32,
     /// Equal comparisons retain source order in both sort directions.
     pub compare: Option<Rc<dyn Fn(&Record, &Record) -> ComparisonResult>>,
     /// Present when the column can be edited in place.
@@ -173,6 +177,7 @@ impl<Record> Clone for TableColumn<Record> {
             title: self.title.clone(),
             layout: self.layout,
             visibility: self.visibility,
+            priority: self.priority,
             compare: self.compare.clone(),
             text_editing: self.text_editing.clone(),
             content: self.content.clone(),
@@ -191,6 +196,7 @@ impl<Record> TableColumn<Record> {
             title: title.into(),
             layout: TableColumnLayout::default(),
             visibility: ColumnVisibility::Required,
+            priority: 0,
             compare: None,
             text_editing: None,
             content: Rc::new(content),
@@ -204,6 +210,12 @@ impl<Record> TableColumn<Record> {
 
     pub fn visibility(mut self, visibility: ColumnVisibility) -> Self {
         self.visibility = visibility;
+        self
+    }
+
+    /// Order in which automatic columns leave the plan: lowest first.
+    pub fn priority(mut self, priority: i32) -> Self {
+        self.priority = priority;
         self
     }
 
@@ -304,15 +316,18 @@ pub struct TableColumnPlan {
 /// The table's three-way visibility maps onto the shared plan's two-way one.
 ///
 /// `Hidden` is handled by the table before planning (the column is filtered out
-/// entirely), so only `Required` and `Optional` reach the resolver. Optional
-/// columns all share priority 0, which keeps them in authored order.
+/// entirely), so only `Required` and `Optional` reach the resolver. Automatic
+/// columns leave the plan in ascending `priority` order, and equal priorities
+/// fall back to the authored order.
 fn table_visibility(
-    visibility: ColumnVisibility,
+    column: &TableColumn<impl Sized>,
 ) -> crate::primitives::layout::grid::ColumnVisibility {
-    match visibility {
+    match column.visibility {
         ColumnVisibility::Required => crate::primitives::layout::grid::ColumnVisibility::Required,
         ColumnVisibility::Optional | ColumnVisibility::Hidden => {
-            crate::primitives::layout::grid::ColumnVisibility::Automatic { priority: 0 }
+            crate::primitives::layout::grid::ColumnVisibility::Automatic {
+                priority: column.priority,
+            }
         }
     }
 }
@@ -334,7 +349,7 @@ impl TableColumnPlan {
                 ColumnVisibilityTrack {
                     id: column.id.clone(),
                     title: column.title.clone(),
-                    visibility: table_visibility(column.visibility),
+                    visibility: table_visibility(column),
                     width: column.layout.constrained(authored),
                 }
             })

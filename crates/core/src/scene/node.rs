@@ -110,6 +110,9 @@ pub struct NodeData {
     pub render_object: Option<RenderObjectWeak>,
     is_hit_testable: bool,
     allows_hit_testing: bool,
+    /// Set when this node was removed from its parent. A subtree that is not in
+    /// a tree cannot receive input, however its own flags read.
+    is_detached: bool,
     cached_input_revision: u64,
     cached_accepts_subtree_input: bool,
     is_focusable: bool,
@@ -201,6 +204,7 @@ impl Node {
             render_object: None,
             is_hit_testable: true,
             allows_hit_testing: true,
+            is_detached: false,
             cached_input_revision: u64::MAX,
             cached_accepts_subtree_input: false,
             is_focusable: false,
@@ -333,7 +337,11 @@ impl Node {
     pub fn add_child(&self, child: &Node) {
         {
             let mut data = self.0.borrow_mut();
-            child.0.borrow_mut().parent = Rc::downgrade(&self.0);
+            {
+                let mut child_data = child.0.borrow_mut();
+                child_data.parent = Rc::downgrade(&self.0);
+                child_data.is_detached = false;
+            }
             data.children.push(child.clone());
             if child.0.borrow().z_index != 0.0 {
                 data.children_may_need_z_sort = true;
@@ -355,7 +363,9 @@ impl Node {
                 .retain(|candidate| !Rc::ptr_eq(&candidate.0, &child.0));
             let removed = data.children.len() != before;
             if removed {
-                child.0.borrow_mut().parent = Weak::new();
+                let mut child_data = child.0.borrow_mut();
+                child_data.parent = Weak::new();
+                child_data.is_detached = true;
             }
             (removed, removed_may_need_z_sort)
         };
@@ -459,6 +469,9 @@ impl Node {
             Self::invalidate_input_cache();
             AccessibilityRevision::bump_structure();
         }
+    }
+    pub fn is_detached(&self) -> bool {
+        self.0.borrow().is_detached
     }
     pub fn is_layout_visible(&self) -> bool {
         self.0.borrow().is_layout_visible
@@ -652,7 +665,8 @@ impl Node {
                 return data.cached_accepts_subtree_input;
             }
         }
-        let value = self.is_layout_visible()
+        let value = !self.is_detached()
+            && self.is_layout_visible()
             && self.allows_hit_testing()
             && self.is_interaction_enabled()
             && self
@@ -1112,6 +1126,14 @@ impl Node {
         }
     }
     fn release_own_resources(&self) {
+        // Leaving the tree is the single authoritative point where a subtree
+        // stops being reachable from the window; nothing that is no longer in
+        // the tree may claim input.
+        {
+            let mut data = self.0.borrow_mut();
+            data.is_detached = true;
+        }
+        Self::invalidate_input_cache();
         let resources = std::mem::take(&mut self.0.borrow_mut().resources);
         for resource in resources {
             resource.unmount(self);

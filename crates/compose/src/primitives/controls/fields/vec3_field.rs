@@ -13,7 +13,6 @@ use crate::Scope;
 use std::collections::HashSet;
 use std::rc::Rc;
 
-use cove_core::scene::{Align, FlexDirection, Justify, Node, Wrap};
 use cove_core::{Binding, Color};
 
 use crate::modifiers::layout::LayoutFrameExt;
@@ -25,7 +24,7 @@ use crate::primitives::overlays::context_menu::ContextMenu;
 use crate::primitives::overlays::menu::{MenuEntry, MenuItem};
 use crate::primitives::text::text_field::TextFieldSize;
 use crate::theme::SemanticColorRef;
-use crate::{AnyView, BoxView, PrimitiveView, TupleView, View, impl_primitive_view};
+use crate::{AnyView, TupleView, View};
 
 /// Axis chip width used when the row has room for three side by side.
 pub const AXIS_BASIS: f32 = 96.0;
@@ -244,14 +243,15 @@ impl View for Vec3Field {
             self.axis(Vec3Axis::Y, self.y.clone()),
             self.axis(Vec3Axis::Z, self.z.clone()),
         ];
-        let row = Vec3Row {
-            minimum_width: self.resolved_minimum_width(1.0),
-            axes: AnyView::new(TupleView::new(
-                axes.into_iter()
-                    .map(|axis| AnyView::new(AnyView::new(axis).frame_width(AXIS_BASIS)))
-                    .collect(),
-            )),
-        };
+        let minimum = self.minimum_axis_width;
+        let row = crate::theme::TextScalerReader::new(move |scaler| {
+            crate::LayoutContainer::new(
+                crate::primitives::controls::fields::numeric::axis_layout::AxisLayout::new(
+                    4.0, minimum_axis_width(minimum, scaler.scale(1.0)), scaler.scale(AXIS_BASIS)),
+                TupleView::new(axes.iter().cloned().map(|axis| AnyView::new(axis.frame(
+                    Some(crate::modifiers::layout::FrameDimension::Percent(100.0)), None, None, None, None, None))).collect()),
+            )
+        });
         let field = self.snapshot();
         AnyView::new(ContextMenu::new(move || field.menu(), row).width(220.0))
     }
@@ -262,39 +262,3 @@ impl Clone for Vec3Field {
         self.snapshot()
     }
 }
-
-/// The three axes: a wrapping row that keeps every value visible, spilling to a
-/// second line when the available width cannot hold three.
-struct Vec3Row {
-    minimum_width: f32,
-    axes: AnyView,
-}
-
-impl PrimitiveView for Vec3Row {
-    fn make_node(&self) -> Node {
-        let node = Node::new();
-        node.set_is_hit_testable(false);
-        node
-    }
-
-    fn make_layout_node(&self) -> Option<cove_core::scene::LayoutNode> {
-        None
-    }
-
-    fn update_node(&self, _node: &Node) {}
-
-    fn children(&self, _node: &Node) -> Vec<AnyView> {
-        vec![AnyView::new(
-            BoxView::new(
-                FlexDirection::Row,
-                Align::Center,
-                Justify::FlexStart,
-                Wrap::Wrap,
-                8.0,
-                self.axes.clone(),
-            )
-            .frame_min_width(self.minimum_width),
-        )]
-    }
-}
-impl_primitive_view!(Vec3Row);

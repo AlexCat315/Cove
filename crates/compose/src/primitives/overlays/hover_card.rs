@@ -19,7 +19,6 @@ use crate::modifiers::interaction::HoverExt;
 use crate::modifiers::layout::PaddingExt;
 use crate::modifiers::style::SurfaceStyleExt;
 use crate::primitives::controls::button::{Button, ButtonRole};
-use crate::primitives::overlays::modal::BottomSheet;
 use crate::primitives::overlays::portal::{PortalPlacementMode, PortalResource, PortalStoreHolder};
 use crate::theme::styles::buttons::ButtonStyleViewExt;
 use crate::theme::theme_for_node;
@@ -385,7 +384,7 @@ impl HoverCardSession {
                 Some(PortalStoreHolder::current()),
                 position,
                 options.width,
-                AnyView::new(card),
+                AnyView::new(HoverCardAccessory { owner: node.clone(), session: self.me.borrow().clone(), content: AnyView::new(card) }),
                 false,
                 PortalPlacementMode::Fixed,
                 None,
@@ -526,10 +525,14 @@ impl View for TouchHoverCard {
             None,
         )
         .button_style(crate::theme::styles::buttons::plain());
-        let sheet = BottomSheet::new(
-            is_presented.into(),
-            self.content.clone().padding_edges(8.0, 0.0),
-        );
+        // Swift wraps the detail in `TouchOverlay` (`HoverCard.swift:213`), the
+        // same touch sheet the menu and dialog use: drag handle, scrolling
+        // content, keyboard avoidance and the `touch-overlay-sheet` name.
+        let sheet = crate::primitives::overlays::popover::TouchOverlay {
+            is_presented: is_presented.into(),
+            content: AnyView::new(self.content.clone().padding_edges(8.0, 0.0)),
+            on_key: None,
+        };
         let column = BoxView::new(
             FlexDirection::Column,
             Align::FlexStart,
@@ -544,3 +547,30 @@ impl View for TouchHoverCard {
         AnyView::new(column)
     }
 }
+
+struct HoverCardAccessory { owner: Node, session: Weak<HoverCardSession>, content: AnyView }
+impl PrimitiveView for HoverCardAccessory {
+    fn make_node(&self) -> Node {
+        let node = Node::new();
+        node.set_is_hit_testable(false);
+        node.set_attachment("hoverCard.content", true);
+        node.add_resource(Rc::new(cove_core::scene::FocusAccessoryResource::new(&self.owner)));
+        node
+    }
+    fn make_layout_node(&self) -> Option<LayoutNode> { None }
+    fn update_node(&self, node: &Node) {
+        if let Some(registry) = InteractionRegistryHolder::current() {
+            let hovered_session = self.session.clone();
+            registry.set_hover(node, Rc::new(move |phase| {
+                if let Some(session) = hovered_session.upgrade() { session.set_card_hovered(phase == HoverPhase::Enter); }
+            }));
+            let session = self.session.clone();
+            registry.set_key(node, InputHandlerRoute::overlay(), Rc::new(move |event, phase| {
+                if phase != cove_core::scene::EventPhase::Capture && event.scancode == crate::Scancode::ESCAPE
+                    && session.upgrade().is_some_and(|s| s.dismiss()) { EventResult::Handled } else { EventResult::Ignored }
+            }));
+        }
+    }
+    fn children(&self, _node: &Node) -> Vec<AnyView> { vec![self.content.clone()] }
+}
+crate::impl_primitive_view!(HoverCardAccessory);

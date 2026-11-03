@@ -115,7 +115,7 @@ impl<Id: std::hash::Hash + Eq + Clone + PartialEq + Send + Sync + 'static> View
             AnyView::new(safe),
         )
         .semantic_background(SemanticColorRef::surface());
-        AnyView::new(column)
+        AnyView::new(cove_composition::LayoutDebugExt::debug_name(column, "mobile-tab-bar"))
     }
 }
 
@@ -170,6 +170,7 @@ fn tab_item<Id: std::hash::Hash + Eq + Clone + PartialEq + Send + Sync + 'static
     .frame_min_width(0.0);
 
     let button = Button::new(label, move || action_selection.set(action_id.clone()))
+        .enabled(tab_enabled)
         .button_style(MobileTabStyle)
         .accessibility(move |semantics| {
             semantics.role = AccessibilityRole::Tab;
@@ -241,7 +242,14 @@ fn more_item<Id: std::hash::Hash + Eq + Clone + PartialEq + Send + Sync + 'stati
     .is_presented(shows_more.binding())
     .enabled(hidden.iter().any(|tab| tab.is_enabled))
     .placement(PopoverPlacement::TopTrailing)
-    .width(220.0);
+    .width(220.0)
+    // Swift gives the trigger `PopoverTriggerDescription(label: "More tabs")`,
+    // so assistive clients and the query surface see that name.
+    .trigger_description(crate::primitives::overlays::PopoverTriggerDescription {
+        label: "More tabs".to_string(),
+        value: String::new(),
+        help: None,
+    });
 
     AnyView::new(
         AnyView::new(popover)

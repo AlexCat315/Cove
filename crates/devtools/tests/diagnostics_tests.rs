@@ -6,26 +6,12 @@
 //! geometry the wire cannot represent is refused rather than serialised as
 //! `null`; and state metadata never evaluates a value it was not asked for.
 //!
-//! Named differences (production gaps, not fixed here — reported to the Lead):
-//!
-//! `GAP 1 — role spelling.` `AccessibilityRole` is a Rust enum with no string
-//! form, and both the inspector and the compact projection render it with
-//! `format!("{:?}", role)`, producing `"ListItem"`. Swift's `AccessibilityRole`
-//! is a `String` enum whose `rawValue` is `"listItem"` (`Accessibility.swift:4`),
-//! and `Queries.swift:105` compares `semantics?.role.rawValue == role`. So every
-//! documented role filter (`role: "listItem"`, `"textField"`, `"button"`) matches
-//! nothing in Rust, and `DiagnosticCompactNode.role` reports `"ListItem"` where
-//! the wire contract says `"listItem"`. Assertions below use the current
-//! documented spelling and name the Swift expectation.
-//!
-//! `GAP 3 — overflow order.` `collect_overflow` walks with an explicit stack
-//! (`while let Some(node) = stack.pop()`), so it reports depth-first in reverse
-//! sibling order: `["7", "2"]` where Swift's recursive
-//! `Queries.swift` walk reports document order `["2", "7"]`.
-//!
-//! `GAP 4 — issue page order.` `layout_issues` builds `invalid_geometry` from
-//! `self.nodes(None)`, which is also stack-ordered, so the first page reports the
-//! negative-width node and not the `NaN`-width node Swift lists first.
+//! Wire contracts this suite pins against Swift's `Queries.swift`:
+//! - roles serialise with their raw value (`listItem`, `textField`), which is
+//!   also what the documented role filters match
+//! - overflow and invalid-geometry reports walk in document order
+//! - every tool result stays within Swift's 512 KiB budget
+//! - a capture records the spans the host emits while its window is open
 //!
 //! Behaviour checklist:
 //! - text search matches label, value and help case-insensitively
@@ -200,8 +186,8 @@ fn compact_queries_return_one_short_record_per_node_with_state_and_secure_redact
     assert_eq!(item["label"].as_str(), Some("Document 3"));
     assert_eq!(
         item["role"].as_str(),
-        Some("ListItem"),
-        "GAP: the compact role is the Debug spelling; Swift reports rawValue 'listItem'",
+        Some("listItem"),
+        "the compact role uses the raw value Swift reports",
     );
     let state: Vec<&str> = item["state"]
         .as_array()
@@ -399,11 +385,8 @@ fn overview_reports_invalid_geometry_without_losing_json_and_queries_identify_th
     tree.set_root(Some(root));
 
     let diagnostics = Diagnostics::new(Rc::new(RefCell::new(tree)), None);
-    // `limit: 1` matches the Swift suite. GAP 4: `layout_issues` pages
-    // `self.nodes(None)`, which is stack-ordered, so the *first* entry is the
-    // negative-width node where Swift reports the NaN-width node. Assert that
-    // ordering explicitly, then read both entries with a larger page so the
-    // NaN diagnostics are still verified.
+    // `limit: 1` matches the Swift suite. `layout_issues` walks the tree in
+    // document order, so the first entry is the NaN-width node.
     let overview = diagnostics
         .handle_read_request(&call("get_diagnostics", serde_json::json!({ "limit": 1 })));
     assert_eq!(overview.r#type, "diagnostics.call.ok");
@@ -415,8 +398,8 @@ fn overview_reports_invalid_geometry_without_losing_json_and_queries_identify_th
     );
     assert_eq!(
         issues["invalidGeometry"][0]["nodeID"].as_str(),
-        Some(negative.id().0.to_string().as_str()),
-        "GAP: the first page reports the negative-width node; Swift reports the NaN one",
+        Some(broken.id().0.to_string().as_str()),
+        "the first page reports the NaN-width node",
     );
 
     let page = diagnostics
@@ -520,9 +503,7 @@ fn overview_reports_content_clipped_by_non_scrolling_containers() {
         .iter()
         .filter_map(|value| value["nodeID"].as_str())
         .collect();
-    // GAP 3: `collect_overflow` uses `stack.pop()`, so the report is depth-first
-    // in reverse sibling order. Swift's recursive walk reports the panel before
-    // the nested clip. Assert the set, then the current order explicitly.
+    // The walk reports document order: the panel precedes the nested clip.
     let panel_id = panel.id().0.to_string();
     let nested_id = nested.id().0.to_string();
     assert_eq!(
@@ -536,8 +517,8 @@ fn overview_reports_content_clipped_by_non_scrolling_containers() {
     );
     assert_eq!(
         ids,
-        [nested_id.as_str(), panel_id.as_str()],
-        "GAP: the walk reports reverse sibling order; Swift reports document order",
+        [panel_id.as_str(), nested_id.as_str()],
+        "the walk reports document order",
     );
     let panel_entry = issues["clippedOverflow"]
         .as_array()
@@ -601,19 +582,10 @@ fn diagnostic_registry_is_the_single_definition_source() {
         // Swift's `AgentTool.init` defaults `readOnly` to `true` and
         // `UIDiagnosticTool` never overrides it (`Contracts/Tool.swift:14`,
         // `Tools/Diagnostics.swift`), so every diagnostic tool is read-only.
-        // GAP 5: Rust marks `CaptureUiTrace` non-read-only
-        // (`crates/agent/src/ui_tools.rs` passes `false`), the only divergence.
-        let expected_read_only = tool != UIDiagnosticTool::CaptureUiTrace;
-        assert_eq!(
+        assert!(
             definition.read_only,
-            expected_read_only,
-            "{} read-only flag matches the Swift default{}",
+            "{} is read-only, matching the Swift default",
             tool.name(),
-            if expected_read_only {
-                ""
-            } else {
-                " (GAP: Swift leaves this true)"
-            },
         );
         let schema = definition.schema;
         assert_eq!(
@@ -757,11 +729,9 @@ fn immediate_wire_rejects_malformed_unbounded_and_async_requests() {
     tree.set_root(Some(root));
     let oversized = Diagnostics::new(Rc::new(RefCell::new(tree)), None)
         .handle_read_request(&call("query_ui_nodes", serde_json::json!({})));
-    // GAP 6: the 512 KiB result ceiling is not enforced by the wire adapter.
-    // Swift reports this as an error; Rust returns the oversized payload.
     assert_eq!(
-        oversized.r#type, "diagnostics.call.ok",
-        "GAP: an oversized label is returned; Swift refuses a result over 512 KiB",
+        oversized.r#type, "diagnostics.call.err",
+        "a result over the 512 KiB budget is refused",
     );
 }
 
@@ -790,8 +760,7 @@ fn query_is_flat_paged_semantic_and_rejects_stale_nodes() {
         "a query returns flat records",
     );
 
-    // GAP 1: Swift passes `role: "textField"`; the Rust enum's Debug spelling is
-    // `"TextField"`, and only that matches.
+    // The documented filter spelling is the raw value, `textField`.
     let field = diagnostics
         .query_nodes(
             None,
@@ -925,15 +894,10 @@ fn immediate_wire_state_defaults_to_metadata() {
 /// a capture owns only its own recording window, the inspector keeps working
 /// during it, and a comparison reports the phase that appeared.
 ///
-/// GAP: Rust's `capture_trace` is synchronous — `TraceStore::capture` sleeps
-/// `duration_ms` on the calling thread between reading `latest_sequence()` and
-/// calling `events_after(..)`. `NodeTree` is `Rc`-based and single-threaded, so
-/// nothing can emit a span while that sleep runs, and every capture therefore
-/// reports `event_count == 0`. Swift's `captureTrace` is `async` and runs
-/// concurrently with the host that emits the spans, so its capture observes
-/// them (`first.eventCount == 1`). This test asserts the current synchronous
-/// behaviour: the capture window is empty, the external enable flag is left
-/// alone, and a comparison of two empty captures reports no phase changes.
+/// `begin_capture` opens the window and returns; the host emits spans while it
+/// is open; `finish_capture` collects them. This mirrors Swift's async
+/// `captureTrace`, where the recorder runs concurrently with the host, without
+/// requiring a second thread on the `Rc`-based scene graph.
 #[test]
 fn captures_share_recorder_without_stopping_inspector_and_compare_actual_events() {
     let tree = Rc::new(RefCell::new(NodeTree::new()));
@@ -948,14 +912,25 @@ fn captures_share_recorder_without_stopping_inspector_and_compare_actual_events(
         timeline.end(start, "old", "Before capture", None, &[]);
     }
 
-    let first = diagnostics.capture_trace(50).expect("a capture runs");
+    // Open the window, let the host emit a span inside it, then close it. The
+    // capture observes spans produced while recording, like Swift's async one.
+    diagnostics
+        .begin_capture(50)
+        .expect("a capture window opens");
+    {
+        let borrowed = tree.borrow();
+        let mut timeline = borrowed.timeline.borrow_mut();
+        let start = timeline.begin();
+        timeline.end(start, "compose", "During capture", None, &[]);
+    }
+    let first = diagnostics.finish_capture().expect("the window closes");
     assert!(
         tree.borrow().timeline.borrow().enabled(),
         "capturing does not stop the inspector's own timeline"
     );
     assert_eq!(
-        first.event_count, 0,
-        "GAP: a synchronous capture cannot observe a concurrently emitted span"
+        first.event_count, 1,
+        "the capture observes the span emitted inside its window"
     );
     assert_eq!(first.dropped, 0, "nothing was dropped");
 
@@ -968,10 +943,12 @@ fn captures_share_recorder_without_stopping_inspector_and_compare_actual_events(
         .compare_traces(&first.id, &second.id)
         .expect("two captures compare");
     assert!(
-        comparison.changes.is_empty(),
-        "GAP: two empty captures share no phase, so no change is reported; \
-         Swift compares a populated baseline against an idle candidate and \
-         reports the vanished phase"
+        comparison
+            .changes
+            .iter()
+            .any(|change| change.phase == "compose"),
+        "the comparison reports the phase that vanished, got {:?}",
+        comparison.changes
     );
 
     diagnostics.reset_captures();
@@ -987,11 +964,9 @@ fn captures_share_recorder_without_stopping_inspector_and_compare_actual_events(
 /// Swift `cancellationReleasesOwnRecordingAndDoesNotPublishCapture`: a cancelled
 /// capture releases its recording bracket and leaves no published capture.
 ///
-/// GAP: Rust's `capture_trace` is synchronous (`std::thread::sleep` inside
-/// `TraceStore::capture`), so there is no in-flight future to cancel. What is
-/// still assertable — and what the Swift test was checking — is that a capture
-/// leaves the timeline disabled when the host never enabled it, and that no
-/// capture is published on a failed request.
+/// A failed request publishes nothing: the duration bound is checked before any
+/// recording bracket opens, and a capture leaves the timeline disabled when the
+/// host never enabled it.
 #[test]
 fn a_failed_capture_releases_its_recording_and_publishes_nothing() {
     let tree = Rc::new(RefCell::new(NodeTree::new()));

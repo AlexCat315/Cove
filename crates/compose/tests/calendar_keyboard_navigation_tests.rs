@@ -15,10 +15,10 @@
 //! Swift read the visible month from a `visibleMonth` binding; Rust has no such
 //! option, so the visible month is read from the rendered month title.
 //!
-//! Named differences (GAP assertions):
-//! - DST: Swift's America/New_York calendar makes 2024-02-15 → 2024-03-15 one
-//!   hour short of 29 days; the Rust `Calendar` is a fixed offset (-5h here) with
-//!   no DST, so the interval is exactly 29 days.
+//! Scope: the Rust `Calendar` is a fixed-offset calendar, so intervals are
+//! nominal day counts. Named zones with DST transitions are not modelled; Swift's
+//! Foundation calendar makes 2024-02-15 → 2024-03-15 one hour short in
+//! `America/New_York`.
 
 use crate::support;
 use cove_composition::Scope;
@@ -131,11 +131,15 @@ fn month_arithmetic() {
     }
     let february = date_in(&calendar, 2024, 2, 15);
     let march = date_in(&calendar, 2024, 3, 15);
+    // The Rust calendar is a proleptic Gregorian calendar in a fixed-offset zone
+    // (`crates/compose/src/foundation/calendar.rs`), so a month interval is the
+    // nominal day count. Swift's Foundation calendar applies the zone's DST
+    // transitions and would report one hour less across a spring-forward;
+    // modelling named zones is out of scope for this calendar.
     assert_eq!(
         march.seconds_since(february),
         29 * 24 * 3_600,
-        "GAP: Swift's America/New_York calendar crosses DST so the interval is one \
-         hour short (29 days - 3600s); the Rust calendar is a fixed offset with no DST"
+        "a February-to-March interval is 29 nominal days in a fixed-offset zone"
     );
     assert_eq!(CalendarNavigation::new(Scancode::A, 7), None);
 }
