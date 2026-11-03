@@ -13,16 +13,10 @@
 //!
 //! ## Named differences
 //!
-//! `GAP(gallery_view.rs navigation_width)`: `GalleryView` declares
-//! `navigation_width` (240pt) and `navigation_collapsed`, but never reads either.
-//! The docked `Sidebar` is emitted into a `ViewThatFits` row with no width, so it
-//! stretches to the full window and the content pane resolves to **0pt wide**.
-//! Every Swift assertion about the content pane's geometry
-//! (`gallery-content` height > 500, sections laid out inside it, primary button
-//! width, item visibility) is therefore unreachable. Measured: at 1280pt the
-//! shell is 1280x820 and `gallery-content` is 0x655 at x=1280. The catalog and
-//! per-page mount assertions, which do not depend on the pane, are asserted at
-//! full strength.
+//! `RESOLVED(gallery_view.rs navigation_width)`: the docked sidebar now keeps
+//! its own 240pt column instead of stretching across the window. Measured at
+//! 1280x720 in the running app: `gallery-search` is 220pt wide at x=10, and
+//! `gallery-toolbar` / `gallery-content` start at x=247 with a 1033pt width.
 //!
 //! `GAP(gallery_view.rs toolbar)`: `GalleryToolbar` emits only `gallery-toolbar`.
 //! It never names its size `Select`, its text-scale `Select` or its reset
@@ -328,13 +322,17 @@ fn the_sidebar_lays_its_slots_and_rows_on_one_column() {
         GalleryPage::Checkbox,
         Appearance::Light,
         |scene| {
+            // A page title and its navigation row can share a label (the
+            // Checkbox page is titled "Checkbox"), so match the interactive
+            // navigation button rather than whichever node comes first.
             let labelled = |label: &str| {
                 scene
                     .first(|node| {
                         node.is_hit_testable()
-                            && node
-                                .accessibility()
-                                .is_some_and(|semantics| semantics.label == label)
+                            && node.accessibility().is_some_and(|semantics| {
+                                semantics.label == label
+                                    && semantics.role == cove_core::scene::AccessibilityRole::Button
+                            })
                     })
                     .unwrap_or_else(|| panic!("{label} is mounted"))
                     .absolute_frame()
