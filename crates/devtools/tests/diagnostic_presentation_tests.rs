@@ -36,19 +36,6 @@
 //! `role.rawValue` (`"button"`). Where Swift filters `role: "button"`, these use
 //! the current `"Button"` spelling and say so at the assertion.
 //!
-//! `GAP 4 — the projection keeps the raw label instead of the resolved one.`
-//! `Diagnostics::nodes` inserts `node.accessibility()` verbatim, so a control
-//! whose semantics are `combines_children == true` with an empty label projects
-//! `label: ""` even though `AccessibilityTree::resolved_label` would give
-//! "Open workspace". Swift resolves it first:
-//! `Queries.swift:57` does `semantics.label = AccessibilityTree.resolvedLabel(for: node)`
-//! before storing the meaning, so its `label`, its `text` search and its compact
-//! projection all see the composed name. Consequences asserted below: a
-//! `{ text, role }` query cannot find a composite control (the text matches the
-//! static-text child, the role does not match the button), and the reported
-//! `semantics.label` for the button is empty. The tests therefore locate the
-//! composite control by text alone and assert the gap at each site.
-//!
 //! `GAP 3 — `SF Symbols` / attachment key naming.` Swift writes
 //! `root.attachments["CoveUI.semantic.role"]`. Rust exposes the same key as
 //! `DebugAttachmentKey::SEMANTIC_ROLE`, which the tests use.
@@ -292,8 +279,6 @@ fn explicit_values_resolve_live_values_bound_unicode_output_and_never_read_secur
 fn the_ai_tool_finds_an_ordinary_composite_button_by_the_same_label_as_native_accessibility() {
     let root = Node::new();
     root.set_frame(Rect::new(0.0, 0.0, 300.0, 200.0));
-    // The composite shape: the label lives on the child, as Swift's fixture
-    // builds it, so this case really exercises GAP 4 rather than sidestepping it.
     let control = composite_button("Open workspace", Rect::new(10.0, 20.0, 120.0, 40.0));
     let hidden = Node::new();
     hidden.set_opacity(0.0);
@@ -313,21 +298,14 @@ fn the_ai_tool_finds_an_ordinary_composite_button_by_the_same_label_as_native_ac
     let diagnostics = Diagnostics::new(tree, None);
     let role = role_name(AccessibilityRole::Button);
 
-    // GAP — composed labels are never resolved. Swift sets
-    // `semantics.label = AccessibilityTree.resolvedLabel(for: node)` for every
-    // node (`Queries.swift:59`), so a `combinesChildren` button takes its
-    // child's text and is found as `role: "button"` + `"Open workspace"`. Rust
-    // inserts the authored semantics untouched, so the button's own label stays
-    // empty: the text still matches, but only on the static-text child, and
-    // adding the role filter loses the control.
     let response = diagnostics.handle_read_request(&call(
         "query_ui_nodes",
         serde_json::json!({ "text": "Open workspace", "visible_only": true }),
     ));
     assert_eq!(
         total(&response),
-        1,
-        "the text is findable through the child that owns it",
+        2,
+        "the composed control and its label child are discoverable",
     );
     assert_eq!(reads.get(), 0, "searching never reads a value");
 
@@ -346,12 +324,10 @@ fn the_ai_tool_finds_an_ordinary_composite_button_by_the_same_label_as_native_ac
             )
             .expect("the query succeeds")
             .total,
-        0,
-        "GAP: text + role finds nothing; Swift finds the composite control",
+        1,
+        "text and role identify the composed control",
     );
 
-    // The child that carries the text is what matches, and the control keeps an
-    // empty composed label. Querying by the raw label directly shows both.
     let label_child = diagnostics
         .query_nodes(
             None,
@@ -375,8 +351,8 @@ fn the_ai_tool_finds_an_ordinary_composite_button_by_the_same_label_as_native_ac
     );
     assert_eq!(
         label_child.semantics.as_ref().map(|s| s.role),
-        Some(AccessibilityRole::StaticText),
-        "the match is the static-text child, not the composite button",
+        Some(AccessibilityRole::Button),
+        "the control is discoverable by its composed label",
     );
 
     let control_node = diagnostics
@@ -405,16 +381,15 @@ fn the_ai_tool_finds_an_ordinary_composite_button_by_the_same_label_as_native_ac
     );
     assert_eq!(
         control_node.semantics.as_ref().map(|s| s.label.as_str()),
-        Some(""),
-        "GAP: the composed label is empty; Swift resolves it",
+        Some("Open workspace"),
+        "the composed label matches native accessibility",
     );
     assert!(
         control_node.presentation.input_enabled,
         "the control is still an enabled target",
     );
 
-    // Native accessibility does resolve the label, so the two surfaces
-    // disagree until the gap closes — which is the observable difference.
+    // Compare against native accessibility without evaluating private values.
     /// Flatten while keeping each element's *snapshot* semantics: the resolved
     /// label lives on the element, not on the authored node.
     fn flatten(
@@ -438,7 +413,7 @@ fn the_ai_tool_finds_an_ordinary_composite_button_by_the_same_label_as_native_ac
         .expect("the button is in the native tree");
     assert_eq!(
         native_label, "Open workspace",
-        "GAP: native accessibility resolves the composed label, diagnostics does not",
+        "native accessibility and diagnostics resolve the same composed label",
     );
     assert_eq!(reads.get(), 0);
 }

@@ -6,7 +6,8 @@
 use crate::inspection::inspector::{DebugAttachmentKey, SceneInspector};
 use cove_core::Rect;
 use cove_core::scene::{
-    AccessibilitySemantics, Node, NodeTree, StateDescriptor, StateRegistry, StateValue,
+    AccessibilitySemantics, AccessibilityTree, Node, NodeTree, StateDescriptor, StateRegistry,
+    StateValue,
 };
 use cove_devtools_protocol::{
     Envelope, NodeFrame, NodeSummary, SourceLocation, StateObservation, StateWatch,
@@ -92,6 +93,8 @@ pub struct DiagnosticCompactNode {
     pub role: Option<String>,
     pub label: Option<String>,
     pub value: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub value_truncated: Option<bool>,
     pub state: Option<Vec<String>>,
     pub frame: Option<NodeFrame>,
     pub input_enabled: bool,
@@ -133,6 +136,7 @@ impl DiagnosticCompactNode {
             value: semantics
                 .map(|semantics| semantics.value.clone())
                 .filter(|value| !value.is_empty()),
+            value_truncated: item.value_truncated,
             state: (!state.is_empty()).then_some(state),
             frame: item.presentation.visible_frame.clone(),
             input_enabled: item.presentation.input_enabled,
@@ -203,6 +207,7 @@ pub struct DiagnosticsStateQuery {
 #[derive(Debug, Clone, PartialEq)]
 pub enum DiagnosticError {
     InvalidConfiguration(String),
+    MissingNode(String),
     UnknownTool(String),
     InvalidResult,
 }
@@ -211,6 +216,7 @@ impl DiagnosticError {
     pub fn message(&self) -> String {
         match self {
             Self::InvalidConfiguration(message) => message.clone(),
+            Self::MissingNode(id) => format!("Node is missing or unmounted: {id}"),
             Self::UnknownTool(name) => format!("Unknown tool: {name}"),
             Self::InvalidResult => "Tool returned invalid JSON or exceeded 512 KiB.".into(),
         }
@@ -232,6 +238,9 @@ impl From<DiagnosticError> for crate::agent::AgentError {
                 crate::agent::AgentError::InvalidConfiguration(message)
             }
             DiagnosticError::UnknownTool(name) => crate::agent::AgentError::UnknownTool(name),
+            DiagnosticError::MissingNode(id) => crate::agent::AgentError::InvalidConfiguration(
+                format!("Node is missing or unmounted: {id}"),
+            ),
             DiagnosticError::InvalidResult => crate::agent::AgentError::InvalidResult,
         }
     }
@@ -308,6 +317,7 @@ impl Diagnostics {
             if let Some(mut semantics) = node.accessibility()
                 && !semantics.is_hidden
             {
+                semantics.label = AccessibilityTree::resolved_label(&node);
                 if semantics.state.is_secure {
                     semantics.value = "<redacted>".into();
                 }
@@ -380,9 +390,7 @@ impl Diagnostics {
         if let Some(id) = id
             && !all.iter().any(|item| item.node.id == id)
         {
-            return Err(DiagnosticError::InvalidConfiguration(format!(
-                "Node is missing or unmounted: {id}"
-            )));
+            return Err(DiagnosticError::MissingNode(id.into()));
         }
         let text = text.map(str::to_lowercase);
         let source = source.map(str::to_lowercase);
@@ -416,12 +424,17 @@ impl Diagnostics {
                         }
                     }
                     if let Some(role) = role {
-                        let matches = node.semantic_role.as_deref() == Some(role)
-                            || node.layout_role.as_deref() == Some(role)
-                            || item
-                                .semantics
-                                .as_ref()
-                                .is_some_and(|semantics| format!("{:?}", semantics.role) == role);
+                        let matches = node
+                            .semantic_role
+                            .as_deref()
+                            .is_some_and(|name| name.eq_ignore_ascii_case(role))
+                            || node
+                                .layout_role
+                                .as_deref()
+                                .is_some_and(|name| name.eq_ignore_ascii_case(role))
+                            || item.semantics.as_ref().is_some_and(|semantics| {
+                                format!("{:?}", semantics.role).eq_ignore_ascii_case(role)
+                            });
                         if !matches {
                             return false;
                         }
@@ -658,6 +671,7 @@ impl Diagnostics {
             Err(error) => {
                 let kind = match error {
                     DiagnosticError::UnknownTool(_) => "unsupported_tool",
+                    DiagnosticError::MissingNode(_) => "stale_node",
                     _ => "bad_request",
                 };
                 request.error(kind, &error.message())
@@ -743,6 +757,8 @@ impl Diagnostics {
         arguments: &serde_json::Value,
     ) -> Result<serde_json::Value, DiagnosticError> {
         use crate::inspection::tools::Tool;
+        crate::agent::JsonSchemaValidator::validate(arguments, &tool.definition().schema)
+            .map_err(|error| DiagnosticError::InvalidConfiguration(error.to_string()))?;
         let data = match tool {
             Tool::QueryUiMemory => {
                 let memory = self.memory.borrow().clone();

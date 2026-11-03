@@ -188,8 +188,14 @@ impl McpServer {
                 match toolbox.execute(name, &arguments) {
                     Ok(result) => {
                         let text = String::from_utf8_lossy(&result.json).to_string();
+                        let mut content = vec![json!({ "type": "text", "text": text })];
+                        content.extend(result.images.iter().map(|image| {
+                            json!({
+                                "type": "image", "data": image.data, "mimeType": image.mime_type
+                            })
+                        }));
                         let mut payload = json!({
-                            "content": [{ "type": "text", "text": text }],
+                            "content": content,
                             "isError": result.is_error
                         });
                         if let Some(value) = result.value()
@@ -197,7 +203,14 @@ impl McpServer {
                         {
                             payload["structuredContent"] = value;
                         }
-                        response(id, payload)
+                        let encoded = response(id, payload);
+                        if encoded.len() > crate::transport::MAX_RESPONSE_BYTES {
+                            return response(
+                                id,
+                                json!({"content": [{"type": "text", "text": "Tool result exceeds the MCP response limit; request a smaller page or image."}], "isError": true}),
+                            );
+                        }
+                        encoded
                     }
                     Err(error) => {
                         let message = error.to_string();
@@ -443,5 +456,38 @@ mod tests {
         );
         assert_eq!(called["result"]["isError"], false);
         assert_eq!(called["result"]["structuredContent"]["x"], 1);
+    }
+
+    #[test]
+    fn image_content_is_separate_from_text_and_media_bounds_are_tool_errors() {
+        let toolbox = AgentToolbox::new(
+            vec![AgentTool::new("image", "capture", JsonSchema::any(), true)],
+            Arc::new(|_, input| {
+                let data = if input["large"] == true {
+                    "A".repeat(crate::MAX_TOOL_IMAGE_BYTES + 4)
+                } else {
+                    "/9j/2Q==".into()
+                };
+                Ok(AgentToolResult::encode(&json!({"width": 2}), false)
+                    .with_image(data, "image/jpeg"))
+            }),
+        )
+        .unwrap();
+        let server = McpServer::new("image-test", "1", toolbox);
+        let call = |large| {
+            parse(&server.respond(&serde_json::to_vec(&json!({
+            "jsonrpc": "2.0", "id": 1, "method": "tools/call", "params": {"name": "image", "arguments": {"large": large}}
+        })).unwrap()).unwrap())
+        };
+        let result = call(false);
+        assert_eq!(result["result"]["content"][1]["type"], "image");
+        assert_eq!(result["result"]["structuredContent"]["width"], 2);
+        assert!(
+            !result["result"]["content"][0]["text"]
+                .as_str()
+                .unwrap()
+                .contains("/9j/2Q==")
+        );
+        assert_eq!(call(true)["result"]["isError"], true);
     }
 }

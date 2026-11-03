@@ -68,7 +68,8 @@ impl DiagnosticsSession for DevToolsSession {
     }
 
     fn attach_input(&mut self, inject: Rc<dyn Fn(InputEvent)>) {
-        *self.devtools.input_delivery.borrow_mut() = Some(Rc::new(move |event| inject(event)));
+        self.devtools
+            .set_input_delivery(Some(Rc::new(move |event| inject(event))));
     }
 
     fn mirror_is_active(&self) -> bool {
@@ -156,7 +157,10 @@ pub fn factory() -> DiagnosticsFactory {
                         .windows
                         .iter()
                         .map(|(key, value)| {
-                            (key.clone(), BTreeMap::from([("bytes".to_owned(), *value as i64)]))
+                            (
+                                key.clone(),
+                                BTreeMap::from([("bytes".to_owned(), *value as i64)]),
+                            )
                         })
                         .collect(),
                 }

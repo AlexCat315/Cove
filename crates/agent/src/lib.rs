@@ -15,9 +15,10 @@ pub use schema::{
 };
 pub use skills::{AgentSkill, AgentSkillLibrary};
 pub use tool::{
-    AgentError, AgentMessage, AgentModel, AgentReply, AgentRole, AgentRun, AgentSession, AgentTool,
-    AgentToolCall, AgentToolResult, AgentToolbox, MAX_TOOL_DESCRIPTION_BYTES, MAX_TOOL_INPUT_BYTES,
-    MAX_TOOL_NAME_BYTES, MAX_TOOL_RESULT_BYTES, MAX_TOOLS, SessionApiFormat, ToolExecutor,
+    AgentError, AgentImage, AgentMessage, AgentModel, AgentReply, AgentRole, AgentRun,
+    AgentSession, AgentTool, AgentToolCall, AgentToolResult, AgentToolbox,
+    MAX_TOOL_DESCRIPTION_BYTES, MAX_TOOL_IMAGE_BYTES, MAX_TOOL_INPUT_BYTES, MAX_TOOL_NAME_BYTES,
+    MAX_TOOL_RESULT_BYTES, MAX_TOOLS, SessionApiFormat, ToolExecutor,
 };
 
 // Convenience aliases so call sites can use either the `JSON`-prefixed spelling

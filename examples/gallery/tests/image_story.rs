@@ -25,9 +25,14 @@ fn the_story_starts_with_the_bundled_source() {
 #[test]
 fn each_source_resolves_to_its_own_url() {
     let story = story();
-    assert_eq!(
-        story.resolved_url().as_deref(),
-        Some("gallery-landscape.svg")
+    let bundled = story.resolved_url().expect("the bundled source has a URL");
+    assert!(
+        bundled.starts_with("file://") && bundled.ends_with("/resources/gallery-landscape.png"),
+        "the bundled source is a file URL the loader accepts, got {bundled}"
+    );
+    assert!(
+        std::path::Path::new(bundled.trim_start_matches("file://")).exists(),
+        "the bundled sample picture ships with the gallery: {bundled}"
     );
 
     story.set_source(ImageSourceKind::Missing);

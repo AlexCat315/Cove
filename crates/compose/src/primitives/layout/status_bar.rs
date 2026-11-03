@@ -209,6 +209,10 @@ impl View for StatusBarText {
                 AnyView::new(TupleView::new(items)),
             )
             .frame(None, None, Some(0.0), None, None, None)
+            // A cell is the flex item inside the bar's slot row. Without shrink it
+            // keeps its measured width and paints over the trailing counts; with
+            // shrink it takes the slot's width and the labels ellipsize inside it.
+            .flex_with(0.0, 1.0, None)
             .accessibility({
                 let text = text.clone();
                 let detail = detail.clone();

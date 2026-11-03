@@ -23,6 +23,8 @@ cargo run --package cove-rust-counter --locked
 
 crate 使用 `src/`、`tests/`、`native/`、`resources/`；`build.rs` 位于 crate 根目录。性能关键的原生内核保留 C。
 
+AI 调试可直接使用 [DevTools MCP](crates/devtools/README.md)。项目配置见 `.mcp.json`；启动入口为 `cargo run --quiet -p cove-devtools-cli -- mcp`，提供查询、交互、等待、截图和性能工具。
+
 ```sh
 cargo fmt --all --check
 cargo clippy --workspace --all-targets --locked -- -D warnings

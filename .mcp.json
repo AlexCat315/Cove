@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "cove-devtools": {
+      "command": "cargo",
+      "args": ["run", "--quiet", "--package", "cove-devtools-cli", "--", "mcp"]
+    }
+  }
+}

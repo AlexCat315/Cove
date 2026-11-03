@@ -4,6 +4,13 @@
 
 ## Unreleased
 
+- **DevTools MCP 可直接使用（2026-11-03）**：
+  - 新增独立 Rust `cove-devtools-cli` / `cove-devtools mcp` stdio 服务及项目 `.mcp.json`，启动前可发现工具和指南，支持端口、WebSocket 地址与认证会话文件；持久连接后台读取，失败不重放写操作。
+  - 补齐语义选择器点击、填值、键盘、拖拽/滚动、条件等待、截图、窗口调整、选择、临时样式和日志工具，以及跨调用 CPU trace、分页、比较和帧耗时采集；同一套工具可由 CLI 调用。
+  - MCP 截图返回有大小限制的图片 content，不再作为 base64 文字；节点默认紧凑输出，显式值读取保留截断标记，选择器歧义和无效输入在交付前报错。
+  - 修复角色筛选大小写、组合控件标签、诊断参数校验和时间线停止时丢失尾部 span；宿主区分输入、可访问性动作和图片能力，桌面/Android 共用适配器在延迟安装输入回调后更新能力声明。
+  - 替换过时 Swift 接入文档，补充 AI 使用指引与真实认证 WebSocket、stdio、交互、截图和 trace 回归验证。破坏性：`AgentToolResult` 增加 `images` 字段，直接构造时请改用构造器或补齐字段；无效协议输入和越界诊断参数不再被当作成功请求。
+
 - **Swift 迁移遗留与 Gallery 覆盖补齐（2026-11-02）**：
   - `ChartOverlayLabel` 从 attachment 字符串改为真实文字排版：标题、副标题与每行键值都按主题渲染，callout 与 annotation 的卡片边框和圆角随之生效。
   - 删除 `workspace/view.rs` 中重复移植的 tab bar、rail、split divider 与布局节点子树；`DRAG_THRESHOLD` 只保留 `drag.rs` 一处定义。

@@ -5,8 +5,10 @@
 //! variants (`Null`/`Bool`/`Number`/`String`/`Array`/`Object`) and its accessors
 //! are Swift's `stringValue`/`objectValue`. Keeping one type means a payload can
 //! never hold two incompatible JSON trees.
+mod keyboard;
 mod recording;
 mod session;
+pub use keyboard::key_scancode;
 pub use recording::*;
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
 pub use serde_json::Value as JsonValue;
@@ -144,6 +146,31 @@ payload!(MirrorInput {
     button: Option<i64>, key: Option<String>, key_code: Option<i64>, text: Option<String>,
     modifiers: Option<i64>, click_count: Option<i64>, is_repeat: Option<bool>, scroll: Option<cove_platform::ScrollInput>,
 });
+impl MirrorInput {
+    pub fn is_valid(&self) -> bool {
+        if [self.x, self.y, self.delta_x, self.delta_y]
+            .into_iter()
+            .flatten()
+            .any(|value| !value.is_finite())
+            || self.button.is_some_and(|button| !(0..=4).contains(&button))
+            || self
+                .modifiers
+                .is_some_and(|modifiers| !(0..=15).contains(&modifiers))
+        {
+            return false;
+        }
+        match self.kind.as_str() {
+            "pointerMove" | "pointerDown" | "pointerUp" => self.x.is_some() && self.y.is_some(),
+            "wheel" => self.delta_x.is_some() || self.delta_y.is_some(),
+            "text" => self
+                .text
+                .as_ref()
+                .is_some_and(|text| !text.is_empty() && text.len() <= 65_536),
+            "keyDown" | "keyUp" => key_scancode(self.key.as_deref()).is_some(),
+            _ => false,
+        }
+    }
+}
 payload!(TimingFrame {
     frame: u64, recomposition_ms: Option<f64>, layout_ms: f64, draw_ms: f64,
     present_ms: f64, presented: Option<bool>, total_ms: f64, node_count: usize, batch_count: usize,

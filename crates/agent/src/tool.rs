@@ -76,18 +76,39 @@ impl AgentTool {
 pub struct AgentToolResult {
     pub json: Vec<u8>,
     pub is_error: bool,
+    pub images: Vec<AgentImage>,
+}
+
+/// Image content is kept out of the JSON/text result so MCP clients can see it.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct AgentImage {
+    pub data: String,
+    pub mime_type: String,
 }
 
 impl AgentToolResult {
     pub fn new(json: Vec<u8>, is_error: bool) -> Self {
-        Self { json, is_error }
+        Self {
+            json,
+            is_error,
+            images: Vec::new(),
+        }
     }
 
     pub fn encode(value: &Value, is_error: bool) -> Self {
         Self {
             json: serde_json::to_vec(value).unwrap_or_else(|_| b"null".to_vec()),
             is_error,
+            images: Vec::new(),
         }
+    }
+
+    pub fn with_image(mut self, data: String, mime_type: impl Into<String>) -> Self {
+        self.images.push(AgentImage {
+            data,
+            mime_type: mime_type.into(),
+        });
+        self
     }
 
     pub fn value(&self) -> Option<Value> {
@@ -109,7 +130,7 @@ impl AgentError {
         match self {
             Self::InvalidConfiguration(message) => message.clone(),
             Self::UnknownTool(name) => format!("Unknown tool: {name}"),
-            Self::InvalidResult => "Tool returned invalid JSON or exceeded 512 KiB.".into(),
+            Self::InvalidResult => "Tool returned invalid JSON/media or exceeded the result limit (JSON: 512 KiB; images: 1 MiB encoded).".into(),
             Self::StepLimit => "Agent reached its tool round limit.".into(),
         }
     }
@@ -127,6 +148,7 @@ impl std::error::Error for AgentError {}
 pub const MAX_TOOLS: usize = 256;
 pub const MAX_TOOL_INPUT_BYTES: usize = 262_144;
 pub const MAX_TOOL_RESULT_BYTES: usize = 524_288;
+pub const MAX_TOOL_IMAGE_BYTES: usize = 1_048_576;
 pub const MAX_TOOL_NAME_BYTES: usize = 128;
 pub const MAX_TOOL_DESCRIPTION_BYTES: usize = 16_384;
 
@@ -185,6 +207,24 @@ impl AgentToolbox {
         let result = (self.executor)(name, input)?;
         if result.json.len() > MAX_TOOL_RESULT_BYTES
             || serde_json::from_slice::<Value>(&result.json).is_err()
+            || result.images.len() > 4
+            || result
+                .images
+                .iter()
+                .map(|image| image.data.len())
+                .sum::<usize>()
+                > MAX_TOOL_IMAGE_BYTES
+            || result.images.iter().any(|image| {
+                image.data.is_empty()
+                    || !matches!(
+                        image.mime_type.as_str(),
+                        "image/jpeg" | "image/png" | "image/webp"
+                    )
+                    || image
+                        .data
+                        .bytes()
+                        .any(|byte| !byte.is_ascii_alphanumeric() && !b"+/=".contains(&byte))
+            })
         {
             return Err(AgentError::InvalidResult);
         }

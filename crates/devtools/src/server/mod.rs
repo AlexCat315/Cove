@@ -542,6 +542,14 @@ impl DevServer {
                 }
             }
             "timeline.unsubscribe" => {
+                // A client stopping capture must receive the tail even if no
+                // further frame will call `broadcast_observations`.
+                if let Some(client) = self.clients.get(&key)
+                    && let Some(timeline) = &self.host.observation.timeline
+                {
+                    let snapshot = timeline(client.session.timeline_sequence);
+                    self.send_timeline(&snapshot, connection, None);
+                }
                 self.set_subscription(Subscription::Timeline, false, key);
                 self.sync_timeline_capture();
                 self.send_ok(connection, &envelope);
@@ -652,9 +660,16 @@ impl DevServer {
                 }
                 match decode_payload::<cove_devtools_protocol::MirrorInput>(&envelope.payload) {
                     Some(input) => {
-                        if let Some(deliver) = &self.host.mirror.input {
-                            deliver(&input);
-                        }
+                        let Some(deliver) = &self.host.mirror.input else {
+                            self.send_error(
+                                connection,
+                                &envelope,
+                                "unsupported",
+                                "Host has no input adapter",
+                            );
+                            return;
+                        };
+                        deliver(&input);
                         self.send_ok(connection, &envelope);
                     }
                     None => self.send_error(

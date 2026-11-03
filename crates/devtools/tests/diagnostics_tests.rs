@@ -18,15 +18,6 @@
 //! the wire contract says `"listItem"`. Assertions below use the current
 //! documented spelling and name the Swift expectation.
 //!
-//! `GAP 2 — argument schema is not enforced.` `execute_read_json` reads each
-//! argument with `.get(..)` and never validates against the published
-//! `JsonSchema`. Swift's wire adapter rejects unknown keys and out-of-range
-//! values, so `query_ui_nodes` must refuse `arguments: []`,
-//! `{"limit": 0}` and `{"unexpected": true}`; Rust answers all three with
-//! `diagnostics.call.ok`. Only the `include_value`-without-`node_id` rule and an
-//! unmounted `node_id` are rejected, because those two are checked in
-//! `query_nodes` itself.
-//!
 //! `GAP 3 — overflow order.` `collect_overflow` walks with an explicit stack
 //! (`while let Some(node) = stack.pop()`), so it reports depth-first in reverse
 //! sibling order: `["7", "2"]` where Swift's recursive
@@ -185,9 +176,7 @@ fn compact_queries_return_one_short_record_per_node_with_state_and_secure_redact
     tree.set_root(Some(root));
 
     let diagnostics = Diagnostics::new(Rc::new(RefCell::new(tree)), None);
-    // GAP 1: the wire role is `"ListItem"` here; Swift filters on `"listItem"`.
-    // Assert the documented spelling works, so a future fix to GAP 1 that
-    // changes the spelling will fail loudly at this exact line.
+    // Both the existing Debug spelling and the documented wire spelling work.
     let response = diagnostics.handle_read_request(&call(
         "query_ui_nodes",
         serde_json::json!({ "role": "ListItem", "compact": true }),
@@ -199,9 +188,8 @@ fn compact_queries_return_one_short_record_per_node_with_state_and_secure_redact
             "query_ui_nodes",
             serde_json::json!({ "role": "listItem", "compact": true }),
         ))),
-        0,
-        "GAP: the Swift-spelled role 'listItem' does not match; Rust emits \
-         'ListItem' where Swift uses AccessibilityRole.rawValue",
+        1,
+        "the documented listItem role filter is accepted",
     );
     let item = &data(&response)["items"][0];
     assert_eq!(
@@ -728,23 +716,16 @@ fn immediate_wire_rejects_malformed_unbounded_and_async_requests() {
     };
 
     rejected(serde_json::json!([]));
-    rejected(serde_json::json!({ "node_id": "unmounted" }));
+    let stale = diagnostics.handle_read_request(&call(
+        "query_ui_nodes",
+        serde_json::json!({"node_id": "unmounted"}),
+    ));
+    assert_eq!(stale.r#type, "diagnostics.call.err");
+    assert_eq!(stale.payload.unwrap()["code"], "stale_node");
     rejected(serde_json::json!({ "include_value": true }));
 
-    // GAP 2: the published schema is not enforced on the wire. Swift rejects
-    // unknown keys and out-of-range values; Rust reads each argument with
-    // `.get(..)` and answers `ok`. Assert the current behaviour and name the
-    // Swift expectation, so a later fix fails here rather than silently.
-    for arguments in [
-        serde_json::json!({ "limit": 0 }),
-        serde_json::json!({ "unexpected": true }),
-    ] {
-        let response = diagnostics.handle_read_request(&call("query_ui_nodes", arguments.clone()));
-        assert_eq!(
-            response.r#type, "diagnostics.call.ok",
-            "GAP: {arguments} is not schema-validated; Swift rejects it as bad_request",
-        );
-    }
+    rejected(serde_json::json!({ "limit": 0 }));
+    rejected(serde_json::json!({ "unexpected": true }));
 
     for name in [
         "capture_ui_trace",

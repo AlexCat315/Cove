@@ -1,340 +1,93 @@
-# CoveUI DevTools
+# Cove DevTools
 
-Minimal standalone client for the in-process `CoveUIDevTools` WebSocket server.
+Rust 2024 运行时诊断、Inspector 和 AI 工具。应用端使用 WebSocket；AI 通过独立的 `cove-devtools` MCP 服务连接，同一会话复用一条应用连接。
 
-The server uses SwiftNIO on macOS, Linux and Windows. Protocol dispatch and
-socket transport live in the [Protocol](Protocol/Package.swift), [Inspection](Inspection/Package.swift) and [DevTools](Package.swift) capability packages.
-The previous Network.framework-only server and non-Apple no-op were removed.
-
-1. Start an app with DevTools enabled:
-
-   ```bash
-   COVE_DEVTOOLS=1 cargo run
-   ```
-
-   The server listens on `COVE_DEVTOOLS_HOST:COVE_DEVTOOLS_PORT`
-   (default `127.0.0.1:9229`). Setting `COVE_DEVTOOLS_SESSION_ID`,
-   `COVE_DEVTOOLS_TOKEN` and `COVE_DEVTOOLS_SESSION_FILE` together enables an
-   authenticated session whose descriptor is written to that file. Android needs
-   `adb forward tcp:9229 tcp:9229`.
-
-For direct framework development, `COVE_DEVTOOLS=1 swift run --package-path
-CoveUI/Examples CoveUIDemo` still enables the loopback service at the default
-port 9229. Open Client/index.html and connect manually in that workflow. Ordinary apps
-use the same runtime diagnostics service; no demo-specific API is required.
-
-The client uses a two-zone layout: the mirror fills the full width of the upper
-area, and a resizable bottom dock holds tabbed panels (Tree, Selection,
-Performance, Log). The dock splitter drags its height and the active tab,
-height and collapsed state persist in the browser; clicking a tab restores a
-collapsed dock and clicking the active tab collapses it.
-
-The client can inspect and filter the live node tree, select a node, request
-configurable mirror frames, collect timing/log/runtime inventory data, capture
-and restore host checkpoints, and forward pointer, wheel, text, and common
-keyboard input through the mirror. Selecting a node sends `select.node` with the
-stable `elementID`, which the host uses to draw a runtime overlay.
-
-Tree, log, timing, and mirror streams are opt-in per connection. Disconnecting
-also releases pressed input and clears the runtime selection overlay.
-
-## Performance capture and reports
-
-The Performance tab is populated automatically; no manual start is required.
-
-- Timing frames are collected continuously from the `timing` stream into a
-  bounded in-browser history (latest 3600 frames). Windows of 30/60/120/300
-  seconds or all history can be compared.
-- The summary cards show reciprocal CPU throughput, frame-total avg/p50/p99/max,
-  hitch counts against the 60 fps budget, presented-frame percentage and
-  average node/batch counts.
-- The stage heatmap renders one row per measured stage (frame total,
-  recomposition, layout, draw, present) and 120 time buckets per window; a cell
-  is the worst frame in that bucket, colored against the stage budget. Hover a
-  cell for the frame number, timestamp and stage values.
-- Stage tables list avg/p50/p95/p99/max and the over-budget rate; worst frames
-  and the hottest CPU-timeline components (count/total/avg/max) are listed
-  separately. **Mark** adds a named marker for before/after comparisons.
-- **Auto trace** (on by default) subscribes to the CPU timeline on connect;
-  disable it when the CPU instrumentation overhead is unwanted. The host
-  recorder still only runs while at least one client subscribes.
-- **Export MD** writes an AI-friendly Markdown report (summary, stage tables,
-  worst frames, hot components, heatmap series, markers, warning/error logs);
-  **Copy report** copies the same text; **Export JSON** writes structured data
-  including the Chrome/Perfetto trace and recent log entries. **Clear** resets
-  the frame history and restarts the host timeline capture.
-  Report downloads are named `cove-performance-<timestamp>.{md,json}`.
-
-Layout and dock preferences (active tab, height, collapsed state, auto trace)
-are kept in browser localStorage and never sent to the host.
-
-Desktop tree snapshots are captured on the scene thread and encoded once on a
-dedicated background worker. Full-tree updates are limited to at most 10 Hz;
-bursts keep one pending notification and capture the latest tree after the active
-update, including the last change before the app becomes idle. Unsubscribed
-clients do not cause tree capture. Timing, state and input requests use the
-separate server queue and do not wait for tree JSON encoding.
-
-The loaded Editor has also passed connection acceptance with 1,036 nodes and
-approximately 1.1 MB per snapshot: continuous temporary layout edits, final idle
-update delivery, layout/draw/component timeline, mirror output, and three
-disconnect/reconnect cycles. The connection regression previously spent about
-2.3 seconds per frame parsing tree JSON on the main thread. In the same test
-scene after the fix, 21 selection/style requests had a median response time of
-23 ms and a maximum of 61 ms. These are local debug-build acceptance results,
-not a display FPS guarantee.
-
-Frame mirroring currently requires the macOS ImageIO encoder. Linux/Windows
-hosts advertise tree, selection, log, timing and configured state providers,
-and omit the unavailable mirror capability.
-
-For a headless connection test, use the `cove_devtools::probe` module
-(`cargo test -p cove-devtools`). It serves a real Node/Taffy diagnostic tree without GPU dependencies.
-
-## Pick, inspect layout, edit styles
-
-Click **Pick component**, then click a component in the actual application or
-mirror. Picking includes noninteractive text and consumes the click before app
-handlers. Escape cancels. The selection path lets you move to a parent container.
-The layout panel shows margin, border, padding, content dimensions and flex rules.
-Edit the four padding edges or background/foreground color fields to see a live
-layout/repaint. Hex colors accept alpha; color swatches choose opaque colors.
-
-**Undo / Redo**, **Clear selected**, **Clear all**, and per-property Reset control
-temporary overrides. App recomposition preserves them; clearing restores current
-app styles. Disconnect/stop discards overrides and history. Changes stay in memory.
-Native `Text` and the shared demo honor foreground/padding; custom paint callbacks
-must read effective node styles. See [inspection protocol](Protocol/Inspection.md)
-for messages, lifecycle, limits and custom host integration.
-
-## Source location and component recomposition
-
-Select a component in the app/tree, then use **Source & recomposition → Open
-source** to open the recorded Swift expression in VS Code or Cursor. For a
-remote/CI build, expand **Editor path mapping** and enter the build-machine
-repository prefix and your local repository prefix. POSIX and Windows absolute
-paths, spaces and Unicode are supported. Preferences stay in this browser.
-Your OS/browser must have the chosen editor's URI handler installed.
-
-`ViewBuilder` automatically captures `#fileID`, `#filePath`, `#line` and `#column`
-for view expressions. These wrappers add no scene nodes and preserve keyed
-reconciliation. Bodies with an explicit `return`, manually assembled child lists,
-and explicitly declared concrete `Body` types may bypass automatic capture;
-use `.sourceLocation()` at the component's creation site when exact coordinates
-matter (for example, `ConcreteBodyView().sourceLocation()`).
-`graph.install(root:)` also records its call site as a root fallback. If a node
-has no coordinates, the Inspector labels the nearest ancestor location explicitly.
-Locations refer to the compiled source version; rebuild after moving code.
-
-The selected node's **owning user component** shows recomposition count, last,
-average, total and maximum time, plus a separate initial-mount time. Causes include
-named `@State` writes, observable registrar keys, dynamic properties, parent scope
-updates and changed CompositionLocal providers. Cause links select the originating
-parent component. Same-scope queued writes coalesce and retain at most 16 distinct
-causes; actual parent-driven body evaluations are also counted. Only property/key
-names are recorded, not state values. Temporary style edits and viewport layout
-changes do not count as body recomposition.
-
-Expand **All components** to sort by count, total or last duration and select a
-row. **Reset statistics** clears counters, update durations and causes for live
-components, preserving initial-mount times, app state and style undo history.
-Removed components disappear and new instances start fresh. Measurements use a
-monotonic clock around body evaluation plus reconciliation; layout/GPU paint is
-excluded, and parent durations include child work, so rows must not be summed as
-frame time. Profiling is lightweight and enabled by default; custom hosts may set
-`graph.tracksRecomposition = false` before installation.
-
-Native and Wasm hosts publish identical additive snapshot fields. See
-[component analysis protocol](Protocol/Analysis.md). Editor jumps construct a
-client-side `vscode://file`/`cursor://file` link; the runtime never reads a source
-file or executes an editor command.
-
-The [Wasm prototype](../Browser/README.md) embeds the same client and uses
-`browser://cove` over a same-origin MessageChannel. This transport requires the
-Inspector to be embedded in its browser host.
-
-Application startup installs [CoveLogging](../../Engine/Logging/README.md), independently of DevTools. The Inspector subscribes to bounded startup history and live records; it does not install or replace swift-log. The Logs panel supports level/module/text filters, structured metadata and source details, pause display, loss counts and JSONL export. See [log protocol](Protocol/Logs.md). Hosts with an existing swift-log backend select local installation in the application's logging configuration.
-
-The default endpoint is loopback-only. Binding to `0.0.0.0` or `::` exposes
-remote input and state restore to the local network; only do this on a trusted
-development network.
-
-
-## Shared Compose and reproducible input
-
-The [Wasm host](../Browser/README.md) and desktop `CoveUIDemo --shared-counter`
-run one Compose source with real ViewGraph, Taffy and input dispatch. Their Inspector
-supports Capture/Restore/Diff and Record/Stop/Replay. `state.diff` accepts the baseline
-string dictionary and returns `{added, removed, changed: {key: {before, after}}}`.
-The tree invalidation log attributes State writes to their Compose scope.
-
-Input recordings use version 2 with `initialState`, optional `focusTarget`, `events`
-(`milliseconds`, Codable `event`) and `truncated`. Wheel events preserve the typed
-`scroll` group: points/lines/pages, stream precision, finger phase, independent
-momentum phase and monotonic timestamp. The browser mirror maps DOM `deltaMode`
-and direction into this protocol; native point input is not multiplied by a line
-step or display density. Version 1 recordings are not decoded. Replay restores initial state and
-focus, then dispatches events in order with composition/layout between events. It does
-not reproduce wall-clock delays. The limits are 4096 events and 768 KiB. Native recording is owned by
-one connection and is stopped on disconnect. Hosts provide `recording.start`,
-`recording.stop`, `recording.replay` callbacks and observe input with the window
-session's `inputObserver`; controls are enabled only with capability `recording`.
-
-Browser development reloads use `npm run dev`; successful complete builds restore
-checkpoints, and compile failures keep the previous page usable with an error overlay.
-
-## State observation, timeline and source breakpoints
-
-Use `@State(expose: true)` to register a field for read-only observation; a
-`summary:` callback can abbreviate or redact it. **Observed state** lists metadata
-without reading values. Check individual fields to watch their current summaries,
-or filter to the selected component. Custom hosts can register providers on
-`graph.stateRegistry`. Registration follows component lifetime.
-
-**Record timeline** captures actual component/commit, flex layout and draw-list
-CPU spans. Filter stages, click a component span to inspect it, then stop and
-**Export trace** for a Chrome/Perfetto-compatible JSON capture. The web client
-subscribes automatically via **Auto trace** while connected; the recorder
-itself is subscriber-driven and bounded, so unsubscribed hosts capture nothing.
-Parent and child durations overlap. GPU execution is excluded.
-
-**Add breakpoint** forwards the mapped source coordinates to the companion
-CoveUI-vscode extension's existing VS Code/Cursor debugger API. Build and reload
-that extension to enable its URI handler and node-tree context command. See
-[observation protocol](Protocol/Observation.md) for registration APIs, lifecycle,
-wire messages and bounds.
-
-The extension adds line breakpoints and reveals the original source column.
-Its source-node command has been verified in a real VS Code Swift/LLDB DAP
-session, including pending/live breakpoint hits, pause, step, stacks and variable
-scopes. Cursor and OS URI dispatch still need separate acceptance. Launch/attach
-and execution control remain with the editor debugger. Wasm source debugging
-requires a separate tool integration that supports Swift/Wasm debug information.
-
-Native timing distinguishes submitted and skipped swapchain frames. A locked or
-occluded window can skip presentation while State observations, CPU timeline and
-offscreen mirror continue. Failed frames retain dirty work and retry at display
-cadence. `cpuThroughputFPS` is a CPU work estimate, not measured display FPS.
-The macOS SDL loop flushes pending Core Animation transactions before drawable
-acquisition. Unlocked native window display, State/layout updates, CPU timeline,
-Metal mirror and pointer input have passed
-`npm run verify:native-demo -- --require-presented`; the check requires submitted frames
-after each update.
-Native window zoom and restore have also passed visual acceptance; the demo now
-reallocates its MSAA target when the drawable dimensions change.
-
-Run the native Inspector acceptance suite without a Wasm SDK or GPU:
-
-```bash
-cargo test -p cove-devtools
-swift run --package-path Tools/Developer cove-dev browser verify --native-only
-```
-
-The runner needs Chromium. It exercises real WebSocket
-source/profile, picking/styles, selected state values, timeline start/stop/export,
-breakpoint URLs and disconnect/reconnect cleanup.
-
-## Profile and platform adapters
-
-Streams are still subscription-driven;
-CPU instrumentation and picture mirroring have measurement overhead and should
-be enabled only for the investigation. `fromEnvironment` does not enable a production Release runtime.
-
-Android now connects the same scene protocol to its UI-thread Handler, including
-while the surface is paused. It advertises tree/selection/styles/source/component
-analysis/state observation/CPU timeline/timing. It does not advertise picture
-mirroring or arbitrary checkpoint/recording providers that its host has not
-installed. Its timing presentMs covers host work after draw-list preparation,
-including GPU command submission/waiting; it is not GPU execution duration.
-
-
-## AI-driven component acceptance
-
-No OS automation is needed. Start the app with `COVE_DEVTOOLS=1`, query its
-live AI diagnostics, inject input through DevTools and inspect the renderer mirror.
-The actions below are DevTools protocol requests sent over the session endpoint.
-
-A bare JSON object runs `query_ui_nodes`; `query TOOL JSON` runs any other tool.
-`click` and `input` accept `--capture OUT.jpg`, which mirrors the window as soon
-as delivery completes. Use it for transient states (a scroll indicator that fades,
-a transition in flight); a separate `capture` call opens a new connection first.
-`compact: true` returns one short record per node (id, role, label, value,
-non-default state, clipped frame, `File.swift:line`) instead of the full
-layout/style/view-type payload. The same actions are available as
-`cove-dev devtools query-ui|input-ui|capture-ui|record-timings`, which
-accept a port or an `@session.json` / `@runtime.json` file. Managed sessions retain their authentication
-token and device-forwarded port inside the connection; copying a token into shell
-commands is unnecessary. Select a component through the Gallery search, then
-inspect the narrow/wide/touch previews and change scale or appearance in the UI.
-Build/test changes with `cargo test --workspace TEST -- --test-threads=1`.
-
-Gallery flags: `--input touch|mixed|pointer`, `--dark`, `--text-scale 2`,
-`--rtl`, `--reduce-motion`. Width and height still follow the real window after
-resize. These overrides are transient and never change authored configuration.
-The host may clamp window height to the available display; use the mirror's
-logical dimensions and queried visible frames as the actual acceptance size.
-
-`input-ui PORT --click-node ID` resolves a live, visible, enabled hit region.
-`input-ui PORT --input @events.json` accepts pointer, wheel, keyboard and text
-events, plus `{"kind":"wait","milliseconds":100}` between events. Each wait is
-at most 2 seconds and the sequence's total wait budget is 10 seconds. One
-connection stays open throughout the sequence, preserving capture while the
-host produces intermediate frames. Start a drag with a small move inside the
-target before moving outside its bounds. Input acknowledgements confirm delivery;
-always query the resulting value and inspect a fresh mirror image to verify it.
-
-Input fields keep their values lazy. Ordinary node discovery does not read them.
-Keyboard events use browser `KeyboardEvent.code`, for example
-`{"kind":"keyDown","key":"KeyA","modifiers":["cmd"]}`. Numeric USB-HID
-`scancode` is also accepted, including letters and digits. Unsupported
-or missing key codes fail before delivery instead of reporting a successful
-sequence whose shortcut was ignored.
-
-For modal and menu entrance animations, use
-`capture-ui PORT OUTPUT.jpg --settle-ms 400`. The optional delay is bounded to
-0–2000 ms and recorded in the capture's JSON sidecar. It lets the host advance
-its animations before the mirror starts; it is a sampling delay, not an assertion
-that an async operation has completed. Query the expected state as well.
-
-Mirror captures default to one pixel per logical point. Add `--scale 2` (1–3,
-up to the display density) to inspect hairlines, corner radii and antialiasing
-at Retina resolution; the capture fails after 15 s when the host cannot produce
-a frame, and the application log names the reason.
-
-After locating the actual `textField` node (rather than a debug-name wrapper),
-explicitly request its current draft/value through the same AI query:
+## 启动与 MCP 接入
 
 ```sh
-cove-dev devtools query-ui 9231 query_ui_nodes \
-  '{"node_id":"177","include_value":true}'
+COVE_DEVTOOLS=1 cargo run --package cove-examples
+cargo run --quiet --package cove-devtools-cli -- mcp
 ```
 
-The response puts the value in `semantics.value` and reports `valueTruncated`.
-Output is capped at 4096 Unicode characters; `include_value` requires one
-`node_id`, and unmounted IDs fail. Secure fields return `<redacted>` without
-evaluating their value provider. No private `@State` is exposed by this read.
+仓库根目录的 `.mcp.json` 提供项目配置。支持该配置的 MCP 客户端可直接加载；其他客户端注册同一 stdio 命令：
 
-Touch surfaces use CoveUI's unified pointer dispatcher, including real touch
-scroll/refresh/swipe recognition and 44pt hit regions. They test component
-behavior; platform IME and physical device adapters still need device acceptance.
-The mirror replays the application's draw list and excludes OS compositor chrome.
-Its native render target is sampleable and supplies the renderer's backdrop
-source, so backdrop effects match the application's
-rendering. `MirrorBackdropTests` verifies actual Metal pixels before and after
-capture resize.
-Native display links paused by hidden/occluded windows report themselves
-unavailable, so the host's deadline clock still advances animations. This keeps
-an AI-opened modal from remaining transparent when another test window covers
-it; the mirror remains useful without foregrounding or OS automation.
+```json
+{
+  "mcpServers": {
+    "cove-devtools": {
+      "command": "cargo",
+      "args": ["run", "--quiet", "--manifest-path", "/absolute/path/to/Cove/Cargo.toml", "--package", "cove-devtools-cli", "--", "mcp"]
+    }
+  }
+}
+```
 
+服务可在应用启动前完成 `initialize`、`tools/list` 和任务指南发现。第一次操作时连接应用；连接失效后，下次调用重新连接。写操作失败不会自动重放。
 
-## Ownership and directory structure
+默认地址为 `ws://127.0.0.1:9229/`。通过 `--endpoint 9231`、`--endpoint ws://127.0.0.1:9231/` 或 `--endpoint @session.json` 指定目标，也可设置 `COVE_DEVTOOLS_ENDPOINT`。没有显式目标时依次读取 `COVE_DEVTOOLS_SESSION_FILE`、`COVE_DEVTOOLS_PORT`，最后使用 9229。
 
-- `Client/Connection` owns WebSocket and embedded browser transports and message dispatch.
-- `Client/Inspector` owns the tree, runtime inventory and temporary layout/style edits.
-- `Client/Analysis`, `Client/State`, `Client/Diagnostics`, and `Client/Mirror` own their respective panels.
-- `Client/Session` owns grouped session state and common controls; `Application.js` only composes factories and startup events. Factories receive explicit session/elements/peer operations.
-- `Protocol` documents the shared protocol. Swift message models remain canonical in Protocol, separate from HTML rendering.
-- DevTools server `Session`, `Transport`, `Tree` and `Requests` separate lifecycle, sockets, tree encoding and request domains. Typed host adapters group scene, checkpoints, recordings, observations and mirror callbacks.
+应用端设置 `COVE_DEVTOOLS_SESSION_ID`、`COVE_DEVTOOLS_TOKEN` 和 `COVE_DEVTOOLS_SESSION_FILE` 后，将含认证端点的会话文件写入指定路径。MCP 服务重新连接时重读文件；连接 token 不会写入工具结果或连接错误。Android 使用 `adb forward tcp:9229 tcp:9229` 后连接本地端口。
 
-Session descriptor files, connection tokens, ADB forwarding and temporary edits are session data, never application manifest or authored checkpoint fields.
+MCP 服务在 macOS、Linux 和 Windows 使用同一 Rust 实现，不依赖 UI/GPU 库。设备上的应用通过可达的 WebSocket 或端口转发接入；浏览器内的 MessageChannel Inspector 仍由浏览器宿主连接。具体工具是否可用取决于 `get_ui_session` 返回的实际 host capabilities。
+
+## 直接使用工具
+
+| 任务 | 工具 |
+| --- | --- |
+| 连接与能力发现 | `get_ui_session`、`get_diagnostics` |
+| 查找节点、布局与源位置 | `query_ui_nodes` |
+| 点击、填值、键盘、拖拽与滚动 | `click_ui`、`fill_ui`、`press_ui_key`、`input_ui` |
+| 可访问性动作与滚动到节点 | `activate_ui` |
+| 等待可见、隐藏、启用或字段值 | `wait_for_ui` |
+| 截图与窗口尺寸 | `capture_ui`、`resize_ui` |
+| 选择与临时样式 | `select_ui`、`set_ui_style`、`edit_ui_style_history` |
+| 日志、重组、公开状态与内存 | `query_ui_logs`、`query_ui_recomposition`、`query_ui_state`、`query_ui_memory` |
+| 帧耗时 | `record_ui_timings` |
+| 围绕操作录制 CPU 时间线 | `start_ui_trace`、`stop_ui_trace` |
+| 固定时段录制、分页与比较 | `capture_ui_trace`、`get_ui_trace`、`compare_ui_traces` |
+| 使用指南 | `list_skills`、`read_skill`，或 MCP `prompts/list`、`prompts/get` |
+
+`query_ui_nodes` 在 MCP/CLI 中默认 `compact: true`，返回节点 ID、语义、可见边界和源位置。设 `compact: false` 可读取完整布局与样式。角色筛选兼容 `button` / `Button`、`textField` / `TextField`；组合控件使用与原生无障碍一致的可见文字。普通发现不读取懒加载字段值。读取字段需显式指定 `node_id` 和 `include_value: true`，上限 4096 个字符并报告 `valueTruncated`；安全字段返回 `<redacted>`，不执行值 provider。
+
+交互工具的 `selector` 接受 `node_id`、`label`、`text`、`role` 和 `source`。`label` 精确匹配，`text` 为子串；点击和填值只接受唯一、可见、启用且未被模态作用域阻挡的目标。歧义会返回候选 ID。节点卸载后 ID 失效。
+
+常用调用参数：
+
+```json
+{"selector":{"label":"Save","role":"button"},"capture":true}
+{"selector":{"label":"Name","role":"textField"},"text":"Cove"}
+{"selector":{"node_id":"177"},"state":"value","expected":"Cove","timeout_ms":3000}
+{"key":"Enter"}
+{"scale":2,"settle_ms":400}
+```
+
+截图通过 MCP `image` content 返回，同时提供像素和逻辑尺寸；不会把 base64 放进文字上下文。`click_ui` / `fill_ui` 的 `capture: true` 在同一连接上立即截图。截图不包含 OS 窗口装饰；`settle_ms` 是 0–2000 ms 的采样延迟，不是异步完成断言。请使用 `wait_for_ui` 验证实际状态。
+
+`input_ui` 接受最多 256 个有类型的事件。指针坐标为逻辑点，滚轮位移使用点单位；键盘使用 `KeyboardEvent.code`。修饰键位为 Shift=1、Ctrl=2、Alt=4、Meta=8。`fill_ui` 根据远端平台选择全选快捷键，支持空字符串清空。事件在全部校验后才交付；每个 wait 最多 2000 ms，总等待最多 10000 ms。输入成功回执只确认交付。
+
+CPU trace 可先 start，再执行真实交互，最后 stop；后台连接线程会持续读取，避免录制期间空闲的 MCP 客户端阻塞宿主。事件与结果有上限，超出部分报告损失，最多保留八个 capture。停止时会读取最后一批 span。空闲采集可能为空；父子 span 重叠，CPU present 不代表 GPU 执行时间，帧样本也不代表显示 FPS。
+
+## 无 MCP 客户端时的 CLI
+
+相同工具可以直接调用，无需编写 WebSocket 脚本：
+
+```sh
+cargo run --quiet -p cove-devtools-cli -- tools
+cargo run --quiet -p cove-devtools-cli -- --endpoint 9231 call query_ui_nodes '{"text":"Save","role":"button"}'
+cargo run --quiet -p cove-devtools-cli -- call click_ui '{"selector":{"label":"Save","role":"button"}}'
+cargo run --quiet -p cove-devtools-cli -- call capture_ui '{"scale":2}' --image /tmp/cove.jpg
+```
+
+一次 CLI 调用拥有一个连接。需要跨调用保持选择、样式历史或 start/stop trace 时使用 MCP 服务。JSON 输出不含截图 base64；`--image` 保存 JPEG。
+
+## Inspector 与宿主集成
+
+浏览器打开 `crates/devtools/client/index.html`，连接运行时端点。Inspector 提供树、镜像、布局、临时样式、重组统计、公开状态、日志、性能与宿主已安装的 checkpoint / 输入录制。流按连接显式订阅，断开后释放所属临时检查状态。
+
+框架宿主创建 `DevTools`，通过 `set_input_delivery` 安装输入回调，按需安装帧读取、状态、窗口和内存 provider，然后启动；每轮 UI 事件泵调用 `pump`，布局或帧完成后调用对应通知。`input`、`accessibility` 和 `mirror` 分别描述原始输入、语义动作和图片读取，截图缺失不妨碍已安装的输入工具。没有 provider 的能力不会被假定存在。
+
+协议见 [Inspection](../devtools-protocol/Inspection.md)、[Analysis](../devtools-protocol/Analysis.md)、[Observation](../devtools-protocol/Observation.md) 和 [Logs](../devtools-protocol/Logs.md)。
+
+```sh
+cargo test -p cove-agent -p cove-devtools-protocol -p cove-devtools -p cove-devtools-cli --locked
+```

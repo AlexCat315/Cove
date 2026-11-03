@@ -130,7 +130,7 @@ impl Session {
                     "mirror commands require an active mirror subscription",
                 ));
             }
-            "mirror.input" => decode::<MirrorInput>(request).is_some(),
+            "mirror.input" => decode::<MirrorInput>(request).is_some_and(|input| input.is_valid()),
             "mirror.activate" => decode::<MirrorActivate>(request).is_some(),
             "window.resize" => decode::<WindowResize>(request).is_some_and(|p| p.is_valid()),
             "mirror.start" => request.payload.is_none() || decode::<MirrorStart>(request).is_some(),
@@ -341,6 +341,33 @@ mod tests {
         );
         assert!(session.validate(&request).is_some());
     }
+    #[test]
+    fn invalid_input_is_rejected_before_acknowledging_delivery() {
+        let mut session = Session::default();
+        session.set(Subscription::Mirror, true);
+        for payload in [
+            serde_json::json!({"kind": "keyDown", "key": "Unsupported"}),
+            serde_json::json!({"kind": "pointerDown", "x": 10}),
+            serde_json::json!({"kind": "text", "text": ""}),
+            serde_json::json!({"kind": "unknown"}),
+        ] {
+            assert!(
+                session
+                    .validate(&Envelope::new("mirror.input", Some(1), Some(payload)))
+                    .is_some()
+            );
+        }
+        assert!(
+            session
+                .validate(&Envelope::new(
+                    "mirror.input",
+                    Some(1),
+                    Some(serde_json::json!({"kind": "keyDown", "key": "Enter"}))
+                ))
+                .is_none()
+        );
+    }
+
     #[test]
     fn watched_ids_are_bounded_and_unique() {
         assert!(

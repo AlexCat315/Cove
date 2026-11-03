@@ -666,7 +666,12 @@ fn menu() {
 #[test]
 fn scrolling() {
     InteractiveScene::run(390.0, GRID_HEIGHT, |scene| {
-        let harness = Harness::new(true, false, None);
+        // A 400pt fixture for a column set that needs 720pt: the grid's own
+        // scroll viewport is narrower than its content, which is what makes the
+        // horizontal reveal and the wheel meaningful. At the default 720pt the
+        // columns fit exactly and the only "overflow" used to be a cell that
+        // painted past its track.
+        let harness = Harness::new(true, false, Some(400.0));
         scene.install(harness.clone());
         harness.overrides.set(HashMap::from([
             ("notes".to_string(), true),

@@ -601,11 +601,20 @@ impl View for ModalStory {
         AnyView::new(StorySection::new(
             "Dialog",
             "Open the dialog, cycle focus with Tab, then close with Escape or the cancel action.",
-            AnyView::new(TupleView::new(vec![
-                AnyView::new(Button::title("New project", open).enabled(self.options.is_enabled)),
-                dialog,
-                AnyView::new(AnyView::new(status).debug_name("modal-status")),
-            ])),
+            // FlexStart keeps the trigger at its natural width; a bare tuple
+            // would be stretched by the section's Stretch column.
+            AnyView::new(BoxView::new(
+                FlexDirection::Column,
+                Align::FlexStart,
+                Justify::FlexStart,
+                Wrap::NoWrap,
+                12.0,
+                AnyView::new(TupleView::new(vec![
+                    AnyView::new(Button::title("New project", open).enabled(self.options.is_enabled)),
+                    dialog,
+                    AnyView::new(AnyView::new(status).debug_name("modal-status")),
+                ])),
+            )),
         ))
     }
 

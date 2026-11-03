@@ -230,10 +230,11 @@ pub fn serve_stdio(handler: Handler) -> io::Result<()> {
 /// [`serve_stdio`] over any reader and writer.
 pub fn serve_lines(reader: impl BufRead, writer: &LineWriter, handler: &Handler) -> io::Result<()> {
     let mut reader = reader;
-    let mut line = String::new();
+    let mut line = Vec::new();
     loop {
         line.clear();
-        let read = reader.read_line(&mut line)?;
+        let read = std::io::Read::take(&mut reader, (MAX_LINE_BYTES + 1) as u64)
+            .read_until(b'\n', &mut line)?;
         if read == 0 {
             return Ok(());
         }
@@ -243,7 +244,9 @@ pub fn serve_lines(reader: impl BufRead, writer: &LineWriter, handler: &Handler)
                 "request exceeds 1 MiB",
             ));
         }
-        let trimmed = line.trim_end_matches(['\n', '\r']);
+        let text = std::str::from_utf8(&line)
+            .map_err(|_| io::Error::new(io::ErrorKind::InvalidData, "request must be UTF-8"))?;
+        let trimmed = text.trim_end_matches(['\n', '\r']);
         if trimmed.is_empty() {
             continue;
         }
@@ -329,5 +332,13 @@ mod tests {
         // nothing because the handler returned `None`.
         drop(stream);
         server.stop();
+    }
+
+    #[test]
+    fn stdio_rejects_oversized_input_before_reading_the_whole_line() {
+        let mut input = std::io::Cursor::new(vec![b'x'; MAX_LINE_BYTES * 3]);
+        let writer = LineWriter::new(Sink::default());
+        assert!(serve_lines(&mut input, &writer, &echo()).is_err());
+        assert_eq!(input.position(), (MAX_LINE_BYTES + 1) as u64);
     }
 }

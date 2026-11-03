@@ -20,6 +20,7 @@ members = [
     "crates/http",
     "crates/devtools",
     "crates/devtools-protocol",
+    "crates/devtools-cli",
     "crates/addons",
     "xtask",
     "crates/browser",

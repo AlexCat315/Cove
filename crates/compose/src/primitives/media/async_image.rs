@@ -308,6 +308,16 @@ impl AsyncImage {
         self
     }
 
+    /// The decode extent the loader is asked for, in device pixels. The view
+    /// still occupies the authored points; only the decoded bitmap scales with
+    /// the display density.
+    pub fn request_extent(&self) -> (u32, u32) {
+        (
+            pixel_extent(self.width, self.content_mode == ImageContentMode::Fill),
+            pixel_extent(self.height, self.content_mode == ImageContentMode::Fill),
+        )
+    }
+
     pub fn policy(mut self, mut policy: ImageLoadingPolicy) -> Self {
         policy.validate();
         self.policy = policy;
@@ -376,6 +386,8 @@ impl View for AsyncImage {
         AnyView::new(AsyncImageHost {
             session: session.clone(),
             request,
+            width: self.width,
+            height: self.height,
             content,
         })
     }
@@ -394,6 +406,10 @@ fn image_for_asset(
 struct AsyncImageHost {
     session: Rc<AsyncImageSession>,
     request: ImageLoadRequest,
+    /// The authored size in points. The request carries the decode resolution,
+    /// which is a multiple of this once the display scale is applied.
+    width: f32,
+    height: f32,
     content: AnyView,
 }
 
@@ -410,28 +426,25 @@ impl PrimitiveView for AsyncImageHost {
 
     fn make_layout_node(&self) -> Option<LayoutNode> {
         let layout = LayoutNode::new();
-        layout.set_width(Some(self.request_width()));
-        layout.set_height(Some(self.request_height()));
+        layout.set_width(Some(self.width));
+        layout.set_height(Some(self.height));
         layout.set_align_items(cove_core::scene::Align::Center);
         layout.set_justify_content(cove_core::scene::Justify::Center);
         Some(layout)
     }
 
     fn update_layout(&self, layout: &LayoutNode) {
-        layout.set_width(Some(self.request_width()));
-        layout.set_height(Some(self.request_height()));
+        layout.set_width(Some(self.width));
+        layout.set_height(Some(self.height));
     }
 
     fn update_node(&self, node: &Node) {
-        let width = self.request_width();
-        let height = self.request_height();
         if let Some(resource) = node.first_resource::<AsyncImageResource>() {
             resource.configure(&self.session, &self.request);
         }
         if let Some(playback) = node.first_resource::<AsyncImagePlayback>() {
             playback.configure(&self.session, node.prefers_reduced_motion());
         }
-        let _ = (width, height);
     }
 
     fn children(&self, _node: &Node) -> Vec<AnyView> {
@@ -440,16 +453,6 @@ impl PrimitiveView for AsyncImageHost {
 }
 
 impl_primitive_view!(AsyncImageHost);
-
-impl AsyncImageHost {
-    fn request_width(&self) -> f32 {
-        (self.request.pixel_width as f32).max(1.0)
-    }
-
-    fn request_height(&self) -> f32 {
-        (self.request.pixel_height as f32).max(1.0)
-    }
-}
 
 struct AsyncImageResource {
     node: RefCell<Option<Node>>,

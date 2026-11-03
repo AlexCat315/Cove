@@ -6,14 +6,19 @@
 //!   still has width at the wider sizes
 //! - a long leading fact truncates to one line, and the trailing state stays
 //!   readable and keeps its own width
+//! - the truncating leading fact stops at the trailing state instead of painting
+//!   over it
 //!
-//! Named difference (production gap, recorded rather than fixed): the truncating
-//! leading fact overlaps the trailing state. Swift sized the flexed leading fact to
-//! the space left after the trailing cells, so `maxX <= trailing.minX` held. The
-//! Rust `StatusBar` gives the leading fact its measured width instead of the
-//! remaining width: at a 320pt bar the leading fact is laid out 262.125pt wide from
-//! x = 8 (so it reaches 270.125) while the trailing state starts at 253.97.
-//! `the_truncating_fact_overlaps_the_trailing_state` pins that.
+//! Resolved difference (was a recorded production gap): the truncating leading
+//! fact used to overlap the trailing state. A custom layout used to lay its child
+//! out in a flex-start probe, so an auto-width row kept its min-content width — a
+//! nowrap label is as wide as the whole label — and the leading fact was laid out
+//! at its measured 262.125pt from x = 8 while the trailing state started at 253.97.
+//! `place_for_custom_layout` now lays an overflowing child out again in a
+//! stretching probe, so the cell takes the slot the layout assigned it and the
+//! labels ellipsize inside it. At a 320pt bar the leading fact is 225.969pt wide
+//! from x = 8 and the trailing state starts at 253.969.
+//! `the_truncating_fact_stops_at_the_trailing_state` pins that.
 //! - a long panel title stays on one line at both a narrow and a wide panel, and
 //!   the narrow title is genuinely narrower so the accessory keeps its space
 
@@ -141,11 +146,9 @@ fn a_long_fact_truncates_without_hiding_the_trailing_state() {
                 leading_node.frame().width > 0.0,
                 "the long fact still gets width"
             );
-            // Gap: see the module note. The leading fact is laid out wider than the
-            // space left for it, so it runs into the trailing state.
             assert!(
-                leading_node.absolute_frame().max_x() > trailing_node.absolute_frame().x,
-                "the leading fact currently overlaps the trailing state: {:?} vs {:?}",
+                leading_node.absolute_frame().max_x() <= trailing_node.absolute_frame().x,
+                "the leading fact stops at the trailing state: {:?} vs {:?}",
                 leading_node.absolute_frame(),
                 trailing_node.absolute_frame()
             );
@@ -217,9 +220,9 @@ fn a_long_panel_title_stays_one_line_and_gives_space_back() {
 }
 
 #[test]
-fn the_truncating_fact_overlaps_the_trailing_state() {
-    // Gap: see the module note. Pinned with the concrete geometry so the fix is
-    // easy to verify.
+fn the_truncating_fact_stops_at_the_trailing_state() {
+    // The resolved difference above, pinned with the concrete geometry so a
+    // regression is easy to spot.
     GlobalTestLock::locked(|| {
         support::with_test_text_environment(|| {
             let leading = "feature/workspace-permissions-and-collaboration";
@@ -252,12 +255,12 @@ fn the_truncating_fact_overlaps_the_trailing_state() {
                 .absolute_frame();
 
             assert_eq!(
-                leading_frame.width, 262.125,
-                "the leading fact takes its measured width rather than the remaining space"
+                leading_frame.width, 225.96875,
+                "the leading fact takes the space left after the trailing state"
             );
             assert!(
-                leading_frame.max_x() > trailing_frame.x,
-                "so it reaches past the trailing state's leading edge: {} > {}",
+                leading_frame.max_x() <= trailing_frame.x,
+                "so it stops before the trailing state's leading edge: {} <= {}",
                 leading_frame.max_x(),
                 trailing_frame.x
             );

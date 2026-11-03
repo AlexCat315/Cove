@@ -14,13 +14,20 @@ use cove_ui_compose::primitives::controls::Button;
 use cove_ui_compose::primitives::media::{AsyncImage, AsyncImagePhase, ImageContentMode};
 use cove_ui_compose::primitives::text::Text;
 use cove_ui_compose::theme::tokens::SemanticColorRef;
-use cove_ui_compose::{AnyView, TupleView, View};
+use cove_core::scene::{Align, FlexDirection, Justify, Wrap};
+use cove_ui_compose::{AnyView, BoxView, TupleView, View};
 
 use super::feedback::StorySection;
 use crate::gallery_content::catalog::GalleryOptions;
 
 /// The default remote URL the story pre-fills.
 pub const DEFAULT_REMOTE_URL: &str = "https://avatars.githubusercontent.com/u/99124972?v=4";
+/// The bundled sample picture, as a `file:` URL the loader accepts.
+pub const BUNDLED_URL: &str = concat!(
+    "file://",
+    env!("CARGO_MANIFEST_DIR"),
+    "/resources/gallery-landscape.png"
+);
 /// The path that intentionally does not exist, for the missing state.
 pub const MISSING_PATH: &str = "/cove-gallery-missing.png";
 /// The preview size, in points.
@@ -176,7 +183,10 @@ impl ImageStory {
     /// The URL the current source resolves to, or `None` for the empty source.
     pub fn resolved_url(&self) -> Option<String> {
         match self.source() {
-            ImageSourceKind::Bundled => Some("gallery-landscape.svg".to_owned()),
+            // `AsyncImage` only speaks `file:` and `http(s):`, so a bare file
+            // name is rejected as an unsupported URL and the demo would always
+            // show its failure state.
+            ImageSourceKind::Bundled => Some(BUNDLED_URL.to_owned()),
             ImageSourceKind::Remote => Some(self.remote_url.get().trim().to_owned()),
             ImageSourceKind::Missing => Some(MISSING_PATH.to_owned()),
             ImageSourceKind::Empty => None,
@@ -218,6 +228,11 @@ impl View for ImageStory {
             PREVIEW_WIDTH,
             PREVIEW_HEIGHT,
             |phase: AsyncImagePhase| {
+                // A decoded image is the point of the demo; the caption only
+                // stands in for the phases that have nothing to draw.
+                if let AsyncImagePhase::Success(image) = &phase {
+                    return AnyView::new(image.clone());
+                }
                 let surface = surface_for(&phase, || "The request failed".to_owned());
                 AnyView::new(
                     Text::new(surface_caption(&surface))
@@ -232,12 +247,21 @@ impl View for ImageStory {
         AnyView::new(StorySection::new(
             "Asynchronous loading",
             "Switch between a bundled SVG, a remote photo, a missing file and no source. Retry starts a new request after failure.",
-            AnyView::new(TupleView::new(vec![
-                AnyView::new(AnyView::new(preview).frame_height(PREVIEW_HEIGHT)),
-                AnyView::new(caption),
-                AnyView::new(request),
-                AnyView::new(retry),
-            ])),
+            // FlexStart keeps the trigger at its natural width; a bare tuple
+            // would be stretched by the section's Stretch column.
+            AnyView::new(BoxView::new(
+                FlexDirection::Column,
+                Align::FlexStart,
+                Justify::FlexStart,
+                Wrap::NoWrap,
+                12.0,
+                AnyView::new(TupleView::new(vec![
+                    AnyView::new(AnyView::new(preview).frame_height(PREVIEW_HEIGHT)),
+                    AnyView::new(caption),
+                    AnyView::new(request),
+                    AnyView::new(retry),
+                ])),
+            )),
         ))
     }
 

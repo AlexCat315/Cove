@@ -339,17 +339,22 @@ fn session_captures_one_request_at_a_time() {
 fn density_change_rescales_the_request() {
     support::GlobalTestLock::locked(|| {
         let previous = ContentScaleHolder::current();
-        for (scale, expected) in [(1.0f32, (40.0f32, 30.0f32)), (2.0, (80.0, 60.0))] {
+        for (scale, expected) in [(1.0f32, (40u32, 30u32)), (2.0, (80, 60))] {
             ContentScaleHolder::set_current(scale);
             let graph = support::graph();
             let image = AsyncImage::new(None::<String>, 40.0, 30.0, |_phase: AsyncImagePhase| {
                 AnyView::new(cove_composition::EmptyView)
             });
+            // The host keeps the authored points at every density; only the
+            // decode extent doubles. It used to lay out at the request extent,
+            // so a 2x display doubled the view instead of the bitmap.
+            assert_eq!(
+                image.request_extent(),
+                expected,
+                "density {scale} resolves the request extent to {expected:?}"
+            );
             graph.install_view(AnyView::new(image), Default::default());
             graph.compute_layout(200.0, 200.0);
-
-            // The host's laid-out size is the resolved request extent, so a
-            // doubled drawable density doubles it without rebuilding the node.
             let root = graph.tree.borrow().root().expect("root");
             let mut nodes = Vec::new();
             collect(&root, &mut nodes);
@@ -363,8 +368,8 @@ fn density_change_rescales_the_request() {
                 .expect("the image host lays out");
             assert_eq!(
                 (host.width, host.height),
-                expected,
-                "density {scale} resolves the request extent to {expected:?}"
+                (40.0, 30.0),
+                "density {scale} keeps the authored logical size"
             );
         }
         ContentScaleHolder::set_current(previous);

@@ -1,0 +1,28 @@
+[package]
+name = "cove-devtools-cli"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "Persistent Cove DevTools MCP bridge and command-line tools"
+
+[[bin]]
+name = "cove-devtools"
+path = "src/main.rs"
+
+[dependencies]
+cove-agent.workspace = true
+cove-devtools-protocol.workspace = true
+serde_json.workspace = true
+clap.workspace = true
+tungstenite = { version = "0.30", default-features = false, features = ["handshake"] }
+base64 = "0.22"
+
+[dev-dependencies]
+tempfile.workspace = true
+cove-devtools = { path = "../devtools" }
+cove-core.workspace = true
+cove-platform.workspace = true
+
+[lints]
+workspace = true

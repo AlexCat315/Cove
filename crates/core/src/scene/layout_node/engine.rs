@@ -26,20 +26,29 @@ use taffy::{
 };
 
 const PROBE_BIT: usize = 1;
-const _: () = assert!(align_of::<LayoutCell>() > PROBE_BIT);
+const PLACE_BIT: usize = 2;
+const _: () = assert!(align_of::<LayoutCell>() > PLACE_BIT);
 
 /// Swift's measurement cache depth per child of a custom layout.
 const MEASUREMENTS: usize = 4;
 
 thread_local! {
     /// The probe container: a flex-start column with Yoga's zero minimums.
-    static PROBE_STYLE: &'static Style = Box::leak(Box::new(probe_style()));
+    static PROBE_STYLE: &'static Style = Box::leak(Box::new(probe_style(taffy::AlignItems::FLEX_START)));
+    /// The placement probe: the same column, but stretching across the slot.
+    ///
+    /// A custom layout assigns each child an exact slot. Measurement has to stay
+    /// flex-start so an intrinsic probe reports the child's own size, but
+    /// placement must hand the child that width: a flex container child only
+    /// shrinks its own children when it knows its extent, and an auto width
+    /// resolved from min-content (a nowrap label) is as wide as the label.
+    static PLACE_STYLE: &'static Style = Box::leak(Box::new(probe_style(taffy::AlignItems::STRETCH)));
 }
 
-fn probe_style() -> Style {
+fn probe_style(align_items: taffy::AlignItems) -> Style {
     Style {
         flex_direction: taffy::FlexDirection::Column,
-        align_items: taffy::AlignItems::FLEX_START,
+        align_items,
         align_content: taffy::AlignContent::FLEX_START,
         position: taffy::Position::Relative,
         min_size: taffy::Size {
@@ -48,6 +57,15 @@ fn probe_style() -> Style {
         },
         ..Style::DEFAULT
     }
+}
+
+/// Which synthetic container stands in for a custom layout's child.
+#[derive(Clone, Copy, PartialEq)]
+pub(super) enum Probe {
+    /// Intrinsic measurement: the child keeps its own size.
+    Measure,
+    /// Placement: the child takes the slot the layout assigned it.
+    Place,
 }
 
 #[derive(Clone, Copy, PartialEq)]
@@ -67,6 +85,7 @@ pub(super) struct EngineState {
     cache: RefCell<Cache>,
     layout: Cell<Layout>,
     probe_cache: RefCell<Cache>,
+    place_cache: RefCell<Cache>,
     measurements: RefCell<Vec<(Proposal, Size)>>,
 }
 
@@ -80,6 +99,7 @@ impl Default for EngineState {
             cache: RefCell::new(Cache::new()),
             layout: Cell::new(Layout::new()),
             probe_cache: RefCell::new(Cache::new()),
+            place_cache: RefCell::new(Cache::new()),
             measurements: RefCell::new(Vec::new()),
         }
     }
@@ -95,11 +115,13 @@ impl EngineState {
     pub(super) fn is_clear(&self) -> bool {
         self.cache.borrow().is_empty()
             && self.probe_cache.borrow().is_empty()
+            && self.place_cache.borrow().is_empty()
             && self.measurements.borrow().is_empty()
     }
     pub(super) fn clear_results(&self) {
         self.cache.borrow_mut().clear();
         self.probe_cache.borrow_mut().clear();
+        self.place_cache.borrow_mut().clear();
         self.forget_measurements();
     }
     pub(super) fn forget_measurements(&self) {
@@ -147,18 +169,31 @@ impl EngineState {
 fn node_id(node: &LayoutNode) -> NodeId {
     NodeId::from(Rc::as_ptr(&node.0) as usize)
 }
-fn probe_id(node: &LayoutNode) -> NodeId {
-    NodeId::from(Rc::as_ptr(&node.0) as usize | PROBE_BIT)
+fn probe_id(node: &LayoutNode, probe: Probe) -> NodeId {
+    let bit = match probe {
+        Probe::Measure => PROBE_BIT,
+        Probe::Place => PLACE_BIT,
+    };
+    NodeId::from(Rc::as_ptr(&node.0) as usize | bit)
+}
+fn probe_kind(id: NodeId) -> Option<Probe> {
+    let bits = usize::from(id) & (PROBE_BIT | PLACE_BIT);
+    match bits {
+        0 => None,
+        PROBE_BIT => Some(Probe::Measure),
+        PLACE_BIT => Some(Probe::Place),
+        _ => unreachable!("a node address is only ever tagged with one probe bit"),
+    }
 }
 fn is_probe(id: NodeId) -> bool {
-    usize::from(id) & PROBE_BIT != 0
+    probe_kind(id).is_some()
 }
 /// # Safety
 /// `id` must name a node of the tree being laid out; the root's strong
 /// references keep every such cell alive for the whole pass.
 unsafe fn cell<'a>(id: NodeId) -> &'a LayoutCell {
     // SAFETY: the caller guarantees the tagged address belongs to a live tree node.
-    unsafe { &*((usize::from(id) & !PROBE_BIT) as *const LayoutCell) }
+    unsafe { &*((usize::from(id) & !(PROBE_BIT | PLACE_BIT)) as *const LayoutCell) }
 }
 
 /// Rebuild `cell`'s Taffy style for `inherited` if it is stale.
@@ -305,11 +340,14 @@ impl LayoutPartialTree for LayoutTree {
 }
 
 fn style_of<'a>(id: NodeId) -> &'a Style {
-    if is_probe(id) {
-        return PROBE_STYLE.with(|style| *style);
+    match probe_kind(id) {
+        Some(Probe::Measure) => PROBE_STYLE.with(|style| *style),
+        Some(Probe::Place) => PLACE_STYLE.with(|style| *style),
+        None => {
+            // SAFETY: see `cell` and `refresh_style`.
+            unsafe { &*cell(id).engine.style.get() }
+        }
     }
-    // SAFETY: see `cell` and `refresh_style`.
-    unsafe { &*cell(id).engine.style.get() }
 }
 
 fn compute_node(
@@ -497,10 +535,10 @@ impl CacheTree for LayoutTree {
 fn cache_of<'a>(id: NodeId) -> &'a RefCell<Cache> {
     // SAFETY: see `cell`.
     let node = unsafe { cell(id) };
-    if is_probe(id) {
-        &node.engine.probe_cache
-    } else {
-        &node.engine.cache
+    match probe_kind(id) {
+        Some(Probe::Measure) => &node.engine.probe_cache,
+        Some(Probe::Place) => &node.engine.place_cache,
+        None => &node.engine.cache,
     }
 }
 
@@ -586,6 +624,7 @@ pub(super) fn layout_probe(
     width: Option<f32>,
     height: Option<f32>,
     direction: Direction,
+    probe: Probe,
 ) -> Size {
     refresh_style(&child.0, direction);
     let inputs = LayoutInput {
@@ -605,7 +644,7 @@ pub(super) fn layout_probe(
         vertical_margins_are_collapsible: Line::FALSE,
     };
     let mut tree = LayoutTree;
-    tree.compute_child_layout(probe_id(child), inputs);
+    tree.compute_child_layout(probe_id(child, probe), inputs);
     let size = child.0.engine.layout().size;
     Size {
         width: size.width,

@@ -81,7 +81,7 @@ impl LayoutNode {
         if let Some(state) = &owner.data().custom {
             state.invalidate();
         }
-        let size = engine::layout_probe(self, width, height, direction);
+        let size = engine::layout_probe(self, width, height, direction, engine::Probe::Measure);
         self.0
             .engine
             .store_measurement(width, height, direction, size);
@@ -105,18 +105,22 @@ impl LayoutNode {
             self.data_mut().placed_frame = Some(Rect::default());
             return;
         }
-        let size = engine::layout_probe(self, width, height, owner.custom_layout_direction());
+        let direction = owner.custom_layout_direction();
+        let mut size = engine::layout_probe(self, width, height, direction, engine::Probe::Measure);
+        // A child wider than its slot is laid out again in a stretching probe:
+        // an auto-width flex container resolves to its min-content width (a
+        // nowrap label is as wide as the whole label), so it would otherwise
+        // keep its intrinsic width and paint over the neighbouring slot. The
+        // stretch only runs when the child actually overflows, so an at-most
+        // proposal still leaves a narrower child at its own size.
+        if width.is_some_and(|slot| size.width > slot + 0.01) {
+            size = engine::layout_probe(self, width, height, direction, engine::Probe::Place);
+        }
         self.place_custom_layouts();
-        // The probe reports the child's intrinsic size, which can be narrower
-        // than the slot the algorithm assigned it. Honour an explicit proposal
-        // so the frame matches the box the layout measured against; otherwise
-        // a wrapped cell reports the height of a wider box and clips its last
-        // line.
-        let placed = Size {
-            width: width.unwrap_or(size.width),
-            height: height.unwrap_or(size.height),
-        };
-        self.data_mut().placed_frame = Some(Rect::new(at.x, at.y, placed.width, placed.height));
+        // The probe reports the size the child settled on: its own size when the
+        // slot is only an at-most proposal, the slot width when it overflowed and
+        // was laid out again above.
+        self.data_mut().placed_frame = Some(Rect::new(at.x, at.y, size.width, size.height));
     }
     pub(super) fn prepare_custom_layouts(&self) {
         if !self.subtree_is_dirty() {

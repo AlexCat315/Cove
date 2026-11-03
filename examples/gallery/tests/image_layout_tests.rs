@@ -315,17 +315,15 @@ fn the_preview_keeps_its_authored_box_and_retry_stays_inside_the_column() {
                     frame.width > 0.0,
                     "the preview keeps a real width at scale {scale}"
                 );
-                // GAP(Compose async_image.rs): `AsyncImage::new(url,
-                // PREVIEW_WIDTH, PREVIEW_HEIGHT, ..)` is given a 200pt width, but
-                // the materialised node resolves to 400pt (2x). Measured at
-                // width 286 scale 1: Rect { x: 18, y: 144, w: 400, h: 140 }. So
-                // the authored width is not honoured as a logical width and the
-                // preview overflows a narrow column. What is pinned is the
-                // measured contract plus the fact that it does not move left.
+                // RESOLVED(Compose async_image.rs): `AsyncImage` used to size its
+                // host from the decode resolution, so an authored 200pt preview
+                // materialised 400pt wide (2x, 800pt in Fill mode) and overflowed
+                // a narrow column. The host now takes the authored points and
+                // leaves the multiple to the request.
                 assert!(
-                    (frame.width - 400.0).abs() < 0.5,
-                    "the preview resolves to 400pt for an authored {PREVIEW_WIDTH}pt \
-                     width at scale {scale}, got {frame:?}"
+                    (frame.width - PREVIEW_WIDTH).abs() < 0.5,
+                    "the preview keeps its authored {PREVIEW_WIDTH}pt width at scale \
+                     {scale}, got {frame:?}"
                 );
                 assert!(
                     frame.x >= -0.5,

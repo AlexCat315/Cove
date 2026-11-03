@@ -6,7 +6,9 @@
 //! delivered by `pump`, because the server owns the client list and a callback
 //! cannot borrow it.
 use crate::devtools::mirror::{FrameCapture, FrameTap, FrameTapSink, InputBridge, TimingPublisher};
-use crate::inspection::{DiagnosticStateSource, Diagnostics, SceneInspector, UIAccessibilityActions};
+use crate::inspection::{
+    DiagnosticStateSource, Diagnostics, SceneInspector, UIAccessibilityActions,
+};
 use crate::server::DevServer;
 use crate::server::Outbound;
 use crate::server::config::{
@@ -99,16 +101,21 @@ impl DevTools {
         &self.tree
     }
 
+    /// Input is often attached after the diagnostics session starts.
+    pub fn set_input_delivery(&mut self, deliver: Option<Rc<dyn Fn(cove_platform::InputEvent)>>) {
+        *self.input_delivery.borrow_mut() = deliver;
+        self.server.advertised_capabilities = self.capabilities();
+    }
+
     /// Give the diagnostics facade the state it reads.
     pub fn set_state_source(&mut self, source: Option<Rc<dyn DiagnosticStateSource>>) {
         let diagnostics = Rc::new(Diagnostics::with_state_source(self.tree.clone(), source));
         *diagnostics.memory.borrow_mut() = self.diagnostics.borrow().memory.borrow().clone();
-        self.server.host.observation.state =
-            diagnostics.state_observation_available().then(|| {
-                let diagnostics = diagnostics.clone();
-                Rc::new(move |ids: &[String]| diagnostics.state_observation(ids))
-                    as Rc<dyn Fn(&[String]) -> cove_devtools_protocol::StateObservation>
-            });
+        self.server.host.observation.state = diagnostics.state_observation_available().then(|| {
+            let diagnostics = diagnostics.clone();
+            Rc::new(move |ids: &[String]| diagnostics.state_observation(ids))
+                as Rc<dyn Fn(&[String]) -> cove_devtools_protocol::StateObservation>
+        });
         *self.diagnostics.borrow_mut() = diagnostics;
     }
 
@@ -334,6 +341,7 @@ impl DevTools {
             "recomposition",
             "timeline",
             "diagnostics",
+            "accessibility",
         ]
         .into_iter()
         .map(str::to_string)
@@ -343,6 +351,9 @@ impl DevTools {
         }
         if self.frame_tap.borrow().is_some() {
             capabilities.push("mirror".into());
+        }
+        if self.input_delivery.borrow().is_some() {
+            capabilities.push("input".into());
         }
         if self.server.host.window.resize.is_some() {
             capabilities.push("window".into());
@@ -500,12 +511,28 @@ mod tests {
     #[test]
     fn capabilities_reflect_the_wired_adapters() {
         let tree = Rc::new(RefCell::new(NodeTree::new()));
-        let devtools = DevTools::new(DevToolsConfig::default(), tree, None, None);
+        let mut devtools = DevTools::new(DevToolsConfig::default(), tree, None, None);
         let capabilities = devtools.capabilities();
         // Base capabilities plus diagnostics; no mirror until a tap is attached.
         assert!(capabilities.contains(&"diagnostics".to_string()));
         assert!(!capabilities.contains(&"mirror".to_string()));
         assert!(!capabilities.contains(&"state.observe".to_string()));
+        assert!(!capabilities.contains(&"input".to_string()));
+        assert!(capabilities.contains(&"accessibility".to_string()));
+        devtools.set_input_delivery(Some(Rc::new(|_| {})));
+        assert!(
+            devtools
+                .server
+                .advertised_capabilities
+                .contains(&"input".to_string())
+        );
+        devtools.set_input_delivery(None);
+        assert!(
+            !devtools
+                .server
+                .advertised_capabilities
+                .contains(&"input".to_string())
+        );
     }
 
     #[test]
