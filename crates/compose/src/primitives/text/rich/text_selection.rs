@@ -612,22 +612,6 @@ impl TextSelectionScope {
         self.range_at(index, self.selection_span(), &ids)
     }
 
-    /// UTF-8 offsets of the document's two visible endpoints in this member.
-    /// Interior paragraphs have no endpoint markers, including reverse drags.
-    pub(crate) fn endpoint_offsets(&mut self, node: &Node) -> (Option<usize>, Option<usize>) {
-        self.update_order();
-        let Some(index) = self.member_indices.get(&node.id().0).copied() else {
-            return (None, None);
-        };
-        let Some(span) = self.selection_span() else {
-            return (None, None);
-        };
-        (
-            (index == span.lower).then_some(span.start),
-            (index == span.upper).then_some(span.end),
-        )
-    }
-
     /// Paragraphs on one row (table cells) join with tabs, rows with newlines.
     pub fn selected_text(&mut self) -> String {
         if !self.has_selection() {
@@ -792,34 +776,6 @@ impl TextSelectionChrome {
             return Some(TextSelectionEndpoint::End);
         }
         None
-    }
-
-    /// Short rounded stems at opposite edges: the start hangs below the
-    /// selection, the end rises above it, matching Swift's endpoint direction.
-    pub fn draw_endpoint_bars(
-        list: &mut DrawList,
-        origin: Point,
-        start: Option<Rect>,
-        end: Option<Rect>,
-        color: Color,
-    ) {
-        for (caret, is_start) in [(start, true), (end, false)] {
-            let Some(caret) = caret else {
-                continue;
-            };
-            let length = ((caret.height * 0.3).clamp(5.0, 8.0) * 2.0).round() * 0.5;
-            let overlap = 2.0_f32.min(caret.height * 0.1);
-            let top = if is_start {
-                caret.y + caret.height - overlap
-            } else {
-                caret.y - length + overlap
-            };
-            let _ = list.add_rounded_rect(
-                Rect::new(origin.x + caret.x - 0.75, origin.y + top, 1.5, length),
-                0.75,
-                color,
-            );
-        }
     }
 
     pub fn draw_handles(

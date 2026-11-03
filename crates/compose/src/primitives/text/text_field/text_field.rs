@@ -2816,13 +2816,6 @@ fn render(
             low,
             high,
             color.multiplied_alpha(node.opacity()),
-            (!render_state.is_composing).then(|| {
-                field
-                    .decoration
-                    .cursor_color
-                    .unwrap_or(theme.colors.accent)
-                    .multiplied_alpha(node.opacity())
-            }),
         );
     }
 
@@ -3059,42 +3052,31 @@ fn draw_range(
     low: usize,
     high: usize,
     color: Color,
-    endpoint_color: Option<Color>,
 ) {
     let lower = buffer.utf8_offset_for_character_index(low);
     let upper = buffer.utf8_offset_for_character_index(high);
+    let line_break_at = |offset: usize| {
+        let character = buffer.character_index_for_utf8_offset(offset);
+        buffer
+            .character_at(character)
+            .is_some_and(|value| value.contains('\n'))
+    };
     for line in &layout.lines {
-        if lower > line.end_cluster as usize || upper <= line.start_cluster as usize {
-            continue;
-        }
-        let x_low = super::text_field_layout_engine::row_x_at_byte(
-            line,
-            lower.max(line.start_cluster as usize),
-        );
-        let x_high = super::text_field_layout_engine::row_x_at_byte(
-            line,
-            upper.min(line.end_cluster as usize),
-        );
-        crate::primitives::text::selection_input::paint_selection(
-            list,
-            Rect::new(
-                text_origin.x + x_low,
-                text_origin.y + line.top_y,
-                (x_high - x_low).max(1.0),
-                line_height,
-            ),
-            color,
-        );
-        if let Some(color) = endpoint_color {
-            let start = (lower >= line.start_cluster as usize && lower < line.end_cluster as usize)
-                .then_some(Rect::new(x_low, line.top_y, 0.0, line_height));
-            let end = (upper > line.start_cluster as usize && upper <= line.end_cluster as usize)
-                .then_some(Rect::new(x_high, line.top_y, 0.0, line_height));
-            crate::primitives::text::rich::text_selection::TextSelectionChrome::draw_endpoint_bars(
+        let line_start = line.start_cluster as usize;
+        let line_end = line.end_cluster as usize;
+        let overlaps_text = lower < line_end && upper > line_start;
+        let selects_line_break = lower <= line_end && upper > line_end && line_break_at(line_end);
+        let x_low = super::text_field_layout_engine::row_x_at_byte(line, lower.max(line_start));
+        let x_high = super::text_field_layout_engine::row_x_at_byte(line, upper.min(line_end));
+        if overlaps_text || selects_line_break {
+            crate::primitives::text::selection_input::paint_selection(
                 list,
-                text_origin,
-                start,
-                end,
+                Rect::new(
+                    text_origin.x + x_low,
+                    text_origin.y + line.top_y,
+                    (x_high - x_low).max(1.0),
+                    line_height,
+                ),
                 color,
             );
         }

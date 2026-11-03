@@ -317,13 +317,9 @@ fn paint(
     }
 
     let scope = node.composition_value(&TextSelectionScope::key());
-    let (selection, endpoints) = scope
+    let selection = scope
         .as_ref()
-        .map(|scope| {
-            let mut scope = scope.0.borrow_mut();
-            (scope.range_for(node), scope.endpoint_offsets(node))
-        })
-        .unwrap_or((None, (None, None)));
+        .and_then(|scope| scope.0.borrow_mut().range_for(node));
     if let Some(range) = selection {
         for (x, y, width, height) in flow.selection_rects(range) {
             crate::primitives::text::selection_input::paint_selection(
@@ -350,18 +346,6 @@ fn paint(
                 None
             }
         }),
-    );
-
-    let caret = |offset, trailing| {
-        let (x, y, width, height) = flow.caret_rect_with_affinity(offset, trailing);
-        Rect::new(x, y, width, height)
-    };
-    TextSelectionChrome::draw_endpoint_bars(
-        list,
-        origin,
-        endpoints.0.map(|offset| caret(offset, false)),
-        endpoints.1.map(|offset| caret(offset, true)),
-        theme_for_node(node).colors.accent.multiplied_alpha(opacity),
     );
 
     // Link underlines, plus a focus ring on the focused link's fragments.

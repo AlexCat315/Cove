@@ -503,13 +503,9 @@ impl PrimitiveView for Text {
                 .or_else(|| node.inherited_foreground_color())
                 .unwrap_or_else(|| theme_for_node(&node).colors.on_surface)
                 .multiplied_alpha(node.opacity());
-            let (selection, endpoints) = node
+            let selection = node
                 .composition_value(&TextSelectionScope::key())
-                .map(|scope| {
-                    let mut scope = scope.0.borrow_mut();
-                    (scope.range_for(&node), scope.endpoint_offsets(&node))
-                })
-                .unwrap_or((None, (None, None)));
+                .and_then(|scope| scope.0.borrow_mut().range_for(&node));
             if let Some(range) = selection {
                 let text = &snapshot.string;
                 let measured = MeasuredTextLine::new(text, text, &result, metrics.line_height);
@@ -547,28 +543,6 @@ impl PrimitiveView for Text {
                 Some(&environment.atlas),
                 None,
             );
-            if endpoints.0.is_some() || endpoints.1.is_some() {
-                let text = &snapshot.string;
-                let measured = MeasuredTextLine::new(text, text, &result, metrics.line_height);
-                let caret = |offset, trailing| {
-                    let (x, row) =
-                        measured.caret(measured.display_character_index_for_byte(offset), trailing);
-                    measured
-                        .rows
-                        .get(row)
-                        .map(|row| cove_core::Rect::new(x, row.top_y, 0.0, metrics.line_height))
-                };
-                TextSelectionChrome::draw_endpoint_bars(
-                    list,
-                    cove_core::Point::new(origin.x + padding.left, origin.y + padding.top),
-                    endpoints.0.and_then(|offset| caret(offset, false)),
-                    endpoints.1.and_then(|offset| caret(offset, true)),
-                    theme_for_node(&node)
-                        .colors
-                        .accent
-                        .multiplied_alpha(node.opacity()),
-                );
-            }
         });
     }
 

@@ -1589,16 +1589,16 @@ fn affixes_and_counter_paint() {
 }
 
 #[test]
-fn selection_paints_the_authored_alpha_once() {
+fn selection_paints_the_authored_alpha_without_endpoint_marks() {
     with_rig(|rig| {
         rig.set("e\u{301} 👩🏽‍💻 selected");
         TextEnvironmentHolder::set_current(Some(test_text_environment(16.0, 20.0)));
         let selection = Color::from_rgba8(91, 121, 151, 96);
-        let endpoint = Color::from_rgba8(139, 47, 73, 255);
+        let cursor = Color::from_rgba8(139, 47, 73, 255);
         rig.install(
             TextField::new("", rig.binding()).decoration(TextFieldDecoration {
                 selection_color: Some(selection),
-                cursor_color: Some(endpoint),
+                cursor_color: Some(cursor),
                 ..Default::default()
             }),
         );
@@ -1615,18 +1615,46 @@ fn selection_paints_the_authored_alpha_once() {
                 .any(|vertex| vertex.color == selection.rgba8()),
             "selection must preserve the authored opacity rather than dim it again"
         );
-        let mut xs: Vec<f32> = selected
+        assert!(
+            !selected
+                .vertices()
+                .iter()
+                .any(|vertex| vertex.color == cursor.rgba8()),
+            "a range selection does not paint endpoint marks in the cursor color"
+        );
+    });
+}
+
+#[test]
+fn newline_selection_paints_its_line_break_highlight() {
+    with_rig(|rig| {
+        rig.set("alpha\nbeta");
+        TextEnvironmentHolder::set_current(Some(test_text_environment(16.0, 20.0)));
+        let selection = Color::from_rgba8(91, 121, 151, 96);
+        rig.install(
+            TextField::new("", rig.binding())
+                .layout(vertical())
+                .decoration(TextFieldDecoration {
+                    selection_color: Some(selection),
+                    ..Default::default()
+                }),
+        );
+        rig.graph.compute_layout(160.0, 80.0);
+        let node = rig.field();
+        rig.focus.focus(Some(&node), false);
+        let state = state_of(&node).unwrap();
+        state.borrow_mut().selection.anchor = Some(5);
+        state.borrow_mut().selection.cursor_index = 6;
+
+        let vertices: Vec<_> = draw(&node)
             .vertices()
             .iter()
-            .filter(|v| v.color == endpoint.rgba8())
-            .map(|v| v.x)
+            .filter(|vertex| vertex.color == selection.rgba8())
+            .copied()
             .collect();
-        xs.sort_by(f32::total_cmp);
-        let groups =
-            usize::from(!xs.is_empty()) + xs.windows(2).filter(|p| p[1] - p[0] > 3.0).count();
-        assert_eq!(
-            groups, 2,
-            "selection has two stable endpoint bars and no blinking insertion caret"
+        assert!(
+            !vertices.is_empty(),
+            "selecting a line break paints its visible tail"
         );
     });
 }

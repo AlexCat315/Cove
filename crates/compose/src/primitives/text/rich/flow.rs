@@ -194,6 +194,11 @@ impl RichTextFlow {
             self.lines
                 .iter()
                 .position(|line| offset > line.start_offset && offset <= line.end_offset)
+                .or_else(|| {
+                    self.lines
+                        .iter()
+                        .position(|line| line.start_offset == offset)
+                })
         } else {
             self.lines
                 .iter()
@@ -213,11 +218,14 @@ impl RichTextFlow {
         for (index, line) in self.lines.iter().enumerate() {
             let lower = range.start.max(line.start_offset);
             let upper = range.end.min(line.end_offset);
-            if !(lower < upper
-                || (range.start <= line.start_offset
-                    && line.start_offset < range.end
-                    && line.start_offset == line.end_offset))
-            {
+            let selects_line_break = index + 1 < self.lines.len()
+                && range.start <= line.end_offset
+                && range.end > line.end_offset
+                && self.text.as_bytes().get(line.end_offset) == Some(&b'\n');
+            let selects_empty_line = range.start <= line.start_offset
+                && line.start_offset < range.end
+                && line.start_offset == line.end_offset;
+            if !(lower < upper || selects_line_break || selects_empty_line) {
                 continue;
             }
             let start = self.caret_x(lower, index);

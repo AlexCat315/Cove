@@ -681,7 +681,35 @@ fn caret_rect() {
 }
 
 #[test]
-fn selectable_rich_text_drags_without_opening_links_and_paints_both_edges() {
+fn selection_over_a_newline_spans_both_lines() {
+    GlobalTestLock::locked(|| {
+        support::with_test_text_environment(|| {
+            let env = environment();
+            let flow = RichTextFlow::layout(&plain("alpha\nbeta"), 300.0, &env);
+            let newline_end = "alpha\n".len();
+            let end = flow.caret_rect_with_affinity(newline_end, true);
+            assert_eq!(
+                end.1, flow.lines[1].top,
+                "the trailing endpoint after a hard break belongs to the next line"
+            );
+
+            let rectangles = flow.selection_rects("alpha".len().."alpha\n".len());
+            assert_eq!(
+                rectangles.len(),
+                1,
+                "the selected newline has a visible tail"
+            );
+            assert_eq!(rectangles[0].1, flow.lines[0].top);
+            assert!(
+                rectangles[0].2 > 2.0,
+                "the newline selection extends slightly beyond the first line"
+            );
+        });
+    });
+}
+
+#[test]
+fn selectable_rich_text_drags_without_opening_links_and_paints_selection() {
     use cove_core::scene::EventDispatcher;
     use cove_core::{DrawList, Point};
     use cove_ui_compose::primitives::text::rich::text_selection::TextSelectionScope;
@@ -722,15 +750,6 @@ fn selectable_rich_text_drags_without_opening_links_and_paints_both_edges() {
                 .vertices()
                 .iter()
                 .any(|v| v.color == palette.selection.rgba8())
-        );
-        let edges: Vec<_> = drawing
-            .vertices()
-            .iter()
-            .filter(|v| v.color == palette.accent.rgba8())
-            .collect();
-        assert!(
-            !edges.is_empty(),
-            "two endpoint marks paint over the selected run"
         );
         let before = scope.0.borrow_mut().selected_text();
         let dispatcher: EventDispatcher = scene.dispatcher();
