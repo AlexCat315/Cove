@@ -433,6 +433,7 @@ impl PrimitiveView for Text {
     fn update_node(&self, node: &Node) {
         crate::theme::sync_text_style_environment(node);
         node.set_foreground_color(self.color);
+        node.set_clips_to_bounds(self.truncates);
         if self.runs.is_some() {
             node.set_attachment("__text_runs", true);
             node.set_is_hit_testable(true);

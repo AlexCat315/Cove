@@ -8,6 +8,7 @@
 use cove_core::scene::{Align, Edge, FlexDirection, FocusChainHolder, Justify, LayoutNode, Node};
 use cove_core::{Color, InputCapabilities};
 
+use crate::modifiers::layout::{FlexExt, LayoutFrameExt};
 use crate::theme::{
     ControlSize, SemanticColorRef, SemanticFontRef, SemanticStyleViewExt, Theme, theme_for_node,
 };
@@ -196,6 +197,8 @@ impl PrimitiveView for BuiltinButtonChrome {
 
     fn children(&self, _node: &Node) -> Vec<AnyView> {
         let label = AnyView::new(self.label.clone())
+            .frame_min_width(0.0)
+            .shrink(1.0)
             .semantic_font(SemanticFontRef::label())
             .semantic_foreground(self.foreground.clone());
         vec![AnyView::new(label)]

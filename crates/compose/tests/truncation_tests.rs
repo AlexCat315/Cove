@@ -4,23 +4,15 @@
 //! - a long title ellipsizes inside a narrow rail for `Button`, `Link`,
 //!   `MenuButton` and a `DatePicker` placeholder
 //! - every one of those keeps its complete accessible name
-//! - every clipped static-text node stays within the rail width
-//!
-//! Named difference (reported as a production gap, not fixed here): Swift's
-//! `Text._updateNode` sets `node.clipsToBounds = truncates`
-//! (`Primitives/Text/Text.swift:77`). The Rust `Text::update_node` never sets
-//! it, so a truncating label paints its `Text` node unclipped — the node's
-//! frame keeps the shaped width of the whole string instead of the rail width.
-//! `truncating_labels_do_not_report_clips_to_bounds` pins that, and the main
-//! case asserts the parts of the contract that do hold: every control keeps its
-//! complete accessible name, and each one is built from a truncating `Text`.
+//! - every truncated title stays within its control's available width
 
 use crate::support;
 
 use std::rc::Rc;
 
 use cove_composition::{AnyView, Column, TupleView, ViewGraph};
-use cove_core::scene::{AccessibilityRole, Node, PlatformInputContext};
+use cove_core::DrawList;
+use cove_core::scene::{AccessibilityRole, Node, NodeRenderer, PlatformInputContext};
 use cove_ui_compose::BoxView;
 use cove_ui_compose::modifiers::layout::LayoutFrameExt;
 use cove_ui_compose::primitives::controls::Button;
@@ -151,14 +143,14 @@ fn titles_ellipsize_while_their_accessible_name_stays_complete() {
 }
 
 #[test]
-fn truncating_labels_do_not_report_clips_to_bounds() {
+fn truncating_button_label_stays_inside_its_constrained_frame() {
     GlobalTestLock::locked(|| {
         support::with_test_text_environment(|| {
             let context = PlatformInputContext::new();
             context.with_current(|| {
                 let graph = support::graph();
                 graph.install_view(
-                    rail(AnyView::new(Link::title(LONG_TITLE, || {}))),
+                    AnyView::new(Button::title(LONG_TITLE, || {}).frame_width(220.0)),
                     Default::default(),
                 );
                 settle(&graph);
@@ -172,16 +164,31 @@ fn truncating_labels_do_not_report_clips_to_bounds() {
                                 && semantics.label == LONG_TITLE
                         })
                     })
-                    .expect("the link title mounts as static text");
+                    .expect("the button title mounts as static text");
+                NodeRenderer::new().render(&root, &mut DrawList::default());
 
                 assert!(
-                    !text.clips_to_bounds(),
-                    "documented gap: Swift sets clipsToBounds on a truncating label, Rust does not"
+                    text.clips_to_bounds(),
+                    "a truncating label clips glyphs at its allocated width"
                 );
                 assert!(
-                    text.frame().width > 150.0,
-                    "the unclipped node keeps the shaped width of the whole title, was {}",
+                    text.frame().width < 220.0,
+                    "button padding leaves less than the host width for its label, was {}",
                     text.frame().width
+                );
+                assert_eq!(
+                    text.attachment::<bool>("__text_truncated"),
+                    Some(true),
+                    "the constrained label is fitted with a trailing ellipsis"
+                );
+                let visible_text = text
+                    .layout_node()
+                    .and_then(|layout| layout.text_measure())
+                    .map(|measure| measure.key.text)
+                    .expect("the rendered label has a shaped result");
+                assert!(
+                    visible_text.ends_with('…'),
+                    "the visible title ends with an ellipsis, got {visible_text:?}"
                 );
             });
         });
