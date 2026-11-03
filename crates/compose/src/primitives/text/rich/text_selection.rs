@@ -5,7 +5,8 @@
 use super::flow::RichTextFlow;
 use crate::primitives::text::text_buffer::TextBuffer;
 use cove_core::scene::{
-    AccessibilityRevision, CompositionLocal, InvalidationSource, Node, NodeResource, NodeWeak,
+    AccessibilityRevision, CompositionLocal, EventResult, InputHandlerRoute, InvalidationSource,
+    Node, NodeResource, NodeWeak, PointerPhase,
 };
 use cove_core::scene::{FocusChainHolder, InputRoutingPriority, InteractionRegistryHolder};
 use cove_core::{Clip, Color, DrawList, Painter, Point, Rect, RoundedRect, paint_scaled};
@@ -961,7 +962,33 @@ impl cove_composition::PrimitiveView for TextSelectionRoot {
         node.add_resource(Rc::new(MountedSelectionScope(self.scope.clone())));
         node
     }
-    fn update_node(&self, _node: &Node) {}
+    fn update_node(&self, node: &Node) {
+        let Some(registry) = InteractionRegistryHolder::current() else {
+            return;
+        };
+        let scope = node
+            .first_resource::<MountedSelectionScope>()
+            .map_or_else(|| self.scope.clone(), |mounted| mounted.0.clone());
+        registry.set_pointer(
+            node,
+            InputHandlerRoute::overlay(),
+            Rc::new(move |event, phase, _| {
+                if phase != PointerPhase::Down || event.button != cove_platform::MouseButton::Left {
+                    return EventResult::Ignored;
+                }
+
+                let point = Point::new(event.x, event.y);
+                let outside_selection = {
+                    let mut scope = scope.borrow_mut();
+                    scope.has_selection() && !scope.text_under(point)
+                };
+                if outside_selection {
+                    scope.borrow_mut().clear();
+                }
+                EventResult::Ignored
+            }),
+        );
+    }
     fn make_layout_node(&self) -> Option<cove_core::scene::LayoutNode> {
         None
     }

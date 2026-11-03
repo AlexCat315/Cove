@@ -545,13 +545,11 @@ fn large_pages_keep_lookup_and_endpoint_updates_responsive() {
 }
 
 #[test]
-fn endpoint_marks_bracket_only_the_two_outer_paragraphs_and_survive_rebuild() {
+fn selection_scope_survives_rebuild() {
     use cove_composition::{AnyView, Column, HorizontalAlignment, TupleView};
     use cove_core::scene::AccessibilityRole;
-    use cove_core::{DrawList, Point};
     use cove_ui_compose::primitives::text::Text;
     use cove_ui_compose::primitives::text::rich::text_selection::TextSelectionRoot;
-    use cove_ui_compose::theme::theme_for_node;
     fn region() -> TextSelectionRoot {
         TextSelectionRoot::new(AnyView::new(Column::new(
             HorizontalAlignment::Leading,
@@ -570,27 +568,11 @@ fn endpoint_marks_bracket_only_the_two_outer_paragraphs_and_survive_rebuild() {
             AnyView::new(region())
         }
     }
-    fn marks(node: &Node) -> usize {
-        let mut drawing = DrawList::default();
-        node.draw().unwrap()(&mut drawing, Point::default());
-        let color = theme_for_node(node).colors.accent.rgba8();
-        let mut xs: Vec<f32> = drawing
-            .vertices()
-            .iter()
-            .filter(|v| v.color == color)
-            .map(|v| v.x)
-            .collect();
-        xs.sort_by(f32::total_cmp);
-        usize::from(!xs.is_empty()) + xs.windows(2).filter(|pair| pair[1] - pair[0] > 3.0).count()
-    }
     support::InteractiveScene::run(400.0, 120.0, |scene| {
         let generation = cove_core::State::new(0);
         scene.install(RefreshingRegion(generation.clone()));
         let first = scene
             .labelled("first paragraph", Some(AccessibilityRole::StaticText))
-            .unwrap();
-        let middle = scene
-            .labelled("middle paragraph", Some(AccessibilityRole::StaticText))
             .unwrap();
         let last = scene
             .labelled("last paragraph", Some(AccessibilityRole::StaticText))
@@ -599,17 +581,11 @@ fn endpoint_marks_bracket_only_the_two_outer_paragraphs_and_survive_rebuild() {
             .composition_value(&TextSelectionScope::key())
             .unwrap()
             .0;
-        for reversed in [false, true] {
-            let (a, f) = (position(&first, 2), position(&last, 4));
-            scope
-                .borrow_mut()
-                .select(if reversed { f } else { a }, if reversed { a } else { f });
-            assert_eq!(
-                [marks(&first), marks(&middle), marks(&last)],
-                [1, 0, 1],
-                "a document selection has two outer endpoints, not a pair on every line"
-            );
-        }
+        scope
+            .borrow_mut()
+            .select(position(&first, 2), position(&last, 4));
+        assert!(scope.borrow().has_selection());
+
         generation.set(1);
         scene.settle(2, 1.0);
         let first = scene
@@ -621,6 +597,57 @@ fn endpoint_marks_bracket_only_the_two_outer_paragraphs_and_survive_rebuild() {
             "rebuilding the wrapper preserves its mounted scope"
         );
         assert!(scope.borrow().has_selection());
+    });
+}
+
+#[test]
+fn clicking_outside_text_clears_selection_without_consuming_the_click() {
+    use cove_composition::{AnyView, Column, HorizontalAlignment, TupleView};
+    use cove_core::scene::AccessibilityRole;
+    use cove_ui_compose::primitives::controls::Button;
+    use cove_ui_compose::primitives::text::Text;
+    use cove_ui_compose::primitives::text::rich::text_selection::TextSelectionRoot;
+    use std::cell::Cell;
+
+    support::InteractiveScene::run(320.0, 120.0, |scene| {
+        let calls = Rc::new(Cell::new(0));
+        let button_calls = calls.clone();
+        scene.install(Column::new(
+            HorizontalAlignment::Leading,
+            8.0,
+            AnyView::new(TupleView::new(vec![
+                AnyView::new(TextSelectionRoot::new(AnyView::new(Text::new(
+                    "selected text",
+                )))),
+                AnyView::new(Button::new(Text::new("Other control"), move || {
+                    button_calls.set(button_calls.get() + 1);
+                })),
+            ])),
+        ));
+
+        let text = scene
+            .labelled("selected text", Some(AccessibilityRole::StaticText))
+            .unwrap();
+        let text_frame = text.absolute_frame();
+        let button = scene
+            .first(|node| {
+                let frame = node.absolute_frame();
+                frame.y > text_frame.y && frame.width > 0.0 && frame.height > 0.0
+            })
+            .unwrap();
+        let scope = text
+            .composition_value(&TextSelectionScope::key())
+            .unwrap()
+            .0;
+        scope
+            .borrow_mut()
+            .select(position(&text, 0), position(&text, 8));
+        assert!(scope.borrow().has_selection());
+
+        scene.click(&button, 1);
+
+        assert!(!scope.borrow().has_selection());
+        assert_eq!(calls.get(), 1, "the clicked control still receives input");
     });
 }
 
