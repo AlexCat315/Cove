@@ -93,7 +93,10 @@ impl View for AnchorHarness {
                 if self.marks_anchors {
                     AnyView::new(text.modifier(AnchorMarker).id(row))
                 } else {
-                    { use cove_ui_compose::primitives::layout::ScrollAnchorViewExt; AnyView::new(text.scroll_anchor().id(row)) }
+                    {
+                        use cove_ui_compose::primitives::layout::ScrollAnchorViewExt;
+                        AnyView::new(text.scroll_anchor().id(row))
+                    }
                 }
             })
             .collect();
@@ -360,8 +363,6 @@ fn scroll_anchor() {
     assert_eq!(
         (offset, bound),
         (520.0, 520.0),
-        "Swift's public `.scrollAnchor()` modifier marks rows so prepending keeps \
-         them in place (520); Rust has no public anchor modifier, so rows built from \
-         public API do not anchor and the offset stays at 400"
+        "the public scroll anchor preserves the row position after prepending"
     );
 }

@@ -176,7 +176,14 @@ impl<Id: PartialEq + Eq + std::hash::Hash + Clone + Send + Sync + 'static> View
                     swipe_presented.set(false);
                 }
             },
-            AnyView::new(sidebar).frame(None, Some(FrameDimension::Percent(100.0)), None, None, None, None),
+            AnyView::new(sidebar).frame(
+                None,
+                Some(FrameDimension::Percent(100.0)),
+                None,
+                None,
+                None,
+                None,
+            ),
         )
         .enabled(allows_swipe);
 

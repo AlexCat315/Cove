@@ -17,15 +17,6 @@
 //! accessibility label of their own, so they are found by
 //! `AccessibilityTree::resolved_label`.
 //!
-//! Named differences (GAP assertions):
-//! - Pending-start limits: Swift disables days more than `maximum_days` from a
-//!   pending start (Oct 15 and Oct 5 after pressing Oct 10); Rust day cells keep
-//!   their enabled semantics.
-//! - Session reset: the harness re-renders on every selection write, and
-//!   `DateRangeCalendar::new` builds a fresh session each time, so the pending
-//!   start is lost. Swift keeps 10...10 after pressing the over-limit 15 and then
-//!   completes 10...13; Rust records 15...15 and then 13...13.
-
 use crate::support;
 use cove_composition::Scope;
 
@@ -188,22 +179,19 @@ fn calendar_interaction() {
         );
         assert!(
             !is_enabled(15) && !is_enabled(5),
-            "Swift disables days beyond the maximum once a start is pending \
-             (15 and 5 here); the Rust day cells keep their enabled semantics"
+            "pending starts disable days beyond the maximum"
         );
         scene.click(&day(15), 1);
         assert_eq!(
             *recorded.lock().unwrap(),
             Some(DateRange::new(oct(10), oct(10))),
-            "Swift ignores the over-limit day and keeps the pending 10...10; the Rust \
-             harness re-render rebuilds DateRangeCalendar with a fresh session, so the \
-             pending start is lost and 15 starts a new range"
+            "an over-limit press preserves the pending range"
         );
         scene.click(&day(13), 1);
         assert_eq!(
             *recorded.lock().unwrap(),
             Some(DateRange::new(oct(10), oct(13))),
-            "Swift completes 10...13; Rust starts yet another single-day range at 13"
+            "the valid second press completes 10...13"
         );
 
         let preset = |title: &str| -> Node {

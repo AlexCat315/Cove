@@ -166,8 +166,7 @@ fn only_the_active_route_is_created() {
         scene.settle(5, 1.0);
         assert!(
             counts.borrow().shell == before,
-            "Rust RouteOutlet does not observe its binding, so the parent shell \
-             body re-runs to swap routes (shell before {before}, after {})",
+            "route changes preserve the shell body (before {before}, after {})",
             counts.borrow().shell
         );
         assert_eq!(

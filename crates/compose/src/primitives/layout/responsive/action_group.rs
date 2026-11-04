@@ -64,7 +64,13 @@ impl Layout for ActionGroupLayout {
         };
         let sizes: Vec<_> = subviews
             .iter()
-            .map(|subview| subview.size_that_fits(proposal))
+            .map(|subview| {
+                if column {
+                    subview.size_that_fits_constrained(proposal)
+                } else {
+                    subview.size_that_fits(proposal)
+                }
+            })
             .collect();
         let gaps = self.spacing * sizes.len().saturating_sub(1) as f32;
         let width = if column {
@@ -97,7 +103,13 @@ impl Layout for ActionGroupLayout {
         };
         let sizes: Vec<_> = subviews
             .iter()
-            .map(|subview| subview.size_that_fits(child_proposal))
+            .map(|subview| {
+                if column {
+                    subview.size_that_fits_constrained(child_proposal)
+                } else {
+                    subview.size_that_fits(child_proposal)
+                }
+            })
             .collect();
         let gaps = self.spacing * sizes.len().saturating_sub(1) as f32;
         let used = sizes.iter().map(|size| size.width).sum::<f32>() + gaps;

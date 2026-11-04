@@ -402,7 +402,9 @@ fn metadata_edges_wrap_inside_the_row() {
         let spacing = theme_for_node(&event_rows[0]).spacing.sm;
         assert!(
             (event_rows[0].frame().height - ready.frame().height - spacing).abs() < 1.0,
-            "the metadata-free row contains its title and spacing"
+            "the metadata-free row contains its title and spacing: row {:?}, title {:?}, spacing {spacing}",
+            event_rows[0].frame(),
+            ready.frame()
         );
 
         let review = text_in(&event_rows[1], "Review");

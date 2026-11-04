@@ -10,20 +10,6 @@
 //!   disabled
 //! - disabling the gallery options makes the header controls inert
 //!
-//! ## Named difference: the story never recomposes
-//!
-//! `GAP(navigation_stories.rs AppBarStory)`: `impl View for AppBarStory` declares
-//! no `dynamic_properties()`, so the `long_title` and `text_primary` `State`
-//! reads in `body()` are untracked and no write schedules a recomposition.
-//! `last_action` is an `Rc<RefCell<String>>`, not a `State`, so it could not
-//! trigger one even if tracking were declared. Measured: after clicking
-//! `appbar-long-title`, `story.title()` returns "Workspace" while
-//! `recomposer.has_pending()` is `false` and the tree still renders the long
-//! title; after clicking Save, `story.last_action()` is "Saved" while the result
-//! line still renders "No action yet". The assertions below therefore pin the
-//! story's *state* (which does change) and the static render, and the three
-//! republish assertions are recorded rather than asserted.
-//!
 //! ## Named differences
 //!
 //! `GAP(navigation_stories.rs)`: Swift's `AppBarTests` drove the header through
@@ -62,7 +48,9 @@ impl View for StoryView {
     fn body(&self, cx: &Scope) -> AnyView {
         View::body(self.0.as_ref(), cx)
     }
-    fn dynamic_properties(&self) -> Vec<cove_composition::DynamicField> { self.0.dynamic_properties() }
+    fn dynamic_properties(&self) -> Vec<cove_composition::DynamicField> {
+        self.0.dynamic_properties()
+    }
 }
 
 struct Mounted(Rc<AppBarStory>, Appearance);
@@ -191,7 +179,10 @@ fn the_long_title_toggle_switches_the_authored_title() {
         scene.settle_n(2);
         let short = story.title();
         assert_ne!(short, long, "the toggle switches the story's title state");
-        assert!(scene.has_text(short), "the header republishes the short title");
+        assert!(
+            scene.has_text(short),
+            "the header republishes the short title"
+        );
 
         let toggle = scene.require_named("appbar-long-title");
         scene.click(&toggle);

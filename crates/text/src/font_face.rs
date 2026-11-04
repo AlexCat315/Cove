@@ -171,6 +171,17 @@ impl FontFace {
     pub(crate) fn pointer(&self) -> *mut c_void {
         self.0.pointer.as_ptr()
     }
+    /// Resolved OpenType traits, including variation coordinates, for portable
+    /// fallback matching. Unknown font containers retain the requested style.
+    #[cfg(not(any(target_os = "macos", target_os = "ios")))]
+    pub(crate) fn resolved_style(&self) -> Option<(cove_core::FontWeight, bool)> {
+        resolved_font_style(
+            &self.0.storage,
+            self.0.selector.face_index(),
+            &self.0.coordinates,
+        )
+    }
+
     pub fn post_script_name(&self) -> &str {
         &self.0.name
     }
@@ -346,4 +357,112 @@ impl FontFace {
 pub(crate) fn scalar_script(scalar: char) -> ScriptTag {
     // SAFETY: HarfBuzz's immutable default Unicode tables accept a Unicode scalar value.
     unsafe { native::cove_text_script(scalar as u32) }
+}
+
+#[cfg(any(test, not(any(target_os = "macos", target_os = "ios"))))]
+fn resolved_font_style(
+    bytes: &[u8],
+    face: u16,
+    coordinates: &BTreeMap<FontAxisId, f64>,
+) -> Option<(cove_core::FontWeight, bool)> {
+    let u16_at = |at: usize| -> Option<u16> {
+        Some(u16::from_be_bytes(
+            bytes.get(at..at.checked_add(2)?)?.try_into().ok()?,
+        ))
+    };
+    let u32_at = |at: usize| -> Option<u32> {
+        Some(u32::from_be_bytes(
+            bytes.get(at..at.checked_add(4)?)?.try_into().ok()?,
+        ))
+    };
+    let base = if bytes.get(..4)? == b"ttcf" {
+        if u32::from(face) >= u32_at(8)? {
+            return None;
+        }
+        u32_at(12 + usize::from(face) * 4)? as usize
+    } else {
+        0
+    };
+    let tables = usize::from(u16_at(base.checked_add(4)?)?);
+    let mut weight = None;
+    let mut italic = false;
+    for i in 0..tables {
+        let entry = base.checked_add(12)?.checked_add(i.checked_mul(16)?)?;
+        let tag = bytes.get(entry..entry.checked_add(4)?)?;
+        let offset = u32_at(entry.checked_add(8)?)? as usize;
+        let length = u32_at(entry.checked_add(12)?)? as usize;
+        bytes.get(offset..offset.checked_add(length)?)?;
+        if tag == b"OS/2" && length >= 6 {
+            weight = Some(f64::from(u16_at(offset + 4)?));
+            if length >= 64 {
+                italic |= u16_at(offset + 62)? & 1 != 0;
+            }
+        } else if tag == b"head" && length >= 46 {
+            let style = u16_at(offset + 44)?;
+            if weight.is_none() {
+                weight = Some(if style & 1 != 0 { 700.0 } else { 400.0 });
+            }
+            italic |= style & 2 != 0;
+        }
+    }
+    let weight = coordinates
+        .get(&FontAxisId(u32::from_be_bytes(*b"wght")))
+        .copied()
+        .or(weight)?;
+    let ital = coordinates.get(&FontAxisId(u32::from_be_bytes(*b"ital")));
+    let slnt = coordinates.get(&FontAxisId(u32::from_be_bytes(*b"slnt")));
+    if ital.is_some() || slnt.is_some() {
+        italic = ital.is_some_and(|v| *v > 0.0) || slnt.is_some_and(|v| *v != 0.0);
+    }
+    let weight = if weight >= 650.0 {
+        cove_core::FontWeight::Bold
+    } else if weight >= 550.0 {
+        cove_core::FontWeight::Semibold
+    } else if weight >= 450.0 {
+        cove_core::FontWeight::Medium
+    } else {
+        cove_core::FontWeight::Regular
+    };
+    Some((weight, italic))
+}
+
+#[cfg(test)]
+mod resolved_style_tests {
+    use super::*;
+    #[test]
+    fn fallback_style_reads_static_and_variable_opentype_traits() {
+        let mut bytes = vec![0; 92];
+        bytes[4..6].copy_from_slice(&1_u16.to_be_bytes());
+        bytes[12..16].copy_from_slice(b"OS/2");
+        bytes[20..24].copy_from_slice(&28_u32.to_be_bytes());
+        bytes[24..28].copy_from_slice(&64_u32.to_be_bytes());
+        bytes[32..34].copy_from_slice(&700_u16.to_be_bytes());
+        bytes[90..92].copy_from_slice(&1_u16.to_be_bytes());
+        assert_eq!(
+            resolved_font_style(&bytes, 0, &BTreeMap::new()),
+            Some((cove_core::FontWeight::Bold, true))
+        );
+        let coordinates = BTreeMap::from([(FontAxisId(u32::from_be_bytes(*b"wght")), 500.0)]);
+        assert_eq!(
+            resolved_font_style(&bytes, 0, &coordinates),
+            Some((cove_core::FontWeight::Medium, true))
+        );
+        assert_eq!(resolved_font_style(&bytes[..40], 0, &coordinates), None);
+        let mut collection = vec![0; bytes.len() + 16];
+        collection[..4].copy_from_slice(b"ttcf");
+        collection[8..12].copy_from_slice(&1_u32.to_be_bytes());
+        collection[12..16].copy_from_slice(&16_u32.to_be_bytes());
+        collection[16..].copy_from_slice(&bytes);
+        collection[36..40].copy_from_slice(&44_u32.to_be_bytes());
+        assert_eq!(
+            resolved_font_style(&collection, 0, &BTreeMap::new()),
+            Some((cove_core::FontWeight::Bold, true))
+        );
+        assert_eq!(resolved_font_style(&collection, 1, &BTreeMap::new()), None);
+        let coordinates = BTreeMap::from([(FontAxisId(u32::from_be_bytes(*b"ital")), 0.0)]);
+        assert_eq!(
+            resolved_font_style(&bytes, 0, &coordinates),
+            Some((cove_core::FontWeight::Bold, false))
+        );
+    }
 }

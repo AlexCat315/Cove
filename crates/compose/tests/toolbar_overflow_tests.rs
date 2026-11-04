@@ -335,8 +335,7 @@ fn density() {
                         }
                         assert!(
                             !share.accepts_subtree_input() || width != 390.0,
-                            "Swift hides Share project at 390pt; Rust keeps it visible \
-                             (frame {:?})",
+                            "Share project is hidden at 390pt (frame {:?})",
                             share.frame()
                         );
                         assert!(

@@ -14,9 +14,7 @@ use cove_composition::{AnyView, View};
 use cove_core::Binding;
 use cove_core::scene::{Align, Direction, FlexDirection, Point, Rect, Size, Wrap};
 
-use crate::modifiers::interaction::AccessibilityExt;
 use crate::modifiers::layout::{FlexExt, LayoutFrameExt};
-use crate::primitives::controls::button::{Button, ButtonIconSource};
 use crate::primitives::layout::scroll_view::ScrollView;
 use crate::primitives::layout::tab_view::TabStripItem;
 use crate::primitives::layout::tab_view::{IndicatorPlacement, TabItem, TabVariant};
@@ -25,7 +23,6 @@ use crate::primitives::overlays::anchored::PopoverPlacement;
 use crate::primitives::overlays::menu::{MenuEntry, MenuItem};
 use crate::primitives::overlays::popover::Popover;
 use crate::primitives::overlays::roving_focus::{RovingFocusRequest, RovingItem, roving_identity};
-use crate::theme::styles::buttons::ButtonStyleViewExt;
 use crate::{BoxView, TupleView};
 
 /// Custom layout that measures which headers fit and reports the hidden ones.
@@ -335,8 +332,11 @@ impl<Id: std::hash::Hash + Clone + PartialEq + 'static> View for TabOverflowStri
                 .selected(item_selected);
                 menu_entries.push(MenuEntry::Item(item));
             }
-            let more_button = crate::primitives::media::Icon::new(ui_icon_catalog::action::more_horizontal(), 16.0)
-                .frame(None, None, Some(44.0), Some(44.0), None, None);
+            let more_button = crate::primitives::media::Icon::new(
+                ui_icon_catalog::action::more_horizontal(),
+                16.0,
+            )
+            .frame(None, None, Some(44.0), Some(44.0), None, None);
             let more_column = BoxView::new(
                 FlexDirection::Column,
                 Align::FlexStart,
@@ -351,9 +351,13 @@ impl<Id: std::hash::Hash + Clone + PartialEq + 'static> View for TabOverflowStri
                     .is_presented(more_presented)
                     .enabled(is_enabled)
                     .trigger_style(MoreTabsTriggerStyle)
-                    .trigger_description(crate::primitives::overlays::popover::PopoverTriggerDescription {
-                        label: "More tabs".to_string(), value: String::new(), help: Some("More tabs".to_string()),
-                    })
+                    .trigger_description(
+                        crate::primitives::overlays::popover::PopoverTriggerDescription {
+                            label: "More tabs".to_string(),
+                            value: String::new(),
+                            help: Some("More tabs".to_string()),
+                        },
+                    )
                     .placement(PopoverPlacement::BottomTrailing)
                     .width(220.0),
                 ),
@@ -388,8 +392,14 @@ impl<Id: std::hash::Hash + Clone + PartialEq + 'static> View for TabOverflowStri
 
 struct MoreTabsTriggerStyle;
 impl crate::theme::styles::buttons::ButtonStyle for MoreTabsTriggerStyle {
-    fn make_body(&self, configuration: crate::theme::styles::buttons::ButtonStyleConfiguration) -> AnyView {
-        let body = crate::theme::styles::buttons::ButtonStyle::make_body(&crate::theme::styles::buttons::GhostButtonStyle, configuration);
+    fn make_body(
+        &self,
+        configuration: crate::theme::styles::buttons::ButtonStyleConfiguration,
+    ) -> AnyView {
+        let body = crate::theme::styles::buttons::ButtonStyle::make_body(
+            &crate::theme::styles::buttons::GhostButtonStyle,
+            configuration,
+        );
         AnyView::new(body.frame(None, None, Some(44.0), Some(44.0), None, None))
     }
 }

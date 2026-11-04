@@ -45,7 +45,11 @@ import component12 from '@/content/components/timeline.md?raw'
 import component13 from '@/content/components/tab-view.md?raw'
 import component14 from '@/content/components/date-range.md?raw'
 
+import actionGroupLayout from '@/content/components/action-group-layout.md?raw'
+import markdown from '@/content/components/markdown.md?raw'
+import grid from '@/content/components/grid.md?raw'
 import terminal from '@/content/components/terminal.md?raw'
+import resourcePreparation from '@/content/components/resource-preparation.md?raw'
 
 export const docGroups: DocGroup[] = [
   {
@@ -60,6 +64,7 @@ export const docGroups: DocGroup[] = [
     items: [
       { slug: 'views', title: '视图与布局', raw: views },
       { slug: 'native-rhi', title: 'NativeRHI', raw: nativeRhi },
+      { slug: 'resource-preparation', title: 'Resource preparation', raw: resourcePreparation },
       { slug: 'theme', title: '默认主题', raw: theme },
     ],
   },
@@ -88,6 +93,9 @@ export const docGroups: DocGroup[] = [
       { slug: 'command-palette', title: 'CommandPalette', raw: component8 },
       { slug: 'menu', title: 'Menu / MenuItemContent', raw: component9 },
       { slug: 'toolbar', title: 'Toolbar / AppBar', raw: component10 },
+      { slug: 'action-group-layout', title: 'ActionGroupLayout', raw: actionGroupLayout },
+      { slug: 'grid', title: 'Grid / named columns', raw: grid },
+      { slug: 'markdown', title: 'MarkdownView', raw: markdown },
       { slug: 'vec3-field', title: 'Vec3Field', raw: component11 },
       { slug: 'timeline', title: 'Timeline', raw: component12 },
       { slug: 'tab-view', title: 'TabView', raw: component13 },

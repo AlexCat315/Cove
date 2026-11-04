@@ -35,38 +35,111 @@ impl AppleFont {
         })
     }
     /// Match a family by weight and slant without pinning a PostScript face name.
-    pub fn family(name: &str, size: f32, weight: FontWeight, italic: bool) -> Option<Self> {
+    pub fn family(
+        name: &str,
+        size: f32,
+        weight: FontWeight,
+        italic: bool,
+        primary: Option<&Self>,
+    ) -> Option<Self> {
         type Ref = *const c_void;
         unsafe extern "C" {
-            fn CFStringCreateWithBytes(allocator: Ref, bytes: *const u8, count: isize, encoding: u32, external: bool) -> Ref;
+            fn CFStringCreateWithBytes(
+                allocator: Ref,
+                bytes: *const u8,
+                count: isize,
+                encoding: u32,
+                external: bool,
+            ) -> Ref;
             fn CFNumberCreate(allocator: Ref, kind: isize, value: Ref) -> Ref;
-            fn CFDictionaryCreate(allocator: Ref, keys: *const Ref, values: *const Ref, count: isize, key_callbacks: Ref, value_callbacks: Ref) -> Ref;
+            fn CFDictionaryCreate(
+                allocator: Ref,
+                keys: *const Ref,
+                values: *const Ref,
+                count: isize,
+                key_callbacks: Ref,
+                value_callbacks: Ref,
+            ) -> Ref;
             fn CFRelease(value: Ref);
+            fn CFDictionaryGetValue(dictionary: Ref, key: Ref) -> Ref;
+            fn CFNumberGetValue(number: Ref, kind: isize, value: *mut c_void) -> bool;
+            fn CTFontCopyTraits(font: Ref) -> Ref;
             fn CTFontDescriptorCreateWithAttributes(attributes: Ref) -> Ref;
-            fn CTFontCreateWithFontDescriptor(descriptor: Ref, size: f64, matrix: Ref) -> *mut c_void;
+            fn CTFontCreateWithFontDescriptor(
+                descriptor: Ref,
+                size: f64,
+                matrix: Ref,
+            ) -> *mut c_void;
             static kCTFontFamilyNameAttribute: Ref;
             static kCTFontTraitsAttribute: Ref;
             static kCTFontWeightTrait: Ref;
             static kCTFontSymbolicTrait: Ref;
         }
-        let weight = crate::FontWeightTextExt::core_text_weight(weight);
-        let symbolic: i32 = i32::from(italic);
+        let mut weight = crate::FontWeightTextExt::core_text_weight(weight);
+        let mut symbolic: i32 = i32::from(italic);
         // SAFETY: all dictionaries reference live CF objects until the descriptor
         // has copied them; every create reference is released once below.
         unsafe {
-            let family = CFStringCreateWithBytes(ptr::null(), name.as_ptr(), name.len() as isize, 0x08000100, false);
+            let primary_traits =
+                primary.map_or(ptr::null(), |font| CTFontCopyTraits(font.pointer()));
+            if !primary_traits.is_null() {
+                let value = CFDictionaryGetValue(primary_traits, kCTFontWeightTrait);
+                if !value.is_null() {
+                    CFNumberGetValue(value, 5, (&mut weight as *mut f32).cast());
+                }
+                let value = CFDictionaryGetValue(primary_traits, kCTFontSymbolicTrait);
+                if !value.is_null() {
+                    CFNumberGetValue(value, 3, (&mut symbolic as *mut i32).cast());
+                }
+                symbolic &= 1; // Only the italic trait crosses font families.
+            }
+            let family = CFStringCreateWithBytes(
+                ptr::null(),
+                name.as_ptr(),
+                name.len() as isize,
+                0x08000100,
+                false,
+            );
             let weight = CFNumberCreate(ptr::null(), 5, (&weight as *const f32).cast());
             let symbolic = CFNumberCreate(ptr::null(), 3, (&symbolic as *const i32).cast());
             let keys = [kCTFontWeightTrait, kCTFontSymbolicTrait];
             let values = [weight, symbolic];
-            let traits = CFDictionaryCreate(ptr::null(), keys.as_ptr(), values.as_ptr(), 2, ptr::null(), ptr::null());
+            let traits = CFDictionaryCreate(
+                ptr::null(),
+                keys.as_ptr(),
+                values.as_ptr(),
+                2,
+                ptr::null(),
+                ptr::null(),
+            );
             let keys = [kCTFontFamilyNameAttribute, kCTFontTraitsAttribute];
             let values = [family, traits];
-            let attributes = CFDictionaryCreate(ptr::null(), keys.as_ptr(), values.as_ptr(), 2, ptr::null(), ptr::null());
+            let attributes = CFDictionaryCreate(
+                ptr::null(),
+                keys.as_ptr(),
+                values.as_ptr(),
+                2,
+                ptr::null(),
+                ptr::null(),
+            );
             let descriptor = CTFontDescriptorCreateWithAttributes(attributes);
-            let font = if descriptor.is_null() { ptr::null_mut() } else { CTFontCreateWithFontDescriptor(descriptor, size as f64, ptr::null()) };
-            for value in [descriptor, attributes, traits, symbolic, weight, family] {
-                if !value.is_null() { CFRelease(value); }
+            let font = if descriptor.is_null() {
+                ptr::null_mut()
+            } else {
+                CTFontCreateWithFontDescriptor(descriptor, size as f64, ptr::null())
+            };
+            for value in [
+                descriptor,
+                attributes,
+                traits,
+                symbolic,
+                weight,
+                family,
+                primary_traits,
+            ] {
+                if !value.is_null() {
+                    CFRelease(value);
+                }
             }
             Self::owned(font)
         }

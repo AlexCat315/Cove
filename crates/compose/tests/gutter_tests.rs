@@ -115,7 +115,10 @@ impl Harness {
     fn folding(&self) -> TextEditorFolding {
         let mut folding = TextEditorFolding::new();
         let shift = usize::from(self.text.get().string_value().starts_with("// before\n"));
-        folding.regions = vec![TextFoldRegion::new(shift, 7 + shift), TextFoldRegion::new(3 + shift, 5 + shift)];
+        folding.regions = vec![
+            TextFoldRegion::new(shift, 7 + shift),
+            TextFoldRegion::new(3 + shift, 5 + shift),
+        ];
         folding.collapsed_lines = Some(self.collapsed.binding());
         folding
     }
@@ -242,10 +245,15 @@ fn assert_gutter_controls(graph: &ViewGraph, case: &str) {
     let mut pending = vec![root];
     let mut found = 0;
     while let Some(node) = pending.pop() {
-        if support::debug_name(&node).is_some_and(|name| name.starts_with("editor-gutter-")) { found += 1; }
+        if support::debug_name(&node).is_some_and(|name| name.starts_with("editor-gutter-")) {
+            found += 1;
+        }
         pending.extend(node.children());
     }
-    assert!(found > 0, "{case}: code fields mount interactive gutter controls");
+    assert!(
+        found > 0,
+        "{case}: code fields mount interactive gutter controls"
+    );
 }
 
 fn scene(work: impl FnOnce(&Harness, &ViewGraph, &PlatformInputContext, &EventDispatcher)) {
@@ -383,7 +391,12 @@ fn equivalent_inputs() {
         let session = session(harness);
         let none = KeyModifiers::default();
         assert!(
-            !session.handle_key(&key_event(Scancode::PAGE_DOWN, none), 3, SAMPLE.len(), false),
+            !session.handle_key(
+                &key_event(Scancode::PAGE_DOWN, none),
+                3,
+                SAMPLE.len(),
+                false
+            ),
             "Page Down is not a gutter chord"
         );
         assert!(!has_breakpoint(harness, 3));
@@ -731,4 +744,91 @@ fn nested_regions() {
     assert!(folds.reveal(4));
     assert!(folds.collapsed().is_empty());
     assert!(folds.hidden_lines().is_empty());
+}
+
+#[test]
+fn mounted_editor_routes_gutter_shortcuts() {
+    scene(|harness, graph, context, input| {
+        let surface = field(graph);
+        let state = surface
+            .attachment::<Rc<std::cell::RefCell<FieldState>>>(FIELD_STATE)
+            .expect("field state");
+        state.borrow_mut().selection.cursor_index = harness.text.get().line_range(3).start;
+        context.focus_chain.focus(Some(&surface), true);
+        let press = |scancode, modifiers| {
+            input.dispatch(&InputEvent::KeyDown(key_event(scancode, modifiers)));
+            settle(graph, harness);
+        };
+        press(Scancode::F9, KeyModifiers::default());
+        assert!(has_breakpoint(harness, 3));
+        press(Scancode::F9, KeyModifiers::LEFT_SHIFT);
+        assert_eq!(
+            harness
+                .breakpoints
+                .get()
+                .iter()
+                .find(|p| p.line == 3)
+                .map(|p| p.state),
+            Some(TextBreakpointState::Disabled)
+        );
+        press(
+            Scancode::ARROW_LEFT,
+            KeyModifiers::LEFT_GUI | KeyModifiers::LEFT_ALT,
+        );
+        assert_eq!(harness.collapsed.get(), BTreeSet::from([3]));
+        press(
+            Scancode::ARROW_RIGHT,
+            KeyModifiers::LEFT_GUI | KeyModifiers::LEFT_ALT,
+        );
+        assert!(harness.collapsed.get().is_empty());
+        assert_eq!(harness.text.get().string_value(), SAMPLE);
+    });
+}
+
+#[test]
+fn mounted_gutter_buttons_receive_pointer_input() {
+    scene(|harness, graph, _, input| {
+        let target = nodes(graph)
+            .into_iter()
+            .find(|node| {
+                node.is_focusable()
+                    && node
+                        .accessibility()
+                        .is_some_and(|a| a.label == "Add breakpoint at line 2")
+            })
+            .expect("mounted breakpoint control");
+        let frame = target.absolute_frame();
+        assert!(frame.width >= 24.0 && frame.height >= 24.0);
+        let event = cove_platform::MouseButtonEvent {
+            button: cove_platform::MouseButton::Left,
+            x: frame.x + frame.width * 0.5,
+            y: frame.y + frame.height * 0.5,
+            clicks: 1,
+            modifiers: Default::default(),
+            kind: Default::default(),
+        };
+        let before = field(graph)
+            .attachment::<Rc<std::cell::RefCell<FieldState>>>(FIELD_STATE)
+            .unwrap()
+            .borrow()
+            .selection
+            .cursor_index;
+        input.dispatch(&InputEvent::MouseButtonDown(event.clone()));
+        input.dispatch(&InputEvent::MouseButtonUp(event));
+        settle(graph, harness);
+        assert!(
+            has_breakpoint(harness, 1),
+            "the actual mounted gutter button toggles a breakpoint"
+        );
+        assert_eq!(
+            field(graph)
+                .attachment::<Rc<std::cell::RefCell<FieldState>>>(FIELD_STATE)
+                .unwrap()
+                .borrow()
+                .selection
+                .cursor_index,
+            before
+        );
+        assert_eq!(harness.text.get().string_value(), SAMPLE);
+    });
 }

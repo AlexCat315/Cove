@@ -5,7 +5,6 @@
 //! on each node is what lets the reader scan by outcome before reading a title.
 
 use crate::Scope;
-use std::cell::RefCell;
 use std::rc::Rc;
 
 use crate::LayoutContainer;
@@ -220,7 +219,6 @@ pub struct Timeline {
     pub zoom: Option<TimelineZoom>,
     /// Collapsed group IDs; session-local when `None`.
     pub collapsed_groups: Option<Binding<Vec<String>>>,
-    local_collapsed: Rc<RefCell<Vec<String>>>,
 }
 
 impl Timeline {
@@ -235,7 +233,6 @@ impl Timeline {
             spacing: TimelineSpacing::Uniform,
             zoom: None,
             collapsed_groups: None,
-            local_collapsed: Rc::new(RefCell::new(Vec::new())),
         }
     }
 
@@ -252,17 +249,6 @@ impl Timeline {
             .collect()
     }
 
-    fn is_collapsed(&self, id: &str) -> bool {
-        match &self.collapsed_groups {
-            Some(binding) => binding.get().iter().any(|value| value == id),
-            None => self
-                .local_collapsed
-                .borrow()
-                .iter()
-                .any(|value| value == id),
-        }
-    }
-
     fn zoom_factor(&self) -> f32 {
         self.zoom
             .as_ref()
@@ -272,13 +258,17 @@ impl Timeline {
 }
 
 impl View for Timeline {
-    fn body(&self, _cx: &Scope) -> AnyView {
+    fn body(&self, cx: &Scope) -> AnyView {
+        let local = cx.state(Vec::<String>::new);
         let groups = self.groups.clone();
         let shows_trailing_connector = self.shows_trailing_connector;
         let spacing = self.spacing;
         let zoom = self.zoom.clone();
-        let collapsed_binding = self.collapsed_groups.clone();
-        let local_collapsed = self.local_collapsed.clone();
+        let collapsed_binding = self
+            .collapsed_groups
+            .clone()
+            .unwrap_or_else(|| local.binding());
+        let collapsed = collapsed_binding.get();
         let group_count = groups.len();
 
         let mut column: Vec<AnyView> = Vec::new();
@@ -288,33 +278,21 @@ impl View for Timeline {
         let factor = self.zoom_factor();
         for (group_index, group) in groups.iter().enumerate() {
             let is_last_group = group_index + 1 == group_count;
-            let is_collapsed = !group.title.is_empty()
-                && group.is_collapsible
-                && self.is_collapsed(&group.id);
+            let is_collapsed =
+                !group.title.is_empty() && group.is_collapsible && collapsed.contains(&group.id);
 
             let mut group_column: Vec<AnyView> = Vec::new();
             if !group.title.is_empty() {
                 let toggle_id = group.id.clone();
                 let binding = collapsed_binding.clone();
-                let local = local_collapsed.clone();
-                let toggle = Rc::new(move || match &binding {
-                    Some(binding) => {
-                        let mut next = binding.get();
-                        if let Some(index) = next.iter().position(|value| value == &toggle_id) {
-                            next.remove(index);
-                        } else {
-                            next.push(toggle_id.clone());
-                        }
-                        binding.set(next);
+                let toggle = Rc::new(move || {
+                    let mut next = binding.get();
+                    if let Some(index) = next.iter().position(|value| value == &toggle_id) {
+                        next.remove(index);
+                    } else {
+                        next.push(toggle_id.clone());
                     }
-                    None => {
-                        let mut next = local.borrow_mut();
-                        if let Some(index) = next.iter().position(|value| value == &toggle_id) {
-                            next.remove(index);
-                        } else {
-                            next.push(toggle_id.clone());
-                        }
-                    }
+                    binding.set(next);
                 });
                 group_column.push(AnyView::new(group_header(
                     group,
@@ -328,19 +306,13 @@ impl View for Timeline {
                 for (index, event) in group.events.iter().enumerate() {
                     let is_last = is_last_group && index + 1 == event_count;
                     let next_date = group.events.get(index + 1).and_then(|next| next.date);
-                    let gap = if index + 1 == event_count {
-                        if is_last_group { 0.0 } else { 0.0 }
-                    } else {
-                        0.0 + spacing.gap(event.date, next_date, factor)
-                    };
                     let row = TimelineRow {
                         event: event.clone(),
                         is_last,
                         shows_trailing_connector,
+                        extra_gap: spacing.gap(event.date, next_date, factor),
                     };
-                    group_column.push(AnyView::new(
-                        AnyView::new(AnyView::new(row).padding_insets(EdgeInsets::new(0.0, 0.0, gap, 0.0))).id(event.id.clone()),
-                    ));
+                    group_column.push(AnyView::new(AnyView::new(row).id(event.id.clone())));
                 }
             }
             column.push(AnyView::new(
@@ -504,6 +476,7 @@ fn group_header(
 
 /// One event row: rail node, connector, and the heading/body text.
 struct TimelineRow {
+    extra_gap: f32,
     event: TimelineEvent,
     is_last: bool,
     shows_trailing_connector: bool,
@@ -524,7 +497,7 @@ impl PrimitiveView for TimelineRow {
         let metrics = IconMetrics::new(node);
         let rail_width = metrics.size(theme.icons.medium).max(22.0);
 
-        let mut rail: Vec<AnyView> = vec![AnyView::new(self.node(&theme, &metrics))];
+        let mut rail: Vec<AnyView> = vec![AnyView::new(self.node(&theme))];
         if !self.is_last || self.shows_trailing_connector {
             rail.push(AnyView::new(
                 AnyView::new(BoxView::new(
@@ -603,6 +576,12 @@ impl PrimitiveView for TimelineRow {
                     ),
                 ])),
             ))
+            .padding_insets(EdgeInsets::new(
+                0.0,
+                0.0,
+                (if self.is_last { 0.0 } else { theme.spacing.sm }) + self.extra_gap,
+                0.0,
+            ))
             .accessibility(move |semantics| {
                 semantics.role = AccessibilityRole::ListItem;
                 semantics.label = label.clone();
@@ -614,7 +593,7 @@ impl PrimitiveView for TimelineRow {
 }
 
 impl TimelineRow {
-    fn node(&self, theme: &Theme, metrics: &IconMetrics) -> AnyView {
+    fn node(&self, theme: &Theme) -> AnyView {
         if self.event.is_compact || !self.event.shows_icon {
             return AnyView::new(
                 AnyView::new(BoxView::new(
@@ -636,9 +615,13 @@ impl TimelineRow {
             .icon
             .clone()
             .unwrap_or_else(|| self.event.tone.icon());
-        let size = metrics.size(theme.icons.medium);
         AnyView::new(
-            Icon::with_semantic(resource, size, self.event.tone.color()).accessibility_hidden(true),
+            Icon::semantic_with_ref(
+                resource,
+                SemanticIconSize::medium(),
+                self.event.tone.color(),
+            )
+            .accessibility_hidden(true),
         )
     }
 }

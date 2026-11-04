@@ -69,6 +69,13 @@ impl LayoutSubview {
         self.node
             .measure_for_custom_layout(proposal.width, proposal.height)
     }
+    /// Measures an auto-width child after fitting it to the offered width.
+    /// Use this for stacked controls whose wrapped height must match placement;
+    /// `size_that_fits` keeps the normal soft proposal and intrinsic overflow.
+    pub fn size_that_fits_constrained(&self, proposal: ProposedViewSize) -> Size {
+        self.node
+            .measure_constrained_for_custom_layout(proposal.width, proposal.height)
+    }
     /// Hidden placements retain their views, excluding them from paint, input
     /// and accessibility. Layout algorithms still own their geometry and gaps.
     pub fn place(&self, at: Point, proposal: ProposedViewSize, is_visible: bool) {

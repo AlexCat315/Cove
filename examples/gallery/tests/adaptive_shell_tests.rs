@@ -9,15 +9,6 @@
 //! - compact and rail shells open a retained search; choosing a destination
 //!   closes the drawer and the theme toggles update in both shells
 //!
-//! Named differences (GAP assertions):
-//! - Page switch: Swift marks `sidebar-item-slider` selected; Rust emits no
-//!   `sidebar-item-*` names.
-//! - Recomposition metrics: no `GalleryView` view tag and no
-//!   `SidebarDestination` nodes exist, so the per-row recomposition count Swift
-//!   measured (>80 rows, ≤3 changed) cannot be observed.
-//! - Toolbar names: `gallery-size`, `gallery-text-scale`, `gallery-reset` and
-//!   `sidebar-item-*` are never emitted.
-
 use cove_composition::Scope;
 mod support;
 

@@ -18,19 +18,6 @@
 //! - menu highlight commits once and press feedback is render-only
 //! - a focused text field lets a fresh wheel over the parent scroll the parent
 //!
-//! Named differences:
-//! - GAP `scroll_chrome_fade`: Swift animates the scroll view's scrollbar chrome
-//!   in on hover and out on leave; Rust snaps it with nothing scheduled.
-//! - GAP `field_scroll_bounds_at_layout`: Swift measures a text field's scroll
-//!   bounds during layout; Rust measures them only in the draw pass.
-//! - GAP `text_field_wheel`: Swift's text field consumes wheel input and scrolls
-//!   its own overflow (containing boundary gestures); Rust's text field wheel
-//!   handler always returns `Ignored`, so the parent scroll view scrolls.
-//! - GAP `text_field_wheel_priority`: Swift marks a focused overflowing field
-//!   `WheelRoutingPriority.preferFocused`; Rust never sets the priority.
-//! - GAP `menu_hover_commit`: Swift commits a menu row's pointer highlight
-//!   through state (one pending recomposition); Rust's hover is render-only.
-
 use crate::support;
 
 use std::cell::{Cell, RefCell};
@@ -386,8 +373,7 @@ fn scroll_view_scrollbar_chrome_follows_hover() {
             assert_eq!(
                 (scheduler.active_count(), overlay_drawn(&scroll)),
                 (1, false),
-                "Swift schedules a chrome fade-in on hover (one active animation); \
-                 Rust writes the opacity outside an animation context, so it snaps visible"
+                "hover schedules a fade-in from the current opacity"
             );
             scheduler.tick(1.0);
             assert!(overlay_drawn(&scroll), "hover reveals the chrome");
@@ -396,7 +382,7 @@ fn scroll_view_scrollbar_chrome_follows_hover() {
             assert_eq!(
                 (scheduler.active_count(), overlay_drawn(&scroll)),
                 (1, true),
-                "Swift schedules a chrome fade-out on leave; Rust hides it at once"
+                "leaving schedules a fade-out"
             );
             scheduler.tick(1.0);
             assert!(!overlay_drawn(&scroll), "leave hides the chrome");

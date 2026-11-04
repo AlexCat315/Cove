@@ -81,15 +81,38 @@ impl LayoutNode {
         if let Some(state) = &owner.data().custom {
             state.invalidate();
         }
-        let mut size = engine::layout_probe(self, width, height, direction, engine::Probe::Measure);
-        if width.is_some_and(|slot| size.width > slot + 0.01) {
-            size = engine::layout_probe(self, width, height, direction, engine::Probe::Place);
-        }
+        let size = engine::layout_probe(self, width, height, direction, engine::Probe::Measure);
         self.0
             .engine
             .store_measurement(width, height, direction, size);
         size
     }
+    /// Measures the same width-constrained placement used for an auto-width
+    /// child. Ordinary proposals stay soft so scrolling can retain overflow.
+    pub fn measure_constrained_for_custom_layout(
+        &self,
+        width: Option<f32>,
+        height: Option<f32>,
+    ) -> Size {
+        let size = self.measure_for_custom_layout(width, height);
+        if !width.is_some_and(|slot| size.width > slot + 0.01) {
+            return size;
+        }
+        let Some(owner) = self.parent().filter(LayoutNode::is_custom) else {
+            return size;
+        };
+        if let Some(state) = &owner.data().custom {
+            state.invalidate();
+        }
+        engine::layout_probe(
+            self,
+            width,
+            height,
+            owner.custom_layout_direction(),
+            engine::Probe::Place,
+        )
+    }
+
     pub fn custom_layout_is_visible(&self) -> bool {
         self.data().placement_is_visible
     }

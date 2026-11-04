@@ -31,10 +31,9 @@
 
 use cove_graphics::rhi::{
     BindingLayout, BindingLayoutDescriptor, BindingLayoutEntry, BindingResource, BindingSet,
-    BindingSetDescriptor, BindingSetEntry, BindingType, Buffer, BufferDescriptor, BufferUsage,
-    DeviceConfig, GraphicsApi, QueueClass, RhiBackend, RhiError, Sampler, SamplerDescriptor,
-    ShaderVisibility, Texture, TextureDescriptor,
-    TextureFormat, TextureUsage,
+    BindingSetEntry, BindingType, Buffer, BufferDescriptor, BufferUsage, DeviceConfig, GraphicsApi,
+    QueueClass, RhiBackend, RhiError, Sampler, SamplerDescriptor, ShaderVisibility, Texture,
+    TextureDescriptor, TextureFormat, TextureUsage,
 };
 
 fn backend() -> Option<cove_graphics::metal::MetalBackend> {
@@ -246,23 +245,52 @@ fn submitting_an_invalidated_binding_set_is_refused_before_queueing() {
         return;
     };
     let buffer = Buffer::new(1);
-    backend.create_buffer(buffer, BufferDescriptor::new(16, BufferUsage::UNIFORM)).expect("buffer");
-    let set = register(&mut backend, 10_000, 100, &[BindingResource::UniformBuffer {
-        buffer, offset: 0, size: None,
-    }]).expect("registered set");
+    backend
+        .create_buffer(buffer, BufferDescriptor::new(16, BufferUsage::UNIFORM))
+        .expect("buffer");
+    let set = register(
+        &mut backend,
+        10_000,
+        100,
+        &[BindingResource::UniformBuffer {
+            buffer,
+            offset: 0,
+            size: None,
+        }],
+    )
+    .expect("registered set");
     backend.destroy_buffer(buffer);
-    let submit = cove_graphics::rhi::PlannedSubmit::new(QueueClass::Compute, vec![
-        cove_graphics::rhi::PlannedCommand::ComputePass(cove_graphics::rhi::ComputePassRecord {
-            body: vec![cove_graphics::rhi::ComputeCommand::SetBindingSet { slot: 0, set, dynamic_offsets: Vec::new() }],
-        }),
-    ]);
+    let submit = cove_graphics::rhi::PlannedSubmit::new(
+        QueueClass::Compute,
+        vec![cove_graphics::rhi::PlannedCommand::ComputePass(
+            cove_graphics::rhi::ComputePassRecord {
+                body: vec![cove_graphics::rhi::ComputeCommand::SetBindingSet {
+                    slot: 0,
+                    set,
+                    dynamic_offsets: Vec::new(),
+                }],
+            },
+        )],
+    );
     let completed = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
     let completion = completed.clone();
-    let error = backend.submit(&submit, None, Box::new(move || {
-        completion.store(true, std::sync::atomic::Ordering::SeqCst);
-    })).expect_err("an invalidated binding set must not submit");
-    assert_eq!(error, RhiError::invalid_argument("unknown compute binding set"));
-    assert!(!completed.load(std::sync::atomic::Ordering::SeqCst), "invalid input never queues completion");
+    let error = backend
+        .submit(
+            &submit,
+            None,
+            Box::new(move || {
+                completion.store(true, std::sync::atomic::Ordering::SeqCst);
+            }),
+        )
+        .expect_err("an invalidated binding set must not submit");
+    assert_eq!(
+        error,
+        RhiError::invalid_argument("unknown compute binding set")
+    );
+    assert!(
+        !completed.load(std::sync::atomic::Ordering::SeqCst),
+        "invalid input never queues completion"
+    );
 }
 
 #[test]

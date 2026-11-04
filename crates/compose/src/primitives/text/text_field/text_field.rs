@@ -42,10 +42,9 @@ use super::text_field_editing::{
 };
 use super::text_field_layout_engine::{
     DOCUMENT_LAYOUT_KEY, FIELD_STATE_KEY, FieldCompositionState, FieldLayoutInputs,
-    RENDER_CACHE_KEY, RenderCacheEntry, RenderCacheKey,
-    FieldScrollState, FieldSelectionState, RenderDraftState, document_geometry,
-    horizontal_scrollbar_metrics, make_render_state, scrollbar_metrics, selection_range,
-    update_scroll,
+    FieldScrollState, FieldSelectionState, RENDER_CACHE_KEY, RenderCacheEntry, RenderCacheKey,
+    RenderDraftState, document_geometry, horizontal_scrollbar_metrics, make_render_state,
+    scrollbar_metrics, selection_range, update_scroll,
 };
 use super::text_field_navigation::{
     line_boundary, move_cursor_by_page, move_cursor_vertically, word_boundary_after,
@@ -113,6 +112,7 @@ pub struct AddonLayouts {
     pub suffix: Option<std::sync::Arc<cove_core::TextLayoutResult>>,
     pub counter: Option<std::sync::Arc<cove_core::TextLayoutResult>>,
     pub counter_text: Option<String>,
+    pub gutter_geometry: Option<crate::primitives::text::code::TextGutterGeometry>,
 }
 
 impl AddonLayouts {
@@ -126,6 +126,7 @@ impl AddonLayouts {
             suffix: None,
             counter: None,
             counter_text: None,
+            gutter_geometry: None,
         }
     }
 
@@ -544,6 +545,7 @@ impl TextField {
     /// reads these same reservations so nothing collides.
     fn addon_layouts(
         &self,
+        node: &Node,
         theme: &Theme,
         env: &TextEnvironment,
         font: &cove_core::Font,
@@ -592,12 +594,32 @@ impl TextField {
         let counter = counter_text.as_deref().map(measure);
         // Three digit slots keep the document column still while the visible
         // line numbers grow; narrower documents never need more.
+        let mut gutter_geometry = None;
         let gutter = if self.code_editing.shows_line_numbers
             && self.layout.axis == TextFieldAxis::Vertical
         {
             let digits = rows.max(1).to_string().len().max(3);
             let slot = measure("0").total_width.max(1.0);
-            slot * digits as f32 + GUTTER_GAP
+            let number_width = slot * digits as f32;
+            if self.code_editing.gutter.is_enabled()
+                || !self.code_editing.folding.regions.is_empty()
+            {
+                let gutter = &self.code_editing.gutter;
+                let geometry = crate::primitives::text::code::TextGutterGeometry::new(
+                    gutter.is_enabled(),
+                    gutter.breakpoints.is_some(),
+                    gutter.execution_line.is_some(),
+                    !self.code_editing.folding.regions.is_empty(),
+                    number_width,
+                    font,
+                    theme,
+                    !crate::primitives::controls::adaptive::supports_control_hover(node),
+                );
+                gutter_geometry = Some(geometry);
+                geometry.width
+            } else {
+                number_width + GUTTER_GAP
+            }
         } else {
             0.0
         };
@@ -631,6 +653,7 @@ impl TextField {
         };
         AddonLayouts {
             metrics,
+            gutter_geometry,
             prepend,
             append,
             prefix,
@@ -767,7 +790,9 @@ impl PrimitiveView for TextFieldHost {
         node.add_resource(portal.clone());
         node.add_resource(snippet.clone());
         node.add_resource(TextCompletionSession::new(portal, snippet));
-        node.add_resource(Rc::new(crate::primitives::text::code::TextGutterSession::new()));
+        node.add_resource(Rc::new(
+            crate::primitives::text::code::TextGutterSession::new(),
+        ));
         node
     }
 
@@ -910,10 +935,18 @@ impl PrimitiveView for TextFieldHost {
             session.configure(self.field.snapshot(), state_handle.clone());
         }
         install_interaction(node, &self.field, state_handle.clone(), &self.interaction);
-        if let Some(gutter) = node.first_resource::<crate::primitives::text::code::TextGutterSession>() {
-            gutter.configure(self.field.code_editing.gutter.clone(), &self.field.code_editing.folding, &current);
+        if let Some(gutter) =
+            node.first_resource::<crate::primitives::text::code::TextGutterSession>()
+        {
+            gutter.configure(
+                self.field.code_editing.gutter.clone(),
+                &self.field.code_editing.folding,
+                &current,
+            );
             let field = self.field.snapshot();
-            node.set_layout_did_update(Some(Rc::new(move |owner| update_gutter_controls(owner, &field))));
+            node.set_layout_did_update(Some(Rc::new(move |owner| {
+                update_gutter_controls(owner, &field)
+            })));
         }
 
         let overlay_node = node.downgrade();
@@ -953,39 +986,89 @@ impl PrimitiveView for TextFieldHost {
     }
     fn children(&self, node: &Node) -> Vec<AnyView> {
         use crate::primitives::text::code::{TextGutterControls, TextGutterSession};
-        let Some(session) = node.first_resource::<TextGutterSession>() else { return Vec::new() };
-        if !self.field.code_editing.shows_line_numbers || self.field.behavior.secure || self.field.layout.axis != TextFieldAxis::Vertical { return Vec::new() }
+        let Some(session) = node.first_resource::<TextGutterSession>() else {
+            return Vec::new();
+        };
+        if !self.field.code_editing.shows_line_numbers
+            || self.field.behavior.secure
+            || self.field.layout.axis != TextFieldAxis::Vertical
+        {
+            return Vec::new();
+        }
         let current = self.field.text.get();
-        let cursor = node.attachment::<Rc<RefCell<FieldState>>>(FIELD_STATE_KEY).map_or(0, |s| s.borrow().selection.cursor_index);
-        vec![AnyView::new(TextGutterControls::new(session, self.field.code_editing.gutter.clone())
-            .is_enabled(!self.field.behavior.disabled)
-            .caret(current.line_index_for_character_index(cursor), current.character_count(), self.field.behavior.read_only))]
+        let cursor = node
+            .attachment::<Rc<RefCell<FieldState>>>(FIELD_STATE_KEY)
+            .map_or(0, |s| s.borrow().selection.cursor_index);
+        vec![AnyView::new(
+            TextGutterControls::new(session, self.field.code_editing.gutter.clone())
+                .is_enabled(!self.field.behavior.disabled)
+                .caret(
+                    current.line_index_for_character_index(cursor),
+                    current.character_count(),
+                    self.field.behavior.read_only,
+                ),
+        )]
     }
 }
 impl_primitive_view!(TextFieldHost);
 
 fn update_gutter_controls(node: &Node, field: &TextField) {
-    use crate::primitives::text::code::{TextGutterSession, TextGutterControl, TextGutterControlKind as Kind, TextGutterGeometry};
-    let Some(session) = node.first_resource::<TextGutterSession>() else { return };
-    if !field.code_editing.shows_line_numbers || field.behavior.secure || field.layout.axis != TextFieldAxis::Vertical {
-        session.update(Vec::new()); return;
+    use crate::primitives::text::code::{
+        TextGutterControl, TextGutterControlKind as Kind, TextGutterSession,
+    };
+    let Some(session) = node.first_resource::<TextGutterSession>() else {
+        return;
+    };
+    if !field.code_editing.shows_line_numbers
+        || field.behavior.secure
+        || field.layout.axis != TextFieldAxis::Vertical
+    {
+        session.update(Vec::new());
+        return;
     }
     let buffer = field.text.get();
     let style = resolved_text_style(node, &theme_for_node(node));
-    let gutter = &field.code_editing.gutter;
     let touch = !crate::primitives::controls::adaptive::supports_control_hover(node);
-    let geometry = TextGutterGeometry::new(gutter.is_enabled(), gutter.breakpoints.is_some(), gutter.execution_line.is_some(), !field.code_editing.folding.regions.is_empty(), 24.0, &style.font, &theme_for_node(node), touch);
-    let offset = node.attachment::<Rc<RefCell<FieldState>>>(FIELD_STATE_KEY).map_or(0.0, |s| s.borrow().scroll.offset_y);
+    let Some(environment) = TextEnvironmentHolder::current() else {
+        session.update(Vec::new());
+        return;
+    };
+    let theme = theme_for_node(node);
+    let addons = field.addon_layouts(
+        node,
+        &theme,
+        &environment,
+        &style.font,
+        style.line_height,
+        style.letter_spacing,
+        buffer.character_count(),
+        buffer.line_count(),
+    );
+    let Some(geometry) = addons.gutter_geometry else {
+        session.update(Vec::new());
+        return;
+    };
+    let left = field.horizontal_inset(&theme);
+    let top = field.vertical_inset(style.line_height);
+    let offset = node
+        .attachment::<Rc<RefCell<FieldState>>>(FIELD_STATE_KEY)
+        .map_or(0.0, |s| s.borrow().scroll.offset_y);
     let hidden = session.folds().hidden_lines();
     let mut controls = Vec::new();
     let line_height = style.line_height.max(1.0);
-    let first_row = ((offset - 8.0) / line_height).floor().max(0.0) as usize;
-    let end_row = ((offset + node.frame().height - 8.0) / line_height).ceil().max(0.0) as usize;
+    let first_row = ((offset - top) / line_height).floor().max(0.0) as usize;
+    let end_row = ((offset + node.frame().height - top) / line_height)
+        .ceil()
+        .max(0.0) as usize;
     let mut line = first_row;
     // Translate the first visible row through the merged folded ranges, then
     // visit only the viewport's rows even for a large document.
     for range in &hidden {
-        if range.start <= line { line += range.len(); } else { break; }
+        if range.start <= line {
+            line += range.len();
+        } else {
+            break;
+        }
     }
     let markers = session.markers_by_line();
     let mut row = first_row;
@@ -994,21 +1077,40 @@ fn update_gutter_controls(node: &Node, field: &TextField) {
             line = range.end;
             continue;
         }
-        let y = 8.0 + row as f32 * line_height - offset;
-        let mut push = |kind, x| controls.push(TextGutterControl::new(line, kind, x, y, geometry.control_width, style.line_height.max(if touch { 44.0 } else { 24.0 }), 0));
+        let y = top + row as f32 * line_height - offset;
+        let mut push = |kind, x| {
+            controls.push(TextGutterControl::new(
+                line,
+                kind,
+                left + x,
+                y,
+                geometry.control_width,
+                style.line_height.max(if touch { 44.0 } else { 24.0 }),
+                0,
+            ))
+        };
         if geometry.combined {
             push(Kind::Combined, 0.0);
         } else {
-            if let Some(x) = geometry.breakpoint_x { push(Kind::Breakpoint, x); }
-            if let Some(x) = geometry.marker_x && markers.contains_key(&line) { push(Kind::Markers, x); }
-            if let Some(x) = geometry.fold_x && session.folds().region(line).is_some() { push(Kind::Fold, x); }
+            if let Some(x) = geometry.breakpoint_x {
+                push(Kind::Breakpoint, x);
+            }
+            if let Some(x) = geometry.marker_x
+                && markers.contains_key(&line)
+            {
+                push(Kind::Markers, x);
+            }
+            if let Some(x) = geometry.fold_x
+                && session.folds().region(line).is_some()
+            {
+                push(Kind::Fold, x);
+            }
         }
         line += 1;
         row += 1;
     }
     session.update(controls);
 }
-
 
 /// Inputs that change the measured size of a field. Cached on the layout node
 /// so a text edit can mark the node dirty instead of silently keeping a stale
@@ -1380,6 +1482,7 @@ fn committed_input_area(
     let vertical = field.layout.axis == TextFieldAxis::Vertical;
     let mut state = state.borrow_mut();
     let addons = field.addon_layouts(
+        node,
         &theme,
         &environment,
         &token.font,
@@ -1462,6 +1565,7 @@ fn pointer_character(
     let line_height = token.line_height;
     let mut state = state.borrow_mut();
     let addons = field.addon_layouts(
+        node,
         &theme,
         &environment,
         &token.font,
@@ -1659,8 +1763,10 @@ fn install_interaction(
     registry.set_pointer(
         node,
         InputHandlerRoute::text_input(),
-        Rc::new(move |event, phase, _event_phase| {
-            if event.button != MouseButton::Left {
+        Rc::new(move |event, phase, event_phase| {
+            if event_phase == cove_core::scene::EventPhase::Capture
+                || event.button != MouseButton::Left
+            {
                 return EventResult::Ignored;
             }
             let Some(owner) = Node::upgrade(&pointer_node) else {
@@ -1953,12 +2059,8 @@ fn install_interaction(
             if event.scancode == crate::Scancode::F1
                 && event.modifiers.is_empty()
                 && let Some(request) = key_field.code_editing.on_request_hover.clone()
-                && let Some(area) = committed_input_area(
-                    &owner,
-                    &key_field,
-                    &key_state,
-                    owner.absolute_origin(),
-                )
+                && let Some(area) =
+                    committed_input_area(&owner, &key_field, &key_state, owner.absolute_origin())
             {
                 let character_index = key_state.borrow().selection.cursor_index;
                 // The anchor sits on the caret itself: the area's column
@@ -1993,6 +2095,43 @@ fn install_interaction(
                     }
                 }
                 return EventResult::Handled;
+            }
+            if _phase != cove_core::scene::EventPhase::Capture
+                && key_field.code_editing.shows_line_numbers
+                && key_field.layout.axis == TextFieldAxis::Vertical
+                && !key_behavior.disabled
+                && !key_behavior.secure
+                && let Some(gutter) =
+                    owner.first_resource::<crate::primitives::text::code::TextGutterSession>()
+            {
+                let state = key_state.borrow();
+                let cursor = state.selection.cursor_index;
+                let line = state.buffer.line_index_for_character_index(cursor);
+                let count = state.buffer.character_count();
+                let range = state.buffer.line_range(line);
+                let boundary = match event.scancode {
+                    crate::Scancode::BACKSPACE => cursor == range.start,
+                    crate::Scancode::DELETE => cursor.saturating_add(1) >= range.end,
+                    _ => true,
+                };
+                let available = boundary && !state.composition.is_active();
+                drop(state);
+                if available && gutter.handle_key(event, line, count, key_behavior.read_only) {
+                    if let Some(hidden) = gutter
+                        .folds()
+                        .hidden_lines()
+                        .iter()
+                        .find(|range| range.contains(&line))
+                    {
+                        let mut state = key_state.borrow_mut();
+                        let header = state.buffer.line_range(hidden.start.saturating_sub(1));
+                        state.move_cursor(header.end.saturating_sub(1), false, None);
+                    }
+                    owner.mark_render_dirty(cove_core::scene::InvalidationSource::style_set(
+                        "textFieldGutter",
+                    ));
+                    return EventResult::Handled;
+                }
             }
             let primary = event.modifiers.has_gui() || event.modifiers.has_ctrl();
             // Undo / redo take priority over every other binding. Primary-Z
@@ -2196,6 +2335,7 @@ fn navigation_context(
     let token = resolved_text_style(node, &theme);
     let line_height = token.line_height;
     let addons = field.addon_layouts(
+        node,
         &theme,
         &environment,
         &token.font,
@@ -2326,9 +2466,7 @@ fn apply_key(
     match scancode {
         // A code field consumes Tab to indent; every other field yields it to
         // focus traversal.
-        crate::Scancode::TAB
-            if vertical && indentation.is_some() && !primary =>
-        {
+        crate::Scancode::TAB if vertical && indentation.is_some() && !primary => {
             let width = indentation.unwrap_or(4);
             if field.behavior.read_only {
                 return EventResult::Handled;
@@ -2742,6 +2880,7 @@ fn render(
     let current = field.text.get();
     state.normalize(&current);
     let addons = field.addon_layouts(
+        node,
         &theme,
         &environment,
         &font,
@@ -2783,7 +2922,10 @@ fn render(
         render_state.shows_placeholder,
     );
     let mut document = TextDocumentLayout::new(render_state.buffer.clone(), geometry.clone());
-    if let Some(gutter) = node.first_resource::<crate::primitives::text::code::TextGutterSession>() { document.set_hidden_lines(gutter.folds().hidden_lines()); }
+    if let Some(gutter) = node.first_resource::<crate::primitives::text::code::TextGutterSession>()
+    {
+        document.set_hidden_lines(gutter.folds().hidden_lines());
+    }
     let vertical_inset = field.vertical_inset(line_height);
     state.scroll.visible_height = (frame.height - vertical_inset * 2.0).max(line_height);
     update_scroll(&mut state.scroll, &document, line_height);
@@ -2892,7 +3034,13 @@ fn render(
                 TextAlignment::Trailing,
                 token.letter_spacing,
             );
-            let right = origin.x + inset + addons.metrics.gutter - GUTTER_GAP;
+            let right = origin.x
+                + inset
+                + addons
+                    .gutter_geometry
+                    .map_or(addons.metrics.gutter - GUTTER_GAP, |geometry| {
+                        geometry.number_right
+                    });
             let y = origin.y + vertical_inset + row as f32 * line_height - state.scroll.offset_y;
             let _ = list.add_text(
                 &number,

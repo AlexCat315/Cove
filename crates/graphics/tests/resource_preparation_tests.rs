@@ -137,8 +137,10 @@ fn cancellation_discards_native_work_and_publishes_the_cancelled_phase() {
 
     let buffer = created.expect("the first step really created its native buffer");
     device.wait_until_idle().expect("drain cancelled resources");
-    assert!(device.read_buffer_data(buffer, 0, &mut [0; 4]).is_err(),
-        "cancellation releases the buffer created by the earlier step");
+    assert!(
+        device.read_buffer_data(buffer, 0, &mut [0; 4]).is_err(),
+        "cancellation releases the buffer created by the earlier step"
+    );
     match result {
         Err(RhiError::Cancelled) => {}
         other => panic!("a cancelled preparation reports cancellation, got {other:?}"),

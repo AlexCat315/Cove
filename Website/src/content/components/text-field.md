@@ -125,3 +125,5 @@ SDL / Android 的组合事件使用 Unicode 标量偏移，字段会转换到完
 ## 代码行号栏
 
 `TextFieldCodeEditing::gutter` 将断点、执行行和 marker 接入实际输入框，`folding` 控制折叠。显示行号的纵向字段挂载 `TextGutterControls`，断点、marker、折叠与触摸行操作共用可见行几何。折叠的正文行从文档布局索引中隐藏；gutter 的 Escape 把焦点交回编辑器。
+
+行号、断点和折叠控件与正文共用 gutter 几何，点击断点不移动文本插入点。输入框聚焦时，F9 切换当前行断点，Shift+F9 切换启用状态，Alt+Primary+Left / Right 折叠或展开当前代码区间。文本重基同步移动折叠区间和断点，并保留调用方已重基的标记。

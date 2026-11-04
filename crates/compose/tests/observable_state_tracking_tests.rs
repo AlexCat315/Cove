@@ -352,26 +352,21 @@ fn reader_closure_read_invalidates_the_enclosing_scope() {
         store.set_value(1);
         assert!(
             graph.recomposer.has_pending(),
-            "Swift attributes a reader-closure read to the enclosing view; \
-             Rust evaluates the closure outside the body scope and records no dependency"
+            "reader closure reads invalidate the enclosing view"
         );
         graph.recomposer.commit_all();
-        assert_eq!(
-            counter.get(),
-            2,
-            "the enclosing view is not rebuilt because it never subscribed"
-        );
+        assert_eq!(counter.get(), 2, "the enclosing view recomposes");
 
         store.set_value(2);
         assert!(
             graph.recomposer.has_pending(),
-            "a dependency that was never recorded cannot survive a recomposition"
+            "reader dependencies survive recomposition"
         );
         graph.recomposer.commit_all();
         assert_eq!(
             counter.get(),
             3,
-            "the reader closure's write never recomposes its view"
+            "the next write recomposes the enclosing view"
         );
     });
 }

@@ -315,7 +315,7 @@ fn only_the_measured_branch_lays_out_and_is_exposed() {
         );
         assert!(
             named(&graph2, "wide").is_none(),
-            "a branch inactive from the first frame is never materialised; Swift mounts both"
+            "an initially inactive branch remains lazy until first activation"
         );
         let labels = exposed_labels(&graph2);
         assert_eq!(

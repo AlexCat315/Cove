@@ -407,7 +407,8 @@ fn matrix() {
 #[test]
 fn menu() {
     InteractiveScene::run(240.0, 300.0, |scene| {
-        scene.install(cove_ui_compose::primitives::overlays::portal::LayerRoot::new(Harness::new()));
+        scene
+            .install(cove_ui_compose::primitives::overlays::portal::LayerRoot::new(Harness::new()));
         let more = labelled(scene, "More tabs", Some(AccessibilityRole::Button))
             .expect("the menu strip exposes a More tabs entrance");
         assert!(
@@ -546,8 +547,8 @@ fn ai_queries() {
             "the hidden header stays mounted and queryable by label (got {})",
             visible(scene, "History")
         );
-        let history = labelled(scene, "History", Some(AccessibilityRole::Tab))
-            .expect("History is a tab");
+        let history =
+            labelled(scene, "History", Some(AccessibilityRole::Tab)).expect("History is a tab");
         assert!(
             !history.accepts_subtree_input() || history.absolute_frame().width == 0.0,
             "a header that does not fit is not visible to input; frame {:?}",

@@ -254,9 +254,10 @@ fn button_group_wraps_segments_instead_of_shrinking_them() {
 
 fn axis_fields(scene: &InteractiveScene) -> Vec<Node> {
     let mut fields: Vec<Node> = scene.all(|node| {
-        node.accessibility()
-            .is_some_and(|semantics| semantics.role == AccessibilityRole::StaticText
-                && ["X", "Y", "Z"].contains(&semantics.label.as_str()))
+        node.accessibility().is_some_and(|semantics| {
+            semantics.role == AccessibilityRole::StaticText
+                && ["X", "Y", "Z"].contains(&semantics.label.as_str())
+        })
     });
     fields.sort_by_key(|node| node.accessibility().map(|s| s.label));
     fields

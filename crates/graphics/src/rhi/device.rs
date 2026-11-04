@@ -395,7 +395,9 @@ impl Device {
     /// Keep each preparation's leases independent, including cache hits. The
     /// cleanup owns shared bookkeeping rather than a borrowed Device pointer.
     fn track_prepared(&self, resource: PreparedResource) {
-        let Some(context) = ResourcePreparationContext::current() else { return };
+        let Some(context) = ResourcePreparationContext::current() else {
+            return;
+        };
         let state = Arc::clone(&self.state);
         let backend = Arc::clone(&self.backend);
         let frame_ring = Arc::clone(&self.frame_ring);
@@ -403,20 +405,46 @@ impl Device {
         let ready_retirements = Arc::clone(&self.ready_retirements);
         let next = Arc::clone(&self.next_retirement);
         context.acquired(self.id, resource.id(), move || {
-            let mut state = state.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
-            if !resource.release(&mut state) { return; }
+            let mut state = state
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner);
+            if !resource.release(&mut state) {
+                return;
+            }
             let backend = Arc::clone(&backend);
             let id = next.fetch_add(1, Ordering::Relaxed);
             assert!(id != 0 && id != u64::MAX, "retirement sequence exhausted");
-            retirements.lock().unwrap_or_else(std::sync::PoisonError::into_inner)
-                .insert(id, Box::new(move || resource.destroy(&mut **backend.lock().unwrap_or_else(std::sync::PoisonError::into_inner))));
+            retirements
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
+                .insert(
+                    id,
+                    Box::new(move || {
+                        resource.destroy(
+                            &mut **backend
+                                .lock()
+                                .unwrap_or_else(std::sync::PoisonError::into_inner),
+                        )
+                    }),
+                );
             let mut ready = frame_ring.register_retirement(id);
-            ready.extend(std::mem::take(&mut *ready_retirements.lock().unwrap_or_else(std::sync::PoisonError::into_inner)));
+            ready.extend(std::mem::take(
+                &mut *ready_retirements
+                    .lock()
+                    .unwrap_or_else(std::sync::PoisonError::into_inner),
+            ));
             let actions: Vec<_> = {
-                let mut pending = retirements.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
-                ready.into_iter().filter_map(|id| pending.remove(&id)).collect()
+                let mut pending = retirements
+                    .lock()
+                    .unwrap_or_else(std::sync::PoisonError::into_inner);
+                ready
+                    .into_iter()
+                    .filter_map(|id| pending.remove(&id))
+                    .collect()
             };
-            for action in actions { action(); }
+            for action in actions {
+                action();
+            }
         });
     }
 
@@ -631,7 +659,9 @@ impl Device {
     }
 
     pub fn destroy_acceleration_structure(&self, structure: AccelerationStructure) {
-        if let Some(context) = ResourcePreparationContext::current() { context.released(self.id, structure.id()); }
+        if let Some(context) = ResourcePreparationContext::current() {
+            context.released(self.id, structure.id());
+        }
         let mut state = self.lock();
         state.acceleration_build_inputs.remove(&structure.id());
         state
@@ -649,7 +679,9 @@ impl Device {
     // MARK: Resource destruction (deferred)
 
     pub fn destroy_buffer(&self, buffer: Buffer) {
-        if let Some(context) = ResourcePreparationContext::current() { context.released(self.id, buffer.id()); }
+        if let Some(context) = ResourcePreparationContext::current() {
+            context.released(self.id, buffer.id());
+        }
         let mut state = self.lock();
         state
             .planner
@@ -664,7 +696,9 @@ impl Device {
     }
 
     pub fn destroy_texture(&self, texture: Texture) {
-        if let Some(context) = ResourcePreparationContext::current() { context.released(self.id, texture.id()); }
+        if let Some(context) = ResourcePreparationContext::current() {
+            context.released(self.id, texture.id());
+        }
         let mut state = self.lock();
         state
             .planner
@@ -679,7 +713,9 @@ impl Device {
     }
 
     pub fn destroy_sampler(&self, sampler: Sampler) {
-        if let Some(context) = ResourcePreparationContext::current() { context.released(self.id, sampler.id()); }
+        if let Some(context) = ResourcePreparationContext::current() {
+            context.released(self.id, sampler.id());
+        }
         let _state = self.lock();
         let backend = Arc::clone(&self.backend);
         self.retire_current(Box::new(move || {
@@ -691,7 +727,9 @@ impl Device {
     }
 
     pub fn destroy_shader_module(&self, shader: ShaderModule) {
-        if let Some(context) = ResourcePreparationContext::current() { context.released(self.id, shader.id()); }
+        if let Some(context) = ResourcePreparationContext::current() {
+            context.released(self.id, shader.id());
+        }
         let mut state = self.lock();
         if !state.pipeline_store.shaders.release(shader) {
             return;
@@ -867,7 +905,9 @@ impl Device {
     }
 
     pub fn destroy_mesh_pipeline(&self, pipeline: MeshPipeline) {
-        if let Some(context) = ResourcePreparationContext::current() { context.released(self.id, pipeline.id()); }
+        if let Some(context) = ResourcePreparationContext::current() {
+            context.released(self.id, pipeline.id());
+        }
         let mut state = self.lock();
         if !state.pipeline_store.mesh.release(pipeline) {
             return;
@@ -883,7 +923,9 @@ impl Device {
     }
 
     pub fn destroy_graphics_pipeline(&self, pipeline: GraphicsPipeline) {
-        if let Some(context) = ResourcePreparationContext::current() { context.released(self.id, pipeline.id()); }
+        if let Some(context) = ResourcePreparationContext::current() {
+            context.released(self.id, pipeline.id());
+        }
         let mut state = self.lock();
         if !state.pipeline_store.graphics.release(pipeline) {
             return;
@@ -899,7 +941,9 @@ impl Device {
     }
 
     pub fn destroy_compute_pipeline(&self, pipeline: ComputePipeline) {
-        if let Some(context) = ResourcePreparationContext::current() { context.released(self.id, pipeline.id()); }
+        if let Some(context) = ResourcePreparationContext::current() {
+            context.released(self.id, pipeline.id());
+        }
         let mut state = self.lock();
         if !state.pipeline_store.compute.release(pipeline) {
             return;
@@ -1713,39 +1757,61 @@ impl Device {
 
 #[derive(Clone, Copy)]
 enum PreparedResource {
-    Buffer(Buffer), Texture(Texture), Sampler(Sampler), Shader(ShaderModule),
-    Acceleration(AccelerationStructure), Graphics(GraphicsPipeline),
-    Mesh(MeshPipeline), Compute(ComputePipeline),
+    Buffer(Buffer),
+    Texture(Texture),
+    Sampler(Sampler),
+    Shader(ShaderModule),
+    Acceleration(AccelerationStructure),
+    Graphics(GraphicsPipeline),
+    Mesh(MeshPipeline),
+    Compute(ComputePipeline),
 }
 
 impl PreparedResource {
     fn id(self) -> u32 {
         match self {
-            Self::Buffer(v) => v.id(), Self::Texture(v) => v.id(), Self::Sampler(v) => v.id(),
-            Self::Shader(v) => v.id(), Self::Acceleration(v) => v.id(),
-            Self::Graphics(v) => v.id(), Self::Mesh(v) => v.id(), Self::Compute(v) => v.id(),
+            Self::Buffer(v) => v.id(),
+            Self::Texture(v) => v.id(),
+            Self::Sampler(v) => v.id(),
+            Self::Shader(v) => v.id(),
+            Self::Acceleration(v) => v.id(),
+            Self::Graphics(v) => v.id(),
+            Self::Mesh(v) => v.id(),
+            Self::Compute(v) => v.id(),
         }
     }
 
     fn release(self, state: &mut DeviceState) -> bool {
         match self {
-            Self::Buffer(v) => state.planner.forget_resource(super::ResourceRef::buffer(v.id())),
-            Self::Texture(v) => state.planner.forget_resource(super::ResourceRef::texture(v.id())),
+            Self::Buffer(v) => state
+                .planner
+                .forget_resource(super::ResourceRef::buffer(v.id())),
+            Self::Texture(v) => state
+                .planner
+                .forget_resource(super::ResourceRef::texture(v.id())),
             Self::Acceleration(v) => {
                 state.acceleration_build_inputs.remove(&v.id());
-                state.planner.forget_resource(super::ResourceRef::acceleration_structure(v.id()));
+                state
+                    .planner
+                    .forget_resource(super::ResourceRef::acceleration_structure(v.id()));
             }
             Self::Shader(v) => return state.pipeline_store.shaders.release(v),
             Self::Graphics(v) => {
-                if !state.pipeline_store.graphics.release(v) { return false; }
+                if !state.pipeline_store.graphics.release(v) {
+                    return false;
+                }
                 state.interfaces.uses.remove(&v.id());
             }
             Self::Mesh(v) => {
-                if !state.pipeline_store.mesh.release(v) { return false; }
+                if !state.pipeline_store.mesh.release(v) {
+                    return false;
+                }
                 state.interfaces.uses.remove(&v.id());
             }
             Self::Compute(v) => {
-                if !state.pipeline_store.compute.release(v) { return false; }
+                if !state.pipeline_store.compute.release(v) {
+                    return false;
+                }
                 state.interfaces.uses.remove(&v.id());
             }
             Self::Sampler(_) => {}
@@ -1755,11 +1821,14 @@ impl PreparedResource {
 
     fn destroy(self, backend: &mut dyn RhiBackend) {
         match self {
-            Self::Buffer(v) => backend.destroy_buffer(v), Self::Texture(v) => backend.destroy_texture(v),
-            Self::Sampler(v) => backend.destroy_sampler(v), Self::Shader(v) => backend.destroy_shader_module(v),
+            Self::Buffer(v) => backend.destroy_buffer(v),
+            Self::Texture(v) => backend.destroy_texture(v),
+            Self::Sampler(v) => backend.destroy_sampler(v),
+            Self::Shader(v) => backend.destroy_shader_module(v),
             Self::Acceleration(v) => backend.destroy_acceleration_structure(v),
             Self::Graphics(v) => backend.destroy_graphics_pipeline(v),
-            Self::Mesh(v) => backend.destroy_mesh_pipeline(v), Self::Compute(v) => backend.destroy_compute_pipeline(v),
+            Self::Mesh(v) => backend.destroy_mesh_pipeline(v),
+            Self::Compute(v) => backend.destroy_compute_pipeline(v),
         }
     }
 }

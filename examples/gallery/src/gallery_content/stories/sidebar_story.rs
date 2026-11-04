@@ -210,10 +210,9 @@ impl SidebarStory {
                     icon: Option<cove_imaging::BundleImageResource>,
                     badge: Option<&str>,
                     is_enabled: bool| {
-            let mut row =
-                SidebarItem::new(id.to_owned(), title.to_owned())
-                    .enabled(enabled && is_enabled)
-                    .debug_name(format!("sidebar-item-{id}"));
+            let mut row = SidebarItem::new(id.to_owned(), title.to_owned())
+                .enabled(enabled && is_enabled)
+                .debug_name(format!("sidebar-item-{id}"));
             if icons_on && let Some(icon) = icon {
                 row = row.icon(icon);
             }
@@ -332,7 +331,10 @@ impl View for SidebarStory {
             cove_core::scene::Justify::FlexStart,
             cove_core::scene::Wrap::Wrap,
             16.0,
-            AnyView::new(TupleView::new(vec![AnyView::new(sidebar), AnyView::new(pane)])),
+            AnyView::new(TupleView::new(vec![
+                AnyView::new(sidebar),
+                AnyView::new(pane),
+            ])),
         );
         let drawer = NavigationDrawer::try_new(
             "Cove workspace",
@@ -348,9 +350,14 @@ impl View for SidebarStory {
                 "Native SidebarItem icons follow IconTheme and Scale. Up / Down and Home / End select enabled destinations and reveal them inside the scrolling pane.",
                 AnyView::new(TupleView::new(vec![
                     AnyView::new(preview),
-                    AnyView::new(cove_ui_compose::primitives::controls::Button::title("Open navigation", {
-                        let open = self.is_drawer_open.clone(); move || open.set(true)
-                    }).debug_name("sidebar-open-drawer")),
+                    AnyView::new(
+                        cove_ui_compose::primitives::controls::Button::title("Open as drawer", {
+                            let open = self.is_drawer_open.clone();
+                            move || open.set(true)
+                        })
+                        .enabled(self.options.is_enabled)
+                        .debug_name("sidebar-open-drawer"),
+                    ),
                     AnyView::new(drawer),
                 ])),
             )),

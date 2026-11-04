@@ -179,7 +179,7 @@ cargo test -p cove-ui-compose --test compose --locked
 - 每个 Swift 段落用标题词比对 Rust 段落：同页 ≥50% 词重合算同页有对应；同页对不上但其他页面 ≥80% 算被挪走；都没有算无对应。
 - 段数不等于功能数量。Rust 常把一个 Swift 段落拆成多段（Slider 3 → 5），段数多不代表能力更全。
 - 另查“孤儿 story”：Rust 里存在、自带段落，但没有被 `StoryDispatch::view` 任何分支引用、也没有被已挂页面组合的类型，即为已实现但没有页面展示。
-- 本清单是静态源码比对，不是运行时验收。当前工作区因 `crates/compose/src/primitives/text/text_field/` 未完成的改动无法编译（17 个错误），`catalog_audit` 跑不起来，所以本轮没有运行时段落节点数据。
+- 以下是当时静态源码比对的历史快照，不是本轮测试结果。当时工作区因 `crates/compose/src/primitives/text/text_field/` 未完成的改动无法编译（17 个错误），`catalog_audit` 跑不起来，所以本轮没有运行时段落节点数据。
 
 ### 结论
 
@@ -428,6 +428,21 @@ Swift 目录没有、Rust 新增的 8 页：SingleLineText、CompletionPopover�
 | Timeline | 共享 Rust 行为与场景回归 | 本轮未作原生设备验收 | Website/src/content/components/timeline.md |
 | TabView | 共享 Rust 行为与场景回归 | 本轮未作原生设备验收 | Website/src/content/components/tab-view.md |
 | DateRangeCalendar | 共享 Rust 行为与场景回归 | 本轮未作原生设备验收 | Website/src/content/components/date-range.md |
-| TextField / Code gutter | 挂载真实行号控件，折叠布局与键盘接口 | 本轮未作原生键盘或 IME 验收 | Website/src/content/components/text-field.md |
+| TextField / Code gutter | 挂载控件与正文共用几何；真实场景指针点击、输入框 F9/折叠快捷键、标记重基 | 本轮未作原生键盘或 IME 验收 | Website/src/content/components/text-field.md |
 
 未增加按平台跳过的生产实现；原生 Windows、Linux、iOS、Android 的设备验收继续独立跟踪。
+
+逐项源码与断言处理记录见 [swift-gap-audit.md](swift-gap-audit.md)。Resource preparation 自动资源所有权与取消回收的 Rust 文档位于 `Website/src/content/components/resource-preparation.md`；Metal 提交错误与资源回收的原生 API 回归独立于 Gallery 视觉验收。
+
+| 关联组件 | 实现与自动化验收 | 原生视觉/交互验收 | Rust 文档 |
+| --- | --- | --- | --- |
+| ActionGroupLayout | 软提议与堆叠约束测量分开，关联 Grid/Markdown 横向滚动回归 | 本轮未作原生设备验收 | Website/src/content/components/action-group-layout.md |
+| Grid / named columns | 保留必需列固有宽度，收窄后滚轮移动视口；9 项定向场景 | 本轮未作原生设备验收 | Website/src/content/components/grid.md |
+| MarkdownView | 长代码不换行并横向滚动，正文换行；14 项定向场景 | 本轮未作原生设备验收 | Website/src/content/components/markdown.md |
+
+### 2026-11-04 最终验证
+
+- `cargo test --workspace --locked --no-fail-fast`：退出码 0，3534 项通过、0 失败、5 项沿用原有忽略（2 项性能测量、3 项文档示例）。未新增忽略或跳过来隐藏回归。
+- Gallery `catalog_audit`：106 页、212 个宽屏/窄屏几何场景通过。以上组件的实现与自动化验收通过；原生视觉、平台键盘与 IME 验收仍按各行单独记录。
+- 网站 `npm run build`、本轮 Rust 文件格式检查与 `git diff --check` 通过。
+- `crates/` 与 `examples/` Rust 扫描：缺失行为前缀断言/说明残留 0。剩余 7 处冒号命中均为合法的 GAP 常量声明。

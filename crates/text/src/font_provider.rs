@@ -252,6 +252,14 @@ impl FontProvider {
         #[cfg(not(any(target_os = "macos", target_os = "ios")))]
         {
             let font = self.load_primary_direct(name)?;
+            if let Some((weight, italic)) = font.face.resolved_style() {
+                if self.weight != weight || self.italic != italic {
+                    self.fallback_chain.clear();
+                    self.tried_paths.clear();
+                }
+                self.weight = weight;
+                self.italic = italic;
+            }
             self.primary_name = Some(font.post_script_name.clone());
             Some(font)
         }
@@ -297,11 +305,16 @@ impl FontProvider {
     #[cfg(not(any(target_os = "macos", target_os = "ios")))]
     fn load_direct(&mut self, path: &Path, alias: &str) -> Option<Rc<ManagedFont>> {
         let alias = format!("{alias}:{:?}:{}", self.weight, self.italic);
-        if let Some(font) = self.fonts.get(&alias) { return Some(font.clone()); }
-        let path = styled_font_paths(path, self.weight, self.italic).into_iter().find(|path| path.is_file())?;
+        if let Some(font) = self.fonts.get(&alias) {
+            return Some(font.clone());
+        }
+        let path = styled_font_paths(path, self.weight, self.italic)
+            .into_iter()
+            .find(|path| path.is_file())?;
         let bytes = font_registry::file(&path).ok()?;
         let selector = FontFaceSelector::default();
-        let face = FontFace::from_bytes(bytes, self.size, self.scale, selector, Default::default()).ok()?;
+        let face = FontFace::from_bytes(bytes, self.size, self.scale, selector, Default::default())
+            .ok()?;
         let coordinates = styled_coordinates(&face.design_axes(), self.weight, self.italic);
         let key = font_registry::FontKey::new(path, selector, &coordinates, self.size, self.scale);
         self.register(key, alias, &[], || face.resolved(coordinates).ok())
@@ -431,8 +444,7 @@ impl FontProvider {
         let bytes = font_registry::file(&path).ok()?;
         let selector = font_registry::selector(&path, &name, &bytes).unwrap_or_default();
         let variations = native.variations();
-        let key =
-            font_registry::FontKey::new(path, selector, &variations, self.size, self.scale);
+        let key = font_registry::FontKey::new(path, selector, &variations, self.size, self.scale);
         let (size, scale) = (self.size, self.scale);
         self.register(key, name, aliases, || {
             let face = FontFace::from_bytes(bytes, size, scale, selector, variations).ok()?;
@@ -466,7 +478,13 @@ impl FontProvider {
                 crate::SystemFontDefaults::FONT_STACK
                     .iter()
                     .filter_map(|name| {
-                        AppleFont::family(name, self.size, self.weight, self.italic)
+                        AppleFont::family(
+                            name,
+                            self.size,
+                            self.weight,
+                            self.italic,
+                            self.primary_native.as_ref(),
+                        )
                     })
                     .collect(),
             );
@@ -603,63 +621,137 @@ fn system_fallback_paths() -> Vec<PathBuf> {
 
 #[cfg(any(test, not(any(target_os = "macos", target_os = "ios"))))]
 fn styled_font_paths(path: &Path, weight: FontWeight, italic: bool) -> Vec<PathBuf> {
-    let stem = path.file_stem().and_then(|v| v.to_str()).unwrap_or_default();
+    let stem = path
+        .file_stem()
+        .and_then(|v| v.to_str())
+        .unwrap_or_default();
     let extension = path.extension().and_then(|v| v.to_str()).unwrap_or("ttf");
     let mut stems = Vec::new();
     let heavy = matches!(weight, FontWeight::Bold | FontWeight::Semibold);
     if heavy {
         let windows = match stem.to_ascii_lowercase().as_str() {
-            "msyh" => Some("msyhbd"), "msjh" => Some("msjhbd"),
-            "malgun" => Some("malgunbd"), "yugothm" => Some("yugothb"),
+            "msyh" => Some("msyhbd"),
+            "msjh" => Some("msjhbd"),
+            "malgun" => Some("malgunbd"),
+            "yugothm" => Some("yugothb"),
             "arial" => Some(if italic { "arialbi" } else { "arialbd" }),
             "segoeui" => Some(if italic { "segoeuiz" } else { "segoeuib" }),
             _ => None,
         };
-        if let Some(name) = windows { stems.push(name.to_string()); }
+        if let Some(name) = windows {
+            stems.push(name.to_string());
+        }
     }
     let family = stem.strip_suffix("-Regular").unwrap_or(stem);
-    let style = match weight { FontWeight::Regular => "Regular", FontWeight::Medium => "Medium", FontWeight::Semibold => "SemiBold", FontWeight::Bold => "Bold" };
+    let style = match weight {
+        FontWeight::Regular => "Regular",
+        FontWeight::Medium => "Medium",
+        FontWeight::Semibold => "SemiBold",
+        FontWeight::Bold => "Bold",
+    };
     if italic {
-        let prefix = if weight == FontWeight::Regular { "" } else { style };
+        let prefix = if weight == FontWeight::Regular {
+            ""
+        } else {
+            style
+        };
         stems.push(format!("{family}-{prefix}Italic"));
         stems.push(format!("{family}-{prefix}Oblique"));
     }
-    if weight != FontWeight::Regular { stems.push(format!("{family}-{style}")); }
-    if weight == FontWeight::Semibold { stems.push(format!("{family}-Bold")); }
-    let mut paths: Vec<_> = stems.into_iter().map(|stem| path.with_file_name(format!("{stem}.{extension}"))).collect();
+    if weight != FontWeight::Regular {
+        stems.push(format!("{family}-{style}"));
+    }
+    if weight == FontWeight::Semibold {
+        stems.push(format!("{family}-Bold"));
+    }
+    let mut paths: Vec<_> = stems
+        .into_iter()
+        .map(|stem| path.with_file_name(format!("{stem}.{extension}")))
+        .collect();
     paths.push(path.to_owned());
     paths
 }
 #[cfg(any(test, not(any(target_os = "macos", target_os = "ios"))))]
-fn styled_coordinates(axes: &[crate::FontAxis], weight: FontWeight, italic: bool) -> std::collections::BTreeMap<crate::FontAxisId, f64> {
-    axes.iter().filter_map(|axis| {
-        let value: f64 = match axis.id.0.to_be_bytes() {
-            [b'w', b'g', b'h', b't'] => match weight { FontWeight::Regular => 400.0, FontWeight::Medium => 500.0, FontWeight::Semibold => 600.0, FontWeight::Bold => 700.0 },
-            [b'i', b't', b'a', b'l'] => if italic { 1.0 } else { 0.0 },
-            [b's', b'l', b'n', b't'] => if italic { -12.0 } else { 0.0 },
-            _ => return None,
-        };
-        Some((axis.id, value.clamp(axis.minimum, axis.maximum)))
-    }).collect()
+fn styled_coordinates(
+    axes: &[crate::FontAxis],
+    weight: FontWeight,
+    italic: bool,
+) -> std::collections::BTreeMap<crate::FontAxisId, f64> {
+    axes.iter()
+        .filter_map(|axis| {
+            let value: f64 = match axis.id.0.to_be_bytes() {
+                [b'w', b'g', b'h', b't'] => match weight {
+                    FontWeight::Regular => 400.0,
+                    FontWeight::Medium => 500.0,
+                    FontWeight::Semibold => 600.0,
+                    FontWeight::Bold => 700.0,
+                },
+                [b'i', b't', b'a', b'l'] => {
+                    if italic {
+                        1.0
+                    } else {
+                        0.0
+                    }
+                }
+                [b's', b'l', b'n', b't'] => {
+                    if italic {
+                        -12.0
+                    } else {
+                        0.0
+                    }
+                }
+                _ => return None,
+            };
+            Some((axis.id, value.clamp(axis.minimum, axis.maximum)))
+        })
+        .collect()
 }
 #[cfg(test)]
 mod portable_style_tests {
     use super::*;
     #[test]
     fn cjk_family_paths_keep_the_requested_style() {
-        for directory in ["/usr/share/fonts/opentype/noto", "/system/fonts", "/browser/fonts"] {
+        for directory in [
+            "/usr/share/fonts/opentype/noto",
+            "/system/fonts",
+            "/browser/fonts",
+        ] {
             let regular = PathBuf::from(directory).join("NotoSansCJK-Regular.ttc");
-            assert_eq!(styled_font_paths(&regular, FontWeight::Bold, false)[0], regular.with_file_name("NotoSansCJK-Bold.ttc"));
+            assert_eq!(
+                styled_font_paths(&regular, FontWeight::Bold, false)[0],
+                regular.with_file_name("NotoSansCJK-Bold.ttc")
+            );
         }
         let regular = PathBuf::from("C:/Windows/Fonts/msyh.ttc");
-        assert_eq!(styled_font_paths(&regular, FontWeight::Bold, false)[0], regular.with_file_name("msyhbd.ttc"));
+        assert_eq!(
+            styled_font_paths(&regular, FontWeight::Bold, false)[0],
+            regular.with_file_name("msyhbd.ttc")
+        );
     }
     #[test]
     fn variable_families_use_weight_and_slant_within_the_font_limits() {
-        let axes = [crate::FontAxis { id: crate::FontAxisId(u32::from_be_bytes(*b"wght")), name: "Weight".into(), minimum: 100.0, default_value: 400.0, maximum: 650.0 }, crate::FontAxis { id: crate::FontAxisId(u32::from_be_bytes(*b"ital")), name: "Italic".into(), minimum: 0.0, default_value: 0.0, maximum: 1.0 }];
+        let axes = [
+            crate::FontAxis {
+                id: crate::FontAxisId(u32::from_be_bytes(*b"wght")),
+                name: "Weight".into(),
+                minimum: 100.0,
+                default_value: 400.0,
+                maximum: 650.0,
+            },
+            crate::FontAxis {
+                id: crate::FontAxisId(u32::from_be_bytes(*b"ital")),
+                name: "Italic".into(),
+                minimum: 0.0,
+                default_value: 0.0,
+                maximum: 1.0,
+            },
+        ];
         let values = styled_coordinates(&axes, FontWeight::Bold, true);
         assert_eq!(values[&axes[0].id], 650.0);
         assert_eq!(values[&axes[1].id], 1.0);
-        assert_eq!(styled_coordinates(&axes, FontWeight::Regular, false)[&axes[0].id], 400.0);
+        assert_eq!(
+            styled_coordinates(&axes, FontWeight::Regular, false)[&axes[0].id],
+            400.0
+        );
     }
 }

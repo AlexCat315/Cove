@@ -21,7 +21,9 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::ops::Range;
 use std::rc::Rc;
 
-use crate::primitives::text::code::folding_options::{TextEditorFolding, TextFoldRegion};
+use crate::primitives::text::code::folding_options::{
+    TextEditorFolding, TextFoldRegion, TextLineRebase,
+};
 use crate::primitives::text::code::gutter_geometry::TextGutterControl;
 use crate::primitives::text::code::gutter_options::{
     TextBreakpoint, TextBreakpointState, TextEditorGutter, TextGutterMarker,
@@ -39,6 +41,8 @@ pub struct TextFoldSession {
     collapsed: RefCell<BTreeSet<usize>>,
     binding: RefCell<Option<Binding<BTreeSet<usize>>>>,
     authored: RefCell<Vec<TextFoldRegion>>,
+    buffer: RefCell<Option<TextBuffer>>,
+    previous_bound: RefCell<BTreeSet<usize>>,
     hidden_lines: RefCell<Vec<Range<usize>>>,
 }
 
@@ -100,17 +104,43 @@ impl TextFoldSession {
     /// properly nested regions keep their own header.
     pub fn synchronize(&self, folding: &TextEditorFolding, buffer: &TextBuffer) {
         *self.binding.borrow_mut() = folding.collapsed_lines.clone();
+        let mut collapsed = self.collapsed();
+        let previous_buffer = self.buffer.borrow().clone();
+        if let Some(previous) = &previous_buffer
+            && previous != buffer
+        {
+            if let Some(change) = TextLineRebase::new(previous, buffer) {
+                if folding.collapsed_lines.is_none() || collapsed == *self.previous_bound.borrow() {
+                    collapsed = collapsed
+                        .into_iter()
+                        .filter_map(|line| change.line(line))
+                        .collect();
+                }
+                let regions = self
+                    .regions
+                    .borrow()
+                    .values()
+                    .filter_map(|region| {
+                        let start = change.line(region.first_line)?;
+                        let end = change.line(region.last_line)?;
+                        (start < end).then_some((start, TextFoldRegion::new(start, end)))
+                    })
+                    .collect();
+                *self.regions.borrow_mut() = regions;
+            } else if previous.string_value() != buffer.string_value() {
+                collapsed.clear();
+                self.regions.borrow_mut().clear();
+            }
+        }
         let line_count = buffer.line_count();
-        if *self.authored.borrow() != folding.regions {
+        if previous_buffer.is_none() || *self.authored.borrow() != folding.regions {
             let mut regions = BTreeMap::new();
             let mut ancestors: Vec<TextFoldRegion> = Vec::new();
             let mut sorted = folding.regions.clone();
             sorted.sort_by(|left, right| {
-                left.first_line.cmp(&right.first_line).then_with(|| {
-                    right
-                        .last_line
-                        .cmp(&left.last_line)
-                })
+                left.first_line
+                    .cmp(&right.first_line)
+                    .then_with(|| right.last_line.cmp(&left.last_line))
             });
             for region in sorted {
                 if region.first_line >= region.last_line
@@ -138,13 +168,16 @@ impl TextFoldSession {
             *self.authored.borrow_mut() = folding.regions.clone();
         }
         if folding.is_ready {
-            let mut collapsed = self.collapsed();
             collapsed.retain(|line| self.regions.borrow().contains_key(line));
-            match &*self.binding.borrow() {
-                Some(binding) => { if binding.get() != collapsed { binding.set(collapsed); } },
-                None => *self.collapsed.borrow_mut() = collapsed,
-            }
         }
+        if let Some(binding) = &*self.binding.borrow()
+            && binding.get() != collapsed
+        {
+            binding.set(collapsed.clone());
+        }
+        *self.collapsed.borrow_mut() = collapsed.clone();
+        *self.previous_bound.borrow_mut() = collapsed;
+        *self.buffer.borrow_mut() = Some(buffer.clone());
         self.update_projection();
     }
 
@@ -203,6 +236,7 @@ pub struct TextGutterSession {
     revision: Cell<u64>,
     changed: cove_core::Signal<()>,
     previous_breakpoints: RefCell<Vec<TextBreakpoint>>,
+    buffer: RefCell<Option<TextBuffer>>,
     pub selected_control: RefCell<Option<String>>,
     subscribers: RefCell<Vec<Rc<dyn Fn()>>>,
 }
@@ -218,6 +252,7 @@ impl TextGutterSession {
             revision: Cell::new(0),
             changed: cove_core::Signal::detached(()),
             previous_breakpoints: RefCell::new(Vec::new()),
+            buffer: RefCell::new(None),
             selected_control: RefCell::new(None),
             subscribers: RefCell::new(Vec::new()),
         }
@@ -288,15 +323,28 @@ impl TextGutterSession {
             .map(|binding| binding.get())
             .unwrap_or_default();
         let line_count = next.line_count();
-        let rebased: Vec<TextBreakpoint> = previous
-            .iter()
-            .filter_map(|point| {
-                (point.line < line_count).then_some(TextBreakpoint {
-                    line: point.line,
-                    state: point.state,
-                })
-            })
-            .collect();
+        let previous_buffer = self.buffer.borrow().clone();
+        let rebased: Vec<TextBreakpoint> = match previous_buffer.as_ref() {
+            Some(buffer) if buffer != next => match TextLineRebase::new(buffer, next) {
+                Some(change) => previous
+                    .iter()
+                    .filter_map(|point| {
+                        let line = change.line(point.line)?;
+                        (line < line_count).then_some(TextBreakpoint {
+                            line,
+                            state: point.state,
+                        })
+                    })
+                    .collect(),
+                None if buffer.string_value() == next.string_value() => previous.clone(),
+                None => Vec::new(),
+            },
+            _ => previous
+                .iter()
+                .filter(|point| point.line < line_count)
+                .copied()
+                .collect(),
+        };
         if let Some(binding) = self.gutter.borrow().breakpoints.clone() {
             let unchanged = current == previous;
             if unchanged && current != rebased {
@@ -306,7 +354,14 @@ impl TextGutterSession {
                 }
             }
         }
-        *self.previous_breakpoints.borrow_mut() = rebased;
+        *self.previous_breakpoints.borrow_mut() = self
+            .gutter
+            .borrow()
+            .breakpoints
+            .as_ref()
+            .map(|binding| binding.get())
+            .unwrap_or_default();
+        *self.buffer.borrow_mut() = Some(next.clone());
     }
 
     fn publish(&self) {
@@ -511,9 +566,19 @@ impl Default for TextGutterSession {
 }
 
 impl cove_core::scene::NodeResource for TextGutterSession {
-    fn mount(&self, node: &Node) { TextGutterSession::mount(self, node.clone()); }
-    fn unmount(&self, _node: &Node) { TextGutterSession::unmount(self); }
-    fn as_any_rc(self: Rc<Self>) -> Rc<dyn std::any::Any> { self }
+    fn mount(&self, node: &Node) {
+        TextGutterSession::mount(self, node.clone());
+    }
+    fn unmount(&self, _node: &Node) {
+        TextGutterSession::unmount(self);
+    }
+    fn as_any_rc(self: Rc<Self>) -> Rc<dyn std::any::Any> {
+        self
+    }
 }
 
-impl Drop for TextGutterSession { fn drop(&mut self) { self.changed.dispose(); } }
+impl Drop for TextGutterSession {
+    fn drop(&mut self) {
+        self.changed.dispose();
+    }
+}

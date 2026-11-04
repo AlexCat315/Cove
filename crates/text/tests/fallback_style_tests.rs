@@ -6,15 +6,6 @@
 //! the primary font's real CoreText weight trait rather than from the requested
 //! `FontWeight`.
 //!
-//! Named difference (production gap, not fixed here):
-//! `cove_text::FontProvider::covering_apple_font` constructs each stack family
-//! with `AppleFont::new(Some(family), size, self.weight, self.italic)` instead of
-//! copying the primary font's resolved `kCTFontWeightTrait` into the descriptor
-//! the way `FontProvider.swift` does. On this machine that makes the bold CJK
-//! fallback resolve to `PingFangSC-Regular`, identical to the regular request, so
-//! Swift's `bold != regular` / `weight(bold) > weight(regular)` assertions cannot
-//! hold. The reload-stability and run-coverage behaviours do hold and are
-//!
 //! Behaviour checklist:
 //! - reloading the primary font refreshes the cached fallback style
 //! - a reload back to regular reuses the same fallback font identity
@@ -90,13 +81,9 @@ fn primary_style_change() {
         .map(|run| run.font.post_script_name.clone())
         .expect("the CJK cluster resolves while bold");
 
-    // Swift asserts the CJK fallback becomes heavier here. It does not: see the
-    // module-level named difference.
     assert_ne!(
         bold, regular.0,
-        "bold CJK falls back to the same face as regular ({bold}); Swift \
-         FontProvider.swift:435-448 copies the primary's kCTFontWeightTrait into \
-         the styled fallback descriptor and expects a heavier PingFang face",
+        "bold CJK resolves to a distinct styled face ({bold})",
     );
 
     assert!(
@@ -134,13 +121,9 @@ fn bold_fallback() {
     let (regular_name, _) = fallback_face(FontWeight::Regular);
     let (bold_name, _) = fallback_face(FontWeight::Bold);
 
-    // Swift asserts `regular != bold`, `weight(regular) <= 0.05` and
-    // `weight(bold) > weight(regular)`, plus a shared family prefix. Only the
-    // family invariant survives in the current port.
     assert_ne!(
         regular_name, bold_name,
-        "regular and bold CJK both fall back to {regular_name}; Swift expects \
-         distinct faces of the same family (bold heavier than regular)",
+        "regular and bold CJK resolve distinct faces in one family ({regular_name})",
     );
     let family = |name: &str| {
         name.split('-')
@@ -152,5 +135,27 @@ fn bold_fallback() {
         family(&regular_name),
         family(&bold_name),
         "both weights stay in one family ({regular_name} vs {bold_name})",
+    );
+}
+
+#[cfg(any(target_os = "macos", target_os = "ios"))]
+#[test]
+fn named_bold_primary_passes_its_resolved_weight_to_fallback() {
+    let (regular, _) = fallback_face(FontWeight::Regular);
+    let mut provider = FontProvider::new(14.0, 1.0);
+    let primary = provider
+        .load_primary_font("Helvetica-Bold", FontWeight::Regular, false)
+        .expect("named primary");
+    assert!(primary.post_script_name.contains("Bold"));
+    let fallback = provider
+        .resolve_runs("ab粗体")
+        .last()
+        .expect("CJK fallback")
+        .font
+        .post_script_name
+        .clone();
+    assert_ne!(
+        fallback, regular,
+        "fallback inherits the actual bold face despite a regular request"
     );
 }

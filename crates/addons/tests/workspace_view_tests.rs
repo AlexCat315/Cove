@@ -41,6 +41,8 @@
 //! - the top region uses the shared height contract and keyboard
 //! - 200 % tabs keep controls reachable and reveal keyboard selection
 //!
+mod workspace_support;
+
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -61,9 +63,8 @@ use cove_ui_compose::modifiers::layout::{FlexExt, LayoutFrameExt};
 use cove_ui_compose::primitives::text::Text;
 use workspace_support::{WorkspaceRig, group, group_node, panel};
 
-/// `WorkspaceViewRig` with the re-render Swift gets from its controller
-/// subscription. The embedded [`WorkspaceRig`] is reinstalled whenever the
-/// controller version moved, so a test reads the geometry the document implies.
+/// Pumps the installed workspace tree after controller notifications; panel
+/// identity and interaction checks use the same retained production nodes.
 struct ViewRig {
     rig: WorkspaceRig,
 }
@@ -452,9 +453,15 @@ fn workspace_theme_controls_tab_bar_height() {
     let root_controller = controller.clone();
     let mut rig = ViewRig::new(controller, 1000.0, 640.0, move || {
         use cove_composition::ViewExt;
-        AnyView::new(workspace_support::workspace_root(root_controller.clone()).composition_local(
-            cove_ui_addons::workspace::WorkspaceThemeEnvironment::key(),
-            cove_ui_addons::workspace::WorkspaceTheme { tab_bar_height: 52.0, ..Default::default() }))
+        AnyView::new(
+            workspace_support::workspace_root(root_controller.clone()).composition_local(
+                cove_ui_addons::workspace::WorkspaceThemeEnvironment::key(),
+                cove_ui_addons::workspace::WorkspaceTheme {
+                    tab_bar_height: 52.0,
+                    ..Default::default()
+                },
+            ),
+        )
     });
     rig.pump();
 
@@ -940,10 +947,7 @@ fn workspace_panel_content_is_clipped_to_its_region() {
     let panel_node = rig.named("workspace-panel-viewport");
     let panel_frame = rig.frame("workspace-panel-viewport");
     let status_bar = rig.frame("editor-status-bar");
-    assert!(
-        panel_node.clips_to_bounds(),
-        "the panel clips its content"
-    );
+    assert!(panel_node.clips_to_bounds(), "the panel clips its content");
     assert!(
         panel_frame.height > 0.0,
         "the panel takes the region's height below the tab bar"
@@ -954,7 +958,10 @@ fn workspace_panel_content_is_clipped_to_its_region() {
         panel_frame.max_y()
     );
     assert!(
-        panel_node.children().iter().any(|child| child.clips_to_bounds()),
+        panel_node
+            .children()
+            .iter()
+            .any(|child| child.clips_to_bounds()),
         "the panel's viewport clips the overflow"
     );
     let region_frame = rig.frame("workspace-region-center");
@@ -1024,7 +1031,9 @@ fn collapsing_left_right_then_bottom_restores_in_place() {
         ("trailing", "inspector"),
         ("bottom", "console"),
     ] {
-        rig.click(center_of(rig.frame(&format!("workspace-restore-{panel_id}"))));
+        rig.click(center_of(
+            rig.frame(&format!("workspace-restore-{panel_id}")),
+        ));
         assert_eq!(rig.group(group).map(|g| g.is_collapsed), Some(false));
     }
 
@@ -1174,7 +1183,10 @@ fn dragging_tab_within_same_group_reorders_panel() {
     );
 
     rig.drag(
-        Point::new(console.x + console.width / 2.0, console.y + console.height / 2.0),
+        Point::new(
+            console.x + console.width / 2.0,
+            console.y + console.height / 2.0,
+        ),
         Point::new(assets.max_x() - 1.0, assets.y + assets.height / 2.0),
     );
 
@@ -1684,7 +1696,15 @@ fn tab_strip_exposes_tab_list_panel_and_position_and_mirrors_arrows_in_rtl() {
         let root_controller = controller.clone();
         let mut rig = ViewRig::new(controller, 1000.0, 640.0, move || {
             use cove_composition::layout::LayoutDirectionExt;
-            AnyView::new(workspace_support::workspace_root(root_controller.clone()).layout_direction(if rtl { cove_core::scene::Direction::Rtl } else { cove_core::scene::Direction::Ltr }))
+            AnyView::new(
+                workspace_support::workspace_root(root_controller.clone()).layout_direction(
+                    if rtl {
+                        cove_core::scene::Direction::Rtl
+                    } else {
+                        cove_core::scene::Direction::Ltr
+                    },
+                ),
+            )
         });
         rig.pump();
 
@@ -1742,7 +1762,11 @@ fn tab_strip_exposes_tab_list_panel_and_position_and_mirrors_arrows_in_rtl() {
         );
 
         rig.focus(&console);
-        rig.key(if rtl { Scancode::ARROW_LEFT } else { Scancode::ARROW_RIGHT });
+        rig.key(if rtl {
+            Scancode::ARROW_LEFT
+        } else {
+            Scancode::ARROW_RIGHT
+        });
         assert_eq!(
             rig.group("bottom").and_then(|group| group.active_panel_id),
             Some(WorkspacePanelID::new("assets")),
@@ -1754,7 +1778,7 @@ fn tab_strip_exposes_tab_list_panel_and_position_and_mirrors_arrows_in_rtl() {
 
 #[test]
 fn tab_arrow_command_mapping() {
-    use cove_ui_addons::workspace::{workspace_tab_command as command, WorkspaceTabCommand::*};
+    use cove_ui_addons::workspace::{WorkspaceTabCommand::*, workspace_tab_command as command};
     assert_eq!(command(Scancode::ARROW_LEFT, false), Some(Previous));
     assert_eq!(command(Scancode::ARROW_LEFT, true), Some(Next));
     assert_eq!(command(Scancode::ARROW_RIGHT, true), Some(Previous));
@@ -2018,9 +2042,17 @@ fn two_hundred_percent_tabs_keep_controls_reachable_and_reveal_keyboard_selectio
     let root_controller = controller.clone();
     let rig = ViewRig::new(controller, 420.0, 400.0, move || {
         use cove_ui_compose::theme::TextScalerViewExt;
-        AnyView::new(workspace_support::workspace_root(root_controller.clone()).text_scaler(cove_ui_compose::theme::TextScaler::new(2.0)))
+        AnyView::new(
+            workspace_support::workspace_root(root_controller.clone())
+                .text_scaler(cove_ui_compose::theme::TextScaler::new(2.0)),
+        )
     });
-    assert_close(rig.frame("workspace-panel-tab-0").y - rig.frame("workspace-group-center").y, 68.0, 0.5, "tabs follow text scale");
+    assert_close(
+        rig.frame("workspace-panel-tab-0").y - rig.frame("workspace-group-center").y,
+        68.0,
+        0.5,
+        "tabs follow text scale",
+    );
 
     assert!(
         rig.optional_named("workspace-group-center").is_some(),
@@ -2051,14 +2083,28 @@ fn two_hundred_percent_tabs_keep_controls_reachable_and_reveal_keyboard_selectio
 fn closing_last_panel_animates_the_vacated_region_and_keeps_the_document_closed() {
     let mut rig = animated_rig();
     let inspector = rig.named("content-inspector");
-    rig.dispatch(WorkspaceCommand::ClosePanel(WorkspacePanelID::new("inspector")));
-    assert!(rig.document().group_containing(&WorkspacePanelID::new("inspector")).is_none());
+    rig.dispatch(WorkspaceCommand::ClosePanel(WorkspacePanelID::new(
+        "inspector",
+    )));
+    assert!(
+        rig.document()
+            .group_containing(&WorkspacePanelID::new("inspector"))
+            .is_none()
+    );
     assert_eq!(rig.named("content-inspector").id(), inspector.id());
-    assert!(!inspector.accepts_subtree_input(), "closing retains only paint");
+    assert!(
+        !inspector.accepts_subtree_input(),
+        "closing retains only paint"
+    );
     cove_core::scene::AnimatorScheduler::current().tick(1.0);
     rig.pump();
     assert!(rig.optional_named("content-inspector").is_none());
-    assert_close(rig.frame("workspace-region-center").max_x(), 1000.0, 1.0, "closed region releases its allocation");
+    assert_close(
+        rig.frame("workspace-region-center").max_x(),
+        1000.0,
+        1.0,
+        "closed region releases its allocation",
+    );
 }
 
 fn animated_rig() -> ViewRig {
@@ -2066,8 +2112,16 @@ fn animated_rig() -> ViewRig {
     let controller = workspace_support::controller_with_fixture();
     let root_controller = controller.clone();
     ViewRig::new(controller, 1000.0, 600.0, move || {
-        let theme = cove_ui_addons::workspace::WorkspaceTheme { animates_layout: true, ..Default::default() };
-        AnyView::new(workspace_support::workspace_root(root_controller.clone()).composition_local(cove_ui_addons::workspace::WorkspaceThemeEnvironment::key(), theme))
+        let theme = cove_ui_addons::workspace::WorkspaceTheme {
+            animates_layout: true,
+            ..Default::default()
+        };
+        AnyView::new(
+            workspace_support::workspace_root(root_controller.clone()).composition_local(
+                cove_ui_addons::workspace::WorkspaceThemeEnvironment::key(),
+                theme,
+            ),
+        )
     })
 }
 
@@ -2082,12 +2136,20 @@ fn animated_collapse_retains_paint_disables_input_and_reclaims_space() {
     cove_core::scene::AnimatorScheduler::current().tick(0.08);
     rig.pump();
     let during = rig.frame("workspace-region-trailing").width;
-    assert!(during > 0.0 && during < before, "the region interpolates its allocation: {during} of {before}");
+    assert!(
+        during > 0.0 && during < before,
+        "the region interpolates its allocation: {during} of {before}"
+    );
     cove_core::scene::AnimatorScheduler::current().tick(1.0);
     rig.pump();
     assert!(rig.optional_named("content-inspector").is_none());
     let rail = rig.frame("workspace-rail-chrome.trailing.rail");
-    assert_close(rig.frame("workspace-region-center").max_x(), rail.x, 1.0, "center meets the collapsed rail");
+    assert_close(
+        rig.frame("workspace-region-center").max_x(),
+        rail.x,
+        1.0,
+        "center meets the collapsed rail",
+    );
 }
 
 #[test]
@@ -2104,5 +2166,10 @@ fn animated_collapse_reversal_keeps_the_same_panel_and_restores_layout() {
     rig.pump();
     assert_eq!(rig.named("content-inspector").id(), inspector.id());
     assert!(inspector.accepts_subtree_input());
-    assert_close(rig.frame("workspace-region-trailing").width, initial.width, 1.0, "reversal restores allocation");
+    assert_close(
+        rig.frame("workspace-region-trailing").width,
+        initial.width,
+        1.0,
+        "reversal restores allocation",
+    );
 }

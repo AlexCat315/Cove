@@ -64,3 +64,5 @@ fn title() -> impl View {
 本次为破坏性整理：删除 `RichText`，不提供兼容别名。原 `RichText::new(runs)` 改为 `Text::runs(runs)`，原 `RichTextRun` / `RichTextTraits` 改为 `TextRun` / `TextTraits`。`with_alignment` / `with_color` 改为 `alignment` / `color`。
 
 CJK 回退按字体家族匹配当前字重和斜体；同一段内容切换粗体时重新选择对应字面。
+
+回退字体继承主字体实际解析出的样式。Apple 使用主字体的 CoreText 字重及 italic trait；其他平台读取 OpenType OS/2、head 和当前 variation 坐标。命名字体本身已是 Bold 时，即使请求参数为 Regular，CJK 回退也保留其实际字重。

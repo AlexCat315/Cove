@@ -13,13 +13,6 @@
 //! - reduced motion snaps visibility without scheduling fades
 //! - touch-only surfaces keep the chrome always visible
 //!
-//! Named differences:
-//! - GAP `hover_fade_in`: Swift animates the hover reveal through the
-//!   scheduler; Rust snaps the chrome opacity to 1 with nothing scheduled.
-//! - GAP `scroll_flash`: Swift flashes the chrome visible on an offset change
-//!   and fades it after the content rests; Rust applies the reveal and the
-//!   fade back-to-back without an animation context, so the chrome stays at 0.
-
 use crate::support;
 use cove_composition::Scope;
 
@@ -305,9 +298,7 @@ fn auto_hide_follows_hover() {
         assert_eq!(
             (scheduler.active_count(), chrome_opacity(bar)),
             (1, 0.0),
-            "Swift schedules a fade-in on hover (one active animation, opacity \
-             still 0); Rust writes the chrome opacity outside an animation context, so \
-             it snaps to 1 with nothing scheduled"
+            "hover schedules one fade-in from zero opacity"
         );
         scheduler.tick(1.0);
         assert_eq!(chrome_opacity(bar), 1.0);
@@ -333,9 +324,7 @@ fn scroll_flash() {
         assert_eq!(
             (chrome_opacity(bar), drawn(bar), scheduler.active_count()),
             (1.0, true, 1),
-            "Swift flashes the chrome to opacity 1 and schedules one delayed fade \
-             that holds through 0.5s; Rust snaps the reveal and then the fade in the \
-             same update with no animation context, so the flash is never visible"
+            "scrolling flashes the chrome and schedules a delayed fade"
         );
         scheduler.tick(0.5);
         assert_eq!(chrome_opacity(bar), 1.0);

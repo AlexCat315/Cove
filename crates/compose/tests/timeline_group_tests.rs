@@ -7,17 +7,6 @@
 //! - a group header collapses its events and publishes its expanded state
 //! - the zoom controls double and halve the proportionally-added gap
 //!
-//! Named difference (reported as a production gap, not fixed here): a `State`
-//! read inside a `View::body` is only tracked when that view also declares the
-//! state in `dynamic_properties`. `Timeline` reads its `collapsed_groups` and
-//! `zoom.factor` bindings in `body` but declares no `dynamic_properties`, so
-//! toggling a group or zooming updates the model and never recomposes the view.
-//! Swift gets this from `@State`. The same defect class affects `LazyGrid` and
-//! the three `VirtualStack` variants.
-//! `group_and_zoom_toggles_update_the_model_but_do_not_recompose` pins it.
-//! Everything below therefore asserts the model the bindings observe (which is
-//! what the Swift suite checks) plus the geometry that genuinely follows.
-//!
 //! Row heights are additive: each row contributes its own height, so the tests
 //! compare gaps *between* configurations instead of absolute row offsets.
 
@@ -235,12 +224,9 @@ fn group_headers_collapse_events_and_expose_expanded_state() {
             button_labelled(scene, "Today").is_some(),
             "the header stays after collapsing"
         );
-        // The state model is the authoritative half: collapsing a group records
-        // its id, and the group still mounts its rows because the view did not
-        // recompose (see `group_and_zoom_toggles_update_the_model_but_do_not_recompose`).
         assert!(
-            list_item_labelled(scene, "Deploy").is_some(),
-            "the collapsed group's events are still mounted until a recomposition lands"
+            list_item_labelled(scene, "Deploy").is_none(),
+            "the collapsed group removes its events"
         );
         assert!(
             list_item_labelled(scene, "Review").is_some(),
@@ -289,8 +275,8 @@ fn zoom_buttons_double_and_halve_proportional_gaps() {
         scene.click(&zoom_out, 1);
         assert_eq!(
             factor.get(),
-            0.5,
-            "the zoom-out control halves the doubled factor, because the control never rebuilt"
+            1.0,
+            "the zoom-out control halves the updated factor"
         );
     });
 
@@ -311,7 +297,7 @@ const _: fn() = || {
 };
 
 #[test]
-fn group_and_zoom_toggles_update_the_model_but_do_not_recompose() {
+fn group_toggles_recompose_the_visible_events() {
     let collapsed = State::new(Vec::<String>::new());
     InteractiveScene::run(500.0, 600.0, |scene| {
         scene.install(CollapseHarness {
@@ -324,11 +310,30 @@ fn group_and_zoom_toggles_update_the_model_but_do_not_recompose() {
             vec!["Today".to_string()],
             "the click does reach the model"
         );
-        // Reported gap: Timeline reads the binding in `body` but declares no
-        // `dynamic_properties`, so the view never recomposes.
         assert!(
-            list_item_labelled(scene, "Deploy").is_some(),
-            "documented gap: the collapsed group still shows its events because the view did not rebuild"
+            list_item_labelled(scene, "Deploy").is_none(),
+            "the collapsed group removes its events"
         );
+        assert!(list_item_labelled(scene, "Review").is_some());
+        scene.click(
+            &button_labelled(scene, "Today").expect("the header remains mounted"),
+            1,
+        );
+        assert!(list_item_labelled(scene, "Deploy").is_some());
+    });
+}
+
+#[test]
+fn unbound_group_collapse_uses_retained_local_state() {
+    InteractiveScene::run(500.0, 600.0, |scene| {
+        scene.install(Timeline::groups(vec![TimelineGroup::new(
+            "Today",
+            vec![TimelineEvent::new("Deploy")],
+        )]));
+        let header = button_labelled(scene, "Today").expect("group header");
+        scene.click(&header, 1);
+        assert!(list_item_labelled(scene, "Deploy").is_none());
+        scene.click(&header, 1);
+        assert!(list_item_labelled(scene, "Deploy").is_some());
     });
 }
