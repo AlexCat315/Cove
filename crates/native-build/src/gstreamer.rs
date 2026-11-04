@@ -39,7 +39,7 @@ impl Build {
             "--wrap-mode=forcefallback", "-Dgst-full=enabled", "-Dgst-full-target-type=static_library",
             "-Dgst-full-libraries=gstreamer-base-1.0,gstreamer-app-1.0,gstreamer-video-1.0,gstreamer-audio-1.0",
             "-Dbase=enabled", "-Dgood=enabled", "-Dbad=enabled", "-Dugly=disabled",
-            "-Dlibav=disabled", "-Dbuild-tools-source=system", "-Dtools=enabled",
+            "-Dlibav=disabled", "-Dgpl=disabled", "-Dbuild-tools-source=system", "-Dtools=enabled",
             "-Dtests=disabled", "-Dglib:tests=false", "-Dglib:installed_tests=false",
             "-Dgstreamer:registry=false",
         ].iter().map(|s| (*s).into()).collect();
@@ -209,7 +209,17 @@ impl Build {
             toolchain.trim()
         );
         fs::write(out.join("build-manifest.txt"), manifest)?;
+        self.write_notices()?;
         Ok(prefix)
+    }
+    /// Regenerate the license bundle for an existing native build.
+    pub fn write_notices(&self) -> io::Result<()> {
+        let workspace = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+        super::media_notices::generate(
+            self,
+            &workspace,
+            &self.prefix().join("share/licenses/cove-media"),
+        )
     }
     pub fn configure_cargo(&self, command: &mut Command) -> io::Result<()> {
         let prefix = self.prefix().canonicalize()?;

@@ -1,5 +1,7 @@
 # cove-media
 
+第三方许可证包由原生构建器写入安装前缀的 `share/licenses/cove-media/`。静态 LGPL 的源码与应用重新链接材料见 [许可证与分发](../../Docs/media-licensing.md)。
+
 Rust 2024 媒体控制与保留帧端点。原生播放器通过可选的 `gst` feature 使用官方 GStreamer 绑定；本 crate 不依赖 Compose、Graphics 或窗口系统。
 
 本批实现的是原生控制、应用管线接入和 CPU 帧展示基线。`VideoView`、Browser 后端、宿主音频策略和硬件表面共享仍按 [实施文档](../../Docs/media-gstreamer.md) 后续阶段推进，没有提供占位接口。

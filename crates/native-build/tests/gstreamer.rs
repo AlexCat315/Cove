@@ -68,6 +68,9 @@ fn every_native_platform_selects_a_real_audio_sink_and_decoder_profile() {
         assert!(options.contains(&"--auto-features=disabled".into()));
         assert!(options.contains(&"--default-library=static".into()));
         assert!(options.contains(&"--wrap-mode=forcefallback".into()));
+        assert!(options.contains(&"-Dgpl=disabled".into()));
+        assert!(options.contains(&"-Dugly=disabled".into()));
+        assert!(options.contains(&"-Dlibav=disabled".into()));
     }
 }
 #[test]

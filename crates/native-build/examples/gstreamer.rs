@@ -20,11 +20,16 @@ fn main() -> io::Result<()> {
     let mut cross_file = None;
     let mut jobs = 4;
     let mut cargo = Vec::new();
+    let mut notices_only = false;
     let mut arguments = std::env::args().skip(1);
     while let Some(argument) = arguments.next() {
         if argument == "--" {
             cargo.extend(arguments);
             break;
+        }
+        if argument == "--notices-only" {
+            notices_only = true;
+            continue;
         }
         let value = arguments
             .next()
@@ -54,7 +59,16 @@ fn main() -> io::Result<()> {
         cross_file,
         jobs,
     };
-    build.build()?;
+    if notices_only {
+        if !cargo.is_empty() {
+            return Err(io::Error::other(
+                "--notices-only cannot run Cargo against an unrebuilt prefix",
+            ));
+        }
+        build.write_notices()?;
+    } else {
+        build.build()?;
+    }
     if !cargo.is_empty() {
         if target != host {
             let position = cargo

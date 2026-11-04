@@ -431,6 +431,7 @@ version = "0.3.0-dev"
 dependencies = [
  "cc",
  "cmake",
+ "serde_json",
 ]
 
 [[package]]

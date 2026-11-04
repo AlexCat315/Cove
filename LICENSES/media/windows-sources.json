@@ -1,0 +1,14 @@
+[
+  {
+    "component": "directx-headers",
+    "file": "native/directx-headers/LICENSE",
+    "source": "https://raw.githubusercontent.com/microsoft/DirectX-Headers/v1.611.0/LICENSE",
+    "sha256": "903df5512f7d02609fed0c780a9b704f5a3eeb6e4d84ebe42a29845c81899a3c"
+  },
+  {
+    "component": "directxmath",
+    "file": "native/directxmath/LICENSE",
+    "source": "https://raw.githubusercontent.com/microsoft/DirectXMath/feb2024/LICENSE",
+    "sha256": "c2cfccb812fe482101a8f04597dfc5a9991a6b2748266c47ac91b6a5aae15383"
+  }
+]

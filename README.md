@@ -2,6 +2,8 @@
 
 Rust 2024 跨平台 UI 工具包。工作区版本为 `0.3.0-dev`，尚未发布。
 
+Cove 自有代码采用 [Apache-2.0](LICENSE)。依赖保留各自许可，见 [第三方声明](THIRD_PARTY_NOTICES.md)；启用原生媒体后的随包材料见 [媒体许可证与分发](Docs/media-licensing.md)。
+
 需要 `rust-toolchain.toml` 固定的 Rust 工具链、C/C++ 编译器、CMake 和 Zig 0.17。首次构建前初始化原生依赖：
 
 ```sh
