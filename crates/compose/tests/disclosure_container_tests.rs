@@ -565,8 +565,8 @@ fn tree_rows_share_the_scaled_geometry() {
             );
             assert_eq!(
                 child_text.x - root_text.x,
-                -18.0,
-                "the child content keeps its 32pt indent difference, was {}",
+                16.0,
+                "a leaf child keeps its one-level indent and disclosure gutter, was {}",
                 child_text.x - root_text.x
             );
             // The scaled glyph is 32pt here; Swift's `iconSmall` metric resolves

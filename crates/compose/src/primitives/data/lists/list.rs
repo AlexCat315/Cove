@@ -48,6 +48,9 @@ impl PrimitiveView for ListRowHost {
     fn make_node(&self) -> Node {
         let node = Node::new();
         node.set_is_hit_testable(true);
+        // A row is a fixed virtualized slot; taller content must not bleed into
+        // the neighbouring row.
+        node.set_clips_to_bounds(true);
         node
     }
 

@@ -10,7 +10,7 @@ use crate::primitives::controls::button::{ButtonIcon, ButtonIconSource};
 use crate::primitives::layout::{ScrollAxis, ScrollView};
 use crate::primitives::text::Text;
 use crate::theme::styles::buttons::ButtonRole;
-use crate::theme::{SemanticFontRef, ThemeReader, theme_for_node};
+use crate::theme::{SemanticFontRef, ThemeReader};
 use crate::{AnyView, BoxView, PrimitiveView, TupleView, View, ViewExt, impl_primitive_view};
 use cove_core::scene::{Align, FlexDirection, Justify, LayoutNode, Node, Wrap};
 
@@ -101,11 +101,15 @@ impl View for ListRow {
                 let leading = leading.clone();
                 let trailing = trailing.clone();
                 AnyView::new(ThemeReader::new(move |theme: &crate::theme::Theme| {
-                    let title_color = if options.role == ButtonRole::Destructive {
-                        theme.colors.error
-                    } else {
-                        theme.colors.on_surface
-                    };
+                    // Title and subtitle inherit the row's ink. A selected row
+                    // re-inks its whole band with `on_accent`; hard-coding
+                    // `on_surface` here left dark text on the accent fill.
+                    let title_color = (options.role == ButtonRole::Destructive)
+                        .then_some(theme.colors.error);
+                    let mut title_text = Text::new(title.clone()).truncated().clipped();
+                    if let Some(color) = title_color {
+                        title_text = title_text.foreground_color(color);
+                    }
                     let title_content = match options.subtitle.clone() {
                         Some(subtitle) => AnyView::new(BoxView::new(
                             FlexDirection::Column,
@@ -114,29 +118,17 @@ impl View for ListRow {
                             Wrap::NoWrap,
                             4.0,
                             AnyView::new(TupleView::new(vec![
-                                AnyView::new(
-                                    Text::new(title.clone())
-                                        .truncated()
-                                        .clipped()
-                                        .foreground_color(title_color),
-                                ),
+                                AnyView::new(title_text),
                                 AnyView::new(
                                     Text::new(subtitle)
                                         .truncated()
                                         .clipped()
                                         .semantic_font(SemanticFontRef::caption())
-                                        .semantic_foreground(
-                                            crate::theme::SemanticColorRef::on_surface_muted(),
-                                        ),
+                                        .opacity(0.72),
                                 ),
                             ])),
                         )),
-                        None => AnyView::new(
-                            Text::new(title.clone())
-                                .truncated()
-                                .clipped()
-                                .foreground_color(title_color),
-                        ),
+                        None => AnyView::new(title_text),
                     };
                     let trailing_content = if options.shows_disclosure {
                         AnyView::new(BoxView::new(
@@ -210,11 +202,15 @@ struct ListRowSlots {
 }
 
 impl ListRowSlots {
+    /// Fixed slots keep their intrinsic width; the title takes the remainder
+    /// with a breathing gap on either side. Without the gaps an icon or badge
+    /// sits flush against the text, which reads as one crowded token.
     fn sizes(
         &self,
         width: Option<f32>,
         children: &[crate::LayoutSubview],
     ) -> (f32, Vec<cove_core::Size>) {
+        const SPACING: f32 = 8.0;
         if children.len() != 3 {
             return (0.0, Vec::new());
         }
@@ -222,21 +218,31 @@ impl ListRowSlots {
             .iter()
             .map(|child| child.size_that_fits(crate::ProposedViewSize::UNSPECIFIED))
             .collect();
-        let floor = natural[1].width.min(80.0);
-        let natural_width = natural.iter().map(|size| size.width).sum();
+        let leading_gap = if natural[0].width > 0.0 { SPACING } else { 0.0 };
+        let trailing_gap = if natural[2].width > 0.0 { SPACING } else { 0.0 };
+        let gaps = leading_gap + trailing_gap;
+        let natural_width = natural.iter().map(|size| size.width).sum::<f32>() + gaps;
         let width = width.unwrap_or(natural_width);
+        let minimum_title = natural[1].width.min(80.0);
         let width = if self.touch {
             width
         } else {
-            width.max(natural[0].width + floor + natural[2].width)
+            width.max(natural[0].width + natural[2].width + gaps + minimum_title)
         };
-        let leading = natural[0].width.min(width);
-        let trailing = if self.touch {
-            natural[2].width.min((width - leading - floor).max(0.0))
+
+        let fixed_budget = (width - minimum_title.min(width) - gaps).max(0.0);
+        let total_fixed = natural[0].width + natural[2].width;
+        let (leading, trailing) = if self.touch && total_fixed > fixed_budget {
+            let leading_budget = fixed_budget * natural[0].width / total_fixed;
+            let trailing_budget = fixed_budget - leading_budget;
+            (
+                natural[0].width.min(leading_budget),
+                natural[2].width.min(trailing_budget),
+            )
         } else {
-            natural[2].width
+            (natural[0].width.min(width), natural[2].width)
         };
-        let title = (width - leading - trailing).max(0.0);
+        let title = (width - leading - trailing - gaps).max(0.0);
         let sizes = [leading, title, trailing]
             .into_iter()
             .zip(children)
@@ -274,11 +280,12 @@ impl crate::Layout for ListRowSlots {
         children: &[crate::LayoutSubview],
     ) {
         let (_, sizes) = self.sizes(Some(bounds.width), children);
+        let trailing_present = sizes.get(2).is_some_and(|size| size.width > 0.0);
         let rtl = children
             .first()
             .is_some_and(|child| child.layout_direction == cove_core::scene::Direction::Rtl);
         let mut cursor = if rtl { bounds.max_x() } else { bounds.x };
-        for (child, size) in children.iter().zip(sizes) {
+        for (index, (child, size)) in children.iter().zip(sizes).enumerate() {
             if rtl {
                 cursor -= size.width;
             }
@@ -290,6 +297,14 @@ impl crate::Layout for ListRowSlots {
             if !rtl {
                 cursor += size.width;
             }
+            let gap = if index == 0 && size.width > 0.0 {
+                8.0
+            } else if index == 1 && trailing_present {
+                8.0
+            } else {
+                0.0
+            };
+            cursor += if rtl { -gap } else { gap };
         }
     }
 }
@@ -312,8 +327,9 @@ impl PrimitiveView for ListDisclosure {
     }
 
     fn update_node(&self, node: &Node) {
-        let theme = theme_for_node(node);
-        node.set_foreground_color(Some(theme.colors.on_surface_muted));
+        // Inherit the row ink so a selected band's chevron follows `on_accent`
+        // instead of staying muted against the fill.
+        node.set_foreground_color(None);
     }
 
     fn children(&self, _node: &Node) -> Vec<AnyView> {

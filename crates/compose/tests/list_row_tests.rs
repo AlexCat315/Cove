@@ -470,8 +470,18 @@ fn matrix() {
                                         "{case}: the icon precedes the title"
                                     );
                                     assert!(
+                                        title_frame.x - (icon_frame.x + icon_frame.width) >= 7.5,
+                                        "{case}: the icon keeps an 8pt gap to the title"
+                                    );
+                                    assert!(
                                         title_frame.x + title_frame.width <= trailing_frame.x + 0.5,
                                         "{case}: the title precedes the trailing slot"
+                                    );
+                                    assert!(
+                                        trailing_frame.x
+                                            - (title_frame.x + title_frame.width)
+                                            >= 7.5,
+                                        "{case}: the trailing slot keeps an 8pt gap"
                                     );
                                 }
                                 let cache = title_node

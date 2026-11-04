@@ -7,6 +7,7 @@
 use cove_composition::Scope;
 use cove_core::State;
 use cove_core::scene::{Align, FlexDirection, Justify, Wrap};
+use cove_ui_compose::modifiers::interaction::AccessibilityExt;
 use cove_ui_compose::modifiers::layout::LayoutFrameExt;
 use cove_ui_compose::primitives::controls::fields::slider::Slider;
 use cove_ui_compose::primitives::data::lists::RowState;
@@ -19,11 +20,12 @@ use cove_ui_compose::primitives::data::{
 };
 use cove_ui_compose::primitives::feedback::StatusTone;
 use cove_ui_compose::primitives::interaction::{Scrollbar, ScrollbarAxis};
+use cove_ui_compose::primitives::media::{Icon, ui_icon_catalog};
 use cove_ui_compose::primitives::text::Text;
 use cove_ui_compose::primitives::text::text_buffer::TextBuffer;
 use cove_ui_compose::primitives::text::text_field::TextField;
+use cove_ui_compose::theme::tokens::{SemanticColorRef, SemanticIconSize, SemanticStyleViewExt};
 use cove_ui_compose::theme::SemanticFontRef;
-use cove_ui_compose::theme::tokens::{SemanticColorRef, SemanticStyleViewExt};
 use cove_ui_compose::{AnyView, BoxView, LayoutDebugExt, TupleView, View};
 
 use super::feedback::StorySection;
@@ -58,7 +60,7 @@ impl ListStory {
     pub fn new(options: GalleryOptions) -> Self {
         Self {
             options,
-            selection: State::new(None),
+            selection: State::new(Some(2)),
             activated: State::new(None),
         }
     }
@@ -93,19 +95,33 @@ impl View for ListStory {
                     let is_selected = state.is_selected;
 
                     let (title, subtitle) = Self::ROWS[id];
+                    let ink = if is_selected {
+                        SemanticColorRef::on_accent()
+                    } else {
+                        SemanticColorRef::on_surface_muted()
+                    };
                     AnyView::new(
-                        ListRow::new(title).options(
-                            ListRowOptions::new()
-                                .subtitle(subtitle)
-                                .disclosure(is_selected),
-                        ),
+                        ListRow::new(title)
+                            .options(
+                                ListRowOptions::new()
+                                    .subtitle(subtitle)
+                                    .disclosure(is_selected),
+                            )
+                            .leading(
+                                Icon::semantic_with_ref(
+                                    ui_icon_catalog::file::file_text(),
+                                    SemanticIconSize::medium(),
+                                    ink,
+                                )
+                                .accessibility_hidden(true),
+                            ),
                     )
                 },
             )
             .selection(Selection::single(self.selection.binding()))
-            .row_height(40.0)
+            .row_height(52.0)
             .on_activate(move |id: &usize| activated.set(Some(*id)))
-            .frame_size(320.0, 240.0)
+            .frame_size(360.0, 312.0)
             .debug_name("list-control"),
         );
         AnyView::new(StorySection::new(

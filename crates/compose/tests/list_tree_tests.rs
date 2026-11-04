@@ -452,12 +452,23 @@ fn tree_expansion() {
             })
             .into_iter()
             .next();
+        let root_text = scene
+            .all(|node| {
+                node.accessibility()
+                    .is_some_and(|semantics| semantics.label.starts_with("0: "))
+            })
+            .into_iter()
+            .next();
         assert!(
             indented_text
                 .as_ref()
-                .is_some_and(|node| node.absolute_frame().x > 0.0),
-            "a depth-1 row label is indented past the root, found {:?}",
-            indented_text.map(|node| node.absolute_frame())
+                .zip(root_text.as_ref())
+                .is_some_and(|(child, root)| {
+                    child.absolute_frame().x >= root.absolute_frame().x + 16.0
+                }),
+            "a depth-1 leaf keeps its indentation and disclosure gutter: child {:?}, root {:?}",
+            indented_text.map(|node| node.absolute_frame()),
+            root_text.map(|node| node.absolute_frame())
         );
     });
 }
@@ -472,7 +483,7 @@ fn tree_selection() {
             item("light", "Light", vec![]),
         ],
     )];
-    let selection = State::new(None);
+    let selection = State::new(Some("camera".to_string()));
     let expanded = State::new(HashSet::from(["scene".to_string()]));
     let tree_selection = TreeSelection {
         ids: Selection::single(bind(&selection)),
@@ -488,15 +499,29 @@ fn tree_selection() {
         ));
         let rows = tree_rows(scene);
         assert_eq!(rows.len(), 3, "the caller-owned expansion mounts expanded");
-        let child = rows
+        let fill = scene
+            .nodes()
             .into_iter()
-            .nth(1)
-            .expect("the expanded child row mounts");
-        click(scene, &child, KeyModifiers::default());
+            .find(|node| {
+                node.background_color()
+                    .is_some_and(|color| color.a > 0.1)
+            })
+            .expect("the selected row paints its fill");
+        assert!(
+            fill.absolute_frame().width > 200.0,
+            "the selection band spans the row slot, got {}",
+            fill.absolute_frame().width
+        );
+
+        let sibling = rows
+            .into_iter()
+            .nth(2)
+            .expect("the expanded sibling row mounts");
+        click(scene, &sibling, KeyModifiers::default());
         assert_eq!(
             selection.get(),
-            Some("camera".to_string()),
-            "clicking Camera writes primary selection, got {:?}",
+            Some("light".to_string()),
+            "clicking Light writes primary selection, got {:?}",
             selection.get()
         );
     });

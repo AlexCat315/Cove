@@ -4,6 +4,13 @@
 
 Swift 源码逐页对照见文末《Swift 源码对照（逐页差异清单）》。
 
+## 2026-11-04：List / Tree / SwipeList 排版与示例卡片
+
+- 通用修复：`ListRow` 补 8pt 槽间距、选中行墨色继承、行槽裁剪；`Tree` 行内容撑满行槽、叶子行保留缩进/disclosure 栏、选中带满宽；`SwipeList` 内容满宽且动作条只在打开时挂载。
+- Gallery 卡片：`StorySection` 由背景 + 1px 线框改为 `surface_raised` + `radius.xl` + 低 elevation 阴影 + 20pt 内边距；删除重复且未使用的 `GalleryStorySection`。
+- 示例对齐：List 52pt 两行行高 + 图标 + 默认选中；SwipeList 52pt 两行内容 + 圆形标记 + 2pt 行距；RefreshableList 264pt 视口完整显示 6 行；Tree 简化行内容并补回搜索/展开/折叠工具栏。
+- 结构验证：`list_row_tests` 6 项、`list_tree_tests` 15 项、`swipe_list_tests` 7 项通过；Gallery 全量测试通过。DevTools 在 1400×1000 下逐页截图目检 List、SwipeList、RefreshableList、Tree；共享卡片在浅色与深色主题下均已目检。
+
 ## 2026-11-04：Gallery 侧栏搜索清除按钮裁切
 
 - 输入 `hh` 后清除图标贴右边框并被裁切，根因是通用 `TextField` 的绘制把绝对原点叠加了两次，不是 Gallery 用法错误。修复后图标与命中区使用同一个绝对起点；新增偏移容器回归测试。

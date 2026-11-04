@@ -4,8 +4,8 @@
 //! (`BadgeStory`, `AlertStory`, `ProgressStory`, `EmptyStory`).
 
 use cove_composition::Scope;
-use cove_core::State;
 use cove_core::scene::animation::AnimationCurve;
+use cove_core::{Color, State};
 use cove_core::scene::{Align, FlexDirection, Justify, Wrap};
 use cove_ui_compose::modifiers::layout::{FlexExt, PaddingExt};
 use cove_ui_compose::modifiers::style::AppearanceExt;
@@ -16,6 +16,7 @@ use cove_ui_compose::primitives::feedback::{
 use cove_ui_compose::primitives::media::ui_icon_catalog as icons;
 use cove_ui_compose::primitives::text::Text;
 use cove_ui_compose::theme::tokens::{SemanticColorRef, SemanticStyleViewExt};
+use cove_ui_compose::theme::{Theme, ThemeReader};
 use cove_ui_compose::{AnyView, BoxView, DynamicField, LayoutDebugExt, TupleView, View};
 
 use crate::gallery_content::catalog::GalleryOptions;
@@ -177,20 +178,24 @@ impl View for StorySection {
         let title = self.title.clone();
         let detail = self.detail.clone();
         let content = self.content.clone();
-        let card = AnyView::new(
-            BoxView::new(
-                FlexDirection::Column,
-                Align::Stretch,
-                Justify::FlexStart,
-                Wrap::NoWrap,
-                12.0,
-                content,
+        let card = AnyView::new(ThemeReader::new(move |theme: &Theme| {
+            let shadow = theme.elevation.low.color.unwrap_or(Color::CLEAR);
+            AnyView::new(
+                BoxView::new(
+                    FlexDirection::Column,
+                    Align::Stretch,
+                    Justify::FlexStart,
+                    Wrap::NoWrap,
+                    12.0,
+                    content.clone(),
+                )
+                .padding(20.0)
+                .background_color(theme.colors.surface_raised)
+                .corner_radius(theme.radius.xl)
+                .border_color(theme.colors.border.multiplied_alpha(0.40), 1.0)
+                .shadow(shadow, 0.0, 2.0, 8.0),
             )
-            .padding(18.0)
-            .semantic_background(SemanticColorRef::background())
-            .corner_radius(12.0)
-            .semantic_border(SemanticColorRef::border(), 1.0),
-        );
+        }));
         AnyView::new(
             BoxView::new(
                 FlexDirection::Column,

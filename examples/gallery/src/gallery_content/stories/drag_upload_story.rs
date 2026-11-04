@@ -229,8 +229,7 @@ impl View for DragUploadStory {
                             Wrap::NoWrap,
                             12.0,
                             AnyView::new(everything.debug_name("drag-upload-any")),
-                        )
-                        .semantic_background(SemanticColorRef::background()),
+                        ),
                     ),
                 )),
                 AnyView::new(StorySection::new(
@@ -244,8 +243,7 @@ impl View for DragUploadStory {
                             Wrap::NoWrap,
                             12.0,
                             AnyView::new(archives.debug_name("drag-upload-archive")),
-                        )
-                        .semantic_background(SemanticColorRef::background()),
+                        ),
                     ),
                 )),
                 AnyView::new(StorySection::new(
@@ -259,8 +257,7 @@ impl View for DragUploadStory {
                             Wrap::NoWrap,
                             12.0,
                             AnyView::new(rejecting_upload.debug_name("drag-upload-rejected")),
-                        )
-                        .semantic_background(SemanticColorRef::background()),
+                        ),
                     ),
                 )),
             ])),

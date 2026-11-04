@@ -4,6 +4,15 @@
 
 ## Unreleased
 
+- **List / Tree / SwipeList 排版修复与 Gallery 卡片化（2026-11-04，界面）**：
+  - `ListRow`：图标/标题/尾部槽之间补上 Swift 的 8pt 间距；标题不再硬编码 `on_surface`，选中行由行样式统一改墨为 `on_accent`；副标题改为继承行墨并降低透明度，避免强调色带上的深色副标题。选中行尾部 chevron 也继承行墨。
+  - `List`：行宿主裁剪到固定虚拟槽，内容超出行高时不再渗入相邻行。
+  - `Tree`：行内容与带缩进引导的 ZStack 都撑满行槽，选中带不再收缩到标签宽度；叶子行用真实固定槽保留缩进与 disclosure 栏，不再因 `EmptyView` 无布局而贴左；行样式外层负责 flex，选中带覆盖完整内容区。
+  - `SwipeList`：行内容显式 100% 宽；动作条只在 `reveal < -0.5` 时挂载，闭合行不再把 Archive/Delete 画在标题上。
+  - Gallery：所有 `StorySection` 从“背景 + 1px 线框”改为 `surface_raised` 卡片，`radius.xl`、低 elevation 阴影、20pt 内边距和 40% 边框；删除未使用的重复 `GalleryStorySection`。
+  - Gallery 列表示例对齐 Swift：List 使用 52pt 两行行高、文件图标、默认选中的强调行；SwipeList 使用 52pt 两行行内容、圆形标记、2pt 行距与 260pt 视口；RefreshableList 视口改为 264pt 以完整显示 6 行；Tree 改为仅显示节点标题，补回 Search/Expand all/Collapse all 工具栏和 260pt 宽可清除搜索框。
+  - 回归：`list_row_tests` 6 项（新增 8pt 间距断言）、`list_tree_tests` 15 项（新增叶子缩进与选中带宽度断言）、`swipe_list_tests` 7 项（新增闭合行无动作条、内容从左侧开始断言）通过。
+
 - **偏移容器中的 TextField 清除按钮几何修复（2026-11-04，修复）**：
   - `TextField` 的清除图标与命中区在绘制时重复叠加了节点的绝对原点：`edge` 已包含 `origin.x`，代码又加了一次 `absolute_origin().x`。字段不在窗口左边缘时（如 Gallery 侧栏搜索框），图标会整体右移并贴边裁切。
   - 现在图标与命中区统一使用已包含原点的绝对 `start`；新增 `the_clear_affordance_stays_inside_an_offset_field` 回归测试，把字段放在 40pt 内边距容器中并断言清除图标的所有顶点仍位于字段边界内。

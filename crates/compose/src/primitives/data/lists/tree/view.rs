@@ -1190,6 +1190,23 @@ where
     }
 }
 
+/// A fixed-size empty slot. `EmptyView` has no layout node, so a frame applied
+/// to it reserves no width; leaf rows then lose their indentation and
+/// disclosure gutter.
+fn fixed_spacer(width: f32, height: f32) -> AnyView {
+    AnyView::new(
+        AnyView::new(BoxView::new(
+            FlexDirection::Row,
+            Align::Center,
+            Justify::FlexStart,
+            Wrap::NoWrap,
+            0.0,
+            AnyView::new(TupleView::new(Vec::new())),
+        ))
+        .frame_size(width.max(0.0), height),
+    )
+}
+
 /// One visible row: indentation, disclosure, indent guides, style-driven body
 /// and the trailing slot.
 struct TreeRow {
@@ -1527,18 +1544,16 @@ impl PrimitiveView for TreeRow {
                 }),
             )
         } else {
-            AnyView::new(
-                AnyView::new(crate::EmptyView).frame_size(self.disclosure_width, row_height),
-            )
+            fixed_spacer(self.disclosure_width, row_height)
         };
 
         let mut row = vec![
-            AnyView::new(AnyView::new(crate::EmptyView).frame_size(indent.max(0.0), row_height)),
+            fixed_spacer(indent, row_height),
             disclosure,
             AnyView::new(
                 AnyView::new(BoxView::new(
                     FlexDirection::Row,
-                    Align::Center,
+                    Align::Stretch,
                     Justify::FlexStart,
                     Wrap::NoWrap,
                     0.0,
@@ -1565,6 +1580,9 @@ impl PrimitiveView for TreeRow {
             None
         };
 
+        // The virtual stack gives the row a full-width slot. The row itself and
+        // the guide overlay's ZStack must both take that width, or the selection
+        // band shrinks to the label's intrinsic width.
         let row = AnyView::new(
             AnyView::new(BoxView::new(
                 FlexDirection::Row,
@@ -1574,18 +1592,28 @@ impl PrimitiveView for TreeRow {
                 0.0,
                 AnyView::new(TupleView::new(row)),
             ))
-            .frame_height(row_height),
+            .frame(
+                Some(crate::modifiers::layout::FrameDimension::Percent(100.0)),
+                Some(crate::modifiers::layout::FrameDimension::Points(row_height)),
+                None,
+                None,
+                None,
+                None,
+            ),
         );
 
         match guides {
             Some(guides) => vec![AnyView::new(
-                crate::primitives::layout::ZStack::new(AnyView::new(TupleView::new(vec![
-                    AnyView::new(guides),
-                    row,
-                ])))
-                .alignment(crate::Alignment::Leading),
+                AnyView::new(
+                    crate::primitives::layout::ZStack::new(AnyView::new(TupleView::new(vec![
+                        AnyView::new(guides),
+                        row,
+                    ])))
+                    .alignment(crate::Alignment::Leading),
+                )
+                .flex(1.0),
             )],
-            None => vec![row],
+            None => vec![AnyView::new(AnyView::new(row).flex(1.0))],
         }
     }
 }

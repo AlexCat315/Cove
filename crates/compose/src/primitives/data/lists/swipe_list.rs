@@ -891,24 +891,37 @@ impl PrimitiveView for SwipeRowHost {
                 4.0,
                 AnyView::new(TupleView::new(row)),
             ))
-            .frame_height(self.row_height),
+            .frame(
+                Some(crate::modifiers::layout::FrameDimension::Percent(100.0)),
+                Some(crate::modifiers::layout::FrameDimension::Points(
+                    self.row_height,
+                )),
+                None,
+                None,
+                None,
+                None,
+            ),
         );
 
-        match &self.action_row {
-            Some(actions) => vec![AnyView::new(
+        // Settled rows show the actions button (inside the content row); the
+        // action strip only exists once a swipe has opened the row. Keeping it
+        // mounted while closed painted Archive/Delete over every row.
+        if self.reveal.get() < -0.5
+            && let Some(actions) = &self.action_row
+        {
+            return vec![AnyView::new(
                 crate::primitives::layout::ZStack::new(AnyView::new(TupleView::new(vec![
                     AnyView::new(
                         actions
                             .clone()
-                            .accessibility_hidden(self.reveal.get() >= -0.5 || !self.is_enabled)
-                            .allows_hit_testing(self.reveal.get() < -0.5 && self.is_enabled),
+                            .allows_hit_testing(self.is_enabled),
                     ),
                     content,
                 ])))
                 .alignment(crate::Alignment::Trailing),
-            )],
-            None => vec![content],
+            )];
         }
+        vec![content]
     }
 }
 

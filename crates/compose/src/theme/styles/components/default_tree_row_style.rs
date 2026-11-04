@@ -48,17 +48,21 @@ impl TreeRowStyle for DefaultTreeRowStyle {
             .flex(1.0)
             .padding_edges(theme.spacing.sm + 1.0, theme.spacing.xs + 1.0),
         );
+        // The outer row is the selection band's node. It must take the row's
+        // remaining width; growing only the inner row shrink-wrapped the band
+        // to the label.
         let outer = AnyView::new(Row::new(
             VerticalAlignment::Center,
             0.0,
             AnyView::new(content),
-        ));
+        ))
+        .flex(1.0);
         // Only the selected band re-inks its label; unselected rows keep the
         // default ink, so a theme cross-fade doesn't animate a redundant color.
         let inked = if configuration.is_selected {
             AnyView::new(outer.semantic_foreground(SemanticColorRef::on_accent()))
         } else {
-            outer
+            AnyView::new(outer)
         };
         AnyView::new(
             inked

@@ -13,8 +13,9 @@
 //!
 //! `SwipeRowHost` records its reveal in `content_offset.x`, which `reveal`
 //! returns; the strip slides toward the logical leading edge in both directions.
-//! Closed actions remain mounted for animation but are excluded from input and
-//! accessibility. The actions button opens the same actions without a swipe.
+//! Closed rows mount only the actions button; the action strip is added once a
+//! swipe opens the row. The actions button opens the same actions without a
+//! swipe.
 
 use crate::support;
 use cove_composition::Scope;
@@ -418,6 +419,38 @@ fn actions_menu() {
             .expect("Delete exposes activate"))();
         scene.settle(6, 0.05);
         assert_eq!(*harness.actions.borrow(), vec!["delete-1".to_string()]);
+    });
+}
+
+#[test]
+fn closed_rows_use_the_full_width_for_content() {
+    InteractiveScene::run(360.0, 460.0, |scene| {
+        let harness = Harness::new(InputCapabilities::POINTER | InputCapabilities::KEYBOARD);
+        scene.install(harness);
+        let item = row(scene, "Item 1");
+        let label = scene
+            .all(|node| {
+                node.accessibility().is_some_and(|semantics| {
+                    semantics.role == AccessibilityRole::StaticText
+                        && semantics.label == "Item 1"
+                })
+            })
+            .into_iter()
+            .next()
+            .expect("the row content paints its title");
+        assert!(
+            label.absolute_frame().x - item.absolute_frame().x < 40.0,
+            "the row content starts at the leading edge, not under the trailing actions"
+        );
+        let buttons = row_buttons(scene, "Item 1");
+        assert!(!buttons.is_empty(), "the actions button remains available");
+        assert!(
+            buttons.iter().all(|button| {
+                let label = AccessibilityTree::resolved_label(button);
+                label != "Archive" && label != "Delete"
+            }),
+            "closed rows do not paint their swipe actions"
+        );
     });
 }
 

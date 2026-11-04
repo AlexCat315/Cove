@@ -13,6 +13,7 @@ use std::collections::{BTreeSet, HashSet};
 use std::rc::Rc;
 
 use cove_core::{Binding, State};
+use cove_ui_compose::modifiers::interaction::AccessibilityExt;
 use cove_ui_compose::modifiers::layout::LayoutFrameExt;
 use cove_ui_compose::modifiers::style::SemanticStyleViewExt;
 use cove_ui_compose::primitives::controls::Button;
@@ -27,10 +28,14 @@ use cove_ui_compose::primitives::data::{List, ListSection, SectionedList, SwipeA
 use cove_ui_compose::primitives::feedback::StatusTone;
 use cove_ui_compose::primitives::interaction::{DragScope, Draggable, DropTarget};
 use cove_ui_compose::primitives::layout::virtualization::FixedVirtualStack;
+use cove_ui_compose::primitives::media::{Icon, ui_icon_catalog};
 use cove_ui_compose::primitives::text::Text;
 use cove_ui_compose::primitives::text::text_buffer::TextBuffer;
 use cove_ui_compose::primitives::text::text_field::TextField;
-use cove_ui_compose::theme::tokens::SemanticColorRef;
+use cove_ui_compose::primitives::text::text_field::text_field_options::TextFieldBehavior;
+use cove_ui_compose::theme::styles::buttons::{ButtonStyleViewExt, SecondaryButtonStyle};
+use cove_ui_compose::theme::tokens::{SemanticColorRef, SemanticIconSize};
+use cove_ui_compose::theme::SemanticFontRef;
 use cove_ui_compose::{AnyView, BoxView, LayoutDebugExt, TupleView, View};
 
 use super::feedback::StorySection;
@@ -263,35 +268,21 @@ impl View for TreeStory {
                 SceneNode::gallery(),
                 |node: &SceneNode| node.id.to_owned(),
                 |node: &SceneNode| node.children.clone(),
-                |node: &SceneNode, state: RowState| {
-                    let selected = state.is_selected;
-                    let expands = state.is_expanded;
-                    let depth = state.depth;
-
-                    let marker = if node.children.is_empty() {
-                        "·"
-                    } else if expands {
-                        "▾"
-                    } else {
-                        "▸"
-                    };
-                    let row = format!("{}{marker} {}", "  ".repeat(depth), node.title);
-                    let text = Text::new(row);
-                    AnyView::new(if selected {
-                        text.semantic_foreground(SemanticColorRef::info())
-                    } else {
-                        text.semantic_foreground(SemanticColorRef::on_surface())
-                    })
+                |node: &SceneNode, _: RowState| {
+                    // The tree already paints indentation, disclosure and the
+                    // selected band; repeating them in the label double-drew
+                    // markers and clipped the text inside a narrow band.
+                    AnyView::new(Text::new(node.title.clone()))
                 },
             )
             .options(options)
-            .frame_size(320.0, 260.0)
+            .frame_size(360.0, 280.0)
             .debug_name("tree-control"),
         );
         let query_state = self.query.clone();
         let search = AnyView::new(
             TextField::new(
-                "Filter nodes",
+                "Search nodes…",
                 Binding::new(
                     {
                         let state = query_state.clone();
@@ -300,18 +291,56 @@ impl View for TreeStory {
                     move |value: TextBuffer| query_state.set(value.string_value()),
                 ),
             )
-            .frame_width(220.0)
+            .behavior(TextFieldBehavior {
+                clearable: true,
+                disabled: !self.options.is_enabled,
+                ..TextFieldBehavior::default()
+            })
+            .frame_width(260.0)
             .debug_name("tree-search"),
         );
+        let expand = {
+            let expanded = self.expanded.clone();
+            let enabled = self.options.is_enabled;
+            AnyView::new(
+                Button::title("Expand all", move || {
+                    expanded.set(
+                        expandable_ids(&SceneNode::gallery())
+                            .into_iter()
+                            .map(str::to_owned)
+                            .collect::<BTreeSet<_>>(),
+                    );
+                })
+                .enabled(enabled)
+                .button_style(SecondaryButtonStyle),
+            )
+        };
+        let collapse = {
+            let expanded = self.expanded.clone();
+            let enabled = self.options.is_enabled;
+            AnyView::new(
+                Button::title("Collapse all", move || expanded.set(BTreeSet::new()))
+                    .enabled(enabled)
+                    .button_style(SecondaryButtonStyle),
+            )
+        };
+        let toolbar = AnyView::new(BoxView::new(
+            cove_core::scene::FlexDirection::Row,
+            cove_core::scene::Align::Center,
+            cove_core::scene::Justify::FlexStart,
+            cove_core::scene::Wrap::Wrap,
+            8.0,
+            AnyView::new(TupleView::new(vec![search, expand, collapse])),
+        ));
         AnyView::new(StorySection::new(
             "Scene hierarchy",
             "Search retains matching ancestors. Use arrows, Home and End; Option/Alt + Right expands all and Option/Alt + Left collapses all. Command/Control-click selects multiple nodes.",
             AnyView::new(TupleView::new(vec![
-                search,
+                toolbar,
                 tree,
                 AnyView::new(
                     Text::new(self.caption())
-                        .semantic_font(cove_ui_compose::theme::SemanticFontRef::caption())
+                        .semantic_font(SemanticFontRef::caption())
                         .semantic_foreground(SemanticColorRef::on_surface_muted())
                         .debug_name("tree-caption"),
                 ),
@@ -505,7 +534,49 @@ impl View for SwipeListStory {
             SwipeList::new(
                 rows,
                 |index: &usize| *index,
-                |index: &usize, _: RowState| AnyView::new(Text::new(SWIPE_ROWS[*index])),
+                |index: &usize, state: RowState| {
+                    let ink = if state.is_selected {
+                        SemanticColorRef::accent()
+                    } else {
+                        SemanticColorRef::on_surface_muted()
+                    };
+                    AnyView::new(BoxView::new(
+                        cove_core::scene::FlexDirection::Row,
+                        cove_core::scene::Align::Center,
+                        cove_core::scene::Justify::FlexStart,
+                        cove_core::scene::Wrap::NoWrap,
+                        10.0,
+                        AnyView::new(TupleView::new(vec![
+                            AnyView::new(
+                                Icon::semantic_with_ref(
+                                    ui_icon_catalog::shape::circle(),
+                                    SemanticIconSize::small(),
+                                    ink,
+                                )
+                                .accessibility_hidden(true),
+                            ),
+                            AnyView::new(BoxView::new(
+                                cove_core::scene::FlexDirection::Column,
+                                cove_core::scene::Align::Stretch,
+                                cove_core::scene::Justify::FlexStart,
+                                cove_core::scene::Wrap::NoWrap,
+                                2.0,
+                                AnyView::new(TupleView::new(vec![
+                                    AnyView::new(
+                                        Text::new(SWIPE_ROWS[*index])
+                                            .semantic_foreground(SemanticColorRef::on_surface()),
+                                    ),
+                                    AnyView::new(
+                                        Text::new("Swipe toward the leading edge or use Actions")
+                                            .truncated()
+                                            .semantic_font(SemanticFontRef::caption())
+                                            .semantic_foreground(SemanticColorRef::on_surface_muted()),
+                                    ),
+                                ])),
+                            )),
+                        ])),
+                    ))
+                },
             )
             .selection(Selection::single(self.selection.binding()))
             .actions(move |index: &usize| {
@@ -525,9 +596,10 @@ impl View for SwipeListStory {
             .on_activate(move |index: &usize| {
                 activate_log.set(format!("Opened {}", SWIPE_ROWS[*index]));
             })
-            .row_height(44.0)
+            .row_height(52.0)
+            .row_spacing(2.0)
             .row_label(|index: &usize| SWIPE_ROWS[*index].to_owned())
-            .frame_height(240.0)
+            .frame_height(260.0)
             .debug_name("swipe-list"),
         );
         AnyView::new(StorySection::new(
@@ -635,7 +707,7 @@ impl View for RefreshListStory {
             })
             .row_height(44.0)
             .refresh(self.options())
-            .frame_height(240.0)
+            .frame_height(264.0)
             .debug_name("refresh-list"),
         );
         let start = self.handle();
