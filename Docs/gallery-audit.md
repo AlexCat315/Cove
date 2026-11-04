@@ -4,6 +4,15 @@
 
 Swift 源码逐页对照见文末《Swift 源码对照（逐页差异清单）》。
 
+## 2026-11-04：Drag & Drop 会话与指针修复
+
+- 根因：Gallery 每次 body 重建 `DragScope`，旧实现同时新建 `DragSession`；拖拽中的一次重组把 pointer-up 交给空会话，payload 丢失。会话改为按视图身份 `Scope::remember`，并新增 `DragScope::with_session` 供共享。
+- 指针：按下先可转移捕获，首次快速移动离开源节点仍能越过阈值；越过 6pt 后升级为独占捕获，滚动容器不能再抢走。释放先结束会话再释放捕获，避免 lost-capture 回调把 payload 取消。
+- 类型：`Draggable<T>` / `DropTarget<T>` 改为真正泛型 payload（`dyn Any` 会话存储），不再只支持 `u64` token；不同类型目标可在同一 scope 共存。
+- Tree：行拖拽同样改为按下可转移、阈值后独占；新增外层 ScrollView 下的行拖拽回归。
+- Gallery：Drag & Drop 页的标签改为有底/圆角的 chip，预览同步；目标 lane 在悬停时用 `state_layer_selected` 高亮，释放后清除。
+- 验证：`drag_and_drop_tests` 6 项（含快速单次移动、ScrollView、异类型 payload）、`list_tree_tests` 16 项、Gallery Drag & Drop 场景测试 1 项通过。
+
 ## 2026-11-04：Tree 能力扩展与外观收敛
 
 - 能力：新增父子级联勾选（含半选）、`checkStrictly`、默认/受控勾选、`defaultExpandAll`、`autoExpandParent`、手风琴展开、自定义过滤谓词与 `filter()`、懒加载 `load_data`/`loadedKeys`/加载指示、拖拽生命周期、非虚拟滚动开关，以及 `getPath`/`scrollTo`/`setCurrentKey`/`setCheckedKeys` 等命令式方法。

@@ -20,9 +20,13 @@ use std::rc::Rc;
 
 use cove_composition::AnyView;
 use cove_core::scene::{AccessibilityRole, Node};
+use cove_core::Point;
 use cove_examples::gallery_content::catalog::{GalleryOptions, GalleryPage};
 use cove_examples::gallery_content::stories::calendar::{CalendarStory, is_weekend};
-use cove_examples::gallery_content::stories::data_stories_file::{LAZY_TREE_BRANCH, TreeStory};
+use cove_examples::gallery_content::stories::data_stories_file::{
+    DragAndDropStory, LAZY_TREE_BRANCH, TreeStory,
+};
+use cove_platform::{InputEvent, KeyModifiers, MouseButton, MouseButtonEvent, MouseMotionEvent};
 use cove_examples::gallery_content::stories::layout::LazyGridStory;
 use cove_ui_compose::foundation::Date;
 use cove_ui_compose::theme::tokens::TextScaler;
@@ -400,6 +404,89 @@ fn the_tree_story_loads_the_lazy_branch_on_expansion() {
                     == 1,
                 "the loaded child row appears after recomposition"
             );
+        },
+    );
+}
+
+#[test]
+fn the_drag_and_drop_story_highlights_and_drops() {
+    let story = Rc::new(DragAndDropStory::new());
+    mount(
+        story.clone(),
+        900.0,
+        760.0,
+        1.0,
+        Theme::default_light(),
+        |scene, story| {
+            let source = scene
+                .first(|node| {
+                    node.accessibility()
+                        .is_some_and(|semantics| semantics.label == "Design")
+                })
+                .expect("the Design chip mounts")
+                .absolute_frame();
+            let target = scene
+                .first(|node| {
+                    node.accessibility()
+                        .is_some_and(|semantics| semantics.label == "Design lane")
+                })
+                .expect("the Design lane mounts")
+                .absolute_frame();
+            let from = Point::new(
+                source.x + source.width / 2.0,
+                source.y + source.height / 2.0,
+            );
+            let to = Point::new(
+                target.x + target.width / 2.0,
+                target.y + target.height / 2.0,
+            );
+            let dispatcher = scene.dispatcher();
+            dispatcher.dispatch(&InputEvent::MouseButtonDown(MouseButtonEvent {
+                button: MouseButton::Left,
+                x: from.x,
+                y: from.y,
+                clicks: 1,
+                modifiers: KeyModifiers::default(),
+                kind: Default::default(),
+            }));
+            // Cross the threshold while still inside the chip, then move onto
+            // the lane. A single motion to the target is covered by the
+            // component suite.
+            for step in [4.0f32, 8.0] {
+                dispatcher.dispatch(&InputEvent::MouseMotion(MouseMotionEvent {
+                    x: from.x + step,
+                    y: from.y + step,
+                    delta_x: 4.0,
+                    delta_y: 4.0,
+                    kind: Default::default(),
+                }));
+            }
+            dispatcher.dispatch(&InputEvent::MouseMotion(MouseMotionEvent {
+                x: to.x,
+                y: to.y,
+                delta_x: to.x - from.x,
+                delta_y: to.y - from.y,
+                kind: Default::default(),
+            }));
+            scene.settle_n(3);
+            assert_eq!(
+                story.highlight(),
+                Some(1),
+                "the lane highlights while the pointer is over it"
+            );
+
+            dispatcher.dispatch(&InputEvent::MouseButtonUp(MouseButtonEvent {
+                button: MouseButton::Left,
+                x: to.x,
+                y: to.y,
+                clicks: 1,
+                modifiers: KeyModifiers::default(),
+                kind: Default::default(),
+            }));
+            scene.settle_n(4);
+            assert_eq!(story.lane_a().as_deref(), Some("Design"));
+            assert_eq!(story.lane_b(), None);
+            assert_eq!(story.highlight(), None, "the highlight clears on drop");
         },
     );
 }

@@ -55,7 +55,7 @@ fn harness(model: Rc<Model>) -> AnyView {
             16.0,
             AnyView::new(cove_composition::TupleView::new(vec![
                 AnyView::new(Draggable::new(
-                    42,
+                    42u64,
                     AnyView::new(Text::new("42")),
                     AnyView::new(AnyView::new(Text::new("Drag me")).frame_size(120.0, 36.0)),
                 )),
@@ -344,6 +344,62 @@ fn a_fast_drag_starts_from_the_down_position() {
             *model.dropped.borrow(),
             vec![42],
             "a single fast motion beyond the threshold still starts and completes the drag"
+        );
+    });
+}
+
+#[test]
+fn different_payload_types_can_share_one_scope() {
+    let dropped = Rc::new(RefCell::new(Vec::<String>::new()));
+    let wrong = Rc::new(RefCell::new(Vec::<u64>::new()));
+    let target_drop = dropped.clone();
+    let wrong_drop = wrong.clone();
+    InteractiveScene::run(360.0, 360.0, |scene| {
+        scene.install(AnyView::new(LayerRoot::new(AnyView::new(AnyView::new(
+            DragScope::new(AnyView::new(Column::new(
+                HorizontalAlignment::Leading,
+                16.0,
+                AnyView::new(cove_composition::TupleView::new(vec![
+                    AnyView::new(Draggable::new(
+                        "hello".to_string(),
+                        AnyView::new(Text::new("hello")),
+                        AnyView::new(AnyView::new(Text::new("Text source")).frame_size(120.0, 36.0)),
+                    )),
+                    AnyView::new(DropTarget::new(
+                        |payload: &String| payload == "hello",
+                        move |payload: String| target_drop.borrow_mut().push(payload),
+                        AnyView::new(AnyView::new(Text::new("Text target")).frame_size(160.0, 60.0)),
+                    )),
+                    AnyView::new(DropTarget::new(
+                        |payload: &u64| *payload == 1,
+                        move |payload: u64| wrong_drop.borrow_mut().push(payload),
+                        AnyView::new(AnyView::new(Text::new("Number target")).frame_size(160.0, 60.0)),
+                    )),
+                ])),
+            )))
+            .frame_size(320.0, 320.0),
+        )))));
+        let source = labelled(scene, "Text source").absolute_frame();
+        let target = labelled(scene, "Text target").absolute_frame();
+        drag(
+            scene,
+            cove_core::Point::new(
+                source.x + source.width / 2.0,
+                source.y + source.height / 2.0,
+            ),
+            cove_core::Point::new(
+                target.x + target.width / 2.0,
+                target.y + target.height / 2.0,
+            ),
+        );
+        assert_eq!(
+            *dropped.borrow(),
+            vec!["hello".to_string()],
+            "the String target receives the typed payload"
+        );
+        assert!(
+            wrong.borrow().is_empty(),
+            "a u64 target never accepts a String payload"
         );
     });
 }

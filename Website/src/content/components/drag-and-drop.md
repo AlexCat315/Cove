@@ -1,0 +1,47 @@
+# Drag & Drop
+
+`Draggable<T>` / `DropTarget<T>` 在 `DragScope` 内共享一个类型化的拖拽 payload。payload 类型由调用方决定，不同目标可以声明不同的 payload 类型；作用域内的会话负责指针捕获、预览与命中。
+
+```rust
+let scope = DragScope::new(Column::new(
+    HorizontalAlignment::Leading,
+    16.0,
+    AnyView::new(TupleView::new(vec![
+        AnyView::new(Draggable::new(
+            "Design",                       // payload: &'static str
+            AnyView::new(Text::new("Design")), // 拖拽预览
+            chip("Design"),                 // 常驻内容
+        )),
+        AnyView::new(
+            DropTarget::new(
+                |payload: &&'static str| *payload == "Design",
+                |payload| println!("dropped {payload}"),
+                lane("Design lane"),
+            )
+            .on_targeted(|is_targeted| { /* 高亮切换 */ }),
+        ),
+    ])),
+));
+```
+
+## 会话与重组
+
+`DragScope` 的会话按视图身份通过 `Scope::remember` 保留，调用方可以在 `body` 里重建 `DragScope`，拖拽不会因为一次重组而丢失 payload。需要在多个作用域间共享会话时，用 `DragScope::with_session(session, content)`。
+
+## 指针与手势
+
+- 指针按下时先以“可转移手势”捕获，这样第一次移动已经离开源节点时仍能收到阈值事件。
+- 越过 6pt 阈值后升级为独占捕获并发布预览；此后滚动容器不能再抢走手势。
+- 未越过阈值就释放时只释放捕获，不产生 drop。
+- 文字/预览由 portal 渲染，不受裁剪影响；释放到所有目标之外只取消，不触发 drop。
+- `on_targeted` 在目标进入/离开时回调，供调用方切换高亮。
+
+## 与 Tree 拖拽的区别
+
+`Tree` 的行拖拽是集合内部的排序/归属操作，使用 `TreeDragOperations`（`can_drag` / `can_drop` / `on_drop` 与生命周期事件）。它与通用 `Draggable` 共用指针捕获规则：按下可让外层滚动容器滚动，越过阈值后独占。行拖拽的落点是 `Before` / `Inside` / `After` 三个带区。
+
+## Gallery
+
+Gallery 的 Drag & Drop 页演示两个不同 payload 的标签拖入对应 lane：拖动期间目标 lane 使用选中态高亮，预览由 portal 渲染，释放后只在匹配的 lane 写入结果。Tree 的拖拽生命周期由 `list_tree_tests` 与 `tree_features_tests` 覆盖。
+
+共享 Rust 实现覆盖所有宿主平台；结构、场景与 Gallery 挂载验证记录在 `Docs/gallery-audit.md`。

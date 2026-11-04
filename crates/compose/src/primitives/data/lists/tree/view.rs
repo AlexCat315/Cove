@@ -2518,7 +2518,10 @@ impl PrimitiveView for TreeRow {
                                     },
                                 );
                                 if let Some(capture) = PointerCaptureHolder::current() {
-                                    capture.acquire(&pointer_node, false);
+                                    // Keep the gesture transferable until the
+                                    // drag threshold: pressing a row must still
+                                    // let a surrounding scroll view scroll.
+                                    capture.acquire(&pointer_node, true);
                                 }
                             }
                             EventResult::Handled
@@ -2589,6 +2592,10 @@ impl PrimitiveView for TreeRow {
                         if !press.did_drag && dx.abs().max(dy.abs()) >= 4.0 {
                             press.did_drag = true;
                             owner.set_attachment(PRESSED, false);
+                            if let Some(capture) = PointerCaptureHolder::current() {
+                                // Exclusive from here: the drag owns the pointer.
+                                capture.acquire(&owner, false);
+                            }
                             (drag.on_start)();
                         }
                         if press.did_drag {
@@ -2627,6 +2634,7 @@ impl PrimitiveView for TreeRow {
             Rc::new(move || {
                 if let Some(owner) = Node::upgrade(&clear_node) {
                     owner.set_attachment(PRESSED, false);
+                    owner.remove_attachment(DRAG_PRESS);
                 }
             }) as Rc<dyn Fn()>,
         );

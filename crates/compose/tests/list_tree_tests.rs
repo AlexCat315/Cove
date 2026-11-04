@@ -57,6 +57,7 @@ use cove_ui_compose::primitives::data::lists::tree::{
     Tree, TreeDropPosition, TreeNodeKey, TreeSearchFilterPolicy,
 };
 use cove_ui_compose::primitives::data::lists::{List, Selection};
+use cove_ui_compose::primitives::layout::{ScrollAxis, ScrollView};
 use cove_ui_compose::primitives::text::Text;
 use cove_ui_compose::theme::Theme;
 use cove_ui_compose::theme::styles::components::selection_appearance::{
@@ -724,6 +725,37 @@ fn tree_drag_dispatches_inside_drop() {
             Some(("B", "A", TreeDropPosition::Inside)),
             "dragging B onto A's middle reports an inside drop, got {:?}",
             *done.borrow()
+        );
+    });
+}
+
+#[test]
+fn tree_drag_survives_a_surrounding_scroll_view() {
+    let done = Rc::new(RefCell::new(None));
+    let probe = done.clone();
+    InteractiveScene::run(320.0, 220.0, |scene| {
+        let tree = drag_tree(
+            vec![item("a", "A", vec![]), item("b", "B", vec![])],
+            probe.clone(),
+        );
+        scene.install(AnyView::new(
+            ScrollView::new(
+                ScrollAxis::Vertical,
+                AnyView::new(tree).frame_height(420.0),
+            )
+            .frame_size(300.0, 200.0),
+        ));
+        let rows = tree_rows(scene);
+        assert_eq!(rows.len(), 2, "two rows mount");
+        drag(scene, &rows[1], &rows[0]);
+        assert_eq!(
+            done.borrow().as_ref().map(|(source, target, position)| (
+                source.as_str(),
+                target.as_str(),
+                *position
+            )),
+            Some(("B", "A", TreeDropPosition::Inside)),
+            "the row drag survives the surrounding scroll view"
         );
     });
 }

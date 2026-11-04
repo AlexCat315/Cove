@@ -15,7 +15,7 @@ use std::rc::Rc;
 use cove_core::{Binding, State};
 use cove_ui_compose::modifiers::interaction::AccessibilityExt;
 use cove_ui_compose::modifiers::layout::LayoutFrameExt;
-use cove_ui_compose::modifiers::style::SemanticStyleViewExt;
+use cove_ui_compose::modifiers::style::{AppearanceExt, SemanticStyleViewExt};
 use cove_ui_compose::primitives::controls::{Button, Toggle};
 use cove_ui_compose::primitives::data::lists::RowState;
 use cove_ui_compose::primitives::data::lists::Selection;
@@ -1063,6 +1063,7 @@ impl View for RefreshListStory {
 pub struct DragAndDropStory {
     lane_a: State<Option<String>>,
     lane_b: State<Option<String>>,
+    highlight: State<Option<u64>>,
 }
 
 impl DragAndDropStory {
@@ -1070,6 +1071,7 @@ impl DragAndDropStory {
         Self {
             lane_a: State::new(None),
             lane_b: State::new(None),
+            highlight: State::new(None),
         }
     }
 
@@ -1079,6 +1081,11 @@ impl DragAndDropStory {
 
     pub fn lane_b(&self) -> Option<String> {
         self.lane_b.get()
+    }
+
+    /// The lane currently highlighted by the pointer.
+    pub fn highlight(&self) -> Option<u64> {
+        self.highlight.get()
     }
 
     /// Drops `payload` into a lane.
@@ -1110,24 +1117,62 @@ impl View for DragAndDropStory {
         let lane_a = self.lane_a.clone();
         let lane_b = self.lane_b.clone();
         let chip = |title: &'static str, payload: u64| {
-            AnyView::new(Draggable::new(
-                payload,
-                AnyView::new(Text::new(title)),
-                AnyView::new(AnyView::new(Text::new(title)).frame_size(120.0, 36.0)),
-            ))
+            let body = AnyView::new(
+                AnyView::new(BoxView::new(
+                    cove_core::scene::FlexDirection::Row,
+                    cove_core::scene::Align::Center,
+                    cove_core::scene::Justify::Center,
+                    cove_core::scene::Wrap::NoWrap,
+                    0.0,
+                    AnyView::new(Text::new(title)),
+                ))
+                .frame_size(120.0, 36.0)
+                .semantic_background(SemanticColorRef::surface_raised())
+                .corner_radius(8.0),
+            );
+            AnyView::new(Draggable::new(payload, body.clone(), body))
         };
-        let lane = |title: &'static str, accepts: u64, on_drop: Rc<dyn Fn(u64)>| {
+        let highlight = self.highlight.clone();
+        let lane = move |title: &'static str, accepted: u64, on_drop: Rc<dyn Fn(u64)>| {
             let drop_title = title;
+            let is_targeted = highlight.get() == Some(accepted);
+            let fill = if is_targeted {
+                SemanticColorRef::state_layer_selected()
+            } else {
+                SemanticColorRef::surface_variant()
+            };
+            let body = AnyView::new(
+                AnyView::new(
+                    AnyView::new(BoxView::new(
+                        cove_core::scene::FlexDirection::Row,
+                        cove_core::scene::Align::Center,
+                        cove_core::scene::Justify::Center,
+                        cove_core::scene::Wrap::NoWrap,
+                        0.0,
+                        AnyView::new(Text::new(drop_title)),
+                    ))
+                    .frame_size(160.0, 80.0)
+                    .semantic_background(fill)
+                    .corner_radius(10.0),
+                )
+                .debug_name("drop-lane"),
+            );
+            let targeted = highlight.clone();
             AnyView::new(
                 DropTarget::new(
-                    move |payload: &u64| *payload == accepts,
+                    move |payload: &u64| *payload == accepted,
                     move |payload| on_drop(payload),
-                    AnyView::new(
-                        AnyView::new(Text::new(drop_title))
-                            .frame_size(160.0, 80.0)
-                            .debug_name("drop-lane"),
-                    ),
+                    body,
                 )
+                .on_targeted(move |is_targeted| {
+                    targeted.update(|current| {
+                        if is_targeted {
+                            *current = Some(accepted);
+                        } else if *current == Some(accepted) {
+                            *current = None;
+                        }
+                    });
+                })
                 .debug_name("drop-target"),
             )
         };
@@ -1204,7 +1249,7 @@ impl View for DragAndDropStory {
     }
 
     fn dynamic_properties(&self) -> Vec<cove_composition::DynamicField> {
-        cove_composition::dynamic_fields!(self; lane_a, lane_b)
+        cove_composition::dynamic_fields!(self; lane_a, lane_b, highlight)
     }
 }
 
