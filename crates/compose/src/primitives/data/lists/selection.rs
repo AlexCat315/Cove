@@ -22,6 +22,16 @@ pub struct RowState {
     pub is_dragging: bool,
     /// Depth in a hierarchy; zero in a flat collection.
     pub depth: usize,
+    /// Checkbox state in a checkable tree.
+    pub is_checked: bool,
+    /// Some descendant is checked while this branch is not.
+    pub is_half_checked: bool,
+    /// A lazy branch is waiting for its children.
+    pub is_loading: bool,
+    /// The keyboard/selection cursor is on this row.
+    pub is_current: bool,
+    /// The row has no children.
+    pub is_leaf: bool,
 }
 
 impl RowState {

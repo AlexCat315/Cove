@@ -368,6 +368,14 @@ impl PrimitiveView for DragSourceHost {
                     PointerPhase::Down => {
                         owner.set_attachment(DRAG_START, Point::new(event.x, event.y));
                         owner.set_attachment(DRAG_ACTIVE, false);
+                        // Capture immediately but keep the gesture transferable:
+                        // motion reaches the source even when the first event is
+                        // already outside it, while a scroll container may still
+                        // claim the gesture before the drag threshold. Crossing
+                        // the threshold upgrades the capture to exclusive.
+                        if let Some(capture) = PointerCaptureHolder::current() {
+                            capture.acquire(&owner, true);
+                        }
                         EventResult::Ignored
                     }
                     PointerPhase::Up => {
@@ -375,8 +383,19 @@ impl PrimitiveView for DragSourceHost {
                         owner.remove_attachment(DRAG_START);
                         owner.set_attachment(DRAG_ACTIVE, false);
                         if !active {
+                            if PointerCaptureHolder::current()
+                                .and_then(|capture| capture.target())
+                                .is_some_and(|target| target == owner)
+                                && let Some(capture) = PointerCaptureHolder::current()
+                            {
+                                capture.release();
+                            }
                             return EventResult::Ignored;
                         }
+                        // Finish the drop before releasing capture: releasing
+                        // invokes the lost-capture callback, which cancels any
+                        // live session.
+                        pointer_session.end();
                         if PointerCaptureHolder::current()
                             .and_then(|capture| capture.target())
                             .is_some_and(|target| target == owner)
@@ -384,7 +403,6 @@ impl PrimitiveView for DragSourceHost {
                         {
                             capture.release();
                         }
-                        pointer_session.end();
                         EventResult::Handled
                     }
                 }
@@ -411,13 +429,30 @@ impl PrimitiveView for DragSourceHost {
                     }
                     owner.set_attachment(DRAG_ACTIVE, true);
                     if let Some(capture) = PointerCaptureHolder::current() {
-                        capture.acquire(&owner, true);
+                        // Exclusive: a scroll gesture must not take the drag
+                        // away once the threshold has been crossed.
+                        capture.acquire(&owner, false);
                     }
                     motion_session.begin(payload, preview.clone(), point);
                 }
                 motion_session.move_to(point);
                 EventResult::Handled
             }),
+        );
+
+        let clear_node = node.downgrade();
+        let clear_session = session.clone();
+        node.set_attachment(
+            cove_core::scene::PointerCaptureAttachmentKey::DID_LOSE_CAPTURE,
+            Rc::new(move || {
+                if let Some(owner) = Node::upgrade(&clear_node) {
+                    owner.remove_attachment(DRAG_START);
+                    owner.set_attachment(DRAG_ACTIVE, false);
+                }
+                if clear_session.is_dragging() {
+                    clear_session.cancel();
+                }
+            }) as Rc<dyn Fn()>,
         );
     }
 

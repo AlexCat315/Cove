@@ -1,13 +1,15 @@
 //! Shared tree types and configuration.
 //!
 //! The small supporting enums (`TreeSearchFilterPolicy`, `TreeDropPosition`,
-//! `TreeNodeKey`) are shared with the future translation of the large
-//! `Tree.swift` view, so they live here rather than inside that view.
+//! `TreeNodeKey`) are shared with the projection, so they live here rather than
+//! inside the view.
+pub(crate) mod check;
 pub mod options;
 pub mod view;
 
 pub use options::{
-    TreeDragOperations, TreeEvents, TreeLayout, TreeOptions, TreeSearch, TreeSelection, TreeSlots,
+    TreeCheck, TreeDragOperations, TreeEdit, TreeEvents, TreeExpansion, TreeLayout, TreeLazy,
+    TreeOptions, TreeSearch, TreeSearchMatch, TreeSelection, TreeSlots,
 };
 pub use view::{Tree, TreeEntry, TreeSearchMetadata, flatten_tree, flatten_tree_matching};
 
@@ -19,6 +21,18 @@ pub enum TreeSearchFilterPolicy {
     /// Hide non-matches and expand the ancestors of every match.
     #[default]
     FilterAndAutoExpand,
+}
+
+/// Where a programmatic scroll places the target row. Virtualized stacks use
+/// the exact alignment; the eager scroll view clamps the resulting offset.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum TreeScrollAlign {
+    /// Reveal with the least movement.
+    #[default]
+    Auto,
+    Start,
+    Center,
+    End,
 }
 
 /// Where a dragged row lands relative to the row under the pointer.

@@ -53,6 +53,7 @@ import component11 from '@/content/components/vec3-field.md?raw'
 import component12 from '@/content/components/timeline.md?raw'
 import chart from '@/content/components/chart.md?raw'
 import table from '@/content/components/table.md?raw'
+import tree from '@/content/components/tree.md?raw'
 import component13 from '@/content/components/tab-view.md?raw'
 import component14 from '@/content/components/date-range.md?raw'
 
@@ -121,6 +122,7 @@ export const docGroups: DocGroup[] = [
       { slug: 'vec3-field', title: 'Vec3Field', raw: component11 },
       { slug: 'chart', title: 'Chart', raw: chart },
       { slug: 'table', title: 'Table', raw: table },
+      { slug: 'tree', title: 'Tree', raw: tree },
       { slug: 'timeline', title: 'Timeline', raw: component12 },
       { slug: 'tab-view', title: 'TabView', raw: component13 },
       { slug: 'date-range', title: 'DateRangeCalendar', raw: component14 },

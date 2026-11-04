@@ -16,13 +16,14 @@ use cove_core::{Binding, State};
 use cove_ui_compose::modifiers::interaction::AccessibilityExt;
 use cove_ui_compose::modifiers::layout::LayoutFrameExt;
 use cove_ui_compose::modifiers::style::SemanticStyleViewExt;
-use cove_ui_compose::primitives::controls::Button;
+use cove_ui_compose::primitives::controls::{Button, Toggle};
 use cove_ui_compose::primitives::data::lists::RowState;
 use cove_ui_compose::primitives::data::lists::Selection;
 use cove_ui_compose::primitives::data::lists::refresh::RefreshOptions;
 use cove_ui_compose::primitives::data::lists::swipe_list::SwipeList;
 use cove_ui_compose::primitives::data::lists::tree::{
-    Tree, TreeOptions, TreeSearch, TreeSelection,
+    Tree, TreeCheck, TreeEvents, TreeExpansion, TreeLazy, TreeNodeKey, TreeOptions, TreeSearch,
+    TreeSelection, TreeSlots,
 };
 use cove_ui_compose::primitives::data::{List, ListSection, SectionedList, SwipeAction};
 use cove_ui_compose::primitives::feedback::StatusTone;
@@ -33,9 +34,9 @@ use cove_ui_compose::primitives::text::Text;
 use cove_ui_compose::primitives::text::text_buffer::TextBuffer;
 use cove_ui_compose::primitives::text::text_field::TextField;
 use cove_ui_compose::primitives::text::text_field::text_field_options::TextFieldBehavior;
+use cove_ui_compose::theme::SemanticFontRef;
 use cove_ui_compose::theme::styles::buttons::{ButtonStyleViewExt, SecondaryButtonStyle};
 use cove_ui_compose::theme::tokens::{SemanticColorRef, SemanticIconSize};
-use cove_ui_compose::theme::SemanticFontRef;
 use cove_ui_compose::{AnyView, BoxView, LayoutDebugExt, TupleView, View};
 
 use super::feedback::StorySection;
@@ -155,13 +156,42 @@ pub fn expandable_ids(nodes: &[SceneNode]) -> BTreeSet<&'static str> {
     out
 }
 
-/// `TreeStory`: the scene hierarchy with search and multi-selection.
+/// `TreeStory`: the scene hierarchy with search, checks, selection, accordion,
+/// strict checks, a lazy branch and the event log.
 pub struct TreeStory {
     pub options: GalleryOptions,
     selection: State<Option<String>>,
     expanded: State<BTreeSet<String>>,
     selected_ids: State<BTreeSet<String>>,
+    checked: State<BTreeSet<String>>,
+    strict: State<bool>,
+    accordion: State<bool>,
+    lazy: State<bool>,
+    loaded: State<BTreeSet<String>>,
+    status: State<String>,
     query: State<String>,
+}
+
+/// The branch the lazy-loading demo gates until it is expanded.
+pub const LAZY_TREE_BRANCH: &str = "objects";
+
+fn collect_ids(nodes: &[SceneNode], out: &mut BTreeSet<String>) {
+    for node in nodes {
+        out.insert(node.id.to_owned());
+        collect_ids(&node.children, out);
+    }
+}
+
+fn gallery_ids() -> BTreeSet<String> {
+    let mut out = BTreeSet::new();
+    collect_ids(&SceneNode::gallery(), &mut out);
+    out
+}
+
+fn boolean_binding(state: &State<bool>) -> Binding<bool> {
+    let get = state.clone();
+    let set = state.clone();
+    Binding::new(move || get.get(), move |value| set.set(value))
 }
 
 impl TreeStory {
@@ -175,6 +205,12 @@ impl TreeStory {
                     .collect(),
             ),
             selected_ids: State::new(["camera".to_owned()].into_iter().collect()),
+            checked: State::new(["camera".to_owned()].into_iter().collect()),
+            strict: State::new(false),
+            accordion: State::new(false),
+            lazy: State::new(false),
+            loaded: State::new(BTreeSet::new()),
+            status: State::new("Ready".to_owned()),
             query: State::new(String::new()),
         }
     }
@@ -189,6 +225,30 @@ impl TreeStory {
 
     pub fn selected_ids(&self) -> BTreeSet<String> {
         self.selected_ids.get()
+    }
+
+    pub fn checked_ids(&self) -> BTreeSet<String> {
+        self.checked.get()
+    }
+
+    pub fn strict(&self) -> bool {
+        self.strict.get()
+    }
+
+    pub fn accordion(&self) -> bool {
+        self.accordion.get()
+    }
+
+    pub fn lazy(&self) -> bool {
+        self.lazy.get()
+    }
+
+    pub fn loaded(&self) -> BTreeSet<String> {
+        self.loaded.get()
+    }
+
+    pub fn status(&self) -> String {
+        self.status.get()
     }
 
     pub fn query(&self) -> String {
@@ -213,6 +273,42 @@ impl TreeStory {
         self.expanded.set(BTreeSet::new());
     }
 
+    pub fn check_all(&self) {
+        self.checked.set(gallery_ids());
+    }
+
+    pub fn clear_checked(&self) {
+        self.checked.set(BTreeSet::new());
+    }
+
+    pub fn toggle_strict(&self) {
+        self.strict.update(|value| *value = !*value);
+    }
+
+    pub fn toggle_accordion(&self) {
+        self.accordion.update(|value| *value = !*value);
+    }
+
+    /// Turning lazy mode on resets the branch so the next expansion asks the
+    /// host for its children again.
+    pub fn toggle_lazy(&self) {
+        self.lazy.update(|value| *value = !*value);
+        self.loaded.update(|set| {
+            set.remove(LAZY_TREE_BRANCH);
+        });
+        self.expanded.update(|set| {
+            set.remove(LAZY_TREE_BRANCH);
+        });
+    }
+
+    /// Host side of `load_data`: record the branch and report the load.
+    pub fn mark_loaded(&self, id: &str) {
+        self.loaded.update(|set| {
+            set.insert(id.to_owned());
+        });
+        self.status.set(format!("Loaded {id}"));
+    }
+
     /// The ids still shown for the current query.
     pub fn visible(&self) -> BTreeSet<String> {
         visible_ids(&SceneNode::gallery(), &self.query.get())
@@ -230,10 +326,14 @@ impl TreeStory {
         });
     }
 
-    /// The caption lists the multi-selection in sorted order.
+    /// The caption lists the multi-selection and the checked count.
     pub fn caption(&self) -> String {
         let ids: Vec<String> = self.selected_ids.get().into_iter().collect();
-        format!("Selected: {}", ids.join(", "))
+        format!(
+            "Selected: {} · Checked: {}",
+            ids.join(", "),
+            self.checked.get().len()
+        )
     }
 }
 
@@ -247,8 +347,86 @@ impl View for TreeStory {
             },
             move |set: HashSet<String>| expanded_state.set(set.into_iter().collect()),
         );
+        let checked_state = self.checked.clone();
+        let checked = Binding::new(
+            {
+                let state = checked_state.clone();
+                move || state.get().into_iter().collect::<HashSet<String>>()
+            },
+            move |set: HashSet<String>| checked_state.set(set.into_iter().collect()),
+        );
         let text: Rc<dyn Fn(&SceneNode) -> String> =
             Rc::new(|node: &SceneNode| format!("{} {}", node.title, node.id));
+
+        let lazy_enabled = self.lazy.get();
+        let loaded_children = self.loaded.clone();
+        let children = move |node: &SceneNode| {
+            if lazy_enabled
+                && node.id == LAZY_TREE_BRANCH
+                && !loaded_children.get().contains(LAZY_TREE_BRANCH)
+            {
+                Vec::new()
+            } else {
+                node.children.clone()
+            }
+        };
+
+        let load_status = self.status.clone();
+        let load_loaded = self.loaded.clone();
+        let load_data: Rc<dyn Fn(&SceneNode)> = Rc::new(move |node: &SceneNode| {
+            load_loaded.update(|set| {
+                set.insert(node.id.to_owned());
+            });
+            load_status.set(format!("Loaded {}", node.title));
+        });
+
+        let icon_slot: Rc<dyn Fn(&SceneNode) -> AnyView> = Rc::new(|node: &SceneNode| {
+            let icon = if node.children.is_empty() {
+                ui_icon_catalog::file::file_text()
+            } else {
+                ui_icon_catalog::file::folder()
+            };
+            AnyView::new(Icon::with_semantic(
+                icon,
+                14.0,
+                SemanticColorRef::on_surface_muted(),
+            ))
+        });
+
+        let select_status = self.status.clone();
+        let on_select: Rc<dyn Fn(SceneNode)> = Rc::new(move |node: SceneNode| {
+            select_status.set(format!("Selected {}", node.title));
+        });
+        let expand_status = self.status.clone();
+        let on_expand: Rc<
+            dyn Fn(&SceneNode, bool, &HashSet<TreeNodeKey<String>>),
+        > = Rc::new(
+            move |node: &SceneNode, expanded: bool, _keys: &HashSet<TreeNodeKey<String>>| {
+                expand_status.set(format!(
+                    "{} {}",
+                    node.title,
+                    if expanded { "expanded" } else { "collapsed" }
+                ));
+            },
+        );
+        let check_status = self.status.clone();
+        let on_check: Rc<
+            dyn Fn(&SceneNode, bool, &HashSet<TreeNodeKey<String>>, &HashSet<TreeNodeKey<String>>),
+        > = Rc::new(
+            move |node: &SceneNode,
+                  checked: bool,
+                  checked_keys: &HashSet<TreeNodeKey<String>>,
+                  half_keys: &HashSet<TreeNodeKey<String>>| {
+                check_status.set(format!(
+                    "{} {} · {} checked · {} half",
+                    node.title,
+                    if checked { "checked" } else { "unchecked" },
+                    checked_keys.len(),
+                    half_keys.len()
+                ));
+            },
+        );
+
         let options = TreeOptions {
             is_enabled: self.options.is_enabled,
             selection: TreeSelection {
@@ -256,10 +434,38 @@ impl View for TreeStory {
                 expanded: Some(expanded),
                 ..TreeSelection::default()
             },
+            check: TreeCheck {
+                is_enabled: self.options.is_enabled,
+                checked: Some(checked),
+                check_strictly: self.strict.get(),
+                on_change: Some(on_check),
+                ..TreeCheck::default()
+            },
+            expansion: TreeExpansion {
+                accordion: self.accordion.get(),
+                ..TreeExpansion::default()
+            },
+            lazy: TreeLazy {
+                is_enabled: self.options.is_enabled && lazy_enabled,
+                is_leaf: Some(Rc::new(|node: &SceneNode| {
+                    node.id != LAZY_TREE_BRANCH && node.children.is_empty()
+                })),
+                load_data: Some(load_data),
+                ..TreeLazy::default()
+            },
+            slots: TreeSlots {
+                icon: Some(icon_slot),
+                ..TreeSlots::default()
+            },
             search: TreeSearch {
                 query: self.query.get(),
                 text: Some(text),
                 ..TreeSearch::default()
+            },
+            events: TreeEvents {
+                on_select: Some(on_select),
+                on_expand_change: Some(on_expand),
+                ..TreeEvents::default()
             },
             ..TreeOptions::default()
         };
@@ -267,18 +473,19 @@ impl View for TreeStory {
             Tree::new(
                 SceneNode::gallery(),
                 |node: &SceneNode| node.id.to_owned(),
-                |node: &SceneNode| node.children.clone(),
+                children,
                 |node: &SceneNode, _: RowState| {
                     // The tree already paints indentation, disclosure and the
                     // selected band; repeating them in the label double-drew
                     // markers and clipped the text inside a narrow band.
-                    AnyView::new(Text::new(node.title.clone()))
+                    AnyView::new(Text::new(node.title))
                 },
             )
             .options(options)
             .frame_size(360.0, 280.0)
             .debug_name("tree-control"),
         );
+
         let query_state = self.query.clone();
         let search = AnyView::new(
             TextField::new(
@@ -324,17 +531,86 @@ impl View for TreeStory {
                     .button_style(SecondaryButtonStyle),
             )
         };
-        let toolbar = AnyView::new(BoxView::new(
+        let check_all = {
+            let checked = self.checked.clone();
+            let enabled = self.options.is_enabled;
+            AnyView::new(
+                Button::title("Check all", move || checked.set(gallery_ids()))
+                    .enabled(enabled)
+                    .button_style(SecondaryButtonStyle),
+            )
+        };
+        let clear_checks = {
+            let checked = self.checked.clone();
+            let enabled = self.options.is_enabled;
+            AnyView::new(
+                Button::title("Clear checks", move || checked.set(BTreeSet::new()))
+                    .enabled(enabled)
+                    .button_style(SecondaryButtonStyle),
+            )
+        };
+
+        let strict = AnyView::new(Toggle::labeled(
+            "Strict check",
+            boolean_binding(&self.strict),
+        ));
+        let accordion = AnyView::new(Toggle::labeled(
+            "Accordion",
+            boolean_binding(&self.accordion),
+        ));
+        let lazy_state = self.lazy.clone();
+        let lazy_loaded = self.loaded.clone();
+        let lazy_expanded = self.expanded.clone();
+        let lazy = AnyView::new(Toggle::labeled(
+            "Lazy Objects",
+            Binding::new(
+                {
+                    let state = lazy_state.clone();
+                    move || state.get()
+                },
+                move |value: bool| {
+                    lazy_state.set(value);
+                    lazy_loaded.set(BTreeSet::new());
+                    lazy_expanded.update(|set| {
+                        set.remove(LAZY_TREE_BRANCH);
+                    });
+                },
+            ),
+        ));
+
+        let button_row = AnyView::new(BoxView::new(
             cove_core::scene::FlexDirection::Row,
             cove_core::scene::Align::Center,
             cove_core::scene::Justify::FlexStart,
             cove_core::scene::Wrap::Wrap,
             8.0,
-            AnyView::new(TupleView::new(vec![search, expand, collapse])),
+            AnyView::new(TupleView::new(vec![
+                search,
+                expand,
+                collapse,
+                check_all,
+                clear_checks,
+            ])),
+        ));
+        let toggle_row = AnyView::new(BoxView::new(
+            cove_core::scene::FlexDirection::Row,
+            cove_core::scene::Align::Center,
+            cove_core::scene::Justify::FlexStart,
+            cove_core::scene::Wrap::Wrap,
+            12.0,
+            AnyView::new(TupleView::new(vec![strict, accordion, lazy])),
+        ));
+        let toolbar = AnyView::new(BoxView::new(
+            cove_core::scene::FlexDirection::Column,
+            cove_core::scene::Align::Stretch,
+            cove_core::scene::Justify::FlexStart,
+            cove_core::scene::Wrap::NoWrap,
+            8.0,
+            AnyView::new(TupleView::new(vec![button_row, toggle_row])),
         ));
         AnyView::new(StorySection::new(
             "Scene hierarchy",
-            "Search retains matching ancestors. Use arrows, Home and End; Option/Alt + Right expands all and Option/Alt + Left collapses all. Command/Control-click selects multiple nodes.",
+            "Search retains matching ancestors. Arrows, Home and End move; Option/Alt + Right expands all and Option/Alt + Left collapses all. Command/Control-click selects multiple nodes. Checking cascades unless Strict check is on; Accordion keeps one branch open; Lazy Objects asks the host for children on first expansion.",
             AnyView::new(TupleView::new(vec![
                 toolbar,
                 tree,
@@ -343,6 +619,12 @@ impl View for TreeStory {
                         .semantic_font(SemanticFontRef::caption())
                         .semantic_foreground(SemanticColorRef::on_surface_muted())
                         .debug_name("tree-caption"),
+                ),
+                AnyView::new(
+                    Text::new(self.status())
+                        .semantic_font(SemanticFontRef::caption())
+                        .semantic_foreground(SemanticColorRef::accent())
+                        .debug_name("tree-status"),
                 ),
             ])),
         ))
@@ -353,7 +635,19 @@ impl View for TreeStory {
     }
 
     fn dynamic_properties(&self) -> Vec<cove_composition::DynamicField> {
-        cove_composition::dynamic_fields!(self; selection, expanded, selected_ids, query)
+        cove_composition::dynamic_fields!(
+            self;
+            selection,
+            expanded,
+            selected_ids,
+            checked,
+            strict,
+            accordion,
+            lazy,
+            loaded,
+            status,
+            query
+        )
     }
 }
 
@@ -570,7 +864,9 @@ impl View for SwipeListStory {
                                         Text::new("Swipe toward the leading edge or use Actions")
                                             .truncated()
                                             .semantic_font(SemanticFontRef::caption())
-                                            .semantic_foreground(SemanticColorRef::on_surface_muted()),
+                                            .semantic_foreground(
+                                                SemanticColorRef::on_surface_muted(),
+                                            ),
                                     ),
                                 ])),
                             )),

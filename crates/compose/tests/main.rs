@@ -240,6 +240,7 @@ mod toolbar_overflow_tests;
 mod tooltip_deduplication_tests;
 mod touch_density_tests;
 mod tree_behavior;
+mod tree_features_tests;
 mod truncation_tests;
 mod typography_raster_tests;
 mod value_subtree;

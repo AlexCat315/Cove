@@ -1,0 +1,144 @@
+# Tree
+
+`Tree` 是虚拟化的层级列表：只投影已展开分支，行高固定，可见行才挂载。选择、勾选、展开、搜索、懒加载与拖拽都是独立配置组，可以按需组合。
+
+```rust
+let tree = Tree::new(
+    roots,
+    |node: &Node| node.id.clone(),        // nodeKey / fieldNames.key
+    |node: &Node| node.children.clone(),  // fieldNames.children
+    |node: &Node, state: RowState| AnyView::new(Text::new(node.title.clone())),
+)
+.has_children(|node: &Node| node.has_children) // isLeaf 的补集
+.options(TreeOptions {
+    selection: TreeSelection::local(["scene".to_string()]),
+    check: TreeCheck {
+        is_enabled: true,
+        default_checked: vec!["camera".to_string()],
+        ..TreeCheck::default()
+    },
+    ..TreeOptions::default()
+});
+```
+
+`id_of`、`children` 与 `has_children` 就是 `fieldNames` / `nodeKey` / `isLeaf` 在类型化 Rust 里的形态：字段名由取值闭包代替，节点标识与子节点解析保持编译期类型安全。
+
+## 选择
+
+`TreeSelection::ids` 是受控单选或多选；`TreeSelection::local` / `local_multiple` 使用树自身持有的状态，等价于非受控的 `defaultSelectedKeys`。
+
+- `is_selectable: false`（或 `TreeSelection::disabled()`）关闭行选择，但方向键仍移动光标。
+- `expanded` / `expanded_keys` 是受控展开；`default_expanded` / `default_expanded_keys` 只作为首次挂载的种子。
+- `get_selected_ids()`、`get_selected_keys()`、`get_current_key()` 读取状态。
+- `events.on_select_change(node, selected, selected_keys)` 在选择变化后回调；旧的 `on_select(node)` 保留。
+- `on_node_click(node, modifiers)`、`on_double_click(node)`、`on_node_context_menu(node, point)` 分别覆盖点击、双击与右键。
+
+## 勾选
+
+`TreeCheck` 打开复选框：
+
+- `checked` / `checked_keys` 为受控状态，`default_checked` 为非受控种子。
+- 默认父子级联：勾选分支会勾选整棵子树；子节点变化会重算祖先的选中/半选状态。
+- `check_strictly: true` 关闭级联，父子互不影响，也不会产生半选。
+- `get_checked_keys()`、`get_half_checked_keys()`、`get_checked_nodes()` 读取结果；
+  `get_checked_nodes_filtered(leaf_only, include_half_checked)` 对应带过滤参数的
+  `getCheckedNodes`。
+- `set_checked_keys(keys, leaf_only)`、`set_checked(key, checked, deep)`、
+  `set_checked_element(node, checked, deep)` 写入；`deep = Some(false)` 让单次调用按
+  `checkStrictly` 处理。
+- 可勾选时 `Space` 切换当前行的勾选；复选框是独立控件，点击它不会改变行选择。
+- `check.on_change(node, checked, checked_keys, half_checked_keys)` 在每次变化后回调。
+
+## 展开
+
+`TreeExpansion` 提供策略层：
+
+- `default_expand_all`：首次挂载展开所有分支。
+- `auto_expand_parent`：展开、`scroll_to_key`、`set_current_key` 时补齐祖先路径。
+- `accordion`：同一层级同时只保留一个展开的分支。
+- `events.on_expand_change(node, expanded, expanded_keys)` 报告变化。
+- `expand_all()`、`collapse_all()`、`expand_key(key)`、`collapse_key(key)`、`toggle_key(key)`。
+
+## 搜索与过滤
+
+`TreeSearch`：
+
+- `query` 为静态查询；`Tree::filter(value)` 写入编程式查询并覆盖静态值，直到
+  `clear_filter()`。
+- `text` 提取行文本；`filter` 是自定义谓词，接收节点和归一化后的查询，优先于文本匹配。
+- `ignore_case`、`match_mode`（`Contains` / `Prefix` / `Exact`）控制比较。
+- `policy` 为 `FilterAndAutoExpand` 时隐藏非匹配并展开匹配祖先；`HighlightOnly` 只标记
+  `is_search_hit`，保留所有已展开行。
+- `scroll_to_key(key)` 会先展开祖先，再让下一次投影滚动到该行。
+
+## 懒加载
+
+`TreeLazy` 让宿主决定何时加载子节点：
+
+- `is_leaf(node)` 显式标记叶子；未加载的分支仍然显示展开控件。
+- `load_data(node)` 在分支首次展开时调用一次；宿主把子节点写回自己的数据并记录
+  `loaded_keys`。
+- `loaded_keys` 可以是受控绑定，否则由树持有；`get_loaded_keys()` 读取。
+- `is_loading(node)` 为真的行用进度环替代展开箭头，适合宿主异步加载期间显示。
+- 展开/收起/再次展开不会重复请求已经记录的节点。
+
+## 拖拽
+
+`TreeDragOperations`：
+
+- `is_enabled` 与 `can_drag(node)` 控制哪些行可以拖动。
+- `can_drop(source, target, position)` 决定放置是否合法；位置是 `Before` / `Inside` / `After`。
+- `on_drag_start`、`on_drag_enter`、`on_drag_leave`、`on_drop`、`on_drag_end` 覆盖完整生命周期。
+- 拖动超过 4pt 死区才进入拖拽，点击不会被误判；源行降低不透明度，目标行绘制插入线或
+  进入高亮。
+
+## 虚拟滚动
+
+行栈默认由 `FixedVirtualStack` 虚拟化，可视区外只保留超出扫描行。`TreeLayout::virtual_scroll(false)`
+会改为在 `ScrollView` 中挂载全部可见行，适合行内有长期存活的编辑器；此时
+`scroll_to_key` 用行高换算滚动偏移。
+
+`TreeLayout` 还提供 `row_height`、`row_spacing`、`indentation`、`disclosure_width`、
+`shows_indent_guides`（`show_line`）、`block_node`（选择带是否满行）、`trailing_slot_width`。
+
+## 样式与插槽
+
+- `row_content` 即 `titleRender`：完整接管行内容。
+- `TreeSlots::icon` 在展开控件/复选框之后、标题之前插入前导图标。
+- `TreeSlots::disclosure` 替换默认的展开/收起箭头，接收展开状态。
+- `TreeSlots::trailing` 追加尾部操作区。
+- `TreeRowStyle` 控制整行底色与选中带；默认样式使用主题的 accent 选中带、
+  `state_layer_hover` 悬停、`state_layer_selected` 搜索命中，并为键盘光标绘制较弱的
+  `state_layer_selected` 底。
+- 缩进参考线是 1pt 细线，只绘制仍有后续兄弟的祖先列；`show_line(false)` 可关闭。
+
+## 命令式方法
+
+| 方法 | 作用 |
+| --- | --- |
+| `filter(value)` / `clear_filter()` | 编程式过滤 |
+| `get_checked_keys()` / `get_checked_nodes()` | 读取勾选 |
+| `get_half_checked_keys()` | 读取半选 |
+| `set_checked_keys(keys, leaf_only)` | 替换勾选 |
+| `set_checked(key, checked, deep)` / `set_checked_element(node, checked, deep)` | 设置单节点 |
+| `check_all()` / `uncheck_all()` | 全选/全不选 |
+| `get_current_key()` / `get_current_node()` / `set_current_key(key)` / `clear_current_key()` | 光标读写 |
+| `get_path(key)` / `get_key_path(key)` | 根到目标的元素/键路径 |
+| `scroll_to_key(key)` / `scroll_to_key_aligned(key, align)` / `expand_to(key)` | 展开路径并滚动；`TreeScrollAlign` 支持 `Auto` / `Start` / `Center` / `End` |
+| `get_expanded_keys()` / `get_expanded_ids()` | 展开状态 |
+| `append(data, parent)` / `append_at(parent_key, data)` | 追加节点（委托宿主） |
+| `insert_before(reference, data)` / `insert_after(reference, data)` | 同级插入 |
+| `remove(node)` / `remove_key(key)` | 删除 |
+| `update_children(parent, children)` / `update_children_at(key, children)` | 替换子节点 |
+
+结构性编辑通过 `TreeEdit` 回调交给宿主模型：树不拥有节点存储，因此这些方法在未安装回调时
+是空操作。
+
+## 可访问性
+
+容器暴露 tree 角色，行暴露 tree item 角色并报告选中、展开与勾选（`checked` /
+`mixed` / `unchecked`）值；复选框本身是 checkbox 角色，展开控件是带 `Expand` /
+`Collapse` 标签的按钮。键盘支持方向键、Home/End、Return/Space，`Alt+→`/`Alt+←`
+展开/收起整个森林。
+
+共享 Rust 实现覆盖全部宿主平台。Gallery 的 Scene hierarchy 页演示搜索、多选、级联/严格勾选、手风琴、懒加载 `Objects` 分支、前导图标与事件状态行；结构、场景与浅/深主题挂载验证记录在 `Docs/gallery-audit.md`。

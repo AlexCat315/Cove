@@ -139,6 +139,7 @@ fn tree(
             entry_text(item)
         })),
         policy: TreeSearchFilterPolicy::FilterAndAutoExpand,
+        ..TreeSearch::default()
     };
     Tree::new(
         vec![Item { id: 0 }],
@@ -354,6 +355,7 @@ fn a_highlight_only_policy_keeps_every_row_mounted() {
         query: "Node 3".to_string(),
         text: Some(Rc::new(entry_text)),
         policy: TreeSearchFilterPolicy::HighlightOnly,
+        ..TreeSearch::default()
     };
     let search_reads = reads.clone();
     let tree = Tree::new(

@@ -47,6 +47,20 @@ pub fn total_extent(count: usize, row_stride: f32, spacing: f32) -> f32 {
     (count as f32 * row_stride - spacing).max(0.0)
 }
 
+/// Where a requested row lands in the viewport.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum VirtualScrollAlign {
+    /// Reveal the row with the least movement.
+    #[default]
+    Auto,
+    /// Put the row at the top edge.
+    Start,
+    /// Centre the row.
+    Center,
+    /// Put the row at the bottom edge.
+    End,
+}
+
 /// Vertically scrolling stack of fixed-height rows.
 pub struct FixedVirtualStack<Id: Clone> {
     pub ids: Vec<Id>,
@@ -55,13 +69,14 @@ pub struct FixedVirtualStack<Id: Clone> {
     pub overscan: usize,
     pub preload: f32,
     pub scroll_to_index: Option<usize>,
+    pub scroll_to_align: VirtualScrollAlign,
     pub on_scroll_offset_change: Option<Rc<dyn Fn(Point)>>,
     pub row_content: Rc<dyn Fn(&Id) -> AnyView + 'static>,
     viewport: cove_core::State<ScrollViewport>,
     /// Shared like Swift's `@State` class: the reference survives recomposition
     /// and mutating it never invalidates the body.
     window: cove_core::State<Arc<Mutex<VirtualWindow>>>,
-    previous_target: cove_core::State<Option<usize>>,
+    previous_target: cove_core::State<Option<(usize, VirtualScrollAlign)>>,
     generation: u128,
 }
 
@@ -78,6 +93,7 @@ impl<Id: Clone + Hash + Eq + 'static> FixedVirtualStack<Id> {
             overscan: 3,
             preload: 0.3,
             scroll_to_index: None,
+            scroll_to_align: VirtualScrollAlign::Auto,
             on_scroll_offset_change: None,
             row_content: Rc::new(row_content),
             viewport: cove_core::State::new(ScrollViewport::default()),
@@ -104,6 +120,14 @@ impl<Id: Clone + Hash + Eq + 'static> FixedVirtualStack<Id> {
 
     pub fn scroll_to_index(mut self, index: usize) -> Self {
         self.scroll_to_index = Some(index);
+        self.scroll_to_align = VirtualScrollAlign::Auto;
+        self
+    }
+
+    /// Reveal `index` at the requested edge or centre.
+    pub fn scroll_to_index_aligned(mut self, index: usize, align: VirtualScrollAlign) -> Self {
+        self.scroll_to_index = Some(index);
+        self.scroll_to_align = align;
         self
     }
 
@@ -158,17 +182,32 @@ impl<Id: Clone + Hash + Eq + 'static> View for FixedVirtualStack<Id> {
         // target that is already visible still starts the stack scrolled past
         // its own top.
         if let Some(target) = self.scroll_to_index
-            && self.previous_target.get() != Some(target)
+            && self.previous_target.get() != Some((target, self.scroll_to_align))
             && viewport.size.height > 0.0
         {
-            self.previous_target.set(Some(target));
+            self.previous_target
+                .set(Some((target, self.scroll_to_align)));
             let top = target.min(count.saturating_sub(1)) as f32 * stride;
             let bottom = top + self.row_height;
-            if top < state.offset.y {
-                state.offset.y = top;
-            } else if bottom > state.offset.y + viewport.size.height {
-                state.offset.y = (bottom - self.row_height.max(viewport.size.height)).max(0.0);
+            let max_offset =
+                (total_extent(count, stride, self.spacing) - viewport.size.height).max(0.0);
+            state.offset.y = match self.scroll_to_align {
+                VirtualScrollAlign::Auto => {
+                    if top < state.offset.y {
+                        top
+                    } else if bottom > state.offset.y + viewport.size.height {
+                        (bottom - self.row_height.max(viewport.size.height)).max(0.0)
+                    } else {
+                        state.offset.y
+                    }
+                }
+                VirtualScrollAlign::Start => top,
+                VirtualScrollAlign::Center => {
+                    top - ((viewport.size.height - self.row_height) * 0.5).max(0.0)
+                }
+                VirtualScrollAlign::End => bottom - viewport.size.height,
             }
+            .clamp(0.0, max_offset);
         }
         let total = total_extent(count, stride, self.spacing);
         let clamped = state

@@ -502,10 +502,7 @@ fn tree_selection() {
         let fill = scene
             .nodes()
             .into_iter()
-            .find(|node| {
-                node.background_color()
-                    .is_some_and(|color| color.a > 0.1)
-            })
+            .find(|node| node.background_color().is_some_and(|color| color.a > 0.1))
             .expect("the selected row paints its fill");
         assert!(
             fill.absolute_frame().width > 200.0,
@@ -691,6 +688,7 @@ fn drag_tree(
             *probe.borrow_mut() =
                 Some((source.title.to_string(), target.title.to_string(), position));
         })),
+        ..TreeDragOperations::default()
     };
     tree_harness(
         roots,
@@ -822,6 +820,7 @@ fn filtered_tree_node_key_paths_remain_stable() {
         query: "Second".to_string(),
         text: Some(Rc::new(|item: &Item| item.title.to_string())),
         policy: TreeSearchFilterPolicy::FilterAndAutoExpand,
+        ..TreeSearch::default()
     };
     InteractiveScene::run(280.0, 160.0, |scene| {
         scene.install(keyed_tree(roots, multiple.clone(), search));

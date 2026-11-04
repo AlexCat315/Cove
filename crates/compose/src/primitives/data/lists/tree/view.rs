@@ -1,38 +1,48 @@
 //! Translation of Primitives/Data/Lists/Tree.swift.
 //!
-//! Hierarchical, single-selection tree. Visual chrome (selection fill,
-//! indentation, disclosure chevron) is delegated to the active `TreeRowStyle`;
-//! the default is `DefaultTreeRowStyle`.
+//! Hierarchical, virtualized tree. Visual chrome (selection fill, indentation,
+//! disclosure chevron) is delegated to the active `TreeRowStyle`; the default
+//! is `DefaultTreeRowStyle`.
 //!
-//! The configuration groups live in [`tree::options`], the flattening and
-//! keyboard rules here. Behaviour checklist:
-//! - only expanded branches are walked, so a collapsed subtree costs nothing
-//! - paths are identity tokens for selection, expansion and drag state;
+//! The configuration groups live in [`super::options`], the flattening,
+//! cascade and keyboard rules here. Behaviour checklist:
+//! - only expanded branches are projected; a collapsed subtree is never mounted
+//! - paths are identity tokens for selection, expansion, check and drag state;
 //!   filtering must not renumber them, so callers' keys stay valid while
 //!   search merely hides non-matching siblings
-//! - a cheap branch predicate lets a synchronous provider defer child
+//! - a cheap branch predicate lets a synchronous or lazy provider defer child
 //!   construction until expansion
-//! - searching filters and auto-expands ancestors of every match
+//! - searching filters and auto-expands ancestors of every match, or only
+//!   highlights them under `HighlightOnly`
+//! - checkbox cascade keeps parents fully checked only when every child is,
+//!   and reports indeterminate branches separately; `checkStrictly` disables it
+//! - `accordion` keeps one sibling open, `auto_expand_parent` repairs the path
+//!   before a programmatic scroll or cursor move
 //! - Down/Up move by one visible row; Left collapses or selects the parent;
-//!   Right expands or selects the first child; Alt+Left/Right collapse/expand
-//!   everything
+//!   Right expands or selects the first child; Space checks when checkboxes
+//!   are enabled; Alt+Left/Right collapse/expand everything
 //! - Shift extends from the anchor, Cmd/Ctrl toggles, anything else replaces
 //! - indent guides draw a branch line per depth with a continuation column
 //!   only where an ancestor still has a following sibling
 
 use crate::Scope;
 use std::cell::RefCell;
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeSet, HashMap, HashSet};
 use std::rc::Rc;
 
 use super::super::selection::{CollectionId, RowState};
-use super::options::{TreeOptions, TreeSelection};
-use super::{TreeDropPosition, TreeNodeKey, TreeSearchFilterPolicy};
+use super::check::{self, CheckSnapshot, TreeIndex};
+use super::options::{
+    TreeCheck, TreeDragOperations, TreeEdit, TreeEvents, TreeExpansion, TreeLazy, TreeOptions,
+    TreeSearchMatch, TreeSelection,
+};
+use super::{TreeDropPosition, TreeNodeKey, TreeScrollAlign, TreeSearchFilterPolicy};
 use crate::modifiers::interaction::AccessibilityExt;
 use crate::modifiers::layout::{FlexExt, LayoutFrameExt, PaddingExt};
 use crate::modifiers::style::AppearanceExt;
-use crate::primitives::controls::Button;
-use crate::primitives::layout::virtualization::FixedVirtualStack;
+use crate::primitives::controls::{Button, Checkbox, CheckboxState};
+use crate::primitives::feedback::progress_circle::ProgressCircle;
+use crate::primitives::layout::virtualization::{FixedVirtualStack, VirtualScrollAlign};
 use crate::primitives::media::{Icon, ui_icon_catalog};
 use crate::primitives::overlays::selection_key_host::SelectionKeyHost;
 use crate::theme::styles::buttons::ButtonStyleViewExt;
@@ -68,7 +78,11 @@ pub struct TreeEntry<Element, Id: std::hash::Hash + Eq> {
     pub has_next_sibling: bool,
     pub is_search_hit: bool,
     pub has_children: bool,
+    pub is_leaf: bool,
     pub is_expanded: bool,
+    pub is_checked: bool,
+    pub is_half_checked: bool,
+    pub is_loading: bool,
 }
 
 /// The search match bookkeeping for one projection.
@@ -78,12 +92,67 @@ pub struct TreeSearchMetadata<Id> {
     pub subtree_matches: HashMap<Id, bool>,
 }
 
+/// Everything a projection needs to decide whether a node matches: the query,
+/// the text extractor, an optional predicate that replaces it, and the
+/// comparison rules.
+pub(crate) struct SearchSpec<'a, Element> {
+    pub query: &'a str,
+    pub text: Option<&'a dyn Fn(&Element) -> String>,
+    pub filter: Option<&'a dyn Fn(&Element, &str) -> bool>,
+    pub ignore_case: bool,
+    pub match_mode: TreeSearchMatch,
+}
+
+impl<'a, Element> Clone for SearchSpec<'a, Element> {
+    fn clone(&self) -> Self {
+        *self
+    }
+}
+
+impl<'a, Element> Copy for SearchSpec<'a, Element> {}
+
+impl<Element> SearchSpec<'_, Element> {
+    pub fn is_active(&self) -> bool {
+        !self.query.trim().is_empty() && (self.text.is_some() || self.filter.is_some())
+    }
+
+    pub fn normalized(&self) -> String {
+        let query = self.query.trim();
+        if self.ignore_case {
+            query.to_lowercase()
+        } else {
+            query.to_string()
+        }
+    }
+
+    pub fn matches(&self, element: &Element, query: &str) -> bool {
+        if let Some(filter) = self.filter {
+            return filter(element, query);
+        }
+        let Some(text) = self.text else {
+            return false;
+        };
+        let haystack = text(element);
+        let haystack = if self.ignore_case {
+            haystack.to_lowercase()
+        } else {
+            haystack
+        };
+        match self.match_mode {
+            TreeSearchMatch::Contains => haystack.contains(query),
+            TreeSearchMatch::Prefix => haystack.starts_with(query),
+            TreeSearchMatch::Exact => haystack == query,
+        }
+    }
+}
+
 /// Flattens the expanded branches of a tree.
 ///
-/// Children of collapsed branches are never visited, so cost follows the
-/// visible rows rather than the whole forest. Paths stay keyed to the
-/// unfiltered scene so the caller's keys remain valid while search merely
-/// hides non-matching siblings.
+/// Children of collapsed branches are never projected, so cost follows the
+/// visible rows rather than the whole forest; a branch predicate lets the
+/// provider avoid constructing them at all. Paths stay keyed to the unfiltered
+/// scene so the caller's keys remain valid while search merely hides
+/// non-matching siblings.
 pub fn flatten_tree<Element, Id>(
     roots: &[Element],
     id_of: &dyn Fn(&Element) -> Id,
@@ -129,6 +198,13 @@ where
     Element: Clone,
     Id: std::hash::Hash + Eq + Clone,
 {
+    let spec = search.map(|(text, query)| SearchSpec {
+        query,
+        text: Some(text),
+        filter: None,
+        ignore_case: true,
+        match_mode: TreeSearchMatch::Contains,
+    });
     flatten_visible(
         roots,
         id_of,
@@ -136,7 +212,7 @@ where
         has_children,
         expanded,
         expanded_keys,
-        search,
+        spec,
         filters,
         None,
     )
@@ -153,7 +229,7 @@ pub(crate) fn flatten_visible<Element, Id>(
     has_children: Option<&dyn Fn(&Element) -> bool>,
     expanded: &HashSet<Id>,
     expanded_keys: &HashSet<TreeNodeKey<Id>>,
-    search: Option<(&dyn Fn(&Element) -> String, &str)>,
+    search: Option<SearchSpec<'_, Element>>,
     filters: bool,
     mut seen: Option<&mut HashSet<Id>>,
 ) -> Vec<TreeEntry<Element, Id>>
@@ -161,14 +237,12 @@ where
     Element: Clone,
     Id: std::hash::Hash + Eq + Clone,
 {
-    let query = search
-        .map(|(_, query)| query.trim().to_lowercase())
-        .unwrap_or_default();
-    let filter_active = filters && !query.is_empty() && search.is_some();
+    let query = search.map(|spec| spec.normalized()).unwrap_or_default();
+    let filter_active = filters && search.is_some_and(|spec| spec.is_active());
 
     // A blank query matches nothing to mark, and walking it would resolve lazy
     // children the tree has not asked for yet.
-    let metadata = search.filter(|_| !query.is_empty()).map(|(text, _)| {
+    let metadata = search.filter(|spec| spec.is_active()).map(|spec| {
         let mut self_matches = HashMap::new();
         let mut subtree_matches = HashMap::new();
         fn walk<Element, Id: std::hash::Hash + Eq + Clone>(
@@ -176,13 +250,13 @@ where
             id_of: &dyn Fn(&Element) -> Id,
             children: &dyn Fn(&Element) -> Vec<Element>,
             has_children: Option<&dyn Fn(&Element) -> bool>,
-            text: &dyn Fn(&Element) -> String,
+            spec: SearchSpec<'_, Element>,
             query: &str,
             self_matches: &mut HashMap<Id, bool>,
             subtree_matches: &mut HashMap<Id, bool>,
         ) -> bool {
             let id = id_of(node);
-            let own = text(node).to_lowercase().contains(query);
+            let own = spec.matches(node, query);
             self_matches.insert(id.clone(), own);
             let mut any = own;
             if has_children
@@ -195,7 +269,7 @@ where
                         id_of,
                         children,
                         has_children,
-                        text,
+                        spec,
                         query,
                         self_matches,
                         subtree_matches,
@@ -213,7 +287,7 @@ where
                 id_of,
                 children,
                 has_children,
-                text,
+                spec,
                 &query,
                 &mut self_matches,
                 &mut subtree_matches,
@@ -294,6 +368,10 @@ where
                 .and_then(|metadata| metadata.self_matches.get(&id))
                 .copied()
                 .unwrap_or(false);
+            let is_leaf = match branch {
+                Some(value) => !value,
+                None => child_nodes.is_empty(),
+            };
             out.push(TreeEntry {
                 element: node.clone(),
                 id: id.clone(),
@@ -305,7 +383,11 @@ where
                 has_next_sibling,
                 is_search_hit: self_matches,
                 has_children: branch.unwrap_or(!child_nodes.is_empty()),
+                is_leaf,
                 is_expanded,
+                is_checked: false,
+                is_half_checked: false,
+                is_loading: false,
             });
             if is_expanded && !child_nodes.is_empty() {
                 let mut child_guide = ancestor_has_next_siblings.to_vec();
@@ -357,7 +439,8 @@ where
     out
 }
 
-/// Hierarchical, single-selection tree.
+/// Hierarchical tree with selection, check cascade, filtering, lazy loading,
+/// drag and drop and virtual or eager scrolling.
 pub struct Tree<Element, Id, RowContent>
 where
     Element: Clone + 'static,
@@ -373,6 +456,14 @@ where
     anchor: State<Option<TreeNodeKey<Id>>>,
     cursor: State<Option<TreeNodeKey<Id>>>,
     local_expanded: State<HashSet<Id>>,
+    local_expanded_keys: State<HashSet<TreeNodeKey<Id>>>,
+    local_checked: State<HashSet<Id>>,
+    local_checked_keys: State<HashSet<TreeNodeKey<Id>>>,
+    local_loaded_keys: State<HashSet<TreeNodeKey<Id>>>,
+    local_selected: State<Option<Id>>,
+    local_multi_selected: State<BTreeSet<Id>>,
+    local_query: State<String>,
+    scroll_request: State<Option<(TreeNodeKey<Id>, TreeScrollAlign)>>,
     hovered: State<Option<TreeNodeKey<Id>>>,
     modifiers: RefCell<KeyModifiers>,
     drag_source: State<Option<TreeNodeKey<Id>>>,
@@ -402,6 +493,14 @@ where
             anchor: State::new(None),
             cursor: State::new(None),
             local_expanded: State::new(HashSet::new()),
+            local_expanded_keys: State::new(HashSet::new()),
+            local_checked: State::new(HashSet::new()),
+            local_checked_keys: State::new(HashSet::new()),
+            local_loaded_keys: State::new(HashSet::new()),
+            local_selected: State::new(None),
+            local_multi_selected: State::new(BTreeSet::new()),
+            local_query: State::new(String::new()),
+            scroll_request: State::new(None),
             hovered: State::new(None),
             modifiers: RefCell::new(KeyModifiers(0)),
             drag_source: State::new(None),
@@ -413,7 +512,43 @@ where
     pub fn options(mut self, options: TreeOptions<Element, Id>) -> Self {
         self.options = options;
         self.options.layout.validate();
+        self.seed_local_state();
+        if self.options.expansion.default_expand_all
+            && self.options.selection.expanded.is_none()
+            && self.options.selection.expanded_keys.is_none()
+        {
+            self.expand_all();
+        }
         self
+    }
+
+    /// Seeds the tree-owned fallbacks the first time options are applied.
+    fn seed_local_state(&self) {
+        let selection = &self.options.selection;
+        if selection.is_local {
+            if selection.local_multiple {
+                self.local_multi_selected
+                    .set(selection.default_selected.iter().cloned().collect());
+            } else {
+                self.local_selected
+                    .set(selection.default_selected.first().cloned());
+            }
+        }
+        if selection.expanded.is_none() && selection.expanded_keys.is_none() {
+            if !selection.default_expanded.is_empty() {
+                self.local_expanded
+                    .set(selection.default_expanded.iter().cloned().collect());
+            }
+            if !selection.default_expanded_keys.is_empty() {
+                self.local_expanded_keys
+                    .set(selection.default_expanded_keys.iter().cloned().collect());
+            }
+        }
+        let check = &self.options.check;
+        if check.is_enabled && check.checked.is_none() && check.checked_keys.is_none() {
+            self.local_checked
+                .set(check.default_checked.iter().cloned().collect());
+        }
     }
 
     /// A cheap branch predicate, so a synchronous provider can defer child
@@ -421,6 +556,30 @@ where
     pub fn has_children(mut self, has_children: impl Fn(&Element) -> bool + 'static) -> Self {
         self.has_children = Some(Rc::new(has_children));
         self
+    }
+
+    /// Explicit leaf marker for a lazy tree; overrides [`Tree::has_children`].
+    pub fn is_leaf(mut self, is_leaf: impl Fn(&Element) -> bool + 'static) -> Self {
+        self.options.lazy.is_leaf = Some(Rc::new(is_leaf));
+        self
+    }
+
+    fn branch_predicate(&self) -> Option<Rc<dyn Fn(&Element) -> bool>> {
+        if let Some(is_leaf) = &self.options.lazy.is_leaf {
+            let is_leaf = is_leaf.clone();
+            return Some(Rc::new(move |element: &Element| !is_leaf(element)));
+        }
+        self.has_children.clone()
+    }
+
+    fn full_index(&self) -> TreeIndex<Element, Id> {
+        let predicate = self.branch_predicate();
+        TreeIndex::build(
+            &self.roots,
+            &*self.id_of,
+            &*self.children,
+            predicate.as_deref(),
+        )
     }
 
     fn expanded_ids(&self) -> HashSet<Id> {
@@ -433,18 +592,91 @@ where
     fn expanded_keys(&self) -> HashSet<TreeNodeKey<Id>> {
         match &self.options.selection.expanded_keys {
             Some(binding) => binding.get(),
-            None => HashSet::new(),
+            None => self.local_expanded_keys.get(),
         }
     }
 
+    /// Expansion keys including those derived from an ID-only binding.
+    fn expanded_key_snapshot(&self) -> HashSet<TreeNodeKey<Id>> {
+        let mut keys = self.expanded_keys();
+        let ids = self.expanded_ids();
+        if ids.is_empty() {
+            return keys;
+        }
+        for node in &self.full_index().nodes {
+            if ids.contains(&node.id) {
+                keys.insert(node.key.clone());
+            }
+        }
+        keys
+    }
+
     fn set_expanded(&self, ids: HashSet<Id>, keys: HashSet<TreeNodeKey<Id>>) {
+        let use_local = self.options.selection.expanded.is_none()
+            && self.options.selection.expanded_keys.is_none();
         if let Some(binding) = &self.options.selection.expanded_keys {
-            binding.set(keys);
+            binding.set(keys.clone());
+        } else if use_local {
+            self.local_expanded_keys.set(keys);
         }
         if let Some(binding) = &self.options.selection.expanded {
             binding.set(ids);
-        } else if self.options.selection.expanded_keys.is_none() {
+        } else if use_local {
             self.local_expanded.set(ids);
+        }
+    }
+
+    fn checked_state(&self) -> (HashSet<Id>, HashSet<TreeNodeKey<Id>>) {
+        let check = &self.options.check;
+        if let Some(binding) = &check.checked_keys {
+            let keys = binding.get();
+            let ids = keys.iter().map(|key| key.id.clone()).collect();
+            return (ids, keys);
+        }
+        if let Some(binding) = &check.checked {
+            return (binding.get(), HashSet::new());
+        }
+        (self.local_checked.get(), self.local_checked_keys.get())
+    }
+
+    fn set_checked_state(&self, ids: HashSet<Id>, keys: HashSet<TreeNodeKey<Id>>) {
+        let check = &self.options.check;
+        if let Some(binding) = &check.checked_keys {
+            binding.set(keys.clone());
+        } else {
+            self.local_checked_keys.set(keys.clone());
+        }
+        if let Some(binding) = &check.checked {
+            binding.set(ids.clone());
+        } else {
+            self.local_checked.set(ids);
+        }
+    }
+
+    fn check_snapshot(&self) -> CheckSnapshot<Element, Id> {
+        if !self.options.check.is_enabled {
+            return CheckSnapshot::default();
+        }
+        let index = self.full_index();
+        let (ids, keys) = self.checked_state();
+        check::snapshot(&index, &ids, &keys, self.options.check.check_strictly)
+    }
+
+    fn loaded_keys(&self) -> HashSet<TreeNodeKey<Id>> {
+        match &self.options.lazy.loaded_keys {
+            Some(binding) => binding.get(),
+            None => self.local_loaded_keys.get(),
+        }
+    }
+
+    /// The active query: a programmatic [`Tree::filter`] overrides the option
+    /// string until it is cleared.
+    fn effective_query(&self) -> String {
+        let local = self.local_query.get();
+        if local.trim().is_empty() {
+            self.options.search.query.clone()
+        } else {
+            local
         }
     }
 
@@ -452,30 +684,61 @@ where
     pub fn entries(&self) -> Vec<TreeEntry<Element, Id>> {
         let expanded = self.expanded_ids();
         let keys = self.expanded_keys();
-        let query = self.options.search.query.clone();
-        // The search text always runs, so matches are marked under either
-        // policy; only FilterAndAutoExpand also hides non-matches and
-        // auto-expands ancestors.
-        let search = self
-            .options
-            .search
-            .text
-            .as_ref()
-            .map(|text| (text.as_ref(), query.as_str()));
-        flatten_tree_matching(
+        let query = self.effective_query();
+        let search = &self.options.search;
+        let text: Option<&dyn Fn(&Element) -> String> = search.text.as_deref();
+        let filter: Option<&dyn Fn(&Element, &str) -> bool> = search.filter.as_deref();
+        let has_matcher = text.is_some() || filter.is_some();
+        let spec = has_matcher.then_some(SearchSpec {
+            query: query.as_str(),
+            text,
+            filter,
+            ignore_case: search.ignore_case,
+            match_mode: search.match_mode,
+        });
+        let predicate = self.branch_predicate();
+        let mut entries = flatten_visible(
             &self.roots,
             &*self.id_of,
             &*self.children,
-            self.has_children.as_deref(),
+            predicate.as_deref(),
             &expanded,
             &keys,
-            search,
-            self.options.search.policy == TreeSearchFilterPolicy::FilterAndAutoExpand,
-        )
+            spec,
+            search.policy == TreeSearchFilterPolicy::FilterAndAutoExpand,
+            None,
+        );
+
+        if self.options.check.is_enabled {
+            let snapshot = self.check_snapshot();
+            for entry in &mut entries {
+                entry.is_checked = snapshot.checked_keys.contains(&entry.key)
+                    || snapshot.checked_ids.contains(&entry.id);
+                entry.is_half_checked = snapshot.half_checked_keys.contains(&entry.key);
+            }
+        }
+        if let Some(is_loading) = &self.options.lazy.is_loading {
+            for entry in &mut entries {
+                entry.is_loading = is_loading(&entry.element);
+            }
+        }
+        entries
     }
 
     fn selection_state(&self) -> (HashSet<Id>, HashSet<TreeNodeKey<Id>>) {
         let selection: &TreeSelection<Id> = &self.options.selection;
+        if selection.is_local {
+            if selection.local_multiple {
+                return (
+                    self.local_multi_selected.get().into_iter().collect(),
+                    HashSet::new(),
+                );
+            }
+            return (
+                self.local_selected.get().into_iter().collect(),
+                HashSet::new(),
+            );
+        }
         if let Some(keys) = &selection.keys {
             let keys: HashSet<TreeNodeKey<Id>> = keys.ids().into_iter().collect();
             let ids = keys.iter().map(|key| key.id.clone()).collect();
@@ -490,22 +753,47 @@ where
 
     /// The row actions, cloned so row closures do not borrow `self`.
     fn session_actions(&self) -> TreeActions<Element, Id> {
+        self.session_actions_with(self.entries())
+    }
+
+    /// [`Tree::session_actions`] reusing a projection the caller already
+    /// computed, so the body does not walk the tree twice.
+    fn session_actions_with(
+        &self,
+        entries: Vec<TreeEntry<Element, Id>>,
+    ) -> TreeActions<Element, Id> {
         TreeActions {
-            entries: Rc::new(RefCell::new(self.entries())),
+            entries: Rc::new(RefCell::new(entries)),
             expanded: self.local_expanded.clone(),
+            local_expanded_keys: self.local_expanded_keys.clone(),
             expanded_keys: self.options.selection.expanded_keys.clone(),
             selection: self.options.selection.clone(),
+            check: self.options.check.clone(),
+            expansion: self.options.expansion,
+            lazy: self.options.lazy.clone(),
+            edit: self.options.edit.clone(),
             anchor: self.anchor.clone(),
             cursor: self.cursor.clone(),
-            events: super::options::TreeEvents {
+            local_checked: self.local_checked.clone(),
+            local_checked_keys: self.local_checked_keys.clone(),
+            local_loaded_keys: self.local_loaded_keys.clone(),
+            local_selected: self.local_selected.clone(),
+            local_multi_selected: self.local_multi_selected.clone(),
+            scroll_request: self.scroll_request.clone(),
+            events: TreeEvents {
                 on_key_command: self.options.events.on_key_command.clone(),
                 on_select: self.options.events.on_select.clone(),
+                on_select_change: self.options.events.on_select_change.clone(),
+                on_expand_change: self.options.events.on_expand_change.clone(),
+                on_node_click: self.options.events.on_node_click.clone(),
+                on_node_context_menu: self.options.events.on_node_context_menu.clone(),
+                on_double_click: self.options.events.on_double_click.clone(),
             },
             modifiers: Rc::new(RefCell::new(*self.modifiers.borrow())),
             roots: Rc::new(self.roots.clone()),
             id_of: self.id_of.clone(),
             children: self.children.clone(),
-            has_children: self.has_children.clone(),
+            has_children: self.branch_predicate(),
             drag: self.options.drag.clone(),
             drag_source: self.drag_source.clone(),
             drag_target: self.drag_target.clone(),
@@ -547,16 +835,362 @@ where
                 visit(&kids, &next_path, id_of, children, has_children, keys);
             }
         }
+        let predicate = self.branch_predicate();
         visit(
             &self.roots,
             &[],
             &*self.id_of,
             &*self.children,
-            self.has_children.as_deref(),
+            predicate.as_deref(),
             &mut keys,
         );
         let ids: HashSet<Id> = keys.iter().map(|key| key.id.clone()).collect();
         self.set_expanded(ids, keys);
+    }
+
+    /// Programmatic filter, the equivalent of `filter(value)` in the reference
+    /// APIs. It overrides the option query until [`Tree::clear_filter`].
+    pub fn filter(&self, query: impl Into<String>) {
+        self.local_query.set(query.into());
+    }
+
+    pub fn clear_filter(&self) {
+        self.local_query.set(String::new());
+    }
+
+    pub fn get_expanded_keys(&self) -> HashSet<TreeNodeKey<Id>> {
+        self.expanded_key_snapshot()
+    }
+
+    pub fn get_expanded_ids(&self) -> HashSet<Id> {
+        self.expanded_ids()
+    }
+
+    /// The selected rows as path keys. With an ID-only selection this resolves
+    /// the visible occurrences.
+    pub fn get_selected_keys(&self) -> HashSet<TreeNodeKey<Id>> {
+        let (ids, keys) = self.selection_state();
+        if !keys.is_empty() {
+            return keys;
+        }
+        self.entries()
+            .into_iter()
+            .filter(|entry| ids.contains(&entry.id))
+            .map(|entry| entry.key)
+            .collect()
+    }
+
+    pub fn get_selected_ids(&self) -> HashSet<Id> {
+        self.selection_state().0
+    }
+
+    /// Opens one visible branch.
+    pub fn expand_key(&self, key: &TreeNodeKey<Id>) {
+        if let Some(entry) = self.entries().into_iter().find(|entry| &entry.key == key)
+            && entry.has_children
+            && !entry.is_expanded
+        {
+            self.session_actions().toggle(&entry);
+        }
+    }
+
+    /// Closes one visible branch.
+    pub fn collapse_key(&self, key: &TreeNodeKey<Id>) {
+        if let Some(entry) = self.entries().into_iter().find(|entry| &entry.key == key)
+            && entry.is_expanded
+        {
+            self.session_actions().toggle(&entry);
+        }
+    }
+
+    /// Toggles one visible branch.
+    pub fn toggle_key(&self, key: &TreeNodeKey<Id>) {
+        if let Some(entry) = self.entries().into_iter().find(|entry| &entry.key == key) {
+            self.session_actions().toggle(&entry);
+        }
+    }
+
+    pub fn get_checked_keys(&self) -> HashSet<TreeNodeKey<Id>> {
+        self.check_snapshot().checked_keys
+    }
+
+    pub fn get_half_checked_keys(&self) -> HashSet<TreeNodeKey<Id>> {
+        self.check_snapshot().half_checked_keys
+    }
+
+    pub fn get_checked_nodes(&self) -> Vec<Element> {
+        self.check_snapshot().checked_elements
+    }
+
+    /// Checked nodes with the reference API's `leafOnly` / `includeHalfChecked`
+    /// filters.
+    pub fn get_checked_nodes_filtered(
+        &self,
+        leaf_only: bool,
+        include_half_checked: bool,
+    ) -> Vec<Element> {
+        if !self.options.check.is_enabled {
+            return Vec::new();
+        }
+        let index = self.full_index();
+        let (ids, keys) = self.checked_state();
+        let snapshot = check::snapshot(&index, &ids, &keys, self.options.check.check_strictly);
+        index
+            .nodes
+            .iter()
+            .filter(|node| {
+                let checked = snapshot.checked_keys.contains(&node.key)
+                    || snapshot.checked_ids.contains(&node.id);
+                let half = snapshot.half_checked_keys.contains(&node.key);
+                (checked || (include_half_checked && half)) && (!leaf_only || node.is_leaf)
+            })
+            .map(|node| node.element.clone())
+            .collect()
+    }
+
+    pub fn get_loaded_keys(&self) -> HashSet<TreeNodeKey<Id>> {
+        self.loaded_keys()
+    }
+
+    pub fn is_expanded(&self, key: &TreeNodeKey<Id>) -> bool {
+        self.expanded_ids().contains(&key.id) || self.expanded_keys().contains(key)
+    }
+
+    pub fn is_checked(&self, key: &TreeNodeKey<Id>) -> bool {
+        let snapshot = self.check_snapshot();
+        snapshot.checked_keys.contains(key) || snapshot.checked_ids.contains(&key.id)
+    }
+
+    pub fn is_half_checked(&self, key: &TreeNodeKey<Id>) -> bool {
+        self.check_snapshot().half_checked_keys.contains(key)
+    }
+
+    /// Replaces the check state. `leaf_only` keeps only leaf keys, matching
+    /// `getCheckedKeys(leafOnly)`.
+    pub fn set_checked_keys(
+        &self,
+        keys: impl IntoIterator<Item = TreeNodeKey<Id>>,
+        leaf_only: bool,
+    ) {
+        if !self.options.check.is_enabled {
+            return;
+        }
+        let index = self.full_index();
+        let keys: HashSet<TreeNodeKey<Id>> = keys.into_iter().collect();
+        let ids: HashSet<Id> = keys.iter().map(|key| key.id.clone()).collect();
+        let (ids, keys) = check::canonical_checked(
+            &index,
+            ids,
+            keys,
+            self.options.check.check_strictly,
+            leaf_only,
+        );
+        self.set_checked_state(ids, keys);
+    }
+
+    /// Sets one node's check state. `deep` overrides the cascade for this call:
+    /// `Some(false)` is the `checkStrictly` behaviour, `None` follows options.
+    pub fn set_checked(&self, key: &TreeNodeKey<Id>, checked: bool, deep: Option<bool>) {
+        if !self.options.check.is_enabled {
+            return;
+        }
+        let index = self.full_index();
+        let Some(node) = index.node(key) else {
+            return;
+        };
+        let element = node.element.clone();
+        self.apply_checked(&index, key, &element, checked, deep);
+    }
+
+    pub fn set_checked_element(&self, element: &Element, checked: bool, deep: Option<bool>) {
+        if !self.options.check.is_enabled {
+            return;
+        }
+        let index = self.full_index();
+        let id = (self.id_of)(element);
+        let Some(node) = index.node_by_id(&id) else {
+            return;
+        };
+        let key = node.key.clone();
+        self.apply_checked(&index, &key, element, checked, deep);
+    }
+
+    fn apply_checked(
+        &self,
+        index: &TreeIndex<Element, Id>,
+        key: &TreeNodeKey<Id>,
+        element: &Element,
+        checked: bool,
+        deep: Option<bool>,
+    ) {
+        let strict = deep.unwrap_or(self.options.check.check_strictly);
+        let (ids, keys) = self.checked_state();
+        let (ids, keys) = check::toggle(index, &ids, &keys, key, checked, strict);
+        self.set_checked_state(ids, keys);
+        if let Some(on_change) = &self.options.check.on_change {
+            let (ids, keys) = self.checked_state();
+            let snapshot = check::snapshot(index, &ids, &keys, strict);
+            on_change(
+                element,
+                checked,
+                &snapshot.checked_keys,
+                &snapshot.half_checked_keys,
+            );
+        }
+    }
+
+    /// Checks every node, branches included.
+    pub fn check_all(&self) {
+        if !self.options.check.is_enabled {
+            return;
+        }
+        let index = self.full_index();
+        let ids = index.nodes.iter().map(|node| node.id.clone()).collect();
+        let keys = index.nodes.iter().map(|node| node.key.clone()).collect();
+        self.set_checked_state(ids, keys);
+    }
+
+    pub fn uncheck_all(&self) {
+        self.set_checked_state(HashSet::new(), HashSet::new());
+    }
+
+    /// The current keyboard/selection row.
+    pub fn get_current_key(&self) -> Option<TreeNodeKey<Id>> {
+        self.cursor
+            .get()
+            .or_else(|| self.get_selected_keys().into_iter().next())
+    }
+
+    pub fn get_current_node(&self) -> Option<Element> {
+        let key = self.get_current_key()?;
+        self.full_index()
+            .node(&key)
+            .map(|node| node.element.clone())
+    }
+
+    /// Moves the current row. With `auto_expand_parent` its ancestors are
+    /// revealed before the cursor moves.
+    pub fn set_current_key(&self, key: Option<TreeNodeKey<Id>>) {
+        self.cursor.set(key.clone());
+        let Some(key) = key else { return };
+        if self.options.expansion.auto_expand_parent {
+            self.expand_to(&key);
+        }
+        if self.options.selection.is_selectable
+            && let Some(entry) = self.entries().into_iter().find(|entry| entry.key == key)
+        {
+            self.select(&entry, KeyModifiers(0));
+        }
+    }
+
+    /// Root → node elements.
+    pub fn get_path(&self, key: &TreeNodeKey<Id>) -> Vec<Element> {
+        self.full_index().path(key)
+    }
+
+    /// Root → node keys.
+    pub fn get_key_path(&self, key: &TreeNodeKey<Id>) -> Vec<TreeNodeKey<Id>> {
+        let index = self.full_index();
+        let mut slot = index.by_key.get(key).copied();
+        let mut out = Vec::new();
+        while let Some(current) = slot {
+            out.push(index.nodes[current].key.clone());
+            slot = index.nodes[current].parent;
+        }
+        out.reverse();
+        out
+    }
+
+    /// Expands every ancestor of `key`, including its own branch.
+    pub fn expand_to(&self, key: &TreeNodeKey<Id>) {
+        let index = self.full_index();
+        let Some(node) = index.node(key) else { return };
+        let mut ids = self.expanded_ids();
+        let mut keys = self.expanded_keys();
+        for ancestor in index.ancestor_keys(key) {
+            keys.insert(ancestor.clone());
+            ids.insert(ancestor.id);
+        }
+        if node.children.len() > 0 {
+            keys.insert(node.key.clone());
+            ids.insert(node.id.clone());
+        }
+        self.set_expanded(ids, keys);
+    }
+
+    /// Releases the next projection at the row for `key`, expanding its path
+    /// first so a collapsed target is reachable.
+    pub fn scroll_to_key(&self, key: TreeNodeKey<Id>) {
+        self.scroll_to_key_aligned(key, TreeScrollAlign::Auto);
+    }
+
+    /// [`Tree::scroll_to_key`] with an explicit alignment.
+    pub fn scroll_to_key_aligned(&self, key: TreeNodeKey<Id>, align: TreeScrollAlign) {
+        self.expand_to(&key);
+        self.scroll_request.set(Some((key, align)));
+    }
+
+    pub fn clear_current_key(&self) {
+        self.cursor.set(None);
+    }
+
+    /// Delegated structural edits. A missing callback makes these no-ops.
+    pub fn append_at(&self, parent: Option<&TreeNodeKey<Id>>, data: Element) {
+        let index = self.full_index();
+        let parent_element = parent
+            .and_then(|key| index.node(key))
+            .map(|node| node.element.clone());
+        if let Some(callback) = &self.options.edit.on_append {
+            callback(parent_element.as_ref(), &data);
+        }
+    }
+
+    pub fn remove_key(&self, key: &TreeNodeKey<Id>) {
+        let index = self.full_index();
+        if let Some(node) = index.node(key)
+            && let Some(callback) = &self.options.edit.on_remove
+        {
+            callback(&node.element);
+        }
+    }
+
+    pub fn update_children_at(&self, key: &TreeNodeKey<Id>, children: Vec<Element>) {
+        let index = self.full_index();
+        if let Some(node) = index.node(key)
+            && let Some(callback) = &self.options.edit.on_update_children
+        {
+            callback(&node.element, children);
+        }
+    }
+
+    pub fn append(&self, data: Element, parent: Option<&Element>) {
+        if let Some(callback) = &self.options.edit.on_append {
+            callback(parent, &data);
+        }
+    }
+
+    pub fn insert_before(&self, reference: &Element, data: Element) {
+        if let Some(callback) = &self.options.edit.on_insert_before {
+            callback(reference, &data);
+        }
+    }
+
+    pub fn insert_after(&self, reference: &Element, data: Element) {
+        if let Some(callback) = &self.options.edit.on_insert_after {
+            callback(reference, &data);
+        }
+    }
+
+    pub fn remove(&self, element: &Element) {
+        if let Some(callback) = &self.options.edit.on_remove {
+            callback(element);
+        }
+    }
+
+    pub fn update_children(&self, parent: &Element, children: Vec<Element>) {
+        if let Some(callback) = &self.options.edit.on_update_children {
+            callback(parent, children);
+        }
     }
 
     /// The tree's keyboard behaviour. Returns whether the event was consumed.
@@ -602,6 +1236,9 @@ where
         let hovered = self.hovered.clone();
         let drag_source = self.drag_source.get();
         let drag_target = self.drag_target.get();
+        let cursor = self.cursor.get();
+        let actions = self.session_actions_with(entries.clone());
+        let check_enabled = self.options.check.is_enabled;
 
         let trailing_width = layout.trailing_slot_width;
         let rows: Vec<AnyView> = entries
@@ -613,16 +1250,22 @@ where
                     selected_ids.contains(&entry.id)
                 };
                 let key = entry.key.clone();
-                let id = entry.id.clone();
                 let has_next_sibling = entry.has_next_sibling;
                 let ancestor = entry.ancestor_has_next_siblings.clone();
+                let is_current = cursor.as_ref() == Some(&key);
+                let is_hovered = hovered.get().as_ref() == Some(&entry.key);
                 let content = (self.row_content)(
                     &entry.element,
                     RowState {
                         is_selected,
                         is_expanded: entry.is_expanded,
-                        is_dragging: false,
+                        is_dragging: drag_source.as_ref() == Some(&key),
                         depth: entry.depth,
+                        is_checked: entry.is_checked,
+                        is_half_checked: entry.is_half_checked,
+                        is_loading: entry.is_loading,
+                        is_current,
+                        is_leaf: entry.is_leaf,
                     },
                 );
 
@@ -634,31 +1277,75 @@ where
 
                 let on_toggle: Rc<dyn Fn()> = {
                     let entry = entry.clone();
-                    let tree = self.session_actions();
+                    let tree = actions.clone();
                     Rc::new(move || tree.toggle(&entry))
                 };
                 let on_select: Rc<dyn Fn(KeyModifiers)> = {
                     let entry = entry.clone();
-                    let tree = self.session_actions();
+                    let tree = actions.clone();
                     Rc::new(move |modifiers| tree.select(&entry, modifiers))
                 };
                 let on_move: Rc<dyn Fn(i64)> = {
                     let entry = entry.clone();
-                    let tree = self.session_actions();
+                    let tree = actions.clone();
                     Rc::new(move |delta| tree.step(&entry, delta))
                 };
                 let on_collapse: Rc<dyn Fn()> = {
                     let entry = entry.clone();
-                    let tree = self.session_actions();
+                    let tree = actions.clone();
                     Rc::new(move || tree.collapse(&entry))
                 };
                 let on_expand: Rc<dyn Fn()> = {
                     let entry = entry.clone();
-                    let tree = self.session_actions();
+                    let tree = actions.clone();
                     Rc::new(move || tree.expand(&entry))
                 };
-                let row_drag = self.options.drag.on_drop.as_ref().map(|_| {
-                    let tree = self.session_actions();
+                let on_toggle_check: Option<Rc<dyn Fn()>> = check_enabled.then(|| {
+                    let entry = entry.clone();
+                    let tree = actions.clone();
+                    let toggle: Rc<dyn Fn()> = Rc::new(move || tree.toggle_checked(&entry));
+                    toggle
+                });
+                let on_node_click: Option<Rc<dyn Fn(KeyModifiers)>> =
+                    self.options.events.on_node_click.as_ref().map(|handler| {
+                        let handler = handler.clone();
+                        let element = entry.element.clone();
+                        let closure: Rc<dyn Fn(KeyModifiers)> =
+                            Rc::new(move |modifiers: KeyModifiers| handler(&element, modifiers));
+                        closure
+                    });
+                let on_context_menu: Option<Rc<dyn Fn(Point)>> = self
+                    .options
+                    .events
+                    .on_node_context_menu
+                    .as_ref()
+                    .map(|handler| {
+                        let handler = handler.clone();
+                        let element = entry.element.clone();
+                        let closure: Rc<dyn Fn(Point)> =
+                            Rc::new(move |point: Point| handler(&element, point));
+                        closure
+                    });
+                let on_double_click: Option<Rc<dyn Fn()>> =
+                    self.options.events.on_double_click.as_ref().map(|handler| {
+                        let handler = handler.clone();
+                        let element = entry.element.clone();
+                        let closure: Rc<dyn Fn()> = Rc::new(move || handler(&element));
+                        closure
+                    });
+                let drag_enabled = self.options.drag.is_enabled
+                    && (self.options.drag.on_drop.is_some()
+                        || self.options.drag.on_drag_start.is_some()
+                        || self.options.drag.on_drag_enter.is_some()
+                        || self.options.drag.on_drag_end.is_some());
+                let can_drag = self
+                    .options
+                    .drag
+                    .can_drag
+                    .as_ref()
+                    .is_none_or(|allowed| allowed(&entry.element));
+                let row_drag = (drag_enabled && can_drag).then(|| {
+                    let tree = actions.clone();
                     let registry = self.drag_registry.clone();
                     let entry = entry.clone();
                     TreeRowDrag {
@@ -668,9 +1355,9 @@ where
                             Rc::new(move |node: &Node| registry.register(node, key.clone()))
                         },
                         on_start: {
-                            let key = key.clone();
+                            let entry = entry.clone();
                             let tree = tree.clone();
-                            Rc::new(move || tree.drag_source.set(Some(key.clone())))
+                            Rc::new(move || tree.drag_start(&entry))
                         },
                         on_move: {
                             let key = key.clone();
@@ -686,6 +1373,7 @@ where
                 });
                 let on_hover: Rc<dyn Fn(bool)> = {
                     let hovered = hovered.clone();
+                    let key = key.clone();
                     Rc::new(move |entered| {
                         if entered {
                             hovered.set(Some(key.clone()));
@@ -702,7 +1390,7 @@ where
                                 is_selected,
                                 entry.is_expanded,
                                 entry.is_search_hit,
-                                hovered.get().as_ref() == Some(&entry.key),
+                                is_hovered,
                                 entry.depth,
                             ))
                             .padding_edges(4.0, 0.0)
@@ -711,7 +1399,37 @@ where
                         .clipped(),
                     ))
                 });
-                let _ = id;
+                let icon: Option<AnyView> = self.options.slots.icon.as_ref().map(|slot| {
+                    AnyView::new(slot(&entry.element).frame_size(16.0, layout.row_height))
+                });
+
+                let checkbox: Option<AnyView> = check_enabled.then(|| {
+                    let state = if entry.is_checked {
+                        CheckboxState::On
+                    } else if entry.is_half_checked {
+                        CheckboxState::Mixed
+                    } else {
+                        CheckboxState::Off
+                    };
+                    let tree = actions.clone();
+                    let entry = entry.clone();
+                    let key = key.clone();
+                    let binding = Binding::new(
+                        move || state,
+                        move |value: CheckboxState| {
+                            tree.apply_checked(
+                                &key,
+                                &entry.element,
+                                value == CheckboxState::On,
+                                None,
+                            );
+                        },
+                    );
+                    AnyView::new(
+                        AnyView::new(Checkbox::new(binding).enabled(is_enabled))
+                            .frame_size(16.0, 16.0),
+                    )
+                });
 
                 AnyView::new(TreeRow {
                     is_enabled,
@@ -719,7 +1437,12 @@ where
                     is_expanded: entry.is_expanded,
                     is_search_hit: entry.is_search_hit,
                     is_selected,
-                    is_hovered: hovered.get().as_ref() == Some(&entry.key),
+                    is_hovered,
+                    is_checked: entry.is_checked,
+                    is_half_checked: entry.is_half_checked,
+                    is_loading: entry.is_loading,
+                    is_current,
+                    width_filling: layout.block_node,
                     depth: entry.depth,
                     row_height: layout.row_height,
                     indentation: layout.indentation,
@@ -730,52 +1453,103 @@ where
                     drop_position,
                     is_drag_source,
                     content,
-                    trailing_slot: trailing.clone(),
+                    checkbox,
+                    icon,
+                    disclosure_slot: self.options.slots.disclosure.clone(),
+                    trailing_slot: trailing,
                     drag: row_drag,
                     on_toggle,
                     on_select,
                     on_move,
                     on_collapse,
                     on_expand,
+                    on_toggle_check,
                     on_hover,
+                    on_node_click,
+                    on_context_menu,
+                    on_double_click,
                 })
             })
             .collect();
 
-        let ids: Vec<TreeNodeKey<Id>> = entries.iter().map(|entry| entry.key.clone()).collect();
-        let scroll_to = entries.iter().position(|entry| {
-            if uses_key_selection {
-                selected_keys.contains(&entry.key)
-            } else {
-                selected_ids.contains(&entry.id)
-            }
-        });
+        let keys: Vec<TreeNodeKey<Id>> = entries.iter().map(|entry| entry.key.clone()).collect();
+        let scroll_request = self.scroll_request.get();
+        let scroll_to = scroll_request
+            .as_ref()
+            .and_then(|(key, _)| entries.iter().position(|entry| &entry.key == key))
+            .or_else(|| {
+                entries.iter().position(|entry| {
+                    if uses_key_selection {
+                        selected_keys.contains(&entry.key)
+                    } else {
+                        selected_ids.contains(&entry.id)
+                    }
+                })
+            });
+        let scroll_align = scroll_request
+            .as_ref()
+            .map(|(_, align)| *align)
+            .unwrap_or_default();
 
-        let mut stack = FixedVirtualStack::new(ids, layout.row_height, {
-            let rows = rows.clone();
-            let entries = entries.clone();
-            move |key: &TreeNodeKey<Id>| {
-                entries
-                    .iter()
-                    .position(|entry| &entry.key == key)
-                    .and_then(|index| rows.get(index).cloned())
-                    .map(AnyView::new)
-                    .unwrap_or_else(|| AnyView::new(crate::EmptyView))
+        let tree = if layout.virtual_scroll {
+            let mut stack = FixedVirtualStack::new(keys, layout.row_height, {
+                let rows = rows.clone();
+                let entries = entries.clone();
+                move |key: &TreeNodeKey<Id>| {
+                    entries
+                        .iter()
+                        .position(|entry| &entry.key == key)
+                        .and_then(|index| rows.get(index).cloned())
+                        .map(AnyView::new)
+                        .unwrap_or_else(|| AnyView::new(crate::EmptyView))
+                }
+            })
+            .spacing(layout.row_spacing);
+            if let Some(index) = scroll_to {
+                stack = stack.scroll_to_index_aligned(index, virtual_align(scroll_align));
             }
-        })
-        .spacing(layout.row_spacing);
-        if let Some(index) = scroll_to {
-            stack = stack.scroll_to_index(index);
-        }
-
-        let tree = AnyView::new(
-            AnyView::new(stack)
-                .frame(None, None, Some(0.0), Some(0.0), None, None)
-                .flex_with(1.0, 1.0, Some(0.0)),
-        );
+            AnyView::new(
+                AnyView::new(stack)
+                    .frame(None, None, Some(0.0), Some(0.0), None, None)
+                    .flex_with(1.0, 1.0, Some(0.0)),
+            )
+        } else {
+            let content = AnyView::new(
+                AnyView::new(BoxView::new(
+                    FlexDirection::Column,
+                    Align::Stretch,
+                    Justify::FlexStart,
+                    Wrap::NoWrap,
+                    layout.row_spacing,
+                    AnyView::new(TupleView::new(rows.clone())),
+                ))
+                .frame(None, None, Some(0.0), None, None, None),
+            );
+            let mut scroll = crate::primitives::layout::ScrollView::new(
+                crate::primitives::layout::ScrollAxis::Vertical,
+                content,
+            );
+            if let Some(index) = scroll_to {
+                let stride = layout.row_height + layout.row_spacing;
+                let top = index as f32 * stride;
+                let offset = match scroll_align {
+                    TreeScrollAlign::End => top + layout.row_height,
+                    _ => top,
+                };
+                scroll = scroll.scroll_request(crate::primitives::layout::ScrollRequest::new(
+                    Point::new(0.0, offset),
+                    0.0,
+                ));
+            }
+            AnyView::new(
+                AnyView::new(scroll)
+                    .frame(None, None, Some(0.0), Some(0.0), None, None)
+                    .flex_with(1.0, 1.0, Some(0.0)),
+            )
+        };
 
         let host = SelectionKeyHost::new(tree, is_enabled, {
-            let actions = self.session_actions();
+            let actions = actions.clone();
             move |event: &KeyEvent| actions.handle_key(event)
         });
 
@@ -790,6 +1564,15 @@ where
     fn dynamic_properties(&self) -> Vec<crate::DynamicField> {
         vec![
             crate::DynamicField::state("expansion", &self.local_expanded),
+            crate::DynamicField::state("expansionKeys", &self.local_expanded_keys),
+            crate::DynamicField::state("checked", &self.local_checked),
+            crate::DynamicField::state("checkedKeys", &self.local_checked_keys),
+            crate::DynamicField::state("loadedKeys", &self.local_loaded_keys),
+            crate::DynamicField::state("filter", &self.local_query),
+            crate::DynamicField::state("selected", &self.local_selected),
+            crate::DynamicField::state("multiSelected", &self.local_multi_selected),
+            crate::DynamicField::state("cursor", &self.cursor),
+            crate::DynamicField::state("scrollRequest", &self.scroll_request),
             crate::DynamicField::state("dragSource", &self.drag_source),
             crate::DynamicField::state("dragTarget", &self.drag_target),
         ]
@@ -805,17 +1588,28 @@ where
 {
     entries: Rc<RefCell<Vec<TreeEntry<Element, Id>>>>,
     expanded: State<HashSet<Id>>,
+    local_expanded_keys: State<HashSet<TreeNodeKey<Id>>>,
     expanded_keys: Option<Binding<HashSet<TreeNodeKey<Id>>>>,
     selection: TreeSelection<Id>,
+    check: TreeCheck<Element, Id>,
+    expansion: TreeExpansion,
+    lazy: TreeLazy<Element, Id>,
+    edit: TreeEdit<Element>,
     anchor: State<Option<TreeNodeKey<Id>>>,
     cursor: State<Option<TreeNodeKey<Id>>>,
-    events: super::options::TreeEvents<Element, Id>,
+    local_checked: State<HashSet<Id>>,
+    local_checked_keys: State<HashSet<TreeNodeKey<Id>>>,
+    local_loaded_keys: State<HashSet<TreeNodeKey<Id>>>,
+    local_selected: State<Option<Id>>,
+    local_multi_selected: State<BTreeSet<Id>>,
+    scroll_request: State<Option<(TreeNodeKey<Id>, TreeScrollAlign)>>,
+    events: TreeEvents<Element, Id>,
     modifiers: Rc<RefCell<KeyModifiers>>,
     roots: Rc<Vec<Element>>,
     id_of: Rc<dyn Fn(&Element) -> Id>,
     children: Rc<dyn Fn(&Element) -> Vec<Element>>,
     has_children: Option<Rc<dyn Fn(&Element) -> bool>>,
-    drag: super::options::TreeDragOperations<Element>,
+    drag: TreeDragOperations<Element>,
     drag_source: State<Option<TreeNodeKey<Id>>>,
     drag_target: State<Option<(TreeNodeKey<Id>, TreeDropPosition)>>,
 }
@@ -829,13 +1623,29 @@ where
         Self {
             entries: self.entries.clone(),
             expanded: self.expanded.clone(),
+            local_expanded_keys: self.local_expanded_keys.clone(),
             expanded_keys: self.expanded_keys.clone(),
             selection: self.selection.clone(),
+            check: self.check.clone(),
+            expansion: self.expansion,
+            lazy: self.lazy.clone(),
+            edit: self.edit.clone(),
             anchor: self.anchor.clone(),
             cursor: self.cursor.clone(),
-            events: super::options::TreeEvents {
+            local_checked: self.local_checked.clone(),
+            local_checked_keys: self.local_checked_keys.clone(),
+            local_loaded_keys: self.local_loaded_keys.clone(),
+            local_selected: self.local_selected.clone(),
+            local_multi_selected: self.local_multi_selected.clone(),
+            scroll_request: self.scroll_request.clone(),
+            events: TreeEvents {
                 on_key_command: self.events.on_key_command.clone(),
                 on_select: self.events.on_select.clone(),
+                on_select_change: self.events.on_select_change.clone(),
+                on_expand_change: self.events.on_expand_change.clone(),
+                on_node_click: self.events.on_node_click.clone(),
+                on_node_context_menu: self.events.on_node_context_menu.clone(),
+                on_double_click: self.events.on_double_click.clone(),
             },
             modifiers: self.modifiers.clone(),
             roots: self.roots.clone(),
@@ -854,28 +1664,200 @@ where
     Element: Clone + 'static,
     Id: CollectionId,
 {
-    fn toggle(&self, entry: &TreeEntry<Element, Id>) {
-        if let Some(binding) = &self.selection.expanded_keys {
-            let mut next = binding.get();
-            if !next.remove(&entry.key) {
-                next.insert(entry.key.clone());
-            }
-            binding.set(next.clone());
-            if let Some(expanded) = &self.selection.expanded {
-                expanded.set(next.iter().map(|key| key.id.clone()).collect());
-            }
-            return;
-        }
-        let mut next = match &self.selection.expanded {
+    fn index(&self) -> TreeIndex<Element, Id> {
+        TreeIndex::build(
+            &self.roots,
+            &*self.id_of,
+            &*self.children,
+            self.has_children.as_deref(),
+        )
+    }
+
+    fn expanded_ids(&self) -> HashSet<Id> {
+        match &self.selection.expanded {
             Some(binding) => binding.get(),
             None => self.expanded.get(),
-        };
-        if !next.remove(&entry.id) {
-            next.insert(entry.id.clone());
         }
-        match &self.selection.expanded {
-            Some(binding) => binding.set(next),
-            None => self.expanded.set(next),
+    }
+
+    fn expanded_keys(&self) -> HashSet<TreeNodeKey<Id>> {
+        match &self.selection.expanded_keys {
+            Some(binding) => binding.get(),
+            None => self.local_expanded_keys.get(),
+        }
+    }
+
+    fn expanded_snapshot(&self) -> HashSet<TreeNodeKey<Id>> {
+        let mut keys = self.expanded_keys();
+        let ids = self.expanded_ids();
+        if ids.is_empty() {
+            return keys;
+        }
+        for node in &self.index().nodes {
+            if ids.contains(&node.id) {
+                keys.insert(node.key.clone());
+            }
+        }
+        keys
+    }
+
+    fn set_expanded(&self, ids: HashSet<Id>, keys: HashSet<TreeNodeKey<Id>>) {
+        let use_local = self.selection.expanded.is_none() && self.selection.expanded_keys.is_none();
+        if let Some(binding) = &self.selection.expanded_keys {
+            binding.set(keys.clone());
+        } else if use_local {
+            self.local_expanded_keys.set(keys);
+        }
+        if let Some(binding) = &self.selection.expanded {
+            binding.set(ids.clone());
+        } else if use_local {
+            self.expanded.set(ids);
+        }
+    }
+
+    fn checked_state(&self) -> (HashSet<Id>, HashSet<TreeNodeKey<Id>>) {
+        if let Some(binding) = &self.check.checked_keys {
+            let keys = binding.get();
+            let ids = keys.iter().map(|key| key.id.clone()).collect();
+            return (ids, keys);
+        }
+        if let Some(binding) = &self.check.checked {
+            return (binding.get(), HashSet::new());
+        }
+        (self.local_checked.get(), self.local_checked_keys.get())
+    }
+
+    fn set_checked_state(&self, ids: HashSet<Id>, keys: HashSet<TreeNodeKey<Id>>) {
+        if let Some(binding) = &self.check.checked_keys {
+            binding.set(keys.clone());
+        } else {
+            self.local_checked_keys.set(keys);
+        }
+        if let Some(binding) = &self.check.checked {
+            binding.set(ids);
+        } else {
+            self.local_checked.set(ids);
+        }
+    }
+
+    fn allow_multiple(&self) -> bool {
+        if self.selection.is_local {
+            return self.selection.local_multiple;
+        }
+        self.selection.ids.allows_multiple()
+            || self
+                .selection
+                .keys
+                .as_ref()
+                .is_some_and(|keys| keys.allows_multiple())
+    }
+
+    fn selected_key_snapshot(&self) -> HashSet<TreeNodeKey<Id>> {
+        let entries = self.entries.borrow();
+        if let Some(keys) = &self.selection.keys {
+            return keys.ids().into_iter().collect();
+        }
+        if self.selection.is_local {
+            if self.selection.local_multiple {
+                let ids = self.local_multi_selected.get();
+                return entries
+                    .iter()
+                    .filter(|entry| ids.contains(&entry.id))
+                    .map(|entry| entry.key.clone())
+                    .collect();
+            }
+            let selected = self.local_selected.get();
+            return entries
+                .iter()
+                .filter(|entry| Some(&entry.id) == selected.as_ref())
+                .map(|entry| entry.key.clone())
+                .collect();
+        }
+        let ids = self.selection.ids.ids();
+        entries
+            .iter()
+            .filter(|entry| ids.contains(&entry.id))
+            .map(|entry| entry.key.clone())
+            .collect()
+    }
+
+    fn toggle(&self, entry: &TreeEntry<Element, Id>) {
+        let expanding = !entry.is_expanded;
+        let mut ids = self.expanded_ids();
+        let mut keys = self.expanded_keys();
+        if expanding {
+            if self.expansion.accordion {
+                let siblings: Vec<TreeNodeKey<Id>> = self
+                    .entries
+                    .borrow()
+                    .iter()
+                    .filter(|other| {
+                        other.key != entry.key
+                            && other.parent_key == entry.parent_key
+                            && other.is_expanded
+                    })
+                    .map(|other| other.key.clone())
+                    .collect();
+                for sibling in siblings {
+                    ids.remove(&sibling.id);
+                    keys.remove(&sibling);
+                }
+            }
+            if self.expansion.auto_expand_parent {
+                let mut ancestor = entry.parent_key.clone();
+                while let Some(key) = ancestor {
+                    keys.insert(key.clone());
+                    ids.insert(key.id.clone());
+                    ancestor = self
+                        .entries
+                        .borrow()
+                        .iter()
+                        .find(|other| other.key == key)
+                        .and_then(|other| other.parent_key.clone());
+                }
+            }
+            ids.insert(entry.id.clone());
+            keys.insert(entry.key.clone());
+        } else {
+            ids.remove(&entry.id);
+            keys.remove(&entry.key);
+        }
+        self.set_expanded(ids, keys);
+        if let Some(handler) = &self.events.on_expand_change {
+            handler(&entry.element, expanding, &self.expanded_snapshot());
+        }
+        if expanding {
+            self.load_if_needed(entry);
+        }
+    }
+
+    fn load_if_needed(&self, entry: &TreeEntry<Element, Id>) {
+        if !self.lazy.is_enabled || !entry.has_children {
+            return;
+        }
+        let already_loaded = match &self.lazy.loaded_keys {
+            Some(binding) => binding.get().contains(&entry.key),
+            None => self.local_loaded_keys.get().contains(&entry.key),
+        };
+        if already_loaded {
+            return;
+        }
+        if let Some(load) = &self.lazy.load_data {
+            load(&entry.element);
+        }
+        match &self.lazy.loaded_keys {
+            Some(binding) => {
+                let mut next = binding.get();
+                if next.insert(entry.key.clone()) {
+                    binding.set(next);
+                }
+            }
+            None => {
+                let mut next = self.local_loaded_keys.get();
+                if next.insert(entry.key.clone()) {
+                    self.local_loaded_keys.set(next);
+                }
+            }
         }
     }
 
@@ -920,57 +1902,106 @@ where
         self.set_expanded(ids, keys);
     }
 
-    fn set_expanded(&self, ids: HashSet<Id>, keys: HashSet<TreeNodeKey<Id>>) {
-        if let Some(binding) = &self.selection.expanded_keys {
-            binding.set(keys.clone());
-        }
-        if let Some(binding) = &self.selection.expanded {
-            binding.set(ids.clone());
-        } else if self.selection.expanded_keys.is_none() {
-            self.expanded.set(ids);
-        }
-    }
-
-    fn allows_multiple(&self) -> bool {
-        self.selection.ids.allows_multiple()
-            || self
-                .selection
-                .keys
-                .as_ref()
-                .is_some_and(|keys| keys.allows_multiple())
-    }
-
     fn select(&self, entry: &TreeEntry<Element, Id>, modifiers: KeyModifiers) {
         *self.modifiers.borrow_mut() = modifiers;
-        let multiple = self.allows_multiple();
-        let ids = &self.selection.ids;
-        let keys = self.selection.keys.as_ref();
-        if multiple && modifiers.has_shift() {
-            let anchor = self.anchor.get().unwrap_or_else(|| entry.key.clone());
-            let mut range = keys_between(&anchor, &entry.key, &self.entries.borrow());
-            if range.is_empty() {
-                range.insert(entry.key.clone());
+        if !self.selection.is_selectable {
+            self.cursor.set(Some(entry.key.clone()));
+            return;
+        }
+        let multiple = self.allow_multiple();
+        if self.selection.is_local {
+            if multiple && modifiers.has_shift() {
+                let anchor = self.anchor.get().unwrap_or_else(|| entry.key.clone());
+                let range = keys_between(&anchor, &entry.key, &self.entries.borrow());
+                if self.selection.local_multiple {
+                    let ids: BTreeSet<Id> = range.iter().map(|key| key.id.clone()).collect();
+                    self.local_multi_selected.set(ids);
+                }
+            } else if multiple && (modifiers.has_gui() || modifiers.has_ctrl()) {
+                let id = entry.id.clone();
+                if self.selection.local_multiple {
+                    let mut next = self.local_multi_selected.get();
+                    if !next.remove(&id) {
+                        next.insert(id);
+                    }
+                    self.local_multi_selected.set(next);
+                }
+                self.anchor.set(Some(entry.key.clone()));
+            } else if self.selection.local_multiple {
+                self.local_multi_selected
+                    .set([entry.id.clone()].into_iter().collect());
+                self.anchor.set(Some(entry.key.clone()));
+            } else {
+                self.local_selected.set(Some(entry.id.clone()));
+                self.anchor.set(Some(entry.key.clone()));
             }
-            ids.replace(range.iter().map(|key| key.id.clone()));
-            if let Some(keys) = keys {
-                keys.replace(range);
-            }
-        } else if multiple && (modifiers.has_gui() || modifiers.has_ctrl()) {
-            ids.toggle(entry.id.clone());
-            if let Some(keys) = keys {
-                keys.toggle(entry.key.clone());
-            }
-            self.anchor.set(Some(entry.key.clone()));
         } else {
-            ids.replace([entry.id.clone()]);
-            if let Some(keys) = keys {
-                keys.replace([entry.key.clone()]);
+            let ids = &self.selection.ids;
+            let keys = self.selection.keys.as_ref();
+            if multiple && modifiers.has_shift() {
+                let anchor = self.anchor.get().unwrap_or_else(|| entry.key.clone());
+                let mut range = keys_between(&anchor, &entry.key, &self.entries.borrow());
+                if range.is_empty() {
+                    range.insert(entry.key.clone());
+                }
+                ids.replace(range.iter().map(|key| key.id.clone()));
+                if let Some(keys) = keys {
+                    keys.replace(range);
+                }
+            } else if multiple && (modifiers.has_gui() || modifiers.has_ctrl()) {
+                ids.toggle(entry.id.clone());
+                if let Some(keys) = keys {
+                    keys.toggle(entry.key.clone());
+                }
+                self.anchor.set(Some(entry.key.clone()));
+            } else {
+                ids.replace([entry.id.clone()]);
+                if let Some(keys) = keys {
+                    keys.replace([entry.key.clone()]);
+                }
+                self.anchor.set(Some(entry.key.clone()));
             }
-            self.anchor.set(Some(entry.key.clone()));
         }
         self.cursor.set(Some(entry.key.clone()));
         if let Some(handler) = &self.events.on_select {
             handler(entry.element.clone());
+        }
+        if let Some(handler) = &self.events.on_select_change {
+            let selected = self.selected_key_snapshot();
+            handler(&entry.element, true, &selected);
+        }
+    }
+
+    fn toggle_checked(&self, entry: &TreeEntry<Element, Id>) {
+        if !self.check.is_enabled {
+            return;
+        }
+        let (ids, keys) = self.checked_state();
+        let checked = !(keys.contains(&entry.key) || ids.contains(&entry.id));
+        self.apply_checked(&entry.key, &entry.element, checked, None);
+    }
+
+    fn apply_checked(
+        &self,
+        key: &TreeNodeKey<Id>,
+        element: &Element,
+        checked: bool,
+        deep: Option<bool>,
+    ) {
+        let index = self.index();
+        let strict = deep.unwrap_or(self.check.check_strictly);
+        let (ids, keys) = self.checked_state();
+        let (ids, keys) = check::toggle(&index, &ids, &keys, key, checked, strict);
+        self.set_checked_state(ids, keys);
+        if let Some(handler) = &self.check.on_change {
+            let (ids, keys) = self.checked_state();
+            let snapshot = check::snapshot(&index, &ids, &keys, strict);
+            handler(
+                element,
+                checked,
+                &snapshot.checked_keys,
+                &snapshot.half_checked_keys,
+            );
         }
     }
 
@@ -983,6 +2014,7 @@ where
         y: f32,
         registry: &TreeDragRegistry<Id>,
     ) {
+        let previous = self.drag_target.get();
         let target = registry.hit(Point::new(x, y));
         let entries = self.entries.borrow();
         let source_entry = entries.iter().find(|entry| &entry.key == source).cloned();
@@ -990,8 +2022,17 @@ where
             .as_ref()
             .and_then(|(key, _)| entries.iter().find(|entry| &entry.key == key).cloned());
         drop(entries);
-        let (Some(source_entry), Some((target_key, frame))) = (source_entry, target) else {
+        let Some(source_entry) = source_entry else {
             self.drag_target.set(None);
+            return;
+        };
+        let Some((target_key, frame)) = target else {
+            self.drag_target.set(None);
+            if previous.is_some()
+                && let Some(handler) = &self.drag.on_drag_leave
+            {
+                handler(&source_entry.element);
+            }
             return;
         };
         let Some(target_entry) = target_entry else {
@@ -1009,7 +2050,19 @@ where
             self.drag_target.set(None);
             return;
         }
+        if previous.as_ref().is_some_and(|(key, _)| key != &target_key)
+            && let Some(handler) = &self.drag.on_drag_enter
+        {
+            handler(&source_entry.element, &target_entry.element, position);
+        }
         self.drag_target.set(Some((target_key, position)));
+    }
+
+    fn drag_start(&self, entry: &TreeEntry<Element, Id>) {
+        self.drag_source.set(Some(entry.key.clone()));
+        if let Some(handler) = &self.drag.on_drag_start {
+            handler(&entry.element);
+        }
     }
 
     /// Reports the drop for the current target, then clears the session. A
@@ -1018,24 +2071,29 @@ where
         let target = self.drag_target.get();
         self.drag_source.set(None);
         self.drag_target.set(None);
-        let Some((target_key, position)) = target else {
-            return;
-        };
-        let entries = self.entries.borrow();
-        let target_entry = entries
-            .iter()
-            .find(|entry| entry.key == target_key)
-            .cloned();
-        drop(entries);
-        let Some(target_entry) = target_entry else {
-            return;
-        };
-        if let Some(on_drop) = &self.drag.on_drop {
-            on_drop(
-                source.element.clone(),
-                target_entry.element.clone(),
-                position,
-            );
+        if let Some((target_key, position)) = target {
+            let entries = self.entries.borrow();
+            let target_entry = entries
+                .iter()
+                .find(|entry| entry.key == target_key)
+                .cloned();
+            drop(entries);
+            if let Some(target_entry) = target_entry {
+                if let Some(on_drop) = &self.drag.on_drop {
+                    on_drop(
+                        source.element.clone(),
+                        target_entry.element.clone(),
+                        position,
+                    );
+                }
+                if let Some(handler) = &self.drag.on_drag_end {
+                    handler(&source.element, Some(&target_entry.element));
+                }
+                return;
+            }
+        }
+        if let Some(handler) = &self.drag.on_drag_end {
+            handler(&source.element, None);
         }
     }
 
@@ -1091,6 +2149,41 @@ where
         }
     }
 
+    fn current_entry(&self, entries: &[TreeEntry<Element, Id>]) -> Option<TreeEntry<Element, Id>> {
+        let by_cursor = self
+            .cursor
+            .get()
+            .and_then(|key| entries.iter().find(|entry| entry.key == key).cloned());
+        let by_selection = {
+            if self.selection.is_local {
+                let first_id = if self.selection.local_multiple {
+                    self.local_multi_selected.get().into_iter().next()
+                } else {
+                    self.local_selected.get()
+                };
+                first_id.and_then(|id| entries.iter().find(|entry| entry.id == id).cloned())
+            } else {
+                self.selection
+                    .keys
+                    .as_ref()
+                    .and_then(|keys| keys.first())
+                    .and_then(|key| entries.iter().find(|entry| entry.key == key).cloned())
+                    .or_else(|| {
+                        self.selection
+                            .ids
+                            .first()
+                            .and_then(|id| entries.iter().find(|entry| entry.id == id).cloned())
+                    })
+            }
+        };
+        if self.allow_multiple() {
+            by_cursor.or(by_selection)
+        } else {
+            by_selection.or(by_cursor)
+        }
+        .or_else(|| entries.first().cloned())
+    }
+
     fn handle_key(&self, event: &KeyEvent) -> bool {
         let entries = self.entries.borrow().clone();
         if entries.is_empty() {
@@ -1111,31 +2204,9 @@ where
                 _ => {}
             }
         }
-        // Single selection follows the binding, so an outside write moves the
-        // keyboard too.
-        let by_cursor = self
-            .cursor
-            .get()
-            .and_then(|key| entries.iter().find(|entry| entry.key == key).cloned());
-        let by_selection = self
-            .selection
-            .keys
-            .as_ref()
-            .and_then(|keys| keys.first())
-            .and_then(|key| entries.iter().find(|entry| entry.key == key).cloned())
-            .or_else(|| {
-                self.selection
-                    .ids
-                    .first()
-                    .and_then(|id| entries.iter().find(|entry| entry.id == id).cloned())
-            });
-        let current = if self.allows_multiple() {
-            by_cursor.or(by_selection)
-        } else {
-            by_selection.or(by_cursor)
-        }
-        .or_else(|| entries.first().cloned());
-        let Some(current) = current else { return false };
+        let Some(current) = self.current_entry(&entries) else {
+            return false;
+        };
         *self.modifiers.borrow_mut() = event.modifiers;
 
         match event.scancode {
@@ -1181,12 +2252,25 @@ where
                 }
                 true
             }
+            Scancode::SPACE if self.check.is_enabled => {
+                self.toggle_checked(&current);
+                true
+            }
             Scancode::RETURN | Scancode::KEYPAD_ENTER | Scancode::SPACE => {
                 self.select(&current, event.modifiers);
                 true
             }
             _ => false,
         }
+    }
+}
+
+fn virtual_align(align: TreeScrollAlign) -> VirtualScrollAlign {
+    match align {
+        TreeScrollAlign::Auto => VirtualScrollAlign::Auto,
+        TreeScrollAlign::Start => VirtualScrollAlign::Start,
+        TreeScrollAlign::Center => VirtualScrollAlign::Center,
+        TreeScrollAlign::End => VirtualScrollAlign::End,
     }
 }
 
@@ -1216,6 +2300,11 @@ struct TreeRow {
     is_search_hit: bool,
     is_selected: bool,
     is_hovered: bool,
+    is_checked: bool,
+    is_half_checked: bool,
+    is_loading: bool,
+    is_current: bool,
+    width_filling: bool,
     depth: usize,
     row_height: f32,
     indentation: f32,
@@ -1226,6 +2315,9 @@ struct TreeRow {
     drop_position: Option<TreeDropPosition>,
     is_drag_source: bool,
     content: AnyView,
+    checkbox: Option<AnyView>,
+    icon: Option<AnyView>,
+    disclosure_slot: Option<Rc<dyn Fn(bool) -> AnyView>>,
     trailing_slot: Option<AnyView>,
     /// The armed drag surface, `None` when `on_drop` is unset.
     drag: Option<TreeRowDrag>,
@@ -1234,7 +2326,11 @@ struct TreeRow {
     on_move: Rc<dyn Fn(i64)>,
     on_collapse: Rc<dyn Fn()>,
     on_expand: Rc<dyn Fn()>,
+    on_toggle_check: Option<Rc<dyn Fn()>>,
     on_hover: Rc<dyn Fn(bool)>,
+    on_node_click: Option<Rc<dyn Fn(KeyModifiers)>>,
+    on_context_menu: Option<Rc<dyn Fn(Point)>>,
+    on_double_click: Option<Rc<dyn Fn()>>,
 }
 
 impl PrimitiveView for TreeRow {
@@ -1294,9 +2390,20 @@ impl PrimitiveView for TreeRow {
         }
         node.set_accessibility(Some(AccessibilitySemantics {
             role: AccessibilityRole::TreeItem,
+            value: if self.checkbox.is_some() {
+                if self.is_half_checked {
+                    "mixed".to_string()
+                } else if self.is_checked {
+                    "checked".to_string()
+                } else {
+                    "unchecked".to_string()
+                }
+            } else {
+                String::new()
+            },
             state: cove_core::scene::AccessibilityState {
                 is_enabled: self.is_enabled,
-                is_selected: self.is_selected,
+                is_selected: self.is_selected || self.is_checked,
                 is_expanded: self.has_children.then_some(self.is_expanded),
                 ..Default::default()
             },
@@ -1314,12 +2421,17 @@ impl PrimitiveView for TreeRow {
         let paint_node = node.clone();
         let is_selected = self.is_selected;
         let is_search_hit = self.is_search_hit;
+        let is_current = self.is_current;
         let paint: Rc<dyn Fn()> = Rc::new(move || {
             let hovered = paint_node.attachment::<bool>(HOVERED) == Some(true);
             let theme = theme_for_node(&paint_node);
             paint_node.set_corner_radius(theme.radius.sm);
-            paint_node.set_background_color(Some(if hovered && !is_selected && !is_search_hit {
+            paint_node.set_background_color(Some(if is_selected || is_search_hit {
+                Color::CLEAR
+            } else if hovered {
                 theme.colors.state_layer_hover
+            } else if is_current {
+                theme.colors.state_layer_selected.multiplied_alpha(0.45)
             } else {
                 Color::CLEAR
             }));
@@ -1366,6 +2478,9 @@ impl PrimitiveView for TreeRow {
         let pointer_select = self.on_select.clone();
         let pointer_node = node.clone();
         let pointer_drag = self.drag.clone();
+        let pointer_click = self.on_node_click.clone();
+        let pointer_context = self.on_context_menu.clone();
+        let pointer_double = self.on_double_click.clone();
         registry.set_pointer(
             node,
             InputHandlerRoute::control(),
@@ -1373,7 +2488,19 @@ impl PrimitiveView for TreeRow {
                 move |event: &cove_platform::MouseButtonEvent,
                       phase: PointerPhase,
                       delivery: EventPhase| {
-                    if delivery == EventPhase::Capture || event.button != MouseButton::Left {
+                    if delivery == EventPhase::Capture {
+                        return EventResult::Ignored;
+                    }
+                    if event.button == MouseButton::Right {
+                        if phase == PointerPhase::Up
+                            && let Some(context) = &pointer_context
+                        {
+                            context(Point::new(event.x, event.y));
+                            return EventResult::Handled;
+                        }
+                        return EventResult::Ignored;
+                    }
+                    if event.button != MouseButton::Left {
                         return EventResult::Ignored;
                     }
                     match phase {
@@ -1412,6 +2539,14 @@ impl PrimitiveView for TreeRow {
                             }
                             if was {
                                 pointer_select(event.modifiers);
+                                if let Some(click) = &pointer_click {
+                                    click(event.modifiers);
+                                }
+                                if event.clicks >= 2
+                                    && let Some(double) = &pointer_double
+                                {
+                                    double();
+                                }
                                 return EventResult::Handled;
                             }
                             EventResult::Ignored
@@ -1511,58 +2646,84 @@ impl PrimitiveView for TreeRow {
             is_search_hit: self.is_search_hit,
             is_selected: self.is_selected,
             is_hovered: self.is_hovered,
+            is_checked: self.is_checked,
+            is_half_checked: self.is_half_checked,
+            is_current: self.is_current,
             is_enabled: self.is_enabled,
+            fills_width: self.width_filling,
             theme: theme_for_node(node),
         };
         let body = style.make_body(configuration);
 
-        let disclosure = if self.has_children {
-            let icon = if self.is_expanded {
-                ui_icon_catalog::navigation::chevron_down()
-            } else {
-                ui_icon_catalog::navigation::chevron_right()
-            };
-            let label = if self.is_expanded {
-                "Collapse"
-            } else {
-                "Expand"
-            };
-            let toggle = self.on_toggle.clone();
-            let enabled = self.is_enabled;
+        let disclosure = if self.is_loading {
             AnyView::new(
-                AnyView::new(
-                    Button::new(
-                        Icon::with_semantic(icon, 16.0, SemanticColorRef::on_surface_variant()),
-                        move || toggle(),
-                    )
-                    .enabled(enabled),
-                )
-                .button_style(crate::theme::styles::buttons::plain())
-                .frame_size(self.disclosure_width, row_height)
-                .accessibility(move |semantics: &mut AccessibilitySemantics| {
-                    semantics.label = label.to_string();
-                }),
+                AnyView::new(ProgressCircle::new(None).diameter(14.0).thickness(1.5))
+                    .frame_size(self.disclosure_width, row_height),
             )
+        } else if self.has_children {
+            if let Some(slot) = &self.disclosure_slot {
+                let slot = slot.clone();
+                let expanded = self.is_expanded;
+                AnyView::new(
+                    AnyView::new(slot(expanded)).frame_size(self.disclosure_width, row_height),
+                )
+            } else {
+                let icon = if self.is_expanded {
+                    ui_icon_catalog::navigation::chevron_down()
+                } else {
+                    ui_icon_catalog::navigation::chevron_right()
+                };
+                let label = if self.is_expanded {
+                    "Collapse"
+                } else {
+                    "Expand"
+                };
+                let toggle = self.on_toggle.clone();
+                let enabled = self.is_enabled;
+                AnyView::new(
+                    AnyView::new(
+                        Button::new(
+                            Icon::with_semantic(icon, 16.0, SemanticColorRef::on_surface_variant()),
+                            move || toggle(),
+                        )
+                        .enabled(enabled),
+                    )
+                    .button_style(crate::theme::styles::buttons::plain())
+                    .frame_size(self.disclosure_width, row_height)
+                    .accessibility(
+                        move |semantics: &mut AccessibilitySemantics| {
+                            semantics.label = label.to_string();
+                        },
+                    ),
+                )
+            }
         } else {
             fixed_spacer(self.disclosure_width, row_height)
         };
 
-        let mut row = vec![
-            fixed_spacer(indent, row_height),
-            disclosure,
-            AnyView::new(
-                AnyView::new(BoxView::new(
-                    FlexDirection::Row,
-                    Align::Stretch,
-                    Justify::FlexStart,
-                    Wrap::NoWrap,
-                    0.0,
-                    body,
-                ))
-                .flex_with(1.0, 1.0, Some(0.0))
-                .frame(None, None, Some(0.0), None, None, None),
-            ),
-        ];
+        let mut row = vec![fixed_spacer(indent, row_height), disclosure];
+        if let Some(checkbox) = &self.checkbox {
+            row.push(AnyView::new(checkbox.clone().padding_edges(0.0, 2.0)));
+            row.push(fixed_spacer(6.0, row_height));
+        }
+        if let Some(icon) = &self.icon {
+            row.push(icon.clone());
+            row.push(fixed_spacer(4.0, row_height));
+        }
+        let content = AnyView::new(BoxView::new(
+            FlexDirection::Row,
+            Align::Stretch,
+            Justify::FlexStart,
+            Wrap::NoWrap,
+            0.0,
+            body,
+        ))
+        .frame(None, None, Some(0.0), None, None, None);
+        row.push(if self.width_filling {
+            AnyView::new(AnyView::new(content).flex_with(1.0, 1.0, Some(0.0)))
+        } else {
+            AnyView::new(content)
+        });
 
         if let Some(trailing) = &self.trailing_slot {
             row.push(trailing.clone());
@@ -1624,6 +2785,7 @@ impl TreeRow {
         let move_key = self.on_move.clone();
         let collapse = self.on_collapse.clone();
         let expand = self.on_expand.clone();
+        let toggle_check = self.on_toggle_check.clone();
         let enabled = self.is_enabled;
         Rc::new(move |event: &KeyEvent| {
             if !enabled || event.is_repeat {
@@ -1644,6 +2806,12 @@ impl TreeRow {
                 }
                 Scancode::ARROW_RIGHT => {
                     expand();
+                    true
+                }
+                Scancode::SPACE if toggle_check.is_some() => {
+                    if let Some(toggle_check) = &toggle_check {
+                        toggle_check();
+                    }
                     true
                 }
                 Scancode::RETURN | Scancode::KEYPAD_ENTER | Scancode::SPACE => {

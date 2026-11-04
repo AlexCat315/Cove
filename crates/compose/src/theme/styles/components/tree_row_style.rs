@@ -19,7 +19,12 @@ pub struct TreeRowStyleConfiguration {
     pub is_search_hit: bool,
     pub is_selected: bool,
     pub is_hovered: bool,
+    pub is_checked: bool,
+    pub is_half_checked: bool,
+    pub is_current: bool,
     pub is_enabled: bool,
+    /// The selection band fills the row slot. `false` makes it hug the content.
+    pub fills_width: bool,
     pub theme: Theme,
 }
 
@@ -30,6 +35,9 @@ pub struct TreeRowInteractionKey {
     pub is_search_hit: bool,
     pub is_selected: bool,
     pub is_hovered: bool,
+    pub is_checked: bool,
+    pub is_half_checked: bool,
+    pub is_current: bool,
     pub is_enabled: bool,
 }
 
@@ -39,6 +47,9 @@ impl TreeRowStyleConfiguration {
             is_search_hit: self.is_search_hit,
             is_selected: self.is_selected,
             is_hovered: self.is_hovered,
+            is_checked: self.is_checked,
+            is_half_checked: self.is_half_checked,
+            is_current: self.is_current,
             is_enabled: self.is_enabled,
         }
     }

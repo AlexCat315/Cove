@@ -7,8 +7,8 @@
 use cove_examples::gallery_content::catalog::GalleryOptions;
 use cove_examples::gallery_content::stories::data_stories_file::{
     DragAndDropStory, REFRESH_ROWS, REFRESH_THRESHOLD, RefreshListStory, SWIPE_ROWS, SceneNode,
-    SectionedListStory, SwipeListStory, TreeStory, VIRTUAL_MIDDLE, VIRTUAL_STACK_COUNT,
-    VirtualStackStory, expandable_ids, node_matches, visible_ids,
+    LAZY_TREE_BRANCH, SectionedListStory, SwipeListStory, TreeStory, VIRTUAL_MIDDLE,
+    VIRTUAL_STACK_COUNT, VirtualStackStory, expandable_ids, node_matches, visible_ids,
 };
 
 fn story() -> TreeStory {
@@ -74,7 +74,7 @@ fn the_story_starts_with_scene_and_lights_expanded() {
     assert!(story.expanded().contains("scene"));
     assert!(story.expanded().contains("lights"));
     assert_eq!(story.query(), "");
-    assert_eq!(story.caption(), "Selected: camera");
+    assert_eq!(story.caption(), "Selected: camera · Checked: 1");
 }
 
 #[test]
@@ -105,9 +105,44 @@ fn multi_selection_toggles_one_id_at_a_time() {
     assert_eq!(story.selected_ids().len(), 1);
     story.toggle_multi("scene");
     assert_eq!(story.selected_ids().len(), 2);
-    assert_eq!(story.caption(), "Selected: camera, scene");
+    assert_eq!(story.caption(), "Selected: camera, scene · Checked: 1");
     story.toggle_multi("scene");
     assert_eq!(story.selected_ids().len(), 1, "toggling again deselects");
+}
+
+#[test]
+fn check_all_and_clear_cover_the_whole_gallery() {
+    let story = story();
+    story.check_all();
+    assert_eq!(story.checked_ids().len(), 7, "all seven nodes are checked");
+    assert!(story.checked_ids().contains("scene"));
+    assert!(story.checked_ids().contains("camera"));
+    assert_eq!(story.caption(), "Selected: camera · Checked: 7");
+
+    story.clear_checked();
+    assert!(story.checked_ids().is_empty());
+    assert_eq!(story.caption(), "Selected: camera · Checked: 0");
+}
+
+#[test]
+fn strict_accordion_and_lazy_switches_flip() {
+    let story = story();
+    assert!(!story.strict());
+    story.toggle_strict();
+    assert!(story.strict());
+
+    assert!(!story.accordion());
+    story.toggle_accordion();
+    assert!(story.accordion());
+
+    assert!(!story.lazy());
+    story.toggle_lazy();
+    assert!(story.lazy());
+    assert!(!story.loaded().contains(LAZY_TREE_BRANCH));
+    assert!(!story.expanded().contains(LAZY_TREE_BRANCH));
+    story.mark_loaded(LAZY_TREE_BRANCH);
+    assert!(story.loaded().contains(LAZY_TREE_BRANCH));
+    assert_eq!(story.status(), format!("Loaded {LAZY_TREE_BRANCH}"));
 }
 
 #[test]

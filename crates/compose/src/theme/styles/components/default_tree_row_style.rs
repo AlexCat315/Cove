@@ -31,7 +31,7 @@ impl TreeRowStyle for DefaultTreeRowStyle {
         } else if configuration.is_search_hit {
             colors.state_layer_selected
         } else if configuration.is_hovered {
-            colors.surface_variant
+            colors.state_layer_hover
         } else {
             Color::CLEAR
         };
@@ -55,8 +55,13 @@ impl TreeRowStyle for DefaultTreeRowStyle {
             VerticalAlignment::Center,
             0.0,
             AnyView::new(content),
-        ))
-        .flex(1.0);
+        ));
+        let outer = AnyView::new(outer);
+        let outer = if configuration.fills_width {
+            AnyView::new(outer.flex(1.0))
+        } else {
+            outer
+        };
         // Only the selected band re-inks its label; unselected rows keep the
         // default ink, so a theme cross-fade doesn't animate a redundant color.
         let inked = if configuration.is_selected {

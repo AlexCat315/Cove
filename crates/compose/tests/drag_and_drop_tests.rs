@@ -30,6 +30,7 @@ use cove_core::scene::{Node, PointerCaptureHolder};
 use cove_platform::{InputEvent, KeyModifiers, MouseButton, MouseButtonEvent, MouseMotionEvent};
 use cove_ui_compose::modifiers::layout::LayoutFrameExt;
 use cove_ui_compose::primitives::interaction::{DragScope, Draggable, DropTarget};
+use cove_ui_compose::primitives::layout::{ScrollAxis, ScrollView};
 use cove_ui_compose::primitives::overlays::portal::LayerRoot;
 use cove_ui_compose::primitives::text::Text;
 use cove_ui_compose::{Column, HorizontalAlignment};
@@ -255,6 +256,94 @@ fn the_preview_uses_the_portal_only_while_dragging() {
             scene.portal.entries().is_empty(),
             "no preview lingers after the drag ends, still had {}",
             scene.portal.entries().len()
+        );
+    });
+}
+
+
+#[test]
+fn a_drag_inside_a_scroll_view_still_reaches_its_target() {
+    let model = Rc::new(Model::default());
+    let harness_model = model.clone();
+    InteractiveScene::run(360.0, 360.0, |scene| {
+        // The Gallery mounts stories inside a scroll view; a drag must not be
+        // mistaken for a scroll gesture once it crosses the threshold.
+        let content = AnyView::new(
+            AnyView::new(harness(harness_model)).frame_height(600.0),
+        );
+        scene.install(AnyView::new(
+            ScrollView::new(ScrollAxis::Vertical, content).frame_size(340.0, 320.0),
+        ));
+        let source = labelled(scene, "Drag me").absolute_frame();
+        let target = labelled(scene, "Drop here").absolute_frame();
+
+        drag(
+            scene,
+            cove_core::Point::new(
+                source.x + source.width / 2.0,
+                source.y + source.height / 2.0,
+            ),
+            cove_core::Point::new(
+                target.x + target.width / 2.0,
+                target.y + target.height / 2.0,
+            ),
+        );
+
+        assert_eq!(
+            *model.dropped.borrow(),
+            vec![42],
+            "the drag survives the surrounding scroll view"
+        );
+    });
+}
+
+#[test]
+fn a_fast_drag_starts_from_the_down_position() {
+    let model = Rc::new(Model::default());
+    let harness_model = model.clone();
+    InteractiveScene::run(360.0, 360.0, |scene| {
+        scene.install(harness(harness_model));
+        let source = labelled(scene, "Drag me").absolute_frame();
+        let target = labelled(scene, "Drop here").absolute_frame();
+        let from = cove_core::Point::new(
+            source.x + source.width / 2.0,
+            source.y + source.height / 2.0,
+        );
+        let to = cove_core::Point::new(
+            target.x + target.width / 2.0,
+            target.y + target.height / 2.0,
+        );
+        let dispatcher = scene.dispatcher();
+        dispatcher.dispatch(&InputEvent::MouseButtonDown(MouseButtonEvent {
+            button: MouseButton::Left,
+            x: from.x,
+            y: from.y,
+            clicks: 1,
+            modifiers: KeyModifiers::default(),
+            kind: Default::default(),
+        }));
+        // One motion event straight to the target: no intermediate step stayed
+        // inside the source to cross the threshold.
+        dispatcher.dispatch(&InputEvent::MouseMotion(MouseMotionEvent {
+            x: to.x,
+            y: to.y,
+            delta_x: to.x - from.x,
+            delta_y: to.y - from.y,
+            kind: Default::default(),
+        }));
+        dispatcher.dispatch(&InputEvent::MouseButtonUp(MouseButtonEvent {
+            button: MouseButton::Left,
+            x: to.x,
+            y: to.y,
+            clicks: 1,
+            modifiers: KeyModifiers::default(),
+            kind: Default::default(),
+        }));
+        scene.settle(6, 0.05);
+        assert_eq!(
+            *model.dropped.borrow(),
+            vec![42],
+            "a single fast motion beyond the threshold still starts and completes the drag"
         );
     });
 }

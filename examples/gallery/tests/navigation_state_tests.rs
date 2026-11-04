@@ -22,7 +22,7 @@ use cove_composition::AnyView;
 use cove_core::scene::{AccessibilityRole, Node};
 use cove_examples::gallery_content::catalog::{GalleryOptions, GalleryPage};
 use cove_examples::gallery_content::stories::calendar::{CalendarStory, is_weekend};
-use cove_examples::gallery_content::stories::data_stories_file::TreeStory;
+use cove_examples::gallery_content::stories::data_stories_file::{LAZY_TREE_BRANCH, TreeStory};
 use cove_examples::gallery_content::stories::layout::LazyGridStory;
 use cove_ui_compose::foundation::Date;
 use cove_ui_compose::theme::tokens::TextScaler;
@@ -208,6 +208,197 @@ fn the_tree_story_mounts_with_its_caption() {
                         .is_some_and(|semantics| semantics.role == AccessibilityRole::Tree)
                 }),
                 "the story publishes a tree role"
+            );
+        },
+    );
+}
+
+#[test]
+fn the_tree_story_cascades_a_checkbox_click() {
+    let story = Rc::new(TreeStory::new(GalleryOptions::default()));
+    mount(
+        story.clone(),
+        900.0,
+        760.0,
+        1.0,
+        Theme::default_light(),
+        |scene, story| {
+            let mut boxes: Vec<Node> = scene.all(|node| {
+                node.accessibility()
+                    .is_some_and(|semantics| semantics.role == AccessibilityRole::Checkbox)
+            });
+            assert_eq!(boxes.len(), 6, "one checkbox per visible row");
+            boxes.sort_by(|a, b| {
+                a.absolute_frame()
+                    .y
+                    .partial_cmp(&b.absolute_frame().y)
+                    .unwrap_or(std::cmp::Ordering::Equal)
+            });
+            scene.click(&boxes[0]);
+            scene.settle_n(3);
+            assert_eq!(
+                story.checked_ids().len(),
+                7,
+                "checking the root cascades to the whole tree"
+            );
+            assert_eq!(story.caption(), "Selected: camera · Checked: 7");
+            assert!(
+                story.status().starts_with("Scene checked"),
+                "the check event updates the story status, got {:?}",
+                story.status()
+            );
+            assert_eq!(
+                story.selected_ids(),
+                ["camera".to_owned()].into_iter().collect(),
+                "clicking a checkbox must not change row selection"
+            );
+        },
+    );
+}
+
+#[test]
+fn the_tree_story_strict_switch_stops_the_check_cascade() {
+    let story = Rc::new(TreeStory::new(GalleryOptions::default()));
+    mount(
+        story.clone(),
+        900.0,
+        760.0,
+        1.0,
+        Theme::default_light(),
+        |scene, story| {
+            let strict = scene
+                .first(|node| {
+                    node.accessibility().is_some_and(|semantics| {
+                        semantics.role == AccessibilityRole::Toggle
+                            && semantics.label == "Strict check"
+                    })
+                })
+                .expect("the strict-check toggle mounts");
+            scene.click(&strict);
+            scene.settle_n(2);
+            assert!(story.strict());
+
+            let mut boxes: Vec<Node> = scene.all(|node| {
+                node.accessibility()
+                    .is_some_and(|semantics| semantics.role == AccessibilityRole::Checkbox)
+            });
+            boxes.sort_by(|a, b| {
+                a.absolute_frame()
+                    .y
+                    .partial_cmp(&b.absolute_frame().y)
+                    .unwrap_or(std::cmp::Ordering::Equal)
+            });
+            scene.click(&boxes[0]);
+            scene.settle_n(3);
+            assert_eq!(
+                story.checked_ids(),
+                ["camera".to_owned(), "scene".to_owned()]
+                    .into_iter()
+                    .collect(),
+                "strict mode checks only the tapped node"
+            );
+        },
+    );
+}
+
+#[test]
+fn the_tree_story_accordion_closes_the_other_branch() {
+    let story = Rc::new(TreeStory::new(GalleryOptions::default()));
+    mount(
+        story.clone(),
+        900.0,
+        760.0,
+        1.0,
+        Theme::default_light(),
+        |scene, story| {
+            let accordion = scene
+                .first(|node| {
+                    node.accessibility().is_some_and(|semantics| {
+                        semantics.role == AccessibilityRole::Toggle
+                            && semantics.label == "Accordion"
+                    })
+                })
+                .expect("the accordion toggle mounts");
+            scene.click(&accordion);
+            scene.settle_n(2);
+            assert!(story.accordion());
+
+            let objects = scene
+                .first(|node| {
+                    node.accessibility()
+                        .is_some_and(|semantics| semantics.label == "Objects")
+                })
+                .expect("the Objects row mounts");
+            let row_y = objects.absolute_frame().y;
+            let disclosure = scene
+                .all(|node| {
+                    node.accessibility().is_some_and(|semantics| {
+                        semantics.role == AccessibilityRole::Button
+                            && semantics.label == "Expand"
+                            && (node.absolute_frame().y - row_y).abs() < 10.0
+                    })
+                })
+                .into_iter()
+                .next()
+                .expect("the collapsed Objects branch has a disclosure");
+            scene.click(&disclosure);
+            scene.settle_n(3);
+            let expanded = story.expanded();
+            assert!(expanded.contains("objects"));
+            assert!(
+                !expanded.contains("lights"),
+                "opening Objects closed its expanded sibling, got {expanded:?}"
+            );
+        },
+    );
+}
+
+#[test]
+fn the_tree_story_loads_the_lazy_branch_on_expansion() {
+    let story = Rc::new(TreeStory::new(GalleryOptions::default()));
+    story.toggle_lazy();
+    mount(
+        story.clone(),
+        900.0,
+        760.0,
+        1.0,
+        Theme::default_light(),
+        |scene, story| {
+            assert!(!story.loaded().contains(LAZY_TREE_BRANCH));
+            let objects = scene
+                .first(|node| {
+                    node.accessibility()
+                        .is_some_and(|semantics| semantics.label == "Objects")
+                })
+                .expect("the Objects row mounts");
+            let row_y = objects.absolute_frame().y;
+            let disclosure = scene
+                .all(|node| {
+                    node.accessibility().is_some_and(|semantics| {
+                        semantics.role == AccessibilityRole::Button
+                            && semantics.label == "Expand"
+                            && (node.absolute_frame().y - row_y).abs() < 10.0
+                    })
+                })
+                .into_iter()
+                .next()
+                .expect("the collapsed Objects branch has a disclosure");
+            scene.click(&disclosure);
+            scene.settle_n(4);
+            assert!(
+                story.loaded().contains(LAZY_TREE_BRANCH),
+                "expanding the branch asks the host to load it"
+            );
+            assert_eq!(story.status(), "Loaded Objects");
+            assert!(
+                scene
+                    .all(|node| {
+                        node.accessibility()
+                            .is_some_and(|semantics| semantics.label == "Sphere")
+                    })
+                    .len()
+                    == 1,
+                "the loaded child row appears after recomposition"
             );
         },
     );

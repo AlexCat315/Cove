@@ -166,7 +166,11 @@ fn tree_row_style_is_wired_and_carries_depth() {
             is_search_hit: false,
             is_selected: false,
             is_hovered: false,
+            is_checked: false,
+            is_half_checked: false,
+            is_current: false,
             is_enabled: true,
+            fills_width: true,
             theme: Theme::default_dark(),
         });
         assert!(is_chrome(&body), "a deep expanded row produces a body");

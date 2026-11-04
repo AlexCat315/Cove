@@ -4,6 +4,13 @@
 
 Swift 源码逐页对照见文末《Swift 源码对照（逐页差异清单）》。
 
+## 2026-11-04：Tree 能力扩展与外观收敛
+
+- 能力：新增父子级联勾选（含半选）、`checkStrictly`、默认/受控勾选、`defaultExpandAll`、`autoExpandParent`、手风琴展开、自定义过滤谓词与 `filter()`、懒加载 `load_data`/`loadedKeys`/加载指示、拖拽生命周期、非虚拟滚动开关，以及 `getPath`/`scrollTo`/`setCurrentKey`/`setCheckedKeys` 等命令式方法。
+- 外观：默认行样式统一为 accent 选中带、`state_layer_hover` 悬停、`state_layer_selected` 搜索命中；键盘光标使用更弱的选中底色。复选框、前导图标、自定义展开控件、加载进度环与缩进参考线共用同一行槽，叶子行保留缩进与展开栏。
+- Gallery：Scene hierarchy 页接入受控勾选、严格勾选、手风琴、懒加载 `Objects` 分支、Check all / Clear checks、前导文件夹/文件图标与事件状态行；保留搜索、多选、展开/折叠工具栏。
+- 验证：`tree_behavior` 11 项、`tree_features_tests` 15 项、`list_tree_tests` 15 项、`row_density_tests` 4 项通过；Gallery `tree` 5 项场景测试用真实指针事件验证复选框级联、严格勾选、手风琴与 `Objects` 分支首次展开加载。`Tree` 页在 DevTools 下的浅/深主题目检仍待执行。
+
 ## 2026-11-04：List / Tree / SwipeList 排版与示例卡片
 
 - 通用修复：`ListRow` 补 8pt 槽间距、选中行墨色继承、行槽裁剪；`Tree` 行内容撑满行槽、叶子行保留缩进/disclosure 栏、选中带满宽；`SwipeList` 内容满宽且动作条只在打开时挂载。
