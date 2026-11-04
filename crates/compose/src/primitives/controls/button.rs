@@ -141,6 +141,12 @@ impl Button {
         self.tooltip = Some(tooltip.into());
         self
     }
+
+    /// Accessible name for a label that is not text, such as a colour swatch.
+    pub fn accessibility_text(mut self, text: impl Into<String>) -> Self {
+        self.accessibility_text = Some(text.into());
+        self
+    }
     pub fn with_tooltip(mut self, tooltip: Option<String>) -> Self {
         self.tooltip = tooltip;
         self

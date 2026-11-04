@@ -25,6 +25,7 @@ use cove_ui_compose::primitives::data::data_table::table_column::{
     ColumnVisibility, ComparisonResult, TableColumn, TableColumnLayout,
 };
 use cove_ui_compose::primitives::data::data_table::{DataTable, DataTableOptions};
+use cove_ui_compose::primitives::data::lists::{Table, TableOptions};
 use cove_ui_compose::primitives::text::Text;
 use cove_ui_compose::theme::tokens::SemanticColorRef;
 use cove_ui_compose::{AnyView, BoxView, LayoutDebugExt, TupleView, View};
@@ -929,9 +930,19 @@ impl View for AdaptiveTableSample {
     fn body(&self, _cx: &Scope) -> AnyView {
         let enabled = self.options.is_enabled;
         let rows: Vec<usize> = (0..ADAPTIVE_TABLE_ROWS).collect();
-        let mut options = DataTableOptions::default();
+        // The same columns drive either flavour, which is the point of the
+        // sample: only the data lifecycle and the weight differ.
+        if self.data {
+            let mut options = DataTableOptions::default();
+            options.is_enabled = enabled;
+            let table = DataTable::from_records(rows, |row: &usize| *row, adaptive_table_columns())
+                .expect("the gallery table columns are static with unique ids")
+                .options(options);
+            return AnyView::new(table);
+        }
+        let mut options = TableOptions::default();
         options.is_enabled = enabled;
-        let table = DataTable::from_records(rows, |row: &usize| *row, adaptive_table_columns())
+        let table = Table::new(rows, |row: &usize| *row, adaptive_table_columns())
             .expect("the gallery table columns are static with unique ids")
             .options(options);
         AnyView::new(table)

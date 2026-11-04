@@ -282,12 +282,16 @@ impl<Record, Id: Eq + std::hash::Hash + Clone> RowStorage<Record, Id> {
 ///
 /// Equal comparisons fall back to the source index in both directions, so a
 /// descending sort does not reverse ties.
-fn project<Record, Id: Eq + std::hash::Hash + Clone>(
+/// The source indices in sorted order.
+///
+/// Equal comparisons retain source order in both directions, so a stable sort
+/// never reshuffles rows the comparator cannot separate. Shared by the async
+/// `DataTable` projection and the synchronous `Table`.
+pub fn sorted_order<Record>(
     records: &[Record],
-    ids: &[Id],
     sort: &TableSort,
-    compare: &Rc<dyn Fn(&Record, &Record) -> ComparisonResult>,
-) -> DataTableProjection<Id> {
+    compare: &dyn Fn(&Record, &Record) -> ComparisonResult,
+) -> Vec<usize> {
     let wanted = match sort.direction {
         TableSortDirection::Ascending => ComparisonResult::Ascending,
         TableSortDirection::Descending => ComparisonResult::Descending,
@@ -303,6 +307,16 @@ fn project<Record, Id: Eq + std::hash::Hash + Clone>(
             std::cmp::Ordering::Greater
         }
     });
+    order
+}
+
+fn project<Record, Id: Eq + std::hash::Hash + Clone>(
+    records: &[Record],
+    ids: &[Id],
+    sort: &TableSort,
+    compare: &Rc<dyn Fn(&Record, &Record) -> ComparisonResult>,
+) -> DataTableProjection<Id> {
+    let order = sorted_order(records, sort, compare.as_ref());
     let positions = order
         .iter()
         .enumerate()

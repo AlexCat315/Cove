@@ -4,6 +4,22 @@
 
 ## Unreleased
 
+- **补齐 Table 轻量表格（2026-11-04）**：新增 `Table`（`primitives/data/lists/table.rs`），在普通 `Vec<Record>` 上绘制固定表头与虚拟化行，排序同步完成，宽度/排序/可见性/单选由挂载会话持有；`TableOptions` 的 `selection` 沿用 `Selection<Id>`，与 `List` 一致。与 `DataTable` 的分界是数据生命周期与排序成本，而非外观；两者共用 `TableColumn`、`TableColumnLayout`、`TableLayout`、`TableSort`、`ColumnVisibility`、`TableColumnPlan`。`TreeTable` 仍是首列换成层级列的 `DataTable`，`ChartDataTable` 是 `Chart` 的无障碍镜像，均非并列选项。
+  - 列宽拖拽手柄从 `data_table/view.rs` 提到 `columns/resize_grip.rs`，改为只依赖 `Binding<f32>` + `TableColumnLayout`，`DataTable` 通过适配器传入原行为，两边共用指针拖动、方向键与辅助功能设置；顺带补上此前缺失的悬停与按压缩放反馈之外的绘制逻辑（竖线改为按节点高度绘制）。
+  - 排序语义抽为 `sorted_order()` 共享：相等比较在两个方向都保留源序；`Table` 按列 id 在所有已授权列中查找排序，隐藏被排序列不会丢失排序。
+  - 列可见性轨道换算去重为 `columns::picker_tracks`，`data_table/view.rs` 与 `table_presentation.rs` 不再各留一份。
+  - `TableColumns` 收敛为 `pub(crate)`：它此前被导出但没有任何外部使用者。
+  - Gallery 的 Table 页此前路由到 `AdaptiveTableSample::new(options, true)`，即实际渲染 `DataTable`；现改为新增的 `TableStory`（10,000 行库存表 + 空数据段，`gallery-table`），`AdaptiveTableSample` 按 `data` 分支真正在两种表之间选择。
+  - 回归覆盖排序循环、相等保留源序、隐藏排序列、列宽约束、窄宽丢列、空数据保留表头、重复行 id 拒绝与选中绑定。用户文档 `table.md` 新增。
+
+- **ColorField 色轮与取色器完善（2026-11-04）**：
+  - 新增 `ColorWheel`，提供环样式（色相环 + 内嵌饱和度/明度方块）与盘样式（角度=色相、半径=饱和度）；拖动与方向键实时写回绑定并保留透明度；HSV 转换与几何映射独立到 `color_wheel_model`。**修复拖动**：指针点与圆心原先分属局部/窗口两套坐标，节点不在原点时角度全错；现在统一为窗口坐标，浮层内拖动正确（新增浮层内拖动的回归测试）。
+  - `cove_core` 新增公开的逐顶点着色原语 `DrawList::add_disk_shaded(center, radius, shade)` 与 `add_shaded_annulus(center, inner, outer, shade)`，按位置逐顶点求色并按半径做一像素羽化。
+  - `ColorField` 浮层新增透明度棋盘（触发器与预览，alpha 可见）与预设色板（`shows_swatches`/`swatches`）；`shows_wheel(false)` 可收起色轮。`Button` 新增 `accessibility_text`，供非文本标签（色块）提供可访问名。
+  - R/G/B/A 数值改为可编辑输入（0–255）；文本输入支持 HEX/HSL 切换（`ColorFormat`、`format_color`、`parse_color`、`hsl_from_rgb`、`rgb_from_hsl`、`parse_hsl`）；透明度滑块改为棋盘上的透明→不透明渐变轨道；提交的颜色自动进入“最近颜色”色板（`recent`/`recent_colors`，去重上限 8）。
+  - `ColorField` 新增 `on_sample(handler)` 吸管钩子：宿主提供屏幕取色，控件显示吸管按钮并在取色完成时回调（控件本身不访问屏幕；平台取色实现由宿主提供）。
+  - 色轮属于取色器家族，不是通用 Slider 的类型。Gallery 新增环/盘两个示例，用户文档新增 `color-wheel.md` 并更新 `color-field.md`。
+
 - **图表对齐 Swift（2026-11-04）**：
   - 轴文字真正绘制：`ChartPaint::axis_labels` 按 Swift `axisLabels` 的 gutter 规则输出刻度与标题并接入 `ChartPlot` 绘制流程；`ChartText` 接入真实 `TextEnvironment` 测量，仅在没有环境时退回字素近似，修复轴宽、绘图区与标签抽稀一直按伪造字宽计算的问题。
   - 覆盖层按种类分级：callout 卡片（`input_radius`、色点、body-strong 数值）、annotation 描边药丸、donut 中心标题、其余 caption；callout 行距改为 2pt；覆盖层整体从可访问性树隐藏，避免与图表读数重复播报。

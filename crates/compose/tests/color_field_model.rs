@@ -5,7 +5,10 @@
 //! alpha-pair position are user-facing contract.
 
 use cove_core::Color;
-use cove_ui_compose::primitives::controls::fields::{hex_string, panel_width, parse_hex};
+use cove_ui_compose::primitives::controls::fields::{
+    ColorFormat, format_color, hex_string, hsl_from_rgb, panel_width, parse_color, parse_hex,
+    parse_hsl, rgb_from_hsl,
+};
 
 fn close(a: f32, b: f32) -> bool {
     (a - b).abs() < 0.001
@@ -102,6 +105,53 @@ fn format_and_parse_round_trip_within_8_bit_quantisation() {
     assert!((parsed.g - original.g).abs() <= tolerance, "g from {text}");
     assert!((parsed.b - original.b).abs() <= tolerance, "b from {text}");
     assert_eq!(parsed.a, 1.0);
+}
+
+#[test]
+fn hsl_round_trips_a_colour_within_percent_rounding() {
+    let original = Color::from_rgba8(88, 126, 231, 255);
+    let text = format_color(original, true, ColorFormat::Hsl);
+    assert!(
+        text.ends_with('%'),
+        "hsl text carries percentages, got {text}"
+    );
+    let parsed = parse_color(&text, ColorFormat::Hsl).expect("hsl output parses");
+    // Hue is whole degrees and s/l whole percent, so allow a few 8-bit steps.
+    for (a, b) in [
+        (parsed.r, original.r),
+        (parsed.g, original.g),
+        (parsed.b, original.b),
+    ] {
+        assert!((a - b).abs() < 0.02, "{parsed:?} vs {original:?}");
+    }
+}
+
+#[test]
+fn formatting_follows_the_selected_format() {
+    let color = Color::from_rgba8(231, 76, 60, 255);
+    assert_eq!(format_color(color, false, ColorFormat::Hex), "#E74C3C");
+    let hsl = format_color(color, true, ColorFormat::Hsl);
+    assert!(!hsl.contains('#'), "hsl is not hex, got {hsl}");
+}
+
+#[test]
+fn hsl_conversion_round_trips_a_gray() {
+    let (h, s, l) = hsl_from_rgb(Color::from_rgba8(120, 120, 120, 255));
+    assert_eq!(h, 0.0, "a gray has no hue");
+    assert_eq!(s, 0.0, "a gray has no saturation");
+    assert!(close(l, 120.0 / 255.0));
+    let restored = rgb_from_hsl(h, s, l, 1.0);
+    assert!(close(restored.r, 120.0 / 255.0));
+}
+
+#[test]
+fn hsl_parsing_accepts_common_separators() {
+    for text in ["210 65% 62%", "210, 65%, 62%", "210 65 62"] {
+        let color = parse_hsl(text).unwrap_or_else(|| panic!("{text} should parse"));
+        assert!(color.r.is_finite() && color.g.is_finite() && color.b.is_finite());
+    }
+    assert_eq!(parse_hsl("210 65"), None, "two fields are rejected");
+    assert_eq!(parse_hsl("210 65% abc%"), None, "a non-number is rejected");
 }
 
 #[test]

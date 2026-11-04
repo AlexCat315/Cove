@@ -49,7 +49,17 @@ pub use json_field_model::{
 pub mod color_field;
 pub use color_field::ColorField;
 pub mod color_field_model;
-pub use color_field_model::{hex_string, panel_width, parse_hex};
+pub use color_field_model::{
+    ColorFormat, default_swatches, format_color, hex_string, hsl_from_rgb, panel_width, parse_color,
+    parse_hex, parse_hsl, rgb_from_hsl,
+};
+pub mod color_wheel;
+pub use color_wheel::{ColorWheel, ColorWheelStyle};
+pub mod color_wheel_model;
+pub use color_wheel_model::{
+    Hsv, angle_for_hue, color_from_hsv, disk_radius_for_saturation, disk_saturation_for_radius,
+    hsv_from_color, hue_for_angle, point_for_sv, sv_for_point,
+};
 pub mod combobox;
 pub use combobox::{Combobox, ComboboxPresentation, ComboboxSearch};
 pub mod combobox_model;

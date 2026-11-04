@@ -19,7 +19,6 @@ pub(crate) mod api {
         CHART_DATA_GAP, Chart, ChartConfiguration, ChartDataTable, ChartDataTableEntry, ChartDatum,
         ChartGuides, ChartMark, ChartSeries, ChartSlice, ChartStyle, ChartXDomain,
     };
-    pub use super::columns::TableColumns;
     pub use super::data_table::{
         DataTable, DataTableModel, DataTableOptions, TableColumn, TableColumnLayout, TableLayout,
         TableSort, TableSortDirection, TableTextEditing,
@@ -27,7 +26,8 @@ pub(crate) mod api {
     pub use super::lists::{
         CollectionId, List, ListGroup, ListRow, ListRowOptions, ListSection, RefreshOptions,
         ReorderSession, ReorderableList, RowState, SectionedEntryId, SectionedList, Selection,
-        StickyHeader, SwipeAction, SwipeList, Tree, TreeEntry, TreeSearchMetadata, flatten_tree,
+        StickyHeader, SwipeAction, SwipeList, Table, TableOptions, Tree, TreeEntry,
+        TreeSearchMetadata, flatten_tree,
     };
     pub use super::property_grid::{
         PropertyGrid, PropertyGridRow, PropertyGridRowLayout, PropertyGridRowSizing,

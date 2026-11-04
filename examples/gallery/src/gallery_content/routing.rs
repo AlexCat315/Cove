@@ -165,9 +165,9 @@ impl StoryDispatch {
             Self::Story(GalleryPage::Tooltip) => {
                 Some(AnyView::new(stories::TooltipStory::new(options)))
             }
-            Self::Story(GalleryPage::Table) => Some(AnyView::new(
-                stories::AdaptiveTableSample::new(options, true),
-            )),
+            Self::Story(GalleryPage::Table) => {
+                Some(AnyView::new(stories::TableStory::new(options)))
+            }
             Self::Story(GalleryPage::DatePicker) => {
                 Some(AnyView::new(stories::DatePickerStory::new(options)))
             }
@@ -489,7 +489,11 @@ mod checks {
     #[test]
     fn every_catalog_page_has_exactly_one_entry() {
         let entries = StorySource::entries();
-        assert_eq!(entries.len(), 106, "one row per catalog page");
+        assert_eq!(
+            entries.len(),
+            crate::gallery_content::catalog::GalleryPage::ALL.len(),
+            "one row per catalog page"
+        );
         for entry in GalleryCatalog::entries() {
             assert!(
                 entries.iter().any(|(page, _)| *page == entry.page),
@@ -498,7 +502,11 @@ mod checks {
             );
         }
         let unique: std::collections::BTreeSet<_> = entries.iter().map(|(page, _)| *page).collect();
-        assert_eq!(unique.len(), 106, "no page appears twice");
+        assert_eq!(
+            unique.len(),
+            crate::gallery_content::catalog::GalleryPage::ALL.len(),
+            "no page appears twice"
+        );
     }
 
     #[test]

@@ -31,6 +31,7 @@ import splitButton from '@/content/components/split-button.md?raw'
 import completionPopover from '@/content/components/completion-popover.md?raw'
 import numberField from '@/content/components/number-field.md?raw'
 import field from '@/content/components/field.md?raw'
+import colorWheel from '@/content/components/color-wheel.md?raw'
 import select from '@/content/components/select.md?raw'
 import colorField from '@/content/components/color-field.md?raw'
 import textArea from '@/content/components/text-area.md?raw'
@@ -51,6 +52,7 @@ import component10 from '@/content/components/toolbar.md?raw'
 import component11 from '@/content/components/vec3-field.md?raw'
 import component12 from '@/content/components/timeline.md?raw'
 import chart from '@/content/components/chart.md?raw'
+import table from '@/content/components/table.md?raw'
 import component13 from '@/content/components/tab-view.md?raw'
 import component14 from '@/content/components/date-range.md?raw'
 
@@ -107,6 +109,7 @@ export const docGroups: DocGroup[] = [
       { slug: 'field', title: 'Field', raw: field },
       { slug: 'select', title: 'Select', raw: select },
       { slug: 'color-field', title: 'ColorField', raw: colorField },
+      { slug: 'color-wheel', title: 'ColorWheel', raw: colorWheel },
       { slug: 'text-area', title: 'TextArea / ResizableTextArea', raw: textArea },
       { slug: 'text-editor', title: 'Text Editor', raw: textEditor },
       { slug: 'toolbar', title: 'Toolbar / AppBar', raw: component10 },
@@ -115,6 +118,7 @@ export const docGroups: DocGroup[] = [
       { slug: 'markdown', title: 'MarkdownView', raw: markdown },
       { slug: 'vec3-field', title: 'Vec3Field', raw: component11 },
       { slug: 'chart', title: 'Chart', raw: chart },
+      { slug: 'table', title: 'Table', raw: table },
       { slug: 'timeline', title: 'Timeline', raw: component12 },
       { slug: 'tab-view', title: 'TabView', raw: component13 },
       { slug: 'date-range', title: 'DateRangeCalendar', raw: component14 },

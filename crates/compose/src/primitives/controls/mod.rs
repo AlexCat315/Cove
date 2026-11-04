@@ -39,14 +39,15 @@ pub(crate) mod api {
     pub use super::date_values::TimeOfDay;
     pub use super::field_label::{FieldLabel, FieldLabelOptions};
     pub use super::fields::{
-        AssetRef, AssetRefField, ColorField, Combobox, ComboboxPresentation, ComboboxSearch,
-        DatePicker, DatePickerOptions, DatePickerPresentation, DateRange, DateRangeCalendar,
-        DateRangePicker, DateRangePickerOptions, DateRangePickerPresentation, DateRangePreset,
-        DateRangeRules, JsonField, KeyboardShortcut, KeyboardShortcutModifier,
-        KeyboardShortcutPlatform, NumberField, NumberFieldOptions, RadioGroup, RadioOption,
-        RangeSlider, RangeValue, SearchField, Select, SelectOption, Slider, SliderAxis, TimeField,
-        TimeFieldOptions, TimeInput, Vec3, Vec3Axis, Vec3Constraints, Vec3Field, WheelPicker,
-        WheelPickerModel, WheelPickerOption,
+        AssetRef, AssetRefField, ColorField, ColorWheel, ColorWheelStyle, Combobox,
+        ComboboxPresentation, ComboboxSearch, DatePicker, DatePickerOptions,
+        DatePickerPresentation, DateRange, DateRangeCalendar, DateRangePicker,
+        DateRangePickerOptions, DateRangePickerPresentation, DateRangePreset, DateRangeRules,
+        JsonField, KeyboardShortcut, KeyboardShortcutModifier, KeyboardShortcutPlatform,
+        NumberField, NumberFieldOptions, RadioGroup, RadioOption, RangeSlider, RangeValue,
+        SearchField, Select, SelectOption, Slider, SliderAxis, TimeField, TimeFieldOptions,
+        TimeInput, Vec3, Vec3Axis, Vec3Constraints, Vec3Field, WheelPicker, WheelPickerModel,
+        WheelPickerOption,
     };
     pub use super::form::label_placement::FieldLabelPlacement;
     pub use super::form::{Field, Form, FormField, FormFieldPresentation, FormLayout};

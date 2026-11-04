@@ -15,6 +15,7 @@ use cove_ui_compose::modifiers::style::AppearanceExt;
 use cove_ui_compose::primitives::controls::fields::asset_ref_field::AssetRefField;
 use cove_ui_compose::primitives::controls::fields::asset_ref_model::AssetRef;
 use cove_ui_compose::primitives::controls::fields::color_field::ColorField;
+use cove_ui_compose::primitives::controls::fields::color_wheel::{ColorWheel, ColorWheelStyle};
 use cove_ui_compose::primitives::controls::fields::json_field::JsonField;
 use cove_ui_compose::primitives::controls::fields::numeric::{
     NumberField, NumberFieldOptions, NumberFieldPrefix, NumericTextFormat,
@@ -954,9 +955,9 @@ impl ColorFieldStory {
 
 impl View for ColorFieldStory {
     fn body(&self, _cx: &Scope) -> AnyView {
-        AnyView::new(StorySection::new(
+        let picker = AnyView::new(StorySection::new(
             "Color picker",
-            "Open the swatch to edit RGB, alpha and hexadecimal values.",
+            "Open the swatch to pick a hue and saturation on the wheel, then edit RGB, alpha and hexadecimal values.",
             stack(vec![
                 AnyView::new(
                     ColorField::new(self.color.binding())
@@ -985,7 +986,35 @@ impl View for ColorFieldStory {
                     .debug_name("color-preview"),
                 ),
             ]),
-        ))
+        ));
+        let wheel = AnyView::new(StorySection::new(
+            "Wheel",
+            "Ring: drag the ring for hue and the square for saturation and value. Disk: angle is hue and radius is saturation. Arrow keys step hue and value; the bound alpha is kept.",
+            stack(vec![
+                AnyView::new(BoxView::new(
+                    FlexDirection::Row,
+                    Align::FlexStart,
+                    Justify::FlexStart,
+                    Wrap::Wrap,
+                    20.0,
+                    AnyView::new(TupleView::new(vec![
+                        AnyView::new(
+                            ColorWheel::new(self.color.binding())
+                                .enabled(self.options.is_enabled)
+                                .debug_name("color-wheel-ring"),
+                        ),
+                        AnyView::new(
+                            ColorWheel::new(self.color.binding())
+                                .enabled(self.options.is_enabled)
+                                .style(ColorWheelStyle::Disk)
+                                .debug_name("color-wheel-disk"),
+                        ),
+                    ])),
+                )),
+                note(self.readout()),
+            ]),
+        ));
+        stack(vec![picker, wheel])
     }
 
     fn tag(&self) -> &'static str {

@@ -137,6 +137,108 @@ impl DrawList {
         });
         Ok(())
     }
+    /// Fills a disk, sampling `shade` at every vertex. Use it for shaded
+    /// surfaces (colour wheels, heat maps) that a flat fill or a single linear
+    /// gradient cannot express. The rim is feathered over one pixel.
+    ///
+    /// `shade` receives the vertex position in the list's coordinate space.
+    pub fn add_disk_shaded<F>(
+        &mut self,
+        center: Point,
+        radius: f32,
+        shade: F,
+    ) -> Result<(), DrawError>
+    where
+        F: Fn(f32, f32) -> Color,
+    {
+        self.add_shaded_annulus(center, 0.0, radius, shade)
+    }
+
+    /// Fills the annulus between `inner` and `outer`, sampling `shade` at every
+    /// vertex. `inner == 0` is a disk. Both rims are feathered over one pixel.
+    pub fn add_shaded_annulus<F>(
+        &mut self,
+        center: Point,
+        inner: f32,
+        outer: f32,
+        shade: F,
+    ) -> Result<(), DrawError>
+    where
+        F: Fn(f32, f32) -> Color,
+    {
+        if !center.x.is_finite()
+            || !center.y.is_finite()
+            || !outer.is_finite()
+            || outer <= 0.0
+            || !inner.is_finite()
+        {
+            return Ok(());
+        }
+        let inner = inner.clamp(0.0, outer);
+        let feather = 1.0 / self.pixel_scale.max(1.0);
+        let circumference = std::f32::consts::TAU * outer;
+        let segments = ((circumference / (2.0 * feather)).ceil() as usize).clamp(24, 512);
+
+        let ring = |radius: f32, into: &mut Vec<Vertex>| {
+            for index in 0..=segments {
+                let angle = index as f32 / segments as f32 * std::f32::consts::TAU;
+                into.push(Vertex {
+                    x: center.x + angle.cos() * radius,
+                    y: center.y + angle.sin() * radius,
+                    u: -1.0,
+                    v: 0.0,
+                    color: u32::MAX,
+                });
+            }
+        };
+
+        let mut vertices: Vec<Vertex> = Vec::new();
+        let mut indices: Vec<u32> = Vec::new();
+        if inner <= feather {
+            // Disk: a fan from the centre.
+            vertices.push(Vertex {
+                x: center.x,
+                y: center.y,
+                u: -1.0,
+                v: 0.0,
+                color: u32::MAX,
+            });
+            ring(outer, &mut vertices);
+            for index in 0..segments as u32 {
+                indices.extend_from_slice(&[0, index + 1, index + 2]);
+            }
+        } else {
+            // Annulus: a quad strip between two rings.
+            ring(inner, &mut vertices);
+            ring(outer, &mut vertices);
+            let stride = (segments + 1) as u32;
+            for index in 0..segments as u32 {
+                let inner_a = index;
+                let inner_b = index + 1;
+                let outer_a = stride + index;
+                let outer_b = stride + index + 1;
+                indices.extend_from_slice(&[inner_a, outer_a, outer_b, inner_a, outer_b, inner_b]);
+            }
+        }
+
+        let first = self.vertices.len();
+        self.append_geometry(&vertices, &indices, 0)?;
+        let cover = move |x: f32, y: f32| {
+            let distance = ((x - center.x).powi(2) + (y - center.y).powi(2)).sqrt();
+            let outer_cover = ((outer - distance) / feather + 0.5).clamp(0.0, 1.0);
+            if inner <= feather {
+                outer_cover
+            } else {
+                let inner_cover = ((distance - inner) / feather + 0.5).clamp(0.0, 1.0);
+                outer_cover.min(inner_cover)
+            }
+        };
+        self.recolor(first, |x, y, _coverage| {
+            shade(x, y).multiplied_alpha(cover(x, y))
+        });
+        Ok(())
+    }
+
     pub fn add_triangle(
         &mut self,
         a: Point,

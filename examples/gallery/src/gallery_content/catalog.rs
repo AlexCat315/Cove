@@ -114,6 +114,115 @@ pub enum GalleryPage {
 }
 
 impl GalleryPage {
+    /// Every page, in Swift declaration order.
+    ///
+    /// The catalog, the routing table and the tests all read this list, so a new
+    /// page cannot be added to one without the others noticing.
+    pub const ALL: &'static [Self] = &[
+        Self::Introduction,
+        Self::Button,
+        Self::Checkbox,
+        Self::Toggle,
+        Self::Slider,
+        Self::RangeSlider,
+        Self::Rating,
+        Self::TextField,
+        Self::TextEditor,
+        Self::NumberField,
+        Self::ColorField,
+        Self::Select,
+        Self::AssetRef,
+        Self::List,
+        Self::SectionedList,
+        Self::ReorderableList,
+        Self::SwipeList,
+        Self::RefreshableList,
+        Self::Scrollbar,
+        Self::Tree,
+        Self::VirtualStack,
+        Self::Chart,
+        Self::Icon,
+        Self::Image,
+        Self::Web,
+        Self::Avatar,
+        Self::Menu,
+        Self::MenuButton,
+        Self::ContextMenu,
+        Self::Popover,
+        Self::Popconfirm,
+        Self::ActionSheet,
+        Self::Modal,
+        Self::Disclosure,
+        Self::Tabs,
+        Self::Panel,
+        Self::SplitView,
+        Self::ScrollView,
+        Self::BoundedScroll,
+        Self::PropertyGrid,
+        Self::Workspace,
+        Self::Layout,
+        Self::Masonry,
+        Self::ZStack,
+        Self::Animation,
+        Self::Theme,
+        Self::Badge,
+        Self::Alert,
+        Self::Progress,
+        Self::Empty,
+        Self::Radio,
+        Self::Form,
+        Self::Combobox,
+        Self::Notification,
+        Self::Tooltip,
+        Self::Sidebar,
+        Self::NavigationDrawer,
+        Self::NavigationRail,
+        Self::Table,
+        Self::DataTable,
+        Self::Calendar,
+        Self::DatePicker,
+        Self::DateRangePicker,
+        Self::TimeField,
+        Self::TimePicker,
+        Self::WheelPicker,
+        Self::Accordion,
+        Self::Breadcrumb,
+        Self::Pagination,
+        Self::ButtonGroup,
+        Self::SplitButton,
+        Self::Tag,
+        Self::KeyCap,
+        Self::Label,
+        Self::Dialog,
+        Self::AlertDialog,
+        Self::Sheet,
+        Self::BottomSheet,
+        Self::CommandPalette,
+        Self::HoverCard,
+        Self::Timeline,
+        Self::Toolbar,
+        Self::AppBar,
+        Self::NavigationStack,
+        Self::DragAndDrop,
+        Self::Link,
+        Self::StatusBar,
+        Self::Carousel,
+        Self::Skeleton,
+        Self::Stepper,
+        Self::ViewportTraits,
+        Self::ViewThatFits,
+        Self::TextRuns,
+        Self::Markdown,
+        Self::SingleLineText,
+        Self::CompletionPopover,
+        Self::RouteOutlet,
+        Self::ProgressValue,
+        Self::HorizontalSwipe,
+        Self::EdgeAutoScroll,
+        Self::ScrollReveal,
+        Self::ActionGroupLayout,
+    ];
+
     /// The `rawValue` used by `--component` matching and story identity.
     pub const fn raw_value(self) -> &'static str {
         match self {
@@ -999,22 +1108,27 @@ mod checks {
     #[test]
     fn catalog_has_one_entry_per_page_in_swift_order() {
         let entries = GalleryCatalog::entries();
-        // `GalleryPage` declares 106 cases and the catalog lists them all.
-        assert_eq!(entries.len(), 106);
+        // The declaration order and the catalog must stay in step, so both are
+        // measured against the enum rather than against a remembered count.
+        let pages = GalleryPage::ALL.len();
+        assert_eq!(entries.len(), pages, "every declared page has an entry");
         assert_eq!(
             entries
                 .iter()
                 .map(|entry| entry.page)
                 .collect::<BTreeSet<_>>()
                 .len(),
-            106,
+            pages,
             "every page appears exactly once"
         );
         assert_eq!(entries[0].page, GalleryPage::Introduction);
         assert_eq!(entries[0].title, "Dashboard");
         assert_eq!(entries[0].category, "Overview");
-        assert_eq!(entries[97].page, GalleryPage::Stepper);
-        assert_eq!(entries[97].title, "Stepper");
+        let stepper = entries
+            .iter()
+            .find(|entry| entry.page == GalleryPage::Stepper)
+            .expect("the catalog lists Stepper");
+        assert_eq!(stepper.title, "Stepper");
         // Raw values keep the Swift case spelling, including interior capitals.
         assert_eq!(GalleryPage::RangeSlider.raw_value(), "rangeSlider");
         assert_eq!(GalleryPage::ViewThatFits.raw_value(), "viewThatFits");
@@ -1058,7 +1172,7 @@ mod checks {
         assert!(GalleryCatalog::search("zzzznotathing").is_empty());
         assert_eq!(
             GalleryCatalog::search("").len(),
-            106,
+            GalleryPage::ALL.len(),
             "an empty query matches everything"
         );
     }

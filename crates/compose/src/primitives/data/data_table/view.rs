@@ -44,8 +44,7 @@ use super::row_metrics::{
 };
 use super::selection_model::{DataTableNavigation, DataTableSelection, DataTableSelectionMode};
 use super::table_column::{
-    ColumnVisibility, TableColumn, TableColumnLayout, TableColumnPlan, TableLayout, TableSort,
-    TableSortDirection,
+    ColumnVisibility, TableColumn, TableColumnPlan, TableLayout, TableSort, TableSortDirection,
 };
 use crate::modifiers::layout::{FlexExt, LayoutFrameExt, PaddingExt};
 use crate::modifiers::style::{AppearanceExt, SemanticStyleViewExt};
@@ -1134,29 +1133,6 @@ impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 
 
 /// The table's own tracks re-expressed through the shared columns contract, so
 /// the picker and the planner read one visibility type.
-fn shared_tracks(
-    tracks: &[crate::primitives::layout::grid::ColumnVisibilityTrack],
-) -> Vec<crate::primitives::columns::ColumnVisibilityTrack> {
-    tracks
-        .iter()
-        .map(|track| {
-            crate::primitives::columns::ColumnVisibilityTrack::new(
-                track.id.clone(),
-                track.title.clone(),
-                match track.visibility {
-                    crate::primitives::layout::grid::ColumnVisibility::Required => {
-                        crate::primitives::columns::ColumnVisibility::Required
-                    }
-                    crate::primitives::layout::grid::ColumnVisibility::Automatic { priority } => {
-                        crate::primitives::columns::ColumnVisibility::Automatic { priority }
-                    }
-                },
-                track.width,
-            )
-        })
-        .collect()
-}
-
 fn plan_available_width<Record>(plan: &DataTablePlan<Record>, moving_width: f32) -> f32 {
     plan.geometry.frozen_width() + moving_width
 }
@@ -1284,7 +1260,7 @@ impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 
             let tracks = TableColumnPlan::tracks(&ordered, &widths);
             Some(AnyView::new(
                 AnyView::new(crate::primitives::columns::ColumnVisibilityPicker::new(
-                    shared_tracks(&tracks),
+                    crate::primitives::data::columns::picker_tracks(&tracks),
                     crate::primitives::columns::ColumnVisibilityPlan {
                         indices: resolved.indices.clone(),
                         required_ids: resolved.required_ids.clone(),
@@ -2443,13 +2419,11 @@ impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 
             content: label,
         })];
         if self.column.layout.is_resizable {
-            cells.push(AnyView::new(ResizeGrip {
-                controller: self.controller.clone(),
-                column: self.column.clone(),
-                width: self.width,
-                layout: self.column.layout,
-                is_enabled: self.is_enabled,
-            }));
+            cells.push(AnyView::new(shared_resize_grip(
+                &self.controller,
+                &self.column,
+                self.is_enabled,
+            )));
         }
         AnyView::new(
             BoxView::new(
@@ -2627,152 +2601,39 @@ impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 
     }
 }
 
-/// Column resize grip: drag, arrow keys and the accessibility set-value action.
-struct ResizeGrip<
+/// Binds one column's width to the table's own storage: the caller's binding
+/// when it supplied one, the mount's session otherwise.
+fn shared_resize_grip<
     Record: Clone + 'static,
     Id: Ord + std::hash::Hash + Clone + Send + Sync + 'static,
-> {
-    controller: DataTableController<Record, Id>,
-    column: TableColumn<Record>,
-    width: f32,
-    layout: TableColumnLayout,
+>(
+    controller: &DataTableController<Record, Id>,
+    column: &TableColumn<Record>,
     is_enabled: bool,
-}
-
-impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 'static>
-    PrimitiveView for ResizeGrip<Record, Id>
-{
-    fn make_node(&self) -> Node {
-        let node = Node::new();
-        node.set_is_hit_testable(self.is_enabled);
-        node
-    }
-
-    fn make_layout_node(&self) -> Option<LayoutNode> {
-        let layout = LayoutNode::new();
-        layout.set_width(Some(6.0));
-        layout.set_align_self(Align::Stretch);
-        Some(layout)
-    }
-
-    fn update_node(&self, node: &Node) {
-        let theme = theme_for_node(node);
-        node.set_cursor(Some(SystemCursor::ResizeHorizontal));
-        node.set_accessibility(Some(AccessibilitySemantics {
-            role: AccessibilityRole::Slider,
-            value: format!("{:.0}", self.width),
-            label: format!("Resize {} column", self.column.title),
-            state: AccessibilityState {
-                is_enabled: self.is_enabled,
-                ..Default::default()
-            },
-            ..Default::default()
-        }));
-        let inc_controller = self.controller.clone();
-        let inc_column = self.column.clone();
-        let dec_controller = self.controller.clone();
-        let dec_column = self.column.clone();
-        let layout = self.layout;
-        let width = self.width;
-        node.set_accessibility_actions(AccessibilityActions {
-            increment: Some(Rc::new(move || {
-                inc_controller.write_width(&inc_column, width + 10.0)
-            })),
-            decrement: Some(Rc::new(move || {
-                dec_controller.write_width(&dec_column, width - 10.0)
-            })),
-            ..Default::default()
-        });
-        let _ = (theme, layout);
-        let Some(registry) = InteractionRegistryHolder::current() else {
-            return;
-        };
-        if !self.is_enabled {
-            registry.remove(node);
-            return;
-        }
-        let start = Rc::new(RefCell::new(None::<(f32, f32)>));
-        let down_controller = self.controller.clone();
-        let down_column = self.column.clone();
-        let down_width = self.width;
-        let down_start = start.clone();
-        let down_node = node.downgrade();
-        registry.set_pointer(
-            node,
-            InputHandlerRoute::control(),
-            Rc::new(move |event, phase, event_phase| {
-                if event_phase == EventPhase::Capture || event.button != MouseButton::Left {
-                    return EventResult::Ignored;
-                }
-                match phase {
-                    PointerPhase::Down => {
-                        *down_start.borrow_mut() = Some((event.x, down_width));
-                        if let Some(capture) = PointerCaptureHolder::current()
-                            && let Some(owner) = Node::upgrade(&down_node)
-                        {
-                            capture.acquire(&owner, false);
-                        }
-                        let _ = &down_controller;
-                        let _ = &down_column;
-                    }
-                    PointerPhase::Up => {
-                        *down_start.borrow_mut() = None;
-                        if let Some(capture) = PointerCaptureHolder::current() {
-                            capture.release();
-                        }
-                    }
-                }
-                EventResult::Handled
-            }),
-        );
-        let motion_controller = self.controller.clone();
-        let motion_column = self.column.clone();
-        let motion_start = start.clone();
-        registry.set_motion(
-            node,
-            InputHandlerRoute::control(),
-            Rc::new(move |event, _phase| {
-                let Some((started, initial)) = *motion_start.borrow() else {
-                    return EventResult::Ignored;
-                };
-                motion_controller.write_width(&motion_column, initial + event.x - started);
-                EventResult::Handled
-            }),
-        );
-        let key_controller = self.controller.clone();
-        let key_column = self.column.clone();
-        registry.set_key(
-            node,
-            InputHandlerRoute::control(),
-            Rc::new(move |event, phase| {
-                if phase != EventPhase::Target {
-                    return EventResult::Ignored;
-                }
-                let delta = match event.scancode {
-                    crate::Scancode::ARROW_LEFT => -10.0,
-                    crate::Scancode::ARROW_RIGHT => 10.0,
-                    _ => return EventResult::Ignored,
-                };
-                let current = key_controller
-                    .stored_widths()
-                    .get(&key_column.id)
+) -> crate::primitives::data::columns::ResizeGrip {
+    let layout = column.layout;
+    let read = controller.clone();
+    let read_column = column.clone();
+    let write = controller.clone();
+    let write_column = column.clone();
+    let width = Binding::new(
+        move || {
+            let stored = read.stored_widths();
+            layout.constrained(
+                stored
+                    .get(&read_column.id)
                     .copied()
-                    .unwrap_or(key_column.layout.width);
-                key_controller.write_width(&key_column, current + delta);
-                EventResult::Handled
-            }),
-        );
-    }
-}
-impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 'static> View
-    for ResizeGrip<Record, Id>
-{
-    fn kind(&self) -> crate::ViewKind<'_> {
-        crate::ViewKind::Primitive(self)
-    }
-    fn tag(&self) -> &'static str {
-        std::any::type_name::<Self>()
-    }
+                    .unwrap_or(read_column.layout.width),
+            )
+        },
+        move |value| write.write_width(&write_column, value),
+    );
+    crate::primitives::data::columns::ResizeGrip::new(
+        column.title.clone(),
+        width,
+        layout,
+        is_enabled,
+    )
 }
 
 /// Header background, matching the canvas fill the reference table uses.

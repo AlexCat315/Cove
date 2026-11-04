@@ -203,6 +203,11 @@ impl<Record> TableColumn<Record> {
         }
     }
 
+    /// The cell a record draws, so a table can lay the content out itself.
+    pub fn content(&self) -> &Rc<dyn Fn(&Record) -> AnyView> {
+        &self.content
+    }
+
     pub fn layout(mut self, layout: TableColumnLayout) -> Self {
         self.layout = layout;
         self

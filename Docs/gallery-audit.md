@@ -10,6 +10,7 @@ Swift 源码逐页对照见文末《Swift 源码对照（逐页差异清单）�
 - 新增独立 `Field` 外壳（与 `Form` 同一套标签/帮助/错误/可访问性布局），Gallery 各 field 页由临时的 `field_row` 改用 `Field`。
 - 数值配置收敛为 `NumberFieldOptions`；`Vec3Field` 组合三个 `NumberField` 并共用该配置，不再复刻其 builder。
 - 目录由 106 页收敛为 102 页：`Numeric` 合并 `NumberField`+`Vec3Field`，`Text Fields` 合并 `TextField`+`SearchField`+`TextArea`+`JsonField`；对应旧页的 `GalleryPage` 变体、catalog 条目、图标与 dispatch 一并删除。
+- ColorField 增加色轮（`ColorWheel`），提供环样式（色相环 + 饱和度/明度方块）与盘样式（角度=色相、半径=饱和度），浮层默认展示环样式，`shows_wheel(false)` 可关闭；色轮属于取色器，不作为 Slider 类型。修复拖动坐标混用（局部 vs 窗口）导致的映射错误，新增浮层内拖动回归测试。浮层新增透明度棋盘、预设色板（`shows_swatches`/`swatches`）、可编辑 RGBA 数值、HEX/HSL 文本切换、最近颜色与吸管钩子（`on_sample`，平台取色由宿主实现）。`cove_core` 新增逐顶点着色原语 `add_disk_shaded` / `add_shaded_annulus`。Gallery 展示环/盘两种样式，模型、指针交互与着色几何各有单元/场景测试。
 - 结构验证：`catalog_audit` 102 页 / 204 个宽屏窄屏场景通过。页级视觉与交互验收仍按原队列逐项进行。
 
 
@@ -99,7 +100,7 @@ cargo test -p cove-ui-compose --test compose --locked
 | Text Fields | — | 0 / 0 | 合并原 TextField / SearchField / TextArea / JsonField；段落数需重新测量；字段壳改用 `Field`；待逐项交互和视觉验收 |
 | Text Editor | 0 | 0 / 0 | 挂载/几何基础检查通过；待逐项交互和视觉验收 |
 | Numeric | — | 0 / 0 | 合并原 NumberField / Vec3Field；`Vec3Field` 组合三个 `NumberField` 并共用 `NumberFieldOptions`；待逐项交互和视觉验收 |
-| ColorField | 0 | 0 / 0 | 挂载/几何基础检查通过；待逐项交互和视觉验收 |
+| ColorField | — | 0 / 0 | 浮层新增色轮（`ColorWheel`）与独立示例；模型/指针测试通过；待逐项交互和视觉验收 |
 | Select | 0 | 0 / 0 | 挂载/几何基础检查通过；待逐项交互和视觉验收 |
 | AssetRef / DropTarget | 0 | 0 / 0 | 挂载/几何基础检查通过；待逐项交互和视觉验收 |
 | List | 0 | 0 / 0 | 挂载/几何基础检查通过；待逐项交互和视觉验收 |
@@ -152,7 +153,7 @@ cargo test -p cove-ui-compose --test compose --locked
 | NavigationDrawer | 0 | 0 / 0 | 挂载/几何基础检查通过；待逐项交互和视觉验收 |
 | NavigationRail | 0 | 0 / 0 | 挂载/几何基础检查通过；待逐项交互和视觉验收 |
 | AppBar / NavigationBar | 0 | 0 / 0 | 挂载/几何基础检查通过；待逐项交互和视觉验收 |
-| Table | 0 | 0 / 0 | 挂载/几何基础检查通过；待逐项交互和视觉验收 |
+| Table | 2 | 6 / 6 | 段落与 Swift 对齐（10,000 行库存表 + 空数据）；排序循环、隐藏排序列、列宽约束、窄宽丢列、空数据保留表头与单选已有回归；待逐项原生视觉验收 |
 | DataTable | 3 | 3 / 0 | 挂载/几何基础检查通过；待逐项交互和视觉验收 |
 | Calendar | 2 | 0 / 0 | 挂载/几何基础检查通过；待逐项交互和视觉验收 |
 | DatePicker | 0 | 0 / 0 | 挂载/几何基础检查通过；待逐项交互和视觉验收 |
@@ -221,7 +222,7 @@ cargo test -p cove-ui-compose --test compose --locked
 | ActionSheet | `ActionSheetStory` | 2 | Project actions、Long action lists |
 | Alert | `AlertStory` | 2 | Actions & dismissal、Inline feedback |
 | EmptyState | `EmptyStory` | 1 | Empty content |
-| Table | `AdaptiveTableSample` | 2 | Inventory · 10,000 rows、Empty data |
+| Table | `TableStory` | 2 | Inventory · 10,000 rows、Empty data |
 | Toolbar | `ToolbarStory` | 1 | Toolbar |
 | Workspace / Dock | 未分派（`StoryDispatch::Pending`） | 1 | Dock workspace |
 
@@ -305,8 +306,8 @@ cargo test -p cove-ui-compose --test compose --locked
 | ScrollView | Native scroll stream | 1/3 | 未出现：native、stream |
 | SearchField | Search input | 2/2 | 出现在本页源码，未单独成段 |
 | Select | Typed options | 2/2 | 出现在本页源码，未单独成段 |
-| Table | Inventory · 10,000 rows | 0/1 | 未出现：inventory |
-| Table | Empty data | 1/2 | 未出现：empty |
+| Table | Inventory · 10,000 rows | 1/1 | 已单独成段（`gallery-table`，10,000 行） |
+| Table | Empty data | 2/2 | 已单独成段（保留表头 + 空状态） |
 | TextArea | Resizable text area | 2/3 | 未出现：resizable |
 | TimeField | Time input | 1/2 | 未出现：input |
 | TimePicker | Segmented time input | 1/3 | 未出现：input、segmented |
@@ -397,7 +398,7 @@ cargo test -p cove-ui-compose --test compose --locked
 | StatusBar | 3 | 3 | 3 | 0 | 0 | 段落数持平 |
 | Stepper | 3 | 3 | 3 | 0 | 0 | 段落数持平 |
 | SwipeList | 1 | 1 | 1 | 0 | 0 | 段落数持平 |
-| Table | 2 | 0 | 0 | 0 | 2 | Rust 无段落结构 |
+| Table | 2 | 2 | 2 | 0 | 0 | 段落数持平 |
 | TabView | 3 | 4 | 3 | 0 | 0 | 段落多于 Swift |
 | Tag | 2 | 3 | 2 | 0 | 0 | 段落多于 Swift |
 | Text Editor | 1 | 1 | 1 | 0 | 0 | 段落数持平 |

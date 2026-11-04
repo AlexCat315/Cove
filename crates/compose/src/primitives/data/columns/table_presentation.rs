@@ -14,11 +14,11 @@ use crate::Scope;
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::rc::Rc;
 
+use super::picker_tracks;
 use crate::adaptive::{ContainerSizeReader, SurfaceReader};
 use crate::modifiers::layout::{FlexExt, LayoutFrameExt};
 use crate::primitives::columns::{
     ColumnVisibilityPicker, ColumnVisibilityPickerModel, ColumnVisibilityPlan,
-    ColumnVisibilityTrack,
 };
 use crate::primitives::data::data_table::table_column::{
     ColumnVisibility, TableColumn, TableColumnPlan,
@@ -27,30 +27,6 @@ use crate::primitives::layout::scroll_view::ScrollView as ScrollViewPrimitive;
 use crate::{AnyView, BoxView, View};
 use cove_core::Binding;
 use cove_core::scene::{Align, FlexDirection, Justify, Wrap};
-
-/// The shared columns track for one authored table, so the picker and the
-/// planner read the same widths and priorities.
-fn shared_tracks<Record>(
-    columns: &[TableColumn<Record>],
-    widths: &BTreeMap<String, f32>,
-) -> Vec<ColumnVisibilityTrack> {
-    TableColumnPlan::tracks(columns, widths)
-        .into_iter()
-        .map(|track| ColumnVisibilityTrack {
-            id: track.id,
-            title: track.title,
-            visibility: match track.visibility {
-                crate::primitives::layout::grid::ColumnVisibility::Required => {
-                    crate::primitives::columns::ColumnVisibility::Required
-                }
-                crate::primitives::layout::grid::ColumnVisibility::Automatic { priority } => {
-                    crate::primitives::columns::ColumnVisibility::Automatic { priority }
-                }
-            },
-            width: track.width,
-        })
-        .collect()
-}
 
 /// Authored inputs shared by both table implementations.
 pub struct TableColumns<Record: 'static> {
@@ -125,7 +101,7 @@ impl<Record: 'static> TableColumns<Record> {
         if !self.shows_picker() {
             return None;
         }
-        let tracks = shared_tracks(&self.columns, &self.widths);
+        let tracks = picker_tracks(&TableColumnPlan::tracks(&self.columns, &self.widths));
         let shared = ColumnVisibilityPlan {
             indices: plan.indices.clone(),
             required_ids: plan.required_ids.clone(),
@@ -176,7 +152,7 @@ impl<Record: 'static> View for TableColumns<Record> {
                         &pinned,
                     );
                     let picker = shows_picker.then(|| {
-                        let tracks = shared_tracks(&columns, &widths);
+                        let tracks = picker_tracks(&TableColumnPlan::tracks(&columns, &widths));
                         let shared = ColumnVisibilityPlan {
                             indices: plan.indices.clone(),
                             required_ids: plan.required_ids.clone(),
@@ -192,7 +168,7 @@ impl<Record: 'static> View for TableColumns<Record> {
 
                     let mut children = Vec::new();
                     if picker.is_some() {
-                        let tracks = shared_tracks(&columns, &widths);
+                        let tracks = picker_tracks(&TableColumnPlan::tracks(&columns, &widths));
                         let shared = ColumnVisibilityPlan {
                             indices: plan.indices.clone(),
                             required_ids: plan.required_ids.clone(),
