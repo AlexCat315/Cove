@@ -4,50 +4,33 @@ use cove_composition::{AnyView, ViewGraph};
 use cove_core::scene::{LayerAwareNodeRenderer, NodeRenderer, NodeTree, Recomposer};
 use cove_core::{DrawList, Environment, State};
 use cove_imaging::ImageAssetRegistry;
+use cove_ui_compose::primitives::interaction::{FileDropRegistry, FileDropRegistryHolder};
 use cove_ui_compose::primitives::overlays::portal::portal_registry::PortalStore;
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 
-/// Scoped asset drop registry.
+/// The file drop registry slot.
 ///
-/// The Swift type tracked drag-and-drop targets per scene. `cove-core` does not
-/// expose a drop registry, so the host keeps the per-window slot the pieces are
-/// registered into; a drag session asks this registry which node accepted it.
-#[derive(Default)]
-pub struct AssetDropRegistry {
-    active_target: RefCell<Option<String>>,
-}
+/// The registry itself lives in `cove-ui-compose` beside the zones that
+/// register into it; the host only decides which one is current for a window,
+/// so a platform drag is delivered to the zones of the window it entered.
+pub type AssetDropRegistry = FileDropRegistry;
 
-impl AssetDropRegistry {
-    pub fn new() -> Self {
-        Self::default()
-    }
-
-    pub fn set_active_target(&self, target: Option<String>) {
-        *self.active_target.borrow_mut() = target;
-    }
-
-    pub fn active_target(&self) -> Option<String> {
-        self.active_target.borrow().clone()
-    }
-}
-
-/// The process-global drop registry slot, mirroring `AssetDropRegistryHolder`.
+/// The process-global file drop registry slot.
 pub struct AssetDropRegistryHolder;
 
 thread_local! {
-    static CURRENT_DROP_REGISTRY: RefCell<Option<Rc<AssetDropRegistry>>> = const { RefCell::new(None) };
     static CURRENT_DISPLAY_HANDLE: RefCell<Option<crate::desktop::display::AppDisplayHandle>> =
         const { RefCell::new(None) };
 }
 
 impl AssetDropRegistryHolder {
-    pub fn current() -> Option<Rc<AssetDropRegistry>> {
-        CURRENT_DROP_REGISTRY.with(|slot| slot.borrow().clone())
+    pub fn current() -> Option<Rc<FileDropRegistry>> {
+        FileDropRegistryHolder::current()
     }
 
-    pub fn set_current(registry: Option<Rc<AssetDropRegistry>>) {
-        CURRENT_DROP_REGISTRY.with(|slot| *slot.borrow_mut() = registry);
+    pub fn set_current(registry: Option<Rc<FileDropRegistry>>) {
+        FileDropRegistryHolder::set_current(registry);
     }
 }
 
@@ -71,7 +54,7 @@ pub struct MainComposition {
     pub portal_store: Rc<PortalStore>,
     pub graph: Rc<ViewGraph>,
     pub image_assets: std::sync::Arc<ImageAssetRegistry>,
-    pub asset_drop_registry: Rc<AssetDropRegistry>,
+    pub asset_drop_registry: Rc<FileDropRegistry>,
     pub draw_list: RefCell<DrawList>,
     pub layer_renderer: RefCell<LayerAwareNodeRenderer>,
     pub node_renderer: NodeRenderer,
@@ -91,7 +74,7 @@ impl MainComposition {
             portal_store,
             graph,
             image_assets: std::sync::Arc::new(ImageAssetRegistry::default()),
-            asset_drop_registry: Rc::new(AssetDropRegistry::new()),
+            asset_drop_registry: Rc::new(FileDropRegistry::new()),
             draw_list: RefCell::new(DrawList::default()),
             layer_renderer: RefCell::new(LayerAwareNodeRenderer::new()),
             node_renderer: NodeRenderer::new(),

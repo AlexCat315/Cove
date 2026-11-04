@@ -7,13 +7,7 @@ use cove_core::{
     Color, Font, FontWeight, ShapedGlyph, TextAlignment, TextLayoutCacheKey, TextLayoutOptions,
     TextLayoutResult, TextureId, layout_text,
 };
-use std::{
-    cell::RefCell,
-    collections::HashSet,
-    mem::size_of,
-    rc::Rc,
-    sync::Arc,
-};
+use std::{cell::RefCell, collections::HashSet, mem::size_of, rc::Rc, sync::Arc};
 /// Below this much text a batch is shaped on the calling thread; handing it
 /// to workers would cost more than it saves.
 const PARALLEL_SHAPING_BYTES: usize = 512;

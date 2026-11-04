@@ -55,4 +55,4 @@ pub use ids::{
     WorkspaceSlotID, WorkspaceSplitAxis, WorkspaceSplitID, WorkspaceTabGroupID,
 };
 
-pub use workspace_view::{workspace_tab_command, WorkspaceTabCommand};
+pub use workspace_view::{WorkspaceTabCommand, workspace_tab_command};

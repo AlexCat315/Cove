@@ -309,6 +309,9 @@ impl StoryDispatch {
             Self::Story(GalleryPage::RefreshableList) => {
                 Some(AnyView::new(stories::RefreshListStory::new()))
             }
+            Self::Story(GalleryPage::DragUpload) => {
+                Some(AnyView::new(stories::DragUploadStory::new(options)))
+            }
             Self::Story(GalleryPage::DragAndDrop) => {
                 Some(AnyView::new(stories::DragAndDropStory::new()))
             }
@@ -368,6 +371,7 @@ impl StorySource {
                 "Foundation/IntrinsicFitting.swift",
             ),
             (GalleryPage::DragAndDrop, "Data/DataStories.swift"),
+            (GalleryPage::DragUpload, "Data/DataStories.swift"),
             (GalleryPage::Tree, "Data/DataStories.swift"),
             (GalleryPage::VirtualStack, "Data/DataStories.swift"),
             (GalleryPage::Chart, "Data/DataStories.swift"),

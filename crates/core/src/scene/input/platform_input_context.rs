@@ -33,6 +33,32 @@ pub type ColorSampleCompletion = Box<dyn FnOnce(Option<crate::Color>)>;
 /// Host screen-colour sampler installed by the platform shell.
 pub type ColorSamplerCallback = Rc<dyn Fn(ColorSampleCompletion)>;
 
+/// A file-type filter a native open panel understands.
+///
+/// Core cannot name `cove-shell::FileDialogFilter` (no dependency), so the
+/// contract is restated here and the host adapts it.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct FilePickerFilter {
+    pub name: String,
+    /// Extensions without the leading dot; empty matches every file.
+    pub extensions: Vec<String>,
+}
+
+impl FilePickerFilter {
+    pub fn new(name: impl Into<String>, extensions: impl IntoIterator<Item = String>) -> Self {
+        Self {
+            name: name.into(),
+            extensions: extensions.into_iter().collect(),
+        }
+    }
+}
+
+/// Receives the chosen paths once the native open panel closed. Empty when the
+/// user cancelled.
+pub type FilePickCompletion = Box<dyn FnOnce(Vec<String>)>;
+/// Host open-panel presenter installed by the platform shell.
+pub type FilePickerCallback = Rc<dyn Fn(&[FilePickerFilter], bool, FilePickCompletion)>;
+
 thread_local! {
     static CURRENT_INTERACTIONS: RefCell<Option<Rc<InteractionRegistry>>> = const { RefCell::new(None) };
     static CLIPBOARD_READ: RefCell<Option<ClipboardReader>> = const { RefCell::new(None) };
@@ -40,6 +66,7 @@ thread_local! {
     static CLIPBOARD_WRITE: RefCell<Option<ClipboardWriter>> = const { RefCell::new(None) };
     static NATIVE_MENU_PRESENTER: RefCell<Option<NativeMenuPresenterCallback>> = const { RefCell::new(None) };
     static COLOR_SAMPLER: RefCell<Option<ColorSamplerCallback>> = const { RefCell::new(None) };
+    static FILE_PICKER: RefCell<Option<FilePickerCallback>> = const { RefCell::new(None) };
 }
 
 /// Holds the active window's interaction registry.
@@ -126,6 +153,30 @@ impl ColorSampler {
     }
     pub fn set_requester(request: Option<ColorSamplerCallback>) {
         COLOR_SAMPLER.with(|slot| *slot.borrow_mut() = request);
+    }
+}
+
+/// Holds the native open panel, injected by the platform shell.
+///
+/// The panel may close later; the host answers through `done` on the UI thread.
+/// Without an installed picker every request completes with no paths, so a
+/// caller can disable its browse affordance instead of pretending to open one.
+pub struct FilePicker;
+impl FilePicker {
+    /// Shows an open panel filtered to `filters`; `multiple` allows a multi-file
+    /// choice. `done` receives the chosen paths, empty when the user cancelled.
+    pub fn request(filters: &[FilePickerFilter], multiple: bool, done: FilePickCompletion) {
+        match FILE_PICKER.with(|slot| slot.borrow().clone()) {
+            Some(present) => present(filters, multiple, done),
+            None => done(Vec::new()),
+        }
+    }
+    /// Whether a platform shell installed a picker on this thread.
+    pub fn is_installed() -> bool {
+        FILE_PICKER.with(|slot| slot.borrow().is_some())
+    }
+    pub fn set_presenter(present: Option<FilePickerCallback>) {
+        FILE_PICKER.with(|slot| *slot.borrow_mut() = present);
     }
 }
 

@@ -140,6 +140,12 @@ bool cove_shell_poll(CoveShellEvent *out) { COVE_ASSERT_MAIN();
             case SDL_EVENT_GAMEPAD_BUTTON_DOWN:case SDL_EVENT_GAMEPAD_BUTTON_UP:out->kind=e.type==SDL_EVENT_GAMEPAD_BUTTON_DOWN?20:21;out->identity=e.gbutton.which;out->a=e.gbutton.button;break;
             case SDL_EVENT_GAMEPAD_AXIS_MOTION:out->kind=22;out->identity=e.gaxis.which;out->a=e.gaxis.axis;out->x=SDL_clamp(e.gaxis.value/32767.0f,e.gaxis.axis>=SDL_GAMEPAD_AXIS_LEFT_TRIGGER?0:-1,1);break;
             case SDL_EVENT_GAMEPAD_ADDED:out->kind=23;out->identity=e.gdevice.which;break;case SDL_EVENT_GAMEPAD_REMOVED:out->kind=24;out->identity=e.gdevice.which;break;
+            case SDL_EVENT_DROP_BEGIN:case SDL_EVENT_DROP_FILE:case SDL_EVENT_DROP_TEXT:case SDL_EVENT_DROP_POSITION:case SDL_EVENT_DROP_COMPLETE: {
+                out->kind=e.type==SDL_EVENT_DROP_BEGIN?25:e.type==SDL_EVENT_DROP_FILE?26:e.type==SDL_EVENT_DROP_TEXT?27:e.type==SDL_EVENT_DROP_POSITION?28:29;
+                out->window=e.drop.windowID;out->x=e.drop.x;out->y=e.drop.y;
+                if(e.drop.data)out->text=SDL_strdup(e.drop.data);
+                if(e.drop.source)out->aux=SDL_strdup(e.drop.source);
+                break; }
             default:continue;
         }
 #if defined(__APPLE__)
@@ -147,6 +153,9 @@ bool cove_shell_poll(CoveShellEvent *out) { COVE_ASSERT_MAIN();
         if(out->kind==12 && cove_shell_apple_shortcut(out->window,out->a,out->modifiers))continue;
 #endif
         if(out->kind>=16&&out->kind<=19&&out->flags!=2) { float scale=coordinate_scale(out->window);out->x/=scale;out->y/=scale;if(out->kind==16){out->dx/=scale;out->dy/=scale;} }
+        /* Drop positions arrive in the platform's window points; pointer events
+           use the same space, so the same scale applies. */
+        if(out->kind>=26&&out->kind<=28) { float scale=coordinate_scale(out->window);out->x/=scale;out->y/=scale; }
         return true;
     }
 #if defined(__APPLE__)
@@ -154,7 +163,7 @@ bool cove_shell_poll(CoveShellEvent *out) { COVE_ASSERT_MAIN();
 #endif
     return false;
 }
-void cove_shell_event_free(CoveShellEvent *event) { SDL_free(event->text);event->text=NULL; }
+void cove_shell_event_free(CoveShellEvent *event) { SDL_free(event->text);event->text=NULL;SDL_free(event->aux);event->aux=NULL; }
 bool cove_shell_wait(uint64_t timeout) { COVE_ASSERT_MAIN(); if(SDL_CompareAndSwapAtomicInt(&wake_lost,1,0))return true; uint64_t deadline=SDL_GetTicksNS()+SDL_min(timeout,86400000000000ULL);while(SDL_GetAtomicInt(&initialized)){uint64_t now=SDL_GetTicksNS();if(now>=deadline)return false;uint64_t remaining=deadline-now,ms=remaining/1000000;if(ms){if(SDL_WaitEventTimeout(NULL,(int)SDL_min(ms,2147483647)))return true;}else{SDL_DelayNS(remaining);return false;}}return false; }
 void cove_shell_wake(void) { if(SDL_GetAtomicInt(&initialized) && SDL_CompareAndSwapAtomicInt(&wake_pending,0,1)){SDL_Event e;SDL_zero(e);e.type=wake_type;if(!SDL_PushEvent(&e)){SDL_SetAtomicInt(&wake_lost,1);SDL_SetAtomicInt(&wake_pending,0);}} }
 void cove_shell_command(CoveShellWindow *h,int command,int a,int b) { COVE_ASSERT_MAIN();

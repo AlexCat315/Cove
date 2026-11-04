@@ -17,6 +17,7 @@ pub(crate) struct Event {
     pub modifiers: u16,
     pub flags: u16,
     pub text: *mut c_char,
+    pub aux: *mut c_char,
 }
 #[repr(C)]
 #[derive(Clone, Copy, Default, Debug)]
@@ -122,6 +123,19 @@ impl Event {
                 .to_string_lossy()
                 .into_owned()
         }
+    }
+
+    /// The secondary string, absent when the event has none (drop source).
+    pub fn aux_string(&self) -> Option<String> {
+        if self.aux.is_null() {
+            return None;
+        }
+        // SAFETY: `aux` is a bridge-owned NUL terminated copy valid until Drop.
+        Some(
+            unsafe { CStr::from_ptr(self.aux) }
+                .to_string_lossy()
+                .into_owned(),
+        )
     }
 }
 impl Drop for Event {

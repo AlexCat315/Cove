@@ -95,6 +95,7 @@ mod editor_height_tests;
 mod editor_interaction_tests;
 mod feedback_component_tests;
 mod field_layout_tests;
+mod file_drop_tests;
 mod floating_surface_tests;
 mod focus_ring_tests;
 mod four_tree_consistency_tests;

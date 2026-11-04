@@ -307,35 +307,62 @@ impl PrimitiveView for WorkspaceRegionTransition {
             }
         }
         let theme = super::theme::resolve_workspace_theme(node);
-        let target = if self.is_visible { self.sizing.extent(&theme) } else { 0.0 };
+        let target = if self.is_visible {
+            self.sizing.extent(&theme)
+        } else {
+            0.0
+        };
         let previous = node.attachment::<f32>("workspace.region.extent");
         let old_visible = node.attachment::<bool>("workspace.region.visible");
         node.set_attachment("workspace.region.visible", self.is_visible);
-        if self.is_visible && let Some(content) = &self.content {
+        if self.is_visible
+            && let Some(content) = &self.content
+        {
             node.set_attachment("workspace.region.content", content.clone());
         }
-        let revision = node.attachment::<cove_core::Signal<u64>>("workspace.region.revision").unwrap_or_else(|| {
-            let signal = cove_core::Signal::detached(0);
-            node.set_attachment("workspace.region.revision", signal);
-            signal
-        });
+        let revision = node
+            .attachment::<cove_core::Signal<u64>>("workspace.region.revision")
+            .unwrap_or_else(|| {
+                let signal = cove_core::Signal::detached(0);
+                node.set_attachment("workspace.region.revision", signal);
+                signal
+            });
         let weak = node.downgrade();
         let horizontal = self.horizontal;
         let sizing = self.sizing;
         let visible = self.is_visible;
-        let animate = theme.animates_layout && (old_visible.is_some_and(|old| old != visible) || node.has_animation_controller("workspace.region.extent"));
-        if let (Some(extent), Some(layout)) = (previous, node.layout_node()) { apply_region_extent(&layout, sizing, horizontal, extent, &theme); }
-        cove_core::scene::with_animation(animate.then(|| cove_ui_compose::theme::SemanticMotionRef::medium().resolve(&cove_ui_compose::theme::theme_for_node(node))), || {
-            node.animatable_set_with("workspace.region.extent", previous.unwrap_or(target), target, move |extent| {
-                let Some(owner) = Node::upgrade(&weak) else { return };
-                owner.set_attachment("workspace.region.extent", extent);
-                owner.set_opacity(if extent > 0.0001 { 1.0 } else { 0.0 });
-                if let Some(layout) = owner.layout_node() {
-                    apply_region_extent(&layout, sizing, horizontal, extent, &theme);
-                }
-                if !visible && extent <= 0.0001 { revision.notify(); }
-            });
-        });
+        let animate = theme.animates_layout
+            && (old_visible.is_some_and(|old| old != visible)
+                || node.has_animation_controller("workspace.region.extent"));
+        if let (Some(extent), Some(layout)) = (previous, node.layout_node()) {
+            apply_region_extent(&layout, sizing, horizontal, extent, &theme);
+        }
+        cove_core::scene::with_animation(
+            animate.then(|| {
+                cove_ui_compose::theme::SemanticMotionRef::medium()
+                    .resolve(&cove_ui_compose::theme::theme_for_node(node))
+            }),
+            || {
+                node.animatable_set_with(
+                    "workspace.region.extent",
+                    previous.unwrap_or(target),
+                    target,
+                    move |extent| {
+                        let Some(owner) = Node::upgrade(&weak) else {
+                            return;
+                        };
+                        owner.set_attachment("workspace.region.extent", extent);
+                        owner.set_opacity(if extent > 0.0001 { 1.0 } else { 0.0 });
+                        if let Some(layout) = owner.layout_node() {
+                            apply_region_extent(&layout, sizing, horizontal, extent, &theme);
+                        }
+                        if !visible && extent <= 0.0001 {
+                            revision.notify();
+                        }
+                    },
+                );
+            },
+        );
     }
 
     fn make_layout_node(&self) -> Option<LayoutNode> {
@@ -352,11 +379,25 @@ impl PrimitiveView for WorkspaceRegionTransition {
         self.apply_extent(layout);
     }
     fn children(&self, node: &Node) -> Vec<AnyView> {
-        if let Some(revision) = node.attachment::<cove_core::Signal<u64>>("workspace.region.revision") { revision.track(); }
-        if self.is_visible { return self.content.iter().cloned().collect(); }
-        if node.attachment::<f32>("workspace.region.extent").unwrap_or(0.0) > 0.0001 {
-            node.attachment::<AnyView>("workspace.region.content").into_iter().collect()
-        } else { Vec::new() }
+        if let Some(revision) =
+            node.attachment::<cove_core::Signal<u64>>("workspace.region.revision")
+        {
+            revision.track();
+        }
+        if self.is_visible {
+            return self.content.iter().cloned().collect();
+        }
+        if node
+            .attachment::<f32>("workspace.region.extent")
+            .unwrap_or(0.0)
+            > 0.0001
+        {
+            node.attachment::<AnyView>("workspace.region.content")
+                .into_iter()
+                .collect()
+        } else {
+            Vec::new()
+        }
     }
 }
 
@@ -367,43 +408,55 @@ impl WorkspaceRegionTransition {
         } else {
             0.0
         };
-        apply_region_extent(layout, self.sizing, self.horizontal, target, &WorkspaceTheme::default());
+        apply_region_extent(
+            layout,
+            self.sizing,
+            self.horizontal,
+            target,
+            &WorkspaceTheme::default(),
+        );
     }
 }
-fn apply_region_extent(layout: &LayoutNode, sizing: WorkspaceRegionSizing, horizontal: bool, target: f32, theme: &WorkspaceTheme) {
-        match sizing {
-            WorkspaceRegionSizing::Fraction(_) => {
-                layout.set_flex_basis(0.0);
-                layout.set_flex_grow(target);
-            }
-            WorkspaceRegionSizing::Points(_) => {
-                layout.set_flex_grow(0.0);
-                layout.set_flex_shrink(0.0);
-                if horizontal {
-                    layout.set_width(Some(target));
-                } else {
-                    layout.set_height(Some(target));
-                }
-            }
-            WorkspaceRegionSizing::Divider => {
-                // The hairline separates two panes, so the region reserves only
-                // it; the grab area is a negative margin that overhangs the
-                // neighbouring cards instead of pushing them apart.
-                layout.set_flex_grow(0.0);
-                layout.set_flex_shrink(0.0);
-                let slop = theme.split_divider_hit_slop;
-                let span = target + 2.0 * slop;
-                if horizontal {
-                    layout.set_width(Some(span));
-                    layout.set_margin(-slop, cove_core::scene::Edge::Left);
-                    layout.set_margin(-slop, cove_core::scene::Edge::Right);
-                } else {
-                    layout.set_height(Some(span));
-                    layout.set_margin(-slop, cove_core::scene::Edge::Top);
-                    layout.set_margin(-slop, cove_core::scene::Edge::Bottom);
-                }
+fn apply_region_extent(
+    layout: &LayoutNode,
+    sizing: WorkspaceRegionSizing,
+    horizontal: bool,
+    target: f32,
+    theme: &WorkspaceTheme,
+) {
+    match sizing {
+        WorkspaceRegionSizing::Fraction(_) => {
+            layout.set_flex_basis(0.0);
+            layout.set_flex_grow(target);
+        }
+        WorkspaceRegionSizing::Points(_) => {
+            layout.set_flex_grow(0.0);
+            layout.set_flex_shrink(0.0);
+            if horizontal {
+                layout.set_width(Some(target));
+            } else {
+                layout.set_height(Some(target));
             }
         }
+        WorkspaceRegionSizing::Divider => {
+            // The hairline separates two panes, so the region reserves only
+            // it; the grab area is a negative margin that overhangs the
+            // neighbouring cards instead of pushing them apart.
+            layout.set_flex_grow(0.0);
+            layout.set_flex_shrink(0.0);
+            let slop = theme.split_divider_hit_slop;
+            let span = target + 2.0 * slop;
+            if horizontal {
+                layout.set_width(Some(span));
+                layout.set_margin(-slop, cove_core::scene::Edge::Left);
+                layout.set_margin(-slop, cove_core::scene::Edge::Right);
+            } else {
+                layout.set_height(Some(span));
+                layout.set_margin(-slop, cove_core::scene::Edge::Top);
+                layout.set_margin(-slop, cove_core::scene::Edge::Bottom);
+            }
+        }
+    }
 }
 
 impl_primitive_view!(WorkspaceRegionTransition);
@@ -528,7 +581,6 @@ impl PrimitiveView for WorkspaceVerticalTitle {
     }
 }
 impl_primitive_view!(WorkspaceVerticalTitle);
-
 
 pub fn visible_groups(
     slot_id: &WorkspaceSlotID,

@@ -145,6 +145,17 @@ payload!(MirrorInput {
     kind: String, x: Option<f32>, y: Option<f32>, delta_x: Option<f32>, delta_y: Option<f32>,
     button: Option<i64>, key: Option<String>, key_code: Option<i64>, text: Option<String>,
     modifiers: Option<i64>, click_count: Option<i64>, is_repeat: Option<bool>, scroll: Option<cove_platform::ScrollInput>,
+    /// `externalDrop` payload: `"begin"`, `"file"`, `"text"`, `"position"` or
+    /// `"complete"`. Lets a client exercise the OS-drop path without a real drag
+    /// from another application.
+    #[serde(default)]
+    phase: Option<String>,
+    /// Absolute paths for `phase: "file"`.
+    #[serde(default)]
+    paths: Option<Vec<String>>,
+    /// The source application reported by the platform, when known.
+    #[serde(default)]
+    source: Option<String>,
 });
 impl MirrorInput {
     pub fn is_valid(&self) -> bool {
@@ -167,6 +178,28 @@ impl MirrorInput {
                 .as_ref()
                 .is_some_and(|text| !text.is_empty() && text.len() <= 65_536),
             "keyDown" | "keyUp" => key_scancode(self.key.as_deref()).is_some(),
+            "externalDrop" => match self.phase.as_deref() {
+                Some("position") | Some("begin") | Some("complete") => {
+                    self.x.is_some() && self.y.is_some()
+                }
+                Some("file") => {
+                    self.x.is_some()
+                        && self.y.is_some()
+                        && self.paths.as_ref().is_some_and(|paths| {
+                            !paths.is_empty()
+                                && paths.len() <= 256
+                                && paths
+                                    .iter()
+                                    .all(|path| !path.is_empty() && path.len() <= 4096)
+                        })
+                }
+                Some("text") => {
+                    self.x.is_some()
+                        && self.y.is_some()
+                        && self.text.as_ref().is_some_and(|text| !text.is_empty())
+                }
+                _ => false,
+            },
             _ => false,
         }
     }

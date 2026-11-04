@@ -237,11 +237,14 @@ impl<T: Send + 'static> State<T> {
     {
         let read = self.clone();
         let write = self.clone();
-        Binding::new(move || {
-            let value = read.0.value.lock().unwrap_or_else(|e| e.into_inner());
-            read.track_access(None, None, true);
-            value.0.clone()
-        }, move |value| write.set(value))
+        Binding::new(
+            move || {
+                let value = read.0.value.lock().unwrap_or_else(|e| e.into_inner());
+                read.track_access(None, None, true);
+                value.0.clone()
+            },
+            move |value| write.set(value),
+        )
     }
     /// Projections are pure and must not recursively lock this state.
     pub fn read_field<F: SnapshotValue>(
@@ -522,7 +525,9 @@ mod binding_read_tests {
         let binding = value.binding();
         let hits = Arc::new(AtomicUsize::new(0));
         let count = hits.clone();
-        let scope = ReadScope::new(move |_| { count.fetch_add(1, Ordering::SeqCst); });
+        let scope = ReadScope::new(move |_| {
+            count.fetch_add(1, Ordering::SeqCst);
+        });
         crate::state_read_tracking::with_read_scope(&scope, || assert_eq!(binding.get(), 1));
         value.set(2);
         assert_eq!(hits.load(Ordering::SeqCst), 1);

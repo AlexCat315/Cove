@@ -4,6 +4,17 @@
 
 ## Unreleased
 
+- **系统文件拖入与上传（2026-11-04）**：
+  - `cove-platform` 新增 `ExternalDropEvent` 与 `DropPhase::{Begin, File, Text, Position, Complete}`，作为 `InputEvent::ExternalDrop` 交付。此前 shell/runtime 完全没有系统拖入通道：`cove_shell_poll` 只解码键鼠与手柄，SDL3 已支持的 `SDL_EVENT_DROP_*` 被丢弃。
+  - 原生桥接入拖放：`CoveShellEvent` 新增 `aux` 承载拖拽来源，drop 坐标按 `coordinate_scale` 单独换算（此前只有指针事件缩放），`event_free` 一并释放。`sdl3_shell::decode_event` 解码 kind 25…29；无窗口归属的 drop 路由到主窗口，修复 iOS 以 null window 交付文档时被 `windows.contains_key` 丢弃的问题。解码逻辑抽为公开的 `external_drop` 以便无窗口断言。
+  - 新增 `FileDropZone`、`FileDropRegistry`、`DroppedFile`：节点命中与顶层优先、扩展名与数量过滤、`accepts` 谓词、进入/离开高亮（接受/拒绝两种描边）。
+  - 新增 `primitives/upload`：`multipart` 编码（单次拷贝、文件名与参数转义、编码前超限拒绝）、`UploadTransport`/`UploadTransportHolder` 接缝、`UploadState` 五态与 `DragUpload`（拖放区 + 状态机 + 进度 + 取消）。上传在 worker 线程读取与发送，经 `cove_core::work::spawn_then` 回 UI 线程写 `State`。
+  - core 新增 `FilePicker`/`FilePickerFilter` ambient（照 `ColorSampler`），为触屏与键盘提供与拖入等价的浏览入口；未安装时按钮禁用而非打开空面板。
+  - 宿主：新增 `application_services/upload.rs` 的 `HttpUploadTransport` 并在 `install_platform_services()` 安装；桌面运行时把 `InputEvent::ExternalDrop` 路由到 per-window 注册表并安装 `FilePicker`；`ApplicationServices` 补 `FilePicker` 的 capture/restore。删除 `composition.rs` 中无任何调用者的旧 `AssetDropRegistry`（`set_active_target` 从未被调用），改用 `FileDropRegistry`。
+  - `cove-http` 仍以 `Vec<u8>` 发送 body，因此上传有 `maximum_bytes`（默认 64 MiB）并显式报 `PayloadTooLarge`；流式 body 列为后续项。
+  - 边界：Wasm 无 HTTP 后端时 holder 为空，`DragUpload` 保持可用并报告 `HostUnavailable`；Android SDL 后端不上报拖放、iOS 仅“用…打开”触发，两端的正式入口是浏览按钮。
+  - Gallery 新增 “Drag Upload” 页（注入离线假 transport），同步 catalog/routing/icons 与用户文档 `drag-upload.md`。结构测试：`file_drop_tests` 13 项、`external_drop_tests` 6 项、upload 与 hosts transport 单测。**原生 OS 拖入与原生打开面板交互尚未实机验收**。
+
 - **屏幕取色：契约/后端分层与全异步回调（2026-11-04，破坏性）**：
   - `cove-platform` 只放契约：`ScreenColor` 之外新增 `ScreenColorBackend`、`ScreenColorSample`、`ScreenColorCompletion`；取消、不支持、失败不再折叠成一个 `None`。`Shell::sample_screen_color`、平台桥消息与宿主注入统一改用契约类型。
   - 真正的取色全部下沉到 `cove-shell/src/color_sampler/`，按窗口系统分后端：macOS `NSColorSampler`（`objc2-app-kit` + `block2`，从 `apple.m` 迁到 Rust）；Windows Win32 屏幕 DC `GetPixel`（系统没有桌面取色 API，WinUI/Chromium 的 Eyedropper 只能读自身窗口内容）；Linux X11 `XGetImage` 截屏采样（运行时 `dlopen` 加载 `libX11.so.6`，按 XImage 真实通道掩码解码像素）与 XDG `org.freedesktop.portal.Screenshot.PickColor`（自带最小 D-Bus 线协议客户端，无新增 crate）；iOS/Android/Wasm 明确回报 `Unsupported`。

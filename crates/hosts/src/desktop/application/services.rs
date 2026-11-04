@@ -8,9 +8,9 @@ use crate::desktop::application::composition::{
     AppDisplayHandleHolder, AssetDropRegistry, AssetDropRegistryHolder,
 };
 use cove_core::scene::{
-    ClipboardHolder, ClipboardRequester, ColorSampler, ColorSamplerCallback, FocusChain,
-    FocusChainHolder, InteractionRegistry, InteractionRegistryHolder, PointerCapture,
-    PointerCaptureHolder, UIWorkSchedulerHolder,
+    ClipboardHolder, ClipboardRequester, ColorSampler, ColorSamplerCallback, FilePicker,
+    FilePickerCallback, FocusChain, FocusChainHolder, InteractionRegistry,
+    InteractionRegistryHolder, PointerCapture, PointerCaptureHolder, UIWorkSchedulerHolder,
 };
 use cove_imaging::{ImageAssetRegistry, ImageAssetRegistryHolder};
 use cove_text::{TextEnvironment, TextEnvironmentHolder};
@@ -25,6 +25,7 @@ pub struct ApplicationServices {
     clipboard_read: Option<ClipboardRequester>,
     clipboard_write: Option<Rc<dyn Fn(&str)>>,
     sampler: Option<ColorSamplerCallback>,
+    picker: Option<FilePickerCallback>,
     images: Option<std::sync::Arc<ImageAssetRegistry>>,
     drops: Option<Rc<AssetDropRegistry>>,
     work: Option<Rc<dyn Fn(Rc<dyn Fn()>)>>,
@@ -42,6 +43,7 @@ impl ApplicationServices {
             clipboard_read: clipboard_handlers::read(),
             clipboard_write: clipboard_handlers::write(),
             sampler: color_sampler_handler::handler(),
+            picker: file_picker_handler::handler(),
             images: ImageAssetRegistryHolder::current(),
             drops: AssetDropRegistryHolder::current(),
             work: work_scheduler::handler(),
@@ -61,6 +63,8 @@ impl ApplicationServices {
         clipboard_handlers::remember(self.clipboard_read, self.clipboard_write);
         ColorSampler::set_requester(self.sampler.clone());
         color_sampler_handler::remember(self.sampler);
+        FilePicker::set_presenter(self.picker.clone());
+        file_picker_handler::remember(self.picker);
         ImageAssetRegistryHolder::set_current(self.images);
         AssetDropRegistryHolder::set_current(self.drops);
         work_scheduler::remember(self.work.clone());
@@ -110,6 +114,25 @@ pub mod color_sampler_handler {
     }
 
     pub fn handler() -> Option<ColorSamplerCallback> {
+        SLOT.with(|slot| slot.borrow().clone())
+    }
+}
+
+/// Native open-panel registry, mirroring [`color_sampler_handler`] because
+/// `FilePicker` exposes no getter.
+pub mod file_picker_handler {
+    use super::*;
+    use std::cell::RefCell;
+
+    thread_local! {
+        static SLOT: RefCell<Option<FilePickerCallback>> = const { RefCell::new(None) };
+    }
+
+    pub fn remember(handler: Option<FilePickerCallback>) {
+        SLOT.with(|slot| *slot.borrow_mut() = handler);
+    }
+
+    pub fn handler() -> Option<FilePickerCallback> {
         SLOT.with(|slot| slot.borrow().clone())
     }
 }

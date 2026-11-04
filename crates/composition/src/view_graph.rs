@@ -947,16 +947,25 @@ impl ViewScope {
     fn observed<R>(scope: &Rc<RefCell<Self>>, run: impl FnOnce() -> R) -> R {
         let (observer, tracking) = {
             let scope = scope.borrow();
-            (scope.observer.clone(), scope.read_invalidation.as_ref().map(|reads| (
-                cove_core::ReadScopeId(scope.anchor.id().0), reads.invalidator(), reads.tracked(),
-            )))
+            (
+                scope.observer.clone(),
+                scope.read_invalidation.as_ref().map(|reads| {
+                    (
+                        cove_core::ReadScopeId(scope.anchor.id().0),
+                        reads.invalidator(),
+                        reads.tracked(),
+                    )
+                }),
+            )
         };
         let evaluate = || match observer {
             Some(observer) => observer.track(run),
             None => run(),
         };
         match tracking {
-            Some((id, invalidate, tracked)) => ObservableStateTracking::with_scope(id, invalidate, Some(tracked), evaluate),
+            Some((id, invalidate, tracked)) => {
+                ObservableStateTracking::with_scope(id, invalidate, Some(tracked), evaluate)
+            }
             None => evaluate(),
         }
     }

@@ -68,7 +68,11 @@ fn start_and_stop_drive_the_tap_and_the_host_hooks() {
     assert_eq!(resets.get(), 1, "stopping frees the capture target");
     devtools.mirror_capture(&DrawList::default(), 8, 8, 8.0, 8.0);
     assert_eq!(captures.get(), 1, "a stopped tap captures nothing");
-    assert_eq!(*active.borrow(), [true, false], "the host hooks run in order");
+    assert_eq!(
+        *active.borrow(),
+        [true, false],
+        "the host hooks run in order"
+    );
 
     devtools.stop();
 }
@@ -77,7 +81,12 @@ fn start_and_stop_drive_the_tap_and_the_host_hooks() {
 fn the_mirror_capability_follows_the_attached_tap() {
     let mut without = devtools();
     without.start().expect("the server starts");
-    assert!(!without.server.advertised_capabilities.contains(&"mirror".to_owned()));
+    assert!(
+        !without
+            .server
+            .advertised_capabilities
+            .contains(&"mirror".to_owned())
+    );
     without.stop();
 
     let mut with = devtools();
@@ -86,6 +95,10 @@ fn the_mirror_capability_follows_the_attached_tap() {
         || {},
     );
     with.start().expect("the server starts");
-    assert!(with.server.advertised_capabilities.contains(&"mirror".to_owned()));
+    assert!(
+        with.server
+            .advertised_capabilities
+            .contains(&"mirror".to_owned())
+    );
     with.stop();
 }

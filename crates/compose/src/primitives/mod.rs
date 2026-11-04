@@ -9,6 +9,7 @@ pub mod media;
 pub mod navigation;
 pub mod overlays;
 pub mod text;
+pub mod upload;
 
 /// An authored collection contains the same identity twice.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

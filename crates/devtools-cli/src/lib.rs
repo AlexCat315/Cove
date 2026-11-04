@@ -515,6 +515,36 @@ fn validate_events(events: &[Value]) -> Result<(), AgentError> {
             }
             "keyDown" | "keyUp" => validate_key(event["key"].as_str().unwrap_or_default())?,
             "text" if event["text"].as_str().is_some_and(|text| !text.is_empty()) => {}
+            "externalDrop" => {
+                for name in ["x", "y"] {
+                    if event[name].as_f64().is_none() {
+                        return Err(failure("externalDrop events require x and y."));
+                    }
+                }
+                match event["phase"].as_str().unwrap_or_default() {
+                    "begin" | "position" | "complete" => {}
+                    "file" => {
+                        let paths = event["paths"]
+                            .as_array()
+                            .ok_or_else(|| failure("a file drop requires paths."))?;
+                        if paths.is_empty() || paths.len() > 256 {
+                            return Err(failure("a file drop carries 1 to 256 paths."));
+                        }
+                        if paths.iter().any(|path| {
+                            path.as_str()
+                                .is_none_or(|path| path.is_empty() || path.len() > 4096)
+                        }) {
+                            return Err(failure("each dropped path is 1 to 4096 bytes."));
+                        }
+                    }
+                    "text" if event["text"].as_str().is_some_and(|text| !text.is_empty()) => {}
+                    _ => {
+                        return Err(failure(
+                            "externalDrop requires phase begin|position|complete, or file with paths, or text with text.",
+                        ));
+                    }
+                }
+            }
             "pointerMove" | "pointerDown" | "pointerUp" | "wheel" => {
                 for name in ["x", "y"] {
                     if event[name].as_f64().is_none() {

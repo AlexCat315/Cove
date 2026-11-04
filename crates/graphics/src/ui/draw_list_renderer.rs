@@ -156,10 +156,15 @@ impl NativeDrawListRenderer {
         self.raster = None;
         for (other, pass) in &self.backdrops {
             if *other != key {
-                pass.lock().unwrap_or_else(PoisonError::into_inner).trim_scratch();
+                pass.lock()
+                    .unwrap_or_else(PoisonError::into_inner)
+                    .trim_scratch();
             }
         }
-        let mut state = self.presentation.lock().unwrap_or_else(PoisonError::into_inner);
+        let mut state = self
+            .presentation
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner);
         state.epoch = state.epoch.wrapping_add(1);
         state.reveal = None;
         state.last_extent = None;
@@ -194,7 +199,11 @@ impl NativeDrawListRenderer {
     pub fn estimated_presentation_texture_bytes(&self) -> usize {
         self.backdrops
             .values()
-            .map(|p| p.lock().unwrap_or_else(PoisonError::into_inner).estimated_scratch_bytes())
+            .map(|p| {
+                p.lock()
+                    .unwrap_or_else(PoisonError::into_inner)
+                    .estimated_scratch_bytes()
+            })
             .sum::<usize>()
             + self.raster.as_ref().map_or(0, |r| r.estimated_bytes())
     }
@@ -216,9 +225,14 @@ impl NativeDrawListRenderer {
         self.geometry = None;
         self.raster = None;
         for pass in self.backdrops.values() {
-            pass.lock().unwrap_or_else(PoisonError::into_inner).trim_scratch();
+            pass.lock()
+                .unwrap_or_else(PoisonError::into_inner)
+                .trim_scratch();
         }
-        let mut state = self.presentation.lock().unwrap_or_else(PoisonError::into_inner);
+        let mut state = self
+            .presentation
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner);
         state.epoch = state.epoch.wrapping_add(1);
         state.reveal = None;
         state.last_extent = None;
@@ -235,7 +249,8 @@ impl NativeDrawListRenderer {
             .ok_or_else(|| {
                 RhiError::invalid_argument("configure the renderer before recording a blit")
             })?
-            .lock().unwrap_or_else(PoisonError::into_inner)
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
             .record_blit(source, target, size, commands)
     }
     pub fn synchronize_textures(&self, source: &Self) -> RhiResult<()> {
@@ -366,7 +381,10 @@ impl NativeDrawListRenderer {
         if let (Some(backdrop), Some(source), Some(reveal)) =
             (&self.backdrop, backdrop_source, list.reveal)
         {
-            let state = self.presentation.lock().unwrap_or_else(PoisonError::into_inner);
+            let state = self
+                .presentation
+                .lock()
+                .unwrap_or_else(PoisonError::into_inner);
             if state
                 .reveal
                 .is_none_or(|old| old.sequence != reveal.sequence)
@@ -374,7 +392,8 @@ impl NativeDrawListRenderer {
                 if state.last_extent == Some(viewport) {
                     retained = Some(
                         backdrop
-                            .lock().unwrap_or_else(PoisonError::into_inner)
+                            .lock()
+                            .unwrap_or_else(PoisonError::into_inner)
                             .record_reveal_capture(source, viewport, commands)?,
                     );
                 }
@@ -469,7 +488,9 @@ impl NativeDrawListRenderer {
             });
         }
         let backdrop = self.backdrop.clone();
-        let mut backdrop = backdrop.as_ref().map(|p| p.lock().unwrap_or_else(PoisonError::into_inner));
+        let mut backdrop = backdrop
+            .as_ref()
+            .map(|p| p.lock().unwrap_or_else(PoisonError::into_inner));
         if let Some(pass) = &mut backdrop {
             pass.begin_captures();
         }
@@ -536,7 +557,11 @@ impl NativeDrawListRenderer {
             .ok_or_else(|| RhiError::invalid_argument("UI frame sequence exhausted"))?;
         let sequence = self.record_sequence;
         let state = Arc::downgrade(&self.presentation);
-        let epoch = self.presentation.lock().unwrap_or_else(PoisonError::into_inner).epoch;
+        let epoch = self
+            .presentation
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .epoch;
         let weak_pass = self.backdrop.as_ref().map(Arc::downgrade);
         Ok(NativeUIDrawFrame {
             statistics,

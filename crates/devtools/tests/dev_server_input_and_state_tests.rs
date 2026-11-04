@@ -31,6 +31,9 @@ fn key_event(web_code: &str, key_code: Option<i64>, modifiers: Option<i64>) -> O
         click_count: None,
         is_repeat: None,
         scroll: None,
+        phase: None,
+        paths: None,
+        source: None,
     })
 }
 
@@ -93,6 +96,9 @@ fn keyboard_input_maps_web_codes_to_scancodes() {
         click_count: None,
         is_repeat: Some(true),
         scroll: None,
+        phase: None,
+        paths: None,
+        source: None,
     })
     .expect("key down");
     let InputEvent::KeyDown(repeat) = with_repeat else {
@@ -114,6 +120,9 @@ fn keyboard_input_maps_web_codes_to_scancodes() {
         click_count: None,
         is_repeat: Some(false),
         scroll: None,
+        phase: None,
+        paths: None,
+        source: None,
     }) else {
         panic!("expected a key up event");
     };

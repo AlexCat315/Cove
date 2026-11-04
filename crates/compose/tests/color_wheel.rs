@@ -342,7 +342,9 @@ fn the_installed_screen_sampler_shows_and_drives_the_eyedropper() {
         cove_core::scene::ColorSampler::set_requester(Some(std::rc::Rc::new(|done| {
             done(Some(Color::from_rgba8(9, 8, 7, 255)));
         })));
-        scene.install(LayerRoot::new(AnyView::new(ColorField::new(color.binding()))));
+        scene.install(LayerRoot::new(AnyView::new(ColorField::new(
+            color.binding(),
+        ))));
         let trigger = scene
             .first(|n| n.accessibility().is_some_and(|s| s.label == "Choose color"))
             .expect("the color field publishes its trigger");

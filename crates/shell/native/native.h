@@ -4,7 +4,11 @@
 #include <stddef.h>
 #include <stdint.h>
 typedef struct CoveShellWindow CoveShellWindow;
-typedef struct { uint32_t kind, window; double timestamp; uint64_t identity; int32_t a,b,c,d; float x,y,dx,dy; uint16_t modifiers,flags; char *text; } CoveShellEvent;
+/* `text` carries the payload of an event that has one (typed text, a dropped
+   filename or dropped plain text). `aux` carries a secondary string: for drop
+   events it is the drag source application, NULL when unavailable. Both are
+   owned copies released by cove_shell_event_free. */
+typedef struct { uint32_t kind, window; double timestamp; uint64_t identity; int32_t a,b,c,d; float x,y,dx,dy; uint16_t modifiers,flags; char *text, *aux; } CoveShellEvent;
 typedef struct { float x,y,width,height; } CoveShellRect;
 typedef struct { float title_height,leading,trailing,border; bool explicit_drag; const CoveShellRect *drag,*non_drag; size_t drag_count,non_drag_count; } CoveShellChrome;
 typedef struct { uint32_t id; int32_t width,height,pixel_width,pixel_height,x,y; float scale; bool focused,visible,minimized,occluded,maximized; float top,bottom,leading,trailing; uint32_t surface_kind; uintptr_t surface,display,instance,native_window; uint64_t native_number; double refresh_rate; } CoveShellWindowState;

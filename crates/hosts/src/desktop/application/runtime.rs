@@ -13,7 +13,9 @@ use super::services::ApplicationServices;
 use super::typography::{AdaptiveApplicationContent, ApplicationTypography};
 use crate::desktop::diagnostics::checkpoint::ApplicationCheckpoint;
 use crate::desktop::diagnostics::frame_metrics::FrameMetrics;
-use crate::desktop::diagnostics::integration::{DiagnosticsCallbacks, DiagnosticsSession, take_factory};
+use crate::desktop::diagnostics::integration::{
+    DiagnosticsCallbacks, DiagnosticsSession, take_factory,
+};
 use crate::desktop::diagnostics::performance_hud::PerformanceHud;
 use crate::desktop::diagnostics::recording::{InputRecorder, RecordingControl};
 use crate::desktop::diagnostics::session::{ApplicationDiagnostics, DiagnosticsQueries};
@@ -42,6 +44,9 @@ use cove_runtime::{
 };
 use cove_shell::{NativeRenderSurface, WindowChromeHitTest, WindowOptions};
 use cove_text::{TextBootstrapOptions, TextEnvironment, TextEnvironmentHolder};
+use cove_ui_compose::primitives::interaction::{
+    DroppedFile, FileDropRegistry, FileDropRegistryHolder,
+};
 use cove_ui_compose::primitives::overlays::portal::portal_registry::{
     PortalStore, PortalStoreAmbient,
 };
@@ -359,6 +364,29 @@ impl Application {
         cove_core::scene::ColorSampler::set_requester(sample.clone());
         super::services::color_sampler_handler::remember(sample);
         AppDisplayHandleHolder::set_current(Some(state.display_handle.clone()));
+        // The open panel is what makes a drop zone usable without a pointer
+        // drag: touch and keyboard users reach the same callback through it.
+        let picker: cove_core::scene::FilePickerCallback = Rc::new({
+            let display = state.display_handle.clone();
+            move |filters: &[cove_core::scene::FilePickerFilter],
+                  multiple: bool,
+                  done: cove_core::scene::FilePickCompletion| {
+                let filters: Vec<cove_shell::FileDialogFilter> = filters
+                    .iter()
+                    .map(|filter| cove_shell::FileDialogFilter {
+                        name: filter.name.clone(),
+                        extensions: filter
+                            .extensions
+                            .iter()
+                            .map(|extension| extension.trim_start_matches('.').to_owned())
+                            .collect(),
+                    })
+                    .collect();
+                display.request_open_file(&filters, multiple, None, done);
+            }
+        });
+        cove_core::scene::FilePicker::set_presenter(Some(picker.clone()));
+        super::services::file_picker_handler::remember(Some(picker));
         if let Some(link) = cove_runtime::platform::PlatformLink::current() {
             cove_core::scene::PlatformThread::set_executor(Some(Rc::new(move |work| {
                 link.bridge
@@ -515,6 +543,35 @@ impl Application {
         self.state.diagnostics.borrow_mut().dev_tools = session;
     }
 
+    /// Delivers a platform drag to the file drop zones of the current window.
+    ///
+    /// The registry owns node hit testing; the host only translates one platform
+    /// event into one registry call, so a zone never talks to the shell.
+    fn route_external_drop(state: &Rc<ApplicationState>, event: &cove_platform::InputEvent) {
+        let cove_platform::InputEvent::ExternalDrop(drop) = event else {
+            return;
+        };
+        let Some(registry) = FileDropRegistryHolder::current() else {
+            return;
+        };
+        let point = cove_core::Point::new(drop.x, drop.y);
+        match drop.phase {
+            cove_platform::DropPhase::Position => {
+                registry.update_position(point);
+            }
+            cove_platform::DropPhase::File => {
+                let files: Vec<DroppedFile> = drop.paths.iter().map(DroppedFile::new).collect();
+                FileDropRegistry::drop(registry.as_ref(), &files, point);
+            }
+            cove_platform::DropPhase::Complete => {
+                registry
+                    .update_position(cove_core::Point::new(f32::NEG_INFINITY, f32::NEG_INFINITY));
+            }
+            cove_platform::DropPhase::Begin | cove_platform::DropPhase::Text => {}
+        }
+        let _ = state;
+    }
+
     /// Lets the session consume a platform event before the app dispatcher sees
     /// it, which is what makes DevTools picking work.
     fn install_input_interceptor(&self) {
@@ -523,6 +580,13 @@ impl Application {
         };
         let state = self.state.clone();
         *session.callbacks.input_interceptor.borrow_mut() = Some(Rc::new(move |event| {
+            // A platform drag is delivered as an input event but has no
+            // dispatcher route of its own, so the host consumes it here: this
+            // runs for every event, including one injected by DevTools, without
+            // depending on the window's `on_event` slot.
+            if matches!(event, cove_platform::InputEvent::ExternalDrop(_)) {
+                Application::route_external_drop(&state, event);
+            }
             let mut session = state.diagnostics.borrow_mut().dev_tools.take();
             let consumed = session
                 .as_mut()
@@ -800,13 +864,14 @@ impl Application {
         {
             let state = state.clone();
             let weak: Weak<ApplicationState> = Rc::downgrade(&state);
-            *callbacks.on_frame.borrow_mut() =
-                Some(Rc::new(move |_native: NativeRenderSurface| -> FrameOutcome {
+            *callbacks.on_frame.borrow_mut() = Some(Rc::new(
+                move |_native: NativeRenderSurface| -> FrameOutcome {
                     match weak.upgrade() {
                         Some(state) => Application { state }.handle_frame(),
                         None => FrameOutcome::Skipped,
                     }
-                }));
+                },
+            ));
         }
         {
             let state = state.clone();
@@ -1209,7 +1274,9 @@ impl Application {
                 // Every slot is in flight. This is pacing, not failure, and the
                 // renderer owes us a wake once a slot frees.
                 renderer.note_frame_dropped();
-                state.frame_drops.set(state.frame_drops.get().saturating_add(1));
+                state
+                    .frame_drops
+                    .set(state.frame_drops.get().saturating_add(1));
                 return FrameOutcome::Skipped;
             }
         }
@@ -1349,7 +1416,9 @@ impl Application {
             Ok(Some(_)) => {}
             Ok(None) => {
                 // Lost the race for a slot between the check above and here.
-                state.frame_drops.set(state.frame_drops.get().saturating_add(1));
+                state
+                    .frame_drops
+                    .set(state.frame_drops.get().saturating_add(1));
                 return FrameOutcome::Skipped;
             }
             Err(error) => {
@@ -1633,13 +1702,14 @@ impl Application {
         }
         {
             let state = state.clone();
-            *session.callbacks.on_frame.borrow_mut() =
-                Some(Rc::new(move |_native: NativeRenderSurface| -> FrameOutcome {
+            *session.callbacks.on_frame.borrow_mut() = Some(Rc::new(
+                move |_native: NativeRenderSurface| -> FrameOutcome {
                     Application {
                         state: state.clone(),
                     }
                     .auxiliary_frame(window_id)
-                }));
+                },
+            ));
         }
         session.request_display();
         Some(window_id)

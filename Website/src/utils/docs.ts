@@ -61,6 +61,7 @@ import markdown from '@/content/components/markdown.md?raw'
 import grid from '@/content/components/grid.md?raw'
 import terminal from '@/content/components/terminal.md?raw'
 import resourcePreparation from '@/content/components/resource-preparation.md?raw'
+import dragUpload from '@/content/components/drag-upload.md?raw'
 
 export const docGroups: DocGroup[] = [
   {
@@ -114,6 +115,7 @@ export const docGroups: DocGroup[] = [
       { slug: 'text-editor', title: 'Text Editor', raw: textEditor },
       { slug: 'toolbar', title: 'Toolbar / AppBar', raw: component10 },
       { slug: 'action-group-layout', title: 'ActionGroupLayout', raw: actionGroupLayout },
+      { slug: 'drag-upload', title: 'DragUpload / FileDropZone', raw: dragUpload },
       { slug: 'grid', title: 'Grid / named columns', raw: grid },
       { slug: 'markdown', title: 'MarkdownView', raw: markdown },
       { slug: 'vec3-field', title: 'Vec3Field', raw: component11 },

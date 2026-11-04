@@ -38,12 +38,7 @@ impl ScreenColor {
 
     pub fn rgba8(self) -> [u8; 4] {
         let byte = |v: f32| (v.clamp(0.0, 1.0) * 255.0).round() as u8;
-        [
-            byte(self.r),
-            byte(self.g),
-            byte(self.b),
-            byte(self.a),
-        ]
+        [byte(self.r), byte(self.g), byte(self.b), byte(self.a)]
     }
 
     /// Backends may report out-of-gamut floats; keep the contract in `0…1`.
@@ -379,6 +374,39 @@ pub struct GamepadAxisEvent {
     pub value: f32,
 }
 
+/// One step of a drag that started outside the application.
+///
+/// The OS delivers drops as a sequence: `Begin` announces the drag, `File` and
+/// `Text` carry each item, `Position` tracks the pointer while it moves over a
+/// window, and `Complete` ends the sequence. A platform that cannot report a
+/// position still reports the rest, so hosts read `position` as advisory.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum DropPhase {
+    #[default]
+    Begin,
+    File,
+    Text,
+    Position,
+    Complete,
+}
+
+/// A dropped item and where it landed.
+///
+/// `paths` holds filesystem paths for [`DropPhase::File`] and is empty
+/// otherwise; `text` holds plain text for [`DropPhase::Text`]. Both stay empty
+/// for `Begin`, `Position` and `Complete`. `x`/`y` are window coordinates in
+/// logical points, the same space as pointer events.
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+pub struct ExternalDropEvent {
+    pub phase: DropPhase,
+    pub paths: Vec<String>,
+    pub text: Option<String>,
+    pub x: f32,
+    pub y: f32,
+    /// The application that started the drag, when the platform reports one.
+    pub source: Option<String>,
+}
+
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub enum InputEvent {
     KeyDown(KeyEvent),
@@ -389,6 +417,9 @@ pub enum InputEvent {
     MouseButtonDown(MouseButtonEvent),
     MouseButtonUp(MouseButtonEvent),
     MouseWheel(MouseWheelEvent),
+    /// A drag that started outside the application. Window identity travels in
+    /// [`WindowInputEvent::window_id`], so it is not repeated here.
+    ExternalDrop(ExternalDropEvent),
     GamepadButtonDown(GamepadButtonEvent),
     GamepadButtonUp(GamepadButtonEvent),
     GamepadAxisMotion(GamepadAxisEvent),
@@ -400,8 +431,14 @@ pub enum InputEvent {
     WindowRestored,
     WindowOccluded,
     WindowExposed,
-    WindowResized { width: i32, height: i32 },
-    WindowPixelSizeChanged { width: i32, height: i32 },
+    WindowResized {
+        width: i32,
+        height: i32,
+    },
+    WindowPixelSizeChanged {
+        width: i32,
+        height: i32,
+    },
 }
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct WindowInputEvent {
@@ -509,10 +546,7 @@ mod tests {
             ScreenColor::new(0.0, 1.0, 0.25, 1.0)
         );
         let data = serde_json::to_vec(&color).unwrap();
-        assert_eq!(
-            serde_json::from_slice::<ScreenColor>(&data).unwrap(),
-            color
-        );
+        assert_eq!(serde_json::from_slice::<ScreenColor>(&data).unwrap(), color);
     }
     #[test]
     fn screen_color_sample_distinguishes_pick_cancel_and_unsupported() {

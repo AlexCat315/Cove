@@ -90,12 +90,14 @@ impl Alignment {
     pub fn layout_values(self, direction: FlexDirection) -> (Align, Justify) {
         let (horizontal, vertical) = self.components();
         match direction {
-            FlexDirection::Row | FlexDirection::RowReverse => {
-                (vertical.layout_align(), horizontal.layout_justify(direction))
-            }
-            FlexDirection::Column | FlexDirection::ColumnReverse => {
-                (horizontal.layout_align(), vertical.layout_justify(direction))
-            }
+            FlexDirection::Row | FlexDirection::RowReverse => (
+                vertical.layout_align(),
+                horizontal.layout_justify(direction),
+            ),
+            FlexDirection::Column | FlexDirection::ColumnReverse => (
+                horizontal.layout_align(),
+                vertical.layout_justify(direction),
+            ),
         }
     }
 }

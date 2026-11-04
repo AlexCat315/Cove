@@ -89,3 +89,7 @@ cargo test -p cove-graphics
 ```
 
 测试包不再由根 manifest 重复声明，因此根包测试和能力包测试均需在 CI 中执行。平台图形/窗口后端仍需各平台验收；本机通过不代表 Android、Wasm、Windows 与 Linux 全部通过。
+
+## 后续能力设计
+
+[音视频与 GStreamer 集成设计](media-gstreamer.md)记录 Rust 媒体能力的公共接口、可选模块、RHI/宿主适配、平台工作项和验证门禁；该文档为设计草案，不代表媒体接口已实现。

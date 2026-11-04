@@ -53,12 +53,8 @@ mod apple {
     }
     pub(super) fn perform_pending() {
         for action in take_actions() {
-            let bridge = BRIDGES.with(|bridges| {
-                bridges
-                    .borrow()
-                    .get(&action.bridge)
-                    .and_then(Weak::upgrade)
-            });
+            let bridge = BRIDGES
+                .with(|bridges| bridges.borrow().get(&action.bridge).and_then(Weak::upgrade));
             if let Some(bridge) = bridge {
                 bridge.perform(action.element, action.kind, action.value.as_deref());
             }
@@ -67,7 +63,10 @@ mod apple {
     /// Where a window's snapshots go: a presenter on this thread when it owns the
     /// platform, otherwise the platform thread.
     enum Target {
-        Direct { window: usize, presenter: RefCell<Option<Presenter>> },
+        Direct {
+            window: usize,
+            presenter: RefCell<Option<Presenter>>,
+        },
         Remote(Arc<PlatformLink>),
     }
     #[derive(Clone, PartialEq)]
@@ -292,7 +291,12 @@ mod apple {
                         role: role_id(s.role),
                         flags,
                         actions: action_flags,
-                        frame: [item.frame.x, item.frame.y, item.frame.width, item.frame.height],
+                        frame: [
+                            item.frame.x,
+                            item.frame.y,
+                            item.frame.width,
+                            item.frame.height,
+                        ],
                         label: text(if bare_text { "" } else { &s.label }),
                         value: text(if bare_text { &s.label } else { &s.value }),
                         live_value,

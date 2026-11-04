@@ -18,6 +18,7 @@ pub mod data_list_stories;
 pub mod data_stories;
 pub mod data_stories_file;
 pub mod data_table_story;
+pub mod drag_upload_story;
 pub mod feedback;
 pub mod field_stories;
 pub mod image_story;
@@ -70,6 +71,7 @@ pub use data_stories_file::{
     VirtualStackStory,
 };
 pub use data_table_story::DataTableStory;
+pub use drag_upload_story::DragUploadStory;
 pub use feedback::{AlertStory, BadgeStory, EmptyStory, ProgressStory, StorySection};
 pub use field_stories::{
     AssetRefStory, ColorFieldStory, JsonFieldStory, NumberFieldStory, NumericStory,

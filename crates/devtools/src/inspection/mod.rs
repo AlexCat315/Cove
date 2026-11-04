@@ -8,13 +8,14 @@ pub use cove_agent::ui_tools as tools;
 pub use actions::{UIAccessibilityActions, perform_accessibility_action};
 pub use diagnostics::{
     DiagnosticCompactNode, DiagnosticError, DiagnosticGeometryIssue, DiagnosticLayoutSummary,
-    DiagnosticMemorySnapshot, DiagnosticNode, DiagnosticStateSource, DiagnosticOverflowIssue, DiagnosticOverview,
-    DiagnosticPage, DiagnosticPresentation, Diagnostics, DiagnosticsStateQuery, TraceCapture,
-    TraceComparison, TracePhase, TracePhaseChange, TraceQuery, UIDiagnosticCompactNode,
-    UIDiagnosticGeometryIssue, UIDiagnosticLayoutSummary, UIDiagnosticMemorySnapshot,
-    UIDiagnosticNode, UIDiagnosticOverflowIssue, UIDiagnosticOverview, UIDiagnosticPage,
-    UIDiagnosticPresentation, UIDiagnosticTool, UIDiagnosticTools, UIDiagnostics, UIStateQuery,
-    UITraceCapture, UITraceComparison, UITracePhase, UITracePhaseChange, UITraceQuery,
+    DiagnosticMemorySnapshot, DiagnosticNode, DiagnosticOverflowIssue, DiagnosticOverview,
+    DiagnosticPage, DiagnosticPresentation, DiagnosticStateSource, Diagnostics,
+    DiagnosticsStateQuery, TraceCapture, TraceComparison, TracePhase, TracePhaseChange, TraceQuery,
+    UIDiagnosticCompactNode, UIDiagnosticGeometryIssue, UIDiagnosticLayoutSummary,
+    UIDiagnosticMemorySnapshot, UIDiagnosticNode, UIDiagnosticOverflowIssue, UIDiagnosticOverview,
+    UIDiagnosticPage, UIDiagnosticPresentation, UIDiagnosticTool, UIDiagnosticTools, UIDiagnostics,
+    UIStateQuery, UITraceCapture, UITraceComparison, UITracePhase, UITracePhaseChange,
+    UITraceQuery,
 };
 pub use editor::SceneEditor;
 pub use inspector::{DebugAttachmentKey, SceneInspector};

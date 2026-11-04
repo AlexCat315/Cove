@@ -419,7 +419,9 @@ impl Sdl3PlatformHost {
             Rc::new(Recomposer::new()),
             Rc::new(PlatformInputContext::new()),
             || match crate::platform::PlatformLink::current() {
-                Some(link) => Ok(Box::new(crate::platform::ProxyShell::new(link)) as Box<dyn Shell>),
+                Some(link) => {
+                    Ok(Box::new(crate::platform::ProxyShell::new(link)) as Box<dyn Shell>)
+                }
                 None => cove_shell::make_default_shell().map(|s| Box::new(s) as Box<dyn Shell>),
             },
         )
@@ -1198,7 +1200,11 @@ impl Sdl3PlatformHost {
                         "render stall watchdog: window {:?} asked for a frame {:.0}ms ago and produced none{}; forcing a redraw",
                         session.id,
                         (now - since) * 1000.0,
-                        if was_parked { " (it was parked on a display tick)" } else { "" }
+                        if was_parked {
+                            " (it was parked on a display tick)"
+                        } else {
+                            ""
+                        }
                     ),
                 );
             }

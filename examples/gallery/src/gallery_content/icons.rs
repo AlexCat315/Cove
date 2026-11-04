@@ -41,6 +41,7 @@ impl GalleryPage {
             Self::ViewportTraits => icons::navigation::maximize(),
             Self::ViewThatFits => icons::navigation::shrink(),
             Self::DragAndDrop => icons::navigation::arrow_down_right(),
+            Self::DragUpload => icons::device::cloud_upload(),
             Self::Tree => icons::editor::git_branch(),
             Self::Chart => icons::data::chart_line(),
             Self::Icon => icons::status::sparkles(),

@@ -5,7 +5,10 @@ use std::{
     collections::HashMap,
     ffi::{CStr, CString, c_char, c_void},
     rc::Rc,
-    sync::{Arc, mpsc::{self, Receiver, Sender}},
+    sync::{
+        Arc,
+        mpsc::{self, Receiver, Sender},
+    },
     time::Duration,
 };
 thread_local! { static SDL_LEASED: Cell<bool> = const { Cell::new(false) }; }
@@ -435,6 +438,18 @@ impl Shell for Sdl3Shell {
                 20..=24 => {
                     id = self.main_window_id().unwrap_or(WindowId::MAIN);
                 }
+                // A drop may name no window at all: iOS reports dropped
+                // documents against a null window, and a drag that began outside
+                // the application does not always carry a target. Route those to
+                // the main window instead of discarding the drag.
+                25..=29 => {
+                    if !self.windows.contains_key(&id) {
+                        match self.main_window_id() {
+                            Some(main) => id = main,
+                            None => continue,
+                        }
+                    }
+                }
                 _ => {
                     if !self.windows.contains_key(&id) {
                         continue;
@@ -678,6 +693,44 @@ pub fn wheel_event(
         },
     }
 }
+/// Decode one platform drop step into [`ExternalDropEvent`].
+///
+/// Extracted from the `25..=29` branch of [`decode_event`] so the phase and
+/// payload contract can be asserted without a live window: a real drop needs a
+/// drag from another application, which a headless test cannot produce. The
+/// bridge already copied `data` into `text` and `source` into `aux`; this maps
+/// them onto the phase that owns them.
+pub fn external_drop(
+    kind: u32,
+    x: f32,
+    y: f32,
+    data: String,
+    source: Option<String>,
+) -> ExternalDropEvent {
+    let phase = match kind {
+        25 => DropPhase::Begin,
+        26 => DropPhase::File,
+        27 => DropPhase::Text,
+        28 => DropPhase::Position,
+        _ => DropPhase::Complete,
+    };
+    // A file drop carries one path per event and a text drop one string; the
+    // other payload stays empty so a host never mixes the two.
+    let (paths, text) = match phase {
+        DropPhase::File => (vec![data], None),
+        DropPhase::Text => (Vec::new(), Some(data)),
+        _ => (Vec::new(), None),
+    };
+    ExternalDropEvent {
+        phase,
+        paths,
+        text,
+        x,
+        y,
+        source,
+    }
+}
+
 fn decode_event(e: &native::Event) -> Option<InputEvent> {
     let key = || KeyEvent {
         scancode: e.a as u32,
@@ -802,6 +855,9 @@ fn decode_event(e: &native::Event) -> Option<InputEvent> {
         }
         23 => InputEvent::GamepadAdded(e.identity as u32),
         24 => InputEvent::GamepadRemoved(e.identity as u32),
+        25..=29 => {
+            InputEvent::ExternalDrop(external_drop(e.kind, e.x, e.y, e.string(), e.aux_string()))
+        }
         _ => return None,
     })
 }

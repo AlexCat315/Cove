@@ -10,8 +10,8 @@ use cove_graphics::rhi::{
 };
 use cove_graphics::ui::{NativeDrawListRenderer, NativeUIViewport};
 use cove_platform::{
-    InputEvent, KeyEvent, KeyModifiers, MouseButton, MouseButtonEvent, MouseMotionEvent,
-    MouseWheelEvent,
+    DropPhase, ExternalDropEvent, InputEvent, KeyEvent, KeyModifiers, MouseButton,
+    MouseButtonEvent, MouseMotionEvent, MouseWheelEvent,
 };
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -1068,6 +1068,24 @@ impl InputBridge {
                 } else {
                     InputEvent::KeyUp(event)
                 })
+            }
+            "externalDrop" => {
+                let phase = match payload.phase.as_deref() {
+                    Some("begin") => DropPhase::Begin,
+                    Some("file") => DropPhase::File,
+                    Some("text") => DropPhase::Text,
+                    Some("position") => DropPhase::Position,
+                    Some("complete") => DropPhase::Complete,
+                    _ => return None,
+                };
+                Some(InputEvent::ExternalDrop(ExternalDropEvent {
+                    phase,
+                    paths: payload.paths.clone().unwrap_or_default(),
+                    text: payload.text.clone(),
+                    x: payload.x.unwrap_or(0.0),
+                    y: payload.y.unwrap_or(0.0),
+                    source: payload.source.clone(),
+                }))
             }
             _ => None,
         }

@@ -507,14 +507,22 @@ impl TerminalSession {
         pointer: &TerminalPointer,
         rectangle: bool,
     ) -> bool {
-        let changed = self.inner.engine.borrow_mut().select(phase, pointer, rectangle);
-        if changed { Session::invalidate(&self.inner); }
+        let changed = self
+            .inner
+            .engine
+            .borrow_mut()
+            .select(phase, pointer, rectangle);
+        if changed {
+            Session::invalidate(&self.inner);
+        }
         changed
     }
 
     pub fn clear_selection(&self) -> bool {
         let changed = self.inner.engine.borrow_mut().clear_selection();
-        if changed { Session::invalidate(&self.inner); }
+        if changed {
+            Session::invalidate(&self.inner);
+        }
         changed
     }
 

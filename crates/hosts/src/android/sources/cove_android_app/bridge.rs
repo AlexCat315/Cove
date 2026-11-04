@@ -116,8 +116,8 @@ mod ndk {
     /// Adds a reference to `window`.
     pub fn window_acquire(window: *mut c_void) -> bool {
         type Acquire = unsafe extern "C" fn(*mut c_void);
-        let Some(acquire) =
-            android_library().and_then(|library| library.symbol::<Acquire>(c"ANativeWindow_acquire"))
+        let Some(acquire) = android_library()
+            .and_then(|library| library.symbol::<Acquire>(c"ANativeWindow_acquire"))
         else {
             return false;
         };
@@ -129,8 +129,8 @@ mod ndk {
     /// Drops a reference taken by [`window_acquire`].
     pub fn window_release(window: *mut c_void) {
         type Release = unsafe extern "C" fn(*mut c_void);
-        if let Some(release) =
-            android_library().and_then(|library| library.symbol::<Release>(c"ANativeWindow_release"))
+        if let Some(release) = android_library()
+            .and_then(|library| library.symbol::<Release>(c"ANativeWindow_release"))
         {
             // SAFETY: releases exactly the reference `window_acquire` added.
             unsafe { release(window) };

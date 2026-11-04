@@ -1394,4 +1394,8 @@ mod tests {
     }
 }
 
-impl Drop for WorkspaceController { fn drop(&mut self) { self.changed.dispose(); } }
+impl Drop for WorkspaceController {
+    fn drop(&mut self) {
+        self.changed.dispose();
+    }
+}

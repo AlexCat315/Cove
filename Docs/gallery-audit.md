@@ -4,6 +4,14 @@
 
 Swift 源码逐页对照见文末《Swift 源码对照（逐页差异清单）》。
 
+## 2026-11-04：系统文件拖入与上传
+
+- 平台层：`cove-platform` 新增 `ExternalDropEvent` 与 `DropPhase::{Begin, File, Text, Position, Complete}`，挂为 `InputEvent::ExternalDrop`；`native.c` 的 `cove_shell_poll` 接入 `SDL_EVENT_DROP_*`，drop 坐标按 `coordinate_scale` 单独换算，`CoveShellEvent` 新增 `aux` 承载拖拽来源。`sdl3_shell` 的 `decode_event` 解码 25…29，并把无窗口归属的 drop 路由到主窗口（iOS 以 null window 交付文档）。
+- 组件层：新增 `FileDropZone` / `FileDropRegistry`（节点命中、顶层优先、类型与数量过滤、进入/离开回调）与 `DroppedFile`；新增 `DragUpload`，组合拖放区、上传状态机与进度显示。`FilePicker` 作为 core ambient 提供浏览兜底，触屏与键盘用户走同一回调。
+- 上传：新增 `primitives/upload`，含 `multipart` 编码（流式拼接、文件名转义、编码前超限拒绝）、`UploadTransport` 接缝与 `UploadState` 五态。上传在 worker 线程执行，经 `cove_core::work::spawn_then` 回 UI 线程写 `State`。
+- 宿主：`crates/hosts/src/application_services/upload.rs` 提供 `HttpUploadTransport` 并在 `install_platform_services()` 安装；桌面运行时把 `InputEvent::ExternalDrop` 路由进 per-window 注册表，并安装 `FilePicker`。删除 `composition.rs` 中无调用者的旧 `AssetDropRegistry` 死代码，改为复用 `FileDropRegistry`。
+- 结构验证：`file_drop_tests` 13 项、`external_drop_tests` 6 项、`upload` 单元测试与 hosts transport 测试通过；Gallery 全量 104 项通过。**原生验收未完成**：从其他应用真实拖入文件、原生打开面板交互均未在本机验收，结构测试不代表原生拖放已验收。
+
 ## 2026-11-04：屏幕取色后端
 
 - ColorField 吸管链路：`cove-platform` 只保留 `ScreenColor` / `ScreenColorSample` / `ScreenColorCompletion` / `ScreenColorBackend` 契约；取色实现下沉到 `cove-shell/src/color_sampler/`，按窗口系统分 macOS（`NSColorSampler` / `objc2-app-kit`）、Windows（Win32 屏幕 DC）、Linux（X11 `XGetImage` 截屏采样 / XDG `PickColor` portal）、iOS/Android/Wasm（`Unsupported`）后端，全部异步回调且不阻塞平台线程。宿主按后端可用性安装 ambient，不支持时吸管隐藏。
@@ -182,6 +190,7 @@ cargo test -p cove-ui-compose --test compose --locked
 | Command Palette | 0 | 0 / 0 | 挂载/几何基础检查通过；待逐项交互和视觉验收 |
 | NavigationStack | 0 | 0 / 0 | 挂载/几何基础检查通过；待逐项交互和视觉验收 |
 | Drag & Drop | 0 | 0 / 0 | 挂载/几何基础检查通过；待逐项交互和视觉验收 |
+| Drag Upload | 0 | 3 / 0 | 拖放区命中、类型/数量拒绝与上传状态机有结构回归；原生 OS 拖入与原生打开面板尚未验收 |
 | HoverCard | 0 | 0 / 0 | 挂载/几何基础检查通过；待逐项交互和视觉验收 |
 | Timeline | 2 | 0 / 0 | 挂载/几何基础检查通过；待逐项交互和视觉验收 |
 | Toolbar | 0 | 0 / 0 | 挂载/几何基础检查通过；待逐项交互和视觉验收 |
@@ -358,6 +367,7 @@ cargo test -p cove-ui-compose --test compose --locked
 | Dialog | 1 | 1 | 1 | 0 | 0 | 段落数持平 |
 | DisclosureGroup | 1 | 1 | 1 | 0 | 0 | 段落数持平 |
 | Drag & Drop | 1 | 1 | 1 | 0 | 0 | 段落数持平 |
+| Drag Upload | 0 | 2 | 0 | 0 | 0 | Rust 新增页（Swift 无对应） |
 | EmptyState | 1 | 0 | 0 | 0 | 1 | Rust 无段落结构 |
 | Form | 1 | 1 | 1 | 0 | 0 | 段落数持平 |
 | HoverCard | 1 | 1 | 1 | 0 | 0 | 段落数持平 |

@@ -100,7 +100,11 @@ thread_local! {
 /// The contents of the font file at `path`, read at most once while any
 /// face built from it is alive.
 pub fn file(path: &Path) -> std::io::Result<Arc<[u8]>> {
-    if let Some(bytes) = registry().files.get(path).and_then(std::sync::Weak::upgrade) {
+    if let Some(bytes) = registry()
+        .files
+        .get(path)
+        .and_then(std::sync::Weak::upgrade)
+    {
         return Ok(bytes);
     }
     let bytes: Arc<[u8]> = std::fs::read(path)?.into();
