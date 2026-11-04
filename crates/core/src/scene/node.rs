@@ -940,6 +940,10 @@ impl Node {
     }
     /// Refresh a custom painter, invalidating render caches only when its
     /// paint-affecting identity changed.
+    ///
+    /// `draw` receives this node's absolute origin in window space. Everything
+    /// it paints is already positioned by the renderer, so adding
+    /// `absolute_origin()` inside the hook double-counts the node's offset.
     pub fn update_draw(
         &self,
         identity: impl PartialEq + 'static,

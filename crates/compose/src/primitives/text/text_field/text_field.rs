@@ -3250,7 +3250,10 @@ fn render(
         && !current.is_empty()
     {
         let start = edge - 20.0;
-        node.set_attachment("__textfield_clear_hit", node.absolute_origin().x + start);
+        // `edge` already includes the paint origin; adding it again here moved
+        // the glyph and its hit region one field offset to the right, so a
+        // field inset from the window edge clipped the clear affordance.
+        node.set_attachment("__textfield_clear_hit", start);
         let image = crate::primitives::media::image::Image::resolve_resource(
             &crate::primitives::media::ui_icon_catalog::action::x(),
             14.0,
@@ -3259,7 +3262,7 @@ fn render(
         image.retain(list);
         let _ = list.add_image_mask_quad(
             Rect::new(
-                origin.x + start + 3.0,
+                start + 3.0,
                 origin.y + (frame.height - 14.0) * 0.5,
                 14.0,
                 14.0,

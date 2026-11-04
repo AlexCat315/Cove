@@ -4,6 +4,11 @@
 
 ## Unreleased
 
+- **偏移容器中的 TextField 清除按钮几何修复（2026-11-04，修复）**：
+  - `TextField` 的清除图标与命中区在绘制时重复叠加了节点的绝对原点：`edge` 已包含 `origin.x`，代码又加了一次 `absolute_origin().x`。字段不在窗口左边缘时（如 Gallery 侧栏搜索框），图标会整体右移并贴边裁切。
+  - 现在图标与命中区统一使用已包含原点的绝对 `start`；新增 `the_clear_affordance_stays_inside_an_offset_field` 回归测试，把字段放在 40pt 内边距容器中并断言清除图标的所有顶点仍位于字段边界内。
+  - 这是通用 TextField 几何问题，不是 Gallery 的用法错误；`Node::update_draw` 文档补充了“绘制回调收到的 origin 已是绝对坐标，不要再叠加 `absolute_origin()`”的约定。
+
 - **DragUpload 默认外观重做（2026-11-04，界面）**：
   - `FileDropZone` 自带安静状态外观：`surface_sunken` 填充、`radius.lg` 圆角与虚线描边，不再只在拖拽悬停时才有框体。拖拽悬停/接受为强调色实线，拒绝为错误色实线，禁用为分隔线色；虚线沿圆角轮廓连续分段绘制。
   - `FileDropPrompt` 改为图标芯片 + headline 标题 + caption 类型说明 + 次级 “Browse files” 按钮的居中层级，类型与数量只在说明行出现一次；禁用时文字与芯片同步降级。图标在 44pt 芯片内真正居中，按钮的顶部间距移到独立容器，不扩大命中区域。

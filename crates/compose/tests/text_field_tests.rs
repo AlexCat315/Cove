@@ -36,11 +36,12 @@ use std::sync::{Arc, Mutex};
 use cove_composition::{AnyView, ViewGraph};
 use cove_core::scene::ClipboardHolder;
 use cove_core::scene::{
-    EventDispatcher, EventPhase, EventResult, FocusChain, FocusChainHolder, InteractionRegistry,
-    InteractionRegistryHolder, Node, PointerCapture, PointerCaptureHolder, PointerPhase,
-    TextInputAttachmentKey, TextInputClient,
+    Align, EventDispatcher, EventPhase, EventResult, FlexDirection, FocusChain, FocusChainHolder,
+    InteractionRegistry, InteractionRegistryHolder, Justify, Node, PointerCapture,
+    PointerCaptureHolder, PointerPhase, TextInputAttachmentKey, TextInputClient, Wrap,
 };
 use cove_core::{AnimatorScheduler, Binding, Color, DrawList, Point, Rect};
+use cove_ui_compose::modifiers::layout::PaddingExt;
 use cove_platform::{
     InputEvent, KeyEvent, KeyModifiers, MouseButton, MouseButtonEvent, MouseMotionEvent,
     MouseWheelEvent, TextEditingEvent, TextInputArea, WindowId,
@@ -1584,6 +1585,56 @@ fn affixes_and_counter_paint() {
         assert!(
             decorated > plain,
             "the prefix, suffix and counter add glyphs ({decorated} vs {plain})"
+        );
+    });
+}
+
+#[test]
+fn the_clear_affordance_stays_inside_an_offset_field() {
+    with_rig(|rig| {
+        rig.set("hh");
+        TextEnvironmentHolder::set_current(Some(test_text_environment(16.0, 20.0)));
+        let marker = Color::from_rgba8(1, 2, 3, 255);
+        rig.install(
+            AnyView::new(cove_ui_compose::BoxView::new(
+                FlexDirection::Row,
+                Align::Center,
+                Justify::FlexStart,
+                Wrap::NoWrap,
+                0.0,
+                AnyView::new(
+                    TextField::new("", rig.binding())
+                        .behavior(TextFieldBehavior {
+                            clearable: true,
+                            ..TextFieldBehavior::default()
+                        })
+                        .decoration(TextFieldDecoration {
+                            placeholder_color: Some(marker),
+                            ..TextFieldDecoration::default()
+                        }),
+                ),
+            ))
+            .padding(40.0),
+        );
+        rig.graph.compute_layout(240.0, 60.0);
+        let node = rig.field();
+        let frame = node.absolute_frame();
+        assert!(frame.x > 0.0, "the field is inset from the window edge");
+
+        let mut list = DrawList::default();
+        if let Some(hook) = node.draw() {
+            hook(&mut list, Point::new(frame.x, frame.y));
+        }
+        let icon: Vec<_> = list
+            .vertices()
+            .iter()
+            .filter(|vertex| vertex.color == marker.rgba8())
+            .collect();
+        assert!(!icon.is_empty(), "the clear affordance paints");
+        assert!(
+            icon.iter()
+                .all(|vertex| vertex.x >= frame.x && vertex.x <= frame.x + frame.width),
+            "the clear affordance stays inside the field instead of clipping at the edge"
         );
     });
 }
