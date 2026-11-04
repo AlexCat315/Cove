@@ -27,6 +27,13 @@ import textFieldStyle from '@/content/components/text-field-style.md?raw'
 import textBuffer from '@/content/components/text-buffer.md?raw'
 import textSelection from '@/content/components/text-selection.md?raw'
 import theme from '@/content/components/theme.md?raw'
+import splitButton from '@/content/components/split-button.md?raw'
+import completionPopover from '@/content/components/completion-popover.md?raw'
+import numberField from '@/content/components/number-field.md?raw'
+import select from '@/content/components/select.md?raw'
+import colorField from '@/content/components/color-field.md?raw'
+import textArea from '@/content/components/text-area.md?raw'
+import textEditor from '@/content/components/text-editor.md?raw'
 import text from '@/content/components/text.md?raw'
 
 import component0 from '@/content/components/sidebar.md?raw'
@@ -92,6 +99,13 @@ export const docGroups: DocGroup[] = [
       { slug: 'hover-card', title: 'HoverCard', raw: component7 },
       { slug: 'command-palette', title: 'CommandPalette', raw: component8 },
       { slug: 'menu', title: 'Menu / MenuItemContent', raw: component9 },
+      { slug: 'split-button', title: 'SplitButton', raw: splitButton },
+      { slug: 'completion-popover', title: 'CompletionPopover', raw: completionPopover },
+      { slug: 'number-field', title: 'NumberField', raw: numberField },
+      { slug: 'select', title: 'Select', raw: select },
+      { slug: 'color-field', title: 'ColorField', raw: colorField },
+      { slug: 'text-area', title: 'TextArea / ResizableTextArea', raw: textArea },
+      { slug: 'text-editor', title: 'Text Editor', raw: textEditor },
       { slug: 'toolbar', title: 'Toolbar / AppBar', raw: component10 },
       { slug: 'action-group-layout', title: 'ActionGroupLayout', raw: actionGroupLayout },
       { slug: 'grid', title: 'Grid / named columns', raw: grid },

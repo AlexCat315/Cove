@@ -443,6 +443,7 @@ impl PrimitiveView for TextFieldChrome {
 impl_primitive_view!(TextFieldChrome);
 
 /// Text input field.
+#[derive(Clone)]
 pub struct TextField {
     pub text: Binding<TextBuffer>,
     pub placeholder: String,

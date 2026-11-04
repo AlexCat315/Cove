@@ -239,26 +239,11 @@ impl View for TimeFieldStory {
     }
 }
 
-fn sample_entries(clicks: State<u64>) -> Vec<MenuEntry> {
-    let one = {
-        let clicks = clicks.clone();
-        MenuItem::new(1, "Publish now", move || clicks.update(|count| *count += 1))
-    };
-    let two = {
-        let clicks = clicks.clone();
-        MenuItem::new(2, "Schedule", move || clicks.update(|count| *count += 10))
-    };
-    vec![
-        MenuEntry::Item(one),
-        MenuEntry::Item(two),
-        MenuEntry::Item(MenuItem::new(3, "Unavailable", || {}).enabled(false)),
-    ]
-}
-
 /// `SplitButtonStory`: a primary action plus a menu.
 pub struct SplitButtonStory {
     pub options: GalleryOptions,
     clicks: State<u64>,
+    last_action: State<String>,
 }
 
 impl SplitButtonStory {
@@ -266,6 +251,7 @@ impl SplitButtonStory {
         Self {
             options,
             clicks: State::new(0),
+            last_action: State::new("None".into()),
         }
     }
 
@@ -280,19 +266,49 @@ impl SplitButtonStory {
 
 impl View for SplitButtonStory {
     fn body(&self, _cx: &Scope) -> AnyView {
-        let primary = {
-            let clicks = self.clicks.clone();
-            move || clicks.update(|count| *count += 1)
-        };
-        let button = AnyView::new(
-            SplitButton::new("Publish", sample_entries(self.clicks.clone()), primary)
-                .enabled(self.options.is_enabled)
-                .debug_name("split-button-control"),
-        );
+        use super::showcase::{note, stack};
+        use cove_ui_compose::primitives::overlays::menu::MenuItemRole;
+        let entries = [
+            ("Save as…", "Save as", MenuItemRole::Normal),
+            ("Export", "Export", MenuItemRole::Normal),
+            ("Discard", "Discard", MenuItemRole::Destructive),
+        ]
+        .into_iter()
+        .enumerate()
+        .flat_map(|(id, (label, result, role))| {
+            let state = self.last_action.clone();
+            let count = self.clicks.clone();
+            let item = MenuEntry::Item(
+                MenuItem::new(id as u64, label, move || {
+                    state.set(result.into());
+                    count.update(|n| *n += 1);
+                })
+                .role(role),
+            );
+            if id == 2 {
+                vec![MenuEntry::separator(99), item]
+            } else {
+                vec![item]
+            }
+        })
+        .collect();
+        let state = self.last_action.clone();
+        let count = self.clicks.clone();
         AnyView::new(StorySection::new(
-            "Primary and menu",
-            "Return runs the primary action. Down opens the menu; the disabled entry is skipped.",
-            AnyView::new(TupleView::new(vec![button, caption(self.readout())])),
+            "Primary + menu",
+            "The left zone runs the default action; the arrow opens the same menu used by MenuButton. Both zones have independent hit areas and disabled behavior.",
+            stack(vec![
+                AnyView::new(
+                    SplitButton::new("Save", entries, move || {
+                        state.set("Save".into());
+                        count.update(|n| *n += 1);
+                    })
+                    .enabled(self.options.is_enabled)
+                    .menu_width(200.0)
+                    .debug_name("split-button-control"),
+                ),
+                note(format!("Last action: {}", self.last_action.get())),
+            ]),
         ))
     }
 
@@ -301,7 +317,7 @@ impl View for SplitButtonStory {
     }
 
     fn dynamic_properties(&self) -> Vec<cove_composition::DynamicField> {
-        cove_composition::dynamic_fields!(self; clicks)
+        cove_composition::dynamic_fields!(self; clicks, last_action)
     }
 }
 

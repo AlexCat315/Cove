@@ -45,6 +45,8 @@ pub struct Vec3Field {
     pub y: Binding<f32>,
     pub z: Binding<f32>,
     pub decimals: usize,
+    pub step: Option<f32>,
+    pub format: super::numeric::NumericTextFormat,
     pub size: TextFieldSize,
     pub is_enabled: bool,
     pub constraints: Vec3Constraints,
@@ -62,6 +64,8 @@ impl Vec3Field {
             y,
             z,
             decimals: 2,
+            step: None,
+            format: super::numeric::NumericTextFormat::invariant(2),
             size: TextFieldSize::Small,
             is_enabled: true,
             constraints: Vec3Constraints::default(),
@@ -75,6 +79,19 @@ impl Vec3Field {
 
     pub fn decimals(mut self, decimals: usize) -> Self {
         self.decimals = decimals.min(6);
+        self.format.decimals = self.decimals;
+        self
+    }
+
+    pub fn step(mut self, step: f32) -> Self {
+        self.step = Some(step);
+        self
+    }
+
+    /// Locale-specific presentation shared by all axes.
+    pub fn with_format(mut self, format: super::numeric::NumericTextFormat) -> Self {
+        self.decimals = format.decimals;
+        self.format = format;
         self
     }
 
@@ -128,6 +145,8 @@ impl Vec3Field {
             y: self.y.clone(),
             z: self.z.clone(),
             decimals: self.decimals,
+            step: self.step,
+            format: self.format.clone(),
             size: self.size,
             is_enabled: self.is_enabled,
             constraints: self.constraints,
@@ -160,19 +179,27 @@ impl Vec3Field {
     pub fn copy(&self) {
         if let Some(handler) = self.on_copy.as_ref() {
             handler(Vec3Codec::format(self.value()));
+        } else {
+            cove_core::scene::ClipboardHolder::write(&Vec3Codec::format(self.value()));
         }
     }
 
-    /// Pastes a vector parsed from the clipboard, when the host supplies one.
+    /// Pastes through an authored reader, or asynchronously through the platform clipboard.
     pub fn paste(&self) {
         if !self.is_enabled {
             return;
         }
-        let Some(read) = self.on_paste.as_ref() else {
-            return;
-        };
-        if let Some(vector) = read() {
-            self.write(vector);
+        if let Some(read) = self.on_paste.as_ref() {
+            if let Some(vector) = read() {
+                self.write(vector);
+            }
+        } else {
+            let field = self.snapshot();
+            cove_core::scene::ClipboardHolder::request_read(Box::new(move |text| {
+                if let Some(vector) = text.and_then(|text| Vec3Codec::parse(&text)) {
+                    field.write(vector);
+                }
+            }));
         }
     }
 
@@ -186,17 +213,16 @@ impl Vec3Field {
         }
     }
 
-    /// The row's context menu. Paste is available only while the clipboard
-    /// parses as a vector.
+    /// The row's context menu. An authored synchronous reader can preflight Paste;
+    /// the platform bridge validates asynchronous clipboard replies before writing.
     fn menu(&self) -> Vec<MenuEntry> {
         let copy = self.snapshot();
         let mut entries = vec![MenuEntry::Item(
-            MenuItem::new(1, crate::i18n::tr("Copy Vector"), move || copy.copy())
-                .enabled(self.on_copy.is_some()),
+            MenuItem::new(1, crate::i18n::tr("Copy Vector"), move || copy.copy()).enabled(true),
         )];
         let paste = self.snapshot();
         let can_paste =
-            self.is_enabled && self.on_paste.as_ref().is_some_and(|read| read().is_some());
+            self.is_enabled && self.on_paste.as_ref().is_none_or(|read| read().is_some());
         entries.push(MenuEntry::Item(
             MenuItem::new(2, crate::i18n::tr("Paste Vector"), move || paste.paste())
                 .enabled(can_paste),
@@ -216,11 +242,14 @@ impl Vec3Field {
         let reset = self.constraints.reset.map(|reset| reset.get(axis));
         let prefix = NumberFieldPrefix::new(axis.label()).tint(axis_tint(axis));
         let mut field = NumberField::new(value)
-            .decimals(self.decimals)
+            .with_format(self.format.clone())
             .size(self.size)
             .enabled(self.is_enabled)
             .range(self.constraints.minimum, self.constraints.maximum)
             .prefix(prefix);
+        if let Some(step) = self.step {
+            field = field.step(step);
+        }
         if mixed {
             field = field.mixed_value_label(self.mixed_value_label.clone());
         }
@@ -247,9 +276,25 @@ impl View for Vec3Field {
         let row = crate::theme::TextScalerReader::new(move |scaler| {
             crate::LayoutContainer::new(
                 crate::primitives::controls::fields::numeric::axis_layout::AxisLayout::new(
-                    4.0, minimum_axis_width(minimum, scaler.scale(1.0)), scaler.scale(AXIS_BASIS)),
-                TupleView::new(axes.iter().cloned().map(|axis| AnyView::new(axis.frame(
-                    Some(crate::modifiers::layout::FrameDimension::Percent(100.0)), None, None, None, None, None))).collect()),
+                    4.0,
+                    minimum_axis_width(minimum, scaler.scale(1.0)),
+                    scaler.scale(AXIS_BASIS),
+                ),
+                TupleView::new(
+                    axes.iter()
+                        .cloned()
+                        .map(|axis| {
+                            AnyView::new(axis.frame(
+                                Some(crate::modifiers::layout::FrameDimension::Percent(100.0)),
+                                None,
+                                None,
+                                None,
+                                None,
+                                None,
+                            ))
+                        })
+                        .collect(),
+                ),
             )
         });
         let field = self.snapshot();

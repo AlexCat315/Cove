@@ -12,12 +12,13 @@ use std::sync::{Arc, Mutex};
 use cove_core::scene::{Align, FlexDirection, Justify, Node, Wrap};
 use cove_core::{Binding, Color};
 
+use crate::LayoutDebugExt;
 use crate::modifiers::layout::{FlexExt, LayoutFrameExt, PaddingExt};
 use crate::modifiers::style::{AppearanceExt, SemanticStyleViewExt, SurfaceStyleExt};
 use crate::primitives::controls::fields::color_field_model::{hex_string, panel_width, parse_hex};
 use crate::primitives::controls::fields::slider::Slider;
 use crate::primitives::overlays::anchored::{PopoverOverflow, PopoverSurface};
-use crate::primitives::overlays::popover::Popover;
+use crate::primitives::overlays::popover::{Popover, PopoverTriggerDescription};
 use crate::primitives::text::Text;
 use crate::primitives::text::text_buffer::TextBuffer;
 use crate::primitives::text::text_field::{TextField, TextFieldEvents};
@@ -135,7 +136,9 @@ impl ColorField {
 
 impl View for ColorField {
     fn body(&self, cx: &Scope) -> AnyView {
-        let field = self.snapshot();
+        let mut field = self.snapshot();
+        field.draft = cx.remember(|| self.draft.clone());
+        field.is_editing = cx.remember(|| self.is_editing.clone());
         let presented: Binding<bool> = cx.state(|| false).into();
         let trigger = AnyView::new(ColorSwatch {
             color: self.color.get(),
@@ -144,16 +147,23 @@ impl View for ColorField {
             shows_inline_values: self.shows_inline_values,
             shows_inline_channels: self.shows_inline_channels,
         });
-        let content = AnyView::new(ColorPickerPanel {
-            field: field.clone(),
-        });
+        let content = AnyView::new(crate::adaptive::SurfaceReader::new(move |surface| {
+            AnyView::new(ColorPickerPanel {
+                field: field.clone(),
+                width: panel_width(surface.viewport.width),
+            })
+        }));
         AnyView::new(
             Popover::new(trigger, content)
                 .is_presented(presented)
                 .enabled(self.is_enabled)
                 .surface(PopoverSurface::Content)
                 .overflow(PopoverOverflow::Flip)
-                .width(panel_width(320.0)),
+                .trigger_description(PopoverTriggerDescription {
+                    label: crate::i18n::tr("Choose color"),
+                    value: hex_string(self.color.get(), self.show_alpha),
+                    help: None,
+                }),
         )
     }
 }
@@ -206,8 +216,8 @@ impl PrimitiveView for ColorSwatch {
 
     fn update_node(&self, _node: &Node) {}
 
-    fn children(&self, _node: &Node) -> Vec<AnyView> {
-        let theme = crate::theme::styles::default_dark_theme::value();
+    fn children(&self, node: &Node) -> Vec<AnyView> {
+        let theme = crate::theme::theme_for_node(node);
         let swatch = AnyView::new(
             BoxView::new(
                 FlexDirection::Row,
@@ -281,6 +291,7 @@ fn rgb_string(color: Color, show_alpha: bool) -> String {
 /// The channel editor inside the popover.
 struct ColorPickerPanel {
     field: ColorField,
+    width: f32,
 }
 
 impl PrimitiveView for ColorPickerPanel {
@@ -296,9 +307,9 @@ impl PrimitiveView for ColorPickerPanel {
 
     fn update_node(&self, _node: &Node) {}
 
-    fn children(&self, _node: &Node) -> Vec<AnyView> {
+    fn children(&self, node: &Node) -> Vec<AnyView> {
         let field = &self.field;
-        let theme = crate::theme::styles::default_dark_theme::value();
+        let theme = crate::theme::theme_for_node(node);
         let mut column: Vec<AnyView> = vec![AnyView::new(
             BoxView::new(
                 FlexDirection::Row,
@@ -311,7 +322,7 @@ impl PrimitiveView for ColorPickerPanel {
             .frame_height(PREVIEW_HEIGHT)
             .background_color(field.color.get())
             .corner_radius(theme.radius.sm)
-            .border_color(Color::from_rgba8(58, 64, 78, 255), 1.0),
+            .border_color(theme.colors.border, 1.0),
         )];
         for channel in [Channel::Red, Channel::Green, Channel::Blue] {
             column.push(AnyView::new(ChannelRow {
@@ -338,8 +349,9 @@ impl PrimitiveView for ColorPickerPanel {
                 AnyView::new(TupleView::new(column)),
             )
             .padding(10.0)
-            .frame_width(panel_width(320.0))
-            .floating_surface(theme.radius.md),
+            .frame_width(self.width)
+            .floating_surface(theme.radius.md)
+            .debug_name("color-picker-panel"),
         )]
     }
 }
@@ -454,7 +466,7 @@ impl PrimitiveView for HexRow {
         let commit = field.clone();
         let focus = field.clone();
         let blur = field.clone();
-        let input = TextField::new("", text).events(TextFieldEvents {
+        let input = TextField::new("Hex color", text).events(TextFieldEvents {
             on_submit: Some(std::rc::Rc::new(move || commit.commit_hex())),
             on_focus: Some(std::rc::Rc::new(move || {
                 let mut editing = focus

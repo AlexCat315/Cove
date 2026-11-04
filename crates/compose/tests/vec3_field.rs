@@ -147,3 +147,52 @@ fn the_axis_minimum_width_never_drops_below_the_usable_floor() {
         "the text scale multiplies the resolved minimum"
     );
 }
+
+#[test]
+fn the_default_vector_clipboard_uses_the_platform_request_bridge() {
+    use crate::support::GlobalTestLock;
+    use cove_core::{State, scene::ClipboardHolder};
+    use cove_ui_compose::primitives::controls::fields::vec3_field::Vec3Field;
+    use std::{cell::RefCell, rc::Rc};
+    GlobalTestLock::locked(|| {
+        let (x, y, z) = (State::new(1.0), State::new(2.0), State::new(3.0));
+        let copied = Rc::new(RefCell::new(String::new()));
+        let output = copied.clone();
+        ClipboardHolder::set_write(Some(Rc::new(move |text| {
+            *output.borrow_mut() = text.to_owned()
+        })));
+        ClipboardHolder::set_read(None);
+        ClipboardHolder::set_read_requester(Some(Rc::new(|done| {
+            done(Some("Vector3(4, 5, 6)".into()))
+        })));
+        let field = Vec3Field::new(x.binding(), y.binding(), z.binding());
+        field.copy();
+        field.paste();
+        let value = field.value();
+        let text = copied.borrow().clone();
+        ClipboardHolder::set_write(None);
+        ClipboardHolder::set_read_requester(None);
+        assert_eq!(text, "1, 2, 3");
+        assert_eq!(value, Vec3::new(4.0, 5.0, 6.0));
+    });
+}
+
+#[test]
+fn authored_vector_step_reaches_each_numeric_axis() {
+    use cove_core::{State, scene::AccessibilityRole};
+    use cove_ui_compose::primitives::controls::fields::vec3_field::Vec3Field;
+    crate::support::InteractiveScene::run(600.0, 300.0, |scene| {
+        let (x, y, z) = (State::new(1.0), State::new(2.0), State::new(3.0));
+        scene.install(Vec3Field::new(x.binding(), y.binding(), z.binding()).step(0.1));
+        let fields = scene.all(|n| {
+            n.accessibility()
+                .is_some_and(|s| s.role == AccessibilityRole::TextField)
+        });
+        assert_eq!(fields.len(), 3);
+        for (index, field) in fields.into_iter().enumerate() {
+            scene.focus.focus(Some(&field), true);
+            scene.key(cove_ui_compose::Scancode::ARROW_UP, Default::default());
+            assert!((([x.get(), y.get(), z.get()][index]) - (index as f32 + 1.1)).abs() < 0.0001);
+        }
+    });
+}

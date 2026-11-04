@@ -5,21 +5,27 @@
 //! and renders the real widget, so the gallery page is the control itself rather
 //! than a description of it.
 
+use super::showcase::{bounded, note, stack};
 use cove_composition::Scope;
 use cove_core::scene::{Align, FlexDirection, Justify, Wrap};
 use cove_core::{Binding, Color, State};
+use cove_ui_compose::modifiers::interaction::AccessibilityExt;
 use cove_ui_compose::modifiers::layout::LayoutFrameExt;
 use cove_ui_compose::modifiers::style::AppearanceExt;
 use cove_ui_compose::primitives::controls::fields::asset_ref_field::AssetRefField;
 use cove_ui_compose::primitives::controls::fields::asset_ref_model::AssetRef;
 use cove_ui_compose::primitives::controls::fields::color_field::ColorField;
 use cove_ui_compose::primitives::controls::fields::json_field::JsonField;
-use cove_ui_compose::primitives::controls::fields::numeric::NumberField;
+use cove_ui_compose::primitives::controls::fields::numeric::{
+    NumberField, NumberFieldPrefix, NumericTextFormat,
+};
 use cove_ui_compose::primitives::controls::fields::range_slider::{RangeSlider, RangeValue};
 use cove_ui_compose::primitives::controls::fields::search_field::SearchField;
 use cove_ui_compose::primitives::controls::fields::select::{Select, SelectOption};
 use cove_ui_compose::primitives::controls::fields::slider::Slider;
 use cove_ui_compose::primitives::controls::fields::vec3_field::Vec3Field;
+use cove_ui_compose::primitives::controls::fields::vec3_model::{Vec3, Vec3Constraints};
+use cove_ui_compose::primitives::layout::ResizableTextArea;
 use cove_ui_compose::primitives::text::Text;
 use cove_ui_compose::primitives::text::text_buffer::TextBuffer;
 use cove_ui_compose::primitives::text::text_field::TextField;
@@ -684,7 +690,9 @@ impl TextAreaStory {
     pub fn new(options: GalleryOptions) -> Self {
         Self {
             options,
-            text: State::new(TextBuffer::new("First line\nSecond line")),
+            text: State::new(TextBuffer::new(
+                "Multiline text wraps within the field.\nTry editing, selecting, pasting and scrolling.\nThe resize grip belongs to the surrounding container.",
+            )),
         }
     }
 
@@ -699,20 +707,28 @@ impl TextAreaStory {
 
 impl View for TextAreaStory {
     fn body(&self, _cx: &Scope) -> AnyView {
-        let field = AnyView::new(
-            TextField::new("Notes", self.text.binding())
-                .multiline()
-                .behavior(TextFieldBehavior {
-                    disabled: !self.options.is_enabled,
-                    ..TextFieldBehavior::new()
-                })
-                .frame_width(300.0)
-                .debug_name("text-area-control"),
-        );
         AnyView::new(StorySection::new(
-            "Multiple lines",
-            "Return inserts a newline instead of submitting. The field grows to its maximum visible lines and then scrolls.",
-            field_row("Notes", field, self.readout()),
+            "Resizable text area",
+            "The container controls height; the text field controls its own scrolling.",
+            stack(vec![
+                bounded(
+                    AnyView::new(ResizableTextArea::new(
+                        "Write a note…",
+                        self.text.binding(),
+                        90.0,
+                        320.0,
+                        !self.options.is_enabled,
+                        "Editor height",
+                        Default::default(),
+                        None,
+                        None,
+                        None,
+                    ))
+                    .debug_name("text-area-control"),
+                    520.0,
+                ),
+                note(format!("{} characters", self.text.get().character_count())),
+            ]),
         ))
     }
 
@@ -729,18 +745,20 @@ impl View for TextAreaStory {
 pub struct NumberFieldStory {
     pub options: GalleryOptions,
     value: State<f32>,
+    localized: State<f32>,
 }
 
 impl NumberFieldStory {
     /// Field bounds.
-    pub const RANGE: (f32, f32) = (0.0, 128.0);
+    pub const RANGE: (f32, f32) = (0.0, 10.0);
     /// Stepper increment.
-    pub const STEP: f32 = 1.0;
+    pub const STEP: f32 = 0.25;
 
     pub fn new(options: GalleryOptions) -> Self {
         Self {
             options,
-            value: State::new(24.0),
+            value: State::new(3.14),
+            localized: State::new(1.25),
         }
     }
 
@@ -760,21 +778,71 @@ impl NumberFieldStory {
 
 impl View for NumberFieldStory {
     fn body(&self, _cx: &Scope) -> AnyView {
-        let field = AnyView::new(
+        let enabled = self.options.is_enabled;
+        let numeric = || {
             NumberField::new(self.value.binding())
-                .decimals(1)
-                .range(Some(Self::RANGE.0), Some(Self::RANGE.1))
-                .step(Self::STEP)
-                .shows_stepper(true)
-                .enabled(self.options.is_enabled)
-                .frame_width(140.0)
-                .debug_name("number-field-control"),
-        );
-        AnyView::new(StorySection::new(
-            "Bounded number",
-            "Up and Down step by one. Typed values are clamped to 0…128 when the edit commits.",
-            field_row("Corner radius", field, self.readout()),
-        ))
+                .enabled(enabled)
+                .range(Some(0.0), Some(10.0))
+                .step(0.25)
+        };
+        stack(vec![
+            AnyView::new(StorySection::new(
+                "Numeric editing",
+                "Invalid drafts revert on blur. Arrow keys step; Shift multiplies the step and Option divides it. Drag a prefix to scrub; double-click to reset.",
+                stack(vec![
+                    AnyView::new(
+                        numeric()
+                            .shows_stepper(true)
+                            .frame_width(220.0)
+                            .debug_name("number-field-control"),
+                    ),
+                    AnyView::new(
+                        numeric()
+                            .prefix(NumberFieldPrefix::new("W").tint(SemanticColorRef::accent()))
+                            .reset_value(1.0)
+                            .frame_width(220.0)
+                            .debug_name("number-scrub"),
+                    ),
+                    AnyView::new(
+                        NumberField::new(Binding::constant(0.0))
+                            .enabled(enabled)
+                            .mixed_value_label("Mixed value")
+                            .frame_width(220.0),
+                    ),
+                    AnyView::new(
+                        NumberField::new(Binding::constant(42.0))
+                            .enabled(false)
+                            .frame_width(220.0),
+                    ),
+                    note(format!("Committed value: {}", self.value())),
+                ]),
+            )),
+            AnyView::new(StorySection::new(
+                "Locale decimals",
+                "The same value uses a comma or point. Localized digits and signs parse strictly; grouping and trailing junk are rejected.",
+                stack(vec![
+                    AnyView::new(
+                        NumberField::new(self.localized.binding())
+                            .enabled(enabled)
+                            .step(0.25)
+                            .with_format(NumericTextFormat::new(',', 2))
+                            .accessibility_label("Comma decimal")
+                            .debug_name("number-comma"),
+                    ),
+                    AnyView::new(
+                        NumberField::new(self.localized.binding())
+                            .enabled(enabled)
+                            .with_format(NumericTextFormat::invariant(2))
+                            .accessibility_label("Point decimal")
+                            .debug_name("number-point"),
+                    ),
+                    AnyView::new(
+                        note(format!("Numeric value: {}", self.localized.get()))
+                            .debug_name("locale-number-value"),
+                    ),
+                ]),
+            )),
+        ])
     }
 
     fn tag(&self) -> &'static str {
@@ -782,7 +850,7 @@ impl View for NumberFieldStory {
     }
 
     fn dynamic_properties(&self) -> Vec<cove_composition::DynamicField> {
-        cove_composition::dynamic_fields!(self; value)
+        cove_composition::dynamic_fields!(self; value, localized)
     }
 }
 
@@ -795,16 +863,20 @@ pub struct SelectStory {
 impl SelectStory {
     /// The options, one of which is disabled.
     pub const OPTIONS: [(&'static str, &'static str, bool); 4] = [
-        ("compact", "Compact", true),
-        ("regular", "Regular", true),
-        ("large", "Large", true),
-        ("unavailable", "Unavailable", false),
+        ("fast", "Fast", true),
+        ("balanced", "Balanced", true),
+        (
+            "high",
+            "High quality · International collaboration and workspace permissions 👩🏽‍💻",
+            true,
+        ),
+        ("offline", "Unavailable", false),
     ];
 
     pub fn new(options: GalleryOptions) -> Self {
         Self {
             options,
-            selection: State::new("regular".to_owned()),
+            selection: State::new("high".to_owned()),
         }
     }
 
@@ -834,17 +906,20 @@ impl View for SelectStory {
             .iter()
             .map(|(value, label, enabled)| SelectOption::new((*value).to_owned(), *label, *enabled))
             .collect();
-        let select = AnyView::new(
-            Select::new(self.selection.binding(), options)
-                .enabled(self.options.is_enabled)
-                .width(200.0)
-                .max_visible_rows(4)
-                .debug_name("select-control"),
-        );
         AnyView::new(StorySection::new(
-            "Fixed choices",
-            "Return opens the menu, arrows move the highlight and Return commits. The disabled row is skipped.",
-            field_row("Density", select, self.readout()),
+            "Typed options",
+            "Open with Space or Return, move with arrows, select with Return and dismiss with Escape.",
+            stack(vec![
+                bounded(
+                    AnyView::new(
+                        Select::new(self.selection.binding(), options)
+                            .enabled(self.options.is_enabled)
+                            .debug_name("select-control"),
+                    ),
+                    360.0,
+                ),
+                note(self.readout()),
+            ]),
         ))
     }
 
@@ -867,7 +942,7 @@ impl ColorFieldStory {
     pub fn new(options: GalleryOptions) -> Self {
         Self {
             options,
-            color: State::new(Color::from_rgba8(56, 132, 255, 255)),
+            color: State::new(Color::from_rgba8(88, 126, 231, 255)),
         }
     }
 
@@ -892,17 +967,37 @@ impl ColorFieldStory {
 
 impl View for ColorFieldStory {
     fn body(&self, _cx: &Scope) -> AnyView {
-        let field = AnyView::new(
-            ColorField::new(self.color.binding())
-                .show_alpha(true)
-                .shows_inline_channels(true)
-                .enabled(self.options.is_enabled)
-                .debug_name("color-field-control"),
-        );
         AnyView::new(StorySection::new(
-            "Accent colour",
-            "The swatch opens the channel editor. Hex entry accepts six or eight digits.",
-            field_row("Accent", field, self.readout()),
+            "Color picker",
+            "Open the swatch to edit RGB, alpha and hexadecimal values.",
+            stack(vec![
+                AnyView::new(
+                    ColorField::new(self.color.binding())
+                        .enabled(self.options.is_enabled)
+                        .shows_inline_values(true)
+                        .debug_name("color-field-control"),
+                ),
+                AnyView::new(
+                    ColorField::new(self.color.binding())
+                        .enabled(self.options.is_enabled)
+                        .show_alpha(false)
+                        .debug_name("color-field-rgb"),
+                ),
+                AnyView::new(
+                    BoxView::new(
+                        FlexDirection::Column,
+                        Align::Stretch,
+                        Justify::FlexStart,
+                        Wrap::NoWrap,
+                        0.0,
+                        AnyView::new(cove_ui_compose::EmptyView),
+                    )
+                    .frame_size(200.0, 60.0)
+                    .background_color(self.color())
+                    .corner_radius(8.0)
+                    .debug_name("color-preview"),
+                ),
+            ]),
         ))
     }
 
@@ -927,9 +1022,9 @@ impl Vec3FieldStory {
     pub fn new(options: GalleryOptions) -> Self {
         Self {
             options,
-            x: State::new(0.0),
-            y: State::new(1.0),
-            z: State::new(0.0),
+            x: State::new(1.0),
+            y: State::new(2.0),
+            z: State::new(3.0),
         }
     }
 
@@ -955,16 +1050,37 @@ impl Vec3FieldStory {
 
 impl View for Vec3FieldStory {
     fn body(&self, _cx: &Scope) -> AnyView {
-        let field = AnyView::new(
-            Vec3Field::new(self.x.binding(), self.y.binding(), self.z.binding())
-                .decimals(2)
-                .enabled(self.options.is_enabled)
-                .debug_name("vec3-field-control"),
-        );
+        let enabled = self.options.is_enabled;
         AnyView::new(StorySection::new(
-            "Vector",
-            "Tab moves across the axes. Copy and paste operate on the whole triple.",
-            field_row("Direction", field, self.readout()),
+            "Transform",
+            "Drag an axis to scrub (Shift for coarse, Option for fine); double-click to reset. Right-click to copy, paste or reset. Narrow rows stack all three axes.",
+            stack(vec![
+                AnyView::new(
+                    Vec3Field::new(self.x.binding(), self.y.binding(), self.z.binding())
+                        .enabled(enabled)
+                        .step(0.1)
+                        .constraints(Vec3Constraints {
+                            reset: Some(Vec3::new(0.0, 0.0, 0.0)),
+                            ..Default::default()
+                        })
+                        .debug_name("vec3-transform"),
+                ),
+                bounded(
+                    AnyView::new(
+                        Vec3Field::new(self.x.binding(), self.y.binding(), self.z.binding())
+                            .enabled(enabled)
+                            .mixed_axes(["x".to_owned(), "z".to_owned()].into_iter().collect())
+                            .debug_name("vec3-mixed"),
+                    ),
+                    240.0,
+                ),
+                note(format!(
+                    "Position: {}, {}, {}",
+                    self.x.get(),
+                    self.y.get(),
+                    self.z.get()
+                )),
+            ]),
         ))
     }
 

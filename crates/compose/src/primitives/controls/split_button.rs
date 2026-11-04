@@ -12,10 +12,9 @@ use cove_core::scene::{
 };
 
 use crate::modifiers::layout::{FlexExt, PaddingExt};
-use crate::primitives::controls::button::{Button, ButtonRole};
+use crate::primitives::controls::button::Button;
 use crate::primitives::controls::menu_button::MenuButton;
 use crate::primitives::overlays::menu::MenuEntry;
-use crate::primitives::text::Text;
 use crate::theme::styles::buttons::{ButtonStyleViewExt, SecondaryButtonStyle};
 use crate::theme::theme_for_node;
 use crate::{AnyView, BoxView, PrimitiveView, View, impl_primitive_view};
@@ -87,16 +86,9 @@ impl Clone for SplitButton {
 impl View for SplitButton {
     fn body(&self, _cx: &Scope) -> AnyView {
         let action = self.action.clone();
-        let primary = Button::with_options(
-            AnyView::new(Text::new(self.title.clone()).truncated()),
-            move || action(),
-            ButtonRole::Normal,
-            self.is_enabled,
-            false,
-            false,
-            None,
-        )
-        .button_style(SecondaryButtonStyle);
+        let primary = Button::title(self.title.clone(), move || action())
+            .enabled(self.is_enabled)
+            .button_style(SecondaryButtonStyle);
 
         let menu_label = AnyView::new(
             AnyView::new(crate::primitives::controls::button::ButtonIcon::new(
@@ -153,6 +145,10 @@ impl PrimitiveView for SplitButtonGroup {
         let theme = theme_for_node(node);
         node.set_border_color(Some(theme.colors.border));
         node.set_corner_radius(theme.inputs.radius);
+        node.set_layout_did_update(Some(Rc::new(|owner| {
+            let zone = owner.attachment::<usize>("split.zone").unwrap_or(0);
+            apply_tab_stops(owner, zone);
+        })));
         if !self.is_enabled {
             return;
         }
@@ -194,11 +190,12 @@ impl PrimitiveView for SplitButtonGroup {
                     return EventResult::Ignored;
                 };
                 let zone = if buttons.len() > 1 && target == &buttons[1] {
-                    1
+                    1usize
                 } else {
-                    0
+                    0usize
                 };
                 owner.set_attachment("split.zone", zone);
+                apply_tab_stops(&owner, zone);
                 chain.focus(Some(target), true);
                 EventResult::Handled
             }),
@@ -221,6 +218,12 @@ impl PrimitiveView for SplitButtonGroup {
     }
 }
 impl_primitive_view!(SplitButtonGroup);
+
+fn apply_tab_stops(node: &Node, zone: usize) {
+    for (index, button) in focusable_buttons(node).into_iter().enumerate() {
+        button.set_is_tab_stop(index == zone);
+    }
+}
 
 /// The pressable buttons inside the pair, in visual order.
 fn focusable_buttons(node: &Node) -> Vec<Node> {

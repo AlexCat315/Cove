@@ -249,7 +249,11 @@ fn the_story_starts_in_code_mode_on_the_sample() {
     let story = TextEditorStory::new(GalleryOptions::default());
     assert!(story.is_code_mode());
     assert_eq!(story.source(), SAMPLE_SOURCE);
-    assert_eq!(story.line_count(), 7, "six newlines plus the trailing one");
+    assert_eq!(
+        story.line_count(),
+        8,
+        "the trailing newline starts an empty eighth line"
+    );
     assert!(story.is_bookmarked());
     assert_eq!(story.breakpoints(), vec![3]);
     assert_eq!(story.fold_regions().len(), 2);

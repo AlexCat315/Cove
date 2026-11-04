@@ -1,8 +1,26 @@
 # Gallery 逐项验收记录
 
-更新：2026-11-03。目录共 106 页；先处理搜索、Slider / RangeSlider、Rating 与共享文本选择，随后补齐 TextField 编辑能力；本轮继续完成 TextFieldStyle 焦点/编辑接入与 TextBuffer 字素索引。
+更新：2026-11-04。目录共 106 页。当前九页控件的验收以以下 Swift 对照表为准；后续旧轮记录保留其原有范围。
 
 Swift 源码逐页对照见文末《Swift 源码对照（逐页差异清单）》。
+
+## 2026-11-04：九页 Swift 对照
+
+基准是本地 `swift/Examples/Sources/GalleryContent/Stories/Controls/ControlStories.swift`、`ToolbarStory.swift`、`TextEditorStory.swift`，以及 `swift/Compose/Sources/CoveUICompose/Primitives/Controls/CompletionPopover.swift`。全部实现使用共享 Rust，无新增 Swift。CompletionPopover 没有对应的 Swift Gallery story，按组件本身的十行窗口、详情、文档与编辑器导航语义接入示例。
+
+| 页面 | 对齐的布局、状态与交互 | 结构/场景验证 | macOS 原生验收 | Rust 文档 |
+| --- | --- | --- | --- | --- |
+| SplitButton | Save / Save as / Export / Discard、200pt 菜单、结果状态、独立命中区域、单一 Tab 停靠点随左右键移动 | 主操作和菜单结果、Tab 停靠点与禁用回归 | 待检 | split-button.md |
+| Toolbar | 自适应命令、播放/格式组、搜索、50…200% 缩放、Apply、纵向工具与八项纵向溢出 | Run、Zoom、Apply 结果；窄屏控件边界 | 待检 | toolbar.md |
+| CompletionPopover | 真实 TextField 请求/接受、20 项候选的十行窗口、详情和文档 | Control-Space / Return 接受结果，宽窄布局 | 待检 | completion-popover.md |
+| TextArea | Swift 三行样本、90…320pt 可拖动高度、520pt 最大宽度、字符计数 | 挂载真实编辑区与手柄，宽窄布局 | 待检 | text-area.md |
+| Text Editor | 文档头、320pt 可调编辑区、行列状态、代码/正文、断点/折叠、书签/运行/警告标记、暂停行、诊断悬停、print/private 补全、20 万行导航 | 编辑/模式往返保留文档、完整几何矩阵、词法/折叠/诊断及压力数据模型 | 待检 | text-editor.md |
+| NumberField | 3.14 / 0…10 / 0.25 步进、W 拖动/双击复位、混合/禁用、共享 1.25 的逗号/小数点输入 | 数值格式和键盘步进、宽窄布局 | 待检 | number-field.md |
+| Vec3Field | (1,2,3)、0.1 步进、全宽/240pt 混合 X/Z、整体复制/粘贴/复位、宽排窄叠 | 每轴步长、默认平台异步剪贴板、前缀布局和编解码 | 待检 | vec3-field.md |
+| ColorField | (88,126,231)、行内数值和 RGB 两个触发器、200×60 预览；当前主题、视口限宽、编辑草稿跨重组 | 色值编解码/浮层打开、宽窄布局 | 待检 | color-field.md |
+| Select | fast / balanced / high / offline、默认 high、完整长标签与组合 emoji、360pt 最大宽度 | 菜单键盘/禁用项与组合框语义；宽窄布局 | 待检 | select.md |
+
+`control_story_parity` 验证九页在 390 / 720 / 1280pt 下的真实控件边界；`text_editor_layout_tests` 另覆盖 1×/2× 字体与浅/深主题。场景事件注入仅验证 Rust 输入分发，不等于原生键盘或 IME 激活。各平台共享实现；其他平台原生视觉/输入尚未在本机验收。
 
 ## 本轮结论
 

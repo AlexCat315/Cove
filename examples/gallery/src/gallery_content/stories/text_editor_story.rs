@@ -12,12 +12,37 @@
 //! size, and its brace-fold scan deliberately ignores braces inside strings and
 //! comments.
 
+use super::showcase::{note, row, stack};
 use cove_composition::Scope;
-use cove_core::State;
+use cove_core::scene::{Align, FlexDirection, Justify, Wrap};
+use cove_core::{Binding, State};
+use cove_core::{Font, FontWeight, Point};
+use cove_ui_compose::modifiers::layout::{FlexExt, LayoutFrameExt, PaddingExt};
+use cove_ui_compose::modifiers::style::AppearanceExt;
 use cove_ui_compose::modifiers::style::SemanticStyleViewExt;
+use cove_ui_compose::primitives::controls::{Button, Checkbox};
+use cove_ui_compose::primitives::layout::ResizableEditor;
+use cove_ui_compose::primitives::media::{Icon, ui_icon_catalog as icons};
+use cove_ui_compose::primitives::overlays::tooltip::{Tooltip, TooltipAnchor};
 use cove_ui_compose::primitives::text::Text;
-use cove_ui_compose::theme::tokens::SemanticColorRef;
-use cove_ui_compose::{AnyView, BoxView, LayoutDebugExt, TupleView, View};
+use cove_ui_compose::primitives::text::code::{
+    folding_options::{TextEditorFolding, TextFoldRegion},
+    gutter_options::{TextBreakpoint, TextEditorGutter, TextGutterMarker},
+};
+use cove_ui_compose::primitives::text::text_buffer::TextBuffer;
+use cove_ui_compose::primitives::text::text_diagnostic::{
+    TextDiagnostic, TextDiagnosticSeverity, TextDiagnostics,
+};
+use cove_ui_compose::primitives::text::text_field::text_field_observation::TextFieldHoverAnchor;
+use cove_ui_compose::primitives::text::text_field::{
+    TextField, TextFieldAxis, TextFieldBehavior, TextFieldCaretState, TextFieldCodeEditing,
+    TextFieldEvents, TextFieldLayout, TextFieldNavigationRequest,
+};
+use cove_ui_compose::theme::styles::components::{AnyTextFieldStyle, EditorTextFieldStyle};
+use cove_ui_compose::theme::{SemanticColorRef, SemanticFontRef};
+use cove_ui_compose::{AnyView, LayoutDebugExt, View};
+use cove_ui_compose::{BoxView, TupleView};
+use std::rc::Rc;
 
 use super::feedback::StorySection;
 use crate::gallery_content::catalog::GalleryOptions;
@@ -336,7 +361,10 @@ pub fn token_at(offset: usize, tokens: &[Token]) -> Option<&Token> {
 /// `TextEditorStory`: prose and code modes over one document.
 pub struct TextEditorStory {
     pub options: GalleryOptions,
-    source: State<String>,
+    source: State<TextBuffer>,
+    caret: State<TextFieldCaretState>,
+    hover: State<Option<TextFieldHoverAnchor>>,
+    navigation: State<TextFieldNavigationRequest>,
     status: State<String>,
     is_code_mode: State<bool>,
     shows_diagnostic: State<bool>,
@@ -351,7 +379,10 @@ impl TextEditorStory {
     pub fn new(options: GalleryOptions) -> Self {
         Self {
             options,
-            source: State::new(SAMPLE_SOURCE.to_owned()),
+            source: State::new(TextBuffer::new(SAMPLE_SOURCE)),
+            caret: State::new(TextFieldCaretState::INITIAL),
+            hover: State::new(None),
+            navigation: State::new(TextFieldNavigationRequest::default()),
             status: State::new(
                 "Press Control-Space at the end of a line to request completion".to_owned(),
             ),
@@ -375,7 +406,7 @@ impl TextEditorStory {
     }
 
     pub fn source(&self) -> String {
-        self.source.get()
+        self.source.get().string_value()
     }
 
     pub fn status(&self) -> String {
@@ -413,8 +444,10 @@ impl TextEditorStory {
     /// Replaces the document and re-tokenises it.
     pub fn set_source(&self, source: impl Into<String>) {
         let source = source.into();
-        self.tokens.set(tokens(&source));
-        self.source.set(source);
+        let lexical = tokens(&source);
+        self.fold_regions.set(folds(&source, &lexical));
+        self.tokens.set(lexical);
+        self.source.set(TextBuffer::new(&source));
     }
 
     /// Replaces the document with `count` generated lines and jumps the caret.
@@ -426,10 +459,20 @@ impl TextEditorStory {
             .map(|index| format!("let value{index} = {index}"))
             .collect::<Vec<_>>()
             .join("\n");
-        self.tokens.set(tokens(&source));
-        self.source.set(source);
+        let lexical = tokens(&source);
+        self.fold_regions.set(folds(&source, &lexical));
+        self.tokens.set(lexical);
+        self.source.set(TextBuffer::new(&source));
         self.breakpoints.set(Vec::new());
         self.fold_regions.set(Vec::new());
+        let buffer = self.source.get();
+        let index = buffer.line_range(count / 2).end;
+        let request = self.navigation.get().caret_request_id.unwrap_or(0) + 1;
+        self.navigation.set(TextFieldNavigationRequest {
+            focus_request_id: Some(request),
+            caret_request_id: Some(request),
+            caret_request_index: Some(index),
+        });
         self.status.set(format!(
             "{count} lines · caret at line {} · type, scroll, undo and redo",
             count / 2 + 1
@@ -438,7 +481,7 @@ impl TextEditorStory {
 
     /// The line count of the current document.
     pub fn line_count(&self) -> usize {
-        self.source.get().lines().count()
+        self.source.get().line_count()
     }
 
     /// The sample diagnostic: a warning spanning the first line.
@@ -447,13 +490,21 @@ impl TextEditorStory {
     /// line 0 rather than assuming a fixed length.
     pub fn diagnostic(&self) -> (std::ops::Range<usize>, &'static str) {
         let source = self.source.get();
-        let end = source.find('\n').unwrap_or(source.len());
-        (0..end, "Sample warning: this declaration is unused.")
+        let range = source.line_range(0);
+        (
+            source.utf8_offset_for_character_index(range.start)
+                ..source.utf8_offset_for_character_index(range.end),
+            "Sample warning: this declaration is unused.",
+        )
     }
 
     /// The folds this document would produce, which is what code mode shows.
     pub fn computed_folds(&self) -> Vec<FoldRegion> {
-        folds(&self.source.get(), &self.tokens.get())
+        folds(&self.source(), &self.tokens.get())
+    }
+
+    pub fn set_code_mode(&self, code: bool) {
+        self.is_code_mode.set(code);
     }
 
     pub fn toggle_bookmark(&self) {
@@ -463,30 +514,350 @@ impl TextEditorStory {
 
 impl View for TextEditorStory {
     fn body(&self, _cx: &Scope) -> AnyView {
-        let status = Text::new(self.status())
-            .semantic_font(cove_ui_compose::theme::SemanticFontRef::caption())
-            .semantic_foreground(SemanticColorRef::on_surface_muted());
-
-        let detail = Text::new(
-            "A multiline editor for prose and code. Code mode adds line numbers, indentation, diagnostics and completion; plain mode soft-wraps and removes code chrome.",
+        let enabled = self.options.is_enabled;
+        let code_mode = self.is_code_mode();
+        let token_state = self.tokens.clone();
+        let folds_state = self.fold_regions.clone();
+        let caret = self.caret.clone();
+        let hover = self.hover.clone();
+        let edit_hover = self.hover.clone();
+        let navigation = self.navigation.clone();
+        let jump = Button::title("Go to beginning", move || {
+            let id = navigation.get().caret_request_id.unwrap_or(0) + 1;
+            navigation.set(TextFieldNavigationRequest {
+                focus_request_id: Some(id),
+                caret_request_id: Some(id),
+                caret_request_index: Some(0),
+            });
+        })
+        .enabled(enabled);
+        let source = self.source.clone();
+        let lexical = self.tokens.clone();
+        let regions = self.fold_regions.clone();
+        let load_navigation = self.navigation.clone();
+        let status = self.status.clone();
+        let stress_breakpoints = self.breakpoints.clone();
+        let stress = Button::title("Load 200,000 lines", move || {
+            let text = (0..STRESS_LINES)
+                .map(|i| format!("let value{i} = {i}"))
+                .collect::<Vec<_>>()
+                .join("\n");
+            let buffer = TextBuffer::new(&text);
+            let index = buffer.line_range(STRESS_TARGET_LINE).end;
+            source.set(buffer);
+            lexical.set(Vec::new());
+            regions.set(Vec::new());
+            stress_breakpoints.set(Vec::new());
+            hover.set(None);
+            let id = load_navigation.get().caret_request_id.unwrap_or(0) + 1;
+            load_navigation.set(TextFieldNavigationRequest {
+                focus_request_id: None,
+                caret_request_id: Some(id),
+                caret_request_index: Some(index),
+            });
+            status
+                .set("200,000 lines · caret at line 100,001 · type, scroll, undo and redo".into());
+        })
+        .enabled(enabled && code_mode);
+        let mut markers = Vec::new();
+        if self.is_bookmarked() && self.source.get().line_count() > 1 {
+            let bookmark = self.is_bookmarked.clone();
+            let status = self.status.clone();
+            markers.push(TextGutterMarker::new(
+                "bookmark",
+                1,
+                "Remove bookmark",
+                icons::status::bookmark(),
+                None,
+                move || {
+                    bookmark.set(false);
+                    status.set("Bookmark removed".into());
+                },
+            ));
+        }
+        if let Some(function) = self
+            .fold_regions()
+            .into_iter()
+            .find(|region| region.first_line > 0)
+        {
+            let status = self.status.clone();
+            markers.push(TextGutterMarker::new(
+                "run",
+                function.first_line,
+                "Preview Greeting.message",
+                icons::editor::play(),
+                None,
+                move || status.set("Greeting.message preview: Hello, Cove".into()),
+            ));
+        }
+        if self.shows_diagnostic() {
+            let (_, message) = self.diagnostic();
+            let status = self.status.clone();
+            let navigation = self.navigation.clone();
+            markers.push(TextGutterMarker::new(
+                "warning",
+                0,
+                message,
+                icons::status::alert_triangle(),
+                None,
+                move || {
+                    status.set(message.into());
+                    let id = navigation.get().caret_request_id.unwrap_or(0) + 1;
+                    navigation.set(TextFieldNavigationRequest {
+                        focus_request_id: None,
+                        caret_request_id: Some(id),
+                        caret_request_index: Some(0),
+                    });
+                },
+            ));
+        }
+        let breakpoints = self.breakpoints.clone();
+        let write_breakpoints = self.breakpoints.clone();
+        let gutter = TextEditorGutter {
+            breakpoints: Some(Binding::new(
+                move || {
+                    breakpoints
+                        .get()
+                        .into_iter()
+                        .map(TextBreakpoint::new)
+                        .collect()
+                },
+                move |values: Vec<TextBreakpoint>| {
+                    write_breakpoints.set(values.into_iter().map(|v| v.line).collect())
+                },
+            )),
+            execution_line: self.paused_preview().then_some(4),
+            markers,
+            ..TextEditorGutter::new()
+        };
+        let mut code = TextFieldCodeEditing::default();
+        if code_mode {
+            code.shows_line_numbers = true;
+            code.indentation_width = Some(4);
+            code.gutter = gutter;
+            code.folding = TextEditorFolding {
+                regions: self
+                    .fold_regions()
+                    .into_iter()
+                    .map(|v| TextFoldRegion::new(v.first_line, v.last_line))
+                    .collect(),
+                ..TextEditorFolding::new()
+            };
+            if self.shows_diagnostic() {
+                let (range, message) = self.diagnostic();
+                code.diagnostics = TextDiagnostics::new(&[TextDiagnostic::new(
+                    range,
+                    TextDiagnosticSeverity::Warning,
+                    message,
+                )]);
+            }
+            code.syntax_revision = Some(self.source.get().identity() as u64);
+            code.on_request_completion = Some(Rc::new(|_, reply| {
+                use cove_ui_compose::primitives::text::text_completion_rebase::TextCompletionItem;
+                let mut print = TextCompletionItem::new("print", "print", "print(value)");
+                print.detail = Some("Writes a value to standard output".into());
+                let mut private = TextCompletionItem::new("private", "private", "private ");
+                private.detail = Some("Access control".into());
+                reply(vec![print, private]);
+            }));
+            let status = self.status.clone();
+            code.on_accept_completion = Some(Rc::new(move |item| {
+                status.set(format!("Accepted {}", item.label))
+            }));
+        }
+        let mut field = TextField::new(
+            if code_mode {
+                "Swift source"
+            } else {
+                "Plain text document"
+            },
+            self.source.binding(),
         )
-        .semantic_font(cove_ui_compose::theme::SemanticFontRef::caption())
-        .semantic_foreground(SemanticColorRef::on_surface_muted());
-
+        .layout(TextFieldLayout {
+            axis: TextFieldAxis::Vertical,
+            max_visible_lines: 24,
+            wraps_lines: !code_mode,
+            ..TextFieldLayout::default()
+        })
+        .behavior(TextFieldBehavior {
+            disabled: !enabled,
+            ..TextFieldBehavior::default()
+        })
+        .style(AnyTextFieldStyle::new(EditorTextFieldStyle))
+        .code_editing(code)
+        .events(TextFieldEvents {
+            on_change: Some(Rc::new(move |buffer| {
+                edit_hover.set(None);
+                if buffer.utf8_length() > SYNTAX_LIMIT {
+                    folds_state.set(Vec::new());
+                    token_state.set(Vec::new());
+                } else {
+                    let source = buffer.string_value();
+                    let lexical = tokens(&source);
+                    folds_state.set(folds(&source, &lexical));
+                    token_state.set(lexical);
+                }
+            })),
+            on_caret_change: Some(Rc::new(move |value| {
+                if caret.get() != value {
+                    caret.set(value);
+                }
+            })),
+            on_hover_change: Some(Rc::new({
+                let hover = self.hover.clone();
+                move |value| {
+                    if hover.get() != value {
+                        hover.set(value);
+                    }
+                }
+            })),
+            ..TextFieldEvents::default()
+        });
+        field.navigation = self.navigation.get();
+        let lexical = self.tokens.get();
+        let field = cove_ui_compose::theme::ThemeReader::new(move |theme| {
+            let mut field = field.clone();
+            if code_mode {
+                let lexical = lexical.clone();
+                let light = theme.colors.background.r > 0.5;
+                field.code_editing.syntax_color_at_utf8_offset = Some(Rc::new(move |_, offset| {
+                    token_at(offset, &lexical).map(|t| {
+                        let (r, g, b) = token_color(t.kind, light);
+                        cove_core::Color::from_rgba8(r, g, b, 255)
+                    })
+                }));
+            }
+            let font = if code_mode {
+                Font::monospaced(15.0, FontWeight::Regular)
+            } else {
+                theme.typography.body.font.clone()
+            };
+            AnyView::new(cove_ui_compose::adaptive::SurfaceReader::new(
+                move |surface| {
+                    let mut field = field.clone();
+                    field.layout.wraps_lines = !code_mode
+                        || surface.viewport.width_class() == cove_core::SizeClass::Compact;
+                    AnyView::new(
+                        AnyView::new(field)
+                            .font(font.clone())
+                            .line_height(if code_mode { 24.0 } else { 22.0 }),
+                    )
+                },
+            ))
+        });
+        let text = self.source.get();
+        let (line, column) =
+            text.line_and_column(self.caret.get().caret_index.min(text.character_count()));
+        let (line, column) = (line + 1, column + 1);
+        let code_state = self.is_code_mode.binding();
+        let header = BoxView::new(
+            FlexDirection::Row,
+            Align::Center,
+            Justify::FlexStart,
+            Wrap::Wrap,
+            8.0,
+            AnyView::new(TupleView::new(vec![
+                AnyView::new(Icon::new(icons::editor::code(), 16.0)),
+                AnyView::new(
+                    Text::new(if code_mode {
+                        "Greeting.swift"
+                    } else {
+                        "Notes.txt"
+                    })
+                    .truncated()
+                    .semantic_font(SemanticFontRef::label())
+                    .flex_with(1.0, 1.0, Some(0.0))
+                    .frame_min_width(60.0),
+                ),
+                AnyView::new(
+                    Checkbox::labeled_from_boolean("Code mode", code_state).enabled(enabled),
+                ),
+            ])),
+        )
+        .padding_edges(14.0, 8.0)
+        .semantic_background(SemanticColorRef::surface_raised());
+        let status_bar = row(vec![
+            AnyView::new(note(format!("Ln {line}, Col {column}")).debug_name("text-editor-caret")),
+            note(if code_mode { "Spaces: 4" } else { "Soft wrap" }),
+            note("UTF-8"),
+            note(if code_mode { "Swift" } else { "Plain text" }),
+        ])
+        .padding_edges(14.0, 6.0)
+        .semantic_background(SemanticColorRef::surface_raised());
+        let document = AnyView::new(
+            BoxView::new(
+                FlexDirection::Column,
+                Align::Stretch,
+                Justify::FlexStart,
+                Wrap::NoWrap,
+                0.0,
+                AnyView::new(TupleView::new(vec![
+                    AnyView::new(header),
+                    AnyView::new(
+                        ResizableEditor::new(
+                            AnyView::new(field)
+                                .frame(None, None, None, Some(0.0), None, None)
+                                .flex(1.0)
+                                .debug_name("gallery-text-editor"),
+                        )
+                        .initial_height(320.0)
+                        .resizable(enabled)
+                        .resize_label("Editor height"),
+                    ),
+                    AnyView::new(status_bar),
+                ])),
+            )
+            .semantic_background(SemanticColorRef::surface_sunken())
+            .corner_radius(8.0),
+        );
+        let document = cove_ui_compose::theme::ThemeReader::new(move |theme| {
+            AnyView::new(document.clone().border_color(theme.colors.border, 1.0))
+        });
+        let mut controls = vec![AnyView::new(jump), AnyView::new(stress)];
+        if code_mode {
+            controls.push(AnyView::new(
+                Checkbox::labeled_from_boolean("Sample warning", self.shows_diagnostic.binding())
+                    .enabled(enabled),
+            ));
+            controls.push(AnyView::new(
+                Checkbox::labeled_from_boolean(
+                    "Paused line preview",
+                    self.paused_preview.binding(),
+                )
+                .enabled(enabled),
+            ));
+        }
+        let mut content = vec![
+            row(controls),
+            AnyView::new(document),
+            AnyView::new(note(self.status()).debug_name("text-editor-status")),
+            note(
+                "F9 toggles a breakpoint · Primary-Alt-Left/Right folds or expands · gutter icons expose named actions · touch uses a line menu",
+            ),
+        ];
+        if code_mode && self.shows_diagnostic() {
+            if let Some(hover) = self.hover.get() {
+                if text.line_index_for_character_index(hover.character_index) == 0 {
+                    let (_, message) = self.diagnostic();
+                    content.push(AnyView::new(
+                        Tooltip::anchored(
+                            TooltipAnchor::Point(Point {
+                                x: hover.window_x,
+                                y: hover.window_y,
+                            }),
+                            note(message)
+                                .padding(10.0)
+                                .semantic_background(SemanticColorRef::surface_floating()),
+                        )
+                        .presented(true),
+                    ));
+                }
+            }
+        }
         AnyView::new(StorySection::new(
             "Text editing",
-            "Line numbers, diagnostics and completion in code mode; soft wrap with no chrome in plain mode.",
-            AnyView::new(BoxView::new(
-                cove_core::scene::FlexDirection::Column,
-                cove_core::scene::Align::Stretch,
-                cove_core::scene::Justify::FlexStart,
-                cove_core::scene::Wrap::NoWrap,
-                8.0,
-                AnyView::new(TupleView::new(vec![
-                    AnyView::new(detail),
-                    AnyView::new(AnyView::new(status).debug_name("text-editor-status")),
-                ])),
-            )),
+            "A multiline editor for prose and code. Code mode adds line numbers, indentation, diagnostics and completion; plain mode soft-wraps and removes code chrome.",
+            stack(content),
         ))
     }
 
@@ -495,6 +866,6 @@ impl View for TextEditorStory {
     }
 
     fn dynamic_properties(&self) -> Vec<cove_composition::DynamicField> {
-        cove_composition::dynamic_fields!(self; source, status, is_code_mode, shows_diagnostic, paused_preview, is_bookmarked, breakpoints, fold_regions, tokens)
+        cove_composition::dynamic_fields!(self; source, caret, hover, navigation, status, is_code_mode, shows_diagnostic, paused_preview, is_bookmarked, breakpoints, fold_regions, tokens)
     }
 }

@@ -8,12 +8,6 @@
 //! - the menu zone is one button, opens its menu on click, and an activated
 //!   entry closes it
 //!
-//! Remaining gap: the pair does not share a single Tab stop. Swift kept exactly
-//! one of the two zones in the Tab order and moved the stop with the rove.
-//! `is_tab_stop()` defaults to `true` and `SplitButtonGroup` never calls
-//! `set_is_tab_stop`, so both zones are always Tab stops.
-//! `both_zones_are_tab_stops` pins that.
-
 use crate::support;
 
 use std::cell::Cell;
@@ -131,8 +125,7 @@ fn a_disabled_split_button_runs_neither_zone() {
 }
 
 #[test]
-fn both_zones_are_tab_stops() {
-    // Gap: Swift made the pair own one Tab stop and moved it with the rove.
+fn the_pair_shares_one_tab_stop_and_roving_moves_it() {
     InteractiveScene::run(800.0, 600.0, |scene| {
         scene.install(AnyView::new(LayerRoot::new(AnyView::new(
             SplitButton::new(
@@ -144,8 +137,19 @@ fn both_zones_are_tab_stops() {
 
         let hosts = zones(scene);
         assert!(
-            hosts[0].is_tab_stop() && hosts[1].is_tab_stop(),
-            "both zones are Tab stops today"
+            hosts[0].is_tab_stop() && !hosts[1].is_tab_stop(),
+            "only the primary zone starts in the Tab order"
+        );
+        scene.focus.focus(Some(&hosts[0]), true);
+        scene.key(cove_ui_compose::Scancode::ARROW_RIGHT, Default::default());
+        assert!(
+            !hosts[0].is_tab_stop() && hosts[1].is_tab_stop(),
+            "Right moves the single Tab stop to the menu"
+        );
+        scene.key(cove_ui_compose::Scancode::ARROW_LEFT, Default::default());
+        assert!(
+            hosts[0].is_tab_stop() && !hosts[1].is_tab_stop(),
+            "Left restores the primary stop"
         );
     });
 }

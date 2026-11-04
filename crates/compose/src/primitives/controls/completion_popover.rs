@@ -44,6 +44,7 @@ const DOCUMENTATION_LINES: usize = 8;
 pub struct CompletionPopover {
     pub items: Vec<TextCompletionItem>,
     pub selected_index: usize,
+    pub is_enabled: bool,
     pub on_accept: Option<Rc<dyn Fn(TextCompletionItem)>>,
 }
 
@@ -53,8 +54,14 @@ impl CompletionPopover {
         Self {
             items,
             selected_index,
+            is_enabled: true,
             on_accept: None,
         }
+    }
+
+    pub fn enabled(mut self, enabled: bool) -> Self {
+        self.is_enabled = enabled;
+        self
     }
 
     pub fn on_accept(mut self, handler: impl Fn(TextCompletionItem) + 'static) -> Self {
@@ -66,6 +73,7 @@ impl CompletionPopover {
         CompletionPopover {
             items: self.items.clone(),
             selected_index: self.selected_index,
+            is_enabled: self.is_enabled,
             on_accept: self.on_accept.clone(),
         }
     }
@@ -141,10 +149,15 @@ impl PrimitiveView for CompletionPanel {
                 continue;
             };
             let is_selected = index == view.selected_index;
-            let on_accept = view.on_accept.clone();
+            let on_accept = if view.is_enabled {
+                view.on_accept.clone()
+            } else {
+                None
+            };
             column.push(AnyView::new(CompletionRow {
                 item,
                 is_selected,
+                is_enabled: view.is_enabled,
                 on_accept,
             }));
         }
@@ -190,6 +203,7 @@ impl_primitive_view!(CompletionPanel);
 struct CompletionRow {
     item: TextCompletionItem,
     is_selected: bool,
+    is_enabled: bool,
     on_accept: Option<Rc<dyn Fn(TextCompletionItem)>>,
 }
 
@@ -210,11 +224,14 @@ impl PrimitiveView for CompletionRow {
     }
 
     fn update_node(&self, node: &Node) {
+        node.set_is_focusable(self.is_enabled);
+        node.set_is_hit_testable(self.is_enabled);
         node.set_accessibility(Some(AccessibilitySemantics {
             role: AccessibilityRole::ListItem,
             label: self.item.label.clone(),
             state: AccessibilityState {
                 is_selected: self.is_selected,
+                is_enabled: self.is_enabled,
                 ..Default::default()
             },
             ..Default::default()

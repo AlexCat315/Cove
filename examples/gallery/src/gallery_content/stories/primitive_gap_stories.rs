@@ -20,7 +20,7 @@ use cove_ui_compose::primitives::navigation::RouteOutlet;
 use cove_ui_compose::primitives::text::Text;
 use cove_ui_compose::primitives::text::single_line::{SingleLineText, normalized_single_line};
 use cove_ui_compose::theme::theme_for_node;
-use cove_ui_compose::{AnyView, BoxView, TupleView, View};
+use cove_ui_compose::{AnyView, BoxView, LayoutDebugExt, TupleView, View};
 use std::rc::Rc;
 
 use super::feedback::StorySection;
@@ -118,6 +118,7 @@ pub struct CompletionPopoverStory {
     options: GalleryOptions,
     selected: State<usize>,
     accepted: State<String>,
+    input: State<cove_ui_compose::primitives::text::text_buffer::TextBuffer>,
 }
 
 impl CompletionPopoverStory {
@@ -126,21 +127,113 @@ impl CompletionPopoverStory {
             options,
             selected: State::new(0),
             accepted: State::new(String::new()),
+            input: State::new(cove_ui_compose::primitives::text::text_buffer::TextBuffer::empty()),
         }
     }
 
     /// The rows the popover lists.
     pub fn items() -> Vec<TextCompletionItem> {
         [
-            ("render", "render", "render(_ view:)"),
-            ("layout", "layout", "layout(width:)"),
-            ("measure", "measure", "measure(in:)"),
-            ("focus", "focus", "focus(_:)"),
-            ("reveal", "reveal", "reveal(_:)"),
-            ("animate", "animate", "animate(_:to:)"),
+            (
+                "render",
+                "render(_ view: View)",
+                "Render a view into the current surface.",
+            ),
+            (
+                "layout",
+                "layout(width: Float)",
+                "Recompute layout for the available width.",
+            ),
+            (
+                "measure",
+                "measure(in: Size)",
+                "Measure the content without changing its placement.",
+            ),
+            (
+                "focus",
+                "focus(_ target: Node)",
+                "Move keyboard focus to a control.",
+            ),
+            (
+                "reveal",
+                "reveal(_ range: Range)",
+                "Scroll the requested range into view.",
+            ),
+            (
+                "animate",
+                "animate(_:to:)",
+                "Animate a value using the active motion settings.",
+            ),
+            (
+                "print",
+                "print(_ value: Any)",
+                "Write a value to the debug console.",
+            ),
+            (
+                "private",
+                "Access modifier",
+                "Limit a declaration to its enclosing scope.",
+            ),
+            (
+                "padding",
+                "padding(_ value: Float)",
+                "Inset content on all sides.",
+            ),
+            (
+                "position",
+                "position(x:y:)",
+                "Position a view within its parent.",
+            ),
+            (
+                "background",
+                "background(_ color: Color)",
+                "Fill the area behind the content.",
+            ),
+            (
+                "border",
+                "border(_ color: Color)",
+                "Draw a border around a view.",
+            ),
+            ("clip", "clip(to: Rect)", "Clip rendering to a rectangle."),
+            ("color", "Color", "Create a color value."),
+            (
+                "frame",
+                "frame(width:height:)",
+                "Constrain the content dimensions.",
+            ),
+            (
+                "font",
+                "font(_ font: Font)",
+                "Set the font for text descendants.",
+            ),
+            (
+                "opacity",
+                "opacity(_ value: Float)",
+                "Set the content opacity between zero and one.",
+            ),
+            ("offset", "offset(x:y:)", "Translate the rendered content."),
+            ("scroll", "scroll(to: Point)", "Scroll to an offset."),
+            (
+                "selection",
+                "selection: Range",
+                "Read the current selected range.",
+            ),
         ]
         .into_iter()
-        .map(|(id, label, insert)| TextCompletionItem::new(id, label, insert))
+        .map(|(label, detail, documentation)| {
+            let mut item = TextCompletionItem::new(
+                label,
+                label,
+                if label == "print" {
+                    "print(value)"
+                } else {
+                    label
+                },
+            );
+            item.detail = Some(detail.into());
+            item.documentation = Some(documentation.into());
+            item
+        })
         .collect()
     }
 
@@ -155,64 +248,100 @@ impl CompletionPopoverStory {
 
 impl View for CompletionPopoverStory {
     fn body(&self, _cx: &Scope) -> AnyView {
-        let items = Self::items();
-        let count = items.len();
-
+        use super::showcase::{bounded, note, row, stack};
+        use cove_ui_compose::primitives::text::text_field::{
+            TextField, TextFieldBehavior, TextFieldCodeEditing,
+        };
+        let enabled = self.options.is_enabled;
         let accepted = self.accepted.clone();
-        let popover = CompletionPopover::new(items, self.selected.get())
-            .on_accept(move |item| accepted.set(item.label));
-
-        let next = {
-            let selected = self.selected.clone();
-            move || selected.set((selected.get() + 1).min(count.saturating_sub(1)))
+        let code = TextFieldCodeEditing {
+            on_request_completion: Some(Rc::new(|request, reply| {
+                let prefix = request.prefix.to_lowercase();
+                reply(
+                    Self::items()
+                        .into_iter()
+                        .filter(|item| item.label.starts_with(&prefix))
+                        .collect(),
+                );
+            })),
+            on_accept_completion: Some(Rc::new(move |item| accepted.set(item.label))),
+            ..TextFieldCodeEditing::default()
         };
-        let previous = {
-            let selected = self.selected.clone();
-            move || selected.set(selected.get().saturating_sub(1))
-        };
-        let reset = {
-            let selected = self.selected.clone();
-            move || selected.set(0)
-        };
+        let input = TextField::new("Type a symbol", self.input.binding())
+            .code_editing(code)
+            .behavior(TextFieldBehavior {
+                disabled: !enabled,
+                ..TextFieldBehavior::default()
+            })
+            .debug_name("completion-input");
+        let accepted = self.accepted.clone();
+        let text = self.input.clone();
+        let panel = CompletionPopover::new(Self::items(), self.selected.get())
+            .enabled(enabled)
+            .on_accept(move |item| {
+                text.set(
+                    cove_ui_compose::primitives::text::text_buffer::TextBuffer::new(
+                        &item.insert_text,
+                    ),
+                );
+                accepted.set(item.label);
+            });
+        let previous = self.selected.clone();
+        let next = self.selected.clone();
+        let last = self.selected.clone();
+        stack(vec![
+            AnyView::new(StorySection::new(
+                "Live completion",
+                "Type a prefix or press Control-Space. Arrows navigate, Return inserts, Escape dismisses.",
+                stack(vec![
+                    bounded(AnyView::new(input), 480.0),
+                    note(if self.accepted.get().is_empty() {
+                        "No completion accepted".into()
+                    } else {
+                        format!("Inserted: {}", self.accepted.get())
+                    }),
+                ]),
+            )),
+            AnyView::new(StorySection::new(
+                "Candidate browser",
+                "Twenty symbols, ten visible rows, with details and documentation for the highlight.",
+                stack(vec![
+                    bounded(
+                        AnyView::new(panel).debug_name("completion-candidates"),
+                        580.0,
+                    ),
+                    row(vec![
+                        AnyView::new(
+                            Button::title("Previous", move || {
+                                previous.set(previous.get().saturating_sub(1))
+                            })
+                            .enabled(enabled && self.selected.get() > 0),
+                        ),
+                        AnyView::new(
+                            Button::title("Next", move || {
+                                next.set((next.get() + 1).min(Self::items().len() - 1))
+                            })
+                            .enabled(enabled && self.selected.get() + 1 < Self::items().len()),
+                        ),
+                        AnyView::new(
+                            Button::title("Last candidate", move || {
+                                last.set(Self::items().len() - 1)
+                            })
+                            .enabled(enabled),
+                        ),
+                        note(format!(
+                            "{} / {}",
+                            self.selected.get() + 1,
+                            Self::items().len()
+                        )),
+                    ]),
+                ]),
+            )),
+        ])
+    }
 
-        let controls = AnyView::new(BoxView::new(
-            FlexDirection::Row,
-            Align::Center,
-            Justify::FlexStart,
-            Wrap::Wrap,
-            8.0,
-            AnyView::new(TupleView::new(vec![
-                AnyView::new(Button::title("Previous", previous).enabled(self.options.is_enabled)),
-                AnyView::new(Button::title("Next", next).enabled(self.options.is_enabled)),
-                AnyView::new(Button::title("Reset", reset).enabled(self.options.is_enabled)),
-            ])),
-        ));
-
-        let readout = Text::new(if self.accepted.get().is_empty() {
-            format!("highlighted index: {}", self.selected.get())
-        } else {
-            format!(
-                "highlighted index: {} · accepted: {}",
-                self.selected.get(),
-                self.accepted.get()
-            )
-        });
-
-        AnyView::new(column(
-            vec![
-                AnyView::new(StorySection::new(
-                    "Completion list",
-                    "Ten rows fit before the window scrolls; the highlight keeps five rows of context above it.",
-                    AnyView::new(popover),
-                )),
-                AnyView::new(StorySection::new(
-                    "Keyboard model",
-                    "The buttons stand in for Up/Down so the highlighted row is observable without a text field.",
-                    column(vec![AnyView::new(controls), AnyView::new(readout)], 10.0),
-                )),
-            ],
-            20.0,
-        ))
+    fn dynamic_properties(&self) -> Vec<cove_composition::DynamicField> {
+        cove_composition::dynamic_fields!(self; selected, accepted, input)
     }
 }
 

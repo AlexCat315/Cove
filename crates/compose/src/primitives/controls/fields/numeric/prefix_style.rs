@@ -100,7 +100,10 @@ impl PrimitiveView for NumericPrefixChrome {
     }
 
     fn make_layout_node(&self) -> Option<cove_core::scene::LayoutNode> {
-        None
+        let layout = cove_core::scene::LayoutNode::new();
+        layout.set_flex_direction(FlexDirection::Column);
+        layout.set_align_items(Align::Stretch);
+        Some(layout)
     }
 
     fn update_node(&self, node: &Node) {

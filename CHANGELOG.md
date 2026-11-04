@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+- **Gallery 控件对齐（2026-11-04）**：按本地 Swift 恢复 Toolbar 全部命令组及纵向溢出、完整 Text Editor 与其状态/诊断/标记/补全，重新对齐 TextArea、NumberField、Vec3Field、ColorField、Select、SplitButton 的初始值、布局和操作；修复数值前缀输入框外观、向量步长与平台剪贴板、颜色浮层主题/草稿和 SplitButton 单一 Tab 停靠点。同步九页 Rust 文档及验收记录。
+
 - **自定义布局测量（2026-11-04）**：普通尺寸提议保留内容固有宽度，操作组单独测量收窄后的换行高度，避免长按钮重叠及网格、Markdown 代码块横向滚动回归。
 
 - **实际字体样式继承（2026-11-04）**：CJK 回退继承主字体实际字重与斜体；Apple 复制 CoreText traits，其他平台读取 OpenType 表与 variation 坐标，补充命名 Bold 主字体和 TTC 元数据回归。

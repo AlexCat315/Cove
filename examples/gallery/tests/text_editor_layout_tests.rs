@@ -7,27 +7,6 @@
 //! - the document survives a source replacement and stays tokenised
 //! - the byte-level lexer, folds and diagnostics behave as the editor relies on
 //!
-//! ## Named differences — the story is not the editor
-//!
-//! `GAP(text_editor_story.rs)`: Swift's suite asserted the *editor widget's*
-//! geometry and input behaviour. This port's story is a documentation shell: it
-//! renders a section title, a summary, a paragraph and a status line, with
-//! exactly two debug names (`story-section-Text editing`, `text-editor-status`)
-//! and no `.debug_name` on anything else. Specifically absent:
-//!   - no `textField` with label `Swift source` or `Plain text document`, so the
-//!     field's width/height (`> 100` wide, `>= 240` tall) and the
-//!     `field.height + handle.height == 320` contract have no target;
-//!   - no `slider` labelled `Editor height`;
-//!   - no interactive controls at all: `Code mode`, `Sample warning`,
-//!     `Go to beginning` and `Load 200,000 lines` are named in Swift but the
-//!     Rust story renders none of them, so their 44pt touch-target and
-//!     in-column assertions cannot hold;
-//!   - no text input route, so the `Cmd+A` then type-then-toggle-mode sequence
-//!     and the `Cmd+C` clipboard round trip have no target.
-//! Everything the shipped story does expose — mount at every matrix entry, the
-//! status line, the code/plain state and the full lexer/fold/diagnostic contract
-//! the editor is built on — is asserted at full strength.
-
 use cove_composition::Scope;
 mod support;
 
@@ -159,33 +138,30 @@ fn the_document_starts_in_code_mode_and_survives_an_edit() {
     let story = TextEditorStory::new(GalleryOptions::default());
     assert!(story.is_code_mode(), "the story starts in code mode");
     assert_eq!(story.source(), SAMPLE_SOURCE, "the sample document loads");
-    assert_eq!(story.line_count(), 7, "six newlines plus the trailing one");
+    assert_eq!(
+        story.line_count(),
+        8,
+        "the trailing newline starts an empty eighth line"
+    );
     assert!(
         story.status().contains("Control-Space"),
         "code mode advertises completion, got {:?}",
         story.status()
     );
 
-    // GAP(text_editor_story.rs): `is_code_mode` is a private `State` with no
-    // setter, so the mode cannot be switched from a test at all — Swift toggled
-    // it through a `Code mode` button that this story does not render. What is
-    // asserted instead is that the document and its derived state survive an
-    // edit, which is what the Swift suite's mode round trip was protecting.
-    let folds_before = story.fold_regions();
     story.set_source("let edited = 1");
     assert_eq!(story.source(), "let edited = 1", "the edit applies");
     assert_eq!(story.line_count(), 1, "the line count follows the edit");
     assert!(!story.tokens().is_empty(), "the edit re-tokenises");
 
-    // GAP(text_editor_story.rs `set_source`): `set_source` re-tokenises but does
-    // not recompute `fold_regions`, so the *stored* list still describes the old
-    // document. `computed_folds()` is right; the accessor the paint path reads is
-    // stale. Swift recomputed both together.
-    assert_eq!(
-        story.fold_regions(),
-        folds_before,
-        "the stored folds still describe the previous document"
+    assert!(
+        story.fold_regions().is_empty(),
+        "source replacement updates stored folds"
     );
+    story.set_code_mode(false);
+    assert_eq!(story.source(), "let edited = 1");
+    story.set_code_mode(true);
+    assert_eq!(story.source(), "let edited = 1");
     assert!(
         story.computed_folds().is_empty(),
         "recomputing shows a single line has nothing to fold, got {:?}",
@@ -232,9 +208,7 @@ fn the_lexer_and_fold_contract_the_editor_depends_on() {
 }
 
 #[test]
-fn the_story_renders_only_its_section_and_status() {
-    // Pins the GAP above as a fact: the story's whole observable surface is the
-    // section plus the status line.
+fn the_story_mounts_a_real_editor_and_resize_handle() {
     let story = Rc::new(TextEditorStory::new(GalleryOptions::default()));
     let mounted = story.clone();
     GalleryScene::run(
@@ -242,31 +216,38 @@ fn the_story_renders_only_its_section_and_status() {
         2000.0,
         move |_| AnyView::new(StoryView(mounted)),
         |scene| {
-            scene.settle_n(6);
-            let mut names: Vec<String> = scene
-                .nodes()
-                .iter()
-                .filter_map(support::debug_name)
-                .collect();
-            names.sort();
-            names.dedup();
-            assert_eq!(
-                names,
-                vec![
-                    "story-section-Text editing".to_owned(),
-                    "text-editor-status".to_owned()
-                ],
-                "the story exposes exactly two debug names"
-            );
-            assert!(
-                !scene.nodes().iter().any(|node| {
-                    node.accessibility().is_some_and(|semantics| {
-                        semantics.role == cove_core::scene::AccessibilityRole::TextField
-                            || semantics.role == cove_core::scene::AccessibilityRole::Slider
+            let field = scene
+                .first(|node| {
+                    node.accessibility().is_some_and(|s| {
+                        s.role == cove_core::scene::AccessibilityRole::TextField
+                            && s.label == "Swift source"
                     })
-                }),
-                "the story renders no text field and no height slider"
+                })
+                .expect("mounted editor");
+            assert!(field.frame().width > 100.0);
+            assert!(field.frame().height >= 240.0);
+            let handle = scene.require_named("editor-height-handle");
+            assert!(handle.frame().height > 0.0);
+            scene.click(&field);
+            scene.key_with(
+                cove_ui_compose::Scancode::A,
+                cove_platform::KeyModifiers::LEFT_GUI,
             );
+            scene.text_input("let edited = 1");
+            scene.settle();
+            assert_eq!(story.source(), "let edited = 1");
+            story.set_code_mode(false);
+            scene.settle();
+            assert!(
+                scene
+                    .first(|n| n
+                        .accessibility()
+                        .is_some_and(|s| s.label == "Plain text document"))
+                    .is_some()
+            );
+            assert_eq!(story.source(), "let edited = 1");
+            story.set_code_mode(true);
+            scene.settle();
         },
     );
 }
