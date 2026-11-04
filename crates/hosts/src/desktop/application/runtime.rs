@@ -336,6 +336,28 @@ impl Application {
         });
         ClipboardHolder::set_write(Some(write.clone()));
         super::services::clipboard_handlers::remember(Some(read), Some(write));
+        // Only install the ambient when the host has a native backend: that is
+        // what makes `ColorField` show or hide the eyedropper affordance.
+        let sample: Option<cove_core::scene::ColorSamplerCallback> =
+            if host.screen_color_backend().is_available() {
+                Some(Rc::new({
+                    let host = host.clone();
+                    move |done: cove_core::scene::ColorSampleCompletion| {
+                        host.sample_screen_color(Box::new(move |sample| {
+                            done(sample.color().map(|color| cove_core::Color {
+                                r: color.r,
+                                g: color.g,
+                                b: color.b,
+                                a: color.a,
+                            }));
+                        }));
+                    }
+                }))
+            } else {
+                None
+            };
+        cove_core::scene::ColorSampler::set_requester(sample.clone());
+        super::services::color_sampler_handler::remember(sample);
         AppDisplayHandleHolder::set_current(Some(state.display_handle.clone()));
         if let Some(link) = cove_runtime::platform::PlatformLink::current() {
             cove_core::scene::PlatformThread::set_executor(Some(Rc::new(move |work| {

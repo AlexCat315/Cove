@@ -25,6 +25,20 @@ Native web views belong to the platform thread on every desktop platform; wrap t
 | **Android** | Full Android host (15/15 Swift files): activity-retained application, JNI bridge (**all 18 `@_cdecl` entry points preserved** with identical names/signatures; the `Java_com_cove_probe_*` layer is Rust in `android/jni.rs`, application content arrives through `install_application_content`), surface session (swapchain, owned framebuffer, frosted-panel blit, texture teardown), content session (launch-mode selection, layer/direct rendering, input routing), frame timings + rolling GPU pass timings, device-fact surface updates (idiom/safe-area/keyboard/text-scale), system-bar icon style, memory-pressure trim, diagnostics pump. NDK symbols resolved by `dlopen`/`dlsym` (`liblog.so`, `libandroid.so`) — **no new crate dependency**. Logcat forwarding wired. Probe (`CoveAndroidProbe`) ported fully in-crate on `cove-graphics` only | Showcase/counter/gallery **content** is injected via `HostedSceneContent`/`ShowcaseProducts` traits — the host owns the machinery and the platform app supplies the products. Image transport via `cove-http` (HTTP/1.1 + OpenSSL); https needs `libssl.so`/`libcrypto.so` bundled from `COVE_OPENSSL_ANDROID_DIR` by `cargo xtask android-prepare` | "Android showcase and application content is supplied by the platform app through `HostedSceneContent`/`ShowcaseProducts`; `cove-hosts` carries no dependency on the example product crates." |
 | **Wasm** | Nothing. `cove-http` has no backend on Wasm, so `install_platform_services()` leaves the image-transport holder unset | Everything. `cove-hosts` is **not** a dependency of `cove-browser` (the Wasm host); they are independent crates | `TransportCapabilities` = `{http: false, https: false, file: true}`; limitation = **"no HTTP stack on this target"**. `file:` still works because `ImageDataDownload` handles it without a transport. |
 
+## Screen-colour sampling
+
+`cove-platform` holds only the contract (`ScreenColor`, `ScreenColorSample`, `ScreenColorCompletion`, `ScreenColorBackend`) and has no window-system dependency. Every native implementation lives in `cove-shell/src/color_sampler/`; all of them are asynchronous, queue their result through a thread-safe sink, wake the event loop, and let `Shell::take_deferred_callbacks()` deliver the callback on the platform thread.
+
+| Platform | Backend | Native mechanism | Limitation |
+| --- | --- | --- | --- |
+| macOS | `AppKit` | `NSColorSampler` via `objc2-app-kit` + `block2` | macOS 10.15+; must start on the application's main thread, which `run_with_ui_thread` guarantees; colour converted to sRGB |
+| Windows | `Win32` | `GetCursorPos` + `GetDC(NULL)` + `GetPixel` on a worker thread | Win32 has no desktop eyedropper (WinUI/Chromium `Eyedropper` only reads its own window); no colour management, alpha opaque; ESC/right-click cancel |
+| Linux (X11) | `X11` | `XGetImage` root-window screenshot, then one-pixel sample on a worker thread | `libX11.so.6` resolved with `dlopen`; pixels decoded from the XImage channel masks |
+| Linux (Wayland) | `XdgPortal` | `org.freedesktop.portal.Screenshot.PickColor` over the session bus | Needs a portal implementing `PickColor`; otherwise falls back to X11 (XWayland root image excludes Wayland-native windows), then `Unsupported` |
+| iOS / Android / Wasm | `None` | — | The OS does not expose other apps' screen pixels; `ScreenColorSample::Unsupported`, eyedropper hidden |
+
+Hosts install the `ColorSampler` ambient only when `Sdl3PlatformHost::screen_color_backend().is_available()`. A new pick supersedes the previous one (`Cancelled`), and `Sdl3Shell::shutdown()` cancels every in-flight worker. Native picker interaction on Windows and Linux has not been visually accepted on real hardware yet; the wire codec, pixel decoding and async queue are covered by structural tests.
+
 ### Platform gate counts (`target_os = "…"` occurrences)
 
 | Gate | Occurrences |

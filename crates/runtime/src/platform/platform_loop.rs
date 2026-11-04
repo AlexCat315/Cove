@@ -227,6 +227,12 @@ impl PlatformLoop {
                     link.post(PlatformMessage::ClipboardRead(request, text));
                 }));
             }
+            PlatformCommand::SampleColor(request) => {
+                let link = self.link.clone();
+                self.shell.sample_screen_color(Box::new(move |sample| {
+                    link.post(PlatformMessage::ColorSampled(request, sample));
+                }));
+            }
             PlatformCommand::OpenDialog(dialog) => self.open_dialog(dialog),
             PlatformCommand::ShowMenu {
                 request,

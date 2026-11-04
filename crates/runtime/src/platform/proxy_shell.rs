@@ -5,8 +5,8 @@ use super::{DialogRequest, PlatformCommand, PlatformLink, PlatformMessage};
 use cove_platform::{NativeMenuSnapshot, SystemCursor, TextInputArea, WindowId, WindowInputEvent};
 use cove_shell::{
     ClipboardCompletion, DialogCompletion, DisplayRefreshTick, EventLoopWaker, FileDialogFilter,
-    MenuCompletion, NativeRenderSurface, NativeWindowReference, Shell, ShellError,
-    WindowChromeHitTest, WindowHandle, WindowOptions, WindowSafeArea, WindowSnapshot,
+    MenuCompletion, NativeRenderSurface, NativeWindowReference, ScreenColorCompletion, Shell,
+    ShellError, WindowChromeHitTest, WindowHandle, WindowOptions, WindowSafeArea, WindowSnapshot,
 };
 use std::{
     cell::{Cell, RefCell},
@@ -69,6 +69,7 @@ struct Pending {
     dialogs: HashMap<u64, DialogCompletion>,
     menus: HashMap<u64, MenuCompletion>,
     clipboard: HashMap<u64, ClipboardCompletion>,
+    colors: HashMap<u64, ScreenColorCompletion>,
     finished: Vec<Box<dyn FnOnce()>>,
 }
 
@@ -161,6 +162,12 @@ impl ProxyShell {
                 let mut pending = self.pending.borrow_mut();
                 if let Some(done) = pending.clipboard.remove(&request) {
                     pending.finished.push(Box::new(move || done(text)));
+                }
+            }
+            PlatformMessage::ColorSampled(request, color) => {
+                let mut pending = self.pending.borrow_mut();
+                if let Some(done) = pending.colors.remove(&request) {
+                    pending.finished.push(Box::new(move || done(color)));
                 }
             }
         }
@@ -414,6 +421,15 @@ impl Shell for ProxyShell {
             request
         };
         self.post(PlatformCommand::ReadClipboard(request));
+    }
+    fn sample_screen_color(&self, done: ScreenColorCompletion) {
+        let request = {
+            let mut pending = self.pending.borrow_mut();
+            let request = pending.allocate();
+            pending.colors.insert(request, done);
+            request
+        };
+        self.post(PlatformCommand::SampleColor(request));
     }
     fn present_menu(
         &self,

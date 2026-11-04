@@ -209,4 +209,6 @@ bool cove_shell_menu_popup(const CoveShellMenuItem *items,size_t count,float x,f
     NSPoint point=view?NSMakePoint(x,view.isFlipped?y:view.bounds.size.height-y):NSEvent.mouseLocation;
     [root popUpMenuPositioningItem:nil atLocation:point inView:view];if(target.chosen)*chosen=target.chosenID;return target.chosen;
 }
+/* Screen-colour sampling is implemented in Rust with objc2-app-kit's
+   NSColorSampler binding; see crate::color_sampler::appkit. */
 #endif

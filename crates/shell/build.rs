@@ -41,6 +41,9 @@ fn main() {
     if assert_main_thread {
         bridge.define("COVE_ASSERT_MAIN_THREAD", None);
     }
+    // Screen-colour sampling is pure Rust. The Linux backends load libX11 with
+    // dlopen and talk to the XDG portal over the session bus, so the bridge
+    // needs no X11 headers or link-time libraries on any target.
     bridge.compile("cove_shell_bridge");
     if os == "macos" || os == "ios" {
         let mut apple = cc::Build::new();

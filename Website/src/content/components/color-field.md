@@ -29,8 +29,28 @@ let recents = seeded.recent();
 
 ## 吸管
 
-`on_sample(handler)` 提供屏幕取色：设置后浮层出现吸管按钮，宿主在取色完成时回调采样颜色。控件本身不访问屏幕——取色 API 是平台相关的，由宿主提供实现。
+`on_sample(handler)` 提供屏幕取色：设置后浮层出现吸管按钮，宿主在取色完成时回调采样颜色。控件本身不访问屏幕。
+
+契约只在 `cove-platform`：`ScreenColor`、`ScreenColorSample`、`ScreenColorCompletion`、`ScreenColorBackend`。实现全部在 `cove-shell` 的宿主/后端层，按窗口系统分后端，并且都是异步回调——`Shell::sample_screen_color` 立即返回，结果回到平台线程再回调，恰好一次；取消、不支持、失败是三种不同的结果。
+
+```rust
+use cove_ui_compose::primitives::controls::fields::color_field::ColorField;
+use cove_core::{Color, State};
+
+let color = State::new(Color::from_rgba8(88, 126, 231, 255));
+let field = ColorField::new(color.binding()).on_sample(|done| {
+    // 宿主在这里启动原生取色；稍后带着选中的颜色调用 done，取消则不调用。
+    done(Color::from_rgba8(88, 126, 231, 255));
+});
+```
+
+| 平台 | 后端 |
+| --- | --- |
+| macOS | `NSColorSampler`（`objc2-app-kit`） |
+| Windows | Win32 屏幕 DC 截屏采样 |
+| Linux | X11 `XGetImage` 截屏采样；Wayland 用 XDG `PickColor` portal |
+| iOS / Android / Wasm | 不支持，宿主不安装取色器，吸管隐藏 |
 
 色轮是取色器的一部分，不属于通用 Slider。单独使用时见 [ColorWheel](/docs/color-wheel)。
 
-共享 Rust 实现适用于所有宿主。结构测试与 macOS 原生操作验收分别记录在 `Docs/gallery-audit.md`；输入事件注入不代表原生键盘或 IME 已验收。
+共享 Rust 实现适用于所有宿主。结构测试与 macOS 原生操作验收分别记录在 `Docs/gallery-audit.md`；输入事件注入与 fake sampler 不代表原生拾色、原生键盘或 IME 已验收，Windows/Linux 的原生取色交互仍待实机验收。

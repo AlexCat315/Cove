@@ -1,6 +1,6 @@
 //! Shared state of one platform-thread and UI-thread pair.
 use super::{MainThreadBridge, PlatformState};
-use cove_platform::{WindowId, WindowInputEvent};
+use cove_platform::{ScreenColorSample, WindowId, WindowInputEvent};
 use cove_shell::EventLoopWaker;
 use std::{
     cell::RefCell,
@@ -22,6 +22,7 @@ pub enum PlatformMessage {
     DialogFinished(u64, Vec<String>),
     MenuFinished(u64, Option<i64>),
     ClipboardRead(u64, Option<String>),
+    ColorSampled(u64, ScreenColorSample),
 }
 
 pub struct PlatformLink {

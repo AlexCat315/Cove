@@ -225,6 +225,26 @@ impl ColorField {
         self.push_recent(color);
     }
 
+    /// Whether an eyedropper is available: an authored handler or the host's
+    /// installed sampler.
+    fn sampler_available(&self) -> bool {
+        self.on_sample.is_some() || cove_core::scene::ColorSampler::is_installed()
+    }
+
+    /// Starts a screen pick and writes the sampled colour back.
+    fn request_sample(&self) {
+        let target = self.clone();
+        if let Some(sample) = self.on_sample.clone() {
+            sample(std::rc::Rc::new(move |color| target.write_color(color)));
+        } else {
+            cove_core::scene::ColorSampler::request(Box::new(move |color| {
+                if let Some(color) = color {
+                    target.write_color(color);
+                }
+            }));
+        }
+    }
+
     /// Writes one channel, clamped to 0…1.
     fn set_channel(&self, channel: Channel, value: f64) {
         let mut color = self.color.get();
@@ -991,7 +1011,7 @@ impl PrimitiveView for HexRow {
         });
         // Format toggle: one button per format, the active one selected.
         let mut toggles: Vec<AnyView> = Vec::new();
-        if let Some(sample) = field.on_sample.clone() {
+        if field.sampler_available() {
             let target = field.clone();
             toggles.push(AnyView::new(
                 Button::icon_with_options(
@@ -1005,10 +1025,7 @@ impl PrimitiveView for HexRow {
                     false,
                     false,
                     Some(crate::i18n::tr("Pick color from screen")),
-                    move || {
-                        let target = target.clone();
-                        sample(std::rc::Rc::new(move |color| target.write_color(color)));
-                    },
+                    move || target.request_sample(),
                 )
                 .button_style(GhostButtonStyle)
                 .debug_name("color-eyedropper"),

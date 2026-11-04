@@ -9,6 +9,15 @@ links = "cove_shell"
 cove-platform.workspace = true
 cove-logging.workspace = true
 thiserror.workspace = true
+
+# Screen-colour sampling is a per-window-system backend. Only the target that
+# owns the window system links its native bindings; `cove-platform` stays clean.
+[target.'cfg(target_os = "macos")'.dependencies]
+objc2.workspace = true
+objc2-app-kit.workspace = true
+block2.workspace = true
+[target.'cfg(target_os = "linux")'.dependencies]
+libc.workspace = true
 [build-dependencies]
 cc.workspace = true
 cove-native-build.workspace = true

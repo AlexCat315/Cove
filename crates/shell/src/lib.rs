@@ -1,5 +1,6 @@
 //! SDL3 native shell. Window handles are confined to the application thread.
 mod application_entry;
+pub(crate) mod color_sampler;
 mod cursor;
 pub mod diagnostics;
 pub mod display_refresh;
@@ -11,6 +12,7 @@ pub mod scroll;
 mod sdl3_clipboard;
 mod sdl3_shell;
 pub use application_entry::PlatformApplication;
+pub use color_sampler::screen_color_backend;
 pub use cove_platform::*;
 pub use display_refresh::DisplayRefreshTick;
 pub use platform_shell::*;

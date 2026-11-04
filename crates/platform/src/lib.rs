@@ -3,6 +3,125 @@ use serde::{Deserialize, Serialize};
 mod resources;
 pub use resources::ResourceBundle;
 
+/// One pixel read from the screen: sRGB components in `0…1` with straight
+/// (unpremultiplied) alpha. This crate only defines the contract; reading a
+/// screen pixel is a host/backend responsibility with one native implementation
+/// per window system.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Serialize, Deserialize)]
+pub struct ScreenColor {
+    pub r: f32,
+    pub g: f32,
+    pub b: f32,
+    pub a: f32,
+}
+
+impl ScreenColor {
+    pub const CLEAR: Self = Self {
+        r: 0.0,
+        g: 0.0,
+        b: 0.0,
+        a: 0.0,
+    };
+
+    pub fn new(r: f32, g: f32, b: f32, a: f32) -> Self {
+        Self { r, g, b, a }
+    }
+
+    pub fn from_rgba8(r: u8, g: u8, b: u8, a: u8) -> Self {
+        Self::new(
+            f32::from(r) / 255.0,
+            f32::from(g) / 255.0,
+            f32::from(b) / 255.0,
+            f32::from(a) / 255.0,
+        )
+    }
+
+    pub fn rgba8(self) -> [u8; 4] {
+        let byte = |v: f32| (v.clamp(0.0, 1.0) * 255.0).round() as u8;
+        [
+            byte(self.r),
+            byte(self.g),
+            byte(self.b),
+            byte(self.a),
+        ]
+    }
+
+    /// Backends may report out-of-gamut floats; keep the contract in `0…1`.
+    pub fn clamped(self) -> Self {
+        Self::new(
+            self.r.clamp(0.0, 1.0),
+            self.g.clamp(0.0, 1.0),
+            self.b.clamp(0.0, 1.0),
+            self.a.clamp(0.0, 1.0),
+        )
+    }
+}
+
+/// The window-system backend that answers a screen-colour request.
+///
+/// This is a *description*, not an implementation: `cove-platform` has no
+/// window-system dependency and never links a native library. The host picks
+/// one backend per window system and reports it so UI affordances can be hidden
+/// where sampling is impossible.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub enum ScreenColorBackend {
+    /// macOS `NSColorSampler` (AppKit, macOS 10.15+).
+    AppKit,
+    /// Win32 screen-DC pixel read on a worker thread.
+    Win32,
+    /// X11 `XGetImage` screenshot-and-sample on a worker thread.
+    X11,
+    /// `org.freedesktop.portal.Screenshot.PickColor` on Wayland desktops.
+    XdgPortal,
+    /// The platform exposes no way to read a screen pixel.
+    #[default]
+    None,
+}
+impl ScreenColorBackend {
+    pub fn is_available(self) -> bool {
+        !matches!(self, Self::None)
+    }
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::AppKit => "NSColorSampler",
+            Self::Win32 => "Win32 screen DC",
+            Self::X11 => "X11 XGetImage",
+            Self::XdgPortal => "XDG PickColor portal",
+            Self::None => "unsupported",
+        }
+    }
+}
+
+/// The single answer to a screen-colour request.
+///
+/// A request never blocks: the backend starts the picker and reports exactly
+/// once, later, through the completion. Cancellation and "no backend" are
+/// distinct outcomes instead of one opaque `None`.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub enum ScreenColorSample {
+    Picked(ScreenColor),
+    Cancelled,
+    Unsupported(String),
+    Failed(String),
+}
+impl ScreenColorSample {
+    /// The colour to write, if the user actually picked one.
+    pub fn color(&self) -> Option<ScreenColor> {
+        match self {
+            Self::Picked(color) => Some(color.clamped()),
+            _ => None,
+        }
+    }
+    pub fn is_cancelled(&self) -> bool {
+        matches!(self, Self::Cancelled)
+    }
+}
+
+/// Delivers a screen-colour result. `FnOnce` because a request has one answer;
+/// the backend must invoke it exactly once, never on the platform thread while
+/// it is inside a blocking native call.
+pub type ScreenColorCompletion = Box<dyn FnOnce(ScreenColorSample)>;
+
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct WindowId(pub u32);
 impl WindowId {
@@ -380,6 +499,41 @@ mod tests {
         assert_eq!(wheel.displacement(20.0, 100.0, 200.0), (-200.0, 600.0));
         wheel.input.momentum_phase = ScrollPhase::Began;
         assert!(wheel.input.is_continuation());
+    }
+    #[test]
+    fn screen_color_round_trips_as_srgba_bytes_and_clamps() {
+        let color = ScreenColor::from_rgba8(0x12, 0x34, 0x56, 0x78);
+        assert_eq!(color.rgba8(), [0x12, 0x34, 0x56, 0x78]);
+        assert_eq!(
+            ScreenColor::new(-0.5, 1.5, 0.25, 1.0).clamped(),
+            ScreenColor::new(0.0, 1.0, 0.25, 1.0)
+        );
+        let data = serde_json::to_vec(&color).unwrap();
+        assert_eq!(
+            serde_json::from_slice::<ScreenColor>(&data).unwrap(),
+            color
+        );
+    }
+    #[test]
+    fn screen_color_sample_distinguishes_pick_cancel_and_unsupported() {
+        let picked = ScreenColorSample::Picked(ScreenColor::new(-0.2, 0.5, 1.4, 1.0));
+        assert_eq!(picked.color(), Some(ScreenColor::new(0.0, 0.5, 1.0, 1.0)));
+        for sample in [
+            ScreenColorSample::Cancelled,
+            ScreenColorSample::Unsupported("no portal".into()),
+            ScreenColorSample::Failed("XOpenDisplay failed".into()),
+        ] {
+            assert_eq!(sample.color(), None);
+            let data = serde_json::to_vec(&sample).unwrap();
+            assert_eq!(
+                serde_json::from_slice::<ScreenColorSample>(&data).unwrap(),
+                sample
+            );
+        }
+        assert!(ScreenColorSample::Cancelled.is_cancelled());
+        assert!(!picked.is_cancelled());
+        assert!(ScreenColorBackend::AppKit.is_available());
+        assert!(!ScreenColorBackend::None.is_available());
     }
     #[test]
     fn input_round_trip_preserves_unicode_ime_and_window() {

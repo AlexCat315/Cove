@@ -4,6 +4,13 @@
 
 ## Unreleased
 
+- **屏幕取色：契约/后端分层与全异步回调（2026-11-04，破坏性）**：
+  - `cove-platform` 只放契约：`ScreenColor` 之外新增 `ScreenColorBackend`、`ScreenColorSample`、`ScreenColorCompletion`；取消、不支持、失败不再折叠成一个 `None`。`Shell::sample_screen_color`、平台桥消息与宿主注入统一改用契约类型。
+  - 真正的取色全部下沉到 `cove-shell/src/color_sampler/`，按窗口系统分后端：macOS `NSColorSampler`（`objc2-app-kit` + `block2`，从 `apple.m` 迁到 Rust）；Windows Win32 屏幕 DC `GetPixel`（系统没有桌面取色 API，WinUI/Chromium 的 Eyedropper 只能读自身窗口内容）；Linux X11 `XGetImage` 截屏采样（运行时 `dlopen` 加载 `libX11.so.6`，按 XImage 真实通道掩码解码像素）与 XDG `org.freedesktop.portal.Screenshot.PickColor`（自带最小 D-Bus 线协议客户端，无新增 crate）；iOS/Android/Wasm 明确回报 `Unsupported`。
+  - **修复阻塞平台线程**：Windows 按键轮询与 `GetPixel`、X11 指针/按键轮询与 `XGetImage`、D-Bus 会话全部移到工作线程；结果经 `CompletionSink` 入队并唤醒事件循环，由 `take_deferred_callbacks()` 回到平台线程回调，恰好一次。删除原生 `cove_shell_sample_color` FFI 及 C/ObjC 实现，`build.rs` 不再探测 X11 头或链接 `-lX11`。
+  - 取色器是模态的：新请求取消上一个并回调 `Cancelled`；`Sdl3Shell::shutdown()` 取消所有在途请求。宿主按 `screen_color_backend()` 决定是否安装 ambient，不支持的平台不显示吸管。
+  - 结构覆盖：契约、异步队列/唤醒/去重/取消、Win32 `COLORREF`、X11 掩码像素、D-Bus 编解码与假总线完整 `PickColor` 流程。Windows/Linux 后端在本机用带桩契约的临时 harness 完成类型检查；原生实机取色交互尚未验收。
+
 - **补齐 Table 轻量表格（2026-11-04）**：新增 `Table`（`primitives/data/lists/table.rs`），在普通 `Vec<Record>` 上绘制固定表头与虚拟化行，排序同步完成，宽度/排序/可见性/单选由挂载会话持有；`TableOptions` 的 `selection` 沿用 `Selection<Id>`，与 `List` 一致。与 `DataTable` 的分界是数据生命周期与排序成本，而非外观；两者共用 `TableColumn`、`TableColumnLayout`、`TableLayout`、`TableSort`、`ColumnVisibility`、`TableColumnPlan`。`TreeTable` 仍是首列换成层级列的 `DataTable`，`ChartDataTable` 是 `Chart` 的无障碍镜像，均非并列选项。
   - 列宽拖拽手柄从 `data_table/view.rs` 提到 `columns/resize_grip.rs`，改为只依赖 `Binding<f32>` + `TableColumnLayout`，`DataTable` 通过适配器传入原行为，两边共用指针拖动、方向键与辅助功能设置；顺带补上此前缺失的悬停与按压缩放反馈之外的绘制逻辑（竖线改为按节点高度绘制）。
   - 排序语义抽为 `sorted_order()` 共享：相等比较在两个方向都保留源序；`Table` 按列 id 在所有已授权列中查找排序，隐藏被排序列不会丢失排序。

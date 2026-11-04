@@ -5,7 +5,7 @@ use std::{
     collections::HashMap,
     ffi::{CStr, CString, c_char, c_void},
     rc::Rc,
-    sync::mpsc::{self, Receiver, Sender},
+    sync::{Arc, mpsc::{self, Receiver, Sender}},
     time::Duration,
 };
 thread_local! { static SDL_LEASED: Cell<bool> = const { Cell::new(false) }; }
@@ -182,6 +182,7 @@ pub struct Sdl3Shell {
     quitting: bool,
     pub close_interceptor: Option<Box<dyn FnMut(Option<WindowId>) -> bool>>,
     dialogs: RefCell<Dialogs>,
+    sampler: crate::color_sampler::ScreenColorSampler,
     default_options: WindowOptions,
 }
 impl Sdl3Shell {
@@ -200,6 +201,7 @@ impl Sdl3Shell {
                 next: 1,
                 callbacks: HashMap::new(),
             }),
+            sampler: crate::color_sampler::ScreenColorSampler::new(Arc::new(Self::wake)),
             default_options: WindowOptions::default(),
         })
     }
@@ -452,7 +454,9 @@ impl Shell for Sdl3Shell {
         collected
     }
     fn take_deferred_callbacks(&self) -> Vec<Box<dyn FnOnce()>> {
-        self.complete_dialogs()
+        let mut work = self.complete_dialogs();
+        work.extend(self.sampler.take_deferred_callbacks());
+        work
     }
     fn wait_for_events(&self, timeout: Duration) -> bool {
         if self.session.is_none() {
@@ -581,6 +585,12 @@ impl Shell for Sdl3Shell {
     ) {
         self.dialog(id, false, path, filters, multiple, accept);
     }
+    fn sample_screen_color(&self, done: ScreenColorCompletion) {
+        // The per-window-system backend starts the picker and returns at once.
+        // Its result is queued and delivered by `take_deferred_callbacks` on
+        // this platform thread, never from inside a blocking native call.
+        self.sampler.start(done);
+    }
     fn display_refresh_rate(&self, id: Option<WindowId>) -> Option<f64> {
         id.or_else(|| self.main_window_id())
             .and_then(|id| self.windows.get(&id))
@@ -614,6 +624,7 @@ impl Shell for Sdl3Shell {
             self.destroy_window(id);
         }
         self.dialogs.borrow_mut().callbacks.clear();
+        self.sampler.cancel_all();
         self.session = None;
         self.quitting = true;
     }

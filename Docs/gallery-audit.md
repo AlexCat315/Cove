@@ -4,6 +4,12 @@
 
 Swift 源码逐页对照见文末《Swift 源码对照（逐页差异清单）》。
 
+## 2026-11-04：屏幕取色后端
+
+- ColorField 吸管链路：`cove-platform` 只保留 `ScreenColor` / `ScreenColorSample` / `ScreenColorCompletion` / `ScreenColorBackend` 契约；取色实现下沉到 `cove-shell/src/color_sampler/`，按窗口系统分 macOS（`NSColorSampler` / `objc2-app-kit`）、Windows（Win32 屏幕 DC）、Linux（X11 `XGetImage` 截屏采样 / XDG `PickColor` portal）、iOS/Android/Wasm（`Unsupported`）后端，全部异步回调且不阻塞平台线程。宿主按后端可用性安装 ambient，不支持时吸管隐藏。
+- 结构验证：`cove-platform` 契约、`cove-shell` 12 项后端测试（异步队列/唤醒/去重/取消、Win32 `COLORREF`、X11 掩码像素、D-Bus 编解码与假总线完整 `PickColor` 流程）、`cove-ui-compose` 吸管 fake sampler 场景，以及 `cargo check --workspace --all-targets` 全绿。Windows/Linux 后端源码在本机用带桩契约的临时 harness 完成类型检查。
+- 原生验收：macOS `NSColorSampler`、Windows `GetPixel` 轮询、Linux X11/portal 拾色的实机视觉与交互尚未验收；结构测试与假总线不等于原生拾色、原生键盘或 IME 激活已验收。
+
 ## 2026-11-04：字段 API 收敛
 
 - 输入框外壳统一：`InputChromeState` 是唯一的交互快照，`TextField`、数值前缀、`Select`、`TimeInput` 与 JSON 编辑器共用 `InputAppearance` 的填充、边框与圆角推导，删除各自手写的背景/边框。

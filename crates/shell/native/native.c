@@ -212,3 +212,6 @@ static CoveShellLogCallback log_callback;static void SDLCALL log_output(void *co
 void cove_shell_log_install(CoveShellLogCallback callback){log_callback=callback;SDL_SetLogOutputFunction(log_output,NULL);}
 
 double cove_shell_monotonic_seconds(void){return (double)SDL_GetPerformanceCounter()/(double)SDL_GetPerformanceFrequency();}
+
+/* Screen-colour sampling lives in Rust (crate::color_sampler), with one
+   asynchronous backend per window system. No C entry point blocks here. */

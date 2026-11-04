@@ -28,6 +28,10 @@ pub type ClipboardWriter = Rc<dyn Fn(&str)>;
 pub type NativeMenuCompletion = Box<dyn FnOnce(Option<i64>)>;
 /// Host native-menu presenter installed by the platform shell.
 pub type NativeMenuPresenterCallback = Rc<dyn Fn(&NativeMenuSnapshot, Point, NativeMenuCompletion)>;
+/// Receives the sampled screen colour once the platform picked it.
+pub type ColorSampleCompletion = Box<dyn FnOnce(Option<crate::Color>)>;
+/// Host screen-colour sampler installed by the platform shell.
+pub type ColorSamplerCallback = Rc<dyn Fn(ColorSampleCompletion)>;
 
 thread_local! {
     static CURRENT_INTERACTIONS: RefCell<Option<Rc<InteractionRegistry>>> = const { RefCell::new(None) };
@@ -35,6 +39,7 @@ thread_local! {
     static CLIPBOARD_REQUEST: RefCell<Option<ClipboardRequester>> = const { RefCell::new(None) };
     static CLIPBOARD_WRITE: RefCell<Option<ClipboardWriter>> = const { RefCell::new(None) };
     static NATIVE_MENU_PRESENTER: RefCell<Option<NativeMenuPresenterCallback>> = const { RefCell::new(None) };
+    static COLOR_SAMPLER: RefCell<Option<ColorSamplerCallback>> = const { RefCell::new(None) };
 }
 
 /// Holds the active window's interaction registry.
@@ -98,6 +103,29 @@ impl NativeMenuPresenter {
     }
     pub fn set_present(present: Option<NativeMenuPresenterCallback>) {
         NATIVE_MENU_PRESENTER.with(|slot| *slot.borrow_mut() = present);
+    }
+}
+
+/// Holds the native screen-colour sampler, injected by the platform shell.
+///
+/// Sampling may complete later and off the UI thread's call site; the host
+/// answers through `done`. When no sampler is installed the request reports no
+/// colour, so callers can hide the affordance.
+pub struct ColorSampler;
+impl ColorSampler {
+    /// Asks the platform for a colour under the user's pick.
+    pub fn request(done: ColorSampleCompletion) {
+        match COLOR_SAMPLER.with(|slot| slot.borrow().clone()) {
+            Some(request) => request(done),
+            None => done(None),
+        }
+    }
+    /// Whether a platform shell installed a sampler on this thread.
+    pub fn is_installed() -> bool {
+        COLOR_SAMPLER.with(|slot| slot.borrow().is_some())
+    }
+    pub fn set_requester(request: Option<ColorSamplerCallback>) {
+        COLOR_SAMPLER.with(|slot| *slot.borrow_mut() = request);
     }
 }
 

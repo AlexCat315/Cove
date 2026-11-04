@@ -426,10 +426,14 @@ dependencies = [
 name = "cove-shell"
 version = "0.3.0-dev"
 dependencies = [
+ "block2",
  "cc",
  "cove-logging",
  "cove-native-build",
  "cove-platform",
+ "libc",
+ "objc2",
+ "objc2-app-kit",
  "thiserror",
 ]
 

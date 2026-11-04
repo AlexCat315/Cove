@@ -40,6 +40,7 @@ pub enum PlatformCommand {
     ShowSystemMenu(WindowId, f32, f32),
     WriteClipboard(String),
     ReadClipboard(u64),
+    SampleColor(u64),
     OpenDialog(DialogRequest),
     ShowMenu {
         request: u64,

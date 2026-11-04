@@ -336,6 +336,29 @@ fn the_eyedropper_hook_writes_the_sampled_color() {
 }
 
 #[test]
+fn the_installed_screen_sampler_shows_and_drives_the_eyedropper() {
+    support::InteractiveScene::run(640.0, 560.0, |scene| {
+        let color = State::new(Color::from_rgba8(10, 10, 10, 255));
+        cove_core::scene::ColorSampler::set_requester(Some(std::rc::Rc::new(|done| {
+            done(Some(Color::from_rgba8(9, 8, 7, 255)));
+        })));
+        scene.install(LayerRoot::new(AnyView::new(ColorField::new(color.binding()))));
+        let trigger = scene
+            .first(|n| n.accessibility().is_some_and(|s| s.label == "Choose color"))
+            .expect("the color field publishes its trigger");
+        scene.click(&trigger, 1);
+        scene.settle(20, 1.0 / 60.0);
+        let dropper = scene
+            .first(|n| crate::support::debug_name(n).as_deref() == Some("color-eyedropper"))
+            .expect("a host sampler installs the eyedropper button");
+        scene.click(&dropper, 1);
+        scene.settle(2, 1.0 / 60.0);
+        assert_eq!(color.get(), Color::from_rgba8(9, 8, 7, 255));
+        cove_core::scene::ColorSampler::set_requester(None);
+    });
+}
+
+#[test]
 fn the_disk_maps_radius_to_saturation() {
     let radius = 50.0;
     assert!(close(disk_saturation_for_radius(0.0, radius), 0.0, 0.0001));

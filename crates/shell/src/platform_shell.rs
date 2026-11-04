@@ -1,5 +1,6 @@
 use cove_platform::{
-    InputEvent, NativeMenuSnapshot, SystemCursor, TextInputArea, WindowId, WindowInputEvent,
+    InputEvent, NativeMenuSnapshot, ScreenColorCompletion, ScreenColorSample, SystemCursor,
+    TextInputArea, WindowId, WindowInputEvent,
 };
 use std::{rc::Rc, sync::Arc, time::Duration};
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -213,6 +214,15 @@ pub trait Shell {
     /// by a threaded implementation.
     fn read_clipboard(&self, done: ClipboardCompletion) {
         done(crate::Sdl3Clipboard::read());
+    }
+    /// Starts a screen-colour pick. `done` is called exactly once on the
+    /// platform thread; native backends answer later and must never block this
+    /// call. Hosts without a native sampler report `Unsupported` so the UI can
+    /// hide the affordance.
+    fn sample_screen_color(&self, done: ScreenColorCompletion) {
+        done(ScreenColorSample::Unsupported(
+            "this shell has no screen-colour backend".into(),
+        ));
     }
     /// Shows a native menu and reports the chosen item through `done`.
     fn present_menu(

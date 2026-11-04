@@ -698,6 +698,19 @@ impl Sdl3PlatformHost {
             Err(_) => done(None),
         }
     }
+    pub fn sample_screen_color(&self, done: ScreenColorCompletion) {
+        match self.resolve_shell() {
+            Ok(shell) => shell.borrow().sample_screen_color(done),
+            Err(_) => done(ScreenColorSample::Unsupported(
+                "the platform shell is not available".into(),
+            )),
+        }
+    }
+    /// The native sampling backend, used by hosts to decide whether the
+    /// eyedropper affordance can do anything on this platform/session.
+    pub fn screen_color_backend(&self) -> ScreenColorBackend {
+        cove_shell::screen_color_backend()
+    }
     pub fn present_menu(
         &self,
         id: Option<WindowId>,

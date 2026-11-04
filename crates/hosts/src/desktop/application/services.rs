@@ -8,8 +8,9 @@ use crate::desktop::application::composition::{
     AppDisplayHandleHolder, AssetDropRegistry, AssetDropRegistryHolder,
 };
 use cove_core::scene::{
-    ClipboardHolder, ClipboardRequester, FocusChain, FocusChainHolder, InteractionRegistry, InteractionRegistryHolder,
-    PointerCapture, PointerCaptureHolder, UIWorkSchedulerHolder,
+    ClipboardHolder, ClipboardRequester, ColorSampler, ColorSamplerCallback, FocusChain,
+    FocusChainHolder, InteractionRegistry, InteractionRegistryHolder, PointerCapture,
+    PointerCaptureHolder, UIWorkSchedulerHolder,
 };
 use cove_imaging::{ImageAssetRegistry, ImageAssetRegistryHolder};
 use cove_text::{TextEnvironment, TextEnvironmentHolder};
@@ -23,6 +24,7 @@ pub struct ApplicationServices {
     capture: Option<Rc<PointerCapture>>,
     clipboard_read: Option<ClipboardRequester>,
     clipboard_write: Option<Rc<dyn Fn(&str)>>,
+    sampler: Option<ColorSamplerCallback>,
     images: Option<std::sync::Arc<ImageAssetRegistry>>,
     drops: Option<Rc<AssetDropRegistry>>,
     work: Option<Rc<dyn Fn(Rc<dyn Fn()>)>>,
@@ -39,6 +41,7 @@ impl ApplicationServices {
             capture: PointerCaptureHolder::current(),
             clipboard_read: clipboard_handlers::read(),
             clipboard_write: clipboard_handlers::write(),
+            sampler: color_sampler_handler::handler(),
             images: ImageAssetRegistryHolder::current(),
             drops: AssetDropRegistryHolder::current(),
             work: work_scheduler::handler(),
@@ -56,6 +59,8 @@ impl ApplicationServices {
         ClipboardHolder::set_read_requester(self.clipboard_read.clone());
         ClipboardHolder::set_write(self.clipboard_write.clone());
         clipboard_handlers::remember(self.clipboard_read, self.clipboard_write);
+        ColorSampler::set_requester(self.sampler.clone());
+        color_sampler_handler::remember(self.sampler);
         ImageAssetRegistryHolder::set_current(self.images);
         AssetDropRegistryHolder::set_current(self.drops);
         work_scheduler::remember(self.work.clone());
@@ -87,6 +92,25 @@ pub mod clipboard_handlers {
 
     pub fn write() -> Option<Rc<dyn Fn(&str)>> {
         SLOT.with(|slot| slot.borrow().1.clone())
+    }
+}
+
+/// Screen-colour sampler registry, mirroring [`clipboard_handlers`] because
+/// `ColorSampler` exposes no getter.
+pub mod color_sampler_handler {
+    use super::*;
+    use std::cell::RefCell;
+
+    thread_local! {
+        static SLOT: RefCell<Option<ColorSamplerCallback>> = const { RefCell::new(None) };
+    }
+
+    pub fn remember(handler: Option<ColorSamplerCallback>) {
+        SLOT.with(|slot| *slot.borrow_mut() = handler);
+    }
+
+    pub fn handler() -> Option<ColorSamplerCallback> {
+        SLOT.with(|slot| slot.borrow().clone())
     }
 }
 
