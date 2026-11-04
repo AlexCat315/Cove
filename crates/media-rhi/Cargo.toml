@@ -1,0 +1,19 @@
+[package]
+name = "cove-media-rhi"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "Retained media frame upload and Cove RHI presentation"
+
+[features]
+default = []
+gst = ["cove-media/gst"]
+
+[dependencies]
+cove-media.workspace = true
+cove-graphics.workspace = true
+cove-imaging.workspace = true
+
+[lints]
+workspace = true

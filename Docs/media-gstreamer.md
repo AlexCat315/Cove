@@ -1,8 +1,8 @@
 # Cove 音视频：GStreamer 集成设计
 
-日期：2026-11-04。状态：设计草案，供接口评审、技术验证和后续实现使用。
+日期：2026-11-04。状态：首批原生基础实现已落地；完整 UI、宿主和平台分发仍在实施中。
 
-本文提出以 GStreamer 为原生媒体引擎，为 Cove 增加可选的播放、视频展示和媒体管线接入能力。这里的 crate、类型、方法和配置均为拟议设计；当前仓库尚未实现这些媒体接口，也未完成 GStreamer 构建或平台验证。本次文档不新增 Cargo 依赖、不改变原生构建方式、不代表版本发布。
+本文以 GStreamer 为原生媒体引擎，为 Cove 增加可选的播放、视频展示和媒体管线接入能力。`cove-media`、`cove-media-rhi` 和固定源码构建入口已实现，macOS 已验证静态链接、headless 播放与 Metal 上传。本设计还包含尚未实现的后续能力，不能把全文视为已支持列表；实际范围与证据见 §16.3 和 [使用说明](../crates/media/README.md)。本次不发布新版本。
 
 ## 1. 设计目标与边界
 
@@ -21,18 +21,18 @@ Diffuse 的项目格式、场景、仿真时钟、剪辑业务、撤销重做和
 
 ## 2. 仓库现状与本设计的关系
 
-以下是本次查阅源码得到的现状，不是媒体实现完成声明：
+以下区分已有框架基础与本次新增实现：
 
 | 项目 | 当前事实 | 对媒体设计的约束 |
 | --- | --- | --- |
-| 工作区 | [Cargo.toml](../Cargo.toml) 中没有 GStreamer 或媒体 crate | 新模块和第三方依赖需要在实施批次单独落地 |
+| 工作区 | [Cargo.toml](../Cargo.toml) 已加入可选 GStreamer 绑定及两个媒体 crate | 默认 UI 构建仍不启用媒体依赖 |
 | Compose 依赖 | 当前 [Compose manifest](../crates/compose/Cargo.toml) 已依赖 Graphics；[架构文档](architecture.md) 主要保留 Swift 时期分层 | 以 Rust manifest 判断现状；本设计不借媒体接入扩大层间循环依赖 |
 | 图像持有 | [TextureImage](../crates/imaging/src/texture_image.rs) 用 backing 保留资源，[TextureResource](../crates/graphics/src/rhi/resource_ownership.rs) 保留设备并延迟释放纹理 | 视频发布应沿用快照持有资源的语义 |
 | UI 纹理入口 | [texture_image](../crates/graphics/src/ui/texture_image.rs) 当前接受可采样的 RGBA8/BGRA8 二维纹理 | 不能把 YUV、P010 或 HDR 帧直接标记为已有 UI 图像 |
 | RHI | [公开 RHI 模块](../crates/graphics/src/rhi/mod.rs) 已有设备、提交和退休机制；本次未找到受支持的完整媒体外部表面导入契约 | 外部内存导入、同步与释放协议是待设计和实现的工作，不能把裸指针强转为 RHI 句柄 |
-| 原生构建 | [cove-native-build](../crates/native-build/src/lib.rs) 当前按固定子模块源码构建到 OUT_DIR，以 CMake 为主要入口 | GStreamer 的 Meson/依赖构建必须显式扩展，不能偷偷依赖本机 SDK 或共享预构建目录 |
+| 原生构建 | [cove-native-build](../crates/native-build/src/gstreamer.rs) 已加入固定源码 Meson 构建与 Cargo 启动入口 | 目标专属产物、静态链接与 pkg-config 隔离；其他平台完整构建仍待验收 |
 
-本提案尚未在 Cove 实现播放器、视频 sink、音频设备适配、GPU 导入或浏览器媒体后端。下文平台表中的路径均是实施要求或候选路线。
+当前已实现原生播放器、appsink 视频端点、平台音频 sink 选择和 CPU→RHI 上传。GPU 共享导入、VideoView、Browser 与宿主音频会话/焦点策略尚未完成；下文相关条目仍是实施要求。
 
 ## 3. 为什么采用 GStreamer
 
@@ -46,7 +46,7 @@ FFmpeg 可以通过 [gst-libav][gst-libav] 提供编解码能力。采用 GStrea
 
 ## 4. 模块划分与依赖方向
 
-拟议物理边界如下；名称在实现前可调整，责任边界应保留。
+物理边界如下；UI/宿主/Browser 条目仍待实现。
 
 | 所有者 | 公开范围 | 依赖与职责 |
 | --- | --- | --- |
@@ -84,7 +84,7 @@ VideoOutput 在 media 中声明中立的端点与发布/订阅契约；具体的
 
 ### 5.1 常规播放
 
-以下为接口职责草案，不是可直接编译的示例代码：
+以下定义接口职责；原生控制与输出接口已实现，VideoView/PlaybackControls 仍为后续交付。可编译用法见 crate README 和 `headless` 示例。
 
 | 入口 | 操作/结果 | 契约 |
 | --- | --- | --- |
@@ -247,11 +247,11 @@ VideoView 的输出需要参与 Cove 的布局、裁剪、透明度、变换、�
 
 Hosts 负责把前后台、音频焦点/中断、设备切换、耳机插拔、窗口销毁、权限和允许的后台播放策略传给媒体服务。暂停渲染不必然等于暂停音频，具体行为由应用策略决定。
 
-纯音频 Player 不创建视频端点或 RHI 设备；无 GPU 的后台转换不因 UI 媒体 feature 而被迫初始化窗口系统。
+纯音频 Player 不产生视频帧或创建 RHI 设备；playbin 的视频 sink 配置保留一个轻量 appsink，避免后端自动创建独立视频窗口。无 GPU 的后台转换不初始化窗口系统。
 
 ## 12. 平台实现与验证矩阵
 
-当前本提案各平台均未实现/验证。下列是完整工作项，不是“已支持”的列表。官方存在某个平台插件，不构成 Cove 集成通过的证据。
+五个平台共用已实现的控制、帧持有和 RHI 上传代码，并有明确的平台音频/插件配方；macOS 已执行基础测试，其他平台尚未编译和实机验收。Browser 属于 P4，尚未实现。下表仍列出完整验收要求，不能作为全部通过的声明。
 
 | 平台 | 基本实现与输出要求 | GPU 候选路线及需验证条件 | 平台验收 |
 | --- | --- | --- | --- |
@@ -270,7 +270,7 @@ Browser 不作为跳过五个平台原生实现的理由，也不把不适用的
 
 ### 13.1 依赖计划
 
-拟新增官方 gstreamer、gstreamer-app、gstreamer-video、gstreamer-audio 及所需 glib/GObject 绑定；平台绑定按实际桥接选择。具体版本尚未锁定，需以完整平台构建验证后提交 Cargo.lock 与原生版本清单。
+已固定官方 gstreamer/gstreamer-video/gstreamer-audio 0.25.4、gstreamer-app 0.25.2，启用 `v1_28`；glib 由 Cargo.lock 固定。原生 GStreamer 为 1.28.8，子模块 revision `1b2a95a1b72787cda146b46df9605b168e5b683b`，其 wraps 提供传递源码版本及哈希。完整平台构建与分发验收仍未完成。
 
 Rust 绑定和原生 GStreamer 是两部分依赖。只加入 Cargo crate 不会自动解决原生库、插件、平台工具链和发布包的构建。
 
@@ -284,6 +284,8 @@ Rust 绑定和原生 GStreamer 是两部分依赖。只加入 Cargo crate 不会
 - 使用 Cerbero 时明确它与 Cargo 产物布局的衔接。上游 bootstrap 可能修改宿主环境，不能在普通 build.rs 中直接运行未经约束的安装流程。
 
 能否完整沿用源码静态构建，是进入正式实现前的验证门禁。若确需改变 Cove 的原生分发规则，必须单独记录架构决策，不以文档示例或本机 SDK 路径暗中替换。
+
+已采用两步构建：`cove-native-build` 的 `gstreamer` 示例先在 `target/media-native/<target>/out` 构建，再以目标专属 pkg-config 环境启动 Cargo。官方 sys crate 的 build.rs 必须先于媒体 crate 执行，因此不能依赖媒体 crate 的 build.rs 给它们反向提供库。构建清单包含 revision、target、工具/编译器与 Meson 选项，清单指纹进入 pkg-config 路径以触发 Cargo 正确重建。没有改变静态源码分发方向；SDK 发现只保留为官方绑定的开发工作流，不能作为正式分发证明。当前已证明 macOS 路线，其他平台的门禁仍开放。
 
 ### 13.2 功能闭包
 
@@ -303,6 +305,8 @@ Rust 绑定和原生 GStreamer 是两部分依赖。只加入 Cargo crate 不会
 静态插件需要显式注册并测试链接器裁剪后的可发现性，见 [静态插件说明][gst-static]。动态插件方案若被采用，必须记录随包路径、依赖和 scanner；不能靠构建机的 GST_PLUGIN_PATH 才能运行。
 
 registry、环境与初始化采用进程级、可重复的设置。应用启动后不逐播放器改全局环境；发布包不得意外扫描并加载系统中另一版本的插件。受控部署仍不能被解释为恶意插件的安全沙箱。
+
+当前固定源码 profile 以 `gstreamer:registry=false` 关闭文件注册表扫描，保留内存注册表和 `gst-full` 静态注册；应用在构建器之外启动也不会自动扫描本机 SDK。自定义 Rust 插件仍可显式静态注册。需要动态插件的应用须采用明确的其他构建 profile，不能把本批默认闭包描述成动态插件加载器。
 
 记录每个插件及其外部库的许可证、构建配置、源码和通知要求；按实际分发闭包进行发布审查。插件所在的 base/good/bad/ugly 分组不能代替逐项判断，参见 [官方许可说明][gst-license]。本设计不预先断言任意静态链接组合都可直接发布。
 
@@ -334,7 +338,7 @@ Diffuse 的导出分辨率、帧率、有理数时间基、音频混音、颜色
 
 ## 16. 分阶段实施与门禁
 
-以下均未执行。每阶段完成后更新证据，失败项保留，不将“可以编译”写成“设备行为通过”。
+阶段划分保持如下；本批实现与验证见 §16.3。每阶段完成后更新证据，不将“可以编译”写成“设备行为通过”。
 
 | 阶段 | 交付 | 进入下一阶段的证据 |
 | --- | --- | --- |
@@ -365,6 +369,28 @@ Diffuse 的导出分辨率、帧率、有理数时间基、音频混音、颜色
 
 每个分发包在没有开发机媒体环境的机器上验证插件发现和基本播放。含原生媒体依赖的样例/模板还需验证安装、签名、升级和卸载后的资源清理。
 
+### 16.3 已落地批次：原生控制与 CPU 展示基线
+
+2026-11-04 的实际交付：
+
+- `cove-media`：可选 `gst` feature；独立控制线程/GLib 上下文；Player 命令、快照、有界事件和持久请求终态；文件/URI/内存/合作取消输入；真实轨道选择、音量/倍速、generation 与 seek segment 关联、超时、EOS、显式关闭和析构关闭。
+- `GstVideoEndpoint`：官方 appsink 端点，不拥有调用方管线；保留 sample、PTS/DTS、完整 caps、每个 buffer 的 VideoMeta stride/offset。最新帧与合并通知有界，CPU 映射/复制显式发生。
+- `cove-media-rhi`：RGBA8/BGRA8 的 CPU 上传，现有 Metal/D3D12/Vulkan RHI 共用实现；旧 TextureImage 保留资源；统计上传帧数与字节数。尚无共享导入或零拷贝声明。
+- 构建：固定 GStreamer 子模块与静态 `gst-full`；五平台显式插件/音频配方，iOS/Android 交叉配置；Android JNI VM/application/class-loader 提供函数与资源所有者契约。宿主自动安装这些策略属于 P4。
+- 独立 `headless` 示例：无参数时运行应用拥有的测试源管线；传本地文件时通过 Player 获取状态，均不创建窗口、音频设备或 GPU。
+
+验证主机为 aarch64 macOS；构建工具 Meson 1.12.1、Ninja 1.13.2，GStreamer 1.28.8。固定源码同时构建 GLib 等 wraps 依赖。清空系统插件路径后通过 18 项测试：10 项真实媒体控制/管线、2 项来源与输出契约、3 项 RHI 上传/读回与 HDR 拒绝、3 项平台构建清单测试。测试使用可再生成的 raw AVI、PCM WAV、多轨音视频、测试源和带行填充的 RGBA buffer，不依赖外部影视资源。
+
+多轨测试覆盖文件和内存来源的暂停/播放态双向切换、禁用视频后的音频 seek、恢复视频后的持续出帧。可 seek 来源的轨道变更先到 READY，按目标轨道重建输出，确认新管线选择后精确寻址到原位置，等待新样本并恢复播放意图；该基线允许短暂的音频输出间断。旧总线消息清空，输入使用新的取消 token。不可 seek 来源仅在播放态使用 SELECT_STREAMS 事件序号确认，直播矩阵仍待验证。音频回归使用显式 Silent/fakesink，尚未验收实际扬声器、设备切换或音频会话中断。
+
+持续出帧回归发现 1.28.8 的 appsink `max-time` 在非零 seek 后会出现空队列仍报告非零时长的阻塞。默认端点使用 3 帧、256 MiB 上限与实时最新帧策略，不启用该属性；seek 后必须断言帧序号持续增长，不能只断言 Playing 或一次预滚成功。
+
+Metal 实测覆盖像素一致、动态尺寸、旧快照在关闭后仍有效、每 buffer stride 上传。测试可执行文件经 `otool -L` 检查不链接 Homebrew 的 GStreamer/GLib 动态库；这不是卸载 SDK 后的干净机器或正式包验收。
+
+执行命令及工具要求见 [crate README](../crates/media/README.md)。macOS 系统 Bison 2.3 不满足上游 ≥2.4 要求，需使用新版本。Apple 的固定版本 applemedia 插件依赖 gst-gl，即使应用只请求系统内存；构建配方已显式开启该依赖，不将它误报为 Metal 共享路径。
+
+保留的工作：P0 的其他平台完整构建/设备验收，P2 的 UI/宿主显示接线，P3 外部资源与颜色/HDR，P4 VideoView/控件/Browser/生命周期，P5 Diffuse 接入与正式分发。Linux 基础 profile 目前仅具备所选容器和 raw/PCM 软件路径，尚未加入 H.264/AAC 软件解码闭包；网络协议与 gst-libav 也未加入。以上没有用占位 API 伪装为已完成。
+
 ## 17. 尚待技术验证的问题
 
 | 编号 | 问题 | 关闭条件 |
@@ -379,13 +405,14 @@ Diffuse 的导出分辨率、帧率、有理数时间基、音频混音、颜色
 | M8 | Browser 的高层契约与原生 gst 扩展的边界 | 通用播放实现、能力查询和独立浏览器验收 |
 | M9 | 最终插件、版本、静态链接与分发闭包 | 固定清单、可发现性/裁剪测试及分发审查记录 |
 
-上述问题影响实现路线与可承诺能力，当前全部开放。实现期间发现新的平台缺口，应立即在此记录其影响、所需契约与处理方式。
+上述问题仍未全部关闭：M1 已有 macOS 静态构建/链接证据，M5 已有连续 seek、音频 seek、切源与取消回归；其他平台、迟到事件的更大矩阵及正式分发仍需验证。实现期间发现新的平台缺口，应继续记录影响与处理方式。
 
 ## 18. 决策记录与资料
 
 | 日期 | 记录 |
 | --- | --- |
 | 2026-11-04 | 初稿：原生媒体优先采用 GStreamer；Cove 提供常规播放入口与可直接使用官方绑定的高级端点；FFmpeg 作为可选插件实现；平台、RHI、构建和行为证据尚待验证 |
+| 2026-11-04 | 首批实现：固定 1.28.8，源码构建先于 Cargo sys 发现；原生 Player/端点与 CPU 上传通过 macOS 回归，其他阶段按 §16.3 保留 |
 
 上游链接查阅于 2026-11-04，文档站点会随版本更新。实施时应固定源代码 tag/commit，并再次核对所用 API、属性与插件；特别不能直接使用页面上标注为高于所选版本的 Vulkan 或队列接口。
 

@@ -1,0 +1,65 @@
+# cove-media
+
+Rust 2024 媒体控制与保留帧端点。原生播放器通过可选的 `gst` feature 使用官方 GStreamer 绑定；本 crate 不依赖 Compose、Graphics 或窗口系统。
+
+本批实现的是原生控制、应用管线接入和 CPU 帧展示基线。`VideoView`、Browser 后端、宿主音频策略和硬件表面共享仍按 [实施文档](../../Docs/media-gstreamer.md) 后续阶段推进，没有提供占位接口。
+
+## 构建与运行
+
+原生版本固定为 GStreamer 1.28.8，revision `1b2a95a1b72787cda146b46df9605b168e5b683b`。Rust 绑定固定在工作区与 Cargo.lock 中。需要 Git、C/C++ 工具链、Python、Meson、Ninja、pkg-config、Bison ≥ 2.4、Flex；Apple/Android/Windows/Linux 还需相应平台 SDK/系统音频开发库。
+
+在 Cove 根目录执行：
+
+```sh
+git submodule update --init --depth 1 third-party/gstreamer
+cargo run -p cove-native-build --example gstreamer -- \
+  --jobs 6 -- test -p cove-media -p cove-media-rhi -p cove-native-build \
+  --features cove-media-rhi/gst
+cargo run -p cove-native-build --example gstreamer -- \
+  --jobs 6 -- run -p cove-media --features gst --example headless
+```
+
+macOS 的系统 Bison 2.3 太旧时，将已安装的新 Bison 的 `bin` 目录加入 `PATH`。构建失败的详细命令输出保留在 `target/media-native/<target>/out/{configure,compile,install}.log`。
+
+构建器先将固定源码及上游带哈希的 Meson wraps 构建到目标专属目录，再启动 Cargo。它只向 sys crate 提供该次构建的 pkg-config 文件，选择静态链接；固定 profile 关闭文件插件注册表扫描，在构建器之外启动也不会扫描本机 SDK，显式静态注册仍可用。构建清单改变时，pkg-config 路径指纹也改变，避免 Cargo 复用旧的原生链接结果。普通 `cargo ... --features gst` 仍按官方绑定规则发现开发 SDK，不能据此视为完成源码分发验证。
+
+默认原生 profile 选定 core/app/playback、转换、测试源、AVI/WAV/MP4/Matroska 容器与平台音频/解码插件。容器插件不等于具备其所有编解码器；Linux 基础 profile 尚未包含 H.264/AAC 软件解码器，gst-libav/网络协议也未加入。应用通过 `has_element` 和实际协商结果查询能力，缺失插件以错误返回。
+
+交叉构建用 `--target <triple>`；iOS 自动使用 Xcode SDK，Android 使用 `ANDROID_NDK_HOME`（arm64/x86_64，API 26），其他交叉工具链传 `--cross-file <Meson 文件>`。生成配方不代表相应设备已验收。Android 在初始化前须通过 `gst::android::install_environment` 提供 JavaVM、application/class-loader 全局引用和资源所有者；静态链接的 JNI 提供函数供 androidmedia 使用。
+
+## 播放控制
+
+```rust,no_run
+use cove_media::*;
+use std::time::Duration;
+
+let context = MediaContext::new(ContextOptions::default())?;
+let player = context.create_player(PlayerOptions::default())?;
+let request = player.open(MediaSource::file("clip.mov"))?;
+// 仅用于非 UI 线程；UI 通过 result/events_since 观察。
+let outcome = player.wait_result(request, Duration::from_secs(35))?;
+player.take_result(request)?;
+if let CommandOutcome::Failed(error) = outcome { return Err(error); }
+let output = player.video_output();
+# Ok::<(), MediaError>(())
+```
+
+提交成功只返回 `RequestId`。`result`/`wait_result` 查询终态，`take_result` 确认消费并释放请求容量；未确认的结果计入 `result_capacity`，达到容量后提交返回 `Busy`。`wait_result` 的等待超时不会取消命令；`operation_timeout` 是后端操作期限，触发时停止会话并发布失败。
+
+`events_since(0)` 返回保留的事件；后续传回 `next_cursor`。`missed > 0` 表示有事件被覆盖，应刷新 `snapshot` 并查询未确认的请求。状态快照事件包含 EOS、错误和 Closed，命令终态独立保留。事件序号和状态 revision 在切源时持续递增。
+
+seek 完成需要匹配 flush/segment 序号后的新 generation 样本，不以任意 `ASYNC_DONE` 作为确认。连续 seek 采用最新请求优先，被替代请求有 `Superseded` 终态。未知 PTS 保留为 `None`，仅在报告命令实际位置时可查询管线位置。rate 范围为 0.1–16，音量范围为 0–1；音量可以在打开前设置并跨切源保留。
+
+可 seek 来源的轨道切换会重建管线输出并回到原位置预滚，确认选择、新样本与播放意图恢复后才完成；该基线允许短暂的音频间断。不可 seek 来源仅在播放态走带序号的 SELECT_STREAMS，直播矩阵尚待验收。正在切换或 seek 时收到另一条不兼容操作会返回 Busy。切源及输出重建不会强制释放已保留的旧帧。
+
+文件、绝对 URI、`Arc<[u8]>` 和自定义 `MediaInput` 都可作为来源。自定义输入必须报告真实的字节寻址能力并合作取消，阻塞读取应定期检查 `CancellationToken`。普通播放与静音 headless 输出使用同一控制契约。
+
+## 自有管线与视频展示
+
+`cove_media::gst` 再导出同一套官方绑定；`GstVideoEndpoint::element()` 可连接应用拥有的管线，`with_caps` 可请求其他 raw 格式/内存。端点不控制或关闭应用管线。离线逐帧消费使用官方 appsink/appsrc 及其背压配置；最新帧展示端点会覆盖尚未展示的旧帧。
+
+`VideoOutput::subscribe` 提供容量为 1 的合并唤醒，收到后读取一致的 `snapshot`。帧 generation、sequence、PTS/DTS、布局、色彩与完整 caps 随 `Arc<VideoFrame>` 保留；`SampleStorage::sample` 可取完整 Gst 元数据。关闭或切源拒绝迟到帧，已有帧仍持有原样本。CPU map/copy 是显式操作，硬件内存可能拒绝映射或发生下载。
+
+`cove-media-rhi::VideoPresenter` 在 RHI 所有者线程将 RGBA8/BGRA8 上传为 `Arc<TextureImage>`，适用于现有 Metal/D3D12/Vulkan 后端。它遵循每帧实际 stride，并保留旧图像资源以支持旧视图快照；统计报告上传帧数和源平面字节数（含行填充，不是 GPU 总线测量）。PQ/HLG 明确报错，要求先做 tone mapping。未实现外部表面导入，不承诺零拷贝、HDR 或任意 YUV 直接显示。
+
+`close` 拒绝后续控制操作，重复关闭有效；最后一个 Player 句柄析构发起非阻塞关闭。`shutdown`/`wait_closed` 用于显式宿主停机，不能在 UI 或 streaming 回调中阻塞等待。

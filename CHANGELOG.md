@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+- **原生媒体基础（2026-11-04）**：新增可选 `cove-media` / `cove-media-rhi`，提供 GStreamer Player、自有管线端点、有界状态/请求与帧订阅、合作取消和保留帧的 CPU→RHI 上传。固定 GStreamer 1.28.8 源码，加入隔离 pkg-config 的静态构建入口与五平台配方。macOS 已验证真实媒体控制、Metal 像素读回和旧纹理生命周期；VideoView、Browser、硬件共享与其他平台设备验收仍待完成。详见 `Docs/media-gstreamer.md` §16.3。
+
 - **List / Tree / SwipeList 排版修复与 Gallery 卡片化（2026-11-04，界面）**：
   - `ListRow`：图标/标题/尾部槽之间补上 Swift 的 8pt 间距；标题不再硬编码 `on_surface`，选中行由行样式统一改墨为 `on_accent`；副标题改为继承行墨并降低透明度，避免强调色带上的深色副标题。选中行尾部 chevron 也继承行墨。
   - `List`：行宿主裁剪到固定虚拟槽，内容超出行高时不再渗入相邻行。

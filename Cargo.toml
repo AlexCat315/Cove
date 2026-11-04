@@ -8,6 +8,8 @@ members = [
     "crates/graphics",
     "crates/text",
     "crates/imaging",
+    "crates/media",
+    "crates/media-rhi",
     "crates/shell",
     "crates/runtime",
     "crates/compose",
@@ -56,6 +58,12 @@ cove-logging = { path = "crates/logging" }
 cove-graphics = { path = "crates/graphics" }
 cove-text = { path = "crates/text" }
 cove-imaging = { path = "crates/imaging" }
+cove-media = { path = "crates/media" }
+cove-media-rhi = { path = "crates/media-rhi" }
+gstreamer = { version = "=0.25.4", features = ["v1_28"] }
+gstreamer-app = { version = "=0.25.2", features = ["v1_28"] }
+gstreamer-video = { version = "=0.25.4", features = ["v1_28"] }
+gstreamer-audio = { version = "=0.25.4", features = ["v1_28"] }
 cove-shell = { path = "crates/shell" }
 cove-runtime = { path = "crates/runtime" }
 cove-composition = { path = "crates/composition" }

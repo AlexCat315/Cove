@@ -10,6 +10,8 @@
 use std::env;
 use std::path::{Path, PathBuf};
 
+pub mod gstreamer;
+
 /// Minimum Apple OS version for every native archive.
 pub const APPLE_DEPLOYMENT_TARGET: &str = "26.0";
 /// Android API level the NDK toolchain targets.
