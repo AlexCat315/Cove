@@ -6,9 +6,11 @@
 //! shows, and the transport only reports what happened.
 use std::sync::{Arc, RwLock};
 
+pub mod content_type;
 pub mod drag_upload;
 pub mod multipart;
 
+pub use content_type::{content_type_for, is_known};
 pub use drag_upload::{DragUpload, FileReader};
 
 use multipart::{MultipartBody, MultipartError, UploadField, UploadFilePart};

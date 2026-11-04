@@ -4,6 +4,15 @@
 
 Swift 源码逐页对照见文末《Swift 源码对照（逐页差异清单）》。
 
+## 2026-11-04：拖入批次与类型语义修复
+
+- **修复**：`DropPhase::File` 曾被直接映射成一次投递，而 SDL 每个文件发一条 `DROP_FILE`，导致 `maximum_files` 在真实拖入里只数到 1。改为 `Begin` 开批次、`File` 累积、`Complete` 一次性投递；`cancel` 丢弃未投递批次。宿主改用 `DroppedFile::inspected`，目录与大小来自 `fs::metadata`。
+- 目录语义：`DroppedFile::is_directory` 与 `FileDropZone::allows_directories`（默认拒绝）。拒绝是显式结果，不是读取失败。
+- 扩展名语义：新增 `DroppedFile::extension()`；无扩展名与隐藏文件（`.gitignore`）在非空白名单下明确拒绝，在空清单下通过。`file_kind` 不再把前导点当扩展名。
+- Content-Type：新增 `upload/content_type.rs` 查表（图像/文档/音视频/字体/压缩包），未知回落 `application/octet-stream`；`FileDropPrompt` 对空过滤显示 “Any file” 而非省略该行。
+- 覆盖：`file_drop_tests` 18 项（批次三文件单次投递、超限整批拒绝、批次清除、取消、目录拒绝与放行），`content_type` 6 项单元测试。
+- **原生验收仍未完成**：以上为结构测试与 DevTools 注入验证，真实 OS 拖入（含多选、文件夹）与原生打开面板交互尚未实机验收。
+
 ## 2026-11-04：系统文件拖入与上传
 
 - 平台层：`cove-platform` 新增 `ExternalDropEvent` 与 `DropPhase::{Begin, File, Text, Position, Complete}`，挂为 `InputEvent::ExternalDrop`；`native.c` 的 `cove_shell_poll` 接入 `SDL_EVENT_DROP_*`，drop 坐标按 `coordinate_scale` 单独换算，`CoveShellEvent` 新增 `aux` 承载拖拽来源。`sdl3_shell` 的 `decode_event` 解码 25…29，并把无窗口归属的 drop 路由到主窗口（iOS 以 null window 交付文档）。
@@ -190,7 +199,7 @@ cargo test -p cove-ui-compose --test compose --locked
 | Command Palette | 0 | 0 / 0 | 挂载/几何基础检查通过；待逐项交互和视觉验收 |
 | NavigationStack | 0 | 0 / 0 | 挂载/几何基础检查通过；待逐项交互和视觉验收 |
 | Drag & Drop | 0 | 0 / 0 | 挂载/几何基础检查通过；待逐项交互和视觉验收 |
-| Drag Upload | 0 | 3 / 0 | 拖放区命中、类型/数量拒绝与上传状态机有结构回归；原生 OS 拖入与原生打开面板尚未验收 |
+| Drag Upload | 0 | 3 / 0 | 拖放区命中、类型/数量拒绝、批次聚合、目录拒绝、空过滤与 Content-Type 查表有结构回归；DevTools 注入 begin→file→complete 已端到端验证；原生 OS 拖入与原生打开面板尚未验收 |
 | HoverCard | 0 | 0 / 0 | 挂载/几何基础检查通过；待逐项交互和视觉验收 |
 | Timeline | 2 | 0 / 0 | 挂载/几何基础检查通过；待逐项交互和视觉验收 |
 | Toolbar | 0 | 0 / 0 | 挂载/几何基础检查通过；待逐项交互和视觉验收 |
@@ -367,7 +376,7 @@ cargo test -p cove-ui-compose --test compose --locked
 | Dialog | 1 | 1 | 1 | 0 | 0 | 段落数持平 |
 | DisclosureGroup | 1 | 1 | 1 | 0 | 0 | 段落数持平 |
 | Drag & Drop | 1 | 1 | 1 | 0 | 0 | 段落数持平 |
-| Drag Upload | 0 | 2 | 0 | 0 | 0 | Rust 新增页（Swift 无对应） |
+| Drag Upload | 0 | 5 | 0 | 0 | 0 | Rust 新增页（Swift 无对应）；Drop to upload / Any type / Archives / Narrow filter / 状态 |
 | EmptyState | 1 | 0 | 0 | 0 | 1 | Rust 无段落结构 |
 | Form | 1 | 1 | 1 | 0 | 0 | 段落数持平 |
 | HoverCard | 1 | 1 | 1 | 0 | 0 | 段落数持平 |

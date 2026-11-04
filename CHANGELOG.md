@@ -4,6 +4,14 @@
 
 ## Unreleased
 
+- **拖入批次与类型语义修复（2026-11-04，修复）**：
+  - **修复 `maximum_files` 失效**：`DropPhase::File` 原先每条事件立刻投递一次，而 SDL 每个文件发一条 `DROP_FILE`，多文件拖入因此被拆成多次投递，数量上限只看到 1 个文件。现在 `Begin` 开启批次、`File` 累积、`Complete` 一次性投递；新增 `FileDropRegistry::begin/stage/finish/cancel` 与 `has_staged`。中断的拖入不会把残留路径带进下一次。
+  - 目录语义：`DroppedFile` 新增 `is_directory`；新增 `DroppedFile::inspected` 用 `fs::metadata` 判定目录与大小，读不到的路径按文件处理。`FileDropZone` 新增 `allows_directories`（默认 `false`），文件夹默认被显式拒绝而不是被当成空文件读取。
+  - 扩展名语义：新增 `DroppedFile::extension()`。`file_kind` 不再把前导点当扩展名，因此 `.gitignore`、`.env` 与 `README` 都没有类型：空过滤放行，非空过滤明确拒绝。
+  - Content-Type：新增 `primitives/upload/content_type.rs`，按扩展名查表覆盖图像、文档、音视频、字体与压缩包（zip/tar/gz/7z/rar 等），未知回落 `application/octet-stream`；只查表不嗅探，拖入阶段不读字节。`FileDropPrompt` 对空过滤显示 “Any file”，不再省略该行。
+  - Gallery 的 `part()` 改用该表，删除手写 match；新增 “Any type”（空过滤）与 “Archives”（仅压缩包）两段示例。
+  - 覆盖：`file_drop_tests` 增至 18 项（批次单次投递、超批整批拒绝、批次清除、取消、目录拒绝/放行）与 `content_type` 6 项单元测试；DevTools 注入 `begin → file×3 → complete` 验证整批只触发一次上传。真实 OS 多选拖入、文件夹拖入与原生打开面板仍未实机验收。
+
 - **系统文件拖入与上传（2026-11-04）**：
   - `cove-platform` 新增 `ExternalDropEvent` 与 `DropPhase::{Begin, File, Text, Position, Complete}`，作为 `InputEvent::ExternalDrop` 交付。此前 shell/runtime 完全没有系统拖入通道：`cove_shell_poll` 只解码键鼠与手柄，SDL3 已支持的 `SDL_EVENT_DROP_*` 被丢弃。
   - 原生桥接入拖放：`CoveShellEvent` 新增 `aux` 承载拖拽来源，drop 坐标按 `coordinate_scale` 单独换算（此前只有指针事件缩放），`event_free` 一并释放。`sdl3_shell::decode_event` 解码 kind 25…29；无窗口归属的 drop 路由到主窗口，修复 iOS 以 null window 交付文档时被 `windows.contains_key` 丢弃的问题。解码逻辑抽为公开的 `external_drop` 以便无窗口断言。

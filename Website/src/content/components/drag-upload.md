@@ -18,15 +18,53 @@ DragUpload::new(UploadRequest::new("https://example.test/upload", Vec::new()))
 
 `FilePicker` 未安装时浏览按钮禁用，而不是打开一个空面板。
 
+## 类型过滤
+
+`accepted_extensions` 是**调用方自选的清单**，不是框架的类型白名单。空集合表示接受任意文件：
+
+```rust
+// 任意类型，包括压缩包和未知格式
+DragUpload::new(request)
+
+// 只要图片
+DragUpload::new(request).accepted_extensions(["png".to_owned(), "jpg".to_owned()])
+```
+
+匹配规则：
+
+- 大小写不敏感，清单里不含点。
+- **没有扩展名的文件不参与白名单匹配**：`README`、`.gitignore` 在空清单下通过，在非空清单下明确拒绝。开头的点表示隐藏文件，不是扩展名。
+- 压缩包（zip、tar、gz、7z、rar 等）与普通文件同等对待，只是 Content-Type 不同。解压不由拖放区决定。
+
 ## 接受规则
 
-`FileDropZone` 按三层判断是否接受：
+`FileDropZone` 按四层判断是否接受：
 
-1. `accepted_extensions`：扩展名（不含点，大小写不敏感）。空表示接受所有类型。
-2. `maximum_files`：一次拖入的文件数量上限。
-3. `accepts`：调用方补充的谓词，例如控件忙或载荷超限。
+1. `accepted_extensions`：如上一节。
+2. `maximum_files`：**整批**文件的数量上限。平台按文件逐条上报，注册表累积到 `Complete` 再一次性投递，所以上限看到的是整次拖入而不是单个文件。
+3. `allows_directories`：默认 `false`。文件夹没有单一载荷，按默认读作文件只会得到空内容。
+4. `accepts`：调用方补充的谓词，例如控件忙或载荷超限。
 
 被拒绝的拖入不是错误：区域显示拒绝色，`on_drop` 不触发，调用方状态不变。
+
+## 目录
+
+拖入文件夹默认被拒绝，区域显示拒绝色而不是静默失败。确实要接收目录的调用方显式打开：
+
+```rust
+DragUpload::new(request)
+    .allows_directories(true)
+    .reader(|file| {
+        // 展开目录内容由调用方负责；框架不递归读取。
+        Ok(UploadFilePart::new("file", file.name.clone(), "application/octet-stream", vec![]))
+    })
+```
+
+目录判定来自 `std::fs::metadata`（`DroppedFile::inspected`）。无法读取的路径按文件处理，由 reader 报告真实失败，而不是在拖入阶段丢弃。
+
+## Content-Type
+
+`content_type_for(name)` 按扩展名查表，覆盖常见图像、文档、音视频、字体与压缩包；未知扩展名与无扩展名回落 `application/octet-stream`。这是查表而非嗅探：拖入阶段不读取字节。
 
 ## 上传状态
 

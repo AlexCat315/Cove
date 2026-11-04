@@ -28,15 +28,20 @@ pub struct DroppedFile {
     pub path: String,
     pub name: String,
     pub byte_size: Option<u64>,
+    /// The lowercase extension without the dot, or `""` when there is none.
     pub kind: String,
+    /// A dropped folder. Folders are rejected unless a zone opts in, because
+    /// reading one as a file silently produces nothing.
+    pub is_directory: bool,
 }
 
 impl DroppedFile {
     /// Describes a path without touching the filesystem.
     ///
-    /// Size is left absent: a drop can arrive before anything is readable (a
-    /// sandboxed URL, a removed file), and a control must not read every file
-    /// just to paint a row.
+    /// Size and folder-ness are left unknown: a drop can arrive before anything
+    /// is readable (a sandboxed URL, a removed file), and a control must not read
+    /// every file just to paint a row. Use [`Self::inspected`] when the caller
+    /// needs them.
     pub fn new(path: impl Into<String>) -> Self {
         let path = path.into();
         let name = file_name(&path);
@@ -46,7 +51,25 @@ impl DroppedFile {
             name,
             byte_size: None,
             kind,
+            is_directory: false,
         }
+    }
+
+    /// Describes a path after asking the filesystem about it.
+    ///
+    /// A path that cannot be inspected (missing, sandboxed, or a platform with no
+    /// filesystem) is treated as a file with an unknown size rather than
+    /// rejected: the drop already happened, and the reader will report the real
+    /// failure.
+    pub fn inspected(path: impl Into<String>) -> Self {
+        let mut file = Self::new(path);
+        if let Ok(metadata) = std::fs::metadata(&file.path) {
+            file.is_directory = metadata.is_dir();
+            if metadata.is_file() {
+                file.byte_size = Some(metadata.len());
+            }
+        }
+        file
     }
 
     pub fn byte_size(mut self, byte_size: u64) -> Self {
@@ -54,11 +77,33 @@ impl DroppedFile {
         self
     }
 
+    pub fn is_directory(mut self, is_directory: bool) -> Self {
+        self.is_directory = is_directory;
+        self
+    }
+
+    /// The extension without the dot, or `None` when the name has none.
+    ///
+    /// A leading-dot name is a hidden file, not an extension: `.gitignore` has no
+    /// extension, so a type filter never matches it.
+    pub fn extension(&self) -> Option<&str> {
+        if self.kind.is_empty() {
+            None
+        } else {
+            Some(self.kind.as_str())
+        }
+    }
+
     /// Whether this file matches one of `extensions` (case-insensitive, no dot).
     ///
-    /// An empty list accepts every file.
+    /// An empty list accepts every file. A file with no extension never matches a
+    /// non-empty list: `README` is not "a file of some type", it is untitled.
     pub fn matches_any(&self, extensions: &HashSet<String>) -> bool {
-        extensions.is_empty() || extensions.contains(&self.kind)
+        if extensions.is_empty() {
+            return true;
+        }
+        self.extension()
+            .is_some_and(|extension| extensions.contains(extension))
     }
 
     /// A human-readable size, or nothing when the size is unknown.
@@ -77,11 +122,17 @@ fn file_name(path: &str) -> String {
 }
 
 /// The lowercase extension of `name`, or `""` when it has none.
+///
+/// A dot at the start of the name marks a hidden file, not an extension:
+/// `.gitignore` and `.env` have no type, so a filter cannot match them.
 fn file_kind(name: &str) -> String {
-    name.rsplit_once('.')
-        .map(|(_, extension)| extension.to_ascii_lowercase())
-        .filter(|extension| !extension.contains(['/', '\\']))
-        .unwrap_or_default()
+    let Some((stem, extension)) = name.rsplit_once('.') else {
+        return String::new();
+    };
+    if stem.is_empty() || extension.is_empty() || extension.contains(['/', '\\']) {
+        return String::new();
+    }
+    extension.to_ascii_lowercase()
 }
 
 /// Formats a byte count with one decimal for the units above bytes.
@@ -105,9 +156,11 @@ struct Zone {
     node: NodeWeak,
     accepted_extensions: HashSet<String>,
     maximum_files: usize,
+    allows_directories: bool,
     is_enabled: bool,
     on_drop: Rc<dyn Fn(Vec<DroppedFile>)>,
     on_targeted: Option<Rc<dyn Fn(bool)>>,
+    on_rejected: Option<Rc<dyn Fn(&[DroppedFile])>>,
     accepts: Option<Rc<dyn Fn(&[DroppedFile]) -> bool>>,
 }
 
@@ -116,11 +169,59 @@ struct Zone {
 pub struct FileDropRegistry {
     zones: RefCell<Vec<Zone>>,
     targeted: RefCell<Option<NodeWeak>>,
+    /// Paths collected between `Begin` and `Complete`.
+    ///
+    /// The platform reports one path per event, so a single multi-file drag
+    /// arrives as several `File` steps. The registry accumulates them and
+    /// delivers once, which is what makes a per-zone file limit meaningful.
+    staged: RefCell<Vec<DroppedFile>>,
 }
 
 impl FileDropRegistry {
     pub fn new() -> Self {
         Self::default()
+    }
+
+    /// Starts a batch. A drag replaces any batch left by an interrupted one.
+    pub fn begin(&self, point: Point) -> Option<Node> {
+        self.staged.borrow_mut().clear();
+        self.update_position(point)
+    }
+
+    /// Appends one dropped item to the open batch.
+    ///
+    /// A platform that reports a file without a preceding `Begin` still works:
+    /// the path is staged and delivered by the matching `Complete`, or by
+    /// [`Self::finish`] when the platform sends none.
+    pub fn stage(&self, files: impl IntoIterator<Item = DroppedFile>, point: Point) -> Option<Node> {
+        self.staged.borrow_mut().extend(files);
+        self.update_position(point)
+    }
+
+    /// Whether a batch is open (at least one staged path, not yet delivered).
+    pub fn has_staged(&self) -> bool {
+        !self.staged.borrow().is_empty()
+    }
+
+    /// Delivers the staged batch to the zone under `point` and clears it.
+    ///
+    /// Returns whether a zone accepted it. The batch is cleared either way: a
+    /// rejected drag is finished, and keeping it would leak into the next one.
+    pub fn finish(&self, point: Point) -> bool {
+        let files = std::mem::take(&mut *self.staged.borrow_mut());
+        let accepted = if files.is_empty() {
+            false
+        } else {
+            self.deliver(&files, point)
+        };
+        self.clear_targeted();
+        accepted
+    }
+
+    /// Drops a staged batch without delivering it, e.g. a cancelled drag.
+    pub fn cancel(&self) {
+        self.staged.borrow_mut().clear();
+        self.clear_targeted();
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -129,9 +230,11 @@ impl FileDropRegistry {
         node: &Node,
         accepted_extensions: HashSet<String>,
         maximum_files: usize,
+        allows_directories: bool,
         is_enabled: bool,
         on_drop: Rc<dyn Fn(Vec<DroppedFile>)>,
         on_targeted: Option<Rc<dyn Fn(bool)>>,
+        on_rejected: Option<Rc<dyn Fn(&[DroppedFile])>>,
         accepts: Option<Rc<dyn Fn(&[DroppedFile]) -> bool>>,
     ) {
         let mut zones = self.zones.borrow_mut();
@@ -141,9 +244,11 @@ impl FileDropRegistry {
         {
             existing.accepted_extensions = accepted_extensions;
             existing.maximum_files = maximum_files;
+            existing.allows_directories = allows_directories;
             existing.is_enabled = is_enabled;
             existing.on_drop = on_drop;
             existing.on_targeted = on_targeted;
+            existing.on_rejected = on_rejected;
             existing.accepts = accepts;
             return;
         }
@@ -151,9 +256,11 @@ impl FileDropRegistry {
             node: node.downgrade(),
             accepted_extensions,
             maximum_files,
+            allows_directories,
             is_enabled,
             on_drop,
             on_targeted,
+            on_rejected,
             accepts,
         });
     }
@@ -220,20 +327,29 @@ impl FileDropRegistry {
     /// error: the type filter is a normal outcome and the caller keeps the
     /// previous state.
     pub fn drop(&self, files: &[DroppedFile], point: Point) -> bool {
+        let accepted = self.deliver(files, point);
+        self.clear_targeted();
+        accepted
+    }
+
+    /// Hands `files` to the topmost zone under `point` without clearing the
+    /// highlight, so a caller can keep painting the drag's target.
+    fn deliver(&self, files: &[DroppedFile], point: Point) -> bool {
         self.prune();
         let Some(node) = self.zone_at(point) else {
-            self.clear_targeted();
             return false;
         };
-        let accepted = self.with_zone(&node, |zone| {
+        self.with_zone(&node, |zone| {
             if !Self::accepts(files, zone) {
+                if let Some(on_rejected) = zone.on_rejected.as_ref() {
+                    on_rejected(files);
+                }
                 return false;
             }
             (zone.on_drop)(files.to_vec());
             true
-        });
-        self.clear_targeted();
-        accepted.unwrap_or(false)
+        })
+        .unwrap_or(false)
     }
 
     /// How many files the zone under `point` accepts; `None` when it takes none.
@@ -267,8 +383,17 @@ impl FileDropRegistry {
             && files.len() <= zone.maximum_files
             && files
                 .iter()
-                .all(|file| file.matches_any(&zone.accepted_extensions))
+                .all(|file| Self::accepts_file(file, zone))
             && zone.accepts.as_ref().is_none_or(|accepts| accepts(files))
+    }
+
+    fn accepts_file(file: &DroppedFile, zone: &Zone) -> bool {
+        // A folder is not a file of an accepted type, so it is refused by
+        // default instead of being read as an empty payload.
+        if file.is_directory {
+            return zone.allows_directories;
+        }
+        file.matches_any(&zone.accepted_extensions)
     }
 
     fn zone_at(&self, point: Point) -> Option<Node> {
@@ -359,6 +484,9 @@ pub enum FileDropOutcome {
 pub struct FileDropZone {
     pub accepted_extensions: HashSet<String>,
     pub maximum_files: usize,
+    /// Accept a dropped folder. Off by default: a folder has no single payload,
+    /// so reading it would either fail or send something the user did not pick.
+    pub allows_directories: bool,
     pub is_enabled: bool,
     /// The live drag is over this zone. Provided by the owner so the zone can be
     /// painted by a binding the host already drives.
@@ -367,6 +495,7 @@ pub struct FileDropZone {
     pub outcome: Binding<FileDropOutcome>,
     on_drop: Rc<dyn Fn(Vec<DroppedFile>)>,
     on_targeted: Option<Rc<dyn Fn(bool)>>,
+    on_rejected: Option<Rc<dyn Fn(&[DroppedFile])>>,
     accepts: Option<Rc<dyn Fn(&[DroppedFile]) -> bool>>,
     content: AnyView,
 }
@@ -376,11 +505,13 @@ impl FileDropZone {
         Self {
             accepted_extensions: HashSet::new(),
             maximum_files: usize::MAX,
+            allows_directories: false,
             is_enabled: true,
             is_targeted: Binding::constant(false),
             outcome: Binding::constant(FileDropOutcome::Idle),
             on_drop: Rc::new(on_drop),
             on_targeted: None,
+            on_rejected: None,
             accepts: None,
             content: AnyView::new(content),
         }
@@ -400,6 +531,13 @@ impl FileDropZone {
 
     pub fn maximum_files(mut self, maximum_files: usize) -> Self {
         self.maximum_files = maximum_files.max(1);
+        self
+    }
+
+    /// Accept a dropped folder. The default refuses one; a caller that wants to
+    /// upload a folder's contents must opt in and expand it in its reader.
+    pub fn allows_directories(mut self, allows_directories: bool) -> Self {
+        self.allows_directories = allows_directories;
         self
     }
 
@@ -425,6 +563,15 @@ impl FileDropZone {
         self
     }
 
+    /// Called when a drop is refused, with the files that were refused.
+    ///
+    /// A refusal is a normal outcome, so it is reported separately from
+    /// `on_drop`; a caller that only wants the accepted payload can ignore it.
+    pub fn on_rejected(mut self, on_rejected: impl Fn(&[DroppedFile]) + 'static) -> Self {
+        self.on_rejected = Some(Rc::new(on_rejected));
+        self
+    }
+
     /// Narrows what the zone accepts beyond the extension list, e.g. a payload
     /// that is too large or a drag that arrived while the control was busy.
     pub fn accepts(mut self, accepts: impl Fn(&[DroppedFile]) -> bool + 'static) -> Self {
@@ -438,11 +585,13 @@ impl View for FileDropZone {
         AnyView::new(FileDropZoneHost {
             accepted_extensions: self.accepted_extensions.clone(),
             maximum_files: self.maximum_files,
+            allows_directories: self.allows_directories,
             is_enabled: self.is_enabled,
             is_targeted: self.is_targeted.clone(),
             outcome: self.outcome.clone(),
             on_drop: self.on_drop.clone(),
             on_targeted: self.on_targeted.clone(),
+            on_rejected: self.on_rejected.clone(),
             accepts: self.accepts.clone(),
             content: self.content.clone(),
         })
@@ -459,11 +608,13 @@ struct PaintIdentity {
 struct FileDropZoneHost {
     accepted_extensions: HashSet<String>,
     maximum_files: usize,
+    allows_directories: bool,
     is_enabled: bool,
     is_targeted: Binding<bool>,
     outcome: Binding<FileDropOutcome>,
     on_drop: Rc<dyn Fn(Vec<DroppedFile>)>,
     on_targeted: Option<Rc<dyn Fn(bool)>>,
+    on_rejected: Option<Rc<dyn Fn(&[DroppedFile])>>,
     accepts: Option<Rc<dyn Fn(&[DroppedFile]) -> bool>>,
     content: AnyView,
 }
@@ -489,9 +640,11 @@ impl PrimitiveView for FileDropZoneHost {
                     node,
                     self.accepted_extensions.clone(),
                     self.maximum_files,
+                    self.allows_directories,
                     self.is_enabled,
                     self.on_drop.clone(),
                     self.on_targeted.clone(),
+                    self.on_rejected.clone(),
                     self.accepts.clone(),
                 );
             } else {
@@ -603,9 +756,13 @@ impl FileDropPrompt {
     }
 
     /// The filter summary shown under the hint, e.g. `PNG, JPG · up to 4 files`.
+    ///
+    /// An empty extension list is reported as "Any file" rather than as an empty
+    /// string: silently omitting it would read as "no filter configured" when the
+    /// intent is "every type is allowed".
     pub fn detail_text(&self) -> Option<String> {
         let types = if self.accepted_extensions.is_empty() {
-            None
+            Some("Any file".to_owned())
         } else {
             Some(
                 self.accepted_extensions
@@ -735,5 +892,47 @@ mod tests {
             prompt.detail_text().as_deref(),
             Some("PNG, JPG · up to 4 files")
         );
+    }
+
+    #[test]
+    fn an_empty_filter_reads_as_any_file_not_as_nothing() {
+        let prompt = FileDropPrompt::new(|_| {});
+        assert_eq!(prompt.detail_text().as_deref(), Some("Any file"));
+    }
+
+    #[test]
+    fn a_hidden_file_has_no_extension() {
+        assert_eq!(DroppedFile::new("/tmp/.gitignore").extension(), None);
+        assert_eq!(DroppedFile::new("/tmp/.env").extension(), None);
+        assert_eq!(DroppedFile::new("/tmp/a.png").extension(), Some("png"));
+        assert_eq!(DroppedFile::new("/tmp/archive.").extension(), None);
+    }
+
+    #[test]
+    fn an_untitled_file_never_matches_a_type_filter() {
+        let png = HashSet::from(["png".to_owned()]);
+        assert!(!DroppedFile::new("/tmp/README").matches_any(&png));
+        assert!(!DroppedFile::new("/tmp/.gitignore").matches_any(&png));
+        // An empty filter accepts it, because the caller asked for any file.
+        assert!(DroppedFile::new("/tmp/README").matches_any(&HashSet::new()));
+    }
+
+    #[test]
+    fn a_directory_is_marked_by_inspection_not_by_name() {
+        let temp = tempfile::tempdir().expect("temp dir");
+        let folder = temp.path().join("assets");
+        std::fs::create_dir(&folder).expect("create dir");
+        assert!(DroppedFile::inspected(folder.to_string_lossy()).is_directory);
+
+        let file = temp.path().join("a.png");
+        std::fs::write(&file, b"12345").expect("write file");
+        let inspected = DroppedFile::inspected(file.to_string_lossy());
+        assert!(!inspected.is_directory);
+        assert_eq!(inspected.byte_size, Some(5));
+
+        // A path that does not exist is treated as a file of unknown size.
+        let missing = DroppedFile::inspected(temp.path().join("gone.png").to_string_lossy());
+        assert!(!missing.is_directory);
+        assert_eq!(missing.byte_size, None);
     }
 }

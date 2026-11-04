@@ -417,3 +417,171 @@ fn the_extension_filter_is_case_insensitive() {
     assert!(DroppedFile::new("/tmp/A.PNG").matches_any(&accepted));
     assert!(!DroppedFile::new("/tmp/A.PDF").matches_any(&accepted));
 }
+
+#[test]
+fn one_batch_of_three_files_arrives_as_one_drop() {
+    // The platform reports each path as its own step; the zone must see one
+    // delivery, or a per-zone file limit would only ever count to one.
+    let model = Rc::new(Model::default());
+    InteractiveScene::run(480.0, 320.0, |scene| {
+        with_registry(|registry| {
+            let model = model.clone();
+            scene.install(zone_batch_harness(model.clone(), 4));
+            let point = centre(&zone_node(scene));
+            let registry = registry.clone();
+
+            registry.begin(point);
+            for name in ["a.png", "b.png", "c.png"] {
+                registry.stage([DroppedFile::new(format!("/tmp/{name}"))], point);
+            }
+            assert_eq!(model.dropped.borrow().len(), 0, "nothing before complete");
+            assert!(registry.finish(point));
+
+            let dropped = model.dropped.borrow();
+            assert_eq!(dropped.len(), 1, "one delivery for the whole batch");
+            assert_eq!(dropped[0].len(), 3);
+            assert_eq!(dropped[0][2].name, "c.png");
+        });
+    });
+}
+
+#[test]
+fn a_batch_over_the_limit_is_refused_as_a_whole() {
+    let model = Rc::new(Model::default());
+    InteractiveScene::run(480.0, 320.0, |scene| {
+        with_registry(|registry| {
+            let model = model.clone();
+            scene.install(zone_batch_harness(model.clone(), 2));
+            let point = centre(&zone_node(scene));
+            let registry = registry.clone();
+
+            registry.begin(point);
+            for name in ["a.png", "b.png", "c.png"] {
+                registry.stage([DroppedFile::new(format!("/tmp/{name}"))], point);
+            }
+            assert!(!registry.finish(point), "three files exceed a limit of two");
+            assert!(model.dropped.borrow().is_empty());
+            assert!(!registry.has_staged(), "a refused batch is cleared");
+        });
+    });
+}
+
+#[test]
+fn a_batch_is_cleared_after_delivery() {
+    let model = Rc::new(Model::default());
+    InteractiveScene::run(480.0, 320.0, |scene| {
+        with_registry(|registry| {
+            let model = model.clone();
+            scene.install(zone_batch_harness(model.clone(), 4));
+            let point = centre(&zone_node(scene));
+            let registry = registry.clone();
+
+            registry.begin(point);
+            registry.stage([DroppedFile::new("/tmp/a.png")], point);
+            assert!(registry.finish(point));
+            assert!(!registry.has_staged());
+            // A second finish must not re-deliver the same files.
+            assert!(!registry.finish(point));
+            assert_eq!(model.dropped.borrow().len(), 1);
+        });
+    });
+}
+
+#[test]
+fn cancelling_a_batch_delivers_nothing() {
+    let model = Rc::new(Model::default());
+    InteractiveScene::run(480.0, 320.0, |scene| {
+        with_registry(|registry| {
+            let model = model.clone();
+            scene.install(zone_batch_harness(model.clone(), 4));
+            let point = centre(&zone_node(scene));
+            let registry = registry.clone();
+
+            registry.begin(point);
+            registry.stage([DroppedFile::new("/tmp/a.png")], point);
+            registry.cancel();
+            assert!(!registry.has_staged());
+            assert!(model.dropped.borrow().is_empty());
+        });
+    });
+}
+
+#[test]
+fn a_folder_is_refused_unless_the_zone_opts_in() {
+    let refused = Rc::new(Model::default());
+    InteractiveScene::run(480.0, 320.0, |scene| {
+        with_registry(|registry| {
+            let model = refused.clone();
+            scene.install(zone_batch_harness(model.clone(), 4));
+            let point = centre(&zone_node(scene));
+            let folder = DroppedFile::new("/tmp/assets").is_directory(true);
+            assert!(!registry.can_drop(&[folder.clone()], point));
+            assert!(!FileDropRegistry::drop(&registry, &[folder], point));
+            assert!(model.dropped.borrow().is_empty());
+        });
+    });
+
+    let accepted = Rc::new(Model::default());
+    InteractiveScene::run(480.0, 320.0, |scene| {
+        with_registry(|registry| {
+            let model = accepted.clone();
+            scene.install(zone_folder_harness(model.clone()));
+            let point = centre(&zone_node(scene));
+            let folder = DroppedFile::new("/tmp/assets").is_directory(true);
+            assert!(FileDropRegistry::drop(&registry, &[folder], point));
+            assert_eq!(model.dropped.borrow().len(), 1);
+        });
+    });
+}
+
+fn zone_batch_harness(model: Rc<Model>, maximum_files: usize) -> AnyView {
+    let dropped = model;
+    let zone = FileDropZone::new(
+        move |files| dropped.dropped.borrow_mut().push(files),
+        AnyView::new(Text::new("batch")).frame_size(200.0, 120.0),
+    )
+    .accepted_extensions(["png".to_owned()])
+    .maximum_files(maximum_files);
+    AnyView::new(AnyView::new(zone).frame_size(240.0, 160.0))
+}
+
+fn zone_folder_harness(model: Rc<Model>) -> AnyView {
+    let dropped = model;
+    let zone = FileDropZone::new(
+        move |files| dropped.dropped.borrow_mut().push(files),
+        AnyView::new(Text::new("folders")).frame_size(200.0, 120.0),
+    )
+    .allows_directories(true);
+    AnyView::new(AnyView::new(zone).frame_size(240.0, 160.0))
+}
+
+#[test]
+fn a_refused_batch_is_reported_separately_from_a_drop() {
+    let dropped = Rc::new(RefCell::new(0usize));
+    let refused = Rc::new(RefCell::new(0usize));
+    InteractiveScene::run(480.0, 320.0, |scene| {
+        with_registry(|registry| {
+            let accepted_count = dropped.clone();
+            let refused_count = refused.clone();
+            let dropped = accepted_count.clone();
+            let refused = refused_count.clone();
+            let zone = FileDropZone::new(
+                move |_| *dropped.borrow_mut() += 1,
+                AnyView::new(Text::new("limited")).frame_size(200.0, 120.0),
+            )
+            .maximum_files(2)
+            .on_rejected(move |files| *refused.borrow_mut() += files.len());
+            scene.install(AnyView::new(AnyView::new(zone).frame_size(240.0, 160.0)));
+            let point = centre(&zone_node(scene));
+            let registry = registry.clone();
+
+            registry.begin(point);
+            for name in ["a.png", "b.png", "c.png"] {
+                registry.stage([DroppedFile::new(format!("/tmp/{name}"))], point);
+            }
+            assert!(!registry.finish(point));
+            assert_eq!(*accepted_count.borrow(), 0, "no accepted drop");
+            assert_eq!(*refused_count.borrow(), 3, "every refused file is reported");
+        });
+    });
+}

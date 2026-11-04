@@ -545,8 +545,10 @@ impl Application {
 
     /// Delivers a platform drag to the file drop zones of the current window.
     ///
-    /// The registry owns node hit testing; the host only translates one platform
-    /// event into one registry call, so a zone never talks to the shell.
+    /// A drag is a batch, not one event: the platform reports each dropped path
+    /// as its own step between `Begin` and `Complete`. The registry accumulates
+    /// them and delivers once, so a zone's `maximum_files` sees the whole drag
+    /// instead of one file at a time.
     fn route_external_drop(state: &Rc<ApplicationState>, event: &cove_platform::InputEvent) {
         let cove_platform::InputEvent::ExternalDrop(drop) = event else {
             return;
@@ -556,18 +558,30 @@ impl Application {
         };
         let point = cove_core::Point::new(drop.x, drop.y);
         match drop.phase {
+            cove_platform::DropPhase::Begin => {
+                registry.begin(point);
+            }
             cove_platform::DropPhase::Position => {
                 registry.update_position(point);
             }
             cove_platform::DropPhase::File => {
-                let files: Vec<DroppedFile> = drop.paths.iter().map(DroppedFile::new).collect();
-                FileDropRegistry::drop(registry.as_ref(), &files, point);
+                // Inspected, not merely parsed: a folder and a file of the same
+                // name take different paths, and only the filesystem knows which
+                // this is.
+                let files: Vec<DroppedFile> =
+                    drop.paths.iter().map(DroppedFile::inspected).collect();
+                registry.stage(files, point);
             }
+            cove_platform::DropPhase::Text => {}
             cove_platform::DropPhase::Complete => {
-                registry
-                    .update_position(cove_core::Point::new(f32::NEG_INFINITY, f32::NEG_INFINITY));
+                // A platform that sends `File` with no `Begin` still has a
+                // batch to deliver: `stage` opened it implicitly.
+                registry.finish(point);
+                registry.update_position(cove_core::Point::new(
+                    f32::NEG_INFINITY,
+                    f32::NEG_INFINITY,
+                ));
             }
-            cove_platform::DropPhase::Begin | cove_platform::DropPhase::Text => {}
         }
         let _ = state;
     }

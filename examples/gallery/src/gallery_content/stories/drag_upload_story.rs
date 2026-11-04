@@ -17,6 +17,7 @@ use cove_core::scene::{Align, FlexDirection, Justify, Wrap};
 use cove_ui_compose::primitives::interaction::DroppedFile;
 use cove_ui_compose::primitives::interaction::file_drop::format_bytes;
 use cove_ui_compose::primitives::text::Text;
+use cove_ui_compose::primitives::upload::content_type_for;
 use cove_ui_compose::primitives::upload::multipart::UploadFilePart;
 use cove_ui_compose::primitives::upload::{
     DragUpload, UploadError, UploadRequest, UploadResponse, UploadState, UploadTransport,
@@ -59,6 +60,9 @@ impl UploadTransport for SampleTransport {
 /// `DragUploadStory`: the drop zone, its upload and the accepted filter.
 pub struct DragUploadStory {
     state: State<Option<UploadState>>,
+    /// Files the limit refused, counted so a refusal is observable instead of
+    /// looking like nothing happened.
+    rejected: State<u32>,
     options: GalleryOptions,
 }
 
@@ -66,6 +70,7 @@ impl DragUploadStory {
     pub fn new(options: GalleryOptions) -> Self {
         Self {
             state: State::new(None),
+            rejected: State::new(0),
             options,
         }
     }
@@ -73,6 +78,11 @@ impl DragUploadStory {
     /// The last finished upload, so a test can assert what the zone reported.
     pub fn last_state(&self) -> Option<UploadState> {
         self.state.get()
+    }
+
+    /// How many files the per-zone limit has refused.
+    pub fn rejected_count(&self) -> u32 {
+        self.rejected.get()
     }
 
     /// The extensions this page's zone accepts.
@@ -90,18 +100,14 @@ impl DragUploadStory {
     /// is readable and otherwise describes the file from its name alone, so a
     /// demo never fails because a sample file is absent.
     fn part(file: &DroppedFile) -> Result<UploadFilePart, String> {
+        if file.is_directory {
+            return Err(format!("{} is a folder, not a file", file.name));
+        }
         let bytes = std::fs::read(&file.path).unwrap_or_default();
-        let content_type = match file.kind.as_str() {
-            "png" => "image/png",
-            "jpg" | "jpeg" => "image/jpeg",
-            "webp" => "image/webp",
-            "gif" => "image/gif",
-            _ => "application/octet-stream",
-        };
         Ok(UploadFilePart::new(
             "file",
             file.name.clone(),
-            content_type,
+            content_type_for(&file.name),
             bytes,
         ))
     }
@@ -124,7 +130,11 @@ impl View for DragUploadStory {
             .maximum_files(4)
             .is_enabled(options.is_enabled)
             .reader(Self::part)
-            .on_finished(move |state| reported.set(Some(state.clone())));
+            .on_finished(move |state| reported.set(Some(state.clone())))
+            .on_rejected({
+                let rejected = self.rejected.clone();
+                move |files| rejected.set(rejected.get() + files.len() as u32)
+            });
 
         let last = self
             .state
@@ -139,6 +149,27 @@ impl View for DragUploadStory {
             DragUpload::new(request)
                 .accepted_extensions(vec!["txt".to_owned()])
                 .maximum_files(1)
+                .reader(Self::part)
+        };
+
+        // No filter at all: every type is accepted, archives included. This is
+        // the shape a caller uses when the server decides what it wants.
+        let everything = {
+            let request = UploadRequest::new("memory://gallery/any", Vec::new());
+            DragUpload::new(request)
+                .maximum_files(8)
+                .reader(Self::part)
+        };
+        let archives = {
+            let request = UploadRequest::new("memory://gallery/archive", Vec::new());
+            DragUpload::new(request)
+                .accepted_extensions(vec![
+                    "zip".to_owned(),
+                    "tar".to_owned(),
+                    "gz".to_owned(),
+                    "7z".to_owned(),
+                ])
+                .maximum_files(2)
                 .reader(Self::part)
         };
 
@@ -172,12 +203,46 @@ impl View for DragUploadStory {
                             AnyView::new(upload.debug_name("drag-upload")),
                             AnyView::new(filtered),
                             AnyView::new(Text::new(format!("Last upload: {last}"))),
+                            AnyView::new(Text::new(format!(
+                                "Refused by limit: {}",
+                                self.rejected.get()
+                            ))),
                         ])),
                     )),
                 )),
                 AnyView::new(StorySection::new(
+                    "Any type",
+                    "An empty filter accepts every file, archives and unknown formats included. Type is derived from the name: an archive is sent as application/zip, its contents are never unpacked.",
+                    AnyView::new(
+                        BoxView::new(
+                            FlexDirection::Column,
+                            Align::Stretch,
+                            Justify::FlexStart,
+                            Wrap::NoWrap,
+                            12.0,
+                            AnyView::new(everything.debug_name("drag-upload-any")),
+                        )
+                        .semantic_background(SemanticColorRef::background()),
+                    ),
+                )),
+                AnyView::new(StorySection::new(
+                    "Archives",
+                    "A filter restricted to archive formats. The archive is uploaded as one file: unpacking is the receiving service's decision, not the drop zone's.",
+                    AnyView::new(
+                        BoxView::new(
+                            FlexDirection::Column,
+                            Align::Stretch,
+                            Justify::FlexStart,
+                            Wrap::NoWrap,
+                            12.0,
+                            AnyView::new(archives.debug_name("drag-upload-archive")),
+                        )
+                        .semantic_background(SemanticColorRef::background()),
+                    ),
+                )),
+                AnyView::new(StorySection::new(
                     "Narrow filter",
-                    "The same control limited to one text file. A drop of any other type is refused before any bytes move, and the zone stays usable.",
+                    "The same control limited to one text file. A drop of any other type, and any folder, is refused before any bytes move, and the zone stays usable.",
                     AnyView::new(
                         BoxView::new(
                             FlexDirection::Column,

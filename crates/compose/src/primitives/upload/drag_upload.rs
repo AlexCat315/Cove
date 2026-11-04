@@ -37,6 +37,7 @@ pub struct DragUpload {
     is_enabled: bool,
     reader: Option<FileReader>,
     on_finished: Option<Rc<dyn Fn(&UploadState)>>,
+    on_rejected: Option<Rc<dyn Fn(&[DroppedFile])>>,
     boundary: String,
     /// Owned here, not in `body`: a `State` created during composition is
     /// recreated on every pass and the upload would report progress into a
@@ -55,6 +56,7 @@ impl DragUpload {
             is_enabled: true,
             reader: None,
             on_finished: None,
+            on_rejected: None,
             // Fixed per instance so a retry frames the body identically.
             boundary: "cove-upload-boundary".into(),
             state: State::new(UploadState::Idle),
@@ -104,6 +106,13 @@ impl DragUpload {
     /// Runs once per finished upload, on the UI thread.
     pub fn on_finished(mut self, on_finished: impl Fn(&UploadState) + 'static) -> Self {
         self.on_finished = Some(Rc::new(on_finished));
+        self
+    }
+
+    /// Runs when a drop is refused by the type filter, the file limit or a
+    /// folder, with the files that were refused.
+    pub fn on_rejected(mut self, on_rejected: impl Fn(&[DroppedFile]) + 'static) -> Self {
+        self.on_rejected = Some(Rc::new(on_rejected));
         self
     }
 
@@ -173,6 +182,14 @@ impl View for DragUpload {
             hover.set(is_targeted);
             if !is_targeted {
                 verdict.set(FileDropOutcome::Idle);
+            }
+        })
+        .on_rejected({
+            let on_rejected = self.on_rejected.clone();
+            move |files: &[DroppedFile]| {
+                if let Some(on_rejected) = on_rejected.as_ref() {
+                    on_rejected(files);
+                }
             }
         })
         .accepts(move |files: &[DroppedFile]| {
