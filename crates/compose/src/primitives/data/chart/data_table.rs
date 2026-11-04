@@ -372,8 +372,6 @@ impl View for ChartDataTableCell {
         } else {
             TextAlignment::Trailing
         };
-        let grow = if self.column.is_none() { 0.0 } else { 1.0 };
-        let _ = grow;
         let text = AnyView::new(
             AnyView::new(
                 Text::new(self.text.clone())
@@ -390,11 +388,8 @@ impl View for ChartDataTableCell {
                         SemanticColorRef::on_surface_variant()
                     }),
             )
-            .flex_with(
-                if self.column.is_none() { 1.2 } else { 1.0 },
-                1.0,
-                Some(0.0),
-            ),
+            // Content-sized first, then the label column takes the extra share.
+            .flex_with(if self.column.is_none() { 1.2 } else { 1.0 }, 1.0, None),
         );
 
         if self.is_header {

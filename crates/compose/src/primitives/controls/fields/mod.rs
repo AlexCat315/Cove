@@ -8,8 +8,8 @@ pub mod slider;
 
 pub use date_picker::{DatePicker, DatePickerOptions, DatePickerPresentation};
 pub use numeric::{
-    NumberField, NumberFieldPrefix, NumericPrefixFieldStyle, NumericScrub, NumericScrubHandle,
-    NumericTextFormat,
+    NumberField, NumberFieldOptions, NumberFieldPrefix, NumericPrefixFieldStyle, NumericScrub,
+    NumericScrubHandle, NumericTextFormat,
 };
 pub use radio_group::{RadioGroup, RadioOption};
 pub use range_slider::{RangeSlider, RangeThumb, RangeValue};

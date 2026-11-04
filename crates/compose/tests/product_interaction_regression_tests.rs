@@ -393,10 +393,16 @@ fn hover_card_cancels_pending_work_and_survives_the_gap() {
             "a leave shorter than the close delay keeps the card"
         );
 
-        let card_hover = scene.first(|node| node.attachment::<bool>("hoverCard.content") == Some(true)).expect("card content hover host");
+        let card_hover = scene
+            .first(|node| node.attachment::<bool>("hoverCard.content") == Some(true))
+            .expect("card content hover host");
         scene.registry.handlers(&card_hover).hover.unwrap()(HoverPhase::Enter);
         AnimatorScheduler::current().tick(1.0);
-        assert_eq!(scene.portal.entries().len(), 1, "card hover holds presentation");
+        assert_eq!(
+            scene.portal.entries().len(),
+            1,
+            "card hover holds presentation"
+        );
 
         let dismiss = scene
             .registry

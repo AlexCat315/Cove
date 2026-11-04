@@ -14,12 +14,12 @@ use std::rc::Rc;
 use cove_core::scene::{Align, FlexDirection, Justify, Wrap};
 use cove_ui_compose::modifiers::layout::LayoutFrameExt;
 use cove_ui_compose::modifiers::style::SemanticStyleViewExt;
-use cove_ui_compose::primitives::controls::Button;
+use cove_ui_compose::primitives::controls::{Button, Checkbox};
 use cove_ui_compose::primitives::data::chart::{
-    Chart, ChartAnnotation, ChartBand, ChartConfiguration, ChartContent, ChartDataTable,
-    ChartDatum, ChartGuides, ChartHistogram, ChartLegendPlacementState, ChartMark,
-    ChartOrientation, ChartPlot, ChartPoint, ChartScaleKind, ChartSeries, ChartSeriesStyle,
-    ChartSlice, ChartStacking, ChartStyle, ChartThreshold, ChartValueAxis, ChartXDomain, PieCenter,
+    Chart, ChartAnnotation, ChartBand, ChartConfiguration, ChartDataTable, ChartDatum, ChartGuides,
+    ChartHistogram, ChartLegendPlacementState, ChartMark, ChartOrientation, ChartPoint, ChartRange,
+    ChartScaleKind, ChartSeries, ChartSeriesStyle, ChartSlice, ChartStacking, ChartStyle,
+    ChartThreshold, ChartValueAxis, ChartXDomain, PieCenter,
 };
 use cove_ui_compose::primitives::data::data_table::table_column::{
     ColumnVisibility, ComparisonResult, TableColumn, TableColumnLayout,
@@ -40,14 +40,24 @@ pub const CHART_FOCUS_RANGE: (f32, f32) = (20.0, 40.0);
 pub const CHART_VALUE_DOMAIN: (f32, f32) = (0.0, 45.0);
 
 /// `ChartExplorationStory`: a signal you can zoom, brush and re-seed.
-#[derive(Clone, Default)]
+#[derive(Clone)]
 pub struct ChartExplorationStory {
     /// Zoomed viewport, or `None` for the full domain.
-    viewport: Rc<Cell<Option<(f32, f32)>>>,
+    viewport: State<Option<ChartRange>>,
     /// Brushed selection, or `None`.
-    selection: Rc<Cell<Option<(f32, f32)>>>,
+    selection: State<Option<ChartRange>>,
     /// Seeds the signal phase so "Update data" visibly changes the curve.
     revision: Rc<Cell<u32>>,
+}
+
+impl Default for ChartExplorationStory {
+    fn default() -> Self {
+        Self {
+            viewport: State::new(None),
+            selection: State::new(None),
+            revision: Rc::new(Cell::new(0)),
+        }
+    }
 }
 
 impl ChartExplorationStory {
@@ -55,11 +65,11 @@ impl ChartExplorationStory {
         Self::default()
     }
 
-    pub fn viewport(&self) -> Option<(f32, f32)> {
+    pub fn viewport(&self) -> Option<ChartRange> {
         self.viewport.get()
     }
 
-    pub fn selection(&self) -> Option<(f32, f32)> {
+    pub fn selection(&self) -> Option<ChartRange> {
         self.selection.get()
     }
 
@@ -69,7 +79,10 @@ impl ChartExplorationStory {
 
     /// Focuses the interesting part of the signal.
     pub fn focus(&self) {
-        self.viewport.set(Some(CHART_FOCUS_RANGE));
+        self.viewport.set(Some(ChartRange::new(
+            CHART_FOCUS_RANGE.0,
+            CHART_FOCUS_RANGE.1,
+        )));
     }
 
     /// Restores the full domain and clears the brush.
@@ -83,7 +96,7 @@ impl ChartExplorationStory {
         self.revision.set(self.revision.get().wrapping_add(1));
     }
 
-    pub fn set_selection(&self, selection: Option<(f32, f32)>) {
+    pub fn set_selection(&self, selection: Option<ChartRange>) {
         self.selection.set(selection);
     }
 
@@ -105,7 +118,47 @@ impl ChartExplorationStory {
     pub fn brushed_caption(&self) -> Option<String> {
         self.selection
             .get()
-            .map(|(lower, upper)| format!("Selected {lower:.1}–{upper:.1}"))
+            .map(|range| format!("Selected {:.1}–{:.1}", range.lower, range.upper))
+    }
+
+    /// The chart the section shows: an area signal on a fixed value domain, with
+    /// the viewport, brush and data-change animation wired to this story's state.
+    fn chart(&self) -> Chart {
+        let series = vec![ChartSeries::points(
+            self.samples(),
+            SemanticColorRef::accent(),
+            ChartMark::Area,
+            "Signal",
+            ChartValueAxis::Left,
+            ChartSeriesStyle {
+                line_width: Some(2.0),
+                ..ChartSeriesStyle::default()
+            },
+        )];
+        let mut configuration = ChartConfiguration::default();
+        configuration.label = "Explore signal".to_string();
+        configuration.viewport.range = Some(self.viewport.binding());
+        configuration.selection.range = Some(self.selection.binding());
+        configuration.animation = Some(cove_core::scene::Animation::ease_in_out(0.45));
+        Chart::new(
+            series,
+            ChartXDomain::Numeric,
+            ChartGuides::default(),
+            ChartStyle::new(
+                Some(CHART_VALUE_DOMAIN.0),
+                Some(CHART_VALUE_DOMAIN.1),
+                true,
+                2.0,
+                2.0,
+                4.0,
+                None,
+                SemanticColorRef::divider(),
+                ChartStacking::None,
+                0.6,
+                ChartOrientation::Vertical,
+            ),
+            configuration,
+        )
     }
 }
 
@@ -135,38 +188,13 @@ impl View for ChartExplorationStory {
             ])),
         ));
 
-        let mut plot = ChartPlot::new(ChartContent::Cartesian {
-            series: vec![ChartSeries::values(
-                self.samples().into_iter().map(|datum| datum.y).collect(),
-                SemanticColorRef::accent(),
-                ChartMark::Area,
-                "Signal",
-                ChartValueAxis::Left,
-                ChartSeriesStyle {
-                    line_width: Some(2.0),
-                    ..ChartSeriesStyle::default()
-                },
-            )],
-            guides: ChartGuides::default(),
-            x: ChartXDomain::Numeric,
-        });
-        plot.style = ChartStyle::new(
-            Some(CHART_VALUE_DOMAIN.0),
-            Some(CHART_VALUE_DOMAIN.1),
-            false,
-            2.0,
-            2.0,
-            2.0,
-            None,
-            SemanticColorRef::divider(),
-            ChartStacking::None,
-            0.6,
-            ChartOrientation::Vertical,
-        );
-
         let mut stack = vec![
             controls,
-            AnyView::new(AnyView::new(plot.frame_height(200.0)).debug_name("chart-exploration")),
+            AnyView::new(
+                AnyView::new(self.chart())
+                    .frame_height(200.0)
+                    .debug_name("chart-exploration"),
+            ),
         ];
         if let Some(caption) = self.brushed_caption() {
             stack.push(AnyView::new(
@@ -194,7 +222,9 @@ impl View for ChartExplorationStory {
 #[derive(Clone)]
 pub struct ChartStory {
     stacked: State<bool>,
+    percent: State<bool>,
     selection: State<Option<ChartPoint>>,
+    hidden: State<std::collections::HashSet<String>>,
     exploration: ChartExplorationStory,
 }
 
@@ -227,6 +257,20 @@ const CHART_DURATIONS: [f32; 26] = [
     42.0, 55.0, 61.0, 63.0, 68.0, 70.0, 72.0, 74.0, 75.0, 77.0, 78.0, 79.0, 80.0, 81.0, 82.0, 84.0,
     85.0, 86.0, 88.0, 90.0, 92.0, 95.0, 98.0, 104.0, 112.0, 118.0,
 ];
+const CHART_ONLINE: [f32; 6] = [14.0, 18.0, 12.0, 22.0, 19.0, 25.0];
+const CHART_RETAIL: [f32; 6] = [9.0, 7.0, 11.0, 8.0, 12.0, 10.0];
+const CHART_LOSSES: [f32; 6] = [-7.0, -12.0, -5.0, -8.0, -9.0, -6.0];
+
+/// Two thousand samples across a narrow plot: the line keeps its envelope while
+/// the stroke only covers what the pixels can resolve.
+fn chart_signal() -> Vec<f32> {
+    (0..2_000)
+        .map(|index| {
+            let t = index as f32 / 2_000.0;
+            (t * 60.0).sin() * 12.0 + (t * 7.0).sin() * 6.0 + 20.0
+        })
+        .collect()
+}
 
 impl Default for ChartStory {
     fn default() -> Self {
@@ -238,7 +282,9 @@ impl ChartStory {
     pub fn new() -> Self {
         Self {
             stacked: State::new(false),
+            percent: State::new(false),
             selection: State::new(None),
+            hidden: State::new(std::collections::HashSet::new()),
             exploration: ChartExplorationStory::new(),
         }
     }
@@ -247,16 +293,22 @@ impl ChartStory {
         self.stacked.get()
     }
 
-    pub fn toggle_stacked(&self) {
-        self.stacked.update(|value| *value = !*value);
-    }
-
     pub fn selection(&self) -> Option<ChartPoint> {
         self.selection.get()
     }
 
     fn months() -> ChartXDomain {
         ChartXDomain::Categorical(CHART_MONTHS.iter().map(|month| month.to_string()).collect())
+    }
+
+    /// The first six month labels, for the six-point datasets.
+    fn months_six() -> ChartXDomain {
+        ChartXDomain::Categorical(
+            CHART_MONTHS[..6]
+                .iter()
+                .map(|month| month.to_string())
+                .collect(),
+        )
     }
 
     fn base_style(stacking: ChartStacking) -> ChartStyle {
@@ -276,21 +328,22 @@ impl ChartStory {
     }
 
     fn section(title: &'static str, detail: &'static str, body: AnyView) -> AnyView {
-        AnyView::new(
-            StorySection::new(title, detail, body).debug_name(match title {
-                "Trend" => "chart-trend",
-                "Grouped and stacked bars" => "chart-bars",
-                "Below the baseline" => "chart-baseline",
-                "Dual axis" => "chart-dual-axis",
-                "Log axis" => "chart-log",
-                "Histogram" => "chart-histogram",
-                "Scatter" => "chart-scatter",
-                "Donut" => "chart-donut",
-                "Sparkline" => "chart-sparkline",
-                "Horizontal bars" => "chart-horizontal",
-                _ => "chart-data-table",
-            }),
-        )
+        let name = match title {
+            "Trend" => "chart-trend",
+            "Grouped and stacked bars" => "chart-bars",
+            "Below the baseline" => "chart-stacking",
+            "Dual axis" => "chart-dual-axis",
+            "Log axis" => "chart-log-axis",
+            "Histogram" => "chart-histogram",
+            "Large series" => "chart-large-series",
+            "Scatter" => "chart-scatter",
+            "Donut" => "chart-donut",
+            "Sparkline" => "chart-sparkline",
+            "Horizontal bars" => "chart-horizontal-bars",
+            "Data table" => "chart-data-table",
+            other => panic!("no chart section named {other}"),
+        };
+        AnyView::new(StorySection::new(title, detail, body).debug_name(name))
     }
 
     fn trend(&self) -> AnyView {
@@ -304,14 +357,17 @@ impl ChartStory {
         guides.bands.push(band);
         guides
             .annotations
-            .push(ChartAnnotation::new("Launch", 1, 3));
+            .push(ChartAnnotation::new("Launch", 0, 3));
 
         let mut configuration = ChartConfiguration::default();
         configuration.label = "Monthly revenue and signups".to_string();
         configuration.legend.placement = ChartLegendPlacementState::bottom();
         configuration.axis.y.title = "Revenue".to_string();
-        configuration.axis.x.title = "Month".to_string();
         configuration.selection.point = Some(self.selection.binding());
+        configuration.legend.hidden_series = Some(self.hidden.binding());
+        configuration.data_labels.format = Some(std::sync::Arc::new(|value: f32| {
+            format!("{}", value.round() as i64)
+        }));
 
         let series = vec![
             ChartSeries::values(
@@ -338,10 +394,35 @@ impl ChartStory {
             Self::base_style(ChartStacking::None),
             configuration,
         );
+        // What the pointer is over reads back in words, so a keyboard or a
+        // screenshot tells the same story the callout does.
+        let readout = match self.selection.get() {
+            Some(point) => {
+                let series = if point.series == 0 {
+                    "Revenue"
+                } else {
+                    "Signups"
+                };
+                let month = CHART_MONTHS.get(point.index).copied().unwrap_or("?");
+                format!("Selected: {series} · {month}")
+            }
+            None => "Nothing selected".to_string(),
+        };
         Self::section(
             "Trend",
-            "Area and line marks with a target, a shaded corridor and a pinned note.",
-            AnyView::new(AnyView::new(chart).frame_height(200.0)),
+            "Area and line marks with a labelled target, a shaded corridor and \
+             a pinned note. The value axis fits the data to round ticks, so \
+             grid lines and labels agree. Hover or drag to inspect a value.",
+            AnyView::new(TupleView::new(vec![
+                AnyView::new(AnyView::new(chart).frame_height(200.0)),
+                AnyView::new(
+                    AnyView::new(
+                        Text::new(readout)
+                            .semantic_font(cove_ui_compose::theme::SemanticFontRef::caption()),
+                    )
+                    .debug_name("chart-trend-selection"),
+                ),
+            ])),
         )
     }
 
@@ -351,29 +432,27 @@ impl ChartStory {
         } else {
             ChartStacking::None
         };
-        let toggle = Button::title(if self.stacked.get() { "Group" } else { "Stack" }, {
-            let this = self.clone();
-            move || this.toggle_stacked()
-        })
-        .debug_name("chart-bars-toggle");
+        let stacked = self.stacked.binding();
+        let toggle = Checkbox::labeled_from_boolean("Stacked", stacked).debug_name("chart-stacked");
 
         let mut configuration = ChartConfiguration::default();
-        configuration.label = "Revenue and signups by month".to_string();
+        configuration.label = "Sales by channel".to_string();
         configuration.legend.placement = ChartLegendPlacementState::bottom();
+        configuration.selection.point = Some(self.selection.binding());
         let series = vec![
             ChartSeries::values(
-                CHART_REVENUE.to_vec(),
+                CHART_ONLINE.to_vec(),
                 SemanticColorRef::accent(),
                 ChartMark::Bar,
-                "Revenue",
+                "Online",
                 ChartValueAxis::Left,
                 ChartSeriesStyle::default(),
             ),
             ChartSeries::values(
-                CHART_SIGNUPS.to_vec(),
-                SemanticColorRef::accent_secondary(),
+                CHART_RETAIL.to_vec(),
+                SemanticColorRef::warning(),
                 ChartMark::Bar,
-                "Signups",
+                "Retail",
                 ChartValueAxis::Left,
                 ChartSeriesStyle::default(),
             ),
@@ -387,42 +466,68 @@ impl ChartStory {
         );
         Self::section(
             "Grouped and stacked bars",
-            "Bars pair per month until the toggle stacks them.",
+            "Bar series sit side by side per category, or accumulate when \
+             stacked. Category labels drop out on their own when the columns \
+             get narrow.",
             AnyView::new(TupleView::new(vec![
                 AnyView::new(toggle),
-                AnyView::new(AnyView::new(chart).frame_height(200.0)),
+                AnyView::new(AnyView::new(chart).frame_height(180.0)),
             ])),
         )
     }
 
     fn baseline(&self) -> AnyView {
+        let stacking = if self.percent.get() {
+            ChartStacking::Percent
+        } else {
+            ChartStacking::Stacked
+        };
+        let percent = self.percent.binding();
+        let toggle = Checkbox::labeled_from_boolean("Percent", percent).debug_name("chart-percent");
+
         let mut configuration = ChartConfiguration::default();
-        configuration.label = "Weekly change".to_string();
-        configuration.legend.placement = ChartLegendPlacementState::hidden();
-        let series = vec![ChartSeries::values(
-            CHART_GAINS.to_vec(),
-            SemanticColorRef::success(),
-            ChartMark::Bar,
-            "Change",
-            ChartValueAxis::Left,
-            ChartSeriesStyle::default(),
-        )];
+        configuration.label = "Monthly gain and loss".to_string();
+        configuration.legend.placement = ChartLegendPlacementState::bottom();
+        configuration.selection.point = Some(self.selection.binding());
+        configuration.axis.y.title = if self.percent.get() {
+            "Share".to_string()
+        } else {
+            "Amount".to_string()
+        };
+        let series = vec![
+            ChartSeries::values(
+                CHART_GAINS.to_vec(),
+                SemanticColorRef::success(),
+                ChartMark::Bar,
+                "Gain",
+                ChartValueAxis::Left,
+                ChartSeriesStyle::default(),
+            ),
+            ChartSeries::values(
+                CHART_LOSSES.to_vec(),
+                SemanticColorRef::error(),
+                ChartMark::Bar,
+                "Loss",
+                ChartValueAxis::Left,
+                ChartSeriesStyle::default(),
+            ),
+        ];
         let chart = Chart::new(
             series,
-            ChartXDomain::Categorical(
-                ["W1", "W2", "W3", "W4", "W5", "W6"]
-                    .iter()
-                    .map(|week| week.to_string())
-                    .collect(),
-            ),
+            Self::months(),
             ChartGuides::default(),
-            Self::base_style(ChartStacking::None),
+            Self::base_style(stacking),
             configuration,
         );
         Self::section(
             "Below the baseline",
-            "Negatives fall from zero instead of being clipped.",
-            AnyView::new(AnyView::new(chart).frame_height(180.0)),
+            "Values under zero stack downward instead of cancelling the surplus \
+             above them, so one column carries both a gain and a loss. Percent \
+             mode scales every column to 100, and the axis reads as shares.",
+            AnyView::new(TupleView::new(vec![
+                AnyView::new(toggle),
+                AnyView::new(AnyView::new(chart).frame_height(180.0)),
+            ])),
         )
     }
 
@@ -430,50 +535,53 @@ impl ChartStory {
         let mut configuration = ChartConfiguration::default();
         configuration.label = "Latency and error rate".to_string();
         configuration.legend.placement = ChartLegendPlacementState::bottom();
-        configuration.axis.y.title = "Latency (ms)".to_string();
-        configuration.axis.secondary.title = "Error rate %".to_string();
+        configuration.axis.y.title = "Sessions".to_string();
+        configuration.axis.secondary.title = "Error %".to_string();
+        configuration.axis.secondary.format =
+            Some(std::sync::Arc::new(|value: f32| format!("{value:.1}")));
         let series = vec![
             ChartSeries::values(
-                CHART_LATENCY.to_vec(),
+                CHART_ONLINE.to_vec(),
                 SemanticColorRef::accent(),
-                ChartMark::Area,
-                "Latency",
+                ChartMark::Bar,
+                "Sessions",
                 ChartValueAxis::Left,
                 ChartSeriesStyle::default(),
             ),
             ChartSeries::values(
-                CHART_ERRORS.to_vec(),
+                CHART_ERRORS[..6].to_vec(),
                 SemanticColorRef::error(),
                 ChartMark::Line,
-                "Errors",
+                "Error rate",
                 ChartValueAxis::Right,
                 ChartSeriesStyle::default(),
             ),
         ];
         let chart = Chart::new(
             series,
-            ChartXDomain::Numeric,
+            Self::months_six(),
             ChartGuides::default(),
             Self::base_style(ChartStacking::None),
             configuration,
         );
         Self::section(
             "Dual axis",
-            "Latency on the left, error rate on the right.",
-            AnyView::new(AnyView::new(chart).frame_height(200.0)),
+            "A series can read the right-hand axis, which fits only its own              data: a count and a rate share one plot without flattening each              other. Grid lines follow the left axis.",
+            AnyView::new(AnyView::new(chart).frame_height(180.0)),
         )
     }
 
     fn log_axis(&self) -> AnyView {
         let mut configuration = ChartConfiguration::default();
-        configuration.label = "Visits by month".to_string();
-        configuration.legend.placement = ChartLegendPlacementState::hidden();
+        configuration.label = "Visits on a log axis".to_string();
+        configuration.legend.placement = ChartLegendPlacementState::bottom();
         configuration.axis.y.kind = ChartScaleKind::Log;
         configuration.axis.y.title = "Visits".to_string();
+        configuration.selection.point = Some(self.selection.binding());
         let series = vec![ChartSeries::values(
             CHART_VISITS.to_vec(),
-            SemanticColorRef::warning(),
-            ChartMark::Bar,
+            SemanticColorRef::accent_secondary(),
+            ChartMark::Line,
             "Visits",
             ChartValueAxis::Left,
             ChartSeriesStyle::default(),
@@ -487,31 +595,72 @@ impl ChartStory {
         );
         Self::section(
             "Log axis",
-            "Even spacing per power of ten; ticks land on 1, 2 and 5.",
-            AnyView::new(AnyView::new(chart).frame_height(200.0)),
+            "When values span orders of magnitude a log axis spaces them by \
+             power of ten. Ticks land on 1, 2 and 5 x 10^n, so a small early \
+             value still reads next to a large late one.",
+            AnyView::new(AnyView::new(chart).frame_height(180.0)),
         )
     }
 
     fn histogram(&self) -> AnyView {
-        let result = ChartHistogram::new(10, None).build(
+        let result = ChartHistogram::new(8, Some(ChartRange::new(40.0, 120.0))).build(
             &CHART_DURATIONS,
             SemanticColorRef::accent_secondary(),
-            "Duration",
+            "Requests",
         );
         let mut configuration = ChartConfiguration::default();
-        configuration.label = "Session duration".to_string();
+        configuration.label = "Latency distribution".to_string();
         configuration.legend.placement = ChartLegendPlacementState::hidden();
+        configuration.axis.y.title = "Requests".to_string();
+        configuration.axis.x.title = "Latency (ms)".to_string();
+        // Binning is a data step, so the chart only draws bars: no grid, and
+        // bars touch with no spacing.
+        let mut style = Self::base_style(ChartStacking::None);
+        style.shows_grid = false;
+        style.bar_spacing = 0.0;
         let chart = Chart::new(
             vec![result.series],
             ChartXDomain::Categorical(result.labels),
+            ChartGuides::default(),
+            style,
+            configuration,
+        );
+        Self::section(
+            "Histogram",
+            "Binning is a data step, so the chart only draws bars: \
+             ChartHistogram counts the samples and labels each bin's edges. \
+             Bars touch with no bar spacing.",
+            AnyView::new(AnyView::new(chart).frame_height(160.0)),
+        )
+    }
+
+    fn large_series(&self) -> AnyView {
+        let mut configuration = ChartConfiguration::default();
+        configuration.label = "A two-thousand-sample signal".to_string();
+        configuration.legend.placement = ChartLegendPlacementState::hidden();
+        configuration.axis.y.title = "Level".to_string();
+        configuration.selection.point = Some(self.selection.binding());
+        let series = vec![ChartSeries::values(
+            chart_signal(),
+            SemanticColorRef::accent_secondary(),
+            ChartMark::Line,
+            "Signal",
+            ChartValueAxis::Left,
+            ChartSeriesStyle::default(),
+        )];
+        let chart = Chart::new(
+            series,
+            ChartXDomain::Numeric,
             ChartGuides::default(),
             Self::base_style(ChartStacking::None),
             configuration,
         );
         Self::section(
-            "Histogram",
-            "Samples counted into even bins; tails are never folded in.",
-            AnyView::new(AnyView::new(chart).frame_height(180.0)),
+            "Large series",
+            "Two thousand samples across a narrow plot: each pixel column keeps \
+             its highest and lowest sample, so the envelope survives while the \
+             stroke only covers what the pixels can resolve.",
+            AnyView::new(AnyView::new(chart).frame_height(150.0)),
         )
     }
 
@@ -519,6 +668,9 @@ impl ChartStory {
         let mut configuration = ChartConfiguration::default();
         configuration.label = "Error rate by latency".to_string();
         configuration.legend.placement = ChartLegendPlacementState::hidden();
+        configuration.selection.point = Some(self.selection.binding());
+        configuration.selection.value_text =
+            std::sync::Arc::new(|value: f32| format!("{value:.1}%"));
         configuration.axis.x.title = "Latency (ms)".to_string();
         configuration.axis.y.title = "Error rate %".to_string();
         let points = CHART_LATENCY
@@ -552,6 +704,7 @@ impl ChartStory {
         let mut configuration = ChartConfiguration::default();
         configuration.label = "Sessions by device".to_string();
         configuration.legend.placement = ChartLegendPlacementState::bottom();
+        configuration.selection.point = Some(self.selection.binding());
         configuration.pie.sorts_by_value = true;
         configuration.pie.shows_labels = true;
         configuration.pie.center = Some(PieCenter::new("100", "Sessions"));
@@ -603,6 +756,9 @@ impl ChartStory {
         let mut configuration = ChartConfiguration::default();
         configuration.label = "Sessions by state".to_string();
         configuration.legend.placement = ChartLegendPlacementState::bottom();
+        configuration.selection.point = Some(self.selection.binding());
+        configuration.axis.y.title = "Sessions".to_string();
+        configuration.axis.x.title = "State".to_string();
         let mut style = Self::base_style(ChartStacking::None);
         style.orientation = ChartOrientation::Horizontal;
         let series = vec![
@@ -632,8 +788,11 @@ impl ChartStory {
         );
         Self::section(
             "Horizontal bars",
-            "Long category names read down the left edge.",
-            AnyView::new(AnyView::new(chart).frame_height(200.0)),
+            "Long category names have no room under a column, so the chart \
+             turns: categories down the left, values along the bottom. \
+             `axis.y` still configures the value axis — the title and ticks \
+             just move to the bottom edge.",
+            AnyView::new(AnyView::new(chart).frame_height(220.0)),
         )
     }
 
@@ -642,7 +801,7 @@ impl ChartStory {
             ChartSeries::values(
                 CHART_REVENUE.to_vec(),
                 SemanticColorRef::accent(),
-                ChartMark::Line,
+                ChartMark::Area,
                 "Revenue",
                 ChartValueAxis::Left,
                 ChartSeriesStyle::default(),
@@ -661,31 +820,16 @@ impl ChartStory {
             Self::months(),
             "Monthly revenue and signups",
             "Month",
-            12,
+            100,
             None,
         );
-        let rows: Vec<AnyView> = table
-            .rows()
-            .iter()
-            .map(|row| {
-                AnyView::new(Text::new(format!(
-                    "{} · {}",
-                    row.label,
-                    row.cells.join(" · ")
-                )))
-            })
-            .collect();
         Self::section(
             "Data table",
-            "The plotted series as rows, for assistive tech.",
-            AnyView::new(BoxView::new(
-                FlexDirection::Column,
-                Align::Stretch,
-                Justify::FlexStart,
-                Wrap::NoWrap,
-                4.0,
-                AnyView::new(TupleView::new(rows)),
-            )),
+            "A plot is a picture of a table, and a picture is the one thing a \
+             screen reader cannot describe. ChartDataTable is the table itself: \
+             one row per month, one column per series, carrying the table, row \
+             and cell roles that let a reader move by row and column.",
+            AnyView::new(table),
         )
     }
 }
@@ -705,11 +849,12 @@ impl View for ChartStory {
                 self.dual_axis(),
                 self.log_axis(),
                 self.histogram(),
-                AnyView::new(self.exploration.clone()),
+                self.large_series(),
                 self.scatter(),
                 self.donut(),
                 self.sparkline(),
                 self.horizontal(),
+                AnyView::new(self.exploration.clone()),
                 self.data_table(),
             ])),
         ))

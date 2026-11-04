@@ -24,6 +24,7 @@ use crate::primitives::controls::fields::time_input_model::{
     TimeInputHourCycle, TimeInputState, TimeSegment,
 };
 use crate::primitives::text::Text;
+use crate::theme::styles::components::InputChromeState;
 use crate::theme::{SemanticColorRef, SemanticFontRef, theme_for_node};
 use crate::{AnyView, BoxView, PrimitiveView, TupleView, View, impl_primitive_view};
 
@@ -157,14 +158,11 @@ impl PrimitiveView for TimeInputFrame {
 
     fn update_node(&self, node: &Node) {
         let theme = theme_for_node(node);
-        node.set_background_color(Some(theme.inputs.background));
+        let state = InputChromeState::new(self.is_enabled);
+        node.set_background_color(Some(theme.inputs.background_for(state)));
         node.set_corner_radius(theme.inputs.radius);
-        node.set_border_color(Some(if self.is_enabled {
-            theme.inputs.border_color
-        } else {
-            theme.inputs.border_disabled
-        }));
-        node.set_border_width(theme.inputs.border_width);
+        node.set_border_color(Some(theme.inputs.border_for(state)));
+        node.set_border_width(theme.inputs.border_width_for(state));
         node.set_accessibility(Some(AccessibilitySemantics {
             role: AccessibilityRole::Group,
             label: self.accessibility_label.clone().unwrap_or_default(),

@@ -345,9 +345,7 @@ impl View for DateRangeCalendar {
     fn body(&self, cx: &Scope) -> AnyView {
         let mut view = self.snapshot();
         view.session = cx.remember(|| self.session.clone());
-        AnyView::new(DateRangeCalendarBody {
-            view,
-        })
+        AnyView::new(DateRangeCalendarBody { view })
     }
 }
 

@@ -93,9 +93,7 @@ impl LocalizedStringKey {
                 return value;
             }
         }
-        if !pinned
-            && let Some(value) = lookup_files(&roots, None, locales, &self.key)
-        {
+        if !pinned && let Some(value) = lookup_files(&roots, None, locales, &self.key) {
             return value;
         }
         builtin_lookup("en", &self.key).unwrap_or_else(|| self.key.clone())
@@ -427,7 +425,10 @@ mod checks {
     #[test]
     fn a_language_subtag_finds_the_catalog() {
         let key = LocalizedStringKey::literal("calendar.weekday.3");
-        assert_eq!(key.resolved_for(&["zh-CN".to_string(), "zh".to_string()]), "三");
+        assert_eq!(
+            key.resolved_for(&["zh-CN".to_string(), "zh".to_string()]),
+            "三"
+        );
     }
 
     #[test]
@@ -512,11 +513,7 @@ mod checks {
             "\"Scrollbar\" = \"来自应用\";\n",
         )
         .expect("the strings file");
-        let key = LocalizedStringKey::new(
-            "Scrollbar",
-            Some(directory.path().to_path_buf()),
-            None,
-        );
+        let key = LocalizedStringKey::new("Scrollbar", Some(directory.path().to_path_buf()), None);
         assert_eq!(
             key.resolved_for(&zh()),
             "来自应用",

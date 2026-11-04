@@ -65,28 +65,16 @@ impl StoryDispatch {
                 Some(AnyView::new(stories::RangeSliderStory::new(options)))
             }
             Self::Story(GalleryPage::TextField) => {
-                Some(AnyView::new(stories::TextFieldStory::new(options)))
-            }
-            Self::Story(GalleryPage::SearchField) => {
-                Some(AnyView::new(stories::SearchFieldStory::new(options)))
-            }
-            Self::Story(GalleryPage::TextArea) => {
-                Some(AnyView::new(stories::TextAreaStory::new(options)))
+                Some(AnyView::new(stories::TextFieldsStory::new(options)))
             }
             Self::Story(GalleryPage::NumberField) => {
-                Some(AnyView::new(stories::NumberFieldStory::new(options)))
-            }
-            Self::Story(GalleryPage::Vec3Field) => {
-                Some(AnyView::new(stories::Vec3FieldStory::new(options)))
+                Some(AnyView::new(stories::NumericStory::new(options)))
             }
             Self::Story(GalleryPage::ColorField) => {
                 Some(AnyView::new(stories::ColorFieldStory::new(options)))
             }
             Self::Story(GalleryPage::Select) => {
                 Some(AnyView::new(stories::SelectStory::new(options)))
-            }
-            Self::Story(GalleryPage::JsonField) => {
-                Some(AnyView::new(stories::JsonFieldStory::new(options)))
             }
             Self::Story(GalleryPage::AssetRef) => {
                 Some(AnyView::new(stories::AssetRefStory::new(options)))
@@ -359,15 +347,11 @@ impl StorySource {
             (GalleryPage::RangeSlider, "Controls/ControlStories.swift"),
             (GalleryPage::Rating, "Feedback/RatingStory.swift"),
             (GalleryPage::TextField, "Controls/ControlStories.swift"),
-            (GalleryPage::SearchField, "Controls/ControlStories.swift"),
-            (GalleryPage::TextArea, "Controls/ControlStories.swift"),
             (GalleryPage::TextEditor, "Controls/TextEditorStory.swift"),
             (GalleryPage::WheelPicker, "Controls/WheelPickerStory.swift"),
             (GalleryPage::NumberField, "Controls/ControlStories.swift"),
-            (GalleryPage::Vec3Field, "Controls/ControlStories.swift"),
             (GalleryPage::ColorField, "Controls/ControlStories.swift"),
             (GalleryPage::Select, "Controls/ControlStories.swift"),
-            (GalleryPage::JsonField, "Controls/ControlStories.swift"),
             (GalleryPage::AssetRef, "Data/DataStories.swift"),
             (GalleryPage::List, "Data/DataStories.swift"),
             (GalleryPage::SectionedList, "Data/DataStories.swift"),

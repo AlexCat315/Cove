@@ -561,8 +561,8 @@ impl<Value: PartialEq + Clone + Send + Sync + 'static> PrimitiveView for Combobo
 
     fn children(&self, node: &Node) -> Vec<AnyView> {
         let field = &self.field;
-        let surface = node
-            .composition_value(&cove_composition::adaptive::SurfaceEnvironment::key());
+        let surface =
+            node.composition_value(&cove_composition::adaptive::SurfaceEnvironment::key());
         let mut row: Vec<AnyView> = vec![AnyView::new(
             Text::new(self.title.clone())
                 .truncated()
@@ -604,11 +604,13 @@ impl<Value: PartialEq + Clone + Send + Sync + 'static> PrimitiveView for Combobo
         let minimum = field.presentation.trigger_minimum(&theme_for_node(node));
         // Swift floors the trigger at the surface's minimum control extent, so a
         // touch surface gets a 44pt target instead of the authored 32.
-        let height = minimum.max(if surface.input.contains(cove_core::InputCapabilities::TOUCH) {
-            surface.minimum_control_extent()
-        } else {
-            TRIGGER_MIN_HEIGHT
-        });
+        let height = minimum.max(
+            if surface.input.contains(cove_core::InputCapabilities::TOUCH) {
+                surface.minimum_control_extent()
+            } else {
+                TRIGGER_MIN_HEIGHT
+            },
+        );
         vec![AnyView::new(
             BoxView::new(
                 FlexDirection::Row,
@@ -798,8 +800,8 @@ impl<Value: PartialEq + Clone + Send + Sync + 'static> PrimitiveView
 
     fn children(&self, node: &Node) -> Vec<AnyView> {
         let field = &self.field;
-        let surface = node
-            .composition_value(&cove_composition::adaptive::SurfaceEnvironment::key());
+        let surface =
+            node.composition_value(&cove_composition::adaptive::SurfaceEnvironment::key());
         let matches = field.matches(&field.session().with(|session| session.query.clone()));
         let phase = field.phase();
         let count = matches.len();
@@ -856,7 +858,11 @@ impl<Value: PartialEq + Clone + Send + Sync + 'static> PrimitiveView
                 // Scale the authored row once, then floor it on touch: Swift's
                 // order, so 200% + touch lands on 64pt.
                 let scaler = crate::theme::tokens::text_scaler::node_text_scaler(node);
-                let authored = scaler.scale(field.presentation.authored_row_height(&theme_for_node(node)));
+                let authored = scaler.scale(
+                    field
+                        .presentation
+                        .authored_row_height(&theme_for_node(node)),
+                );
                 let touch_floor = if surface.input.contains(cove_core::InputCapabilities::TOUCH) {
                     surface.minimum_control_extent()
                 } else {

@@ -970,7 +970,8 @@ fn lane_lifecycle() {
             368.0,
             "RTL dragging leftward grows the navigation"
         );
-        scene.width = 720.0; scene.settle(8, 1.0);
+        scene.width = 720.0;
+        scene.settle(8, 1.0);
         assert!(
             scene.capture.target().is_none(),
             "leaving the docked layout releases the capture"
@@ -985,14 +986,16 @@ fn lane_lifecycle() {
             Some("Documents".to_string()),
             "leaving the resize lane hands focus to the selected destination"
         );
-        scene.width = 1280.0; scene.settle(8, 1.0);
+        scene.width = 1280.0;
+        scene.settle(8, 1.0);
         assert_eq!(
             resize_lane(scene).map(|node| id(&node)),
             Some(id(&resize)),
             "returning to the docked layout restores the same lane node"
         );
         grab(scene, &resize);
-        scene.width = 390.0; scene.settle(8, 1.0);
+        scene.width = 390.0;
+        scene.settle(8, 1.0);
         assert!(
             scene.capture.target().is_none(),
             "a compact container releases the lane"
@@ -1006,9 +1009,11 @@ fn lane_lifecycle() {
             Some("Open navigation".to_string()),
             "compact navigation hands focus to its opener"
         );
-        scene.width = 1280.0; scene.settle(8, 1.0);
+        scene.width = 1280.0;
+        scene.settle(8, 1.0);
         grab(scene, &resize);
-        lane.input.set(InputCapabilities::TOUCH | InputCapabilities::KEYBOARD);
+        lane.input
+            .set(InputCapabilities::TOUCH | InputCapabilities::KEYBOARD);
         scene.settle(8, 1.0);
         assert!(
             scene.capture.target().is_none(),

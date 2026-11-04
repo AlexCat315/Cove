@@ -17,9 +17,13 @@ use crate::primitives::overlays::roving_focus::{
 };
 use crate::primitives::text::Text;
 use crate::theme::SemanticFontRef;
-use crate::{AnyView, BoxView, LayoutDebugExt, PrimitiveView, TupleView, View, impl_primitive_view};
+use crate::{
+    AnyView, BoxView, LayoutDebugExt, PrimitiveView, TupleView, View, impl_primitive_view,
+};
 use cove_core::Binding;
-use cove_core::scene::{AccessibilityRole, Align, FlexDirection, FocusChainHolder, Justify, Node, Wrap};
+use cove_core::scene::{
+    AccessibilityRole, Align, FlexDirection, FocusChainHolder, Justify, Node, Wrap,
+};
 use cove_platform::KeyEvent;
 
 use super::hierarchy::{SidebarEntry, SidebarHierarchy};
@@ -126,7 +130,10 @@ impl<Id: PartialEq + Eq + std::hash::Hash + Clone + Send + Sync + 'static> View 
         // having to expand every branch above it.
         let revealed = cx.state(|| None::<(Option<Id>, Vec<Id>)>);
         let selection = self.selection.get();
-        let path = selection.as_ref().map(|id| hierarchy.path_to(id)).unwrap_or_default();
+        let path = selection
+            .as_ref()
+            .map(|id| hierarchy.path_to(id))
+            .unwrap_or_default();
         let reveal_signature = (selection.clone(), path);
         if revealed.get() != Some(reveal_signature.clone()) {
             revealed.set(Some(reveal_signature));
@@ -283,9 +290,14 @@ impl<Id: PartialEq + Eq + std::hash::Hash + Clone + Send + Sync + 'static> View 
         // is removed outright still has ancestors to fall back along.
         let recovery_path = cx.remember(|| Rc::new(std::cell::RefCell::new(Vec::<Id>::new())));
 
-        let old_paths = cx.remember(|| Rc::new(std::cell::RefCell::new(Vec::<(Id, Vec<Id>)>::new())));
+        let old_paths =
+            cx.remember(|| Rc::new(std::cell::RefCell::new(Vec::<(Id, Vec<Id>)>::new())));
         let previous_paths = old_paths.borrow().clone();
-        *old_paths.borrow_mut() = hierarchy.entries().into_iter().map(|entry| (entry.item.id.clone(), hierarchy.path_to(&entry.item.id))).collect();
+        *old_paths.borrow_mut() = hierarchy
+            .entries()
+            .into_iter()
+            .map(|entry| (entry.item.id.clone(), hierarchy.path_to(&entry.item.id)))
+            .collect();
         let focused_id = FocusChainHolder::current()
             .and_then(|chain| chain.focused())
             .and_then(|focused| {
@@ -308,11 +320,22 @@ impl<Id: PartialEq + Eq + std::hash::Hash + Clone + Send + Sync + 'static> View 
                     .into_iter()
                     .find(|entry| roving_identity(&entry.item.id) == token)
                     .map(|entry| entry.item.id)
-                    .or_else(|| previous_paths.iter().find(|(id, _)| roving_identity(id) == token).map(|(id, _)| id.clone()))
+                    .or_else(|| {
+                        previous_paths
+                            .iter()
+                            .find(|(id, _)| roving_identity(id) == token)
+                            .map(|(id, _)| id.clone())
+                    })
             });
         if let Some(focused_id) = focused_id.as_ref() {
             let mut chain = hierarchy.path_to(focused_id);
-            if chain.is_empty() { chain = previous_paths.iter().find(|(id, _)| id == focused_id).map(|(_, path)| path.clone()).unwrap_or_default(); }
+            if chain.is_empty() {
+                chain = previous_paths
+                    .iter()
+                    .find(|(id, _)| id == focused_id)
+                    .map(|(_, path)| path.clone())
+                    .unwrap_or_default();
+            }
             *recovery_path.borrow_mut() = chain;
         }
         let remembered_path = recovery_path.borrow().clone();
@@ -678,11 +701,7 @@ impl crate::theme::styles::buttons::ButtonStyle for SidebarItemStyle {
                 ink,
                 radius: appearance.corner_radius,
                 ring,
-                ring_width: if configuration.is_focused {
-                    1.0
-                } else {
-                    0.0
-                },
+                ring_width: if configuration.is_focused { 1.0 } else { 0.0 },
                 shows_labels: self.presentation.shows_labels(),
             });
         }
@@ -693,11 +712,7 @@ impl crate::theme::styles::buttons::ButtonStyle for SidebarItemStyle {
             ink,
             radius: appearance.corner_radius,
             ring,
-            ring_width: if configuration.is_focused {
-                2.0
-            } else {
-                0.0
-            },
+            ring_width: if configuration.is_focused { 2.0 } else { 0.0 },
         })
     }
 }

@@ -449,7 +449,9 @@ impl PrimitiveView for AsyncImageHost {
 
     fn children(&self, _node: &Node) -> Vec<AnyView> {
         use crate::modifiers::layout::LayoutFrameExt;
-        vec![AnyView::new(self.content.clone().frame_size(self.width, self.height))]
+        vec![AnyView::new(
+            self.content.clone().frame_size(self.width, self.height),
+        )]
     }
 }
 
@@ -544,9 +546,8 @@ impl AsyncImageResource {
         };
         match services.execution {
             ImageDecodeExecution::Inline => {
-                let result = ImageInflightLoads::shared().load(&key, || {
-                    (services.decode)(request, Some(progress.clone()))
-                });
+                let result = ImageInflightLoads::shared()
+                    .load(&key, || (services.decode)(request, Some(progress.clone())));
                 finish(result);
             }
             ImageDecodeExecution::Background => {

@@ -13,7 +13,10 @@ use cove_core::scene::{
     Node, Point, PointerPhase, Rect, Size,
 };
 
-use crate::theme::theme_for_node;
+use crate::modifiers::layout::{FlexExt, LayoutFrameExt};
+use crate::modifiers::style::{AppearanceExt, SemanticStyleViewExt};
+use crate::primitives::text::Text;
+use crate::theme::SemanticFontRef;
 use crate::theme::tokens::SemanticColorRef;
 
 #[derive(Clone)]
@@ -119,48 +122,115 @@ impl PrimitiveView for ChartLegendToggle {
         node.set_attachment("chart.legend.title", self.item.title.clone());
         node.set_attachment("chart.legend.hidden", self.is_hidden);
         node.set_attachment("chart.legend.index", self.index);
-        let theme = theme_for_node(node);
-        let swatch = if self.is_hidden {
-            theme.colors.background
-        } else {
-            self.item.color.resolve(&theme)
-        };
-        let stroke = if self.is_hidden {
-            theme.colors.on_surface_muted
-        } else {
-            self.item.color.resolve(&theme)
-        };
-        node.update_overlay_draw(
-            (swatch.rgba8(), stroke.rgba8(), self.is_hidden),
-            move |list, origin| {
-                let rect = Rect::new(origin.x, origin.y, 8.0, 8.0);
-                let _ = list.add_rounded_rect(rect, 4.0, swatch);
-                let _ = list.add_rounded_rect_stroke(rect, 4.0, 1.5, stroke);
-            },
-        );
+        node.set_cursor(Some(cove_platform::SystemCursor::Pointer));
         let hidden = self.hidden.clone();
-        let title = self.item.title.clone();
         if let Some(registry) = cove_core::scene::InteractionRegistryHolder::current() {
+            let pointer_hidden = hidden.clone();
+            let pointer_title = self.item.title.clone();
             registry.set_pointer(
                 node,
                 cove_core::scene::InputHandlerRoute::control(),
                 Rc::new(move |_event, phase, event_phase| {
                     if phase == PointerPhase::Up && event_phase == EventPhase::Target {
-                        let mut next = hidden.get();
-                        if !next.remove(&title) {
-                            next.insert(title.clone());
-                        }
-                        hidden.set(next);
+                        toggle(&pointer_hidden, &pointer_title);
                         return EventResult::Handled;
                     }
                     EventResult::Ignored
                 }),
             );
+            // The item is a control: it takes focus, so it has to activate from
+            // the keyboard too. A repeat does not toggle again.
+            let key_hidden = hidden;
+            let key_title = self.item.title.clone();
+            registry.set_key(
+                node,
+                cove_core::scene::InputHandlerRoute::control(),
+                Rc::new(move |event, phase| {
+                    if phase != EventPhase::Target
+                        || event.is_repeat
+                        || !matches!(
+                            event.scancode,
+                            crate::Scancode::RETURN
+                                | crate::Scancode::SPACE
+                                | crate::Scancode::KEYPAD_ENTER
+                        )
+                    {
+                        return EventResult::Ignored;
+                    }
+                    toggle(&key_hidden, &key_title);
+                    EventResult::Handled
+                }),
+            );
         }
-        node.set_cursor(Some(cove_platform::SystemCursor::Pointer));
+    }
+    /// The swatch and the title as one row. Swift builds this with a ghost
+    /// `Button`; here the row *is* the toggle, so the content has to be mounted
+    /// as a child instead of being painted as an overlay.
+    fn children(&self, _node: &Node) -> Vec<crate::AnyView> {
+        vec![legend_row(self.item.clone(), self.is_hidden)]
     }
 }
 impl_primitive_view!(ChartLegendToggle);
+
+/// Flips one series in the hidden set: pointer and keyboard share it.
+fn toggle(hidden: &Binding<HashSet<String>>, title: &str) {
+    let mut next = hidden.get();
+    if !next.remove(title) {
+        next.insert(title.to_string());
+    }
+    hidden.set(next);
+}
+
+/// The visible content of one legend item: swatch, then title.
+///
+/// A hidden item keeps its place, dims its text and hollows its swatch instead
+/// of disappearing.
+fn legend_row(item: ChartLegendItem, is_hidden: bool) -> crate::AnyView {
+    // A hidden swatch is hollow: it must not paint an opaque patch over whatever
+    // the chart set as its own background.
+    let (swatch, stroke) = if is_hidden {
+        (
+            SemanticColorRef::clear(),
+            SemanticColorRef::on_surface_muted(),
+        )
+    } else {
+        (item.color.clone(), item.color.clone())
+    };
+    let swatch = crate::AnyView::new(
+        crate::BoxView::new(
+            cove_core::scene::FlexDirection::Row,
+            cove_core::scene::Align::Center,
+            cove_core::scene::Justify::FlexStart,
+            cove_core::scene::Wrap::NoWrap,
+            0.0,
+            crate::AnyView::new(crate::EmptyView),
+        )
+        .frame_size(8.0, 8.0)
+        .semantic_background(swatch)
+        .corner_radius(4.0)
+        .semantic_border(stroke, 1.5),
+    );
+    crate::AnyView::new(
+        crate::Row::new(
+            crate::VerticalAlignment::Center,
+            6.0,
+            crate::AnyView::new(crate::TupleView::new(vec![
+                swatch,
+                crate::AnyView::new(
+                    crate::AnyView::new(Text::new(item.title.clone()).line_limit(Some(1)))
+                        .semantic_font(SemanticFontRef::caption())
+                        .semantic_foreground(if is_hidden {
+                            SemanticColorRef::on_surface_disabled()
+                        } else {
+                            SemanticColorRef::on_surface_variant()
+                        }),
+                ),
+            ])),
+        )
+        .flex(0.0)
+        .shrink(0.0),
+    )
+}
 
 /// Places whole items left to right and wraps; RTL starts at the trailing edge.
 #[derive(Clone, Copy)]

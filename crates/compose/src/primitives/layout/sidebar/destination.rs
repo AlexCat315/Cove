@@ -9,14 +9,16 @@ use crate::Scope;
 use crate::modifiers::layout::{FlexExt, FrameDimension, LayoutFrameExt, PaddingExt};
 use crate::modifiers::style::SemanticStyleViewExt;
 use crate::primitives::controls::button::{Button, ButtonIcon, ButtonIconSource, ButtonRole};
+use crate::primitives::feedback::Badge;
 use crate::primitives::overlays::context_menu::ContextMenu;
 use crate::primitives::overlays::{Popover, PopoverTriggerDescription};
-use crate::primitives::feedback::Badge;
 use crate::primitives::text::Text;
 use crate::theme::styles::buttons::ButtonStyleViewExt;
 use crate::theme::tokens::{IconScaling, IconScalingViewExt};
 use crate::theme::{SemanticFontRef, theme_for_node};
-use crate::{AnyView, BoxView, LayoutDebugExt, PrimitiveView, TupleView, View, impl_primitive_view};
+use crate::{
+    AnyView, BoxView, LayoutDebugExt, PrimitiveView, TupleView, View, impl_primitive_view,
+};
 use cove_core::Binding;
 use cove_core::scene::{
     AccessibilityRole, Align, Edge, FlexDirection, Justify, Node, PositionType, Wrap,
@@ -193,10 +195,12 @@ impl<Id: PartialEq + Eq + std::hash::Hash + Clone + Send + Sync + 'static> Primi
         let content = if is_rail {
             // Swift clamps the glyph to `railWidth - 16` so an oversized
             // authored icon cannot widen or overhang the rail.
-            let icon_extent = self.presentation.rail_width().map_or(
-                self.icon_extent,
-                |rail_width| self.icon_extent.min(rail_width - 16.0),
-            );
+            let icon_extent = self
+                .presentation
+                .rail_width()
+                .map_or(self.icon_extent, |rail_width| {
+                    self.icon_extent.min(rail_width - 16.0)
+                });
             AnyView::new(RailDestinationLabel {
                 item: self.entry.item.clone(),
                 shows_labels: self.presentation.shows_labels(),
@@ -321,7 +325,10 @@ impl<Id: PartialEq + Eq + std::hash::Hash + Clone + Send + Sync + 'static> Primi
         .frame(None, None, Some(0.0), Some(minimum_height), None, None);
 
         let button = AnyView::new(button);
-        let button = match &self.entry.item.debug_name { Some(name) => AnyView::new(button.debug_name(name)), None => button };
+        let button = match &self.entry.item.debug_name {
+            Some(name) => AnyView::new(button.debug_name(name)),
+            None => button,
+        };
         let row_label = label.clone();
         let mut column: Vec<AnyView> = vec![AnyView::new(AnyView::new(button).with_modifier(
             SidebarRowIdentity {
@@ -625,12 +632,18 @@ impl<Id: PartialEq + Eq + std::hash::Hash + Clone + Send + Sync + 'static> Primi
                 // `.iconScaling(.fixed)`: the authored extent has already been
                 // resolved against the icon roles and clamped to the rail, so a
                 // second application of text scaling would grow it again.
-                ButtonIcon::new(ButtonIconSource::resource(icon), Some(self.icon_extent), Some(tint))
-                    .icon_scaling(IconScaling::Fixed),
+                ButtonIcon::new(
+                    ButtonIconSource::resource(icon),
+                    Some(self.icon_extent),
+                    Some(tint),
+                )
+                .icon_scaling(IconScaling::Fixed),
             ),
             None => AnyView::new(
                 ButtonIcon::new(
-                    ButtonIconSource::resource(crate::primitives::media::ui_icon_catalog::file::file()),
+                    ButtonIconSource::resource(
+                        crate::primitives::media::ui_icon_catalog::file::file(),
+                    ),
                     Some(self.icon_extent),
                     Some(tint),
                 )

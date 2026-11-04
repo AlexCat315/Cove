@@ -516,11 +516,11 @@ impl Default for Selection {
 }
 impl Selection {
     /// Whole numbers without decimals, the rest to two places.
+    ///
+    /// A non-finite value falls through to the two-place form so it reads as
+    /// `nan`/`inf` rather than a blank, matching the Swift formatter.
     pub fn default_text(value: f32) -> String {
-        if !value.is_finite() {
-            return String::new();
-        }
-        if value.round() == value && value.abs() < 1e9 {
+        if value.is_finite() && value.round() == value && value.abs() < 1e9 {
             format!("{}", value as i64)
         } else {
             format!("{value:.2}")
@@ -636,11 +636,17 @@ impl Default for Accessibility {
     }
 }
 
-#[derive(Clone, Default)]
+#[derive(Clone)]
 pub struct Viewport {
     /// Visible interval on the independent axis; `None` fits all data.
     pub range: Option<Binding<Option<ChartRange>>>,
+    /// Smallest visible share of the full axis, including logarithmic axes.
     pub minimum_fraction: f32,
+}
+impl Default for Viewport {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 impl Viewport {
     pub fn new() -> Self {

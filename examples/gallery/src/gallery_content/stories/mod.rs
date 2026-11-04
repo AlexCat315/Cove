@@ -71,8 +71,9 @@ pub use data_stories_file::{
 pub use data_table_story::DataTableStory;
 pub use feedback::{AlertStory, BadgeStory, EmptyStory, ProgressStory, StorySection};
 pub use field_stories::{
-    AssetRefStory, ColorFieldStory, JsonFieldStory, NumberFieldStory, RangeSliderStory,
-    SearchFieldStory, SelectStory, SliderStory, TextAreaStory, TextFieldStory, Vec3FieldStory,
+    AssetRefStory, ColorFieldStory, JsonFieldStory, NumberFieldStory, NumericStory,
+    RangeSliderStory, SearchFieldStory, SelectStory, SliderStory, TextAreaStory, TextFieldStory,
+    TextFieldsStory, Vec3FieldStory,
 };
 pub use image_story::ImageStory;
 pub use interaction_gap_stories::{

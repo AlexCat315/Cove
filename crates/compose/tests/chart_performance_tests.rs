@@ -24,7 +24,7 @@ use cove_ui_compose::primitives::data::chart::cache::ChartResolutionCache;
 use cove_ui_compose::primitives::data::chart::coordinates::{ChartGeometry, Mark};
 use cove_ui_compose::primitives::data::chart::{
     Axis, ChartContent, ChartGuides, ChartOrientation, ChartPlot, ChartPlotInput, ChartPoint,
-    ChartSeries, ChartSession, ChartStyle, ChartXDomain,
+    ChartSeries, ChartSession, ChartStyle, ChartThreshold, ChartValueAxis, ChartXDomain,
 };
 use cove_ui_compose::theme::Theme;
 
@@ -357,5 +357,78 @@ fn new_data_drops_the_cache_and_a_selection_keeps_it() {
         let _ = Direction::Ltr;
         let mut nodes = Vec::new();
         all_nodes(&node, &mut nodes);
+    });
+}
+
+#[test]
+fn guides_and_series_styles_both_drop_the_cache() {
+    // A threshold widens the scale it belongs to and a series style changes the
+    // stroke or the axis a series reads, so none of them may reuse geometry
+    // cached for the previous chart.
+    GlobalTestLock::locked(|| {
+        let size = Size {
+            width: 160.0,
+            height: 60.0,
+        };
+        let build = |guides: ChartGuides, series: Vec<ChartSeries>| {
+            let count = series.len().max(1);
+            let mut chart = plot(series.clone(), None, ChartStyle::default());
+            chart.visible = vec![true; count];
+            chart.content = ChartContent::Cartesian {
+                series,
+                guides,
+                x: ChartXDomain::Categorical(Vec::new()),
+            };
+            chart
+        };
+
+        let values = vec![1.0, 2.0, 3.0];
+        let initial = build(
+            ChartGuides::default(),
+            vec![ChartSeries::line(values.clone())],
+        );
+        let node = initial.make_node();
+        node.set_frame(Rect::new(0.0, 0.0, size.width, size.height));
+        initial.update_node(&node);
+        let text = ChartText::new(&Theme::default_light());
+        let session = node
+            .attachment::<Rc<ChartSession>>(ChartSession::KEY)
+            .expect("the plot installs a chart session");
+        let cache = session.cache.clone();
+        let _ = initial.resolve(size, Point::default(), &text, Some(cache.clone()));
+        assert_eq!(cache.borrow().builds, 1, "the first resolve builds once");
+
+        let mut guides = ChartGuides::default();
+        guides.thresholds.push(ChartThreshold::new(90.0));
+        let with_rule = build(guides, vec![ChartSeries::line(values.clone())]);
+        with_rule.update_node(&node);
+        let _ = with_rule.resolve(size, Point::default(), &text, Some(cache.clone()));
+        assert_eq!(
+            cache.borrow().builds,
+            2,
+            "adding a threshold rebuilds the geometry"
+        );
+
+        let mut curved = ChartSeries::line(values.clone());
+        curved.style.curve = true;
+        let styled = build(ChartGuides::default(), vec![curved]);
+        styled.update_node(&node);
+        let _ = styled.resolve(size, Point::default(), &text, Some(cache.clone()));
+        assert_eq!(
+            cache.borrow().builds,
+            3,
+            "changing a series style rebuilds the geometry"
+        );
+
+        let mut right = ChartSeries::line(values);
+        right.axis = ChartValueAxis::Right;
+        let sided = build(ChartGuides::default(), vec![right]);
+        sided.update_node(&node);
+        let _ = sided.resolve(size, Point::default(), &text, Some(cache.clone()));
+        assert_eq!(
+            cache.borrow().builds,
+            4,
+            "moving a series to the right axis rebuilds the geometry"
+        );
     });
 }

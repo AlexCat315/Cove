@@ -83,7 +83,10 @@ impl<Id: PartialEq + Clone> SidebarItem<Id> {
         }
     }
 
-    pub fn debug_name(mut self, name: impl Into<String>) -> Self { self.debug_name = Some(name.into()); self }
+    pub fn debug_name(mut self, name: impl Into<String>) -> Self {
+        self.debug_name = Some(name.into());
+        self
+    }
 
     pub fn icon(mut self, icon: BundleImageResource) -> Self {
         self.icon = Some(icon);

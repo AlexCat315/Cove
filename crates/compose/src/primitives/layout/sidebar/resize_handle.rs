@@ -88,11 +88,7 @@ impl SidebarResizeHandle {
     }
 
     fn current(&self) -> f32 {
-        resolve_current(
-            self.value.as_ref(),
-            self.range,
-            self.resolved_width,
-        )
+        resolve_current(self.value.as_ref(), self.range, self.resolved_width)
     }
 
     /// Owned writer so every interaction closure shares one guarded path.
@@ -250,7 +246,9 @@ impl PrimitiveView for SidebarResizeHandle {
             role: AccessibilityRole::Slider,
             label: self.label.clone(),
             value: format!("{} pt", current.round() as i64),
-            help: crate::i18n::tr("Use Left/Right to resize, Shift for larger steps, Home/End for the limits"),
+            help: crate::i18n::tr(
+                "Use Left/Right to resize, Shift for larger steps, Home/End for the limits",
+            ),
             ..Default::default()
         }));
 

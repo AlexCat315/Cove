@@ -384,7 +384,11 @@ impl HoverCardSession {
                 Some(PortalStoreHolder::current()),
                 position,
                 options.width,
-                AnyView::new(HoverCardAccessory { owner: node.clone(), session: self.me.borrow().clone(), content: AnyView::new(card) }),
+                AnyView::new(HoverCardAccessory {
+                    owner: node.clone(),
+                    session: self.me.borrow().clone(),
+                    content: AnyView::new(card),
+                }),
                 false,
                 PortalPlacementMode::Fixed,
                 None,
@@ -548,29 +552,54 @@ impl View for TouchHoverCard {
     }
 }
 
-struct HoverCardAccessory { owner: Node, session: Weak<HoverCardSession>, content: AnyView }
+struct HoverCardAccessory {
+    owner: Node,
+    session: Weak<HoverCardSession>,
+    content: AnyView,
+}
 impl PrimitiveView for HoverCardAccessory {
     fn make_node(&self) -> Node {
         let node = Node::new();
         node.set_is_hit_testable(false);
         node.set_attachment("hoverCard.content", true);
-        node.add_resource(Rc::new(cove_core::scene::FocusAccessoryResource::new(&self.owner)));
+        node.add_resource(Rc::new(cove_core::scene::FocusAccessoryResource::new(
+            &self.owner,
+        )));
         node
     }
-    fn make_layout_node(&self) -> Option<LayoutNode> { None }
+    fn make_layout_node(&self) -> Option<LayoutNode> {
+        None
+    }
     fn update_node(&self, node: &Node) {
         if let Some(registry) = InteractionRegistryHolder::current() {
             let hovered_session = self.session.clone();
-            registry.set_hover(node, Rc::new(move |phase| {
-                if let Some(session) = hovered_session.upgrade() { session.set_card_hovered(phase == HoverPhase::Enter); }
-            }));
+            registry.set_hover(
+                node,
+                Rc::new(move |phase| {
+                    if let Some(session) = hovered_session.upgrade() {
+                        session.set_card_hovered(phase == HoverPhase::Enter);
+                    }
+                }),
+            );
             let session = self.session.clone();
-            registry.set_key(node, InputHandlerRoute::overlay(), Rc::new(move |event, phase| {
-                if phase != cove_core::scene::EventPhase::Capture && event.scancode == crate::Scancode::ESCAPE
-                    && session.upgrade().is_some_and(|s| s.dismiss()) { EventResult::Handled } else { EventResult::Ignored }
-            }));
+            registry.set_key(
+                node,
+                InputHandlerRoute::overlay(),
+                Rc::new(move |event, phase| {
+                    if phase != cove_core::scene::EventPhase::Capture
+                        && event.scancode == crate::Scancode::ESCAPE
+                        && session.upgrade().is_some_and(|s| s.dismiss())
+                    {
+                        EventResult::Handled
+                    } else {
+                        EventResult::Ignored
+                    }
+                }),
+            );
         }
     }
-    fn children(&self, _node: &Node) -> Vec<AnyView> { vec![self.content.clone()] }
+    fn children(&self, _node: &Node) -> Vec<AnyView> {
+        vec![self.content.clone()]
+    }
 }
 crate::impl_primitive_view!(HoverCardAccessory);

@@ -11,11 +11,10 @@ use crate::Scope;
 use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 
-use cove_core::scene::{Align, FlexDirection, Justify, Node, Wrap};
 use cove_core::Binding;
+use cove_core::scene::{Align, FlexDirection, Justify, Node, Wrap};
 
 use crate::modifiers::layout::{FlexExt, LayoutFrameExt, PaddingExt};
-use cove_composition::LayoutDebugExt;
 use crate::primitives::controls::button::{Button, ButtonIconSource, ButtonRole};
 use crate::primitives::controls::fields::json_field_model::{
     JsonFieldLabels, JsonFieldValidation, normalized_commit_text, pretty_printed, validate,
@@ -26,11 +25,13 @@ use crate::primitives::text::Text;
 use crate::primitives::text::text_buffer::TextBuffer;
 use crate::primitives::text::text_field::TextFieldCodeEditing;
 use crate::theme::styles::buttons::{ButtonStyleViewExt, GhostButtonStyle};
+use crate::theme::styles::components::InputChromeState;
 use crate::theme::tokens::SemanticStyleViewExt;
 use crate::theme::{SemanticColorRef, SemanticFontRef, theme_for_node};
 use crate::{
     AnyView, BoxView, PrimitiveView, Row, TupleView, VerticalAlignment, View, impl_primitive_view,
 };
+use cove_composition::LayoutDebugExt;
 
 /// Toolbar spacing.
 const TOOLBAR_SPACING: f32 = 2.0;
@@ -572,16 +573,11 @@ impl PrimitiveView for RestorableEditor {
 
     fn update_node(&self, node: &Node) {
         let theme = theme_for_node(node);
-        node.set_background_color(Some(theme.colors.surface_sunken));
+        let state = InputChromeState::new(self.is_enabled).error(!self.is_acceptable);
+        node.set_background_color(Some(theme.inputs.background_for(state)));
         node.set_corner_radius(theme.inputs.radius);
-        node.set_border_color(Some(if !self.is_enabled {
-            theme.inputs.border_disabled
-        } else if self.is_acceptable {
-            theme.colors.border
-        } else {
-            theme.colors.error
-        }));
-        node.set_border_width(1.0);
+        node.set_border_color(Some(theme.inputs.border_for(state)));
+        node.set_border_width(theme.inputs.border_width_for(state));
     }
 
     fn children(&self, _node: &Node) -> Vec<AnyView> {
@@ -680,7 +676,7 @@ impl PrimitiveView for JsonExpandedEditorBody {
                                     None,
                                 )
                                 .button_style(GhostButtonStyle)
-                                    .debug_name("json-cancel"),
+                                .debug_name("json-cancel"),
                             ),
                             AnyView::new(
                                 Button::with_options(

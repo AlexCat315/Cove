@@ -549,7 +549,8 @@ fn presentations_retain_identity_header_focus_and_visibility() {
                 .first(|node| node.scroll_reveal().is_some())
                 .expect("the rail body is scrollable");
             let viewport = scroller.absolute_frame();
-            let frame = current.absolute_frame();            let visible = frame.y.max(viewport.y)..frame.max_y().min(viewport.max_y());
+            let frame = current.absolute_frame();
+            let visible = frame.y.max(viewport.y)..frame.max_y().min(viewport.max_y());
             let visible_height = (visible.end - visible.start).max(0.0);
             assert!(
                 visible_height >= frame.height - 1.0,
@@ -649,17 +650,15 @@ fn roving_navigation_skips_wraps_and_separates_activation() {
 
         let selected = row(scene, 0);
         assert!(
-            nodes_of(&selected)
-                .iter()
-                .all(|node| support::debug_name(node).as_deref()
-                    != Some("rail-selection-indicator")),
+            nodes_of(&selected).iter().all(
+                |node| support::debug_name(node).as_deref() != Some("rail-selection-indicator")
+            ),
             "the selected row carries no accent-lane chrome node"
         );
         assert!(
             nodes_of(&selected)
                 .iter()
-                .all(|node| support::debug_name(node).as_deref()
-                    != Some("rail-selection-tile")),
+                .all(|node| support::debug_name(node).as_deref() != Some("rail-selection-tile")),
             "a labelled rail uses the full-width pill, not the icon-only tile"
         );
     });

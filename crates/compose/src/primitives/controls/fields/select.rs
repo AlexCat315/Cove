@@ -158,6 +158,7 @@ use crate::primitives::overlays::popover::{Popover, PopoverSizing, PopoverTrigge
 use crate::primitives::text::Text;
 use crate::theme::SemanticFontRef;
 use crate::theme::styles::buttons::{ButtonStyle, ButtonStyleConfiguration};
+use crate::theme::styles::components::InputChromeState;
 use crate::{AnyView, BoxView, TupleView, View, ViewExt};
 use cove_core::Binding;
 use cove_core::scene::{AccessibilityRole, Align, FlexDirection, Justify, Wrap};
@@ -325,15 +326,12 @@ struct SelectTriggerStyle;
 impl ButtonStyle for SelectTriggerStyle {
     fn make_body(&self, configuration: ButtonStyleConfiguration) -> AnyView {
         let theme = configuration.theme.clone();
-        let border = if !configuration.is_enabled {
-            theme.inputs.border_disabled
-        } else if configuration.is_selected || configuration.is_focused {
-            theme.inputs.border_focused
-        } else if configuration.is_hovered {
-            theme.inputs.border_hover
-        } else {
-            theme.inputs.border_color
-        };
+        // Open beats hover: the popup is open because of this trigger, so the
+        // trigger explains it even while the pointer has moved into the menu.
+        let state = InputChromeState::new(configuration.is_enabled)
+            .focused(configuration.is_selected || configuration.is_focused)
+            .hovered(configuration.is_hovered);
+        let border = theme.inputs.border_for(state);
         AnyView::new(
             BoxView::new(
                 FlexDirection::Column,
@@ -350,9 +348,9 @@ impl ButtonStyle for SelectTriggerStyle {
             } else {
                 theme.colors.on_surface_muted
             })
-            .background_color(theme.inputs.background)
+            .background_color(theme.inputs.background_for(state))
             .corner_radius(theme.inputs.radius)
-            .border_color(border, theme.inputs.border_width),
+            .border_color(border, theme.inputs.border_width_for(state)),
         )
     }
 }

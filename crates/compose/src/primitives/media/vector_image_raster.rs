@@ -5,8 +5,8 @@
 //! needs no recompose.
 
 use std::cell::RefCell;
-use std::rc::Rc;
 use std::path::{Path, PathBuf};
+use std::rc::Rc;
 use std::sync::Arc;
 
 use cove_imaging::ImageAssetRegistryHolder;
@@ -99,7 +99,9 @@ impl VectorImageRaster {
         cove_core::work::spawn_then(
             move || Image::rasterize(registry, &job_path, target),
             move |result| {
-                let Some(raster) = raster.upgrade() else { return };
+                let Some(raster) = raster.upgrade() else {
+                    return;
+                };
                 // A newer size superseded this one; its own job will land.
                 if raster.pending.borrow().as_ref() != Some(&next) {
                     return;

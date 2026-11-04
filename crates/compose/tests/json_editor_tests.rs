@@ -270,10 +270,7 @@ fn transactions() {
             !scene.portal.entries().is_empty(),
             "Expand presents the expanded editor in a portal"
         );
-        assert!(
-            dialog(scene).is_some(),
-            "the expanded editor is a dialog"
-        );
+        assert!(dialog(scene).is_some(), "the expanded editor is a dialog");
         key(scene, Scancode::A, true);
         scene
             .dispatcher()

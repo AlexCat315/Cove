@@ -157,10 +157,8 @@ fn drag(scene: &InteractiveScene, source: &Node, target: &Node) {
         let t = step as f32 / 6.0;
         dispatcher.dispatch(&cove_platform::InputEvent::MouseMotion(
             cove_platform::MouseMotionEvent {
-                x: start.x + start.width / 2.0
-                    + (to.x - (start.x + start.width / 2.0)) * t,
-                y: start.y + start.height / 2.0
-                    + (to.y - (start.y + start.height / 2.0)) * t,
+                x: start.x + start.width / 2.0 + (to.x - (start.x + start.width / 2.0)) * t,
+                y: start.y + start.height / 2.0 + (to.y - (start.y + start.height / 2.0)) * t,
                 delta_x: 0.0,
                 delta_y: 0.0,
                 kind: Default::default(),
@@ -489,11 +487,7 @@ fn tree_selection() {
             TreeDragOperations::default(),
         ));
         let rows = tree_rows(scene);
-        assert_eq!(
-            rows.len(),
-            3,
-            "the caller-owned expansion mounts expanded"
-        );
+        assert_eq!(rows.len(), 3, "the caller-owned expansion mounts expanded");
         let child = rows
             .into_iter()
             .nth(1)

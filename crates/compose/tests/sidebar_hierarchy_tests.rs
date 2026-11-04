@@ -1094,8 +1094,7 @@ fn item_actions() {
         harness.expand(scene, &["projects", "team"]);
         harness.selection.set(Some("audit".to_owned()));
         scene.settle(10, 1.0);
-        let actions = actions_trigger(scene, AUDIT)
-            .expect("the row mounts its actions trigger");
+        let actions = actions_trigger(scene, AUDIT).expect("the row mounts its actions trigger");
         press(scene, &actions, MouseButton::Left);
         assert_eq!(
             harness.archived.get(),
@@ -1142,8 +1141,8 @@ fn compact_item_actions() {
         harness.input.set(InputCapabilities::TOUCH);
         harness.open.set(true);
         harness.set_width(scene, 390.0);
-        let actions = actions_trigger(scene, AUDIT)
-            .expect("the compact drawer mounts the actions trigger");
+        let actions =
+            actions_trigger(scene, AUDIT).expect("the compact drawer mounts the actions trigger");
         assert!(
             actions.frame().height >= 44.0,
             "the compact drawer's actions trigger keeps a 44pt target, saw {:?}",

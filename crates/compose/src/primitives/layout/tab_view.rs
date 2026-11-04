@@ -322,12 +322,11 @@ impl<Id: PartialEq + Clone + std::hash::Hash + 'static> PrimitiveView for TabVie
             let identity = identity.clone();
             move |strip_width: f32| -> Vec<AnyView> {
                 let mut strip_items: Vec<AnyView> = Vec::new();
-                let tabs_in_strip: &[TabItem<Id>] =
-                    if view.overflow == TabOverflow::Menu {
-                        &[]
-                    } else {
-                        &view.tabs
-                    };
+                let tabs_in_strip: &[TabItem<Id>] = if view.overflow == TabOverflow::Menu {
+                    &[]
+                } else {
+                    &view.tabs
+                };
                 let reserved = if view.variant == TabVariant::Segmented {
                     6.0
                 } else {
@@ -484,7 +483,10 @@ impl PrimitiveView for TabStrip {
             node.set_background_color(Some(theme.colors.surface_variant));
             node.set_corner_radius(theme.radius.md);
         } else {
-            crate::theme::tokens::SemanticBackgroundModifier::new(crate::theme::SemanticColorRef::surface()).apply_node(node);
+            crate::theme::tokens::SemanticBackgroundModifier::new(
+                crate::theme::SemanticColorRef::surface(),
+            )
+            .apply_node(node);
             node.set_corner_radius(0.0);
         }
     }
@@ -571,7 +573,9 @@ impl<Id: PartialEq + Clone + std::hash::Hash + 'static> PrimitiveView for TabStr
     fn children(&self, _node: &Node) -> Vec<AnyView> {
         let mut label_row: Vec<AnyView> = Vec::new();
         if let Some(icon) = self.tab.icon.clone() {
-            label_row.push(AnyView::new(Icon::new(icon, 14.0).accessibility_hidden(true)));
+            label_row.push(AnyView::new(
+                Icon::new(icon, 14.0).accessibility_hidden(true),
+            ));
         }
         // Swift hides the title from accessibility and carries it on the tab's
         // own semantics instead (`TabView.swift:193`).
@@ -704,7 +708,10 @@ impl PrimitiveView for TabItemChrome {
     fn update_node(&self, node: &Node) {
         let theme = theme_for_node(node);
         if self.variant == TabVariant::Card && self.is_selected {
-            crate::theme::tokens::SemanticBackgroundModifier::new(crate::theme::SemanticColorRef::surface()).apply_node(node);
+            crate::theme::tokens::SemanticBackgroundModifier::new(
+                crate::theme::SemanticColorRef::surface(),
+            )
+            .apply_node(node);
             node.set_corner_radius(theme.radius.md);
         }
         if self.indicator != IndicatorPlacement::None && self.is_selected {

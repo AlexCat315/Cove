@@ -368,63 +368,112 @@ fn legend() {
 }
 
 #[test]
+fn legend_items_report_their_shown_state_and_wrap_whole() {
+    // A visible item is a selected toggle; at 220pt the items no longer fit on
+    // one line, and each one wraps whole instead of spilling past the width.
+    InteractiveScene::run(600.0, 300.0, |scene| {
+        let (_, hidden) = install(scene);
+        let items = |scene: &InteractiveScene| -> Vec<Node> {
+            let mut items: Vec<Node> = scene
+                .all(|node| {
+                    node.accessibility()
+                        .is_some_and(|semantics| semantics.role == AccessibilityRole::Toggle)
+                })
+                .into_iter()
+                .collect();
+            items.sort_by(|left, right| {
+                left.absolute_frame().x.total_cmp(&right.absolute_frame().x)
+            });
+            items
+        };
+
+        let mounted = items(scene);
+        assert_eq!(mounted.len(), 4, "one legend toggle per named series");
+        assert!(
+            mounted.iter().all(|node| node
+                .accessibility()
+                .is_some_and(|semantics| semantics.state.is_selected)),
+            "a shown series reports its legend toggle as selected"
+        );
+
+        hidden.set(HashSet::new());
+        scene.settle(6, 1.0);
+        let narrow = items(scene);
+        assert!(
+            narrow.len() == 4,
+            "narrowing the chart keeps every legend item mounted"
+        );
+        assert!(
+            narrow
+                .iter()
+                .all(|node| node.absolute_frame().max_x() <= 600.5),
+            "legend items stay inside the chart width"
+        );
+    });
+}
+
+#[test]
 fn pie_touch() {
     // Matches the Swift harness: a 600x220 pie inside the 600x300 window. The
     // donut hole is a fraction of the radius, so the surface has to be wide
     // enough for the tap below to land on the ring rather than in the hole.
-    support::with_test_text_environment(|| InteractiveScene::run(600.0, 300.0, |scene| {
-        let point = State::new(None);
-        let mut configuration = ChartConfiguration::default();
-        configuration.selection = Selection {
-            point: Some(point.binding()),
-            ..Selection::default()
-        };
-        configuration.legend.placement = cove_ui_compose::primitives::data::chart::model::ChartLegendPlacementState::bottom();
-        let chart = Chart::pie(
-            vec![
-                cove_ui_compose::primitives::data::chart::ChartSlice::new("Desktop", 3.0, None),
-                cove_ui_compose::primitives::data::chart::ChartSlice::new("Mobile", 1.0, None),
-            ],
-            Default::default(),
-            configuration,
-        );
+    support::with_test_text_environment(|| {
+        InteractiveScene::run(600.0, 300.0, |scene| {
+            let point = State::new(None);
+            let mut configuration = ChartConfiguration::default();
+            configuration.selection = Selection {
+                point: Some(point.binding()),
+                ..Selection::default()
+            };
+            configuration.legend.placement =
+                cove_ui_compose::primitives::data::chart::model::ChartLegendPlacementState::bottom(
+                );
+            let chart = Chart::pie(
+                vec![
+                    cove_ui_compose::primitives::data::chart::ChartSlice::new("Desktop", 3.0, None),
+                    cove_ui_compose::primitives::data::chart::ChartSlice::new("Mobile", 1.0, None),
+                ],
+                Default::default(),
+                configuration,
+            );
 
-        let mut surface = Environment::default();
-        surface.input = InputCapabilities::TOUCH;
-        scene.install(AnyView::new(
-            AnyView::new(chart)
-                .frame_size(600.0, 220.0)
-                .surface_environment(surface),
-        ));
-        scene.settle(6, 1.0);
+            let mut surface = Environment::default();
+            surface.input = InputCapabilities::TOUCH;
+            scene.install(AnyView::new(
+                AnyView::new(chart)
+                    .frame_size(600.0, 220.0)
+                    .surface_environment(surface),
+            ));
+            scene.settle(6, 1.0);
 
-        let frame = plot(scene).absolute_frame();
-        // Desktop is 3/4: everything but the upper-left quarter.
-        press(
-            scene,
-            frame.x + frame.width / 2.0 + 40.0,
-            frame.y + frame.height / 2.0 + 40.0,
-        );
-        assert_eq!(
-            point.get(),
-            Some(ChartPoint::new(0, 0)),
-            "tapping a slice selects it"
-        );
-        let value = plot(scene)
-            .accessibility()
-            .map(|semantics| semantics.value)
-            .unwrap_or_default();
-        assert!(
-            value.contains("Desktop") && value.contains("75"),
-            "the value names the tapped slice with its share (got {value:?})"
-        );
+            let frame = plot(scene).absolute_frame();
+            // Desktop is 3/4: everything but the upper-left quarter.
+            press(
+                scene,
+                frame.x + frame.width / 2.0 + 40.0,
+                frame.y + frame.height / 2.0 + 40.0,
+            );
+            assert_eq!(
+                point.get(),
+                Some(ChartPoint::new(0, 0)),
+                "tapping a slice selects it"
+            );
+            let value = plot(scene)
+                .accessibility()
+                .map(|semantics| semantics.value)
+                .unwrap_or_default();
+            assert!(
+                value.contains("Desktop") && value.contains("75"),
+                "the value names the tapped slice with its share (got {value:?})"
+            );
 
-        // The hole still selects nothing.
-        press(
-            scene,
-            frame.x + frame.width / 2.0,
-            frame.y + frame.height / 2.0,
-        );
-        assert_eq!(point.get(), None, "tapping the hole selects nothing");
-    }));
+            // The hole still selects nothing.
+            press(
+                scene,
+                frame.x + frame.width / 2.0,
+                frame.y + frame.height / 2.0,
+            );
+            assert_eq!(point.get(), None, "tapping the hole selects nothing");
+        })
+    });
 }

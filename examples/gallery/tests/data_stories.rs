@@ -7,6 +7,7 @@ use cove_examples::gallery_content::stories::data_stories::{
     AdaptiveTableSample, CHART_FOCUS_RANGE, CHART_SAMPLE_COUNT, ChartExplorationStory,
     numeric_comparison,
 };
+use cove_ui_compose::primitives::data::chart::ChartRange;
 use cove_ui_compose::primitives::data::data_table::table_column::ComparisonResult;
 
 #[test]
@@ -21,14 +22,17 @@ fn the_chart_starts_at_the_full_domain() {
 fn focus_zooms_to_the_interesting_range() {
     let story = ChartExplorationStory::new();
     story.focus();
-    assert_eq!(story.viewport(), Some(CHART_FOCUS_RANGE));
+    assert_eq!(
+        story.viewport(),
+        Some(ChartRange::new(CHART_FOCUS_RANGE.0, CHART_FOCUS_RANGE.1))
+    );
 }
 
 #[test]
 fn reset_clears_both_the_zoom_and_the_brush() {
     let story = ChartExplorationStory::new();
     story.focus();
-    story.set_selection(Some((21.0, 30.0)));
+    story.set_selection(Some(ChartRange::new(21.0, 30.0)));
     story.reset();
     assert_eq!(story.viewport(), None);
     assert_eq!(story.selection(), None);
@@ -57,7 +61,7 @@ fn the_chart_plots_a_fixed_sample_count() {
 fn the_brushed_caption_appears_only_with_a_selection() {
     let story = ChartExplorationStory::new();
     assert_eq!(story.brushed_caption(), None);
-    story.set_selection(Some((20.0, 40.0)));
+    story.set_selection(Some(ChartRange::new(20.0, 40.0)));
     assert_eq!(
         story.brushed_caption().as_deref(),
         Some("Selected 20.0–40.0")

@@ -87,8 +87,8 @@ impl View for Harness {
         if self.touch {
             use cove_ui_compose::adaptive::SurfaceEnvironmentExt;
             let mut environment = cove_core::Environment::default();
-            environment.input = cove_core::InputCapabilities::TOUCH
-                | cove_core::InputCapabilities::KEYBOARD;
+            environment.input =
+                cove_core::InputCapabilities::TOUCH | cove_core::InputCapabilities::KEYBOARD;
             AnyView::new(list.surface_environment(environment))
         } else {
             list

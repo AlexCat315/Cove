@@ -4,27 +4,33 @@
 //! has to know label widths before it can size the plot, so this resolves from
 //! the data-derived scale: domain -> ticks -> label widths -> plot.
 //!
-//! `TextEnvironment` is not available in Rust yet; measurements fall back to
-//! the caption glyph approximation the Swift headless path uses, and labels are
-//! carried for a future text host.
+//! Measurements use the live `TextEnvironment` when one is installed and fall
+//! back to the caption glyph approximation the Swift headless path uses.
 use cove_core::scene::{Point, Rect, Size};
+use cove_core::{TextAlignment, TextLayoutResult};
+use cove_text::{TextEnvironment, TextEnvironmentHolder};
+use std::sync::Arc;
+use unicode_segmentation::UnicodeSegmentation;
 
 use crate::theme::{TextStyleToken, Theme};
 
 use super::axes::ChartValueAxes;
 use super::coordinates::ChartGeometry;
-use super::model::{Axis as AxisConfig, ChartOrientation, ChartRange, ChartStyle, ChartXDomain};
+use super::model::{Axis as AxisConfig, ChartOrientation, ChartStyle, ChartXDomain};
 use super::scale::ChartScale;
 use super::viewport::ChartWindow;
 
+/// Caption text the axis chrome is measured with and drawn in.
 #[derive(Clone)]
 pub struct ChartText {
     pub token: TextStyleToken,
+    pub environment: Option<TextEnvironment>,
 }
 impl ChartText {
     pub fn new(theme: &Theme) -> Self {
         Self {
             token: theme.typography.caption.clone(),
+            environment: TextEnvironmentHolder::current(),
         }
     }
 
@@ -35,10 +41,34 @@ impl ChartText {
                 height: 0.0,
             };
         }
+        if let Some(layout) = self.layout(text) {
+            return Size {
+                width: layout.total_width,
+                height: layout.total_height,
+            };
+        }
+        // No text environment (headless tests): a caption glyph averages ~0.55em.
+        // Count grapheme clusters, as Swift's `text.count` does, so a combining
+        // mark or an emoji does not inflate a category label.
         Size {
-            width: text.chars().count() as f32 * self.token.font.size() * 0.55,
+            width: text.graphemes(true).count() as f32 * self.token.font.size() * 0.55,
             height: self.token.line_height,
         }
+    }
+
+    pub fn layout(&self, text: &str) -> Option<Arc<TextLayoutResult>> {
+        let environment = self.environment.as_ref()?;
+        if text.is_empty() {
+            return None;
+        }
+        Some(environment.cached_layout(
+            text,
+            Some(&self.token.font),
+            Some(self.token.line_height),
+            f32::INFINITY,
+            TextAlignment::Leading,
+            self.token.letter_spacing,
+        ))
     }
 }
 
@@ -424,10 +454,5 @@ impl ChartFrame {
             (size.width - inset * 2.0).max(0.0),
             (size.height - inset * 2.0).max(0.0),
         )
-    }
-
-    /// Ratio window helper retained for overlays.
-    pub fn visible_range(&self) -> ChartRange {
-        ChartRange::new(0.0, 1.0)
     }
 }

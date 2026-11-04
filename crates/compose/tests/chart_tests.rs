@@ -33,9 +33,10 @@ use std::rc::Rc;
 use cove_composition::PrimitiveView;
 use cove_core::{Point, Rect, Size};
 use cove_ui_compose::primitives::data::chart::{
-    Axis, ChartBand, ChartContent, ChartDatum, ChartGuides, ChartHistogram, ChartPlot,
-    ChartPlotInput, ChartPoint, ChartSeries, ChartSeriesStyle, ChartSlice, ChartStacking,
-    ChartStyle, ChartText, ChartValueAxes, ChartValueAxis, ChartXDomain, PieGeometry,
+    Axis, Chart, ChartBand, ChartConfiguration, ChartContent, ChartDatum, ChartGuides,
+    ChartHistogram, ChartMark, ChartPlot, ChartPlotInput, ChartPoint, ChartRange, ChartScaleKind,
+    ChartSeries, ChartSeriesStyle, ChartSlice, ChartStacking, ChartStyle, ChartText,
+    ChartValueAxes, ChartValueAxis, ChartWindow, ChartXDomain, PieGeometry, Viewport,
 };
 use cove_ui_compose::theme::{SemanticColorRef, Theme};
 
@@ -986,6 +987,70 @@ fn a_histogram_of_identical_samples_still_divides_a_width() {
             "every sample lands in a bin"
         );
         assert_eq!(histogram.labels.len(), 3, "three bins are still labelled");
+    });
+}
+
+#[test]
+fn a_custom_value_formatter_reaches_the_callout_and_the_summary() {
+    GlobalTestLock::locked(|| {
+        // The selection formatter is public API: a chart that sets only
+        // `selection.value_text` still formats every value it speaks.
+        let mut configuration = ChartConfiguration::default();
+        configuration.label = "Sales".to_string();
+        configuration.selection.value_text =
+            std::sync::Arc::new(|value: f32| format!("{value:.1}%"));
+
+        let series = vec![ChartSeries::values(
+            vec![1.0, 2.0],
+            SemanticColorRef::accent(),
+            ChartMark::Bar,
+            "Sales",
+            ChartValueAxis::Left,
+            ChartSeriesStyle::default(),
+        )];
+        let chart = Chart::new(
+            series,
+            ChartXDomain::Categorical(vec!["A".to_string(), "B".to_string()]),
+            ChartGuides::default(),
+            ChartStyle::default(),
+            configuration,
+        );
+
+        let callout = chart.callout(ChartPoint::new(0, 0)).expect("a callout");
+        assert_eq!(
+            callout.rows[0].value, "1.0%",
+            "the custom formatter labels the callout row"
+        );
+        let (label, summary) = chart.summary(None);
+        assert_eq!(label, "Sales");
+        assert!(
+            summary.contains("1.0%") && summary.contains("2.0%"),
+            "the summary formats both ends of the range (got {summary:?})"
+        );
+    });
+}
+
+#[test]
+fn a_default_viewport_keeps_the_one_percent_zoom_floor() {
+    GlobalTestLock::locked(|| {
+        let viewport = Viewport::default();
+        assert_eq!(
+            viewport.minimum_fraction, 0.01,
+            "a default chart keeps the documented 1% zoom floor"
+        );
+        let window = ChartWindow::new(
+            ChartRange::new(0.0, 100.0),
+            None,
+            ChartScaleKind::Linear,
+            viewport.minimum_fraction,
+            false,
+        );
+        let zoomed = window.zoom(0.0001, 0.5);
+        assert!(
+            zoomed.range.span() >= 0.9,
+            "zooming past the floor stops at 1% of the domain (got {})",
+            zoomed.range.span()
+        );
     });
 }
 

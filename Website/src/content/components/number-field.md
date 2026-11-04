@@ -4,14 +4,17 @@
 
 ```rust
 use cove_core::State;
-use cove_ui_compose::primitives::controls::fields::numeric::{NumberField, NumberFieldPrefix, NumericTextFormat};
+use cove_ui_compose::primitives::controls::fields::numeric::{
+    NumberField, NumberFieldOptions, NumberFieldPrefix, NumericTextFormat,
+};
 
 let amount = State::new(3.14_f32);
 let field = NumberField::new(amount.binding()).range(Some(0.0), Some(10.0))
     .step(0.25).shows_stepper(true).prefix(NumberFieldPrefix::new("W"))
     .reset_value(1.0);
-let comma = NumberField::new(amount.binding())
-    .with_format(NumericTextFormat::new(',', 2));
+// 与 Vec3Field 共用同一份格式/边界/步长/启用配置。
+let options = NumberFieldOptions::default().format(NumericTextFormat::new(',', 2));
+let comma = NumberField::new(amount.binding()).options(options);
 ```
 
 Gallery 与 Swift 对齐：3.14 的绑定、普通/拖动/混合/禁用示例，以及共享 1.25 绑定的逗号与小数点输入。分组符和尾随垃圾输入不会被宽松解析。

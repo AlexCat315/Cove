@@ -200,17 +200,14 @@ impl PrimitiveView for Image {
 
     fn update_node(&self, node: &cove_core::scene::Node) {
         let snapshot = self.clone();
-        let vector_raster = self
-            .vector_source_url
-            .clone()
-            .map(|path| {
-                std::rc::Rc::new(VectorImageRaster::new(
-                    path,
-                    self.source.clone(),
-                    self.width,
-                    self.height,
-                ))
-            });
+        let vector_raster = self.vector_source_url.clone().map(|path| {
+            std::rc::Rc::new(VectorImageRaster::new(
+                path,
+                self.source.clone(),
+                self.width,
+                self.height,
+            ))
+        });
         let identity = PaintIdentity {
             source: self.source.clone(),
             width: self.width,
@@ -257,7 +254,9 @@ impl PrimitiveView for Image {
                     let repaint = node.downgrade();
                     raster.resolve_async(draw_width, draw_height, move || {
                         if let Some(node) = cove_core::scene::Node::upgrade(&repaint) {
-                            node.mark_render_dirty(cove_core::scene::InvalidationSource::style_set("image.raster"));
+                            node.mark_render_dirty(
+                                cove_core::scene::InvalidationSource::style_set("image.raster"),
+                            );
                         }
                     })
                 })

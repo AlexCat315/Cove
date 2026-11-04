@@ -102,6 +102,65 @@ impl FormField {
     }
 }
 
+/// One labelled field: label, control and help or error, using the same shell
+/// `Form` places in its grid. Use it directly for a page that shows a single
+/// control without a form-level controller.
+#[derive(Clone)]
+pub struct Field {
+    pub id: String,
+    pub label: String,
+    pub content: AnyView,
+    pub presentation: FormFieldPresentation,
+    pub layout: FormLayout,
+}
+
+impl Field {
+    pub fn new(
+        id: impl Into<String>,
+        label: impl Into<String>,
+        content: impl View + 'static,
+    ) -> Self {
+        Self {
+            id: id.into(),
+            label: label.into(),
+            content: AnyView::new(content),
+            presentation: FormFieldPresentation {
+                is_visible: true,
+                ..Default::default()
+            },
+            layout: FormLayout::default(),
+        }
+    }
+
+    /// Required marker, help or error copy.
+    pub fn configure(mut self, configure: impl FnOnce(&mut FormFieldPresentation)) -> Self {
+        configure(&mut self.presentation);
+        self
+    }
+
+    /// Label placement and spacing; defaults to the adaptive single-column layout.
+    pub fn layout(mut self, layout: FormLayout) -> Self {
+        self.layout = layout;
+        self
+    }
+}
+
+impl View for Field {
+    fn body(&self, _cx: &Scope) -> AnyView {
+        let field = FormField {
+            id: self.id.clone(),
+            label: self.label.clone(),
+            content: self.content.clone(),
+            presentation: self.presentation.clone(),
+        };
+        AnyView::new(FormFieldView {
+            field,
+            layout: self.layout.clone(),
+            error: self.presentation.error.clone(),
+        })
+    }
+}
+
 /// Layout and field descriptions; values, validation policy and submission remain application-owned.
 pub struct Form {
     fields: Vec<FormField>,

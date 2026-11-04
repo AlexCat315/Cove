@@ -7,7 +7,9 @@ use crate::modifiers::animation_value::AnimationValueExt;
 use crate::modifiers::layout::{FlexExt, LayoutFrameExt};
 use crate::modifiers::style::AppearanceExt;
 use crate::theme::SemanticMotionRef;
-use crate::theme::styles::components::{TextFieldStyle, TextFieldStyleConfiguration};
+use crate::theme::styles::components::{
+    InputChromeState, TextFieldStyle, TextFieldStyleConfiguration,
+};
 use crate::{AnyView, BoxView, PrimitiveView, TupleView, View};
 use cove_core::Color;
 use cove_core::scene::{Align, FlexDirection, Justify, Node, Wrap};
@@ -24,33 +26,14 @@ impl NumericPrefixFieldStyle {
             chip: AnyView::new(chip),
         }
     }
-
-    /// Border tone for the current interaction state.
-    pub fn border_color(configuration: &TextFieldStyleConfiguration) -> Color {
-        let inputs = &configuration.theme.inputs;
-        if !configuration.is_enabled {
-            inputs.border_disabled
-        } else if configuration.is_error {
-            inputs.border_error
-        } else if configuration.is_focused {
-            inputs.border_focused
-        } else if configuration.is_hovered {
-            inputs.border_hover
-        } else {
-            inputs.border_color
-        }
-    }
 }
 
 impl TextFieldStyle for NumericPrefixFieldStyle {
     fn make_body(&self, configuration: TextFieldStyleConfiguration) -> AnyView {
         let theme = configuration.theme.clone();
-        let border = Self::border_color(&configuration);
-        let width = if configuration.is_focused {
-            theme.inputs.focus_ring_width
-        } else {
-            theme.inputs.border_width
-        };
+        let state = InputChromeState::from(&configuration);
+        let border = theme.inputs.border_for(state);
+        let width = theme.inputs.border_width_for(state);
         let alpha = if configuration.is_enabled || theme.text_emphasis.disabled.is_some() {
             1.0
         } else {
@@ -65,11 +48,7 @@ impl TextFieldStyle for NumericPrefixFieldStyle {
                 content: configuration.content.clone(),
                 border,
                 border_width: width,
-                background: if configuration.is_enabled {
-                    theme.inputs.background
-                } else {
-                    theme.inputs.background_disabled
-                },
+                background: theme.inputs.background_for(state),
                 divider: theme.inputs.divider_color,
                 radius: theme.inputs.radius,
                 alpha,

@@ -50,11 +50,14 @@ impl ChartPlot {
 
     pub fn install_input(&self, node: &cove_core::scene::Node, session: &Rc<ChartSession>) {
         let Some(registry) = InteractionRegistryHolder::current() else {
+            session.release(node);
             session.navigation.borrow_mut().cancel();
             return;
         };
         if !self.is_interactive_plot() {
+            session.release(node);
             session.navigation.borrow_mut().cancel();
+            registry.remove(node);
             return;
         }
 
@@ -102,7 +105,7 @@ impl ChartPlot {
             let choose = choose.clone();
             registry.set_motion(
                 node,
-                InputHandlerRoute::scroll(),
+                InputHandlerRoute::control(),
                 Rc::new(move |event, phase| {
                     let Some(owner) = cove_core::scene::Node::upgrade(&weak_node) else {
                         return EventResult::Ignored;
@@ -165,7 +168,14 @@ impl ChartPlot {
                                 session.navigation.borrow_mut().cancel();
                                 return EventResult::Handled;
                             }
-                            if begin_navigation(&plot, event.x, event.y, &owner, &session) {
+                            if begin_navigation(
+                                &plot,
+                                event.x,
+                                event.y,
+                                &owner,
+                                &session,
+                                event.modifiers.has_alt(),
+                            ) {
                                 session.press(&owner);
                                 return EventResult::Handled;
                             }
@@ -206,9 +216,11 @@ impl ChartPlot {
             let session = session.clone();
             let weak_node = weak_node.clone();
             let plot = self.clone();
+            // The default route, as Swift's wheel registration uses: a chart
+            // that declined the hit must not be reached by the scroll fallback.
             registry.set_wheel(
                 node,
-                InputHandlerRoute::scroll(),
+                InputHandlerRoute::control(),
                 Rc::new(move |event, phase| {
                     let Some(owner) = cove_core::scene::Node::upgrade(&weak_node) else {
                         return EventResult::Ignored;
@@ -381,6 +393,7 @@ fn begin_navigation(
     y: f32,
     node: &cove_core::scene::Node,
     session: &Rc<ChartSession>,
+    alt: bool,
 ) -> bool {
     if !plot.is_cartesian() {
         return false;
@@ -396,7 +409,7 @@ fn begin_navigation(
     }
     let fraction = window.fraction_at(x, y, geometry.plot, plot.style.orientation);
     let mut navigation = session.navigation.borrow_mut();
-    if plot.viewport.range.is_some() && (window_pan_by_default(plot) || !plot.input.is_enabled) {
+    if plot.viewport.range.is_some() && (alt || (plot.brush.is_none() && !plot.input.is_enabled)) {
         navigation.drag = Some(ChartDrag::Pan {
             anchor: fraction,
             window,
@@ -415,12 +428,6 @@ fn begin_navigation(
         return false;
     }
     true
-}
-
-/// The Swift path pans when the alt modifier is held. The Rust input event
-/// carries modifiers only on pointer/press, so the default (no alt) decides.
-fn window_pan_by_default(plot: &ChartPlot) -> bool {
-    plot.brush.is_none()
 }
 
 fn move_navigation(

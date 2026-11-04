@@ -119,7 +119,10 @@ pub struct FillUnlessSizedModifier;
 impl ViewModifier for FillUnlessSizedModifier {
     fn apply_node(&self, node: &Node) {
         if let Some(layout) = node.layout_node()
-            && matches!(FrameModifier::current_height(&layout), FrameDimensionSpec::Auto)
+            && matches!(
+                FrameModifier::current_height(&layout),
+                FrameDimensionSpec::Auto
+            )
         {
             FlexModifier::new(1.0, 1.0, Some(0.0)).apply(node, &layout);
         }

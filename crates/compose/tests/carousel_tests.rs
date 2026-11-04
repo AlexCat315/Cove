@@ -421,11 +421,7 @@ fn hover_and_the_pause_control_stop_rotation() {
             .expect("the pause control is actionable")();
         settle(graph);
         tick(2.1, graph);
-        assert_eq!(
-            page.get(),
-            "page-2",
-            "resuming advances again"
-        );
+        assert_eq!(page.get(), "page-2", "resuming advances again");
         tick(10.0, graph);
         assert_eq!(
             page.get(),

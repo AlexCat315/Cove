@@ -99,7 +99,6 @@ fn select_step<Id: PartialEq + Clone + 'static>(
 }
 
 impl<Id: std::hash::Hash + PartialEq + Clone + 'static> Stepper<Id> {
-
     fn content(&self, vertical: bool) -> AnyView {
         let enabled = self.enabled();
         let selection = self.selection.clone();

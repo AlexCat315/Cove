@@ -540,7 +540,9 @@ fn combobox_list_scales_once_and_search_focus_survives_a_resize() {
         // the mounted height grows with the text scale rather than staying flat.
         let heights: Vec<f32> = rows.iter().map(|row| row.frame().height).collect();
         assert!(
-            heights.windows(2).all(|pair| (pair[0] - pair[1]).abs() < 0.5),
+            heights
+                .windows(2)
+                .all(|pair| (pair[0] - pair[1]).abs() < 0.5),
             "every option row shares one height, got {heights:?}"
         );
         state.width.set(720.0);

@@ -59,7 +59,10 @@ impl CalendarGranularity {
             Self::Month => super::calendar::month_title(date, calendar),
             Self::Year => crate::i18n::format_template(
                 &crate::i18n::tr("calendar.year_period"),
-                &[("year", &calendar.component(CalendarUnit::Year, date).to_string())],
+                &[(
+                    "year",
+                    &calendar.component(CalendarUnit::Year, date).to_string(),
+                )],
             ),
         }
     }

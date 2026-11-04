@@ -210,7 +210,12 @@ impl CommandPalette {
     }
 
     fn visible(&self, state: PaletteState) -> Vec<PaletteCommand> {
-        let items: Vec<CommandItem> = self.items.iter().filter(|item| item.is_enabled).map(PaletteCommand::item).collect();
+        let items: Vec<CommandItem> = self
+            .items
+            .iter()
+            .filter(|item| item.is_enabled)
+            .map(PaletteCommand::item)
+            .collect();
         ranked(&items, &Self::trimmed_query(state))
             .into_iter()
             .filter_map(|ranked_item| {

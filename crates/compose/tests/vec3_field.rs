@@ -15,7 +15,7 @@
 use cove_platform::KeyModifiers;
 use cove_ui_compose::primitives::controls::fields::numeric::scrub::NumericScrub;
 use cove_ui_compose::primitives::controls::fields::{
-    Vec3, Vec3Axis, Vec3Codec, Vec3Constraints, minimum_axis_width, shows_mixed,
+    NumberFieldOptions, Vec3, Vec3Axis, Vec3Codec, Vec3Constraints, minimum_axis_width, shows_mixed,
 };
 use std::collections::HashSet;
 
@@ -183,7 +183,10 @@ fn authored_vector_step_reaches_each_numeric_axis() {
     use cove_ui_compose::primitives::controls::fields::vec3_field::Vec3Field;
     crate::support::InteractiveScene::run(600.0, 300.0, |scene| {
         let (x, y, z) = (State::new(1.0), State::new(2.0), State::new(3.0));
-        scene.install(Vec3Field::new(x.binding(), y.binding(), z.binding()).step(0.1));
+        scene.install(
+            Vec3Field::new(x.binding(), y.binding(), z.binding())
+                .options(NumberFieldOptions::default().step(0.1)),
+        );
         let fields = scene.all(|n| {
             n.accessibility()
                 .is_some_and(|s| s.role == AccessibilityRole::TextField)

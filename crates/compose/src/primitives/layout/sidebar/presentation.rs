@@ -3,9 +3,7 @@
 //! Present the same destination nodes as a full sidebar or a narrow rail.
 use crate::Scope;
 use crate::modifiers::layout::LayoutFrameExt;
-use crate::primitives::controls::button::{
-    ActionControlAccessibility, Button, ButtonIconSource,
-};
+use crate::primitives::controls::button::{ActionControlAccessibility, Button, ButtonIconSource};
 use crate::theme::styles::buttons::{ButtonRole, ButtonStyleViewExt, GhostButtonStyle};
 use crate::{AnyView, PrimitiveView, View, ViewExt};
 

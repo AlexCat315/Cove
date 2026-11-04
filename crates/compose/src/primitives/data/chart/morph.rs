@@ -129,7 +129,9 @@ impl ChartTransition {
         cache: Rc<RefCell<ChartResolutionCache>>,
     ) {
         let next = ChartSamples::new(content);
-        if self.target.as_ref() == Some(&next) || node.prefers_reduced_motion() {
+        // Only a genuine data change starts a transition. Reduced motion is not
+        // an early exit: it still reaches the target, it just gets there at once.
+        if self.target.as_ref() == Some(&next) {
             return;
         }
         let previous = cache
@@ -146,10 +148,11 @@ impl ChartTransition {
                 node.mark_render_dirty(cove_core::scene::InvalidationSource::Unknown);
             }
         };
-        // The surrounding `withAnimation` transaction supplies the animation
-        // when this chart has none of its own; the node's helper handles both.
-        node.animatable_set_with("chart.samples", previous, next, apply);
-        let _ = animation;
+        // The chart's own `animation` wins; the surrounding `withAnimation`
+        // transaction is the fallback. Reduced motion snaps inside the helper.
+        cove_core::scene::with_animation(animation, || {
+            node.animatable_set_with("chart.samples", previous, next, apply);
+        });
     }
 }
 

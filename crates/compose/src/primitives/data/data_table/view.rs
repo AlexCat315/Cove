@@ -786,11 +786,7 @@ impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 
         self.commit_editing_inner(input, true)
     }
 
-    fn commit_editing_inner(
-        &self,
-        input: &Rc<RefCell<Option<Node>>>,
-        restore_focus: bool,
-    ) -> bool {
+    fn commit_editing_inner(&self, input: &Rc<RefCell<Option<Node>>>, restore_focus: bool) -> bool {
         let mut session = self.session.get();
         let Some(draft) = session.editing.draft.clone() else {
             return true;

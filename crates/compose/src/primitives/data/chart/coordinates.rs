@@ -7,8 +7,7 @@ use cove_core::scene::{Point, Rect};
 
 use super::axes::ChartValueAxes;
 use super::model::{
-    ChartDatum, ChartMark, ChartOrientation, ChartPoint, ChartSeries, ChartSlice, ChartValueAxis,
-    ChartXDomain,
+    ChartMark, ChartOrientation, ChartPoint, ChartSeries, ChartSlice, ChartValueAxis, ChartXDomain,
 };
 use super::scale::ChartScale;
 use super::viewport::ChartWindow;
@@ -578,10 +577,4 @@ impl PieGeometry {
             self.center.y + middle.sin() * radius,
         )
     }
-}
-
-/// Gaps are represented by non-finite values; this helper keeps the checks in
-/// one place for series construction.
-pub fn is_gap(datum: &ChartDatum) -> bool {
-    !datum.y.is_finite()
 }

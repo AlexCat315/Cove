@@ -40,12 +40,12 @@ use crate::theme::styles::components::{TreeRowStyleConfiguration, TreeRowStyleEn
 use crate::theme::{SemanticColorRef, theme_for_node};
 use crate::{AnyView, BoxView, PrimitiveView, TupleView, View};
 use cove_composition::Scancode;
+use cove_core::scene::NodeWeak;
 use cove_core::scene::{
     AccessibilityActions, AccessibilityRole, AccessibilitySemantics, Align, DrawHook, EventPhase,
     EventResult, FlexDirection, HoverPhase, InputHandlerRoute, InteractionRegistryHolder, Justify,
     LayoutNode, Node, PointerCaptureHolder, PointerPhase, Wrap,
 };
-use cove_core::scene::NodeWeak;
 use cove_core::{Binding, Color, Point, Rect, State};
 use cove_platform::{KeyEvent, KeyModifiers, MouseButton, SystemCursor};
 
@@ -976,7 +976,13 @@ where
 
     /// Records the row the pointer is over and the band it lands in. Invalid or
     /// self targets keep the source row marked but clear the drop target.
-    fn update_drag(&self, source: &TreeNodeKey<Id>, x: f32, y: f32, registry: &TreeDragRegistry<Id>) {
+    fn update_drag(
+        &self,
+        source: &TreeNodeKey<Id>,
+        x: f32,
+        y: f32,
+        registry: &TreeDragRegistry<Id>,
+    ) {
         let target = registry.hit(Point::new(x, y));
         let entries = self.entries.borrow();
         let source_entry = entries.iter().find(|entry| &entry.key == source).cloned();
@@ -997,12 +1003,9 @@ where
             return;
         }
         let position = drop_position(y, frame);
-        if self
-            .drag
-            .can_drop
-            .as_ref()
-            .is_some_and(|can_drop| !can_drop(&source_entry.element, &target_entry.element, position))
-        {
+        if self.drag.can_drop.as_ref().is_some_and(|can_drop| {
+            !can_drop(&source_entry.element, &target_entry.element, position)
+        }) {
             self.drag_target.set(None);
             return;
         }
@@ -1019,13 +1022,20 @@ where
             return;
         };
         let entries = self.entries.borrow();
-        let target_entry = entries.iter().find(|entry| entry.key == target_key).cloned();
+        let target_entry = entries
+            .iter()
+            .find(|entry| entry.key == target_key)
+            .cloned();
         drop(entries);
         let Some(target_entry) = target_entry else {
             return;
         };
         if let Some(on_drop) = &self.drag.on_drop {
-            on_drop(source.element.clone(), target_entry.element.clone(), position);
+            on_drop(
+                source.element.clone(),
+                target_entry.element.clone(),
+                position,
+            );
         }
     }
 
@@ -1414,13 +1424,13 @@ impl PrimitiveView for TreeRow {
                         if target != owner {
                             return EventResult::Ignored;
                         }
-                        let mut press = owner
-                            .attachment::<TreeDragPress>(DRAG_PRESS)
-                            .unwrap_or(TreeDragPress {
+                        let mut press = owner.attachment::<TreeDragPress>(DRAG_PRESS).unwrap_or(
+                            TreeDragPress {
                                 down_x: event.x,
                                 down_y: event.y,
                                 did_drag: false,
-                            });
+                            },
+                        );
                         let dx = event.x - press.down_x;
                         let dy = event.y - press.down_y;
                         // A small dead zone keeps a click from becoming a drag.
@@ -1819,7 +1829,9 @@ impl<Id: std::hash::Hash + Eq + Clone> TreeDragRegistry<Id> {
     fn register(&self, node: &Node, key: TreeNodeKey<Id>) {
         let mut entries = self.entries.borrow_mut();
         let weak = node.downgrade();
-        if let Some(existing) = entries.iter_mut().find(|(other, _)| other.strong_count() > 0 && Node::upgrade(other).as_ref() == Some(node)) {
+        if let Some(existing) = entries.iter_mut().find(|(other, _)| {
+            other.strong_count() > 0 && Node::upgrade(other).as_ref() == Some(node)
+        }) {
             *existing = (weak, key);
         } else {
             entries.push((weak, key));
@@ -1833,10 +1845,17 @@ impl<Id: std::hash::Hash + Eq + Clone> TreeDragRegistry<Id> {
         let entries = self.entries.borrow();
         let mut found = None;
         for (weak, key) in entries.iter() {
-            let Some(node) = Node::upgrade(weak) else { continue };
+            let Some(node) = Node::upgrade(weak) else {
+                continue;
+            };
             let frame = node.absolute_frame();
             let gutter = node.attachment::<f32>(ROW_GUTTER).unwrap_or(0.0);
-            let expanded = Rect::new(frame.x - gutter, frame.y, frame.width + gutter, frame.height);
+            let expanded = Rect::new(
+                frame.x - gutter,
+                frame.y,
+                frame.width + gutter,
+                frame.height,
+            );
             if expanded.contains(point) {
                 found = Some((key.clone(), expanded));
             }

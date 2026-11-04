@@ -7,6 +7,7 @@
 use std::collections::HashSet;
 
 use cove_core::scene::{Color, DrawList, Point, Rect};
+use cove_text::DrawListText;
 
 use crate::theme::Theme;
 
@@ -259,6 +260,31 @@ impl<'a> ChartPaint<'a> {
             ));
         }
         result
+    }
+
+    /// Tick labels in the gutters, plus the axis titles.
+    ///
+    /// A value tick sits in the left gutter on a vertical chart and under the
+    /// plot on a horizontal one; the category ticks swap. Text itself is never
+    /// rotated, which is the point of turning the chart instead.
+    pub fn axis_labels(&self, list: &mut DrawList) {
+        let Some(environment) = self.text.environment.as_ref() else {
+            return;
+        };
+        let color = self.theme.colors.on_surface_muted;
+        for (label, origin) in self.axis_label_layouts() {
+            let Some(layout) = self.text.layout(&label) else {
+                continue;
+            };
+            let _ = list.add_text(
+                &layout,
+                origin,
+                color,
+                environment.atlas_texture_id,
+                Some(&environment.atlas),
+                None,
+            );
+        }
     }
 
     pub fn thresholds(

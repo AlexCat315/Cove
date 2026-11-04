@@ -378,18 +378,20 @@ impl TimePicker {
     ) -> AnyView {
         let label = label.to_string();
         let is_enabled = self.options.is_enabled;
-        AnyView::new(SurfaceReader::new(move |surface: &cove_core::Environment| {
-            AnyView::new(
-                TimeWheel {
-                    label: label.clone(),
-                    options: options.clone(),
-                    value: value.clone(),
-                    is_enabled,
-                    row_height: row_height(surface),
-                }
-                .frame_width(WHEEL_WIDTH),
-            )
-        }))
+        AnyView::new(SurfaceReader::new(
+            move |surface: &cove_core::Environment| {
+                AnyView::new(
+                    TimeWheel {
+                        label: label.clone(),
+                        options: options.clone(),
+                        value: value.clone(),
+                        is_enabled,
+                        row_height: row_height(surface),
+                    }
+                    .frame_width(WHEEL_WIDTH),
+                )
+            },
+        ))
     }
 
     fn separator() -> AnyView {

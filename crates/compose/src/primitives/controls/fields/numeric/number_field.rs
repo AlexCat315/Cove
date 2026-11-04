@@ -22,6 +22,7 @@ use crate::{AnyView, BoxView, PrimitiveView, Row, TupleView, VerticalAlignment, 
 use cove_core::scene::{Align, FlexDirection, Justify, Node, Wrap};
 use cove_core::{Binding, Color};
 
+use super::options::NumberFieldOptions;
 use super::prefix_style::NumericPrefixFieldStyle;
 use super::scrub::{NumericScrub, NumericScrubHandle};
 use super::text_format::NumericTextFormat;
@@ -94,9 +95,15 @@ impl NumberField {
         }
     }
 
-    pub fn decimals(mut self, decimals: usize) -> Self {
-        self.decimals = decimals.min(6);
-        self.format = NumericTextFormat::invariant(self.decimals);
+    /// Applies the presentation shared with other numeric fields.
+    pub fn options(mut self, options: NumberFieldOptions) -> Self {
+        self.decimals = options.format.decimals;
+        self.format = options.format;
+        self.size = options.size;
+        self.is_enabled = options.is_enabled;
+        self.min_value = options.min_value;
+        self.max_value = options.max_value;
+        self.step = options.step;
         self
     }
 

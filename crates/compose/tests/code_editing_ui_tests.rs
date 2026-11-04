@@ -219,7 +219,17 @@ fn diagnostics_select_overlapping_rows_clusters_and_empty_positions() {
                 emoji_span.width
             );
             assert_eq!(emoji_span.baseline_y, 18.0);
-            eprintln!("DBG segs {:?}", segments.iter().map(|s| (s.diagnostic.message.clone(), s.diagnostic.utf8_range.clone(), s.baseline_y)).collect::<Vec<_>>());
+            eprintln!(
+                "DBG segs {:?}",
+                segments
+                    .iter()
+                    .map(|s| (
+                        s.diagnostic.message.clone(),
+                        s.diagnostic.utf8_range.clone(),
+                        s.baseline_y
+                    ))
+                    .collect::<Vec<_>>()
+            );
             assert_eq!(
                 segments
                     .iter()

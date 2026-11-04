@@ -385,9 +385,6 @@ fn strip_items_are_tabs() {
             AccessibilityRole::Tab,
             "a strip item is announced as a tab"
         );
-        assert_eq!(
-            semantics.label, "Overview",
-            "the tab carries its own label"
-        );
+        assert_eq!(semantics.label, "Overview", "the tab carries its own label");
     });
 }

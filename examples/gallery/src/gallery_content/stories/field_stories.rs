@@ -17,7 +17,7 @@ use cove_ui_compose::primitives::controls::fields::asset_ref_model::AssetRef;
 use cove_ui_compose::primitives::controls::fields::color_field::ColorField;
 use cove_ui_compose::primitives::controls::fields::json_field::JsonField;
 use cove_ui_compose::primitives::controls::fields::numeric::{
-    NumberField, NumberFieldPrefix, NumericTextFormat,
+    NumberField, NumberFieldOptions, NumberFieldPrefix, NumericTextFormat,
 };
 use cove_ui_compose::primitives::controls::fields::range_slider::{RangeSlider, RangeValue};
 use cove_ui_compose::primitives::controls::fields::search_field::SearchField;
@@ -25,41 +25,28 @@ use cove_ui_compose::primitives::controls::fields::select::{Select, SelectOption
 use cove_ui_compose::primitives::controls::fields::slider::Slider;
 use cove_ui_compose::primitives::controls::fields::vec3_field::Vec3Field;
 use cove_ui_compose::primitives::controls::fields::vec3_model::{Vec3, Vec3Constraints};
+use cove_ui_compose::primitives::controls::form::Field;
 use cove_ui_compose::primitives::layout::ResizableTextArea;
-use cove_ui_compose::primitives::text::Text;
 use cove_ui_compose::primitives::text::text_buffer::TextBuffer;
 use cove_ui_compose::primitives::text::text_field::TextField;
 use cove_ui_compose::primitives::text::text_field::text_field_options::{
     TextFieldAxis, TextFieldBehavior, TextFieldDecoration, TextFieldLayout,
 };
-use cove_ui_compose::theme::SemanticFontRef;
 use cove_ui_compose::theme::styles::components::{
     AnyTextFieldStyle, EditorTextFieldStyle, TextFieldStyle, TextFieldStyleConfiguration,
 };
-use cove_ui_compose::theme::tokens::{SemanticColorRef, SemanticStyleViewExt};
+use cove_ui_compose::theme::tokens::SemanticColorRef;
 use cove_ui_compose::{AnyView, BoxView, LayoutDebugExt, TupleView, View};
 
 use super::feedback::StorySection;
 use crate::gallery_content::catalog::GalleryOptions;
 
-/// A label, its control and a muted readout, stacked top to bottom.
+/// A labelled field: the shared field shell (label, control, muted readout) so
+/// gallery pages show the real form-field chrome rather than a bespoke stack.
 fn field_row(label: &str, control: AnyView, readout: String) -> AnyView {
-    AnyView::new(BoxView::new(
-        FlexDirection::Column,
-        Align::FlexStart,
-        Justify::FlexStart,
-        Wrap::NoWrap,
-        6.0,
-        AnyView::new(TupleView::new(vec![
-            AnyView::new(Text::new(label).semantic_foreground(SemanticColorRef::on_surface())),
-            control,
-            AnyView::new(
-                Text::new(readout)
-                    .semantic_font(SemanticFontRef::caption())
-                    .semantic_foreground(SemanticColorRef::on_surface_muted()),
-            ),
-        ])),
-    ))
+    AnyView::new(Field::new(label, label, control).configure(|presentation| {
+        presentation.help = readout;
+    }))
 }
 
 /// A row of fields that wraps when the pane narrows.
@@ -1057,8 +1044,7 @@ impl View for Vec3FieldStory {
             stack(vec![
                 AnyView::new(
                     Vec3Field::new(self.x.binding(), self.y.binding(), self.z.binding())
-                        .enabled(enabled)
-                        .step(0.1)
+                        .options(NumberFieldOptions::default().enabled(enabled).step(0.1))
                         .constraints(Vec3Constraints {
                             reset: Some(Vec3::new(0.0, 0.0, 0.0)),
                             ..Default::default()
@@ -1068,7 +1054,7 @@ impl View for Vec3FieldStory {
                 bounded(
                     AnyView::new(
                         Vec3Field::new(self.x.binding(), self.y.binding(), self.z.binding())
-                            .enabled(enabled)
+                            .options(NumberFieldOptions::default().enabled(enabled))
                             .mixed_axes(["x".to_owned(), "z".to_owned()].into_iter().collect())
                             .debug_name("vec3-mixed"),
                     ),
@@ -1215,6 +1201,56 @@ impl View for AssetRefStory {
 
     fn dynamic_properties(&self) -> Vec<cove_composition::DynamicField> {
         cove_composition::dynamic_fields!(self; value)
+    }
+}
+
+/// `NumericStory`: single values and three-axis vectors on one page.
+pub struct NumericStory {
+    pub options: GalleryOptions,
+}
+
+impl NumericStory {
+    pub fn new(options: GalleryOptions) -> Self {
+        Self { options }
+    }
+}
+
+impl View for NumericStory {
+    fn body(&self, _cx: &Scope) -> AnyView {
+        stack(vec![
+            AnyView::new(NumberFieldStory::new(self.options.clone())),
+            AnyView::new(Vec3FieldStory::new(self.options.clone())),
+        ])
+    }
+
+    fn tag(&self) -> &'static str {
+        "NumericStory"
+    }
+}
+
+/// `TextFieldsStory`: single-line, search, multiline and JSON entry on one page.
+pub struct TextFieldsStory {
+    pub options: GalleryOptions,
+}
+
+impl TextFieldsStory {
+    pub fn new(options: GalleryOptions) -> Self {
+        Self { options }
+    }
+}
+
+impl View for TextFieldsStory {
+    fn body(&self, _cx: &Scope) -> AnyView {
+        stack(vec![
+            AnyView::new(TextFieldStory::new(self.options.clone())),
+            AnyView::new(SearchFieldStory::new(self.options.clone())),
+            AnyView::new(TextAreaStory::new(self.options.clone())),
+            AnyView::new(JsonFieldStory::new(self.options.clone())),
+        ])
+    }
+
+    fn tag(&self) -> &'static str {
+        "TextFieldsStory"
     }
 }
 

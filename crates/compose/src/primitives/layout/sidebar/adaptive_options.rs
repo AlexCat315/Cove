@@ -208,11 +208,9 @@ impl SidebarGeometry {
         // so its rows keep their titles, badges and trailing accessories.
         match self.mode {
             SidebarMode::Expanded => super::presentation::SidebarPresentation::Expanded,
-            SidebarMode::Rail if !self.is_modal => {
-                super::presentation::SidebarPresentation::Rail {
-                    shows_labels: shows_rail_labels,
-                }
-            }
+            SidebarMode::Rail if !self.is_modal => super::presentation::SidebarPresentation::Rail {
+                shows_labels: shows_rail_labels,
+            },
             _ => super::presentation::SidebarPresentation::Expanded,
         }
     }

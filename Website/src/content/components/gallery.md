@@ -13,4 +13,6 @@ Gallery 展示 Cove 的 Rust 组件。组件页的 Size、Scale、Disabled 和 R
 - [TextField](/docs/text-field)：原生输入、选区、剪贴板与当前能力范围。
 - [文本选择](/docs/text-selection)：正文拖选、复制与控件手势边界。
 
+输入类控件的 Gallery 页面已收敛为两组：Numeric（NumberField + Vec3Field）与 Text Fields（TextField / SearchField / TextArea / JsonField）；上表列的是各自的组件文档。
+
 浅色和深色、紧凑窗口、触摸输入、从右到左与较大文字应分别检查。示例数量不代表全部功能都已验收；其他页面的使用文档随组件核对与修复继续补充。

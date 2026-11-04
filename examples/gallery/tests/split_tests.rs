@@ -108,10 +108,18 @@ fn the_resizable_fraction_stays_inside_its_bounds() {
     assert_eq!(story.readout(), "50 / 50");
 
     story.set_fraction(0.95);
-    assert_eq!(story.fraction(), SplitViewStory::RANGE.1, "clamped at the top");
+    assert_eq!(
+        story.fraction(),
+        SplitViewStory::RANGE.1,
+        "clamped at the top"
+    );
     assert_eq!(story.readout(), "80 / 20");
 
     story.set_fraction(0.05);
-    assert_eq!(story.fraction(), SplitViewStory::RANGE.0, "clamped at the bottom");
+    assert_eq!(
+        story.fraction(),
+        SplitViewStory::RANGE.0,
+        "clamped at the bottom"
+    );
     assert_eq!(story.readout(), "20 / 80");
 }

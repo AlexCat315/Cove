@@ -19,11 +19,12 @@ use super::axis::{ChartFrame, ChartText};
 use super::cache::ChartResolutionCache;
 use super::coordinates::{ChartGeometry, Mark, PieGeometry};
 use super::drawing::ChartPaint;
+use super::interaction::release_session;
 use super::model::{
     Accessibility as AccessibilityConfig, Axis as AxisConfig, ChartAnnotation, ChartBand,
     ChartCallout, ChartCalloutRow, ChartMarker, ChartOrientation, ChartPoint, ChartRange,
-    ChartSeries, ChartSlice, ChartStyle, ChartThreshold, ChartXDomain, Pie as PieConfig,
-    Viewport as ViewportConfig,
+    ChartSeries, ChartSlice, ChartStyle, ChartThreshold, ChartValueAxis, ChartXDomain,
+    Pie as PieConfig, Viewport as ViewportConfig,
 };
 use super::morph::ChartTransition;
 use super::overlay::{
@@ -141,8 +142,10 @@ impl ChartPlot {
         }
     }
 
+    /// A chart takes input when it can select a point, or when a navigable
+    /// viewport or a brush is bound: zoom, pan and brushing need no selection.
     fn is_interactive(&self) -> bool {
-        self.input.is_enabled
+        self.is_interactive_plot()
     }
 
     pub(crate) fn theme(&self, node: &Node) -> Theme {
@@ -251,7 +254,15 @@ impl PrimitiveView for ChartOverlayHost {
         node.set_is_hit_testable(false);
         node
     }
-    fn update_node(&self, _node: &Node) {}
+    /// The labels restate what the plot's own readout already says, so a reader
+    /// hearing both would hear every value twice.
+    fn update_node(&self, node: &Node) {
+        let mut semantics = cove_core::scene::AccessibilitySemantics::new(
+            cove_core::scene::AccessibilityRole::Group,
+        );
+        semantics.is_hidden = true;
+        node.set_accessibility(Some(semantics));
+    }
     fn make_layout_node(&self) -> Option<LayoutNode> {
         let layout = LayoutNode::new();
         layout.set_position_type(cove_core::scene::PositionType::Absolute);
@@ -962,7 +973,8 @@ impl ChartPlot {
             values
         } else {
             format!("{}: {}", callout.title, values)
-        }.replace(" · ", ", ");
+        }
+        .replace(" · ", ", ");
         let count = self.track_count(point);
         if count <= 1 || self.names_position_in_title(point) {
             return Some(head);
@@ -1063,7 +1075,8 @@ impl ChartPlot {
             }
             paint.pie(slices, geometry, list);
         }
-        // Axis text is materialised by the overlay host (Text primitive gap).
+        // Axis text is drawn after the plot so the gutters read above the rules.
+        paint.axis_labels(list);
         if let Some(focus) = FocusChainHolder::current()
             && focus
                 .focused()
@@ -1136,6 +1149,9 @@ impl NodeResource for ChartSession {
     fn unmount(&self, node: &Node) {
         node.cancel_animation("chart.samples");
         self.navigation.borrow_mut().cancel();
+        // A chart that leaves the tree must not keep a held pointer capture or
+        // focus: nothing would ever release them again.
+        release_session(node);
     }
     fn as_any_rc(self: Rc<Self>) -> Rc<dyn std::any::Any> {
         self
@@ -1223,13 +1239,26 @@ pub struct ChartGeometrySignature {
     marks: Vec<u8>,
     visible: Vec<bool>,
     x_domain: Option<u8>,
+    /// Category labels, so a rename invalidates even when the count matches.
+    category_labels: Vec<String>,
     range: Option<(u32, u32)>,
     style: Vec<u32>,
+    /// Per-series drawing overrides: dash, curve, radius, fill and stroke.
+    series_styles: Vec<u32>,
+    /// Per-series value-axis side: flipping a series moves every mark.
+    sides: Vec<u8>,
+    /// Threshold values and band bounds, which widen the scale they belong to.
+    thresholds: Vec<u32>,
+    bands: Vec<u32>,
+    markers: Vec<u32>,
+    /// Caption metrics that decide the gutters.
+    text: Vec<u32>,
     axis: Vec<String>,
     pie: [u32; 3],
 }
 impl ChartGeometrySignature {
     fn new(plot: &ChartPlot, theme: &Theme) -> Self {
+        let text_token = theme.typography.caption.clone();
         let style = [
             plot.style.min_value.map(f32::to_bits).unwrap_or(u32::MAX),
             plot.style.max_value.map(f32::to_bits).unwrap_or(u32::MAX),
@@ -1267,10 +1296,21 @@ impl ChartGeometrySignature {
             marks: Vec::new(),
             visible: plot.visible.clone(),
             x_domain: None,
+            category_labels: Vec::new(),
             range: plot
                 .visible_range
                 .map(|range| (range.lower.to_bits(), range.upper.to_bits())),
             style,
+            series_styles: Vec::new(),
+            sides: Vec::new(),
+            thresholds: Vec::new(),
+            bands: Vec::new(),
+            markers: Vec::new(),
+            text: vec![
+                text_token.font.size().to_bits(),
+                text_token.line_height.to_bits(),
+                text_token.letter_spacing.to_bits(),
+            ],
             axis,
             pie: [
                 plot.pie.start_angle.to_bits(),
@@ -1300,15 +1340,66 @@ impl ChartGeometrySignature {
                     .collect();
                 signature.x_domain = Some(match x {
                     ChartXDomain::Categorical(labels) => {
-                        if labels.is_empty() {
-                            1
-                        } else {
-                            2
-                        }
+                        signature.category_labels = labels.clone();
+                        if labels.is_empty() { 1 } else { 2 }
                     }
                     ChartXDomain::Numeric => 3,
                 });
-                let _ = guides;
+                signature.series_styles = series
+                    .iter()
+                    .flat_map(|item| {
+                        [
+                            item.style.line_width.map(f32::to_bits).unwrap_or(u32::MAX),
+                            item.style.point_radius.to_bits(),
+                            item.style.fill_opacity.to_bits(),
+                            u32::from(item.style.curve),
+                            u32::from(item.style.shows_values),
+                            item.style.dash.len() as u32,
+                            item.style.dash.iter().map(|value| value.to_bits()).sum(),
+                        ]
+                    })
+                    .collect();
+                signature.sides = series
+                    .iter()
+                    .map(|item| match item.axis {
+                        ChartValueAxis::Left => 0,
+                        ChartValueAxis::Right => 1,
+                    })
+                    .collect();
+                // Rules and bands widen the domain of the axis they belong to,
+                // so editing one moves every mark on that side.
+                signature.thresholds = guides
+                    .thresholds
+                    .iter()
+                    .flat_map(|item| {
+                        [
+                            item.value.to_bits(),
+                            match item.axis {
+                                ChartValueAxis::Left => 0,
+                                ChartValueAxis::Right => 1,
+                            },
+                        ]
+                    })
+                    .collect();
+                signature.bands = guides
+                    .bands
+                    .iter()
+                    .flat_map(|item| {
+                        [
+                            item.from.to_bits(),
+                            item.to.to_bits(),
+                            match item.axis {
+                                ChartValueAxis::Left => 0,
+                                ChartValueAxis::Right => 1,
+                            },
+                        ]
+                    })
+                    .collect();
+                signature.markers = guides
+                    .markers
+                    .iter()
+                    .map(|item| item.index as u32)
+                    .collect();
             }
             ChartContent::Pie(slices) => {
                 signature.pie_values = slices.iter().map(|slice| slice.value.to_bits()).collect();
@@ -1326,8 +1417,15 @@ impl PartialEq for ChartGeometrySignature {
             && self.marks == other.marks
             && self.visible == other.visible
             && self.x_domain == other.x_domain
+            && self.category_labels == other.category_labels
             && self.range == other.range
             && self.style == other.style
+            && self.series_styles == other.series_styles
+            && self.sides == other.sides
+            && self.thresholds == other.thresholds
+            && self.bands == other.bands
+            && self.markers == other.markers
+            && self.text == other.text
             && self.axis == other.axis
             && self.pie == other.pie
     }

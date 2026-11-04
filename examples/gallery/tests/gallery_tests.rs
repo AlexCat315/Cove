@@ -420,8 +420,9 @@ fn every_placement_trigger_stays_inside_the_story() {
                         .all(|node| node.accessibility().is_some())
                         .into_iter()
                         .filter_map(|node| {
-                            node.accessibility()
-                                .map(|semantics| format!("{:?}:{}", semantics.role, semantics.label))
+                            node.accessibility().map(|semantics| {
+                                format!("{:?}:{}", semantics.role, semantics.label)
+                            })
                         })
                         .collect();
                     let triggers: Vec<_> = scene

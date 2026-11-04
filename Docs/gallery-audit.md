@@ -1,8 +1,17 @@
 # Gallery 逐项验收记录
 
-更新：2026-11-04。目录共 106 页。当前九页控件的验收以以下 Swift 对照表为准；后续旧轮记录保留其原有范围。
+更新：2026-11-04。目录共 102 页（Numeric 合并 NumberField+Vec3Field，Text Fields 合并 TextField+SearchField+TextArea+JsonField）。当前控件页的验收以以下 Swift 对照表为准；后续旧轮记录保留其原有范围。
 
 Swift 源码逐页对照见文末《Swift 源码对照（逐页差异清单）》。
+
+## 2026-11-04：字段 API 收敛
+
+- 输入框外壳统一：`InputChromeState` 是唯一的交互快照，`TextField`、数值前缀、`Select`、`TimeInput` 与 JSON 编辑器共用 `InputAppearance` 的填充、边框与圆角推导，删除各自手写的背景/边框。
+- 新增独立 `Field` 外壳（与 `Form` 同一套标签/帮助/错误/可访问性布局），Gallery 各 field 页由临时的 `field_row` 改用 `Field`。
+- 数值配置收敛为 `NumberFieldOptions`；`Vec3Field` 组合三个 `NumberField` 并共用该配置，不再复刻其 builder。
+- 目录由 106 页收敛为 102 页：`Numeric` 合并 `NumberField`+`Vec3Field`，`Text Fields` 合并 `TextField`+`SearchField`+`TextArea`+`JsonField`；对应旧页的 `GalleryPage` 变体、catalog 条目、图标与 dispatch 一并删除。
+- 结构验证：`catalog_audit` 102 页 / 204 个宽屏窄屏场景通过。页级视觉与交互验收仍按原队列逐项进行。
+
 
 ## 2026-11-04：九页 Swift 对照
 
@@ -87,15 +96,11 @@ cargo test -p cove-ui-compose --test compose --locked
 | Slider | 5 | 0 / 0 | 本轮组件/页面修复；文档已写 |
 | RangeSlider | 4 | 0 / 0 | 本轮组件/页面修复；文档已写 |
 | Rating | 6 | 0 / 0 | 本轮组件/页面修复；文档已写 |
-| TextField | 6 | 0 / 0 | 已补齐样式焦点/编辑接入与字素索引；新增样式、Unicode 实时计数；跨平台设备与编辑器扩展能力继续独立验收 |
-| SearchField | 0 | 0 / 0 | 搜索与输入链路修复；文档已写 |
-| TextArea | 0 | 0 / 0 | 挂载/几何基础检查通过；待逐项交互和视觉验收 |
+| Text Fields | — | 0 / 0 | 合并原 TextField / SearchField / TextArea / JsonField；段落数需重新测量；字段壳改用 `Field`；待逐项交互和视觉验收 |
 | Text Editor | 0 | 0 / 0 | 挂载/几何基础检查通过；待逐项交互和视觉验收 |
-| NumberField | 0 | 0 / 0 | 挂载/几何基础检查通过；待逐项交互和视觉验收 |
-| Vec3Field | 0 | 0 / 0 | 挂载/几何基础检查通过；待逐项交互和视觉验收 |
+| Numeric | — | 0 / 0 | 合并原 NumberField / Vec3Field；`Vec3Field` 组合三个 `NumberField` 并共用 `NumberFieldOptions`；待逐项交互和视觉验收 |
 | ColorField | 0 | 0 / 0 | 挂载/几何基础检查通过；待逐项交互和视觉验收 |
 | Select | 0 | 0 / 0 | 挂载/几何基础检查通过；待逐项交互和视觉验收 |
-| JsonField | 0 | 0 / 0 | 挂载/几何基础检查通过；待逐项交互和视觉验收 |
 | AssetRef / DropTarget | 0 | 0 / 0 | 挂载/几何基础检查通过；待逐项交互和视觉验收 |
 | List | 0 | 0 / 0 | 挂载/几何基础检查通过；待逐项交互和视觉验收 |
 | SectionedList | 0 | 0 / 0 | 挂载/几何基础检查通过；待逐项交互和视觉验收 |
@@ -105,7 +110,7 @@ cargo test -p cove-ui-compose --test compose --locked
 | Scrollbar | 0 | 0 / 0 | 挂载/几何基础检查通过；待逐项交互和视觉验收 |
 | Tree | 0 | 0 / 6 | 挂载/几何基础检查通过；待逐项交互和视觉验收 |
 | VirtualStack | 0 | 0 / 0 | 挂载/几何基础检查通过；待逐项交互和视觉验收 |
-| Chart | 1 | 0 / 0 | 挂载/几何基础检查通过；待逐项交互和视觉验收 |
+| Chart | 13 | 8 / 8 | 段落与 Swift 对齐；轴标签、覆盖层分级、图例键盘激活、缩放/刷选交互、数据动画与缓存失效已有回归；待逐项原生视觉验收 |
 | Icon | 3 | 0 / 0 | 挂载/几何基础检查通过；待逐项交互和视觉验收 |
 | Avatar | 4 | 0 / 0 | 挂载/几何基础检查通过；待逐项交互和视觉验收 |
 | Image | 0 | 0 / 0 | 挂载/几何基础检查通过；待逐项交互和视觉验收 |
@@ -236,7 +241,7 @@ cargo test -p cove-ui-compose --test compose --locked
 | Animation | 6 | 4 | Animated visibility、Timing curves、Tracks & phases、Shared geometry、Spring release、Numbers & completion | Animated visibility、Timing curves、Tracks & phases、Numbers & completion |
 | Sidebar | 3 | 1 | Workspace navigation、Resizable navigation、Nested navigation | Workspace navigation |
 | AppBar / NavigationBar | 2 | 1 | Application header、Host safe area | Application header |
-| Chart | 13 | 12 | Trend、Grouped and stacked bars、Below the baseline、Dual axis、Log axis、Histogram、Large series、Scatter、Donut、Sparkline、Horizontal bars、Data table、Explore | Trend、Grouped and stacked bars、Below the baseline、Dual axis、Log axis、Histogram、Scatter、Donut、Sparkline、Horizontal bars、Data table、Explore |
+| Chart | 13 | 13 | Trend、Grouped and stacked bars、Below the baseline、Dual axis、Log axis、Histogram、Large series、Scatter、Donut、Sparkline、Horizontal bars、Data table、Explore | Trend、Grouped and stacked bars、Below the baseline、Dual axis、Log axis、Histogram、Large series、Scatter、Donut、Sparkline、Horizontal bars、Data table、Explore |
 | Checkbox | 2 | 1 | Selection、Disabled | Selection |
 | Combobox | 2 | 1 | Searchable selection、Remote results | Searchable selection |
 | Command Palette | 2 | 1 | Command palette、Custom footer | Command palette |
@@ -278,7 +283,7 @@ cargo test -p cove-ui-compose --test compose --locked
 | Box / Row / Column | Wide lazy grid · 200 × 200 | 3/3 | 出现在本页源码，未单独成段 |
 | Box / Row / Column | Estimated rows · 10,000 items | 1/2 | 未出现：estimated |
 | Box / Row / Column | Variable rows · 100,000 items | 1/2 | 未出现：variable |
-| Chart | Large series | 2/2 | 出现在本页源码，未单独成段 |
+| Chart | Large series | 2/2 | 已单独成段（`chart-large-series`，2000 采样，numeric x） |
 | ColorField | Color picker | 2/2 | 出现在本页源码，未单独成段 |
 | Combobox | Remote results | 2/2 | 出现在本页源码，未单独成段 |
 | Command Palette | Custom footer | 2/2 | 出现在本页源码，未单独成段 |
@@ -333,7 +338,7 @@ cargo test -p cove-ui-compose --test compose --locked
 | ButtonGroup | 1 | 1 | 1 | 0 | 0 | 段落数持平 |
 | Calendar | 2 | 2 | 2 | 0 | 0 | 段落数持平 |
 | Carousel | 5 | 5 | 5 | 0 | 0 | 段落数持平 |
-| Chart | 13 | 12 | 12 | 0 | 1 | 段落少 1 段 |
+| Chart | 13 | 13 | 13 | 0 | 0 | 段落数持平 |
 | Checkbox | 2 | 1 | 1 | 1 | 0 | 段落少 1 段 |
 | ColorField | 1 | 1 | 0 | 0 | 1 | 段落数持平 |
 | Combobox | 2 | 1 | 1 | 0 | 1 | 段落少 1 段 |

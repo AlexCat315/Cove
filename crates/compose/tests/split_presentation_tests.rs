@@ -263,8 +263,7 @@ fn handle(scene: &InteractiveScene) -> Node {
     scene
         .first(|node| {
             node.accessibility().is_some_and(|semantics| {
-                semantics.label == "Resize split"
-                    && semantics.role == AccessibilityRole::Slider
+                semantics.label == "Resize split" && semantics.role == AccessibilityRole::Slider
             })
         })
         .expect("the divider mounts")
@@ -610,12 +609,15 @@ fn interaction_and_retention() {
         for width in [390.0_f32, 720.0, 390.0] {
             apply_size(scene, &h, width, 400.0);
             let f = scene.focus.focused();
-            eprintln!("PROBE w={width} focused={:?} role={:?} label={:?} first_field={:?} first_input={:?}",
+            eprintln!(
+                "PROBE w={width} focused={:?} role={:?} label={:?} first_field={:?} first_input={:?}",
                 f.as_ref().map(|n| n.id()),
                 f.as_ref().and_then(|n| n.accessibility().map(|s| s.role)),
-                f.as_ref().and_then(|n| n.accessibility().map(|s| s.label.clone())),
+                f.as_ref()
+                    .and_then(|n| n.accessibility().map(|s| s.label.clone())),
                 first_field.id(),
-                named(scene,"pane-First").accepts_subtree_input());
+                named(scene, "pane-First").accepts_subtree_input()
+            );
             assert_eq!(
                 scene.focus.focused().map(|node| node.id()),
                 Some(first_field.id()),
@@ -648,15 +650,22 @@ fn interaction_and_retention() {
         dispatcher.dispatch(&InputEvent::MouseButtonDown(event.clone()));
         {
             let root = scene.graph.tree.borrow().root().expect("root");
-            let hit = cove_core::scene::input::HitTester::hit_test(&root, Point::new(event.x, event.y));
-            eprintln!("PROBE hit={:?} divider={:?} div_input={:?} has_pointer={:?}",
-                hit.as_ref().map(|h| h.node.id()), divider.id(), divider.accepts_subtree_input(),
-                scene.registry.handlers(&divider).pointer.is_some());
+            let hit =
+                cove_core::scene::input::HitTester::hit_test(&root, Point::new(event.x, event.y));
+            eprintln!(
+                "PROBE hit={:?} divider={:?} div_input={:?} has_pointer={:?}",
+                hit.as_ref().map(|h| h.node.id()),
+                divider.id(),
+                divider.accepts_subtree_input(),
+                scene.registry.handlers(&divider).pointer.is_some()
+            );
         }
-        eprintln!("PROBE geo div={:?} pane1={:?} pane2={:?}",
+        eprintln!(
+            "PROBE geo div={:?} pane1={:?} pane2={:?}",
             divider.absolute_frame(),
             named(scene, "pane-First").absolute_frame(),
-            named(scene, "pane-Second").absolute_frame());
+            named(scene, "pane-Second").absolute_frame()
+        );
         assert_eq!(
             scene.capture.target().map(|node| node.id()),
             Some(divider.id()),

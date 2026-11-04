@@ -19,27 +19,10 @@ impl TextFieldStyle for DefaultTextFieldStyle {
     fn make_body(&self, configuration: TextFieldStyleConfiguration) -> AnyView {
         let theme = configuration.theme.clone();
         let inputs = theme.inputs;
-        let background = if configuration.is_enabled {
-            inputs.background
-        } else {
-            inputs.background_disabled
-        };
-        let border = if !configuration.is_enabled {
-            inputs.border_disabled
-        } else if configuration.is_error {
-            inputs.border_error
-        } else if configuration.is_focused {
-            inputs.border_focused
-        } else if configuration.is_hovered {
-            inputs.border_hover
-        } else {
-            inputs.border_color
-        };
-        let border_width = if configuration.is_focused {
-            inputs.focus_ring_width
-        } else {
-            inputs.border_width
-        };
+        let state = super::input_appearance::InputChromeState::from(&configuration);
+        let background = inputs.background_for(state);
+        let border = inputs.border_for(state);
+        let border_width = inputs.border_width_for(state);
         let alpha = if configuration.is_enabled || theme.text_emphasis.disabled.is_some() {
             1.0
         } else {

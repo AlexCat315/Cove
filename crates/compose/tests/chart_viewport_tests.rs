@@ -21,6 +21,7 @@
 
 use crate::support;
 
+use cove_composition::PrimitiveView;
 use cove_core::scene::AnimationCurve;
 use cove_core::{Point, Size};
 use cove_ui_compose::primitives::data::chart::{
@@ -243,4 +244,43 @@ fn transitions_snap_for_reduced_motion() {
         library.contains("Animation"),
         "the transition type comes from the scene animation library"
     );
+}
+
+#[test]
+fn reduced_motion_still_advances_the_samples() {
+    // Reduced motion means "get there at once", not "never get there": the
+    // transition must still write the new samples, or the plot keeps painting
+    // the previous data forever.
+    GlobalTestLock::locked(|| {
+        let mut chart = plot(ChartOrientation::Vertical, ChartRange::new(0.0, 10.0));
+        chart.animation = Some(cove_core::scene::Animation::ease_in_out(0.45));
+        let node = chart.make_node();
+        node.set_composition_value(&cove_core::scene::ReducedMotionEnvironment::key(), true);
+        assert!(node.prefers_reduced_motion(), "the preference is in scope");
+
+        let cache = std::rc::Rc::new(std::cell::RefCell::new(
+            cove_ui_compose::primitives::data::chart::ChartResolutionCache::new(),
+        ));
+        let mut transition = cove_ui_compose::primitives::data::chart::ChartTransition::default();
+        transition.update(
+            &chart.content,
+            chart.animation.clone(),
+            &node,
+            cache.clone(),
+        );
+        assert!(
+            cache.borrow().samples.is_some(),
+            "a reduced-motion data change still lands on the new samples"
+        );
+
+        // The same chart with animation off must also land, and a second update
+        // of identical data must not churn.
+        let before = cache.borrow().samples.clone();
+        transition.update(&chart.content, None, &node, cache.clone());
+        assert_eq!(
+            cache.borrow().samples,
+            before,
+            "unchanged data does not restart the transition"
+        );
+    });
 }

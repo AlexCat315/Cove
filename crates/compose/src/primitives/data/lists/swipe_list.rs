@@ -104,7 +104,11 @@ pub const SWIPE_SNAP_THRESHOLD: f32 = 0.45;
 /// The resolved row height: `max(scaler.scale(rowHeight), touch ? extent : 0)`,
 /// exactly as `SwipeList.body` computes it in Swift.
 pub fn swipe_row_height(scaled: f32, is_touch: bool, minimum_control_extent: f32) -> f32 {
-    scaled.max(if is_touch { minimum_control_extent } else { 0.0 })
+    scaled.max(if is_touch {
+        minimum_control_extent
+    } else {
+        0.0
+    })
 }
 
 /// The action extent for `count` actions within `row_width`.
@@ -271,55 +275,72 @@ where
                 let row_label = row_label.clone();
                 let actions = actions.clone();
                 let row_content = row_content.clone();
-                let content_scaler = TextScalerReader::new(move |scaler: crate::theme::TextScaler| {
-                    let height = swipe_row_height(scaler.scale(authored_height), is_touch, minimum);
-                    let spacing = scaler.scale(row_spacing);
-                    let action_width = scaler.scale(SWIPE_ACTION_WIDTH);
-                    let row_core = scaler_core.clone();
-                    let row_items = items.clone();
-                    let row_label = row_label.clone();
-                    let row_actions = actions.clone();
-                    let row_content = row_content.clone();
-                    let mut stack =
-                        FixedVirtualStack::new(scaler_core.ids.to_vec(), height, move |id: &Id| {
-                            let Some(item) = row_items.get(id) else {
-                                return AnyView::new(crate::EmptyView);
-                            };
-                            let selected = row_core.selection.contains(id);
-                            let select = row_core.clone();
-                            let select_id = id.clone();
-                            AnyView::new(SwipeRow {
-                                label: row_label(item),
-                                is_selected: selected,
-                                is_enabled,
-                                row_height: height,
-                                action_width,
-                                actions: if is_enabled {
-                                    row_actions(item)
-                                } else {
-                                    Vec::new()
-                                },
-                                on_select: Rc::new(move || select.activate(select_id.clone())),
-                                content: row_content(item, RowState::selected(selected)),
-                            })
-                        })
+                let content_scaler =
+                    TextScalerReader::new(move |scaler: crate::theme::TextScaler| {
+                        let height =
+                            swipe_row_height(scaler.scale(authored_height), is_touch, minimum);
+                        let spacing = scaler.scale(row_spacing);
+                        let action_width = scaler.scale(SWIPE_ACTION_WIDTH);
+                        let row_core = scaler_core.clone();
+                        let row_items = items.clone();
+                        let row_label = row_label.clone();
+                        let row_actions = actions.clone();
+                        let row_content = row_content.clone();
+                        let mut stack = FixedVirtualStack::new(
+                            scaler_core.ids.to_vec(),
+                            height,
+                            move |id: &Id| {
+                                let Some(item) = row_items.get(id) else {
+                                    return AnyView::new(crate::EmptyView);
+                                };
+                                let selected = row_core.selection.contains(id);
+                                let select = row_core.clone();
+                                let select_id = id.clone();
+                                AnyView::new(SwipeRow {
+                                    label: row_label(item),
+                                    is_selected: selected,
+                                    is_enabled,
+                                    row_height: height,
+                                    action_width,
+                                    actions: if is_enabled {
+                                        row_actions(item)
+                                    } else {
+                                        Vec::new()
+                                    },
+                                    on_select: Rc::new(move || select.activate(select_id.clone())),
+                                    content: row_content(item, RowState::selected(selected)),
+                                })
+                            },
+                        )
                         .spacing(spacing);
-                    if let Some(index) = scaler_keys.target() {
-                        stack = stack.scroll_to_index(index);
-                    }
-                    let key_core = scaler_keys.clone();
-                    AnyView::new(
-                        AnyView::new(SelectionKeyHost::new(
-                            AnyView::new(stack)
-                                .flex(1.0)
-                                .frame(None, None, Some(0.0), Some(0.0), None, None),
-                            is_enabled,
-                            move |event| key_core.handle_key(event),
-                        ))
-                        .flex(1.0)
-                        .frame(None, None, Some(0.0), Some(0.0), None, None),
-                    )
-                });
+                        if let Some(index) = scaler_keys.target() {
+                            stack = stack.scroll_to_index(index);
+                        }
+                        let key_core = scaler_keys.clone();
+                        AnyView::new(
+                            AnyView::new(SelectionKeyHost::new(
+                                AnyView::new(stack).flex(1.0).frame(
+                                    None,
+                                    None,
+                                    Some(0.0),
+                                    Some(0.0),
+                                    None,
+                                    None,
+                                ),
+                                is_enabled,
+                                move |event| key_core.handle_key(event),
+                            ))
+                            .flex(1.0)
+                            .frame(
+                                None,
+                                None,
+                                Some(0.0),
+                                Some(0.0),
+                                None,
+                                None,
+                            ),
+                        )
+                    });
                 AnyView::new(content_scaler)
             },
         );

@@ -358,7 +358,7 @@ fn the_tab_strip_exposes_tab_roles() {
                 let semantics = node.accessibility()?;
                 (semantics.role == AccessibilityRole::Tab
                     && (semantics.label == "A" || semantics.label == "B"))
-                .then_some(semantics.label)
+                    .then_some(semantics.label)
             })
             .collect();
         assert_eq!(

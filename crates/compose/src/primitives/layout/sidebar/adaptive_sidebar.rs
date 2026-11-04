@@ -485,7 +485,11 @@ impl<Id: PartialEq + Eq + std::hash::Hash + Clone + Send + Sync + 'static> Adapt
             7.0
         };
         let geometry = self.geometry(width, handle);
-        self.focus.prepare(geometry.mode, geometry.is_modal, cove_core::scene::FocusChainHolder::current());
+        self.focus.prepare(
+            geometry.mode,
+            geometry.is_modal,
+            cove_core::scene::FocusChainHolder::current(),
+        );
         let fill = |view: AnyView| {
             AnyView::new(view.flex_with(1.0, 1.0, Some(0.0)).frame(
                 None,
@@ -583,18 +587,21 @@ impl<Id: PartialEq + Eq + std::hash::Hash + Clone + Send + Sync + 'static> Adapt
             geometry.viewport_width,
         );
         let panel = pinned(
-            AnyView::new(AnimatedVisibility::new(
-                geometry.is_visible(),
-                if geometry.mode == SidebarMode::Expanded {
-                    Transition::identity()
-                } else {
-                    Transition::move_edge(TransitionEdge::Leading, geometry.panel_width)
-                },
-                None,
-                false,
-                None,
-                fill(self.navigation(geometry)),
-            ).retaining_content(true)),
+            AnyView::new(
+                AnimatedVisibility::new(
+                    geometry.is_visible(),
+                    if geometry.mode == SidebarMode::Expanded {
+                        Transition::identity()
+                    } else {
+                        Transition::move_edge(TransitionEdge::Leading, geometry.panel_width)
+                    },
+                    None,
+                    false,
+                    None,
+                    fill(self.navigation(geometry)),
+                )
+                .retaining_content(true),
+            ),
             geometry.panel_width,
         );
         let layer = AnyView::new(

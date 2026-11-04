@@ -115,7 +115,10 @@ impl<Id: std::hash::Hash + Eq + Clone + PartialEq + Send + Sync + 'static> View
             AnyView::new(safe),
         )
         .semantic_background(SemanticColorRef::surface());
-        AnyView::new(cove_composition::LayoutDebugExt::debug_name(column, "mobile-tab-bar"))
+        AnyView::new(cove_composition::LayoutDebugExt::debug_name(
+            column,
+            "mobile-tab-bar",
+        ))
     }
 }
 

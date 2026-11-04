@@ -17,6 +17,7 @@ use cove_core::{Binding, Color};
 
 use crate::modifiers::layout::LayoutFrameExt;
 use crate::primitives::controls::fields::numeric::number_field::{NumberField, NumberFieldPrefix};
+use crate::primitives::controls::fields::numeric::options::NumberFieldOptions;
 use crate::primitives::controls::fields::vec3_model::{
     Vec3, Vec3Axis, Vec3Codec, Vec3Constraints, minimum_axis_width, shows_mixed,
 };
@@ -44,11 +45,9 @@ pub struct Vec3Field {
     pub x: Binding<f32>,
     pub y: Binding<f32>,
     pub z: Binding<f32>,
-    pub decimals: usize,
-    pub step: Option<f32>,
-    pub format: super::numeric::NumericTextFormat,
-    pub size: TextFieldSize,
-    pub is_enabled: bool,
+    /// Formatting, bounds, step and enabled state shared by all three axes, the
+    /// same type a single [`NumberField`] takes.
+    pub options: NumberFieldOptions,
     pub constraints: Vec3Constraints,
     pub mixed_axes: HashSet<String>,
     pub mixed_value_label: String,
@@ -63,11 +62,10 @@ impl Vec3Field {
             x,
             y,
             z,
-            decimals: 2,
-            step: None,
-            format: super::numeric::NumericTextFormat::invariant(2),
-            size: TextFieldSize::Small,
-            is_enabled: true,
+            options: NumberFieldOptions {
+                size: TextFieldSize::Small,
+                ..Default::default()
+            },
             constraints: Vec3Constraints::default(),
             mixed_axes: HashSet::new(),
             mixed_value_label: crate::i18n::tr("Mixed value"),
@@ -77,31 +75,9 @@ impl Vec3Field {
         }
     }
 
-    pub fn decimals(mut self, decimals: usize) -> Self {
-        self.decimals = decimals.min(6);
-        self.format.decimals = self.decimals;
-        self
-    }
-
-    pub fn step(mut self, step: f32) -> Self {
-        self.step = Some(step);
-        self
-    }
-
-    /// Locale-specific presentation shared by all axes.
-    pub fn with_format(mut self, format: super::numeric::NumericTextFormat) -> Self {
-        self.decimals = format.decimals;
-        self.format = format;
-        self
-    }
-
-    pub fn size(mut self, size: TextFieldSize) -> Self {
-        self.size = size;
-        self
-    }
-
-    pub fn enabled(mut self, is_enabled: bool) -> Self {
-        self.is_enabled = is_enabled;
+    /// The presentation shared by all three axes.
+    pub fn options(mut self, options: NumberFieldOptions) -> Self {
+        self.options = options;
         self
     }
 
@@ -144,11 +120,7 @@ impl Vec3Field {
             x: self.x.clone(),
             y: self.y.clone(),
             z: self.z.clone(),
-            decimals: self.decimals,
-            step: self.step,
-            format: self.format.clone(),
-            size: self.size,
-            is_enabled: self.is_enabled,
+            options: self.options.clone(),
             constraints: self.constraints,
             mixed_axes: self.mixed_axes.clone(),
             mixed_value_label: self.mixed_value_label.clone(),
@@ -186,7 +158,7 @@ impl Vec3Field {
 
     /// Pastes through an authored reader, or asynchronously through the platform clipboard.
     pub fn paste(&self) {
-        if !self.is_enabled {
+        if !self.options.is_enabled {
             return;
         }
         if let Some(read) = self.on_paste.as_ref() {
@@ -205,7 +177,7 @@ impl Vec3Field {
 
     /// Resets every axis to the authored reset value.
     pub fn reset(&self) {
-        if !self.is_enabled {
+        if !self.options.is_enabled {
             return;
         }
         if let Some(reset) = self.constraints.reset {
@@ -222,7 +194,7 @@ impl Vec3Field {
         )];
         let paste = self.snapshot();
         let can_paste =
-            self.is_enabled && self.on_paste.as_ref().is_none_or(|read| read().is_some());
+            self.options.is_enabled && self.on_paste.as_ref().is_none_or(|read| read().is_some());
         entries.push(MenuEntry::Item(
             MenuItem::new(2, crate::i18n::tr("Paste Vector"), move || paste.paste())
                 .enabled(can_paste),
@@ -231,7 +203,7 @@ impl Vec3Field {
             let reset = self.snapshot();
             entries.push(MenuEntry::Item(
                 MenuItem::new(3, crate::i18n::tr("Reset Vector"), move || reset.reset())
-                    .enabled(self.is_enabled),
+                    .enabled(self.options.is_enabled),
             ));
         }
         entries
@@ -242,14 +214,9 @@ impl Vec3Field {
         let reset = self.constraints.reset.map(|reset| reset.get(axis));
         let prefix = NumberFieldPrefix::new(axis.label()).tint(axis_tint(axis));
         let mut field = NumberField::new(value)
-            .with_format(self.format.clone())
-            .size(self.size)
-            .enabled(self.is_enabled)
+            .options(self.options.clone())
             .range(self.constraints.minimum, self.constraints.maximum)
             .prefix(prefix);
-        if let Some(step) = self.step {
-            field = field.step(step);
-        }
         if mixed {
             field = field.mixed_value_label(self.mixed_value_label.clone());
         }

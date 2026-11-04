@@ -43,12 +43,13 @@ pub(crate) mod api {
         DatePicker, DatePickerOptions, DatePickerPresentation, DateRange, DateRangeCalendar,
         DateRangePicker, DateRangePickerOptions, DateRangePickerPresentation, DateRangePreset,
         DateRangeRules, JsonField, KeyboardShortcut, KeyboardShortcutModifier,
-        KeyboardShortcutPlatform, NumberField, RadioGroup, RadioOption, RangeSlider, RangeValue,
-        SearchField, Select, SelectOption, Slider, SliderAxis, TimeField, TimeFieldOptions,
-        TimeInput, Vec3, Vec3Axis, Vec3Constraints, Vec3Field, WheelPicker, WheelPickerModel,
-        WheelPickerOption,
+        KeyboardShortcutPlatform, NumberField, NumberFieldOptions, RadioGroup, RadioOption,
+        RangeSlider, RangeValue, SearchField, Select, SelectOption, Slider, SliderAxis, TimeField,
+        TimeFieldOptions, TimeInput, Vec3, Vec3Axis, Vec3Constraints, Vec3Field, WheelPicker,
+        WheelPickerModel, WheelPickerOption,
     };
-    pub use super::form::{Form, FormField, FormFieldPresentation, FormLayout};
+    pub use super::form::label_placement::FieldLabelPlacement;
+    pub use super::form::{Field, Form, FormField, FormFieldPresentation, FormLayout};
     pub use super::form_validation::{FormController, FormIssue, FormRule, FormSubmissionState};
     pub use super::key_cap::KeyCap;
     pub use super::link::{Link, LinkUnderline};

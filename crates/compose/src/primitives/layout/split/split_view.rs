@@ -525,7 +525,9 @@ impl PrimitiveView for SplitFocusHandoffHost {
             // previously focused pane is actually gone from the input graph.
             if is_compact
                 && let Some(chain) = FocusChainHolder::current()
-                && chain.focused().is_some_and(|node| node.accepts_subtree_input())
+                && chain
+                    .focused()
+                    .is_some_and(|node| node.accepts_subtree_input())
             {
                 return;
             }

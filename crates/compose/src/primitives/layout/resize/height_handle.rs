@@ -6,10 +6,10 @@ use std::rc::Rc;
 
 use cove_core::Binding;
 use cove_core::scene::{
-    AccessibilityActions, AccessibilityRole, AccessibilitySemantics, AccessibilityState, Display, EventPhase,
-    EventResult, FocusChainHolder, HoverPhase, InputHandlerRoute, InteractionRegistryHolder,
-    LayoutNode, Node, NodeResource, PointerCaptureAttachmentKey, PointerCaptureHolder,
-    PointerPhase,
+    AccessibilityActions, AccessibilityRole, AccessibilitySemantics, AccessibilityState, Display,
+    EventPhase, EventResult, FocusChainHolder, HoverPhase, InputHandlerRoute,
+    InteractionRegistryHolder, LayoutNode, Node, NodeResource, PointerCaptureAttachmentKey,
+    PointerCaptureHolder, PointerPhase,
 };
 use cove_platform::{MouseButton, SystemCursor};
 
@@ -141,7 +141,9 @@ impl PrimitiveView for EditorHeightHandle {
             role: AccessibilityRole::Slider,
             label: self.label.clone(),
             value: format!("{}", current.round() as i64),
-            help: crate::i18n::tr("Use Up/Down to resize, Shift for larger steps, Home/End for the limits"),
+            help: crate::i18n::tr(
+                "Use Up/Down to resize, Shift for larger steps, Home/End for the limits",
+            ),
             state: AccessibilityState {
                 is_enabled: self.is_enabled,
                 ..Default::default()

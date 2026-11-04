@@ -52,9 +52,9 @@ use cove_ui_compose::modifiers::layout::{FlexExt, LayoutFrameExt};
 use cove_ui_compose::primitives::controls::fields::JsonField;
 use cove_ui_compose::primitives::layout::virtualization::virtual_stack::VirtualStack;
 use cove_ui_compose::primitives::overlays::ShortcutHost;
-use cove_ui_compose::primitives::overlays::{ContextMenuExt, MenuEntry, MenuItem};
 use cove_ui_compose::primitives::overlays::modal::Modal;
 use cove_ui_compose::primitives::overlays::portal::LayerRoot;
+use cove_ui_compose::primitives::overlays::{ContextMenuExt, MenuEntry, MenuItem};
 use cove_ui_compose::primitives::text::Text;
 use cove_ui_compose::primitives::text::text_buffer::TextBuffer;
 use cove_ui_compose::primitives::text::text_field::text_field::{FieldState, TextField};
@@ -360,7 +360,9 @@ fn expanded_json_applies_valid_content_and_escape_cancels() {
         );
 
         // An invalid draft disables Apply, so it cannot commit malformed text.
-        let apply = scene.named("json-apply").expect("the footer names its Apply button");
+        let apply = scene
+            .named("json-apply")
+            .expect("the footer names its Apply button");
         assert!(
             apply
                 .accessibility()
@@ -371,11 +373,7 @@ fn expanded_json_applies_valid_content_and_escape_cancels() {
             apply.accessibility_actions().activate.is_none(),
             "a disabled Apply exposes no activation action"
         );
-        assert_eq!(
-            text(&store),
-            "{}",
-            "the invalid draft stays rejected"
-        );
+        assert_eq!(text(&store), "{}", "the invalid draft stays rejected");
         assert!(
             scene.focus.modal_root().is_some(),
             "the expanded editor stays open"
@@ -422,7 +420,11 @@ fn expanded_json_has_a_centered_editor_and_clickable_footer() {
                 .named("json-expanded-editor")
                 .unwrap_or_else(|| panic!("the dialog is named at {width}x{height}"));
             let frame = dialog.absolute_frame();
-            assert_eq!(frame.width, 760.0_f32.min(width - 32.0), "dialog width at {width}x{height}");
+            assert_eq!(
+                frame.width,
+                760.0_f32.min(width - 32.0),
+                "dialog width at {width}x{height}"
+            );
             assert_eq!(
                 frame.height,
                 560.0_f32.min(height - 32.0),

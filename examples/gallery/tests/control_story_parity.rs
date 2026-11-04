@@ -27,15 +27,13 @@ fn control(scene: &GalleryScene, label: &str) -> cove_core::scene::Node {
 }
 
 #[test]
-fn all_nine_pages_mount_controls_within_narrow_and_wide_content() {
+fn control_pages_mount_controls_within_narrow_and_wide_content() {
     for page in [
         GalleryPage::SplitButton,
         GalleryPage::Toolbar,
         GalleryPage::CompletionPopover,
-        GalleryPage::TextArea,
         GalleryPage::TextEditor,
         GalleryPage::NumberField,
-        GalleryPage::Vec3Field,
         GalleryPage::ColorField,
         GalleryPage::Select,
     ] {

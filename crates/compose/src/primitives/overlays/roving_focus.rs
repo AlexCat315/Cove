@@ -310,7 +310,9 @@ impl<Id: PartialEq + Clone + 'static> PrimitiveView for RovingFocusHost<Id> {
             // graph (collapsed subtree, removed row, disabled branch) is asked
             // to recover, so focus never stays on a row the person cannot use.
             let focused_now = focused_token(owner);
-            if let Some(token) = focused_now { owner.set_attachment(ROVING_OWNED_FOCUS, token); }
+            if let Some(token) = focused_now {
+                owner.set_attachment(ROVING_OWNED_FOCUS, token);
+            }
             // The row that owned focus before this pass, so a row that vanished
             // still has an identity to fall back from.
             let remembered = owner.attachment::<u64>(ROVING_OWNED_FOCUS);
@@ -334,8 +336,7 @@ impl<Id: PartialEq + Clone + 'static> PrimitiveView for RovingFocusHost<Id> {
                 None => false,
                 Some(token) => {
                     !enabled_tokens.contains(&token)
-                        || locate(owner, token)
-                            .is_none_or(|item| !item.accepts_subtree_input())
+                        || locate(owner, token).is_none_or(|item| !item.accepts_subtree_input())
                 }
             };
             let repair_target = if needs_repair {

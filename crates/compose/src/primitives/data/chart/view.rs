@@ -131,13 +131,11 @@ impl Chart {
 
     /// The format used for data labels, falling back to the selection text.
     fn value_format(&self) -> Rc<dyn Fn(f32) -> String> {
-        match &self.configuration.data_labels.format {
-            Some(format) => {
-                let format = format.clone();
-                Rc::new(move |value| format(value))
-            }
-            None => Rc::new(crate::primitives::data::chart::Selection::default_text),
-        }
+        let format = match &self.configuration.data_labels.format {
+            Some(format) => format.clone(),
+            None => self.configuration.selection.value_text.clone(),
+        };
+        Rc::new(move |value| format(value))
     }
 
     /// What the x axis calls this position.
@@ -362,11 +360,9 @@ impl View for Chart {
             },
         };
 
-        let mut children = vec![AnyView::new(AnyView::new(plot).flex_with(
-            1.0,
-            1.0,
-            Some(0.0),
-        ))];
+        // Auto basis: the plot keeps its own 64pt default when the parent does
+        // not impose a height, and takes the leftover space when it does.
+        let mut children = vec![AnyView::new(AnyView::new(plot).flex_with(1.0, 1.0, None))];
         if self.configuration.legend.placement.0 == ChartLegendPlacement::Bottom {
             children.push(AnyView::new(
                 AnyView::new(ChartLegend {
@@ -431,13 +427,11 @@ impl ChartCalloutSource {
     }
 
     fn value_format(&self) -> Rc<dyn Fn(f32) -> String> {
-        match &self.configuration.data_labels.format {
-            Some(format) => {
-                let format = format.clone();
-                Rc::new(move |value| format(value))
-            }
-            None => Rc::new(crate::primitives::data::chart::Selection::default_text),
-        }
+        let format = match &self.configuration.data_labels.format {
+            Some(format) => format.clone(),
+            None => self.configuration.selection.value_text.clone(),
+        };
+        Rc::new(move |value| format(value))
     }
 
     fn callout(&self, point: ChartPoint) -> Option<ChartCallout> {

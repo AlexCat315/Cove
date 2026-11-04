@@ -4,6 +4,18 @@
 
 ## Unreleased
 
+- **图表对齐 Swift（2026-11-04）**：
+  - 轴文字真正绘制：`ChartPaint::axis_labels` 按 Swift `axisLabels` 的 gutter 规则输出刻度与标题并接入 `ChartPlot` 绘制流程；`ChartText` 接入真实 `TextEnvironment` 测量，仅在没有环境时退回字素近似，修复轴宽、绘图区与标签抽稀一直按伪造字宽计算的问题。
+  - 覆盖层按种类分级：callout 卡片（`input_radius`、色点、body-strong 数值）、annotation 描边药丸、donut 中心标题、其余 caption；callout 行距改为 2pt；覆盖层整体从可访问性树隐藏，避免与图表读数重复播报。
+  - 图例项补齐可见内容、`Return`/`Space`/`KeypadEnter` 键盘激活（忽略重复）、透明空心色块与焦点环；隐藏色块改用 `clear`，不再覆盖图表自身背景。
+  - 交互判定恢复 Swift 语义：仅绑定 `viewport.range` 或 `selection.range` 的图表也可命中、聚焦与滚轮缩放；Alt-drag 平移改用真实修饰键；wheel/motion 注册改回 `control` 路由，不再被全局滚动兜底误触发；卸载时释放指针捕获与焦点。
+  - 数据动画修复：减少动态效果不再提前返回（此前会永久冻结采样），`ChartConfiguration.animation` 真正生效而不再被丢弃。
+  - 几何缓存签名补齐 guides（阈值/带状区/标记）、每序列绘制样式、每序列值轴侧、完整分类标签与 caption 字号：编辑阈值、切换右轴或改变曲线样式会重建几何，而不是沿用旧位置。
+  - 修复 `selection.value_text` 从未被读取（自定义格式化静默失效）、`Viewport::default()` 把最小缩放比例归零（1% 下限退化为 0.01%）、`Chart` 绘图区 basis 置 0 导致无约束父容器下塌陷到 24pt；`ChartDataTable` 单元格恢复内容自适应宽度。
+  - Gallery 图表页补齐 Swift 全部 13 个段落：新增 Large series；Data table 改为真正渲染 `ChartDataTable`；Explore 接入 label/viewport/brush/animation（三个按钮此前无效）；新增 Stacked/Percent 复选框并让 Percent 模式可用；Bars/Baseline/Dual axis/Log/Histogram/Horizontal/Scatter/Donut/Trend 改用 Swift 数据集、标记、颜色、轴标题与高度；调试名恢复 Swift 命名并去掉兜底分支。
+
+- **字段 API 收敛（2026-11-04，破坏性）**：输入框外壳从一处解析——新增 `InputChromeState` 与 `InputAppearance::{background_for,border_for,border_width_for}`，`TextField`、数值前缀、`Select`、`TimeInput` 与 JSON 编辑器共用同一份填充/边框/圆角，不再各自手写。新增可独立使用的 `Field` 外壳（与 `Form` 同一套标签、帮助、错误与可访问性布局），Gallery 字段页由临时的 `field_row` 改用 `Field`。数值配置收敛为 `NumberFieldOptions`：`Vec3Field` 不再复刻 `NumberField` 的 builder，改为 `.options(NumberFieldOptions)`，删除 `.step/.size/.with_format/.enabled/.decimals/.mixed_value_label`；`NumberField` 增加 `.options(...)`，删除未使用的 `decimals`。向量专属的约束、混合轴、最小轴宽与剪贴板仍留在 `Vec3Field`。Gallery 目录由 106 页收敛为 102 页：`Numeric` 合并 `NumberField`+`Vec3Field`，`Text Fields` 合并 `TextField`+`SearchField`+`TextArea`+`JsonField`，并删除对应页变量、catalog 条目、图标与 dispatch。用户文档：`field.md` 新增，`number-field.md`、`vec3-field.md` 更新。
+
 - **Gallery 控件对齐（2026-11-04）**：按本地 Swift 恢复 Toolbar 全部命令组及纵向溢出、完整 Text Editor 与其状态/诊断/标记/补全，重新对齐 TextArea、NumberField、Vec3Field、ColorField、Select、SplitButton 的初始值、布局和操作；修复数值前缀输入框外观、向量步长与平台剪贴板、颜色浮层主题/草稿和 SplitButton 单一 Tab 停靠点。同步九页 Rust 文档及验收记录。
 
 - **自定义布局测量（2026-11-04）**：普通尺寸提议保留内容固有宽度，操作组单独测量收窄后的换行高度，避免长按钮重叠及网格、Markdown 代码块横向滚动回归。
