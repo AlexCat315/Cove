@@ -286,6 +286,52 @@ fn drag_upload_mounts_with_a_zone_and_a_progress_readout() {
 }
 
 #[test]
+fn an_idle_upload_shows_no_progress_readout() {
+    InteractiveScene::run(600.0, 400.0, |scene| {
+        with_registry(|_registry| {
+            scene.install(AnyView::new(DragUpload::new(UploadRequest::new(
+                "memory://test/upload",
+                Vec::new(),
+            ))));
+            assert!(scene.labelled("Cancel upload", None).is_none());
+        });
+    });
+}
+
+#[test]
+fn a_running_upload_shows_progress_and_cancel() {
+    InteractiveScene::run(600.0, 400.0, |scene| {
+        with_registry(|_registry| {
+            let upload =
+                DragUpload::new(UploadRequest::new("memory://test/upload", Vec::new()));
+            upload
+                .state()
+                .set(UploadState::Uploading { sent: 1, total: 4 });
+            scene.install(AnyView::new(upload));
+            assert!(scene.labelled("25%", None).is_some());
+            assert!(scene.labelled("Cancel upload", None).is_some());
+        });
+    });
+}
+
+#[test]
+fn a_finished_upload_shows_its_status_row() {
+    InteractiveScene::run(600.0, 400.0, |scene| {
+        with_registry(|_registry| {
+            let upload =
+                DragUpload::new(UploadRequest::new("memory://test/upload", Vec::new()));
+            upload.state().set(UploadState::Succeeded(UploadResponse {
+                status: 201,
+                body: Vec::new(),
+            }));
+            scene.install(AnyView::new(upload));
+            assert!(scene.labelled("Uploaded", None).is_some());
+            assert!(scene.labelled("Cancel upload", None).is_none());
+        });
+    });
+}
+
+#[test]
 fn a_finished_upload_lands_in_the_state() {
     let transport: std::sync::Arc<RecordingTransport> = std::sync::Arc::new(RecordingTransport {
         calls: std::sync::Mutex::new(Vec::new()),

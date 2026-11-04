@@ -4,6 +4,12 @@
 
 ## Unreleased
 
+- **DragUpload 默认外观重做（2026-11-04，界面）**：
+  - `FileDropZone` 自带安静状态外观：`surface_sunken` 填充、`radius.lg` 圆角与虚线描边，不再只在拖拽悬停时才有框体。拖拽悬停/接受为强调色实线，拒绝为错误色实线，禁用为分隔线色；虚线沿圆角轮廓连续分段绘制。
+  - `FileDropPrompt` 改为图标芯片 + headline 标题 + caption 类型说明 + 次级 “Browse files” 按钮的居中层级，类型与数量只在说明行出现一次；禁用时文字与芯片同步降级。图标在 44pt 芯片内真正居中，按钮的顶部间距移到独立容器，不扩大命中区域。
+  - `DragUpload` 不再常驻空进度条与禁用取消按钮。进度条、百分比与取消按钮只在 `Preparing`/`Uploading` 出现；`Succeeded`/`Failed` 显示带色调的图标状态条，错误文案限制两行。
+  - Gallery 的 Drag Upload 示例把过滤说明与诊断收为 caption 行，用户文档 `drag-upload.md` 补充默认外观说明。
+
 - **拖入批次与类型语义修复（2026-11-04，修复）**：
   - **修复 `maximum_files` 失效**：`DropPhase::File` 原先每条事件立刻投递一次，而 SDL 每个文件发一条 `DROP_FILE`，多文件拖入因此被拆成多次投递，数量上限只看到 1 个文件。现在 `Begin` 开启批次、`File` 累积、`Complete` 一次性投递；新增 `FileDropRegistry::begin/stage/finish/cancel` 与 `has_staged`。中断的拖入不会把残留路径带进下一次。
   - 目录语义：`DroppedFile` 新增 `is_directory`；新增 `DroppedFile::inspected` 用 `fs::metadata` 判定目录与大小，读不到的路径按文件处理。`FileDropZone` 新增 `allows_directories`（默认 `false`），文件夹默认被显式拒绝而不是被当成空文件读取。

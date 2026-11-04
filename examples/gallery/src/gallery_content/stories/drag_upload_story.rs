@@ -23,7 +23,9 @@ use cove_ui_compose::primitives::upload::{
     DragUpload, UploadError, UploadRequest, UploadResponse, UploadState, UploadTransport,
     UploadTransportHolder,
 };
-use cove_ui_compose::theme::tokens::{SemanticColorRef, SemanticStyleViewExt};
+use cove_ui_compose::theme::tokens::{
+    SemanticColorRef, SemanticFontRef, SemanticStyleViewExt,
+};
 use cove_ui_compose::{AnyView, BoxView, LayoutDebugExt, TupleView, View};
 
 use crate::gallery_content::catalog::GalleryOptions;
@@ -181,7 +183,17 @@ impl View for DragUploadStory {
                 .collect::<Vec<_>>()
                 .join(", "),
             format_bytes(cove_ui_compose::primitives::upload::DEFAULT_MAXIMUM_BYTES as u64)
-        ));
+        ))
+        .semantic_font(SemanticFontRef::caption())
+        .semantic_foreground(SemanticColorRef::on_surface_muted());
+        let diagnostics = AnyView::new(
+            Text::new(format!(
+                "Last upload: {last} · Refused by limit: {}",
+                self.rejected.get()
+            ))
+            .semantic_font(SemanticFontRef::caption())
+            .semantic_foreground(SemanticColorRef::on_surface_muted()),
+        );
 
         AnyView::new(BoxView::new(
             FlexDirection::Column,
@@ -192,7 +204,7 @@ impl View for DragUploadStory {
             AnyView::new(TupleView::new(vec![
                 AnyView::new(StorySection::new(
                     "Drop to upload",
-                    "Drop an image into the zone, or use Browse… when a pointer drag is not available. The zone rejects a type it does not accept and reports it before any bytes move.",
+                    "Drop an image into the zone, or use Browse files when a pointer drag is not available. The zone rejects a type it does not accept and reports it before any bytes move.",
                     AnyView::new(BoxView::new(
                         FlexDirection::Column,
                         Align::Stretch,
@@ -202,11 +214,7 @@ impl View for DragUploadStory {
                         AnyView::new(TupleView::new(vec![
                             AnyView::new(upload.debug_name("drag-upload")),
                             AnyView::new(filtered),
-                            AnyView::new(Text::new(format!("Last upload: {last}"))),
-                            AnyView::new(Text::new(format!(
-                                "Refused by limit: {}",
-                                self.rejected.get()
-                            ))),
+                            diagnostics,
                         ])),
                     )),
                 )),

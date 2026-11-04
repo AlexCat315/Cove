@@ -4,6 +4,13 @@
 
 Swift 源码逐页对照见文末《Swift 源码对照（逐页差异清单）》。
 
+## 2026-11-04：DragUpload 默认外观
+
+- `FileDropZone` 补上安静状态的沉降表面、圆角与虚线框；悬停/接受/拒绝/禁用各自有独立描边与填充。虚线由圆角轮廓连续分段绘制。
+- `FileDropPrompt` 改为图标芯片 + headline 标题 + caption 过滤说明 + 次级 “Browse files” 按钮；移除重复的 “or choose files” 与正文样式的过滤行。
+- `UploadProgress` 只在有任务时出现：进行中为进度条 + 百分比 + 取消；结束为成功/失败色调状态条。Gallery 示例把诊断行收为 caption。
+- 验证：`file_drop_tests` 22 项通过（新增空闲无进度、进行中显示进度/取消、结束显示状态条三项）。Gallery Drag Upload 页在 1400×1000 浅色与深色主题下由 DevTools 截图目检，圆角虚线框、居中图标芯片、按钮层级与 caption 行均按预期呈现；进行中/成功/失败状态的视觉效果尚未实机截图验收。
+
 ## 2026-11-04：拖入批次与类型语义修复
 
 - **修复**：`DropPhase::File` 曾被直接映射成一次投递，而 SDL 每个文件发一条 `DROP_FILE`，导致 `maximum_files` 在真实拖入里只数到 1。改为 `Begin` 开批次、`File` 累积、`Complete` 一次性投递；`cancel` 丢弃未投递批次。宿主改用 `DroppedFile::inspected`，目录与大小来自 `fs::metadata`。

@@ -9,12 +9,21 @@ DragUpload::new(UploadRequest::new("https://example.test/upload", Vec::new()))
     .reader(|file| Ok(UploadFilePart::new("file", file.name.clone(), "image/png", std::fs::read(&file.path)?)))
 ```
 
+## 默认外观
+
+拖放区自带静态外观，不依赖拖拽状态才出现：
+
+- 下沉表面 + 主题圆角 + 虚线描边，安静状态即可读作投放目标。
+- 图标芯片、标题、类型/数量说明与 “Browse files” 次级按钮按层级排列，文案不重复。
+- 拖拽悬停或类型被接受时描边转为强调色；拒绝时转为错误色；禁用时使用分隔线色与禁用文字色。
+- 上传进度只在有上传任务时出现：进行中显示进度条、百分比与取消按钮；结束显示成功或失败状态条，不再常驻空进度条。
+
 ## 两条入口
 
 同一个回调有两条到达路径，这样触屏和键盘用户不必依赖拖拽：
 
 - **平台拖入**：系统拖入事件经 `InputEvent::ExternalDrop` 进入，由 `FileDropRegistry` 按节点命中分发到拖放区。
-- **浏览按钮**：`FileDropPrompt` 内的 “Browse…” 经 `FilePicker` 打开系统面板。
+- **浏览按钮**：`FileDropPrompt` 内的 “Browse files” 经 `FilePicker` 打开系统面板。
 
 `FilePicker` 未安装时浏览按钮禁用，而不是打开一个空面板。
 

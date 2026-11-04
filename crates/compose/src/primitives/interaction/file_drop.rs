@@ -10,14 +10,20 @@ use std::cell::RefCell;
 use std::collections::HashSet;
 use std::rc::Rc;
 
-use cove_composition::{AnyView, PrimitiveView, View};
-use cove_core::scene::{Align, FlexDirection, LayoutNode, Node, NodeWeak};
-use cove_core::{Binding, Point, Rect};
+use cove_composition::{AnyView, PrimitiveView, TupleView, View};
+use cove_core::scene::{Align, FlexDirection, Justify, LayoutNode, Node, NodeWeak, Wrap};
+use cove_core::{Binding, Color, DrawList, Point, Rect, RoundedRect, TextAlignment};
 
 use crate::modifiers::interaction::AccessibilityExt;
+use crate::modifiers::layout::{EdgeInsets, LayoutFrameExt, PaddingExt};
+use crate::modifiers::style::{AppearanceExt, SemanticStyleViewExt};
 use crate::primitives::controls::{Button, ButtonRole};
+use crate::primitives::media::{Icon, ui_icon_catalog};
 use crate::primitives::text::Text;
-use crate::theme::theme_for_node;
+use crate::theme::styles::buttons::{ButtonStyleViewExt, SecondaryButtonStyle};
+use crate::theme::{
+    SemanticColorRef, SemanticFontRef, SemanticIconSize, Theme, ThemeReader, theme_for_node,
+};
 
 /// One file the user dropped or picked.
 ///
@@ -440,6 +446,82 @@ fn contains(rect: Rect, point: Point) -> bool {
         && point.y <= rect.y + rect.height
 }
 
+/// Dashed perimeter for the drop zone's resting state.
+///
+/// The draw list paints solid outlines only, so the rounded outline is walked
+/// as short line runs. A dashed edge is the established drag-and-drop
+/// affordance; a solid hairline reads as a text field instead.
+fn add_dashed_rounded_rect_stroke(
+    list: &mut DrawList,
+    rect: Rect,
+    radius: f32,
+    width: f32,
+    color: Color,
+) {
+    const DASH: f32 = 6.0;
+    const GAP: f32 = 4.0;
+    if rect.width <= 0.0
+        || rect.height <= 0.0
+        || width <= 0.0
+        || color.a <= 0.0
+        || !rect.width.is_finite()
+        || !rect.height.is_finite()
+    {
+        return;
+    }
+    let inset = width * 0.5;
+    let inner = Rect::new(
+        rect.x + inset,
+        rect.y + inset,
+        (rect.width - width).max(0.0),
+        (rect.height - width).max(0.0),
+    );
+    let radius = (radius.min(inner.width.min(inner.height) * 0.5) - inset).max(0.0);
+    let segments = ((radius * 1.5) as usize).clamp(4, 24);
+    let mut points = RoundedRect::new(inner, radius).outline(segments);
+    if points.len() < 2 {
+        return;
+    }
+    let first = points[0];
+    points.push(first);
+
+    let mut remaining = DASH;
+    let mut drawing = true;
+    for pair in points.windows(2) {
+        let (from, to) = (pair[0], pair[1]);
+        let segment = ((to.x - from.x).powi(2) + (to.y - from.y).powi(2)).sqrt();
+        if !segment.is_finite() || segment <= 0.0001 {
+            continue;
+        }
+        let mut travelled = 0.0;
+        while travelled < segment {
+            let step = remaining.min(segment - travelled);
+            if drawing && step > 0.0001 {
+                let start = travelled / segment;
+                let end = (travelled + step) / segment;
+                let _ = list.add_line(
+                    Point::new(
+                        from.x + (to.x - from.x) * start,
+                        from.y + (to.y - from.y) * start,
+                    ),
+                    Point::new(
+                        from.x + (to.x - from.x) * end,
+                        from.y + (to.y - from.y) * end,
+                    ),
+                    width,
+                    color,
+                );
+            }
+            travelled += step;
+            remaining -= step;
+            if remaining <= 0.0001 {
+                drawing = !drawing;
+                remaining = if drawing { DASH } else { GAP };
+            }
+        }
+    }
+}
+
 fn depth_of(node: &Node) -> usize {
     let mut depth = 0;
     let mut current = node.parent();
@@ -478,9 +560,11 @@ pub enum FileDropOutcome {
 
 /// A drop area for files dragged in from outside the application.
 ///
-/// `is_targeted` and `outcome` drive the chrome; `on_drop` runs only for a drop
-/// the filter accepted. `is_enabled: false` removes the zone entirely, so a
-/// disabled control never paints a border it cannot honour.
+/// The zone paints its own resting chrome (sunken fill, rounded corner, dashed
+/// border), so it reads as a target before a drag exists. `is_targeted` and
+/// `outcome` then swap that chrome for the accent or error state; `on_drop`
+/// runs only for a drop the filter accepted. `is_enabled: false` unregisters
+/// the zone and paints it with the disabled palette.
 pub struct FileDropZone {
     pub accepted_extensions: HashSet<String>,
     pub maximum_files: usize,
@@ -582,7 +666,7 @@ impl FileDropZone {
 
 impl View for FileDropZone {
     fn body(&self, _cx: &Scope) -> AnyView {
-        AnyView::new(FileDropZoneHost {
+        let host = AnyView::new(FileDropZoneHost {
             accepted_extensions: self.accepted_extensions.clone(),
             maximum_files: self.maximum_files,
             allows_directories: self.allows_directories,
@@ -594,7 +678,22 @@ impl View for FileDropZone {
             on_rejected: self.on_rejected.clone(),
             accepts: self.accepts.clone(),
             content: self.content.clone(),
-        })
+        });
+        let is_enabled = self.is_enabled;
+        // The zone owns its resting chrome: a sunken well with a dashed border.
+        // Without it the control is invisible until a drag is in flight, which
+        // reads as loose text rather than a drop target.
+        AnyView::new(ThemeReader::new(move |theme: &Theme| {
+            let fill = if is_enabled {
+                theme.colors.surface_sunken
+            } else {
+                theme.colors.surface
+            };
+            AnyView::new(host.clone())
+                .background_color(fill)
+                .corner_radius(theme.radius.lg)
+                .padding(theme.spacing.xl)
+        }))
     }
 }
 
@@ -651,10 +750,6 @@ impl PrimitiveView for FileDropZoneHost {
                 registry.unregister(node);
             }
         }
-        if !self.is_enabled {
-            node.update_overlay_draw((), |_, _| {});
-            return;
-        }
         let identity = PaintIdentity {
             is_targeted: self.is_targeted.get(),
             outcome: self.outcome.get(),
@@ -662,36 +757,51 @@ impl PrimitiveView for FileDropZoneHost {
         };
         let outcome = identity.outcome;
         let is_targeted = identity.is_targeted;
+        let is_enabled = identity.is_enabled;
         let draw_node = node.clone();
         node.update_overlay_draw(identity, move |list, origin| {
-            if !is_targeted {
-                return;
-            }
             let theme = theme_for_node(&draw_node);
             let frame = draw_node.frame();
             let rect = Rect::new(origin.x, origin.y, frame.width, frame.height);
-            let radius = theme.inputs.radius;
-            let (fill, stroke) = match outcome {
-                FileDropOutcome::Accepted => (
-                    theme.colors.accent.multiplied_alpha(0.10),
-                    theme.colors.accent.multiplied_alpha(0.85),
-                ),
-                FileDropOutcome::Rejected => (
-                    theme.colors.error.multiplied_alpha(0.08),
-                    theme.colors.error.multiplied_alpha(0.70),
-                ),
-                FileDropOutcome::Idle => (
-                    theme.colors.accent.multiplied_alpha(0.04),
-                    theme.inputs.border_color,
-                ),
+            if rect.width <= 0.0 || rect.height <= 0.0 {
+                return;
+            }
+            let radius = theme.radius.lg;
+            let stroke_width = theme.inputs.border_width.max(1.0);
+            let (fill, stroke, is_solid) = if !is_enabled {
+                (None, theme.colors.divider, false)
+            } else {
+                match (is_targeted, outcome) {
+                    (_, FileDropOutcome::Accepted) => (
+                        Some(theme.colors.accent.multiplied_alpha(0.10)),
+                        theme.colors.accent.multiplied_alpha(0.85),
+                        true,
+                    ),
+                    (_, FileDropOutcome::Rejected) => (
+                        Some(theme.colors.error.multiplied_alpha(0.08)),
+                        theme.colors.error.multiplied_alpha(0.70),
+                        true,
+                    ),
+                    (true, FileDropOutcome::Idle) => (
+                        Some(theme.colors.accent.multiplied_alpha(0.04)),
+                        theme.colors.accent.multiplied_alpha(0.80),
+                        true,
+                    ),
+                    (false, FileDropOutcome::Idle) => (
+                        None,
+                        theme.colors.border_strong.multiplied_alpha(0.65),
+                        false,
+                    ),
+                }
             };
-            let _ = list.add_rounded_rect(rect, radius, fill);
-            let _ = list.add_rounded_rect_stroke(
-                rect,
-                radius,
-                theme.inputs.border_width.max(1.0),
-                stroke,
-            );
+            if let Some(fill) = fill {
+                let _ = list.add_rounded_rect(rect, radius, fill);
+            }
+            if is_solid {
+                let _ = list.add_rounded_rect_stroke(rect, radius, stroke_width, stroke);
+            } else {
+                add_dashed_rounded_rect_stroke(list, rect, radius, stroke_width, stroke);
+            }
         });
     }
 
@@ -785,65 +895,180 @@ impl FileDropPrompt {
 
 impl View for FileDropPrompt {
     fn body(&self, _cx: &Scope) -> AnyView {
-        let on_browse = self.on_browse.clone();
-        let multiple = self.maximum_files > 1;
-        let is_enabled = self.is_enabled;
-        let filters = self.accepted_extensions.clone();
+        let title = self.title.clone();
+        let hint = self.hint.clone();
+        let detail = self.detail_text();
+        let accepted = self.accepted_extensions.clone();
         let maximum_files = self.maximum_files;
-        let browse = Button::with_options(
-            Text::new("Browse…"),
-            move || {
-                if !is_enabled {
-                    return;
-                }
-                let filters = filters.clone();
-                let on_browse = on_browse.clone();
-                cove_core::scene::FilePicker::request(
-                    &[cove_core::scene::FilePickerFilter::new(
-                        "Files",
-                        filters.iter().map(|extension| format!(".{extension}")),
-                    )],
-                    multiple,
-                    Box::new(move |paths| {
-                        let files: Vec<DroppedFile> = paths
-                            .into_iter()
-                            .map(DroppedFile::new)
-                            .take(maximum_files)
-                            .collect();
-                        if !files.is_empty() {
-                            on_browse(files);
-                        }
-                    }),
-                );
-            },
-            ButtonRole::Normal,
-            is_enabled && cove_core::scene::FilePicker::is_installed(),
-            false,
-            false,
-            None,
-        );
-        let mut rows = vec![
-            AnyView::new(Text::new(self.title.clone())),
-            AnyView::new(Text::new(self.hint.clone())),
-        ];
-        if let Some(detail) = self.detail_text() {
-            rows.push(AnyView::new(Text::new(detail)));
-        }
-        rows.push(AnyView::new(browse));
-        AnyView::new(
-            crate::BoxView::new(
+        let is_enabled = self.is_enabled;
+        let on_browse = self.on_browse.clone();
+        let label = title.clone();
+        let help = hint.clone();
+
+        AnyView::new(ThemeReader::new(move |theme: &Theme| {
+            let title_color = if is_enabled {
+                SemanticColorRef::on_surface()
+            } else {
+                SemanticColorRef::on_surface_disabled()
+            };
+            let icon_color = if is_enabled {
+                theme.colors.accent
+            } else {
+                theme.colors.on_surface_muted
+            };
+            let chip_fill = theme.colors.surface_variant;
+            let chip_body = AnyView::new(
+                crate::BoxView::new(
+                    FlexDirection::Row,
+                    Align::Center,
+                    Justify::Center,
+                    Wrap::NoWrap,
+                    0.0,
+                    AnyView::new(Icon::with_color(
+                        ui_icon_catalog::device::cloud_upload(),
+                        24.0,
+                        icon_color,
+                    )),
+                )
+                .frame_size(44.0, 44.0)
+                .background_color(chip_fill)
+                .corner_radius(theme.radius.pill)
+                .accessibility_hidden(true),
+            );
+            // The gap lives on a wrapper: padding on the chip node itself would
+            // shrink its content box and push the glyph off-center.
+            let chip = AnyView::new(
+                crate::BoxView::new(
+                    FlexDirection::Column,
+                    Align::Center,
+                    Justify::FlexStart,
+                    Wrap::NoWrap,
+                    0.0,
+                    chip_body,
+                )
+                .padding_insets(EdgeInsets::new(0.0, 0.0, 14.0, 0.0)),
+            );
+
+            let mut lines = vec![AnyView::new(
+                Text::new(title.clone())
+                    .alignment(TextAlignment::Center)
+                    .semantic_font(SemanticFontRef::headline())
+                    .semantic_foreground(title_color),
+            )];
+            if !hint.is_empty() {
+                lines.push(AnyView::new(
+                    Text::new(hint.clone())
+                        .alignment(TextAlignment::Center)
+                        .semantic_font(SemanticFontRef::body())
+                        .semantic_foreground(SemanticColorRef::on_surface_muted()),
+                ));
+            }
+            if let Some(detail) = detail.clone() {
+                lines.push(AnyView::new(
+                    Text::new(detail)
+                        .alignment(TextAlignment::Center)
+                        .semantic_font(SemanticFontRef::caption())
+                        .semantic_foreground(SemanticColorRef::on_surface_muted()),
+                ));
+            }
+            let copy = AnyView::new(
+                crate::BoxView::new(
+                    FlexDirection::Column,
+                    Align::Center,
+                    Justify::FlexStart,
+                    Wrap::NoWrap,
+                    theme.spacing.xs,
+                    AnyView::new(TupleView::new(lines)),
+                )
+                .frame(None, None, None, None, Some(420.0), None),
+            );
+
+            let filters = accepted.clone();
+            let on_browse = on_browse.clone();
+            let browse_button = Button::with_options(
+                browse_label(),
+                move || {
+                    if !is_enabled {
+                        return;
+                    }
+                    let filters = filters.clone();
+                    let on_browse = on_browse.clone();
+                    cove_core::scene::FilePicker::request(
+                        &[cove_core::scene::FilePickerFilter::new(
+                            "Files",
+                            filters.iter().map(|extension| format!(".{extension}")),
+                        )],
+                        maximum_files > 1,
+                        Box::new(move |paths| {
+                            let files: Vec<DroppedFile> = paths
+                                .into_iter()
+                                .map(DroppedFile::new)
+                                .take(maximum_files)
+                                .collect();
+                            if !files.is_empty() {
+                                on_browse(files);
+                            }
+                        }),
+                    );
+                },
+                ButtonRole::Normal,
+                is_enabled && cove_core::scene::FilePicker::is_installed(),
+                false,
+                false,
+                None,
+            )
+            .accessibility_text("Browse files")
+            .button_style(SecondaryButtonStyle);
+            let browse = AnyView::new(
+                crate::BoxView::new(
+                    FlexDirection::Column,
+                    Align::Center,
+                    Justify::FlexStart,
+                    Wrap::NoWrap,
+                    0.0,
+                    AnyView::new(browse_button),
+                )
+                .padding_insets(EdgeInsets::new(16.0, 0.0, 0.0, 0.0)),
+            );
+
+            let column = crate::BoxView::new(
                 FlexDirection::Column,
                 Align::Center,
-                cove_core::scene::Justify::Center,
-                cove_core::scene::Wrap::NoWrap,
-                8.0,
-                AnyView::new(cove_composition::TupleView::new(rows)),
+                Justify::Center,
+                Wrap::NoWrap,
+                0.0,
+                AnyView::new(TupleView::new(vec![chip, copy, browse])),
             )
-            .accessibility(|semantics| {
-                semantics.role = cove_core::scene::AccessibilityRole::Group;
-            }),
-        )
+            .frame(None, None, None, Some(148.0), None, None);
+            AnyView::new(column.accessibility({
+                let label = label.clone();
+                let help = help.clone();
+                move |semantics| {
+                    semantics.role = cove_core::scene::AccessibilityRole::Group;
+                    semantics.label = label.clone();
+                    semantics.help = help.clone();
+                }
+            }))
+        }))
     }
+}
+
+/// The browse button's label: a glyph and text that inherit the button's ink.
+fn browse_label() -> AnyView {
+    AnyView::new(crate::BoxView::new(
+        FlexDirection::Row,
+        Align::Center,
+        Justify::Center,
+        Wrap::NoWrap,
+        6.0,
+        AnyView::new(TupleView::new(vec![
+            AnyView::new(Icon::semantic(
+                ui_icon_catalog::action::upload(),
+                SemanticIconSize::small(),
+            )),
+            AnyView::new(Text::new("Browse files").semantic_font(SemanticFontRef::label())),
+        ])),
+    ))
 }
 
 #[cfg(test)]
