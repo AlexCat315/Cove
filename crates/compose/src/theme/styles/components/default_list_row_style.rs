@@ -63,10 +63,7 @@ impl ListRowStyle for DefaultListRowStyle {
         } else {
             row
         };
-        let result = selected_ink.padding_edges(
-            edge,
-            if touch { 0.0 } else { theme.spacing.xs },
-        );
+        let result = selected_ink.padding_edges(edge, if touch { 0.0 } else { theme.spacing.xs });
         let separator = ListRowSeparatorModifier {
             color: theme.colors.divider,
             is_enabled: configuration.shows_separator && !configuration.is_selected,

@@ -24,7 +24,8 @@ use cove_composition::Scancode;
 use cove_core::Binding;
 use cove_platform::{KeyEvent, KeyModifiers};
 use cove_ui_compose::primitives::data::lists::tree::{
-    Tree, TreeOptions, TreeSearch, TreeSearchFilterPolicy, TreeSelection, flatten_tree,
+    Tree, TreeDragOperations, TreeDropPosition, TreeOptions, TreeSearch, TreeSearchFilterPolicy,
+    TreeSelection, flatten_tree,
 };
 use cove_ui_compose::primitives::data::lists::{RowState, Selection};
 
@@ -484,4 +485,186 @@ fn expand_all_and_collapse_all_cover_the_whole_forest() {
         "collapse_all clears the expansion"
     );
     assert_eq!(tree.entries().len(), 1, "only the root remains visible");
+}
+
+/// Records every `(source, target, position)` the tree reports through the drop
+/// contract, which both the pointer and the keyboard moves use.
+#[derive(Clone, Default)]
+struct Drops(Rc<RefCell<Vec<(usize, usize, TreeDropPosition)>>>);
+
+impl Drops {
+    fn take(&self) -> Vec<(usize, usize, TreeDropPosition)> {
+        std::mem::take(&mut *self.0.borrow_mut())
+    }
+}
+
+fn alt() -> KeyModifiers {
+    KeyModifiers::LEFT_ALT
+}
+
+fn alt_shift() -> KeyModifiers {
+    KeyModifiers::LEFT_ALT | KeyModifiers::LEFT_SHIFT
+}
+
+/// The same 0 -> {1 -> {3}, 2} hierarchy with dragging armed and every branch
+/// open, so all four rows are flattened and movable.
+fn drag_tree(
+    drops: &Drops,
+    primary: Binding<Option<usize>>,
+    can_drag: Option<Rc<dyn Fn(&Item) -> bool>>,
+) -> Tree<Item, usize, impl Fn(&Item, RowState) -> AnyView + 'static> {
+    let reads = Reads::default();
+    let children_reads = reads.clone();
+    let expanded = Cell::new(HashSet::from([0usize, 1usize]));
+    let record = drops.clone();
+    let mut options: TreeOptions<Item, usize> = TreeOptions::default();
+    options.selection = TreeSelection {
+        ids: Selection::single(primary),
+        expanded: Some(expanded.binding()),
+        ..TreeSelection::default()
+    };
+    options.drag = TreeDragOperations {
+        can_drag,
+        on_drop: Some(Rc::new(move |source: Item, target: Item, position| {
+            record.0.borrow_mut().push((source.id, target.id, position));
+        })),
+        ..TreeDragOperations::default()
+    };
+    Tree::new(
+        vec![Item { id: 0 }],
+        |item: &Item| item.id,
+        move |item: &Item| children_reads.children(item),
+        |item: &Item, _: RowState| AnyView::new(TreeRowText(item.id)),
+    )
+    .options(options)
+    .has_children(|item: &Item| item.is_branch())
+}
+
+#[test]
+fn alt_up_and_down_move_between_siblings_through_the_drop_contract() {
+    let drops = Drops::default();
+    let tree = drag_tree(&drops, Binding::constant(Some(2usize)), None);
+    assert_eq!(
+        tree.entries()
+            .iter()
+            .map(|entry| entry.depth)
+            .collect::<Vec<_>>(),
+        vec![0, 1, 2, 1],
+        "every branch is open"
+    );
+
+    assert!(
+        tree.handle_key(&key(Scancode::ARROW_UP, alt())),
+        "Alt+ArrowUp is consumed by the move"
+    );
+    assert_eq!(
+        drops.take(),
+        vec![(2, 1, TreeDropPosition::Before)],
+        "the selected row is reported as moving above its upper sibling"
+    );
+
+    // Row 2 is the last row, so there is nothing to pass and the key falls
+    // through to plain navigation.
+    assert!(tree.handle_key(&key(Scancode::ARROW_DOWN, alt())));
+    assert!(
+        drops.take().is_empty(),
+        "Alt+ArrowDown reports no move for the last row"
+    );
+
+    let drops = Drops::default();
+    let tree = drag_tree(&drops, Binding::constant(Some(1usize)), None);
+    assert!(tree.handle_key(&key(Scancode::ARROW_DOWN, alt())));
+    assert_eq!(
+        drops.take(),
+        vec![(1, 2, TreeDropPosition::After)],
+        "the branch is reported as moving below its lower sibling"
+    );
+}
+
+#[test]
+fn alt_shift_left_outdents_and_alt_shift_right_indents() {
+    let drops = Drops::default();
+    let tree = drag_tree(&drops, Binding::constant(Some(3usize)), None);
+    assert!(
+        tree.handle_key(&key(Scancode::ARROW_LEFT, alt_shift())),
+        "Alt+Shift+ArrowLeft is consumed by the outdent"
+    );
+    assert_eq!(
+        drops.take(),
+        vec![(3, 1, TreeDropPosition::After)],
+        "the grandchild moves out below its parent's branch"
+    );
+
+    let drops = Drops::default();
+    let tree = drag_tree(&drops, Binding::constant(Some(2usize)), None);
+    assert!(
+        tree.handle_key(&key(Scancode::ARROW_RIGHT, alt_shift())),
+        "Alt+Shift+ArrowRight is consumed by the indent"
+    );
+    assert_eq!(
+        drops.take(),
+        vec![(2, 1, TreeDropPosition::Inside)],
+        "the row becomes the last child of its upper sibling"
+    );
+}
+
+#[test]
+fn expand_all_and_collapse_all_keep_their_alt_shortcuts() {
+    let expanded = Cell::new(HashSet::from([0usize]));
+    let tree = tree(
+        Reads::default(),
+        expanded.binding(),
+        Binding::constant(Some(1usize)),
+        "",
+        true,
+    );
+    assert!(tree.handle_key(&key(Scancode::ARROW_RIGHT, alt())));
+    assert_eq!(
+        expanded.get(),
+        HashSet::from([0, 1]),
+        "Alt+ArrowRight without Shift still expands the whole subtree"
+    );
+    assert!(tree.handle_key(&key(Scancode::ARROW_LEFT, alt())));
+    assert!(
+        expanded.get().is_empty(),
+        "Alt+ArrowLeft without Shift still collapses the whole forest"
+    );
+}
+
+#[test]
+fn a_denied_or_unmovable_row_falls_back_to_navigation() {
+    let drops = Drops::default();
+    let primary = Cell::new(Some(2usize));
+    let tree = drag_tree(
+        &drops,
+        primary.binding(),
+        Some(Rc::new(|item: &Item| item.id != 2)),
+    );
+    assert!(
+        tree.handle_key(&key(Scancode::ARROW_UP, alt())),
+        "the key is still consumed as navigation"
+    );
+    assert!(
+        drops.take().is_empty(),
+        "can_drag refused the structural move"
+    );
+    assert_eq!(
+        primary.get(),
+        Some(3),
+        "so the row cursor steps up one instead"
+    );
+
+    let drops = Drops::default();
+    let primary = Cell::new(Some(0usize));
+    let tree = drag_tree(&drops, primary.binding(), None);
+    assert!(
+        tree.handle_key(&key(Scancode::ARROW_RIGHT, alt_shift())),
+        "a root has nothing to indent into"
+    );
+    assert!(drops.take().is_empty());
+    assert_eq!(
+        primary.get(),
+        Some(1),
+        "so the key falls through to ArrowRight, which steps into the open branch"
+    );
 }

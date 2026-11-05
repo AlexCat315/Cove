@@ -156,7 +156,10 @@ fn install_in(
     moves
 }
 
-fn install_horizontal(scene: &mut InteractiveScene, count: u64) -> Rc<RefCell<Vec<(usize, usize)>>> {
+fn install_horizontal(
+    scene: &mut InteractiveScene,
+    count: u64,
+) -> Rc<RefCell<Vec<(usize, usize)>>> {
     let moves = Rc::new(RefCell::new(Vec::new()));
     scene.install(Harness {
         items: State::new((0..count).collect()),
@@ -196,9 +199,7 @@ fn displacement(scene: &InteractiveScene, id: u64) -> f32 {
 /// The live projection of every mounted row, as `(row id, offset)` by id.
 fn projections(scene: &InteractiveScene) -> Vec<(u64, f32)> {
     let mut rows: Vec<(u64, f32)> = scene
-        .all(|node| {
-            support::debug_name(node).is_some_and(|name| name.starts_with("reorder-row-"))
-        })
+        .all(|node| support::debug_name(node).is_some_and(|name| name.starts_with("reorder-row-")))
         .into_iter()
         .filter_map(|node| {
             let name = support::debug_name(&node)?;
@@ -307,9 +308,7 @@ fn pointer_reorder() {
         );
 
         assert!(
-            projections(scene)
-                .iter()
-                .all(|(_, offset)| *offset == 0.0),
+            projections(scene).iter().all(|(_, offset)| *offset == 0.0),
             "the drop leaves no projection offset behind"
         );
         assert_eq!(
@@ -496,7 +495,10 @@ fn dragging_inside_the_viewport_does_not_auto_scroll() {
 
         dispatcher.dispatch(&release(start));
         scene.settle(4, 1.0);
-        assert!(moves.borrow().is_empty(), "releasing on the row moves nothing");
+        assert!(
+            moves.borrow().is_empty(),
+            "releasing on the row moves nothing"
+        );
     });
 }
 
@@ -610,13 +612,17 @@ fn floating_preview_follows_the_pointer() {
 
         dispatcher.dispatch(&motion(Point::new(point.x, point.y + 50.0)));
         scene.settle(2, 0.1);
-        let preview = scene.named("reorder-preview").expect("the preview stays mounted");
+        let preview = scene
+            .named("reorder-preview")
+            .expect("the preview stays mounted");
         assert!(
             (preview.absolute_frame().y - (start.y + 50.0)).abs() < 1.0,
             "the lifted row follows pointer travel without a relayout"
         );
 
-        let row = scene.named("reorder-row-1").expect("the source row stays mounted");
+        let row = scene
+            .named("reorder-row-1")
+            .expect("the source row stays mounted");
         assert!(
             std::iter::successors(Some(row), |node| node.parent())
                 .any(|node| (node.opacity() - 0.35).abs() < 0.001),
@@ -740,9 +746,7 @@ fn horizontal_axis_reorder() {
             "a two-card horizontal drag reports one move past the source row"
         );
         assert!(
-            projections(scene)
-                .iter()
-                .all(|(_, offset)| *offset == 0.0),
+            projections(scene).iter().all(|(_, offset)| *offset == 0.0),
             "the drop hands the cards back to layout without a second slide"
         );
     });
@@ -819,8 +823,7 @@ fn drop_settles_with_a_spring() {
             "the placeholder already sits in the destination slot (y {row_y})"
         );
         assert!(
-            std::iter::successors(Some(row), |node| node.parent())
-                .any(|node| node.opacity() < 1.0),
+            std::iter::successors(Some(row), |node| node.parent()).any(|node| node.opacity() < 1.0),
             "the placeholder is still fading up from its dimmed state"
         );
 

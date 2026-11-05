@@ -4,6 +4,17 @@
 
 Swift 源码逐页对照见文末《Swift 源码对照（逐页差异清单）》。
 
+## 2026-11-05：Tree 拖拽实时重排与参考线样式
+
+- 能力：Tree 行拖拽改为实时重排，删除插入线。投影只改位移不改数据，展平顺序、布局与命中仍由宿主模型决定，每行按 `(投影槽位 - 自身索引) * 行距` 位移；源行 0.38 不透明度，其余行弹簧跟随，松手后模型落位与拖拽中绘制的位置逐行一致。`Before` / `Inside` / `After` 由行高上下 28% 判定。
+- 根因修复：`FixedVirtualStack` 给每个 `RowSlot` 加了裁剪，行的 `frame` 是父级相对坐标，位移作用在行上会把行推出唯一可见区域，拖动中整行消失（`frame: null`、`inputEnabled: false`）。新增 `ROW_SHIFT_ANCHOR` 标记与 `ReorderRowShift::anchor`，位移改作用在裁剪槽上；ReorderableList 使用自身绝对定位槽，不受影响。
+- 键盘：`Alt+↑`/`Alt+↓` 兄弟移动、`Alt+Shift+←`/`Alt+Shift+→` 出/入层级，与指针共用 `can_drag`/`can_drop`/`on_drop` 契约；被拒绝的组合退回普通方向键导航。`TreeRow::on_key_command` 此前无条件吞掉四个方向键（不检查 `event.modifiers`），Alt 移动因此只在直接调用 `handle_key` 的单测里成立；现先交给会话的 Alt 感知路径，`HOME`/`END` 等回落同一入口。
+- 外观：参考线拆成 `TreeGuideStyle::{None, Straight, Elbow, Dashed, Dotted}` 加 `guide_width`（pt，不随字号缩放）与 `guide_position`（0.0 到 1.0）；新增 `leading_padding`/`trailing_padding` 链式方法并补齐缺失的 `indentation`。`Inside` 放置自动展开目标分支，避免移入折叠节点的行被隐藏。
+- 焦点：Tree 行改为可聚焦，点击行即可用键盘；`SelectionKeyHost` 记录子树是否持有焦点，焦点行随收起/过滤离开输入图后把焦点收回容器，`Alt+←` 收起全树后的快捷键不再静默失效。
+- Gallery：Scene hierarchy 页新增 `None`/`Straight`/`Elbow`/`Dashed`/`Dotted` 样式条与 `Indent`/`Lead` 两个滑杆，状态行同时报告拖放结果（`Moved X into Y` 等，自动展开不再覆盖该消息）；目录副标题同步。
+- 验证：`tree_reparent_tests` 10 项、`list_tree_tests` 新增 14 项通过，其中 `tree_drag_paints_projected_rows_inside_their_slots` 断言每行仍在其最近 `clips_to_bounds()` 祖先内（早期版本只断言宽高，漏掉了本缺陷），`tree_drag_reveals_the_branch_an_inside_drop_creates`、`alt_arrow_on_a_focused_row_moves_the_branch`、`collapse_all_keeps_the_tree_on_the_keyboard` 三项均验证过移除对应修复后失败。compose 全量 1683 项通过。原生视觉与交互验收已完成：DevTools 真机指针拖拽验证三种放置位置（`Moved Sphere after Fill Light`、`Moved Camera before Key Light`、`Moved Camera into Key Light`）、四种键盘移动、展开/收起全部与焦点回收；浅色与深色主题下目检五种参考线、两个滑杆与拖动中的投影，行槽连续无空隙无重叠。
+- 待办：拖到视口边缘不自动滚动；键盘重排立即改结构，不走弹簧动画；减弱动效只有代码路径验证；Gallery 的 Reset example 不会恢复 Tree 模型（列表页同样如此，属既有行为）。
+
 ## 2026-11-05：ReorderableList 拖拽实时重排
 
 - 能力：删除 2pt 插入线（`visible_boundary`/`drop_indicator_y`/`reorder-drop-indicator`），拖拽过程中直接按落点重排——被拖动行的槽位跟随落点，越过的行反向让出一个步长，画面等于松手后的顺序；`ReorderRowShift` 改为行槽上的弹簧位移资源，新增 `.axis(ScrollAxis::Horizontal)` 让滚动、拖拽、重排与落位整体转横轴。
@@ -174,7 +185,7 @@ cargo test -p cove-ui-compose --test compose --locked
 | SwipeList | 0 | 0 / 5 | 挂载/几何基础检查通过；待逐项交互和视觉验收 |
 | RefreshableList | 0 | 0 / 0 | 挂载/几何基础检查通过；待逐项交互和视觉验收 |
 | Scrollbar | 0 | 0 / 0 | 挂载/几何基础检查通过；待逐项交互和视觉验收 |
-| Tree | 0 | 0 / 6 | 挂载/几何基础检查通过；待逐项交互和视觉验收 |
+| Tree | 0 | 0 / 6 | 拖拽改为实时重排（删除插入线）并共用键盘移动契约；五种参考线样式与 `guide_width`/`guide_position`/`leading_padding`/`trailing_padding` 几何 API；行可聚焦与焦点回收回归通过；浅/深主题下三种放置、四种键盘移动、样式与滑杆的真机目检已完成，边缘自动滚动与减弱动效仍待处理；文档已写 |
 | VirtualStack | 0 | 0 / 0 | 挂载/几何基础检查通过；待逐项交互和视觉验收 |
 | Chart | 13 | 8 / 8 | 段落与 Swift 对齐；轴标签、覆盖层分级、图例键盘激活、缩放/刷选交互、数据动画与缓存失效已有回归；待逐项原生视觉验收 |
 | Icon | 3 | 0 / 0 | 挂载/几何基础检查通过；待逐项交互和视觉验收 |

@@ -87,10 +87,22 @@ let tree = Tree::new(
 `TreeDragOperations`：
 
 - `is_enabled` 与 `can_drag(node)` 控制哪些行可以拖动。
-- `can_drop(source, target, position)` 决定放置是否合法；位置是 `Before` / `Inside` / `After`。
+- `can_drop(source, target, position)` 决定放置是否合法；位置是 `Before` / `Inside` / `After`，
+  按行高的上下 28% 判定，中间区域进入目标节点。
 - `on_drag_start`、`on_drag_enter`、`on_drag_leave`、`on_drop`、`on_drag_end` 覆盖完整生命周期。
-- 拖动超过 4pt 死区才进入拖拽，点击不会被误判；源行降低不透明度，目标行绘制插入线或
-  进入高亮。
+- 拖动超过 `DRAG_THRESHOLD`（6pt）死区才进入拖拽，点击不会被误判。投影只改位移不改数据：展平顺序、布局与命中
+  仍由宿主模型决定，每行按 `(投影槽位 - 自身索引) * 行距` 位移，源行降到 0.38 不透明度，
+  其余行用弹簧跟随新槽位。松手后模型落位与拖拽中绘制的位置一致，不会二次跳动。
+- `on_drop` 是唯一入口：键盘移动走同一份 `can_drag` / `can_drop` / `on_drop` 契约。
+- 放进折叠分支的 `Inside` 放置会自动展开目标，避免移动后的行被隐藏。
+
+键盘移动（行获得焦点后）：
+
+- `Alt+↑` / `Alt+↓`：与上一个/下一个兄弟交换，等价于 `Before` / `After` 放置。
+- `Alt+Shift+←`：移出父节点，放在父节点之后。
+- `Alt+Shift+→`：放进上一个兄弟，等价于 `Inside` 放置。
+- `Alt+→` / `Alt+←`：展开全部 / 收起全部。
+- 被 `can_drop` 拒绝的组合退回普通方向键导航，不会吞掉按键。
 
 ## 虚拟滚动
 
@@ -98,8 +110,22 @@ let tree = Tree::new(
 会改为在 `ScrollView` 中挂载全部可见行，适合行内有长期存活的编辑器；此时
 `scroll_to_key` 用行高换算滚动偏移。
 
-`TreeLayout` 还提供 `row_height`、`row_spacing`、`indentation`、`disclosure_width`、
-`shows_indent_guides`（`show_line`）、`block_node`（选择带是否满行）、`trailing_slot_width`。
+`TreeLayout` 的几何字段都有同名链式方法：`row_height`、`row_spacing`、`indentation`、
+`disclosure_width`、`trailing_slot_width`、`block_node`（选择带是否满行）、`leading_padding`
+（第一层缩进前的留白）、`trailing_padding`（尾部插槽后的留白）。参考线由
+`guide_style`、`guide_width`、`guide_position` 控制：`guide_width` 单位为 pt 且不随字号缩放，
+`guide_position` 取 0.0（贴住缩进阶梯前沿）到 1.0（贴住后沿），默认 0.5。`show_line(bool)`
+保留为 `guide_style` 的 `Straight` / `None` 简写。
+
+```rust
+let layout = TreeLayout::default()
+    .guide_style(TreeGuideStyle::Elbow)
+    .guide_width(1.5)
+    .guide_position(0.38)
+    .indentation(20.0)
+    .leading_padding(8.0)
+    .trailing_padding(8.0);
+```
 
 ## 样式与插槽
 
@@ -110,7 +136,9 @@ let tree = Tree::new(
 - `TreeRowStyle` 控制整行底色与选中带；默认样式使用主题的 accent 选中带、
   `state_layer_hover` 悬停、`state_layer_selected` 搜索命中，并为键盘光标绘制较弱的
   `state_layer_selected` 底。
-- 缩进参考线是 1pt 细线，只绘制仍有后续兄弟的祖先列；`show_line(false)` 可关闭。
+- 缩进参考线有五种 `TreeGuideStyle`：`None`（只靠缩进）、`Straight`（默认，每层一条竖线，
+  最深一列在没有后续兄弟时止于行中心）、`Elbow`（最深一列折进本行）、`Dashed`、`Dotted`。
+  每列只在仍有后续兄弟的祖先层绘制，线宽由 `guide_width` 决定。
 
 ## 命令式方法
 
@@ -138,7 +166,8 @@ let tree = Tree::new(
 
 容器暴露 tree 角色，行暴露 tree item 角色并报告选中、展开与勾选（`checked` /
 `mixed` / `unchecked`）值；复选框本身是 checkbox 角色，展开控件是带 `Expand` /
-`Collapse` 标签的按钮。键盘支持方向键、Home/End、Return/Space，`Alt+→`/`Alt+←`
-展开/收起整个森林。
+`Collapse` 标签的按钮。行本身可聚焦，键盘支持方向键、Home/End、Return/Space，以及上文
+“拖拽”一节的 `Alt` 移动与展开/收起快捷键；收起整棵树会移除当前焦点行，焦点会自动回到树容器，
+后续快捷键仍然有效。
 
-共享 Rust 实现覆盖全部宿主平台。Gallery 的 Scene hierarchy 页演示搜索、多选、级联/严格勾选、手风琴、懒加载 `Objects` 分支、前导图标与事件状态行；结构、场景与浅/深主题挂载验证记录在 `Docs/gallery-audit.md`。
+共享 Rust 实现覆盖全部宿主平台。Gallery 的 Scene hierarchy 页演示搜索、多选、级联/严格勾选、手风琴、懒加载 `Objects` 分支、前导图标、拖拽与 `Alt` 键盘移动，以及参考线样式与 `Indent` / `Lead` 两个几何滑杆；结构、场景与浅/深主题挂载验证记录在 `Docs/gallery-audit.md`。

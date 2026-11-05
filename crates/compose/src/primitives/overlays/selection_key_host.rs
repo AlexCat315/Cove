@@ -8,6 +8,10 @@ use cove_core::scene::{
 use cove_platform::KeyEvent;
 use std::rc::Rc;
 
+/// Set while a node inside this host holds the keyboard focus, so the host can
+/// reclaim it when the focused row leaves the input graph.
+const OWNED_FOCUS: &str = "__selection_key_host_owned_focus";
+
 pub(crate) struct SelectionKeyHost {
     is_enabled: bool,
     on_key: Rc<dyn Fn(&KeyEvent) -> bool>,
@@ -76,6 +80,38 @@ impl PrimitiveView for SelectionKeyHost {
                     }
                 }),
             );
+        }
+
+        // A row that collapses, filters away or is removed takes its focus with
+        // it, and the collection stops answering the keyboard. Record that this
+        // host held the focus while the row is still mounted, then take it back
+        // for the subtree once the pass that dropped the row has run.
+        if let Some(chain) = FocusChainHolder::current() {
+            let owned = chain.focused().is_some_and(|focused| {
+                std::ptr::eq(&focused, node) || chain.contains(&focused, node)
+            });
+            node.set_attachment(OWNED_FOCUS, owned);
+            if owned {
+                let weak = node.downgrade();
+                node.set_layout_did_update(Some(Rc::new(move |owner: &Node| {
+                    let Some(host) = Node::upgrade(&weak) else {
+                        return;
+                    };
+                    let Some(chain) = FocusChainHolder::current() else {
+                        return;
+                    };
+                    if chain.focused().is_some()
+                        || host.attachment::<bool>(OWNED_FOCUS) != Some(true)
+                    {
+                        return;
+                    }
+                    // Recovering a lost row keeps focus where it was: an
+                    // automatic collapse must not paint a focus ring the person
+                    // never asked for.
+                    chain.focus(Some(owner), chain.is_focus_visible());
+                })
+                    as cove_core::scene::LayoutUpdateHook));
+            }
         }
     }
 

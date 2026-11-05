@@ -234,6 +234,23 @@ impl<Element: Clone + 'static> Clone for TreeEdit<Element> {
     }
 }
 
+/// How the indent guide columns are drawn.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+pub enum TreeGuideStyle {
+    /// No columns: hierarchy reads from indentation alone.
+    None,
+    /// One column per level. The deepest column stops at the row's centre when
+    /// the row has no following sibling, so a branch closes visually.
+    #[default]
+    Straight,
+    /// Like [`Self::Straight`], except the deepest column bends into the row.
+    Elbow,
+    /// Straight columns broken into dashes.
+    Dashed,
+    /// Straight columns broken into dots.
+    Dotted,
+}
+
 /// Geometry consumed by virtualization, hit testing, guides and disclosure slots.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct TreeLayout {
@@ -241,8 +258,19 @@ pub struct TreeLayout {
     pub row_spacing: f32,
     pub indentation: f32,
     pub disclosure_width: f32,
-    pub shows_indent_guides: bool,
+    /// Which guide columns are drawn.
+    pub guide_style: TreeGuideStyle,
+    /// Guide stroke width in points. It stays unscaled so the columns remain
+    /// crisp at every text size.
+    pub guide_width: f32,
+    /// Where a column sits inside its indent step: `0.0` hugs the step's
+    /// leading edge, `0.5` centres it, `1.0` the trailing edge.
+    pub guide_position: f32,
     pub trailing_slot_width: f32,
+    /// Space before the first level's indent.
+    pub leading_padding: f32,
+    /// Space after the trailing slot.
+    pub trailing_padding: f32,
     /// Fill the row slot with the selection band. When false the band hugs the
     /// row's content, matching `blockNode: false` in the reference APIs.
     pub block_node: bool,
@@ -258,8 +286,12 @@ impl Default for TreeLayout {
             row_spacing: 0.0,
             indentation: 16.0,
             disclosure_width: 18.0,
-            shows_indent_guides: true,
+            guide_style: TreeGuideStyle::Straight,
+            guide_width: 1.0,
+            guide_position: 0.5,
             trailing_slot_width: 64.0,
+            leading_padding: 0.0,
+            trailing_padding: 0.0,
             block_node: true,
             virtual_scroll: true,
         }
@@ -269,7 +301,71 @@ impl Default for TreeLayout {
 impl TreeLayout {
     /// Draw the vertical indent lines.
     pub fn show_line(mut self, show: bool) -> Self {
-        self.shows_indent_guides = show;
+        self.guide_style = if show {
+            TreeGuideStyle::Straight
+        } else {
+            TreeGuideStyle::None
+        };
+        self
+    }
+
+    /// Choose the guide column style.
+    pub fn guide_style(mut self, style: TreeGuideStyle) -> Self {
+        self.guide_style = style;
+        self
+    }
+
+    /// Guide stroke width in points.
+    pub fn guide_width(mut self, width: f32) -> Self {
+        self.guide_width = width.clamp(0.5, 4.0);
+        self
+    }
+
+    /// Position of a guide column inside its indent step, from `0.0` to `1.0`.
+    pub fn guide_position(mut self, position: f32) -> Self {
+        self.guide_position = position.clamp(0.0, 1.0);
+        self
+    }
+
+    /// Row height before the platform minimums are applied.
+    pub fn row_height(mut self, row_height: f32) -> Self {
+        self.row_height = row_height.max(1.0);
+        self
+    }
+
+    /// Gap between rows.
+    pub fn row_spacing(mut self, row_spacing: f32) -> Self {
+        self.row_spacing = row_spacing.max(0.0);
+        self
+    }
+
+    /// Width of the disclosure slot. Zero hides it.
+    pub fn disclosure_width(mut self, disclosure_width: f32) -> Self {
+        self.disclosure_width = disclosure_width.max(0.0);
+        self
+    }
+
+    /// Width of one indent step, and the spacing between guide columns.
+    pub fn indentation(mut self, indentation: f32) -> Self {
+        self.indentation = indentation.max(0.0);
+        self
+    }
+
+    /// Width reserved for the trailing slot.
+    pub fn trailing_slot_width(mut self, trailing_slot_width: f32) -> Self {
+        self.trailing_slot_width = trailing_slot_width.max(0.0);
+        self
+    }
+
+    /// Space before the first level's indent.
+    pub fn leading_padding(mut self, padding: f32) -> Self {
+        self.leading_padding = padding.max(0.0);
+        self
+    }
+
+    /// Space after the trailing slot.
+    pub fn trailing_padding(mut self, padding: f32) -> Self {
+        self.trailing_padding = padding.max(0.0);
         self
     }
 
@@ -320,6 +416,8 @@ impl TreeLayout {
             0.0
         };
         result.trailing_slot_width = text_scaler.scale(self.trailing_slot_width);
+        result.leading_padding = text_scaler.scale(self.leading_padding);
+        result.trailing_padding = text_scaler.scale(self.trailing_padding);
         if environment.is_touch {
             result.row_height = result.row_height.max(environment.minimum_control_extent);
             if result.disclosure_width > 0.0 {
@@ -337,6 +435,10 @@ impl TreeLayout {
         self.indentation = self.indentation.max(0.0);
         self.disclosure_width = self.disclosure_width.max(0.0);
         self.trailing_slot_width = self.trailing_slot_width.max(0.0);
+        self.guide_width = self.guide_width.clamp(0.5, 4.0);
+        self.guide_position = self.guide_position.clamp(0.0, 1.0);
+        self.leading_padding = self.leading_padding.max(0.0);
+        self.trailing_padding = self.trailing_padding.max(0.0);
     }
 }
 

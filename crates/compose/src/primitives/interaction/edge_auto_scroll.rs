@@ -10,10 +10,10 @@ use std::rc::Rc;
 use cove_core::Point;
 use cove_core::scene::{AnimatorScheduler, AnyAnimationController, Node, NodeResource, Rect};
 
+use crate::primitives::layout::ScrollAxis;
 use crate::primitives::layout::scroll_view::{
     cached_scrollable_content_size, report_scroll_change, visible_viewport_rect,
 };
-use crate::primitives::layout::ScrollAxis;
 
 /// Points per second at the very edge.
 pub const MAXIMUM_SPEED: f32 = 1200.0;

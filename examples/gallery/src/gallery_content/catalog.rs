@@ -500,7 +500,7 @@ impl GalleryCatalog {
                 GalleryPage::Tree,
                 "Tree",
                 "Data",
-                "Hierarchy, expansion, selection and search with automatic expansion.",
+                "Hierarchy, drag re-parenting, expansion, selection and search with adjustable indent guides.",
             ),
             GalleryEntry::new(
                 GalleryPage::VirtualStack,

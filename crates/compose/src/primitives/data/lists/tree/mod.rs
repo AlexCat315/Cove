@@ -5,12 +5,14 @@
 //! inside the view.
 pub(crate) mod check;
 pub mod options;
+pub mod reparent;
 pub mod view;
 
 pub use options::{
-    TreeCheck, TreeDragOperations, TreeEdit, TreeEvents, TreeExpansion, TreeLayout, TreeLazy,
-    TreeOptions, TreeSearch, TreeSearchMatch, TreeSelection, TreeSlots,
+    TreeCheck, TreeDragOperations, TreeEdit, TreeEvents, TreeExpansion, TreeGuideStyle, TreeLayout,
+    TreeLazy, TreeOptions, TreeSearch, TreeSearchMatch, TreeSelection, TreeSlots,
 };
+pub use reparent::TreeReparentPlan;
 pub use view::{Tree, TreeEntry, TreeSearchMetadata, flatten_tree, flatten_tree_matching};
 
 /// How a search box affects the tree.

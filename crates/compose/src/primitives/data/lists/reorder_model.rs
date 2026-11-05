@@ -22,7 +22,7 @@ use std::rc::{Rc, Weak};
 use std::sync::atomic::{AtomicU64, Ordering};
 
 use cove_core::scene::{
-    AnyAnimationController, AnimatorScheduler, LayoutUpdateHook, Node, NodeResource, NodeWeak,
+    AnimatorScheduler, AnyAnimationController, LayoutUpdateHook, Node, NodeResource, NodeWeak,
     SpringSolution,
 };
 use cove_core::{Point, Rect};
@@ -199,7 +199,8 @@ impl ReorderDragSession {
         self.cancel_settle();
         self.epoch.set(self.epoch.get().wrapping_add(1));
         self.row_extent.set(row_extent);
-        self.start_main.set(row_main_in_content - self.scroll_main.get());
+        self.start_main
+            .set(row_main_in_content - self.scroll_main.get());
         self.active.set(true);
         *self.placeholder.borrow_mut() = None;
         self.move_by(0.0);
@@ -313,7 +314,8 @@ impl ReorderDragSession {
             self.cancel_settle();
             return;
         }
-        self.settle_elapsed.set(self.settle_elapsed.get() + delta_time);
+        self.settle_elapsed
+            .set(self.settle_elapsed.get() + delta_time);
         let spring = reorder_spring();
         let duration = spring.settling_duration();
         if self.settle_elapsed.get() >= duration {
@@ -329,12 +331,7 @@ impl ReorderDragSession {
         self.preview.apply(main);
         // Blend the placeholder up to full opacity as the preview nears it.
         let progress = (t / duration as f32).clamp(0.0, 1.0);
-        if let Some(node) = self
-            .placeholder
-            .borrow()
-            .as_ref()
-            .and_then(Node::upgrade)
-        {
+        if let Some(node) = self.placeholder.borrow().as_ref().and_then(Node::upgrade) {
             node.set_opacity(0.35 + 0.65 * progress);
         }
     }
@@ -348,12 +345,7 @@ impl ReorderDragSession {
         let target = self.settle_target.get();
         self.preview_main.set(target);
         self.preview.apply(target);
-        if let Some(node) = self
-            .placeholder
-            .borrow()
-            .as_ref()
-            .and_then(Node::upgrade)
-        {
+        if let Some(node) = self.placeholder.borrow().as_ref().and_then(Node::upgrade) {
             node.set_opacity(1.0);
         }
         self.unregister_controller();
@@ -558,6 +550,10 @@ impl ReorderPreviewOffset {
     }
 }
 
+/// Marks a node as the frame a row displacement moves, set by the containers
+/// that clip their rows.
+pub(crate) const ROW_SHIFT_ANCHOR: &str = "__row_shift_anchor";
+
 /// The displacement a row paints while a reorder drags over it.
 ///
 /// Rows sit at a fixed slot (`index * stride`) and only their frame moves, so
@@ -565,6 +561,11 @@ impl ReorderPreviewOffset {
 /// back without recomposing the list. The resource stays attached at its
 /// target; `clear` hands the frame back to layout once the data order catches
 /// up with the projection. Reduced motion still displaces, it just snaps.
+///
+/// A row that lives inside a clipping slot, which is what a virtualized stack
+/// hands every row, is displaced through that slot instead: moving the row
+/// inside its own clip would paint it outside the only region that is still
+/// visible.
 pub struct ReorderRowShift {
     /// Displacement currently painted, along the list's main axis.
     current: Cell<f32>,
@@ -582,6 +583,19 @@ pub struct ReorderRowShift {
 }
 
 impl ReorderRowShift {
+    /// The node the displacement is applied to: the row itself, or the slot
+    /// clipping it when a virtualized stack wraps one around it.
+    fn anchor(node: &Node) -> Node {
+        let mut current = node.clone();
+        while current.attachment::<bool>(ROW_SHIFT_ANCHOR) != Some(true) {
+            let Some(parent) = current.parent() else {
+                return node.clone();
+            };
+            current = parent;
+        }
+        current
+    }
+
     fn new() -> Rc<Self> {
         let shift = Rc::new(Self {
             current: Cell::new(0.0),
@@ -610,16 +624,17 @@ impl ReorderRowShift {
         let shift = Self::new();
         shift.current.set(offset);
         shift.axis.set(axis);
-        node.add_resource(shift);
+        Self::anchor(node).add_resource(shift);
     }
 
     /// Springs the row to a live displacement and rests attached there.
     pub fn slide_to(node: &Node, target: f32, axis: ScrollAxis) {
-        if node.prefers_reduced_motion() {
+        let anchor = Self::anchor(node);
+        if anchor.prefers_reduced_motion() {
             Self::set_offset(node, target, axis);
             return;
         }
-        if let Some(shift) = node.first_resource::<Self>() {
+        if let Some(shift) = anchor.first_resource::<Self>() {
             shift.retarget(target);
             return;
         }
@@ -629,13 +644,14 @@ impl ReorderRowShift {
         let shift = Self::new();
         shift.target.set(target);
         shift.axis.set(axis);
-        node.add_resource(shift);
+        anchor.add_resource(shift);
     }
 
     /// Places the row at `offset` without animating, for a row that mounts
     /// while a live drag already holds the list displaced.
     pub fn set_offset(node: &Node, offset: f32, axis: ScrollAxis) {
-        if let Some(shift) = node.first_resource::<Self>() {
+        let anchor = Self::anchor(node);
+        if let Some(shift) = anchor.first_resource::<Self>() {
             shift.snap(offset);
             return;
         }
@@ -646,21 +662,22 @@ impl ReorderRowShift {
         shift.current.set(offset);
         shift.target.set(offset);
         shift.axis.set(axis);
-        node.add_resource(shift);
+        anchor.add_resource(shift);
     }
 
     /// Forgets every displacement so layout owns the frame again. The row's
     /// slot moves to exactly where it is already painted when the projected
     /// order becomes the data order, so this is not a jump.
     pub fn clear(node: &Node) {
-        if let Some(shift) = node.first_resource::<Self>() {
+        if let Some(shift) = Self::anchor(node).first_resource::<Self>() {
             shift.clear_offsets();
         }
     }
 
     /// The displacement the row is holding or heading to.
     pub fn target_offset(node: &Node) -> f32 {
-        node.first_resource::<Self>()
+        Self::anchor(node)
+            .first_resource::<Self>()
             .map(|shift| shift.target.get())
             .unwrap_or(0.0)
     }
@@ -726,12 +743,8 @@ impl ReorderRowShift {
             return;
         }
         let t = self.elapsed.get() as f32;
-        self.current.set(spring.position(
-            t,
-            self.release.get(),
-            0.0,
-            self.target.get(),
-        ));
+        self.current
+            .set(spring.position(t, self.release.get(), 0.0, self.target.get()));
         self.place();
     }
 
@@ -798,15 +811,13 @@ impl NodeResource for ReorderRowShift {
             scheduler.register(controller);
         }
         let weak_self = self.self_ref.borrow().clone();
-        node.set_layout_did_update(Some(
-            Rc::new(move |owner: &Node| {
-                let Some(shift) = weak_self.upgrade() else {
-                    return;
-                };
-                shift.origin.set(owner.frame());
-                shift.place();
-            }) as LayoutUpdateHook,
-        ));
+        node.set_layout_did_update(Some(Rc::new(move |owner: &Node| {
+            let Some(shift) = weak_self.upgrade() else {
+                return;
+            };
+            shift.origin.set(owner.frame());
+            shift.place();
+        }) as LayoutUpdateHook));
     }
 
     fn unmount(&self, node: &Node) {

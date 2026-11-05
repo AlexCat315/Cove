@@ -33,15 +33,18 @@ use std::rc::Rc;
 use super::super::selection::{CollectionId, RowState};
 use super::check::{self, CheckSnapshot, TreeIndex};
 use super::options::{
-    TreeCheck, TreeDragOperations, TreeEdit, TreeEvents, TreeExpansion, TreeLazy, TreeOptions,
-    TreeSearchMatch, TreeSelection,
+    TreeCheck, TreeDragOperations, TreeEdit, TreeEvents, TreeExpansion, TreeGuideStyle, TreeLazy,
+    TreeOptions, TreeSearchMatch, TreeSelection,
 };
+use super::reparent::{self, TreeReparentProjection};
 use super::{TreeDropPosition, TreeNodeKey, TreeScrollAlign, TreeSearchFilterPolicy};
 use crate::modifiers::interaction::AccessibilityExt;
 use crate::modifiers::layout::{FlexExt, LayoutFrameExt, PaddingExt};
 use crate::modifiers::style::AppearanceExt;
 use crate::primitives::controls::{Button, Checkbox, CheckboxState};
+use crate::primitives::data::lists::reorder_model::ReorderRowShift;
 use crate::primitives::feedback::progress_circle::ProgressCircle;
+use crate::primitives::layout::ScrollAxis;
 use crate::primitives::layout::virtualization::{FixedVirtualStack, VirtualScrollAlign};
 use crate::primitives::media::{Icon, ui_icon_catalog};
 use crate::primitives::overlays::selection_key_host::SelectionKeyHost;
@@ -800,6 +803,22 @@ where
         }
     }
 
+    /// The move the live drag projects, resolved against the rows about to be
+    /// rendered: where each row is painted, and which rows travel with the
+    /// pointer. `None` when no drag holds a valid target.
+    fn drag_projection(
+        &self,
+        entries: &[TreeEntry<Element, Id>],
+    ) -> Option<(TreeReparentProjection, std::ops::Range<usize>)> {
+        let source = self.drag_source.get()?;
+        let (target, position) = self.drag_target.get()?;
+        let depths: Vec<usize> = entries.iter().map(|entry| entry.depth).collect();
+        let source_index = entries.iter().position(|entry| entry.key == source)?;
+        let target_index = entries.iter().position(|entry| entry.key == target)?;
+        let plan = reparent::plan_move(&depths, source_index, target_index, position)?;
+        Some((reparent::project(&depths, &plan), plan.block()))
+    }
+
     /// Applies one selection with Shift/Cmd/Ctrl semantics.
     pub fn select(&self, entry: &TreeEntry<Element, Id>, modifiers: KeyModifiers) {
         *self.modifiers.borrow_mut() = modifiers;
@@ -1228,22 +1247,32 @@ where
     RowContent: Fn(&Element, RowState) -> AnyView + 'static,
 {
     fn body(&self, _cx: &Scope) -> AnyView {
-        let entries = self.entries();
+        let mut entries = self.entries();
+        let projection = self.drag_projection(&entries);
+        let dragged_block = projection.as_ref().map(|(_, block)| block.clone());
+        if let Some((projection, _)) = projection.as_ref() {
+            for (index, entry) in entries.iter_mut().enumerate() {
+                entry.depth = projection.depths[index];
+                entry.has_next_sibling = projection.has_next_sibling[index];
+                entry.ancestor_has_next_siblings =
+                    projection.ancestor_has_next_siblings[index].clone();
+            }
+        }
         let (selected_ids, selected_keys) = self.selection_state();
         let uses_key_selection = self.uses_key_selection();
         let layout = self.options.layout;
         let is_enabled = self.options.is_enabled;
         let hovered = self.hovered.clone();
-        let drag_source = self.drag_source.get();
-        let drag_target = self.drag_target.get();
         let cursor = self.cursor.get();
         let actions = self.session_actions_with(entries.clone());
         let check_enabled = self.options.check.is_enabled;
 
         let trailing_width = layout.trailing_slot_width;
+        let stride = layout.row_height + layout.row_spacing;
         let rows: Vec<AnyView> = entries
             .iter()
-            .map(|entry| {
+            .enumerate()
+            .map(|(index, entry)| {
                 let is_selected = if uses_key_selection {
                     selected_keys.contains(&entry.key)
                 } else {
@@ -1254,12 +1283,15 @@ where
                 let ancestor = entry.ancestor_has_next_siblings.clone();
                 let is_current = cursor.as_ref() == Some(&key);
                 let is_hovered = hovered.get().as_ref() == Some(&entry.key);
+                let is_dragged = dragged_block
+                    .as_ref()
+                    .is_some_and(|block| block.contains(&index));
                 let content = (self.row_content)(
                     &entry.element,
                     RowState {
                         is_selected,
                         is_expanded: entry.is_expanded,
-                        is_dragging: drag_source.as_ref() == Some(&key),
+                        is_dragging: is_dragged,
                         depth: entry.depth,
                         is_checked: entry.is_checked,
                         is_half_checked: entry.is_half_checked,
@@ -1269,11 +1301,13 @@ where
                     },
                 );
 
-                let drop_position = drag_target
+                // The dragged branch is painted at its projected slots, so each
+                // row holds the distance between its own slot and that one.
+                let drag_offset = projection
                     .as_ref()
-                    .filter(|(target, _)| target == &key)
-                    .map(|(_, position)| *position);
-                let is_drag_source = drag_source.as_ref() == Some(&key);
+                    .map(|(projection, _)| (projection.slots[index] as f32 - index as f32) * stride)
+                    .unwrap_or(0.0);
+                let is_drag_source = is_dragged;
 
                 let on_toggle: Rc<dyn Fn()> = {
                     let entry = entry.clone();
@@ -1299,6 +1333,10 @@ where
                     let entry = entry.clone();
                     let tree = actions.clone();
                     Rc::new(move || tree.expand(&entry))
+                };
+                let on_session_key: Rc<dyn Fn(&KeyEvent) -> bool> = {
+                    let tree = actions.clone();
+                    Rc::new(move |event: &KeyEvent| tree.handle_key(event))
                 };
                 let on_toggle_check: Option<Rc<dyn Fn()>> = check_enabled.then(|| {
                     let entry = entry.clone();
@@ -1447,10 +1485,14 @@ where
                     row_height: layout.row_height,
                     indentation: layout.indentation,
                     disclosure_width: layout.disclosure_width,
-                    shows_indent_guides: layout.shows_indent_guides,
+                    guide_style: layout.guide_style,
+                    guide_width: layout.guide_width,
+                    guide_position: layout.guide_position,
+                    leading_padding: layout.leading_padding,
+                    trailing_padding: layout.trailing_padding,
                     ancestor_has_next_siblings: ancestor,
                     has_next_sibling,
-                    drop_position,
+                    drag_offset,
                     is_drag_source,
                     content,
                     checkbox,
@@ -1463,6 +1505,7 @@ where
                     on_move,
                     on_collapse,
                     on_expand,
+                    on_session_key,
                     on_toggle_check,
                     on_hover,
                     on_node_click,
@@ -2039,8 +2082,20 @@ where
             self.drag_target.set(None);
             return;
         };
-        if &target_key == source {
-            self.drag_target.set(None);
+        // A row of the dragged subtree cannot receive it. Holding the previous
+        // target keeps the projection the pointer already earned instead of
+        // collapsing it every time the pointer crosses the rows being moved.
+        let entries = self.entries.borrow();
+        let source_index = entries.iter().position(|entry| &entry.key == source);
+        let target_index = entries.iter().position(|entry| entry.key == target_key);
+        let depths: Vec<usize> = entries.iter().map(|entry| entry.depth).collect();
+        drop(entries);
+        if source_index.is_some_and(|source_index| {
+            target_index.is_some_and(|target_index| {
+                target_index >= source_index
+                    && target_index < source_index + reparent::subtree_len(&depths, source_index)
+            })
+        }) {
             return;
         }
         let position = drop_position(y, frame);
@@ -2086,6 +2141,9 @@ where
                         position,
                     );
                 }
+                if position == TreeDropPosition::Inside {
+                    self.reveal(&target_entry);
+                }
                 if let Some(handler) = &self.drag.on_drag_end {
                     handler(&source.element, Some(&target_entry.element));
                 }
@@ -2094,6 +2152,58 @@ where
         }
         if let Some(handler) = &self.drag.on_drag_end {
             handler(&source.element, None);
+        }
+    }
+
+    /// Reports a keyboard move through the drop contract the pointer uses, so
+    /// a caller implements one move for both.
+    fn move_entry(
+        &self,
+        entries: &[TreeEntry<Element, Id>],
+        source: usize,
+        target: usize,
+        position: TreeDropPosition,
+    ) -> bool {
+        let (Some(source_entry), Some(target_entry)) = (entries.get(source), entries.get(target))
+        else {
+            return false;
+        };
+        if self
+            .drag
+            .can_drag
+            .as_ref()
+            .is_some_and(|allowed| !allowed(&source_entry.element))
+        {
+            return false;
+        }
+        if self
+            .drag
+            .can_drop
+            .as_ref()
+            .is_some_and(|allowed| !allowed(&source_entry.element, &target_entry.element, position))
+        {
+            return false;
+        }
+        let Some(on_drop) = &self.drag.on_drop else {
+            return false;
+        };
+        on_drop(
+            source_entry.element.clone(),
+            target_entry.element.clone(),
+            position,
+        );
+        if position == TreeDropPosition::Inside {
+            self.reveal(target_entry);
+        }
+        true
+    }
+
+    /// Opens a branch that just received a child. The caller's model decides
+    /// which nodes have children, so a leaf that became a branch after an
+    /// Inside drop would otherwise hide the row that moved into it.
+    fn reveal(&self, target: &TreeEntry<Element, Id>) {
+        if !target.is_expanded {
+            self.toggle(target);
         }
     }
 
@@ -2190,8 +2300,9 @@ where
             return false;
         }
         // Alt+Right expands every descendant and Alt+Left collapses the whole
-        // forest, whatever the current row is.
-        if event.modifiers.has_alt() {
+        // forest, whatever the current row is. Adding Shift turns the same pair
+        // into the indent/outdent moves below.
+        if event.modifiers.has_alt() && !event.modifiers.has_shift() {
             match event.scancode {
                 Scancode::ARROW_RIGHT => {
                     self.expand_all();
@@ -2208,6 +2319,35 @@ where
             return false;
         };
         *self.modifiers.borrow_mut() = event.modifiers;
+
+        // Alt+Up/Down moves between siblings and Alt+Shift+Left/Right outdents
+        // and indents. Each reports the same (source, target, position) a
+        // pointer drop would, so one caller callback covers both routes.
+        if event.modifiers.has_alt() {
+            let index = entries
+                .iter()
+                .position(|entry| entry.key == current.key)
+                .unwrap_or(0);
+            let depths: Vec<usize> = entries.iter().map(|entry| entry.depth).collect();
+            let request = match (event.scancode, event.modifiers.has_shift()) {
+                (Scancode::ARROW_UP, false) => reparent::previous_sibling(&depths, index)
+                    .map(|target| (target, TreeDropPosition::Before)),
+                (Scancode::ARROW_DOWN, false) => reparent::next_sibling(&depths, index)
+                    .map(|target| (target, TreeDropPosition::After)),
+                (Scancode::ARROW_LEFT, true) => reparent::parent_index(&depths, index)
+                    .map(|target| (target, TreeDropPosition::After)),
+                (Scancode::ARROW_RIGHT, true) => reparent::previous_sibling(&depths, index)
+                    .map(|target| (target, TreeDropPosition::Inside)),
+                _ => None,
+            };
+            // A move the caller refuses (or that has no sibling to pass) leaves
+            // the key to plain navigation rather than swallowing it.
+            if let Some((target, position)) = request
+                && self.move_entry(&entries, index, target, position)
+            {
+                return true;
+            }
+        }
 
         match event.scancode {
             Scancode::ARROW_DOWN => {
@@ -2309,10 +2449,15 @@ struct TreeRow {
     row_height: f32,
     indentation: f32,
     disclosure_width: f32,
-    shows_indent_guides: bool,
+    guide_style: TreeGuideStyle,
+    guide_width: f32,
+    guide_position: f32,
+    leading_padding: f32,
+    trailing_padding: f32,
     ancestor_has_next_siblings: Vec<bool>,
     has_next_sibling: bool,
-    drop_position: Option<TreeDropPosition>,
+    /// How far the row is displaced from its slot while a drag projects a move.
+    drag_offset: f32,
     is_drag_source: bool,
     content: AnyView,
     checkbox: Option<AnyView>,
@@ -2326,6 +2471,9 @@ struct TreeRow {
     on_move: Rc<dyn Fn(i64)>,
     on_collapse: Rc<dyn Fn()>,
     on_expand: Rc<dyn Fn()>,
+    /// The session's Alt-aware handling: branch moves and expand/collapse all,
+    /// run before this row's plain navigation.
+    on_session_key: Rc<dyn Fn(&KeyEvent) -> bool>,
     on_toggle_check: Option<Rc<dyn Fn()>>,
     on_hover: Rc<dyn Fn(bool)>,
     on_node_click: Option<Rc<dyn Fn(KeyModifiers)>>,
@@ -2352,6 +2500,9 @@ impl PrimitiveView for TreeRow {
 
     fn update_node(&self, node: &Node) {
         node.set_is_hit_testable(self.is_enabled);
+        // The row owns the tree's keyboard handling, so a tap has to leave it
+        // focused for the arrow and Alt shortcuts to reach the tree.
+        node.set_is_focusable(self.is_enabled);
         node.set_cursor(Some(SystemCursor::Pointer));
         // The drag hit zone covers the indent gutter and disclosure slot, so a
         // drop over indented columns still resolves this row.
@@ -2364,30 +2515,10 @@ impl PrimitiveView for TreeRow {
         }
         node.set_opacity(if self.is_drag_source { 0.38 } else { 1.0 });
         node.set_corner_radius(4.0);
-        if let Some(position) = self.drop_position {
-            let gutter = self.depth as f32 * self.indentation + self.disclosure_width;
-            let weak = node.downgrade();
-            let overlay: DrawHook = Rc::new(move |list, origin| {
-                let Some(node) = Node::upgrade(&weak) else {
-                    return;
-                };
-                let frame = node.frame();
-                draw_drop_indicator(
-                    position,
-                    Rect::new(
-                        origin.x - gutter,
-                        origin.y,
-                        frame.width + gutter,
-                        frame.height,
-                    ),
-                    theme_for_node(&node).colors.accent,
-                    list,
-                );
-            });
-            node.set_overlay_draw(Some(overlay));
-        } else {
-            node.set_overlay_draw(None);
-        }
+        // The projection displaces rows without re-ordering the flattened
+        // stack, so each row springs to the slot the drop would give it and
+        // springs back when the drag releases elsewhere.
+        ReorderRowShift::slide_to(node, self.drag_offset, ScrollAxis::Vertical);
         node.set_accessibility(Some(AccessibilitySemantics {
             role: AccessibilityRole::TreeItem,
             value: if self.checkbox.is_some() {
@@ -2589,9 +2720,7 @@ impl PrimitiveView for TreeRow {
                         let dx = event.x - press.down_x;
                         let dy = event.y - press.down_y;
                         // A small dead zone keeps a click from becoming a drag.
-                        if !press.did_drag
-                            && crate::primitives::interaction::drag_crossed(dx, dy)
-                        {
+                        if !press.did_drag && crate::primitives::interaction::drag_crossed(dx, dy) {
                             press.did_drag = true;
                             owner.set_attachment(PRESSED, false);
                             if let Some(capture) = PointerCaptureHolder::current() {
@@ -2711,7 +2840,11 @@ impl PrimitiveView for TreeRow {
             fixed_spacer(self.disclosure_width, row_height)
         };
 
-        let mut row = vec![fixed_spacer(indent, row_height), disclosure];
+        let mut row = vec![
+            fixed_spacer(self.leading_padding, row_height),
+            fixed_spacer(indent, row_height),
+            disclosure,
+        ];
         if let Some(checkbox) = &self.checkbox {
             row.push(AnyView::new(checkbox.clone().padding_edges(0.0, 2.0)));
             row.push(fixed_spacer(6.0, row_height));
@@ -2738,12 +2871,19 @@ impl PrimitiveView for TreeRow {
         if let Some(trailing) = &self.trailing_slot {
             row.push(trailing.clone());
         }
+        if self.trailing_padding > 0.0 {
+            row.push(fixed_spacer(self.trailing_padding, row_height));
+        }
 
-        let guides = if self.shows_indent_guides && self.depth > 0 {
+        let guides = if self.guide_style != TreeGuideStyle::None && self.depth > 0 {
             Some(TreeGuideOverlay {
                 depth: self.depth,
                 row_height,
                 indentation: self.indentation,
+                leading_padding: self.leading_padding,
+                style: self.guide_style,
+                width: self.guide_width,
+                position: self.guide_position,
                 ancestor_has_next_siblings: self.ancestor_has_next_siblings.clone(),
                 has_next_sibling: self.has_next_sibling,
             })
@@ -2795,11 +2935,19 @@ impl TreeRow {
         let move_key = self.on_move.clone();
         let collapse = self.on_collapse.clone();
         let expand = self.on_expand.clone();
+        let session_key = self.on_session_key.clone();
         let toggle_check = self.on_toggle_check.clone();
         let enabled = self.is_enabled;
         Rc::new(move |event: &KeyEvent| {
             if !enabled || event.is_repeat {
                 return false;
+            }
+            // Alt pairs each arrow with a branch move or with expand-all and
+            // collapse-all, so the session takes the event first and only hands
+            // it back when it declines, which keeps Alt on a denied move as
+            // plain navigation.
+            if event.modifiers.has_alt() && session_key(event) {
+                return true;
             }
             match event.scancode {
                 Scancode::ARROW_DOWN => {
@@ -2828,7 +2976,9 @@ impl TreeRow {
                     select(event.modifiers);
                     true
                 }
-                _ => false,
+                // HOME, END and the rest of the session's keys still reach the
+                // session from a focused row.
+                _ => session_key(event),
             }
         })
     }
@@ -2863,12 +3013,17 @@ impl View for TreeRow {
     }
 }
 
-/// Indent guides: one branch line per depth, with a continuation column only
-/// where an ancestor still has a following sibling.
+/// Indent guides: one branch column per depth, with a continuation column only
+/// where an ancestor still has a following sibling. The style decides whether
+/// the columns are solid, broken, or bent into the row.
 struct TreeGuideOverlay {
     depth: usize,
     row_height: f32,
     indentation: f32,
+    leading_padding: f32,
+    style: TreeGuideStyle,
+    width: f32,
+    position: f32,
     ancestor_has_next_siblings: Vec<bool>,
     has_next_sibling: bool,
 }
@@ -2889,6 +3044,10 @@ impl PrimitiveView for TreeGuideOverlay {
         let depth = self.depth;
         let row_height = self.row_height;
         let indentation = self.indentation;
+        let leading_padding = self.leading_padding;
+        let style = self.style;
+        let width = self.width;
+        let position = self.position;
         let ancestor = self.ancestor_has_next_siblings.clone();
         let has_next_sibling = self.has_next_sibling;
         let weak = node.downgrade();
@@ -2901,30 +3060,37 @@ impl PrimitiveView for TreeGuideOverlay {
                 .colors
                 .on_surface_muted
                 .multiplied_alpha(0.24 * node.opacity());
-            let base_x = origin.x;
-            let base_y = origin.y;
-            let center_lead = (((indentation.max(2.0).floor() - 1.0) * 0.5).floor()).max(0.0);
-            let center_y = (((row_height.max(2.0).floor() - 1.0) * 0.5).floor()).max(0.0);
-            let top = base_y.floor();
-            let bottom = (base_y + row_height).ceil().max(top + 1.0);
+            let center_y = (origin.y + row_height * 0.5).floor();
+            let top = origin.y.floor();
+            let bottom = (origin.y + row_height).ceil().max(top + 1.0);
 
             for level in 0..depth {
-                let stroke_x = (base_x + level as f32 * indentation + center_lead).floor();
-                if level == depth - 1 {
-                    let vertical_bottom = if has_next_sibling {
-                        bottom
-                    } else {
-                        base_y + center_y + 1.0
-                    };
-                    let _ = list.add_rect(
-                        Rect::new(stroke_x, top, 1.0, (vertical_bottom - top).max(1.0)),
-                        ink,
-                    );
+                let stroke_x = (origin.x
+                    + leading_padding
+                    + level as f32 * indentation
+                    + indentation * position
+                    - width * 0.5)
+                    .floor();
+                let is_deepest = level == depth - 1;
+                if !is_deepest && !ancestor.get(level).copied().unwrap_or(false) {
                     continue;
                 }
-                if ancestor.get(level).copied().unwrap_or(false) {
-                    let _ =
-                        list.add_rect(Rect::new(stroke_x, top, 1.0, (bottom - top).max(1.0)), ink);
+                // The deepest column stops at the connector when the row is the
+                // last sibling, so the branch visibly closes.
+                let vertical_bottom = if is_deepest && !has_next_sibling {
+                    center_y + width * 0.5
+                } else {
+                    bottom
+                };
+                draw_guide_column(list, stroke_x, top, vertical_bottom, style, width, ink);
+                if is_deepest && style == TreeGuideStyle::Elbow {
+                    let reach = (indentation * (1.0 - position)).max(width + 2.0);
+                    let _ = list.add_line(
+                        Point::new(stroke_x + width * 0.5, center_y),
+                        Point::new(stroke_x + reach, center_y),
+                        width,
+                        ink,
+                    );
                 }
             }
         });
@@ -2952,6 +3118,34 @@ impl View for TreeGuideOverlay {
     }
 }
 
+/// One guide column between `top` and `bottom`, broken into dashes or dots
+/// when the style asks for it.
+fn draw_guide_column(
+    list: &mut cove_core::DrawList,
+    x: f32,
+    top: f32,
+    bottom: f32,
+    style: TreeGuideStyle,
+    width: f32,
+    ink: Color,
+) {
+    let segment: f32 = match style {
+        TreeGuideStyle::Dashed => 3.0,
+        TreeGuideStyle::Dotted => 2.0,
+        _ => {
+            let _ = list.add_rect(Rect::new(x, top, width, (bottom - top).max(1.0)), ink);
+            return;
+        }
+    };
+    let period = segment * 2.0;
+    let mut y = top;
+    while y < bottom {
+        let height = segment.min(bottom - y).max(1.0);
+        let _ = list.add_rect(Rect::new(x, y, width, height), ink);
+        y += period;
+    }
+}
+
 /// Top and bottom sixth-scale bands drop before/after; the middle drops inside,
 /// matching the Swift `dropPosition(for:frame:)` bands.
 fn drop_position(pointer_y: f32, frame: Rect) -> TreeDropPosition {
@@ -2964,56 +3158,6 @@ fn drop_position(pointer_y: f32, frame: Rect) -> TreeDropPosition {
         TreeDropPosition::After
     } else {
         TreeDropPosition::Inside
-    }
-}
-
-/// The drop affordance: an insertion rule before/after, or a highlighted row
-/// for a drop inside.
-fn draw_drop_indicator(
-    position: TreeDropPosition,
-    frame: Rect,
-    accent: Color,
-    list: &mut cove_core::DrawList,
-) {
-    match position {
-        TreeDropPosition::Inside => {
-            let _ = list.add_rounded_rect(
-                Rect::new(
-                    frame.x + 1.0,
-                    frame.y + 1.0,
-                    (frame.width - 2.0).max(2.0),
-                    (frame.height - 2.0).max(2.0),
-                ),
-                4.0,
-                accent.multiplied_alpha(0.12),
-            );
-            let _ = list.add_rounded_rect_stroke(
-                Rect::new(
-                    frame.x + 1.0,
-                    frame.y + 1.0,
-                    (frame.width - 2.0).max(2.0),
-                    (frame.height - 2.0).max(2.0),
-                ),
-                4.0,
-                1.0,
-                accent.multiplied_alpha(0.9),
-            );
-        }
-        TreeDropPosition::Before => {
-            let _ = list.add_rect(
-                Rect::new(frame.x, frame.y + 1.0, frame.width, 2.0),
-                accent.multiplied_alpha(0.95),
-            );
-            let _ = list.add_rect(Rect::new(frame.x, frame.y, 6.0, 4.0), accent);
-        }
-        TreeDropPosition::After => {
-            let y = frame.y + frame.height - 3.0;
-            let _ = list.add_rect(
-                Rect::new(frame.x, y, frame.width, 2.0),
-                accent.multiplied_alpha(0.95),
-            );
-            let _ = list.add_rect(Rect::new(frame.x, y - 1.0, 6.0, 4.0), accent);
-        }
     }
 }
 

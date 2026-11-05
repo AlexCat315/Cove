@@ -21,7 +21,7 @@ use crate::primitives::overlays::portal::portal_registry::{
 use crate::{PrimitiveView, View, ViewExt, impl_primitive_view};
 use cove_core::Point;
 use cove_core::scene::{
-    AnyAnimationController, AnimatorScheduler, CompositionLocal, EventResult, InputHandlerRoute,
+    AnimatorScheduler, AnyAnimationController, CompositionLocal, EventResult, InputHandlerRoute,
     InteractionRegistryHolder, LayoutNode, Node, NodeResource, NodeWeak, PointerCaptureHolder,
     PointerPhase, SpringSolution,
 };
@@ -878,13 +878,7 @@ impl DragPreviewFollower {
     }
 
     fn apply(&self, position: Point) {
-        let Some(owner) = self
-            .state
-            .owner
-            .borrow()
-            .as_ref()
-            .and_then(Node::upgrade)
-        else {
+        let Some(owner) = self.state.owner.borrow().as_ref().and_then(Node::upgrade) else {
             return;
         };
         let Some(resource) = owner.first_resource::<PortalResource>() else {

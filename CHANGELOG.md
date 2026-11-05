@@ -4,6 +4,17 @@
 
 ## Unreleased
 
+- **Tree 拖拽实时重排、参考线样式与几何 API（2026-11-05，破坏性）**：
+  - `TreeDragOperations` 改为实时重排：投影只改位移不改数据，展平顺序、布局与命中仍由宿主模型决定，每行按 `(投影槽位 - 自身索引) * (row_height + row_spacing)` 位移，源行降到 0.38 不透明度，其余行用弹簧跟随，松手后模型落位与拖拽中绘制的位置逐行一致、不再二次滑动。删除放置插入线，`Before` / `Inside` / `After` 由行高上下 28% 判定。
+  - 位移改为作用在裁剪槽上：新增 `ROW_SHIFT_ANCHOR` 标记与 `ReorderRowShift::anchor`，`FixedVirtualStack` 的 `RowSlot` 在 `update_node` 登记自己为锚点。虚拟化 Tree 的行 `frame` 是父级相对坐标，直接位移会把行推出唯一可见区域导致整行消失；ReorderableList 用自己的绝对定位槽因此未受影响。
+  - 键盘移动与指针共用一份契约：`Alt+↑`/`Alt+↓` 走兄弟 `Before`/`After`，`Alt+Shift+←` 出到父节点之后，`Alt+Shift+→` 进入上一个兄弟，全部经 `can_drag`/`can_drop`/`on_drop` 上报；被拒绝的组合退回普通方向键导航。`TreeRow` 的按键处理先交给会话的 Alt 感知路径，`HOME`/`END` 等其余按键回落同一入口，此前它无条件吞掉四个方向键导致 Alt 移动失效。
+  - `Inside` 放置自动展开目标分支（`TreeActions::reveal`），避免移入折叠节点的行被隐藏。
+  - 参考线拆成 `TreeGuideStyle::{None, Straight, Elbow, Dashed, Dotted}` 与 `guide_width`（pt，不随字号缩放）、`guide_position`（0.0 到 1.0，默认 0.5）；`show_line(bool)` 保留为 `Straight`/`None` 简写。边距新增 `leading_padding`、`trailing_padding` 链式方法，并补齐缺失的 `indentation`，`TreeLayout` 几何字段全部可链式配置。
+  - Tree 行改为可聚焦（`set_is_focusable`），点击行即可用键盘；`SelectionKeyHost` 记录自己是否持有子树焦点，并在焦点行随收起/过滤离开输入图后把焦点收回容器，`Alt+←` 收起全树后的快捷键不再失效。
+  - 文档与示例：`tree.md` 重写《拖拽》并补键盘移动、《虚拟滚动》改为完整几何 API 与链式示例、参考线一节列出五种样式、《可访问性》补焦点回收；Gallery Tree 页新增 `None`/`Straight`/`Elbow`/`Dashed`/`Dotted` 样式条与 `Indent`/`Lead` 两个滑杆，状态行同时报告拖放结果，目录副标题同步。
+  - 验证：`tree_reparent_tests` 10 项、`list_tree_tests` 新增 14 项（含 `tree_drag_paints_projected_rows_inside_their_slots` 断言每行仍在其裁剪槽内、`tree_drag_reveals_the_branch_an_inside_drop_creates`、`alt_arrow_on_a_focused_row_moves_the_branch`、`collapse_all_keeps_the_tree_on_the_keyboard`，均验证过移除修复后失败）、`tree_behavior` 的 Alt 移动契约用例，compose 全量 1683 项通过。DevTools 真机验收覆盖三种放置位置、四种键盘移动、展开/收起全部与焦点回收，并在明暗主题下目检五种参考线、两个滑杆与拖动中的投影。
+  - 已知缺口：Tree 拖到视口边缘不自动滚动；键盘重排立即改结构，不走弹簧动画；减弱动效只有代码路径，未做设备级目检；Gallery 的 Reset example 不会把 Tree 模型恢复到初始层级（列表页同样如此，属既有行为）。
+
 - **ReorderableList 拖拽实时重排与动效统一（2026-11-05，破坏性）**：
   - 拖拽改为实时重排，删除插入线：被拖动行的槽位跟随落点移动，它越过的每一行反向让出一个步长，拖动过程中画面就是松手后的顺序。移除 `ReorderableListModel::visible_boundary`、`drop_indicator_y` 与 `reorder-drop-indicator` 节点；`ReorderRowShift` 改为挂在行槽上的弹簧位移资源，新增 `slide_to`/`set_offset`/`clear`/`target_offset`，`live_offset` 给出投影位移。
   - 落位不再二次滑动：投影已经把每行放到落点，释放只清除投影并回调 `on_move`，任何行都不会再滑第二次；浮起副本仍用弹簧落到目标槽位，占位行透明度在落位过程中回到满值。Escape 取消时投影弹回、副本飞回原槽位。

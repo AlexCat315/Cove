@@ -10,6 +10,7 @@ use std::sync::{Arc, Mutex, PoisonError};
 
 use crate::modifiers::layout::{FrameDimension, LayoutFrameExt};
 use crate::modifiers::style::AppearanceExt;
+use crate::primitives::data::lists::reorder_model::ROW_SHIFT_ANCHOR;
 use crate::primitives::layout::{ScrollAxis, ScrollView, ScrollViewport, ScrollbarGutter};
 use crate::{AnyView, BoxView, PrimitiveView, View, ViewExt};
 use cove_composition::MemoizedView;
@@ -362,7 +363,11 @@ impl PrimitiveView for RowSlot {
         layout.set_height(Some(self.extent));
     }
 
-    fn update_node(&self, _node: &Node) {}
+    fn update_node(&self, node: &Node) {
+        // The slot is the clipped box around its row, so a row that a live
+        // reorder paints outside its own slot has to be displaced through it.
+        node.set_attachment(ROW_SHIFT_ANCHOR, true);
+    }
 
     fn children(&self, _node: &Node) -> Vec<AnyView> {
         vec![self.content.clone()]

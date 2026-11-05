@@ -9,6 +9,7 @@
 //! binding; they are ported for completeness but carry no algorithm.
 
 use cove_composition::Scope;
+use std::cell::RefCell;
 use std::collections::{BTreeSet, HashSet};
 use std::rc::Rc;
 
@@ -16,14 +17,16 @@ use cove_core::{Binding, State};
 use cove_ui_compose::modifiers::interaction::AccessibilityExt;
 use cove_ui_compose::modifiers::layout::LayoutFrameExt;
 use cove_ui_compose::modifiers::style::{AppearanceExt, SemanticStyleViewExt};
-use cove_ui_compose::primitives::controls::{Button, Toggle};
+use cove_ui_compose::primitives::controls::fields::Slider;
+use cove_ui_compose::primitives::controls::{Button, ButtonGroup, ButtonGroupItem, Toggle};
 use cove_ui_compose::primitives::data::lists::RowState;
 use cove_ui_compose::primitives::data::lists::Selection;
 use cove_ui_compose::primitives::data::lists::refresh::RefreshOptions;
 use cove_ui_compose::primitives::data::lists::swipe_list::SwipeList;
 use cove_ui_compose::primitives::data::lists::tree::{
-    Tree, TreeCheck, TreeEvents, TreeExpansion, TreeLazy, TreeNodeKey, TreeOptions, TreeSearch,
-    TreeSelection, TreeSlots,
+    Tree, TreeCheck, TreeDragOperations, TreeDropPosition, TreeEvents, TreeExpansion,
+    TreeGuideStyle, TreeLayout, TreeLazy, TreeNodeKey, TreeOptions, TreeSearch, TreeSelection,
+    TreeSlots,
 };
 use cove_ui_compose::primitives::data::{List, ListSection, SectionedList, SwipeAction};
 use cove_ui_compose::primitives::feedback::StatusTone;
@@ -115,6 +118,57 @@ impl SceneNode {
     }
 }
 
+/// Detaches the node with `id` from `nodes`, taking its whole branch with it.
+fn take_scene_node(nodes: &mut Vec<SceneNode>, id: &str) -> Option<SceneNode> {
+    for index in 0..nodes.len() {
+        if nodes[index].id == id {
+            return Some(nodes.remove(index));
+        }
+        if let Some(found) = take_scene_node(&mut nodes[index].children, id) {
+            return Some(found);
+        }
+    }
+    None
+}
+
+/// Attaches `node` beside — or inside — the node with `target_id`, which is how
+/// the gallery's host model answers a tree drop.
+fn insert_scene_node(
+    nodes: &mut Vec<SceneNode>,
+    target_id: &str,
+    position: TreeDropPosition,
+    node: SceneNode,
+) -> bool {
+    for index in 0..nodes.len() {
+        if nodes[index].id == target_id {
+            match position {
+                TreeDropPosition::Inside => nodes[index].children.push(node),
+                TreeDropPosition::Before => nodes.insert(index, node),
+                TreeDropPosition::After => nodes.insert(index + 1, node),
+            }
+            return true;
+        }
+        if insert_scene_node(
+            &mut nodes[index].children,
+            target_id,
+            position,
+            node.clone(),
+        ) {
+            return true;
+        }
+    }
+    false
+}
+
+/// The five guide styles, in the order the gallery offers them.
+pub const TREE_GUIDE_STYLES: [(&str, TreeGuideStyle); 5] = [
+    ("None", TreeGuideStyle::None),
+    ("Straight", TreeGuideStyle::Straight),
+    ("Elbow", TreeGuideStyle::Elbow),
+    ("Dashed", TreeGuideStyle::Dashed),
+    ("Dotted", TreeGuideStyle::Dotted),
+];
+
 /// Whether `title` matches `query`, case-insensitively.
 pub fn node_matches(title: &str, query: &str) -> bool {
     query.is_empty() || title.to_lowercase().contains(&query.to_lowercase())
@@ -157,9 +211,10 @@ pub fn expandable_ids(nodes: &[SceneNode]) -> BTreeSet<&'static str> {
 }
 
 /// `TreeStory`: the scene hierarchy with search, checks, selection, accordion,
-/// strict checks, a lazy branch and the event log.
+/// strict checks, a lazy branch, drag re-parenting and the event log.
 pub struct TreeStory {
     pub options: GalleryOptions,
+    nodes: State<Vec<SceneNode>>,
     selection: State<Option<String>>,
     expanded: State<BTreeSet<String>>,
     selected_ids: State<BTreeSet<String>>,
@@ -170,6 +225,9 @@ pub struct TreeStory {
     loaded: State<BTreeSet<String>>,
     status: State<String>,
     query: State<String>,
+    guide_style: State<Option<TreeGuideStyle>>,
+    indentation: State<f64>,
+    leading_padding: State<f64>,
 }
 
 /// The branch the lazy-loading demo gates until it is expanded.
@@ -182,10 +240,29 @@ fn collect_ids(nodes: &[SceneNode], out: &mut BTreeSet<String>) {
     }
 }
 
-fn gallery_ids() -> BTreeSet<String> {
+fn gallery_ids(nodes: &[SceneNode]) -> BTreeSet<String> {
     let mut out = BTreeSet::new();
-    collect_ids(&SceneNode::gallery(), &mut out);
+    collect_ids(nodes, &mut out);
     out
+}
+
+/// A captioned control row the geometry strip uses.
+fn geometry_row(title: &str, value: String, control: AnyView) -> AnyView {
+    AnyView::new(BoxView::new(
+        cove_core::scene::FlexDirection::Row,
+        cove_core::scene::Align::Center,
+        cove_core::scene::Justify::FlexStart,
+        cove_core::scene::Wrap::NoWrap,
+        6.0,
+        AnyView::new(TupleView::new(vec![
+            AnyView::new(
+                Text::new(format!("{title} {value}"))
+                    .semantic_font(SemanticFontRef::caption())
+                    .semantic_foreground(SemanticColorRef::on_surface_muted()),
+            ),
+            control,
+        ])),
+    ))
 }
 
 fn boolean_binding(state: &State<bool>) -> Binding<bool> {
@@ -198,6 +275,7 @@ impl TreeStory {
     pub fn new(options: GalleryOptions) -> Self {
         Self {
             options,
+            nodes: State::new(SceneNode::gallery()),
             selection: State::new(Some("camera".to_owned())),
             expanded: State::new(
                 ["scene".to_owned(), "lights".to_owned()]
@@ -212,7 +290,26 @@ impl TreeStory {
             loaded: State::new(BTreeSet::new()),
             status: State::new("Ready".to_owned()),
             query: State::new(String::new()),
+            guide_style: State::new(Some(TreeGuideStyle::Straight)),
+            indentation: State::new(16.0),
+            leading_padding: State::new(0.0),
         }
+    }
+
+    pub fn nodes(&self) -> Vec<SceneNode> {
+        self.nodes.get()
+    }
+
+    pub fn guide_style(&self) -> TreeGuideStyle {
+        self.guide_style.get().unwrap_or_default()
+    }
+
+    pub fn indentation(&self) -> f64 {
+        self.indentation.get()
+    }
+
+    pub fn leading_padding(&self) -> f64 {
+        self.leading_padding.get()
     }
 
     pub fn selection(&self) -> Option<String> {
@@ -259,10 +356,10 @@ impl TreeStory {
         self.query.set(query.into());
     }
 
-    /// Expand every branch. The authored list is exactly the expandable ids.
+    /// Expand every branch of the current model.
     pub fn expand_all(&self) {
         self.expanded.set(
-            expandable_ids(&SceneNode::gallery())
+            expandable_ids(&self.nodes.get())
                 .into_iter()
                 .map(str::to_owned)
                 .collect::<BTreeSet<_>>(),
@@ -274,7 +371,7 @@ impl TreeStory {
     }
 
     pub fn check_all(&self) {
-        self.checked.set(gallery_ids());
+        self.checked.set(gallery_ids(&self.nodes.get()));
     }
 
     pub fn clear_checked(&self) {
@@ -311,7 +408,7 @@ impl TreeStory {
 
     /// The ids still shown for the current query.
     pub fn visible(&self) -> BTreeSet<String> {
-        visible_ids(&SceneNode::gallery(), &self.query.get())
+        visible_ids(&self.nodes.get(), &self.query.get())
             .into_iter()
             .map(str::to_owned)
             .collect()
@@ -398,15 +495,23 @@ impl View for TreeStory {
             select_status.set(format!("Selected {}", node.title));
         });
         let expand_status = self.status.clone();
-        let on_expand: Rc<dyn Fn(&SceneNode, bool, &HashSet<TreeNodeKey<String>>)> = Rc::new(
+        // A row dropped inside a collapsed branch makes the tree open it, and
+        // that automatic expand must not replace the drop message.
+        let drop_reveal: Rc<RefCell<Option<String>>> = Rc::new(RefCell::new(None));
+        let on_expand: Rc<dyn Fn(&SceneNode, bool, &HashSet<TreeNodeKey<String>>)> = Rc::new({
+            let drop_reveal = drop_reveal.clone();
             move |node: &SceneNode, expanded: bool, _keys: &HashSet<TreeNodeKey<String>>| {
+                if drop_reveal.borrow().as_deref() == Some(node.id) {
+                    drop_reveal.borrow_mut().take();
+                    return;
+                }
                 expand_status.set(format!(
                     "{} {}",
                     node.title,
                     if expanded { "expanded" } else { "collapsed" }
                 ));
-            },
-        );
+            }
+        });
         let check_status = self.status.clone();
         let on_check: Rc<
             dyn Fn(&SceneNode, bool, &HashSet<TreeNodeKey<String>>, &HashSet<TreeNodeKey<String>>),
@@ -424,6 +529,49 @@ impl View for TreeStory {
                 ));
             },
         );
+
+        // The host owns the hierarchy, so a drop edits `nodes` and the tree
+        // repaints from the new model.
+        let drop_status = self.status.clone();
+        let drop_nodes = self.nodes.clone();
+        let drag = TreeDragOperations {
+            is_enabled: self.options.is_enabled,
+            can_drag: Some(Rc::new(|node: &SceneNode| node.id != "scene")),
+            can_drop: Some(Rc::new(|source: &SceneNode, target: &SceneNode, _| {
+                source.id != target.id
+            })),
+            on_drop: Some(Rc::new(
+                move |source: SceneNode, target: SceneNode, position| {
+                    let mut model = drop_nodes.get();
+                    let Some(moved) = take_scene_node(&mut model, source.id) else {
+                        return;
+                    };
+                    if insert_scene_node(&mut model, target.id, position, moved) {
+                        drop_nodes.set(model);
+                        if position == TreeDropPosition::Inside {
+                            *drop_reveal.borrow_mut() = Some(target.id.to_owned());
+                        }
+                        drop_status.set(format!(
+                            "Moved {} {} {}",
+                            source.title,
+                            match position {
+                                TreeDropPosition::Before => "before",
+                                TreeDropPosition::Inside => "into",
+                                TreeDropPosition::After => "after",
+                            },
+                            target.title
+                        ));
+                    }
+                },
+            )),
+            ..TreeDragOperations::default()
+        };
+        let layout = TreeLayout {
+            guide_style: self.guide_style(),
+            indentation: self.indentation.get() as f32,
+            leading_padding: self.leading_padding.get() as f32,
+            ..TreeLayout::default()
+        };
 
         let options = TreeOptions {
             is_enabled: self.options.is_enabled,
@@ -451,6 +599,7 @@ impl View for TreeStory {
                 load_data: Some(load_data),
                 ..TreeLazy::default()
             },
+            layout,
             slots: TreeSlots {
                 icon: Some(icon_slot),
                 ..TreeSlots::default()
@@ -465,11 +614,12 @@ impl View for TreeStory {
                 on_expand_change: Some(on_expand),
                 ..TreeEvents::default()
             },
+            drag,
             ..TreeOptions::default()
         };
         let tree = AnyView::new(
             Tree::new(
-                SceneNode::gallery(),
+                self.nodes.get(),
                 |node: &SceneNode| node.id.to_owned(),
                 children,
                 |node: &SceneNode, _: RowState| {
@@ -506,11 +656,12 @@ impl View for TreeStory {
         );
         let expand = {
             let expanded = self.expanded.clone();
+            let nodes = self.nodes.clone();
             let enabled = self.options.is_enabled;
             AnyView::new(
                 Button::title("Expand all", move || {
                     expanded.set(
-                        expandable_ids(&SceneNode::gallery())
+                        expandable_ids(&nodes.get())
                             .into_iter()
                             .map(str::to_owned)
                             .collect::<BTreeSet<_>>(),
@@ -531,9 +682,10 @@ impl View for TreeStory {
         };
         let check_all = {
             let checked = self.checked.clone();
+            let nodes = self.nodes.clone();
             let enabled = self.options.is_enabled;
             AnyView::new(
-                Button::title("Check all", move || checked.set(gallery_ids()))
+                Button::title("Check all", move || checked.set(gallery_ids(&nodes.get())))
                     .enabled(enabled)
                     .button_style(SecondaryButtonStyle),
             )
@@ -576,6 +728,51 @@ impl View for TreeStory {
             ),
         ));
 
+        let enabled = self.options.is_enabled;
+        let guide_group = AnyView::new(
+            ButtonGroup::try_new(
+                TREE_GUIDE_STYLES
+                    .iter()
+                    .map(|(title, style)| ButtonGroupItem::new(*style, *title))
+                    .collect(),
+                self.guide_style.binding(),
+            )
+            .expect("the guide styles are a static, unique set")
+            .enabled(enabled)
+            .debug_name("tree-guide-style"),
+        );
+        let indent_row = geometry_row(
+            "Indent",
+            format!("{:.0}", self.indentation.get()),
+            AnyView::new(
+                Slider::new(self.indentation.binding())
+                    .range((8.0, 32.0))
+                    .step(2.0)
+                    .enabled(enabled)
+                    .frame_width(120.0)
+                    .debug_name("tree-indentation"),
+            ),
+        );
+        let leading_row = geometry_row(
+            "Lead",
+            format!("{:.0}", self.leading_padding.get()),
+            AnyView::new(
+                Slider::new(self.leading_padding.binding())
+                    .range((0.0, 24.0))
+                    .step(2.0)
+                    .enabled(enabled)
+                    .frame_width(120.0)
+                    .debug_name("tree-leading-padding"),
+            ),
+        );
+        let geometry_row_view = AnyView::new(BoxView::new(
+            cove_core::scene::FlexDirection::Row,
+            cove_core::scene::Align::Center,
+            cove_core::scene::Justify::FlexStart,
+            cove_core::scene::Wrap::Wrap,
+            12.0,
+            AnyView::new(TupleView::new(vec![guide_group, indent_row, leading_row])),
+        ));
         let button_row = AnyView::new(BoxView::new(
             cove_core::scene::FlexDirection::Row,
             cove_core::scene::Align::Center,
@@ -604,11 +801,15 @@ impl View for TreeStory {
             cove_core::scene::Justify::FlexStart,
             cove_core::scene::Wrap::NoWrap,
             8.0,
-            AnyView::new(TupleView::new(vec![button_row, toggle_row])),
+            AnyView::new(TupleView::new(vec![
+                button_row,
+                toggle_row,
+                geometry_row_view,
+            ])),
         ));
         AnyView::new(StorySection::new(
             "Scene hierarchy",
-            "Search retains matching ancestors. Arrows, Home and End move; Option/Alt + Right expands all and Option/Alt + Left collapses all. Command/Control-click selects multiple nodes. Checking cascades unless Strict check is on; Accordion keeps one branch open; Lazy Objects asks the host for children on first expansion.",
+            "Drag a row onto another to move it: the branch lifts into place while the pointer is held and the host model takes the drop. Option/Alt + Up/Down moves between siblings and Option/Alt + Shift + Left/Right outdents and indents. Option/Alt + Right expands all, Option/Alt + Left collapses all, Command/Control-click multi-selects, and the style row sets the indent guides and their spacing.",
             AnyView::new(TupleView::new(vec![
                 toolbar,
                 tree,
@@ -635,6 +836,7 @@ impl View for TreeStory {
     fn dynamic_properties(&self) -> Vec<cove_composition::DynamicField> {
         cove_composition::dynamic_fields!(
             self;
+            nodes,
             selection,
             expanded,
             selected_ids,
@@ -644,7 +846,10 @@ impl View for TreeStory {
             lazy,
             loaded,
             status,
-            query
+            query,
+            guide_style,
+            indentation,
+            leading_padding
         )
     }
 }

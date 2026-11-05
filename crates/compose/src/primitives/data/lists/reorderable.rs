@@ -178,13 +178,8 @@ impl<Id: CollectionId> ReorderSession<Id> {
             return;
         };
         let stride = self.row_height.get() + self.row_spacing.get();
-        let boundary = ReorderableListModel::drop_boundary(
-            source,
-            travel,
-            scrolled,
-            stride,
-            self.count(),
-        );
+        let boundary =
+            ReorderableListModel::drop_boundary(source, travel, scrolled, stride, self.count());
         self.boundary.set(Some(boundary));
         self.apply_live_shifts(source, boundary);
     }
@@ -312,8 +307,7 @@ impl<Id: CollectionId> ReorderSession<Id> {
         };
         self.session.set_scroll_main(self.scroll.get());
         self.session.set_viewport_extent(extent_main);
-        self.session
-            .ensure_begun(row_main_in_content, row_extent);
+        self.session.ensure_begun(row_main_in_content, row_extent);
     }
 
     /// Queues the one-stride slide for every row the move displaces. Must run
@@ -381,8 +375,7 @@ impl<Id: CollectionId> ReorderSession<Id> {
     /// Springs the mounted rows into the order the drop would produce. Only the
     /// range whose projection changed is touched.
     fn apply_live_shifts(&self, source: usize, boundary: usize) {
-        let destination =
-            ReorderableListModel::destination(source, boundary).unwrap_or(source);
+        let destination = ReorderableListModel::destination(source, boundary).unwrap_or(source);
         let previous = self.live_destination.get().unwrap_or(destination);
         if previous == destination {
             return;
@@ -1099,13 +1092,11 @@ impl<Id: CollectionId> PrimitiveView for ReorderHandle<Id> {
 
         // Recomposition reruns `update_node`; keep one resource so the drag
         // that started on it also receives the pointer updates and ticks.
-        let auto_scroll = node
-            .first_resource::<EdgeAutoScroll>()
-            .unwrap_or_else(|| {
-                let auto_scroll = EdgeAutoScroll::new();
-                node.add_resource(auto_scroll.clone());
-                auto_scroll
-            });
+        let auto_scroll = node.first_resource::<EdgeAutoScroll>().unwrap_or_else(|| {
+            let auto_scroll = EdgeAutoScroll::new();
+            node.add_resource(auto_scroll.clone());
+            auto_scroll
+        });
 
         let pointer_session = session.clone();
         let pointer_node = node.clone();
