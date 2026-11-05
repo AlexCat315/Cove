@@ -25,6 +25,6 @@ pub use table::{Table, TableOptions};
 pub use tree::{Tree, TreeEntry, TreeSearchMetadata, flatten_tree};
 pub mod reorder_model;
 pub use reorder_model::{
-    ReorderDragSession, ReorderPreviewOffset, ReorderableListModel, drop_indicator_y,
-    reorder_row_height,
+    ReorderDragSession, ReorderPreviewOffset, ReorderRowShift, ReorderableListModel,
+    drop_indicator_y, reorder_row_height,
 };

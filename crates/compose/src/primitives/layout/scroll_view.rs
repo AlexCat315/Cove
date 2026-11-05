@@ -1709,7 +1709,9 @@ impl PrimitiveView for ScrollView {
         let node = Node::new();
         node.set_is_hit_testable(true);
         node.set_clips_to_bounds(true);
-        node.set_is_scroll_viewport(self.axes != ScrollAxis::Horizontal);
+        // Edge auto-scroll reads this flag to find the enclosing scroll and
+        // then scrolls along the gesture's own axis, so every axis qualifies.
+        node.set_is_scroll_viewport(true);
         node
     }
 
@@ -1725,7 +1727,7 @@ impl PrimitiveView for ScrollView {
     }
 
     fn update_node(&self, node: &Node) {
-        node.set_is_scroll_viewport(self.axes != ScrollAxis::Horizontal);
+        node.set_is_scroll_viewport(true);
         let observers = ScrollViewObservers {
             scroll_offset: self.scroll_offset.clone(),
             on_viewport_change: self.on_viewport_change.clone(),

@@ -13,25 +13,38 @@ use cove_core::scene::{AnimatorScheduler, AnyAnimationController, Node, NodeReso
 use crate::primitives::layout::scroll_view::{
     cached_scrollable_content_size, report_scroll_change, visible_viewport_rect,
 };
+use crate::primitives::layout::ScrollAxis;
 
 /// Points per second at the very edge.
 pub const MAXIMUM_SPEED: f32 = 1200.0;
 
-/// Signed speed for a pointer at `pointer_y`: zero outside the edge zones,
-/// rising quadratically to the maximum at (or beyond) the edge.
-pub fn velocity(pointer_y: f32, viewport: Rect) -> f32 {
-    let zone = 48.0_f32.min(viewport.height / 4.0);
+/// The component of a value that lies along the scrolling axis.
+fn main_of(point: Point, axis: ScrollAxis) -> f32 {
+    match axis {
+        ScrollAxis::Horizontal => point.x,
+        _ => point.y,
+    }
+}
+
+/// Signed speed for a pointer held at `pointer`: zero outside the edge zones
+/// of `axis`, rising quadratically to the maximum at (or beyond) the edge.
+pub fn velocity(pointer: Point, viewport: Rect, axis: ScrollAxis) -> f32 {
+    let (main, start, extent) = match axis {
+        ScrollAxis::Horizontal => (pointer.x, viewport.x, viewport.width),
+        _ => (pointer.y, viewport.y, viewport.height),
+    };
+    let zone = 48.0_f32.min(extent / 4.0);
     if zone <= 0.0 {
         return 0.0;
     }
-    let top = pointer_y - viewport.y;
-    let bottom = viewport.y + viewport.height - pointer_y;
-    if top < zone {
-        let depth = (1.0_f32).min((zone - top) / zone);
+    let leading = main - start;
+    let trailing = start + extent - main;
+    if leading < zone {
+        let depth = (1.0_f32).min((zone - leading) / zone);
         return -MAXIMUM_SPEED * depth * depth;
     }
-    if bottom < zone {
-        let depth = (1.0_f32).min((zone - bottom) / zone);
+    if trailing < zone {
+        let depth = (1.0_f32).min((zone - trailing) / zone);
         return MAXIMUM_SPEED * depth * depth;
     }
     0.0
@@ -52,7 +65,8 @@ fn enclosing_scroll(node: &Node) -> Option<Node> {
 struct EdgeAutoScrollState {
     owner: RefCell<Option<Node>>,
     scroll: RefCell<Option<Node>>,
-    pointer_y: Cell<f32>,
+    pointer: Cell<Point>,
+    axis: Cell<ScrollAxis>,
     start_offset: Cell<f32>,
     on_scroll: RefCell<Option<Rc<dyn Fn()>>>,
     is_finished: Cell<bool>,
@@ -71,7 +85,8 @@ impl EdgeAutoScroll {
             state: Rc::new(EdgeAutoScrollState {
                 owner: RefCell::new(None),
                 scroll: RefCell::new(None),
-                pointer_y: Cell::new(0.0),
+                pointer: Cell::new(Point::default()),
+                axis: Cell::new(ScrollAxis::Vertical),
                 start_offset: Cell::new(0.0),
                 on_scroll: RefCell::new(None),
                 is_finished: Cell::new(true),
@@ -81,13 +96,13 @@ impl EdgeAutoScroll {
         })
     }
 
-    /// Distance scrolled since `begin`; drags add it to the pointer delta so
-    /// positions stay in content coordinates.
+    /// Distance scrolled along the gesture axis since `begin`; drags add it to
+    /// the pointer delta so positions stay in content coordinates.
     pub fn scrolled_distance(&self) -> f32 {
-        match self.state.scroll.borrow().as_ref() {
-            Some(scroll) => scroll.content_offset().y - self.state.start_offset.get(),
-            None => 0.0,
-        }
+        let Some(scroll) = self.state.scroll.borrow().clone() else {
+            return 0.0;
+        };
+        main_of(scroll.content_offset(), self.state.axis.get()) - self.state.start_offset.get()
     }
 
     pub fn is_finished(&self) -> bool {
@@ -95,15 +110,18 @@ impl EdgeAutoScroll {
     }
 
     /// Starts tracking; `on_scroll` runs after every automatic scroll step.
-    pub fn begin(self: &Rc<Self>, pointer_y: f32, on_scroll: Rc<dyn Fn()>) {
+    pub fn begin(self: &Rc<Self>, pointer: Point, axis: ScrollAxis, on_scroll: Rc<dyn Fn()>) {
         let Some(owner) = self.state.owner.borrow().clone() else {
             return;
         };
         let Some(scroll) = enclosing_scroll(&owner) else {
             return;
         };
-        self.state.start_offset.set(scroll.content_offset().y);
-        self.state.pointer_y.set(pointer_y);
+        self.state.axis.set(axis);
+        self.state
+            .start_offset
+            .set(main_of(scroll.content_offset(), axis));
+        self.state.pointer.set(pointer);
         *self.state.scroll.borrow_mut() = Some(scroll);
         *self.state.on_scroll.borrow_mut() = Some(on_scroll);
         if self.state.is_finished.get() {
@@ -116,8 +134,8 @@ impl EdgeAutoScroll {
         }
     }
 
-    pub fn update(&self, pointer_y: f32) {
-        self.state.pointer_y.set(pointer_y);
+    pub fn update(&self, pointer: Point) {
+        self.state.pointer.set(pointer);
     }
 
     pub fn end(&self) {
@@ -141,22 +159,32 @@ fn tick(state: &EdgeAutoScrollState, delta_time: f64) {
     let Some(scroll) = state.scroll.borrow().clone() else {
         return;
     };
+    let axis = state.axis.get();
     // Pointer events are in window coordinates while the viewport rect is
     // local to the scroll node; compare both in the scroll's space.
-    let pointer = scroll.convert_from_window(Point::new(0.0, state.pointer_y.get()));
+    let pointer = scroll.convert_from_window(state.pointer.get());
     let viewport = visible_viewport_rect(&scroll);
-    let speed = velocity(pointer.y, viewport);
+    let speed = velocity(pointer, viewport, axis);
     if speed == 0.0 {
         return;
     }
     let content = cached_scrollable_content_size(&scroll);
-    let maximum = (content.height - viewport.height).max(0.0);
+    let (content_main, viewport_main) = match axis {
+        ScrollAxis::Horizontal => (content.width, viewport.width),
+        _ => (content.height, viewport.height),
+    };
+    let maximum = (content_main - viewport_main).max(0.0);
     let offset = scroll.content_offset();
-    let next = (offset.y + speed * delta_time as f32).clamp(0.0, maximum);
-    if next == offset.y {
+    let current = main_of(offset, axis);
+    let next = (current + speed * delta_time as f32).clamp(0.0, maximum);
+    if next == current {
         return;
     }
-    scroll.set_content_offset(Point::new(offset.x, next));
+    let scrolled = match axis {
+        ScrollAxis::Horizontal => Point::new(next, offset.y),
+        _ => Point::new(offset.x, next),
+    };
+    scroll.set_content_offset(scrolled);
     report_scroll_change(&scroll);
     if let Some(on_scroll) = state.on_scroll.borrow().clone() {
         on_scroll();

@@ -35,7 +35,7 @@ use crate::{AnyView, BoxView, PrimitiveView, TupleView, View, impl_primitive_vie
 const POINTER_ROW_HEIGHT: f32 = 32.0;
 const TOUCH_ROW_HEIGHT: f32 = 44.0;
 /// Pointer travel below this is a click on a row rather than a drag.
-const CLICK_SLOP: f32 = 4.0;
+const CLICK_SLOP: f32 = crate::primitives::interaction::DRAG_THRESHOLD;
 const DRAG_START: &str = "__wheel_drag_start";
 const DRAG_BASE: &str = "__wheel_drag_base";
 

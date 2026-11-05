@@ -65,7 +65,7 @@ const ROW_INDEX_MARKER: &str = "dataTable.rowIndex";
 const METRICS_CACHE: &str = "dataTable.metrics";
 const COLUMN_DRAG: &str = "dataTable.columnDrag";
 /// Pointer travel before a header press becomes a column drag.
-const COLUMN_DRAG_SLOP: f32 = 4.0;
+const COLUMN_DRAG_SLOP: f32 = crate::primitives::interaction::DRAG_THRESHOLD;
 
 /// The hovered row, painted directly on its nodes so entering a row recomposes
 /// nothing. The frozen and moving lanes each mount a node for the same row.

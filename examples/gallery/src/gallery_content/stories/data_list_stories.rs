@@ -20,6 +20,7 @@ use cove_ui_compose::primitives::data::{
 };
 use cove_ui_compose::primitives::feedback::StatusTone;
 use cove_ui_compose::primitives::interaction::{Scrollbar, ScrollbarAxis};
+use cove_ui_compose::primitives::layout::ScrollAxis;
 use cove_ui_compose::primitives::media::{Icon, ui_icon_catalog};
 use cove_ui_compose::primitives::text::Text;
 use cove_ui_compose::primitives::text::text_buffer::TextBuffer;
@@ -144,16 +145,20 @@ impl View for ListStory {
 pub struct ReorderableStory {
     pub options: GalleryOptions,
     items: State<Vec<String>>,
+    cards: State<Vec<String>>,
 }
 
 impl ReorderableStory {
     /// The authored order.
     pub const INITIAL: [&'static str; 5] = ["Landscape", "Portrait", "Macro", "Night", "Panorama"];
+    /// The authored order of the horizontal strip.
+    pub const CARDS: [&'static str; 6] = ["One", "Two", "Three", "Four", "Five", "Six"];
 
     pub fn new(options: GalleryOptions) -> Self {
         Self {
             options,
             items: State::new(Self::INITIAL.iter().map(|s| (*s).to_owned()).collect()),
+            cards: State::new(Self::CARDS.iter().map(|s| (*s).to_owned()).collect()),
         }
     }
 
@@ -175,10 +180,16 @@ impl ReorderableStory {
     pub fn reset(&self) {
         self.items
             .set(Self::INITIAL.iter().map(|s| (*s).to_owned()).collect());
+        self.cards
+            .set(Self::CARDS.iter().map(|s| (*s).to_owned()).collect());
     }
 
     pub fn readout(&self) -> String {
         format!("Order: {}", self.items.get().join(" · "))
+    }
+
+    pub fn card_readout(&self) -> String {
+        format!("Card order: {}", self.cards.get().join(" · "))
     }
 }
 
@@ -222,11 +233,58 @@ impl View for ReorderableStory {
             .frame_height(220.0)
             .debug_name("reorderable-control"),
         );
-        AnyView::new(StorySection::new(
-            "Reordering",
-            "Space lifts the focused row, arrows move it and Space drops it. Escape cancels and restores the original order.",
-            AnyView::new(TupleView::new(vec![list, caption(self.readout())])),
-        ))
+        let cards = self.cards.clone();
+        let strip = AnyView::new(
+            ReorderableList::new(
+                self.cards.get(),
+                |item: &String| item.clone(),
+                |item: &String, _state: RowState| {
+                    AnyView::new(
+                        AnyView::new(BoxView::new(
+                            FlexDirection::Column,
+                            Align::Center,
+                            Justify::Center,
+                            Wrap::NoWrap,
+                            0.0,
+                            AnyView::new(TupleView::new(vec![AnyView::new(Text::new(
+                                item.clone(),
+                            ))])),
+                        ))
+                        .padding_edges(0.0, 10.0),
+                    )
+                },
+            )
+            .on_move({
+                let cards = cards.clone();
+                move |from: usize, to: usize| {
+                    let mut current = cards.get();
+                    if from >= current.len() || to > current.len() {
+                        return;
+                    }
+                    let item = current.remove(from);
+                    current.insert(to.min(current.len()), item);
+                    cards.set(current);
+                }
+            })
+            .row_height(112.0)
+            .row_spacing(8.0)
+            .axis(ScrollAxis::Horizontal)
+            .is_enabled(self.options.is_enabled)
+            .frame_height(96.0)
+            .debug_name("reorderable-horizontal"),
+        );
+        AnyView::new(TupleView::new(vec![
+            AnyView::new(StorySection::new(
+                "Reordering",
+                "Space lifts the focused row, arrows move it and Space drops it. Escape cancels and restores the original order.",
+                AnyView::new(TupleView::new(vec![list, caption(self.readout())])),
+            )),
+            AnyView::new(StorySection::new(
+                "Reordering along the scroll axis",
+                "The same handle, insertion rule and settle spring drive a horizontal list; drag the cards left or right.",
+                AnyView::new(TupleView::new(vec![strip, caption(self.card_readout())])),
+            )),
+        ]))
     }
 
     fn tag(&self) -> &'static str {
@@ -234,7 +292,7 @@ impl View for ReorderableStory {
     }
 
     fn dynamic_properties(&self) -> Vec<cove_composition::DynamicField> {
-        cove_composition::dynamic_fields!(self; items)
+        cove_composition::dynamic_fields!(self; items, cards)
     }
 }
 

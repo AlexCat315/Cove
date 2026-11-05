@@ -1,13 +1,16 @@
 //! Translation of Primitives/Data/Lists/Reorder/{Reorderable,Handle,Preview}.swift
 //! (the view half; the drag arithmetic lives in [`reorder_model`]).
 //!
-//! Vertical list whose rows can be reordered with a drag handle or the keyboard.
-//! The caller owns the order: `on_move` receives the source index and the final
-//! index after the row is removed.
+//! List whose rows can be reordered with a drag handle or the keyboard, along
+//! either the vertical or the horizontal axis (`.axis(ScrollAxis::Horizontal)`;
+//! `Both` reorders vertically). The caller owns the order: `on_move` receives
+//! the source index and the final index after the row is removed.
 //!
 //! The handle is a 44pt-wide target and is the only drag surface, so row content
 //! keeps its own buttons and taps. While dragging, a 2pt accent line marks the
-//! insertion boundary; Escape cancels without calling `on_move`.
+//! insertion boundary; Escape cancels without calling `on_move`. On release the
+//! lifted row springs onto its slot while the displaced rows slide one stride,
+//! and reduced motion snaps both.
 //!
 //! Behaviour checklist:
 //! - the drag position is pointer travel plus automatic scroll, so the drop
@@ -18,13 +21,15 @@
 //! - the dragged and last keyboard-moved rows always stay mounted so pointer
 //!   capture and focus survive auto-scrolling
 //! - the dragged row stays as a dimmed placeholder while the lifted copy follows
+//! - after a drop (or a keyboard move) the placeholder crossfades up to full
+//!   opacity while the displaced rows spring into their slots
 
 use crate::Scope;
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 
 use super::reorder_model::{
-    ReorderDragSession, ReorderableListModel, drop_indicator_y, reorder_row_height,
+    ReorderDragSession, ReorderRowShift, ReorderableListModel, drop_indicator_y, reorder_row_height,
 };
 use super::selection::{CollectionId, RowState};
 use crate::modifiers::interaction::{AccessibilityExt, HitTestingExt};
@@ -48,9 +53,13 @@ use cove_core::scene::{
 use cove_platform::{KeyEvent, MouseButton, SystemCursor};
 
 const HANDLE_ACTIVE: &str = "__reorder.active";
+/// The pointer coordinate along the list's main axis when the drag began.
 const HANDLE_START_Y: &str = "__reorder.startY";
 const HANDLE_HOVERED: &str = "__reorder.hovered";
+/// The latest main-axis pointer coordinate; auto-scroll rereads it after each
+/// scroll step.
 const HANDLE_LAST_Y: &str = "__reorder.lastY";
+const ROW_PLACEHOLDING: &str = "__reorder.placeholdering";
 
 /// Everything a handle needs to drive one drag. Cloning keeps the same stores,
 /// so a clone is the same list rather than a copy — this is what lets the
@@ -62,11 +71,24 @@ pub struct ReorderSession<Id> {
     retained: State<Option<Id>>,
     window: State<std::ops::Range<usize>>,
     width: State<f32>,
+    height: State<f32>,
+    /// Latest viewport offset along the main axis, kept in state so a rebuild
+    /// can hand the same geometry to the replacement drag session.
+    scroll: State<f32>,
     ids: Rc<RefCell<Vec<Id>>>,
     on_move: Rc<RefCell<Rc<dyn Fn(usize, usize)>>>,
     is_enabled: bool,
     row_height: Rc<Cell<f32>>,
     row_spacing: Rc<Cell<f32>>,
+    axis: Rc<Cell<ScrollAxis>>,
+    /// Rows displaced by the latest drop or keyboard move, as `(id, offset)`
+    /// in the order they were laid out *before* the move. Each row consumes
+    /// its entry once, when the rebuilt row mounts its slide.
+    shifts: State<Vec<(Id, f32)>>,
+    /// The landing in flight, as `(release, target)` in viewport coordinates.
+    /// Kept as state so a parent rebuild can restart the spring where the
+    /// previous session left it instead of dropping the preview at its origin.
+    settle: State<Option<(f32, f32)>>,
 }
 
 impl<Id: CollectionId> Clone for ReorderSession<Id> {
@@ -78,11 +100,16 @@ impl<Id: CollectionId> Clone for ReorderSession<Id> {
             retained: self.retained.clone(),
             window: self.window.clone(),
             width: self.width.clone(),
+            height: self.height.clone(),
+            scroll: self.scroll.clone(),
             ids: self.ids.clone(),
             on_move: self.on_move.clone(),
             is_enabled: self.is_enabled,
             row_height: self.row_height.clone(),
             row_spacing: self.row_spacing.clone(),
+            axis: self.axis.clone(),
+            shifts: self.shifts.clone(),
+            settle: self.settle.clone(),
         }
     }
 }
@@ -109,12 +136,18 @@ impl<Id: CollectionId> ReorderSession<Id> {
         self.dragging.get().as_ref() == Some(id)
     }
 
+    pub fn axis(&self) -> ScrollAxis {
+        self.axis.get()
+    }
+
     pub fn begin_drag(&self, index: usize) {
         if !self.is_enabled {
             return;
         }
         let row_height = self.row_height.get();
         let stride = row_height + self.row_spacing.get();
+        self.shifts.set(Vec::new());
+        self.settle.set(None);
         self.session.begin(index as f32 * stride, row_height);
         self.dragging.set(self.ids.borrow().get(index).cloned());
         self.boundary.set(Some(index));
@@ -138,28 +171,159 @@ impl<Id: CollectionId> ReorderSession<Id> {
         self.boundary.set(Some(boundary));
     }
 
-    pub fn finish_drag(&self) {
+    /// Applies the drop, then springs the lifted row onto its slot. `dragging`
+    /// stays set until the landing finishes so the placeholder crossfade and
+    /// the slide of the displaced rows read as one motion.
+    pub fn finish_drag(self: &Rc<Self>) {
         let dragging = self.dragging.get();
         let boundary = self.boundary.get();
-        self.dragging.set(None);
         self.boundary.set(None);
-        self.session.end();
-        let (Some(dragging), Some(boundary)) = (dragging, boundary) else {
+        let Some(dragging) = dragging else {
+            self.session.end();
             return;
         };
         let Some(source) = self.index_of(&dragging) else {
+            self.landing_finished();
             return;
         };
-        if let Some(destination) = ReorderableListModel::destination(source, boundary) {
+        let stride = self.row_height.get() + self.row_spacing.get();
+        let destination = boundary.and_then(|b| ReorderableListModel::destination(source, b));
+        if let Some(destination) = destination {
+            self.queue_shifts(source, destination, stride);
+            self.retained.set(Some(dragging.clone()));
             let on_move = self.on_move.borrow().clone();
             on_move(source, destination);
         }
+        let landing = destination.unwrap_or(source) as f32 * stride;
+        self.land_at(landing);
     }
 
-    pub fn cancel_drag(&self) {
-        self.dragging.set(None);
+    /// Cancels without reporting a move, but still springs the lifted row back
+    /// onto its source slot instead of dropping it out from under the pointer.
+    pub fn cancel_drag(self: &Rc<Self>) {
         self.boundary.set(None);
+        let Some(dragging) = self.dragging.get() else {
+            self.session.end();
+            return;
+        };
+        match self.index_of(&dragging) {
+            Some(source) => {
+                let stride = self.row_height.get() + self.row_spacing.get();
+                self.land_at(source as f32 * stride);
+            }
+            None => {
+                self.landing_finished();
+            }
+        }
+    }
+
+    /// Springs the preview to `content_main` and clears the drag once it
+    /// lands. The epoch guard keeps a stale landing from clobbering a drag
+    /// that started while it was still flying.
+    fn land_at(self: &Rc<Self>, content_main: f32) {
+        let target = content_main - self.session.scroll_main();
+        let release = self.session.preview_main();
+        let epoch = self.session.epoch();
+        let weak = Rc::downgrade(self);
+        let started = self.session.settle_to(
+            target,
+            Rc::new(move || {
+                let Some(session) = weak.upgrade() else {
+                    return;
+                };
+                if session.session.epoch() != epoch {
+                    return;
+                }
+                session.landing_finished();
+            }),
+        );
+        if started {
+            self.settle.set(Some((release, target)));
+        }
+    }
+
+    /// Continues a landing that a parent rebuild interrupted: the drag session
+    /// is fresh, so re-arm the spring from the transferred release and target.
+    fn resume_landing(self: &Rc<Self>) {
+        if self.session.is_settling() {
+            return;
+        }
+        let Some((release, target)) = self.settle.get() else {
+            return;
+        };
+        let epoch = self.session.epoch();
+        let weak = Rc::downgrade(self);
+        self.session.resume_settle(
+            release,
+            target,
+            Rc::new(move || {
+                let Some(session) = weak.upgrade() else {
+                    return;
+                };
+                if session.session.epoch() != epoch {
+                    return;
+                }
+                session.landing_finished();
+            }),
+        );
+    }
+
+    fn landing_finished(&self) {
+        self.dragging.set(None);
+        self.retained.set(None);
+        self.settle.set(None);
         self.session.end();
+    }
+
+    /// Re-adopts the viewport geometry for a drag that outlived the session
+    /// value it started in: a parent rebuild replaces the drag session, whose
+    /// measured extent and scroll offset then read as zero until the next
+    /// viewport report.
+    fn restore_drag(&self, row_main_in_content: f32, row_extent: f32, axis: ScrollAxis) {
+        if self.session.is_active() {
+            return;
+        }
+        let extent_main = if axis == ScrollAxis::Horizontal {
+            self.width.get()
+        } else {
+            self.height.get()
+        };
+        self.session.set_scroll_main(self.scroll.get());
+        self.session.set_viewport_extent(extent_main);
+        self.session
+            .ensure_begun(row_main_in_content, row_extent);
+    }
+
+    /// Queues the one-stride slide for every row the move displaces. Must run
+    /// before `on_move` so the ids still describe the pre-move order.
+    fn queue_shifts(&self, source: usize, destination: usize, stride: f32) {
+        let ids = self.ids.borrow();
+        let mut shifts = Vec::new();
+        if source < destination {
+            // Items at (source, destination] slide toward the freed slot.
+            for slot in source..destination {
+                if let Some(id) = ids.get(slot + 1) {
+                    shifts.push((id.clone(), stride));
+                }
+            }
+        } else {
+            // Items at [destination, source) slide away from the insertion.
+            for slot in destination..source {
+                if let Some(id) = ids.get(slot) {
+                    shifts.push((id.clone(), -stride));
+                }
+            }
+        }
+        self.shifts.set(shifts);
+    }
+
+    /// Consumes the pending slide for `id`, if the latest move displaced it.
+    pub fn take_shift(&self, id: &Id) -> Option<f32> {
+        let mut shifts = self.shifts.get();
+        let position = shifts.iter().position(|(other, _)| other == id)?;
+        let offset = shifts.remove(position).1;
+        self.shifts.set(shifts);
+        Some(offset)
     }
 
     /// Keeps the drag arithmetic on the same row metrics the rows were laid
@@ -169,8 +333,13 @@ impl<Id: CollectionId> ReorderSession<Id> {
         self.row_spacing.set(row_spacing);
     }
 
+    fn set_axis(&self, axis: ScrollAxis) {
+        self.axis.set(axis);
+        self.session.set_axis(axis);
+    }
+
     /// Keyboard move: records the moved row so it stays mounted after the
-    /// caller's reorder lands.
+    /// caller's reorder lands, and slides the displaced rows like a drop.
     pub fn move_row(&self, index: usize, delta: i64) {
         if !self.is_enabled {
             return;
@@ -178,6 +347,8 @@ impl<Id: CollectionId> ReorderSession<Id> {
         let Some(destination) = ReorderableListModel::stepped(index, delta, self.count()) else {
             return;
         };
+        let stride = self.row_height.get() + self.row_spacing.get();
+        self.queue_shifts(index, destination, stride);
         self.retained.set(self.ids.borrow().get(index).cloned());
         let on_move = self.on_move.borrow().clone();
         on_move(index, destination);
@@ -208,12 +379,12 @@ impl<Id: CollectionId> ReorderSession<Id> {
         ReorderableListModel::mounted_indices(self.window.get(), self.count(), &retained)
     }
 
-    pub fn preview_top(&self) -> f32 {
-        self.session.preview_top()
+    pub fn preview_main(&self) -> f32 {
+        self.session.preview_main()
     }
 }
 
-/// Vertical, keyboard-accessible reorderable list.
+/// Keyboard-accessible reorderable list along a scroll axis.
 pub struct ReorderableList<Item, Id, RowContent>
 where
     Item: Clone + 'static,
@@ -221,11 +392,14 @@ where
     RowContent: Fn(&Item, RowState) -> AnyView + 'static,
 {
     pub data: Vec<Item>,
-    /// Authored logical row height, before text scaling and the touch floor.
+    /// Authored logical row extent along the main axis, before text scaling
+    /// and the touch floor.
     pub row_height: f32,
     /// Authored logical row spacing, before text scaling.
     pub row_spacing: f32,
     pub is_enabled: bool,
+    /// Scrolling and drag axis. `Both` reorders vertically.
+    pub axis: ScrollAxis,
     pub row_label: Rc<dyn Fn(&Item) -> String>,
     pub row_content: RowContent,
     id_of: Rc<dyn Fn(&Item) -> Id>,
@@ -252,24 +426,29 @@ where
             retained: State::new(None),
             window: State::new(0..24),
             width: State::new(0.0),
+            height: State::new(0.0),
+            scroll: State::new(0.0),
             ids: Rc::new(RefCell::new(ids)),
             on_move: Rc::new(RefCell::new(Rc::new(|_, _| {}))),
             is_enabled: true,
             row_height: Rc::new(Cell::new(36.0)),
             row_spacing: Rc::new(Cell::new(0.0)),
+            axis: Rc::new(Cell::new(ScrollAxis::Vertical)),
+            shifts: State::new(Vec::new()),
+            settle: State::new(None),
         });
         Self {
             data,
             row_height: 36.0,
             row_spacing: 0.0,
             is_enabled: true,
+            axis: ScrollAxis::Vertical,
             row_label: Rc::new(|_| String::new()),
             row_content,
             id_of,
             session,
         }
     }
-
     /// Called with `(from, to)`, where `to` is the final index after removal.
     pub fn on_move(self, on_move: impl Fn(usize, usize) + 'static) -> Self {
         *self.session.on_move.borrow_mut() = Rc::new(on_move);
@@ -288,6 +467,14 @@ where
 
     pub fn is_enabled(mut self, is_enabled: bool) -> Self {
         self.is_enabled = is_enabled;
+        self
+    }
+
+    /// Reorders along `axis`; a horizontal list drags rows left/right with the
+    /// same handle, indicator, and settle behaviour. `Both` reorders
+    /// vertically.
+    pub fn axis(mut self, axis: ScrollAxis) -> Self {
+        self.axis = axis;
         self
     }
 
@@ -340,13 +527,24 @@ where
 {
     fn body(&self, _cx: &Scope) -> AnyView {
         self.publish();
-        let row_height = self.row_height;
+        let axis = match self.axis {
+            ScrollAxis::Horizontal => ScrollAxis::Horizontal,
+            _ => ScrollAxis::Vertical,
+        };
+        let horizontal = axis == ScrollAxis::Horizontal;
+        let row_extent = self.row_height;
         let row_spacing = self.row_spacing;
-        let row_stride = row_height + row_spacing;
+        let row_stride = row_extent + row_spacing;
         let count = self.data.len();
         let session = self.session.clone();
-        session.set_row_metrics(row_height, row_spacing);
+        session.set_row_metrics(row_extent, row_spacing);
+        session.set_axis(axis);
         let dragging = session.dragging_id();
+        if let Some(id) = &dragging
+            && let Some(index) = session.index_of(id)
+        {
+            session.restore_drag(index as f32 * row_stride, row_extent, axis);
+        }
 
         let mounted = mounted_window(&session, count);
         let rows: Vec<AnyView> = mounted
@@ -354,7 +552,7 @@ where
             .filter_map(|index| {
                 let item = self.data.get(index)?.clone();
                 let id = (self.id_of)(&item);
-                let is_dragging = dragging.as_ref() == Some(&id);
+                let is_placeholder = dragging.as_ref() == Some(&id);
                 let is_last = index + 1 == count;
                 let label = self.handle_label(index);
                 let content = (self.row_content)(
@@ -369,16 +567,20 @@ where
                 Some(AnyView::new(ReorderRowSlot {
                     index,
                     row_stride,
-                    row_height,
-                    is_dragging,
+                    row_extent,
+                    axis,
+                    is_placeholder,
                     is_last,
+                    id,
+                    session: session.clone(),
                     handle: ReorderHandle {
                         index,
                         count,
                         label,
                         is_enabled: self.is_enabled,
-                        is_dragging,
-                        row_height,
+                        is_dragging: is_placeholder,
+                        row_extent,
+                        axis,
                         session: session.clone(),
                     },
                     content,
@@ -386,12 +588,21 @@ where
             })
             .collect();
 
-        let content_height = (count as f32 * row_stride - row_spacing).max(0.0);
-        let width = session.width.get();
+        let content_extent = (count as f32 * row_stride - row_spacing).max(0.0);
+        let cross = if horizontal {
+            session.height.get()
+        } else {
+            session.width.get()
+        };
+        let direction = if horizontal {
+            FlexDirection::Row
+        } else {
+            FlexDirection::Column
+        };
 
         let column = AnyView::new(
             AnyView::new(BoxView::new(
-                FlexDirection::Column,
+                direction,
                 Align::Stretch,
                 Justify::FlexStart,
                 Wrap::NoWrap,
@@ -400,10 +611,18 @@ where
             ))
             .frame(
                 Some(crate::modifiers::layout::FrameDimension::Points(
-                    width.max(1.0),
+                    if horizontal {
+                        content_extent.max(1.0)
+                    } else {
+                        cross.max(1.0)
+                    },
                 )),
                 Some(crate::modifiers::layout::FrameDimension::Points(
-                    content_height.max(1.0),
+                    if horizontal {
+                        cross.max(1.0)
+                    } else {
+                        content_extent.max(1.0)
+                    },
                 )),
                 None,
                 None,
@@ -414,35 +633,64 @@ where
 
         let mut layers = vec![column];
         if count > 1 && let Some(boundary) = session.visible_boundary() {
-            let y = drop_indicator_y(boundary, count, row_stride, content_height);
+            let position = drop_indicator_y(boundary, count, row_stride, content_extent);
             // A spacer rather than `EmptyView`: an empty view materialises no
             // node, so the rule would never be laid out or painted.
-            layers.push(AnyView::new(
+            let rule = AnyView::new(
                 AnyView::new(
                     AnyView::new(crate::Spacer::new(0.0))
-                        .frame_height(2.0)
                         .semantic_background(crate::theme::SemanticColorRef::accent())
                         .corner_radius(1.0)
                         .modifier(cove_composition::LayoutDebugModifier::debug_name(
                             "reorder-drop-indicator",
                         )),
                 )
-                .with_modifier(AbsolutePositionModifier::new(
-                    Some(8.0),
-                    Some(y),
+                // Only the cross-axis thickness is fixed. The main-axis
+                // dimension stays auto so the absolute insets stretch the rule
+                // across the list; an explicit zero would collapse it.
+                .frame(
+                    if horizontal {
+                        Some(crate::modifiers::layout::FrameDimension::Points(2.0))
+                    } else {
+                        None
+                    },
+                    if horizontal {
+                        None
+                    } else {
+                        Some(crate::modifiers::layout::FrameDimension::Points(2.0))
+                    },
+                    None,
+                    None,
+                    None,
+                    None,
+                ),
+            );
+            let rule = if horizontal {
+                rule.with_modifier(AbsolutePositionModifier::new(
+                    Some(position),
                     Some(8.0),
                     None,
-                )),
-            ));
+                    Some(8.0),
+                ))
+            } else {
+                rule.with_modifier(AbsolutePositionModifier::new(
+                    Some(8.0),
+                    Some(position),
+                    Some(8.0),
+                    None,
+                ))
+            };
+            layers.push(AnyView::new(rule));
         }
 
         let scroll_session = session.clone();
+        let scroll_axis = axis;
         let scroll = ScrollView::new(
-            ScrollAxis::Vertical,
+            scroll_axis,
             // A flex parent rather than a `ZStack`: only flex layout honours
-            // the drop line's absolute top inset (Swift's overlay `Box`).
+            // the drop line's absolute main-axis inset (Swift's overlay `Box`).
             AnyView::new(BoxView::new(
-                FlexDirection::Column,
+                direction,
                 Align::Stretch,
                 Justify::FlexStart,
                 Wrap::NoWrap,
@@ -453,16 +701,28 @@ where
         .scrollbar_gutter(ScrollbarGutter::Stable)
         .on_viewport_change(move |viewport: ScrollViewport| {
             let drag = &scroll_session.session;
-            drag.set_scroll_y(viewport.offset.y);
-            drag.set_viewport_height(viewport.size.height);
+            let offset_main = main_of(scroll_axis, viewport.offset.x, viewport.offset.y);
+            let extent_main = if scroll_axis == ScrollAxis::Horizontal {
+                viewport.size.width
+            } else {
+                viewport.size.height
+            };
+            drag.set_scroll_main(offset_main);
+            drag.set_viewport_extent(extent_main);
+            if (offset_main - scroll_session.scroll.get()).abs() > 0.5 {
+                scroll_session.scroll.set(offset_main);
+            }
             if (viewport.size.width - scroll_session.width.get()).abs() > 0.5 {
                 scroll_session.width.set(viewport.size.width);
+            }
+            if (viewport.size.height - scroll_session.height.get()).abs() > 0.5 {
+                scroll_session.height.set(viewport.size.height);
             }
             let visible = visible_range(
                 scroll_session.count(),
                 (scroll_session.row_height.get() + scroll_session.row_spacing.get()).max(1.0),
-                viewport.offset.y,
-                viewport.size.height,
+                offset_main,
+                extent_main,
                 4,
             );
             if scroll_session.window.get() != visible {
@@ -488,8 +748,9 @@ where
             surface.push(AnyView::new(
                 AnyView::new(ReorderPreviewHost {
                     session: session.clone(),
-                    row_height,
-                    width,
+                    row_extent,
+                    cross,
+                    axis,
                     content: preview,
                 })
                 .with_modifier(AbsolutePositionModifier::new(
@@ -526,7 +787,18 @@ where
             crate::DynamicField::state("retained", &session.retained),
             crate::DynamicField::state("window", &session.window),
             crate::DynamicField::state("width", &session.width),
+            crate::DynamicField::state("height", &session.height),
+            crate::DynamicField::state("scroll", &session.scroll),
+            crate::DynamicField::state("shifts", &session.shifts),
+            crate::DynamicField::state("settle", &session.settle),
         ]
+    }
+}
+
+fn main_of(axis: ScrollAxis, x: f32, y: f32) -> f32 {
+    match axis {
+        ScrollAxis::Horizontal => x,
+        _ => y,
     }
 }
 
@@ -551,9 +823,12 @@ fn mounted_window<Id: CollectionId>(session: &Rc<ReorderSession<Id>>, count: usi
 struct ReorderRowSlot<Id: CollectionId> {
     index: usize,
     row_stride: f32,
-    row_height: f32,
-    is_dragging: bool,
+    row_extent: f32,
+    axis: ScrollAxis,
+    is_placeholder: bool,
     is_last: bool,
+    id: Id,
+    session: Rc<ReorderSession<Id>>,
     handle: ReorderHandle<Id>,
     content: AnyView,
 }
@@ -572,59 +847,92 @@ impl<Id: CollectionId> PrimitiveView for ReorderRowSlot<Id> {
     fn update_layout(&self, layout: &LayoutNode) {
         use cove_core::scene::{Edge, PositionType};
         layout.set_position_type(PositionType::Absolute);
-        layout.set_position(0.0, Edge::Left);
-        layout.set_position(self.index as f32 * self.row_stride, Edge::Top);
-        layout.set_position(0.0, Edge::Right);
-        layout.set_height(Some(self.row_height));
+        if self.axis == ScrollAxis::Horizontal {
+            layout.set_position(0.0, Edge::Top);
+            layout.set_position(self.index as f32 * self.row_stride, Edge::Left);
+            layout.set_position(0.0, Edge::Bottom);
+            layout.set_width(Some(self.row_extent));
+        } else {
+            layout.set_position(0.0, Edge::Left);
+            layout.set_position(self.index as f32 * self.row_stride, Edge::Top);
+            layout.set_position(0.0, Edge::Right);
+            layout.set_height(Some(self.row_extent));
+        }
     }
 
     fn update_node(&self, node: &Node) {
         node.set_corner_radius(6.0);
-        node.set_opacity(if self.is_dragging { 0.35 } else { 1.0 });
+        if self.is_placeholder {
+            // Dim once and bind for the settle crossfade; the landing raises
+            // the opacity itself, so a rebuild mid-settle must not clip it
+            // back to the starting value.
+            self.session.session.bind_placeholder(node);
+            if node.attachment::<bool>(ROW_PLACEHOLDING) != Some(true) {
+                node.set_attachment(ROW_PLACEHOLDING, true);
+                node.set_opacity(0.35);
+            }
+        } else {
+            node.remove_attachment(ROW_PLACEHOLDING);
+            node.set_opacity(1.0);
+        }
+        // A displaced row slides from its old slot into the new one.
+        if let Some(offset) = self.session.take_shift(&self.id) {
+            ReorderRowShift::begin_for(node, offset, self.axis);
+        }
         node.set_is_hit_testable(false);
         // A hairline between rows gives the list the same grouped rhythm as
         // `List`; the lifted placeholder keeps a clean edge while it moves.
-        if !self.is_dragging && !self.is_last {
+        if !self.is_placeholder && !self.is_last {
             let weak = node.downgrade();
+            let horizontal = self.axis == ScrollAxis::Horizontal;
             node.update_draw(false, move |list, origin| {
                 let Some(owner) = Node::upgrade(&weak) else {
                     return;
                 };
                 let frame = owner.frame();
                 let color = theme_for_node(&owner).colors.divider;
-                let _ = list.add_rect(
+                let rect = if horizontal {
+                    cove_core::Rect::new(
+                        origin.x + frame.width - 0.5,
+                        origin.y + 12.0,
+                        0.5,
+                        (frame.height - 12.0).max(0.0),
+                    )
+                } else {
                     cove_core::Rect::new(
                         origin.x + 12.0,
                         origin.y + frame.height - 0.5,
                         (frame.width - 12.0).max(0.0),
                         0.5,
-                    ),
-                    color,
-                );
+                    )
+                };
+                let _ = list.add_rect(rect, color);
             });
         }
     }
 
     fn children(&self, _node: &Node) -> Vec<AnyView> {
-        vec![AnyView::new(
-            AnyView::new(BoxView::new(
-                FlexDirection::Row,
-                Align::Center,
-                Justify::FlexStart,
-                Wrap::NoWrap,
-                4.0,
-                AnyView::new(TupleView::new(vec![
-                    AnyView::new(
-                        AnyView::new(self.content.clone())
-                            .flex_with(1.0, 1.0, Some(0.0))
-                            .clipped(),
-                    ),
-                    AnyView::new(self.handle.clone()),
-                ])),
-            ))
-            .frame_height(self.row_height)
-            .clipped(),
-        )]
+        let inner = AnyView::new(BoxView::new(
+            FlexDirection::Row,
+            Align::Center,
+            Justify::FlexStart,
+            Wrap::NoWrap,
+            4.0,
+            AnyView::new(TupleView::new(vec![
+                AnyView::new(
+                    AnyView::new(self.content.clone())
+                        .flex_with(1.0, 1.0, Some(0.0))
+                        .clipped(),
+                ),
+                AnyView::new(self.handle.clone()),
+            ])),
+        ));
+        let inner = if self.axis == ScrollAxis::Horizontal {
+            inner.frame_width(self.row_extent)
+        } else {
+            inner.frame_height(self.row_extent)
+        };
+        vec![AnyView::new(AnyView::new(inner).clipped())]
     }
 }
 
@@ -646,7 +954,8 @@ struct ReorderHandle<Id: CollectionId> {
     label: String,
     is_enabled: bool,
     is_dragging: bool,
-    row_height: f32,
+    row_extent: f32,
+    axis: ScrollAxis,
     session: Rc<ReorderSession<Id>>,
 }
 
@@ -660,7 +969,7 @@ impl<Id: CollectionId> PrimitiveView for ReorderHandle<Id> {
     fn make_layout_node(&self) -> Option<LayoutNode> {
         let layout = LayoutNode::new();
         layout.set_width(Some(44.0));
-        layout.set_height(Some(self.row_height));
+        layout.set_height(Some(self.row_extent));
         layout.set_flex_shrink(0.0);
         layout.set_align_items(Align::Center);
         layout.set_justify_content(Justify::Center);
@@ -672,6 +981,7 @@ impl<Id: CollectionId> PrimitiveView for ReorderHandle<Id> {
         let index = self.index;
         let count = self.count;
         let is_enabled = self.is_enabled;
+        let axis = self.axis;
 
         // A touch surface reserves a finger-sized target on both axes, so the
         // 44pt-wide grip also grows to 44pt tall.
@@ -771,14 +1081,16 @@ impl<Id: CollectionId> PrimitiveView for ReorderHandle<Id> {
                     }
                     match phase {
                         PointerPhase::Down => {
+                            let main = main_of(axis, event.x, event.y);
                             pointer_node.set_attachment(HANDLE_ACTIVE, true);
-                            pointer_node.set_attachment(HANDLE_START_Y, event.y);
-                            pointer_node.set_attachment(HANDLE_LAST_Y, event.y);
+                            pointer_node.set_attachment(HANDLE_START_Y, main);
+                            pointer_node.set_attachment(HANDLE_LAST_Y, main);
                             let report_node = pointer_node.downgrade();
                             let report_session = pointer_session.clone();
                             let report_scroll = pointer_scroll.clone();
-                            (pointer_scroll).begin(
-                                event.y,
+                            pointer_scroll.begin(
+                                cove_core::Point::new(event.x, event.y),
+                                axis,
                                 Rc::new(move || {
                                     if let Some(owner) = Node::upgrade(&report_node)
                                         && let Some(start) = owner.attachment::<f32>(HANDLE_START_Y)
@@ -826,11 +1138,11 @@ impl<Id: CollectionId> PrimitiveView for ReorderHandle<Id> {
                     if motion_node.attachment::<bool>(HANDLE_ACTIVE) != Some(true) {
                         return EventResult::Ignored;
                     }
-                    motion_node.set_attachment(HANDLE_LAST_Y, event.y);
-                    motion_scroll.update(event.y);
+                    let main = main_of(axis, event.x, event.y);
+                    motion_node.set_attachment(HANDLE_LAST_Y, main);
+                    motion_scroll.update(cove_core::Point::new(event.x, event.y));
                     if let Some(start) = motion_node.attachment::<f32>(HANDLE_START_Y) {
-                        motion_session
-                            .update_drag(event.y - start, motion_scroll.scrolled_distance());
+                        motion_session.update_drag(main - start, motion_scroll.scrolled_distance());
                     }
                     EventResult::Handled
                 },
@@ -848,11 +1160,11 @@ impl<Id: CollectionId> PrimitiveView for ReorderHandle<Id> {
                     return EventResult::Ignored;
                 }
                 match event.scancode {
-                    Scancode::ARROW_UP => {
+                    Scancode::ARROW_UP | Scancode::ARROW_LEFT => {
                         key_session.move_row(index, -1);
                         EventResult::Handled
                     }
-                    Scancode::ARROW_DOWN => {
+                    Scancode::ARROW_DOWN | Scancode::ARROW_RIGHT => {
                         key_session.move_row(index, 1);
                         EventResult::Handled
                     }
@@ -913,8 +1225,9 @@ impl<Id: CollectionId> View for ReorderHandle<Id> {
 /// relayouts nor recomposes. It never takes input.
 struct ReorderPreviewHost<Id: CollectionId> {
     session: Rc<ReorderSession<Id>>,
-    row_height: f32,
-    width: f32,
+    row_extent: f32,
+    cross: f32,
+    axis: ScrollAxis,
     content: AnyView,
 }
 
@@ -934,12 +1247,19 @@ impl<Id: CollectionId> PrimitiveView for ReorderPreviewHost<Id> {
 
     fn update_node(&self, node: &Node) {
         self.session.session.bind_preview(node);
+        self.session.resume_landing();
         node.set_clips_to_bounds(true);
         node.set_is_hit_testable(false);
     }
 
     fn children(&self, _node: &Node) -> Vec<AnyView> {
-        let height = self.row_height;
+        let main = self.row_extent;
+        let cross = self.cross.max(1.0);
+        let (frame_width, frame_height) = if self.axis == ScrollAxis::Horizontal {
+            (main, cross)
+        } else {
+            (cross, main)
+        };
         vec![AnyView::new(
             AnyView::new(BoxView::new(
                 FlexDirection::Row,
@@ -959,15 +1279,17 @@ impl<Id: CollectionId> PrimitiveView for ReorderPreviewHost<Id> {
                             16.0,
                             crate::theme::SemanticColorRef::on_surface_muted(),
                         ))
-                        .frame_size(44.0, height),
+                        .frame_size(44.0, main),
                     ),
                 ])),
             ))
             .frame(
                 Some(crate::modifiers::layout::FrameDimension::Points(
-                    self.width.max(1.0),
+                    frame_width.max(1.0),
                 )),
-                Some(crate::modifiers::layout::FrameDimension::Points(height)),
+                Some(crate::modifiers::layout::FrameDimension::Points(
+                    frame_height.max(1.0),
+                )),
                 None,
                 None,
                 None,

@@ -18,7 +18,7 @@ pub const DRAG_OVERLAY_ROOT_KEY: &str = "__workspace_drag_overlay_root";
 pub const DRAG_OVERLAY_STATE_KEY: &str = "__workspace_tab_drag_overlay";
 
 /// Distance a pointer must travel before a press becomes a drag.
-pub const DRAG_THRESHOLD: f32 = 4.0;
+pub const DRAG_THRESHOLD: f32 = cove_ui_compose::primitives::interaction::DRAG_THRESHOLD;
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct WorkspaceReorderPreview {
@@ -543,8 +543,11 @@ mod tests {
     use super::*;
 
     #[test]
-    fn drag_threshold_is_four_points() {
-        assert_eq!(DRAG_THRESHOLD, 4.0);
+    fn drag_threshold_matches_the_shared_activation_rule() {
+        assert_eq!(
+            DRAG_THRESHOLD,
+            cove_ui_compose::primitives::interaction::DRAG_THRESHOLD
+        );
     }
 
     #[test]

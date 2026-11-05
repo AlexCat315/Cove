@@ -16,18 +16,18 @@ use crate::AnyView;
 use crate::modifiers::interaction::HitTestingExt;
 use crate::primitives::overlays::portal::PortalPlacementMode;
 use crate::primitives::overlays::portal::portal_registry::{
-    PortalResource, PortalStoreEnvironment, PortalStoreHolder,
+    PortalResource, PortalStore, PortalStoreEnvironment, PortalStoreHolder,
 };
 use crate::{PrimitiveView, View, ViewExt, impl_primitive_view};
 use cove_core::Point;
 use cove_core::scene::{
-    CompositionLocal, EventResult, InputHandlerRoute, InteractionRegistryHolder, LayoutNode, Node,
-    PointerCaptureHolder, PointerPhase,
+    AnyAnimationController, AnimatorScheduler, CompositionLocal, EventResult, InputHandlerRoute,
+    InteractionRegistryHolder, LayoutNode, Node, NodeResource, NodeWeak, PointerCaptureHolder,
+    PointerPhase, SpringSolution,
 };
 use cove_platform::MouseButton;
 
-/// Movement before which the pointer still reads as a tap.
-const DRAG_THRESHOLD: f32 = 6.0;
+use super::drag_threshold::crossed as drag_crossed;
 
 struct DragTarget {
     node: Option<Node>,
@@ -43,6 +43,9 @@ pub struct DragSession {
     pointer: Cell<Point>,
     targets: RefCell<Vec<(u64, DragTarget)>>,
     active: Cell<Option<u64>>,
+    /// Bumped on every `begin`; lets the preview portal tell a fresh drag from
+    /// a continuation without comparing view identities.
+    generation: Cell<u64>,
     on_change: RefCell<Option<Rc<dyn Fn()>>>,
 }
 
@@ -62,6 +65,7 @@ impl DragSession {
             pointer: Cell::new(Point::default()),
             targets: RefCell::new(Vec::new()),
             active: Cell::new(None),
+            generation: Cell::new(0),
             on_change: RefCell::new(None),
         })
     }
@@ -80,6 +84,10 @@ impl DragSession {
 
     pub fn preview(&self) -> Option<AnyView> {
         self.preview.borrow().clone()
+    }
+
+    pub fn generation(&self) -> u64 {
+        self.generation.get()
     }
 
     pub fn register(
@@ -108,6 +116,7 @@ impl DragSession {
         *self.preview.borrow_mut() = Some(preview);
         self.pointer.set(pointer);
         self.active.set(None);
+        self.generation.set(self.generation.get().wrapping_add(1));
         self.notify();
     }
 
@@ -445,7 +454,7 @@ impl<T: Clone + 'static> PrimitiveView for DragSourceHost<T> {
                 if owner.attachment::<bool>(DRAG_ACTIVE) != Some(true) {
                     let dx = point.x - start.x;
                     let dy = point.y - start.y;
-                    if (dx * dx + dy * dy).sqrt() < DRAG_THRESHOLD {
+                    if !drag_crossed(dx, dy) {
                         return EventResult::Ignored;
                     }
                     owner.set_attachment(DRAG_ACTIVE, true);
@@ -590,8 +599,10 @@ impl PrimitiveView for DragPreviewPortal {
     fn make_node(&self) -> Node {
         let node = Node::new();
         node.set_is_hit_testable(false);
-        let resource: Rc<dyn cove_core::scene::NodeResource> = PortalResource::new();
+        let resource: Rc<dyn NodeResource> = PortalResource::new();
         node.add_resource(resource);
+        let follower: Rc<dyn NodeResource> = DragPreviewFollower::new();
+        node.add_resource(follower);
         node
     }
 
@@ -603,30 +614,300 @@ impl PrimitiveView for DragPreviewPortal {
         let Some(resource) = node.first_resource::<PortalResource>() else {
             return;
         };
-        if !self.session.is_dragging() {
-            cove_core::scene::NodeResource::unmount(&*resource, node);
+        let Some(follower) = node.first_resource::<DragPreviewFollower>() else {
             return;
-        }
-        let Some(preview) = self.session.preview() else {
-            cove_core::scene::NodeResource::unmount(&*resource, node);
+        };
+        let preview = if self.session.is_dragging() {
+            self.session.preview()
+        } else {
+            None
+        };
+        let Some(preview) = preview else {
+            follower.exit(node, &resource);
             return;
         };
         let store = Some(
             node.composition_value(&PortalStoreEnvironment::key())
                 .unwrap_or_else(PortalStoreHolder::current),
         );
-        let pointer = self.session.pointer();
-        resource.present(
+        follower.drive(
+            node,
+            &resource,
             store,
-            Point::new(pointer.x + 12.0, pointer.y + 12.0),
-            None,
             AnyView::new(preview.allows_hit_testing(false)),
-            false,
-            PortalPlacementMode::Fixed,
-            None,
-            None,
+            self.session.pointer(),
+            self.session.generation(),
         );
         let _ = self.revision;
     }
 }
 impl_primitive_view!(DragPreviewPortal);
+
+/// Gap between the pointer and the preview's origin.
+const PREVIEW_LEAD: f32 = 12.0;
+
+/// Follow spring: quick enough to feel attached, soft enough to read as glass.
+const PREVIEW_RESPONSE: f32 = 0.16;
+
+/// Eased pointer-follow and fade presentation for one `DragScope`'s preview.
+/// The portal entry is presented once per drag with a fade-in, moved through
+/// `PortalStore::update_position` on spring ticks (no recompose), and dismissed
+/// with a fade-out. Reduced motion pins the preview to the pointer and skips
+/// the fades.
+pub struct DragPreviewFollower {
+    state: Rc<FollowerState>,
+    self_ref: RefCell<std::rc::Weak<Self>>,
+}
+
+struct FollowerState {
+    owner: RefCell<Option<NodeWeak>>,
+    scheduler: RefCell<Option<AnimatorScheduler>>,
+    controller: RefCell<Option<Rc<dyn AnyAnimationController>>>,
+    presented_generation: Cell<u64>,
+    is_presented: Cell<bool>,
+    current: Cell<Point>,
+    release: Cell<Point>,
+    release_velocity: Cell<Point>,
+    target: Cell<Point>,
+    elapsed: Cell<f64>,
+    reduced: Cell<bool>,
+}
+
+struct FollowerController {
+    follower: std::rc::Weak<DragPreviewFollower>,
+}
+
+impl AnyAnimationController for FollowerController {
+    fn is_finished(&self) -> bool {
+        self.follower.upgrade().is_none_or(|f| f.is_finished())
+    }
+
+    fn tick(&self, delta_time: f64) {
+        if let Some(follower) = self.follower.upgrade() {
+            follower.tick(delta_time);
+        }
+    }
+
+    fn finish_immediately(&self) {
+        if let Some(follower) = self.follower.upgrade() {
+            follower.finish_immediately();
+        }
+    }
+
+    fn cancel(&self) {
+        if let Some(follower) = self.follower.upgrade() {
+            follower.cancel();
+        }
+    }
+
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
+}
+
+impl DragPreviewFollower {
+    fn new() -> Rc<Self> {
+        let follower = Rc::new(Self {
+            state: Rc::new(FollowerState {
+                owner: RefCell::new(None),
+                scheduler: RefCell::new(None),
+                controller: RefCell::new(None),
+                presented_generation: Cell::new(0),
+                is_presented: Cell::new(false),
+                current: Cell::new(Point::default()),
+                release: Cell::new(Point::default()),
+                release_velocity: Cell::new(Point::default()),
+                target: Cell::new(Point::default()),
+                elapsed: Cell::new(0.0),
+                reduced: Cell::new(false),
+            }),
+            self_ref: RefCell::new(std::rc::Weak::new()),
+        });
+        *follower.self_ref.borrow_mut() = Rc::downgrade(&follower);
+        follower
+    }
+
+    fn weak(&self) -> std::rc::Weak<Self> {
+        self.self_ref.borrow().clone()
+    }
+
+    fn is_finished(&self) -> bool {
+        self.state.controller.borrow().is_none()
+    }
+
+    /// Presents a fresh drag or re-aims the follow spring at the pointer.
+    fn drive(
+        self: &Rc<Self>,
+        node: &Node,
+        resource: &Rc<PortalResource>,
+        store: Option<Rc<PortalStore>>,
+        preview: AnyView,
+        pointer: Point,
+        generation: u64,
+    ) {
+        let position = Point::new(pointer.x + PREVIEW_LEAD, pointer.y + PREVIEW_LEAD);
+        let reduced = node.prefers_reduced_motion();
+        self.state.reduced.set(reduced);
+        if self.state.presented_generation.get() != generation {
+            // A dismissal still fading out is re-presented in place: the store
+            // swaps the exiting entry back to live content.
+            self.state.presented_generation.set(generation);
+            self.state.is_presented.set(true);
+            self.state.current.set(position);
+            self.state.release.set(position);
+            self.state.release_velocity.set(Point::default());
+            self.state.target.set(position);
+            self.state.elapsed.set(0.0);
+            let transition = if reduced {
+                None
+            } else {
+                Some(crate::animation::Transition::opacity())
+            };
+            resource.present(
+                store,
+                position,
+                None,
+                preview,
+                false,
+                PortalPlacementMode::Fixed,
+                None,
+                transition,
+            );
+            return;
+        }
+        if !self.state.is_presented.get() {
+            return;
+        }
+        if reduced {
+            self.cancel();
+            self.state.current.set(position);
+            self.state.target.set(position);
+            resource.update_position(position);
+            return;
+        }
+        // Rebase the analytic spring from the live position, carrying its
+        // velocity so a retarget mid-flight does not visibly stutter.
+        let spring = SpringSolution::new(PREVIEW_RESPONSE, 1.0);
+        let elapsed = self.state.elapsed.get() as f32;
+        let current = self.state.current.get();
+        let release = self.state.release.get();
+        let velocity = self.state.release_velocity.get();
+        let target = self.state.target.get();
+        self.state.release.set(current);
+        self.state.release_velocity.set(Point::new(
+            spring.velocity(elapsed, release.x, velocity.x, target.x),
+            spring.velocity(elapsed, release.y, velocity.y, target.y),
+        ));
+        self.state.target.set(position);
+        self.state.elapsed.set(0.0);
+        self.register();
+    }
+
+    /// Fades the preview out where it stands. A new drag within the fade
+    /// re-presents the same entry, so the exit is interrupted rather than
+    /// queued.
+    fn exit(self: &Rc<Self>, node: &Node, resource: &Rc<PortalResource>) {
+        if self.state.is_presented.get() {
+            self.state.is_presented.set(false);
+            self.cancel();
+            if self.state.reduced.get() {
+                resource.unmount(node);
+            } else {
+                resource.dismiss(node);
+            }
+        } else if resource.entry_id().is_none() {
+            NodeResource::unmount(&**resource, node);
+        }
+    }
+
+    fn register(&self) {
+        if self.state.controller.borrow().is_some() {
+            return;
+        }
+        let controller: Rc<dyn AnyAnimationController> = Rc::new(FollowerController {
+            follower: self.weak(),
+        });
+        *self.state.controller.borrow_mut() = Some(controller.clone());
+        if let Some(scheduler) = self.state.scheduler.borrow().as_ref() {
+            scheduler.register(controller);
+        }
+    }
+
+    fn tick(&self, delta_time: f64) {
+        let state = &self.state;
+        if state.controller.borrow().is_none() || !delta_time.is_finite() || delta_time < 0.0 {
+            return;
+        }
+        state.elapsed.set(state.elapsed.get() + delta_time);
+        let spring = SpringSolution::new(PREVIEW_RESPONSE, 1.0);
+        if state.elapsed.get() >= spring.settling_duration() {
+            self.finish_at(state.target.get());
+            return;
+        }
+        let t = state.elapsed.get() as f32;
+        let release = state.release.get();
+        let velocity = state.release_velocity.get();
+        let target = state.target.get();
+        let next = Point::new(
+            spring.position(t, release.x, velocity.x, target.x),
+            spring.position(t, release.y, velocity.y, target.y),
+        );
+        state.current.set(next);
+        self.apply(next);
+    }
+
+    fn finish_at(&self, position: Point) {
+        self.state.current.set(position);
+        self.apply(position);
+        self.cancel();
+    }
+
+    fn finish_immediately(&self) {
+        let target = self.state.target.get();
+        self.finish_at(target);
+    }
+
+    fn cancel(&self) {
+        if let (Some(scheduler), Some(controller)) = (
+            self.state.scheduler.borrow().as_ref(),
+            self.state.controller.borrow().as_ref(),
+        ) {
+            scheduler.unregister(controller);
+        }
+        self.state.controller.borrow_mut().take();
+    }
+
+    fn apply(&self, position: Point) {
+        let Some(owner) = self
+            .state
+            .owner
+            .borrow()
+            .as_ref()
+            .and_then(Node::upgrade)
+        else {
+            return;
+        };
+        let Some(resource) = owner.first_resource::<PortalResource>() else {
+            return;
+        };
+        resource.update_position(position);
+    }
+}
+
+impl NodeResource for DragPreviewFollower {
+    fn mount(&self, node: &Node) {
+        *self.state.owner.borrow_mut() = Some(node.downgrade());
+        *self.state.scheduler.borrow_mut() = Some(AnimatorScheduler::current());
+    }
+
+    fn unmount(&self, _node: &Node) {
+        self.cancel();
+        self.state.is_presented.set(false);
+        *self.state.owner.borrow_mut() = None;
+        *self.state.scheduler.borrow_mut() = None;
+    }
+
+    fn as_any_rc(self: Rc<Self>) -> Rc<dyn std::any::Any> {
+        self
+    }
+}

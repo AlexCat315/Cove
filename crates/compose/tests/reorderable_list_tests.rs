@@ -34,6 +34,8 @@ use cove_ui_compose::primitives::text::Text;
 use support::InteractiveScene;
 
 const ROW_HEIGHT: f32 = 36.0;
+/// The main-axis extent of a row in the horizontal-axis tests.
+const CARD_WIDTH: f32 = 60.0;
 
 /// `@State var items` plus the move log, so a keyboard move can re-render.
 struct Harness {
@@ -45,6 +47,7 @@ struct Harness {
     /// Pushes the list down so pointer coordinates and the list's local
     /// coordinates differ, like the gallery's story section.
     top_padding: f32,
+    axis: cove_ui_compose::primitives::layout::ScrollAxis,
 }
 
 impl View for Harness {
@@ -52,6 +55,8 @@ impl View for Harness {
         let items = self.items.get();
         let reordered = self.items.clone();
         let moves = self.moves.clone();
+        let horizontal = self.axis == cove_ui_compose::primitives::layout::ScrollAxis::Horizontal;
+        let row_extent = if horizontal { CARD_WIDTH } else { ROW_HEIGHT };
         let list = ReorderableList::new(
             items,
             |id: &u64| *id,
@@ -81,7 +86,8 @@ impl View for Harness {
                 reordered.set(next);
             }
         })
-        .row_height(ROW_HEIGHT)
+        .row_height(row_extent)
+        .axis(self.axis)
         .row_label(|id: &u64| format!("Item {}", id + 1));
 
         let list = AnyView::new(AnyView::new(list).frame_size(280.0, self.list_height));
@@ -144,6 +150,21 @@ fn install_in(
         touch,
         list_height,
         top_padding,
+        axis: cove_ui_compose::primitives::layout::ScrollAxis::Vertical,
+    });
+    scene.settle(8, 1.0);
+    moves
+}
+
+fn install_horizontal(scene: &mut InteractiveScene, count: u64) -> Rc<RefCell<Vec<(usize, usize)>>> {
+    let moves = Rc::new(RefCell::new(Vec::new()));
+    scene.install(Harness {
+        items: State::new((0..count).collect()),
+        moves: moves.clone(),
+        touch: false,
+        list_height: 120.0,
+        top_padding: 0.0,
+        axis: cove_ui_compose::primitives::layout::ScrollAxis::Horizontal,
     });
     scene.settle(8, 1.0);
     moves
@@ -552,30 +573,180 @@ fn floating_preview_follows_the_pointer() {
     });
 }
 
+/// A horizontal list drags along x: the drop line is vertical, the move is
+/// reported in strides of the card width, and auto-scroll is off-axis safe.
+#[test]
+fn horizontal_axis_reorder() {
+    InteractiveScene::run(520.0, 320.0, |scene| {
+        let moves = install_horizontal(scene, 6);
+        let scroll = scroll_viewport(scene);
+        assert!(
+            scroll.is_scroll_viewport(),
+            "the horizontal list owns its scroll viewport"
+        );
+
+        let source = handle(scene, 0, 6);
+        let start = window_point(&source);
+        let dispatcher = scene.dispatcher();
+        dispatcher.dispatch(&press(start));
+        scene.settle(2, 0.1);
+
+        let drop = Point::new(start.x + 140.0, start.y);
+        dispatcher.dispatch(&motion(drop));
+        scene.settle(2, 0.1);
+
+        let line = indicator(scene).expect("a horizontal drag paints the drop line");
+        let line_frame = line.absolute_frame();
+        assert!(
+            (line_frame.x - (2.0 * CARD_WIDTH - 1.0)).abs() < 1.0,
+            "the rule sits at the horizontal insertion boundary (got {})",
+            line_frame.x
+        );
+        assert!(
+            line_frame.width < 3.0 && line_frame.height > 20.0,
+            "the horizontal rule is a vertical line ({} x {})",
+            line_frame.width,
+            line_frame.height
+        );
+
+        dispatcher.dispatch(&release(drop));
+        scene.settle(8, 1.0);
+
+        assert_eq!(
+            moves.borrow().as_slice(),
+            [(0, 1)],
+            "a two-card horizontal drag reports one move past the source row"
+        );
+        assert!(
+            indicator(scene).is_none(),
+            "the drop line is cleared once the drag settles"
+        );
+    });
+}
+
+/// The same handle is keyboard-driven along the list's axis: in a horizontal
+/// list the arrows step cards left and right.
+#[test]
+fn horizontal_keyboard_reorder() {
+    InteractiveScene::run(520.0, 320.0, |scene| {
+        let moves = install_horizontal(scene, 6);
+
+        let first = handle(scene, 0, 6);
+        scene.focus.focus(Some(&first), false);
+        scene.key(cove_ui_compose::Scancode::ARROW_RIGHT, Default::default());
+        scene.settle(8, 1.0);
+
+        assert_eq!(
+            moves.borrow().as_slice(),
+            [(0, 1)],
+            "the right arrow moves the focused card forward one position"
+        );
+
+        let second = handle(scene, 1, 6);
+        scene.focus.focus(Some(&second), false);
+        scene.key(cove_ui_compose::Scancode::ARROW_LEFT, Default::default());
+        scene.settle(8, 1.0);
+
+        assert_eq!(
+            moves.borrow().as_slice(),
+            [(0, 1), (1, 0)],
+            "the left arrow moves a card back toward the start"
+        );
+    });
+}
+
+/// The lifted row keeps flying after release and lands on its destination
+/// slot; the placeholder stays mounted and dimmed while it settles (Swift
+/// `settleAnimation`).
+#[test]
+fn drop_settles_with_a_spring() {
+    InteractiveScene::run(320.0, 520.0, |scene| {
+        let moves = install(scene, 4);
+
+        let source = handle(scene, 0, 4);
+        let start = window_point(&source);
+        let dispatcher = scene.dispatcher();
+        dispatcher.dispatch(&press(start));
+        scene.settle(2, 0.1);
+        let drop = Point::new(start.x, start.y + 80.0);
+        dispatcher.dispatch(&motion(drop));
+        scene.settle(2, 0.1);
+        dispatcher.dispatch(&release(drop));
+
+        // Two short ticks: the landing spring is still in flight.
+        scene.settle(2, 0.05);
+        let preview = scene
+            .named("reorder-preview")
+            .expect("the lifted row is still landing");
+        let landing = preview.absolute_frame().y;
+        assert!(
+            landing > ROW_HEIGHT && landing < drop.y - 20.0,
+            "the preview springs toward its slot instead of teleporting (y {landing})"
+        );
+
+        let row = scene
+            .named("reorder-row-0")
+            .expect("the moved row stays mounted while it lands");
+        let row_y = row.absolute_frame().y;
+        assert!(
+            row_y > ROW_HEIGHT && row_y < 2.0 * ROW_HEIGHT,
+            "the placeholder already sits in the destination slot (y {row_y})"
+        );
+        assert!(
+            std::iter::successors(Some(row), |node| node.parent())
+                .any(|node| node.opacity() < 1.0),
+            "the placeholder is still fading up from its dimmed state"
+        );
+
+        scene.settle(8, 1.0);
+        assert!(
+            scene.named("reorder-preview").is_none(),
+            "the preview is gone once the landing finishes"
+        );
+        assert_eq!(
+            moves.borrow().as_slice(),
+            [(0, 1)],
+            "the move is reported once, on release"
+        );
+    });
+}
+
 #[test]
 fn edge_velocity() {
+    use cove_ui_compose::primitives::layout::ScrollAxis;
     let viewport = Rect::new(0.0, 100.0, 300.0, 400.0);
 
     assert_eq!(
-        velocity(300.0, viewport),
+        velocity(Point::new(150.0, 300.0), viewport, ScrollAxis::Vertical),
         0.0,
         "mid-viewport there is no automatic scroll"
     );
     assert_eq!(
-        velocity(100.0, viewport),
+        velocity(Point::new(150.0, 100.0), viewport, ScrollAxis::Vertical),
         -MAXIMUM_SPEED,
         "at the top edge the list scrolls up at maximum speed"
     );
     assert_eq!(
-        velocity(520.0, viewport),
+        velocity(Point::new(150.0, 520.0), viewport, ScrollAxis::Vertical),
         MAXIMUM_SPEED,
         "at and beyond the bottom edge the list scrolls down at maximum speed"
     );
 
-    let shallow = velocity(470.0, viewport);
-    let deep = velocity(490.0, viewport);
+    let shallow = velocity(Point::new(150.0, 470.0), viewport, ScrollAxis::Vertical);
+    let deep = velocity(Point::new(150.0, 490.0), viewport, ScrollAxis::Vertical);
     assert!(
         shallow > 0.0 && deep > shallow,
         "the speed rises quadratically toward the edge (shallow {shallow}, deep {deep})"
+    );
+
+    assert_eq!(
+        velocity(Point::new(150.0, 100.0), viewport, ScrollAxis::Horizontal),
+        0.0,
+        "a vertical pointer offset cannot trigger horizontal auto-scroll"
+    );
+    assert_eq!(
+        velocity(Point::new(0.0, 300.0), viewport, ScrollAxis::Horizontal),
+        -MAXIMUM_SPEED,
+        "on the horizontal axis the leading edge scrolls left at maximum speed"
     );
 }

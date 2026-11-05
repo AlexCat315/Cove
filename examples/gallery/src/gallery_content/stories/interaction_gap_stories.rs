@@ -21,7 +21,7 @@ use cove_ui_compose::primitives::interaction::edge_auto_scroll::MAXIMUM_SPEED;
 use cove_ui_compose::primitives::interaction::{
     HorizontalSwipe, HorizontalSwipeDirection, edge_auto_scroll_velocity,
 };
-use cove_ui_compose::primitives::layout::{ActionGroupLayout, ScrollReveal};
+use cove_ui_compose::primitives::layout::{ActionGroupLayout, ScrollAxis, ScrollReveal};
 use cove_ui_compose::primitives::text::Text;
 use cove_ui_compose::theme::tokens::{SemanticColorRef, SemanticStyleViewExt};
 use cove_ui_compose::{
@@ -214,7 +214,11 @@ impl EdgeAutoScrollStory {
 
     /// Signed speed at `pointer_y` in the demo viewport.
     pub fn speed(pointer_y: f32) -> f32 {
-        edge_auto_scroll_velocity(pointer_y, EDGE_VIEWPORT)
+        edge_auto_scroll_velocity(
+            Point::new(EDGE_VIEWPORT.width / 2.0, pointer_y),
+            EDGE_VIEWPORT,
+            ScrollAxis::Vertical,
+        )
     }
 
     /// The edge zone: `min(48, height / 4)`.

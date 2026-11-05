@@ -2589,7 +2589,9 @@ impl PrimitiveView for TreeRow {
                         let dx = event.x - press.down_x;
                         let dy = event.y - press.down_y;
                         // A small dead zone keeps a click from becoming a drag.
-                        if !press.did_drag && dx.abs().max(dy.abs()) >= 4.0 {
+                        if !press.did_drag
+                            && crate::primitives::interaction::drag_crossed(dx, dy)
+                        {
                             press.did_drag = true;
                             owner.set_attachment(PRESSED, false);
                             if let Some(capture) = PointerCaptureHolder::current() {

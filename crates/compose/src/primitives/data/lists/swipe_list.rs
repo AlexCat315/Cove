@@ -95,7 +95,8 @@ pub const SWIPE_TRAILING_SLOT: f32 = 44.0;
 /// Authored row height, before text scaling and the touch control extent.
 pub const SWIPE_ROW_HEIGHT: f32 = 36.0;
 /// Horizontal travel past which a press becomes a swipe.
-pub const SWIPE_ACTIVATION_DISTANCE: f32 = 8.0;
+pub const SWIPE_ACTIVATION_DISTANCE: f32 =
+    crate::primitives::interaction::DRAG_THRESHOLD;
 /// Vertical travel past which a press is abandoned to the list's scrolling.
 pub const SWIPE_REJECTION_DISTANCE: f32 = 4.0;
 /// Fraction of the extent past which the reveal snaps open.

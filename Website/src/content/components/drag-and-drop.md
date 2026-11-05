@@ -36,6 +36,14 @@ let scope = DragScope::new(Column::new(
 - 文字/预览由 portal 渲染，不受裁剪影响；释放到所有目标之外只取消，不触发 drop。
 - `on_targeted` 在目标进入/离开时回调，供调用方切换高亮。
 
+## 预览跟随与淡入淡出
+
+预览不是逐帧贴死指针，而是由 `DragPreviewFollower` 用弹簧追到指针位置：移动只走 `PortalStore::update_position`，不触发重组，因此快速拖动时预览保持轻微滞后与惯性，看起来像被拎着的实体。出现时淡入、取消或落下时原地淡出；淡出未完成就开始下一次拖拽会直接接管同一个入口，不会排队。开启减弱动效时预览钉在指针上并跳过淡变。
+
+## 阈值统一
+
+“按下还是拖拽”的判定集中在 `primitives::interaction::drag_threshold`：`DRAG_THRESHOLD`（6pt）与 `crossed` / `crossed_along_axis`。通用拖放、`Tree` 行拖拽、`SwipeList` 滑动、`DataTable` 列拖拽与 `WheelPicker` 都读同一组值，调灵敏度只需要改一处。
+
 ## 与 Tree 拖拽的区别
 
 `Tree` 的行拖拽是集合内部的排序/归属操作，使用 `TreeDragOperations`（`can_drag` / `can_drop` / `on_drop` 与生命周期事件）。它与通用 `Draggable` 共用指针捕获规则：按下可让外层滚动容器滚动，越过阈值后独占。行拖拽的落点是 `Before` / `Inside` / `After` 三个带区。
