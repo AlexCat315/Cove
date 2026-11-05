@@ -16,7 +16,8 @@
 //!   token, so duplicate ids stay deterministic
 //! - key selection disambiguates duplicate ids by path; filtered search keeps
 //!   the original paths
-//! - indent guides are subtle 1pt vertical strokes with ancestor continuations
+//! - indent guides are subtle 1.5pt vertical strokes with ancestor
+//!   continuations, and the hovered row deepens its own columns
 //!
 //! Named differences from the Swift suite:
 //! - Rust selection is configured through `TreeSelection` bindings rather than
@@ -911,6 +912,15 @@ fn guide_nodes(scene: &InteractiveScene) -> Vec<Node> {
 }
 
 fn stroke_rects(node: &Node) -> Vec<(f32, f32)> {
+    guide_strokes(node)
+        .into_iter()
+        .map(|(rect, _)| rect)
+        .collect()
+}
+
+/// Every rect a guide node paints as `(width, height)` plus its packed colour,
+/// so tests can compare the ink a hovered row deepens against a resting one.
+fn guide_strokes(node: &Node) -> Vec<((f32, f32), u32)> {
     let Some(draw) = node.draw() else {
         return Vec::new();
     };
@@ -925,7 +935,7 @@ fn stroke_rects(node: &Node) -> Vec<(f32, f32)> {
             let max_x = quad.iter().map(|vertex| vertex.x).fold(f32::MIN, f32::max);
             let min_y = quad.iter().map(|vertex| vertex.y).fold(f32::MAX, f32::min);
             let max_y = quad.iter().map(|vertex| vertex.y).fold(f32::MIN, f32::max);
-            (max_x - min_x, max_y - min_y)
+            ((max_x - min_x, max_y - min_y), quad[0].color)
         })
         .collect()
 }
@@ -962,8 +972,8 @@ fn tree_guide_lines_are_pixel_aligned() {
         );
         for (width, height) in &rects {
             assert_eq!(
-                *width, 1.0,
-                "every guide stroke is one pixel wide, got {width}"
+                *width, 1.5,
+                "every guide stroke is the default 1.5pt wide, got {width}"
             );
             assert!(
                 *height > 1.0,
@@ -971,14 +981,11 @@ fn tree_guide_lines_are_pixel_aligned() {
             );
         }
         for node in &guides {
-            let Some(draw) = node.draw() else { continue };
-            let mut list = DrawList::default();
-            draw(&mut list, Point::default());
-            for vertex in list.vertices() {
-                let alpha = ((vertex.color >> 24) & 0xFF) as f32 / 255.0;
+            for (_, color) in guide_strokes(node) {
+                let alpha = ((color >> 24) & 0xFF) as f32 / 255.0;
                 assert!(
-                    alpha <= 0.25,
-                    "guide ink stays subtle (alpha <= 0.25), got {alpha}"
+                    alpha <= 0.4,
+                    "guide ink stays subtle (alpha <= 0.4), got {alpha}"
                 );
             }
         }
@@ -1006,7 +1013,7 @@ fn tree_guide_lines_include_ancestor_continuations() {
         assert!(
             rects
                 .iter()
-                .any(|(width, height)| *width == 1.0 && *height == 30.0),
+                .any(|(width, height)| *width == 1.5 && *height == 30.0),
             "an ancestor continuation stem spans the full 30pt row, got {rects:?}"
         );
     });
@@ -1015,6 +1022,27 @@ fn tree_guide_lines_include_ancestor_continuations() {
 /// Every axis-aligned rect a guide node paints, as `(width, height)`.
 fn guide_rects(scene: &InteractiveScene) -> Vec<(f32, f32)> {
     guide_nodes(scene).iter().flat_map(stroke_rects).collect()
+}
+
+/// Each row's columns as `(guide node, strongest ink alpha it paints)`, ordered
+/// by row position so two reads of the same tree line up entry by entry.
+fn guide_inks(scene: &InteractiveScene) -> Vec<(cove_core::scene::ElementId, f32)> {
+    let mut inks: Vec<(f32, cove_core::scene::ElementId, f32)> = guide_nodes(scene)
+        .into_iter()
+        .map(|node| {
+            let alpha = guide_strokes(&node)
+                .into_iter()
+                .map(|(_, color)| ((color >> 24) & 0xFF) as f32 / 255.0)
+                .fold(0.0f32, f32::max);
+            (node.absolute_frame().y, node.id(), alpha)
+        })
+        .collect();
+    inks.sort_by(|a, b| {
+        a.0.partial_cmp(&b.0)
+            .unwrap_or(std::cmp::Ordering::Equal)
+            .then(a.1.cmp(&b.1))
+    });
+    inks.into_iter().map(|(_, id, alpha)| (id, alpha)).collect()
 }
 
 /// The widest horizontal span any single guide node paints, which is how the
@@ -1122,8 +1150,94 @@ fn tree_guide_style_straight_draws_unbroken_columns() {
             .fold(0.0f32, f32::max);
         assert_eq!(tallest, 30.0, "an unbroken column spans the whole row");
         assert!(
-            rects.iter().all(|(width, _)| *width == 1.0),
-            "the default guide width is 1pt, got {rects:?}"
+            rects.iter().all(|(width, _)| *width == 1.5),
+            "the default guide width is 1.5pt, got {rects:?}"
+        );
+    });
+}
+
+#[test]
+fn tree_guide_hover_deepens_only_the_hovered_row() {
+    InteractiveScene::run(280.0, 220.0, |scene| {
+        scene.install(guide_tree(
+            guided_roots(),
+            TreeLayout::default().guide_style(TreeGuideStyle::Elbow),
+        ));
+        expand_two_levels(scene);
+
+        let rows = tree_rows(scene);
+        let deepest = rows
+            .iter()
+            .filter_map(|row| row.attachment::<f32>("__tree_row_gutter").map(|g| (row, g)))
+            .max_by(|(_, left), (_, right)| {
+                left.partial_cmp(right).unwrap_or(std::cmp::Ordering::Equal)
+            })
+            .map(|(row, _)| row.clone())
+            .expect("the deepest row mounts");
+        let hover = scene
+            .registry
+            .handlers(&deepest)
+            .hover
+            .expect("the row registers a hover handler");
+
+        let resting = guide_inks(scene);
+        assert!(
+            resting.len() >= 2,
+            "two expanded levels mount one column set per indented row, got {resting:?}"
+        );
+        assert!(
+            resting.iter().all(|(_, alpha)| *alpha < 0.5),
+            "resting columns keep the subtle ink, got {resting:?}"
+        );
+
+        let owned: Vec<cove_core::scene::ElementId> = deepest
+            .attachment::<Rc<RefCell<Vec<cove_core::scene::NodeWeak>>>>("__tree_row_guides")
+            .expect("the indented row owns its columns")
+            .borrow()
+            .iter()
+            .filter_map(Node::upgrade)
+            .map(|guide| guide.id())
+            .collect();
+        scene.graph.tree.borrow_mut().flush();
+        hover(cove_core::scene::HoverPhase::Enter);
+        assert!(
+            !scene.graph.recomposer.has_pending(),
+            "deepening the columns repaints without recomposing the tree"
+        );
+        let dirty: Vec<cove_core::scene::ElementId> = guide_nodes(scene)
+            .into_iter()
+            .filter(|node| node.render_dirty())
+            .map(|node| node.id())
+            .collect();
+        assert_eq!(
+            dirty, owned,
+            "the hover handler invalidates the hovered row's columns and no others"
+        );
+        let hovered = guide_inks(scene);
+        assert_eq!(
+            hovered.len(),
+            resting.len(),
+            "hovering adds no guide surface"
+        );
+        let deepened: Vec<usize> = (0..resting.len())
+            .filter(|index| hovered[*index].1 > resting[*index].1 + 0.05)
+            .collect();
+        assert_eq!(
+            deepened.len(),
+            1,
+            "only the hovered row's own columns darken, got {hovered:?} against {resting:?}"
+        );
+        assert_eq!(
+            owned,
+            vec![hovered[deepened[0]].0],
+            "the darkened column belongs to the hovered row"
+        );
+
+        hover(cove_core::scene::HoverPhase::Leave);
+        assert_eq!(
+            guide_inks(scene),
+            resting,
+            "leaving returns every column to the resting ink"
         );
     });
 }

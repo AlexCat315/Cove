@@ -4,6 +4,13 @@
 
 Swift 源码逐页对照见文末《Swift 源码对照（逐页差异清单）》。
 
+## 2026-11-05：Tree 参考线加粗与悬停加深
+
+- 外观：`guide_width` 默认 1.0 → 1.5pt，参考线基础墨色由 `on_surface_muted` 的 0.24 提到 0.36（1pt 细线在高分屏上几乎不可读）。
+- 悬停：鼠标停在某一行时只加深该行自己绘制的参考线（含 `Elbow` 横向连接段）到 0.62，其余行保持默认。参考线在绘制阶段读取行的 `__tree_row_hovered` 标记，行把参考线节点登记在 `__tree_row_guides` 上、由悬停回调逐个 `mark_render_dirty`，因此指针移动不排入 Tree 重算（`default_tree_row_hover_does_not_recompose_tree` 的约束仍然成立）。
+- 验证：`list_tree_tests` 新增 `tree_guide_hover_deepens_only_the_hovered_row`，断言墨色只变深一行、失效标记恰好落在该行的参考线节点上、且不排入重算；移除墨色分支或移除 `mark_render_dirty` 后该用例分别失败。原 `tree_guide_lines_are_pixel_aligned`、`tree_guide_lines_include_ancestor_continuations`、`tree_guide_style_straight_draws_unbroken_columns` 的 1pt/0.25 断言同步到 1.5pt/0.4。compose 全量 1684 项通过。原生验收：DevTools 真机指针悬停 `Key Light` 行，`Straight` 与 `Elbow` 两种样式下该行两列明显加深、相邻行墨色不变，深色主题同样成立。
+- 待办：悬停加深只作用于参考线与行底色，未提供开关；减弱动效下无过渡动画（当前为即时切换）。
+
 ## 2026-11-05：Tree 拖拽实时重排与参考线样式
 
 - 能力：Tree 行拖拽改为实时重排，删除插入线。投影只改位移不改数据，展平顺序、布局与命中仍由宿主模型决定，每行按 `(投影槽位 - 自身索引) * 行距` 位移；源行 0.38 不透明度，其余行弹簧跟随，松手后模型落位与拖拽中绘制的位置逐行一致。`Before` / `Inside` / `After` 由行高上下 28% 判定。
@@ -185,7 +192,7 @@ cargo test -p cove-ui-compose --test compose --locked
 | SwipeList | 0 | 0 / 5 | 挂载/几何基础检查通过；待逐项交互和视觉验收 |
 | RefreshableList | 0 | 0 / 0 | 挂载/几何基础检查通过；待逐项交互和视觉验收 |
 | Scrollbar | 0 | 0 / 0 | 挂载/几何基础检查通过；待逐项交互和视觉验收 |
-| Tree | 0 | 0 / 6 | 拖拽改为实时重排（删除插入线）并共用键盘移动契约；五种参考线样式与 `guide_width`/`guide_position`/`leading_padding`/`trailing_padding` 几何 API；行可聚焦与焦点回收回归通过；浅/深主题下三种放置、四种键盘移动、样式与滑杆的真机目检已完成，边缘自动滚动与减弱动效仍待处理；文档已写 |
+| Tree | 0 | 0 / 6 | 拖拽改为实时重排（删除插入线）并共用键盘移动契约；五种参考线样式与 `guide_width`/`guide_position`/`leading_padding`/`trailing_padding` 几何 API；参考线默认 1.5pt 且悬停行自身参考线加深（不重算）；行可聚焦与焦点回收回归通过；浅/深主题下三种放置、四种键盘移动、样式与滑杆、悬停加深的真机目检已完成，边缘自动滚动与减弱动效仍待处理；文档已写 |
 | VirtualStack | 0 | 0 / 0 | 挂载/几何基础检查通过；待逐项交互和视觉验收 |
 | Chart | 13 | 8 / 8 | 段落与 Swift 对齐；轴标签、覆盖层分级、图例键盘激活、缩放/刷选交互、数据动画与缓存失效已有回归；待逐项原生视觉验收 |
 | Icon | 3 | 0 / 0 | 挂载/几何基础检查通过；待逐项交互和视觉验收 |

@@ -23,7 +23,8 @@
 //!   are enabled; Alt+Left/Right collapse/expand everything
 //! - Shift extends from the anchor, Cmd/Ctrl toggles, anything else replaces
 //! - indent guides draw a branch line per depth with a continuation column
-//!   only where an ancestor still has a following sibling
+//!   only where an ancestor still has a following sibling, and the hovered row
+//!   draws its own columns with a deeper ink
 
 use crate::Scope;
 use std::cell::RefCell;
@@ -56,8 +57,8 @@ use cove_composition::Scancode;
 use cove_core::scene::NodeWeak;
 use cove_core::scene::{
     AccessibilityActions, AccessibilityRole, AccessibilitySemantics, Align, DrawHook, EventPhase,
-    EventResult, FlexDirection, HoverPhase, InputHandlerRoute, InteractionRegistryHolder, Justify,
-    LayoutNode, Node, PointerCaptureHolder, PointerPhase, Wrap,
+    EventResult, FlexDirection, HoverPhase, InputHandlerRoute, InteractionRegistryHolder,
+    InvalidationSource, Justify, LayoutNode, Node, PointerCaptureHolder, PointerPhase, Wrap,
 };
 use cove_core::{Binding, Color, Point, Rect, State};
 use cove_platform::{KeyEvent, KeyModifiers, MouseButton, SystemCursor};
@@ -67,6 +68,8 @@ const HOVERED: &str = "__tree_row_hovered";
 const DRAG_PRESS: &str = "__tree_row_drag_press";
 const ROW_GUTTER: &str = "__tree_row_gutter";
 const GUIDE_MARKER: &str = "__tree_guide";
+/// The guide nodes a row owns, so its hover handler can repaint them.
+const ROW_GUIDES: &str = "__tree_row_guides";
 
 /// One visible row: the element plus its place in the hierarchy.
 #[derive(Clone, Debug, PartialEq)]
@@ -2587,6 +2590,7 @@ impl PrimitiveView for TreeRow {
         let hover_paint = paint.clone();
         let hover_action = self.on_hover.clone();
         let hover_enabled = self.is_enabled;
+        let hover_guides = guide_targets(node);
         registry.set_hover(
             node,
             Rc::new(move |phase: HoverPhase| {
@@ -2600,6 +2604,13 @@ impl PrimitiveView for TreeRow {
                     owner.set_attachment(HOVERED, entered);
                 }
                 hover_paint();
+                // The columns live beside the row, outside the area a background
+                // change repaints, so they are invalidated by hand.
+                for guide in hover_guides.borrow().iter() {
+                    if let Some(guide) = Node::upgrade(guide) {
+                        guide.mark_render_dirty(InvalidationSource::style_set("treeGuideHover"));
+                    }
+                }
                 if propagates_hover {
                     hover_action(entered);
                 }
@@ -2886,6 +2897,7 @@ impl PrimitiveView for TreeRow {
                 position: self.guide_position,
                 ancestor_has_next_siblings: self.ancestor_has_next_siblings.clone(),
                 has_next_sibling: self.has_next_sibling,
+                row: node.downgrade(),
             })
         } else {
             None
@@ -3016,6 +3028,10 @@ impl View for TreeRow {
 /// Indent guides: one branch column per depth, with a continuation column only
 /// where an ancestor still has a following sibling. The style decides whether
 /// the columns are solid, broken, or bent into the row.
+///
+/// The columns belong to the row that draws them, so hovering a row deepens
+/// exactly its own columns. Hover is read at paint time from the row, which
+/// keeps a pointer move out of the tree's recomposition.
 struct TreeGuideOverlay {
     depth: usize,
     row_height: f32,
@@ -3026,6 +3042,7 @@ struct TreeGuideOverlay {
     position: f32,
     ancestor_has_next_siblings: Vec<bool>,
     has_next_sibling: bool,
+    row: NodeWeak,
 }
 
 impl PrimitiveView for TreeGuideOverlay {
@@ -3041,6 +3058,20 @@ impl PrimitiveView for TreeGuideOverlay {
             node.set_draw(None);
             return;
         }
+        // Painting the row can't reach these columns, so the row's hover
+        // handler needs a handle on them to invalidate the right ones.
+        if let Some(row) = Node::upgrade(&self.row) {
+            let targets = guide_targets(&row);
+            let weak = node.downgrade();
+            let mut targets = targets.borrow_mut();
+            targets.retain(|other| other.strong_count() > 0);
+            if !targets
+                .iter()
+                .any(|other| Node::upgrade(other).as_ref() == Some(node))
+            {
+                targets.push(weak);
+            }
+        }
         let depth = self.depth;
         let row_height = self.row_height;
         let indentation = self.indentation;
@@ -3051,15 +3082,21 @@ impl PrimitiveView for TreeGuideOverlay {
         let ancestor = self.ancestor_has_next_siblings.clone();
         let has_next_sibling = self.has_next_sibling;
         let weak = node.downgrade();
+        let hovered_row = self.row.clone();
         let draw: DrawHook = Rc::new(move |list, origin| {
             let Some(node) = Node::upgrade(&weak) else {
                 return;
             };
+            let hovered = Node::upgrade(&hovered_row)
+                .is_some_and(|row| row.attachment::<bool>(HOVERED) == Some(true));
             let theme = theme_for_node(&node);
+            // The hovered row's columns carry the hierarchy the pointer is on,
+            // so they take the full-strength ink and the rest stays quiet.
+            let strength = if hovered { 0.62 } else { 0.36 };
             let ink = theme
                 .colors
                 .on_surface_muted
-                .multiplied_alpha(0.24 * node.opacity());
+                .multiplied_alpha(strength * node.opacity());
             let center_y = (origin.y + row_height * 0.5).floor();
             let top = origin.y.floor();
             let bottom = (origin.y + row_height).ceil().max(top + 1.0);
@@ -3116,6 +3153,18 @@ impl View for TreeGuideOverlay {
     fn tag(&self) -> &'static str {
         std::any::type_name::<Self>()
     }
+}
+
+/// The guide nodes owned by a row, created once per row node and filled in as
+/// the overlay mounts. Kept alive by the row's attachment, so it survives
+/// every recompose that keeps the row.
+fn guide_targets(row: &Node) -> Rc<RefCell<Vec<NodeWeak>>> {
+    if let Some(existing) = row.attachment::<Rc<RefCell<Vec<NodeWeak>>>>(ROW_GUIDES) {
+        return existing;
+    }
+    let created = Rc::new(RefCell::new(Vec::new()));
+    row.set_attachment(ROW_GUIDES, created.clone());
+    created
 }
 
 /// One guide column between `top` and `bottom`, broken into dashes or dots

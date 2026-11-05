@@ -10,9 +10,10 @@
   - 键盘移动与指针共用一份契约：`Alt+↑`/`Alt+↓` 走兄弟 `Before`/`After`，`Alt+Shift+←` 出到父节点之后，`Alt+Shift+→` 进入上一个兄弟，全部经 `can_drag`/`can_drop`/`on_drop` 上报；被拒绝的组合退回普通方向键导航。`TreeRow` 的按键处理先交给会话的 Alt 感知路径，`HOME`/`END` 等其余按键回落同一入口，此前它无条件吞掉四个方向键导致 Alt 移动失效。
   - `Inside` 放置自动展开目标分支（`TreeActions::reveal`），避免移入折叠节点的行被隐藏。
   - 参考线拆成 `TreeGuideStyle::{None, Straight, Elbow, Dashed, Dotted}` 与 `guide_width`（pt，不随字号缩放）、`guide_position`（0.0 到 1.0，默认 0.5）；`show_line(bool)` 保留为 `Straight`/`None` 简写。边距新增 `leading_padding`、`trailing_padding` 链式方法，并补齐缺失的 `indentation`，`TreeLayout` 几何字段全部可链式配置。
+  - 参考线默认加粗（破坏性）：`guide_width` 默认 1.0 → 1.5pt，基础墨色由 `on_surface_muted` 的 0.24 提到 0.36，1pt 细线在高分屏上几乎看不清的问题随之消失。悬停某一行时只加深这一行自己绘制的参考线（含 `Elbow` 横向连接段）到 0.62，其余行保持默认；加深在绘制阶段读取行的悬停标记，行把参考线节点登记在 `__tree_row_guides` 上并由悬停回调逐个 `mark_render_dirty`，因此不触发行重算。
   - Tree 行改为可聚焦（`set_is_focusable`），点击行即可用键盘；`SelectionKeyHost` 记录自己是否持有子树焦点，并在焦点行随收起/过滤离开输入图后把焦点收回容器，`Alt+←` 收起全树后的快捷键不再失效。
-  - 文档与示例：`tree.md` 重写《拖拽》并补键盘移动、《虚拟滚动》改为完整几何 API 与链式示例、参考线一节列出五种样式、《可访问性》补焦点回收；Gallery Tree 页新增 `None`/`Straight`/`Elbow`/`Dashed`/`Dotted` 样式条与 `Indent`/`Lead` 两个滑杆，状态行同时报告拖放结果，目录副标题同步。
-  - 验证：`tree_reparent_tests` 10 项、`list_tree_tests` 新增 14 项（含 `tree_drag_paints_projected_rows_inside_their_slots` 断言每行仍在其裁剪槽内、`tree_drag_reveals_the_branch_an_inside_drop_creates`、`alt_arrow_on_a_focused_row_moves_the_branch`、`collapse_all_keeps_the_tree_on_the_keyboard`，均验证过移除修复后失败）、`tree_behavior` 的 Alt 移动契约用例，compose 全量 1683 项通过。DevTools 真机验收覆盖三种放置位置、四种键盘移动、展开/收起全部与焦点回收，并在明暗主题下目检五种参考线、两个滑杆与拖动中的投影。
+  - 文档与示例：`tree.md` 重写《拖拽》并补键盘移动、《虚拟滚动》改为完整几何 API 与链式示例（含 `guide_width` 新默认值）、参考线一节列出五种样式与悬停加深、《可访问性》补焦点回收；Gallery Tree 页新增 `None`/`Straight`/`Elbow`/`Dashed`/`Dotted` 样式条与 `Indent`/`Lead` 两个滑杆，状态行同时报告拖放结果，目录副标题同步。
+  - 验证：`tree_reparent_tests` 10 项、`list_tree_tests` 新增 15 项（含 `tree_drag_paints_projected_rows_inside_their_slots` 断言每行仍在其裁剪槽内、`tree_drag_reveals_the_branch_an_inside_drop_creates`、`alt_arrow_on_a_focused_row_moves_the_branch`、`collapse_all_keeps_the_tree_on_the_keyboard`、`tree_guide_hover_deepens_only_the_hovered_row`（断言只有悬停行的参考线墨色变深、失效标记只落在该行的参考线节点上，且不排入重算），均验证过移除修复后失败）、`tree_behavior` 的 Alt 移动契约用例，compose 全量 1684 项通过。DevTools 真机验收覆盖三种放置位置、四种键盘移动、展开/收起全部与焦点回收，并在明暗主题下目检五种参考线、两个滑杆、拖动中的投影，以及悬停行参考线加深（`Straight` 与 `Elbow` 两种样式，其余行墨色不变）。
   - 已知缺口：Tree 拖到视口边缘不自动滚动；键盘重排立即改结构，不走弹簧动画；减弱动效只有代码路径，未做设备级目检；Gallery 的 Reset example 不会把 Tree 模型恢复到初始层级（列表页同样如此，属既有行为）。
 
 - **ReorderableList 拖拽实时重排与动效统一（2026-11-05，破坏性）**：

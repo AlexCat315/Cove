@@ -114,13 +114,13 @@ let tree = Tree::new(
 `disclosure_width`、`trailing_slot_width`、`block_node`（选择带是否满行）、`leading_padding`
 （第一层缩进前的留白）、`trailing_padding`（尾部插槽后的留白）。参考线由
 `guide_style`、`guide_width`、`guide_position` 控制：`guide_width` 单位为 pt 且不随字号缩放，
-`guide_position` 取 0.0（贴住缩进阶梯前沿）到 1.0（贴住后沿），默认 0.5。`show_line(bool)`
-保留为 `guide_style` 的 `Straight` / `None` 简写。
+默认 1.5；`guide_position` 取 0.0（贴住缩进阶梯前沿）到 1.0（贴住后沿），默认 0.5。
+`show_line(bool)` 保留为 `guide_style` 的 `Straight` / `None` 简写。
 
 ```rust
 let layout = TreeLayout::default()
     .guide_style(TreeGuideStyle::Elbow)
-    .guide_width(1.5)
+    .guide_width(2.0)
     .guide_position(0.38)
     .indentation(20.0)
     .leading_padding(8.0)
@@ -139,6 +139,8 @@ let layout = TreeLayout::default()
 - 缩进参考线有五种 `TreeGuideStyle`：`None`（只靠缩进）、`Straight`（默认，每层一条竖线，
   最深一列在没有后续兄弟时止于行中心）、`Elbow`（最深一列折进本行）、`Dashed`、`Dotted`。
   每列只在仍有后续兄弟的祖先层绘制，线宽由 `guide_width` 决定。
+- 鼠标悬停某一行时，只加深这一行自己绘制的参考线（含 `Elbow` 的横向连接段），其余行保持
+  默认墨色；加深在绘制阶段读取悬停标记完成，不会触发行重算。
 
 ## 命令式方法
 

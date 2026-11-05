@@ -260,8 +260,8 @@ pub struct TreeLayout {
     pub disclosure_width: f32,
     /// Which guide columns are drawn.
     pub guide_style: TreeGuideStyle,
-    /// Guide stroke width in points. It stays unscaled so the columns remain
-    /// crisp at every text size.
+    /// Guide stroke width in points, 1.5 by default. It stays unscaled so the
+    /// columns remain crisp at every text size.
     pub guide_width: f32,
     /// Where a column sits inside its indent step: `0.0` hugs the step's
     /// leading edge, `0.5` centres it, `1.0` the trailing edge.
@@ -287,7 +287,7 @@ impl Default for TreeLayout {
             indentation: 16.0,
             disclosure_width: 18.0,
             guide_style: TreeGuideStyle::Straight,
-            guide_width: 1.0,
+            guide_width: 1.5,
             guide_position: 0.5,
             trailing_slot_width: 64.0,
             leading_padding: 0.0,
