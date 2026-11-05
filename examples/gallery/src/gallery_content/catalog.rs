@@ -476,7 +476,7 @@ impl GalleryCatalog {
                 GalleryPage::ReorderableList,
                 "ReorderableList",
                 "Data",
-                "Drag handles, a drop indicator and keyboard moves over a caller-owned order.",
+                "Drag handles, live reordering and keyboard moves over a caller-owned order.",
             ),
             GalleryEntry::new(
                 GalleryPage::SwipeList,

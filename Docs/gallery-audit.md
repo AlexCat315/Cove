@@ -1,8 +1,15 @@
 # Gallery 逐项验收记录
 
-更新：2026-11-04。目录共 102 页（Numeric 合并 NumberField+Vec3Field，Text Fields 合并 TextField+SearchField+TextArea+JsonField）。当前控件页的验收以以下 Swift 对照表为准；后续旧轮记录保留其原有范围。
+更新：2026-11-05。目录共 102 页（Numeric 合并 NumberField+Vec3Field，Text Fields 合并 TextField+SearchField+TextArea+JsonField）。当前控件页的验收以以下 Swift 对照表为准；后续旧轮记录保留其原有范围。
 
 Swift 源码逐页对照见文末《Swift 源码对照（逐页差异清单）》。
+
+## 2026-11-05：ReorderableList 拖拽实时重排
+
+- 能力：删除 2pt 插入线（`visible_boundary`/`drop_indicator_y`/`reorder-drop-indicator`），拖拽过程中直接按落点重排——被拖动行的槽位跟随落点，越过的行反向让出一个步长，画面等于松手后的顺序；`ReorderRowShift` 改为行槽上的弹簧位移资源，新增 `.axis(ScrollAxis::Horizontal)` 让滚动、拖拽、重排与落位整体转横轴。
+- 外观：落位不再二次滑动，释放只清除投影并回调 `on_move`；浮起副本弹簧落位、占位行透明度回到满值；Escape 取消时投影弹回、副本飞回原槽位。通用拖放预览补弹簧跟随与淡入淡出；各组件阈值统一为 6pt（删除 SwipeList 的 4pt 死区）。
+- Gallery：Reordering 页新增第二条横轴卡片条（6 张卡片、112×8 尺寸、96pt 视口）与顺序读数，纵向条保留。
+- 验证：`reorder_model` + `reorderable_list_tests` 共 34 项通过，新增 `drag_reflows_the_rows_live`、`horizontal_axis_reorder`、`horizontal_keyboard_reorder`；原插入线断言改为位移与绘制顺序断言。compose 全量 1654 项通过。原生视觉验收已完成：DevTools 真机指针拖拽在浅/深两套主题下分别目检纵轴与横轴——拖动中各行槽位连续无空隙无重叠、浮起副本跟随指针、松手后停在投影位置不再二次滑动、顺序读数与画面一致（纵轴 `Portrait · Macro · Landscape · Night · Panorama`，横轴 `One · Two · Three · Four · Five · Six`）。减弱动效（reduce motion）下的表现仍只有代码路径验证。
 
 ## 2026-11-04：Drag & Drop 会话与指针修复
 
@@ -163,7 +170,7 @@ cargo test -p cove-ui-compose --test compose --locked
 | AssetRef / DropTarget | 0 | 0 / 0 | 挂载/几何基础检查通过；待逐项交互和视觉验收 |
 | List | 0 | 0 / 0 | 挂载/几何基础检查通过；待逐项交互和视觉验收 |
 | SectionedList | 0 | 0 / 0 | 挂载/几何基础检查通过；待逐项交互和视觉验收 |
-| ReorderableList | 0 | 0 / 0 | 本轮修复拖拽：窗口/视口坐标换算、自动滚动夹紧、插入线绝对定位与手柄资源复用；指针、边界与浮动副本回归通过，原生拖拽已验收；文档已写 |
+| ReorderableList | 0 | 0 / 0 | 拖拽改为实时重排（删除插入线）、落位弹簧、横轴轴向与 6pt 统一阈值；纵向/横轴指针与键盘回归通过；浅/深主题下纵轴与横轴的真机指针拖拽视觉目检已完成，减弱动效仍待目检；文档已写 |
 | SwipeList | 0 | 0 / 5 | 挂载/几何基础检查通过；待逐项交互和视觉验收 |
 | RefreshableList | 0 | 0 / 0 | 挂载/几何基础检查通过；待逐项交互和视觉验收 |
 | Scrollbar | 0 | 0 / 0 | 挂载/几何基础检查通过；待逐项交互和视觉验收 |

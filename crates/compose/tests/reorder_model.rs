@@ -5,9 +5,7 @@
 //! arithmetic where an off-by-one silently moves the wrong row, so these pin the
 //! boundary → destination conversion exactly.
 
-use cove_ui_compose::primitives::data::lists::{
-    ReorderableListModel, drop_indicator_y, reorder_row_height,
-};
+use cove_ui_compose::primitives::data::lists::{ReorderableListModel, reorder_row_height};
 
 #[test]
 fn a_drag_within_one_stride_stays_on_its_own_row() {
@@ -58,13 +56,47 @@ fn dropping_on_its_own_position_reports_no_move() {
     assert_eq!(ReorderableListModel::destination(2, 2), None);
     // The boundary just past the row is still its own position.
     assert_eq!(ReorderableListModel::destination(2, 3), None);
-    // And no indicator is drawn in that case.
-    assert_eq!(ReorderableListModel::visible_boundary(2, 3), None);
 }
 
+/// The live projection while row 1 is lifted and the drop lands at 3: the lifted
+/// slot travels there, rows 2 and 3 close up behind it, and the list is painted
+/// exactly as the drop would order it.
 #[test]
-fn an_indicator_is_drawn_for_a_real_move() {
-    assert_eq!(ReorderableListModel::visible_boundary(1, 3), Some(3));
+fn rows_between_the_source_and_the_drop_slide_up_behind_it() {
+    let offset = |index: usize| ReorderableListModel::live_offset(index, 1, 3, 40.0);
+    assert_eq!(
+        (offset(0), offset(1), offset(2), offset(3), offset(4)),
+        (0.0, 80.0, -40.0, -40.0, 0.0)
+    );
+    // Every slot stays occupied: no gap, no overlap.
+    let painted = |index: usize| index as f32 * 40.0 + offset(index);
+    assert_eq!(
+        (painted(0), painted(1), painted(2), painted(3), painted(4)),
+        (0.0, 120.0, 40.0, 80.0, 160.0)
+    );
+}
+
+/// Symmetrically, pulling row 3 up to 1 carries it to slot 1 and pushes rows 1
+/// and 2 down behind it.
+#[test]
+fn rows_between_the_drop_and_the_source_slide_down_behind_it() {
+    let offset = |index: usize| ReorderableListModel::live_offset(index, 3, 1, 40.0);
+    assert_eq!(
+        (offset(0), offset(1), offset(2), offset(3), offset(4)),
+        (0.0, 40.0, 40.0, -80.0, 0.0)
+    );
+    let painted = |index: usize| index as f32 * 40.0 + offset(index);
+    assert_eq!(
+        (painted(0), painted(1), painted(2), painted(3), painted(4)),
+        (0.0, 80.0, 120.0, 40.0, 160.0)
+    );
+}
+
+/// With no hole, no row moves — the projection collapses to the authored order.
+#[test]
+fn an_unmoved_drag_displaces_nothing() {
+    let offset = |index: usize| ReorderableListModel::live_offset(index, 2, 2, 40.0);
+    assert_eq!((offset(1), offset(2), offset(3)), (0.0, 0.0, 0.0));
 }
 
 #[test]
@@ -120,12 +152,4 @@ fn a_touch_surface_raises_the_row_to_the_minimum_extent() {
     assert_eq!(reorder_row_height(30.0, false, 44.0), 30.0);
     // A comfortably tall row is untouched on touch.
     assert_eq!(reorder_row_height(56.0, true, 44.0), 56.0);
-}
-
-#[test]
-fn the_drop_indicator_sits_on_the_row_boundary() {
-    // Boundary 2 at stride 40 draws 1pt above the boundary line.
-    assert!((drop_indicator_y(2, 5, 40.0, 200.0) - 79.0).abs() < 1e-5);
-    // The past-the-end boundary pins to the bottom of the content.
-    assert!((drop_indicator_y(5, 5, 40.0, 200.0) - 198.0).abs() < 1e-5);
 }

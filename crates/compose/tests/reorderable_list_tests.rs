@@ -5,7 +5,7 @@
 //! - Escape cancels a drag without reporting a move
 //! - touch surfaces reserve a 44pt handle
 //! - edge speed is zero mid-viewport and rises to the maximum at and beyond the edge
-//! - dragging the handle shows a drop line and moves the row once
+//! - dragging the handle reflows the rows live and moves the row once
 //!
 //! Named differences (documented, not dropped):
 //! - Handles are located by accessible role/value rather than Swift's
@@ -26,7 +26,7 @@ use cove_core::scene::{AccessibilityRole, Node};
 use cove_core::{Point, Rect};
 use cove_ui_compose::modifiers::layout::LayoutFrameExt;
 use cove_ui_compose::primitives::data::lists::RowState;
-use cove_ui_compose::primitives::data::lists::reorder_model::drop_indicator_y;
+use cove_ui_compose::primitives::data::lists::reorder_model::ReorderRowShift;
 use cove_ui_compose::primitives::data::lists::reorderable::ReorderableList;
 use cove_ui_compose::primitives::interaction::edge_auto_scroll::{MAXIMUM_SPEED, velocity};
 use cove_ui_compose::primitives::text::Text;
@@ -181,8 +181,56 @@ fn handle(scene: &InteractiveScene, index: usize, count: usize) -> Node {
         .unwrap_or_else(|| panic!("a handle at {} mounts", index + 1))
 }
 
-fn indicator(scene: &InteractiveScene) -> Option<Node> {
-    scene.named("reorder-drop-indicator")
+/// The live projection offset a mounted row is holding, read from the row slot
+/// that carries it.
+fn displacement(scene: &InteractiveScene, id: u64) -> f32 {
+    let row = scene
+        .named(&format!("reorder-row-{id}"))
+        .unwrap_or_else(|| panic!("row {id} is mounted"));
+    std::iter::successors(Some(row), |node| node.parent())
+        .map(|node| ReorderRowShift::target_offset(&node))
+        .find(|offset| *offset != 0.0)
+        .unwrap_or(0.0)
+}
+
+/// The live projection of every mounted row, as `(row id, offset)` by id.
+fn projections(scene: &InteractiveScene) -> Vec<(u64, f32)> {
+    let mut rows: Vec<(u64, f32)> = scene
+        .all(|node| {
+            support::debug_name(node).is_some_and(|name| name.starts_with("reorder-row-"))
+        })
+        .into_iter()
+        .filter_map(|node| {
+            let name = support::debug_name(&node)?;
+            let id = name["reorder-row-".len()..].parse().ok()?;
+            let offset = std::iter::successors(Some(node), |node| node.parent())
+                .map(|node| ReorderRowShift::target_offset(&node))
+                .find(|offset| *offset != 0.0)
+                .unwrap_or(0.0);
+            Some((id, offset))
+        })
+        .collect();
+    rows.sort_by_key(|(id, _)| *id);
+    // The lifted copy carries the same name as its row; only the row in the
+    // list holds the projection.
+    let mut unique: Vec<(u64, f32)> = Vec::new();
+    for (id, offset) in rows {
+        match unique.last_mut() {
+            Some((last, value)) if *last == id && *value == 0.0 => *value = offset,
+            Some((last, _)) if *last == id => {}
+            _ => unique.push((id, offset)),
+        }
+    }
+    unique
+}
+
+/// The main-axis position a row is painted at.
+fn painted(scene: &InteractiveScene, id: u64, horizontal: bool) -> f32 {
+    let frame = scene
+        .named(&format!("reorder-row-{id}"))
+        .unwrap_or_else(|| panic!("row {id} is mounted"))
+        .absolute_frame();
+    if horizontal { frame.x } else { frame.y }
 }
 
 fn positions(scene: &InteractiveScene) -> Vec<String> {
@@ -246,6 +294,7 @@ fn keyboard_reorder() {
 fn pointer_reorder() {
     InteractiveScene::run(320.0, 520.0, |scene| {
         let moves = install(scene, 4);
+        let before: Vec<f32> = (0..4).map(|id| painted(scene, id, false)).collect();
 
         let source = handle(scene, 0, 4);
         let start = source.absolute_frame();
@@ -258,13 +307,22 @@ fn pointer_reorder() {
         );
 
         assert!(
-            indicator(scene).is_none(),
-            "the drop indicator is cleared once the drag ends"
+            projections(scene)
+                .iter()
+                .all(|(_, offset)| *offset == 0.0),
+            "the drop leaves no projection offset behind"
         );
         assert_eq!(
             moves.borrow().as_slice(),
             [(0, 1)],
             "dragging the first row one stride down reports a single move"
+        );
+        // The move put row 1 in row 0's slot and vice versa, and the drop did not
+        // slide either of them again.
+        assert!(
+            (painted(scene, 1, false) - before[0]).abs() < 1.0
+                && (painted(scene, 0, false) - before[1]).abs() < 1.0,
+            "the dropped rows rest exactly on the slots the drag already showed"
         );
         assert_eq!(
             positions(scene),
@@ -287,42 +345,34 @@ fn escape_cancels() {
         let source = handle(scene, 1, 4);
         let start = source.absolute_frame();
         let start_point = Point::new(start.x + start.width / 2.0, start.y + start.height / 2.0);
+        let before: Vec<f32> = (0..4).map(|id| painted(scene, id, false)).collect();
 
         let dispatcher = scene.dispatcher();
-        dispatcher.dispatch(&cove_platform::InputEvent::MouseButtonDown(
-            cove_platform::MouseButtonEvent {
-                button: cove_platform::MouseButton::Left,
-                x: start_point.x,
-                y: start_point.y,
-                clicks: 1,
-                modifiers: Default::default(),
-                kind: Default::default(),
-            },
-        ));
+        dispatcher.dispatch(&press(start_point));
         scene.settle(6, 1.0);
-        dispatcher.dispatch(&cove_platform::InputEvent::MouseMotion(
-            cove_platform::MouseMotionEvent {
-                x: start_point.x,
-                y: start_point.y + 80.0,
-                delta_x: 0.0,
-                delta_y: 80.0,
-                kind: Default::default(),
-            },
-        ));
+        dispatcher.dispatch(&motion(Point::new(start_point.x, start_point.y + 80.0)));
         scene.settle(6, 1.0);
 
+        // Two strides down from row 1 projects the order 0, 2, 1, 3.
         assert!(
-            indicator(scene).is_some(),
-            "an in-flight drag paints the drop line"
+            (displacement(scene, 1) - ROW_HEIGHT).abs() < 0.001,
+            "the lifted row's slot travels to the drop position"
+        );
+        assert!(
+            (displacement(scene, 2) + ROW_HEIGHT).abs() < 0.001,
+            "the row it passed over closes up behind it"
         );
 
         scene.key(cove_ui_compose::Scancode::ESCAPE, Default::default());
-        scene.settle(6, 1.0);
+        scene.settle(8, 1.0);
 
-        assert!(indicator(scene).is_none(), "Escape leaves no drop line");
         assert!(
             moves.borrow().is_empty(),
             "a cancelled drag reports no move"
+        );
+        assert!(
+            (0..4).all(|id| (painted(scene, id as u64, false) - before[id]).abs() < 1.0),
+            "Escape springs every row back onto its own slot"
         );
     });
 }
@@ -476,17 +526,28 @@ fn edge_auto_scroll_stops_at_the_content_end() {
             maximum,
             "auto-scroll clamps to the last content offset instead of running past it"
         );
-        let line = indicator(scene).expect("a drop line");
-        let boundary = ((edge.y - start.y + maximum) / ROW_HEIGHT)
-            .round()
-            .clamp(0.0, 30.0) as usize;
-        let expected_line_y = viewport.y
-            + drop_indicator_y(boundary, 30, ROW_HEIGHT, 30.0 * ROW_HEIGHT)
-            - scroll.content_offset().y;
+        // The index the pointer projects to, and the live order that must
+        // already show it: the lifted slot travels there and the row parked
+        // there closes up by one stride.
+        let destination = (((edge.y - start.y + maximum) / ROW_HEIGHT).round() as usize) - 1;
+        scene.settle(8, 1.0);
         assert!(
-            (line.absolute_frame().y - expected_line_y).abs() < 1.0,
-            "the drop line follows the insertion boundary (got {}, expected {expected_line_y})",
-            line.absolute_frame().y
+            (displacement(scene, 0) - destination as f32 * ROW_HEIGHT).abs() < 0.001,
+            "the lifted row's slot travels to the projected drop position"
+        );
+        assert!(
+            (displacement(scene, destination as u64) + ROW_HEIGHT).abs() < 0.001,
+            "the row at the drop position closes up by one stride"
+        );
+        let lifted = scene
+            .named("reorder-row-0")
+            .expect("the lifted row stays mounted");
+        let closed = scene
+            .named(&format!("reorder-row-{destination}"))
+            .expect("the displaced row stays mounted at the drop position");
+        assert!(
+            (lifted.absolute_frame().y - closed.absolute_frame().y - ROW_HEIGHT).abs() < 1.0,
+            "the list is painted in the order the drop would produce"
         );
 
         let preview = scene.named("reorder-preview").expect("a lifted preview");
@@ -501,12 +562,10 @@ fn edge_auto_scroll_stops_at_the_content_end() {
         scene.settle(4, 1.0);
 
         // The drop lands where the pointer is in content coordinates.
-        let expected = ((edge.y - start.y + maximum) / ROW_HEIGHT).round() as usize;
-        let expected = expected - 1;
-        let expected: Vec<(usize, usize)> = if expected == 0 {
+        let expected: Vec<(usize, usize)> = if destination == 0 {
             Vec::new()
         } else {
-            vec![(0, expected)]
+            vec![(0, destination)]
         };
         assert_eq!(
             moves.borrow().as_slice(),
@@ -573,7 +632,71 @@ fn floating_preview_follows_the_pointer() {
     });
 }
 
-/// A horizontal list drags along x: the drop line is vertical, the move is
+/// Dragging past several rows reflows the list while the drag is live: the
+/// lifted row's slot travels to the drop position and the rows it passes close
+/// up behind it, so the list already shows the order the drop will produce.
+#[test]
+fn drag_reflows_the_rows_live() {
+    InteractiveScene::run(320.0, 520.0, |scene| {
+        let moves = install(scene, 5);
+
+        let source = handle(scene, 0, 5);
+        let start = window_point(&source);
+        let dispatcher = scene.dispatcher();
+        dispatcher.dispatch(&press(start));
+        scene.settle(2, 1.0);
+
+        let drop = Point::new(start.x, start.y + 3.0 * ROW_HEIGHT);
+        dispatcher.dispatch(&motion(drop));
+        scene.settle(8, 1.0);
+
+        // Three strides of travel projects the drop at index 2: rows 1 and 2
+        // each close one slot and row 0 parks at the vacated position.
+        assert_eq!(
+            projections(scene),
+            [
+                (0, 2.0 * ROW_HEIGHT),
+                (1, -ROW_HEIGHT),
+                (2, -ROW_HEIGHT),
+                (3, 0.0),
+                (4, 0.0),
+            ],
+            "the drag displaces the rows it passes over"
+        );
+        let during: Vec<f32> = (0..5).map(|id| painted(scene, id, false)).collect();
+        assert_eq!(
+            positions(scene),
+            [
+                "Position 1 of 5".to_string(),
+                "Position 2 of 5".to_string(),
+                "Position 3 of 5".to_string(),
+                "Position 4 of 5".to_string(),
+                "Position 5 of 5".to_string(),
+            ],
+            "the handles still describe the authored order while the drag is live"
+        );
+
+        dispatcher.dispatch(&release(drop));
+        scene.settle(8, 1.0);
+
+        assert_eq!(
+            moves.borrow().as_slice(),
+            [(0, 2)],
+            "the drop reports the move the drag already showed"
+        );
+        let after: Vec<f32> = (0..5).map(|id| painted(scene, id, false)).collect();
+        for index in 0..5 {
+            assert!(
+                (after[index] - during[index]).abs() < 1.0,
+                "row {index} was already on the slot the drop gives it ({} -> {})",
+                during[index],
+                after[index]
+            );
+        }
+    });
+}
+
+/// A horizontal list drags along x: the rows reflow left and right, the move is
 /// reported in strides of the card width, and auto-scroll is off-axis safe.
 #[test]
 fn horizontal_axis_reorder() {
@@ -593,20 +716,19 @@ fn horizontal_axis_reorder() {
 
         let drop = Point::new(start.x + 140.0, start.y);
         dispatcher.dispatch(&motion(drop));
-        scene.settle(2, 0.1);
+        scene.settle(8, 1.0);
 
-        let line = indicator(scene).expect("a horizontal drag paints the drop line");
-        let line_frame = line.absolute_frame();
         assert!(
-            (line_frame.x - (2.0 * CARD_WIDTH - 1.0)).abs() < 1.0,
-            "the rule sits at the horizontal insertion boundary (got {})",
-            line_frame.x
+            (displacement(scene, 0) - CARD_WIDTH).abs() < 0.001,
+            "the lifted card's slot travels one card forward"
         );
         assert!(
-            line_frame.width < 3.0 && line_frame.height > 20.0,
-            "the horizontal rule is a vertical line ({} x {})",
-            line_frame.width,
-            line_frame.height
+            (displacement(scene, 1) + CARD_WIDTH).abs() < 0.001,
+            "the card it passed closes up behind it"
+        );
+        assert!(
+            (painted(scene, 0, true) - painted(scene, 1, true) - CARD_WIDTH).abs() < 1.0,
+            "the cards are painted in the order the drop would produce"
         );
 
         dispatcher.dispatch(&release(drop));
@@ -618,8 +740,10 @@ fn horizontal_axis_reorder() {
             "a two-card horizontal drag reports one move past the source row"
         );
         assert!(
-            indicator(scene).is_none(),
-            "the drop line is cleared once the drag settles"
+            projections(scene)
+                .iter()
+                .all(|(_, offset)| *offset == 0.0),
+            "the drop hands the cards back to layout without a second slide"
         );
     });
 }
@@ -662,6 +786,8 @@ fn horizontal_keyboard_reorder() {
 fn drop_settles_with_a_spring() {
     InteractiveScene::run(320.0, 520.0, |scene| {
         let moves = install(scene, 4);
+        // The live projection parked the lifted row here before the release.
+        let before_second_row = painted(scene, 1, false);
 
         let source = handle(scene, 0, 4);
         let start = window_point(&source);
@@ -689,7 +815,7 @@ fn drop_settles_with_a_spring() {
             .expect("the moved row stays mounted while it lands");
         let row_y = row.absolute_frame().y;
         assert!(
-            row_y > ROW_HEIGHT && row_y < 2.0 * ROW_HEIGHT,
+            (row_y - before_second_row).abs() < 1.0,
             "the placeholder already sits in the destination slot (y {row_y})"
         );
         assert!(

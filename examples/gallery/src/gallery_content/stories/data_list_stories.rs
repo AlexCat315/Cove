@@ -281,7 +281,7 @@ impl View for ReorderableStory {
             )),
             AnyView::new(StorySection::new(
                 "Reordering along the scroll axis",
-                "The same handle, insertion rule and settle spring drive a horizontal list; drag the cards left or right.",
+                "The same handle and settle spring drive a horizontal list; the cards reflow as you drag them left or right.",
                 AnyView::new(TupleView::new(vec![strip, caption(self.card_readout())])),
             )),
         ]))

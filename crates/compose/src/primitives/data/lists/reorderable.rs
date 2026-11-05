@@ -7,29 +7,34 @@
 //! the source index and the final index after the row is removed.
 //!
 //! The handle is a 44pt-wide target and is the only drag surface, so row content
-//! keeps its own buttons and taps. While dragging, a 2pt accent line marks the
-//! insertion boundary; Escape cancels without calling `on_move`. On release the
-//! lifted row springs onto its slot while the displaced rows slide one stride,
-//! and reduced motion snaps both.
+//! keeps its own buttons and taps. While dragging, the list is painted in the
+//! order the drop would produce: the lifted row's slot travels to the drop
+//! position and every row it passes over slides one stride behind it. Escape
+//! cancels without calling `on_move`. On release the lifted copy springs onto its
+//! slot while the displaced rows spring from where they already are, and reduced
+//! motion snaps both.
 //!
 //! Behaviour checklist:
 //! - the drag position is pointer travel plus automatic scroll, so the drop
 //!   boundary stays in content coordinates while the list scrolls
-//! - the drop indicator is hidden when the drop would be a no-op
+//! - the rows between the source and the drop hold their projected displacement
+//!   while the drag is live, so the drop itself needs no second slide
 //! - keyboard Up/Down move the focused handle; assistive clients use
 //!   increment/decrement
 //! - the dragged and last keyboard-moved rows always stay mounted so pointer
 //!   capture and focus survive auto-scrolling
-//! - the dragged row stays as a dimmed placeholder while the lifted copy follows
-//! - after a drop (or a keyboard move) the placeholder crossfades up to full
-//!   opacity while the displaced rows spring into their slots
+//! - the dragged row stays as a dimmed placeholder that travels with the
+//!   projected drop while the lifted copy follows the pointer
+//! - after a drop the placeholder crossfades up to full opacity as the lifted
+//!   copy lands on it; a keyboard move springs the displaced rows into place
 
 use crate::Scope;
 use std::cell::{Cell, RefCell};
+use std::collections::HashMap;
 use std::rc::Rc;
 
 use super::reorder_model::{
-    ReorderDragSession, ReorderRowShift, ReorderableListModel, drop_indicator_y, reorder_row_height,
+    ReorderDragSession, ReorderRowShift, ReorderableListModel, reorder_row_height,
 };
 use super::selection::{CollectionId, RowState};
 use crate::modifiers::interaction::{AccessibilityExt, HitTestingExt};
@@ -48,7 +53,8 @@ use cove_core::State;
 use cove_core::scene::{
     AccessibilityActions, AccessibilityRole, AccessibilitySemantics, Align, EventPhase,
     EventResult, FlexDirection, HoverPhase, InputHandlerRoute, InteractionRegistryHolder, Justify,
-    LayoutNode, Node, PointerCaptureAttachmentKey, PointerCaptureHolder, PointerPhase, Wrap,
+    LayoutNode, Node, NodeWeak, PointerCaptureAttachmentKey, PointerCaptureHolder, PointerPhase,
+    Wrap,
 };
 use cove_platform::{KeyEvent, MouseButton, SystemCursor};
 
@@ -89,6 +95,12 @@ pub struct ReorderSession<Id> {
     /// Kept as state so a parent rebuild can restart the spring where the
     /// previous session left it instead of dropping the preview at its origin.
     settle: State<Option<(f32, f32)>>,
+    /// Mounted row nodes by id, so a live drag displaces rows without
+    /// recomposing the list. Entries whose node is gone are pruned on use.
+    row_nodes: Rc<RefCell<HashMap<Id, NodeWeak>>>,
+    /// The hole index the mounted rows are displaced around, or `None` while
+    /// they follow the authored order.
+    live_destination: Rc<Cell<Option<usize>>>,
 }
 
 impl<Id: CollectionId> Clone for ReorderSession<Id> {
@@ -110,6 +122,8 @@ impl<Id: CollectionId> Clone for ReorderSession<Id> {
             axis: self.axis.clone(),
             shifts: self.shifts.clone(),
             settle: self.settle.clone(),
+            row_nodes: self.row_nodes.clone(),
+            live_destination: self.live_destination.clone(),
         }
     }
 }
@@ -148,6 +162,8 @@ impl<Id: CollectionId> ReorderSession<Id> {
         let stride = row_height + self.row_spacing.get();
         self.shifts.set(Vec::new());
         self.settle.set(None);
+        self.clear_live_shifts();
+        self.live_destination.set(Some(index));
         self.session.begin(index as f32 * stride, row_height);
         self.dragging.set(self.ids.borrow().get(index).cloned());
         self.boundary.set(Some(index));
@@ -161,14 +177,16 @@ impl<Id: CollectionId> ReorderSession<Id> {
         let Some(source) = self.index_of(&dragging) else {
             return;
         };
+        let stride = self.row_height.get() + self.row_spacing.get();
         let boundary = ReorderableListModel::drop_boundary(
             source,
             travel,
             scrolled,
-            self.row_height.get() + self.row_spacing.get(),
+            stride,
             self.count(),
         );
         self.boundary.set(Some(boundary));
+        self.apply_live_shifts(source, boundary);
     }
 
     /// Applies the drop, then springs the lifted row onto its slot. `dragging`
@@ -189,7 +207,10 @@ impl<Id: CollectionId> ReorderSession<Id> {
         let stride = self.row_height.get() + self.row_spacing.get();
         let destination = boundary.and_then(|b| ReorderableListModel::destination(source, b));
         if let Some(destination) = destination {
-            self.queue_shifts(source, destination, stride);
+            // The live projection already moved the rows out of the way, so the
+            // data change puts each where it is already painted. Clearing the
+            // offsets before `on_move` hands the frames back to layout.
+            self.clear_live_shifts();
             self.retained.set(Some(dragging.clone()));
             let on_move = self.on_move.borrow().clone();
             on_move(source, destination);
@@ -209,6 +230,7 @@ impl<Id: CollectionId> ReorderSession<Id> {
         match self.index_of(&dragging) {
             Some(source) => {
                 let stride = self.row_height.get() + self.row_spacing.get();
+                self.apply_live_shifts(source, source);
                 self.land_at(source as f32 * stride);
             }
             None => {
@@ -307,7 +329,7 @@ impl<Id: CollectionId> ReorderSession<Id> {
                 }
             }
         } else {
-            // Items at [destination, source) slide away from the insertion.
+            // Items at [destination, source) slide back by one stride.
             for slot in destination..source {
                 if let Some(id) = ids.get(slot) {
                     shifts.push((id.clone(), -stride));
@@ -324,6 +346,80 @@ impl<Id: CollectionId> ReorderSession<Id> {
         let offset = shifts.remove(position).1;
         self.shifts.set(shifts);
         Some(offset)
+    }
+
+    /// Records the node behind a mounted row so the live drag can move it.
+    fn bind_row_node(&self, id: &Id, node: &Node) {
+        let mut nodes = self.row_nodes.borrow_mut();
+        if nodes.len() > 2 * self.count() + 8 {
+            nodes.retain(|_, weak| weak.upgrade().is_some());
+        }
+        nodes.insert(id.clone(), node.downgrade());
+    }
+
+    /// Places a row that mounts mid-drag at the displacement its projection
+    /// already holds, so auto-scrolling new rows into view does not break the
+    /// ordering the drag is showing.
+    fn restore_live_shift(&self, id: &Id, node: &Node, axis: ScrollAxis) {
+        let Some(destination) = self.live_destination.get() else {
+            return;
+        };
+        let Some(dragging) = self.dragging.get() else {
+            return;
+        };
+        let Some(source) = self.index_of(&dragging) else {
+            return;
+        };
+        let Some(index) = self.index_of(id) else {
+            return;
+        };
+        let stride = self.row_height.get() + self.row_spacing.get();
+        let offset = ReorderableListModel::live_offset(index, source, destination, stride);
+        ReorderRowShift::set_offset(node, offset, axis);
+    }
+
+    /// Springs the mounted rows into the order the drop would produce. Only the
+    /// range whose projection changed is touched.
+    fn apply_live_shifts(&self, source: usize, boundary: usize) {
+        let destination =
+            ReorderableListModel::destination(source, boundary).unwrap_or(source);
+        let previous = self.live_destination.get().unwrap_or(destination);
+        if previous == destination {
+            return;
+        }
+        self.live_destination.set(Some(destination));
+        let stride = self.row_height.get() + self.row_spacing.get();
+        let low = previous.min(destination).min(source);
+        let high = previous.max(destination).max(source);
+        let ids = self.ids.borrow();
+        let nodes = self.row_nodes.borrow();
+        for index in low..=high.min(ids.len().saturating_sub(1)) {
+            let Some(node) = ids
+                .get(index)
+                .and_then(|id| nodes.get(id))
+                .and_then(Node::upgrade)
+            else {
+                continue;
+            };
+            ReorderRowShift::slide_to(
+                &node,
+                ReorderableListModel::live_offset(index, source, destination, stride),
+                self.axis.get(),
+            );
+        }
+    }
+
+    /// Hands every row's frame back to layout without animating. A new drag
+    /// starts from the authored order and a completed drop moves every slot to
+    /// where the row is already painted, so the offsets are stale either way.
+    fn clear_live_shifts(&self) {
+        let nodes = self.row_nodes.clone();
+        for weak in nodes.borrow().values() {
+            if let Some(node) = Node::upgrade(weak) {
+                ReorderRowShift::clear(&node);
+            }
+        }
+        self.live_destination.set(None);
     }
 
     /// Keeps the drag arithmetic on the same row metrics the rows were laid
@@ -352,13 +448,6 @@ impl<Id: CollectionId> ReorderSession<Id> {
         self.retained.set(self.ids.borrow().get(index).cloned());
         let on_move = self.on_move.borrow().clone();
         on_move(index, destination);
-    }
-
-    pub fn visible_boundary(&self) -> Option<usize> {
-        let dragging = self.dragging.get()?;
-        let boundary = self.boundary.get()?;
-        let source = self.index_of(&dragging)?;
-        ReorderableListModel::visible_boundary(source, boundary)
     }
 
     /// Indices to mount: the visible window plus the dragged and last
@@ -436,6 +525,8 @@ where
             axis: Rc::new(Cell::new(ScrollAxis::Vertical)),
             shifts: State::new(Vec::new()),
             settle: State::new(None),
+            row_nodes: Rc::new(RefCell::new(HashMap::new())),
+            live_destination: Rc::new(Cell::new(None)),
         });
         Self {
             data,
@@ -471,7 +562,7 @@ where
     }
 
     /// Reorders along `axis`; a horizontal list drags rows left/right with the
-    /// same handle, indicator, and settle behaviour. `Both` reorders
+    /// same handle, live displacement, and settle behaviour. `Both` reorders
     /// vertically.
     pub fn axis(mut self, axis: ScrollAxis) -> Self {
         self.axis = axis;
@@ -631,71 +722,22 @@ where
             ),
         );
 
-        let mut layers = vec![column];
-        if count > 1 && let Some(boundary) = session.visible_boundary() {
-            let position = drop_indicator_y(boundary, count, row_stride, content_extent);
-            // A spacer rather than `EmptyView`: an empty view materialises no
-            // node, so the rule would never be laid out or painted.
-            let rule = AnyView::new(
-                AnyView::new(
-                    AnyView::new(crate::Spacer::new(0.0))
-                        .semantic_background(crate::theme::SemanticColorRef::accent())
-                        .corner_radius(1.0)
-                        .modifier(cove_composition::LayoutDebugModifier::debug_name(
-                            "reorder-drop-indicator",
-                        )),
-                )
-                // Only the cross-axis thickness is fixed. The main-axis
-                // dimension stays auto so the absolute insets stretch the rule
-                // across the list; an explicit zero would collapse it.
-                .frame(
-                    if horizontal {
-                        Some(crate::modifiers::layout::FrameDimension::Points(2.0))
-                    } else {
-                        None
-                    },
-                    if horizontal {
-                        None
-                    } else {
-                        Some(crate::modifiers::layout::FrameDimension::Points(2.0))
-                    },
-                    None,
-                    None,
-                    None,
-                    None,
-                ),
-            );
-            let rule = if horizontal {
-                rule.with_modifier(AbsolutePositionModifier::new(
-                    Some(position),
-                    Some(8.0),
-                    None,
-                    Some(8.0),
-                ))
-            } else {
-                rule.with_modifier(AbsolutePositionModifier::new(
-                    Some(8.0),
-                    Some(position),
-                    Some(8.0),
-                    None,
-                ))
-            };
-            layers.push(AnyView::new(rule));
-        }
+        // The drag displaces the rows themselves, so there is nothing to draw
+        // over the list: the projected order is the affordance.
 
         let scroll_session = session.clone();
         let scroll_axis = axis;
         let scroll = ScrollView::new(
             scroll_axis,
-            // A flex parent rather than a `ZStack`: only flex layout honours
-            // the drop line's absolute main-axis inset (Swift's overlay `Box`).
+            // A flex parent rather than a `ZStack`: only flex layout stretches
+            // the absolutely positioned row slots across the content.
             AnyView::new(BoxView::new(
                 direction,
                 Align::Stretch,
                 Justify::FlexStart,
                 Wrap::NoWrap,
                 0.0,
-                AnyView::new(TupleView::new(layers)),
+                column,
             )),
         )
         .scrollbar_gutter(ScrollbarGutter::Stable)
@@ -862,6 +904,7 @@ impl<Id: CollectionId> PrimitiveView for ReorderRowSlot<Id> {
 
     fn update_node(&self, node: &Node) {
         node.set_corner_radius(6.0);
+        self.session.bind_row_node(&self.id, node);
         if self.is_placeholder {
             // Dim once and bind for the settle crossfade; the landing raises
             // the opacity itself, so a rebuild mid-settle must not clip it
@@ -878,6 +921,8 @@ impl<Id: CollectionId> PrimitiveView for ReorderRowSlot<Id> {
         // A displaced row slides from its old slot into the new one.
         if let Some(offset) = self.session.take_shift(&self.id) {
             ReorderRowShift::begin_for(node, offset, self.axis);
+        } else {
+            self.session.restore_live_shift(&self.id, node, self.axis);
         }
         node.set_is_hit_testable(false);
         // A hairline between rows gives the list the same grouped rhythm as

@@ -8,7 +8,7 @@ Gallery 展示 Cove 的 Rust 组件。组件页的 Size、Scale、Disabled 和 R
 
 - [Slider](/docs/slider)：连续值、步长、刻度、垂直方向与禁用。
 - [RangeSlider](/docs/range-slider)：两个端点、步长、最小间距与禁用。
-- [ReorderableList](/docs/reorderable-list)：拖拽手柄、插入线、落位弹簧、纵向与横向轴向与边缘自动滚动。
+- [ReorderableList](/docs/reorderable-list)：拖拽手柄、拖动中的实时重排、落位弹簧、纵向与横向轴向与边缘自动滚动。
 - [Rating](/docs/rating)：整星、分数、自定义图形、只读、密度与布局方向。
 - [SearchField](/docs/search-field)：查询绑定、建议、提交与清空。
 - [TextField](/docs/text-field)：原生输入、选区、剪贴板与当前能力范围。

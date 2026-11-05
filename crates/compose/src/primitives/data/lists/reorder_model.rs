@@ -425,10 +425,21 @@ impl ReorderableListModel {
         (destination != source).then_some(destination)
     }
 
-    /// The boundary a drop indicator should draw at, or `None` when the drop
-    /// would be a no-op (the indicator must not appear in that case).
-    pub fn visible_boundary(source: usize, boundary: usize) -> Option<usize> {
-        Self::destination(source, boundary).map(|_| boundary)
+    /// The displacement row `index` holds while the drag projects the dropped
+    /// order: the lifted row's slot travels to `destination`, every row it passes
+    /// over slides one stride the other way, and everything else keeps its slot.
+    /// Together they paint the list exactly as the drop would reorder it, with no
+    /// gap and no overlap.
+    pub fn live_offset(index: usize, source: usize, destination: usize, stride: f32) -> f32 {
+        if index == source {
+            (destination as f32 - source as f32) * stride
+        } else if destination > source && index > source && index <= destination {
+            -stride
+        } else if destination < source && index >= destination && index < source {
+            stride
+        } else {
+            0.0
+        }
     }
 
     /// Keyboard stepping clamps at both ends rather than wrapping.
@@ -479,20 +490,6 @@ pub fn reorder_row_height(scaled: f32, is_touch: bool, minimum_control_extent: f
         0.0
     };
     scaled.max(floor)
-}
-
-/// The painted y of the drop indicator for `boundary`.
-pub fn drop_indicator_y(
-    boundary: usize,
-    count: usize,
-    row_stride: f32,
-    content_height: f32,
-) -> f32 {
-    if boundary >= count {
-        (content_height - 2.0).max(0.0)
-    } else {
-        boundary as f32 * row_stride - 1.0
-    }
 }
 
 /// Shared handle for the preview node's scroll offset, so following the pointer
@@ -561,13 +558,18 @@ impl ReorderPreviewOffset {
     }
 }
 
-/// The slide a displaced row plays when the dragged row lands in its slot.
+/// The displacement a row paints while a reorder drags over it.
 ///
-/// Rows sit at a fixed slot (`index * stride`) and only their content moves,
-/// so a shifted row starts painted one stride away from its slot and springs
-/// home. Reduced motion never animates and the resource is a no-op.
+/// Rows sit at a fixed slot (`index * stride`) and only their frame moves, so
+/// a live drag can slide rows out of the way, hold them there, and spring them
+/// back without recomposing the list. The resource stays attached at its
+/// target; `clear` hands the frame back to layout once the data order catches
+/// up with the projection. Reduced motion still displaces, it just snaps.
 pub struct ReorderRowShift {
-    offset: Cell<f32>,
+    /// Displacement currently painted, along the list's main axis.
+    current: Cell<f32>,
+    /// Displacement the row is heading to and rests at.
+    target: Cell<f32>,
     axis: Cell<ScrollAxis>,
     node: RefCell<Option<NodeWeak>>,
     origin: Cell<Rect>,
@@ -582,7 +584,8 @@ pub struct ReorderRowShift {
 impl ReorderRowShift {
     fn new() -> Rc<Self> {
         let shift = Rc::new(Self {
-            offset: Cell::new(0.0),
+            current: Cell::new(0.0),
+            target: Cell::new(0.0),
             axis: Cell::new(ScrollAxis::Vertical),
             node: RefCell::new(None),
             origin: Cell::new(Rect::default()),
@@ -605,9 +608,90 @@ impl ReorderRowShift {
             return;
         }
         let shift = Self::new();
-        shift.offset.set(offset);
+        shift.current.set(offset);
         shift.axis.set(axis);
         node.add_resource(shift);
+    }
+
+    /// Springs the row to a live displacement and rests attached there.
+    pub fn slide_to(node: &Node, target: f32, axis: ScrollAxis) {
+        if node.prefers_reduced_motion() {
+            Self::set_offset(node, target, axis);
+            return;
+        }
+        if let Some(shift) = node.first_resource::<Self>() {
+            shift.retarget(target);
+            return;
+        }
+        if target == 0.0 {
+            return;
+        }
+        let shift = Self::new();
+        shift.target.set(target);
+        shift.axis.set(axis);
+        node.add_resource(shift);
+    }
+
+    /// Places the row at `offset` without animating, for a row that mounts
+    /// while a live drag already holds the list displaced.
+    pub fn set_offset(node: &Node, offset: f32, axis: ScrollAxis) {
+        if let Some(shift) = node.first_resource::<Self>() {
+            shift.snap(offset);
+            return;
+        }
+        if offset == 0.0 {
+            return;
+        }
+        let shift = Self::new();
+        shift.current.set(offset);
+        shift.target.set(offset);
+        shift.axis.set(axis);
+        node.add_resource(shift);
+    }
+
+    /// Forgets every displacement so layout owns the frame again. The row's
+    /// slot moves to exactly where it is already painted when the projected
+    /// order becomes the data order, so this is not a jump.
+    pub fn clear(node: &Node) {
+        if let Some(shift) = node.first_resource::<Self>() {
+            shift.clear_offsets();
+        }
+    }
+
+    /// The displacement the row is holding or heading to.
+    pub fn target_offset(node: &Node) -> f32 {
+        node.first_resource::<Self>()
+            .map(|shift| shift.target.get())
+            .unwrap_or(0.0)
+    }
+
+    fn retarget(&self, target: f32) {
+        if self.target.get() == target {
+            return;
+        }
+        self.target.set(target);
+        self.release.set(self.current.get());
+        self.elapsed.set(0.0);
+        self.running.set(true);
+        if let (Some(scheduler), Some(controller)) = (
+            self.scheduler.borrow().as_ref(),
+            self.controller.borrow().as_ref(),
+        ) {
+            scheduler.register(controller.clone());
+        }
+    }
+
+    fn snap(&self, offset: f32) {
+        self.current.set(offset);
+        self.target.set(offset);
+        self.running.set(false);
+        self.place();
+    }
+
+    fn clear_offsets(&self) {
+        self.current.set(0.0);
+        self.target.set(0.0);
+        self.running.set(false);
     }
 
     /// Paints the row at its slot plus the current displacement.
@@ -620,11 +704,7 @@ impl ReorderRowShift {
             .filter(|node| node.parent().is_some());
         let Some(node) = node else { return };
         let origin = self.origin.get();
-        let progress = if self.running.get() {
-            self.release.get()
-        } else {
-            self.offset.get()
-        };
+        let progress = self.current.get();
         let frame = match self.axis.get() {
             ScrollAxis::Horizontal => {
                 Rect::new(origin.x + progress, origin.y, origin.width, origin.height)
@@ -646,24 +726,21 @@ impl ReorderRowShift {
             return;
         }
         let t = self.elapsed.get() as f32;
-        self.release
-            .set(spring.position(t, self.offset.get(), 0.0, 0.0));
+        self.current.set(spring.position(
+            t,
+            self.release.get(),
+            0.0,
+            self.target.get(),
+        ));
         self.place();
     }
 
     fn finish(&self) {
         if self.running.get() {
             self.running.set(false);
-            self.release.set(0.0);
+            self.current.set(self.target.get());
             self.place();
         }
-        if let (Some(scheduler), Some(controller)) = (
-            self.scheduler.borrow().as_ref(),
-            self.controller.borrow().as_ref(),
-        ) {
-            scheduler.unregister(controller);
-        }
-        self.controller.borrow_mut().take();
     }
 }
 
@@ -704,13 +781,14 @@ impl NodeResource for ReorderRowShift {
     fn mount(&self, node: &Node) {
         *self.node.borrow_mut() = Some(node.downgrade());
         *self.scheduler.borrow_mut() = Some(AnimatorScheduler::current());
-        // The slot frame is already resolved; draw the row one stride away
-        // and spring it home. Every later layout pass resets the frame to
-        // the slot, so the hook re-places the row while the slide runs.
-        let frame = node.frame();
-        self.origin.set(frame);
-        self.release.set(self.offset.get());
-        self.running.set(true);
+        // The slot frame is already resolved; the row paints at the slot plus
+        // its displacement. Every later layout pass resets the frame to the
+        // slot, so the hook re-places the row for as long as it is attached.
+        self.origin.set(node.frame());
+        self.release.set(self.current.get());
+        self.elapsed.set(0.0);
+        self.running
+            .set(self.current.get() != self.target.get() && !node.prefers_reduced_motion());
         self.place();
         let controller: Rc<dyn AnyAnimationController> = Rc::new(RowShiftController {
             shift: self.self_ref.borrow().clone(),
@@ -725,17 +803,15 @@ impl NodeResource for ReorderRowShift {
                 let Some(shift) = weak_self.upgrade() else {
                     return;
                 };
-                if shift.running.get() {
-                    shift.place();
-                } else {
-                    shift.origin.set(owner.frame());
-                }
+                shift.origin.set(owner.frame());
+                shift.place();
             }) as LayoutUpdateHook,
         ));
     }
 
     fn unmount(&self, node: &Node) {
         self.finish();
+        self.running.set(false);
         node.set_layout_did_update(None);
         *self.scheduler.borrow_mut() = None;
     }

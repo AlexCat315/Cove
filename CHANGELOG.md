@@ -4,6 +4,16 @@
 
 ## Unreleased
 
+- **ReorderableList 拖拽实时重排与动效统一（2026-11-05，破坏性）**：
+  - 拖拽改为实时重排，删除插入线：被拖动行的槽位跟随落点移动，它越过的每一行反向让出一个步长，拖动过程中画面就是松手后的顺序。移除 `ReorderableListModel::visible_boundary`、`drop_indicator_y` 与 `reorder-drop-indicator` 节点；`ReorderRowShift` 改为挂在行槽上的弹簧位移资源，新增 `slide_to`/`set_offset`/`clear`/`target_offset`，`live_offset` 给出投影位移。
+  - 落位不再二次滑动：投影已经把每行放到落点，释放只清除投影并回调 `on_move`，任何行都不会再滑第二次；浮起副本仍用弹簧落到目标槽位，占位行透明度在落位过程中回到满值。Escape 取消时投影弹回、副本飞回原槽位。
+  - 落位动画跨父级重建：新增 `session.ensure_begun`/`resume_settle` 与预览节点的会话 token，`scroll`/`shifts`/`settle` 进入 `dynamic_properties`，重建后弹簧从上一次的位置继续，孤儿会话自动退役且不会改写新会话状态。
+  - 新增 `.axis(ScrollAxis::Horizontal)`：滚动、拖拽、实时重排与落位动画整体转到横轴，键盘左/右方向键与上/下等效，`Both` 按纵向处理。
+  - 通用拖放预览（`Draggable`/`DropTarget`）加入 `DragPreviewFollower` 弹簧跟随与淡入淡出，减弱动效时贴住指针。
+  - 阈值收敛为 `primitives::interaction::DRAG_THRESHOLD`（6pt）与 `crossed`/`crossed_along_axis`，`Draggable`/`DropTarget`、`Tree`、`SwipeList`、`DataTable`、`WheelPicker` 共用；删除 `SwipeListState` 内联的 4pt 死区。
+  - 文档与示例：`reorderable-list.md` 改写拖拽段落并新增《轴向》，`drag-and-drop.md` 补《预览跟随与淡入淡出》《阈值统一》，`gallery.md` 目录行同步；Gallery Reordering 页新增横轴卡片条与顺序读数。
+  - 验证：`reorder_model` 与 `reorderable_list_tests` 共 34 项通过（新增 `drag_reflows_the_rows_live`、横轴指针/键盘回归，原插入线断言改为位移与绘制顺序断言）；compose 全量 1654 项通过。DevTools 真机指针拖拽已在明暗两套主题下目检纵轴与横轴：拖动中的实时重排无空隙无重叠、浮起副本跟随指针、松手后各行停在投影位置不再二次滑动，顺序读数与画面一致。
+
 - **媒体后端迁移到 FFmpeg（2026-11-05，破坏性）**：
   - `cove-media` 与 `cove-media-rhi` 的媒体 feature 由 `gst` 改为 `ffmpeg`。播放器、解复用、解码、重采样与 RGBA8 转换改为 `ffmpeg-sys-next 9.0.1`（静态源码构建，LGPL profile），音频设备输出改为 `cpal`；Wasm 不提供媒体后端。
   - 引擎按播放器拆分为泵线程与控制线程：所有 `AV*` 句柄只属于泵线程，控制线程负责命令路由、请求终态与操作期限；`abort` 通过 FFmpeg 中断回调中止阻塞 I/O，显式关闭可以打断卡住的打开。
