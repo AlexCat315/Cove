@@ -51,4 +51,4 @@ cargo xtask package android --release --package cove-mobile-example
 cargo xtask run ios --simulator --package cove-mobile-example
 ```
 
-平台实现和验证范围见 [迁移验证](Docs/rust-migration-validation.md)；测试通过不代表已消除其中列出的行为差异或完成设备验收。[逐文件映射](Docs/rust-migration-files.md)保留迁移来源及目标。发布变更记入 [CHANGELOG.md](CHANGELOG.md)。
+平台实现和验证范围见 [平台覆盖矩阵](crates/hosts/src/PLATFORM_COVERAGE.md)；测试通过不代表已完成设备验收。本地 `swift/` 参考树（不随仓库分发）保留迁移来源与逐文件映射。发布变更记入 [CHANGELOG.md](CHANGELOG.md)。

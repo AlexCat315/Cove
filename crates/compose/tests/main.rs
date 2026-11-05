@@ -4,6 +4,20 @@
 //!
 //! Tests that touch process-wide state take [`support::GlobalTestLock`].
 
+// Historical test fixtures predate the workspace lint gate; keep test-only
+// hygiene lints from failing the build.
+#![allow(
+    dead_code,
+    unused_assignments,
+    unused_imports,
+    clippy::doc_lazy_continuation,
+    clippy::double_ended_iterator_last,
+    clippy::field_reassign_with_default,
+    clippy::same_item_push,
+    clippy::single_range_in_vec_init,
+    clippy::useless_vec
+)]
+
 mod support;
 
 mod accessibility_semantics_tests;

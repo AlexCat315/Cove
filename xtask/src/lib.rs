@@ -39,7 +39,7 @@ enum Command {
         #[arg(long)]
         target: Vec<String>,
     },
-    /// Check the Rust workspace layout and retained Swift migration mappings.
+    /// Check the Rust workspace layout.
     Audit {
         #[arg(long)]
         json: bool,

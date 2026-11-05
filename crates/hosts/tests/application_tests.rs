@@ -48,10 +48,12 @@ fn defaults_are_idle_and_groups_are_independent() {
 #[test]
 fn invalid_frame_rates_use_the_display_cadence() {
     for value in [f64::NAN, f64::INFINITY, 0.0, -1.0] {
-        let mut config = ApplicationConfiguration::default();
-        config.frames = FramesConfiguration {
-            policy: AppFrameDrivePolicy::EventDriven,
-            target_rate: Some(value),
+        let config = ApplicationConfiguration {
+            frames: FramesConfiguration {
+                policy: AppFrameDrivePolicy::EventDriven,
+                target_rate: Some(value),
+            },
+            ..ApplicationConfiguration::default()
         };
         assert_eq!(
             config.frames.validated_target_rate(),
@@ -60,10 +62,12 @@ fn invalid_frame_rates_use_the_display_cadence() {
         );
     }
 
-    let mut config = ApplicationConfiguration::default();
-    config.frames = FramesConfiguration {
-        policy: AppFrameDrivePolicy::EventDriven,
-        target_rate: Some(1000.0),
+    let config = ApplicationConfiguration {
+        frames: FramesConfiguration {
+            policy: AppFrameDrivePolicy::EventDriven,
+            target_rate: Some(1000.0),
+        },
+        ..ApplicationConfiguration::default()
     };
     assert_eq!(
         config.frames.validated_target_rate(),

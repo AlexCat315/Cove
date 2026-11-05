@@ -565,12 +565,7 @@ impl<T: Clone + 'static> PrimitiveView for DropTargetHost<T> {
                 on_drop(value.clone());
             }
         });
-        session.register(
-            node,
-            erased_accepts,
-            erased_drop,
-            self.on_targeted.clone(),
-        );
+        session.register(node, erased_accepts, erased_drop, self.on_targeted.clone());
     }
 
     fn children(&self, _node: &Node) -> Vec<AnyView> {

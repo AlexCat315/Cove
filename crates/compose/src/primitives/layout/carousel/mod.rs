@@ -220,12 +220,9 @@ fn running_interval<Id: PartialEq + Eq + Clone + Send + Sync + 'static>(
     config: &CarouselConfig,
     actions: &CarouselActions<Id>,
 ) -> Option<f64> {
-    if config.autoplay.is_some()
-        && config.is_enabled
-        && config.page_count > 1
-        && (config.allows_wrap || actions.can_step(1))
-    {
-        Some(config.autoplay.expect("checked above").interval)
+    let autoplay = config.autoplay?;
+    if config.is_enabled && config.page_count > 1 && (config.allows_wrap || actions.can_step(1)) {
+        Some(autoplay.interval)
     } else {
         None
     }

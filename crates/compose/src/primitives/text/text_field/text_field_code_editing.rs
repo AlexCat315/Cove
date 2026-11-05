@@ -135,15 +135,17 @@ pub fn indent_lines(
             insertion.graphemes(true).map(str::to_owned),
         );
         let shift = insertion.graphemes(true).count() as isize - removed as isize;
-        let moved = |index: usize| -> usize {
+        let move_index = |index: usize| -> usize {
             if index < offset {
                 index
             } else {
                 ((index as isize + shift).max(offset as isize)) as usize
             }
         };
-        caret = moved(caret);
-        anchor = anchor.map(moved);
+        caret = move_index(caret);
+        if let Some(value) = anchor {
+            anchor = Some(move_index(value));
+        }
     }
     let text: String = characters.join("");
     if let Some(max_length) = max_length

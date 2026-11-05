@@ -397,8 +397,16 @@ impl Node {
             current.len(),
             "reorderChildren: count mismatch"
         );
-        let current_ids: HashSet<&Node> = current.iter().collect();
-        let next_ids: HashSet<&Node> = ordered.iter().collect();
+        // Identity, matching `PartialEq`/`Hash` for `Node`; the nodes' interior mutability
+        // must not be part of the key.
+        let current_ids: HashSet<usize> = current
+            .iter()
+            .map(|node| Rc::as_ptr(&node.0) as usize)
+            .collect();
+        let next_ids: HashSet<usize> = ordered
+            .iter()
+            .map(|node| Rc::as_ptr(&node.0) as usize)
+            .collect();
         assert!(
             current_ids == next_ids,
             "reorderChildren: membership mismatch"

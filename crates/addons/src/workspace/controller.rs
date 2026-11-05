@@ -1297,6 +1297,12 @@ fn unique_suffix() -> u64 {
     COUNTER.fetch_add(1, Ordering::Relaxed)
 }
 
+impl Drop for WorkspaceController {
+    fn drop(&mut self) {
+        self.changed.dispose();
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::super::model::{WorkspacePanel, WorkspaceSlot};
@@ -1391,11 +1397,5 @@ mod tests {
             "viewport",
         )));
         assert_eq!(hits.get(), 1);
-    }
-}
-
-impl Drop for WorkspaceController {
-    fn drop(&mut self) {
-        self.changed.dispose();
     }
 }

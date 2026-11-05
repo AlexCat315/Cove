@@ -9,6 +9,8 @@
 //! every optional one inherits its default, so the tests also prove that a
 //! backend can omit an operation instead of silently faking it.
 
+#![allow(dead_code)]
+
 use std::sync::{Arc, Mutex, MutexGuard};
 
 use cove_graphics::{

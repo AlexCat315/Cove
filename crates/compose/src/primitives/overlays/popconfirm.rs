@@ -129,7 +129,6 @@ impl Popconfirm {
         let on_confirm = self.on_confirm.clone();
         let enabled = self.is_enabled;
         let cancel = {
-            let is_presented = is_presented.clone();
             Button::with_options(
                 Text::new(question.cancel_title.clone()).semantic_font(SemanticFontRef::label()),
                 move || is_presented.set(false),

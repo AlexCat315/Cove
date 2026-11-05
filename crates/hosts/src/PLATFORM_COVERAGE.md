@@ -1,8 +1,8 @@
 # `cove-hosts` — platform coverage matrix
 
 Source: `crates/hosts/src/` (67 files, 10,452 lines). The Swift desktop host (`Hosts/Desktop/Sources/CoveUI`,
-26 files) and Android host (`Hosts/Android/Sources/`, 15 files) are deleted; their paths and SHA-256 remain in
-`Docs/rust-migration-files.json`.
+26 files) and Android host (`Hosts/Android/Sources/`, 15 files) are deleted; only the local, untracked
+`swift/` reference tree retains their paths.
 
 ## Threads
 

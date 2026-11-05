@@ -10,7 +10,9 @@ use std::rc::Rc;
 
 use crate::adaptive::WidthClassReader;
 use crate::animation::geometry::transforms::TransformViewExt;
-use crate::primitives::overlays::modal::{Modal, ModalDismissal, ModalPlacement, SheetDragHandle};
+use crate::primitives::overlays::modal::{
+    Modal, ModalDismissal, ModalGeometry, ModalPlacement, SheetDragHandle,
+};
 use crate::{AnyView, BoxView, TupleView, View};
 use cove_core::scene::{Align, FlexDirection, Justify, Wrap};
 use cove_core::{Binding, SizeClass};
@@ -147,20 +149,28 @@ impl View for BottomSheet {
                 .min(options.detents.len().saturating_sub(1));
             let height = options.detents.get(index).copied().unwrap_or(320.0);
 
-            let mut modal_options = crate::primitives::overlays::modal::ModalOptions::default();
-            modal_options.dismissal = options.dismissal;
-            modal_options.geometry.corner_radius = 12.0;
-            if compact {
-                modal_options.geometry.placement = ModalPlacement::Bottom;
-                modal_options.geometry.inset = 0.0;
-                modal_options.geometry.width = f32::MAX;
-                modal_options.geometry.height = height;
+            let geometry = if compact {
+                ModalGeometry {
+                    width: f32::MAX,
+                    height,
+                    inset: 0.0,
+                    corner_radius: 12.0,
+                    placement: ModalPlacement::Bottom,
+                }
             } else {
-                modal_options.geometry.placement = ModalPlacement::Center;
-                modal_options.geometry.inset = options.dialog_inset;
-                modal_options.geometry.width = options.dialog_width;
-                modal_options.geometry.height = height;
-            }
+                ModalGeometry {
+                    width: options.dialog_width,
+                    height,
+                    inset: options.dialog_inset,
+                    corner_radius: 12.0,
+                    placement: ModalPlacement::Center,
+                }
+            };
+            let modal_options = crate::primitives::overlays::modal::ModalOptions {
+                dismissal: options.dismissal,
+                geometry,
+                ..Default::default()
+            };
 
             let mut column: Vec<AnyView> = Vec::new();
             if options.shows_handle {

@@ -132,7 +132,7 @@ impl GridRowHeights {
     }
 
     fn bounded_index(value: f32, count: usize) -> usize {
-        if !(value > 0.0) {
+        if value.partial_cmp(&0.0) != Some(std::cmp::Ordering::Greater) {
             return 0;
         }
         if value < count as f32 {

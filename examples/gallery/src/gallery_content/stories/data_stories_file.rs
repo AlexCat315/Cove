@@ -398,9 +398,7 @@ impl View for TreeStory {
             select_status.set(format!("Selected {}", node.title));
         });
         let expand_status = self.status.clone();
-        let on_expand: Rc<
-            dyn Fn(&SceneNode, bool, &HashSet<TreeNodeKey<String>>),
-        > = Rc::new(
+        let on_expand: Rc<dyn Fn(&SceneNode, bool, &HashSet<TreeNodeKey<String>>)> = Rc::new(
             move |node: &SceneNode, expanded: bool, _keys: &HashSet<TreeNodeKey<String>>| {
                 expand_status.set(format!(
                     "{} {}",

@@ -382,91 +382,89 @@ impl View for UploadProgress {
         let current = self.state.get();
         let state = self.state.clone();
         let is_enabled = self.is_enabled;
-        AnyView::new(ThemeReader::new(move |theme: &Theme| {
-            match &current {
-                UploadState::Idle => empty_view(),
-                UploadState::Succeeded(_) | UploadState::Failed(_) => {
-                    let tone = match &current {
-                        UploadState::Succeeded(_) => StatusTone::Success,
-                        _ => StatusTone::Danger,
-                    };
-                    let tint = tone.color().resolve(theme);
-                    let message = current.status_text().unwrap_or_default();
-                    let row = crate::BoxView::new(
-                        FlexDirection::Row,
-                        Align::Center,
-                        Justify::FlexStart,
-                        Wrap::NoWrap,
-                        8.0,
-                        AnyView::new(cove_composition::TupleView::new(vec![
-                            AnyView::new(Icon::with_color(tone.icon(), 16.0, tint)),
-                            AnyView::new(
-                                Text::new(message)
-                                    .line_limit(Some(2))
-                                    .semantic_font(SemanticFontRef::body())
-                                    .semantic_foreground(tone.color())
-                                    .flex(1.0),
-                            ),
-                        ])),
-                    )
-                    .padding_edges(12.0, 10.0)
-                    .background_color(tint.multiplied_alpha(0.10))
-                    .corner_radius(theme.radius.md);
-                    AnyView::new(row)
-                }
-                UploadState::Preparing | UploadState::Uploading { .. } => {
-                    let message = match &current {
-                        UploadState::Uploading { sent, total } if *total > 0 => {
-                            format!("{:.0}%", (*sent as f64 / *total as f64) * 100.0)
+        AnyView::new(ThemeReader::new(move |theme: &Theme| match &current {
+            UploadState::Idle => empty_view(),
+            UploadState::Succeeded(_) | UploadState::Failed(_) => {
+                let tone = match &current {
+                    UploadState::Succeeded(_) => StatusTone::Success,
+                    _ => StatusTone::Danger,
+                };
+                let tint = tone.color().resolve(theme);
+                let message = current.status_text().unwrap_or_default();
+                let row = crate::BoxView::new(
+                    FlexDirection::Row,
+                    Align::Center,
+                    Justify::FlexStart,
+                    Wrap::NoWrap,
+                    8.0,
+                    AnyView::new(cove_composition::TupleView::new(vec![
+                        AnyView::new(Icon::with_color(tone.icon(), 16.0, tint)),
+                        AnyView::new(
+                            Text::new(message)
+                                .line_limit(Some(2))
+                                .semantic_font(SemanticFontRef::body())
+                                .semantic_foreground(tone.color())
+                                .flex(1.0),
+                        ),
+                    ])),
+                )
+                .padding_edges(12.0, 10.0)
+                .background_color(tint.multiplied_alpha(0.10))
+                .corner_radius(theme.radius.md);
+                AnyView::new(row)
+            }
+            UploadState::Preparing | UploadState::Uploading { .. } => {
+                let message = match &current {
+                    UploadState::Uploading { sent, total } if *total > 0 => {
+                        format!("{:.0}%", (*sent as f64 / *total as f64) * 100.0)
+                    }
+                    UploadState::Preparing => "Preparing…".into(),
+                    _ => "Uploading…".into(),
+                };
+                let state = state.clone();
+                let cancel = Button::with_options(
+                    Text::new("Cancel"),
+                    move || {
+                        if state.get().is_busy() {
+                            state.set(UploadState::Failed(UploadError::Cancelled));
                         }
-                        UploadState::Preparing => "Preparing…".into(),
-                        _ => "Uploading…".into(),
-                    };
-                    let state = state.clone();
-                    let cancel = Button::with_options(
-                        Text::new("Cancel"),
-                        move || {
-                            if state.get().is_busy() {
-                                state.set(UploadState::Failed(UploadError::Cancelled));
-                            }
-                        },
-                        ButtonRole::Normal,
-                        is_enabled,
-                        false,
-                        false,
-                        None,
-                    )
-                    .accessibility_text("Cancel upload")
-                    .button_style(GhostButtonStyle);
-                    let cancel = AnyView::new(cancel.control_size(ControlSize::Small));
-                    let bar = AnyView::new(
-                        ProgressView::new(current.progress())
-                            .tone(StatusTone::Info)
-                            .height(4.0)
-                            .flex(1.0),
-                    );
-                    let row = crate::BoxView::new(
-                        FlexDirection::Row,
-                        Align::Center,
-                        Justify::FlexStart,
-                        Wrap::NoWrap,
-                        12.0,
-                        AnyView::new(cove_composition::TupleView::new(vec![
-                            bar,
-                            AnyView::new(
-                                Text::new(message)
-                                    .alignment(cove_core::TextAlignment::Trailing)
-                                    .semantic_font(SemanticFontRef::label())
-                                    .semantic_foreground(SemanticColorRef::on_surface_variant()),
-                            ),
-                            cancel,
-                        ])),
-                    )
-                    .padding_edges(12.0, 10.0)
-                    .background_color(theme.colors.surface_variant.multiplied_alpha(0.55))
-                    .corner_radius(theme.radius.md);
-                    AnyView::new(row)
-                }
+                    },
+                    ButtonRole::Normal,
+                    is_enabled,
+                    false,
+                    false,
+                    None,
+                )
+                .accessibility_text("Cancel upload")
+                .button_style(GhostButtonStyle);
+                let cancel = AnyView::new(cancel.control_size(ControlSize::Small));
+                let bar = AnyView::new(
+                    ProgressView::new(current.progress())
+                        .tone(StatusTone::Info)
+                        .height(4.0)
+                        .flex(1.0),
+                );
+                let row = crate::BoxView::new(
+                    FlexDirection::Row,
+                    Align::Center,
+                    Justify::FlexStart,
+                    Wrap::NoWrap,
+                    12.0,
+                    AnyView::new(cove_composition::TupleView::new(vec![
+                        bar,
+                        AnyView::new(
+                            Text::new(message)
+                                .alignment(cove_core::TextAlignment::Trailing)
+                                .semantic_font(SemanticFontRef::label())
+                                .semantic_foreground(SemanticColorRef::on_surface_variant()),
+                        ),
+                        cancel,
+                    ])),
+                )
+                .padding_edges(12.0, 10.0)
+                .background_color(theme.colors.surface_variant.multiplied_alpha(0.55))
+                .corner_radius(theme.radius.md);
+                AnyView::new(row)
             }
         }))
     }

@@ -22,7 +22,7 @@ use super::model::{
     WorkspacePanelRegistry, WorkspaceTabGroup,
 };
 use super::sizing::{WorkspaceLayoutMetrics, WorkspaceResolvedSplit, WorkspaceSizingResolver};
-use super::theme::{WorkspaceRegionSizing, WorkspaceTheme};
+use super::theme::WorkspaceRegionSizing;
 use super::view::{
     RESIZE_GEOMETRY_KEY, WorkspaceBox, WorkspacePane, WorkspaceRegionTransition,
     WorkspaceResizeGeometry, chrome_rail_slots, collapsed_groups_on, rail_groups, rail_plan,
@@ -421,7 +421,7 @@ impl PrimitiveView for WorkspaceExtentBody {
 
     fn update_node(&self, node: &Node) {
         node.set_clips_to_bounds(false);
-        let extent = self.extent.clone();
+        let extent = self.extent;
         let horizontal = self.horizontal;
         node.set_layout_did_update(Some(Rc::new(move |node| {
             WorkspaceExtent::measure(horizontal, &extent, node);
@@ -476,7 +476,7 @@ impl View for WorkspaceShell {
         erased(
             AnyView::new(WorkspaceExtentBody {
                 horizontal: false,
-                extent: extent.clone(),
+                extent,
                 build: Rc::new(move |height| {
                     build_shell(
                         document.clone(),
@@ -653,7 +653,7 @@ impl View for WorkspaceMainRow {
         erased(
             AnyView::new(WorkspaceExtentBody {
                 horizontal: true,
-                extent: extent.clone(),
+                extent,
                 build: Rc::new(move |width| {
                     build_main_row(
                         document.clone(),
@@ -738,93 +738,94 @@ fn build_main_row(
     let leading_rail_thickness = leading_rail.as_ref().map_or(RAIL_THICKNESS, |plan| plan.2);
     let trailing_rail_thickness = trailing_rail.as_ref().map_or(RAIL_THICKNESS, |plan| plan.2);
 
-    let mut children: Vec<AnyView> = Vec::new();
-    children.push(AnyView::new(WorkspaceRegionTransition::new(
-        leading_rail.is_some(),
-        true,
-        WorkspaceRegionSizing::Points(leading_rail_thickness),
-        Some(match &leading_rail {
-            Some(plan) => AnyView::new(WorkspaceRail {
-                slot_id: plan.0.clone(),
-                edge_override: Some(plan.1),
-                thickness: plan.2,
-                groups_override: Some(plan.3.clone()),
+    let children: Vec<AnyView> = vec![
+        AnyView::new(WorkspaceRegionTransition::new(
+            leading_rail.is_some(),
+            true,
+            WorkspaceRegionSizing::Points(leading_rail_thickness),
+            Some(match &leading_rail {
+                Some(plan) => AnyView::new(WorkspaceRail {
+                    slot_id: plan.0.clone(),
+                    edge_override: Some(plan.1),
+                    thickness: plan.2,
+                    groups_override: Some(plan.3.clone()),
+                    document: document.clone(),
+                    controller: controller.clone(),
+                }),
+                None => AnyView::new(EmptyView),
+            }),
+        )),
+        AnyView::new(WorkspaceRegionTransition::new(
+            leading_visible,
+            true,
+            WorkspaceRegionSizing::Fraction(leading_weight),
+            Some(AnyView::new(WorkspaceSlotView {
+                slot_id: WorkspaceSlotID::leading(),
                 document: document.clone(),
                 controller: controller.clone(),
-            }),
-            None => AnyView::new(EmptyView),
-        }),
-    )));
-    children.push(AnyView::new(WorkspaceRegionTransition::new(
-        leading_visible,
-        true,
-        WorkspaceRegionSizing::Fraction(leading_weight),
-        Some(AnyView::new(WorkspaceSlotView {
-            slot_id: WorkspaceSlotID::leading(),
-            document: document.clone(),
-            controller: controller.clone(),
-            content: content.clone(),
-        })),
-    )));
-    children.push(AnyView::new(WorkspaceRegionTransition::new(
-        leading_visible,
-        true,
-        WorkspaceRegionSizing::Divider,
-        Some(AnyView::new(WorkspaceSplitDivider::named(
-            "leading",
+                content: content.clone(),
+            })),
+        )),
+        AnyView::new(WorkspaceRegionTransition::new(
+            leading_visible,
             true,
-            controller.clone(),
-        ))),
-    )));
-    children.push(erased(
-        AnyView::new(WorkspaceCenterColumn {
-            document: document.clone(),
-            controller: controller.clone(),
-            content: content.clone(),
-            metrics,
-        })
-        .flex_with(center_weight, 1.0, Some(0.0))
-        .modifier(WorkspaceLayoutAnimation {
-            phase: phase.clone(),
-        }),
-    ));
-    children.push(AnyView::new(WorkspaceRegionTransition::new(
-        trailing_visible,
-        true,
-        WorkspaceRegionSizing::Divider,
-        Some(AnyView::new(WorkspaceSplitDivider::named(
-            "centerTrailing",
-            true,
-            controller.clone(),
-        ))),
-    )));
-    children.push(AnyView::new(WorkspaceRegionTransition::new(
-        trailing_visible,
-        true,
-        WorkspaceRegionSizing::Fraction(trailing_weight),
-        Some(AnyView::new(WorkspaceSlotView {
-            slot_id: WorkspaceSlotID::trailing(),
-            document: document.clone(),
-            controller: controller.clone(),
-            content: content.clone(),
-        })),
-    )));
-    children.push(AnyView::new(WorkspaceRegionTransition::new(
-        trailing_rail.is_some(),
-        true,
-        WorkspaceRegionSizing::Points(trailing_rail_thickness),
-        Some(match &trailing_rail {
-            Some(plan) => AnyView::new(WorkspaceRail {
-                slot_id: plan.0.clone(),
-                edge_override: Some(plan.1),
-                thickness: plan.2,
-                groups_override: Some(plan.3.clone()),
+            WorkspaceRegionSizing::Divider,
+            Some(AnyView::new(WorkspaceSplitDivider::named(
+                "leading",
+                true,
+                controller.clone(),
+            ))),
+        )),
+        erased(
+            AnyView::new(WorkspaceCenterColumn {
                 document: document.clone(),
                 controller: controller.clone(),
+                content: content.clone(),
+                metrics,
+            })
+            .flex_with(center_weight, 1.0, Some(0.0))
+            .modifier(WorkspaceLayoutAnimation {
+                phase: phase.clone(),
             }),
-            None => AnyView::new(EmptyView),
-        }),
-    )));
+        ),
+        AnyView::new(WorkspaceRegionTransition::new(
+            trailing_visible,
+            true,
+            WorkspaceRegionSizing::Divider,
+            Some(AnyView::new(WorkspaceSplitDivider::named(
+                "centerTrailing",
+                true,
+                controller.clone(),
+            ))),
+        )),
+        AnyView::new(WorkspaceRegionTransition::new(
+            trailing_visible,
+            true,
+            WorkspaceRegionSizing::Fraction(trailing_weight),
+            Some(AnyView::new(WorkspaceSlotView {
+                slot_id: WorkspaceSlotID::trailing(),
+                document: document.clone(),
+                controller: controller.clone(),
+                content: content.clone(),
+            })),
+        )),
+        AnyView::new(WorkspaceRegionTransition::new(
+            trailing_rail.is_some(),
+            true,
+            WorkspaceRegionSizing::Points(trailing_rail_thickness),
+            Some(match &trailing_rail {
+                Some(plan) => AnyView::new(WorkspaceRail {
+                    slot_id: plan.0.clone(),
+                    edge_override: Some(plan.1),
+                    thickness: plan.2,
+                    groups_override: Some(plan.3.clone()),
+                    document: document.clone(),
+                    controller: controller.clone(),
+                }),
+                None => AnyView::new(EmptyView),
+            }),
+        )),
+    ];
 
     let geometry = vec![
         WorkspaceResizeGeometry {
@@ -879,7 +880,7 @@ impl View for WorkspaceCenterColumn {
         erased(
             AnyView::new(WorkspaceExtentBody {
                 horizontal: false,
-                extent: extent.clone(),
+                extent,
                 build: Rc::new(move |height| {
                     build_center_column(
                         document.clone(),
@@ -1818,7 +1819,8 @@ impl View for WorkspaceTabBar {
         erased(WorkspaceMetricsReader {
             build: Rc::new(move |metrics| {
                 let scroller = scroller.clone();
-                let content = erased(
+
+                erased(
                     AnyView::new(
                         WorkspaceBox::row()
                             .align(Align::Center)
@@ -1831,9 +1833,8 @@ impl View for WorkspaceTabBar {
                             })
                             .boxed(),
                     )
-                    .modifier(WorkspaceTabBarModifier { metrics: metrics }),
-                );
-                content
+                    .modifier(WorkspaceTabBarModifier { metrics }),
+                )
             }),
         })
     }

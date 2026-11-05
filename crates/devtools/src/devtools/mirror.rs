@@ -623,6 +623,7 @@ fn forward_dct(block: &[f32; 64], output: &mut [i32; 64], quant: &[u8; 64]) {
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn write_jpeg(
     out: &mut Vec<u8>,
     width: usize,

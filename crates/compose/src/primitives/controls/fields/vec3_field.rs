@@ -234,7 +234,7 @@ impl Vec3Field {
 
 impl View for Vec3Field {
     fn body(&self, _cx: &Scope) -> AnyView {
-        let axes = vec![
+        let axes = [
             self.axis(Vec3Axis::X, self.x.clone()),
             self.axis(Vec3Axis::Y, self.y.clone()),
             self.axis(Vec3Axis::Z, self.z.clone()),

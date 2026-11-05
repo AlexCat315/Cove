@@ -11,6 +11,8 @@
 //! - [`abi`] — the `#[unsafe(no_mangle)]` C exports and allocation helpers.
 //! - [`prototype`] — the reactor that owns scene, text, draw list and DevTools.
 
+#![allow(clippy::module_inception)]
+
 pub mod abi;
 pub mod counter;
 pub mod frame;

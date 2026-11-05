@@ -21,27 +21,31 @@ use std::rc::Rc;
 
 use cove_composition::AnyView;
 use cove_core::InputCapabilities;
-use cove_core::{Environment, Idiom, Insets, Keyboard, TextScale};
+use cove_core::{Environment, Idiom, Insets, Keyboard, TextScale, Viewport};
 use cove_examples::gallery_content::stories::viewport_traits::ViewportTraitsStory;
 use cove_ui_compose::adaptive::SurfaceEnvironmentExt;
 
 use support::GalleryScene;
 
 fn phone_environment() -> Environment {
-    let mut surface = Environment::default();
-    surface.idiom = Idiom::Phone;
-    surface.viewport.width = 393.0;
-    surface.viewport.height = 852.0;
-    surface.safe_area = Insets {
-        top: 59.0,
-        leading: 0.0,
-        bottom: 34.0,
-        trailing: 0.0,
-    };
-    surface.keyboard = Keyboard { height: 336.0 };
-    surface.text_scale = TextScale::linear(1.3);
-    surface.input = InputCapabilities::TOUCH | InputCapabilities::KEYBOARD;
-    surface
+    Environment {
+        idiom: Idiom::Phone,
+        viewport: Viewport {
+            width: 393.0,
+            height: 852.0,
+            ..Viewport::default()
+        },
+        safe_area: Insets {
+            top: 59.0,
+            leading: 0.0,
+            bottom: 34.0,
+            trailing: 0.0,
+        },
+        keyboard: Keyboard { height: 336.0 },
+        text_scale: TextScale::linear(1.3),
+        input: InputCapabilities::TOUCH | InputCapabilities::KEYBOARD,
+        ..Environment::default()
+    }
 }
 
 #[test]

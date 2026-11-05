@@ -244,7 +244,7 @@ impl Fixture {
         let selection = self.selected_row.binding();
         AnyView::new(
             List::new((0..30).collect(), |value: &usize, _: RowState| {
-                let value = value.clone();
+                let value = *value;
 
                 AnyView::new(
                     ListRow::new(format!(

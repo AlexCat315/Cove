@@ -141,7 +141,7 @@ fn all_interactive_families_reach_the_touch_extent() {
                     AnyView::new(Rating::new("Rating", 2.0, |_| {}).debug_name("rating")),
                     AnyView::new(
                         List::new((0..8_usize).collect(), |item: &usize, _: RowState| {
-                            let item = item.clone();
+                            let item = *item;
 
                             AnyView::new(cove_ui_compose::primitives::text::Text::new(format!(
                                 "Row {item}"

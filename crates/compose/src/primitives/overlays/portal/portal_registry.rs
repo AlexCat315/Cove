@@ -743,7 +743,6 @@ impl PortalResource {
 
     /// Resources cannot produce a weak handle to themselves; callers that need
     /// the settled callback use this hook, set by `new`.
-
     fn self_weak(&self) -> Weak<PortalResource> {
         self.me.borrow().clone()
     }

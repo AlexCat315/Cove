@@ -431,8 +431,7 @@ fn closed_rows_use_the_full_width_for_content() {
         let label = scene
             .all(|node| {
                 node.accessibility().is_some_and(|semantics| {
-                    semantics.role == AccessibilityRole::StaticText
-                        && semantics.label == "Item 1"
+                    semantics.role == AccessibilityRole::StaticText && semantics.label == "Item 1"
                 })
             })
             .into_iter()

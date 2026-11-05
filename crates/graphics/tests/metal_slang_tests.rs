@@ -33,24 +33,24 @@ use cove_graphics::rhi::{
 
 /// Why the Slang integration cases cannot run here.
 enum FixtureUnavailable {
-    NoCompiler,
-    NoArtifact(&'static str),
-    NoDevice,
-    NoMeshShading,
+    Compiler,
+    Artifact(&'static str),
+    Device,
+    MeshShading,
 }
 
 impl std::fmt::Display for FixtureUnavailable {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::NoCompiler => formatter.write_str(
+            Self::Compiler => formatter.write_str(
                 "no Slang compiler tool is available (Swift required SLANGC and cove-dev)",
             ),
-            Self::NoArtifact(name) => write!(
+            Self::Artifact(name) => write!(
                 formatter,
                 "no compiled artifact for the `{name}` fixture (the Rust tree has no cove-dev to produce it)"
             ),
-            Self::NoDevice => formatter.write_str("no Metal device is available on this host"),
-            Self::NoMeshShading => formatter.write_str("this Metal GPU has no mesh shader support"),
+            Self::Device => formatter.write_str("no Metal device is available on this host"),
+            Self::MeshShading => formatter.write_str("this Metal GPU has no mesh shader support"),
         }
     }
 }
@@ -75,7 +75,7 @@ fn metal_device() -> Result<Device, FixtureUnavailable> {
         preferred_backends: vec![GraphicsApi::Metal],
         ..DeviceConfig::default()
     })
-    .map_err(|_| FixtureUnavailable::NoDevice)
+    .map_err(|_| FixtureUnavailable::Device)
 }
 
 #[test]
@@ -83,14 +83,14 @@ fn slang_compute_uses_reflected_eight_thread_workgroups() {
     if std::env::var_os("SLANGC").is_none() {
         eprintln!(
             "skipping the Slang compute case: {}",
-            FixtureUnavailable::NoCompiler
+            FixtureUnavailable::Compiler
         );
         return;
     }
     let Some(artifact) = compiled_artifact("compute", ShaderStage::Compute) else {
         eprintln!(
             "skipping the Slang compute case: {}",
-            FixtureUnavailable::NoArtifact("compute")
+            FixtureUnavailable::Artifact("compute")
         );
         return;
     };
@@ -192,7 +192,7 @@ fn slang_mesh_pipeline_draws_green_triangle() {
     if std::env::var_os("SLANGC").is_none() {
         eprintln!(
             "skipping the Slang mesh case: {}",
-            FixtureUnavailable::NoCompiler
+            FixtureUnavailable::Compiler
         );
         return;
     }
@@ -201,14 +201,14 @@ fn slang_mesh_pipeline_draws_green_triangle() {
     let Some(mesh_artifact) = compiled_artifact("mesh", ShaderStage::Mesh) else {
         eprintln!(
             "skipping the Slang mesh case: {}",
-            FixtureUnavailable::NoArtifact("mesh")
+            FixtureUnavailable::Artifact("mesh")
         );
         return;
     };
     let Some(fragment_artifact) = compiled_artifact("mesh", ShaderStage::Fragment) else {
         eprintln!(
             "skipping the Slang mesh case: {}",
-            FixtureUnavailable::NoArtifact("mesh")
+            FixtureUnavailable::Artifact("mesh")
         );
         return;
     };
@@ -223,7 +223,7 @@ fn slang_mesh_pipeline_draws_green_triangle() {
     if !device.capabilities().mesh_shading.mesh {
         eprintln!(
             "skipping the Slang mesh case: {}",
-            FixtureUnavailable::NoMeshShading
+            FixtureUnavailable::MeshShading
         );
         return;
     }

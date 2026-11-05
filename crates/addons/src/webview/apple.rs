@@ -45,7 +45,9 @@ pub struct AppleSurfaceState {
 impl AppleSurfaceState {
     fn publish(&mut self) {
         if let Some(web_view) = &self.web_view {
+            // SAFETY: WebKit accessors run on the main thread with the retained view.
             self.state.can_go_back = unsafe { web_view.canGoBack() };
+            // SAFETY: same retained view, main thread.
             self.state.can_go_forward = unsafe { web_view.canGoForward() };
         }
         if let Some(callback) = &self.on_state_change {
@@ -59,6 +61,7 @@ impl AppleSurfaceState {
         // A link inside a local document leaves HTML mode. Keep reporting the
         // real URL from that point so Back/Forward and status text stay honest.
         let current_url = self.web_view.as_ref().and_then(|web_view| {
+            // SAFETY: retained WebKit view accessed on the main thread.
             unsafe { web_view.URL() }
                 .and_then(|url| url.absoluteString())
                 .map(|value| value.to_string())
@@ -81,10 +84,12 @@ impl AppleSurfaceState {
         self.state.error_description = None;
         if let Some(web_view) = &self.web_view {
             if !self.loads_html
+                // SAFETY: retained WebKit view accessed on the main thread.
                 && let Some(url) = unsafe { web_view.URL() }.and_then(|url| url.absoluteString())
             {
                 self.state.url = Some(url.to_string());
             }
+            // SAFETY: retained WebKit view accessed on the main thread.
             if let Some(title) = unsafe { web_view.title() } {
                 let title = title.to_string();
                 if !title.is_empty() {
@@ -103,6 +108,7 @@ impl AppleSurfaceState {
         self.state.error_description = Some(description.to_string());
         if !self.loads_html && self.state.url.is_none() {
             self.state.url = self.web_view.as_ref().and_then(|web_view| {
+                // SAFETY: retained WebKit view accessed on the main thread.
                 unsafe { web_view.URL() }
                     .and_then(|url| url.absoluteString())
                     .map(|value| value.to_string())
@@ -205,6 +211,8 @@ define_class!(
 impl AppleNavigationDelegate {
     fn new(mtm: MainThreadMarker, surface: Weak<RefCell<AppleSurfaceState>>) -> Retained<Self> {
         let this = Self::alloc(mtm).set_ivars(DelegateIvars { surface });
+        // SAFETY: `NSObject` init on a freshly allocated instance; `super` is the
+        // class returned by `alloc`.
         unsafe { msg_send![super(this), init] }
     }
 }
@@ -328,7 +336,9 @@ impl AppleWebKitSurface {
         container.setWantsLayer(true);
         container.setHidden(true);
 
+        // SAFETY: main-thread-only `WKWebViewConfiguration` construction.
         let configuration = unsafe { WKWebViewConfiguration::new(mtm) };
+        // SAFETY: the view is allocated for the main thread and configuration is live.
         let web_view = unsafe {
             WKWebView::initWithFrame_configuration(
                 WKWebView::alloc(mtm),
@@ -342,12 +352,14 @@ impl AppleWebKitSurface {
                 &configuration,
             )
         };
+        // SAFETY: Setter on a view this surface owns, called on the main thread.
         unsafe { web_view.setAllowsBackForwardNavigationGestures(true) };
         container.addSubview(&web_view);
 
         let delegate = AppleNavigationDelegate::new(mtm, Rc::downgrade(&self.state));
         // WebKit holds the delegate weakly; the surface must retain it.
         let delegate_object = objc2::runtime::ProtocolObject::from_ref(&*delegate);
+        // SAFETY: `delegate_object` outlives the call and is a live WKNavigationDelegate.
         unsafe { web_view.setNavigationDelegate(Some(delegate_object)) };
 
         self.container = Some(container);
@@ -391,6 +403,7 @@ impl WebViewSurface for AppleWebKitSurface {
                     NSURL::URLWithString(&objc2_foundation::NSString::from_str(url))
                 {
                     let request = NSURLRequest::requestWithURL(&ns_url);
+                    // SAFETY: load issued on the main-thread WebKit view with a live request.
                     let _ = unsafe { web_view.loadRequest(&request) };
                 }
             }
@@ -399,6 +412,7 @@ impl WebViewSurface for AppleWebKitSurface {
                 let base = base_url.as_ref().and_then(|url| {
                     NSURL::URLWithString(&objc2_foundation::NSString::from_str(url))
                 });
+                // SAFETY: load issued on the main-thread WebKit view; strings are live.
                 let _ = unsafe { web_view.loadHTMLString_baseURL(&body, base.as_deref()) };
             }
         }
@@ -410,12 +424,16 @@ impl WebViewSurface for AppleWebKitSurface {
         let Some(web_view) = web_view else { return };
         match command {
             WebViewCommand::Back => {
+                // SAFETY: navigation calls target the retained main-thread WebKit view.
                 if unsafe { web_view.canGoBack() } {
+                    // SAFETY: guarded by the back-forward list check above.
                     let _ = unsafe { web_view.goBack() };
                 }
             }
             WebViewCommand::Forward => {
+                // SAFETY: navigation calls target the retained main-thread WebKit view.
                 if unsafe { web_view.canGoForward() } {
+                    // SAFETY: guarded by the back-forward list check above.
                     let _ = unsafe { web_view.goForward() };
                 }
             }
@@ -425,9 +443,11 @@ impl WebViewSurface for AppleWebKitSurface {
                     state.state.phase = WebViewPhase::Loading;
                     state.state.error_description = None;
                 }
+                // SAFETY: reload targets the retained main-thread WebKit view.
                 let _ = unsafe { web_view.reload() };
             }
             WebViewCommand::Stop => {
+                // SAFETY: stop targets the retained main-thread WebKit view.
                 unsafe { web_view.stopLoading() };
                 self.state.borrow_mut().state.phase = WebViewPhase::Loaded;
             }
@@ -471,6 +491,7 @@ impl WebViewSurface for AppleWebKitSurface {
             return;
         };
         // Re-parent when the window changed.
+        // SAFETY: AppKit accessor on a live view, called on the main thread.
         if unsafe { container.superview() }.as_deref() != Some(&*content_view) {
             container.removeFromSuperview();
             content_view.addSubview(&container);
@@ -485,7 +506,9 @@ impl WebViewSurface for AppleWebKitSurface {
             let mut state = self.state.borrow_mut();
             state.detached = true;
             if let Some(web_view) = state.web_view.take() {
+                // SAFETY: teardown runs on the main thread while the view is still retained.
                 unsafe { web_view.stopLoading() };
+                // SAFETY: clearing the delegate is safe on a view being detached.
                 unsafe { web_view.setNavigationDelegate(None) };
                 web_view.removeFromSuperview();
             }

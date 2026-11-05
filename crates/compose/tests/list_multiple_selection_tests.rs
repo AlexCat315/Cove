@@ -34,7 +34,7 @@ const ROWS: [i32; 4] = [10, 20, 30, 40];
 fn harness(selection: State<BTreeSet<i32>>) -> AnyView {
     AnyView::new(
         List::new(ROWS.to_vec(), |item: &i32, _: RowState| {
-            let item = item.clone();
+            let item = *item;
             AnyView::new(Text::new(format!("{item}")))
         })
         .selection(Selection::multiple(Binding::new(

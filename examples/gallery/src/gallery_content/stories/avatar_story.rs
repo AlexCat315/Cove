@@ -275,7 +275,7 @@ impl View for AvatarStory {
                             ] {
                                 tiles.push(AnyView::new(Avatar::new("Ada Lovelace").configure(
                                     move |appearance| {
-                                        appearance.shape = shape.clone();
+                                        appearance.shape = shape;
                                     },
                                 )));
                             }

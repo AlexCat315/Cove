@@ -13,6 +13,8 @@
 //! the Compose suites use, and it is what makes the Swift `.serialized` trait a
 //! no-op here.
 
+#![allow(dead_code)]
+
 use std::rc::Rc;
 use std::sync::{Mutex, MutexGuard, OnceLock};
 

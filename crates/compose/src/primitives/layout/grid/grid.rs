@@ -336,8 +336,7 @@ fn native_columns(
                 let minimum = GridTrackResolver::finite_nonnegative(*minimum).max(1.0);
                 ((cell.frame().width + gap) / (minimum + gap))
                     .floor()
-                    .max(1.0)
-                    .min(32767.0) as usize
+                    .clamp(1.0, 32767.0) as usize
             } else {
                 1
             };

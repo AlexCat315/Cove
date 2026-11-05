@@ -486,6 +486,7 @@ pub unsafe extern "C" fn cove_android_open(
 /// `pointer` must be null or a live session pointer.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn cove_android_frame(pointer: SessionPointer, timestamp: u64) -> i32 {
+    // SAFETY: the caller's `# Safety` contract guarantees a null or live session pointer.
     let Some(handle) = (unsafe { session(pointer) }) else {
         return 0;
     };
@@ -508,6 +509,7 @@ pub unsafe extern "C" fn cove_android_frame(pointer: SessionPointer, timestamp: 
 /// `pointer` must be null or a live session pointer.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn cove_android_pointer(pointer: SessionPointer, kind: i32, x: f32, y: f32) {
+    // SAFETY: the caller's `# Safety` contract guarantees a null or live session pointer.
     let Some(handle) = (unsafe { session(pointer) }) else {
         return;
     };
@@ -526,6 +528,7 @@ pub unsafe extern "C" fn cove_android_text(
     count: i32,
     composing: i32,
 ) {
+    // SAFETY: the caller's `# Safety` contract guarantees a null or live session pointer.
     let Some(handle) = (unsafe { session(pointer) }) else {
         return;
     };
@@ -541,6 +544,7 @@ pub unsafe extern "C" fn cove_android_text(
 /// `pointer` must be null or a live session pointer.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn cove_android_key(pointer: SessionPointer, scancode: u32, modifiers: u16) {
+    // SAFETY: the caller's `# Safety` contract guarantees a null or live session pointer.
     let Some(handle) = (unsafe { session(pointer) }) else {
         return;
     };
@@ -562,6 +566,7 @@ pub unsafe extern "C" fn cove_android_scroll(
     delta_x: f32,
     delta_y: f32,
 ) {
+    // SAFETY: the caller's `# Safety` contract guarantees a null or live session pointer.
     let Some(handle) = (unsafe { session(pointer) }) else {
         return;
     };
@@ -589,6 +594,7 @@ pub unsafe extern "C" fn cove_android_surface(
     text_sizes: *const f32,
     text_count: i32,
 ) {
+    // SAFETY: the caller's `# Safety` contract guarantees a null or live session pointer.
     let Some(handle) = (unsafe { session(pointer) }) else {
         return;
     };
@@ -628,6 +634,7 @@ pub unsafe extern "C" fn cove_android_surface(
 /// `pointer` must be null or a live session pointer.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn cove_android_system_bar_icons(pointer: SessionPointer) -> i32 {
+    // SAFETY: the caller's `# Safety` contract guarantees a null or live session pointer.
     let Some(handle) = (unsafe { session(pointer) }) else {
         return -1;
     };
@@ -641,6 +648,7 @@ pub unsafe extern "C" fn cove_android_system_bar_icons(pointer: SessionPointer) 
 /// `pointer` must be null or a live session pointer.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn cove_android_key_state(pointer: SessionPointer, scancode: u32, down: i32) {
+    // SAFETY: the caller's `# Safety` contract guarantees a null or live session pointer.
     let Some(handle) = (unsafe { session(pointer) }) else {
         return;
     };
@@ -664,6 +672,7 @@ pub unsafe extern "C" fn cove_android_snapshot(
     output: *mut u16,
     capacity: i32,
 ) -> i32 {
+    // SAFETY: the caller's `# Safety` contract guarantees a null or live session pointer.
     let Some(handle) = (unsafe { session(pointer) }) else {
         return 0;
     };
@@ -684,6 +693,7 @@ pub unsafe extern "C" fn cove_android_input_snapshot(
     output: *mut u16,
     capacity: i32,
 ) -> i32 {
+    // SAFETY: the caller's `# Safety` contract guarantees a null or live session pointer.
     let Some(handle) = (unsafe { session(pointer) }) else {
         return 0;
     };
@@ -704,6 +714,7 @@ pub unsafe extern "C" fn cove_android_edit(
     start: i32,
     end: i32,
 ) {
+    // SAFETY: the caller's `# Safety` contract guarantees a null or live session pointer.
     let Some(handle) = (unsafe { session(pointer) }) else {
         return;
     };

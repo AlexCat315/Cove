@@ -425,7 +425,7 @@ impl Clone for SwipeRowBody {
             actions: self.actions.clone(),
             on_select: self.on_select.clone(),
             content: self.content.clone(),
-            reveal: self.reveal.clone(),
+            reveal: self.reveal,
         }
     }
 }
@@ -435,18 +435,17 @@ impl View for SwipeRowBody {
         let actions = self.actions.clone();
         let row_height = self.row_height;
         let is_enabled = self.is_enabled;
-        let reveal = self.reveal.clone();
+        let reveal = self.reveal;
         let extent = swipe_action_extent_for(self.row_width, actions.len(), self.action_width);
         let max_reveal = extent * actions.len() as f32;
 
         let actions_menu: Rc<dyn Fn() -> Vec<MenuEntry>> = {
             let actions = self.actions.clone();
-            let reveal = reveal.clone();
             Rc::new(move || {
                 actions
                     .iter()
                     .map(|action| {
-                        let reset = reveal.clone();
+                        let reset = reveal;
                         let run = action.action.clone();
                         let action_tone = action.tone;
                         let enabled = is_enabled && action.is_enabled;
@@ -474,7 +473,7 @@ impl View for SwipeRowBody {
             .map(|action| {
                 let title = action.title.clone();
                 let enabled = is_enabled && action.is_enabled;
-                let reset = reveal.clone();
+                let reset = reveal;
                 let run = action.action.clone();
                 let style = if action.tone == StatusTone::Danger {
                     AnyButtonStyle::new(crate::theme::styles::buttons::destructive())
@@ -530,7 +529,6 @@ impl View for SwipeRowBody {
             None
         } else {
             let open = {
-                let reveal = reveal.clone();
                 Rc::new(move || {
                     if reveal.get() >= -0.5 {
                         reveal.set(-max_reveal);
@@ -561,7 +559,7 @@ impl View for SwipeRowBody {
             is_enabled,
             row_height,
             max_reveal,
-            reveal: reveal.clone(),
+            reveal,
             on_select: self.on_select.clone(),
             content: self.content.clone(),
             action_row,
@@ -616,7 +614,7 @@ impl PrimitiveView for SwipeRowHost {
 
     fn update_node(&self, node: &Node) {
         let reveal_value = self.reveal.get();
-        let reveal = self.reveal.clone();
+        let reveal = self.reveal;
         node.set_corner_radius(6.0);
         node.set_cursor(Some(if self.is_enabled {
             SystemCursor::Pointer
@@ -702,7 +700,7 @@ impl PrimitiveView for SwipeRowHost {
         );
 
         let pointer_node = node.clone();
-        let pointer_reveal = reveal.clone();
+        let pointer_reveal = reveal;
         let pointer_paint = paint.clone();
         let pointer_select = self.on_select.clone();
         let environment = node.composition_value(&SurfaceEnvironment::key());
@@ -787,7 +785,7 @@ impl PrimitiveView for SwipeRowHost {
         );
 
         let motion_node = node.clone();
-        let motion_reveal = reveal.clone();
+        let motion_reveal = reveal;
         let motion_paint = paint.clone();
         let touch = node
             .composition_value(&SurfaceEnvironment::key())
@@ -843,7 +841,7 @@ impl PrimitiveView for SwipeRowHost {
             ),
         );
 
-        let key_reveal = reveal.clone();
+        let key_reveal = reveal;
         registry.set_key(
             node,
             InputHandlerRoute::control(),
@@ -911,11 +909,7 @@ impl PrimitiveView for SwipeRowHost {
         {
             return vec![AnyView::new(
                 crate::primitives::layout::ZStack::new(AnyView::new(TupleView::new(vec![
-                    AnyView::new(
-                        actions
-                            .clone()
-                            .allows_hit_testing(self.is_enabled),
-                    ),
+                    AnyView::new(actions.clone().allows_hit_testing(self.is_enabled)),
                     content,
                 ])))
                 .alignment(crate::Alignment::Trailing),

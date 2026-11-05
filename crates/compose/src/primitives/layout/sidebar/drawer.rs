@@ -101,13 +101,15 @@ impl<Id: PartialEq + Eq + std::hash::Hash + Clone + Send + Sync + 'static> View
     for NavigationDrawer<Id>
 {
     fn body(&self, _cx: &Scope) -> AnyView {
-        let mut geometry = ModalGeometry::default();
         // A drawer is a leading sheet flush with the window edge: no inset and
         // no rounding, so it reads as navigation rather than a dialog.
-        geometry.placement = ModalPlacement::Leading;
-        geometry.inset = 0.0;
-        geometry.corner_radius = 0.0;
-        geometry.height = 0.0;
+        let geometry = ModalGeometry {
+            placement: ModalPlacement::Leading,
+            inset: 0.0,
+            corner_radius: 0.0,
+            height: 0.0,
+            ..ModalGeometry::default()
+        };
         let modal_options = ModalOptions {
             geometry,
             dismissal: self.options.dismissal,

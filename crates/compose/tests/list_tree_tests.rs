@@ -214,7 +214,7 @@ impl View for ListTestHarness {
         let _ = self.selection.get();
         AnyView::new(
             List::new(self.rows.clone(), |id: &i32, _: RowState| {
-                let id = id.clone();
+                let id = *id;
                 AnyView::new(Text::new(format!("Document {id}")))
             })
             .selection(Selection::single(bind(&self.selection)))
@@ -234,7 +234,7 @@ fn sized_list_harness(selection: State<Option<i32>>, rows: Vec<i32>) -> AnyView 
             AnyView::new(TupleView::new(vec![
                 AnyView::new(
                     List::new(rows, |id: &i32, _: RowState| {
-                        let id = id.clone();
+                        let id = *id;
 
                         AnyView::new(Text::new(format!("Document {id}")))
                     })
@@ -739,11 +739,8 @@ fn tree_drag_survives_a_surrounding_scroll_view() {
             probe.clone(),
         );
         scene.install(AnyView::new(
-            ScrollView::new(
-                ScrollAxis::Vertical,
-                AnyView::new(tree).frame_height(420.0),
-            )
-            .frame_size(300.0, 200.0),
+            ScrollView::new(ScrollAxis::Vertical, AnyView::new(tree).frame_height(420.0))
+                .frame_size(300.0, 200.0),
         ));
         let rows = tree_rows(scene);
         assert_eq!(rows.len(), 2, "two rows mount");

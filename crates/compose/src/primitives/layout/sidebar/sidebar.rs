@@ -384,7 +384,7 @@ impl<Id: PartialEq + Eq + std::hash::Hash + Clone + Send + Sync + 'static> View 
                 let previous = previous.or_else(|| path_for.last())?;
                 let expanded = expanded.get();
                 // The path the focused row had when it was last reachable.
-                let path = if path_for.ends_with(&[previous.clone()]) {
+                let path = if path_for.ends_with(std::slice::from_ref(previous)) {
                     path_for.clone()
                 } else {
                     hierarchy.path_to(previous)

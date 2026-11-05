@@ -58,6 +58,7 @@ fn borrowed_bytes_dispatch_to_backend_through_protocol() {
     let uploader: &mut dyn FrameUploader = &mut backend;
     let location = uploader.write(&source, 64).unwrap();
     source[0] = 99;
+    assert_ne!(source[0], backend.copied[0]);
     assert_eq!(backend.copied, vec![17, 29, 41, 53]);
     assert_eq!(location.offset, 64);
 }
@@ -88,6 +89,7 @@ fn write_copies_data() {
     let mut allocator = make_allocator(1024);
     let data = [1u8, 2, 3, 4];
     let allocation = allocator.write(&data, 1).unwrap();
+    // SAFETY: the allocation owns a live 64 KiB chunk buffer and 4 bytes fit.
     let bytes = unsafe { std::slice::from_raw_parts(allocation.pointer(), 4).to_vec() };
     assert_eq!(bytes, vec![1, 2, 3, 4]);
 }

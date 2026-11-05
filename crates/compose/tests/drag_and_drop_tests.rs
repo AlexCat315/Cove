@@ -260,7 +260,6 @@ fn the_preview_uses_the_portal_only_while_dragging() {
     });
 }
 
-
 #[test]
 fn a_drag_inside_a_scroll_view_still_reaches_its_target() {
     let model = Rc::new(Model::default());
@@ -268,9 +267,7 @@ fn a_drag_inside_a_scroll_view_still_reaches_its_target() {
     InteractiveScene::run(360.0, 360.0, |scene| {
         // The Gallery mounts stories inside a scroll view; a drag must not be
         // mistaken for a scroll gesture once it crosses the threshold.
-        let content = AnyView::new(
-            AnyView::new(harness(harness_model)).frame_height(600.0),
-        );
+        let content = AnyView::new(AnyView::new(harness(harness_model)).frame_height(600.0));
         scene.install(AnyView::new(
             ScrollView::new(ScrollAxis::Vertical, content).frame_size(340.0, 320.0),
         ));
@@ -363,17 +360,23 @@ fn different_payload_types_can_share_one_scope() {
                     AnyView::new(Draggable::new(
                         "hello".to_string(),
                         AnyView::new(Text::new("hello")),
-                        AnyView::new(AnyView::new(Text::new("Text source")).frame_size(120.0, 36.0)),
+                        AnyView::new(
+                            AnyView::new(Text::new("Text source")).frame_size(120.0, 36.0),
+                        ),
                     )),
                     AnyView::new(DropTarget::new(
                         |payload: &String| payload == "hello",
                         move |payload: String| target_drop.borrow_mut().push(payload),
-                        AnyView::new(AnyView::new(Text::new("Text target")).frame_size(160.0, 60.0)),
+                        AnyView::new(
+                            AnyView::new(Text::new("Text target")).frame_size(160.0, 60.0),
+                        ),
                     )),
                     AnyView::new(DropTarget::new(
                         |payload: &u64| *payload == 1,
                         move |payload: u64| wrong_drop.borrow_mut().push(payload),
-                        AnyView::new(AnyView::new(Text::new("Number target")).frame_size(160.0, 60.0)),
+                        AnyView::new(
+                            AnyView::new(Text::new("Number target")).frame_size(160.0, 60.0),
+                        ),
                     )),
                 ])),
             )))

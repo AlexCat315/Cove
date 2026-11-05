@@ -190,7 +190,9 @@ fn status_geometry_scales_with_the_diameter() {
     let circle = AvatarStatusGeometry::new(48.0, AvatarShape::Circle);
     let radius = AvatarShape::Circle.radius(48.0);
     assert!(
-        (circle.inset - (radius * (1.0 - 0.70710678) - circle.size / 2.0)).abs() < 1e-4,
+        (circle.inset - (radius * (1.0 - std::f32::consts::FRAC_1_SQRT_2) - circle.size / 2.0))
+            .abs()
+            < 1e-4,
         "the circular inset is the diagonal corner gap minus half the size"
     );
     let square = AvatarStatusGeometry::new(48.0, AvatarShape::Square);

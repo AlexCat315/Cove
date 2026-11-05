@@ -184,7 +184,7 @@ impl View for ColumnVisibilityPicker {
         // Scope-owned, so the presentation survives the recomposition the
         // choice itself triggers.
         let presented = cx.state(|| false);
-        let toggle = presented.clone();
+        let toggle = presented;
         let trigger = crate::primitives::controls::Button::with_options(
             crate::primitives::text::Text::new("Columns"),
             move || toggle.set(!toggle.get()),
@@ -208,7 +208,7 @@ impl View for ColumnVisibilityPicker {
             })
             .flex_with(1.0, 1.0, Some(0.0))
             .frame(None, None, Some(0.0), None, None, None);
-        let dismiss = presented.clone();
+        let dismiss = presented;
         let menu = crate::primitives::overlays::Menu::new(entries)
             .on_item_activated(move || dismiss.set(false));
         let popover = crate::primitives::overlays::Popover::new(trigger, menu)

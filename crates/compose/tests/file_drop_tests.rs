@@ -302,8 +302,7 @@ fn an_idle_upload_shows_no_progress_readout() {
 fn a_running_upload_shows_progress_and_cancel() {
     InteractiveScene::run(600.0, 400.0, |scene| {
         with_registry(|_registry| {
-            let upload =
-                DragUpload::new(UploadRequest::new("memory://test/upload", Vec::new()));
+            let upload = DragUpload::new(UploadRequest::new("memory://test/upload", Vec::new()));
             upload
                 .state()
                 .set(UploadState::Uploading { sent: 1, total: 4 });
@@ -318,8 +317,7 @@ fn a_running_upload_shows_progress_and_cancel() {
 fn a_finished_upload_shows_its_status_row() {
     InteractiveScene::run(600.0, 400.0, |scene| {
         with_registry(|_registry| {
-            let upload =
-                DragUpload::new(UploadRequest::new("memory://test/upload", Vec::new()));
+            let upload = DragUpload::new(UploadRequest::new("memory://test/upload", Vec::new()));
             upload.state().set(UploadState::Succeeded(UploadResponse {
                 status: 201,
                 body: Vec::new(),
@@ -561,8 +559,8 @@ fn a_folder_is_refused_unless_the_zone_opts_in() {
             scene.install(zone_batch_harness(model.clone(), 4));
             let point = centre(&zone_node(scene));
             let folder = DroppedFile::new("/tmp/assets").is_directory(true);
-            assert!(!registry.can_drop(&[folder.clone()], point));
-            assert!(!FileDropRegistry::drop(&registry, &[folder], point));
+            assert!(!registry.can_drop(std::slice::from_ref(&folder), point));
+            assert!(!FileDropRegistry::drop(registry, &[folder], point));
             assert!(model.dropped.borrow().is_empty());
         });
     });
@@ -574,7 +572,7 @@ fn a_folder_is_refused_unless_the_zone_opts_in() {
             scene.install(zone_folder_harness(model.clone()));
             let point = centre(&zone_node(scene));
             let folder = DroppedFile::new("/tmp/assets").is_directory(true);
-            assert!(FileDropRegistry::drop(&registry, &[folder], point));
+            assert!(FileDropRegistry::drop(registry, &[folder], point));
             assert_eq!(model.dropped.borrow().len(), 1);
         });
     });

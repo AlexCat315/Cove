@@ -6,8 +6,6 @@
 //! and the full request/response flow are exercised against a fake bus here,
 //! even though the production backend only runs on Linux.
 
-#![allow(dead_code)]
-
 use cove_platform::{ScreenColor, ScreenColorSample};
 use std::{
     io::{self, Read, Write},
@@ -36,7 +34,7 @@ struct Writer {
 }
 impl Writer {
     fn align(&mut self, alignment: usize) {
-        while self.bytes.len() % alignment != 0 {
+        while !self.bytes.len().is_multiple_of(alignment) {
             self.bytes.push(0);
         }
     }
@@ -201,7 +199,7 @@ impl<'a> Reader<'a> {
         Self { bytes, pos: 0 }
     }
     fn align(&mut self, alignment: usize) {
-        self.pos = (self.pos + alignment - 1) / alignment * alignment;
+        self.pos = self.pos.div_ceil(alignment) * alignment;
     }
     fn take(&mut self, count: usize) -> Result<&'a [u8], String> {
         let end = self.pos.checked_add(count).ok_or("D-Bus value overflow")?;
@@ -515,28 +513,12 @@ impl PortalClient {
 
     fn call(
         &mut self,
-        path: &str,
-        interface: &str,
-        member: &str,
-        destination: &str,
-        signature: &str,
+        header: Header<'_>,
         body: impl FnOnce(&mut Writer),
         cancel: &AtomicBool,
     ) -> Result<Message, String> {
         let serial = self.connection.next_serial();
-        let bytes = build_message(
-            METHOD_CALL,
-            serial,
-            &Header {
-                path: Some(path),
-                interface: Some(interface),
-                member: Some(member),
-                destination: Some(destination),
-                signature: Some(signature),
-                ..Header::default()
-            },
-            body,
-        );
+        let bytes = build_message(METHOD_CALL, serial, &header, body);
         self.connection.send(&bytes)?;
         let deadline = Instant::now() + Duration::from_secs(10);
         loop {
@@ -570,11 +552,14 @@ impl PortalClient {
     pub(crate) fn add_match(&mut self, cancel: &AtomicBool) -> Result<(), String> {
         let rule = format!("type='signal',interface='{PORTAL_REQUEST}',member='Response'");
         self.call(
-            DBUS_PATH,
-            DBUS_DESTINATION,
-            "AddMatch",
-            DBUS_DESTINATION,
-            "s",
+            Header {
+                path: Some(DBUS_PATH),
+                interface: Some(DBUS_DESTINATION),
+                member: Some("AddMatch"),
+                destination: Some(DBUS_DESTINATION),
+                signature: Some("s"),
+                ..Header::default()
+            },
             |writer| writer.string(&rule),
             cancel,
         )?;
@@ -588,11 +573,14 @@ impl PortalClient {
         cancel: &AtomicBool,
     ) -> Result<String, String> {
         let reply = self.call(
-            PORTAL_PATH,
-            PORTAL_SCREENSHOT,
-            "PickColor",
-            PORTAL_DESTINATION,
-            "sa{sv}",
+            Header {
+                path: Some(PORTAL_PATH),
+                interface: Some(PORTAL_SCREENSHOT),
+                member: Some("PickColor"),
+                destination: Some(PORTAL_DESTINATION),
+                signature: Some("sa{sv}"),
+                ..Header::default()
+            },
             |writer| {
                 writer.string("");
                 writer.array(8, |writer| {

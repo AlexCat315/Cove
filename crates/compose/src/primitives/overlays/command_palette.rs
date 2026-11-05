@@ -480,44 +480,51 @@ impl View for PaletteBody {
         let clear_change = self.on_change.clone();
 
         let token = self.focus_token.get() as usize;
-        let mut events = TextFieldEvents::default();
-        events.on_key_down = Some(Rc::new(move |event: &KeyEvent| match event.scancode {
-            crate::Scancode::ARROW_DOWN => {
-                move_down(());
-                true
-            }
-            crate::Scancode::ARROW_UP => {
-                move_up(());
-                true
-            }
-            crate::Scancode::PAGE_DOWN => {
-                page_down(());
-                true
-            }
-            crate::Scancode::PAGE_UP => {
-                page_up(());
-                true
-            }
-            crate::Scancode::RETURN | crate::Scancode::KEYPAD_ENTER => {
-                run();
-                true
-            }
-            crate::Scancode::ESCAPE => {
-                close();
-                true
-            }
-            _ => false,
-        }));
-        events.on_change = Some(Rc::new(move |buffer: &TextBuffer| change(buffer)));
-        events.on_clear = Some(Rc::new(move || clear_change(&TextBuffer::empty())));
+        let events = TextFieldEvents {
+            on_key_down: Some(Rc::new(move |event: &KeyEvent| match event.scancode {
+                crate::Scancode::ARROW_DOWN => {
+                    move_down(());
+                    true
+                }
+                crate::Scancode::ARROW_UP => {
+                    move_up(());
+                    true
+                }
+                crate::Scancode::PAGE_DOWN => {
+                    page_down(());
+                    true
+                }
+                crate::Scancode::PAGE_UP => {
+                    page_up(());
+                    true
+                }
+                crate::Scancode::RETURN | crate::Scancode::KEYPAD_ENTER => {
+                    run();
+                    true
+                }
+                crate::Scancode::ESCAPE => {
+                    close();
+                    true
+                }
+                _ => false,
+            })),
+            on_change: Some(Rc::new(move |buffer: &TextBuffer| change(buffer))),
+            on_clear: Some(Rc::new(move || clear_change(&TextBuffer::empty()))),
+            ..TextFieldEvents::default()
+        };
 
-        let mut behavior = crate::primitives::text::text_field::TextFieldBehavior::default();
-        behavior.clearable = true;
-        let mut decoration = TextFieldDecoration::default();
-        decoration.size = TextFieldSize::Large;
-        let mut navigation =
-            crate::primitives::text::text_field::TextFieldNavigationRequest::default();
-        navigation.focus_request_id = Some(token as u64);
+        let behavior = crate::primitives::text::text_field::TextFieldBehavior {
+            clearable: true,
+            ..Default::default()
+        };
+        let decoration = TextFieldDecoration {
+            size: TextFieldSize::Large,
+            ..Default::default()
+        };
+        let navigation = crate::primitives::text::text_field::TextFieldNavigationRequest {
+            focus_request_id: Some(token as u64),
+            ..Default::default()
+        };
 
         let field = TextField::new(self.placeholder.clone(), self.query.binding())
             .behavior(behavior)

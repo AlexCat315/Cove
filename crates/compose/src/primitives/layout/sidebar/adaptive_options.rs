@@ -179,7 +179,7 @@ impl SidebarGeometry {
         };
         let is_modal = mode != SidebarMode::Expanded && is_presented;
         let panel_width = if is_modal || mode == SidebarMode::Compact {
-            (viewport_width - 56.0).max(0.0).min(320.0)
+            (viewport_width - 56.0).clamp(0.0, 320.0)
         } else {
             docked_width
         };

@@ -26,7 +26,7 @@ mod support;
 use std::collections::HashSet;
 use std::rc::Rc;
 
-use cove_composition::{AnyView, BoxView, PrimitiveView, View, ViewExt, ViewGraph, ViewKind};
+use cove_composition::{AnyView, BoxView, PrimitiveView, View, ViewGraph, ViewKind};
 use cove_core::scene::{
     Align, AnimatorScheduler, ComponentSourceLocation, FlexDirection, Justify, LayoutNode, Node,
     NodeTree, PlatformInputContext, Recomposer, RecompositionReason, Wrap,

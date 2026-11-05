@@ -670,7 +670,7 @@ impl AndroidContentSession {
                     (client.delete_surrounding)(start, end);
                 }
             } else if kind == 1 {
-                for _ in 0..start.min(32768).max(0) {
+                for _ in 0..start.clamp(0, 32768) {
                     let event = KeyEvent {
                         scancode: 42,
                         keycode: 0,

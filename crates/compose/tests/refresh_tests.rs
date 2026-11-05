@@ -122,7 +122,7 @@ fn list_never_consults_its_refresh_options() {
             environment.viewport.width = 360.0;
             environment.input = InputCapabilities::TOUCH;
             let list = List::new((0..20_usize).collect(), |index: &usize, _: RowState| {
-                let index = index.clone();
+                let index = *index;
 
                 AnyView::new(cove_ui_compose::primitives::text::Text::new(format!(
                     "Row {}",

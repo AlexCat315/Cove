@@ -250,8 +250,8 @@ impl<Id: std::hash::Hash + Clone + PartialEq + 'static> View for TabOverflowStri
 
             let selected_index = tabs.iter().position(|tab| tab.id == selection.get());
 
-            let layout_hidden = hidden_state.clone();
-            let layout_presented = presented_state.clone();
+            let layout_hidden = hidden_state;
+            let layout_presented = presented_state;
             let layout_selection = selection.clone();
             let layout_focus = focus_request.clone();
             let layout = TabOverflowLayout::new(selected_index, spacing, move |indices| {
@@ -308,10 +308,10 @@ impl<Id: std::hash::Hash + Clone + PartialEq + 'static> View for TabOverflowStri
 
             // More button + overflow menu.
             let more_presented = presented_state.binding();
-            let hidden_for_menu = hidden_state.clone();
+            let hidden_for_menu = hidden_state;
             let menu_tabs = tabs.clone();
             let menu_selection = selection.clone();
-            let menu_presented = presented_state.clone();
+            let menu_presented = presented_state;
             let mut menu_entries: Vec<MenuEntry> = Vec::new();
             for hidden_index in hidden_for_menu.get() {
                 let Some(tab) = menu_tabs.get(hidden_index) else {
@@ -323,7 +323,7 @@ impl<Id: std::hash::Hash + Clone + PartialEq + 'static> View for TabOverflowStri
                 let item_selected = tab.id == menu_selection.get();
                 let action_selection = menu_selection.clone();
                 let action_target = tab.id.clone();
-                let action_presented = menu_presented.clone();
+                let action_presented = menu_presented;
                 let item = MenuItem::new(id, title, move || {
                     action_selection.set(action_target.clone());
                     action_presented.set(false);

@@ -156,7 +156,7 @@ impl Harness {
                 let this = self.clone();
                 AnyView::new(
                     List::new((0..count).collect(), move |index, _: RowState| {
-                        let index = index.clone();
+                        let index = *index;
                         this.row(index)
                     })
                     .selection(Selection::single(self.selected.binding()))
@@ -167,7 +167,7 @@ impl Harness {
                 let this = self.clone();
                 AnyView::new(
                     List::new((0..count).collect(), move |index, _: RowState| {
-                        let index = index.clone();
+                        let index = *index;
                         this.row(index)
                     })
                     .selection(Selection::multiple(self.multiple.binding()))
@@ -478,8 +478,7 @@ fn matrix() {
                                         "{case}: the title precedes the trailing slot"
                                     );
                                     assert!(
-                                        trailing_frame.x
-                                            - (title_frame.x + title_frame.width)
+                                        trailing_frame.x - (title_frame.x + title_frame.width)
                                             >= 7.5,
                                         "{case}: the trailing slot keeps an 8pt gap"
                                     );

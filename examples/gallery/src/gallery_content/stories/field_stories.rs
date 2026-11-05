@@ -745,7 +745,7 @@ impl NumberFieldStory {
     pub fn new(options: GalleryOptions) -> Self {
         Self {
             options,
-            value: State::new(3.14),
+            value: State::new(std::f32::consts::PI),
             localized: State::new(1.25),
         }
     }

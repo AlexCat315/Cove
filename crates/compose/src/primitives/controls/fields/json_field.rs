@@ -337,7 +337,7 @@ impl View for JsonField {
         };
         let expand = {
             let field = field.clone();
-            let expanded_flag = is_expanded.clone();
+            let expanded_flag = is_expanded;
             Button::icon_with_options(
                 ButtonIconSource::resource(
                     crate::primitives::media::ui_icon_catalog::navigation::expand(),
@@ -450,12 +450,12 @@ impl View for JsonField {
         let _ = is_expanded.get();
         let expanded_binding = Binding::new(
             {
-                let flag = is_expanded.clone();
+                let flag = is_expanded;
                 move || flag.get()
             },
             {
                 let draft = draft_handle.clone();
-                let flag = is_expanded.clone();
+                let flag = is_expanded;
                 move |value: bool| {
                     draft
                         .lock()
@@ -477,12 +477,9 @@ impl View for JsonField {
         });
         let expanded_text = {
             let mirror = draft_handle.clone();
-            let state = expanded_state.clone();
+            let state = expanded_state;
             Binding::new(
-                {
-                    let state = state.clone();
-                    move || state.get()
-                },
+                move || state.get(),
                 move |value: TextBuffer| {
                     mirror
                         .lock()
@@ -503,7 +500,7 @@ impl View for JsonField {
             expanded_binding,
             AnyView::new(JsonExpandedEditor {
                 text: expanded_text,
-                draft: expanded_state.clone(),
+                draft: expanded_state,
                 labels,
                 apply: {
                     let field = modal_field.clone();
@@ -511,7 +508,7 @@ impl View for JsonField {
                 },
                 cancel: {
                     let field = modal_field.clone();
-                    let flag = is_expanded.clone();
+                    let flag = is_expanded;
                     Rc::new(move || {
                         field
                             .draft
@@ -603,7 +600,7 @@ impl View for JsonExpandedEditor {
         // draft: Apply enables only once the text parses.
         AnyView::new(JsonExpandedEditorBody {
             text: self.text.clone(),
-            draft: self.draft.clone(),
+            draft: self.draft,
             labels: self.labels.clone(),
             apply: self.apply.clone(),
             cancel: self.cancel.clone(),

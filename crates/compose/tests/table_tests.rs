@@ -15,7 +15,6 @@ use std::collections::{BTreeMap, HashMap};
 
 use cove_composition::Scope;
 use cove_core::State;
-use cove_ui_compose::modifiers::layout::{FlexExt, LayoutFrameExt};
 use cove_ui_compose::primitives::data::data_table::table_column::{
     ColumnVisibility, ComparisonResult, TableColumn, TableColumnLayout, TableColumnPlan, TableSort,
     TableSortDirection,
@@ -333,7 +332,7 @@ fn a_supplied_selection_binding_is_the_one_that_moves() {
         let selected = State::new(None::<usize>);
         let mut options = TableOptions::default();
         options.selection = Some(Selection::single(selected.binding()));
-        let table = table(options);
+        let _table = table(options);
         // The table reads the caller's state; writing through it is what a tap
         // does, and the view must not keep a private copy that drifts.
         selected.set(Some(2));

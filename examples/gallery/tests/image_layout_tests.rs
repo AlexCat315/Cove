@@ -84,7 +84,6 @@ fn retry_button(scene: &GalleryScene) -> Option<cove_core::scene::Node> {
 
 struct Mounted {
     story: Rc<ImageStory>,
-    width: f32,
     dimension: f32,
     surface: Environment,
     scale: f32,
@@ -152,7 +151,6 @@ fn every_matrix_entry_keeps_the_story_inside_its_column() {
                     move |_| {
                         AnyView::new(Mounted {
                             story: mounted,
-                            width,
                             dimension: available,
                             surface,
                             scale,

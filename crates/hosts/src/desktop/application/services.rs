@@ -81,9 +81,10 @@ pub mod clipboard_handlers {
     use super::*;
     use std::cell::RefCell;
 
+    type ClipboardSlot = (Option<ClipboardRequester>, Option<Rc<dyn Fn(&str)>>);
+
     thread_local! {
-        static SLOT: RefCell<(Option<ClipboardRequester>, Option<Rc<dyn Fn(&str)>>)> =
-            const { RefCell::new((None, None)) };
+        static SLOT: RefCell<ClipboardSlot> = const { RefCell::new((None, None)) };
     }
 
     pub fn remember(read: Option<ClipboardRequester>, write: Option<Rc<dyn Fn(&str)>>) {
@@ -143,15 +144,17 @@ pub mod work_scheduler {
     use super::*;
     use std::cell::RefCell;
 
+    type Enqueue = Rc<dyn Fn(Rc<dyn Fn()>)>;
+
     thread_local! {
-        static SLOT: RefCell<Option<Rc<dyn Fn(Rc<dyn Fn()>)>>> = const { RefCell::new(None) };
+        static SLOT: RefCell<Option<Enqueue>> = const { RefCell::new(None) };
     }
 
-    pub fn remember(enqueue: Option<Rc<dyn Fn(Rc<dyn Fn()>)>>) {
+    pub fn remember(enqueue: Option<Enqueue>) {
         SLOT.with(|slot| *slot.borrow_mut() = enqueue);
     }
 
-    pub fn handler() -> Option<Rc<dyn Fn(Rc<dyn Fn()>)>> {
+    pub fn handler() -> Option<Enqueue> {
         SLOT.with(|slot| slot.borrow().clone())
     }
 }

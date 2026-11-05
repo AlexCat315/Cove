@@ -51,8 +51,7 @@ where
         append(
             roots,
             None,
-            &mut Vec::new(),
-            0,
+            &[],
             id_of,
             children,
             has_children,
@@ -116,8 +115,7 @@ where
 fn append<Element, Id>(
     nodes: &[Element],
     parent: Option<usize>,
-    path_prefix: &mut Vec<usize>,
-    depth: usize,
+    path_prefix: &[usize],
     id_of: &dyn Fn(&Element) -> Id,
     children: &dyn Fn(&Element) -> Vec<Element>,
     has_children: Option<&dyn Fn(&Element) -> bool>,
@@ -132,7 +130,7 @@ fn append<Element, Id>(
         if !ancestry.insert(id.clone()) {
             continue;
         }
-        let mut path = path_prefix.clone();
+        let mut path = path_prefix.to_vec();
         path.push(position);
         let key = TreeNodeKey::new(id.clone(), path.clone());
         let declared_branch = has_children.map(|predicate| predicate(element));
@@ -155,12 +153,11 @@ fn append<Element, Id>(
             }
             if !kids.is_empty() {
                 let count_before = index.nodes.len();
-                let mut child_path = path;
+                let child_path = path;
                 append(
                     &kids,
                     Some(slot),
-                    &mut child_path,
-                    depth + 1,
+                    &child_path,
                     id_of,
                     children,
                     has_children,

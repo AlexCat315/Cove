@@ -60,7 +60,7 @@ enum Command {
 enum Completion {
     Frame {
         token: FrameToken,
-        list: DrawList,
+        list: Box<DrawList>,
         result: RhiResult<bool>,
         cpu_ms: f64,
     },
@@ -101,7 +101,7 @@ impl Worker {
                 self.publish_snapshot();
                 let _ = self.done.send(Completion::Frame {
                     token,
-                    list,
+                    list: Box::new(list),
                     result,
                     cpu_ms: start.elapsed().as_secs_f64() * 1000.0,
                 });
@@ -306,7 +306,7 @@ impl ThreadedWindowRenderer {
                 cpu_ms,
             } => {
                 self.in_flight = self.in_flight.saturating_sub(1);
-                self.recycled.push(list);
+                self.recycled.push(*list);
                 match result {
                     Ok(value) => presented.push(FramePresented {
                         token,

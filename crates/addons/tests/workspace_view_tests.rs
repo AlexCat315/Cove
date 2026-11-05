@@ -857,10 +857,9 @@ fn bottom_rail_renders_for_legacy_document_without_chrome_rail_slot() {
     let center = rig.frame("workspace-region-center");
     assert!(rig.optional_frame("workspace-region-bottom").is_none());
     assert!(
-        rig.document()
+        !rig.document()
             .slots
-            .get(&WorkspaceSlotID::chrome_bottom_rail())
-            .is_none(),
+            .contains_key(&WorkspaceSlotID::chrome_bottom_rail()),
         "the legacy document still has no chrome rail slot"
     );
     assert_close(
@@ -1877,7 +1876,7 @@ fn panel_sizing_applies_to_outer_pointer_keyboard_and_accessibility_and_restores
         "the accessibility decrement shrinks the leading region"
     );
 
-    let before_drag = rig.frame("workspace-region-leading").width;
+    let _before_drag = rig.frame("workspace-region-leading").width;
     let split = center_of(rig.frame("workspace-split-leading"));
     rig.drag(
         split,

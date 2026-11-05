@@ -49,10 +49,6 @@ impl TestConnection {
             .collect()
     }
 
-    fn take_raw(&self) -> Vec<Vec<u8>> {
-        std::mem::take(&mut *self.messages.lock().expect("messages"))
-    }
-
     fn drain(&self) {
         self.messages.lock().expect("messages").clear();
     }

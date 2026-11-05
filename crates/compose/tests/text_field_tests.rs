@@ -41,13 +41,13 @@ use cove_core::scene::{
     PointerCaptureHolder, PointerPhase, TextInputAttachmentKey, TextInputClient, Wrap,
 };
 use cove_core::{AnimatorScheduler, Binding, Color, DrawList, Point, Rect};
-use cove_ui_compose::modifiers::layout::PaddingExt;
 use cove_platform::{
     InputEvent, KeyEvent, KeyModifiers, MouseButton, MouseButtonEvent, MouseMotionEvent,
     MouseWheelEvent, TextEditingEvent, TextInputArea, WindowId,
 };
 use cove_text::{TextBootstrapOptions, TextEnvironment, TextEnvironmentHolder};
 use cove_ui_compose::Scancode;
+use cove_ui_compose::modifiers::layout::PaddingExt;
 use cove_ui_compose::primitives::text::text_buffer::TextBuffer;
 use cove_ui_compose::primitives::text::text_field::text_field::{
     FieldState, TextField, TextFieldEvents,

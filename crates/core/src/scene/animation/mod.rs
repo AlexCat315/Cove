@@ -1,6 +1,5 @@
 // `animation.rs` keeps the name of the Swift file it translates
-// (`Animation/Animation.swift`) and is recorded under that path in
-// `Docs/rust-migration-files.json`, so the module keeps its name.
+// (`Animation/Animation.swift`), so the module keeps its name.
 #[allow(clippy::module_inception)]
 mod animation;
 mod context;

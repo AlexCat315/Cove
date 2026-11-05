@@ -142,7 +142,7 @@ impl ColorField {
     }
 
     /// Seeds the "recent" row.
-    pub fn recent_colors(mut self, recent: Vec<Color>) -> Self {
+    pub fn recent_colors(self, recent: Vec<Color>) -> Self {
         *self
             .recent
             .lock()

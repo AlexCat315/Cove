@@ -8,7 +8,7 @@ use std::collections::{BTreeMap, HashMap};
 use cove_composition::Scope;
 use cove_core::State;
 use cove_core::scene::{Align, FlexDirection, Justify, Wrap};
-use cove_ui_compose::modifiers::layout::{FlexExt, LayoutFrameExt};
+use cove_ui_compose::modifiers::layout::LayoutFrameExt;
 use cove_ui_compose::modifiers::style::SemanticStyleViewExt;
 use cove_ui_compose::primitives::data::data_table::table_column::{
     ColumnVisibility, ComparisonResult, TableColumn, TableColumnLayout, TableSort,

@@ -144,7 +144,7 @@ impl PrimitiveView for PortalHostPrimitive {
             if let (Some(store), Some(token)) = (bound, node.attachment::<u64>(OBSERVER_TOKEN)) {
                 store.remove_observer(token);
             }
-            let revision = self.revision.clone();
+            let revision = self.revision;
             let token = resolved.add_observer(Rc::new(move |_| {
                 revision.update(|revision| *revision = revision.wrapping_add(1));
             }));

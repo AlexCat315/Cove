@@ -52,8 +52,10 @@ use support::GalleryScene;
 fn gallery(page: GalleryPage, selectable: bool, phone: bool) -> AnyView {
     let mut view = AnyView::new(GalleryView::new(page, Appearance::Light, 1.0));
     if phone {
-        let mut environment = Environment::default();
-        environment.input = InputCapabilities::TOUCH | InputCapabilities::KEYBOARD;
+        let mut environment = Environment {
+            input: InputCapabilities::TOUCH | InputCapabilities::KEYBOARD,
+            ..Environment::default()
+        };
         environment.viewport.width = 390.0;
         environment.viewport.height = 820.0;
         view = AnyView::new(view.surface_environment(environment));

@@ -37,7 +37,7 @@ use std::rc::Rc;
 
 use cove_composition::{AnyView, EmptyView, LayoutDebugExt, TupleView, View, ViewGraph};
 use cove_core::scene::{AccessibilityRole, Align, FlexDirection, Justify, Node, Wrap};
-use cove_core::{Binding, Color, Environment, InputCapabilities, Point, State};
+use cove_core::{Binding, Environment, InputCapabilities, Point, State};
 use cove_platform::{
     InputEvent, KeyEvent, KeyModifiers, MouseButton, MouseButtonEvent, MouseMotionEvent,
 };

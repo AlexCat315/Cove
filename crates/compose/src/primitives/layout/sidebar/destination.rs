@@ -407,8 +407,8 @@ impl View for SidebarActionsTrigger {
         let entries = self.entries.clone();
         let title = self.title.clone();
         let is_enabled = self.is_enabled;
-        let toggle = presented.clone();
-        let dismiss = presented.clone();
+        let toggle = presented;
+        let dismiss = presented;
         let menu = crate::primitives::overlays::menu::Menu::new(entries)
             .width(220.0)
             .on_dismiss(move || dismiss.set(false));
@@ -440,10 +440,7 @@ impl View for SidebarActionsTrigger {
                 ..Default::default()
             })
             .is_presented(Binding::new(
-                {
-                    let presented = presented.clone();
-                    move || presented.get()
-                },
+                move || presented.get(),
                 move |value: bool| presented.set(value),
             ));
         AnyView::new(SidebarActionsLane {

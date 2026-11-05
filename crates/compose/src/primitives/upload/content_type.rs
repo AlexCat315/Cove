@@ -11,7 +11,10 @@
 /// The match is case-insensitive and ignores a leading dot. A name with no
 /// extension (or a hidden file such as `.gitignore`) is octet-stream.
 pub fn content_type_for(file_name: &str) -> &'static str {
-    match extension_of(file_name).map(str::to_ascii_lowercase).as_deref() {
+    match extension_of(file_name)
+        .map(str::to_ascii_lowercase)
+        .as_deref()
+    {
         Some("png") => "image/png",
         Some("jpg") | Some("jpeg") | Some("jpe") | Some("jfif") => "image/jpeg",
         Some("gif") => "image/gif",
@@ -35,9 +38,7 @@ pub fn content_type_for(file_name: &str) -> &'static str {
         Some("txt") | Some("text") | Some("log") => "text/plain",
         Some("rtf") => "application/rtf",
         Some("doc") => "application/msword",
-        Some("docx") => {
-            "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-        }
+        Some("docx") => "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
         Some("xls") => "application/vnd.ms-excel",
         Some("xlsx") => "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         Some("ppt") => "application/vnd.ms-powerpoint",

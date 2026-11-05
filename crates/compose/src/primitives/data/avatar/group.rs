@@ -78,9 +78,11 @@ impl AvatarGroup {
     pub fn geometry(&self, node: &Node) -> AvatarGroupGeometry {
         let mut options = self.options.clone();
         options.validate();
-        let mut appearance = AvatarAppearance::default();
-        appearance.size = options.size;
-        appearance.diameter = options.diameter;
+        let appearance = AvatarAppearance {
+            size: options.size,
+            diameter: options.diameter,
+            ..AvatarAppearance::default()
+        };
         AvatarGroupGeometry::new(
             self.avatars.len(),
             options.limit,

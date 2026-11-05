@@ -110,11 +110,7 @@ impl View for SidebarRail {
             } else {
                 FlexDirection::Row
             },
-            if self.is_vertical {
-                Align::Center
-            } else {
-                Align::Center
-            },
+            Align::Center,
             Justify::FlexStart,
             Wrap::NoWrap,
             4.0,

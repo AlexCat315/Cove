@@ -232,9 +232,11 @@ fn text_scale_factor_reports_the_ramp_value_at_sixteen_points() {
 fn surface_metrics_reach_composed_content() {
     Lock::with(|| {
         let mut session = session(1.0);
-        let mut safe_area = Insets::default();
-        safe_area.top = 59.0;
-        safe_area.bottom = 34.0;
+        let safe_area = Insets {
+            top: 59.0,
+            bottom: 34.0,
+            ..Insets::default()
+        };
         session.update_surface(
             Idiom::Phone,
             safe_area,

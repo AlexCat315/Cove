@@ -129,7 +129,7 @@ impl View for GranularityCalendar {
             *options = gallery_calendar(self.options.is_enabled, self.granularity)
         });
         let caption = {
-            let value = self.value.clone();
+            let value = self.value;
             let granularity = self.granularity;
             let label = self.label;
             move || granularity_line(label, granularity, value.get())

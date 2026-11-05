@@ -316,9 +316,7 @@ impl PrimitiveView for ColorWheel {
         let color = self.color.get();
         // A live hue survives a saturation of zero; otherwise follow the colour.
         let hsv = hsv_from_color(color);
-        if hsv.s > 1e-4 && hsv.v > 1e-4 {
-            node.set_attachment(HUE, hsv.h.to_bits());
-        } else if node.attachment::<u32>(HUE).is_none() {
+        if (hsv.s > 1e-4 && hsv.v > 1e-4) || node.attachment::<u32>(HUE).is_none() {
             node.set_attachment(HUE, hsv.h.to_bits());
         }
         let hue = node

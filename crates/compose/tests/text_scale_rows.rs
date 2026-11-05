@@ -108,7 +108,7 @@ impl View for GeometryHarness {
         let get = selection.clone();
         let set = selection.clone();
         let list = List::new(records.clone(), |value: &usize, _: RowState| {
-            let value = value.clone();
+            let value = *value;
             AnyView::new(Text::new(value.to_string()))
         })
         .selection(Selection::single(Binding::new(

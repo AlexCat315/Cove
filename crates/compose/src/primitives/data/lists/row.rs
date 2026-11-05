@@ -104,8 +104,8 @@ impl View for ListRow {
                     // Title and subtitle inherit the row's ink. A selected row
                     // re-inks its whole band with `on_accent`; hard-coding
                     // `on_surface` here left dark text on the accent fill.
-                    let title_color = (options.role == ButtonRole::Destructive)
-                        .then_some(theme.colors.error);
+                    let title_color =
+                        (options.role == ButtonRole::Destructive).then_some(theme.colors.error);
                     let mut title_text = Text::new(title.clone()).truncated().clipped();
                     if let Some(color) = title_color {
                         title_text = title_text.foreground_color(color);
@@ -297,9 +297,7 @@ impl crate::Layout for ListRowSlots {
             if !rtl {
                 cursor += size.width;
             }
-            let gap = if index == 0 && size.width > 0.0 {
-                8.0
-            } else if index == 1 && trailing_present {
+            let gap = if (index == 0 && size.width > 0.0) || (index == 1 && trailing_present) {
                 8.0
             } else {
                 0.0

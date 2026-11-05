@@ -9,6 +9,8 @@
 //! The holders are process-wide thread-locals, so every test that builds a rig
 //! must hold [`GlobalTestLock`].
 
+#![allow(dead_code)]
+
 use std::cell::RefCell;
 use std::collections::BTreeMap;
 use std::rc::Rc;

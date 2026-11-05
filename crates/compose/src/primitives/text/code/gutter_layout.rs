@@ -198,10 +198,7 @@ pub fn update_gutter_controls(
             && let Some(last_row) = rows.iter().rev().find(|row| row.line == line)
         {
             let badge_x = text_origin_x - origin.x + last_row.width + 8.0;
-            let width = 80.0_f32
-                .max(64.0)
-                .min(80.0)
-                .min(inputs.field_width - badge_x - 8.0);
+            let width = (inputs.field_width - badge_x - 8.0).min(80.0);
             if badge_x >= text_origin_x - origin.x && badge_x + width <= inputs.field_width {
                 controls.push(TextGutterControl::new(
                     line,

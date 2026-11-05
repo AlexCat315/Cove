@@ -64,15 +64,6 @@ fn total(response: &Envelope) -> u64 {
         .unwrap_or_default()
 }
 
-fn button(label: &str, frame: cove_core::Rect) -> Node {
-    let node = Node::new();
-    node.set_frame(frame);
-    node.set_accessibility(Some(
-        AccessibilitySemantics::new(AccessibilityRole::Button).with_label(label),
-    ));
-    node
-}
-
 #[test]
 fn text_search_includes_live_values_and_help_without_matching_secure_contents() {
     let mut tree = NodeTree::new();

@@ -835,24 +835,24 @@ impl View for TextEditorStory {
                 "F9 toggles a breakpoint · Primary-Alt-Left/Right folds or expands · gutter icons expose named actions · touch uses a line menu",
             ),
         ];
-        if code_mode && self.shows_diagnostic() {
-            if let Some(hover) = self.hover.get() {
-                if text.line_index_for_character_index(hover.character_index) == 0 {
-                    let (_, message) = self.diagnostic();
-                    content.push(AnyView::new(
-                        Tooltip::anchored(
-                            TooltipAnchor::Point(Point {
-                                x: hover.window_x,
-                                y: hover.window_y,
-                            }),
-                            note(message)
-                                .padding(10.0)
-                                .semantic_background(SemanticColorRef::surface_floating()),
-                        )
-                        .presented(true),
-                    ));
-                }
-            }
+        if code_mode
+            && self.shows_diagnostic()
+            && let Some(hover) = self.hover.get()
+            && text.line_index_for_character_index(hover.character_index) == 0
+        {
+            let (_, message) = self.diagnostic();
+            content.push(AnyView::new(
+                Tooltip::anchored(
+                    TooltipAnchor::Point(Point {
+                        x: hover.window_x,
+                        y: hover.window_y,
+                    }),
+                    note(message)
+                        .padding(10.0)
+                        .semantic_background(SemanticColorRef::surface_floating()),
+                )
+                .presented(true),
+            ));
         }
         AnyView::new(StorySection::new(
             "Text editing",

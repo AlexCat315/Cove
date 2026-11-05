@@ -6,8 +6,8 @@
 
 use cove_examples::gallery_content::catalog::GalleryOptions;
 use cove_examples::gallery_content::stories::data_stories_file::{
-    DragAndDropStory, REFRESH_ROWS, REFRESH_THRESHOLD, RefreshListStory, SWIPE_ROWS, SceneNode,
-    LAZY_TREE_BRANCH, SectionedListStory, SwipeListStory, TreeStory, VIRTUAL_MIDDLE,
+    DragAndDropStory, LAZY_TREE_BRANCH, REFRESH_ROWS, REFRESH_THRESHOLD, RefreshListStory,
+    SWIPE_ROWS, SceneNode, SectionedListStory, SwipeListStory, TreeStory, VIRTUAL_MIDDLE,
     VIRTUAL_STACK_COUNT, VirtualStackStory, expandable_ids, node_matches, visible_ids,
 };
 

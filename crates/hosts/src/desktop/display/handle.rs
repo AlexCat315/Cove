@@ -48,6 +48,12 @@ impl DisplaySignal {
     }
 }
 
+type CloseDecision = Rc<dyn Fn(Option<WindowId>) -> bool>;
+type CloseInterceptor = Rc<dyn Fn(Option<CloseDecision>)>;
+type FolderDialog = Rc<dyn Fn(Option<&str>, Box<dyn FnOnce(Option<String>)>)>;
+type FileDialogResult = Box<dyn FnOnce(Vec<String>)>;
+type FileDialog = Rc<dyn Fn(Option<&str>, &[FileDialogFilter], bool, FileDialogResult)>;
+
 /// Host-installed callbacks behind the public display handle.
 #[derive(Default)]
 pub struct DisplayBindings {
@@ -59,12 +65,11 @@ pub struct DisplayBindings {
     pub auxiliary_window_is_open: Option<Rc<dyn Fn(WindowId) -> bool>>,
     pub install_native_menu_bar:
         Option<Rc<dyn Fn(&super::super::window::native_menu::NativeMenuBar)>>,
-    pub set_close_interceptor: Option<Rc<dyn Fn(Option<Rc<dyn Fn(Option<WindowId>) -> bool>>)>>,
+    pub set_close_interceptor: Option<CloseInterceptor>,
     pub quit: Option<Rc<dyn Fn()>>,
     pub main_window_id_query: Option<Rc<dyn Fn() -> Option<WindowId>>>,
-    pub open_folder_dialog: Option<Rc<dyn Fn(Option<&str>, Box<dyn FnOnce(Option<String>)>)>>,
-    pub open_file_dialog:
-        Option<Rc<dyn Fn(Option<&str>, &[FileDialogFilter], bool, Box<dyn FnOnce(Vec<String>)>)>>,
+    pub open_folder_dialog: Option<FolderDialog>,
+    pub open_file_dialog: Option<FileDialog>,
     pub memory_query: Option<Rc<dyn Fn() -> Option<BTreeMap<String, u64>>>>,
     pub trim_memory: Option<Rc<dyn Fn()>>,
 }

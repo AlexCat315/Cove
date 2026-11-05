@@ -17,6 +17,7 @@
 //!   - the rating's role is exactly `slider`;
 //!   - an arrow-left key press moves the bound value by 1 in the reading
 //!     direction (8 in RTL, 6 in LTR) through a real `EventDispatcher`.
+//!
 //! The Rust `RatingSample` has a fixed 5-star `Rating` plus a `Slider` for the
 //! same value, no configurable maximum, no Clear button, and no pointer lane, so
 //! the 12pt reservation and the arrow-key contract have no target. The story

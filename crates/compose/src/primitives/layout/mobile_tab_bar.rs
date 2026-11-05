@@ -88,12 +88,7 @@ impl<Id: std::hash::Hash + Eq + Clone + PartialEq + Send + Sync + 'static> View
             row_items.push(tab_item(tab.clone(), selection.clone(), is_enabled));
         }
         if !hidden.is_empty() {
-            row_items.push(more_item(
-                hidden,
-                selection.clone(),
-                is_enabled,
-                shows_more.clone(),
-            ));
+            row_items.push(more_item(hidden, selection.clone(), is_enabled, shows_more));
         }
 
         let row = Row::new(
@@ -208,7 +203,7 @@ fn more_item<Id: std::hash::Hash + Eq + Clone + PartialEq + Send + Sync + 'stati
         let item_enabled = bar_enabled && tab.is_enabled;
         let action_selection = selection.clone();
         let action_id = tab.id.clone();
-        let action_more = shows_more.clone();
+        let action_more = shows_more;
         let item = MenuItem::new(id, title, move || {
             action_selection.set(action_id.clone());
             action_more.set(false);

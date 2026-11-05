@@ -105,7 +105,7 @@ impl PrimitiveView for ModalPresenter {
             &self.is_presented,
         );
         let presented = self.is_presented.clone();
-        let retained = self.retained.clone();
+        let retained = self.retained;
         let options = self.options.clone();
         let fitting = self.fitting_geometry.clone();
         let content = self.content.clone();
@@ -174,7 +174,7 @@ fn present(
         width: bounds.width,
         height: bounds.height,
     });
-    let retained_state = retained.clone();
+    let retained_state = *retained;
     let panel = AnyView::new(AnimatedVisibility::new(
         is_presented,
         Transition::opacity(),

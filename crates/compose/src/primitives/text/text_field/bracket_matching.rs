@@ -71,10 +71,8 @@ impl TextBracketMatching {
         } else {
             None
         };
-        let Some(target) = target else { return None };
-        let Some(matched) = Self::matching_bracket(&bytes, &code, target) else {
-            return None;
-        };
+        let target = target?;
+        let matched = Self::matching_bracket(&bytes, &code, target)?;
         let mut result = self.result.borrow_mut();
         result.clear();
         result.push(start + target);

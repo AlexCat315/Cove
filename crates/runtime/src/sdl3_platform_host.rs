@@ -1234,10 +1234,9 @@ impl Sdl3PlatformHost {
                     && !cadence
                     && !native_windows.contains(&session.id)
                     && (session.needs_display.get() || session.tree.borrow().has_render_updates())
+                    && let Some(deadline) = session.gate_deadline()
                 {
-                    if let Some(deadline) = session.gate_deadline() {
-                        timeout = timeout.min((deadline - now).max(0.001));
-                    }
+                    timeout = timeout.min((deadline - now).max(0.001));
                 }
             }
             if timeout > 0.0 && timeout.is_finite() {

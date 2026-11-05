@@ -43,7 +43,7 @@ use cove_ui_compose::modifiers::interaction::AccessibilityExt;
 use cove_ui_compose::modifiers::layout::{FlexExt, LayoutFrameExt};
 use cove_ui_compose::primitives::controls::Button;
 use cove_ui_compose::primitives::data::data_table::table_column::{
-    ColumnVisibility, ComparisonResult, TableColumn, TableColumnLayout, TableColumnPlan, TableSort,
+    ColumnVisibility, ComparisonResult, TableColumn, TableColumnLayout, TableColumnPlan,
     TableTextEditing,
 };
 use cove_ui_compose::primitives::data::data_table::{
@@ -859,7 +859,7 @@ fn frozen_edit() {
         );
 
         scene.key(Scancode::F2, KeyModifiers::default());
-        let field = editor_field(scene);
+        let _field = editor_field(scene);
         type_text(scene, "Committed by blur");
         let after = labelled(scene, "After table").expect("the trailing button is mounted");
         scene.click(&after, 1);

@@ -33,6 +33,7 @@ pub extern "C" fn cove_set_scale(scale: f32) {
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn cove_font_alloc(count: i32) -> *mut u8 {
     match usize::try_from(count) {
+        // SAFETY: validated size; ownership transfers to the caller per the contract.
         Ok(count) => unsafe { export_buffer::allocate_export_allocation(count) },
         Err(_) => std::ptr::null_mut(),
     }
@@ -170,6 +171,7 @@ pub extern "C" fn cove_events() {
 pub unsafe extern "C" fn cove_alloc(count: i32) -> *mut u8 {
     match usize::try_from(count) {
         Ok(count) if count <= 1024 * 1024 => unsafe {
+            // SAFETY: size was validated; ownership transfers to the caller.
             export_buffer::allocate_export_allocation(count)
         },
         _ => std::ptr::null_mut(),
@@ -185,6 +187,7 @@ pub unsafe extern "C" fn cove_free(pointer: *mut u8, count: i32) {
     let Ok(count) = usize::try_from(count) else {
         return;
     };
+    // SAFETY: the caller's contract guarantees a live allocation of `count` bytes.
     unsafe { export_buffer::free_export_allocation(pointer, count) };
 }
 

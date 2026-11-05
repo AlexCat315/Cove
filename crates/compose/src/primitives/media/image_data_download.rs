@@ -222,6 +222,9 @@ impl ImageDataDownload {
 }
 
 /// Bounded body accumulator mirroring the delegate's 64 KiB progress gate.
+///
+/// `Arc` mirrors the Swift delegate's shared handle; the accumulator itself is
+/// confined to the thread driving the download, hence the non-`Sync` cells.
 pub struct DownloadProgressReporter {
     data: RefCell<Vec<u8>>,
     reported: RefCell<usize>,
@@ -230,6 +233,7 @@ pub struct DownloadProgressReporter {
 }
 
 impl DownloadProgressReporter {
+    #[allow(clippy::arc_with_non_send_sync)]
     pub fn new(limit: usize, progress: Option<DownloadProgress>) -> Arc<Self> {
         Arc::new(Self {
             data: RefCell::new(Vec::new()),

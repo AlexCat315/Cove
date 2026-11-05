@@ -23,9 +23,7 @@ use cove_ui_compose::primitives::upload::{
     DragUpload, UploadError, UploadRequest, UploadResponse, UploadState, UploadTransport,
     UploadTransportHolder,
 };
-use cove_ui_compose::theme::tokens::{
-    SemanticColorRef, SemanticFontRef, SemanticStyleViewExt,
-};
+use cove_ui_compose::theme::tokens::{SemanticColorRef, SemanticFontRef, SemanticStyleViewExt};
 use cove_ui_compose::{AnyView, BoxView, LayoutDebugExt, TupleView, View};
 
 use crate::gallery_content::catalog::GalleryOptions;
@@ -158,9 +156,7 @@ impl View for DragUploadStory {
         // the shape a caller uses when the server decides what it wants.
         let everything = {
             let request = UploadRequest::new("memory://gallery/any", Vec::new());
-            DragUpload::new(request)
-                .maximum_files(8)
-                .reader(Self::part)
+            DragUpload::new(request).maximum_files(8).reader(Self::part)
         };
         let archives = {
             let request = UploadRequest::new("memory://gallery/archive", Vec::new());
@@ -221,44 +217,38 @@ impl View for DragUploadStory {
                 AnyView::new(StorySection::new(
                     "Any type",
                     "An empty filter accepts every file, archives and unknown formats included. Type is derived from the name: an archive is sent as application/zip, its contents are never unpacked.",
-                    AnyView::new(
-                        BoxView::new(
-                            FlexDirection::Column,
-                            Align::Stretch,
-                            Justify::FlexStart,
-                            Wrap::NoWrap,
-                            12.0,
-                            AnyView::new(everything.debug_name("drag-upload-any")),
-                        ),
-                    ),
+                    AnyView::new(BoxView::new(
+                        FlexDirection::Column,
+                        Align::Stretch,
+                        Justify::FlexStart,
+                        Wrap::NoWrap,
+                        12.0,
+                        AnyView::new(everything.debug_name("drag-upload-any")),
+                    )),
                 )),
                 AnyView::new(StorySection::new(
                     "Archives",
                     "A filter restricted to archive formats. The archive is uploaded as one file: unpacking is the receiving service's decision, not the drop zone's.",
-                    AnyView::new(
-                        BoxView::new(
-                            FlexDirection::Column,
-                            Align::Stretch,
-                            Justify::FlexStart,
-                            Wrap::NoWrap,
-                            12.0,
-                            AnyView::new(archives.debug_name("drag-upload-archive")),
-                        ),
-                    ),
+                    AnyView::new(BoxView::new(
+                        FlexDirection::Column,
+                        Align::Stretch,
+                        Justify::FlexStart,
+                        Wrap::NoWrap,
+                        12.0,
+                        AnyView::new(archives.debug_name("drag-upload-archive")),
+                    )),
                 )),
                 AnyView::new(StorySection::new(
                     "Narrow filter",
                     "The same control limited to one text file. A drop of any other type, and any folder, is refused before any bytes move, and the zone stays usable.",
-                    AnyView::new(
-                        BoxView::new(
-                            FlexDirection::Column,
-                            Align::Stretch,
-                            Justify::FlexStart,
-                            Wrap::NoWrap,
-                            12.0,
-                            AnyView::new(rejecting_upload.debug_name("drag-upload-rejected")),
-                        ),
-                    ),
+                    AnyView::new(BoxView::new(
+                        FlexDirection::Column,
+                        Align::Stretch,
+                        Justify::FlexStart,
+                        Wrap::NoWrap,
+                        12.0,
+                        AnyView::new(rejecting_upload.debug_name("drag-upload-rejected")),
+                    )),
                 )),
             ])),
         ))

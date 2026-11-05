@@ -1111,7 +1111,7 @@ where
             keys.insert(ancestor.clone());
             ids.insert(ancestor.id);
         }
-        if node.children.len() > 0 {
+        if !node.children.is_empty() {
             keys.insert(node.key.clone());
             ids.insert(node.id.clone());
         }

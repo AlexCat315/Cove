@@ -22,7 +22,7 @@ use crate::primitives::controls::button::{
 use crate::primitives::layout::{ScrollAxis, ScrollView, ScrollbarGutter};
 use crate::primitives::media::ui_icon_catalog;
 use crate::primitives::overlays::modal::{
-    Modal, ModalBackdrop, ModalOptions, ModalPlacement, SheetDragHandle,
+    Modal, ModalBackdrop, ModalGeometry, ModalOptions, ModalPlacement, SheetDragHandle,
 };
 use crate::primitives::overlays::roving_focus::{
     RovingFocusHost, RovingItem, SelectionNavigation, roving_identity,
@@ -295,17 +295,21 @@ impl PrimitiveView for ActionSheetDrawer {
         let chrome = (if is_compact { 44.0 } else { 0.0 }) + 140.0;
         let action_viewport = 88.0_f32.max(window_height - top_clearance - safe_bottom - chrome);
 
-        let mut modal_options = ModalOptions::default();
-        modal_options.label = self.question.title.clone();
-        modal_options.geometry.placement = ModalPlacement::Bottom;
-        modal_options.geometry.inset = inset;
-        modal_options.geometry.width = width;
-        modal_options.geometry.height = f32::MAX;
-        modal_options.geometry.corner_radius = 18.0;
-        modal_options.fits_content_height = true;
-        modal_options.backdrop = ModalBackdrop::Dimmed;
-        modal_options.surface = SemanticColorRef::surface_floating();
-        modal_options.translation_y = self.state.drag_offset.get();
+        let modal_options = ModalOptions {
+            label: self.question.title.clone(),
+            geometry: ModalGeometry {
+                placement: ModalPlacement::Bottom,
+                inset,
+                width,
+                height: f32::MAX,
+                corner_radius: 18.0,
+            },
+            fits_content_height: true,
+            backdrop: ModalBackdrop::Dimmed,
+            surface: SemanticColorRef::surface_floating(),
+            translation_y: self.state.drag_offset.get(),
+            ..ModalOptions::default()
+        };
         let _ = &theme;
 
         let content = AnyView::new(ActionSheetContent {

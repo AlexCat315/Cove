@@ -199,7 +199,11 @@ impl FileDropRegistry {
     /// A platform that reports a file without a preceding `Begin` still works:
     /// the path is staged and delivered by the matching `Complete`, or by
     /// [`Self::finish`] when the platform sends none.
-    pub fn stage(&self, files: impl IntoIterator<Item = DroppedFile>, point: Point) -> Option<Node> {
+    pub fn stage(
+        &self,
+        files: impl IntoIterator<Item = DroppedFile>,
+        point: Point,
+    ) -> Option<Node> {
         self.staged.borrow_mut().extend(files);
         self.update_position(point)
     }
@@ -387,9 +391,7 @@ impl FileDropRegistry {
         !files.is_empty()
             && zone.is_enabled
             && files.len() <= zone.maximum_files
-            && files
-                .iter()
-                .all(|file| Self::accepts_file(file, zone))
+            && files.iter().all(|file| Self::accepts_file(file, zone))
             && zone.accepts.as_ref().is_none_or(|accepts| accepts(files))
     }
 

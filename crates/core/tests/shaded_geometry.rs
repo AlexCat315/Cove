@@ -7,7 +7,7 @@
 //! - an annulus leaves the hole empty: no vertex sits inside the inner radius
 use cove_core::{Color, DrawList, Point};
 
-fn shade_at(x: f32, y: f32, center: Point, radius: f32) -> Color {
+fn shade_at(x: f32, _y: f32, center: Point, radius: f32) -> Color {
     let t = ((x - center.x).abs() / radius).clamp(0.0, 1.0);
     Color {
         r: t,

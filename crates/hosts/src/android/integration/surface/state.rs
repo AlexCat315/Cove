@@ -1,6 +1,8 @@
 //! Translation of Android/Integration/Surface/State.swift.
 
-use cove_core::{Environment, Idiom, InputCapabilities, Insets, Keyboard, State, TextScale};
+use cove_core::{
+    Environment, Idiom, InputCapabilities, Insets, Keyboard, State, TextScale, Viewport,
+};
 use cove_ui_compose::theme::Theme;
 
 /// Session geometry survives swapchain recreation. Native updates replace
@@ -12,12 +14,16 @@ pub struct SurfaceState {
 
 impl SurfaceState {
     pub fn new(scale: f32) -> Self {
-        let mut surface = Environment::default();
-        surface.idiom = Idiom::Phone;
-        surface.input = InputCapabilities::TOUCH | InputCapabilities::KEYBOARD;
-        surface.viewport.width = 0.0;
-        surface.viewport.height = 0.0;
-        surface.viewport.scale = Self::valid_scale(scale);
+        let surface = Environment {
+            idiom: Idiom::Phone,
+            input: InputCapabilities::TOUCH | InputCapabilities::KEYBOARD,
+            viewport: Viewport {
+                width: 0.0,
+                height: 0.0,
+                scale: Self::valid_scale(scale),
+            },
+            ..Environment::default()
+        };
         Self {
             value: State::new(surface),
             system_bar_icon_style: -1,

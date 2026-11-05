@@ -44,9 +44,7 @@ use cove_runtime::{
 };
 use cove_shell::{NativeRenderSurface, WindowChromeHitTest, WindowOptions};
 use cove_text::{TextBootstrapOptions, TextEnvironment, TextEnvironmentHolder};
-use cove_ui_compose::primitives::interaction::{
-    DroppedFile, FileDropRegistry, FileDropRegistryHolder,
-};
+use cove_ui_compose::primitives::interaction::{DroppedFile, FileDropRegistryHolder};
 use cove_ui_compose::primitives::overlays::portal::portal_registry::{
     PortalStore, PortalStoreAmbient,
 };
@@ -577,10 +575,8 @@ impl Application {
                 // A platform that sends `File` with no `Begin` still has a
                 // batch to deliver: `stage` opened it implicitly.
                 registry.finish(point);
-                registry.update_position(cove_core::Point::new(
-                    f32::NEG_INFINITY,
-                    f32::NEG_INFINITY,
-                ));
+                registry
+                    .update_position(cove_core::Point::new(f32::NEG_INFINITY, f32::NEG_INFINITY));
             }
         }
         let _ = state;
@@ -1055,7 +1051,6 @@ impl Application {
             raster_scale: scale,
             atlas_edge: Some(atlas_edge),
             cache_limits: state.config.memory.text,
-            ..TextBootstrapOptions::default()
         });
         typography.atlas = Some(environment.atlas.clone());
         let texture_id = typography.texture_id;

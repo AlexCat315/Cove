@@ -22,9 +22,11 @@ use cove_devtools::devtools::mirror::{FrameTapError, FrameTapPixels, NativeAppFr
 
 /// A source that records the extents it was asked for and returns an opaque
 /// buffer filled with a deterministic pattern.
-fn recording_source(
-    calls: Rc<RefCell<Vec<(u32, u32, f32, f32)>>>,
-) -> Rc<dyn Fn(&DrawList, (u32, u32), (f32, f32)) -> Result<FrameTapPixels, FrameTapError>> {
+type RecordedExtent = (u32, u32, f32, f32);
+type TapSource =
+    Rc<dyn Fn(&DrawList, (u32, u32), (f32, f32)) -> Result<FrameTapPixels, FrameTapError>>;
+
+fn recording_source(calls: Rc<RefCell<Vec<RecordedExtent>>>) -> TapSource {
     Rc::new(move |_list, size, logical| {
         calls
             .borrow_mut()

@@ -1,4 +1,14 @@
 //! CoveUICompose: widgets, themes, modifiers, animation, scrolling and pets.
+//!
+//! Widget builders keep Swift's long parameter lists, and module files intentionally
+//! repeat the component name (`calendar/calendar.rs`).
+#![allow(
+    clippy::large_enum_variant,
+    clippy::module_inception,
+    clippy::needless_range_loop,
+    clippy::too_many_arguments,
+    clippy::type_complexity
+)]
 pub mod animation;
 pub mod app_storage;
 pub mod core;

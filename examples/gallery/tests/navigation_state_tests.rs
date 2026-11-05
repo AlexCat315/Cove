@@ -19,15 +19,15 @@ mod support;
 use std::rc::Rc;
 
 use cove_composition::AnyView;
-use cove_core::scene::{AccessibilityRole, Node};
 use cove_core::Point;
+use cove_core::scene::{AccessibilityRole, Node};
 use cove_examples::gallery_content::catalog::{GalleryOptions, GalleryPage};
 use cove_examples::gallery_content::stories::calendar::{CalendarStory, is_weekend};
 use cove_examples::gallery_content::stories::data_stories_file::{
     DragAndDropStory, LAZY_TREE_BRANCH, TreeStory,
 };
-use cove_platform::{InputEvent, KeyModifiers, MouseButton, MouseButtonEvent, MouseMotionEvent};
 use cove_examples::gallery_content::stories::layout::LazyGridStory;
+use cove_platform::{InputEvent, KeyModifiers, MouseButton, MouseButtonEvent, MouseMotionEvent};
 use cove_ui_compose::foundation::Date;
 use cove_ui_compose::theme::tokens::TextScaler;
 use cove_ui_compose::theme::{TextScalerViewExt, Theme, ThemeViewExt};
