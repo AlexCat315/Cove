@@ -53,6 +53,67 @@ jobs:
         run: cargo run --locked --manifest-path examples/counter/Cargo.toml
       - name: Audit source layout and migration mappings
         run: cargo xtask audit --json
+  media:
+    # The pinned GStreamer source builds inside the official *-sys build scripts,
+    # so CI runs the same cargo entry points developers use.
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [macos-26, ubuntu-24.04]
+    runs-on: ${{ matrix.runner }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          submodules: recursive
+      - name: Rust toolchain
+        run: rustup toolchain install 1.99.1 --profile minimal
+      - name: Prepare native build environment
+        run: cargo cove setup --media
+      - name: Media control and output tests
+        run: cargo test --locked -p cove-media --features gst --all-targets
+      - name: Video upload tests
+        run: cargo test --locked -p cove-media-rhi --features gst
+      - name: Out-of-tree consumer application
+        run: |
+          cp -R Tools/MediaSmoke "$RUNNER_TEMP/cove-media-consumer"
+          cd "$RUNNER_TEMP/cove-media-consumer"
+          sed "s|path = \"../../crates/media\"|path = \"$GITHUB_WORKSPACE/crates/media\"|" Cargo.toml > Cargo.toml.next
+          mv Cargo.toml.next Cargo.toml
+          cargo build
+          cargo test
+          cargo run
+      - name: Regenerate license bundle
+        run: cargo cove media notices
+  media-windows:
+    # First-run validation of the Windows install and static-build path. Remove
+    # continue-on-error once a Windows host has passed the same checks as media.
+    runs-on: windows-2025
+    continue-on-error: true
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          submodules: recursive
+      - name: Rust toolchain
+        run: rustup toolchain install 1.99.1 --profile minimal
+      - name: Prepare native build environment
+        run: cargo cove setup --media
+      - name: Media control and output tests
+        run: cargo test --locked -p cove-media --features gst --all-targets
+      - name: Out-of-tree consumer application
+        run: |
+          cp -R Tools/MediaSmoke "$RUNNER_TEMP/cove-media-consumer"
+          cd "$RUNNER_TEMP/cove-media-consumer"
+          sed "s|path = \"../../crates/media\"|path = \"$GITHUB_WORKSPACE/crates/media\"|" Cargo.toml > Cargo.toml.next
+          mv Cargo.toml.next Cargo.toml
+          cargo build
+          cargo test
+          cargo run
   ios-foundation:
     runs-on: macos-15
     strategy:

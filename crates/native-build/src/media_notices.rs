@@ -13,6 +13,34 @@ use std::{
 /// the Cove checkout whose locked media dependencies were used for the build.
 /// The output is replaced only after all license inputs have been validated.
 pub fn generate(build: &Build, workspace: &Path, destination: &Path) -> io::Result<()> {
+    let metadata = command_json(
+        Command::new(std::env::var_os("CARGO").unwrap_or_else(|| "cargo".into()))
+            .current_dir(workspace)
+            .args([
+                "metadata",
+                "--locked",
+                "--format-version",
+                "1",
+                "--filter-platform",
+            ])
+            .arg(&build.target)
+            .args(["--features", "cove-media-rhi/gst"]),
+    )?;
+    generate_inner(build, workspace, destination, Some(&metadata))
+}
+
+/// Build-script-safe inventory: native projects and vendored binding licenses.
+/// Never invokes Cargo recursively while a parent Cargo build holds locks.
+pub fn generate_native(build: &Build, workspace: &Path, destination: &Path) -> io::Result<()> {
+    generate_inner(build, workspace, destination, None)
+}
+
+fn generate_inner(
+    build: &Build,
+    workspace: &Path,
+    destination: &Path,
+    metadata: Option<&Value>,
+) -> io::Result<()> {
     let destination = absolute(destination)?;
     let workspace = workspace.canonicalize()?;
     let source = build.source.canonicalize()?;
@@ -34,19 +62,6 @@ pub fn generate(build: &Build, workspace: &Path, destination: &Path) -> io::Resu
     let project = meson(&directory, "--projectinfo")?;
     let dependencies = meson(&directory, "--dependencies")?;
     let targets = meson(&directory, "--targets")?;
-    let metadata = command_json(
-        Command::new(std::env::var_os("CARGO").unwrap_or_else(|| "cargo".into()))
-            .current_dir(&workspace)
-            .args([
-                "metadata",
-                "--locked",
-                "--format-version",
-                "1",
-                "--filter-platform",
-            ])
-            .arg(&build.target)
-            .args(["--features", "cove-media-rhi/gst"]),
-    )?;
     let catalog = read_json(&workspace.join("LICENSES/media/native.json"))?;
     let supplements = read_json(&workspace.join("LICENSES/media/rust-supplements.json"))?;
     let mut copies = BTreeMap::new();
@@ -55,7 +70,11 @@ pub fn generate(build: &Build, workspace: &Path, destination: &Path) -> io::Resu
         "native/source-copyrights.txt".into(),
         source_notices(&source, &targets)?.into_bytes(),
     );
-    let rust = rust_packages(&workspace, &metadata, &supplements, &mut copies)?;
+    let rust = if let Some(metadata) = metadata {
+        rust_packages(&workspace, metadata, &supplements, &mut copies)?
+    } else {
+        vendored_packages(&workspace, &mut copies)?
+    };
     // Include exact wrap hashes, local patches and nested wrap redirects.
     collect_wraps(&source.join("subprojects"), &source, &mut copies)?;
     add_file(
@@ -91,7 +110,7 @@ pub fn generate(build: &Build, workspace: &Path, destination: &Path) -> io::Resu
     let inventory = json!({
         "schema": 1, "target": build.target, "gstreamer_revision": source_revision.trim(),
         "tracked_source_changes": !changes.is_empty(), "untracked_source_files": untracked.lines().collect::<Vec<_>>(),
-        "scope": "GStreamer enabled Meson subprojects and Cove media/media-rhi Cargo normal + build dependency closure; not the final application closure",
+        "scope": if metadata.is_some() {"GStreamer enabled Meson subprojects and Cove media/media-rhi Cargo normal + build dependency closure; not the final application closure"} else {"GStreamer enabled Meson subprojects and vendored Rust bindings; application Cargo dependencies must be collected at packaging"},
         "native": native, "rust": rust,
     });
     copies.insert("inventory.json".into(), json_bytes(&inventory)?);
@@ -100,6 +119,46 @@ pub fn generate(build: &Build, workspace: &Path, destination: &Path) -> io::Resu
         notice_text(&inventory)?.into_bytes(),
     );
     write_bundle(&destination, &copies)
+}
+
+fn vendored_packages(
+    workspace: &Path,
+    copies: &mut BTreeMap<PathBuf, Vec<u8>>,
+) -> io::Result<Vec<Value>> {
+    let directory = workspace.join("third-party/rust-media");
+    let mut packages = read_json(&directory.join("upstream.json"))?
+        .as_array()
+        .ok_or_else(|| io::Error::other("binding inventory"))?
+        .clone();
+    for package in &mut packages {
+        let name = string(package, "name")?.to_owned();
+        let output =
+            PathBuf::from("rust").join(format!("{}-{}", name, string(package, "version")?));
+        let mut files = Vec::new();
+        for file in sorted_entries(&directory.join(&name))? {
+            if is_notice(&file.file_name().to_string_lossy()) {
+                collect_files(
+                    &file.path(),
+                    &output.join(file.file_name()),
+                    copies,
+                    &mut files,
+                )?;
+            }
+        }
+        if files.is_empty() {
+            return Err(io::Error::other(format!(
+                "vendored binding {name} has no license"
+            )));
+        }
+        package["files"] = json!(files);
+        package["source"] = json!("vendored official source; see upstream.json");
+    }
+    add_file(
+        copies,
+        "rust/upstream.json".into(),
+        &directory.join("upstream.json"),
+    )?;
+    Ok(packages)
 }
 
 fn native_packages(
@@ -194,8 +253,14 @@ fn rust_packages(
     let selected = closure(metadata)?;
     let mut packages = Vec::new();
     for package in array(&metadata["packages"])? {
-        if !selected.contains(string(package, "id")?) || package["source"].is_null() {
+        if !selected.contains(string(package, "id")?) {
             continue;
+        }
+        if package["source"].is_null() {
+            let manifest = Path::new(string(package, "manifest_path")?);
+            if !manifest.starts_with(workspace.join("third-party/rust-media")) {
+                continue;
+            }
         }
         let name = string(package, "name")?;
         let version = string(package, "version")?;
@@ -501,13 +566,13 @@ fn command_json(command: &mut Command) -> io::Result<Value> {
 }
 fn meson(directory: &Path, argument: &str) -> io::Result<Value> {
     command_json(
-        Command::new("meson")
+        crate::setup::command("meson")?
             .args(["introspect", argument])
             .arg(directory),
     )
 }
 fn git(source: &Path, arguments: &[&str]) -> io::Result<String> {
-    let output = Command::new("git")
+    let output = crate::setup::command("git")?
         .arg("-C")
         .arg(source)
         .args(arguments)
@@ -598,7 +663,8 @@ mod tests {
         for (name, bytes) in texts {
             fs::write(directory.0.join(name), bytes).expect("license fixture");
         }
-        let metadata = json!({"packages":[{"name":"cove-media","id":"media"},{"name":"cove-media-rhi","id":"rhi"},
+        let metadata = json!({"packages":[{"name":"cove-media","id":"media","version":"1","source":null,"manifest_path":directory.0.join("crates/media/Cargo.toml")},
+            {"name":"cove-media-rhi","id":"rhi","version":"1","source":null,"manifest_path":directory.0.join("crates/media-rhi/Cargo.toml")},
             {"name":"unicode-fixture","version":"1","id":"fixture","source":"registry+test","license":license,"manifest_path":directory.0.join("Cargo.toml")}],
             "resolve":{"nodes":[{"id":"media","deps":[{"pkg":"fixture","dep_kinds":[{"kind":null}]}]}, {"id":"rhi","deps":[]},{"id":"fixture","deps":[]}]}});
         let mut copies = BTreeMap::new();

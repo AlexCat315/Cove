@@ -8,6 +8,7 @@ mod audit;
 mod desktop;
 mod process;
 mod project;
+mod setup_config;
 
 use clap::{Args, Parser, Subcommand, ValueEnum};
 use project::Project;
@@ -25,6 +26,19 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Command {
+    /// Prepare native build tools and SDKs. Does not compile GStreamer.
+    Setup {
+        #[arg(long)]
+        media: bool,
+        /// Check without installing or changing system configuration.
+        #[arg(long)]
+        check: bool,
+        /// Show the host installation plan without executing it.
+        #[arg(long)]
+        dry_run: bool,
+        #[arg(long)]
+        target: Vec<String>,
+    },
     /// Check the Rust workspace layout and retained Swift migration mappings.
     Audit {
         #[arg(long)]
@@ -45,6 +59,21 @@ enum Command {
     Devices {
         #[arg(value_enum)]
         platform: Platform,
+    },
+    /// Maintain the source-built native media tree.
+    Media {
+        #[command(subcommand)]
+        action: MediaAction,
+    },
+}
+
+#[derive(Subcommand)]
+enum MediaAction {
+    /// Regenerate the license bundle inside the cached native prefix.
+    Notices {
+        /// Defaults to the host target.
+        #[arg(long)]
+        target: Option<String>,
     },
 }
 
@@ -155,7 +184,20 @@ impl Mode {
 }
 
 pub fn main() -> ExitCode {
-    match execute(Cli::parse()) {
+    finish(Cli::parse())
+}
+
+/// Entry point for Cargo's external `cargo-cove` subcommand protocol.
+pub fn cargo_main() -> ExitCode {
+    let mut arguments: Vec<_> = std::env::args_os().collect();
+    if arguments.get(1).is_some_and(|arg| arg == "cove") {
+        arguments.remove(1);
+    }
+    finish(Cli::parse_from(arguments))
+}
+
+fn finish(cli: Cli) -> ExitCode {
+    match execute(cli) {
         Ok(()) => ExitCode::SUCCESS,
         Err(error) => {
             eprintln!("error: {error}");
@@ -166,6 +208,41 @@ pub fn main() -> ExitCode {
 
 fn execute(cli: Cli) -> Result<()> {
     match cli.command {
+        Command::Setup {
+            media,
+            check,
+            dry_run,
+            target,
+        } => {
+            let targets = target.clone();
+            let mut report = cove_native_build::setup::run(&cove_native_build::setup::Options {
+                media,
+                check,
+                dry_run,
+                targets: target,
+            })
+            .map_err(|e| e.to_string())?;
+            if !check && !dry_run && report["ready"] == true {
+                // Setup edits the project's Cargo config, which is tracked inside this
+                // workspace, so the modified path must be visible in the report.
+                if let Some(path) = setup_config::configure_android(
+                    &std::env::current_dir().map_err(|e| e.to_string())?,
+                    &targets,
+                )? {
+                    report["cargo_config_updated"] = path.display().to_string().into();
+                }
+            }
+            println!(
+                "{}",
+                serde_json::to_string_pretty(&report).map_err(|e| e.to_string())?
+            );
+            if !dry_run && report["ready"] != true {
+                return Err(
+                    "native tools or SDKs are not ready; run cargo cove setup --media".into(),
+                );
+            }
+            Ok(())
+        }
         Command::Audit { json } => audit::run(json),
         Command::Package(target) => {
             let platform = target.platform.unwrap_or_else(Platform::host);
@@ -194,6 +271,27 @@ fn execute(cli: Cli) -> Result<()> {
             Platform::Android => android::devices(),
             Platform::Ios => apple::devices(),
             _ => Err("devices lists android or ios targets".into()),
+        },
+        Command::Media { action } => match action {
+            MediaAction::Notices { target } => {
+                let target = match target {
+                    Some(target) => target,
+                    None => cove_native_build::setup::host_triple().map_err(|e| e.to_string())?,
+                };
+                let build = cove_native_build::gstreamer::cached_build(&target)
+                    .map_err(|e| e.to_string())?;
+                if !build.out_dir.join("build-manifest.txt").is_file() {
+                    return Err(format!(
+                        "no cached native media build for {target}; build a crate with the gst feature first"
+                    ));
+                }
+                build.write_notices().map_err(|e| e.to_string())?;
+                println!(
+                    "{}",
+                    build.prefix().join("share/licenses/cove-media").display()
+                );
+                Ok(())
+            }
         },
     }
 }

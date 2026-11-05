@@ -8,26 +8,31 @@ Rust 2024 媒体控制与保留帧端点。原生播放器通过可选的 `gst` 
 
 ## 构建与运行
 
-原生版本固定为 GStreamer 1.28.8，revision `1b2a95a1b72787cda146b46df9605b168e5b683b`。Rust 绑定固定在工作区与 Cargo.lock 中。需要 Git、C/C++ 工具链、Python、Meson、Ninja、pkg-config、Bison ≥ 2.4、Flex；Apple/Android/Windows/Linux 还需相应平台 SDK/系统音频开发库。
+原生版本固定为 GStreamer 1.28.8，revision `1b2a95a1b72787cda146b46df9605b168e5b683b`。Rust 绑定固定在工作区与 Cargo.lock 中。
 
-在 Cove 根目录执行：
+首次使用只初始化一次构建环境：`cargo cove setup --media` 检查并按需补齐 Git、C/C++ 编译器与平台 SDK、Python、Meson、Ninja、pkg-config、Bison ≥ 2.4、Flex，并把验证过的工具路径写入用户缓存；`--check` 只报告，`--dry-run` 只输出安装计划。macOS、Windows、Linux 均有实现，交叉目标用 `--target <triple>` 追加平台 SDK 与链接器配置。
 
 ```sh
-git submodule update --init --depth 1 third-party/gstreamer
-cargo run -p cove-native-build --example gstreamer -- \
-  --jobs 6 -- test -p cove-media -p cove-media-rhi -p cove-native-build \
-  --features cove-media-rhi/gst
-cargo run -p cove-native-build --example gstreamer -- \
-  --jobs 6 -- run -p cove-media --features gst --example headless
+cargo cove setup --media
 ```
 
-macOS 的系统 Bison 2.3 太旧时，将已安装的新 Bison 的 `bin` 目录加入 `PATH`。构建失败的详细命令输出保留在 `target/media-native/<target>/out/{configure,compile,install}.log`。
+在 Cove 仓库之外开发应用时，先在 Cove 根目录执行 `cargo install --path xtask --bin cargo-cove` 取得 `cargo cove` 子命令；仓库内的 `cargo cove` 来自 `.cargo/config.toml` 别名，只在 Cove 工作目录可用。
 
-构建器先将固定源码及上游带哈希的 Meson wraps 构建到目标专属目录，再启动 Cargo。它只向 sys crate 提供该次构建的 pkg-config 文件，选择静态链接；固定 profile 关闭文件插件注册表扫描，在构建器之外启动也不会扫描本机 SDK，显式静态注册仍可用。构建清单改变时，pkg-config 路径指纹也改变，避免 Cargo 复用旧的原生链接结果。普通 `cargo ... --features gst` 仍按官方绑定规则发现开发 SDK，不能据此视为完成源码分发验证。
+之后是日常 Cargo 入口，不需要额外构建步骤、环境变量或 `[patch]`：
+
+```sh
+cargo test -p cove-media --features gst --all-targets
+cargo test -p cove-media-rhi --features gst
+cargo run -p cove-media --features gst --example headless
+```
+
+固定的官方 `*-sys` 绑定在构建脚本里调用 `cove-native-build`：首次请求时按目标完成源码准备、Meson 构建、静态链接和许可证收集，产物位于用户缓存的 `Cove/native/<指纹>/`（macOS 为 `~/Library/Caches/Cove/native/<指纹>/`，含 `configure.log`、`compile.log`、`install.log`）。`third-party/gstreamer` 子模块未初始化时按固定 revision 自行获取；并发 sys crate 由构建锁串行化，只有清单指纹改变才重建。
+
+构建器只把本次构建的 pkg-config 目录暴露给 sys crate，选择静态链接；固定 profile 关闭文件插件注册表扫描，在构建器之外启动也不会扫描本机 SDK，显式静态注册仍可用。构建清单改变时 pkg-config 路径指纹也改变，避免 Cargo 复用旧的原生链接结果。
 
 默认原生 profile 选定 core/app/playback、转换、测试源、AVI/WAV/MP4/Matroska 容器与平台音频/解码插件。容器插件不等于具备其所有编解码器；Linux 基础 profile 尚未包含 H.264/AAC 软件解码器，gst-libav/网络协议也未加入。应用通过 `has_element` 和实际协商结果查询能力，缺失插件以错误返回。
 
-交叉构建用 `--target <triple>`；iOS 自动使用 Xcode SDK，Android 使用 `ANDROID_NDK_HOME`（arm64/x86_64，API 26），其他交叉工具链传 `--cross-file <Meson 文件>`。生成配方不代表相应设备已验收。Android 在初始化前须通过 `gst::android::install_environment` 提供 JavaVM、application/class-loader 全局引用和资源所有者；静态链接的 JNI 提供函数供 androidmedia 使用。
+交叉构建在应用侧仍用 `cargo build --target <triple>`，先执行 `cargo cove setup --media --target <triple>` 准备 SDK：iOS 自动使用 Xcode SDK，Android 由 setup 安装 NDK 并写入目标链接器与 `CC_/CXX_/AR_` 变量（arm64/x86_64，API 26），其他交叉工具链通过 `COVE_CROSS_FILE_<TARGET>`（`-` 换成 `_`）提供 Meson cross 文件。Android 的链接器写入当前项目的 `.cargo/config.toml`，只补缺失项、不覆盖项目已有配置；该文件被 Cove 仓库跟踪，因此 setup 只在实际发生写入时于 JSON 报告的 `cargo_config_updated` 字段给出路径。生成配方不代表相应设备已验收。Android 在初始化前须通过 `gst::android::install_environment` 提供 JavaVM、application/class-loader 全局引用和资源所有者；静态链接的 JNI 提供函数供 androidmedia 使用。
 
 ## 播放控制
 

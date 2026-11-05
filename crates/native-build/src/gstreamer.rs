@@ -1,5 +1,6 @@
-//! Pinned, out-of-source GStreamer build plans. The caller runs Cargo only after
-//! this build finishes, so official *-sys crates discover the target's pc files.
+//! Pinned, out-of-source GStreamer build plans. Official `*-sys` build scripts
+//! call [`prepare_sys`], which builds the target's prefix and then points
+//! pkg-config at it, so plain `cargo build` needs no separate native step.
 use std::{
     fs, io,
     path::{Path, PathBuf},
@@ -8,6 +9,7 @@ use std::{
 
 pub const REVISION: &str = "1b2a95a1b72787cda146b46df9605b168e5b683b";
 pub const VERSION: &str = "1.28.8";
+pub use super::media_provider::{cached_build, prepare_sys};
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Platform {
     Mac,
@@ -70,6 +72,18 @@ impl Build {
             options.push(format!("-Dgst-plugins-good:{name}=enabled"));
         }
         options.push("-Dgst-plugins-bad:videoparsers=enabled".into());
+        if self.target.contains("msvc") {
+            options.push(
+                if std::env::var("CARGO_CFG_TARGET_FEATURE")
+                    .is_ok_and(|v| v.split(',').any(|f| f == "crt-static"))
+                {
+                    "-Db_vscrt=mt"
+                } else {
+                    "-Db_vscrt=md"
+                }
+                .into(),
+            );
+        }
         match self.platform()? {
             Platform::Mac | Platform::Ios => {
                 options.push("-Dgst-plugins-good:osxaudio=enabled".into());
@@ -110,6 +124,12 @@ impl Build {
     }
     /// Builds from the recorded git revision; dependency wraps carry upstream hashes.
     pub fn build(&self) -> io::Result<PathBuf> {
+        self.build_inner(true)
+    }
+    pub(crate) fn build_for_cargo(&self) -> io::Result<PathBuf> {
+        self.build_inner(false)
+    }
+    fn build_inner(&self, full_notices: bool) -> io::Result<PathBuf> {
         if self.jobs == 0 {
             return Err(io::Error::other("native build jobs must be positive"));
         }
@@ -209,7 +229,15 @@ impl Build {
             toolchain.trim()
         );
         fs::write(out.join("build-manifest.txt"), manifest)?;
-        self.write_notices()?;
+        if full_notices {
+            self.write_notices()?;
+        } else {
+            super::media_notices::generate_native(
+                self,
+                &Path::new(env!("CARGO_MANIFEST_DIR")).join("../.."),
+                &prefix.join("share/licenses/cove-media"),
+            )?;
+        }
         Ok(prefix)
     }
     /// Regenerate the license bundle for an existing native build.
@@ -285,6 +313,31 @@ impl Build {
         let (family, cpu) = architecture(&self.target)?;
         let mut arguments = Vec::new();
         let (cc, cxx, ar, strip) = match platform {
+            Platform::Mac => {
+                let root =
+                    output(Command::new("xcrun").args(["--sdk", "macosx", "--show-sdk-path"]))?;
+                let compiler = |name: &str| {
+                    output(Command::new("xcrun").args(["--sdk", "macosx", "--find", name]))
+                };
+                let arch = if family == "aarch64" {
+                    "arm64"
+                } else {
+                    "x86_64"
+                };
+                arguments.extend([
+                    format!(
+                        "--target={arch}-apple-macos{}",
+                        super::APPLE_DEPLOYMENT_TARGET
+                    ),
+                    format!("-isysroot{}", root.trim()),
+                ]);
+                (
+                    compiler("clang")?,
+                    compiler("clang++")?,
+                    compiler("ar")?,
+                    compiler("strip")?,
+                )
+            }
             Platform::Ios => {
                 let simulator = self.target.ends_with("-sim") || family == "x86_64";
                 let sdk = if simulator {
@@ -317,8 +370,8 @@ impl Build {
                 )
             }
             Platform::Android => {
-                let ndk = std::env::var_os("ANDROID_NDK_HOME")
-                    .or_else(|| std::env::var_os("ANDROID_NDK_ROOT"))
+                let ndk = super::setup::setting("ANDROID_NDK_HOME")?
+                    .or(super::setup::setting("ANDROID_NDK_ROOT")?)
                     .ok_or_else(|| {
                         io::Error::other("Android media build requires ANDROID_NDK_HOME")
                     })?;
@@ -435,6 +488,7 @@ fn meson_string(s: &str) -> String {
     format!("'{}'", s.replace('\\', "/").replace('\'', "\\'"))
 }
 fn output(command: &mut Command) -> io::Result<String> {
+    super::setup::apply(command)?;
     let output = command.output()?;
     if !output.status.success() {
         return Err(io::Error::other(
@@ -444,6 +498,7 @@ fn output(command: &mut Command) -> io::Result<String> {
     Ok(String::from_utf8_lossy(&output.stdout).into_owned())
 }
 fn logged(command: &mut Command, path: &Path) -> io::Result<()> {
+    super::setup::apply(command)?;
     let log = fs::File::create(path)?;
     let status = command.stdout(log.try_clone()?).stderr(log).status()?;
     if status.success() {

@@ -1,0 +1,10 @@
+[workspace]
+
+[package]
+name = "cove-media-consumer-smoke"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+cove-media = { path = "../../crates/media", features = ["gst"] }

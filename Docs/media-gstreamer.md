@@ -2,7 +2,7 @@
 
 日期：2026-11-04。状态：首批原生基础实现已落地；完整 UI、宿主和平台分发仍在实施中。
 
-本文以 GStreamer 为原生媒体引擎，为 Cove 增加可选的播放、视频展示和媒体管线接入能力。`cove-media`、`cove-media-rhi` 和固定源码构建入口已实现，macOS 已验证静态链接、headless 播放与 Metal 上传。本设计还包含尚未实现的后续能力，不能把全文视为已支持列表；实际范围与证据见 §16.3 和 [使用说明](../crates/media/README.md)。本次不发布新版本。
+本文以 GStreamer 为原生媒体引擎，为 Cove 增加可选的播放、视频展示和媒体管线接入能力。`cove-media`、`cove-media-rhi` 和固定源码构建入口已实现，macOS 已验证静态链接、headless 播放与 Metal 上传；媒体构建已收敛为一次 `cargo cove setup --media` 加普通 Cargo 命令（§16.4）。本设计还包含尚未实现的后续能力，不能把全文视为已支持列表；实际范围与证据见 §16.3、§16.4 和 [使用说明](../crates/media/README.md)。本次不发布新版本。
 
 ## 1. 设计目标与边界
 
@@ -30,7 +30,7 @@ Diffuse 的项目格式、场景、仿真时钟、剪辑业务、撤销重做和
 | 图像持有 | [TextureImage](../crates/imaging/src/texture_image.rs) 用 backing 保留资源，[TextureResource](../crates/graphics/src/rhi/resource_ownership.rs) 保留设备并延迟释放纹理 | 视频发布应沿用快照持有资源的语义 |
 | UI 纹理入口 | [texture_image](../crates/graphics/src/ui/texture_image.rs) 当前接受可采样的 RGBA8/BGRA8 二维纹理 | 不能把 YUV、P010 或 HDR 帧直接标记为已有 UI 图像 |
 | RHI | [公开 RHI 模块](../crates/graphics/src/rhi/mod.rs) 已有设备、提交和退休机制；本次未找到受支持的完整媒体外部表面导入契约 | 外部内存导入、同步与释放协议是待设计和实现的工作，不能把裸指针强转为 RHI 句柄 |
-| 原生构建 | [cove-native-build](../crates/native-build/src/gstreamer.rs) 已加入固定源码 Meson 构建与 Cargo 启动入口 | 目标专属产物、静态链接与 pkg-config 隔离；其他平台完整构建仍待验收 |
+| 原生构建 | [cove-native-build](../crates/native-build/src/media_provider.rs) 在 sys crate 构建脚本内完成固定源码构建、静态链接与 pkg-config 隔离；[setup](../crates/native-build/src/setup.rs) 负责工具与平台 SDK 检查安装 | 日常入口是普通 Cargo 命令；其他平台完整构建仍待验收 |
 
 当前已实现原生播放器、appsink 视频端点、平台音频 sink 选择和 CPU→RHI 上传。GPU 共享导入、VideoView、Browser 与宿主音频会话/焦点策略尚未完成；下文相关条目仍是实施要求。
 
@@ -280,12 +280,12 @@ Rust 绑定和原生 GStreamer 是两部分依赖。只加入 Cargo crate 不会
 - 明确 host 工具与 target 库的构建区分；pkg-config 只解析当前 target 的产物，不能误链接开发机系统库。
 - 证明 Rust sys crate 的发现/链接顺序与源码构建协调可行，避免构建循环和多份原生库。
 - 禁止 Meson auto-detect 使开发机安装的软件改变发布能力；显式选择插件并验证输出清单。
-- 构建输出留在 Cargo 产物目录；依赖下载/源码准备遵循固定来源与离线可重现要求。
-- 使用 Cerbero 时明确它与 Cargo 产物布局的衔接。上游 bootstrap 可能修改宿主环境，不能在普通 build.rs 中直接运行未经约束的安装流程。
+- 构建输出位于按构建身份指纹分区的用户缓存（`COVE_CACHE_DIR` 可重定向）；依赖下载与源码准备遵循固定来源，子模块未初始化时按固定 revision 获取。
+- 使用 Cerbero 时明确它与 Cargo 产物布局的衔接。上游 bootstrap 可能修改宿主环境，不能在普通 build.rs 中直接运行未经约束的安装流程；工具与 SDK 的安装只发生在显式的 `cargo cove setup` 入口，构建脚本只发现和使用已验证的工具。
 
 能否完整沿用源码静态构建，是进入正式实现前的验证门禁。若确需改变 Cove 的原生分发规则，必须单独记录架构决策，不以文档示例或本机 SDK 路径暗中替换。
 
-已采用两步构建：`cove-native-build` 的 `gstreamer` 示例先在 `target/media-native/<target>/out` 构建，再以目标专属 pkg-config 环境启动 Cargo。官方 sys crate 的 build.rs 必须先于媒体 crate 执行，因此不能依赖媒体 crate 的 build.rs 给它们反向提供库。构建清单包含 revision、target、工具/编译器与 Meson 选项，清单指纹进入 pkg-config 路径以触发 Cargo 正确重建。没有改变静态源码分发方向；SDK 发现只保留为官方绑定的开发工作流，不能作为正式分发证明。当前已证明 macOS 路线，其他平台的门禁仍开放。
+原生构建已并入 Cargo 依赖链，不再是两步流程。官方绑定固定版本的源码副本随仓库保存在 `third-party/rust-media/`，其 `*-sys` 构建脚本先调用 `cove-native-build`：按 `target`/`host` 与工具、编译器、SDK、Meson 选项构成的身份指纹在用户缓存中定位原生树，缺失时自行完成源码准备（子模块未初始化时按固定 revision 获取）、Meson 构建、静态链接安装和许可证收集，再以该树的 pkg-config 目录重新执行自身探测。进程锁避免多个 sys crate 重复编译；指纹变化才重建，`rerun-if-env-changed` 覆盖工具链与 SDK 变量。因此 `cargo build`、`cargo test`、`cargo run` 加上 `gst` feature 就是完整入口，下游应用不需要 `[patch]`、额外构建脚本、pkg-config 配置或 SDK 环境变量。工具检查与安装由 `cargo cove setup --media` 承担（见 [crate README](../crates/media/README.md)）。构建清单包含 revision、target、工具/编译器与 Meson 选项，清单指纹进入 pkg-config 路径以触发 Cargo 正确重建。没有改变静态源码分发方向；显式 `COVE_MEDIA_NATIVE_PREFIX` 只保留给 LGPL 重新链接。当前已证明 macOS 的宿主构建与仓库外独立应用路线，其他平台的门禁仍开放。
 
 ### 13.2 功能闭包
 
@@ -393,6 +393,17 @@ Metal 实测覆盖像素一致、动态尺寸、旧快照在关闭后仍有效�
 
 保留的工作：P0 的其他平台完整构建/设备验收，P2 的 UI/宿主显示接线，P3 外部资源与颜色/HDR，P4 VideoView/控件/Browser/生命周期，P5 Diffuse 接入与正式分发。Linux 基础 profile 目前仅具备所选容器和 raw/PCM 软件路径，尚未加入 H.264/AAC 软件解码闭包；网络协议与 gst-libav 也未加入。以上没有用占位 API 伪装为已完成。
 
+### 16.4 已落地批次：一次初始化的 Cargo 入口
+
+2026-11-05 的实际交付：
+
+- `cargo cove setup --media`：检查并按需补齐 Git、CMake、Ninja、Python、Meson、pkg-config、Bison、Flex 与宿主编译器/平台 SDK；`--target <triple>` 追加 Android SDK/NDK、Java 与目标链接器，iOS 需要完整 Xcode 时走 `xcodes` 与 `xcodebuild` 下载平台；`--check` 只报告、`--dry-run` 只输出计划。验证过的工具路径写入用户缓存的 setup 状态，构建脚本自动读取，因此 macOS 会选用新版 Bison 而不需要手工改 `PATH`。macOS、Windows、Linux 三条安装路径均有实现。
+- 官方绑定按固定版本源码保存在 `third-party/rust-media/`，`*-sys` 构建脚本先调用 `cove-native-build` 完成原生准备再探测；工作区依赖指向该目录，所以仓库外应用不需要 `[patch]`。Windows 在 setup 后把 `vcvarsall` 得到的 `INCLUDE`/`LIB`/`PATH` 与 SDK 变量存入状态并在构建命令中恢复；Android 由 `cargo cove setup` 向项目 `.cargo/config.toml` 合并目标链接器与 `CC_/CXX_/AR_`，保留既有 alias、rustflags 与用户已写的 linker。
+- `crates/native-build` 的 `gstreamer` 构建示例退出正式流程；许可证声明刷新改为 `cargo cove media notices [--target <triple>]`，大容量存储用 `COVE_CACHE_DIR` 指定缓存位置。
+- `Tools/MediaSmoke`：仓库外的独立消费者应用，清单只声明 `cove-media` 与 `gst`，没有构建脚本、`[patch]`、pkg-config 或 SDK 环境变量。
+
+验证主机为 aarch64 macOS。`cargo cove setup --media --check` 报告全部工具与编译器/SDK 就绪；`cargo test -p cove-media --features gst --all-targets` 通过 12 项（10 项控制与管线、2 项来源与输出契约），`cargo test -p cove-media-rhi --features gst` 通过 3 项，均没有再运行原生构建示例。把 `Tools/MediaSmoke` 复制到仓库之外并把依赖改为绝对路径后，`cargo build`、`cargo test`、`cargo run` 全部成功；该次运行复用了已缓存的原生树，Rust 侧链接耗时 24 秒，未单独计时首次干净缓存构建。Windows、Linux 与移动平台只有安装计划、命令实现和单元检查，尚未在真实主机或干净环境验收；`cargo cove setup` 的安装副作用（包管理器、NDK 下载、`.cargo/config.toml` 写入）也需在对应平台复核。
+
 ## 17. 尚待技术验证的问题
 
 | 编号 | 问题 | 关闭条件 |
@@ -407,7 +418,7 @@ Metal 实测覆盖像素一致、动态尺寸、旧快照在关闭后仍有效�
 | M8 | Browser 的高层契约与原生 gst 扩展的边界 | 通用播放实现、能力查询和独立浏览器验收 |
 | M9 | 最终插件、版本、静态链接与分发闭包 | 固定清单、可发现性/裁剪测试及分发审查记录 |
 
-上述问题仍未全部关闭：M1 已有 macOS 静态构建/链接证据，M5 已有连续 seek、音频 seek、切源与取消回归；其他平台、迟到事件的更大矩阵及正式分发仍需验证。实现期间发现新的平台缺口，应继续记录影响与处理方式。
+上述问题仍未全部关闭：M1 的 sys crate 发现与链接顺序已随构建脚本接入在 macOS 关闭，并通过仓库外独立应用验证，但其他平台和干净缓存环境仍待验收；M5 已有连续 seek、音频 seek、切源与取消回归；其他平台、迟到事件的更大矩阵及正式分发仍需验证。实现期间发现新的平台缺口，应继续记录影响与处理方式。
 
 ## 18. 决策记录与资料
 
@@ -415,6 +426,7 @@ Metal 实测覆盖像素一致、动态尺寸、旧快照在关闭后仍有效�
 | --- | --- |
 | 2026-11-04 | 初稿：原生媒体优先采用 GStreamer；Cove 提供常规播放入口与可直接使用官方绑定的高级端点；FFmpeg 作为可选插件实现；平台、RHI、构建和行为证据尚待验证 |
 | 2026-11-04 | 首批实现：固定 1.28.8，源码构建先于 Cargo sys 发现；原生 Player/端点与 CPU 上传通过 macOS 回归，其他阶段按 §16.3 保留 |
+| 2026-11-05 | 构建入口收敛：`cargo cove setup --media` 一次完成工具与平台 SDK 检查安装，固定源码构建接入 `*-sys` 构建脚本，日常入口回到 `cargo build` / `cargo test` / `cargo run`；`gstreamer` 构建示例退出正式流程，声明刷新改用 `cargo cove media notices`（§16.4） |
 
 上游链接查阅于 2026-11-04，文档站点会随版本更新。实施时应固定源代码 tag/commit，并再次核对所用 API、属性与插件；特别不能直接使用页面上标注为高于所选版本的 Vulkan 或队列接口。
 

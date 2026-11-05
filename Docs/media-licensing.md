@@ -8,28 +8,26 @@
 
 当前应用开发者从源码使用 Cove 媒体时，需要 Rust、C/C++ 编译器、Meson、Ninja、目标平台 SDK，以及上游构建要求的代码生成工具。当前 macOS 源码版本还需要较新的 Bison，系统自带版本不能满足要求。这些是构建机依赖，不能变成应用启动时的安装要求。
 
-开发者沿用当前源码构建入口，按目标平台保留独立的原生输出目录，后续由 Meson/Ninja 增量构建，Cargo 复用已编译结果。构建器可在原生构建完成后直接运行 Cargo，例如在 Cove 源码工作区执行：
+当前应用开发者只需要一次工具链初始化，然后用普通 Cargo 命令构建媒体功能。`cove-native-build` 在官方 `*-sys` 构建脚本里按目标准备独立输出目录，Meson/Ninja 增量构建，Cargo 复用已编译结果，许可证收集在同一次原生构建中完成：
 
 ```sh
-cargo run --locked -p cove-native-build --example gstreamer -- \
-  --out-dir target/media-source-build --jobs 6 -- \
-  build --locked -p cove-media --features gst
+cargo cove setup --media
+cargo build --locked -p cove-media --features gst
 ```
 
-许可证收集接在这次构建中完成。当前不增加独立的原生 SDK 发布、下载和版本管理流程。CI 可运行同一源码构建入口并复用匹配工具链和目标的缓存；缓存用于提速，首次构建仍需必要工具。工具检查/初始化和下游应用接入体验的进一步简化属于后续构建工作，本次没有自动安装工具链。
+工具与平台 SDK 的检查和安装由 setup 完成，macOS、Windows、Linux 均有实现；`--target <triple>` 额外准备 Android SDK/NDK 与目标链接器。CI 复用同一入口并按工具链与目标缓存匹配结果；缓存用于提速，首次构建仍需必要工具。构建磁盘位置由 `COVE_CACHE_DIR` 控制（默认为用户缓存目录下的 `Cove`），需要大容量卷时指向该变量。
 
 预构建 SDK 只作为未来有明确需求时的可选优化，届时需要维护目标架构、最低系统版本、C/C++ ABI、MSVC runtime、功能 profile、源码 revision 和包校验。现有 pkg-config 文件含构建机绝对路径，不能直接把本机 `install/` 压缩后宣称为可用的通用 SDK。采用预构建分发时仍须保留可复现源码构建和 LGPL 修改/重新链接入口。
 
 ## 生成和随包保留的材料
 
-正常源码构建会在安装前缀中生成 `share/licenses/cove-media/`。已有构建可以单独刷新声明，不会重新编译或启动应用：
+正常源码构建会在安装前缀中生成 `share/licenses/cove-media/`。许可输入变化但原生清单未变时，只刷新声明，不重新编译或启动应用：
 
 ```sh
-cargo run --locked -p cove-native-build --example gstreamer -- \
-  --out-dir target/media-source-build --notices-only
+cargo cove media notices [--target <triple>]
 ```
 
-交叉构建须同时传入与该输出目录一致的 `--target <triple>`。每个平台使用独立输出目录。生成机制覆盖 macOS、iOS、Windows、Linux、Android；目前只有 macOS 的实际媒体构建包已验证，其他平台的设备/分发验收仍待完成。
+命令打印刷新后的许可证目录；交叉构建须传入与实际构建一致的 `--target <triple>`。每个目标使用独立缓存树。生成机制覆盖 macOS、iOS、Windows、Linux、Android；目前只有 macOS 的实际媒体构建包已验证，其他平台的设备/分发验收仍待完成。
 
 目录内容：
 
@@ -70,7 +68,7 @@ meson compile -C <native-out>/build
 meson install -C <native-out>/build --no-rebuild --only-changed
 ```
 
-随后用新的 Cargo 输出目录构建应用，令官方 `*-sys` crate 使用该前缀的静态 pkg-config 文件；`PKG_CONFIG_LIBDIR` 需同时包含 `<prefix>/lib/pkgconfig` 和 `<prefix>/lib/gstreamer-1.0/pkgconfig`，`PKG_CONFIG_PATH` 置空，`PKG_CONFIG_ALL_STATIC=1`，交叉构建另设 `PKG_CONFIG_ALLOW_CROSS=1`。使用新的 `CARGO_TARGET_DIR` 避免缓存旧链接结果。应用发行包应给出其目标对应的完整命令，而不是要求接收者调用拒绝修改的固定 revision 检查。若从源码重新配置 Meson，选项及 cross file 以随版本提供的构建记录为准。
+随后用新的 Cargo 输出目录构建应用，令官方 `*-sys` crate 使用该前缀的静态 pkg-config 文件：把 `COVE_MEDIA_NATIVE_PREFIX` 指向该 `<out>/install` 前缀，并设置新的 `CARGO_TARGET_DIR` 避免复用旧链接结果。构建脚本会校验前缀来自 Cove 的原生构建树（同一 `<out>` 下需保留 `build-manifest.txt` 与 `source/`），只导出其中的静态 `.pc` 目录；外部 `PKG_CONFIG_*` / `SYSTEM_DEPS_*` 在探测时被清空，不能改用手工 pkg-config 注入。应用发行包应给出其目标对应的完整命令，而不是要求接收者调用拒绝修改的固定 revision 检查。若从源码重新配置 Meson，选项及 cross file 以随版本提供的构建记录为准。
 
 修改后重新生成声明，并另行记录修改者、日期和内容。`gstreamer-changes.patch` 只记录主仓库已跟踪文件的差异；ignored wrap 目录、嵌套仓库和新增文件必须体现在实际提供的对应源码中，不能用该 patch 代替完整源码。
 

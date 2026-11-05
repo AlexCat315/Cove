@@ -4,6 +4,15 @@
 
 ## Unreleased
 
+- **媒体一次性初始化与 Cargo 日常入口（2026-11-05）**：
+  - `cargo cove setup --media` 成为唯一前置命令：检查并按平台补齐 CMake、Ninja、Python/Meson、pkg-config、Bison/Flex 以及编译器与平台 SDK（macOS 走 Homebrew 与 Command Line Tools，Windows 走 winget 与 MSYS2 并自动恢复 `vcvars` 环境，Linux 走发行版包管理器；Android 按需安装 cmdline-tools、platform/build-tools、固定 SHA-256 的 NDK 与 JDK 21）。`--check`、`--dry-run`、`--target` 用于诊断与交叉准备。
+  - 原生 GStreamer 构建移入官方 `*-sys` crate 的构建脚本：按目标身份哈希使用用户级缓存目录、并发加锁避免重复构建、隔离 pkg-config 后写入 Cargo 链接参数。应用侧不需要 `[patch]`、额外环境变量，也不需要先跑构建示例；日常入口恢复为 `cargo build` / `cargo test` / `cargo run`。
+  - 删除 `crates/native-build/examples/gstreamer.rs`，旧的“先构建原生依赖”入口退出正式流程；第三方许可证声明改由 `cargo cove media notices [--target <triple>]` 生成并打印输出目录。
+  - setup 完成 Android 准备后写入项目 `.cargo/config.toml` 的目标链接器与 `CC_/CXX_/AR_/ANDROID_*/JAVA_HOME`，只补缺失项、不覆盖项目已有配置，并在 JSON 报告里用 `cargo_config_updated` 指出被修改的文件。
+  - 补记 `third-party/gstreamer` 的子模块 gitlink（`1b2a95a1b727…`，即 1.28.8），使递归克隆与 CI 能真正取到源码；本地缺失时构建脚本回退到按该 revision 执行 `git fetch`。
+  - CI 新增 `media`（macos-26、ubuntu-24.04）与 `media-windows`（windows-2025，暂标 `continue-on-error`）任务：setup → `cargo test --locked -p cove-media --features gst` → `cove-media-rhi` → 仓库外消费者构建/测试/运行 → `cargo cove media notices`。
+  - 验证范围：macOS 已实测 setup 检查、缓存复用、`cove-media`（12 项）、`cove-media-rhi`（3 项）与仓库外下游应用的 `cargo build` / `cargo test` / `cargo run`；Linux、Windows、iOS、Android 只有实现，尚无本机验收。
+
 - **媒体许可证声明（2026-11-05）**：补齐 GStreamer 及原生传递依赖的许可证原文、Rust 上游补充许可和静态 LGPL 分发说明；源码构建自动生成按目标收集的第三方通知、版本、许可和构建记录，遇到缺失原文或未登记项目时报错。固定 profile 显式关闭 GPL 选项；产品级对应源码、应用重新链接材料及其他平台发行验收仍按分发说明准备。
 
 - **原生媒体基础（2026-11-04）**：新增可选 `cove-media` / `cove-media-rhi`，提供 GStreamer Player、自有管线端点、有界状态/请求与帧订阅、合作取消和保留帧的 CPU→RHI 上传。固定 GStreamer 1.28.8 源码，加入隔离 pkg-config 的静态构建入口与五平台配方。macOS 已验证真实媒体控制、Metal 像素读回和旧纹理生命周期；VideoView、Browser、硬件共享与其他平台设备验收仍待完成。详见 `Docs/media-gstreamer.md` §16.3。

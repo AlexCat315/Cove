@@ -1,0 +1,122 @@
+[
+  {
+    "name": "gio-sys",
+    "version": "0.22.9",
+    "checksum": "6c28739f914c15b87a9856000bed9cbd5b3a8afbca5e982d9a299e1601422cb5",
+    "license": "MIT",
+    "repository": "https://github.com/gtk-rs/gtk-rs-core",
+    "revision": "dbeadbd65f3b946b91083009178286cc73763edc"
+  },
+  {
+    "name": "glib",
+    "version": "0.22.10",
+    "checksum": "e4cf9e5bd8713f1990a92c422998826e0fb34824277b46bc59757373483c6694",
+    "license": "MIT",
+    "repository": "https://github.com/gtk-rs/gtk-rs-core",
+    "revision": "08a30b9cccafc82194cb24df13806a176f20b0ae"
+  },
+  {
+    "name": "glib-macros",
+    "version": "0.22.9",
+    "checksum": "c9597c68fa7bdf4154a3079642cd21c4dccac0b0bdd2897d82861523bf91e7b9",
+    "license": "MIT",
+    "repository": "https://github.com/gtk-rs/gtk-rs-core",
+    "revision": "dbeadbd65f3b946b91083009178286cc73763edc"
+  },
+  {
+    "name": "glib-sys",
+    "version": "0.22.9",
+    "checksum": "99b38907e67e40dec9b60f858bcada952598719cb512a13eb13d6cdcd16f8295",
+    "license": "MIT",
+    "repository": "https://github.com/gtk-rs/gtk-rs-core",
+    "revision": "dbeadbd65f3b946b91083009178286cc73763edc"
+  },
+  {
+    "name": "gobject-sys",
+    "version": "0.22.9",
+    "checksum": "07595c9ba696bd9819cb6a8df39f08078f3dd679508fe052dd558492c2053834",
+    "license": "MIT",
+    "repository": "https://github.com/gtk-rs/gtk-rs-core",
+    "revision": "dbeadbd65f3b946b91083009178286cc73763edc"
+  },
+  {
+    "name": "gstreamer",
+    "version": "0.25.4",
+    "checksum": "f4237e2066a25ecb7e54be6c066409e30615920265b9799b8d560ef8ac9857c6",
+    "license": "MIT OR Apache-2.0",
+    "repository": "https://gitlab.freedesktop.org/gstreamer/gstreamer-rs",
+    "revision": "f0b788c9520dca084209d3b18d71135cbc59cff7"
+  },
+  {
+    "name": "gstreamer-app",
+    "version": "0.25.2",
+    "checksum": "97f8ae9238c2352398dcc084de28df3f7099af216ac6c160b52318d23f25c010",
+    "license": "MIT OR Apache-2.0",
+    "repository": "https://gitlab.freedesktop.org/gstreamer/gstreamer-rs",
+    "revision": "c1f88371d75cbd69e7b84567cd705d1ba3bd22db"
+  },
+  {
+    "name": "gstreamer-app-sys",
+    "version": "0.25.4",
+    "checksum": "0798b8aef6694341d40bb81edc759f8979b896b59f9f0f45d8cfa3bb7bf2e743",
+    "license": "MIT",
+    "repository": "https://gitlab.freedesktop.org/gstreamer/gstreamer-rs",
+    "revision": "f0b788c9520dca084209d3b18d71135cbc59cff7"
+  },
+  {
+    "name": "gstreamer-audio",
+    "version": "0.25.4",
+    "checksum": "544f14e19e3b7221845be0e5c2f2cf284576b7baa16835ac16def6e734bfa866",
+    "license": "MIT OR Apache-2.0",
+    "repository": "https://gitlab.freedesktop.org/gstreamer/gstreamer-rs",
+    "revision": "f0b788c9520dca084209d3b18d71135cbc59cff7"
+  },
+  {
+    "name": "gstreamer-audio-sys",
+    "version": "0.25.4",
+    "checksum": "09a010deb715bc29953a07c6714249132e736b3daf3a529e70586b58a7063888",
+    "license": "MIT",
+    "repository": "https://gitlab.freedesktop.org/gstreamer/gstreamer-rs",
+    "revision": "f0b788c9520dca084209d3b18d71135cbc59cff7"
+  },
+  {
+    "name": "gstreamer-base",
+    "version": "0.25.4",
+    "checksum": "17cbd8f59586a369c40d4b0d2f3a61cf9e9287b3cf5503cdcd8e7c5faa99265e",
+    "license": "MIT OR Apache-2.0",
+    "repository": "https://gitlab.freedesktop.org/gstreamer/gstreamer-rs",
+    "revision": "f0b788c9520dca084209d3b18d71135cbc59cff7"
+  },
+  {
+    "name": "gstreamer-base-sys",
+    "version": "0.25.4",
+    "checksum": "3b05f77bfd76b5afee6b29c27dae19eaf5018b5cf8d0d17520f3de44c6385c32",
+    "license": "MIT",
+    "repository": "https://gitlab.freedesktop.org/gstreamer/gstreamer-rs",
+    "revision": "f0b788c9520dca084209d3b18d71135cbc59cff7"
+  },
+  {
+    "name": "gstreamer-sys",
+    "version": "0.25.4",
+    "checksum": "436d9532847489a8285d57b8c3670762c12a18f777fdc2ab159b52e0e6f521b9",
+    "license": "MIT",
+    "repository": "https://gitlab.freedesktop.org/gstreamer/gstreamer-rs",
+    "revision": "f0b788c9520dca084209d3b18d71135cbc59cff7"
+  },
+  {
+    "name": "gstreamer-video",
+    "version": "0.25.4",
+    "checksum": "ffe4d77b2a5e679973d9c6b6c052da8cda86b83f5c268872f8691fde693fde84",
+    "license": "MIT OR Apache-2.0",
+    "repository": "https://gitlab.freedesktop.org/gstreamer/gstreamer-rs",
+    "revision": "f0b788c9520dca084209d3b18d71135cbc59cff7"
+  },
+  {
+    "name": "gstreamer-video-sys",
+    "version": "0.25.4",
+    "checksum": "ef455da22edca97ac9299d682b868227f3d9217b303748ce0161b31ae82dc106",
+    "license": "MIT",
+    "repository": "https://gitlab.freedesktop.org/gstreamer/gstreamer-rs",
+    "revision": "f0b788c9520dca084209d3b18d71135cbc59cff7"
+  }
+]

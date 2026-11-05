@@ -1,8 +1,12 @@
 //! Build-script support for the native libraries Cove compiles from the pinned
 //! git submodules in `third-party/`.
 //!
-//! Every library is configured with CMake into the calling crate's `OUT_DIR`
-//! and linked statically; nothing is looked up in a shared prebuilt directory.
+//! Every CMake library is configured into the calling crate's `OUT_DIR` and
+//! linked statically; nothing is looked up in a shared prebuilt directory.
+//! GStreamer is the exception: [`gstreamer`] builds the pinned source once per
+//! build identity into the user cache shared by the official `*-sys` crates,
+//! and [`setup`] is the explicit entry point that installs and discovers the
+//! tools and platform SDKs those builds need.
 //! [`cmake`] applies the per-target settings the crates share: the Release
 //! profile, static position-independent archives, the Apple deployment target,
 //! the Android NDK toolchain, the wasi-sdk toolchain and the MSVC C runtime.
@@ -12,6 +16,8 @@ use std::path::{Path, PathBuf};
 
 pub mod gstreamer;
 pub mod media_notices;
+mod media_provider;
+pub mod setup;
 
 /// Minimum Apple OS version for every native archive.
 pub const APPLE_DEPLOYMENT_TARGET: &str = "26.0";
@@ -61,8 +67,9 @@ fn uses_static_crt() -> bool {
 
 /// The Android NDK named by `ANDROID_NDK_HOME` or `ANDROID_NDK_ROOT`.
 pub fn android_ndk() -> PathBuf {
-    env::var_os("ANDROID_NDK_HOME")
-        .or_else(|| env::var_os("ANDROID_NDK_ROOT"))
+    setup::setting("ANDROID_NDK_HOME")
+        .expect("read Cove toolchain state")
+        .or(setup::setting("ANDROID_NDK_ROOT").expect("read Cove toolchain state"))
         .map(PathBuf::from)
         .expect("Android builds require ANDROID_NDK_HOME or ANDROID_NDK_ROOT")
 }
@@ -90,6 +97,9 @@ pub fn cmake(name: &str, source: &Path) -> cmake::Config {
     let target = target();
     let os = target_os();
     let mut config = cmake::Config::new(source);
+    for (key, value) in setup::environment().expect("read Cove toolchain state") {
+        config.env(key, value);
+    }
     config
         .out_dir(PathBuf::from(env::var_os("OUT_DIR").expect("OUT_DIR")).join(name))
         .profile("Release")
@@ -157,6 +167,9 @@ pub fn cmake(name: &str, source: &Path) -> cmake::Config {
 
 /// Points a `cc` build at the wasi-sdk compiler when targeting Wasm.
 pub fn configure_cc(build: &mut cc::Build, cpp: bool) {
+    for (key, value) in setup::environment().expect("read Cove toolchain state") {
+        build.env(key, value);
+    }
     if target().starts_with("wasm") {
         let sdk = wasi_sdk();
         build
