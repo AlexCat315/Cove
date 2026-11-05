@@ -35,6 +35,3 @@ __pycache__/
 .vscode/settings.json
 /Tools/MediaSmoke/target/
 /Tools/MediaSmoke/Cargo.lock
-
-# Published-crate lockfiles: the workspace Cargo.lock governs; these are `cargo package` side products.
-/third-party/rust-media/*/Cargo.lock

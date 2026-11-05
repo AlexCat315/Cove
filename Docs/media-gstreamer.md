@@ -285,7 +285,7 @@ Rust 绑定和原生 GStreamer 是两部分依赖。只加入 Cargo crate 不会
 
 能否完整沿用源码静态构建，是进入正式实现前的验证门禁。若确需改变 Cove 的原生分发规则，必须单独记录架构决策，不以文档示例或本机 SDK 路径暗中替换。
 
-原生构建已并入 Cargo 依赖链，不再是两步流程。官方绑定固定版本的源码副本随仓库保存在 `third-party/rust-media/`，其 `*-sys` 构建脚本先调用 `cove-native-build`：按 `target`/`host` 与工具、编译器、SDK、Meson 选项构成的身份指纹在用户缓存中定位原生树，缺失时自行完成源码准备（子模块未初始化时按固定 revision 获取）、Meson 构建、静态链接安装和许可证收集，再以该树的 pkg-config 目录重新执行自身探测。进程锁避免多个 sys crate 重复编译；指纹变化才重建，`rerun-if-env-changed` 覆盖工具链与 SDK 变量。因此 `cargo build`、`cargo test`、`cargo run` 加上 `gst` feature 就是完整入口，下游应用不需要 `[patch]`、额外构建脚本、pkg-config 配置或 SDK 环境变量。工具检查与安装由 `cargo cove setup --media` 承担（见 [crate README](../crates/media/README.md)）。构建清单包含 revision、target、工具/编译器与 Meson 选项，清单指纹进入 pkg-config 路径以触发 Cargo 正确重建。没有改变静态源码分发方向；显式 `COVE_MEDIA_NATIVE_PREFIX` 只保留给 LGPL 重新链接。当前已证明 macOS 的宿主构建与仓库外独立应用路线，其他平台的门禁仍开放。
+原生构建已并入 Cargo 依赖链，不再是两步流程，且不再维护官方绑定的仓库副本：工作区直接依赖 crates.io 上固定版本的 `gstreamer`/`gstreamer-app`/`gstreamer-video`/`gstreamer-audio`，官方 `*-sys` 构建脚本保持原样。`cargo cove setup --media` 按 `target`/`host` 与工具、编译器、SDK、Meson 选项构成的身份指纹在用户缓存中定位原生树，缺失时在进程锁内完成源码准备（按固定 revision 获取）、Meson 构建、静态链接安装和许可证收集，然后把该树的 pkg-config 搜索目录、静态链接开关和清空后的 `GST_PLUGIN*` 变量写入当前项目的 `.cargo/config.toml` `[env]`（这几个键由 setup 拥有，`force = true`，其余键只补不覆盖）。因此 `cargo build`、`cargo test`、`cargo run` 加上 `gst` feature 就是完整入口，下游应用不需要 `[patch]`、额外构建脚本或手工环境变量。构建清单包含 revision、target、工具/编译器与 Meson 选项，清单指纹进入 pkg-config 路径，使 Cargo 在原生树变更后重建官方 sys crate。一个项目配置只承载一个媒体 target；换 target 需再跑一次 setup，`cargo cove setup --media --check` 的 `media_environment` 字段会报告当前指向的树是 `current`、`stale-or-other-target` 还是 `missing-tree`。工具检查与安装由同一入口承担（见 [crate README](../crates/media/README.md)）。当前已证明 macOS 的宿主构建与仓库外独立应用路线，其他平台的门禁仍开放。
 
 ### 13.2 功能闭包
 
@@ -398,7 +398,7 @@ Metal 实测覆盖像素一致、动态尺寸、旧快照在关闭后仍有效�
 2026-11-05 的实际交付：
 
 - `cargo cove setup --media`：检查并按需补齐 Git、CMake、Ninja、Python、Meson、pkg-config、Bison、Flex 与宿主编译器/平台 SDK；`--target <triple>` 追加 Android SDK/NDK、Java 与目标链接器，iOS 需要完整 Xcode 时走 `xcodes` 与 `xcodebuild` 下载平台；`--check` 只报告、`--dry-run` 只输出计划。验证过的工具路径写入用户缓存的 setup 状态，构建脚本自动读取，因此 macOS 会选用新版 Bison 而不需要手工改 `PATH`。macOS、Windows、Linux 三条安装路径均有实现。
-- 官方绑定按固定版本源码保存在 `third-party/rust-media/`，`*-sys` 构建脚本先调用 `cove-native-build` 完成原生准备再探测；工作区依赖指向该目录，所以仓库外应用不需要 `[patch]`。Windows 在 setup 后把 `vcvarsall` 得到的 `INCLUDE`/`LIB`/`PATH` 与 SDK 变量存入状态并在构建命令中恢复；Android 由 `cargo cove setup` 向项目 `.cargo/config.toml` 合并目标链接器与 `CC_/CXX_/AR_`，保留既有 alias、rustflags 与用户已写的 linker。
+- 官方绑定用 crates.io 的固定版本，构建脚本未经修改；原生准备与 pkg-config 环境由 `cargo cove setup --media` 提供并写入项目 `.cargo/config.toml`，所以仓库外应用不需要 `[patch]`。Windows 在 setup 后把 `vcvarsall` 得到的 `INCLUDE`/`LIB`/`PATH` 与 SDK 变量存入状态并在构建命令中恢复；Android 由同一入口向项目 `.cargo/config.toml` 合并目标链接器与 `CC_/CXX_/AR_`，保留既有 alias、rustflags 与用户已写的 linker。
 - `crates/native-build` 的 `gstreamer` 构建示例退出正式流程；许可证声明刷新改为 `cargo cove media notices [--target <triple>]`，大容量存储用 `COVE_CACHE_DIR` 指定缓存位置。
 - `Tools/MediaSmoke`：仓库外的独立消费者应用，清单只声明 `cove-media` 与 `gst`，没有构建脚本、`[patch]`、pkg-config 或 SDK 环境变量。
 

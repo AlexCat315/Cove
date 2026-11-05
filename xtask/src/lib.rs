@@ -222,15 +222,19 @@ fn execute(cli: Cli) -> Result<()> {
                 targets: target,
             })
             .map_err(|e| e.to_string())?;
+            let project = std::env::current_dir().map_err(|e| e.to_string())?;
             if !check && !dry_run && report["ready"] == true {
                 // Setup edits the project's Cargo config, which is tracked inside this
                 // workspace, so the modified path must be visible in the report.
-                if let Some(path) = setup_config::configure_android(
-                    &std::env::current_dir().map_err(|e| e.to_string())?,
-                    &targets,
-                )? {
+                if let Some(path) = setup_config::configure_android(&project, &targets)? {
                     report["cargo_config_updated"] = path.display().to_string().into();
                 }
+                if media && let Some(path) = setup_config::configure_media(&project, &report)? {
+                    report["cargo_config_updated"] = path.display().to_string().into();
+                }
+            }
+            if media {
+                report["media_environment"] = setup_config::media_state(&project, &report);
             }
             println!(
                 "{}",

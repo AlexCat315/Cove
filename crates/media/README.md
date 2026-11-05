@@ -26,13 +26,13 @@ cargo test -p cove-media-rhi --features gst
 cargo run -p cove-media --features gst --example headless
 ```
 
-固定的官方 `*-sys` 绑定在构建脚本里调用 `cove-native-build`：首次请求时按目标完成源码准备、Meson 构建、静态链接和许可证收集，产物位于用户缓存的 `Cove/native/<指纹>/`（macOS 为 `~/Library/Caches/Cove/native/<指纹>/`，含 `configure.log`、`compile.log`、`install.log`）。`third-party/gstreamer` 子模块未初始化时按固定 revision 自行获取；并发 sys crate 由构建锁串行化，只有清单指纹改变才重建。
+Rust 绑定取自 crates.io 的固定版本，构建脚本未经修改。`cargo cove setup --media` 按目标完成源码准备、Meson 构建、静态链接和许可证收集，产物位于用户缓存的 `Cove/native/<指纹>/`（macOS 为 `~/Library/Caches/Cove/native/<指纹>/`，含 `configure.log`、`compile.log`、`install.log`），并把该树的 pkg-config 环境写入当前项目的 `.cargo/config.toml`。`third-party/gstreamer` 子模块未初始化时按固定 revision 自行获取；重建由缓存内的身份锁串行化，只有清单指纹改变才重建。
 
-构建器只把本次构建的 pkg-config 目录暴露给 sys crate，选择静态链接；固定 profile 关闭文件插件注册表扫描，在构建器之外启动也不会扫描本机 SDK，显式静态注册仍可用。构建清单改变时 pkg-config 路径指纹也改变，避免 Cargo 复用旧的原生链接结果。
+setup 写入的 pkg-config 目录只含本次构建的产物，并强制静态链接、清空 `GST_PLUGIN*` 扫描路径；固定 profile 关闭文件插件注册表扫描，在构建器之外启动也不会扫描本机 SDK，显式静态注册仍可用。构建清单改变时 pkg-config 路径指纹也改变，`[env]` 里那几个键由 setup 拥有并带 `force = true`，因此 Cargo 会重建 sys crate 而不是复用旧的原生链接结果。
 
 默认原生 profile 选定 core/app/playback、转换、测试源、AVI/WAV/MP4/Matroska 容器与平台音频/解码插件。容器插件不等于具备其所有编解码器；Linux 基础 profile 尚未包含 H.264/AAC 软件解码器，gst-libav/网络协议也未加入。应用通过 `has_element` 和实际协商结果查询能力，缺失插件以错误返回。
 
-交叉构建在应用侧仍用 `cargo build --target <triple>`，先执行 `cargo cove setup --media --target <triple>` 准备 SDK：iOS 自动使用 Xcode SDK，Android 由 setup 安装 NDK 并写入目标链接器与 `CC_/CXX_/AR_` 变量（arm64/x86_64，API 26），其他交叉工具链通过 `COVE_CROSS_FILE_<TARGET>`（`-` 换成 `_`）提供 Meson cross 文件。Android 的链接器写入当前项目的 `.cargo/config.toml`，只补缺失项、不覆盖项目已有配置；该文件被 Cove 仓库跟踪，因此 setup 只在实际发生写入时于 JSON 报告的 `cargo_config_updated` 字段给出路径。生成配方不代表相应设备已验收。Android 在初始化前须通过 `gst::android::install_environment` 提供 JavaVM、application/class-loader 全局引用和资源所有者；静态链接的 JNI 提供函数供 androidmedia 使用。
+交叉构建在应用侧仍用 `cargo build --target <triple>`，先执行 `cargo cove setup --media --target <triple>` 准备 SDK：iOS 自动使用 Xcode SDK，Android 由 setup 安装 NDK 并写入目标链接器与 `CC_/CXX_/AR_` 变量（arm64/x86_64，API 26），其他交叉工具链通过 `COVE_CROSS_FILE_<TARGET>`（`-` 换成 `_`）提供 Meson cross 文件。Android 链接器与环境变量都写入当前项目的 `.cargo/config.toml`：链接器与 `CC_/CXX_/AR_` 只补缺失项，媒体 pkg-config 那几个键由 setup 拥有并改写；一个项目配置同时只承载一个媒体 target，换 target 要重跑 setup，`--check` 报告的 `media_environment.state` 会指出指向的树是 `current`、`stale-or-other-target` 还是 `missing-tree`。该文件被 Cove 仓库跟踪，setup 只在实际发生写入时于 JSON 报告的 `cargo_config_updated` 字段给出路径。生成配方不代表相应设备已验收。Android 在初始化前须通过 `gst::android::install_environment` 提供 JavaVM、application/class-loader 全局引用和资源所有者；静态链接的 JNI 提供函数供 androidmedia 使用。
 
 ## 播放控制
 

@@ -331,8 +331,35 @@ pub fn run(options: &Options) -> io::Result<Value> {
     let compiler = sdk::inspect_compiler(host)?;
     let sdk = sdk::check(host, &targets)?;
     let ready = report.iter().all(|r| r["ready"] == true) && compiler && sdk;
-    let result =
-        json!({"ready":ready,"tools":report,"compiler":compiler,"sdk":sdk,"targets":targets});
+    let mut native = serde_json::Map::new();
+    if options.media && ready {
+        for target in &targets {
+            if options.check {
+                let prefix = crate::gstreamer::cached_build(target)?.prefix();
+                native.insert(
+                    target.clone(),
+                    json!({
+                        "ready": prefix.join("lib/pkgconfig/gstreamer-full-1.0.pc").is_file(),
+                        "prefix": prefix,
+                    }),
+                );
+            } else {
+                let (build, environment) = crate::gstreamer::prepare(target)?;
+                native.insert(
+                    target.clone(),
+                    json!({"ready":true,"prefix":build.prefix(),"environment":environment}),
+                );
+            }
+        }
+    }
+    let result = json!({
+        "ready": ready,
+        "tools": report,
+        "compiler": compiler,
+        "sdk": sdk,
+        "targets": targets,
+        "native": native,
+    });
     if !options.check && ready {
         let mut saved = state()?;
         saved["schema"] = json!(1);

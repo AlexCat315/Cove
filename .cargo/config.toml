@@ -1,3 +1,35 @@
 [alias]
-xtask = "run --quiet --package cove-package --bin cove-package --"
 cove = "run --quiet --package cove-package --bin cargo-cove --"
+xtask = "run --quiet --package cove-package --bin cove-package --"
+
+[env.GST_PLUGIN_PATH]
+force = true
+value = ""
+
+[env.GST_PLUGIN_PATH_1_0]
+force = true
+value = ""
+
+[env.GST_PLUGIN_SYSTEM_PATH]
+force = true
+value = ""
+
+[env.GST_PLUGIN_SYSTEM_PATH_1_0]
+force = true
+value = ""
+
+[env.PKG_CONFIG_ALLOW_CROSS]
+force = true
+value = "1"
+
+[env.PKG_CONFIG_ALL_STATIC]
+force = true
+value = "1"
+
+[env.PKG_CONFIG_LIBDIR]
+force = true
+value = "/Users/cyke666/Library/Caches/Cove/native/deb71c4cfe87c201ad884c25c9439bdf62217aa2b47ab6e7637bef2c5d371cdd/out/pc/5e309ec6e3c7ebb6"
+
+[env.PKG_CONFIG_PATH]
+force = true
+value = ""

@@ -1,7 +1,8 @@
-//! Pinned, out-of-source GStreamer build plans. Official `*-sys` build scripts
-//! call [`prepare_sys`], which builds the target's prefix and then points
-//! pkg-config at it, so plain `cargo build` needs no separate native step.
+//! Pinned, out-of-source GStreamer build plans. `cargo cove setup --media`
+//! builds the target's prefix and writes the pkg-config environment into the
+//! project's Cargo config, so plain `cargo build` needs no separate native step.
 use std::{
+    collections::BTreeMap,
     fs, io,
     path::{Path, PathBuf},
     process::Command,
@@ -9,7 +10,7 @@ use std::{
 
 pub const REVISION: &str = "1b2a95a1b72787cda146b46df9605b168e5b683b";
 pub const VERSION: &str = "1.28.8";
-pub use super::media_provider::{cached_build, prepare_sys};
+pub use super::media_provider::{cached_build, prepare};
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Platform {
     Mac,
@@ -124,12 +125,6 @@ impl Build {
     }
     /// Builds from the recorded git revision; dependency wraps carry upstream hashes.
     pub fn build(&self) -> io::Result<PathBuf> {
-        self.build_inner(true)
-    }
-    pub(crate) fn build_for_cargo(&self) -> io::Result<PathBuf> {
-        self.build_inner(false)
-    }
-    fn build_inner(&self, full_notices: bool) -> io::Result<PathBuf> {
         if self.jobs == 0 {
             return Err(io::Error::other("native build jobs must be positive"));
         }
@@ -229,15 +224,7 @@ impl Build {
             toolchain.trim()
         );
         fs::write(out.join("build-manifest.txt"), manifest)?;
-        if full_notices {
-            self.write_notices()?;
-        } else {
-            super::media_notices::generate_native(
-                self,
-                &Path::new(env!("CARGO_MANIFEST_DIR")).join("../.."),
-                &prefix.join("share/licenses/cove-media"),
-            )?;
-        }
+        self.write_notices()?;
         Ok(prefix)
     }
     /// Regenerate the license bundle for an existing native build.
@@ -249,12 +236,16 @@ impl Build {
             &self.prefix().join("share/licenses/cove-media"),
         )
     }
-    pub fn configure_cargo(&self, command: &mut Command) -> io::Result<()> {
+    /// The pkg-config environment that makes official bindings resolve to this
+    /// pinned tree instead of a machine SDK. `cargo cove setup --media` writes
+    /// these pairs into the project's Cargo config, so no consumer build script
+    /// has to inject them.
+    pub fn cargo_environment(&self) -> io::Result<BTreeMap<String, String>> {
         let prefix = self.prefix().canonicalize()?;
         let pc = prefix.join("lib/pkgconfig");
         if !pc.join("gstreamer-full-1.0.pc").is_file() {
             return Err(io::Error::other(
-                "build the pinned native GStreamer prefix before invoking Cargo",
+                "no native GStreamer prefix for this target; run cargo cove setup --media",
             ));
         }
         let manifest = fs::read(self.out_dir.join("build-manifest.txt"))?;
@@ -276,17 +267,19 @@ impl Build {
                 }
             }
         }
-        command
-            .env("PKG_CONFIG_LIBDIR", search)
-            .env("PKG_CONFIG_PATH", "")
-            .env("PKG_CONFIG_ALLOW_CROSS", "1")
-            .env("PKG_CONFIG_ALL_STATIC", "1")
-            .env("COVE_MEDIA_NATIVE_PREFIX", &prefix)
-            .env("GST_PLUGIN_SYSTEM_PATH_1_0", "")
-            .env("GST_PLUGIN_PATH_1_0", "")
-            .env("GST_PLUGIN_SYSTEM_PATH", "")
-            .env("GST_PLUGIN_PATH", "");
-        Ok(())
+        Ok(BTreeMap::from([
+            (
+                "PKG_CONFIG_LIBDIR".to_string(),
+                search.to_string_lossy().into_owned(),
+            ),
+            ("PKG_CONFIG_PATH".to_string(), String::new()),
+            ("PKG_CONFIG_ALLOW_CROSS".to_string(), "1".to_string()),
+            ("PKG_CONFIG_ALL_STATIC".to_string(), "1".to_string()),
+            ("GST_PLUGIN_SYSTEM_PATH_1_0".to_string(), String::new()),
+            ("GST_PLUGIN_PATH_1_0".to_string(), String::new()),
+            ("GST_PLUGIN_SYSTEM_PATH".to_string(), String::new()),
+            ("GST_PLUGIN_PATH".to_string(), String::new()),
+        ]))
     }
     fn write_aliases(&self, prefix: &Path) -> io::Result<()> {
         let pc = prefix.join("lib/pkgconfig");

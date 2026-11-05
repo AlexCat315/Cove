@@ -1,4 +1,4 @@
-//! Native preparation runs before each upstream sys probe, with a shared lock.
+//! The pinned native media tree is prepared by `cargo cove setup --media`.
 use crate::{
     gstreamer::{Build, REVISION},
     setup,
@@ -6,55 +6,27 @@ use crate::{
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 use std::{
+    collections::BTreeMap,
     env, fs, io,
     path::{Path, PathBuf},
-    process::Command,
 };
 
-const PROBE: &str = "COVE_MEDIA_SYS_PROBE";
+/// The cached native tree for `target`, keyed by the build identity so a
+/// changed toolchain, SDK or profile starts a new tree instead of reusing it.
+pub fn cached_build(target: &str) -> io::Result<Build> {
+    let host = setup::host_triple()?;
+    crate::gstreamer::platform(target)?;
+    Ok(native_tree(target, &host)?.1)
+}
 
-/// Called at the start of the vendored official sys crates' build scripts.
-/// Re-execution isolates pkg-config settings from other concurrently built crates.
-/// Tool installation never happens from a build script.
-pub fn prepare_sys() -> io::Result<()> {
-    if env::var_os(PROBE).is_some() {
-        let prefix = env::var_os("COVE_MEDIA_NATIVE_PREFIX")
-            .ok_or_else(|| io::Error::other("missing isolated Cove media prefix"))?;
-        if !Path::new(&prefix)
-            .join("lib/pkgconfig/gstreamer-full-1.0.pc")
-            .is_file()
-        {
-            return Err(io::Error::other("invalid isolated native prefix"));
-        }
-        return Ok(());
-    }
-    let target = env::var("TARGET").map_err(io::Error::other)?;
-    let host = env::var("HOST").map_err(io::Error::other)?;
-    crate::gstreamer::platform(&target)?;
-    // Explicit source-built replacements remain available for LGPL relinking.
-    // Normal consumers never need this setting.
-    if let Some(prefix) = env::var_os("COVE_MEDIA_NATIVE_PREFIX") {
-        let prefix = PathBuf::from(prefix).canonicalize()?;
-        let out = prefix
-            .parent()
-            .ok_or_else(|| io::Error::other("native prefix parent"))?
-            .to_path_buf();
-        let build = Build {
-            source: out.join("source"),
-            out_dir: out,
-            target,
-            host,
-            cross_file: None,
-            jobs: 1,
-        };
-        if build.prefix().canonicalize()? != prefix {
-            return Err(io::Error::other(
-                "use the install/ prefix of a Cove source build",
-            ));
-        }
-        return probe(&build);
-    }
-    let (identity, build, key) = native_tree(&target, &host)?;
+/// Build or reuse the pinned native tree for `target`, refresh its license
+/// bundle and create the pkg-config search directory. Called by
+/// `cargo cove setup --media`; nothing here depends on a build script, so the
+/// published bindings only need the environment this tree implies.
+pub fn prepare(target: &str) -> io::Result<(Build, BTreeMap<String, String>)> {
+    let host = setup::host_triple()?;
+    crate::gstreamer::platform(target)?;
+    let (identity, build, key) = native_tree(target, &host)?;
     let root = build.out_dir.parent().expect("native tree root");
     let locks = setup::cache_dir()?.join("native/locks");
     fs::create_dir_all(&locks)?;
@@ -68,19 +40,19 @@ pub fn prepare_sys() -> io::Result<()> {
     let ready = root.join("ready.json");
     let previous = fs::read(&ready)
         .ok()
-        .and_then(|b| serde_json::from_slice::<Value>(&b).ok());
+        .and_then(|bytes| serde_json::from_slice::<Value>(&bytes).ok());
     let notice_key = notice_key()?;
-    if previous.as_ref().map(|v| &v["identity"]) != Some(&identity)
+    if previous.as_ref().map(|value| &value["identity"]) != Some(&identity)
         || !prefix_complete(&build.prefix())
     {
         prepare_source(&build.source)?;
-        build.build_for_cargo()?;
-    } else if previous.as_ref().and_then(|v| v["notices"].as_str()) != Some(notice_key.as_str()) {
-        crate::media_notices::generate_native(
-            &build,
-            &Path::new(env!("CARGO_MANIFEST_DIR")).join("../.."),
-            &build.prefix().join("share/licenses/cove-media"),
-        )?;
+        build.build()?;
+    } else if previous
+        .as_ref()
+        .and_then(|value| value["notices"].as_str())
+        != Some(notice_key.as_str())
+    {
+        build.write_notices()?;
     }
     fs::write(
         &ready,
@@ -88,15 +60,8 @@ pub fn prepare_sys() -> io::Result<()> {
             .map_err(io::Error::other)?,
     )?;
     lock.unlock()?;
-    probe(&build)
-}
-
-/// The cached native tree for `target`, keyed by the build identity so a
-/// changed toolchain, SDK or profile starts a new tree instead of reusing it.
-pub fn cached_build(target: &str) -> io::Result<Build> {
-    let host = setup::host_triple()?;
-    crate::gstreamer::platform(target)?;
-    Ok(native_tree(target, &host)?.1)
+    let environment = build.cargo_environment()?;
+    Ok((build, environment))
 }
 
 fn native_tree(target: &str, host: &str) -> io::Result<(Value, Build, String)> {
@@ -122,44 +87,6 @@ fn native_tree(target: &str, host: &str) -> io::Result<(Value, Build, String)> {
     Ok((identity, build, key))
 }
 
-fn probe(build: &Build) -> io::Result<()> {
-    for name in [
-        "CC",
-        "CXX",
-        "CFLAGS",
-        "CXXFLAGS",
-        "SDKROOT",
-        "MACOSX_DEPLOYMENT_TARGET",
-        "COVE_CACHE_DIR",
-        "COVE_MEDIA_NATIVE_PREFIX",
-    ] {
-        println!("cargo:rerun-if-env-changed={name}");
-    }
-    println!(
-        "cargo:rerun-if-changed={}",
-        setup::cache_dir()?
-            .join(format!(
-                "setup-{}-{}.json",
-                env::consts::OS,
-                env::consts::ARCH
-            ))
-            .display()
-    );
-    let mut child = Command::new(env::current_exe()?);
-    setup::apply(&mut child)?;
-    // Target-qualified user variables must not override the isolated prefix.
-    for (name, _) in env::vars_os() {
-        let text = name.to_string_lossy();
-        if text.starts_with("PKG_CONFIG") || text.starts_with("SYSTEM_DEPS_") {
-            child.env_remove(name);
-        }
-    }
-    build.configure_cargo(&mut child)?;
-    child.env(PROBE, "1");
-    let status = child.status()?;
-    std::process::exit(status.code().unwrap_or(1));
-}
-
 fn prefix_complete(prefix: &Path) -> bool {
     prefix.join("lib/pkgconfig/gstreamer-full-1.0.pc").is_file()
         && [
@@ -178,7 +105,6 @@ fn notice_key() -> io::Result<String> {
         "LICENSE",
         "Docs/media-licensing.md",
         "LICENSES/media/native.json",
-        "third-party/rust-media/upstream.json",
     ] {
         hash.update(fs::read(workspace.join(path))?);
     }

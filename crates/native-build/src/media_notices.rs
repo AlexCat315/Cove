@@ -12,6 +12,7 @@ use std::{
 /// Generate notices without rebuilding the native prefix. `workspace` must be
 /// the Cove checkout whose locked media dependencies were used for the build.
 /// The output is replaced only after all license inputs have been validated.
+/// This invokes Cargo recursively, so it must never run from a build script.
 pub fn generate(build: &Build, workspace: &Path, destination: &Path) -> io::Result<()> {
     let metadata = command_json(
         Command::new(std::env::var_os("CARGO").unwrap_or_else(|| "cargo".into()))
@@ -26,20 +27,14 @@ pub fn generate(build: &Build, workspace: &Path, destination: &Path) -> io::Resu
             .arg(&build.target)
             .args(["--features", "cove-media-rhi/gst"]),
     )?;
-    generate_inner(build, workspace, destination, Some(&metadata))
-}
-
-/// Build-script-safe inventory: native projects and vendored binding licenses.
-/// Never invokes Cargo recursively while a parent Cargo build holds locks.
-pub fn generate_native(build: &Build, workspace: &Path, destination: &Path) -> io::Result<()> {
-    generate_inner(build, workspace, destination, None)
+    generate_inner(build, workspace, destination, &metadata)
 }
 
 fn generate_inner(
     build: &Build,
     workspace: &Path,
     destination: &Path,
-    metadata: Option<&Value>,
+    metadata: &Value,
 ) -> io::Result<()> {
     let destination = absolute(destination)?;
     let workspace = workspace.canonicalize()?;
@@ -70,11 +65,7 @@ fn generate_inner(
         "native/source-copyrights.txt".into(),
         source_notices(&source, &targets)?.into_bytes(),
     );
-    let rust = if let Some(metadata) = metadata {
-        rust_packages(&workspace, metadata, &supplements, &mut copies)?
-    } else {
-        vendored_packages(&workspace, &mut copies)?
-    };
+    let rust = rust_packages(&workspace, metadata, &supplements, &mut copies)?;
     // Include exact wrap hashes, local patches and nested wrap redirects.
     collect_wraps(&source.join("subprojects"), &source, &mut copies)?;
     add_file(
@@ -110,7 +101,7 @@ fn generate_inner(
     let inventory = json!({
         "schema": 1, "target": build.target, "gstreamer_revision": source_revision.trim(),
         "tracked_source_changes": !changes.is_empty(), "untracked_source_files": untracked.lines().collect::<Vec<_>>(),
-        "scope": if metadata.is_some() {"GStreamer enabled Meson subprojects and Cove media/media-rhi Cargo normal + build dependency closure; not the final application closure"} else {"GStreamer enabled Meson subprojects and vendored Rust bindings; application Cargo dependencies must be collected at packaging"},
+        "scope": "GStreamer enabled Meson subprojects and Cove media/media-rhi Cargo normal + build dependency closure; not the final application closure",
         "native": native, "rust": rust,
     });
     copies.insert("inventory.json".into(), json_bytes(&inventory)?);
@@ -119,46 +110,6 @@ fn generate_inner(
         notice_text(&inventory)?.into_bytes(),
     );
     write_bundle(&destination, &copies)
-}
-
-fn vendored_packages(
-    workspace: &Path,
-    copies: &mut BTreeMap<PathBuf, Vec<u8>>,
-) -> io::Result<Vec<Value>> {
-    let directory = workspace.join("third-party/rust-media");
-    let mut packages = read_json(&directory.join("upstream.json"))?
-        .as_array()
-        .ok_or_else(|| io::Error::other("binding inventory"))?
-        .clone();
-    for package in &mut packages {
-        let name = string(package, "name")?.to_owned();
-        let output =
-            PathBuf::from("rust").join(format!("{}-{}", name, string(package, "version")?));
-        let mut files = Vec::new();
-        for file in sorted_entries(&directory.join(&name))? {
-            if is_notice(&file.file_name().to_string_lossy()) {
-                collect_files(
-                    &file.path(),
-                    &output.join(file.file_name()),
-                    copies,
-                    &mut files,
-                )?;
-            }
-        }
-        if files.is_empty() {
-            return Err(io::Error::other(format!(
-                "vendored binding {name} has no license"
-            )));
-        }
-        package["files"] = json!(files);
-        package["source"] = json!("vendored official source; see upstream.json");
-    }
-    add_file(
-        copies,
-        "rust/upstream.json".into(),
-        &directory.join("upstream.json"),
-    )?;
-    Ok(packages)
 }
 
 fn native_packages(
@@ -257,10 +208,8 @@ fn rust_packages(
             continue;
         }
         if package["source"].is_null() {
-            let manifest = Path::new(string(package, "manifest_path")?);
-            if !manifest.starts_with(workspace.join("third-party/rust-media")) {
-                continue;
-            }
+            // Cove's own path dependencies are Apache-2.0 and not third-party material.
+            continue;
         }
         let name = string(package, "name")?;
         let version = string(package, "version")?;
