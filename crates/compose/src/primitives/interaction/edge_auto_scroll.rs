@@ -10,6 +10,10 @@ use std::rc::Rc;
 use cove_core::Point;
 use cove_core::scene::{AnimatorScheduler, AnyAnimationController, Node, NodeResource, Rect};
 
+use crate::primitives::layout::scroll_view::{
+    cached_scrollable_content_size, report_scroll_change, visible_viewport_rect,
+};
+
 /// Points per second at the very edge.
 pub const MAXIMUM_SPEED: f32 = 1200.0;
 
@@ -137,18 +141,23 @@ fn tick(state: &EdgeAutoScrollState, delta_time: f64) {
     let Some(scroll) = state.scroll.borrow().clone() else {
         return;
     };
-    let viewport = crate::primitives::layout::scroll_view::visible_viewport_rect(&scroll);
-    let speed = velocity(state.pointer_y.get(), viewport);
+    // Pointer events are in window coordinates while the viewport rect is
+    // local to the scroll node; compare both in the scroll's space.
+    let pointer = scroll.convert_from_window(Point::new(0.0, state.pointer_y.get()));
+    let viewport = visible_viewport_rect(&scroll);
+    let speed = velocity(pointer.y, viewport);
     if speed == 0.0 {
         return;
     }
-    let delta = speed * delta_time as f32;
+    let content = cached_scrollable_content_size(&scroll);
+    let maximum = (content.height - viewport.height).max(0.0);
     let offset = scroll.content_offset();
-    let target = Point::new(offset.x, offset.y + delta);
-    if target.y == offset.y {
+    let next = (offset.y + speed * delta_time as f32).clamp(0.0, maximum);
+    if next == offset.y {
         return;
     }
-    scroll.set_content_offset(target);
+    scroll.set_content_offset(Point::new(offset.x, next));
+    report_scroll_change(&scroll);
     if let Some(on_scroll) = state.on_scroll.borrow().clone() {
         on_scroll();
     }

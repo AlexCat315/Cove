@@ -30,6 +30,9 @@ pub struct ReorderDragSession {
     start_top: Cell<f32>,
     row_height: Cell<f32>,
     preview_top: Cell<f32>,
+    /// Node whose content offset carries the lifted row; weak in Swift, kept
+    /// alive here by the preview host while it is mounted.
+    preview: ReorderPreviewOffset,
     /// Whether a drag is in progress.
     active: Cell<bool>,
 }
@@ -64,13 +67,21 @@ impl ReorderDragSession {
         self.move_by(0.0);
     }
 
+    /// Binds the node that paints the lifted row, then positions it at the
+    /// current drag offset so a rebuild mid-drag does not jump.
+    pub fn bind_preview(&self, node: &cove_core::scene::Node) {
+        self.preview.bind(node);
+        self.preview.apply(self.preview_top.get());
+    }
+
     /// Follows the pointer, staying inside the viewport so the preview rests at
     /// an edge while automatic scrolling moves the content beneath it.
     pub fn move_by(&self, travel: f32) {
         let row_height = self.row_height.get();
         let ceiling = (self.viewport_height.get() - row_height).max(0.0);
-        self.preview_top
-            .set((self.start_top.get() + travel).clamp(0.0, ceiling));
+        let top = (self.start_top.get() + travel).clamp(0.0, ceiling);
+        self.preview_top.set(top);
+        self.preview.apply(top);
     }
 
     pub fn end(&self) {
@@ -78,6 +89,7 @@ impl ReorderDragSession {
         self.preview_top.set(0.0);
         self.row_height.set(0.0);
         self.start_top.set(0.0);
+        self.preview.apply(0.0);
     }
 }
 
@@ -189,20 +201,25 @@ pub fn drop_indicator_y(
 /// Shared handle for the preview node's scroll offset, so following the pointer
 /// neither relayouts nor recomposes.
 #[derive(Clone, Default)]
-pub struct ReorderPreviewOffset(std::rc::Rc<RefCell<Option<std::rc::Rc<cove_core::scene::Node>>>>);
+pub struct ReorderPreviewOffset(std::rc::Rc<RefCell<Option<cove_core::scene::NodeWeak>>>);
 
 impl ReorderPreviewOffset {
     pub fn new() -> Self {
         Self::default()
     }
 
-    pub fn bind(&self, node: std::rc::Rc<cove_core::scene::Node>) {
-        *self.0.borrow_mut() = Some(node);
+    pub fn bind(&self, node: &cove_core::scene::Node) {
+        *self.0.borrow_mut() = Some(node.downgrade());
     }
 
     /// Applies `preview_top` through the node's content offset.
     pub fn apply(&self, preview_top: f32) {
-        if let Some(node) = self.0.borrow().as_ref() {
+        let node = self
+            .0
+            .borrow()
+            .as_ref()
+            .and_then(cove_core::scene::Node::upgrade);
+        if let Some(node) = node {
             node.set_content_offset(cove_core::Point {
                 x: 0.0,
                 y: -preview_top,

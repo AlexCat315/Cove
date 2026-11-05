@@ -20,12 +20,11 @@
 //! - the dragged row stays as a dimmed placeholder while the lifted copy follows
 
 use crate::Scope;
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 
 use super::reorder_model::{
-    ReorderDragSession, ReorderPreviewOffset, ReorderableListModel, drop_indicator_y,
-    reorder_row_height,
+    ReorderDragSession, ReorderableListModel, drop_indicator_y, reorder_row_height,
 };
 use super::selection::{CollectionId, RowState};
 use crate::modifiers::interaction::{AccessibilityExt, HitTestingExt};
@@ -66,8 +65,8 @@ pub struct ReorderSession<Id> {
     ids: Rc<RefCell<Vec<Id>>>,
     on_move: Rc<RefCell<Rc<dyn Fn(usize, usize)>>>,
     is_enabled: bool,
-    row_height: f32,
-    row_spacing: f32,
+    row_height: Rc<Cell<f32>>,
+    row_spacing: Rc<Cell<f32>>,
 }
 
 impl<Id: CollectionId> Clone for ReorderSession<Id> {
@@ -82,8 +81,8 @@ impl<Id: CollectionId> Clone for ReorderSession<Id> {
             ids: self.ids.clone(),
             on_move: self.on_move.clone(),
             is_enabled: self.is_enabled,
-            row_height: self.row_height,
-            row_spacing: self.row_spacing,
+            row_height: self.row_height.clone(),
+            row_spacing: self.row_spacing.clone(),
         }
     }
 }
@@ -114,8 +113,9 @@ impl<Id: CollectionId> ReorderSession<Id> {
         if !self.is_enabled {
             return;
         }
-        let stride = self.row_height + self.row_spacing;
-        self.session.begin(index as f32 * stride, self.row_height);
+        let row_height = self.row_height.get();
+        let stride = row_height + self.row_spacing.get();
+        self.session.begin(index as f32 * stride, row_height);
         self.dragging.set(self.ids.borrow().get(index).cloned());
         self.boundary.set(Some(index));
     }
@@ -132,7 +132,7 @@ impl<Id: CollectionId> ReorderSession<Id> {
             source,
             travel,
             scrolled,
-            self.row_height + self.row_spacing,
+            self.row_height.get() + self.row_spacing.get(),
             self.count(),
         );
         self.boundary.set(Some(boundary));
@@ -160,6 +160,13 @@ impl<Id: CollectionId> ReorderSession<Id> {
         self.dragging.set(None);
         self.boundary.set(None);
         self.session.end();
+    }
+
+    /// Keeps the drag arithmetic on the same row metrics the rows were laid
+    /// out with, including any future scaling or touch floor.
+    fn set_row_metrics(&self, row_height: f32, row_spacing: f32) {
+        self.row_height.set(row_height);
+        self.row_spacing.set(row_spacing);
     }
 
     /// Keyboard move: records the moved row so it stays mounted after the
@@ -223,7 +230,6 @@ where
     pub row_content: RowContent,
     id_of: Rc<dyn Fn(&Item) -> Id>,
     session: Rc<ReorderSession<Id>>,
-    preview_offset: ReorderPreviewOffset,
 }
 
 impl<Item, Id, RowContent> ReorderableList<Item, Id, RowContent>
@@ -249,8 +255,8 @@ where
             ids: Rc::new(RefCell::new(ids)),
             on_move: Rc::new(RefCell::new(Rc::new(|_, _| {}))),
             is_enabled: true,
-            row_height: 36.0,
-            row_spacing: 0.0,
+            row_height: Rc::new(Cell::new(36.0)),
+            row_spacing: Rc::new(Cell::new(0.0)),
         });
         Self {
             data,
@@ -261,7 +267,6 @@ where
             row_content,
             id_of,
             session,
-            preview_offset: ReorderPreviewOffset::new(),
         }
     }
 
@@ -340,6 +345,7 @@ where
         let row_stride = row_height + row_spacing;
         let count = self.data.len();
         let session = self.session.clone();
+        session.set_row_metrics(row_height, row_spacing);
         let dragging = session.dragging_id();
 
         let mounted = mounted_window(&session, count);
@@ -403,7 +409,7 @@ where
         );
 
         let mut layers = vec![column];
-        if let Some(boundary) = session.visible_boundary() {
+        if count > 1 && let Some(boundary) = session.visible_boundary() {
             let y = drop_indicator_y(boundary, count, row_stride, content_height);
             // A spacer rather than `EmptyView`: an empty view materialises no
             // node, so the rule would never be laid out or painted.
@@ -429,10 +435,16 @@ where
         let scroll_session = session.clone();
         let scroll = ScrollView::new(
             ScrollAxis::Vertical,
-            AnyView::new(
-                crate::primitives::layout::ZStack::new(AnyView::new(TupleView::new(layers)))
-                    .alignment(crate::Alignment::TopLeading),
-            ),
+            // A flex parent rather than a `ZStack`: only flex layout honours
+            // the drop line's absolute top inset (Swift's overlay `Box`).
+            AnyView::new(BoxView::new(
+                FlexDirection::Column,
+                Align::Stretch,
+                Justify::FlexStart,
+                Wrap::NoWrap,
+                0.0,
+                AnyView::new(TupleView::new(layers)),
+            )),
         )
         .scrollbar_gutter(ScrollbarGutter::Stable)
         .on_viewport_change(move |viewport: ScrollViewport| {
@@ -444,7 +456,7 @@ where
             }
             let visible = visible_range(
                 scroll_session.count(),
-                (scroll_session.row_height + scroll_session.row_spacing).max(1.0),
+                (scroll_session.row_height.get() + scroll_session.row_spacing.get()).max(1.0),
                 viewport.offset.y,
                 viewport.size.height,
                 4,
@@ -471,7 +483,6 @@ where
             );
             surface.push(AnyView::new(
                 AnyView::new(ReorderPreviewHost {
-                    offset: self.preview_offset.clone(),
                     session: session.clone(),
                     row_height,
                     width,
@@ -705,8 +716,15 @@ impl<Id: CollectionId> PrimitiveView for ReorderHandle<Id> {
             }),
         );
 
-        let auto_scroll = EdgeAutoScroll::new();
-        node.add_resource(auto_scroll.clone());
+        // Recomposition reruns `update_node`; keep one resource so the drag
+        // that started on it also receives the pointer updates and ticks.
+        let auto_scroll = node
+            .first_resource::<EdgeAutoScroll>()
+            .unwrap_or_else(|| {
+                let auto_scroll = EdgeAutoScroll::new();
+                node.add_resource(auto_scroll.clone());
+                auto_scroll
+            });
 
         let pointer_session = session.clone();
         let pointer_node = node.clone();
@@ -868,7 +886,6 @@ impl<Id: CollectionId> View for ReorderHandle<Id> {
 /// position through its content offset, so following the pointer neither
 /// relayouts nor recomposes. It never takes input.
 struct ReorderPreviewHost<Id: CollectionId> {
-    offset: ReorderPreviewOffset,
     session: Rc<ReorderSession<Id>>,
     row_height: f32,
     width: f32,
@@ -890,8 +907,7 @@ impl<Id: CollectionId> PrimitiveView for ReorderPreviewHost<Id> {
     }
 
     fn update_node(&self, node: &Node) {
-        self.offset.bind(std::rc::Rc::new(node.clone()));
-        self.offset.apply(self.session.preview_top());
+        self.session.session.bind_preview(node);
         node.set_clips_to_bounds(true);
         node.set_is_hit_testable(false);
     }
@@ -933,7 +949,10 @@ impl<Id: CollectionId> PrimitiveView for ReorderPreviewHost<Id> {
             )
             .semantic_background(crate::theme::SemanticColorRef::surface())
             .corner_radius(6.0)
-            .border_color(cove_core::Color::from_rgba8(0, 0, 0, 26), 1.0)
+            .semantic_border(
+                crate::theme::SemanticColorRef::accent().opacity(0.35),
+                1.0,
+            )
             .shadow(cove_core::Color::from_rgba8(0, 0, 0, 71), 0.0, 4.0, 12.0)
             .modifier(cove_composition::LayoutDebugModifier::debug_name(
                 "reorder-preview",

@@ -163,7 +163,7 @@ cargo test -p cove-ui-compose --test compose --locked
 | AssetRef / DropTarget | 0 | 0 / 0 | 挂载/几何基础检查通过；待逐项交互和视觉验收 |
 | List | 0 | 0 / 0 | 挂载/几何基础检查通过；待逐项交互和视觉验收 |
 | SectionedList | 0 | 0 / 0 | 挂载/几何基础检查通过；待逐项交互和视觉验收 |
-| ReorderableList | 0 | 0 / 0 | 挂载/几何基础检查通过；待逐项交互和视觉验收 |
+| ReorderableList | 0 | 0 / 0 | 本轮修复拖拽：窗口/视口坐标换算、自动滚动夹紧、插入线绝对定位与手柄资源复用；指针、边界与浮动副本回归通过，原生拖拽已验收；文档已写 |
 | SwipeList | 0 | 0 / 5 | 挂载/几何基础检查通过；待逐项交互和视觉验收 |
 | RefreshableList | 0 | 0 / 0 | 挂载/几何基础检查通过；待逐项交互和视觉验收 |
 | Scrollbar | 0 | 0 / 0 | 挂载/几何基础检查通过；待逐项交互和视觉验收 |

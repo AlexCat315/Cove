@@ -10,13 +10,9 @@
 //! Named differences (documented, not dropped):
 //! - Handles are located by accessible role/value rather than Swift's
 //!   `reorder-handle-<index>` debug name, so the lookup survives a reorder.
-//! - The Swift suite also drives held-at-edge auto-scroll and the floating drag
-//!   preview, which need `EnclosingScroll.container(of:)`/`viewport(of:)`. Rust's
-//!   `EdgeAutoScroll` exposes the same pure velocity contract, which
-//!   [`edge_velocity`] asserts; the two interaction scenarios are recorded.
 //!
-//! Deviations are limited to lookup mechanics and the two interaction scenarios
-//! that need `EnclosingScroll`; every assertion below states the Swift contract.
+//! Deviations are limited to lookup mechanics; every assertion below states the
+//! Swift contract, including held-at-edge auto-scroll and the floating preview.
 
 use crate::support;
 use cove_composition::Scope;
@@ -30,6 +26,7 @@ use cove_core::scene::{AccessibilityRole, Node};
 use cove_core::{Point, Rect};
 use cove_ui_compose::modifiers::layout::LayoutFrameExt;
 use cove_ui_compose::primitives::data::lists::RowState;
+use cove_ui_compose::primitives::data::lists::reorder_model::drop_indicator_y;
 use cove_ui_compose::primitives::data::lists::reorderable::ReorderableList;
 use cove_ui_compose::primitives::interaction::edge_auto_scroll::{MAXIMUM_SPEED, velocity};
 use cove_ui_compose::primitives::text::Text;
@@ -44,6 +41,10 @@ struct Harness {
     moves: Rc<RefCell<Vec<(usize, usize)>>>,
     /// The Swift suite installs `[.touch, .keyboard]` for the handle size test.
     touch: bool,
+    list_height: f32,
+    /// Pushes the list down so pointer coordinates and the list's local
+    /// coordinates differ, like the gallery's story section.
+    top_padding: f32,
 }
 
 impl View for Harness {
@@ -83,7 +84,25 @@ impl View for Harness {
         .row_height(ROW_HEIGHT)
         .row_label(|id: &u64| format!("Item {}", id + 1));
 
-        let list = AnyView::new(AnyView::new(list).frame_size(280.0, 500.0));
+        let list = AnyView::new(AnyView::new(list).frame_size(280.0, self.list_height));
+        // Offset the list from the window origin like a padded parent would.
+        let list = if self.top_padding > 0.0 {
+            use cove_core::scene::{Align, FlexDirection, Justify, Wrap};
+            use cove_ui_compose::{BoxView, Spacer, TupleView};
+            AnyView::new(BoxView::new(
+                FlexDirection::Column,
+                Align::Stretch,
+                Justify::FlexStart,
+                Wrap::NoWrap,
+                0.0,
+                AnyView::new(TupleView::new(vec![
+                    AnyView::new(Spacer::new(self.top_padding)),
+                    list,
+                ])),
+            ))
+        } else {
+            list
+        };
         if self.touch {
             use cove_ui_compose::adaptive::SurfaceEnvironmentExt;
             let mut environment = cove_core::Environment::default();
@@ -108,11 +127,23 @@ fn install_with(
     count: u64,
     touch: bool,
 ) -> Rc<RefCell<Vec<(usize, usize)>>> {
+    install_in(scene, count, touch, 500.0, 0.0)
+}
+
+fn install_in(
+    scene: &mut InteractiveScene,
+    count: u64,
+    touch: bool,
+    list_height: f32,
+    top_padding: f32,
+) -> Rc<RefCell<Vec<(usize, usize)>>> {
     let moves = Rc::new(RefCell::new(Vec::new()));
     scene.install(Harness {
         items: State::new((0..count).collect()),
         moves: moves.clone(),
         touch,
+        list_height,
+        top_padding,
     });
     scene.settle(8, 1.0);
     moves
@@ -304,6 +335,219 @@ fn touch_handle() {
         assert!(
             nodes.iter().any(|node| node.frame().width > 0.0),
             "the handle paints real content"
+        );
+    });
+}
+
+fn window_point(node: &Node) -> Point {
+    let frame = node.absolute_frame();
+    Point::new(frame.x + frame.width / 2.0, frame.y + frame.height / 2.0)
+}
+
+fn press(point: Point) -> cove_platform::InputEvent {
+    cove_platform::InputEvent::MouseButtonDown(cove_platform::MouseButtonEvent {
+        button: cove_platform::MouseButton::Left,
+        x: point.x,
+        y: point.y,
+        clicks: 1,
+        modifiers: Default::default(),
+        kind: Default::default(),
+    })
+}
+
+fn motion(point: Point) -> cove_platform::InputEvent {
+    cove_platform::InputEvent::MouseMotion(cove_platform::MouseMotionEvent {
+        x: point.x,
+        y: point.y,
+        delta_x: 0.0,
+        delta_y: 0.0,
+        kind: Default::default(),
+    })
+}
+
+fn release(point: Point) -> cove_platform::InputEvent {
+    cove_platform::InputEvent::MouseButtonUp(cove_platform::MouseButtonEvent {
+        button: cove_platform::MouseButton::Left,
+        x: point.x,
+        y: point.y,
+        clicks: 1,
+        modifiers: Default::default(),
+        kind: Default::default(),
+    })
+}
+
+fn scroll_viewport(scene: &InteractiveScene) -> Node {
+    scene
+        .first(|node| node.is_scroll_viewport())
+        .expect("the list owns a scroll viewport")
+}
+
+/// Pointer events are window coordinates; the auto-scroll edge test must
+/// compare them with the viewport in the scroll's own space. A list pushed
+/// down the scene used to scroll itself to the end on any drag.
+#[test]
+fn dragging_inside_the_viewport_does_not_auto_scroll() {
+    InteractiveScene::run(320.0, 520.0, |scene| {
+        let moves = install_in(scene, 20, false, 220.0, 160.0);
+        let scroll = scroll_viewport(scene);
+
+        let mounted_before = positions(scene);
+        assert!(
+            mounted_before.len() > 1,
+            "the virtualized window mounts several rows before the drag"
+        );
+
+        let source = handle(scene, 4, 20);
+        let start = window_point(&source);
+        let dispatcher = scene.dispatcher();
+        dispatcher.dispatch(&press(start));
+        scene.settle(4, 0.1);
+
+        assert_eq!(
+            scroll.content_offset().y,
+            0.0,
+            "the pointer is mid-viewport, so a drag must not scroll the list"
+        );
+
+        dispatcher.dispatch(&motion(Point::new(start.x, start.y + 10.0)));
+        scene.settle(4, 0.1);
+
+        assert_eq!(
+            scroll.content_offset().y,
+            0.0,
+            "holding inside the viewport keeps the content still"
+        );
+        assert_eq!(
+            positions(scene),
+            mounted_before,
+            "the mounted rows stay exactly as they were during the drag"
+        );
+
+        dispatcher.dispatch(&release(start));
+        scene.settle(4, 1.0);
+        assert!(moves.borrow().is_empty(), "releasing on the row moves nothing");
+    });
+}
+
+/// Holding the handle at the bottom edge scrolls, but the offset stops at the
+/// content end and the drop lands below the initial window (Swift
+/// `edgeAutoScroll`).
+#[test]
+fn edge_auto_scroll_stops_at_the_content_end() {
+    InteractiveScene::run(320.0, 520.0, |scene| {
+        let moves = install_in(scene, 30, false, 200.0, 160.0);
+        let scroll = scroll_viewport(scene);
+
+        let viewport = scroll.absolute_frame();
+        let source = handle(scene, 0, 30);
+        let start = window_point(&source);
+        let edge = Point::new(start.x, viewport.max_y() - 2.0);
+        let dispatcher = scene.dispatcher();
+        dispatcher.dispatch(&press(start));
+        scene.settle(2, 0.1);
+
+        dispatcher.dispatch(&motion(edge));
+        scene.settle(12, 0.1);
+
+        let maximum = 30.0 * ROW_HEIGHT - viewport.height;
+        assert_eq!(
+            scroll.content_offset().y,
+            maximum,
+            "auto-scroll clamps to the last content offset instead of running past it"
+        );
+        let line = indicator(scene).expect("a drop line");
+        let boundary = ((edge.y - start.y + maximum) / ROW_HEIGHT)
+            .round()
+            .clamp(0.0, 30.0) as usize;
+        let expected_line_y = viewport.y
+            + drop_indicator_y(boundary, 30, ROW_HEIGHT, 30.0 * ROW_HEIGHT)
+            - scroll.content_offset().y;
+        assert!(
+            (line.absolute_frame().y - expected_line_y).abs() < 1.0,
+            "the drop line follows the insertion boundary (got {}, expected {expected_line_y})",
+            line.absolute_frame().y
+        );
+
+        let preview = scene.named("reorder-preview").expect("a lifted preview");
+        assert!(
+            (preview.absolute_frame().max_y() - scroll.absolute_frame().max_y()).abs() < 1.0,
+            "the lifted row rests at the bottom edge of the viewport (preview {:?}, viewport {:?})",
+            preview.absolute_frame(),
+            scroll.absolute_frame()
+        );
+
+        dispatcher.dispatch(&release(edge));
+        scene.settle(4, 1.0);
+
+        // The drop lands where the pointer is in content coordinates.
+        let expected = ((edge.y - start.y + maximum) / ROW_HEIGHT).round() as usize;
+        let expected = expected - 1;
+        let expected: Vec<(usize, usize)> = if expected == 0 {
+            Vec::new()
+        } else {
+            vec![(0, expected)]
+        };
+        assert_eq!(
+            moves.borrow().as_slice(),
+            expected.as_slice(),
+            "the drop lands where the pointer rests in content coordinates"
+        );
+        assert!(
+            expected.first().is_some_and(|(_, to)| *to > 6),
+            "the drop lands below the initially visible rows"
+        );
+        assert_eq!(
+            scroll.content_offset().y,
+            maximum,
+            "releasing the drag stops auto-scrolling"
+        );
+    });
+}
+
+/// The lifted copy follows the pointer and the source row stays as a dimmed
+/// placeholder (Swift `floatingPreview`).
+#[test]
+fn floating_preview_follows_the_pointer() {
+    InteractiveScene::run(320.0, 520.0, |scene| {
+        install_in(scene, 10, false, 300.0, 0.0);
+
+        let source = handle(scene, 1, 10);
+        let start = source.absolute_frame();
+        let point = window_point(&source);
+        let dispatcher = scene.dispatcher();
+        dispatcher.dispatch(&press(point));
+        scene.settle(2, 1.0);
+
+        let preview = scene.named("reorder-preview").expect("a lifted preview");
+        assert!(
+            (preview.absolute_frame().y - start.y).abs() < 1.0,
+            "the lifted row starts over its source row"
+        );
+        assert!(
+            (preview.absolute_frame().height - start.height).abs() < 1.0,
+            "the lifted row keeps the row height"
+        );
+
+        dispatcher.dispatch(&motion(Point::new(point.x, point.y + 50.0)));
+        scene.settle(2, 0.1);
+        let preview = scene.named("reorder-preview").expect("the preview stays mounted");
+        assert!(
+            (preview.absolute_frame().y - (start.y + 50.0)).abs() < 1.0,
+            "the lifted row follows pointer travel without a relayout"
+        );
+
+        let row = scene.named("reorder-row-1").expect("the source row stays mounted");
+        assert!(
+            std::iter::successors(Some(row), |node| node.parent())
+                .any(|node| (node.opacity() - 0.35).abs() < 0.001),
+            "the source row remains as a dimmed placeholder"
+        );
+
+        dispatcher.dispatch(&release(Point::new(point.x, point.y + 50.0)));
+        scene.settle(2, 1.0);
+        assert!(
+            scene.named("reorder-preview").is_none(),
+            "the lifted row disappears when the drag ends"
         );
     });
 }

@@ -372,13 +372,22 @@ fn scrollable_content_size(node: &Node) -> Size {
     }
 }
 
-fn cached_scrollable_content_size(node: &Node) -> Size {
+pub(crate) fn cached_scrollable_content_size(node: &Node) -> Size {
     if let Some(cache) = node.attachment::<ContentSizeCache>(CONTENT_SIZE)
         && cache.structure_version == node.subtree_structure_version()
     {
         return cache.size;
     }
     refresh_scrollable_content_size(node)
+}
+
+/// Notifies the scroll view's observers after code outside this module moved
+/// its content offset (a drag auto-scroll), so viewport bindings, bars and the
+/// reorder window see the new offset the way interactive scrolling already does.
+pub(crate) fn report_scroll_change(node: &Node) {
+    if let Some(report) = node.attachment::<Rc<dyn Fn(&Node)>>(REPORT) {
+        report(node);
+    }
 }
 
 fn refresh_scrollable_content_size(node: &Node) -> Size {
