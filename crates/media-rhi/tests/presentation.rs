@@ -1,53 +1,70 @@
-#![cfg(all(feature = "gst", not(target_arch = "wasm32")))]
+#![cfg(all(feature = "ffmpeg", not(target_arch = "wasm32")))]
 
 use cove_graphics::{rhi::*, ui::NativeTextureImageBacking};
 use cove_imaging::TextureImage;
 use cove_media::{
-    VideoOutput,
-    gst::{self, prelude::*},
+    PixelFormat, PlaneLayout, VideoDynamicRange, VideoFormat, VideoFrame, VideoOutput,
+    ffmpeg::FrameStorage,
 };
 use cove_media_rhi::VideoPresenter;
 use std::{any::Any, sync::Arc};
 
-fn produce(output: VideoOutput, width: i32, height: i32) -> Vec<u8> {
-    let endpoint = gst::GstVideoEndpoint::new(output.clone()).expect("video endpoint");
-    let pipeline = gst::Pipeline::new();
-    let source = gst::ElementFactory::make("videotestsrc")
-        .property("num-buffers", 1_i32)
-        .property_from_str("pattern", "smpte")
-        .build()
-        .expect("test video");
-    let caps = gst::Caps::builder("video/x-raw")
-        .field("format", "RGBA")
-        .field("width", width)
-        .field("height", height)
-        .build();
-    pipeline
-        .add_many([&source, endpoint.element()])
-        .expect("elements");
-    source
-        .link_filtered(endpoint.element(), &caps)
-        .expect("RGBA link");
-    pipeline.set_state(gst::State::Playing).expect("start");
-    let message = pipeline
-        .bus()
-        .expect("bus")
-        .timed_pop_filtered(
-            gst::ClockTime::from_seconds(10),
-            &[gst::MessageType::Eos, gst::MessageType::Error],
-        )
-        .expect("completion");
-    pipeline.set_state(gst::State::Null).expect("stop");
-    if let gst::MessageView::Error(error) = message.view() {
-        panic!("{} {:?}", error.error(), error.debug());
+fn pattern(width: u32, height: u32, stride: usize) -> Vec<u8> {
+    let mut bytes = vec![0; stride * height as usize];
+    for y in 0..height as usize {
+        for x in 0..width as usize {
+            let index = y * stride + x * 4;
+            bytes[index] = (x * 7) as u8;
+            bytes[index + 1] = (y * 5) as u8;
+            bytes[index + 2] = ((x + y) * 3) as u8;
+            bytes[index + 3] = 255;
+        }
     }
-    output
-        .latest()
-        .expect("sample")
-        .storage
-        .copy_planes()
-        .expect("mapped sample")
-        .remove(0)
+    bytes
+}
+
+fn publish(
+    output: &VideoOutput,
+    width: u32,
+    height: u32,
+    stride: usize,
+    bytes: Vec<u8>,
+    dynamic_range: VideoDynamicRange,
+) {
+    let generation = output.begin_generation().expect("generation");
+    let frame = VideoFrame {
+        generation,
+        sequence: 1,
+        pts: None,
+        dts: None,
+        duration: None,
+        format: VideoFormat {
+            width,
+            height,
+            pixel_format: PixelFormat::Rgba8,
+            planes: vec![PlaneLayout { stride, offset: 0 }],
+            pixel_aspect_ratio: (1, 1),
+            frame_rate: (30, 1),
+            colorimetry: "unknown".into(),
+            dynamic_range,
+            format_description: format!("rgba {width}x{height}"),
+        },
+        storage: Arc::new(FrameStorage::new(bytes)),
+    };
+    assert!(output.publish(frame));
+}
+
+fn produce(output: &VideoOutput, width: u32, height: u32) -> Vec<u8> {
+    let bytes = pattern(width, height, width as usize * 4);
+    publish(
+        output,
+        width,
+        height,
+        width as usize * 4,
+        bytes.clone(),
+        VideoDynamicRange::Unknown,
+    );
+    bytes
 }
 
 fn read(device: &Device, image: &Arc<TextureImage>) -> Vec<u8> {
@@ -77,7 +94,7 @@ fn native_upload_resize_and_close_preserve_old_texture_snapshots() {
     let output = VideoOutput::new();
     let mut presenter = VideoPresenter::new(device.clone(), output.clone());
     assert!(presenter.update().expect("empty output").is_none());
-    let first_pixels = produce(output.clone(), 32, 24);
+    let first_pixels = produce(&output, 32, 24);
     let first = presenter.update().expect("upload").expect("first image");
     assert_eq!(read(&device, &first), first_pixels);
     assert!(Arc::ptr_eq(
@@ -86,7 +103,7 @@ fn native_upload_resize_and_close_preserve_old_texture_snapshots() {
     ));
     assert_eq!(presenter.statistics().uploaded_frames, 1);
 
-    let second_pixels = produce(output.clone(), 16, 8);
+    let second_pixels = produce(&output, 16, 8);
     let second = presenter
         .update()
         .expect("resize upload")
@@ -111,26 +128,8 @@ fn native_upload_resize_and_close_preserve_old_texture_snapshots() {
 
 #[test]
 fn per_buffer_padding_is_preserved_in_metadata_and_uploaded_by_stride() {
-    gst::initialize().expect("GStreamer");
     let device = Arc::new(Device::make(DeviceConfig::default()).expect("native RHI device"));
     let output = VideoOutput::new();
-    let endpoint = gst::GstVideoEndpoint::new(output.clone()).expect("endpoint");
-    let caps = gst::Caps::builder("video/x-raw")
-        .field("format", "RGBA")
-        .field("width", 8_i32)
-        .field("height", 2_i32)
-        .field("framerate", gst::Fraction::new(30, 1))
-        .build();
-    let source = gst::app::AppSrc::builder()
-        .caps(&caps)
-        .format(gst::Format::Time)
-        .build();
-    let pipeline = gst::Pipeline::new();
-    pipeline
-        .add_many([source.upcast_ref::<gst::Element>(), endpoint.element()])
-        .expect("elements");
-    source.link(endpoint.element()).expect("link");
-    pipeline.set_state(gst::State::Playing).expect("play");
     let mut data = vec![0x77; 128];
     for pixel in data[..32].as_chunks_mut::<4>().0 {
         pixel.copy_from_slice(&[255, 0, 0, 255]);
@@ -143,33 +142,7 @@ fn per_buffer_padding_is_preserved_in_metadata_and_uploaded_by_stride() {
         .chain(data[64..96].iter())
         .copied()
         .collect();
-    let mut buffer = gst::Buffer::from_mut_slice(data);
-    let writable = buffer.get_mut().expect("writable sample");
-    writable.set_pts(gst::ClockTime::ZERO);
-    gst::video::VideoMeta::add_full(
-        writable,
-        gst::video::VideoFrameFlags::empty(),
-        gst::video::VideoFormat::Rgba,
-        8,
-        2,
-        &[0],
-        &[64],
-    )
-    .expect("padded metadata");
-    source.push_buffer(buffer).expect("input buffer");
-    source.end_of_stream().expect("EOF");
-    let message = pipeline
-        .bus()
-        .expect("bus")
-        .timed_pop_filtered(
-            gst::ClockTime::from_seconds(10),
-            &[gst::MessageType::Eos, gst::MessageType::Error],
-        )
-        .expect("completion");
-    pipeline.set_state(gst::State::Null).expect("stop");
-    if let gst::MessageView::Error(error) = message.view() {
-        panic!("{} {:?}", error.error(), error.debug());
-    }
+    publish(&output, 8, 2, 64, data, VideoDynamicRange::Unknown);
     assert_eq!(output.latest().expect("frame").format.planes[0].stride, 64);
     let mut presenter = VideoPresenter::new(device.clone(), output);
     let image = presenter
@@ -181,14 +154,17 @@ fn per_buffer_padding_is_preserved_in_metadata_and_uploaded_by_stride() {
 
 #[test]
 fn hdr_requires_explicit_conversion_instead_of_silent_sdr_presentation() {
-    use cove_media::{MediaErrorKind, VideoDynamicRange};
+    use cove_media::MediaErrorKind;
     let device = Arc::new(Device::make(DeviceConfig::default()).expect("native RHI device"));
     let output = VideoOutput::new();
-    produce(output.clone(), 16, 8);
-    let mut frame = (*output.latest().expect("frame")).clone();
-    frame.sequence += 1;
-    frame.format.dynamic_range = VideoDynamicRange::Pq;
-    assert!(output.publish(frame));
+    publish(
+        &output,
+        16,
+        8,
+        16 * 4,
+        pattern(16, 8, 16 * 4),
+        VideoDynamicRange::Pq,
+    );
     let mut presenter = VideoPresenter::new(device, output);
     let error = match presenter.update() {
         Err(error) => error,

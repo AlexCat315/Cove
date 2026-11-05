@@ -34,8 +34,8 @@ pub struct VideoFormat {
     pub frame_rate: (u32, u32),
     pub colorimetry: String,
     pub dynamic_range: VideoDynamicRange,
-    /// Full negotiated backend format, including memory features and HDR fields.
-    pub negotiated_caps: String,
+    /// Human-readable backend format description, for example `rgba, 32x24, bt709`.
+    pub format_description: String,
 }
 /// Copying is explicit. Hardware-backed implementations may reject CPU access.
 pub trait VideoStorage: Any + Send + Sync {

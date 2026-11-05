@@ -59,10 +59,16 @@ cove-text = { path = "crates/text" }
 cove-imaging = { path = "crates/imaging" }
 cove-media = { path = "crates/media" }
 cove-media-rhi = { path = "crates/media-rhi" }
-gstreamer = { version = "=0.25.4", features = ["v1_28"] }
-gstreamer-app = { version = "=0.25.2", features = ["v1_28"] }
-gstreamer-video = { version = "=0.25.4", features = ["v1_28"] }
-gstreamer-audio = { version = "=0.25.4", features = ["v1_28"] }
+ffmpeg-sys-next = { version = "=9.0.1", default-features = false, features = [
+    "build",
+    "avcodec",
+    "avfilter",
+    "avformat",
+    "swresample",
+    "swscale",
+] }
+cpal = { version = "0.18.2", default-features = false }
+ndk-context = "0.1"
 cove-shell = { path = "crates/shell" }
 cove-runtime = { path = "crates/runtime" }
 cove-composition = { path = "crates/composition" }

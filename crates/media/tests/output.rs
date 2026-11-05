@@ -29,7 +29,7 @@ fn frame(generation: u64, sequence: u64) -> VideoFrame {
             frame_rate: (0, 1),
             colorimetry: "unknown".into(),
             dynamic_range: VideoDynamicRange::Unknown,
-            negotiated_caps: "application-owned RGBA".into(),
+            format_description: "application-owned RGBA".into(),
         },
         storage: Arc::new(Pixels(vec![255, 0, 0, 255])),
     }

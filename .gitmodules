@@ -26,7 +26,3 @@
 	path = third-party/lunasvg
 	url = https://github.com/sammycage/lunasvg.git
 	shallow = true
-[submodule "third-party/gstreamer"]
-	path = third-party/gstreamer
-	url = https://github.com/GStreamer/gstreamer.git
-	shallow = true

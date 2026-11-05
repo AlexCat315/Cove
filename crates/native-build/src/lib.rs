@@ -3,10 +3,9 @@
 //!
 //! Every CMake library is configured into the calling crate's `OUT_DIR` and
 //! linked statically; nothing is looked up in a shared prebuilt directory.
-//! GStreamer is the exception: [`gstreamer`] builds the pinned source once per
-//! build identity into the user cache shared by the official `*-sys` crates,
-//! and [`setup`] is the explicit entry point that installs and discovers the
-//! tools and platform SDKs those builds need.
+//! [`setup`] is the explicit entry point that installs and discovers the tools
+//! and platform SDKs those builds need; FFmpeg is compiled by its own
+//! `*-sys` build script into Cargo's `OUT_DIR`.
 //! [`cmake`] applies the per-target settings the crates share: the Release
 //! profile, static position-independent archives, the Apple deployment target,
 //! the Android NDK toolchain, the wasi-sdk toolchain and the MSVC C runtime.
@@ -14,9 +13,6 @@
 use std::env;
 use std::path::{Path, PathBuf};
 
-pub mod gstreamer;
-pub mod media_notices;
-mod media_provider;
 pub mod setup;
 
 /// Minimum Apple OS version for every native archive.

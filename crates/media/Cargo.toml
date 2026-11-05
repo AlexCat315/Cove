@@ -4,24 +4,22 @@ version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
-description = "Media control, retained frame output and optional GStreamer integration"
+description = "Media control, retained frame output and optional FFmpeg integration"
 
 [features]
 default = []
-gst = ["dep:gstreamer", "dep:gstreamer-app", "dep:gstreamer-video", "dep:gstreamer-audio"]
+ffmpeg = ["dep:ffmpeg-sys-next", "dep:cpal"]
 
 [dependencies]
 cove-logging.workspace = true
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
-gstreamer = { workspace = true, optional = true }
-gstreamer-app = { workspace = true, optional = true }
-gstreamer-video = { workspace = true, optional = true }
-gstreamer-audio = { workspace = true, optional = true }
+ffmpeg-sys-next = { workspace = true, optional = true }
+cpal = { workspace = true, optional = true }
+libc.workspace = true
+
+[target.'cfg(target_os = "android")'.dependencies]
+ndk-context.workspace = true
 
 [lints]
 workspace = true
-
-[[example]]
-name = "headless"
-required-features = ["gst"]

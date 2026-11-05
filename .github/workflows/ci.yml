@@ -54,7 +54,7 @@ jobs:
       - name: Audit source layout and migration mappings
         run: cargo xtask audit --json
   media:
-    # The pinned GStreamer source builds inside the official *-sys build scripts,
+    # FFmpeg and its bindings build inside the `ffmpeg-sys-next` build script,
     # so CI runs the same cargo entry points developers use.
     strategy:
       fail-fast: false
@@ -73,9 +73,9 @@ jobs:
       - name: Prepare native build environment
         run: cargo cove setup --media
       - name: Media control and output tests
-        run: cargo test --locked -p cove-media --features gst --all-targets
+        run: cargo test --locked -p cove-media --features ffmpeg --all-targets
       - name: Video upload tests
-        run: cargo test --locked -p cove-media-rhi --features gst
+        run: cargo test --locked -p cove-media-rhi --features ffmpeg
       - name: Out-of-tree consumer application
         run: |
           cp -R Tools/MediaSmoke "$RUNNER_TEMP/cove-media-consumer"
@@ -85,10 +85,8 @@ jobs:
           cargo build
           cargo test
           cargo run
-      - name: Regenerate license bundle
-        run: cargo cove media notices
   media-windows:
-    # First-run validation of the Windows install and static-build path. Remove
+    # First-run validation of the Windows install and FFmpeg build path. Remove
     # continue-on-error once a Windows host has passed the same checks as media.
     runs-on: windows-2025
     continue-on-error: true
@@ -104,7 +102,7 @@ jobs:
       - name: Prepare native build environment
         run: cargo cove setup --media
       - name: Media control and output tests
-        run: cargo test --locked -p cove-media --features gst --all-targets
+        run: cargo test --locked -p cove-media --features ffmpeg --all-targets
       - name: Out-of-tree consumer application
         run: |
           cp -R Tools/MediaSmoke "$RUNNER_TEMP/cove-media-consumer"

@@ -1,7 +1,6 @@
 //! Cargo needs the Android linker before build scripts run. Setup writes it once;
 //! consumers use ordinary Cargo commands afterwards.
 use crate::Result;
-use serde_json::{Value, json};
 use std::{
     collections::BTreeMap,
     fs,
@@ -75,16 +74,15 @@ pub(crate) fn configure_android(project: &Path, targets: &[String]) -> Result<Op
             environment.insert(key.into(), value);
         }
     }
-    apply(project, &linkers, &environment, &BTreeMap::new())
+    apply(project, &linkers, &environment)
 }
 
-/// Merges into the project's Cargo config: `linkers`/`environment` only fill
-/// missing entries, `owned` keys are rewritten. Returns the path when written.
+/// Merges into the project's Cargo config; `linkers`/`environment` only fill
+/// missing entries. Returns the path when written.
 fn apply(
     project: &Path,
     linkers: &BTreeMap<String, String>,
     environment: &BTreeMap<String, String>,
-    owned: &BTreeMap<String, String>,
 ) -> Result<Option<PathBuf>> {
     let directory = project.join(".cargo");
     fs::create_dir_all(&directory).map_err(|e| e.to_string())?;
@@ -98,7 +96,7 @@ fn apply(
     } else {
         String::new()
     };
-    let configured = merge(&original, linkers, environment, owned)?;
+    let configured = merge(&original, linkers, environment)?;
     if configured != original {
         fs::write(&path, configured)
             .map_err(|e| format!("cannot write {}: {e}", path.display()))?;
@@ -107,85 +105,10 @@ fn apply(
     Ok(None)
 }
 
-/// Points the project's Cargo config at the native media tree that setup just
-/// prepared, so published bindings find it without a build-script hook.
-pub(crate) fn configure_media(project: &Path, report: &Value) -> Result<Option<PathBuf>> {
-    let owned = media_environment(report)?;
-    if owned.is_empty() {
-        return Ok(None);
-    }
-    apply(project, &BTreeMap::new(), &BTreeMap::new(), &owned)
-}
-
-fn media_environment(report: &Value) -> Result<BTreeMap<String, String>> {
-    let prepared = report["native"]
-        .as_object()
-        .into_iter()
-        .flat_map(|native| native.values())
-        .filter(|entry| entry["environment"].is_object())
-        .collect::<Vec<_>>();
-    if prepared.len() > 1 {
-        return Err(
-            "the media environment is one value per project; prepare one target at a time with --target <triple>".into(),
-        );
-    }
-    let mut owned = BTreeMap::new();
-    if let Some(entry) = prepared.first() {
-        for (key, value) in entry["environment"].as_object().expect("environment") {
-            owned.insert(key.clone(), value.as_str().unwrap_or_default().to_string());
-        }
-    }
-    Ok(owned)
-}
-
-/// Reports whether the project config points at a usable native media tree.
-/// A stale value is silent otherwise: Cargo would keep linking the old prefix.
-pub(crate) fn media_state(project: &Path, report: &Value) -> Value {
-    let mut state = json!({"configured": false, "state": "not-configured"});
-    let path = project.join(".cargo/config.toml");
-    let text = fs::read_to_string(&path).unwrap_or_default();
-    let Ok(document) = toml::from_str::<toml::Table>(&text) else {
-        state["state"] = json!("unreadable-config");
-        return state;
-    };
-    let configured = document
-        .get("env")
-        .and_then(toml::Value::as_table)
-        .and_then(|env| env.get("PKG_CONFIG_LIBDIR"))
-        .and_then(|entry| match entry {
-            toml::Value::String(value) => Some(value.clone()),
-            toml::Value::Table(table) => table
-                .get("value")
-                .and_then(toml::Value::as_str)
-                .map(str::to_owned),
-            _ => None,
-        });
-    let Some(configured) = configured else {
-        return state;
-    };
-    let directory = Path::new(&configured);
-    let complete = directory.join("gstreamer-full-1.0.pc").is_file();
-    let expected = report["native"]
-        .as_object()
-        .and_then(|native| native.values().next())
-        .and_then(|entry| entry["prefix"].as_str())
-        .and_then(|prefix| Path::new(prefix).parent().map(|out| out.join("pc")))
-        .filter(|pc| directory.starts_with(pc))
-        .is_some();
-    state["configured"] = json!(configured);
-    state["state"] = json!(match (complete, expected) {
-        (true, true) => "current",
-        (true, false) => "stale-or-other-target",
-        (false, _) => "missing-tree",
-    });
-    state
-}
-
 fn merge(
     original: &str,
     linkers: &BTreeMap<String, String>,
     environment: &BTreeMap<String, String>,
-    owned: &BTreeMap<String, String>,
 ) -> Result<String> {
     let mut document: toml::Table =
         toml::from_str(original).map_err(|e| format!("cannot read Cargo config: {e}"))?;
@@ -207,7 +130,7 @@ fn merge(
                 .or_insert_with(|| toml::Value::String(linker.clone()));
         }
     }
-    if environment.is_empty() && owned.is_empty() {
+    if environment.is_empty() {
         return Ok(original.into());
     }
     let values = document
@@ -219,14 +142,6 @@ fn merge(
         values
             .entry(key)
             .or_insert_with(|| toml::Value::String(value.clone()));
-    }
-    // Setup owns these keys: the native tree moves when its build manifest
-    // changes, so a previous value must not keep pointing at a stale prefix.
-    for (key, value) in owned {
-        let mut entry = toml::Table::new();
-        entry.insert("value".into(), toml::Value::String(value.clone()));
-        entry.insert("force".into(), toml::Value::Boolean(true));
-        values.insert(key.clone(), toml::Value::Table(entry));
     }
     if document == before {
         Ok(original.into())
@@ -255,8 +170,7 @@ mod tests {
             ("x86_64-linux-android".into(), "x64-clang".into()),
         ]);
         let environment = BTreeMap::from([("ANDROID_NDK_HOME".into(), "/sdk/ndk".into())]);
-        let configured =
-            merge(original, &linkers, &environment, &BTreeMap::new()).expect("configure");
+        let configured = merge(original, &linkers, &environment).expect("configure");
         let document: toml::Value = toml::from_str(&configured).expect("Cargo config");
         assert_eq!(
             document["alias"]["check-all"].as_str(),
@@ -279,14 +193,14 @@ mod tests {
         );
         assert_eq!(document["env"]["USER_SETTING"].as_str(), Some("preserved"));
         assert_eq!(
-            merge(&configured, &linkers, &environment, &BTreeMap::new()).expect("second setup"),
+            merge(&configured, &linkers, &environment).expect("second setup"),
             configured
         );
     }
     #[test]
     fn malformed_configuration_is_rejected_before_writing() {
         assert!(
-            merge("[env", &BTreeMap::new(), &BTreeMap::new(), &BTreeMap::new()).is_err(),
+            merge("[env", &BTreeMap::new(), &BTreeMap::new()).is_err(),
             "a broken config must not be rewritten"
         );
     }
@@ -303,8 +217,7 @@ mod tests {
         let (project, _fixture) = project();
         let linkers = BTreeMap::from([("aarch64-linux-android".into(), "/ndk/bin/clang".into())]);
         let environment = BTreeMap::from([("ANDROID_NDK_HOME".into(), "/ndk".into())]);
-        let changed =
-            apply(&project, &linkers, &environment, &BTreeMap::new()).expect("first setup");
+        let changed = apply(&project, &linkers, &environment).expect("first setup");
         let config = project.join(".cargo/config.toml");
         assert_eq!(changed, Some(config.clone()));
         assert!(
@@ -313,80 +226,9 @@ mod tests {
                 .contains("aarch64-linux-android")
         );
         assert_eq!(
-            apply(&project, &linkers, &environment, &BTreeMap::new()).expect("second setup"),
+            apply(&project, &linkers, &environment).expect("second setup"),
             None,
             "an up-to-date config must not be reported as changed"
-        );
-    }
-
-    fn prepared(prefix: &Path) -> Value {
-        json!({"native": {
-            "aarch64-apple-darwin": {
-                "ready": true,
-                "prefix": prefix.join("out/install"),
-                "environment": {
-                    "PKG_CONFIG_LIBDIR": prefix.join("out/pc/abc"),
-                    "PKG_CONFIG_PATH": "",
-                    "PKG_CONFIG_ALL_STATIC": "1",
-                }
-            }
-        }})
-    }
-
-    #[test]
-    fn media_environment_is_written_once_and_repointed_on_the_next_setup() {
-        let (project, _fixture) = project();
-        let first = prepared(Path::new("/cache/tree-one"));
-        let changed = configure_media(&project, &first)
-            .expect("first media setup")
-            .expect("config written");
-        let text = fs::read_to_string(&changed).expect("config");
-        assert!(text.contains("/cache/tree-one/out/pc/abc"), "{text}");
-        assert!(text.contains("force = true"), "{text}");
-        // The native prefix moves with its build manifest; the old value must
-        // not keep the project linked against a stale tree.
-        configure_media(&project, &prepared(Path::new("/cache/tree-two")))
-            .expect("second media setup")
-            .expect("config repointed");
-        let text = fs::read_to_string(&changed).expect("config");
-        assert!(text.contains("/cache/tree-two/out/pc/abc"), "{text}");
-        assert!(!text.contains("tree-one"), "{text}");
-    }
-
-    #[test]
-    fn one_project_config_cannot_hold_two_media_targets() {
-        let (project, _fixture) = project();
-        let report = json!({"native": {
-            "aarch64-apple-darwin": {"environment": {"PKG_CONFIG_LIBDIR": "/a"}},
-            "aarch64-linux-android": {"environment": {"PKG_CONFIG_LIBDIR": "/b"}}
-        }});
-        assert!(
-            configure_media(&project, &report)
-                .expect_err("two targets")
-                .contains("one target at a time")
-        );
-        assert!(
-            !project.join(".cargo/config.toml").exists(),
-            "nothing written"
-        );
-    }
-
-    #[test]
-    fn media_state_names_the_configured_tree_and_its_staleness() {
-        let (project, _fixture) = project();
-        let out = project.join("native/out");
-        fs::create_dir_all(out.join("pc/abc")).expect("pc fixture");
-        let report = prepared(&project.join("native"));
-        configure_media(&project, &report).expect("configured");
-        // Without the .pc file the tree is unusable, not merely stale.
-        assert_eq!(media_state(&project, &report)["state"], "missing-tree");
-        fs::write(out.join("pc/abc/gstreamer-full-1.0.pc"), "Name: gst\n").expect("pc fixture");
-        assert_eq!(media_state(&project, &report)["state"], "current");
-        let other = prepared(Path::new("/somewhere/else"));
-        assert_eq!(
-            media_state(&project, &other)["state"],
-            "stale-or-other-target",
-            "a config from another tree must be visible"
         );
     }
 }

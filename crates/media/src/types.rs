@@ -1,5 +1,5 @@
 use std::fmt;
-#[cfg(any(feature = "gst", target_arch = "wasm32"))]
+#[cfg(any(feature = "ffmpeg", target_arch = "wasm32"))]
 use std::{
     collections::{BTreeMap, VecDeque},
     sync::{Arc, Condvar, Mutex},
@@ -94,7 +94,8 @@ pub enum TrackKind {
 pub struct TrackInfo {
     pub id: String,
     pub kind: TrackKind,
-    pub caps: Option<String>,
+    /// Codec and format description, for example `h264 (High)` or `pcm_s16le 48000 Hz stereo`.
+    pub description: Option<String>,
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum SeekAccuracy {
@@ -169,7 +170,8 @@ pub struct PlayerSnapshot {
     pub tracks: Vec<TrackInfo>,
     pub selected_tracks: Vec<String>,
     pub last_error: Option<MediaError>,
-    pub decoder_elements: Vec<String>,
+    /// Decoder codec names active for the current source.
+    pub decoders: Vec<String>,
 }
 impl Default for PlayerSnapshot {
     fn default() -> Self {
@@ -189,7 +191,7 @@ impl Default for PlayerSnapshot {
             tracks: Vec::new(),
             selected_tracks: Vec::new(),
             last_error: None,
-            decoder_elements: Vec::new(),
+            decoders: Vec::new(),
         }
     }
 }
@@ -225,13 +227,13 @@ pub struct PlayerOptions {
     pub audio: AudioOutput,
 }
 
-#[cfg(any(feature = "gst", target_arch = "wasm32"))]
+#[cfg(any(feature = "ffmpeg", target_arch = "wasm32"))]
 struct EventJournal {
     next: u64,
     capacity: usize,
     events: VecDeque<PlayerEvent>,
 }
-#[cfg(any(feature = "gst", target_arch = "wasm32"))]
+#[cfg(any(feature = "ffmpeg", target_arch = "wasm32"))]
 pub(crate) struct SharedPlayer {
     pub snapshot: Mutex<PlayerSnapshot>,
     pub results: Mutex<BTreeMap<RequestId, Option<CommandOutcome>>>,
@@ -242,7 +244,7 @@ pub(crate) struct SharedPlayer {
     pub result_capacity: usize,
     events: Mutex<EventJournal>,
 }
-#[cfg(any(feature = "gst", target_arch = "wasm32"))]
+#[cfg(any(feature = "ffmpeg", target_arch = "wasm32"))]
 impl SharedPlayer {
     pub fn new(result_capacity: usize, event_capacity: usize) -> Arc<Self> {
         Arc::new(Self {

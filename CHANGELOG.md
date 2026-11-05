@@ -4,6 +4,14 @@
 
 ## Unreleased
 
+- **媒体后端迁移到 FFmpeg（2026-11-05，破坏性）**：
+  - `cove-media` 与 `cove-media-rhi` 的媒体 feature 由 `gst` 改为 `ffmpeg`。播放器、解复用、解码、重采样与 RGBA8 转换改为 `ffmpeg-sys-next 9.0.1`（静态源码构建，LGPL profile），音频设备输出改为 `cpal`；Wasm 不提供媒体后端。
+  - 引擎按播放器拆分为泵线程与控制线程：所有 `AV*` 句柄只属于泵线程，控制线程负责命令路由、请求终态与操作期限；`abort` 通过 FFmpeg 中断回调中止阻塞 I/O，显式关闭可以打断卡住的打开。
+  - 文件、绝对 URI、`Arc<[u8]>` 和自定义 `MediaInput` 统一走 `avformat` 与自定义 AVIO；音频主时钟来自 cpal 回调，无设备或静音输出时退回单调墙钟。
+  - 删除 `third-party/gstreamer` 子模块、GStreamer 构建入口、`media notices` 命令、原生媒体缓存树、pkg-config/`GST_PLUGIN*` 环境注入和对应许可证收集器；`cargo cove setup --media` 改为检查 `make`、`nasm`、`clang`（libclang）以及 Linux 的 pkg-config/ALSA 开发包。
+  - 文档改为 [Docs/media-ffmpeg.md](Docs/media-ffmpeg.md)，许可证说明改为 FFmpeg 静态链接义务；`Tools/MediaSmoke` 改为 FFmpeg 解码能力与控制层冒烟测试。
+  - 验证范围：macOS 本机 media 测试与 RHI 上传测试；Linux、Windows、iOS、Android 已实现但未设备验收。
+
 - **媒体一次性初始化与 Cargo 日常入口（2026-11-05）**：
   - `cargo cove setup --media` 成为唯一前置命令：检查并按平台补齐 CMake、Ninja、Python/Meson、pkg-config、Bison/Flex 以及编译器与平台 SDK（macOS 走 Homebrew 与 Command Line Tools，Windows 走 winget 与 MSYS2 并自动恢复 `vcvars` 环境，Linux 走发行版包管理器；Android 按需安装 cmdline-tools、platform/build-tools、固定 SHA-256 的 NDK 与 JDK 21）。`--check`、`--dry-run`、`--target` 用于诊断与交叉准备。
   - 原生 GStreamer 构建移入官方 `*-sys` crate 的构建脚本：按目标身份哈希使用用户级缓存目录、并发加锁避免重复构建、隔离 pkg-config 后写入 Cargo 链接参数。应用侧不需要 `[patch]`、额外环境变量，也不需要先跑构建示例；日常入口恢复为 `cargo build` / `cargo test` / `cargo run`。
@@ -15,7 +23,7 @@
 
 - **媒体许可证声明（2026-11-05）**：补齐 GStreamer 及原生传递依赖的许可证原文、Rust 上游补充许可和静态 LGPL 分发说明；源码构建自动生成按目标收集的第三方通知、版本、许可和构建记录，遇到缺失原文或未登记项目时报错。固定 profile 显式关闭 GPL 选项；产品级对应源码、应用重新链接材料及其他平台发行验收仍按分发说明准备。
 
-- **原生媒体基础（2026-11-04）**：新增可选 `cove-media` / `cove-media-rhi`，提供 GStreamer Player、自有管线端点、有界状态/请求与帧订阅、合作取消和保留帧的 CPU→RHI 上传。固定 GStreamer 1.28.8 源码，加入隔离 pkg-config 的静态构建入口与五平台配方。macOS 已验证真实媒体控制、Metal 像素读回和旧纹理生命周期；VideoView、Browser、硬件共享与其他平台设备验收仍待完成。详见 `Docs/media-gstreamer.md` §16.3。
+- **原生媒体基础（2026-11-04）**：新增可选 `cove-media` / `cove-media-rhi`，提供 GStreamer Player、自有管线端点、有界状态/请求与帧订阅、合作取消和保留帧的 CPU→RHI 上传。固定 GStreamer 1.28.8 源码，加入隔离 pkg-config 的静态构建入口与五平台配方。macOS 已验证真实媒体控制、Metal 像素读回和旧纹理生命周期；VideoView、Browser、硬件共享与其他平台设备验收仍待完成。该后端已在下方 Unreleased 记录中被 FFmpeg 取代。
 
 - **List / Tree / SwipeList 排版修复与 Gallery 卡片化（2026-11-04，界面）**：
   - `ListRow`：图标/标题/尾部槽之间补上 Swift 的 8pt 间距；标题不再硬编码 `on_surface`，选中行由行样式统一改墨为 `on_accent`；副标题改为继承行墨并降低透明度，避免强调色带上的深色副标题。选中行尾部 chevron 也继承行墨。

@@ -61,29 +61,20 @@ const BASE: &[Tool] = &[
 ];
 const MEDIA: &[Tool] = &[
     Tool {
-        name: "python",
-        candidates: &["python3", "python"],
-        minimum: (3, 10, 0),
+        name: "make",
+        candidates: &["make", "gmake"],
+        minimum: (3, 81, 0),
     },
     Tool {
-        name: "meson",
-        candidates: &["meson"],
-        minimum: (1, 4, 0),
+        name: "nasm",
+        candidates: &["nasm"],
+        minimum: (2, 13, 0),
     },
+    // bindgen links libclang to generate the FFmpeg bindings.
     Tool {
-        name: "pkg-config",
-        candidates: &["pkg-config", "pkgconf"],
-        minimum: (0, 29, 0),
-    },
-    Tool {
-        name: "bison",
-        candidates: &["bison", "win_bison"],
-        minimum: (2, 4, 0),
-    },
-    Tool {
-        name: "flex",
-        candidates: &["flex", "win_flex"],
-        minimum: (2, 5, 31),
+        name: "clang",
+        candidates: &["clang"],
+        minimum: (9, 0, 0),
     },
 ];
 
@@ -129,12 +120,8 @@ pub fn setting(name: &str) -> io::Result<Option<String>> {
 
 fn extra_paths() -> io::Result<Vec<PathBuf>> {
     let mut paths = Vec::new();
-    let venv = cache_dir()?
-        .join("tools")
-        .join(if cfg!(windows) { "Scripts" } else { "bin" });
-    paths.push(venv);
     for prefix in ["/opt/homebrew", "/usr/local"] {
-        for tail in ["opt/bison/bin", "opt/flex/bin", "bin"] {
+        for tail in ["opt/nasm/bin", "bin"] {
             paths.push(Path::new(prefix).join(tail));
         }
     }
@@ -146,7 +133,7 @@ fn extra_paths() -> io::Result<Vec<PathBuf>> {
                     "Microsoft/WindowsApps",
                     "CMake/bin",
                     "Git/cmd",
-                    "Programs/Python/Python313",
+                    "LLVM/bin",
                 ] {
                     paths.push(PathBuf::from(&root).join(tail));
                 }
@@ -200,11 +187,7 @@ pub fn command(program: &str) -> io::Result<Command> {
         .filter(|p| p.is_file());
     let path = preferred
         .or(find(program)?)
-        .or(if program == "bison" {
-            find("win_bison")?
-        } else if program == "flex" {
-            find("win_flex")?
-        } else if program == "pkg-config" {
+        .or(if program == "pkg-config" {
             find("pkgconf")?
         } else {
             None
@@ -281,9 +264,6 @@ pub fn run(options: &Options) -> io::Result<Value> {
     if targets.is_empty() {
         targets.push(host_triple()?);
     }
-    for target in &targets {
-        crate::gstreamer::platform(target)?;
-    }
     sdk::validate(host, &targets)?;
     let tools: Vec<_> = BASE
         .iter()
@@ -320,9 +300,6 @@ pub fn run(options: &Options) -> io::Result<Value> {
         let mut saved = state()?;
         sdk::prepare(host, &targets, &mut saved)?;
         save(&saved)?;
-        if options.media {
-            prepare_python_tools()?;
-        }
         report = tools
             .iter()
             .map(|t| inspect(*t))
@@ -331,34 +308,12 @@ pub fn run(options: &Options) -> io::Result<Value> {
     let compiler = sdk::inspect_compiler(host)?;
     let sdk = sdk::check(host, &targets)?;
     let ready = report.iter().all(|r| r["ready"] == true) && compiler && sdk;
-    let mut native = serde_json::Map::new();
-    if options.media && ready {
-        for target in &targets {
-            if options.check {
-                let prefix = crate::gstreamer::cached_build(target)?.prefix();
-                native.insert(
-                    target.clone(),
-                    json!({
-                        "ready": prefix.join("lib/pkgconfig/gstreamer-full-1.0.pc").is_file(),
-                        "prefix": prefix,
-                    }),
-                );
-            } else {
-                let (build, environment) = crate::gstreamer::prepare(target)?;
-                native.insert(
-                    target.clone(),
-                    json!({"ready":true,"prefix":build.prefix(),"environment":environment}),
-                );
-            }
-        }
-    }
     let result = json!({
         "ready": ready,
         "tools": report,
         "compiler": compiler,
         "sdk": sdk,
         "targets": targets,
-        "native": native,
     });
     if !options.check && ready {
         let mut saved = state()?;
@@ -381,7 +336,7 @@ pub fn run(options: &Options) -> io::Result<Value> {
 pub fn installation_plan(host: Host, media: bool, targets: &[String]) -> Value {
     json!({"host":format!("{host:?}"),"media":media,"targets":targets,
         "manager":match host {Host::Mac=>"Homebrew and Apple softwareupdate / xcodebuild",Host::Windows=>"WinGet, MSYS2 and Visual Studio Installer",Host::Linux=>"apt-get / dnf / pacman / zypper / apk"},
-        "python_environment":"user cache/Cove/tools (venv)","requires_elevation":true,
+        "requires_elevation":true,
         "sdk":"host compiler/SDK; Android SDK+NDK for android targets; full Xcode for iOS"})
 }
 fn save(value: &Value) -> io::Result<()> {
@@ -412,7 +367,7 @@ fn install_host(host: Host, media: bool) -> io::Result<()> {
             let mut brew = command("brew")?;
             brew.args(["install", "cmake", "ninja", "git"]);
             if media {
-                brew.args(["python@3.13", "pkgconf", "bison", "flex"]);
+                brew.args(["nasm"]);
             }
             checked(&mut brew)?;
         }
@@ -423,16 +378,13 @@ fn install_host(host: Host, media: bool) -> io::Result<()> {
                 }
             }
             if media {
-                if inspect(MEDIA[0])?["ready"] != true {
-                    winget_install("Python.Python.3.13", None)?;
-                }
                 let bash = windows_drive().join("msys64/usr/bin/bash.exe");
                 if !bash.is_file() {
                     winget_install("MSYS2.MSYS2", None)?;
                 }
                 checked(Command::new(bash).env("MSYSTEM", "MSYS").args([
                     "-lc",
-                    "pacman -Sy --needed --noconfirm bison flex pkgconf ninja",
+                    "pacman -Sy --needed --noconfirm make nasm clang ninja",
                 ]))?;
             } else if inspect(BASE[2])?["ready"] != true {
                 winget_install("Ninja-build.Ninja", None)?;
@@ -547,46 +499,28 @@ fn linux_packages(media: bool) -> io::Result<(&'static str, Vec<&'static str>)> 
             if media {
                 packages.extend(match manager {
                     "apt-get" => vec![
-                        "python3",
-                        "python3-venv",
-                        "python3-pip",
                         "pkg-config",
-                        "bison",
-                        "flex",
                         "libasound2-dev",
+                        "nasm",
+                        "clang",
+                        "libclang-dev",
                     ],
                     "dnf" => vec![
-                        "python3",
-                        "python3-pip",
                         "pkgconf-pkg-config",
-                        "bison",
-                        "flex",
                         "alsa-lib-devel",
+                        "nasm",
+                        "clang",
+                        "clang-devel",
                     ],
-                    "pacman" => vec![
-                        "python",
-                        "python-pip",
-                        "pkgconf",
-                        "bison",
-                        "flex",
-                        "alsa-lib",
-                    ],
+                    "pacman" => vec!["pkgconf", "alsa-lib", "nasm", "clang"],
                     "zypper" => vec![
-                        "python3",
-                        "python3-pip",
                         "pkgconf-pkg-config",
-                        "bison",
-                        "flex",
                         "alsa-devel",
+                        "nasm",
+                        "clang",
+                        "clang-devel",
                     ],
-                    _ => vec![
-                        "python3",
-                        "py3-pip",
-                        "pkgconf",
-                        "bison",
-                        "flex",
-                        "alsa-lib-dev",
-                    ],
+                    _ => vec!["pkgconf", "alsa-lib-dev", "nasm", "clang", "clang-dev"],
                 });
             }
             return Ok((manager, packages));
@@ -595,36 +529,6 @@ fn linux_packages(media: bool) -> io::Result<(&'static str, Vec<&'static str>)> 
     Err(io::Error::other(
         "no supported Linux package manager (apt-get, dnf, pacman, zypper, apk)",
     ))
-}
-fn prepare_python_tools() -> io::Result<()> {
-    let needs = MEDIA
-        .iter()
-        .filter(|t| ["meson"].contains(&t.name))
-        .chain(BASE.iter().filter(|t| ["cmake", "ninja"].contains(&t.name)))
-        .any(|t| inspect(*t).map_or(true, |r| r["ready"] != true));
-    if !needs {
-        return Ok(());
-    }
-    let python = inspect(MEDIA[0])?["path"]
-        .as_str()
-        .map(PathBuf::from)
-        .ok_or_else(|| io::Error::other("Python >=3.10 installation failed"))?;
-    let directory = cache_dir()?.join("tools");
-    checked(Command::new(python).args(["-m", "venv"]).arg(&directory))?;
-    let python = directory.join(if cfg!(windows) {
-        "Scripts/python.exe"
-    } else {
-        "bin/python"
-    });
-    checked(Command::new(python).args([
-        "-m",
-        "pip",
-        "install",
-        "--disable-pip-version-check",
-        "meson>=1.4,<2",
-        "ninja>=1.8,<2",
-        "cmake>=3.20,<5",
-    ]))
 }
 pub(super) fn privileged(program: &str) -> io::Result<Command> {
     let root = Command::new("id")
@@ -682,10 +586,10 @@ mod tests {
     #[test]
     fn accepts_real_tool_version_formats() {
         for (text, expected) in [
-            ("bison (GNU Bison) 3.8.2", (3, 8, 2)),
-            ("Python 3.13.2", (3, 13, 2)),
-            ("1.4.0", (1, 4, 0)),
-            ("flex 2.6.4", (2, 6, 4)),
+            ("GNU Make 4.4.1", (4, 4, 1)),
+            ("NASM version 2.16.01 compiled on Apr 21 2024", (2, 16, 1)),
+            ("cygwin32-make 3.81", (3, 81, 0)),
+            ("clang version 18.1.8", (18, 1, 8)),
             ("cmake version 4.0.1", (4, 0, 1)),
         ] {
             assert_eq!(version(text), Some(expected));

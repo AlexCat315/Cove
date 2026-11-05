@@ -4,26 +4,15 @@ Cove 自有代码按 [Apache License 2.0](LICENSE) 提供。第三方源码、�
 
 ## 可选原生媒体
 
-固定源码：GStreamer **1.28.8**，revision `1b2a95a1b72787cda146b46df9605b168e5b683b`。原生传递依赖由该 revision 的 Meson wraps 固定；Rust 依赖由 `Cargo.lock` 固定。以下为当前 profile 的声明，实际构建清单随目标平台生成。
+`cove-media` 的 `ffmpeg` feature 通过 `ffmpeg-sys-next 9.0.1` 从 FFmpeg `release/9.0` 源码静态编译。构建启用 `avcodec`、`avfilter`、`avformat`、`swresample`、`swscale`，关闭 `gpl`、`version3`、`nonfree`，不自动探测外部库。Rust 依赖由 `Cargo.lock` 固定。
 
 | 组件 | 许可证及原文 |
 | --- | --- |
-| GStreamer core、base、good | LGPL-2.1-or-later；[core](LICENSES/media/native/gstreamer/COPYING)、[base](LICENSES/media/native/gst-plugins-base/COPYING)、[good](LICENSES/media/native/gst-plugins-good/COPYING) |
-| GStreamer bad、codecparsers | [LGPL-2.1-or-later](LICENSES/media/native/gst-plugins-bad/COPYING)，内嵌 dboolhuff 保留 [BSD 条款和专利授权](LICENSES/media/native/gst-plugins-bad/gst-libs/gst/codecparsers/) |
-| GLib 2.86.3、GVDB | [LGPL-2.1-or-later](LICENSES/media/native/glib/COPYING)，附带 [GLib 各文件的其他许可证](LICENSES/media/native/glib/LICENSES/)；[GVDB](LICENSES/media/native/gvdb/COPYING) |
-| proxy-libintl 0.5（Meson 版本字段为 `1`） | [LGPL-2.0-or-later](LICENSES/media/native/proxy-libintl/COPYING) |
-| PCRE2 10.47、SLJIT | [BSD-3-Clause WITH PCRE2-exception，另含 SLJIT 的 BSD 条款](LICENSES/media/native/pcre2/LICENCE.md) |
-| libffi（Meson 3.2.9999，wrap 3.2.9999.5） | [MIT](LICENSES/media/native/libffi/LICENSE) |
-| zlib 1.3.1 | [Zlib](LICENSES/media/native/zlib/LICENSE) |
-| Khronos GL headers 2019.1.0 | [原始版权、许可和免责注释](LICENSES/media/native/gl-headers/) |
-| Windows DirectX-Headers、DirectXMath（启用对应 fallback 时） | MIT；[DirectX-Headers](LICENSES/media/native/directx-headers/LICENSE)、[DirectXMath](LICENSES/media/native/directxmath/LICENSE)，构建时从实际启用的源码目录收集 |
-| 官方 GStreamer Rust 绑定、GLib Rust 绑定及传递依赖 | 按每个 crate 的声明收集全文；并非统一采用 LGPL。包括 MIT / Apache-2.0、Unicode-3.0、LLVM exception 等附加条款 |
+| FFmpeg 9.0（libavcodec、libavfilter、libavformat、libavutil、libswresample、libswscale） | LGPL-2.1-or-later，不启用 GPL/version3/nonfree 组件；原文为源码树中的 `COPYING.LGPLv2.1`、`COPYING.LGPLv3` 及逐文件版权声明 |
+| `ffmpeg-sys-next` 9.0.1 | WTFPL；绑定在构建时生成 |
+| `cpal` 0.18.2 及其平台后端 | Apache-2.0；各平台使用 CoreAudio、WASAPI、ALSA 或 AAudio 等系统 API |
 
-完整原文及来源规则见 [LICENSES/media](LICENSES/media/README.md)。`glib/LICENSES/` 中保留了上游测试、工具等代码的许可证文本；目录内存在某种许可证，不表示当前应用链接了对应代码。
-
-构建器自动在 `<native-out>/install/share/licenses/cove-media/` 写入第三方声明、逐组件原文、版本、Cargo 校验信息、Meson 项目和构建记录。应将该目录随使用媒体功能的二进制一起分发。
-
-静态链接 LGPL 还须提供对应源码及重新链接所需材料；单独附带本文件或“关于”页面不能替代这些材料。具体操作见 [媒体分发说明](Docs/media-licensing.md)。当前 profile 显式关闭 GPL 选项、ugly 和 gst-libav；增加插件或外部库后须更新实际清单，不能按插件分组名称推断许可证。
+FFmpeg 源码与原文在首次构建时下载到 Cargo 的 `OUT_DIR`，不保存在本仓库。分发静态链接 FFmpeg 的二进制时，须同时提供对应源码、构建参数与重新链接材料；单独附带本文件或“关于”页面不能替代这些材料。具体操作见 [媒体分发说明](Docs/media-licensing.md)。
 
 ## 其他组件
 

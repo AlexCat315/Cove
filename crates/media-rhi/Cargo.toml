@@ -8,7 +8,7 @@ description = "Retained media frame upload and Cove RHI presentation"
 
 [features]
 default = []
-gst = ["cove-media/gst"]
+ffmpeg = ["cove-media/ffmpeg"]
 
 [dependencies]
 cove-media.workspace = true

@@ -6,9 +6,12 @@ pub use frame::*;
 pub use source::*;
 pub use types::*;
 
-#[cfg(all(feature = "gst", not(target_arch = "wasm32")))]
+#[cfg(all(feature = "ffmpeg", not(target_arch = "wasm32")))]
+mod engine;
+#[cfg(all(feature = "ffmpeg", not(target_arch = "wasm32")))]
 mod native;
-#[cfg(all(feature = "gst", not(target_arch = "wasm32")))]
+#[cfg(all(feature = "ffmpeg", not(target_arch = "wasm32")))]
 pub use native::{MediaContext, Player};
-#[cfg(all(feature = "gst", not(target_arch = "wasm32")))]
-pub mod gst;
+/// Advanced entry point: the raw FFmpeg bindings plus retained CPU frame storage.
+#[cfg(all(feature = "ffmpeg", not(target_arch = "wasm32")))]
+pub mod ffmpeg;

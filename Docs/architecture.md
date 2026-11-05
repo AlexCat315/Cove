@@ -92,4 +92,4 @@ cargo test -p cove-graphics
 
 ## 后续能力设计
 
-[音视频与 GStreamer 集成设计](media-gstreamer.md)记录 Rust 媒体能力的公共接口、可选模块、RHI/宿主适配、平台工作项和验证门禁；该文档为设计草案，不代表媒体接口已实现。
+[音视频与 FFmpeg 集成设计](media-ffmpeg.md)记录 Rust 媒体能力的公共接口、可选模块、RHI 适配、构建要求与平台状态。

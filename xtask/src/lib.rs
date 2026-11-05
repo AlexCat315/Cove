@@ -26,7 +26,7 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Command {
-    /// Prepare native build tools and SDKs. Does not compile GStreamer.
+    /// Prepare native build tools and SDKs. Does not compile FFmpeg.
     Setup {
         #[arg(long)]
         media: bool,
@@ -59,21 +59,6 @@ enum Command {
     Devices {
         #[arg(value_enum)]
         platform: Platform,
-    },
-    /// Maintain the source-built native media tree.
-    Media {
-        #[command(subcommand)]
-        action: MediaAction,
-    },
-}
-
-#[derive(Subcommand)]
-enum MediaAction {
-    /// Regenerate the license bundle inside the cached native prefix.
-    Notices {
-        /// Defaults to the host target.
-        #[arg(long)]
-        target: Option<String>,
     },
 }
 
@@ -229,12 +214,6 @@ fn execute(cli: Cli) -> Result<()> {
                 if let Some(path) = setup_config::configure_android(&project, &targets)? {
                     report["cargo_config_updated"] = path.display().to_string().into();
                 }
-                if media && let Some(path) = setup_config::configure_media(&project, &report)? {
-                    report["cargo_config_updated"] = path.display().to_string().into();
-                }
-            }
-            if media {
-                report["media_environment"] = setup_config::media_state(&project, &report);
             }
             println!(
                 "{}",
@@ -275,27 +254,6 @@ fn execute(cli: Cli) -> Result<()> {
             Platform::Android => android::devices(),
             Platform::Ios => apple::devices(),
             _ => Err("devices lists android or ios targets".into()),
-        },
-        Command::Media { action } => match action {
-            MediaAction::Notices { target } => {
-                let target = match target {
-                    Some(target) => target,
-                    None => cove_native_build::setup::host_triple().map_err(|e| e.to_string())?,
-                };
-                let build = cove_native_build::gstreamer::cached_build(&target)
-                    .map_err(|e| e.to_string())?;
-                if !build.out_dir.join("build-manifest.txt").is_file() {
-                    return Err(format!(
-                        "no cached native media build for {target}; build a crate with the gst feature first"
-                    ));
-                }
-                build.write_notices().map_err(|e| e.to_string())?;
-                println!(
-                    "{}",
-                    build.prefix().join("share/licenses/cove-media").display()
-                );
-                Ok(())
-            }
         },
     }
 }

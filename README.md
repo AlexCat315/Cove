@@ -21,7 +21,7 @@ cargo run --package cove-rust-counter --locked
 | `examples/` | Gallery、Counter、移动示例 |
 | `xtask/` | 应用打包、签名、安装、迁移审计与原生构建环境初始化 |
 | `Templates/app/` | `cargo-generate` 应用模板 |
-| `third-party/` | 原生依赖子模块；CMake 库编译到 crate `OUT_DIR`，GStreamer 按构建指纹编译到用户缓存 |
+| `third-party/` | 原生依赖子模块；CMake 库编译到 crate `OUT_DIR`，FFmpeg 由 `ffmpeg-sys-next` 构建脚本编译到 `OUT_DIR` |
 
 crate 使用 `src/`、`tests/`、`native/`、`resources/`；`build.rs` 位于 crate 根目录。性能关键的原生内核保留 C。
 
@@ -34,11 +34,11 @@ cargo test --workspace --locked --no-fail-fast -- --test-threads=1
 cargo xtask audit --json
 ```
 
-媒体功能按 `gst` feature 选择，首次使用前初始化一次原生构建环境，之后沿用普通 Cargo 命令：
+媒体功能按 `ffmpeg` feature 选择，首次使用前初始化一次原生构建环境，之后沿用普通 Cargo 命令：
 
 ```sh
 cargo cove setup --media
-cargo test --locked -p cove-media --features gst --all-targets
+cargo test --locked -p cove-media --features ffmpeg --all-targets
 ```
 
 `cargo cove setup --media --check` 只报告工具与 SDK 状态，`--dry-run` 只输出安装计划。
