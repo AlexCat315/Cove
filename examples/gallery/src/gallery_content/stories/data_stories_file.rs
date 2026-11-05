@@ -480,7 +480,7 @@ impl View for TreeStory {
                 },
             )
             .options(options)
-            .frame_size(360.0, 280.0)
+            .frame_height(250.0)
             .debug_name("tree-control"),
         );
 
@@ -1308,7 +1308,7 @@ impl View for SectionedListStory {
             )
             .selection(Selection::single(self.selection.binding()))
             .sticky_headers(true)
-            .row_height(Some(36.0))
+            .row_height(Some(44.0))
             .frame_height(260.0)
             .debug_name("sectioned-list"),
         );

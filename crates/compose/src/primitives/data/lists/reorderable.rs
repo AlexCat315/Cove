@@ -355,11 +355,14 @@ where
                 let item = self.data.get(index)?.clone();
                 let id = (self.id_of)(&item);
                 let is_dragging = dragging.as_ref() == Some(&id);
+                let is_last = index + 1 == count;
                 let label = self.handle_label(index);
                 let content = (self.row_content)(
                     &item,
                     RowState {
-                        is_dragging,
+                        // The placeholder is only a dimmed source row; only
+                        // the lifted copy reads as the row in motion.
+                        is_dragging: false,
                         ..RowState::default()
                     },
                 );
@@ -368,6 +371,7 @@ where
                     row_stride,
                     row_height,
                     is_dragging,
+                    is_last,
                     handle: ReorderHandle {
                         index,
                         count,
@@ -549,6 +553,7 @@ struct ReorderRowSlot<Id: CollectionId> {
     row_stride: f32,
     row_height: f32,
     is_dragging: bool,
+    is_last: bool,
     handle: ReorderHandle<Id>,
     content: AnyView,
 }
@@ -577,6 +582,27 @@ impl<Id: CollectionId> PrimitiveView for ReorderRowSlot<Id> {
         node.set_corner_radius(6.0);
         node.set_opacity(if self.is_dragging { 0.35 } else { 1.0 });
         node.set_is_hit_testable(false);
+        // A hairline between rows gives the list the same grouped rhythm as
+        // `List`; the lifted placeholder keeps a clean edge while it moves.
+        if !self.is_dragging && !self.is_last {
+            let weak = node.downgrade();
+            node.update_draw(false, move |list, origin| {
+                let Some(owner) = Node::upgrade(&weak) else {
+                    return;
+                };
+                let frame = owner.frame();
+                let color = theme_for_node(&owner).colors.divider;
+                let _ = list.add_rect(
+                    cove_core::Rect::new(
+                        origin.x + 12.0,
+                        origin.y + frame.height - 0.5,
+                        (frame.width - 12.0).max(0.0),
+                        0.5,
+                    ),
+                    color,
+                );
+            });
+        }
     }
 
     fn children(&self, _node: &Node) -> Vec<AnyView> {
@@ -948,12 +974,9 @@ impl<Id: CollectionId> PrimitiveView for ReorderPreviewHost<Id> {
                 None,
             )
             .semantic_background(crate::theme::SemanticColorRef::surface())
-            .corner_radius(6.0)
-            .semantic_border(
-                crate::theme::SemanticColorRef::accent().opacity(0.35),
-                1.0,
-            )
-            .shadow(cove_core::Color::from_rgba8(0, 0, 0, 71), 0.0, 4.0, 12.0)
+            .corner_radius(8.0)
+            .semantic_border(crate::theme::SemanticColorRef::border(), 1.0)
+            .shadow(cove_core::Color::from_rgba8(0, 0, 0, 56), 0.0, 8.0, 24.0)
             .modifier(cove_composition::LayoutDebugModifier::debug_name(
                 "reorder-preview",
             )),

@@ -497,8 +497,8 @@ where
                         AnyView::new(
                             Text::new(title.clone())
                                 .line_limit(Some(1))
-                                .semantic_font(SemanticFontRef::caption())
-                                .semantic_foreground(SemanticColorRef::on_surface_muted()),
+                                .semantic_font(SemanticFontRef::label())
+                                .semantic_foreground(SemanticColorRef::on_surface_variant()),
                         ),
                     )
                     .padding_insets(if touch {
@@ -524,7 +524,7 @@ where
                 AnyView::new(
                     Text::new(text.clone())
                         .semantic_font(SemanticFontRef::caption())
-                        .semantic_foreground(SemanticColorRef::on_surface_muted())
+                        .semantic_foreground(SemanticColorRef::on_surface_variant())
                         .padding_edges(if touch { 16.0 } else { 10.0 }, 0.0)
                         .frame_height(height),
                 )
@@ -541,6 +541,9 @@ where
             let id = (id_of)(item);
             let selected = core.selection.contains(&id);
             let view = content(item, RowState::selected(selected));
+            // A header, footer or the end of the stream closes the group, so
+            // the last row of a section paints no trailing rule.
+            let shows_separator = matches!(rows.get(position + 1), Some(Entry::Item(_)));
             let activate = core.clone();
             let activate_id = id.clone();
             let tap = core.clone();
@@ -548,6 +551,7 @@ where
                 id: 0,
                 is_selected: selected,
                 row_height: height,
+                shows_separator,
                 on_activate: Rc::new(move || activate.activate(activate_id.clone())),
                 on_tap: Some(Rc::new(move |modifiers| {
                     if touch {

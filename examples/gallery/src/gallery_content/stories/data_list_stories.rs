@@ -8,7 +8,7 @@ use cove_composition::Scope;
 use cove_core::State;
 use cove_core::scene::{Align, FlexDirection, Justify, Wrap};
 use cove_ui_compose::modifiers::interaction::AccessibilityExt;
-use cove_ui_compose::modifiers::layout::LayoutFrameExt;
+use cove_ui_compose::modifiers::layout::{FlexExt, LayoutFrameExt, PaddingExt};
 use cove_ui_compose::primitives::controls::fields::slider::Slider;
 use cove_ui_compose::primitives::data::lists::RowState;
 use cove_ui_compose::primitives::data::lists::{
@@ -105,7 +105,7 @@ impl View for ListStory {
                             .options(
                                 ListRowOptions::new()
                                     .subtitle(subtitle)
-                                    .disclosure(is_selected),
+                                    .disclosure(true),
                             )
                             .leading(
                                 Icon::semantic_with_ref(
@@ -121,7 +121,7 @@ impl View for ListStory {
             .selection(Selection::single(self.selection.binding()))
             .row_height(52.0)
             .on_activate(move |id: &usize| activated.set(Some(*id)))
-            .frame_size(360.0, 312.0)
+            .frame_height(260.0)
             .debug_name("list-control"),
         );
         AnyView::new(StorySection::new(
@@ -189,16 +189,20 @@ impl View for ReorderableStory {
             ReorderableList::new(
                 self.items.get(),
                 |item: &String| item.clone(),
-                |item: &String, state: RowState| {
-                    let is_dragging = state.is_dragging;
-
-                    AnyView::new(ListRow::new(item.clone()).options(
-                        ListRowOptions::new().subtitle(if is_dragging {
-                            "Moving"
-                        } else {
-                            "Drag to reorder"
-                        }),
-                    ))
+                |item: &String, _state: RowState| {
+                    AnyView::new(
+                        AnyView::new(BoxView::new(
+                            FlexDirection::Row,
+                            Align::Center,
+                            Justify::FlexStart,
+                            Wrap::NoWrap,
+                            8.0,
+                            AnyView::new(TupleView::new(vec![AnyView::new(
+                                Text::new(item.clone()).flex(1.0).frame_min_width(0.0),
+                            )])),
+                        ))
+                        .padding_edges(12.0, 0.0),
+                    )
                 },
             )
             .on_move({
@@ -213,9 +217,9 @@ impl View for ReorderableStory {
                     items.set(current);
                 }
             })
-            .row_height(36.0)
+            .row_height(44.0)
             .is_enabled(self.options.is_enabled)
-            .frame_size(320.0, 220.0)
+            .frame_height(220.0)
             .debug_name("reorderable-control"),
         );
         AnyView::new(StorySection::new(

@@ -1,8 +1,9 @@
 //! Translation of Theme/Styles/Components/DefaultListRowStyle.swift.
 //!
-//! Pointer rows use the shared navigation highlight; touch rows use a
-//! full-width band with an inset separator. The host owns the fixed row slot so
-//! oversized content cannot expand the hit region into a neighbouring row.
+//! Grouped-list row chrome. Rows paint a full-height selection band, a neutral
+//! hover face, and an inset hairline between neighbours. The host owns the
+//! fixed row slot so oversized content cannot expand the hit region into a
+//! neighbouring row.
 use crate::modifiers::layout::{FlexExt, LayoutFrameExt, PaddingExt};
 use crate::modifiers::style::{AppearanceExt, SemanticStyleViewExt};
 use crate::{AnyView, Row, VerticalAlignment, ViewExt};
@@ -34,8 +35,11 @@ impl ListRowStyle for DefaultListRowStyle {
         } else {
             Color::CLEAR
         };
+        // Pointer highlights float inside the row as a rounded band; touch
+        // keeps the edge-to-edge band with a square edge.
         let radius = if touch { 0.0 } else { theme.radius.md };
         let alpha = if configuration.is_enabled { 1.0 } else { 0.55 };
+        let edge = if touch { 16.0 } else { theme.spacing.lg };
         let inner_height =
             (configuration.row_height - 2.0 * if touch { 0.0 } else { theme.spacing.xs }).max(0.0);
         let row = AnyView::new(
@@ -59,10 +63,14 @@ impl ListRowStyle for DefaultListRowStyle {
         } else {
             row
         };
-        let result = selected_ink.padding_edges(if touch { 16.0 } else { theme.spacing.sm }, 0.0);
+        let result = selected_ink.padding_edges(
+            edge,
+            if touch { 0.0 } else { theme.spacing.xs },
+        );
         let separator = ListRowSeparatorModifier {
             color: theme.colors.divider,
-            is_enabled: touch,
+            is_enabled: configuration.shows_separator && !configuration.is_selected,
+            inset: edge,
         };
         AnyView::new(
             result
@@ -82,6 +90,7 @@ impl ListRowStyle for DefaultListRowStyle {
 struct ListRowSeparatorModifier {
     color: Color,
     is_enabled: bool,
+    inset: f32,
 }
 
 impl cove_composition::ViewModifier for ListRowSeparatorModifier {
@@ -102,17 +111,18 @@ impl cove_composition::ViewModifier for ListRowSeparatorModifier {
             parent = current.parent();
         }
         let color = self.color;
+        let inset = self.inset;
         let weak = node.downgrade();
         node.update_draw(rtl, move |list, origin| {
             let Some(owner) = Node::upgrade(&weak) else {
                 return;
             };
             let frame = owner.frame();
-            let left = if rtl { 0.0 } else { 16.0 };
+            let left = if rtl { 0.0 } else { inset };
             let rect = Rect::new(
                 origin.x + left,
                 origin.y + frame.height - 0.5,
-                (frame.width - 16.0).max(0.0),
+                (frame.width - inset).max(0.0),
                 0.5,
             );
             let _ = list.add_rect(rect, color);

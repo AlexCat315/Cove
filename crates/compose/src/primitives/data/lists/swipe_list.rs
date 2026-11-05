@@ -286,6 +286,7 @@ where
                         let row_label = row_label.clone();
                         let row_actions = actions.clone();
                         let row_content = row_content.clone();
+                        let last = scaler_core.ids.last().cloned();
                         let mut stack = FixedVirtualStack::new(
                             scaler_core.ids.to_vec(),
                             height,
@@ -299,6 +300,7 @@ where
                                 AnyView::new(SwipeRow {
                                     label: row_label(item),
                                     is_selected: selected,
+                                    is_last: last.as_ref() == Some(id),
                                     is_enabled,
                                     row_height: height,
                                     action_width,
@@ -357,6 +359,7 @@ where
 struct SwipeRow {
     label: String,
     is_selected: bool,
+    is_last: bool,
     is_enabled: bool,
     row_height: f32,
     /// The action width after text scaling; the extent itself also depends on
@@ -381,6 +384,7 @@ impl View for SwipeRow {
         let row = SwipeRowBody {
             label: self.label.clone(),
             is_selected: self.is_selected,
+            is_last: self.is_last,
             is_enabled: self.is_enabled,
             row_height: self.row_height,
             row_width: 0.0,
@@ -403,6 +407,7 @@ impl View for SwipeRow {
 struct SwipeRowBody {
     label: String,
     is_selected: bool,
+    is_last: bool,
     is_enabled: bool,
     row_height: f32,
     row_width: f32,
@@ -418,6 +423,7 @@ impl Clone for SwipeRowBody {
         Self {
             label: self.label.clone(),
             is_selected: self.is_selected,
+            is_last: self.is_last,
             is_enabled: self.is_enabled,
             row_height: self.row_height,
             row_width: self.row_width,
@@ -556,6 +562,7 @@ impl View for SwipeRowBody {
         let host = AnyView::new(SwipeRowHost {
             label: self.label.clone(),
             is_selected: self.is_selected,
+            is_last: self.is_last,
             is_enabled,
             row_height,
             max_reveal,
@@ -587,6 +594,7 @@ impl View for SwipeRowBody {
 struct SwipeRowHost {
     label: String,
     is_selected: bool,
+    is_last: bool,
     is_enabled: bool,
     row_height: f32,
     max_reveal: f32,
@@ -616,6 +624,26 @@ impl PrimitiveView for SwipeRowHost {
         let reveal_value = self.reveal.get();
         let reveal = self.reveal;
         node.set_corner_radius(6.0);
+        if !self.is_last && !self.is_selected {
+            let rtl = node.resolves_right_to_left();
+            let weak = node.downgrade();
+            node.update_draw(rtl, move |list, origin| {
+                let Some(owner) = Node::upgrade(&weak) else {
+                    return;
+                };
+                let frame = owner.frame();
+                let color = crate::theme::theme_for_node(&owner).colors.divider;
+                let _ = list.add_rect(
+                    cove_core::Rect::new(
+                        origin.x + if rtl { 0.0 } else { 12.0 },
+                        origin.y + frame.height - 0.5,
+                        (frame.width - 12.0).max(0.0),
+                        0.5,
+                    ),
+                    color,
+                );
+            });
+        }
         node.set_cursor(Some(if self.is_enabled {
             SystemCursor::Pointer
         } else {

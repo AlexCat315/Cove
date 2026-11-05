@@ -6,7 +6,7 @@
 use cove_composition::Scope;
 use cove_core::scene::animation::AnimationCurve;
 use cove_core::scene::{Align, FlexDirection, Justify, Wrap};
-use cove_core::{Color, State};
+use cove_core::State;
 use cove_ui_compose::modifiers::layout::{FlexExt, PaddingExt};
 use cove_ui_compose::modifiers::style::AppearanceExt;
 use cove_ui_compose::primitives::feedback::{
@@ -179,7 +179,6 @@ impl View for StorySection {
         let detail = self.detail.clone();
         let content = self.content.clone();
         let card = AnyView::new(ThemeReader::new(move |theme: &Theme| {
-            let shadow = theme.elevation.low.color.unwrap_or(Color::CLEAR);
             AnyView::new(
                 BoxView::new(
                     FlexDirection::Column,
@@ -189,11 +188,10 @@ impl View for StorySection {
                     12.0,
                     content.clone(),
                 )
-                .padding(20.0)
-                .background_color(theme.colors.surface_raised)
+                .padding(18.0)
+                .background_color(theme.colors.surface)
                 .corner_radius(theme.radius.xl)
-                .border_color(theme.colors.border.multiplied_alpha(0.40), 1.0)
-                .shadow(shadow, 0.0, 2.0, 8.0),
+                .border_color(theme.colors.border, 1.0),
             )
         }));
         AnyView::new(
@@ -205,7 +203,9 @@ impl View for StorySection {
                 8.0,
                 AnyView::new(TupleView::new(vec![
                     AnyView::new(
-                        Text::new(title).semantic_foreground(SemanticColorRef::on_surface()),
+                        Text::new(title)
+                            .semantic_font(cove_ui_compose::theme::SemanticFontRef::headline())
+                            .semantic_foreground(SemanticColorRef::on_surface()),
                     ),
                     AnyView::new(
                         Text::new(detail).semantic_foreground(SemanticColorRef::on_surface_muted()),

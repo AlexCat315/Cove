@@ -39,6 +39,7 @@ pub(crate) struct ListRowHost {
     pub id: u64,
     pub is_selected: bool,
     pub row_height: f32,
+    pub shows_separator: bool,
     pub on_activate: Rc<dyn Fn()>,
     pub on_tap: Option<Rc<dyn Fn(cove_platform::KeyModifiers)>>,
     pub content: AnyView,
@@ -223,6 +224,7 @@ impl PrimitiveView for ListRowHost {
             is_hovered: node.attachment::<bool>(ROW_HOVERED).unwrap_or(false),
             is_enabled: true,
             row_height: self.row_height,
+            shows_separator: self.shows_separator,
             theme,
             input,
         })]
@@ -319,6 +321,7 @@ impl<Id: CollectionId> List<Id> {
                 let core = list.core();
                 let target = core.target();
                 let rows = list.row_content.clone();
+                let last = list.ids.last().cloned();
                 let mut stack =
                     FixedVirtualStack::new(list.ids.to_vec(), height, move |id: &Id| {
                         let selected = core.selection.contains(id);
@@ -336,6 +339,7 @@ impl<Id: CollectionId> List<Id> {
                             id: 0,
                             is_selected: selected,
                             row_height: height,
+                            shows_separator: last.as_ref() != Some(id),
                             on_activate: Rc::new(move || activate.activate(activate_id.clone())),
                             on_tap,
                             content: rows(id, RowState::selected(selected)),

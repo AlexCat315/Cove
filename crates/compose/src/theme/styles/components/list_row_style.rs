@@ -20,6 +20,9 @@ pub struct ListRowStyleConfiguration {
     /// *inside* it instead of letting a taller child push the painted row past
     /// its own slot.
     pub row_height: f32,
+    /// Another row follows in the same group, so a hairline belongs under this
+    /// one. The last row of a list or section ends the group instead.
+    pub shows_separator: bool,
     pub theme: Theme,
     pub input: InputCapabilities,
 }

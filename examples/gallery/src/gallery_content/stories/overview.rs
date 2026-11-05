@@ -145,6 +145,10 @@ impl View for MetricCard {
                 x: ChartXDomain::Numeric,
             });
             // A metric sparkline: fixed 0...100 domain, no grid, 2-pt stroke.
+            // A 42-pt trend has no room for tick labels; drawing them stacked
+            // over the plot reads as clipped text.
+            plot.axis.x.is_labeled = false;
+            plot.axis.y.is_labeled = false;
             plot.style = ChartStyle::new(
                 Some(0.0),
                 Some(100.0),
