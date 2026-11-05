@@ -103,11 +103,7 @@ impl View for ListStory {
                     };
                     AnyView::new(
                         ListRow::new(title)
-                            .options(
-                                ListRowOptions::new()
-                                    .subtitle(subtitle)
-                                    .disclosure(true),
-                            )
+                            .options(ListRowOptions::new().subtitle(subtitle).disclosure(true))
                             .leading(
                                 Icon::semantic_with_ref(
                                     ui_icon_catalog::file::file_text(),

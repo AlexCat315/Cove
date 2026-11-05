@@ -49,8 +49,6 @@ jobs:
           else
             cargo test --workspace --locked --no-fail-fast -- --test-threads=1
           fi
-      - name: Headless counter example
-        run: cargo run --locked --manifest-path examples/counter/Cargo.toml
       - name: Audit source layout and migration mappings
         run: cargo xtask audit --json
   media:
@@ -145,9 +143,15 @@ jobs:
           packages: 'platform-tools ndk;30.0.16248370'
       - name: Configure NDK
         run: |
-          ndk_cc="$ANDROID_HOME/ndk/30.0.16248370/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android26-clang"
-          echo "CC_aarch64_linux_android=$ndk_cc" >> "$GITHUB_ENV"
-          echo "AR_aarch64_linux_android=$ANDROID_HOME/ndk/30.0.16248370/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-ar" >> "$GITHUB_ENV"
-          echo "CARGO_TARGET_AARCH64_LINUX_ANDROID_LINKER=$ndk_cc" >> "$GITHUB_ENV"
+          ndk="$ANDROID_HOME/ndk/30.0.16248370"
+          bin="$ndk/toolchains/llvm/prebuilt/linux-x86_64/bin"
+          # The runner ships another NDK, so name the pinned one for the CMake
+          # toolchains in crates/native-build.
+          echo "ANDROID_NDK_HOME=$ndk" >> "$GITHUB_ENV"
+          echo "ANDROID_NDK_ROOT=$ndk" >> "$GITHUB_ENV"
+          echo "CC_aarch64_linux_android=$bin/aarch64-linux-android26-clang" >> "$GITHUB_ENV"
+          echo "CXX_aarch64_linux_android=$bin/aarch64-linux-android26-clang++" >> "$GITHUB_ENV"
+          echo "AR_aarch64_linux_android=$bin/llvm-ar" >> "$GITHUB_ENV"
+          echo "CARGO_TARGET_AARCH64_LINUX_ANDROID_LINKER=$bin/aarch64-linux-android26-clang" >> "$GITHUB_ENV"
       - name: Shared Rust workspace
         run: cargo check --package cove-ui --target aarch64-linux-android --locked

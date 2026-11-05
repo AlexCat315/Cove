@@ -83,6 +83,7 @@ jobs:
           ndk_bin="$ndk/toolchains/llvm/prebuilt/linux-x86_64/bin"
           echo "ANDROID_NDK_HOME=$ndk" >> "$GITHUB_ENV"
           echo "CC_aarch64_linux_android=$ndk_bin/aarch64-linux-android26-clang" >> "$GITHUB_ENV"
+          echo "CXX_aarch64_linux_android=$ndk_bin/aarch64-linux-android26-clang++" >> "$GITHUB_ENV"
           echo "AR_aarch64_linux_android=$ndk_bin/llvm-ar" >> "$GITHUB_ENV"
           echo "CARGO_TARGET_AARCH64_LINUX_ANDROID_LINKER=$ndk_bin/aarch64-linux-android26-clang" >> "$GITHUB_ENV"
       - name: Build workspace for ${{ matrix.target }}

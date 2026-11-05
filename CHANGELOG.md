@@ -4,6 +4,11 @@
 
 ## Unreleased
 
+- **CI 构建修复（2026-11-05）**：
+  - `cove-logging` 在 unix 目标给 `native/logging/Router.c` 补上 `_POSIX_C_SOURCE=200809L`、`_DEFAULT_SOURCE`、`_DARWIN_C_SOURCE`，写法与 `cove-system`、`cove-http` 一致。Linux 用严格 `-std=c11` 编译时，`O_CLOEXEC` 与 `flock` 的声明被特性测试宏隐藏，构建脚本直接报 `undeclared identifier`；macOS、iOS、Android 原本就能编译。已用 `zig cc -target x86_64-linux-gnu` 复现修复前的同一条错误并确认修复后通过，其余仓库自有原生 C 源文件也用同一三元组逐个编译验证。
+  - Android 构建补上 `CXX_aarch64_linux_android`：`crates/imaging/build.rs` 的图像解码桥是 C++ 的 `cc::Build`，而 `cc 1.10` 不读 `ANDROID_NDK_HOME`，缺少该变量时只会去找 NDK 中并不存在的 `aarch64-linux-android-clang++`，于是 `cove-imaging` 构建失败（三个 CMake 依赖自身编译通过）。CI 与 Release 的 `Configure NDK` 步骤同时设置；CI 还把 `ANDROID_NDK_HOME`/`ANDROID_NDK_ROOT` 钉到 r30，此前 runner 预装的 27.3.13750724 会被 CMake 取用，与仓库钉住的版本不一致。
+  - 删除 CI 的 `Headless counter example` 步骤：`examples/counter` 已在 `3212c158` 连同 `zz_shaping_probe` 一起删除，步骤仍指向不存在的 manifest，`cargo run` 会以 `manifest path ... does not exist` 失败；headless 冒烟覆盖由 `cargo test --workspace` 与 `cargo xtask audit` 承担。
+
 - **Tree 拖拽实时重排、参考线样式与几何 API（2026-11-05，破坏性）**：
   - `TreeDragOperations` 改为实时重排：投影只改位移不改数据，展平顺序、布局与命中仍由宿主模型决定，每行按 `(投影槽位 - 自身索引) * (row_height + row_spacing)` 位移，源行降到 0.38 不透明度，其余行用弹簧跟随，松手后模型落位与拖拽中绘制的位置逐行一致、不再二次滑动。删除放置插入线，`Before` / `Inside` / `After` 由行高上下 28% 判定。
   - 位移改为作用在裁剪槽上：新增 `ROW_SHIFT_ANCHOR` 标记与 `ReorderRowShift::anchor`，`FixedVirtualStack` 的 `RowSlot` 在 `update_node` 登记自己为锚点。虚拟化 Tree 的行 `frame` 是父级相对坐标，直接位移会把行推出唯一可见区域导致整行消失；ReorderableList 用自己的绝对定位槽因此未受影响。
