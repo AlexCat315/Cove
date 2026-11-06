@@ -155,15 +155,10 @@ fn install_windows_sdk() -> io::Result<()> {
         "--includeRecommended",
     ];
     if let Some(path) = existing {
+        // `--wait` is bootstrapper-only; VS Installer 4.11+ rejects it on `setup.exe modify`.
         checked(
             Command::new(installer_root.join("setup.exe"))
-                .args([
-                    "modify",
-                    "--quiet",
-                    "--wait",
-                    "--norestart",
-                    "--installPath",
-                ])
+                .args(["modify", "--quiet", "--norestart", "--installPath"])
                 .arg(path)
                 .args(COMPONENTS),
         )

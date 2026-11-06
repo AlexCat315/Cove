@@ -2,6 +2,10 @@ name: Rust workspace
 on: [push, pull_request, workflow_dispatch]
 permissions:
   contents: read
+env:
+  # `cove-media-rhi` and the desktop suite need the Vulkan loader plus a window
+  # system; the loader only advertises VK_KHR_surface when one is present.
+  LINUX_NATIVE_PACKAGES: libvulkan-dev mesa-vulkan-drivers vulkan-validationlayers xvfb libx11-dev libxext-dev libxrandr-dev libxcursor-dev libxi-dev libxss-dev libxtst-dev libwayland-dev libxkbcommon-dev libasound2-dev libpulse-dev
 concurrency:
   group: rust-ci-${{ github.ref }}
   cancel-in-progress: true
@@ -26,6 +30,11 @@ jobs:
         run: rustup toolchain install 1.99.1 --profile minimal --component rustfmt --component clippy
       - uses: ilammy/msvc-dev-cmd@v1
         if: runner.os == 'Windows'
+      - name: Pin MSVC linker
+        # `shell: bash` re-prepends Git's `/usr/bin` at every step, so GNU
+        # coreutils `link.exe` shadows the MSVC linker in PATH lookups.
+        if: runner.os == 'Windows'
+        run: printf 'CARGO_TARGET_X86_64_PC_WINDOWS_MSVC_LINKER=%sbin\\HostX64\\x64\\link.exe\n' "$VCToolsInstallDir" >> "$GITHUB_ENV"
       - uses: actions/cache@v5
         with:
           path: |
@@ -37,7 +46,7 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y libvulkan-dev mesa-vulkan-drivers vulkan-validationlayers xvfb libx11-dev libxext-dev libxrandr-dev libxcursor-dev libxi-dev libxss-dev libxtst-dev libwayland-dev libxkbcommon-dev libasound2-dev libpulse-dev
+          sudo apt-get install -y $LINUX_NATIVE_PACKAGES
       - name: Formatting
         run: cargo fmt --all --check
       - name: Lints
@@ -68,12 +77,22 @@ jobs:
           submodules: recursive
       - name: Rust toolchain
         run: rustup toolchain install 1.99.1 --profile minimal
+      - name: Linux native dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y $LINUX_NATIVE_PACKAGES
       - name: Prepare native build environment
         run: cargo cove setup --media
       - name: Media control and output tests
         run: cargo test --locked -p cove-media --features ffmpeg --all-targets
       - name: Video upload tests
-        run: cargo test --locked -p cove-media-rhi --features ffmpeg
+        run: |
+          if [[ "$RUNNER_OS" == "Linux" ]]; then
+            xvfb-run -a cargo test --locked -p cove-media-rhi --features ffmpeg
+          else
+            cargo test --locked -p cove-media-rhi --features ffmpeg
+          fi
       - name: Out-of-tree consumer application
         run: |
           cp -R Tools/MediaSmoke "$RUNNER_TEMP/cove-media-consumer"

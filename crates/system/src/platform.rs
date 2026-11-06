@@ -42,7 +42,7 @@ impl ProcessPlatform {
                     libc::sigtimedwait(&blocked, std::ptr::null_mut(), &timeout);
                 }
                 libc::pthread_sigmask(libc::SIG_SETMASK, &original, std::ptr::null_mut());
-                return result;
+                result
             }
         }
         #[cfg(not(target_os = "linux"))]
