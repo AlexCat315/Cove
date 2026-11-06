@@ -220,7 +220,20 @@ pub fn guide_flags(depths: &[usize]) -> (Vec<bool>, Vec<Vec<bool>>) {
         while path.len() > depth {
             path.pop();
         }
-        ancestors[index] = path.iter().map(|&row| has_next_sibling[row]).collect();
+        // Column `level` continues the branch of the ancestor at depth
+        // `level + 1`. The root level has no column, so its sibling state must
+        // not shift the descendant columns; an ancestor depth missing from the
+        // path leaves its column broken.
+        let mut columns = vec![false; depth.saturating_sub(1)];
+        for &row in &path {
+            let ancestor_depth = depths[row];
+            if ancestor_depth > 0
+                && let Some(column) = columns.get_mut(ancestor_depth - 1)
+            {
+                *column = has_next_sibling[row];
+            }
+        }
+        ancestors[index] = columns;
         path.push(index);
     }
     (has_next_sibling, ancestors)

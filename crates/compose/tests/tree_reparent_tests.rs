@@ -184,17 +184,41 @@ fn guide_flags_close_a_branch_at_its_last_sibling() {
         Vec::<bool>::new(),
         "a root has no ancestor columns"
     );
-    assert_eq!(ancestors[1], vec![true], "A's column continues past A1");
+    assert_eq!(
+        ancestors[1],
+        Vec::<bool>::new(),
+        "A1 owns the only column a level-1 row draws, so the root's sibling state is not a column"
+    );
     assert_eq!(
         ancestors[2],
-        vec![true, true],
-        "both A's and A1's columns continue past A1a"
+        vec![true],
+        "A1's column continues past A1a; the root level draws no column of its own"
     );
-    assert_eq!(ancestors[3], vec![true], "A1's column closes at A2");
+    assert_eq!(
+        ancestors[3],
+        Vec::<bool>::new(),
+        "A2 closes its own branch, so it has no ancestor column either"
+    );
     assert_eq!(
         ancestors[4],
         Vec::<bool>::new(),
         "B has no ancestor columns"
+    );
+}
+
+#[test]
+fn guide_flags_index_columns_by_ancestor_depth() {
+    // `A → {A1 → {A1a → A1aI}, A2}` and `B`.
+    let (has_next_sibling, ancestors) = guide_flags(&[0, 1, 2, 3, 1, 0]);
+    assert_eq!(
+        has_next_sibling,
+        vec![true, true, false, false, false, false],
+        "A and A1 continue below, every last sibling does not"
+    );
+    assert_eq!(
+        ancestors[3],
+        vec![true, false],
+        "column 0 is A1's continuation and column 1 is A1a's, which closes at A2"
     );
 }
 
@@ -209,7 +233,7 @@ fn guide_flags_move_with_the_projection() {
     );
     assert_eq!(
         projection.ancestor_has_next_siblings[4],
-        vec![false, true],
-        "B is painted inside a branch whose inner column continues but whose root column closes"
+        vec![true],
+        "B is painted at depth 2 inside the branch whose only column, A1's, continues below it"
     );
 }

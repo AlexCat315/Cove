@@ -17,7 +17,7 @@
 //! - key selection disambiguates duplicate ids by path; filtered search keeps
 //!   the original paths
 //! - indent guides are subtle 1.5pt vertical strokes with ancestor
-//!   continuations, and the hovered row deepens its own columns
+//!   continuations, and hovering a row deepens the whole path it hangs from
 //!
 //! Named differences from the Swift suite:
 //! - Rust selection is configured through `TreeSelection` bindings rather than
@@ -44,11 +44,11 @@ use cove_core::scene::{
     AccessibilityRole, Align as SceneAlign, EventPhase, FlexDirection, Justify, Node, PointerPhase,
     Wrap,
 };
-use cove_core::{Binding, DrawList, Point, State};
+use cove_core::{Binding, Color, DrawList, Point, State};
 use cove_platform::{KeyModifiers, MouseButton, MouseButtonEvent};
 use cove_ui_compose::BoxView;
 use cove_ui_compose::adaptive::SurfaceEnvironmentExt;
-use cove_ui_compose::modifiers::layout::LayoutFrameExt;
+use cove_ui_compose::modifiers::layout::{LayoutFrameExt, PaddingExt};
 use cove_ui_compose::primitives::data::lists::RowState;
 use cove_ui_compose::primitives::data::lists::reorder_model::ReorderRowShift;
 use cove_ui_compose::primitives::data::lists::tree::options::{
@@ -64,6 +64,9 @@ use cove_ui_compose::primitives::text::Text;
 use cove_ui_compose::theme::Theme;
 use cove_ui_compose::theme::styles::components::selection_appearance::{
     SelectionAppearance, SelectionRole,
+};
+use cove_ui_compose::theme::styles::components::{
+    TreeRowStyle, TreeRowStyleConfiguration, TreeRowStyleViewExt,
 };
 
 use support::InteractiveScene;
@@ -690,26 +693,93 @@ fn default_tree_row_hover_does_not_recompose_tree() {
             .hover
             .expect("the row registers a hover handler");
 
+        let band = || {
+            row_paint_targets(&row, "__tree_row_state_layers")
+                .into_iter()
+                .next()
+                .expect("the content slot owns a state layer")
+        };
         assert!(!paints(&row), "a resting row paints no background");
+        assert!(
+            drawn_size(&band()).is_none(),
+            "a resting row paints no hover band"
+        );
         hover(cove_core::scene::HoverPhase::Enter);
         assert!(
             !scene.graph.recomposer.has_pending(),
             "hover repaints without scheduling a structural recompose"
         );
         assert!(
-            paints(&row),
-            "entering paints the hover fill on the row host, got {:?}",
-            row.background_color()
+            drawn_size(&band()).is_some(),
+            "entering paints the hover band inside the row's content slot"
         );
         scene.settle(1, 1.0);
         assert!(
-            paints(&row),
-            "the hover fill survives a recompose, got {:?}",
-            row.background_color()
+            drawn_size(&band()).is_some(),
+            "the hover band survives a recompose"
         );
+        assert!(!paints(&row), "the row host never takes a fill");
         hover(cove_core::scene::HoverPhase::Leave);
         scene.settle(1, 1.0);
-        assert!(!paints(&row), "leaving clears the hover background");
+        assert!(
+            drawn_size(&band()).is_none(),
+            "leaving clears the hover background"
+        );
+    });
+}
+
+/// A row style that records the hover flag it is handed.
+struct HoverRecordingStyle {
+    seen: Rc<RefCell<Vec<bool>>>,
+}
+impl TreeRowStyle for HoverRecordingStyle {
+    fn make_body(&self, configuration: TreeRowStyleConfiguration) -> AnyView {
+        self.seen.borrow_mut().push(configuration.is_hovered);
+        configuration.content
+    }
+}
+
+/// The hover flag reaches a custom style as configuration data, which needs a
+/// rebuild; the tree subscribes to it only for styles that ask for one.
+#[test]
+fn a_custom_tree_row_style_receives_the_hovered_row() {
+    let seen = Rc::new(RefCell::new(Vec::new()));
+    let probe = seen.clone();
+    InteractiveScene::run(280.0, 220.0, |scene| {
+        scene.install(AnyView::new(
+            default_tree(vec![item("a", "A", vec![]), item("b", "B", vec![])])
+                .tree_row_style(HoverRecordingStyle { seen: probe }),
+        ));
+        scene.settle(1, 1.0);
+
+        let rows: Vec<Node> = tree_rows(scene)
+            .into_iter()
+            .filter(|row| !row_paint_targets(row, "__tree_row_state_layers").is_empty())
+            .collect();
+        assert_eq!(rows.len(), 2, "two row hosts mount");
+        let hover = scene
+            .registry
+            .handlers(&rows[1])
+            .hover
+            .expect("the row registers a hover handler");
+
+        seen.borrow_mut().clear();
+        hover(cove_core::scene::HoverPhase::Enter);
+        scene.settle(2, 1.0);
+        assert!(
+            seen.borrow().iter().any(|hovered| *hovered),
+            "the style is rebuilt with the hover flag, got {:?}",
+            *seen.borrow()
+        );
+
+        seen.borrow_mut().clear();
+        hover(cove_core::scene::HoverPhase::Leave);
+        scene.settle(2, 1.0);
+        assert!(
+            !seen.borrow().is_empty() && seen.borrow().iter().all(|hovered| !*hovered),
+            "leaving rebuilds the rows without the flag, got {:?}",
+            *seen.borrow()
+        );
     });
 }
 
@@ -814,6 +884,71 @@ fn tree_drag_with_duplicate_ids_is_deterministic() {
             )),
             Some(("Second", "First", TreeDropPosition::Inside)),
             "duplicate ids resolve by row token, got {:?}",
+            *done.borrow()
+        );
+    });
+}
+
+/// A drop over an indented column must target the row that owns that column,
+/// and a drop left of the tree must target nothing. Every row frame already
+/// spans the whole slot, indent gutter included, so the hit test has no reason
+/// to reach further left than that.
+#[test]
+fn tree_drag_resolves_the_indent_gutter_inside_the_row_frame() {
+    let done = Rc::new(RefCell::new(None));
+    let probe = done.clone();
+    InteractiveScene::run(360.0, 220.0, |scene| {
+        scene.install(AnyView::new(
+            drag_tree(guided_roots(), probe.clone()).padding_edges(60.0, 0.0),
+        ));
+        expand_two_levels(scene);
+
+        let rows: Vec<Node> = tree_rows(scene)
+            .into_iter()
+            .filter(|row| !row_paint_targets(row, "__tree_row_state_layers").is_empty())
+            .collect();
+        assert_eq!(rows.len(), 4, "the expanded branch mounts four rows");
+
+        let lefts: Vec<f32> = rows.iter().map(|row| row.absolute_frame().x).collect();
+        assert!(
+            lefts.windows(2).all(|pair| pair[0] == pair[1]),
+            "every row frame spans the full slot, so its indent gutter is inside it, got {lefts:?}"
+        );
+
+        let (leaf, sibling) = (&rows[2], &rows[3]);
+        let leaf_band = row_paint_targets(leaf, "__tree_row_state_layers")[0].absolute_frame();
+        let root_band = row_paint_targets(&rows[0], "__tree_row_state_layers")[0].absolute_frame();
+        assert!(
+            leaf_band.x > root_band.x,
+            "the leaf's content is indented, got {leaf_band:?} after {root_band:?}"
+        );
+
+        let frame = leaf.absolute_frame();
+        let from = centre(sibling);
+        // Two levels of indentation plus the disclosure column reach 50pt, so
+        // this point sits inside the gutter the hit test used to add by hand.
+        let outside = Point::new(frame.x - 30.0, frame.y + frame.height / 2.0);
+        pointer_down(scene, from);
+        pointer_walk(scene, from, outside);
+        pointer_up(scene, outside);
+        assert!(
+            done.borrow().is_none(),
+            "a point left of every row frame drops on nothing, got {:?}",
+            *done.borrow()
+        );
+
+        let gutter = Point::new(frame.x + 2.0, frame.y + frame.height / 2.0);
+        pointer_down(scene, from);
+        pointer_walk(scene, from, gutter);
+        pointer_up(scene, gutter);
+        assert_eq!(
+            done.borrow().as_ref().map(|(source, target, position)| (
+                source.as_str(),
+                target.as_str(),
+                *position
+            )),
+            Some(("Sibling", "Leaf", TreeDropPosition::Inside)),
+            "a drop in the leaf's gutter targets the leaf row, got {:?}",
             *done.borrow()
         );
     });
@@ -940,6 +1075,34 @@ fn guide_strokes(node: &Node) -> Vec<((f32, f32), u32)> {
         .collect()
 }
 
+/// The nodes a row repaints on hover, from one of its registries.
+fn row_paint_targets(row: &Node, key: &str) -> Vec<Node> {
+    let Some(targets) = row.attachment::<Rc<RefCell<Vec<cove_core::scene::NodeWeak>>>>(key) else {
+        return Vec::new();
+    };
+    targets.borrow().iter().filter_map(Node::upgrade).collect()
+}
+
+/// The size of everything a node's draw hook emits, or `None` when it paints
+/// nothing. Called with the origin at zero, so this is the local geometry.
+fn drawn_size(node: &Node) -> Option<(f32, f32)> {
+    let draw = node.draw()?;
+    let mut list = DrawList::default();
+    draw(&mut list, Point::default());
+    let vertices = list.vertices();
+    if vertices.is_empty() {
+        return None;
+    }
+    let mut bounds = (f32::MAX, f32::MAX, f32::MIN, f32::MIN);
+    for vertex in vertices {
+        bounds.0 = bounds.0.min(vertex.x);
+        bounds.1 = bounds.1.min(vertex.y);
+        bounds.2 = bounds.2.max(vertex.x);
+        bounds.3 = bounds.3.max(vertex.y);
+    }
+    Some((bounds.2 - bounds.0, bounds.3 - bounds.1))
+}
+
 fn expand_two_levels(scene: &InteractiveScene) {
     let first = disclosures(scene)
         .into_iter()
@@ -1022,27 +1185,6 @@ fn tree_guide_lines_include_ancestor_continuations() {
 /// Every axis-aligned rect a guide node paints, as `(width, height)`.
 fn guide_rects(scene: &InteractiveScene) -> Vec<(f32, f32)> {
     guide_nodes(scene).iter().flat_map(stroke_rects).collect()
-}
-
-/// Each row's columns as `(guide node, strongest ink alpha it paints)`, ordered
-/// by row position so two reads of the same tree line up entry by entry.
-fn guide_inks(scene: &InteractiveScene) -> Vec<(cove_core::scene::ElementId, f32)> {
-    let mut inks: Vec<(f32, cove_core::scene::ElementId, f32)> = guide_nodes(scene)
-        .into_iter()
-        .map(|node| {
-            let alpha = guide_strokes(&node)
-                .into_iter()
-                .map(|(_, color)| ((color >> 24) & 0xFF) as f32 / 255.0)
-                .fold(0.0f32, f32::max);
-            (node.absolute_frame().y, node.id(), alpha)
-        })
-        .collect();
-    inks.sort_by(|a, b| {
-        a.0.partial_cmp(&b.0)
-            .unwrap_or(std::cmp::Ordering::Equal)
-            .then(a.1.cmp(&b.1))
-    });
-    inks.into_iter().map(|(_, id, alpha)| (id, alpha)).collect()
 }
 
 /// The widest horizontal span any single guide node paints, which is how the
@@ -1156,88 +1298,424 @@ fn tree_guide_style_straight_draws_unbroken_columns() {
     });
 }
 
+/// The row a hover handler repaints through, i.e. the one whose content slot
+/// sits furthest right. Depth moves the slot one indentation per level.
+fn deepest_row(scene: &InteractiveScene) -> Node {
+    tree_rows(scene)
+        .into_iter()
+        .filter_map(|row| {
+            let layer = row_paint_targets(&row, "__tree_row_state_layers").pop()?;
+            Some((layer.absolute_frame().x, row))
+        })
+        .max_by(|(left, _), (right, _)| {
+            left.partial_cmp(right).unwrap_or(std::cmp::Ordering::Equal)
+        })
+        .map(|(_, row)| row)
+        .expect("the deepest row mounts")
+}
+
+fn alpha(color: u32) -> f32 {
+    ((color >> 24) & 0xFF) as f32 / 255.0
+}
+
 #[test]
-fn tree_guide_hover_deepens_only_the_hovered_row() {
+fn tree_guide_columns_are_drawn_from_the_row_top() {
     InteractiveScene::run(280.0, 220.0, |scene| {
         scene.install(guide_tree(
             guided_roots(),
-            TreeLayout::default().guide_style(TreeGuideStyle::Elbow),
+            TreeLayout::default().guide_style(TreeGuideStyle::Straight),
         ));
         expand_two_levels(scene);
 
-        let rows = tree_rows(scene);
-        let deepest = rows
-            .iter()
-            .filter_map(|row| row.attachment::<f32>("__tree_row_gutter").map(|g| (row, g)))
-            .max_by(|(_, left), (_, right)| {
-                left.partial_cmp(right).unwrap_or(std::cmp::Ordering::Equal)
-            })
-            .map(|(row, _)| row.clone())
-            .expect("the deepest row mounts");
+        let mut mounted = 0;
+        for row in tree_rows(scene) {
+            for guide in row_paint_targets(&row, "__tree_row_guides") {
+                let (row_frame, guide_frame) = (row.absolute_frame(), guide.absolute_frame());
+                assert_eq!(
+                    guide_frame.y, row_frame.y,
+                    "a row's columns start at its top edge, not at its midline"
+                );
+                assert_eq!(
+                    guide_frame.height, row_frame.height,
+                    "the guide surface is one row tall so columns meet across rows"
+                );
+                mounted += 1;
+            }
+        }
+        assert!(
+            mounted >= 2,
+            "indented rows own guide columns, got {mounted}"
+        );
+    });
+}
+
+#[test]
+fn tree_row_hover_paints_one_band_in_the_content_slot() {
+    InteractiveScene::run(280.0, 220.0, |scene| {
+        scene.install(guide_tree(guided_roots(), TreeLayout::default()));
+        expand_two_levels(scene);
+
+        let deepest = deepest_row(scene);
         let hover = scene
             .registry
             .handlers(&deepest)
             .hover
             .expect("the row registers a hover handler");
 
-        let resting = guide_inks(scene);
+        hover(cove_core::scene::HoverPhase::Enter);
         assert!(
-            resting.len() >= 2,
-            "two expanded levels mount one column set per indented row, got {resting:?}"
+            !scene.graph.recomposer.has_pending(),
+            "the hover band repaints without recomposing the tree"
         );
         assert!(
-            resting.iter().all(|(_, alpha)| *alpha < 0.5),
-            "resting columns keep the subtle ink, got {resting:?}"
+            deepest
+                .background_color()
+                .is_none_or(|color| color == Color::CLEAR),
+            "the row node leaves the hierarchy gutter clear"
         );
 
-        let owned: Vec<cove_core::scene::ElementId> = deepest
-            .attachment::<Rc<RefCell<Vec<cove_core::scene::NodeWeak>>>>("__tree_row_guides")
-            .expect("the indented row owns its columns")
-            .borrow()
-            .iter()
-            .filter_map(Node::upgrade)
-            .map(|guide| guide.id())
-            .collect();
+        let layers = row_paint_targets(&deepest, "__tree_row_state_layers");
+        assert_eq!(layers.len(), 1, "the content slot owns one state layer");
+        let (row_frame, layer_frame) = (deepest.absolute_frame(), layers[0].absolute_frame());
+        assert!(
+            layer_frame.x > row_frame.x,
+            "the band starts after the disclosure gutter, got {layer_frame:?} in {row_frame:?}"
+        );
+        assert!(
+            layer_frame.width < row_frame.width,
+            "the band is narrower than the row, so it cannot double the style's fill"
+        );
+        assert_eq!(
+            layer_frame.height, row_frame.height,
+            "the band fills the row's height"
+        );
+        assert!(
+            drawn_size(&layers[0]).is_some(),
+            "the hovered row paints its band"
+        );
+
+        hover(cove_core::scene::HoverPhase::Leave);
+        assert!(
+            drawn_size(&layers[0]).is_none(),
+            "leaving the row removes the band"
+        );
+    });
+}
+
+/// Every column segment the mounted guides paint, as
+/// `(row top y, segment x, segment top y, segment bottom y, packed colour)`.
+fn mounted_guide_strokes(scene: &InteractiveScene) -> Vec<(f32, f32, f32, f32, u32)> {
+    let mut strokes: Vec<(f32, f32, f32, f32, u32)> = guide_nodes(scene)
+        .into_iter()
+        .flat_map(|node| {
+            let top = node.absolute_frame().y;
+            let draw = match node.draw() {
+                Some(draw) => draw,
+                None => return Vec::new(),
+            };
+            let mut list = DrawList::default();
+            draw(&mut list, Point::default());
+            list.vertices()
+                .chunks(4)
+                .filter(|quad| quad.len() == 4)
+                .map(|quad| {
+                    let min_x = quad.iter().map(|vertex| vertex.x).fold(f32::MAX, f32::min);
+                    let first = Point::new(quad[0].x, quad[0].y);
+                    let (low, high) = quad.iter().fold((first.y, first.y), |acc, vertex| {
+                        (acc.0.min(vertex.y), acc.1.max(vertex.y))
+                    });
+                    (top, min_x, low, high, quad[0].color)
+                })
+                .collect()
+        })
+        .collect();
+    strokes.sort_by(|a, b| {
+        a.0.partial_cmp(&b.0)
+            .unwrap_or(std::cmp::Ordering::Equal)
+            .then(a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal))
+            .then(a.2.partial_cmp(&b.2).unwrap_or(std::cmp::Ordering::Equal))
+    });
+    strokes
+}
+
+/// The `(row top y, x)` pairs a row's guide surface paints, ignoring how a
+/// column is split up for ink.
+fn guide_columns(scene: &InteractiveScene) -> Vec<(f32, f32)> {
+    let mut columns: Vec<(f32, f32)> = mounted_guide_strokes(scene)
+        .into_iter()
+        .map(|(row_top, x, _, _, _)| (row_top, x))
+        .collect();
+    columns.dedup();
+    columns
+}
+
+#[test]
+fn tree_guide_hover_deepens_the_path_to_the_hovered_row() {
+    InteractiveScene::run(280.0, 220.0, |scene| {
+        scene.install(guide_tree(
+            guided_roots(),
+            TreeLayout::default().guide_style(TreeGuideStyle::Straight),
+        ));
+        expand_two_levels(scene);
+
+        let mut rows = tree_rows(scene);
+        rows.sort_by(|left, right| {
+            left.absolute_frame()
+                .y
+                .partial_cmp(&right.absolute_frame().y)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
+        assert_eq!(rows.len(), 4, "Scene, Group, Leaf and Sibling mount");
+        let hovered = deepest_row(scene);
+        assert_eq!(
+            hovered.absolute_frame().y,
+            rows[2].absolute_frame().y,
+            "Leaf is the deepest row"
+        );
+        let group_y = rows[1].absolute_frame().y;
+        let leaf_y = rows[2].absolute_frame().y;
+        let sibling_y = rows[3].absolute_frame().y;
+        let hover = scene
+            .registry
+            .handlers(&hovered)
+            .hover
+            .expect("the row registers a hover handler");
+
+        let resting = mounted_guide_strokes(scene);
+        assert!(
+            resting
+                .iter()
+                .all(|(_, _, _, _, color)| alpha(*color) < 0.5),
+            "resting columns keep the subtle ink, got {resting:?}"
+        );
+        let resting_columns = guide_columns(scene);
+
         scene.graph.tree.borrow_mut().flush();
         hover(cove_core::scene::HoverPhase::Enter);
         assert!(
             !scene.graph.recomposer.has_pending(),
-            "deepening the columns repaints without recomposing the tree"
+            "deepening the path repaints without recomposing the tree"
         );
+
+        let deepened = mounted_guide_strokes(scene);
+        assert_eq!(
+            guide_columns(scene),
+            resting_columns,
+            "hovering adds no column and removes none"
+        );
+
+        // Strokes are reported in the row's own space: `0` is its top edge and
+        // one row height is its bottom edge. Only the trunk the pointer hangs
+        // from deepens, so Leaf's own column is the single dark stroke here;
+        // the ancestor columns above it lead on to other rows and stay subtle.
+        // The cap sits half a stroke below the midline, where a closing column
+        // visibly turns.
+        let row_height = 30.0;
+        let turn = row_height * 0.5 + 1.5 * 0.5;
+        let ink_of = |color: u32| if alpha(color) > 0.5 { "deep" } else { "rest" };
+        let shape: Vec<(f32, f32, f32, f32, &str)> = deepened
+            .iter()
+            .map(|stroke| (stroke.0, stroke.1, stroke.2, stroke.3, ink_of(stroke.4)))
+            .collect();
+        assert_eq!(
+            shape,
+            vec![
+                (group_y, 7.0, 0.0, row_height, "rest"),
+                // The root column inside Leaf's band still runs to Sibling.
+                (leaf_y, 7.0, 0.0, row_height, "rest"),
+                // Leaf's own column, capped where it turns into the row.
+                (leaf_y, 23.0, 0.0, turn, "deep"),
+                (sibling_y, 7.0, 0.0, turn, "rest"),
+            ],
+            "only the trunk the pointer hangs from deepens"
+        );
+
         let dirty: Vec<cove_core::scene::ElementId> = guide_nodes(scene)
             .into_iter()
             .filter(|node| node.render_dirty())
             .map(|node| node.id())
             .collect();
         assert_eq!(
-            dirty, owned,
-            "the hover handler invalidates the hovered row's columns and no others"
-        );
-        let hovered = guide_inks(scene);
-        assert_eq!(
-            hovered.len(),
-            resting.len(),
-            "hovering adds no guide surface"
-        );
-        let deepened: Vec<usize> = (0..resting.len())
-            .filter(|index| hovered[*index].1 > resting[*index].1 + 0.05)
-            .collect();
-        assert_eq!(
-            deepened.len(),
-            1,
-            "only the hovered row's own columns darken, got {hovered:?} against {resting:?}"
-        );
-        assert_eq!(
-            owned,
-            vec![hovered[deepened[0]].0],
-            "the darkened column belongs to the hovered row"
+            dirty.len(),
+            guide_nodes(scene).len(),
+            "every mounted column repaints, since any of them can hold the trunk"
         );
 
         hover(cove_core::scene::HoverPhase::Leave);
         assert_eq!(
-            guide_inks(scene),
+            mounted_guide_strokes(scene),
             resting,
             "leaving returns every column to the resting ink"
+        );
+
+        // The group's trunk is shared, so hovering the parent darkens the same
+        // column across every sibling band that carries it, and the level the
+        // children hang from stays subtle because the pointer is not on it.
+        let group_hover = scene
+            .registry
+            .handlers(&rows[1])
+            .hover
+            .expect("the branch row registers a hover handler");
+        scene.graph.tree.borrow_mut().flush();
+        group_hover(cove_core::scene::HoverPhase::Enter);
+        let group_shape: Vec<(f32, f32, f32, f32, &str)> = mounted_guide_strokes(scene)
+            .iter()
+            .map(|stroke| (stroke.0, stroke.1, stroke.2, stroke.3, ink_of(stroke.4)))
+            .collect();
+        assert_eq!(
+            group_shape,
+            vec![
+                (group_y, 7.0, 0.0, row_height, "deep"),
+                (leaf_y, 7.0, 0.0, row_height, "deep"),
+                (leaf_y, 23.0, 0.0, turn, "rest"),
+                (sibling_y, 7.0, 0.0, turn, "deep"),
+            ],
+            "the shared trunk deepens over the whole sibling group"
+        );
+        group_hover(cove_core::scene::HoverPhase::Leave);
+        assert_eq!(
+            mounted_guide_strokes(scene),
+            resting,
+            "leaving the branch row returns every column to the resting ink"
+        );
+
+        // A branch collapsed out from under the pointer unmounts the hovered
+        // row without a leave, so the trunk it recorded must not stay dark on
+        // the columns that remain mounted.
+        hover(cove_core::scene::HoverPhase::Enter);
+        let group_disclosure = disclosures(scene)
+            .into_iter()
+            .nth(1)
+            .expect("the branch disclosure mounts");
+        click(scene, &group_disclosure, KeyModifiers::default());
+        let collapsed = mounted_guide_strokes(scene);
+        assert!(
+            !collapsed.is_empty(),
+            "the ancestor and its sibling keep their columns, got {collapsed:?}"
+        );
+        assert!(
+            collapsed.iter().all(|stroke| alpha(stroke.4) < 0.5),
+            "a trunk whose row left the tree stops deepening, got {collapsed:?}"
+        );
+    });
+}
+
+#[test]
+fn tree_guide_hover_deepens_only_the_trunk_a_row_hangs_from() {
+    InteractiveScene::run(280.0, 260.0, |scene| {
+        scene.install(guide_tree(
+            vec![item(
+                "scene",
+                "Scene",
+                vec![
+                    item("group", "Group", vec![item("leaf", "Leaf", vec![])]),
+                    item(
+                        "sibling",
+                        "Sibling",
+                        vec![
+                            item("other", "Other", vec![]),
+                            item("another", "Another", vec![]),
+                        ],
+                    ),
+                ],
+            )],
+            TreeLayout::default().guide_style(TreeGuideStyle::Elbow),
+        ));
+        // Open the root, then each of its children, so `Another` shares a trunk
+        // with `Other` while `Group` sits on the root column above them.
+        for level in 0..3 {
+            let target = disclosures(scene)
+                .into_iter()
+                .nth(level)
+                .expect("every level has a disclosure");
+            click(scene, &target, KeyModifiers::default());
+        }
+
+        let mut rows = tree_rows(scene);
+        rows.sort_by(|left, right| {
+            left.absolute_frame()
+                .y
+                .partial_cmp(&right.absolute_frame().y)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
+        assert_eq!(
+            rows.len(),
+            6,
+            "Scene, Group, Leaf, Sibling, Other and Another mount"
+        );
+        let group_y = rows[1].absolute_frame().y;
+        let leaf_y = rows[2].absolute_frame().y;
+        let sibling_y = rows[3].absolute_frame().y;
+        let other_y = rows[4].absolute_frame().y;
+        let another_y = rows[5].absolute_frame().y;
+        let hover = scene
+            .registry
+            .handlers(&rows[5])
+            .hover
+            .expect("the row registers a hover handler");
+
+        hover(cove_core::scene::HoverPhase::Enter);
+        let row_height = 30.0;
+        let turn = row_height * 0.5 + 1.5 * 0.5;
+        let strokes = mounted_guide_strokes(scene);
+        let label = |color: u32| if alpha(color) > 0.5 { "deep" } else { "rest" };
+        // A bend is one stroke tall; a column runs most of the band.
+        let is_bend = |stroke: &(f32, f32, f32, f32, u32)| stroke.3 - stroke.2 < 2.0;
+
+        // `Another` hangs from `Sibling`, so the whole column of Sibling's
+        // child group darkens, including the band of the sibling above the
+        // pointer. The root column that runs past Group and Leaf belongs to
+        // another level, and Leaf's column belongs to Group's group, so neither
+        // answers the pointer.
+        let columns: Vec<(f32, f32, f32, f32, &str)> = strokes
+            .iter()
+            .filter(|stroke| !is_bend(stroke))
+            .map(|stroke| (stroke.0, stroke.1, stroke.2, stroke.3, label(stroke.4)))
+            .collect();
+        assert_eq!(
+            columns,
+            vec![
+                (group_y, 7.0, 0.0, row_height, "rest"),
+                (leaf_y, 7.0, 0.0, row_height, "rest"),
+                (leaf_y, 23.0, 0.0, turn, "rest"),
+                // Sibling is the last root child, so its column closes there.
+                (sibling_y, 7.0, 0.0, turn, "rest"),
+                // Other keeps the shared trunk running to the row below.
+                (other_y, 23.0, 0.0, row_height, "deep"),
+                (another_y, 23.0, 0.0, turn, "deep"),
+            ],
+            "the trunk the pointer hangs from darkens across its siblings, got {strokes:?}"
+        );
+
+        // The bend turns into its own row's label, so only the row under the
+        // pointer bends; Other shares the deepened trunk yet stays subtle.
+        let bends_on = |y: f32| {
+            let (mut deep, mut subtle) = (false, false);
+            for stroke in strokes.iter().filter(|stroke| is_bend(stroke)) {
+                // Rounded joints emit transparent coverage; only the strokes
+                // with real ink carry the highlight.
+                if alpha(stroke.4) < 0.1 || (stroke.0 - y).abs() > 0.01 {
+                    continue;
+                }
+                if alpha(stroke.4) > 0.5 {
+                    deep = true;
+                } else {
+                    subtle = true;
+                }
+            }
+            (deep, subtle)
+        };
+        for above in [group_y, leaf_y, sibling_y, other_y] {
+            assert_eq!(
+                bends_on(above),
+                (false, true),
+                "the bend of a row the pointer is not on stays subtle, got {strokes:?}"
+            );
+        }
+        assert_eq!(
+            bends_on(another_y),
+            (true, false),
+            "the bend under the pointer deepens with its trunk, got {strokes:?}"
         );
     });
 }

@@ -5,14 +5,27 @@ use crate::theme::SemanticColorRef;
 use super::builtin_button_chrome::{BuiltinButtonChrome, BuiltinButtonChromeKind};
 use super::button_style::{ButtonStyle, ButtonStyleConfiguration};
 
-/// On/off chip for toolbars, segmented choices, and view-mode switches.
-/// Reads `is_selected` (set via `Button(isSelected:)`): solid accent with
-/// `on_accent` foreground when on — the theme guarantees that pairing's
-/// contrast — transparent with state-layer washes when off.
+/// On/off chip for toolbars, segmented choices, and view-mode switches. Reads
+/// `is_selected` (set via `Button::selected`): solid accent with `on_accent`
+/// foreground when on — the theme guarantees that pairing's contrast —
+/// transparent with state-layer washes when off.
 ///
-/// ```ignore
-/// Button::new(/* is_selected: */ mode == Mode::Grid, /* action: */ move || mode.set(Mode::Grid))
-///     .button_style(toggle())
+/// ```
+/// use cove_core::State;
+/// use cove_ui_compose::primitives::controls::Button;
+/// use cove_ui_compose::primitives::text::Text;
+/// use cove_ui_compose::theme::styles::buttons::{ButtonStyleViewExt, toggle};
+///
+/// let is_grid = State::new(true);
+/// let button = Button::new(
+///     Text::new("Grid"),
+///     {
+///         let is_grid = is_grid.clone();
+///         move || is_grid.set(!is_grid.get())
+///     },
+/// )
+/// .selected(is_grid.get())
+/// .button_style(toggle());
 /// ```
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct ToggleButtonStyle {

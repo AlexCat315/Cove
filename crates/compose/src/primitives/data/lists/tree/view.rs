@@ -23,8 +23,11 @@
 //!   are enabled; Alt+Left/Right collapse/expand everything
 //! - Shift extends from the anchor, Cmd/Ctrl toggles, anything else replaces
 //! - indent guides draw a branch line per depth with a continuation column
-//!   only where an ancestor still has a following sibling, and the hovered row
-//!   draws its own columns with a deeper ink
+//!   only where an ancestor still has a following sibling; hovering a row
+//!   deepens the one trunk it hangs from, across every sibling that shares it,
+//!   while the ancestor levels above stay subtle
+//! - the hover and keyboard-cursor layers sit behind the row's content, so they
+//!   share the selection band's geometry and never stack a second fill on it
 
 use crate::Scope;
 use std::cell::RefCell;
@@ -66,10 +69,11 @@ use cove_platform::{KeyEvent, KeyModifiers, MouseButton, SystemCursor};
 const PRESSED: &str = "__tree_row_pressed";
 const HOVERED: &str = "__tree_row_hovered";
 const DRAG_PRESS: &str = "__tree_row_drag_press";
-const ROW_GUTTER: &str = "__tree_row_gutter";
 const GUIDE_MARKER: &str = "__tree_guide";
 /// The guide nodes a row owns, so its hover handler can repaint them.
 const ROW_GUIDES: &str = "__tree_row_guides";
+/// The state-layer nodes a row owns, repainted with the guides on hover.
+const ROW_STATE_LAYERS: &str = "__tree_row_state_layers";
 
 /// One visible row: the element plus its place in the hierarchy.
 #[derive(Clone, Debug, PartialEq)]
@@ -1249,7 +1253,7 @@ where
     Id: CollectionId,
     RowContent: Fn(&Element, RowState) -> AnyView + 'static,
 {
-    fn body(&self, _cx: &Scope) -> AnyView {
+    fn body(&self, cx: &Scope) -> AnyView {
         let mut entries = self.entries();
         let projection = self.drag_projection(&entries);
         let dragged_block = projection.as_ref().map(|(_, block)| block.clone());
@@ -1266,12 +1270,18 @@ where
         let layout = self.options.layout;
         let is_enabled = self.options.is_enabled;
         let hovered = self.hovered.clone();
+        let guide_hover = cx.remember::<Rc<TreeGuideHover>>(Rc::default);
         let cursor = self.cursor.get();
         let actions = self.session_actions_with(entries.clone());
         let check_enabled = self.options.check.is_enabled;
 
         let trailing_width = layout.trailing_slot_width;
         let stride = layout.row_height + layout.row_spacing;
+        guide_hover.retain_active(|row, path| {
+            entries
+                .get(row)
+                .is_some_and(|entry| entry.key.path.as_slice() == path)
+        });
         let rows: Vec<AnyView> = entries
             .iter()
             .enumerate()
@@ -1285,7 +1295,6 @@ where
                 let has_next_sibling = entry.has_next_sibling;
                 let ancestor = entry.ancestor_has_next_siblings.clone();
                 let is_current = cursor.as_ref() == Some(&key);
-                let is_hovered = hovered.get().as_ref() == Some(&entry.key);
                 let is_dragged = dragged_block
                     .as_ref()
                     .is_some_and(|block| block.contains(&index));
@@ -1423,23 +1432,39 @@ where
                         }
                     })
                 };
-                let trailing: Option<AnyView> = self.options.slots.trailing.as_ref().map(|slot| {
-                    AnyView::new(AnyView::new(
-                        AnyView::new(
-                            AnyView::new(slot(
-                                entry.element.clone(),
-                                is_selected,
-                                entry.is_expanded,
-                                entry.is_search_hit,
-                                is_hovered,
-                                entry.depth,
-                            ))
-                            .padding_edges(4.0, 0.0)
-                            .frame_width(trailing_width),
-                        )
-                        .clipped(),
-                    ))
-                });
+                // Rows that need a rebuild to show hover read the flag here, so
+                // only those subscribe to it; every other row paints from the
+                // hover handler in the same frame as the pointer.
+                let hover_snapshot: Rc<dyn Fn() -> bool> = {
+                    let hovered = hovered.clone();
+                    let key = key.clone();
+                    Rc::new(move || hovered.get().as_ref() == Some(&key))
+                };
+                let trailing: Option<Rc<dyn Fn(bool) -> AnyView>> =
+                    self.options.slots.trailing.as_ref().map(|slot| {
+                        let slot = slot.clone();
+                        let element = entry.element.clone();
+                        let (is_expanded, is_search_hit, depth) =
+                            (entry.is_expanded, entry.is_search_hit, entry.depth);
+                        let build: Rc<dyn Fn(bool) -> AnyView> = Rc::new(move |is_hovered| {
+                            AnyView::new(AnyView::new(AnyView::new(
+                                AnyView::new(
+                                    slot(
+                                        element.clone(),
+                                        is_selected,
+                                        is_expanded,
+                                        is_search_hit,
+                                        is_hovered,
+                                        depth,
+                                    )
+                                    .padding_edges(4.0, 0.0)
+                                    .frame_width(trailing_width),
+                                )
+                                .clipped(),
+                            )))
+                        });
+                        build
+                    });
                 let icon: Option<AnyView> = self.options.slots.icon.as_ref().map(|slot| {
                     AnyView::new(slot(&entry.element).frame_size(16.0, layout.row_height))
                 });
@@ -1478,7 +1503,6 @@ where
                     is_expanded: entry.is_expanded,
                     is_search_hit: entry.is_search_hit,
                     is_selected,
-                    is_hovered,
                     is_checked: entry.is_checked,
                     is_half_checked: entry.is_half_checked,
                     is_loading: entry.is_loading,
@@ -1495,6 +1519,9 @@ where
                     trailing_padding: layout.trailing_padding,
                     ancestor_has_next_siblings: ancestor,
                     has_next_sibling,
+                    row_index: index,
+                    guide_path: entry.key.path.clone(),
+                    guide_hover: guide_hover.clone(),
                     drag_offset,
                     is_drag_source,
                     content,
@@ -1502,6 +1529,7 @@ where
                     icon,
                     disclosure_slot: self.options.slots.disclosure.clone(),
                     trailing_slot: trailing,
+                    hover_snapshot,
                     drag: row_drag,
                     on_toggle,
                     on_select,
@@ -1618,6 +1646,7 @@ where
             crate::DynamicField::state("selected", &self.local_selected),
             crate::DynamicField::state("multiSelected", &self.local_multi_selected),
             crate::DynamicField::state("cursor", &self.cursor),
+            crate::DynamicField::state("hovered", &self.hovered),
             crate::DynamicField::state("scrollRequest", &self.scroll_request),
             crate::DynamicField::state("dragSource", &self.drag_source),
             crate::DynamicField::state("dragTarget", &self.drag_target),
@@ -2442,7 +2471,6 @@ struct TreeRow {
     is_expanded: bool,
     is_search_hit: bool,
     is_selected: bool,
-    is_hovered: bool,
     is_checked: bool,
     is_half_checked: bool,
     is_loading: bool,
@@ -2459,6 +2487,11 @@ struct TreeRow {
     trailing_padding: f32,
     ancestor_has_next_siblings: Vec<bool>,
     has_next_sibling: bool,
+    /// The row's slot in the flattened tree and its ancestor chain, used to
+    /// decide which guide columns the pointer is on.
+    row_index: usize,
+    guide_path: Vec<usize>,
+    guide_hover: Rc<TreeGuideHover>,
     /// How far the row is displaced from its slot while a drag projects a move.
     drag_offset: f32,
     is_drag_source: bool,
@@ -2466,7 +2499,10 @@ struct TreeRow {
     checkbox: Option<AnyView>,
     icon: Option<AnyView>,
     disclosure_slot: Option<Rc<dyn Fn(bool) -> AnyView>>,
-    trailing_slot: Option<AnyView>,
+    /// Built per pass, because the caller's slot reads the row's hover state.
+    trailing_slot: Option<Rc<dyn Fn(bool) -> AnyView>>,
+    /// Whether the pointer is on this row, read only when a rebuild is needed.
+    hover_snapshot: Rc<dyn Fn() -> bool>,
     /// The armed drag surface, `None` when `on_drop` is unset.
     drag: Option<TreeRowDrag>,
     on_toggle: Rc<dyn Fn()>,
@@ -2507,12 +2543,6 @@ impl PrimitiveView for TreeRow {
         // focused for the arrow and Alt shortcuts to reach the tree.
         node.set_is_focusable(self.is_enabled);
         node.set_cursor(Some(SystemCursor::Pointer));
-        // The drag hit zone covers the indent gutter and disclosure slot, so a
-        // drop over indented columns still resolves this row.
-        node.set_attachment(
-            ROW_GUTTER,
-            (self.depth as f32 * self.indentation + self.disclosure_width).max(0.0),
-        );
         if let Some(drag) = &self.drag {
             (drag.register)(node);
         }
@@ -2552,45 +2582,37 @@ impl PrimitiveView for TreeRow {
             });
         }
 
-        let paint_node = node.clone();
-        let is_selected = self.is_selected;
-        let is_search_hit = self.is_search_hit;
-        let is_current = self.is_current;
-        let paint: Rc<dyn Fn()> = Rc::new(move || {
-            let hovered = paint_node.attachment::<bool>(HOVERED) == Some(true);
-            let theme = theme_for_node(&paint_node);
-            paint_node.set_corner_radius(theme.radius.sm);
-            paint_node.set_background_color(Some(if is_selected || is_search_hit {
-                Color::CLEAR
-            } else if hovered {
-                theme.colors.state_layer_hover
-            } else if is_current {
-                theme.colors.state_layer_selected.multiplied_alpha(0.45)
-            } else {
-                Color::CLEAR
-            }));
-        });
-        // A custom style watches its own hover and has to rebuild on a change; the
-        // default one keeps the chrome on this node. A caller-supplied trailing
-        // slot also reads the flag, so it keeps the state in sync either way.
+        // The hover flag lives on the node, where the handler keeps it current
+        // for the state layer's draw pass. A custom row style and a
+        // caller-supplied trailing slot read the flag from their own views, so
+        // those rows additionally write the tree's hover state and rebuild when
+        // the pointer moves.
         let style = node.composition_value(&TreeRowStyleEnvironment::key());
         let propagates_hover = self.trailing_slot.is_some() || style.requires_hover_recompose();
-        if propagates_hover {
-            node.set_attachment(HOVERED, self.is_hovered);
-        } else if node.attachment::<bool>(HOVERED).is_none() {
+        if node.attachment::<bool>(HOVERED).is_none() {
             node.set_attachment(HOVERED, false);
         }
-        paint();
+        // The row node itself stays chrome-free: a fill here would cover the
+        // hierarchy gutter the style deliberately leaves clear.
+        node.set_background_color(Some(Color::CLEAR));
 
         let Some(registry) = InteractionRegistryHolder::current() else {
             return;
         };
 
+        if self.guide_style != TreeGuideStyle::None && self.depth > 0 {
+            self.guide_hover.register(&guide_targets(node));
+        }
+
         let hover_node = node.downgrade();
-        let hover_paint = paint.clone();
         let hover_action = self.on_hover.clone();
         let hover_enabled = self.is_enabled;
-        let hover_guides = guide_targets(node);
+        let hover_layers = state_layer_targets(node);
+        let guide_hover = self.guide_hover.clone();
+        let guide_path = self.guide_path.clone();
+        let guide_row = self.row_index;
+        // A root row hangs from no trunk, so it cannot deepen one.
+        let guide_level = self.depth.checked_sub(1);
         registry.set_hover(
             node,
             Rc::new(move |phase: HoverPhase| {
@@ -2603,12 +2625,20 @@ impl PrimitiveView for TreeRow {
                 if let Some(owner) = Node::upgrade(&hover_node) {
                     owner.set_attachment(HOVERED, entered);
                 }
-                hover_paint();
-                // The columns live beside the row, outside the area a background
-                // change repaints, so they are invalidated by hand.
-                for guide in hover_guides.borrow().iter() {
-                    if let Some(guide) = Node::upgrade(guide) {
-                        guide.mark_render_dirty(InvalidationSource::style_set("treeGuideHover"));
+                // A sibling group shares one trunk, and the rows above and
+                // below the pointer draw it, so the whole group repaints rather
+                // than only the row under the pointer.
+                match (entered, guide_level) {
+                    (true, Some(level)) => guide_hover.set(Some(HoveredGuides {
+                        row: guide_row,
+                        path: guide_path.clone(),
+                        level,
+                    })),
+                    _ => guide_hover.clear_if(guide_row, &guide_path),
+                }
+                for target in hover_layers.borrow().iter() {
+                    if let Some(target) = Node::upgrade(target) {
+                        target.mark_render_dirty(InvalidationSource::style_set("treeRowHover"));
                     }
                 }
                 if propagates_hover {
@@ -2786,6 +2816,15 @@ impl PrimitiveView for TreeRow {
         let indent = self.depth as f32 * self.indentation;
         let row_height = self.row_height;
         let style = node.composition_value(&TreeRowStyleEnvironment::key());
+        // A custom style and a caller-supplied trailing slot take hover as data,
+        // so they subscribe to it and rebuild when the pointer moves. The
+        // default style paints from the node flag the handler owns instead.
+        let watches_hover = self.trailing_slot.is_some() || style.requires_hover_recompose();
+        let is_hovered = if watches_hover {
+            (self.hover_snapshot)()
+        } else {
+            node.attachment::<bool>(HOVERED) == Some(true)
+        };
         let configuration = TreeRowStyleConfiguration {
             content: self.content.clone(),
             depth: self.depth,
@@ -2795,7 +2834,7 @@ impl PrimitiveView for TreeRow {
             is_expanded: self.is_expanded,
             is_search_hit: self.is_search_hit,
             is_selected: self.is_selected,
-            is_hovered: self.is_hovered,
+            is_hovered,
             is_checked: self.is_checked,
             is_half_checked: self.is_half_checked,
             is_current: self.is_current,
@@ -2864,14 +2903,24 @@ impl PrimitiveView for TreeRow {
             row.push(icon.clone());
             row.push(fixed_spacer(4.0, row_height));
         }
-        let content = AnyView::new(BoxView::new(
-            FlexDirection::Row,
-            Align::Stretch,
-            Justify::FlexStart,
-            Wrap::NoWrap,
-            0.0,
-            body,
-        ))
+        // The state layer fills the slot the style's band fills, so hover, the
+        // keyboard cursor and the selection band agree on geometry.
+        let content = AnyView::new(TreeRowStateLayer {
+            row: node.downgrade(),
+            is_selected: self.is_selected,
+            is_search_hit: self.is_search_hit,
+            is_current: self.is_current,
+            style_paints_hover: watches_hover,
+            fills_width: self.width_filling,
+            content: AnyView::new(BoxView::new(
+                FlexDirection::Row,
+                Align::Stretch,
+                Justify::FlexStart,
+                Wrap::NoWrap,
+                0.0,
+                body,
+            )),
+        })
         .frame(None, None, Some(0.0), None, None, None);
         row.push(if self.width_filling {
             AnyView::new(AnyView::new(content).flex_with(1.0, 1.0, Some(0.0)))
@@ -2879,8 +2928,8 @@ impl PrimitiveView for TreeRow {
             AnyView::new(content)
         });
 
-        if let Some(trailing) = &self.trailing_slot {
-            row.push(trailing.clone());
+        if let Some(build) = &self.trailing_slot {
+            row.push(build(is_hovered));
         }
         if self.trailing_padding > 0.0 {
             row.push(fixed_spacer(self.trailing_padding, row_height));
@@ -2898,6 +2947,9 @@ impl PrimitiveView for TreeRow {
                 ancestor_has_next_siblings: self.ancestor_has_next_siblings.clone(),
                 has_next_sibling: self.has_next_sibling,
                 row: node.downgrade(),
+                row_index: self.row_index,
+                path: self.guide_path.clone(),
+                hover: self.guide_hover.clone(),
             })
         } else {
             None
@@ -3030,8 +3082,9 @@ impl View for TreeRow {
 /// the columns are solid, broken, or bent into the row.
 ///
 /// The columns belong to the row that draws them, so hovering a row deepens
-/// exactly its own columns. Hover is read at paint time from the row, which
-/// keeps a pointer move out of the tree's recomposition.
+/// the one trunk it hangs from and every sibling that shares that trunk, while
+/// the ancestor levels above it stay subtle. Hover is read at paint time from
+/// the row, which keeps a pointer move out of the tree's recomposition.
 struct TreeGuideOverlay {
     depth: usize,
     row_height: f32,
@@ -3043,6 +3096,9 @@ struct TreeGuideOverlay {
     ancestor_has_next_siblings: Vec<bool>,
     has_next_sibling: bool,
     row: NodeWeak,
+    row_index: usize,
+    path: Vec<usize>,
+    hover: Rc<TreeGuideHover>,
 }
 
 impl PrimitiveView for TreeGuideOverlay {
@@ -3082,21 +3138,20 @@ impl PrimitiveView for TreeGuideOverlay {
         let ancestor = self.ancestor_has_next_siblings.clone();
         let has_next_sibling = self.has_next_sibling;
         let weak = node.downgrade();
-        let hovered_row = self.row.clone();
+        let row_node = self.row.clone();
+        let hover = self.hover.clone();
+        let row_index = self.row_index;
+        let path = self.path.clone();
         let draw: DrawHook = Rc::new(move |list, origin| {
             let Some(node) = Node::upgrade(&weak) else {
                 return;
             };
-            let hovered = Node::upgrade(&hovered_row)
-                .is_some_and(|row| row.attachment::<bool>(HOVERED) == Some(true));
             let theme = theme_for_node(&node);
-            // The hovered row's columns carry the hierarchy the pointer is on,
-            // so they take the full-strength ink and the rest stays quiet.
-            let strength = if hovered { 0.62 } else { 0.36 };
-            let ink = theme
-                .colors
-                .on_surface_muted
-                .multiplied_alpha(strength * node.opacity());
+            // A column is a sibling of its row, so a dimmed drag source has to
+            // carry that opacity over here as well.
+            let opacity = Node::upgrade(&row_node)
+                .map(|row| row.opacity())
+                .unwrap_or_else(|| node.opacity());
             let center_y = (origin.y + row_height * 0.5).floor();
             let top = origin.y.floor();
             let bottom = (origin.y + row_height).ceil().max(top + 1.0);
@@ -3112,6 +3167,21 @@ impl PrimitiveView for TreeGuideOverlay {
                 if !is_deepest && !ancestor.get(level).copied().unwrap_or(false) {
                     continue;
                 }
+                // One level is active at a time: the guide the hovered row
+                // hangs from, exactly like the active indent guide of an editor.
+                let active = hover.deepens(&path, level);
+                let resting = theme
+                    .colors
+                    .on_surface_muted
+                    .multiplied_alpha(0.36 * opacity);
+                let ink = if active {
+                    theme
+                        .colors
+                        .on_surface_muted
+                        .multiplied_alpha(0.62 * opacity)
+                } else {
+                    resting
+                };
                 // The deepest column stops at the connector when the row is the
                 // last sibling, so the branch visibly closes.
                 let vertical_bottom = if is_deepest && !has_next_sibling {
@@ -3120,13 +3190,21 @@ impl PrimitiveView for TreeGuideOverlay {
                     bottom
                 };
                 draw_guide_column(list, stroke_x, top, vertical_bottom, style, width, ink);
+                // The bend turns into its own row's label, so only the row under
+                // the pointer bends; the siblings it shares the trunk with stay
+                // subtle on the horizontal.
                 if is_deepest && style == TreeGuideStyle::Elbow {
+                    let bend = if hover.is_pointer_row(row_index) {
+                        ink
+                    } else {
+                        resting
+                    };
                     let reach = (indentation * (1.0 - position)).max(width + 2.0);
                     let _ = list.add_line(
                         Point::new(stroke_x + width * 0.5, center_y),
                         Point::new(stroke_x + reach, center_y),
                         width,
-                        ink,
+                        bend,
                     );
                 }
             }
@@ -3138,7 +3216,15 @@ impl PrimitiveView for TreeGuideOverlay {
         let layout = LayoutNode::new();
         layout.set_flex_direction(FlexDirection::Column);
         layout.set_align_items(Align::Stretch);
+        layout.set_height(Some(self.row_height));
         Some(layout)
+    }
+
+    fn update_layout(&self, layout: &LayoutNode) {
+        // The ZStack centres a child shorter than the row, which would hand the
+        // draw hook the row's midline as its origin. Being exactly one row tall
+        // keeps every column on the row's top edge.
+        layout.set_height(Some(self.row_height));
     }
 
     fn children(&self, _node: &Node) -> Vec<AnyView> {
@@ -3167,6 +3253,233 @@ fn guide_targets(row: &Node) -> Rc<RefCell<Vec<NodeWeak>>> {
     created
 }
 
+/// The state-layer nodes a row owns, so its hover handler can repaint them.
+fn state_layer_targets(row: &Node) -> Rc<RefCell<Vec<NodeWeak>>> {
+    if let Some(existing) = row.attachment::<Rc<RefCell<Vec<NodeWeak>>>>(ROW_STATE_LAYERS) {
+        return existing;
+    }
+    let created = Rc::new(RefCell::new(Vec::new()));
+    row.set_attachment(ROW_STATE_LAYERS, created.clone());
+    created
+}
+
+/// The row the pointer is on, with the guide level it hangs from.
+struct HoveredGuides {
+    row: usize,
+    path: Vec<usize>,
+    /// The row's own indentation level: the column its connector sits on.
+    level: usize,
+}
+
+/// The guide columns that have to repaint when the pointer moves, shared by
+/// every row of one `Tree`.
+///
+/// A hovered row darkens the one guide it hangs from, and that guide is shared
+/// by every sibling under the same parent, so the whole group's trunk deepens
+/// instead of only the row under the pointer. Those strokes belong to other
+/// rows, so each row registers its guide nodes here and the handler records the
+/// shared group instead of only repainting the row under the pointer.
+#[derive(Default)]
+pub(crate) struct TreeGuideHover {
+    active: RefCell<Option<HoveredGuides>>,
+    rows: RefCell<Vec<Rc<RefCell<Vec<NodeWeak>>>>>,
+}
+
+impl TreeGuideHover {
+    /// Adds a row's guide nodes, dropping rows whose nodes have unmounted.
+    fn register(&self, guides: &Rc<RefCell<Vec<NodeWeak>>>) {
+        let mut rows = self.rows.borrow_mut();
+        rows.retain(|entry| {
+            let mut nodes = entry.borrow_mut();
+            nodes.retain(|node| node.strong_count() > 0);
+            !nodes.is_empty()
+        });
+        if !rows.iter().any(|entry| Rc::ptr_eq(entry, guides)) {
+            rows.push(guides.clone());
+        }
+    }
+
+    /// Whether the column at `level` of a row drawing `path` is the guide the
+    /// pointer hangs from.
+    ///
+    /// Only the hovered row's own level qualifies, and every row whose ancestor
+    /// at that depth is the same node shares the trunk, so siblings and the
+    /// subtrees between them deepen together. Ancestor levels stay subtle.
+    fn deepens(&self, path: &[usize], level: usize) -> bool {
+        let active = self.active.borrow();
+        let Some(hovered) = active.as_ref() else {
+            return false;
+        };
+        if level != hovered.level {
+            return false;
+        }
+        let (Some(prefix), Some(hover_prefix)) =
+            (path.get(..level + 1), hovered.path.get(..level + 1))
+        else {
+            return false;
+        };
+        prefix == hover_prefix
+    }
+
+    /// Whether `row` is the one under the pointer, whose own connector bends.
+    fn is_pointer_row(&self, row: usize) -> bool {
+        self.active
+            .borrow()
+            .as_ref()
+            .is_some_and(|hovered| hovered.row == row)
+    }
+
+    /// Drops the recorded path when its row has left the tree, so a hovered
+    /// row that collapses or filters away cannot leave its trunk dark with
+    /// nothing under the pointer.
+    fn retain_active(&self, is_mounted: impl Fn(usize, &[usize]) -> bool) {
+        let stale = self
+            .active
+            .borrow()
+            .as_ref()
+            .is_some_and(|hovered| !is_mounted(hovered.row, &hovered.path));
+        if stale {
+            self.set(None);
+        }
+    }
+
+    /// Points the path at the pointer's row, or clears it, and repaints every
+    /// registered column; the ink itself is decided while drawing.
+    fn set(&self, active: Option<HoveredGuides>) {
+        *self.active.borrow_mut() = active;
+        for entry in self.rows.borrow().iter() {
+            let nodes = entry.borrow();
+            for node in nodes.iter() {
+                if let Some(node) = Node::upgrade(node) {
+                    node.mark_render_dirty(InvalidationSource::style_set("treeGuidePath"));
+                }
+            }
+        }
+    }
+
+    /// Clears the path only when `row` is still the row that set it, so a
+    /// leave that arrives after the pointer moved on cannot wipe the new path.
+    fn clear_if(&self, row: usize, path: &[usize]) {
+        let owns = self
+            .active
+            .borrow()
+            .as_ref()
+            .is_some_and(|active| active.row == row && active.path.as_slice() == path);
+        if owns {
+            self.set(None);
+        }
+    }
+}
+
+/// The hover and keyboard-cursor fill behind a row's content.
+///
+/// It takes the slot the row style paints its own band in, so the two layers
+/// share a left edge and a radius instead of stacking a full-row fill under a
+/// content-width one. Like the guide columns it reads the row's hover flag
+/// while painting, which keeps a pointer move out of recomposition.
+struct TreeRowStateLayer {
+    row: NodeWeak,
+    is_selected: bool,
+    is_search_hit: bool,
+    is_current: bool,
+    /// The style watches hover itself and paints that layer, so this one stays
+    /// out of the way.
+    style_paints_hover: bool,
+    /// The band fills the row slot, matching `blockNode: true`.
+    fills_width: bool,
+    content: AnyView,
+}
+
+impl PrimitiveView for TreeRowStateLayer {
+    fn make_node(&self) -> Node {
+        let node = Node::new();
+        node.set_is_hit_testable(false);
+        node
+    }
+
+    fn make_layout_node(&self) -> Option<LayoutNode> {
+        Some(LayoutNode::new())
+    }
+
+    fn update_layout(&self, layout: &LayoutNode) {
+        layout.set_flex_direction(FlexDirection::Row);
+        layout.set_align_items(Align::Stretch);
+        layout.set_justify_content(Justify::FlexStart);
+        layout.set_flex_wrap(Wrap::NoWrap);
+    }
+
+    fn update_node(&self, node: &Node) {
+        if let Some(row) = Node::upgrade(&self.row) {
+            let targets = state_layer_targets(&row);
+            let weak = node.downgrade();
+            let mut targets = targets.borrow_mut();
+            targets.retain(|other| other.strong_count() > 0);
+            if !targets
+                .iter()
+                .any(|other| Node::upgrade(other).as_ref() == Some(node))
+            {
+                targets.push(weak);
+            }
+        }
+        let weak = node.downgrade();
+        let row_node = self.row.clone();
+        let is_selected = self.is_selected;
+        let is_search_hit = self.is_search_hit;
+        let is_current = self.is_current;
+        let style_paints_hover = self.style_paints_hover;
+        let draw: DrawHook = Rc::new(move |list, origin| {
+            // Selection and search belong to the style, and so does hover once
+            // the style watches it — painting them here would double the ink.
+            if is_selected || is_search_hit || style_paints_hover {
+                return;
+            }
+            let (Some(node), Some(row)) = (Node::upgrade(&weak), Node::upgrade(&row_node)) else {
+                return;
+            };
+            let hovered = row.attachment::<bool>(HOVERED) == Some(true);
+            if !hovered && !is_current {
+                return;
+            }
+            let theme = theme_for_node(&node);
+            let frame = node.absolute_frame();
+            let color = if hovered {
+                theme.colors.state_layer_hover
+            } else {
+                theme.colors.state_layer_selected.multiplied_alpha(0.45)
+            };
+            let _ = list.add_rounded_rect(
+                Rect::new(origin.x, origin.y, frame.width, frame.height),
+                theme.radius.md,
+                color,
+            );
+        });
+        node.set_draw(Some(draw));
+    }
+
+    fn children(&self, _node: &Node) -> Vec<AnyView> {
+        if self.fills_width {
+            // The layer takes the slot the content used to fill directly, so the
+            // style's band still has to grow inside it.
+            vec![AnyView::new(AnyView::new(self.content.clone()).flex_with(
+                1.0,
+                1.0,
+                Some(0.0),
+            ))]
+        } else {
+            vec![self.content.clone()]
+        }
+    }
+}
+
+impl View for TreeRowStateLayer {
+    fn kind(&self) -> crate::ViewKind<'_> {
+        crate::ViewKind::Primitive(self)
+    }
+    fn tag(&self) -> &'static str {
+        std::any::type_name::<Self>()
+    }
+}
+
 /// One guide column between `top` and `bottom`, broken into dashes or dots
 /// when the style asks for it.
 fn draw_guide_column(
@@ -3187,10 +3500,15 @@ fn draw_guide_column(
         }
     };
     let period = segment * 2.0;
-    let mut y = top;
+    // The grid is anchored to the absolute y rather than to each row's own top,
+    // so consecutive rows keep one rhythm instead of restarting the phase.
+    let mut y = top - top.rem_euclid(period);
     while y < bottom {
-        let height = segment.min(bottom - y).max(1.0);
-        let _ = list.add_rect(Rect::new(x, y, width, height), ink);
+        let start = y.max(top);
+        let end = (y + segment).min(bottom);
+        if end - start >= 1.0 {
+            let _ = list.add_rect(Rect::new(x, start, width, end - start), ink);
+        }
         y += period;
     }
 }
@@ -3237,9 +3555,9 @@ impl<Id: std::hash::Hash + Eq + Clone> TreeDragRegistry<Id> {
         }
     }
 
-    /// The row token under `point`, with the row's absolute frame extended left
-    /// by its indent gutter so a drop over indented columns still resolves a
-    /// target.
+    /// The row token under `point`, in the row's absolute frame. The frame
+    /// already spans the indent gutter and the disclosure slot, so a drop over
+    /// an indented column resolves this row without any extra reach.
     fn hit(&self, point: Point) -> Option<(TreeNodeKey<Id>, Rect)> {
         let entries = self.entries.borrow();
         let mut found = None;
@@ -3248,15 +3566,8 @@ impl<Id: std::hash::Hash + Eq + Clone> TreeDragRegistry<Id> {
                 continue;
             };
             let frame = node.absolute_frame();
-            let gutter = node.attachment::<f32>(ROW_GUTTER).unwrap_or(0.0);
-            let expanded = Rect::new(
-                frame.x - gutter,
-                frame.y,
-                frame.width + gutter,
-                frame.height,
-            );
-            if expanded.contains(point) {
-                found = Some((key.clone(), expanded));
+            if frame.contains(point) {
+                found = Some((key.clone(), frame));
             }
         }
         found

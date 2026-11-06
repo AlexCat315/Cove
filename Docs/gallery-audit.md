@@ -1,8 +1,26 @@
 # Gallery 逐项验收记录
 
-更新：2026-11-05。目录共 102 页（Numeric 合并 NumberField+Vec3Field，Text Fields 合并 TextField+SearchField+TextArea+JsonField）。当前控件页的验收以以下 Swift 对照表为准；后续旧轮记录保留其原有范围。
+更新：2026-11-06。目录共 102 页（Numeric 合并 NumberField+Vec3Field，Text Fields 合并 TextField+SearchField+TextArea+JsonField）。当前控件页的验收以以下 Swift 对照表为准；后续旧轮记录保留其原有范围。
 
 Swift 源码逐页对照见文末《Swift 源码对照（逐页差异清单）》。
+
+## 2026-11-06：Tree 参考线落位、投影列索引与悬停底带
+
+- 根因修复：`TreeGuideOverlay` 的布局表面没有子节点、高度为 0，被 `ZStack(alignment: .leading)` 按垂直居中摆到行的中线上，而绘制钩子把 `origin.y` 当行顶用——`Straight` 每行只画下半段、行间接缝断开，末子的收束段掉到行下方悬空。表面改为与行等高后竖线接成连续一条，`Elbow` 的横向连接与收束点回到行中心。
+- 拖拽投影：`reparent::guide_flags` 原先把深度 0 祖先的兄弟状态也写进列表（长度 `depth`），展平投影与绘制循环却按 `level` 索引、约定根层不占列（长度 `depth - 1`），投影生效时最外列读到不存在的根层、父级真正的续接位被丢弃。改为按祖先深度写入 `column = ancestor_depth - 1` 并跳过根层。
+- 悬停：行节点此前用 `radius.sm` 铺满整行（含缩进与展开控件），自定义 `TreeRowStyle` 或 `TreeSlots::trailing` 场景下样式又用 `radius.md` 在内容区铺第二层，内容区比留白区深一档、出现接缝，高亮左边界也与 accent 选中带不一致。新增 `TreeRowStateLayer` 占据行内容插槽、在绘制阶段读取悬停标记，行节点自身保持无底色；样式自行接管时该层让位。悬停与键盘光标仍不排入 Tree 重算。
+- 小项：拖动中的源行连同其参考线一起降低不透明度（此前只有行变淡）；`Dashed` / `Dotted` 的分段相位改为按绝对 y 排布，跨行不再每行重新起相。
+- 验证：`list_tree_tests` 新增 `tree_guide_columns_are_drawn_from_the_row_top`（参考线节点与行同 y、同高）与 `tree_row_hover_paints_one_band_in_the_content_slot`（只有一层底带、比行窄、与行等高、离开后消失），`default_tree_row_hover_does_not_recompose_tree` 改为断言底带落在状态层上；`tree_reparent_tests` 新增 `guide_flags_index_columns_by_ancestor_depth`，既有列索引断言同步收敛。compose 全量 1687 项通过；移除表面高度设置后落位用例以 `45.0 != 30.0` 失败。
+- 原生验收：DevTools 真机指针与拖拽，Scene hierarchy 页展开全树。`Straight` 下最外列逐像素为 431→597 的连续线（旧实现是 120-149/180-209 这类下半段），末子收束正好停在行中心；`Elbow` 的横向连接与竖段落在行中心；`Dashed` 在同一列跨 6 行保持 6pt 周期、`Dotted` 保持 4pt 周期，行界处不重新起相；悬停行底带左边界随缩进与选中带同步（深度 1 为 x=365、深度 2 为 x=381，差值正好一个 16pt 缩进），无第二层底色；真机拖拽 `Lights` 到 `Objects` 内部，预览中祖先列按新层级落位（296 连续、312 止于 Lights 中心、328 覆盖 Key Light→Fill Light 中心），被拖动子树的参考线墨色与标签同步变淡（202 → 243），松手后回到满墨；浅色与深色主题均成立。
+- 待办：无（该轮三项待办已在下面《2026-11-06：Tree 悬停主干按单层整组加深、命中区与悬停依赖收敛》一并处理）。
+
+## 2026-11-06：Tree 悬停主干按单层整组加深、命中区与悬停依赖收敛
+
+- 悬停加深范围：先按「整条上游路径逐层加深」实现，又在中间一轮改为「在祖先中线把高亮交给下一层」；两种写法都找不到对应先例，逐条查证后确认业界约定是：文件树/大纲树的缩进参考线本身是静态的（VS Code Explorer `tree.indentGuidesStroke`、IntelliJ *Show tree indent guides*、Ant Design Tree 的 hover 只改行底色），唯一会「跟随光标」的是编辑器的 active indent guide（Sublime `indent_guide_options: draw_active`、VS Code `editor.guides.highlightActiveIndentation`），其语义是**只高亮光标所在那一层、并覆盖该缩进块的整段范围**。最终按此实现：悬停行只加深自己悬挂的那一列（层 = 深度 − 1），该列经过的**整组兄弟**一起变深到 0.62，祖先各列、其他分组的列、更深层的列保持 0.36；`Elbow` 的弯头属于每行自己的标签，只有指针所在那一行的弯头加深。根层行不悬挂任何主干，悬停不加深参考线。判定改为 `TreeGuideHover` 记录 `(行号, 祖先路径, 层)`，绘制阶段用 `deepens(path, level)` 比较前 `level + 1` 段索引（`TreeNodeKey.path` 含根索引，故层 `L` 的分组标识是 `path[..L+1]`，写成 `path[..L]` 会让旁支的列误跟着加深）；跨行失效仍由参考线节点自身承担，不排入 Tree 重算。悬停行被折叠或过滤移出树时，`retain_active` 在展平阶段核对记录，主干立刻回到默认墨色，不留残影。
+- 悬停依赖收敛：`TreeRow::body` 此前无条件读 `hovered.get()`，默认样式下每次指针移动都会把整棵树排入重算——之所以没暴露，是因为 `hovered` State 从未出现在 `Tree::dynamic_properties()` 里，写进去的人其实谁也没通知（顺带的真实缺陷：自定义 `TreeRowStyle` 因此从来没收到过 `is_hovered`）。现补上 `DynamicField::state("hovered", &self.hovered)`，`body` 不再读取该状态，改为把判定封成 `hover_snapshot` 闭包传入行；`children()` 只在「有 `TreeSlots::trailing`」或「样式 `requires_hover_recompose()`」时调用它，默认样式改读行节点上的悬停标记附件。`TreeRow::update_node` 的悬停回调同样只在这两种情况下调用宿主 `hover_action`。默认样式回归为纯绘制阶段响应，自定义路径才订阅。
+- 拖拽命中区：`TreeDragRegistry::hit` 原先在行的绝对 frame 之外再向左扩 `ROW_GUTTER`，而行节点本身已经铺满整行插槽（缩进留白与展开控件都在 frame 内），等于把同一份留白算了两遍，树左侧的空白区也会被误判成命中。改为只用原始 frame 判定。
+- 验证：`list_tree_tests` 的 `tree_guide_hover_deepens_the_path_to_the_hovered_row` 断言悬停叶子行时全树只有一列变深（`(leaf_y, 23.0, 0, 中线, deep)`，祖先列与父级续接全部保持默认），悬停父级行时该列在 Group / Leaf / Sibling 三段一起变深，Leave 回到基准，折叠悬停行后残留清零；新增 `tree_guide_hover_deepens_only_the_trunk_a_row_hangs_from`（`Elbow`，`Sibling` 下两个子行），断言共用主干跨兄弟带加深、指针上方兄弟的弯头仍是默认墨色、只有指针行的弯头加深。三个变异各自失败：去掉 `deepens` 的层级判定（祖先层跟着变深）、把主干收窄到悬停行自身路径（兄弟带不变深）、让弯头不看指针行（兄弟弯头跟着变深）。`tree_drag_resolves_the_indent_gutter_inside_the_row_frame`、`a_custom_tree_row_style_receives_the_hovered_row` 同轮保留。compose 全量 1690 项通过；doctest 由 1 passed / 1 ignored 变为 2 passed / 0 ignored（`ToggleButtonStyle` 的示例从 ` ```ignore ` 改成可编译 doctest，同时把 Swift 风格的 `Button(isSelected:action:)` 写法换成真实 Rust API）。
+- 原生验收：DevTools 真机指针，Scene hierarchy 页（Scene › Lights › Key Light / Fill Light，Objects，Camera），基线指针停在 900,150 的树外，逐像素取参考线墨色。`Straight` 悬停 Fill Light：二级列 x312 在 460..507（Key Light 整带 + Fill Light 到中线收束）202 → 164，祖先主干列 x296 全程 202 → 202 不变。悬停 Lights：x296 在 430..567 连续一段 202 → 164，覆盖 Lights、Key Light、Fill Light、Objects 直到 Camera 的中线，x312 不变。`Elbow` 悬停 Fill Light：x312 主干 202 → 164 跨两行，本行弯头 x314-318 208/201/202 → 177/159/169，Key Light 的弯头 206/204/203 → 203/200/198（仅 JPEG 噪声级）；悬停 Key Light 时加深的是它自己的弯头 206 → 159，Fill Light 的弯头回到 208 → 214 噪声级，主干仍整组 202 → 164。深色主题同页复核：主干 x312 84 → 112、祖先列 x296 84 → 84、指针行弯头 80/88/87 → 109/113/117、兄弟弯头 83/82/86 → 79/81/85。
 
 ## 2026-11-05：Tree 参考线加粗与悬停加深
 
@@ -192,7 +210,7 @@ cargo test -p cove-ui-compose --test compose --locked
 | SwipeList | 0 | 0 / 5 | 挂载/几何基础检查通过；待逐项交互和视觉验收 |
 | RefreshableList | 0 | 0 / 0 | 挂载/几何基础检查通过；待逐项交互和视觉验收 |
 | Scrollbar | 0 | 0 / 0 | 挂载/几何基础检查通过；待逐项交互和视觉验收 |
-| Tree | 0 | 0 / 6 | 拖拽改为实时重排（删除插入线）并共用键盘移动契约；五种参考线样式与 `guide_width`/`guide_position`/`leading_padding`/`trailing_padding` 几何 API；参考线默认 1.5pt 且悬停行自身参考线加深（不重算）；行可聚焦与焦点回收回归通过；浅/深主题下三种放置、四种键盘移动、样式与滑杆、悬停加深的真机目检已完成，边缘自动滚动与减弱动效仍待处理；文档已写 |
+| Tree | 0 | 0 / 6 | 拖拽改为实时重排（删除插入线）并共用键盘移动契约；五种参考线样式与 `guide_width`/`guide_position`/`leading_padding`/`trailing_padding` 几何 API；参考线默认 1.5pt 且悬停行自身参考线加深（不重算）；参考线落位改为行顶起算（`Straight` 连续、末子收束止于行中心）、投影祖先列按深度索引、悬停与光标底带并入内容插槽不再叠第二层；行可聚焦与焦点回收回归通过；浅/深主题下三种放置、四种键盘移动、样式与滑杆、悬停加深、拖拽预览列位与源行淡出的真机目检已完成，边缘自动滚动与减弱动效仍待处理；文档已写 |
 | VirtualStack | 0 | 0 / 0 | 挂载/几何基础检查通过；待逐项交互和视觉验收 |
 | Chart | 13 | 8 / 8 | 段落与 Swift 对齐；轴标签、覆盖层分级、图例键盘激活、缩放/刷选交互、数据动画与缓存失效已有回归；待逐项原生视觉验收 |
 | Icon | 3 | 0 / 0 | 挂载/几何基础检查通过；待逐项交互和视觉验收 |
