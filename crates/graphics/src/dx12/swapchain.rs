@@ -233,10 +233,19 @@ fn present_swapchain(chain: &Dx12Swapchain) -> RhiResult<()> {
     }
 }
 
-/// `IDXGISwapChain`'s vtable prefix, which is all the backend calls.
+/// `IDXGISwapChain3`'s vtable up to `GetCurrentBackBufferIndex`, in header
+/// order: `IDXGIObject`, `IDXGIDeviceSubObject`, then each swap-chain revision.
 #[repr(C)]
 struct SwapChainVtbl {
     base: sys::IUnknownVtbl,
+    // IDXGIObject
+    SetPrivateData: usize,
+    SetPrivateDataInterface: usize,
+    GetPrivateData: usize,
+    GetParent: usize,
+    // IDXGIDeviceSubObject
+    GetDevice: usize,
+    // IDXGISwapChain
     Present: unsafe extern "system" fn(sys::ComPtr, u32, u32) -> sys::HRESULT,
     GetBuffer: unsafe extern "system" fn(
         sys::ComPtr,
@@ -252,8 +261,27 @@ struct SwapChainVtbl {
     GetContainingOutput: usize,
     GetFrameStatistics: usize,
     GetLastPresentCount: usize,
-    /// `IDXGISwapChain1`…`3` methods follow; `GetCurrentBackBufferIndex` is on
-    /// `IDXGISwapChain3`, after the `IDXGISwapChain1`/`2` additions.
+    // IDXGISwapChain1
+    GetDesc1: usize,
+    GetFullscreenDesc: usize,
+    GetHwnd: usize,
+    GetCoreWindow: usize,
+    Present1: usize,
+    IsTemporaryMonoSupported: usize,
+    GetRestrictToOutput: usize,
+    SetBackgroundColor: usize,
+    GetBackgroundColor: usize,
+    SetRotation: usize,
+    GetRotation: usize,
+    // IDXGISwapChain2
+    SetSourceSize: usize,
+    GetSourceSize: usize,
+    SetMaximumFrameLatency: usize,
+    GetMaximumFrameLatency: usize,
+    GetFrameLatencyWaitableObject: usize,
+    SetMatrixTransform: usize,
+    GetMatrixTransform: usize,
+    // IDXGISwapChain3
     GetCurrentBackBufferIndex: unsafe extern "system" fn(sys::ComPtr) -> u32,
 }
 

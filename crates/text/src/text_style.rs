@@ -51,11 +51,11 @@ impl SystemFontDefaults {
         }
         #[cfg(target_os = "windows")]
         {
-            return "Segoe UI".into();
+            "Segoe UI".into()
         }
         #[cfg(target_os = "android")]
         {
-            return "Roboto".into();
+            "Roboto".into()
         }
         #[cfg(not(any(
             target_os = "macos",

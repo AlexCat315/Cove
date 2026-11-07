@@ -4,6 +4,7 @@
 use cove_platform::ScreenColor;
 
 /// Win32 `COLORREF` is `0x00BBGGRR`; alpha is always opaque.
+#[cfg(any(target_os = "windows", test))]
 pub(crate) fn decode_colorref(color: u32) -> ScreenColor {
     ScreenColor::from_rgba8(
         (color & 0xFF) as u8,
@@ -16,6 +17,7 @@ pub(crate) fn decode_colorref(color: u32) -> ScreenColor {
 /// Extract an sRGB pixel from an X11 `XImage` value using the image's real
 /// channel masks. Handles 565, 888, 10-bit and other TrueColor layouts without
 /// assuming R is always at bit 16.
+#[cfg(any(target_os = "linux", test))]
 pub(crate) fn decode_masked_pixel(pixel: u64, masks: [u64; 3]) -> ScreenColor {
     let channel = |mask: u64| -> u8 {
         if mask == 0 {

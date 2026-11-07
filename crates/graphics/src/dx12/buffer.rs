@@ -96,11 +96,10 @@ fn create_in_heap_from_pointer(
             Flags: sys::D3D12_RESOURCE_FLAG_NONE,
         };
         let mut resource: sys::ComPtr = core::ptr::null_mut();
-        // SAFETY: `device` is a live `ID3D12Device`; the vtable entry matches
-        // `CreateCommittedResource` (the first method after `CheckFeatureSupport`
-        // that creates resources).
+        // SAFETY: `device` is a live `ID3D12Device` and the vtable is declared
+        // in header order.
         let status = unsafe {
-            let vtbl = *(device as *mut *const DeviceCreateVtbl);
+            let vtbl = *(device as *mut *const sys::ID3D12DeviceVtbl);
             ((*vtbl).CreateCommittedResource)(
                 device,
                 &heap,
@@ -159,50 +158,11 @@ fn gpu_address(resource: sys::ComPtr) -> u64 {
     }
 }
 
-/// `ID3D12Device`'s vtable prefix up to `CreateCommittedResource`.
-#[repr(C)]
-struct DeviceCreateVtbl {
-    base: sys::IUnknownVtbl,
-    GetNodeCount: usize,
-    CreateCommandQueue: usize,
-    CreateCommandAllocator: usize,
-    CreateGraphicsPipelineState: usize,
-    CreateComputePipelineState: usize,
-    CreateCommandList: usize,
-    CheckFeatureSupport: usize,
-    CreateDescriptorHeap: usize,
-    GetDescriptorHandleIncrementSize: usize,
-    CreateRootSignature: usize,
-    CreateConstantBufferView: usize,
-    CreateShaderResourceView: usize,
-    CreateUnorderedAccessView: usize,
-    CreateRenderTargetView: usize,
-    CreateDepthStencilView: usize,
-    CreateSampler: usize,
-    CopyDescriptors: usize,
-    CopyDescriptorsSimple: usize,
-    CreateCommittedResource: unsafe extern "system" fn(
-        sys::ComPtr,
-        *const sys::D3D12_HEAP_PROPERTIES,
-        u32,
-        *const sys::D3D12_RESOURCE_DESC,
-        u32,
-        *const c_void,
-        *const sys::GUID,
-        *mut sys::ComPtr,
-    ) -> sys::HRESULT,
-}
-
 /// `ID3D12Resource`'s vtable prefix, which is all the backend calls.
 #[repr(C)]
 pub struct ResourceVtbl {
     pub base: sys::IUnknownVtbl,
-    pub GetPrivateData: usize,
-    pub SetPrivateData: usize,
-    pub SetPrivateDataInterface: usize,
-    pub GetName: usize,
-    pub SetName: usize,
-    pub GetHeapProperties: usize,
+    pub child: sys::ID3D12DeviceChildSlots,
     pub Map: unsafe extern "system" fn(
         sys::ComPtr,
         u32,

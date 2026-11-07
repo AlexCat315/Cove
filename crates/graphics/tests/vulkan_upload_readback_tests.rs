@@ -138,7 +138,7 @@ fn upload_then_readback_round_trips_pixels() {
         .expect("the texture is created");
 
     let mut uploaded = vec![0_u8; bytes_per_row * height];
-    for pixel in uploaded.chunks_exact_mut(4) {
+    for pixel in uploaded.as_chunks_mut::<4>().0 {
         pixel.copy_from_slice(&[255, 0, 0, 255]);
     }
     device

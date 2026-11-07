@@ -26,8 +26,9 @@ use std::{
 
 #[cfg(target_os = "macos")]
 mod appkit;
-#[cfg(any(target_os = "linux", test))]
-// Compiled off Linux too so the D-Bus wire codec has real coverage on this host.
+// Compiled on every Unix test host too, so the D-Bus wire codec has real
+// coverage there; it needs Unix sockets, so Windows never builds it.
+#[cfg(any(target_os = "linux", all(test, unix)))]
 #[allow(dead_code)]
 mod dbus;
 #[cfg(target_os = "linux")]
@@ -68,7 +69,7 @@ pub(crate) struct Session {
 }
 
 impl Session {
-    #[cfg(any(target_os = "macos", test))]
+    #[cfg(target_os = "macos")]
     pub(crate) fn native(state: Box<dyn Any>) -> Self {
         Self {
             cancel: None,

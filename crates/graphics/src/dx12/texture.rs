@@ -124,7 +124,7 @@ fn create_committed(
         // SAFETY: the device is live, the descriptor outlives the call, and the state
         // matches a default-heap texture.
         let status = unsafe {
-            let vtbl = *(device.device as *mut *const super::buffer::DeviceCreateVtbl);
+            let vtbl = *(device.device as *mut *const sys::ID3D12DeviceVtbl);
             ((*vtbl).CreateCommittedResource)(
                 device.device,
                 &heap,
@@ -195,12 +195,16 @@ fn heap_start(heap: sys::ComPtr) -> RhiResult<sys::D3D12_CPU_DESCRIPTOR_HANDLE> 
     }
     #[cfg(target_os = "windows")]
     {
-        // SAFETY: the heap is live; the vtable entry matches
-        // `GetCPUDescriptorHandleForHeapStart`.
-        let handle = unsafe {
+        // A COM method returning a struct hands it back through a hidden
+        // out-parameter under the MSVC ABI, so the handle is written into
+        // `handle` rather than returned in a register.
+        let mut handle = sys::D3D12_CPU_DESCRIPTOR_HANDLE { ptr: 0 };
+        // SAFETY: the heap is live, the vtable is declared in header order and
+        // `handle` is a writable local.
+        unsafe {
             let vtbl = *(heap as *mut *const DescriptorHeapVtbl);
-            ((*vtbl).GetCPUDescriptorHandleForHeapStart)(heap)
-        };
+            ((*vtbl).GetCPUDescriptorHandleForHeapStart)(heap, &mut handle);
+        }
         Ok(handle)
     }
 }
@@ -209,9 +213,12 @@ fn heap_start(heap: sys::ComPtr) -> RhiResult<sys::D3D12_CPU_DESCRIPTOR_HANDLE> 
 #[repr(C)]
 struct DescriptorHeapVtbl {
     base: sys::IUnknownVtbl,
+    child: sys::ID3D12DeviceChildSlots,
     GetDesc: usize,
-    GetCPUDescriptorHandleForHeapStart:
-        unsafe extern "system" fn(sys::ComPtr) -> sys::D3D12_CPU_DESCRIPTOR_HANDLE,
+    GetCPUDescriptorHandleForHeapStart: unsafe extern "system" fn(
+        sys::ComPtr,
+        *mut sys::D3D12_CPU_DESCRIPTOR_HANDLE,
+    ) -> *mut sys::D3D12_CPU_DESCRIPTOR_HANDLE,
     GetGPUDescriptorHandleForHeapStart: usize,
 }
 
@@ -529,17 +536,35 @@ fn transfer(
         } else {
             sys::D3D12_HEAP_TYPE_READBACK
         };
-        let staging =
-            super::buffer::create_in_heap_for_transfer(device.device, byte_count.max(1), heap)?;
+        // The buffer side of a texture copy is a placed footprint whose rows
+        // must start on 256-byte boundaries, so tightly packed caller rows are
+        // re-laid out through the staging buffer.
+        let rows = usize::try_from(region.height).unwrap_or(0);
+        let pitch = bytes_per_row.next_multiple_of(sys::D3D12_TEXTURE_DATA_PITCH_ALIGNMENT);
+        let staging = super::buffer::create_in_heap_for_transfer(
+            device.device,
+            (pitch * rows).max(1),
+            heap,
+        )?;
+        let row_bytes = |row: usize| {
+            let start = row * bytes_per_row;
+            start..(start + bytes_per_row).min(byte_count)
+        };
         if upload {
             let pointer = staging.mapped;
             rhi_require(!pointer.is_null(), "upload heap is not mapped")?;
             let bytes =
                 source.ok_or_else(|| RhiError::invalid_argument("missing upload source"))?;
-            // SAFETY: the staging buffer holds at least `byte_count` bytes and the
-            // source slice is distinct.
-            unsafe {
-                std::ptr::copy_nonoverlapping(bytes.as_ptr(), pointer, byte_count);
+            for row in 0..rows {
+                let range = row_bytes(row);
+                let Some(chunk) = bytes.get(range) else {
+                    break;
+                };
+                // SAFETY: row `row` of the staging buffer spans `pitch >= chunk.len()`
+                // bytes inside its `pitch * rows` allocation; the slices are distinct.
+                unsafe {
+                    std::ptr::copy_nonoverlapping(chunk.as_ptr(), pointer.add(row * pitch), chunk.len());
+                }
             }
         }
         let result = record_copy(
@@ -547,18 +572,29 @@ fn transfer(
             record,
             staging.resource,
             region,
-            bytes_per_row,
+            pitch,
             subresource,
             upload,
         );
         if result.is_ok() && !upload {
             let pointer = staging.mapped;
-            if !pointer.is_null() {
-                if let Some(destination) = destination {
-                    // SAFETY: the copy completed and the readback mapping covers the
-                    // range; the destination is a distinct live slice.
+            if !pointer.is_null()
+                && let Some(destination) = destination
+            {
+                for row in 0..rows {
+                    let range = row_bytes(row);
+                    let Some(chunk) = destination.get_mut(range) else {
+                        break;
+                    };
+                    // SAFETY: the copy completed and row `row` of the readback
+                    // mapping holds at least `chunk.len()` bytes; the slices are
+                    // distinct.
                     unsafe {
-                        std::ptr::copy_nonoverlapping(pointer, destination.as_mut_ptr(), byte_count)
+                        std::ptr::copy_nonoverlapping(
+                            pointer.add(row * pitch),
+                            chunk.as_mut_ptr(),
+                            chunk.len(),
+                        )
                     };
                 }
             }
@@ -577,7 +613,7 @@ fn record_copy(
     record: &super::backend::TextureSnapshot,
     staging: sys::ComPtr,
     region: TextureUploadRegion,
-    bytes_per_row: usize,
+    row_pitch: usize,
     subresource: TextureSubresource,
     upload: bool,
 ) -> RhiResult<()> {
@@ -603,56 +639,54 @@ fn record_copy(
         )
     };
 
-    let texture_location = sys::D3D12_TEXTURE_COPY_LOCATION {
-        pResource: record.resource,
-        Type: sys::D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX,
-        SubresourceIndex: (subresource.mip_level + subresource.layer * record.mip_levels) as u32,
-        PlacedFootprintPadding: [0; 6],
-    };
-    let buffer_location = sys::D3D12_TEXTURE_COPY_LOCATION {
-        pResource: staging,
-        Type: sys::D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT,
-        SubresourceIndex: 0,
-        PlacedFootprintPadding: [
-            bytes_per_row as u32,
-            region.height as u32,
-            region.width as u32,
-            region.height as u32,
-            1,
-            0,
-        ],
-    };
-    let box_region = sys::D3D12_BOX {
-        left: region.origin[0].max(0) as u32,
-        top: region.origin[1].max(0) as u32,
-        front: 0,
-        right: (region.origin[0] + region.width) as u32,
-        bottom: (region.origin[1] + region.height) as u32,
-        back: 1,
-    };
-    // SAFETY: both resources are live and in the states the copy names.
+    let texture_location = sys::D3D12_TEXTURE_COPY_LOCATION::subresource(
+        record.resource,
+        (subresource.mip_level + subresource.layer * record.mip_levels) as u32,
+    );
+    let width = region.width.max(0) as u32;
+    let height = region.height.max(0) as u32;
+    let buffer_location = sys::D3D12_TEXTURE_COPY_LOCATION::placed(
+        staging,
+        sys::D3D12_PLACED_SUBRESOURCE_FOOTPRINT {
+            Offset: 0,
+            Footprint: sys::D3D12_SUBRESOURCE_FOOTPRINT {
+                Format: formats::dxgi_format(record.format),
+                Width: width,
+                Height: height,
+                Depth: 1,
+                RowPitch: row_pitch as u32,
+            },
+        },
+    );
+    let x = region.origin[0].max(0) as u32;
+    let y = region.origin[1].max(0) as u32;
+    // SAFETY: both resources are live and in the states the copy names; the
+    // footprint describes the staging allocation.
     unsafe {
         let vtbl = *(list as *mut *const super::resources::CommandListVtbl);
-        let (destination, destination_subresource, destination_x, destination_y) = if upload {
-            (&texture_location, 0u32, 0u32, 0u32)
+        if upload {
+            // The whole staged footprint lands at the region's origin.
+            let source_box = sys::D3D12_BOX {
+                left: 0,
+                top: 0,
+                front: 0,
+                right: width,
+                bottom: height,
+                back: 1,
+            };
+            ((*vtbl).CopyTextureRegion)(list, &texture_location, x, y, 0, &buffer_location, &source_box);
         } else {
-            (&buffer_location, 0u32, 0u32, 0u32)
-        };
-        let (source, source_subresource, source_x, source_y) = if upload {
-            (&buffer_location, 0u32, 0u32, 0u32)
-        } else {
-            (&texture_location, 0u32, 0u32, 0u32)
-        };
-        ((*vtbl).CopyTextureRegion)(
-            list,
-            destination,
-            destination_subresource,
-            destination_x,
-            destination_y,
-            0,
-            source,
-            &box_region,
-        );
+            // The region is read out of the texture to the footprint's origin.
+            let source_box = sys::D3D12_BOX {
+                left: x,
+                top: y,
+                front: 0,
+                right: x + width,
+                bottom: y + height,
+                back: 1,
+            };
+            ((*vtbl).CopyTextureRegion)(list, &buffer_location, 0, 0, 0, &texture_location, &source_box);
+        }
         super::resources::transition(list, record.resource, before, after);
     }
     super::command_list::close_and_submit(device, list)

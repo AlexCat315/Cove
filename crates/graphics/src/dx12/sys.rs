@@ -376,14 +376,66 @@ pub struct D3D12_RESOURCE_BARRIER {
 
 #[repr(C)]
 #[derive(Clone, Copy, Default)]
+pub struct D3D12_SUBRESOURCE_FOOTPRINT {
+    pub Format: u32,
+    pub Width: u32,
+    pub Height: u32,
+    pub Depth: u32,
+    /// Bytes between rows; D3D12 requires a multiple of
+    /// [`D3D12_TEXTURE_DATA_PITCH_ALIGNMENT`].
+    pub RowPitch: u32,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Default)]
+pub struct D3D12_PLACED_SUBRESOURCE_FOOTPRINT {
+    pub Offset: u64,
+    pub Footprint: D3D12_SUBRESOURCE_FOOTPRINT,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub union D3D12_TEXTURE_COPY_LOCATION_0 {
+    pub PlacedFootprint: D3D12_PLACED_SUBRESOURCE_FOOTPRINT,
+    pub SubresourceIndex: u32,
+}
+
+/// A copy endpoint: a texture subresource, or a buffer laid out as one.
+#[repr(C)]
+#[derive(Clone, Copy)]
 pub struct D3D12_TEXTURE_COPY_LOCATION {
     pub pResource: *mut c_void,
     pub Type: u32,
-    pub SubresourceIndex: u32,
-    /// `PlacedFootprint` when `Type` is `PLACED_FOOTPRINT`; the buffer path only
-    /// uses the subresource form, so this keeps the union's size.
-    pub PlacedFootprintPadding: [u32; 6],
+    pub Anonymous: D3D12_TEXTURE_COPY_LOCATION_0,
 }
+
+impl D3D12_TEXTURE_COPY_LOCATION {
+    pub fn subresource(resource: *mut c_void, index: u32) -> Self {
+        Self {
+            pResource: resource,
+            Type: D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX,
+            Anonymous: D3D12_TEXTURE_COPY_LOCATION_0 {
+                SubresourceIndex: index,
+            },
+        }
+    }
+
+    pub fn placed(resource: *mut c_void, footprint: D3D12_PLACED_SUBRESOURCE_FOOTPRINT) -> Self {
+        Self {
+            pResource: resource,
+            Type: D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT,
+            Anonymous: D3D12_TEXTURE_COPY_LOCATION_0 {
+                PlacedFootprint: footprint,
+            },
+        }
+    }
+}
+
+/// Row pitch alignment for buffer-side texture copies.
+pub const D3D12_TEXTURE_DATA_PITCH_ALIGNMENT: usize = 256;
+
+#[cfg(target_pointer_width = "64")]
+const _: () = assert!(core::mem::size_of::<D3D12_TEXTURE_COPY_LOCATION>() == 48);
 
 #[repr(C)]
 #[derive(Clone, Copy, Default)]
@@ -584,11 +636,11 @@ pub struct D3D12_RENDER_TARGET_BLEND_STATE {
 #[derive(Clone, Copy)]
 pub struct D3D12_GRAPHICS_PIPELINE_STATE_DESC {
     pub pRootSignature: *mut c_void,
-    pub VS: [u8; 8],
-    pub PS: [u8; 8],
-    pub DS: [u8; 8],
-    pub HS: [u8; 8],
-    pub GS: [u8; 8],
+    pub VS: D3D12_SHADER_BYTECODE,
+    pub PS: D3D12_SHADER_BYTECODE,
+    pub DS: D3D12_SHADER_BYTECODE,
+    pub HS: D3D12_SHADER_BYTECODE,
+    pub GS: D3D12_SHADER_BYTECODE,
     pub StreamOutput: D3D12_STREAM_OUTPUT_DESC,
     pub BlendState: D3D12_BLEND_DESC,
     pub SampleMask: u32,
@@ -602,7 +654,7 @@ pub struct D3D12_GRAPHICS_PIPELINE_STATE_DESC {
     pub DSVFormat: u32,
     pub SampleDesc: [u32; 2],
     pub NodeMask: u32,
-    pub CachedPSO: [u8; 8],
+    pub CachedPSO: D3D12_CACHED_PIPELINE_STATE,
     pub Flags: u32,
 }
 
@@ -617,9 +669,9 @@ impl Default for D3D12_GRAPHICS_PIPELINE_STATE_DESC {
 #[derive(Clone, Copy)]
 pub struct D3D12_COMPUTE_PIPELINE_STATE_DESC {
     pub pRootSignature: *mut c_void,
-    pub CS: [u8; 8],
+    pub CS: D3D12_SHADER_BYTECODE,
     pub NodeMask: u32,
-    pub CachedPSO: [u8; 8],
+    pub CachedPSO: D3D12_CACHED_PIPELINE_STATE,
     pub Flags: u32,
 }
 
@@ -751,37 +803,40 @@ pub struct DXGI_PRESENT_PARAMETERS {
 
 // MARK: - Shader bytecode
 
-/// `D3D12_SHADER_BYTECODE`: `[u8; 8]` above is the same size as this struct, but
-/// naming it makes the pipeline descriptors readable.
+/// `D3D12_SHADER_BYTECODE`: a pointer and a length, so 16 bytes and
+/// pointer-aligned on a 64-bit target.
 #[repr(C)]
-#[derive(Clone, Copy, Default)]
+#[derive(Clone, Copy)]
 pub struct D3D12_SHADER_BYTECODE {
     pub pShaderBytecode: *const c_void,
     pub BytecodeLength: usize,
 }
 
-impl D3D12_SHADER_BYTECODE {
-    /// Reads a shader bytecode struct back out of its inline storage.
-    ///
-    /// The struct is two machine words — a pointer and a length — so it is 8 bytes
-    /// on a 32-bit target and 16 on a 64-bit one. The storage size therefore comes
-    /// from `size_of` rather than a hardcoded constant; a fixed 8-byte buffer is
-    /// too small on 64-bit and `transmute_copy` is undefined behaviour there.
-    ///
-    /// # Safety
-    /// `storage` must contain a `D3D12_SHADER_BYTECODE` written by [`Self::write_into`].
-    pub unsafe fn read_from(storage: &[u8; core::mem::size_of::<Self>()]) -> Self {
-        // SAFETY: `storage` is exactly `size_of::<Self>()` bytes and the caller
-        // guarantees it holds a previously written value.
-        unsafe { core::mem::transmute_copy(storage) }
-    }
-
-    /// Writes this struct into the inline storage a pipeline descriptor exposes.
-    pub fn write_into(self, storage: &mut [u8; core::mem::size_of::<Self>()]) {
-        // SAFETY: the sizes match by construction.
-        *storage = unsafe { core::mem::transmute_copy(&self) };
+impl Default for D3D12_SHADER_BYTECODE {
+    fn default() -> Self {
+        Self {
+            pShaderBytecode: core::ptr::null(),
+            BytecodeLength: 0,
+        }
     }
 }
+
+/// `D3D12_CACHED_PIPELINE_STATE`: the same pointer-and-length shape.
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub struct D3D12_CACHED_PIPELINE_STATE {
+    pub pCachedBlob: *const c_void,
+    pub CachedBlobSizeInBytes: usize,
+}
+
+// The pipeline descriptors are passed to the driver by pointer, so their
+// layout must match `d3d12.h` exactly; these are its x64 sizes.
+#[cfg(target_pointer_width = "64")]
+const _: () = {
+    assert!(core::mem::size_of::<D3D12_SHADER_BYTECODE>() == 16);
+    assert!(core::mem::size_of::<D3D12_COMPUTE_PIPELINE_STATE_DESC>() == 56);
+    assert!(core::mem::size_of::<D3D12_GRAPHICS_PIPELINE_STATE_DESC>() == 656);
+};
 
 // MARK: - VTables
 //
@@ -819,6 +874,29 @@ impl IUnknownVtbl {
     }
 }
 
+/// `ID3D12Object`'s methods, which every D3D12 interface inherits right after
+/// `IUnknown`'s. None are called; the slots keep later offsets right.
+#[repr(C)]
+pub struct ID3D12ObjectSlots {
+    pub GetPrivateData: usize,
+    pub SetPrivateData: usize,
+    pub SetPrivateDataInterface: usize,
+    pub SetName: usize,
+}
+
+/// `ID3D12Object` plus `ID3D12DeviceChild::GetDevice`, the prefix of every
+/// device-owned interface (queues, fences, heaps, resources, command lists).
+#[repr(C)]
+pub struct ID3D12DeviceChildSlots {
+    pub object: ID3D12ObjectSlots,
+    pub GetDevice: usize,
+}
+
+/// `CreateRenderTargetView` / `CreateDepthStencilView`: resource, optional view
+/// description, destination descriptor.
+pub type CreateViewFn =
+    unsafe extern "system" fn(*mut c_void, *mut c_void, *const c_void, D3D12_CPU_DESCRIPTOR_HANDLE);
+
 /// `ID3D12Device`'s vtable, in header order.
 ///
 /// Only the entries the backend calls are typed; the rest are declared with their
@@ -827,6 +905,7 @@ impl IUnknownVtbl {
 #[repr(C)]
 pub struct ID3D12DeviceVtbl {
     pub base: IUnknownVtbl,
+    pub object: ID3D12ObjectSlots,
     pub GetNodeCount: usize,
     pub CreateCommandQueue: unsafe extern "system" fn(
         *mut c_void,
@@ -879,8 +958,8 @@ pub struct ID3D12DeviceVtbl {
     pub CreateConstantBufferView: usize,
     pub CreateShaderResourceView: usize,
     pub CreateUnorderedAccessView: usize,
-    pub CreateRenderTargetView: usize,
-    pub CreateDepthStencilView: usize,
+    pub CreateRenderTargetView: CreateViewFn,
+    pub CreateDepthStencilView: CreateViewFn,
     pub CreateSampler: unsafe extern "system" fn(
         *mut c_void,
         *const D3D12_SAMPLER_DESC,
@@ -888,6 +967,28 @@ pub struct ID3D12DeviceVtbl {
     ),
     pub CopyDescriptors: usize,
     pub CopyDescriptorsSimple: usize,
+    /// Returns a struct: not callable through this plain signature.
+    pub GetResourceAllocationInfo: usize,
+    /// Returns a struct: not callable through this plain signature.
+    pub GetCustomHeapProperties: usize,
+    pub CreateCommittedResource: unsafe extern "system" fn(
+        *mut c_void,
+        *const D3D12_HEAP_PROPERTIES,
+        u32,
+        *const D3D12_RESOURCE_DESC,
+        u32,
+        *const c_void,
+        *const GUID,
+        *mut *mut c_void,
+    ) -> HRESULT,
+    pub CreateHeap: usize,
+    pub CreatePlacedResource: usize,
+    pub CreateReservedResource: usize,
+    pub CreateSharedHandle: usize,
+    pub OpenSharedHandle: usize,
+    pub OpenSharedHandleByName: usize,
+    pub MakeResident: usize,
+    pub Evict: usize,
     /// `CreateFence`.
     pub CreateFence:
         unsafe extern "system" fn(*mut c_void, u64, u32, *const GUID, *mut *mut c_void) -> HRESULT,
@@ -905,25 +1006,6 @@ mod tests {
     fn hresult_messages_name_the_code() {
         assert!(hresult_message(E_FAIL).contains("0x80004005"));
         assert_eq!(S_OK, 0);
-    }
-
-    #[test]
-    fn shader_bytecode_round_trips_through_inline_storage() {
-        let bytecode = D3D12_SHADER_BYTECODE {
-            pShaderBytecode: 0x1000usize as *const c_void,
-            BytecodeLength: 64,
-        };
-        let mut storage = [0u8; std::mem::size_of::<D3D12_SHADER_BYTECODE>()];
-        bytecode.write_into(&mut storage);
-        // SAFETY: `storage` was just written by `write_into`.
-        let restored = unsafe { D3D12_SHADER_BYTECODE::read_from(&storage) };
-        assert_eq!(restored.pShaderBytecode, bytecode.pShaderBytecode);
-        assert_eq!(restored.BytecodeLength, 64);
-        // Two machine words, so 16 bytes on a 64-bit target.
-        assert_eq!(
-            std::mem::size_of::<D3D12_SHADER_BYTECODE>(),
-            2 * std::mem::size_of::<usize>()
-        );
     }
 
     #[test]

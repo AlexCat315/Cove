@@ -32,11 +32,9 @@ impl NativeUIShaderResources {
             )));
         }
         let constants = ranges[0];
-        let vertex = device.make_shader_module(va.module_descriptor(&[])?)?;
-        let fragment = match fa
-            .module_descriptor(&[])
-            .and_then(|d| device.make_shader_module(d))
-        {
+        let api = device.backend_api();
+        let vertex = make_module(&device, &va, api, name, ShaderStage::Vertex)?;
+        let fragment = match make_module(&device, &fa, api, name, ShaderStage::Fragment) {
             Ok(value) => value,
             Err(error) => {
                 device.destroy_shader_module(vertex);
@@ -173,4 +171,66 @@ pub(super) fn make_pipeline(
         vec![VertexBufferLayout::new(if backdrop { 16 } else { 20 })],
     ));
     shaders.device.make_graphics_pipeline(descriptor)
+}
+
+/// Creates a module from the preferred artifact. A precompiled Metal library
+/// built for a newer OS than the running one refuses to load ("deployment
+/// target ... not supported on this device"); the MSL source it was built
+/// from, carrying the same fingerprint and interface, compiles here instead.
+fn make_module(
+    device: &Device,
+    artifact: &ShaderArtifact,
+    api: GraphicsApi,
+    name: &str,
+    stage: ShaderStage,
+) -> RhiResult<ShaderModule> {
+    match artifact
+        .module_descriptor(&[])
+        .and_then(|descriptor| device.make_shader_module(descriptor))
+    {
+        Ok(module) => Ok(module),
+        Err(error) if artifact.format == ShaderFormat::Metallib => {
+            let source = super::resources::source_artifact(api, name, stage)?;
+            source
+                .module_descriptor(&[])
+                .and_then(|descriptor| device.make_shader_module(descriptor))
+                .map_err(|_| error)
+        }
+        Err(error) => Err(error),
+    }
+}
+
+#[cfg(all(test, any(target_os = "macos", target_os = "ios")))]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn an_unloadable_library_falls_back_to_its_msl_source() {
+        let Ok(device) = Device::make(DeviceConfig {
+            preferred_backends: vec![GraphicsApi::Metal],
+            enable_validation: false,
+            ..DeviceConfig::default()
+        }) else {
+            eprintln!("no Metal device available; skipping");
+            return;
+        };
+        let mut broken = super::super::resources::source_artifact(
+            GraphicsApi::Metal,
+            "ui",
+            ShaderStage::Fragment,
+        )
+        .expect("the MSL source artifact");
+        // Stands in for a library built for a newer OS than this one.
+        broken.format = ShaderFormat::Metallib;
+        broken.code = b"not a metallib".to_vec();
+        let module = make_module(
+            &device,
+            &broken,
+            GraphicsApi::Metal,
+            "ui",
+            ShaderStage::Fragment,
+        )
+        .expect("the MSL source builds the module");
+        device.destroy_shader_module(module);
+    }
 }

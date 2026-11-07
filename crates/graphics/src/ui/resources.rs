@@ -1,5 +1,6 @@
 use crate::rhi::{GraphicsApi, RhiError, RhiResult, ShaderArtifact, ShaderStage};
-pub(super) fn artifact(
+/// The portable artifact: MSL source on Metal, SPIR-V and DXIL elsewhere.
+pub(super) fn source_artifact(
     api: GraphicsApi,
     name: &str,
     stage: ShaderStage,
@@ -14,7 +15,20 @@ pub(super) fn artifact(
         ShaderStage::Fragment => "fragment",
         _ => return Err(RhiError::unsupported_feature("UI shader stage")),
     };
-    let source = ShaderArtifact::from_json(bytes(backend, name, stage)?)?;
+    ShaderArtifact::from_json(bytes(backend, name, stage)?)
+}
+
+pub(super) fn artifact(
+    api: GraphicsApi,
+    name: &str,
+    stage: ShaderStage,
+) -> RhiResult<ShaderArtifact> {
+    let source = source_artifact(api, name, stage)?;
+    let stage = match stage {
+        ShaderStage::Vertex => "vertex",
+        ShaderStage::Fragment => "fragment",
+        _ => return Err(RhiError::unsupported_feature("UI shader stage")),
+    };
     if api == GraphicsApi::Metal {
         let platform = if cfg!(target_os = "macos") {
             Some("metal-macos")

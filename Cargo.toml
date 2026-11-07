@@ -61,6 +61,9 @@ cove-media = { path = "crates/media" }
 cove-media-rhi = { path = "crates/media-rhi" }
 ffmpeg-sys-next = { version = "=9.0.1", default-features = false, features = [
     "build",
+    # No `-march/-mtune=native`: shipped binaries must run on any CPU of the
+    # target, and cl.exe does not understand the GCC flags.
+    "build-portable",
     "avcodec",
     "avfilter",
     "avformat",

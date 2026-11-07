@@ -612,10 +612,12 @@ mod windows_impl {
     #[repr(C)]
     struct FenceVtbl {
         base: sys::IUnknownVtbl,
+        child: sys::ID3D12DeviceChildSlots,
         GetCompletedValue: unsafe extern "system" fn(sys::ComPtr) -> u64,
         SetEventOnCompletion:
             unsafe extern "system" fn(sys::ComPtr, u64, sys::HANDLE) -> sys::HRESULT,
-        Signal: unsafe extern "system" fn(sys::ComPtr, sys::ComPtr, u64) -> sys::HRESULT,
+        /// CPU-side signal; queues signal through `ID3D12CommandQueue::Signal`.
+        Signal: unsafe extern "system" fn(sys::ComPtr, u64) -> sys::HRESULT,
     }
 
     /// The vtable entry points the swapchain needs from `IDXGISwapChain3`.
@@ -635,8 +637,8 @@ pub fn execute_and_signal(queue: &mut Dx12Queue, command_list: sys::ComPtr) -> R
             ((*vtbl).ExecuteCommandLists)(queue.queue, 1, list.as_ptr().cast());
             queue.fence_value += 1;
             let value = queue.fence_value;
-            let fence_vtbl = *(queue.fence as *mut *const FenceVtblLocal);
-            ((*fence_vtbl).Signal)(queue.fence, queue.queue, value);
+            // The queue signals the fence once the list completes on the GPU.
+            ((*vtbl).Signal)(queue.queue, queue.fence, value);
             Ok(value)
         }
     }
@@ -658,6 +660,7 @@ pub fn wait_idle(queue: &Dx12Queue, value: u64) -> RhiResult<()> {
 #[repr(C)]
 struct QueueVtbl {
     base: sys::IUnknownVtbl,
+    child: sys::ID3D12DeviceChildSlots,
     UpdateTileMappings: usize,
     CopyTileMappings: usize,
     ExecuteCommandLists: unsafe extern "system" fn(sys::ComPtr, u32, *const sys::ComPtr),
@@ -668,16 +671,6 @@ struct QueueVtbl {
     Wait: unsafe extern "system" fn(sys::ComPtr, sys::ComPtr, u64) -> sys::HRESULT,
     GetTimestampFrequency: usize,
     GetClockCalibration: usize,
-}
-
-/// `ID3D12Fence`'s vtable prefix, at module scope so `execute_and_signal` can use
-/// it without the Windows-only module.
-#[repr(C)]
-struct FenceVtblLocal {
-    base: sys::IUnknownVtbl,
-    GetCompletedValue: unsafe extern "system" fn(sys::ComPtr) -> u64,
-    SetEventOnCompletion: unsafe extern "system" fn(sys::ComPtr, u64, sys::HANDLE) -> sys::HRESULT,
-    Signal: unsafe extern "system" fn(sys::ComPtr, sys::ComPtr, u64) -> sys::HRESULT,
 }
 
 #[cfg(test)]

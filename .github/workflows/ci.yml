@@ -127,7 +127,13 @@ jobs:
           rm -f /usr/bin/link.exe /c/msys64/usr/bin/link.exe
           printf 'CARGO_TARGET_X86_64_PC_WINDOWS_MSVC_LINKER=%sbin\\HostX64\\x64\\link.exe\n' "$VCToolsInstallDir" >> "$GITHUB_ENV"
       - name: Media control and output tests
-        run: cargo test --locked -p cove-media --features ffmpeg --all-targets
+        # A failed configure prints its log, since the build script only
+        # reports "C compiler test failed".
+        run: |
+          cargo test --locked -p cove-media --features ffmpeg --all-targets || {
+            find target -path '*ffmpeg-sys-next*' -name config.log -exec tail -n 60 {} \;
+            exit 1
+          }
       - name: Out-of-tree consumer application
         run: |
           cp -R Tools/MediaSmoke "$RUNNER_TEMP/cove-media-consumer"

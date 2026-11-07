@@ -108,8 +108,7 @@ fn list_row_cross_fade() {
             let dark = Theme::default_dark().colors.surface_pressed;
             let light = Theme::default_light().colors.surface_pressed;
             let root = graph.tree.borrow().root().expect("root");
-            let node =
-                find_with_color(&root, dark).expect("a row paints the dark selection band");
+            let node = find_with_color(&root, dark).expect("a row paints the dark selection band");
 
             appearance.set(Appearance::Light);
             graph.recomposer.commit_all();

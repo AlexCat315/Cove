@@ -93,6 +93,7 @@ struct Xlib {
 // that is deliberately never closed; every call uses its own `Display`, so the
 // value can be shared by sampler threads without mutation.
 unsafe impl Send for Xlib {}
+// SAFETY: as above; the function pointers are never written after loading.
 unsafe impl Sync for Xlib {}
 
 unsafe extern "C" {
@@ -173,6 +174,9 @@ fn escape_pressed(x: &Xlib, display: *mut c_void, keycode: u8) -> bool {
     keys[usize::from(keycode) / 8] & (1 << (keycode % 8)) != 0
 }
 
+// `c_ulong` is 64-bit on LP64 Linux but 32-bit elsewhere, so the widening
+// casts below are only no-ops on some targets.
+#[allow(clippy::unnecessary_cast)]
 fn sample(
     x: &Xlib,
     display: *mut c_void,

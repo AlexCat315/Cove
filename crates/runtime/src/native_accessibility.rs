@@ -1,9 +1,9 @@
 use crate::{PlatformWindowSession, Sdl3PlatformHost};
 use cove_core::scene::*;
-use std::{
-    cell::{Cell, RefCell},
-    rc::{Rc, Weak},
-};
+use std::{cell::RefCell, rc::Rc};
+// Only the Apple bridge keeps per-window state behind weak handles.
+#[cfg(any(target_os = "macos", target_os = "ios"))]
+use std::{cell::Cell, rc::Weak};
 pub struct NativeAccessibility;
 impl NativeAccessibility {
     pub fn synchronize(

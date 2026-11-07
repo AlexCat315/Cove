@@ -15,6 +15,8 @@ pub enum RhiError {
     OutOfMemory,
     #[error("RHI: swapchain acquire failed — {0}")]
     SwapchainAcquireFailed(String),
+    #[error("RHI: swapchain creation failed — {0}")]
+    MakeSwapchainFailed(String),
     #[error("RHI: submit failed — {0}")]
     SubmitFailed(String),
     #[error("RHI: present failed — {0}")]
@@ -46,6 +48,9 @@ impl RhiError {
     }
     pub fn present_failed(detail: impl Into<String>) -> Self {
         Self::PresentFailed(detail.into())
+    }
+    pub fn make_swapchain_failed(detail: impl Into<String>) -> Self {
+        Self::MakeSwapchainFailed(detail.into())
     }
 }
 

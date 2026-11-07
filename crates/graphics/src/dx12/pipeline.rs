@@ -12,7 +12,7 @@ use crate::rhi::{
 
 use super::device::Dx12DeviceHandle;
 use super::resources::Dx12Registries;
-use super::sys;
+use super::{formats, sys};
 
 /// Creates one graphics pipeline state and records it.
 pub fn create_graphics(
@@ -122,17 +122,15 @@ fn create_graphics_native(
 
         let mut pipeline = sys::D3D12_GRAPHICS_PIPELINE_STATE_DESC::default();
         pipeline.pRootSignature = root_signature;
-        sys::D3D12_SHADER_BYTECODE {
+        pipeline.VS = sys::D3D12_SHADER_BYTECODE {
             pShaderBytecode: vertex.bytecode.as_ptr().cast(),
             BytecodeLength: vertex.bytecode.len(),
-        }
-        .write_into(&mut pipeline.VS);
+        };
         if let Some(fragment) = fragment {
-            sys::D3D12_SHADER_BYTECODE {
+            pipeline.PS = sys::D3D12_SHADER_BYTECODE {
                 pShaderBytecode: fragment.bytecode.as_ptr().cast(),
                 BytecodeLength: fragment.bytecode.len(),
-            }
-            .write_into(&mut pipeline.PS);
+            };
         }
         for (index, attachment) in descriptor.color_attachments.iter().enumerate() {
             pipeline.RTVFormats[index] = formats::dxgi_format(attachment.format);
@@ -226,31 +224,28 @@ fn create_mesh_native(
         // A mesh pipeline puts the mesh shader in the amplification/geometry slots:
         // `MS` occupies the `GS` field and the object shader the `AS` field, which
         // is how D3D12 spells the mesh pipeline without a separate descriptor.
-        sys::D3D12_SHADER_BYTECODE {
+        pipeline.GS = sys::D3D12_SHADER_BYTECODE {
             pShaderBytecode: mesh.bytecode.as_ptr().cast(),
             BytecodeLength: mesh.bytecode.len(),
-        }
-        .write_into(&mut pipeline.GS);
+        };
         if let Some(task) = descriptor.task {
             let task = registries
                 .shaders
                 .get(&task.id())
                 .ok_or_else(|| RhiError::invalid_argument("mesh pipeline task shader not found"))?;
-            sys::D3D12_SHADER_BYTECODE {
+            pipeline.HS = sys::D3D12_SHADER_BYTECODE {
                 pShaderBytecode: task.bytecode.as_ptr().cast(),
                 BytecodeLength: task.bytecode.len(),
-            }
-            .write_into(&mut pipeline.HS);
+            };
         }
         if let Some(fragment) = descriptor.fragment {
             let fragment = registries.shaders.get(&fragment.id()).ok_or_else(|| {
                 RhiError::invalid_argument("mesh pipeline fragment shader not found")
             })?;
-            sys::D3D12_SHADER_BYTECODE {
+            pipeline.PS = sys::D3D12_SHADER_BYTECODE {
                 pShaderBytecode: fragment.bytecode.as_ptr().cast(),
                 BytecodeLength: fragment.bytecode.len(),
-            }
-            .write_into(&mut pipeline.PS);
+            };
         }
         for (index, attachment) in descriptor.color_attachments.iter().enumerate() {
             pipeline.RTVFormats[index] = formats::dxgi_format(attachment.format);
@@ -320,11 +315,10 @@ fn create_compute_native(
             .unwrap_or(core::ptr::null_mut());
         let mut pipeline = sys::D3D12_COMPUTE_PIPELINE_STATE_DESC::default();
         pipeline.pRootSignature = root_signature;
-        sys::D3D12_SHADER_BYTECODE {
+        pipeline.CS = sys::D3D12_SHADER_BYTECODE {
             pShaderBytecode: shader.bytecode.as_ptr().cast(),
             BytecodeLength: shader.bytecode.len(),
-        }
-        .write_into(&mut pipeline.CS);
+        };
         let mut state: sys::ComPtr = core::ptr::null_mut();
         // SAFETY: the device is live and the descriptor's bytecode pointer refers to
         // the registry's buffer, which outlives the call.

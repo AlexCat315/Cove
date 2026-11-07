@@ -55,7 +55,7 @@ pub fn record(
 
 /// Opens a command list on the allocator for this queue class.
 #[cfg(target_os = "windows")]
-fn open_list(device: &Dx12DeviceHandle, queue_kind: u32) -> RhiResult<sys::ComPtr> {
+fn open_list(device: &mut Dx12DeviceHandle, queue_kind: u32) -> RhiResult<sys::ComPtr> {
     let allocator = device.command_allocator(queue_kind)?;
     let mut list: sys::ComPtr = core::ptr::null_mut();
     // SAFETY: the device and allocator are live; the vtable entry matches
@@ -370,7 +370,7 @@ fn encode_copy(
 
 /// Opens a command list on the copy queue, for one immediate transfer.
 #[cfg(target_os = "windows")]
-pub fn open_transfer_list(device: &Dx12DeviceHandle) -> RhiResult<sys::ComPtr> {
+pub fn open_transfer_list(device: &mut Dx12DeviceHandle) -> RhiResult<sys::ComPtr> {
     open_list(device, sys::D3D12_COMMAND_LIST_TYPE_COPY)
 }
 

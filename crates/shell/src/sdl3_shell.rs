@@ -92,11 +92,11 @@ impl WindowHandle for Sdl3WindowHandle {
         }
         #[cfg(target_os = "ios")]
         {
-            return Some(NativeWindowReference::UIKit(state.native_window));
+            Some(NativeWindowReference::UIKit(state.native_window))
         }
         #[cfg(target_os = "windows")]
         {
-            return Some(NativeWindowReference::Win32(state.native_window));
+            Some(NativeWindowReference::Win32(state.native_window))
         }
         #[cfg(not(any(target_os = "macos", target_os = "ios", target_os = "windows")))]
         {

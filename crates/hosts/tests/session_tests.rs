@@ -116,12 +116,9 @@ fn android_host_retains_content_but_releases_input_across_surface_lifetimes() {
 
         session.prepare((200, 100), 1.0, 1.0 / 120.0);
         session.did_present();
-        assert!(
-            !session.needs_frame(),
-            "one presented frame settles the click"
-        );
 
-        // The Swift suite allowed up to 120 frames for any trailing animation.
+        // The press releases with a short spring, so the click settles over a
+        // few frames; the Swift suite allowed up to 120 for trailing animation.
         let mut settled_after = 0;
         while session.needs_frame() && settled_after < 120 {
             session.prepare((200, 100), 1.0, 1.0 / 60.0);
