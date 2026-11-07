@@ -9,6 +9,8 @@ use cove_core::State;
 use cove_core::scene::{Align, FlexDirection, Justify, Wrap};
 use cove_ui_compose::modifiers::interaction::AccessibilityExt;
 use cove_ui_compose::modifiers::layout::{FlexExt, LayoutFrameExt, PaddingExt};
+use cove_ui_compose::primitives::controls::Toggle;
+use cove_ui_compose::primitives::controls::fields::numeric::NumberField;
 use cove_ui_compose::primitives::controls::fields::slider::Slider;
 use cove_ui_compose::primitives::data::lists::RowState;
 use cove_ui_compose::primitives::data::lists::{
@@ -25,11 +27,13 @@ use cove_ui_compose::primitives::media::{Icon, ui_icon_catalog};
 use cove_ui_compose::primitives::text::Text;
 use cove_ui_compose::primitives::text::text_buffer::TextBuffer;
 use cove_ui_compose::primitives::text::text_field::TextField;
+use cove_ui_compose::primitives::text::text_field::text_field_options::TextFieldBehavior;
 use cove_ui_compose::theme::SemanticFontRef;
 use cove_ui_compose::theme::tokens::{SemanticColorRef, SemanticIconSize, SemanticStyleViewExt};
 use cove_ui_compose::{AnyView, BoxView, LayoutDebugExt, TupleView, View};
 
 use super::feedback::StorySection;
+use super::showcase::stack;
 use crate::gallery_content::catalog::GalleryOptions;
 
 fn caption(text: String) -> AnyView {
@@ -292,10 +296,13 @@ impl View for ReorderableStory {
     }
 }
 
-/// `PropertyGridStory`: two collapsible sections of labelled values.
+/// `PropertyGridStory`: collapsible labelled values, typed inspector controls
+/// and the empty state.
 pub struct PropertyGridStory {
     pub options: GalleryOptions,
     name: State<TextBuffer>,
+    visible: State<bool>,
+    exposure: State<f32>,
 }
 
 impl PropertyGridStory {
@@ -303,6 +310,8 @@ impl PropertyGridStory {
         Self {
             options,
             name: State::new(TextBuffer::new("Cove Studio")),
+            visible: State::new(true),
+            exposure: State::new(1.2),
         }
     }
 
@@ -317,8 +326,13 @@ impl PropertyGridStory {
 
 impl View for PropertyGridStory {
     fn body(&self, _cx: &Scope) -> AnyView {
+        let enabled = self.options.is_enabled;
         let name_field = AnyView::new(
             TextField::new("Name", self.name.binding())
+                .behavior(TextFieldBehavior {
+                    disabled: !enabled,
+                    ..Default::default()
+                })
                 .frame_width(180.0)
                 .debug_name("property-grid-name"),
         );
@@ -350,11 +364,71 @@ impl View for PropertyGridStory {
                 .frame_width(360.0)
                 .debug_name("property-grid-control"),
         );
-        AnyView::new(StorySection::new(
+        let labelled = AnyView::new(StorySection::new(
             "Labelled values",
             "Each header toggles its section. Labels keep their column; long values wrap under the label when the pane narrows.",
             AnyView::new(TupleView::new(vec![grid, caption(self.readout())])),
-        ))
+        ));
+
+        let inspector_sections = vec![
+            PropertyGridSection::new(
+                "identity",
+                "Identity",
+                vec![
+                    PropertyGridRow::new(
+                        "name",
+                        "Name",
+                        AnyView::new(
+                            TextField::new("Name", self.name.binding())
+                                .behavior(TextFieldBehavior {
+                                    disabled: !enabled,
+                                    ..Default::default()
+                                })
+                                .debug_name("property-grid-inspector-name"),
+                        ),
+                    ),
+                    PropertyGridRow::new(
+                        "visible",
+                        "Visible",
+                        AnyView::new(Toggle::new(self.visible.binding()).enabled(enabled)),
+                    ),
+                ],
+            )
+            .collapsible(true),
+            PropertyGridSection::new(
+                "camera",
+                "Camera",
+                vec![PropertyGridRow::new(
+                    "exposure",
+                    "Exposure",
+                    AnyView::new(
+                        NumberField::new(self.exposure.binding())
+                            .enabled(enabled)
+                            .range(Some(0.0), Some(8.0))
+                            .step(0.1),
+                    ),
+                )],
+            )
+            .collapsible(true),
+        ];
+        let inspector = AnyView::new(
+            PropertyGrid::new(inspector_sections)
+                .min_value_width(200.0)
+                .frame_height(270.0)
+                .debug_name("property-grid-inspector"),
+        );
+        let empty = AnyView::new(
+            PropertyGrid::new(Vec::new())
+                .empty_text("Select an object to inspect its properties")
+                .frame_height(70.0)
+                .debug_name("property-grid-empty"),
+        );
+        let inspector_section = AnyView::new(StorySection::new(
+            "Inspector",
+            "Typed controls occupy value slots; section and row sizing belongs to the grid.",
+            AnyView::new(TupleView::new(vec![inspector, empty])),
+        ));
+        stack(vec![labelled, inspector_section])
     }
 
     fn tag(&self) -> &'static str {
@@ -362,7 +436,7 @@ impl View for PropertyGridStory {
     }
 
     fn dynamic_properties(&self) -> Vec<cove_composition::DynamicField> {
-        cove_composition::dynamic_fields!(self; name)
+        cove_composition::dynamic_fields!(self; name, visible, exposure)
     }
 }
 

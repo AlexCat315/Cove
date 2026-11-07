@@ -137,7 +137,7 @@ Swift 源码逐页对照见文末《Swift 源码对照（逐页差异清单）�
 
 API 收敛：删除 RichText 类型与导出，无兼容别名。普通文字与样式片段统一为 Text::new / Text::runs，TextRun / TextTraits；字体、颜色、对齐、行数、截断、正文读取共用同一 Text 配置与节点。Gallery 的 RichText 页改为 Text，SingleLineText 页标为 Text · Truncation；目录仍为 106 个能力页面。用户文档：`Website/src/content/components/text.md`。
 
-2026-11-07 macOS 风格组件库：默认主题改为 macOS 窗口结构（白色内容区、`surface_variant` 侧栏与分组），`Button` 默认改为推按钮，输入/弹出按钮/搜索/复选/单选/开关/滑块/分段/Tab/列表/表格/日历/提示/进度/滚动条/对话框/通知统一外观；Sidebar、ButtonGroup、TabView 共用 `SlidingSelection` 弹簧滑动选中。修复 TabView 标题宽度塌为 0（原版即存在）、节点自身阴影被自身裁剪、列表分隔线残留。DevTools 截图目检（1280×720，浅色为主，深色抽查 Dashboard 与 Text Fields）：Dashboard、Checkbox、Toggle、Text Fields、TabView、ButtonGroup、Tree、DataTable、Calendar、Accordion、Toolbar、SplitButton、List、SectionedList、ReorderableList、Alert、Dialog。PropertyGrid 页内容不渲染，原因未查明，未修复。用户文档：`theme.md`、`motion.md`（新增）、`sidebar.md`、`slider.md`。
+2026-11-07 macOS 风格组件库：默认主题改为 macOS 窗口结构（白色内容区、`surface_variant` 侧栏与分组），`Button` 默认改为推按钮，输入/弹出按钮/搜索/复选/单选/开关/滑块/分段/Tab/列表/表格/日历/提示/进度/滚动条/对话框/通知统一外观；Sidebar、ButtonGroup、TabView 共用 `SlidingSelection` 弹簧滑动选中。修复 TabView 标题宽度塌为 0（原版即存在）、节点自身阴影被自身裁剪、列表分隔线残留。DevTools 截图目检（1280×720，浅色为主，深色抽查 Dashboard 与 Text Fields）：Dashboard、Checkbox、Toggle、Text Fields、TabView、ButtonGroup、Tree、DataTable、Calendar、Accordion、Toolbar、SplitButton、List、SectionedList、ReorderableList、Alert、Dialog。PropertyGrid 页内容不渲染的问题已于同日修复：先是挂载缺口，随后内容列在 `HorizontalScrollOrigin` 的 flex-start 测量探针内塌为固有宽度（约 60pt）；内容列改为 `Percent(100)` 宽度后填满滚动视口（扣除稳定滚动条槽），三种滚动轴模式与无作者宽度均有回归（`property_grid_sizing`），并经 DevTools 截图目检与折叠/填值交互后置条件验证。用户文档：`theme.md`、`motion.md`（新增）、`sidebar.md`、`slider.md`、`property-grid.md`（新增）。
 
 2026-11-03 主题与选区追加：默认浅/深色改为中性桌面配色，圆角 0/4/6/8/12；正文/样式片段/输入框选区共用轻微圆角与两端短竖线，输入框移除重复透明度。Text 样式片段补齐共享选择注册、键盘扩展、独立选择与 display-only；跨链接拖选不激活链接。选择 scope 随挂载节点保留。触控长按已复用；圆形手柄与放大镜尚未接线，未宣称已完成。鼠标问题：用户确认浏览器也会闪回箭头，Codex 正常，暂不能归因 Cove；不添加推测性的原生光标覆盖。应用 I 形指针节点及焦点/拖选/重建路径另行回归，操作系统实际光标仍待系统恢复后原生复核。用户文档：`Website/src/content/components/theme.md` 与 `text-selection.md`。
 
@@ -234,7 +234,7 @@ cargo test -p cove-ui-compose --test compose --locked
 | SplitView | 2 | 0 / 0 | 挂载/几何基础检查通过；待逐项交互和视觉验收 |
 | ScrollView | 0 | 0 / 0 | 挂载/几何基础检查通过；待逐项交互和视觉验收 |
 | BoundedScrollView | 0 | 0 / 0 | 挂载/几何基础检查通过；待逐项交互和视觉验收 |
-| PropertyGrid | 0 | 0 / 0 | 挂载/几何基础检查通过；待逐项交互和视觉验收 |
+| PropertyGrid | 0 | 0 / 0 | 内容列宽度塌陷已修复（`Percent(100)` 填满滚动视口），三种滚动轴、有界父容器与自适应标签回归通过；故事补齐 Swift Inspector 段落（Toggle/NumberField 值槽、空状态）；macOS DevTools 截图目检与折叠/填值后置条件通过；其他平台原生视觉待验收；文档已写 |
 | Workspace / Dock | 0 | 0 / 0 | 挂载/几何基础检查通过；待逐项交互和视觉验收 |
 | Box / Row / Column | 6 | 0 / 0 | 挂载/几何基础检查通过；待逐项交互和视觉验收 |
 | Masonry | 0 | 0 / 0 | 挂载/几何基础检查通过；待逐项交互和视觉验收 |
@@ -404,7 +404,6 @@ cargo test -p cove-ui-compose --test compose --locked
 | NavigationRail | Retained presentations | 1/2 | 未出现：retained |
 | NumberField | Numeric editing | 2/2 | 出现在本页源码，未单独成段 |
 | NumberField | Locale decimals | 1/2 | 未出现：locale |
-| PropertyGrid | Inspector | 0/1 | 未出现：inspector |
 | ReorderableList | Reorderable list | 2/2 | 出现在本页源码，未单独成段 |
 | ReorderableList | Long list | 2/2 | 出现在本页源码，未单独成段 |
 | ScrollView | Native scroll stream | 1/3 | 未出现：native、stream |

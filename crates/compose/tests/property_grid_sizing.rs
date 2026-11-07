@@ -6,6 +6,9 @@
 //! - an intrinsic value row grows and shrinks without overlapping the next row
 //! - both the value and the following row stay inside the grid width
 //! - the row's intrinsic height is exactly its content height
+//! - the content column fills the scroll viewport on every scroll-axis mode
+//!   instead of collapsing to its intrinsic width
+//! - an adaptive row stacks or leads with the grid's own width
 
 use crate::support;
 
@@ -329,6 +332,148 @@ fn an_empty_grid_renders_without_rows() {
             !root.children().is_empty(),
             "an empty grid still materialises its empty state"
         );
+    });
+}
+
+/// ContainerSizeReader publishes its measured size after layout, so adaptive
+/// rows need another round before their placement settles.
+fn settle(graph: &Rc<cove_composition::ViewGraph>, width: f32, height: f32) {
+    for _ in 0..4 {
+        graph.recomposer.commit_all();
+        graph.compute_layout(width, height);
+        cove_core::scene::AnimatorScheduler::current().tick(1.0);
+    }
+    graph.recomposer.commit_all();
+    graph.compute_layout(width, height);
+}
+
+#[test]
+fn the_grid_content_fills_the_scroll_viewport_width() {
+    // The vertical/both axes reserve the 12pt stable scrollbar lane; the
+    // horizontal axis does not. The content column must fill the viewport
+    // instead of collapsing to its intrinsic (header-driven) width.
+    for (axes, gutter) in [
+        (PropertyGridScrollAxes::Both, 12.0),
+        (PropertyGridScrollAxes::Vertical, 12.0),
+        (PropertyGridScrollAxes::Horizontal, 0.0),
+    ] {
+        GlobalTestLock::with_scheduler(|| {
+            let grid = PropertyGrid::new(vec![PropertyGridSection::new(
+                "general",
+                "General",
+                vec![PropertyGridRow::new(
+                    "name",
+                    "Name",
+                    AnyView::new(Text::new("Cove Studio")).debug_name("grid-value"),
+                )],
+            )])
+            .scroll_axes(axes)
+            .frame_width(360.0)
+            .debug_name("property-grid-control");
+
+            let graph = support::graph();
+            graph.install_view(AnyView::new(grid), Default::default());
+            settle(&graph, 800.0, 600.0);
+
+            let control = named(&graph, "property-grid-control")
+                .expect("the grid materialises")
+                .absolute_frame();
+            assert_eq!(control.width, 360.0, "the authored width is honoured");
+            let header = named(&graph, "property-section-header-general")
+                .expect("the section header materialises")
+                .absolute_frame();
+            // Content padding (8×2) plus section body padding (8×2) sit
+            // between the viewport and the header button.
+            assert_eq!(
+                header.width,
+                360.0 - gutter - 32.0,
+                "the header fills the viewport minus the scrollbar lane ({axes:?})"
+            );
+            let value = named(&graph, "grid-value")
+                .expect("the row value materialises")
+                .absolute_frame();
+            assert!(
+                value.width > 200.0,
+                "the value slot fills the row instead of collapsing ({axes:?})"
+            );
+            assert!(
+                value.x + value.width <= 360.0 - gutter + 0.5,
+                "the value stays inside the viewport ({axes:?})"
+            );
+        });
+    }
+}
+
+#[test]
+fn the_grid_fills_a_bounded_parent_without_an_authored_width() {
+    GlobalTestLock::with_scheduler(|| {
+        let grid = PropertyGrid::new(vec![PropertyGridSection::new(
+            "general",
+            "General",
+            vec![PropertyGridRow::new(
+                "name",
+                "Name",
+                AnyView::new(Text::new("Cove Studio")).debug_name("grid-value"),
+            )],
+        )])
+        .debug_name("property-grid-control");
+
+        let graph = support::graph();
+        graph.install_view(AnyView::new(grid), Default::default());
+        settle(&graph, 400.0, 480.0);
+
+        let header = named(&graph, "property-section-header-general")
+            .expect("the section header materialises")
+            .absolute_frame();
+        assert_eq!(
+            header.width,
+            400.0 - 12.0 - 32.0,
+            "the grid stretches to the parent's width minus the stable lane"
+        );
+    });
+}
+
+#[test]
+fn an_adaptive_row_switches_between_stacked_and_leading_with_the_grid_width() {
+    GlobalTestLock::with_scheduler(|| {
+        for (width, expect_leading) in [(200.0f32, false), (480.0, true)] {
+            let grid = PropertyGrid::new(vec![PropertyGridSection::new(
+                "general",
+                "General",
+                vec![PropertyGridRow::new(
+                    "name",
+                    "Name",
+                    AnyView::new(Text::new("Cove Studio")).debug_name("grid-value"),
+                )],
+            )])
+            .frame_width(width)
+            .debug_name("property-grid-control");
+
+            let graph = support::graph();
+            graph.install_view(AnyView::new(grid), Default::default());
+            settle(&graph, 800.0, 600.0);
+
+            let value = named(&graph, "grid-value")
+                .expect("the row value materialises")
+                .absolute_frame();
+            if expect_leading {
+                // The label column starts at 16pt and is 96pt wide; a leading
+                // value sits past it, a stacked one starts at the row's inset.
+                assert!(
+                    value.x > 100.0,
+                    "a wide grid places the value beside the label (width {width})"
+                );
+            } else {
+                assert!(
+                    value.x < 100.0,
+                    "a narrow grid stacks the value under the label (width {width})"
+                );
+            }
+            assert!(
+                value.x + value.width <= width - 12.0 + 0.5,
+                "the value stays inside the viewport (width {width})"
+            );
+        }
     });
 }
 

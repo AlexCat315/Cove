@@ -388,7 +388,14 @@ impl View for PropertyGrid {
 
         let content = AnyView::new(
             AnyView::new(grid)
-                .frame(None, None, None, None, None, None)
+                .frame(
+                    Some(FrameDimension::Percent(100.0)),
+                    None,
+                    Some(0.0),
+                    None,
+                    None,
+                    None,
+                )
                 .flex_with(1.0, 1.0, Some(0.0)),
         );
 
