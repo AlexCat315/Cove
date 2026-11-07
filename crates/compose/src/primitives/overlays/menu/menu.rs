@@ -6,6 +6,7 @@ use crate::Scope;
 use crate::primitives::overlays::focus_scope::FocusScope;
 use std::rc::Rc;
 
+use crate::modifiers::layout::PaddingExt;
 use crate::modifiers::style::SemanticStyleViewExt;
 use crate::primitives::controls::KeyboardShortcut;
 use crate::{AnyView, PrimitiveView, View};
@@ -13,9 +14,35 @@ use cove_core::scene::{LayoutNode, Node};
 use cove_imaging::BundleImageResource;
 
 use super::menu_descriptor::{MenuDescriptor, MenuItemDescriptor};
-use super::menu_item_row::MenuItemRowHost;
+use super::menu_item_row::{
+    MenuItemRowHost, ROW_HORIZONTAL_PADDING, ROW_LANE_SPACING, ROW_LANE_WIDTH,
+};
 use super::menu_navigation::{MENU_SCROLL_MARKER, MenuRowEvents, MenuRowPresentation, MenuSession};
 use super::row_content::MenuItemContent;
+
+/// Air above and below a separator, so a hairline plus its band reads as the
+/// ~11pt section break a system menu uses. The hairline keeps the panel's
+/// content width so it lines up with the highlight bands on both sides.
+const SEPARATOR_GUTTER: f32 = 5.0;
+
+/// The section break, shared by the anchored and touch presentations.
+///
+/// The air belongs to a wrapper, never to the `Divider` itself: a node's
+/// background fills its whole box, so padding on the hairline would thicken
+/// the line instead of separating the sections.
+pub(super) fn separator_view() -> AnyView {
+    AnyView::new(
+        crate::BoxView::new(
+            cove_core::scene::FlexDirection::Column,
+            cove_core::scene::Align::Stretch,
+            cove_core::scene::Justify::Center,
+            cove_core::scene::Wrap::NoWrap,
+            0.0,
+            AnyView::new(crate::primitives::text::Divider::horizontal()),
+        )
+        .padding_edges(0.0, SEPARATOR_GUTTER),
+    )
+}
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
 pub enum MenuItemRole {
@@ -435,6 +462,14 @@ impl MenuLevel {
             .any(|entry| entry.row().is_some_and(|row| row.content.icon.is_some()));
         let highlight = self.effective_highlight();
         let reveal_token = self.session.navigation().reveal_token;
+        // A section header is not a row, so it carries no lanes: it borrows the
+        // lane widths the rows reserve to land on the same title column.
+        let title_leading = ROW_HORIZONTAL_PADDING
+            + [selection_column, icon_column]
+                .into_iter()
+                .filter(|shows_lane| *shows_lane)
+                .map(|_| ROW_LANE_WIDTH + ROW_LANE_SPACING)
+                .sum::<f32>();
         self.configuration
             .entries
             .iter()
@@ -446,9 +481,10 @@ impl MenuLevel {
                                 .semantic_font(crate::theme::SemanticFontRef::caption())
                                 .semantic_foreground(
                                     crate::theme::SemanticColorRef::on_surface_muted(),
-                                ),
+                                )
+                                .padding_edges(title_leading, 2.0),
                         ),
-                        _ => AnyView::new(crate::primitives::text::Divider::horizontal()),
+                        _ => separator_view(),
                     };
                 };
                 let session = self.session.clone();

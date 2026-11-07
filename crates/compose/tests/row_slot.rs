@@ -68,8 +68,8 @@ fn menu_rows_center_content_in_the_minimum_row_height() {
                 .expect("the menu title exposes StaticText semantics");
 
             assert!(
-                item.height >= 30.0,
-                "a menu row is at least 30pt tall (got {})",
+                item.height >= 24.0,
+                "a menu row is at least 24pt tall (got {})",
                 item.height
             );
             let item_mid = item.y + item.height / 2.0;

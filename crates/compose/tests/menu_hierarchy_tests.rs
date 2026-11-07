@@ -368,8 +368,8 @@ fn home_end_and_typeahead_reveal_offscreen_rows() {
         let scroll = scroll_viewport(scene);
         // 100 rows at the reference row metric, minus the viewport.
         assert!(
-            scroll.content_offset().y > 2700.0,
-            "End scrolls past 2700 pt to reveal row 99, saw {}",
+            scroll.content_offset().y > 2100.0,
+            "End scrolls past 2100 pt to reveal row 99, saw {}",
             scroll.content_offset().y
         );
         let last_frame = last.absolute_frame();
@@ -783,7 +783,7 @@ fn rows_wrap_labels_within_their_bounds_at_each_scale() {
                 .expect("the title is measured");
             assert_eq!(
                 measurement.key.font.size(),
-                14.0 * scale,
+                13.0 * scale,
                 "the title font follows the text scale"
             );
             assert!(
@@ -814,8 +814,8 @@ fn rows_wrap_labels_within_their_bounds_at_each_scale() {
             let gap = shortcut.absolute_frame().x
                 - (title.absolute_frame().x + title.absolute_frame().width);
             assert!(
-                (gap - 8.0).abs() <= 1.0,
-                "the title and shortcut keep their 8-pt gap, saw {gap}"
+                (gap - 6.0).abs() <= 1.0,
+                "the title and shortcut keep their 6-pt gap, saw {gap}"
             );
             assert!(
                 contains_rect(target.absolute_frame(), shortcut.absolute_frame()),
@@ -823,8 +823,8 @@ fn rows_wrap_labels_within_their_bounds_at_each_scale() {
             );
             assert_eq!(
                 title.absolute_frame().x - target.absolute_frame().x,
-                10.0,
-                "the title keeps the row's 10-pt leading padding"
+                8.0,
+                "the title keeps the row's 8-pt leading padding"
             );
             let short = row(scene, 2);
             assert!(
@@ -942,6 +942,64 @@ fn row_highlight_is_inset_equally_on_both_sides() {
         assert!(
             (leading - trailing).abs() < 0.5,
             "the highlight keeps equal insets, leading {leading} trailing {trailing}"
+        );
+    });
+}
+
+#[test]
+fn section_header_and_separator_take_their_own_chrome() {
+    InteractiveScene::run(640.0, 400.0, |scene| {
+        scene.install(AnyView::new(
+            Menu::new(vec![
+                MenuEntry::label(0, "Workspace"),
+                MenuEntry::separator(1),
+                MenuEntry::Item(MenuItem::new(2, "Open", || {}).selected(true)),
+                MenuEntry::Item(MenuItem::new(3, "Close", || {})),
+            ])
+            .width(220.0)
+            .theme(Theme::default_light()),
+        ));
+        scene.settle(5, 1.0);
+
+        let labelled = |label: &str| {
+            scene.nodes().into_iter().find(|node| {
+                node.accessibility().is_some_and(|semantics| {
+                    semantics.role == AccessibilityRole::StaticText && semantics.label == label
+                })
+            })
+        };
+        let header = labelled("Workspace").expect("the section header is measured");
+        let target = row(scene, 2);
+        let title = scene
+            .nodes()
+            .into_iter()
+            .find(|node| {
+                node.accessibility().is_some_and(|semantics| {
+                    semantics.role == AccessibilityRole::StaticText && semantics.label == "Open"
+                }) && ancestors(node)
+                    .iter()
+                    .any(|parent| parent.id() == target.id())
+            })
+            .expect("the row title sits inside its row");
+        // The header is a leaf text with its own padding: its frame is the
+        // padding box, its glyphs start at the inset. Compare where the ink
+        // lands, which is what has to line up with the row titles.
+        let header_ink = header.absolute_frame().x
+            + header
+                .layout_node()
+                .map(|layout| layout.resolved_padding().left)
+                .unwrap_or_default();
+        assert_eq!(
+            header_ink,
+            title.absolute_frame().x,
+            "the header lands on the title column, past the checkmark lane"
+        );
+
+        let separator_top = header.absolute_frame().y + header.absolute_frame().height;
+        let gap = target.absolute_frame().y - separator_top;
+        assert!(
+            gap >= 11.0,
+            "the separator keeps its own gutter between sections, saw {gap}"
         );
     });
 }

@@ -253,11 +253,10 @@ impl<Value: PartialEq + Clone + Send + Sync + 'static> View for Select<Value> {
             .find(|option| option.value == self.selection.get())
             .map(|option| option.label.clone())
             .unwrap_or_default();
-        let chevron = if is_presented.get() {
-            crate::primitives::media::ui_icon_catalog::navigation::dropdown_chevron_up()
-        } else {
-            crate::primitives::media::ui_icon_catalog::navigation::dropdown_chevron_down()
-        };
+        // System popup buttons keep the chevron pointing down while open; the
+        // pressed bezel, not a flipped glyph, explains the open menu.
+        let chevron =
+            crate::primitives::media::ui_icon_catalog::navigation::dropdown_chevron_down();
         let trigger = BoxView::new(
             FlexDirection::Row,
             Align::Center,
@@ -319,8 +318,8 @@ impl<Value: PartialEq + Clone + Send + Sync + 'static> View for Select<Value> {
 /// text fields use, so a Select sits flush with the fields around it in a
 /// property grid instead of looking like a lighter pill.
 ///
-/// Open beats hover: the popup is open because of the trigger, so the trigger
-/// explains it even while the pointer has moved into the menu.
+/// Open reads as a pressed bezel rather than a focus ring, the way a system
+/// popup button sits under its menu.
 struct SelectTriggerStyle;
 
 impl ButtonStyle for SelectTriggerStyle {
@@ -328,8 +327,9 @@ impl ButtonStyle for SelectTriggerStyle {
         let theme = configuration.theme.clone();
         // Open beats hover: the popup is open because of this trigger, so the
         // trigger explains it even while the pointer has moved into the menu.
+        let open = configuration.is_selected;
         let state = InputChromeState::new(configuration.is_enabled)
-            .focused(configuration.is_selected || configuration.is_focused)
+            .focused(configuration.is_focused && !open)
             .hovered(configuration.is_hovered);
         let border = theme.inputs.border_for(state);
         AnyView::new(
@@ -348,7 +348,11 @@ impl ButtonStyle for SelectTriggerStyle {
             } else {
                 theme.colors.on_surface_muted
             })
-            .background_color(theme.inputs.background_for(state))
+            .background_color(if open {
+                theme.colors.surface_pressed
+            } else {
+                theme.inputs.background_for(state)
+            })
             .corner_radius(theme.inputs.radius)
             .border_color(border, theme.inputs.border_width_for(state)),
         )

@@ -137,11 +137,11 @@ impl PrimitiveView for MenuLevelHost {
             Some(width) => AnyView::new(marked.frame_width(width.max(80.0))),
             None => AnyView::new(marked),
         };
-        // The dropdown shares the chrome's shadow, but its corners match the
-        // tighter popup radius rather than the wider panel tier, so it reads as
-        // a menu, not a floating window.
+        // The dropdown shares the chrome's shadow, but its corners sit at the
+        // control tier rather than the wider panel tier, so it reads as a
+        // menu, not a floating window.
         vec![panel.floating_surface_metric_with_elevation(
-            crate::theme::ThemeMetric::group_radius(),
+            crate::theme::ThemeMetric::control_radius(),
             FloatingSurfaceElevation::Panel,
         )]
     }
@@ -170,17 +170,8 @@ impl cove_composition::ViewModifier for MenuWindowBounds {
         let Some(layout) = node.layout_node() else {
             return;
         };
-        // The viewport budget uses the same row metric the rows lay out with,
-        // so a taller authored row cannot overflow the clip.
-        let row_height = node
-            .composition_value(&super::menu_item_row::minimum_row_height())
-            .max(
-                node.composition_value(&crate::theme::ControlSizeEnvironment::key())
-                    .button_height(),
-            );
-        let preferred = self.max_visible_rows as f32
-            * row_height
-            * crate::theme::node_text_scaler(node).factor();
+        let max_visible_rows = self.max_visible_rows;
+        layout.set_max_height(Some(budgeted_height(node, max_visible_rows)));
         let weak = node.downgrade();
         let previous_update = node.layout_did_update();
         node.set_layout_did_update(Some(Rc::new(move |owner: &Node| {
@@ -193,12 +184,19 @@ impl cove_composition::ViewModifier for MenuWindowBounds {
             let Some(layout) = node.layout_node() else {
                 return;
             };
-            let bounds = super::super::portal::portal_window_bounds(&node);
-            let height = preferred.min((bounds.height - 12.0).max(0.0));
+            let height = budgeted_height(&node, max_visible_rows);
             if layout.max_height() != Some(height) {
                 layout.set_max_height(Some(height));
             }
         }) as cove_core::scene::LayoutUpdateHook));
-        layout.set_max_height(Some(preferred));
     }
+}
+
+/// The panel viewport: the row budget clamped to the window. The update and
+/// the layout pass resolve it through this one function, so they cannot fight
+/// over `max_height` when the window bounds only become known after layout.
+fn budgeted_height(node: &Node, max_visible_rows: usize) -> f32 {
+    let row_height = super::menu_item_row::natural_row_height(node);
+    let bounds = super::super::portal::portal_window_bounds(node);
+    (max_visible_rows as f32 * row_height).min((bounds.height - 12.0).max(0.0))
 }

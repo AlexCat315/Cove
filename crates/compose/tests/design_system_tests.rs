@@ -381,7 +381,7 @@ fn loading_icon_button_keeps_its_name_and_disables_activation() {
 }
 
 #[test]
-fn menu_rows_follow_scaled_body_typography() {
+fn menu_rows_follow_scaled_label_typography() {
     InteractiveScene::run(900.0, 700.0, |scene| {
         scene.install(
             Menu::new(vec![
@@ -393,10 +393,10 @@ fn menu_rows_follow_scaled_body_typography() {
             .theme(Theme::default_light())
             .text_scaler(TextScaler::new(2.0)),
         );
-        assert_eq!(font_size(&text(scene, "First")), 28.0);
+        assert_eq!(font_size(&text(scene, "First")), 26.0);
         let rows = scene.all(|n| n.attachment::<u64>("__menu_item_id").is_some());
         assert!(!rows.is_empty());
-        assert!(rows.iter().all(|n| n.frame().height >= 48.0));
+        assert!(rows.iter().all(|n| n.frame().height >= 42.0));
     });
 }
 

@@ -517,6 +517,9 @@ impl cove_core::scene::ScopedAmbient for PortalStoreAmbient {
     }
 }
 
+/// A surface leaves faster than it arrives: dismissal replays none of the
+/// entrance timing, it runs the theme's short surface exit so a closing menu
+/// does not feel like a second opening one.
 fn animated_visibility(
     is_visible: bool,
     transition: Transition,
@@ -524,10 +527,15 @@ fn animated_visibility(
     on_visibility_settled: Option<Rc<dyn Fn(bool)>>,
     content: AnyView,
 ) -> AnyView {
+    let motion = if is_visible {
+        SemanticMotionRef::entering()
+    } else {
+        SemanticMotionRef::exiting()
+    };
     AnyView::new(AnimatedVisibility::with_motion(
         is_visible,
         transition,
-        Some(SemanticMotionRef::entering()),
+        Some(motion),
         animate_on_mount,
         on_visibility_settled,
         content,

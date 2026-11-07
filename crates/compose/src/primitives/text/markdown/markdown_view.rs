@@ -131,9 +131,20 @@ pub fn markdown_block(
             }
             None => MarkdownTableView::new(table.clone()),
         }),
-        MarkdownBlock::Rule => {
-            AnyView::new(crate::primitives::text::Divider::horizontal().padding_edges(0.0, 4.0))
-        }
+        // The air around a rule belongs to a wrapper, not to the hairline: a
+        // node paints its background over its whole box, so padding on the
+        // divider would render the break as a bar instead of a line.
+        MarkdownBlock::Rule => AnyView::new(
+            BoxView::new(
+                FlexDirection::Column,
+                Align::Stretch,
+                Justify::Center,
+                Wrap::NoWrap,
+                0.0,
+                AnyView::new(crate::primitives::text::Divider::horizontal()),
+            )
+            .padding_edges(0.0, 4.0),
+        ),
     }
 }
 

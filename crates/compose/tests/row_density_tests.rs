@@ -563,9 +563,10 @@ fn touch_floors_preserve_scaled_tree_and_menu_rows() {
                     menu_row.frame().height
                 );
                 if scale == 2.0 {
-                    assert!(
-                        menu_row.frame().height > 44.0,
-                        "a 2x menu row grows past the floor (actual {})",
+                    assert_eq!(
+                        menu_row.frame().height,
+                        44.0,
+                        "a 2x menu row still sits at the touch floor (actual {})",
                         menu_row.frame().height
                     );
                 }
@@ -584,7 +585,7 @@ fn touch_floors_preserve_scaled_tree_and_menu_rows() {
                     .labelled("Command", None)
                     .expect("menu row mounted on pointer");
                 assert!(
-                    pointer_row.frame().height >= 28.0
+                    pointer_row.frame().height >= 22.0
                         && pointer_row.frame().height <= menu_row.frame().height,
                     "the anchored row returns to its compact height (touch {}, pointer {})",
                     menu_row.frame().height,

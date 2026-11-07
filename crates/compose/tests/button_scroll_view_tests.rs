@@ -1042,11 +1042,21 @@ fn nested_menu_consumes_boundary_wheel_before_parent_scroll_view() {
 
         let parent = scroll_node(&graph, registry);
         let menu_scroll = first(&graph, |node| {
-            *node != parent
-                && registry.handlers(node).wheel.is_some()
-                && (node.frame().height - 160.0).abs() < 0.1
+            node.attachment::<bool>(
+                cove_ui_compose::primitives::overlays::menu::menu_navigation::MENU_SCROLL_MARKER,
+            ) == Some(true)
         })
-        .expect("the menu's 160pt inner viewport");
+        .expect("the menu owns an inner scroll viewport");
+        let menu_row = first(&graph, |node| {
+            node.attachment::<u64>("__menu_item_id").is_some()
+        })
+        .expect("a menu row is mounted");
+        assert!(
+            (menu_scroll.frame().height - 5.0 * menu_row.frame().height).abs() <= 1.0,
+            "the panel budgets its five rows, saw {}pt with {}pt rows",
+            menu_scroll.frame().height,
+            menu_row.frame().height
+        );
 
         let menu_wheel = registry.handlers(&menu_scroll).wheel.expect("menu wheel");
         for _ in 0..100 {

@@ -2,7 +2,7 @@
 use crate::theme::{ThemeMetric, ThemeReader, theme_for_node};
 use crate::{AnyView, ModifiedContent, View, ViewExt, ViewModifier};
 use cove_core::Rect;
-use cove_core::scene::{Node, NodeWeak, SurfaceShadow};
+use cove_core::scene::{Node, NodeWeak};
 
 pub struct SurfaceFinishModifier;
 
@@ -87,7 +87,7 @@ impl ViewModifier for FloatingSurfaceModifier {
                 node.set_shadow(elevation.key);
             }
             FloatingSurfaceElevation::Panel => {
-                node.set_ambient_shadow(SurfaceShadow::default());
+                node.set_ambient_shadow(theme.elevation.floating.ambient);
                 node.set_shadow(theme.elevation.high);
             }
         }

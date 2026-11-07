@@ -306,7 +306,6 @@ pub fn menu_row(id: u64, node: &Node) -> Option<Node> {
 
 pub const MENU_ITEM_ID: &str = "__menu_item_id";
 pub const MENU_LEVEL_MARKER: &str = "__menu.level";
-pub const MENU_WINDOW_BOUNDS: &str = "__menu.rowMetrics";
 pub const MENU_SCROLL_MARKER: &str = "__menu.scroll";
 pub const MENU_SCROLL_INSET: &str = "__menu.scroll.inset";
 

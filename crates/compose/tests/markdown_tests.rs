@@ -284,6 +284,31 @@ fn headings() {
 }
 
 #[test]
+fn thematic_break_keeps_its_air_outside_the_hairline() {
+    render("---\n\ntext", 320.0, |mounted| {
+        let theme = cove_ui_compose::theme::theme_for_node(&mounted[0]);
+        let rule = mounted
+            .iter()
+            .find(|node| node.background_color() == Some(theme.colors.divider))
+            .expect("the thematic break draws a divider");
+        assert_eq!(
+            rule.frame().height,
+            1.0,
+            "the rule stays a one-point hairline"
+        );
+        let band = rule
+            .parent()
+            .expect("the rule sits inside the section band it breaks");
+        assert_eq!(
+            band.frame().height,
+            rule.frame().height + 8.0,
+            "the block's air belongs to the wrapper, saw {:?}",
+            band.frame()
+        );
+    });
+}
+
+#[test]
 fn code_scrolls() {
     let line = "x".repeat(200);
     let source = format!("```\n{line}\n```");

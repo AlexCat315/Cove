@@ -18,7 +18,7 @@ use cove_core::scene::{
     InteractionRegistryHolder, Justify, LayoutNode, Node, PointerCaptureHolder, PointerPhase, Wrap,
 };
 use cove_core::{Color, Point};
-use cove_platform::{MouseButton, SystemCursor};
+use cove_platform::MouseButton;
 
 use super::menu::MenuItemRole;
 use super::menu_navigation::{MENU_ITEM_ID, MenuRowEvents, MenuRowPresentation};
@@ -35,28 +35,53 @@ const VISUAL_FILL: &str = "__menu_visual_fill";
 const REVEAL_TOKEN: &str = "__menu.revealToken";
 
 /// Default minimum row height, before touch extents and text scaling.
-const MINIMUM_ROW_HEIGHT: f32 = 30.0;
+const MINIMUM_ROW_HEIGHT: f32 = 20.0;
 
-/// `MenuRowMetrics.minimumHeight`: a menu row's minimum height. Swift declares
-/// it as a `CompositionLocal` defaulting to 30, so a caller can ask for taller
-/// rows — a picker with 44-pt entries — without reimplementing the row.
+/// The row's vertical padding, mirrored by `natural_row_height` so the panel
+/// budgets rows at the height they really take.
+const ROW_VERTICAL_PADDING: f32 = 3.0;
+
+/// The row's leading and trailing gutter, shared with the panel's separators
+/// and section headers so every lane lines up.
+pub(crate) const ROW_HORIZONTAL_PADDING: f32 = 8.0;
+/// A fixed leading lane — the checkmark or the icon column — and the gap that
+/// follows it. A section header adds these to reach the title column.
+pub(crate) const ROW_LANE_WIDTH: f32 = 12.0;
+pub(crate) const ROW_LANE_SPACING: f32 = 6.0;
+
+/// `MenuRowMetrics.minimumHeight`: a menu row's minimum height. Swift declared
+/// it as a `CompositionLocal` defaulting to 30; the default now matches the
+/// compact system-menu density, and a caller can still ask for taller rows —
+/// a picker with 44-pt entries — without reimplementing the row.
 pub fn minimum_row_height() -> Rc<cove_core::scene::CompositionLocal<f32>> {
     thread_local! {
         static KEY: Rc<cove_core::scene::CompositionLocal<f32>> =
-            Rc::new(cove_core::scene::CompositionLocal::new(|| 30.0));
+            Rc::new(cove_core::scene::CompositionLocal::new(|| MINIMUM_ROW_HEIGHT));
     }
     KEY.with(|key| key.clone())
 }
 
 /// The row's resolved minimum height: the authored metric, raised to the
 /// surface's touch extent when the input is a finger.
-fn resolved_row_height(node: &Node) -> f32 {
+pub(crate) fn resolved_row_height(node: &Node) -> f32 {
     let authored = node.composition_value(&minimum_row_height()).max(0.0);
     let touch = node
         .composition_value(&crate::adaptive::SurfaceEnvironment::key())
         .input
         .contains(cove_core::InputCapabilities::TOUCH);
     if touch { authored.max(44.0) } else { authored }
+}
+
+/// The height of a single-line row at the current density and text scale: a
+/// label line and the row's padding, never shorter than the resolved minimum.
+/// The panel budgets its visible rows with this so `max_visible_rows` caps
+/// what shows instead of only reserving space.
+pub(crate) fn natural_row_height(node: &Node) -> f32 {
+    let theme = theme_for_node(node);
+    let scaler = crate::theme::node_text_scaler(node).factor();
+    let single_line =
+        theme.typography.label.line_height_for(None) * scaler + 2.0 * ROW_VERTICAL_PADDING;
+    resolved_row_height(node).max(single_line)
 }
 
 #[derive(Clone, Copy, PartialEq)]
@@ -85,15 +110,15 @@ fn update_fill(node: &Node) {
     let hovered = node.attachment::<bool>(HOVERED) == Some(true);
     let highlighted = node.attachment::<bool>(HIGHLIGHTED) == Some(true);
     let colors = theme_for_node(node).colors;
-    // The row the pointer or the arrows are on takes a soft accent tint and
-    // keeps its ink; it snaps rather than easing, so the band follows the
-    // highlight without a trailing fade.
+    // The row the pointer or the arrows are on takes the saturated accent band
+    // with on-accent ink, the way system menus highlight; it snaps rather than
+    // easing, so the band follows the highlight without a trailing fade.
     let fill = if !enabled {
         Color::CLEAR
     } else if pressed {
-        colors.selection
+        colors.accent_pressed
     } else if hovered || highlighted {
-        colors.accent_muted
+        colors.accent
     } else {
         Color::CLEAR
     };
@@ -151,7 +176,7 @@ impl PrimitiveView for MenuItemRowHost {
 
     fn update_node(&self, node: &Node) {
         if let Some(layout) = node.layout_node() {
-            layout.set_min_height(Some(resolved_row_height(node)));
+            layout.set_min_height(Some(natural_row_height(node)));
         }
         node.set_is_focusable(self.item.is_enabled);
         node.set_is_tab_stop(self.item.is_enabled && self.is_highlighted);
@@ -262,11 +287,10 @@ impl PrimitiveView for MenuItemRowHost {
                 capture.release();
             }
         }
-        node.set_cursor(Some(if self.item.is_enabled {
-            SystemCursor::Pointer
-        } else {
-            SystemCursor::NotAllowed
-        }));
+        // A system menu keeps the arrow over every item: no hand for an
+        // activatable row, no prohibition sign for a dimmed one. The row sets
+        // no cursor and inherits the panel's.
+        node.set_cursor(None);
         node.set_attachment(HIGHLIGHTED, self.is_highlighted);
         node.set_attachment(ENABLED, self.item.is_enabled);
         update_fill(node);
@@ -290,7 +314,7 @@ impl PrimitiveView for MenuItemRowHost {
             // The panel insets the rows; the highlight fills the row so the
             // accent band runs to the same gutter on both sides.
             let rect = cove_core::Rect::new(origin.x, origin.y, frame.width, frame.height);
-            let radius = theme_for_node(&owner).radius.md;
+            let radius = theme_for_node(&owner).radius.sm;
             let _ =
                 list.add_rounded_rect(rect, radius, background.multiplied_alpha(owner.opacity()));
         });
@@ -406,18 +430,24 @@ impl PrimitiveView for MenuItemRowHost {
 
     fn children(&self, node: &Node) -> Vec<AnyView> {
         let theme = theme_for_node(node);
-        let minimum_height = resolved_row_height(node);
+        let highlighted = self.is_highlighted && self.item.is_enabled;
         let title_color = if !self.item.is_enabled {
             theme
                 .text_emphasis
                 .disabled
                 .unwrap_or(theme.colors.on_surface_muted)
+        } else if highlighted {
+            theme.colors.on_accent
         } else if self.item.role == MenuItemRole::Destructive {
             theme.colors.error
         } else {
             theme.colors.on_surface
         };
-        let secondary_color = theme.colors.on_surface_muted;
+        let secondary_color = if highlighted {
+            theme.colors.on_accent
+        } else {
+            theme.colors.on_surface_muted
+        };
 
         let mut lanes: Vec<AnyView> = Vec::new();
         if self.shows_selection_column {
@@ -443,7 +473,7 @@ impl PrimitiveView for MenuItemRowHost {
                     0.0,
                     check,
                 )
-                .frame_width(12.0),
+                .frame_width(ROW_LANE_WIDTH),
             ));
         }
         if self.shows_icon_column {
@@ -464,7 +494,7 @@ impl PrimitiveView for MenuItemRowHost {
                     0.0,
                     glyph,
                 )
-                .frame_width(12.0)
+                .frame_width(ROW_LANE_WIDTH)
                 .flex(0.0)
                 .shrink(0.0),
             ));
@@ -473,7 +503,7 @@ impl PrimitiveView for MenuItemRowHost {
         if self.item.content.rich_title.is_empty() {
             labels.push(AnyView::new(
                 Text::new(self.item.title.clone())
-                    .semantic_font(SemanticFontRef::body())
+                    .semantic_font(SemanticFontRef::label())
                     .foreground_color(title_color),
             ));
         } else {
@@ -534,11 +564,11 @@ impl PrimitiveView for MenuItemRowHost {
         vec![AnyView::new(
             Row::new(
                 VerticalAlignment::Center,
-                8.0,
+                ROW_LANE_SPACING,
                 AnyView::new(TupleView::new(lanes)),
             )
-            .padding_edges(10.0, 6.0)
-            .frame(None, None, None, Some(minimum_height), None, None),
+            .padding_edges(ROW_HORIZONTAL_PADDING, ROW_VERTICAL_PADDING)
+            .frame(None, None, None, Some(natural_row_height(node)), None, None),
         )]
     }
 }

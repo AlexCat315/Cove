@@ -255,6 +255,40 @@ fn menu_reveal() {
 }
 
 #[test]
+fn menu_exit_uses_the_short_surface_exit_not_the_entrance() {
+    InteractiveScene::run(640.0, 400.0, |scene| {
+        let harness = MenuHarness {
+            shown: State::new(false),
+            actions: Rc::new(Cell::new(0)),
+            trailing: false,
+            reduced: false,
+        };
+        scene.install(harness.clone());
+        settle(scene);
+        harness.shown.set(true);
+        settle(scene);
+        let scheduler = AnimatorScheduler::current();
+        assert_eq!(scheduler.active_count(), 1, "the 0.2s entrance is running");
+
+        scene.portal.dismiss_outside(Point::new(600.0, 390.0));
+        settle(scene);
+        // Leaving is not a second arriving: a dismissal runs the 0.09s surface
+        // exit, so it has settled a full 0.11s before this tick ends.
+        scheduler.tick(0.12);
+        settle(scene);
+        assert_eq!(
+            scheduler.active_count(),
+            0,
+            "the exit finished inside its own 0.09s budget"
+        );
+        assert!(
+            scene.portal.entries().is_empty(),
+            "no portal entry survives the exit"
+        );
+    });
+}
+
+#[test]
 fn context_menu_reveal() {
     InteractiveScene::run(640.0, 400.0, |scene| {
         let actions = Rc::new(Cell::new(0));

@@ -122,7 +122,7 @@ impl TouchMenu {
                     )
                     .padding(12.0),
                 ),
-                _ => AnyView::new(crate::primitives::text::Divider::horizontal()),
+                _ => super::menu::separator_view(),
             };
         };
 
