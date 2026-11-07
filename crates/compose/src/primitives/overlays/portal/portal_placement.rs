@@ -57,6 +57,21 @@ impl PortalPlacement {
     }
 }
 
+/// Places a portal slot at a window-space rect. The slot's frame is relative
+/// to its host, which can sit below a safe-area inset or a title bar.
+pub fn set_window_frame(node: &Node, window: Rect) {
+    let origin = node
+        .parent()
+        .map(|parent| parent.absolute_frame())
+        .unwrap_or_default();
+    node.set_frame(Rect::new(
+        window.x - origin.x,
+        window.y - origin.y,
+        window.width,
+        window.height,
+    ));
+}
+
 pub fn portal_window_bounds(node: &Node) -> Rect {
     let mut root = node.clone();
     while let Some(parent) = root.parent() {

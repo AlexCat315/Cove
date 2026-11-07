@@ -140,7 +140,8 @@ impl PortalStore {
         };
         match slot {
             Some(slot_node) => {
-                if slot_node.frame().x != position.x || slot_node.frame().y != position.y {
+                let placed = slot_node.absolute_frame();
+                if placed.x != position.x || placed.y != position.y {
                     let size = Size {
                         width: slot_node.frame().width,
                         height: slot_node.frame().height,
@@ -158,7 +159,7 @@ impl PortalStore {
                         entry.fit.viewport_margin,
                         entry.placement,
                     );
-                    slot_node.set_frame(fitted);
+                    super::portal_placement::set_window_frame(&slot_node, fitted);
                 }
             }
             None => {

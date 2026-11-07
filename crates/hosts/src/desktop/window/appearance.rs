@@ -32,7 +32,7 @@ pub fn changed_appearance(root: &Node) -> Option<WindowAppearance> {
 /// every application gets a legible base without painting it itself.
 pub fn sync_backdrop_tint(root: &Node, translucent: bool) {
     let tint = if translucent {
-        provided_theme_within(root, 48, 2048).map(|theme| {
+        provided_theme_within(root, 48, 2048).and_then(|theme| {
             cove_ui_compose::theme::tokens::material::window_backdrop_tint(&theme.colors)
         })
     } else {

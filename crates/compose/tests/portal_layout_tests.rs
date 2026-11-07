@@ -16,7 +16,7 @@ use std::rc::Rc;
 use cove_composition::{AnyView, LayoutDebugExt, ViewExt, ViewGraph};
 use cove_core::Point;
 use cove_core::scene::{Align, FlexDirection, Justify, NodeTree, Recomposer, Wrap};
-use cove_ui_compose::modifiers::layout::{FlexExt, LayoutFrameExt};
+use cove_ui_compose::modifiers::layout::{EdgeInsets, FlexExt, LayoutFrameExt, PaddingExt};
 use cove_ui_compose::primitives::overlays::portal::{
     LayerRoot, PortalHost, PortalStore, PortalStoreEnvironment, PortalStoreHolder,
 };
@@ -190,6 +190,71 @@ fn portal_host_does_not_participate_in_content_flex() {
             .expect("popover entry");
         assert_eq!(popover.absolute_frame.x, 24.0, "the entry keeps its x");
         assert_eq!(popover.absolute_frame.y, 32.0, "the entry keeps its y");
+
+        PortalStoreHolder::current().clear();
+    });
+}
+
+#[test]
+fn an_entry_keeps_its_window_position_when_the_layer_sits_below_an_inset() {
+    GlobalTestLock::locked(|| {
+        PortalStoreHolder::current().clear();
+        PortalStoreHolder::current().register(
+            Some("inset-popover".to_string()),
+            Point::new(24.0, 80.0),
+            Some(120.0),
+            AnyView::new(AnyView::new(empty_box()).frame_height(60.0)),
+        );
+
+        let graph = Rc::new(ViewGraph::new(
+            Rc::new(RefCell::new(NodeTree::new())),
+            Rc::new(Recomposer::new()),
+        ));
+        // A title bar or safe area pushes the layer root 32pt down.
+        graph.install(
+            AnyView::new(BoxView::new(
+                FlexDirection::Column,
+                Align::Stretch,
+                Justify::FlexStart,
+                Wrap::NoWrap,
+                0.0,
+                AnyView::new(
+                    AnyView::new(LayerRoot::with_portals(
+                        AnyView::new(empty_box().flex(1.0)),
+                        PortalHost::new(),
+                    ))
+                    .flex(1.0),
+                ),
+            ))
+            .padding_insets(EdgeInsets {
+                top: 32.0,
+                leading: 0.0,
+                bottom: 0.0,
+                trailing: 0.0,
+            }),
+            Default::default(),
+        );
+        graph.recomposer.commit_all();
+        graph.compute_layout(300.0, 240.0);
+
+        let snapshot = graph.layout_snapshot();
+        let layer = snapshot
+            .iter()
+            .find(|entry| entry.layout_role.as_deref() == Some("portal-layer"))
+            .expect("portal layer");
+        assert_eq!(
+            layer.absolute_frame.y, 32.0,
+            "the layer starts below the inset"
+        );
+        let popover = snapshot
+            .iter()
+            .find(|entry| entry.debug_name.as_deref() == Some("inset-popover"))
+            .expect("popover entry");
+        assert_eq!(
+            (popover.absolute_frame.x, popover.absolute_frame.y),
+            (24.0, 80.0),
+            "the window position is not shifted by the layer's own offset"
+        );
 
         PortalStoreHolder::current().clear();
     });

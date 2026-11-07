@@ -26,7 +26,7 @@ use cove_core::scene::{
 };
 use cove_core::{Point, Rect, Signal, Size};
 
-use super::portal_placement::{PortalPlacement, portal_window_bounds};
+use super::portal_placement::{PortalPlacement, portal_window_bounds, set_window_frame};
 use super::portal_registry::{
     PortalEntry, PortalOwnership, PortalStore, PortalStoreEnvironment, PortalStoreHolder,
 };
@@ -256,7 +256,7 @@ impl PrimitiveView for PortalEntrySlot {
                     entry.fit.viewport_margin,
                     entry.placement,
                 );
-                node.set_frame(fitted);
+                set_window_frame(node, fitted);
                 if let Some(layout) = node.layout_node() {
                     let (minimum, maximum) = entry.fit.width_range(window);
                     layout.set_min_width(Some(minimum));

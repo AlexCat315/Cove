@@ -128,7 +128,9 @@ bool cove_shell_apple_backdrop(void *raw,int kind) {COVE_ASSERT_MAIN();
         NSVisualEffectView *effect=[[NSVisualEffectView alloc] initWithFrame:content.bounds];
         effect.autoresizingMask=NSViewWidthSizable|NSViewHeightSizable;
         effect.blendingMode=NSVisualEffectBlendingModeBehindWindow;
-        effect.state=NSVisualEffectStateFollowsWindowActiveState;
+        /* Stays translucent while another window is key; following the active
+           state turns the material opaque whenever the app is in the background. */
+        effect.state=NSVisualEffectStateActive;
         [content addSubview:effect positioned:NSWindowBelow relativeTo:nil];
         context.backdrop=effect;
     }
