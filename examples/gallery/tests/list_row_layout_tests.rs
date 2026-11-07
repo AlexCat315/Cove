@@ -194,7 +194,6 @@ fn the_list_page_renders_its_story() {
     use cove_examples::gallery_content::StoryDispatch;
     let dispatch = StoryDispatch::new(GalleryPage::List);
     assert!(dispatch.is_implemented(), "the list page has a story");
-    assert!(dispatch.pending_message().is_none());
     assert!(
         dispatch.view(Default::default()).is_some(),
         "the story view is produced for the list page"

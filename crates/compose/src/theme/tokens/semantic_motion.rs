@@ -66,21 +66,14 @@ impl SemanticMotionRef {
     /// On-screen movement (a selection sliding to a new row): the iOS sheet
     /// curve over the standard duration — decisive, bounded, no bounce.
     pub fn snappy() -> Self {
-        Self::new(|theme| {
-            Animation::new(
-                theme.motion.standard,
-                Easing::FLUID.as_animation_curve(),
-            )
-        })
+        Self::new(|theme| Animation::new(theme.motion.standard, Easing::FLUID.as_animation_curve()))
     }
     /// Opt-in playful motion. No built-in control uses it.
     pub fn bouncy() -> Self {
         Self::new(|theme| Animation::spring(theme.motion.slow, 0.62).with_overshoot(true))
     }
     pub fn smooth() -> Self {
-        Self::new(|theme| {
-            Animation::new(theme.motion.slow, Easing::FLUID.as_animation_curve())
-        })
+        Self::new(|theme| Animation::new(theme.motion.slow, Easing::FLUID.as_animation_curve()))
     }
 }
 

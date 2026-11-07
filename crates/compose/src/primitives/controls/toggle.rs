@@ -458,11 +458,9 @@ fn update_appearance(node: &Node, is_on: bool, is_enabled: bool) {
             // Swift marks the switch spring `allowsOvershoot: true` (Toggle.swift:495).
             // Without the flag `inherit_motion` bails and a reversal restarts from
             // rest instead of continuing with the live velocity.
-            // The knob travels on the iOS sheet curve: quick, then settling.
-            cove_core::scene::Animation::new(
-                theme.motion.standard,
-                crate::theme::Easing::FLUID.as_animation_curve(),
-            )
+            // A critically damped spring: it never overshoots, and a reversal
+            // mid-travel carries the knob's momentum instead of restarting.
+            cove_core::scene::Animation::spring(theme.motion.standard, 1.0).with_overshoot(true)
         } else {
             // Long enough for the check to be seen drawing itself in.
             semantic_animation(&SemanticMotionRef::medium(), &theme)
@@ -474,8 +472,7 @@ fn update_appearance(node: &Node, is_on: bool, is_enabled: bool) {
         cove_core::scene::ActiveAnimationContext::with(Some(fill_motion), None, None, || {
             write_fill(node)
         });
-        let stretch_motion =
-            cove_core::scene::Animation::new(
+        let stretch_motion = cove_core::scene::Animation::new(
             theme.motion.fast * 1.5,
             crate::theme::Easing::RESPONSIVE.as_animation_curve(),
         );

@@ -88,6 +88,9 @@ impl Hash for NodeKey {
 }
 
 pub type DrawHook = Rc<dyn Fn(&mut DrawList, Point)>;
+/// Chrome a node paints above its own children (a scroll bar): given a point
+/// in the node's local space, whether that point belongs to the chrome.
+pub type ChromeHitRegion = Rc<dyn Fn(Point) -> bool>;
 pub type LayoutUpdateHook = Rc<dyn Fn(&Node)>;
 
 pub struct NodeData {
@@ -136,6 +139,7 @@ pub struct NodeData {
     stored_draw: Option<DrawHook>,
     draw_identity: Option<AnyRenderContentIdentity>,
     stored_overlay_draw: Option<DrawHook>,
+    chrome_hit_region: Option<ChromeHitRegion>,
     overlay_draw_identity: Option<AnyRenderContentIdentity>,
     pub layout_did_update: Option<LayoutUpdateHook>,
     pub content_offset: Point,
@@ -228,6 +232,7 @@ impl Node {
             stored_draw: None,
             draw_identity: None,
             stored_overlay_draw: None,
+            chrome_hit_region: None,
             overlay_draw_identity: None,
             layout_did_update: None,
             content_offset: Point::default(),
@@ -934,6 +939,19 @@ impl Node {
             data.draw_identity = None;
         }
         self.mark_render_dirty(InvalidationSource::style_set("draw"));
+    }
+    /// Declares chrome this node paints over its children. Inside the region
+    /// the node itself is the hit target — its children are not visited — so
+    /// its handlers receive the press and its cursor applies, the same as if
+    /// the chrome were a separate topmost control.
+    pub fn set_chrome_hit_region(&self, region: Option<ChromeHitRegion>) {
+        self.0.borrow_mut().chrome_hit_region = region;
+        Self::invalidate_input_cache();
+    }
+    /// Whether `local` lies in this node's chrome region.
+    pub fn chrome_contains(&self, local: Point) -> bool {
+        let region = self.0.borrow().chrome_hit_region.clone();
+        region.is_some_and(|region| region(local))
     }
     pub fn overlay_draw(&self) -> Option<DrawHook> {
         self.0.borrow().stored_overlay_draw.clone()

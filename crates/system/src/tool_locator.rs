@@ -33,10 +33,10 @@ impl ProcessEnvironment {
         }
         #[cfg(windows)]
         {
-            return environment
+            environment
                 .iter()
                 .find(|(key, _)| key.eq_ignore_ascii_case(name))
-                .map(|(_, value)| value.clone());
+                .map(|(_, value)| value.clone())
         }
         #[cfg(not(windows))]
         {

@@ -53,10 +53,10 @@ use cove_core::scene::{AccessibilityRole, Align, FlexDirection, Justify, Node, W
 use cove_platform::{InputEvent, KeyEvent, KeyModifiers};
 use cove_ui_addons::workspace::{
     WorkspaceAxisSizing, WorkspaceCommand, WorkspaceController, WorkspaceDocument, WorkspaceEdge,
-    WorkspaceFloatingWindowID, WorkspacePanel, WorkspacePanelID, WorkspacePanelSizing,
-    WorkspaceRect, WorkspaceSlot, WorkspaceSlotID, WorkspaceSlotKind, WorkspaceSlotSize,
-    WorkspaceSplitFractions, WorkspaceTabGroup, WorkspaceTabGroupID, WorkspaceTarget,
-    WorkspaceView,
+    WorkspaceFloatingWindowID, WorkspaceLayoutNode, WorkspacePanel, WorkspacePanelID,
+    WorkspacePanelSizing, WorkspaceRect, WorkspaceSlot, WorkspaceSlotID, WorkspaceSlotKind,
+    WorkspaceSlotSize, WorkspaceSplitAxis, WorkspaceSplitFractions, WorkspaceTabGroup,
+    WorkspaceTabGroupID, WorkspaceTarget, WorkspaceView,
 };
 use cove_ui_compose::BoxView;
 use cove_ui_compose::modifiers::layout::{FlexExt, LayoutFrameExt};
@@ -2171,4 +2171,49 @@ fn animated_collapse_reversal_keeps_the_same_panel_and_restores_layout() {
         1.0,
         "reversal restores allocation",
     );
+}
+
+#[test]
+fn an_in_slot_split_shares_its_slot_by_fraction() {
+    workspace_support::GlobalTestLock::locked(|| {
+        let mut document = workspace_support::make_bare_document(
+            &[("main", &["editor"]), ("preview", &["preview"])],
+            WorkspaceSlotID::center(),
+        );
+        if let Some(slot) = document.slots.get_mut(&WorkspaceSlotID::center()) {
+            slot.layout = Some(WorkspaceLayoutNode::split(
+                WorkspaceSplitAxis::Vertical,
+                0.6,
+                workspace_support::group_node("main"),
+                workspace_support::group_node("preview"),
+            ));
+        }
+        let controller = Rc::new(RefCell::new(WorkspaceController::new(document)));
+        let rig = ViewRig::standard(controller, 800.0, 400.0);
+        let main = rig.rig.named("workspace-group-main").absolute_frame();
+        let preview = rig.rig.named("workspace-group-preview").absolute_frame();
+        let divider = rig
+            .rig
+            .named("workspace-layout-split-center-main-preview")
+            .absolute_frame();
+        let gutter = cove_ui_addons::workspace::WorkspaceTheme::default().gutter;
+        assert_close(
+            divider.height,
+            gutter,
+            0.5,
+            "the divider reserves the gutter",
+        );
+        assert!(
+            preview.y >= main.y + main.height,
+            "the second side sits below the first, not over it: main {main:?}, preview {preview:?}"
+        );
+        let total = main.height + preview.height;
+        assert!(total > 0.0, "both sides are laid out");
+        assert_close(
+            main.height / total,
+            0.6,
+            0.01,
+            "the first side takes the authored fraction",
+        );
+    });
 }

@@ -44,6 +44,14 @@ fn walk(node: &Node, point_in_parent: Point, path: &mut Vec<Node>) -> Option<Hit
         return None;
     }
     path.push(node.clone());
+    // Chrome painted above the children (a scroll bar) answers before them.
+    if node.is_hit_testable() && local_bounds.contains(local) && node.chrome_contains(local) {
+        return Some(HitResult {
+            node: node.clone(),
+            path: path.clone(),
+            local_point: local,
+        });
+    }
     let content = placement_step(frame, node.transform(), node.content_offset());
     let child_point = content.source(point_in_parent);
     let children = if node.children_may_need_z_sort() {
@@ -81,6 +89,20 @@ mod tests {
         root.add_child(&left);
         root.add_child(&right);
         (root, left, right)
+    }
+
+    #[test]
+    fn a_chrome_region_answers_before_the_children_it_covers() {
+        let (root, left, _) = window();
+        root.set_is_hit_testable(true);
+        left.set_is_hit_testable(true);
+        // The root's chrome is a 10pt lane on its leading edge, over `left`.
+        root.set_chrome_hit_region(Some(std::rc::Rc::new(|point: Point| point.x < 10.0)));
+        let in_chrome = HitTester::hit_test(&root, Point { x: 5.0, y: 50.0 }).unwrap();
+        assert_eq!(in_chrome.node, root, "the chrome lane belongs to its owner");
+        assert_eq!(in_chrome.path, vec![root.clone()]);
+        let beside = HitTester::hit_test(&root, Point { x: 50.0, y: 50.0 }).unwrap();
+        assert_eq!(beside.node, left, "outside the lane the child still wins");
     }
 
     #[test]

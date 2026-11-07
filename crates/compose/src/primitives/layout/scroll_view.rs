@@ -58,6 +58,11 @@ pub enum ScrollbarGutter {
     /// Reserves a fixed lane on the trailing edge so trailing controls are
     /// never covered by the bar or its grab area.
     Stable,
+    /// No bar at all: the content still scrolls by wheel, trackpad, keyboard
+    /// and reveal, but nothing is painted over it or grabs the pointer. For
+    /// strips such as tab rows, where a bar would cover the controls and an
+    /// overflow menu already reaches what is out of view.
+    Hidden,
 }
 
 /// One declarative programmatic scroll. A new identity starts a new animation;
@@ -126,6 +131,7 @@ struct AnchorState {
 struct PaintIdentity {
     axes: ScrollAxis,
     touch_indicator: bool,
+    hidden: bool,
     track_bits: (u32, u32, u32, u32),
     thumb_bits: (u32, u32, u32, u32),
 }
@@ -977,6 +983,7 @@ fn install_interaction(
     gutter: ScrollbarGutter,
 ) {
     let axes = view.axes;
+    let hidden = gutter == ScrollbarGutter::Hidden;
     let touch_indicator = !crate::primitives::controls::adaptive::supports_control_hover(node);
     node.set_attachment(TOUCH_INDICATOR, touch_indicator);
     if let Some(layout) = node.layout_node() {
@@ -1005,6 +1012,36 @@ fn install_interaction(
     let track_thickness = if touch_indicator { 3.0 } else { 8.0 };
     let track_inset = if touch_indicator { 3.0 } else { 2.0 };
     let track_hit_slop = 6.0;
+
+    // The bar lanes are chrome over the content: inside them the pointer is
+    // the arrow and a press drags or pages the bar, never selecting the text
+    // the bar is drawn over.
+    if hidden || touch_indicator {
+        node.set_chrome_hit_region(None);
+    } else {
+        let lane = track_thickness + track_inset + track_hit_slop / 2.0;
+        let region_node = node.downgrade();
+        node.set_chrome_hit_region(Some(Rc::new(move |local: Point| {
+            let Some(owner) = Node::upgrade(&region_node) else {
+                return false;
+            };
+            let viewport = visible_viewport_rect(&owner);
+            let content = cached_scrollable_content_size(&owner);
+            let vertical = matches!(axes, ScrollAxis::Vertical | ScrollAxis::Both)
+                && content.height > viewport.height + 0.5
+                && local.x >= viewport.x + viewport.width - lane
+                && local.x <= viewport.x + viewport.width
+                && local.y >= viewport.y
+                && local.y <= viewport.y + viewport.height;
+            let horizontal = matches!(axes, ScrollAxis::Horizontal | ScrollAxis::Both)
+                && content.width > viewport.width + 0.5
+                && local.y >= viewport.y + viewport.height - lane
+                && local.y <= viewport.y + viewport.height
+                && local.x >= viewport.x
+                && local.x <= viewport.x + viewport.width;
+            vertical || horizontal
+        })));
+    }
 
     let motion = motion_animator(node, resolved_physics(node));
     let supports_touch_drag = node
@@ -1144,6 +1181,7 @@ fn install_interaction(
             registry.remove(node);
         }
         node.update_overlay_draw(false, |_, _| {});
+        node.set_chrome_hit_region(None);
         return;
     }
 
@@ -1345,6 +1383,7 @@ fn install_interaction(
                     let geometry =
                         scrollbar_geometry(&owner, pointer_axes, track_thickness, track_inset);
                     if !touch_indicator
+                        && !hidden
                         && let Some(state) = begin_scrollbar_drag(
                             &owner,
                             DragAxis::Vertical,
@@ -1362,6 +1401,7 @@ fn install_interaction(
                         return EventResult::Handled;
                     }
                     if !touch_indicator
+                        && !hidden
                         && let Some(state) = begin_scrollbar_drag(
                             &owner,
                             DragAxis::Horizontal,
@@ -1542,6 +1582,7 @@ fn install_interaction(
         PaintIdentity {
             axes,
             touch_indicator,
+            hidden,
             track_bits: color_bits(track_color),
             thumb_bits: color_bits(thumb_color),
         },
@@ -1566,7 +1607,7 @@ fn install_interaction(
                 }
             }
             let opacity = owner.attachment::<f32>(CHROME_OPACITY).unwrap_or(0.0);
-            if opacity <= 0.001 {
+            if hidden || opacity <= 0.001 {
                 return;
             }
             let offset = owner.content_offset();

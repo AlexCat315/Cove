@@ -10,8 +10,9 @@
 //! - the tab is `height - 8` tall with 9pt leading/trailing padding
 //! - fill is `surfaceVariant` when selected, `stateLayerHover` when merely
 //!   hovered, and clear otherwise
-//! - a 6pt corner radius and a 1pt `focusRing` border apply, the border only on
-//!   focus
+//! - the tab is a capsule; a 1pt `focusRing` border applies only on focus
+//! - inside the bar's sliding selection the resting selection is one capsule
+//!   that springs between tabs; the tab itself paints only hover
 //! - the interaction key drives the fast motion animation, so a changed
 //!   selection or hover animates rather than snapping
 //! - no rules are drawn above or between tabs
@@ -19,7 +20,8 @@
 use cove_core::Color;
 use cove_core::scene::{Align, Animation, Edge, FlexDirection, LayoutNode, Node, with_animation};
 
-use cove_composition::{AnyView, PrimitiveView, impl_primitive_view};
+use cove_composition::{AnyView, PrimitiveView, ViewModifier, impl_primitive_view};
+use cove_ui_compose::animation::geometry::{SlidingSelectionMark, is_in_sliding_selection};
 use cove_ui_compose::theme::ColorScheme;
 use cove_ui_compose::theme::styles::buttons::button_style::{
     ButtonInteractionKey, ButtonStyle, ButtonStyleConfiguration,
@@ -70,8 +72,6 @@ impl ButtonStyle for WorkspaceTabStyle {
 
 const WORKSPACE_TAB_KEY: &str = "cove.workspace.tab.interaction";
 
-/// Corner radius of the panel tab block.
-const CORNER_RADIUS: f32 = 6.0;
 /// Horizontal padding around the label.
 const LABEL_PADDING: f32 = 9.0;
 /// The tab is inset this much inside the bar's full height.
@@ -102,7 +102,11 @@ impl PrimitiveView for WorkspaceTabChrome {
     fn update_node(&self, node: &Node) {
         // Selection wins over hover, hover over the resting clear fill. Swift
         // expresses this as a nested ternary in the same order.
-        let fill = if self.is_selected {
+        // Inside a sliding strip the resting selection is the strip's capsule;
+        // the tab paints only its hover.
+        let slides = self.is_selected && is_in_sliding_selection(node);
+        SlidingSelectionMark(slides).apply_node(node);
+        let fill = if self.is_selected && !slides {
             self.colors.surface_variant
         } else if self.is_hovered {
             self.colors.state_layer_hover
@@ -123,7 +127,8 @@ impl PrimitiveView for WorkspaceTabChrome {
 
         let apply = || {
             node.set_background_color(Some(fill));
-            node.set_corner_radius(CORNER_RADIUS);
+            // A capsule, like every tab and segment in the library.
+            node.set_corner_radius((self.height - TAB_HEIGHT_INSET) * 0.5);
             node.set_border_color(Some(border));
             node.set_border_width(border_width);
             // A disabled tab keeps its block but reads as unavailable.

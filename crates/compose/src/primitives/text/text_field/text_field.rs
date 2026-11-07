@@ -664,7 +664,8 @@ impl TextField {
         }
     }
 
-    /// The trailing clear glyph is offered while the field can be emptied.
+    /// The trailing lane the clear control uses while the field can be emptied.
+    /// The control itself only appears while the field is focused.
     fn shows_clear_affordance(&self, has_text: bool) -> bool {
         self.behavior.clearable && !self.behavior.read_only && !self.behavior.disabled && has_text
     }
@@ -3244,31 +3245,43 @@ fn render(
             Point::new(1.0, 1.0),
         );
     }
+    // Apple fields offer clearing only while they are being edited: at rest a
+    // field shows its text alone. The lane stays reserved, so focusing never
+    // reflows the text.
     if field.behavior.clearable
         && !field.behavior.disabled
         && !field.behavior.read_only
         && !current.is_empty()
+        && state.is_focused
     {
         let start = edge - 20.0;
         // `edge` already includes the paint origin; adding it again here moved
         // the glyph and its hit region one field offset to the right, so a
         // field inset from the window edge clipped the clear affordance.
         node.set_attachment("__textfield_clear_hit", start);
-        let image = crate::primitives::media::image::Image::resolve_resource(
-            &crate::primitives::media::ui_icon_catalog::action::x(),
+        // The system clear control: a filled gray disc with the cross knocked
+        // out in the field's own fill.
+        let disc = Rect::new(
+            start + 3.0,
+            origin.y + (frame.height - 14.0) * 0.5,
             14.0,
             14.0,
         );
+        let _ = list.add_rounded_rect(
+            disc,
+            7.0,
+            theme.colors.on_surface_muted.multiplied_alpha(0.55),
+        );
+        let image = crate::primitives::media::image::Image::resolve_resource(
+            &crate::primitives::media::ui_icon_catalog::action::x(),
+            8.0,
+            8.0,
+        );
         image.retain(list);
         let _ = list.add_image_mask_quad(
-            Rect::new(
-                start + 3.0,
-                origin.y + (frame.height - 14.0) * 0.5,
-                14.0,
-                14.0,
-            ),
+            Rect::new(disc.x + 3.0, disc.y + 3.0, 8.0, 8.0),
             image.texture_id(),
-            placeholder_color,
+            theme.inputs.background,
             Point::default(),
             Point::new(1.0, 1.0),
         );

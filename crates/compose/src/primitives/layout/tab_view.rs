@@ -551,7 +551,7 @@ impl PrimitiveView for TabStrip {
                     crate::primitives::layout::ScrollAxis::Horizontal,
                     styled,
                 )
-                .scrollbar_gutter(crate::primitives::layout::ScrollbarGutter::Overlay)
+                .scrollbar_gutter(crate::primitives::layout::ScrollbarGutter::Hidden)
                 .frame(None, None, None, Some(40.0), None, None),
             )];
         }

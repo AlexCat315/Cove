@@ -214,6 +214,23 @@ impl PrimitiveView for SlidingSelection {
 }
 impl_primitive_view!(SlidingSelection);
 
+/// Makes the modified view's own node the sliding selection host. Use it where
+/// a wrapper would change layout, such as a row inside a scroll view.
+#[derive(Clone)]
+pub struct SlidingSelectionHost(pub Rc<dyn Fn(&crate::theme::Theme) -> SlidingSelectionStyle>);
+
+impl SlidingSelectionHost {
+    pub fn new(style: impl Fn(&crate::theme::Theme) -> SlidingSelectionStyle + 'static) -> Self {
+        Self(Rc::new(style))
+    }
+}
+
+impl ViewModifier for SlidingSelectionHost {
+    fn apply_node(&self, node: &Node) {
+        install(node, self.0.clone());
+    }
+}
+
 /// Makes `node` itself the sliding selection host, for a primitive that already
 /// owns the node its rows sit in and cannot take a wrapper without changing
 /// its layout. Call it from `update_node`, before the rows compose.

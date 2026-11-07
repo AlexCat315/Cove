@@ -49,6 +49,7 @@ pub mod toolbar_story;
 pub mod viewport_traits;
 pub mod web_story;
 pub mod wheel_picker_story;
+pub mod workspace_story;
 
 pub use action_sheet_story::ActionSheetStory;
 pub use animation::AnimationStory;
@@ -118,3 +119,4 @@ pub use web_story::WebStory;
 pub use wheel_picker_story::WheelPickerStory;
 
 mod showcase;
+pub use workspace_story::WorkspaceStory;

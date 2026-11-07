@@ -15,28 +15,14 @@ use cove_ui_compose::AnyView;
 /// What the shell should render for a page.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum StoryDispatch {
-    /// A ported story exists.
+    /// A ported story exists; every catalog page has one.
     Story(GalleryPage),
-    /// The page has no ported story yet.
-    Pending {
-        page: GalleryPage,
-        story_file: &'static str,
-    },
 }
 
 impl StoryDispatch {
     /// Resolves the dispatch for `page`.
     pub fn new(page: GalleryPage) -> Self {
-        match page {
-            // `Workspace` is the one page without a story: the addon view needs a
-            // controller, a panel registry and authored content, so it is ported
-            // separately from the gallery stories.
-            GalleryPage::Workspace => Self::Pending {
-                page,
-                story_file: StorySource::entry(page),
-            },
-            _ => Self::Story(page),
-        }
+        Self::Story(page)
     }
 
     pub fn is_implemented(&self) -> bool {
@@ -135,6 +121,9 @@ impl StoryDispatch {
             }
             Self::Story(GalleryPage::BoundedScroll) => {
                 Some(AnyView::new(stories::BoundedScrollStory::new(options)))
+            }
+            Self::Story(GalleryPage::Workspace) => {
+                Some(AnyView::new(stories::WorkspaceStory::new(options)))
             }
             Self::Story(GalleryPage::PropertyGrid) => {
                 Some(AnyView::new(stories::PropertyGridStory::new(options)))
@@ -318,19 +307,6 @@ impl StoryDispatch {
             Self::Story(GalleryPage::SectionedList) => {
                 Some(AnyView::new(stories::SectionedListStory::new()))
             }
-            Self::Story(_) | Self::Pending { .. } => None,
-        }
-    }
-
-    /// The operator-facing message for a page without a story.
-    pub fn pending_message(&self) -> Option<String> {
-        match self {
-            Self::Story(_) => None,
-            Self::Pending { page, story_file } => Some(format!(
-                "{} has no Rust story yet; port it from Stories/{}.",
-                page.raw_value(),
-                story_file
-            )),
         }
     }
 }
@@ -535,7 +511,6 @@ mod checks {
         let dispatch = StoryDispatch::new(GalleryPage::Introduction);
         assert!(dispatch.is_implemented());
         assert!(dispatch.view(GalleryOptions::default()).is_some());
-        assert!(dispatch.pending_message().is_none());
     }
 
     #[test]
@@ -557,16 +532,18 @@ mod checks {
     }
 
     #[test]
-    fn only_the_workspace_page_is_pending() {
+    fn every_page_has_a_story() {
         let pending: Vec<_> = GalleryCatalog::entries()
             .into_iter()
             .map(|entry| entry.page)
             .filter(|page| !StoryDispatch::new(*page).is_implemented())
             .collect();
-        assert_eq!(pending, vec![GalleryPage::Workspace]);
-        let message = StoryDispatch::new(GalleryPage::Workspace)
-            .pending_message()
-            .expect("a pending page explains itself");
-        assert!(message.contains("Layout/LayoutStories.swift"), "{message}");
+        assert!(pending.is_empty(), "pages without a story: {pending:?}");
+        assert!(
+            StoryDispatch::new(GalleryPage::Workspace)
+                .view(GalleryOptions::default())
+                .is_some(),
+            "the workspace page mounts its dock story"
+        );
     }
 }

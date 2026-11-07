@@ -98,7 +98,7 @@ impl LogSystem {
             let base = std::env::var_os("LOCALAPPDATA")
                 .map(PathBuf::from)
                 .unwrap_or_else(home_directory);
-            return base.join("Cove").join("Logs");
+            base.join("Cove").join("Logs")
         }
         #[cfg(target_os = "macos")]
         {
@@ -115,7 +115,7 @@ impl LogSystem {
                 .map(PathBuf::from)
                 .map(|home| home.join("Library").join("Application Support"))
                 .unwrap_or_else(std::env::temp_dir);
-            return base.join("Cove").join("Logs");
+            base.join("Cove").join("Logs")
         }
         #[cfg(not(any(
             target_os = "windows",
@@ -129,7 +129,7 @@ impl LogSystem {
             let base = std::env::var_os("XDG_STATE_HOME")
                 .map(PathBuf::from)
                 .unwrap_or_else(|| home_directory().join(".local").join("state"));
-            return base.join("cove").join("logs");
+            base.join("cove").join("logs")
         }
     }
 }

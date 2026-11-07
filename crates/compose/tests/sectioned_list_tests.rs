@@ -207,7 +207,8 @@ fn sticky_headers() {
         let pinned = sticky(scene).expect("scrolling pins Alpha");
         assert_eq!(sticky_title(&pinned).as_deref(), Some("Alpha"));
         assert_eq!(pinned.absolute_frame().y, port.absolute_frame().y);
-        assert_eq!(pinned.frame().width, LIST_WIDTH);
+        // The inset list box keeps 4pt on each side of its rows.
+        assert_eq!(pinned.frame().width, LIST_WIDTH - 8.0);
         assert!(
             !pinned.allows_hit_testing(),
             "the pinned decoration never intercepts rows"

@@ -217,10 +217,21 @@ fn windows_environment() -> io::Result<Vec<(String, String)>> {
         "amd64"
     };
     let script = Path::new(directory).join("VC/Auxiliary/Build/vcvarsall.bat");
-    let output = checked_output(Command::new("cmd").args(["/d", "/s", "/c"]).arg(format!(
-        "\"\"{}\" {architecture} >nul && set\"",
-        script.display()
-    )))?;
+    let mut shell = Command::new("cmd");
+    shell.args(["/d", "/s", "/c"]);
+    // `cmd /s /c` strips one outer pair of quotes and reads the rest verbatim.
+    // `Command::arg` would escape the inner quotes as `\"`, which cmd does not
+    // understand, so the script path never ran and setup fell back to the
+    // Visual Studio installer even with Build Tools present.
+    let line = format!("\"\"{}\" {architecture} >nul && set\"", script.display());
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        shell.raw_arg(line);
+    }
+    #[cfg(not(windows))]
+    shell.arg(line);
+    let output = checked_output(&mut shell)?;
     let mut values: Vec<(String, String)> = Vec::new();
     for line in output.lines() {
         if let Some((key, value)) = line.split_once('=')

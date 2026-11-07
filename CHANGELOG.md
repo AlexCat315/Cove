@@ -4,6 +4,20 @@
 
 ## Unreleased
 
+- **Workspace 外观与槽位拆分修复、CI 修复（2026-11-07）**：
+  - Workspace：槽位内拆分此前只记录 `fraction`、从未用于布局，两侧都按 100% 填充，第二个面板被挤出容器（Gallery 中 Preview 面板完全不可见）；现按 `fraction` 以 flex 份额分配，分隔条保留与区域间一致的 6pt `gutter`（此前为 1pt）。标签栏选中标签改为胶囊，并以 `SlidingSelection` 在标签间滑动；新增 `SlidingSelectionHost` 修饰符，可在不改变布局的前提下把现有节点设为滑动选中宿主（用于滚动标签行）。工作区根节点自带 `surface_variant` 画布，侧轨与外壳槽位不再自绘白底。标签行不再显示横向滚动条（此前浮在标签上方遮挡内容），仍可用滚轮与触控板滚动，溢出标签由尾部菜单提供。
+  - 滚动条与文字选择：滚动条此前只是滚动视图上方的绘制，命中测试看不到它——指针移到滚动条上会取到下方可选文字的 I 形光标，按下也可能落到文字选择上。`Node` 新增 `set_chrome_hit_region` / `chrome_contains`：节点声明自己绘制在子节点之上的“铬区”，命中测试在该区域内以节点本身为目标、不再访问子节点，按下只交给该节点处理，指针恢复为箭头。ScrollView 把有溢出方向的滚动条通道声明为铬区（`Hidden` 与触屏除外）。`hit_tester` 新增用例覆盖铬区优先于其覆盖的子节点。
+  - TextField：`clearable` 的清除控件改为仅在获得焦点且有内容时出现，并画成系统样式（灰色实心圆 + 白色 ×）；此前静止时也常驻一个裸 ×，不符合 macOS 输入框外观。尾部预留宽度不随焦点变化。
+  - 动画泄漏：节点离开树之后（例如拆除时释放指针捕获或悬停导致按钮重绘），`animatable_set_with` / `animatable_set_optional` 仍会在其上启动新动画，而该节点的动画注册表已随卸载清空，控制器永远留在调度器里。现在已脱离树的节点直接写入终值、不注册动画。`unmounting_the_story_clears_its_scheduler` 因此恢复通过。
+  - 开关拇指改为临界阻尼弹簧：不回弹，但中途反向时保留速度（`switch_value_changes_immediately_while_the_thumb_travels`）。
+  - 测试（main 上已失败的 8 项）：内嵌列表盒的 4pt 侧边内缩与 `surface` 底色同步到 `list_tree_tests`、`sectioned_list_tests`、`mobile_presentation_tests`；Gallery 动画用例在断言调度器空闲前让被点按钮的 0.15s 松手反馈结束。
+  - ScrollView：`ScrollbarGutter` 新增 `Hidden`——不绘制滚动条、不接收指针，内容仍可滚动；Workspace 标签行、TabView 滚动标签条与 Toolbar 命令行改用它。
+  - Gallery：补上唯一缺失的 Workspace 页（Dock workspace：左侧 Files / Search / History 三标签、中部 Editor 与 Preview 上下拆分、面板最小/首选/最大尺寸、保存/恢复/重置布局），删除不再使用的 `StoryDispatch::Pending` 及占位视图；`serde_json` 移入 Gallery 正式依赖。
+  - CI：修复各桌面平台 Formatting 与 Lints——`cove-logging` 与 `cove-system` 中仅在 Linux/Windows 编译的 `needless_return`、`collapsible_if`、Windows 下未使用的 `lexical`；`accessibility.m` 改用 `@"AXHeading"`，在 macOS 15 SDK 上不再因缺少 `NSAccessibilityHeadingRole` 编译失败。
+  - CI（Linux 媒体）：手写 Vulkan 绑定中 30 个常量与头文件不符——`VkPhysicalDeviceFeatures2` 等 20 个 `sType`（深度模板/动态状态互换、时间线信号量、缓冲区地址、加速结构、mesh、draw parameters 等），以及访问掩码、混合因子、边框颜色、深度格式、解析模式与加速结构枚举；驱动按错误类型读取结构，导致 `vkGetPhysicalDeviceFeatures2` 校验错误与 `media-rhi` presentation 测试失败。全部按 `vulkan_core.h` 改正，新增 `graphics/tests/vulkan_constants.rs` 以文本方式比对绑定与头文件（任意宿主可运行；回退修复时失败）。
+  - CI（Windows 媒体）：`windows_environment()` 用 `Command::arg` 传 `cmd /s /c` 命令行，Windows 下内层引号被转义为 `\"`，vcvarsall 从未执行，于是即使已装 Build Tools 也会转去调用 Visual Studio 安装器并在 runner 上失败；改用 `raw_arg` 原样传入。
+  - 未覆盖：在 macOS 上交叉运行的 Linux / Windows clippy 只覆盖不依赖 CMake 原生库的 crate（`cove-logging`、`cove-system`、`cove-native-build` 已通过），其余 crate 的平台专属 lint 仍以 CI 结果为准；Vulkan 修复未在 Linux 实机运行 `media-rhi` 测试验证。
+
 - **Stepper 外观重做与自适应堆叠修复（2026-11-07，破坏性外观）**：
   - 外观：标记改为按状态的实心圆盘（完成 success + 勾、失败 error + 叉、进行中 accent + 指示器、等待描边空心 + 序号），选中不再在整行背后画矩形，只强调标记与标题；连接线搬进该步自己的单元格，横向跨过到下一个标记的真实间距（1pt 发丝线），纵向竖轨从标记底边连到下一个标记顶边无断口；连接线颜色取它离开的那一步的结果（success/error/中性）。状态与交互切换使用主题 fast 动效。
   - 修复：`FlexModifier` 只在 `basis` 为 `Some` 时写回 flex basis，`None` 保留节点旧样式；自适应 Stepper 复用同一批节点切换主轴后，宽屏分支留下的 `basis 0` 让堆叠的每一步高度塌为 0、三步重叠在一起。改为完整表达作者意图（`None` 显式写回 auto）——该缺陷属于共享修饰符，任何按分支切换主轴的自适应组件都可能命中。

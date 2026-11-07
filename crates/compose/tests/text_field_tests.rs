@@ -1594,7 +1594,6 @@ fn the_clear_affordance_stays_inside_an_offset_field() {
     with_rig(|rig| {
         rig.set("hh");
         TextEnvironmentHolder::set_current(Some(test_text_environment(16.0, 20.0)));
-        let marker = Color::from_rgba8(1, 2, 3, 255);
         rig.install(
             AnyView::new(cove_ui_compose::BoxView::new(
                 FlexDirection::Row,
@@ -1603,15 +1602,10 @@ fn the_clear_affordance_stays_inside_an_offset_field() {
                 Wrap::NoWrap,
                 0.0,
                 AnyView::new(
-                    TextField::new("", rig.binding())
-                        .behavior(TextFieldBehavior {
-                            clearable: true,
-                            ..TextFieldBehavior::default()
-                        })
-                        .decoration(TextFieldDecoration {
-                            placeholder_color: Some(marker),
-                            ..TextFieldDecoration::default()
-                        }),
+                    TextField::new("", rig.binding()).behavior(TextFieldBehavior {
+                        clearable: true,
+                        ..TextFieldBehavior::default()
+                    }),
                 ),
             ))
             .padding(40.0),
@@ -1621,20 +1615,31 @@ fn the_clear_affordance_stays_inside_an_offset_field() {
         let frame = node.absolute_frame();
         assert!(frame.x > 0.0, "the field is inset from the window edge");
 
-        let mut list = DrawList::default();
-        if let Some(hook) = node.draw() {
-            hook(&mut list, Point::new(frame.x, frame.y));
-        }
-        let icon: Vec<_> = list
-            .vertices()
-            .iter()
-            .filter(|vertex| vertex.color == marker.rgba8())
-            .collect();
-        assert!(!icon.is_empty(), "the clear affordance paints");
+        let paint = |node: &Node| {
+            let mut list = DrawList::default();
+            if let Some(hook) = node.draw() {
+                hook(&mut list, Point::new(frame.x, frame.y));
+            }
+            list
+        };
+        paint(&node);
         assert!(
-            icon.iter()
-                .all(|vertex| vertex.x >= frame.x && vertex.x <= frame.x + frame.width),
-            "the clear affordance stays inside the field instead of clipping at the edge"
+            node.attachment::<f32>("__textfield_clear_hit").is_none(),
+            "at rest a field shows its text alone, with no clear control"
+        );
+
+        rig.focus.focus(Some(&node), false);
+        rig.graph.recomposer.commit_all();
+        rig.graph.compute_layout(240.0, 60.0);
+        paint(&node);
+        let start = node
+            .attachment::<f32>("__textfield_clear_hit")
+            .expect("a focused, non-empty field offers clearing");
+        assert!(
+            start >= frame.x && start + 20.0 <= frame.x + frame.width + 0.5,
+            "the clear control stays inside the field instead of clipping at the edge \
+             (lane {start}..{}, field {frame:?})",
+            start + 20.0
         );
     });
 }

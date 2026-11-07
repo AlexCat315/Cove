@@ -461,9 +461,7 @@ impl View for GalleryPagePane {
                     )
                 }
             })),
-            None => AnyView::new(GalleryPendingStory {
-                message: dispatch.pending_message(),
-            }),
+            None => AnyView::new(cove_composition::EmptyView),
         };
         // A page change is a quick cross-fade with an 8pt rise: content
         // swaps, it does not perform. The identity restarts it per navigation.
@@ -554,38 +552,6 @@ impl cove_composition::ViewModifier for GalleryStoryFrame {
         layout.set_padding(24.0, cove_core::scene::Edge::Right);
         layout.set_padding(24.0, cove_core::scene::Edge::Top);
         layout.set_padding(24.0, cove_core::scene::Edge::Bottom);
-    }
-}
-
-/// A page whose story still needs Compose widgets. The message names the exact
-/// missing widgets instead of rendering a placeholder story.
-struct GalleryPendingStory {
-    message: Option<String>,
-}
-
-impl View for GalleryPendingStory {
-    fn body(&self, _cx: &Scope) -> AnyView {
-        erased(
-            AnyView::new(
-                Text::new(
-                    self.message
-                        .clone()
-                        .unwrap_or_else(|| "Story unavailable".to_string()),
-                )
-                .semantic_font(SemanticFontRef::body())
-                .semantic_foreground(SemanticColorRef::on_surface_muted()),
-            )
-            .modifier(GalleryPendingFrame),
-        )
-    }
-}
-
-struct GalleryPendingFrame;
-
-impl cove_composition::ViewModifier for GalleryPendingFrame {
-    fn apply_layout(&self, layout: &LayoutNode) {
-        layout.set_flex_shrink(0.0);
-        layout.set_max_width(Some(560.0));
     }
 }
 

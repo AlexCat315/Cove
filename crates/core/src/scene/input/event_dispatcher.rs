@@ -171,6 +171,12 @@ impl EventDispatcher {
         if !self.focus_chain.permits_input(&hit.node) {
             return;
         }
+        // A press on chrome (a scroll bar) belongs to the chrome alone: it
+        // never falls through to a text selection or control behind it.
+        if hit.node.chrome_contains(hit.local_point) {
+            let _ = self.invoke(&hit.node, &kind, EventPhase::Target);
+            return;
+        }
         let previous_focus = self.focus_chain.focused();
         let _ = self.deliver(&hit.path, &kind);
         // Give explicit handler focus changes priority; otherwise focus the
@@ -723,7 +729,13 @@ impl EventDispatcher {
 
     fn update_cursor(&self, path: &[Node]) {
         let mut resolved = SystemCursor::Arrow;
-        for node in path.iter().rev() {
+        // Over chrome the pointer is the plain arrow, whatever the content
+        // underneath (selectable text) would ask for.
+        let over_chrome = path
+            .last()
+            .zip(self.last_cursor.get())
+            .is_some_and(|(node, point)| node.chrome_contains(node.convert_from_window(point)));
+        for node in path.iter().rev().filter(|_| !over_chrome) {
             if let Some(cursor) = node.cursor() {
                 resolved = cursor;
                 break;

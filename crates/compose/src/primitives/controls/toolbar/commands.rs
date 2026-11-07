@@ -221,7 +221,9 @@ impl View for ToolbarCommands {
                 },
                 body,
             )
-            .scrollbar_gutter(ScrollbarGutter::Overlay)
+            // Commands that do not fit go to the overflow menu; a bar would
+            // only cover the row.
+            .scrollbar_gutter(ScrollbarGutter::Hidden)
         });
         // The probe fills only the width by default; a vertical bar measures height.
         if vertical {

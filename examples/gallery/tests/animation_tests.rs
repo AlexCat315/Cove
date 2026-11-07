@@ -150,6 +150,9 @@ fn playing_moves_the_bar_between_its_two_authored_widths_in_both_directions() {
                         28.0,
                         "the bar keeps its authored height"
                     );
+                    // Only the clicked button's release feedback runs, and it
+                    // finishes within its own short ease.
+                    scene.scheduler.tick(0.3);
                     assert_eq!(
                         scene.scheduler.active_count(),
                         0,

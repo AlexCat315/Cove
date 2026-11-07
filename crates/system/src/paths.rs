@@ -192,6 +192,7 @@ impl PathIdentity {
 }
 
 /// `standardizedFileURL` without touching the filesystem.
+#[cfg(not(windows))]
 fn lexical(path: &Path) -> PathBuf {
     let absolute = if path.is_absolute() {
         path.to_owned()
@@ -245,10 +246,8 @@ fn normalize_windows(path: &Path) -> String {
     } else {
         parts.join("/")
     };
-    if is_windows_root(Path::new(&normalized)) {
-        if !normalized.ends_with('/') {
-            normalized.push('/');
-        }
+    if is_windows_root(Path::new(&normalized)) && !normalized.ends_with('/') {
+        normalized.push('/');
     }
     normalized
 }

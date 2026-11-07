@@ -243,7 +243,7 @@ cargo test -p cove-ui-compose --test compose --locked
 | ScrollView | 0 | 0 / 0 | 挂载/几何基础检查通过；待逐项交互和视觉验收 |
 | BoundedScrollView | 0 | 0 / 0 | 挂载/几何基础检查通过；待逐项交互和视觉验收 |
 | PropertyGrid | 0 | 0 / 0 | 内容列宽度塌陷已修复（`Percent(100)` 填满滚动视口），三种滚动轴、有界父容器与自适应标签回归通过；故事补齐 Swift Inspector 段落（Toggle/NumberField 值槽、空状态）；macOS DevTools 截图目检与折叠/填值后置条件通过；其他平台原生视觉待验收；文档已写 |
-| Workspace / Dock | 0 | 0 / 0 | 挂载/几何基础检查通过；待逐项交互和视觉验收 |
+| Workspace / Dock | 1 | 0 / 0 | 2026-11-07 补上 Dock workspace 故事；修复槽位拆分不分配空间、分隔条 1pt；标签胶囊滑动选中；DevTools 实测 Editor 208pt / Preview 151pt、分隔条 6pt，切换标签后选中态正确 |
 | Box / Row / Column | 6 | 0 / 0 | 挂载/几何基础检查通过；待逐项交互和视觉验收 |
 | Masonry | 0 | 0 / 0 | 挂载/几何基础检查通过；待逐项交互和视觉验收 |
 | ZStack / Overlay | 2 | 0 / 0 | 挂载/几何基础检查通过；待逐项交互和视觉验收 |
@@ -321,7 +321,7 @@ cargo test -p cove-ui-compose --test compose --locked
 
 - 目录：Swift 98 页全部进入 Rust catalog（106 页），没有丢页；标题、分类、摘要逐字一致（0 处文案差异）。
 - 段落：Swift 191 段，Rust 169 段；同页有对应 143 段，被挪到其他页面 2 段，全库找不到对应 46 段。
-- 页面级缺口：5 页在 Rust 侧完全没有分段标题；15 页段落数少于 Swift；1 页（Workspace）未分派 story，页面无内容。
+- 页面级缺口：5 页在 Rust 侧完全没有分段标题；15 页段落数少于 Swift；Workspace 页已于 2026-11-07 补上 story。
 - 已实现但没有页面展示的 story：1 个（2 段），见下表。
 - 结论：不是整页没迁移。少的是页面内的能力分组、说明和示例密度；部分能力被挪到新页面，部分只是段落标题改了措辞。
 
@@ -336,7 +336,7 @@ cargo test -p cove-ui-compose --test compose --locked
 | EmptyState | `EmptyStory` | 1 | Empty content |
 | Table | `TableStory` | 2 | Inventory · 10,000 rows、Empty data |
 | Toolbar | `ToolbarStory` | 1 | Toolbar |
-| Workspace / Dock | 未分派（`StoryDispatch::Pending`） | 1 | Dock workspace |
+| Workspace / Dock | Dock workspace | 1 | Dock workspace |
 
 ### 已实现但没有页面展示的 story
 
@@ -425,7 +425,7 @@ cargo test -p cove-ui-compose --test compose --locked
 | Toolbar | Toolbar | 1/1 | 出现在本页源码，未单独成段 |
 | Tooltip | Managed descriptions | 0/2 | 未出现：managed、description |
 | Vec3Field | Transform | 0/1 | 未出现：transform |
-| Workspace / Dock | Dock workspace | 0/2 | 未出现：workspace、dock |
+| Workspace / Dock | Dock workspace | 2/2 | 已出现：workspace、dock |
 
 ### 逐页统计
 
@@ -530,7 +530,7 @@ cargo test -p cove-ui-compose --test compose --locked
 | VirtualStack | 1 | 1 | 1 | 0 | 0 | 段落数持平 |
 | WebView | 1 | 1 | 1 | 0 | 0 | 段落数持平 |
 | WheelPicker | 1 | 1 | 1 | 0 | 0 | 段落数持平 |
-| Workspace / Dock | 1 | 0 | 0 | 0 | 1 | Rust 未分派 story |
+| Workspace / Dock | 1 | 1 | 1 | 0 | 0 | 段落数持平 |
 | ZStack / Overlay | 2 | 2 | 2 | 0 | 0 | 段落数持平 |
 
 ### Rust 独有页面

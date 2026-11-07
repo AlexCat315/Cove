@@ -1346,7 +1346,8 @@ fn a_tap_opens_a_touch_section_row_and_its_label_lines_up_with_the_rows_pointer_
         let row = find_text(scene, "Entry 0");
         assert_eq!(
             (header.absolute_frame().x, row.absolute_frame().x),
-            (16.0, 16.0),
+            // 16pt row inset plus the inset list box's 4pt side padding.
+            (20.0, 20.0),
             "section headers and row labels share the leading inset"
         );
         let entry_two = find_text(scene, "Entry 2");

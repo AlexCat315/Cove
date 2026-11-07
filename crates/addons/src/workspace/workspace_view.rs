@@ -45,6 +45,9 @@ use cove_core::scene::{
     PointerCaptureHolder, PositionType,
 };
 use cove_platform::MouseButton;
+use cove_ui_compose::animation::geometry::{
+    SlidingSelectionHost, SlidingSelectionMark, SlidingSelectionStyle, is_in_sliding_selection,
+};
 use cove_ui_compose::modifiers::layout::{FlexExt, LayoutFrameExt};
 use cove_ui_compose::modifiers::style::AppearanceExt;
 use cove_ui_compose::primitives::controls::Button;
@@ -213,6 +216,7 @@ impl WorkspaceView {
                             .boxed(),
                     )
                     .modifier(WorkspaceFillModifier)
+                    .modifier(WorkspaceCanvasModifier)
                     .modifier(WorkspaceRoleModifier::new(
                         "workspace",
                         "workspace",
@@ -247,6 +251,18 @@ impl View for WorkspaceSurfaceReader {
 // MARK: - Modifiers
 
 struct WorkspaceFillModifier;
+
+/// The canvas the panes rest on: one step of fill below the panes'
+/// `surface`, so white panes read as panes on any host background and the
+/// gutters between them read as the canvas showing through.
+struct WorkspaceCanvasModifier;
+
+impl cove_composition::ViewModifier for WorkspaceCanvasModifier {
+    fn apply_node(&self, node: &Node) {
+        let colors = theme_for_node(node).colors;
+        node.set_background_color(Some(colors.surface_variant));
+    }
+}
 
 impl cove_composition::ViewModifier for WorkspaceFillModifier {
     fn apply_layout(&self, layout: &LayoutNode) {
@@ -1116,8 +1132,8 @@ struct WorkspaceChromeSlotModifier {
 
 impl cove_composition::ViewModifier for WorkspaceChromeSlotModifier {
     fn apply_node(&self, node: &Node) {
-        let colors = theme_for_node(node).colors;
-        node.set_background_color(Some(colors.background));
+        // The chrome slot is canvas: the workspace fill shows through it.
+        node.set_background_color(None);
         node.set_attachment(
             LayoutDebugAttachmentKey::LAYOUT_ROLE,
             "workspace-chrome-slot".to_owned(),
@@ -1241,25 +1257,47 @@ impl View for WorkspaceLayoutNodeView {
                     address: Some(address),
                     split_id: None,
                     hairline: metrics.divider,
+                })
+                // A shell divider takes the gutter from its region; inside a
+                // slot nothing else reserves it, so the divider does.
+                .modifier(WorkspaceInSlotGutter {
+                    extent: metrics.divider,
+                    is_vertical_split: *axis == WorkspaceSplitAxis::Horizontal,
                 });
+                // Each side takes its share of the space left after the
+                // divider; without the shares both sides filled the container
+                // and the second was pushed outside it.
+                let first_share = fraction.clamp(0.0, 1.0);
+                let first_view = AnyView::new(
+                    WorkspaceBox::column()
+                        .child(WorkspaceLayoutNodeView {
+                            node: (**first).clone(),
+                            slot_id: self.slot_id.clone(),
+                            document: self.document.clone(),
+                            controller: self.controller.clone(),
+                            content: self.content.clone(),
+                        })
+                        .boxed(),
+                )
+                .modifier(WorkspaceSplitShare(first_share));
+                let second_view = AnyView::new(
+                    WorkspaceBox::column()
+                        .child(WorkspaceLayoutNodeView {
+                            node: (**second).clone(),
+                            slot_id: self.slot_id.clone(),
+                            document: self.document.clone(),
+                            controller: self.controller.clone(),
+                            content: self.content.clone(),
+                        })
+                        .boxed(),
+                )
+                .modifier(WorkspaceSplitShare(1.0 - first_share));
                 erased(
                     AnyView::new(
                         order
-                            .child(WorkspaceLayoutNodeView {
-                                node: (**first).clone(),
-                                slot_id: self.slot_id.clone(),
-                                document: self.document.clone(),
-                                controller: self.controller.clone(),
-                                content: self.content.clone(),
-                            })
+                            .child(first_view)
                             .child(divider)
-                            .child(WorkspaceLayoutNodeView {
-                                node: (**second).clone(),
-                                slot_id: self.slot_id.clone(),
-                                document: self.document.clone(),
-                                controller: self.controller.clone(),
-                                content: self.content.clone(),
-                            })
+                            .child(second_view)
                             .boxed(),
                     )
                     .modifier(WorkspaceFillModifier)
@@ -1269,6 +1307,38 @@ impl View for WorkspaceLayoutNodeView {
                 )
             }
         }
+    }
+}
+
+/// The gutter an in-slot divider reserves along the split axis.
+struct WorkspaceInSlotGutter {
+    extent: f32,
+    is_vertical_split: bool,
+}
+
+impl cove_composition::ViewModifier for WorkspaceInSlotGutter {
+    fn apply_layout(&self, layout: &LayoutNode) {
+        if self.is_vertical_split {
+            layout.set_width(Some(self.extent));
+        } else {
+            layout.set_height(Some(self.extent));
+        }
+        layout.set_flex_shrink(0.0);
+    }
+}
+
+/// One side of an in-slot split: grows by its share of the space the divider
+/// leaves and may shrink to nothing, so the fraction alone decides the sizes.
+struct WorkspaceSplitShare(f32);
+
+impl cove_composition::ViewModifier for WorkspaceSplitShare {
+    fn apply_layout(&self, layout: &LayoutNode) {
+        layout.set_flex_grow(self.0.max(0.0));
+        layout.set_flex_shrink(1.0);
+        layout.set_flex_basis(0.0);
+        layout.set_min_width(Some(0.0));
+        layout.set_min_height(Some(0.0));
+        layout.set_align_self(Align::Stretch);
     }
 }
 
@@ -1801,17 +1871,32 @@ impl View for WorkspaceTabBar {
         let mut list = AccessibilitySemantics::new(AccessibilityRole::TabList);
         list.label = "Panel tabs".to_string();
         list.value = active_title;
+        // One capsule slides between the tabs, as in every other tab strip.
         let row = AnyView::new(
-            WorkspaceBox::row()
-                .align(Align::Center)
-                .children(tabs)
-                .boxed(),
+            AnyView::new(
+                WorkspaceBox::row()
+                    .align(Align::Center)
+                    .spacing(2.0)
+                    .children(tabs)
+                    .boxed(),
+            )
+            .modifier(SlidingSelectionHost::new(|theme| SlidingSelectionStyle {
+                fill: theme.colors.surface_variant,
+                corner_radius: theme.radius.pill,
+                shadow: cove_core::SurfaceShadow::NONE,
+            })),
         )
         .modifier(WorkspaceSemanticsModifier(list));
-        let scroller = AnyView::new(ScrollView::horizontal(row).debug_name(&format!(
-            "workspace-tabs-scroll-{}",
-            self.group.id.raw_value()
-        )))
+        // The row scrolls by wheel and trackpad; a bar would sit over the
+        // tabs, and the trailing menu already reaches every panel.
+        let scroller = AnyView::new(
+            ScrollView::horizontal(row)
+                .scrollbar_gutter(cove_ui_compose::ScrollbarGutter::Hidden)
+                .debug_name(&format!(
+                    "workspace-tabs-scroll-{}",
+                    self.group.id.raw_value()
+                )),
+        )
         .flex_with(1.0, 1.0, Some(0.0));
         let group = self.group.clone();
         let document = self.document.clone();
@@ -2322,10 +2407,13 @@ impl PrimitiveView for WorkspaceTabButton {
     }
 
     fn children(&self, node: &Node) -> Vec<AnyView> {
-        // Selected tab: `surfaceVariant`; otherwise clear. 9 pt padding, 6 pt
-        // radius, `height - 8` tall, no rules above or between tabs.
+        // Selected tab: a `surfaceVariant` capsule, 9 pt padding, no rules
+        // above or between tabs. Inside the bar's sliding selection the
+        // capsule is the bar's, so it glides to the new tab instead of
+        // jumping; the tab only marks itself as its target.
         let theme = theme_for_node(node);
-        let fill = if self.is_active {
+        let slides = self.is_active && is_in_sliding_selection(node);
+        let fill = if self.is_active && !slides {
             theme.colors.surface_variant
         } else {
             Color::CLEAR
@@ -2339,13 +2427,16 @@ impl PrimitiveView for WorkspaceTabButton {
         }
         row = row.child(Text::new(self.title.clone()).semantic_font(SemanticFontRef::label()));
         vec![erased(
-            AnyView::new(WorkspaceBox::row().child(row.boxed()).boxed()).modifier(
-                WorkspaceTabButtonModifier {
-                    fill,
-                    radius: 6.0,
-                    padding: 9.0,
-                },
-            ),
+            AnyView::new(
+                AnyView::new(WorkspaceBox::row().child(row.boxed()).boxed()).modifier(
+                    WorkspaceTabButtonModifier {
+                        fill,
+                        radius: TAB_MIN_HEIGHT * 0.5,
+                        padding: 9.0,
+                    },
+                ),
+            )
+            .modifier(SlidingSelectionMark(slides)),
         )]
     }
 }
@@ -2365,6 +2456,9 @@ impl cove_composition::ViewModifier for WorkspaceDotModifier {
     }
 }
 
+/// Height of a panel tab's capsule.
+const TAB_MIN_HEIGHT: f32 = 26.0;
+
 struct WorkspaceTabButtonModifier {
     fill: Color,
     radius: f32,
@@ -2379,7 +2473,7 @@ impl cove_composition::ViewModifier for WorkspaceTabButtonModifier {
     }
     fn apply_layout(&self, layout: &LayoutNode) {
         layout.set_flex_shrink(0.0);
-        layout.set_min_height(Some(26.0));
+        layout.set_min_height(Some(TAB_MIN_HEIGHT));
         layout.set_padding(self.padding, Edge::Left);
         layout.set_padding(self.padding, Edge::Right);
     }
@@ -2604,8 +2698,9 @@ struct WorkspaceRailModifier {
 
 impl cove_composition::ViewModifier for WorkspaceRailModifier {
     fn apply_node(&self, node: &Node) {
-        let colors = theme_for_node(node).colors;
-        node.set_background_color(Some(colors.surface_sunken));
+        // A collapsed group's rail sits on the canvas; its buttons carry the
+        // hover and press washes.
+        node.set_background_color(None);
         node.set_attachment(
             LayoutDebugAttachmentKey::LAYOUT_ROLE,
             "workspace-rail".to_owned(),

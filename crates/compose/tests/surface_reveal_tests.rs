@@ -268,11 +268,7 @@ fn menu_exit_uses_the_short_surface_exit_not_the_entrance() {
         harness.shown.set(true);
         settle(scene);
         let scheduler = AnimatorScheduler::current();
-        assert_eq!(
-            scheduler.active_count(),
-            1,
-            "the 0.2s entrance is running"
-        );
+        assert_eq!(scheduler.active_count(), 1, "the 0.2s entrance is running");
 
         scene.portal.dismiss_outside(Point::new(600.0, 390.0));
         settle(scene);

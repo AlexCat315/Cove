@@ -288,6 +288,8 @@ fn the_completion_control_moves_its_bar_and_counts_once_per_activation() {
             "the second activation counts again, texts: {:?}",
             scene.texts()
         );
+        // The clicked button's own release feedback eases out first.
+        scene.scheduler.tick(0.3);
         assert_eq!(
             scene.scheduler.active_count(),
             0,

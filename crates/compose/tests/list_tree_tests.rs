@@ -341,7 +341,13 @@ fn list_selection() {
         let fills = scene
             .nodes()
             .into_iter()
-            .filter(|node| node.background_color().is_some_and(|color| color.a > 0.1))
+            .filter(|node| {
+                // The inset list box paints the surface behind every row; only
+                // a selection band differs from it.
+                let surface = cove_ui_compose::theme::theme_for_node(node).colors.surface;
+                node.background_color()
+                    .is_some_and(|color| color.a > 0.1 && color != surface)
+            })
             .count();
         assert_eq!(
             fills, 1,
@@ -386,7 +392,13 @@ fn selected_row_fits_its_slot() {
         let fills: Vec<Node> = scene
             .nodes()
             .into_iter()
-            .filter(|node| node.background_color().is_some_and(|color| color.a > 0.1))
+            .filter(|node| {
+                // The inset list box paints the surface behind every row; only
+                // a selection band differs from it.
+                let surface = cove_ui_compose::theme::theme_for_node(node).colors.surface;
+                node.background_color()
+                    .is_some_and(|color| color.a > 0.1 && color != surface)
+            })
             .collect();
         assert_eq!(
             fills.len(),

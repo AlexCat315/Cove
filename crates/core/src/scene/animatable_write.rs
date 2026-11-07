@@ -48,6 +48,13 @@ impl Node {
         target: T,
         apply: impl Fn(T) + 'static,
     ) {
+        // A node that has left the tree cannot be seen and nothing will cancel
+        // a controller started on it now: write the value and register nothing.
+        if self.is_detached() {
+            self.replace_animation_controller(key, None);
+            apply(target);
+            return;
+        }
         if self.finishes_reduced_animation(key, &target) {
             return;
         }
@@ -93,6 +100,11 @@ impl Node {
         target: Option<T>,
         apply: impl Fn(Option<T>) + 'static,
     ) {
+        if self.is_detached() {
+            self.replace_animation_controller(key, None);
+            apply(target);
+            return;
+        }
         if let Some(target) = target.as_ref()
             && self.finishes_reduced_animation(key, target)
         {
