@@ -266,6 +266,16 @@ fn click(scene: &InteractiveScene, node: &Node) {
     scene.settle(6, 0.05);
 }
 
+/// The width a row gets inside the inset list box of a 320pt list.
+fn row_width_in_box() -> f32 {
+    let inset = cove_ui_compose::theme::styles::components::selection_appearance::SelectionAppearance::resolve(
+        cove_ui_compose::theme::styles::components::selection_appearance::SelectionRole::Navigation,
+        &cove_ui_compose::theme::Theme::default_dark(),
+    )
+    .horizontal_inset;
+    320.0 - 2.0 * inset
+}
+
 #[test]
 fn swipe_action() {
     InteractiveScene::run(360.0, 460.0, |scene| {
@@ -278,8 +288,8 @@ fn swipe_action() {
             first.frame().height
         );
         assert!(
-            (first.frame().width - 320.0).abs() < 0.5,
-            "the row spans the list width; measured {}",
+            (first.frame().width - row_width_in_box()).abs() < 0.5,
+            "the row spans the list box; measured {}",
             first.frame().width
         );
 
@@ -334,8 +344,8 @@ fn mirrored_actions() {
                 let first = row(scene, "Item 1");
                 let width = first.frame().width;
                 assert!(
-                    (width - 320.0).abs() < 0.5,
-                    "rtl={rtl} scale={scale}: the row spans the list width; measured {width}"
+                    (width - row_width_in_box()).abs() < 0.5,
+                    "rtl={rtl} scale={scale}: the row spans the list box; measured {width}"
                 );
 
                 // Swift swipes by `direction == .rtl ? 140 : -140` and then by

@@ -368,9 +368,13 @@ fn list_respects_caller_height() {
             .first(|node| node.clips_to_bounds() && node.frame().width > 200.0)
             .expect("the list mounts a clipping viewport wider than 200pt");
         let frame = viewport.absolute_frame();
+        // The caller's 260pt is the inset box; its rows scroll inside the
+        // box's vertical selection inset.
+        let inset = SelectionAppearance::resolve(SelectionRole::Navigation, &Theme::default_dark())
+            .vertical_inset;
         assert!(
-            (frame.height - 260.0).abs() < 0.5,
-            "the viewport is the caller's 260pt frame, got {}",
+            (frame.height - (260.0 - 2.0 * inset)).abs() < 0.5,
+            "the viewport is the caller's 260pt box less its {inset}pt insets, got {}",
             frame.height
         );
         assert!(
@@ -424,15 +428,30 @@ fn selected_row_fits_its_slot() {
         let viewport = scene
             .first(|node| node.clips_to_bounds() && node.frame().width > 200.0)
             .expect("the list mounts a clipping viewport");
-        let viewport_width = viewport.absolute_frame().width;
+        // The inset box keeps the selection inset clear on both sides, so the
+        // band sits evenly inside the box.
+        let surface = theme.colors.surface;
+        let list_box = scene
+            .first(|node| {
+                node.background_color() == Some(surface)
+                    && (node.corner_radius() - theme.radius.lg).abs() < 0.01
+                    && node.frame().width > 200.0
+            })
+            .expect("the inset list box");
+        let box_frame = list_box.absolute_frame();
+        let band = fill.absolute_frame();
         assert!(
-            (viewport_width - 2.0 * appearance.horizontal_inset - fill.absolute_frame().width)
-                .abs()
-                < 0.5,
-            "the selection fill is inset by {} per side; viewport {} fill {}",
+            (band.x - box_frame.x - appearance.horizontal_inset).abs() < 0.5
+                && (box_frame.x + box_frame.width
+                    - band.x
+                    - band.width
+                    - appearance.horizontal_inset)
+                    .abs()
+                    < 0.5,
+            "the selection band is inset by {} on both sides of the box; box {:?} band {:?}",
             appearance.horizontal_inset,
-            viewport_width,
-            fill.absolute_frame().width
+            box_frame,
+            band
         );
         // Swift paints `.background(fill)` before `.padding(horizontal:)`, so the
         // band spans the whole row slot and only the content is inset.
@@ -2389,6 +2408,47 @@ fn collapse_all_keeps_the_tree_on_the_keyboard() {
             row_labels(scene),
             vec!["0: Scene", "1: Lights", "1: Objects"],
             "Alt+Right still reaches the tree after the focused row left"
+        );
+    });
+}
+
+/// The selection is a neutral band until the list holds keyboard focus; then
+/// it is the accent band, as in a macOS list.
+#[test]
+fn selection_takes_the_accent_only_while_the_list_has_focus() {
+    let selection = State::new(Some(2));
+    InteractiveScene::run(600.0, 800.0, |scene| {
+        scene.install(sized_list_harness(selection.clone(), (1..=6).collect()));
+        let count = |color: cove_core::Color| {
+            scene
+                .nodes()
+                .into_iter()
+                .filter(|node| node.background_color() == Some(color))
+                .count()
+        };
+        let accent = cove_ui_compose::theme::theme_for_node(
+            &scene
+                .first(|node| node.frame().width > 0.0)
+                .expect("a node"),
+        )
+        .colors
+        .accent;
+        assert_eq!(count(accent), 0, "an unfocused list shows no accent band");
+
+        let row = scene
+            .first(|node| {
+                node.accessibility()
+                    .is_some_and(|semantics| semantics.label.contains("Document 4"))
+            })
+            .or_else(|| scene.named("Document 4"))
+            .expect("row 4");
+        scene.click(&row, 1);
+        scene.settle(4, 1.0);
+        assert_eq!(selection.get(), Some(4), "the click selects row 4");
+        assert_eq!(
+            count(accent),
+            1,
+            "with focus in the list the selected row is the accent band"
         );
     });
 }

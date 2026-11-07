@@ -14,12 +14,10 @@ use std::collections::{BTreeSet, HashSet};
 use std::rc::Rc;
 
 use cove_core::{Binding, State};
-use cove_ui_compose::modifiers::interaction::AccessibilityExt;
 use cove_ui_compose::modifiers::layout::LayoutFrameExt;
 use cove_ui_compose::modifiers::style::{AppearanceExt, SemanticStyleViewExt};
 use cove_ui_compose::primitives::controls::fields::Slider;
 use cove_ui_compose::primitives::controls::{Button, ButtonGroup, ButtonGroupItem, Toggle};
-use cove_ui_compose::primitives::data::lists::RowState;
 use cove_ui_compose::primitives::data::lists::Selection;
 use cove_ui_compose::primitives::data::lists::refresh::RefreshOptions;
 use cove_ui_compose::primitives::data::lists::swipe_list::SwipeList;
@@ -28,6 +26,7 @@ use cove_ui_compose::primitives::data::lists::tree::{
     TreeGuideStyle, TreeLayout, TreeLazy, TreeNodeKey, TreeOptions, TreeSearch, TreeSelection,
     TreeSlots,
 };
+use cove_ui_compose::primitives::data::lists::{ListRow, RowState};
 use cove_ui_compose::primitives::data::{List, ListSection, SectionedList, SwipeAction};
 use cove_ui_compose::primitives::feedback::StatusTone;
 use cove_ui_compose::primitives::interaction::{DragScope, Draggable, DropTarget};
@@ -39,7 +38,7 @@ use cove_ui_compose::primitives::text::text_field::TextField;
 use cove_ui_compose::primitives::text::text_field::text_field_options::TextFieldBehavior;
 use cove_ui_compose::theme::SemanticFontRef;
 use cove_ui_compose::theme::styles::buttons::{ButtonStyleViewExt, SecondaryButtonStyle};
-use cove_ui_compose::theme::tokens::{SemanticColorRef, SemanticIconSize};
+use cove_ui_compose::theme::tokens::SemanticColorRef;
 use cove_ui_compose::{AnyView, BoxView, LayoutDebugExt, TupleView, View};
 
 use super::feedback::StorySection;
@@ -1031,50 +1030,12 @@ impl View for SwipeListStory {
             SwipeList::new(
                 rows,
                 |index: &usize| *index,
-                |index: &usize, state: RowState| {
-                    let ink = if state.is_selected {
-                        SemanticColorRef::accent()
-                    } else {
-                        SemanticColorRef::on_surface_muted()
-                    };
-                    AnyView::new(BoxView::new(
-                        cove_core::scene::FlexDirection::Row,
-                        cove_core::scene::Align::Center,
-                        cove_core::scene::Justify::FlexStart,
-                        cove_core::scene::Wrap::NoWrap,
-                        10.0,
-                        AnyView::new(TupleView::new(vec![
-                            AnyView::new(
-                                Icon::semantic_with_ref(
-                                    ui_icon_catalog::shape::circle(),
-                                    SemanticIconSize::small(),
-                                    ink,
-                                )
-                                .accessibility_hidden(true),
-                            ),
-                            AnyView::new(BoxView::new(
-                                cove_core::scene::FlexDirection::Column,
-                                cove_core::scene::Align::Stretch,
-                                cove_core::scene::Justify::FlexStart,
-                                cove_core::scene::Wrap::NoWrap,
-                                2.0,
-                                AnyView::new(TupleView::new(vec![
-                                    AnyView::new(
-                                        Text::new(SWIPE_ROWS[*index])
-                                            .semantic_foreground(SemanticColorRef::on_surface()),
-                                    ),
-                                    AnyView::new(
-                                        Text::new("Swipe toward the leading edge or use Actions")
-                                            .truncated()
-                                            .semantic_font(SemanticFontRef::caption())
-                                            .semantic_foreground(
-                                                SemanticColorRef::on_surface_muted(),
-                                            ),
-                                    ),
-                                ])),
-                            )),
-                        ])),
-                    ))
+                |index: &usize, _state: RowState| {
+                    AnyView::new(
+                        ListRow::new(SWIPE_ROWS[*index])
+                            .subtitle("Swipe toward the leading edge or use Actions")
+                            .icon(ui_icon_catalog::shape::mail()),
+                    )
                 },
             )
             .selection(Selection::single(self.selection.binding()))

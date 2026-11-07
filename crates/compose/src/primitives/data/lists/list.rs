@@ -23,7 +23,7 @@ use cove_core::scene::{
     EventPhase, EventResult, HoverPhase, InputHandlerRoute, InteractionRegistryHolder, LayoutNode,
     Node, PointerCaptureHolder, PointerPhase,
 };
-use cove_core::{Color, Environment, InputCapabilities};
+use cove_core::{Environment, InputCapabilities};
 use cove_platform::{KeyEvent, MouseButton, SystemCursor};
 
 use super::refresh::RefreshOptions;
@@ -31,6 +31,78 @@ use super::selection::{CollectionId, ListCore, RowState, Selection};
 
 const ROW_PRESSED: &str = "__list_row_pressed";
 const ROW_HOVERED: &str = "__list_row_hovered";
+const ROW_SELECTED: &str = "__list_row_selected";
+const ROW_FEEDBACK: &str = "__list_row_feedback_installed";
+
+/// Whether keyboard focus is in the list that owns `row`: the nearest
+/// focusable ancestor is the list's key host. Reading the focus through
+/// `current_focus` makes the row recompose when focus moves.
+pub(crate) fn list_has_focus(row: &Node) -> bool {
+    let Some(chain) = cove_core::scene::FocusChainHolder::current() else {
+        return false;
+    };
+    let focused = chain.current_focus();
+    let mut cursor = row.parent();
+    while let Some(candidate) = cursor {
+        if candidate.is_focusable() {
+            return focused.is_some_and(|focused| {
+                focused == candidate || chain.contains(&focused, &candidate)
+            });
+        }
+        cursor = candidate.parent();
+    }
+    false
+}
+
+/// Paints hover and press inside the row, in the selection band's inset and
+/// radius; a selected row shows no hover, as in a macOS list.
+fn install_row_feedback(node: &Node) {
+    if node.attachment::<bool>(ROW_FEEDBACK) == Some(true) {
+        return;
+    }
+    node.set_attachment(ROW_FEEDBACK, true);
+    let weak = node.downgrade();
+    node.set_draw(Some(Rc::new(move |list, origin| {
+        let Some(owner) = Node::upgrade(&weak) else {
+            return;
+        };
+        let selected = owner.attachment::<bool>(ROW_SELECTED).unwrap_or(false);
+        let hovered = owner.attachment::<bool>(ROW_HOVERED).unwrap_or(false);
+        let pressed = owner.attachment::<bool>(ROW_PRESSED).unwrap_or(false);
+        if selected || !(hovered || pressed) {
+            return;
+        }
+        let theme = theme_for_node(&owner);
+        let touch = owner
+            .composition_value(&crate::adaptive::SurfaceEnvironment::key())
+            .input
+            .contains(cove_core::InputCapabilities::TOUCH);
+        let (inset, radius) = if touch {
+            (0.0, 0.0)
+        } else {
+            (theme.spacing.xs, theme.radius.md)
+        };
+        let frame = owner.frame();
+        let rect = cove_core::Rect::new(
+            origin.x,
+            origin.y + inset,
+            frame.width,
+            (frame.height - 2.0 * inset).max(0.0),
+        );
+        let color = if pressed {
+            theme.colors.state_layer_pressed
+        } else {
+            theme.colors.state_layer_hover
+        };
+        let _ = list.add_rounded_rect(rect, radius.min(rect.height * 0.5), color);
+    })));
+}
+
+fn paint_row_feedback(node: &Node) {
+    node.mark_render_dirty(cove_core::scene::InvalidationSource::style_set(
+        "listRowFeedback",
+    ));
+}
 const ROW_ID: &str = "__list_row_id";
 
 /// Row host: owns tap handling and resolves the active row style on every
@@ -97,7 +169,7 @@ impl PrimitiveView for ListRowHost {
             Rc::new(move || {
                 if let Some(owner) = Node::upgrade(&clear_node) {
                     owner.set_attachment(ROW_PRESSED, false);
-                    owner.set_background_color(Some(Color::CLEAR));
+                    paint_row_feedback(&owner);
                 }
             }) as Rc<dyn Fn()>,
         );
@@ -106,23 +178,11 @@ impl PrimitiveView for ListRowHost {
             return;
         };
         node.set_cursor(Some(SystemCursor::Pointer));
-        // Hover paints on the host so entering a row never recomposes it. The
-        // radius comes from the shared selection appearance, so the hover band
-        // is not the one square thing left on the row.
-        let touch = node
-            .composition_value(&crate::adaptive::SurfaceEnvironment::key())
-            .input
-            .contains(cove_core::InputCapabilities::TOUCH);
-        let radius = if touch {
-            0.0
-        } else {
-            SelectionAppearance::resolve(SelectionRole::Navigation, &theme_for_node(node))
-                .corner_radius
-        };
-        node.set_corner_radius(radius);
-        let is_selected = self.is_selected;
-        // Shared by the initial paint and the hover handler, so it must be
-        // callable more than once: capture the weak handle by clone each call.
+        // Hover and press paint live on the host, in the selection band's own
+        // geometry, so entering a row never recomposes it and the feedback
+        // never outgrows the band it previews.
+        node.set_attachment(ROW_SELECTED, self.is_selected);
+        install_row_feedback(node);
         let hover_fn: Rc<dyn Fn(bool)> = Rc::new({
             let hover_node = node.downgrade();
             move |hovered: bool| {
@@ -131,12 +191,7 @@ impl PrimitiveView for ListRowHost {
                 };
                 let hovered = hovered && supports_control_hover(&owner);
                 owner.set_attachment(ROW_HOVERED, hovered);
-                let fill = if hovered && !is_selected {
-                    theme_for_node(&owner).colors.state_layer_hover
-                } else {
-                    Color::CLEAR
-                };
-                owner.set_background_color(Some(fill));
+                paint_row_feedback(&owner);
             }
         });
         hover_fn(node.attachment::<bool>(ROW_HOVERED) == Some(true));
@@ -166,15 +221,7 @@ impl PrimitiveView for ListRowHost {
                 match phase {
                     PointerPhase::Down => {
                         owner.set_attachment(ROW_PRESSED, true);
-                        let touch = owner
-                            .composition_value(&crate::adaptive::SurfaceEnvironment::key())
-                            .input
-                            .contains(cove_core::InputCapabilities::TOUCH);
-                        if touch {
-                            owner.set_background_color(Some(
-                                theme_for_node(&owner).colors.state_layer_pressed,
-                            ));
-                        }
+                        paint_row_feedback(&owner);
                         if let Some(capture) = PointerCaptureHolder::current() {
                             capture.acquire(&owner, true);
                         }
@@ -221,6 +268,7 @@ impl PrimitiveView for ListRowHost {
         vec![style.make_body(ListRowStyleConfiguration {
             content: self.content.clone(),
             is_selected: self.is_selected,
+            is_emphasized: list_has_focus(node),
             is_hovered: node.attachment::<bool>(ROW_HOVERED).unwrap_or(false),
             is_enabled: true,
             row_height: self.row_height,
@@ -410,8 +458,9 @@ impl<Id: CollectionId> List<Id> {
     }
 }
 
-/// The macOS inset list box: surface fill, group radius and a small side
-/// inset so the rounded selection band never touches the box edge.
+/// The macOS inset list box: surface fill, group radius, and padding equal to
+/// the selection appearance's insets, so the rounded selection band clears
+/// every edge of the box by the theme's own amount.
 pub(crate) struct InsetListBox;
 
 impl cove_composition::ViewModifier for InsetListBox {
@@ -419,11 +468,16 @@ impl cove_composition::ViewModifier for InsetListBox {
         let theme = theme_for_node(node);
         node.set_background_color(Some(theme.colors.surface));
         node.set_corner_radius(theme.radius.lg);
-    }
-
-    fn apply_layout(&self, layout: &cove_core::scene::LayoutNode) {
-        // Horizontal only: an authored list height stays the rows' height.
-        layout.set_padding(4.0, cove_core::scene::Edge::Left);
-        layout.set_padding(4.0, cove_core::scene::Edge::Right);
+        let appearance = SelectionAppearance::resolve(SelectionRole::Navigation, &theme);
+        if let Some(layout) = node.layout_node() {
+            for (edge, inset) in [
+                (cove_core::scene::Edge::Left, appearance.horizontal_inset),
+                (cove_core::scene::Edge::Right, appearance.horizontal_inset),
+                (cove_core::scene::Edge::Top, appearance.vertical_inset),
+                (cove_core::scene::Edge::Bottom, appearance.vertical_inset),
+            ] {
+                layout.set_padding(inset, edge);
+            }
+        }
     }
 }

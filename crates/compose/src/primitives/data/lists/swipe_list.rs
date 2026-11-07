@@ -27,8 +27,9 @@ use crate::modifiers::interaction::{AccessibilityExt, HitTestingExt};
 use std::rc::Rc;
 
 use super::selection::{CollectionId, ListCore, RowState, Selection};
+use crate::ViewExt as _;
 use crate::adaptive::SurfaceEnvironment;
-use crate::modifiers::layout::{FlexExt, LayoutFrameExt};
+use crate::modifiers::layout::{FlexExt, LayoutFrameExt, PaddingExt};
 use crate::modifiers::style::{AppearanceExt, SemanticStyleViewExt};
 use crate::primitives::controls::button::{Button, ButtonIcon, ButtonIconSource};
 use crate::primitives::feedback::StatusTone;
@@ -39,6 +40,7 @@ use crate::primitives::overlays::menu::{MenuEntry, MenuItem, MenuItemRole};
 use crate::primitives::overlays::selection_key_host::SelectionKeyHost;
 use crate::primitives::text::Text;
 use crate::theme::styles::buttons::{AnyButtonStyle, ButtonStyleViewExt};
+use crate::theme::styles::components::list_row_style::{ListRowContext, ListRowContextReader};
 use crate::theme::{SemanticFontRef, TextScalerReader};
 use crate::{AnyView, BoxView, PrimitiveView, TupleView, View};
 use cove_composition::Scancode;
@@ -287,6 +289,15 @@ where
                         let row_actions = actions.clone();
                         let row_content = row_content.clone();
                         let last = scaler_core.ids.last().cloned();
+                        // The id after each row: its hairline never runs into a
+                        // selection band below it, as in the inset List.
+                        let next: Rc<std::collections::HashMap<Id, Id>> = Rc::new(
+                            scaler_core
+                                .ids
+                                .windows(2)
+                                .map(|pair| (pair[0].clone(), pair[1].clone()))
+                                .collect(),
+                        );
                         let mut stack = FixedVirtualStack::new(
                             scaler_core.ids.to_vec(),
                             height,
@@ -300,7 +311,10 @@ where
                                 AnyView::new(SwipeRow {
                                     label: row_label(item),
                                     is_selected: selected,
-                                    is_last: last.as_ref() == Some(id),
+                                    is_last: last.as_ref() == Some(id)
+                                        || next.get(id).is_some_and(|after| {
+                                            row_core.selection.contains(after)
+                                        }),
                                     is_enabled,
                                     row_height: height,
                                     action_width,
@@ -346,7 +360,18 @@ where
                 AnyView::new(content_scaler)
             },
         );
-        AnyView::new(surface)
+        // The same inset box as List, so every list reads as one family.
+        AnyView::new(
+            AnyView::new(AnyView::new(surface).flex(1.0).frame(
+                None,
+                None,
+                Some(0.0),
+                Some(0.0),
+                None,
+                None,
+            ))
+            .with_modifier(super::list::InsetListBox),
+        )
     }
 
     fn dynamic_properties(&self) -> Vec<crate::DynamicField> {
@@ -541,22 +566,34 @@ impl View for SwipeRowBody {
                     }
                 })
             };
-            Some(AnyView::new(
-                AnyView::new(
-                    Button::new(
-                        ButtonIcon::new(
-                            ButtonIconSource::resource(ui_icon_catalog::action::more_horizontal()),
-                            Some(16.0),
-                            None,
-                        ),
-                        move || open(),
+            let tooltip = format!("Actions for {}", self.label);
+            // The actions glyph follows the band it sits on, like the row's
+            // own content: light on the accent band, row ink elsewhere.
+            Some(AnyView::new(ListRowContextReader::new(
+                move |context: ListRowContext| {
+                    let open = open.clone();
+                    AnyView::new(
+                        AnyView::new(
+                            Button::new(
+                                ButtonIcon::new(
+                                    ButtonIconSource::resource(
+                                        ui_icon_catalog::action::more_horizontal(),
+                                    ),
+                                    Some(16.0),
+                                    None,
+                                ),
+                                move || open(),
+                            )
+                            .enabled(is_enabled)
+                            .tooltip(tooltip.clone()),
+                        )
+                        .button_style(RowActionButtonStyle {
+                            on_accent: context.is_on_accent(),
+                        })
+                        .frame_size(SWIPE_TRAILING_SLOT, row_height),
                     )
-                    .enabled(is_enabled)
-                    .tooltip(format!("Actions for {}", self.label)),
-                )
-                .button_style(crate::theme::styles::buttons::ghost())
-                .frame_size(SWIPE_TRAILING_SLOT, row_height),
-            ))
+                },
+            )))
         };
 
         let host = AnyView::new(SwipeRowHost {
@@ -623,8 +660,10 @@ impl PrimitiveView for SwipeRowHost {
     fn update_node(&self, node: &Node) {
         let reveal_value = self.reveal.get();
         let reveal = self.reveal;
-        node.set_corner_radius(6.0);
-        if !self.is_last && !self.is_selected {
+        node.set_corner_radius(8.0);
+        if self.is_last || self.is_selected {
+            node.set_draw(None);
+        } else {
             let rtl = node.resolves_right_to_left();
             let weak = node.downgrade();
             node.update_draw(rtl, move |list, origin| {
@@ -689,6 +728,9 @@ impl PrimitiveView for SwipeRowHost {
 
         let is_enabled = self.is_enabled;
         let is_selected = self.is_selected;
+        // The same selection as List: accent while the list has focus,
+        // neutral otherwise.
+        let is_emphasized = is_selected && super::list::list_has_focus(node);
         let max_reveal = self.max_reveal;
         let paint_node = node.clone();
         let paint: Rc<dyn Fn()> = Rc::new(move || {
@@ -697,11 +739,12 @@ impl PrimitiveView for SwipeRowHost {
             let color = if active {
                 None
             } else if is_selected {
-                Some(
-                    crate::theme::theme_for_node(&paint_node)
-                        .colors
-                        .state_layer_selected,
-                )
+                let colors = crate::theme::theme_for_node(&paint_node).colors;
+                Some(if is_emphasized {
+                    colors.accent
+                } else {
+                    colors.surface_pressed
+                })
             } else if hovered && is_enabled {
                 Some(
                     crate::theme::theme_for_node(&paint_node)
@@ -899,14 +942,32 @@ impl PrimitiveView for SwipeRowHost {
         );
     }
 
-    fn children(&self, _node: &Node) -> Vec<AnyView> {
+    fn children(&self, node: &Node) -> Vec<AnyView> {
+        let context = ListRowContext {
+            is_selected: self.is_selected,
+            is_emphasized: self.is_selected && super::list::list_has_focus(node),
+            is_enabled: self.is_enabled,
+        };
+        let content = AnyView::new(
+            self.content
+                .clone()
+                .composition_local(ListRowContext::key(), context),
+        );
+        let content = if context.is_on_accent() {
+            AnyView::new(content.semantic_foreground(crate::theme::SemanticColorRef::on_accent()))
+        } else {
+            content
+        };
         let mut row = vec![AnyView::new(
-            AnyView::new(self.content.clone())
+            AnyView::new(content)
                 .flex_with(1.0, 1.0, Some(0.0))
                 .clipped(),
         )];
         if let Some(slot) = &self.trailing_slot {
-            row.push(slot.clone());
+            row.push(AnyView::new(
+                slot.clone()
+                    .composition_local(ListRowContext::key(), context),
+            ));
         }
         let content = AnyView::new(
             AnyView::new(BoxView::new(
@@ -917,6 +978,14 @@ impl PrimitiveView for SwipeRowHost {
                 4.0,
                 AnyView::new(TupleView::new(row)),
             ))
+            // The same leading inset as a List row, so content starts where the
+            // separator does and clears the rounded selection band.
+            .padding_insets(crate::modifiers::layout::EdgeInsets {
+                top: 0.0,
+                leading: 12.0,
+                bottom: 0.0,
+                trailing: 4.0,
+            })
             .frame(
                 Some(crate::modifiers::layout::FrameDimension::Percent(100.0)),
                 Some(crate::modifiers::layout::FrameDimension::Points(
@@ -953,5 +1022,30 @@ impl View for SwipeRowHost {
     }
     fn tag(&self) -> &'static str {
         std::any::type_name::<Self>()
+    }
+}
+
+/// Ghost chrome for a row's actions button, inked for the band behind it.
+struct RowActionButtonStyle {
+    on_accent: bool,
+}
+
+impl crate::theme::styles::buttons::ButtonStyle for RowActionButtonStyle {
+    fn make_body(
+        &self,
+        configuration: crate::theme::styles::buttons::ButtonStyleConfiguration,
+    ) -> AnyView {
+        let foreground = if !configuration.is_enabled {
+            crate::theme::SemanticColorRef::on_surface_disabled()
+        } else if self.on_accent {
+            crate::theme::SemanticColorRef::on_accent()
+        } else {
+            crate::theme::SemanticColorRef::on_surface()
+        };
+        AnyView::new(crate::theme::styles::buttons::BuiltinButtonChrome::new(
+            crate::theme::styles::buttons::BuiltinButtonChromeKind::Ghost,
+            &configuration,
+            foreground,
+        ))
     }
 }

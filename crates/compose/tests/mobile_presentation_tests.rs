@@ -1345,10 +1345,15 @@ fn a_tap_opens_a_touch_section_row_and_its_label_lines_up_with_the_rows_pointer_
         scene.install(fixture.clone());
         let header = find_text(scene, "Recent");
         let row = find_text(scene, "Entry 0");
+        let side = cove_ui_compose::theme::styles::components::selection_appearance::SelectionAppearance::resolve(
+            cove_ui_compose::theme::styles::components::selection_appearance::SelectionRole::Navigation,
+            &cove_ui_compose::theme::Theme::default_dark(),
+        )
+        .horizontal_inset;
         assert_eq!(
             (header.absolute_frame().x, row.absolute_frame().x),
-            // 16pt row inset plus the inset list box's 4pt side padding.
-            (20.0, 20.0),
+            // 16pt row inset plus the inset list box's side padding.
+            (16.0 + side, 16.0 + side),
             "section headers and row labels share the leading inset"
         );
         let entry_two = find_text(scene, "Entry 2");

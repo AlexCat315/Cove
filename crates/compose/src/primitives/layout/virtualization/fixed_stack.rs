@@ -280,8 +280,12 @@ impl<Id: Clone + Hash + Eq + 'static> View for FixedVirtualStack<Id> {
                 None,
             ),
         );
+        // macOS overlay scroller: the bar floats over the rows instead of
+        // taking a trailing lane, so rows and their selection band stay
+        // centred in the list box. Row padding keeps trailing controls clear
+        // of the bar's grab lane.
         let mut scroll = ScrollView::new(ScrollAxis::Vertical, content)
-            .scrollbar_gutter(ScrollbarGutter::Stable)
+            .scrollbar_gutter(ScrollbarGutter::Overlay)
             .scroll_offset(offset_binding)
             .on_viewport_change(move |next: ScrollViewport| {
                 let mut state = refill_window.lock().unwrap_or_else(PoisonError::into_inner);

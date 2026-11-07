@@ -134,6 +134,7 @@ fn list_row_style_defaults_and_renders_a_selected_row() {
         let body = any.make_body(ListRowStyleConfiguration {
             content: AnyView::new(EmptyView),
             is_selected: true,
+            is_emphasized: true,
             is_hovered: false,
             is_enabled: true,
             row_height: 30.0,

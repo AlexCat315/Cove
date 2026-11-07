@@ -811,8 +811,24 @@ where
         );
         // A vertical list sits in the same inset box as `List`; a horizontal
         // strip of cards keeps its own surfaces.
+        // The box pads a wrapper, not the column: the floating preview is
+        // positioned absolutely inside the column and must share the scroll
+        // viewport's origin rather than the box's outer edge.
         if axis == ScrollAxis::Vertical {
-            AnyView::new(column.with_modifier(super::list::InsetListBox))
+            AnyView::new(
+                AnyView::new(
+                    AnyView::new(BoxView::new(
+                        FlexDirection::Column,
+                        Align::Stretch,
+                        Justify::FlexStart,
+                        Wrap::NoWrap,
+                        0.0,
+                        column,
+                    ))
+                    .flex_with(1.0, 1.0, Some(0.0)),
+                )
+                .with_modifier(super::list::InsetListBox),
+            )
         } else {
             column
         }

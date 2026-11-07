@@ -20,6 +20,7 @@ import cargo from '@/content/cargo.md?raw'
 import gallery from '@/content/components/gallery.md?raw'
 import slider from '@/content/components/slider.md?raw'
 import rangeSlider from '@/content/components/range-slider.md?raw'
+import list from '@/content/components/list.md?raw'
 import reorderableList from '@/content/components/reorderable-list.md?raw'
 import rating from '@/content/components/rating.md?raw'
 import searchField from '@/content/components/search-field.md?raw'
@@ -94,6 +95,7 @@ export const docGroups: DocGroup[] = [
       { slug: 'gallery', title: 'Gallery 使用', raw: gallery },
       { slug: 'slider', title: 'Slider', raw: slider },
       { slug: 'range-slider', title: 'RangeSlider', raw: rangeSlider },
+      { slug: 'list', title: 'List / ListRow', raw: list },
       { slug: 'reorderable-list', title: 'ReorderableList', raw: reorderableList },
       { slug: 'rating', title: 'Rating', raw: rating },
       { slug: 'search-field', title: 'SearchField', raw: searchField },

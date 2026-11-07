@@ -4,15 +4,19 @@
 //! retain horizontal overflow for dense, independently authored accessory slots.
 use crate::Scope;
 use crate::modifiers::interaction::AccessibilityExt;
-use crate::modifiers::layout::{FlexExt, LayoutFrameExt};
+use crate::modifiers::layout::{FlexExt, LayoutFrameExt, PaddingExt};
 use crate::modifiers::style::{AppearanceExt, SemanticStyleViewExt};
 use crate::primitives::controls::button::{ButtonIcon, ButtonIconSource};
 use crate::primitives::layout::{ScrollAxis, ScrollView};
+use crate::primitives::media::Icon;
 use crate::primitives::text::Text;
 use crate::theme::styles::buttons::ButtonRole;
+use crate::theme::styles::components::list_row_style::{ListRowContext, ListRowContextReader};
+use crate::theme::tokens::{SemanticColorRef, SemanticIconSize};
 use crate::theme::{SemanticFontRef, ThemeReader};
 use crate::{AnyView, BoxView, PrimitiveView, TupleView, View, ViewExt, impl_primitive_view};
 use cove_core::scene::{Align, FlexDirection, Justify, LayoutNode, Node, Wrap};
+use cove_imaging::BundleImageResource;
 
 /// Authored options for one list row.
 #[derive(Clone, Debug, PartialEq)]
@@ -53,10 +57,31 @@ impl ListRowOptions {
     }
 }
 
-/// Title with leading and trailing accessory slots.
+/// What closes a row on its trailing edge.
+#[derive(Clone, Default)]
+pub enum ListRowAccessory {
+    #[default]
+    None,
+    /// A chevron: the row opens a detail view.
+    Disclosure,
+    /// A checkmark in the accent: the row is the chosen option.
+    Checkmark,
+    /// Any trailing view, after the value and the badge.
+    Custom(AnyView),
+}
+
+/// A macOS list row: an optional tinted icon, a title with an optional
+/// subtitle, and trailing value, badge and accessory. Every part inks itself
+/// from the band it sits on, so a selected row needs no caller-side colours.
 pub struct ListRow {
     pub title: String,
     pub options: ListRowOptions,
+    icon: Option<BundleImageResource>,
+    icon_tint: Option<SemanticColorRef>,
+    value: Option<String>,
+    badge: Option<String>,
+    accessory: ListRowAccessory,
+    is_disabled: bool,
     leading: AnyView,
     trailing: AnyView,
 }
@@ -66,6 +91,12 @@ impl ListRow {
         Self {
             title: title.into(),
             options: ListRowOptions::default(),
+            icon: None,
+            icon_tint: None,
+            value: None,
+            badge: None,
+            accessory: ListRowAccessory::None,
+            is_disabled: false,
             leading: AnyView::new(crate::EmptyView),
             trailing: AnyView::new(crate::EmptyView),
         }
@@ -73,6 +104,54 @@ impl ListRow {
 
     pub fn options(mut self, options: ListRowOptions) -> Self {
         self.options = options;
+        self
+    }
+
+    /// Secondary line under the title.
+    pub fn subtitle(mut self, subtitle: impl Into<String>) -> Self {
+        self.options.subtitle = Some(subtitle.into());
+        self
+    }
+
+    /// Leading glyph in the accent (or `tint`), light on an emphasized band.
+    pub fn icon(mut self, icon: BundleImageResource) -> Self {
+        self.icon = Some(icon);
+        self
+    }
+
+    /// Tint for the leading glyph when the row is not on the accent band.
+    pub fn icon_tint(mut self, tint: SemanticColorRef) -> Self {
+        self.icon_tint = Some(tint);
+        self
+    }
+
+    /// Trailing secondary text, such as a count, a date or a setting's value.
+    pub fn value(mut self, value: impl Into<String>) -> Self {
+        self.value = Some(value.into());
+        self
+    }
+
+    /// Trailing count capsule, as a mailbox shows unread messages.
+    pub fn badge(mut self, badge: impl Into<String>) -> Self {
+        self.badge = Some(badge.into());
+        self
+    }
+
+    pub fn accessory(mut self, accessory: ListRowAccessory) -> Self {
+        self.options.shows_disclosure = matches!(accessory, ListRowAccessory::Disclosure);
+        self.accessory = accessory;
+        self
+    }
+
+    /// A destructive action row: the title and icon take the error colour.
+    pub fn destructive(mut self) -> Self {
+        self.options.role = ButtonRole::Destructive;
+        self
+    }
+
+    /// Dims the row's content; selection and activation stay with the list.
+    pub fn disabled(mut self, is_disabled: bool) -> Self {
+        self.is_disabled = is_disabled;
         self
     }
 
@@ -87,10 +166,27 @@ impl ListRow {
     }
 }
 
+fn row_stack(spacing: f32, items: Vec<AnyView>) -> AnyView {
+    AnyView::new(BoxView::new(
+        FlexDirection::Row,
+        Align::Center,
+        Justify::FlexStart,
+        Wrap::NoWrap,
+        spacing,
+        AnyView::new(TupleView::new(items)),
+    ))
+}
+
 impl View for ListRow {
     fn body(&self, _cx: &Scope) -> AnyView {
         let title = self.title.clone();
         let options = self.options.clone();
+        let icon = self.icon.clone();
+        let icon_tint = self.icon_tint.clone();
+        let value = self.value.clone();
+        let badge = self.badge.clone();
+        let accessory = self.accessory.clone();
+        let is_disabled = self.is_disabled;
         let leading = self.leading.clone();
         let trailing = self.trailing.clone();
         AnyView::new(crate::adaptive::SurfaceReader::new(
@@ -98,78 +194,112 @@ impl View for ListRow {
                 let touch = surface.input.contains(cove_core::InputCapabilities::TOUCH);
                 let title = title.clone();
                 let options = options.clone();
+                let icon = icon.clone();
+                let icon_tint = icon_tint.clone();
+                let value = value.clone();
+                let badge = badge.clone();
+                let accessory = accessory.clone();
                 let leading = leading.clone();
                 let trailing = trailing.clone();
-                AnyView::new(ThemeReader::new(move |theme: &crate::theme::Theme| {
-                    // Title and subtitle inherit the row's ink. A selected row
-                    // re-inks its whole band with `on_accent`; hard-coding
-                    // `on_surface` here left dark text on the accent fill.
-                    let title_color =
-                        (options.role == ButtonRole::Destructive).then_some(theme.colors.error);
+                AnyView::new(ListRowContextReader::new(move |context: ListRowContext| {
+                    let on_accent = context.is_on_accent();
+                    let destructive = options.role == ButtonRole::Destructive;
+                    // On the accent band everything takes the band's light ink;
+                    // elsewhere the title keeps the row ink, secondary text is
+                    // muted and glyphs carry their tint.
                     let mut title_text = Text::new(title.clone()).truncated().clipped();
-                    if let Some(color) = title_color {
-                        title_text = title_text.foreground_color(color);
+                    if destructive && !on_accent {
+                        title_text = title_text.semantic_foreground(SemanticColorRef::error());
                     }
+                    let secondary = |text: String| {
+                        let view = Text::new(text).truncated().clipped();
+                        if on_accent {
+                            AnyView::new(view.opacity(0.8))
+                        } else {
+                            AnyView::new(
+                                view.semantic_foreground(SemanticColorRef::on_surface_muted()),
+                            )
+                        }
+                    };
                     let title_content = match options.subtitle.clone() {
                         Some(subtitle) => AnyView::new(BoxView::new(
                             FlexDirection::Column,
                             Align::Stretch,
                             Justify::FlexStart,
                             Wrap::NoWrap,
-                            4.0,
+                            2.0,
                             AnyView::new(TupleView::new(vec![
                                 AnyView::new(title_text),
                                 AnyView::new(
-                                    Text::new(subtitle)
-                                        .truncated()
-                                        .clipped()
-                                        .semantic_font(SemanticFontRef::caption())
-                                        .opacity(0.72),
+                                    AnyView::new(secondary(subtitle))
+                                        .semantic_font(SemanticFontRef::caption()),
                                 ),
                             ])),
                         )),
                         None => AnyView::new(title_text),
                     };
-                    let trailing_content = if options.shows_disclosure {
-                        AnyView::new(BoxView::new(
-                            FlexDirection::Row,
-                            Align::Center,
-                            Justify::FlexStart,
-                            Wrap::NoWrap,
-                            8.0,
-                            AnyView::new(TupleView::new(vec![
-                                AnyView::new(trailing.clone().flex(0.0).shrink(0.0)),
-                                AnyView::new(AnyView::new(ListDisclosure).modifier(
-                                    crate::modifiers::interaction::AccessibilityModifier::new(
-                                        |semantics| semantics.is_hidden = true,
-                                    ),
-                                )),
-                            ])),
-                        ))
-                    } else {
-                        AnyView::new(BoxView::new(
-                            FlexDirection::Row,
-                            Align::Center,
-                            Justify::FlexStart,
-                            Wrap::NoWrap,
-                            0.0,
-                            trailing.clone(),
-                        ))
-                    };
+
+                    let mut leading_items = Vec::new();
+                    if let Some(icon) = icon.clone() {
+                        let glyph = if on_accent {
+                            Icon::semantic(icon, SemanticIconSize::medium())
+                        } else {
+                            Icon::semantic_with_ref(
+                                icon,
+                                SemanticIconSize::medium(),
+                                icon_tint.clone().unwrap_or(if destructive {
+                                    SemanticColorRef::error()
+                                } else {
+                                    SemanticColorRef::accent()
+                                }),
+                            )
+                        };
+                        leading_items.push(AnyView::new(glyph.accessibility_hidden(true)));
+                    }
+                    leading_items.push(leading.clone());
+
+                    let mut trailing_items = Vec::new();
+                    if let Some(value) = value.clone() {
+                        trailing_items.push(secondary(value));
+                    }
+                    if let Some(badge) = badge.clone() {
+                        trailing_items.push(AnyView::new(ListRowBadge {
+                            text: badge,
+                            on_accent,
+                        }));
+                    }
+                    trailing_items.push(AnyView::new(trailing.clone().flex(0.0).shrink(0.0)));
+                    match &accessory {
+                        ListRowAccessory::None if options.shows_disclosure => {
+                            trailing_items.push(disclosure(on_accent));
+                        }
+                        ListRowAccessory::None => {}
+                        ListRowAccessory::Disclosure => trailing_items.push(disclosure(on_accent)),
+                        ListRowAccessory::Checkmark => trailing_items.push(AnyView::new(
+                            if on_accent {
+                                Icon::semantic(
+                                    crate::primitives::media::ui_icon_catalog::action::check(),
+                                    SemanticIconSize::small(),
+                                )
+                            } else {
+                                Icon::semantic_with_ref(
+                                    crate::primitives::media::ui_icon_catalog::action::check(),
+                                    SemanticIconSize::small(),
+                                    SemanticColorRef::accent(),
+                                )
+                            }
+                            .accessibility_hidden(true),
+                        )),
+                        ListRowAccessory::Custom(view) => trailing_items.push(view.clone()),
+                    }
+
                     let contents = AnyView::new(
                         crate::LayoutContainer::new(
                             ListRowSlots { touch },
                             TupleView::new(vec![
-                                AnyView::new(BoxView::new(
-                                    FlexDirection::Row,
-                                    Align::Center,
-                                    Justify::FlexStart,
-                                    Wrap::NoWrap,
-                                    0.0,
-                                    leading.clone(),
-                                )),
+                                row_stack(8.0, leading_items),
                                 title_content,
-                                trailing_content,
+                                row_stack(8.0, trailing_items),
                             ]),
                         )
                         .accessibility(|semantics| semantics.combines_children = true),
@@ -177,7 +307,7 @@ impl View for ListRow {
                     let scroll = ScrollView::new(ScrollAxis::Horizontal, contents)
                         .combine_accessibility(true)
                         .scroll_enabled(!touch);
-                    AnyView::new(AnyView::new(scroll).frame(
+                    let row = AnyView::new(AnyView::new(scroll).frame(
                         if touch {
                             Some(crate::modifiers::layout::FrameDimension::Percent(100.0))
                         } else {
@@ -188,10 +318,64 @@ impl View for ListRow {
                         None,
                         None,
                         None,
-                    ))
+                    ));
+                    if is_disabled || !context.is_enabled {
+                        AnyView::new(row.opacity(0.4))
+                    } else {
+                        row
+                    }
                 }))
             },
         ))
+    }
+}
+
+fn disclosure(on_accent: bool) -> AnyView {
+    let chevron = AnyView::new(AnyView::new(ListDisclosure).modifier(
+        crate::modifiers::interaction::AccessibilityModifier::new(|semantics| {
+            semantics.is_hidden = true
+        }),
+    ));
+    // A muted chevron reads as navigation without competing with the title;
+    // on the accent band it follows the light ink.
+    if on_accent {
+        chevron
+    } else {
+        AnyView::new(chevron.semantic_foreground(SemanticColorRef::on_surface_muted()))
+    }
+}
+
+/// A count capsule: muted fill on a plain row, translucent light on the band.
+struct ListRowBadge {
+    text: String,
+    on_accent: bool,
+}
+
+impl View for ListRowBadge {
+    fn body(&self, _cx: &Scope) -> AnyView {
+        let text = self.text.clone();
+        let on_accent = self.on_accent;
+        AnyView::new(ThemeReader::new(move |theme: &crate::theme::Theme| {
+            let (fill, ink) = if on_accent {
+                (
+                    theme.colors.on_accent.multiplied_alpha(0.25),
+                    theme.colors.on_accent,
+                )
+            } else {
+                (
+                    theme.colors.surface_pressed,
+                    theme.colors.on_surface_variant,
+                )
+            };
+            AnyView::new(
+                Text::new(text.clone())
+                    .semantic_font(SemanticFontRef::caption())
+                    .foreground_color(ink)
+                    .padding_edges(7.0, 1.0)
+                    .background_color(fill)
+                    .corner_radius(theme.radius.pill),
+            )
+        }))
     }
 }
 

@@ -22,18 +22,17 @@ impl ListRowStyle for DefaultListRowStyle {
         let theme = configuration.theme.clone();
         let touch = configuration.input.contains(InputCapabilities::TOUCH);
         let colors = theme.colors;
-        // A selected row is a solid accent band with a light label, like the
-        // reference; an unselected hover is a neutral surface face.
-        let fill = if configuration.is_selected {
-            if configuration.is_hovered {
-                colors.accent_hover
-            } else {
-                colors.accent
-            }
-        } else if configuration.is_hovered {
-            colors.state_layer_hover
-        } else {
+        // macOS selection: the accent band with light ink while the list has
+        // keyboard focus, a neutral band with the row's own ink otherwise.
+        // Hover is painted live by the row host in the same band geometry, so
+        // the style never recomposes for it.
+        let on_accent = configuration.is_selected && configuration.is_emphasized;
+        let fill = if !configuration.is_selected {
             Color::CLEAR
+        } else if configuration.is_emphasized {
+            colors.accent
+        } else {
+            colors.surface_pressed
         };
         // Pointer highlights float inside the row as a rounded band; touch
         // keeps the edge-to-edge band with a square edge.
@@ -56,9 +55,17 @@ impl ListRowStyle for DefaultListRowStyle {
             )
             .frame_height(inner_height),
         );
-        // Only the selected band re-inks its label; unselected rows keep the
-        // default ink, so a theme cross-fade doesn't animate a redundant color.
-        let selected_ink = if configuration.is_selected {
+        // Only the accent band re-inks its label; other rows keep the default
+        // ink, so a theme cross-fade doesn't animate a redundant color.
+        let context = super::list_row_style::ListRowContext {
+            is_selected: configuration.is_selected,
+            is_emphasized: configuration.is_emphasized,
+            is_enabled: configuration.is_enabled,
+        };
+        let row = AnyView::new(
+            row.composition_local(super::list_row_style::ListRowContext::key(), context),
+        );
+        let selected_ink = if on_accent {
             AnyView::new(row.semantic_foreground(crate::theme::SemanticColorRef::on_accent()))
         } else {
             row
@@ -75,7 +82,7 @@ impl ListRowStyle for DefaultListRowStyle {
                 .opacity(alpha)
                 .modifier(AnimatedRowFill {
                     fill,
-                    is_selected: configuration.is_selected,
+                    on_accent,
                     radius,
                 }),
         )
@@ -138,7 +145,7 @@ impl cove_composition::ViewModifier for ListRowSeparatorModifier {
 /// motion, mirroring Swift's `.animation(.semantic(.fast, in: theme), value:)`.
 struct AnimatedRowFill {
     fill: Color,
-    is_selected: bool,
+    on_accent: bool,
     radius: f32,
 }
 
@@ -168,8 +175,9 @@ impl cove_composition::ViewModifier for AnimatedRowFill {
                 }
             },
         );
-        if self.is_selected {
-            node.set_foreground_color(Some(crate::theme::theme_for_node(node).colors.on_accent));
-        }
+        node.set_foreground_color(
+            self.on_accent
+                .then(|| crate::theme::theme_for_node(node).colors.on_accent),
+        );
     }
 }

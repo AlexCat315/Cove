@@ -26,6 +26,7 @@ const VIEWPORT: &str = "__scrollbar_viewport";
 const MINIMUM: &str = "__scrollbar_minimum";
 const MAX_OFFSET: &str = "__scrollbar_max_offset";
 const VALUE: &str = "__scrollbar_value";
+const ALWAYS_VISIBLE: &str = "__scrollbar_always_visible";
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum ScrollbarAxis {
@@ -54,6 +55,8 @@ pub struct Scrollbar {
     pub thickness: f32,
     pub minimum_thumb_extent: f32,
     pub label: String,
+    /// Keeps the bar shown at rest, like macOS "Show scroll bars: Always".
+    pub always_visible: bool,
 }
 
 impl Scrollbar {
@@ -71,7 +74,13 @@ impl Scrollbar {
             thickness: 12.0,
             minimum_thumb_extent: 32.0,
             label: crate::i18n::tr("Scrollbar"),
+            always_visible: false,
         }
+    }
+
+    pub fn always_visible(mut self, visible: bool) -> Self {
+        self.always_visible = visible;
+        self
     }
 
     pub fn thickness(mut self, thickness: f32) -> Self {
@@ -115,7 +124,9 @@ impl Scrollbar {
 }
 
 fn apply_desired_visibility(node: &Node) {
-    if !crate::primitives::controls::adaptive::supports_control_hover(node) {
+    if !crate::primitives::controls::adaptive::supports_control_hover(node)
+        || node.attachment::<bool>(ALWAYS_VISIBLE) == Some(true)
+    {
         return;
     }
     let hovered = node.attachment::<bool>(IS_HOVERED).unwrap_or(false);
@@ -159,7 +170,9 @@ fn set_chrome_visible(node: &Node, visible: bool) {
 /// fades 0.3s after the content rests for 0.7s. Reduced motion keeps it visible
 /// instead of animating it out.
 fn flash_if_unheld(node: &Node) {
-    if !crate::primitives::controls::adaptive::supports_control_hover(node) {
+    if !crate::primitives::controls::adaptive::supports_control_hover(node)
+        || node.attachment::<bool>(ALWAYS_VISIBLE) == Some(true)
+    {
         return;
     }
     if node.attachment::<bool>(DESIRED_VISIBLE) == Some(true) {
@@ -254,6 +267,20 @@ impl PrimitiveView for Scrollbar {
             node.set_attachment(IS_DRAGGING, false);
             node.set_attachment(DESIRED_VISIBLE, false);
             node.set_attachment(LAST_OFFSET, self.value());
+        }
+        if node.attachment::<bool>(ALWAYS_VISIBLE) != Some(self.always_visible) {
+            node.set_attachment(ALWAYS_VISIBLE, self.always_visible);
+            if self.always_visible {
+                node.cancel_animation(CHROME_OPACITY);
+                node.set_attachment(CHROME_OPACITY, 1.0_f32);
+                node.mark_render_dirty(cove_core::scene::InvalidationSource::style_set(
+                    "scrollbarChromeOpacity",
+                ));
+            } else {
+                // Recompute from the shown state so a resting bar fades out.
+                node.set_attachment(DESIRED_VISIBLE, true);
+                apply_desired_visibility(node);
+            }
         }
 
         let value = self.value();
@@ -478,6 +505,7 @@ impl Scrollbar {
             thickness: self.thickness,
             minimum_thumb_extent: self.minimum_thumb_extent,
             label: self.label.clone(),
+            always_visible: self.always_visible,
         }
     }
 }

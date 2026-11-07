@@ -104,10 +104,12 @@ fn list_row_cross_fade() {
             );
             graph.compute_layout(400.0, 300.0);
 
-            let dark = Theme::default_dark().colors.accent;
-            let light = Theme::default_light().colors.accent;
+            // An unfocused list paints its selection as the neutral band.
+            let dark = Theme::default_dark().colors.surface_pressed;
+            let light = Theme::default_light().colors.surface_pressed;
             let root = graph.tree.borrow().root().expect("root");
-            let node = find_with_color(&root, dark).expect("a row paints the dark accent");
+            let node =
+                find_with_color(&root, dark).expect("a row paints the dark selection band");
 
             appearance.set(Appearance::Light);
             graph.recomposer.commit_all();
@@ -130,7 +132,7 @@ fn list_row_cross_fade() {
             assert_eq!(
                 node.background_color(),
                 Some(light),
-                "the fill lands on the light accent"
+                "the fill lands on the light selection band"
             );
             assert_eq!(scheduler.active_count(), 0, "the scheduler idles again");
         });

@@ -4,6 +4,17 @@
 
 ## Unreleased
 
+- **列表重设计：选中与悬停、ListRow API、内嵌盒与滚动条（2026-11-07，破坏性外观与 API）**：
+  - 选中：`ListRowStyleConfiguration` 新增 `is_emphasized`。列表持有键盘焦点时选中为强调色带 + 浅色墨水，否则为中性灰带（`surface_pressed`）并保持原墨水，与 macOS 一致；焦点经 `FocusChain::current_focus` 的响应式读取驱动，焦点移动时行自动重组。此前选中行永远是强调色，且离开选中后前景色从未清除。
+  - 悬停：此前行宿主把悬停画成整行高的背景，样式又把选中画成上下各内缩 4pt 的带，两者几何不一致——悬停带比选中带高、贴到相邻的选中行。现在悬停与按压由宿主实时绘制，几何与选中带相同（内缩 `spacing.xs`、圆角 `radius.md`），不重组行；已选中的行不叠加悬停。
+  - 行上下文：新增 `ListRowContext`（`is_selected` / `is_emphasized` / `is_enabled` / `is_on_accent()`）与 `ListRowContextReader`，默认行样式与 SwipeList 都发布它，内容据此自动取墨水。
+  - `ListRow` 新增 `icon` / `icon_tint`、`subtitle`、`value`、`badge`、`accessory(ListRowAccessory::{Disclosure, Checkmark, Custom})`、`destructive`、`disabled`；全部部件按所在的带取色，调用方不再按 `RowState::is_selected` 手选颜色（Gallery 的 List 故事此前在强调带上画强调色图标）。
+  - 内嵌盒：内边距改为取自选中外观（左右 `horizontal_inset` = `spacing.sm`，上下 `vertical_inset` = `spacing.xs`），选中带四周与盒边距离一致；SwipeList 也放进同一个盒子，行内容补上 12pt 前导内边距与分隔线对齐，选中行上方的分隔线不再画。
+  - 滚动条：虚拟化列表（List / SectionedList / SwipeList）改用覆盖式滚动条，不再保留 12pt 尾部车道——此前车道让选中带左边 4pt、右边 16pt。ReorderableList 仍保留车道给尾部拖动手柄，并把盒子内边距移到外层包装，修复拖动预览比源行偏移盒内边距的问题。
+  - Scrollbar：新增 `always_visible(bool)`；Gallery Scrollbar 页此前只有一个静止时隐藏的滑块、没有任何内容，现在与一个 600pt 文档共享偏移，滑块常显。
+  - 测试：新增 `selection_takes_the_accent_only_while_the_list_has_focus`；选中带测量改为相对内嵌盒，列表/分节/滑动列表与移动端测试的几何断言改为从主题取内边距；主题交叉淡化与样式集成测试改用中性选中带。
+  - 文档：新增 `list.md` 并注册导航；`scrollbar.md` 补 `always_visible`。
+
 - **Alert 视觉重做与 API 完善（2026-11-07）**：
   - 图标：状态标记改为 SF Symbols 式实心符号——勾、叉、感叹号与信息标记从实心圆形 / 三角形中挖空（`check-circle-fill`、`x-circle-fill`、`info-circle-fill`、`alert-triangle-fill`、`circle-fill`），16pt 下仍是一块清晰记号；新增 `StatusTone::filled_icon()`，原有描边 `icon()` 保持不变。
   - 外观：`Soft` 底色按 10% 混入 tone 色并压一条 18% 同色发丝边，`Outline` 描边降到 35%；标题与说明按 2pt 配对、操作行单独留 8pt；关闭按钮改用中性灰而不是 tone 色；圆角为 `radius.md`。

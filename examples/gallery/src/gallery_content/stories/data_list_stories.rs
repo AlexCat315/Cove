@@ -7,14 +7,13 @@
 use cove_composition::Scope;
 use cove_core::State;
 use cove_core::scene::{Align, FlexDirection, Justify, Wrap};
-use cove_ui_compose::modifiers::interaction::AccessibilityExt;
 use cove_ui_compose::modifiers::layout::{FlexExt, LayoutFrameExt, PaddingExt};
 use cove_ui_compose::primitives::controls::Toggle;
 use cove_ui_compose::primitives::controls::fields::numeric::NumberField;
 use cove_ui_compose::primitives::controls::fields::slider::Slider;
 use cove_ui_compose::primitives::data::lists::RowState;
 use cove_ui_compose::primitives::data::lists::{
-    List, ListRow, ListRowOptions, ReorderableList, Selection,
+    List, ListRow, ListRowAccessory, ReorderableList, Selection,
 };
 use cove_ui_compose::primitives::data::{
     PropertyGrid, PropertyGridRow, PropertyGridSection, Timeline, TimelineEvent, TimelineGroup,
@@ -22,14 +21,14 @@ use cove_ui_compose::primitives::data::{
 };
 use cove_ui_compose::primitives::feedback::StatusTone;
 use cove_ui_compose::primitives::interaction::{Scrollbar, ScrollbarAxis};
-use cove_ui_compose::primitives::layout::ScrollAxis;
-use cove_ui_compose::primitives::media::{Icon, ui_icon_catalog};
+use cove_ui_compose::primitives::layout::{ScrollAxis, ScrollView, ScrollbarGutter};
+use cove_ui_compose::primitives::media::ui_icon_catalog;
 use cove_ui_compose::primitives::text::Text;
 use cove_ui_compose::primitives::text::text_buffer::TextBuffer;
 use cove_ui_compose::primitives::text::text_field::TextField;
 use cove_ui_compose::primitives::text::text_field::text_field_options::TextFieldBehavior;
 use cove_ui_compose::theme::SemanticFontRef;
-use cove_ui_compose::theme::tokens::{SemanticColorRef, SemanticIconSize, SemanticStyleViewExt};
+use cove_ui_compose::theme::tokens::{SemanticColorRef, SemanticStyleViewExt};
 use cove_ui_compose::{AnyView, BoxView, LayoutDebugExt, TupleView, View};
 
 use super::feedback::StorySection;
@@ -52,15 +51,26 @@ pub struct ListStory {
 }
 
 impl ListStory {
-    /// `(title, subtitle)` for every row.
+    /// `(title, trailing value)` for every row.
     pub const ROWS: [(&'static str, &'static str); 6] = [
-        ("Inbox", "24 unread"),
-        ("Drafts", "3 waiting"),
+        ("Inbox", "24"),
+        ("Drafts", "3"),
         ("Sent", "Yesterday"),
-        ("Archive", "1 204 messages"),
-        ("Spam", "12 held"),
+        ("Archive", "1 204"),
+        ("Spam", "12"),
         ("Trash", "Empty"),
     ];
+
+    fn icon(index: usize) -> cove_imaging::BundleImageResource {
+        match index {
+            0 => ui_icon_catalog::file::inbox(),
+            1 => ui_icon_catalog::action::pencil(),
+            2 => ui_icon_catalog::shape::send(),
+            3 => ui_icon_catalog::file::archive(),
+            4 => ui_icon_catalog::status::shield(),
+            _ => ui_icon_catalog::action::trash(),
+        }
+    }
 
     pub fn new(options: GalleryOptions) -> Self {
         Self {
@@ -95,34 +105,25 @@ impl View for ListStory {
         let list = AnyView::new(
             List::new(
                 (0..Self::ROWS.len()).collect(),
-                |id: &usize, state: RowState| {
-                    let id = *id;
-                    let is_selected = state.is_selected;
-
-                    let (title, subtitle) = Self::ROWS[id];
-                    let ink = if is_selected {
-                        SemanticColorRef::on_accent()
-                    } else {
-                        SemanticColorRef::on_surface_muted()
+                |id: &usize, _state: RowState| {
+                    // The row inks itself from the band it sits on: icons,
+                    // values and the chevron follow the selection and focus.
+                    let (title, detail) = Self::ROWS[*id];
+                    let row = ListRow::new(title)
+                        .icon(Self::icon(*id))
+                        .accessory(ListRowAccessory::Disclosure);
+                    let row = match *id {
+                        0 => row.badge("24"),
+                        5 => row.destructive().value(detail),
+                        _ => row.value(detail),
                     };
-                    AnyView::new(
-                        ListRow::new(title)
-                            .options(ListRowOptions::new().subtitle(subtitle).disclosure(true))
-                            .leading(
-                                Icon::semantic_with_ref(
-                                    ui_icon_catalog::file::file_text(),
-                                    SemanticIconSize::medium(),
-                                    ink,
-                                )
-                                .accessibility_hidden(true),
-                            ),
-                    )
+                    AnyView::new(row)
                 },
             )
             .selection(Selection::single(self.selection.binding()))
-            .row_height(52.0)
+            .row_height(36.0)
             .on_activate(move |id: &usize| activated.set(Some(*id)))
-            .frame_height(260.0)
+            .frame_height(6.0 * 36.0 + 8.0)
             .debug_name("list-control"),
         );
         AnyView::new(StorySection::new(
@@ -451,6 +452,8 @@ impl ScrollbarStory {
     pub const CONTENT_EXTENT: f32 = 600.0;
     /// The viewport extent the story reports.
     pub const VIEWPORT_EXTENT: f32 = 200.0;
+    /// Lines in the scrolled document.
+    pub const LINE_COUNT: usize = 15;
 
     pub fn new(options: GalleryOptions) -> Self {
         Self {
@@ -486,14 +489,55 @@ impl View for ScrollbarStory {
                 Self::VIEWPORT_EXTENT,
             )
             .thickness(12.0)
+            .always_visible(true)
             .label("Scroll position")
             .frame_height(Self::VIEWPORT_EXTENT)
             .debug_name("scrollbar-control"),
         );
+        // The document the thumb drives: the scroll view shares the story's
+        // offset and hides its own bar, so the standalone thumb is the only one.
+        let lines = (1..=Self::LINE_COUNT)
+            .map(|line| {
+                AnyView::new(
+                    Text::new(format!("Line {line}"))
+                        .padding_edges(12.0, 0.0)
+                        .frame_height(Self::CONTENT_EXTENT / Self::LINE_COUNT as f32),
+                )
+            })
+            .collect::<Vec<_>>();
+        let offset = self.offset.clone();
+        let write = self.offset.clone();
+        let max_offset = self.max_offset();
+        let document = AnyView::new(
+            ScrollView::vertical(BoxView::new(
+                FlexDirection::Column,
+                Align::Stretch,
+                Justify::FlexStart,
+                Wrap::NoWrap,
+                0.0,
+                AnyView::new(TupleView::new(lines)),
+            ))
+            .scroll_offset(cove_core::Binding::new(
+                move || cove_core::Point::new(0.0, offset.get()),
+                move |point: cove_core::Point| write.set(point.y.clamp(0.0, max_offset)),
+            ))
+            .scrollbar_gutter(ScrollbarGutter::Hidden)
+            .flex_with(1.0, 1.0, Some(0.0))
+            .frame_height(Self::VIEWPORT_EXTENT)
+            .debug_name("scrollbar-document"),
+        );
+        let viewport = AnyView::new(BoxView::new(
+            FlexDirection::Row,
+            Align::Stretch,
+            Justify::FlexStart,
+            Wrap::NoWrap,
+            4.0,
+            AnyView::new(TupleView::new(vec![document, bar])),
+        ));
         AnyView::new(StorySection::new(
             "Thumb",
             "Arrows move by one line, Page Up and Page Down by a viewport, Home and End jump to the bounds.",
-            AnyView::new(TupleView::new(vec![bar, caption(self.readout())])),
+            AnyView::new(TupleView::new(vec![viewport, caption(self.readout())])),
         ))
     }
 

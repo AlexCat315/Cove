@@ -192,15 +192,17 @@ fn list_row_selection_follows_theme() {
             );
             graph.compute_layout(200.0, 120.0);
 
-            let accent = Theme::default_light().colors.accent;
+            // Nothing holds focus here, so the selection is the theme's
+            // neutral band; the accent band needs the list to be focused.
+            let neutral = Theme::default_light().colors.surface_pressed;
             let hits: Vec<Node> = all_nodes(&graph)
                 .into_iter()
-                .filter(|node| node.background_color() == Some(accent))
+                .filter(|node| node.background_color() == Some(neutral))
                 .collect();
             assert_eq!(
                 hits.len(),
                 1,
-                "exactly one row carries the selected accent fill, got {}",
+                "exactly one row carries the light theme's neutral selection, got {}",
                 hits.len()
             );
         });

@@ -189,14 +189,20 @@ fn sticky_headers() {
             (10..36).contains(&initial_rows),
             "the first window fills the viewport with a bounded buffer: {initial_rows}"
         );
+        let inset = cove_ui_compose::theme::styles::components::selection_appearance::SelectionAppearance::resolve(
+            cove_ui_compose::theme::styles::components::selection_appearance::SelectionRole::Navigation,
+            &cove_ui_compose::theme::Theme::default_dark(),
+        )
+        .vertical_inset;
         assert_eq!(
             initial_port.height,
             scene
                 .named("sectioned-list")
                 .expect("named list")
                 .frame()
-                .height,
-            "the viewport follows its allocation"
+                .height
+                - 2.0 * inset,
+            "the viewport follows its allocation inside the inset box"
         );
 
         scroll(scene, 30.0);
@@ -207,8 +213,13 @@ fn sticky_headers() {
         let pinned = sticky(scene).expect("scrolling pins Alpha");
         assert_eq!(sticky_title(&pinned).as_deref(), Some("Alpha"));
         assert_eq!(pinned.absolute_frame().y, port.absolute_frame().y);
-        // The inset list box keeps 4pt on each side of its rows.
-        assert_eq!(pinned.frame().width, LIST_WIDTH - 8.0);
+        // The inset list box keeps its selection inset on each side of its rows.
+        let side = cove_ui_compose::theme::styles::components::selection_appearance::SelectionAppearance::resolve(
+            cove_ui_compose::theme::styles::components::selection_appearance::SelectionRole::Navigation,
+            &cove_ui_compose::theme::Theme::default_dark(),
+        )
+        .horizontal_inset;
+        assert_eq!(pinned.frame().width, LIST_WIDTH - 2.0 * side);
         assert!(
             !pinned.allows_hit_testing(),
             "the pinned decoration never intercepts rows"

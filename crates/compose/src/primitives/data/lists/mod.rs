@@ -10,11 +10,12 @@ pub mod swipe_list;
 pub mod table;
 pub mod tree;
 
+pub use crate::theme::styles::components::list_row_style::{ListRowContext, ListRowContextReader};
 pub use inset_group::ListGroup;
 pub use list::List;
 pub use refresh::RefreshOptions;
 pub use reorderable::{ReorderSession, ReorderableList};
-pub use row::{ListRow, ListRowOptions};
+pub use row::{ListRow, ListRowAccessory, ListRowOptions};
 pub use sectioned_list::{ListSection, SectionedEntryId, SectionedList, StickyHeader};
 pub use selection::{CollectionId, RowState, Selection};
 pub use swipe_list::{
