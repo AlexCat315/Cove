@@ -4,6 +4,19 @@
 
 ## Unreleased
 
+- **macOS 风格组件库与弹簧动效（2026-11-07，破坏性外观）**：
+  - 主题：浅色改为 macOS 窗口结构——内容区白色、侧栏与分组区 `surface_variant`（`#F2F2F4`）、按压 `#E3E3E8`；深色内容 `#1E1E1E`、分组 `#262628`、控件 `#2C2C2E`。强调色 `#0071E3`（深色 `#0B70E0`，白字均 ≥4.5:1）。圆角 0/4/6/8/10 → 0/6/8/12/16；阴影改为宽而淡的扩散阴影，浮层阴影保持宽光晕 + 紧接触阴影。`display`/`title`/`headline` 按 SF 规律收紧字距（34/26/17pt），正文及以下保持字体自身字距——负字距会让列表行与表格单元的小数宽度越过容器。
+  - 材质：新增 `theme.materials`（`chrome`/`content`/`floating`）与 `.glass(GlassKind)`；`floating_surface`、overlay `FloatingSurface`、搜索建议列表与通知横幅改用 `floating` 磨砂材质（半透明底 + 背景模糊 + 发丝边）。
+  - 按钮：`Button` 默认样式由 `PrimaryButtonStyle` 改为 `SecondaryButtonStyle`（macOS 推按钮：白底、发丝边、接触阴影），只有视图标记的默认动作使用强调色填充；按钮改为胶囊，纯图标按钮无边框（按 ghost 处理），工具栏内默认 ghost。按下即时压缩到 0.96，松手按欠阻尼弹簧回弹。SplitButton 改为一个胶囊外框 + 两个无边框分区；MenuButton 新增 `.ghost()`。
+  - 输入：文本框聚焦时外圈 4pt 强调色光晕；Select 与 DatePicker 触发器改为 macOS 弹出按钮（胶囊 + 上下双箭头）；SearchField 为胶囊。复选框为带接触阴影的白色凹槽，勾按路径逐段画出；单选选中为强调色实心圆 + 白点弹簧弹出；开关关闭轨道改为浅系统灰，拇指弹簧行程、按住拉伸 5pt、柔和投影。Slider 为 4pt 灰轨 + 26×18 胶囊拇指。
+  - 选择与导航：新增 `SlidingSelection` / `install_sliding_selection` / `SlidingSelectionMark`——一组行共用一个选中底并以弹簧滑动，位置相对宿主测量、滚动不追赶。Sidebar（中性灰圆角选中、强调色图标、30pt 紧凑行、贴边全高 + 内容侧发丝线）、ButtonGroup 与 TabView（灰色胶囊槽 + 白色滑动拇指，分段条贴合内容宽度）都基于它。
+  - 列表与表格：List / SectionedList / 纵向 ReorderableList 为 macOS 内嵌列表盒（`surface` 圆角盒 + 侧边内缩），分隔线两端对称内缩、选中行上方与末行不画；DataTable 斑马行改为一级填充。日历日期改为圆形。
+  - 反馈与浮层：Alert soft 变体为语调淡染底、无描边；进度条与环形进度用 `surface_pressed` 轨道；滚动条为 macOS 叠加滚动条（静止只有细胶囊拇指，悬停/拖动时加宽并出现轨道）；对话框圆角 18 + 发丝边、去掉页头页脚分隔线；面板、Accordion、代码块、Carousel、StatusBar、InsetGroup 改用分组填充。
+  - 动效：`MotionScale` 0.12/0.28/0.45s，新增 `Easing::RESPONSIVE` / `Easing::FLUID`；浮层进入为欠阻尼弹簧（0.38s，从 0.9 弹出），退出 0.14s；`snappy`/`bouncy` 允许过冲。新增 `hover_lift()` 与 `cascade_in()`。Gallery 页面切换以弹簧淡入上浮，Dashboard 数字用 `NumericText` 滚动。
+  - 修复：节点自身阴影此前被自身裁剪一并裁掉（两种渲染器都在阴影前压入裁剪），裁剪型表面（文本框等）的阴影/光晕不可见，现先画阴影再裁剪；`SelectionAppearance::fill` 合成顺序颠倒导致选中行的悬停/按压层被盖住；TabView 标题以 `flex-basis: 0` 布局、所有标签标题宽度塌为 0（原版即存在），改为自然宽度可收缩截断；列表行分隔线复用时残留。
+  - 测试：按新默认值更新——默认按钮断言改为推按钮外观，专测主按钮行为的用例显式使用 `PrimaryButtonStyle`；动效时长、浮层 reveal 0.9 / 退出 0.14s、半径阶梯、侧栏 30pt 行与中性选中、侧栏图标强调色、面板分组填充、浮层材质、Tab 截断等断言同步收敛。
+  - 文档：重写 `theme.md`，新增 `motion.md` 并注册导航；`sidebar.md`、`slider.md` 补外观说明。
+
 - **菜单密度、分节样式与浮层动效苹果化（2026-11-07，破坏性外观）**：
   - 菜单行默认下限 30 → 20pt，实际单行高度改由 `natural_row_height` 一处结算：label 行高（默认 18pt）加上下各 3pt 留白，默认字号下为 24pt，仍不低于 `minimum_row_height()` 这个 CompositionLocal（触屏表面抬到 44pt，宿主可自行要求更高，例如 44pt 选择器）。高亮带同时从 `accent_muted` 软染色改为系统菜单的满饱和 `accent` + `on_accent` 墨色，按压态用 `accent_pressed`，圆角降到 `radius.sm`；悬停与键盘高亮仍是即时切换、不做淡入淡出。行首留白、固定列宽与列间距提为 `ROW_HORIZONTAL_PADDING`（8pt）、`ROW_LANE_WIDTH`（12pt）、`ROW_LANE_SPACING`（6pt）三个共享度量，标题、勾选列、图标列与分节标题都按同一套列宽落位。
   - 面板行预算修复：`MenuWindowBounds` 原先按 `max(行下限, button_height)` 结算，行降到 20pt 后 5 行仍按 32pt/行预留 160pt 视口，实际显示约 7 行——`max_visible_rows` 只剩占位、不再限制可见行数。改为与行自身同一份 `natural_row_height`，并让 `apply_node` 与 `layout_did_update` 回调经同一个 `budgeted_height` 解析 `max_height`：先前一处用作者值、一处用测量值，同一轮布局里 `max_height` 在 160 与 388 之间来回改，多行换行的用例会以「行 114pt / 视口 160pt」失败。`button_scroll_view_tests::nested_menu_consumes_boundary_wheel_before_parent_scroll_view` 里写死的 160pt 断言改为断言契约本身（视口 = 5 × 行高，±1pt）。

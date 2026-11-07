@@ -16,6 +16,7 @@ use cove_composition::Scope;
 use cove_composition::{AnyView, LayoutDebugExt, View, ViewExt};
 use cove_core::scene::{Align, FlexDirection, Justify, LayoutNode, Node, Wrap};
 use cove_core::{Binding, State};
+use cove_ui_compose::animation::{AnimatedVisibility, Transition};
 use cove_ui_compose::modifiers::layout::{FlexExt, LayoutFrameExt, PaddingExt};
 use cove_ui_compose::modifiers::style::AppearanceExt;
 use cove_ui_compose::primitives::controls::Button;
@@ -38,8 +39,10 @@ use cove_ui_compose::theme::styles::buttons::{
     ButtonStyleViewExt, GhostButtonStyle, SecondaryButtonStyle,
 };
 use cove_ui_compose::theme::styles::circular_appearance::ThemeTransition;
-use cove_ui_compose::theme::tokens::{SemanticColorRef, SemanticFontRef, SemanticStyleViewExt};
-use cove_ui_compose::theme::{TextScalerReader, TextScalerViewExt, theme_for_node};
+use cove_ui_compose::theme::tokens::{
+    SemanticColorRef, SemanticFontRef, SemanticMotionRef, SemanticStyleViewExt,
+};
+use cove_ui_compose::theme::{TextScalerReader, TextScalerViewExt};
 
 use crate::gallery_content::catalog::{
     CowSize, GalleryCatalog, GalleryEntry, GalleryOptions, GalleryPage,
@@ -348,7 +351,7 @@ impl GalleryView {
         erased(
             AnyView::new(Button::new(label, move || view.toggle_theme()))
                 .button_style(SidebarItemStyle {
-                    minimum_height: 38.0,
+                    minimum_height: 30.0,
                     presentation:
                         cove_ui_compose::primitives::layout::sidebar::SidebarPresentation::Expanded,
                 })
@@ -462,6 +465,19 @@ impl View for GalleryPagePane {
                 message: dispatch.pending_message(),
             }),
         };
+        // A page change is a quick cross-fade with an 8pt rise: content
+        // swaps, it does not perform. The identity restarts it per navigation.
+        let story = erased(
+            AnyView::new(AnimatedVisibility::with_motion(
+                true,
+                Transition::opacity().combined(Transition::offset(0.0, 8.0)),
+                Some(SemanticMotionRef::entering()),
+                true,
+                None,
+                story,
+            ))
+            .id(format!("{}-{generation}", page.raw_value())),
+        );
         let outlet = erased(
             AnyView::new(ScrollView::vertical(story))
                 .flex_with(1.0, 1.0, Some(0.0))
@@ -519,8 +535,8 @@ struct GalleryPageFrame;
 
 impl cove_composition::ViewModifier for GalleryPageFrame {
     fn apply_node(&self, node: &Node) {
-        let colors = theme_for_node(node).colors;
-        node.set_background_color(Some(colors.background));
+        // Transparent: the window canvas shows between the cards.
+        node.set_background_color(None);
     }
     fn apply_layout(&self, layout: &LayoutNode) {
         layout.set_min_width(Some(0.0));

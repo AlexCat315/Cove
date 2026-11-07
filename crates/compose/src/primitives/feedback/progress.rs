@@ -165,8 +165,11 @@ impl PrimitiveView for ProgressView {
             let base = tone.color().resolve(&theme);
             let alpha = owner.opacity() * if is_enabled { 1.0 } else { 0.5 };
             let radius = rect.height / 2.0;
-            let _ =
-                list.add_rounded_rect(rect, radius, theme.colors.border.multiplied_alpha(alpha));
+            let _ = list.add_rounded_rect(
+                rect,
+                radius,
+                theme.colors.surface_pressed.multiplied_alpha(alpha),
+            );
             if rect.width <= rect.height {
                 return;
             }

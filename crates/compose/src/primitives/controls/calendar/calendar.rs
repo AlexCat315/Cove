@@ -988,7 +988,8 @@ impl PrimitiveView for CalendarDayCell {
         let in_month = interval_start(CalendarUnit::Month, self.day, calendar)
             == interval_start(CalendarUnit::Month, self.month, calendar);
         let theme = theme_for_node(node);
-        node.set_corner_radius(theme.radius.md);
+        // Day cells are circles, as in the macOS calendar.
+        node.set_corner_radius(theme.radius.pill);
         node.set_opacity(if in_month { 1.0 } else { 0.35 });
         node.set_background_color(if is_selected {
             Some(theme.colors.accent)
@@ -1235,7 +1236,7 @@ impl PrimitiveView for CalendarWeekButton {
         }));
 
         let theme = theme_for_node(node);
-        node.set_corner_radius(theme.radius.md);
+        node.set_corner_radius(theme.radius.pill);
         node.set_background_color(if self.is_selected {
             Some(theme.colors.accent)
         } else {

@@ -22,6 +22,7 @@ use cove_ui_compose::primitives::overlays::{Modal, ModalOptions, Popover};
 use cove_ui_compose::primitives::text::Text;
 use cove_ui_compose::primitives::text::text_buffer::TextBuffer;
 use cove_ui_compose::primitives::text::text_field::TextField;
+use cove_ui_compose::theme::styles::buttons::ButtonStyleViewExt;
 use cove_ui_compose::theme::tokens::SemanticColorRef;
 use cove_ui_compose::{AnyView, BoxView, LayoutDebugExt, TupleView, View};
 
@@ -443,7 +444,10 @@ impl View for PopoverStory {
             12.0,
             AnyView::new(TupleView::new(vec![
                 AnyView::new(TextField::new("Project name", self.name.binding())),
-                AnyView::new(Button::title("Done", done)),
+                AnyView::new(
+                    Button::title("Done", done)
+                        .button_style(cove_ui_compose::theme::styles::buttons::PrimaryButtonStyle),
+                ),
             ])),
         ));
 
@@ -579,9 +583,15 @@ impl View for ModalStory {
                         AnyView::new(TextField::new("Name", self.name.binding())),
                         AnyView::new(TupleView::new(vec![
                             AnyView::new(Button::title("Cancel", cancel)),
-                            AnyView::new(Button::title("Create", create).enabled(
-                                self.options.is_enabled && !self.name().trim().is_empty(),
-                            )),
+                            AnyView::new(
+                                Button::title("Create", create)
+                                    .enabled(
+                                        self.options.is_enabled && !self.name().trim().is_empty(),
+                                    )
+                                    .button_style(
+                                        cove_ui_compose::theme::styles::buttons::PrimaryButtonStyle,
+                                    ),
+                            ),
                         ])),
                     ])),
                 ),

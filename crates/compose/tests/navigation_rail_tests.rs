@@ -37,7 +37,7 @@ use std::rc::Rc;
 
 use cove_composition::{AnyView, EmptyView, LayoutDebugExt, TupleView, View, ViewGraph};
 use cove_core::scene::{AccessibilityRole, Align, FlexDirection, Justify, Node, Wrap};
-use cove_core::{Binding, Environment, InputCapabilities, Point, State};
+use cove_core::{Binding, Color, Environment, InputCapabilities, Point, State};
 use cove_platform::{
     InputEvent, KeyEvent, KeyModifiers, MouseButton, MouseButtonEvent, MouseMotionEvent,
 };
@@ -700,10 +700,17 @@ fn icon_only_rail_marks_selection_and_hovers_without_an_accent_lane() {
                 && (mid_y(glyph_frame) - mid_y(tile_frame)).abs() < 0.5,
             "the glyph centres in the tile: glyph {glyph_frame:?}, tile {tile_frame:?}"
         );
+        // The resting selection is the sliding pill behind the tile; the tile
+        // marks itself as its target and paints no fill of its own.
         assert_eq!(
             tile.background_color(),
-            Some(theme.colors.surface_variant),
-            "the resting tile paints the neutral selection fill"
+            Some(Color::CLEAR),
+            "the resting tile leaves its fill to the sliding selection"
+        );
+        assert_eq!(
+            tile.attachment::<bool>("__sliding_selection.mark"),
+            Some(true),
+            "the selected tile is the sliding selection's target"
         );
         assert_eq!(
             selected_glyph.inherited_foreground_color(),

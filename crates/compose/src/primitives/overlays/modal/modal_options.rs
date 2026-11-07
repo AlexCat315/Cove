@@ -28,7 +28,8 @@ impl Default for ModalGeometry {
             width: 760.0,
             height: 560.0,
             inset: 16.0,
-            corner_radius: 10.0,
+            // macOS 26 sheets and alerts round generously.
+            corner_radius: 18.0,
             placement: ModalPlacement::Center,
         }
     }
@@ -58,7 +59,7 @@ impl ModalGeometry {
         self.corner_radius = if self.corner_radius.is_finite() {
             self.corner_radius.max(0.0)
         } else {
-            10.0
+            18.0
         };
     }
 

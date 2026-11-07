@@ -9,6 +9,7 @@
 //! pagination window arithmetic, both of which have real edge cases at the ends.
 
 use cove_composition::Scope;
+use cove_ui_compose::theme::styles::buttons::ButtonStyleViewExt;
 use std::collections::BTreeSet;
 
 use cove_core::scene::{Align, FlexDirection, Justify, Wrap};
@@ -899,7 +900,10 @@ impl View for DialogStory {
             )
             .footer(AnyView::new(TupleView::new(vec![
                 AnyView::new(Button::title("Cancel", cancel)),
-                AnyView::new(Button::title("Save", save)),
+                AnyView::new(
+                    Button::title("Save", save)
+                        .button_style(cove_ui_compose::theme::styles::buttons::PrimaryButtonStyle),
+                ),
             ])))
             .debug_name("dialog-control"),
         );

@@ -511,11 +511,21 @@ fn draw_scrollbar(
         0.0
     };
     let position = fraction * travel;
-    let track_color = theme.colors.surface_variant.multiplied_alpha(0.7 * opacity);
+    // The macOS overlay scroller: no track at rest, a thin translucent capsule
+    // thumb, and a track plus a wider thumb only while the pointer is on it.
+    let engaged = node.attachment::<bool>(IS_HOVERED).unwrap_or(false)
+        || node.attachment::<bool>(IS_DRAGGING).unwrap_or(false);
+    let track_color = if engaged {
+        theme.colors.on_surface.multiplied_alpha(0.05 * opacity)
+    } else {
+        cove_core::Color::CLEAR
+    };
     let thumb_color = theme
         .colors
-        .on_surface_muted
-        .multiplied_alpha(0.85 * opacity);
+        .on_surface
+        .multiplied_alpha(if engaged { 0.5 } else { 0.35 } * opacity);
+    let thumb_width: f32 = if engaged { 8.0 } else { 6.0 };
+    let track_width: f32 = if engaged { thickness.min(11.0) } else { 4.0 };
     let chain = FocusChainHolder::current();
     let focused = chain
         .as_ref()
@@ -525,41 +535,61 @@ fn draw_scrollbar(
     match axis_of(node) {
         ScrollbarAxis::Vertical => {
             let _ = list.add_rounded_rect(
-                Rect::new(origin.x + (thickness - 4.0) / 2.0, origin.y, 4.0, track),
-                2.0,
+                Rect::new(
+                    origin.x + (thickness - track_width) / 2.0,
+                    origin.y,
+                    track_width,
+                    track,
+                ),
+                track_width / 2.0,
                 track_color,
             );
-            let x = origin.x + (thickness - 6.0) / 2.0;
+            let x = origin.x + (thickness - thumb_width) / 2.0;
             if visible_focus {
                 let _ = list.add_rounded_rect(
-                    Rect::new(x - 1.0, origin.y + position - 1.0, 8.0, thumb + 2.0),
-                    4.0,
+                    Rect::new(
+                        x - 1.0,
+                        origin.y + position - 1.0,
+                        thumb_width + 2.0,
+                        thumb + 2.0,
+                    ),
+                    thumb_width / 2.0 + 1.0,
                     theme.colors.focus_ring,
                 );
             }
             let _ = list.add_rounded_rect(
-                Rect::new(x, origin.y + position, 6.0, thumb),
-                3.0,
+                Rect::new(x, origin.y + position, thumb_width, thumb),
+                thumb_width / 2.0,
                 thumb_color,
             );
         }
         ScrollbarAxis::Horizontal => {
             let _ = list.add_rounded_rect(
-                Rect::new(origin.x, origin.y + (thickness - 4.0) / 2.0, track, 4.0),
-                2.0,
+                Rect::new(
+                    origin.x,
+                    origin.y + (thickness - track_width) / 2.0,
+                    track,
+                    track_width,
+                ),
+                track_width / 2.0,
                 track_color,
             );
-            let y = origin.y + (thickness - 6.0) / 2.0;
+            let y = origin.y + (thickness - thumb_width) / 2.0;
             if visible_focus {
                 let _ = list.add_rounded_rect(
-                    Rect::new(origin.x + position - 1.0, y - 1.0, thumb + 2.0, 8.0),
-                    4.0,
+                    Rect::new(
+                        origin.x + position - 1.0,
+                        y - 1.0,
+                        thumb + 2.0,
+                        thumb_width + 2.0,
+                    ),
+                    thumb_width / 2.0 + 1.0,
                     theme.colors.focus_ring,
                 );
             }
             let _ = list.add_rounded_rect(
-                Rect::new(origin.x + position, y, thumb, 6.0),
-                3.0,
+                Rect::new(origin.x + position, y, thumb, thumb_width),
+                thumb_width / 2.0,
                 thumb_color,
             );
         }

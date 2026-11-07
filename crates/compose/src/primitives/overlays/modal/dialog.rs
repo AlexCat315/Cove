@@ -19,7 +19,7 @@ use crate::primitives::media::ui_icon_catalog;
 use crate::primitives::overlays::modal::{
     Modal, ModalDismissal, ModalGeometry, ModalOptions, ModalPlacement, SheetDragHandle, uses_sheet,
 };
-use crate::primitives::text::{Divider, Text};
+use crate::primitives::text::Text;
 use crate::theme::styles::buttons::{ButtonStyleViewExt, GhostButtonStyle};
 use crate::theme::{ControlSize, ControlSizeViewExt, SemanticColorRef, SemanticFontRef};
 use crate::{AnyView, BoxView, TupleView, View};
@@ -197,10 +197,7 @@ impl View for Dialog {
                 .shrink(0.0),
             ));
 
-            if !sheet {
-                column.push(AnyView::new(Divider::horizontal()));
-            }
-
+            // macOS sheets separate header, body and actions by space alone.
             let body_insets = if sheet {
                 EdgeInsets::new(8.0, 20.0, 8.0, 20.0)
             } else {
@@ -226,10 +223,6 @@ impl View for Dialog {
                     .shrink(1.0)
                     .frame(None, None, Some(0.0), None, None, None),
             ));
-
-            if !sheet {
-                column.push(AnyView::new(Divider::horizontal()));
-            }
 
             if let Some(footer) = footer.clone() {
                 let footer_insets = if sheet {

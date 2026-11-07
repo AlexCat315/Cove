@@ -86,17 +86,22 @@ fn floating_surface_wiring() {
         FloatingSurfaceModifier::new(7.0, FloatingSurfaceElevation::Modal).apply_node(&node);
         let theme = theme_for_node(&node);
 
+        let material = theme.materials.floating;
         assert_eq!(
             node.background_color(),
-            Some(theme.colors.surface_floating),
+            Some(material.tint),
             "the surface is the floating material"
         );
-        assert_eq!(
-            node.background_color().map(|color| color.a),
-            Some(1.0),
-            "the fill is solid so labels stay legible over anything"
+        assert!(
+            node.background_color()
+                .is_some_and(|color| color.a >= 0.8 && color.a < 1.0),
+            "the vibrant tint stays dense enough for labels over anything"
         );
-        assert_eq!(node.backdrop_blur(), 0.0, "no live sample shows through");
+        assert_eq!(
+            node.backdrop_blur(),
+            material.blur,
+            "what lies beneath is blurred, the way system menus are"
+        );
         assert_eq!(node.corner_radius(), 7.0, "the authored radius applies");
         assert_eq!(node.border_width(), 1.0, "the material carries a hairline");
 

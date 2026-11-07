@@ -163,8 +163,8 @@ fn menu_reveal() {
                 } else {
                     let host = reveal_host(scene).expect("the surface grows from a transform host");
                     assert!(
-                        (host.transform().scale - 0.94).abs() < 0.0001,
-                        "the surface starts at a 0.94 scale, saw {} (trailing={trailing})",
+                        (host.transform().scale - 0.96).abs() < 0.0001,
+                        "the surface starts at a 0.96 scale, saw {} (trailing={trailing})",
                         host.transform().scale
                     );
                     assert_eq!(
@@ -268,18 +268,23 @@ fn menu_exit_uses_the_short_surface_exit_not_the_entrance() {
         harness.shown.set(true);
         settle(scene);
         let scheduler = AnimatorScheduler::current();
-        assert_eq!(scheduler.active_count(), 1, "the 0.2s entrance is running");
+        assert_eq!(
+            scheduler.active_count(),
+            1,
+            "the 0.2s entrance is running"
+        );
 
         scene.portal.dismiss_outside(Point::new(600.0, 390.0));
         settle(scene);
-        // Leaving is not a second arriving: a dismissal runs the 0.09s surface
-        // exit, so it has settled a full 0.11s before this tick ends.
-        scheduler.tick(0.12);
+        // Leaving is not a second arriving: a dismissal runs the 0.12s surface
+        // exit, so it has settled before this 0.14s tick ends, while the 0.2s
+        // entrance would still be moving.
+        scheduler.tick(0.14);
         settle(scene);
         assert_eq!(
             scheduler.active_count(),
             0,
-            "the exit finished inside its own 0.09s budget"
+            "the exit finished inside its own 0.12s budget"
         );
         assert!(
             scene.portal.entries().is_empty(),
@@ -325,8 +330,8 @@ fn context_menu_reveal() {
         let scheduler = AnimatorScheduler::current();
         let host = reveal_host(scene).expect("the menu grows from a transform host");
         assert!(
-            (host.transform().scale - 0.94).abs() < 0.0001,
-            "the menu starts at a 0.94 scale"
+            (host.transform().scale - 0.96).abs() < 0.0001,
+            "the menu starts at a 0.96 scale"
         );
         assert!(
             !host.transform().scales_shadow,

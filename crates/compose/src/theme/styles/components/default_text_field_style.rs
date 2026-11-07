@@ -1,14 +1,13 @@
 //! Translation of Theme/Styles/Components/DefaultTextFieldStyle.swift.
 //!
-//! Recessed field chrome for dense desktop forms. The resting fill is a sunken
-//! surface so inspector rows and toolbar fields read as inputs rather than as
-//! generic cards.
+//! macOS field chrome: a white well with a hairline, and a soft accent halo
+//! outside the border while the field has focus.
 use crate::modifiers::animation_value::AnimationValueExt;
 use crate::modifiers::style::AppearanceExt;
 use crate::theme::SemanticMotionRef;
 use crate::{AnyView, ViewExt};
-use cove_core::Color;
 use cove_core::scene::Node;
+use cove_core::{Color, SurfaceShadow};
 
 use super::text_field_style::{TextFieldStyle, TextFieldStyleConfiguration};
 
@@ -30,7 +29,8 @@ impl TextFieldStyle for DefaultTextFieldStyle {
         };
         // Swift keys the implicit fast transition on this visual state, so a
         // focus or hover change interpolates the border instead of snapping.
-        let visual_key = (background, border, border_width, alpha);
+        let glow = focus_halo(&theme, state.is_focused && configuration.is_enabled);
+        let visual_key = (background, border, border_width, alpha, glow.blur.to_bits());
         AnyView::new(
             configuration
                 .content
@@ -40,6 +40,7 @@ impl TextFieldStyle for DefaultTextFieldStyle {
                     border,
                     border_width,
                     radius: inputs.radius,
+                    glow,
                 })
                 .opacity(alpha)
                 .animation_motion(SemanticMotionRef::fast(), visual_key),
@@ -54,6 +55,21 @@ struct TextFieldChrome {
     border: Color,
     border_width: f32,
     radius: f32,
+    glow: SurfaceShadow,
+}
+
+/// The macOS focus ring: a 4pt accent glow hugging the field's outline.
+pub fn focus_halo(theme: &crate::theme::Theme, is_focused: bool) -> SurfaceShadow {
+    SurfaceShadow {
+        color: Some(if is_focused {
+            theme.colors.focus_ring
+        } else {
+            theme.colors.focus_ring.multiplied_alpha(0.0)
+        }),
+        offset_x: 0.0,
+        offset_y: 0.0,
+        blur: 4.0,
+    }
 }
 
 impl cove_composition::ViewModifier for TextFieldChrome {
@@ -91,6 +107,22 @@ impl cove_composition::ViewModifier for TextFieldChrome {
             move |value| {
                 if let Some(owner) = Node::upgrade(&weak) {
                     owner.set_border_width(value);
+                }
+            },
+        );
+        let weak = node.downgrade();
+        let glow = self.glow;
+        let current = node.shadow().color.unwrap_or(Color::CLEAR);
+        node.animatable_set_optional(
+            "textField.focusHalo",
+            Some(current),
+            glow.color,
+            move |value| {
+                if let Some(owner) = Node::upgrade(&weak) {
+                    owner.set_shadow(SurfaceShadow {
+                        color: value,
+                        ..glow
+                    });
                 }
             },
         );

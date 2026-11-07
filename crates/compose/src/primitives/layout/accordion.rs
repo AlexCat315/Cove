@@ -254,9 +254,9 @@ impl<Id: PartialEq + Clone + Ord + std::hash::Hash + Send + Sync + 'static> View
         )
         .command(move |event: &KeyEvent| command(event));
         AnyView::new(
-            host.semantic_background(crate::theme::SemanticColorRef::surface_raised())
-                .semantic_border(crate::theme::SemanticColorRef::border(), 1.0)
-                .corner_radius_metric(crate::theme::ThemeMetric::control_radius())
+            // A macOS grouped box: one step of fill, no outline.
+            host.semantic_background(crate::theme::SemanticColorRef::surface_variant())
+                .corner_radius_metric(crate::theme::ThemeMetric::group_radius())
                 .clipped(),
         )
     }
@@ -273,9 +273,9 @@ impl ButtonStyle for AccordionHeaderStyle {
     fn make_body(&self, configuration: ButtonStyleConfiguration) -> AnyView {
         let theme = configuration.theme.clone();
         let fill = if configuration.is_pressed {
-            theme.colors.surface_pressed
+            theme.colors.state_layer_pressed
         } else if configuration.is_hovered {
-            theme.colors.surface_variant
+            theme.colors.state_layer_hover
         } else {
             Color::CLEAR
         };

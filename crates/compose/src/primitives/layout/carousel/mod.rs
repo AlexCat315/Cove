@@ -258,8 +258,8 @@ fn build_viewport<Id: PartialEq + Eq + Clone + Send + Sync + 'static>(
     .enabled(config.is_enabled && config.page_count > 1)
     .flex(1.0)
     .clipped()
-    .corner_radius(theme.radius.md)
-    .semantic_background(SemanticColorRef::surface_sunken());
+    .corner_radius(theme.radius.lg)
+    .semantic_background(SemanticColorRef::surface_variant());
     row_items.push(AnyView::new(swipe));
     if config.shows_arrows && config.page_count > 1 {
         row_items.push(build_step_button(theme, 1, actions.clone(), config));

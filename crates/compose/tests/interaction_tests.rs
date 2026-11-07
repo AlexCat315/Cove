@@ -342,7 +342,7 @@ fn regrab_does_not_jump_and_disabling_clears_the_spring() {
 }
 
 #[test]
-fn pointer_press_applies_themed_compression_immediately() {
+fn pointer_press_compresses_immediately_and_springs_back_on_release() {
     GlobalTestLock::locked(|| {
         let scheduler = AnimatorScheduler::default();
         scheduler.with_current(|| {
@@ -356,9 +356,12 @@ fn pointer_press_applies_themed_compression_immediately() {
             let graph = support::graph();
             graph.install_view(
                 AnyView::new(
-                    AnyView::new(Button::title("Press", move || {
-                        counter.set(counter.get() + 1)
-                    }))
+                    AnyView::new(
+                        cove_ui_compose::theme::styles::buttons::ButtonStyleViewExt::button_style(
+                            Button::title("Press", move || counter.set(counter.get() + 1)),
+                            cove_ui_compose::theme::styles::buttons::PrimaryButtonStyle,
+                        ),
+                    )
                     .frame(
                         Some(FrameDimension::Points(200.0)),
                         Some(FrameDimension::Points(44.0)),
@@ -447,13 +450,23 @@ fn pointer_press_applies_themed_compression_immediately() {
             graph.recomposer.commit_all();
             graph.compute_layout(400.0, 300.0);
             assert_eq!(activations.get(), 1, "release activates the button once");
+            assert!(
+                scheduler.active_count() > 0,
+                "release springs back instead of snapping"
+            );
+            for _ in 0..240 {
+                scheduler.tick(1.0 / 120.0);
+            }
             assert_eq!(
                 chrome.background_color(),
                 resting,
-                "release restores the hovered face"
+                "release settles on the hovered face"
             );
-            assert_eq!(chrome.transform().scale, 1.0, "release restores the scale");
-            assert_eq!(scheduler.active_count(), 0, "still nothing queued");
+            assert!(
+                (chrome.transform().scale - 1.0).abs() < 0.001,
+                "release settles at the resting scale"
+            );
+            assert_eq!(scheduler.active_count(), 0, "the release spring settles");
             let _ = host;
         });
     });

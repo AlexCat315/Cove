@@ -1093,7 +1093,7 @@ impl GalleryOptions {
     }
 }
 
-/// A titled story group rendered as a hairline card.
+/// A titled story group rendered as a borderless card on the canvas.
 #[derive(Clone, Debug)]
 pub struct StorySection {
     pub title: String,

@@ -13,7 +13,7 @@ use cove_core::scene::{Align, FlexDirection, Justify, Node, Wrap};
 use cove_core::{Binding, Signal};
 
 use crate::modifiers::layout::{LayoutFrameExt, PaddingExt};
-use crate::modifiers::style::{AppearanceExt, SemanticStyleViewExt};
+use crate::modifiers::style::AppearanceExt;
 use crate::primitives::controls::button::{Button, ButtonRole};
 use crate::primitives::controls::fields::search_field_model::{
     SearchAction, SearchFieldState, SearchKey,
@@ -21,7 +21,6 @@ use crate::primitives::controls::fields::search_field_model::{
 use crate::primitives::text::Text;
 use crate::primitives::text::text_buffer::TextBuffer;
 use crate::primitives::text::text_field::{TextField, TextFieldDecoration, TextFieldEvents};
-use crate::theme::SemanticColorRef;
 use crate::theme::styles::buttons::{ButtonStyle, ButtonStyleConfiguration, ButtonStyleViewExt};
 use crate::{AnyView, BoxView, PrimitiveView, TupleView, View, impl_primitive_view};
 
@@ -219,7 +218,15 @@ impl View for SearchField {
         let shows =
             state.with(|state| state.shows_suggestions(&text, &self.suggestions, self.is_enabled));
 
-        let mut column: Vec<AnyView> = vec![AnyView::new(input)];
+        // macOS search fields are capsules; the rest of the field chrome is
+        // the shared text-field chrome.
+        let input = AnyView::new(input);
+        let input = AnyView::new(crate::theme::ThemeReader::new(move |theme| {
+            let mut capsule = theme.clone();
+            capsule.inputs.radius = theme.radius.pill;
+            AnyView::new(crate::theme::ThemeViewExt::theme(input.clone(), capsule))
+        }));
+        let mut column: Vec<AnyView> = vec![input];
         if shows {
             column.push(AnyView::new(SuggestionList { session: field }));
         }
@@ -255,10 +262,13 @@ impl PrimitiveView for SuggestionList {
 
     fn update_node(&self, node: &Node) {
         let theme = crate::theme::theme_for_node(node);
-        node.set_background_color(Some(theme.colors.surface_floating));
-        node.set_corner_radius(theme.radius.md);
+        let material = theme.materials.floating;
+        node.set_background_color(Some(material.tint));
+        node.set_backdrop_blur(material.blur);
+        node.set_corner_radius(theme.radius.lg);
         node.set_border_color(Some(theme.colors.border));
         node.set_border_width(1.0);
+        node.set_shadow(theme.elevation.medium);
     }
 
     fn children(&self, _node: &Node) -> Vec<AnyView> {
@@ -292,7 +302,7 @@ impl PrimitiveView for SuggestionList {
                 0.0,
                 AnyView::new(TupleView::new(rows)),
             )
-            .semantic_border(SemanticColorRef::border(), 1.0),
+            .padding(4.0),
         )]
     }
 }
@@ -306,7 +316,7 @@ impl ButtonStyle for SuggestionRowStyle {
     fn make_body(&self, configuration: ButtonStyleConfiguration) -> AnyView {
         let theme = configuration.theme.clone();
         let fill = if configuration.is_selected {
-            theme.colors.state_layer_selected
+            theme.colors.accent
         } else if configuration.is_hovered {
             theme.colors.state_layer_hover
         } else {
@@ -331,7 +341,10 @@ impl ButtonStyle for SuggestionRowStyle {
             )
             .padding_edges(ROW_PADDING_HORIZONTAL, ROW_PADDING_VERTICAL)
             .background_color(fill)
-            .foreground_color(if configuration.is_enabled {
+            .corner_radius(theme.radius.sm)
+            .foreground_color(if configuration.is_selected {
+                theme.colors.on_accent
+            } else if configuration.is_enabled {
                 theme.colors.on_surface
             } else {
                 theme.colors.on_surface_muted

@@ -5,12 +5,16 @@
 //! that node-driven repaint: it stores its kind/metrics on the node and reads
 //! the host button's live pressed/hovered/focus attachments every time it is
 //! applied.
-use cove_core::scene::{Align, Edge, FlexDirection, FocusChainHolder, Justify, LayoutNode, Node};
+use cove_core::scene::{
+    ActiveAnimationContext, Align, Animation, Edge, FlexDirection, FocusChainHolder, Justify,
+    LayoutNode, Node,
+};
 use cove_core::{Color, InputCapabilities};
 
 use crate::modifiers::layout::{FlexExt, LayoutFrameExt};
 use crate::theme::{
-    ControlSize, SemanticColorRef, SemanticFontRef, SemanticStyleViewExt, Theme, theme_for_node,
+    ControlSize, SemanticColorRef, SemanticFontRef, SemanticMotionRef, SemanticStyleViewExt, Theme,
+    theme_for_node,
 };
 use crate::{AnyView, PrimitiveView, View, ViewKind};
 
@@ -44,6 +48,7 @@ struct BuiltinButtonChromeState {
     kind: BuiltinButtonChromeKind,
     is_enabled: bool,
     is_selected: bool,
+    is_icon_only: bool,
     metrics: BuiltinButtonChromeMetrics,
 }
 
@@ -62,6 +67,7 @@ pub struct BuiltinButtonChrome {
     kind: BuiltinButtonChromeKind,
     is_enabled: bool,
     is_selected: bool,
+    is_icon_only: bool,
     foreground: SemanticColorRef,
     label: AnyView,
     metrics: BuiltinButtonChromeMetrics,
@@ -76,6 +82,7 @@ impl BuiltinButtonChrome {
             kind,
             is_enabled: configuration.is_enabled,
             is_selected: configuration.is_selected,
+            is_icon_only: configuration.is_icon_only,
             foreground,
             label: configuration.label.clone(),
             metrics: kind.metrics(
@@ -92,6 +99,7 @@ impl BuiltinButtonChrome {
             kind: self.kind,
             is_enabled: self.is_enabled,
             is_selected: self.is_selected,
+            is_icon_only: self.is_icon_only,
             metrics: self.metrics,
         }
     }
@@ -125,11 +133,8 @@ impl BuiltinButtonChromeKind {
                         size.horizontal_padding()
                     }
                     .max(if is_icon_only { 2.0 } else { 0.0 }),
-                    radius: if touch {
-                        12.0f32.max(theme.radius.md)
-                    } else {
-                        theme.radius.md
-                    },
+                    // Push buttons are capsules; icon-only buttons become circles.
+                    radius: height * 0.5,
                     vertical_padding: ((height - line_height) / if touch { 4.0 } else { 2.0 })
                         .max(if touch { 4.0 } else { 2.0 }),
                 }
@@ -233,18 +238,26 @@ fn apply_builtin_button_chrome(chrome_node: &Node) {
     let button_node = nearest_button_host_ancestor(chrome_node);
     let values = builtin_button_chrome_values(state, chrome_node, button_node.as_ref());
 
-    // Hover and press snap, the way the reference button faces do: a control
-    // that eases its fill reads as a delayed answer to the pointer.
+    // Hover and press answer on the same frame: a control that eases toward
+    // the pointer reads as a delayed answer. Release is the moment the face
+    // springs back, so only the way out of a press travels.
+    let previous_scale = chrome_node.transform().scale;
+    let releasing = values.scale > previous_scale && !chrome_node.prefers_reduced_motion();
+    let theme = theme_for_node(chrome_node);
+    let release_fill = (releasing && ActiveAnimationContext::current().animation.is_none())
+        .then(|| SemanticMotionRef::fast().resolve(&theme));
     let owner = chrome_node.clone();
     let current = chrome_node.background_color();
-    chrome_node.animatable_set_optional(
-        "backgroundColor",
-        current,
-        Some(values.background),
-        move |value| {
-            owner.set_background_color(value);
-        },
-    );
+    within(release_fill, || {
+        chrome_node.animatable_set_optional(
+            "backgroundColor",
+            current,
+            Some(values.background),
+            move |value| {
+                owner.set_background_color(value);
+            },
+        );
+    });
     let owner = chrome_node.clone();
     let current = chrome_node.border_color();
     chrome_node.animatable_set_optional(
@@ -274,13 +287,49 @@ fn apply_builtin_button_chrome(chrome_node: &Node) {
     let mut transform = chrome_node.transform();
     transform.anchor = cove_core::Point::new(0.5, 0.5);
     chrome_node.set_transform(transform);
-    let owner = chrome_node.clone();
-    let current = chrome_node.transform().scale;
-    chrome_node.animatable_set_with("button.pressScale", current, values.scale, move |value| {
-        let mut transform = owner.transform();
-        transform.scale = value.max(0.0);
-        owner.set_transform(transform);
+    // A bordered push button rests on a faint contact shadow that a press
+    // tucks away, as on macOS.
+    let rests_raised = matches!(state.kind, BuiltinButtonChromeKind::Secondary)
+        && !state.is_icon_only
+        && state.is_enabled
+        && values.scale >= 1.0;
+    chrome_node.set_shadow(if rests_raised {
+        theme.elevation.low
+    } else {
+        cove_core::SurfaceShadow::NONE
     });
+    let release = releasing.then(|| button_release_spring(&theme));
+    let owner = chrome_node.clone();
+    within(release, || {
+        chrome_node.animatable_set_with(
+            "button.pressScale",
+            previous_scale,
+            values.scale,
+            move |value| {
+                let mut transform = owner.transform();
+                transform.scale = value.max(0.0);
+                owner.set_transform(transform);
+            },
+        );
+    });
+}
+
+/// Runs `body` inside `animation` when there is one, and otherwise leaves the
+/// caller's transaction (a theme cross-fade, for instance) in charge.
+fn within(animation: Option<Animation>, body: impl FnOnce()) {
+    match animation {
+        Some(animation) => ActiveAnimationContext::with(Some(animation), None, None, body),
+        None => body(),
+    }
+}
+
+/// The release eases the face back to rest over the fast duration: a press
+/// answers at once and lets go softly, without a bounce.
+pub fn button_release_spring(theme: &Theme) -> Animation {
+    Animation::new(
+        theme.motion.fast * 1.5,
+        crate::theme::Easing::RESPONSIVE.as_animation_curve(),
+    )
 }
 
 fn builtin_button_chrome_values(
@@ -325,6 +374,17 @@ fn builtin_button_chrome_values(
                 theme.colors.accent_hover
             } else {
                 theme.colors.accent
+            }
+        }
+        // A glyph-only push button has no bezel on macOS: it answers the
+        // pointer with a state layer, like a ghost button.
+        BuiltinButtonChromeKind::Secondary if state.is_icon_only => {
+            if pressed {
+                theme.colors.state_layer_pressed
+            } else if hovered {
+                theme.colors.state_layer_hover
+            } else {
+                clear
             }
         }
         BuiltinButtonChromeKind::Secondary => {

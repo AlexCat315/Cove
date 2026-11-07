@@ -51,7 +51,7 @@ pub enum TabVariant {
 
 impl TabVariant {
     fn horizontal_padding(self) -> f32 {
-        if self == Self::Segmented { 12.0 } else { 14.0 }
+        if self == Self::Segmented { 6.0 } else { 8.0 }
     }
 }
 
@@ -477,11 +477,56 @@ impl PrimitiveView for TabStrip {
         node
     }
 
+    fn update_layout(&self, layout: &cove_core::scene::LayoutNode) {
+        // A segmented strip hugs its segments, as a macOS segmented control
+        // does; a document strip spans the pane.
+        layout.set_align_self(if self.variant == TabVariant::Segmented {
+            Align::FlexStart
+        } else {
+            Align::Stretch
+        });
+        layout.set_margin(
+            if self.variant == TabVariant::Segmented {
+                8.0
+            } else {
+                0.0
+            },
+            cove_core::scene::Edge::Bottom,
+        );
+    }
+
     fn update_node(&self, node: &Node) {
+        // One selection surface springs between the tabs: the raised thumb of
+        // a segmented control, or the tinted capsule of a document strip.
+        let segmented = self.variant == TabVariant::Segmented;
+        crate::animation::geometry::install_sliding_selection(node, move |theme| {
+            if segmented {
+                crate::animation::geometry::SlidingSelectionStyle {
+                    fill: if theme.colors.surface_pressed.r > 0.5 {
+                        theme.colors.surface
+                    } else {
+                        theme.colors.border_strong
+                    },
+                    corner_radius: theme.radius.pill,
+                    shadow: theme.elevation.low,
+                }
+            } else {
+                let appearance =
+                    crate::theme::styles::components::selection_appearance::SelectionAppearance::resolve(
+                        crate::theme::styles::components::selection_appearance::SelectionRole::Navigation,
+                        theme,
+                    );
+                crate::animation::geometry::SlidingSelectionStyle {
+                    fill: appearance.fill,
+                    corner_radius: appearance.corner_radius,
+                    shadow: cove_core::SurfaceShadow::NONE,
+                }
+            }
+        });
         if self.variant == TabVariant::Segmented {
             let theme = theme_for_node(node);
-            node.set_background_color(Some(theme.colors.surface_variant));
-            node.set_corner_radius(theme.radius.md);
+            node.set_background_color(Some(theme.colors.surface_pressed));
+            node.set_corner_radius(theme.radius.pill);
         } else {
             crate::theme::tokens::SemanticBackgroundModifier::new(
                 crate::theme::SemanticColorRef::surface(),
@@ -586,7 +631,10 @@ impl<Id: PartialEq + Clone + std::hash::Hash + 'static> PrimitiveView for TabStr
                     .semantic_font(SemanticFontRef::label())
                     .accessibility_hidden(true),
             )
-            .flex_with(0.0, 1.0, Some(0.0)),
+            // Natural width, shrinking (and truncating) only when the strip is
+            // short. A zero basis with no growth collapsed every title.
+            .flex_with(0.0, 1.0, None)
+            .frame_min_width(0.0),
         ));
         if let Some(badge) = self.tab.badge.clone() {
             label_row.push(AnyView::new(
@@ -632,7 +680,13 @@ impl<Id: PartialEq + Clone + std::hash::Hash + 'static> PrimitiveView for TabStr
             semantics.state.is_selected = is_selected;
             semantics.state.is_enabled = is_enabled;
         });
-        let button = AnyView::new(button);
+        // The tab may shrink below its title so a clamped header truncates
+        // instead of overflowing the strip.
+        let button = AnyView::new(
+            AnyView::new(button)
+                .frame_min_width(0.0)
+                .flex_with(0.0, 1.0, None),
+        );
 
         let mut row: Vec<AnyView> = vec![button];
         if let Some(on_close) = self.tab.on_close.clone() {

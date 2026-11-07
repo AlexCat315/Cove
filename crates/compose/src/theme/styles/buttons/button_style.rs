@@ -199,13 +199,15 @@ fn is_node_driven_interaction_style<S: ButtonStyle + 'static>() -> bool {
 }
 
 /// CompositionLocal that carries the active `AnyButtonStyle`. The default is
-/// `PrimaryButtonStyle`, so a bare `Button(...)` always renders.
+/// `SecondaryButtonStyle`, the macOS push button: a bare `Button(...)` is the
+/// white bordered face, and only the action a view marks as its default takes
+/// the filled accent (`PrimaryButtonStyle`).
 pub struct ButtonStyleEnvironment;
 impl ButtonStyleEnvironment {
     pub fn key() -> Rc<CompositionLocal<AnyButtonStyle>> {
         thread_local! {
             static KEY: Rc<CompositionLocal<AnyButtonStyle>> =
-                Rc::new(CompositionLocal::new(|| AnyButtonStyle::new(PrimaryButtonStyle)));
+                Rc::new(CompositionLocal::new(|| AnyButtonStyle::new(SecondaryButtonStyle)));
         }
         KEY.with(|key| key.clone())
     }

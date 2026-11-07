@@ -28,6 +28,7 @@ import textFieldStyle from '@/content/components/text-field-style.md?raw'
 import textBuffer from '@/content/components/text-buffer.md?raw'
 import textSelection from '@/content/components/text-selection.md?raw'
 import theme from '@/content/components/theme.md?raw'
+import motion from '@/content/components/motion.md?raw'
 import splitButton from '@/content/components/split-button.md?raw'
 import completionPopover from '@/content/components/completion-popover.md?raw'
 import numberField from '@/content/components/number-field.md?raw'
@@ -81,6 +82,7 @@ export const docGroups: DocGroup[] = [
       { slug: 'native-rhi', title: 'NativeRHI', raw: nativeRhi },
       { slug: 'resource-preparation', title: 'Resource preparation', raw: resourcePreparation },
       { slug: 'theme', title: '默认主题', raw: theme },
+      { slug: 'motion', title: '动效', raw: motion },
     ],
   },
   {

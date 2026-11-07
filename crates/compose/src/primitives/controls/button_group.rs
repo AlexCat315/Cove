@@ -7,6 +7,7 @@ use crate::Scope;
 use crate::primitives::{DuplicateId, check_ids};
 use std::rc::Rc;
 
+use crate::animation::geometry::{SlidingSelection, SlidingSelectionStyle};
 use crate::primitives::controls::button::{Button, ButtonRole};
 use crate::primitives::overlays::roving_focus::{RovingFocusHost, RovingItem, roving_identity};
 use crate::theme::styles::buttons::{ButtonStyleViewExt, SegmentButtonStyle};
@@ -123,13 +124,20 @@ impl<Id: PartialEq + Clone + std::hash::Hash + Send + Sync + 'static> View for B
             // Segments keep their authored width; when the row cannot hold them,
             // wrap to a second line instead of squeezing labels or shrinking the
             // touch target.
-            AnyView::new(BoxView::new(
-                FlexDirection::Row,
-                Align::Center,
-                Justify::FlexStart,
-                Wrap::Wrap,
-                2.0,
-                AnyView::new(TupleView::new(segments)),
+            AnyView::new(SlidingSelection::new(
+                |theme| SlidingSelectionStyle {
+                    fill: segment_thumb_fill(theme),
+                    corner_radius: theme.radius.pill,
+                    shadow: theme.elevation.low,
+                },
+                AnyView::new(BoxView::new(
+                    FlexDirection::Row,
+                    Align::Center,
+                    Justify::FlexStart,
+                    Wrap::Wrap,
+                    2.0,
+                    AnyView::new(TupleView::new(segments)),
+                )),
             )),
         );
         AnyView::new(ButtonGroupChrome {
@@ -138,7 +146,18 @@ impl<Id: PartialEq + Clone + std::hash::Hash + Send + Sync + 'static> View for B
     }
 }
 
-/// Group chrome: a surface behind the segments at the control radius.
+/// The thumb is the raised face of the well: white on a light well, a lighter
+/// gray on a dark one.
+fn segment_thumb_fill(theme: &crate::theme::Theme) -> cove_core::Color {
+    let well = theme.colors.surface_pressed;
+    if well.r + well.g + well.b > 1.5 {
+        theme.colors.surface
+    } else {
+        theme.colors.border_strong
+    }
+}
+
+/// Group chrome: a capsule well behind the segments.
 struct ButtonGroupChrome {
     content: AnyView,
 }
@@ -162,8 +181,8 @@ impl PrimitiveView for ButtonGroupChrome {
 
     fn update_node(&self, node: &cove_core::scene::Node) {
         let theme = crate::theme::theme_for_node(node);
-        node.set_background_color(Some(theme.colors.surface));
-        node.set_corner_radius(theme.radius.md);
+        node.set_background_color(Some(theme.colors.surface_pressed));
+        node.set_corner_radius(theme.radius.pill);
     }
 
     fn children(&self, _node: &cove_core::scene::Node) -> Vec<AnyView> {

@@ -6,9 +6,9 @@
 //! - `.slow` resolves to `theme.motion.slow`
 //! - the light and dark default themes share their motion durations
 //! - custom theme motion overrides flow through
-//! - `.snappy` is a spring on `theme.motion.fast`, `.bouncy` on `standard`
+//! - `.snappy` is the bounded sheet curve on `standard`; `.bouncy` an opt-in spring on `slow`
 //! - an `Easing` bridges to a cubic-bezier `AnimationCurve`
-//! - surface entrance/exit and `smooth` resolve the active theme's authored groups
+//! - entrance and exit ease out, and `smooth` resolves the active theme's authored groups
 //! - `staggered` defers later siblings without altering the base animation
 
 use cove_core::scene::{Animation, AnimationCurve};
@@ -18,7 +18,7 @@ use cove_ui_compose::theme::{Easing, SemanticMotionRef, Theme, semantic_animatio
 fn fast_follows_theme() {
     let animation = semantic_animation(&SemanticMotionRef::fast(), &Theme::default_dark());
     assert!(
-        (animation.duration - 0.080).abs() < 1e-6,
+        (animation.duration - 0.100).abs() < 1e-6,
         "`.fast` uses the theme's fast duration (got {})",
         animation.duration
     );
@@ -28,7 +28,7 @@ fn fast_follows_theme() {
 fn medium_follows_theme() {
     let animation = semantic_animation(&SemanticMotionRef::medium(), &Theme::default_dark());
     assert!(
-        (animation.duration - 0.180).abs() < 1e-6,
+        (animation.duration - 0.220).abs() < 1e-6,
         "`.medium` uses the theme's standard duration (got {})",
         animation.duration
     );
@@ -38,7 +38,7 @@ fn medium_follows_theme() {
 fn slow_follows_theme() {
     let animation = semantic_animation(&SemanticMotionRef::slow(), &Theme::default_dark());
     assert!(
-        (animation.duration - 0.320).abs() < 1e-6,
+        (animation.duration - 0.350).abs() < 1e-6,
         "`.slow` uses the theme's slow duration (got {})",
         animation.duration
     );
@@ -65,6 +65,7 @@ fn light_and_dark_parity() {
 fn custom_theme_overrides_flow_through() {
     let mut theme = Theme::default_dark();
     theme.motion.fast = 0.050;
+    theme.motion.standard = 0.200;
     let fast = semantic_animation(&SemanticMotionRef::fast(), &theme);
     assert!(
         (fast.duration - 0.050).abs() < 1e-6,
@@ -74,45 +75,43 @@ fn custom_theme_overrides_flow_through() {
 
     let snappy = semantic_animation(&SemanticMotionRef::snappy(), &theme);
     assert!(
-        (snappy.duration - 0.050).abs() < 1e-6,
-        "`snappy` springs on the overridden fast duration (got {})",
+        (snappy.duration - 0.200).abs() < 1e-6,
+        "`snappy` runs on the overridden standard duration (got {})",
         snappy.duration
     );
 }
 
 #[test]
-fn snappy_follows_theme_fast() {
+fn snappy_follows_theme_standard() {
     let animation = semantic_animation(&SemanticMotionRef::snappy(), &Theme::default_dark());
     assert!(
-        (animation.duration - 0.080).abs() < 1e-6,
-        "`snappy` runs for the theme's fast duration (got {})",
+        (animation.duration - 0.220).abs() < 1e-6,
+        "`snappy` runs for the theme's standard duration (got {})",
         animation.duration
     );
     assert_eq!(
         animation.curve,
-        AnimationCurve::Spring {
-            response: 0.08,
-            damping_fraction: 0.9,
-        },
-        "`snappy` is a 0.9-damped spring on the fast response"
+        Easing::FLUID.as_animation_curve(),
+        "`snappy` is the bounded iOS sheet curve"
     );
+    assert!(!animation.allows_overshoot, "`snappy` never bounces");
 }
 
 #[test]
-fn bouncy_follows_theme_standard() {
+fn bouncy_follows_theme_slow() {
     let animation = semantic_animation(&SemanticMotionRef::bouncy(), &Theme::default_dark());
     assert!(
-        (animation.duration - 0.180).abs() < 1e-6,
-        "`bouncy` runs for the theme's standard duration (got {})",
+        (animation.duration - 0.350).abs() < 1e-6,
+        "`bouncy` runs for the theme's slow duration (got {})",
         animation.duration
     );
     assert_eq!(
         animation.curve,
         AnimationCurve::Spring {
-            response: 0.18,
-            damping_fraction: 0.68,
+            response: 0.35,
+            damping_fraction: 0.62,
         },
-        "`bouncy` is a 0.68-damped spring on the standard response"
+        "`bouncy` is the opt-in 0.62-damped spring on the slow response"
     );
 }
 
@@ -135,26 +134,27 @@ fn surface_motion() {
     let mut theme = Theme::default_light();
     theme.motion.surface.entrance = 0.450;
     theme.motion.surface.exit = 0.120;
-    theme.motion.standard = 0.300;
+    theme.motion.slow = 0.300;
     let entering = semantic_animation(&SemanticMotionRef::entering(), &theme);
     let exiting = semantic_animation(&SemanticMotionRef::exiting(), &theme);
     assert_eq!(
-        (entering.duration, entering.curve),
-        (0.45, Easing::DECELERATE.as_animation_curve()),
-        "entrance reads the theme's surface entrance"
+        (entering.duration, entering.curve.clone()),
+        (0.45, Easing::RESPONSIVE.as_animation_curve()),
+        "entrance eases out over the theme's surface entrance"
     );
+    assert!(!entering.allows_overshoot, "the entrance never bounces");
     assert_eq!(
         (exiting.duration, exiting.curve),
-        (0.12, Easing::DECELERATE.as_animation_curve()),
+        (0.12, Easing::RESPONSIVE.as_animation_curve()),
         "exit reads the theme's surface exit"
     );
     assert_eq!(
-        semantic_animation(&SemanticMotionRef::smooth(), &theme).curve,
-        AnimationCurve::Spring {
-            response: 0.3,
-            damping_fraction: 1.0,
-        },
-        "`smooth` springs critically on the standard response"
+        (
+            semantic_animation(&SemanticMotionRef::smooth(), &theme).duration,
+            semantic_animation(&SemanticMotionRef::smooth(), &theme).curve,
+        ),
+        (0.3, Easing::FLUID.as_animation_curve()),
+        "`smooth` runs the sheet curve over the slow duration"
     );
 }
 

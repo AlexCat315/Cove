@@ -135,7 +135,7 @@ impl crate::PrimitiveView for ToolbarToggleChrome {
                     owner.set_border_width(value);
                 },
             );
-            node.set_corner_radius(self.theme.radius.sm);
+            node.set_corner_radius(self.theme.radius.pill);
         };
 
         if animate {

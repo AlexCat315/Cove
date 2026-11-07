@@ -54,10 +54,14 @@ impl ViewModifier for FloatingSurfaceModifier {
     fn apply_node(&self, node: &Node) {
         let theme = theme_for_node(node);
         let colors = theme.colors;
+        // Floating surfaces are vibrant: a translucent tint over whatever
+        // they float above, blurred the way macOS menus are.
+        let material = theme.materials.floating;
+        node.set_backdrop_blur(material.blur);
         node.animatable_set_optional(
             "backgroundColor",
             node.background_color(),
-            Some(colors.surface_floating),
+            Some(material.tint),
             {
                 let node = node.clone();
                 move |value| node.set_background_color(value)
@@ -132,3 +136,39 @@ pub trait SurfaceStyleExt: View + Sized + 'static {
     }
 }
 impl<T: View + Sized + 'static> SurfaceStyleExt for T {}
+
+/// Which theme material a glass surface uses.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum GlassKind {
+    /// Floating chrome: the most transparent material.
+    Chrome,
+    /// Grouped content, which keeps more of its tint for legibility.
+    #[default]
+    Content,
+}
+
+/// Frosts the surface: a translucent tint over a blurred backdrop and a light
+/// rim. The canvas behind it glows through, so the surface reads as glass
+/// rather than paint.
+pub struct GlassModifier(pub GlassKind);
+
+impl ViewModifier for GlassModifier {
+    fn apply_node(&self, node: &Node) {
+        let materials = theme_for_node(node).materials;
+        let material = match self.0 {
+            GlassKind::Chrome => materials.chrome,
+            GlassKind::Content => materials.content,
+        };
+        node.set_background_color(Some(material.tint));
+        node.set_backdrop_blur(material.blur);
+        node.set_border_color(Some(material.rim));
+        node.set_border_width(material.rim_width);
+    }
+}
+
+pub trait GlassExt: View + Sized + 'static {
+    fn glass(self, kind: GlassKind) -> ModifiedContent {
+        self.modifier(GlassModifier(kind))
+    }
+}
+impl<T: View + Sized + 'static> GlassExt for T {}

@@ -2,7 +2,7 @@
 //!
 //! Behaviour checklist:
 //! - a semantic `.divider` background resolves against the active appearance
-//! - `Panel` paints its body with the theme's sunken surface, and flips when the
+//! - `Panel` paints its body with the theme's grouped surface, and flips when the
 //!   appearance flips
 //! - a selected `List` row paints exactly one accent band
 //! - the `TextField` chrome uses the theme's input fill at the input radius, and
@@ -120,12 +120,12 @@ fn panel_body_uses_theme_surface() {
             );
             graph.compute_layout(240.0, 160.0);
 
-            let surface = Theme::default_dark().colors.surface_sunken;
+            let surface = Theme::default_dark().colors.surface_variant;
             assert!(
                 all_nodes(&graph)
                     .into_iter()
                     .any(|node| node.background_color() == Some(surface)),
-                "the panel body paints the dark theme's sunken surface"
+                "the panel body paints the dark theme's grouped surface"
             );
         });
     });
@@ -135,11 +135,11 @@ fn panel_body_uses_theme_surface() {
 fn panel_follows_appearance_flip() {
     GlobalTestLock::locked(|| {
         support::with_test_text_environment(|| {
-            let dark = Theme::default_dark().colors.surface_sunken;
-            let light = Theme::default_light().colors.surface_sunken;
+            let dark = Theme::default_dark().colors.surface_variant;
+            let light = Theme::default_light().colors.surface_variant;
             assert_ne!(
                 dark, light,
-                "the two presets paint different sunken surfaces, so the cases differ"
+                "the two presets paint different grouped surfaces, so the cases differ"
             );
 
             let dark_graph = graph();
@@ -155,7 +155,7 @@ fn panel_follows_appearance_flip() {
                 all_nodes(&dark_graph)
                     .into_iter()
                     .any(|node| node.background_color() == Some(dark)),
-                "a dark panel paints the dark sunken surface"
+                "a dark panel paints the dark grouped surface"
             );
 
             let light_graph = graph();
@@ -171,7 +171,7 @@ fn panel_follows_appearance_flip() {
                 all_nodes(&light_graph)
                     .into_iter()
                     .any(|node| node.background_color() == Some(light)),
-                "a light panel paints the light sunken surface"
+                "a light panel paints the light grouped surface"
             );
         });
     });
@@ -260,11 +260,11 @@ fn text_field_flips_with_appearance() {
             for (appearance, expected) in [
                 (
                     Appearance::Dark,
-                    Theme::default_dark().colors.surface_sunken,
+                    Theme::default_dark().colors.surface_variant,
                 ),
                 (
                     Appearance::Light,
-                    Theme::default_light().colors.surface_sunken,
+                    Theme::default_light().colors.surface_variant,
                 ),
             ] {
                 let graph = graph();
@@ -360,8 +360,8 @@ fn nested_appearance_override() {
             );
             graph.compute_layout(240.0, 240.0);
 
-            let dark = Theme::default_dark().colors.surface_sunken;
-            let light = Theme::default_light().colors.surface_sunken;
+            let dark = Theme::default_dark().colors.surface_variant;
+            let light = Theme::default_light().colors.surface_variant;
             let nodes = all_nodes(&graph);
             assert!(
                 nodes

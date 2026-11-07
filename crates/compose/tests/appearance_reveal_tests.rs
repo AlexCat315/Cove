@@ -317,6 +317,10 @@ fn programmatic_changes_reveal_from_the_window_centre_and_clear_on_completion() 
                 record(&graph).is_none(),
                 "a completed reveal clears its request"
             );
+            // The switch bound to the same state travels on its own spring,
+            // which settles a little after the reveal.
+            scheduler.tick(1.0);
+            settle(&graph);
             assert_eq!(
                 scheduler.active_count(),
                 0,

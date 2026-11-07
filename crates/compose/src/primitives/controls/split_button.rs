@@ -15,7 +15,7 @@ use crate::modifiers::layout::{FlexExt, PaddingExt};
 use crate::primitives::controls::button::Button;
 use crate::primitives::controls::menu_button::MenuButton;
 use crate::primitives::overlays::menu::MenuEntry;
-use crate::theme::styles::buttons::{ButtonStyleViewExt, SecondaryButtonStyle};
+use crate::theme::styles::buttons::ButtonStyleViewExt;
 use crate::theme::theme_for_node;
 use crate::{AnyView, BoxView, PrimitiveView, View, impl_primitive_view};
 
@@ -86,9 +86,11 @@ impl Clone for SplitButton {
 impl View for SplitButton {
     fn body(&self, _cx: &Scope) -> AnyView {
         let action = self.action.clone();
+        // The group draws the one capsule bezel; each zone only answers the
+        // pointer, so the two halves read as a single macOS split button.
         let primary = Button::title(self.title.clone(), move || action())
             .enabled(self.is_enabled)
-            .button_style(SecondaryButtonStyle);
+            .button_style(crate::theme::styles::buttons::GhostButtonStyle);
 
         let menu_label = AnyView::new(
             AnyView::new(crate::primitives::controls::button::ButtonIcon::new(
@@ -101,6 +103,7 @@ impl View for SplitButton {
             .padding_edges(MENU_PADDING_HORIZONTAL, MENU_PADDING_VERTICAL),
         );
         let menu = MenuButton::new(self.entries.clone(), menu_label)
+            .ghost()
             .enabled(self.is_enabled)
             .accessibility_label(self.menu_accessibility_label.clone());
         let menu = match self.menu_width {
@@ -143,8 +146,12 @@ impl PrimitiveView for SplitButtonGroup {
 
     fn update_node(&self, node: &Node) {
         let theme = theme_for_node(node);
+        // A capsule push-button bezel around both zones.
+        node.set_background_color(Some(theme.colors.surface));
         node.set_border_color(Some(theme.colors.border));
-        node.set_corner_radius(theme.inputs.radius);
+        node.set_border_width(1.0);
+        node.set_corner_radius(SPLIT_MIN_HEIGHT * 0.5);
+        node.set_shadow(theme.elevation.low);
         node.set_layout_did_update(Some(Rc::new(|owner| {
             let zone = owner.attachment::<usize>("split.zone").unwrap_or(0);
             apply_tab_stops(owner, zone);

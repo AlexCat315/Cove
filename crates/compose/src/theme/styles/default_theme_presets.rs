@@ -9,9 +9,8 @@ use crate::theme::Theme;
 
 /// Default dark theme bundled with CoveUI.
 ///
-/// Neutral-zinc palette matching the reference design: a zinc-900 window,
-/// zinc-800 control faces, a single blue accent ramp (lighter on hover than at
-/// rest, as the reference), and flat zinc borders.
+/// macOS dark palette: graphite content, a lighter sidebar and groups, a single
+/// blue accent ramp and spring-driven motion.
 pub struct DefaultDarkTheme;
 
 impl DefaultDarkTheme {
@@ -23,10 +22,8 @@ impl DefaultDarkTheme {
 
 /// Default light theme.
 ///
-/// Neutral-zinc palette matching the reference design: a pure white window with
-/// zinc control faces (the face of buttons, inputs, sidebars and chips), a
-/// single blue accent ramp, and subtle borders that separate flat regions rather
-/// than translucent state washes.
+/// macOS light palette: white content, a light-gray sidebar and groups, a
+/// single blue accent ramp and spring-driven motion.
 pub struct DefaultLightTheme;
 
 impl DefaultLightTheme {

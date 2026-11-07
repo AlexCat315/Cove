@@ -7,7 +7,7 @@ use std::rc::Rc;
 
 use crate::Scope;
 use crate::modifiers::layout::{FlexExt, FrameDimension, LayoutFrameExt, PaddingExt};
-use crate::modifiers::style::SemanticStyleViewExt;
+use crate::modifiers::style::{AppearanceExt, SemanticStyleViewExt};
 use crate::primitives::controls::button::{Button, ButtonIcon, ButtonIconSource, ButtonRole};
 use crate::primitives::feedback::Badge;
 use crate::primitives::overlays::context_menu::ContextMenu;
@@ -237,10 +237,21 @@ impl<Id: PartialEq + Eq + std::hash::Hash + Clone + Send + Sync + 'static> Primi
                 ));
             }
             if let Some(width) = self.icon_width {
+                // Source-list glyphs carry the accent, as macOS sidebars do; a
+                // disabled destination keeps the row's muted ink.
+                let theme = theme_for_node(_node);
                 let glyph = match self.entry.item.icon.clone() {
+                    Some(icon) if self.entry.is_enabled => AnyView::new(
+                        AnyView::new(ButtonIcon::new(
+                            ButtonIconSource::resource(icon),
+                            Some(self.entry.item.icon_size.resolve(&theme)),
+                            None,
+                        ))
+                        .foreground_color(theme.colors.accent),
+                    ),
                     Some(icon) => AnyView::new(ButtonIcon::new(
                         ButtonIconSource::resource(icon),
-                        Some(self.entry.item.icon_size.resolve(&theme_for_node(_node))),
+                        Some(self.entry.item.icon_size.resolve(&theme)),
                         None,
                     )),
                     None => AnyView::new(crate::EmptyView),

@@ -2,8 +2,9 @@
 use cove_core::scene::{Align, Animation, Edge, FlexDirection, LayoutNode, Node, with_animation};
 use cove_core::{Color, SurfaceShadow};
 
+use crate::animation::geometry::{SlidingSelectionMark, is_in_sliding_selection};
 use crate::theme::{ControlSize, SemanticColorRef, SemanticFontRef, SemanticStyleViewExt, Theme};
-use crate::{AnyView, impl_primitive_view};
+use crate::{AnyView, ViewModifier, impl_primitive_view};
 
 use super::button_style::{ButtonInteractionKey, ButtonStyle, ButtonStyleConfiguration};
 
@@ -43,8 +44,8 @@ struct SegmentChrome {
 }
 
 impl SegmentChrome {
-    fn fill(&self) -> Color {
-        let base = if self.is_selected {
+    fn fill(&self, paints_selection: bool) -> Color {
+        let base = if paints_selection {
             self.theme.colors.surface_raised
         } else {
             Color::CLEAR
@@ -69,15 +70,19 @@ impl crate::PrimitiveView for SegmentChrome {
     }
 
     fn update_node(&self, node: &Node) {
-        let fill = self.fill();
+        // Inside a group the thumb is one surface that springs between
+        // segments; a segment paints only its own hover and press.
+        let slides = self.is_selected && is_in_sliding_selection(node);
+        SlidingSelectionMark(slides).apply_node(node);
+        let fill = self.fill(self.is_selected && !slides);
         let border = if self.is_focused {
             self.theme.colors.focus_ring
         } else {
             Color::CLEAR
         };
         let border_width = if self.is_focused { 2.0 } else { 0.0 };
-        let radius = 3.0f32.max(self.theme.radius.md - 3.0);
-        let shadow = if self.is_selected {
+        let radius = self.theme.radius.pill;
+        let shadow = if self.is_selected && !slides {
             SurfaceShadow {
                 color: Some(Color {
                     r: 0.0,

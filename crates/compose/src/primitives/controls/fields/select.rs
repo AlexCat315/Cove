@@ -253,10 +253,9 @@ impl<Value: PartialEq + Clone + Send + Sync + 'static> View for Select<Value> {
             .find(|option| option.value == self.selection.get())
             .map(|option| option.label.clone())
             .unwrap_or_default();
-        // System popup buttons keep the chevron pointing down while open; the
-        // pressed bezel, not a flipped glyph, explains the open menu.
-        let chevron =
-            crate::primitives::media::ui_icon_catalog::navigation::dropdown_chevron_down();
+        // A macOS popup button carries the up/down chevron pair whether or not
+        // its menu is open; the pressed bezel explains the open menu.
+        let chevron = crate::primitives::media::ui_icon_catalog::navigation::chevrons_up_down();
         let trigger = BoxView::new(
             FlexDirection::Row,
             Align::Center,
@@ -271,14 +270,17 @@ impl<Value: PartialEq + Clone + Send + Sync + 'static> View for Select<Value> {
                         .flex_with(1.0, 1.0, None)
                         .frame_min_width(0.0),
                 ),
-                AnyView::new(ButtonIcon::new(
-                    ButtonIconSource::resource(chevron),
-                    Some(12.0),
-                    None,
-                )),
+                AnyView::new(
+                    AnyView::new(ButtonIcon::new(
+                        ButtonIconSource::resource(chevron),
+                        Some(12.0),
+                        None,
+                    ))
+                    .semantic_foreground(crate::theme::SemanticColorRef::on_surface_variant()),
+                ),
             ])),
         )
-        .padding_edges(10.0, 6.0);
+        .padding_edges(12.0, 6.0);
         let popover = Popover::new(trigger, self.menu())
             .is_presented(is_presented)
             .enabled(self.is_enabled)
@@ -314,12 +316,12 @@ impl<Value: PartialEq + Clone + Send + Sync + 'static> View for Select<Value> {
     }
 }
 
-/// Trigger that reads as a text input: the same fill, border and radius the
-/// text fields use, so a Select sits flush with the fields around it in a
-/// property grid instead of looking like a lighter pill.
+/// Trigger drawn as a macOS popup button: a capsule push-button face with a
+/// hairline and a soft contact shadow, so it reads as a control that opens a
+/// menu rather than as a field to type into.
 ///
 /// Open reads as a pressed bezel rather than a focus ring, the way a system
-/// popup button sits under its menu.
+/// popup button sits under its menu; keyboard focus adds the accent halo.
 struct SelectTriggerStyle;
 
 impl ButtonStyle for SelectTriggerStyle {
@@ -331,7 +333,21 @@ impl ButtonStyle for SelectTriggerStyle {
         let state = InputChromeState::new(configuration.is_enabled)
             .focused(configuration.is_focused && !open)
             .hovered(configuration.is_hovered);
-        let border = theme.inputs.border_for(state);
+        let border = if state.is_enabled {
+            theme.colors.border
+        } else {
+            theme.inputs.border_disabled
+        };
+        let contact = if open || !configuration.is_enabled {
+            cove_core::SurfaceShadow::NONE
+        } else {
+            theme.elevation.low
+        };
+        let halo = crate::theme::styles::components::default_text_field_style::focus_halo(
+            &theme,
+            state.is_focused && configuration.is_enabled,
+        );
+        let shadow = if state.is_focused { halo } else { contact };
         AnyView::new(
             BoxView::new(
                 FlexDirection::Column,
@@ -350,11 +366,22 @@ impl ButtonStyle for SelectTriggerStyle {
             })
             .background_color(if open {
                 theme.colors.surface_pressed
+            } else if configuration.is_hovered && configuration.is_enabled {
+                theme
+                    .colors
+                    .surface
+                    .composited(theme.colors.state_layer_hover)
             } else {
-                theme.inputs.background_for(state)
+                theme.colors.surface
             })
-            .corner_radius(theme.inputs.radius)
-            .border_color(border, theme.inputs.border_width_for(state)),
+            .corner_radius(TRIGGER_MIN_HEIGHT * 0.5)
+            .border_color(border, if state.is_focused { 0.0 } else { 1.0 })
+            .shadow(
+                shadow.color.unwrap_or(cove_core::Color::CLEAR),
+                shadow.offset_x,
+                shadow.offset_y,
+                shadow.blur,
+            ),
         )
     }
 }

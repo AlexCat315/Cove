@@ -59,13 +59,7 @@ fn render_node(node: &Node, list: &mut DrawList, placed: Affine2D) {
         list.begin_reveal(reveal);
     }
 
-    // 1. Clip stack push (covers background, content, and children).
-    let clipped = node.clips_to_bounds() && width > 0.0 && height > 0.0;
-    if clipped {
-        list.push_clip_rect(Rect::new(abs_x, abs_y, width, height));
-    }
-
-    // 2. Drop shadow (painted before background so it sits behind). The ambient
+    // 1. Drop shadow (painted before background so it sits behind). The ambient
     //    halo goes down first; the tighter key shadow lands on it.
     let rect = Rect::new(abs_x, abs_y, width, height);
     // A frosted panel samples the frame behind it, so keep its own shadow out
@@ -84,6 +78,13 @@ fn render_node(node: &Node, list: &mut DrawList, placed: Affine2D) {
         (node.backdrop_blur() > 0.0).then_some(rect),
         occluded,
     );
+
+    // 2. Clip stack push (covers background, content, and children; not the
+    //    node's own shadow, which falls outside its box).
+    let clipped = node.clips_to_bounds() && width > 0.0 && height > 0.0;
+    if clipped {
+        list.push_clip_rect(Rect::new(abs_x, abs_y, width, height));
+    }
 
     // 3. Border ring, including when the background is transparent. A frosted
     //    node draws it after the fill: the backdrop composite is attached to

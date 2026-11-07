@@ -400,7 +400,10 @@ impl View for PropertyGrid {
                 ScrollView::new(ScrollAxis::Both, content).scrollbar_gutter(ScrollbarGutter::Stable)
             }
         };
-        AnyView::new(AnyView::new(scroll).flex_with(1.0, 1.0, Some(0.0)))
+        // Auto basis: in a parent without a definite height the grid takes its
+        // content height instead of collapsing to zero; a bounded parent still
+        // shrinks it and the scroll view takes over.
+        AnyView::new(AnyView::new(scroll).flex_with(1.0, 1.0, None))
     }
 
     fn dynamic_properties(&self) -> Vec<crate::DynamicField> {

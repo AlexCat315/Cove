@@ -248,6 +248,15 @@ impl ViewModifier for ShadowStyle {
     }
 }
 
+/// Blurs whatever lies behind the surface by the given radius.
+#[derive(Clone, Copy, Debug)]
+pub struct Backdrop(pub f32);
+impl ViewModifier for Backdrop {
+    fn apply_node(&self, node: &Node) {
+        node.set_backdrop_blur(self.0);
+    }
+}
+
 #[derive(Clone, Copy, Debug)]
 pub struct Border {
     pub color: cove_core::Color,
@@ -286,8 +295,8 @@ impl ViewModifier for HitTesting {
 
 /// `.floatingSurface(radius, elevation:)`.
 ///
-/// Fills with `surfaceFloating`, outlines with the floating hairline and lifts
-/// with the theme's layered floating shadow.
+/// Fills with the vibrant floating material, outlines with the floating hairline
+/// and lifts with the theme's layered floating shadow.
 #[derive(Clone, Copy, Debug)]
 pub struct FloatingSurface {
     pub radius: f32,
@@ -301,7 +310,10 @@ impl FloatingSurface {
 impl ViewModifier for FloatingSurface {
     fn apply_node(&self, node: &Node) {
         let theme = node.composition_value(&ThemeEnvironment::key());
-        node.set_background_color(Some(theme.colors.surface_floating));
+        // The same vibrant material as `FloatingSurfaceModifier`.
+        let material = theme.materials.floating;
+        node.set_background_color(Some(material.tint));
+        node.set_backdrop_blur(material.blur);
         node.set_corner_radius(self.radius);
         node.set_border_color(Some(crate::theme::floating_outline(&theme.colors)));
         node.set_border_width(1.0);

@@ -188,10 +188,10 @@ impl PrimitiveView for CodeBlockCard {
 
     fn update_node(&self, node: &Node) {
         let theme = theme_for_node(node);
-        node.set_background_color(Some(theme.colors.surface_sunken));
-        node.set_corner_radius(10.0);
-        node.set_border_color(Some(theme.colors.border));
-        node.set_border_width(1.0);
+        node.set_background_color(Some(theme.colors.surface_variant));
+        node.set_corner_radius(theme.radius.md);
+        node.set_border_color(Some(cove_core::Color::CLEAR));
+        node.set_border_width(0.0);
         node.set_clips_to_bounds(true);
         node.set_accessibility(Some(AccessibilitySemantics {
             role: AccessibilityRole::Group,

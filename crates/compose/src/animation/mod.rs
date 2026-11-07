@@ -7,8 +7,8 @@ pub mod phases;
 pub mod transition;
 pub mod transition_view;
 
-pub use content::AnimatedVisibility;
 pub use content::NumericText;
+pub use content::{AnimatedVisibility, CascadeIn, CascadeInExt};
 pub use keyframes::KeyframeAnimator;
 pub use phases::PhaseAnimator;
 pub use transition::{Transition, TransitionEdge};

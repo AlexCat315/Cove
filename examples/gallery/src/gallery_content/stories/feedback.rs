@@ -150,7 +150,7 @@ impl View for BadgeStory {
     }
 }
 
-/// A titled story group rendered as a hairline card.
+/// A titled story group in a macOS-style grouped box.
 pub struct StorySection {
     pub title: String,
     pub detail: String,
@@ -189,9 +189,8 @@ impl View for StorySection {
                     content.clone(),
                 )
                 .padding(18.0)
-                .background_color(theme.colors.surface)
-                .corner_radius(theme.radius.xl)
-                .border_color(theme.colors.border, 1.0),
+                .background_color(theme.colors.surface_variant)
+                .corner_radius(theme.radius.lg),
             )
         }));
         AnyView::new(

@@ -1,6 +1,6 @@
 # 默认主题
 
-`Theme::default_light()` 与 `Theme::default_dark()` 使用中性桌面配色：浅色为暖白与石墨色控件，深色为分层炭灰与浅灰色控件。状态色只用于成功、警告、错误和信息。
+`Theme::default_light()` 与 `Theme::default_dark()` 采用 macOS 窗口结构：内容区为白色（深色 `#1E1E1E`），侧栏与分组区高一级填充（`surface_variant`），区域靠填充而非描边或阴影区分；强调色为系统蓝 `#0071E3`，白字对比度不低于 4.5:1。
 
 ```rust
 use cove_ui::prelude::*;
@@ -11,9 +11,36 @@ fn content() -> impl View {
 }
 ```
 
-输入框使用 `surface_sunken` 底色、1pt 边框，聚焦时改变边框颜色。默认圆角为 0 / 4 / 6 / 8 / 12pt；胶囊类控件仍可使用 `radius.pill`。
+## 形状与层次
 
-正文与输入框选区共用 `colors.selection`，使用低饱和灰蓝色与轻微圆角，两端以短竖线标记边界。选区直接使用主题透明度，不额外淡化文字。`colors.focus_ring` 控制键盘焦点提示，`inputs.border_focused` 控制输入框焦点边框。
+圆角为 0 / 6 / 8 / 12 / 16pt（`radius.none` … `radius.xl`）。按钮、分段控件、搜索框、弹出按钮与滑块拇指为胶囊；纯图标按钮无边框。未指定样式的 `Button` 是 macOS 推按钮（白底、发丝边、接触阴影），默认动作需显式使用 `PrimaryButtonStyle`。
+
+文字沿用 SF 的字距规律：字号越大字距越紧（`display` 34pt / -0.9，`title` 26pt / -0.6，`headline` 17pt / -0.4）。
+
+## 材质
+
+`theme.materials` 提供三种磨砂材质，均为半透明底色 + 背景模糊 + 1pt 边缘：
+
+| 材质 | 用途 |
+| --- | --- |
+| `chrome` | 悬浮侧栏、工具栏 |
+| `content` | 需要透出背景的分组内容 |
+| `floating` | 菜单、弹出层、对话框（`floating_surface` 默认使用） |
+
+```rust
+use cove_ui::prelude::*;
+use cove_ui::compose::modifiers::style::{GlassExt, GlassKind};
+
+fn toolbar(content: impl View + 'static) -> impl View {
+    content.glass(GlassKind::Chrome).corner_radius(16.0)
+}
+```
+
+## 动效
+
+`theme.motion` 以弹簧为主：`fast` 0.12s、`standard` 0.28s、`slow` 0.45s，曲线为 `Easing::RESPONSIVE`（强 ease-out）与 `Easing::FLUID`（iOS 面板曲线）。浮层进入用欠阻尼弹簧（`surface.entrance` 0.38s，从 `reveal_scale` 0.9 弹出），关闭用 0.14s ease-out。`press_scale` 为 0.96：按下即时压缩，松手按 `button_release_spring` 回弹。详见 [动效](/docs/motion)。
+
+## 自定义
 
 应用可以复制主题修改对应 token：
 
@@ -33,6 +60,8 @@ fn branded_content() -> impl View {
 }
 ```
 
-需要统一调整输入底色或圆角时，修改 `theme.inputs.background` / `theme.inputs.radius`。自定义 [TextFieldStyle](/docs/text-field-style) 可以消费同一组 token，或为业务场景提供专属外观。
+输入框使用 `surface_sunken` 底色、1pt 边框，聚焦时改变边框颜色；统一调整时修改 `theme.inputs.background` / `theme.inputs.radius`。自定义 [TextFieldStyle](/docs/text-field-style) 可以消费同一组 token。
+
+正文与输入框选区共用 `colors.selection`，`colors.focus_ring` 控制键盘焦点提示。
 
 `ThemeReader` 闭包中读取的可观察状态属于外层视图的读取依赖；重建后会重新订阅，移除视图时释放依赖。

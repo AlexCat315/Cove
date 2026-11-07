@@ -202,7 +202,7 @@ impl PrimitiveView for ProgressCircle {
             let outer = size / 2.0 - ring_thickness / 2.0;
             let inner = (outer - ring_thickness).max(0.5);
             // Same track tone as Slider: sunken surfaces are white in light themes.
-            let track = theme.colors.surface_variant.multiplied_alpha(alpha);
+            let track = theme.colors.surface_pressed.multiplied_alpha(alpha);
             paint_ring(list, Point::new(cx, cy), inner, outer, 0.0, TAU, track);
             if indeterminate {
                 let Some(clock) = clock.as_ref() else { return };

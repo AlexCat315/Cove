@@ -365,6 +365,7 @@ impl PrimitiveView for ModalBackdropView {
                     })
                     .semantic_background(self.options.surface.clone())
                     .corner_radius(self.options.geometry.corner_radius)
+                    .modifier(ModalRim)
                     // The modal lift: a wide, deep shadow.
                     .shadow(Color::from_rgba8(0, 0, 0, 77), 0.0, 10.0, 30.0),
             ),
@@ -412,5 +413,16 @@ impl cove_composition::ViewModifier for TranslationY {
                 }
             },
         );
+    }
+}
+
+/// The hairline rim that keeps a sheet's edge crisp over a dimmed window.
+struct ModalRim;
+
+impl cove_composition::ViewModifier for ModalRim {
+    fn apply_node(&self, node: &cove_core::scene::Node) {
+        let colors = crate::theme::theme_for_node(node).colors;
+        node.set_border_color(Some(crate::theme::floating_outline(&colors)));
+        node.set_border_width(1.0);
     }
 }

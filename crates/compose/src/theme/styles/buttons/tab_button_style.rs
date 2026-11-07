@@ -4,9 +4,10 @@ use cove_core::scene::{
     Align, Animation, Edge, FlexDirection, Justify, LayoutNode, Node, with_animation,
 };
 
+use crate::animation::geometry::{SlidingSelectionMark, is_in_sliding_selection};
 use crate::theme::styles::components::selection_appearance::{SelectionAppearance, SelectionRole};
 use crate::theme::{SemanticColorRef, SemanticFontRef, SemanticStyleViewExt, Theme};
-use crate::{AnyView, impl_primitive_view};
+use crate::{AnyView, ViewModifier, impl_primitive_view};
 
 use super::button_style::{ButtonInteractionKey, ButtonStyle, ButtonStyleConfiguration};
 
@@ -86,9 +87,15 @@ impl crate::PrimitiveView for TabChrome {
     }
 
     fn update_node(&self, node: &Node) {
-        let fill = self
-            .appearance
-            .fill(self.is_selected, self.is_hovered, self.is_pressed);
+        // Inside a strip the resting selection is the strip's sliding pill;
+        // the tab paints only its hover and press.
+        let slides = self.is_selected && is_in_sliding_selection(node);
+        SlidingSelectionMark(slides).apply_node(node);
+        let fill = self.appearance.fill(
+            self.is_selected && !slides,
+            self.is_hovered,
+            self.is_pressed,
+        );
         let border = if self.is_focused {
             self.theme.colors.focus_ring
         } else {
@@ -144,6 +151,8 @@ impl crate::PrimitiveView for TabChrome {
     fn update_layout(&self, layout: &LayoutNode) {
         layout.set_flex_direction(FlexDirection::Column);
         layout.set_align_items(Align::Stretch);
+        layout.set_min_width(Some(0.0));
+        layout.set_flex_shrink(1.0);
         layout.set_padding(self.appearance.horizontal_inset, Edge::Start);
         layout.set_padding(self.appearance.horizontal_inset, Edge::End);
         // `.padding(horizontal:, vertical: top)` followed by
@@ -153,7 +162,9 @@ impl crate::PrimitiveView for TabChrome {
         layout.set_padding(total_vertical, Edge::Bottom);
     }
 
-    fn children(&self, _node: &Node) -> Vec<AnyView> {
+    fn children(&self, node: &Node) -> Vec<AnyView> {
+        // Inside a sliding strip the thumb already says which tab is chosen.
+        let slides = is_in_sliding_selection(node);
         let foreground = if !self.is_enabled {
             SemanticColorRef::on_surface_disabled()
         } else if self.is_selected {
@@ -168,7 +179,7 @@ impl crate::PrimitiveView for TabChrome {
                 min_height: (self.height - self.top - self.bottom).max(0.0),
             }),
             AnyView::new(TabIndicator {
-                color: if self.is_selected {
+                color: if self.is_selected && !slides {
                     self.theme.colors.accent
                 } else {
                     Color::CLEAR
@@ -203,11 +214,15 @@ impl crate::PrimitiveView for TabLabelRow {
         layout.set_flex_direction(FlexDirection::Row);
         layout.set_align_items(Align::Center);
         layout.set_justify_content(Justify::Center);
-        layout.set_padding(10.0, Edge::Start);
-        layout.set_padding(10.0, Edge::End);
+        layout.set_padding(6.0, Edge::Start);
+        layout.set_padding(6.0, Edge::End);
         layout.set_padding(4.0, Edge::Top);
         layout.set_padding(4.0, Edge::Bottom);
         layout.set_min_height(Some(self.min_height));
+        // A long title truncates inside a clamped tab instead of forcing the
+        // tab wider than the strip.
+        layout.set_min_width(Some(0.0));
+        layout.set_flex_shrink(1.0);
     }
 
     fn children(&self, _node: &Node) -> Vec<AnyView> {

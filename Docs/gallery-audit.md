@@ -137,6 +137,8 @@ Swift 源码逐页对照见文末《Swift 源码对照（逐页差异清单）�
 
 API 收敛：删除 RichText 类型与导出，无兼容别名。普通文字与样式片段统一为 Text::new / Text::runs，TextRun / TextTraits；字体、颜色、对齐、行数、截断、正文读取共用同一 Text 配置与节点。Gallery 的 RichText 页改为 Text，SingleLineText 页标为 Text · Truncation；目录仍为 106 个能力页面。用户文档：`Website/src/content/components/text.md`。
 
+2026-11-07 macOS 风格组件库：默认主题改为 macOS 窗口结构（白色内容区、`surface_variant` 侧栏与分组），`Button` 默认改为推按钮，输入/弹出按钮/搜索/复选/单选/开关/滑块/分段/Tab/列表/表格/日历/提示/进度/滚动条/对话框/通知统一外观；Sidebar、ButtonGroup、TabView 共用 `SlidingSelection` 弹簧滑动选中。修复 TabView 标题宽度塌为 0（原版即存在）、节点自身阴影被自身裁剪、列表分隔线残留。DevTools 截图目检（1280×720，浅色为主，深色抽查 Dashboard 与 Text Fields）：Dashboard、Checkbox、Toggle、Text Fields、TabView、ButtonGroup、Tree、DataTable、Calendar、Accordion、Toolbar、SplitButton、List、SectionedList、ReorderableList、Alert、Dialog。PropertyGrid 页内容不渲染，原因未查明，未修复。用户文档：`theme.md`、`motion.md`（新增）、`sidebar.md`、`slider.md`。
+
 2026-11-03 主题与选区追加：默认浅/深色改为中性桌面配色，圆角 0/4/6/8/12；正文/样式片段/输入框选区共用轻微圆角与两端短竖线，输入框移除重复透明度。Text 样式片段补齐共享选择注册、键盘扩展、独立选择与 display-only；跨链接拖选不激活链接。选择 scope 随挂载节点保留。触控长按已复用；圆形手柄与放大镜尚未接线，未宣称已完成。鼠标问题：用户确认浏览器也会闪回箭头，Codex 正常，暂不能归因 Cove；不添加推测性的原生光标覆盖。应用 I 形指针节点及焦点/拖选/重建路径另行回归，操作系统实际光标仍待系统恢复后原生复核。用户文档：`Website/src/content/components/theme.md` 与 `text-selection.md`。
 
 | 项目 | 原因 / 实现状态 | 修复与展示 | 用户文档 |
@@ -191,7 +193,7 @@ cargo test -p cove-ui-compose --test compose --locked
 
 | 页面 | 宽屏段落数 | 宽屏 / 窄屏裁剪线索 | 状态 |
 | --- | ---: | ---: | --- |
-| Dashboard | 0 | 0 / 0 | 挂载/几何基础检查通过；待逐项交互和视觉验收 |
+| Dashboard | 0 | 0 / 0 | 2026-11-07 分组卡片、数字滚动，截图目检通过；逐帧动效未验收 |
 | Button | 5 | 0 / 0 | 挂载/几何基础检查通过；待逐项交互和视觉验收 |
 | Checkbox | 1 | 0 / 0 | 挂载/几何基础检查通过；待逐项交互和视觉验收 |
 | Toggle / Switch | 2 | 0 / 0 | 挂载/几何基础检查通过；待逐项交互和视觉验收 |
@@ -250,7 +252,7 @@ cargo test -p cove-ui-compose --test compose --locked
 | Combobox | 0 | 0 / 0 | 挂载/几何基础检查通过；待逐项交互和视觉验收 |
 | Notification | 0 | 0 / 0 | 挂载/几何基础检查通过；待逐项交互和视觉验收 |
 | Tooltip | 0 | 0 / 0 | 挂载/几何基础检查通过；待逐项交互和视觉验收 |
-| Sidebar | 0 | 0 / 0 | 挂载/几何基础检查通过；待逐项交互和视觉验收 |
+| Sidebar | 0 | 0 / 0 | 2026-11-07 贴边全高、中性滑动选中、强调色图标，明暗截图目检通过 |
 | NavigationDrawer | 0 | 0 / 0 | 挂载/几何基础检查通过；待逐项交互和视觉验收 |
 | NavigationRail | 0 | 0 / 0 | 挂载/几何基础检查通过；待逐项交互和视觉验收 |
 | AppBar / NavigationBar | 0 | 0 / 0 | 挂载/几何基础检查通过；待逐项交互和视觉验收 |
@@ -265,7 +267,7 @@ cargo test -p cove-ui-compose --test compose --locked
 | Accordion | 0 | 0 / 0 | 挂载/几何基础检查通过；待逐项交互和视觉验收 |
 | Breadcrumb | 0 | 0 / 0 | 挂载/几何基础检查通过；待逐项交互和视觉验收 |
 | Pagination | 0 | 0 / 0 | 挂载/几何基础检查通过；待逐项交互和视觉验收 |
-| ButtonGroup | 0 | 0 / 0 | 挂载/几何基础检查通过；待逐项交互和视觉验收 |
+| ButtonGroup | 0 | 0 / 0 | 2026-11-07 胶囊槽 + 弹簧滑动拇指，截到中途帧 |
 | SplitButton | 0 | 0 / 0 | 挂载/几何基础检查通过；待逐项交互和视觉验收 |
 | Tag | 3 | 0 / 0 | 挂载/几何基础检查通过；待逐项交互和视觉验收 |
 | Kbd / KeyCap | 0 | 0 / 0 | 挂载/几何基础检查通过；待逐项交互和视觉验收 |

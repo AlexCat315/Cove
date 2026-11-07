@@ -190,7 +190,7 @@ where
             row_height: None,
             row_spacing: 0.0,
             sticky_headers: false,
-            sticky_header_background: SemanticColorRef::surface_raised(),
+            sticky_header_background: SemanticColorRef::surface(),
             on_activate: None,
             row_content: Rc::new(row_content),
             id_of: Rc::new(id_of),
@@ -293,22 +293,25 @@ where
             row_content: self.row_content.clone(),
             id_of: self.id_of.clone(),
         };
-        AnyView::new(SelectionKeyHost::new(
-            ContainerSizeReader::new({
-                let surface = surface.clone();
-                move |size: Size| {
+        AnyView::new(
+            AnyView::new(SelectionKeyHost::new(
+                ContainerSizeReader::new({
                     let surface = surface.clone();
-                    SurfaceReader::new({
-                        let surface = surface;
-                        move |environment: &Environment| surface.render(size, environment)
-                    })
-                }
-            })
-            .flex_with(1.0, 1.0, Some(0.0))
-            .frame(None, None, Some(0.0), Some(0.0), None, None),
-            true,
-            move |event: &KeyEvent| core.handle_key(event),
-        ))
+                    move |size: Size| {
+                        let surface = surface.clone();
+                        SurfaceReader::new({
+                            let surface = surface;
+                            move |environment: &Environment| surface.render(size, environment)
+                        })
+                    }
+                })
+                .flex_with(1.0, 1.0, Some(0.0))
+                .frame(None, None, Some(0.0), Some(0.0), None, None),
+                true,
+                move |event: &KeyEvent| core.handle_key(event),
+            ))
+            .with_modifier(super::list::InsetListBox),
+        )
     }
 
     fn dynamic_properties(&self) -> Vec<crate::DynamicField> {

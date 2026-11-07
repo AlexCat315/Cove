@@ -93,7 +93,12 @@ fn scene(label: &str, action: impl Fn() + 'static) -> (Rc<cove_composition::View
     }
     let graph = support::graph();
     graph.install_view(
-        AnyView::new(Button::new(Text::new(label), action)),
+        AnyView::new(
+            cove_ui_compose::theme::styles::buttons::ButtonStyleViewExt::button_style(
+                Button::new(Text::new(label), action),
+                cove_ui_compose::theme::styles::buttons::PrimaryButtonStyle,
+            ),
+        ),
         Default::default(),
     );
     // The drag cases compare pointer coordinates against the host's frame, so the

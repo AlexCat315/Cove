@@ -221,6 +221,14 @@ impl PrimitiveView for Toolbar {
     }
 
     fn update_node(&self, node: &Node) {
+        // Toolbar commands are borderless, as macOS toolbar items are; a
+        // command that wants a bezel or the accent names its own style.
+        node.set_composition_value(
+            &crate::theme::styles::buttons::button_style::ButtonStyleEnvironment::key(),
+            crate::theme::styles::buttons::button_style::AnyButtonStyle::new(
+                crate::theme::styles::buttons::GhostButtonStyle,
+            ),
+        );
         node.set_allows_hit_testing(self.options.is_enabled);
         node.set_accessibility(Some(AccessibilitySemantics {
             role: AccessibilityRole::Toolbar,

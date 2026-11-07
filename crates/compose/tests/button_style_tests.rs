@@ -91,15 +91,15 @@ fn mounted_fill(graph: &ViewGraph) -> Option<Color> {
 }
 
 #[test]
-fn the_default_style_is_primary() {
+fn the_default_style_is_the_push_button() {
     GlobalTestLock::locked(|| {
         let registry = Rc::new(InteractionRegistry::new());
         InteractionRegistryHolder::set_current(Some(registry));
         let graph = install(Button::new(Text::new("Save"), || {}));
         assert_eq!(
             mounted_fill(&graph),
-            Some(Theme::default_dark().colors.accent),
-            "the default style paints the accent background"
+            Some(Theme::default_dark().colors.surface),
+            "a bare button is the bordered push-button face; only a marked default action takes the accent"
         );
     });
 }
@@ -166,8 +166,8 @@ fn a_destructive_role_does_not_imply_a_style() {
         ));
         assert_eq!(
             mounted_fill(&graph),
-            Some(Theme::default_dark().colors.accent),
-            "the role alone leaves the primary style in place"
+            Some(Theme::default_dark().colors.surface),
+            "the role alone leaves the default push-button style in place"
         );
     });
 }
@@ -206,8 +206,13 @@ fn a_custom_theme_flows_into_the_button_style() {
             b: 0.5,
             a: 1.0,
         };
-        let graph =
-            install(AnyView::new(Button::new(Text::new("Go"), || {})).theme(custom.clone()));
+        let graph = install(
+            AnyView::new(
+                Button::new(Text::new("Go"), || {})
+                    .button_style(cove_ui_compose::theme::styles::buttons::PrimaryButtonStyle),
+            )
+            .theme(custom.clone()),
+        );
         assert_eq!(
             mounted_fill(&graph),
             Some(custom.colors.accent),
@@ -265,9 +270,10 @@ fn hover_and_press_repaint_without_recomposing() {
             let theme = Theme::default_dark();
             let fired = Rc::new(std::cell::Cell::new(0u32));
             let counter = fired.clone();
-            let graph = install(Button::new(Text::new("Tap"), move || {
-                counter.set(counter.get() + 1)
-            }));
+            let graph = install(
+                Button::new(Text::new("Tap"), move || counter.set(counter.get() + 1))
+                    .button_style(cove_ui_compose::theme::styles::buttons::PrimaryButtonStyle),
+            );
             graph.compute_layout(120.0, 40.0);
 
             let host = find_button_host(&graph).expect("the button host is mounted");

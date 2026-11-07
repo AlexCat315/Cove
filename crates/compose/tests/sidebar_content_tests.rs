@@ -431,8 +431,8 @@ fn semantics_and_color() {
             );
             assert_eq!(
                 glyph(scene, "Projects").inherited_foreground_color(),
-                Some(theme.colors.on_surface),
-                "the selected glyph inherits the row ink (dark {dark})"
+                Some(theme.colors.accent),
+                "source-list glyphs carry the accent (dark {dark})"
             );
             let disabled = row(scene, "Team permissions");
             assert!(
@@ -485,17 +485,28 @@ fn semantics_and_color() {
             );
             let selection = SelectionAppearance::resolve(SelectionRole::Sidebar, &theme);
             assert_eq!(
-                selection.fill, theme.colors.surface_variant,
-                "the sidebar selection uses the neutral grouped fill (dark {dark})"
+                selection.fill,
+                theme
+                    .colors
+                    .surface_variant
+                    .composited(theme.colors.state_layer_pressed),
+                "the sidebar selection is the neutral source-list pill (dark {dark})"
             );
-            let hovered = selection.hover_fill.composited(selection.fill);
+            // The sliding host paints the resting pill; the hovered row adds
+            // only its state layer on top.
             let fills: Vec<_> = subtree(&projects)
                 .iter()
                 .filter_map(Node::background_color)
                 .collect();
             assert!(
-                fills.contains(&hovered),
-                "the hover state layers over the selected fill, saw {fills:?} (dark {dark})"
+                fills.contains(&selection.hover_fill),
+                "the hover state layers over the sliding selection, saw {fills:?} (dark {dark})"
+            );
+            assert!(
+                subtree(&projects)
+                    .iter()
+                    .any(|node| node.attachment::<bool>("__sliding_selection.mark") == Some(true)),
+                "the selected row marks itself for the sliding pill (dark {dark})"
             );
         });
     }
@@ -632,8 +643,9 @@ fn slot_geometry() {
 
 #[test]
 fn controlled_selection_reveal() {
-    InteractiveScene::run(260.0, 130.0, |scene| {
-        let view = SidebarScene::new(130.0, default_light_theme::value());
+    // Dense 30pt rows: a 96pt pane keeps `settings` below the fold.
+    InteractiveScene::run(260.0, 96.0, |scene| {
+        let view = SidebarScene::new(96.0, default_light_theme::value());
         scene.install(view.clone());
         view.selected.set(Some("settings".to_owned()));
         scene.settle(5, 1.0);

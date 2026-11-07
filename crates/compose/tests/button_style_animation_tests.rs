@@ -93,7 +93,9 @@ fn primary_style_swaps_its_face_on_pointer_down() {
             let pressed = theme.colors.accent_pressed;
 
             let (registry, graph) = install(AnyView::new(
-                Button::new(Text::new("Hi"), || {}).theme(theme.clone()),
+                Button::new(Text::new("Hi"), || {})
+                    .button_style(cove_ui_compose::theme::styles::buttons::PrimaryButtonStyle)
+                    .theme(theme.clone()),
             ));
 
             let root = graph.tree.borrow().root().expect("root");

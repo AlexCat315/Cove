@@ -18,11 +18,13 @@ impl SemanticMotionRef {
     pub fn resolve(&self, theme: &Theme) -> Animation {
         (self.resolve)(theme)
     }
+    /// Surfaces arrive on a strong ease-out: they move at once and glide into
+    /// place, with no overshoot and a bounded duration.
     pub fn entering() -> Self {
         Self::new(|theme| {
             Animation::new(
                 theme.motion.surface.entrance,
-                Easing::DECELERATE.as_animation_curve(),
+                Easing::RESPONSIVE.as_animation_curve(),
             )
         })
     }
@@ -30,11 +32,11 @@ impl SemanticMotionRef {
         Self::new(|theme| {
             Animation::new(
                 theme.motion.surface.exit,
-                Easing::DECELERATE.as_animation_curve(),
+                Easing::RESPONSIVE.as_animation_curve(),
             )
         })
     }
-    /// 80 ms in the default themes — micro-interactions, hover/press.
+    /// 100 ms in the default themes — micro-interactions, hover/press.
     pub fn fast() -> Self {
         Self::new(|theme| {
             Animation::new(
@@ -43,7 +45,7 @@ impl SemanticMotionRef {
             )
         })
     }
-    /// 180 ms in the default themes — surface state changes, default choice.
+    /// 220 ms in the default themes — surface state changes, default choice.
     pub fn medium() -> Self {
         Self::new(|theme| {
             Animation::new(
@@ -52,7 +54,7 @@ impl SemanticMotionRef {
             )
         })
     }
-    /// 320 ms in the default themes — emphasized motion.
+    /// 350 ms in the default themes — emphasized motion.
     pub fn slow() -> Self {
         Self::new(|theme| {
             Animation::new(
@@ -61,14 +63,24 @@ impl SemanticMotionRef {
             )
         })
     }
+    /// On-screen movement (a selection sliding to a new row): the iOS sheet
+    /// curve over the standard duration — decisive, bounded, no bounce.
     pub fn snappy() -> Self {
-        Self::new(|theme| Animation::spring(theme.motion.fast, 0.90))
+        Self::new(|theme| {
+            Animation::new(
+                theme.motion.standard,
+                Easing::FLUID.as_animation_curve(),
+            )
+        })
     }
+    /// Opt-in playful motion. No built-in control uses it.
     pub fn bouncy() -> Self {
-        Self::new(|theme| Animation::spring(theme.motion.standard, 0.68))
+        Self::new(|theme| Animation::spring(theme.motion.slow, 0.62).with_overshoot(true))
     }
     pub fn smooth() -> Self {
-        Self::new(|theme| Animation::spring(theme.motion.standard, 1.0))
+        Self::new(|theme| {
+            Animation::new(theme.motion.slow, Easing::FLUID.as_animation_curve())
+        })
     }
 }
 

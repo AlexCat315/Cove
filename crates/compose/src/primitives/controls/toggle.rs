@@ -31,6 +31,9 @@ const ON: &str = "__bool_control_on";
 const VARIANT: &str = "__bool_control_variant";
 const VISUAL_PROGRESS: &str = "__bool_visual_progress";
 const VISUAL_FILL: &str = "__bool_visual_fill";
+const VISUAL_STRETCH: &str = "__bool_visual_stretch";
+/// Extra knob length while the switch is held, the way a finger squeezes it.
+const THUMB_STRETCH: f32 = 5.0;
 
 /// Which boolean control is drawn.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
@@ -329,12 +332,12 @@ fn update_appearance(node: &Node, is_on: bool, is_enabled: bool) {
         .attachment::<u8>(VARIANT)
         .map(|value| value == 0)
         .unwrap_or(true);
-    // Off fill differs by control: the switch has a solid neutral track, the
-    // check box shows the window background inside its border.
+    // Off fill differs by control: the switch has the light system-gray track,
+    // the check box a white well inside its border.
     let off_base = if is_switch {
-        colors.border_strong
+        colors.border
     } else {
-        colors.background
+        colors.surface
     };
     let base = if !is_enabled {
         if is_switch {
@@ -349,14 +352,14 @@ fn update_appearance(node: &Node, is_on: bool, is_enabled: bool) {
     };
     // An unchecked box keeps its fill; only the border reacts to hover.
     let off_hover = if is_switch {
-        mix(colors.border_strong, colors.on_surface, 0.04)
+        mix(colors.border, colors.on_surface, 0.05)
     } else {
-        colors.background
+        colors.surface
     };
     let off_press = if is_switch {
-        mix(colors.border_strong, colors.on_surface, 0.08)
+        mix(colors.border, colors.on_surface, 0.1)
     } else {
-        colors.background
+        colors.border
     };
     let fill = if !is_enabled {
         base
@@ -418,6 +421,28 @@ fn update_appearance(node: &Node, is_on: bool, is_enabled: bool) {
             }
         }
     };
+    let write_stretch = {
+        let weak = node.downgrade();
+        let target = if pressed && is_enabled && is_switch {
+            1.0_f32
+        } else {
+            0.0_f32
+        };
+        let current = node.attachment::<f32>(VISUAL_STRETCH).unwrap_or(target);
+        move |_node: &Node| {
+            if let Some(owner) = Node::upgrade(&weak) {
+                let follow = owner.downgrade();
+                owner.animatable_set_with("bool.stretch", current, target, move |value| {
+                    if let Some(inner) = Node::upgrade(&follow) {
+                        inner.set_attachment(VISUAL_STRETCH, value);
+                        inner.mark_render_dirty(cove_core::scene::InvalidationSource::style_set(
+                            "bool.stretch",
+                        ));
+                    }
+                });
+            }
+        }
+    };
     // Swift wraps only the *update* case in a motion (Toggle.swift:494-500), so a
     // first mount snaps and a change animates. Both arms used to call the writers
     // bare, which left `ActiveAnimationContext` empty and made
@@ -433,9 +458,14 @@ fn update_appearance(node: &Node, is_on: bool, is_enabled: bool) {
             // Swift marks the switch spring `allowsOvershoot: true` (Toggle.swift:495).
             // Without the flag `inherit_motion` bails and a reversal restarts from
             // rest instead of continuing with the live velocity.
-            cove_core::scene::Animation::spring(theme.motion.fast, 0.9).with_overshoot(true)
+            // The knob travels on the iOS sheet curve: quick, then settling.
+            cove_core::scene::Animation::new(
+                theme.motion.standard,
+                crate::theme::Easing::FLUID.as_animation_curve(),
+            )
         } else {
-            semantic_animation(&SemanticMotionRef::fast(), &theme)
+            // Long enough for the check to be seen drawing itself in.
+            semantic_animation(&SemanticMotionRef::medium(), &theme)
         };
         let fill_motion = semantic_animation(&SemanticMotionRef::fast(), &theme);
         cove_core::scene::ActiveAnimationContext::with(Some(progress_motion), None, None, || {
@@ -444,9 +474,18 @@ fn update_appearance(node: &Node, is_on: bool, is_enabled: bool) {
         cove_core::scene::ActiveAnimationContext::with(Some(fill_motion), None, None, || {
             write_fill(node)
         });
+        let stretch_motion =
+            cove_core::scene::Animation::new(
+            theme.motion.fast * 1.5,
+            crate::theme::Easing::RESPONSIVE.as_animation_curve(),
+        );
+        cove_core::scene::ActiveAnimationContext::with(Some(stretch_motion), None, None, || {
+            write_stretch(node)
+        });
     } else {
         write_progress(node);
         write_fill(node);
+        write_stretch(node);
     }
 }
 
@@ -750,16 +789,19 @@ fn fill_color(
         };
     }
     if !is_switch {
-        return colors.background;
+        return if pressed {
+            colors.surface_pressed
+        } else {
+            colors.surface
+        };
     }
-    // Off is a solid neutral track (border darkened toward text): a grey track
-    // rather than a translucent wash.
+    // Off is the light system-gray track the white thumb sits on.
     if pressed {
-        mix(colors.border_strong, colors.on_surface, 0.08)
+        mix(colors.border, colors.on_surface, 0.1)
     } else if hovered {
-        mix(colors.border_strong, colors.on_surface, 0.04)
+        mix(colors.border, colors.on_surface, 0.05)
     } else {
-        colors.border_strong
+        colors.border
     }
 }
 
@@ -796,7 +838,15 @@ fn render_toggle(
         track_height * 0.5,
         fill_color(node, &colors, is_on, is_enabled, true),
     );
-    let thumb_travel = track.width - 2.0 * thumb_inset - thumb_diameter;
+    // A held knob stretches into a capsule. The stretch stays inside the
+    // track, so the knob grows toward the side it travels to.
+    let stretch = node
+        .attachment::<f32>(VISUAL_STRETCH)
+        .unwrap_or(0.0)
+        .max(0.0)
+        * THUMB_STRETCH;
+    let thumb_width = thumb_diameter + stretch;
+    let thumb_travel = track.width - 2.0 * thumb_inset - thumb_width;
     let progress = node
         .attachment::<f32>(VISUAL_PROGRESS)
         .unwrap_or(if is_on { 1.0 } else { 0.0 });
@@ -804,16 +854,29 @@ fn render_toggle(
     let thumb = Rect::new(
         thumb_x,
         track.y + (track.height - thumb_diameter) * 0.5,
-        thumb_diameter,
+        thumb_width,
         thumb_diameter,
     );
-    // The knob is a white disc with a small key shadow: a raised disc rather
-    // than an outlined one.
+    // The knob is a white disc lifted by a soft key shadow: a raised disc
+    // rather than an outlined one.
     let thumb_fill = if is_enabled {
         Color::WHITE
     } else {
         Color::WHITE.multiplied_alpha(0.6)
     };
+    list.add_shadow_layer(
+        cove_core::SurfaceShadow {
+            color: Some(Color::from_rgba8(0, 0, 0, 0x33)),
+            offset_x: 0.0,
+            offset_y: 1.0,
+            blur: 2.5,
+        },
+        thumb,
+        thumb.height * 0.5,
+        1.0,
+        None,
+        Some(thumb),
+    );
     let _ = list.add_rounded_rect(thumb, thumb.height * 0.5, thumb_fill);
 
     // The ring belongs outside the whole control, with a gap: flush against the
@@ -862,6 +925,20 @@ fn render_checkbox(
     } else {
         colors.border
     };
+    // A raised well, as on macOS: a faint contact shadow under the box.
+    list.add_shadow_layer(
+        cove_core::SurfaceShadow {
+            color: Some(Color::from_rgba8(0, 0, 0, 0x1A).multiplied_alpha(node.opacity())),
+            offset_x: 0.0,
+            offset_y: 0.5,
+            blur: 1.5,
+        },
+        box_rect,
+        4.0,
+        1.0,
+        None,
+        Some(box_rect),
+    );
     let _ = list.add_rounded_rect(box_rect, 4.0, fill);
     let _ = list.add_rounded_rect_stroke(box_rect, 4.0, 1.0, border);
     if focus_visible(node) {
@@ -893,7 +970,7 @@ fn render_checkbox(
     } else {
         colors.on_surface_muted
     })
-    .multiplied_alpha(progress * node.opacity());
+    .multiplied_alpha(progress.clamp(0.0, 1.0).sqrt() * node.opacity());
     if variant == BoolControlVariant::MixedCheckbox {
         let _ = list.add_line(
             cove_core::Point::new(x0, box_rect.y + edge / 2.0),
@@ -903,18 +980,27 @@ fn render_checkbox(
         );
         return;
     }
+    // The check draws itself in: the short stroke first, then the long one,
+    // each in proportion to its share of the whole path.
+    let short = ((x1 - x0).powi(2) + (y1 - y0).powi(2)).sqrt();
+    let long = ((x2 - x1).powi(2) + (y2 - y1).powi(2)).sqrt();
+    let drawn = progress.clamp(0.0, 1.0) * (short + long);
+    let first = (drawn / short).min(1.0);
     let _ = list.add_line(
         cove_core::Point::new(x0, y0),
-        cove_core::Point::new(x1, y1),
+        cove_core::Point::new(x0 + (x1 - x0) * first, y0 + (y1 - y0) * first),
         2.0,
         line_color,
     );
-    let _ = list.add_line(
-        cove_core::Point::new(x1, y1),
-        cove_core::Point::new(x2, y2),
-        2.0,
-        line_color,
-    );
+    if drawn > short {
+        let second = ((drawn - short) / long).min(1.0);
+        let _ = list.add_line(
+            cove_core::Point::new(x1, y1),
+            cove_core::Point::new(x1 + (x2 - x1) * second, y1 + (y2 - y1) * second),
+            2.0,
+            line_color,
+        );
+    }
 }
 
 fn focus_visible(node: &Node) -> bool {

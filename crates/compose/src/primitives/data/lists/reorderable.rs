@@ -798,7 +798,7 @@ where
             ));
         }
 
-        AnyView::new(
+        let column = AnyView::new(
             AnyView::new(BoxView::new(
                 FlexDirection::Column,
                 Align::Stretch,
@@ -808,7 +808,14 @@ where
                 AnyView::new(TupleView::new(surface)),
             ))
             .flex_with(1.0, 1.0, Some(0.0)),
-        )
+        );
+        // A vertical list sits in the same inset box as `List`; a horizontal
+        // strip of cards keeps its own surfaces.
+        if axis == ScrollAxis::Vertical {
+            AnyView::new(column.with_modifier(super::list::InsetListBox))
+        } else {
+            column
+        }
     }
 
     /// Swift keeps the drag, viewport and mount window in `@State`; declaring

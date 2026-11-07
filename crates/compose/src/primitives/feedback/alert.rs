@@ -165,12 +165,14 @@ impl AlertSnapshot {
     fn style(&self, theme: &Theme) -> AlertStyle {
         let base = self.tone.color().resolve(theme);
         match self.variant {
+            // A tinted callout, as macOS banners are: the tone washes the
+            // fill and no outline is drawn.
             AlertTone::Soft => AlertStyle {
                 ink: theme.colors.on_surface,
                 icon_ink: base,
                 detail: theme.colors.on_surface_variant,
-                fill: theme.colors.surface_raised,
-                stroke: theme.colors.border,
+                fill: theme.colors.surface.composited(base.multiplied_alpha(0.1)),
+                stroke: Color::CLEAR,
             },
             AlertTone::Outline => AlertStyle {
                 ink: theme.colors.on_surface,
@@ -344,7 +346,7 @@ impl PrimitiveView for AlertHost {
             )
             .padding(theme.spacing.md)
             .background_color(style.fill)
-            .corner_radius(theme.radius.md)
+            .corner_radius(theme.radius.lg)
             .border_color(style.stroke, 1.0),
         )]
     }

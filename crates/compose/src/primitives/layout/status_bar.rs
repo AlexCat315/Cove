@@ -105,7 +105,7 @@ impl View for StatusBar {
                     None,
                 )
                 .padding_edges(theme.spacing.md, 0.0)
-                .semantic_background(SemanticColorRef::surface_raised())
+                .semantic_background(SemanticColorRef::surface_variant())
                 .opacity(if is_enabled { 1.0 } else { 0.6 });
             column_items.push(AnyView::new(bar));
             BoxView::new(

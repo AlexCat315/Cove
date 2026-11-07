@@ -29,10 +29,18 @@ pub struct MenuButton<Label: View + Clone + 'static> {
     pub placement: PopoverPlacement,
     pub accessibility_label: Option<String>,
     pub tooltip: Option<String>,
+    /// Drop the push-button bezel, for a trigger inside a control that draws
+    /// its own (a split button).
+    pub is_borderless: bool,
     pub label: Label,
 }
 
 impl<Label: View + Clone + 'static> MenuButton<Label> {
+    pub fn ghost(mut self) -> Self {
+        self.is_borderless = true;
+        self
+    }
+
     pub fn new(entries: Vec<MenuEntry>, label: Label) -> Self {
         Self {
             entries,
@@ -41,6 +49,7 @@ impl<Label: View + Clone + 'static> MenuButton<Label> {
             placement: PopoverPlacement::BottomLeading,
             accessibility_label: None,
             tooltip: None,
+            is_borderless: false,
             label,
         }
     }
@@ -110,7 +119,13 @@ impl<Label: View + Clone + 'static> MenuButton<Label> {
             false,
             self.tooltip.clone(),
         )
-        .button_style(SecondaryButtonStyle)
+        .button_style_any(if self.is_borderless {
+            crate::theme::styles::buttons::button_style::AnyButtonStyle::new(
+                crate::theme::styles::buttons::GhostButtonStyle,
+            )
+        } else {
+            crate::theme::styles::buttons::button_style::AnyButtonStyle::new(SecondaryButtonStyle)
+        })
         .capture_frame(frame);
         match &self.accessibility_label {
             Some(label) => AnyView::new(
@@ -124,8 +139,12 @@ impl<Label: View + Clone + 'static> MenuButton<Label> {
         let mut popover = Popover::new(self.label.clone(), self.menu(presented))
             .is_presented(presented.into())
             .enabled(self.is_enabled)
-            .placement(self.placement)
-            .trigger_style(SecondaryButtonStyle);
+            .placement(self.placement);
+        popover = if self.is_borderless {
+            popover.trigger_style(crate::theme::styles::buttons::GhostButtonStyle)
+        } else {
+            popover.trigger_style(SecondaryButtonStyle)
+        };
         if let Some(width) = self.width {
             popover = popover.width(width);
         }

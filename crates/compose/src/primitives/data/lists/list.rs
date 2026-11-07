@@ -17,7 +17,7 @@ use crate::primitives::overlays::selection_key_host::SelectionKeyHost;
 use crate::theme::styles::components::selection_appearance::{SelectionAppearance, SelectionRole};
 use crate::theme::styles::components::{ListRowStyleConfiguration, ListRowStyleEnvironment};
 use crate::theme::{TextScalerReader, theme_for_node};
-use crate::{AnyView, PrimitiveView, View, impl_primitive_view};
+use crate::{AnyView, PrimitiveView, View, ViewExt, impl_primitive_view};
 use cove_core::scene::{
     AccessibilityActions, AccessibilityRole, AccessibilitySemantics, AccessibilityState,
     EventPhase, EventResult, HoverPhase, InputHandlerRoute, InteractionRegistryHolder, LayoutNode,
@@ -322,6 +322,14 @@ impl<Id: CollectionId> List<Id> {
                 let target = core.target();
                 let rows = list.row_content.clone();
                 let last = list.ids.last().cloned();
+                // The id after each row: a hairline never runs into the
+                // selection band below it, as in a macOS inset list.
+                let next: Rc<std::collections::HashMap<Id, Id>> = Rc::new(
+                    list.ids
+                        .windows(2)
+                        .map(|pair| (pair[0].clone(), pair[1].clone()))
+                        .collect(),
+                );
                 let mut stack =
                     FixedVirtualStack::new(list.ids.to_vec(), height, move |id: &Id| {
                         let selected = core.selection.contains(id);
@@ -339,7 +347,10 @@ impl<Id: CollectionId> List<Id> {
                             id: 0,
                             is_selected: selected,
                             row_height: height,
-                            shows_separator: last.as_ref() != Some(id),
+                            shows_separator: last.as_ref() != Some(id)
+                                && !next
+                                    .get(id)
+                                    .is_some_and(|after| core.selection.contains(after)),
                             on_activate: Rc::new(move || activate.activate(activate_id.clone())),
                             on_tap,
                             content: rows(id, RowState::selected(selected)),
@@ -364,9 +375,12 @@ impl<Id: CollectionId> View for List<Id> {
         let host = AnyView::new(SelectionKeyHost::new(rows, true, move |event| {
             core.handle_key(event)
         }));
+        // An inset list: one rounded box in the surface fill, its rows inset
+        // so the selection band clears the box edge.
         AnyView::new(
             host.flex(1.0)
-                .frame(None, None, Some(0.0), Some(0.0), None, None),
+                .frame(None, None, Some(0.0), Some(0.0), None, None)
+                .modifier(InsetListBox),
         )
     }
 
@@ -393,5 +407,23 @@ impl<Id: CollectionId> List<Id> {
             anchor: self.anchor.clone(),
             cursor: self.cursor.clone(),
         }
+    }
+}
+
+/// The macOS inset list box: surface fill, group radius and a small side
+/// inset so the rounded selection band never touches the box edge.
+pub(crate) struct InsetListBox;
+
+impl cove_composition::ViewModifier for InsetListBox {
+    fn apply_node(&self, node: &Node) {
+        let theme = theme_for_node(node);
+        node.set_background_color(Some(theme.colors.surface));
+        node.set_corner_radius(theme.radius.lg);
+    }
+
+    fn apply_layout(&self, layout: &cove_core::scene::LayoutNode) {
+        // Horizontal only: an authored list height stays the rows' height.
+        layout.set_padding(4.0, cove_core::scene::Edge::Left);
+        layout.set_padding(4.0, cove_core::scene::Edge::Right);
     }
 }

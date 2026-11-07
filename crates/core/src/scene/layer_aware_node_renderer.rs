@@ -295,9 +295,8 @@ fn begin(
     if let Some(reveal) = node.reveal_request() {
         target_list(open).begin_reveal(reveal);
     }
-    if clipped {
-        target_list(open).push_clip_rect(clip);
-    }
+    // A node's own shadow falls outside its box, so it is painted before the
+    // node's clip goes on: clipping to bounds clips content, not the shadow.
     let rect = Rect::new(x, y, width, height);
     let occluded = node.background_color().is_some().then_some(rect);
     let layers = LayeredShadow {
@@ -312,6 +311,9 @@ fn begin(
         (node.backdrop_blur() > 0.0).then_some(rect),
         occluded,
     );
+    if clipped {
+        target_list(open).push_clip_rect(clip);
+    }
     let frosted = node.backdrop_blur() > 0.0 && node.background_color().is_some();
     if !frosted {
         emit_border(node, target_list(open), rect, radius, border_width);

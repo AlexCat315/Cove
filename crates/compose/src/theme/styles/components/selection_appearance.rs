@@ -15,8 +15,8 @@ use crate::{AnyView, View, impl_primitive_view};
 ///
 /// Three roles, because the surfaces answer different questions:
 ///
-/// - `Sidebar`: the iOS/macOS source list pill. A neutral grouped fill keeps
-///   the selected destination quiet; the accent is reserved for controls.
+/// - `Sidebar`: the macOS source list pill: one neutral step darker than the
+///   sidebar fill. The accent stays on the row icons and on controls.
 /// - `Navigation`: an accent-tinted pill for tabs and compact navigation.
 /// - `DataRow`: an edge-to-edge band, for dense grids whose rows share
 ///   horizontal rules with their neighbours and must keep column alignment.
@@ -51,13 +51,23 @@ impl SelectionAppearance {
         let inset_role = role != SelectionRole::DataRow;
         Self {
             fill: if role == SelectionRole::Sidebar {
-                colors.surface_variant
+                colors
+                    .surface_variant
+                    .composited(colors.state_layer_pressed)
             } else {
                 colors.selection
             },
             hover_fill: colors.state_layer_hover,
             pressed_fill: colors.state_layer_pressed,
-            corner_radius: if inset_role { theme.radius.md } else { 0.0 },
+            // Navigation selections are capsules, as macOS tabs and segmented
+            // controls are; a source list keeps a rounded rect.
+            corner_radius: match role {
+                // Capsule for the 28-32pt rows these sit in; a finite radius
+                // keeps clipping masks well-formed.
+                SelectionRole::Navigation => theme.radius.xl,
+                SelectionRole::Sidebar => theme.radius.md,
+                SelectionRole::DataRow => 0.0,
+            },
             horizontal_inset: if inset_role { theme.spacing.sm } else { 0.0 },
             vertical_inset: if inset_role { theme.spacing.xs } else { 0.0 },
         }
@@ -68,14 +78,14 @@ impl SelectionAppearance {
     pub fn fill(&self, is_selected: bool, is_hovered: bool, is_pressed: bool) -> Color {
         if is_pressed {
             return if is_selected {
-                self.pressed_fill.composited(self.fill)
+                self.fill.composited(self.pressed_fill)
             } else {
                 self.pressed_fill
             };
         }
         if is_hovered {
             return if is_selected {
-                self.hover_fill.composited(self.fill)
+                self.fill.composited(self.hover_fill)
             } else {
                 self.hover_fill
             };

@@ -1,8 +1,8 @@
 //! Translation of Theme/Styles/Components/DefaultSliderStyle.swift.
 //!
-//! Built-in style, matching the reference control: a 6-pt track with a neutral
-//! empty half and an accent filled half, and a white 20x16 capsule knob with a
-//! small key shadow. The knob stays white; the fill carries the accent, and the
+//! Built-in style, matching the macOS control: a 4-pt track with a neutral
+//! empty half and an accent filled half, and a white 26x18 capsule knob lifted
+//! by a soft shadow. The knob stays white; the fill carries the accent, and the
 //! track reacts to hover / press.
 use cove_core::{Color, SurfaceShadow};
 
@@ -22,9 +22,9 @@ impl SliderStyle for DefaultSliderStyle {
             crate::theme::ControlSize::Large => 1.25,
         };
         let track = if configuration.is_enabled {
-            theme.colors.border
+            theme.colors.surface_pressed
         } else {
-            theme.colors.border.multiplied_alpha(0.6)
+            theme.colors.surface_pressed.multiplied_alpha(0.6)
         };
         let fill = if configuration.is_enabled {
             theme.colors.accent
@@ -38,31 +38,32 @@ impl SliderStyle for DefaultSliderStyle {
         };
         // The empty track darkens slightly while the knob is held.
         let track_color = if configuration.is_pressed {
-            theme.colors.border_strong
+            theme.colors.border
         } else {
             track
         };
         SliderAppearance::new(
-            6.0 * scale,
+            4.0 * scale,
             track_color,
             fill,
-            16.0 * scale,
-            Some(20.0 * scale),
+            18.0 * scale,
+            Some(26.0 * scale),
             knob,
-            // Keyboard focus draws a 2-px ring around the white capsule knob.
+            // Keyboard focus draws a 2-px ring; at rest a faint hairline keeps
+            // the white knob legible on white cards.
             if configuration.is_focused {
                 Some(theme.colors.focus_ring)
             } else {
-                Some(theme.colors.border_strong.multiplied_alpha(0.45))
+                Some(Color::from_rgba8(0, 0, 0, 0x1A))
             },
-            if configuration.is_focused { 2.0 } else { 1.0 },
+            if configuration.is_focused { 2.0 } else { 0.5 },
             Some(SurfaceShadow {
-                color: Some(Color::from_rgba8(0, 0, 0, 64)),
+                color: Some(Color::from_rgba8(0, 0, 0, 0x38)),
                 offset_x: 0.0,
-                offset_y: 1.0,
-                blur: 3.0,
+                offset_y: 2.0,
+                blur: 5.0,
             }),
-            3.0,
+            2.0 * scale,
         )
     }
 }

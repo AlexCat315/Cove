@@ -1947,7 +1947,8 @@ impl PrimitiveView for DataTableRowHost {
         let fill = if self.is_selected {
             theme.colors.accent
         } else if self.is_striped && self.row % 2 == 1 {
-            theme.colors.surface.multiplied_alpha(0.6)
+            // macOS alternating rows: one step of fill, never a tinted wash.
+            theme.colors.surface_variant
         } else {
             theme.colors.background
         };

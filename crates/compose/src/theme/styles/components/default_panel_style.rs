@@ -1,8 +1,8 @@
 //! Translation of Theme/Styles/Components/DefaultPanelStyle.swift.
 //!
-//! Panel default — the "floating island" idiom: the panel body is a rounded
-//! slab of `surface_sunken`, darker than the window canvas, with no border and
-//! no header fill. Separation between neighbouring panels comes from the canvas
+//! Panel default — the macOS grouped box: the panel body is a rounded slab of
+//! `surface_variant`, one step of fill off the white window, with no border
+//! and no header fill. Separation between neighbouring panels comes from the canvas
 //! showing through the gutters, not from lines. The header has a 34 pt minimum
 //! and grows with its title and accessories. Active panels brighten the title
 //! rather than repainting the header.
@@ -74,7 +74,7 @@ impl PanelStyle for DefaultPanelStyle {
                 0.0,
                 AnyView::new(TupleView::new(vec![header, body])),
             )
-            .semantic_background(SemanticColorRef::surface_sunken())
+            .semantic_background(SemanticColorRef::surface_variant())
             .corner_radius(theme.radius.xl)
             .clipped(),
         )

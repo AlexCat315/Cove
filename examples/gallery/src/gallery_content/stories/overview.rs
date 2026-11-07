@@ -8,8 +8,10 @@
 
 use cove_composition::Scope;
 use cove_core::Binding;
+use cove_core::State;
+use cove_core::scene::Animation;
 use cove_core::scene::{Align, FlexDirection, Justify, Wrap};
-use cove_core::{Color, State};
+use cove_ui_compose::animation::{CascadeInExt, NumericText};
 use cove_ui_compose::modifiers::layout::{FlexExt, LayoutFrameExt, PaddingExt};
 use cove_ui_compose::modifiers::style::AppearanceExt;
 use cove_ui_compose::primitives::controls::Button;
@@ -24,7 +26,7 @@ use cove_ui_compose::primitives::text::Text;
 use cove_ui_compose::theme::ThemeReader;
 use cove_ui_compose::theme::styles::buttons::SecondaryButtonStyle;
 use cove_ui_compose::theme::styles::buttons::button_style::ButtonStyleViewExt;
-use cove_ui_compose::theme::tokens::{SemanticColorRef, SemanticStyleViewExt};
+use cove_ui_compose::theme::tokens::{SemanticColorRef, SemanticFontRef, SemanticStyleViewExt};
 use cove_ui_compose::{AnyView, BoxView, DynamicField, LayoutDebugExt, TupleView, View};
 
 use crate::gallery_content::catalog::GalleryOptions;
@@ -54,9 +56,8 @@ impl View for DashboardCard {
     fn body(&self, _cx: &Scope) -> AnyView {
         let content = self.content.clone();
         AnyView::new(ThemeReader::new(move |theme| {
-            let border = theme.colors.border.multiplied_alpha(0.55);
-            let shadow = theme.elevation.low.color.unwrap_or(Color::CLEAR);
-            let radius = theme.radius.xl;
+            // A grouped box: one step of fill above the window, no outline or
+            // shadow.
             AnyView::new(
                 BoxView::new(
                     FlexDirection::Column,
@@ -67,10 +68,9 @@ impl View for DashboardCard {
                     content.clone(),
                 )
                 .padding(20.0)
-                .background_color(theme.colors.surface_raised)
-                .corner_radius(radius)
-                .border_color(border, 1.0)
-                .shadow(shadow, 0.0, 2.0, 8.0),
+                .background_color(theme.colors.surface_variant)
+                .corner_radius(theme.radius.lg)
+                .cascade_in(),
             )
         }))
     }
@@ -78,6 +78,47 @@ impl View for DashboardCard {
     fn dynamic_properties(&self) -> Vec<DynamicField> {
         Vec::new()
     }
+}
+
+/// A numeric metric rolls to its new value on a short ease-out; any other value is
+/// plain text.
+fn metric_value(value: &str) -> AnyView {
+    let grouped = value.contains(',');
+    let plain = value.replace(',', "");
+    let Ok(number) = plain.parse::<f64>() else {
+        return AnyView::new(Text::new(value.to_string()));
+    };
+    let decimals = plain
+        .split_once('.')
+        .map_or(0, |(_, fraction)| fraction.len());
+    AnyView::new(NumericText::with_format(
+        number,
+        Some(Animation::new(
+            0.4,
+            cove_ui_compose::theme::Easing::RESPONSIVE.as_animation_curve(),
+        )),
+        move |current| {
+            let text = format!("{current:.decimals$}");
+            if !grouped {
+                return text;
+            }
+            let (whole, fraction) = text
+                .split_once('.')
+                .map_or((text.as_str(), None), |(w, f)| (w, Some(f)));
+            let mut out = String::new();
+            for (index, digit) in whole.chars().enumerate() {
+                if index > 0 && (whole.len() - index) % 3 == 0 {
+                    out.push(',');
+                }
+                out.push(digit);
+            }
+            if let Some(fraction) = fraction {
+                out.push('.');
+                out.push_str(fraction);
+            }
+            out
+        },
+    ))
 }
 
 /// A titled metric with an optional history chart.
@@ -183,7 +224,9 @@ impl View for MetricCard {
                     5.0,
                     AnyView::new(TupleView::new(vec![
                         AnyView::new(
-                            Text::new(value).semantic_foreground(SemanticColorRef::on_surface()),
+                            AnyView::new(metric_value(&value))
+                                .semantic_font(SemanticFontRef::title())
+                                .semantic_foreground(SemanticColorRef::on_surface()),
                         ),
                         AnyView::new(
                             Text::new(unit)
@@ -527,6 +570,7 @@ impl View for IntroductionStory {
                     },
                 )
                 .enabled(enabled && !is_paused)
+                .button_style(cove_ui_compose::theme::styles::buttons::PrimaryButtonStyle)
                 .debug_name("dashboard-advance"),
             );
 

@@ -19,7 +19,7 @@ use crate::primitives::overlays::portal::{
 use crate::primitives::text::Text;
 use crate::theme::styles::buttons::{ButtonRole, ButtonStyleViewExt, GhostButtonStyle};
 use crate::theme::{ControlSizeViewExt, SemanticFontRef, ThemeReader};
-use crate::{AnyView, BoxView, PrimitiveView, View, impl_primitive_view};
+use crate::{AnyView, BoxView, PrimitiveView, View, ViewExt, impl_primitive_view};
 use cove_core::scene::{Align, FlexDirection, Justify, Wrap};
 use cove_core::scene::{AnimatorScheduler, AnyAnimationController, LayoutNode, Node, NodeResource};
 use cove_core::{Point, Rect, Signal};
@@ -304,8 +304,8 @@ impl View for ToastCard {
         let notification = self.notification.clone();
         let controller = self.controller.clone();
         AnyView::new(ThemeReader::new(move |theme: &crate::theme::Theme| {
-            let on_chip = theme.colors.background;
-            let on_chip_soft = theme.colors.background.multiplied_alpha(0.82);
+            let on_chip = theme.colors.on_surface;
+            let on_chip_soft = theme.colors.on_surface_variant;
             let mut lines: Vec<AnyView> = vec![AnyView::new(
                 Text::new(notification.title.clone())
                     .truncated()
@@ -370,9 +370,9 @@ impl View for ToastCard {
                     .foreground_color(on_chip_soft),
                 ));
             }
-            // Inverted toast: the primary text color fills the chip, the window
-            // background color carries the label, and a wide lift shadow floats
-            // it.
+            // A macOS notification banner: the frosted floating material, a
+            // hairline rim and a wide lift shadow.
+            let material = theme.materials.floating;
             AnyView::new(
                 BoxView::new(
                     FlexDirection::Row,
@@ -383,10 +383,14 @@ impl View for ToastCard {
                     AnyView::new(crate::TupleView::new(row)),
                 )
                 .foreground_color(on_chip)
-                .padding_edges(14.0, 10.0)
-                .background_color(theme.colors.on_surface)
-                .corner_radius(theme.radius.lg)
-                .shadow(cove_core::Color::from_rgba8(0, 0, 0, 64), 0.0, 6.0, 20.0),
+                .padding_edges(16.0, 12.0)
+                .background_color(material.tint)
+                .modifier(crate::primitives::overlays::support::Backdrop(
+                    material.blur,
+                ))
+                .corner_radius(theme.radius.xl)
+                .border_color(crate::theme::floating_outline(&theme.colors), 1.0)
+                .shadow(cove_core::Color::from_rgba8(0, 0, 0, 48), 0.0, 10.0, 24.0),
             )
         }))
     }

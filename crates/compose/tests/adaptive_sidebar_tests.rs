@@ -588,7 +588,7 @@ fn allocated_breakpoints_dialog_geometry_and_targets() {
                                     >= if input.contains(InputCapabilities::TOUCH) {
                                         44.0
                                     } else {
-                                        38.0
+                                        30.0
                                     }
                             );
                         }

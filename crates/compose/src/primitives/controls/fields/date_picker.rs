@@ -254,7 +254,8 @@ impl PrimitiveView for DatePickerBody {
 }
 crate::impl_primitive_view!(DatePickerBody);
 
-/// The trigger's surface: field chrome around the label, clear and chevron.
+/// The trigger's surface: a popup-button capsule around the label, clear and
+/// chevron.
 struct TriggerFace {
     content: AnyView,
 }
@@ -286,10 +287,12 @@ impl PrimitiveView for TriggerFace {
 
     fn update_node(&self, node: &cove_core::scene::Node) {
         let theme = crate::theme::theme_for_node(node);
+        // A popup-button capsule with a soft contact shadow, like Select.
         node.set_background_color(Some(theme.colors.surface));
-        node.set_corner_radius(theme.inputs.radius);
+        node.set_corner_radius(17.0);
         node.set_border_color(Some(theme.colors.border));
         node.set_border_width(1.0);
+        node.set_shadow(theme.elevation.low);
     }
 
     fn children(&self, _node: &cove_core::scene::Node) -> Vec<AnyView> {

@@ -1,7 +1,7 @@
 //! Translation of Theme/Theme.swift.
 use super::tokens::{
-    ColorScheme, ElevationScale, IconTheme, MotionScale, RadiusScale, SpacingScale, TextEmphasis,
-    ThemeExtensions, Typography,
+    ColorScheme, ElevationScale, IconTheme, MaterialScale, MotionScale, RadiusScale, SpacingScale,
+    TextEmphasis, ThemeExtensions, Typography,
 };
 use crate::theme::styles::InputAppearance;
 
@@ -18,6 +18,7 @@ pub struct Theme {
     pub radius: RadiusScale,
     pub elevation: ElevationScale,
     pub motion: MotionScale,
+    pub materials: MaterialScale,
     pub inputs: InputAppearance,
     pub text_emphasis: TextEmphasis,
     pub icons: IconTheme,
@@ -57,6 +58,7 @@ impl Theme {
             radius,
             elevation,
             motion,
+            materials: MaterialScale::from_surface(colors.surface, colors.surface_floating),
             inputs,
             text_emphasis: TextEmphasis::default(),
             icons: IconTheme::default(),

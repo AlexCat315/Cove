@@ -164,8 +164,9 @@ impl<Id: PartialEq + Eq + std::hash::Hash + Clone + Send + Sync + 'static> Adapt
     fn navigation(&self, geometry: SidebarGeometry) -> AnyView {
         let is_modal = geometry.is_modal;
         let presentation = geometry.presentation(self.options.layout.shows_rail_labels);
+        // A pointer source list is dense, as on macOS; touch keeps 44pt.
         let row_height = if geometry.mode == SidebarMode::Expanded {
-            38.0
+            30.0
         } else {
             44.0
         };

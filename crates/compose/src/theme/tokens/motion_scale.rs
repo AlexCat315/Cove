@@ -19,6 +19,10 @@ impl Easing {
     pub const STANDARD: Self = Self::cubic_bezier(0.4, 0.0, 0.2, 1.0);
     pub const EMPHASIZED: Self = Self::cubic_bezier(0.2, 0.0, 0.0, 1.0);
     pub const DECELERATE: Self = Self::cubic_bezier(0.0, 0.0, 0.2, 1.0);
+    /// Strong ease-out: moves at once, then glides into place.
+    pub const RESPONSIVE: Self = Self::cubic_bezier(0.23, 1.0, 0.32, 1.0);
+    /// The iOS sheet curve for on-screen movement.
+    pub const FLUID: Self = Self::cubic_bezier(0.32, 0.72, 0.0, 1.0);
 
     /// Convert the authored cubic-bezier descriptor into a runtime curve.
     pub fn as_animation_curve(self) -> AnimationCurve {
@@ -27,6 +31,8 @@ impl Easing {
 }
 
 /// Floating surfaces share entrance, exit and reveal sizing across components.
+/// Surfaces grow out of `reveal_scale` on a short ease-out and leave faster
+/// than they arrive.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct SurfaceMotion {
     /// Seconds.
@@ -39,8 +45,8 @@ impl Default for SurfaceMotion {
     fn default() -> Self {
         Self {
             entrance: 0.2,
-            exit: 0.09,
-            reveal_scale: 0.94,
+            exit: 0.12,
+            reveal_scale: 0.96,
         }
     }
 }
@@ -62,7 +68,7 @@ pub struct MotionScale {
 }
 impl Default for MotionScale {
     fn default() -> Self {
-        Self::new(0.08, 0.18, 0.32, Easing::EMPHASIZED, Easing::STANDARD)
+        Self::new(0.1, 0.22, 0.35, Easing::FLUID, Easing::RESPONSIVE)
     }
 }
 impl MotionScale {

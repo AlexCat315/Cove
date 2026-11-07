@@ -230,11 +230,8 @@ struct RadioItemStyle;
 impl ButtonStyle for RadioItemStyle {
     fn make_body(&self, configuration: ButtonStyleConfiguration) -> AnyView {
         let theme = configuration.theme.clone();
-        let fill = if configuration.is_hovered {
-            theme.colors.state_layer_hover
-        } else {
-            Color::CLEAR
-        };
+        // macOS radio rows have no hover band; the mark itself answers.
+        let fill = Color::CLEAR;
         AnyView::new(
             BoxView::new(
                 FlexDirection::Row,
@@ -265,7 +262,10 @@ impl ButtonStyle for RadioItemStyle {
     }
 }
 
-/// The radio mark: white face, ring, and an accent dot when selected.
+const RADIO_PROGRESS: &str = "radio.progress";
+
+/// The radio mark: a white well when empty; an accent disc with a white centre
+/// when selected.
 struct RadioMark {
     is_selected: bool,
     is_enabled: bool,
@@ -286,6 +286,35 @@ impl PrimitiveView for RadioMark {
     }
 
     fn update_node(&self, node: &Node) {
+        // The selection grows in: the disc fills with the accent while the
+        // white centre opens from nothing.
+        let target = if self.is_selected { 1.0_f32 } else { 0.0 };
+        let previous = node.attachment::<f32>(RADIO_PROGRESS);
+        let weak = node.downgrade();
+        let write = move |value: f32| {
+            if let Some(owner) = Node::upgrade(&weak) {
+                owner.set_attachment(RADIO_PROGRESS, value);
+                owner.mark_render_dirty(cove_core::scene::InvalidationSource::style_set(
+                    RADIO_PROGRESS,
+                ));
+            }
+        };
+        match previous {
+            Some(current) if current != target => {
+                let theme = theme_for_node(node);
+                let motion = cove_core::scene::Animation::new(
+                    theme.motion.standard,
+                    crate::theme::Easing::RESPONSIVE.as_animation_curve(),
+                );
+                cove_core::scene::ActiveAnimationContext::with(Some(motion), None, None, || {
+                    node.animatable_set_with(RADIO_PROGRESS, current, target, write);
+                });
+            }
+            Some(_) => {}
+            None => {
+                node.set_attachment(RADIO_PROGRESS, target);
+            }
+        }
         let weak = node.downgrade();
         let is_selected = self.is_selected;
         let is_enabled = self.is_enabled;
@@ -294,36 +323,45 @@ impl PrimitiveView for RadioMark {
                 return;
             };
             let colors = theme_for_node(&owner).colors;
+            let progress = owner.attachment::<f32>(RADIO_PROGRESS).unwrap_or(0.0);
+            let fill_amount = progress.clamp(0.0, 1.0);
             let rect = Rect::new(origin.x, origin.y, MARK_EDGE, MARK_EDGE);
-            // White face with a thin border, like the check box.
-            let fill = if is_enabled {
-                colors.background
-            } else {
-                colors.surface
-            };
-            let border = if !is_enabled {
-                colors.on_surface.multiplied_alpha(0.3)
-            } else if is_selected {
+            let opacity = owner.opacity();
+            let accent = if is_enabled {
                 colors.accent
             } else {
-                colors.border
+                colors.on_surface_muted
             };
-            let opacity = owner.opacity();
-            let _ = list.add_rounded_rect(rect, MARK_EDGE * 0.5, fill.multiplied_alpha(opacity));
-            // The selected ring is 2 px; the empty ring is 1 px.
+            // Empty: a white well with a hairline and a faint contact shadow.
+            list.add_shadow_layer(
+                cove_core::SurfaceShadow {
+                    color: Some(Color::from_rgba8(0, 0, 0, 0x1A).multiplied_alpha(opacity)),
+                    offset_x: 0.0,
+                    offset_y: 0.5,
+                    blur: 1.5,
+                },
+                rect,
+                MARK_EDGE * 0.5,
+                1.0,
+                None,
+                Some(rect),
+            );
+            let well = if is_enabled {
+                colors.surface
+            } else {
+                colors.surface_variant
+            };
+            let face = well.composited(accent.multiplied_alpha(fill_amount));
+            let _ = list.add_rounded_rect(rect, MARK_EDGE * 0.5, face.multiplied_alpha(opacity));
+            let ring = colors.border.multiplied_alpha(1.0 - fill_amount);
             let _ = list.add_rounded_rect_stroke(
                 rect,
                 MARK_EDGE * 0.5,
-                if is_selected { 2.0 } else { 1.0 },
-                border.multiplied_alpha(opacity),
+                1.0,
+                ring.multiplied_alpha(opacity),
             );
-            if is_selected {
-                let dot = if is_enabled {
-                    colors.accent
-                } else {
-                    colors.on_surface_muted
-                };
-                let diameter = 6.0;
+            if progress > 0.0 {
+                let diameter = 6.0 * progress.max(0.0);
                 let _ = list.add_rounded_rect(
                     Rect::new(
                         origin.x + (MARK_EDGE - diameter) * 0.5,
@@ -332,7 +370,7 @@ impl PrimitiveView for RadioMark {
                         diameter,
                     ),
                     diameter * 0.5,
-                    dot.multiplied_alpha(opacity),
+                    colors.on_accent.multiplied_alpha(opacity * fill_amount),
                 );
             }
         });

@@ -69,8 +69,8 @@ impl View for ListGroup {
                     content: content.clone(),
                 }
                 .frame(None, None, Some(0.0), None, None, None)
-                .background_color(theme.colors.surface_raised)
-                .corner_radius(theme.radius.md),
+                .background_color(theme.colors.surface_variant)
+                .corner_radius(theme.radius.lg),
             ));
             if let Some(footer) = footer.clone() {
                 column.push(AnyView::new(

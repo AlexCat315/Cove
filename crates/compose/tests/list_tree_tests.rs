@@ -401,10 +401,12 @@ fn selected_row_fits_its_slot() {
             "the highlight stays inside the 30pt row (expected {expected_height}), got {}",
             fill.frame().height
         );
+        // A list selection is the macOS rounded rect, not the capsule that
+        // tabs and segmented controls use.
         assert!(
-            (fill.corner_radius() - appearance.corner_radius).abs() < 0.01,
-            "the highlight uses the navigation radius {}, got {}",
-            appearance.corner_radius,
+            (fill.corner_radius() - theme.radius.md).abs() < 0.01,
+            "the highlight uses the control radius {}, got {}",
+            theme.radius.md,
             fill.corner_radius()
         );
         let viewport = scene

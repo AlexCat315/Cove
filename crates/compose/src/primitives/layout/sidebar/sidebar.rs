@@ -8,6 +8,9 @@ use crate::primitives::layout::sidebar::items::SidebarSections;
 use std::collections::HashSet;
 use std::rc::Rc;
 
+use crate::animation::geometry::{
+    SlidingSelection, SlidingSelectionMark, SlidingSelectionStyle, is_in_sliding_selection,
+};
 use crate::animation::{AnimatedVisibility, Transition};
 use crate::modifiers::interaction::AccessibilityExt;
 use crate::modifiers::layout::{FlexExt, FrameDimension, LayoutFrameExt, PaddingExt};
@@ -17,8 +20,9 @@ use crate::primitives::overlays::roving_focus::{
 };
 use crate::primitives::text::Text;
 use crate::theme::SemanticFontRef;
+use crate::theme::styles::components::selection_appearance::{SelectionAppearance, SelectionRole};
 use crate::{
-    AnyView, BoxView, LayoutDebugExt, PrimitiveView, TupleView, View, impl_primitive_view,
+    AnyView, BoxView, LayoutDebugExt, PrimitiveView, TupleView, View, ViewExt, impl_primitive_view,
 };
 use cove_core::Binding;
 use cove_core::scene::{
@@ -64,7 +68,7 @@ impl<Id: PartialEq + Eq + std::hash::Hash + Clone + Send + Sync + 'static> Sideb
             sections,
             presentation: SidebarPresentation::Expanded,
             expanded: None,
-            minimum_row_height: 38.0,
+            minimum_row_height: 30.0,
             on_activate: Rc::new(|_| {}),
             ambient_theme: crate::theme::styles::default_light_theme::value(),
             header: AnyView::new(crate::EmptyView),
@@ -86,7 +90,7 @@ impl<Id: PartialEq + Eq + std::hash::Hash + Clone + Send + Sync + 'static> Sideb
         self.minimum_row_height = if height.is_finite() {
             height.max(0.0)
         } else {
-            38.0
+            30.0
         };
         self
     }
@@ -364,17 +368,27 @@ impl<Id: PartialEq + Eq + std::hash::Hash + Clone + Send + Sync + 'static> View 
                 }
             },
             move |id: &Id| identity(id),
-            AnyView::new(
-                BoxView::new(
-                    FlexDirection::Column,
-                    Align::Stretch,
-                    Justify::FlexStart,
-                    Wrap::NoWrap,
-                    10.0,
-                    AnyView::new(TupleView::new(section_views)),
-                )
-                .padding_edges(gutter, 4.0),
-            ),
+            AnyView::new(SlidingSelection::new(
+                |theme| {
+                    let appearance = SelectionAppearance::resolve(SelectionRole::Sidebar, theme);
+                    SlidingSelectionStyle {
+                        fill: appearance.fill,
+                        corner_radius: appearance.corner_radius,
+                        shadow: cove_core::SurfaceShadow::NONE,
+                    }
+                },
+                AnyView::new(
+                    BoxView::new(
+                        FlexDirection::Column,
+                        Align::Stretch,
+                        Justify::FlexStart,
+                        Wrap::NoWrap,
+                        10.0,
+                        AnyView::new(TupleView::new(section_views)),
+                    )
+                    .padding_edges(gutter, 4.0),
+                ),
+            )),
         )
         .recovery({
             let hierarchy = recovery_hierarchy.clone();
@@ -463,11 +477,17 @@ impl<Id: PartialEq + Eq + std::hash::Hash + Clone + Send + Sync + 'static> View 
                 slot(self.footer.clone()),
             ])),
         ));
-        // At rest the edge between navigation and content is the change of
-        // surface; the resize handle draws a line only while grabbed.
+        // The expanded sidebar floats, macOS 26 style: a neutral frosted panel
+        // inset from the window edge. A rail stays flush so its 40pt tiles keep
+        // their gutter. The resize handle draws a line only while grabbed.
         let rail_width = self.presentation.rail_width();
+        // The pane runs the full window height in the sidebar fill and meets
+        // the content at a hairline, the way a macOS source list does.
         let body = AnyView::new(
-            AnyView::new(body.semantic_background(crate::theme::SemanticColorRef::surface()))
+            AnyView::new(body.flex_with(1.0, 1.0, Some(0.0))).modifier(SidebarPaneFinish),
+        );
+        let body = AnyView::new(
+            body
                 // Always a width: the modifier leaves an unset dimension alone, so
                 // leaving the rail with `None` would keep the rail's width.
                 .frame(
@@ -525,6 +545,9 @@ struct SidebarChromeRow {
     label: AnyView,
     minimum_height: f32,
     fill: cove_core::Color,
+    /// Fill when a sliding selection host paints the resting selection.
+    feedback_fill: cove_core::Color,
+    is_selected: bool,
     ink: cove_core::Color,
     radius: f32,
     ring: cove_core::Color,
@@ -544,7 +567,8 @@ impl PrimitiveView for SidebarChromeRow {
 
     fn update_node(&self, _node: &Node) {}
 
-    fn children(&self, _node: &Node) -> Vec<AnyView> {
+    fn children(&self, node: &Node) -> Vec<AnyView> {
+        let slides = self.is_selected && is_in_sliding_selection(node);
         let row = BoxView::new(
             FlexDirection::Row,
             Align::Center,
@@ -554,15 +578,47 @@ impl PrimitiveView for SidebarChromeRow {
             AnyView::new(self.label.clone().with_modifier(FlexGrowOne)),
         )
         .foreground_color(self.ink)
-        .background_color(self.fill)
+        .background_color(if slides {
+            self.feedback_fill
+        } else {
+            self.fill
+        })
         .corner_radius(self.radius)
         .border_color(self.ring, self.ring_width)
+        .modifier(SlidingSelectionMark(slides))
         .flex_with(1.0, 1.0, None)
         .frame(None, None, Some(0.0), Some(self.minimum_height), None, None);
         vec![AnyView::new(row)]
     }
 }
 crate::impl_primitive_view!(SidebarChromeRow);
+
+/// The pane finish: the sidebar fill and a hairline on the edge that meets the
+/// content.
+struct SidebarPaneFinish;
+
+impl cove_composition::ViewModifier for SidebarPaneFinish {
+    fn apply_node(&self, node: &Node) {
+        let colors = crate::theme::theme_for_node(node).colors;
+        node.set_background_color(Some(colors.surface_variant));
+        let weak = node.downgrade();
+        node.update_overlay_draw(colors.divider, move |list, origin| {
+            let Some(node) = Node::upgrade(&weak) else {
+                return;
+            };
+            let frame = node.frame();
+            let x = if node.resolves_right_to_left() {
+                origin.x
+            } else {
+                origin.x + frame.width - 1.0
+            };
+            let _ = list.add_rect(
+                cove_core::Rect::new(x, origin.y, 1.0, frame.height),
+                colors.divider,
+            );
+        });
+    }
+}
 
 /// The icon-only rail paints one compact, centered tile instead of a full-width
 /// band. The button keeps the whole row as its hit target; only the visible
@@ -576,6 +632,8 @@ struct RailChromeRow {
     label: AnyView,
     minimum_height: f32,
     fill: cove_core::Color,
+    feedback_fill: cove_core::Color,
+    is_selected: bool,
     ink: cove_core::Color,
     radius: f32,
     ring: cove_core::Color,
@@ -596,7 +654,8 @@ impl PrimitiveView for RailChromeRow {
 
     fn update_node(&self, _node: &Node) {}
 
-    fn children(&self, _node: &Node) -> Vec<AnyView> {
+    fn children(&self, node: &Node) -> Vec<AnyView> {
+        let slides = self.is_selected && is_in_sliding_selection(node);
         let label = AnyView::new(self.label.clone());
         let label = if self.shows_labels {
             AnyView::new(label.flex_with(1.0, 1.0, Some(0.0)))
@@ -612,9 +671,14 @@ impl PrimitiveView for RailChromeRow {
             label,
         )
         .foreground_color(self.ink)
-        .background_color(self.fill)
+        .background_color(if slides {
+            self.feedback_fill
+        } else {
+            self.fill
+        })
         .corner_radius(self.radius)
-        .border_color(self.ring, self.ring_width);
+        .border_color(self.ring, self.ring_width)
+        .modifier(SlidingSelectionMark(slides));
         let surface = if self.shows_labels {
             surface.flex_with(1.0, 1.0, None)
         } else {
@@ -676,6 +740,8 @@ impl crate::theme::styles::buttons::ButtonStyle for SidebarItemStyle {
             configuration.is_hovered,
             configuration.is_pressed,
         );
+        let feedback_fill =
+            appearance.fill(false, configuration.is_hovered, configuration.is_pressed);
         let ink = if !configuration.is_enabled {
             theme
                 .text_emphasis
@@ -698,6 +764,8 @@ impl crate::theme::styles::buttons::ButtonStyle for SidebarItemStyle {
                 label: configuration.label.clone(),
                 minimum_height: self.minimum_height.max(44.0),
                 fill,
+                feedback_fill,
+                is_selected: configuration.is_selected,
                 ink,
                 radius: appearance.corner_radius,
                 ring,
@@ -709,6 +777,8 @@ impl crate::theme::styles::buttons::ButtonStyle for SidebarItemStyle {
             label: configuration.label.clone(),
             minimum_height: self.minimum_height,
             fill,
+            feedback_fill,
+            is_selected: configuration.is_selected,
             ink,
             radius: appearance.corner_radius,
             ring,

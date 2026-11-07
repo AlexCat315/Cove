@@ -31,7 +31,7 @@ impl ListRowStyle for DefaultListRowStyle {
                 colors.accent
             }
         } else if configuration.is_hovered {
-            colors.surface_variant
+            colors.state_layer_hover
         } else {
             Color::CLEAR
         };
@@ -93,6 +93,10 @@ struct ListRowSeparatorModifier {
 impl cove_composition::ViewModifier for ListRowSeparatorModifier {
     fn apply_node(&self, node: &Node) {
         if !self.is_enabled {
+            // A recycled row may still carry the hairline it drew before.
+            if node.draw().is_some() {
+                node.set_draw(None);
+            }
             return;
         }
         let mut parent = Some(node.clone());
@@ -116,10 +120,13 @@ impl cove_composition::ViewModifier for ListRowSeparatorModifier {
             };
             let frame = owner.frame();
             let left = if rtl { 0.0 } else { inset };
+            // Inset at both ends, so the hairline lines up with the rounded
+            // selection band rather than running past it.
+            let _ = left;
             let rect = Rect::new(
-                origin.x + left,
+                origin.x + inset,
                 origin.y + frame.height - 0.5,
-                (frame.width - inset).max(0.0),
+                (frame.width - inset * 2.0).max(0.0),
                 0.5,
             );
             let _ = list.add_rect(rect, color);
