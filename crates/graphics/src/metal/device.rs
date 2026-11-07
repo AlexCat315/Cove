@@ -131,21 +131,25 @@ impl MetalDeviceHandle {
 
     pub fn adapter_capabilities(&self) -> AdapterCapabilities {
         AdapterCapabilities {
-            ray_tracing: self.device.supportsRaytracing(),
+            ray_tracing: self.capabilities.ray_tracing.acceleration_structures,
             mesh_shading: self.supports_mesh_shading(),
         }
     }
 
     pub fn supports_mesh_shading(&self) -> bool {
-        self.device.supportsFamily(MTLGPUFamily::Apple7)
-            || self.device.supportsFamily(MTLGPUFamily::Mac2)
+        self.capabilities.mesh_shading.mesh
     }
 
     /// Only implemented paths are exposed, gated by native device support.
     fn query_capabilities(device: &ProtocolObject<dyn MTLDevice>) -> Capabilities {
-        let ray_tracing = device.supportsRaytracing();
-        let mesh = device.supportsFamily(MTLGPUFamily::Apple7)
-            || device.supportsFamily(MTLGPUFamily::Mac2);
+        // The virtual-machine GPU reports Mac2 features it cannot allocate:
+        // its driver aborts inside the allocation instead of returning nil, so
+        // it keeps the core raster and compute paths only.
+        let paravirtual = Self::is_paravirtual(device);
+        let ray_tracing = !paravirtual && device.supportsRaytracing();
+        let mesh = !paravirtual
+            && (device.supportsFamily(MTLGPUFamily::Apple7)
+                || device.supportsFamily(MTLGPUFamily::Mac2));
         Capabilities::configure(|capabilities| {
             capabilities.graphics = true;
             capabilities.compute = true;
@@ -155,7 +159,8 @@ impl MetalDeviceHandle {
             // Task shaders stay disabled: the mesh implementation has no depth
             // state path yet, matching the Swift capability set.
             capabilities.mesh_shading.task = false;
-            capabilities.indirect_draw = Self::probe_indirect_command_buffer(device);
+            capabilities.indirect_draw =
+                !paravirtual && Self::probe_indirect_command_buffer(device);
             capabilities.textures.texture_3d = Self::probe_texture(
                 device,
                 MTLTextureType::Type3D,
@@ -170,6 +175,11 @@ impl MetalDeviceHandle {
             );
             capabilities.max_queues = QueueLimits::default();
         })
+    }
+
+    /// Apple's paravirtualized GPU, which macOS virtual machines expose.
+    fn is_paravirtual(device: &ProtocolObject<dyn MTLDevice>) -> bool {
+        device.name().to_string().contains("Paravirtual")
     }
 
     /// Indirect draw is advertised only when the device can allocate an

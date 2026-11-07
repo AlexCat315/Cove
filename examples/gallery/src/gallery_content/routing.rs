@@ -180,7 +180,9 @@ impl StoryDispatch {
                 Some(AnyView::new(stories::ViewThatFitsStory::new()))
             }
             Self::Story(GalleryPage::Badge) => Some(AnyView::new(stories::BadgeStory)),
-            Self::Story(GalleryPage::Alert) => Some(AnyView::new(stories::AlertStory::new())),
+            Self::Story(GalleryPage::Alert) => {
+                Some(AnyView::new(stories::AlertStory::new(options)))
+            }
             Self::Story(GalleryPage::Progress) => {
                 Some(AnyView::new(stories::ProgressStory::new(options)))
             }

@@ -28,7 +28,7 @@ use cove_ui_compose::adaptive::SurfaceEnvironmentExt;
 use cove_ui_compose::modifiers::interaction::AccessibilityExt;
 use cove_ui_compose::modifiers::layout::LayoutFrameExt;
 use cove_ui_compose::primitives::controls::Button;
-use cove_ui_compose::primitives::feedback::{Alert, AlertTone, StatusTone};
+use cove_ui_compose::primitives::feedback::{Alert, AlertVariant, StatusTone};
 use cove_ui_compose::primitives::text::Text;
 use cove_ui_compose::theme::TextScalerViewExt;
 use cove_ui_compose::theme::tokens::{IconScaling, ReducedMotionViewExt};
@@ -82,7 +82,7 @@ fn with_actions(retry: impl Fn() + 'static) -> Alert {
                 .accessibility_label("Offline"),
         ),
     ]));
-    Alert::with_actions(TITLE, actions).message(MESSAGE)
+    Alert::new(TITLE).message(MESSAGE).actions(actions)
 }
 
 #[test]
@@ -97,9 +97,9 @@ fn actions_fit_the_card_and_keep_alignment_and_semantics() {
                             ("dark", Theme::default_dark()),
                         ] {
                             for (variant_label, variant) in [
-                                ("soft", AlertTone::Soft),
-                                ("outline", AlertTone::Outline),
-                                ("filled", AlertTone::Filled),
+                                ("soft", AlertVariant::Soft),
+                                ("outline", AlertVariant::Outline),
+                                ("filled", AlertVariant::Filled),
                             ] {
                                 let context = PlatformInputContext::new();
                                 context.with_current(|| {
@@ -112,14 +112,14 @@ fn actions_fit_the_card_and_keep_alignment_and_semantics() {
                                     };
 
                                     let mut resolved = theme.clone();
-                                    if variant == AlertTone::Filled {
+                                    if variant == AlertVariant::Filled {
                                         resolved.icons.scaling = IconScaling::Factor(1.5);
                                     }
 
                                     let body = with_actions(|| {})
                                         .tone(StatusTone::Warning)
                                         .variant(variant)
-                                        .shows_icon(variant != AlertTone::Outline)
+                                        .shows_icon(variant != AlertVariant::Outline)
                                         .on_dismiss(|| {});
                                     let graph = support::graph();
                                     graph.install_view(
@@ -183,21 +183,18 @@ fn actions_fit_the_card_and_keep_alignment_and_semantics() {
                                         "the status carries the complete title and message ({context_label})"
                                     );
 
-                                    // Named difference: the Rust alert host publishes no
-                                    // `alert-icon-slot` node and resolves the glyph extent
-                                    // from the raw `theme.icons.medium` token, so neither the
-                                    // text scaler nor the icon-scaling override reaches it.
-                                    // Swift reads `icons.size(.medium)` through
-                                    // `IconMetricsReader`. The assertions below pin the
-                                    // current behaviour so a future fix trips them.
-                                    assert!(
-                                        !graph.layout_snapshot().iter().any(|entry| entry
-                                            .debug_name
-                                            .as_deref()
-                                            == Some("alert-icon-slot")),
-                                        "the Rust alert publishes no named icon slot ({context_label})"
-                                    );
-                                    if variant != AlertTone::Outline {
+                                    // The glyph extent resolves through `IconMetrics`, so
+                                    // both the text scaler and the icon-scaling override
+                                    // reach it. The slot centers the glyph against the
+                                    // heading line, as Swift's `alert-icon-slot` box does.
+                                    if variant != AlertVariant::Outline {
+                                        assert!(
+                                            graph.layout_snapshot().iter().any(|entry| entry
+                                                .debug_name
+                                                .as_deref()
+                                                == Some("alert-icon-slot")),
+                                            "the alert publishes a named, centered icon slot ({context_label})"
+                                        );
                                         let glyph = nodes
                                             .iter()
                                             .find(|node| {
@@ -206,42 +203,59 @@ fn actions_fit_the_card_and_keep_alignment_and_semantics() {
                                             })
                                             .cloned()
                                             .expect("the decorative glyph is hidden from assistive technology");
-                                        assert_eq!(
-                                            glyph.frame().width, 16.0,
-                                            "the glyph keeps the unscaled medium token ({context_label})"
+                                        let glyph_extent = if variant == AlertVariant::Filled {
+                                            theme.icons.medium * 1.5
+                                        } else {
+                                            theme.icons.medium * scale
+                                        };
+                                        assert!(
+                                            (glyph.frame().width - glyph_extent).abs() < 0.5,
+                                            "the glyph follows the icon metrics, expected {} got {} ({context_label})",
+                                            glyph_extent,
+                                            glyph.frame().width
                                         );
                                         let heading_frame = heading.absolute_frame();
                                         let glyph_frame = glyph.absolute_frame();
                                         if rtl {
                                             assert!(
                                                 heading_frame.max_x()
-                                                    <= glyph_frame.x - theme.spacing.sm,
+                                                    <= glyph_frame.x - theme.spacing.md,
                                                 "RTL places the heading before the glyph ({context_label})"
                                             );
                                         } else {
                                             assert!(
                                                 heading_frame.x
-                                                    >= glyph_frame.max_x() + theme.spacing.sm,
+                                                    >= glyph_frame.max_x() + theme.spacing.md,
                                                 "LTR places the heading after the glyph ({context_label})"
                                             );
                                         }
                                     }
 
-                                    // Named difference 2: `padding_insets` on a `Text`
-                                    // leaf is folded into the text node itself, so the
-                                    // inset widens the node but never offsets the glyphs.
-                                    // Swift wraps the text in a padded box and the child
-                                    // text lands at box-origin + inset. The detail text
-                                    // therefore sits at the card's content origin here
-                                    // instead of under the heading. Pinned below.
+                                    // The explanation hangs under the heading, not under
+                                    // the glyph. The inset rides on the text node itself,
+                                    // so the node frame is the padded outer box: resolve
+                                    // the node's own padding to place the first glyph.
                                     let (heading_frame, detail_frame) =
                                         (heading.absolute_frame(), detail.absolute_frame());
-                                    assert!(
-                                        (detail_frame.x - status.absolute_frame().x - theme.spacing.md)
-                                            .abs()
-                                            < 0.5,
-                                        "the detail text keeps the card's content origin ({context_label})"
-                                    );
+                                    let detail_padding = detail
+                                        .layout_node()
+                                        .map(|layout| layout.resolved_padding())
+                                        .expect("the detail text layout");
+                                    if rtl {
+                                        let glyph_trailing =
+                                            detail_frame.max_x() - detail_padding.right;
+                                        assert!(
+                                            (heading_frame.max_x() - glyph_trailing).abs() < 0.5,
+                                            "RTL aligns the detail's trailing glyph edge with the heading's ({context_label})"
+                                        );
+                                    } else {
+                                        let glyph_leading =
+                                            detail_frame.x + detail_padding.left;
+                                        assert!(
+                                            (glyph_leading - heading_frame.x).abs() < 0.5,
+                                            "LTR aligns the detail's leading glyph edge with the heading's ({context_label})"
+                                        );
+                                    }
                                     if rtl {
                                         assert!(
                                             heading_frame.max_x() <= detail_frame.max_x() + 0.5,

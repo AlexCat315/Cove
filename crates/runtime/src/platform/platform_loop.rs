@@ -161,6 +161,11 @@ impl PlatformLoop {
                     self.shell.set_window_chrome_hit_test(id, hit.as_ref());
                 }
             }
+            PlatformCommand::SetAppearance(id, appearance) => {
+                if let Some(id) = native(&self.native_ids, id) {
+                    self.shell.set_window_appearance(id, appearance);
+                }
+            }
             PlatformCommand::SetPosition(id, x, y) => {
                 if let Some(id) = native(&self.native_ids, id) {
                     self.shell.set_window_position(id, x, y);

@@ -4,6 +4,23 @@
 
 ## Unreleased
 
+- **Alert 视觉重做与 API 完善（2026-11-07）**：
+  - 图标：状态标记改为 SF Symbols 式实心符号——勾、叉、感叹号与信息标记从实心圆形 / 三角形中挖空（`check-circle-fill`、`x-circle-fill`、`info-circle-fill`、`alert-triangle-fill`、`circle-fill`），16pt 下仍是一块清晰记号；新增 `StatusTone::filled_icon()`，原有描边 `icon()` 保持不变。
+  - 外观：`Soft` 底色按 10% 混入 tone 色并压一条 18% 同色发丝边，`Outline` 描边降到 35%；标题与说明按 2pt 配对、操作行单独留 8pt；关闭按钮改用中性灰而不是 tone 色；圆角为 `radius.md`。
+  - API（破坏性）：`AlertTone` 更名为 `AlertVariant`；`with_actions` 由链式 `.actions(view)` 取代；新增 `.enabled(bool)`（60% 不透明度、语义禁用、关闭失活）、`.dismiss_label(...)`、`AlertMetrics` 密度（Mini/Small、Regular、Large 的图标、内边距与间距统一随 `ControlSizeEnvironment` 缩放）。
+  - Gallery：Alert 页按 Swift 段落重排为 Actions & dismissal、Inline feedback，并保留 Variants、Density；dismiss → Show alert 与 Disabled 交互经 DevTools 后置条件验证，浅色 / 深色截图目检通过。用户文档：`alert.md`。
+
+- **半透明侧栏、正文卡片、指针与 CI（2026-11-07）**：
+  - 窗口背景：`WindowOptions` / `WindowConfiguration` 新增 `backdrop: WindowBackdrop`（`Opaque` / `Sidebar`），`WindowHandle::backdrop()` 与 `WindowSnapshot` 报告平台实际应用的值。macOS 在内容视图最底层插入 `NSVisualEffectView`（`Sidebar` 材质、窗口后方混合、跟随窗口激活状态），窗口与 `CAMetalLayer` 设为非不透明，主窗口清屏色改为 `[0,0,0,0]`——UI 的直通 alpha 混合在透明目标上输出的正是预乘结果，无需改着色器。`Environment` 新增 `translucent_window`（破坏性：完整列出字段的字面量需补上）；`Sidebar` 在其为真时不画填充与发丝线。Windows / Linux 返回不透明：DXGI 与 Vulkan 交换链以不透明方式创建，Mica 与合成器模糊无法透出，需要 DirectComposition / 带 alpha 的交换链后再接入。
+  - 标题栏与外观：首版只把材质放进内容视图，标准标题栏区域没有任何背景、完全透明（能看到窗口后面的其他应用）；且材质跟随系统外观，系统深色时浅色主题的侧栏是深灰底、文字几乎看不清。现在启用材质的窗口改为全尺寸内容视图 + 透明标题栏，材质一直铺到顶边，标题栏高度经 `contentLayoutRect` 作为顶部安全区上报，UI 从其下方开始，拖动与标题仍由系统处理。`Shell` 新增 `set_window_appearance(WindowAppearance)`（含平台线程命令 `SetAppearance`），桌面宿主每帧按根主题背景亮度在变化时同步：macOS 设置 `NSWindow.appearance`（Aqua / DarkAqua），Windows 设置 `DWMWA_USE_IMMERSIVE_DARK_MODE` 让标题栏随主题；Linux 窗口装饰属于合成器，无可移植开关，保持系统外观。
+  - 材质可读性与侧栏排版：外观同步此前从未生效——`surface_theme` 只向下找 12 层 / 512 个节点，桌面宿主在应用根外包了 Surface、文字缩放与浮层等多层提供者，找不到主题；新增 `provided_theme_within(node, depth, budget)`，桌面宿主用 48 层 / 2048 节点。UI 文字不是 AppKit 的 vibrant 文字，纯模糊在窗口背后内容较暗时会让文字发灰；宿主在半透明窗口的根节点上铺一层轻薄的主题色（`window_backdrop_tint`：`surface_variant`，浅色 40%、深色 34%），每个应用都自动获得，材质仍明显透出。背景应用后立即刷新窗口状态，首帧即拿到标题栏顶部安全区——此前首几帧顶部为 0，侧栏品牌行与红绿灯和窗口标题重叠；启用材质后隐藏窗口标题（侧栏品牌已给出应用名）。
+  - Gallery：窗口请求侧栏材质；正文页放进圆角卡片（主题 `lg` 圆角、内容底色、`low` 阴影、0.5pt 分隔色边，距窗口上/右/下 8pt），不透明窗口下卡片外为 `surface_variant`。
+  - 指针：文字选择根节点此前把 I 形光标设在整个根上，根下没有自己光标的控件（Workspace 标签、按钮）与空白处都显示 I 形光标。`Node` 新增 `set_cursor_region` / `cursor_at`，指针按窗口坐标判断节点光标是否生效；选择根只在 `text_under` 命中已注册段落时显示 I 形光标（控件内的文字本就不注册），其余位置为箭头。新增 `a_cursor_region_limits_where_the_cursor_shows`。
+  - CI（macOS）：macOS-15 runner 首次真正运行 Metal 测试，Apple Paravirtual GPU 在分配不受支持的资源时直接断言（`IOGPUMetalResource initWithResource`）而不是返回 nil，设备创建中的间接命令缓冲探测让每个 GPU 测试进程 SIGABRT。半虚拟化设备现只暴露核心光栅与计算路径（关闭间接绘制、光追与 mesh 探测），`adapter_capabilities` 与能力一致。
+  - CI（Lints）：`cove-text` 中 Apple 专用的 `take_string` 加平台门控、`font_provider` 两处 `needless_return`；`cove-system` 路径测试在 Windows 下的未使用导入与对 `io::Result` 的 `==`；SDL 3.4 移除 `SDL_HINT_WINDOWS_DPI_AWARENESS`（SDL3 默认即 per-monitor-v2），删去该调用。
+  - CI（Windows 媒体）：FFmpeg 的 MSVC configure 在 `sh` 下运行，job 此前既没有 MSVC 开发环境也没有 MSYS2 的 make / nasm，`cl.exe` 无法生成可执行文件；改为加载 `msvc-dev-cmd`、把 `C:\msys64\usr\bin` 加入 PATH、移除 coreutils 的 `link.exe` 并固定 MSVC 链接器。
+  - 未验证：macOS 半虚拟化 GPU 与 Windows 媒体修复需等 CI 结果；系统材质的实际合成效果未截图（本机无屏幕录制权限），DevTools 只能看到 UI 自身像素。
+
 - **Workspace 外观与槽位拆分修复、CI 修复（2026-11-07）**：
   - Workspace：槽位内拆分此前只记录 `fraction`、从未用于布局，两侧都按 100% 填充，第二个面板被挤出容器（Gallery 中 Preview 面板完全不可见）；现按 `fraction` 以 flex 份额分配，分隔条保留与区域间一致的 6pt `gutter`（此前为 1pt）。标签栏选中标签改为胶囊，并以 `SlidingSelection` 在标签间滑动；新增 `SlidingSelectionHost` 修饰符，可在不改变布局的前提下把现有节点设为滑动选中宿主（用于滚动标签行）。工作区根节点自带 `surface_variant` 画布，侧轨与外壳槽位不再自绘白底。标签行不再显示横向滚动条（此前浮在标签上方遮挡内容），仍可用滚轮与触控板滚动，溢出标签由尾部菜单提供。
   - 滚动条与文字选择：滚动条此前只是滚动视图上方的绘制，命中测试看不到它——指针移到滚动条上会取到下方可选文字的 I 形光标，按下也可能落到文字选择上。`Node` 新增 `set_chrome_hit_region` / `chrome_contains`：节点声明自己绘制在子节点之上的“铬区”，命中测试在该区域内以节点本身为目标、不再访问子节点，按下只交给该节点处理，指针恢复为箭头。ScrollView 把有溢出方向的滚动条通道声明为铬区（`Hidden` 与触屏除外）。`hit_tester` 新增用例覆盖铬区优先于其覆盖的子节点。

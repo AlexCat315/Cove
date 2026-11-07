@@ -588,6 +588,12 @@ impl Sdl3PlatformHost {
     pub fn native_window_reference(&self, id: WindowId) -> Option<NativeWindowReference> {
         self.shell()?.borrow().window(id)?.native_window_reference()
     }
+    /// The backdrop the main window's platform applied.
+    pub fn backdrop(&self) -> cove_shell::WindowBackdrop {
+        self.shell()
+            .and_then(|s| self.main_window().and_then(|id| s.borrow().window(id)))
+            .map_or(cove_shell::WindowBackdrop::Opaque, |w| w.backdrop())
+    }
     pub fn safe_area(&self) -> WindowSafeArea {
         self.shell()
             .and_then(|s| self.main_window().and_then(|id| s.borrow().window(id)))
@@ -642,6 +648,11 @@ impl Sdl3PlatformHost {
     pub fn show_window_system_menu(&self, id: WindowId, x: f32, y: f32) {
         if let Some(s) = self.shell() {
             s.borrow().show_window_system_menu(id, x, y);
+        }
+    }
+    pub fn set_window_appearance(&self, id: WindowId, appearance: cove_shell::WindowAppearance) {
+        if let Some(s) = self.shell() {
+            s.borrow().set_window_appearance(id, appearance);
         }
     }
     pub fn set_window_chrome_hit_test(&self, id: WindowId, hit: Option<&WindowChromeHitTest>) {

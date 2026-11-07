@@ -40,6 +40,9 @@ impl WindowHandle for ProxyWindow {
     fn safe_area(&self) -> WindowSafeArea {
         self.snapshot().safe_area
     }
+    fn backdrop(&self) -> cove_shell::WindowBackdrop {
+        self.snapshot().backdrop
+    }
     fn drawable_size(&self) -> (u32, u32) {
         self.snapshot().drawable_size
     }
@@ -340,6 +343,9 @@ impl Shell for ProxyShell {
     }
     fn set_window_chrome_hit_test(&self, id: WindowId, hit: Option<&WindowChromeHitTest>) {
         self.post(PlatformCommand::SetChromeHitTest(id, hit.cloned()));
+    }
+    fn set_window_appearance(&self, id: WindowId, appearance: cove_shell::WindowAppearance) {
+        self.post(PlatformCommand::SetAppearance(id, appearance));
     }
     fn show_open_folder_dialog(
         &self,

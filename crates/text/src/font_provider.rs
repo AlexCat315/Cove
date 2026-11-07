@@ -531,23 +531,23 @@ fn windows_font_directory() -> PathBuf {
 fn system_primary_paths() -> Vec<PathBuf> {
     #[cfg(target_os = "windows")]
     {
-        return ["segoeui.ttf", "tahoma.ttf", "arial.ttf"]
+        ["segoeui.ttf", "tahoma.ttf", "arial.ttf"]
             .iter()
             .map(|name| windows_font_directory().join(name))
-            .collect();
+            .collect()
     }
     #[cfg(target_os = "android")]
     {
-        return [
+        [
             "/system/fonts/Roboto-Regular.ttf",
             "/system/fonts/NotoSans-Regular.ttf",
         ]
         .map(PathBuf::from)
-        .to_vec();
+        .to_vec()
     }
     #[cfg(target_os = "linux")]
     {
-        return [
+        [
             "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
             "/usr/share/fonts/TTF/DejaVuSans.ttf",
             "/usr/share/fonts/truetype/noto/NotoSans-Regular.ttf",
@@ -557,7 +557,7 @@ fn system_primary_paths() -> Vec<PathBuf> {
             "/usr/share/fonts/truetype/freefont/FreeSans.ttf",
         ]
         .map(PathBuf::from)
-        .to_vec();
+        .to_vec()
     }
     #[cfg(not(any(target_os = "windows", target_os = "android", target_os = "linux")))]
     Vec::new()
@@ -566,7 +566,7 @@ fn system_primary_paths() -> Vec<PathBuf> {
 fn system_fallback_paths() -> Vec<PathBuf> {
     #[cfg(target_os = "windows")]
     {
-        return [
+        [
             "msyh.ttc",
             "msyhl.ttc",
             "simsun.ttc",
@@ -579,7 +579,7 @@ fn system_fallback_paths() -> Vec<PathBuf> {
         ]
         .iter()
         .map(|name| windows_font_directory().join(name))
-        .collect();
+        .collect()
     }
     #[cfg(target_os = "android")]
     {
@@ -595,11 +595,11 @@ fn system_fallback_paths() -> Vec<PathBuf> {
         if let Some(resources) = std::env::var_os("PACKAGE_RESOURCE_BUNDLE_PATH") {
             paths.push(PathBuf::from(resources).join("Fonts/NotoEmoji.ttf"));
         }
-        return paths;
+        paths
     }
     #[cfg(target_os = "linux")]
     {
-        return [
+        [
             "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
             "/usr/share/fonts/noto-cjk/NotoSansCJK-Regular.ttc",
             "/usr/share/fonts/truetype/noto/NotoSansCJK-Regular.ttc",
@@ -613,7 +613,7 @@ fn system_fallback_paths() -> Vec<PathBuf> {
             "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
         ]
         .map(PathBuf::from)
-        .to_vec();
+        .to_vec()
     }
     #[cfg(not(any(target_os = "windows", target_os = "android", target_os = "linux")))]
     Vec::new()

@@ -126,6 +126,9 @@ pub struct Environment {
     pub text_scale: TextScale,
     pub keyboard: Keyboard,
     pub reduces_motion: bool,
+    /// The window shows the platform's blurred material wherever the UI
+    /// leaves it clear, so a sidebar can omit its fill.
+    pub translucent_window: bool,
 }
 impl Default for Environment {
     fn default() -> Self {
@@ -137,6 +140,7 @@ impl Default for Environment {
             text_scale: TextScale::default(),
             keyboard: Keyboard::default(),
             reduces_motion: false,
+            translucent_window: false,
         }
     }
 }

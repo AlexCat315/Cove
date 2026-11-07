@@ -52,6 +52,7 @@ pub struct AuxiliaryAppWindow {
     window_chrome_hit_test_collector: RefCell<WindowChromeHitTestCollector>,
     last_window_chrome_hit_test: RefCell<Option<WindowChromeHitTest>>,
     set_window_chrome_hit_test: Rc<dyn Fn(WindowId, Option<&WindowChromeHitTest>)>,
+    set_window_appearance: Rc<dyn Fn(WindowId, cove_shell::WindowAppearance)>,
     environment: State<Environment>,
 }
 
@@ -70,6 +71,7 @@ impl AuxiliaryAppWindow {
         is_vsync_enabled: bool,
         use_legacy_renderer: bool,
         set_window_chrome_hit_test: Rc<dyn Fn(WindowId, Option<&WindowChromeHitTest>)>,
+        set_window_appearance: Rc<dyn Fn(WindowId, cove_shell::WindowAppearance)>,
     ) -> Self {
         let mut draw_list = DrawList::default();
         draw_list.geometry_antialiasing = window_rendering
@@ -99,6 +101,7 @@ impl AuxiliaryAppWindow {
             window_chrome_hit_test_collector: RefCell::new(WindowChromeHitTestCollector::new()),
             last_window_chrome_hit_test: RefCell::new(None),
             set_window_chrome_hit_test,
+            set_window_appearance,
             environment: State::new(Environment::default()),
         }
     }
@@ -237,6 +240,9 @@ impl AuxiliaryAppWindow {
     fn sync_window_chrome_hit_test(&self) {
         let tree = self.session.tree.borrow();
         let Some(root) = tree.root() else { return };
+        if let Some(appearance) = super::appearance::changed_appearance(&root) {
+            (self.set_window_appearance)(self.session.id, appearance);
+        }
         let next = self
             .window_chrome_hit_test_collector
             .borrow_mut()

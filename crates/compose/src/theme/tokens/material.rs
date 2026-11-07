@@ -56,3 +56,14 @@ impl MaterialScale {
         }
     }
 }
+
+/// The tint a translucent window lays over the platform's blurred material.
+///
+/// The UI's text is not vibrant, so a light wash of the chrome tone steadies
+/// contrast over busy content behind the window. It stays light: the material
+/// already matches the theme's appearance and must remain visibly translucent.
+pub fn window_backdrop_tint(colors: &crate::theme::ColorScheme) -> Color {
+    let base = colors.surface_variant;
+    let light = base.r + base.g + base.b > 1.5;
+    base.multiplied_alpha(if light { 0.4 } else { 0.34 })
+}

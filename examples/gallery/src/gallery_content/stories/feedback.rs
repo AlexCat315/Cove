@@ -10,14 +10,16 @@ use cove_core::scene::{Align, FlexDirection, Justify, Wrap};
 use cove_ui_compose::modifiers::layout::{FlexExt, PaddingExt};
 use cove_ui_compose::modifiers::style::AppearanceExt;
 use cove_ui_compose::primitives::feedback::{
-    Alert, AlertTone, Badge, BadgeVariant, EmptyState, ProgressCircle, ProgressView, Spinner,
+    Alert, AlertVariant, Badge, BadgeVariant, EmptyState, ProgressCircle, ProgressView, Spinner,
     StatusTone,
 };
 use cove_ui_compose::primitives::media::ui_icon_catalog as icons;
 use cove_ui_compose::primitives::text::Text;
+use cove_ui_compose::theme::styles::buttons::ButtonStyleViewExt;
 use cove_ui_compose::theme::tokens::{SemanticColorRef, SemanticStyleViewExt};
-use cove_ui_compose::theme::{Theme, ThemeReader};
+use cove_ui_compose::theme::{ControlSizeViewExt, Theme, ThemeReader};
 use cove_ui_compose::{AnyView, BoxView, DynamicField, LayoutDebugExt, TupleView, View};
+use std::rc::Rc;
 
 use crate::gallery_content::catalog::GalleryOptions;
 
@@ -150,11 +152,14 @@ impl View for BadgeStory {
     }
 }
 
-/// A titled story group in a macOS-style grouped box.
+/// A titled story group. `new` groups content in a macOS-style box; `plain`
+/// sets title, detail and content directly on the page for tinted cards that
+/// must not sit on a second surface.
 pub struct StorySection {
     pub title: String,
     pub detail: String,
     pub content: AnyView,
+    plain: bool,
 }
 
 impl StorySection {
@@ -163,6 +168,16 @@ impl StorySection {
             title: title.into(),
             detail: detail.into(),
             content,
+            plain: false,
+        }
+    }
+
+    pub fn plain(title: impl Into<String>, detail: impl Into<String>, content: AnyView) -> Self {
+        Self {
+            title: title.into(),
+            detail: detail.into(),
+            content,
+            plain: true,
         }
     }
 
@@ -178,21 +193,25 @@ impl View for StorySection {
         let title = self.title.clone();
         let detail = self.detail.clone();
         let content = self.content.clone();
-        let card = AnyView::new(ThemeReader::new(move |theme: &Theme| {
-            AnyView::new(
-                BoxView::new(
-                    FlexDirection::Column,
-                    Align::Stretch,
-                    Justify::FlexStart,
-                    Wrap::NoWrap,
-                    12.0,
-                    content.clone(),
+        let card = if self.plain {
+            content
+        } else {
+            AnyView::new(ThemeReader::new(move |theme: &Theme| {
+                AnyView::new(
+                    BoxView::new(
+                        FlexDirection::Column,
+                        Align::Stretch,
+                        Justify::FlexStart,
+                        Wrap::NoWrap,
+                        12.0,
+                        content.clone(),
+                    )
+                    .padding(18.0)
+                    .background_color(theme.colors.surface_variant)
+                    .corner_radius(theme.radius.lg),
                 )
-                .padding(18.0)
-                .background_color(theme.colors.surface_variant)
-                .corner_radius(theme.radius.lg),
-            )
-        }));
+            }))
+        };
         AnyView::new(
             BoxView::new(
                 FlexDirection::Column,
@@ -220,44 +239,231 @@ impl View for StorySection {
 
 /// `AlertStory`.
 pub struct AlertStory {
+    pub options: GalleryOptions,
     pub dismissed: State<bool>,
     pub result: State<String>,
 }
 
 impl AlertStory {
-    pub fn new() -> Self {
+    pub fn new(options: GalleryOptions) -> Self {
         Self {
+            options,
             dismissed: State::new(false),
             result: State::new("No action yet".into()),
         }
     }
 
     pub fn dismiss(&self) {
-        self.dismissed.set(true);
-        self.result.set("Alert dismissed".into());
+        (self.dismiss_handler())();
     }
 
     pub fn reconnect(&self) {
-        self.result.set("Reconnection requested".into());
+        (self.reconnect_handler())();
     }
 
     pub fn work_offline(&self) {
-        self.result.set("Working offline".into());
+        (self.work_offline_handler())();
     }
 
     pub fn show_alert(&self) {
-        self.dismissed.set(false);
+        (self.show_alert_handler())();
+    }
+
+    pub fn dismiss_handler(&self) -> Rc<dyn Fn()> {
+        let dismissed = self.dismissed.clone();
+        let result = self.result.clone();
+        Rc::new(move || {
+            dismissed.set(true);
+            result.set("Alert dismissed".into());
+        })
+    }
+
+    pub fn reconnect_handler(&self) -> Rc<dyn Fn()> {
+        let result = self.result.clone();
+        Rc::new(move || result.set("Reconnection requested".into()))
+    }
+
+    pub fn work_offline_handler(&self) -> Rc<dyn Fn()> {
+        let result = self.result.clone();
+        Rc::new(move || result.set("Working offline".into()))
+    }
+
+    pub fn show_alert_handler(&self) -> Rc<dyn Fn()> {
+        let dismissed = self.dismissed.clone();
+        Rc::new(move || dismissed.set(false))
     }
 }
 
 impl Default for AlertStory {
     fn default() -> Self {
-        Self::new()
+        Self::new(GalleryOptions::default())
     }
 }
 
 impl View for AlertStory {
     fn body(&self, _cx: &Scope) -> AnyView {
+        let enabled = self.options.is_enabled;
+
+        let dismissed = self.dismissed.get();
+        let interactive = if dismissed {
+            let show = self.show_alert_handler();
+            AnyView::new(cove_ui_compose::primitives::controls::Button::title(
+                "Show alert",
+                move || show(),
+            ))
+        } else {
+            let dismiss = self.dismiss_handler();
+            let reconnect = self.reconnect_handler();
+            let offline = self.work_offline_handler();
+            AnyView::new(
+                Alert::new("Reconnect to synchronize your workspace")
+                    .message(
+                        "Your local changes are safe. Reconnect when the connection returns, \
+                         or continue working offline.",
+                    )
+                    .tone(StatusTone::Warning)
+                    .enabled(enabled)
+                    .on_dismiss(move || dismiss())
+                    .dismiss_label("Dismiss interruption")
+                    .actions(BoxView::new(
+                        FlexDirection::Row,
+                        Align::Center,
+                        Justify::FlexStart,
+                        Wrap::Wrap,
+                        8.0,
+                        AnyView::new(TupleView::new(vec![
+                            AnyView::new(cove_ui_compose::primitives::controls::Button::title(
+                                "Reconnect",
+                                move || reconnect(),
+                            )),
+                            AnyView::new(
+                                cove_ui_compose::primitives::controls::Button::title(
+                                    "Work offline",
+                                    move || offline(),
+                                )
+                                .button_style(
+                                    cove_ui_compose::theme::styles::buttons::SecondaryButtonStyle,
+                                ),
+                            ),
+                        ])),
+                    ))
+                    .debug_name("alert-interactive"),
+            )
+        };
+        let interactive = AnyView::new(
+            BoxView::new(
+                FlexDirection::Column,
+                Align::Stretch,
+                Justify::FlexStart,
+                Wrap::NoWrap,
+                8.0,
+                AnyView::new(TupleView::new(vec![
+                    interactive,
+                    AnyView::new(
+                        Text::new(self.result.get())
+                            .semantic_foreground(SemanticColorRef::on_surface_muted()),
+                    ),
+                ])),
+            )
+            .debug_name("alert-interactive-column"),
+        );
+
+        let inline = AnyView::new(BoxView::new(
+            FlexDirection::Column,
+            Align::Stretch,
+            Justify::FlexStart,
+            Wrap::NoWrap,
+            10.0,
+            AnyView::new(TupleView::new(vec![
+                AnyView::new(
+                    Alert::new("Project saved")
+                        .message("All changes are available in the workspace.")
+                        .tone(StatusTone::Success)
+                        .enabled(enabled)
+                        .debug_name("alert-inline-success"),
+                ),
+                AnyView::new(
+                    Alert::new("Connection interrupted")
+                        .message("Retry when the connection is available.")
+                        .tone(StatusTone::Warning)
+                        .enabled(enabled)
+                        .debug_name("alert-inline-warning"),
+                ),
+                AnyView::new(
+                    Alert::new("Import failed")
+                        .message("The selected asset format is unsupported.")
+                        .tone(StatusTone::Danger)
+                        .enabled(enabled)
+                        .debug_name("alert-inline-danger"),
+                ),
+                AnyView::new(
+                    Alert::new("Update available")
+                        .message("Restart to use the new version.")
+                        .tone(StatusTone::Info)
+                        .enabled(enabled)
+                        .debug_name("alert-inline-info"),
+                ),
+            ])),
+        ));
+
+        let variants = AnyView::new(BoxView::new(
+            FlexDirection::Column,
+            Align::Stretch,
+            Justify::FlexStart,
+            Wrap::NoWrap,
+            10.0,
+            AnyView::new(TupleView::new(vec![
+                AnyView::new(
+                    Alert::new("Import failed")
+                        .message("The selected asset format is unsupported.")
+                        .tone(StatusTone::Danger)
+                        .variant(AlertVariant::Soft)
+                        .enabled(enabled)
+                        .debug_name("alert-variant-soft"),
+                ),
+                AnyView::new(
+                    Alert::new("Import failed")
+                        .message("The selected asset format is unsupported.")
+                        .tone(StatusTone::Danger)
+                        .variant(AlertVariant::Outline)
+                        .enabled(enabled)
+                        .debug_name("alert-variant-outline"),
+                ),
+                AnyView::new(
+                    Alert::new("Import failed")
+                        .message("The selected asset format is unsupported.")
+                        .tone(StatusTone::Danger)
+                        .variant(AlertVariant::Filled)
+                        .enabled(enabled)
+                        .debug_name("alert-variant-filled"),
+                ),
+            ])),
+        ));
+
+        let density = AnyView::new(BoxView::new(
+            FlexDirection::Column,
+            Align::Stretch,
+            Justify::FlexStart,
+            Wrap::NoWrap,
+            10.0,
+            AnyView::new(TupleView::new(vec![
+                AnyView::new(
+                    Alert::new("Regular density")
+                        .message("The default card metrics.")
+                        .tone(StatusTone::Info)
+                        .enabled(enabled),
+                ),
+                AnyView::new(
+                    Alert::new("Compact density")
+                        .message("Inherited control size shrinks the glyph, gaps and padding.")
+                        .tone(StatusTone::Info)
+                        .enabled(enabled)
+                        .control_size(cove_ui_compose::theme::ControlSize::Small)
+                        .debug_name("alert-compact"),
+                ),
+            ])),
+        ));
+
         AnyView::new(
             BoxView::new(
                 FlexDirection::Column,
@@ -266,35 +472,26 @@ impl View for AlertStory {
                 Wrap::NoWrap,
                 24.0,
                 AnyView::new(TupleView::new(vec![
-                    AnyView::new(Text::new("Alert")),
-                    AnyView::new(
-                        Text::new(self.result.get())
-                            .semantic_foreground(SemanticColorRef::on_surface_muted()),
-                    ),
-                    AnyView::new(
-                        Alert::new("Project saved")
-                            .message("All changes are available in the workspace.")
-                            .tone(StatusTone::Success)
-                            .variant(AlertTone::Soft),
-                    ),
-                    AnyView::new(
-                        Alert::new("Connection interrupted")
-                            .message("Retry when the connection is available.")
-                            .tone(StatusTone::Warning)
-                            .variant(AlertTone::Soft),
-                    ),
-                    AnyView::new(
-                        Alert::new("Import failed")
-                            .message("The selected asset format is unsupported.")
-                            .tone(StatusTone::Danger)
-                            .variant(AlertTone::Soft),
-                    ),
-                    AnyView::new(
-                        Alert::new("Update available")
-                            .message("Restart to use the new version.")
-                            .tone(StatusTone::Info)
-                            .variant(AlertTone::Soft),
-                    ),
+                    AnyView::new(StorySection::plain(
+                        "Actions & dismissal",
+                        "Actions stack when their natural widths no longer fit. Long titles and details wrap; the close button stays at the top.",
+                        interactive,
+                    )),
+                    AnyView::new(StorySection::plain(
+                        "Inline feedback",
+                        "State the result and explain what the user can do next.",
+                        inline,
+                    )),
+                    AnyView::new(StorySection::plain(
+                        "Variants",
+                        "Soft sits in ordinary content, outline stacks inside a bordered panel, filled is a single blocking message.",
+                        variants,
+                    )),
+                    AnyView::new(StorySection::plain(
+                        "Density",
+                        "The block follows the inherited control size.",
+                        density,
+                    )),
                 ])),
             )
             .debug_name("alert-story"),
@@ -560,7 +757,7 @@ mod checks {
 
     #[test]
     fn alert_story_tracks_dismissal_and_results() {
-        let story = AlertStory::new();
+        let story = AlertStory::new(GalleryOptions::default());
         assert!(!story.dismissed.get());
         assert_eq!(story.result.get(), "No action yet");
         story.reconnect();

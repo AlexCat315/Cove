@@ -43,6 +43,7 @@ pub struct Sdl3WindowHandle {
     /// Refreshed once per event poll and after every command, so reads never
     /// reach the platform.
     state: Cell<native::WindowState>,
+    backdrop: Cell<WindowBackdrop>,
 }
 impl Sdl3WindowHandle {
     fn state(&self) -> native::WindowState {
@@ -121,6 +122,9 @@ impl WindowHandle for Sdl3WindowHandle {
             5 if s.surface != 0 => Some(NativeRenderSurface::AndroidWindow(s.surface)),
             _ => None,
         }
+    }
+    fn backdrop(&self) -> WindowBackdrop {
+        self.backdrop.get()
     }
     fn safe_area(&self) -> WindowSafeArea {
         let s = self.state();
@@ -382,7 +386,23 @@ impl Shell for Sdl3Shell {
             _session: self.session.as_ref().unwrap().clone(),
             last_area: Cell::new(None),
             state: Cell::new(state),
+            backdrop: Cell::new(WindowBackdrop::Opaque),
         });
+        let applied = match options.backdrop {
+            WindowBackdrop::Opaque => false,
+            // SAFETY: the window pointer is live and owned by `window`.
+            WindowBackdrop::Sidebar => unsafe { native::cove_shell_backdrop(pointer, 1) },
+        };
+        if applied {
+            window.backdrop.set(options.backdrop);
+            // The backdrop moves content under the title bar; the first frame
+            // must already see the new size and top inset.
+            let mut state = native::WindowState::default();
+            // SAFETY: pointer is live and state is writable.
+            if unsafe { native::cove_shell_state(pointer, &mut state) } {
+                window.state.set(state);
+            }
+        }
         self.windows.insert(id, window.clone());
         self.order.retain(|entry| *entry != id);
         self.order.push(id);
@@ -552,6 +572,14 @@ impl Shell for Sdl3Shell {
     fn show_window_system_menu(&self, id: WindowId, x: f32, y: f32) {
         if x.is_finite() && y.is_finite() {
             self.command(id, 9, x.round() as i32, y.round() as i32);
+        }
+    }
+    fn set_window_appearance(&self, id: WindowId, appearance: WindowAppearance) {
+        if let Some(w) = self.windows.get(&id) {
+            // SAFETY: the window pointer is live while the shell owns it.
+            unsafe {
+                native::cove_shell_appearance(w.pointer.get(), appearance == WindowAppearance::Dark)
+            };
         }
     }
     fn set_window_chrome_hit_test(&self, id: WindowId, hit: Option<&WindowChromeHitTest>) {

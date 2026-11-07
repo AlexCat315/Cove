@@ -17,6 +17,23 @@ pub enum WindowTitleBarStyle {
     Standard,
     HiddenInset,
 }
+/// Light or dark native chrome: title bar, window controls and materials.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum WindowAppearance {
+    #[default]
+    Light,
+    Dark,
+}
+/// What shows through where the UI leaves the window clear.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum WindowBackdrop {
+    /// The UI paints every pixel.
+    #[default]
+    Opaque,
+    /// The platform's blurred sidebar material, the way a macOS source list
+    /// shows the desktop through it.
+    Sidebar,
+}
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct ChromeRect {
@@ -63,6 +80,7 @@ pub struct WindowOptions {
     pub height: i32,
     pub title_bar_style: WindowTitleBarStyle,
     pub shows_dock_icon: bool,
+    pub backdrop: WindowBackdrop,
 }
 impl Default for WindowOptions {
     fn default() -> Self {
@@ -71,6 +89,7 @@ impl Default for WindowOptions {
             height: 720,
             title_bar_style: WindowTitleBarStyle::Standard,
             shows_dock_icon: true,
+            backdrop: WindowBackdrop::Opaque,
         }
     }
 }
@@ -116,6 +135,11 @@ pub trait WindowHandle {
     fn is_visible(&self) -> bool;
     fn is_minimized(&self) -> bool;
     fn is_occluded(&self) -> bool;
+    /// The backdrop the platform actually applied; `Opaque` where the
+    /// requested material is unavailable.
+    fn backdrop(&self) -> WindowBackdrop {
+        WindowBackdrop::Opaque
+    }
 }
 /// Every window fact a thread other than the platform thread may read. The
 /// platform thread publishes it; readers never call the platform.
@@ -134,6 +158,7 @@ pub struct WindowSnapshot {
     pub refresh_rate: Option<f64>,
     pub surface: Option<NativeRenderSurface>,
     pub native_window: Option<NativeWindowReference>,
+    pub backdrop: WindowBackdrop,
 }
 pub type DialogCompletion = Box<dyn FnOnce(Vec<String>)>;
 pub type ClipboardCompletion = Box<dyn FnOnce(Option<String>)>;
@@ -177,6 +202,8 @@ pub trait Shell {
     fn is_window_maximized(&self, id: WindowId) -> bool;
     fn show_window_system_menu(&self, id: WindowId, x: f32, y: f32);
     fn set_window_chrome_hit_test(&self, id: WindowId, hit: Option<&WindowChromeHitTest>);
+    /// Makes the native chrome follow the UI theme instead of the system.
+    fn set_window_appearance(&self, _id: WindowId, _appearance: WindowAppearance) {}
     fn show_open_folder_dialog(
         &self,
         id: Option<WindowId>,
@@ -258,6 +285,7 @@ pub trait Shell {
             refresh_rate: self.display_refresh_rate(Some(id)),
             surface: window.render_surface(),
             native_window: window.native_window_reference(),
+            backdrop: window.backdrop(),
         })
     }
     fn initialize_window(&mut self, title: &str) -> Result<(), ShellError> {

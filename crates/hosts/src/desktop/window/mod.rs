@@ -1,5 +1,6 @@
 //! Translation of Desktop/Sources/CoveUI/Window.
 
+pub mod appearance;
 pub mod auxiliary;
 pub mod chrome;
 pub mod chrome_views;

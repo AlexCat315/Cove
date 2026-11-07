@@ -735,8 +735,13 @@ impl EventDispatcher {
             .last()
             .zip(self.last_cursor.get())
             .is_some_and(|(node, point)| node.chrome_contains(node.convert_from_window(point)));
+        let point = self.last_cursor.get();
         for node in path.iter().rev().filter(|_| !over_chrome) {
-            if let Some(cursor) = node.cursor() {
+            let cursor = match point {
+                Some(point) => node.cursor_at(point),
+                None => node.cursor(),
+            };
+            if let Some(cursor) = cursor {
                 resolved = cursor;
                 break;
             }
@@ -992,5 +997,32 @@ mod tests {
             ..MouseMotionEvent::default()
         }));
         assert_eq!(*seen.borrow(), vec![SystemCursor::Ibeam]);
+    }
+
+    #[test]
+    fn a_cursor_region_limits_where_the_cursor_shows() {
+        let (dispatcher, _interactions, root, child) = dispatcher();
+        root.set_cursor(Some(SystemCursor::Ibeam));
+        root.set_cursor_region(Some(Rc::new(|point: Point| point.x < 30.0)));
+        let _ = child;
+        let seen = Rc::new(RefCell::new(Vec::new()));
+        let log = seen.clone();
+        let dispatcher = EventDispatcher {
+            cursor_sink: Some(Rc::new(move |cursor| log.borrow_mut().push(cursor))),
+            ..dispatcher
+        };
+        let motion = |x: f32| {
+            InputEvent::MouseMotion(MouseMotionEvent {
+                x,
+                y: 20.0,
+                ..MouseMotionEvent::default()
+            })
+        };
+        dispatcher.dispatch(&motion(20.0));
+        dispatcher.dispatch(&motion(40.0));
+        assert_eq!(
+            *seen.borrow(),
+            vec![SystemCursor::Ibeam, SystemCursor::Arrow]
+        );
     }
 }

@@ -25,9 +25,8 @@ static uint16_t modifiers(SDL_Keymod value) {
 bool cove_shell_init(void) {
     if (SDL_GetAtomicInt(&initialized)) return true;
     if (!SDL_IsMainThread()) return SDL_SetError("Cove shell must be initialized on the application main thread");
-#if defined(_WIN32)
-    SDL_SetHint(SDL_HINT_WINDOWS_DPI_AWARENESS,"permonitorv2");
-#endif
+    /* Windows: SDL3 declares per-monitor-v2 DPI awareness by default, and
+       3.4 no longer exports the hint macro. */
 #if defined(__APPLE__)
     SDL_SetHint("SDL_MAC_SCROLL_MOMENTUM","1");
 #endif
@@ -66,6 +65,35 @@ CoveShellWindow *cove_shell_create(const char *title,int width,int height,bool i
     handle->apple = cove_shell_apple_attach(window,handle->layer,inset,dock);
 #endif
     return handle;
+}
+/* kind 0 is opaque, 1 the sidebar material. Windows and Linux report false:
+   their DXGI and Vulkan swapchains here are created opaque, so a system
+   backdrop (Mica, compositor blur) could not show through. */
+bool cove_shell_backdrop(CoveShellWindow *handle,int kind) { COVE_ASSERT_MAIN();
+#if defined(__APPLE__)
+    return handle&&cove_shell_apple_backdrop(handle->apple,kind);
+#else
+    (void)handle;(void)kind;return false;
+#endif
+}
+/* Native chrome follows the UI theme rather than the system setting, so the
+   title bar, traffic lights and materials match what the app paints. Linux
+   window decorations belong to the compositor and have no portable switch. */
+void cove_shell_appearance(CoveShellWindow *handle,bool dark) { COVE_ASSERT_MAIN();
+    if (!handle) return;
+#if defined(__APPLE__)
+    cove_shell_apple_appearance(handle->apple,dark);
+#elif defined(_WIN32)
+    typedef long (__stdcall *DwmSetWindowAttributeFn)(void *,unsigned long,const void *,unsigned long);
+    static SDL_SharedObject *dwm; static DwmSetWindowAttributeFn set_attribute;
+    if (!dwm) { dwm = SDL_LoadObject("dwmapi.dll"); if (dwm) set_attribute = (DwmSetWindowAttributeFn)SDL_LoadFunction(dwm,"DwmSetWindowAttribute"); }
+    void *hwnd = SDL_GetPointerProperty(SDL_GetWindowProperties(handle->window),"SDL.window.win32.hwnd",NULL);
+    int value = dark ? 1 : 0;
+    /* DWMWA_USE_IMMERSIVE_DARK_MODE */
+    if (set_attribute && hwnd) set_attribute(hwnd,20,&value,sizeof(value));
+#else
+    (void)dark;
+#endif
 }
 void cove_shell_destroy(CoveShellWindow *handle) { COVE_ASSERT_MAIN();
     if (!handle) return;

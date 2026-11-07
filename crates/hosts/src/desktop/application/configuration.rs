@@ -63,6 +63,8 @@ pub struct WindowConfiguration {
     pub height: i32,
     pub title_bar_style: AppWindowTitleBarStyle,
     pub shows_dock_icon: bool,
+    /// Requested backdrop; the platform may fall back to opaque.
+    pub backdrop: cove_shell::WindowBackdrop,
     pub rendering: AppWindowRendering,
 }
 
@@ -80,6 +82,7 @@ impl Default for WindowConfiguration {
             height: 720,
             title_bar_style: AppWindowTitleBarStyle::Standard,
             shows_dock_icon: true,
+            backdrop: cove_shell::WindowBackdrop::Opaque,
             rendering: AppWindowRendering::default(),
         }
     }

@@ -36,10 +36,18 @@ pub fn theme_for_node(node: &Node) -> Theme {
 /// The search is bounded: applications provide their theme near the root, so a
 /// deep scan would only cost frames.
 pub fn surface_theme(node: &Node) -> Option<Theme> {
+    provided_theme_within(node, 12, 512)
+}
+
+/// Nearest explicitly provided theme within `max_depth` levels and `budget`
+/// visited nodes, breadth first. Hosts that wrap the application root in
+/// several providers (surface, text scale, portals) need a deeper reach than
+/// [`surface_theme`].
+pub fn provided_theme_within(node: &Node, max_depth: usize, budget: i32) -> Option<Theme> {
     let mut level = vec![node.clone()];
     let mut depth = 0;
-    let mut budget = 512;
-    while !level.is_empty() && depth < 12 && budget > 0 {
+    let mut budget = budget;
+    while !level.is_empty() && depth < max_depth && budget > 0 {
         let mut next = Vec::new();
         for current in level {
             budget -= 1;

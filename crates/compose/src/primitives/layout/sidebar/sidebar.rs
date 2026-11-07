@@ -600,6 +600,16 @@ struct SidebarPaneFinish;
 impl cove_composition::ViewModifier for SidebarPaneFinish {
     fn apply_node(&self, node: &Node) {
         let colors = crate::theme::theme_for_node(node).colors;
+        // Over the window's sidebar material the pane stays clear and the
+        // material's own edge separates it from the content.
+        let translucent = node
+            .composition_value(&crate::adaptive::SurfaceEnvironment::key())
+            .translucent_window;
+        if translucent {
+            node.set_background_color(None);
+            node.set_overlay_draw(None);
+            return;
+        }
         node.set_background_color(Some(colors.surface_variant));
         let weak = node.downgrade();
         node.update_overlay_draw(colors.divider, move |list, origin| {

@@ -74,6 +74,10 @@ unsafe extern "C" {
         dock: bool,
     ) -> *mut Window;
     pub fn cove_shell_destroy(window: *mut Window);
+    /// Shows the platform material behind the window's clear pixels; false
+    /// where the platform has none.
+    pub fn cove_shell_backdrop(window: *mut Window, kind: i32) -> bool;
+    pub fn cove_shell_appearance(window: *mut Window, dark: bool);
     pub fn cove_shell_state(window: *mut Window, state: *mut WindowState) -> bool;
     pub fn cove_shell_poll(event: *mut Event) -> bool;
     fn cove_shell_event_free(event: *mut Event);

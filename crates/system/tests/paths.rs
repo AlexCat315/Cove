@@ -9,10 +9,13 @@
 //! - a symlink pointing outside the root escapes containment, and a missing
 //!   target resolves through the link on POSIX
 
+#[cfg(unix)]
 use std::fs;
 use std::path::PathBuf;
 
-use cove_system::files::{contains_path, resolve_path, same_file};
+#[cfg(unix)]
+use cove_system::files::same_file;
+use cove_system::files::{contains_path, resolve_path};
 
 fn temporary_directory() -> tempfile::TempDir {
     tempfile::Builder::new()
@@ -98,8 +101,12 @@ fn drive_and_extended_paths_have_the_same_identity() {
     // Extended-length and plain forms name the same location once the prefix
     // is stripped; `resolve_path` normalises both.
     assert_eq!(
-        resolve_path(&path).map(|resolved| resolved.file_name().map(|n| n.to_owned())),
-        resolve_path(&extended).map(|resolved| resolved.file_name().map(|n| n.to_owned()))
+        resolve_path(&path)
+            .ok()
+            .map(|resolved| resolved.file_name().map(|n| n.to_owned())),
+        resolve_path(&extended)
+            .ok()
+            .map(|resolved| resolved.file_name().map(|n| n.to_owned()))
     );
     assert_eq!(PathBuf::from(r"C:\").parent(), None);
 

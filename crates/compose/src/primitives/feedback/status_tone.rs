@@ -44,6 +44,19 @@ impl StatusTone {
         }
     }
 
+    /// Solid glyph with the mark knocked out of the shape, the way SF Symbols
+    /// draws its filled status variants. Reads as a single mark at small sizes.
+    pub fn filled_icon(self) -> BundleImageResource {
+        use crate::primitives::media::ui_icon_catalog::asset;
+        match self {
+            Self::Neutral => asset("circle-fill"),
+            Self::Info => asset("info-circle-fill"),
+            Self::Success => asset("check-circle-fill"),
+            Self::Warning => asset("alert-triangle-fill"),
+            Self::Danger => asset("x-circle-fill"),
+        }
+    }
+
     pub fn ink_on_solid(self, theme: &Theme) -> Color {
         let color = self.color().resolve(theme);
         let luminance = 0.2126 * color.r + 0.7152 * color.g + 0.0722 * color.b;

@@ -16,8 +16,9 @@ use cove_composition::Scope;
 use cove_composition::{AnyView, LayoutDebugExt, View, ViewExt};
 use cove_core::scene::{Align, FlexDirection, Justify, LayoutNode, Node, Wrap};
 use cove_core::{Binding, State};
+use cove_ui_compose::adaptive::SurfaceEnvironment;
 use cove_ui_compose::animation::{AnimatedVisibility, Transition};
-use cove_ui_compose::modifiers::layout::{FlexExt, LayoutFrameExt, PaddingExt};
+use cove_ui_compose::modifiers::layout::{EdgeInsets, FlexExt, LayoutFrameExt, PaddingExt};
 use cove_ui_compose::modifiers::style::AppearanceExt;
 use cove_ui_compose::primitives::controls::Button;
 use cove_ui_compose::primitives::controls::Checkbox;
@@ -39,6 +40,7 @@ use cove_ui_compose::theme::styles::buttons::{
     ButtonStyleViewExt, GhostButtonStyle, SecondaryButtonStyle,
 };
 use cove_ui_compose::theme::styles::circular_appearance::ThemeTransition;
+use cove_ui_compose::theme::theme_for_node;
 use cove_ui_compose::theme::tokens::{
     SemanticColorRef, SemanticFontRef, SemanticMotionRef, SemanticStyleViewExt,
 };
@@ -200,10 +202,7 @@ impl View for GalleryView {
         let root = AnyView::new(SafeArea::all(LayerRoot::new(shell)))
             .flex_with(1.0, 1.0, Some(0.0))
             .modifier(GalleryShellFrame)
-            // The app background paints behind the system bars; the window is
-            // white, the sidebar carries the surface fill, and the cards carry
-            // their own edge.
-            .semantic_background(SemanticColorRef::background());
+            .modifier(GalleryWindowFill);
         erased(AnyView::new(root).appearance(self.appearance.get(), ThemeTransition::circular()))
     }
 
@@ -508,7 +507,8 @@ impl View for GalleryPagePane {
             ))
             .flex_with(1.0, 1.0, Some(0.0))
             .frame_min_width(0.0)
-            .modifier(GalleryPageFrame),
+            .modifier(GalleryPageFrame)
+            .modifier(GalleryContentCard),
         );
         erased(
             AnyView::new(cove_ui_compose::BoxView::new(
@@ -520,7 +520,13 @@ impl View for GalleryPagePane {
                 body,
             ))
             .flex_with(1.0, 1.0, Some(0.0))
-            .frame_min_width(0.0),
+            .frame_min_width(0.0)
+            .padding_insets(EdgeInsets {
+                top: CARD_INSET,
+                leading: 0.0,
+                bottom: CARD_INSET,
+                trailing: CARD_INSET,
+            }),
         )
     }
 
@@ -529,13 +535,42 @@ impl View for GalleryPagePane {
     }
 }
 
+/// Gap between the content card and the window edges.
+const CARD_INSET: f32 = 8.0;
+
+/// The window behind the shell: clear over the platform's sidebar material,
+/// otherwise the chrome tone the sidebar shares.
+struct GalleryWindowFill;
+
+impl cove_composition::ViewModifier for GalleryWindowFill {
+    fn apply_node(&self, node: &Node) {
+        let translucent = node
+            .composition_value(&SurfaceEnvironment::key())
+            .translucent_window;
+        let colors = theme_for_node(node).colors;
+        node.set_background_color((!translucent).then_some(colors.surface_variant));
+    }
+}
+
+/// The page sits on one soft card: the content fill, large corners, a low
+/// shadow and a hairline edge.
+struct GalleryContentCard;
+
+impl cove_composition::ViewModifier for GalleryContentCard {
+    fn apply_node(&self, node: &Node) {
+        let theme = theme_for_node(node);
+        node.set_background_color(Some(theme.colors.background));
+        node.set_corner_radius(theme.radius.lg);
+        node.set_border_color(Some(theme.colors.divider));
+        node.set_border_width(0.5);
+        node.set_shadow(theme.elevation.low);
+        node.set_clips_to_bounds(true);
+    }
+}
+
 struct GalleryPageFrame;
 
 impl cove_composition::ViewModifier for GalleryPageFrame {
-    fn apply_node(&self, node: &Node) {
-        // Transparent: the window canvas shows between the cards.
-        node.set_background_color(None);
-    }
     fn apply_layout(&self, layout: &LayoutNode) {
         layout.set_min_width(Some(0.0));
         layout.set_min_height(Some(0.0));

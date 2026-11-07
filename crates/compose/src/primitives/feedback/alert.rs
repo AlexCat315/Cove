@@ -18,18 +18,21 @@ use crate::primitives::feedback::StatusTone;
 use crate::primitives::layout::ActionGroupLayout;
 use crate::primitives::media::ui_icon_catalog;
 use crate::primitives::text::Text;
-use crate::theme::ControlSizeViewExt;
-use crate::theme::styles::buttons::{ButtonStyleViewExt, GhostButtonStyle};
-use crate::theme::{ControlSize, SemanticFontRef, Theme, node_text_scaler, theme_for_node};
-use crate::{AnyView, BoxView, PrimitiveView, TupleView, View};
+use crate::theme::styles::buttons::{ButtonRole, ButtonStyleViewExt, GhostButtonStyle};
+use crate::theme::{
+    ControlSize, ControlSizeEnvironment, ControlSizeViewExt, IconMetrics, SemanticFontRef, Theme,
+    theme_for_node,
+};
+use crate::{AnyView, BoxView, LayoutDebugExt, PrimitiveView, TupleView, View};
 use cove_core::Color;
 use cove_core::scene::{AccessibilityRole, Align, FlexDirection, Justify, Node, Wrap};
 use cove_imaging::BundleImageResource;
 
 /// How the block relates to the surface behind it.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
-pub enum AlertTone {
-    /// Neutral grouped surface, with tone reserved for the glyph.
+pub enum AlertVariant {
+    /// Tone-washed surface with a matching hairline, for a block that sits in
+    /// ordinary content.
     #[default]
     Soft,
     /// Transparent with a tinted edge, for stacking inside a bordered panel.
@@ -39,16 +42,21 @@ pub enum AlertTone {
 }
 
 /// Inline feedback block with a status glyph and optional dismissal.
+///
+/// Density follows the inherited `ControlSize`: a compact alert shrinks the
+/// glyph, the inner gaps and the card padding together.
 pub struct Alert {
     pub title: String,
     pub message: String,
     pub tone: StatusTone,
-    pub variant: AlertTone,
+    pub variant: AlertVariant,
     /// Glyph override. `None` uses the tone's glyph.
     pub icon: Option<BundleImageResource>,
     pub shows_icon: bool,
+    pub is_enabled: bool,
     /// When set, a close button is rendered in the trailing slot.
     pub on_dismiss: Option<Rc<dyn Fn()>>,
+    pub dismiss_label: String,
     actions: Option<AnyView>,
 }
 
@@ -58,22 +66,14 @@ impl Alert {
             title: title.into(),
             message: String::new(),
             tone: StatusTone::Info,
-            variant: AlertTone::Soft,
+            variant: AlertVariant::Soft,
             icon: None,
             shows_icon: true,
+            is_enabled: true,
             on_dismiss: None,
+            dismiss_label: "Dismiss".to_string(),
             actions: None,
         }
-    }
-
-    /// Mirrors the Swift `actions:` `@ViewBuilder` overload.
-    pub fn with_actions<Actions: View + 'static>(
-        title: impl Into<String>,
-        actions: Actions,
-    ) -> Self {
-        let mut value = Self::new(title);
-        value.actions = Some(AnyView::new(actions));
-        value
     }
 
     pub fn message(mut self, message: impl Into<String>) -> Self {
@@ -86,7 +86,7 @@ impl Alert {
         self
     }
 
-    pub fn variant(mut self, variant: AlertTone) -> Self {
+    pub fn variant(mut self, variant: AlertVariant) -> Self {
         self.variant = variant;
         self
     }
@@ -101,8 +101,27 @@ impl Alert {
         self
     }
 
+    /// A disabled alert mutes the card and detaches its dismissal.
+    pub fn enabled(mut self, is_enabled: bool) -> Self {
+        self.is_enabled = is_enabled;
+        self
+    }
+
     pub fn on_dismiss(mut self, on_dismiss: impl Fn() + 'static) -> Self {
         self.on_dismiss = Some(Rc::new(on_dismiss));
+        self
+    }
+
+    /// Name of the dismissal affordance for assistive technology and for its
+    /// hover tip. Defaults to `Dismiss`.
+    pub fn dismiss_label(mut self, label: impl Into<String>) -> Self {
+        self.dismiss_label = label.into();
+        self
+    }
+
+    /// Trailing or stacked action row, as an already-composed view.
+    pub fn actions<Actions: View + 'static>(mut self, actions: Actions) -> Self {
+        self.actions = Some(AnyView::new(actions));
         self
     }
 
@@ -114,26 +133,19 @@ impl Alert {
 
 impl View for Alert {
     fn body(&self, _cx: &Scope) -> AnyView {
-        let title = self.title.clone();
-        let message = self.message.clone();
-        let tone = self.tone;
-        let variant = self.variant;
-        let icon = self.icon.clone();
-        let shows_icon = self.shows_icon;
-        let on_dismiss = self.on_dismiss.clone();
-        let actions = self.actions.clone();
-        let has_actions = self.actions.is_some();
         AnyView::new(AlertHost {
             snapshot: AlertSnapshot {
-                title,
-                message,
-                tone,
-                variant,
-                icon,
-                shows_icon,
-                on_dismiss,
-                actions,
-                has_actions,
+                title: self.title.clone(),
+                message: self.message.clone(),
+                tone: self.tone,
+                variant: self.variant,
+                icon: self.icon.clone(),
+                shows_icon: self.shows_icon,
+                is_enabled: self.is_enabled,
+                on_dismiss: self.on_dismiss.clone(),
+                dismiss_label: self.dismiss_label.clone(),
+                actions: self.actions.clone(),
+                has_actions: self.actions.is_some(),
             },
         })
     }
@@ -143,8 +155,73 @@ struct AlertStyle {
     ink: Color,
     icon_ink: Color,
     detail: Color,
+    dismiss_ink: Color,
     fill: Color,
     stroke: Color,
+}
+
+/// Density resolved once per pass from the inherited control size and the
+/// active text scaler, so the glyph, the gaps and the padding stay in step.
+struct AlertMetrics {
+    glyph: f32,
+    glyph_gap: f32,
+    padding: f32,
+    title_message_spacing: f32,
+    actions_gap: f32,
+    action_spacing: f32,
+    title_line_height: f32,
+}
+
+impl AlertMetrics {
+    fn resolve(node: &Node, theme: &Theme) -> Self {
+        let size = node.composition_value(&ControlSizeEnvironment::key());
+        let icons = IconMetrics::new(node);
+        let glyph = icons.size(match size {
+            ControlSize::Mini | ControlSize::Small => theme.icons.small,
+            ControlSize::Regular => theme.icons.medium,
+            ControlSize::Large => theme.icons.large,
+        });
+        let (padding, glyph_gap, actions_gap, action_spacing) = match size {
+            ControlSize::Mini | ControlSize::Small => (
+                theme.spacing.md,
+                theme.spacing.sm,
+                theme.spacing.sm,
+                theme.spacing.sm,
+            ),
+            ControlSize::Regular => (
+                theme.spacing.lg,
+                theme.spacing.md,
+                theme.spacing.md,
+                theme.spacing.md,
+            ),
+            ControlSize::Large => (
+                theme.spacing.xl,
+                theme.spacing.lg,
+                theme.spacing.lg,
+                theme.spacing.lg,
+            ),
+        };
+        Self {
+            glyph,
+            glyph_gap,
+            padding,
+            // Title and explanation read as one paragraph; only actions get air.
+            title_message_spacing: theme.spacing.xs * 0.5,
+            actions_gap,
+            action_spacing,
+            title_line_height: icons.size(theme.typography.body_strong.line_height),
+        }
+    }
+
+    /// Leading inset that keeps the explanation and the actions under the
+    /// title instead of under the glyph.
+    fn text_inset(&self, shows_icon: bool) -> f32 {
+        if shows_icon {
+            self.glyph + self.glyph_gap
+        } else {
+            0.0
+        }
+    }
 }
 
 /// Everything the block needs once a theme is available. Kept as a plain
@@ -153,10 +230,12 @@ struct AlertSnapshot {
     title: String,
     message: String,
     tone: StatusTone,
-    variant: AlertTone,
+    variant: AlertVariant,
     icon: Option<BundleImageResource>,
     shows_icon: bool,
+    is_enabled: bool,
     on_dismiss: Option<Rc<dyn Fn()>>,
+    dismiss_label: String,
     actions: Option<AnyView>,
     has_actions: bool,
 }
@@ -165,30 +244,33 @@ impl AlertSnapshot {
     fn style(&self, theme: &Theme) -> AlertStyle {
         let base = self.tone.color().resolve(theme);
         match self.variant {
-            // A tinted callout, as macOS banners are: the tone washes the
-            // fill and no outline is drawn.
-            AlertTone::Soft => AlertStyle {
+            // The tone washes the fill and draws a hairline edge, so the block
+            // holds its shape on any surface while the hue stays a hint.
+            AlertVariant::Soft => AlertStyle {
                 ink: theme.colors.on_surface,
                 icon_ink: base,
                 detail: theme.colors.on_surface_variant,
-                fill: theme.colors.surface.composited(base.multiplied_alpha(0.1)),
-                stroke: Color::CLEAR,
+                dismiss_ink: theme.colors.on_surface_variant,
+                fill: theme.colors.surface.composited(base.multiplied_alpha(0.10)),
+                stroke: base.multiplied_alpha(0.18),
             },
-            AlertTone::Outline => AlertStyle {
+            AlertVariant::Outline => AlertStyle {
                 ink: theme.colors.on_surface,
                 icon_ink: base,
                 detail: theme.colors.on_surface_variant,
+                dismiss_ink: theme.colors.on_surface_variant,
                 fill: Color::CLEAR,
-                stroke: base.multiplied_alpha(0.45),
+                stroke: base.multiplied_alpha(0.35),
             },
-            AlertTone::Filled => {
+            AlertVariant::Filled => {
                 let solid_ink = self.tone.ink_on_solid(theme);
                 AlertStyle {
                     ink: solid_ink,
                     icon_ink: solid_ink,
                     detail: solid_ink.multiplied_alpha(0.88),
+                    dismiss_ink: solid_ink.multiplied_alpha(0.80),
                     fill: base,
-                    stroke: Color::CLEAR,
+                    stroke: base,
                 }
             }
         }
@@ -211,28 +293,19 @@ impl PrimitiveView for AlertHost {
     }
 
     fn update_node(&self, node: &Node) {
-        let theme = theme_for_node(node);
-        let style = self.snapshot.style(&theme);
-        let label = self.snapshot.title.clone();
-        let help = self.snapshot.message.clone();
         let mut semantics =
             cove_core::scene::AccessibilitySemantics::new(AccessibilityRole::Status);
-        semantics.label = label;
-        semantics.help = help;
-        let _ = style;
+        semantics.label = self.snapshot.title.clone();
+        semantics.help = self.snapshot.message.clone();
+        semantics.state.is_enabled = self.snapshot.is_enabled;
         node.set_accessibility(Some(semantics));
     }
 
     fn children(&self, node: &Node) -> Vec<AnyView> {
         let theme = theme_for_node(node);
-        let scaler = node_text_scaler(node);
         let style = self.snapshot.style(&theme);
-        let icon_extent = theme.icons.medium;
-        let text_inset = if self.snapshot.shows_icon {
-            icon_extent + theme.spacing.sm
-        } else {
-            0.0
-        };
+        let metrics = AlertMetrics::resolve(node, &theme);
+        let text_inset = metrics.text_inset(self.snapshot.shows_icon);
 
         let mut leading: Vec<AnyView> = Vec::new();
         if self.snapshot.shows_icon {
@@ -240,23 +313,31 @@ impl PrimitiveView for AlertHost {
                 .snapshot
                 .icon
                 .clone()
-                .unwrap_or_else(|| self.snapshot.tone.icon());
+                .unwrap_or_else(|| self.snapshot.tone.filled_icon());
             leading.push(AnyView::new(
-                ButtonIcon::new(
-                    ButtonIconSource::resource(resource),
-                    Some(icon_extent),
-                    Some(style.icon_ink),
+                BoxView::new(
+                    FlexDirection::Row,
+                    Align::Center,
+                    Justify::Center,
+                    Wrap::NoWrap,
+                    0.0,
+                    AnyView::new(ButtonIcon::new(
+                        ButtonIconSource::resource(resource),
+                        Some(metrics.glyph),
+                        Some(style.icon_ink),
+                    )),
                 )
                 .frame(
-                    Some(FrameDimension::Points(icon_extent)),
+                    Some(FrameDimension::Points(metrics.glyph)),
                     Some(FrameDimension::Points(
-                        icon_extent.max(scaler.scale(theme.typography.body_strong.line_height)),
+                        metrics.glyph.max(metrics.title_line_height),
                     )),
                     None,
                     None,
                     None,
                     None,
                 )
+                .debug_name("alert-icon-slot")
                 .accessibility_hidden(true)
                 .flex(0.0)
                 .shrink(0.0),
@@ -277,7 +358,7 @@ impl PrimitiveView for AlertHost {
                 Align::FlexStart,
                 Justify::FlexStart,
                 Wrap::NoWrap,
-                theme.spacing.sm,
+                metrics.glyph_gap,
                 AnyView::new(TupleView::new(leading)),
             ))
             .flex(1.0)
@@ -285,16 +366,24 @@ impl PrimitiveView for AlertHost {
             .frame_min_width(0.0),
         )];
         if let Some(on_dismiss) = self.snapshot.on_dismiss.clone() {
-            let dismiss = Button::icon(
-                ButtonIconSource::resource(ui_icon_catalog::action::x()),
-                14.0,
-                move || on_dismiss(),
-            )
-            .button_style(GhostButtonStyle)
-            .control_size(ControlSize::Small)
-            .accessibility_label("Dismiss")
-            .accessibility(move |semantics| semantics.label = "Dismiss".to_string());
-            header.push(AnyView::new(dismiss));
+            let label = self.snapshot.dismiss_label.clone();
+            header.push(AnyView::new(
+                Button::icon_with_options(
+                    ButtonIconSource::resource(ui_icon_catalog::action::x()),
+                    Some(metrics.glyph),
+                    Some(style.dismiss_ink),
+                    ButtonRole::Normal,
+                    self.snapshot.is_enabled,
+                    false,
+                    false,
+                    Some(label.clone()),
+                    move || on_dismiss(),
+                )
+                .button_style(GhostButtonStyle)
+                .control_size(ControlSize::Small)
+                .accessibility_label(label.clone())
+                .accessibility(move |semantics| semantics.label = label.clone()),
+            ));
         }
 
         let mut column: Vec<AnyView> = vec![AnyView::new(BoxView::new(
@@ -302,7 +391,7 @@ impl PrimitiveView for AlertHost {
             Align::FlexStart,
             Justify::FlexStart,
             Wrap::NoWrap,
-            theme.spacing.sm,
+            metrics.glyph_gap,
             AnyView::new(TupleView::new(header)),
         ))];
         if !self.snapshot.message.is_empty() {
@@ -326,12 +415,12 @@ impl PrimitiveView for AlertHost {
                         .width
                         < cove_core::Viewport::COMPACT_MAXIMUM_WIDTH,
                     alignment: crate::HorizontalAlignment::Leading,
-                    spacing: 8.0,
+                    spacing: metrics.action_spacing,
                 },
                 actions,
             );
             column.push(AnyView::new(AnyView::new(group).padding_insets(
-                EdgeInsets::new(theme.spacing.xs, text_inset, 0.0, 0.0),
+                EdgeInsets::new(metrics.actions_gap, text_inset, 0.0, 0.0),
             )));
         }
 
@@ -341,13 +430,14 @@ impl PrimitiveView for AlertHost {
                 Align::Stretch,
                 Justify::FlexStart,
                 Wrap::NoWrap,
-                4.0,
+                metrics.title_message_spacing,
                 AnyView::new(TupleView::new(column)),
             )
-            .padding(theme.spacing.md)
+            .padding(metrics.padding)
             .background_color(style.fill)
-            .corner_radius(theme.radius.lg)
-            .border_color(style.stroke, 1.0),
+            .corner_radius(theme.radius.md)
+            .border_color(style.stroke, 1.0)
+            .opacity(if self.snapshot.is_enabled { 1.0 } else { 0.6 }),
         )]
     }
 }

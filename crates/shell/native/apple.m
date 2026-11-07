@@ -25,6 +25,7 @@
 #if TARGET_OS_OSX
 @property(nonatomic,strong) NSMutableArray *observers;
 @property(nonatomic,strong) id scrollMonitor,doubleClickMonitor;
+@property(nonatomic,strong) NSVisualEffectView *backdrop;
 @property(nonatomic) CVDisplayLinkRef videoLink;
 @property(nonatomic,strong) NSMutableArray *signalSources;
 #endif
@@ -116,11 +117,50 @@ void *cove_shell_apple_attach(void *rawWindow,void *rawLayer,bool inset,bool doc
     return (__bridge_retained void*)context;
 }
 void cove_shell_apple_detach(void *raw) {COVE_ASSERT_MAIN(); if(!raw)return;CoveShellAppleWindow *context=CFBridgingRelease(raw);[context stop];[windows removeObjectForKey:@(context.windowID)]; }
+bool cove_shell_apple_backdrop(void *raw,int kind) {COVE_ASSERT_MAIN();
+    CoveShellAppleWindow *context=(__bridge CoveShellAppleWindow*)raw;if(!context)return false;
+#if TARGET_OS_OSX
+    NSWindow *window=context.window;NSView *content=window.contentView;if(!window||!content)return false;
+    if(kind==0){[context.backdrop removeFromSuperview];context.backdrop=nil;window.opaque=YES;window.backgroundColor=NSColor.windowBackgroundColor;context.layer.opaque=YES;return true;}
+    if(!context.backdrop){
+        /* Behind-window blending samples the desktop under the window; the Metal
+           layer above it composites premultiplied, so clear pixels reveal it. */
+        NSVisualEffectView *effect=[[NSVisualEffectView alloc] initWithFrame:content.bounds];
+        effect.autoresizingMask=NSViewWidthSizable|NSViewHeightSizable;
+        effect.blendingMode=NSVisualEffectBlendingModeBehindWindow;
+        effect.state=NSVisualEffectStateFollowsWindowActiveState;
+        [content addSubview:effect positioned:NSWindowBelow relativeTo:nil];
+        context.backdrop=effect;
+    }
+    context.backdrop.material=NSVisualEffectMaterialSidebar;
+    window.opaque=NO;window.backgroundColor=NSColor.clearColor;context.layer.opaque=NO;
+    /* The material reaches the top edge: content runs under a transparent
+       title bar, and the bar's height is reported as the top safe area so the
+       UI starts below it while the system keeps dragging and the title. */
+    window.styleMask|=NSWindowStyleMaskFullSizeContentView;window.titlebarAppearsTransparent=YES;window.titleVisibility=NSWindowTitleHidden;
+    /* The frame is unchanged, so AppKit posts no resize; SDL learns the taller
+       content area from an explicit one. */
+    [NSNotificationCenter.defaultCenter postNotificationName:NSWindowDidResizeNotification object:window];
+    return true;
+#else
+    (void)kind;return false;
+#endif
+}
+void cove_shell_apple_appearance(void *raw,bool dark) {COVE_ASSERT_MAIN();
+    CoveShellAppleWindow *context=(__bridge CoveShellAppleWindow*)raw;if(!context)return;
+#if TARGET_OS_OSX
+    NSWindow *window=context.window;NSAppearanceName name=dark?NSAppearanceNameDarkAqua:NSAppearanceNameAqua;
+    if(![window.appearance.name isEqualToString:name])window.appearance=[NSAppearance appearanceNamed:name];
+#else
+    (void)dark;
+#endif
+}
 void cove_shell_apple_update(void *raw,CoveShellWindowState *state) {COVE_ASSERT_MAIN();
     CoveShellAppleWindow *context=(__bridge CoveShellAppleWindow*)raw;if(!context)return;context.windowID=state->id;windows[@(state->id)]=context;
     state->native_window=(uintptr_t)(__bridge void*)context.window;
 #if TARGET_OS_OSX
     NSWindow *window=context.window;state->visible=window.isVisible&&!NSApp.isHidden;state->maximized=window.isZoomed||(window.styleMask&NSWindowStyleMaskFullScreen);state->minimized=window.isMiniaturized;state->focused=window.isKeyWindow;state->refresh_rate=window.screen.maximumFramesPerSecond;
+    if(context.backdrop&&window.contentView){NSRect layout=window.contentLayoutRect;state->top=fmax(state->top,window.contentView.bounds.size.height-NSMaxY(layout));}
 #endif
     context.layer.contentsScale=fmax(1,(double)state->pixel_width/fmax(1,state->width));context.layer.drawableSize=CGSizeMake(state->pixel_width,state->pixel_height);
 }

@@ -8,7 +8,7 @@ use cove_core::scene::Direction;
 use cove_core::{Environment, InputCapabilities};
 use cove_hosts::desktop::application::configuration::AppFrameDrivePolicy;
 use cove_hosts::desktop::diagnostics::ApplicationCheckpoint;
-use cove_hosts::{ApplicationConfiguration, ApplicationLaunch};
+use cove_hosts::{ApplicationConfiguration, ApplicationLaunch, WindowBackdrop};
 use cove_ui_compose::adaptive::{SurfaceEnvironmentExt, SurfaceReader};
 use cove_ui_compose::theme::styles::appearance_modifier::Appearance;
 use cove_ui_compose::theme::tokens::ReducedMotionViewExt;
@@ -21,6 +21,7 @@ fn configuration(launch: &ShowcaseLaunch) -> ApplicationConfiguration {
     if let Some(height) = launch.height {
         configuration.window.height = height;
     }
+    configuration.window.backdrop = WindowBackdrop::Sidebar;
     configuration.rendering.vsync = launch.vsync;
     configuration.diagnostics.shows_performance_hud = launch.performance_hud;
     configuration.frames.policy = if launch.continuous_frames() {

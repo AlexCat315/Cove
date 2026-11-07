@@ -118,6 +118,14 @@ jobs:
         run: rustup toolchain install 1.99.1 --profile minimal
       - name: Prepare native build environment
         run: cargo cove setup --media
+      - uses: ilammy/msvc-dev-cmd@v1
+      - name: FFmpeg build tools
+        # FFmpeg's MSVC configure runs under `sh` and needs MSYS2's make and
+        # nasm, and `link` must resolve to the MSVC linker, not coreutils.
+        run: |
+          echo 'C:\msys64\usr\bin' >> "$GITHUB_PATH"
+          rm -f /usr/bin/link.exe /c/msys64/usr/bin/link.exe
+          printf 'CARGO_TARGET_X86_64_PC_WINDOWS_MSVC_LINKER=%sbin\\HostX64\\x64\\link.exe\n' "$VCToolsInstallDir" >> "$GITHUB_ENV"
       - name: Media control and output tests
         run: cargo test --locked -p cove-media --features ffmpeg --all-targets
       - name: Out-of-tree consumer application

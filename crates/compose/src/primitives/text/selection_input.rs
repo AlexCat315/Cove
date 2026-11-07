@@ -18,6 +18,14 @@ pub(super) fn install(node: &Node, scope: &SharedTextSelectionScope) {
     node.set_is_tab_stop(false);
     node.set_automatically_focus_on_pointer_down(false);
     node.set_cursor(Some(SystemCursor::Ibeam));
+    // The I-beam belongs to the glyphs; controls and empty space below the
+    // root keep the arrow.
+    let region_scope = scope.clone();
+    node.set_cursor_region(Some(Rc::new(move |point| {
+        region_scope
+            .try_borrow_mut()
+            .is_ok_and(|mut selection| selection.text_under(point))
+    })));
 
     let owner = node.downgrade();
     let selection = scope.clone();
@@ -178,6 +186,7 @@ pub(super) fn disable(node: &Node) {
     node.set_is_focusable(false);
     node.set_is_hit_testable(false);
     node.set_cursor(None);
+    node.set_cursor_region(None);
 }
 
 /// The selection keeps the caret's line geometry. A small corner radius softens

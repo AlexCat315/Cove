@@ -156,6 +156,7 @@ pub(crate) unsafe fn borrowed_string(value: *const c_char) -> String {
             .into_owned()
     }
 }
+#[cfg(any(target_os = "macos", target_os = "ios"))]
 pub(crate) unsafe fn take_string(value: *mut c_char) -> Option<String> {
     if value.is_null() {
         return None;

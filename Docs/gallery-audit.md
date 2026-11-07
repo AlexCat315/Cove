@@ -252,7 +252,7 @@ cargo test -p cove-ui-compose --test compose --locked
 | ViewThatFits | 0 | 0 / 0 | 挂载/几何基础检查通过；待逐项交互和视觉验收 |
 | Theme / Typography | 2 | 0 / 0 | 挂载/几何基础检查通过；待逐项交互和视觉验收 |
 | Badge | 4 | 0 / 0 | 挂载/几何基础检查通过；待逐项交互和视觉验收 |
-| Alert | 0 | 0 / 0 | 挂载/几何基础检查通过；待逐项交互和视觉验收 |
+| Alert | 4 | 0 / 0 | 2026-11-07 段落结构对齐 Swift（Actions & dismissal、Inline feedback），并补 Variants、Density 两段；状态图标改为 SF Symbols 式实心挖空符号，Soft 用 10% 色调底 + 18% 同色发丝边，标题与说明按 2pt 配对，关闭按钮改中性灰；dismiss → Show alert、Disabled 熄灭与关闭失活经 DevTools 后置条件验证；浅色/深色截图目检通过；文档已写（`alert.md`）；其他平台原生视觉待验收 |
 | Progress / Spinner | 2 | 0 / 0 | 挂载/几何基础检查通过；待逐项交互和视觉验收 |
 | EmptyState | 0 | 0 / 0 | 挂载/几何基础检查通过；待逐项交互和视觉验收 |
 | RadioGroup | 0 | 0 / 0 | 挂载/几何基础检查通过；待逐项交互和视觉验收 |
@@ -260,7 +260,7 @@ cargo test -p cove-ui-compose --test compose --locked
 | Combobox | 0 | 0 / 0 | 挂载/几何基础检查通过；待逐项交互和视觉验收 |
 | Notification | 0 | 0 / 0 | 挂载/几何基础检查通过；待逐项交互和视觉验收 |
 | Tooltip | 0 | 0 / 0 | 挂载/几何基础检查通过；待逐项交互和视觉验收 |
-| Sidebar | 0 | 0 / 0 | 2026-11-07 贴边全高、中性滑动选中、强调色图标，明暗截图目检通过 |
+| Sidebar | 0 | 0 / 0 | 2026-11-07 贴边全高、中性滑动选中、强调色图标，明暗截图目检通过；同日 Gallery 窗口改为 macOS 侧栏材质（侧栏无填充）、正文放入圆角卡片，DevTools 截图确认卡片与侧栏透明区，系统材质的实际合成未截图验证（无屏幕录制权限） |
 | NavigationDrawer | 0 | 0 / 0 | 挂载/几何基础检查通过；待逐项交互和视觉验收 |
 | NavigationRail | 0 | 0 / 0 | 挂载/几何基础检查通过；待逐项交互和视觉验收 |
 | AppBar / NavigationBar | 0 | 0 / 0 | 挂载/几何基础检查通过；待逐项交互和视觉验收 |
@@ -332,7 +332,6 @@ cargo test -p cove-ui-compose --test compose --locked
 | 页面 | Rust story | Swift 段 | Swift 段落标题 |
 | --- | --- | ---: | --- |
 | ActionSheet | `ActionSheetStory` | 2 | Project actions、Long action lists |
-| Alert | `AlertStory` | 2 | Actions & dismissal、Inline feedback |
 | EmptyState | `EmptyStory` | 1 | Empty content |
 | Table | `TableStory` | 2 | Inventory · 10,000 rows、Empty data |
 | Toolbar | `ToolbarStory` | 1 | Toolbar |
@@ -383,8 +382,6 @@ cargo test -p cove-ui-compose --test compose --locked
 | --- | --- | --- | --- |
 | ActionSheet | Project actions | 2/2 | 出现在本页源码，未单独成段 |
 | ActionSheet | Long action lists | 3/3 | 出现在本页源码，未单独成段 |
-| Alert | Actions & dismissal | 2/2 | 出现在本页源码，未单独成段 |
-| Alert | Inline feedback | 1/2 | 未出现：inline |
 | Animation | Shared geometry | 2/2 | 出现在本页源码，未单独成段 |
 | Animation | Spring release | 0/2 | 未出现：spring、release |
 | AppBar / NavigationBar | Host safe area | 0/3 | 未出现：safe、area、host |
@@ -435,7 +432,7 @@ cargo test -p cove-ui-compose --test compose --locked
 | --- | ---: | ---: | ---: | ---: | ---: | --- |
 | Accordion | 1 | 1 | 1 | 0 | 0 | 段落数持平 |
 | ActionSheet | 2 | 0 | 0 | 0 | 2 | Rust 无段落结构 |
-| Alert | 2 | 0 | 0 | 0 | 2 | Rust 无段落结构 |
+| Alert | 2 | 4 | 2 | 0 | 0 | Rust 多 2 段（Variants、Density） |
 | AlertDialog | 1 | 1 | 1 | 0 | 0 | 段落数持平 |
 | Animation | 6 | 4 | 4 | 0 | 2 | 段落少 2 段 |
 | AppBar / NavigationBar | 2 | 1 | 1 | 0 | 1 | 段落少 1 段 |

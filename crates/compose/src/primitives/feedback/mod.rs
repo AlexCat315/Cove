@@ -8,7 +8,7 @@ pub(crate) mod progress_value;
 pub(crate) mod spinner;
 pub(crate) mod status_tone;
 
-pub use alert::{Alert, AlertTone};
+pub use alert::{Alert, AlertVariant};
 pub use badge::{Badge, BadgeVariant};
 pub use empty_state::{EmptyState, EmptyStateProminence};
 pub use progress::ProgressView;

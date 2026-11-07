@@ -91,6 +91,10 @@ pub type DrawHook = Rc<dyn Fn(&mut DrawList, Point)>;
 /// Chrome a node paints above its own children (a scroll bar): given a point
 /// in the node's local space, whether that point belongs to the chrome.
 pub type ChromeHitRegion = Rc<dyn Fn(Point) -> bool>;
+/// Where a node's cursor applies: given a window-space point, whether the
+/// node's cursor shows there. Elsewhere the cursor resolves as if the node set
+/// none, so a text container shows the I-beam over its glyphs only.
+pub type CursorRegion = Rc<dyn Fn(Point) -> bool>;
 pub type LayoutUpdateHook = Rc<dyn Fn(&Node)>;
 
 pub struct NodeData {
@@ -145,6 +149,7 @@ pub struct NodeData {
     pub content_offset: Point,
     pub transform: super::NodeTransform,
     pub cursor: Option<SystemCursor>,
+    cursor_region: Option<CursorRegion>,
     pub view_tag: Option<String>,
     pub key: Option<NodeKey>,
     pub attachments: BTreeMap<String, Rc<dyn Any>>,
@@ -238,6 +243,7 @@ impl Node {
             content_offset: Point::default(),
             transform: super::NodeTransform::IDENTITY,
             cursor: None,
+            cursor_region: None,
             view_tag: None,
             key: None,
             attachments: BTreeMap::new(),
@@ -1037,6 +1043,19 @@ impl Node {
     }
     pub fn set_cursor(&self, cursor: Option<SystemCursor>) {
         self.0.borrow_mut().cursor = cursor;
+    }
+    /// Limits this node's cursor to part of its bounds.
+    pub fn set_cursor_region(&self, region: Option<CursorRegion>) {
+        self.0.borrow_mut().cursor_region = region;
+    }
+    /// The cursor this node shows at a window-space point.
+    pub fn cursor_at(&self, window: Point) -> Option<SystemCursor> {
+        let (cursor, region) = {
+            let data = self.0.borrow();
+            (data.cursor, data.cursor_region.clone())
+        };
+        let cursor = cursor?;
+        region.is_none_or(|region| region(window)).then_some(cursor)
     }
 
     // MARK: - Compose reconciliation

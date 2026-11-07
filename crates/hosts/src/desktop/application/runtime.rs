@@ -216,6 +216,7 @@ impl Application {
             },
             title_bar_style: config.window.title_bar_style.platform_style(),
             shows_dock_icon: config.window.shows_dock_icon,
+            backdrop: config.window.backdrop,
         };
         let host = Sdl3PlatformHost::new(config.window.title.clone(), options);
         let portal_store = Rc::new(PortalStore::new());
@@ -1025,6 +1026,7 @@ impl Application {
                 environment.idiom = cove_core::Idiom::Desktop;
             }
         }
+        environment.translucent_window = host.backdrop() != cove_shell::WindowBackdrop::Opaque;
         if environment != state.environment.get() {
             state.environment.set(environment);
         }
@@ -1106,8 +1108,12 @@ impl Application {
             main.logical_w = logical.0;
             main.logical_h = logical.1;
         }
-        let settings =
+        let mut settings =
             AppWindowRenderSettings::resolve(&state.config, state.config.window.rendering);
+        if state.host.backdrop() != cove_shell::WindowBackdrop::Opaque {
+            // Premultiplied clear: untouched pixels reveal the platform material.
+            settings.clear_color = [0.0; 4];
+        }
         let mut renderer = state
             .rendering
             .make_window(settings)
@@ -1222,6 +1228,15 @@ impl Application {
             return;
         };
         let root = state.composition.tree.borrow().root();
+        if let Some(root) = root.as_ref() {
+            if let Some(appearance) = crate::desktop::window::appearance::changed_appearance(root) {
+                state.host.set_window_appearance(window_id, appearance);
+            }
+            crate::desktop::window::appearance::sync_backdrop_tint(
+                root,
+                state.environment.get().translucent_window,
+            );
+        }
         let next = root.and_then(|root| state.chrome_collector.borrow_mut().collect(&root));
         let mut last = state.last_chrome_hit_test.borrow_mut();
         match next {
@@ -1643,6 +1658,7 @@ impl Application {
             height: request.height,
             title_bar_style: state.config.window.title_bar_style.platform_style(),
             shows_dock_icon: state.config.window.shows_dock_icon,
+            ..WindowOptions::default()
         };
         let session = match state.host.open_window(
             &name,
@@ -1673,7 +1689,11 @@ impl Application {
             request.rendering,
             vsync,
             state.composition.use_legacy_renderer,
-            Rc::new(move |id, hit_test| host.set_window_chrome_hit_test(id, hit_test)),
+            Rc::new({
+                let host = host.clone();
+                move |id, hit_test| host.set_window_chrome_hit_test(id, hit_test)
+            }),
+            Rc::new(move |id, appearance| host.set_window_appearance(id, appearance)),
         );
         state
             .auxiliary_windows

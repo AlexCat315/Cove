@@ -9,6 +9,7 @@ pub use application::{
     DiagnosticsSession,
 };
 pub use application_services::{http::TransportCapabilities, install_platform_services};
+pub use cove_shell::WindowBackdrop;
 pub use desktop::AppDisplayHandle;
 pub use desktop::application::configuration::ApplicationConfiguration;
 pub use desktop::application::runtime::{Application, ApplicationCallbacks};
