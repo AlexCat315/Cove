@@ -59,6 +59,7 @@ import tree from '@/content/components/tree.md?raw'
 import dragAndDrop from '@/content/components/drag-and-drop.md?raw'
 import component13 from '@/content/components/tab-view.md?raw'
 import component14 from '@/content/components/date-range.md?raw'
+import stepper from '@/content/components/stepper.md?raw'
 
 import actionGroupLayout from '@/content/components/action-group-layout.md?raw'
 import markdown from '@/content/components/markdown.md?raw'
@@ -134,6 +135,7 @@ export const docGroups: DocGroup[] = [
       { slug: 'timeline', title: 'Timeline', raw: component12 },
       { slug: 'tab-view', title: 'TabView', raw: component13 },
       { slug: 'date-range', title: 'DateRangeCalendar', raw: component14 },
+      { slug: 'stepper', title: 'Stepper', raw: stepper },
     ],
   },
   {

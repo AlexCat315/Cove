@@ -213,6 +213,7 @@ mod split_view_panel_tests;
 mod spring_interruption_tests;
 mod state_propagation_regression_tests;
 mod status_bar_panel_truncation_tests;
+mod stepper_appearance_tests;
 mod style_integration_tests;
 mod style_skeleton_tests;
 mod surface_reveal_tests;

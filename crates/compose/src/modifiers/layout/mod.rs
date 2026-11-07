@@ -101,8 +101,12 @@ impl FlexModifier {
             },
         );
         layout.set_flex_shrink(self.shrink);
-        if let Some(basis) = self.basis {
-            layout.set_flex_basis(basis);
+        // Express the authored basis completely: a reused node keeps the
+        // previous branch's basis otherwise, and a stale zero basis collapses
+        // the main axis when the container changes direction.
+        match self.basis {
+            Some(basis) => layout.set_flex_basis(basis),
+            None => layout.set_flex_basis_auto(),
         }
     }
 }

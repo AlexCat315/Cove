@@ -4,6 +4,14 @@
 
 Swift 源码逐页对照见文末《Swift 源码对照（逐页差异清单）》。
 
+## 2026-11-07：Stepper 外观重做与堆叠分支塌陷
+
+- 外观：标记改为按状态的实心圆盘（完成 success + 勾、失败 error + 叉、进行中 accent + 指示器、等待描边空心 + 序号），选中不再画整行底色，只强调标记与标题；连接线搬进该步自己的单元格，横向跨到下一个标记的真实间距（1pt 发丝线，`min_width` 24 兜底），纵向竖轨从标记底边连到下一个标记顶边，不再留断口；连接线颜色取它离开的那一步的结果（success/error/中性 border）。状态与交互切换走主题 fast 动效。
+- 根因修复：自适应堆叠分支把三步压成同一行。`FlexModifier::apply` 只在 `basis` 为 `Some` 时写回 flex basis，`None` 保留节点上一次的样式；宽屏分支给每步 `basis 0`，切到堆叠分支后这个 0 留在同一批复用节点上，而容器主轴已换成高度，于是每个单元格高度为 0。`crates/compose/src/modifiers/layout/mod.rs` 改为完整表达作者意图（`None` 显式写回 auto）。该缺陷属于共享修饰符，任何按分支切换主轴的自适应组件都可能命中。
+- 结构验证：`stepper_appearance_tests` 6 项（横向连接线跨距、纵向竖轨连续、连接线随结果着色、标记填充、选中不改底色、堆叠分支不塌陷）+ 原有 `product_interaction_regression_tests::stepper_owns_one_tab_stop_and_preserves_outcomes`、`narrow_reflow_tests::stepper_stacks_on_a_narrow_container_and_keeps_the_axis_aware_keyboard_path`，共 8 项通过；移除 basis 修复后堆叠用例失败，逐项变异验证过。compose 全量 1702 项中 1697 通过，5 项失败（`control_motion_tests::switch_value_changes_immediately_while_the_thumb_travels`、`list_tree_tests::list_selection`、`list_tree_tests::selected_row_fits_its_slot`、`sectioned_list_tests::sticky_headers`、`mobile_presentation_tests::a_tap_opens_a_touch_section_row_...`）在 HEAD 干净工作区同样失败，属本轮之前的既有失败，与 Stepper 无关。
+- 原生验收：DevTools 真机操作，600×820 与 1180×820 两种窗口。窄容器（内容 476pt < 508pt 预算）堆叠分支目检三步依次落位、竖轨连续、下方 Start/Fail/Complete 与结果条不被压叠；Fail 后该步为 error 实心叉、其下方连接线转红；宽容器恢复横向行、连接线落在标记中线；Tab 停靠点内 ArrowDown 移动焦点并出现焦点环；深色主题下等待步描边、中性连接线与 muted 文字均可读。
+- 文档：新增 `Website/src/content/components/stepper.md` 并登记到文档导航。
+
 ## 2026-11-06：Tree 参考线落位、投影列索引与悬停底带
 
 - 根因修复：`TreeGuideOverlay` 的布局表面没有子节点、高度为 0，被 `ZStack(alignment: .leading)` 按垂直居中摆到行的中线上，而绘制钩子把 `origin.y` 当行顶用——`Straight` 每行只画下半段、行间接缝断开，末子的收束段掉到行下方悬空。表面改为与行等高后竖线接成连续一条，`Elbow` 的横向连接与收束点回到行中心。
@@ -287,7 +295,7 @@ cargo test -p cove-ui-compose --test compose --locked
 | StatusBar | 3 | 0 / 0 | 挂载/几何基础检查通过；待逐项交互和视觉验收 |
 | Carousel | 5 | 1 / 3 | 挂载/几何基础检查通过；待逐项交互和视觉验收 |
 | Skeleton | 2 | 0 / 0 | 挂载/几何基础检查通过；待逐项交互和视觉验收 |
-| Stepper | 3 | 0 / 0 | 挂载/几何基础检查通过；待逐项交互和视觉验收 |
+| Stepper | 3 | 0 / 0 | 2026-11-07 重做外观与自适应堆叠：实心状态标记、跨越真实间距的连接线、选中只强调标记与标题；堆叠分支塌陷已修复并有回归；浅/深主题与宽窄布局目检通过；文档已写 |
 | SingleLineText | 2 | 0 / 0 | 挂载/几何基础检查通过；待逐项交互和视觉验收 |
 | CompletionPopover | 2 | 0 / 0 | 挂载/几何基础检查通过；待逐项交互和视觉验收 |
 | RouteOutlet | 2 | 0 / 0 | 挂载/几何基础检查通过；待逐项交互和视觉验收 |

@@ -12,8 +12,8 @@ use cove_ui_compose::primitives::navigation::stepper::{
     StepStatus, Stepper, StepperAxis, StepperItem, StepperOptions,
 };
 use cove_ui_compose::primitives::text::Text;
+use cove_ui_compose::theme::styles::buttons::SecondaryButtonStyle;
 use cove_ui_compose::theme::styles::buttons::button_style::ButtonStyleViewExt;
-use cove_ui_compose::theme::styles::buttons::{DestructiveButtonStyle, SecondaryButtonStyle};
 use cove_ui_compose::theme::tokens::{SemanticColorRef, SemanticStyleViewExt};
 use cove_ui_compose::{AnyView, BoxView, DynamicField, LayoutDebugExt, TupleView, View};
 
@@ -22,14 +22,6 @@ use crate::gallery_content::stories::StorySection;
 
 /// The workflow step identifiers, in order.
 pub const STEP_IDS: [&str; 3] = ["account", "details", "review"];
-
-/// The detail line for the details step, which depends on the outcome.
-pub fn details_detail(status: StepStatus) -> &'static str {
-    match status {
-        StepStatus::Failed => "Configure your workspace",
-        _ => "Configure your workspace",
-    }
-}
 
 /// The review step's detail depends on whether details succeeded.
 pub fn review_detail(unlocked: bool) -> &'static str {
@@ -94,7 +86,7 @@ impl StepperStory {
                 .detail("Profile saved"),
             StepperItem::new("details".to_string(), "Details")
                 .status(self.status.get())
-                .detail(details_detail(self.status.get())),
+                .detail("Configure your workspace"),
             // Review stays unavailable until details succeed.
             StepperItem::new("review".to_string(), "Review")
                 .enabled(unlocked)
@@ -149,7 +141,7 @@ impl View for StepperStory {
                     unlock.set(false);
                 })
                 .enabled(enabled)
-                .button_style(DestructiveButtonStyle),
+                .button_style(SecondaryButtonStyle),
             )
         };
         let complete = {
