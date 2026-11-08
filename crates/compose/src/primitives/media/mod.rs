@@ -51,7 +51,8 @@ pub(crate) mod api {
     pub use super::image::{Image, ImageSource};
     pub use super::image_geometry::{ImageContentMode, ImageRenderingMode};
     pub use super::media_player::{
-        AudioPlayer, MediaTransport, format_media_time, toggle_playback, use_playback,
+        AudioPlayer, MediaTransport, format_media_time, steady_snapshot, toggle_playback,
+        use_playback, use_playback_select,
     };
     pub use super::skeleton::{Skeleton, SkeletonAppearance, SkeletonMotion, SkeletonShape};
     pub use super::ui_icons::UIIcons;

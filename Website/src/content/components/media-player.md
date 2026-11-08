@@ -40,7 +40,7 @@ let audio = AudioPlayer::new(control).title("Clip").subtitle("Artist");
 
 `Waveform::new(peaks)` 绘制包络柱，默认按最响一列归一化（`.normalized(false)` 保持原始幅度），`.progress(f)` 着色已播放部分，`.on_seek(|fraction| ..)` 在按下与拖动时回报比例。峰值通常来自 `MediaDecoder::read_audio(None)?.peaks(n)`。
 
-`use_playback(cx, &control)` 在任意 `View::body` 中返回控制源的最新 `PlayerSnapshot` 并在变化时重组。
+`use_playback(cx, &control)` 在任意 `View::body` 中返回控制源的最新 `PlayerSnapshot` 并在变化时重组；播放中位置每 50ms 上报一次，只依赖状态、倍速、音量、音轨的视图应改用 `use_playback_select(cx, &control, steady_snapshot)` 或自定义投影，只在投影变化时重组，避免把菜单等浮层随位置一起重建。
 
 ## 弹幕
 

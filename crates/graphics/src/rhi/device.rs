@@ -1136,6 +1136,13 @@ impl Device {
         Ok(handle)
     }
 
+    /// Whether `set` is still registered. The binding-set cache evicts its least
+    /// recently created sets when full, so callers that keep a set across frames
+    /// must check it (or ask again) before binding it.
+    pub fn is_binding_set_live(&self, set: BindingSet) -> bool {
+        self.lock().caches.binding_set_layout_id(set.id()).is_some()
+    }
+
     fn teardown_binding_set(&self, state: &mut DeviceState, handle_id: u32) {
         state.caches.remove_binding_set_owner(handle_id);
         state.planner.remove_binding_set_entries(handle_id);

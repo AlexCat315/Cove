@@ -17,7 +17,6 @@ const _: () = assert!(std::mem::size_of::<Params>() == 64);
 #[derive(Clone)]
 struct Scratch {
     resource: Arc<TextureResource>,
-    binding: Option<BindingSet>,
 }
 impl Scratch {
     fn width(&self) -> usize {
@@ -46,7 +45,6 @@ pub(super) struct NativeUIBackdropPass {
     captures: Vec<Scratch>,
     capture_index: usize,
     reveal_capture: Option<Scratch>,
-    frame_binding: Option<(Texture, BindingSet)>,
 }
 #[derive(Clone, Copy)]
 struct PixelRect {
@@ -97,7 +95,6 @@ impl NativeUIBackdropPass {
             captures: Vec::new(),
             capture_index: 0,
             reveal_capture: None,
-            frame_binding: None,
         })
     }
     pub fn estimated_scratch_bytes(&self) -> usize {
@@ -120,7 +117,6 @@ impl NativeUIBackdropPass {
         self.captures.clear();
         self.scratch_b = None;
         self.reveal_capture = None;
-        self.frame_binding = None;
     }
     pub fn begin_captures(&mut self) {
         self.capture_index = 0;
@@ -152,33 +148,12 @@ impl NativeUIBackdropPass {
         d.label = Some("native-ui-backdrop-scratch");
         Ok(Scratch {
             resource: Arc::new(TextureResource::new(self.device.clone(), d)?),
-            binding: None,
         })
     }
+    /// Asks the device each time: a cache hit returns the same set and refreshes
+    /// it, so sets in use are never evicted from the bounded cache mid-frame.
     fn binding(&mut self, texture: Texture) -> RhiResult<BindingSet> {
-        for scratch in self
-            .captures
-            .iter_mut()
-            .chain(self.scratch_b.iter_mut())
-            .chain(self.reveal_capture.iter_mut())
-        {
-            if scratch.resource.texture() == texture {
-                if let Some(binding) = scratch.binding {
-                    return Ok(binding);
-                }
-                let binding = self.shaders.binding(texture)?;
-                scratch.binding = Some(binding);
-                return Ok(binding);
-            }
-        }
-        if let Some((old, binding)) = self.frame_binding
-            && old == texture
-        {
-            return Ok(binding);
-        }
-        let binding = self.shaders.binding(texture)?;
-        self.frame_binding = Some((texture, binding));
-        Ok(binding)
+        self.shaders.binding(texture)
     }
     pub fn record(
         &mut self,

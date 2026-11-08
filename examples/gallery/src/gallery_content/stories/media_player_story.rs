@@ -59,12 +59,11 @@ mod backend {
     use cove_core::{Binding, Color, Signal};
     use cove_media::{
         AudioFormat, AudioOutput, AudioPeak, ContextOptions, DecoderOptions, MediaContext,
-        MediaDecoder, MediaSource, MediaTime, PlaybackControl, Player, PlayerOptions,
-        SeekRequest,
+        MediaDecoder, MediaSource, MediaTime, PlaybackControl, Player, PlayerOptions, SeekRequest,
     };
     use cove_ui_compose::modifiers::interaction::AccessibilityExt;
     use cove_ui_compose::modifiers::layout::{FlexExt, LayoutFrameExt};
-    use cove_ui_compose::modifiers::style::SemanticStyleViewExt;
+    use cove_ui_compose::modifiers::style::{AppearanceExt, SemanticStyleViewExt};
     use cove_ui_compose::primitives::controls::Button;
     use cove_ui_compose::primitives::interaction::{DroppedFile, FileDropZone};
     use cove_ui_compose::primitives::media::{
@@ -220,9 +219,11 @@ mod backend {
                 ..TextFieldEvents::default()
             })
             .debug_name(&format!("{debug}-url"));
-        let go = Button::title("Open URL", move || from_url(url.get_untracked().string_value()))
-            .enabled(enabled)
-            .debug_name(&format!("{debug}-open-url"));
+        let go = Button::title("Open URL", move || {
+            from_url(url.get_untracked().string_value())
+        })
+        .enabled(enabled)
+        .debug_name(&format!("{debug}-open-url"));
         stack(
             FlexDirection::Row,
             Align::Center,
@@ -323,7 +324,11 @@ mod backend {
             },
             player.debug_name("media-video-player"),
         )
-        .accepted_extensions(VIDEO_EXTENSIONS.iter().map(|extension| extension.to_string()))
+        .accepted_extensions(
+            VIDEO_EXTENSIONS
+                .iter()
+                .map(|extension| extension.to_string()),
+        )
         .maximum_files(1);
 
         let send_feed = feed.clone();
@@ -343,12 +348,15 @@ mod backend {
         });
         let submit = send.clone();
         let (r, g, b) = DANMAKU_COLORS[color.get() % DANMAKU_COLORS.len()];
-        let swatch = Button::new(
-            Text::new("●").color(Color::from_rgba8(r, g, b, 255)),
-            move || color.update(|index| *index += 1),
-        )
-        .accessibility_label("Danmaku colour")
-        .debug_name("media-danmaku-colour");
+        // An outlined dot, so white stays visible on a light button.
+        let dot = stack(FlexDirection::Row, Align::Center, 0.0, Vec::new())
+            .frame_size(14.0, 14.0)
+            .background_color(Color::from_rgba8(r, g, b, 255))
+            .corner_radius(7.0)
+            .border_color(Color::from_rgba8(0, 0, 0, 90), 1.0);
+        let swatch = Button::new(dot, move || color.update(|index| *index += 1))
+            .accessibility_label("Danmaku colour")
+            .debug_name("media-danmaku-colour");
         let load_feed = feed.clone();
         let load = Button::title("Load XML…", move || {
             let feed = load_feed.clone();
@@ -388,7 +396,13 @@ mod backend {
             ],
         );
         let mut video_items = vec![
-            source_bar(&VIDEO_EXTENSIONS, video_url, enabled, open_video, "media-video"),
+            source_bar(
+                &VIDEO_EXTENSIONS,
+                video_url,
+                enabled,
+                open_video,
+                "media-video",
+            ),
             AnyView::new(player),
             danmaku_bar,
         ];
@@ -446,10 +460,20 @@ mod backend {
                 .subtitle(subtitle)
                 .debug_name("media-audio-player"),
         )
-        .accepted_extensions(AUDIO_EXTENSIONS.iter().map(|extension| extension.to_string()))
+        .accepted_extensions(
+            AUDIO_EXTENSIONS
+                .iter()
+                .map(|extension| extension.to_string()),
+        )
         .maximum_files(1);
         let mut audio_items = vec![
-            source_bar(&AUDIO_EXTENSIONS, audio_url, enabled, open_audio, "media-audio"),
+            source_bar(
+                &AUDIO_EXTENSIONS,
+                audio_url,
+                enabled,
+                open_audio,
+                "media-audio",
+            ),
             AnyView::new(audio_card),
             AnyView::new(waveform),
         ];

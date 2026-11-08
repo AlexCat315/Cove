@@ -27,7 +27,7 @@ use cove_platform::MouseButton;
 use super::danmaku::{DanmakuComment, DanmakuFeed, DanmakuLayer, DanmakuSettings};
 use super::frame_ticker::FrameTicker;
 use super::image_geometry::ImageContentMode;
-use super::media_player::{format_media_time, use_playback};
+use super::media_player::{format_media_time, steady_snapshot, use_playback, use_playback_select};
 use super::progress_bar::MediaProgressBar;
 use super::ui_icon_catalog::{action, asset, editor, media};
 use super::video::VideoView;
@@ -86,9 +86,6 @@ struct PlayerUi {
     controls: bool,
     presentation: PlayerPresentation,
     settings: PlayerSettings,
-    hover: Option<f64>,
-    /// Seconds under the scrubber, and when it was released.
-    scrub: Option<(f64, Option<Instant>)>,
     volume: Option<f64>,
     restore_volume: f64,
 }
@@ -99,11 +96,32 @@ impl Default for PlayerUi {
             controls: true,
             presentation: PlayerPresentation::Inline,
             settings: PlayerSettings::default(),
-            hover: None,
-            scrub: None,
             volume: None,
             restore_volume: 1.0,
         }
+    }
+}
+
+/// Pointer state of the seek bar. Kept apart from [`PlayerUi`] so hovering or
+/// scrubbing recomposes only the timeline views, not the menus and buttons.
+#[derive(Clone, Debug, Default, PartialEq)]
+struct Timeline {
+    hover: Option<f64>,
+    /// Seconds under the scrubber, and when it was released.
+    scrub: Option<(f64, Option<Instant>)>,
+}
+
+/// The position to show: the scrubber while dragging or until a released seek
+/// lands, otherwise the reported position.
+fn shown_position(snapshot: &PlayerSnapshot, timeline: &Timeline) -> f64 {
+    match timeline.scrub {
+        Some((seconds, None)) => seconds,
+        Some((seconds, Some(released)))
+            if snapshot.seeking || released.elapsed() < Duration::from_millis(400) =>
+        {
+            seconds
+        }
+        _ => snapshot.position.unwrap_or_default().seconds(),
     }
 }
 
@@ -113,6 +131,8 @@ struct PlayerRuntime {
     /// Last pointer position over the picture; only real movement counts as activity.
     pointer: Cell<Option<(f32, f32)>>,
     over_controls: Cell<bool>,
+    /// A menu from the control bar is open; the bar must not hide under it.
+    menu_open: Cell<bool>,
     floating: Cell<Option<FloatingWindowId>>,
     /// The host put the window in full screen for this player.
     window_fullscreen: Cell<bool>,
@@ -128,6 +148,7 @@ impl Default for PlayerRuntime {
             activity: Cell::new(Instant::now()),
             pointer: Cell::new(None),
             over_controls: Cell::new(false),
+            menu_open: Cell::new(false),
             floating: Cell::new(None),
             window_fullscreen: Cell::new(false),
             fullscreen_confirmed: Cell::new(false),
@@ -141,6 +162,7 @@ impl Default for PlayerRuntime {
 pub struct PlayerActions {
     control: Arc<dyn PlaybackControl>,
     ui: Signal<PlayerUi>,
+    timeline: Signal<Timeline>,
     runtime: Rc<PlayerRuntime>,
     title: Option<String>,
 }
@@ -204,8 +226,8 @@ impl PlayerActions {
     }
 
     fn scrub(&self, seconds: f64, committed: bool) {
-        self.ui.update(|ui| {
-            ui.scrub = Some((seconds, committed.then(Instant::now)));
+        self.timeline.update(|timeline| {
+            timeline.scrub = Some((seconds, committed.then(Instant::now)));
         });
         if let Ok(time) = MediaTime::from_seconds(seconds.max(0.0)) {
             let request = if committed {
@@ -219,9 +241,9 @@ impl PlayerActions {
     }
 
     fn hover(&self, seconds: Option<f64>) {
-        self.ui.update_if(|ui| {
-            let changed = ui.hover != seconds;
-            ui.hover = seconds;
+        self.timeline.update_if(|timeline| {
+            let changed = timeline.hover != seconds;
+            timeline.hover = seconds;
             changed
         });
     }
@@ -240,9 +262,10 @@ impl PlayerActions {
         self.ui.update_if(|ui| {
             let shown = ui.controls;
             ui.controls = false;
-            ui.hover = None;
             shown
         });
+        self.timeline
+            .update_if(|timeline| timeline.hover.take().is_some());
     }
 
     pub fn presentation(&self) -> PlayerPresentation {
@@ -386,16 +409,20 @@ impl VideoPlayer {
 
 impl View for VideoPlayer {
     fn body(&self, cx: &Scope) -> AnyView {
-        let snapshot = use_playback(cx, &self.control);
+        // Position reports do not rebuild the player (and its open menus); the
+        // timeline views below subscribe to them on their own.
+        let snapshot = use_playback_select(cx, &self.control, steady_snapshot);
         let initial = self.settings;
         let ui_signal = cx.state(move || PlayerUi {
             settings: initial,
             ..PlayerUi::default()
         });
+        let timeline = cx.state(Timeline::default);
         let runtime = cx.remember(|| Rc::new(PlayerRuntime::default()));
         let actions = PlayerActions {
             control: self.control.clone(),
             ui: ui_signal,
+            timeline,
             runtime,
             title: self.title.clone(),
         };
@@ -501,11 +528,11 @@ impl Surface {
         if let Some(feed) = self.player.danmaku.clone()
             && self.ui.settings.danmaku.enabled
         {
-            layers.push(fill(
-                DanmakuLayer::new(feed, self.position())
-                    .settings(self.ui.settings.danmaku)
-                    .playing(self.playing(), self.snapshot.rate),
-            ));
+            layers.push(fill(DanmakuOverlay {
+                feed,
+                settings: self.ui.settings.danmaku,
+                actions: self.actions.clone(),
+            }));
         }
         layers.push(fill(GestureLayer {
             actions: self.actions.clone(),
@@ -529,18 +556,6 @@ impl Surface {
                 .clipped()
                 .accessibility_label(self.player.title.clone().unwrap_or_else(|| "Video".into())),
         )
-    }
-
-    fn position(&self) -> f64 {
-        match self.ui.scrub {
-            Some((seconds, None)) => seconds,
-            Some((seconds, Some(released)))
-                if self.snapshot.seeking || released.elapsed() < Duration::from_millis(400) =>
-            {
-                seconds
-            }
-            _ => self.snapshot.position.unwrap_or_default().seconds(),
-        }
     }
 
     fn center(&self) -> Option<AnyView> {
@@ -604,42 +619,9 @@ impl Surface {
     }
 
     fn bottom(&self) -> AnyView {
-        let duration = self.snapshot.duration.map_or(0.0, MediaTime::seconds);
-        let position = self.position();
-        let seekable = self.snapshot.seekable_range.is_some() && duration > 0.0;
-        let scrub = self.actions.clone();
-        let hover = self.actions.clone();
-        let bar = MediaProgressBar::new(position, duration)
-            .enabled(seekable)
-            .on_scrub(move |seconds, committed| scrub.scrub(seconds, committed))
-            .on_hover(move |seconds| hover.hover(seconds));
-        let mut bar_layers = vec![AnyView::new(bar)];
-        if let Some(seconds) = self.ui.hover.filter(|_| duration > 0.0) {
-            let fraction = (seconds / duration).clamp(0.0, 1.0) as f32;
-            bar_layers.push(AnyView::new(
-                white_text(format_media_time(
-                    MediaTime::from_seconds(seconds).ok(),
-                    self.snapshot.duration,
-                ))
-                .padding_edges(6.0, 2.0)
-                .background_color(Color::BLACK.multiplied_alpha(0.75))
-                .corner_radius(4.0)
-                .position_value(LayoutStyleValue::Points(-26.0), Edge::Top)
-                .position_value(
-                    LayoutStyleValue::Calc(LayoutCalc::new(fraction * 100.0, -22.0)),
-                    Edge::Left,
-                )
-                .modifier(AbsolutePosition),
-            ));
-        }
-        let bar_block = AnyView::new(BoxView::new(
-            FlexDirection::Column,
-            Align::Stretch,
-            Justify::FlexStart,
-            Wrap::NoWrap,
-            0.0,
-            AnyView::new(TupleView::new(bar_layers)),
-        ));
+        let bar_block = AnyView::new(TimelineBar {
+            actions: self.actions.clone(),
+        });
         AnyView::new(
             BoxView::new(
                 FlexDirection::Column,
@@ -703,14 +685,9 @@ impl Surface {
                     .padding_edges(10.0, 0.0),
             )
         };
-        let time = white_text(format!(
-            "{} / {}",
-            format_media_time(
-                MediaTime::from_seconds(self.position().max(0.0)).ok(),
-                self.snapshot.duration
-            ),
-            format_media_time(self.snapshot.duration, self.snapshot.duration)
-        ));
+        let time = AnyView::new(TimeLabel {
+            actions: actions.clone(),
+        });
         let mut items = vec![
             play,
             mute,
@@ -868,6 +845,14 @@ impl Surface {
                 )),
             )
             .ghost()
+            .on_open_change({
+                let actions = actions.clone();
+                move |open| {
+                    actions.runtime.menu_open.set(open);
+                    // Closing restarts the countdown instead of hiding at once.
+                    actions.activity();
+                }
+            })
             .placement(PopoverPlacement::TopTrailing)
             .width(220.0)
             .accessibility_label("Settings")
@@ -1141,6 +1126,92 @@ impl PrimitiveView for FullscreenKeys {
 }
 impl_primitive_view!(FullscreenKeys);
 
+/// The seek bar with its hover time, following the live position.
+struct TimelineBar {
+    actions: PlayerActions,
+}
+
+impl View for TimelineBar {
+    fn body(&self, cx: &Scope) -> AnyView {
+        let snapshot = use_playback(cx, &self.actions.control);
+        let timeline = self.actions.timeline.get();
+        let duration = snapshot.duration.map_or(0.0, MediaTime::seconds);
+        let seekable = snapshot.seekable_range.is_some() && duration > 0.0;
+        let scrub = self.actions.clone();
+        let hover = self.actions.clone();
+        let bar = MediaProgressBar::new(shown_position(&snapshot, &timeline), duration)
+            .enabled(seekable)
+            .on_scrub(move |seconds, committed| scrub.scrub(seconds, committed))
+            .on_hover(move |seconds| hover.hover(seconds));
+        let mut layers = vec![AnyView::new(bar)];
+        if let Some(seconds) = timeline.hover.filter(|_| duration > 0.0) {
+            let fraction = (seconds / duration).clamp(0.0, 1.0) as f32;
+            layers.push(AnyView::new(
+                white_text(format_media_time(
+                    MediaTime::from_seconds(seconds).ok(),
+                    snapshot.duration,
+                ))
+                .padding_edges(6.0, 2.0)
+                .background_color(Color::BLACK.multiplied_alpha(0.75))
+                .corner_radius(4.0)
+                .position_value(LayoutStyleValue::Points(-26.0), Edge::Top)
+                .position_value(
+                    LayoutStyleValue::Calc(LayoutCalc::new(fraction * 100.0, -22.0)),
+                    Edge::Left,
+                )
+                .modifier(AbsolutePosition),
+            ));
+        }
+        AnyView::new(BoxView::new(
+            FlexDirection::Column,
+            Align::Stretch,
+            Justify::FlexStart,
+            Wrap::NoWrap,
+            0.0,
+            AnyView::new(TupleView::new(layers)),
+        ))
+    }
+}
+
+/// `elapsed / total`, following the live position.
+struct TimeLabel {
+    actions: PlayerActions,
+}
+
+impl View for TimeLabel {
+    fn body(&self, cx: &Scope) -> AnyView {
+        let snapshot = use_playback(cx, &self.actions.control);
+        let position = shown_position(&snapshot, &self.actions.timeline.get());
+        white_text(format!(
+            "{} / {}",
+            format_media_time(
+                MediaTime::from_seconds(position.max(0.0)).ok(),
+                snapshot.duration
+            ),
+            format_media_time(snapshot.duration, snapshot.duration)
+        ))
+    }
+}
+
+/// Danmaku driven by the live position.
+struct DanmakuOverlay {
+    feed: DanmakuFeed,
+    settings: DanmakuSettings,
+    actions: PlayerActions,
+}
+
+impl View for DanmakuOverlay {
+    fn body(&self, cx: &Scope) -> AnyView {
+        let snapshot = use_playback(cx, &self.actions.control);
+        let position = shown_position(&snapshot, &self.actions.timeline.get());
+        AnyView::new(
+            DanmakuLayer::new(self.feed.clone(), position)
+                .settings(self.settings)
+                .playing(snapshot.state == PlaybackState::Playing, snapshot.rate),
+        )
+    }
+}
+
 /// Shows or hides the control layer without unmounting it.
 struct ChromeVisibility {
     visible: bool,
@@ -1190,6 +1261,22 @@ impl PrimitiveView for ControlsRegion {
         let Some(registry) = InteractionRegistryHolder::current() else {
             return;
         };
+        let moving = self.runtime.clone();
+        registry.set_motion(
+            node,
+            InputHandlerRoute::control(),
+            Rc::new(move |event, _| {
+                let moved = moving
+                    .pointer
+                    .get()
+                    .is_none_or(|(x, y)| (x - event.x).abs() >= 1.0 || (y - event.y).abs() >= 1.0);
+                moving.pointer.set(Some((event.x, event.y)));
+                if moved {
+                    moving.activity.set(Instant::now());
+                }
+                EventResult::Ignored
+            }),
+        );
         let runtime = self.runtime.clone();
         registry.set_hover(
             node,
@@ -1239,7 +1326,9 @@ impl PrimitiveView for GestureLayer {
                 self.playing && self.controls,
                 Rc::new(move |_| {
                     let runtime = &actions.runtime;
-                    if !runtime.over_controls.get() && runtime.activity.get().elapsed() >= autohide
+                    if !runtime.over_controls.get()
+                        && !runtime.menu_open.get()
+                        && runtime.activity.get().elapsed() >= autohide
                     {
                         actions.hide_controls();
                     }
@@ -1279,9 +1368,10 @@ impl PrimitiveView for GestureLayer {
             InputHandlerRoute::control(),
             Rc::new(move |event, _| {
                 let runtime = &motion.runtime;
-                let moved = runtime.pointer.get().is_none_or(|(x, y)| {
-                    (x - event.x).abs() >= 1.0 || (y - event.y).abs() >= 1.0
-                });
+                let moved = runtime
+                    .pointer
+                    .get()
+                    .is_none_or(|(x, y)| (x - event.x).abs() >= 1.0 || (y - event.y).abs() >= 1.0);
                 runtime.pointer.set(Some((event.x, event.y)));
                 runtime.over_controls.set(false);
                 if moved {

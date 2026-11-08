@@ -46,13 +46,21 @@ pub fn format_media_time(time: Option<MediaTime>, scale: Option<MediaTime>) -> S
 }
 
 /// Keeps a snapshot signal current with a control for as long as the scope lives.
+/// Keeps a projection of a control's snapshot current for as long as the scope lives.
 #[derive(Default)]
 struct PlaybackLink {
     bound: RefCell<Option<(usize, ChangeListener)>>,
 }
 
+type Selector<T> = Arc<dyn Fn(&PlayerSnapshot) -> T + Send + Sync>;
+
 impl PlaybackLink {
-    fn bind(&self, control: &Arc<dyn PlaybackControl>, snapshot: Signal<PlayerSnapshot>) {
+    fn bind<T: Clone + PartialEq + Send + 'static>(
+        &self,
+        control: &Arc<dyn PlaybackControl>,
+        signal: Signal<T>,
+        select: Selector<T>,
+    ) {
         let identity = Arc::as_ptr(control) as *const () as usize;
         if self
             .bound
@@ -62,8 +70,8 @@ impl PlaybackLink {
         {
             return;
         }
-        snapshot.set_if_changed(control.snapshot());
-        let sender = snapshot.sender();
+        signal.set_if_changed(select(&control.snapshot()));
+        let sender = signal.sender();
         let pending = Arc::new(AtomicBool::new(false));
         let source = control.clone();
         let listener = control.on_change(Arc::new(move || {
@@ -72,9 +80,17 @@ impl PlaybackLink {
             }
             let pending = pending.clone();
             let source = source.clone();
-            sender.update(move |current| {
+            let select = select.clone();
+            // Only a changed projection invalidates the reading body.
+            sender.update_if(move |current| {
                 pending.store(false, Ordering::Release);
-                *current = source.snapshot();
+                let next = select(&source.snapshot());
+                if *current == next {
+                    false
+                } else {
+                    *current = next;
+                    true
+                }
             });
         }));
         *self.bound.borrow_mut() = Some((identity, listener));
@@ -84,10 +100,36 @@ impl PlaybackLink {
 /// The live snapshot of `control`, recomposing the calling body when it changes.
 #[track_caller]
 pub fn use_playback(cx: &Scope, control: &Arc<dyn PlaybackControl>) -> PlayerSnapshot {
-    let snapshot = cx.state(|| control.snapshot());
+    use_playback_select(cx, control, PlayerSnapshot::clone)
+}
+
+/// A projection of `control`'s snapshot. The calling body recomposes only when
+/// the projection changes, so a view that ignores the position is not rebuilt
+/// on every position report.
+#[track_caller]
+pub fn use_playback_select<T: Clone + PartialEq + Send + 'static>(
+    cx: &Scope,
+    control: &Arc<dyn PlaybackControl>,
+    select: impl Fn(&PlayerSnapshot) -> T + Send + Sync + 'static,
+) -> T {
+    let select: Selector<T> = Arc::new(select);
+    let first = select.clone();
+    let signal = cx.state(|| first(&control.snapshot()));
     let link = cx.remember(|| Rc::new(PlaybackLink::default()));
-    link.bind(control, snapshot);
-    snapshot.get()
+    link.bind(control, signal, select);
+    signal.get()
+}
+
+/// The snapshot without the fields that change while playing (position,
+/// buffering, revision), for views that only follow state, rate, volume and tracks.
+pub fn steady_snapshot(snapshot: &PlayerSnapshot) -> PlayerSnapshot {
+    PlayerSnapshot {
+        position: None,
+        buffering_percent: None,
+        revision: 0,
+        frame_generation: 0,
+        ..snapshot.clone()
+    }
 }
 
 /// Transient scrubbing and volume state owned by a transport's scope.

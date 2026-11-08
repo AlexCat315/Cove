@@ -16,7 +16,6 @@ pub(super) struct TexturePatch {
     pub pixels: Arc<[u8]>,
 }
 struct SlotState {
-    binding: Option<BindingSet>,
     patches: Vec<TexturePatch>,
     sequence: u64,
 }
@@ -31,7 +30,6 @@ impl TextureSlot {
             resource,
             accepts_uploads,
             state: Mutex::new(SlotState {
-                binding: None,
                 patches: Vec::new(),
                 sequence: 0,
             }),
@@ -65,13 +63,10 @@ impl TextureSlot {
             .retain(|patch| patch.sequence > sequence);
     }
     fn binding(&self, shaders: &NativeUIShaderResources) -> RhiResult<BindingSet> {
-        let mut state = self.state.lock().unwrap_or_else(|e| e.into_inner());
-        if let Some(binding) = state.binding {
-            return Ok(binding);
-        }
-        let binding = shaders.binding(self.resource.texture())?;
-        state.binding = Some(binding);
-        Ok(binding)
+        // Ask the device each time: a cache hit returns the same set and marks it
+        // recently used, so a set this slot keeps drawing with is never the one the
+        // bounded binding-set cache evicts. A retained handle could go stale.
+        shaders.binding(self.resource.texture())
     }
 }
 #[derive(Clone, Copy)]
@@ -85,7 +80,6 @@ struct Placement {
 #[derive(Clone)]
 struct ImageAtlas {
     texture: Arc<TextureResource>,
-    binding: Option<BindingSet>,
     size: usize,
     x: usize,
     y: usize,
@@ -347,7 +341,6 @@ impl NativeUITextureStore {
             d.label = Some("native-ui-atlas");
             let mut atlas = ImageAtlas {
                 texture: Arc::new(TextureResource::new(self.device.clone(), d)?),
-                binding: None,
                 size: Self::ATLAS_SIZE,
                 x: 0,
                 y: 0,
@@ -441,13 +434,10 @@ impl NativeUITextureStore {
     }
     pub fn binding_set(&mut self, id: TextureId) -> RhiResult<BindingSet> {
         if let Some(p) = self.placements.get(&id) {
-            let atlas = &mut self.atlases[p.atlas];
-            if let Some(set) = atlas.binding {
-                return Ok(set);
-            }
-            let set = self.shaders.binding(atlas.texture.texture())?;
-            atlas.binding = Some(set);
-            return Ok(set);
+            // See `TextureSlot::binding`: never retain a set across frames.
+            return self
+                .shaders
+                .binding(self.atlases[p.atlas].texture.texture());
         }
         self.textures
             .get(&id)

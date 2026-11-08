@@ -33,6 +33,9 @@ pub struct MenuButton<Label: View + Clone + 'static> {
     /// its own (a split button).
     pub is_borderless: bool,
     pub label: Label,
+    /// Told when the menu opens and closes, for owners that must stay in place
+    /// while it is shown (an auto-hiding control bar).
+    pub on_open_change: Option<std::rc::Rc<dyn Fn(bool)>>,
 }
 
 impl<Label: View + Clone + 'static> MenuButton<Label> {
@@ -51,7 +54,13 @@ impl<Label: View + Clone + 'static> MenuButton<Label> {
             tooltip: None,
             is_borderless: false,
             label,
+            on_open_change: None,
         }
+    }
+
+    pub fn on_open_change(mut self, handler: impl Fn(bool) + 'static) -> Self {
+        self.on_open_change = Some(std::rc::Rc::new(handler));
+        self
     }
 
     pub fn enabled(mut self, is_enabled: bool) -> Self {
@@ -86,7 +95,15 @@ impl<Label: View + Clone + 'static> MenuButton<Label> {
             Some(width) => menu.width(width),
             None => menu,
         };
-        menu.on_item_activated(move || presented.set(false))
+        let on_open_change = self.on_open_change.clone();
+        menu.on_item_activated(move || {
+            if presented.get_untracked()
+                && let Some(handler) = on_open_change.as_ref()
+            {
+                handler(false);
+            }
+            presented.set(false);
+        })
     }
 
     /// A button that opens the system menu anchored at its own corner.
@@ -95,6 +112,7 @@ impl<Label: View + Clone + 'static> MenuButton<Label> {
         let captured = frame.clone();
         let entries = self.entries.clone();
         let placement = self.placement;
+        let on_open_change = self.on_open_change.clone();
         let button = Button::with_options(
             self.label.clone(),
             move || {
@@ -103,10 +121,17 @@ impl<Label: View + Clone + 'static> MenuButton<Label> {
                 };
                 let built = NativeMenuBuilder::build(&entries);
                 let snapshot = built.snapshot.clone();
+                if let Some(handler) = on_open_change.as_ref() {
+                    handler(true);
+                }
+                let closed = on_open_change.clone();
                 NativeMenuPresenter::present(
                     &snapshot,
                     anchor(rect, placement),
                     Box::new(move |chosen| {
+                        if let Some(handler) = closed.as_ref() {
+                            handler(false);
+                        }
                         if let Some(chosen) = chosen {
                             built.run(chosen);
                         }
@@ -136,8 +161,20 @@ impl<Label: View + Clone + 'static> MenuButton<Label> {
     }
 
     fn popover_button(&self, presented: Signal<bool>) -> AnyView {
+        let binding = match self.on_open_change.clone() {
+            Some(handler) => cove_core::Binding::new(
+                move || presented.get(),
+                move |open: bool| {
+                    if presented.get_untracked() != open {
+                        handler(open);
+                    }
+                    presented.set(open);
+                },
+            ),
+            None => presented.into(),
+        };
         let mut popover = Popover::new(self.label.clone(), self.menu(presented))
-            .is_presented(presented.into())
+            .is_presented(binding)
             .enabled(self.is_enabled)
             .placement(self.placement);
         popover = if self.is_borderless {

@@ -528,8 +528,15 @@ fn hidden_controls_stay_mounted_and_ignore_a_resting_pointer() {
     use cove_platform::{InputEvent, MouseMotionEvent};
     InteractiveScene::run(800.0, 600.0, |scene| {
         let control = FakeControl::new(PlaybackState::Playing, Some(MediaTime(60_000_000_000)));
-        scene.install(VideoPlayer::new(control.clone()).autohide(0.05).frame_width(640.0));
-        let video = scene.labelled("Video player", None).expect("player").absolute_frame();
+        scene.install(
+            VideoPlayer::new(control.clone())
+                .autohide(0.05)
+                .frame_width(640.0),
+        );
+        let video = scene
+            .labelled("Video player", None)
+            .expect("player")
+            .absolute_frame();
         let motion = |x: f32, y: f32| {
             scene
                 .dispatcher()
@@ -559,6 +566,97 @@ fn hidden_controls_stay_mounted_and_ignore_a_resting_pointer() {
             "a resting pointer must not flash the bar back"
         );
         motion(x + 6.0, y);
-        assert!(effective_opacity(&pause()) > 0.99, "real movement shows it again");
+        assert!(
+            effective_opacity(&pause()) > 0.99,
+            "real movement shows it again"
+        );
+    });
+}
+
+#[test]
+fn an_open_settings_menu_keeps_the_controls_up() {
+    InteractiveScene::run(800.0, 600.0, |scene| {
+        let control = FakeControl::new(PlaybackState::Playing, Some(MediaTime(60_000_000_000)));
+        scene.install(
+            VideoPlayer::new(control.clone())
+                .autohide(0.05)
+                .frame_width(640.0),
+        );
+        let pause = || labelled_button(scene, "Pause").expect("the bar stays mounted");
+        let settings = scene
+            .first(|node| {
+                node.accessibility()
+                    .is_some_and(|semantics| semantics.label == "Settings")
+            })
+            .expect("settings trigger");
+        scene.click(&settings, 1);
+        assert!(!scene.portal.entries().is_empty(), "the menu is open");
+
+        std::thread::sleep(std::time::Duration::from_millis(80));
+        scene.settle(3, 1.0 / 60.0);
+        assert!(
+            effective_opacity(&pause()) > 0.99,
+            "the bar must not hide while its menu is open"
+        );
+
+        scene.click(&settings, 1);
+        assert!(scene.portal.entries().is_empty(), "the menu closed");
+        // Resting on the bar keeps it up; once the pointer is over the picture,
+        // idleness hides it again.
+        let video = scene
+            .labelled("Video player", None)
+            .expect("player")
+            .absolute_frame();
+        scene
+            .dispatcher()
+            .dispatch(&cove_platform::InputEvent::MouseMotion(
+                cove_platform::MouseMotionEvent {
+                    x: video.x + 120.0,
+                    y: video.y + 60.0,
+                    delta_x: 0.0,
+                    delta_y: 0.0,
+                    kind: Default::default(),
+                },
+            ));
+        scene.settle(2, 1.0 / 60.0);
+        std::thread::sleep(std::time::Duration::from_millis(80));
+        scene.settle(3, 1.0 / 60.0);
+        assert!(
+            effective_opacity(&pause()) < 0.01,
+            "idle hides it again afterwards"
+        );
+    });
+}
+
+#[test]
+fn position_reports_do_not_re_present_an_open_menu() {
+    InteractiveScene::run(800.0, 600.0, |scene| {
+        let control = FakeControl::new(PlaybackState::Paused, Some(MediaTime(600_000_000_000)));
+        scene.install(VideoPlayer::new(control.clone()).frame_width(640.0));
+        let settings = scene
+            .first(|node| {
+                node.accessibility()
+                    .is_some_and(|semantics| semantics.label == "Settings")
+            })
+            .expect("settings trigger");
+        scene.click(&settings, 1);
+        assert!(!scene.portal.entries().is_empty(), "the menu is open");
+        let revision = scene.portal.revision();
+        for second in 1..=20u64 {
+            control.change(|snapshot| {
+                snapshot.position = Some(MediaTime(second * 1_000_000_000));
+                snapshot.revision += 1;
+            });
+            scene.settle(1, 1.0 / 60.0);
+        }
+        assert_eq!(
+            scene.portal.revision(),
+            revision,
+            "the open menu must not be re-presented by position reports"
+        );
+        assert!(
+            scene.labelled("0:20 / 10:00", None).is_some(),
+            "the time label still follows the position"
+        );
     });
 }

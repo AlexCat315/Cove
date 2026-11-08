@@ -590,13 +590,13 @@ impl<T: 'static> Signal<T> {
         let key = self.key;
         SignalSender {
             inbox,
-            apply: Arc::new(move |change: Box<dyn FnOnce(&mut T) + Send>| {
+            apply: Arc::new(move |change: Box<dyn FnOnce(&mut T) -> bool + Send>| {
                 Box::new(move || {
                     Signal::<T> {
                         key,
                         _marker: PhantomData,
                     }
-                    .update(change)
+                    .update_if(change)
                 })
             }),
         }
@@ -613,7 +613,7 @@ impl<T: Default + 'static> Default for Signal<T> {
     }
 }
 
-type Apply<T> = Arc<dyn Fn(Box<dyn FnOnce(&mut T) + Send>) -> Posted + Send + Sync>;
+type Apply<T> = Arc<dyn Fn(Box<dyn FnOnce(&mut T) -> bool + Send>) -> Posted + Send + Sync>;
 
 /// Thread-safe writer for a [`Signal`].
 pub struct SignalSender<T: 'static> {
@@ -632,6 +632,15 @@ impl<T: 'static> Clone for SignalSender<T> {
 
 impl<T: Send + 'static> SignalSender<T> {
     pub fn update(&self, change: impl FnOnce(&mut T) + Send + 'static) {
+        self.update_if(move |value| {
+            change(value);
+            true
+        });
+    }
+
+    /// Like [`update`](Self::update), but subscribers are invalidated only when
+    /// `change` reports that it changed the value.
+    pub fn update_if(&self, change: impl FnOnce(&mut T) -> bool + Send + 'static) {
         let posted = (self.apply)(Box::new(change));
         self.inbox
             .lock()
@@ -642,6 +651,21 @@ impl<T: Send + 'static> SignalSender<T> {
 
     pub fn set(&self, value: T) {
         self.update(move |current| *current = value);
+    }
+
+    /// Writes `value` and invalidates subscribers only when it differs.
+    pub fn set_if_changed(&self, value: T)
+    where
+        T: PartialEq,
+    {
+        self.update_if(move |current| {
+            if *current == value {
+                false
+            } else {
+                *current = value;
+                true
+            }
+        });
     }
 }
 
