@@ -26,6 +26,7 @@ pub mod interaction_gap_stories;
 pub mod intrinsic_fitting;
 pub mod layout;
 pub mod markdown_story;
+pub mod media_player_story;
 pub mod media_stories;
 pub mod navigation_layout_stories;
 pub mod navigation_stories;
@@ -86,6 +87,7 @@ pub use interaction_gap_stories::{
 pub use intrinsic_fitting::{FIT_CHIPS, ViewThatFitsStory};
 pub use layout::{LayoutGridStory, LazyGridStory, MasonrySample, MasonryStory};
 pub use markdown_story::MarkdownStory;
+pub use media_player_story::MediaPlayerStory;
 pub use media_stories::{RatingSample, RatingStory, SkeletonStory};
 pub use navigation_layout_stories::{DrawerStory, RailStory};
 pub use navigation_stories::AppBarStory;

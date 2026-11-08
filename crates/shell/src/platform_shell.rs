@@ -153,6 +153,7 @@ pub struct WindowSnapshot {
     pub minimized: bool,
     pub occluded: bool,
     pub maximized: bool,
+    pub fullscreen: bool,
     pub safe_area: WindowSafeArea,
     pub position: Option<(f32, f32)>,
     pub refresh_rate: Option<f64>,
@@ -204,6 +205,15 @@ pub trait Shell {
     fn set_window_chrome_hit_test(&self, id: WindowId, hit: Option<&WindowChromeHitTest>);
     /// Makes the native chrome follow the UI theme instead of the system.
     fn set_window_appearance(&self, _id: WindowId, _appearance: WindowAppearance) {}
+    /// Enters or leaves full screen (a separate Space on macOS). Shells without
+    /// window management ignore it and keep reporting `false`.
+    fn set_window_fullscreen(&self, _id: WindowId, _fullscreen: bool) {}
+    fn is_window_fullscreen(&self, _id: WindowId) -> bool {
+        false
+    }
+    /// Keeps the window above normal windows, including other applications'
+    /// full-screen Spaces on macOS: the basis of picture-in-picture windows.
+    fn set_window_always_on_top(&self, _id: WindowId, _on_top: bool) {}
     fn show_open_folder_dialog(
         &self,
         id: Option<WindowId>,
@@ -280,6 +290,7 @@ pub trait Shell {
             minimized: window.is_minimized(),
             occluded: window.is_occluded(),
             maximized: self.is_window_maximized(id),
+            fullscreen: self.is_window_fullscreen(id),
             safe_area: window.safe_area(),
             position: self.window_position(id),
             refresh_rate: self.display_refresh_rate(Some(id)),

@@ -208,6 +208,10 @@ icon_group!(media {
     video => "video",
     volume => "volume",
     volume_x => "volume-x",
+    picture_in_picture => "picture-in-picture",
+    danmaku => "danmaku",
+    danmaku_off => "danmaku-off",
+    play_fill => "play-fill",
 });
 
 icon_group!(device {
@@ -456,6 +460,10 @@ const CATALOG: &[(&str, &str)] = &[
     ("video", "Media"),
     ("volume", "Media"),
     ("volume-x", "Media"),
+    ("picture-in-picture", "Media"),
+    ("danmaku", "Media"),
+    ("danmaku-off", "Media"),
+    ("play-fill", "Media"),
     ("battery", "Device"),
     ("bluetooth", "Device"),
     ("cloud", "Device"),

@@ -178,6 +178,8 @@ pub struct LayoutStyle {
     pub gap_column: LayoutStyleValue,
     pub box_sizing: BoxSizing,
     pub grid: GridStyle,
+    /// Width over height applied when one dimension is auto.
+    pub aspect_ratio: Option<f32>,
 }
 impl Default for LayoutStyle {
     fn default() -> Self {
@@ -209,6 +211,7 @@ impl Default for LayoutStyle {
             gap_column: LayoutStyleValue::Auto,
             box_sizing: BoxSizing::BorderBox,
             grid: GridStyle::default(),
+            aspect_ratio: None,
         }
     }
 }
@@ -286,6 +289,9 @@ impl LayoutStyle {
                 width: self.width.dimension(calc),
                 height: self.height.dimension(calc),
             },
+            aspect_ratio: self
+                .aspect_ratio
+                .filter(|ratio| ratio.is_finite() && *ratio > 0.0),
             min_size: taffy::Size {
                 width: minimum(self.min_width, floor.map(|floor| floor.width)),
                 height: minimum(self.min_height, floor.map(|floor| floor.height)),

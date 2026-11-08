@@ -28,6 +28,10 @@ use std::time::{Duration, Instant};
 const PACKET_BYTES: usize = 4 * 1024 * 1024;
 /// Packets one stream may hold regardless of size.
 const PACKET_COUNT: usize = 512;
+/// How far past its limit a stream may grow while another selected stream starves.
+const OVERFLOW_FACTOR: usize = 4;
+/// Queued packets below which a stream counts as starving.
+const STARVING_PACKETS: usize = 4;
 /// Demux calls per pump tick.
 const READ_LIMIT: usize = 64;
 /// Decode iterations while prerolling a source or seek target.
@@ -100,6 +104,12 @@ impl Stream {
 
     fn full(&self) -> bool {
         self.bytes >= PACKET_BYTES || self.packets.len() >= PACKET_COUNT
+    }
+
+    /// The hard bound a full stream may grow to while another one starves.
+    fn overflowing(&self) -> bool {
+        self.bytes >= PACKET_BYTES * OVERFLOW_FACTOR
+            || self.packets.len() >= PACKET_COUNT * OVERFLOW_FACTOR
     }
 
     /// Queue fill as a percentage, reported as `buffering_percent`.
@@ -224,7 +234,12 @@ impl Engine {
         abort: Arc<Abort>,
     ) -> Self {
         Self {
-            audio: Audio::open(options.audio, VIRTUAL_RATE, VIRTUAL_CHANNELS),
+            audio: Audio::open(
+                &options.audio,
+                shared.meter.clone(),
+                VIRTUAL_RATE,
+                VIRTUAL_CHANNELS,
+            ),
             converter: Converter::new(),
             shared,
             options,
@@ -347,6 +362,10 @@ impl Engine {
         for _ in 0..READ_LIMIT {
             if let Some(packet) = self.deferred.take() {
                 self.queue(packet)?;
+                if self.deferred.is_some() {
+                    // Still full: wait for the decoders instead of spinning.
+                    return Ok(());
+                }
                 continue;
             }
             let packet = self.scratch();
@@ -386,26 +405,33 @@ impl Engine {
             // SAFETY: the packet is a live allocation read from the demuxer.
             (*packet).stream_index
         };
-        let accept = self
+        let Some(target) = self
             .streams
             .iter()
-            .any(|stream| stream.index == index && stream.selected && !stream.full());
-        if !accept {
-            let unwanted = self
-                .streams
-                .iter()
-                .any(|stream| stream.index == index && stream.selected);
-            if unwanted || !self.is_known(index) {
-                // Either an unselected stream or one with no decoder: drop it, the
-                // demuxer must keep making progress.
-                unsafe {
-                    // SAFETY: the packet is owned here and never queued.
-                    ffi::av_packet_unref(packet);
-                }
-                return Ok(());
+            .find(|stream| stream.index == index && stream.selected && stream.decodable())
+        else {
+            // An unselected stream or one with no decoder: drop it so the demuxer
+            // keeps making progress.
+            unsafe {
+                // SAFETY: the packet is owned here and never queued.
+                ffi::av_packet_unref(packet);
             }
+            return Ok(());
+        };
+        // A full stream waits, unless another selected stream is starving behind
+        // it in the file; then it may overflow up to a hard bound, or both stall.
+        let starving = self.streams.iter().any(|stream| {
+            stream.index != index
+                && stream.selected
+                && stream.decodable()
+                && !stream.end
+                && stream.packets.len() < STARVING_PACKETS
+        });
+        if target.full() && !(starving && !target.overflowing()) {
             self.deferred = Some(packet);
-            self.packet = std::ptr::null_mut();
+            if self.packet == packet {
+                self.packet = std::ptr::null_mut();
+            }
             return Ok(());
         }
         let Some(stream) = self.streams.iter_mut().find(|stream| stream.index == index) else {
@@ -416,10 +442,6 @@ impl Engine {
             self.packet = std::ptr::null_mut();
         }
         Ok(())
-    }
-
-    fn is_known(&self, index: c_int) -> bool {
-        self.streams.iter().any(|stream| stream.index == index)
     }
 
     /// Returns the reusable demux packet, allocating it after a hand-off.
@@ -433,10 +455,15 @@ impl Engine {
         self.packet
     }
 
-    /// Tells every selected decoder that no further packets will arrive.
+    /// Tells every selected decoder whose queue is empty that no further packets will
+    /// arrive. Streams still holding packets drain on a later tick, once decoded.
     fn drain_decoders(&mut self) {
         for stream in self.streams.iter_mut() {
-            if !stream.selected || stream.decoder.is_null() || stream.flushed {
+            if !stream.selected
+                || stream.decoder.is_null()
+                || stream.flushed
+                || !stream.packets.is_empty()
+            {
                 continue;
             }
             stream.end = true;
@@ -593,6 +620,10 @@ impl Engine {
             self.reconfigure(key, sample_rate, channels)?;
         }
         unsafe {
+            // SAFETY: the decoded frame is live and owned by this session until unreferenced.
+            super::normalize_layout(frame);
+        }
+        unsafe {
             // SAFETY: the frame is empty apart from the descriptor fields written here,
             // and `swr_convert_frame` allocates its own output buffer from them.
             ffi::av_frame_unref(self.pcm);
@@ -693,7 +724,7 @@ impl Engine {
             let image = if stale {
                 None
             } else {
-                Some(self.converter.convert(frame, Vec::new())?)
+                Some(self.converter.convert(frame, None)?)
             };
             unsafe {
                 // SAFETY: the decoded frame is not retained past this point.
@@ -918,6 +949,7 @@ impl Engine {
         if let MediaSource::Uri(uri) = &source {
             validate_uri(uri)?;
         }
+        let source = crate::http::route(source)?;
         self.token = cancellation;
         self.abort.reset();
         let volume = self

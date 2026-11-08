@@ -244,15 +244,32 @@ impl NativeUITextureStore {
         Ok(())
     }
     pub fn prepare_assets(&mut self, resources: &DrawListResources) -> RhiResult<()> {
+        let pending = self.residency.pending(resources);
+        // Ids that reappear with a new owner are streamed textures; they keep their slot
+        // even when the previous owner has already been released.
+        let streamed: std::collections::HashSet<TextureId> = pending
+            .iter()
+            .map(|(id, ..)| *id)
+            .filter(|id| self.residency.is_registered(*id))
+            .collect();
         for id in self.residency.expired() {
-            self.unregister(id);
+            if !streamed.contains(&id) {
+                self.unregister(id);
+            }
         }
-        for (id, asset, owner) in self.residency.pending(resources) {
+        for (id, asset, owner) in pending {
             match asset {
                 AssetOwner::Pixels(asset) => {
                     let image = asset.image();
                     let (w, h) = (image.width() as usize, image.height() as usize);
-                    if w <= Self::MAX_ATLAS_DIMENSION
+                    // A new owner under a known id is a streamed texture (video frames):
+                    // it leaves the atlas and updates one dedicated slot in place.
+                    let streamed = streamed.contains(&id);
+                    if streamed && let Some(placement) = self.placements.remove(&id) {
+                        self.atlases[placement.atlas].free.push(placement);
+                    }
+                    if !streamed
+                        && w <= Self::MAX_ATLAS_DIMENSION
                         && h <= Self::MAX_ATLAS_DIMENSION
                         && !self.placements.contains_key(&id)
                     {
@@ -261,7 +278,7 @@ impl NativeUITextureStore {
                     } else {
                         self.stage(
                             id,
-                            image.pixels().to_vec().into(),
+                            image.shared_pixels(),
                             [w, h],
                             TextureUploadRegion::new(w as i64, h as i64),
                             TextureFormat::Rgba8Unorm,

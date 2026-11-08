@@ -13,7 +13,7 @@ pub use bundle_image_resource::BundleImageResource;
 pub use cove_core as core;
 pub use cove_core::Bitmap as DecodedImage;
 pub use image_asset_registry::{
-    ImageAsset, ImageAssetRegistry, ImageAssetRegistryHolder, ImageCacheLimits,
+    ImageAsset, ImageAssetRegistry, ImageAssetRegistryHolder, ImageCacheLimits, allocate_texture_id,
 };
 pub use image_decoder::{ImageDecodeError, ImageDecoder, PixelSize};
 pub use orientation::ImageOrientation;

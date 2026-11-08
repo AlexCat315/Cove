@@ -35,6 +35,8 @@ pub enum PlatformCommand {
     Raise(WindowId),
     Minimize(WindowId),
     Maximize(WindowId),
+    Fullscreen(WindowId, bool),
+    AlwaysOnTop(WindowId, bool),
     Restore(WindowId),
     Hide(WindowId),
     Show(WindowId),

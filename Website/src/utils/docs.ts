@@ -61,6 +61,7 @@ import dragAndDrop from '@/content/components/drag-and-drop.md?raw'
 import component13 from '@/content/components/tab-view.md?raw'
 import component14 from '@/content/components/date-range.md?raw'
 import stepper from '@/content/components/stepper.md?raw'
+import mediaPlayer from '@/content/components/media-player.md?raw'
 import alert from '@/content/components/alert.md?raw'
 
 import actionGroupLayout from '@/content/components/action-group-layout.md?raw'
@@ -139,6 +140,7 @@ export const docGroups: DocGroup[] = [
       { slug: 'tab-view', title: 'TabView', raw: component13 },
       { slug: 'date-range', title: 'DateRangeCalendar', raw: component14 },
       { slug: 'stepper', title: 'Stepper', raw: stepper },
+      { slug: 'media-player', title: 'VideoPlayer / AudioPlayer', raw: mediaPlayer },
       { slug: 'alert', title: 'Alert', raw: alert },
     ],
   },

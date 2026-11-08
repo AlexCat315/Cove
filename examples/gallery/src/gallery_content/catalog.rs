@@ -99,6 +99,7 @@ pub enum GalleryPage {
     StatusBar,
     Carousel,
     Skeleton,
+    MediaPlayer,
     Stepper,
     ViewportTraits,
     ViewThatFits,
@@ -210,6 +211,7 @@ impl GalleryPage {
         Self::StatusBar,
         Self::Carousel,
         Self::Skeleton,
+        Self::MediaPlayer,
         Self::Stepper,
         Self::ViewportTraits,
         Self::ViewThatFits,
@@ -318,6 +320,7 @@ impl GalleryPage {
             Self::StatusBar => "statusBar",
             Self::Carousel => "carousel",
             Self::Skeleton => "skeleton",
+            Self::MediaPlayer => "mediaPlayer",
             Self::Stepper => "stepper",
             Self::ViewportTraits => "viewportTraits",
             Self::ViewThatFits => "viewThatFits",
@@ -947,6 +950,12 @@ impl GalleryCatalog {
                 "Shaped loading placeholders, reduced motion and content transitions.",
             ),
             GalleryEntry::new(
+                GalleryPage::MediaPlayer,
+                "Media Player",
+                "Media",
+                "Video and audio playback, live levels and waveform seeking over any PlaybackControl.",
+            ),
+            GalleryEntry::new(
                 GalleryPage::Stepper,
                 "Stepper",
                 "Navigation",
@@ -1164,7 +1173,8 @@ mod checks {
                 "Navigation",
                 "Layout",
                 "Foundation",
-                "Feedback"
+                "Feedback",
+                "Media"
             ]
         );
     }

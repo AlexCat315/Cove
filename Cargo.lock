@@ -401,6 +401,7 @@ dependencies = [
  "cove-hosts",
  "cove-imaging",
  "cove-logging",
+ "cove-media",
  "cove-platform",
  "cove-runtime",
  "cove-terminal",
@@ -491,6 +492,7 @@ dependencies = [
 name = "cove-media"
 version = "0.3.0-dev"
 dependencies = [
+ "cove-http",
  "cove-logging",
  "cpal",
  "ffmpeg-sys-next",
@@ -651,6 +653,7 @@ dependencies = [
  "cove-graphics",
  "cove-imaging",
  "cove-logging",
+ "cove-media",
  "cove-platform",
  "cove-system",
  "cove-text",

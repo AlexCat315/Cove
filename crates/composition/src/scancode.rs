@@ -13,6 +13,7 @@ impl Scancode {
     pub const F: u32 = 9;
     pub const K: u32 = 14;
     pub const L: u32 = 15;
+    pub const M: u32 = 16;
     pub const N: u32 = 17;
     pub const O: u32 = 18;
     pub const P: u32 = 19;

@@ -50,3 +50,9 @@ seek 完成需要位置之后的新解码帧，不以任意解码器状态作为
 `cove-media-rhi::VideoPresenter` 在 RHI 所有者线程将 RGBA8 上传为 `Arc<TextureImage>`，适用于现有 Metal/D3D12/Vulkan 后端。它遵循每帧实际 stride，并保留旧图像资源以支持旧视图快照；统计报告上传帧数和源平面字节数（含行填充，不是 GPU 总线测量）。PQ/HLG 明确报错，要求先做 tone mapping。未实现外部表面导入，不承诺零拷贝、HDR 或任意 YUV 直接显示。
 
 `close` 拒绝后续控制操作，重复关闭有效；最后一个 Player 句柄析构发起非阻塞关闭。`shutdown`/`wait_closed` 用于显式宿主停机，不能在 UI 或 streaming 回调中阻塞等待。
+
+## UI 与底层接口
+
+`PlaybackControl` 是 `cove-ui-compose` 音视频组件驱动的契约，`Player` 已实现；自定义来源可用 `ChangeNotifier` 发出变更、向 `VideoOutput` 发布 `SharedPlanes` 帧、用 `AudioMeter::record` 计量。组件文档见 `Website/src/content/components/media-player.md`。
+
+`MediaDecoder` 在调用线程同步解码（缩略图、取帧、波形、转码前端），`probe` 只读描述，`audio_output_devices` 与 `AudioOutput::Device` 选择输出设备，`AudioStream` 播放应用渲染的 PCM。`AudioBuffer::peaks` 与 `sample_stats` 计算波形与电平，样本统计内核在 AArch64 与 x86-64 上为内联汇编。

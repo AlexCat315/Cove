@@ -166,12 +166,19 @@ void cove_shell_apple_update(void *raw,CoveShellWindowState *state) {COVE_ASSERT
 #endif
     context.layer.contentsScale=fmax(1,(double)state->pixel_width/fmax(1,state->width));context.layer.drawableSize=CGSizeMake(state->pixel_width,state->pixel_height);
 }
-bool cove_shell_apple_command(void *raw,int command) {COVE_ASSERT_MAIN();
+bool cove_shell_apple_command(void *raw,int command,int a) {COVE_ASSERT_MAIN();
 #if TARGET_OS_OSX
     NSWindow *window=((__bridge CoveShellAppleWindow*)raw).window;if(!window)return false;
-    switch(command){case 3:case 8:[window makeKeyAndOrderFront:nil];[NSApp activateIgnoringOtherApps:YES];return true;case 4:[window performMiniaturize:nil];return true;case 5:if(!window.isZoomed)[window performZoom:nil];return true;case 6:if(window.isMiniaturized)[window deminiaturize:nil];else if(window.isZoomed)[window performZoom:nil];else if(window.styleMask&NSWindowStyleMaskFullScreen)[window toggleFullScreen:nil];return true;case 7:[window orderOut:nil];return true;default:return false;}
+    switch(command){case 3:case 8:[window makeKeyAndOrderFront:nil];[NSApp activateIgnoringOtherApps:YES];return true;case 4:[window performMiniaturize:nil];return true;case 5:if(!window.isZoomed)[window performZoom:nil];return true;case 6:if(window.isMiniaturized)[window deminiaturize:nil];else if(window.isZoomed)[window performZoom:nil];else if(window.styleMask&NSWindowStyleMaskFullScreen)[window toggleFullScreen:nil];return true;case 7:[window orderOut:nil];return true;case 10:{BOOL on=(window.styleMask&NSWindowStyleMaskFullScreen)!=0;if(on!=(a!=0)){window.collectionBehavior|=NSWindowCollectionBehaviorFullScreenPrimary;[window toggleFullScreen:nil];}return true;}case 11:{NSWindowCollectionBehavior floating=NSWindowCollectionBehaviorCanJoinAllSpaces|NSWindowCollectionBehaviorFullScreenAuxiliary;window.level=a?NSFloatingWindowLevel:NSNormalWindowLevel;window.collectionBehavior=a?((window.collectionBehavior&~NSWindowCollectionBehaviorFullScreenPrimary)|floating):(window.collectionBehavior&~floating);return true;}default:return false;}
 #else
-    (void)raw;(void)command;return false;
+    (void)raw;(void)command;(void)a;return false;
+#endif
+}
+int cove_shell_apple_fullscreen(void *raw) {COVE_ASSERT_MAIN();
+#if TARGET_OS_OSX
+    NSWindow *window=((__bridge CoveShellAppleWindow*)raw).window;if(!window)return -1;return (window.styleMask&NSWindowStyleMaskFullScreen)!=0;
+#else
+    (void)raw;return -1;
 #endif
 }
 void cove_shell_apple_chrome(void *raw,const CoveShellChrome *chrome) {COVE_ASSERT_MAIN();

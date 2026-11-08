@@ -205,6 +205,16 @@ impl PlatformLoop {
                     self.shell.maximize_window(id);
                 }
             }
+            PlatformCommand::Fullscreen(id, fullscreen) => {
+                if let Some(id) = native(&self.native_ids, id) {
+                    self.shell.set_window_fullscreen(id, fullscreen);
+                }
+            }
+            PlatformCommand::AlwaysOnTop(id, on_top) => {
+                if let Some(id) = native(&self.native_ids, id) {
+                    self.shell.set_window_always_on_top(id, on_top);
+                }
+            }
             PlatformCommand::Restore(id) => {
                 if let Some(id) = native(&self.native_ids, id) {
                     self.shell.restore_window(id);

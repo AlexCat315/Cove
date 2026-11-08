@@ -1,8 +1,17 @@
 # Gallery 逐项验收记录
 
-更新：2026-11-06。目录共 102 页（Numeric 合并 NumberField+Vec3Field，Text Fields 合并 TextField+SearchField+TextArea+JsonField）。当前控件页的验收以以下 Swift 对照表为准；后续旧轮记录保留其原有范围。
+更新：2026-11-08。目录共 103 页（Numeric 合并 NumberField+Vec3Field，Text Fields 合并 TextField+SearchField+TextArea+JsonField）。当前控件页的验收以以下 Swift 对照表为准；后续旧轮记录保留其原有范围。
 
 Swift 源码逐页对照见文末《Swift 源码对照（逐页差异清单）》。
+
+## 2026-11-08：音视频组件（Media Player）
+
+- 新页：Media 分类下的 Media Player，覆盖 `VideoPlayer`、`AudioPlayer`、`MediaTransport`、`VideoView`、`AudioLevelMeter`、`Waveform`。默认构建由基于公开底层 API 的合成源驱动（`VideoOutput` 发布 `SharedPlanes` 帧、`AudioMeter::record` 计量）；`--features media-ffmpeg` 播放 `examples/gallery/resources/media/sample.mp4`（384×216 H.264 + AAC 调幅正弦，8s），波形由 `MediaDecoder` 解出。
+- 结构验证：compose `media_player_tests` 6 项（同一纹理 id 提交最新帧且背景铺满、跨线程变更经 UI 收件箱刷新、播放/暂停/结束后从头播放/静音、拖动进度条松手为精确 seek、无时长时进度条禁用、波形按指针比例 seek、视图卸载即注销监听）；`cove-media` `decoder` 9 项（内存 WAV/Y4M 与真实 H.264/AAC：探测、重采样、缩放、seek、取消、分离请求、播放到结束、结束后 seek）。compose 全量 1710 项通过。
+- 原生验收：DevTools 真机操作（1280×720，FFmpeg 与合成两种构建）。H.264 首帧即显示，播放时画面与时间码推进、暂停图标与时间跟随快照，播放到 0:08 回到 Play；暂停时拖动进度条到 0:05 画面同步更新；音频走 CoreAudio，电平条实时跳动、停止后归零；波形按播放进度着 accent 色，结束后点击 25% 回到 0:02 并暂停；浅/深主题目检通过。
+- 验收中发现并修复：视频帧首帧落入图集后同 id 的后续帧不更新（画面停在第一帧）→ 纹理存储把同 id 新所有者作为流式纹理移出图集、原地更新专用槽；设备音频时钟在 flush 后不复位，结束后 seek 显示仍停在末尾；文件末尾未清空包队列就排空解码器，短片段停在 Playing；`from_micros` 放大 1000 倍；未指定声道布局的 WAV 第二帧起重采样失败；控制条时间标签被滑块拇指遮挡、行未拉伸、音频卡片缺内边距；x86-64 内联汇编 `1:` 标签在 Intel 语法下不合法（Linux/Windows 编译会失败）。
+- 未验证 / 既有问题：x86-64 SSE 内核只做了 Linux/Windows 目标的编译，未在 x86 机器上运行；iOS/Android/Windows/Linux 未做设备验收。主题切换的圆形揭示首帧在 DevTools 截图中为整屏品红，不含媒体的页面同样出现，属既有问题，与本轮无关。
+- 文档：新增 `Website/src/content/components/media-player.md` 并登记导航；更新 `Docs/media-ffmpeg.md`、`crates/media/README.md`。
 
 ## 2026-11-07：Stepper 外观重做与堆叠分支塌陷
 
@@ -296,6 +305,7 @@ cargo test -p cove-ui-compose --test compose --locked
 | Carousel | 5 | 1 / 3 | 挂载/几何基础检查通过；待逐项交互和视觉验收 |
 | Skeleton | 2 | 0 / 0 | 挂载/几何基础检查通过；待逐项交互和视觉验收 |
 | Stepper | 3 | 0 / 0 | 2026-11-07 重做外观与自适应堆叠：实心状态标记、跨越真实间距的连接线、选中只强调标记与标题；堆叠分支塌陷已修复并有回归；浅/深主题与宽窄布局目检通过；文档已写 |
+| Media Player | 2 | 0 / 0 | 2026-11-08 新增：视频画面与控制条、音频卡片（电平、波形 seek）；FFmpeg 与合成源两种构建 DevTools 原生验收通过；浅/深主题目检通过；文档已写 |
 | SingleLineText | 2 | 0 / 0 | 挂载/几何基础检查通过；待逐项交互和视觉验收 |
 | CompletionPopover | 2 | 0 / 0 | 挂载/几何基础检查通过；待逐项交互和视觉验收 |
 | RouteOutlet | 2 | 0 / 0 | 挂载/几何基础检查通过；待逐项交互和视觉验收 |

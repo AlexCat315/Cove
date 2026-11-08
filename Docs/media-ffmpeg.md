@@ -32,6 +32,7 @@ crates/media/src/
     audio.rs    cpal 输出、采样队列、主时钟
     video.rs    swscale RGBA8 转换与 FrameStorage
     pump.rs     每播放器一条泵线程与命令枚举
+    decoder.rs  MediaDecoder：调用线程上的同步解复用/解码与 probe
   native.rs     MediaContext / Player 控制层、请求期限与关闭
   ffmpeg.rs     原始 FFmpeg 绑定与 FrameStorage 再导出
 ```
@@ -48,7 +49,15 @@ crates/media/src/
 - `play`、`pause`、`seek(MediaTime)`、`select_tracks`、`set_rate`、`set_volume`、`close`。
 - `result`、`take_result`、`wait_result` 查询并消费请求终态；未消费结果计入 `result_capacity`，达到容量后提交返回 `Busy`。
 - `events_since(cursor)` 返回保留事件与下一个游标；`snapshot()` 返回一致的状态快照。
-- `video_output()` 返回 `VideoOutput`，订阅容量为 1 的最新帧唤醒。
+- `video_output()` 返回 `VideoOutput`，订阅容量为 1 的最新帧唤醒，或用 `on_change` 注册回调。
+- `on_change(callback)` 在快照变化与命令完成后于媒体线程回调；`audio_meter()` 返回实际送入设备的电平与采样历史；`detach(request)` 让结果完成即丢弃，分离的请求不计入 `result_capacity`。
+- `Player` 实现 `PlaybackControl`，可直接交给 `VideoPlayer` / `AudioPlayer`。
+
+同步底层接口：
+
+- `MediaDecoder::open(source, DecoderOptions)` 在调用线程解复用与解码；`next_frame`/`next_video`/`next_audio`、`frame_at`、`read_audio`、`seek`；`video_size` 按比例缩放，`audio_format` 重采样为交错 `f32`；`cancellation_token()` 可从其他线程中止阻塞读取。`probe(source)` 只读描述。
+- `audio_output_devices()` 枚举默认音频主机的输出设备，`AudioOutput::Device(id)` 选择设备，不可用时回退默认设备。
+- `AudioStream::open(AudioStreamOptions, render)` 播放应用渲染的 PCM；cpal 流在专用线程上创建与持有。
 
 `operation_timeout`（默认 30 秒）是后端操作期限，不是 `wait_result` 的等待超时。期限触发时控制层中止泵线程、把状态置为 `Failed` 并以 `Timeout` 完成未决请求；显式 `close` 则立即中止操作并进入 `Closed`，因此卡住的打开也能被关闭。
 
@@ -92,6 +101,6 @@ cargo test --locked -p cove-media-rhi --features ffmpeg
 ## 8. 已知边界
 
 - 尚未启用硬件解码（VideoToolbox/MediaCodec/D3D11VA/VAAPI）与零拷贝外部表面导入；所有帧先下载为 CPU 数据。
-- 未实现播放列表、字幕轨渲染、音轨混音或音频设备切换；`AudioOutput` 只有默认设备与静音两种。
-- 帧格式只输出 RGBA8；YUV 直接展示与 HDR 元数据传递不在当前范围。
+- 未实现播放列表、字幕轨渲染与音轨混音；播放中切换输出设备需要重新创建 `Player`。
+- 帧格式只输出 RGBA8；YUV 直接展示与 HDR 元数据传递不在当前范围。帧数据由 `sws_scale` 直接写入共享分配，`VideoView` 与 `VideoPresenter` 借用该分配上传，不做 CPU 拷贝。
 - 网络协议由 FFmpeg 自带实现启用，但未对每个协议做端到端验收。

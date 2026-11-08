@@ -185,6 +185,47 @@ impl Player {
     pub fn video_output(&self) -> VideoOutput {
         self.0.shared.output.clone()
     }
+    /// Levels and sample history of what this player delivered to its device.
+    pub fn audio_meter(&self) -> AudioMeter {
+        self.0.shared.meter.clone()
+    }
+    /// Calls `callback` after every snapshot change and command completion, on the
+    /// media thread that caused it. Keep it non-blocking.
+    pub fn on_change(&self, callback: ChangeCallback) -> ChangeListener {
+        self.0.shared.listeners.listen(callback)
+    }
+    /// Discards `request`'s result when it completes, freeing its `result_capacity` slot
+    /// without a `take_result`. Completed results are discarded immediately.
+    pub fn detach(&self, request: RequestId) -> MediaResult<()> {
+        let mut results = self
+            .0
+            .shared
+            .results
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        match results.get(&request) {
+            Some(Some(_)) => {
+                results.remove(&request);
+                Ok(())
+            }
+            Some(None) => {
+                self.0
+                    .shared
+                    .detached
+                    .lock()
+                    .unwrap_or_else(std::sync::PoisonError::into_inner)
+                    .insert(request);
+                Ok(())
+            }
+            None => Err(MediaError::new(
+                MediaErrorKind::RequestUnknown,
+                "unknown or acknowledged request",
+            )),
+        }
+    }
+    fn fire(&self, request: MediaResult<RequestId>) -> MediaResult<()> {
+        self.detach(request?)
+    }
     pub fn events_since(&self, cursor: u64) -> PlayerEvents {
         self.0.shared.events_since(cursor)
     }
@@ -286,7 +327,15 @@ impl Player {
         if was_closing && !closing {
             return Err(closed());
         }
-        if results.len() >= self.0.shared.result_capacity {
+        // Detached requests free themselves on completion; only retained results count.
+        let detached = self
+            .0
+            .shared
+            .detached
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .len();
+        if results.len().saturating_sub(detached) >= self.0.shared.result_capacity {
             return Err(MediaError::new(
                 MediaErrorKind::Busy,
                 "acknowledge completed media requests before submitting more",
@@ -310,6 +359,44 @@ impl Player {
         }
         Ok(id)
     }
+}
+
+impl PlaybackControl for Player {
+    fn snapshot(&self) -> PlayerSnapshot {
+        Player::snapshot(self)
+    }
+    fn video_output(&self) -> Option<VideoOutput> {
+        Some(Player::video_output(self))
+    }
+    fn audio_meter(&self) -> Option<AudioMeter> {
+        Some(Player::audio_meter(self))
+    }
+    fn play(&self) -> MediaResult<()> {
+        self.fire(Player::play(self))
+    }
+    fn pause(&self) -> MediaResult<()> {
+        self.fire(Player::pause(self))
+    }
+    fn seek(&self, request: SeekRequest) -> MediaResult<()> {
+        self.fire(Player::seek(self, request))
+    }
+    fn set_volume(&self, volume: f64) -> MediaResult<()> {
+        self.fire(Player::set_volume(self, volume))
+    }
+    fn set_rate(&self, rate: f64) -> MediaResult<()> {
+        self.fire(Player::set_rate(self, rate))
+    }
+    fn select_tracks(&self, tracks: Vec<String>) -> MediaResult<()> {
+        self.fire(Player::select_tracks(self, tracks))
+    }
+    fn on_change(&self, callback: ChangeCallback) -> ChangeListener {
+        Player::on_change(self, callback)
+    }
+}
+
+/// Output endpoints of the platform's default audio host.
+pub fn audio_output_devices() -> MediaResult<Vec<AudioDeviceInfo>> {
+    crate::engine::output_devices()
 }
 
 enum Operation {

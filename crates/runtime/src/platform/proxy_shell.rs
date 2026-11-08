@@ -338,6 +338,15 @@ impl Shell for ProxyShell {
     fn is_window_maximized(&self, id: WindowId) -> bool {
         self.link.state.window(id).is_some_and(|s| s.maximized)
     }
+    fn set_window_fullscreen(&self, id: WindowId, fullscreen: bool) {
+        self.post(PlatformCommand::Fullscreen(id, fullscreen));
+    }
+    fn is_window_fullscreen(&self, id: WindowId) -> bool {
+        self.link.state.window(id).is_some_and(|s| s.fullscreen)
+    }
+    fn set_window_always_on_top(&self, id: WindowId, on_top: bool) {
+        self.post(PlatformCommand::AlwaysOnTop(id, on_top));
+    }
     fn show_window_system_menu(&self, id: WindowId, x: f32, y: f32) {
         self.post(PlatformCommand::ShowSystemMenu(id, x, y));
     }

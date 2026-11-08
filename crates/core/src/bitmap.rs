@@ -47,6 +47,10 @@ impl Bitmap {
     pub fn pixels(&self) -> &[u8] {
         &self.pixels
     }
+    /// The shared pixel storage; uploads and frame retention use it without copying.
+    pub fn shared_pixels(&self) -> Arc<[u8]> {
+        self.pixels.clone()
+    }
     pub fn reduced_mip(&self) -> Option<Self> {
         if self.width == 1 && self.height == 1 {
             return None;

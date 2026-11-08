@@ -70,10 +70,17 @@ impl VideoPresenter {
         let plane = frame.format.planes.first().ok_or_else(|| {
             MediaError::new(MediaErrorKind::Negotiation, "video frame has no plane")
         })?;
-        let planes = frame.storage.copy_planes()?;
-        let data = planes
-            .first()
-            .ok_or_else(|| MediaError::new(MediaErrorKind::Decode, "missing video pixels"))?;
+        let data: std::sync::Arc<[u8]> = match frame.storage.shared_plane(0) {
+            Some(plane) => plane,
+            None => frame
+                .storage
+                .copy_planes()?
+                .into_iter()
+                .next()
+                .map(Into::into)
+                .ok_or_else(|| MediaError::new(MediaErrorKind::Decode, "missing video pixels"))?,
+        };
+        let data = &data[..];
         let width = frame.format.width as usize;
         let height = frame.format.height as usize;
         let required = plane.stride.checked_mul(height).ok_or_else(|| {

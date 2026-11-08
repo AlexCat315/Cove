@@ -85,6 +85,7 @@ impl GalleryPage {
             Self::Alert => icons::status::alert_circle(),
             Self::Progress => icons::status::loader(),
             Self::Skeleton => icons::layout::rows_2(),
+            Self::MediaPlayer => icons::media::video(),
             Self::Empty => icons::file::inbox(),
             Self::Radio => icons::shape::circle_dot(),
             Self::Notification => icons::status::bell(),

@@ -215,10 +215,12 @@ impl Default for ContextOptions {
         }
     }
 }
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub enum AudioOutput {
     #[default]
     DefaultDevice,
+    /// An `AudioDeviceInfo::id`. A device that disappeared falls back to the default.
+    Device(String),
     Silent,
 }
 #[derive(Clone, Debug, Default)]
@@ -239,6 +241,10 @@ pub(crate) struct SharedPlayer {
     pub results: Mutex<BTreeMap<RequestId, Option<CommandOutcome>>>,
     pub changed: Condvar,
     pub output: crate::VideoOutput,
+    pub meter: crate::AudioMeter,
+    pub listeners: crate::ChangeNotifier,
+    /// Requests whose result is discarded on completion instead of retained.
+    pub detached: Mutex<std::collections::BTreeSet<RequestId>>,
     pub abandoned: std::sync::atomic::AtomicBool,
     pub next_request: std::sync::atomic::AtomicU64,
     pub result_capacity: usize,
@@ -252,6 +258,9 @@ impl SharedPlayer {
             results: Mutex::new(BTreeMap::new()),
             changed: Condvar::new(),
             output: crate::VideoOutput::new(),
+            meter: crate::AudioMeter::default(),
+            listeners: crate::ChangeNotifier::new(),
+            detached: Mutex::new(std::collections::BTreeSet::new()),
             abandoned: std::sync::atomic::AtomicBool::new(false),
             next_request: std::sync::atomic::AtomicU64::new(1),
             result_capacity,
@@ -279,7 +288,9 @@ impl SharedPlayer {
             state.source_generation,
             PlayerEventKind::SnapshotChanged(state.clone()),
         );
+        drop(state);
         self.changed.notify_all();
+        self.listeners.notify();
     }
     pub fn finish(&self, request: RequestId, result: CommandOutcome) {
         let generation = self
@@ -298,6 +309,14 @@ impl SharedPlayer {
             return;
         }
         *slot = Some(result.clone());
+        let mut detached = self
+            .detached
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        if detached.remove(&request) {
+            results.remove(&request);
+        }
+        drop(detached);
         self.record(
             generation,
             PlayerEventKind::CommandCompleted {
@@ -307,6 +326,7 @@ impl SharedPlayer {
         );
         drop(results);
         self.changed.notify_all();
+        self.listeners.notify();
     }
     fn record(&self, source_generation: u64, kind: PlayerEventKind) {
         let mut journal = self

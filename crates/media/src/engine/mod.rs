@@ -5,11 +5,15 @@
 //! in [`crate::native`] only routes commands and enforces operation deadlines.
 
 mod audio;
+mod decoder;
 mod io;
 mod pump;
 mod session;
 mod video;
 
+pub(crate) use audio::output_devices;
+pub use audio::{AudioRender, AudioStream, AudioStreamOptions};
+pub use decoder::{DecodedFrame, MediaDecoder, probe};
 pub(crate) use pump::{Pump, Task};
 pub use video::FrameStorage;
 
@@ -178,9 +182,29 @@ pub(crate) fn from_micros(timestamp: i64) -> MediaTime {
         timestamp
             .max(0)
             .unsigned_abs()
-            .saturating_mul(MICROSECONDS as u64),
+            .saturating_mul((NANOSECONDS / MICROSECONDS) as u64),
     )
 }
+
+/// Gives a frame whose channel layout only carries a count the native default layout.
+///
+/// The resampler stores the default layout for such input, so leaving it unspecified
+/// makes every following frame look like a format change.
+///
+/// # Safety
+/// `frame` must be a live decoded audio frame owned by the caller.
+pub(crate) unsafe fn normalize_layout(frame: *mut ffi::AVFrame) {
+    // SAFETY: guaranteed by the caller; the layout is reset before it is rebuilt.
+    unsafe {
+        let layout = &mut (*frame).ch_layout;
+        if layout.order == ffi::AVChannelOrder::AV_CHANNEL_ORDER_UNSPEC {
+            let channels = layout.nb_channels.max(1);
+            ffi::av_channel_layout_uninit(layout);
+            ffi::av_channel_layout_default(layout, channels);
+        }
+    }
+}
+
 
 /// A UTF-8 path as a NUL-terminated C string for the FFmpeg file protocol.
 pub(crate) fn c_path(path: &Path) -> MediaResult<std::ffi::CString> {
@@ -210,4 +234,13 @@ pub(crate) fn c_str(text: &str) -> MediaResult<std::ffi::CString> {
 /// A negative FFmpeg status built from a platform errno.
 pub(crate) fn averror(errno: c_int) -> c_int {
     ffi::AVERROR(errno)
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn microseconds_become_nanoseconds() {
+        assert_eq!(super::from_micros(1_500_000).0, 1_500_000_000);
+        assert_eq!(super::from_micros(-4).0, 0);
+    }
 }

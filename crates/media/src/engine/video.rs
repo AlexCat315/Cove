@@ -3,10 +3,11 @@ use crate::{MediaError, MediaErrorKind, MediaResult, VideoDynamicRange, VideoSto
 use ffmpeg_sys_next as ffi;
 use std::any::Any;
 use std::ffi::{CStr, c_char, c_int};
+use std::sync::Arc;
 
 /// One converted frame: `width * height * 4` bytes, row stride `width * 4`.
 pub(crate) struct Rgba {
-    pub bytes: Vec<u8>,
+    pub bytes: Arc<[u8]>,
     pub width: u32,
     pub height: u32,
     pub colorimetry: String,
@@ -14,14 +15,16 @@ pub(crate) struct Rgba {
     pub aspect_ratio: (u32, u32),
 }
 
-/// The single CPU plane behind a published frame.
+/// The single CPU plane behind a published frame. Presenters borrow it without copying.
 pub struct FrameStorage {
-    bytes: Vec<u8>,
+    bytes: Arc<[u8]>,
 }
 
 impl FrameStorage {
-    pub fn new(bytes: Vec<u8>) -> Self {
-        Self { bytes }
+    pub fn new(bytes: impl Into<Arc<[u8]>>) -> Self {
+        Self {
+            bytes: bytes.into(),
+        }
     }
 
     pub fn bytes(&self) -> &[u8] {
@@ -31,11 +34,15 @@ impl FrameStorage {
 
 impl VideoStorage for FrameStorage {
     fn copy_planes(&self) -> MediaResult<Vec<Vec<u8>>> {
-        Ok(vec![self.bytes.clone()])
+        Ok(vec![self.bytes.to_vec()])
     }
 
     fn as_any(&self) -> &dyn Any {
         self
+    }
+
+    fn shared_plane(&self, index: usize) -> Option<Arc<[u8]>> {
+        (index == 0).then(|| self.bytes.clone())
     }
 }
 
@@ -51,12 +58,12 @@ impl Converter {
         }
     }
 
-    /// Scales `source` into `bytes`, which must be at least `width * height * 4`.
-    /// The destination is a borrowed buffer: the scaler writes into it, we own the copy.
+    /// Converts `source` to packed RGBA, scaled to fit `bounds` when given.
+    /// The scaler writes straight into the shared allocation the frame publishes.
     pub(crate) fn convert(
         &mut self,
         source: *mut ffi::AVFrame,
-        mut bytes: Vec<u8>,
+        bounds: Option<(u32, u32)>,
     ) -> MediaResult<Rgba> {
         // SAFETY: `source` is a live decoded frame owned by the pump thread for this call.
         let (width, height, transfer, aspect, colorspace) = unsafe {
@@ -74,15 +81,18 @@ impl Converter {
                 "decoded video has no dimensions",
             ));
         }
-        let stride = usize::try_from(width)
+        let (out_width, out_height) = fit(width, height, bounds);
+        let stride = usize::try_from(out_width)
             .ok()
             .and_then(|w| w.checked_mul(4))
-            .and_then(|w| w.checked_mul(usize::try_from(height).unwrap_or(usize::MAX - 1)))
+            .and_then(|w| w.checked_mul(usize::try_from(out_height).unwrap_or(usize::MAX - 1)))
             .ok_or_else(|| {
                 MediaError::new(MediaErrorKind::Negotiation, "video frame is too large")
             })?;
-        bytes.clear();
-        bytes.resize(stride, 0);
+        let mut bytes: Arc<[u8]> = Arc::from(vec![0u8; stride]);
+        let target = Arc::get_mut(&mut bytes).ok_or_else(|| {
+            MediaError::new(MediaErrorKind::Initialization, "frame buffer is shared")
+        })?;
         let format = unsafe {
             // SAFETY: `AV_PIX_FMT_*` values are exactly the discriminants of the generated
             // `AVPixelFormat` enum, and a decoded frame carries one of them.
@@ -96,8 +106,8 @@ impl Converter {
                 width,
                 height,
                 format,
-                width,
-                height,
+                out_width,
+                out_height,
                 ffi::AVPixelFormat::AV_PIX_FMT_RGBA,
                 ffi::SwsFlags::SWS_BILINEAR as c_int,
                 std::ptr::null_mut(),
@@ -112,10 +122,10 @@ impl Converter {
                 "FFmpeg could not convert the decoded pixel format to RGBA",
             ));
         }
-        let row = c_int::try_from(width * 4)
+        let row = c_int::try_from(out_width * 4)
             .map_err(|_| MediaError::new(MediaErrorKind::Negotiation, "video row overflows"))?;
         let mut data = [
-            bytes.as_mut_ptr(),
+            target.as_mut_ptr(),
             std::ptr::null_mut(),
             std::ptr::null_mut(),
             std::ptr::null_mut(),
@@ -142,8 +152,8 @@ impl Converter {
         }
         Ok(Rgba {
             bytes,
-            width: width as u32,
-            height: height as u32,
+            width: out_width as u32,
+            height: out_height as u32,
             colorimetry: colorimetry(transfer, colorspace),
             dynamic_range: match transfer {
                 ffi::AVColorTransferCharacteristic::AVCOL_TRC_SMPTE2084 => VideoDynamicRange::Pq,
@@ -158,6 +168,21 @@ impl Converter {
             aspect_ratio: (aspect.num.max(0) as u32, aspect.den.max(1) as u32),
         })
     }
+}
+
+/// Source dimensions scaled down to fit `bounds`, keeping the aspect ratio.
+fn fit(width: c_int, height: c_int, bounds: Option<(u32, u32)>) -> (c_int, c_int) {
+    let Some((max_width, max_height)) = bounds else {
+        return (width, height);
+    };
+    let (max_width, max_height) = (max_width.max(1) as f64, max_height.max(1) as f64);
+    let scale = (max_width / f64::from(width))
+        .min(max_height / f64::from(height))
+        .min(1.0);
+    (
+        ((f64::from(width) * scale).round() as c_int).max(1),
+        ((f64::from(height) * scale).round() as c_int).max(1),
+    )
 }
 
 impl Drop for Converter {

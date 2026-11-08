@@ -15,6 +15,7 @@ cove-platform.workspace = true
 cove-graphics.workspace = true
 cove-text.workspace = true
 cove-imaging.workspace = true
+cove-media.workspace = true
 cove-logging.workspace = true
 cove-system.workspace = true
 serde.workspace = true

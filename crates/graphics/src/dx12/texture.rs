@@ -215,10 +215,11 @@ struct DescriptorHeapVtbl {
     base: sys::IUnknownVtbl,
     child: sys::ID3D12DeviceChildSlots,
     GetDesc: usize,
-    GetCPUDescriptorHandleForHeapStart: unsafe extern "system" fn(
-        sys::ComPtr,
-        *mut sys::D3D12_CPU_DESCRIPTOR_HANDLE,
-    ) -> *mut sys::D3D12_CPU_DESCRIPTOR_HANDLE,
+    GetCPUDescriptorHandleForHeapStart:
+        unsafe extern "system" fn(
+            sys::ComPtr,
+            *mut sys::D3D12_CPU_DESCRIPTOR_HANDLE,
+        ) -> *mut sys::D3D12_CPU_DESCRIPTOR_HANDLE,
     GetGPUDescriptorHandleForHeapStart: usize,
 }
 
@@ -541,11 +542,8 @@ fn transfer(
         // re-laid out through the staging buffer.
         let rows = usize::try_from(region.height).unwrap_or(0);
         let pitch = bytes_per_row.next_multiple_of(sys::D3D12_TEXTURE_DATA_PITCH_ALIGNMENT);
-        let staging = super::buffer::create_in_heap_for_transfer(
-            device.device,
-            (pitch * rows).max(1),
-            heap,
-        )?;
+        let staging =
+            super::buffer::create_in_heap_for_transfer(device.device, (pitch * rows).max(1), heap)?;
         let row_bytes = |row: usize| {
             let start = row * bytes_per_row;
             start..(start + bytes_per_row).min(byte_count)
@@ -563,7 +561,11 @@ fn transfer(
                 // SAFETY: row `row` of the staging buffer spans `pitch >= chunk.len()`
                 // bytes inside its `pitch * rows` allocation; the slices are distinct.
                 unsafe {
-                    std::ptr::copy_nonoverlapping(chunk.as_ptr(), pointer.add(row * pitch), chunk.len());
+                    std::ptr::copy_nonoverlapping(
+                        chunk.as_ptr(),
+                        pointer.add(row * pitch),
+                        chunk.len(),
+                    );
                 }
             }
         }
@@ -674,7 +676,15 @@ fn record_copy(
                 bottom: height,
                 back: 1,
             };
-            ((*vtbl).CopyTextureRegion)(list, &texture_location, x, y, 0, &buffer_location, &source_box);
+            ((*vtbl).CopyTextureRegion)(
+                list,
+                &texture_location,
+                x,
+                y,
+                0,
+                &buffer_location,
+                &source_box,
+            );
         } else {
             // The region is read out of the texture to the footprint's origin.
             let source_box = sys::D3D12_BOX {
@@ -685,7 +695,15 @@ fn record_copy(
                 bottom: y + height,
                 back: 1,
             };
-            ((*vtbl).CopyTextureRegion)(list, &buffer_location, 0, 0, 0, &texture_location, &source_box);
+            ((*vtbl).CopyTextureRegion)(
+                list,
+                &buffer_location,
+                0,
+                0,
+                0,
+                &texture_location,
+                &source_box,
+            );
         }
         super::resources::transition(list, record.resource, before, after);
     }

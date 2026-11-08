@@ -41,6 +41,91 @@ pub struct VideoFormat {
 pub trait VideoStorage: Any + Send + Sync {
     fn copy_planes(&self) -> MediaResult<Vec<Vec<u8>>>;
     fn as_any(&self) -> &dyn Any;
+    /// Shared CPU bytes of plane `index`, when the storage can lend them without copying.
+    fn shared_plane(&self, index: usize) -> Option<Arc<[u8]>> {
+        let _ = index;
+        None
+    }
+}
+
+/// CPU planes owned by shared byte buffers, for frames an application produces itself.
+#[derive(Clone, Debug)]
+pub struct SharedPlanes(pub Vec<Arc<[u8]>>);
+impl VideoStorage for SharedPlanes {
+    fn copy_planes(&self) -> MediaResult<Vec<Vec<u8>>> {
+        Ok(self.0.iter().map(|plane| plane.to_vec()).collect())
+    }
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+    fn shared_plane(&self, index: usize) -> Option<Arc<[u8]>> {
+        self.0.get(index).cloned()
+    }
+}
+
+impl VideoFrame {
+    /// Tightly packed RGBA8 pixels, shared when the storage allows it.
+    pub fn rgba_pixels(&self) -> MediaResult<Arc<[u8]>> {
+        let width = self.format.width as usize;
+        let height = self.format.height as usize;
+        let row = width
+            .checked_mul(4)
+            .ok_or_else(|| MediaError::new(MediaErrorKind::InvalidInput, "video row overflow"))?;
+        if self.format.pixel_format != PixelFormat::Rgba8 || width == 0 || height == 0 {
+            return Err(MediaError::new(
+                MediaErrorKind::Unsupported,
+                "frame is not RGBA8",
+            ));
+        }
+        let plane = self.format.planes.first().cloned().unwrap_or(PlaneLayout {
+            stride: row,
+            offset: 0,
+        });
+        let needed = plane
+            .stride
+            .checked_mul(height - 1)
+            .and_then(|n| n.checked_add(row))
+            .and_then(|n| n.checked_add(plane.offset))
+            .ok_or_else(|| {
+                MediaError::new(MediaErrorKind::InvalidInput, "video extent overflow")
+            })?;
+        if plane.stride < row {
+            return Err(MediaError::new(
+                MediaErrorKind::InvalidInput,
+                "video stride is shorter than a row",
+            ));
+        }
+        let shared = self.storage.shared_plane(0);
+        if let Some(bytes) = &shared
+            && plane.offset == 0
+            && plane.stride == row
+            && bytes.len() == row * height
+        {
+            return Ok(bytes.clone());
+        }
+        let bytes = match shared {
+            Some(bytes) => bytes,
+            None => self
+                .storage
+                .copy_planes()?
+                .into_iter()
+                .next()
+                .map(Arc::from)
+                .ok_or_else(|| MediaError::new(MediaErrorKind::Decode, "missing video pixels"))?,
+        };
+        if bytes.len() < needed {
+            return Err(MediaError::new(
+                MediaErrorKind::Decode,
+                "video plane is smaller than its declared extent",
+            ));
+        }
+        let mut packed = Vec::with_capacity(row * height);
+        for y in 0..height {
+            let start = plane.offset + y * plane.stride;
+            packed.extend_from_slice(&bytes[start..start + row]);
+        }
+        Ok(packed.into())
+    }
 }
 #[derive(Clone)]
 pub struct VideoFrame {
@@ -71,6 +156,7 @@ struct OutputInner {
     state: Mutex<OutputState>,
     subscriptions: Mutex<BTreeMap<u64, mpsc::SyncSender<()>>>,
     next_subscription: AtomicU64,
+    listeners: crate::ChangeNotifier,
 }
 struct OutputState {
     generation: u64,
@@ -131,6 +217,7 @@ impl VideoOutput {
             }),
             subscriptions: Mutex::new(BTreeMap::new()),
             next_subscription: AtomicU64::new(1),
+            listeners: crate::ChangeNotifier::new(),
         }))
     }
     pub fn id(&self) -> u64 {
@@ -183,7 +270,12 @@ impl VideoOutput {
             receiver,
         }
     }
+    /// Calls `callback` on the publishing thread after every change. Keep it non-blocking.
+    pub fn on_change(&self, callback: crate::ChangeCallback) -> crate::ChangeListener {
+        self.0.listeners.listen(callback)
+    }
     fn notify(&self) {
+        self.0.listeners.notify();
         self.0
             .subscriptions
             .lock()

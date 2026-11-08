@@ -58,6 +58,9 @@ impl UIAssetResidency {
     pub fn registered(&mut self, id: TextureId, owner: &Arc<dyn Any + Send + Sync>) {
         self.owners.insert(id, Arc::downgrade(owner));
     }
+    pub fn is_registered(&self, id: TextureId) -> bool {
+        self.owners.contains_key(&id)
+    }
     pub fn forget(&mut self, id: TextureId) {
         self.owners.remove(&id);
     }

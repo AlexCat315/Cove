@@ -569,6 +569,18 @@ impl Shell for Sdl3Shell {
     fn is_window_maximized(&self, id: WindowId) -> bool {
         self.windows.get(&id).is_some_and(|w| w.state().maximized)
     }
+    fn set_window_fullscreen(&self, id: WindowId, fullscreen: bool) {
+        self.command(id, 10, i32::from(fullscreen), 0);
+    }
+    fn is_window_fullscreen(&self, id: WindowId) -> bool {
+        self.windows.get(&id).is_some_and(|window| {
+            // SAFETY: the bridge accepts a closed/null window and only queries a live one.
+            unsafe { native::cove_shell_is_fullscreen(window.pointer.get()) }
+        })
+    }
+    fn set_window_always_on_top(&self, id: WindowId, on_top: bool) {
+        self.command(id, 11, i32::from(on_top), 0);
+    }
     fn show_window_system_menu(&self, id: WindowId, x: f32, y: f32) {
         if x.is_finite() && y.is_finite() {
             self.command(id, 9, x.round() as i32, y.round() as i32);

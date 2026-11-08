@@ -136,6 +136,7 @@ mod list_tree_tests;
 mod localization_tests;
 mod markdown_tests;
 mod masonry_tests;
+mod media_player_tests;
 mod menu_button_tests;
 mod menu_content_tests;
 mod menu_hierarchy_tests;

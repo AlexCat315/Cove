@@ -6,6 +6,9 @@ rust-version.workspace = true
 license.workspace = true
 description = "Gallery, demo and mobile example content"
 
+[features]
+## Plays the bundled clip through FFmpeg instead of the synthetic source.
+media-ffmpeg = ["cove-media/ffmpeg"]
 
 [dependencies]
 cove-ui-compose = { path = "../../crates/compose" }
@@ -18,6 +21,7 @@ cove-core.workspace = true
 cove-platform.workspace = true
 cove-graphics.workspace = true
 cove-imaging.workspace = true
+cove-media.workspace = true
 cove-text.workspace = true
 cove-logging.workspace = true
 serde.workspace = true

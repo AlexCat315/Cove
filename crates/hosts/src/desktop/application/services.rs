@@ -30,6 +30,7 @@ pub struct ApplicationServices {
     drops: Option<Rc<AssetDropRegistry>>,
     work: Option<Rc<dyn Fn(Rc<dyn Fn()>)>>,
     display: Option<crate::desktop::display::AppDisplayHandle>,
+    presenter: Option<Rc<dyn cove_ui_compose::core::WindowPresenter>>,
 }
 
 impl ApplicationServices {
@@ -48,6 +49,7 @@ impl ApplicationServices {
             drops: AssetDropRegistryHolder::current(),
             work: work_scheduler::handler(),
             display: AppDisplayHandleHolder::current(),
+            presenter: cove_ui_compose::core::WindowPresentation::current(),
         }
     }
 
@@ -70,6 +72,7 @@ impl ApplicationServices {
         work_scheduler::remember(self.work.clone());
         UIWorkSchedulerHolder::set_enqueue(self.work);
         AppDisplayHandleHolder::set_current(self.display);
+        cove_ui_compose::core::WindowPresentation::set_current(self.presenter);
     }
 }
 

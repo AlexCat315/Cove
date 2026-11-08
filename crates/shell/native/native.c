@@ -197,9 +197,16 @@ void cove_shell_wake(void) { if(SDL_GetAtomicInt(&initialized) && SDL_CompareAnd
 void cove_shell_command(CoveShellWindow *h,int command,int a,int b) { COVE_ASSERT_MAIN();
     if(!h)return;
 #if defined(__APPLE__)
-    if(cove_shell_apple_command(h->apple,command))return;
+    if(cove_shell_apple_command(h->apple,command,a))return;
 #endif
-    switch(command){case 1:SDL_SetWindowPosition(h->window,a,b);break;case 2:SDL_SetWindowSize(h->window,a,b);break;case 3:SDL_RaiseWindow(h->window);break;case 4:SDL_MinimizeWindow(h->window);break;case 5:SDL_MaximizeWindow(h->window);break;case 6:SDL_RestoreWindow(h->window);break;case 7:SDL_HideWindow(h->window);break;case 8:SDL_ShowWindow(h->window);break;case 9:SDL_ShowWindowSystemMenu(h->window,a,b);break;}
+    switch(command){case 1:SDL_SetWindowPosition(h->window,a,b);break;case 2:SDL_SetWindowSize(h->window,a,b);break;case 3:SDL_RaiseWindow(h->window);break;case 4:SDL_MinimizeWindow(h->window);break;case 5:SDL_MaximizeWindow(h->window);break;case 6:SDL_RestoreWindow(h->window);break;case 7:SDL_HideWindow(h->window);break;case 8:SDL_ShowWindow(h->window);break;case 9:SDL_ShowWindowSystemMenu(h->window,a,b);break;case 10:SDL_SetWindowFullscreen(h->window,a!=0);break;case 11:SDL_SetWindowAlwaysOnTop(h->window,a!=0);break;}
+}
+bool cove_shell_is_fullscreen(CoveShellWindow *h) { COVE_ASSERT_MAIN();
+    if(!h)return false;
+#if defined(__APPLE__)
+    int apple=cove_shell_apple_fullscreen(h->apple);if(apple>=0)return apple!=0;
+#endif
+    return (SDL_GetWindowFlags(h->window)&SDL_WINDOW_FULLSCREEN)!=0;
 }
 static bool contains(CoveShellRect r,float x,float y){return x>=r.x&&y>=r.y&&x<r.x+r.width&&y<r.y+r.height;}
 static SDL_HitTestResult SDLCALL hit_test(SDL_Window *window,const SDL_Point *point,void *data){

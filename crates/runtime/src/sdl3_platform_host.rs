@@ -641,6 +641,21 @@ impl Sdl3PlatformHost {
         }
         self.synchronize_presentation(id);
     }
+    pub fn set_window_fullscreen(&self, id: WindowId, fullscreen: bool) {
+        if let Some(s) = self.shell() {
+            s.borrow().set_window_fullscreen(id, fullscreen);
+        }
+        self.synchronize_presentation(id);
+    }
+    pub fn is_window_fullscreen(&self, id: WindowId) -> bool {
+        self.shell()
+            .is_some_and(|s| s.borrow().is_window_fullscreen(id))
+    }
+    pub fn set_window_always_on_top(&self, id: WindowId, on_top: bool) {
+        if let Some(s) = self.shell() {
+            s.borrow().set_window_always_on_top(id, on_top);
+        }
+    }
     pub fn is_window_maximized(&self, id: WindowId) -> bool {
         self.shell()
             .is_some_and(|s| s.borrow().is_window_maximized(id))

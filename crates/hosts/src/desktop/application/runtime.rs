@@ -363,6 +363,11 @@ impl Application {
         cove_core::scene::ColorSampler::set_requester(sample.clone());
         super::services::color_sampler_handler::remember(sample);
         AppDisplayHandleHolder::set_current(Some(state.display_handle.clone()));
+        cove_ui_compose::core::WindowPresentation::set_current(Some(Rc::new(
+            HostWindowPresenter {
+                state: Rc::downgrade(&state),
+            },
+        )));
         // The open panel is what makes a drop zone usable without a pointer
         // drag: touch and keyboard users reach the same callback through it.
         let picker: cove_core::scene::FilePickerCallback = Rc::new({
@@ -1834,5 +1839,67 @@ impl Application {
             .auxiliary_windows
             .borrow_mut()
             .retain(|id, _| live.contains(id));
+    }
+}
+
+/// Full screen and floating windows for widgets such as the video player.
+struct HostWindowPresenter {
+    state: Weak<ApplicationState>,
+}
+
+impl cove_ui_compose::core::WindowPresenter for HostWindowPresenter {
+    fn set_fullscreen(&self, fullscreen: bool) -> bool {
+        let Some(state) = self.state.upgrade() else {
+            return false;
+        };
+        let Some(window) = state.host.main_window() else {
+            return false;
+        };
+        state.host.set_window_fullscreen(window, fullscreen);
+        true
+    }
+
+    fn is_fullscreen(&self) -> bool {
+        self.state.upgrade().is_some_and(|state| {
+            state
+                .host
+                .main_window()
+                .is_some_and(|window| state.host.is_window_fullscreen(window))
+        })
+    }
+
+    fn open_floating(
+        &self,
+        request: cove_ui_compose::core::FloatingWindowRequest,
+    ) -> Option<cove_ui_compose::core::FloatingWindowId> {
+        let state = self.state.upgrade()?;
+        let application = Application {
+            state: state.clone(),
+        };
+        let id = application.open_auxiliary_window(AppAuxiliaryWindowRequest {
+            title: request.title,
+            width: request.width.round().max(160.0) as i32,
+            height: request.height.round().max(90.0) as i32,
+            root_view: request.content,
+            rendering: Default::default(),
+        })?;
+        state.host.set_window_always_on_top(id, true);
+        Some(cove_ui_compose::core::FloatingWindowId(u64::from(id.0)))
+    }
+
+    fn close_floating(&self, id: cove_ui_compose::core::FloatingWindowId) {
+        if let Some(state) = self.state.upgrade()
+            && let Ok(raw) = u32::try_from(id.0)
+        {
+            Application { state }.close_auxiliary_window(WindowId(raw));
+        }
+    }
+
+    fn is_floating_open(&self, id: cove_ui_compose::core::FloatingWindowId) -> bool {
+        let Some(state) = self.state.upgrade() else {
+            return false;
+        };
+        u32::try_from(id.0)
+            .is_ok_and(|raw| Application { state }.is_auxiliary_window_open(WindowId(raw)))
     }
 }

@@ -193,6 +193,9 @@ impl StoryDispatch {
             Self::Story(GalleryPage::ViewportTraits) => {
                 Some(AnyView::new(stories::ViewportTraitsStory::new()))
             }
+            Self::Story(GalleryPage::MediaPlayer) => {
+                Some(AnyView::new(stories::MediaPlayerStory::new(options)))
+            }
             Self::Story(GalleryPage::Skeleton) => {
                 Some(AnyView::new(stories::SkeletonStory::new(options)))
             }
@@ -450,6 +453,7 @@ impl StorySource {
             (GalleryPage::Carousel, "Layout/LayoutStories.swift"),
             (GalleryPage::Skeleton, "Feedback/SkeletonStory.swift"),
             (GalleryPage::Stepper, "Controls/StepperStory.swift"),
+            (GalleryPage::MediaPlayer, "Media/MediaPlayerStory.swift"),
         ]
     }
 

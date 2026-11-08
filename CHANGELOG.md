@@ -4,6 +4,17 @@
 
 ## Unreleased
 
+- **音视频组件与底层媒体 API（2026-11-08）**：
+  - 组件：`cove_ui_compose::primitives::media` 新增 `VideoPlayer`、`AudioPlayer`、`MediaTransport`（播放/暂停、拖动 seek、时间、静音与音量）、`VideoView`、`AudioLevelMeter` 与 `Waveform`，以及 `use_playback(cx, &control)`。组件只依赖新的 `cove_media::PlaybackControl` 契约，`cove-ui-compose` 依赖不带 FFmpeg 的 `cove-media`。媒体线程的变更只置位原子标记并向 UI 线程投递至多一个刷新；视频帧以每个视图一个稳定纹理 id 提交，渲染器就地更新同一 GPU 纹理槽。
+  - 底层 API（始终可用）：`PlaybackControl`、`ChangeNotifier` / `ChangeListener`、`VideoOutput::on_change`、`VideoStorage::shared_plane`（默认 `None`）、`SharedPlanes`、`VideoFrame::rgba_pixels`、`AudioFormat`、`AudioBuffer`、`AudioPeak` / `audio_peaks`、`AudioMeter`（实时回调安全）、`AudioLevels`、`AudioDeviceInfo`、`MediaInfo` / `StreamInfo` / `StreamDetails`、`DecoderOptions`、`sample_stats` / `channel_stats`。样本统计内核在 AArch64（NEON）与 x86-64（SSE）上为内联汇编，其他目标为标量实现。
+  - 底层 API（`ffmpeg` feature）：`MediaDecoder`（`next_frame`/`next_video`/`next_audio`，同步解复用/解码、按比例缩放、重采样、`frame_at`、`read_audio`、可跨线程取消）、`probe`、`audio_output_devices`、`AudioStream`（应用渲染 PCM，句柄在所有平台为 `Send + Sync`）、`Player::on_change` / `audio_meter` / `detach`，`Player` 实现 `PlaybackControl`；分离的请求不再计入 `result_capacity`。
+  - 破坏性：`AudioOutput` 新增 `Device(String)` 并去掉 `Copy`；`FrameStorage::new` 接受 `impl Into<Arc<[u8]>>`，帧数据由 FFmpeg 直接写入共享分配，展示与上传不再拷贝；`VideoPresenter` 优先使用共享平面。
+  - 修复（既有缺陷）：`from_micros` 把微秒乘以 1 000 000，容器时长被放大 1000 倍（`PlayerSnapshot::duration` 受影响）；声道布局未指定的音频（如普通 WAV）第二帧起重采样报 “Input changed” 导致播放失败；文件末尾在包队列未清空时就向解码器发送排空信号，剩余包永远不被解码，短片段停在 `Playing` 不会 `Ended`；设备音频时钟在 flush 后不复位，暂停或结束后 seek 时位置仍报告旧的设备时间。
+  - 渲染：`Bitmap::shared_pixels`；`cove_imaging::allocate_texture_id`；UI 纹理存储把同 id 的新所有者视为流式纹理，移出图集并原地更新专用纹理槽，旧所有者先释放也不丢槽，CPU 像素上传不再复制。
+  - Gallery：新增 Media Player 页（Media 分类）。默认用基于公开底层 API 的合成源驱动；`--features media-ffmpeg` 时播放 `examples/gallery/resources/media/sample.mp4`（生成的测试图案与正弦音，169 KB），波形来自 `MediaDecoder`。
+  - 测试：`cove-media` 新增 `decoder` 集成测试 9 项（内存 WAV/Y4M 与 Gallery 的 H.264/AAC 样片：探测、重采样、缩放、seek、取消、分离请求与通知、`AudioStream`、播放到结束、结束后 seek）与内核、电平、通知单元测试；compose 新增 `media_player_tests` 6 项，全量 1710 项通过。x86-64 内核只做了编译验证。
+  - 文档：新增 `media-player.md` 并登记导航；更新 `Docs/media-ffmpeg.md` 与 `crates/media/README.md`。
+
 - **列表重设计：选中与悬停、ListRow API、内嵌盒与滚动条（2026-11-07，破坏性外观与 API）**：
   - 选中：`ListRowStyleConfiguration` 新增 `is_emphasized`。列表持有键盘焦点时选中为强调色带 + 浅色墨水，否则为中性灰带（`surface_pressed`）并保持原墨水，与 macOS 一致；焦点经 `FocusChain::current_focus` 的响应式读取驱动，焦点移动时行自动重组。此前选中行永远是强调色，且离开选中后前景色从未清除。
   - 悬停：此前行宿主把悬停画成整行高的背景，样式又把选中画成上下各内缩 4pt 的带，两者几何不一致——悬停带比选中带高、贴到相邻的选中行。现在悬停与按压由宿主实时绘制，几何与选中带相同（内缩 `spacing.xs`、圆角 `radius.md`），不重组行；已选中的行不叠加悬停。

@@ -10,6 +10,11 @@ use std::{
     },
 };
 static NEXT_ID: AtomicU32 = AtomicU32::new(0x1000_0000);
+/// A process-unique id for a texture whose pixels the caller supplies, such as a
+/// streamed video surface that republishes new owners under one id.
+pub fn allocate_texture_id() -> Result<TextureId, ImageDecodeError> {
+    allocate_id()
+}
 pub(crate) fn allocate_id() -> Result<TextureId, ImageDecodeError> {
     NEXT_ID
         .try_update(Ordering::Relaxed, Ordering::Relaxed, |next| {

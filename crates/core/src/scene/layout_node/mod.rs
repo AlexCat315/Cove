@@ -375,6 +375,10 @@ impl LayoutNode {
             style.width = value.map_or(LayoutStyleValue::Auto, LayoutStyleValue::Points)
         });
     }
+    /// Width over height; the auto dimension follows the other. `None` clears it.
+    pub fn set_aspect_ratio(&self, ratio: Option<f32>) {
+        self.update_style(|style| style.aspect_ratio = ratio);
+    }
     pub fn set_width_percent(&self, value: f32) {
         self.update_style(|style| style.width = LayoutStyleValue::Percent(value));
     }

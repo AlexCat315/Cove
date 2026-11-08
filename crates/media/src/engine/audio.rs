@@ -1,9 +1,12 @@
 //! cpal output device, sample queue and audio master clock.
-use crate::{AudioOutput, MediaError, MediaErrorKind, MediaResult, MediaTime};
+use crate::{
+    AudioDeviceInfo, AudioFormat, AudioMeter, AudioOutput, MediaError, MediaErrorKind, MediaResult,
+    MediaTime,
+};
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use std::collections::VecDeque;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, mpsc};
 
 /// At most two seconds of decoded audio may wait for the device.
 const QUEUE_SECONDS: f64 = 2.0;
@@ -28,19 +31,23 @@ pub(crate) struct Bus {
     volume: AtomicU64,
     rate: AtomicU64,
     clock_ns: AtomicU64,
+    meter: AudioMeter,
+    format: AudioFormat,
 }
 
 impl Bus {
-    fn new(channels: usize) -> Self {
+    fn new(format: AudioFormat, meter: AudioMeter) -> Self {
         Self {
             queue: Mutex::new(Queue {
-                channels,
+                channels: usize::from(format.channels),
                 ..Queue::default()
             }),
             playing: AtomicBool::new(false),
             volume: AtomicU64::new(1.0f64.to_bits()),
             rate: AtomicU64::new(1.0f64.to_bits()),
             clock_ns: AtomicU64::new(u64::MAX),
+            meter,
+            format,
         }
     }
     fn volume(&self) -> f64 {
@@ -81,6 +88,9 @@ impl Bus {
         queue.samples.clear();
         queue.position = 0.0;
         queue.front_pts = 0;
+        // The device no longer plays anything at the old time; until new samples are
+        // delivered the session falls back to its anchor (the seek target or pause point).
+        self.clock_ns.store(u64::MAX, Ordering::Release);
     }
     /// Appends one decoded audio chunk. `pts` is its media time; `None` keeps continuity.
     pub(crate) fn push(&self, pts: Option<MediaTime>, samples: &[f32]) {
@@ -97,8 +107,13 @@ impl Bus {
         queue.samples.extend(samples.iter().copied());
     }
 
-    /// Delivers samples to the device. Returns after filling `output`.
+    /// Delivers samples to the device and meters what was played.
     fn deliver(&self, output: &mut [f32]) {
+        self.fill(output);
+        self.meter.record(self.format, output);
+    }
+
+    fn fill(&self, output: &mut [f32]) {
         let mut queue = self
             .queue
             .lock()
@@ -160,32 +175,109 @@ pub(crate) struct Sink {
     capacity: usize,
 }
 
-impl Sink {
-    /// Opens the platform default output device with a floating-point stream.
-    pub(crate) fn open() -> MediaResult<Self> {
-        let host = cpal::default_host();
-        let device = host.default_output_device().ok_or_else(|| {
+/// The device an `AudioOutput` names; a vanished or unknown id falls back to the default.
+fn output_device(output: &AudioOutput) -> MediaResult<cpal::Device> {
+    let host = cpal::default_host();
+    if let AudioOutput::Device(id) = output {
+        let found = id
+            .parse::<cpal::DeviceId>()
+            .ok()
+            .and_then(|id| host.device_by_id(&id));
+        if let Some(device) = found {
+            return Ok(device);
+        }
+        warn(&format!(
+            "audio device {id} is unavailable; using the default output"
+        ));
+    }
+    host.default_output_device().ok_or_else(|| {
+        MediaError::new(
+            MediaErrorKind::Device,
+            "no audio output device is available",
+        )
+    })
+}
+
+/// A floating-point stream configuration, matching `preferred` when the device supports it.
+fn output_config(
+    device: &cpal::Device,
+    preferred: Option<AudioFormat>,
+) -> MediaResult<cpal::StreamConfig> {
+    let ranges: Vec<_> = device
+        .supported_output_configs()
+        .map_err(device_error)?
+        .filter(|range| range.sample_format() == cpal::SampleFormat::F32)
+        .collect();
+    if let Some(format) = preferred
+        && let Some(range) = ranges.iter().find(|range| {
+            range.channels() == format.channels
+                && (range.min_sample_rate()..=range.max_sample_rate()).contains(&format.sample_rate)
+        })
+    {
+        return Ok(range.with_sample_rate(format.sample_rate).config());
+    }
+    ranges
+        .into_iter()
+        .max_by(|a, b| a.cmp_default_heuristics(b))
+        .and_then(cpal::SupportedStreamConfigRange::try_with_standard_sample_rate)
+        .map(|config| config.config())
+        .ok_or_else(|| {
             MediaError::new(
                 MediaErrorKind::Device,
-                "no audio output device is available",
+                "no floating-point output configuration",
             )
-        })?;
-        let config = device
-            .supported_output_configs()
-            .map_err(device_error)?
-            .filter(|range| range.sample_format() == cpal::SampleFormat::F32)
-            .max_by(|a, b| a.cmp_default_heuristics(b))
-            .and_then(cpal::SupportedStreamConfigRange::try_with_standard_sample_rate)
-            .ok_or_else(|| {
-                MediaError::new(
-                    MediaErrorKind::Device,
-                    "no floating-point output configuration",
-                )
-            })?
-            .config();
+        })
+}
+
+/// Output endpoints of the platform's default audio host.
+pub(crate) fn output_devices() -> MediaResult<Vec<AudioDeviceInfo>> {
+    let host = cpal::default_host();
+    let default = host
+        .default_output_device()
+        .and_then(|device| device.id().ok());
+    let mut devices = Vec::new();
+    for device in host.output_devices().map_err(device_error)? {
+        let Ok(id) = device.id() else { continue };
+        let name = device
+            .description()
+            .map(|description| description.name().to_owned())
+            .unwrap_or_else(|_| id.to_string());
+        let mut max_channels = 0u16;
+        let mut rates: Option<(u32, u32)> = None;
+        if let Ok(ranges) = device.supported_output_configs() {
+            for range in ranges.filter(|range| range.sample_format() == cpal::SampleFormat::F32) {
+                max_channels = max_channels.max(range.channels());
+                let (low, high) = (range.min_sample_rate(), range.max_sample_rate());
+                rates = Some(rates.map_or((low, high), |(a, b)| (a.min(low), b.max(high))));
+            }
+        }
+        devices.push(AudioDeviceInfo {
+            is_default: default.as_ref() == Some(&id),
+            id: id.to_string(),
+            name,
+            max_channels,
+            sample_rates: rates.unwrap_or((0, 0)),
+        });
+    }
+    Ok(devices)
+}
+
+fn warn(message: &str) {
+    cove_logging::LogSystem::logger("com.cove.media").log(&cove_logging::LogEvent::new(
+        cove_logging::Level::Warning,
+        message.to_owned(),
+    ));
+}
+
+impl Sink {
+    /// Opens the selected output device with a floating-point stream.
+    pub(crate) fn open(output: &AudioOutput, meter: AudioMeter) -> MediaResult<Self> {
+        let device = output_device(output)?;
+        let config = output_config(&device, None)?;
         let channels = usize::from(config.channels);
         let sample_rate = usize::try_from(config.sample_rate).unwrap_or(48000);
-        let bus = Arc::new(Bus::new(channels));
+        let format = AudioFormat::new(config.sample_rate, config.channels)?;
+        let bus = Arc::new(Bus::new(format, meter));
         {
             let mut queue = bus
                 .queue
@@ -197,12 +289,7 @@ impl Sink {
             let bus = bus.clone();
             move |data: &mut [f32], _: &cpal::OutputCallbackInfo| bus.deliver(data)
         };
-        let error_callback = move |error: cpal::Error| {
-            cove_logging::LogSystem::logger("com.cove.media").log(&cove_logging::LogEvent::new(
-                cove_logging::Level::Warning,
-                error.to_string(),
-            ));
-        };
+        let error_callback = move |error: cpal::Error| warn(&error.to_string());
         let stream = device
             .build_output_stream(config, callback, error_callback, None)
             .map_err(device_error)?;
@@ -259,21 +346,23 @@ pub(crate) struct Audio {
 }
 
 impl Audio {
-    pub(crate) fn open(output: AudioOutput, sample_rate: u32, channels: usize) -> Self {
+    pub(crate) fn open(
+        output: &AudioOutput,
+        meter: AudioMeter,
+        sample_rate: u32,
+        channels: usize,
+    ) -> Self {
         let sink = match output {
             AudioOutput::Silent => None,
-            AudioOutput::DefaultDevice => match Sink::open() {
-                Ok(sink) => Some(sink),
-                Err(error) => {
-                    cove_logging::LogSystem::logger("com.cove.media").log(
-                        &cove_logging::LogEvent::new(
-                            cove_logging::Level::Warning,
-                            error.to_string(),
-                        ),
-                    );
-                    None
+            AudioOutput::DefaultDevice | AudioOutput::Device(_) => {
+                match Sink::open(output, meter) {
+                    Ok(sink) => Some(sink),
+                    Err(error) => {
+                        warn(&error.to_string());
+                        None
+                    }
                 }
-            },
+            }
         };
         let format = sink.as_ref().map_or((sample_rate, channels), Sink::format);
         Self { sink, format }
@@ -322,6 +411,122 @@ impl Audio {
             sink.stop();
         }
     }
+}
+
+/// Renders interleaved `f32` samples for an [`AudioStream`]; runs on the device thread.
+pub type AudioRender = Box<dyn FnMut(&mut [f32], AudioFormat) + Send + 'static>;
+
+/// Where and how an [`AudioStream`] plays.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct AudioStreamOptions {
+    pub output: AudioOutput,
+    /// Requested format; the device default is used when it is unsupported or `None`.
+    pub format: Option<AudioFormat>,
+}
+
+/// Application-rendered PCM on an output device.
+///
+/// The device stream lives on its own thread, so the handle is `Send + Sync` on every
+/// platform. It starts paused; paused streams deliver silence. Dropping the last
+/// handle closes the device.
+pub struct AudioStream {
+    format: AudioFormat,
+    playing: Arc<AtomicBool>,
+    meter: AudioMeter,
+    /// Dropping the sender ends the device thread.
+    _stop: mpsc::Sender<()>,
+}
+
+impl AudioStream {
+    /// Opens the device and waits for it to accept the stream. Not for the UI thread.
+    pub fn open(options: AudioStreamOptions, render: AudioRender) -> MediaResult<Self> {
+        if options.output == AudioOutput::Silent {
+            return Err(MediaError::new(
+                MediaErrorKind::InvalidInput,
+                "an audio stream needs an output device",
+            ));
+        }
+        let playing = Arc::new(AtomicBool::new(false));
+        let meter = AudioMeter::default();
+        let (stop, stopped) = mpsc::channel::<()>();
+        let (ready, opened) = mpsc::channel::<MediaResult<AudioFormat>>();
+        let thread_playing = playing.clone();
+        let thread_meter = meter.clone();
+        std::thread::Builder::new()
+            .name("cove-audio-stream".into())
+            .spawn(move || {
+                let built = build_stream(&options, render, thread_playing, thread_meter);
+                match built {
+                    Ok((stream, format)) => {
+                        let _ = ready.send(Ok(format));
+                        let _ = stopped.recv();
+                        drop(stream);
+                    }
+                    Err(error) => {
+                        let _ = ready.send(Err(error));
+                    }
+                }
+            })
+            .map_err(|error| MediaError::new(MediaErrorKind::Initialization, error.to_string()))?;
+        let format = opened.recv().map_err(|_| {
+            MediaError::new(MediaErrorKind::Device, "audio stream thread ended early")
+        })??;
+        Ok(Self {
+            format,
+            playing,
+            meter,
+            _stop: stop,
+        })
+    }
+
+    /// The format the render callback receives.
+    pub fn format(&self) -> AudioFormat {
+        self.format
+    }
+
+    pub fn play(&self) {
+        self.playing.store(true, Ordering::Release);
+    }
+
+    pub fn pause(&self) {
+        self.playing.store(false, Ordering::Release);
+    }
+
+    pub fn is_playing(&self) -> bool {
+        self.playing.load(Ordering::Acquire)
+    }
+
+    /// Levels and history of the rendered output.
+    pub fn meter(&self) -> AudioMeter {
+        self.meter.clone()
+    }
+}
+
+fn build_stream(
+    options: &AudioStreamOptions,
+    mut render: AudioRender,
+    playing: Arc<AtomicBool>,
+    meter: AudioMeter,
+) -> MediaResult<(cpal::Stream, AudioFormat)> {
+    let device = output_device(&options.output)?;
+    let config = output_config(&device, options.format)?;
+    let format = AudioFormat::new(config.sample_rate, config.channels)?;
+    let callback = move |data: &mut [f32], _: &cpal::OutputCallbackInfo| {
+        if playing.load(Ordering::Acquire) {
+            render(data, format);
+            for sample in data.iter_mut() {
+                *sample = sample.clamp(-1.0, 1.0);
+            }
+        } else {
+            data.fill(0.0);
+        }
+        meter.record(format, data);
+    };
+    let stream = device
+        .build_output_stream(config, callback, |error| warn(&error.to_string()), None)
+        .map_err(device_error)?;
+    stream.play().map_err(device_error)?;
+    Ok((stream, format))
 }
 
 fn device_error(error: cpal::Error) -> MediaError {
