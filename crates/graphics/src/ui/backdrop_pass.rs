@@ -41,6 +41,9 @@ pub(super) struct NativeUIBackdropPass {
     offscreen: GraphicsPipeline,
     composite: GraphicsPipeline,
     blit: GraphicsPipeline,
+    /// Copies into presentation targets whose format differs from the frame's,
+    /// built on first use.
+    presentation_blits: Vec<(TextureFormat, GraphicsPipeline)>,
     scratch_b: Option<Scratch>,
     captures: Vec<Scratch>,
     capture_index: usize,
@@ -91,6 +94,7 @@ impl NativeUIBackdropPass {
             offscreen,
             composite,
             blit,
+            presentation_blits: Vec::new(),
             scratch_b: None,
             captures: Vec::new(),
             capture_index: 0,
@@ -304,14 +308,42 @@ impl NativeUIBackdropPass {
         pass.draw(6, 1, 0, 0);
         Ok(())
     }
+    /// Copies the frame into a presentation target of `format`. Sampling the
+    /// frame yields linear premultiplied colour, so a linear float target
+    /// receives exactly what a compositor reading linear premultiplied pixels
+    /// expects; an sRGB target is re-encoded by the hardware.
     pub fn record_blit(
         &mut self,
         source: Texture,
         target: RenderColorTarget,
+        format: TextureFormat,
         size: [usize; 2],
         commands: &mut CommandBuffer,
     ) -> RhiResult<()> {
-        self.record_copy(source, target, size, "backdrop-blit", commands)
+        let pipeline = self.presentation_blit(format)?;
+        self.record_copy_with(pipeline, source, target, size, "backdrop-blit", commands)
+    }
+    fn presentation_blit(&mut self, format: TextureFormat) -> RhiResult<GraphicsPipeline> {
+        if format == self.format {
+            return Ok(self.blit);
+        }
+        if let Some((_, pipeline)) = self
+            .presentation_blits
+            .iter()
+            .find(|(candidate, _)| *candidate == format)
+        {
+            return Ok(*pipeline);
+        }
+        let pipeline = make_pipeline(
+            &self.shaders,
+            format,
+            1,
+            true,
+            false,
+            "native-ui-presentation-blit",
+        )?;
+        self.presentation_blits.push((format, pipeline));
+        Ok(pipeline)
     }
     pub fn record_reveal_capture(
         &mut self,
@@ -379,12 +411,23 @@ impl NativeUIBackdropPass {
         label: &'static str,
         commands: &mut CommandBuffer,
     ) -> RhiResult<()> {
+        self.record_copy_with(self.blit, source, target, size, label, commands)
+    }
+    fn record_copy_with(
+        &mut self,
+        pipeline: GraphicsPipeline,
+        source: Texture,
+        target: RenderColorTarget,
+        size: [usize; 2],
+        label: &'static str,
+        commands: &mut CommandBuffer,
+    ) -> RhiResult<()> {
         let quad = self.upload_quad([-1.0, 1.0, 1.0, -1.0])?;
         let binding = self.binding(source)?;
         commands.render_pass(
             RenderPassDescriptor::new(vec![target]).with_label(label),
             |pass| {
-                pass.set_pipeline(self.blit);
+                pass.set_pipeline(pipeline);
                 pass.set_viewport(Viewport::new(size[0] as f64, size[1] as f64));
                 pass.set_vertex_buffer(quad.buffer, quad.offset, 0);
                 pass.set_binding_set(binding, 0, Vec::new());
@@ -477,6 +520,9 @@ impl Drop for NativeUIBackdropPass {
         self.device.destroy_graphics_pipeline(self.offscreen);
         self.device.destroy_graphics_pipeline(self.composite);
         self.device.destroy_graphics_pipeline(self.blit);
+        for (_, pipeline) in self.presentation_blits.drain(..) {
+            self.device.destroy_graphics_pipeline(pipeline);
+        }
     }
 }
 fn capture_margin(radius: f32, scale: f32) -> i64 {

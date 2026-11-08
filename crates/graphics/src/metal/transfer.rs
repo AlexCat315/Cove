@@ -524,9 +524,11 @@ pub fn configure_swapchain(
     rhi_require(
         matches!(
             descriptor.color_format,
-            crate::rhi::TextureFormat::Bgra8Unorm | crate::rhi::TextureFormat::Bgra8UnormSrgb
+            crate::rhi::TextureFormat::Bgra8Unorm
+                | crate::rhi::TextureFormat::Bgra8UnormSrgb
+                | crate::rhi::TextureFormat::Rgba16Float
         ),
-        "CAMetalLayer requires BGRA8 or BGRA8 sRGB",
+        "CAMetalLayer requires BGRA8, BGRA8 sRGB or RGBA16 float",
     )?;
     // SAFETY: the frontend hands over an unmanaged `CAMetalLayer` that the
     // caller keeps alive until the device releases the surface.
@@ -559,6 +561,7 @@ pub fn configure_swapchain(
 
     layer.setDevice(Some(&device.device));
     layer.setPixelFormat(formats::pixel_format(descriptor.color_format));
+    layer::set_colorspace(&layer, descriptor.color_format);
     layer.setFramebufferOnly(true);
     // `NSSize` is the Foundation spelling of `CGSize`, so it needs no extra
     // core-foundation dependency for this one field.
@@ -875,5 +878,51 @@ mod tests {
     #[test]
     fn the_upload_chunk_size_matches_the_swift_default() {
         assert_eq!(UPLOAD_CHUNK_SIZE, 4 * 1024 * 1024);
+    }
+}
+
+/// The compositor reads a layer through its colour space. Eight-bit layers hold
+/// sRGB-encoded values; a float layer holds the frame's linear premultiplied
+/// colour, which only an extended linear space reads back unchanged — reading
+/// it as encoded sRGB would brighten every translucent pixel.
+mod layer {
+    use objc2::encode::{Encoding, RefEncode};
+    use objc2::msg_send;
+    use objc2_quartz_core::CAMetalLayer;
+    use std::ffi::c_void;
+
+    #[repr(C)]
+    pub struct CGColorSpace {
+        _private: [u8; 0],
+    }
+    // SAFETY: `CGColorSpaceRef` is `struct CGColorSpace *`.
+    unsafe impl RefEncode for CGColorSpace {
+        const ENCODING_REF: Encoding = Encoding::Pointer(&Encoding::Struct("CGColorSpace", &[]));
+    }
+
+    #[link(name = "CoreGraphics", kind = "framework")]
+    unsafe extern "C" {
+        static kCGColorSpaceSRGB: *const c_void;
+        static kCGColorSpaceExtendedLinearSRGB: *const c_void;
+        fn CGColorSpaceCreateWithName(name: *const c_void) -> *mut CGColorSpace;
+        fn CGColorSpaceRelease(space: *mut CGColorSpace);
+    }
+
+    pub fn set_colorspace(layer: &CAMetalLayer, format: crate::rhi::TextureFormat) {
+        // SAFETY: the names are CoreGraphics constants; the created space is
+        // retained by the layer and released here once.
+        unsafe {
+            let name = if format == crate::rhi::TextureFormat::Rgba16Float {
+                kCGColorSpaceExtendedLinearSRGB
+            } else {
+                kCGColorSpaceSRGB
+            };
+            let space = CGColorSpaceCreateWithName(name);
+            if space.is_null() {
+                return;
+            }
+            let _: () = msg_send![layer, setColorspace: space];
+            CGColorSpaceRelease(space);
+        }
     }
 }

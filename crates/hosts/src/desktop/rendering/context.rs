@@ -30,6 +30,7 @@ impl AppWindowRenderSettings {
         Self {
             samples,
             clear_color: window.clear_color.unwrap_or(config.rendering.clear_color),
+            surface_format: TextureFormat::Bgra8UnormSrgb,
         }
     }
 }

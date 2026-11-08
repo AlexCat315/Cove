@@ -237,11 +237,13 @@ impl NativeDrawListRenderer {
         state.reveal = None;
         state.last_extent = None;
     }
+    /// Copies an owned frame into a presentation target of `format`.
     pub fn record_blit(
         &self,
         source: Texture,
         commands: &mut CommandBuffer,
         target: RenderColorTarget,
+        format: TextureFormat,
         size: [usize; 2],
     ) -> RhiResult<()> {
         self.backdrop
@@ -251,7 +253,7 @@ impl NativeDrawListRenderer {
             })?
             .lock()
             .unwrap_or_else(PoisonError::into_inner)
-            .record_blit(source, target, size, commands)
+            .record_blit(source, target, format, size, commands)
     }
     pub fn synchronize_textures(&self, source: &Self) -> RhiResult<()> {
         if Arc::ptr_eq(&self.texture_store, &source.texture_store) {

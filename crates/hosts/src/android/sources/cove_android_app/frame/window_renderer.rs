@@ -133,6 +133,7 @@ impl AndroidWindowRenderer {
                         target_texture,
                         &mut commands,
                         RenderColorTarget::new(image.texture),
+                        cove_graphics::rhi::platform_default_surface_format(),
                         [image.width, image.height],
                     )?;
                 }

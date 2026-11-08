@@ -1118,6 +1118,10 @@ impl Application {
         if state.host.backdrop() != cove_shell::WindowBackdrop::Opaque {
             // Premultiplied clear: untouched pixels reveal the platform material.
             settings.clear_color = [0.0; 4];
+            // An eight-bit sRGB layer is read as encoded premultiplied colour,
+            // but the frame holds linear premultiplied colour: every partly
+            // covered edge of a light shape would composite past white.
+            settings.surface_format = cove_graphics::rhi::TextureFormat::Rgba16Float;
         }
         let mut renderer = state
             .rendering

@@ -9,7 +9,8 @@
 use super::super::application::memory::{AppWindowMemorySnapshot, AppWindowRendererState};
 use cove_core::DrawList;
 use cove_graphics::rhi::{
-    CommandBuffer, Device, RenderColorTarget, RhiResult, Swapchain, TextureDescriptor,
+    CommandBuffer, Device, RenderColorTarget, RhiResult, SurfaceDescriptor, Swapchain,
+    TextureDescriptor,
     TextureFormat, TextureResource, TextureUsage,
 };
 use cove_graphics::ui::{FontAtlasUpload, NativeDrawListRenderer, NativeUIViewport};
@@ -17,11 +18,15 @@ use cove_runtime::SurfaceFactory;
 use cove_shell::NativeRenderSurface;
 use std::sync::Arc;
 
-/// Samples and clear colour for one window's presentation target.
+/// Samples, clear colour and swapchain format for one window's presentation.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct AppWindowRenderSettings {
     pub samples: u32,
     pub clear_color: [f32; 4],
+    /// A window that shows a platform material through clear pixels presents
+    /// linear float, so the compositor reads its translucent pixels as the
+    /// linear premultiplied colour the frame holds.
+    pub surface_format: TextureFormat,
 }
 
 /// Presentation ownership for one window. Runs on the render thread, where its
@@ -88,6 +93,17 @@ impl NativeAppWindowRenderer {
         self.state
     }
 
+    fn surface_descriptor(
+        &self,
+        native: NativeRenderSurface,
+        size: (u32, u32),
+        vsync: bool,
+    ) -> SurfaceDescriptor {
+        let mut descriptor = SurfaceFactory::native_descriptor(native, [size.0, size.1], vsync);
+        descriptor.color_format = self.settings.surface_format;
+        descriptor
+    }
+
     /// The swapchain the shell surface currently backs, if any.
     pub fn swapchain(&self) -> Option<Swapchain> {
         self.swapchain
@@ -128,7 +144,7 @@ impl AppWindowRenderer for NativeAppWindowRenderer {
         }
         let device = self.device.clone();
         device.with_frame_session(|| {
-            let descriptor = SurfaceFactory::native_descriptor(native, [size.0, size.1], vsync);
+            let descriptor = self.surface_descriptor(native, size, vsync);
             let swapchain = device.make_swapchain(descriptor)?;
             self.native = Some(native);
             self.swapchain = Some(swapchain);
@@ -153,10 +169,7 @@ impl AppWindowRenderer for NativeAppWindowRenderer {
         }
         let device = self.device.clone();
         device.with_frame_session(|| {
-            device.configure_swapchain(
-                swapchain,
-                SurfaceFactory::native_descriptor(native, [size.0, size.1], vsync),
-            )
+            device.configure_swapchain(swapchain, self.surface_descriptor(native, size, vsync))
         })
     }
 
@@ -178,10 +191,8 @@ impl AppWindowRenderer for NativeAppWindowRenderer {
         let vsync = self.vsync;
         device.with_frame_session(|| {
             if self.swapchain.is_none() {
-                self.swapchain = Some(device.make_swapchain(SurfaceFactory::native_descriptor(
-                    native,
-                    [size.0, size.1],
-                    vsync,
+                self.swapchain = Some(device.make_swapchain(self.surface_descriptor(
+                    native, size, vsync,
                 ))?);
             }
             let Some(swapchain) = self.swapchain else {
@@ -243,6 +254,7 @@ impl AppWindowRenderer for NativeAppWindowRenderer {
                 framebuffer.texture(),
                 &mut commands,
                 present,
+                self.settings.surface_format,
                 [pixels.0, pixels.1],
             )?;
             device.submit(
