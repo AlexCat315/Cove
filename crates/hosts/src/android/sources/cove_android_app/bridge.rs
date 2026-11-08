@@ -17,7 +17,8 @@ use super::content::scene::HostedScene;
 use super::frame::runtime_options::RuntimeOptions;
 use super::surface_session::SurfaceSession;
 use crate::android::contract::launch::SceneLaunch;
-use cove_core::{Idiom, Insets, Keyboard, TextScale, TextScaleSample};
+use crate::android::integration::surface::{DeviceFacts, FEATURE_STRIDE, MAXIMUM_FEATURES};
+use cove_core::{Insets, Keyboard, TextScale, TextScaleSample};
 use cove_logging::{Level, LogEvent, LogSystem, LogValue};
 use cove_platform::KeyModifiers;
 use std::collections::BTreeMap;
@@ -575,17 +576,23 @@ pub unsafe extern "C" fn cove_android_scroll(
 
 /// `cove_android_surface`
 ///
-/// Reports device facts the window itself cannot derive: density, idiom, safe
-/// area, keyboard height and the accessibility text-size samples.
+/// Reports device facts the window itself cannot derive: density, hardware
+/// class, fold posture and display features, safe area, keyboard height and
+/// the accessibility text-size samples.
 ///
 /// # Safety
-/// `pointer` must be null or a live session pointer; `text_sizes` must be null
-/// or point to `text_count` readable floats.
+/// `pointer` must be null or a live session pointer; `features` must be null
+/// or point to `feature_count` readable floats; `text_sizes` must be null or
+/// point to `text_count` readable floats.
 #[unsafe(no_mangle)]
+#[allow(clippy::too_many_arguments)]
 pub unsafe extern "C" fn cove_android_surface(
     pointer: SessionPointer,
     density: f32,
-    idiom: i32,
+    device: i32,
+    posture: i32,
+    features: *const f32,
+    feature_count: i32,
     top: f32,
     leading: f32,
     bottom: f32,
@@ -615,13 +622,17 @@ pub unsafe extern "C" fn cove_android_surface(
         leading,
         trailing,
     };
-    let idiom = match idiom {
-        0 => Idiom::Phone,
-        1 => Idiom::Tablet,
-        _ => Idiom::Desktop,
+    let feature_values = if features.is_null()
+        || feature_count <= 0
+        || feature_count as usize > FEATURE_STRIDE * MAXIMUM_FEATURES
+    {
+        &[][..]
+    } else {
+        // SAFETY: the caller guarantees `feature_count` readable floats.
+        unsafe { std::slice::from_raw_parts(features, feature_count as usize) }
     };
     handle.session().scene().content().update_surface(
-        idiom,
+        DeviceFacts::decode(device, posture, feature_values),
         safe_area,
         Keyboard::new(keyboard),
         text_scale,

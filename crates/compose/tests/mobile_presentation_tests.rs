@@ -44,7 +44,8 @@ use cove_composition::Scope;
 use cove_composition::{AnyView, DynamicField, LayoutDebugExt, View};
 use cove_core::scene::{AccessibilityRole, Align, FlexDirection, Justify, Node, Wrap};
 use cove_core::{
-    Environment, Idiom, InputCapabilities, Insets, Keyboard, State, TextScale, Viewport,
+    DesignLanguage, DeviceClass, Environment, InputCapabilities, Insets, Keyboard, Platform,
+    Posture, State, TextScale, Viewport,
 };
 use cove_platform::{InputEvent, KeyModifiers, MouseButton, MouseButtonEvent, MouseMotionEvent};
 use cove_ui_compose::modifiers::interaction::AccessibilityExt;
@@ -93,7 +94,11 @@ fn environment(width: f32, height: f32) -> Environment {
             trailing: 0.0,
         },
         input: PHONE_INPUT,
-        idiom: Idiom::Phone,
+        platform: Platform::IOS,
+        design_language: DesignLanguage::Cupertino,
+        device_class: DeviceClass::Phone,
+        posture: Posture::Flat,
+        display_features: Vec::new(),
         text_scale: TextScale::linear(1.0),
         keyboard: Keyboard::default(),
         reduces_motion: true,
@@ -1056,7 +1061,7 @@ fn popover_sheets_avoid_the_keyboard_and_restore_anchored_presentation_for_point
         assert!(!presented.get(), "Commit dismisses the popover");
 
         let mut desktop = environment(390.0, 844.0);
-        desktop.idiom = Idiom::Desktop;
+        desktop.device_class = DeviceClass::Desktop;
         desktop.input = POINTER_INPUT;
         desktop.keyboard = Keyboard::default();
         surface.set(desktop);
@@ -1188,7 +1193,7 @@ fn phone_dialogs_rise_from_the_bottom_edge_above_the_home_indicator_pointer_dial
         assert!(!presented.get(), "Save dismisses the dialog");
 
         let mut desktop = environment(390.0, 844.0);
-        desktop.idiom = Idiom::Desktop;
+        desktop.device_class = DeviceClass::Desktop;
         desktop.input = POINTER_INPUT;
         surface.set(desktop);
         scene.settle(5, 1.0);

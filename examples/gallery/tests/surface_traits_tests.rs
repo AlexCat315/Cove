@@ -21,7 +21,9 @@ use std::rc::Rc;
 
 use cove_composition::AnyView;
 use cove_core::InputCapabilities;
-use cove_core::{Environment, Idiom, Insets, Keyboard, TextScale, Viewport};
+use cove_core::{
+    DesignLanguage, DeviceClass, Environment, Insets, Keyboard, Platform, TextScale, Viewport,
+};
 use cove_examples::gallery_content::stories::viewport_traits::ViewportTraitsStory;
 use cove_ui_compose::adaptive::SurfaceEnvironmentExt;
 
@@ -29,7 +31,9 @@ use support::GalleryScene;
 
 fn phone_environment() -> Environment {
     Environment {
-        idiom: Idiom::Phone,
+        platform: Platform::IOS,
+        design_language: DesignLanguage::Cupertino,
+        device_class: DeviceClass::Phone,
         viewport: Viewport {
             width: 393.0,
             height: 852.0,
@@ -66,8 +70,10 @@ fn the_gallery_reports_host_facts_without_installing_a_simulated_device() {
             let texts = scene.texts();
 
             assert!(
-                texts.iter().any(|text| text == "Idiom: phone"),
-                "the story reports the live idiom, texts: {texts:?}"
+                texts
+                    .iter()
+                    .any(|text| text == "Device: ios · cupertino · phone"),
+                "the story reports the live device, texts: {texts:?}"
             );
             assert!(
                 texts
@@ -97,7 +103,8 @@ fn the_gallery_reports_host_facts_without_installing_a_simulated_device() {
                 "viewport-width-class",
                 "viewport-height-class",
                 "viewport-orientation",
-                "viewport-idiom",
+                "viewport-device",
+                "viewport-posture",
                 "viewport-safe-area",
                 "viewport-text-scale",
                 "viewport-thresholds",
@@ -119,7 +126,9 @@ fn the_trait_lines_follow_the_environment_they_are_given() {
     let mut desktop = Environment::default();
     desktop.viewport.width = 1280.0;
     desktop.viewport.height = 820.0;
-    desktop.idiom = Idiom::Desktop;
+    desktop.platform = Platform::MacOS;
+    desktop.design_language = DesignLanguage::Cupertino;
+    desktop.device_class = DeviceClass::Desktop;
     desktop.safe_area = Insets::default();
     let installed = Rc::new(desktop);
     GalleryScene::run(
@@ -135,8 +144,10 @@ fn the_trait_lines_follow_the_environment_they_are_given() {
             scene.settle_n(8);
             let texts = scene.texts();
             assert!(
-                texts.iter().any(|text| text == "Idiom: desktop"),
-                "the idiom follows the supplied surface, texts: {texts:?}"
+                texts
+                    .iter()
+                    .any(|text| text == "Device: macos · cupertino · desktop"),
+                "the device follows the supplied surface, texts: {texts:?}"
             );
             assert!(
                 texts.iter().any(|text| text == "Safe area: 0 / 0 / 0 / 0"),

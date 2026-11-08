@@ -14,7 +14,7 @@ cargo xtask package android --release --package cove-examples
 cargo xtask run ios --simulator --package cove-examples
 ```
 
-`COVE_PREVIEW_DEVICE=phone` 可在桌面预览手机表面（390pt 宽度、触摸输入密度）。
+`COVE_PREVIEW_DEVICE=<预设>` 可在桌面以其他设备运行，例如 `iphone`、`fold-tabletop`、`dual-screen`；平台、设备类别、折叠姿态与铰链见[平台自适应](adaptive)。
 
 ## 输入与键盘
 

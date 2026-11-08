@@ -45,6 +45,23 @@ fn selector() -> S {
         &[],
     )
 }
+/// Mirrors `cove_core::DevicePreset::NAMES`; the CLI does not link `cove-core`.
+const DEVICE_PRESETS: [&str; 13] = [
+    "iphone",
+    "ipad-split",
+    "android-phone",
+    "android-tablet",
+    "fold-cover",
+    "fold-open",
+    "fold-book",
+    "fold-tabletop",
+    "flip-open",
+    "dual-screen",
+    "macos",
+    "windows",
+    "linux",
+];
+
 pub fn definitions() -> Vec<AgentTool> {
     let mut tools: Vec<_> = cove_agent::ui_tools::Tools::tools();
     tools.extend([
@@ -66,6 +83,20 @@ pub fn definitions() -> Vec<AgentTool> {
         tool("wait_for_ui", "Poll a selector until visible, hidden, enabled or an exact field value is observed. Returns the matching nodes or a timeout error with the last observation. value requires selector.node_id and expected; secure values stay redacted.", vec![("selector", selector()), ("state", choice(&["visible", "hidden", "enabled", "value"])), ("expected", S::string(Some(0), Some(4096))), ("timeout_ms", integer(0., 10_000.))], &["selector"], true),
         tool("capture_ui", "Return a fresh renderer screenshot as MCP image content with logical/pixel dimensions. settle_ms is an optional animation sampling delay, not a condition assertion. Does not include OS window chrome.", vec![("scale", S::number(Some(1.), Some(3.))), ("quality", S::number(Some(0.1), Some(1.))), ("settle_ms", integer(0., 2000.))], &[], true),
         tool("resize_ui", "Resize the application viewport in logical points. Query resulting layout or capture_ui to verify the actual size.", vec![("width", S::number(Some(1.), Some(16_384.))), ("height", S::number(Some(1.), Some(16_384.)))], &["width", "height"], false),
+        tool("set_ui_environment", "Replace the device facts the host reports, to render another platform, device class, fold posture or hinge on this host. clear resets first; preset starts from a complete device and resizes the window where the host can; explicit fields apply last. Returns the environment the next frame publishes; verify layout with query_ui_nodes or capture_ui.", vec![
+            ("clear", S::boolean()),
+            ("preset", choice(&DEVICE_PRESETS)),
+            ("platform", choice(&["macos", "windows", "linux", "ios", "ipados", "android", "web"])),
+            ("designLanguage", choice(&["cupertino", "material", "fluent", "adwaita"])),
+            ("deviceClass", choice(&["phone", "foldable-book", "foldable-flip", "foldable-dual-screen", "tablet", "desktop"])),
+            ("posture", choice(&["flat", "tabletop", "book"])),
+            ("displayFeatures", S::array_of(object(vec![
+                ("kind", choice(&["fold", "hinge"])),
+                ("bounds", object(vec![("x", S::number(Some(0.), Some(16_384.))), ("y", S::number(Some(0.), Some(16_384.))), ("width", S::number(Some(0.), Some(16_384.))), ("height", S::number(Some(0.), Some(16_384.)))], &["x", "y", "width", "height"])),
+                ("orientation", choice(&["horizontal", "vertical"])),
+                ("occludes", S::boolean()), ("separates", S::boolean()),
+            ], &["kind", "bounds", "orientation"]), Some(8))),
+        ], &[], false),
         tool("select_ui", "Select a unique node in the runtime inspector overlay, or clear this connection's selection.", vec![("selector", selector()), ("clear", S::boolean())], &[], false),
         tool("set_ui_style", "Set temporary inspector overrides on a unique node. Colors use #RRGGBB or #RRGGBBAA; null resets a property. Overrides remain through recomposition and are discarded on disconnect.", vec![("selector", selector()), ("properties", object(vec![
             ("padding", object(vec![("top", S::number(Some(0.), Some(4096.))), ("right", S::number(Some(0.), Some(4096.))), ("bottom", S::number(Some(0.), Some(4096.))), ("left", S::number(Some(0.), Some(4096.)))], &["top", "right", "bottom", "left"])),
@@ -81,3 +112,11 @@ pub fn definitions() -> Vec<AgentTool> {
 }
 
 pub const GUIDE: &str = "Use get_ui_session and get_diagnostics first. Query query_ui_nodes (compact is the default here) with text/role/source, then use click_ui or fill_ui with a unique selector; label matches exactly. Never guess coordinates or silently pick the first of several matches. Use input_ui for drag/scroll sequences and press_ui_key for shortcuts. Use wait_for_ui for observable postconditions, then capture_ui to inspect rendering; delivery acknowledgements are not behavior assertions. capture=true on click_ui/fill_ui returns an image on the same connection for transient states. Field values require explicit node_id and include_value=true; secure providers are never read. Start a CPU trace with start_ui_trace, perform the real operation, stop_ui_trace, then get_ui_trace or compare_ui_traces. capture_ui_trace records a fixed window; it does not create work. Missing host capabilities and idle or dropped samples must be reported. Nodes expire on unmount. The bridge reconnects on the next call after a transport failure and never retries mutations. Configure the cove-devtools mcp command once in the MCP client; do not write WebSocket scripts for these tools.";
+
+#[cfg(test)]
+mod environment_tool {
+    #[test]
+    fn presets_match_the_core_catalog() {
+        assert_eq!(super::DEVICE_PRESETS, cove_core::DevicePreset::NAMES);
+    }
+}

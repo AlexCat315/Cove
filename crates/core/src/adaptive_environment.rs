@@ -1,24 +1,56 @@
 //! Translation of CoveUICore/Adaptive/Environment.swift.
-use crate::TextScale;
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub enum SizeClass {
+use serde::{Deserialize, Serialize};
+
+use crate::{
+    DesignLanguage, DeviceClass, DisplayFeature, Platform, Posture, Rect, TextScale,
+    display_features,
+};
+
+/// Material 3 window width classes.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum WidthClass {
+    Compact,
+    Medium,
+    Expanded,
+    Large,
+    ExtraLarge,
+}
+
+impl WidthClass {
+    pub const fn name(self) -> &'static str {
+        match self {
+            Self::Compact => "compact",
+            Self::Medium => "medium",
+            Self::Expanded => "expanded",
+            Self::Large => "large",
+            Self::ExtraLarge => "extra-large",
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum HeightClass {
     Compact,
     Medium,
     Expanded,
 }
-pub type WidthClass = SizeClass;
-pub type HeightClass = SizeClass;
+
+impl HeightClass {
+    pub const fn name(self) -> &'static str {
+        match self {
+            Self::Compact => "compact",
+            Self::Medium => "medium",
+            Self::Expanded => "expanded",
+        }
+    }
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum Orientation {
     Portrait,
     Landscape,
-}
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
-pub enum Idiom {
-    Phone,
-    Tablet,
-    #[default]
-    Desktop,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -38,23 +70,36 @@ impl Default for Viewport {
 }
 impl Viewport {
     pub const COMPACT_MAXIMUM_WIDTH: f32 = 600.0;
-    pub const EXPANDED_MINIMUM_WIDTH: f32 = 1000.0;
-    pub const COMPACT_MAXIMUM_HEIGHT: f32 = 600.0;
-    pub const EXPANDED_MINIMUM_HEIGHT: f32 = 1000.0;
-    fn classify(extent: f32) -> SizeClass {
-        if extent < 600.0 {
-            SizeClass::Compact
-        } else if extent < 1000.0 {
-            SizeClass::Medium
+    pub const MEDIUM_MAXIMUM_WIDTH: f32 = 840.0;
+    pub const EXPANDED_MAXIMUM_WIDTH: f32 = 1200.0;
+    pub const LARGE_MAXIMUM_WIDTH: f32 = 1600.0;
+    /// First width that fits two panes side by side.
+    pub const EXPANDED_MINIMUM_WIDTH: f32 = Self::MEDIUM_MAXIMUM_WIDTH;
+    pub const COMPACT_MAXIMUM_HEIGHT: f32 = 480.0;
+    pub const EXPANDED_MINIMUM_HEIGHT: f32 = 900.0;
+
+    pub fn width_class(self) -> WidthClass {
+        let width = self.width;
+        if width < Self::COMPACT_MAXIMUM_WIDTH {
+            WidthClass::Compact
+        } else if width < Self::MEDIUM_MAXIMUM_WIDTH {
+            WidthClass::Medium
+        } else if width < Self::EXPANDED_MAXIMUM_WIDTH {
+            WidthClass::Expanded
+        } else if width < Self::LARGE_MAXIMUM_WIDTH {
+            WidthClass::Large
         } else {
-            SizeClass::Expanded
+            WidthClass::ExtraLarge
         }
     }
-    pub fn width_class(self) -> WidthClass {
-        Self::classify(self.width)
-    }
     pub fn height_class(self) -> HeightClass {
-        Self::classify(self.height)
+        if self.height < Self::COMPACT_MAXIMUM_HEIGHT {
+            HeightClass::Compact
+        } else if self.height < Self::EXPANDED_MINIMUM_HEIGHT {
+            HeightClass::Medium
+        } else {
+            HeightClass::Expanded
+        }
     }
     pub fn orientation(self) -> Orientation {
         if self.width >= self.height {
@@ -63,8 +108,12 @@ impl Viewport {
             Orientation::Portrait
         }
     }
+    pub fn bounds(self) -> Rect {
+        Rect::new(0.0, 0.0, self.width.max(0.0), self.height.max(0.0))
+    }
 }
-#[derive(Clone, Copy, Debug, Default, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
 pub struct Insets {
     pub top: f32,
     pub bottom: f32,
@@ -100,7 +149,7 @@ impl Keyboard {
         self.height.is_finite() && self.height > 0.0
     }
 }
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct InputCapabilities(pub u8);
 impl InputCapabilities {
     pub const TOUCH: Self = Self(1);
@@ -122,7 +171,14 @@ pub struct Environment {
     pub viewport: Viewport,
     pub safe_area: Insets,
     pub input: InputCapabilities,
-    pub idiom: Idiom,
+    /// Conventions to follow; constant for a process unless overridden.
+    pub platform: Platform,
+    pub design_language: DesignLanguage,
+    /// Hardware class; constant through folds and rotations.
+    pub device_class: DeviceClass,
+    pub posture: Posture,
+    /// Folds and hinges in window coordinates.
+    pub display_features: Vec<DisplayFeature>,
     pub text_scale: TextScale,
     pub keyboard: Keyboard,
     pub reduces_motion: bool,
@@ -136,7 +192,11 @@ impl Default for Environment {
             viewport: Viewport::default(),
             safe_area: Insets::default(),
             input: InputCapabilities::POINTER | InputCapabilities::KEYBOARD,
-            idiom: Idiom::Desktop,
+            platform: Platform::current(),
+            design_language: Platform::current().design_language(),
+            device_class: DeviceClass::Desktop,
+            posture: Posture::Flat,
+            display_features: Vec::new(),
             text_scale: TextScale::default(),
             keyboard: Keyboard::default(),
             reduces_motion: false,
@@ -145,14 +205,47 @@ impl Default for Environment {
     }
 }
 impl Environment {
+    pub fn width_class(&self) -> WidthClass {
+        self.viewport.width_class()
+    }
+
+    pub fn height_class(&self) -> HeightClass {
+        self.viewport.height_class()
+    }
+
     pub fn minimum_control_extent(&self) -> f32 {
         if self.input.contains(InputCapabilities::TOUCH) {
-            44.0
+            self.design_language.touch_target()
         } else {
             28.0
         }
     }
+
     pub fn supports_hover(&self) -> bool {
         self.input.contains(InputCapabilities::POINTER)
+    }
+
+    /// Logical window regions separated by folds and hinges; one region when
+    /// nothing divides the window.
+    pub fn segments(&self) -> Vec<Rect> {
+        display_features::window_segments(self.viewport.bounds(), &self.display_features)
+    }
+
+    /// Whether a fold or hinge divides the window into more than one segment.
+    pub fn is_spanned(&self) -> bool {
+        self.segments().len() > 1
+    }
+
+    /// The segment that should host `rect`, so overlays never straddle a fold.
+    pub fn segment_for(&self, rect: Rect) -> Rect {
+        display_features::segment_for(&self.segments(), rect).unwrap_or(self.viewport.bounds())
+    }
+
+    /// Regions where nothing can be drawn.
+    pub fn occluded_regions(&self) -> impl Iterator<Item = Rect> + '_ {
+        self.display_features
+            .iter()
+            .filter(|feature| feature.occludes)
+            .map(|feature| feature.bounds)
     }
 }

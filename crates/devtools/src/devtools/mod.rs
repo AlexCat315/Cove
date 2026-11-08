@@ -358,6 +358,9 @@ impl DevTools {
         if self.server.host.window.resize.is_some() {
             capabilities.push("window".into());
         }
+        if self.server.host.window.environment.is_some() {
+            capabilities.push("environment".into());
+        }
         if self.server.host.checkpoint.capture.is_some()
             && self.server.host.checkpoint.restore.is_some()
         {

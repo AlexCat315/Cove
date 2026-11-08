@@ -10,5 +10,5 @@ pub mod touch_input;
 pub use environment::SceneEnvironment;
 pub use inspection::Inspection;
 pub use scene::{AndroidContentSession, Rendering};
-pub use surface::SurfaceState;
+pub use surface::{DeviceFacts, SurfaceState};
 pub use touch_input::TouchInput;

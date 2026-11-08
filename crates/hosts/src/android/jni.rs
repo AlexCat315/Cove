@@ -394,7 +394,8 @@ pub unsafe extern "C" fn Java_com_cove_probe_MainActivity_scroll(
 }
 
 /// # Safety
-/// `value` must be a handle returned by `open` and `text_sizes` a `float[]`.
+/// `value` must be a handle returned by `open`; `features` and `text_sizes`
+/// must be `float[]` references.
 #[unsafe(no_mangle)]
 #[allow(clippy::too_many_arguments)]
 pub unsafe extern "C" fn Java_com_cove_probe_MainActivity_surface(
@@ -402,7 +403,9 @@ pub unsafe extern "C" fn Java_com_cove_probe_MainActivity_surface(
     _class: Object,
     value: i64,
     density: f32,
-    idiom: i32,
+    device: i32,
+    posture: i32,
+    features: Object,
     top: f32,
     leading: f32,
     bottom: f32,
@@ -413,7 +416,18 @@ pub unsafe extern "C" fn Java_com_cove_probe_MainActivity_surface(
     let Some(session) = session(value) else {
         return;
     };
-    if text_sizes.is_null() {
+    if text_sizes.is_null() || features.is_null() {
+        return;
+    }
+    // SAFETY: JNI slot signatures from jni.h.
+    let feature_count = unsafe {
+        function::<unsafe extern "C" fn(JniEnv, Object) -> i32>(env, slot::GET_ARRAY_LENGTH)(
+            env, features,
+        )
+    };
+    let feature_limit = (crate::android::integration::surface::FEATURE_STRIDE
+        * crate::android::integration::surface::MAXIMUM_FEATURES) as i32;
+    if !(0..=feature_limit).contains(&feature_count) {
         return;
     }
     // SAFETY: JNI slot signatures from jni.h.
@@ -435,16 +449,53 @@ pub unsafe extern "C" fn Java_com_cove_probe_MainActivity_surface(
     if samples.is_null() {
         return;
     }
-    // SAFETY: `samples` holds `count` floats until released.
+    // An unfolded phone reports no features; skip pinning an empty array.
+    let feature_values = if feature_count == 0 {
+        std::ptr::null_mut()
+    } else {
+        // SAFETY: JNI slot signatures from jni.h; released with JNI_ABORT below.
+        unsafe {
+            function::<unsafe extern "C" fn(JniEnv, Object, *mut u8) -> *mut f32>(
+                env,
+                slot::GET_FLOAT_ARRAY_ELEMENTS,
+            )(env, features, std::ptr::null_mut())
+        }
+    };
+    let release = |array: Object, elements: *mut f32| {
+        // SAFETY: `elements` came from GET_FLOAT_ARRAY_ELEMENTS on `array`.
+        unsafe {
+            function::<unsafe extern "C" fn(JniEnv, Object, *mut f32, i32)>(
+                env,
+                slot::RELEASE_FLOAT_ARRAY_ELEMENTS,
+            )(env, array, elements, JNI_ABORT);
+        }
+    };
+    if feature_count > 0 && feature_values.is_null() {
+        release(text_sizes, samples);
+        return;
+    }
+    // SAFETY: both buffers hold their reported float counts until released.
     unsafe {
         bridge::cove_android_surface(
-            session, density, idiom, top, leading, bottom, trailing, keyboard, samples, count,
+            session,
+            density,
+            device,
+            posture,
+            feature_values,
+            feature_count,
+            top,
+            leading,
+            bottom,
+            trailing,
+            keyboard,
+            samples,
+            count,
         );
-        function::<unsafe extern "C" fn(JniEnv, Object, *mut f32, i32)>(
-            env,
-            slot::RELEASE_FLOAT_ARRAY_ELEMENTS,
-        )(env, text_sizes, samples, JNI_ABORT);
     }
+    if !feature_values.is_null() {
+        release(features, feature_values);
+    }
+    release(text_sizes, samples);
 }
 
 type SnapshotCopy = unsafe extern "C" fn(SessionPointer, *mut u16, i32) -> i32;

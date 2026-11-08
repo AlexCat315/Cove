@@ -1,6 +1,6 @@
 # 平台自适应设计
 
-> 状态：提案（0.3.0-dev）。1.0.0 之前按本文直接做破坏性变更，不保留兼容层。
+> 状态：P0 已实现（0.3.0-dev，见 §14），P1 起为提案。1.0.0 之前按本文直接做破坏性变更，不保留兼容层。
 
 ## 目标
 
@@ -40,76 +40,44 @@
 
 ## 3. 环境模型
 
-替换 `cove_core::Environment` 中的 `idiom`、`viewport` 分类部分。
+`Idiom` 与 `SizeClass` 已删除。`cove_core::Environment` 保持扁平，新增字段与已有的 `viewport`、`safe_area`、`keyboard` 并列：
 
 ```rust
-pub enum Platform { MacOS, Windows, Linux, IOS, IPadOS, Android, Web }
-
-pub enum DesignLanguage { Cupertino, Material, Fluent, Adwaita }
-
-pub enum DeviceClass {
-    Phone,
-    Foldable(FoldableKind),
-    Tablet,
-    Desktop,
-}
-
-pub enum FoldableKind {
-    /// 竖向折痕，展开接近平板（Galaxy Z Fold、Pixel Fold 等书本式）。
-    Book,
-    /// 横向折痕，展开是手机，合上是外屏（翻盖式）。
-    Flip,
-    /// 两块独立屏幕，中间是有遮挡的物理铰链（Surface Duo 类）。
-    DualScreen,
-}
-
-pub struct DeviceProfile {
-    pub platform: Platform,
-    pub design_language: DesignLanguage,
-    pub device_class: DeviceClass,
-}
-
-pub enum WindowClass { Compact, Medium, Expanded, Large, ExtraLarge }
-
-pub enum Posture {
-    Flat,
-    /// 半开，折痕水平：上半屏显示内容，下半屏放操作（桌面支架）。
-    Tabletop,
-    /// 半开，折痕竖直：左右两页。
-    Book,
-}
-
-pub struct DisplayFeature {
-    pub kind: DisplayFeatureKind,   // Fold | Hinge | Cutout
-    pub bounds: Rect,               // 窗口坐标
-    pub orientation: Axis,
-    /// 区域内不可显示内容（物理铰链）。
-    pub occludes: bool,
-    /// 将窗口在逻辑上分成两块（铰链，或半开的折痕）。
-    pub separates: bool,
-}
-
-pub struct WindowProfile {
-    pub viewport: Viewport,
-    pub width_class: WindowClass,
-    pub height_class: WindowClass,
-    pub posture: Posture,
-    pub display_features: Vec<DisplayFeature>,
-    /// 由 separates 的显示特征切出的区段，按阅读方向排序；无分隔时只有一段。
-    pub segments: Vec<Rect>,
-    pub safe_area: Insets,
-    pub keyboard: Keyboard,
-}
-
 pub struct Environment {
-    pub device: DeviceProfile,
-    pub window: WindowProfile,
+    pub viewport: Viewport,
+    pub safe_area: Insets,
     pub input: InputCapabilities,
+    pub platform: Platform,                 // MacOS | Windows | Linux | IOS | IPadOS | Android | Web
+    pub design_language: DesignLanguage,    // Cupertino | Material | Fluent | Adwaita
+    pub device_class: DeviceClass,          // Phone | Foldable(Book | Flip | DualScreen) | Tablet | Desktop
+    pub posture: Posture,                   // Flat | Tabletop | Book
+    pub display_features: Vec<DisplayFeature>,
     pub text_scale: TextScale,
+    pub keyboard: Keyboard,
     pub reduces_motion: bool,
     pub translucent_window: bool,
 }
+
+pub struct DisplayFeature {
+    pub kind: DisplayFeatureKind,           // Fold | Hinge | Cutout
+    pub bounds: Rect,                       // 窗口逻辑坐标，物理左右
+    pub orientation: FeatureOrientation,    // Horizontal | Vertical
+    pub occludes: bool,                     // 区域内不可绘制
+    pub separates: bool,                    // 把窗口分成两段
+}
+
+impl Environment {
+    pub fn width_class(&self) -> WidthClass;
+    pub fn height_class(&self) -> HeightClass;
+    pub fn segments(&self) -> Vec<Rect>;     // 按 separates 的特征切分，上到下、左到右
+    pub fn is_spanned(&self) -> bool;
+    pub fn segment_for(&self, rect: Rect) -> Rect;
+    pub fn occluded_regions(&self) -> impl Iterator<Item = Rect> + '_;
+    pub fn minimum_control_extent(&self) -> f32; // 触摸：Material 48，其余 44；指针 28
+}
 ```
+
+没有拆成 `device` / `window` 两个子结构：`viewport`、`safe_area` 有上百处读取，嵌套只增加迁移面而不改变语义。
 
 ### 3.1 窗口分级
 
@@ -149,14 +117,14 @@ pub struct Environment {
 - 局部覆盖：子树强制 `Compact`，例如在桌面上画一个手机预览。
 - 验收：在 macOS 上渲染 Android 书本式折叠屏的 Tabletop 姿态（§11）。
 
-现有的 `previews_phone()` 由通用覆盖取代。
+实现：`EnvironmentOverride`（全部字段可选，`apply` / `merged`）、`DevicePreset`（§11.1 的预设）、`EnvironmentRequest`（DevTools 请求：`clear` → `preset` → 显式字段）。`COVE_PREVIEW_DEVICE=<预设>` 取代了原来的 `previews_phone()`。
 
 ## 4. 宿主数据源
 
 | 平台 | `DeviceClass` | 窗口与姿态 | 显示特征 | 运行时变化 |
 |---|---|---|---|---|
 | Android | `PackageManager.hasSystemFeature`（铰链角度传感器）+ Jetpack WindowManager 是否上报 `FoldingFeature`；Book/Flip 由 fold 方向相对设备自然方向判定，`occlusionType == FULL` 判为 DualScreen | `WindowMetricsCalculator` 求窗口尺寸；`FoldingFeature.state`（`FLAT` / `HALF_OPENED`）与 `orientation` 求姿态 | `FoldingFeature.bounds`、`occlusionType`、`isSeparating` | `WindowInfoTracker.windowLayoutInfo` 流；Activity 声明 `screenSize|smallestScreenSize|screenLayout|orientation|density` 配置变更自理，保持现有的"Activity 保留应用"模型 |
-| iOS / iPadOS | `UIDevice.userInterfaceIdiom` 区分 Phone 与 Pad（修正现有的一律 Phone）。可折叠 iPhone：先按 Phone 接入，待 UIKit 提供公开的姿态/铰链信息后上报 `Foldable` | `UIWindowScene` 几何与 trait collection 变化；Stage Manager、Split View、Slide Over 都表现为窗口尺寸变化 | 当前为空；接口已就绪，等 UIKit 有公开数据源时填充 | `viewWillTransition(to:)` / scene 几何回调 |
+| iOS / iPadOS | `SDL_IsTablet`（内部即 `UIDevice.userInterfaceIdiom`）区分 Phone 与 Pad，iPad 上报 `Platform::IPadOS`。可折叠 iPhone：先按 Phone 接入，待 UIKit 提供公开的姿态/铰链信息后上报 `Foldable` | `UIWindowScene` 几何与 trait collection 变化；Stage Manager、Split View、Slide Over 都表现为窗口尺寸变化 | 当前为空；接口已就绪，等 UIKit 有公开数据源时填充 | `viewWillTransition(to:)` / scene 几何回调 |
 | macOS | Desktop | 窗口尺寸 | 无 | 窗口缩放、全屏、分屏 |
 | Windows | Desktop；`GetSystemMetrics(SM_CONVERTIBLESLATEMODE)` 为平板模式时补 `TOUCH` | 窗口尺寸 | 无 | `WM_SETTINGCHANGE("ConvertibleSlateMode")` 更新 `input` |
 | Linux | Desktop | 窗口尺寸 | 无 | 窗口缩放 |
@@ -165,8 +133,9 @@ pub struct Environment {
 注意：
 
 - **外屏与内屏密度不同**。折叠屏开合时 `viewport.scale` 可能改变，Text 的字形图集与 Imaging 的缓存要按新 scale 失效重建。这是现有 scale 变化路径，折叠屏只是让它更频繁。
-- Android 依赖：Jetpack WindowManager 是获取 `FoldingFeature` 的公开途径，需要给 Android 宿主引入 `androidx.window`。如果坚持探针工程零依赖，备选是只用 `WindowMetrics`，此时只有窗口分级，没有姿态与铰链，验收表必须注明这一限制。
-- JNI `surface(...)` 签名要扩展：增加姿态、显示特征数组和 `device_class`，并删掉 `idiom` 参数。
+- Android 依赖：Gradle 运行时库引入 `androidx.window:window` 与 `window-java` 1.4.0（以及 `androidx.core`）。`FoldingState.java` 在 `onStart` / `onStop` 注册监听，合上（外屏不报告特征）时沿用 `SharedPreferences` 中上次见到的折叠类型，铰链角度传感器作为后备。
+- JNI `surface(...)`：`idiom` 换成 `device`（0 手机、1 平板、2 书本式、3 翻盖、4 双屏）、`posture`（0 平放、1 桌面支架、2 书本）与 `float[] features`（每项 8 个数：kind、x、y、width、height、orientation、occludes、separates，逻辑坐标），Rust 侧由 `DeviceFacts::decode` 解码。
+- Activity 在折叠/展开时仍按默认流程重建，应用状态由现有的 `onRetainNonConfigurationInstance` 保留；声明 `configChanges` 自理留待 P2 与 §6 一起做。
 
 ## 5. 语义组件
 
@@ -282,13 +251,14 @@ EnvironmentReader::new(|env| match env.device.design_language {
 
 ### 11.1 设备配置
 
-在 DevTools 增加 `set_ui_environment`，参数为完整的 `DeviceProfile` + `WindowProfile` 覆盖，并提供预设：
+DevTools `set_ui_environment` 接受 `clear`、`preset` 与 `EnvironmentOverride` 的各字段；预设：
 
 | 预设 | 平台 | 设备 | 窗口 | 姿态 / 特征 |
 |---|---|---|---|---|
 | `iphone` | IOS | Phone | 393×852 | Flat |
 | `ipad-split` | IPadOS | Tablet | 694×1024 | Flat |
 | `android-phone` | Android | Phone | 412×915 | Flat |
+| `android-tablet` | Android | Tablet | 1280×800 | Flat |
 | `fold-cover` | Android | Foldable(Book) | 360×800 | Flat |
 | `fold-open` | Android | Foldable(Book) | 841×701 | Flat，竖向折痕不遮挡 |
 | `fold-book` | Android | Foldable(Book) | 841×701 | Book |
@@ -320,7 +290,21 @@ EnvironmentReader::new(|env| match env.device.design_language {
 
 ## 13. 未决问题
 
-1. Android 宿主是否引入 `androidx.window`。不引入就没有姿态与铰链（见 §4）。
+1. ~~Android 宿主是否引入 `androidx.window`~~：已引入。
 2. 可折叠 iPhone 的姿态与铰链信息何时、以何种形式由 UIKit 公开。现在只预留接口。
-3. 宽度分级从 600/1000 改为 Material 3 五档后，现有按 `Viewport::COMPACT_MAXIMUM_WIDTH` 写的组件要逐个迁移。
+3. 宽度分级已改为 Material 3 五档；`Viewport::EXPANDED_MINIMUM_WIDTH` 从 1000 变为 840，`SidebarAdaptiveOptions` 与工作区布局随之在 840 进入双栏。
 4. Web 的 Viewport Segments、Device Posture API 仍是实验性 API，可用性随浏览器变化，需要特性检测。
+
+## 14. 实施状态
+
+| 项 | 状态 | 位置 |
+|---|---|---|
+| 环境模型、窗口分级、区段计算 | 完成，结构测试 | `crates/core/src/{adaptive_environment,device_profile,display_features,environment_override}.rs`，`crates/core/tests/adaptive_environment.rs` |
+| 组合读取器 | 完成 | `crates/composition/src/adaptive/viewport_traits.rs`（`PostureReader`、`DeviceClassReader`、`PlatformReader`、`DesignLanguageReader`） |
+| Android 数据源 | 完成，**未编译验证**（本机无 Android SDK/JDK），未设备验收 | `FoldingState.java`、`SurfaceMetrics.java`、`jni.rs`、`surface/device_facts.rs` |
+| iOS / iPadOS 数据源 | 完成，未设备验收 | `cove_shell_device_form` → `Sdl3PlatformHost::device_form` |
+| Windows 平板模式 | 完成，未实机验收 | `native.c` 的 `SM_CONVERTIBLESLATEMODE` + `SM_DIGITIZER` |
+| macOS / Linux | 完成 | 桌面，无显示特征 |
+| Web | **缺口**：`cove-browser` 原型不发布 `Environment`，组件得到默认值（`Platform::Web`、Material） | — |
+| 预设与覆盖 | 完成 | `COVE_PREVIEW_DEVICE`，DevTools `set_ui_environment`（桌面会调整窗口尺寸；Android 只替换事实） |
+| 组件消费 | 部分：`uses_sheet` 改用 `is_handheld()`，其余组件仍只读宽度 | P1、P2 |

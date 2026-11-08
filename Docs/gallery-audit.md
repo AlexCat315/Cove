@@ -4,6 +4,12 @@
 
 Swift 源码逐页对照见文末《Swift 源码对照（逐页差异清单）》。
 
+## 2026-11-09：平台自适应 P0（平台、设备类别、折叠姿态、铰链）
+
+- 页面：Viewport Traits 页的 Idiom 行改为 `Device: <platform> · <design language> · <device class>`，新增 `Posture: <posture> · Segments: <n>` 行（`viewport-device`、`viewport-posture`），阈值说明改为五档。新增用户文档 `Website/src/content/components/adaptive.md` 并登记到「工具链」组；目录仍为 103 页。
+- 结构验证：core `adaptive_environment` 11 项（五档阈值、平台→设计语言、平放折痕不分段、半开折痕分段、遮挡铰链移除区域并把居中对话框移入前一段、13 个预设完整、覆盖抬高安全区与 JSON 往返）；hosts `surface_metrics_tests` 新增折叠数据解码与限长、DevTools 覆盖叠加在宿主上报之上并可清除；compose `handheld_devices_present_overlays_as_sheets`；gallery Viewport Traits 文本与调试名。
+- 原生验收：**未做**。Android `FoldingFeature`（需折叠屏模拟器或真机）、iPad `SDL_IsTablet`、Windows 平板模式均未实测；本机无 Android SDK，Java 未编译。`set_ui_environment` 只替换上报事实，不能验证宿主数据源。
+
 ## 2026-11-09：移动端能力补齐与文档修复
 
 - 页面：新增用户文档 `Website/src/content/components/mobile.md`（移动端支持）并登记到 `Website/src/utils/docs.ts`「工具链」组；未新增 Gallery 控件页，目录仍为 103 页。
@@ -278,7 +284,7 @@ cargo test -p cove-ui-compose --test compose --locked
 | Masonry | 0 | 0 / 0 | 挂载/几何基础检查通过；待逐项交互和视觉验收 |
 | ZStack / Overlay | 2 | 0 / 0 | 挂载/几何基础检查通过；待逐项交互和视觉验收 |
 | Animation | 4 | 0 / 0 | 挂载/几何基础检查通过；待逐项交互和视觉验收 |
-| Viewport Traits | 2 | 0 / 0 | 挂载/几何基础检查通过；待逐项交互和视觉验收 |
+| Viewport Traits | 2 | 0 / 0 | 挂载/几何基础检查通过；设备、姿态、区段行有结构测试；待各预设下的视觉验收 |
 | ViewThatFits | 0 | 0 / 0 | 挂载/几何基础检查通过；待逐项交互和视觉验收 |
 | Theme / Typography | 2 | 0 / 0 | 挂载/几何基础检查通过；待逐项交互和视觉验收 |
 | Badge | 4 | 0 / 0 | 挂载/几何基础检查通过；待逐项交互和视觉验收 |

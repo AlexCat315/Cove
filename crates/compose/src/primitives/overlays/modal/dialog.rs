@@ -24,7 +24,7 @@ use crate::theme::styles::buttons::{ButtonStyleViewExt, GhostButtonStyle};
 use crate::theme::{ControlSize, ControlSizeViewExt, SemanticColorRef, SemanticFontRef};
 use crate::{AnyView, BoxView, TupleView, View};
 use cove_core::scene::{AccessibilityRole, Align, FlexDirection, Justify, Wrap};
-use cove_core::{Binding, Environment, SizeClass};
+use cove_core::{Binding, Environment, WidthClass};
 
 /// Presentation knobs layered above `ModalOptions`.
 #[derive(Clone)]
@@ -107,7 +107,7 @@ impl View for Dialog {
             } else {
                 0.0
             };
-            let compact = surface.viewport.width_class() == SizeClass::Compact;
+            let compact = surface.width_class() == WidthClass::Compact;
 
             let mut modal_options = options.modal.clone();
             if sheet {

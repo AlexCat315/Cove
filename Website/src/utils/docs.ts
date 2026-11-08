@@ -18,6 +18,7 @@ import views from '@/content/views.md?raw'
 import nativeRhi from '@/content/native-rhi.md?raw'
 import cargo from '@/content/cargo.md?raw'
 import mobile from '@/content/components/mobile.md?raw'
+import adaptive from '@/content/components/adaptive.md?raw'
 import gallery from '@/content/components/gallery.md?raw'
 import slider from '@/content/components/slider.md?raw'
 import rangeSlider from '@/content/components/range-slider.md?raw'
@@ -150,6 +151,7 @@ export const docGroups: DocGroup[] = [
     items: [
       { slug: 'cargo', title: 'Cargo 工作流', raw: cargo },
       { slug: 'mobile', title: '移动端支持', raw: mobile },
+      { slug: 'adaptive', title: '平台自适应', raw: adaptive },
     ],
   },
 ]

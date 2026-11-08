@@ -33,7 +33,8 @@ use cove_core::scene::{
     UIWorkSchedulerHolder,
 };
 use cove_core::{
-    Environment, Font, FontWeight, InputCapabilities, Insets, Keyboard, State, set_content_scale,
+    DevicePreset, Environment, EnvironmentOverride, Font, FontWeight, InputCapabilities, Insets,
+    Keyboard, State, set_content_scale,
 };
 use cove_graphics::rhi::Device;
 use cove_imaging::ImageAssetRegistryHolder;
@@ -91,8 +92,21 @@ fn environment_flag(key: &str) -> Option<String> {
     std::env::var(key).ok()
 }
 
-fn previews_phone() -> bool {
-    environment_flag("COVE_PREVIEW_DEVICE").is_some_and(|value| value.eq_ignore_ascii_case("phone"))
+/// `COVE_PREVIEW_DEVICE=<preset>` opens the window at a device preset's size
+/// and reports that device's facts (see `DevicePreset::NAMES`).
+fn preview_device() -> Option<DevicePreset> {
+    let name = environment_flag("COVE_PREVIEW_DEVICE")?;
+    let preset = DevicePreset::named(&name);
+    if preset.is_none() {
+        LogSystem::logger("com.cove.ui.app").log(&LogEvent::new(
+            Level::Warning,
+            format!(
+                "COVE_PREVIEW_DEVICE={name} is not one of {}",
+                DevicePreset::NAMES.join(", ")
+            ),
+        ));
+    }
+    preset
 }
 
 fn force_vsync_off() -> bool {
@@ -137,6 +151,9 @@ struct ApplicationState {
     memory_pressure: RefCell<Option<ApplicationMemoryPressure>>,
     display_handle: AppDisplayHandle,
     environment: State<Environment>,
+    /// Applied over host facts every frame: a launch preview device, then
+    /// DevTools requests.
+    environment_override: RefCell<EnvironmentOverride>,
     recording_control: RefCell<RecordingControl>,
     root_view: RefCell<Option<AnyView>>,
     chrome_collector: RefCell<WindowChromeHitTestCollector>,
@@ -203,17 +220,18 @@ impl Application {
     ) -> Result<Self, String> {
         let rendering =
             Rc::new(AppRenderingContext::new(backend, &config).map_err(|error| error.to_string())?);
+        let preview = preview_device();
         let options = WindowOptions {
-            width: if previews_phone() {
-                390
-            } else {
-                config.window.width.max(1)
-            },
-            height: if previews_phone() {
-                844
-            } else {
-                config.window.height.max(1)
-            },
+            width: preview
+                .as_ref()
+                .map_or(config.window.width.max(1), |preset| {
+                    preset.size.width as i32
+                }),
+            height: preview
+                .as_ref()
+                .map_or(config.window.height.max(1), |preset| {
+                    preset.size.height as i32
+                }),
             title_bar_style: config.window.title_bar_style.platform_style(),
             shows_dock_icon: config.window.shows_dock_icon,
             backdrop: config.window.backdrop,
@@ -258,6 +276,9 @@ impl Application {
             display_handle,
             environment,
             recording_control: RefCell::new(RecordingControl::default()),
+            environment_override: RefCell::new(
+                preview.map(|preset| preset.environment).unwrap_or_default(),
+            ),
             root_view: RefCell::new(None),
             chrome_collector: RefCell::new(WindowChromeHitTestCollector::new()),
             last_chrome_hit_test: RefCell::new(None),
@@ -495,6 +516,14 @@ impl Application {
                     None
                 }))
             },
+            environment: {
+                let application = Application {
+                    state: state.clone(),
+                };
+                Some(Rc::new(move |request: &cove_core::EnvironmentRequest| {
+                    application.request_environment(request)
+                }))
+            },
         };
         match factory(
             configuration,
@@ -519,6 +548,30 @@ impl Application {
                 format!("DevTools failed to start: {error}"),
             )),
         }
+    }
+
+    /// Replaces the reported device facts. A preset also resizes the window,
+    /// which lands on a later frame, so the returned viewport is the preset's.
+    fn request_environment(
+        &self,
+        request: &cove_core::EnvironmentRequest,
+    ) -> Result<Environment, String> {
+        let state = &self.state;
+        let (next, size) = request.resolve(&state.environment_override.borrow())?;
+        *state.environment_override.borrow_mut() = next;
+        if let Some(size) = size {
+            let window = state.host.main_window().ok_or("No main window")?;
+            state.host.restore_window(window);
+            state.host.set_window_size(window, size.width, size.height);
+        }
+        self.update_surface_environment();
+        let mut environment = state.environment.get();
+        if let Some(size) = size {
+            environment.viewport.width = size.width;
+            environment.viewport.height = size.height;
+        }
+        state.host.request_display(None);
+        Ok(environment)
     }
 
     /// Keeps presenting for the mirror, even while the window is occluded. The
@@ -1018,22 +1071,30 @@ impl Application {
         // Refreshed every frame: UIKit posts keyboard frame changes on the main
         // queue and wakes the event loop, so the writing surface can avoid it.
         environment.keyboard = Keyboard::new(host.keyboard_height());
+        let form = host.device_form();
         #[cfg(any(target_os = "ios", target_os = "android"))]
         {
             environment.input = InputCapabilities::TOUCH | InputCapabilities::KEYBOARD;
-            environment.idiom = cove_core::Idiom::Phone;
+            environment.device_class = if form == cove_shell::DeviceForm::Tablet {
+                cove_core::DeviceClass::Tablet
+            } else {
+                cove_core::DeviceClass::Phone
+            };
+            #[cfg(target_os = "ios")]
+            if form == cove_shell::DeviceForm::Tablet {
+                environment.platform = cove_core::Platform::IPadOS;
+            }
         }
         #[cfg(not(any(target_os = "ios", target_os = "android")))]
         {
-            if previews_phone() {
-                environment.input = InputCapabilities::TOUCH | InputCapabilities::KEYBOARD;
-                environment.idiom = cove_core::Idiom::Phone;
-                environment.safe_area.top = insets.top.max(47.0);
-                environment.safe_area.bottom = insets.bottom.max(34.0);
-            } else {
-                environment.idiom = cove_core::Idiom::Desktop;
+            environment.device_class = cove_core::DeviceClass::Desktop;
+            if form == cove_shell::DeviceForm::TouchComputer {
+                environment.input = InputCapabilities::TOUCH
+                    | InputCapabilities::POINTER
+                    | InputCapabilities::KEYBOARD;
             }
         }
+        state.environment_override.borrow().apply(&mut environment);
         environment.translucent_window = host.backdrop() != cove_shell::WindowBackdrop::Opaque;
         if environment != state.environment.get() {
             state.environment.set(environment);

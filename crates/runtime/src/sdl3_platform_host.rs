@@ -605,6 +605,11 @@ impl Sdl3PlatformHost {
             .and_then(|s| self.main_window().map(|id| s.borrow().keyboard_height(id)))
             .unwrap_or(0.0)
     }
+    pub fn device_form(&self) -> cove_shell::DeviceForm {
+        self.shell().map_or(cove_shell::DeviceForm::Computer, |s| {
+            s.borrow().device_form()
+        })
+    }
     pub fn window_position(&self, id: WindowId) -> Option<(f32, f32)> {
         self.shell()?.borrow().window_position(id)
     }

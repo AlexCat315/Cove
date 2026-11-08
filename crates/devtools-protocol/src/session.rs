@@ -133,6 +133,9 @@ impl Session {
             "mirror.input" => decode::<MirrorInput>(request).is_some_and(|input| input.is_valid()),
             "mirror.activate" => decode::<MirrorActivate>(request).is_some(),
             "window.resize" => decode::<WindowResize>(request).is_some_and(|p| p.is_valid()),
+            "window.environment" => request.payload.as_ref().is_some_and(|payload| {
+                payload.is_object() && payload.to_string().len() <= 16 * 1024
+            }),
             "mirror.start" => request.payload.is_none() || decode::<MirrorStart>(request).is_some(),
             "input.replay" => decode::<InputRecording>(request).is_some_and(|p| p.is_valid()),
             _ => true,

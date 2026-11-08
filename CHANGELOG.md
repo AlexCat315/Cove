@@ -4,6 +4,16 @@
 
 ## Unreleased
 
+- **平台自适应 P0：平台、设备类别、折叠姿态与铰链进入环境（2026-11-09，破坏性）**：
+  - 设计：新增 `Docs/adaptive-platform.md`（四个正交维度、语义组件、跨铰链规则、形态变化时的状态连续性、分阶段计划）；本条为其中 P0。
+  - `cove-core`：删除 `Idiom` 与 `SizeClass`。`Environment` 新增 `platform`（`MacOS | Windows | Linux | IOS | IPadOS | Android | Web`）、`design_language`（`Cupertino | Material | Fluent | Adwaita`）、`device_class`（`Phone | Foldable(Book | Flip | DualScreen) | Tablet | Desktop`）、`posture`（`Flat | Tabletop | Book`）、`display_features`（折痕/铰链的窗口坐标、遮挡、分隔），以及 `segments()`、`is_spanned()`、`segment_for()`、`occluded_regions()`；`display_features::confine` 把弹层移入区段。宽度改为 Material 3 五档 `WidthClass`（600/840/1200/1600，可比较），高度为 `HeightClass`（480/900）；`Viewport::EXPANDED_MINIMUM_WIDTH` 由 1000 变为 840，侧栏与工作区在 840 进入双栏。触摸命中区按设计语言：Material 48，其余 44。新增 `EnvironmentOverride`、`DevicePreset`（13 个预设）、`EnvironmentRequest`，`Size::new`；`Insets`、`InputCapabilities` 可序列化。
+  - `cove-composition`：新增 `PostureReader`、`DeviceClassReader`、`PlatformReader`、`DesignLanguageReader`；`WidthClassReader` / `HeightClassReader` 改为传 `WidthClass` / `HeightClass`。`uses_sheet` 改用 `device_class.is_handheld()`，折叠屏与手机一致。
+  - Android：运行时库依赖 `androidx.window:window` / `window-java` 1.4.0 与 `androidx.core` 1.13.1。新增 `FoldingState.java`（`WindowInfoTracker` 监听 `FoldingFeature`，按显示自然方向区分书本式/翻盖，`OcclusionType.FULL` 为双屏；合上时沿用 `SharedPreferences` 记住的类型，铰链角度传感器作后备）。JNI `MainActivity.surface` / `cove_android_surface` 用 `device`、`posture`、`float[] features` 取代 `idiom`，Rust 侧 `DeviceFacts::decode` 解码并限长。`SurfaceState` 分离宿主上报与 DevTools 覆盖。
+  - iOS / Windows：`cove-shell` 新增 `DeviceForm` 与 `PlatformShell::device_form`（`SDL_IsTablet`；Windows 平板模式且有内置触摸屏时为 `TouchComputer`）。iPad 不再被当作手机，上报 `Tablet` 与 `Platform::IPadOS`；Windows 平板模式在 `input` 中加入 `TOUCH`。
+  - 预览与 DevTools：`COVE_PREVIEW_DEVICE=<预设>` 取代 `=phone`；新增协议命令 `window.environment`、能力 `environment` 与 MCP 工具 `set_ui_environment`（`clear` → `preset` → 显式字段，桌面按预设调整窗口尺寸，返回下一帧的环境与区段）。
+  - 文档：`Website/src/content/components/adaptive.md`（平台自适应）登记到「工具链」组；更新 `mobile.md`、`crates/devtools/README.md`、`crates/hosts/src/PLATFORM_COVERAGE.md`。
+  - 未验证：本机无 Android SDK/JDK，`FoldingState.java` 与 Gradle 依赖**未编译**；Android 折叠数据、iPad 判定与 Windows 平板模式均未做设备验收。已知缺口：`cove-browser` 原型不发布 `Environment`，Web 无姿态数据源；组件尚未按区段定位弹层或按姿态重排（P1/P2）。
+
 - **移动端能力补齐与文档修复（2026-11-09）**：
   - 键盘：`Shell` 新增 `show_soft_keyboard` / `hide_soft_keyboard` / `keyboard_height`（默认无副作用，桌面与测试 fake 不受影响）；`cove_shell` 的 C 桥用 `SDL_StartTextInput/StopTextInput` 显隐软键盘；`apple.m` 在 iOS 观察 `UIKeyboardWillShow/WillHide` 缓存键盘高度并唤醒事件循环；`Sdl3PlatformHost::keyboard_height()` 让 `Environment.keyboard` 每帧刷新。Android 原有 `WindowInsets.Type.ime()` 链路保持不变，两端现在共享同一套组件层 API。
   - 存储：`FileAppStorageStore::default_path()` 拆出可测的 `base_for` 策略。iOS 写入沙盒 `Library/Application Support`，Android 由 `createApplication` 的 JNI 入口显式注入 `COVE_APP_STORAGE_DIR`（`resources` 的父目录，即应用私有 `filesDir`），也可回退到 `PACKAGE_RESOURCE_BUNDLE_PATH` 的父目录，不再写 `$HOME/.local/share`；桌面策略不变。

@@ -2,7 +2,10 @@
 use super::SurfaceEnvironment;
 use crate::{AnyView, PrimitiveView, View, ViewKind};
 use cove_core::scene::{LayoutNode, Node};
-use cove_core::{Environment, Orientation, SizeClass};
+use cove_core::{
+    DesignLanguage, DeviceClass, Environment, HeightClass, Orientation, Platform, Posture,
+    WidthClass,
+};
 use std::rc::Rc;
 
 macro_rules! viewport_reader {
@@ -47,13 +50,13 @@ macro_rules! viewport_reader {
 
 viewport_reader!(
     HeightClassReader,
-    SizeClass,
+    HeightClass,
     |environment: &Environment| environment.viewport.height_class(),
     "Reads only the surface height class into application content."
 );
 viewport_reader!(
     WidthClassReader,
-    SizeClass,
+    WidthClass,
     |environment: &Environment| environment.viewport.width_class(),
     "Reads only the surface width class into application content."
 );
@@ -62,4 +65,28 @@ viewport_reader!(
     Orientation,
     |environment: &Environment| environment.viewport.orientation(),
     "Reads whether the surface is portrait or landscape. Square counts as landscape."
+);
+viewport_reader!(
+    PostureReader,
+    Posture,
+    |environment: &Environment| environment.posture,
+    "Reads only the fold posture into application content."
+);
+viewport_reader!(
+    DeviceClassReader,
+    DeviceClass,
+    |environment: &Environment| environment.device_class,
+    "Reads only the hardware class into application content."
+);
+viewport_reader!(
+    PlatformReader,
+    Platform,
+    |environment: &Environment| environment.platform,
+    "Reads only the platform whose conventions apply."
+);
+viewport_reader!(
+    DesignLanguageReader,
+    DesignLanguage,
+    |environment: &Environment| environment.design_language,
+    "Reads only the design language components resolve their styles from."
 );

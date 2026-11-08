@@ -90,6 +90,7 @@ unsafe extern "C" {
     pub fn cove_shell_text_area(window: *mut Window, area: *const f32);
     pub fn cove_shell_keyboard(window: *mut Window, show: bool);
     pub fn cove_shell_keyboard_height() -> f32;
+    pub fn cove_shell_device_form() -> i32;
     pub fn cove_shell_cursor(window: *mut Window, cursor: i32);
     pub fn cove_shell_global_pointer(x: *mut f32, y: *mut f32) -> bool;
     pub fn cove_shell_clipboard_read() -> *mut c_char;

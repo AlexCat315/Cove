@@ -9,7 +9,7 @@
 
 use cove_composition::Scope;
 use cove_core::scene::{Align, FlexDirection, Justify, Wrap};
-use cove_core::{Environment, Idiom, Insets, Orientation, SizeClass};
+use cove_core::{Environment, Insets, Orientation};
 use cove_ui_compose::adaptive::SurfaceReader;
 use cove_ui_compose::modifiers::layout::{LayoutFrameExt, PaddingExt};
 use cove_ui_compose::primitives::layout::{SafeArea, SafeAreaEdges, SurfaceRoot};
@@ -27,7 +27,11 @@ pub struct ViewportTraits {
     pub width_class: &'static str,
     pub height_class: &'static str,
     pub orientation: &'static str,
-    pub idiom: &'static str,
+    pub platform: &'static str,
+    pub design_language: &'static str,
+    pub device_class: &'static str,
+    pub posture: &'static str,
+    pub segments: usize,
     pub safe_area: (i32, i32, i32, i32),
     pub text_scale_percent: i32,
     pub keyboard_visible: bool,
@@ -42,10 +46,14 @@ impl ViewportTraits {
             // `Int(...)` truncates toward zero, as the Swift interpolation does.
             width: viewport.width as i32,
             height: viewport.height as i32,
-            width_class: Self::size_class_name(viewport.width_class()),
-            height_class: Self::size_class_name(viewport.height_class()),
+            width_class: viewport.width_class().name(),
+            height_class: viewport.height_class().name(),
             orientation: Self::orientation_name(viewport.orientation()),
-            idiom: Self::idiom_name(environment.idiom),
+            platform: environment.platform.name(),
+            design_language: environment.design_language.name(),
+            device_class: environment.device_class.name(),
+            posture: environment.posture.name(),
+            segments: environment.segments().len(),
             safe_area: (
                 safe_area.top as i32,
                 safe_area.leading as i32,
@@ -58,26 +66,10 @@ impl ViewportTraits {
         }
     }
 
-    pub fn size_class_name(class: SizeClass) -> &'static str {
-        match class {
-            SizeClass::Compact => "compact",
-            SizeClass::Medium => "medium",
-            SizeClass::Expanded => "expanded",
-        }
-    }
-
     pub fn orientation_name(orientation: Orientation) -> &'static str {
         match orientation {
             Orientation::Portrait => "portrait",
             Orientation::Landscape => "landscape",
-        }
-    }
-
-    pub fn idiom_name(idiom: Idiom) -> &'static str {
-        match idiom {
-            Idiom::Phone => "phone",
-            Idiom::Tablet => "tablet",
-            Idiom::Desktop => "desktop",
         }
     }
 
@@ -98,8 +90,15 @@ impl ViewportTraits {
         format!("Orientation: {}", self.orientation)
     }
 
-    pub fn idiom_line(&self) -> String {
-        format!("Idiom: {}", self.idiom)
+    pub fn device_line(&self) -> String {
+        format!(
+            "Device: {} · {} · {}",
+            self.platform, self.design_language, self.device_class
+        )
+    }
+
+    pub fn posture_line(&self) -> String {
+        format!("Posture: {} · Segments: {}", self.posture, self.segments)
     }
 
     pub fn safe_area_line(&self) -> String {
@@ -170,7 +169,10 @@ impl View for ViewportTraitsStory {
                                 .debug_name(ViewportDebugName::ORIENTATION),
                         ),
                         AnyView::new(
-                            Text::new(traits.idiom_line()).debug_name(ViewportDebugName::IDIOM),
+                            Text::new(traits.device_line()).debug_name(ViewportDebugName::DEVICE),
+                        ),
+                        AnyView::new(
+                            Text::new(traits.posture_line()).debug_name(ViewportDebugName::POSTURE),
                         ),
                         line(traits.safe_area_line(), ViewportDebugName::SAFE_AREA),
                         line(traits.text_scale_line(), ViewportDebugName::TEXT_SCALE),
@@ -192,7 +194,8 @@ impl View for ViewportTraitsStory {
 }
 
 /// The threshold caption the story always shows.
-pub const THRESHOLD_CAPTION: &str = "Compact < 600 · Medium 600–999 · Expanded ≥ 1000";
+pub const THRESHOLD_CAPTION: &str =
+    "Compact < 600 · Medium 600–839 · Expanded 840–1199 · Large 1200–1599 · Extra large ≥ 1600";
 
 /// Debug names used by the gallery and DevTools.
 pub struct ViewportDebugName;
@@ -201,7 +204,8 @@ impl ViewportDebugName {
     pub const WIDTH_CLASS: &'static str = "viewport-width-class";
     pub const HEIGHT_CLASS: &'static str = "viewport-height-class";
     pub const ORIENTATION: &'static str = "viewport-orientation";
-    pub const IDIOM: &'static str = "viewport-idiom";
+    pub const DEVICE: &'static str = "viewport-device";
+    pub const POSTURE: &'static str = "viewport-posture";
     pub const SAFE_AREA: &'static str = "viewport-safe-area";
     pub const TEXT_SCALE: &'static str = "viewport-text-scale";
 }
@@ -261,7 +265,7 @@ mod checks {
 
     #[test]
     fn size_classes_use_the_documented_thresholds() {
-        // Compact < 600, Medium 600..999, Expanded >= 1000.
+        // Compact < 600, Medium 600..839, Expanded 840..1199, Large 1200..1599.
         assert_eq!(
             ViewportTraits::new(&environment(599.0, 800.0)).width_class,
             "compact"
@@ -271,15 +275,19 @@ mod checks {
             "medium"
         );
         assert_eq!(
-            ViewportTraits::new(&environment(999.0, 800.0)).width_class,
+            ViewportTraits::new(&environment(839.0, 800.0)).width_class,
             "medium"
         );
         assert_eq!(
-            ViewportTraits::new(&environment(1000.0, 800.0)).width_class,
+            ViewportTraits::new(&environment(840.0, 800.0)).width_class,
             "expanded"
         );
         assert_eq!(
-            ViewportTraits::new(&environment(1200.0, 599.0)).height_class,
+            ViewportTraits::new(&environment(1200.0, 800.0)).width_class,
+            "large"
+        );
+        assert_eq!(
+            ViewportTraits::new(&environment(1200.0, 479.0)).height_class,
             "compact"
         );
         assert_eq!(
@@ -310,10 +318,11 @@ mod checks {
         let traits = ViewportTraits::new(&environment(1280.6, 720.9));
         // `Int(...)` truncates, so 1280.6 renders as 1280.
         assert_eq!(traits.viewport_line(), "Viewport: 1280 × 720");
-        assert_eq!(traits.width_class_line(), "Width class: expanded");
+        assert_eq!(traits.width_class_line(), "Width class: large");
         assert_eq!(traits.height_class_line(), "Height class: medium");
         assert_eq!(traits.orientation_line(), "Orientation: landscape");
-        assert_eq!(traits.idiom_line(), "Idiom: desktop");
+        assert!(traits.device_line().ends_with(" · desktop"));
+        assert_eq!(traits.posture_line(), "Posture: flat · Segments: 1");
         assert_eq!(traits.safe_area_line(), "Safe area: 24 / 12 / 0 / 0");
         assert_eq!(
             traits.text_scale_line(),
@@ -346,9 +355,11 @@ mod checks {
         assert_eq!(ViewportDebugName::SIZE, "viewport-size");
         assert_eq!(ViewportDebugName::WIDTH_CLASS, "viewport-width-class");
         assert_eq!(ViewportDebugName::TEXT_SCALE, "viewport-text-scale");
+        assert_eq!(ViewportDebugName::DEVICE, "viewport-device");
+        assert_eq!(ViewportDebugName::POSTURE, "viewport-posture");
         assert_eq!(
             THRESHOLD_CAPTION,
-            "Compact < 600 · Medium 600–999 · Expanded ≥ 1000"
+            "Compact < 600 · Medium 600–839 · Expanded 840–1199 · Large 1200–1599 · Extra large ≥ 1600"
         );
     }
 }

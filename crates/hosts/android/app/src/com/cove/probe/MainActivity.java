@@ -34,13 +34,14 @@ public final class MainActivity extends Activity {
     static native void text(long session, String text, boolean composing);
     static native void key(long session, int scancode, int modifiers);
     static native void scroll(long session, float x, float y, float deltaX, float deltaY);
-    static native void surface(long session, float density, int idiom, float top, float leading, float bottom, float trailing, float keyboard, float[] textSizes);
+    static native void surface(long session, float density, int device, int posture, float[] features, float top, float leading, float bottom, float trailing, float keyboard, float[] textSizes);
     static native void keyState(long session, int scancode, boolean down);
     static native void edit(long session, int kind, int start, int end);
     static native String snapshot(long session);
     static native String inputSnapshot(long session);
     static native void close(long session);
     private ContentSurfaceView surface;
+    private FoldingState folding;
     @Override public void onTrimMemory(int level) {
         super.onTrimMemory(level);
         if (surface != null && (level >= android.content.ComponentCallbacks2.TRIM_MEMORY_RUNNING_LOW
@@ -105,6 +106,8 @@ public final class MainActivity extends Activity {
             return insets;
         });
         setContentView(root);
+        folding = new FoldingState(this, () -> surface.refreshMetrics());
+        surface.setFoldingState(folding);
         // The insets controller only exists once the decor view is attached.
         if (!gameMode) configureSystemBars();
         root.requestApplyInsets();
@@ -158,6 +161,14 @@ public final class MainActivity extends Activity {
         }
     }
 
+    @Override protected void onStart() {
+        super.onStart();
+        folding.start();
+    }
+    @Override protected void onStop() {
+        folding.stop();
+        super.onStop();
+    }
     @Override protected void onResume() {
         super.onResume();
         RuntimeLog.info("com.cove.android.lifecycle", "Activity resumed");

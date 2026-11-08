@@ -165,7 +165,13 @@ values!(
     crate::FontDesign,
     crate::TextAlignment,
     crate::InputCapabilities,
-    crate::Idiom
+    crate::Platform,
+    crate::DesignLanguage,
+    crate::DeviceClass,
+    crate::Posture,
+    crate::WidthClass,
+    crate::HeightClass,
+    crate::DisplayFeature
 );
 impl<T: SnapshotValue> SnapshotValue for Option<T> {}
 impl<T: SnapshotValue> SnapshotValue for Vec<T> {}

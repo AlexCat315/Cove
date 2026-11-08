@@ -46,6 +46,11 @@ pub struct DiagnosticsCallbacks {
     pub mirror_active: Rc<dyn Fn(bool)>,
     /// `None` where windows cannot be resized. Returns why a resize failed.
     pub resize_window: Option<Rc<dyn Fn(f32, f32) -> Option<String>>>,
+    /// `None` where the host cannot replace its reported facts. Returns the
+    /// environment the next frame publishes.
+    pub environment: Option<
+        Rc<dyn Fn(&cove_core::EnvironmentRequest) -> Result<cove_core::Environment, String>>,
+    >,
 }
 
 /// One DevTools session bound to a single host tree and render graph.

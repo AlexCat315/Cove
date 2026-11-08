@@ -16,6 +16,7 @@ final class SurfaceMetrics {
     private final View view;
     private final LongSupplier session;
     private WindowInsets insets;
+    private FoldingState folding;
 
     SurfaceMetrics(View view, LongSupplier session) {
         this.view = view;
@@ -37,6 +38,8 @@ final class SurfaceMetrics {
     }
 
     void update(WindowInsets value) { insets = value; publish(); }
+
+    void setFolding(FoldingState value) { folding = value; publish(); }
 
     void refresh() {
         WindowInsets current = view.getRootWindowInsets();
@@ -76,7 +79,11 @@ final class SurfaceMetrics {
         DisplayMetrics display = view.getResources().getDisplayMetrics();
         float density = Float.isFinite(display.density) && display.density > 0 ? display.density : 1;
         boolean rtl = configuration.getLayoutDirection() == View.LAYOUT_DIRECTION_RTL;
-        MainActivity.surface(target, density, configuration.smallestScreenWidthDp >= 600 ? 1 : 0,
+        int device = folding != null ? folding.deviceClass(configuration)
+                : configuration.smallestScreenWidthDp >= 600 ? FoldingState.TABLET : FoldingState.PHONE;
+        int posture = folding != null ? folding.posture() : FoldingState.FLAT;
+        float[] features = folding != null ? folding.features(density) : new float[0];
+        MainActivity.surface(target, density, device, posture, features,
                 safe.top / density, (rtl ? safe.right : safe.left) / density,
                 safe.bottom / density, (rtl ? safe.left : safe.right) / density,
                 keyboard / density, textSizes(display, density));

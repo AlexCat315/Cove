@@ -15,7 +15,7 @@ use crate::primitives::overlays::modal::{
 };
 use crate::{AnyView, BoxView, TupleView, View};
 use cove_core::scene::{Align, FlexDirection, Justify, Wrap};
-use cove_core::{Binding, SizeClass};
+use cove_core::{Binding, WidthClass};
 
 /// Detents and drag behavior for a bottom sheet.
 #[derive(Clone, Debug, PartialEq)]
@@ -141,8 +141,8 @@ impl View for BottomSheet {
         let options = self.options.clone();
         let content = self.content.clone();
         let state = self.state.clone();
-        AnyView::new(WidthClassReader::new(move |width_class: SizeClass| {
-            let compact = width_class != SizeClass::Expanded;
+        AnyView::new(WidthClassReader::new(move |width_class: WidthClass| {
+            let compact = width_class < WidthClass::Expanded;
             let index = state
                 .detent
                 .get()

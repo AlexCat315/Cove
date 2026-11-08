@@ -735,8 +735,8 @@ impl View for TextEditorStory {
             AnyView::new(cove_ui_compose::adaptive::SurfaceReader::new(
                 move |surface| {
                     let mut field = field.clone();
-                    field.layout.wraps_lines = !code_mode
-                        || surface.viewport.width_class() == cove_core::SizeClass::Compact;
+                    field.layout.wraps_lines =
+                        !code_mode || surface.width_class() == cove_core::WidthClass::Compact;
                     AnyView::new(
                         AnyView::new(field)
                             .font(font.clone())

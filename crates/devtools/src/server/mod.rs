@@ -293,6 +293,7 @@ impl DevServer {
                 self.dispatch_mirror(envelope, connection, key)
             }
             "window.resize" => self.dispatch_window(envelope, connection),
+            "window.environment" => self.dispatch_environment(envelope, connection),
             "state.checkpoint" | "state.restore" | "state.diff" => {
                 self.dispatch_checkpoint(envelope, connection)
             }
@@ -741,6 +742,45 @@ impl DevServer {
         match failure {
             Some(message) => self.send_error(connection, &envelope, "not_supported", &message),
             None => self.send_ok(connection, &envelope),
+        }
+    }
+
+    fn dispatch_environment(
+        &mut self,
+        envelope: Envelope,
+        connection: &Arc<dyn DevToolsConnection>,
+    ) {
+        let Some(request) = envelope
+            .payload
+            .clone()
+            .filter(serde_json::Value::is_object)
+        else {
+            self.send_error(
+                connection,
+                &envelope,
+                "bad_request",
+                "window.environment requires an object payload",
+            );
+            return;
+        };
+        let Some(apply) = self.host.window.environment.clone() else {
+            self.send_error(
+                connection,
+                &envelope,
+                "not_supported",
+                "Host cannot replace its environment",
+            );
+            return;
+        };
+        match apply(&request) {
+            Ok(environment) => {
+                let mut response = envelope
+                    .ok()
+                    .unwrap_or_else(|| Envelope::new("window.environment.ok", envelope.id, None));
+                response.payload = Some(environment);
+                self.send(response, connection);
+            }
+            Err(message) => self.send_error(connection, &envelope, "bad_request", &message),
         }
     }
 

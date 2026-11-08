@@ -2,7 +2,10 @@
 //!
 //! Behaviour checklist:
 //! - `WidthClassReader` follows the surface breakpoints independently of input
-//!   density (599 → compact, 600/999 → medium, 1000 → expanded)
+//!   density (599 → compact, 600/839 → medium, 840 → expanded, 1200 → large,
+//!   1600 → extra large)
+//! - handheld devices, foldables included, present overlays as sheets; a
+//!   pointer desktop does not
 //! - the layout density floor preserves authored minima and their changes while
 //!   active, and restores the authored minima when cleared
 
@@ -23,13 +26,15 @@ use support::GlobalTestLock;
 #[test]
 fn width_classes_follow_surface_breakpoints() {
     GlobalTestLock::locked(|| {
-        let reads: Rc<RefCell<Vec<cove_core::SizeClass>>> = Rc::new(RefCell::new(Vec::new()));
+        let reads: Rc<RefCell<Vec<cove_core::WidthClass>>> = Rc::new(RefCell::new(Vec::new()));
         let graph = support::graph();
         for (width, expected) in [
-            (599.0_f32, cove_core::SizeClass::Compact),
-            (600.0, cove_core::SizeClass::Medium),
-            (999.0, cove_core::SizeClass::Medium),
-            (1000.0, cove_core::SizeClass::Expanded),
+            (599.0_f32, cove_core::WidthClass::Compact),
+            (600.0, cove_core::WidthClass::Medium),
+            (839.0, cove_core::WidthClass::Medium),
+            (840.0, cove_core::WidthClass::Expanded),
+            (1200.0, cove_core::WidthClass::Large),
+            (1600.0, cove_core::WidthClass::ExtraLarge),
         ] {
             let mut surface = Environment::default();
             surface.viewport.width = width;
@@ -128,4 +133,29 @@ fn minimum_floor_preserves_authored_minima() {
             "with no minima the frame returns to the authored size"
         );
     });
+}
+
+#[test]
+fn handheld_devices_present_overlays_as_sheets() {
+    use cove_core::{DeviceClass, FoldableKind};
+    use cove_ui_compose::primitives::overlays::uses_sheet;
+    let mut surface = Environment::default();
+    surface.input = InputCapabilities::POINTER | InputCapabilities::KEYBOARD;
+    assert!(!uses_sheet(&surface));
+    for class in [
+        DeviceClass::Phone,
+        DeviceClass::Foldable(FoldableKind::Book),
+        DeviceClass::Foldable(FoldableKind::Flip),
+        DeviceClass::Foldable(FoldableKind::DualScreen),
+    ] {
+        surface.device_class = class;
+        assert!(uses_sheet(&surface), "{class:?} presents a sheet");
+    }
+    surface.device_class = DeviceClass::Tablet;
+    assert!(
+        !uses_sheet(&surface),
+        "a tablet with a pointer anchors panels"
+    );
+    surface.input = InputCapabilities::TOUCH;
+    assert!(uses_sheet(&surface), "a touch-only tablet presents a sheet");
 }

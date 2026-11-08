@@ -40,6 +40,7 @@ MCP 服务在 macOS、Linux 和 Windows 使用同一 Rust 实现，不依赖 UI/
 | 可访问性动作与滚动到节点 | `activate_ui` |
 | 等待可见、隐藏、启用或字段值 | `wait_for_ui` |
 | 截图与窗口尺寸 | `capture_ui`、`resize_ui` |
+| 平台、设备类别、折叠姿态与铰链 | `set_ui_environment` |
 | 选择与临时样式 | `select_ui`、`set_ui_style`、`edit_ui_style_history` |
 | 日志、重组、公开状态与内存 | `query_ui_logs`、`query_ui_recomposition`、`query_ui_state`、`query_ui_memory` |
 | 帧耗时 | `record_ui_timings` |

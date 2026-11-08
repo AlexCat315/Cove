@@ -3,6 +3,10 @@
 #if defined(__APPLE__)
 #include <SDL3/SDL_metal.h>
 #endif
+#if defined(_WIN32)
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#endif
 #include <math.h>
 #include <stdlib.h>
 #include <string.h>
@@ -235,6 +239,17 @@ float cove_shell_keyboard_height(void){
 #else
     return 0.0f;
 #endif
+}
+int cove_shell_device_form(void){
+    if (SDL_IsTablet()) return 1;
+#if defined(_WIN32)
+    /* SM_CONVERTIBLESLATEMODE is 0 in slate mode; desktops without an
+       integrated digitizer may also report 0, so require touch hardware. */
+    int digitizer = GetSystemMetrics(SM_DIGITIZER);
+    bool touch = (digitizer & NID_INTEGRATED_TOUCH) && (digitizer & NID_READY);
+    if (touch && GetSystemMetrics(SM_CONVERTIBLESLATEMODE) == 0) return 2;
+#endif
+    return 0;
 }
 void cove_shell_cursor(CoveShellWindow *h,int cursor){ COVE_ASSERT_MAIN();static const SDL_SystemCursor ids[]={SDL_SYSTEM_CURSOR_DEFAULT,SDL_SYSTEM_CURSOR_POINTER,SDL_SYSTEM_CURSOR_TEXT,SDL_SYSTEM_CURSOR_CROSSHAIR,SDL_SYSTEM_CURSOR_WAIT,SDL_SYSTEM_CURSOR_PROGRESS,SDL_SYSTEM_CURSOR_NOT_ALLOWED,SDL_SYSTEM_CURSOR_MOVE,SDL_SYSTEM_CURSOR_EW_RESIZE,SDL_SYSTEM_CURSOR_NS_RESIZE,SDL_SYSTEM_CURSOR_NWSE_RESIZE,SDL_SYSTEM_CURSOR_NESW_RESIZE};if(!h||cursor<0||cursor>=12)return;if(!h->cursors[cursor])h->cursors[cursor]=SDL_CreateSystemCursor(ids[cursor]);if(h->cursors[cursor])SDL_SetCursor(h->cursors[cursor]);}
 bool cove_shell_global_pointer(float *x,float *y){ COVE_ASSERT_MAIN();if(!SDL_GetAtomicInt(&initialized))return false;SDL_GetGlobalMouseState(x,y);return true;}

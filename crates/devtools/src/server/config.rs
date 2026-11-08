@@ -145,6 +145,11 @@ pub struct DevToolsHostMirror {
 pub struct DevToolsHostWindow {
     /// Returns `None` on success, or the reason the window could not resize.
     pub resize: Option<std::rc::Rc<dyn Fn(&WindowResize) -> Option<String>>>,
+    /// Replaces the device facts the host reports (platform, device class,
+    /// posture, folds). Takes the request object and returns the resulting
+    /// environment, or why it was rejected.
+    pub environment:
+        Option<std::rc::Rc<dyn Fn(&serde_json::Value) -> Result<serde_json::Value, String>>>,
 }
 
 /// One bounded handoff from the log writer to the socket side.

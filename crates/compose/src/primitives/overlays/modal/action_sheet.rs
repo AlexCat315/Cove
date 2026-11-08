@@ -280,7 +280,7 @@ impl PrimitiveView for ActionSheetDrawer {
         let surface: cove_core::Environment =
             node.composition_value(&crate::adaptive::SurfaceEnvironment::key());
         let window_height = surface.viewport.height;
-        let is_compact = surface.viewport.width_class() == cove_core::SizeClass::Compact;
+        let is_compact = surface.width_class() == cove_core::WidthClass::Compact;
         let safe_bottom = surface.safe_area.bottom.max(0.0);
         let inset = if is_compact { 0.0 } else { 12.0 };
         let width = if is_compact {

@@ -19,8 +19,13 @@ use cove_composition::Scope;
 use cove_composition::adaptive::SurfaceReader;
 use cove_composition::{AnyView, LayoutDebugExt, TupleView, View};
 use cove_core::scene::{Align, FlexDirection, Justify, Wrap};
-use cove_core::{Environment, Idiom, Insets, Keyboard, TextScale, TextScaleSample};
-use cove_hosts::android::integration::{AndroidContentSession, Rendering, SurfaceState};
+use cove_core::{
+    DeviceClass, Environment, EnvironmentRequest, FeatureOrientation, FoldableKind, Insets,
+    Keyboard, Posture, TextScale, TextScaleSample,
+};
+use cove_hosts::android::integration::{
+    AndroidContentSession, DeviceFacts, Rendering, SurfaceState,
+};
 use cove_ui_compose::modifiers::layout::{FlexExt, LayoutFrameExt};
 use cove_ui_compose::primitives::layout::insets::safe_area::{SafeArea, SafeAreaEdges};
 
@@ -61,11 +66,7 @@ impl View for MetricsProbe {
         AnyView::new(SurfaceReader::new(move |surface: &Environment| {
             let keyboard = surface.keyboard.height;
             let factor = surface.text_scale.factor();
-            let idiom = match surface.idiom {
-                Idiom::Phone => "phone",
-                Idiom::Tablet => "tablet",
-                Idiom::Desktop => "desktop",
-            };
+            let device = surface.device_class.name();
             let fill = AnyView::new(
                 AnyView::new(cove_composition::BoxView::new(
                     FlexDirection::Column,
@@ -86,7 +87,7 @@ impl View for MetricsProbe {
                     Wrap::NoWrap,
                     0.0,
                     AnyView::new(TupleView::new(vec![
-                        marker(&format!("probe-idiom-{idiom}")),
+                        marker(&format!("probe-device-{device}")),
                         marker(&format!("probe-scale-{factor}")),
                         marker(&format!("probe-keyboard-{}", keyboard.round() as i64)),
                         fill,
@@ -149,7 +150,7 @@ fn surface_state_normalises_and_publishes_every_device_fact() {
         safe = insets(20.0, 34.0, 0.0, 0.0);
         assert!(
             surface.update(
-                Idiom::Tablet,
+                DeviceFacts::tablet(),
                 safe,
                 Keyboard::new(300.0),
                 TextScale::linear(1.0)
@@ -157,9 +158,9 @@ fn surface_state_normalises_and_publishes_every_device_fact() {
             "new facts are published"
         );
         assert_eq!(
-            surface.environment().idiom,
-            Idiom::Tablet,
-            "the idiom is published"
+            surface.environment().device_class,
+            DeviceClass::Tablet,
+            "the device class is published"
         );
         assert_eq!(
             surface.environment().keyboard.height,
@@ -169,7 +170,7 @@ fn surface_state_normalises_and_publishes_every_device_fact() {
 
         assert!(
             !surface.update(
-                Idiom::Tablet,
+                DeviceFacts::tablet(),
                 safe,
                 Keyboard::new(300.0),
                 TextScale::linear(1.0)
@@ -179,7 +180,7 @@ fn surface_state_normalises_and_publishes_every_device_fact() {
 
         assert!(
             surface.update(
-                Idiom::Tablet,
+                DeviceFacts::tablet(),
                 safe,
                 Keyboard::new(0.0),
                 TextScale::linear(2.0)
@@ -238,7 +239,7 @@ fn surface_metrics_reach_composed_content() {
             ..Insets::default()
         };
         session.update_surface(
-            Idiom::Phone,
+            DeviceFacts::phone(),
             safe_area,
             Keyboard::new(336.0),
             TextScale::linear(1.25),
@@ -246,7 +247,7 @@ fn surface_metrics_reach_composed_content() {
         session.prepare((393, 852), 1.0, 0.0);
 
         assert!(
-            publishes(&session, "probe-idiom-phone"),
+            publishes(&session, "probe-device-phone"),
             "the probe composed at least once; controls: {:?}",
             session.inspect().controls.keys().collect::<Vec<_>>()
         );
@@ -268,7 +269,7 @@ fn safe_area_padding_follows_republished_metrics() {
         // A zero-inset, keyboard-free first frame so the padding baseline is the
         // whole viewport.
         session.update_surface(
-            Idiom::Phone,
+            DeviceFacts::phone(),
             Insets::default(),
             Keyboard::new(0.0),
             TextScale::linear(1.0),
@@ -284,7 +285,7 @@ fn safe_area_padding_follows_republished_metrics() {
 
         // Now publish a top inset plus an open keyboard, as the Swift case did.
         session.update_surface(
-            Idiom::Phone,
+            DeviceFacts::phone(),
             insets(59.0, 34.0, 0.0, 0.0),
             Keyboard::new(336.0),
             TextScale::linear(1.25),
@@ -316,7 +317,7 @@ fn logical_size_and_scale_follow_rotation_and_density() {
         ]);
 
         session.update_surface(
-            Idiom::Phone,
+            DeviceFacts::phone(),
             insets(24.0, 16.0, 10.0, 0.0),
             Keyboard::new(200.0),
             text.clone(),
@@ -334,7 +335,7 @@ fn logical_size_and_scale_follow_rotation_and_density() {
         );
 
         session.update_surface(
-            Idiom::Phone,
+            DeviceFacts::phone(),
             insets(24.0, 16.0, 10.0, 0.0),
             Keyboard::new(200.0),
             text,
@@ -365,7 +366,7 @@ fn logical_size_and_scale_follow_rotation_and_density() {
             "the padded extent follows the rotated 800x400 viewport, its insets and the keyboard"
         );
         assert!(
-            publishes(&session, "probe-idiom-phone"),
+            publishes(&session, "probe-device-phone"),
             "the idiom stays correct across the rotation"
         );
     });
@@ -376,7 +377,7 @@ fn android_rejects_invalid_metrics_before_publishing_them() {
     Lock::with(|| {
         let mut session = session(f32::NAN);
         session.update_surface(
-            Idiom::Phone,
+            DeviceFacts::phone(),
             insets(f32::NAN, f32::NEG_INFINITY, -20.0, 12.0),
             Keyboard::new(f32::INFINITY),
             TextScale::from_samples([TextScaleSample {
@@ -414,4 +415,93 @@ fn android_rejects_invalid_metrics_before_publishing_them() {
             "a valid trailing inset is the only one that survives rejection"
         );
     });
+}
+
+#[test]
+fn foldable_facts_decode_and_survive_until_the_host_replaces_them() {
+    // device 2 = book foldable, posture 2 = book, one separating vertical fold.
+    let facts = DeviceFacts::decode(2, 2, &[0.0, 420.0, 0.0, 0.0, 701.0, 1.0, 0.0, 1.0]);
+    assert_eq!(
+        facts.device_class,
+        DeviceClass::Foldable(FoldableKind::Book)
+    );
+    assert_eq!(facts.posture, Posture::Book);
+    assert_eq!(facts.display_features.len(), 1);
+    assert_eq!(
+        facts.display_features[0].orientation,
+        FeatureOrientation::Vertical
+    );
+    assert!(facts.display_features[0].separates);
+    // Unknown kinds, truncated records and non-finite bounds are dropped.
+    let dropped = DeviceFacts::decode(
+        9,
+        7,
+        &[
+            5.0,
+            0.0,
+            0.0,
+            1.0,
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            f32::NAN,
+            0.0,
+            1.0,
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+        ],
+    );
+    assert_eq!(dropped.device_class, DeviceClass::Phone);
+    assert_eq!(dropped.posture, Posture::Flat);
+    assert!(dropped.display_features.is_empty());
+
+    let surface = SurfaceState::new(2.0);
+    surface.prepare((1682, 1402), 2.0);
+    assert!(surface.update(
+        facts,
+        Insets::default(),
+        Keyboard::new(0.0),
+        TextScale::linear(1.0)
+    ));
+    let environment = surface.environment();
+    assert_eq!(environment.segments().len(), 2);
+    assert!(environment.device_class.is_handheld());
+}
+
+#[test]
+fn devtools_overrides_layer_over_reported_facts() {
+    let surface = SurfaceState::new(1.0);
+    surface.prepare((412, 915), 1.0);
+    let overrides = surface.overrides();
+    let request: EnvironmentRequest = serde_json::from_str(r#"{"preset":"dual-screen"}"#).unwrap();
+    let environment = overrides.request(&request).unwrap();
+    assert_eq!(
+        environment.device_class,
+        DeviceClass::Foldable(FoldableKind::DualScreen)
+    );
+    // The system owns the window size: the preset contributes facts only.
+    assert_eq!(environment.viewport.width, 412.0);
+    // A host update keeps the override on top.
+    surface.update(
+        DeviceFacts::phone(),
+        Insets::default(),
+        Keyboard::new(0.0),
+        TextScale::linear(1.0),
+    );
+    assert_eq!(
+        surface.environment().device_class,
+        DeviceClass::Foldable(FoldableKind::DualScreen)
+    );
+    let cleared: EnvironmentRequest = serde_json::from_str(r#"{"clear":true}"#).unwrap();
+    assert_eq!(
+        overrides.request(&cleared).unwrap().device_class,
+        DeviceClass::Phone
+    );
+    let unknown: EnvironmentRequest = serde_json::from_str(r#"{"preset":"nope"}"#).unwrap();
+    assert!(overrides.request(&unknown).is_err());
 }

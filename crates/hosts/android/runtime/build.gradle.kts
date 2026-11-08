@@ -16,3 +16,10 @@ android {
     }
     compileOptions { sourceCompatibility = JavaVersion.VERSION_1_8; targetCompatibility = JavaVersion.VERSION_1_8 }
 }
+
+dependencies {
+    // Folds, hinges and posture (FoldingFeature) on foldable and dual-screen devices.
+    implementation("androidx.window:window:1.4.0")
+    implementation("androidx.window:window-java:1.4.0")
+    implementation("androidx.core:core:1.13.1")
+}

@@ -9,7 +9,7 @@ use cove_core::scene::CompositionLocal;
 
 /// Whether overlays present as bottom sheets rather than anchored panels.
 pub fn uses_sheet(surface: &Environment) -> bool {
-    surface.idiom == cove_core::Idiom::Phone
+    surface.device_class.is_handheld()
         || (surface.input.contains(cove_core::InputCapabilities::TOUCH)
             && !surface.supports_hover())
 }

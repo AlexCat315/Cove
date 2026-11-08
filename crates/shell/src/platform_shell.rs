@@ -116,6 +116,17 @@ pub enum NativeWindowReference {
     UIKit(usize),
     Win32(usize),
 }
+/// Hardware form the shell can observe. Phones are not distinguished here:
+/// handheld hosts report their class themselves.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum DeviceForm {
+    #[default]
+    Computer,
+    /// iPad, or an Android tablet running the SDL path.
+    Tablet,
+    /// A convertible PC in slate mode with an integrated touch screen.
+    TouchComputer,
+}
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct WindowSafeArea {
     pub top: f32,
@@ -196,6 +207,10 @@ pub trait Shell {
     /// Keyboard inset in logical points; zero when hidden or on desktop.
     fn keyboard_height(&self, _id: WindowId) -> f32 {
         0.0
+    }
+    /// Read every frame: a convertible can enter slate mode at any time.
+    fn device_form(&self) -> DeviceForm {
+        DeviceForm::Computer
     }
     fn set_cursor(&self, id: WindowId, cursor: SystemCursor);
     fn global_pointer_position(&self) -> Option<(f32, f32)>;

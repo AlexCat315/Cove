@@ -53,6 +53,9 @@ pub struct AndroidDiagnosticsHooks {
     pub frame_source: Option<DiagnosticsFrameSource>,
     pub mirror_active: Rc<dyn Fn(bool)>,
     pub inject: Rc<dyn Fn(InputEvent)>,
+    pub environment: Option<
+        Rc<dyn Fn(&cove_core::EnvironmentRequest) -> Result<cove_core::Environment, String>>,
+    >,
 }
 
 pub struct AndroidDiagnostics {
@@ -86,6 +89,7 @@ impl AndroidDiagnostics {
                 mirror_active: hooks.mirror_active,
                 // A surface fills the screen; the system owns its size.
                 resize_window: None,
+                environment: hooks.environment,
             };
             let mut session = factory(config, tree, graph, schedule, callbacks)?;
             session.attach_input(hooks.inject);

@@ -143,6 +143,14 @@ pub fn factory() -> DiagnosticsFactory {
                     resize(size.width as f32, size.height as f32)
                 }));
             }
+            if let Some(apply) = callbacks.environment.clone() {
+                devtools.window.environment = Some(Rc::new(move |payload: &serde_json::Value| {
+                    let request: cove_core::EnvironmentRequest =
+                        serde_json::from_value(payload.clone())
+                            .map_err(|error| format!("invalid environment request: {error}"))?;
+                    apply(&request).map(|environment| environment_summary(&environment))
+                }));
+            }
 
             let memory = callbacks.memory.clone();
             devtools.set_memory_snapshot(Some(Rc::new(move || {
@@ -179,4 +187,28 @@ pub fn factory() -> DiagnosticsFactory {
             }) as Box<dyn DiagnosticsSession>)
         },
     )
+}
+
+/// What a caller needs to verify an environment change without a capture.
+pub fn environment_summary(environment: &cove_core::Environment) -> serde_json::Value {
+    serde_json::json!({
+        "platform": environment.platform,
+        "designLanguage": environment.design_language,
+        "deviceClass": environment.device_class,
+        "posture": environment.posture,
+        "input": {
+            "touch": environment.input.contains(cove_core::InputCapabilities::TOUCH),
+            "pointer": environment.input.contains(cove_core::InputCapabilities::POINTER),
+            "keyboard": environment.input.contains(cove_core::InputCapabilities::KEYBOARD),
+        },
+        "viewport": {
+            "width": environment.viewport.width,
+            "height": environment.viewport.height,
+            "widthClass": environment.width_class(),
+            "heightClass": environment.height_class(),
+        },
+        "safeArea": environment.safe_area,
+        "displayFeatures": environment.display_features,
+        "segments": environment.segments(),
+    })
 }

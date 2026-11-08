@@ -29,7 +29,7 @@ use crate::theme::styles::buttons::{
 };
 use crate::{AnyView, BoxView, LayoutDebugExt, LayoutDirectionExt, View, ViewExt};
 use cove_core::scene::{Align, EventPhase, EventResult, FlexDirection, Justify, Wrap};
-use cove_core::{Binding, Environment, SizeClass};
+use cove_core::{Binding, Environment, WidthClass};
 
 /// How the popup sizes itself.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
@@ -284,7 +284,7 @@ impl View for TouchOverlay {
             let mut options = ModalOptions::default();
             options.geometry.placement = ModalPlacement::Bottom;
             options.geometry.inset = 0.0;
-            options.geometry.width = if surface.viewport.width_class() == SizeClass::Compact {
+            options.geometry.width = if surface.width_class() == WidthClass::Compact {
                 f32::MAX
             } else {
                 560.0

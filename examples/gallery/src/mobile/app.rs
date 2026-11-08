@@ -2,7 +2,7 @@
 //!
 //! The shared mobile root: desktop and mobile hosts install this once per
 //! application session. Step up to a phone surface on desktop with
-//! `COVE_PREVIEW_DEVICE=phone`.
+//! `COVE_PREVIEW_DEVICE=iphone`.
 //!
 //! Sheets, dialogs and menus present in the layer root's portal layer, so the
 //! root wraps `LayerRoot` rather than a plain column.

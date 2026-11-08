@@ -1,21 +1,62 @@
 //! Translation of Android/Integration/Surface/State.swift.
 
+use std::cell::RefCell;
+use std::rc::Rc;
+
 use cove_core::{
-    Environment, Idiom, InputCapabilities, Insets, Keyboard, State, TextScale, Viewport,
+    DesignLanguage, DeviceClass, Environment, EnvironmentOverride, EnvironmentRequest,
+    InputCapabilities, Insets, Keyboard, Platform, State, TextScale, Viewport,
 };
 use cove_ui_compose::theme::Theme;
 
+use super::DeviceFacts;
+
 /// Session geometry survives swapchain recreation. Native updates replace
-/// device facts; frame preparation replaces only viewport facts.
+/// device facts; frame preparation replaces only viewport facts. The published
+/// environment is the reported one with any DevTools override applied.
 pub struct SurfaceState {
-    value: State<Environment>,
+    shared: Rc<Shared>,
     system_bar_icon_style: i32,
+}
+
+struct Shared {
+    value: State<Environment>,
+    reported: RefCell<Environment>,
+    environment_override: RefCell<EnvironmentOverride>,
+}
+
+impl Shared {
+    fn publish(&self) -> bool {
+        let mut surface = self.reported.borrow().clone();
+        self.environment_override.borrow().apply(&mut surface);
+        if surface == self.value.get() {
+            return false;
+        }
+        self.value.set(surface);
+        true
+    }
+}
+
+/// Replaces reported facts from DevTools. The system owns an Android window's
+/// size, so a preset contributes only its facts.
+#[derive(Clone)]
+pub struct SurfaceOverrides(Rc<Shared>);
+
+impl SurfaceOverrides {
+    pub fn request(&self, request: &EnvironmentRequest) -> Result<Environment, String> {
+        let (next, _size) = request.resolve(&self.0.environment_override.borrow())?;
+        *self.0.environment_override.borrow_mut() = next;
+        self.0.publish();
+        Ok(self.0.value.get())
+    }
 }
 
 impl SurfaceState {
     pub fn new(scale: f32) -> Self {
         let surface = Environment {
-            idiom: Idiom::Phone,
+            platform: Platform::Android,
+            design_language: DesignLanguage::Material,
+            device_class: DeviceClass::Phone,
             input: InputCapabilities::TOUCH | InputCapabilities::KEYBOARD,
             viewport: Viewport {
                 width: 0.0,
@@ -25,17 +66,25 @@ impl SurfaceState {
             ..Environment::default()
         };
         Self {
-            value: State::new(surface),
+            shared: Rc::new(Shared {
+                value: State::new(surface.clone()),
+                reported: RefCell::new(surface),
+                environment_override: RefCell::new(EnvironmentOverride::default()),
+            }),
             system_bar_icon_style: -1,
         }
     }
 
     pub fn value(&self) -> State<Environment> {
-        self.value.clone()
+        self.shared.value.clone()
     }
 
     pub fn environment(&self) -> Environment {
-        self.value.get()
+        self.shared.value.get()
+    }
+
+    pub fn overrides(&self) -> SurfaceOverrides {
+        SurfaceOverrides(self.shared.clone())
     }
 
     /// 1 = dark icons over a light surface, 0 = light icons over a dark
@@ -45,35 +94,41 @@ impl SurfaceState {
     }
 
     pub fn scale(&self) -> f32 {
-        self.value.get().viewport.scale
+        self.shared.value.get().viewport.scale
     }
 
     pub fn logical_size(&self) -> (f32, f32) {
-        let viewport = self.value.get().viewport;
+        let viewport = self.shared.value.get().viewport;
         (viewport.width, viewport.height)
     }
 
     pub fn update(
         &self,
-        idiom: Idiom,
+        device: DeviceFacts,
         safe_area: Insets,
         keyboard: Keyboard,
         text_scale: TextScale,
     ) -> bool {
-        let mut surface = self.value.get();
-        surface.idiom = idiom;
-        surface.safe_area = safe_area.normalized();
-        surface.keyboard = Keyboard::new(keyboard.height);
-        surface.text_scale = text_scale;
-        self.replace(surface)
+        {
+            let mut surface = self.shared.reported.borrow_mut();
+            surface.device_class = device.device_class;
+            surface.posture = device.posture;
+            surface.display_features = device.display_features;
+            surface.safe_area = safe_area.normalized();
+            surface.keyboard = Keyboard::new(keyboard.height);
+            surface.text_scale = text_scale;
+        }
+        self.shared.publish()
     }
 
     pub fn prepare(&self, pixels: (i32, i32), scale: f32) {
-        let mut surface = self.value.get();
-        surface.viewport.scale = Self::valid_scale(scale);
-        surface.viewport.width = pixels.0.max(0) as f32 / surface.viewport.scale;
-        surface.viewport.height = pixels.1.max(0) as f32 / surface.viewport.scale;
-        let _ = self.replace(surface);
+        {
+            let mut surface = self.shared.reported.borrow_mut();
+            surface.viewport.scale = Self::valid_scale(scale);
+            surface.viewport.width = pixels.0.max(0) as f32 / surface.viewport.scale;
+            surface.viewport.height = pixels.1.max(0) as f32 / surface.viewport.scale;
+        }
+        let _ = self.shared.publish();
     }
 
     pub fn update_system_bars(&mut self, theme: Option<&Theme>) {
@@ -82,14 +137,6 @@ impl SurfaceState {
         };
         let luminance = 0.2126 * background.r + 0.7152 * background.g + 0.0722 * background.b;
         self.system_bar_icon_style = if luminance > 0.5 { 1 } else { 0 };
-    }
-
-    fn replace(&self, surface: Environment) -> bool {
-        if surface == self.value.get() {
-            return false;
-        }
-        self.value.set(surface);
-        true
     }
 
     fn valid_scale(value: f32) -> f32 {

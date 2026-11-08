@@ -252,6 +252,10 @@ impl Bridge {
                 peer.request("window.resize", Some(args.clone()))?;
                 json!({"delivered": true})
             }
+            "set_ui_environment" => {
+                peer.require("environment")?;
+                peer.request("window.environment", Some(args.clone()))?
+            }
             "select_ui" => {
                 peer.require("select")?;
                 if args["clear"] == true {

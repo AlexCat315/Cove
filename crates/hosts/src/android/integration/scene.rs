@@ -234,15 +234,15 @@ impl AndroidContentSession {
 
     /// Reports device facts the window itself cannot derive: display cutout and
     /// system-bar insets, the software keyboard height, the accessibility text
-    /// size and whether this is a phone or a tablet.
+    /// size, the hardware class and any folds or hinges.
     pub fn update_surface(
         &self,
-        idiom: cove_core::Idiom,
+        device: crate::android::integration::surface::DeviceFacts,
         safe_area: cove_core::Insets,
         keyboard: cove_core::Keyboard,
         text_scale: cove_core::TextScale,
     ) {
-        if self.surface.update(idiom, safe_area, keyboard, text_scale) {
+        if self.surface.update(device, safe_area, keyboard, text_scale) {
             self.needs_update.set(true);
         }
     }
@@ -312,6 +312,20 @@ impl AndroidContentSession {
                 }
             })
         };
+        let environment = {
+            let overrides = self.surface.overrides();
+            let invalidate = invalidate.clone();
+            Rc::new(move |request: &cove_core::EnvironmentRequest| {
+                let environment = overrides.request(request)?;
+                invalidate();
+                Ok(environment)
+            })
+                as Rc<
+                    dyn Fn(
+                        &cove_core::EnvironmentRequest,
+                    ) -> Result<cove_core::Environment, String>,
+                >
+        };
         let diagnostics = AndroidDiagnostics::new(
             config,
             self.tree.clone(),
@@ -332,6 +346,7 @@ impl AndroidContentSession {
                         dispatcher.dispatch(&event);
                     })
                 },
+                environment: Some(environment),
             },
         )?;
         *self.diagnostics.borrow_mut() = Some(diagnostics);

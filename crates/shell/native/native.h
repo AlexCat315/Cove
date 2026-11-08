@@ -40,6 +40,8 @@ void cove_shell_text_area(CoveShellWindow *window,const float *area);
    points. Touch hosts report the IME inset; desktop hosts return 0. */
 void cove_shell_keyboard(CoveShellWindow *window,bool show);
 float cove_shell_keyboard_height(void);
+/* 0 computer, 1 tablet, 2 convertible PC in slate mode with integrated touch. */
+int cove_shell_device_form(void);
 void cove_shell_cursor(CoveShellWindow *window,int cursor);
 bool cove_shell_global_pointer(float *x,float *y);
 char *cove_shell_clipboard_read(void);

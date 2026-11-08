@@ -534,6 +534,14 @@ impl Shell for Sdl3Shell {
         // SAFETY: reads a main-thread cached inset; no window handle is needed.
         unsafe { native::cove_shell_keyboard_height() }
     }
+    fn device_form(&self) -> crate::DeviceForm {
+        // SAFETY: stateless queries of SDL and the system metrics.
+        match unsafe { native::cove_shell_device_form() } {
+            1 => crate::DeviceForm::Tablet,
+            2 => crate::DeviceForm::TouchComputer,
+            _ => crate::DeviceForm::Computer,
+        }
+    }
     fn set_cursor(&self, id: WindowId, cursor: SystemCursor) {
         if let Some(w) = self.windows.get(&id) {
             // SAFETY: window pointer is owned and the bridge validates the cursor ID.

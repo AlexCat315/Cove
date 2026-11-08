@@ -114,6 +114,8 @@ final class ContentSurfaceView extends SurfaceView implements SurfaceHolder.Call
     }
 
     void setWindowInsets(WindowInsets insets) { metrics.update(insets); }
+    void setFoldingState(FoldingState folding) { metrics.setFolding(folding); }
+    void refreshMetrics() { metrics.refresh(); }
 
     @Override protected void onConfigurationChanged(android.content.res.Configuration configuration) {
         super.onConfigurationChanged(configuration);
