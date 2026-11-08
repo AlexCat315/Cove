@@ -205,7 +205,6 @@ pub(crate) unsafe fn normalize_layout(frame: *mut ffi::AVFrame) {
     }
 }
 
-
 /// A UTF-8 path as a NUL-terminated C string for the FFmpeg file protocol.
 pub(crate) fn c_path(path: &Path) -> MediaResult<std::ffi::CString> {
     let text = path.to_str().ok_or_else(|| {

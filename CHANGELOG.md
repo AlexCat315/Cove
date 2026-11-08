@@ -4,6 +4,13 @@
 
 ## Unreleased
 
+- **CI 门禁失败修复（2026-11-08）**：
+  - 统一 `cargo fmt --all` 的 5 处格式差异；`crates/graphics/src/dx12/pipeline.rs` 的 `formats` 只在 Windows 分支使用，导入改为 `#[cfg(target_os = "windows")]`，消除非 Windows 上的 `unused_imports`（clippy `-D warnings`）。
+  - `cargo cove setup --check` 要求 macOS SDK 26+，desktop 矩阵由 `macos-15` 改为 `macos-26`；media-windows 补上固定版本的 Zig，避免 `setup --media` 报告 `zig` 未就绪。
+  - `cove-native-build`：Windows `sdk::prepare` 原先直接用 vcvars 的 PATH 覆盖 `record_pinned` 写入的 Zig/Slang 目录；改为合并 PATH 并新增回归测试。
+  - `cove-media`：`read_packets` 在 EOF 后提前返回，遗留的延后包再也不会入队，`queues_empty` 永假、短片段停在 `Playing`；现在优先重试延后包，队列满时立即停止读包以免覆盖唯一延后槽位。`pump` 在一个 tick 内连续发布所有到期帧，慢速 runner 不再被限制为每 tick 一帧（700 帧 / 200fps 的读前测试此前在 CI 稳定超时 15 秒）。
+  - 本地验收：`fmt --check`、全 workspace `clippy -D warnings`、`test --workspace --test-threads=1`、`-p cove-media --features ffmpeg --all-targets`、`cargo cove setup --check`、`cargo xtask audit --json` 全部通过；Windows / Linux 分支由 CI 实机验收。
+
 - **环境准备收敛到 `cargo cove setup`（2026-11-08）**：
   - `cove-native-build` 的 `BASE` 清单补上 `zig`（最低 0.17.0）。它是 `crates/terminal/build.rs` 每次构建必需的工具，此前 `setup --check` 会误报 `ready: true` 而 `cargo build` 仍失败。缺失时下载 Zig 0.17.0 官方归档，SHA-256 校验后解到 Cove 缓存并把绝对路径写入 setup state；`build.rs` 经 `cove_native_build::setup::setting("COVE_ZIG")` 读取，开发者无需手工 export。macOS / Linux / Windows 的 x86_64 与 aarch64 六组归档均有固定校验值。
   - 新增 `--shaders`：同样下载安装 Slang 2026.19（六组归档、固定 SHA-256）；Windows 额外从 Windows SDK 复制 `dxcompiler.dll` / `dxil.dll` 到 `slangc` 目录以启用 `-target dxil`。`Tools/Shaders/build-native-ui.mjs` 在 `SLANGC` 未设置时读取 setup state。macOS / Linux 会尝试复用 Slang 归档自带的 DXC 运行库，缺失时在报告里明确标注 DXIL 不可用，不伪造实现。

@@ -10,8 +10,7 @@ use super::super::application::memory::{AppWindowMemorySnapshot, AppWindowRender
 use cove_core::DrawList;
 use cove_graphics::rhi::{
     CommandBuffer, Device, RenderColorTarget, RhiResult, SurfaceDescriptor, Swapchain,
-    TextureDescriptor,
-    TextureFormat, TextureResource, TextureUsage,
+    TextureDescriptor, TextureFormat, TextureResource, TextureUsage,
 };
 use cove_graphics::ui::{FontAtlasUpload, NativeDrawListRenderer, NativeUIViewport};
 use cove_runtime::SurfaceFactory;
@@ -191,9 +190,8 @@ impl AppWindowRenderer for NativeAppWindowRenderer {
         let vsync = self.vsync;
         device.with_frame_session(|| {
             if self.swapchain.is_none() {
-                self.swapchain = Some(device.make_swapchain(self.surface_descriptor(
-                    native, size, vsync,
-                ))?);
+                self.swapchain =
+                    Some(device.make_swapchain(self.surface_descriptor(native, size, vsync))?);
             }
             let Some(swapchain) = self.swapchain else {
                 return Ok(false);

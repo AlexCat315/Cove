@@ -146,7 +146,9 @@ impl PrimitiveView for MediaProgressBar {
             let (position, duration) = (self.position, self.duration);
             let (forward, backward) = (scrub.clone(), scrub);
             node.set_accessibility_actions(AccessibilityActions {
-                increment: Some(Rc::new(move || forward((position + 5.0).min(duration), true))),
+                increment: Some(Rc::new(move || {
+                    forward((position + 5.0).min(duration), true)
+                })),
                 decrement: Some(Rc::new(move || backward((position - 5.0).max(0.0), true))),
                 ..Default::default()
             });
@@ -272,8 +274,7 @@ impl PrimitiveView for MediaProgressBar {
                         }
                         owner.set_attachment(PRESSED, true);
                         owner.set_attachment(DRAG, fraction);
-                        if let (Some(handler), Some(fraction)) = (press_scrub.as_ref(), fraction)
-                        {
+                        if let (Some(handler), Some(fraction)) = (press_scrub.as_ref(), fraction) {
                             handler(fraction * duration, false);
                         }
                     }

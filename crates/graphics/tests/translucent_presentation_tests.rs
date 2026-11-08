@@ -42,8 +42,11 @@ fn device() -> Option<Arc<Device>> {
 }
 
 fn texture(device: &Arc<Device>, format: TextureFormat, usage: TextureUsage) -> TextureResource {
-    TextureResource::new(device.clone(), TextureDescriptor::new(SIZE[0], SIZE[1], format, usage))
-        .expect("texture")
+    TextureResource::new(
+        device.clone(),
+        TextureDescriptor::new(SIZE[0], SIZE[1], format, usage),
+    )
+    .expect("texture")
 }
 
 /// Renders a light, nearly opaque rounded fill over a clear frame the way the
@@ -112,7 +115,11 @@ fn present(format: TextureFormat) -> Vec<[f32; 4]> {
     recorded.did_submit();
     device.end_frame();
     device.wait_until_idle().expect("idle");
-    let bytes_per_pixel = if format == TextureFormat::Rgba16Float { 8 } else { 4 };
+    let bytes_per_pixel = if format == TextureFormat::Rgba16Float {
+        8
+    } else {
+        4
+    };
     let mut data = vec![0u8; SIZE[0] * SIZE[1] * bytes_per_pixel];
     device
         .read_texture_data(
@@ -136,7 +143,12 @@ fn present(format: TextureFormat) -> Vec<[f32; 4]> {
         data.chunks(4)
             .map(|pixel| {
                 let unit = |value: u8| f32::from(value) / 255.0;
-                [unit(pixel[2]), unit(pixel[1]), unit(pixel[0]), unit(pixel[3])]
+                [
+                    unit(pixel[2]),
+                    unit(pixel[1]),
+                    unit(pixel[0]),
+                    unit(pixel[3]),
+                ]
             })
             .collect()
     }
@@ -171,7 +183,10 @@ fn a_float_presentation_keeps_translucent_edges_premultiplied() {
         .iter()
         .filter(|pixel| pixel[3] > 0.02 && pixel[3] < 0.9)
         .count();
-    assert!(edges > 0, "the rounded corners produce partly covered pixels");
+    assert!(
+        edges > 0,
+        "the rounded corners produce partly covered pixels"
+    );
     assert_eq!(
         overflowing(&pixels),
         0,

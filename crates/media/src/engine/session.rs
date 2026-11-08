@@ -348,18 +348,29 @@ impl Engine {
     fn pump(&mut self) -> MediaResult<()> {
         self.read_packets()?;
         self.decode_audio()?;
-        self.decode_video(None)
+        // One frame per tick would cap delivery at the pump wake-up rate; a
+        // loaded runner would fall behind real time and never reach the end.
+        // Publish every frame that is already due, then hold the next one.
+        loop {
+            self.decode_video(None)?;
+            let Some(ready) = self.pending.take() else {
+                return Ok(());
+            };
+            if ready.pts.is_some_and(|pts| pts > self.clock()) {
+                self.pending = Some(ready);
+                return Ok(());
+            }
+            self.publish(ready);
+        }
     }
 
     fn read_packets(&mut self) -> MediaResult<()> {
-        if self.drained {
-            self.drain_decoders();
-            return Ok(());
-        }
-        if self.format.is_null() {
+        if self.format.is_null() && self.deferred.is_none() {
             return Ok(());
         }
         for _ in 0..READ_LIMIT {
+            // A deferred packet outlives EOF: retry it before declaring the
+            // demuxer drained, otherwise `queues_empty` never becomes true.
             if let Some(packet) = self.deferred.take() {
                 self.queue(packet)?;
                 if self.deferred.is_some() {
@@ -367,6 +378,13 @@ impl Engine {
                     return Ok(());
                 }
                 continue;
+            }
+            if self.drained {
+                self.drain_decoders();
+                return Ok(());
+            }
+            if self.format.is_null() {
+                return Ok(());
             }
             let packet = self.scratch();
             if packet.is_null() {
@@ -388,11 +406,10 @@ impl Engine {
                     return Err(source_error(status));
                 }
                 self.drained = true;
-                self.drain_decoders();
-                return Ok(());
+                continue;
             }
             self.queue(packet)?;
-            if self.audio.is_full() {
+            if self.deferred.is_some() || self.audio.is_full() {
                 return Ok(());
             }
         }

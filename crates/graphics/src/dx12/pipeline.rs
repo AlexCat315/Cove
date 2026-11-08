@@ -11,8 +11,10 @@ use crate::rhi::{
 };
 
 use super::device::Dx12DeviceHandle;
+#[cfg(target_os = "windows")]
+use super::formats;
 use super::resources::Dx12Registries;
-use super::{formats, sys};
+use super::sys;
 
 /// Creates one graphics pipeline state and records it.
 pub fn create_graphics(

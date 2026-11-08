@@ -16,8 +16,8 @@ pub(crate) mod skeleton;
 pub mod ui_icon_catalog;
 pub mod ui_icons;
 pub(crate) mod vector_image_raster;
-pub(crate) mod video_player;
 pub(crate) mod video;
+pub(crate) mod video_player;
 pub(crate) mod waveform;
 
 pub use api::*;
@@ -47,6 +47,11 @@ pub use video::VideoSurface;
 pub(crate) mod api {
     pub use super::async_image::{AsyncImage, AsyncImagePhase, ImageLoadingPolicy};
     pub use super::audio_meter::{AudioLevelMeter, meter_fraction};
+    pub use super::danmaku::{
+        ActiveDanmaku, DanmakuComment, DanmakuFeed, DanmakuLayer, DanmakuMode, DanmakuScheduler,
+        DanmakuSettings,
+    };
+    pub use super::frame_ticker::FrameTicker;
     pub use super::icon::Icon;
     pub use super::image::{Image, ImageSource};
     pub use super::image_geometry::{ImageContentMode, ImageRenderingMode};
@@ -54,14 +59,9 @@ pub(crate) mod api {
         AudioPlayer, MediaTransport, format_media_time, steady_snapshot, toggle_playback,
         use_playback, use_playback_select,
     };
+    pub use super::progress_bar::{MediaProgressBar, PROGRESS_BAR_HEIGHT};
     pub use super::skeleton::{Skeleton, SkeletonAppearance, SkeletonMotion, SkeletonShape};
     pub use super::ui_icons::UIIcons;
-    pub use super::danmaku::{
-        ActiveDanmaku, DanmakuComment, DanmakuFeed, DanmakuLayer, DanmakuMode, DanmakuScheduler,
-        DanmakuSettings,
-    };
-    pub use super::frame_ticker::FrameTicker;
-    pub use super::progress_bar::{MediaProgressBar, PROGRESS_BAR_HEIGHT};
     pub use super::video::VideoView;
     pub use super::video_player::{
         PLAYBACK_RATES, PlayerActions, PlayerPresentation, PlayerSettings, VideoPlayer,

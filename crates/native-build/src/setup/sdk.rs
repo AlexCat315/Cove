@@ -100,7 +100,11 @@ pub(super) fn prepare(host: Host, targets: &[String], saved: &mut Value) -> io::
         }
         let vars = windows_environment()?;
         for (key, value) in vars {
-            saved["environment"][key] = json!(value);
+            if key.eq_ignore_ascii_case("PATH") {
+                merge_path(saved, &value)?;
+            } else {
+                saved["environment"][key] = json!(value);
+            }
         }
     }
     if targets.iter().any(|target| target.contains("ios")) {
@@ -135,6 +139,28 @@ pub(super) fn prepare(host: Host, targets: &[String], saved: &mut Value) -> io::
     }
     Ok(())
 }
+
+/// Keeps the pinned toolchain directories recorded by setup when the MSVC
+/// environment contributes its own PATH. Replacing it made `zig` and `slangc`
+/// undiscoverable immediately after `cargo cove setup` on Windows.
+fn merge_path(saved: &mut Value, sdk_path: &str) -> io::Result<()> {
+    let mut paths: Vec<PathBuf> = saved["environment"]["PATH"]
+        .as_str()
+        .map(|value| env::split_paths(value).collect())
+        .unwrap_or_default();
+    for entry in env::split_paths(sdk_path) {
+        if !paths.contains(&entry) {
+            paths.push(entry);
+        }
+    }
+    saved["environment"]["PATH"] = json!(
+        env::join_paths(&paths)
+            .map_err(io::Error::other)?
+            .to_string_lossy()
+    );
+    Ok(())
+}
+
 fn install_windows_sdk() -> io::Result<()> {
     let installer_root = PathBuf::from(
         env::var_os("ProgramFiles(x86)").unwrap_or_else(|| "C:/Program Files (x86)".into()),
@@ -471,6 +497,29 @@ mod tests {
         assert_ne!(
             android_archive(Host::Mac, "aarch64"),
             android_archive(Host::Mac, "x86_64")
+        );
+    }
+    #[test]
+    fn msvc_path_keeps_pinned_tool_directories() {
+        let pinned = env::join_paths(["/Cove/zig", "/Cove/slangc"])
+            .expect("join pinned paths")
+            .to_string_lossy()
+            .into_owned();
+        let sdk = env::join_paths(["/VC/bin", "/Cove/zig"])
+            .expect("join SDK paths")
+            .to_string_lossy()
+            .into_owned();
+        let mut saved = json!({"environment": {"PATH": pinned}});
+        merge_path(&mut saved, &sdk).expect("merge");
+        let paths: Vec<_> =
+            env::split_paths(saved["environment"]["PATH"].as_str().expect("merged PATH")).collect();
+        assert_eq!(
+            paths,
+            [
+                PathBuf::from("/Cove/zig"),
+                PathBuf::from("/Cove/slangc"),
+                PathBuf::from("/VC/bin"),
+            ]
         );
     }
 }
