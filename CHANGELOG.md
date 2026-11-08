@@ -4,6 +4,11 @@
 
 ## Unreleased
 
+- **有状态的基础视图在任意位置都会随自身状态刷新（2026-11-09）**：
+  - 根因：`ViewGraph` 只在用户视图和 `install_view` 的根视图上连接 `dynamic_properties`。嵌套在修饰符里或作为后代的 `PrimitiveView` 即使声明了状态依赖也被静默忽略，`children()` 中读取的 `State` 变化不会让它重跑（`ObservableStateTracking::observe_reads` 不做跟踪）。桌面宿主环境不刷新就是这个问题的一个实例。
+  - 修复：声明了 `dynamic_properties` 的基础视图在物化时与用户视图一样获得一个透明锚点和作用域，作用域的主体就是该基础视图本身；父级更新时复用同一锚点（`replace_view` + `recompose`），卸载时随作用域解除订阅。未声明状态的基础视图路径不变。
+  - 测试：composition `primitive_state_tests` 4 项（根、根修饰符之下、嵌套且父级不重算、父级更新后依赖仍在且不新增节点、卸载后不再响应），其中两项在修复前失败；hosts `adaptive_root_tests` 新增根视图被外部修饰符包裹的情形。
+
 - **平台自适应 P0：平台、设备类别、折叠姿态与铰链进入环境（2026-11-09，破坏性）**：
   - 设计：新增 `Docs/adaptive-platform.md`（四个正交维度、语义组件、跨铰链规则、形态变化时的状态连续性、分阶段计划）；本条为其中 P0。
   - `cove-core`：删除 `Idiom` 与 `SizeClass`。`Environment` 新增 `platform`（`MacOS | Windows | Linux | IOS | IPadOS | Android | Web`）、`design_language`（`Cupertino | Material | Fluent | Adwaita`）、`device_class`（`Phone | Foldable(Book | Flip | DualScreen) | Tablet | Desktop`）、`posture`（`Flat | Tabletop | Book`）、`display_features`（折痕/铰链的窗口坐标、遮挡、分隔），以及 `segments()`、`is_spanned()`、`segment_for()`、`occluded_regions()`；`display_features::confine` 把弹层移入区段。宽度改为 Material 3 五档 `WidthClass`（600/840/1200/1600，可比较），高度为 `HeightClass`（480/900）；`Viewport::EXPANDED_MINIMUM_WIDTH` 由 1000 变为 840，侧栏与工作区在 840 进入双栏。触摸命中区按设计语言：Material 48，其余 44。新增 `EnvironmentOverride`、`DevicePreset`（13 个预设）、`EnvironmentRequest`，`Size::new`；`Insets`、`InputCapabilities` 可序列化。

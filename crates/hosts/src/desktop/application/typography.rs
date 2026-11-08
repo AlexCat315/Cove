@@ -31,11 +31,6 @@ impl Default for ApplicationTypography {
 /// `SurfaceRoot` in the Compose vocabulary is the same idea; the host needs it
 /// here because the environment lives in host state that changes as the window
 /// resizes or the safe area moves.
-///
-/// Install it as the graph root, unwrapped: the graph wires `dynamic_properties`
-/// only on the root view, so a modifier around it would stop environment
-/// changes from reaching content. Content-level modifiers go through
-/// [`Self::text_scaler`] instead.
 pub struct AdaptiveApplicationContent {
     pub content: AnyView,
     pub environment: State<Environment>,
@@ -97,9 +92,9 @@ impl View for AdaptiveApplicationContent {
     fn tag(&self) -> &'static str {
         std::any::type_name::<Self>()
     }
-    /// `children()` reads the surface environment from `State`; without this
-    /// dependency nothing re-runs it, and every window resize, keyboard,
-    /// device or posture change after the first frame is lost.
+    /// `children()` reads the surface environment from `State`; this
+    /// dependency is what re-runs it on every window resize, keyboard, device
+    /// or posture change after the first frame.
     fn dynamic_properties(&self) -> Vec<cove_composition::DynamicField> {
         vec![cove_composition::DynamicField::state(
             "environment",

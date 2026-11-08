@@ -12,19 +12,24 @@ use cove_hosts::desktop::application::AdaptiveApplicationContent;
 
 #[test]
 fn environment_changes_after_install_reach_content() {
-    changes_reach_content(|content| content);
+    changes_reach_content(AnyView::new);
 }
 
 #[test]
 fn environment_changes_reach_content_under_the_host_text_scaler() {
-    // The desktop host scales text inside the root, never by wrapping it.
     use cove_ui_compose::theme::tokens::TextScaler;
-    changes_reach_content(|content| content.text_scaler(TextScaler::identity()));
+    changes_reach_content(|root| AnyView::new(root.text_scaler(TextScaler::identity())));
 }
 
-fn changes_reach_content(
-    configure: impl FnOnce(AdaptiveApplicationContent) -> AdaptiveApplicationContent,
-) {
+#[test]
+fn environment_changes_reach_content_when_the_root_is_wrapped() {
+    use cove_ui_compose::theme::tokens::{TextScaler, TextScalerViewExt};
+    changes_reach_content(|root| {
+        AnyView::new(AnyView::new(root).text_scaler(TextScaler::identity()))
+    });
+}
+
+fn changes_reach_content(install: impl FnOnce(AdaptiveApplicationContent) -> AnyView) {
     let environment = State::new(Environment::default());
     let seen: Rc<RefCell<Vec<(f32, DeviceClass, Posture)>>> = Rc::default();
     let recorded = seen.clone();
@@ -41,10 +46,10 @@ fn changes_reach_content(
         Rc::new(Recomposer::new()),
     ));
     graph.install_view(
-        AnyView::new(configure(AdaptiveApplicationContent::new(
+        install(AdaptiveApplicationContent::new(
             content,
             environment.clone(),
-        ))),
+        )),
         Default::default(),
     );
     assert_eq!(seen.borrow().last().map(|entry| entry.0), Some(1280.0));

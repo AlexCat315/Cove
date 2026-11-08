@@ -508,6 +508,23 @@ impl ViewGraph {
         }
 
         match inner.kind() {
+            ViewKind::Primitive(_) if self.scopes.borrow().contains_key(&node.id()) => {
+                // A stateful primitive's anchor: refresh the scope's value and
+                // its subscriptions, then its single child, the primitive.
+                let scope = self.scopes.borrow().get(&node.id()).cloned();
+                if let Some(scope) = scope {
+                    ModifierReplay::reset(node);
+                    let mut reasons = Vec::new();
+                    let mut parent_reason = RecompositionReason::new("parent");
+                    if let Some(active) = self.active_recomposition_scope.get() {
+                        parent_reason = parent_reason.with_origin_scope(active);
+                    }
+                    reasons.push(parent_reason);
+                    reasons.extend(self.environment_reasons.borrow().iter().cloned());
+                    ViewScope::replace_view(&scope, self, view.clone());
+                    ViewScope::recompose(&scope, self, reasons);
+                }
+            }
             ViewKind::Primitive(primitive) => {
                 ModifierReplay::reset(node);
                 ObservableStateTracking::observe_reads(|| primitive.update_node(node));
@@ -630,8 +647,13 @@ impl ViewGraph {
         }
 
         match inner.kind() {
-            // 3. Primitive (text / box / row / ...)
+            // 3. Primitive (text / box / row / ...). One that declares state
+            //    gets a scope like a user view, so writes to that state re-run
+            //    its `children()` wherever it is mounted.
             ViewKind::Primitive(primitive) => {
+                if declares_state(inner) && !self.is_scope_body(parent, inner) {
+                    return self.materialise_user_view(view, parent, layout_parent);
+                }
                 self.materialise_primitive(primitive, inner.tag(), parent, layout_parent)
             }
             // 4. ModifiedContent — forward to the type-erased helper.
@@ -709,6 +731,17 @@ impl ViewGraph {
 
     // MARK: - Internal
 
+    /// Whether `parent` is the anchor of the scope whose body is `view` itself:
+    /// a stateful primitive materialising into its own scope, or a primitive
+    /// root installed by `install_view`.
+    fn is_scope_body(&self, parent: &Node, view: &dyn View) -> bool {
+        self.scopes.borrow().get(&parent.id()).is_some_and(|scope| {
+            let scope = scope.borrow();
+            matches!(scope.view.storage.kind(), ViewKind::Primitive(_))
+                && slot_tag(scope.view.storage.as_ref()) == slot_tag(view)
+        })
+    }
+
     fn top_level_layouts(&self, node: &Node) -> Vec<LayoutNode> {
         if let Some(layout) = self.layout_of.borrow().get(&node.id()).cloned() {
             return vec![layout];
@@ -718,6 +751,10 @@ impl ViewGraph {
             .flat_map(|child| self.top_level_layouts(child))
             .collect()
     }
+}
+
+fn declares_state(view: &dyn View) -> bool {
+    !view.dynamic_properties().is_empty()
 }
 
 fn is_empty_view(view: &dyn View) -> bool {
