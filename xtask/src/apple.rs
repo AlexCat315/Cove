@@ -40,6 +40,37 @@ fn info_plist(base: &Path, destination: &Path, entries: &[(&str, Plist)]) -> Res
     Ok(())
 }
 
+/// iPhone and iPad orientations. Without these keys UIKit only accepts the
+/// portrait default, so a writing app cannot follow a rotated device or an
+/// external keyboard on iPad. Kept separate from `identity_entries`, which
+/// is shared with macOS bundles.
+fn ios_entries(simulator: bool) -> Vec<(&'static str, Plist<'static>)> {
+    const ORIENTATIONS: &str = "[\"UIInterfaceOrientationPortrait\",\"UIInterfaceOrientationPortraitUpsideDown\",\"UIInterfaceOrientationLandscapeLeft\",\"UIInterfaceOrientationLandscapeRight\"]";
+    vec![
+        ("MinimumOSVersion", Plist::String(MINIMUM_VERSION)),
+        (
+            "CFBundleSupportedPlatforms",
+            Plist::Json(if simulator {
+                "[\"iPhoneSimulator\"]"
+            } else {
+                "[\"iPhoneOS\"]"
+            }),
+        ),
+        ("UIDeviceFamily", Plist::Json("[1,2]")),
+        ("UIRequiredDeviceCapabilities", Plist::Json("[\"arm64\"]")),
+        ("UILaunchScreen", Plist::Json("{}")),
+        ("LSRequiresIPhoneOS", Plist::Json("true")),
+        (
+            "UISupportedInterfaceOrientations",
+            Plist::Json(ORIENTATIONS),
+        ),
+        (
+            "UISupportedInterfaceOrientations~ipad",
+            Plist::Json(ORIENTATIONS),
+        ),
+    ]
+}
+
 fn identity_entries<'a>(
     project: &'a Project,
     executable: &'a str,
@@ -125,21 +156,7 @@ pub fn bundle_ios(project: &Project, target: &Target, output: &Path) -> Result<P
     process::copy_tree(&platform.join("Resources"), &app)?;
     let build = project.build.to_string();
     let mut entries = identity_entries(project, bin, &build);
-    entries.extend([
-        ("MinimumOSVersion", Plist::String(MINIMUM_VERSION)),
-        (
-            "CFBundleSupportedPlatforms",
-            Plist::Json(if target.simulator {
-                "[\"iPhoneSimulator\"]"
-            } else {
-                "[\"iPhoneOS\"]"
-            }),
-        ),
-        ("UIDeviceFamily", Plist::Json("[1,2]")),
-        ("UIRequiredDeviceCapabilities", Plist::Json("[\"arm64\"]")),
-        ("UILaunchScreen", Plist::Json("{}")),
-        ("LSRequiresIPhoneOS", Plist::Json("true")),
-    ]);
+    entries.extend(ios_entries(target.simulator));
     info_plist(
         &platform.join("Info.plist"),
         &app.join("Info.plist"),
@@ -225,4 +242,49 @@ pub fn launch_ios(project: &Project, app: &Path, target: &Target) -> Result<()> 
 pub fn devices() -> Result<()> {
     process::run(Command::new("xcrun").args(["simctl", "list", "devices", "available"]))?;
     process::run(Command::new("xcrun").args(["devicectl", "list", "devices"]))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn ios_bundle_declares_every_orientation_for_iphone_and_ipad() {
+        for simulator in [false, true] {
+            let entries = ios_entries(simulator);
+            for key in [
+                "UISupportedInterfaceOrientations",
+                "UISupportedInterfaceOrientations~ipad",
+            ] {
+                let (_, value) = entries
+                    .iter()
+                    .find(|(name, _)| *name == key)
+                    .unwrap_or_else(|| panic!("missing {key}"));
+                let Plist::Json(json) = value else {
+                    panic!("{key} must be a plist array");
+                };
+                for orientation in [
+                    "UIInterfaceOrientationPortrait",
+                    "UIInterfaceOrientationPortraitUpsideDown",
+                    "UIInterfaceOrientationLandscapeLeft",
+                    "UIInterfaceOrientationLandscapeRight",
+                ] {
+                    assert!(json.contains(orientation), "{key} misses {orientation}");
+                }
+            }
+            let platform = entries
+                .iter()
+                .find(|(name, _)| *name == "CFBundleSupportedPlatforms")
+                .map(|(_, value)| value)
+                .expect("platform key");
+            let Plist::Json(json) = platform else {
+                panic!("platform key must be a plist array");
+            };
+            assert_eq!(
+                json.contains("Simulator"),
+                simulator,
+                "simulator bundles must target iPhoneSimulator"
+            );
+        }
+    }
 }

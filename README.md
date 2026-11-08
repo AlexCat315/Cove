@@ -9,7 +9,7 @@ Cove 自有代码采用 [Apache-2.0](LICENSE)。依赖保留各自许可，见 [
 ```sh
 cargo cove setup
 cargo build --workspace --locked
-cargo run --package cove-rust-counter --locked
+cargo run -p cove-examples --bin gallery --locked
 ```
 
 改动 `crates/graphics/resources/Shaders/Slang/*.slang` 时追加 `cargo cove setup --shaders`，它会安装固定版本 Slang 2026.19；Windows 把 Windows SDK 的 `dxcompiler.dll` / `dxil.dll` 放到 `slangc` 旁边，macOS / Linux 尝试复用 Slang 归档自带的 DXC 运行库，没有就在报告里标明 DXIL 不可用。`Tools/Shaders/build-native-ui.mjs` 直接读取该状态中的 `SLANGC`，无需手工 export。
@@ -49,8 +49,8 @@ cargo test --locked -p cove-media --features ffmpeg --all-targets
 
 ```sh
 cargo generate --git https://github.com/AlexCat315/Cove.git Templates/app --name my-app
-cargo xtask package android --release --package cove-mobile-example
-cargo xtask run ios --simulator --package cove-mobile-example
+cargo xtask package android --release --package cove-examples
+cargo xtask run ios --simulator --package cove-examples
 ```
 
 平台实现和验证范围见 [平台覆盖矩阵](crates/hosts/src/PLATFORM_COVERAGE.md)；测试通过不代表已完成设备验收。本地 `swift/` 参考树（不随仓库分发）保留迁移来源与逐文件映射。发布变更记入 [CHANGELOG.md](CHANGELOG.md)。

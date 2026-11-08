@@ -228,6 +228,14 @@ void cove_shell_chrome(CoveShellWindow *h,const CoveShellChrome *chrome){ COVE_A
 #endif
 }
 void cove_shell_text_area(CoveShellWindow *h,const float *area){ COVE_ASSERT_MAIN();if(!h)return;if(!area){SDL_SetTextInputArea(h->window,NULL,0);SDL_StopTextInput(h->window);return;}SDL_Rect r={(int)fmaxf(0,floorf(area[0])),(int)fmaxf(0,floorf(area[1])),(int)fmaxf(1,ceilf(area[2])),(int)fmaxf(1,ceilf(area[3]))};if(!SDL_TextInputActive(h->window))SDL_StartTextInput(h->window);SDL_SetTextInputArea(h->window,&r,(int)fmaxf(0,roundf(area[4])));}
+void cove_shell_keyboard(CoveShellWindow *h,bool show){ COVE_ASSERT_MAIN();if(!h)return;if(show){if(!SDL_TextInputActive(h->window))SDL_StartTextInput(h->window);}else SDL_StopTextInput(h->window);}
+float cove_shell_keyboard_height(void){
+#if defined(__APPLE__)
+    return cove_shell_apple_keyboard_height();
+#else
+    return 0.0f;
+#endif
+}
 void cove_shell_cursor(CoveShellWindow *h,int cursor){ COVE_ASSERT_MAIN();static const SDL_SystemCursor ids[]={SDL_SYSTEM_CURSOR_DEFAULT,SDL_SYSTEM_CURSOR_POINTER,SDL_SYSTEM_CURSOR_TEXT,SDL_SYSTEM_CURSOR_CROSSHAIR,SDL_SYSTEM_CURSOR_WAIT,SDL_SYSTEM_CURSOR_PROGRESS,SDL_SYSTEM_CURSOR_NOT_ALLOWED,SDL_SYSTEM_CURSOR_MOVE,SDL_SYSTEM_CURSOR_EW_RESIZE,SDL_SYSTEM_CURSOR_NS_RESIZE,SDL_SYSTEM_CURSOR_NWSE_RESIZE,SDL_SYSTEM_CURSOR_NESW_RESIZE};if(!h||cursor<0||cursor>=12)return;if(!h->cursors[cursor])h->cursors[cursor]=SDL_CreateSystemCursor(ids[cursor]);if(h->cursors[cursor])SDL_SetCursor(h->cursors[cursor]);}
 bool cove_shell_global_pointer(float *x,float *y){ COVE_ASSERT_MAIN();if(!SDL_GetAtomicInt(&initialized))return false;SDL_GetGlobalMouseState(x,y);return true;}
 char *cove_shell_clipboard_read(void){ COVE_ASSERT_MAIN();return SDL_GetClipboardText();}bool cove_shell_clipboard_write(const char *text){ COVE_ASSERT_MAIN();return SDL_SetClipboardText(text);}void cove_shell_free(void *p){SDL_free(p);}

@@ -2,7 +2,9 @@
 //!
 //! One native process lifetime shared by LSP, tasks and extension imports.
 //! Pipe readers drain concurrently; queued writes never block the caller.
-use super::command::{ProcessBudget, ProcessCommand, ProcessError, ProcessEvent};
+use super::command::{
+    ProcessBudget, ProcessCommand, ProcessError, ProcessEvent, require_process_execution,
+};
 use super::event_buffer::{Failure, ProcessEventBuffer, ProcessFailure};
 use super::io_state::{ProcessIOState, ProcessTimer};
 use super::native_process::NativeProcess;
@@ -108,6 +110,7 @@ impl Core {
 
 impl ProcessSession {
     pub fn new(command: &ProcessCommand, budget: ProcessBudget) -> Result<Self, ProcessFailure> {
+        require_process_execution()?;
         Self::validate(command, &budget)?;
         let events = Arc::new(ProcessEventBuffer::new(budget.output_bytes));
         let process = Arc::new(NativeProcess::new());

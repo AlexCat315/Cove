@@ -53,6 +53,8 @@ impl NativeProcess {
         command: &ProcessCommand,
         on_exit: Arc<dyn Fn(i32) + Send + Sync>,
     ) -> io::Result<StartedPipes> {
+        crate::command::require_process_execution()
+            .map_err(|error| io::Error::new(io::ErrorKind::Unsupported, error.to_string()))?;
         let legacy = crate::process::ProcessCommand {
             executable: command.executable.clone(),
             arguments: command.arguments.iter().map(OsString::from).collect(),

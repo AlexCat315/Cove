@@ -46,6 +46,6 @@ cargo xtask devices android
 git clone --recurse-submodules https://github.com/AlexCat315/Cove.git
 cd Cove
 cargo test --workspace -- --test-threads=1
-cargo xtask run --package cove-mobile-example
-python3 Tools/Migration/inventory.py --status
+cargo xtask run --package cove-examples
+cargo xtask audit --json
 ```

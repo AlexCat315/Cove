@@ -517,6 +517,23 @@ impl Shell for Sdl3Shell {
             w.last_area.set(area);
         }
     }
+    fn show_soft_keyboard(&self, id: WindowId) {
+        if let Some(w) = self.windows.get(&id) {
+            // SAFETY: the window pointer is owned by this shell and the bridge
+            // validates SDL main-thread affinity before touching SDL.
+            unsafe { native::cove_shell_keyboard(w.pointer.get(), true) };
+        }
+    }
+    fn hide_soft_keyboard(&self, id: WindowId) {
+        if let Some(w) = self.windows.get(&id) {
+            // SAFETY: same window ownership as `show_soft_keyboard`.
+            unsafe { native::cove_shell_keyboard(w.pointer.get(), false) };
+        }
+    }
+    fn keyboard_height(&self, _id: WindowId) -> f32 {
+        // SAFETY: reads a main-thread cached inset; no window handle is needed.
+        unsafe { native::cove_shell_keyboard_height() }
+    }
     fn set_cursor(&self, id: WindowId, cursor: SystemCursor) {
         if let Some(w) = self.windows.get(&id) {
             // SAFETY: window pointer is owned and the bridge validates the cursor ID.

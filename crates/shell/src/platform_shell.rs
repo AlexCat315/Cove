@@ -189,6 +189,14 @@ pub trait Shell {
     fn wait_for_events(&self, timeout: Duration) -> bool;
     fn wake_event_loop(&self);
     fn set_text_input_area(&self, id: WindowId, area: Option<TextInputArea>);
+    /// Explicit on-screen keyboard control for touch hosts. Shells without a
+    /// software keyboard keep the native text-input focus path unchanged.
+    fn show_soft_keyboard(&self, _id: WindowId) {}
+    fn hide_soft_keyboard(&self, _id: WindowId) {}
+    /// Keyboard inset in logical points; zero when hidden or on desktop.
+    fn keyboard_height(&self, _id: WindowId) -> f32 {
+        0.0
+    }
     fn set_cursor(&self, id: WindowId, cursor: SystemCursor);
     fn global_pointer_position(&self) -> Option<(f32, f32)>;
     fn window_position(&self, id: WindowId) -> Option<(f32, f32)>;

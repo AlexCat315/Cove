@@ -51,7 +51,7 @@ Hosts install the `ColorSampler` ambient only when `Sdl3PlatformHost::screen_col
 
 ## The three behaviours that could not be ported faithfully
 
-1. **DevTools is not linked into `cove-hosts`.** Diagnostic sessions use the pre-existing injected-factory seam (`set_diagnostics_factory` / `NullDiagnosticsSession`), so by default there is no DevTools server, inspection overlay, input interception, or mirror capture. **Reason:** `cove-hosts` has no `cove-devtools` dependency and adding one is a workspace-graph change; the seam was already established in this crate before my work and I preserved it rather than re-architecting.
+1. **DevTools is feature-gated, not always active.** The `devtools` feature links `cove-devtools` into `cove-hosts` (the workspace and Gallery enable it by default). With `COVE_DEVTOOLS=1` the host starts the server, inspection overlay, input interception and mirror capture; otherwise diagnostics fall back to `NullDiagnosticsSession` through the injected-factory seam (`set_diagnostics_factory`). **Reason:** diagnostics must remain optional for release builds, so the no-backend path is a deliberate fallback rather than a missing implementation.
 
 2. **macOS memory pressure is read, not owned.** The sampler polls a published pressure level (`darwin::set_level`) instead of owning a `dispatch_source` with an event handler. Linux and Windows use their real mechanisms (`/proc/meminfo` + cgroup v2; `CreateMemoryResourceNotification`). **Reason:** a `dispatch_source` event handler is an Objective-C block, which this crate does not hand-encode. All three platforms sample on a worker thread and only raise a flag that the UI thread drains, because `Sdl3PlatformHost` is `!Send` and stays on the UI thread.
 
@@ -65,6 +65,20 @@ Hosts install the `ColorSampler` ambient only when `Sdl3PlatformHost::screen_col
    Remote `http`/`https` image loading is therefore live on macOS, iOS, Windows and Linux (Linux `http` only, see deviation 1). A host that embeds `cove-hosts` differently must still call `install_platform_services()` itself.
 
 7. **The macOS application menu bar is not installed.** `cove-shell` exposes only `cove_shell_menu_popup` (context popups). `NativeMenuBar::snapshot()` already produces the tree an `NSApplication.mainMenu` install needs, and `native_menu_bridge` routes chosen ids back to authored closures — but there is no shell entry point to hand the bar to.
+
+## Mobile parity additions (2026-11-09)
+
+These close implementation gaps on both mobile targets; structural tests pass, **device acceptance is still outstanding** (see `Docs/gallery-audit.md`).
+
+| Area | iOS | Android |
+|---|---|---|
+| Keyboard inset | `UIKeyboardWillShow/WillHide` observers in `shell/native/apple.m` cache the frame, wake the SDL loop, and `Sdl3PlatformHost::keyboard_height()` publishes it into `Environment.keyboard` every frame | Already supplied by `SurfaceMetrics` / `WindowInsets.Type.ime()`; now reachable through the same shared `Shell` API |
+| Explicit soft keyboard | `Shell::{show_soft_keyboard,hide_soft_keyboard,keyboard_height}` + `cove_shell_keyboard` (SDL text-input start/stop) | Java `InputMethodManager.showSoftInput/hideSoftInput` driven by `inputSnapshot`; unchanged, no platform omission |
+| Persistent app storage | Sandbox `HOME/Library/Application Support` | `COVE_APP_STORAGE_DIR` injected by the `createApplication` JNI entry, then the parent of `PACKAGE_RESOURCE_BUNDLE_PATH` (`filesDir`); `$HOME/.local/share` is gone |
+| Process services | All launchers return `ProcessError::Unavailable` | Same guard; no fork/exec through `cfg(unix)` |
+| Bundle metadata | `UISupportedInterfaceOrientations` + `~ipad` added to `bundle_ios` | Orientation already handled by `MainActivity.setRequestedOrientation` |
+
+Still open, reported rather than hidden: no iOS-specific host or `UITextInput` (SDL3 UIKit has no `SDL_SendEditingText` path in this tree, so native composition preview is unverified); Android's generic `ClipboardHolder` backend is not wired to a JNI clipboard (only IME context-menu copy/cut/paste works); multi-pointer gestures beyond the primary pointer; Storage Access Framework / runtime permissions; bundled OpenSSL for Android https; native WebView on both mobile targets; application foreground/background notifications; and screen-colour sampling, which the OS does not expose on either target.
 
 ## Swift-source coverage
 

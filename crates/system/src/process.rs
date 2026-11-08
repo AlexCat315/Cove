@@ -163,6 +163,8 @@ pub struct ProcessSession {
 
 impl ProcessSession {
     pub fn spawn(command: &ProcessCommand, limits: ProcessLimits) -> io::Result<Self> {
+        crate::command::require_process_execution()
+            .map_err(|error| io::Error::new(io::ErrorKind::Unsupported, error.to_string()))?;
         if !command.executable.is_absolute()
             || !command.directory.is_absolute()
             || limits.timeout.is_zero()

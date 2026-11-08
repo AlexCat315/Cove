@@ -58,6 +58,30 @@ pub enum ProcessEvent {
     StderrClosed,
 }
 
+/// Whether spawning an external process is permitted on this target.
+/// Sandboxed mobile hosts cannot fork/exec, so every public launcher must
+/// report [`ProcessError::Unavailable`] instead of surfacing an opaque
+/// `io::Error` from `std::process::Command`.
+pub const fn process_execution_available() -> bool {
+    !cfg!(any(
+        target_os = "ios",
+        target_os = "tvos",
+        target_os = "watchos",
+        target_os = "visionos",
+        target_os = "android"
+    ))
+}
+
+/// Shared guard for every public launcher (`ProcessSession::new`,
+/// `ProcessSession::spawn`, `ProcessRunner::run*`, `NativeProcess::start`).
+pub(crate) fn require_process_execution() -> Result<(), ProcessError> {
+    if process_execution_available() {
+        Ok(())
+    } else {
+        Err(ProcessError::Unavailable)
+    }
+}
+
 impl ProcessEvent {
     /// Bytes charged against the event buffer budget.
     pub fn size(&self) -> usize {
@@ -113,5 +137,35 @@ impl ProcessOutput {
             ProcessEvent::Exited(status) => self.status = *status,
             ProcessEvent::StdoutClosed | ProcessEvent::StderrClosed => {}
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn mobile_targets_are_the_only_ones_without_process_execution() {
+        let mobile = cfg!(any(
+            target_os = "ios",
+            target_os = "tvos",
+            target_os = "watchos",
+            target_os = "visionos",
+            target_os = "android"
+        ));
+        assert_eq!(process_execution_available(), !mobile);
+        assert_eq!(require_process_execution().is_ok(), !mobile);
+        assert_eq!(
+            require_process_execution().err(),
+            mobile.then_some(ProcessError::Unavailable)
+        );
+    }
+
+    #[test]
+    fn unavailable_is_reported_with_a_stable_message() {
+        assert_eq!(
+            ProcessError::Unavailable.to_string(),
+            "Process execution is unavailable on this platform."
+        );
     }
 }

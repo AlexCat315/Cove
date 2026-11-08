@@ -38,6 +38,19 @@
 @end
 static NSMutableDictionary<NSNumber*,CoveShellAppleWindow*> *windows;
 static uint32_t scrollType;
+#if !TARGET_OS_OSX
+/* UIKit posts the keyboard frame in points. The observers run on the main
+   queue, the same thread that reads the cached inset and wakes the SDL loop,
+   so a plain float is sufficient. */
+static float keyboardHeight;
+static id keyboardObservers[2];
+static void cove_keyboard_changed(NSNotification *note) {
+    NSValue *frame=note.userInfo[UIKeyboardFrameEndUserInfoKey];
+    BOOL showing=[note.name isEqualToString:UIKeyboardWillShowNotification];
+    keyboardHeight=showing&&frame?(float)[frame CGRectValue].size.height:0.0f;
+    cove_shell_wake();
+}
+#endif
 static int phase_value(unsigned long value) {
 #if TARGET_OS_OSX
     if(value&NSEventPhaseCancelled)return 6;if(value&NSEventPhaseEnded)return 5;if(value&NSEventPhaseBegan)return 2;if(value&NSEventPhaseChanged)return 3;if(value&NSEventPhaseStationary)return 4;if(value&NSEventPhaseMayBegin)return 1;
@@ -113,6 +126,10 @@ void *cove_shell_apple_attach(void *rawWindow,void *rawLayer,bool inset,bool doc
     for(NSNumber *signal in @[@(SIGINT),@(SIGTERM)]){dispatch_source_t source=dispatch_source_create(DISPATCH_SOURCE_TYPE_SIGNAL,signal.intValue,0,dispatch_get_global_queue(QOS_CLASS_USER_INITIATED,0));if(source){dispatch_source_set_event_handler(source,^{cove_shell_wake();});dispatch_resume(source);[context.signalSources addObject:source];}}
 #else
     (void)inset;
+    if(!keyboardObservers[0]){
+        keyboardObservers[0]=[NSNotificationCenter.defaultCenter addObserverForName:UIKeyboardWillShowNotification object:nil queue:NSOperationQueue.mainQueue usingBlock:^(NSNotification *note){cove_keyboard_changed(note);}];
+        keyboardObservers[1]=[NSNotificationCenter.defaultCenter addObserverForName:UIKeyboardWillHideNotification object:nil queue:NSOperationQueue.mainQueue usingBlock:^(NSNotification *note){cove_keyboard_changed(note);}];
+    }
 #endif
     return (__bridge_retained void*)context;
 }
@@ -229,6 +246,13 @@ bool cove_shell_apple_shortcut(uint32_t id,int scancode,uint16_t modifiers) {COV
     (void)id;(void)scancode;(void)modifiers;
 #endif
     return false;
+}
+float cove_shell_apple_keyboard_height(void) {COVE_ASSERT_MAIN();
+#if TARGET_OS_OSX
+    return 0.0f;
+#else
+    return keyboardHeight;
+#endif
 }
 void cove_shell_apple_flush(void) {COVE_ASSERT_MAIN();[CATransaction flush];}
 #if TARGET_OS_OSX

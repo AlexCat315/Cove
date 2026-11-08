@@ -36,6 +36,10 @@ void cove_shell_command(CoveShellWindow *window,int command,int a,int b);
 bool cove_shell_is_fullscreen(CoveShellWindow *h);
 void cove_shell_chrome(CoveShellWindow *window,const CoveShellChrome *chrome);
 void cove_shell_text_area(CoveShellWindow *window,const float *area);
+/* Explicit on-screen keyboard control and its current height in logical
+   points. Touch hosts report the IME inset; desktop hosts return 0. */
+void cove_shell_keyboard(CoveShellWindow *window,bool show);
+float cove_shell_keyboard_height(void);
 void cove_shell_cursor(CoveShellWindow *window,int cursor);
 bool cove_shell_global_pointer(float *x,float *y);
 char *cove_shell_clipboard_read(void);
@@ -62,6 +66,7 @@ void cove_shell_apple_chrome(void *context,const CoveShellChrome *chrome);
 bool cove_shell_apple_refresh(void *context,bool active);
 bool cove_shell_apple_refresh_take(void *context,double *timestamp,double *target);
 bool cove_shell_apple_event(CoveShellEvent *event);
+float cove_shell_apple_keyboard_height(void);
 void cove_shell_apple_flush(void);
 #endif
 #endif

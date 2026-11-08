@@ -17,19 +17,10 @@
 //! - a combined transition retains exit content, suppresses input and survives
 //!   reversal
 //!
-//! Named differences from the Swift suite:
-//! - **No text-field undo, select-all or edit actions.** `FieldState` keeps no
-//!   transaction history and the field publishes no `TextEditActions`, so
-//!   Primary-A/Z/Shift-Z/Y do nothing, `text_edit_availability` is `None`, and
-//!   every edit is appended at the caret.
-//! - **Edits outside typed text never reach the binding.** Typed text writes the
-//!   binding; Backspace, Return and IME commits do not.
-//! - **Editor shortcuts reach the app.** Swift's focused editor consumes
-//!   Primary-A/Z; Rust forwards both to the `ShortcutHost`.
-//! - **A fixed `VirtualStack` publishes no scroll extent.** Its scroll view's
-//!   maximum offset is 0, so a wheel gesture leaves the window at row 0.
-//! - **Text metrics.** The shared harness installs an 16/20 text environment
-//!   where the Swift rig used 12/16; no assertion here depends on glyph metrics.
+//! The Swift-era "named differences" notes were removed: undo/redo, select-all,
+//! `TextEditActions`, Backspace, Return and IME commits are implemented and
+//! asserted in this suite; the focused field consumes Primary-A/Z before the
+//! scene shortcut host sees them.
 
 use crate::support;
 use cove_composition::Scope;

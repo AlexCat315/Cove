@@ -820,3 +820,15 @@ fn a_shell_that_cannot_start_never_spawns_the_ui() {
     assert!(result.is_err());
     assert!(!*ran.lock().unwrap());
 }
+
+#[test]
+fn soft_keyboard_api_is_a_no_op_on_shells_without_a_software_keyboard() {
+    let shell = FakeShell::new();
+    assert_eq!(shell.keyboard_height(NATIVE_ID), 0.0);
+    shell.show_soft_keyboard(NATIVE_ID);
+    shell.hide_soft_keyboard(NATIVE_ID);
+    assert!(
+        shell.calls().is_empty(),
+        "desktop shells must not forward software-keyboard commands"
+    );
+}

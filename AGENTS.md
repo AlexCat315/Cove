@@ -5,7 +5,7 @@ Use Rust 2024 for all new implementations. Migrate existing Swift capabilities t
 Avoid unnecessary supporting text, descriptive copy, and redundant UI microcopy.
 
 
-Please refer to this for UI design agent/skills/
+For UI design decisions, follow `agent/skills/emil-design-eng/SKILL.md`; the runtime skill registry lives in `crates/agent/src/skills.rs`.
 
 A changelog must be written for every new version release.
 

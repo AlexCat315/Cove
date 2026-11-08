@@ -166,8 +166,13 @@ pub unsafe extern "C" fn Java_com_cove_probe_MainActivity_createApplication(
         )(env, resources, path)
     };
     // SAFETY: the activity creates the application on the UI thread before any
-    // native thread reads the environment.
-    unsafe { std::env::set_var("PACKAGE_RESOURCE_BUNDLE_PATH", value) };
+    // native thread reads the environment. `resources` is `<filesDir>/runtime`,
+    // so its parent is the app-private directory Compose storage must use;
+    // Android has no usable HOME and must not write to `$HOME/.local/share`.
+    if let Some(files) = std::path::Path::new(&value).parent() {
+        unsafe { std::env::set_var("COVE_APP_STORAGE_DIR", files) };
+    }
+    unsafe { std::env::set_var("PACKAGE_RESOURCE_BUNDLE_PATH", &value) };
     // SAFETY: the VM passes live `jstring` arguments for this call.
     let (Some(state), Some(launch), Some(runtime)) = (unsafe {
         (

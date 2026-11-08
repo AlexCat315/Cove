@@ -4,6 +4,15 @@
 
 ## Unreleased
 
+- **移动端能力补齐与文档修复（2026-11-09）**：
+  - 键盘：`Shell` 新增 `show_soft_keyboard` / `hide_soft_keyboard` / `keyboard_height`（默认无副作用，桌面与测试 fake 不受影响）；`cove_shell` 的 C 桥用 `SDL_StartTextInput/StopTextInput` 显隐软键盘；`apple.m` 在 iOS 观察 `UIKeyboardWillShow/WillHide` 缓存键盘高度并唤醒事件循环；`Sdl3PlatformHost::keyboard_height()` 让 `Environment.keyboard` 每帧刷新。Android 原有 `WindowInsets.Type.ime()` 链路保持不变，两端现在共享同一套组件层 API。
+  - 存储：`FileAppStorageStore::default_path()` 拆出可测的 `base_for` 策略。iOS 写入沙盒 `Library/Application Support`，Android 由 `createApplication` 的 JNI 入口显式注入 `COVE_APP_STORAGE_DIR`（`resources` 的父目录，即应用私有 `filesDir`），也可回退到 `PACKAGE_RESOURCE_BUNDLE_PATH` 的父目录，不再写 `$HOME/.local/share`；桌面策略不变。
+  - 进程服务：`cove-system` 新增 `process_execution_available()` / `require_process_execution()`，`ProcessSession::new`、`ProcessSession::spawn`、`NativeProcess::start` 在 iOS/Android/tvOS/watchOS/visionOS 统一返回 `ProcessError::Unavailable`（聚合层为 `io::ErrorKind::Unsupported`），此前 README 声称的行为并无代码。
+  - 打包：`xtask/src/apple.rs` 抽出 `ios_entries`，iOS `Info.plist` 补 `UISupportedInterfaceOrientations` 与 `~ipad` 变体（四种方向），桌面 bundle 不受影响。
+  - 文档：新增 `Website/src/content/components/mobile.md` 并注册导航；修正 `README.md`、`Website/src/content/cargo.md` 的过时包名/脚本、`AGENTS.md` 残缺引用、`Docs/architecture.md` 悬空链接、`crates/hosts/src/PLATFORM_COVERAGE.md` 的 DevTools 状态、`crates/system/README.md` 的 Swift API 名、`editor_interaction_tests.rs` 的矛盾注释与三个平台 README；`Docs/gallery-audit.md` 记录结构验证与原生验收边界。
+  - 测试：`app_storage` 目录策略 5 项、进程守卫 2 项、iOS plist 键 1 项、软键盘默认实现 1 项，均为纯 Rust 结构测试。
+  - 未验证：iOS/Android 键盘、IME、触摸、存储、方向与进程行为均未做设备验收。已知缺口（iOS 独立宿主与 `UITextInput`、原生 IME 组合预览、Android 通用剪贴板 JNI、多指手势、SAF/权限、前后台通知、原生 WebView、Android https OpenSSL）已在平台矩阵中列明，未以空实现充当完成。
+
 - **CI 门禁失败修复（2026-11-08）**：
   - 统一 `cargo fmt --all` 的 5 处格式差异；`crates/graphics/src/dx12/pipeline.rs` 的 `formats` 只在 Windows 分支使用，导入改为 `#[cfg(target_os = "windows")]`，消除非 Windows 上的 `unused_imports`（clippy `-D warnings`）。
   - `cargo cove setup --check` 要求 macOS SDK 26+，desktop 矩阵由 `macos-15` 改为 `macos-26`；media-windows 补上固定版本的 Zig，避免 `setup --media` 报告 `zig` 未就绪。

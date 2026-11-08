@@ -33,7 +33,7 @@ use cove_core::scene::{
     UIWorkSchedulerHolder,
 };
 use cove_core::{
-    Environment, Font, FontWeight, InputCapabilities, Insets, State, set_content_scale,
+    Environment, Font, FontWeight, InputCapabilities, Insets, Keyboard, State, set_content_scale,
 };
 use cove_graphics::rhi::Device;
 use cove_imaging::ImageAssetRegistryHolder;
@@ -1015,6 +1015,9 @@ impl Application {
             leading: insets.leading,
             trailing: insets.trailing,
         };
+        // Refreshed every frame: UIKit posts keyboard frame changes on the main
+        // queue and wakes the event loop, so the writing surface can avoid it.
+        environment.keyboard = Keyboard::new(host.keyboard_height());
         #[cfg(any(target_os = "ios", target_os = "android"))]
         {
             environment.input = InputCapabilities::TOUCH | InputCapabilities::KEYBOARD;

@@ -473,26 +473,76 @@ fn set_box_value<T: AppStorageConvertible>(shared: &Arc<Mutex<AppStorageBox<T>>>
 }
 
 fn default_path() -> PathBuf {
+    platform_base().join("CoveUI").join("app-storage.json")
+}
+
+/// Which platform directory policy applies. Kept as data so every host,
+/// including iOS and Android, can be verified without a device.
+/// Each build constructs only its own variant; the other policies are
+/// exercised by `storage_path_tests` so every host stays verifiable offline.
+#[allow(dead_code)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum StoragePlatform {
+    Windows,
+    Apple,
+    Android,
+    Unix,
+    Other,
+}
+
+struct StoragePaths {
+    home: Option<PathBuf>,
+    config: Option<PathBuf>,
+    bundle: Option<PathBuf>,
+}
+
+/// `config` is `APPDATA` / `XDG_CONFIG_HOME` / `COVE_APP_STORAGE_DIR`.
+/// `bundle` is Android's `PACKAGE_RESOURCE_BUNDLE_PATH` (`<filesDir>/runtime`),
+/// whose parent is the app-private files directory. iOS `HOME` already points
+/// at the sandbox container, so `Library/Application Support` is the durable
+/// location; Android has no usable `HOME` and must not write to `.local/share`.
+fn base_for(platform: StoragePlatform, paths: &StoragePaths) -> PathBuf {
+    let temp = std::env::temp_dir;
+    match platform {
+        StoragePlatform::Windows => paths.config.clone().unwrap_or_else(temp),
+        StoragePlatform::Apple => paths
+            .home
+            .as_ref()
+            .map(|home| home.join("Library/Application Support"))
+            .unwrap_or_else(temp),
+        StoragePlatform::Android => paths
+            .config
+            .clone()
+            .or_else(|| {
+                paths
+                    .bundle
+                    .as_ref()
+                    .and_then(|bundle| bundle.parent())
+                    .map(Path::to_path_buf)
+            })
+            .unwrap_or_else(temp),
+        StoragePlatform::Unix => paths
+            .config
+            .clone()
+            .or_else(|| paths.home.as_ref().map(|home| home.join(".config")))
+            .unwrap_or_else(temp),
+        StoragePlatform::Other => temp(),
+    }
+}
+
+fn platform_base() -> PathBuf {
     #[cfg(target_os = "windows")]
-    let base = std::env::var_os("APPDATA")
-        .map(PathBuf::from)
-        .unwrap_or_else(std::env::temp_dir);
-    #[cfg(target_os = "macos")]
-    let base = std::env::var_os("HOME")
-        .map(PathBuf::from)
-        .map(|home| home.join("Library/Application Support"))
-        .unwrap_or_else(std::env::temp_dir);
+    let platform = StoragePlatform::Windows;
     #[cfg(any(
+        target_os = "macos",
         target_os = "ios",
         target_os = "tvos",
         target_os = "watchos",
-        target_os = "visionos",
-        target_os = "android"
+        target_os = "visionos"
     ))]
-    let base = std::env::var_os("HOME")
-        .map(PathBuf::from)
-        .map(|home| home.join(".local/share"))
-        .unwrap_or_else(std::env::temp_dir);
+    let platform = StoragePlatform::Apple;
+    #[cfg(target_os = "android")]
+    let platform = StoragePlatform::Android;
     #[cfg(all(
         unix,
         not(any(
@@ -504,10 +554,7 @@ fn default_path() -> PathBuf {
             target_os = "android"
         ))
     ))]
-    let base = std::env::var_os("XDG_CONFIG_HOME")
-        .map(PathBuf::from)
-        .or_else(|| std::env::var_os("HOME").map(|home| PathBuf::from(home).join(".config")))
-        .unwrap_or_else(std::env::temp_dir);
+    let platform = StoragePlatform::Unix;
     #[cfg(not(any(
         target_os = "windows",
         target_os = "macos",
@@ -516,20 +563,42 @@ fn default_path() -> PathBuf {
         target_os = "watchos",
         target_os = "visionos",
         target_os = "android",
+        unix
+    )))]
+    let platform = StoragePlatform::Other;
+
+    #[cfg(target_os = "windows")]
+    let config = std::env::var_os("APPDATA").map(PathBuf::from);
+    #[cfg(target_os = "android")]
+    let config = std::env::var_os("COVE_APP_STORAGE_DIR").map(PathBuf::from);
+    #[cfg(all(
+        unix,
+        not(any(target_os = "macos", target_os = "android", target_os = "windows"))
+    ))]
+    let config = std::env::var_os("XDG_CONFIG_HOME").map(PathBuf::from);
+    #[cfg(not(any(
+        target_os = "windows",
+        target_os = "android",
         all(
             unix,
-            not(any(
-                target_os = "macos",
-                target_os = "ios",
-                target_os = "tvos",
-                target_os = "watchos",
-                target_os = "visionos",
-                target_os = "android"
-            ))
+            not(any(target_os = "macos", target_os = "android", target_os = "windows"))
         )
     )))]
-    let base = std::env::temp_dir();
-    base.join("CoveUI").join("app-storage.json")
+    let config = None;
+
+    #[cfg(target_os = "android")]
+    let bundle = std::env::var_os("PACKAGE_RESOURCE_BUNDLE_PATH").map(PathBuf::from);
+    #[cfg(not(target_os = "android"))]
+    let bundle = None;
+
+    base_for(
+        platform,
+        &StoragePaths {
+            home: std::env::var_os("HOME").map(PathBuf::from),
+            config,
+            bundle,
+        },
+    )
 }
 
 fn quarantine_path(path: &Path) -> PathBuf {
@@ -543,4 +612,90 @@ fn quarantine_path(path: &Path) -> PathBuf {
         .map(|extension| format!(".{}", extension.to_string_lossy()))
         .unwrap_or_default();
     path.with_file_name(format!("{stem}.corrupt-{stamp}{suffix}"))
+}
+
+#[cfg(test)]
+mod storage_path_tests {
+    use super::*;
+
+    fn paths(home: Option<&str>) -> StoragePaths {
+        StoragePaths {
+            home: home.map(PathBuf::from),
+            config: None,
+            bundle: None,
+        }
+    }
+
+    #[test]
+    fn ios_uses_the_sandbox_application_support_directory() {
+        assert_eq!(
+            base_for(StoragePlatform::Apple, &paths(Some("/sandbox"))),
+            PathBuf::from("/sandbox/Library/Application Support")
+        );
+    }
+
+    #[test]
+    fn android_prefers_the_host_supplied_private_directory() {
+        let paths = StoragePaths {
+            home: Some("/".into()),
+            config: Some("/data/user/0/app/files".into()),
+            bundle: Some("/data/user/0/app/files/runtime".into()),
+        };
+        assert_eq!(
+            base_for(StoragePlatform::Android, &paths),
+            PathBuf::from("/data/user/0/app/files")
+        );
+    }
+
+    #[test]
+    fn android_falls_back_to_the_resource_bundle_parent() {
+        let paths = StoragePaths {
+            home: None,
+            config: None,
+            bundle: Some("/data/user/0/app/files/runtime".into()),
+        };
+        assert_eq!(
+            base_for(StoragePlatform::Android, &paths),
+            PathBuf::from("/data/user/0/app/files")
+        );
+    }
+
+    #[test]
+    fn android_never_writes_to_home_local_share() {
+        let paths = StoragePaths {
+            home: Some("/".into()),
+            config: None,
+            bundle: None,
+        };
+        assert_eq!(
+            base_for(StoragePlatform::Android, &paths),
+            std::env::temp_dir()
+        );
+    }
+
+    #[test]
+    fn desktop_policies_are_unchanged() {
+        assert_eq!(
+            base_for(
+                StoragePlatform::Windows,
+                &StoragePaths {
+                    home: None,
+                    config: Some("C:/Users/me/AppData/Roaming".into()),
+                    bundle: None,
+                }
+            ),
+            PathBuf::from("C:/Users/me/AppData/Roaming")
+        );
+        assert_eq!(
+            base_for(
+                StoragePlatform::Unix,
+                &StoragePaths {
+                    home: Some("/home/me".into()),
+                    config: None,
+                    bundle: None,
+                }
+            ),
+            PathBuf::from("/home/me/.config")
+        );
+    }
 }

@@ -599,6 +599,12 @@ impl Sdl3PlatformHost {
             .and_then(|s| self.main_window().and_then(|id| s.borrow().window(id)))
             .map_or(WindowSafeArea::default(), |w| w.safe_area())
     }
+    /// On-screen keyboard inset in logical points, refreshed every frame.
+    pub fn keyboard_height(&self) -> f32 {
+        self.shell()
+            .and_then(|s| self.main_window().map(|id| s.borrow().keyboard_height(id)))
+            .unwrap_or(0.0)
+    }
     pub fn window_position(&self, id: WindowId) -> Option<(f32, f32)> {
         self.shell()?.borrow().window_position(id)
     }

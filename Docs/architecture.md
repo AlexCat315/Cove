@@ -1,6 +1,6 @@
 # 能力分层与包边界
 
-> 本文记录保留中的 Swift 0.2.x 架构，作为 Rust 迁移的功能与边界验收依据。当前 Rust 工作区状态见 [rust-migration.md](rust-migration.md)，本页的 Swift 构建命令不再适用于当前 `cove` 入口。
+> 本文记录保留中的 Swift 0.2.x 架构，作为 Rust 迁移的功能与边界验收依据，不是当前实现的说明书。当前 Rust 工作区的包边界见根 `Cargo.toml` 与 `README.md`，逐页能力/验收状态见 [Gallery 验收表](gallery-audit.md)，Cargo 命令见 `Website/src/content/cargo.md`。本页的 Swift 构建命令不再适用于当前 `cove` 入口。
 
 每个能力拥有自己的源码、target 声明与测试。部署需求附着在能力及其实现上；目录和依赖方向不再由「能否脱离原生环境运行」决定。根 `Package.swift` 只定义应用入口与扩展，不重新声明下层 target。
 
@@ -71,11 +71,11 @@ Core + Composition + Text + Inspection ← Browser
 
 `LayoutNode`、`FlexProps` 和自定义布局由 `cove-core` 内的 Taffy（纯 Rust）实现，语义沿用 Swift 版的 Yoga：默认列方向、`flex-shrink: 0`、无自动最小尺寸、布局时解析 logical 边。Taffy 通过底层 trait 直接遍历 `LayoutNode` 树，每个节点自带样式、缓存和父节点相对的结果；自定义布局的探测与放置见 `crates/core/src/scene/layout_node/custom.rs`。Core 没有原生布局依赖。
 
-Taffy 启用 Flexbox、CSS Grid 与 `calc`。`CssGrid` 直接参与保留布局树；普通 `Grid` 通过自定义布局测量契约接入 Taffy 求解，列显隐策略仍归 Compose，`LazyGrid` 保留虚拟化。尺寸表达式与接口见 [布局](layout.md)。
+Taffy 启用 Flexbox、CSS Grid 与 `calc`。`CssGrid` 直接参与保留布局树；普通 `Grid` 通过自定义布局测量契约接入 Taffy 求解，列显隐策略仍归 Compose，`LazyGrid` 保留虚拟化。尺寸表达式与接口见 `Website/src/content/views.md`。
 
 ## 检查与验收
 
-`python3 Tools/Architecture/check.py` 检查每个 target 的唯一所有者、生产包依赖方向、源码 import 边界、跨能力原生桥接导入和内部 product 回流。CI 在构建前执行它。
+`cargo xtask audit --json` 检查工作区源码布局、迁移映射与目标声明；CI 在构建前执行它。已删除的 `Tools/Architecture/check.py` 属于 Swift 时代，不再使用。
 
 构建与测试直接使用 Cargo：
 

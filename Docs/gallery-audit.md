@@ -1,8 +1,16 @@
 # Gallery 逐项验收记录
 
-更新：2026-11-08。目录共 103 页（Numeric 合并 NumberField+Vec3Field，Text Fields 合并 TextField+SearchField+TextArea+JsonField）。当前控件页的验收以以下 Swift 对照表为准；后续旧轮记录保留其原有范围。
+更新：2026-11-09。目录共 103 页（Numeric 合并 NumberField+Vec3Field，Text Fields 合并 TextField+SearchField+TextArea+JsonField）。当前控件页的验收以以下 Swift 对照表为准；后续旧轮记录保留其原有范围。
 
 Swift 源码逐页对照见文末《Swift 源码对照（逐页差异清单）》。
+
+## 2026-11-09：移动端能力补齐与文档修复
+
+- 页面：新增用户文档 `Website/src/content/components/mobile.md`（移动端支持）并登记到 `Website/src/utils/docs.ts`「工具链」组；未新增 Gallery 控件页，目录仍为 103 页。
+- 结构验证：`app_storage` 的 iOS/Android/桌面目录策略纯 Rust 单测（`crates/compose/src/app_storage.rs`）；`cove-system` 移动端 `ProcessError::Unavailable` 守卫单测（`crates/system/src/command.rs`）；iOS `Info.plist` 方向键单测（`xtask/src/apple.rs`）；`Shell` 软键盘 API 默认无副作用单测（`crates/runtime/tests/platform_bridge_tests.rs`）；`cargo check --all-targets` 与全 workspace clippy / fmt / 测试通过。
+- 原生验收：**未做**。iOS 键盘高度与软键盘显隐、SDL3 UIKit 的 IME 组合预览、Android `filesDir` 持久化、屏幕方向、进程不可用行为均未在设备或模拟器实测；DevTools 文本注入不能验证原生键盘/IME 激活。
+- 未完成：iOS 独立宿主与 `UITextInput`、原生 IME 组合预览、Android 通用剪贴板 JNI、多指手势、SAF/文件权限、前后台生命周期通知、原生 WebView、Android https OpenSSL 打包。以上为已知缺口，已在平台矩阵与用户文档中列明，不是平台空实现。
+- 文档：修复 `README.md` / `Website/src/content/cargo.md` 的过时包名与已删除脚本，`AGENTS.md` 残缺 skill 引用，`Docs/architecture.md` 三处悬空链接/脚本，`crates/hosts/src/PLATFORM_COVERAGE.md` 的 DevTools 描述，`crates/system/README.md` 的 Swift 风格 API 名，`editor_interaction_tests.rs` 与代码矛盾的迁移期注释，以及三个 `Platforms/*/README.md` 的过时构建说明。
 
 ## 2026-11-08（二）：Media Player 改为画面内控制、弹幕、全屏/画中画与本地/网络来源
 
