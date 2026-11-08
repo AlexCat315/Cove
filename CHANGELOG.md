@@ -4,6 +4,11 @@
 
 ## Unreleased
 
+- **弹出层定位在布局回写中先于内容确定；嵌套子菜单不再跳位（2026-11-08）**：
+  - 根因：布局回写对每个节点先写子孙、后运行 `layout_did_update`；portal 槽位靠这个钩子把求得的位置翻转/夹紧进窗口，因此槽位里的菜单行在自己的钩子里读到的是父面板未夹紧的原始位置。行用它锚定下一级子菜单，而行重建时（`synchronize_submenu`）又用夹紧后的位置，于是父面板一旦被翻转或夹紧，下一级子菜单就在两个锚点之间交替——横向差一次翻转，纵向差夹紧量。重新弹出时的第一帧同样落在未夹紧的位置。
+  - 修复：`Node` 新增 `FrameResolver` / `set_frame_resolver` / `resolve_layout_frame`，`ViewGraph` 与 `LayoutPass` 的回写在祖先就位后、子孙写回前调用它。portal 槽位改用解析器按实时登记项（位置、`position_for_size`、锚点、视口边距）计算最终 frame，钩子只刷新尺寸约束；不再使用构建时捕获的旧位置。`PortalStore::entry`、`window_frame_in_parent` 公开。
+  - 测试：`a_nested_branch_follows_its_clamped_parent_on_every_pass`（三级菜单贴窗口右下角，修复前第三级请求落在 (842, 386)，屏幕上的行在 (450, 366)）；`an_open_submenu_stays_beside_its_row_in_a_flipped_menu`；`rebuilding_the_settings_menu_keeps_an_open_submenu_in_place`（播放器占满窗口、设置子菜单翻转夹紧，打开及之后每帧重建都与行对齐且不移动）；core `descendants_see_a_resolved_frame_within_the_same_pass`。compose 全量 1720 项通过。
+
 - **视频播放器改为画面内控制、弹幕、全屏与画中画；本地/网络来源（2026-11-08，破坏性）**：
   - `VideoPlayer` 重写为主流形态：进度条与控制栏叠在画面底部渐变上，播放时自动隐藏、指针活动时显示；中央大播放按钮与加载指示；单击播放/暂停、双击全屏；键盘 空格/K、←/→、↑/↓、F、M、D、P、Esc。新增 `MediaProgressBar`（悬停加粗、悬停时间、拖动预览、松手精确 seek）、`PlayerSettings`、`PlayerPresentation`、`PlayerActions`、`send_danmaku`。设置菜单：倍速、画面模式、弹幕不透明度/速度/字号/区域、音轨。旧的“画面 + 下方控制条”`VideoPlayer` 移除（破坏性）；`MediaTransport` 仍供 `AudioPlayer` 使用。
   - 弹幕：`DanmakuFeed`（时间排序、`parse_bilibili_xml`）、`DanmakuComment`（滚动/顶部/底部、自有描边）、`DanmakuSettings`、`DanmakuScheduler`（纯调度：车道分配、防追尾、满屏丢弃、seek 不涌出）、`DanmakuLayer`。位置只由媒体时间决定，暂停静止、倍速同步。

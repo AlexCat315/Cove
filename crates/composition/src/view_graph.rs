@@ -240,7 +240,7 @@ impl ViewGraph {
             // Hidden retained slots are not measured. Publish suppressed
             // geometry rather than uninitialized probe frames until placed.
             node.set_frame(if placement_visible {
-                layout.frame()
+                node.resolve_layout_frame(layout.frame())
             } else {
                 Rect::default()
             });

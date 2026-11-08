@@ -60,16 +60,21 @@ impl PortalPlacement {
 /// Places a portal slot at a window-space rect. The slot's frame is relative
 /// to its host, which can sit below a safe-area inset or a title bar.
 pub fn set_window_frame(node: &Node, window: Rect) {
+    node.set_frame(window_frame_in_parent(node, window));
+}
+
+/// A window-space rect expressed in `node`'s parent space.
+pub fn window_frame_in_parent(node: &Node, window: Rect) -> Rect {
     let origin = node
         .parent()
         .map(|parent| parent.absolute_frame())
         .unwrap_or_default();
-    node.set_frame(Rect::new(
+    Rect::new(
         window.x - origin.x,
         window.y - origin.y,
         window.width,
         window.height,
-    ));
+    )
 }
 
 pub fn portal_window_bounds(node: &Node) -> Rect {

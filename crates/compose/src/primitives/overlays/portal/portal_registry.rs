@@ -100,6 +100,11 @@ impl PortalStore {
             .collect()
     }
 
+    /// The live entry registered under `id`.
+    pub fn entry(&self, id: &str) -> Option<PortalEntry> {
+        self.inner.borrow().storage.get(id).cloned()
+    }
+
     pub fn revision(&self) -> i64 {
         self.inner.borrow().current_revision
     }

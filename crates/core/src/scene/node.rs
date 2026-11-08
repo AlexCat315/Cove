@@ -96,6 +96,11 @@ pub type ChromeHitRegion = Rc<dyn Fn(Point) -> bool>;
 /// none, so a text container shows the I-beam over its glyphs only.
 pub type CursorRegion = Rc<dyn Fn(Point) -> bool>;
 pub type LayoutUpdateHook = Rc<dyn Fn(&Node)>;
+/// Maps a node's solved layout frame to the frame it is placed at. Runs while
+/// layout is written back, after the node's ancestors are placed and before
+/// its descendants, so descendants that read on-screen geometry see the final
+/// placement within the same pass.
+pub type FrameResolver = Rc<dyn Fn(&Node, Rect) -> Rect>;
 
 pub struct NodeData {
     pub id: super::ElementId,
@@ -146,6 +151,7 @@ pub struct NodeData {
     chrome_hit_region: Option<ChromeHitRegion>,
     overlay_draw_identity: Option<AnyRenderContentIdentity>,
     pub layout_did_update: Option<LayoutUpdateHook>,
+    frame_resolver: Option<FrameResolver>,
     pub content_offset: Point,
     pub transform: super::NodeTransform,
     pub cursor: Option<SystemCursor>,
@@ -240,6 +246,7 @@ impl Node {
             chrome_hit_region: None,
             overlay_draw_identity: None,
             layout_did_update: None,
+            frame_resolver: None,
             content_offset: Point::default(),
             transform: super::NodeTransform::IDENTITY,
             cursor: None,
@@ -1016,6 +1023,17 @@ impl Node {
     }
     pub fn set_layout_did_update(&self, hook: Option<LayoutUpdateHook>) {
         self.0.borrow_mut().layout_did_update = hook;
+    }
+    pub fn set_frame_resolver(&self, resolver: Option<FrameResolver>) {
+        self.0.borrow_mut().frame_resolver = resolver;
+    }
+    /// The frame layout write-back places this node at for a solved `frame`.
+    pub fn resolve_layout_frame(&self, frame: Rect) -> Rect {
+        let resolver = self.0.borrow().frame_resolver.clone();
+        match resolver {
+            Some(resolve) => resolve(self, frame),
+            None => frame,
+        }
     }
 
     pub fn content_offset(&self) -> Point {

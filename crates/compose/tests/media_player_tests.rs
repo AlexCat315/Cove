@@ -660,3 +660,83 @@ fn position_reports_do_not_re_present_an_open_menu() {
         );
     });
 }
+
+#[test]
+fn rebuilding_the_settings_menu_keeps_an_open_submenu_in_place() {
+    use cove_core::{Rect, Size};
+    use cove_ui_compose::primitives::overlays::portal::portal_registry::PortalOwnership;
+    use cove_ui_compose::primitives::overlays::portal::{
+        LayerRoot, PortalPlacement, PortalPlacementMode,
+    };
+    const WIDTH: f32 = 640.0;
+    const HEIGHT: f32 = 360.0;
+    fn frame(scene: &InteractiveScene) {
+        cove_core::scene::drain_scene_invalidations();
+        scene.graph.recomposer.commit_all();
+        scene.graph.compute_layout(WIDTH, HEIGHT);
+        cove_core::AnimatorScheduler::current().tick(1.0 / 60.0);
+    }
+    fn speed_row(scene: &InteractiveScene) -> Node {
+        scene
+            .first(|node| node.attachment::<u64>("__menu_item_id") == Some(100))
+            .expect("the speed row is mounted")
+    }
+    /// The submenu's on-screen frame, checked against its row.
+    fn placed_submenu(scene: &InteractiveScene, label: &str) -> Rect {
+        let entries = scene.portal.entries();
+        assert_eq!(entries.len(), 2, "{label}: one menu and one submenu");
+        let entry = &entries[1];
+        let slot = scene
+            .first(|node| {
+                node.attachment::<String>(PortalOwnership::ENTRY_KEY)
+                    .as_deref()
+                    == Some(entry.id.as_str())
+            })
+            .expect("the submenu slot is mounted");
+        let anchor = speed_row(scene).absolute_frame();
+        let placed = slot.absolute_frame();
+        let expected = PortalPlacement::fit(
+            Point::new(anchor.x + anchor.width, anchor.y),
+            Size {
+                width: placed.width,
+                height: placed.height,
+            },
+            Rect::new(0.0, 0.0, WIDTH, HEIGHT),
+            Some(anchor),
+            entry.fit.viewport_margin,
+            PortalPlacementMode::BesideAnchor,
+        );
+        assert_eq!(placed, expected, "{label}: the submenu sits beside its row");
+        placed
+    }
+    // The player fills the window, so the submenu must flip and clamp.
+    InteractiveScene::run(WIDTH, HEIGHT, |scene| {
+        let control = FakeControl::new(PlaybackState::Paused, Some(MediaTime(600_000_000_000)));
+        scene.install(LayerRoot::new(AnyView::new(
+            VideoPlayer::new(control.clone()).frame_width(WIDTH),
+        )));
+        let settings = scene
+            .first(|node| {
+                node.accessibility()
+                    .is_some_and(|semantics| semantics.label == "Settings")
+            })
+            .expect("settings trigger");
+        scene.click(&settings, 1);
+        scene.settle(3, 0.1);
+        scene.focus.focus(Some(&speed_row(scene)), true);
+        scene.key(Scancode::ARROW_RIGHT, Default::default());
+        let first = placed_submenu(scene, "opening");
+        for step in 1..=12u64 {
+            control.change(|snapshot| {
+                snapshot.volume = 0.5 + step as f64 * 0.01;
+                snapshot.revision += 1;
+            });
+            frame(scene);
+            assert_eq!(
+                placed_submenu(scene, &format!("frame {step}")),
+                first,
+                "frame {step}: rebuilding the menu does not move the submenu"
+            );
+        }
+    });
+}

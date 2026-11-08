@@ -26,7 +26,7 @@ use cove_core::scene::{
 };
 use cove_core::{Point, Rect, Signal, Size};
 
-use super::portal_placement::{PortalPlacement, portal_window_bounds, set_window_frame};
+use super::portal_placement::{PortalPlacement, portal_window_bounds, window_frame_in_parent};
 use super::portal_registry::{
     PortalEntry, PortalOwnership, PortalStore, PortalStoreEnvironment, PortalStoreHolder,
 };
@@ -230,38 +230,41 @@ impl PrimitiveView for PortalEntrySlot {
             self.apply_fit(&layout, portal_window_bounds(node));
         }
 
-        // Re-place on every layout pass: the content's measured size feeds the
-        // position, so a panel that grows must be re-fitted.
-        if !self.entry.fills_window {
-            let entry = self.entry.clone();
+        // Placement is resolved while layout is written back: after the host is
+        // placed and before the content, so rows inside a panel read their
+        // on-screen frame — and anchor nested panels from it — in the same pass.
+        // The live entry is read so a moved request never waits for a rebuild.
+        if self.entry.fills_window {
+            node.set_frame_resolver(None);
+            node.set_layout_did_update(None);
+        } else {
+            let id = self.entry.id.clone();
+            let fallback = self.entry.clone();
             let store = self.store.clone();
+            node.set_frame_resolver(Some(Rc::new(move |node: &Node, solved: Rect| {
+                let entry = store.entry(&id).unwrap_or_else(|| fallback.clone());
+                if entry.fills_window {
+                    return solved;
+                }
+                let fitted = fitted_frame(
+                    &entry,
+                    Size {
+                        width: solved.width,
+                        height: solved.height,
+                    },
+                    portal_window_bounds(node),
+                    store.anchor(&entry.id),
+                );
+                window_frame_in_parent(node, fitted)
+            })));
+            let fit = self.entry.fit;
             node.set_layout_did_update(Some(Rc::new(move |node: &Node| {
                 let window = portal_window_bounds(node);
-                let size: Size = {
-                    let frame = node.frame();
-                    Size {
-                        width: frame.width,
-                        height: frame.height,
-                    }
-                };
-                let position = match &entry.position_for_size {
-                    Some(resolve) => resolve(size),
-                    None => entry.position,
-                };
-                let fitted = PortalPlacement::fit(
-                    position,
-                    size,
-                    window,
-                    store.anchor(&entry.id),
-                    entry.fit.viewport_margin,
-                    entry.placement,
-                );
-                set_window_frame(node, fitted);
                 if let Some(layout) = node.layout_node() {
-                    let (minimum, maximum) = entry.fit.width_range(window);
+                    let (minimum, maximum) = fit.width_range(window);
                     layout.set_min_width(Some(minimum));
                     layout.set_max_width(Some(maximum));
-                    layout.set_max_height(Some(entry.fit.height_limit(window)));
+                    layout.set_max_height(Some(fit.height_limit(window)));
                 }
             })));
         }
@@ -311,3 +314,24 @@ impl PrimitiveView for PortalEntrySlot {
 }
 
 impl_primitive_view!(PortalEntrySlot);
+
+/// Window-space frame for `entry` at its measured `size`.
+pub(crate) fn fitted_frame(
+    entry: &PortalEntry,
+    size: Size,
+    window: Rect,
+    anchor: Option<Rect>,
+) -> Rect {
+    let position = match &entry.position_for_size {
+        Some(resolve) => resolve(size),
+        None => entry.position,
+    };
+    PortalPlacement::fit(
+        position,
+        size,
+        window,
+        anchor,
+        entry.fit.viewport_margin,
+        entry.placement,
+    )
+}

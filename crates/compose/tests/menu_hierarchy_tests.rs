@@ -105,6 +105,8 @@ fn item(id: u64, title: &str, actions: &Rc<Cell<i32>>, delta: i32) -> MenuEntry 
 struct MenuHarness {
     shown: State<bool>,
     branch_disabled: State<bool>,
+    /// Bumped to rebuild the menu while it stays open.
+    revision: State<u32>,
     near_edge: bool,
     light: bool,
     scale: Option<f32>,
@@ -116,6 +118,7 @@ impl MenuHarness {
         Self {
             shown: State::new(false),
             branch_disabled: State::new(false),
+            revision: State::new(0),
             near_edge: false,
             light: false,
             scale: None,
@@ -156,6 +159,7 @@ impl View for MenuHarness {
             move || close()
         };
         let on_dismiss = close.clone();
+        let _ = self.revision.get();
         let menu = Menu::new((self.build)(self.branch_disabled.get()))
             .width(180.0)
             .max_visible_rows(4)
@@ -188,6 +192,7 @@ impl View for MenuHarness {
         vec![
             DynamicField::state("shown", &self.shown),
             DynamicField::state("branch_disabled", &self.branch_disabled),
+            DynamicField::state("revision", &self.revision),
         ]
     }
 }
@@ -426,6 +431,153 @@ fn submenus_flip_horizontally_within_the_viewport() {
         contains_rect(window, placed),
         "the flipped popup stays inside the window"
     );
+}
+
+#[test]
+fn an_open_submenu_stays_beside_its_row_in_a_flipped_menu() {
+    InteractiveScene::run(640.0, 400.0, |scene| {
+        let actions = Rc::new(Cell::new(0));
+        let probe = actions.clone();
+        let mut harness = MenuHarness::new(move |_| {
+            vec![
+                item(1, "Copy", &probe, 1),
+                item(2, "Paste", &probe, 1),
+                MenuEntry::Submenu(MenuSubmenu::new(
+                    3,
+                    "Tools",
+                    vec![
+                        item(4, "Build", &probe, 1),
+                        item(5, "Run", &probe, 1),
+                        item(6, "Test", &probe, 1),
+                    ],
+                )),
+            ]
+        });
+        harness.near_edge = true;
+        scene.install(harness.clone());
+        harness.shown_state().set(true);
+        scene.settle(5, 1.0);
+        let branch = row(scene, 3);
+        scene.focus.focus(Some(&branch), true);
+        key(scene, Scancode::ARROW_RIGHT);
+        scene.settle(3, 0.1);
+        assert_eq!(scene.portal.entries().len(), 2, "the branch is open");
+        let window = Rect::new(0.0, 0.0, 640.0, 400.0);
+        let mut first: Option<Rect> = None;
+        for revision in 1..=6 {
+            harness.revision.set(revision);
+            scene.settle(1, 0.016);
+            let entries = scene.portal.entries();
+            assert_eq!(entries.len(), 2, "rebuilding keeps one branch portal");
+            let entry = &entries[1];
+            let slot = scene
+                .first(|node| {
+                    node.attachment::<String>(PortalOwnership::ENTRY_KEY)
+                        .as_deref()
+                        == Some(entry.id.as_str())
+                })
+                .expect("the branch slot is mounted");
+            let anchor = row(scene, 3).absolute_frame();
+            let placed = slot.absolute_frame();
+            let expected = PortalPlacement::fit(
+                Point::new(anchor.x + anchor.width, anchor.y),
+                Size {
+                    width: placed.width,
+                    height: placed.height,
+                },
+                window,
+                Some(anchor),
+                entry.fit.viewport_margin,
+                PortalPlacementMode::BesideAnchor,
+            );
+            assert_eq!(
+                placed, expected,
+                "revision {revision}: the branch is placed from its row's on-screen frame {anchor:?}"
+            );
+            assert!(
+                contains_rect(window, placed),
+                "the branch stays inside the window"
+            );
+            match first {
+                None => first = Some(placed),
+                Some(first) => assert_eq!(
+                    placed, first,
+                    "revision {revision}: rebuilding the menu does not move the branch"
+                ),
+            }
+        }
+    });
+}
+
+#[test]
+fn a_nested_branch_follows_its_clamped_parent_on_every_pass() {
+    InteractiveScene::run(640.0, 400.0, |scene| {
+        let actions = Rc::new(Cell::new(0));
+        let probe = actions.clone();
+        let mut harness = MenuHarness::new(move |_| {
+            let leaves = |base: u64| -> Vec<MenuEntry> {
+                (0..3)
+                    .map(|index| item(base + index, &format!("Leaf {index}"), &probe, 1))
+                    .collect()
+            };
+            let mut middle: Vec<MenuEntry> = (0..4)
+                .map(|index| item(20 + index, &format!("Option {index}"), &probe, 1))
+                .collect();
+            middle.push(MenuEntry::Submenu(MenuSubmenu::new(30, "More", leaves(40))));
+            vec![
+                item(1, "Copy", &probe, 1),
+                item(2, "Paste", &probe, 1),
+                MenuEntry::Submenu(MenuSubmenu::new(3, "Tools", middle)),
+            ]
+        });
+        harness.near_edge = true;
+        scene.install(harness.clone());
+        harness.shown_state().set(true);
+        scene.settle(5, 1.0);
+        scene.focus.focus(Some(&row(scene, 3)), true);
+        key(scene, Scancode::ARROW_RIGHT);
+        scene.settle(3, 0.1);
+        let more = row(scene, 30);
+        scene.focus.focus(Some(&more), true);
+        key(scene, Scancode::ARROW_RIGHT);
+        scene.settle(3, 0.1);
+        assert_eq!(scene.portal.entries().len(), 3, "three levels are open");
+        let window = Rect::new(0.0, 0.0, 640.0, 400.0);
+        for revision in 1..=4 {
+            harness.revision.set(revision);
+            scene.settle(1, 0.016);
+            for level in 1..=2 {
+                let entries = scene.portal.entries();
+                let entry = &entries[level];
+                let slot = scene
+                    .first(|node| {
+                        node.attachment::<String>(PortalOwnership::ENTRY_KEY)
+                            .as_deref()
+                            == Some(entry.id.as_str())
+                    })
+                    .expect("the branch slot is mounted");
+                let anchor = row(scene, if level == 1 { 3 } else { 30 }).absolute_frame();
+                assert_eq!(
+                    entry.position,
+                    Point::new(anchor.x + anchor.width, anchor.y),
+                    "revision {revision}, level {level}: the request follows the row on screen"
+                );
+                let placed = slot.absolute_frame();
+                let expected = PortalPlacement::fit(
+                    entry.position,
+                    Size {
+                        width: placed.width,
+                        height: placed.height,
+                    },
+                    window,
+                    Some(anchor),
+                    entry.fit.viewport_margin,
+                    PortalPlacementMode::BesideAnchor,
+                );
+                assert_eq!(placed, expected, "revision {revision}, level {level}");
+            }
+        }
+    });
 }
 
 #[test]
