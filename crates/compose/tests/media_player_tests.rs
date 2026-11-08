@@ -19,9 +19,11 @@ use cove_media::{
     PixelFormat, PlaneLayout, PlaybackControl, PlaybackState, PlayerSnapshot, SeekRequest,
     SharedPlanes, VideoDynamicRange, VideoFormat, VideoFrame, VideoOutput,
 };
+use cove_ui_compose::Scancode;
 use cove_ui_compose::modifiers::layout::LayoutFrameExt;
 use cove_ui_compose::primitives::media::{
-    AudioPlayer, MediaTransport, VideoView, Waveform, format_media_time,
+    AudioPlayer, DanmakuComment, DanmakuFeed, MediaProgressBar, MediaTransport, VideoPlayer,
+    VideoView, Waveform, format_media_time,
 };
 
 #[derive(Debug, Clone, PartialEq)]
@@ -30,6 +32,7 @@ enum Call {
     Pause,
     Seek(SeekRequest),
     Volume(f64),
+    Rate(f64),
 }
 
 struct FakeControl {
@@ -91,8 +94,8 @@ impl PlaybackControl for FakeControl {
     fn set_volume(&self, volume: f64) -> MediaResult<()> {
         self.record(Call::Volume(volume))
     }
-    fn set_rate(&self, _rate: f64) -> MediaResult<()> {
-        Ok(())
+    fn set_rate(&self, rate: f64) -> MediaResult<()> {
+        self.record(Call::Rate(rate))
     }
     fn on_change(&self, callback: ChangeCallback) -> ChangeListener {
         self.notifier.listen(callback)
@@ -348,5 +351,214 @@ fn listener_is_released_with_the_view() {
         assert_eq!(control.notifier.listener_count(), 1);
         scene.install(cove_composition::EmptyView);
         assert_eq!(control.notifier.listener_count(), 0);
+    });
+}
+
+fn labelled_button(scene: &InteractiveScene, label: &str) -> Option<Node> {
+    scene.labelled(label, Some(AccessibilityRole::Button))
+}
+
+#[test]
+fn overlay_controls_and_shortcuts_drive_the_control() {
+    InteractiveScene::run(800.0, 600.0, |scene| {
+        let control = FakeControl::new(PlaybackState::Paused, Some(MediaTime(60_000_000_000)));
+        scene.install(
+            VideoPlayer::new(control.clone())
+                .danmaku(DanmakuFeed::new())
+                .frame_width(640.0),
+        );
+        for label in [
+            "Play",
+            "Mute",
+            "Hide danmaku",
+            "Picture in picture",
+            "Full screen",
+        ] {
+            assert!(labelled_button(scene, label).is_some(), "{label} button");
+        }
+        let seek = scene
+            .labelled("Seek", Some(AccessibilityRole::Slider))
+            .expect("seek bar");
+        let player = scene.labelled("Video player", None).expect("player");
+        let video = player.absolute_frame();
+        assert!(
+            seek.absolute_frame().y > video.y + video.height * 0.75,
+            "the seek bar sits inside the bottom of the picture"
+        );
+        assert!(
+            (video.height - video.width * 9.0 / 16.0).abs() < 1.0,
+            "16:9 before any frame"
+        );
+
+        scene.click(&labelled_button(scene, "Play").expect("play"), 1);
+        assert_eq!(control.calls(), vec![Call::Play]);
+
+        // A click on the picture focuses the player (and toggles playback).
+        scene.click_at_point(Point::new(video.x + 40.0, video.y + 40.0), 1);
+        assert_eq!(control.calls().len(), 2);
+        scene.key(Scancode::ARROW_RIGHT, Default::default());
+        assert_eq!(
+            control.calls().last(),
+            Some(&Call::Seek(SeekRequest::exact(MediaTime(5_000_000_000))))
+        );
+        scene.key(Scancode::M, Default::default());
+        assert_eq!(control.calls().last(), Some(&Call::Volume(0.0)));
+        assert!(labelled_button(scene, "Unmute").is_some());
+        scene.key(Scancode::D, Default::default());
+        assert!(labelled_button(scene, "Show danmaku").is_some());
+    });
+}
+
+#[test]
+fn full_screen_and_picture_in_picture_fall_back_inside_the_window() {
+    InteractiveScene::run(800.0, 600.0, |scene| {
+        let control = FakeControl::new(PlaybackState::Paused, Some(MediaTime(60_000_000_000)));
+        scene.install(VideoPlayer::new(control.clone()).frame_width(640.0));
+        assert!(scene.portal.entries().is_empty());
+
+        scene.click(
+            &labelled_button(scene, "Full screen").expect("full screen"),
+            1,
+        );
+        assert!(scene.labelled("Playing in full screen", None).is_some());
+        assert_eq!(
+            scene.portal.entries().len(),
+            1,
+            "the surface moves to a window portal"
+        );
+        scene.click(&labelled_button(scene, "Return").expect("return"), 1);
+        assert!(scene.portal.entries().is_empty());
+        assert!(labelled_button(scene, "Full screen").is_some());
+
+        scene.click(
+            &labelled_button(scene, "Picture in picture").expect("pip"),
+            1,
+        );
+        assert!(
+            scene
+                .labelled("Playing in picture-in-picture", None)
+                .is_some()
+        );
+        assert_eq!(
+            scene.portal.entries().len(),
+            1,
+            "without a floating-window host the picture floats in the window"
+        );
+        scene.click(&labelled_button(scene, "Return").expect("return"), 1);
+        assert!(scene.portal.entries().is_empty());
+    });
+}
+
+#[test]
+fn due_danmaku_render_as_text_over_the_picture() {
+    InteractiveScene::run(800.0, 600.0, |scene| {
+        let control = FakeControl::new(PlaybackState::Paused, Some(MediaTime(60_000_000_000)));
+        let feed = DanmakuFeed::from_comments([
+            DanmakuComment::new(MediaTime(1_000_000_000), "hello cove"),
+            DanmakuComment::new(MediaTime(30_000_000_000), "later"),
+        ]);
+        scene.install(
+            VideoPlayer::new(control.clone())
+                .danmaku(feed)
+                .frame_width(640.0),
+        );
+        control.change(|snapshot| snapshot.position = Some(MediaTime(1_500_000_000)));
+        scene.settle(5, 1.0 / 60.0);
+        let comment = scene
+            .labelled("hello cove", None)
+            .expect("the due comment is on screen");
+        let video = scene
+            .labelled("Video player", None)
+            .expect("player")
+            .absolute_frame();
+        let frame = comment.absolute_frame();
+        assert!(
+            frame.x > video.x && frame.x < video.x + video.width,
+            "{frame:?}"
+        );
+        assert!(scene.labelled("later", None).is_none());
+
+        scene.click(&labelled_button(scene, "Hide danmaku").expect("toggle"), 1);
+        assert!(scene.labelled("hello cove", None).is_none());
+    });
+}
+
+#[test]
+fn the_seek_bar_previews_while_dragging_and_commits_on_release() {
+    InteractiveScene::run(600.0, 200.0, |scene| {
+        let calls = Arc::new(Mutex::new(Vec::new()));
+        let sink = calls.clone();
+        scene.install(
+            MediaProgressBar::new(0.0, 100.0)
+                .on_scrub(move |seconds, committed| sink.lock().unwrap().push((seconds, committed)))
+                .frame_width(400.0),
+        );
+        let bar = scene.labelled("Seek", None).expect("bar").absolute_frame();
+        let y = bar.y + bar.height / 2.0;
+        scene.drag(
+            Point::new(bar.x + bar.width * 0.1, y),
+            Point::new(bar.x + bar.width * 0.5, y),
+            4,
+        );
+        let calls = calls.lock().unwrap().clone();
+        let (last, committed) = *calls.last().expect("scrubbed");
+        assert!(committed, "release commits");
+        assert!((last - 50.0).abs() < 1.5, "{last}");
+        assert!(
+            calls[..calls.len() - 1]
+                .iter()
+                .all(|(_, committed)| !committed)
+        );
+    });
+}
+
+/// Opacity of `node` times that of every ancestor.
+fn effective_opacity(node: &Node) -> f32 {
+    let mut opacity = node.opacity();
+    let mut parent = node.parent();
+    while let Some(ancestor) = parent {
+        opacity *= ancestor.opacity();
+        parent = ancestor.parent();
+    }
+    opacity
+}
+
+#[test]
+fn hidden_controls_stay_mounted_and_ignore_a_resting_pointer() {
+    use cove_platform::{InputEvent, MouseMotionEvent};
+    InteractiveScene::run(800.0, 600.0, |scene| {
+        let control = FakeControl::new(PlaybackState::Playing, Some(MediaTime(60_000_000_000)));
+        scene.install(VideoPlayer::new(control.clone()).autohide(0.05).frame_width(640.0));
+        let video = scene.labelled("Video player", None).expect("player").absolute_frame();
+        let motion = |x: f32, y: f32| {
+            scene
+                .dispatcher()
+                .dispatch(&InputEvent::MouseMotion(MouseMotionEvent {
+                    x,
+                    y,
+                    delta_x: 0.0,
+                    delta_y: 0.0,
+                    kind: Default::default(),
+                }));
+            scene.settle(2, 1.0 / 60.0);
+        };
+        let (x, y) = (video.x + 100.0, video.y + 80.0);
+        motion(x, y);
+        let pause = || labelled_button(scene, "Pause").expect("the bar stays mounted");
+        assert!(effective_opacity(&pause()) > 0.99, "movement shows the bar");
+
+        std::thread::sleep(std::time::Duration::from_millis(80));
+        scene.settle(3, 1.0 / 60.0);
+        assert!(effective_opacity(&pause()) < 0.01, "idle hides the bar");
+
+        for _ in 0..5 {
+            motion(x, y);
+        }
+        assert!(
+            effective_opacity(&pause()) < 0.01,
+            "a resting pointer must not flash the bar back"
+        );
+        motion(x + 6.0, y);
+        assert!(effective_opacity(&pause()) > 0.99, "real movement shows it again");
     });
 }

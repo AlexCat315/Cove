@@ -203,14 +203,9 @@ fn flush_surfaces() {
         surfaces.iter().filter_map(Weak::upgrade).collect()
     });
     for surface in surfaces {
-        let was = surface.dirty.swap(false, Ordering::AcqRel);
-        let node = Node::upgrade(&surface.node.borrow());
-        // TEMP-DIAG
-        cove_logging::LogSystem::logger("com.cove.media.diag").log(&cove_logging::LogEvent::new(
-            cove_logging::Level::Info,
-            format!("flush dirty={was} node={}", node.is_some()),
-        ));
-        if was && let Some(node) = node {
+        if surface.dirty.swap(false, Ordering::AcqRel)
+            && let Some(node) = Node::upgrade(&surface.node.borrow())
+        {
             node.mark_render_dirty(InvalidationSource::style_set("video.frame"));
         }
     }
@@ -295,11 +290,6 @@ impl VideoSurface {
         {
             return Some(current.clone());
         }
-        // TEMP-DIAG
-        cove_logging::LogSystem::logger("com.cove.media.diag").log(&cove_logging::LogEvent::new(
-            cove_logging::Level::Info,
-            format!("texture pts={:?} seq={}", frame.pts.map(cove_media::MediaTime::seconds), frame.sequence),
-        ));
         let pixels = frame.rgba_pixels().ok()?;
         let bitmap = Bitmap::new(frame.format.width, frame.format.height, pixels).ok()?;
         let (display_width, display_height) = display_size(&frame);

@@ -415,7 +415,13 @@ fn lane_height(font: f32) -> f32 {
 /// Wide (CJK, emoji) characters take about one em, others about half.
 fn estimate_width(text: &str, font: f32) -> f32 {
     text.chars()
-        .map(|character| if (character as u32) > 0x2E7F { 1.0 } else { 0.56 })
+        .map(|character| {
+            if (character as u32) > 0x2E7F {
+                1.0
+            } else {
+                0.56
+            }
+        })
         .sum::<f32>()
         * font
 }
@@ -524,8 +530,7 @@ impl DanmakuHost {
             &self.layer.settings,
         );
         if changed {
-            self.active
-                .set(self.scheduler.borrow().active().to_vec());
+            self.active.set(self.scheduler.borrow().active().to_vec());
         }
         let items = self.active.get_untracked();
         for (item, child) in items.iter().zip(node.children()) {
@@ -535,13 +540,8 @@ impl DanmakuHost {
             } else {
                 item.estimated_width
             };
-            let at = DanmakuScheduler::placement(
-                item,
-                position,
-                viewport,
-                &self.layer.settings,
-                width,
-            );
+            let at =
+                DanmakuScheduler::placement(item, position, viewport, &self.layer.settings, width);
             if let Some(layout) = child.layout_node() {
                 layout.set_position(at.x.round(), Edge::Left);
                 layout.set_position(at.y.round(), Edge::Top);
@@ -577,11 +577,30 @@ impl PrimitiveView for DanmakuHost {
     }
 
     fn children(&self, node: &Node) -> Vec<AnyView> {
-        let height = node.frame().height;
-        let font = self.layer.settings.font_size(if height > 0.0 { height } else { 270.0 });
+        let frame = node.frame();
+        let viewport = Size {
+            width: frame.width,
+            height: if frame.height > 0.0 {
+                frame.height
+            } else {
+                270.0
+            },
+        };
+        let font = self.layer.settings.font_size(viewport.height);
+        let position = self.clock.now();
         self.items
             .iter()
-            .map(|item| AnyView::new(DanmakuItemView::new(&item.comment, font)))
+            .map(|item| {
+                // Placed from the estimated width now; ticks refine it once measured.
+                let at = DanmakuScheduler::placement(
+                    item,
+                    position,
+                    viewport,
+                    &self.layer.settings,
+                    item.estimated_width,
+                );
+                AnyView::new(DanmakuItemView::new(&item.comment, font, at))
+            })
             .collect()
     }
 }
@@ -594,15 +613,17 @@ struct DanmakuItemView {
     color: Color,
     is_own: bool,
     font: f32,
+    at: Point,
 }
 
 impl DanmakuItemView {
-    fn new(comment: &DanmakuComment, font: f32) -> Self {
+    fn new(comment: &DanmakuComment, font: f32, at: Point) -> Self {
         Self {
             text: comment.text.clone(),
             color: comment.color,
             is_own: comment.is_own,
             font,
+            at,
         }
     }
 }
@@ -617,9 +638,13 @@ impl PrimitiveView for DanmakuItemView {
     fn make_layout_node(&self) -> Option<LayoutNode> {
         let layout = LayoutNode::new();
         layout.set_position_type(PositionType::Absolute);
-        layout.set_position(f32::MAX / 4.0, Edge::Left);
-        layout.set_position(0.0, Edge::Top);
+        self.update_layout(&layout);
         Some(layout)
+    }
+
+    fn update_layout(&self, layout: &LayoutNode) {
+        layout.set_position(self.at.x.round(), Edge::Left);
+        layout.set_position(self.at.y.round(), Edge::Top);
     }
 
     fn update_node(&self, node: &Node) {
@@ -698,12 +723,16 @@ mod tests {
         assert!(!scheduler.advance(&feed, 0.5, VIEW, &settings));
         assert!(scheduler.advance(&feed, 1.01, VIEW, &settings));
         let lanes: Vec<usize> = scheduler.active().iter().map(|item| item.lane).collect();
-        assert_eq!(lanes, vec![0, 1], "simultaneous comments take separate lanes");
+        assert_eq!(
+            lanes,
+            vec![0, 1],
+            "simultaneous comments take separate lanes"
+        );
         let start = DanmakuScheduler::placement(&scheduler.active()[0], 1.0, VIEW, &settings, 50.0);
         let later = DanmakuScheduler::placement(&scheduler.active()[0], 5.0, VIEW, &settings, 50.0);
         assert_eq!(start.x, 640.0);
         assert!(later.x < start.x);
-        let mut play_to = |scheduler: &mut DanmakuScheduler, from: f64, to: f64| {
+        let play_to = |scheduler: &mut DanmakuScheduler, from: f64, to: f64| {
             let mut position = from;
             while position < to {
                 position = (position + 0.25).min(to);
@@ -713,7 +742,11 @@ mod tests {
         play_to(&mut scheduler, 1.01, 2.0);
         assert_eq!(scheduler.active().len(), 3);
         play_to(&mut scheduler, 2.0, 6.5);
-        assert_eq!(scheduler.active().len(), 2, "the top comment expires after 4 s");
+        assert_eq!(
+            scheduler.active().len(),
+            2,
+            "the top comment expires after 4 s"
+        );
         play_to(&mut scheduler, 6.5, 9.5);
         assert!(scheduler.active().is_empty());
     }

@@ -4,6 +4,15 @@
 
 Swift 源码逐页对照见文末《Swift 源码对照（逐页差异清单）》。
 
+## 2026-11-08（二）：Media Player 改为画面内控制、弹幕、全屏/画中画与本地/网络来源
+
+- 页面：去掉随仓库样片与合成源，改为“Open file…”（原生面板）、拖放到播放器/音频卡片、URL 输入三种来源；视频同名 `.xml` 弹幕自动加载，弹幕输入框可选 6 色发送，也可导入 XML；音频在后台线程解码波形与标签。需 `--features media-ffmpeg`。
+- 结构验证：compose `media_player_tests` 11 项全部通过（新增：画面内控制栏位置与 16:9、播放按钮与快捷键 →/M/D、全屏与画中画在无宿主时的窗口内回退与 Return、到期弹幕渲染在画面内且可关闭、进度条拖动中为预览、松手提交）；`cove-media` 集成 11 项（新增 HTTP 206 探测与播放到结束、700 帧超队列读前无丢帧）。
+- 原生验收（DevTools，FFmpeg 构建，30 秒 1280×720 H.264/AAC 本地文件）：本地路径打开后自动播放并加载 160 条 XML 弹幕，滚动/顶部/底部弹幕带阴影渲染、随媒体时间移动；悬停显示底部渐变控制栏、中央播放按钮与时间；控制栏图标（播放、音量、时间、弹幕、设置、画中画、全屏）就位。
+- 用户反馈：播放中控制栏不停闪烁。根因是自动隐藏会卸载控制栏，命中目标变化被当作指针移动而重新显示，形成显示/隐藏循环；改为常驻挂载、只切换不透明度与命中，并仅以真实位移计为活动，`hidden_controls_stay_mounted_and_ignore_a_resting_pointer` 覆盖。
+- 验收中发现并修复：解复用路由写反导致约 17.5 秒处画面冻结（引擎层复现并修复，有回归测试）；暂停时到期的弹幕停在屏外（创建时即按估算宽度定位）；音量滑块拇指压住时间标签（改为外层留白）。
+- 未完成：设置菜单、真实系统全屏与画中画窗口、HTTPS 远程 URL、音频卡片拖放尚未在原生窗口逐项目检——验收后半段 gallery 窗口不再输出帧（DevTools 截图与输入超时，进程空闲等待显示刷新，判断为窗口不可见），需窗口在前台时补测。iOS/Android/Windows/Linux 未做设备验收；移动端画中画为窗口内浮动回退，非系统画中画。
+
 ## 2026-11-08：音视频组件（Media Player）
 
 - 新页：Media 分类下的 Media Player，覆盖 `VideoPlayer`、`AudioPlayer`、`MediaTransport`、`VideoView`、`AudioLevelMeter`、`Waveform`。默认构建由基于公开底层 API 的合成源驱动（`VideoOutput` 发布 `SharedPlanes` 帧、`AudioMeter::record` 计量）；`--features media-ffmpeg` 播放 `examples/gallery/resources/media/sample.mp4`（384×216 H.264 + AAC 调幅正弦，8s），波形由 `MediaDecoder` 解出。
@@ -305,7 +314,7 @@ cargo test -p cove-ui-compose --test compose --locked
 | Carousel | 5 | 1 / 3 | 挂载/几何基础检查通过；待逐项交互和视觉验收 |
 | Skeleton | 2 | 0 / 0 | 挂载/几何基础检查通过；待逐项交互和视觉验收 |
 | Stepper | 3 | 0 / 0 | 2026-11-07 重做外观与自适应堆叠：实心状态标记、跨越真实间距的连接线、选中只强调标记与标题；堆叠分支塌陷已修复并有回归；浅/深主题与宽窄布局目检通过；文档已写 |
-| Media Player | 2 | 0 / 0 | 2026-11-08 新增：视频画面与控制条、音频卡片（电平、波形 seek）；FFmpeg 与合成源两种构建 DevTools 原生验收通过；浅/深主题目检通过；文档已写 |
+| Media Player | 2 | 0 / 0 | 2026-11-08 改为画面内控制、弹幕、全屏/画中画、本地文件/拖放/URL 来源；播放、弹幕、控制栏原生目检通过；设置菜单、系统全屏、画中画窗口、HTTPS 待前台补测；文档已写 |
 | SingleLineText | 2 | 0 / 0 | 挂载/几何基础检查通过；待逐项交互和视觉验收 |
 | CompletionPopover | 2 | 0 / 0 | 挂载/几何基础检查通过；待逐项交互和视觉验收 |
 | RouteOutlet | 2 | 0 / 0 | 挂载/几何基础检查通过；待逐项交互和视觉验收 |

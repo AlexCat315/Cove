@@ -4,6 +4,17 @@
 
 ## Unreleased
 
+- **视频播放器改为画面内控制、弹幕、全屏与画中画；本地/网络来源（2026-11-08，破坏性）**：
+  - `VideoPlayer` 重写为主流形态：进度条与控制栏叠在画面底部渐变上，播放时自动隐藏、指针活动时显示；中央大播放按钮与加载指示；单击播放/暂停、双击全屏；键盘 空格/K、←/→、↑/↓、F、M、D、P、Esc。新增 `MediaProgressBar`（悬停加粗、悬停时间、拖动预览、松手精确 seek）、`PlayerSettings`、`PlayerPresentation`、`PlayerActions`、`send_danmaku`。设置菜单：倍速、画面模式、弹幕不透明度/速度/字号/区域、音轨。旧的“画面 + 下方控制条”`VideoPlayer` 移除（破坏性）；`MediaTransport` 仍供 `AudioPlayer` 使用。
+  - 弹幕：`DanmakuFeed`（时间排序、`parse_bilibili_xml`）、`DanmakuComment`（滚动/顶部/底部、自有描边）、`DanmakuSettings`、`DanmakuScheduler`（纯调度：车道分配、防追尾、满屏丢弃、seek 不涌出）、`DanmakuLayer`。位置只由媒体时间决定，暂停静止、倍速同步。
+  - 全屏与画中画：`Shell` 新增 `set_window_fullscreen` / `is_window_fullscreen` / `set_window_always_on_top`（默认空实现；SDL3 实现，macOS 用 AppKit `toggleFullScreen` 与浮动层级并可跨 Space/全屏应用；线程化宿主经 `PlatformCommand::Fullscreen/AlwaysOnTop` 转发，`WindowSnapshot` 新增 `fullscreen`）。compose 新增 `core::WindowPresentation` / `WindowPresenter`，桌面宿主安装实现（全屏 = 主窗口全屏 + 覆盖窗口的 portal；画中画 = 置顶辅助窗口）。无宿主支持时全屏仅覆盖窗口、画中画在窗口内浮动；系统层面退出全屏或关闭画中画窗口会回到页面内。
+  - 来源：新增 `HttpInput`（`cove-http` 原生 TLS 上的字节范围请求，`206` 可 seek），`http(s)://`（非 `.m3u8`）URI 在 `Player` 与 `MediaDecoder` 中自动经它读取——内置 FFmpeg 不含 TLS，此前 `https` 无法播放。`PlaybackControl` 新增 `select_tracks`（默认不支持，`Player` 实现）。
+  - 控制栏闪烁：播放中指针停在控制栏上时，自动隐藏把控制栏移出节点树，指针下的命中目标随之改变并被当作移动，控制栏又显示、又因手势层的离开事件再次隐藏，循环闪烁。现在控制栏始终挂载，只切换不透明度与子树命中（`ChromeVisibility`）；只有真实的指针位移才算活动；隐藏只由空闲计时决定。新增回归测试。
+  - 布局：`LayoutNode::set_aspect_ratio`（Taffy `aspect_ratio`），播放器按宽度保持 16:9。图标新增 `picture-in-picture`、`danmaku`、`danmaku-off`、`play-fill`；`Scancode::M`。`Waveform` 默认按峰值归一化（`.normalized(false)` 关闭）。
+  - 修复（既有引擎缺陷）：解复用路由条件写反——包所属流已选中但队列已满时直接丢弃，未选中流的包反而被延后；视频队列 512 包上限约 17 秒，读到前面后丢包，画面在约 17.5 秒处冻结直到下一个关键帧（音频同理会出现缺口）。改为未选中/不可解码流丢弃、已满的选中流延后，另一选中流饥饿时允许有界超出（4 倍），避免交错死锁；延后包仍满时不再空转。
+  - Gallery：Media Player 页改为本地文件（原生打开面板、拖放到播放器/音频卡片）与网络 URL 两种来源，视频同名 `.xml` 弹幕自动加载，可输入发送弹幕（6 种颜色）或导入 XML；音频在后台解码波形与标签。播放需 `--features media-ffmpeg`（未开启时页面给出命令）。不再随仓库附带样片：上一轮的 `sample.mp4` 移到 `crates/media/tests/fixtures/` 仅作真实编解码测试夹具。
+  - 测试：compose `media_player_tests` 新增 5 项（画面内控制与快捷键、全屏/画中画窗口内回退、弹幕渲染与开关、进度条拖动预览与松手提交、隐藏后静止指针不闪回），共 11 项；`danmaku` 单元测试 4 项；`cove-media` 新增 HTTP 端到端与超队列读前两项（共 11 项），`HttpInput` 单元测试 2 项。
+
 - **音视频组件与底层媒体 API（2026-11-08）**：
   - 组件：`cove_ui_compose::primitives::media` 新增 `VideoPlayer`、`AudioPlayer`、`MediaTransport`（播放/暂停、拖动 seek、时间、静音与音量）、`VideoView`、`AudioLevelMeter` 与 `Waveform`，以及 `use_playback(cx, &control)`。组件只依赖新的 `cove_media::PlaybackControl` 契约，`cove-ui-compose` 依赖不带 FFmpeg 的 `cove-media`。媒体线程的变更只置位原子标记并向 UI 线程投递至多一个刷新；视频帧以每个视图一个稳定纹理 id 提交，渲染器就地更新同一 GPU 纹理槽。
   - 底层 API（始终可用）：`PlaybackControl`、`ChangeNotifier` / `ChangeListener`、`VideoOutput::on_change`、`VideoStorage::shared_plane`（默认 `None`）、`SharedPlanes`、`VideoFrame::rgba_pixels`、`AudioFormat`、`AudioBuffer`、`AudioPeak` / `audio_peaks`、`AudioMeter`（实时回调安全）、`AudioLevels`、`AudioDeviceInfo`、`MediaInfo` / `StreamInfo` / `StreamDetails`、`DecoderOptions`、`sample_stats` / `channel_stats`。样本统计内核在 AArch64（NEON）与 x86-64（SSE）上为内联汇编，其他目标为标量实现。

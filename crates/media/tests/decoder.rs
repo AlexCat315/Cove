@@ -287,8 +287,7 @@ fn player_resamples_unspecified_layouts_and_reports_true_duration() {
 /// Real codecs: H.264 video and AAC audio from the gallery sample clip.
 #[test]
 fn compressed_sample_decodes_video_and_audio() {
-    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("tests/fixtures/sample.mp4");
+    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/sample.mp4");
     let info = probe(MediaSource::file(&path)).expect("probe");
     assert_eq!(info.title(), Some("Test Pattern"));
     assert_eq!(info.first(TrackKind::Video).expect("video").codec, "h264");
@@ -367,39 +366,6 @@ fn seeking_after_the_end_repositions_and_pauses() {
     context.wait_closed(Duration::from_secs(5)).expect("closed");
 }
 
-#[test]
-#[ignore = "diagnostic: set COVE_MEDIA_PROBE to a media file"]
-fn diagnostic_device_playback_timeline() {
-    let Ok(path) = std::env::var("COVE_MEDIA_PROBE") else {
-        return;
-    };
-    let context = MediaContext::new(ContextOptions::default()).expect("context");
-    let player = context
-        .create_player(PlayerOptions {
-            autoplay: true,
-            audio: AudioOutput::DefaultDevice,
-        })
-        .expect("player");
-    let open = player.open(MediaSource::file(path)).expect("open");
-    player.wait_result(open, Duration::from_secs(10)).expect("opened");
-    let start = Instant::now();
-    while start.elapsed() < Duration::from_secs(24) {
-        let snapshot = player.snapshot();
-        let frame = player.video_output().latest().and_then(|frame| frame.pts);
-        println!(
-            "{:5.2}s state={:?} position={:?} frame={:?}",
-            start.elapsed().as_secs_f64(),
-            snapshot.state,
-            snapshot.position.map(MediaTime::seconds),
-            frame.map(MediaTime::seconds)
-        );
-        if snapshot.state == PlaybackState::Ended {
-            break;
-        }
-        std::thread::sleep(Duration::from_millis(500));
-    }
-}
-
 /// More packets than one stream's queue holds must be deferred, never dropped.
 #[test]
 fn read_ahead_beyond_the_queue_limit_keeps_every_frame() {
@@ -422,7 +388,9 @@ fn read_ahead_beyond_the_queue_limit_keeps_every_frame() {
     let open = player
         .open(MediaSource::bytes(y4m(16, 8, 700, 200)))
         .expect("open");
-    player.wait_result(open, Duration::from_secs(10)).expect("opened");
+    player
+        .wait_result(open, Duration::from_secs(10))
+        .expect("opened");
     let deadline = Instant::now() + Duration::from_secs(15);
     while player.snapshot().state != PlaybackState::Ended {
         assert!(Instant::now() < deadline, "{:?}", player.snapshot());
@@ -436,6 +404,75 @@ fn read_ahead_beyond_the_queue_limit_keeps_every_frame() {
         .map(|pair| pair[1] - pair[0])
         .fold(0.0, f64::max);
     assert!(largest_gap < 0.25, "frames were lost: gap {largest_gap} s");
+    context.shutdown();
+    context.wait_closed(Duration::from_secs(5)).expect("closed");
+}
+
+/// Serves `body` over HTTP/1.1, honouring `Range: bytes=N-`.
+fn serve(body: Arc<[u8]>) -> String {
+    use std::io::{BufRead, BufReader, Write};
+    let listener = std::net::TcpListener::bind("127.0.0.1:0").expect("bind");
+    let address = listener.local_addr().expect("address");
+    std::thread::spawn(move || {
+        for stream in listener.incoming().flatten() {
+            let body = body.clone();
+            std::thread::spawn(move || {
+                let mut reader = BufReader::new(stream.try_clone().expect("clone"));
+                let mut from = 0usize;
+                let mut line = String::new();
+                while reader.read_line(&mut line).is_ok_and(|n| n > 0) {
+                    if let Some(range) = line.to_ascii_lowercase().strip_prefix("range: bytes=") {
+                        from = range.trim().trim_end_matches('-').parse().unwrap_or(0);
+                    }
+                    if line == "\r\n" {
+                        break;
+                    }
+                    line.clear();
+                }
+                let slice = &body[from.min(body.len())..];
+                let head = format!(
+                    "HTTP/1.1 206 Partial Content\r\nContent-Length: {}\r\nContent-Range: bytes {from}-{}/{}\r\nConnection: close\r\n\r\n",
+                    slice.len(),
+                    body.len().saturating_sub(1),
+                    body.len()
+                );
+                let mut stream = stream;
+                let _ = stream.write_all(head.as_bytes());
+                let _ = stream.write_all(slice);
+            });
+        }
+    });
+    format!("http://{address}/tone.wav")
+}
+
+#[test]
+fn http_uris_are_probed_and_played_through_range_requests() {
+    let url = serve(wav(8000, 4000));
+    let info = probe(MediaSource::uri(&url).expect("uri")).expect("probe over http");
+    assert_eq!(info.container, "wav");
+    assert!(info.seekable, "a 206 server is seekable");
+    let context = MediaContext::new(ContextOptions::default()).expect("context");
+    let player = context
+        .create_player(PlayerOptions {
+            autoplay: true,
+            audio: AudioOutput::Silent,
+        })
+        .expect("player");
+    let open = player
+        .open(MediaSource::uri(&url).expect("uri"))
+        .expect("open");
+    let outcome = player
+        .wait_result(open, Duration::from_secs(10))
+        .expect("opened");
+    assert!(
+        matches!(outcome, CommandOutcome::Completed { .. }),
+        "{outcome:?}"
+    );
+    let deadline = Instant::now() + Duration::from_secs(10);
+    while player.snapshot().state != PlaybackState::Ended {
+        assert!(Instant::now() < deadline, "{:?}", player.snapshot());
+        std::thread::sleep(Duration::from_millis(10));
+    }
     context.shutdown();
     context.wait_closed(Duration::from_secs(5)).expect("closed");
 }

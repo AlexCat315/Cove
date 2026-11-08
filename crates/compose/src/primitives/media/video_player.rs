@@ -16,8 +16,7 @@ use cove_composition::{AnyView, PrimitiveView, TupleView, View, ViewExt};
 use cove_core::scene::{
     AccessibilityRole, AccessibilitySemantics, Align, Edge, EventResult, FlexDirection,
     FocusChainHolder, HoverPhase, InputHandlerRoute, InteractionRegistryHolder, Justify,
-    LayoutCalc, LayoutNode, LayoutStyleValue, Node, NodeResource, PointerPhase, PositionType,
-    Wrap,
+    LayoutCalc, LayoutNode, LayoutStyleValue, Node, NodeResource, PointerPhase, PositionType, Wrap,
 };
 use cove_core::{Color, LinearGradient, Point, Signal, Size};
 use cove_media::{
@@ -34,14 +33,13 @@ use super::ui_icon_catalog::{action, asset, editor, media};
 use super::video::VideoView;
 use crate::core::{FloatingWindowId, FloatingWindowRequest, WindowPresentation};
 use crate::modifiers::interaction::AccessibilityExt;
-use crate::modifiers::layout::{
-    FrameDimension, LayoutFrameExt, LayoutValuesExt, PaddingExt,
-};
+use crate::modifiers::layout::{FrameDimension, LayoutFrameExt, LayoutValuesExt, PaddingExt};
 use crate::modifiers::style::AppearanceExt;
 use crate::primitives::controls::button::{Button, ButtonIconSource, ButtonRole};
 use crate::primitives::controls::fields::Slider;
 use crate::primitives::controls::menu_button::MenuButton;
 use crate::primitives::feedback::Spinner;
+use crate::primitives::layout::ZStack;
 use crate::primitives::overlays::anchored::placement::PopoverPlacement;
 use crate::primitives::overlays::menu::{MenuEntry, MenuItem, MenuSubmenu};
 use crate::primitives::overlays::portal::{
@@ -50,12 +48,9 @@ use crate::primitives::overlays::portal::{
 };
 use crate::primitives::text::Text;
 use crate::theme::styles::buttons::{ButtonStyleViewExt, ghost};
-use crate::theme::{ControlSize, ControlSizeViewExt, SemanticFontRef};
 use crate::theme::tokens::semantic_modifiers::SemanticStyleViewExt;
-use crate::{
-    BoxView, Row, Scope, Spacer, VerticalAlignment, impl_primitive_view,
-};
-use crate::primitives::layout::ZStack;
+use crate::theme::{ControlSize, ControlSizeViewExt, SemanticFontRef};
+use crate::{BoxView, Row, Scope, Spacer, VerticalAlignment, impl_primitive_view};
 
 /// Where the player's picture is shown.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -115,6 +110,8 @@ impl Default for PlayerUi {
 /// Imperative state that must not recompose the player.
 struct PlayerRuntime {
     activity: Cell<Instant>,
+    /// Last pointer position over the picture; only real movement counts as activity.
+    pointer: Cell<Option<(f32, f32)>>,
     over_controls: Cell<bool>,
     floating: Cell<Option<FloatingWindowId>>,
     /// The host put the window in full screen for this player.
@@ -129,6 +126,7 @@ impl Default for PlayerRuntime {
     fn default() -> Self {
         Self {
             activity: Cell::new(Instant::now()),
+            pointer: Cell::new(None),
             over_controls: Cell::new(false),
             floating: Cell::new(None),
             window_fullscreen: Cell::new(false),
@@ -296,7 +294,10 @@ impl PlayerActions {
             PlayerPresentation::PictureInPicture => {
                 let actions = self.clone();
                 let floating = WindowPresentation::open_floating(FloatingWindowRequest {
-                    title: self.title.clone().unwrap_or_else(|| "Picture in Picture".into()),
+                    title: self
+                        .title
+                        .clone()
+                        .unwrap_or_else(|| "Picture in Picture".into()),
                     width: 480.0,
                     height: 270.0,
                     content: AnyView::new(PictureInPicture {
@@ -515,10 +516,13 @@ impl Surface {
         if let Some(center) = self.center() {
             layers.push(center);
         }
+        // The bar stays mounted and only fades: removing it would change the hit
+        // target under a resting pointer, which reads as movement and shows it again.
         let visible = self.ui.controls || !self.playing();
-        if visible {
-            layers.push(fill(self.chrome()));
-        }
+        layers.push(fill(ChromeVisibility {
+            visible,
+            content: fill(self.chrome()),
+        }));
         AnyView::new(
             ZStack::new(TupleView::new(layers))
                 .background_color(Color::BLACK)
@@ -660,7 +664,11 @@ impl Surface {
         let play = {
             let actions = actions.clone();
             overlay_button(
-                if playing { editor::pause() } else { editor::play() },
+                if playing {
+                    editor::pause()
+                } else {
+                    editor::play()
+                },
                 if playing { "Pause" } else { "Play" },
                 18.0,
                 move || actions.toggle_playback(),
@@ -682,14 +690,17 @@ impl Surface {
         };
         let volume_slider = {
             let actions = actions.clone();
+            let slider = Slider::new(cove_core::Binding::new(
+                move || volume,
+                move |value: f64| actions.set_volume(value),
+            ))
+            .range((0.0, 1.0))
+            .accessibility_label("Volume")
+            .frame_width(72.0);
+            // The thumb overhangs the track; the padded row keeps it off the time label.
             AnyView::new(
-                Slider::new(cove_core::Binding::new(
-                    move || volume,
-                    move |value: f64| actions.set_volume(value),
-                ))
-                .range((0.0, 1.0))
-                .accessibility_label("Volume")
-                .frame_width(72.0),
+                Row::new(VerticalAlignment::Center, 0.0, AnyView::new(slider))
+                    .padding_edges(10.0, 0.0),
             )
         };
         let time = white_text(format!(
@@ -716,7 +727,11 @@ impl Surface {
                 } else {
                     media::danmaku_off()
                 },
-                if enabled { "Hide danmaku" } else { "Show danmaku" },
+                if enabled {
+                    "Hide danmaku"
+                } else {
+                    "Show danmaku"
+                },
                 18.0,
                 move || actions.toggle_danmaku(),
             ));
@@ -823,7 +838,10 @@ impl Surface {
                         MenuEntry::Item(
                             MenuItem::new(
                                 401 + index as u64,
-                                track.description.clone().unwrap_or_else(|| track.id.clone()),
+                                track
+                                    .description
+                                    .clone()
+                                    .unwrap_or_else(|| track.id.clone()),
                                 move || {
                                     let mut tracks: Vec<String> = others
                                         .iter()
@@ -858,7 +876,6 @@ impl Surface {
     }
 }
 
-
 fn rate_label(rate: f64) -> String {
     if (rate - 1.0).abs() < 0.01 {
         "Normal".into()
@@ -868,16 +885,17 @@ fn rate_label(rate: f64) -> String {
 }
 
 fn danmaku_menu(actions: &PlayerActions, settings: DanmakuSettings) -> MenuSubmenu {
-    let option = |id: u64, title: &str, selected: bool, change: Rc<dyn Fn(&mut DanmakuSettings)>| {
-        let actions = actions.clone();
-        MenuEntry::Item(
-            MenuItem::new(id, title, move || {
-                let change = change.clone();
-                actions.update_settings(move |player| change(&mut player.danmaku));
-            })
-            .selected(selected),
-        )
-    };
+    let option =
+        |id: u64, title: &str, selected: bool, change: Rc<dyn Fn(&mut DanmakuSettings)>| {
+            let actions = actions.clone();
+            MenuEntry::Item(
+                MenuItem::new(id, title, move || {
+                    let change = change.clone();
+                    actions.update_settings(move |player| change(&mut player.danmaku));
+                })
+                .selected(selected),
+            )
+        };
     let mut entries = vec![MenuEntry::label(300, "Opacity")];
     for (index, opacity) in [1.0f32, 0.75, 0.5, 0.25].into_iter().enumerate() {
         entries.push(option(
@@ -915,9 +933,14 @@ fn danmaku_menu(actions: &PlayerActions, settings: DanmakuSettings) -> MenuSubme
     }
     entries.push(MenuEntry::separator(330));
     entries.push(MenuEntry::label(331, "Area"));
-    for (index, (area, title)) in [(0.25f32, "Quarter"), (0.5, "Half"), (0.75, "Three quarters"), (1.0, "Full")]
-        .into_iter()
-        .enumerate()
+    for (index, (area, title)) in [
+        (0.25f32, "Quarter"),
+        (0.5, "Half"),
+        (0.75, "Three quarters"),
+        (1.0, "Full"),
+    ]
+    .into_iter()
+    .enumerate()
     {
         entries.push(option(
             332 + index as u64,
@@ -1118,6 +1141,34 @@ impl PrimitiveView for FullscreenKeys {
 }
 impl_primitive_view!(FullscreenKeys);
 
+/// Shows or hides the control layer without unmounting it.
+struct ChromeVisibility {
+    visible: bool,
+    content: AnyView,
+}
+
+impl PrimitiveView for ChromeVisibility {
+    fn make_node(&self) -> Node {
+        let node = Node::new();
+        node.set_is_hit_testable(false);
+        node
+    }
+
+    fn make_layout_node(&self) -> Option<LayoutNode> {
+        Some(LayoutNode::new())
+    }
+
+    fn update_node(&self, node: &Node) {
+        node.set_opacity(if self.visible { 1.0 } else { 0.0 });
+        node.set_allows_hit_testing(self.visible);
+    }
+
+    fn children(&self, _node: &Node) -> Vec<AnyView> {
+        vec![self.content.clone()]
+    }
+}
+impl_primitive_view!(ChromeVisibility);
+
 /// Tracks the pointer over the control bar so it does not hide under it.
 struct ControlsRegion {
     runtime: Rc<PlayerRuntime>,
@@ -1143,8 +1194,11 @@ impl PrimitiveView for ControlsRegion {
         registry.set_hover(
             node,
             Rc::new(move |phase| {
-                runtime.over_controls.set(phase == HoverPhase::Enter);
-                runtime.activity.set(Instant::now());
+                let entered = phase == HoverPhase::Enter;
+                runtime.over_controls.set(entered);
+                if entered {
+                    runtime.activity.set(Instant::now());
+                }
             }),
         );
     }
@@ -1223,23 +1277,17 @@ impl PrimitiveView for GestureLayer {
         registry.set_motion(
             node,
             InputHandlerRoute::control(),
-            Rc::new(move |_, _| {
-                motion.runtime.over_controls.set(false);
-                motion.activity();
-                EventResult::Ignored
-            }),
-        );
-        let leave = self.actions.clone();
-        let playing = self.playing;
-        registry.set_hover(
-            node,
-            Rc::new(move |phase| {
-                if phase == HoverPhase::Leave
-                    && playing
-                    && !leave.runtime.over_controls.get()
-                {
-                    leave.hide_controls();
+            Rc::new(move |event, _| {
+                let runtime = &motion.runtime;
+                let moved = runtime.pointer.get().is_none_or(|(x, y)| {
+                    (x - event.x).abs() >= 1.0 || (y - event.y).abs() >= 1.0
+                });
+                runtime.pointer.set(Some((event.x, event.y)));
+                runtime.over_controls.set(false);
+                if moved {
+                    motion.activity();
                 }
+                EventResult::Ignored
             }),
         );
         let keys = self.actions.clone();
@@ -1306,27 +1354,32 @@ impl View for PictureInPicture {
                     move || back.set_presentation(PlayerPresentation::Inline),
                 ),
                 overlay_button(
-                    if playing { editor::pause() } else { editor::play() },
+                    if playing {
+                        editor::pause()
+                    } else {
+                        editor::play()
+                    },
                     if playing { "Pause" } else { "Play" },
                     16.0,
                     move || toggle.toggle_playback(),
                 ),
             ])),
         ));
-        let chrome = AnyView::new(BoxView::new(
-            FlexDirection::Column,
-            Align::Stretch,
-            Justify::FlexEnd,
-            Wrap::NoWrap,
-            0.0,
-            AnyView::new(
-                controls.padding_edges(6.0, 4.0).background_gradient(LinearGradient {
-                    start: Color::BLACK.multiplied_alpha(0.0),
-                    end: Color::BLACK.multiplied_alpha(0.65),
-                    angle: 180.0,
-                }),
-            ),
-        ));
+        let chrome =
+            AnyView::new(BoxView::new(
+                FlexDirection::Column,
+                Align::Stretch,
+                Justify::FlexEnd,
+                Wrap::NoWrap,
+                0.0,
+                AnyView::new(controls.padding_edges(6.0, 4.0).background_gradient(
+                    LinearGradient {
+                        start: Color::BLACK.multiplied_alpha(0.0),
+                        end: Color::BLACK.multiplied_alpha(0.65),
+                        angle: 180.0,
+                    },
+                )),
+            ));
         let picture = ZStack::new(TupleView::new(vec![
             fill(
                 VideoView::new(self.actions.control.video_output()).background(Some(Color::BLACK)),
