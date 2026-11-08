@@ -162,3 +162,70 @@ fn the_trait_lines_follow_the_environment_they_are_given() {
         },
     );
 }
+
+#[test]
+fn the_mounted_gallery_follows_host_environment_changes() {
+    use cove_core::{FoldableKind, Posture, State};
+    use cove_examples::gallery_content::GalleryView;
+    use cove_examples::gallery_content::catalog::GalleryPage;
+    use cove_hosts::desktop::application::AdaptiveApplicationContent;
+    use cove_ui_compose::adaptive::SurfaceReader;
+    use cove_ui_compose::theme::styles::appearance_modifier::Appearance;
+
+    let host = State::new(Environment {
+        viewport: Viewport {
+            width: 1280.0,
+            height: 820.0,
+            ..Viewport::default()
+        },
+        ..Environment::default()
+    });
+    let installed = host.clone();
+    GalleryScene::run(
+        1280.0,
+        820.0,
+        move |_| {
+            // The same root the showcase application installs.
+            let root = AnyView::new(SurfaceReader::new(|inherited: &Environment| {
+                AnyView::new(GalleryView::new(
+                    GalleryPage::ViewportTraits,
+                    Appearance::Light,
+                    1.0,
+                ))
+                .surface_environment(inherited.clone())
+            }));
+            AnyView::new(AdaptiveApplicationContent::new(root, installed.clone()))
+        },
+        |scene| {
+            scene.settle_n(8);
+            assert!(
+                scene
+                    .texts()
+                    .iter()
+                    .any(|text| text == "Viewport: 1280 × 820"),
+                "texts: {:?}",
+                scene.texts()
+            );
+            let mut next = host.get();
+            next.viewport.width = 841.0;
+            next.viewport.height = 701.0;
+            next.platform = Platform::Android;
+            next.design_language = DesignLanguage::Material;
+            next.device_class = DeviceClass::Foldable(FoldableKind::Book);
+            next.posture = Posture::Book;
+            host.set(next);
+            scene.settle_n(8);
+            let texts = scene.texts();
+            for expected in [
+                "Viewport: 841 × 701",
+                "Device: android · material · foldable-book",
+                "Posture: book · Segments: 1",
+            ] {
+                assert!(
+                    texts.iter().any(|text| text == expected),
+                    "{expected} after the host change, texts: {texts:?}"
+                );
+            }
+        },
+    );
+}

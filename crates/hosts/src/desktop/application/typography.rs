@@ -31,9 +31,15 @@ impl Default for ApplicationTypography {
 /// `SurfaceRoot` in the Compose vocabulary is the same idea; the host needs it
 /// here because the environment lives in host state that changes as the window
 /// resizes or the safe area moves.
+///
+/// Install it as the graph root, unwrapped: the graph wires `dynamic_properties`
+/// only on the root view, so a modifier around it would stop environment
+/// changes from reaching content. Content-level modifiers go through
+/// [`Self::text_scaler`] instead.
 pub struct AdaptiveApplicationContent {
     pub content: AnyView,
     pub environment: State<Environment>,
+    pub text_scaler: Option<cove_ui_compose::theme::tokens::TextScaler>,
 }
 
 impl AdaptiveApplicationContent {
@@ -41,7 +47,14 @@ impl AdaptiveApplicationContent {
         Self {
             content,
             environment,
+            text_scaler: None,
         }
+    }
+
+    /// Scales authored text sizes for everything below the surface root.
+    pub fn text_scaler(mut self, scaler: cove_ui_compose::theme::tokens::TextScaler) -> Self {
+        self.text_scaler = Some(scaler);
+        self
     }
 }
 
@@ -59,18 +72,20 @@ impl PrimitiveView for AdaptiveApplicationContent {
     }
 
     fn children(&self, _node: &Node) -> Vec<AnyView> {
-        let environment = self.environment.get();
         // The host root is the application's `SurfaceRoot`: publishing only the
         // environment left `SafeArea` reading zero insets under the window root,
         // because the inset composition local is installed by `SurfaceRoot`, not
         // by the bare `surface_environment` modifier. Delegating here is what
         // makes host safe-area insets reach authored content.
-        let _ = environment;
+        let content = match &self.text_scaler {
+            Some(scaler) => {
+                use cove_ui_compose::theme::tokens::TextScalerViewExt;
+                AnyView::new(self.content.clone().text_scaler(scaler.clone()))
+            }
+            None => self.content.clone(),
+        };
         vec![AnyView::new(
-            cove_ui_compose::primitives::layout::SurfaceRoot::new(
-                self.environment.get(),
-                self.content.clone(),
-            ),
+            cove_ui_compose::primitives::layout::SurfaceRoot::new(self.environment.get(), content),
         )]
     }
 }
@@ -81,6 +96,15 @@ impl View for AdaptiveApplicationContent {
     }
     fn tag(&self) -> &'static str {
         std::any::type_name::<Self>()
+    }
+    /// `children()` reads the surface environment from `State`; without this
+    /// dependency nothing re-runs it, and every window resize, keyboard,
+    /// device or posture change after the first frame is lost.
+    fn dynamic_properties(&self) -> Vec<cove_composition::DynamicField> {
+        vec![cove_composition::DynamicField::state(
+            "environment",
+            &self.environment,
+        )]
     }
 }
 

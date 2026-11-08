@@ -1223,7 +1223,6 @@ impl Application {
                 )));
                 context.with_current(|| {
                     chrome::with_window_chrome_context(window_id, || {
-                        use cove_ui_compose::theme::tokens::TextScalerViewExt;
                         // The portal store is scoped per window by the input context
                         // ambient above, which is what `PortalStoreHolder::current()`
                         // actually reads; the composition-local copy would need
