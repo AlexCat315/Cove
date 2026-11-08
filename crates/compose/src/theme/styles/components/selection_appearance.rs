@@ -15,8 +15,10 @@ use crate::{AnyView, View, impl_primitive_view};
 ///
 /// Three roles, because the surfaces answer different questions:
 ///
-/// - `Sidebar`: the macOS source list pill: one neutral step darker than the
-///   sidebar fill. The accent stays on the row icons and on controls.
+/// - `Sidebar`: the macOS source list pill: a translucent neutral layer, one
+///   step darker than whatever the sidebar is painted with — including the
+///   system sidebar material of a translucent window. The accent stays on the
+///   row icons and on controls.
 /// - `Navigation`: an accent-tinted pill for tabs and compact navigation.
 /// - `DataRow`: an edge-to-edge band, for dense grids whose rows share
 ///   horizontal rules with their neighbours and must keep column alignment.
@@ -45,15 +47,25 @@ pub enum SelectionRole {
     DataRow,
 }
 
+/// Opacity of the neutral source-list pill. About 24/255 of sRGB separation
+/// from the surface behind it on both presets: clearly selected, still not an
+/// accent band.
+const SIDEBAR_SELECTION_OPACITY: f32 = 0.12;
+
 impl SelectionAppearance {
     pub fn resolve(role: SelectionRole, theme: &crate::theme::Theme) -> Self {
         let colors = &theme.colors;
         let inset_role = role != SelectionRole::DataRow;
         Self {
             fill: if role == SelectionRole::Sidebar {
+                // A translucent window shows the system sidebar material, not
+                // `surface_variant`. An opaque grey pre-composited against the
+                // theme palette can nearly match that material, so the pill
+                // stays a translucent ink layer and darkens (or lightens in a
+                // dark theme) whatever is actually behind it.
                 colors
-                    .surface_variant
-                    .composited(colors.state_layer_pressed)
+                    .on_surface
+                    .multiplied_alpha(SIDEBAR_SELECTION_OPACITY)
             } else {
                 colors.selection
             },

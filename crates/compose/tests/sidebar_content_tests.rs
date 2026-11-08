@@ -4,7 +4,8 @@
 //! - mixed icon roles reserve one leading lane; dynamic text scale grows the
 //!   glyphs, rows and badges without overlap; dropping icons drops the lane
 //! - icon foreground and destination semantics survive focus and hover in both
-//!   themes; the selection band uses the neutral sidebar role
+//!   themes; the selection band uses the neutral sidebar role and keeps its
+//!   contrast over a translucent system sidebar material
 //! - vertical keyboard selection skips disabled rows, keeps one tab stop and
 //!   reveals offscreen rows; modified and horizontal keys and a disabled click
 //!   change nothing
@@ -27,7 +28,7 @@ use cove_composition::Scope;
 
 use cove_composition::{AnyView, DynamicField, Scancode, TupleView, View};
 use cove_core::scene::{AccessibilityRole, Align, FlexDirection, Justify, Node, Wrap};
-use cove_core::{Binding, Point, Rect, State};
+use cove_core::{Binding, Color, Point, Rect, State};
 use cove_platform::{InputEvent, KeyModifiers, MouseMotionEvent};
 use cove_ui_compose::BoxView;
 use cove_ui_compose::modifiers::layout::{FlexExt, FrameDimension, LayoutFrameExt, PaddingExt};
@@ -484,13 +485,9 @@ fn semantics_and_color() {
                 "hover keeps the selection semantics (dark {dark})"
             );
             let selection = SelectionAppearance::resolve(SelectionRole::Sidebar, &theme);
-            assert_eq!(
-                selection.fill,
-                theme
-                    .colors
-                    .surface_variant
-                    .composited(theme.colors.state_layer_pressed),
-                "the sidebar selection is the neutral source-list pill (dark {dark})"
+            assert!(
+                selection.fill.a < 1.0,
+                "the sidebar selection is a neutral layer, not an opaque fill (dark {dark})"
             );
             // The sliding host paints the resting pill; the hovered row adds
             // only its state layer on top.
@@ -509,6 +506,40 @@ fn semantics_and_color() {
                 "the selected row marks itself for the sliding pill (dark {dark})"
             );
         });
+    }
+}
+
+#[test]
+fn sidebar_selection_keeps_its_step_over_a_system_sidebar_material() {
+    fn gray(color: Color) -> f32 {
+        (color.r + color.g + color.b) / 3.0
+    }
+    // Light: sampled from a macOS `NSVisualEffectView` source list. The old
+    // opaque pill (#DFDFE1) sat only ~5/255 away from it, so the selected row
+    // was almost invisible. Dark: the matching graphite material.
+    let cases = [
+        (
+            Theme::default_light(),
+            Color::from_rgba8(0xE4, 0xE3, 0xE2, 0xFF),
+        ),
+        (
+            Theme::default_dark(),
+            Color::from_rgba8(0x2B, 0x2B, 0x2D, 0xFF),
+        ),
+    ];
+    for (theme, material) in cases {
+        let fill = SelectionAppearance::resolve(SelectionRole::Sidebar, &theme).fill;
+        let step = |base: Color| (gray(base) - gray(base.composited(fill))).abs();
+        let over_material = step(material);
+        let over_opaque = step(theme.colors.surface_variant);
+        assert!(
+            over_material >= 0.08,
+            "the pill must stay visible over the sidebar material, step {over_material}"
+        );
+        assert!(
+            (over_material - over_opaque).abs() <= 0.02,
+            "one pill reads the same over material ({over_material}) and the opaque sidebar ({over_opaque})"
+        );
     }
 }
 
