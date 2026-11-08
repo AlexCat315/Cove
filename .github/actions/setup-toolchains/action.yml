@@ -19,9 +19,17 @@ runs:
         ninjaVersion: '1.13.2'
     - uses: ilammy/msvc-dev-cmd@v1
       if: runner.os == 'Windows'
+    - name: Pinned Zig version
+      # Single source of truth: ZIG_VERSION in crates/native-build/src/setup.rs.
+      id: zig
+      shell: bash
+      run: |
+        version=$(sed -n 's/^const ZIG_VERSION: &str = "\([^"]*\)";/\1/p' crates/native-build/src/setup.rs)
+        test -n "$version" || { echo "ZIG_VERSION missing from setup.rs" >&2; exit 1; }
+        echo "version=$version" >> "$GITHUB_OUTPUT"
     - uses: mlugg/setup-zig@v2
       with:
-        version: '0.17.0'
+        version: ${{ steps.zig.outputs.version }}
     - name: Linux build and test dependencies
       if: runner.os == 'Linux'
       shell: bash

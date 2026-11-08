@@ -30,6 +30,9 @@ enum Command {
     Setup {
         #[arg(long)]
         media: bool,
+        /// Provision the pinned Slang/DXIL shader toolchain as well.
+        #[arg(long)]
+        shaders: bool,
         /// Check without installing or changing system configuration.
         #[arg(long)]
         check: bool,
@@ -195,6 +198,7 @@ fn execute(cli: Cli) -> Result<()> {
     match cli.command {
         Command::Setup {
             media,
+            shaders,
             check,
             dry_run,
             target,
@@ -202,6 +206,7 @@ fn execute(cli: Cli) -> Result<()> {
             let targets = target.clone();
             let mut report = cove_native_build::setup::run(&cove_native_build::setup::Options {
                 media,
+                shaders,
                 check,
                 dry_run,
                 targets: target,
@@ -221,7 +226,7 @@ fn execute(cli: Cli) -> Result<()> {
             );
             if !dry_run && report["ready"] != true {
                 return Err(
-                    "native tools or SDKs are not ready; run cargo cove setup --media".into(),
+                    "native tools, SDKs or submodules are not ready; run `cargo cove setup`".into(),
                 );
             }
             Ok(())

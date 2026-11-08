@@ -1,14 +1,34 @@
 import { execFileSync, spawnSync } from 'node:child_process';
 import { readFileSync, writeFileSync, mkdirSync, mkdtempSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { homedir, platform, tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 // UI-specific offline artifact builder. Keep the reflected ABI used by all
 // backends, and reject a compiler/register mismatch before packaging bytecode.
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
-const compiler = process.env.SLANGC;
-if (!compiler) throw new Error('Set SLANGC to the pinned Slang 2026.19 executable');
+
+/* `cargo cove setup --shaders` records the pinned compiler in the shared
+   toolchain state; mirror cove-native-build's cache_dir/state_path rules. */
+function setupStatePath() {
+    const os = platform();
+    const name = { win32: 'windows', darwin: 'macos', linux: 'linux' }[os] ?? os;
+    const arch = { x64: 'x86_64', arm64: 'aarch64' }[process.arch] ?? process.arch;
+    let cache = process.env.COVE_CACHE_DIR;
+    if (!cache) {
+        if (os === 'win32') cache = join(process.env.LOCALAPPDATA ?? homedir(), 'Cove');
+        else if (os === 'darwin') cache = join(homedir(), 'Library', 'Caches', 'Cove');
+        else cache = join(process.env.XDG_CACHE_HOME ?? join(homedir(), '.cache'), 'Cove');
+    }
+    return join(cache, `setup-${name}-${arch}.json`);
+}
+function pinnedSlangc() {
+    try { return JSON.parse(readFileSync(setupStatePath(), 'utf8')).environment?.SLANGC; }
+    catch { return undefined; }
+}
+
+const compiler = process.env.SLANGC ?? pinnedSlangc();
+if (!compiler) throw new Error('Set SLANGC to the pinned Slang 2026.19 executable, or run `cargo cove setup --shaders`');
 const versionResult = spawnSync(compiler, ['-version'], { encoding: 'utf8' });
 if (versionResult.status !== 0) throw new Error('Failed to query Slang version');
 const version = (versionResult.stdout + versionResult.stderr).trim();

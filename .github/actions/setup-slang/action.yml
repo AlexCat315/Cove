@@ -6,11 +6,25 @@ runs:
     - name: Install pinned Slang
       shell: pwsh
       run: |
+        # Single source of truth: pinned_archive() in crates/native-build/src/setup.rs.
+        $manifest = Get-Content 'crates/native-build/src/setup.rs' -Raw
+        $version = [regex]::Match($manifest, 'const SLANG_VERSION: &str = "([^"]+)"').Groups[1].Value
+        $name = "slang-$version-windows-x86_64.zip"
+        $checksum = [regex]::Match($manifest, [regex]::Escape("`"$name`"") + ',\s*"([0-9a-f]{64})"').Groups[1].Value
+        $asset = [regex]::Match($manifest, [regex]::Escape("`"$name`"") + '\s*=>\s*(\d+)').Groups[1].Value
+        if (-not $version -or -not $checksum -or -not $asset) { throw 'pinned Slang archive missing from setup.rs' }
+        $url = "https://github.com/shader-slang/slang/releases/download/v$version/$name"
+        $api = "https://api.github.com/repos/shader-slang/slang/releases/assets/$asset"
         $archive = Join-Path $env:RUNNER_TEMP 'slang.zip'
         $root = Join-Path $env:RUNNER_TEMP 'slang'
-        curl.exe --fail --location --retry 3 --output $archive https://github.com/shader-slang/slang/releases/download/v2026.19/slang-2026.19-windows-x86_64.zip
-        if ($LASTEXITCODE -ne 0) { throw 'Slang download failed' }
-        if ((Get-FileHash -Algorithm SHA256 $archive).Hash.ToLowerInvariant() -ne 'fc922f214b5d115f663932e59e80e0f6b6cc6fae140979cf307da6459b6f8f33') { throw 'Slang checksum mismatch' }
+        curl.exe --fail --location --retry 2 --output $archive $url
+        if ($LASTEXITCODE -ne 0) {
+          # github.com's release edge can answer 5xx; the API asset endpoint
+          # redirects to the signed CDN object instead.
+          curl.exe --fail --location --retry 5 --retry-delay 2 --header 'Accept: application/octet-stream' --output $archive $api
+          if ($LASTEXITCODE -ne 0) { throw 'Slang download failed on both endpoints' }
+        }
+        if ((Get-FileHash -Algorithm SHA256 $archive).Hash.ToLowerInvariant() -ne $checksum) { throw 'Slang checksum mismatch' }
         Expand-Archive -Path $archive -DestinationPath $root
         $compiler = Get-ChildItem -Path $root -Recurse -Filter slangc.exe | Select-Object -First 1
         if (-not $compiler) { throw 'slangc.exe missing' }

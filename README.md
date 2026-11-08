@@ -4,13 +4,15 @@ Rust 2024 跨平台 UI 工具包。工作区版本为 `0.3.0-dev`，尚未发布
 
 Cove 自有代码采用 [Apache-2.0](LICENSE)。依赖保留各自许可，见 [第三方声明](THIRD_PARTY_NOTICES.md)；启用原生媒体后的随包材料见 [媒体许可证与分发](Docs/media-licensing.md)。
 
-需要 `rust-toolchain.toml` 固定的 Rust 工具链、C/C++ 编译器、CMake 和 Zig 0.17。首次构建前初始化原生依赖：
+需要 `rust-toolchain.toml` 固定的 Rust 工具链。`cargo cove setup` 检测并按平台补齐 C/C++ 编译器、CMake、Ninja、Zig 0.17，初始化 `third-party/` 子模块，并把校验过的工具路径写入 Cove 缓存状态供各 `build.rs` 读取：
 
 ```sh
-git submodule update --init --recursive
+cargo cove setup
 cargo build --workspace --locked
 cargo run --package cove-rust-counter --locked
 ```
+
+改动 `crates/graphics/resources/Shaders/Slang/*.slang` 时追加 `cargo cove setup --shaders`，它会安装固定版本 Slang 2026.19；Windows 把 Windows SDK 的 `dxcompiler.dll` / `dxil.dll` 放到 `slangc` 旁边，macOS / Linux 尝试复用 Slang 归档自带的 DXC 运行库，没有就在报告里标明 DXIL 不可用。`Tools/Shaders/build-native-ui.mjs` 直接读取该状态中的 `SLANGC`，无需手工 export。
 
 ## 工作区
 
@@ -41,7 +43,7 @@ cargo cove setup --media
 cargo test --locked -p cove-media --features ffmpeg --all-targets
 ```
 
-`cargo cove setup --media --check` 只报告工具与 SDK 状态，`--dry-run` 只输出安装计划。
+`cargo cove setup --check` 只报告工具、SDK、子模块与 shader 工具链状态，CI 也用同一条命令校验清单；`--dry-run` 只输出安装计划。`--media` 追加 FFmpeg 工具，`--shaders` 追加 Slang/DXIL。
 
 新建应用与打包：
 

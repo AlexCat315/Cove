@@ -4,6 +4,14 @@
 
 ## Unreleased
 
+- **环境准备收敛到 `cargo cove setup`（2026-11-08）**：
+  - `cove-native-build` 的 `BASE` 清单补上 `zig`（最低 0.17.0）。它是 `crates/terminal/build.rs` 每次构建必需的工具，此前 `setup --check` 会误报 `ready: true` 而 `cargo build` 仍失败。缺失时下载 Zig 0.17.0 官方归档，SHA-256 校验后解到 Cove 缓存并把绝对路径写入 setup state；`build.rs` 经 `cove_native_build::setup::setting("COVE_ZIG")` 读取，开发者无需手工 export。macOS / Linux / Windows 的 x86_64 与 aarch64 六组归档均有固定校验值。
+  - 新增 `--shaders`：同样下载安装 Slang 2026.19（六组归档、固定 SHA-256）；Windows 额外从 Windows SDK 复制 `dxcompiler.dll` / `dxil.dll` 到 `slangc` 目录以启用 `-target dxil`。`Tools/Shaders/build-native-ui.mjs` 在 `SLANGC` 未设置时读取 setup state。macOS / Linux 会尝试复用 Slang 归档自带的 DXC 运行库，缺失时在报告里明确标注 DXIL 不可用，不伪造实现。
+  - 新增子模块检测：按 `.gitmodules` 检查各 checkout 非空，缺失时自动 `git submodule update --init --recursive`；`--check` / `--dry-run` 只报告不改动。报告新增 `submodules`、`shaders` 字段，`ready` 纳入子模块以及（仅 `--shaders` 时）shader 工具链。
+  - 单一来源：CI desktop job 增加 `cargo cove setup --check` 门禁并断言 `ZIG_VERSION` 与 `setup.rs` 一致；`setup-toolchains` 的 Zig 版本、`setup-slang` 的 Slang URL 与 SHA-256 都从 `setup.rs` 派生，不再硬编码。
+  - `github.com/.../releases/download` 边缘返回 504 时自动回退到 `api.github.com` 的 release asset 端点（带 `Accept: application/octet-stream`），两个来源都要通过同一 SHA-256；CI 的 `setup-slang` 同样带回退。修正 `slangc -version` 输出在 stderr、Rust 侧只读 stdout 导致版本误判的问题。
+  - 结构覆盖：六宿主/架构归档齐备与校验值格式、回退端点、Zig 属于必需工具、版本字符串解析、安装计划字段、解压后二进制定位。macOS 本机已端到端跑通 `cargo cove setup --shaders --check`（`ready: true`）；Windows DXIL 复制与 Linux 安装分支仍需在对应宿主实机验收。
+
 - **弹出层定位在布局回写中先于内容确定；嵌套子菜单不再跳位（2026-11-08）**：
   - 根因：布局回写对每个节点先写子孙、后运行 `layout_did_update`；portal 槽位靠这个钩子把求得的位置翻转/夹紧进窗口，因此槽位里的菜单行在自己的钩子里读到的是父面板未夹紧的原始位置。行用它锚定下一级子菜单，而行重建时（`synchronize_submenu`）又用夹紧后的位置，于是父面板一旦被翻转或夹紧，下一级子菜单就在两个锚点之间交替——横向差一次翻转，纵向差夹紧量。重新弹出时的第一帧同样落在未夹紧的位置。
   - 修复：`Node` 新增 `FrameResolver` / `set_frame_resolver` / `resolve_layout_frame`，`ViewGraph` 与 `LayoutPass` 的回写在祖先就位后、子孙写回前调用它。portal 槽位改用解析器按实时登记项（位置、`position_for_size`、锚点、视口边距）计算最终 frame，钩子只刷新尺寸约束；不再使用构建时捕获的旧位置。`PortalStore::entry`、`window_frame_in_parent` 公开。

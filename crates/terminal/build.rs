@@ -23,6 +23,9 @@ fn zig_target(target: &str) -> Option<&'static str> {
 
 fn main() {
     println!("cargo:rerun-if-env-changed=COVE_ZIG");
+    if let Ok(state) = cove_native_build::setup::state_path() {
+        println!("cargo:rerun-if-changed={}", state.display());
+    }
     let source = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../third-party/ghostty");
     for path in ["build.zig", "build.zig.zon", "include/ghostty/vt.h"] {
         println!("cargo:rerun-if-changed={}", source.join(path).display());
@@ -39,7 +42,21 @@ fn main() {
     });
 
     let prefix = PathBuf::from(env::var_os("OUT_DIR").expect("OUT_DIR")).join("ghostty-vt");
-    let mut build = Command::new(env::var_os("COVE_ZIG").unwrap_or_else(|| "zig".into()));
+    // `cargo cove setup` installs a pinned Zig into the Cove cache and records
+    // its absolute path in the setup state; fall back to an explicit COVE_ZIG
+    // or to whatever `zig` is on PATH.
+    let zig = env::var_os("COVE_ZIG")
+        .or_else(|| {
+            cove_native_build::setup::setting("COVE_ZIG")
+                .ok()
+                .flatten()
+                .map(std::ffi::OsString::from)
+        })
+        .unwrap_or_else(|| "zig".into());
+    let mut build = Command::new(zig);
+    if let Err(error) = cove_native_build::setup::apply(&mut build) {
+        println!("cargo:warning=Cove toolchain state unavailable: {error}");
+    }
     build
         .current_dir(&source)
         .args([

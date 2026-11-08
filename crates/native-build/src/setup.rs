@@ -1,6 +1,7 @@
 //! Explicit host-tool installation and discovery shared by the CLI and builders.
 //! Ordinary Cargo build scripts only discover tools; installation is opt-in.
 use serde_json::{Value, json};
+use sha2::{Digest, Sha256};
 use std::{
     env, fs, io,
     path::{Path, PathBuf},
@@ -8,6 +9,11 @@ use std::{
 };
 
 mod sdk;
+
+/// Zig release used by `crates/terminal/build.rs` and the CI toolchain.
+const ZIG_VERSION: &str = "0.17.0";
+/// Slang release required by `Tools/Shaders/build-native-ui.mjs`.
+const SLANG_VERSION: &str = "2026.19";
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Host {
@@ -31,6 +37,8 @@ impl Host {
 #[derive(Clone, Debug, Default)]
 pub struct Options {
     pub media: bool,
+    /// Also provision the pinned Slang/DXIL shader toolchain.
+    pub shaders: bool,
     pub check: bool,
     pub dry_run: bool,
     pub targets: Vec<String>,
@@ -58,6 +66,13 @@ const BASE: &[Tool] = &[
         candidates: &["ninja", "ninja-build"],
         minimum: (1, 8, 0),
     },
+    // `cove-terminal`'s build script compiles libghostty-vt with `zig build`
+    // on every build, so Zig is a base tool rather than an optional one.
+    Tool {
+        name: "zig",
+        candidates: &["zig"],
+        minimum: (0, 17, 0),
+    },
 ];
 const MEDIA: &[Tool] = &[
     Tool {
@@ -78,6 +93,125 @@ const MEDIA: &[Tool] = &[
     },
 ];
 
+#[derive(Clone, Copy)]
+struct PinnedTool {
+    name: &'static str,
+    env_key: &'static str,
+    version: &'static str,
+}
+const PINNED_ZIG: PinnedTool = PinnedTool {
+    name: "zig",
+    env_key: "COVE_ZIG",
+    version: ZIG_VERSION,
+};
+const PINNED_SLANG: PinnedTool = PinnedTool {
+    name: "slangc",
+    env_key: "SLANGC",
+    version: SLANG_VERSION,
+};
+
+struct Archive {
+    name: &'static str,
+    url: String,
+    checksum: &'static str,
+    /// `github.com/.../releases/download` can fail with 5xx at the edge. The
+    /// API asset endpoint redirects to the signed CDN object instead.
+    fallback: Option<String>,
+}
+
+/// Release asset IDs for v2026.19. Accepted only over HTTPS and still verified
+/// against the pinned SHA-256 after download.
+fn slang_asset_id(name: &str) -> Option<u64> {
+    Some(match name {
+        "slang-2026.19-macos-aarch64.zip" => 598765289,
+        "slang-2026.19-macos-x86_64.zip" => 598771849,
+        "slang-2026.19-linux-aarch64.zip" => 598712114,
+        "slang-2026.19-linux-x86_64.zip" => 598767514,
+        "slang-2026.19-windows-aarch64.zip" => 598738790,
+        "slang-2026.19-windows-x86_64.zip" => 598733870,
+        _ => return None,
+    })
+}
+
+/// Official, checksum-pinned archives. Hashes mirror the release manifests at
+/// ziglang.org/download/index.json and the v2026.19 GitHub release digests;
+/// they are also the values used by `.github/actions/setup-slang` and CI.
+fn pinned_archive(tool: PinnedTool, host: Host, arch: &str) -> Option<Archive> {
+    let (name, checksum, base) = match (tool.name, host, arch) {
+        ("zig", Host::Mac, "aarch64") => (
+            "zig-aarch64-macos-0.17.0.tar.xz",
+            "b607e9b9234790a008116ae5bdb71c6243b84b9fb42a53a9e70fde41c06c536a",
+            format!("https://ziglang.org/download/{ZIG_VERSION}"),
+        ),
+        ("zig", Host::Mac, "x86_64") => (
+            "zig-x86_64-macos-0.17.0.tar.xz",
+            "4f9a1c5269aa17ebda5e6d3c2b89d6cbf36f7d2b22a0306e9ab98f25f95529c6",
+            format!("https://ziglang.org/download/{ZIG_VERSION}"),
+        ),
+        ("zig", Host::Linux, "aarch64") => (
+            "zig-aarch64-linux-0.17.0.tar.xz",
+            "9e8d11661d4ae3bd57702a3832781e23ad151dde5798e16a5ccd503f65234ff8",
+            format!("https://ziglang.org/download/{ZIG_VERSION}"),
+        ),
+        ("zig", Host::Linux, "x86_64") => (
+            "zig-x86_64-linux-0.17.0.tar.xz",
+            "1cbe9df9f27e6b78d14ccbca43b6703a404ef79ef1c463de901d7f088d4e2026",
+            format!("https://ziglang.org/download/{ZIG_VERSION}"),
+        ),
+        ("zig", Host::Windows, "aarch64") => (
+            "zig-aarch64-windows-0.17.0.zip",
+            "0a59d91fa1cb40cf068e9b0954434ce973500c7a2ea749f1e01af62cdab52d26",
+            format!("https://ziglang.org/download/{ZIG_VERSION}"),
+        ),
+        ("zig", Host::Windows, "x86_64") => (
+            "zig-x86_64-windows-0.17.0.zip",
+            "b5663f69581dcf391293fbf16c06cb80d81d806545ce618b4d0bab7f0eb8c428",
+            format!("https://ziglang.org/download/{ZIG_VERSION}"),
+        ),
+        ("slangc", Host::Mac, "aarch64") => (
+            "slang-2026.19-macos-aarch64.zip",
+            "f77d89b91ec63698a7a8e5aa4316ce08b70d3211a236640ee4551f55be85d9ed",
+            format!("https://github.com/shader-slang/slang/releases/download/v{SLANG_VERSION}"),
+        ),
+        ("slangc", Host::Mac, "x86_64") => (
+            "slang-2026.19-macos-x86_64.zip",
+            "c5e18233c0b90cc651c792ec4c4e4a467a9a101ffb6301643aab89c016b48e42",
+            format!("https://github.com/shader-slang/slang/releases/download/v{SLANG_VERSION}"),
+        ),
+        ("slangc", Host::Linux, "aarch64") => (
+            "slang-2026.19-linux-aarch64.zip",
+            "39632fa19ca3ea9d65253c6f5450d1971a6f3e7b578a1e1998c7ce2b28048221",
+            format!("https://github.com/shader-slang/slang/releases/download/v{SLANG_VERSION}"),
+        ),
+        ("slangc", Host::Linux, "x86_64") => (
+            "slang-2026.19-linux-x86_64.zip",
+            "758446aa36dd9dc985b6a93e79fff9ed7fc139180c89cb5d3f09427be5d0d2b7",
+            format!("https://github.com/shader-slang/slang/releases/download/v{SLANG_VERSION}"),
+        ),
+        ("slangc", Host::Windows, "aarch64") => (
+            "slang-2026.19-windows-aarch64.zip",
+            "6ddc5a56d22690d2077f91edea884f88f8ea35cba4d2f717fc84bf1c2ded766f",
+            format!("https://github.com/shader-slang/slang/releases/download/v{SLANG_VERSION}"),
+        ),
+        ("slangc", Host::Windows, "x86_64") => (
+            "slang-2026.19-windows-x86_64.zip",
+            "fc922f214b5d115f663932e59e80e0f6b6cc6fae140979cf307da6459b6f8f33",
+            format!("https://github.com/shader-slang/slang/releases/download/v{SLANG_VERSION}"),
+        ),
+        _ => return None,
+    };
+    let fallback = (tool.name == "slangc")
+        .then(|| slang_asset_id(name))
+        .flatten()
+        .map(|id| format!("https://api.github.com/repos/shader-slang/slang/releases/assets/{id}"));
+    Some(Archive {
+        name,
+        url: format!("{base}/{name}"),
+        checksum,
+        fallback,
+    })
+}
+
 pub fn cache_dir() -> io::Result<PathBuf> {
     if let Some(path) = env::var_os("COVE_CACHE_DIR") {
         return Ok(PathBuf::from(path));
@@ -94,7 +228,7 @@ pub fn cache_dir() -> io::Result<PathBuf> {
     root.map(|p| p.join("Cove"))
         .ok_or_else(|| io::Error::other("no user cache directory; set COVE_CACHE_DIR"))
 }
-fn state_path() -> io::Result<PathBuf> {
+pub fn state_path() -> io::Result<PathBuf> {
     Ok(cache_dir()?.join(format!(
         "setup-{}-{}.json",
         env::consts::OS,
@@ -229,6 +363,16 @@ fn version(text: &str) -> Option<(u32, u32, u32)> {
     }
     None
 }
+/// Zig uses `zig version`; Slang uses `slangc -version`; everything else uses
+/// the conventional `--version`.
+fn version_arg(name: &str) -> &'static str {
+    match name {
+        "zig" => "version",
+        "slangc" => "-version",
+        _ => "--version",
+    }
+}
+
 fn inspect(tool: Tool) -> io::Result<Value> {
     for name in tool.candidates {
         let Some(path) = find(name)? else { continue };
@@ -236,7 +380,7 @@ fn inspect(tool: Tool) -> io::Result<Value> {
             path.to_str()
                 .ok_or_else(|| io::Error::other("non-UTF-8 tool path"))?,
         )?
-        .arg("--version")
+        .arg(version_arg(tool.name))
         .output()?;
         let text = String::from_utf8_lossy(&output.stdout);
         let found = version(&text);
@@ -274,6 +418,7 @@ pub fn run(options: &Options) -> io::Result<Value> {
         })
         .copied()
         .collect();
+    let mut saved = state()?;
     let compiler = sdk::inspect_compiler(host)?;
     let mut report: Vec<_> = tools
         .iter()
@@ -286,18 +431,31 @@ pub fn run(options: &Options) -> io::Result<Value> {
         })
         .collect::<io::Result<_>>()?;
     let missing = report.iter().any(|r| r["ready"] != true);
-    let actions = installation_plan(host, options.media, &targets);
+    let actions = installation_plan(host, options.media, options.shaders, &targets);
     if options.dry_run {
-        return Ok(
-            json!({"dry_run":true,"tools":report,"compiler":compiler,"targets":targets,"actions":actions}),
-        );
+        return Ok(json!({
+            "dry_run": true,
+            "tools": report,
+            "compiler": compiler,
+            "submodules": submodule_status()?,
+            "shaders": shader_status(&saved, host)?,
+            "targets": targets,
+            "actions": actions,
+        }));
     }
     if !options.check {
         fs::create_dir_all(cache_dir()?)?;
         if missing || !compiler || !sdk::check(host, &targets)? {
             install_host(host, options.media)?;
         }
-        let mut saved = state()?;
+        if submodule_status()?["ready"] != true {
+            checked(command("git")?.args(["submodule", "update", "--init", "--recursive"]))?;
+        }
+        ensure_pinned(PINNED_ZIG, host, &mut saved)?;
+        if options.shaders {
+            ensure_pinned(PINNED_SLANG, host, &mut saved)?;
+            install_dxil(host, &saved)?;
+        }
         sdk::prepare(host, &targets, &mut saved)?;
         save(&saved)?;
         report = tools
@@ -307,37 +465,48 @@ pub fn run(options: &Options) -> io::Result<Value> {
     }
     let compiler = sdk::inspect_compiler(host)?;
     let sdk = sdk::check(host, &targets)?;
-    let ready = report.iter().all(|r| r["ready"] == true) && compiler && sdk;
+    let submodules = submodule_status()?;
+    let shaders = shader_status(&saved, host)?;
+    let ready = report.iter().all(|r| r["ready"] == true)
+        && compiler
+        && sdk
+        && submodules["ready"] == true
+        && (!options.shaders || shaders["ready"] == true);
     let result = json!({
         "ready": ready,
         "tools": report,
         "compiler": compiler,
         "sdk": sdk,
+        "submodules": submodules,
+        "shaders": shaders,
         "targets": targets,
     });
     if !options.check && ready {
-        let mut saved = state()?;
         saved["schema"] = json!(1);
         saved["tools"] = json!(report);
         saved["targets"] = json!(targets);
-        saved["paths"] = json!(
-            report
-                .iter()
-                .filter_map(|t| t["path"]
+        let mut directories: Vec<PathBuf> = report
+            .iter()
+            .filter_map(|t| {
+                t["path"]
                     .as_str()
                     .and_then(|p| Path::new(p).parent())
-                    .map(|p| p.to_path_buf()))
-                .collect::<Vec<_>>()
-        );
+                    .map(Path::to_path_buf)
+            })
+            .collect();
+        directories.dedup();
+        saved["paths"] = json!(directories);
         save(&saved)?;
     }
     Ok(result)
 }
-pub fn installation_plan(host: Host, media: bool, targets: &[String]) -> Value {
-    json!({"host":format!("{host:?}"),"media":media,"targets":targets,
+pub fn installation_plan(host: Host, media: bool, shaders: bool, targets: &[String]) -> Value {
+    json!({"host":format!("{host:?}"),"media":media,"shaders":shaders,"targets":targets,
         "manager":match host {Host::Mac=>"Homebrew and Apple softwareupdate / xcodebuild",Host::Windows=>"WinGet, MSYS2 and Visual Studio Installer",Host::Linux=>"apt-get / dnf / pacman / zypper / apk"},
         "requires_elevation":true,
-        "sdk":"host compiler/SDK; Android SDK+NDK for android targets; full Xcode for iOS"})
+        "sdk":"host compiler/SDK; Android SDK+NDK for android targets; full Xcode for iOS",
+        "pinned":format!("Zig {ZIG_VERSION} and Slang {SLANG_VERSION} archives, SHA-256 verified in the Cove cache"),
+        "submodules":"git submodule update --init --recursive"})
 }
 fn save(value: &Value) -> io::Result<()> {
     let path = state_path()?;
@@ -567,17 +736,377 @@ pub(super) fn checked_output(command: &mut Command) -> io::Result<String> {
         )))
     }
 }
-pub(super) fn download(url: &str, path: &Path) -> io::Result<()> {
+fn download_with(url: &str, path: &Path, header: Option<&str>, retries: &str) -> io::Result<()> {
     fs::create_dir_all(
         path.parent()
             .ok_or_else(|| io::Error::other("download parent"))?,
     )?;
-    checked(
-        command("curl")?
-            .args(["--fail", "--location", "--retry", "3", "--output"])
-            .arg(path)
-            .arg(url),
+    let mut curl = command("curl")?;
+    curl.args([
+        "--fail",
+        "--location",
+        "--retry",
+        retries,
+        "--retry-delay",
+        "2",
+    ]);
+    if let Some(header) = header {
+        curl.args(["--header", header]);
+    }
+    curl.args(["--output"]).arg(path).arg(url);
+    checked(&mut curl).map_err(|error| io::Error::other(format!("download {url} failed: {error}")))
+}
+pub(super) fn download(url: &str, path: &Path) -> io::Result<()> {
+    download_with(url, path, None, "5")
+}
+
+/// Tries the canonical release URL once, then the API asset endpoint when the
+/// GitHub release edge answers 5xx. Both responses must pass the same SHA-256.
+fn download_pinned(archive: &Archive, path: &Path) -> io::Result<()> {
+    if let Ok(()) = download_with(&archive.url, path, None, "1") {
+        return Ok(());
+    }
+    let Some(fallback) = &archive.fallback else {
+        return Err(io::Error::other(format!(
+            "download {} failed and this archive has no fallback endpoint",
+            archive.url
+        )));
+    };
+    download_with(
+        fallback,
+        path,
+        Some("Accept: application/octet-stream"),
+        "5",
     )
+    .map_err(|error| {
+        io::Error::other(format!(
+            "download {} and fallback {fallback} both failed: {error}",
+            archive.url
+        ))
+    })
+}
+
+fn project_root() -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..")
+}
+
+/// A submodule checkout is an empty directory until it is initialized.
+fn submodule_status() -> io::Result<Value> {
+    let root = project_root();
+    let manifest = fs::read_to_string(root.join(".gitmodules"))?;
+    let paths: Vec<String> = manifest
+        .lines()
+        .filter_map(|line| line.trim().strip_prefix("path = ").map(str::to_owned))
+        .collect();
+    let missing: Vec<String> = paths
+        .iter()
+        .filter(|path| {
+            fs::read_dir(root.join(path))
+                .map(|mut entries| entries.next().is_none())
+                .unwrap_or(true)
+        })
+        .cloned()
+        .collect();
+    Ok(json!({"ready": missing.is_empty(), "total": paths.len(), "missing": missing}))
+}
+
+fn shader_binary(saved: &Value) -> Option<PathBuf> {
+    env::var_os("SLANGC")
+        .map(PathBuf::from)
+        .or_else(|| saved["environment"]["SLANGC"].as_str().map(PathBuf::from))
+        .filter(|path| path.is_file())
+        .or_else(|| find("slangc").ok().flatten())
+}
+
+fn dxil_runtime(host: Host) -> &'static str {
+    match host {
+        Host::Windows => "dxcompiler.dll",
+        Host::Linux => "libdxcompiler.so",
+        Host::Mac => "libdxcompiler.dylib",
+    }
+}
+
+fn shader_status(saved: &Value, host: Host) -> io::Result<Value> {
+    let path = shader_binary(saved);
+    let runtime = dxil_runtime(host);
+    let present = path
+        .as_deref()
+        .and_then(Path::parent)
+        .is_some_and(|directory| directory.join(runtime).is_file());
+    let dxil = if present {
+        json!({"runtime": runtime, "ready": true})
+    } else {
+        json!({
+            "runtime": runtime,
+            "ready": false,
+            "reason": if host == Host::Windows {
+                "Windows SDK dxcompiler.dll missing; install the C++ workload"
+            } else {
+                "DXIL needs a DirectXShaderCompiler runtime; this host's pinned \
+                 Slang archive does not bundle one and the Windows SDK copy is \
+                 only available on Windows"
+            }
+        })
+    };
+    let Some(path) = path else {
+        return Ok(json!({
+            "ready": false,
+            "slangc": {"ready": false, "expected": SLANG_VERSION},
+            "dxil": dxil,
+        }));
+    };
+    let Ok(output) = command(path.to_string_lossy().as_ref())?
+        .arg(version_arg("slangc"))
+        .output()
+    else {
+        return Ok(json!({
+            "ready": false,
+            "slangc": {
+                "ready": false,
+                "path": path.display().to_string(),
+                "expected": SLANG_VERSION,
+            },
+            "dxil": dxil,
+        }));
+    };
+    // slangc writes its version to stderr; build-native-ui.mjs combines both
+    // streams for the same check.
+    let text = format!(
+        "{}{}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    )
+    .trim()
+    .to_owned();
+    let ready = output.status.success() && text == SLANG_VERSION;
+    Ok(json!({
+        "ready": ready,
+        "slangc": {
+            "ready": ready,
+            "path": path.display().to_string(),
+            "version": text,
+            "expected": SLANG_VERSION,
+        },
+        "dxil": dxil,
+    }))
+}
+
+fn pinned_version_ok(tool: PinnedTool, path: &Path) -> bool {
+    let Ok(output) = command(path.to_string_lossy().as_ref())
+        .and_then(|mut command| command.arg(version_arg(tool.name)).output())
+    else {
+        return false;
+    };
+    // slangc reports -version on stderr; every other tool uses stdout.
+    let text = if tool.name == "slangc" {
+        format!(
+            "{}{}",
+            String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&output.stderr)
+        )
+    } else {
+        String::from_utf8_lossy(&output.stdout).into_owned()
+    };
+    if !output.status.success() {
+        return false;
+    }
+    if tool.name == "slangc" {
+        return text.trim() == tool.version;
+    }
+    let minimum = BASE
+        .iter()
+        .find(|candidate| candidate.name == tool.name)
+        .map(|candidate| candidate.minimum)
+        .unwrap_or((0, 0, 0));
+    version(&text).is_some_and(|found| found >= minimum)
+}
+
+fn locate_binary(directory: &Path, name: &str, depth: usize) -> io::Result<Option<PathBuf>> {
+    if depth == 0 || !directory.is_dir() {
+        return Ok(None);
+    }
+    for entry in fs::read_dir(directory)? {
+        let path = entry?.path();
+        if path.is_dir() {
+            if let Some(found) = locate_binary(&path, name, depth - 1)? {
+                return Ok(Some(found));
+            }
+        } else if let Some(file) = path.file_name().and_then(|value| value.to_str())
+            && (file == name || file == format!("{name}.exe"))
+        {
+            return Ok(Some(path));
+        }
+    }
+    Ok(None)
+}
+
+fn checksum_matches(path: &Path, expected: &str) -> bool {
+    fs::read(path)
+        .map(|bytes| format!("{:x}", Sha256::digest(&bytes)) == expected)
+        .unwrap_or(false)
+}
+
+fn record_pinned(tool: PinnedTool, binary: &Path, saved: &mut Value) -> io::Result<()> {
+    let directory = binary
+        .parent()
+        .ok_or_else(|| io::Error::other("pinned tool has no parent directory"))?;
+    let mut paths: Vec<PathBuf> = saved["environment"]["PATH"]
+        .as_str()
+        .map(|value| env::split_paths(value).collect())
+        .unwrap_or_default();
+    if !paths.iter().any(|path| path == directory) {
+        paths.insert(0, directory.to_path_buf());
+    }
+    saved["environment"]["PATH"] = json!(
+        env::join_paths(&paths)
+            .map_err(io::Error::other)?
+            .to_string_lossy()
+    );
+    saved["environment"][tool.env_key] = json!(binary.display().to_string());
+    save(saved)
+}
+
+/// Downloads a pinned toolchain into the Cove cache, verifies its SHA-256,
+/// unpacks it and records the absolute binary path in the setup state. Build
+/// scripts read that state, so a plain `cargo build` finds the tool without the
+/// developer exporting anything.
+fn ensure_pinned(tool: PinnedTool, host: Host, saved: &mut Value) -> io::Result<Value> {
+    let existing = env::var_os(tool.env_key)
+        .map(PathBuf::from)
+        .or_else(|| {
+            saved["environment"][tool.env_key]
+                .as_str()
+                .map(PathBuf::from)
+        })
+        .filter(|path| path.is_file())
+        .or_else(|| find(tool.name).ok().flatten());
+    if let Some(path) = existing.filter(|path| pinned_version_ok(tool, path)) {
+        record_pinned(tool, &path, saved)?;
+        return Ok(json!({
+            "name": tool.name,
+            "ready": true,
+            "path": path.display().to_string(),
+            "source": "host",
+        }));
+    }
+    let archive = pinned_archive(tool, host, env::consts::ARCH).ok_or_else(|| {
+        io::Error::other(format!(
+            "no pinned {} archive for {}-{}",
+            tool.name,
+            env::consts::OS,
+            env::consts::ARCH
+        ))
+    })?;
+    let file = cache_dir()?.join("downloads").join(archive.name);
+    // A verified archive already in the cache is reusable: developers behind a
+    // restricted network can place the official archive there by hand.
+    if !checksum_matches(&file, archive.checksum) {
+        download_pinned(&archive, &file)?;
+    }
+    let bytes = fs::read(&file)?;
+    let actual = format!("{:x}", Sha256::digest(&bytes));
+    if actual != archive.checksum {
+        return Err(io::Error::other(format!(
+            "{} checksum mismatch: {actual}",
+            archive.name
+        )));
+    }
+    let destination = cache_dir()?
+        .join("tools")
+        .join(format!("{}-{}", tool.name, tool.version));
+    if destination.exists() {
+        fs::remove_dir_all(&destination)?;
+    }
+    fs::create_dir_all(&destination)?;
+    if archive.name.ends_with(".zip") {
+        checked(
+            command("cmake")?
+                .args(["-E", "tar", "xf"])
+                .arg(&file)
+                .current_dir(&destination),
+        )?;
+    } else {
+        checked(
+            command("tar")?
+                .args(["-xf"])
+                .arg(&file)
+                .arg("-C")
+                .arg(&destination),
+        )?;
+    }
+    let binary = locate_binary(&destination, tool.name, 4)?.ok_or_else(|| {
+        io::Error::other(format!("{} not found inside {}", tool.name, archive.name))
+    })?;
+    record_pinned(tool, &binary, saved)?;
+    Ok(json!({
+        "name": tool.name,
+        "ready": true,
+        "path": binary.display().to_string(),
+        "source": archive.url,
+        "checksum": archive.checksum,
+    }))
+}
+
+fn find_dxcompiler(directory: &Path, depth: usize) -> io::Result<Option<PathBuf>> {
+    if depth == 0 || !directory.is_dir() {
+        return Ok(None);
+    }
+    for entry in fs::read_dir(directory)? {
+        let path = entry?.path();
+        if path.is_dir() {
+            if let Some(found) = find_dxcompiler(&path, depth - 1)? {
+                return Ok(Some(found));
+            }
+        } else if path.file_name().and_then(|value| value.to_str()) == Some("dxcompiler.dll")
+            && path
+                .parent()
+                .and_then(Path::file_name)
+                .and_then(|value| value.to_str())
+                == Some("x64")
+        {
+            return Ok(Some(path));
+        }
+    }
+    Ok(None)
+}
+
+/// Places a DXIL compiler beside `slangc`, which is where Slang looks for it
+/// when emitting `-target dxil`. Windows takes it from the Windows SDK; the
+/// other hosts use the DirectXShaderCompiler runtime if the pinned Slang
+/// archive bundles one. A missing runtime is reported by `shader_status`.
+fn install_dxil(host: Host, saved: &Value) -> io::Result<()> {
+    let Some(slangc) = saved["environment"]["SLANGC"].as_str().map(PathBuf::from) else {
+        return Ok(());
+    };
+    let directory = slangc
+        .parent()
+        .ok_or_else(|| io::Error::other("slangc has no parent directory"))?;
+    let runtime = dxil_runtime(host);
+    if directory.join(runtime).is_file() {
+        return Ok(());
+    }
+    if host == Host::Windows {
+        let kits = PathBuf::from(
+            env::var_os("ProgramFiles(x86)").unwrap_or_else(|| "C:\\Program Files (x86)".into()),
+        )
+        .join("Windows Kits/10/bin");
+        let compiler = find_dxcompiler(&kits, 5)?.ok_or_else(|| {
+            io::Error::other("Windows SDK dxcompiler.dll missing; install the C++ workload")
+        })?;
+        fs::copy(&compiler, directory.join("dxcompiler.dll"))?;
+        let validator = compiler.parent().map(|parent| parent.join("dxil.dll"));
+        if let Some(validator) = validator.filter(|path| path.is_file()) {
+            fs::copy(validator, directory.join("dxil.dll"))?;
+        }
+        return Ok(());
+    }
+    let archive_root = cache_dir()?
+        .join("tools")
+        .join(format!("slangc-{SLANG_VERSION}"));
+    if let Some(library) = locate_binary(&archive_root, runtime, 4)? {
+        fs::copy(library, directory.join(runtime))?;
+    }
+    Ok(())
 }
 
 #[cfg(test)]
@@ -591,6 +1120,8 @@ mod tests {
             ("cygwin32-make 3.81", (3, 81, 0)),
             ("clang version 18.1.8", (18, 1, 8)),
             ("cmake version 4.0.1", (4, 0, 1)),
+            ("0.17.1", (0, 17, 1)),
+            ("2026.19", (2026, 19, 0)),
         ] {
             assert_eq!(version(text), Some(expected));
         }
@@ -599,9 +1130,102 @@ mod tests {
     #[test]
     fn every_host_has_an_installation_plan_and_mobile_sdk_paths() {
         for host in [Host::Mac, Host::Windows, Host::Linux] {
-            let plan = installation_plan(host, true, &["aarch64-linux-android".into()]);
+            let plan = installation_plan(host, true, true, &["aarch64-linux-android".into()]);
             assert!(plan["manager"].as_str().expect("manager").len() > 5);
             assert!(plan["sdk"].as_str().expect("SDK").contains("Android"));
+            assert!(
+                plan["pinned"]
+                    .as_str()
+                    .expect("pinned")
+                    .contains(ZIG_VERSION)
+            );
         }
+    }
+    #[test]
+    fn zig_is_a_required_tool() {
+        let zig = BASE.iter().find(|tool| tool.name == "zig").expect("zig");
+        assert_eq!(zig.minimum, (0, 17, 0));
+    }
+    #[test]
+    fn every_host_and_architecture_has_a_verified_archive() {
+        for tool in [PINNED_ZIG, PINNED_SLANG] {
+            for host in [Host::Mac, Host::Windows, Host::Linux] {
+                for arch in ["aarch64", "x86_64"] {
+                    let archive = pinned_archive(tool, host, arch).unwrap_or_else(|| {
+                        panic!("missing archive for {} {host:?} {arch}", tool.name)
+                    });
+                    assert_eq!(archive.checksum.len(), 64);
+                    assert!(
+                        archive
+                            .checksum
+                            .bytes()
+                            .all(|byte| byte.is_ascii_hexdigit())
+                    );
+                    assert!(archive.url.ends_with(archive.name));
+                    assert!(archive.name.contains(tool.version));
+                    if tool.name == "slangc" {
+                        let fallback = archive.fallback.as_ref().expect("API asset fallback");
+                        assert!(fallback.starts_with("https://api.github.com/"));
+                    } else {
+                        assert!(archive.fallback.is_none());
+                    }
+                }
+            }
+        }
+    }
+    #[test]
+    fn unsupported_architectures_do_not_get_a_fabricated_archive() {
+        assert!(pinned_archive(PINNED_ZIG, Host::Mac, "riscv64").is_none());
+        assert!(pinned_archive(PINNED_SLANG, Host::Linux, "powerpc64").is_none());
+    }
+    #[test]
+    fn version_arguments_match_each_compiler() {
+        assert_eq!(version_arg("zig"), "version");
+        assert_eq!(version_arg("slangc"), "-version");
+        assert_eq!(version_arg("cmake"), "--version");
+    }
+    #[test]
+    fn checksum_matches_detects_a_corrupt_archive() {
+        let path = std::env::temp_dir().join(format!("cove-hash-{}", std::process::id()));
+        fs::write(&path, b"cove").expect("write archive");
+        let digest = format!("{:x}", Sha256::digest(b"cove"));
+        assert!(checksum_matches(&path, &digest));
+        assert!(!checksum_matches(&path, &"0".repeat(64)));
+        fs::remove_file(&path).expect("clean archive");
+    }
+    #[cfg(unix)]
+    #[test]
+    fn shader_status_requires_the_exact_pinned_slang_version() {
+        use std::os::unix::fs::PermissionsExt;
+        let root = std::env::temp_dir().join(format!("cove-slangc-{}", std::process::id()));
+        fs::create_dir_all(&root).expect("create staging");
+        let script = root.join("slangc");
+        for (version, expected) in [("2026.20", false), ("2026.19", true)] {
+            // The real slangc prints -version on stderr.
+            fs::write(&script, format!("#!/bin/sh\necho {version} >&2\n"))
+                .expect("write fake slangc");
+            fs::set_permissions(&script, fs::Permissions::from_mode(0o755)).expect("chmod");
+            let saved = json!({"environment": {"SLANGC": script.display().to_string()}});
+            let status = shader_status(&saved, Host::Linux).expect("inspect slangc");
+            assert_eq!(status["ready"], expected, "version {version}");
+            assert_eq!(status["slangc"]["version"].as_str(), Some(version));
+        }
+        fs::remove_dir_all(&root).expect("clean staging");
+    }
+    #[test]
+    fn locate_binary_finds_the_executable_inside_an_archive_root() {
+        let root = std::env::temp_dir().join(format!("cove-locate-{}", std::process::id()));
+        let nested = root.join("slang-2026.19/bin");
+        fs::create_dir_all(&nested).expect("create staging directory");
+        fs::write(nested.join("slangc"), b"binary").expect("write fake binary");
+        assert_eq!(
+            locate_binary(&root, "slangc", 4).expect("scan staging"),
+            Some(nested.join("slangc"))
+        );
+        assert_eq!(
+            locate_binary(&root, "slangc.exe", 4).expect("scan staging"),
+            None
+        );
+        fs::remove_dir_all(&root).expect("clean staging");
     }
 }

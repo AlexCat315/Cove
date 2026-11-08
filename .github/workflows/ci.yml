@@ -6,6 +6,8 @@ env:
   # `cove-media-rhi` and the desktop suite need the Vulkan loader plus a window
   # system; the loader only advertises VK_KHR_surface when one is present.
   LINUX_NATIVE_PACKAGES: libvulkan-dev mesa-vulkan-drivers vulkan-validationlayers xvfb libx11-dev libxext-dev libxrandr-dev libxcursor-dev libxi-dev libxss-dev libxtst-dev libwayland-dev libxkbcommon-dev libasound2-dev libpulse-dev
+  # Asserted against ZIG_VERSION in crates/native-build/src/setup.rs below.
+  ZIG_VERSION: 0.17.0
 concurrency:
   group: rust-ci-${{ github.ref }}
   cancel-in-progress: true
@@ -25,7 +27,7 @@ jobs:
           submodules: recursive
       - uses: mlugg/setup-zig@v2
         with:
-          version: '0.17.0'
+          version: ${{ env.ZIG_VERSION }}
       - name: Rust toolchain
         run: rustup toolchain install 1.99.1 --profile minimal --component rustfmt --component clippy
       - uses: ilammy/msvc-dev-cmd@v1
@@ -47,6 +49,13 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y $LINUX_NATIVE_PACKAGES
+      - name: Verify native tool manifest
+        # Same tool list developers run; fails if CI's setup-zig/SDK drifts
+        # away from cove-native-build's BASE manifest or a submodule is missing.
+        run: |
+          pinned=$(sed -n 's/^const ZIG_VERSION: &str = "\([^"]*\)";/\1/p' crates/native-build/src/setup.rs)
+          test "$pinned" = "$ZIG_VERSION" || { echo "Zig version drift: setup.rs=$pinned ci.yml=$ZIG_VERSION" >&2; exit 1; }
+          cargo cove setup --check
       - name: Formatting
         run: cargo fmt --all --check
       - name: Lints
@@ -155,7 +164,7 @@ jobs:
           submodules: recursive
       - uses: mlugg/setup-zig@v2
         with:
-          version: '0.17.0'
+          version: ${{ env.ZIG_VERSION }}
       - name: Rust toolchain
         run: rustup toolchain install 1.99.1 --profile minimal --target ${{ matrix.target }}
       - name: Shared Rust workspace
@@ -168,7 +177,7 @@ jobs:
           submodules: recursive
       - uses: mlugg/setup-zig@v2
         with:
-          version: '0.17.0'
+          version: ${{ env.ZIG_VERSION }}
       - name: Rust toolchain
         run: rustup toolchain install 1.99.1 --profile minimal --target aarch64-linux-android
       - uses: android-actions/setup-android@v3
