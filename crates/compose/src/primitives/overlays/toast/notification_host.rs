@@ -15,6 +15,7 @@ use crate::primitives::controls::button::{Button, ButtonIconSource};
 use crate::primitives::overlays::portal::portal_registry::PortalResource;
 use crate::primitives::overlays::portal::{
     PortalPlacementMode, PortalStoreEnvironment, PortalStoreHolder, portal_window_bounds,
+    presentation_bounds,
 };
 use crate::primitives::text::Text;
 use crate::theme::styles::buttons::{ButtonRole, ButtonStyleViewExt, GhostButtonStyle};
@@ -60,6 +61,8 @@ impl ToastPosition {
 
     /// Top-left origin passed to the portal. A bottom anchor uses the window
     /// height and lets the fit pass clamp to the content's real height.
+    /// The stack's origin in window coordinates; `bounds` is the window, or
+    /// the segment toasts are confined to when a fold divides it.
     pub fn origin(self, bounds: Rect, width: f32) -> Point {
         let x = if self.is_trailing() {
             bounds.width - width - WINDOW_MARGIN
@@ -71,7 +74,10 @@ impl ToastPosition {
         } else {
             WINDOW_MARGIN
         };
-        Point::new(x.max(WINDOW_MARGIN), y.max(WINDOW_MARGIN))
+        Point::new(
+            bounds.x + x.max(WINDOW_MARGIN),
+            bounds.y + y.max(WINDOW_MARGIN),
+        )
     }
 }
 
@@ -178,7 +184,8 @@ impl PrimitiveView for ToastPresenter {
             let Some(node) = Node::upgrade(&weak) else {
                 return;
             };
-            if node.attachment::<Rect>(WINDOW_BOUNDS) == Some(portal_window_bounds(&node)) {
+            let bounds = presentation_bounds(&node, portal_window_bounds(&node));
+            if node.attachment::<Rect>(WINDOW_BOUNDS) == Some(bounds) {
                 return;
             }
             present(&node, &controller, &entries, width, position, &presentation);
@@ -199,7 +206,7 @@ fn present(
     position: ToastPosition,
     presentation: &ToastPresentationHandle,
 ) {
-    let bounds = portal_window_bounds(node);
+    let bounds = presentation_bounds(node, portal_window_bounds(node));
     node.set_attachment(WINDOW_BOUNDS, bounds);
     let resource = node.first_resource::<PortalResource>();
     if entries.is_empty() {

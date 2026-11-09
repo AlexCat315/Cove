@@ -156,11 +156,17 @@ impl PortalStore {
                         .as_ref()
                         .map(|resolve| resolve(size))
                         .unwrap_or(position);
+                    let anchor = self.anchor(id);
                     let fitted = PortalPlacement::fit(
                         fitted_position,
                         size,
-                        portal_window_bounds(&slot_node),
-                        self.anchor(id),
+                        super::segments::anchored_bounds(
+                            &slot_node,
+                            portal_window_bounds(&slot_node),
+                            anchor,
+                            position,
+                        ),
+                        anchor,
                         entry.fit.viewport_margin,
                         entry.placement,
                     );

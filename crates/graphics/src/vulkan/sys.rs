@@ -57,6 +57,7 @@ pub const VK_REMAINING_ARRAY_LAYERS: u32 = !0;
 pub const VK_LOD_CLAMP_NONE: f32 = 1000.0;
 pub const VK_QUEUE_FAMILY_IGNORED: u32 = !0;
 pub const VK_MAX_EXTENSION_NAME_SIZE: usize = 256;
+pub const VK_MAX_DESCRIPTION_SIZE: usize = 256;
 pub const VK_MAX_DEVICE_NAME_SIZE: usize = 256;
 pub const VK_UUID_SIZE: usize = 16;
 pub const VK_MAX_MEMORY_TYPES: usize = 32;
@@ -844,6 +845,35 @@ impl VkPhysicalDeviceProperties {
 pub struct VkExtensionProperties {
     pub extensionName: [c_char; VK_MAX_EXTENSION_NAME_SIZE],
     pub specVersion: u32,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub struct VkLayerProperties {
+    pub layerName: [c_char; VK_MAX_EXTENSION_NAME_SIZE],
+    pub specVersion: u32,
+    pub implementationVersion: u32,
+    pub description: [c_char; VK_MAX_DESCRIPTION_SIZE],
+}
+
+impl Default for VkLayerProperties {
+    fn default() -> Self {
+        // SAFETY: fixed-size char buffers plus integers.
+        unsafe { core::mem::zeroed() }
+    }
+}
+
+impl VkLayerProperties {
+    /// The layer name as a Rust string.
+    pub fn name(&self) -> String {
+        let bytes: Vec<u8> = self
+            .layerName
+            .iter()
+            .take_while(|value| **value != 0)
+            .map(|value| *value as u8)
+            .collect();
+        String::from_utf8_lossy(&bytes).into_owned()
+    }
 }
 
 impl Default for VkExtensionProperties {
@@ -1982,6 +2012,8 @@ pub type PFN_vkCreateInstance = unsafe extern "system" fn(
 pub type PFN_vkDestroyInstance =
     unsafe extern "system" fn(VkInstance, *const VkAllocationCallbacks);
 pub type PFN_vkEnumerateInstanceVersion = unsafe extern "system" fn(*mut u32) -> VkResult;
+pub type PFN_vkEnumerateInstanceLayerProperties =
+    unsafe extern "system" fn(*mut u32, *mut VkLayerProperties) -> VkResult;
 pub type PFN_vkEnumerateInstanceExtensionProperties =
     unsafe extern "system" fn(*const c_char, *mut u32, *mut VkExtensionProperties) -> VkResult;
 pub type PFN_vkEnumeratePhysicalDevices =

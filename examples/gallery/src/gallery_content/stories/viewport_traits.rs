@@ -11,7 +11,7 @@ use cove_composition::Scope;
 use cove_core::scene::{Align, FlexDirection, Justify, Wrap};
 use cove_core::{Environment, Insets, Orientation};
 use cove_ui_compose::adaptive::SurfaceReader;
-use cove_ui_compose::modifiers::layout::{LayoutFrameExt, PaddingExt};
+use cove_ui_compose::modifiers::layout::{FrameDimension, LayoutFrameExt, PaddingExt};
 use cove_ui_compose::primitives::layout::{SafeArea, SafeAreaEdges, SurfaceRoot};
 use cove_ui_compose::primitives::text::Text;
 use cove_ui_compose::theme::tokens::{SemanticColorRef, SemanticStyleViewExt};
@@ -187,7 +187,11 @@ impl View for ViewportTraitsStory {
                 Justify::FlexStart,
                 Wrap::NoWrap,
                 24.0,
-                AnyView::new(TupleView::new(vec![traits_section, safe_area_section()])),
+                AnyView::new(TupleView::new(vec![
+                    traits_section,
+                    segments_section(),
+                    safe_area_section(),
+                ])),
             ))
         }))
     }
@@ -208,6 +212,55 @@ impl ViewportDebugName {
     pub const POSTURE: &'static str = "viewport-posture";
     pub const SAFE_AREA: &'static str = "viewport-safe-area";
     pub const TEXT_SCALE: &'static str = "viewport-text-scale";
+}
+
+/// Panels that follow the window segments: one panel until a fold or hinge
+/// crosses this section, then one per segment.
+fn segments_section() -> AnyView {
+    use cove_ui_compose::primitives::layout::{PostureLayout, SegmentedLayout};
+    let panel = |text: &'static str, name: &'static str| {
+        AnyView::new(
+            AnyView::new(Text::new(text))
+                .padding(12.0)
+                .frame(
+                    Some(FrameDimension::Percent(100.0)),
+                    Some(FrameDimension::Percent(100.0)),
+                    None,
+                    None,
+                    None,
+                    None,
+                )
+                .semantic_background(SemanticColorRef::surface_variant())
+                .debug_name(name),
+        )
+    };
+    AnyView::new(StorySection::new(
+        "Window segments",
+        "",
+        AnyView::new(
+            BoxView::new(
+                FlexDirection::Column,
+                Align::Stretch,
+                Justify::FlexStart,
+                Wrap::NoWrap,
+                0.0,
+                AnyView::new(
+                    PostureLayout::new(
+                        SegmentedLayout::new(panel("One segment", "segments-single")).split(
+                            panel("First segment", "segments-first"),
+                            panel("Second segment", "segments-second"),
+                        ),
+                    )
+                    .tabletop(
+                        panel("Above the fold", "segments-top"),
+                        panel("Below the fold", "segments-bottom"),
+                    ),
+                ),
+            )
+            .frame_height(160.0)
+            .debug_name("segments-surface"),
+        ),
+    ))
 }
 
 /// A surface that declares insets, so `SafeArea` has something to consume.

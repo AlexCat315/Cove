@@ -103,13 +103,21 @@ impl PopoverAnchor {
     }
 
     pub fn geometry(&self, size: Size, placement: PopoverPlacement) -> PopoverGeometry {
+        let anchor = self.frame();
         let window = self
             .owner
             .as_ref()
-            .map(portal_window_bounds)
+            .map(|owner| {
+                crate::primitives::overlays::portal::anchored_bounds(
+                    owner,
+                    portal_window_bounds(owner),
+                    Some(anchor),
+                    anchor.origin(),
+                )
+            })
             .unwrap_or_else(|| Rect::new(0.0, 0.0, 0.0, 0.0));
         PopoverGeometry::new(
-            self.frame(),
+            anchor,
             size,
             window,
             placement,

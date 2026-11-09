@@ -4,6 +4,13 @@
 
 Swift 源码逐页对照见文末《Swift 源码对照（逐页差异清单）》。
 
+## 2026-11-09：平台自适应 P1（弹层区段、SegmentedLayout、PostureLayout、Android 首次运行）
+
+- 页面：Viewport Traits 页新增 Window segments 演示（`segments-single` / `segments-first` / `segments-second` / `segments-top` / `segments-bottom`）；目录仍为 103 页。用户文档 `Website/src/content/components/adaptive.md` 增加「跨折痕布局」「弹层不跨折痕」。
+- 结构验证：compose `fold_overlay_tests` 10 项，core `presentations_choose_the_controls_or_leading_segment`，xtask `jni_on_load_must_be_a_defined_export`。
+- 桌面实测（DevTools）：桌面显示单面板；`dual-screen` 两栏 x 330–540 与 574–1064（铰链 540–574 留空）；`fold-tabletop` 下该节整体位于折痕下方（y=684），保持单面板。
+- Android 模拟器实测：`FoldingFeature` 在平放、合上、桌面支架、书本、旋转下的上报与解码正确（见 CHANGELOG）。Android 渲染、弹层与触摸**未验收**：模拟器两种 GPU 后端都无法渲染 Cove，需真机。
+
 ## 2026-11-09：平台自适应 P0（平台、设备类别、折叠姿态、铰链）
 
 - 页面：Viewport Traits 页的 Idiom 行改为 `Device: <platform> · <design language> · <device class>`，新增 `Posture: <posture> · Segments: <n>` 行（`viewport-device`、`viewport-posture`），阈值说明改为五档。新增用户文档 `Website/src/content/components/adaptive.md` 并登记到「工具链」组；目录仍为 103 页。

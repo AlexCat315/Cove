@@ -20,6 +20,7 @@ pub mod responsive;
 pub(crate) mod row_slot;
 pub(crate) mod scroll_reveal;
 pub(crate) mod scroll_view;
+pub mod segments;
 pub mod sidebar;
 pub mod split;
 pub mod split_compact;
@@ -66,6 +67,7 @@ pub(crate) mod api {
         ScrollAxis, ScrollGeometry, ScrollKeyboardFocus, ScrollRequest, ScrollView, ScrollViewport,
         ScrollbarGutter,
     };
+    pub use super::segments::{PostureLayout, SegmentSplit, SegmentedLayout};
     pub use super::sidebar::{
         AdaptiveSidebar, AdaptiveSidebarOptions, NavigationDrawer, NavigationDrawerOptions,
         Sidebar, SidebarDestination, SidebarEntry, SidebarHierarchy, SidebarItem, SidebarItemSlots,

@@ -20,6 +20,8 @@ use super::{
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct DeviceConfig {
     pub preferred_backends: Vec<super::GraphicsApi>,
+    /// Requests the Khronos validation layer where it is installed; ignored
+    /// where it is not.
     pub enable_validation: bool,
     pub frames_in_flight: usize,
     pub prefer_low_power: bool,

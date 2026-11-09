@@ -33,3 +33,22 @@ cargo xtask devices android
 Gradle wrapper (`assembleDebug`, `assembleProfile` or `assembleRelease`).
 Release signing takes `--keystore`, `--key-alias`, `--store-password-env` and
 `--key-password-env`.
+
+## Application entry
+
+`cove_ui::application!` must be declared in the package's library
+(`src/lib.rs`): Android loads the library as `libCoveAndroidApp.so`, and the
+macro generates its `JNI_OnLoad`. `cargo xtask package android` refuses a
+library that exports none, which would otherwise crash in
+`MainActivity.onCreate` with an unresolved `nativeSetupJNI`.
+
+## Foldables
+
+`FoldingState.java` reads Jetpack WindowManager (`androidx.window` 1.4.0) and
+logs every window layout change under `com.cove.android.window`. On a foldable
+AVD (for example `pixel_9_pro_fold`), `adb emu fold`, `adb emu unfold`,
+`adb emu posture 2` and `adb emu rotate` exercise each posture.
+
+The emulator cannot render Cove: SwiftShader lacks `shaderDrawParameters` and
+indirect `firstInstance`, and the host-GPU (gfxstream) backend aborts with
+"Failed to unbox VkFramebuffer". Rendering needs a physical device.

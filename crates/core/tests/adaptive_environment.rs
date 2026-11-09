@@ -261,3 +261,18 @@ fn defaults_match_the_portable_surface() {
     );
     assert_eq!(Insets::default(), Insets::default());
 }
+
+#[test]
+fn presentations_choose_the_controls_or_leading_segment() {
+    use cove_core::display_features::presentation_segment;
+    let left = Rect::new(0.0, 0.0, 540.0, 705.0);
+    let right = Rect::new(574.0, 0.0, 540.0, 705.0);
+    assert_eq!(presentation_segment(&[left, right], false), Some(left));
+    assert_eq!(presentation_segment(&[left, right], true), Some(right));
+    let top = Rect::new(0.0, 0.0, 701.0, 420.5);
+    let bottom = Rect::new(0.0, 420.5, 701.0, 420.5);
+    assert_eq!(presentation_segment(&[top, bottom], false), Some(bottom));
+    assert_eq!(presentation_segment(&[top, bottom], true), Some(bottom));
+    assert_eq!(presentation_segment(&[left], true), Some(left));
+    assert_eq!(presentation_segment(&[], false), None);
+}

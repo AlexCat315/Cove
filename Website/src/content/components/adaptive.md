@@ -45,6 +45,38 @@ AnyView::new(SurfaceReader::new(|env: &Environment| {
 - `env.segment_for(rect)` 返回应承载该矩形的区段，`display_features::confine(rect, segment)` 把弹层移进区段，避免跨越折痕。
 - 读取器：`PostureReader`、`DeviceClassReader`、`PlatformReader`、`DesignLanguageReader`、`WidthClassReader`、`HeightClassReader`、`OrientationReader`，各自只在对应值变化时重组。
 
+## 跨折痕布局
+
+```rust
+use cove_ui_compose::primitives::layout::{PostureLayout, SegmentedLayout};
+
+// 一块区段时显示 single；折痕或铰链把本视图分成两块时，各放一个面板。
+SegmentedLayout::new(list_and_detail())
+    .split(list(), detail());
+
+// 桌面支架：上半屏内容、下半屏操作；书本：左右两页；其余显示 flat。
+PostureLayout::new(player())
+    .tabletop(video(), controls())
+    .book(page_left(), page_right());
+```
+
+- 两者都量取自身在窗口中的位置，再与区段求交，所以放在侧栏旁边、只占部分窗口时也按真实位置切分；整个落在折痕一侧时不切分。
+- 遮挡的铰链区域留空，不放内容。
+- 首帧尚未量到位置，显示 single / flat，下一帧切换。
+- `SegmentSplit::resolve(env, frame)` 给出同样的切分结果，可用于自定义布局。
+
+## 弹层不跨折痕
+
+框架内的弹层自动遵守区段，应用无需处理：
+
+| 弹层 | 规则 |
+| --- | --- |
+| 菜单、Popover、上下文菜单、Hover card | 放进锚点所在的区段，在区段内翻转和夹紧 |
+| Dialog、Sheet、Action sheet、Bottom sheet | 遮罩覆盖整个窗口，面板放在一个区段内：横向折痕取下半屏，纵向折痕取 leading 区段（RTL 时为右侧） |
+| Toast | 与 Dialog 相同的区段 |
+
+没有折痕或铰链时，行为与原来完全一致。
+
 ## 宿主来源
 
 | 平台 | 设备类别 | 姿态与显示特征 |
@@ -72,4 +104,4 @@ COVE_PREVIEW_DEVICE=fold-tabletop cargo run -p cove-examples
 { "clear": true }
 ```
 
-覆盖只替换宿主报告的事实，不验证宿主自身的上报是否正确；Android 折叠数据需要在折叠屏模拟器或真机上单独验收。
+覆盖只替换宿主报告的事实，不验证宿主自身的上报是否正确。Android 的折叠数据可以在折叠屏模拟器上检查：每次窗口布局变化，日志 `com.cove.android.window` 都会输出设备类别、姿态与折痕，`adb emu fold`、`adb emu unfold`、`adb emu posture 2`、`adb emu rotate` 可切换形态。

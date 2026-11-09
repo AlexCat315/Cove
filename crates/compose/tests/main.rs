@@ -112,6 +112,7 @@ mod field_layout_tests;
 mod file_drop_tests;
 mod floating_surface_tests;
 mod focus_ring_tests;
+mod fold_overlay_tests;
 mod four_tree_consistency_tests;
 mod grid_columns_tests;
 mod grid_layout_tests;

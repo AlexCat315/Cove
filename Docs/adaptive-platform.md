@@ -1,6 +1,6 @@
 # 平台自适应设计
 
-> 状态：P0 已实现（0.3.0-dev，见 §14），P1 起为提案。1.0.0 之前按本文直接做破坏性变更，不保留兼容层。
+> 状态：P0、P1 已实现（0.3.0-dev，见 §14），P2 起为提案。1.0.0 之前按本文直接做破坏性变更，不保留兼容层。
 
 ## 目标
 
@@ -307,4 +307,7 @@ DevTools `set_ui_environment` 接受 `clear`、`preset` 与 `EnvironmentOverride
 | macOS / Linux | 完成 | 桌面，无显示特征 |
 | Web | **缺口**：`cove-browser` 原型不发布 `Environment`，组件得到默认值（`Platform::Web`、Material） | — |
 | 预设与覆盖 | 完成 | `COVE_PREVIEW_DEVICE`，DevTools `set_ui_environment`（桌面会调整窗口尺寸；Android 只替换事实） |
-| 组件消费 | 部分：`uses_sheet` 改用 `is_handheld()`，其余组件仍只读宽度 | P1、P2 |
+| 跨铰链规则（P1） | 完成：菜单、Popover、上下文菜单、Hover card 放进锚点所在区段；Dialog、Sheet、Toast 放进呈现区段（横向折痕取下半屏，纵向取 leading），遮罩仍覆盖窗口 | `crates/compose/src/primitives/overlays/portal/segments.rs`、`display_features::presentation_segment` |
+| `SegmentedLayout`、`PostureLayout`（P1） | 完成；分栏边界吸附折痕（§5.1 第 3 条）留待 P2 的 `ListDetail` | `crates/compose/src/primitives/layout/segments.rs` |
+| Android 实机链路 | 模拟器（Pixel 9 Pro Fold AVD）验证了 `FoldingFeature`：平放、桌面支架、书本、合上、旋转后设备类别保持 `Book`。渲染未验证：模拟器 SwiftShader 缺 `shaderDrawParameters`，gfxstream 在 `VkFramebuffer` 上崩溃 | `FoldingState.java` 的 `com.cove.android.window` 日志 |
+| 组件消费 | 部分：`uses_sheet` 改用 `is_handheld()`；语义导航容器未开始 | P2 |

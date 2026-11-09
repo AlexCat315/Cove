@@ -15,3 +15,7 @@ pub use counter::{
     CounterDebugName, CounterText, CounterTextRun, CounterView, MAXIMUM_COUNT, MAXIMUM_NOTE_LENGTH,
     ProvidedPainter,
 };
+
+// Declared in the library so the Android `cdylib` exports `JNI_OnLoad` and
+// installs the showcase; the desktop/iOS binary calls `run`.
+cove_hosts::application!(launch = demo::application);

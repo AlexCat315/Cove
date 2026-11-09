@@ -49,6 +49,7 @@ final class FoldingState {
             }
             features = next;
             remember();
+            RuntimeLog.info("com.cove.android.window", describe());
             changed.run();
         };
     }
@@ -99,6 +100,21 @@ final class FoldingState {
             values[index++] = feature.isSeparating() ? 1 : 0;
         }
         return values;
+    }
+
+    /** One line per layout change, so fold handling can be checked on a device. */
+    private String describe() {
+        StringBuilder line = new StringBuilder("Window layout: device ")
+                .append(deviceClass(activity.getResources().getConfiguration()))
+                .append(", posture ").append(posture());
+        for (FoldingFeature feature : features) {
+            line.append(", feature ").append(feature.getBounds().toShortString())
+                    .append(feature.getOrientation() == FoldingFeature.Orientation.HORIZONTAL ? " horizontal" : " vertical")
+                    .append(feature.getState() == FoldingFeature.State.HALF_OPENED ? " half-opened" : " flat")
+                    .append(feature.getOcclusionType() == FoldingFeature.OcclusionType.FULL ? " occluding" : "")
+                    .append(feature.isSeparating() ? " separating" : "");
+        }
+        return line.toString();
     }
 
     private int currentKind() {

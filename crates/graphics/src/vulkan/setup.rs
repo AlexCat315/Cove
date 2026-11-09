@@ -208,7 +208,13 @@ pub fn create_instance(
     let extension_pointers: Vec<*const core::ffi::c_char> =
         names.iter().map(|name| name.as_ptr()).collect();
     let layers: [&CStr; 1] = [c"VK_LAYER_KHRONOS_validation"];
-    let layer_pointers: Vec<*const core::ffi::c_char> = if enable_validation {
+    // Validation is a development aid: a device without the layer installed,
+    // such as any Android phone, runs without it instead of failing to start.
+    let validation_available = enable_validation
+        && instance_layers(loader)
+            .iter()
+            .any(|name| name == "VK_LAYER_KHRONOS_validation");
+    let layer_pointers: Vec<*const core::ffi::c_char> = if validation_available {
         layers.iter().map(|name| name.as_ptr()).collect()
     } else {
         Vec::new()
@@ -229,11 +235,47 @@ pub fn create_instance(
     // SAFETY: `create_info` and every array/string it points at are live for the
     // duration of the call, and the out-parameter is a live local.
     let result = unsafe { create(&create_info, core::ptr::null(), &mut instance) };
-    rhi_require(
-        result == sys::VK_SUCCESS && !instance.is_null(),
-        "vkCreateInstance failed",
-    )?;
+    if result != sys::VK_SUCCESS || instance.is_null() {
+        return Err(RhiError::invalid_argument(format!(
+            "vkCreateInstance failed: VkResult {result}, API {}.{}, extensions {:?}",
+            version >> 22,
+            (version >> 12) & 0x3ff,
+            names
+        )));
+    }
     Ok(instance)
+}
+
+/// The loader's instance layers; empty when they cannot be enumerated.
+fn instance_layers(loader: &sys::VulkanLoader) -> Vec<String> {
+    // SAFETY: the name is the global entry point its type declares.
+    let Some(enumerate) = (unsafe {
+        loader.load::<sys::PFN_vkEnumerateInstanceLayerProperties>(
+            sys::VK_NULL_INSTANCE,
+            c"vkEnumerateInstanceLayerProperties",
+        )
+    }) else {
+        return Vec::new();
+    };
+    for _ in 0..4 {
+        let mut count: u32 = 0;
+        // SAFETY: a null array asks only for the count.
+        if unsafe { enumerate(&mut count, core::ptr::null_mut()) } != sys::VK_SUCCESS {
+            return Vec::new();
+        }
+        let mut values = vec![sys::VkLayerProperties::default(); count as usize];
+        // SAFETY: `values` holds `count` entries and `count` bounds the write.
+        let result = unsafe { enumerate(&mut count, values.as_mut_ptr()) };
+        if result == sys::VK_INCOMPLETE {
+            continue;
+        }
+        if result != sys::VK_SUCCESS {
+            return Vec::new();
+        }
+        values.truncate(count as usize);
+        return values.iter().map(sys::VkLayerProperties::name).collect();
+    }
+    Vec::new()
 }
 
 /// Enumerates the loader's instance extensions, retrying `VK_INCOMPLETE`.

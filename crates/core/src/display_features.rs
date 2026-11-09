@@ -194,3 +194,19 @@ pub fn confine(rect: Rect, segment: Rect) -> Rect {
     let y = rect.y.clamp(segment.y, segment.max_y() - height);
     Rect::new(x, y, width, height)
 }
+
+/// The segment that hosts a window-level presentation such as a dialog or a
+/// sheet. Across a horizontal fold it is the lower segment, where controls go
+/// in tabletop posture; across a vertical fold or hinge it is the leading one.
+pub fn presentation_segment(segments: &[Rect], right_to_left: bool) -> Option<Rect> {
+    let first = *segments.first()?;
+    let stacked = segments.iter().any(|segment| segment.y > first.y);
+    if stacked {
+        return segments.iter().copied().max_by(|a, b| a.y.total_cmp(&b.y));
+    }
+    if right_to_left {
+        segments.iter().copied().max_by(|a, b| a.x.total_cmp(&b.x))
+    } else {
+        Some(first)
+    }
+}

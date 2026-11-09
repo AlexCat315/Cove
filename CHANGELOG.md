@@ -4,6 +4,13 @@
 
 ## Unreleased
 
+- **平台自适应 P1：弹层不跨折痕、按区段与姿态布局；Android 首次跑通（2026-11-09）**：
+  - 弹层：新增 `primitives::overlays::portal::{overlay_segments, anchored_bounds, presentation_bounds}` 与 core `display_features::presentation_segment`。菜单、Popover、上下文菜单、Hover card 在锚点所在区段内定位与夹紧；Modal（Dialog、Sheet、Action sheet、Bottom sheet）与 Toast 的面板放进呈现区段（横向折痕取下半屏，纵向取 leading，RTL 取右侧），遮罩仍覆盖整个窗口。区段由实际窗口与 `display_features` 求得，无折痕时与原行为一致。`ModalBackdropView` 的内边距改在 `update_layout` 中按区段设置。
+  - 布局：新增 `SegmentedLayout`（一块区段显示 single，两块时分别放两个面板，遮挡区域留空）、`PostureLayout`（桌面支架上下、书本左右、其余 flat）与 `SegmentSplit::resolve`。两者量取自身窗口位置与区段求交，嵌入时同样正确。Gallery Viewport Traits 页新增 Window segments 演示。
+  - Android：安装 JDK 21、SDK 36、Build-Tools 36.1、NDK r30 后首次编译通过（`FoldingState.java` 与 `androidx.window` 1.4.0）。Gallery 新增 `Platforms/Android`；`application!` 从 `src/bin/gallery.rs` 移到 `src/lib.rs`，此前 Android 的 `cdylib` 没有 `JNI_OnLoad`，启动即崩溃；`cargo xtask package android` 现在检查导出并给出修复提示。Vulkan 实例只在验证层已安装时请求它（`DeviceConfig::default()` 默认开启验证，Android 设备没有该层，`vkCreateInstance` 以 `VK_ERROR_LAYER_NOT_PRESENT` 失败），失败信息附带 `VkResult`、API 版本与扩展。`FoldingState` 每次窗口布局变化记录 `com.cove.android.window` 日志。
+  - 测试：compose `fold_overlay_tests` 10 项（双屏 Dialog 在左段、RTL 在右段、桌面支架在下半屏、无折痕居中、锚定面板不跨铰链、`SegmentSplit` 四种容器、`SegmentedLayout` 两段尺寸与单段回退、`PostureLayout` 桌面支架与平放）；core `presentations_choose_the_controls_or_leading_segment`；xtask `jni_on_load_must_be_a_defined_export`。
+  - 验收：Pixel 9 Pro Fold AVD 上实测 `FoldingFeature`：展开平放 → `device 2, posture 0`、竖向折痕 `[1038,0][1038,2152]`；合上 → `device 2`、无特征；半开 → `posture 1`（横向折痕）/ `posture 2`（旋转后竖向），均为 separating。桌面 DevTools 实测 `dual-screen` 下演示两栏为 x 330–540 与 574–1064，`fold-tabletop` 下演示整体位于折痕下方而不切分。未验证：模拟器无法渲染 Cove（SwiftShader 缺 `shaderDrawParameters`，gfxstream 崩溃于 `VkFramebuffer`），Android 画面与弹层需真机验收。
+
 - **有状态的基础视图在任意位置都会随自身状态刷新（2026-11-09）**：
   - 根因：`ViewGraph` 只在用户视图和 `install_view` 的根视图上连接 `dynamic_properties`。嵌套在修饰符里或作为后代的 `PrimitiveView` 即使声明了状态依赖也被静默忽略，`children()` 中读取的 `State` 变化不会让它重跑（`ObservableStateTracking::observe_reads` 不做跟踪）。桌面宿主环境不刷新就是这个问题的一个实例。
   - 修复：声明了 `dynamic_properties` 的基础视图在物化时与用户视图一样获得一个透明锚点和作用域，作用域的主体就是该基础视图本身；父级更新时复用同一锚点（`replace_view` + `recompose`），卸载时随作用域解除订阅。未声明状态的基础视图路径不变。

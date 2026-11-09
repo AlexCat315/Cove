@@ -14,7 +14,7 @@ use crate::modifiers::style::{AppearanceExt, SemanticStyleViewExt};
 use crate::primitives::overlays::focus_scope::FocusScope;
 use crate::primitives::overlays::portal::portal_registry::PortalResource;
 use crate::primitives::overlays::portal::{
-    PortalStoreEnvironment, PortalStoreHolder, portal_window_bounds,
+    PortalStoreEnvironment, PortalStoreHolder, portal_window_bounds, presentation_bounds,
 };
 use crate::theme::theme_for_node;
 use crate::{AnyView, PrimitiveView, View, ViewExt, impl_primitive_view};
@@ -29,6 +29,8 @@ use cove_platform::MouseButton;
 use super::modal_options::{ModalBackdrop, ModalGeometry, ModalOptions, ModalPlacement};
 
 const WINDOW_BOUNDS: &str = "modal.windowBounds";
+/// The segment the panel is confined to; equals the window without folds.
+const PANEL_AREA: &str = "modal.panelArea";
 
 /// A modal dialog presented over the window.
 pub struct Modal {
@@ -114,7 +116,10 @@ impl PrimitiveView for ModalPresenter {
             let Some(node) = Node::upgrade(&weak) else {
                 return;
             };
-            if node.attachment::<Rect>(WINDOW_BOUNDS) != Some(portal_window_bounds(&node)) {
+            let window = portal_window_bounds(&node);
+            if node.attachment::<Rect>(WINDOW_BOUNDS) != Some(window)
+                || node.attachment::<Rect>(PANEL_AREA) != Some(presentation_bounds(&node, window))
+            {
                 present(
                     &node,
                     presented.get(),
@@ -144,8 +149,12 @@ fn present(
     content: &AnyView,
     is_presented_binding: &Binding<bool>,
 ) {
-    let bounds = portal_window_bounds(node);
-    node.set_attachment(WINDOW_BOUNDS, bounds);
+    let window = portal_window_bounds(node);
+    // A fold or hinge confines the panel to one segment; the scrim still
+    // covers the window.
+    let bounds = presentation_bounds(node, window);
+    node.set_attachment(WINDOW_BOUNDS, window);
+    node.set_attachment(PANEL_AREA, bounds);
     let resource = node.first_resource::<PortalResource>();
     if !(is_presented || retained.get()) {
         if let Some(resource) = resource.as_ref() {
@@ -187,6 +196,13 @@ fn present(
         })),
         AnyView::new(FocusScope::new(AnyView::new(ModalBackdropView {
             is_visible: is_presented,
+            area: Rect::new(
+                bounds.x - window.x,
+                bounds.y - window.y,
+                bounds.width,
+                bounds.height,
+            ),
+            window_size: window.size(),
             options: fitted.clone(),
             content: content.clone(),
             dismiss: Rc::new({
@@ -219,6 +235,9 @@ fn present(
 /// Backdrop that owns dismissal plus one animated panel.
 struct ModalBackdropView {
     is_visible: bool,
+    /// The panel's segment, relative to the window.
+    area: Rect,
+    window_size: Size,
     options: ModalOptions,
     dismiss: Rc<dyn Fn()>,
     content: AnyView,
@@ -294,7 +313,10 @@ impl PrimitiveView for ModalBackdropView {
     }
 
     fn make_layout_node(&self) -> Option<LayoutNode> {
-        let layout = LayoutNode::new();
+        Some(LayoutNode::new())
+    }
+
+    fn update_layout(&self, layout: &LayoutNode) {
         layout.set_position_type(PositionType::Absolute);
         layout.set_position(0.0, Edge::Start);
         layout.set_position(0.0, Edge::Top);
@@ -303,9 +325,18 @@ impl PrimitiveView for ModalBackdropView {
         // `inset` is the documented margin from the window edge, not only a cap
         // on the dialog size. Without padding, top/bottom placement put a
         // rounded panel flush against the window and clipped its corners.
-        if self.options.geometry.inset > 0.0 {
-            layout.set_padding(self.options.geometry.inset, Edge::All);
-        }
+        let inset = self.options.geometry.inset.max(0.0);
+        let area = self.area;
+        layout.set_padding(area.x + inset, Edge::Left);
+        layout.set_padding(area.y + inset, Edge::Top);
+        layout.set_padding(
+            (self.window_size.width - area.max_x()).max(0.0) + inset,
+            Edge::Right,
+        );
+        layout.set_padding(
+            (self.window_size.height - area.max_y()).max(0.0) + inset,
+            Edge::Bottom,
+        );
         layout.set_flex_direction(FlexDirection::Column);
         layout.set_align_items(match self.options.geometry.placement {
             ModalPlacement::Leading => Align::FlexStart,
@@ -317,11 +348,10 @@ impl PrimitiveView for ModalBackdropView {
             ModalPlacement::Top => Justify::FlexStart,
             _ => Justify::Center,
         });
-        Some(layout)
     }
 
-    fn children(&self, node: &Node) -> Vec<AnyView> {
-        let bounds = portal_window_bounds(node);
+    fn children(&self, _node: &Node) -> Vec<AnyView> {
+        let bounds = self.area;
         let inset = self.options.geometry.inset;
         let size = Size {
             width: self

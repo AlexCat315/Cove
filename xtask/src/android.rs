@@ -133,12 +133,11 @@ pub fn prepare(project: &Project, mode: Mode) -> Result<PathBuf> {
     let staged = generated.join(mode.name());
     process::remove_dir(&staged)?;
     let libraries = staged.join("lib/arm64-v8a");
-    process::copy(
-        &project
-            .artifacts(mode, Some(TARGET))
-            .join(format!("lib{}.so", project.lib()?)),
-        &libraries.join("libCoveAndroidApp.so"),
-    )?;
+    let library = project
+        .artifacts(mode, Some(TARGET))
+        .join(format!("lib{}.so", project.lib()?));
+    require_jni_on_load(&llvm, &library, &project.package)?;
+    process::copy(&library, &libraries.join("libCoveAndroidApp.so"))?;
     process::copy(
         &llvm.join("sysroot/usr/lib/aarch64-linux-android/libc++_shared.so"),
         &libraries.join("libc++_shared.so"),
@@ -206,6 +205,36 @@ pub fn prepare(project: &Project, mode: Mode) -> Result<PathBuf> {
         )?;
     }
     Ok(staged)
+}
+
+/// The Activity cannot start without the library's `JNI_OnLoad`, which
+/// `application!` generates; declaring it only in a binary target leaves the
+/// `cdylib` without one and the app crashes in `onCreate`.
+fn require_jni_on_load(llvm: &Path, library: &Path, package: &str) -> Result<()> {
+    let nm = llvm.join("bin").join(if cfg!(windows) {
+        "llvm-nm.exe"
+    } else {
+        "llvm-nm"
+    });
+    let symbols = process::output(
+        Command::new(nm)
+            .args(["--dynamic", "--defined-only"])
+            .arg(library),
+    )?;
+    if exports_jni_on_load(&symbols) {
+        Ok(())
+    } else {
+        Err(format!(
+            "{} exports no JNI_OnLoad; declare `application!` in the `{package}` library (src/lib.rs), not only in a binary",
+            library.display()
+        ))
+    }
+}
+
+fn exports_jni_on_load(symbols: &str) -> bool {
+    symbols
+        .lines()
+        .any(|line| line.split_whitespace().last() == Some("JNI_OnLoad"))
 }
 
 /// `.properties` values are ISO-8859-1 with backslash escapes.
@@ -296,7 +325,18 @@ pub fn devices() -> Result<()> {
 
 #[cfg(test)]
 mod tests {
-    use super::escape;
+    use super::{escape, exports_jni_on_load};
+
+    #[test]
+    fn jni_on_load_must_be_a_defined_export() {
+        assert!(exports_jni_on_load(
+            "0000000000375740 T Java_com_cove_probe_MainActivity_open\n00000000004166d0 T JNI_OnLoad\n"
+        ));
+        assert!(!exports_jni_on_load(
+            "0000000000375740 T Java_com_cove_probe_MainActivity_open\n0000000000415a30 T CoveSDL_JNI_OnLoad\n"
+        ));
+        assert!(!exports_jni_on_load(""));
+    }
 
     #[test]
     fn properties_escape_backslashes_and_non_ascii() {

@@ -197,6 +197,8 @@ impl cove_composition::ViewModifier for MenuWindowBounds {
 /// over `max_height` when the window bounds only become known after layout.
 fn budgeted_height(node: &Node, max_visible_rows: usize) -> f32 {
     let row_height = super::menu_item_row::natural_row_height(node);
-    let bounds = super::super::portal::portal_window_bounds(node);
+    let window = super::super::portal::portal_window_bounds(node);
+    let frame = node.absolute_frame();
+    let bounds = super::super::portal::anchored_bounds(node, window, Some(frame), frame.origin());
     (max_visible_rows as f32 * row_height).min((bounds.height - 12.0).max(0.0))
 }

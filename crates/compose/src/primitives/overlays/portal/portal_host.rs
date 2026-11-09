@@ -186,7 +186,17 @@ struct PortalEntrySlot {
 }
 
 impl PortalEntrySlot {
-    /// Fit the slot into the window when it does not fill it.
+    /// The window segment this entry lives in: the one holding its anchor.
+    fn bounds(&self, node: &Node) -> Rect {
+        super::segments::anchored_bounds(
+            node,
+            portal_window_bounds(node),
+            self.store.anchor(&self.entry.id),
+            self.entry.position,
+        )
+    }
+
+    /// Fit the slot into its window segment when it does not fill the window.
     fn apply_fit(&self, layout: &LayoutNode, window: Rect) {
         if self.entry.fills_window {
             layout.set_min_width(None);
@@ -227,7 +237,7 @@ impl PrimitiveView for PortalEntrySlot {
         node.set_clips_to_bounds(false);
 
         if let Some(layout) = node.layout_node() {
-            self.apply_fit(&layout, portal_window_bounds(node));
+            self.apply_fit(&layout, self.bounds(node));
         }
 
         // Placement is resolved while layout is written back: after the host is
@@ -246,20 +256,35 @@ impl PrimitiveView for PortalEntrySlot {
                 if entry.fills_window {
                     return solved;
                 }
+                let anchor = store.anchor(&entry.id);
+                let bounds = super::segments::anchored_bounds(
+                    node,
+                    portal_window_bounds(node),
+                    anchor,
+                    entry.position,
+                );
                 let fitted = fitted_frame(
                     &entry,
                     Size {
                         width: solved.width,
                         height: solved.height,
                     },
-                    portal_window_bounds(node),
-                    store.anchor(&entry.id),
+                    bounds,
+                    anchor,
                 );
                 window_frame_in_parent(node, fitted)
             })));
             let fit = self.entry.fit;
+            let store = self.store.clone();
+            let id = self.entry.id.clone();
+            let origin = self.entry.position;
             node.set_layout_did_update(Some(Rc::new(move |node: &Node| {
-                let window = portal_window_bounds(node);
+                let window = super::segments::anchored_bounds(
+                    node,
+                    portal_window_bounds(node),
+                    store.anchor(&id),
+                    origin,
+                );
                 if let Some(layout) = node.layout_node() {
                     let (minimum, maximum) = fit.width_range(window);
                     layout.set_min_width(Some(minimum));
@@ -292,7 +317,7 @@ impl PrimitiveView for PortalEntrySlot {
         if self.entry.fills_window {
             return vec![self.entry.content.clone()];
         }
-        let window = portal_window_bounds(node);
+        let window = self.bounds(node);
         let (minimum, maximum) = self.entry.fit.width_range(window);
         let limit = self.entry.fit.height_limit(window);
         // A non-filling entry scrolls only when its content overflows, so short
