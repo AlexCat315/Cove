@@ -346,11 +346,11 @@ fn the_sidebar_lays_its_slots_and_rows_on_one_column() {
                 assert_eq!(frame.x, 10.0, "{frame:?}");
                 assert_eq!(frame.width, 220.0, "{frame:?}");
             }
-            let toggle = labelled("Collapse sidebar");
-            let search = scene.require_named("gallery-search").absolute_frame();
-            assert!(
-                toggle.max_y() <= search.y && toggle.max_x() == 230.0,
-                "the collapse toggle sits at the trailing end of the top row: {toggle:?}"
+            let navigation = scene.require_named("gallery-navigation").absolute_frame();
+            assert_eq!(
+                (navigation.x, navigation.width),
+                (0.0, 240.0),
+                "the navigation keeps its column beside the page"
             );
         },
     );

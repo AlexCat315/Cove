@@ -1,8 +1,10 @@
 //! Translation of CoveUIComposeCore/Adaptive/*.swift.
+mod adaptation;
 mod container_query;
 mod surface;
 mod viewport_traits;
 mod width_class;
+pub use adaptation::*;
 pub use container_query::*;
 pub use surface::*;
 pub use viewport_traits::*;

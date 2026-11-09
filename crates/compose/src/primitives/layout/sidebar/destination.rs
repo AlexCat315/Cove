@@ -513,6 +513,8 @@ fn presentation_code(presentation: SidebarPresentation) -> u8 {
         SidebarPresentation::Rail {
             shows_labels: false,
         } => 2,
+        SidebarPresentation::List { grouped: true } => 3,
+        SidebarPresentation::List { grouped: false } => 4,
     }
 }
 

@@ -4,6 +4,17 @@
 
 ## Unreleased
 
+- **组件形态适配：审计基线、Sidebar 手持列表、TextField 触摸高度；Gallery 外壳改用 ListDetail（2026-11-09）**：
+  - 设计：`Docs/adaptive-platform.md` 新增 §5.3「组件形态」（通用 / 桌面惯用 / 手持惯用三类与逐组件对照）与 §11.3「适配审计」。
+  - 审计：新增 `examples/gallery/tests/adaptation_audit.rs`，在 iphone、android-phone、fold-tabletop、ipad-split、macos 下渲染全部 104 页，检查 `touch-target`（以指针处理器的 Control / TextInput 路由识别可点元素，排除可选文本）、`horizontal-overflow`、`desktop-only`、`handheld-only`，计数与 `adaptation_baseline.txt` 比较，只减不增。`COVE_ADAPTATION_AUDIT_ONLY=preset/page` 与 `COVE_ADAPTATION_AUDIT_DETAIL=1` 定位具体节点。`cove-composition` 新增 `AdaptationMark`（`adaptation.only` 节点标记）。首轮 828 处触摸目标违规，本次修复后 478。
+  - `Sidebar`：新增 `SidebarPresentation::List { grouped }`；外层按环境自动选择：手持设备上 Expanded 变为导航列表（Cupertino 圆角分组、一物理像素分隔、尾部箭头；Material 整宽行），行高 ≥ 44 / 56，不保留选中高亮，头尾槽位 16pt 内边距；桌面面板标记 `DesktopOnly`。`Sidebar::adapts(false)` 保留原呈现。`SidebarItemStyle` 实现 `style_identity`，此前呈现或行高变化不会重建按钮（运行时切换设备后底部行仍是旧形态）。
+  - `TextField`：单行字段在触摸表面上把 `minimum_field_height` 提升到 `minimum_control_extent()`，布局、测量与垂直内边距一致，文字居中（只给节点加最小尺寸会让文字贴顶、下方说明压住边框，已改正）；测量缓存键 `MeasureInputs` 纳入最小高度，触摸与指针切换后测量随之更新。`touch_density_tests` 原先钉住的“文本框未达 44pt”差异改为断言 44pt（与 Swift 一致）。
+  - `ListDetail`：新增 `two_pane_width`、`hairline` 选项与 `ListDetailPresentation::resolve_from`；`ListDetailContext` 带 `presentation`；隐藏的窗格不透明度为 0（零尺寸裁剪挡不住溢出内容，此前单栏时导航在左上角留下压扁的残影）。
+  - Gallery 外壳：`AdaptiveSidebar` 换为 `ListDetail`——导航（`Sidebar`）为列表、页面为详情，600 起并排，折痕 / 铰链 / 桌面支架按 §5；单栏页头带返回；页面卡片仅在导航位于其前缘时去掉前缘间距。移除抽屉、折叠为 rail、拖动宽度（破坏性）。故事源表接受 Rust 源。
+  - 测试：compose `list_detail_tests` 增至 9 项（侧栏随设备选择呈现、样式标识含呈现与行高、手持行高 ≥ 44 且无桌面标记 / 桌面面板带标记、侧栏槽位随环境更新）；gallery `adaptive_shell_tests` 改写 `reflow` 与 `navigation_session`；`gallery_tests` 侧栏列断言改为导航宽 240。
+  - 实测（DevTools）：iPhone 文本字段 44pt 且文字居中；iPhone 返回后为圆角分组列表，行 44pt、行距 0.5pt；桌面支架下导航为 Material 整宽列表；desktop、iphone、fold-open、dual-screen、fold-tabletop、fold-cover、macos 下外壳布局见 Docs/gallery-audit.md。
+  - 未完成：其余 478 处触摸目标（按钮 42 < Material 48、图表图例 22、表格单元 16、列表行 30、滑块轨道等）与 §5.3 中其余组件的手持 / 桌面形态。
+
 - **平台自适应 P2：`ListDetail` 与 `AdaptiveTabs`（2026-11-09）**：
   - `ListDetail`：一份 `ListDetailState { selection, showing_detail }` 驱动所有呈现。宽度 < 840 为单栏（选中后详情覆盖列表，`ListDetailContext::back` 返回并保留选择）；≥ 840 为左列表 + 发丝线 + 右详情；竖向折痕或铰链穿过视图且两侧 ≥ 240 时分界落在折痕上、铰链区域留空；桌面支架时上方详情、下方列表。视图量取自身窗口位置判断，放在侧栏旁边同样正确。列表与详情在所有呈现中占固定槽位（隐藏用 `Display::None`），折叠、展开、旋转、缩放都不重建它们。
   - `AdaptiveTabs`：Compact 宽度为底部 `MobileTabBar`；更宽的手机、折叠屏、平板或无 hover 表面为 `NavigationRail`；有指针的桌面为内容上方的 `TabView` 条。选中内容在三种呈现中共用一个槽位。

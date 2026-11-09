@@ -110,6 +110,29 @@ AdaptiveTabs::try_new(selection, vec![
 
 选中页的内容在三种呈现中共用一个槽位，不会因切换呈现而重建。
 
+## 组件形态
+
+组件分三类：通用组件只随设计语言换样式和触摸尺寸；桌面惯用组件在手持设备上换成手机形态；手持惯用组件在桌面上换成对应物。完整对照见 `Docs/adaptive-platform.md` §5.3。
+
+已适配：
+
+| 组件 | 手持 | 桌面 / 平板 |
+| --- | --- | --- |
+| `Sidebar` | 导航列表：Cupertino 圆角分组、整行可点、尾部箭头；Material 整宽行。行高 ≥ 触摸目标，不保留选中高亮 | 侧栏面板与选中高亮 |
+| `TextField`（单行） | 触摸表面上高度 ≥ 44（Material 48），文字垂直居中 | 设计尺寸 |
+
+`Sidebar::adapts(false)` 保留作者指定的呈现。只适合一种设备的呈现用 `AdaptationMark::DesktopOnly` / `HandheldOnly` 标记在节点上，供审计识别。
+
+### 适配审计
+
+`cargo test -p cove-examples --test adaptation_audit` 在 iPhone、Android 手机、桌面支架、iPad 分屏、macOS 下渲染每一页，检查触摸目标、Compact 宽度横向溢出、手持设备上的桌面专属呈现与桌面上的手持专属呈现。计数与 `examples/gallery/tests/adaptation_baseline.txt` 比较，只能减少：
+
+```sh
+COVE_ADAPTATION_AUDIT_ONLY=iphone/textFields COVE_ADAPTATION_AUDIT_DETAIL=1 \
+  cargo test -p cove-examples --test adaptation_audit -- --nocapture
+COVE_ADAPTATION_AUDIT_WRITE=1 cargo test -p cove-examples --test adaptation_audit
+```
+
 ## 弹层不跨折痕
 
 框架内的弹层自动遵守区段，应用无需处理：

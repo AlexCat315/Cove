@@ -178,6 +178,40 @@ PostureLayout::new()
 
 `ListDetail`、`MediaPlayer` 等语义组件内部用这两个原语实现，应用也可以直接用。
 
+### 5.3 组件形态
+
+语义容器只决定结构；每个组件还要按平台改变自己的形态。组件分三类：
+
+| 类别 | 组件 | 要求 |
+|---|---|---|
+| 通用 | Button、Toggle、Checkbox、Radio、Slider、RangeSlider、Rating、TextField、Select、Badge、Progress、Spinner、Avatar、Tag、Alert、EmptyState、Skeleton、Link、Stepper、Carousel、Chart、Image、Markdown | 跟随设计语言换样式（§7）；触摸时命中区 ≥ 44（Material 48）；不依赖 hover |
+| 桌面惯用，手持需换形态 | Sidebar、Tree、DataTable、Table、PropertyGrid、SplitView、Workspace / Dock、StatusBar、Toolbar、Tooltip、HoverCard、ContextMenu、Command Palette、Breadcrumb、Kbd、SplitButton、Scrollbar、Pagination、Menu bar | 见下表 |
+| 手持惯用，桌面需对应物 | BottomSheet、ActionSheet、SwipeList、RefreshableList、WheelPicker、MobileTabBar、HorizontalSwipe | 见下表 |
+
+| 组件 | 手持形态 | 桌面形态 |
+|---|---|---|
+| Sidebar | 平台列表：Cupertino inset grouped（圆角分组、整行可点、尾部箭头），Material 列表（整宽行、前置图标）；不保留选中高亮 | 侧栏面板与选中高亮 |
+| Tree | 逐层下钻（每层一个 push 页） | 展开折叠 |
+| DataTable / Table | 卡片列表，或冻结首列横向滚动 | 表格 |
+| PropertyGrid | 分组表单 | 两列网格 |
+| SplitView / Workspace | `ListDetail` 或单栏 | 可拖动分栏 |
+| Toolbar | 导航栏 + 底部工具栏 / 溢出菜单 | 窗口工具栏 |
+| Tooltip / HoverCard | 不显示，或点按 popover | 悬停显示 |
+| ContextMenu | 长按菜单或 action sheet | 右键 |
+| Command Palette | 全屏搜索页 | 浮层 |
+| Breadcrumb | 返回 + 标题 | 路径 |
+| Kbd | 不显示 | 显示 |
+| BottomSheet / ActionSheet | 底部弹出 | 居中对话框 / 锚定菜单 |
+| SwipeList | 滑动操作 | 悬停显示的行内操作 + 右键 |
+| RefreshableList | 下拉刷新 | 刷新命令 |
+| WheelPicker | 滚轮 | 下拉选择 |
+
+约定：
+
+1. 形态由组件自己从环境（设计语言、设备类别、输入、宽度）决定，应用代码不分支。
+2. 只适合桌面的呈现在节点上标记 `adaptation.desktop-only`，只适合手持的标记 `adaptation.handheld-only`，供审计识别（§11.3）。
+3. 每个组件的用户文档写明两种形态。
+
 ## 6. 形态变化时的状态连续性
 
 折叠、展开、旋转、多窗口缩放是一次 `Environment` 更新，组合树原地重算，不卸载。
@@ -275,6 +309,19 @@ DevTools `set_ui_environment` 接受 `clear`、`preset` 与 `EnvironmentOverride
 - 动态用例：在预设之间切换（`fold-cover → fold-open → fold-tabletop → fold-cover`），断言 §6 的状态保留，并用 `start_ui_trace` / `stop_ui_trace` 记录过渡帧耗时。
 - 结构覆盖与真机验收分开记录。覆盖注入不验证宿主上报是否正确，宿主数据源要在 Android Studio 的折叠屏与可调尺寸模拟器上、以及有条件时在真机上单独验收。
 
+### 11.3 适配审计
+
+`examples/gallery/tests/adaptation_audit.rs` 在每个预设下渲染 Gallery 的每一页，逐条检查：
+
+| 规则 | 判定 |
+|---|---|
+| `touch-target` | 触摸表面上，可交互节点（按钮、开关、链接等可访问角色且可命中）宽高都 ≥ `minimum_control_extent()` |
+| `horizontal-overflow` | Compact 宽度下，可见节点不超出窗口右缘 |
+| `desktop-only` | 手持设备上出现标记 `adaptation.desktop-only` 的节点 |
+| `handheld-only` | 指针桌面上出现标记 `adaptation.handheld-only` 的节点 |
+
+结果与 `examples/gallery/tests/adaptation_baseline.txt` 比较：新增违规让测试失败；基线里已不再出现的条目也让测试失败，要求删除。基线只减不增，是逐项修复的清单。`COVE_ADAPTATION_AUDIT_WRITE=1` 重写基线（仅在有意接受时使用）。
+
 ## 12. 分阶段
 
 | 阶段 | 内容 | 完成标准 |
@@ -314,4 +361,5 @@ DevTools `set_ui_environment` 接受 `clear`、`preset` 与 `EnvironmentOverride
 | `AdaptiveTabs`（P2） | 完成：底部 tab bar / rail / 顶部 tab 条，内容槽位固定 | `crates/compose/src/primitives/navigation/adaptive_tabs.rs` |
 | 单栏转场 | 未做：单栏中列表与详情直接切换，没有 push 动画与边缘返回手势（`NavigationStack` 有，但会让槽位跨父节点而重建） | P2 后续 |
 | `present_sheet`、`Menu`、`Toolbar` 语义入口 | 未开始 | P2 后续 |
-| 组件消费 | `uses_sheet` 改用 `is_handheld()`；Gallery 外壳仍是 `AdaptiveSidebar`，未改用 `ListDetail` | P2 后续 |
+| Gallery 外壳（P2） | 完成：`ListDetail` 承载导航与页面；600 起并排，折痕 / 铰链 / 桌面支架按 §5 | `examples/gallery/src/gallery_content/gallery_view.rs` |
+| 组件形态（§5.3） | 进行中：审计与基线，Sidebar 手持列表 | §11.3 |

@@ -4,6 +4,14 @@
 
 Swift 源码逐页对照见文末《Swift 源码对照（逐页差异清单）》。
 
+## 2026-11-09：组件形态适配与 Gallery 外壳
+
+- 外壳：导航与页面由 `ListDetail` 承载。DevTools 实测：desktop / macos 导航 240 + 页面；iphone、fold-cover 单栏页面带返回；fold-open 分界在 420.5；dual-screen 导航 0–540、页面 574 起；fold-tabletop 页面在上、导航在下。
+- 适配审计：`examples/gallery/tests/adaptation_audit.rs` 与 `adaptation_baseline.txt`。按预设的触摸目标违规：iphone 116、android-phone 117、fold-tabletop 126、ipad-split 119（总 478，首轮 828）；无横向溢出；手持设备上无桌面专属呈现。
+- Sidebar：手持为导航列表（实测 iPhone 圆角分组、行 44pt、行距 0.5pt；桌面支架 Material 整宽列表）。
+- TextField：触摸表面单行高度 44 / 48，文字居中（实测 iPhone Text Fields 页）。
+- 原生验收：**未做**（模拟器无法渲染，需真机）。
+
 ## 2026-11-09：平台自适应 P2（ListDetail、AdaptiveTabs）
 
 - 页面：新增 ListDetail / AdaptiveTabs（`adaptiveNavigation`），目录 104 页。用户文档 `Website/src/content/components/adaptive.md` 增加「导航」。

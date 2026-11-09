@@ -454,6 +454,9 @@ pub struct TextField {
     pub navigation: TextFieldNavigationRequest,
     pub events: TextFieldEvents,
     pub style: Option<AnyTextFieldStyle>,
+    /// The surface's touch target for a single-line field; zero elsewhere.
+    /// Resolved from the environment each body pass.
+    touch_minimum: f32,
 }
 
 impl TextField {
@@ -468,6 +471,7 @@ impl TextField {
             navigation: TextFieldNavigationRequest::default(),
             events: TextFieldEvents::default(),
             style: None,
+            touch_minimum: 0.0,
         }
     }
 
@@ -507,14 +511,16 @@ impl TextField {
         self
     }
 
-    /// Minimum field height for the authored size variant.
+    /// Minimum field height for the authored size variant, raised to the
+    /// touch target on touch surfaces so the text stays centered in it.
     pub fn minimum_field_height(&self) -> f32 {
-        match self.decoration.size {
+        let authored: f32 = match self.decoration.size {
             TextFieldSize::Large => 40.0,
             TextFieldSize::Automatic | TextFieldSize::Regular => 32.0,
             TextFieldSize::Small => 28.0,
             TextFieldSize::Mini => 22.0,
-        }
+        };
+        authored.max(self.touch_minimum)
     }
 
     fn horizontal_inset(&self, theme: &Theme) -> f32 {
@@ -722,11 +728,26 @@ impl View for TextField {
         // changes. Reading here subscribes the body's observer, so a write
         // recomposes the style host instead of only repainting the surface.
         let snapshot = flags.get();
-        AnyView::new(TextFieldChrome {
-            field: self.snapshot(),
-            interaction,
-            snapshot,
-        })
+        let field = self.snapshot();
+        AnyView::new(crate::adaptive::SurfaceReader::new(
+            move |environment: &cove_core::Environment| {
+                let mut field = field.snapshot();
+                field.touch_minimum = if field.layout.axis == TextFieldAxis::Horizontal
+                    && environment
+                        .input
+                        .contains(cove_core::InputCapabilities::TOUCH)
+                {
+                    environment.minimum_control_extent()
+                } else {
+                    0.0
+                };
+                AnyView::new(TextFieldChrome {
+                    field,
+                    interaction: interaction.clone(),
+                    snapshot,
+                })
+            },
+        ))
     }
 }
 
@@ -746,6 +767,7 @@ impl TextField {
             navigation: self.navigation.clone(),
             events: self.events.clone(),
             style: self.style.clone(),
+            touch_minimum: self.touch_minimum,
         }
     }
 }
@@ -1125,6 +1147,8 @@ struct MeasureInputs {
     wraps_lines: bool,
     max_visible_lines: usize,
     secure: bool,
+    /// Changes with the surface's input: the measure closure captures it.
+    minimum_height_bits: u32,
 }
 
 /// Install the intrinsic-size measure for a text field.
@@ -1141,6 +1165,7 @@ fn install_measure(layout: &LayoutNode, field: TextField) {
         wraps_lines: field.layout.wraps_lines,
         max_visible_lines: field.layout.max_visible_lines,
         secure: field.behavior.secure,
+        minimum_height_bits: field.minimum_field_height().to_bits(),
     };
     let previous = layout.attachment::<MeasureInputs>(MEASURE_INPUTS_KEY);
     if previous.as_ref() == Some(&inputs) {

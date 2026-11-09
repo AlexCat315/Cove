@@ -15,14 +15,28 @@ pub enum SidebarPresentation {
     Rail {
         shows_labels: bool,
     },
+    /// A handheld navigation list: full-width rows at the touch height, no
+    /// persistent selection. `grouped` draws Cupertino inset groups with
+    /// trailing chevrons; otherwise rows run edge to edge, Material style.
+    List {
+        grouped: bool,
+    },
 }
 
 impl SidebarPresentation {
     pub fn rail_width(self) -> Option<f32> {
         match self {
-            Self::Expanded => None,
+            Self::Expanded | Self::List { .. } => None,
             Self::Rail { shows_labels } => Some(if shows_labels { 72.0 } else { 56.0 }),
         }
+    }
+
+    pub fn is_list(self) -> bool {
+        matches!(self, Self::List { .. })
+    }
+
+    pub fn is_grouped(self) -> bool {
+        matches!(self, Self::List { grouped: true })
     }
 
     /// Canvas between the pane's edges and everything it lays out, so rows,
@@ -32,6 +46,8 @@ impl SidebarPresentation {
         match self {
             Self::Expanded => 10.0,
             Self::Rail { .. } => 0.0,
+            Self::List { grouped: true } => 16.0,
+            Self::List { grouped: false } => 0.0,
         }
     }
 
@@ -41,7 +57,7 @@ impl SidebarPresentation {
 
     pub fn shows_labels(self) -> bool {
         match self {
-            Self::Expanded => true,
+            Self::Expanded | Self::List { .. } => true,
             Self::Rail { shows_labels } => shows_labels,
         }
     }

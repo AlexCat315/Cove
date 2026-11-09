@@ -5,13 +5,10 @@
 //! routing, the catalog and the navigation icons live in the sibling modules;
 //! this file is the frame around them.
 //!
-//! Structural difference from Swift: the shell composes [`Sidebar`] inside
-//! [`ViewThatFits`] rather than `AdaptiveSidebar`, because the Rust
-//! `AdaptiveSidebar` exposes no `header`/`footer` seam. Both branches keep the
-//! Swift behaviour — a docked sidebar above the compact breakpoint, a rail with
-//! icon-only affordances below it — and the header/footer content is authored
-//! once and placed in each branch, which is what the Swift `wide`/`compact`
-//! builder pairs did.
+//! The shell is a [`ListDetail`]: the navigation sidebar is the list, the page
+//! is the detail. Narrow windows show one of them with a way back; wider ones
+//! show both, and a fold or hinge places the split on itself. Both panes keep
+//! their state through every change of presentation.
 use cove_composition::Scope;
 use cove_composition::{AnyView, LayoutDebugExt, View, ViewExt};
 use cove_core::scene::{Align, FlexDirection, Justify, LayoutNode, Node, Wrap};
@@ -26,11 +23,13 @@ use cove_ui_compose::primitives::controls::fields::select::{Select, SelectOption
 use cove_ui_compose::primitives::controls::{ButtonIcon, ButtonIconSource};
 use cove_ui_compose::primitives::layout::ScrollView;
 use cove_ui_compose::primitives::layout::insets::SafeArea;
-use cove_ui_compose::primitives::layout::responsive::view_that_fits::ViewThatFits;
 use cove_ui_compose::primitives::layout::sidebar::{
-    AdaptiveSidebar, AdaptiveSidebarOptions, SidebarItem, SidebarItemStyle, SidebarSection,
+    Sidebar, SidebarItem, SidebarItemStyle, SidebarSection,
 };
 use cove_ui_compose::primitives::media::ui_icon_catalog as icons;
+use cove_ui_compose::primitives::navigation::{
+    ListDetail, ListDetailPresentation, ListDetailState,
+};
 use cove_ui_compose::primitives::overlays::portal::LayerRoot;
 use cove_ui_compose::primitives::text::Text;
 use cove_ui_compose::primitives::text::rich::text_selection::TextSelectionViewExt;
@@ -56,8 +55,10 @@ fn erased(view: impl View + 'static) -> AnyView {
     AnyView::new(view)
 }
 
-/// Sidebar breakpoint between the docked and collapsed presentations.
-const NAVIGATION_RAIL_THRESHOLD: f32 = 120.0;
+/// Navigation column width beside a page.
+const NAVIGATION_WIDTH: f32 = 240.0;
+/// Window width from which the navigation stays beside the page.
+const TWO_PANE_WIDTH: f32 = 600.0;
 /// Supplied text scale choices.
 const TEXT_SCALE_CHOICES: [(f64, &str); 4] =
     [(1.0, "100%"), (1.25, "125%"), (1.5, "150%"), (2.0, "200%")];
@@ -73,9 +74,8 @@ pub struct GalleryView {
     pub options: State<GalleryOptions>,
     pub reset_generation: State<u32>,
     pub text_scale: State<Option<f64>>,
-    pub navigation_open: State<bool>,
-    pub navigation_collapsed: State<bool>,
-    pub navigation_width: State<f32>,
+    /// In a single pane, whether the page covers the navigation.
+    pub showing_page: State<bool>,
 }
 
 impl GalleryView {
@@ -92,9 +92,7 @@ impl GalleryView {
             options: State::new(GalleryOptions::default()),
             reset_generation: State::new(0),
             text_scale: State::new(Some(text_scale)),
-            navigation_open: State::new(false),
-            navigation_collapsed: State::new(false),
-            navigation_width: State::new(240.0),
+            showing_page: State::new(true),
         }
     }
 
@@ -108,6 +106,12 @@ impl GalleryView {
 
     pub fn select_page(&self, page: GalleryPage) {
         self.page.set(page);
+        self.showing_page.set(true);
+    }
+
+    /// Returns to the navigation in a single pane; the page stays selected.
+    pub fn show_navigation(&self) {
+        self.showing_page.set(false);
     }
 
     pub fn toggle_theme(&self) {
@@ -143,19 +147,26 @@ impl GalleryView {
         self.search.binding()
     }
 
-    fn selection_binding(&self) -> Binding<Option<GalleryPage>> {
+    fn navigation_state(&self) -> Binding<ListDetailState<GalleryPage>> {
         let page = self.page.clone();
+        let showing = self.showing_page.clone();
         Binding::new(
             {
                 let page = page.clone();
-                move || Some(page.get())
+                let showing = showing.clone();
+                move || ListDetailState {
+                    selection: Some(page.get()),
+                    showing_detail: showing.get(),
+                }
             },
-            {
-                let page = page.clone();
-                move |value: Option<GalleryPage>| {
-                    if let Some(selected) = value {
-                        page.set(selected);
-                    }
+            move |value: ListDetailState<GalleryPage>| {
+                if let Some(selected) = value.selection
+                    && selected != page.get()
+                {
+                    page.set(selected);
+                }
+                if value.showing_detail != showing.get() {
+                    showing.set(value.showing_detail);
                 }
             },
         )
@@ -169,32 +180,46 @@ impl View for GalleryView {
             options: self.options.clone(),
             reset_generation: self.reset_generation.clone(),
             text_scale: self.text_scale.clone(),
+            back: None,
+            beside_navigation: true,
         };
-        let mut options = AdaptiveSidebarOptions::default();
-        options.allows_edge_swipe = true;
-        options.layout.shows_rail_labels = false;
-        let navigation = AdaptiveSidebar::try_new(
-            "CoveUI navigation",
-            self.selection_binding(),
-            self.navigation_sections(),
+        let sections = self.navigation_sections();
+        let brand = self.navigation_brand();
+        let header = self.navigation_header();
+        let footer = self.navigation_footer();
+        let navigation = ListDetail::new(
+            self.navigation_state(),
+            move |selection| {
+                AnyView::new(
+                    AnyView::new(
+                        Sidebar::try_new(selection, sections.clone())
+                            .expect("unique sidebar IDs")
+                            .header(cove_composition::TupleView::new(vec![
+                                brand.clone(),
+                                header.clone(),
+                            ]))
+                            .footer(footer.clone()),
+                    )
+                    .flex_with(1.0, 1.0, Some(0.0))
+                    .debug_name("gallery-navigation"),
+                )
+            },
+            move |_page, context| {
+                AnyView::new(
+                    content
+                        .clone()
+                        .single_pane(context.is_single_pane.then_some(context.back))
+                        .beside_navigation(matches!(
+                            context.presentation,
+                            ListDetailPresentation::SideBySide { .. }
+                        ))
+                        .text_selection(true),
+                )
+            },
         )
-        .expect("unique sidebar IDs")
-        .presentation(self.navigation_open.binding())
-        .collapse(self.navigation_collapsed.binding())
-        .width(self.navigation_width.binding())
-        .options(options)
-        .brand(self.navigation_brand())
-        .header(ViewThatFits::threshold(
-            NAVIGATION_RAIL_THRESHOLD,
-            self.navigation_header(),
-            self.navigation_header_compact(),
-        ))
-        .footer(ViewThatFits::threshold(
-            NAVIGATION_RAIL_THRESHOLD,
-            self.navigation_footer(),
-            self.navigation_footer_compact(),
-        ))
-        .content(content.text_selection(true));
+        .list_width(NAVIGATION_WIDTH)
+        .two_pane_width(TWO_PANE_WIDTH)
+        .hairline(false);
         let shell = AnyView::new(navigation)
             .flex_with(1.0, 1.0, Some(0.0))
             .frame(None, None, None, Some(0.0), None, None)
@@ -215,9 +240,7 @@ impl View for GalleryView {
             DynamicField::state("options", &self.options),
             DynamicField::state("reset_generation", &self.reset_generation),
             DynamicField::state("text_scale", &self.text_scale),
-            DynamicField::state("navigation_open", &self.navigation_open),
-            DynamicField::state("navigation_collapsed", &self.navigation_collapsed),
-            DynamicField::state("navigation_width", &self.navigation_width),
+            DynamicField::state("showing_page", &self.showing_page),
         ]
     }
 }
@@ -299,24 +322,6 @@ impl GalleryView {
         ))
     }
 
-    fn navigation_header_compact(&self) -> AnyView {
-        erased(
-            AnyView::new(cove_ui_compose::BoxView::new(
-                FlexDirection::Row,
-                Align::Center,
-                Justify::Center,
-                Wrap::NoWrap,
-                0.0,
-                AnyView::new(
-                    Text::new("G")
-                        .semantic_font(SemanticFontRef::headline())
-                        .semantic_foreground(SemanticColorRef::accent()),
-                ),
-            ))
-            .padding_edges(0.0, 10.0),
-        )
-    }
-
     fn navigation_footer(&self) -> AnyView {
         let title = match self.appearance.get() {
             Appearance::Light => "Switch to dark theme",
@@ -347,40 +352,35 @@ impl GalleryView {
             ])),
         )
         .padding_edges(10.0, 0.0);
-        erased(
-            AnyView::new(Button::new(label, move || view.toggle_theme()))
-                .button_style(SidebarItemStyle {
-                    minimum_height: 30.0,
-                    presentation:
-                        cove_ui_compose::primitives::layout::sidebar::SidebarPresentation::Expanded,
-                })
-                .debug_name("gallery-theme"),
-        )
-    }
-
-    fn navigation_footer_compact(&self) -> AnyView {
-        let icon = match self.appearance.get() {
-            Appearance::Light => icons::device::moon(),
-            Appearance::Dark => icons::device::sun(),
-        };
-        let tooltip = match self.appearance.get() {
-            Appearance::Light => "Switch to dark theme",
-            Appearance::Dark => "Switch to light theme",
-        };
-        let view = self.clone_handle();
-        erased(
-            AnyView::new(
-                Button::icon(
-                    cove_ui_compose::primitives::controls::ButtonIconSource::resource(icon),
-                    16.0,
-                    move || view.toggle_theme(),
+        let label = AnyView::new(label);
+        let view = std::rc::Rc::new(view);
+        // The footer row matches the sidebar's own rows on every device.
+        erased(AnyView::new(cove_ui_compose::adaptive::SurfaceReader::new(
+            move |environment: &cove_core::Environment| {
+                // An action, not a destination: a plain list row without the
+                // navigation chevron on handheld devices.
+                let presentation = if environment.device_class.is_handheld() {
+                    cove_ui_compose::primitives::layout::sidebar::SidebarPresentation::List {
+                        grouped: false,
+                    }
+                } else {
+                    cove_ui_compose::primitives::layout::sidebar::SidebarPresentation::Expanded
+                };
+                let view = view.clone();
+                AnyView::new(
+                    AnyView::new(Button::new(label.clone(), move || view.toggle_theme()))
+                        .button_style(SidebarItemStyle {
+                            minimum_height: if presentation.is_list() {
+                                environment.minimum_control_extent()
+                            } else {
+                                30.0
+                            },
+                            presentation,
+                        })
+                        .debug_name("gallery-theme"),
                 )
-                .tooltip(tooltip),
-            )
-            .button_style(GhostButtonStyle)
-            .modifier(GalleryCompactFooterFrame)
-            .debug_name("gallery-theme-rail"),
-        )
+            },
+        )))
     }
 
     /// A lightweight handle for closures that only need the theme toggle. State
@@ -406,15 +406,6 @@ impl GalleryThemeToggle {
     }
 }
 
-struct GalleryCompactFooterFrame;
-
-impl cove_composition::ViewModifier for GalleryCompactFooterFrame {
-    fn apply_layout(&self, layout: &LayoutNode) {
-        layout.set_min_width(Some(44.0));
-        layout.set_min_height(Some(44.0));
-    }
-}
-
 struct GalleryShellFrame;
 
 impl cove_composition::ViewModifier for GalleryShellFrame {
@@ -427,11 +418,28 @@ impl cove_composition::ViewModifier for GalleryShellFrame {
 }
 
 /// Page selection is read inside the outlet, away from the adaptive shell.
+#[derive(Clone)]
 struct GalleryPagePane {
     page: State<GalleryPage>,
     options: State<GalleryOptions>,
     reset_generation: State<u32>,
     text_scale: State<Option<f64>>,
+    /// Set while the page covers the navigation: returns to it.
+    back: Option<std::rc::Rc<dyn Fn()>>,
+    /// The navigation sits at the page's leading edge, which then needs no gap.
+    beside_navigation: bool,
+}
+
+impl GalleryPagePane {
+    fn single_pane(mut self, back: Option<std::rc::Rc<dyn Fn()>>) -> Self {
+        self.back = back;
+        self
+    }
+
+    fn beside_navigation(mut self, beside: bool) -> Self {
+        self.beside_navigation = beside;
+        self
+    }
 }
 
 impl View for GalleryPagePane {
@@ -441,7 +449,15 @@ impl View for GalleryPagePane {
         let generation = self.reset_generation.get();
         let scale = self.text_scale.get().unwrap_or(1.0) as f32;
 
-        let header = GalleryPageHeader { page };
+        let leading_inset = if self.beside_navigation {
+            0.0
+        } else {
+            CARD_INSET
+        };
+        let header = GalleryPageHeader {
+            page,
+            back: self.back.clone(),
+        };
         let toolbar = GalleryToolbar {
             options: self.options.clone(),
             text_scale: self.text_scale.clone(),
@@ -523,7 +539,7 @@ impl View for GalleryPagePane {
             .frame_min_width(0.0)
             .padding_insets(EdgeInsets {
                 top: CARD_INSET,
-                leading: 0.0,
+                leading: leading_inset,
                 bottom: CARD_INSET,
                 trailing: CARD_INSET,
             }),
@@ -592,11 +608,40 @@ impl cove_composition::ViewModifier for GalleryStoryFrame {
 
 struct GalleryPageHeader {
     page: GalleryPage,
+    back: Option<std::rc::Rc<dyn Fn()>>,
 }
 
 impl GalleryPageHeader {
     fn view(&self) -> AnyView {
         let entry = self.page.entry();
+        let mut lines = Vec::new();
+        if let Some(back) = self.back.clone() {
+            lines.push(AnyView::new(cove_ui_compose::BoxView::new(
+                FlexDirection::Row,
+                Align::Center,
+                Justify::FlexStart,
+                Wrap::NoWrap,
+                0.0,
+                erased(
+                    AnyView::new(
+                        Button::icon(
+                            ButtonIconSource::resource(icons::navigation::arrow_left()),
+                            16.0,
+                            move || back(),
+                        )
+                        .tooltip("Components"),
+                    )
+                    .button_style(GhostButtonStyle)
+                    .debug_name("gallery-back"),
+                ),
+            )));
+        }
+        lines.push(AnyView::new(
+            Text::new(entry.title).semantic_font(SemanticFontRef::title()),
+        ));
+        lines.push(AnyView::new(
+            Text::new(entry.summary).semantic_font(SemanticFontRef::body()),
+        ));
         erased(
             AnyView::new(cove_ui_compose::BoxView::new(
                 FlexDirection::Column,
@@ -604,10 +649,7 @@ impl GalleryPageHeader {
                 Justify::FlexStart,
                 Wrap::NoWrap,
                 6.0,
-                AnyView::new(cove_composition::TupleView::new(vec![
-                    AnyView::new(Text::new(entry.title).semantic_font(SemanticFontRef::title())),
-                    AnyView::new(Text::new(entry.summary).semantic_font(SemanticFontRef::body())),
-                ])),
+                AnyView::new(cove_composition::TupleView::new(lines)),
             ))
             .padding_edges(24.0, 20.0)
             .modifier(GalleryHeaderFrame),

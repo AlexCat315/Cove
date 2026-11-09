@@ -392,3 +392,180 @@ fn tabs_keep_their_content_across_presentations() {
         );
     });
 }
+
+struct SidebarDevice {
+    environment: State<Environment>,
+    seen: Rc<RefCell<Vec<DeviceClass>>>,
+}
+
+impl View for SidebarDevice {
+    fn body(&self, _cx: &Scope) -> AnyView {
+        use cove_ui_compose::adaptive::SurfaceReader;
+        use cove_ui_compose::primitives::layout::sidebar::{Sidebar, SidebarItem, SidebarSection};
+        let seen = self.seen.clone();
+        let footer = AnyView::new(SurfaceReader::new(move |surface: &Environment| {
+            seen.borrow_mut().push(surface.device_class);
+            AnyView::new(Text::new("footer"))
+        }));
+        AnyView::new(
+            AnyView::new(
+                Sidebar::try_new(
+                    Binding::constant(Some(1u8)),
+                    vec![SidebarSection::new("s", vec![SidebarItem::new(1u8, "One")])],
+                )
+                .expect("unique ids")
+                .footer(footer),
+            )
+            .surface_environment(self.environment.get()),
+        )
+    }
+
+    fn dynamic_properties(&self) -> Vec<DynamicField> {
+        vec![DynamicField::state("environment", &self.environment)]
+    }
+}
+
+#[test]
+fn sidebar_slots_follow_environment_changes() {
+    InteractiveScene::run(360.0, 800.0, |scene| {
+        let environment = State::new(phone());
+        let seen: Rc<RefCell<Vec<DeviceClass>>> = Rc::default();
+        scene.install(SidebarDevice {
+            environment: environment.clone(),
+            seen: seen.clone(),
+        });
+        scene.settle(3, 0.016);
+        assert_eq!(seen.borrow().last(), Some(&DeviceClass::Phone));
+        let mut desktop = surface(360.0, 800.0);
+        desktop.input = InputCapabilities::POINTER | InputCapabilities::KEYBOARD;
+        environment.set(desktop);
+        scene.settle(3, 0.016);
+        assert_eq!(
+            seen.borrow().last(),
+            Some(&DeviceClass::Desktop),
+            "the footer slot sees the new environment"
+        );
+    });
+}
+
+mod sidebar_adaptation {
+    use super::*;
+    use cove_composition::adaptive::AdaptationMark;
+    use cove_core::{DesignLanguage, Platform};
+    use cove_ui_compose::primitives::layout::sidebar::{
+        Sidebar, SidebarItem, SidebarItemStyle, SidebarPresentation, SidebarSection,
+    };
+    use cove_ui_compose::theme::styles::buttons::ButtonStyle;
+
+    fn sidebar() -> Sidebar<u8> {
+        Sidebar::try_new(
+            Binding::constant(Some(1u8)),
+            vec![SidebarSection::new(
+                "s",
+                vec![SidebarItem::new(1u8, "One"), SidebarItem::new(2u8, "Two")],
+            )],
+        )
+        .expect("unique ids")
+    }
+
+    fn on(platform: Platform, mut environment: Environment) -> Environment {
+        environment.platform = platform;
+        environment.design_language = platform.design_language();
+        environment
+    }
+
+    #[test]
+    fn presentation_follows_the_device() {
+        let iphone = on(Platform::IOS, phone());
+        let android = on(Platform::Android, phone());
+        assert_eq!(
+            sidebar().resolved_presentation(&iphone),
+            SidebarPresentation::List { grouped: true }
+        );
+        assert_eq!(
+            sidebar().resolved_presentation(&android),
+            SidebarPresentation::List { grouped: false }
+        );
+        let mut tablet = surface(1024.0, 768.0);
+        tablet.device_class = DeviceClass::Tablet;
+        assert_eq!(
+            sidebar().resolved_presentation(&tablet),
+            SidebarPresentation::Expanded
+        );
+        assert_eq!(
+            sidebar().resolved_presentation(&surface(1280.0, 800.0)),
+            SidebarPresentation::Expanded
+        );
+        assert_eq!(
+            sidebar().adapts(false).resolved_presentation(&iphone),
+            SidebarPresentation::Expanded
+        );
+        assert_eq!(iphone.design_language, DesignLanguage::Cupertino);
+    }
+
+    #[test]
+    fn row_style_identity_includes_presentation_and_height() {
+        let identity = |presentation, minimum_height| {
+            SidebarItemStyle {
+                minimum_height,
+                presentation,
+            }
+            .style_identity()
+        };
+        let grouped = identity(SidebarPresentation::List { grouped: true }, 44.0);
+        assert_ne!(
+            grouped,
+            identity(SidebarPresentation::List { grouped: false }, 44.0)
+        );
+        assert_ne!(
+            grouped,
+            identity(SidebarPresentation::List { grouped: true }, 48.0)
+        );
+        assert_ne!(grouped, identity(SidebarPresentation::Expanded, 44.0));
+    }
+
+    fn rows(scene: &InteractiveScene) -> Vec<Rect> {
+        ["One", "Two"]
+            .iter()
+            .map(|label| {
+                scene
+                    .labelled(label, Some(cove_core::scene::AccessibilityRole::Button))
+                    .or_else(|| scene.labelled(label, None))
+                    .unwrap_or_else(|| panic!("{label} is mounted"))
+                    .absolute_frame()
+            })
+            .collect()
+    }
+
+    fn desktop_marks(scene: &InteractiveScene) -> usize {
+        scene
+            .nodes()
+            .iter()
+            .filter(|node| AdaptationMark::of(node) == Some(AdaptationMark::DesktopOnly))
+            .count()
+    }
+
+    #[test]
+    fn a_handheld_sidebar_is_a_touch_list_and_a_desktop_one_a_panel() {
+        InteractiveScene::run(393.0, 852.0, |scene| {
+            scene.install(AnyView::new(
+                AnyView::new(sidebar()).surface_environment(on(Platform::IOS, phone())),
+            ));
+            scene.settle(3, 0.016);
+            for row in rows(scene) {
+                assert!(row.height >= 44.0, "a touch row: {row:?}");
+            }
+            assert_eq!(desktop_marks(scene), 0);
+        });
+        InteractiveScene::run(1280.0, 800.0, |scene| {
+            let mut desktop = surface(1280.0, 800.0);
+            desktop.input = InputCapabilities::POINTER | InputCapabilities::KEYBOARD;
+            scene.install(AnyView::new(
+                AnyView::new(sidebar()).surface_environment(desktop),
+            ));
+            scene.settle(3, 0.016);
+            assert!(rows(scene).iter().all(|row| row.height < 44.0));
+            assert_eq!(desktop_marks(scene), 1, "the panel is marked desktop-only");
+        });
+    }
+}

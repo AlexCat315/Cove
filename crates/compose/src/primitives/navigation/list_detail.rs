@@ -67,6 +67,17 @@ impl ListDetailPresentation {
     /// `container` is the view's window frame; before it is measured the
     /// viewport stands in for it.
     pub fn resolve(environment: &Environment, container: Rect, list_width: f32) -> Self {
+        Self::resolve_from(environment, container, list_width, TWO_PANE_MINIMUM_WIDTH)
+    }
+
+    /// As [`Self::resolve`], with two panes from `two_pane_width` when no
+    /// fold decides.
+    pub fn resolve_from(
+        environment: &Environment,
+        container: Rect,
+        list_width: f32,
+        two_pane_width: f32,
+    ) -> Self {
         let container = if container.width > 0.0 && container.height > 0.0 {
             container
         } else {
@@ -100,7 +111,7 @@ impl ListDetailPresentation {
                 FeatureOrientation::Horizontal => {}
             }
         }
-        if container.width >= TWO_PANE_MINIMUM_WIDTH {
+        if container.width >= two_pane_width {
             Self::SideBySide {
                 list_width: list_width
                     .clamp(MINIMUM_PANE_WIDTH, container.width - MINIMUM_PANE_WIDTH),
@@ -117,6 +128,8 @@ impl ListDetailPresentation {
 pub struct ListDetailContext {
     /// The detail covers the list; show a way back.
     pub is_single_pane: bool,
+    /// How the panes are arranged around the detail.
+    pub presentation: ListDetailPresentation,
     /// Returns to the list in a single pane; keeps the selection.
     pub back: Rc<dyn Fn()>,
 }
@@ -132,6 +145,8 @@ pub struct ListDetail<Item: Clone + PartialEq + 'static> {
     detail: Rc<dyn Fn(Item, ListDetailContext) -> AnyView>,
     placeholder: AnyView,
     list_width: f32,
+    two_pane_width: f32,
+    hairline: bool,
     frame: State<Rect>,
 }
 
@@ -147,8 +162,25 @@ impl<Item: Clone + PartialEq + 'static> ListDetail<Item> {
             detail: Rc::new(detail),
             placeholder: AnyView::new(crate::EmptyView),
             list_width: 320.0,
+            two_pane_width: TWO_PANE_MINIMUM_WIDTH,
+            hairline: true,
             frame: State::new(Rect::ZERO),
         }
+    }
+
+    /// Container width from which list and detail sit side by side when no
+    /// fold decides; at least the list plus one minimum pane.
+    pub fn two_pane_width(mut self, width: f32) -> Self {
+        if width.is_finite() {
+            self.two_pane_width = width.max(self.list_width + MINIMUM_PANE_WIDTH);
+        }
+        self
+    }
+
+    /// Whether a hairline separates the panes when no hinge does.
+    pub fn hairline(mut self, hairline: bool) -> Self {
+        self.hairline = hairline;
+        self
     }
 
     pub fn placeholder(mut self, placeholder: impl View + 'static) -> Self {
@@ -173,8 +205,15 @@ impl<Item: Clone + PartialEq + 'static> View for ListDetail<Item> {
         let detail = self.detail.clone();
         let placeholder = self.placeholder.clone();
         let list_width = self.list_width;
+        let two_pane_width = self.two_pane_width;
+        let hairline = self.hairline;
         let content = AnyView::new(SurfaceReader::new(move |environment: &Environment| {
-            let presentation = ListDetailPresentation::resolve(environment, frame, list_width);
+            let presentation = ListDetailPresentation::resolve_from(
+                environment,
+                frame,
+                list_width,
+                two_pane_width,
+            );
             let current = state.get();
             let selection = {
                 let state = state.clone();
@@ -194,6 +233,7 @@ impl<Item: Clone + PartialEq + 'static> View for ListDetail<Item> {
             };
             let context = ListDetailContext {
                 is_single_pane: presentation == ListDetailPresentation::Single,
+                presentation,
                 back: {
                     let state = state.clone();
                     Rc::new(move || {
@@ -220,13 +260,13 @@ impl<Item: Clone + PartialEq + 'static> View for ListDetail<Item> {
                 ListDetailPresentation::SideBySide { list_width, gap } => (
                     FlexDirection::Row,
                     PaneLayout::fixed(list_width),
-                    PaneLayout::separator(gap),
+                    PaneLayout::separator(gap, hairline),
                     PaneLayout::fill(true),
                 ),
                 ListDetailPresentation::Stacked { detail_height, gap } => (
                     FlexDirection::ColumnReverse,
                     PaneLayout::fill(true),
-                    PaneLayout::separator(gap),
+                    PaneLayout::separator(gap, hairline),
                     PaneLayout::fixed(detail_height),
                 ),
             };
@@ -314,9 +354,16 @@ impl PaneLayout {
         }
     }
 
-    /// A hinge leaves its width empty; a crease or plain split gets a hairline.
-    fn separator(gap: f32) -> Self {
-        Self::fixed(if gap > 0.0 { gap } else { 1.0 })
+    /// A hinge leaves its width empty; a crease or plain split gets a hairline
+    /// unless the caller separates the panes itself.
+    fn separator(gap: f32, hairline: bool) -> Self {
+        Self::fixed(if gap > 0.0 {
+            gap
+        } else if hairline {
+            1.0
+        } else {
+            0.0
+        })
     }
 }
 
@@ -369,6 +416,9 @@ impl PrimitiveView for Pane {
         node.set_allows_hit_testing(self.layout.visible);
         node.set_is_interaction_enabled(self.layout.visible);
         node.set_clips_to_bounds(true);
+        // A collapsed pane keeps its subtree; it must also paint nothing, since
+        // content overflowing a zero-size frame is not clipped away.
+        node.set_opacity(if self.layout.visible { 1.0 } else { 0.0 });
     }
     fn make_layout_node(&self) -> Option<LayoutNode> {
         Some(LayoutNode::new())

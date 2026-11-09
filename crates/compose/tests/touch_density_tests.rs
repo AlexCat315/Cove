@@ -166,10 +166,8 @@ fn all_interactive_families_reach_the_touch_extent() {
 
             let root = graph.tree.borrow().root().expect("root");
             let all = nodes(&root);
-            // Gap: Swift's fixture included `TextField` among the families that
-            // reach 44pt. The Rust `TextField` host never calls
-            // `apply_touch_control_extent`, so it stays at its 32pt authored
-            // height. `text_field_does_not_reach_the_touch_extent` pins it.
+            // A single-line field reaches the touch extent, as in Swift's
+            // fixture: its minimum height follows the surface's input.
             let field = all
                 .iter()
                 .find(|node| {
@@ -179,8 +177,8 @@ fn all_interactive_families_reach_the_touch_extent() {
                 .expect("the text field host is mounted")
                 .frame();
             assert_eq!(
-                field.height, 32.0,
-                "the text field does not yet reach the 44pt touch extent"
+                field.height, 44.0,
+                "the text field reaches the 44pt touch extent"
             );
 
             let control_hosts = hosts(&root);

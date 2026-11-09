@@ -4,10 +4,10 @@
 //! - a page switch recomposes neither the adaptive shell nor the unrelated
 //!   sidebar destinations, keeps the toolbar controls and selects the new row
 //! - 390, 720 and 1280 layouts keep the story, its local state ("Actions: 1")
-//!   and the toolbar usable, with the content pane inset by the compact,
-//!   rail or docked sidebar
-//! - compact and rail shells open a retained search; choosing a destination
-//!   closes the drawer and the theme toggles update in both shells
+//!   and the toolbar usable: below 600 the page covers the navigation, from
+//!   600 the navigation sits beside it
+//! - in one pane, back reveals the navigation with its search, choosing a
+//!   destination opens it, and the selection survives widening and narrowing
 //!
 use cove_composition::Scope;
 mod support;
@@ -125,17 +125,22 @@ fn reflow() {
                 content.height > 250.0,
                 "the content pane keeps its height at {width}"
             );
-            let inset = if width < 600.0 {
-                0.0
-            } else if width < 1000.0 {
-                56.0
+            let navigation = scene.require_named("gallery-navigation").absolute_frame();
+            if width < 600.0 {
+                assert_eq!(
+                    navigation.width, 0.0,
+                    "the page covers the navigation at {width}"
+                );
+                assert!(content.x < 20.0, "the page fills the window at {width}");
+                assert!(scene.named("gallery-back").is_some());
             } else {
-                247.0
-            };
-            assert_eq!(
-                content.x, inset,
-                "the compact, rail or docked sidebar insets the content at {width}"
-            );
+                assert_eq!(
+                    (navigation.x, navigation.width),
+                    (0.0, 240.0),
+                    "the navigation sits beside the page at {width}"
+                );
+                assert!(content.x >= navigation.max_x());
+            }
             assert!(content.x + content.width <= width + 0.5);
             let toolbar = scene.require_named("gallery-toolbar").absolute_frame();
             assert!(
@@ -154,29 +159,57 @@ fn reflow() {
 
 #[test]
 fn navigation_session() {
-    scene(|_, scene| {
-        let search = control(scene, "Search components…");
+    scene(|gallery, scene| {
         settle_at(scene, 390.0);
-        let open = control(scene, "Open navigation").expect("the compact shell offers navigation");
-        scene.click(&open);
+        let back = scene.require_named("gallery-back");
+        scene.click(&back);
         settle_at(scene, 390.0);
+        let navigation = scene.require_named("gallery-navigation").absolute_frame();
+        assert_eq!(navigation.width, 390.0, "back reveals the navigation");
         assert!(
-            scene.focus.has_modal_scope(),
-            "the drawer opens as a modal scope"
+            control(scene, "Search components…").is_some(),
+            "the search field is part of the navigation"
         );
-        assert!(
-            search.is_some() && scene.named("gallery-search").is_some(),
-            "the search field stays mounted"
+        assert_eq!(
+            scene
+                .require_named("gallery-content")
+                .absolute_frame()
+                .width,
+            0.0,
+            "the page is hidden behind the navigation"
         );
+
+        let slider = scene.require_named("sidebar-item-slider");
+        scene.click(&slider);
+        settle_at(scene, 390.0);
+        assert_eq!(gallery.current_page(), GalleryPage::Slider);
+        assert_eq!(
+            scene
+                .require_named("gallery-navigation")
+                .absolute_frame()
+                .width,
+            0.0,
+            "choosing a destination opens it"
+        );
+
         settle_at(scene, 1280.0);
+        assert_eq!(gallery.current_page(), GalleryPage::Slider);
         assert!(
-            !scene.focus.has_modal_scope(),
-            "the docked shell has no modal scope"
+            scene
+                .require_named("gallery-navigation")
+                .absolute_frame()
+                .width
+                > 0.0
         );
-        settle_at(scene, 720.0);
         assert!(
-            scene.focus.has_modal_scope(),
-            "the open navigation session survives the expanded interval"
+            scene.named("gallery-back").is_none(),
+            "two panes need no back"
+        );
+
+        settle_at(scene, 390.0);
+        assert!(
+            scene.named("gallery-back").is_some(),
+            "narrowing again keeps the page in front"
         );
     });
 }

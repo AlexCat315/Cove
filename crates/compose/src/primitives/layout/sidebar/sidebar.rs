@@ -46,6 +46,29 @@ pub struct Sidebar<Id: PartialEq + Eq + std::hash::Hash + Clone + Send + Sync + 
     ambient_theme: crate::theme::Theme,
     header: AnyView,
     footer: AnyView,
+    /// Whether an expanded sidebar turns into a navigation list on handheld
+    /// devices.
+    pub adapts: bool,
+    /// One physical pixel, for the separators of grouped lists.
+    hairline: f32,
+}
+
+impl<Id: PartialEq + Eq + std::hash::Hash + Clone + Send + Sync + 'static> Clone for Sidebar<Id> {
+    fn clone(&self) -> Self {
+        Self {
+            selection: self.selection.clone(),
+            sections: self.sections.clone(),
+            presentation: self.presentation,
+            expanded: self.expanded.clone(),
+            minimum_row_height: self.minimum_row_height,
+            on_activate: self.on_activate.clone(),
+            ambient_theme: self.ambient_theme.clone(),
+            header: self.header.clone(),
+            footer: self.footer.clone(),
+            adapts: self.adapts,
+            hairline: self.hairline,
+        }
+    }
 }
 
 impl<Id: PartialEq + Eq + std::hash::Hash + Clone + Send + Sync + 'static> Sidebar<Id> {
@@ -73,6 +96,32 @@ impl<Id: PartialEq + Eq + std::hash::Hash + Clone + Send + Sync + 'static> Sideb
             ambient_theme: crate::theme::styles::default_light_theme::value(),
             header: AnyView::new(crate::EmptyView),
             footer: AnyView::new(crate::EmptyView),
+            adapts: true,
+            hairline: 1.0,
+        }
+    }
+
+    /// Keeps the authored presentation on every device.
+    pub fn adapts(mut self, adapts: bool) -> Self {
+        self.adapts = adapts;
+        self
+    }
+
+    /// The presentation for `environment`: an expanded sidebar becomes a
+    /// navigation list on handheld devices, Cupertino grouped or Material flat.
+    pub fn resolved_presentation(
+        &self,
+        environment: &cove_core::Environment,
+    ) -> SidebarPresentation {
+        if self.adapts
+            && self.presentation == SidebarPresentation::Expanded
+            && environment.device_class.is_handheld()
+        {
+            SidebarPresentation::List {
+                grouped: environment.design_language == cove_core::DesignLanguage::Cupertino,
+            }
+        } else {
+            self.presentation
         }
     }
 
@@ -122,7 +171,44 @@ impl<Id: PartialEq + Eq + std::hash::Hash + Clone + Send + Sync + 'static> Sideb
 }
 
 impl<Id: PartialEq + Eq + std::hash::Hash + Clone + Send + Sync + 'static> View for Sidebar<Id> {
+    fn body(&self, _cx: &Scope) -> AnyView {
+        let sidebar = self.clone();
+        AnyView::new(crate::adaptive::SurfaceReader::new(
+            move |environment: &cove_core::Environment| {
+                let mut resolved = sidebar.clone();
+                resolved.presentation = sidebar.resolved_presentation(environment);
+                resolved.hairline = 1.0 / environment.viewport.scale.max(1.0);
+                if resolved.presentation.is_list() {
+                    resolved.minimum_row_height = resolved
+                        .minimum_row_height
+                        .max(if resolved.presentation.is_grouped() {
+                            44.0
+                        } else {
+                            56.0
+                        })
+                        .max(environment.minimum_control_extent());
+                }
+                AnyView::new(SidebarBody(resolved))
+            },
+        ))
+    }
+}
+
+/// The sidebar in its resolved presentation; keeps one scope across changes.
+struct SidebarBody<Id: PartialEq + Eq + std::hash::Hash + Clone + Send + Sync + 'static>(
+    Sidebar<Id>,
+);
+
+impl<Id: PartialEq + Eq + std::hash::Hash + Clone + Send + Sync + 'static> View
+    for SidebarBody<Id>
+{
     fn body(&self, cx: &Scope) -> AnyView {
+        self.0.compose(cx)
+    }
+}
+
+impl<Id: PartialEq + Eq + std::hash::Hash + Clone + Send + Sync + 'static> Sidebar<Id> {
+    fn compose(&self, cx: &Scope) -> AnyView {
         let local_expanded = cx.state(HashSet::<Id>::new);
         let hierarchy = SidebarHierarchy::new(&self.sections.0);
         let expanded_binding = self
@@ -178,7 +264,7 @@ impl<Id: PartialEq + Eq + std::hash::Hash + Clone + Send + Sync + 'static> View 
                     0.0,
                     content,
                 )
-                .padding_edges(gutter, 0.0)
+                .padding_edges(if presentation.is_list() { 16.0 } else { gutter }, 0.0)
                 .flex_with(0.0, 0.0, None),
             )
         };
@@ -190,13 +276,20 @@ impl<Id: PartialEq + Eq + std::hash::Hash + Clone + Send + Sync + 'static> View 
             let icon_width = self.icon_lane_resolved(&entries);
             let section_has_branches = entries.iter().any(|entry| entry.is_branch());
             let mut rows: Vec<AnyView> = Vec::new();
+            let mut title: Option<AnyView> = None;
             if !section.title.is_empty() && !presentation.is_rail() {
-                rows.push(AnyView::new(
+                let inset = if presentation.is_list() { 16.0 } else { 10.0 };
+                let view = AnyView::new(
                     Text::new(section.title.clone())
                         .semantic_font(SemanticFontRef::caption())
                         .semantic_foreground(crate::theme::SemanticColorRef::on_surface_muted())
-                        .padding_edges(10.0, 6.0),
-                ));
+                        .padding_edges(inset, 6.0),
+                );
+                if presentation.is_grouped() {
+                    title = Some(view);
+                } else {
+                    rows.push(view);
+                }
             }
             for entry in &entries {
                 // Swift mounts every authored row and takes the hidden ones out
@@ -261,9 +354,30 @@ impl<Id: PartialEq + Eq + std::hash::Hash + Clone + Send + Sync + 'static> View 
                 Align::Stretch,
                 Justify::FlexStart,
                 Wrap::NoWrap,
-                2.0,
+                if presentation.is_grouped() {
+                    self.hairline
+                } else if presentation.is_list() {
+                    0.0
+                } else {
+                    2.0
+                },
                 AnyView::new(TupleView::new(rows)),
             ));
+            // An inset group: rows on a rounded card, separated by hairlines
+            // the divider fill shows between them.
+            let column = if presentation.is_grouped() {
+                let group = AnyView::new(column.modifier(SidebarInsetGroup));
+                AnyView::new(BoxView::new(
+                    FlexDirection::Column,
+                    Align::Stretch,
+                    Justify::FlexStart,
+                    Wrap::NoWrap,
+                    0.0,
+                    AnyView::new(TupleView::new(title.into_iter().chain([group]).collect())),
+                ))
+            } else {
+                column
+            };
             section_views.push(AnyView::new(SectionIdentity {
                 id: identity,
                 content: column,
@@ -369,10 +483,16 @@ impl<Id: PartialEq + Eq + std::hash::Hash + Clone + Send + Sync + 'static> View 
             },
             move |id: &Id| identity(id),
             AnyView::new(SlidingSelection::new(
-                |theme| {
+                move |theme| {
                     let appearance = SelectionAppearance::resolve(SelectionRole::Sidebar, theme);
                     SlidingSelectionStyle {
-                        fill: appearance.fill,
+                        // A navigation list opens its destination; nothing
+                        // stays highlighted behind it.
+                        fill: if presentation.is_list() {
+                            cove_core::Color::CLEAR
+                        } else {
+                            appearance.fill
+                        },
                         corner_radius: appearance.corner_radius,
                         shadow: cove_core::SurfaceShadow::NONE,
                     }
@@ -383,7 +503,7 @@ impl<Id: PartialEq + Eq + std::hash::Hash + Clone + Send + Sync + 'static> View 
                         Align::Stretch,
                         Justify::FlexStart,
                         Wrap::NoWrap,
-                        10.0,
+                        if presentation.is_list() { 24.0 } else { 10.0 },
                         AnyView::new(TupleView::new(section_views)),
                     )
                     .padding_edges(gutter, 4.0),
@@ -483,9 +603,11 @@ impl<Id: PartialEq + Eq + std::hash::Hash + Clone + Send + Sync + 'static> View 
         let rail_width = self.presentation.rail_width();
         // The pane runs the full window height in the sidebar fill and meets
         // the content at a hairline, the way a macOS source list does.
-        let body = AnyView::new(
-            AnyView::new(body.flex_with(1.0, 1.0, Some(0.0))).modifier(SidebarPaneFinish),
-        );
+        let body = AnyView::new(AnyView::new(body.flex_with(1.0, 1.0, Some(0.0))).modifier(
+            SidebarPaneFinish {
+                presentation: self.presentation,
+            },
+        ));
         let body = AnyView::new(
             body
                 // Always a width: the modifier leaves an unset dimension alone, so
@@ -595,11 +717,30 @@ crate::impl_primitive_view!(SidebarChromeRow);
 
 /// The pane finish: the sidebar fill and a hairline on the edge that meets the
 /// content.
-struct SidebarPaneFinish;
+struct SidebarPaneFinish {
+    presentation: SidebarPresentation,
+}
 
 impl cove_composition::ViewModifier for SidebarPaneFinish {
     fn apply_node(&self, node: &Node) {
         let colors = crate::theme::theme_for_node(node).colors;
+        if self.presentation.is_list() {
+            // A handheld list fills its screen: grouped lists sit on the
+            // grouped background, flat lists on the plain one.
+            cove_composition::adaptive::AdaptationMark::clear(node);
+            node.set_overlay_draw(None);
+            node.set_background_color(Some(if self.presentation.is_grouped() {
+                colors.surface_variant
+            } else {
+                colors.background
+            }));
+            return;
+        }
+        if self.presentation == SidebarPresentation::Expanded {
+            cove_composition::adaptive::AdaptationMark::DesktopOnly.apply(node);
+        } else {
+            cove_composition::adaptive::AdaptationMark::clear(node);
+        }
         // Over the window's sidebar material the pane stays clear and the
         // material's own edge separates it from the content.
         let translucent = node
@@ -627,6 +768,18 @@ impl cove_composition::ViewModifier for SidebarPaneFinish {
                 colors.divider,
             );
         });
+    }
+}
+
+/// One inset group of a Cupertino navigation list.
+struct SidebarInsetGroup;
+
+impl cove_composition::ViewModifier for SidebarInsetGroup {
+    fn apply_node(&self, node: &Node) {
+        let theme = crate::theme::theme_for_node(node);
+        node.set_background_color(Some(theme.colors.divider));
+        node.set_corner_radius(theme.radius.lg);
+        node.set_clips_to_bounds(true);
     }
 }
 
@@ -735,6 +888,21 @@ pub struct SidebarItemStyle {
 }
 
 impl crate::theme::styles::buttons::ButtonStyle for SidebarItemStyle {
+    /// The height and presentation are part of the style: a row that turns
+    /// from a desktop row into a grouped or flat list row must rebuild.
+    fn style_identity(&self) -> u64 {
+        let presentation: u64 = match self.presentation {
+            SidebarPresentation::Expanded => 0,
+            SidebarPresentation::Rail { shows_labels: true } => 1,
+            SidebarPresentation::Rail {
+                shows_labels: false,
+            } => 2,
+            SidebarPresentation::List { grouped: true } => 3,
+            SidebarPresentation::List { grouped: false } => 4,
+        };
+        (u64::from(self.minimum_height.to_bits()) << 8) | presentation
+    }
+
     fn make_body(
         &self,
         configuration: crate::theme::styles::buttons::ButtonStyleConfiguration,
@@ -767,6 +935,27 @@ impl crate::theme::styles::buttons::ButtonStyle for SidebarItemStyle {
         } else {
             cove_core::Color::CLEAR
         };
+        if self.presentation.is_list() {
+            let grouped = self.presentation.is_grouped();
+            return AnyView::new(ListChromeRow {
+                label: configuration.label.clone(),
+                minimum_height: self.minimum_height,
+                fill: if configuration.is_pressed {
+                    theme.colors.surface_variant
+                } else if grouped {
+                    theme.colors.background
+                } else {
+                    cove_core::Color::CLEAR
+                },
+                ink: if configuration.is_enabled {
+                    theme.colors.on_surface
+                } else {
+                    theme.colors.on_surface_muted
+                },
+                chevron: grouped,
+                ring,
+            });
+        }
         if self.presentation.is_rail() {
             // A rail floors its rows at the 44pt touch target regardless of the
             // authored row height.
@@ -796,3 +985,58 @@ impl crate::theme::styles::buttons::ButtonStyle for SidebarItemStyle {
         })
     }
 }
+
+/// A handheld navigation row: full width, the touch height, a press tint and,
+/// in Cupertino groups, a trailing chevron.
+struct ListChromeRow {
+    label: AnyView,
+    minimum_height: f32,
+    fill: cove_core::Color,
+    ink: cove_core::Color,
+    chevron: bool,
+    ring: cove_core::Color,
+}
+
+impl PrimitiveView for ListChromeRow {
+    fn make_node(&self) -> Node {
+        let node = Node::new();
+        node.set_is_hit_testable(false);
+        node
+    }
+
+    fn make_layout_node(&self) -> Option<cove_core::scene::LayoutNode> {
+        None
+    }
+
+    fn update_node(&self, _node: &Node) {}
+
+    fn children(&self, _node: &Node) -> Vec<AnyView> {
+        let mut parts = vec![AnyView::new(self.label.clone().with_modifier(FlexGrowOne))];
+        if self.chevron {
+            parts.push(AnyView::new(
+                crate::primitives::media::Icon::new(
+                    crate::primitives::media::ui_icon_catalog::navigation::chevron_right(),
+                    14.0,
+                )
+                .accessibility_hidden(true)
+                .semantic_foreground(crate::theme::SemanticColorRef::on_surface_muted()),
+            ));
+        }
+        let row = BoxView::new(
+            FlexDirection::Row,
+            Align::Center,
+            Justify::FlexStart,
+            Wrap::NoWrap,
+            8.0,
+            AnyView::new(TupleView::new(parts)),
+        )
+        .padding_edges(16.0, 0.0)
+        .foreground_color(self.ink)
+        .background_color(self.fill)
+        .border_color(self.ring, if self.ring.a > 0.0 { 2.0 } else { 0.0 })
+        .flex_with(1.0, 1.0, None)
+        .frame(None, None, Some(0.0), Some(self.minimum_height), None, None);
+        vec![AnyView::new(row)]
+    }
+}
+crate::impl_primitive_view!(ListChromeRow);
