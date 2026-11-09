@@ -1194,6 +1194,8 @@ impl PrimitiveView for CalendarWeekButton {
     }
 
     fn update_node(&self, node: &Node) {
+        // A week row is tapped as a whole; on touch it reaches the target.
+        crate::primitives::controls::adaptive::apply_touch_control_extent(node, self.available);
         node.set_attachment("calendar.day", self.start);
         node.set_is_focusable(self.available);
         node.set_is_tab_stop(self.is_tab_stop && self.available);
@@ -1459,6 +1461,8 @@ impl PrimitiveView for CalendarPeriodCell {
     }
 
     fn update_node(&self, node: &Node) {
+        // Month and year cells are tap targets like day cells.
+        crate::primitives::controls::adaptive::apply_touch_control_extent(node, self.is_available);
         node.set_attachment("calendar.day", self.date);
         node.set_is_focusable(self.is_available);
         node.set_is_tab_stop(self.is_tab_stop && self.is_available);

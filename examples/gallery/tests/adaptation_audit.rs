@@ -64,17 +64,41 @@ fn is_shown(frame: Rect) -> bool {
     frame.width > 0.5 && frame.height > 0.5
 }
 
-/// Clipped by an ancestor that itself ends inside the window, such as a
-/// horizontal scroller: the overflow is scrollable, not lost.
-fn clipped_inside(node: &Node, window_width: f32) -> bool {
+/// Inside a horizontal scroller that ends inside the window: the overflow can
+/// be scrolled to. A plain clip hides it, which still counts.
+fn scrollable_inside(registry: &InteractionRegistry, node: &Node, window_width: f32) -> bool {
     let mut current = node.parent();
     while let Some(ancestor) = current {
-        if ancestor.clips_to_bounds() && ancestor.absolute_frame().max_x() <= window_width + 0.5 {
+        let scrolls = registry
+            .handlers(&ancestor)
+            .wheel_route
+            .is_some_and(|route| route.role == InputHandlerRole::Scroll);
+        if scrolls
+            && ancestor.clips_to_bounds()
+            && ancestor.absolute_frame().max_x() <= window_width + 0.5
+        {
             return true;
         }
         current = ancestor.parent();
     }
     false
+}
+
+/// The right edge of the nearest clipping ancestor, unless that ancestor
+/// scrolls, in which case nothing is lost.
+fn visible_edge(registry: &InteractionRegistry, node: &Node) -> Option<f32> {
+    let mut current = node.parent();
+    while let Some(ancestor) = current {
+        if ancestor.clips_to_bounds() {
+            let scrolls = registry
+                .handlers(&ancestor)
+                .wheel_route
+                .is_some_and(|route| route.role == InputHandlerRole::Scroll);
+            return (!scrolls).then(|| ancestor.absolute_frame().max_x());
+        }
+        current = ancestor.parent();
+    }
+    None
 }
 
 fn audit(
@@ -100,15 +124,20 @@ fn audit(
             *counts.entry("touch-target").or_default() += 1;
             detail("touch-target", node, frame);
         }
-        if environment.width_class() == WidthClass::Compact
-            && frame.max_x() > window.max_x() + 0.5
-            && node
+        if environment.width_class() == WidthClass::Compact {
+            // The right edge content may reach: the window, or the nearest
+            // clipping ancestor that is not a scroller.
+            let edge = visible_edge(registry, node).unwrap_or(window.max_x());
+            let parent_inside = node
                 .parent()
-                .is_none_or(|parent| parent.absolute_frame().max_x() <= window.max_x() + 0.5)
-            && !clipped_inside(node, window.max_x())
-        {
-            *counts.entry("horizontal-overflow").or_default() += 1;
-            detail("horizontal-overflow", node, frame);
+                .is_none_or(|parent| parent.absolute_frame().max_x() <= edge + 0.5);
+            if frame.max_x() > edge + 0.5
+                && parent_inside
+                && !scrollable_inside(registry, node, window.max_x())
+            {
+                *counts.entry("horizontal-overflow").or_default() += 1;
+                detail("horizontal-overflow", node, frame);
+            }
         }
         match AdaptationMark::of(node) {
             Some(AdaptationMark::DesktopOnly) if handheld => {
@@ -180,6 +209,12 @@ fn every_page_follows_the_adaptation_rules_on_every_device() {
                 },
                 |scene| {
                     scene.settle_n(4);
+                    // Entrances animate scale and offset; measure the
+                    // settled layout, not their first frame.
+                    for _ in 0..8 {
+                        scene.scheduler.tick(0.25);
+                        scene.settle_n(1);
+                    }
                     audit(
                         &scene.interactions,
                         &environment,

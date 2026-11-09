@@ -1267,7 +1267,10 @@ where
         }
         let (selected_ids, selected_keys) = self.selection_state();
         let uses_key_selection = self.uses_key_selection();
-        let layout = self.options.layout;
+        let layout = self
+            .options
+            .layout
+            .for_surface(&cx.composition_value(&crate::adaptive::SurfaceEnvironment::key()));
         let is_enabled = self.options.is_enabled;
         let hovered = self.hovered.clone();
         let guide_hover = cx.remember::<Rc<TreeGuideHover>>(Rc::default);

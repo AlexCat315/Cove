@@ -718,6 +718,9 @@ impl PrimitiveView for HeaderButton {
     }
 
     fn update_node(&self, node: &Node) {
+        // A sortable header is tapped; on touch the header row grows to the
+        // target instead of the cell shrinking it.
+        crate::primitives::controls::adaptive::apply_touch_control_extent(node, self.sortable);
         node.set_accessibility(Some(AccessibilitySemantics {
             role: AccessibilityRole::Button,
             label: format!("Sort by {}", self.label),

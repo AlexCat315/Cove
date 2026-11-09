@@ -120,6 +120,11 @@ AdaptiveTabs::try_new(selection, vec![
 | --- | --- | --- |
 | `Sidebar` | 导航列表：Cupertino 圆角分组、整行可点、尾部箭头；Material 整宽行。行高 ≥ 触摸目标，不保留选中高亮 | 侧栏面板与选中高亮 |
 | `TextField`（单行） | 触摸表面上高度 ≥ 44（Material 48），文字垂直居中 | 设计尺寸 |
+| `Tree` | 行高与展开按钮 ≥ 触摸目标（`TreeLayout::for_surface`），虚拟化步长随之变化 | 设计行高 |
+| `Calendar` | 日、周、月、年单元都 ≥ 触摸目标 | 设计单元尺寸 |
+| `Table` 排序表头、`CompletionPopover` 建议行 | ≥ 触摸目标 | 设计尺寸 |
+
+在 `body` 里读取环境：`cx.composition_value(&SurfaceEnvironment::key())` 返回视图所在位置的值，变化时视图重组，不需要外包 `SurfaceReader`。
 
 `Sidebar::adapts(false)` 保留作者指定的呈现。只适合一种设备的呈现用 `AdaptationMark::DesktopOnly` / `HandheldOnly` 标记在节点上，供审计识别。
 

@@ -224,6 +224,8 @@ impl PrimitiveView for CompletionRow {
     }
 
     fn update_node(&self, node: &Node) {
+        // Suggestions are tapped on touch surfaces.
+        crate::primitives::controls::adaptive::apply_touch_control_extent(node, self.is_enabled);
         node.set_is_focusable(self.is_enabled);
         node.set_is_hit_testable(self.is_enabled);
         node.set_accessibility(Some(AccessibilitySemantics {

@@ -362,4 +362,4 @@ DevTools `set_ui_environment` 接受 `clear`、`preset` 与 `EnvironmentOverride
 | 单栏转场 | 未做：单栏中列表与详情直接切换，没有 push 动画与边缘返回手势（`NavigationStack` 有，但会让槽位跨父节点而重建） | P2 后续 |
 | `present_sheet`、`Menu`、`Toolbar` 语义入口 | 未开始 | P2 后续 |
 | Gallery 外壳（P2） | 完成：`ListDetail` 承载导航与页面；600 起并排，折痕 / 铰链 / 桌面支架按 §5 | `examples/gallery/src/gallery_content/gallery_view.rs` |
-| 组件形态（§5.3） | 进行中：审计与基线，Sidebar 手持列表 | §11.3 |
+| 组件形态（§5.3） | 进行中：审计与基线（284）；已适配 Sidebar、TextField、Tree、Calendar、Table 表头、CompletionPopover | §11.3 |

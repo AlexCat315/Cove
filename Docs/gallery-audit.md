@@ -4,6 +4,12 @@
 
 Swift 源码逐页对照见文末《Swift 源码对照（逐页差异清单）》。
 
+## 2026-11-09：触摸目标——按钮与列表
+
+- Tree、Calendar（月 / 年 / 周）、Table 排序表头、CompletionPopover 建议行在触摸表面达到 44 / 48pt；实测 iPhone Tree 页行与展开按钮放大、布局无重叠。
+- 适配审计基线 478 → 284（iphone 69、android-phone 70、fold-tabletop 75、ipad-split 70）；按钮与列表类违规清零。
+- 原生验收：**未做**。
+
 ## 2026-11-09：组件形态适配与 Gallery 外壳
 
 - 外壳：导航与页面由 `ListDetail` 承载。DevTools 实测：desktop / macos 导航 240 + 页面；iphone、fold-cover 单栏页面带返回；fold-open 分界在 420.5；dual-screen 导航 0–540、页面 574 起；fold-tabletop 页面在上、导航在下。

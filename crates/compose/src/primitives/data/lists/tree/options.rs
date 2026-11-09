@@ -402,6 +402,23 @@ pub struct TreeLayoutEnvironment {
 }
 
 impl TreeLayout {
+    /// Rows and disclosure targets at least the surface's touch target on
+    /// touch surfaces; unchanged elsewhere.
+    pub fn for_surface(&self, environment: &cove_core::Environment) -> Self {
+        let mut result = *self;
+        if environment
+            .input
+            .contains(cove_core::InputCapabilities::TOUCH)
+        {
+            let extent = environment.minimum_control_extent();
+            result.row_height = result.row_height.max(extent);
+            if result.disclosure_width > 0.0 {
+                result.disclosure_width = result.disclosure_width.max(extent);
+            }
+        }
+        result
+    }
+
     /// Resolve one geometry so scaling cannot drift between the subsystems.
     pub fn resolved(&self, text_scaler: &TextScaler, environment: TreeLayoutEnvironment) -> Self {
         let mut result = *self;

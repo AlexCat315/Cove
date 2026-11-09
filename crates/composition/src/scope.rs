@@ -4,6 +4,7 @@
 //! values on every recomposition, but a scope lives as long as its view keeps
 //! its identity in the tree. `cx.state` keys each signal by its call site (and
 //! occurrence, for loops), so successive bodies get the same signal back.
+use cove_core::scene::{CompositionLocal, Node, NodeWeak};
 use cove_core::{AnySignal, Owner, Signal};
 use std::any::TypeId;
 use std::cell::RefCell;
@@ -30,6 +31,8 @@ struct Slots {
 #[derive(Clone, Default)]
 pub struct Scope {
     slots: Rc<Slots>,
+    /// The node this view composes into, for reading ambient values.
+    anchor: Option<NodeWeak>,
 }
 
 impl Scope {
@@ -37,6 +40,26 @@ impl Scope {
     /// directly (tests, previews). Its state is dropped with the last clone.
     pub fn detached() -> Self {
         Self::default()
+    }
+
+    pub(crate) fn anchored(anchor: &Node) -> Self {
+        Self {
+            slots: Rc::default(),
+            anchor: Some(anchor.downgrade()),
+        }
+    }
+
+    /// The value `local` has where this view is mounted, or its default for a
+    /// detached scope. A change to it recomposes the view, so a body can read
+    /// the surface environment, theme or other ambient values directly.
+    pub fn composition_value<Value: Clone + 'static>(
+        &self,
+        local: &CompositionLocal<Value>,
+    ) -> Value {
+        self.anchor.as_ref().and_then(Node::upgrade).map_or_else(
+            || local.default_value(),
+            |node| node.composition_value(local),
+        )
     }
 
     /// Start a body evaluation: occurrence counters restart so the n-th call

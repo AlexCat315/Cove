@@ -232,3 +232,71 @@ fn an_unmounted_primitive_stops_observing() {
         assert_eq!(log.borrow().len(), evaluations);
     });
 }
+
+/// Reads the surface environment through its scope.
+struct EnvironmentBody {
+    log: Rc<RefCell<Vec<f32>>>,
+}
+
+impl View for EnvironmentBody {
+    fn body(&self, cx: &Scope) -> AnyView {
+        let environment =
+            cx.composition_value(&cove_composition::adaptive::SurfaceEnvironment::key());
+        self.log.borrow_mut().push(environment.viewport.width);
+        AnyView::new(EmptyView)
+    }
+}
+
+struct EnvironmentHost {
+    width: State<f32>,
+    log: Rc<RefCell<Vec<f32>>>,
+}
+
+impl View for EnvironmentHost {
+    fn body(&self, _cx: &Scope) -> AnyView {
+        use cove_composition::adaptive::SurfaceEnvironmentExt;
+        let mut environment = cove_core::Environment::default();
+        environment.viewport.width = self.width.get();
+        AnyView::new(
+            AnyView::new(EnvironmentBody {
+                log: self.log.clone(),
+            })
+            .surface_environment(environment),
+        )
+    }
+    fn dynamic_properties(&self) -> Vec<DynamicField> {
+        vec![DynamicField::state("width", &self.width)]
+    }
+}
+
+#[test]
+fn a_body_reads_composition_locals_where_it_is_mounted() {
+    locked(|| {
+        let width = State::new(393.0);
+        let log: Rc<RefCell<Vec<f32>>> = Rc::default();
+        let graph = graph();
+        graph.install_view(
+            AnyView::new(EnvironmentHost {
+                width: width.clone(),
+                log: log.clone(),
+            }),
+            Default::default(),
+        );
+        assert_eq!(log.borrow().last().copied(), Some(393.0));
+        width.set(841.0);
+        graph.recomposer.commit_all();
+        assert_eq!(
+            log.borrow().last().copied(),
+            Some(841.0),
+            "a changed local recomposes the body with the new value"
+        );
+        assert_eq!(
+            Scope::detached()
+                .composition_value(&cove_composition::adaptive::SurfaceEnvironment::key())
+                .viewport
+                .width,
+            cove_core::Environment::default().viewport.width,
+            "a detached scope reads the default"
+        );
+    });
+}

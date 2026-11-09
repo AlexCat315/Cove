@@ -955,7 +955,7 @@ impl ViewScope {
             fields: Vec::new(),
             state_registrations: Vec::new(),
             read_invalidation: None,
-            cx: Scope::default(),
+            cx: Scope::anchored(anchor),
             observer: None,
         }
     }

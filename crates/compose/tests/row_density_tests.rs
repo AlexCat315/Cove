@@ -11,8 +11,8 @@
 //!   focusable, and pointer input restores the compact anchored row
 //!
 //! Notes on the Swift suite:
-//! - `Tree` reports the authored row height on every surface; only the menu row
-//!   takes the touch floor.
+//! - `Tree` rows take the touch floor on touch surfaces (`TreeLayout::for_surface`)
+//!   and keep the authored height on pointer surfaces.
 //! - A touch `Menu` mounts inside whatever host it is given; it is not a modal
 //!   layer, so there is no `touch-menu-back` node and no level change.
 //! - Activating a branch mounts its submenu portal.
@@ -280,7 +280,12 @@ fn collection_rows_share_density_and_retain_identity() {
                 for capabilities in [TOUCH, TOUCH | desktop(), desktop()] {
                     input.set(capabilities);
                     scene.settle(3, 0.016);
-                    let tree_height = authored;
+                    let tree_height = if capabilities.contains(cove_core::InputCapabilities::TOUCH)
+                    {
+                        authored.max(44.0)
+                    } else {
+                        authored
+                    };
                     check_rows(
                         scene,
                         "tree",
@@ -547,12 +552,12 @@ fn touch_floors_preserve_scaled_tree_and_menu_rows() {
                     !tree_rows.is_empty(),
                     "scaled tree mounts rows at scale {scale} dark={dark}"
                 );
-                let expected = 30.0_f32;
+                let expected = 44.0_f32;
                 for row in &tree_rows {
                     assert_eq!(
                         row.frame().height,
                         expected,
-                        "the tree row keeps its authored height on touch at scale {scale} (actual {})",
+                        "the tree row takes the touch floor at scale {scale} (actual {})",
                         row.frame().height
                     );
                 }

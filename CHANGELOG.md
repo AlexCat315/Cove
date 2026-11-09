@@ -4,6 +4,12 @@
 
 ## Unreleased
 
+- **触摸目标：按钮与列表（2026-11-09）**：
+  - `Scope::composition_value`：用户视图在 `body` 中读取所在位置的组合局部值（如 `SurfaceEnvironment`），变化时随环境原因重组；分离的 scope 返回默认值。`ViewScope` 以锚点节点创建 scope。
+  - `Tree`：`TreeLayout::resolved` 从未被调用，触摸表面上行高仍是 30。新增 `TreeLayout::for_surface`，树在 `body` 中按环境把行高与展开按钮宽度提升到触摸目标，虚拟化步长与滚动定位使用同一值。`row_density_tests` 原先钉住“树行保持设计高度”，改为与其检查清单一致的 44pt。
+  - `Calendar`：月、年单元（42pt）与周行（34pt）应用触摸下限；`Table` 可排序表头（38pt）与 `CompletionPopover` 建议行（30pt）同样。
+  - 审计：测量前推进动画（入场缩放曾让按钮读作 43.3pt）；横向溢出改以最近的非滚动裁剪祖先为边界，只有滚动容器能豁免。基线 478 → 284，余下为图表数据点与图例（约 160）、窄控件（22pt 宽，如评分星）、表格列宽拖柄与状态元素。
+
 - **组件形态适配：审计基线、Sidebar 手持列表、TextField 触摸高度；Gallery 外壳改用 ListDetail（2026-11-09）**：
   - 设计：`Docs/adaptive-platform.md` 新增 §5.3「组件形态」（通用 / 桌面惯用 / 手持惯用三类与逐组件对照）与 §11.3「适配审计」。
   - 审计：新增 `examples/gallery/tests/adaptation_audit.rs`，在 iphone、android-phone、fold-tabletop、ipad-split、macos 下渲染全部 104 页，检查 `touch-target`（以指针处理器的 Control / TextInput 路由识别可点元素，排除可选文本）、`horizontal-overflow`、`desktop-only`、`handheld-only`，计数与 `adaptation_baseline.txt` 比较，只减不增。`COVE_ADAPTATION_AUDIT_ONLY=preset/page` 与 `COVE_ADAPTATION_AUDIT_DETAIL=1` 定位具体节点。`cove-composition` 新增 `AdaptationMark`（`adaptation.only` 节点标记）。首轮 828 处触摸目标违规，本次修复后 478。
