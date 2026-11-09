@@ -166,6 +166,26 @@ impl std::ops::BitOr for InputCapabilities {
         Self(self.0 | rhs.0)
     }
 }
+/// The operating system's light/dark appearance, as the host reports it.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+pub enum SystemAppearance {
+    /// The platform reports none; applications pick their own default.
+    #[default]
+    Unknown,
+    Light,
+    Dark,
+}
+
+impl SystemAppearance {
+    pub fn is_dark(self) -> Option<bool> {
+        match self {
+            Self::Unknown => None,
+            Self::Light => Some(false),
+            Self::Dark => Some(true),
+        }
+    }
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub struct Environment {
     pub viewport: Viewport,
@@ -185,6 +205,8 @@ pub struct Environment {
     /// The window shows the platform's blurred material wherever the UI
     /// leaves it clear, so a sidebar can omit its fill.
     pub translucent_window: bool,
+    /// Follows the system setting live; content decides whether to honor it.
+    pub system_appearance: SystemAppearance,
 }
 impl Default for Environment {
     fn default() -> Self {
@@ -201,6 +223,7 @@ impl Default for Environment {
             keyboard: Keyboard::default(),
             reduces_motion: false,
             translucent_window: false,
+            system_appearance: SystemAppearance::Unknown,
         }
     }
 }

@@ -241,6 +241,13 @@ float cove_shell_keyboard_height(void){
     return 0.0f;
 #endif
 }
+int cove_shell_system_theme(void){
+    switch (SDL_GetSystemTheme()) {
+    case SDL_SYSTEM_THEME_LIGHT: return 1;
+    case SDL_SYSTEM_THEME_DARK: return 2;
+    default: return 0;
+    }
+}
 int cove_shell_device_form(void){
     if (SDL_IsTablet()) return 1;
 #if defined(_WIN32)

@@ -355,7 +355,7 @@ static void cove_menu_append_items(NSMenu *root,const CoveShellMenuItem *items,s
         else{entry=[[NSMenuItem alloc]initWithTitle:[NSString stringWithUTF8String:item.title]?:@"" action:item.kind==0?action:nil keyEquivalent:[NSString stringWithUTF8String:item.key]?:@""];
             entry.enabled=(item.flags&1)!=0;entry.state=(item.flags&2)?NSControlStateValueOn:NSControlStateValueOff;
             if(item.kind==0){entry.target=target;entry.tag=(NSInteger)item.id;NSEventModifierFlags flags=0;if(item.flags&4)flags|=NSEventModifierFlagCommand;if(item.flags&8)flags|=NSEventModifierFlagControl;if(item.flags&16)flags|=NSEventModifierFlagOption;if(item.flags&32)flags|=NSEventModifierFlagShift;entry.keyEquivalentModifierMask=flags;}
-            if(item.kind==2){entry.submenu=[NSMenu new];entry.submenu.autoenablesItems=NO;}
+            if(item.kind==2){entry.submenu=[[NSMenu alloc]initWithTitle:entry.title];entry.submenu.autoenablesItems=NO;}
             if(item.png&&item.png_size){NSImage *icon=[[NSImage alloc]initWithData:[NSData dataWithBytes:item.png length:item.png_size]];icon.size=NSMakeSize(16,16);icon.template=(item.flags&64)!=0;entry.image=icon;}}
         NSMenu *parent=item.parent==SIZE_MAX?root:item.parent<built.count?built[item.parent].submenu:nil;if(parent)[parent addItem:entry];[built addObject:entry];
     }
@@ -420,7 +420,10 @@ bool cove_shell_menu_bar_install(const CoveShellMenuBar *bar){COVE_ASSERT_MAIN()
     cove_menu_append_items(authored,bar->menus,bar->menu_count,menuBarTarget,@selector(choose:));
     NSString *editTitle=cove_menu_bar_string(bar->edit,@"Edit"),*windowTitle=cove_menu_bar_string(bar->window,@"Window");
     BOOL hasEdit=NO,hasWindow=NO;
-    for(NSMenuItem *entry in authored.itemArray){[mainMenu addItem:entry];if([entry.title isEqualToString:editTitle])hasEdit=YES;if([entry.title isEqualToString:windowTitle])hasWindow=YES;}
+    /* An item belongs to one menu at a time: AppKit throws when an item still
+       owned by `authored` is added to the bar, so detach them first. */
+    NSArray<NSMenuItem*> *entries=[authored.itemArray copy];[authored removeAllItems];
+    for(NSMenuItem *entry in entries){[mainMenu addItem:entry];if([entry.title isEqualToString:editTitle])hasEdit=YES;if([entry.title isEqualToString:windowTitle])hasWindow=YES;}
 
     if(!hasEdit){
         NSMenuItem *editItem=[NSMenuItem new];editItem.title=editTitle;

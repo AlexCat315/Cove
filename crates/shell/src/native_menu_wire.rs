@@ -53,8 +53,8 @@ pub(crate) fn append(
             .unwrap(),
         );
         let key = strings.last().unwrap().as_ptr();
-        let mut flags = if item.enabled { ENABLED } else { 0 }
-            | if item.checked { CHECKED } else { 0 };
+        let mut flags =
+            if item.enabled { ENABLED } else { 0 } | if item.checked { CHECKED } else { 0 };
         if let Some(shortcut) = &item.shortcut {
             if shortcut.meta {
                 flags |= COMMAND;

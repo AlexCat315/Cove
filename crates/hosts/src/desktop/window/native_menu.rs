@@ -322,7 +322,7 @@ pub mod native_menu_bridge {
 
     thread_local! {
         static ACTIONS: RefCell<BTreeMap<i64, NativeMenuAction>> =
-            RefCell::new(BTreeMap::new());
+            const { RefCell::new(BTreeMap::new()) };
     }
 
     pub fn set_actions(actions: Vec<(i64, NativeMenuAction)>) {

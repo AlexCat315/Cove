@@ -75,7 +75,9 @@ pub struct FileSaveRequest {
 pub enum FileSaveOutcome {
     /// `destination` is where the write landed, `None` where the OS does not
     /// disclose one (the iOS export picker).
-    Saved { destination: Option<String> },
+    Saved {
+        destination: Option<String>,
+    },
     Cancelled,
     /// No native save panel on this platform; the caller keeps its in-app path.
     Unsupported,

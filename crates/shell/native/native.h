@@ -42,6 +42,9 @@ void cove_shell_keyboard(CoveShellWindow *window,bool show);
 float cove_shell_keyboard_height(void);
 /* 0 computer, 1 tablet, 2 convertible PC in slate mode with integrated touch. */
 int cove_shell_device_form(void);
+/* 0 unknown, 1 light, 2 dark: SDL caches the value and updates it from the
+   platform theme-change notification, so reading it is cheap. */
+int cove_shell_system_theme(void);
 void cove_shell_cursor(CoveShellWindow *window,int cursor);
 bool cove_shell_global_pointer(float *x,float *y);
 char *cove_shell_clipboard_read(void);

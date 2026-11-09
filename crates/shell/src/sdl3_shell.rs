@@ -126,6 +126,14 @@ impl WindowHandle for Sdl3WindowHandle {
     fn backdrop(&self) -> WindowBackdrop {
         self.backdrop.get()
     }
+    fn system_appearance(&self) -> SystemAppearance {
+        // SAFETY: reads SDL's cached theme value; no window state is touched.
+        match unsafe { native::cove_shell_system_theme() } {
+            1 => SystemAppearance::Light,
+            2 => SystemAppearance::Dark,
+            _ => SystemAppearance::Unknown,
+        }
+    }
     fn safe_area(&self) -> WindowSafeArea {
         let s = self.state();
         WindowSafeArea {
@@ -222,11 +230,7 @@ impl FilterStrings {
         self.name_ptrs.len()
     }
 }
-unsafe extern "C" fn dialog_done(
-    context: *mut c_void,
-    files: *const *const c_char,
-    status: i32,
-) {
+unsafe extern "C" fn dialog_done(context: *mut c_void, files: *const *const c_char, status: i32) {
     // SAFETY: the native panel calls exactly once with this Box transferred from
     // register_dialog().
     let context = unsafe { Box::from_raw(context.cast::<DialogNativeContext>()) };
@@ -378,9 +382,7 @@ impl Sdl3Shell {
                 break;
             };
             work.push(Box::new(move || match reply {
-                DialogReply::Open(accept) => {
-                    accept(if status == 0 { files } else { Vec::new() })
-                }
+                DialogReply::Open(accept) => accept(if status == 0 { files } else { Vec::new() }),
                 DialogReply::Save(accept) => accept(save_outcome(files, status)),
             }));
         }

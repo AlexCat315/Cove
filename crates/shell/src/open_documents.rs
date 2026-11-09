@@ -45,7 +45,9 @@ mod apple {
                 break;
             }
             // SAFETY: the bridge transferred ownership of this NUL-terminated copy.
-            let owned = unsafe { CStr::from_ptr(text) }.to_string_lossy().into_owned();
+            let owned = unsafe { CStr::from_ptr(text) }
+                .to_string_lossy()
+                .into_owned();
             // SAFETY: the copy was allocated by the bridge's strdup.
             unsafe { cove_shell_free(text.cast_mut().cast()) };
             documents.push(owned);

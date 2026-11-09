@@ -7,7 +7,7 @@ use crate::Scope;
 use std::rc::Rc;
 
 use crate::modifiers::layout::{FlexExt, LayoutFrameExt};
-use crate::modifiers::style::SemanticStyleViewExt;
+use crate::modifiers::style::{AppearanceExt, SemanticStyleViewExt};
 use crate::primitives::controls::button::{ButtonIcon, ButtonIconSource};
 use crate::primitives::text::Text;
 use crate::theme::{SemanticColorRef, SemanticFontRef, theme_for_node};
@@ -193,35 +193,14 @@ impl PrimitiveView for MarkdownBullet {
         Some(layout)
     }
 
-    fn update_node(&self, node: &Node) {
-        let theme = theme_for_node(node);
-        match self.depth % 3 {
-            0 => {
-                node.set_background_color(Some(theme.colors.on_surface_muted));
-                node.set_corner_radius(3.0);
-                node.set_border_width(0.0);
-            }
-            1 => {
-                node.set_background_color(Some(cove_core::Color::CLEAR));
-                node.set_corner_radius(3.0);
-                node.set_border_color(Some(theme.colors.on_surface_muted));
-                node.set_border_width(1.5);
-            }
-            _ => {
-                node.set_background_color(Some(theme.colors.on_surface_muted));
-                node.set_corner_radius(1.0);
-                node.set_border_width(0.0);
-            }
-        }
-    }
+    fn update_node(&self, _node: &Node) {}
 
-    fn children(&self, _node: &Node) -> Vec<AnyView> {
-        let (width, height) = if self.depth % 3 == 2 {
-            (5.0, 5.0)
-        } else {
-            (6.0, 6.0)
-        };
-        vec![AnyView::new(
+    fn children(&self, node: &Node) -> Vec<AnyView> {
+        // The marker paints only its own small box; the gutter around it stays
+        // clear. Styling the gutter node would draw a bar across the column.
+        let theme = theme_for_node(node);
+        let color = theme.colors.on_surface_muted;
+        let dot = |size: f32| {
             BoxView::new(
                 FlexDirection::Column,
                 Align::Stretch,
@@ -230,8 +209,14 @@ impl PrimitiveView for MarkdownBullet {
                 0.0,
                 AnyView::new(crate::EmptyView),
             )
-            .frame_size(width, height),
-        )]
+            .frame_size(size, size)
+        };
+        let marker = match self.depth % 3 {
+            0 => AnyView::new(dot(6.0).background_color(color).corner_radius(3.0)),
+            1 => AnyView::new(dot(6.0).border_color(color, 1.5).corner_radius(3.0)),
+            _ => AnyView::new(dot(5.0).background_color(color).corner_radius(1.0)),
+        };
+        vec![marker]
     }
 }
 impl_primitive_view!(MarkdownBullet);

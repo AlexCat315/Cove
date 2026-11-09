@@ -142,10 +142,12 @@ pub fn layout_text(
             0.0
         };
         let mut next_pen_x = pen_x + gap + glyph.x_advance;
+        let mut wrapped = false;
         if next_pen_x > options.max_width
             && !current.is_empty()
             && current.last().is_some_and(|g| g.0.cluster != glyph.cluster)
         {
+            wrapped = true;
             if let Some(index) = last_break.filter(|&i| i > 0) {
                 let remaining: Vec<_> = current[index..]
                     .iter()
@@ -194,6 +196,13 @@ pub fn layout_text(
                 next_pen_x = glyph.x_advance;
                 last_break = None;
             }
+        }
+        // The space that overflowed hangs at the end of the line it ended,
+        // the same as spaces after an earlier break, instead of indenting the
+        // next line.
+        if wrapped && current.is_empty() && matches!(byte, b' ' | b'\t') {
+            pen_x = 0.0;
+            continue;
         }
         if current.is_empty() {
             start = glyph.cluster;

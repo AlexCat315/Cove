@@ -47,6 +47,9 @@ impl WindowHandle for ProxyWindow {
     fn backdrop(&self) -> cove_shell::WindowBackdrop {
         self.snapshot().backdrop
     }
+    fn system_appearance(&self) -> cove_shell::SystemAppearance {
+        self.snapshot().system_appearance
+    }
     fn drawable_size(&self) -> (u32, u32) {
         self.snapshot().drawable_size
     }
@@ -431,7 +434,7 @@ impl Shell for ProxyShell {
     }
     fn install_menu_bar(&self, bar: &NativeMenuBarSnapshot, on_choice: MenuBarCompletion) {
         self.pending.borrow_mut().menu_bar = Some(on_choice);
-        self.post(PlatformCommand::InstallMenuBar(bar.clone()));
+        self.post(PlatformCommand::InstallMenuBar(Box::new(bar.clone())));
     }
     fn take_open_documents(&self) -> Vec<String> {
         std::mem::take(&mut self.pending.borrow_mut().documents)

@@ -71,7 +71,7 @@ pub enum PlatformCommand {
     SampleColor(u64),
     OpenDialog(DialogRequest),
     SaveDialog(SaveDialogRequest),
-    InstallMenuBar(NativeMenuBarSnapshot),
+    InstallMenuBar(Box<NativeMenuBarSnapshot>),
     ShowMenu {
         request: u64,
         window: Option<WindowId>,

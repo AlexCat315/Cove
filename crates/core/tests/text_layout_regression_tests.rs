@@ -236,3 +236,24 @@ fn ideographs_wrap_between_characters_and_carry_the_previous_one_with_closing_pu
     );
     assert_eq!(result.lines[1].start_cluster, clusters[3]);
 }
+
+#[test]
+fn a_space_that_overflows_hangs_instead_of_indenting_the_next_line() {
+    // "ab cd" at 5pt per glyph in a 10pt column: the space is the glyph that
+    // overflows, so the second line must start at "c", not at the space.
+    let text = "ab cd";
+    let shaped: Vec<ShapedGlyph> = (0..text.len() as u32)
+        .map(|cluster| glyph(cluster, 5.0, 0))
+        .collect();
+    let result = layout_text(&shaped, text, &Metrics, options(10.0, 20.0, 0.0));
+    assert_eq!(result.lines.len(), 2);
+    assert_eq!(result.lines[1].start_cluster, 3);
+    assert_eq!(
+        result.lines[1]
+            .glyphs
+            .iter()
+            .map(|glyph| glyph.cluster)
+            .collect::<Vec<_>>(),
+        vec![3, 4]
+    );
+}

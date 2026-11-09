@@ -1,6 +1,6 @@
 use cove_platform::{
-    InputEvent, NativeMenuBarSnapshot, NativeMenuSnapshot, ScreenColorCompletion, ScreenColorSample,
-    SystemCursor, TextInputArea, WindowId, WindowInputEvent,
+    InputEvent, NativeMenuBarSnapshot, NativeMenuSnapshot, ScreenColorCompletion,
+    ScreenColorSample, SystemCursor, TextInputArea, WindowId, WindowInputEvent,
 };
 use std::{rc::Rc, sync::Arc, time::Duration};
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -21,6 +21,15 @@ pub enum WindowTitleBarStyle {
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum WindowAppearance {
     #[default]
+    Light,
+    Dark,
+}
+/// The light or dark appearance the operating system currently uses.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum SystemAppearance {
+    /// The platform does not report one.
+    #[default]
+    Unknown,
     Light,
     Dark,
 }
@@ -151,6 +160,10 @@ pub trait WindowHandle {
     fn backdrop(&self) -> WindowBackdrop {
         WindowBackdrop::Opaque
     }
+    /// The system light/dark appearance as seen by this window's platform.
+    fn system_appearance(&self) -> SystemAppearance {
+        SystemAppearance::Unknown
+    }
 }
 /// Every window fact a thread other than the platform thread may read. The
 /// platform thread publishes it; readers never call the platform.
@@ -171,6 +184,7 @@ pub struct WindowSnapshot {
     pub surface: Option<NativeRenderSurface>,
     pub native_window: Option<NativeWindowReference>,
     pub backdrop: WindowBackdrop,
+    pub system_appearance: SystemAppearance,
 }
 pub type DialogCompletion = Box<dyn FnOnce(Vec<String>)>;
 pub type ClipboardCompletion = Box<dyn FnOnce(Option<String>)>;
@@ -193,10 +207,14 @@ pub struct SaveFileRequest {
 pub enum SaveFileOutcome {
     /// The user picked a destination on a platform that only chooses paths;
     /// [`Self::finish`] still has to write the bytes there.
-    Chosen { destination: String },
+    Chosen {
+        destination: String,
+    },
     /// The platform performed the write itself. `destination` is `None` where
     /// the OS does not disclose one (the iOS export picker).
-    Saved { destination: Option<String> },
+    Saved {
+        destination: Option<String>,
+    },
     Cancelled,
     /// No native save panel on this shell; the caller keeps its in-app path.
     Unsupported(String),
@@ -392,6 +410,7 @@ pub trait Shell {
             surface: window.render_surface(),
             native_window: window.native_window_reference(),
             backdrop: window.backdrop(),
+            system_appearance: window.system_appearance(),
         })
     }
     fn initialize_window(&mut self, title: &str) -> Result<(), ShellError> {

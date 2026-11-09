@@ -524,6 +524,9 @@ impl TextField {
     }
 
     fn horizontal_inset(&self, theme: &Theme) -> f32 {
+        if let Some(padding) = self.decoration.content_padding {
+            return padding.horizontal;
+        }
         match self.decoration.size {
             TextFieldSize::Large => 12.0,
             TextFieldSize::Automatic | TextFieldSize::Regular => theme.spacing.sm,
@@ -695,6 +698,9 @@ impl TextField {
     }
 
     fn vertical_inset(&self, line_height: f32) -> f32 {
+        if let Some(padding) = self.decoration.content_padding {
+            return padding.vertical;
+        }
         let field = self.minimum_field_height();
         ((field - line_height) / 2.0).max(4.0)
     }
@@ -1240,16 +1246,20 @@ fn measure_field(
     } else {
         current
     };
+    let measure_inset_x = field
+        .decoration
+        .content_padding
+        .map_or(MEASURE_INSET_X, |padding| padding.horizontal * 2.0);
     let width_limit = if matches!(width_mode, MeasureMode::Undefined) || !field.layout.wraps_lines {
         f32::INFINITY
     } else {
-        (width - MEASURE_INSET_X).max(1.0)
+        (width - measure_inset_x).max(1.0)
     };
     let inputs = FieldLayoutInputs {
         is_vertical: true,
         wraps_lines: field.layout.wraps_lines,
         secure: field.behavior.secure,
-        horizontal_inset: MEASURE_INSET_X * 0.5,
+        horizontal_inset: measure_inset_x * 0.5,
         vertical_inset: inset_y,
         text_origin_y_offset: 0.0,
     };
@@ -1277,7 +1287,7 @@ fn measure_field(
             .borrow_mut()
             .visible_layout(0, field.layout.max_visible_lines + 1, &environment);
     let content_height = rows.total_height.max(line_height);
-    let measured_width = rows.total_width + MEASURE_INSET_X;
+    let measured_width = rows.total_width + measure_inset_x;
     let resolved_width = match width_mode {
         MeasureMode::Exactly => width,
         MeasureMode::AtMost | MeasureMode::MinContent => measured_width.min(width.max(0.0)),
@@ -2986,6 +2996,12 @@ fn render(
         layout.total_width,
         reveal,
     );
+    // Wrapped rows never exceed the column; the reveal margin and a caret at
+    // the end of a full row must not turn into a few points of sideways scroll.
+    if is_vertical && field.layout.wraps_lines {
+        state.scroll.horizontal.content_width = state.scroll.horizontal.viewport_width;
+        state.scroll.horizontal.offset = 0.0;
+    }
     state.scroll.needs_caret_reveal = false;
     // Mirror the viewport so hit testing, accessibility and tests observe the
     // same scroll the glyphs were painted with.

@@ -1142,6 +1142,11 @@ impl Application {
         }
         state.environment_override.borrow().apply(&mut environment);
         environment.translucent_window = host.backdrop() != cove_shell::WindowBackdrop::Opaque;
+        environment.system_appearance = match host.system_appearance() {
+            cove_shell::SystemAppearance::Light => cove_core::SystemAppearance::Light,
+            cove_shell::SystemAppearance::Dark => cove_core::SystemAppearance::Dark,
+            cove_shell::SystemAppearance::Unknown => cove_core::SystemAppearance::Unknown,
+        };
         if environment != state.environment.get() {
             state.environment.set(environment);
         }

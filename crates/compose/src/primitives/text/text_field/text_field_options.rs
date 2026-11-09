@@ -108,11 +108,34 @@ pub struct TextFieldDecoration {
     pub placeholder_color: Option<Color>,
     pub cursor_color: Option<Color>,
     pub selection_color: Option<Color>,
+    /// Space between the field edge and its text, replacing the size-derived
+    /// insets. The padding lies inside the scrolled region, so a wide editor
+    /// can center a readable column and still scroll and take clicks across
+    /// its whole width.
+    pub content_padding: Option<TextFieldContentPadding>,
 }
 
 impl TextFieldDecoration {
     pub fn new() -> Self {
         Self::default()
+    }
+}
+
+/// Authored text insets for [`TextFieldDecoration::content_padding`].
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct TextFieldContentPadding {
+    /// Applied on both the leading and trailing edges.
+    pub horizontal: f32,
+    /// Applied above the first line and below the last.
+    pub vertical: f32,
+}
+
+impl TextFieldContentPadding {
+    pub fn new(horizontal: f32, vertical: f32) -> Self {
+        Self {
+            horizontal: horizontal.max(0.0),
+            vertical: vertical.max(0.0),
+        }
     }
 }
 

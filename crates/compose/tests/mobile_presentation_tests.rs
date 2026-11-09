@@ -103,6 +103,7 @@ fn environment(width: f32, height: f32) -> Environment {
         keyboard: Keyboard::default(),
         reduces_motion: true,
         translucent_window: false,
+        system_appearance: cove_core::SystemAppearance::Unknown,
     }
 }
 

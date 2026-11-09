@@ -8,6 +8,14 @@
 | 硬件 | `device_class` | 进程内恒定，折叠屏开合不变 | 默认惯例 |
 | 窗口 | `width_class()`、`height_class()`、`posture`、`display_features`、`segments()` | 随时变化 | 布局结构 |
 | 输入 | `input` | 随时变化 | hover、焦点环、`minimum_control_extent()` |
+| 系统外观 | `system_appearance` | 随时变化 | 跟随系统的浅色 / 深色主题 |
+
+`system_appearance` 为 `Light`、`Dark` 或 `Unknown`（平台未上报）。应用自行决定是否跟随：
+
+```rust
+let environment = cx.composition_value(&SurfaceEnvironment::key());
+let dark = environment.system_appearance.is_dark().unwrap_or(false);
+```
 
 布局只看窗口。折叠屏展开后得到平板布局，是因为宽度变成了 `Expanded`，而不是设备变了。
 

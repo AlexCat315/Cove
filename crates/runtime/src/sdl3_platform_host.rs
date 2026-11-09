@@ -594,6 +594,14 @@ impl Sdl3PlatformHost {
             .and_then(|s| self.main_window().and_then(|id| s.borrow().window(id)))
             .map_or(cove_shell::WindowBackdrop::Opaque, |w| w.backdrop())
     }
+    /// The system light/dark appearance reported for the main window.
+    pub fn system_appearance(&self) -> cove_shell::SystemAppearance {
+        self.shell()
+            .and_then(|s| self.main_window().and_then(|id| s.borrow().window(id)))
+            .map_or(cove_shell::SystemAppearance::Unknown, |w| {
+                w.system_appearance()
+            })
+    }
     pub fn safe_area(&self) -> WindowSafeArea {
         self.shell()
             .and_then(|s| self.main_window().and_then(|id| s.borrow().window(id)))

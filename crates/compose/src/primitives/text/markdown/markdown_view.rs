@@ -327,9 +327,14 @@ impl PrimitiveView for MarkdownQuote {
             12.0,
             AnyView::new(TupleView::new(vec![
                 rule,
-                AnyView::new(
+                // Shrinkable: rows default to `flex-shrink: 0`, which would let
+                // a long quoted line run past the column instead of wrapping.
+                AnyView::new(crate::modifiers::layout::FlexExt::flex_with(
                     content.semantic_foreground(crate::theme::SemanticColorRef::on_surface_muted()),
-                ),
+                    1.0,
+                    1.0,
+                    Some(0.0),
+                )),
             ])),
         ))]
     }

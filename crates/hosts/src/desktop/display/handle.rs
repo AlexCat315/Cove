@@ -53,7 +53,8 @@ type CloseInterceptor = Rc<dyn Fn(Option<CloseDecision>)>;
 type FolderDialog = Rc<dyn Fn(Option<&str>, Box<dyn FnOnce(Option<String>)>)>;
 type FileDialogResult = Box<dyn FnOnce(Vec<String>)>;
 type FileDialog = Rc<dyn Fn(Option<&str>, &[FileDialogFilter], bool, FileDialogResult)>;
-type SaveDialog = Rc<dyn Fn(cove_core::scene::FileSaveRequest, cove_core::scene::FileSaveCompletion)>;
+type SaveDialog =
+    Rc<dyn Fn(cove_core::scene::FileSaveRequest, cove_core::scene::FileSaveCompletion)>;
 
 /// Host-installed callbacks behind the public display handle.
 #[derive(Default)]

@@ -4,6 +4,16 @@
 
 ## Unreleased
 
+- **写作类应用所需能力与修复（2026-11-09，来自 Ruwriter 重构）**：
+  - `TextFieldDecoration::content_padding`（`TextFieldContentPadding { horizontal, vertical }`）：替换按尺寸推导的文字内边距。内边距位于滚动区域之内，宽编辑器可以居中一栏可读宽度的正文，同时整栏都能滚动和点击定位。测量使用同一内边距。
+  - 系统外观：`Environment::system_appearance`（`SystemAppearance::{Unknown, Light, Dark}`，`is_dark()`）。shell 新增 `cove_shell_system_theme` 读取 SDL 缓存的系统主题，经 `WindowHandle::system_appearance` 进入 `WindowSnapshot`（多线程模式下由代理窗口转发），宿主每帧写入环境，随系统切换实时更新。macOS、Windows、iOS、Android 由 SDL 上报；其余平台为 `Unknown`。
+  - macOS 菜单栏：`cove_shell_menu_bar_install` 把仍属于临时 `NSMenu` 的条目加入主菜单，AppKit 抛出异常，应用启动即中止（Rust 无法捕获外部异常）；现在先移出再加入。顶层子菜单以条目标题创建，菜单栏显示应用给出的标题。
+  - 文本换行：恰好溢出的空格不再成为下一行的首字形（此前英文段落换行后行首多一个空格）；与较早断点处的空格一样悬挂在行尾。测试 `a_space_that_overflows_hangs_instead_of_indenting_the_next_line`。
+  - `TextField`：软换行的垂直字段不再出现几个点的横向滚动（行尾光标与 8pt 显示余量曾被计入内容宽度）。
+  - `MarkdownView`：无序列表的圆点只绘制自身 6pt 方块（此前把底色画在整列宽的槽位上，显示为横条）；引用内容可收缩，长句在栏宽内换行而不是溢出。
+  - `CommandPalette`：行标签占满行宽，图标与标题左对齐、快捷键靠右（此前按钮外观把内容尺寸的标签居中）。
+  - Clippy：`PlatformCommand::InstallMenuBar` 改为装箱快照（`large_enum_variant`）；菜单动作表的 `thread_local` 使用 `const` 初始化。上一提交中未格式化的文件已按 rustfmt 整理。
+
 - **触摸目标：图表（2026-11-09）**：
   - `Chart` 图例项在触摸表面应用触摸下限（22 → 44 / 48pt），文字与色块不变，只放大点按区域。绘图区已支持按住拖动选中最近的数据点（最近列再最近系列，无距离上限），触摸无需悬停即可查看数值。
   - 审计：可选文本以 text-input 路由接收按压，图表数据表的文本单元因此被误计为输入框；text-input 路由现在只在 TextField / ComboBox 角色上计数。

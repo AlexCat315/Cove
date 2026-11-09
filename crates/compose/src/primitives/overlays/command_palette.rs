@@ -808,7 +808,17 @@ impl View for CommandRow {
                     shortcut_chip(self.command.shortcut.clone()),
                 ])),
             )
-            .frame(None, None, None, None, Some(f32::INFINITY), None),
+            // Full width: the button chrome centres a content-sized label,
+            // which would centre every row and leave the spacer nothing to
+            // fill.
+            .frame(
+                Some(crate::FrameDimension::Percent(100.0)),
+                None,
+                None,
+                None,
+                Some(f32::INFINITY),
+                None,
+            ),
         );
         let row = Button::with_options(
             label,

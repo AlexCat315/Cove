@@ -3,7 +3,7 @@
 //! Context popups are a different entry point: see `native_menu_popover`.
 
 use crate::ShellError;
-use cove_platform::{NativeMenuBranch, NativeMenuBarSnapshot, NativeMenuKind, NativeMenuItem};
+use cove_platform::{NativeMenuBarSnapshot, NativeMenuBranch, NativeMenuItem, NativeMenuKind};
 
 pub struct NativeMenuBarInstaller;
 
