@@ -627,6 +627,7 @@ dependencies = [
  "cove-text",
  "cove-ui-addons",
  "cove-ui-compose",
+ "cove-watch",
 ]
 
 [[package]]
@@ -666,6 +667,14 @@ dependencies = [
  "tempfile",
  "thiserror 2.0.21",
  "unicode-segmentation",
+]
+
+[[package]]
+name = "cove-watch"
+version = "0.3.0-dev"
+dependencies = [
+ "libc",
+ "tempfile",
 ]
 
 [[package]]

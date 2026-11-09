@@ -3,6 +3,7 @@ members = [
     "crates/core",
     "crates/platform",
     "crates/system",
+    "crates/watch",
     "crates/logging",
     "crates/graphics",
     "crates/text",
@@ -53,6 +54,7 @@ unicode-segmentation = "1"
 cove-core = { path = "crates/core" }
 cove-platform = { path = "crates/platform" }
 cove-system = { path = "crates/system" }
+cove-watch = { path = "crates/watch" }
 cove-logging = { path = "crates/logging" }
 cove-graphics = { path = "crates/graphics" }
 cove-text = { path = "crates/text" }
@@ -121,6 +123,7 @@ cove-graphics.workspace = true
 cove-core.workspace = true
 cove-platform.workspace = true
 cove-system.workspace = true
+cove-watch.workspace = true
 cove-logging.workspace = true
 cove-devtools-protocol.workspace = true
 cove-composition = { path = "crates/composition" }
