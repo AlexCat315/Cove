@@ -123,6 +123,7 @@ AdaptiveTabs::try_new(selection, vec![
 | `Tree` | 行高与展开按钮 ≥ 触摸目标（`TreeLayout::for_surface`），虚拟化步长随之变化 | 设计行高 |
 | `Calendar` | 日、周、月、年单元都 ≥ 触摸目标 | 设计单元尺寸 |
 | `Table` 排序表头、`CompletionPopover` 建议行 | ≥ 触摸目标 | 设计尺寸 |
+| `Chart` | 图例项 ≥ 触摸目标；按住拖动选中最近的数据点（无距离上限，手指无需对准） | 图例 22pt；悬停选中 |
 
 在 `body` 里读取环境：`cx.composition_value(&SurfaceEnvironment::key())` 返回视图所在位置的值，变化时视图重组，不需要外包 `SurfaceReader`。
 

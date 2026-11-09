@@ -4,6 +4,12 @@
 
 Swift 源码逐页对照见文末《Swift 源码对照（逐页差异清单）》。
 
+## 2026-11-09：触摸目标——图表
+
+- Chart 图例项触摸高度 44 / 48pt（实测 iPhone：Revenue、Signups 44pt）；绘图区按住拖动选中数据点。
+- 适配审计基线 284 → 112（iphone 26、android-phone 27、fold-tabletop 32、ipad-split 27）；图表页违规清零。
+- 原生验收：**未做**。
+
 ## 2026-11-09：触摸目标——按钮与列表
 
 - Tree、Calendar（月 / 年 / 周）、Table 排序表头、CompletionPopover 建议行在触摸表面达到 44 / 48pt；实测 iPhone Tree 页行与展开按钮放大、布局无重叠。

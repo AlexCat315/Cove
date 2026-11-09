@@ -4,6 +4,11 @@
 
 ## Unreleased
 
+- **触摸目标：图表（2026-11-09）**：
+  - `Chart` 图例项在触摸表面应用触摸下限（22 → 44 / 48pt），文字与色块不变，只放大点按区域。绘图区已支持按住拖动选中最近的数据点（最近列再最近系列，无距离上限），触摸无需悬停即可查看数值。
+  - 审计：可选文本以 text-input 路由接收按压，图表数据表的文本单元因此被误计为输入框；text-input 路由现在只在 TextField / ComboBox 角色上计数。
+  - 测试：`chart_interaction_tests::legend_items_are_touch_targets_on_touch_surfaces`（触摸 44、指针 22）。基线 284 → 112，图表页清零；余下为 Rating（滑块形态 32pt 高）、22pt 宽的窄控件、表格列宽拖柄与滚动条。
+
 - **触摸目标：按钮与列表（2026-11-09）**：
   - `Scope::composition_value`：用户视图在 `body` 中读取所在位置的组合局部值（如 `SurfaceEnvironment`），变化时随环境原因重组；分离的 scope 返回默认值。`ViewScope` 以锚点节点创建 scope。
   - `Tree`：`TreeLayout::resolved` 从未被调用，触摸表面上行高仍是 30。新增 `TreeLayout::for_surface`，树在 `body` 中按环境把行高与展开按钮宽度提升到触摸目标，虚拟化步长与滚动定位使用同一值。`row_density_tests` 原先钉住“树行保持设计高度”，改为与其检查清单一致的 44pt。

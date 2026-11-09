@@ -40,22 +40,31 @@ fn environment(preset: &DevicePreset) -> Environment {
 }
 
 /// A control or text input someone taps: it handles pointer presses itself.
-/// Selectable text also takes presses but is read, not tapped.
+/// Selectable text also takes presses (as a text-input route) but is read,
+/// not tapped, so a text-input route counts only on editable fields.
 fn is_interactive(registry: &InteractionRegistry, node: &Node) -> bool {
-    node.is_hit_testable()
-        && node.is_interaction_enabled()
-        && !node.accessibility().is_some_and(|semantics| {
-            matches!(
-                semantics.role,
-                AccessibilityRole::StaticText | AccessibilityRole::Heading
-            )
-        })
-        && registry.handlers(node).pointer_route.is_some_and(|route| {
-            matches!(
-                route.role,
-                InputHandlerRole::Control | InputHandlerRole::TextInput
-            )
-        })
+    if !node.is_hit_testable() || !node.is_interaction_enabled() {
+        return false;
+    }
+    let role = node.accessibility().map(|semantics| semantics.role);
+    if matches!(
+        role,
+        Some(AccessibilityRole::StaticText | AccessibilityRole::Heading)
+    ) {
+        return false;
+    }
+    match registry
+        .handlers(node)
+        .pointer_route
+        .map(|route| route.role)
+    {
+        Some(InputHandlerRole::Control) => true,
+        Some(InputHandlerRole::TextInput) => matches!(
+            role,
+            Some(AccessibilityRole::TextField | AccessibilityRole::ComboBox)
+        ),
+        _ => false,
+    }
 }
 
 /// Laid out and not collapsed away: hidden panes and closed overlays have no

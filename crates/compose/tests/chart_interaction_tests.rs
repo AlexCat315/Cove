@@ -87,6 +87,7 @@ fn series() -> Vec<ChartSeries> {
 struct Harness {
     point: State<Option<ChartPoint>>,
     hidden: State<HashSet<String>>,
+    input: InputCapabilities,
 }
 
 impl View for Harness {
@@ -119,7 +120,7 @@ impl View for Harness {
         );
 
         let mut surface = Environment::default();
-        surface.input = InputCapabilities::POINTER | InputCapabilities::KEYBOARD;
+        surface.input = self.input;
 
         AnyView::new(
             AnyView::new(chart)
@@ -136,11 +137,22 @@ impl View for Harness {
 }
 
 fn install(scene: &mut InteractiveScene) -> (State<Option<ChartPoint>>, State<HashSet<String>>) {
+    install_with(
+        scene,
+        InputCapabilities::POINTER | InputCapabilities::KEYBOARD,
+    )
+}
+
+fn install_with(
+    scene: &mut InteractiveScene,
+    input: InputCapabilities,
+) -> (State<Option<ChartPoint>>, State<HashSet<String>>) {
     let point = State::new(None);
     let hidden = State::new(HashSet::new());
     scene.install(Harness {
         point: point.clone(),
         hidden: hidden.clone(),
+        input,
     });
     scene.settle(6, 1.0);
     (point, hidden)
@@ -476,4 +488,31 @@ fn pie_touch() {
             assert_eq!(point.get(), None, "tapping the hole selects nothing");
         })
     });
+}
+
+#[test]
+fn legend_items_are_touch_targets_on_touch_surfaces() {
+    for (input, expected) in [
+        (InputCapabilities::TOUCH, 44.0_f32),
+        (
+            InputCapabilities::POINTER | InputCapabilities::KEYBOARD,
+            22.0,
+        ),
+    ] {
+        InteractiveScene::run(600.0, 300.0, |scene| {
+            install_with(scene, input);
+            let items = scene.all(|node| {
+                node.accessibility()
+                    .is_some_and(|semantics| semantics.role == AccessibilityRole::Toggle)
+            });
+            assert_eq!(items.len(), 4);
+            for item in items {
+                assert_eq!(
+                    item.absolute_frame().height,
+                    expected,
+                    "legend item height for {input:?}"
+                );
+            }
+        });
+    }
 }

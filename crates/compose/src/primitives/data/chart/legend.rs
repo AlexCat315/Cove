@@ -110,6 +110,8 @@ impl PrimitiveView for ChartLegendToggle {
         Some(layout)
     }
     fn update_node(&self, node: &Node) {
+        // A legend item toggles its series; on touch it is a full tap target.
+        crate::primitives::controls::adaptive::apply_touch_control_extent(node, true);
         let mut semantics = AccessibilitySemantics::new(AccessibilityRole::Toggle);
         semantics.label = self.item.title.clone();
         semantics.value = if self.is_hidden {
