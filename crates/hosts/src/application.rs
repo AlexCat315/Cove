@@ -88,7 +88,15 @@ impl ApplicationLaunch {
         {
             factory().run()
         }
-        #[cfg(not(any(target_os = "ios", target_os = "android")))]
+        #[cfg(target_arch = "wasm32")]
+        {
+            // The browser host drives frames through its C ABI and reads the
+            // declaration published by the module initializer, so there is no
+            // blocking loop to enter here.
+            let _ = factory;
+            Ok(())
+        }
+        #[cfg(not(any(target_os = "ios", target_os = "android", target_arch = "wasm32")))]
         {
             if std::env::var_os("COVE_SINGLE_THREAD").is_some_and(|value| value == "1") {
                 return factory().run();
@@ -109,7 +117,8 @@ impl ApplicationLaunch {
 ///
 /// Pass a root factory for defaults, or `launch = factory` for configuration and
 /// checkpoint hooks. Both forms expose `application()` for constructing the
-/// declaration, `run()` for desktop/iOS, and `JNI_OnLoad` for Android.
+/// declaration, `run()` for desktop/iOS, `JNI_OnLoad` for Android, and a Wasm
+/// module initializer that publishes the declaration to the browser host.
 ///
 /// ```ignore
 /// cove_ui::application!(app::make_content);
@@ -145,5 +154,17 @@ macro_rules! application {
             // SAFETY: forwarded from the VM's library load.
             unsafe { $crate::android::jni::on_load(vm, reserved) }
         }
+
+        /// Publishes the declaration when the Wasm module initializes, before the
+        /// browser host makes its first `cove_render` call.
+        #[cfg(all(target_arch = "wasm32", not(test)))]
+        #[used]
+        #[link_section = ".init_array"]
+        static __COVE_APPLICATION_INIT: extern "C" fn() = {
+            extern "C" fn register() {
+                $crate::wasm::install_application(application);
+            }
+            register
+        };
     };
 }

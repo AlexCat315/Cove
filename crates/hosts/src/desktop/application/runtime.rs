@@ -412,6 +412,15 @@ impl Application {
         });
         cove_core::scene::FilePicker::set_presenter(Some(picker.clone()));
         super::services::file_picker_handler::remember(Some(picker));
+        let saver: cove_core::scene::FileSaverCallback = Rc::new({
+            let display = state.display_handle.clone();
+            move |request: cove_core::scene::FileSaveRequest,
+                  done: cove_core::scene::FileSaveCompletion| {
+                display.request_save_file(request, done);
+            }
+        });
+        cove_core::scene::FileSaver::set_presenter(Some(saver.clone()));
+        super::services::file_saver_handler::remember(Some(saver));
         if let Some(link) = cove_runtime::platform::PlatformLink::current() {
             cove_core::scene::PlatformThread::set_executor(Some(Rc::new(move |work| {
                 link.bridge
@@ -813,12 +822,13 @@ impl Application {
             install_native_menu_bar: Some(Rc::new({
                 let host = host.clone();
                 move |menu_bar| {
-                    let host = host.clone();
+                    let presenter_host = host.clone();
                     crate::desktop::window::native_menu::install(
                         menu_bar,
                         Rc::new(move |menu, point, done| {
-                            host.present_menu(None, menu, point.x, point.y, done);
+                            presenter_host.present_menu(None, menu, point.x, point.y, done);
                         }),
+                        &host,
                     );
                 }
             })),
@@ -855,6 +865,34 @@ impl Application {
                       accept: Box<dyn FnOnce(Vec<String>)>| {
                     let window = host.main_window();
                     host.show_open_file_dialog(window, path, filters, multiple, Box::new(accept));
+                }
+            })),
+            save_file_dialog: Some(Rc::new({
+                let host = host.clone();
+                move |request: cove_core::scene::FileSaveRequest,
+                      accept: cove_core::scene::FileSaveCompletion| {
+                    let filters = request
+                        .filters
+                        .iter()
+                        .map(|filter| cove_shell::FileDialogFilter {
+                            name: filter.name.clone(),
+                            extensions: filter
+                                .extensions
+                                .iter()
+                                .map(|extension| extension.trim_start_matches('.').to_owned())
+                                .collect(),
+                        })
+                        .collect();
+                    let window = host.main_window();
+                    host.show_save_file_dialog(
+                        window,
+                        cove_shell::SaveFileRequest {
+                            suggested_name: request.suggested_name,
+                            filters,
+                            contents: request.contents,
+                        },
+                        Box::new(move |outcome| accept(save_outcome_to_core(outcome))),
+                    );
                 }
             })),
             memory_query: Some(Rc::new({
@@ -917,6 +955,7 @@ impl Application {
                 if let Some(state) = weak.upgrade() {
                     let application = Application { state };
                     application.drain_presented_frames();
+                    application.deliver_open_documents();
                     application.with_diagnostics(|session| session.drain());
                 }
             }));
@@ -988,6 +1027,13 @@ impl Application {
 
     /// Collects finished frames: recycles their buffers, surfaces render errors and
     /// retries frames the renderer could not present.
+    fn deliver_open_documents(&self) {
+        let documents = self.state.host.take_open_documents();
+        if !documents.is_empty() {
+            cove_core::scene::OpenedDocuments::deliver(documents);
+        }
+    }
+
     fn drain_presented_frames(&self) {
         let state = &self.state;
         let result = match state.window_renderer.borrow_mut().as_mut() {
@@ -1968,5 +2014,20 @@ impl cove_ui_compose::core::WindowPresenter for HostWindowPresenter {
         };
         u32::try_from(id.0)
             .is_ok_and(|raw| Application { state }.is_auxiliary_window_open(WindowId(raw)))
+    }
+}
+
+/// Collapses the shell save contract to the core ambient contract. The host has
+/// already written the bytes, so a chosen destination is a finished save.
+fn save_outcome_to_core(outcome: cove_shell::SaveFileOutcome) -> cove_core::scene::FileSaveOutcome {
+    use cove_core::scene::FileSaveOutcome as Core;
+    match outcome {
+        cove_shell::SaveFileOutcome::Chosen { destination } => Core::Saved {
+            destination: Some(destination),
+        },
+        cove_shell::SaveFileOutcome::Saved { destination } => Core::Saved { destination },
+        cove_shell::SaveFileOutcome::Cancelled => Core::Cancelled,
+        cove_shell::SaveFileOutcome::Unsupported(_) => Core::Unsupported,
+        cove_shell::SaveFileOutcome::Failed(message) => Core::Failed(message),
     }
 }

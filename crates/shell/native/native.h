@@ -47,13 +47,32 @@ bool cove_shell_global_pointer(float *x,float *y);
 char *cove_shell_clipboard_read(void);
 bool cove_shell_clipboard_write(const char *text);
 void cove_shell_free(void *memory);
-typedef void (*CoveShellDialogCallback)(void *, const char *const *);
-void cove_shell_dialog(CoveShellWindow *,bool folder,const char *path,const char *const *names,const char *const *patterns,size_t count,bool multiple,CoveShellDialogCallback callback,void *context);
+/* status: 0 the user chose the listed paths, 1 the user cancelled, 2 the panel
+   could not run, 3 the platform exported the bytes itself and does not disclose
+   a destination (the list is then empty). */
+typedef void (*CoveShellDialogCallback)(void *, const char *const *, int status);
+/* mode: 0 open files, 1 open a folder, 2 save a file. */
+void cove_shell_dialog(CoveShellWindow *,int mode,const char *path,const char *const *names,const char *const *patterns,size_t count,bool multiple,CoveShellDialogCallback callback,void *context);
+/* iOS export: the OS copies `bytes` to the picked destination and reports
+   status 3. Elsewhere this reports status 2 (no export picker). */
+void cove_shell_save_dialog(CoveShellWindow *,const char *name,const uint8_t *bytes,size_t size,const char *const *patterns,size_t count,CoveShellDialogCallback callback,void *context);
 bool cove_shell_refresh(CoveShellWindow *,bool enabled);
 bool cove_shell_refresh_take(CoveShellWindow *,double *timestamp,double *target);
 typedef void (*CoveShellLogCallback)(int category,int priority,const char *message);
 void cove_shell_log_install(CoveShellLogCallback callback);
 #if defined(__APPLE__)
+/* One menu entry. `parent` indexes this same array, SIZE_MAX for a root.
+   kind: 0 regular, 1 separator, 2 submenu. flags: 1 enabled, 2 checked,
+   4 command, 8 control, 16 option, 32 shift, 64 template icon. */
+typedef struct { size_t parent; int64_t id; uint32_t kind,flags; const char *title,*key; const uint8_t *png; size_t png_size; } CoveShellMenuItem;
+typedef struct {
+    const char *app_name;
+    const char *services,*hide,*hide_others,*show_all,*quit;
+    const char *edit,*undo,*redo,*cut,*copy,*paste,*delete_item,*select_all;
+    const char *window,*minimize,*zoom,*bring_all_to_front;
+    const CoveShellMenuItem *application_items; size_t application_count;
+    const CoveShellMenuItem *menus; size_t menu_count;
+} CoveShellMenuBar;
 void cove_shell_apple_prepare(bool dock);
 bool cove_shell_apple_wheel_owned(uint32_t id);
 bool cove_shell_apple_shortcut(uint32_t id,int scancode,uint16_t modifiers);
@@ -70,5 +89,25 @@ bool cove_shell_apple_refresh_take(void *context,double *timestamp,double *targe
 bool cove_shell_apple_event(CoveShellEvent *event);
 float cove_shell_apple_keyboard_height(void);
 void cove_shell_apple_flush(void);
+/* Installs NSApplication.mainMenu. False where the platform has no menu bar. */
+bool cove_shell_menu_bar_install(const CoveShellMenuBar *bar);
+/* Drains one chosen authored item id. Thread-safe: AppKit enqueues on the main
+   thread, the shell drains on the thread that owns the UI. False when empty. */
+bool cove_shell_menu_bar_take_choice(int64_t *chosen);
+void cove_shell_menu_bar_clear(void);
+/* Presents the iOS document picker for mode 0 (open files) or 1 (open a
+   folder). Declines on macOS, where SDL owns a real panel. `names`/`patterns`
+   are only valid for this call; the callback owns `context` and runs once. */
+bool cove_shell_apple_picker(void *context,int mode,const char *path,const char *const *names,const char *const *patterns,size_t count,bool multiple,CoveShellDialogCallback callback,void *box);
+/* Exports `bytes` through the iOS picker, which copies them to the destination
+   the user picks. False on macOS. Reports an empty list on success because the
+   OS does not disclose where the copy landed. */
+bool cove_shell_apple_export(void *context,const char *name,const uint8_t *bytes,size_t size,const char *const *patterns,size_t count,CoveShellDialogCallback callback,void *box);
+/* Registers the OS "open with" handlers (macOS AppleEvents, iOS openURL). Safe
+   to call once on the platform thread. */
+void cove_shell_open_documents_install(void);
+/* Drains one opened document/URL into an owned NUL-terminated copy the caller
+   frees with cove_shell_free. False when the queue is empty. Thread-safe. */
+bool cove_shell_open_documents_take(char **out);
 #endif
 #endif

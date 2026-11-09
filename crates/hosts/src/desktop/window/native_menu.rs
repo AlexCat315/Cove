@@ -6,25 +6,7 @@
 
 use cove_platform::NativeShortcut;
 
-/// Labels for the entries the platform owns in the application menu.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct NativeApplicationMenuTitles {
-    pub hide: String,
-    pub hide_others: String,
-    pub show_all: String,
-    pub quit: String,
-}
-
-impl NativeApplicationMenuTitles {
-    pub fn for_app_name(app_name: &str) -> Self {
-        Self {
-            hide: format!("Hide {app_name}"),
-            hide_others: "Hide Others".to_owned(),
-            show_all: "Show All".to_owned(),
-            quit: format!("Quit {app_name}"),
-        }
-    }
-}
+pub use cove_platform::NativeApplicationMenuTitles;
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct NativeMenuKeyModifiers(pub u8);
@@ -144,6 +126,8 @@ pub struct NativeMenuBar {
     /// The platform appends its own window-management and quit entries.
     pub application_items: Vec<NativeMenuItem>,
     pub application_titles: NativeApplicationMenuTitles,
+    /// Labels of the Edit and Window menus the platform appends.
+    pub standard_titles: cove_platform::NativeStandardMenuTitles,
     pub menus: Vec<NativeMenu>,
 }
 
@@ -159,17 +143,28 @@ impl NativeMenuBar {
             app_name,
             application_items,
             application_titles,
+            standard_titles: cove_platform::NativeStandardMenuTitles::default(),
             menus,
         }
     }
 
-    /// The `NSMenu`/Win32-neutral snapshot the shell consumes. Ids are assigned
-    /// in traversal order so an action can be routed back to its closure.
-    pub fn snapshot(&self) -> (cove_platform::NativeMenuSnapshot, Vec<NativeMenuAction>) {
+    pub fn standard_titles(mut self, titles: cove_platform::NativeStandardMenuTitles) -> Self {
+        self.standard_titles = titles;
+        self
+    }
+
+    /// The `NSMenu`-neutral bar the shell installs, plus every authored action
+    /// paired with the id the bar reports when the item is chosen.
+    pub fn snapshot(
+        &self,
+    ) -> (
+        cove_platform::NativeMenuBarSnapshot,
+        Vec<(i64, NativeMenuAction)>,
+    ) {
         fn walk(
             items: &[NativeMenuItem],
             next: &mut i64,
-            actions: &mut Vec<NativeMenuAction>,
+            actions: &mut Vec<(i64, NativeMenuAction)>,
             out: &mut Vec<cove_platform::NativeMenuItem>,
         ) {
             for item in items {
@@ -211,27 +206,52 @@ impl NativeMenuBar {
                                 .then(|| action.key_modifiers.shortcut(&action.key_equivalent)),
                             icon: None,
                         });
-                        actions.push(NativeMenuAction {
-                            title: action.title.clone(),
-                            key_equivalent: action.key_equivalent.clone(),
-                            key_modifiers: action.key_modifiers,
-                            is_enabled: action.is_enabled,
-                            is_selected: action.is_selected,
-                            is_enabled_provider: action.is_enabled_provider.clone(),
-                            action: action.action.clone(),
-                        });
+                        actions.push((
+                            id,
+                            NativeMenuAction {
+                                title: action.title.clone(),
+                                key_equivalent: action.key_equivalent.clone(),
+                                key_modifiers: action.key_modifiers,
+                                is_enabled: action.is_enabled,
+                                is_selected: action.is_selected,
+                                is_enabled_provider: action.is_enabled_provider.clone(),
+                                action: action.action.clone(),
+                            },
+                        ));
                     }
                 }
             }
         }
         let mut actions = Vec::new();
-        let mut items = Vec::new();
         let mut next = 1;
-        walk(&self.application_items, &mut next, &mut actions, &mut items);
+        let mut application_items = Vec::new();
+        walk(
+            &self.application_items,
+            &mut next,
+            &mut actions,
+            &mut application_items,
+        );
+        let mut menus = Vec::new();
         for menu in &self.menus {
+            let mut items = Vec::new();
             walk(&menu.items, &mut next, &mut actions, &mut items);
+            menus.push(cove_platform::NativeMenuBranch {
+                title: menu.title.clone(),
+                items: cove_platform::NativeMenuSnapshot { items },
+            });
         }
-        (cove_platform::NativeMenuSnapshot { items }, actions)
+        (
+            cove_platform::NativeMenuBarSnapshot {
+                app_name: self.app_name.clone(),
+                application_titles: self.application_titles.clone(),
+                standard_titles: self.standard_titles.clone(),
+                application_items: cove_platform::NativeMenuSnapshot {
+                    items: application_items,
+                },
+                menus,
+            },
+            actions,
+        )
     }
 }
 
@@ -240,24 +260,27 @@ impl NativeMenuBar {
 pub mod installer {
     use super::*;
 
-    /// macOS presents menus through AppKit. The action table and the native menu
-    /// presenter are installed here.
+    /// Installs the action table, the context-menu presenter and the AppKit
+    /// application menu bar. A chosen bar item travels back as an id and runs
+    /// its closure on the UI thread through the shell's deferred callbacks.
     ///
-    /// The application menu *bar* is not installed: `cove-shell` exposes only
-    /// `cove_shell_menu_popup` (an `NSMenu` for context popups), with no entry
-    /// point for `NSApplication.mainMenu`. `snapshot()` already produces the
-    /// exact tree the bar needs, so installing it is a shell-side addition, not a
-    /// host-side one. Until then an application's menu bar is not shown, and the
-    /// Compose menu path remains the one that works.
+    /// Re-installing replaces the bar, which is how an application refreshes
+    /// titles and enabled state: AppKit reads the snapshot's flags, so a live
+    /// `is_enabled_provider` is re-evaluated here rather than inside AppKit.
     pub fn install(
         menu_bar: &NativeMenuBar,
         presenter: cove_core::scene::NativeMenuPresenterCallback,
+        host: &cove_runtime::Sdl3PlatformHost,
     ) {
-        let (_snapshot, actions) = menu_bar.snapshot();
-        // Retained so a popup routed through the shell can resolve its item ids
-        // back to the authored closures.
+        let (snapshot, actions) = menu_bar.snapshot();
         native_menu_bridge::set_actions(actions);
         cove_core::scene::NativeMenuPresenter::set_present(Some(presenter));
+        host.install_menu_bar(
+            &snapshot,
+            std::rc::Rc::new(|id| {
+                native_menu_bridge::invoke(id);
+            }),
+        );
     }
 }
 
@@ -271,6 +294,7 @@ pub mod installer {
     pub fn install(
         _menu_bar: &NativeMenuBar,
         _presenter: cove_core::scene::NativeMenuPresenterCallback,
+        _host: &cove_runtime::Sdl3PlatformHost,
     ) {
     }
 }
@@ -283,30 +307,33 @@ pub mod installer {
     pub fn install(
         _menu_bar: &NativeMenuBar,
         _presenter: cove_core::scene::NativeMenuPresenterCallback,
+        _host: &cove_runtime::Sdl3PlatformHost,
     ) {
     }
 }
 
 pub use installer::install;
 
-/// Action table the shell routes a chosen menu item back through.
+/// Action table the shell routes a chosen menu item back through, keyed by the
+/// id the native bar reports.
 pub mod native_menu_bridge {
     use super::NativeMenuAction;
-    use std::cell::RefCell;
+    use std::{cell::RefCell, collections::BTreeMap};
 
     thread_local! {
-        static ACTIONS: RefCell<Vec<NativeMenuAction>> = const { RefCell::new(Vec::new()) };
+        static ACTIONS: RefCell<BTreeMap<i64, NativeMenuAction>> =
+            RefCell::new(BTreeMap::new());
     }
 
-    pub fn set_actions(actions: Vec<NativeMenuAction>) {
-        ACTIONS.with(|slot| *slot.borrow_mut() = actions);
+    pub fn set_actions(actions: Vec<(i64, NativeMenuAction)>) {
+        ACTIONS.with(|slot| *slot.borrow_mut() = actions.into_iter().collect());
     }
 
     /// Runs the action with `id`, honoring its live enabled state.
-    pub fn invoke(id: usize) -> bool {
+    pub fn invoke(id: i64) -> bool {
         let action = ACTIONS.with(|slot| {
             slot.borrow()
-                .get(id)
+                .get(&id)
                 .map(|action| (action.resolved_is_enabled(), action.action.clone()))
         });
         match action {

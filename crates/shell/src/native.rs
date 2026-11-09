@@ -60,7 +60,7 @@ pub(crate) struct Chrome {
     pub non_drag_count: usize,
 }
 pub(crate) enum Window {}
-pub(crate) type DialogCallback = unsafe extern "C" fn(*mut c_void, *const *const c_char);
+pub(crate) type DialogCallback = unsafe extern "C" fn(*mut c_void, *const *const c_char, i32);
 unsafe extern "C" {
     pub fn cove_shell_is_main_thread() -> bool;
     pub fn cove_shell_init() -> bool;
@@ -98,12 +98,25 @@ unsafe extern "C" {
     pub fn cove_shell_free(pointer: *mut c_void);
     pub fn cove_shell_dialog(
         window: *mut Window,
-        folder: bool,
+        mode: i32,
         path: *const c_char,
         names: *const *const c_char,
         patterns: *const *const c_char,
         count: usize,
         multiple: bool,
+        callback: DialogCallback,
+        context: *mut c_void,
+    );
+    /// Exports bytes through the iOS document picker; the OS copies them to the
+    /// destination the user picks and reports status 3 without a path.
+    #[cfg(target_os = "ios")]
+    pub fn cove_shell_save_dialog(
+        window: *mut Window,
+        name: *const c_char,
+        bytes: *const u8,
+        size: usize,
+        patterns: *const *const c_char,
+        count: usize,
         callback: DialogCallback,
         context: *mut c_void,
     );

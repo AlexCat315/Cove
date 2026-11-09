@@ -1,8 +1,9 @@
-//! Native application hosts for desktop, iOS and Android.
+//! Native application hosts for desktop, iOS and Android, and the Wasm entry.
 pub mod android;
 pub mod application;
 pub mod application_services;
 pub mod desktop;
+pub mod wasm;
 
 pub use application::{
     ApplicationCheckpoint, ApplicationLaunch, DiagnosticsCallbacks, DiagnosticsFactory,

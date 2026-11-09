@@ -13,7 +13,7 @@ mod proxy_shell;
 mod state;
 
 pub use accessibility::{AccessibilityItem, AccessibilitySnapshot};
-pub use bridge::{DialogRequest, MainThreadBridge, PlatformCommand};
+pub use bridge::{DialogRequest, MainThreadBridge, PlatformCommand, SaveDialogRequest};
 pub use link::{PlatformLink, PlatformMessage};
 pub use platform_loop::{PlatformLoop, run_with_ui_thread};
 pub use proxy_shell::ProxyShell;

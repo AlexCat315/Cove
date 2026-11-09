@@ -17,14 +17,18 @@ pub mod abi;
 pub mod counter;
 pub mod frame;
 pub mod prototype;
+pub mod root_content;
 
 pub use frame::{Batch, Frame, Label, viewport_size};
 pub use prototype::BrowserPrototype;
+pub use root_content::RootContent;
 
 use std::cell::RefCell;
 
-/// The concrete reactor type this host exports through the C ABI.
-pub type Content = BrowserPrototype<cove_examples::CounterView>;
+/// The concrete reactor type this host exports through the C ABI. Its root is
+/// the application registered by `cove_ui::application!`, or the counter when no
+/// application module has been initialized.
+pub type Content = BrowserPrototype<RootContent>;
 
 /// The layout debug name recorded by `.debug_name(_)`, read back from a node.
 ///
@@ -48,7 +52,7 @@ thread_local! {
 pub fn with_app<R>(body: impl FnOnce(&mut Content) -> R) -> R {
     APP.with(|slot| {
         let mut slot = slot.try_borrow_mut().expect("browser prototype re-entered");
-        body(slot.get_or_insert_with(|| Content::new(cove_examples::CounterView::new())))
+        body(slot.get_or_insert_with(|| Content::new(RootContent::from_registration())))
     })
 }
 

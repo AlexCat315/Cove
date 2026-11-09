@@ -53,6 +53,7 @@ type CloseInterceptor = Rc<dyn Fn(Option<CloseDecision>)>;
 type FolderDialog = Rc<dyn Fn(Option<&str>, Box<dyn FnOnce(Option<String>)>)>;
 type FileDialogResult = Box<dyn FnOnce(Vec<String>)>;
 type FileDialog = Rc<dyn Fn(Option<&str>, &[FileDialogFilter], bool, FileDialogResult)>;
+type SaveDialog = Rc<dyn Fn(cove_core::scene::FileSaveRequest, cove_core::scene::FileSaveCompletion)>;
 
 /// Host-installed callbacks behind the public display handle.
 #[derive(Default)]
@@ -70,6 +71,7 @@ pub struct DisplayBindings {
     pub main_window_id_query: Option<Rc<dyn Fn() -> Option<WindowId>>>,
     pub open_folder_dialog: Option<FolderDialog>,
     pub open_file_dialog: Option<FileDialog>,
+    pub save_file_dialog: Option<SaveDialog>,
     pub memory_query: Option<Rc<dyn Fn() -> Option<BTreeMap<String, u64>>>>,
     pub trim_memory: Option<Rc<dyn Fn()>>,
 }
@@ -408,6 +410,21 @@ impl AppDisplayHandle {
         match action {
             Some(action) => action(default_path, filters, allows_multiple, accept),
             None => accept(Vec::new()),
+        }
+    }
+
+    /// Presents the native save panel and writes `request.contents` where the
+    /// user chooses; `accept` receives the result once the bytes land. Without a
+    /// binding the request reports [`cove_core::scene::FileSaveOutcome::Unsupported`].
+    pub fn request_save_file(
+        &self,
+        request: cove_core::scene::FileSaveRequest,
+        accept: cove_core::scene::FileSaveCompletion,
+    ) {
+        let action = self.bindings.borrow().save_file_dialog.clone();
+        match action {
+            Some(action) => action(request, accept),
+            None => accept(cove_core::scene::FileSaveOutcome::Unsupported),
         }
     }
 

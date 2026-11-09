@@ -307,6 +307,7 @@ dependencies = [
  "cove-devtools-protocol",
  "cove-examples",
  "cove-graphics",
+ "cove-hosts",
  "cove-logging",
  "cove-platform",
  "cove-text",

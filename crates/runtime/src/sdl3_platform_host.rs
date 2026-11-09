@@ -763,6 +763,48 @@ impl Sdl3PlatformHost {
             None => done(None),
         }
     }
+    /// Installs the application menu bar. `on_choice` runs on the UI thread with
+    /// the chosen authored item id; a shell without a native bar ignores it.
+    pub fn install_menu_bar(
+        &self,
+        bar: &cove_platform::NativeMenuBarSnapshot,
+        on_choice: cove_shell::MenuBarCompletion,
+    ) {
+        if let Some(shell) = self.shell() {
+            shell.borrow().install_menu_bar(bar, on_choice);
+        }
+    }
+    /// Drains documents the OS opened with the application. Call on the UI
+    /// thread; both the direct shell and the proxy answer through this.
+    pub fn take_open_documents(&self) -> Vec<String> {
+        self.shell()
+            .map(|shell| shell.borrow().take_open_documents())
+            .unwrap_or_default()
+    }
+    /// Shows the platform save panel and writes `request.contents` where the
+    /// user chooses. The write runs in the completion on this (UI) thread, not
+    /// the platform thread the panel returns on. Without a shell the request
+    /// reports no panel.
+    pub fn show_save_file_dialog(
+        &self,
+        id: Option<WindowId>,
+        request: cove_shell::SaveFileRequest,
+        accept: cove_shell::SaveFileCompletion,
+    ) {
+        match self.shell() {
+            Some(shell) => {
+                let contents = request.contents.clone();
+                shell.borrow().show_save_file_dialog(
+                    id,
+                    request,
+                    Box::new(move |outcome| accept(outcome.finish(&contents))),
+                );
+            }
+            None => accept(cove_shell::SaveFileOutcome::Unsupported(
+                "the platform shell is not available".into(),
+            )),
+        }
+    }
     /// A window that could not present stays dirty and tries again one display
     /// interval from now, so a failing present cannot spin the loop.
     pub fn retry_display(&self, id: Option<WindowId>) {

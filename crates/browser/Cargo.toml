@@ -11,6 +11,7 @@ cove-composition.workspace = true
 cove-core.workspace = true
 cove-platform.workspace = true
 cove-graphics.workspace = true
+cove-hosts = { path = "../hosts" }
 cove-logging.workspace = true
 cove-examples = { path = "../../examples/gallery" }
 cove-devtools = { path = "../devtools" }

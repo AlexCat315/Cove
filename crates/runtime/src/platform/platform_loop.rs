@@ -1,7 +1,7 @@
 //! The main-thread side: owns the real shell, applies posted commands, publishes
 //! window state and forwards input. It never waits for the UI or render threads.
 use super::accessibility::AccessibilityPresenters;
-use super::{DialogRequest, PlatformCommand, PlatformLink, PlatformMessage};
+use super::{DialogRequest, PlatformCommand, PlatformLink, PlatformMessage, SaveDialogRequest};
 use cove_platform::WindowId;
 use cove_shell::{Shell, ShellError};
 use std::{
@@ -77,6 +77,10 @@ impl PlatformLoop {
         let events = self.shell.poll_window_events();
         for work in self.shell.take_deferred_callbacks() {
             work();
+        }
+        let documents = self.shell.take_open_documents();
+        if !documents.is_empty() {
+            self.link.post(PlatformMessage::DocumentsOpened(documents));
         }
         for requested in std::mem::take(&mut *self.close_requests.borrow_mut()) {
             match requested {
@@ -249,6 +253,14 @@ impl PlatformLoop {
                 }));
             }
             PlatformCommand::OpenDialog(dialog) => self.open_dialog(dialog),
+            PlatformCommand::SaveDialog(dialog) => self.save_dialog(dialog),
+            PlatformCommand::InstallMenuBar(bar) => {
+                let link = self.link.clone();
+                self.shell.install_menu_bar(
+                    &bar,
+                    Rc::new(move |chosen| link.post(PlatformMessage::MenuBarChosen(chosen))),
+                );
+            }
             PlatformCommand::ShowMenu {
                 request,
                 window,
@@ -341,6 +353,19 @@ impl PlatformLoop {
                 }),
             );
         }
+    }
+
+    fn save_dialog(&mut self, dialog: SaveDialogRequest) {
+        let request = dialog.request;
+        let window = dialog
+            .window
+            .and_then(|id| self.native_ids.get(&id).copied());
+        let link = self.link.clone();
+        self.shell.show_save_file_dialog(
+            window,
+            dialog.into(),
+            Box::new(move |outcome| link.post(PlatformMessage::SaveFinished(request, outcome))),
+        );
     }
 
     /// Reports windows the OS destroyed without the UI asking.

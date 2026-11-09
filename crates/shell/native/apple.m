@@ -6,8 +6,11 @@
 #if TARGET_OS_OSX
 #import <AppKit/AppKit.h>
 #import <CoreVideo/CoreVideo.h>
+#import <CoreServices/CoreServices.h>
 #else
 #import <UIKit/UIKit.h>
+#import <UniformTypeIdentifiers/UniformTypeIdentifiers.h>
+#import <objc/runtime.h>
 #endif
 #include "native.h"
 #include <stdlib.h>
@@ -38,6 +41,83 @@
 @end
 static NSMutableDictionary<NSNumber*,CoveShellAppleWindow*> *windows;
 static uint32_t scrollType;
+/* Documents the OS opened with the app, kept apart from a drag onto a window.
+   AppKit/UIKit enqueue on the main thread; the shell drains on its own thread. */
+static NSMutableArray<NSString*> *openedDocuments;
+static NSLock *openedDocumentsLock;
+static void cove_open_documents_push(NSString *text){
+    if(!text.length)return;
+    if(!openedDocumentsLock){openedDocumentsLock=[NSLock new];openedDocuments=[NSMutableArray array];}
+    [openedDocumentsLock lock];[openedDocuments addObject:text];[openedDocumentsLock unlock];
+    cove_shell_wake();
+}
+bool cove_shell_open_documents_take(char **out){
+    if(!out)return false;*out=NULL;
+    if(!openedDocumentsLock)return false;
+    [openedDocumentsLock lock];
+    NSString *text=openedDocuments.firstObject;
+    if(text)[openedDocuments removeObjectAtIndex:0];
+    [openedDocumentsLock unlock];
+    if(!text)return false;
+    *out=strdup(text.UTF8String);
+    return *out!=NULL;
+}
+#if TARGET_OS_OSX
+@interface CoveShellOpenDocumentsTarget : NSObject
+- (void)handleOpenDocuments:(NSAppleEventDescriptor*)event withReplyEvent:(NSAppleEventDescriptor*)reply;
+- (void)handleURLEvent:(NSAppleEventDescriptor*)event withReplyEvent:(NSAppleEventDescriptor*)reply;
+@end
+/* NSAppleEventManager holds the target unretained, so keep a strong reference. */
+static CoveShellOpenDocumentsTarget *openDocumentsTarget;
+@implementation CoveShellOpenDocumentsTarget
+- (void)pushDescriptor:(NSAppleEventDescriptor*)desc{
+    NSURL *url=desc.fileURLValue;
+    if(!url)url=[desc coerceToDescriptorType:typeFileURL].fileURLValue;
+    cove_open_documents_push(url?url.path:desc.stringValue);
+}
+- (void)handleOpenDocuments:(NSAppleEventDescriptor*)event withReplyEvent:(NSAppleEventDescriptor*)reply{
+    (void)reply;NSAppleEventDescriptor *direct=[event paramDescriptorForKeyword:keyDirectObject];
+    NSInteger count=direct.numberOfItems;
+    if(count>0){for(NSInteger i=1;i<=count;i++){[self pushDescriptor:[direct descriptorAtIndex:i]];}}
+    else [self pushDescriptor:direct];
+}
+- (void)handleURLEvent:(NSAppleEventDescriptor*)event withReplyEvent:(NSAppleEventDescriptor*)reply{
+    (void)reply;cove_open_documents_push([[event paramDescriptorForKeyword:keyDirectObject] stringValue]);
+}
+@end
+void cove_shell_open_documents_install(void){COVE_ASSERT_MAIN();
+    if(openDocumentsTarget)return;
+    openDocumentsTarget=[CoveShellOpenDocumentsTarget new];
+    NSAppleEventManager *manager=[NSAppleEventManager sharedAppleEventManager];
+    /* Installing after SDL replaces its GetURL handler, and the open-documents
+       handler intercepts before AppKit would call application:openFile:. */
+    [manager setEventHandler:openDocumentsTarget andSelector:@selector(handleURLEvent:withReplyEvent:) forEventClass:kInternetEventClass andEventID:kAEGetURL];
+    [manager setEventHandler:openDocumentsTarget andSelector:@selector(handleOpenDocuments:withReplyEvent:) forEventClass:kCoreEventClass andEventID:kAEOpenDocuments];
+}
+#else
+/* SDL's UIKit delegates forward openURL as a drag; divert handleURL: into the
+   open-documents inbox so an OS open is not mistaken for a drop on a window. */
+static void cove_open_documents_swizzle(Class cls){
+    if(!cls)return;
+    Method original=class_getInstanceMethod(cls,sel_registerName("handleURL:"));
+    if(!original)return;
+    SEL replacement=sel_registerName("cove_handleURL:");
+    if(class_getInstanceMethod(cls,replacement))return;
+    IMP imp=imp_implementationWithBlock(^(id self,NSURL *url){
+        (void)self;NSURL *fileURL=url.filePathURL;
+        cove_open_documents_push(fileURL?fileURL.path:url.absoluteString);
+    });
+    class_addMethod(cls,replacement,imp,"v@:@");
+    method_exchangeImplementations(original,class_getInstanceMethod(cls,replacement));
+}
+void cove_shell_open_documents_install(void){COVE_ASSERT_MAIN();
+    static dispatch_once_t once;
+    dispatch_once(&once,^{
+        cove_open_documents_swizzle(NSClassFromString(@"SDLUIKitSceneDelegate"));
+        cove_open_documents_swizzle(NSClassFromString(@"SDLUIKitDelegate"));
+    });
+}
+#endif
 #if !TARGET_OS_OSX
 /* UIKit posts the keyboard frame in points. The observers run on the main
    queue, the same thread that reads the cached inset and wakes the SDL loop,
@@ -264,24 +344,217 @@ void cove_shell_apple_flush(void) {COVE_ASSERT_MAIN();[CATransaction flush];}
 @implementation CoveShellMenuTarget
 - (void)choose:(NSMenuItem*)sender{self.chosen=YES;self.chosenID=sender.tag;}
 @end
-typedef struct {size_t parent;int64_t id;uint32_t kind,flags;const char *title,*key;const uint8_t *png;size_t png_size;} CoveShellMenuItem;
-bool cove_shell_menu_popup(const CoveShellMenuItem *items,size_t count,float x,float y,uintptr_t rawWindow,int64_t *chosen){COVE_ASSERT_MAIN();
-    CoveShellMenuTarget *target=[CoveShellMenuTarget new];NSMenu *root=[NSMenu new];root.autoenablesItems=NO;
+/* Builds a parent-indexed snapshot into `root`. Action items route to `target`;
+   submenus keep a nil action so AppKit opens them. */
+static void cove_menu_append_items(NSMenu *root,const CoveShellMenuItem *items,size_t count,id target,SEL action){
+    root.autoenablesItems=NO;
     NSMutableArray<NSMenuItem*> *built=[NSMutableArray arrayWithCapacity:count];
     for(size_t i=0;i<count;i++){
         CoveShellMenuItem item=items[i];NSMenuItem *entry;
         if(item.kind==1)entry=NSMenuItem.separatorItem;
-        else{entry=[[NSMenuItem alloc]initWithTitle:[NSString stringWithUTF8String:item.title]?:@"" action:item.kind==0?@selector(choose:):nil keyEquivalent:[NSString stringWithUTF8String:item.key]?:@""];
+        else{entry=[[NSMenuItem alloc]initWithTitle:[NSString stringWithUTF8String:item.title]?:@"" action:item.kind==0?action:nil keyEquivalent:[NSString stringWithUTF8String:item.key]?:@""];
             entry.enabled=(item.flags&1)!=0;entry.state=(item.flags&2)?NSControlStateValueOn:NSControlStateValueOff;
             if(item.kind==0){entry.target=target;entry.tag=(NSInteger)item.id;NSEventModifierFlags flags=0;if(item.flags&4)flags|=NSEventModifierFlagCommand;if(item.flags&8)flags|=NSEventModifierFlagControl;if(item.flags&16)flags|=NSEventModifierFlagOption;if(item.flags&32)flags|=NSEventModifierFlagShift;entry.keyEquivalentModifierMask=flags;}
             if(item.kind==2){entry.submenu=[NSMenu new];entry.submenu.autoenablesItems=NO;}
             if(item.png&&item.png_size){NSImage *icon=[[NSImage alloc]initWithData:[NSData dataWithBytes:item.png length:item.png_size]];icon.size=NSMakeSize(16,16);icon.template=(item.flags&64)!=0;entry.image=icon;}}
         NSMenu *parent=item.parent==SIZE_MAX?root:item.parent<built.count?built[item.parent].submenu:nil;if(parent)[parent addItem:entry];[built addObject:entry];
     }
+}
+bool cove_shell_menu_popup(const CoveShellMenuItem *items,size_t count,float x,float y,uintptr_t rawWindow,int64_t *chosen){COVE_ASSERT_MAIN();
+    CoveShellMenuTarget *target=[CoveShellMenuTarget new];NSMenu *root=[NSMenu new];
+    cove_menu_append_items(root,items,count,target,@selector(choose:));
     NSWindow *window=rawWindow?(__bridge NSWindow*)(void*)rawWindow:NSApp.keyWindow;NSView *view=window.contentView;
     NSPoint point=view?NSMakePoint(x,view.isFlipped?y:view.bounds.size.height-y):NSEvent.mouseLocation;
     [root popUpMenuPositioningItem:nil atLocation:point inView:view];if(target.chosen)*chosen=target.chosenID;return target.chosen;
 }
+
+/* AppKit menu actions run on the main thread, while the authored closures live
+   on the UI thread. The choice is queued here and drained by the shell's
+   deferred callbacks, the same shape a native file dialog result takes. */
+static NSMutableArray<NSNumber*> *menuBarChoices;
+static NSLock *menuBarLock;
+@interface CoveShellMenuBarTarget : NSObject
+- (void)choose:(NSMenuItem*)sender;
+@end
+/* NSMenuItem.target is unretained, so the bar keeps its own strong reference. */
+static CoveShellMenuBarTarget *menuBarTarget;
+@implementation CoveShellMenuBarTarget
+- (void)choose:(NSMenuItem*)sender{
+    if(!menuBarLock)return;
+    [menuBarLock lock];[menuBarChoices addObject:@(sender.tag)];[menuBarLock unlock];
+    cove_shell_wake();
+}
+@end
+static NSString *cove_menu_bar_string(const char *text,NSString *fallback){
+    if(!text)return fallback;NSString *value=[NSString stringWithUTF8String:text];return value.length?value:fallback;
+}
+/* A platform entry: nil target so the selector travels the responder chain,
+   which is what lets Cut/Copy/Paste reach a save panel's name field. */
+static NSMenuItem *cove_menu_bar_entry(NSString *title,SEL action,NSString *key,NSEventModifierFlags mask){
+    NSMenuItem *entry=[[NSMenuItem alloc]initWithTitle:title action:action keyEquivalent:key];
+    entry.keyEquivalentModifierMask=mask;return entry;
+}
+bool cove_shell_menu_bar_install(const CoveShellMenuBar *bar){COVE_ASSERT_MAIN();
+    if(!bar)return false;
+    if(!menuBarLock){menuBarLock=[NSLock new];menuBarChoices=[NSMutableArray new];}
+    [menuBarLock lock];[menuBarChoices removeAllObjects];[menuBarLock unlock];
+    if(!menuBarTarget)menuBarTarget=[CoveShellMenuBarTarget new];
+    NSString *appName=cove_menu_bar_string(bar->app_name,NSProcessInfo.processInfo.processName);
+    NSMenu *mainMenu=[NSMenu new];mainMenu.autoenablesItems=NO;
+
+    NSMenuItem *appItem=[NSMenuItem new];appItem.title=appName;
+    NSMenu *appMenu=[NSMenu new];appMenu.title=appName;
+    cove_menu_append_items(appMenu,bar->application_items,bar->application_count,menuBarTarget,@selector(choose:));
+    if(appMenu.numberOfItems>0)[appMenu addItem:NSMenuItem.separatorItem];
+    NSMenuItem *servicesItem=[NSMenuItem new];servicesItem.title=cove_menu_bar_string(bar->services,@"Services");
+    servicesItem.submenu=[NSMenu new];[appMenu addItem:servicesItem];NSApp.servicesMenu=servicesItem.submenu;
+    [appMenu addItem:NSMenuItem.separatorItem];
+    [appMenu addItem:cove_menu_bar_entry(cove_menu_bar_string(bar->hide,[NSString stringWithFormat:@"Hide %@",appName]),@selector(hide:),@"h",NSEventModifierFlagCommand)];
+    [appMenu addItem:cove_menu_bar_entry(cove_menu_bar_string(bar->hide_others,@"Hide Others"),@selector(hideOtherApplications:),@"h",NSEventModifierFlagCommand|NSEventModifierFlagOption)];
+    [appMenu addItem:cove_menu_bar_entry(cove_menu_bar_string(bar->show_all,@"Show All"),@selector(unhideAllApplications:),@"",0)];
+    [appMenu addItem:NSMenuItem.separatorItem];
+    [appMenu addItem:cove_menu_bar_entry(cove_menu_bar_string(bar->quit,[NSString stringWithFormat:@"Quit %@",appName]),@selector(terminate:),@"q",NSEventModifierFlagCommand)];
+    appItem.submenu=appMenu;[mainMenu addItem:appItem];
+
+    NSMenu *authored=[NSMenu new];
+    cove_menu_append_items(authored,bar->menus,bar->menu_count,menuBarTarget,@selector(choose:));
+    NSString *editTitle=cove_menu_bar_string(bar->edit,@"Edit"),*windowTitle=cove_menu_bar_string(bar->window,@"Window");
+    BOOL hasEdit=NO,hasWindow=NO;
+    for(NSMenuItem *entry in authored.itemArray){[mainMenu addItem:entry];if([entry.title isEqualToString:editTitle])hasEdit=YES;if([entry.title isEqualToString:windowTitle])hasWindow=YES;}
+
+    if(!hasEdit){
+        NSMenuItem *editItem=[NSMenuItem new];editItem.title=editTitle;
+        NSMenu *editMenu=[NSMenu new];editMenu.title=editTitle;
+        /* Autoenabled: AppKit asks the responder whether undo/cut/copy/paste
+           currently do anything, which a stored flag cannot answer. */
+        editMenu.autoenablesItems=YES;
+        [editMenu addItem:cove_menu_bar_entry(cove_menu_bar_string(bar->undo,@"Undo"),@selector(undo:),@"z",NSEventModifierFlagCommand)];
+        [editMenu addItem:cove_menu_bar_entry(cove_menu_bar_string(bar->redo,@"Redo"),@selector(redo:),@"z",NSEventModifierFlagCommand|NSEventModifierFlagShift)];
+        [editMenu addItem:NSMenuItem.separatorItem];
+        [editMenu addItem:cove_menu_bar_entry(cove_menu_bar_string(bar->cut,@"Cut"),@selector(cut:),@"x",NSEventModifierFlagCommand)];
+        [editMenu addItem:cove_menu_bar_entry(cove_menu_bar_string(bar->copy,@"Copy"),@selector(copy:),@"c",NSEventModifierFlagCommand)];
+        [editMenu addItem:cove_menu_bar_entry(cove_menu_bar_string(bar->paste,@"Paste"),@selector(paste:),@"v",NSEventModifierFlagCommand)];
+        [editMenu addItem:cove_menu_bar_entry(cove_menu_bar_string(bar->delete_item,@"Delete"),@selector(delete:),@"",0)];
+        [editMenu addItem:cove_menu_bar_entry(cove_menu_bar_string(bar->select_all,@"Select All"),@selector(selectAll:),@"a",NSEventModifierFlagCommand)];
+        editItem.submenu=editMenu;[mainMenu addItem:editItem];
+    }
+    if(!hasWindow){
+        NSMenuItem *windowItem=[NSMenuItem new];windowItem.title=windowTitle;
+        NSMenu *windowMenu=[NSMenu new];windowMenu.title=windowTitle;
+        [windowMenu addItem:cove_menu_bar_entry(cove_menu_bar_string(bar->minimize,@"Minimize"),@selector(performMiniaturize:),@"m",NSEventModifierFlagCommand)];
+        [windowMenu addItem:cove_menu_bar_entry(cove_menu_bar_string(bar->zoom,@"Zoom"),@selector(performZoom:),@"",0)];
+        [windowMenu addItem:NSMenuItem.separatorItem];
+        [windowMenu addItem:cove_menu_bar_entry(cove_menu_bar_string(bar->bring_all_to_front,@"Bring All to Front"),@selector(arrangeInFront:),@"",0)];
+        windowItem.submenu=windowMenu;[mainMenu addItem:windowItem];
+        /* AppKit appends the open-window list and keeps it current. */
+        NSApp.windowsMenu=windowMenu;
+    }
+    NSApp.mainMenu=mainMenu;
+    return true;
+}
+bool cove_shell_menu_bar_take_choice(int64_t *chosen){
+    if(!menuBarLock||!chosen)return false;
+    [menuBarLock lock];
+    NSNumber *first=menuBarChoices.firstObject;
+    if(first)[menuBarChoices removeObjectAtIndex:0];
+    [menuBarLock unlock];
+    if(!first)return false;*chosen=first.longLongValue;return true;
+}
+void cove_shell_menu_bar_clear(void){COVE_ASSERT_MAIN();
+    if(menuBarLock){[menuBarLock lock];[menuBarChoices removeAllObjects];[menuBarLock unlock];}
+    NSApp.servicesMenu=nil;NSApp.windowsMenu=nil;NSApp.mainMenu=nil;
+}
 /* Screen-colour sampling is implemented in Rust with objc2-app-kit's
    NSColorSampler binding; see crate::color_sampler::appkit. */
+bool cove_shell_apple_picker(void *context,int mode,const char *path,const char *const *names,const char *const *patterns,size_t count,bool multiple,CoveShellDialogCallback callback,void *box){(void)context;(void)mode;(void)path;(void)names;(void)patterns;(void)count;(void)multiple;(void)callback;(void)box;return false;}
+bool cove_shell_apple_export(void *context,const char *name,const uint8_t *bytes,size_t size,const char *const *patterns,size_t count,CoveShellDialogCallback callback,void *box){(void)context;(void)name;(void)bytes;(void)size;(void)patterns;(void)count;(void)callback;(void)box;return false;}
+#else
+bool cove_shell_menu_bar_install(const CoveShellMenuBar *bar){(void)bar;return false;}
+bool cove_shell_menu_bar_take_choice(int64_t *chosen){(void)chosen;return false;}
+void cove_shell_menu_bar_clear(void){}
+/* SDL's iOS dialog backend is a stub, so Cove presents UIDocumentPicker itself.
+   The delegate is retained here until UIKit calls back, because the picker only
+   holds it weakly. */
+@interface CoveShellDocumentPicker : NSObject <UIDocumentPickerDelegate>
+@property(nonatomic) CoveShellDialogCallback callback;
+@property(nonatomic) void *box;
+@property(nonatomic) BOOL export;
+@property(nonatomic,strong) NSURL *temporary;
+@end
+static NSMutableArray<CoveShellDocumentPicker*> *activePickers;
+@implementation CoveShellDocumentPicker
+- (void)finish:(NSArray<NSURL*>*)urls status:(int)status{
+    CoveShellDialogCallback callback=self.callback;void *box=self.box;
+    NSMutableArray<NSURL*>*paths=urls;
+    if(self.temporary){[[NSFileManager defaultManager] removeItemAtURL:self.temporary error:nil];}
+    [activePickers removeObject:self];
+    if(status==0&&paths.count){
+        const char **list=calloc(paths.count+1,sizeof(*list));
+        for(NSUInteger i=0;i<paths.count;i++){list[i]=strdup(paths[i].path.UTF8String);}
+        callback(box,list,status);
+        for(NSUInteger i=0;i<paths.count;i++){free((void*)list[i]);}
+        free(list);
+    }else{
+        const char *empty[]={NULL};
+        callback(box,status==3?NULL:empty,status);
+    }
+}
+- (void)documentPicker:(UIDocumentPickerViewController*)controller didPickDocumentsAtURLs:(NSArray<NSURL*>*)urls{
+    (void)controller;[self finish:urls status:self.export?3:0];
+}
+- (void)documentPickerWasCancelled:(UIDocumentPickerViewController*)controller{
+    (void)controller;[self finish:nil status:1];
+}
+@end
+static NSArray<UTType*> *picker_types(const char *const *patterns,size_t count){
+    NSMutableArray<UTType*> *types=[NSMutableArray array];
+    for(size_t i=0;i<count;i++){
+        if(!patterns[i])continue;
+        NSString *joined=[NSString stringWithUTF8String:patterns[i]];
+        for(NSString *ext in [joined componentsSeparatedByString:@";"]){
+            NSString *trimmed=[ext stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceCharacterSet]];
+            if(!trimmed.length)continue;
+            UTType *type=[UTType typeWithFilenameExtension:trimmed];
+            if(type&&![types containsObject:type])[types addObject:type];
+        }
+    }
+    return types;
+}
+static UIViewController *picker_presenter(void *raw){
+    CoveShellAppleWindow *context=(__bridge CoveShellAppleWindow*)raw;
+    UIWindow *window=context.window;
+    UIViewController *presenter=window.rootViewController;
+    while(presenter.presentedViewController)presenter=presenter.presentedViewController;
+    return presenter;
+}
+bool cove_shell_apple_picker(void *raw,int mode,const char *path,const char *const *names,const char *const *patterns,size_t count,bool multiple,CoveShellDialogCallback callback,void *box){COVE_ASSERT_MAIN();
+    (void)path;(void)names;
+    UIViewController *presenter=picker_presenter(raw);if(!presenter)return false;
+    NSArray<UTType*> *types=mode==1?@[[UTType folder]]:picker_types(patterns,count);
+    if(!types.count)types=@[[UTType item]];
+    UIDocumentPickerViewController *picker=[[UIDocumentPickerViewController alloc] initForOpeningContentTypes:types asCopy:YES];
+    picker.allowsMultipleSelection=multiple;
+    CoveShellDocumentPicker *delegate=[CoveShellDocumentPicker new];delegate.callback=callback;delegate.box=box;delegate.export=NO;
+    picker.delegate=delegate;
+    if(!activePickers)activePickers=[NSMutableArray array];
+    [activePickers addObject:delegate];
+    [presenter presentViewController:picker animated:YES completion:nil];
+    return true;
+}
+bool cove_shell_apple_export(void *raw,const char *name,const uint8_t *bytes,size_t size,const char *const *patterns,size_t count,CoveShellDialogCallback callback,void *box){COVE_ASSERT_MAIN();
+    (void)patterns;(void)count;
+    UIViewController *presenter=picker_presenter(raw);if(!presenter)return false;
+    NSString *filename=name&&*name?[NSString stringWithUTF8String:name]:@"Untitled";
+    NSURL *directory=[NSURL fileURLWithPath:NSTemporaryDirectory() isDirectory:YES];
+    NSURL *temporary=[directory URLByAppendingPathComponent:[NSString stringWithFormat:@"%@-%@",NSUUID.UUID.UUIDString,filename.lastPathComponent]];
+    NSData *data=[NSData dataWithBytes:bytes length:size];
+    if(![data writeToURL:temporary options:NSDataWritingAtomic error:nil]){callback(box,NULL,2);return true;}
+    UIDocumentPickerViewController *picker=[[UIDocumentPickerViewController alloc] initForExportingURLs:@[temporary] asCopy:YES];
+    CoveShellDocumentPicker *delegate=[CoveShellDocumentPicker new];delegate.callback=callback;delegate.box=box;delegate.export=YES;delegate.temporary=temporary;
+    picker.delegate=delegate;
+    if(!activePickers)activePickers=[NSMutableArray array];
+    [activePickers addObject:delegate];
+    [presenter presentViewController:picker animated:YES completion:nil];
+    return true;
+}
 #endif

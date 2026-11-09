@@ -5,8 +5,12 @@
 //! Ordered ones keep strict FIFO. An ordered command first flushes the slots
 //! written before it, so coalescing never reorders what a caller observes.
 use super::AccessibilitySnapshot;
-use cove_platform::{NativeMenuSnapshot, SystemCursor, TextInputArea, WindowId};
-use cove_shell::{EventLoopWaker, FileDialogFilter, WindowChromeHitTest, WindowOptions};
+use cove_platform::{
+    NativeMenuBarSnapshot, NativeMenuSnapshot, SystemCursor, TextInputArea, WindowId,
+};
+use cove_shell::{
+    EventLoopWaker, FileDialogFilter, SaveFileRequest, WindowChromeHitTest, WindowOptions,
+};
 use std::{
     collections::{BTreeMap, VecDeque},
     sync::Mutex,
@@ -20,6 +24,27 @@ pub struct DialogRequest {
     pub path: Option<String>,
     pub filters: Vec<FileDialogFilter>,
     pub multiple: bool,
+}
+
+/// A save panel request. The bytes travel with it because the platform thread
+/// owns the write, and on iOS/Android the destination only exists afterwards.
+#[derive(Clone, Debug, PartialEq)]
+pub struct SaveDialogRequest {
+    pub request: u64,
+    pub window: Option<WindowId>,
+    pub name: String,
+    pub filters: Vec<FileDialogFilter>,
+    pub contents: Vec<u8>,
+}
+
+impl From<SaveDialogRequest> for SaveFileRequest {
+    fn from(request: SaveDialogRequest) -> Self {
+        Self {
+            suggested_name: request.name,
+            filters: request.filters,
+            contents: request.contents,
+        }
+    }
 }
 
 pub enum PlatformCommand {
@@ -45,6 +70,8 @@ pub enum PlatformCommand {
     ReadClipboard(u64),
     SampleColor(u64),
     OpenDialog(DialogRequest),
+    SaveDialog(SaveDialogRequest),
+    InstallMenuBar(NativeMenuBarSnapshot),
     ShowMenu {
         request: u64,
         window: Option<WindowId>,

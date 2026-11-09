@@ -171,16 +171,88 @@ impl WindowHandle for Sdl3WindowHandle {
 struct DialogResult {
     id: u64,
     files: Vec<String>,
+    status: i32,
 }
 struct DialogNativeContext {
     id: u64,
     sender: Sender<DialogResult>,
 }
+enum DialogReply {
+    Open(DialogCompletion),
+    Save(SaveFileCompletion),
+}
 struct Dialogs {
     sender: Sender<DialogResult>,
     receiver: Receiver<DialogResult>,
     next: u64,
-    callbacks: HashMap<u64, DialogCompletion>,
+    callbacks: HashMap<u64, DialogReply>,
+}
+/// Owns the filter CStrings and their pointers for a synchronous bridge call.
+/// The CString heap buffers do not move when the pointer Vecs reallocate, so the
+/// pointers stay valid for as long as this struct lives.
+struct FilterStrings {
+    _names: Vec<CString>,
+    _patterns: Vec<CString>,
+    name_ptrs: Vec<*const c_char>,
+    pattern_ptrs: Vec<*const c_char>,
+}
+impl FilterStrings {
+    fn new(filters: &[FileDialogFilter]) -> Self {
+        let mut names = Vec::new();
+        let mut patterns = Vec::new();
+        for filter in filters {
+            if let (Ok(name), Ok(pattern)) = (
+                CString::new(filter.name.as_str()),
+                CString::new(filter.pattern()),
+            ) {
+                names.push(name);
+                patterns.push(pattern);
+            }
+        }
+        let name_ptrs = names.iter().map(|s| s.as_ptr()).collect();
+        let pattern_ptrs = patterns.iter().map(|s| s.as_ptr()).collect();
+        Self {
+            _names: names,
+            _patterns: patterns,
+            name_ptrs,
+            pattern_ptrs,
+        }
+    }
+    fn count(&self) -> usize {
+        self.name_ptrs.len()
+    }
+}
+unsafe extern "C" fn dialog_done(
+    context: *mut c_void,
+    files: *const *const c_char,
+    status: i32,
+) {
+    // SAFETY: the native panel calls exactly once with this Box transferred from
+    // register_dialog().
+    let context = unsafe { Box::from_raw(context.cast::<DialogNativeContext>()) };
+    let mut chosen = Vec::new();
+    if !files.is_null() {
+        let mut index = 0;
+        loop {
+            // SAFETY: the panel provides a NULL terminated list for the duration of the callback.
+            let entry = unsafe { *files.add(index) };
+            if entry.is_null() {
+                break;
+            } // SAFETY: each list entry is a NUL terminated filename.
+            chosen.push(
+                unsafe { CStr::from_ptr(entry) }
+                    .to_string_lossy()
+                    .into_owned(),
+            );
+            index += 1;
+        }
+    }
+    let _ = context.sender.send(DialogResult {
+        id: context.id,
+        files: chosen,
+        status,
+    });
+    Sdl3Shell::wake();
 }
 pub struct Sdl3Shell {
     session: Option<Rc<Session>>,
@@ -190,6 +262,7 @@ pub struct Sdl3Shell {
     pub close_interceptor: Option<Box<dyn FnMut(Option<WindowId>) -> bool>>,
     dialogs: RefCell<Dialogs>,
     sampler: crate::color_sampler::ScreenColorSampler,
+    menu_bar_choice: RefCell<Option<MenuBarCompletion>>,
     default_options: WindowOptions,
 }
 impl Sdl3Shell {
@@ -209,6 +282,7 @@ impl Sdl3Shell {
                 callbacks: HashMap::new(),
             }),
             sampler: crate::color_sampler::ScreenColorSampler::new(Arc::new(Self::wake)),
+            menu_bar_choice: RefCell::new(None),
             default_options: WindowOptions::default(),
         })
     }
@@ -235,76 +309,57 @@ impl Sdl3Shell {
     fn dialog(
         &self,
         id: Option<WindowId>,
-        folder: bool,
+        mode: i32,
         path: Option<&str>,
         filters: &[FileDialogFilter],
         multiple: bool,
-        accept: DialogCompletion,
+        reply: DialogReply,
     ) {
         let path = path.and_then(|s| CString::new(s).ok());
-        let mut names = Vec::new();
-        let mut patterns = Vec::new();
-        for filter in filters {
-            if let (Ok(name), Ok(pattern)) = (
-                CString::new(filter.name.as_str()),
-                CString::new(filter.pattern()),
-            ) {
-                names.push(name);
-                patterns.push(pattern);
-            }
-        }
-        let name_ptrs: Vec<_> = names.iter().map(|s| s.as_ptr()).collect();
-        let pattern_ptrs: Vec<_> = patterns.iter().map(|s| s.as_ptr()).collect();
-        let context = {
-            let mut dialogs = self.dialogs.borrow_mut();
-            let id = dialogs.next;
-            dialogs.next = dialogs.next.wrapping_add(1);
-            dialogs.callbacks.insert(id, accept);
-            Box::new(DialogNativeContext {
-                id,
-                sender: dialogs.sender.clone(),
-            })
-        };
-        unsafe extern "C" fn done(context: *mut c_void, files: *const *const c_char) {
-            // SAFETY: native dialog calls exactly once with this Box transferred from dialog().
-            let context = unsafe { Box::from_raw(context.cast::<DialogNativeContext>()) };
-            let mut chosen = Vec::new();
-            if !files.is_null() {
-                let mut index = 0;
-                loop {
-                    // SAFETY: SDL provides a NULL terminated list for the duration of the callback.
-                    let entry = unsafe { *files.add(index) };
-                    if entry.is_null() {
-                        break;
-                    } // SAFETY: each list entry is a NUL terminated filename.
-                    chosen.push(
-                        unsafe { CStr::from_ptr(entry) }
-                            .to_string_lossy()
-                            .into_owned(),
-                    );
-                    index += 1;
-                }
-            }
-            let _ = context.sender.send(DialogResult {
-                id: context.id,
-                files: chosen,
-            });
-            Sdl3Shell::wake();
-        }
+        let filters = FilterStrings::new(filters);
+        let context = self.register_dialog(reply);
         // SAFETY: the bridge copies all filter/path strings synchronously, and releases context via done exactly once.
         unsafe {
             native::cove_shell_dialog(
                 self.parent(id),
-                folder,
+                mode,
                 path.as_ref().map_or(std::ptr::null(), |s| s.as_ptr()),
-                name_ptrs.as_ptr(),
-                pattern_ptrs.as_ptr(),
-                names.len(),
+                filters.name_ptrs.as_ptr(),
+                filters.pattern_ptrs.as_ptr(),
+                filters.count(),
                 multiple,
-                done,
+                dialog_done,
                 Box::into_raw(context).cast(),
             )
         };
+    }
+    fn register_dialog(&self, reply: DialogReply) -> Box<DialogNativeContext> {
+        let mut dialogs = self.dialogs.borrow_mut();
+        let id = dialogs.next;
+        dialogs.next = dialogs.next.wrapping_add(1);
+        dialogs.callbacks.insert(id, reply);
+        Box::new(DialogNativeContext {
+            id,
+            sender: dialogs.sender.clone(),
+        })
+    }
+    /// AppKit enqueues menu choices on the main thread; the authored closures
+    /// live on the UI thread, so they run as deferred work like a dialog result.
+    fn complete_menu_bar_choices(&self) -> Vec<Box<dyn FnOnce()>> {
+        let choices = crate::native_menu_bar::NativeMenuBarInstaller::take_choices();
+        if choices.is_empty() {
+            return Vec::new();
+        }
+        let Some(on_choice) = self.menu_bar_choice.borrow().clone() else {
+            return Vec::new();
+        };
+        choices
+            .into_iter()
+            .map(|id| {
+                let on_choice = on_choice.clone();
+                Box::new(move || on_choice(id)) as Box<dyn FnOnce()>
+            })
+            .collect()
     }
     fn complete_dialogs(&self) -> Vec<Box<dyn FnOnce()>> {
         let mut work: Vec<Box<dyn FnOnce()>> = Vec::new();
@@ -315,17 +370,34 @@ impl Sdl3Shell {
                     Ok(result) => dialogs
                         .callbacks
                         .remove(&result.id)
-                        .map(|callback| (callback, result.files)),
+                        .map(|reply| (reply, result.files, result.status)),
                     Err(_) => None,
                 }
             };
-            if let Some((callback, files)) = next {
-                work.push(Box::new(move || callback(files)));
-            } else {
+            let Some((reply, files, status)) = next else {
                 break;
-            }
+            };
+            work.push(Box::new(move || match reply {
+                DialogReply::Open(accept) => {
+                    accept(if status == 0 { files } else { Vec::new() })
+                }
+                DialogReply::Save(accept) => accept(save_outcome(files, status)),
+            }));
         }
         work
+    }
+}
+/// Maps a native panel status to the shell save contract. The write itself is
+/// deferred to [`SaveFileOutcome::finish`] on the owning thread.
+fn save_outcome(files: Vec<String>, status: i32) -> SaveFileOutcome {
+    match status {
+        0 => match files.into_iter().next() {
+            Some(destination) => SaveFileOutcome::Chosen { destination },
+            None => SaveFileOutcome::Failed("the save panel returned no destination".into()),
+        },
+        1 => SaveFileOutcome::Cancelled,
+        3 => SaveFileOutcome::Saved { destination: None },
+        _ => SaveFileOutcome::Failed("the save panel could not run".into()),
     }
 }
 impl Shell for Sdl3Shell {
@@ -490,6 +562,7 @@ impl Shell for Sdl3Shell {
     }
     fn take_deferred_callbacks(&self) -> Vec<Box<dyn FnOnce()>> {
         let mut work = self.complete_dialogs();
+        work.extend(self.complete_menu_bar_choices());
         work.extend(self.sampler.take_deferred_callbacks());
         work
     }
@@ -648,11 +721,11 @@ impl Shell for Sdl3Shell {
     ) {
         self.dialog(
             id,
-            true,
+            1,
             path,
             &[],
             false,
-            Box::new(move |files| accept(files.into_iter().next())),
+            DialogReply::Open(Box::new(move |files| accept(files.into_iter().next()))),
         );
     }
     fn show_open_file_dialog(
@@ -663,7 +736,54 @@ impl Shell for Sdl3Shell {
         multiple: bool,
         accept: DialogCompletion,
     ) {
-        self.dialog(id, false, path, filters, multiple, accept);
+        self.dialog(id, 0, path, filters, multiple, DialogReply::Open(accept));
+    }
+    fn show_save_file_dialog(
+        &self,
+        id: Option<WindowId>,
+        request: SaveFileRequest,
+        accept: SaveFileCompletion,
+    ) {
+        #[cfg(target_os = "ios")]
+        {
+            let name = CString::new(request.suggested_name.replace('\0', ""))
+                .unwrap_or_else(|_| CString::new("Untitled").unwrap());
+            let filters = FilterStrings::new(&request.filters);
+            let context = self.register_dialog(DialogReply::Save(accept));
+            // SAFETY: the bridge copies the name and filters synchronously and
+            // reads `contents` before returning; done releases context once.
+            unsafe {
+                native::cove_shell_save_dialog(
+                    self.parent(id),
+                    name.as_ptr(),
+                    request.contents.as_ptr(),
+                    request.contents.len(),
+                    filters.pattern_ptrs.as_ptr(),
+                    filters.count(),
+                    dialog_done,
+                    Box::into_raw(context).cast(),
+                )
+            };
+        }
+        #[cfg(not(target_os = "ios"))]
+        {
+            self.dialog(
+                id,
+                2,
+                Some(&request.suggested_name),
+                &request.filters,
+                false,
+                DialogReply::Save(accept),
+            );
+        }
+    }
+    fn install_menu_bar(&self, bar: &NativeMenuBarSnapshot, on_choice: MenuBarCompletion) {
+        if crate::native_menu_bar::NativeMenuBarInstaller::install(bar).is_ok() {
+            *self.menu_bar_choice.borrow_mut() = Some(on_choice);
+        }
+    }
+    fn take_open_documents(&self) -> Vec<String> {
+        crate::open_documents::drain()
     }
     fn sample_screen_color(&self, done: ScreenColorCompletion) {
         // The per-window-system backend starts the picker and returns at once.
@@ -705,6 +825,8 @@ impl Shell for Sdl3Shell {
         }
         self.dialogs.borrow_mut().callbacks.clear();
         self.sampler.cancel_all();
+        *self.menu_bar_choice.borrow_mut() = None;
+        crate::native_menu_bar::NativeMenuBarInstaller::clear();
         self.session = None;
         self.quitting = true;
     }

@@ -1,6 +1,7 @@
 #include "native.h"
 #include <SDL3/SDL.h>
 #if defined(__APPLE__)
+#include <TargetConditionals.h>
 #include <SDL3/SDL_metal.h>
 #endif
 #if defined(_WIN32)
@@ -255,11 +256,34 @@ void cove_shell_cursor(CoveShellWindow *h,int cursor){ COVE_ASSERT_MAIN();static
 bool cove_shell_global_pointer(float *x,float *y){ COVE_ASSERT_MAIN();if(!SDL_GetAtomicInt(&initialized))return false;SDL_GetGlobalMouseState(x,y);return true;}
 char *cove_shell_clipboard_read(void){ COVE_ASSERT_MAIN();return SDL_GetClipboardText();}bool cove_shell_clipboard_write(const char *text){ COVE_ASSERT_MAIN();return SDL_SetClipboardText(text);}void cove_shell_free(void *p){SDL_free(p);}
 struct DialogBox{CoveShellDialogCallback callback;void *context;SDL_DialogFileFilter *filters;char *path;size_t count;};
-static void SDLCALL dialog_done(void *raw,const char *const *files,int filter){(void)filter;struct DialogBox *box=raw;box->callback(box->context,files);for(size_t i=0;i<box->count;i++){SDL_free((void*)box->filters[i].name);SDL_free((void*)box->filters[i].pattern);}SDL_free(box->filters);SDL_free(box->path);SDL_free(box);}
-void cove_shell_dialog(CoveShellWindow *window,bool folder,const char *path,const char *const *names,const char *const *patterns,size_t count,bool multiple,CoveShellDialogCallback callback,void *context){ COVE_ASSERT_MAIN();
-    struct DialogBox *box=SDL_calloc(1,sizeof(*box));if(!box){callback(context,NULL);return;}box->callback=callback;box->context=context;box->path=path?SDL_strdup(path):NULL;box->count=count;
-    if(count){box->filters=SDL_calloc(count,sizeof(*box->filters));if(!box->filters){box->count=0;dialog_done(box,NULL,0);return;}for(size_t i=0;i<count;i++){box->filters[i].name=SDL_strdup(names[i]);box->filters[i].pattern=SDL_strdup(patterns[i]);}}
-    if(folder)SDL_ShowOpenFolderDialog(dialog_done,box,window?window->window:NULL,box->path,false);else SDL_ShowOpenFileDialog(dialog_done,box,window?window->window:NULL,box->filters,(int)count,box->path,multiple);
+static void dialog_box_free(struct DialogBox *box){for(size_t i=0;i<box->count;i++){SDL_free((void*)box->filters[i].name);SDL_free((void*)box->filters[i].pattern);}SDL_free(box->filters);SDL_free(box->path);SDL_free(box);}
+static void SDLCALL dialog_done(void *raw,const char *const *files,int filter){struct DialogBox *box=raw;int status=2;if(filter>=0&&files){status=files[0]?0:1;}box->callback(box->context,files,status);dialog_box_free(box);}
+#if defined(__APPLE__)
+/* The picker already speaks the cove status convention, so forward it verbatim
+   and only borrow the box's freeing. */
+static void apple_picker_done(void *raw,const char *const *files,int status){struct DialogBox *box=raw;box->callback(box->context,files,status);dialog_box_free(box);}
+#endif
+void cove_shell_dialog(CoveShellWindow *window,int mode,const char *path,const char *const *names,const char *const *patterns,size_t count,bool multiple,CoveShellDialogCallback callback,void *context){ COVE_ASSERT_MAIN();
+    struct DialogBox *box=SDL_calloc(1,sizeof(*box));if(!box){callback(context,NULL,1);return;}box->callback=callback;box->context=context;box->path=path?SDL_strdup(path):NULL;box->count=count;
+    if(count){box->filters=SDL_calloc(count,sizeof(*box->filters));if(!box->filters){box->count=0;dialog_done(box,NULL,-1);return;}for(size_t i=0;i<count;i++){box->filters[i].name=SDL_strdup(names[i]);box->filters[i].pattern=SDL_strdup(patterns[i]);}}
+#if defined(__APPLE__)
+    /* SDL has no iOS dialog backend, so Cove presents the document picker
+       itself; on macOS the hook declines and SDL owns the panel. */
+    if(mode!=2&&cove_shell_apple_picker(window?window->apple:NULL,mode,box->path,names,patterns,count,multiple,apple_picker_done,box))return;
+#endif
+    switch(mode){
+        case 1:SDL_ShowOpenFolderDialog(dialog_done,box,window?window->window:NULL,box->path,false);break;
+        case 2:SDL_ShowSaveFileDialog(dialog_done,box,window?window->window:NULL,box->filters,(int)count,box->path);break;
+        default:SDL_ShowOpenFileDialog(dialog_done,box,window?window->window:NULL,box->filters,(int)count,box->path,multiple);break;
+    }
+}
+void cove_shell_save_dialog(CoveShellWindow *window,const char *name,const uint8_t *bytes,size_t size,const char *const *patterns,size_t count,CoveShellDialogCallback callback,void *context){ COVE_ASSERT_MAIN();
+#if defined(__APPLE__) && !TARGET_OS_OSX
+    if(cove_shell_apple_export(window?window->apple:NULL,name,bytes,size,patterns,count,callback,context))return;
+#else
+    (void)window;(void)name;(void)bytes;(void)size;(void)patterns;(void)count;
+#endif
+    callback(context,NULL,2);
 }
 bool cove_shell_refresh(CoveShellWindow *h,bool enabled){ COVE_ASSERT_MAIN();
 #if defined(__APPLE__)

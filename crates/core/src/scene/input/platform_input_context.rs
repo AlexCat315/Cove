@@ -59,6 +59,38 @@ pub type FilePickCompletion = Box<dyn FnOnce(Vec<String>)>;
 /// Host open-panel presenter installed by the platform shell.
 pub type FilePickerCallback = Rc<dyn Fn(&[FilePickerFilter], bool, FilePickCompletion)>;
 
+/// A document the application wants written through the native save panel.
+///
+/// The bytes travel with the request because iOS and Android export the
+/// contents themselves rather than handing back a path to write to.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct FileSaveRequest {
+    /// Name the panel pre-fills; the user may change it.
+    pub suggested_name: String,
+    pub filters: Vec<FilePickerFilter>,
+    pub contents: Vec<u8>,
+}
+/// The result of a native save panel, after the host has written the bytes.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum FileSaveOutcome {
+    /// `destination` is where the write landed, `None` where the OS does not
+    /// disclose one (the iOS export picker).
+    Saved { destination: Option<String> },
+    Cancelled,
+    /// No native save panel on this platform; the caller keeps its in-app path.
+    Unsupported,
+    Failed(String),
+}
+/// Receives the save result once the native panel closed and the bytes landed.
+pub type FileSaveCompletion = Box<dyn FnOnce(FileSaveOutcome)>;
+/// Host save-panel presenter installed by the platform shell.
+pub type FileSaverCallback = Rc<dyn Fn(FileSaveRequest, FileSaveCompletion)>;
+
+/// Receives documents and URLs the OS opened with this application: Finder
+/// "Open With", a double-clicked file association, or a registered URL scheme.
+/// This is distinct from a drag onto a window ([`crate::scene::ExternalDropEvent`]).
+pub type OpenedDocumentsCallback = Rc<dyn Fn(Vec<String>)>;
+
 thread_local! {
     static CURRENT_INTERACTIONS: RefCell<Option<Rc<InteractionRegistry>>> = const { RefCell::new(None) };
     static CLIPBOARD_READ: RefCell<Option<ClipboardReader>> = const { RefCell::new(None) };
@@ -67,6 +99,9 @@ thread_local! {
     static NATIVE_MENU_PRESENTER: RefCell<Option<NativeMenuPresenterCallback>> = const { RefCell::new(None) };
     static COLOR_SAMPLER: RefCell<Option<ColorSamplerCallback>> = const { RefCell::new(None) };
     static FILE_PICKER: RefCell<Option<FilePickerCallback>> = const { RefCell::new(None) };
+    static FILE_SAVER: RefCell<Option<FileSaverCallback>> = const { RefCell::new(None) };
+    static OPENED_DOCUMENTS: RefCell<Option<OpenedDocumentsCallback>> = const { RefCell::new(None) };
+    static PENDING_DOCUMENTS: RefCell<Vec<String>> = const { RefCell::new(Vec::new()) };
 }
 
 /// Holds the active window's interaction registry.
@@ -177,6 +212,69 @@ impl FilePicker {
     }
     pub fn set_presenter(present: Option<FilePickerCallback>) {
         FILE_PICKER.with(|slot| *slot.borrow_mut() = present);
+    }
+}
+
+/// Holds the native save panel, injected by the platform shell.
+///
+/// The panel may close later; the host writes the bytes and answers through
+/// `done` on the UI thread. Without an installed saver every request reports
+/// [`FileSaveOutcome::Unsupported`], so a caller can fall back to its in-app
+/// save path instead of pretending a panel opened.
+pub struct FileSaver;
+impl FileSaver {
+    /// Shows a save panel pre-filled with `request.suggested_name` and writes
+    /// `request.contents` where the user chooses.
+    pub fn request(request: FileSaveRequest, done: FileSaveCompletion) {
+        match FILE_SAVER.with(|slot| slot.borrow().clone()) {
+            Some(present) => present(request, done),
+            None => done(FileSaveOutcome::Unsupported),
+        }
+    }
+    /// Whether a platform shell installed a saver on this thread.
+    pub fn is_installed() -> bool {
+        FILE_SAVER.with(|slot| slot.borrow().is_some())
+    }
+    pub fn set_presenter(present: Option<FileSaverCallback>) {
+        FILE_SAVER.with(|slot| *slot.borrow_mut() = present);
+    }
+}
+
+/// Holds the application's handler for documents the OS opened with it.
+///
+/// The OS may deliver a document before the application installs its handler
+/// (a cold launch via "Open With"), so [`Self::deliver`] queues documents until
+/// a handler is set, then [`Self::set_handler`] replays them in arrival order.
+/// Both calls run on the UI thread; the host marshals native open events there.
+pub struct OpenedDocuments;
+impl OpenedDocuments {
+    /// Installs the application's handler and replays any documents that
+    /// arrived before it. Passing `None` removes the handler; later documents
+    /// queue again.
+    pub fn set_handler(handler: Option<OpenedDocumentsCallback>) {
+        OPENED_DOCUMENTS.with(|slot| *slot.borrow_mut() = handler.clone());
+        if let Some(handler) = handler {
+            let pending = PENDING_DOCUMENTS.with(|slot| std::mem::take(&mut *slot.borrow_mut()));
+            if !pending.is_empty() {
+                handler(pending);
+            }
+        }
+    }
+    /// Whether an application handler is installed on this thread.
+    pub fn is_installed() -> bool {
+        OPENED_DOCUMENTS.with(|slot| slot.borrow().is_some())
+    }
+    /// Delivers documents the OS opened. With no handler installed they queue
+    /// for the next [`Self::set_handler`]; an empty list is ignored.
+    pub fn deliver(documents: Vec<String>) {
+        if documents.is_empty() {
+            return;
+        }
+        let handler = OPENED_DOCUMENTS.with(|slot| slot.borrow().clone());
+        match handler {
+            Some(handler) => handler(documents),
+            None => PENDING_DOCUMENTS.with(|slot| slot.borrow_mut().extend(documents)),
+        }
     }
 }
 

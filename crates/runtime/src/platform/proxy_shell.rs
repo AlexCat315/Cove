@@ -1,12 +1,16 @@
 //! The [`Shell`] a UI thread sees: writes are posted, reads come from the
 //! published state, and results arrive as deferred callbacks. No method waits
 //! for the platform thread.
-use super::{DialogRequest, PlatformCommand, PlatformLink, PlatformMessage};
-use cove_platform::{NativeMenuSnapshot, SystemCursor, TextInputArea, WindowId, WindowInputEvent};
+use super::{DialogRequest, PlatformCommand, PlatformLink, PlatformMessage, SaveDialogRequest};
+use cove_platform::{
+    NativeMenuBarSnapshot, NativeMenuSnapshot, SystemCursor, TextInputArea, WindowId,
+    WindowInputEvent,
+};
 use cove_shell::{
     ClipboardCompletion, DialogCompletion, DisplayRefreshTick, EventLoopWaker, FileDialogFilter,
-    MenuCompletion, NativeRenderSurface, NativeWindowReference, ScreenColorCompletion, Shell,
-    ShellError, WindowChromeHitTest, WindowHandle, WindowOptions, WindowSafeArea, WindowSnapshot,
+    MenuBarCompletion, MenuCompletion, NativeRenderSurface, NativeWindowReference,
+    SaveFileCompletion, SaveFileRequest, ScreenColorCompletion, Shell, ShellError,
+    WindowChromeHitTest, WindowHandle, WindowOptions, WindowSafeArea, WindowSnapshot,
 };
 use std::{
     cell::{Cell, RefCell},
@@ -70,7 +74,13 @@ impl WindowHandle for ProxyWindow {
 struct Pending {
     next: u64,
     dialogs: HashMap<u64, DialogCompletion>,
+    saves: HashMap<u64, SaveFileCompletion>,
     menus: HashMap<u64, MenuCompletion>,
+    /// Stays on the UI thread: only the chosen id crosses the link.
+    menu_bar: Option<MenuBarCompletion>,
+    /// Documents the platform thread reported; the host drains these on the UI
+    /// thread through `take_open_documents`.
+    documents: Vec<String>,
     clipboard: HashMap<u64, ClipboardCompletion>,
     colors: HashMap<u64, ScreenColorCompletion>,
     finished: Vec<Box<dyn FnOnce()>>,
@@ -154,6 +164,24 @@ impl ProxyShell {
                 if let Some(done) = pending.dialogs.remove(&request) {
                     pending.finished.push(Box::new(move || done(files)));
                 }
+            }
+            PlatformMessage::SaveFinished(request, outcome) => {
+                let mut pending = self.pending.borrow_mut();
+                if let Some(done) = pending.saves.remove(&request) {
+                    pending.finished.push(Box::new(move || done(outcome)));
+                }
+            }
+            PlatformMessage::MenuBarChosen(chosen) => {
+                let on_choice = self.pending.borrow().menu_bar.clone();
+                if let Some(on_choice) = on_choice {
+                    self.pending
+                        .borrow_mut()
+                        .finished
+                        .push(Box::new(move || on_choice(chosen)));
+                }
+            }
+            PlatformMessage::DocumentsOpened(documents) => {
+                self.pending.borrow_mut().documents.extend(documents);
             }
             PlatformMessage::MenuFinished(request, chosen) => {
                 let mut pending = self.pending.borrow_mut();
@@ -380,6 +408,33 @@ impl Shell for ProxyShell {
         accept: DialogCompletion,
     ) {
         self.dialog(id, false, path, filters, multiple, accept);
+    }
+    fn show_save_file_dialog(
+        &self,
+        id: Option<WindowId>,
+        request: SaveFileRequest,
+        accept: SaveFileCompletion,
+    ) {
+        let ticket = {
+            let mut pending = self.pending.borrow_mut();
+            let ticket = pending.allocate();
+            pending.saves.insert(ticket, accept);
+            ticket
+        };
+        self.post(PlatformCommand::SaveDialog(SaveDialogRequest {
+            request: ticket,
+            window: id,
+            name: request.suggested_name,
+            filters: request.filters,
+            contents: request.contents,
+        }));
+    }
+    fn install_menu_bar(&self, bar: &NativeMenuBarSnapshot, on_choice: MenuBarCompletion) {
+        self.pending.borrow_mut().menu_bar = Some(on_choice);
+        self.post(PlatformCommand::InstallMenuBar(bar.clone()));
+    }
+    fn take_open_documents(&self) -> Vec<String> {
+        std::mem::take(&mut self.pending.borrow_mut().documents)
     }
     fn display_refresh_rate(&self, id: Option<WindowId>) -> Option<f64> {
         id.or_else(|| self.main_window_id())

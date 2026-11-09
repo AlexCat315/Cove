@@ -1,6 +1,6 @@
 use cove_platform::{
-    InputEvent, NativeMenuSnapshot, ScreenColorCompletion, ScreenColorSample, SystemCursor,
-    TextInputArea, WindowId, WindowInputEvent,
+    InputEvent, NativeMenuBarSnapshot, NativeMenuSnapshot, ScreenColorCompletion, ScreenColorSample,
+    SystemCursor, TextInputArea, WindowId, WindowInputEvent,
 };
 use std::{rc::Rc, sync::Arc, time::Duration};
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -175,6 +175,52 @@ pub struct WindowSnapshot {
 pub type DialogCompletion = Box<dyn FnOnce(Vec<String>)>;
 pub type ClipboardCompletion = Box<dyn FnOnce(Option<String>)>;
 pub type MenuCompletion = Box<dyn FnOnce(Option<i64>)>;
+/// Runs on the UI thread with the id of a chosen application-menu item.
+pub type MenuBarCompletion = Rc<dyn Fn(i64)>;
+/// A document the application wants written through the platform save panel.
+///
+/// The contents travel with the request because iOS and Android have no
+/// "choose a path, then write" API: both hand the user a destination only after
+/// the bytes exist (an export copy and a `content://` document respectively).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct SaveFileRequest {
+    /// Name the panel pre-fills; the user may change it.
+    pub suggested_name: String,
+    pub filters: Vec<FileDialogFilter>,
+    pub contents: Vec<u8>,
+}
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum SaveFileOutcome {
+    /// The user picked a destination on a platform that only chooses paths;
+    /// [`Self::finish`] still has to write the bytes there.
+    Chosen { destination: String },
+    /// The platform performed the write itself. `destination` is `None` where
+    /// the OS does not disclose one (the iOS export picker).
+    Saved { destination: Option<String> },
+    Cancelled,
+    /// No native save panel on this shell; the caller keeps its in-app path.
+    Unsupported(String),
+    Failed(String),
+}
+impl SaveFileOutcome {
+    /// Writes `contents` for a [`Self::Chosen`] destination and passes every
+    /// other outcome through, so calling it twice never writes twice.
+    ///
+    /// Runs on the thread that owns the completion, never the platform thread:
+    /// a save panel returns while the document may still be megabytes long.
+    pub fn finish(self, contents: &[u8]) -> Self {
+        let Self::Chosen { destination } = self else {
+            return self;
+        };
+        match std::fs::write(&destination, contents) {
+            Ok(()) => Self::Saved {
+                destination: Some(destination),
+            },
+            Err(error) => Self::Failed(format!("{destination}: {error}")),
+        }
+    }
+}
+pub type SaveFileCompletion = Box<dyn FnOnce(SaveFileOutcome)>;
 /// Wakes a blocked event loop from any thread.
 pub type EventLoopWaker = Arc<dyn Fn() + Send + Sync>;
 pub trait Shell {
@@ -255,6 +301,32 @@ pub trait Shell {
     fn set_display_refresh_enabled(&self, id: WindowId, enabled: bool) -> bool;
     fn take_display_refresh(&self, id: WindowId) -> Option<crate::DisplayRefreshTick>;
     fn shutdown(&mut self);
+    /// Shows the platform save panel. Desktop shells report
+    /// [`SaveFileOutcome::Chosen`] and leave the write to
+    /// [`SaveFileOutcome::finish`]; mobile shells export the bytes themselves
+    /// and report [`SaveFileOutcome::Saved`]. The default reports no panel, so
+    /// an application keeps its in-app save path instead of pretending one
+    /// opened.
+    fn show_save_file_dialog(
+        &self,
+        _id: Option<WindowId>,
+        _request: SaveFileRequest,
+        accept: SaveFileCompletion,
+    ) {
+        accept(SaveFileOutcome::Unsupported(
+            "this shell has no native save panel".into(),
+        ));
+    }
+    /// Installs the application menu bar. `on_choice` runs on the UI thread with
+    /// the chosen authored item id. Platforms without a native bar ignore it and
+    /// keep presenting Compose menus.
+    fn install_menu_bar(&self, _bar: &NativeMenuBarSnapshot, _on_choice: MenuBarCompletion) {}
+    /// Drains documents and URLs the OS opened with the application since the
+    /// last call. The platform thread polls this each tick and forwards the
+    /// result to the UI thread; shells without an open-event source return empty.
+    fn take_open_documents(&self) -> Vec<String> {
+        Vec::new()
+    }
     /// Claims the native event queue before any window exists, so a wake can
     /// land and a wait can block from the first loop iteration.
     fn prepare_event_loop(&mut self) -> Result<(), ShellError> {

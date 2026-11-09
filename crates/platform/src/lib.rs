@@ -497,6 +497,85 @@ pub struct NativeMenuIcon {
     pub is_template: bool,
 }
 
+/// Labels for the entries the platform owns in the application menu. An
+/// application supplies only the leading items, such as About and Settings.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct NativeApplicationMenuTitles {
+    pub services: String,
+    pub hide: String,
+    pub hide_others: String,
+    pub show_all: String,
+    pub quit: String,
+}
+
+impl NativeApplicationMenuTitles {
+    pub fn for_app_name(app_name: &str) -> Self {
+        Self {
+            services: "Services".to_owned(),
+            hide: format!("Hide {app_name}"),
+            hide_others: "Hide Others".to_owned(),
+            show_all: "Show All".to_owned(),
+            quit: format!("Quit {app_name}"),
+        }
+    }
+}
+
+/// Labels of the Edit and Window menus the platform appends so that key
+/// equivalents reach native controls — a save panel's name field has no
+/// Cut/Copy/Paste/Select All without an Edit menu in the bar.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct NativeStandardMenuTitles {
+    pub edit: String,
+    pub undo: String,
+    pub redo: String,
+    pub cut: String,
+    pub copy: String,
+    pub paste: String,
+    pub delete: String,
+    pub select_all: String,
+    pub window: String,
+    pub minimize: String,
+    pub zoom: String,
+    pub bring_all_to_front: String,
+}
+
+impl Default for NativeStandardMenuTitles {
+    fn default() -> Self {
+        Self {
+            edit: "Edit".to_owned(),
+            undo: "Undo".to_owned(),
+            redo: "Redo".to_owned(),
+            cut: "Cut".to_owned(),
+            copy: "Copy".to_owned(),
+            paste: "Paste".to_owned(),
+            delete: "Delete".to_owned(),
+            select_all: "Select All".to_owned(),
+            window: "Window".to_owned(),
+            minimize: "Minimize".to_owned(),
+            zoom: "Zoom".to_owned(),
+            bring_all_to_front: "Bring All to Front".to_owned(),
+        }
+    }
+}
+
+/// A titled top-level menu of the application bar.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct NativeMenuBranch {
+    pub title: String,
+    pub items: NativeMenuSnapshot,
+}
+
+/// The whole application menu bar. Ids in `application_items` and `menus` share
+/// one space so a chosen id resolves to a single authored action.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct NativeMenuBarSnapshot {
+    pub app_name: String,
+    pub application_titles: NativeApplicationMenuTitles,
+    pub standard_titles: NativeStandardMenuTitles,
+    pub application_items: NativeMenuSnapshot,
+    pub menus: Vec<NativeMenuBranch>,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
