@@ -65,6 +65,51 @@ PostureLayout::new(player())
 - 首帧尚未量到位置，显示 single / flat，下一帧切换。
 - `SegmentSplit::resolve(env, frame)` 给出同样的切分结果，可用于自定义布局。
 
+## 导航
+
+### ListDetail
+
+```rust
+use cove_ui_compose::primitives::navigation::{ListDetail, ListDetailState};
+
+let state = cx.state(ListDetailState::<MailboxId>::default);
+ListDetail::new(
+    Binding::new(move || state.get(), move |value| state.set(value)),
+    |selection| mailbox_list(selection),          // 行里 selection.set(Some(id))
+    |id, context| mailbox(id, context),           // context.is_single_pane 时提供返回
+)
+.placeholder(empty_mailbox())
+.list_width(320.0);
+```
+
+| 窗口 | 呈现 |
+| --- | --- |
+| 宽度 < 840，无折痕穿过 | 单栏：列表，选中后详情覆盖列表 |
+| 宽度 ≥ 840 | 左列表（`list_width`）+ 发丝线 + 右详情 |
+| 竖向折痕或铰链穿过本视图，两侧都 ≥ 240 | 分界落在折痕上；铰链区域留空 |
+| 桌面支架（横向折痕分隔） | 上方详情，下方列表 |
+
+- `ListDetailState { selection, showing_detail }` 与呈现无关：单栏里返回只清除 `showing_detail`，展开后详情仍显示原选择。
+- 列表与详情在所有呈现中占同一个槽位，折叠、展开、旋转、缩放不会重建它们，滚动位置、草稿与焦点得以保留。
+- `ListDetailPresentation::resolve(env, frame, list_width)` 给出同样的判断。
+
+### AdaptiveTabs
+
+```rust
+AdaptiveTabs::try_new(selection, vec![
+    TabItem::new(Tab::Home, "Home", home()),
+    TabItem::new(Tab::Search, "Search", search()),
+])?
+```
+
+| 环境 | 呈现 |
+| --- | --- |
+| 宽度 Compact | 底部 tab bar |
+| 更宽，且为手机、折叠屏、平板或无 hover | 导航栏（rail） |
+| 有指针的桌面 | 内容上方的 tab 条 |
+
+选中页的内容在三种呈现中共用一个槽位，不会因切换呈现而重建。
+
 ## 弹层不跨折痕
 
 框架内的弹层自动遵守区段，应用无需处理：

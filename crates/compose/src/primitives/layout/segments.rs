@@ -206,9 +206,9 @@ impl View for PostureLayout {
 }
 
 /// Publishes its own window frame after each layout pass and fills its parent.
-struct FrameProbe {
-    frame: State<Rect>,
-    content: AnyView,
+pub(crate) struct FrameProbe {
+    pub(crate) frame: State<Rect>,
+    pub(crate) content: AnyView,
 }
 
 struct FrameMeasurement {

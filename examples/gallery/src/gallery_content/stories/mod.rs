@@ -6,6 +6,7 @@
 //! been migrated yet is listed in `MIGRATION_PENDING` rather than stubbed.
 
 pub mod action_sheet_story;
+pub mod adaptive_navigation_story;
 pub mod animation;
 pub mod animation_curves;
 pub mod animation_system;
@@ -53,6 +54,7 @@ pub mod wheel_picker_story;
 pub mod workspace_story;
 
 pub use action_sheet_story::ActionSheetStory;
+pub use adaptive_navigation_story::AdaptiveNavigationStory;
 pub use animation::AnimationStory;
 pub use animation_curves::{AnimationCurveExamples, CurveChoice};
 pub use animation_system::{AnimationSystemExamples, DemoPhase};

@@ -293,6 +293,9 @@ impl StoryDispatch {
             Self::Story(GalleryPage::NavigationStack) => {
                 Some(AnyView::new(stories::NavigationStackStory::new()))
             }
+            Self::Story(GalleryPage::AdaptiveNavigation) => {
+                Some(AnyView::new(stories::AdaptiveNavigationStory::new()))
+            }
             Self::Story(GalleryPage::Tree) => Some(AnyView::new(stories::TreeStory::new(options))),
             Self::Story(GalleryPage::VirtualStack) => {
                 Some(AnyView::new(stories::VirtualStackStory::new()))
@@ -422,6 +425,10 @@ impl StorySource {
                 GalleryPage::NavigationStack,
                 "Layout/NavigationStories.swift",
             ),
+            (
+                GalleryPage::AdaptiveNavigation,
+                "stories/adaptive_navigation_story.rs",
+            ),
             (GalleryPage::HoverCard, "Overlays/HoverStory.swift"),
             (GalleryPage::Timeline, "Data/DataStories.swift"),
             (GalleryPage::Toolbar, "Controls/ToolbarStory.swift"),
@@ -457,7 +464,8 @@ impl StorySource {
         ]
     }
 
-    /// The Swift story file for one page.
+    /// The story source for one page: its Swift original, or its Rust module
+    /// for pages added after the port.
     pub fn entry(page: GalleryPage) -> &'static str {
         Self::entries()
             .iter()
@@ -499,9 +507,11 @@ mod checks {
     fn every_entry_names_a_real_story_file() {
         for (page, file) in StorySource::entries() {
             assert!(!file.is_empty(), "{} has no story file", page.raw_value());
+            // Ported pages name their Swift original; pages added in Rust name
+            // their own story module.
             assert!(
-                file.ends_with(".swift"),
-                "{} must name a Swift source (got {file})",
+                file.ends_with(".swift") || file.ends_with(".rs"),
+                "{} must name a Swift or Rust story source (got {file})",
                 page.raw_value()
             );
             assert!(

@@ -1,8 +1,15 @@
 # Gallery 逐项验收记录
 
-更新：2026-11-09。目录共 103 页（Numeric 合并 NumberField+Vec3Field，Text Fields 合并 TextField+SearchField+TextArea+JsonField）。当前控件页的验收以以下 Swift 对照表为准；后续旧轮记录保留其原有范围。
+更新：2026-11-09。目录共 104 页（Numeric 合并 NumberField+Vec3Field，Text Fields 合并 TextField+SearchField+TextArea+JsonField）。当前控件页的验收以以下 Swift 对照表为准；后续旧轮记录保留其原有范围。
 
 Swift 源码逐页对照见文末《Swift 源码对照（逐页差异清单）》。
+
+## 2026-11-09：平台自适应 P2（ListDetail、AdaptiveTabs）
+
+- 页面：新增 ListDetail / AdaptiveTabs（`adaptiveNavigation`），目录 104 页。用户文档 `Website/src/content/components/adaptive.md` 增加「导航」。
+- 结构验证：compose `list_detail_tests` 5 项。
+- 桌面实测（DevTools）：见 CHANGELOG；`fold-open`、`dual-screen` 下 Gallery 侧栏占去左段，演示容器不跨折痕或铰链左侧不足 240，保持单栏，符合规则。
+- 原生验收：**未做**（Android 渲染需真机，见 P1 记录）。
 
 ## 2026-11-09：平台自适应 P1（弹层区段、SegmentedLayout、PostureLayout、Android 首次运行）
 
@@ -330,6 +337,7 @@ cargo test -p cove-ui-compose --test compose --locked
 | BottomSheet | 0 | 0 / 0 | 挂载/几何基础检查通过；待逐项交互和视觉验收 |
 | Command Palette | 0 | 0 / 0 | 挂载/几何基础检查通过；待逐项交互和视觉验收 |
 | NavigationStack | 0 | 0 / 0 | 挂载/几何基础检查通过；待逐项交互和视觉验收 |
+| ListDetail / AdaptiveTabs | 2 | 0 / 0 | `list_detail_tests` 结构覆盖；桌面 DevTools 实测选择、单栏返回、预设切换与三种 tab 呈现；待原生触摸与真机验收 |
 | Drag & Drop | 0 | 0 / 0 | 挂载/几何基础检查通过；待逐项交互和视觉验收 |
 | Drag Upload | 0 | 3 / 0 | 拖放区命中、类型/数量拒绝、批次聚合、目录拒绝、空过滤与 Content-Type 查表有结构回归；DevTools 注入 begin→file→complete 已端到端验证；原生 OS 拖入与原生打开面板尚未验收 |
 | HoverCard | 0 | 0 / 0 | 挂载/几何基础检查通过；待逐项交互和视觉验收 |

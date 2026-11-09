@@ -56,6 +56,7 @@ impl GalleryPage {
             Self::ContextMenu => icons::navigation::move_right(),
             Self::CommandPalette => icons::status::zap(),
             Self::NavigationStack => icons::navigation::arrow_left(),
+            Self::AdaptiveNavigation => icons::navigation::maximize(),
             Self::Popover => icons::shape::message_square(),
             Self::Popconfirm => icons::status::help(),
             Self::Tooltip => icons::status::info(),

@@ -131,6 +131,7 @@ mod keyboard_shortcut;
 mod keyed_reconciler_tests;
 mod label_selection_tests;
 mod lazy_grid_tests;
+mod list_detail_tests;
 mod list_multiple_selection_tests;
 mod list_row_tests;
 mod list_tree_tests;

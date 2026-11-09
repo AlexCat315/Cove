@@ -4,6 +4,14 @@
 
 ## Unreleased
 
+- **平台自适应 P2：`ListDetail` 与 `AdaptiveTabs`（2026-11-09）**：
+  - `ListDetail`：一份 `ListDetailState { selection, showing_detail }` 驱动所有呈现。宽度 < 840 为单栏（选中后详情覆盖列表，`ListDetailContext::back` 返回并保留选择）；≥ 840 为左列表 + 发丝线 + 右详情；竖向折痕或铰链穿过视图且两侧 ≥ 240 时分界落在折痕上、铰链区域留空；桌面支架时上方详情、下方列表。视图量取自身窗口位置判断，放在侧栏旁边同样正确。列表与详情在所有呈现中占固定槽位（隐藏用 `Display::None`），折叠、展开、旋转、缩放都不重建它们。
+  - `AdaptiveTabs`：Compact 宽度为底部 `MobileTabBar`；更宽的手机、折叠屏、平板或无 hover 表面为 `NavigationRail`；有指针的桌面为内容上方的 `TabView` 条。选中内容在三种呈现中共用一个槽位。
+  - Gallery：新增 ListDetail / AdaptiveTabs 页（`adaptiveNavigation`，目录 104 页）。故事源表允许 Rust 源文件（此前只接受 Swift 原件，新页无 Swift 对照）。
+  - 测试：compose `list_detail_tests` 5 项（呈现判断 8 种环境、单栏选择与返回、封面屏 → 展开 → 封面屏 → 双屏全程列表与详情各只挂载一次且保留选择、桌面支架上下布局、tabs 三种呈现切换内容只挂载一次）。
+  - 实测（DevTools）：桌面选中 Sent 为两栏；切 `iphone` 为单栏详情并出现 Back；返回后为列表；切回桌面两栏仍显示 Sent。Tabs：桌面顶部条、`iphone` 底部栏、`android-tablet` 左侧 72pt rail。
+  - 未完成：单栏切换没有 push 动画与边缘返回手势；`present_sheet`、`Menu`、`Toolbar` 语义入口；Gallery 外壳仍用 `AdaptiveSidebar`，在 `dual-screen` 等形态下仍跨越铰链。
+
 - **平台自适应 P1：弹层不跨折痕、按区段与姿态布局；Android 首次跑通（2026-11-09）**：
   - 弹层：新增 `primitives::overlays::portal::{overlay_segments, anchored_bounds, presentation_bounds}` 与 core `display_features::presentation_segment`。菜单、Popover、上下文菜单、Hover card 在锚点所在区段内定位与夹紧；Modal（Dialog、Sheet、Action sheet、Bottom sheet）与 Toast 的面板放进呈现区段（横向折痕取下半屏，纵向取 leading，RTL 取右侧），遮罩仍覆盖整个窗口。区段由实际窗口与 `display_features` 求得，无折痕时与原行为一致。`ModalBackdropView` 的内边距改在 `update_layout` 中按区段设置。
   - 布局：新增 `SegmentedLayout`（一块区段显示 single，两块时分别放两个面板，遮挡区域留空）、`PostureLayout`（桌面支架上下、书本左右、其余 flat）与 `SegmentSplit::resolve`。两者量取自身窗口位置与区段求交，嵌入时同样正确。Gallery Viewport Traits 页新增 Window segments 演示。
