@@ -69,6 +69,27 @@ impl Dx12Backend {
     }
 }
 
+impl Drop for Dx12Backend {
+    fn drop(&mut self) {
+        // The device releases its swapchain back buffers in its own `Drop`, while
+        // `Dx12Registries::Drop` releases every texture it owns. Back buffers
+        // appear in both, so detach them here to avoid releasing the same COM
+        // pointer twice at shutdown.
+        let ids: Vec<u32> = self
+            .device
+            .swapchains
+            .values()
+            .flat_map(|chain| chain.texture_ids.iter().copied())
+            .collect();
+        if !ids.is_empty() {
+            let mut registries = self.lock();
+            for id in ids {
+                registries.textures.remove(&id);
+            }
+        }
+    }
+}
+
 /// Per-slot upload ring: a host-visible committed buffer plus the handle the
 /// frontend binds.
 #[derive(Clone)]
@@ -182,9 +203,15 @@ impl RhiBackend for Dx12Backend {
     }
 
     fn destroy_swapchain(&mut self, handle: Swapchain) {
-        // `destroy` only touches the swapchain map, so the registries are not
-        // needed here; taking the lock must wait until after the device borrow.
-        super::swapchain::destroy(&mut self.device, handle);
+        let texture_ids = super::swapchain::destroy(&mut self.device, handle);
+        if !texture_ids.is_empty() {
+            // Back buffers are owned by the swapchain, which released them above;
+            // only the registry entries are removed here.
+            let mut registries = self.lock();
+            for id in texture_ids {
+                registries.textures.remove(&id);
+            }
+        }
     }
 
     fn acquire_swapchain_image(&mut self, handle: Swapchain) -> RhiResult<SwapchainImage> {
@@ -208,8 +235,13 @@ impl RhiBackend for Dx12Backend {
 
     fn create_texture(&mut self, handle: Texture, descriptor: TextureDescriptor) -> RhiResult<()> {
         rhi_validate_texture_samples(&descriptor)?;
-        let mut registries = self.lock();
-        super::texture::create(&self.device, &mut registries, handle, &descriptor)
+        // RTV/DSV allocation advances a device counter, so lock the registry
+        // field directly: `self.lock()` borrows all of `self` immutably.
+        let mut registries = self
+            .registries
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        super::texture::create(&mut self.device, &mut registries, handle, &descriptor)
     }
 
     fn create_sampler(&mut self, handle: Sampler, descriptor: SamplerDescriptor) -> RhiResult<()> {
@@ -323,6 +355,7 @@ impl RhiBackend for Dx12Backend {
     ) -> RhiResult<()> {
         let mut registries = self.lock();
         super::binding::register_set(
+            &self.device,
             &mut registries,
             handle,
             layout,
@@ -476,7 +509,7 @@ impl RhiBackend for Dx12Backend {
             .registries
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner);
-        let command_list =
+        let (command_list, staged) =
             super::command_list::record(&mut self.device, &mut registries, queue_kind, submit)?;
         drop(registries);
         let queue = match queue_kind {
@@ -488,7 +521,19 @@ impl RhiBackend for Dx12Backend {
         let fence_value = execute_and_signal(queue, command_list);
         // SAFETY: the list is no longer needed on the CPU once submitted.
         unsafe { sys::IUnknownVtbl::release(command_list) };
-        let fence_value = fence_value?;
+        let fence_value = match fence_value {
+            Ok(value) => value,
+            Err(error) => {
+                // SAFETY: the submission never reached the GPU, so its staging
+                // buffers have no outstanding readers.
+                unsafe {
+                    for resource in staged {
+                        sys::IUnknownVtbl::release(resource);
+                    }
+                }
+                return Err(error);
+            }
+        };
         if let Some(profile) = cpu_profile {
             profile.end(CpuProfilePhase::Encoding, encoding_start);
             let queue_start = profile.begin();
@@ -503,8 +548,18 @@ impl RhiBackend for Dx12Backend {
             fence: queue.fence,
             value: fence_value,
         };
+        // Raw COM pointers are not `Send`; carrying their addresses keeps the
+        // release on the thread that observed the fence.
+        let staged: Vec<u64> = staged.into_iter().map(|resource| resource as u64).collect();
         std::thread::spawn(move || {
             let _ = waiter.wait();
+            // SAFETY: each address belongs to a staging buffer created for this
+            // submission, and the GPU has retired the fence that referenced it.
+            unsafe {
+                for address in staged {
+                    sys::IUnknownVtbl::release(address as sys::ComPtr);
+                }
+            }
             completion();
         });
         Ok(())
@@ -540,25 +595,25 @@ impl RhiBackend for Dx12Backend {
 
     fn destroy_graphics_pipeline(&mut self, handle: GraphicsPipeline) {
         let mut registries = self.lock();
-        if let Some(pipeline) = registries.graphics_pipelines.remove(&handle.id()) {
+        if let Some(record) = registries.graphics_pipelines.remove(&handle.id()) {
             // SAFETY: the frame ring waited for every submission that could use it.
-            unsafe { sys::IUnknownVtbl::release(pipeline) };
+            unsafe { sys::IUnknownVtbl::release(record.pipeline) };
         }
     }
 
     fn destroy_compute_pipeline(&mut self, handle: ComputePipeline) {
         let mut registries = self.lock();
-        if let Some(pipeline) = registries.compute_pipelines.remove(&handle.id()) {
+        if let Some(record) = registries.compute_pipelines.remove(&handle.id()) {
             // SAFETY: the frame ring waited for every submission that could use it.
-            unsafe { sys::IUnknownVtbl::release(pipeline) };
+            unsafe { sys::IUnknownVtbl::release(record.pipeline) };
         }
     }
 
     fn destroy_mesh_pipeline(&mut self, handle: MeshPipeline) {
         let mut registries = self.lock();
-        if let Some(pipeline) = registries.mesh_pipelines.remove(&handle.id()) {
+        if let Some(record) = registries.mesh_pipelines.remove(&handle.id()) {
             // SAFETY: the frame ring waited for every submission that could use it.
-            unsafe { sys::IUnknownVtbl::release(pipeline) };
+            unsafe { sys::IUnknownVtbl::release(record.pipeline) };
         }
     }
 

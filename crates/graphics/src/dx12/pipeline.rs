@@ -27,8 +27,18 @@ pub fn create_graphics(
         descriptor.color_attachments.len() <= 8,
         "at most eight color attachments are supported",
     )?;
-    let pipeline = create_graphics_native(device, registries, descriptor)?;
-    registries.graphics_pipelines.insert(handle.id(), pipeline);
+    let state = create_graphics_native(device, registries, descriptor)?;
+    // A pipeline carries the layout it was built with: the encoder needs it to
+    // bind the matching root signature and root parameters at draw time.
+    registries.graphics_pipelines.insert(
+        handle.id(),
+        super::resources::Dx12GraphicsPipelineRecord {
+            pipeline: state,
+            layout_id: descriptor.layout.id(),
+            primitive: descriptor.primitive,
+            vertex_layout: descriptor.vertex_layout.clone(),
+        },
+    );
     Ok(())
 }
 
@@ -40,8 +50,14 @@ pub fn create_mesh(
     handle: MeshPipeline,
     descriptor: &MeshPipelineDescriptor,
 ) -> RhiResult<()> {
-    let pipeline = create_mesh_native(device, registries, descriptor)?;
-    registries.mesh_pipelines.insert(handle.id(), pipeline);
+    let state = create_mesh_native(device, registries, descriptor)?;
+    registries.mesh_pipelines.insert(
+        handle.id(),
+        super::resources::Dx12MeshPipelineRecord {
+            pipeline: state,
+            layout_id: descriptor.layout.id(),
+        },
+    );
     Ok(())
 }
 
@@ -52,8 +68,14 @@ pub fn create_compute(
     handle: ComputePipeline,
     descriptor: &ComputePipelineDescriptor,
 ) -> RhiResult<()> {
-    let pipeline = create_compute_native(device, registries, descriptor)?;
-    registries.compute_pipelines.insert(handle.id(), pipeline);
+    let state = create_compute_native(device, registries, descriptor)?;
+    registries.compute_pipelines.insert(
+        handle.id(),
+        super::resources::Dx12ComputePipelineRecord {
+            pipeline: state,
+            layout_id: descriptor.layout.id(),
+        },
+    );
     Ok(())
 }
 
@@ -87,7 +109,7 @@ fn create_graphics_native(
             .root_signatures
             .get(&descriptor.layout.id())
             .copied()
-            .unwrap_or(core::ptr::null_mut());
+            .ok_or_else(|| RhiError::invalid_argument("pipeline references an unknown layout"))?;
 
         // Input layout: one element per declared vertex attribute.
         let mut semantic_names: Vec<std::ffi::CString> = Vec::new();
@@ -122,8 +144,10 @@ fn create_graphics_native(
             }
         }
 
-        let mut pipeline = sys::D3D12_GRAPHICS_PIPELINE_STATE_DESC::default();
-        pipeline.pRootSignature = root_signature;
+        let mut pipeline = sys::D3D12_GRAPHICS_PIPELINE_STATE_DESC {
+            pRootSignature: root_signature,
+            ..Default::default()
+        };
         pipeline.VS = sys::D3D12_SHADER_BYTECODE {
             pShaderBytecode: vertex.bytecode.as_ptr().cast(),
             BytecodeLength: vertex.bytecode.len(),
@@ -220,9 +244,11 @@ fn create_mesh_native(
             .root_signatures
             .get(&descriptor.layout.id())
             .copied()
-            .unwrap_or(core::ptr::null_mut());
-        let mut pipeline = sys::D3D12_GRAPHICS_PIPELINE_STATE_DESC::default();
-        pipeline.pRootSignature = root_signature;
+            .ok_or_else(|| RhiError::invalid_argument("pipeline references an unknown layout"))?;
+        let mut pipeline = sys::D3D12_GRAPHICS_PIPELINE_STATE_DESC {
+            pRootSignature: root_signature,
+            ..Default::default()
+        };
         // A mesh pipeline puts the mesh shader in the amplification/geometry slots:
         // `MS` occupies the `GS` field and the object shader the `AS` field, which
         // is how D3D12 spells the mesh pipeline without a separate descriptor.
@@ -314,9 +340,11 @@ fn create_compute_native(
             .root_signatures
             .get(&descriptor.layout.id())
             .copied()
-            .unwrap_or(core::ptr::null_mut());
-        let mut pipeline = sys::D3D12_COMPUTE_PIPELINE_STATE_DESC::default();
-        pipeline.pRootSignature = root_signature;
+            .ok_or_else(|| RhiError::invalid_argument("pipeline references an unknown layout"))?;
+        let mut pipeline = sys::D3D12_COMPUTE_PIPELINE_STATE_DESC {
+            pRootSignature: root_signature,
+            ..Default::default()
+        };
         pipeline.CS = sys::D3D12_SHADER_BYTECODE {
             pShaderBytecode: shader.bytecode.as_ptr().cast(),
             BytecodeLength: shader.bytecode.len(),

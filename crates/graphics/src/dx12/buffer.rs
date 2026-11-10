@@ -92,7 +92,9 @@ fn create_in_heap_from_pointer(
             MipLevels: 1,
             Format: sys::DXGI_FORMAT_UNKNOWN,
             SampleDesc: [1, 0],
-            Layout: 0,
+            // D3D12 rejects `UNKNOWN` for buffer resources; the row-major
+            // layout is the only valid one for buffers in any heap type.
+            Layout: sys::D3D12_TEXTURE_LAYOUT_ROW_MAJOR,
             Flags: sys::D3D12_RESOURCE_FLAG_NONE,
         };
         let mut resource: sys::ComPtr = core::ptr::null_mut();
@@ -118,7 +120,13 @@ fn create_in_heap_from_pointer(
             )
         };
         if status != sys::S_OK || resource.is_null() {
-            return Err(RhiError::OutOfMemory);
+            // Only a genuine allocation failure is "out of memory"; reporting
+            // E_INVALIDARG as such hides descriptor mistakes.
+            return Err(if status == sys::E_OUTOFMEMORY {
+                RhiError::OutOfMemory
+            } else {
+                RhiError::invalid_argument(sys::hresult_message(status))
+            });
         }
         let mut mapped = core::ptr::null_mut();
         // Upload and readback heaps are both CPU-visible; a default heap is not.

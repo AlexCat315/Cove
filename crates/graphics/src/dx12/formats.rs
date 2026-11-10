@@ -34,7 +34,9 @@ pub fn dxgi_format(format: TextureFormat) -> u32 {
     }
 }
 
-/// The backend-neutral format a DXGI format represents.
+/// The backend-neutral format a DXGI format represents. Kept as the inverse of
+/// `dxgi_format` for diagnostics and future readback paths.
+#[allow(dead_code)]
 pub fn texture_format(format: u32) -> TextureFormat {
     match format {
         sys::DXGI_FORMAT_R8_UNORM => TextureFormat::R8Unorm,

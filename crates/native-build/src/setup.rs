@@ -9,6 +9,7 @@ use std::{
 };
 
 mod sdk;
+pub mod shell;
 
 /// Zig release used by `crates/terminal/build.rs` and the CI toolchain.
 const ZIG_VERSION: &str = "0.17.0";
@@ -42,6 +43,18 @@ pub struct Options {
     pub check: bool,
     pub dry_run: bool,
     pub targets: Vec<String>,
+    /// Add Cove's pinned-tool directories to the user-level PATH. Opt-in:
+    /// Cargo builds never need it, and a persistent PATH is a machine-wide
+    /// change that must not happen silently.
+    pub persist_path: bool,
+    /// Remove only the entries Cove previously added to the user-level PATH.
+    pub unpersist_path: bool,
+}
+
+/// Statements that expose Cove's pinned tools in the invoking shell without
+/// changing any persistent configuration (`cargo cove env`).
+pub fn shell_exports(shell: shell::Shell) -> io::Result<String> {
+    Ok(shell::exports(&state()?, shell))
 }
 
 #[derive(Clone, Copy)]
@@ -402,7 +415,48 @@ pub fn host_triple() -> io::Result<String> {
         .map(str::to_owned)
         .ok_or_else(|| io::Error::other("rustc host triple missing"))
 }
+/// How Cove's tools reach a shell. The report states this explicitly so a
+/// developer never assumes `cargo cove setup` edited their machine's PATH.
+fn shell_report() -> Value {
+    json!({
+        "build_scripts": "automatic: Cove injects the setup state into build-script child processes",
+        "terminal": "not changed by default; use `cargo cove env` or `cargo cove setup --persist-path`",
+    })
+}
+
+fn user_path_plan(options: &Options) -> Value {
+    json!({
+        "action": if options.persist_path {
+            "persist"
+        } else if options.unpersist_path {
+            "unpersist"
+        } else {
+            "none"
+        },
+        "applied": false,
+        "scope": if cfg!(windows) {
+            "user-level PATH (HKCU\\Environment)"
+        } else {
+            "shell profile managed block"
+        },
+        "hint": "omit --persist-path to leave the machine untouched",
+    })
+}
+
 pub fn run(options: &Options) -> io::Result<Value> {
+    if options.persist_path && options.unpersist_path {
+        return Err(io::Error::other(
+            "--persist-path and --unpersist-path are mutually exclusive",
+        ));
+    }
+    if options.unpersist_path && !options.check && !options.dry_run {
+        shell::unpersist()?;
+        return Ok(json!({
+            "ready": true,
+            "user_path": {"persistent": false, "action": "removed"},
+            "shell": shell_report(),
+        }));
+    }
     let host = Host::current()?;
     let mut targets = options.targets.clone();
     if targets.is_empty() {
@@ -441,6 +495,8 @@ pub fn run(options: &Options) -> io::Result<Value> {
             "shaders": shader_status(&saved, host)?,
             "targets": targets,
             "actions": actions,
+            "user_path": user_path_plan(options),
+            "shell": shell_report(),
         }));
     }
     if !options.check {
@@ -477,6 +533,28 @@ pub fn run(options: &Options) -> io::Result<Value> {
         && sdk
         && submodules["ready"] == true
         && (!options.shaders || shaders["ready"] == true);
+    let user_path = if options.persist_path && !options.check && !options.dry_run {
+        if ready {
+            let directories = shell::persist(&saved)?;
+            json!({
+                "persistent": true,
+                "action": "persisted",
+                "directories": directories
+                    .iter()
+                    .map(|path| path.display().to_string())
+                    .collect::<Vec<_>>(),
+                "restart_shell": true,
+            })
+        } else {
+            json!({
+                "persistent": false,
+                "action": "skipped",
+                "reason": "setup is not ready; no tools were persisted",
+            })
+        }
+    } else {
+        user_path_plan(options)
+    };
     let result = json!({
         "ready": ready,
         "tools": report,
@@ -485,6 +563,8 @@ pub fn run(options: &Options) -> io::Result<Value> {
         "submodules": submodules,
         "shaders": shaders,
         "targets": targets,
+        "user_path": user_path,
+        "shell": shell_report(),
     });
     if !options.check && ready {
         saved["schema"] = json!(1);

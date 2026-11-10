@@ -45,6 +45,10 @@ pub struct Dx12Swapchain {
     pub swapchain: sys::ComPtr,
     pub width: usize,
     pub height: usize,
+    /// Diagnostics: the format the swapchain was created with. Render passes
+    /// resolve attachments through the texture registry, so this is not read on
+    /// the hot path.
+    #[allow(dead_code)]
     pub format: TextureFormat,
     pub vsync: bool,
     pub generation: u64,
@@ -52,7 +56,9 @@ pub struct Dx12Swapchain {
     pub buffers: Vec<sys::ComPtr>,
     /// Frontend texture handle per back buffer.
     pub texture_ids: Vec<u32>,
-    /// Render-target descriptors, one per back buffer.
+    /// Render-target descriptors, one per back buffer. Kept alongside the
+    /// registry records so a debugger can inspect the whole chain at once.
+    #[allow(dead_code)]
     pub render_targets: Vec<sys::D3D12_CPU_DESCRIPTOR_HANDLE>,
     pub current_index: u32,
     pub acquired: Option<u32>,
@@ -74,13 +80,17 @@ pub struct Dx12DeviceHandle {
     pub rtv_descriptor_size: u32,
     pub resource_descriptor_size: u32,
     pub sampler_descriptor_size: u32,
+    /// The configuration the device was created with, retained for diagnostics.
+    #[allow(dead_code)]
     pub config: DeviceConfig,
     pub capabilities: Capabilities,
     pub adapter_capabilities: AdapterCapabilities,
     pub device_name: String,
     pub swapchains: HashMap<u32, Dx12Swapchain>,
+    /// Next free descriptor in the RTV/DSV heaps. Both are non-shader-visible
+    /// and share one counter; shader-visible heaps are allocated by the
+    /// binding planner in `Dx12Registries`.
     pub next_rtv_index: u32,
-    pub next_resource_index: u32,
     /// Backend-internal handle counter, above the frontend's low IDs.
     pub next_internal_id: u32,
     /// One reusable command allocator per queue class. A closed list keeps its
@@ -91,6 +101,13 @@ pub struct Dx12DeviceHandle {
 
 /// First backend-internal handle.
 pub const INTERNAL_ID_BASE: u32 = 0xF000_0000;
+
+/// Descriptor-heap capacities. The binding planner uses these to refuse a set
+/// before it writes past the end of a heap.
+pub const RESOURCE_HEAP_CAPACITY: u32 = 1024;
+pub const SAMPLER_HEAP_CAPACITY: u32 = 256;
+pub const RTV_HEAP_CAPACITY: u32 = 64;
+pub const DSV_HEAP_CAPACITY: u32 = 64;
 
 impl Dx12DeviceHandle {
     /// Creates the device and its queues.
@@ -149,6 +166,18 @@ impl Dx12DeviceHandle {
         let id = self.next_internal_id;
         self.next_internal_id = self.next_internal_id.wrapping_add(1);
         id
+    }
+
+    /// Reserves one descriptor slot in the RTV/DSV heaps. A view is never
+    /// recycled while a swapchain may still be presenting, so the counter only
+    /// moves forward.
+    pub fn take_rtv_index(&mut self) -> RhiResult<u32> {
+        if self.next_rtv_index >= RTV_HEAP_CAPACITY.min(DSV_HEAP_CAPACITY) {
+            return Err(RhiError::OutOfMemory);
+        }
+        let index = self.next_rtv_index;
+        self.next_rtv_index += 1;
+        Ok(index)
     }
 }
 
@@ -238,20 +267,6 @@ fn wait_for_fence(queue: &Dx12Queue, value: u64) -> RhiResult<()> {
         Err(RhiError::unsupported_backend(
             "DirectX 12 is only available on Windows",
         ))
-    }
-}
-
-/// Reports the adapter's feature level, for capability shaping.
-fn probe_features(_device: sys::ComPtr) -> (u32, bool, bool) {
-    // D3D12_FEATURE_FEATURE_LEVELS reports the maximum feature level; ray tracing
-    // (DXR 1.0) needs 11_0, and 11_1 is required for ray queries.
-    #[cfg(target_os = "windows")]
-    {
-        windows_impl::probe_features(_device)
-    }
-    #[cfg(not(target_os = "windows"))]
-    {
-        (0, false, false)
     }
 }
 
@@ -372,12 +387,27 @@ mod windows_impl {
         let resource_heap = create_heap(
             device,
             sys::D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV,
-            1024,
+            RESOURCE_HEAP_CAPACITY,
             true,
         )?;
-        let sampler_heap = create_heap(device, sys::D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER, 256, true)?;
-        let rtv_heap = create_heap(device, sys::D3D12_DESCRIPTOR_HEAP_TYPE_RTV, 64, false)?;
-        let dsv_heap = create_heap(device, sys::D3D12_DESCRIPTOR_HEAP_TYPE_DSV, 64, false)?;
+        let sampler_heap = create_heap(
+            device,
+            sys::D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER,
+            SAMPLER_HEAP_CAPACITY,
+            true,
+        )?;
+        let rtv_heap = create_heap(
+            device,
+            sys::D3D12_DESCRIPTOR_HEAP_TYPE_RTV,
+            RTV_HEAP_CAPACITY,
+            false,
+        )?;
+        let dsv_heap = create_heap(
+            device,
+            sys::D3D12_DESCRIPTOR_HEAP_TYPE_DSV,
+            DSV_HEAP_CAPACITY,
+            false,
+        )?;
 
         let (feature_level, ray_tracing, ray_query) = probe_features(device);
         let mesh = feature_level >= 12;
@@ -409,7 +439,6 @@ mod windows_impl {
             device_name: "Direct3D 12 adapter".to_owned(),
             swapchains: HashMap::new(),
             next_rtv_index: 0,
-            next_resource_index: 0,
             next_internal_id: INTERNAL_ID_BASE,
             allocators: HashMap::new(),
         })

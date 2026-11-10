@@ -7,8 +7,9 @@
 //! - on macOS the default backend is Metal, Vulkan and DX12 are not compiled
 //!   in, and asking for Vulkan yields `UnsupportedBackend`
 
-use cove_graphics::rhi::is_compiled_in;
-use cove_graphics::rhi::{Device, DeviceConfig, GraphicsApi, RhiError, platform_default_backends};
+use cove_graphics::rhi::{Device, DeviceConfig, RhiError, platform_default_backends};
+#[cfg(target_os = "macos")]
+use cove_graphics::rhi::{GraphicsApi, is_compiled_in};
 
 #[test]
 fn module_reports_a_version_and_default_backends() {

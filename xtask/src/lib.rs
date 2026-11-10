@@ -24,6 +24,13 @@ struct Cli {
     command: Command,
 }
 
+#[derive(Clone, Copy, Debug, ValueEnum)]
+enum ShellSyntax {
+    Posix,
+    #[value(name = "powershell", alias = "power-shell")]
+    PowerShell,
+}
+
 #[derive(Subcommand)]
 enum Command {
     /// Prepare native build tools and SDKs. Does not compile FFmpeg.
@@ -41,6 +48,19 @@ enum Command {
         dry_run: bool,
         #[arg(long)]
         target: Vec<String>,
+        /// Add Cove's pinned tools to the user-level PATH for future shells.
+        #[arg(long)]
+        persist_path: bool,
+        /// Remove only the entries Cove previously added to the user-level PATH.
+        #[arg(long)]
+        unpersist_path: bool,
+    },
+    /// Print shell statements that expose Cove's pinned tools in this shell.
+    /// Does not change any persistent configuration.
+    Env {
+        /// Syntax to emit; defaults to the host's shell.
+        #[arg(long, value_enum)]
+        shell: Option<ShellSyntax>,
     },
     /// Check the Rust workspace layout.
     Audit {
@@ -202,6 +222,8 @@ fn execute(cli: Cli) -> Result<()> {
             check,
             dry_run,
             target,
+            persist_path,
+            unpersist_path,
         } => {
             let targets = target.clone();
             let mut report = cove_native_build::setup::run(&cove_native_build::setup::Options {
@@ -210,6 +232,8 @@ fn execute(cli: Cli) -> Result<()> {
                 check,
                 dry_run,
                 targets: target,
+                persist_path,
+                unpersist_path,
             })
             .map_err(|e| e.to_string())?;
             let project = std::env::current_dir().map_err(|e| e.to_string())?;
@@ -229,6 +253,22 @@ fn execute(cli: Cli) -> Result<()> {
                     "native tools, SDKs or submodules are not ready; run `cargo cove setup`".into(),
                 );
             }
+            Ok(())
+        }
+        Command::Env { shell } => {
+            let syntax = shell.unwrap_or(if cfg!(windows) {
+                ShellSyntax::PowerShell
+            } else {
+                ShellSyntax::Posix
+            });
+            let native = match syntax {
+                ShellSyntax::Posix => cove_native_build::setup::shell::Shell::Posix,
+                ShellSyntax::PowerShell => cove_native_build::setup::shell::Shell::PowerShell,
+            };
+            println!(
+                "{}",
+                cove_native_build::setup::shell_exports(native).map_err(|e| e.to_string())?
+            );
             Ok(())
         }
         Command::Audit { json } => audit::run(json),

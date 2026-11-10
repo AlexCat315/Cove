@@ -1,3 +1,7 @@
+//! Metal-only draw-list probe. On Windows the Metal backend is not built, so
+//! requesting it would fail before the probe can measure anything.
+#![cfg(target_os = "macos")]
+
 use cove_core::{Color, DrawList, Rect};
 use cove_graphics::NativeDrawListRenderer;
 use cove_graphics::ui::NativeUIViewport;

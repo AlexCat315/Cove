@@ -201,6 +201,10 @@ pub const D3D12_RESOURCE_DIMENSION_TEXTURE1D: u32 = 2;
 pub const D3D12_RESOURCE_DIMENSION_TEXTURE2D: u32 = 3;
 pub const D3D12_RESOURCE_DIMENSION_TEXTURE3D: u32 = 4;
 
+/// `D3D12_TEXTURE_LAYOUT`: buffers must use row-major, textures use unknown.
+pub const D3D12_TEXTURE_LAYOUT_UNKNOWN: u32 = 0;
+pub const D3D12_TEXTURE_LAYOUT_ROW_MAJOR: u32 = 1;
+
 pub const D3D12_RESOURCE_STATE_COMMON: u32 = 0;
 pub const D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER: u32 = 0x1;
 pub const D3D12_RESOURCE_STATE_INDEX_BUFFER: u32 = 0x2;
@@ -274,6 +278,40 @@ pub const D3D12_CULL_MODE_BACK: u32 = 3;
 pub const D3D12_ROOT_SIGNATURE_VERSION_1: u32 = 1;
 pub const D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT: u32 = 0x1;
 
+/// `D3D12_ROOT_PARAMETER_TYPE`, in the enum's real order from `d3d12.h`.
+/// These values are consumed by `D3D12SerializeRootSignature`; using a made-up
+/// 1-based order silently produces a root signature that binds nothing.
+pub const D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE: u32 = 0;
+pub const D3D12_ROOT_PARAMETER_TYPE_32BIT_CONSTANTS: u32 = 1;
+pub const D3D12_ROOT_PARAMETER_TYPE_CBV: u32 = 2;
+pub const D3D12_ROOT_PARAMETER_TYPE_SRV: u32 = 3;
+pub const D3D12_ROOT_PARAMETER_TYPE_UAV: u32 = 4;
+
+/// `D3D12_SHADER_VISIBILITY`. The RHI's compute visibility has no D3D12
+/// counterpart, so compute-only bindings use `ALL` (see `binding.rs`).
+pub const D3D12_SHADER_VISIBILITY_ALL: u32 = 0;
+pub const D3D12_SHADER_VISIBILITY_VERTEX: u32 = 1;
+pub const D3D12_SHADER_VISIBILITY_HULL: u32 = 2;
+pub const D3D12_SHADER_VISIBILITY_DOMAIN: u32 = 3;
+pub const D3D12_SHADER_VISIBILITY_GEOMETRY: u32 = 4;
+pub const D3D12_SHADER_VISIBILITY_PIXEL: u32 = 5;
+pub const D3D12_SHADER_VISIBILITY_AMPLIFICATION: u32 = 6;
+pub const D3D12_SHADER_VISIBILITY_MESH: u32 = 7;
+
+/// A root signature may spend at most 64 DWORDs. A root descriptor costs two,
+/// a descriptor table one, and root constants one per 32-bit value.
+pub const D3D12_MAX_ROOT_SIGNATURE_DWORDS: u32 = 64;
+
+pub const D3D12_DESCRIPTOR_RANGE_TYPE_SRV: u32 = 0;
+pub const D3D12_DESCRIPTOR_RANGE_TYPE_UAV: u32 = 1;
+pub const D3D12_DESCRIPTOR_RANGE_TYPE_CBV: u32 = 2;
+pub const D3D12_DESCRIPTOR_RANGE_TYPE_SAMPLER: u32 = 3;
+pub const D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND: u32 = 0xFFFF_FFFF;
+
+pub const D3D12_BUFFER_UAV_FLAG_RAW: u32 = 0x1;
+
+pub const DXGI_FORMAT_R32_TYPELESS: u32 = 39;
+
 pub const D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV: u32 = 0;
 pub const D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER: u32 = 1;
 pub const D3D12_DESCRIPTOR_HEAP_TYPE_RTV: u32 = 2;
@@ -288,6 +326,10 @@ pub const D3D12_FILTER_COMPARISON_MIN_MAG_MIP_LINEAR: u32 = 0x95;
 pub const D3D12_FENCE_FLAG_NONE: u32 = 0;
 pub const D3D12_FENCE_FLAG_SHARED: u32 = 0x2;
 
+/// `D3D12_CLEAR_FLAGS`, passed to `ClearDepthStencilView`.
+pub const D3D12_CLEAR_FLAG_DEPTH: u32 = 0x1;
+pub const D3D12_CLEAR_FLAG_STENCIL: u32 = 0x2;
+
 pub const D3D12_INDEX_BUFFER_STRIP_CUT_VALUE_DISABLED: u32 = 0;
 pub const D3D12_INDEX_BUFFER_STRIP_CUT_VALUE_0xFFFF: u32 = 1;
 
@@ -300,6 +342,7 @@ pub const DXGI_FORMAT_R32G32B32A32_FLOAT: u32 = 2;
 pub const DXGI_FORMAT_R32G32B32_FLOAT: u32 = 6;
 pub const DXGI_FORMAT_R8G8B8A8_UNORM: u32 = 28;
 pub const DXGI_FORMAT_R8G8B8A8_UNORM_SRGB: u32 = 29;
+pub const DXGI_FORMAT_R16_UINT: u32 = 57;
 pub const DXGI_FORMAT_R32_UINT: u32 = 42;
 pub const DXGI_FORMAT_R32_FLOAT: u32 = 41;
 pub const DXGI_FORMAT_R8_UNORM: u32 = 61;
@@ -691,20 +734,79 @@ impl Default for D3D12_COMPUTE_PIPELINE_STATE_DESC {
     }
 }
 
-/// `D3D12_ROOT_PARAMETER`: a root descriptor or a 32-bit-constant entry.
+/// `D3D12_ROOT_DESCRIPTOR_TABLE`: the union's largest member, and the only one
+/// that carries a pointer. On x64 the pointer forces the union to an 8-byte
+/// alignment, which is why `D3D12_ROOT_PARAMETER` has four bytes of padding
+/// after `ParameterType`.
+#[repr(C)]
+#[derive(Clone, Copy, Default)]
+pub struct D3D12_ROOT_DESCRIPTOR_TABLE {
+    pub NumDescriptorRanges: u32,
+    pub pDescriptorRanges: *const D3D12_DESCRIPTOR_RANGE,
+}
+
+/// `D3D12_ROOT_CONSTANTS`.
+#[repr(C)]
+#[derive(Clone, Copy, Default)]
+pub struct D3D12_ROOT_CONSTANTS {
+    pub ShaderRegister: u32,
+    pub RegisterSpace: u32,
+    pub Num32BitValues: u32,
+}
+
+/// `D3D12_ROOT_DESCRIPTOR` (a CBV/SRV/UAV bound directly in the root signature).
+#[repr(C)]
+#[derive(Clone, Copy, Default)]
+pub struct D3D12_ROOT_DESCRIPTOR {
+    pub ShaderRegister: u32,
+    pub RegisterSpace: u32,
+}
+
+/// The anonymous union of `D3D12_ROOT_PARAMETER`.
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub union D3D12_ROOT_PARAMETER_UNION {
+    pub DescriptorTable: D3D12_ROOT_DESCRIPTOR_TABLE,
+    pub Constants: D3D12_ROOT_CONSTANTS,
+    pub Descriptor: D3D12_ROOT_DESCRIPTOR,
+}
+
+impl Default for D3D12_ROOT_PARAMETER_UNION {
+    fn default() -> Self {
+        Self {
+            Descriptor: D3D12_ROOT_DESCRIPTOR::default(),
+        }
+    }
+}
+
+/// `D3D12_ROOT_PARAMETER`.
 ///
-/// The C struct holds a union whose largest member is a descriptor table; this
-/// declaration keeps the same size by using a fixed payload array, and the
-/// `ParameterType` field selects which member the driver reads.
+/// The C declaration is `ParameterType`, an anonymous union (aligned to the
+/// pointer inside `DescriptorTable`), then `ShaderVisibility`. Flattening it
+/// into a fixed `u32` payload put the visibility at the wrong offset and
+/// truncated descriptor-table pointers to 32 bits on x64.
 #[repr(C)]
 #[derive(Clone, Copy, Default)]
 pub struct D3D12_ROOT_PARAMETER {
     pub ParameterType: u32,
+    pub Anonymous: D3D12_ROOT_PARAMETER_UNION,
     pub ShaderVisibility: u32,
-    pub shader_register: u32,
-    pub register_space: u32,
-    pub payload: [u32; 4],
 }
+
+#[cfg(target_pointer_width = "64")]
+const _: () = {
+    assert!(core::mem::size_of::<D3D12_ROOT_PARAMETER>() == 32);
+    assert!(core::mem::offset_of!(D3D12_ROOT_PARAMETER, Anonymous) == 8);
+    assert!(core::mem::offset_of!(D3D12_ROOT_PARAMETER, ShaderVisibility) == 24);
+    assert!(core::mem::size_of::<D3D12_ROOT_SIGNATURE_DESC>() == 40);
+};
+
+#[cfg(target_pointer_width = "32")]
+const _: () = {
+    assert!(core::mem::size_of::<D3D12_ROOT_PARAMETER>() == 16);
+    assert!(core::mem::offset_of!(D3D12_ROOT_PARAMETER, Anonymous) == 4);
+    assert!(core::mem::offset_of!(D3D12_ROOT_PARAMETER, ShaderVisibility) == 12);
+};
 
 /// `D3D12_ROOT_SIGNATURE_DESC`.
 #[repr(C)]
@@ -715,6 +817,25 @@ pub struct D3D12_ROOT_SIGNATURE_DESC {
     pub NumStaticSamplers: u32,
     pub pStaticSamplers: *const core::ffi::c_void,
     pub Flags: u32,
+}
+
+/// `D3D12_DESCRIPTOR_RANGE`: one contiguous run inside a descriptor table.
+#[repr(C)]
+#[derive(Clone, Copy, Default)]
+pub struct D3D12_DESCRIPTOR_RANGE {
+    pub RangeType: u32,
+    pub NumDescriptors: u32,
+    pub BaseShaderRegister: u32,
+    pub RegisterSpace: u32,
+    pub OffsetInDescriptorsFromTableStart: u32,
+}
+
+/// `D3D12_CONSTANT_BUFFER_VIEW_DESC`.
+#[repr(C)]
+#[derive(Clone, Copy, Default)]
+pub struct D3D12_CONSTANT_BUFFER_VIEW_DESC {
+    pub BufferLocation: u64,
+    pub SizeInBytes: u32,
 }
 
 /// `D3D12_SAMPLER_DESC`.
@@ -963,9 +1084,24 @@ pub struct ID3D12DeviceVtbl {
         *const GUID,
         *mut *mut c_void,
     ) -> HRESULT,
-    pub CreateConstantBufferView: usize,
-    pub CreateShaderResourceView: usize,
-    pub CreateUnorderedAccessView: usize,
+    pub CreateConstantBufferView: unsafe extern "system" fn(
+        *mut c_void,
+        *const D3D12_CONSTANT_BUFFER_VIEW_DESC,
+        D3D12_CPU_DESCRIPTOR_HANDLE,
+    ),
+    pub CreateShaderResourceView: unsafe extern "system" fn(
+        *mut c_void,
+        *mut c_void,
+        *const c_void,
+        D3D12_CPU_DESCRIPTOR_HANDLE,
+    ),
+    pub CreateUnorderedAccessView: unsafe extern "system" fn(
+        *mut c_void,
+        *mut c_void,
+        *mut c_void,
+        *const c_void,
+        D3D12_CPU_DESCRIPTOR_HANDLE,
+    ),
     pub CreateRenderTargetView: CreateViewFn,
     pub CreateDepthStencilView: CreateViewFn,
     pub CreateSampler: unsafe extern "system" fn(
@@ -974,7 +1110,13 @@ pub struct ID3D12DeviceVtbl {
         D3D12_CPU_DESCRIPTOR_HANDLE,
     ),
     pub CopyDescriptors: usize,
-    pub CopyDescriptorsSimple: usize,
+    pub CopyDescriptorsSimple: unsafe extern "system" fn(
+        *mut c_void,
+        u32,
+        D3D12_CPU_DESCRIPTOR_HANDLE,
+        D3D12_CPU_DESCRIPTOR_HANDLE,
+        u32,
+    ),
     /// Returns a struct: not callable through this plain signature.
     pub GetResourceAllocationInfo: usize,
     /// Returns a struct: not callable through this plain signature.
@@ -1020,6 +1162,37 @@ mod tests {
     fn releasing_a_null_interface_is_a_no_op() {
         // SAFETY: null is explicitly handled.
         unsafe { IUnknownVtbl::release(core::ptr::null_mut()) };
+    }
+
+    #[test]
+    fn root_parameter_matches_the_d3d12_header() {
+        let ranges = [D3D12_DESCRIPTOR_RANGE {
+            RangeType: D3D12_DESCRIPTOR_RANGE_TYPE_SRV,
+            NumDescriptors: 1,
+            BaseShaderRegister: 3,
+            RegisterSpace: 0,
+            OffsetInDescriptorsFromTableStart: D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND,
+        }];
+        let parameter = D3D12_ROOT_PARAMETER {
+            ParameterType: D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE,
+            Anonymous: D3D12_ROOT_PARAMETER_UNION {
+                DescriptorTable: D3D12_ROOT_DESCRIPTOR_TABLE {
+                    NumDescriptorRanges: ranges.len() as u32,
+                    pDescriptorRanges: ranges.as_ptr(),
+                },
+            },
+            ShaderVisibility: D3D12_SHADER_VISIBILITY_ALL,
+        };
+        // A descriptor table is parameter type 0, and its pointer must survive
+        // the round trip as a full-width address.
+        assert_eq!(parameter.ParameterType, 0);
+        assert_eq!(parameter.ShaderVisibility, 0);
+        // SAFETY: the union member was initialized as a descriptor table above.
+        let table = unsafe { parameter.Anonymous.DescriptorTable };
+        assert_eq!(table.NumDescriptorRanges, 1);
+        assert_eq!(table.pDescriptorRanges, ranges.as_ptr());
+        assert_eq!(D3D12_ROOT_PARAMETER_TYPE_CBV, 2);
+        assert_eq!(D3D12_ROOT_PARAMETER_TYPE_UAV, 4);
     }
 
     #[test]

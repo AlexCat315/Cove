@@ -17,7 +17,7 @@ use super::sys;
 
 /// Creates one committed texture and records it.
 pub fn create(
-    device: &Dx12DeviceHandle,
+    device: &mut Dx12DeviceHandle,
     registries: &mut Dx12Registries,
     handle: Texture,
     descriptor: &TextureDescriptor,
@@ -77,15 +77,12 @@ pub fn create(
 
     // Carve the views a render target or depth target needs.
     if is_attachment {
-        let descriptor_handle = allocate_descriptor(
-            device,
-            registries,
-            if descriptor.format.is_depth() {
-                sys::D3D12_DESCRIPTOR_HEAP_TYPE_DSV
-            } else {
-                sys::D3D12_DESCRIPTOR_HEAP_TYPE_RTV
-            },
-        )?;
+        let index = device.take_rtv_index()?;
+        let descriptor_handle = if descriptor.format.is_depth() {
+            dsv_heap_cpu(device, index)?
+        } else {
+            rtv_heap_cpu(device, index)?
+        };
         create_view(
             device,
             record.resource,
@@ -137,7 +134,11 @@ fn create_committed(
             )
         };
         if status != sys::S_OK || resource.is_null() {
-            return Err(RhiError::OutOfMemory);
+            return Err(if status == sys::E_OUTOFMEMORY {
+                RhiError::OutOfMemory
+            } else {
+                RhiError::invalid_argument(sys::hresult_message(status))
+            });
         }
         Ok(Dx12TextureRecord {
             resource,
@@ -156,31 +157,25 @@ fn create_committed(
     }
 }
 
-/// Reserves one descriptor from the named heap and returns its CPU handle.
-fn allocate_descriptor(
+/// CPU handle for `index` in the render-target-view heap.
+pub fn rtv_heap_cpu(
     device: &Dx12DeviceHandle,
-    registries: &mut Dx12Registries,
-    heap_type: u32,
+    index: u32,
 ) -> RhiResult<sys::D3D12_CPU_DESCRIPTOR_HANDLE> {
-    let (heap, index, size) = if heap_type == sys::D3D12_DESCRIPTOR_HEAP_TYPE_DSV {
-        (
-            device.dsv_heap,
-            device.next_rtv_index,
-            device.rtv_descriptor_size,
-        )
-    } else {
-        (
-            device.rtv_heap,
-            device.next_rtv_index,
-            device.rtv_descriptor_size,
-        )
-    };
-    let _ = registries;
-    // A descriptor handle is the heap base plus `index * size`; D3D12 also offers
-    // `GetCPUDescriptorHandleForHeapStart`, which needs the heap's vtable.
-    let base = heap_start(heap)?;
+    let base = heap_start(device.rtv_heap)?;
     Ok(sys::D3D12_CPU_DESCRIPTOR_HANDLE {
-        ptr: base.ptr + (index as usize) * size as usize,
+        ptr: base.ptr + (index as usize) * device.rtv_descriptor_size as usize,
+    })
+}
+
+/// CPU handle for `index` in the depth-stencil-view heap.
+pub fn dsv_heap_cpu(
+    device: &Dx12DeviceHandle,
+    index: u32,
+) -> RhiResult<sys::D3D12_CPU_DESCRIPTOR_HANDLE> {
+    let base = heap_start(device.dsv_heap)?;
+    Ok(sys::D3D12_CPU_DESCRIPTOR_HANDLE {
+        ptr: base.ptr + (index as usize) * device.rtv_descriptor_size as usize,
     })
 }
 
@@ -220,7 +215,11 @@ struct DescriptorHeapVtbl {
             sys::ComPtr,
             *mut sys::D3D12_CPU_DESCRIPTOR_HANDLE,
         ) -> *mut sys::D3D12_CPU_DESCRIPTOR_HANDLE,
-    GetGPUDescriptorHandleForHeapStart: usize,
+    GetGPUDescriptorHandleForHeapStart:
+        unsafe extern "system" fn(
+            sys::ComPtr,
+            *mut sys::D3D12_GPU_DESCRIPTOR_HANDLE,
+        ) -> *mut sys::D3D12_GPU_DESCRIPTOR_HANDLE,
 }
 
 /// Creates the render-target or depth-stencil view for a texture.
@@ -242,10 +241,11 @@ fn create_view(
         // The view description is a plain struct whose first fields are the format
         // and dimension; a null description asks D3D12 for a default view over the
         // whole resource, which is what a single-mip attachment needs.
-        let _ = format;
-        let mut view = ViewDescription::default();
-        view.format = formats::dxgi_format(format);
-        view.view_dimension = if format.is_depth() { 3 } else { 4 };
+        let view = ViewDescription {
+            format: formats::dxgi_format(format),
+            view_dimension: if format.is_depth() { 3 } else { 4 },
+            ..Default::default()
+        };
         // SAFETY: the device and resource are live; the vtable entry matches
         // `CreateRenderTargetView`/`CreateDepthStencilView`, which take the same
         // arguments.
@@ -287,9 +287,10 @@ struct ViewDescription {
 /// Creates one sampler by writing a `D3D12_SAMPLER_DESC` into the sampler heap.
 ///
 /// D3D12 has no sampler object: the descriptor *is* the sampler, so the registry
-/// stores the handle the encoder binds.
+/// stores the description and writes it into the shader-visible heap when a
+/// binding set is registered.
 pub fn create_sampler(
-    device: &Dx12DeviceHandle,
+    _device: &Dx12DeviceHandle,
     registries: &mut Dx12Registries,
     handle: Sampler,
     descriptor: &SamplerDescriptor,
@@ -316,41 +317,149 @@ pub fn create_sampler(
         MinLOD: 0.0,
         MaxLOD: f32::MAX,
     };
-    let cpu_handle = write_sampler(device, &description)?;
-    // The registry keeps the descriptor handle as the sampler's identity, which is
-    // what the command list binds through the sampler heap.
-    registries.samplers.insert(handle.id(), cpu_handle);
+    registries.samplers.insert(handle.id(), description);
     Ok(())
 }
 
-/// Writes one sampler description into the sampler heap at the next free slot.
-fn write_sampler(
+/// Writes one sampler description into the sampler heap at the given CPU handle.
+#[cfg(target_os = "windows")]
+pub fn write_sampler_at(
     device: &Dx12DeviceHandle,
     description: &sys::D3D12_SAMPLER_DESC,
-) -> RhiResult<sys::ComPtr> {
+    handle: sys::D3D12_CPU_DESCRIPTOR_HANDLE,
+) {
+    // SAFETY: the device and sampler heap are live, the description outlives the
+    // call, and the handle points inside the heap.
+    unsafe {
+        let vtbl = *(device.device as *mut *const sys::ID3D12DeviceVtbl);
+        ((*vtbl).CreateSampler)(device.device, description, handle);
+    }
+}
+
+#[cfg(not(target_os = "windows"))]
+pub fn write_sampler_at(
+    _device: &Dx12DeviceHandle,
+    _description: &sys::D3D12_SAMPLER_DESC,
+    _handle: sys::D3D12_CPU_DESCRIPTOR_HANDLE,
+) {
+}
+
+/// The GPU start handle of a descriptor heap.
+fn heap_start_gpu(heap: sys::ComPtr) -> RhiResult<sys::D3D12_GPU_DESCRIPTOR_HANDLE> {
     #[cfg(not(target_os = "windows"))]
     {
-        let _ = (device, description);
+        let _ = heap;
         Err(RhiError::unsupported_backend(
             "DirectX 12 is only available on Windows",
         ))
     }
     #[cfg(target_os = "windows")]
     {
-        let base = heap_start(device.sampler_heap)?;
-        let handle = sys::D3D12_CPU_DESCRIPTOR_HANDLE {
-            ptr: base.ptr
-                + (device.next_rtv_index as usize) * device.sampler_descriptor_size as usize,
-        };
-        // SAFETY: the device and sampler heap are live, the description outlives the
-        // call, and the handle was computed inside the heap.
+        let mut handle = sys::D3D12_GPU_DESCRIPTOR_HANDLE { ptr: 0 };
+        // SAFETY: the heap is live and the vtable returns the handle through the
+        // hidden out-parameter used by the MSVC ABI.
         unsafe {
-            let vtbl = *(device.device as *mut *const sys::ID3D12DeviceVtbl);
-            ((*vtbl).CreateSampler)(device.device, description, handle);
+            let vtbl = *(heap as *mut *const DescriptorHeapVtbl);
+            ((*vtbl).GetGPUDescriptorHandleForHeapStart)(heap, &mut handle);
         }
-        // The returned `ComPtr` is the descriptor address, not a COM object, so it
-        // must never be released; the caller stores it as an opaque value.
-        Ok(handle.ptr as sys::ComPtr)
+        Ok(handle)
+    }
+}
+
+/// CPU handle for `index` in the shader-visible CBV/SRV/UAV heap.
+pub fn resource_heap_cpu(
+    device: &Dx12DeviceHandle,
+    index: u32,
+) -> RhiResult<sys::D3D12_CPU_DESCRIPTOR_HANDLE> {
+    let base = heap_start(device.resource_heap)?;
+    Ok(sys::D3D12_CPU_DESCRIPTOR_HANDLE {
+        ptr: base.ptr + (index as usize) * device.resource_descriptor_size as usize,
+    })
+}
+
+/// GPU handle for `index` in the shader-visible CBV/SRV/UAV heap.
+pub fn resource_heap_gpu(
+    device: &Dx12DeviceHandle,
+    index: u32,
+) -> RhiResult<sys::D3D12_GPU_DESCRIPTOR_HANDLE> {
+    let base = heap_start_gpu(device.resource_heap)?;
+    Ok(sys::D3D12_GPU_DESCRIPTOR_HANDLE {
+        ptr: base.ptr + (index as u64) * device.resource_descriptor_size as u64,
+    })
+}
+
+/// CPU handle for `index` in the shader-visible sampler heap.
+pub fn sampler_heap_cpu(
+    device: &Dx12DeviceHandle,
+    index: u32,
+) -> RhiResult<sys::D3D12_CPU_DESCRIPTOR_HANDLE> {
+    let base = heap_start(device.sampler_heap)?;
+    Ok(sys::D3D12_CPU_DESCRIPTOR_HANDLE {
+        ptr: base.ptr + (index as usize) * device.sampler_descriptor_size as usize,
+    })
+}
+
+/// GPU handle for `index` in the shader-visible sampler heap.
+pub fn sampler_heap_gpu(
+    device: &Dx12DeviceHandle,
+    index: u32,
+) -> RhiResult<sys::D3D12_GPU_DESCRIPTOR_HANDLE> {
+    let base = heap_start_gpu(device.sampler_heap)?;
+    Ok(sys::D3D12_GPU_DESCRIPTOR_HANDLE {
+        ptr: base.ptr + (index as u64) * device.sampler_descriptor_size as u64,
+    })
+}
+
+/// Creates a shader-resource view for `texture` at the given CPU handle.
+#[cfg(not(target_os = "windows"))]
+pub fn create_texture_srv(
+    _device: &Dx12DeviceHandle,
+    _texture: sys::ComPtr,
+    _handle: sys::D3D12_CPU_DESCRIPTOR_HANDLE,
+) {
+}
+
+#[cfg(not(target_os = "windows"))]
+pub fn create_texture_uav(
+    _device: &Dx12DeviceHandle,
+    _texture: sys::ComPtr,
+    _handle: sys::D3D12_CPU_DESCRIPTOR_HANDLE,
+) {
+}
+
+/// Creates a shader-resource view for `texture` at the given CPU handle.
+#[cfg(target_os = "windows")]
+pub fn create_texture_srv(
+    device: &Dx12DeviceHandle,
+    texture: sys::ComPtr,
+    handle: sys::D3D12_CPU_DESCRIPTOR_HANDLE,
+) {
+    // SAFETY: the device and texture are live; a null description creates a
+    // default SRV covering the whole resource.
+    unsafe {
+        let vtbl = *(device.device as *mut *const sys::ID3D12DeviceVtbl);
+        ((*vtbl).CreateShaderResourceView)(device.device, texture, core::ptr::null(), handle);
+    }
+}
+
+/// Creates an unordered-access view for `texture` at the given CPU handle.
+#[cfg(target_os = "windows")]
+pub fn create_texture_uav(
+    device: &Dx12DeviceHandle,
+    texture: sys::ComPtr,
+    handle: sys::D3D12_CPU_DESCRIPTOR_HANDLE,
+) {
+    // SAFETY: the device and texture are live; a null description creates a
+    // default UAV covering the whole resource.
+    unsafe {
+        let vtbl = *(device.device as *mut *const sys::ID3D12DeviceVtbl);
+        ((*vtbl).CreateUnorderedAccessView)(
+            device.device,
+            texture,
+            core::ptr::null_mut(),
+            core::ptr::null(),
+            handle,
+        );
     }
 }
 

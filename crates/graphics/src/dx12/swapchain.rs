@@ -17,14 +17,14 @@ use crate::rhi::TextureFormat;
 /// Creates the swapchain, its back buffers and their render-target views.
 pub fn create(
     device: &mut Dx12DeviceHandle,
-    _registries: &std::sync::Mutex<Dx12Registries>,
+    registries: &std::sync::Mutex<Dx12Registries>,
     handle: Swapchain,
     descriptor: &SurfaceDescriptor,
     generation: u64,
 ) -> RhiResult<()> {
     #[cfg(not(target_os = "windows"))]
     {
-        let _ = (device, handle, descriptor, generation);
+        let _ = (device, registries, handle, descriptor, generation);
         Err(RhiError::unsupported_backend(
             "DirectX 12 is only available on Windows",
         ))
@@ -92,35 +92,84 @@ pub fn create(
             )));
         }
 
-        // Wrap each back buffer as a render target.
+        // Wrap each back buffer as a render target. The frontend renders to the
+        // handle returned by `acquire`, so the buffer must be registered as a
+        // texture *and* given a real RTV; a null descriptor would make every
+        // render pass fail to bind its attachment.
+        let mut guard = registries
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
         let mut buffers = Vec::with_capacity(buffer_count as usize);
         let mut texture_ids = Vec::with_capacity(buffer_count as usize);
         let mut render_targets = Vec::with_capacity(buffer_count as usize);
-        for index in 0..buffer_count {
-            let mut resource: sys::ComPtr = core::ptr::null_mut();
-            // SAFETY: the swapchain is live and the index is inside its buffer count.
-            let status = unsafe {
-                let vtbl = *(swapchain as *mut *const SwapChainVtbl);
-                ((*vtbl).GetBuffer)(swapchain, index, &sys::IID_ID3D12_RESOURCE, &mut resource)
-            };
-            if status != sys::S_OK || resource.is_null() {
-                // SAFETY: the buffers wrapped so far are released before the
-                // swapchain, which owns the rest.
-                unsafe {
-                    for buffer in &buffers {
-                        sys::IUnknownVtbl::release(*buffer);
-                    }
-                    sys::IUnknownVtbl::release(swapchain);
+        let outcome: RhiResult<()> = (|| {
+            for index in 0..buffer_count {
+                let mut resource: sys::ComPtr = core::ptr::null_mut();
+                // SAFETY: the swapchain is live and the index is inside its buffer count.
+                let status = unsafe {
+                    let vtbl = *(swapchain as *mut *const SwapChainVtbl);
+                    ((*vtbl).GetBuffer)(swapchain, index, &sys::IID_ID3D12_RESOURCE, &mut resource)
+                };
+                if status != sys::S_OK || resource.is_null() {
+                    return Err(RhiError::make_swapchain_failed(sys::hresult_message(
+                        status,
+                    )));
                 }
-                return Err(RhiError::make_swapchain_failed(sys::hresult_message(
-                    status,
-                )));
+                let id = device.next_internal_id();
+                let rtv_index = device.take_rtv_index()?;
+                let rtv = super::texture::rtv_heap_cpu(device, rtv_index)?;
+                // SAFETY: the device and back buffer are live; a null description asks
+                // D3D12 for a default full-resource view, which is what a swapchain
+                // back buffer needs.
+                unsafe {
+                    let vtbl = *(device.device as *mut *const sys::ID3D12DeviceVtbl);
+                    ((*vtbl).CreateRenderTargetView)(
+                        device.device,
+                        resource,
+                        core::ptr::null(),
+                        rtv,
+                    );
+                }
+                guard.textures.insert(
+                    id,
+                    super::resources::Dx12TextureRecord {
+                        resource,
+                        format: descriptor.color_format,
+                        width,
+                        height,
+                        depth: 1,
+                        layers: 1,
+                        mip_levels: 1,
+                        sample_count: 1,
+                        dimension: crate::rhi::TextureDimension::Texture2D,
+                        usage: crate::rhi::TextureUsage::COLOR_TARGET,
+                        rtv: Some(rtv),
+                        dsv: None,
+                    },
+                );
+                buffers.push(resource);
+                texture_ids.push(id);
+                render_targets.push(rtv);
             }
-            let id = device.next_internal_id();
-            buffers.push(resource);
-            texture_ids.push(id);
-            render_targets.push(sys::D3D12_CPU_DESCRIPTOR_HANDLE::default());
+            Ok(())
+        })();
+        if let Err(error) = outcome {
+            // The registry must not keep records whose COM pointers are about to
+            // be released by the failure path below.
+            for id in &texture_ids {
+                guard.textures.remove(id);
+            }
+            // SAFETY: the buffers wrapped so far are released before the
+            // swapchain, which owns the rest.
+            unsafe {
+                for buffer in &buffers {
+                    sys::IUnknownVtbl::release(*buffer);
+                }
+                sys::IUnknownVtbl::release(swapchain);
+            }
+            return Err(error);
         }
+        drop(guard);
         device.swapchains.insert(
             handle.id(),
             Dx12Swapchain {
@@ -141,18 +190,24 @@ pub fn create(
     }
 }
 
-/// Releases one window's swapchain and its buffers.
-pub fn destroy(device: &mut Dx12DeviceHandle, handle: Swapchain) {
-    if let Some(chain) = device.swapchains.remove(&handle.id()) {
-        // SAFETY: the frame ring waited for every presentation, and each pointer is
-        // released exactly once.
-        unsafe {
-            for buffer in chain.buffers {
-                sys::IUnknownVtbl::release(buffer);
-            }
-            sys::IUnknownVtbl::release(chain.swapchain);
+/// Releases one window's swapchain and its buffers, returning the texture
+/// handles the caller must drop from the resource registry. Those records hold
+/// the same COM pointers, so removing them (without releasing again) prevents a
+/// double free when the registries are torn down.
+pub fn destroy(device: &mut Dx12DeviceHandle, handle: Swapchain) -> Vec<u32> {
+    let Some(chain) = device.swapchains.remove(&handle.id()) else {
+        return Vec::new();
+    };
+    let texture_ids = chain.texture_ids.clone();
+    // SAFETY: the frame ring waited for every presentation, and each pointer is
+    // released exactly once.
+    unsafe {
+        for buffer in chain.buffers {
+            sys::IUnknownVtbl::release(buffer);
         }
+        sys::IUnknownVtbl::release(chain.swapchain);
     }
+    texture_ids
 }
 
 /// Returns the current back buffer as a swapchain image.
