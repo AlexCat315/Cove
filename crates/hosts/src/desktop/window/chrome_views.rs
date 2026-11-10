@@ -204,7 +204,14 @@ impl cove_composition::ViewModifier for WindowTitleBarModifier {
             "app-window-title-bar".to_owned(),
         );
         let colors = cove_ui_compose::theme::theme_for_node(node).colors;
-        node.set_background_color(Some(colors.surface));
+        let translucent = node
+            .composition_value(&cove_ui_compose::adaptive::SurfaceEnvironment::key())
+            .translucent_window;
+        node.set_background_color(Some(if translucent {
+            colors.surface.multiplied_alpha(0.4)
+        } else {
+            colors.surface
+        }));
     }
     fn apply_layout(&self, layout: &LayoutNode) {
         layout.set_flex_direction(FlexDirection::Row);

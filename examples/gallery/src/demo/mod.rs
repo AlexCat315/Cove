@@ -40,6 +40,15 @@ pub struct ShowcaseLaunch {
     pub input: ShowcaseInput,
     /// `--text-scale` multiplies the text scaler.
     pub text_scale: f64,
+    pub menu_bar: ShowcaseMenuBar,
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum ShowcaseMenuBar {
+    #[default]
+    None,
+    Immersive,
+    Native,
 }
 
 /// `--input` capability presets.
@@ -71,6 +80,11 @@ impl ShowcaseLaunch {
             frame_rate: Self::extent("--frame-rate", arguments),
             reduce_motion: arguments.iter().any(|value| value == "--reduce-motion"),
             rtl: arguments.iter().any(|value| value == "--rtl"),
+            menu_bar: match Self::argument("--menu-bar", arguments).as_deref() {
+                Some("immersive") => ShowcaseMenuBar::Immersive,
+                Some("native") => ShowcaseMenuBar::Native,
+                _ => ShowcaseMenuBar::None,
+            },
             input: match Self::argument("--input", arguments).as_deref() {
                 Some("touch") => ShowcaseInput::Touch,
                 Some("mixed") => ShowcaseInput::Mixed,

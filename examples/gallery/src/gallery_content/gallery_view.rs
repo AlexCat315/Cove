@@ -76,6 +76,7 @@ pub struct GalleryView {
     pub text_scale: State<Option<f64>>,
     /// In a single pane, whether the page covers the navigation.
     pub showing_page: State<bool>,
+    menu_bar: Option<AnyView>,
 }
 
 impl GalleryView {
@@ -93,11 +94,17 @@ impl GalleryView {
             reset_generation: State::new(0),
             text_scale: State::new(Some(text_scale)),
             showing_page: State::new(true),
+            menu_bar: None,
         }
     }
 
     pub fn current_page(&self) -> GalleryPage {
         self.page.get()
+    }
+
+    pub fn with_menu_bar(mut self, menu_bar: impl View + 'static) -> Self {
+        self.menu_bar = Some(AnyView::new(menu_bar));
+        self
     }
 
     pub fn is_dark(&self) -> bool {
@@ -224,6 +231,24 @@ impl View for GalleryView {
             .flex_with(1.0, 1.0, Some(0.0))
             .frame(None, None, None, Some(0.0), None, None)
             .debug_name("gallery-shell");
+        let shell = if let Some(menu) = &self.menu_bar {
+            AnyView::new(
+                cove_ui_compose::BoxView::new(
+                    FlexDirection::Column,
+                    Align::Stretch,
+                    Justify::FlexStart,
+                    Wrap::NoWrap,
+                    0.0,
+                    AnyView::new(cove_composition::TupleView::new(vec![
+                        menu.clone(),
+                        AnyView::new(shell),
+                    ])),
+                )
+                .flex_with(1.0, 1.0, Some(0.0)),
+            )
+        } else {
+            AnyView::new(shell)
+        };
         let root = AnyView::new(SafeArea::all(LayerRoot::new(shell)))
             .flex_with(1.0, 1.0, Some(0.0))
             .modifier(GalleryShellFrame)

@@ -1,8 +1,6 @@
 //! Translation of Desktop/Sources/CoveUI/Window/NativeMenu.swift.
 //!
-//! macOS installs an `NSMenu` bar; Windows draws its own title bar so it has no
-//! menu strip; other platforms use Compose menus. The installer keeps the same
-//! per-platform split as the Swift original.
+//! macOS installs an application `NSMenu`. Windows installs a window `HMENU`.
 
 use cove_platform::NativeShortcut;
 
@@ -49,6 +47,7 @@ impl NativeMenuKeyModifiers {
     }
 }
 
+#[derive(Clone)]
 pub struct NativeMenuAction {
     pub title: String,
     pub key_equivalent: String,
@@ -112,11 +111,34 @@ pub struct NativeMenu {
 }
 
 impl NativeMenu {
+    pub fn named(title: impl Into<String>) -> Self {
+        Self::new(title, Vec::new())
+    }
+
     pub fn new(title: impl Into<String>, items: Vec<NativeMenuItem>) -> Self {
         Self {
             title: title.into(),
             items,
         }
+    }
+
+    pub fn action(self, title: impl Into<String>, action: impl Fn() + 'static) -> Self {
+        self.item(NativeMenuAction::new(title, action))
+    }
+
+    pub fn item(mut self, action: NativeMenuAction) -> Self {
+        self.items.push(NativeMenuItem::Action(action));
+        self
+    }
+
+    pub fn submenu(mut self, menu: NativeMenu) -> Self {
+        self.items.push(NativeMenuItem::Submenu(menu));
+        self
+    }
+
+    pub fn separator(mut self) -> Self {
+        self.items.push(NativeMenuItem::Separator);
+        self
     }
 }
 
@@ -132,6 +154,11 @@ pub struct NativeMenuBar {
 }
 
 impl NativeMenuBar {
+    /// Whether the host window system provides a native menu bar.
+    pub const fn is_supported() -> bool {
+        cfg!(any(target_os = "macos", target_os = "windows"))
+    }
+
     pub fn new(
         app_name: impl Into<String>,
         application_items: Vec<NativeMenuItem>,
@@ -206,18 +233,7 @@ impl NativeMenuBar {
                                 .then(|| action.key_modifiers.shortcut(&action.key_equivalent)),
                             icon: None,
                         });
-                        actions.push((
-                            id,
-                            NativeMenuAction {
-                                title: action.title.clone(),
-                                key_equivalent: action.key_equivalent.clone(),
-                                key_modifiers: action.key_modifiers,
-                                is_enabled: action.is_enabled,
-                                is_selected: action.is_selected,
-                                is_enabled_provider: action.is_enabled_provider.clone(),
-                                action: action.action.clone(),
-                            },
-                        ));
+                        actions.push((id, action.clone()));
                     }
                 }
             }
@@ -255,8 +271,14 @@ impl NativeMenuBar {
     }
 }
 
+impl From<Vec<NativeMenu>> for NativeMenuBar {
+    fn from(menus: Vec<NativeMenu>) -> Self {
+        Self::new("", Vec::new(), menus)
+    }
+}
+
 /// Installs the menu bar through the platform shell.
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", target_os = "windows"))]
 pub mod installer {
     use super::*;
 
@@ -274,28 +296,15 @@ pub mod installer {
     ) {
         let (snapshot, actions) = menu_bar.snapshot();
         native_menu_bridge::set_actions(actions);
-        cove_core::scene::NativeMenuPresenter::set_present(Some(presenter));
+        if cfg!(target_os = "macos") {
+            cove_core::scene::NativeMenuPresenter::set_present(Some(presenter));
+        }
         host.install_menu_bar(
             &snapshot,
             std::rc::Rc::new(|id| {
                 native_menu_bridge::invoke(id);
             }),
         );
-    }
-}
-
-/// Windows draws its own title bar in the client area, so a Win32 menu strip
-/// would sit below it. Applications present the same menu tree in that title bar
-/// instead — installing is a no-op, exactly as in the Swift original.
-#[cfg(target_os = "windows")]
-pub mod installer {
-    use super::*;
-
-    pub fn install(
-        _menu_bar: &NativeMenuBar,
-        _presenter: cove_core::scene::NativeMenuPresenterCallback,
-        _host: &cove_runtime::Sdl3PlatformHost,
-    ) {
     }
 }
 

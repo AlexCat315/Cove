@@ -385,6 +385,7 @@ struct HostData {
     options: WindowOptions,
     shell_factory: Box<dyn Fn() -> Result<Box<dyn Shell>, ShellError>>,
     shell: RefCell<Option<Rc<RefCell<Box<dyn Shell>>>>>,
+    pending_menu_bar: RefCell<Option<(NativeMenuBarSnapshot, cove_shell::MenuBarCompletion)>>,
     sessions: RefCell<HashMap<WindowId, Rc<PlatformWindowSession>>>,
     order: RefCell<Vec<WindowId>>,
     main: Cell<Option<WindowId>>,
@@ -439,6 +440,7 @@ impl Sdl3PlatformHost {
             options,
             shell_factory: Box::new(factory),
             shell: RefCell::new(None),
+            pending_menu_bar: RefCell::new(None),
             sessions: RefCell::new(HashMap::new()),
             order: RefCell::new(Vec::new()),
             main: Cell::new(None),
@@ -563,6 +565,9 @@ impl Sdl3PlatformHost {
         let id = shell.borrow().main_window_id().ok_or_else(|| {
             ShellError::InitializationFailed("main window was not registered".into())
         })?;
+        if let Some((bar, on_choice)) = self.0.pending_menu_bar.borrow_mut().take() {
+            shell.borrow().install_menu_bar(&bar, on_choice);
+        }
         let handle = shell
             .borrow()
             .window(id)
@@ -778,8 +783,10 @@ impl Sdl3PlatformHost {
         bar: &cove_platform::NativeMenuBarSnapshot,
         on_choice: cove_shell::MenuBarCompletion,
     ) {
-        if let Some(shell) = self.shell() {
+        if let Some(shell) = self.shell().filter(|_| self.main_window().is_some()) {
             shell.borrow().install_menu_bar(bar, on_choice);
+        } else {
+            *self.0.pending_menu_bar.borrow_mut() = Some((bar.clone(), on_choice));
         }
     }
     /// Drains documents the OS opened with the application. Call on the UI

@@ -18,6 +18,12 @@ pub struct ApplicationLaunch {
     /// Diagnostics backend installed for this run. A build that links the
     /// DevTools crate supplies it; otherwise DevTools stays off.
     pub diagnostics: Option<DiagnosticsFactory>,
+    menu_bar: Option<LaunchMenuBar>,
+}
+
+enum LaunchMenuBar {
+    Native(crate::NativeMenuBar),
+    Immersive(Vec<crate::NativeMenu>),
 }
 
 impl ApplicationLaunch {
@@ -27,6 +33,7 @@ impl ApplicationLaunch {
             configuration: ApplicationConfiguration::default(),
             checkpoint: None,
             diagnostics: None,
+            menu_bar: None,
         }
     }
 
@@ -52,16 +59,76 @@ impl ApplicationLaunch {
         self
     }
 
+    /// Installs the native menu on macOS and Windows. Other desktop systems
+    /// render the same menus in Cove's title bar.
+    pub fn native_menu_bar(mut self, menus: impl Into<crate::NativeMenuBar>) -> Self {
+        self.menu_bar = Some(LaunchMenuBar::Native(menus.into()));
+        self
+    }
+
+    /// Draws the menu in Cove's client title bar, above the application content.
+    pub fn immersive_menu_bar(mut self, menus: Vec<crate::NativeMenu>) -> Self {
+        self.menu_bar = Some(LaunchMenuBar::Immersive(menus));
+        self
+    }
+
+    /// Chooses what the platform composites behind clear pixels of the window.
+    pub fn window_backdrop(mut self, backdrop: crate::WindowBackdrop) -> Self {
+        self.configuration.window.backdrop = backdrop;
+        self
+    }
+
     /// Runs the native window host on the calling thread, which then owns the
     /// platform directly. Android invokes the registered factory from its Activity
     /// instead of entering this blocking loop.
-    pub fn run(self) -> Result<(), String> {
+    pub fn run(mut self) -> Result<(), String> {
         crate::desktop::diagnostics::integration::set_diagnostics_factory(self.diagnostics);
+        let mut callbacks = ApplicationCallbacks::default();
+        let immersive = match self.menu_bar.take() {
+            Some(LaunchMenuBar::Native(mut bar)) if crate::NativeMenuBar::is_supported() => {
+                if bar.app_name.is_empty() {
+                    bar.app_name = self.configuration.window.title.clone();
+                    bar.application_titles =
+                        crate::desktop::window::NativeApplicationMenuTitles::for_app_name(
+                            &bar.app_name,
+                        );
+                }
+                self.configuration.window.title_bar_style =
+                    crate::desktop::application::configuration::AppWindowTitleBarStyle::Standard;
+                callbacks.ready = Some(std::rc::Rc::new(
+                    move |display: &crate::AppDisplayHandle| {
+                        display.install_native_menu_bar(&bar);
+                    },
+                ));
+                None
+            }
+            Some(LaunchMenuBar::Native(mut bar)) => {
+                if !bar.application_items.is_empty() {
+                    let title = if bar.app_name.is_empty() {
+                        &self.configuration.window.title
+                    } else {
+                        &bar.app_name
+                    };
+                    bar.menus.insert(
+                        0,
+                        crate::NativeMenu::new(title.clone(), bar.application_items),
+                    );
+                }
+                Some(bar.menus)
+            }
+            Some(LaunchMenuBar::Immersive(menus)) => Some(menus),
+            None => None,
+        };
+        if let Some(menus) = immersive {
+            self.configuration.window.title_bar_style =
+                crate::desktop::application::configuration::AppWindowTitleBarStyle::HiddenInset;
+            self.root = crate::ImmersiveMenuBar::new(menus).with_content(self.root);
+        }
         Application::run(
             self.configuration,
             None,
             self.root,
-            ApplicationCallbacks::default(),
+            callbacks,
             self.checkpoint,
         )
     }

@@ -16,8 +16,12 @@ NativeRHI 是 Cove 的原生渲染硬件接口（Rendering Hardware Interface）
 | 平台 | 后端 | 状态 |
 |------|------|------|
 | macOS / iOS | Metal | 系统内置 |
-| Windows | DirectX 12 | 默认，需 Windows SDK；shader 编译需 DXC |
+| Windows | DirectX 12 | 默认。初始化失败时尝试 Vulkan。DXIL shader 可由 DXC 或 Slang 编译 |
 | Linux / Windows | Vulkan | SDK 固定头文件，运行时加载系统驱动 |
+
+DX12 的 `draw_indirect` 和 `dispatch_indirect` 使用带 `BufferUsage::INDIRECT` 的缓冲区，偏移按 4 字节对齐。绘制参数块依次为 4 个 `u32`（顶点数、实例数、首顶点、首实例），调度参数块为 3 个 `u32`（X、Y、Z 组数）。
+
+`device.capabilities().mesh_shading.mesh` 表示可创建网格管线并调用 `draw_mesh_tasks`。可选 Task 着色器由 `mesh_shading.task` 标识。DXR 通过 `make_acceleration_structure` 和 `record_build` 构建三角形 BLAS 与实例 TLAS。使用 `compute_ray_query` 检查是否可以在计算着色器中查询绑定的 TLAS。
 | Android | Vulkan | 随 APK 构建 |
 
 ## 统一渲染管线

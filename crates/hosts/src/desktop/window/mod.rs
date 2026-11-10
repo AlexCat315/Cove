@@ -4,6 +4,7 @@ pub mod appearance;
 pub mod auxiliary;
 pub mod chrome;
 pub mod chrome_views;
+mod immersive_menu;
 pub mod native_menu;
 pub mod native_renderer;
 pub mod state;
@@ -17,6 +18,7 @@ pub use chrome_views::{
     Background, ImmersiveWindowTitleBar, WindowChromeFixedSpace, WindowChromeInteractiveRegion,
     WindowControlButton, WindowControlStrip, WindowDragRegion,
 };
+pub use immersive_menu::ImmersiveMenuBar;
 pub use native_menu::{
     NativeApplicationMenuTitles, NativeMenu, NativeMenuAction, NativeMenuBar, NativeMenuItem,
     NativeMenuKeyModifiers,

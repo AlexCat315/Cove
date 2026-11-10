@@ -267,6 +267,8 @@ pub struct Sdl3Shell {
     dialogs: RefCell<Dialogs>,
     sampler: crate::color_sampler::ScreenColorSampler,
     menu_bar_choice: RefCell<Option<MenuBarCompletion>>,
+    #[cfg(target_os = "windows")]
+    windows_menu: RefCell<Option<crate::windows_menu_bar::WindowsMenuBar>>,
     default_options: WindowOptions,
 }
 impl Sdl3Shell {
@@ -287,6 +289,8 @@ impl Sdl3Shell {
             }),
             sampler: crate::color_sampler::ScreenColorSampler::new(Arc::new(Self::wake)),
             menu_bar_choice: RefCell::new(None),
+            #[cfg(target_os = "windows")]
+            windows_menu: RefCell::new(None),
             default_options: WindowOptions::default(),
         })
     }
@@ -350,7 +354,14 @@ impl Sdl3Shell {
     /// AppKit enqueues menu choices on the main thread; the authored closures
     /// live on the UI thread, so they run as deferred work like a dialog result.
     fn complete_menu_bar_choices(&self) -> Vec<Box<dyn FnOnce()>> {
+        #[cfg(not(target_os = "windows"))]
         let choices = crate::native_menu_bar::NativeMenuBarInstaller::take_choices();
+        #[cfg(target_os = "windows")]
+        let choices = self
+            .windows_menu
+            .borrow()
+            .as_ref()
+            .map_or_else(Vec::new, |menu| menu.take_choices());
         if choices.is_empty() {
             return Vec::new();
         }
@@ -464,7 +475,11 @@ impl Shell for Sdl3Shell {
         });
         let applied = match options.backdrop {
             WindowBackdrop::Opaque => false,
+            // The DX12 swapchain applies the DWM backdrop with DirectComposition.
+            #[cfg(target_os = "windows")]
+            WindowBackdrop::Sidebar => true,
             // SAFETY: the window pointer is live and owned by `window`.
+            #[cfg(not(target_os = "windows"))]
             WindowBackdrop::Sidebar => unsafe { native::cove_shell_backdrop(pointer, 1) },
         };
         if applied {
@@ -491,6 +506,17 @@ impl Shell for Sdl3Shell {
     }
     fn destroy_window(&mut self, id: WindowId) {
         if let Some(window) = self.windows.remove(&id) {
+            #[cfg(target_os = "windows")]
+            if let Some(NativeRenderSurface::Win32Window { hwnd, .. }) = window.render_surface()
+                && self
+                    .windows_menu
+                    .get_mut()
+                    .as_ref()
+                    .is_some_and(|menu| menu.hwnd() == hwnd)
+            {
+                self.windows_menu.get_mut().take();
+                self.menu_bar_choice.get_mut().take();
+            }
             window.close();
         }
         self.order.retain(|entry| *entry != id);
@@ -780,8 +806,25 @@ impl Shell for Sdl3Shell {
         }
     }
     fn install_menu_bar(&self, bar: &NativeMenuBarSnapshot, on_choice: MenuBarCompletion) {
+        #[cfg(not(target_os = "windows"))]
         if crate::native_menu_bar::NativeMenuBarInstaller::install(bar).is_ok() {
             *self.menu_bar_choice.borrow_mut() = Some(on_choice);
+        }
+        #[cfg(target_os = "windows")]
+        if let Some(NativeRenderSurface::Win32Window { hwnd, .. }) = self
+            .main_window_id()
+            .and_then(|id| self.windows.get(&id))
+            .and_then(|window| window.render_surface())
+        {
+            match crate::windows_menu_bar::WindowsMenuBar::install(hwnd, bar) {
+                Ok(menu) => {
+                    *self.windows_menu.borrow_mut() = Some(menu);
+                    *self.menu_bar_choice.borrow_mut() = Some(on_choice);
+                }
+                Err(error) => cove_logging::LogSystem::logger("com.cove.shell.menu").log(
+                    &cove_logging::LogEvent::new(cove_logging::Level::Warning, error.to_string()),
+                ),
+            }
         }
     }
     fn take_open_documents(&self) -> Vec<String> {
@@ -828,6 +871,7 @@ impl Shell for Sdl3Shell {
         self.dialogs.borrow_mut().callbacks.clear();
         self.sampler.cancel_all();
         *self.menu_bar_choice.borrow_mut() = None;
+        #[cfg(not(target_os = "windows"))]
         crate::native_menu_bar::NativeMenuBarInstaller::clear();
         self.session = None;
         self.quitting = true;

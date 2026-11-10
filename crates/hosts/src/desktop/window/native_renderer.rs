@@ -26,6 +26,7 @@ pub struct AppWindowRenderSettings {
     /// linear float, so the compositor reads its translucent pixels as the
     /// linear premultiplied colour the frame holds.
     pub surface_format: TextureFormat,
+    pub premultiplied_alpha: bool,
 }
 
 /// Presentation ownership for one window. Runs on the render thread, where its
@@ -100,6 +101,7 @@ impl NativeAppWindowRenderer {
     ) -> SurfaceDescriptor {
         let mut descriptor = SurfaceFactory::native_descriptor(native, [size.0, size.1], vsync);
         descriptor.color_format = self.settings.surface_format;
+        descriptor.premultiplied_alpha = self.settings.premultiplied_alpha;
         descriptor
     }
 

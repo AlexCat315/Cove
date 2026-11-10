@@ -32,6 +32,7 @@ pub struct MenuButton<Label: View + Clone + 'static> {
     /// Drop the push-button bezel, for a trigger inside a control that draws
     /// its own (a split button).
     pub is_borderless: bool,
+    pub prefers_native_menu: bool,
     pub label: Label,
     /// Told when the menu opens and closes, for owners that must stay in place
     /// while it is shown (an auto-hiding control bar).
@@ -44,6 +45,12 @@ impl<Label: View + Clone + 'static> MenuButton<Label> {
         self
     }
 
+    /// Use Cove's menu presentation even if a platform popup presenter is installed.
+    pub fn composed(mut self) -> Self {
+        self.prefers_native_menu = false;
+        self
+    }
+
     pub fn new(entries: Vec<MenuEntry>, label: Label) -> Self {
         Self {
             entries,
@@ -53,6 +60,7 @@ impl<Label: View + Clone + 'static> MenuButton<Label> {
             accessibility_label: None,
             tooltip: None,
             is_borderless: false,
+            prefers_native_menu: true,
             label,
             on_open_change: None,
         }
@@ -213,7 +221,10 @@ impl<Label: View + Clone + 'static> View for MenuButton<Label> {
         let presented = cx.state(|| false);
         let this = self.clone();
         AnyView::new(SurfaceReader::new(move |surface: &Environment| {
-            if NativeMenuPresenter::is_installed() && !uses_sheet(surface) {
+            if this.prefers_native_menu
+                && NativeMenuPresenter::is_installed()
+                && !uses_sheet(surface)
+            {
                 this.native_button()
             } else {
                 this.popover_button(presented)

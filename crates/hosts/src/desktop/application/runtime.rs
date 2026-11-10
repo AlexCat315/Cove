@@ -234,7 +234,13 @@ impl Application {
                 }),
             title_bar_style: config.window.title_bar_style.platform_style(),
             shows_dock_icon: config.window.shows_dock_icon,
-            backdrop: config.window.backdrop,
+            backdrop: if cfg!(target_os = "windows")
+                && rendering.device().backend_api() != cove_graphics::rhi::GraphicsApi::Dx12
+            {
+                cove_shell::WindowBackdrop::Opaque
+            } else {
+                config.window.backdrop
+            },
         };
         let host = Sdl3PlatformHost::new(config.window.title.clone(), options);
         let portal_store = Rc::new(PortalStore::new());
@@ -1233,6 +1239,7 @@ impl Application {
         if state.host.backdrop() != cove_shell::WindowBackdrop::Opaque {
             // Premultiplied clear: untouched pixels reveal the platform material.
             settings.clear_color = [0.0; 4];
+            settings.premultiplied_alpha = true;
             // An eight-bit sRGB layer is read as encoded premultiplied colour,
             // but the frame holds linear premultiplied colour: every partly
             // covered edge of a light shape would composite past white.

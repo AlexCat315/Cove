@@ -33,7 +33,14 @@ pub fn changed_appearance(root: &Node) -> Option<WindowAppearance> {
 pub fn sync_backdrop_tint(root: &Node, translucent: bool) {
     let tint = if translucent {
         provided_theme_within(root, 48, 2048).and_then(|theme| {
-            cove_ui_compose::theme::tokens::material::window_backdrop_tint(&theme.colors)
+            let tint =
+                cove_ui_compose::theme::tokens::material::window_backdrop_tint(&theme.colors);
+            if cfg!(target_os = "windows") {
+                // DWM's backdrop can be darker than AppKit's light material.
+                tint.or_else(|| Some(theme.colors.surface_variant.multiplied_alpha(0.60)))
+            } else {
+                tint
+            }
         })
     } else {
         None

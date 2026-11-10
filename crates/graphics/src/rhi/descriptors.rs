@@ -754,6 +754,8 @@ pub struct SurfaceDescriptor {
     pub width: usize,
     pub height: usize,
     pub color_format: TextureFormat,
+    /// The platform compositor blends premultiplied pixels over its backdrop.
+    pub premultiplied_alpha: bool,
     pub vsync_enabled: bool,
 }
 impl SurfaceDescriptor {
@@ -765,6 +767,7 @@ impl SurfaceDescriptor {
             width: 0,
             height: 0,
             color_format: super::platform_default_surface_format(),
+            premultiplied_alpha: false,
             vsync_enabled: true,
         }
     }
