@@ -10,7 +10,7 @@ Swift 源码逐页对照见文末《Swift 源码对照（逐页差异清单）�
 - 构建与 GPU 回归在 Windows x64 MSVC 上通过。执行 `cargo build --workspace --locked -j 2`，验证 Vulkan 多重采样解析和两个帧槽向同一张纹理写入不同像素的回读结果。
 - Windows 原生窗口视觉验收通过。滚动侧栏后，Form、Combobox、Calendar、DatePicker、DateRangePicker、TimeField、TimePicker、WheelPicker 的图标均可见。
 - Windows 交互验收通过 DevTools 验证侧栏滚动、切换到 DatePicker 并返回 Calendar。两次连续截图均正常出画。验收范围为侧栏导航和窗口出画。
-- DX12 能创建设备，创建 UI 绘制管线仍返回 `E_INVALIDARG`。Windows Gallery 使用 Vulkan。
+- 在 DX12 根签名与命令编码修复后，单采样 UI 管线能绘制矩形并读回正确像素。4× 验证返回 `DXGI_ERROR_DEVICE_REMOVED`，当前 DX12 命令编码也尚未执行多重采样解析。Windows Gallery 的默认 4× 窗口使用 Vulkan。
 - 运行说明见已登记在导航中的 [Gallery 使用](../Website/src/content/components/gallery.md)。
 
 ## 2026-11-09：触摸目标——图表

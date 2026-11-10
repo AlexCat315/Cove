@@ -18,7 +18,7 @@ pub fn platform_default_backends() -> Vec<GraphicsApi> {
     }
     #[cfg(target_os = "windows")]
     {
-        // The DX12 encoder still lacks descriptor and draw bindings.
+        // The DX12 encoder does not resolve multisampled color targets yet.
         vec![GraphicsApi::Vulkan, GraphicsApi::Dx12]
     }
     #[cfg(any(target_os = "linux", target_os = "android"))]
