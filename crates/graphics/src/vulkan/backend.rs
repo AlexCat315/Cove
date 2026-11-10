@@ -643,14 +643,7 @@ impl RhiBackend for VulkanBackend {
         offset: usize,
         destination: &mut [u8],
     ) -> RhiResult<()> {
-        submission::read_buffer_data(
-            &self.context,
-            &self.registries,
-            &mut lock_allocator(&self.allocator),
-            buffer,
-            offset,
-            destination,
-        )
+        submission::read_buffer_data(&self.context, &self.registries, buffer, offset, destination)
     }
 
     fn upload_texture_data(

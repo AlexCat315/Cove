@@ -46,7 +46,11 @@ impl Snapshot {
             self.entries.insert(
                 path.clone(),
                 Entry {
-                    modified: if directory { None } else { metadata.modified().ok() },
+                    modified: if directory {
+                        None
+                    } else {
+                        metadata.modified().ok()
+                    },
                     len: if directory { 0 } else { metadata.len() },
                     directory,
                 },

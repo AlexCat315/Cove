@@ -449,7 +449,12 @@ pub fn run(options: &Options) -> io::Result<Value> {
             install_host(host, options.media)?;
         }
         if submodule_status()?["ready"] != true {
-            checked(command("git")?.args(["submodule", "update", "--init", "--recursive"]))?;
+            checked(command("git")?.current_dir(project_root()).args([
+                "submodule",
+                "update",
+                "--init",
+                "--recursive",
+            ]))?;
         }
         ensure_pinned(PINNED_ZIG, host, &mut saved)?;
         if options.shaders {
@@ -510,16 +515,25 @@ pub fn installation_plan(host: Host, media: bool, shaders: bool, targets: &[Stri
 }
 fn save(value: &Value) -> io::Result<()> {
     let path = state_path()?;
-    fs::create_dir_all(
-        path.parent()
-            .ok_or_else(|| io::Error::other("setup state parent"))?,
-    )?;
+    let directory = create_cache_directory(path.parent().expect("setup state parent"))?;
+    let path = directory.join(path.file_name().expect("setup state filename"));
     let temporary = path.with_extension(format!("{}.tmp", std::process::id()));
     fs::write(
         &temporary,
         serde_json::to_vec_pretty(value).map_err(io::Error::other)?,
     )?;
     fs::rename(temporary, path)
+}
+
+/// Creates a cache directory and returns the real path on Windows, where an
+/// MSIX app can redirect writes under `LOCALAPPDATA` to a private directory.
+pub fn create_cache_directory(path: &Path) -> io::Result<PathBuf> {
+    fs::create_dir_all(path)?;
+    if cfg!(windows) {
+        fs::canonicalize(path)
+    } else {
+        Ok(path.to_path_buf())
+    }
 }
 fn install_host(host: Host, media: bool) -> io::Result<()> {
     match host {
@@ -790,24 +804,39 @@ fn project_root() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..")
 }
 
-/// A submodule checkout is an empty directory until it is initialized.
 fn submodule_status() -> io::Result<Value> {
-    let root = project_root();
-    let manifest = fs::read_to_string(root.join(".gitmodules"))?;
-    let paths: Vec<String> = manifest
-        .lines()
-        .filter_map(|line| line.trim().strip_prefix("path = ").map(str::to_owned))
-        .collect();
-    let missing: Vec<String> = paths
-        .iter()
-        .filter(|path| {
-            fs::read_dir(root.join(path))
-                .map(|mut entries| entries.next().is_none())
-                .unwrap_or(true)
-        })
-        .cloned()
-        .collect();
-    Ok(json!({"ready": missing.is_empty(), "total": paths.len(), "missing": missing}))
+    let mut git = command("git")?;
+    let output = checked_output(git.current_dir(project_root()).args([
+        "submodule",
+        "status",
+        "--recursive",
+    ]));
+    // A dry run can be used before Git or the platform tools are installed.
+    let output = match output {
+        Ok(output) => output,
+        Err(error) => return Ok(json!({"ready": false, "error": error.to_string()})),
+    };
+    let mut missing = Vec::new();
+    let mut mismatched = Vec::new();
+    let mut conflicted = Vec::new();
+    for line in output.lines() {
+        let Some((_, path)) = line.split_once(' ') else {
+            continue;
+        };
+        match line.as_bytes()[0] {
+            b'-' => missing.push(path),
+            b'+' => mismatched.push(path.rsplit_once(" (").map_or(path, |(path, _)| path)),
+            b'U' => conflicted.push(path),
+            _ => {}
+        }
+    }
+    Ok(json!({
+        "ready": missing.is_empty() && mismatched.is_empty() && conflicted.is_empty(),
+        "total": output.lines().count(),
+        "missing": missing,
+        "mismatched": mismatched,
+        "conflicted": conflicted,
+    }))
 }
 
 fn shader_binary(saved: &Value) -> Option<PathBuf> {

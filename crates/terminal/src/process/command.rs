@@ -1,8 +1,11 @@
 //! The program a terminal session runs, and its errors.
 
+#[cfg(not(windows))]
+use std::ffi::OsStr;
+#[cfg(unix)]
+use std::ffi::OsString;
 use std::{
     collections::BTreeMap,
-    ffi::{OsStr, OsString},
     path::{Path, PathBuf},
 };
 

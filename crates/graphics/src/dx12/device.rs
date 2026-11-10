@@ -495,7 +495,12 @@ mod windows_impl {
         // SAFETY: `device` is live and the vtable entry matches `CreateDescriptorHeap`.
         let status = unsafe {
             let vtbl = *(device as *mut *const sys::ID3D12DeviceVtbl);
-            ((*vtbl).CreateDescriptorHeap)(device, &description, &sys::IID_IUNKNOWN, &mut heap)
+            ((*vtbl).CreateDescriptorHeap)(
+                device,
+                &description,
+                &sys::IID_ID3D12_DESCRIPTOR_HEAP,
+                &mut heap,
+            )
         };
         if status != sys::S_OK || heap.is_null() {
             return Err(RhiError::unsupported_backend(sys::hresult_message(status)));

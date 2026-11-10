@@ -4,6 +4,10 @@
 
 ## Unreleased
 
+- `cargo cove setup` 核对递归子模块的锁定提交，能识别上次下载中断后留下的错误版本。Windows 上的设置状态与 Zig 构建使用真实缓存路径，避免应用容器重定向导致写入失败。AppKit 菜单的内部绑定只在 macOS 编译，修复其他平台的未使用代码警告。
+- 修复 Windows DX12 命令列表录制的编译错误，并在编码失败时释放列表。
+- Vulkan 即时缓冲区传输使用可映射的中转内存，并在传输完成后移除对应资源记录。更新 Windows / Linux 的 Slang 集成测试以适配当前 RHI。
+
 - **写作类应用所需能力与修复（2026-11-09，来自 Ruwriter 重构）**：
   - `TextFieldDecoration::content_padding`（`TextFieldContentPadding { horizontal, vertical }`）：替换按尺寸推导的文字内边距。内边距位于滚动区域之内，宽编辑器可以居中一栏可读宽度的正文，同时整栏都能滚动和点击定位。测量使用同一内边距。
   - 系统外观：`Environment::system_appearance`（`SystemAppearance::{Unknown, Light, Dark}`，`is_dark()`）。shell 新增 `cove_shell_system_theme` 读取 SDL 缓存的系统主题，经 `WindowHandle::system_appearance` 进入 `WindowSnapshot`（多线程模式下由代理窗口转发），宿主每帧写入环境，随系统切换实时更新。macOS、Windows、iOS、Android 由 SDL 上报；其余平台为 `Unknown`。

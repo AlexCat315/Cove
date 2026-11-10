@@ -20,11 +20,11 @@ use crate::rhi::{
 
 use super::acceleration;
 use super::formats;
-use super::memory::{VulkanMemoryAllocation, VulkanMemoryAllocator};
+use super::memory::VulkanMemoryAllocation;
 use super::registries::{VulkanRegistries, VulkanTextureRecord};
 use super::rendering::RenderPassObjects;
 use super::rendering::{AttachmentShape, clear_value};
-use super::resources::{create_buffer, lock};
+use super::resources::{create_buffer, destroy_buffer, lock};
 use super::setup::VulkanContext;
 use super::sys;
 
@@ -567,7 +567,10 @@ impl<'a> Encoder<'a> {
 
         // Transition every attachment, collecting the shapes and views the pass
         // needs in one place.
-        let mut shapes: Vec<AttachmentShape> = Vec::new();
+        let mut attachments = Vec::new();
+        let mut colors = Vec::new();
+        let mut resolves = Vec::new();
+        let mut depth_attachment = None;
         let mut views: Vec<sys::VkImageView> = Vec::new();
         let mut clears: Vec<sys::VkClearValue> = Vec::new();
         for target in &record.descriptor.color_targets {
@@ -594,13 +597,20 @@ impl<'a> Encoder<'a> {
                 samples: signature.sample_count as u32,
                 is_depth: false,
             };
-            shapes.push(shape);
-            views.push(view);
-            let color = match target.load_action {
-                ColorLoadAction::Clear(color) => Some(color),
-                _ => None,
+            let (load_op, clear) = match target.load_action {
+                ColorLoadAction::Clear(color) => (sys::VK_ATTACHMENT_LOAD_OP_CLEAR, Some(color)),
+                ColorLoadAction::Load => (sys::VK_ATTACHMENT_LOAD_OP_LOAD, None),
+                ColorLoadAction::DontCare => (sys::VK_ATTACHMENT_LOAD_OP_DONT_CARE, None),
             };
-            clears.push(clear_value(&shape, color, None));
+            let store_op = if target.store {
+                sys::VK_ATTACHMENT_STORE_OP_STORE
+            } else {
+                sys::VK_ATTACHMENT_STORE_OP_DONT_CARE
+            };
+            colors.push(shape.reference(attachments.len()));
+            attachments.push(shape.description(load_op, store_op));
+            views.push(view);
+            clears.push(clear_value(&shape, clear, None));
             if let Some(resolve) = target.resolve_texture {
                 // SAFETY: forwarded from this function's contract.
                 unsafe {
@@ -612,28 +622,31 @@ impl<'a> Encoder<'a> {
                         crate::rhi::ResourceState::RENDER_TARGET,
                     )?
                 };
-                let resolve_view = {
+                let (resolve_view, resolve_format) = {
                     let registries = lock(self.registries);
                     let texture = registries
                         .textures
                         .get(&resolve.id())
                         .ok_or_else(|| RhiError::invalid_argument("unknown resolve target"))?;
-                    registries.attachment_view(texture)
+                    (registries.attachment_view(texture), texture.format)
                 };
                 let resolve_shape = AttachmentShape {
-                    format: formats::vk_format(
-                        lock(self.registries)
-                            .textures
-                            .get(&resolve.id())
-                            .map(|texture| texture.format)
-                            .unwrap_or(TextureFormat::Invalid),
-                    ),
+                    format: formats::vk_format(resolve_format),
                     samples: 1,
                     is_depth: false,
                 };
-                shapes.push(resolve_shape);
+                resolves.push(resolve_shape.reference(attachments.len()));
+                attachments.push(resolve_shape.description(
+                    sys::VK_ATTACHMENT_LOAD_OP_DONT_CARE,
+                    sys::VK_ATTACHMENT_STORE_OP_STORE,
+                ));
                 views.push(resolve_view);
                 clears.push(clear_value(&resolve_shape, None, None));
+            } else {
+                resolves.push(sys::VkAttachmentReference {
+                    attachment: sys::VK_ATTACHMENT_UNUSED,
+                    layout: sys::VK_IMAGE_LAYOUT_UNDEFINED,
+                });
             }
         }
         if let Some(target) = record.descriptor.depth_target {
@@ -661,17 +674,24 @@ impl<'a> Encoder<'a> {
                 samples: signature.sample_count as u32,
                 is_depth: true,
             };
-            shapes.push(shape);
-            views.push(view);
-            let depth = match target.load_action {
-                DepthLoadAction::Clear(value) => Some(value),
-                _ => None,
+            let (load_op, clear) = match target.load_action {
+                DepthLoadAction::Clear(depth) => (sys::VK_ATTACHMENT_LOAD_OP_CLEAR, Some(depth)),
+                DepthLoadAction::Load => (sys::VK_ATTACHMENT_LOAD_OP_LOAD, None),
+                DepthLoadAction::DontCare => (sys::VK_ATTACHMENT_LOAD_OP_DONT_CARE, None),
             };
-            clears.push(clear_value(&shape, None, depth));
+            let store_op = if target.store {
+                sys::VK_ATTACHMENT_STORE_OP_STORE
+            } else {
+                sys::VK_ATTACHMENT_STORE_OP_DONT_CARE
+            };
+            depth_attachment = Some(shape.reference(attachments.len()));
+            attachments.push(shape.description(load_op, store_op));
+            views.push(view);
+            clears.push(clear_value(&shape, None, clear));
         }
 
         let mut render_objects = RenderPassObjects::new(self.context.rendering_handles());
-        let (pass, _) = render_objects.pass_with_clear_values(&shapes)?;
+        let pass = render_objects.make_pass(&attachments, &colors, &resolves, depth_attachment)?;
         let framebuffer = render_objects.framebuffer(pass, &views, extent.width, extent.height)?;
         // SAFETY: every image was transitioned above into the layout the pass
         // declares, and `cmd` is recording.
@@ -2059,8 +2079,7 @@ pub fn upload_buffer_data(
     // SAFETY: the staging allocation is host visible and at least `data.len()`
     // bytes, and `data` is distinct.
     unsafe {
-        let pointer = staging.pointer.ok_or(RhiError::OutOfMemory)?;
-        std::ptr::copy_nonoverlapping(data.as_ptr(), pointer, data.len());
+        std::ptr::copy_nonoverlapping(data.as_ptr(), staging.pointer, data.len());
     }
     let outcome = one_shot(context, |cmd| {
         let copy = sys::VkBufferCopy {
@@ -2080,7 +2099,6 @@ pub fn upload_buffer_data(
 pub fn read_buffer_data(
     context: &VulkanContext,
     registries: &Arc<Mutex<VulkanRegistries>>,
-    allocator: &mut VulkanMemoryAllocator,
     buffer: crate::rhi::Buffer,
     offset: usize,
     destination: &mut [u8],
@@ -2114,25 +2132,26 @@ pub fn read_buffer_data(
         }
         Ok(())
     });
-    if outcome.is_ok()
-        && let Some(pointer) = staging.pointer
-    {
+    if outcome.is_ok() {
         // SAFETY: the copy completed on the GPU and the staging mapping covers
         // the range; `destination` is a distinct live slice.
         unsafe {
-            std::ptr::copy_nonoverlapping(pointer, destination.as_mut_ptr(), destination.len())
+            std::ptr::copy_nonoverlapping(
+                staging.pointer,
+                destination.as_mut_ptr(),
+                destination.len(),
+            )
         };
     }
     destroy_staging_buffer(context, registries, staging);
-    let _ = allocator;
     outcome
 }
 
 /// A host-visible staging buffer plus its mapped pointer.
-pub struct StagingBuffer {
-    pub buffer: sys::VkBuffer,
-    pub allocation: VulkanMemoryAllocation,
-    pub pointer: Option<*mut u8>,
+struct StagingBuffer {
+    handle: crate::rhi::Buffer,
+    buffer: sys::VkBuffer,
+    pointer: *mut u8,
 }
 
 fn make_staging_buffer(
@@ -2140,29 +2159,9 @@ fn make_staging_buffer(
     registries: &Arc<Mutex<VulkanRegistries>>,
     size: usize,
 ) -> RhiResult<StagingBuffer> {
-    let _ = context;
-    // Transient uploads are also bound directly by renderer passes, so every
-    // binding use must be declared at creation.
-    let usage = crate::rhi::BufferUsage::TRANSFER_SOURCE
-        | crate::rhi::BufferUsage::TRANSFER_DESTINATION
-        | crate::rhi::BufferUsage::UNIFORM
-        | crate::rhi::BufferUsage::STORAGE_READ
-        | crate::rhi::BufferUsage::VERTEX
-        | crate::rhi::BufferUsage::INDEX
-        | crate::rhi::BufferUsage::INDIRECT;
-    // The staging buffer is allocated outside the block allocator so its mapping
-    // can be released independently of the registry's lifetime.
-    let mut create_info = sys::VkBufferCreateInfo {
-        sType: sys::VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
-        pNext: core::ptr::null(),
-        flags: 0,
-        size: size.max(1) as sys::VkDeviceSize,
-        usage: formats::vk_buffer_usage(usage),
-        sharingMode: sys::VK_SHARING_MODE_EXCLUSIVE,
-        queueFamilyIndexCount: 0,
-        pQueueFamilyIndices: core::ptr::null(),
-    };
-    let _ = &mut create_info;
+    // Transfer-only usage selects host-visible, coherent memory.
+    let usage =
+        crate::rhi::BufferUsage::TRANSFER_SOURCE | crate::rhi::BufferUsage::TRANSFER_DESTINATION;
     let handle = crate::rhi::Buffer::new(lock(registries).next_internal_id());
     let mut allocator = context
         .staging_allocator
@@ -2175,33 +2174,36 @@ fn make_staging_buffer(
         handle,
         crate::rhi::BufferDescriptor::new(size.max(1), usage),
     )?;
-    let (native, allocation) = {
+    let (buffer, pointer) = {
         let registries = lock(registries);
         let record = registries
             .buffers
             .get(&handle.id())
-            .ok_or(RhiError::OutOfMemory)?;
-        (record.buffer, record.allocation)
+            .expect("new staging buffer is registered");
+        (record.buffer, record.allocation.cpu_pointer(0))
+    };
+    let Some(pointer) = pointer else {
+        destroy_buffer(context, registries, &mut allocator, handle);
+        return Err(RhiError::OutOfMemory);
     };
     Ok(StagingBuffer {
-        buffer: native,
-        allocation,
-        pointer: allocation.cpu_pointer(0),
+        handle,
+        buffer,
+        pointer,
     })
 }
 
 fn destroy_staging_buffer(
     context: &VulkanContext,
-    _registries: &Arc<Mutex<VulkanRegistries>>,
+    registries: &Arc<Mutex<VulkanRegistries>>,
     staging: StagingBuffer,
 ) {
-    // SAFETY: the caller waited for the copy that used this buffer.
-    unsafe { (context.core.destroy_buffer)(context.device, staging.buffer, core::ptr::null()) };
+    // The caller waited for the copy that used this buffer.
     let mut allocator = context
         .staging_allocator
         .lock()
         .unwrap_or_else(std::sync::PoisonError::into_inner);
-    allocator.free(staging.allocation);
+    destroy_buffer(context, registries, &mut allocator, staging.handle);
 }
 
 /// Records and waits for one one-shot command buffer on the graphics queue.

@@ -18,11 +18,12 @@
 
 use cove_graphics::rhi::{
     BindingLayoutDescriptor, BindingLayoutEntry, BindingResource, BindingSetDescriptor,
-    BindingSetEntry, BindingType, Buffer, BufferDescriptor, BufferUsage, ColorAttachmentDescriptor,
-    CommandBuffer, ComputePipelineDescriptor, Device, DeviceConfig, GraphicsApi,
-    GraphicsPipelineDescriptor, PipelineLayoutDescriptor, RenderColorTarget, RenderPassDescriptor,
-    ShaderFormat, ShaderModuleDescriptor, ShaderStage, ShaderVisibility, TextureDescriptor,
-    TextureFormat, TextureSubresource, TextureUsage,
+    BindingSetEntry, BindingType, BufferBindingLayout, BufferDescriptor, BufferUsage,
+    ColorAttachmentDescriptor, CommandBuffer, ComputePipelineDescriptor, Device, DeviceConfig,
+    GraphicsApi, GraphicsPipelineDescriptor, PipelineLayoutDescriptor, RenderColorTarget,
+    RenderPassDescriptor, ShaderFormat, ShaderModuleDescriptor, ShaderStage, ShaderVisibility,
+    TextureBufferUpload, TextureDescriptor, TextureFormat, TextureSubresource, TextureUploadRegion,
+    TextureUsage, Viewport,
 };
 
 /// Why the shader integration cases cannot run here.
@@ -72,11 +73,10 @@ fn prerequisites() -> Result<Device, FixtureUnavailable> {
 /// The compute case: named entry point, storage write, copy back to a texture.
 fn compute_pipeline_round_trip(device: &Device, module_bytes: Vec<u8>) {
     let shader = device
-        .make_shader_module(ShaderModuleDescriptor::new(
-            ShaderStage::Compute,
-            ShaderFormat::Spirv,
-            module_bytes,
-        ))
+        .make_shader_module(
+            ShaderModuleDescriptor::new(ShaderStage::Compute, ShaderFormat::Spirv, module_bytes)
+                .with_entry_point("computeMain"),
+        )
         .expect("compute module");
     let binding = device
         .make_binding_layout(BindingLayoutDescriptor::new(vec![BindingLayoutEntry::new(
@@ -119,8 +119,16 @@ fn compute_pipeline_round_trip(device: &Device, module_bytes: Vec<u8>) {
     let mut commands = CommandBuffer::new();
     commands.compute_pass(|encoder| {
         encoder.set_pipeline(pipeline);
-        encoder.set_binding_set(set);
-        encoder.dispatch(2);
+        encoder.set_binding_set(set, 0, Vec::new());
+        encoder.dispatch(2, 1, 1);
+    });
+    commands.copy_pass(|encoder| {
+        encoder.upload_buffer_to_texture(TextureBufferUpload::new(
+            buffer,
+            64,
+            target,
+            TextureUploadRegion::new(16, 1),
+        ));
     });
 
     device.begin_frame().expect("begin frame");
@@ -161,37 +169,36 @@ fn compute_pipeline_round_trip(device: &Device, module_bytes: Vec<u8>) {
 /// The raster case: uniforms at a fixed or dynamic offset, plus load actions.
 fn raster_uniforms(device: &Device, vertex_bytes: Vec<u8>, fragment_bytes: Vec<u8>, dynamic: bool) {
     let vertex = device
-        .make_shader_module(ShaderModuleDescriptor::new(
-            ShaderStage::Vertex,
-            ShaderFormat::Spirv,
-            vertex_bytes,
-        ))
+        .make_shader_module(
+            ShaderModuleDescriptor::new(ShaderStage::Vertex, ShaderFormat::Spirv, vertex_bytes)
+                .with_entry_point("vertexMain"),
+        )
         .expect("vertex module");
     let fragment = device
-        .make_shader_module(ShaderModuleDescriptor::new(
-            ShaderStage::Fragment,
-            ShaderFormat::Spirv,
-            fragment_bytes,
-        ))
+        .make_shader_module(
+            ShaderModuleDescriptor::new(ShaderStage::Fragment, ShaderFormat::Spirv, fragment_bytes)
+                .with_entry_point("fragmentMain"),
+        )
         .expect("fragment module");
     let binding = device
-        .make_binding_layout(BindingLayoutDescriptor::new(vec![BindingLayoutEntry::new(
-            0,
-            BindingType::UniformBuffer,
-            ShaderVisibility::GRAPHICS,
-        )]))
+        .make_binding_layout(BindingLayoutDescriptor::new(vec![
+            BindingLayoutEntry::new(0, BindingType::UniformBuffer, ShaderVisibility::GRAPHICS)
+                .with_buffer_layout(BufferBindingLayout {
+                    has_dynamic_offset: dynamic,
+                    ..BufferBindingLayout::DEFAULT
+                }),
+        ]))
         .expect("uniform layout");
     let layout = device
         .make_pipeline_layout(PipelineLayoutDescriptor::new(vec![binding.clone()]))
         .expect("pipeline layout");
+    let mut descriptor = GraphicsPipelineDescriptor::new(layout, vertex);
+    descriptor.fragment = Some(fragment);
+    descriptor.color_attachments = vec![ColorAttachmentDescriptor::new(TextureFormat::Rgba8Unorm)];
+    descriptor.depth_format = None;
+    descriptor.depth_stencil = None;
     let pipeline = device
-        .make_graphics_pipeline(GraphicsPipelineDescriptor::new(
-            layout,
-            vertex,
-            fragment,
-            vec![ColorAttachmentDescriptor::new(TextureFormat::Rgba8Unorm)],
-            None,
-        ))
+        .make_graphics_pipeline(descriptor)
         .expect("graphics pipeline");
 
     let buffer = device
@@ -234,12 +241,10 @@ fn raster_uniforms(device: &Device, vertex_bytes: Vec<u8>, fragment_bytes: Vec<u
         )]),
         |encoder| {
             encoder.set_pipeline(pipeline);
-            if dynamic {
-                encoder.set_binding_set_with_dynamic_offsets(set, &[256]);
-            } else {
-                encoder.set_binding_set(set);
-            }
-            encoder.draw(3);
+            encoder.set_viewport(Viewport::new(8.0, 8.0));
+            let offsets = if dynamic { vec![256] } else { Vec::new() };
+            encoder.set_binding_set(set, 0, offsets);
+            encoder.draw(3, 1, 0, 0);
         },
     );
     // The second pass only loads, so it must preserve the colours just drawn.

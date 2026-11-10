@@ -54,6 +54,27 @@ impl AttachmentShape {
             sys::VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL
         }
     }
+
+    pub fn description(&self, load_op: u32, store_op: u32) -> sys::VkAttachmentDescription {
+        sys::VkAttachmentDescription {
+            flags: 0,
+            format: self.format,
+            samples: self.samples,
+            loadOp: load_op,
+            storeOp: store_op,
+            stencilLoadOp: load_op,
+            stencilStoreOp: store_op,
+            initialLayout: self.layout(),
+            finalLayout: self.layout(),
+        }
+    }
+
+    pub fn reference(&self, index: usize) -> sys::VkAttachmentReference {
+        sys::VkAttachmentReference {
+            attachment: index as u32,
+            layout: self.layout(),
+        }
+    }
 }
 
 /// Owns native attachment objects until the submission fence has completed.
@@ -123,82 +144,18 @@ impl RenderPassObjects {
         samples: usize,
         is_depth: bool,
     ) -> sys::VkAttachmentDescription {
-        let layout = if is_depth {
-            sys::VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL
-        } else {
-            sys::VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL
-        };
-        sys::VkAttachmentDescription {
-            flags: 0,
+        AttachmentShape {
             format,
             samples: samples as u32,
-            loadOp: sys::VK_ATTACHMENT_LOAD_OP_DONT_CARE,
-            storeOp: sys::VK_ATTACHMENT_STORE_OP_DONT_CARE,
-            stencilLoadOp: sys::VK_ATTACHMENT_LOAD_OP_DONT_CARE,
-            stencilStoreOp: sys::VK_ATTACHMENT_STORE_OP_DONT_CARE,
-            initialLayout: layout,
-            finalLayout: layout,
+            is_depth,
         }
+        .description(
+            sys::VK_ATTACHMENT_LOAD_OP_DONT_CARE,
+            sys::VK_ATTACHMENT_STORE_OP_DONT_CARE,
+        )
     }
 
-    /// Creates a render pass and the clear values its attachments need, so the
-    /// caller can begin the pass without rebuilding either.
-    pub fn pass_with_clear_values(
-        &mut self,
-        shapes: &[AttachmentShape],
-    ) -> RhiResult<(sys::VkRenderPass, Vec<sys::VkClearValue>)> {
-        let mut attachments = Vec::with_capacity(shapes.len());
-        let mut colors = Vec::new();
-        let mut depth = None;
-        for (index, shape) in shapes.iter().enumerate() {
-            attachments.push(sys::VkAttachmentDescription {
-                flags: 0,
-                format: shape.format,
-                samples: shape.samples,
-                // Load/store are chosen at begin time via the clear values, which
-                // is why the description keeps DONT_CARE and the begin info
-                // carries the real operations through the pass's own values.
-                loadOp: sys::VK_ATTACHMENT_LOAD_OP_LOAD,
-                storeOp: sys::VK_ATTACHMENT_STORE_OP_STORE,
-                stencilLoadOp: sys::VK_ATTACHMENT_LOAD_OP_LOAD,
-                stencilStoreOp: sys::VK_ATTACHMENT_STORE_OP_STORE,
-                initialLayout: shape.layout(),
-                finalLayout: shape.layout(),
-            });
-            if shape.is_depth {
-                rhi_require(
-                    depth.is_none(),
-                    "a render pass takes at most one depth attachment",
-                )?;
-                depth = Some(sys::VkAttachmentReference {
-                    attachment: index as u32,
-                    layout: shape.layout(),
-                });
-            } else {
-                colors.push(sys::VkAttachmentReference {
-                    attachment: index as u32,
-                    layout: shape.layout(),
-                });
-            }
-        }
-        let pass = self.make_pass(&attachments, &colors, &[], depth)?;
-        let clear_values = shapes
-            .iter()
-            .map(|shape| {
-                let mut value = sys::VkClearValue::default();
-                if shape.is_depth {
-                    value.depthStencil = sys::VkClearDepthStencilValue {
-                        depth: 1.0,
-                        stencil: 0,
-                    };
-                }
-                value
-            })
-            .collect();
-        Ok((pass, clear_values))
-    }
-
-    fn make_pass(
+    pub fn make_pass(
         &mut self,
         attachments: &[sys::VkAttachmentDescription],
         colors: &[sys::VkAttachmentReference],

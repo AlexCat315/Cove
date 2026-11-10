@@ -22,12 +22,13 @@ fn expect_change(native: bool) {
         let _ = sender.send(paths);
     })
     .expect("watcher");
-    let expected = if native && cfg!(any(
-        target_os = "macos",
-        target_os = "linux",
-        target_os = "android",
-        windows
-    )) {
+    let expected = if native
+        && cfg!(any(
+            target_os = "macos",
+            target_os = "linux",
+            target_os = "android",
+            windows
+        )) {
         WatchBackend::Native
     } else {
         WatchBackend::Polling
@@ -39,7 +40,9 @@ fn expect_change(native: bool) {
     let deadline = std::time::Instant::now() + Duration::from_secs(5);
     loop {
         let remaining = deadline.saturating_duration_since(std::time::Instant::now());
-        let paths = changes.recv_timeout(remaining).expect("a change before the deadline");
+        let paths = changes
+            .recv_timeout(remaining)
+            .expect("a change before the deadline");
         if paths.iter().any(|path| path.ends_with("folder/note.md")) {
             break;
         }
@@ -92,8 +95,8 @@ fn a_missing_folder_is_an_error() {
 #[test]
 fn dropping_stops_promptly() {
     let root = tempfile::tempdir().expect("temp root");
-    let watcher = DirectoryWatcher::new(root.path(), WatchOptions::default(), |_| {})
-        .expect("watcher");
+    let watcher =
+        DirectoryWatcher::new(root.path(), WatchOptions::default(), |_| {}).expect("watcher");
     let started = std::time::Instant::now();
     drop(watcher);
     assert!(started.elapsed() < Duration::from_secs(1));

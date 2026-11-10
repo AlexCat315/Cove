@@ -21,7 +21,7 @@ use super::sys;
 
 /// Records `submit` into a freshly opened command list and closes it.
 pub fn record(
-    device: &Dx12DeviceHandle,
+    device: &mut Dx12DeviceHandle,
     registries: &mut Dx12Registries,
     queue_kind: u32,
     submit: &PlannedSubmit,
@@ -37,7 +37,11 @@ pub fn record(
     {
         let list = open_list(device, queue_kind)?;
         for command in &submit.commands {
-            encode(device, registries, list, command)?;
+            if let Err(error) = encode(device, registries, list, command) {
+                // SAFETY: recording failed before the list was submitted.
+                unsafe { sys::IUnknownVtbl::release(list) };
+                return Err(error);
+            }
         }
         // SAFETY: the list is open and holds the recorded commands.
         let status = unsafe {

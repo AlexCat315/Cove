@@ -138,9 +138,15 @@ fn wide(value: &str) -> Vec<u16> {
 unsafe extern "system" {
     fn LoadLibraryW(name: LPCWSTR) -> *mut c_void;
     fn GetProcAddress(module: *mut c_void, name: *const c_char) -> *mut c_void;
-    /// Copies a UTF-16 string into a COM task allocation WebView2 takes
-    /// ownership of.
+}
+
+#[link(name = "ole32")]
+unsafe extern "system" {
     fn CoTaskMemFree(pointer: *mut c_void);
+}
+
+#[link(name = "user32")]
+unsafe extern "system" {
     fn GetActiveWindow() -> HWND;
 }
 

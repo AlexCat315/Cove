@@ -471,12 +471,13 @@ impl RhiBackend for Dx12Backend {
         let queue_kind = queue.kind;
         let queue_fence = queue.fence;
 
-        // `record` borrows the device immutably and the registries mutably; the
-        // queue borrow above ends here because only `queue_kind`/`queue_fence` are
-        // still needed, and the queue itself is re-borrowed for the submit.
-        let mut registries = self.lock();
+        // Recording may create the queue's allocator on first use.
+        let mut registries = self
+            .registries
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
         let command_list =
-            super::command_list::record(&self.device, &mut registries, queue_kind, submit)?;
+            super::command_list::record(&mut self.device, &mut registries, queue_kind, submit)?;
         drop(registries);
         let queue = match queue_kind {
             sys::D3D12_COMMAND_LIST_TYPE_DIRECT => &mut self.device.graphics,

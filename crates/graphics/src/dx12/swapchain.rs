@@ -55,7 +55,7 @@ pub fn create(
                 sys::DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING
             },
         };
-        let mut swapchain: sys::ComPtr = core::ptr::null_mut();
+        let mut swapchain1: sys::ComPtr = core::ptr::null_mut();
         // SAFETY: the factory and the HWND are live; the vtable entry matches
         // `CreateSwapChainForHwnd`, which takes the queue, the window and the
         // description.
@@ -68,8 +68,23 @@ pub fn create(
                 &description,
                 core::ptr::null(),
                 core::ptr::null_mut(),
-                &mut swapchain,
+                &mut swapchain1,
             )
+        };
+        if status != sys::S_OK || swapchain1.is_null() {
+            return Err(RhiError::make_swapchain_failed(sys::hresult_message(
+                status,
+            )));
+        }
+        let mut swapchain: sys::ComPtr = core::ptr::null_mut();
+        // SAFETY: the factory returned a live IDXGISwapChain1. Query the
+        // interface that owns GetCurrentBackBufferIndex before using it.
+        let status = unsafe {
+            let vtbl = *(swapchain1 as *mut *const sys::IUnknownVtbl);
+            let status =
+                ((*vtbl).QueryInterface)(swapchain1, &sys::IID_IDXGI_SWAP_CHAIN3, &mut swapchain);
+            sys::IUnknownVtbl::release(swapchain1);
+            status
         };
         if status != sys::S_OK || swapchain.is_null() {
             return Err(RhiError::make_swapchain_failed(sys::hresult_message(

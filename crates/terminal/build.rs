@@ -23,6 +23,8 @@ fn zig_target(target: &str) -> Option<&'static str> {
 
 fn main() {
     println!("cargo:rerun-if-env-changed=COVE_ZIG");
+    println!("cargo:rerun-if-env-changed=COVE_CACHE_DIR");
+    println!("cargo:rerun-if-env-changed=ZIG_GLOBAL_CACHE_DIR");
     if let Ok(state) = cove_native_build::setup::state_path() {
         println!("cargo:rerun-if-changed={}", state.display());
     }
@@ -56,6 +58,13 @@ fn main() {
     let mut build = Command::new(zig);
     if let Err(error) = cove_native_build::setup::apply(&mut build) {
         println!("cargo:warning=Cove toolchain state unavailable: {error}");
+    }
+    // Zig's archive writer needs the real cache directory on MSIX hosts.
+    if cfg!(windows) && env::var_os("ZIG_GLOBAL_CACHE_DIR").is_none() {
+        let cache = cove_native_build::setup::cache_dir().expect("locate Cove cache");
+        let zig_cache = cove_native_build::setup::create_cache_directory(&cache.join("zig"))
+            .expect("create Zig cache");
+        build.env("ZIG_GLOBAL_CACHE_DIR", zig_cache);
     }
     build
         .current_dir(&source)

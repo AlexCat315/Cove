@@ -18,7 +18,8 @@ pub fn platform_default_backends() -> Vec<GraphicsApi> {
     }
     #[cfg(target_os = "windows")]
     {
-        vec![GraphicsApi::Dx12, GraphicsApi::Vulkan]
+        // The DX12 encoder still lacks descriptor and draw bindings.
+        vec![GraphicsApi::Vulkan, GraphicsApi::Dx12]
     }
     #[cfg(any(target_os = "linux", target_os = "android"))]
     {

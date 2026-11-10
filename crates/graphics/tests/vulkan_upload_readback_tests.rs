@@ -109,6 +109,51 @@ fn buffer_copies_preserve_data_across_a_planned_barrier() {
 }
 
 #[test]
+fn multisample_clear_resolves_into_the_single_sample_texture() {
+    use cove_graphics::{
+        CommandBuffer, QueueClass, RenderColorTarget, RenderPassDescriptor, TextureDescriptor,
+        TextureFormat, TextureSubresource, TextureUsage,
+    };
+
+    let Ok(device) = Device::make(DeviceConfig {
+        preferred_backends: vec![GraphicsApi::Vulkan],
+        ..DeviceConfig::default()
+    }) else {
+        eprintln!("skipping: no Vulkan loader/ICD on this host");
+        return;
+    };
+    let resolved_descriptor = TextureDescriptor::new(
+        4,
+        4,
+        TextureFormat::Rgba8Unorm,
+        TextureUsage::COLOR_TARGET | TextureUsage::TRANSFER_SOURCE,
+    );
+    let mut multisample_descriptor = resolved_descriptor;
+    multisample_descriptor.sample_count = 4;
+    multisample_descriptor.usage = TextureUsage::COLOR_TARGET;
+    let multisample = device.make_texture(multisample_descriptor).unwrap();
+    let resolved = device.make_texture(resolved_descriptor).unwrap();
+    let target = RenderColorTarget::clearing(multisample, [0.0, 1.0, 0.0, 1.0])
+        .with_resolve(resolved)
+        .without_store();
+    let mut commands = CommandBuffer::new();
+    commands.render_pass(RenderPassDescriptor::new(vec![target]), |_| {});
+
+    device.begin_frame().unwrap();
+    device
+        .submit(&commands, QueueClass::Graphics, &[], &[], None)
+        .unwrap();
+    device.end_frame();
+    device.wait_until_idle().unwrap();
+
+    let mut readback = [0; 64];
+    device
+        .read_texture_data(resolved, 4, 4, 16, TextureSubresource::default(), &mut readback)
+        .unwrap();
+    assert_eq!(readback, [0, 255, 0, 255].repeat(16).as_slice());
+}
+
+#[test]
 fn upload_then_readback_round_trips_pixels() {
     if !vulkan_available() {
         eprintln!("skipping: no native Vulkan driver on this host");

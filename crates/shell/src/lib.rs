@@ -8,6 +8,7 @@ mod log;
 mod native;
 pub mod native_menu_bar;
 pub mod native_menu_popover;
+#[cfg(target_os = "macos")]
 mod native_menu_wire;
 mod open_documents;
 mod platform_shell;
