@@ -7,6 +7,7 @@
 - `cargo cove setup` 核对递归子模块的锁定提交，能识别上次下载中断后留下的错误版本。Windows 上的设置状态与 Zig 构建使用真实缓存路径，避免应用容器重定向导致写入失败。AppKit 菜单的内部绑定只在 macOS 编译，修复其他平台的未使用代码警告。
 - 修复 Windows DX12 命令列表录制的编译错误，并在编码失败时释放列表。
 - Vulkan 即时缓冲区传输使用可映射的中转内存，并在传输完成后移除对应资源记录。更新 Windows / Linux 的 Slang 集成测试以适配当前 RHI。
+- 修复 Vulkan 多重采样解析导致的 Windows 窗口黑屏。映射内存读写现在计入子分配在内存块中的偏移，修复跨帧上传时图标缺失和画面空白的问题。
 
 - **写作类应用所需能力与修复（2026-11-09，来自 Ruwriter 重构）**：
   - `TextFieldDecoration::content_padding`（`TextFieldContentPadding { horizontal, vertical }`）：替换按尺寸推导的文字内边距。内边距位于滚动区域之内，宽编辑器可以居中一栏可读宽度的正文，同时整栏都能滚动和点击定位。测量使用同一内边距。

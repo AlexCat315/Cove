@@ -23,7 +23,7 @@ pub struct VulkanMemoryAllocation {
     pub offset: sys::VkDeviceSize,
     pub size: sys::VkDeviceSize,
     pub memory: sys::VkDeviceMemory,
-    /// Persistently mapped base for host-visible blocks; null otherwise.
+    /// Persistently mapped block base, before the suballocation's offset.
     pub mapped_base: *mut core::ffi::c_void,
 }
 
@@ -39,14 +39,13 @@ unsafe impl Send for VulkanMemoryAllocator {}
 
 impl VulkanMemoryAllocation {
     /// Writable CPU pointer at `offset` bytes into this allocation, or `None`
-    /// when the block was not host visible.
+    /// when the block was not host visible or the offset is out of range.
     pub fn cpu_pointer(&self, offset: usize) -> Option<*mut u8> {
-        if self.mapped_base.is_null() {
+        if self.mapped_base.is_null() || offset as sys::VkDeviceSize > self.size {
             return None;
         }
-        // SAFETY: the mapping covers at least `self.size` bytes starting at the
-        // allocation's offset, and the caller is expected to stay in range.
-        Some(unsafe { self.mapped_base.cast::<u8>().add(offset) })
+        let block_offset = usize::try_from(self.offset).ok()?.checked_add(offset)?;
+        Some(self.mapped_base.cast::<u8>().wrapping_add(block_offset))
     }
 }
 

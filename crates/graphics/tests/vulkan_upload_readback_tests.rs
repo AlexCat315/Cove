@@ -109,6 +109,65 @@ fn buffer_copies_preserve_data_across_a_planned_barrier() {
 }
 
 #[test]
+fn transient_texture_uploads_preserve_pixels_across_frame_slots() {
+    use cove_graphics::{
+        CommandBuffer, QueueClass, TextureBufferUpload, TextureDescriptor, TextureFormat,
+        TextureSubresource, TextureUploadRegion, TextureUsage,
+    };
+
+    let Ok(device) = Device::make(DeviceConfig {
+        preferred_backends: vec![GraphicsApi::Vulkan],
+        frames_in_flight: 2,
+        ..DeviceConfig::default()
+    }) else {
+        eprintln!("skipping: no Vulkan loader/ICD on this host");
+        return;
+    };
+    let texture = device
+        .make_texture(TextureDescriptor::new(
+            2,
+            1,
+            TextureFormat::Rgba8Unorm,
+            TextureUsage::TRANSFER_DESTINATION | TextureUsage::TRANSFER_SOURCE,
+        ))
+        .unwrap();
+    let pixels = [[23, 53, 71, 255], [113, 127, 149, 255]];
+
+    for (x, pixel) in pixels.iter().enumerate() {
+        device.begin_frame().unwrap();
+        let location = device.upload_transient(pixel, 4).unwrap();
+        let mut upload = TextureBufferUpload::new(
+            location.buffer,
+            pixel.len(),
+            texture,
+            TextureUploadRegion::with_origin(1, 1, x as i64, 0),
+        );
+        upload.offset = location.offset;
+        let mut commands = CommandBuffer::new();
+        commands.copy_pass(|pass| pass.upload_buffer_to_texture(upload));
+        device
+            .submit(&commands, QueueClass::Graphics, &[], &[], None)
+            .unwrap();
+        device.end_frame();
+    }
+    device.wait_until_idle().unwrap();
+
+    let mut readback = [0; 8];
+    device
+        .read_texture_data(
+            texture,
+            2,
+            1,
+            8,
+            TextureSubresource::default(),
+            &mut readback,
+        )
+        .unwrap();
+    assert_eq!(&readback, pixels.as_flattened());
+    device.destroy_texture(texture);
+}
+
+#[test]
 fn multisample_clear_resolves_into_the_single_sample_texture() {
     use cove_graphics::{
         CommandBuffer, QueueClass, RenderColorTarget, RenderPassDescriptor, TextureDescriptor,
@@ -148,7 +207,14 @@ fn multisample_clear_resolves_into_the_single_sample_texture() {
 
     let mut readback = [0; 64];
     device
-        .read_texture_data(resolved, 4, 4, 16, TextureSubresource::default(), &mut readback)
+        .read_texture_data(
+            resolved,
+            4,
+            4,
+            16,
+            TextureSubresource::default(),
+            &mut readback,
+        )
         .unwrap();
     assert_eq!(readback, [0, 255, 0, 255].repeat(16).as_slice());
 }

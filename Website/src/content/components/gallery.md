@@ -2,6 +2,8 @@
 
 Gallery 展示 Cove 的 Rust 组件。组件页的 Size、Scale、Disabled 和 Reset example 分别调整密度、文字缩放、交互状态，并将当前示例恢复到初始值。
 
+在 Windows 上运行 `cargo run -p cove-examples --bin gallery` 打开 Gallery。当前窗口使用 Vulkan，传入 `-- --component calendar` 可直接打开 Calendar 示例。
+
 侧栏搜索按名称、分类和简介过滤导航，不改变当前页面。输入多个词时，条目需同时匹配这些词。按 Escape 或点击清空按钮恢复完整导航。
 
 当前已补充使用说明的页面：

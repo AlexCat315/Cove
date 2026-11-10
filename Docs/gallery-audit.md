@@ -4,6 +4,15 @@
 
 Swift 源码逐页对照见文末《Swift 源码对照（逐页差异清单）》。
 
+## 2026-11-10 Windows Gallery 渲染
+
+- 实现范围为 Gallery 窗口和侧栏。Vulkan 使用独立的多重采样解析附件，映射地址计入内存子分配偏移，使后续帧能够上传图标和绘制数据。
+- 构建与 GPU 回归在 Windows x64 MSVC 上通过。执行 `cargo build --workspace --locked -j 2`，验证 Vulkan 多重采样解析和两个帧槽向同一张纹理写入不同像素的回读结果。
+- Windows 原生窗口视觉验收通过。滚动侧栏后，Form、Combobox、Calendar、DatePicker、DateRangePicker、TimeField、TimePicker、WheelPicker 的图标均可见。
+- Windows 交互验收通过 DevTools 验证侧栏滚动、切换到 DatePicker 并返回 Calendar。两次连续截图均正常出画。验收范围为侧栏导航和窗口出画。
+- DX12 能创建设备，创建 UI 绘制管线仍返回 `E_INVALIDARG`。Windows Gallery 使用 Vulkan。
+- 运行说明见已登记在导航中的 [Gallery 使用](../Website/src/content/components/gallery.md)。
+
 ## 2026-11-09：触摸目标——图表
 
 - Chart 图例项触摸高度 44 / 48pt（实测 iPhone：Revenue、Signups 44pt）；绘图区按住拖动选中数据点。
