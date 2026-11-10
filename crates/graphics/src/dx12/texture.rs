@@ -60,7 +60,16 @@ pub fn create(
         Flags: flags,
     };
 
-    let mut record = create_committed(device, &description)?;
+    let attachment_index = is_attachment.then(|| device.take_rtv_index()).transpose()?;
+    let mut record = match create_committed(device, &description) {
+        Ok(record) => record,
+        Err(error) => {
+            if let Some(index) = attachment_index {
+                device.release_rtv_index(index);
+            }
+            return Err(error);
+        }
+    };
     record.format = descriptor.format;
     record.width = descriptor.width;
     record.height = descriptor.height;
@@ -76,19 +85,32 @@ pub fn create(
     record.usage = descriptor.usage;
 
     // Carve the views a render target or depth target needs.
-    if is_attachment {
-        let index = device.take_rtv_index()?;
-        let descriptor_handle = if descriptor.format.is_depth() {
-            dsv_heap_cpu(device, index)?
+    if let Some(index) = attachment_index {
+        let descriptor_handle = (if descriptor.format.is_depth() {
+            dsv_heap_cpu(device, index)
         } else {
-            rtv_heap_cpu(device, index)?
+            rtv_heap_cpu(device, index)
+        })
+        .and_then(|handle| {
+            create_view(
+                device,
+                record.resource,
+                descriptor.format,
+                descriptor.sample_count,
+                handle,
+            )?;
+            Ok(handle)
+        });
+        let descriptor_handle = match descriptor_handle {
+            Ok(handle) => handle,
+            Err(error) => {
+                device.release_rtv_index(index);
+                // SAFETY: creation succeeded and the resource was never submitted.
+                unsafe { sys::IUnknownVtbl::release(record.resource) };
+                return Err(error);
+            }
         };
-        create_view(
-            device,
-            record.resource,
-            descriptor.format,
-            descriptor_handle,
-        )?;
+        record.attachment_index = Some(index);
         if descriptor.format.is_depth() {
             record.dsv = Some(descriptor_handle);
         } else {
@@ -142,6 +164,7 @@ fn create_committed(
         }
         Ok(Dx12TextureRecord {
             resource,
+            state: sys::D3D12_RESOURCE_STATE_COMMON,
             format: crate::rhi::TextureFormat::Invalid,
             width: 0,
             height: 0,
@@ -151,6 +174,7 @@ fn create_committed(
             sample_count: 1,
             dimension: TextureDimension::Texture2D,
             usage: crate::rhi::TextureUsage::EMPTY,
+            attachment_index: None,
             rtv: None,
             dsv: None,
         })
@@ -175,7 +199,7 @@ pub fn dsv_heap_cpu(
 ) -> RhiResult<sys::D3D12_CPU_DESCRIPTOR_HANDLE> {
     let base = heap_start(device.dsv_heap)?;
     Ok(sys::D3D12_CPU_DESCRIPTOR_HANDLE {
-        ptr: base.ptr + (index as usize) * device.rtv_descriptor_size as usize,
+        ptr: base.ptr + (index as usize) * device.dsv_descriptor_size as usize,
     })
 }
 
@@ -223,27 +247,31 @@ struct DescriptorHeapVtbl {
 }
 
 /// Creates the render-target or depth-stencil view for a texture.
-fn create_view(
+pub(super) fn create_view(
     device: &Dx12DeviceHandle,
     resource: sys::ComPtr,
     format: crate::rhi::TextureFormat,
+    sample_count: usize,
     descriptor: sys::D3D12_CPU_DESCRIPTOR_HANDLE,
 ) -> RhiResult<()> {
     #[cfg(not(target_os = "windows"))]
     {
-        let _ = (device, resource, format, descriptor);
+        let _ = (device, resource, format, sample_count, descriptor);
         Err(RhiError::unsupported_backend(
             "DirectX 12 is only available on Windows",
         ))
     }
     #[cfg(target_os = "windows")]
     {
-        // The view description is a plain struct whose first fields are the format
-        // and dimension; a null description asks D3D12 for a default view over the
-        // whole resource, which is what a single-mip attachment needs.
+        let view_dimension = match (format.is_depth(), sample_count > 1) {
+            (true, true) => sys::D3D12_DSV_DIMENSION_TEXTURE2DMS,
+            (true, false) => sys::D3D12_DSV_DIMENSION_TEXTURE2D,
+            (false, true) => sys::D3D12_RTV_DIMENSION_TEXTURE2DMS,
+            (false, false) => sys::D3D12_RTV_DIMENSION_TEXTURE2D,
+        };
         let view = ViewDescription {
             format: formats::dxgi_format(format),
-            view_dimension: if format.is_depth() { 3 } else { 4 },
+            view_dimension,
             ..Default::default()
         };
         // SAFETY: the device and resource are live; the vtable entry matches
@@ -728,27 +756,14 @@ fn record_copy(
     subresource: TextureSubresource,
     upload: bool,
 ) -> RhiResult<()> {
-    let list = super::command_list::open_transfer_list(device)?;
-    let (before, after) = if upload {
-        (
-            sys::D3D12_RESOURCE_STATE_COPY_DEST,
-            sys::D3D12_RESOURCE_STATE_COMMON,
-        )
+    let list = super::command_list::open_graphics_list(device)?;
+    let copy_state = if upload {
+        sys::D3D12_RESOURCE_STATE_COPY_DEST
     } else {
-        (
-            sys::D3D12_RESOURCE_STATE_COPY_SOURCE,
-            sys::D3D12_RESOURCE_STATE_COMMON,
-        )
+        sys::D3D12_RESOURCE_STATE_COPY_SOURCE
     };
     // SAFETY: the texture resource and the list are live.
-    unsafe {
-        super::resources::transition(
-            list,
-            record.resource,
-            sys::D3D12_RESOURCE_STATE_COMMON,
-            before,
-        )
-    };
+    unsafe { super::resources::transition(list, record.resource, record.state, copy_state) };
 
     let texture_location = sys::D3D12_TEXTURE_COPY_LOCATION::subresource(
         record.resource,
@@ -814,9 +829,12 @@ fn record_copy(
                 &source_box,
             );
         }
-        super::resources::transition(list, record.resource, before, after);
+        if !upload {
+            super::resources::transition(list, record.resource, copy_state, record.state);
+        }
     }
-    super::command_list::close_and_submit(device, list)
+    let value = super::command_list::submit_graphics_list(device, list)?;
+    super::device::wait_idle(&device.graphics, value)
 }
 
 #[cfg(test)]
@@ -826,6 +844,7 @@ mod tests {
     #[test]
     fn allocation_bytes_cover_layers_and_mips() {
         let record = Dx12TextureRecord {
+            state: sys::D3D12_RESOURCE_STATE_COMMON,
             resource: core::ptr::null_mut(),
             format: crate::rhi::TextureFormat::Rgba8Unorm,
             width: 4,
@@ -836,6 +855,7 @@ mod tests {
             sample_count: 1,
             dimension: TextureDimension::Cube,
             usage: crate::rhi::TextureUsage::SAMPLED,
+            attachment_index: None,
             rtv: None,
             dsv: None,
         };

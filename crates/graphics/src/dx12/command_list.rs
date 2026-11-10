@@ -8,8 +8,10 @@
 #[cfg(target_os = "windows")]
 use crate::rhi::{
     ColorLoadAction, ComputeCommand, CopyCommand, DepthLoadAction, PlannedCommand, RenderCommand,
-    rhi_byte_range, rhi_count, rhi_require, rhi_texture_subresource_extent,
-    rhi_texture_upload_bytes,
+    RenderTextureInfo, ResourceKind, ResourceRef, TextureCopyExtent, TextureDimension,
+    TextureFormat, rhi_byte_range, rhi_color_texture_copy_extent, rhi_count,
+    rhi_render_pass_signature, rhi_require, rhi_texture_subresource_extent,
+    rhi_texture_transfer_bytes, rhi_texture_upload_bytes,
 };
 use crate::rhi::{PlannedSubmit, RhiError, RhiResult};
 
@@ -22,6 +24,14 @@ use super::resources::{
     CommandListVtbl, D3D12_INDEX_BUFFER_VIEW, D3D12_VERTEX_BUFFER_VIEW, transition,
 };
 use super::sys;
+use std::collections::HashMap;
+
+pub struct EncodedSubmission {
+    pub list: sys::ComPtr,
+    pub staged: Vec<sys::ComPtr>,
+    pub texture_states: HashMap<u32, u32>,
+    buffer_states: HashMap<u32, u32>,
+}
 
 /// Records `submit` into a freshly opened command list and closes it.
 ///
@@ -31,27 +41,31 @@ use super::sys;
 pub fn record(
     device: &mut Dx12DeviceHandle,
     registries: &mut Dx12Registries,
-    queue_kind: u32,
     submit: &PlannedSubmit,
-) -> RhiResult<(sys::ComPtr, Vec<sys::ComPtr>)> {
+) -> RhiResult<EncodedSubmission> {
     #[cfg(not(target_os = "windows"))]
     {
-        let _ = (device, registries, queue_kind, submit);
+        let _ = (device, registries, submit);
         Err(RhiError::unsupported_backend(
             "DirectX 12 is only available on Windows",
         ))
     }
     #[cfg(target_os = "windows")]
     {
-        let list = open_list(device, queue_kind)?;
-        let mut staged: Vec<sys::ComPtr> = Vec::new();
+        let list = open_graphics_list(device)?;
+        let mut encoded = EncodedSubmission {
+            list,
+            staged: Vec::new(),
+            texture_states: HashMap::new(),
+            buffer_states: HashMap::new(),
+        };
         for command in &submit.commands {
-            if let Err(error) = encode(device, registries, list, command, &mut staged) {
+            if let Err(error) = encode(device, registries, command, &mut encoded) {
                 // SAFETY: recording failed before the list was submitted, so the
                 // staging buffers were never read by the GPU.
                 unsafe {
                     sys::IUnknownVtbl::release(list);
-                    for resource in staged {
+                    for resource in encoded.staged {
                         sys::IUnknownVtbl::release(resource);
                     }
                 }
@@ -67,20 +81,23 @@ pub fn record(
             // SAFETY: a failed close leaves the list unreferenced.
             unsafe {
                 sys::IUnknownVtbl::release(list);
-                for resource in staged {
+                for resource in encoded.staged {
                     sys::IUnknownVtbl::release(resource);
                 }
             }
-            return Err(RhiError::submit_failed(sys::hresult_message(status)));
+            return Err(RhiError::submit_failed(format!(
+                "closing the DX12 command list: {}",
+                sys::hresult_message(status)
+            )));
         }
-        Ok((list, staged))
+        Ok(encoded)
     }
 }
 
-/// Opens a command list on the allocator for this queue class.
+/// Opens a direct command list on a retired or newly allocated allocator.
 #[cfg(target_os = "windows")]
-fn open_list(device: &mut Dx12DeviceHandle, queue_kind: u32) -> RhiResult<sys::ComPtr> {
-    let allocator = device.command_allocator(queue_kind)?;
+pub fn open_graphics_list(device: &mut Dx12DeviceHandle) -> RhiResult<sys::ComPtr> {
+    let allocator = device.command_allocator()?;
     let mut list: sys::ComPtr = core::ptr::null_mut();
     // SAFETY: the device and allocator are live; the vtable entry matches
     // `CreateCommandList` and the list type matches the queue class.
@@ -89,7 +106,7 @@ fn open_list(device: &mut Dx12DeviceHandle, queue_kind: u32) -> RhiResult<sys::C
         ((*vtbl).CreateCommandList)(
             device.device,
             0,
-            queue_kind,
+            sys::D3D12_COMMAND_LIST_TYPE_DIRECT,
             allocator,
             core::ptr::null_mut(),
             &sys::IID_ID3D12_GRAPHICS_COMMAND_LIST,
@@ -107,34 +124,19 @@ fn open_list(device: &mut Dx12DeviceHandle, queue_kind: u32) -> RhiResult<sys::C
 fn encode(
     device: &Dx12DeviceHandle,
     registries: &mut Dx12Registries,
-    list: sys::ComPtr,
     command: &PlannedCommand,
-    staged: &mut Vec<sys::ComPtr>,
+    encoded: &mut EncodedSubmission,
 ) -> RhiResult<()> {
+    let list = encoded.list;
     match command {
         PlannedCommand::Barriers(barriers) => {
             for barrier in barriers {
-                let resource = match barrier.resource.kind {
-                    crate::rhi::ResourceKind::Buffer => registries
-                        .buffers
-                        .get(&barrier.resource.id)
-                        .map(|record| record.resource),
-                    crate::rhi::ResourceKind::Texture => registries
-                        .textures
-                        .get(&barrier.resource.id)
-                        .map(|record| record.resource),
-                    _ => None,
-                };
-                let Some(resource) = resource else { continue };
-                // SAFETY: the resource is live and the list is open.
-                unsafe {
-                    transition(
-                        list,
-                        resource,
-                        formats::resource_state(barrier.source_state),
-                        formats::resource_state(barrier.destination_state),
-                    )
-                };
+                encode_resource_state(
+                    registries,
+                    encoded,
+                    barrier.resource,
+                    formats::resource_state(barrier.destination_state),
+                );
             }
             Ok(())
         }
@@ -144,13 +146,87 @@ fn encode(
         }
         PlannedCommand::CopyPass(record) => {
             for command in &record.body {
-                encode_copy(device, registries, list, command, staged)?;
+                // A single copy pass may write a resource and use it as the
+                // next command's source. Establish each operation's states.
+                let (source, destination) = match command {
+                    CopyCommand::CopyBuffer { src, dst, .. } => {
+                        (ResourceRef::buffer(src.id()), ResourceRef::buffer(dst.id()))
+                    }
+                    CopyCommand::CopyTexture { src, dst, .. } => (
+                        ResourceRef::texture(src.id()),
+                        ResourceRef::texture(dst.id()),
+                    ),
+                    CopyCommand::CopyBufferToTexture(upload) => (
+                        ResourceRef::buffer(upload.buffer.id()),
+                        ResourceRef::texture(upload.texture.id()),
+                    ),
+                    CopyCommand::CopyTextureToBuffer {
+                        texture, buffer, ..
+                    } => (
+                        ResourceRef::texture(texture.id()),
+                        ResourceRef::buffer(buffer.id()),
+                    ),
+                };
+                encode_resource_state(
+                    registries,
+                    encoded,
+                    source,
+                    sys::D3D12_RESOURCE_STATE_COPY_SOURCE,
+                );
+                encode_resource_state(
+                    registries,
+                    encoded,
+                    destination,
+                    sys::D3D12_RESOURCE_STATE_COPY_DEST,
+                );
+                encode_copy(device, registries, list, command, &mut encoded.staged)?;
             }
             Ok(())
         }
-        PlannedCommand::AccelerationStructureBuild(_) => Err(RhiError::unsupported_feature(
-            "DX12 acceleration-structure builds need the DXR dispatch tables, which this build does not link",
-        )),
+        PlannedCommand::AccelerationStructureBuild(build) => {
+            let record = registries
+                .accelerations
+                .get(&build.structure.id())
+                .ok_or_else(|| RhiError::invalid_argument("unknown DXR acceleration structure"))?;
+            record.encode(device, list, &mut encoded.staged)
+        }
+    }
+}
+
+#[cfg(target_os = "windows")]
+fn encode_resource_state(
+    registries: &Dx12Registries,
+    encoded: &mut EncodedSubmission,
+    reference: ResourceRef,
+    after: u32,
+) {
+    let id = reference.id;
+    let resource = match reference.kind {
+        ResourceKind::Buffer => registries
+            .buffers
+            .get(&id)
+            // Upload and readback heaps have immutable native states.
+            .filter(|record| record.heap_type == sys::D3D12_HEAP_TYPE_DEFAULT)
+            .map(|record| {
+                // Default-heap buffers decay to COMMON between executions.
+                let before = encoded
+                    .buffer_states
+                    .insert(id, after)
+                    .unwrap_or(sys::D3D12_RESOURCE_STATE_COMMON);
+                (record.resource, before)
+            }),
+        ResourceKind::Texture => registries.textures.get(&id).map(|record| {
+            let before = encoded
+                .texture_states
+                .insert(id, after)
+                .unwrap_or(record.state);
+            (record.resource, before)
+        }),
+        _ => None,
+    };
+    if let Some((resource, before)) = resource {
+        // SAFETY: the resource is live and the list is open.
+        unsafe { transition(encoded.list, resource, before, after) };
     }
 }
 
@@ -188,6 +264,22 @@ fn encode_render_pass(
     list: sys::ComPtr,
     record: &crate::rhi::RenderPassRecord,
 ) -> RhiResult<()> {
+    let signature = rhi_render_pass_signature(&record.descriptor, |handle| {
+        let texture = registries
+            .textures
+            .get(&handle.id())
+            .ok_or_else(|| RhiError::invalid_argument("unknown render attachment"))?;
+        Ok(RenderTextureInfo {
+            supports_color_resolve: texture.format != TextureFormat::R32Uint,
+            extent: [texture.width, texture.height],
+            sample_count: texture.sample_count,
+            format: texture.format,
+            usage: texture.usage,
+            single_layer_2d: texture.dimension == TextureDimension::Texture2D
+                && texture.layers == 1,
+            is_depth: texture.format.is_depth(),
+        })
+    })?;
     let mut color_views = Vec::with_capacity(record.descriptor.color_targets.len());
     for target in &record.descriptor.color_targets {
         let texture = registries
@@ -212,6 +304,25 @@ fn encode_render_pass(
     // SAFETY: every view belongs to a live texture and the list is open.
     unsafe {
         let vtbl = *(list as *mut *const CommandListVtbl);
+        // DX12 keeps raster state across passes in the same command list.
+        // Start each pass with the full attachment, before any explicit clip.
+        let [width, height] = signature.extent;
+        let viewport = sys::D3D12_VIEWPORT {
+            TopLeftX: 0.0,
+            TopLeftY: 0.0,
+            Width: width as f32,
+            Height: height as f32,
+            MinDepth: 0.0,
+            MaxDepth: 1.0,
+        };
+        let scissor = sys::D3D12_RECT {
+            left: 0,
+            top: 0,
+            right: width as i32,
+            bottom: height as i32,
+        };
+        ((*vtbl).RSSetViewports)(list, 1, &viewport);
+        ((*vtbl).RSSetScissorRects)(list, 1, &scissor);
         ((*vtbl).OMSetRenderTargets)(
             list,
             color_views.len() as u32,
@@ -250,7 +361,41 @@ fn encode_render_pass(
     }
     let mut state = BindState::new(false);
     for command in &record.body {
+        if let RenderCommand::SetMeshPipeline(handle) = command {
+            let pipeline = registries
+                .mesh_pipelines
+                .get(&handle.id())
+                .ok_or_else(|| RhiError::invalid_argument("unknown mesh pipeline"))?;
+            signature.validate(&pipeline.colors, pipeline.depth.as_ref(), 1)?;
+        }
         encode_render(device, registries, list, &mut state, command)?;
+    }
+    for target in &record.descriptor.color_targets {
+        let Some(resolve) = target.resolve_texture else {
+            continue;
+        };
+        let source = &registries.textures[&target.texture.id()];
+        let destination = &registries.textures[&resolve.id()];
+        let render_target = sys::D3D12_RESOURCE_STATE_RENDER_TARGET;
+        let resolve_source = sys::D3D12_RESOURCE_STATE_RESOLVE_SOURCE;
+        let resolve_dest = sys::D3D12_RESOURCE_STATE_RESOLVE_DEST;
+        // SAFETY: the attachment signature validated both live textures. The
+        // planner tracks both as render targets, so restore that state after resolving.
+        unsafe {
+            let vtbl = *(list as *mut *const CommandListVtbl);
+            transition(list, source.resource, render_target, resolve_source);
+            transition(list, destination.resource, render_target, resolve_dest);
+            ((*vtbl).ResolveSubresource)(
+                list,
+                destination.resource,
+                0,
+                source.resource,
+                0,
+                formats::dxgi_format(source.format),
+            );
+            transition(list, destination.resource, resolve_dest, render_target);
+            transition(list, source.resource, resolve_source, render_target);
+        }
     }
     Ok(())
 }
@@ -361,10 +506,30 @@ fn encode_render(
             offset,
             index_type,
         } => bind_index_buffer(registries, list, buffer.id(), *offset, *index_type),
-        RenderCommand::DrawIndirect { .. } | RenderCommand::DrawMeshTasks(_) => {
-            Err(RhiError::unsupported_feature(
-                "DX12 indirect draws and mesh dispatches need command signatures, which this build does not create",
-            ))
+        RenderCommand::DrawIndirect {
+            buffer,
+            offset,
+            draw_count,
+        } => {
+            rhi_require(
+                state.graphics_pipeline.is_some(),
+                "indirect draw requires a graphics pipeline",
+            )?;
+            device.indirect.encode(
+                list,
+                registries,
+                super::extensions::IndirectCommand::Draw,
+                *buffer,
+                *offset,
+                rhi_count(*draw_count)?,
+            )
+        }
+        RenderCommand::DrawMeshTasks(groups) => {
+            rhi_require(
+                state.layout_id.is_some() && state.graphics_pipeline.is_none(),
+                "mesh dispatch requires a mesh pipeline",
+            )?;
+            super::extensions::dispatch_mesh(list, *groups)
         }
     }
 }
@@ -433,9 +598,20 @@ fn encode_compute(
             }
             Ok(())
         }
-        ComputeCommand::DispatchIndirect { .. } => Err(RhiError::unsupported_feature(
-            "DX12 indirect dispatch needs a command signature, which this build does not create",
-        )),
+        ComputeCommand::DispatchIndirect { buffer, offset } => {
+            rhi_require(
+                state.layout_id.is_some(),
+                "indirect dispatch requires a compute pipeline",
+            )?;
+            device.indirect.encode(
+                list,
+                registries,
+                super::extensions::IndirectCommand::Dispatch,
+                *buffer,
+                *offset,
+                1,
+            )
+        }
     }
 }
 
@@ -464,6 +640,14 @@ fn encode_copy(
                 .buffers
                 .get(&dst.id())
                 .ok_or_else(|| RhiError::invalid_argument("unknown copy buffer"))?;
+            rhi_require(
+                src != dst
+                    && source.heap_type != sys::D3D12_HEAP_TYPE_READBACK
+                    && destination.heap_type != sys::D3D12_HEAP_TYPE_UPLOAD,
+                "buffer copy requires distinct GPU-readable and GPU-writable buffers",
+            )?;
+            rhi_byte_range(*src_offset, *size, source.size as usize)?;
+            rhi_byte_range(*dst_offset, *size, destination.size as usize)?;
             // SAFETY: both buffers and the list are live.
             unsafe {
                 let vtbl = *(list as *mut *const CommandListVtbl);
@@ -481,20 +665,182 @@ fn encode_copy(
         CopyCommand::CopyBufferToTexture(upload) => {
             encode_buffer_to_texture(device, registries, list, upload, staged)
         }
-        CopyCommand::CopyTexture { .. } | CopyCommand::CopyTextureToBuffer { .. } => {
-            // Texture-to-texture and readback copies still go through the
-            // immediate-transfer path; planar copies are not recorded here.
+        CopyCommand::CopyTexture {
+            src,
+            dst,
+            width,
+            height,
+        } => {
+            let source = registries
+                .textures
+                .get(&src.id())
+                .ok_or_else(|| RhiError::invalid_argument("unknown copy source texture"))?;
+            let destination = registries
+                .textures
+                .get(&dst.id())
+                .ok_or_else(|| RhiError::invalid_argument("unknown copy destination texture"))?;
+            let extent = |texture: &super::resources::Dx12TextureRecord| TextureCopyExtent {
+                width: texture.width,
+                height: texture.height,
+                format: texture.format,
+            };
+            rhi_require(
+                src != dst && source.sample_count == 1 && destination.sample_count == 1,
+                "texture copy requires distinct single-sample resources",
+            )?;
+            let (width, height) = (rhi_count(*width)?, rhi_count(*height)?);
+            rhi_color_texture_copy_extent(
+                width as usize,
+                height as usize,
+                extent(source),
+                extent(destination),
+            )?;
+            let source = sys::D3D12_TEXTURE_COPY_LOCATION::subresource(source.resource, 0);
+            let destination =
+                sys::D3D12_TEXTURE_COPY_LOCATION::subresource(destination.resource, 0);
+            // SAFETY: the planner established copy states and the region fits both textures.
+            unsafe { copy_texture_region(list, &source, &destination, width, height) };
             Ok(())
         }
+        CopyCommand::CopyTextureToBuffer {
+            texture,
+            width,
+            height,
+            buffer,
+            offset,
+            bytes_per_row,
+        } => {
+            let texture = registries
+                .textures
+                .get(&texture.id())
+                .ok_or_else(|| RhiError::invalid_argument("unknown readback texture"))?;
+            let buffer = registries
+                .buffers
+                .get(&buffer.id())
+                .ok_or_else(|| RhiError::invalid_argument("unknown readback buffer"))?;
+            encode_texture_to_buffer(
+                device,
+                list,
+                texture,
+                buffer,
+                [rhi_count(*width)?, rhi_count(*height)?],
+                *offset,
+                *bytes_per_row,
+                staged,
+            )
+        }
     }
+}
+
+#[cfg(target_os = "windows")]
+unsafe fn copy_texture_region(
+    list: sys::ComPtr,
+    source: &sys::D3D12_TEXTURE_COPY_LOCATION,
+    destination: &sys::D3D12_TEXTURE_COPY_LOCATION,
+    width: u32,
+    height: u32,
+) {
+    let region = sys::D3D12_BOX {
+        left: 0,
+        top: 0,
+        front: 0,
+        right: width,
+        bottom: height,
+        back: 1,
+    };
+    // SAFETY: the caller provides a live list and valid copy locations.
+    unsafe {
+        let vtbl = *(list as *mut *const CommandListVtbl);
+        ((*vtbl).CopyTextureRegion)(list, destination, 0, 0, 0, source, &region);
+    }
+}
+
+#[cfg(target_os = "windows")]
+#[allow(clippy::too_many_arguments)]
+fn encode_texture_to_buffer(
+    device: &Dx12DeviceHandle,
+    list: sys::ComPtr,
+    texture: &super::resources::Dx12TextureRecord,
+    buffer: &super::resources::Dx12ResourceRecord,
+    [width, height]: [u32; 2],
+    offset: usize,
+    bytes_per_row: usize,
+    staged: &mut Vec<sys::ComPtr>,
+) -> RhiResult<()> {
+    rhi_require(
+        texture.sample_count == 1 && buffer.heap_type != sys::D3D12_HEAP_TYPE_UPLOAD,
+        "texture readback requires a single sample and a GPU-writable buffer",
+    )?;
+    let capacity = (buffer.size as usize).saturating_sub(offset);
+    rhi_texture_transfer_bytes(
+        width as usize,
+        height as usize,
+        bytes_per_row,
+        texture.format,
+        texture.width,
+        texture.height,
+        capacity,
+    )?;
+    let row_bytes = width as usize * texture.format.bytes_per_texel();
+    let pitch = row_bytes.next_multiple_of(sys::D3D12_TEXTURE_DATA_PITCH_ALIGNMENT);
+    // The intermediate footprint satisfies D3D12 alignment while the caller
+    // can choose any valid row pitch and byte offset for its buffer.
+    let staging = super::buffer::create_in_heap_for_transfer(
+        device.device,
+        pitch * height as usize,
+        sys::D3D12_HEAP_TYPE_DEFAULT,
+    )?;
+    staged.push(staging.resource);
+    let source = sys::D3D12_TEXTURE_COPY_LOCATION::subresource(texture.resource, 0);
+    let footprint = sys::D3D12_TEXTURE_COPY_LOCATION::placed(
+        staging.resource,
+        sys::D3D12_PLACED_SUBRESOURCE_FOOTPRINT {
+            Offset: 0,
+            Footprint: sys::D3D12_SUBRESOURCE_FOOTPRINT {
+                Format: formats::dxgi_format(texture.format),
+                Width: width,
+                Height: height,
+                Depth: 1,
+                RowPitch: pitch as u32,
+            },
+        },
+    );
+    // SAFETY: both copy regions fit, and the intermediate lives until the fence.
+    unsafe {
+        let vtbl = *(list as *mut *const CommandListVtbl);
+        transition(
+            list,
+            staging.resource,
+            sys::D3D12_RESOURCE_STATE_COMMON,
+            sys::D3D12_RESOURCE_STATE_COPY_DEST,
+        );
+        copy_texture_region(list, &source, &footprint, width, height);
+        transition(
+            list,
+            staging.resource,
+            sys::D3D12_RESOURCE_STATE_COPY_DEST,
+            sys::D3D12_RESOURCE_STATE_COPY_SOURCE,
+        );
+        for row in 0..height as usize {
+            ((*vtbl).CopyBufferRegion)(
+                list,
+                buffer.resource,
+                (offset + row * bytes_per_row) as u64,
+                staging.resource,
+                (row * pitch) as u64,
+                row_bytes as u64,
+            );
+        }
+    }
+    Ok(())
 }
 
 /// Validates and records one buffer-to-texture upload.
 ///
 /// D3D12 requires the buffer side of a placed footprint to use a row pitch that
 /// is a multiple of 256 bytes, while the RHI accepts tightly packed rows. Rows
-/// are re-laid out into a short-lived upload-heap buffer; the caller releases it
-/// once the submission's fence has retired.
+/// are re-laid out into a staging buffer on the CPU for an upload heap and on
+/// the GPU for a device-local buffer.
 #[cfg(target_os = "windows")]
 fn encode_buffer_to_texture(
     device: &Dx12DeviceHandle,
@@ -530,44 +876,58 @@ fn encode_buffer_to_texture(
     )?;
     rhi_byte_range(upload.offset, byte_count, capacity)?;
     rhi_require(
-        !buffer.mapped.is_null(),
-        "recorded upload needs a CPU-visible source buffer",
+        texture.sample_count == 1 && buffer.heap_type != sys::D3D12_HEAP_TYPE_READBACK,
+        "texture upload requires a single sample and a GPU-readable buffer",
     )?;
 
     let width = upload.region.width as u32;
     let height = upload.region.height as u32;
-    let pitch = upload
-        .bytes_per_row
-        .next_multiple_of(sys::D3D12_TEXTURE_DATA_PITCH_ALIGNMENT);
+    let row_bytes = width as usize * texture.format.bytes_per_texel();
+    let pitch = row_bytes.next_multiple_of(sys::D3D12_TEXTURE_DATA_PITCH_ALIGNMENT);
     let staging_size = pitch
         .checked_mul(height as usize)
         .ok_or_else(|| RhiError::invalid_argument("texture upload is too large"))?;
-    let staging = super::buffer::create_in_heap_for_transfer(
-        device.device,
-        staging_size,
-        sys::D3D12_HEAP_TYPE_UPLOAD,
-    )?;
+    let source_heap = buffer.heap_type;
+    let staging =
+        super::buffer::create_in_heap_for_transfer(device.device, staging_size, source_heap)?;
     // Register the resource before anything else can fail: `record` releases
     // everything in `staged` if encoding aborts.
     staged.push(staging.resource);
-    rhi_require(
-        !staging.mapped.is_null(),
-        "upload staging heap is not mapped",
-    )?;
-
-    for row in 0..height as usize {
-        let start = upload.offset + row * upload.bytes_per_row;
-        let end = (start + upload.bytes_per_row).min(upload.offset + byte_count);
-        if end <= start {
-            break;
-        }
-        // SAFETY: `start..end` lies inside the validated source buffer range and
-        // `row * pitch + (end - start)` lies inside the staging allocation.
-        unsafe {
-            core::ptr::copy_nonoverlapping(
-                buffer.mapped.add(start),
-                staging.mapped.add(row * pitch),
-                end - start,
+    // SAFETY: the source and destination row ranges were validated above.
+    unsafe {
+        if source_heap == sys::D3D12_HEAP_TYPE_UPLOAD {
+            for row in 0..height as usize {
+                core::ptr::copy_nonoverlapping(
+                    buffer
+                        .mapped
+                        .add(upload.offset + row * upload.bytes_per_row),
+                    staging.mapped.add(row * pitch),
+                    row_bytes,
+                );
+            }
+        } else {
+            let vtbl = *(list as *mut *const CommandListVtbl);
+            transition(
+                list,
+                staging.resource,
+                sys::D3D12_RESOURCE_STATE_COMMON,
+                sys::D3D12_RESOURCE_STATE_COPY_DEST,
+            );
+            for row in 0..height as usize {
+                ((*vtbl).CopyBufferRegion)(
+                    list,
+                    staging.resource,
+                    (row * pitch) as u64,
+                    buffer.resource,
+                    (upload.offset + row * upload.bytes_per_row) as u64,
+                    row_bytes as u64,
+                );
+            }
+            transition(
+                list,
+                staging.resource,
+                sys::D3D12_RESOURCE_STATE_COPY_DEST,
+                sys::D3D12_RESOURCE_STATE_COPY_SOURCE,
             );
         }
     }
@@ -989,15 +1349,10 @@ fn bind_index_buffer(
     Ok(())
 }
 
-/// Opens a command list on the copy queue, for one immediate transfer.
+/// Opens a direct list for transfers and transitions that must follow rendering.
+/// Closes and submits the list, releasing the CPU's reference.
 #[cfg(target_os = "windows")]
-pub fn open_transfer_list(device: &mut Dx12DeviceHandle) -> RhiResult<sys::ComPtr> {
-    open_list(device, sys::D3D12_COMMAND_LIST_TYPE_COPY)
-}
-
-/// Closes `list`, submits it on the copy queue and waits for the GPU.
-#[cfg(target_os = "windows")]
-pub fn close_and_submit(device: &mut Dx12DeviceHandle, list: sys::ComPtr) -> RhiResult<()> {
+pub fn submit_graphics_list(device: &mut Dx12DeviceHandle, list: sys::ComPtr) -> RhiResult<u64> {
     // SAFETY: the list is open and holds the recorded command.
     let status = unsafe {
         let vtbl = *(list as *mut *const CommandListVtbl);
@@ -1006,15 +1361,15 @@ pub fn close_and_submit(device: &mut Dx12DeviceHandle, list: sys::ComPtr) -> Rhi
     if status != sys::S_OK {
         // SAFETY: a failed close leaves the list unreferenced.
         unsafe { sys::IUnknownVtbl::release(list) };
-        return Err(RhiError::submit_failed(sys::hresult_message(status)));
+        return Err(RhiError::submit_failed(format!(
+            "closing the DX12 command list: {}",
+            sys::hresult_message(status)
+        )));
     }
-    // The immediate transfer APIs are synchronous by contract, so this waits for the
-    // fence the submit just signalled; the per-frame submit path never does.
-    let value = super::device::execute_and_signal(&mut device.copy, list);
+    let value = device.execute(list);
     // SAFETY: the list is submitted and no longer needed on the CPU.
     unsafe { sys::IUnknownVtbl::release(list) };
-    let value = value?;
-    super::device::wait_idle(&device.copy, value)
+    value
 }
 
 #[cfg(test)]

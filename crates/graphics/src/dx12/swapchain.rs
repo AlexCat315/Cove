@@ -55,21 +55,29 @@ pub fn create(
                 sys::DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING
             },
         };
+        let mut composition = None;
         let mut swapchain1: sys::ComPtr = core::ptr::null_mut();
         // SAFETY: the factory and the HWND are live; the vtable entry matches
         // `CreateSwapChainForHwnd`, which takes the queue, the window and the
         // description.
-        let status = unsafe {
-            let vtbl = *(device.factory as *mut *const FactoryVtbl);
-            ((*vtbl).CreateSwapChainForHwnd)(
-                device.factory,
-                device.graphics.queue,
-                descriptor.native_handle as sys::HWND,
-                &description,
-                core::ptr::null(),
-                core::ptr::null_mut(),
-                &mut swapchain1,
-            )
+        let status = if descriptor.premultiplied_alpha {
+            let (chain, target) = super::composition::create(device, descriptor)?;
+            swapchain1 = chain;
+            composition = Some(target);
+            sys::S_OK
+        } else {
+            unsafe {
+                let vtbl = *(device.factory as *mut *const FactoryVtbl);
+                ((*vtbl).CreateSwapChainForHwnd)(
+                    device.factory,
+                    device.graphics.queue,
+                    descriptor.native_handle as sys::HWND,
+                    &description,
+                    core::ptr::null(),
+                    core::ptr::null_mut(),
+                    &mut swapchain1,
+                )
+            }
         };
         if status != sys::S_OK || swapchain1.is_null() {
             return Err(RhiError::make_swapchain_failed(sys::hresult_message(
@@ -101,9 +109,12 @@ pub fn create(
             .unwrap_or_else(std::sync::PoisonError::into_inner);
         let mut buffers = Vec::with_capacity(buffer_count as usize);
         let mut texture_ids = Vec::with_capacity(buffer_count as usize);
-        let mut render_targets = Vec::with_capacity(buffer_count as usize);
+        let mut view_indices = Vec::with_capacity(buffer_count as usize);
         let outcome: RhiResult<()> = (|| {
             for index in 0..buffer_count {
+                let rtv_index = device.take_rtv_index()?;
+                view_indices.push(rtv_index);
+                let rtv = super::texture::rtv_heap_cpu(device, rtv_index)?;
                 let mut resource: sys::ComPtr = core::ptr::null_mut();
                 // SAFETY: the swapchain is live and the index is inside its buffer count.
                 let status = unsafe {
@@ -116,24 +127,15 @@ pub fn create(
                     )));
                 }
                 let id = device.next_internal_id();
-                let rtv_index = device.take_rtv_index()?;
-                let rtv = super::texture::rtv_heap_cpu(device, rtv_index)?;
-                // SAFETY: the device and back buffer are live; a null description asks
-                // D3D12 for a default full-resource view, which is what a swapchain
-                // back buffer needs.
-                unsafe {
-                    let vtbl = *(device.device as *mut *const sys::ID3D12DeviceVtbl);
-                    ((*vtbl).CreateRenderTargetView)(
-                        device.device,
-                        resource,
-                        core::ptr::null(),
-                        rtv,
-                    );
-                }
+                buffers.push(resource);
+                // Flip-model buffers are UNORM. The view matches the pipeline's
+                // requested format, which may apply an sRGB transfer function.
+                super::texture::create_view(device, resource, descriptor.color_format, 1, rtv)?;
                 guard.textures.insert(
                     id,
                     super::resources::Dx12TextureRecord {
                         resource,
+                        state: sys::D3D12_RESOURCE_STATE_PRESENT,
                         format: descriptor.color_format,
                         width,
                         height,
@@ -143,13 +145,12 @@ pub fn create(
                         sample_count: 1,
                         dimension: crate::rhi::TextureDimension::Texture2D,
                         usage: crate::rhi::TextureUsage::COLOR_TARGET,
+                        attachment_index: None,
                         rtv: Some(rtv),
                         dsv: None,
                     },
                 );
-                buffers.push(resource);
                 texture_ids.push(id);
-                render_targets.push(rtv);
             }
             Ok(())
         })();
@@ -158,6 +159,9 @@ pub fn create(
             // be released by the failure path below.
             for id in &texture_ids {
                 guard.textures.remove(id);
+            }
+            for index in view_indices {
+                device.release_rtv_index(index);
             }
             // SAFETY: the buffers wrapped so far are released before the
             // swapchain, which owns the rest.
@@ -178,10 +182,11 @@ pub fn create(
                 height,
                 format: descriptor.color_format,
                 vsync: descriptor.vsync_enabled,
+                composition,
                 generation,
                 buffers,
                 texture_ids,
-                render_targets,
+                view_indices,
                 current_index: 0,
                 acquired: None,
             },
@@ -198,7 +203,7 @@ pub fn destroy(device: &mut Dx12DeviceHandle, handle: Swapchain) -> Vec<u32> {
     let Some(chain) = device.swapchains.remove(&handle.id()) else {
         return Vec::new();
     };
-    let texture_ids = chain.texture_ids.clone();
+    let texture_ids = chain.texture_ids;
     // SAFETY: the frame ring waited for every presentation, and each pointer is
     // released exactly once.
     unsafe {
@@ -206,6 +211,9 @@ pub fn destroy(device: &mut Dx12DeviceHandle, handle: Swapchain) -> Vec<u32> {
             sys::IUnknownVtbl::release(buffer);
         }
         sys::IUnknownVtbl::release(chain.swapchain);
+    }
+    for index in chain.view_indices {
+        device.release_rtv_index(index);
     }
     texture_ids
 }
@@ -288,14 +296,22 @@ fn present_swapchain(chain: &Dx12Swapchain) -> RhiResult<()> {
         // tearing flag the swapchain was created with.
         let (interval, flags) = if chain.vsync {
             (1u32, 0u32)
+        } else if chain.composition.is_some() {
+            (0u32, 0u32)
         } else {
-            (0u32, sys::DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING)
+            (
+                0u32,
+                windows::Win32::Graphics::Dxgi::DXGI_PRESENT_ALLOW_TEARING.0,
+            )
         };
         // SAFETY: the swapchain is live and holds the presented buffers.
         let status = unsafe {
             let vtbl = *(chain.swapchain as *mut *const SwapChainVtbl);
             ((*vtbl).Present)(chain.swapchain, interval, flags)
         };
+        if status == sys::DXGI_ERROR_DEVICE_REMOVED {
+            return Err(RhiError::DeviceLost);
+        }
         if status != sys::S_OK && status != sys::DXGI_STATUS_OCCLUDED {
             return Err(RhiError::present_failed(sys::hresult_message(status)));
         }

@@ -4,9 +4,15 @@
 
 ## Unreleased
 
+- DX12 使用原生命令签名执行间接绘制和调度，支持网格与放大着色器，以及 DXR 三角形 BLAS、实例 TLAS 和内联光线查询。按实际硬件层级报告能力并遵循高性能或低功耗适配器偏好。
+- 桌面启动新增 `immersive_menu_bar`、`native_menu_bar` 和 `window_backdrop`。Windows 使用 Win32 原生菜单及 DirectComposition 透明合成，Gallery 可用 `--menu-bar immersive` 或 `--menu-bar native` 预览。
+
+- Windows 默认使用 DX12，初始化失败时尝试 Vulkan。DX12 支持 4× 多重采样附件和解析、交换链颜色视图与呈现状态转换，以及录制的纹理拷贝。每个渲染通道以附件全尺寸初始化裁剪范围，修复 Gallery 窗口侧栏变黑。窗口调整尺寸后会回收已退休的附件描述符。
+- Badge 按单行文字测量，修复 Dashboard 导入状态被拆成两行。
+
 - `cargo cove setup` 核对递归子模块的锁定提交，能识别上次下载中断后留下的错误版本。Windows 上的设置状态与 Zig 构建使用真实缓存路径，避免应用容器重定向导致写入失败。AppKit 菜单的内部绑定只在 macOS 编译，修复其他平台的未使用代码警告。
 - **`cargo cove setup` 的环境变量能力与文档澄清**：实测确认安装链路可用（本机下载并校验 Zig 0.17.0 归档、写入 `COVE_ZIG` 后完整 `cargo check --workspace` 从失败恢复为通过），但此前它只把工具路径写入 Cove 私有状态文件供 `build.rs` 读取，**不会配置用户终端的环境变量**，README 的措辞也容易让人误解。现在新增 `cargo cove env`（打印可 `eval` 的 POSIX / PowerShell 语句，零侵入，当前 shell 立即可用；Windows 的 POSIX 输出会把盘符路径转成 `/c/...`）与 `cargo cove setup --persist-path` / `--unpersist-path`（显式 opt-in，仅持久化 Cove 缓存内的 pinned 工具目录）。Windows 用注册表原始值读写，保留 `REG_EXPAND_SZ` 与 `%VAR%`、无变化时不写入，避免 `setx` 的 1024 字符截断与 `[Environment]::SetEnvironmentVariable` 展开变量造成的环境破坏；macOS/Linux 写带标记、可完整移除的 profile 块。`--check` / `--dry-run` 的报告新增 `shell`、`user_path` 字段说明作用域，互斥参数会报错。README 补上作用域说明与两个命令的用法；新增 6 项单元测试覆盖目录筛选、块替换幂等/撤销、脚本生成与 shell 转义。
-- **Windows DX12 后端修复**：根签名按 `d3d12.h` 的真实枚举与联合体布局重建（此前 `D3D12_ROOT_PARAMETER` 字段顺序错误、描述符表指针被截成 32 位，且参数类型值全部错位），并按 64 DWORD 预算校验；着色器绑定统一使用 `space0`，与 Slang/DXIL 的寄存器约定一致。描述符堆改为资源/采样器各自独立计数并做容量检查，RTV 分配不再重复占用 0 号槽。命令列表真正录制管线状态、根签名、描述符表、缓冲区根描述符、push constant、顶点/索引缓冲、图元拓扑与清除动作，替代原先的静默 no-op；间接绘制与 mesh dispatch 因缺少 command signature 明确报错。交换链后缓冲现在会创建 RTV 并登记为纹理，销毁时解除登记以避免 COM 指针重复释放。缓冲区创建使用 `D3D12_TEXTURE_LAYOUT_ROW_MAJOR`（此前用 UNKNOWN 导致所有上传堆缓冲区创建失败），并把非 OOM 的 HRESULT 如实上报。录制的纹理上传先做与 Vulkan 一致的区域/字节校验，再把行距补齐到 256 字节对齐，暂存资源随提交 fence 完成后释放。原生设备测试 `dx12_failed_uploads_do_not_poison_the_frame` 现已通过。未覆盖：DX12 的纹理到纹理/纹理到缓冲区录制拷贝、间接绘制、mesh dispatch。
+- **Windows DX12 后端修复**：根签名按 `d3d12.h` 的真实枚举与联合体布局重建（此前 `D3D12_ROOT_PARAMETER` 字段顺序错误、描述符表指针被截成 32 位，且参数类型值全部错位），并按 64 DWORD 预算校验；着色器绑定统一使用 `space0`，与 Slang/DXIL 的寄存器约定一致。描述符堆改为资源/采样器各自独立计数并做容量检查，RTV 分配不再重复占用 0 号槽。命令列表真正录制管线状态、根签名、描述符表、缓冲区根描述符、push constant、顶点/索引缓冲、图元拓扑与清除动作，替代原先的静默 no-op。交换链后缓冲现在会创建 RTV 并登记为纹理，销毁时解除登记以避免 COM 指针重复释放。缓冲区创建使用 `D3D12_TEXTURE_LAYOUT_ROW_MAJOR`（此前用 UNKNOWN 导致所有上传堆缓冲区创建失败），并把非 OOM 的 HRESULT 如实上报。录制的纹理上传先做与 Vulkan 一致的区域/字节校验，再把行距补齐到 256 字节对齐，暂存资源随提交 fence 完成后释放。原生设备测试 `dx12_failed_uploads_do_not_poison_the_frame` 现已通过。
 - 修复 Windows DX12 命令列表录制的编译错误，并在编码失败时释放列表。
 - Vulkan 即时缓冲区传输使用可映射的中转内存，并在传输完成后移除对应资源记录。更新 Windows / Linux 的 Slang 集成测试以适配当前 RHI。
 - 修复 Vulkan 多重采样解析导致的 Windows 窗口黑屏。映射内存读写现在计入子分配在内存块中的偏移，修复跨帧上传时图标缺失和画面空白的问题。

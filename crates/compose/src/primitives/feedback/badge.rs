@@ -142,11 +142,6 @@ impl PrimitiveView for Badge {
         Some(LayoutNode::new())
     }
 
-    fn update_layout(&self, layout: &LayoutNode) {
-        layout.set_min_width(Some(0.0));
-        layout.set_flex_shrink(1.0);
-    }
-
     fn update_node(&self, node: &Node) {
         node.set_is_focusable(false);
         node.set_accessibility(Some(AccessibilitySemantics {
@@ -221,11 +216,11 @@ impl PrimitiveView for Badge {
         }
         row.push(AnyView::new(
             Text::new(self.title.clone())
+                .line_limit(Some(1))
                 .semantic_font(metrics.font())
                 .foreground_color(style.ink)
                 .flex(0.0)
-                .shrink(1.0)
-                .frame_min_width(0.0),
+                .shrink(0.0),
         ));
 
         vec![AnyView::new(

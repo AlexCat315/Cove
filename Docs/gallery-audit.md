@@ -4,13 +4,24 @@
 
 Swift 源码逐页对照见文末《Swift 源码对照（逐页差异清单）》。
 
+## 2026-11-10 Windows DX12 Dashboard
+
+Windows 默认后端改为 DX12。初始化 DX12 失败时尝试 Vulkan。DX12 的 4× 解析、交换链呈现和附件描述符回收已接通。
+
+| 页面或组件 | 实现与自动化验收 | Windows 原生视觉与交互验收 | Rust 文档 |
+| --- | --- | --- | --- |
+| Gallery / Dashboard | DX12 像素回归先绘制局部裁剪内容，再解析 4× 颜色附件并输出完整画面。复制与回读分别断言左右两侧的像素。 | 实际窗口的侧栏、图标与正文完整显示。缩小窗口后双栏仍正常。DevTools 验证侧栏切换页面与返回，以及 Pause、Resume、Advance，进度由 64% 更新到 76%。 | [Gallery](../Website/src/content/components/gallery.md) |
+| Badge | 共用 Rust 组件按单行内容测量，并保留完整辅助功能标签。 | Windows Dashboard 的 Running 与 Paused 徽标按一行显示。 | [Badge](../Website/src/content/components/badge.md) |
+
+本轮使用 Windows x64 MSVC。原生验收覆盖窗口呈现、缩放与指针操作。键盘与 IME 验收另行记录。
+
 ## 2026-11-10 Windows Gallery 渲染
 
 - 实现范围为 Gallery 窗口和侧栏。Vulkan 使用独立的多重采样解析附件，映射地址计入内存子分配偏移，使后续帧能够上传图标和绘制数据。
 - 构建与 GPU 回归在 Windows x64 MSVC 上通过。执行 `cargo build --workspace --locked -j 2`，验证 Vulkan 多重采样解析和两个帧槽向同一张纹理写入不同像素的回读结果。
 - Windows 原生窗口视觉验收通过。滚动侧栏后，Form、Combobox、Calendar、DatePicker、DateRangePicker、TimeField、TimePicker、WheelPicker 的图标均可见。
 - Windows 交互验收通过 DevTools 验证侧栏滚动、切换到 DatePicker 并返回 Calendar。两次连续截图均正常出画。验收范围为侧栏导航和窗口出画。
-- 在 DX12 根签名与命令编码修复后，单采样 UI 管线能绘制矩形并读回正确像素。4× 验证返回 `DXGI_ERROR_DEVICE_REMOVED`，当前 DX12 命令编码也尚未执行多重采样解析。Windows Gallery 的默认 4× 窗口使用 Vulkan。
+- 在该轮验收中，DX12 的单采样 UI 管线能绘制矩形并读回正确像素。4× 验证返回 `DXGI_ERROR_DEVICE_REMOVED`，当时的默认 4× 窗口使用 Vulkan。DX12 修复见上一节。
 - 运行说明见已登记在导航中的 [Gallery 使用](../Website/src/content/components/gallery.md)。
 
 ## 2026-11-09：触摸目标——图表

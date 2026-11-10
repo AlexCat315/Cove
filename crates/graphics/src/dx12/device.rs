@@ -22,19 +22,14 @@ pub struct Dx12Queue {
     pub queue: sys::ComPtr,
     pub fence: sys::ComPtr,
     pub fence_value: u64,
-    /// Timed waits use this; created on first wait.
-    pub fence_event: sys::HANDLE,
-    pub kind: u32,
 }
 
 impl Dx12Queue {
-    fn new(queue: sys::ComPtr, fence: sys::ComPtr, kind: u32) -> Self {
+    fn new(queue: sys::ComPtr, fence: sys::ComPtr) -> Self {
         Self {
             queue,
             fence,
             fence_value: 0,
-            fence_event: core::ptr::null_mut(),
-            kind,
         }
     }
 }
@@ -51,15 +46,14 @@ pub struct Dx12Swapchain {
     #[allow(dead_code)]
     pub format: TextureFormat,
     pub vsync: bool,
+    #[cfg(target_os = "windows")]
+    pub composition: Option<super::composition::CompositionTarget>,
     pub generation: u64,
     /// Back-buffer COM pointers, one per frame.
     pub buffers: Vec<sys::ComPtr>,
     /// Frontend texture handle per back buffer.
     pub texture_ids: Vec<u32>,
-    /// Render-target descriptors, one per back buffer. Kept alongside the
-    /// registry records so a debugger can inspect the whole chain at once.
-    #[allow(dead_code)]
-    pub render_targets: Vec<sys::D3D12_CPU_DESCRIPTOR_HANDLE>,
+    pub view_indices: Vec<u32>,
     pub current_index: u32,
     pub acquired: Option<u32>,
 }
@@ -67,10 +61,10 @@ pub struct Dx12Swapchain {
 /// The D3D12 device and everything hung off it.
 pub struct Dx12DeviceHandle {
     pub device: sys::ComPtr,
+    #[cfg(target_os = "windows")]
+    pub indirect: super::extensions::IndirectSignatures,
     pub factory: sys::ComPtr,
     pub graphics: Dx12Queue,
-    pub compute: Dx12Queue,
-    pub copy: Dx12Queue,
     /// Shader-visible heap for CBV/SRV/UAV descriptors.
     pub resource_heap: sys::ComPtr,
     pub sampler_heap: sys::ComPtr,
@@ -78,6 +72,7 @@ pub struct Dx12DeviceHandle {
     pub rtv_heap: sys::ComPtr,
     pub dsv_heap: sys::ComPtr,
     pub rtv_descriptor_size: u32,
+    pub dsv_descriptor_size: u32,
     pub resource_descriptor_size: u32,
     pub sampler_descriptor_size: u32,
     /// The configuration the device was created with, retained for diagnostics.
@@ -87,16 +82,13 @@ pub struct Dx12DeviceHandle {
     pub adapter_capabilities: AdapterCapabilities,
     pub device_name: String,
     pub swapchains: HashMap<u32, Dx12Swapchain>,
-    /// Next free descriptor in the RTV/DSV heaps. Both are non-shader-visible
-    /// and share one counter; shader-visible heaps are allocated by the
-    /// binding planner in `Dx12Registries`.
-    pub next_rtv_index: u32,
+    next_rtv_index: u32,
+    free_rtv_indices: Vec<u32>,
     /// Backend-internal handle counter, above the frontend's low IDs.
     pub next_internal_id: u32,
-    /// One reusable command allocator per queue class. A closed list keeps its
-    /// allocator busy until the GPU retires it, so each class owns one and resets it
-    /// once its submissions completed.
-    pub allocators: HashMap<u32, sys::ComPtr>,
+    /// An allocator can be reset once the fence for its most recent list retires.
+    allocators: Vec<(sys::ComPtr, u64)>,
+    active_allocator: usize,
 }
 
 /// First backend-internal handle.
@@ -104,8 +96,8 @@ pub const INTERNAL_ID_BASE: u32 = 0xF000_0000;
 
 /// Descriptor-heap capacities. The binding planner uses these to refuse a set
 /// before it writes past the end of a heap.
-pub const RESOURCE_HEAP_CAPACITY: u32 = 1024;
-pub const SAMPLER_HEAP_CAPACITY: u32 = 256;
+pub const RESOURCE_HEAP_CAPACITY: u32 = 4096;
+pub const SAMPLER_HEAP_CAPACITY: u32 = 2048;
 pub const RTV_HEAP_CAPACITY: u32 = 64;
 pub const DSV_HEAP_CAPACITY: u32 = 64;
 
@@ -128,38 +120,49 @@ impl Dx12DeviceHandle {
         }
     }
 
-    /// The command allocator for a queue class, created on first use.
-    pub fn command_allocator(&mut self, queue_kind: u32) -> RhiResult<sys::ComPtr> {
-        if let Some(allocator) = self.allocators.get(&queue_kind) {
-            return Ok(*allocator);
-        }
-        #[cfg(not(target_os = "windows"))]
+    #[cfg(target_os = "windows")]
+    pub fn command_allocator(&mut self) -> RhiResult<sys::ComPtr> {
+        let completed = windows_impl::completed_fence(self.graphics.fence)?;
+        if let Some((index, &(allocator, _))) = self
+            .allocators
+            .iter()
+            .enumerate()
+            .find(|(_, (_, fence))| *fence <= completed)
         {
-            let _ = queue_kind;
-            Err(RhiError::unsupported_backend(
-                "DirectX 12 is only available on Windows",
-            ))
-        }
-        #[cfg(target_os = "windows")]
-        {
-            let mut allocator: sys::ComPtr = core::ptr::null_mut();
-            // SAFETY: the device is live and the vtable entry matches
-            // `CreateCommandAllocator`.
+            // SAFETY: recording is serialized and the allocator's last list has retired.
             let status = unsafe {
-                let vtbl = *(self.device as *mut *const sys::ID3D12DeviceVtbl);
-                ((*vtbl).CreateCommandAllocator)(
-                    self.device,
-                    queue_kind,
-                    &sys::IID_ID3D12_COMMAND_ALLOCATOR,
-                    &mut allocator,
-                )
+                let vtbl = *(allocator as *mut *const CommandAllocatorVtbl);
+                ((*vtbl).Reset)(allocator)
             };
-            if status != sys::S_OK || allocator.is_null() {
+            if status != sys::S_OK {
                 return Err(RhiError::submit_failed(sys::hresult_message(status)));
             }
-            self.allocators.insert(queue_kind, allocator);
-            Ok(allocator)
+            self.active_allocator = index;
+            return Ok(allocator);
         }
+        let mut allocator: sys::ComPtr = core::ptr::null_mut();
+        // SAFETY: the device is live and the vtable entry matches `CreateCommandAllocator`.
+        let status = unsafe {
+            let vtbl = *(self.device as *mut *const sys::ID3D12DeviceVtbl);
+            ((*vtbl).CreateCommandAllocator)(
+                self.device,
+                sys::D3D12_COMMAND_LIST_TYPE_DIRECT,
+                &sys::IID_ID3D12_COMMAND_ALLOCATOR,
+                &mut allocator,
+            )
+        };
+        if status != sys::S_OK || allocator.is_null() {
+            return Err(RhiError::submit_failed(sys::hresult_message(status)));
+        }
+        self.active_allocator = self.allocators.len();
+        self.allocators.push((allocator, 0));
+        Ok(allocator)
+    }
+
+    pub fn execute(&mut self, list: sys::ComPtr) -> RhiResult<u64> {
+        let value = execute_and_signal(&mut self.graphics, list)?;
+        self.allocators[self.active_allocator].1 = value;
+        Ok(value)
     }
 
     pub fn next_internal_id(&mut self) -> u32 {
@@ -168,10 +171,11 @@ impl Dx12DeviceHandle {
         id
     }
 
-    /// Reserves one descriptor slot in the RTV/DSV heaps. A view is never
-    /// recycled while a swapchain may still be presenting, so the counter only
-    /// moves forward.
+    /// Reserves one descriptor slot in the RTV/DSV heaps.
     pub fn take_rtv_index(&mut self) -> RhiResult<u32> {
+        if let Some(index) = self.free_rtv_indices.pop() {
+            return Ok(index);
+        }
         if self.next_rtv_index >= RTV_HEAP_CAPACITY.min(DSV_HEAP_CAPACITY) {
             return Err(RhiError::OutOfMemory);
         }
@@ -179,6 +183,18 @@ impl Dx12DeviceHandle {
         self.next_rtv_index += 1;
         Ok(index)
     }
+
+    pub fn release_rtv_index(&mut self, index: u32) {
+        self.free_rtv_indices.push(index);
+    }
+}
+
+#[cfg(target_os = "windows")]
+#[repr(C)]
+struct CommandAllocatorVtbl {
+    base: sys::IUnknownVtbl,
+    child: sys::ID3D12DeviceChildSlots,
+    Reset: unsafe extern "system" fn(sys::ComPtr) -> sys::HRESULT,
 }
 
 impl Drop for Dx12DeviceHandle {
@@ -192,13 +208,11 @@ impl Drop for Dx12DeviceHandle {
                 }
                 sys::IUnknownVtbl::release(chain.swapchain);
             }
-            for queue in [&self.graphics, &self.compute, &self.copy] {
-                if !queue.fence_event.is_null() {
-                    close_handle(queue.fence_event);
-                }
-                sys::IUnknownVtbl::release(queue.fence);
-                sys::IUnknownVtbl::release(queue.queue);
+            for (allocator, _) in &self.allocators {
+                sys::IUnknownVtbl::release(*allocator);
             }
+            sys::IUnknownVtbl::release(self.graphics.fence);
+            sys::IUnknownVtbl::release(self.graphics.queue);
             for heap in [
                 self.resource_heap,
                 self.sampler_heap,
@@ -210,19 +224,6 @@ impl Drop for Dx12DeviceHandle {
             sys::IUnknownVtbl::release(self.factory);
             sys::IUnknownVtbl::release(self.device);
         }
-    }
-}
-
-/// Closes a Win32 event handle, or does nothing on a host without one.
-fn close_handle(handle: sys::HANDLE) {
-    #[cfg(target_os = "windows")]
-    {
-        // SAFETY: the handle came from `CreateEventW` and is closed once.
-        unsafe { windows_impl::CloseHandle(handle) };
-    }
-    #[cfg(not(target_os = "windows"))]
-    {
-        let _ = handle;
     }
 }
 
@@ -276,8 +277,7 @@ fn wait_for_fence(queue: &Dx12Queue, value: u64) -> RhiResult<()> {
 /// capability set is a promise the backend will honour, and this build does not
 /// link the DXR build/execute dispatch tables. The adapter's real support is
 /// reported separately through `AdapterCapabilities`, which is diagnostic.
-pub fn capabilities_for(feature_level: u32, mesh: bool, task: bool) -> Capabilities {
-    let _ = feature_level;
+pub fn capabilities_for(mesh: bool, ray_tracing: bool, ray_query: bool) -> Capabilities {
     Capabilities::configure(|capabilities| {
         capabilities.graphics = true;
         capabilities.compute = true;
@@ -285,7 +285,9 @@ pub fn capabilities_for(feature_level: u32, mesh: bool, task: bool) -> Capabilit
         capabilities.textures.texture_3d = true;
         capabilities.textures.cube = true;
         capabilities.mesh_shading.mesh = mesh;
-        capabilities.mesh_shading.task = task;
+        capabilities.mesh_shading.task = mesh;
+        capabilities.ray_tracing.acceleration_structures = ray_tracing;
+        capabilities.ray_tracing.compute_ray_query = ray_query;
         capabilities.max_queues = QueueLimits::default();
     })
 }
@@ -296,6 +298,8 @@ pub fn capabilities_for(feature_level: u32, mesh: bool, task: bool) -> Capabilit
 mod windows_impl {
     use super::*;
     use core::ffi::c_void;
+    use windows::Win32::Graphics::{Direct3D12::*, Dxgi::*};
+    use windows::core::Interface;
 
     unsafe extern "system" {
         fn LoadLibraryA(name: *const i8) -> sys::HINSTANCE;
@@ -360,17 +364,62 @@ mod windows_impl {
             return Err(RhiError::unsupported_backend(sys::hresult_message(status)));
         }
 
-        // Prefer the low-power adapter when asked, matching the config flag.
         let mut device: sys::ComPtr = core::ptr::null_mut();
-        // SAFETY: the out-parameter is a live local; `None` picks the default
-        // adapter, and the feature level 11_0 is the DXR baseline.
-        let status = unsafe {
-            create_device(
-                core::ptr::null_mut(),
-                0xB000,
-                &sys::IID_ID3D12_DEVICE,
-                &mut device,
-            )
+        let mut device_name = "Direct3D 12 adapter".to_owned();
+        let preference = if config.prefer_low_power {
+            DXGI_GPU_PREFERENCE_MINIMUM_POWER
+        } else {
+            DXGI_GPU_PREFERENCE_HIGH_PERFORMANCE
+        };
+        // SAFETY: CreateDXGIFactory2 returned a live IDXGIFactory4 pointer.
+        let factory4 = unsafe { IDXGIFactory4::from_raw_borrowed(&factory).unwrap() };
+        if let Ok(factory6) = factory4.cast::<IDXGIFactory6>() {
+            for index in 0.. {
+                // SAFETY: enumeration returns an owned adapter or NOT_FOUND.
+                let Ok(adapter) = (unsafe {
+                    factory6.EnumAdapterByGpuPreference::<IDXGIAdapter1>(index, preference)
+                }) else {
+                    break;
+                };
+                // SAFETY: the adapter interface was returned above.
+                let Ok(description) = (unsafe { adapter.GetDesc1() }) else {
+                    continue;
+                };
+                if description.Flags & DXGI_ADAPTER_FLAG_SOFTWARE.0 as u32 != 0 {
+                    continue;
+                }
+                // SAFETY: the adapter and output pointer are live.
+                let status = unsafe {
+                    create_device(
+                        adapter.as_raw(),
+                        0xB000,
+                        &sys::IID_ID3D12_DEVICE,
+                        &mut device,
+                    )
+                };
+                if status == sys::S_OK && !device.is_null() {
+                    let end = description
+                        .Description
+                        .iter()
+                        .position(|&ch| ch == 0)
+                        .unwrap_or(description.Description.len());
+                    device_name = String::from_utf16_lossy(&description.Description[..end]);
+                    break;
+                }
+            }
+        }
+        let status = if device.is_null() {
+            // SAFETY: a null adapter asks DXGI for its default adapter.
+            unsafe {
+                create_device(
+                    core::ptr::null_mut(),
+                    0xB000,
+                    &sys::IID_ID3D12_DEVICE,
+                    &mut device,
+                )
+            }
+        } else {
+            sys::S_OK
         };
         if status != sys::S_OK || device.is_null() {
             // SAFETY: `factory` was created above and released exactly once.
@@ -379,11 +428,13 @@ mod windows_impl {
         }
 
         let graphics = create_queue(device, sys::D3D12_COMMAND_LIST_TYPE_DIRECT)?;
-        let compute = create_queue(device, sys::D3D12_COMMAND_LIST_TYPE_COMPUTE)?;
-        let copy = create_queue(device, sys::D3D12_COMMAND_LIST_TYPE_COPY)?;
 
-        let (rtv_descriptor_size, resource_descriptor_size, sampler_descriptor_size) =
-            descriptor_sizes(device);
+        let (
+            rtv_descriptor_size,
+            dsv_descriptor_size,
+            resource_descriptor_size,
+            sampler_descriptor_size,
+        ) = descriptor_sizes(device);
         let resource_heap = create_heap(
             device,
             sys::D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV,
@@ -409,23 +460,22 @@ mod windows_impl {
             false,
         )?;
 
-        let (feature_level, ray_tracing, ray_query) = probe_features(device);
-        let mesh = feature_level >= 12;
-        // `capabilities_for` deliberately leaves ray tracing unadvertised; the
-        // adapter's real support rides on `adapter_capabilities` instead.
-        let capabilities = capabilities_for(feature_level, mesh, mesh);
-        let _ = (ray_tracing, ray_query);
+        // SAFETY: the device was just created with IID_ID3D12Device.
+        let native = unsafe { ID3D12Device::from_raw_borrowed(&device).unwrap() };
+        let indirect = super::super::extensions::IndirectSignatures::new(native)?;
+        let (mesh, ray_tracing, ray_query) = probe_features(native);
+        let capabilities = capabilities_for(mesh, ray_tracing, ray_query);
         Ok(Dx12DeviceHandle {
             device,
+            indirect,
             factory,
             graphics,
-            compute,
-            copy,
             resource_heap,
             sampler_heap,
             rtv_heap,
             dsv_heap,
             rtv_descriptor_size,
+            dsv_descriptor_size,
             resource_descriptor_size,
             sampler_descriptor_size,
             config,
@@ -436,11 +486,13 @@ mod windows_impl {
                 ray_tracing,
                 mesh_shading: mesh,
             },
-            device_name: "Direct3D 12 adapter".to_owned(),
+            device_name,
             swapchains: HashMap::new(),
             next_rtv_index: 0,
+            free_rtv_indices: Vec::new(),
             next_internal_id: INTERNAL_ID_BASE,
-            allocators: HashMap::new(),
+            allocators: Vec::new(),
+            active_allocator: 0,
         })
     }
 
@@ -467,7 +519,7 @@ mod windows_impl {
             return Err(RhiError::unsupported_backend(sys::hresult_message(status)));
         }
         let fence = create_fence(device, 0, sys::D3D12_FENCE_FLAG_NONE)?;
-        Ok(Dx12Queue::new(queue, fence, kind))
+        Ok(Dx12Queue::new(queue, fence))
     }
 
     fn create_fence(device: sys::ComPtr, value: u64, flags: u32) -> RhiResult<sys::ComPtr> {
@@ -483,7 +535,7 @@ mod windows_impl {
         Ok(fence)
     }
 
-    fn descriptor_sizes(device: sys::ComPtr) -> (u32, u32, u32) {
+    fn descriptor_sizes(device: sys::ComPtr) -> (u32, u32, u32, u32) {
         // SAFETY: the device is live; each call only reads a size.
         unsafe {
             let vtbl = *(device as *mut *const sys::ID3D12DeviceVtbl);
@@ -491,6 +543,10 @@ mod windows_impl {
                 ((*vtbl).GetDescriptorHandleIncrementSize)(
                     device,
                     sys::D3D12_DESCRIPTOR_HEAP_TYPE_RTV,
+                ),
+                ((*vtbl).GetDescriptorHandleIncrementSize)(
+                    device,
+                    sys::D3D12_DESCRIPTOR_HEAP_TYPE_DSV,
                 ),
                 ((*vtbl).GetDescriptorHandleIncrementSize)(
                     device,
@@ -537,51 +593,50 @@ mod windows_impl {
         Ok(heap)
     }
 
-    pub fn probe_features(device: sys::ComPtr) -> (u32, bool, bool) {
-        // `D3D12_FEATURE_FEATURE_LEVELS` = 1. The struct it fills is an array of
-        // feature levels; the driver writes back the highest one it supports.
-        const D3D12_FEATURE_FEATURE_LEVELS: u32 = 1;
-        let levels = [0xC000u32, 0xB100, 0xB000, 0xA100, 0xA000];
-        let mut query = FeatureLevelsQuery {
-            num_feature_levels: levels.len() as u32,
-            p_feature_levels: levels.as_ptr(),
-            max_supported_feature_level: 0,
-        };
-        // SAFETY: `device` is live, the query struct outlives the call and declares
-        // its exact size.
-        let status = unsafe {
-            let vtbl = *(device as *mut *const sys::ID3D12DeviceVtbl);
-            ((*vtbl).CheckFeatureSupport)(
-                device,
-                D3D12_FEATURE_FEATURE_LEVELS,
-                (&mut query as *mut FeatureLevelsQuery).cast(),
-                core::mem::size_of::<FeatureLevelsQuery>() as u32,
+    fn probe_features(device: &ID3D12Device) -> (bool, bool, bool) {
+        let mut mesh = D3D12_FEATURE_DATA_D3D12_OPTIONS7::default();
+        let mut rays = D3D12_FEATURE_DATA_D3D12_OPTIONS5::default();
+        // SAFETY: the output structures and byte sizes match their selectors.
+        let (mesh_ok, rays_ok) = unsafe {
+            (
+                device
+                    .CheckFeatureSupport(
+                        D3D12_FEATURE_D3D12_OPTIONS7,
+                        (&mut mesh as *mut D3D12_FEATURE_DATA_D3D12_OPTIONS7).cast(),
+                        core::mem::size_of_val(&mesh) as u32,
+                    )
+                    .is_ok(),
+                device
+                    .CheckFeatureSupport(
+                        D3D12_FEATURE_D3D12_OPTIONS5,
+                        (&mut rays as *mut D3D12_FEATURE_DATA_D3D12_OPTIONS5).cast(),
+                        core::mem::size_of_val(&rays) as u32,
+                    )
+                    .is_ok(),
             )
         };
-        if status != sys::S_OK {
-            return (0, false, false);
-        }
-        let max = query.max_supported_feature_level;
-        // 0xB000 is 11_0 (DXR 1.0), 0xB100 is 11_1 (ray queries).
-        (max, max >= 0xB000, max >= 0xB100)
+        (
+            mesh_ok && mesh.MeshShaderTier.0 >= D3D12_MESH_SHADER_TIER_1.0,
+            rays_ok && rays.RaytracingTier.0 >= D3D12_RAYTRACING_TIER_1_0.0,
+            rays_ok && rays.RaytracingTier.0 >= D3D12_RAYTRACING_TIER_1_1.0,
+        )
     }
 
-    /// `D3D12_FEATURE_DATA_FEATURE_LEVELS`.
-    #[repr(C)]
-    struct FeatureLevelsQuery {
-        num_feature_levels: u32,
-        p_feature_levels: *const u32,
-        max_supported_feature_level: u32,
-    }
-
-    /// Waits on a bare fence handle, for the completion thread.
-    pub fn wait_for_fence_values(fence: sys::ComPtr, value: u64) -> RhiResult<()> {
+    pub fn completed_fence(fence: sys::ComPtr) -> RhiResult<u64> {
         // SAFETY: the fence is live and the vtable entry matches `GetCompletedValue`.
         let completed = unsafe {
             let vtbl = *(fence as *mut *const FenceVtbl);
             ((*vtbl).GetCompletedValue)(fence)
         };
-        if completed >= value {
+        if completed == u64::MAX {
+            return Err(RhiError::DeviceLost);
+        }
+        Ok(completed)
+    }
+
+    /// Waits on a bare fence handle, for the completion thread.
+    pub fn wait_for_fence_values(fence: sys::ComPtr, value: u64) -> RhiResult<()> {
+        if completed_fence(fence)? >= value {
             return Ok(());
         }
         // SAFETY: null attributes and name request an auto-named event.
@@ -595,47 +650,20 @@ mod windows_impl {
             ((*vtbl).SetEventOnCompletion)(fence, value, event)
         };
         if status != sys::S_OK {
+            // SAFETY: the event was created here and was not registered.
+            unsafe { CloseHandle(event) };
             return Err(RhiError::submit_failed(sys::hresult_message(status)));
         }
         // SAFETY: the event is live; waiting on it is the documented pattern.
         unsafe { WaitForSingleObject(event, sys::INFINITE) };
         // SAFETY: the event was created here and is no longer needed.
         unsafe { CloseHandle(event) };
+        completed_fence(fence)?;
         Ok(())
     }
 
     pub fn wait_for_fence(queue: &Dx12Queue, value: u64) -> RhiResult<()> {
-        // SAFETY: the fence is live and the vtable entry matches `GetCompletedValue`.
-        let completed = unsafe {
-            let vtbl = *(queue.fence as *mut *const FenceVtbl);
-            ((*vtbl).GetCompletedValue)(queue.fence)
-        };
-        if completed >= value {
-            return Ok(());
-        }
-        let event = if queue.fence_event.is_null() {
-            // SAFETY: the attributes and name are null, which requests an
-            // auto-named, non-inheritable event.
-            unsafe { CreateEventW(core::ptr::null(), 0, 0, core::ptr::null()) }
-        } else {
-            queue.fence_event
-        };
-        if event.is_null() {
-            return Err(RhiError::submit_failed("CreateEventW failed"));
-        }
-        // SAFETY: the fence and event are live; `SetEventOnCompletion` registers the
-        // event for the requested value.
-        let status = unsafe {
-            let vtbl = *(queue.fence as *mut *const FenceVtbl);
-            ((*vtbl).SetEventOnCompletion)(queue.fence, value, event)
-        };
-        if status != sys::S_OK {
-            return Err(RhiError::submit_failed(sys::hresult_message(status)));
-        }
-        // SAFETY: the event handle is live and waiting on it is the documented
-        // pattern.
-        unsafe { WaitForSingleObject(event, sys::INFINITE) };
-        Ok(())
+        wait_for_fence_values(queue.fence, value)
     }
 
     unsafe extern "system" {
@@ -718,20 +746,21 @@ mod tests {
     }
 
     #[test]
-    fn capabilities_follow_the_feature_level() {
-        let none = capabilities_for(0, false, false);
+    fn capabilities_follow_native_feature_tiers() {
+        let none = capabilities_for(false, false, false);
         assert!(none.graphics && none.compute);
         // Ray tracing is deliberately unadvertised at every feature level: this
         // build does not link the DXR build/execute dispatch tables, and the
         // capability set must only promise what the backend will honour. The
         // adapter's real support is reported separately via `AdapterCapabilities`.
-        let eleven = capabilities_for(11, false, false);
-        assert!(!eleven.ray_tracing.acceleration_structures);
-        assert!(!eleven.ray_tracing.compute_ray_query);
-        let twelve = capabilities_for(12, true, true);
-        assert!(!twelve.ray_tracing.acceleration_structures);
-        assert!(!twelve.ray_tracing.compute_ray_query);
-        assert!(twelve.mesh_shading.mesh && twelve.mesh_shading.task);
+        assert!(!none.ray_tracing.acceleration_structures);
+        assert!(!none.ray_tracing.compute_ray_query);
+        let tier_1_0 = capabilities_for(false, true, false);
+        assert!(tier_1_0.ray_tracing.acceleration_structures);
+        assert!(!tier_1_0.ray_tracing.compute_ray_query);
+        let full = capabilities_for(true, true, true);
+        assert!(full.ray_tracing.compute_ray_query);
+        assert!(full.mesh_shading.mesh && full.mesh_shading.task);
     }
 
     #[test]

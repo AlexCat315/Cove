@@ -42,8 +42,7 @@ pub fn create_graphics(
     Ok(())
 }
 
-/// Creates one mesh pipeline. D3D12 expresses mesh shaders as a graphics pipeline
-/// with `MS`/`AS` bytecode, so the graphics path serves both.
+/// Creates a pipeline stream with mesh and optional amplification shaders.
 pub fn create_mesh(
     device: &Dx12DeviceHandle,
     registries: &mut Dx12Registries,
@@ -56,6 +55,12 @@ pub fn create_mesh(
         super::resources::Dx12MeshPipelineRecord {
             pipeline: state,
             layout_id: descriptor.layout.id(),
+            colors: descriptor
+                .color_attachments
+                .iter()
+                .map(|attachment| attachment.format)
+                .collect(),
+            depth: descriptor.depth_format,
         },
     );
     Ok(())
@@ -236,56 +241,96 @@ fn create_mesh_native(
     }
     #[cfg(target_os = "windows")]
     {
-        let mesh = registries
-            .shaders
-            .get(&descriptor.mesh.id())
-            .ok_or_else(|| RhiError::invalid_argument("mesh pipeline requires a mesh shader"))?;
+        use windows::Win32::Graphics::Direct3D12::*;
+        use windows::core::Interface;
+
+        rhi_require(
+            device.capabilities.mesh_shading.mesh,
+            "DX12 adapter does not support mesh shaders",
+        )?;
+        rhi_require(
+            descriptor.color_attachments.len() <= 8,
+            "at most eight color attachments are supported",
+        )?;
+
+        let bytecode =
+            |shader: Option<crate::rhi::ShaderModule>| -> RhiResult<sys::D3D12_SHADER_BYTECODE> {
+                let Some(shader) = shader else {
+                    return Ok(sys::D3D12_SHADER_BYTECODE::default());
+                };
+                let record = registries.shaders.get(&shader.id()).ok_or_else(|| {
+                    RhiError::invalid_argument("mesh pipeline references an unknown shader")
+                })?;
+                Ok(sys::D3D12_SHADER_BYTECODE {
+                    pShaderBytecode: record.bytecode.as_ptr().cast(),
+                    BytecodeLength: record.bytecode.len(),
+                })
+            };
         let root_signature = registries
             .root_signatures
             .get(&descriptor.layout.id())
             .copied()
             .ok_or_else(|| RhiError::invalid_argument("pipeline references an unknown layout"))?;
-        let mut pipeline = sys::D3D12_GRAPHICS_PIPELINE_STATE_DESC {
-            pRootSignature: root_signature,
-            ..Default::default()
-        };
-        // A mesh pipeline puts the mesh shader in the amplification/geometry slots:
-        // `MS` occupies the `GS` field and the object shader the `AS` field, which
-        // is how D3D12 spells the mesh pipeline without a separate descriptor.
-        pipeline.GS = sys::D3D12_SHADER_BYTECODE {
-            pShaderBytecode: mesh.bytecode.as_ptr().cast(),
-            BytecodeLength: mesh.bytecode.len(),
-        };
-        if let Some(task) = descriptor.task {
-            let task = registries
-                .shaders
-                .get(&task.id())
-                .ok_or_else(|| RhiError::invalid_argument("mesh pipeline task shader not found"))?;
-            pipeline.HS = sys::D3D12_SHADER_BYTECODE {
-                pShaderBytecode: task.bytecode.as_ptr().cast(),
-                BytecodeLength: task.bytecode.len(),
-            };
+
+        #[repr(C)]
+        struct Subobject<T> {
+            // The native stream aligns each subobject to the pointer size.
+            alignment: [usize; 0],
+            kind: D3D12_PIPELINE_STATE_SUBOBJECT_TYPE,
+            value: T,
         }
-        if let Some(fragment) = descriptor.fragment {
-            let fragment = registries.shaders.get(&fragment.id()).ok_or_else(|| {
-                RhiError::invalid_argument("mesh pipeline fragment shader not found")
-            })?;
-            pipeline.PS = sys::D3D12_SHADER_BYTECODE {
-                pShaderBytecode: fragment.bytecode.as_ptr().cast(),
-                BytecodeLength: fragment.bytecode.len(),
-            };
+        impl<T> Subobject<T> {
+            fn new(kind: D3D12_PIPELINE_STATE_SUBOBJECT_TYPE, value: T) -> Self {
+                Self {
+                    alignment: [],
+                    kind,
+                    value,
+                }
+            }
         }
+        #[repr(C)]
+        struct Targets {
+            formats: [u32; 8],
+            count: u32,
+        }
+        #[repr(C)]
+        struct MeshStream {
+            root: Subobject<sys::ComPtr>,
+            task: Subobject<sys::D3D12_SHADER_BYTECODE>,
+            mesh: Subobject<sys::D3D12_SHADER_BYTECODE>,
+            fragment: Subobject<sys::D3D12_SHADER_BYTECODE>,
+            blend: Subobject<sys::D3D12_BLEND_DESC>,
+            mask: Subobject<u32>,
+            raster: Subobject<sys::D3D12_RASTERIZER_DESC>,
+            depth: Subobject<sys::D3D12_DEPTH_STENCIL_DESC>,
+            topology: Subobject<u32>,
+            targets: Subobject<Targets>,
+            depth_format: Subobject<u32>,
+            samples: Subobject<[u32; 2]>,
+        }
+
+        let mut targets = Targets {
+            formats: [0; 8],
+            count: descriptor.color_attachments.len() as u32,
+        };
+        let mut blend = sys::D3D12_BLEND_DESC::default();
+        blend.IndependentBlendEnable = 1;
         for (index, attachment) in descriptor.color_attachments.iter().enumerate() {
-            pipeline.RTVFormats[index] = formats::dxgi_format(attachment.format);
+            targets.formats[index] = formats::dxgi_format(attachment.format);
+            let target = &mut blend.RenderTarget[index];
+            target.BlendEnable = u32::from(attachment.blend.enabled);
+            target.SrcBlend = formats::blend_factor(attachment.blend.source_color_blend_factor);
+            target.DestBlend =
+                formats::blend_factor(attachment.blend.destination_color_blend_factor);
+            target.BlendOp = formats::blend_operation(attachment.blend.color_blend_operation);
+            target.SrcBlendAlpha =
+                formats::blend_factor(attachment.blend.source_alpha_blend_factor);
+            target.DestBlendAlpha =
+                formats::blend_factor(attachment.blend.destination_alpha_blend_factor);
+            target.BlendOpAlpha = formats::blend_operation(attachment.blend.alpha_blend_operation);
+            target.RenderTargetWriteMask = 0xF;
         }
-        pipeline.NumRenderTargets = descriptor.color_attachments.len() as u32;
-        pipeline.DSVFormat = descriptor
-            .depth_format
-            .map(formats::dxgi_format)
-            .unwrap_or(sys::DXGI_FORMAT_UNKNOWN);
-        pipeline.SampleDesc = [1, 0];
-        pipeline.SampleMask = u32::MAX;
-        pipeline.RasterizerState = sys::D3D12_RASTERIZER_DESC {
+        let raster = sys::D3D12_RASTERIZER_DESC {
             FillMode: formats::fill_mode(descriptor.rasterization.fill_mode),
             CullMode: formats::cull_mode(descriptor.rasterization.cull_mode),
             FrontCounterClockwise: formats::front_counter_clockwise(
@@ -294,27 +339,63 @@ fn create_mesh_native(
             DepthClipEnable: 1,
             ..Default::default()
         };
-        // A mesh pipeline has no vertex input layout.
-        pipeline.PrimitiveTopologyType =
-            formats::primitive_topology_type(crate::rhi::PrimitiveType::TriangleList);
-        pipeline.IBStripCutValue = sys::D3D12_INDEX_BUFFER_STRIP_CUT_VALUE_DISABLED;
-
-        let mut state: sys::ComPtr = core::ptr::null_mut();
-        // SAFETY: the device is live and every pointer in `pipeline` refers to
-        // storage that outlives the call.
-        let status = unsafe {
-            let vtbl = *(device.device as *mut *const sys::ID3D12DeviceVtbl);
-            ((*vtbl).CreateGraphicsPipelineState)(
-                device.device,
-                &pipeline,
-                &sys::IID_ID3D12_PIPELINE_STATE,
-                &mut state,
-            )
-        };
-        if status != sys::S_OK || state.is_null() {
-            return Err(RhiError::invalid_argument(sys::hresult_message(status)));
+        let mut depth = sys::D3D12_DEPTH_STENCIL_DESC::default();
+        if let Some(state) = descriptor.depth_stencil {
+            depth.DepthEnable = u32::from(descriptor.depth_format.is_some());
+            depth.DepthWriteMask = u32::from(state.depth_write_enabled);
+            depth.DepthFunc = formats::comparison_function(state.depth_compare);
         }
-        Ok(state)
+        let stream = MeshStream {
+            root: Subobject::new(
+                D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_ROOT_SIGNATURE,
+                root_signature,
+            ),
+            task: Subobject::new(
+                D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_AS,
+                bytecode(descriptor.task)?,
+            ),
+            mesh: Subobject::new(
+                D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_MS,
+                bytecode(Some(descriptor.mesh))?,
+            ),
+            fragment: Subobject::new(
+                D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_PS,
+                bytecode(descriptor.fragment)?,
+            ),
+            blend: Subobject::new(D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_BLEND, blend),
+            mask: Subobject::new(D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_SAMPLE_MASK, u32::MAX),
+            raster: Subobject::new(D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_RASTERIZER, raster),
+            depth: Subobject::new(D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_DEPTH_STENCIL, depth),
+            topology: Subobject::new(
+                D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_PRIMITIVE_TOPOLOGY,
+                formats::primitive_topology_type(crate::rhi::PrimitiveType::TriangleList),
+            ),
+            targets: Subobject::new(
+                D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_RENDER_TARGET_FORMATS,
+                targets,
+            ),
+            depth_format: Subobject::new(
+                D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_DEPTH_STENCIL_FORMAT,
+                descriptor
+                    .depth_format
+                    .map(formats::dxgi_format)
+                    .unwrap_or(sys::DXGI_FORMAT_UNKNOWN),
+            ),
+            samples: Subobject::new(D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_SAMPLE_DESC, [1, 0]),
+        };
+        let description = D3D12_PIPELINE_STATE_STREAM_DESC {
+            SizeInBytes: core::mem::size_of_val(&stream),
+            pPipelineStateSubobjectStream: (&stream as *const MeshStream).cast_mut().cast(),
+        };
+        // SAFETY: the pointer came from CreateDevice and the stream keeps its
+        // subobjects and borrowed shader bytecode live for pipeline creation.
+        let native = unsafe { ID3D12Device::from_raw_borrowed(&device.device).unwrap() };
+        let native = native
+            .cast::<ID3D12Device2>()
+            .map_err(super::extensions::native_error)?;
+        let pipeline = unsafe { native.CreatePipelineState::<ID3D12PipelineState>(&description) }
+            .map_err(super::extensions::native_error)?;
+        Ok(pipeline.into_raw())
     }
 }
 

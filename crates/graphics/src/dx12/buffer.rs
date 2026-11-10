@@ -1,14 +1,14 @@
 //! Buffer creation, upload and readback for the DX12 backend.
 //!
 //! Vertex/index/constant/storage buffers live in a default (device-local) heap and
-//! are filled through an upload heap; a transfer-only buffer is itself an upload
-//! heap, which lets the CPU write it directly.
+//! are filled through an upload heap. One-way transfer buffers use CPU-visible
+//! upload or readback heaps.
 #![allow(non_snake_case)]
-use crate::rhi::{
-    Buffer, BufferDescriptor, BufferUsage, RhiError, RhiResult, rhi_byte_range, rhi_require,
-};
+use crate::rhi::{Buffer, BufferDescriptor, BufferUsage, RhiError, RhiResult, rhi_byte_range};
 
 use super::device::Dx12DeviceHandle;
+#[cfg(target_os = "windows")]
+use super::resources::{CommandListVtbl, transition};
 use super::resources::{Dx12Registries, Dx12ResourceRecord};
 use super::sys;
 use core::ffi::c_void;
@@ -20,20 +20,28 @@ pub fn create(
     handle: Buffer,
     descriptor: &BufferDescriptor,
 ) -> RhiResult<()> {
-    // A GPU resource needs device-local memory; a transfer-only buffer stays in an
-    // upload heap so the CPU can write it without staging.
     let is_gpu_resource = descriptor.usage.contains(BufferUsage::VERTEX)
         || descriptor.usage.contains(BufferUsage::INDEX)
         || descriptor.usage.contains(BufferUsage::INDIRECT)
         || descriptor.usage.contains(BufferUsage::UNIFORM)
         || descriptor.usage.contains(BufferUsage::STORAGE_READ)
         || descriptor.usage.contains(BufferUsage::STORAGE_WRITE);
-    let heap = if is_gpu_resource {
+    let source = descriptor.usage.contains(BufferUsage::TRANSFER_SOURCE);
+    let destination = descriptor.usage.contains(BufferUsage::TRANSFER_DESTINATION);
+    let heap = if is_gpu_resource || (source && destination) {
         sys::D3D12_HEAP_TYPE_DEFAULT
+    } else if destination {
+        sys::D3D12_HEAP_TYPE_READBACK
     } else {
         sys::D3D12_HEAP_TYPE_UPLOAD
     };
-    let mut record = create_in_heap(device, descriptor.size.max(1), heap)?;
+    let flags = if descriptor.usage.contains(BufferUsage::STORAGE_WRITE) {
+        sys::D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS
+    } else {
+        sys::D3D12_RESOURCE_FLAG_NONE
+    };
+    let mut record =
+        create_in_heap_from_pointer(device.device, descriptor.size.max(1), heap, flags)?;
     record.usage = descriptor.usage;
     registries.buffers.insert(handle.id(), record);
     Ok(())
@@ -41,7 +49,7 @@ pub fn create(
 
 /// Creates a buffer in an upload heap, for the ring and staging paths.
 pub fn create_upload_heap(device: sys::ComPtr, size: usize) -> RhiResult<Dx12ResourceRecord> {
-    create_in_heap_from_pointer(device, size.max(1), sys::D3D12_HEAP_TYPE_UPLOAD)
+    create_in_heap_for_transfer(device, size, sys::D3D12_HEAP_TYPE_UPLOAD)
 }
 
 /// Creates a staging buffer in the given heap, for one texture transfer.
@@ -50,18 +58,15 @@ pub fn create_in_heap_for_transfer(
     size: usize,
     heap_type: u32,
 ) -> RhiResult<Dx12ResourceRecord> {
-    let mut record = create_in_heap_from_pointer(device, size.max(1), heap_type)?;
+    let mut record = create_in_heap_from_pointer(
+        device,
+        size.max(1),
+        heap_type,
+        sys::D3D12_RESOURCE_FLAG_NONE,
+    )?;
     record.usage =
         crate::rhi::BufferUsage::TRANSFER_SOURCE | crate::rhi::BufferUsage::TRANSFER_DESTINATION;
     Ok(record)
-}
-
-fn create_in_heap(
-    device: &Dx12DeviceHandle,
-    size: usize,
-    heap_type: u32,
-) -> RhiResult<Dx12ResourceRecord> {
-    create_in_heap_from_pointer(device.device, size, heap_type)
 }
 
 /// Creates one committed buffer resource and maps it when the heap allows.
@@ -69,10 +74,11 @@ fn create_in_heap_from_pointer(
     device: sys::ComPtr,
     size: usize,
     heap_type: u32,
+    flags: u32,
 ) -> RhiResult<Dx12ResourceRecord> {
     #[cfg(not(target_os = "windows"))]
     {
-        let _ = (device, size, heap_type);
+        let _ = (device, size, heap_type, flags);
         Err(RhiError::unsupported_backend(
             "DirectX 12 is only available on Windows",
         ))
@@ -95,7 +101,7 @@ fn create_in_heap_from_pointer(
             // D3D12 rejects `UNKNOWN` for buffer resources; the row-major
             // layout is the only valid one for buffers in any heap type.
             Layout: sys::D3D12_TEXTURE_LAYOUT_ROW_MAJOR,
-            Flags: sys::D3D12_RESOURCE_FLAG_NONE,
+            Flags: flags,
         };
         let mut resource: sys::ComPtr = core::ptr::null_mut();
         // SAFETY: `device` is a live `ID3D12Device` and the vtable is declared
@@ -131,11 +137,16 @@ fn create_in_heap_from_pointer(
         let mut mapped = core::ptr::null_mut();
         // Upload and readback heaps are both CPU-visible; a default heap is not.
         if heap_type == sys::D3D12_HEAP_TYPE_UPLOAD || heap_type == sys::D3D12_HEAP_TYPE_READBACK {
-            // SAFETY: the resource is live and the read range is null, meaning
-            // "no CPU reads from this mapping".
-            unsafe {
+            // SAFETY: the resource is live and the null range permits reading
+            // any byte of the persistently mapped buffer.
+            let status = unsafe {
                 let vtbl = *(resource as *mut *const ResourceVtbl);
-                ((*vtbl).Map)(resource, 0, core::ptr::null(), &mut mapped);
+                ((*vtbl).Map)(resource, 0, core::ptr::null(), &mut mapped)
+            };
+            if status != sys::S_OK || mapped.is_null() {
+                // SAFETY: the resource has not been submitted.
+                unsafe { sys::IUnknownVtbl::release(resource) };
+                return Err(RhiError::invalid_argument(sys::hresult_message(status)));
             }
         }
         Ok(Dx12ResourceRecord {
@@ -143,6 +154,7 @@ fn create_in_heap_from_pointer(
             size: size as u64,
             gpu_address: gpu_address(resource),
             mapped: mapped.cast(),
+            heap_type,
             usage: BufferUsage::EMPTY,
         })
     }
@@ -182,10 +194,10 @@ pub struct ResourceVtbl {
     pub GetGPUVirtualAddress: unsafe extern "system" fn(sys::ComPtr) -> u64,
 }
 
-/// Copies `data` into a mapped buffer.
+/// Copies `data` into the buffer, staging device-local memory.
 pub fn upload(
     registries: &Dx12Registries,
-    _device: &Dx12DeviceHandle,
+    device: &mut Dx12DeviceHandle,
     buffer: Buffer,
     offset: usize,
     data: &[u8],
@@ -198,21 +210,26 @@ pub fn upload(
     if data.is_empty() {
         return Ok(());
     }
-    rhi_require(
-        !record.mapped.is_null(),
-        "buffer is not in an upload heap; stage through a ring allocation",
-    )?;
-    // SAFETY: the mapping covers `record.size` bytes and the range was validated;
-    // `data` is a distinct live slice.
-    unsafe {
-        std::ptr::copy_nonoverlapping(data.as_ptr(), record.mapped.add(offset), data.len());
+    if record.heap_type == sys::D3D12_HEAP_TYPE_UPLOAD {
+        // SAFETY: the mapping covers the validated range and data is disjoint.
+        unsafe {
+            std::ptr::copy_nonoverlapping(data.as_ptr(), record.mapped.add(offset), data.len());
+        }
+        return Ok(());
     }
-    Ok(())
+    let staging = create_upload_heap(device.device, data.len())?;
+    // SAFETY: the upload heap is mapped and covers the full data slice.
+    unsafe { std::ptr::copy_nonoverlapping(data.as_ptr(), staging.mapped, data.len()) };
+    let result = copy_immediate(device, &staging, 0, record, offset, data.len());
+    // SAFETY: the copy has retired or could not be submitted.
+    unsafe { sys::IUnknownVtbl::release(staging.resource) };
+    result
 }
 
 /// Copies `destination.len()` bytes back out of a mapped buffer.
 pub fn read(
     registries: &Dx12Registries,
+    device: &mut Dx12DeviceHandle,
     buffer: Buffer,
     offset: usize,
     destination: &mut [u8],
@@ -222,10 +239,30 @@ pub fn read(
         .get(&buffer.id())
         .ok_or_else(|| RhiError::invalid_argument("unknown buffer"))?;
     rhi_byte_range(offset, destination.len(), record.size as usize)?;
-    rhi_require(
-        !record.mapped.is_null(),
-        "buffer readback requires a readback or upload heap",
-    )?;
+    if destination.is_empty() {
+        return Ok(());
+    }
+    if record.heap_type == sys::D3D12_HEAP_TYPE_DEFAULT {
+        let staging = create_in_heap_for_transfer(
+            device.device,
+            destination.len(),
+            sys::D3D12_HEAP_TYPE_READBACK,
+        )?;
+        let result = copy_immediate(device, record, offset, &staging, 0, destination.len());
+        if result.is_ok() {
+            // SAFETY: the copy has retired and wrote the full destination range.
+            unsafe {
+                std::ptr::copy_nonoverlapping(
+                    staging.mapped,
+                    destination.as_mut_ptr(),
+                    destination.len(),
+                );
+            }
+        }
+        // SAFETY: the copy has retired or could not be submitted.
+        unsafe { sys::IUnknownVtbl::release(staging.resource) };
+        return result;
+    }
     // SAFETY: the mapping covers `record.size` bytes, the range was validated, and
     // `destination` is a distinct live slice.
     unsafe {
@@ -236,6 +273,55 @@ pub fn read(
         );
     }
     Ok(())
+}
+
+fn copy_immediate(
+    device: &mut Dx12DeviceHandle,
+    src: &Dx12ResourceRecord,
+    src_offset: usize,
+    dst: &Dx12ResourceRecord,
+    dst_offset: usize,
+    size: usize,
+) -> RhiResult<()> {
+    #[cfg(not(target_os = "windows"))]
+    {
+        let _ = (device, src, src_offset, dst, dst_offset, size);
+        Err(RhiError::unsupported_backend(
+            "DirectX 12 is only available on Windows",
+        ))
+    }
+    #[cfg(target_os = "windows")]
+    {
+        let list = super::command_list::open_graphics_list(device)?;
+        // SAFETY: the caller validated both ranges. Default-heap buffers decay
+        // to COMMON after each ExecuteCommandLists call.
+        unsafe {
+            for (record, state) in [
+                (src, sys::D3D12_RESOURCE_STATE_COPY_SOURCE),
+                (dst, sys::D3D12_RESOURCE_STATE_COPY_DEST),
+            ] {
+                if record.heap_type == sys::D3D12_HEAP_TYPE_DEFAULT {
+                    transition(
+                        list,
+                        record.resource,
+                        sys::D3D12_RESOURCE_STATE_COMMON,
+                        state,
+                    );
+                }
+            }
+            let vtbl = *(list as *mut *const CommandListVtbl);
+            ((*vtbl).CopyBufferRegion)(
+                list,
+                dst.resource,
+                dst_offset as u64,
+                src.resource,
+                src_offset as u64,
+                size as u64,
+            );
+        }
+        let fence = super::command_list::submit_graphics_list(device, list)?;
+        super::device::wait_idle(&device.graphics, fence)
+    }
 }
 
 #[cfg(test)]
@@ -261,6 +347,7 @@ mod tests {
                 core::ptr::null_mut(),
                 64,
                 sys::D3D12_HEAP_TYPE_DEFAULT,
+                sys::D3D12_RESOURCE_FLAG_NONE,
             );
             assert!(result.is_err());
         }

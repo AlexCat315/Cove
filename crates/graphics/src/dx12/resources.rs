@@ -23,6 +23,7 @@ pub struct Dx12ResourceRecord {
     pub gpu_address: u64,
     /// CPU mapping for upload/readback heaps; null for default heaps.
     pub mapped: *mut u8,
+    pub heap_type: u32,
     pub usage: BufferUsage,
 }
 
@@ -33,6 +34,7 @@ unsafe impl Send for Dx12ResourceRecord {}
 
 pub struct Dx12TextureRecord {
     pub resource: sys::ComPtr,
+    pub state: u32,
     pub format: crate::rhi::TextureFormat,
     pub width: usize,
     pub height: usize,
@@ -42,6 +44,7 @@ pub struct Dx12TextureRecord {
     pub sample_count: usize,
     pub dimension: crate::rhi::TextureDimension,
     pub usage: crate::rhi::TextureUsage,
+    pub attachment_index: Option<u32>,
     /// Render-target descriptor, when the texture can be an attachment.
     pub rtv: Option<sys::D3D12_CPU_DESCRIPTOR_HANDLE>,
     /// Depth-stencil descriptor, when the texture can be a depth attachment.
@@ -61,6 +64,7 @@ pub struct Dx12ShaderRecord {
 /// The backend's own handle space.
 #[derive(Default)]
 pub struct Dx12Registries {
+    pub next_upload_buffer_id: u32,
     pub buffers: HashMap<u32, Dx12ResourceRecord>,
     pub textures: HashMap<u32, Dx12TextureRecord>,
     /// Sampler descriptions, copied into the shader-visible sampler heap when a
@@ -70,18 +74,14 @@ pub struct Dx12Registries {
     pub graphics_pipelines: HashMap<u32, Dx12GraphicsPipelineRecord>,
     pub compute_pipelines: HashMap<u32, Dx12ComputePipelineRecord>,
     pub mesh_pipelines: HashMap<u32, Dx12MeshPipelineRecord>,
+    #[cfg(target_os = "windows")]
+    pub accelerations: HashMap<u32, super::acceleration::Acceleration>,
     pub root_signatures: HashMap<u32, sys::ComPtr>,
     /// Binding layouts and sets, which D3D12 keeps as root-signature and
     /// descriptor-heap state rather than GPU objects.
     pub binding_layouts: HashMap<u32, super::binding::Dx12LayoutRecord>,
     pub binding_sets: HashMap<u32, Dx12SetRecord>,
     pub pipeline_layouts: HashMap<u32, Dx12PipelineLayoutRecord>,
-    /// Next free descriptor index in the shader-visible CBV/SRV/UAV heap.
-    pub next_descriptor_index: u32,
-    /// Next free descriptor index in the shader-visible sampler heap. Samplers
-    /// have their own heap and their own increment size, so they cannot share
-    /// the resource-heap counter (or the RTV counter).
-    pub next_sampler_index: u32,
 }
 
 // SAFETY: the records are COM pointers plus plain data. D3D12 objects are
@@ -136,6 +136,8 @@ pub struct Dx12ComputePipelineRecord {
 pub struct Dx12MeshPipelineRecord {
     pub pipeline: sys::ComPtr,
     pub layout_id: u32,
+    pub colors: Vec<crate::rhi::TextureFormat>,
+    pub depth: Option<crate::rhi::TextureFormat>,
 }
 
 impl Drop for Dx12Registries {
@@ -178,6 +180,9 @@ pub unsafe fn transition(
     before: u32,
     after: u32,
 ) {
+    if before == after {
+        return;
+    }
     let barrier = sys::D3D12_RESOURCE_BARRIER {
         Type: sys::D3D12_RESOURCE_BARRIER_TYPE_TRANSITION,
         Flags: 0,
@@ -242,7 +247,8 @@ pub struct CommandListVtbl {
     ),
     pub CopyResource: usize,
     pub CopyTiles: usize,
-    pub ResolveSubresource: usize,
+    pub ResolveSubresource:
+        unsafe extern "system" fn(sys::ComPtr, sys::ComPtr, u32, sys::ComPtr, u32, u32),
     pub IASetPrimitiveTopology: unsafe extern "system" fn(sys::ComPtr, u32),
     pub RSSetViewports: unsafe extern "system" fn(sys::ComPtr, u32, *const sys::D3D12_VIEWPORT),
     pub RSSetScissorRects: unsafe extern "system" fn(sys::ComPtr, u32, *const sys::D3D12_RECT),

@@ -108,6 +108,11 @@ pub struct RootMapping {
 
 /// One descriptor the backend must write into a shader-visible heap.
 enum DescriptorWrite {
+    #[cfg(target_os = "windows")]
+    Acceleration {
+        index: u32,
+        address: u64,
+    },
     Sampler {
         index: u32,
         description: sys::D3D12_SAMPLER_DESC,
@@ -161,10 +166,36 @@ fn plan_set(
         )?;
     }
 
+    let resource_count = declarations
+        .iter()
+        .filter(|entry| {
+            matches!(
+                entry.binding_type,
+                BindingType::Texture
+                    | BindingType::StorageTexture
+                    | BindingType::AccelerationStructure
+            )
+        })
+        .count() as u32;
+    let sampler_count = declarations
+        .iter()
+        .filter(|entry| entry.binding_type == BindingType::Sampler)
+        .count() as u32;
+    let sets = &registries.binding_sets;
     let mut plan = SetPlan {
-        resource_base: registries.next_descriptor_index,
+        resource_base: free_descriptor_range(
+            RESOURCE_HEAP_CAPACITY,
+            resource_count,
+            sets.values()
+                .map(|set| (set.resource_heap_base, set.resource_heap_count)),
+        )?,
         resource_count: 0,
-        sampler_base: registries.next_sampler_index,
+        sampler_base: free_descriptor_range(
+            SAMPLER_HEAP_CAPACITY,
+            sampler_count,
+            sets.values()
+                .map(|set| (set.sampler_heap_base, set.sampler_heap_count)),
+        )?,
         sampler_count: 0,
         writes: Vec::new(),
     };
@@ -222,21 +253,61 @@ fn plan_set(
                 validate_buffer_binding(registries, entry, declaration)?;
             }
             BindingType::AccelerationStructure => {
+                #[cfg(target_os = "windows")]
+                {
+                    let crate::rhi::BindingResource::AccelerationStructure(handle) = entry.resource
+                    else {
+                        return Err(RhiError::layout_mismatch(
+                            "DXR slot has no acceleration structure",
+                        ));
+                    };
+                    let record = registries
+                        .accelerations
+                        .get(&handle.id())
+                        .filter(|r| r.is_top_level())
+                        .ok_or_else(|| {
+                            RhiError::invalid_argument(
+                                "DXR shader binding requires a live top-level structure",
+                            )
+                        })?;
+                    plan.writes.push(DescriptorWrite::Acceleration {
+                        index: plan.resource_base + plan.resource_count,
+                        address: record.address(),
+                    });
+                    plan.resource_count += 1;
+                }
+                #[cfg(not(target_os = "windows"))]
                 return Err(RhiError::unsupported_feature(
-                    "DX12 acceleration structures are not implemented by this build",
+                    "DXR is only available on Windows",
                 ));
             }
         }
     }
-    rhi_require(
-        plan.resource_base + plan.resource_count <= RESOURCE_HEAP_CAPACITY,
-        "CBV/SRV/UAV descriptor heap exhausted",
-    )?;
-    rhi_require(
-        plan.sampler_base + plan.sampler_count <= SAMPLER_HEAP_CAPACITY,
-        "sampler descriptor heap exhausted",
-    )?;
     Ok(plan)
+}
+
+fn free_descriptor_range(
+    capacity: u32,
+    count: u32,
+    occupied: impl Iterator<Item = (u32, u32)>,
+) -> RhiResult<u32> {
+    if count == 0 {
+        return Ok(0);
+    }
+    let mut ranges: Vec<_> = occupied.filter(|&(_, length)| length != 0).collect();
+    ranges.sort_unstable();
+    let mut base = 0;
+    for (start, length) in ranges {
+        if start - base >= count {
+            return Ok(base);
+        }
+        base = start + length;
+    }
+    if capacity - base >= count {
+        Ok(base)
+    } else {
+        Err(RhiError::OutOfMemory)
+    }
 }
 
 /// Checks a buffer binding against the registered buffer record.
@@ -297,6 +368,11 @@ pub fn register_set(
     let plan = plan_set(registries, layout, layout_entries, set_entries)?;
     for write in &plan.writes {
         match *write {
+            #[cfg(target_os = "windows")]
+            DescriptorWrite::Acceleration { index, address } => {
+                let cpu = super::texture::resource_heap_cpu(device, index)?;
+                super::acceleration::write_srv(device.device, cpu, address);
+            }
             DescriptorWrite::Sampler { index, description } => {
                 let cpu = super::texture::sampler_heap_cpu(device, index)?;
                 super::texture::write_sampler_at(device, &description, cpu);
@@ -311,9 +387,6 @@ pub fn register_set(
             }
         }
     }
-    // Only advance the allocation counters once every write succeeded.
-    registries.next_descriptor_index = plan.resource_base + plan.resource_count;
-    registries.next_sampler_index = plan.sampler_base + plan.sampler_count;
     registries.binding_sets.insert(
         handle.id(),
         Dx12SetRecord {
@@ -328,9 +401,7 @@ pub fn register_set(
     Ok(())
 }
 
-/// Releases one binding set. D3D12 descriptors live in the heap, so nothing needs
-/// to be freed beyond the bookkeeping; the retired slots stay reserved for the
-/// lifetime of the device because earlier command lists may still reference them.
+/// Releases the descriptor ranges after the frontend retires the binding set.
 pub fn unregister_set(registries: &mut Dx12Registries, handle: BindingSet) {
     registries.binding_sets.remove(&handle.id());
 }
@@ -471,23 +542,20 @@ fn build_root_parameters(
                     // A root descriptor occupies two DWORDs (the GPU VA).
                     dwords += 2;
                 }
-                BindingType::Texture | BindingType::StorageTexture => {
+                BindingType::Texture
+                | BindingType::StorageTexture
+                | BindingType::AccelerationStructure => {
                     resource_ranges.push(range_for(
                         entry,
-                        if entry.binding_type == BindingType::Texture {
-                            sys::D3D12_DESCRIPTOR_RANGE_TYPE_SRV
-                        } else {
+                        if entry.binding_type == BindingType::StorageTexture {
                             sys::D3D12_DESCRIPTOR_RANGE_TYPE_UAV
+                        } else {
+                            sys::D3D12_DESCRIPTOR_RANGE_TYPE_SRV
                         },
                     ));
                 }
                 BindingType::Sampler => {
                     sampler_ranges.push(range_for(entry, sys::D3D12_DESCRIPTOR_RANGE_TYPE_SAMPLER));
-                }
-                BindingType::AccelerationStructure => {
-                    return Err(RhiError::unsupported_feature(
-                        "DX12 acceleration structures are not implemented by this build",
-                    ));
                 }
             }
         }
@@ -683,6 +751,7 @@ mod tests {
 
     fn texture_record() -> super::super::resources::Dx12TextureRecord {
         super::super::resources::Dx12TextureRecord {
+            state: sys::D3D12_RESOURCE_STATE_COMMON,
             resource: core::ptr::null_mut(),
             format: TextureFormat::Rgba8Unorm,
             width: 4,
@@ -693,6 +762,7 @@ mod tests {
             sample_count: 1,
             dimension: TextureDimension::Texture2D,
             usage: TextureUsage::SAMPLED,
+            attachment_index: None,
             rtv: None,
             dsv: None,
         }
@@ -700,6 +770,7 @@ mod tests {
 
     fn buffer_record() -> super::super::resources::Dx12ResourceRecord {
         super::super::resources::Dx12ResourceRecord {
+            heap_type: sys::D3D12_HEAP_TYPE_DEFAULT,
             resource: core::ptr::null_mut(),
             size: 256,
             gpu_address: 0,
@@ -743,7 +814,7 @@ mod tests {
     }
 
     #[test]
-    fn resource_and_sampler_heaps_use_independent_counters() {
+    fn retired_descriptor_ranges_are_reused_without_overlapping_live_sets() {
         let mut registries = Dx12Registries::default();
         let layout = BindingLayout::new(3);
         let declarations = vec![
@@ -778,12 +849,25 @@ mod tests {
         assert_eq!((first.sampler_base, first.sampler_count), (0, 1));
         assert_eq!(first.writes.len(), 2);
 
-        registries.next_descriptor_index = first.resource_base + first.resource_count;
-        registries.next_sampler_index = first.sampler_base + first.sampler_count;
+        let live = BindingSet::new(1);
+        registries.binding_sets.insert(
+            live.id(),
+            Dx12SetRecord {
+                layout_id: layout.id(),
+                entries: entries.clone(),
+                resource_heap_base: first.resource_base,
+                resource_heap_count: first.resource_count,
+                sampler_heap_base: first.sampler_base,
+                sampler_heap_count: first.sampler_count,
+            },
+        );
         let second = plan_set(&registries, layout, &declarations, &entries).unwrap();
         // Samplers no longer reuse the RTV counter, and sets never overlap.
         assert_eq!((second.resource_base, second.resource_count), (1, 1));
         assert_eq!((second.sampler_base, second.sampler_count), (1, 1));
+        unregister_set(&mut registries, live);
+        let recycled = plan_set(&registries, layout, &declarations, &entries).unwrap();
+        assert_eq!((recycled.resource_base, recycled.sampler_base), (0, 0));
     }
 
     #[test]

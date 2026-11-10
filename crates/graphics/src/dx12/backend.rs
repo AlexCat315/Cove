@@ -15,14 +15,14 @@ use crate::rhi::{
     BufferDescriptor, Capabilities, Completion, ComputePipeline, ComputePipelineDescriptor,
     CpuProfilePhase, DeviceConfig, FrameUploader, GpuTimestampProfile, GraphicsApi,
     GraphicsPipeline, GraphicsPipelineDescriptor, MeshPipeline, MeshPipelineDescriptor,
-    PipelineLayout, PipelineLayoutDescriptor, PlannedSubmit, PresentationMode, QueueClass,
-    RhiBackend, RhiCompilationWork, RhiCompiledObject, RhiError, RhiResult, Sampler,
-    SamplerDescriptor, ShaderModule, ShaderModuleDescriptor, SubmissionCpuProfile,
-    SurfaceDescriptor, Swapchain, SwapchainImage, Texture, TextureAllocation, TextureDescriptor,
-    TextureSubresource, TextureUploadRegion, rhi_require, rhi_validate_texture_samples,
+    PipelineLayout, PipelineLayoutDescriptor, PlannedSubmit, PresentationMode, RhiBackend,
+    RhiCompilationWork, RhiCompiledObject, RhiError, RhiResult, Sampler, SamplerDescriptor,
+    ShaderModule, ShaderModuleDescriptor, SubmissionCpuProfile, SurfaceDescriptor, Swapchain,
+    SwapchainImage, Texture, TextureAllocation, TextureDescriptor, TextureSubresource,
+    TextureUploadRegion, rhi_require, rhi_validate_texture_samples,
 };
 
-use super::device::{Dx12DeviceHandle, execute_and_signal};
+use super::device::Dx12DeviceHandle;
 use super::resources::Dx12Registries;
 use super::sys;
 use crate::rhi::UploadRingChunk;
@@ -219,9 +219,36 @@ impl RhiBackend for Dx12Backend {
     }
 
     fn present(&mut self, image: SwapchainImage, completion: Completion) -> RhiResult<()> {
+        #[cfg(target_os = "windows")]
+        {
+            let mut registries = self
+                .registries
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner);
+            let record = registries
+                .textures
+                .get_mut(&image.texture.id())
+                .ok_or_else(|| RhiError::present_failed("unknown DX12 swapchain image"))?;
+            let present = sys::D3D12_RESOURCE_STATE_PRESENT;
+            if record.state != present {
+                let list = super::command_list::open_graphics_list(&mut self.device)?;
+                // SAFETY: the acquired image and the direct command list are live.
+                unsafe {
+                    super::resources::transition(list, record.resource, record.state, present)
+                };
+                super::command_list::submit_graphics_list(&mut self.device, list)?;
+                record.state = present;
+            }
+        }
         super::swapchain::present(&mut self.device, image)?;
-        // The present is queued; the frontend's completion fires once it is retired.
-        completion();
+        let waiter = super::device::FenceWait {
+            fence: self.device.graphics.fence,
+            value: self.device.graphics.fence_value,
+        };
+        std::thread::spawn(move || {
+            let _ = waiter.wait();
+            completion();
+        });
         Ok(())
     }
 
@@ -275,15 +302,24 @@ impl RhiBackend for Dx12Backend {
 
     fn create_acceleration_structure(
         &mut self,
-        _handle: AccelerationStructure,
-        _descriptor: AccelerationStructureDescriptor,
+        handle: AccelerationStructure,
+        descriptor: AccelerationStructureDescriptor,
     ) -> RhiResult<()> {
-        // Acceleration structures stay unadvertised, so the frontend rejects such
-        // a request before reaching here; this guard keeps the backend honest if a
-        // caller bypasses the capability check.
-        Err(RhiError::unsupported_feature(
-            "DX12 acceleration structures are not implemented by this build",
-        ))
+        #[cfg(target_os = "windows")]
+        {
+            let mut registries = self.lock();
+            let record =
+                super::acceleration::Acceleration::new(&self.device, &registries, descriptor)?;
+            registries.accelerations.insert(handle.id(), record);
+            Ok(())
+        }
+        #[cfg(not(target_os = "windows"))]
+        {
+            let _ = (handle, descriptor);
+            Err(RhiError::unsupported_backend(
+                "DX12 is only available on Windows",
+            ))
+        }
     }
 
     fn texture_allocation(&self, texture: Texture) -> Option<TextureAllocation> {
@@ -371,8 +407,11 @@ impl RhiBackend for Dx12Backend {
     // MARK: Immediate data transfer
 
     fn upload_buffer_data(&mut self, buffer: Buffer, offset: usize, data: &[u8]) -> RhiResult<()> {
-        let registries = self.lock();
-        super::buffer::upload(&registries, &self.device, buffer, offset, data)
+        let registries = self
+            .registries
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        super::buffer::upload(&registries, &mut self.device, buffer, offset, data)
     }
 
     fn read_buffer_data(
@@ -382,8 +421,11 @@ impl RhiBackend for Dx12Backend {
         destination: &mut [u8],
     ) -> RhiResult<()> {
         self.wait_until_idle()?;
-        let registries = self.lock();
-        super::buffer::read(&registries, buffer, offset, destination)
+        let registries = self
+            .registries
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        super::buffer::read(&registries, &mut self.device, buffer, offset, destination)
     }
 
     fn upload_texture_data(
@@ -394,10 +436,7 @@ impl RhiBackend for Dx12Backend {
         bytes_per_row: usize,
         subresource: TextureSubresource,
     ) -> RhiResult<()> {
-        // The transfer needs the device mutably for its copy queue, so the
-        // registries cannot stay locked across the call. The texture record is
-        // resolved before the lock is released, which is enough: the transfer only
-        // reads its immutable metadata.
+        // Snapshot the resource and its state before opening a direct list.
         let record = {
             let registries = self.lock();
             registries
@@ -405,6 +444,7 @@ impl RhiBackend for Dx12Backend {
                 .get(&texture.id())
                 .map(|record| TextureSnapshot {
                     resource: record.resource,
+                    state: record.state,
                     format: record.format,
                     width: record.width,
                     height: record.height,
@@ -421,7 +461,11 @@ impl RhiBackend for Dx12Backend {
             region,
             bytes_per_row,
             subresource,
-        )
+        )?;
+        if let Some(record) = self.lock().textures.get_mut(&texture.id()) {
+            record.state = sys::D3D12_RESOURCE_STATE_COPY_DEST;
+        }
+        Ok(())
     }
 
     fn read_texture_data(
@@ -441,6 +485,7 @@ impl RhiBackend for Dx12Backend {
                 .get(&texture.id())
                 .map(|record| TextureSnapshot {
                     resource: record.resource,
+                    state: record.state,
                     format: record.format,
                     width: record.width,
                     height: record.height,
@@ -476,7 +521,6 @@ impl RhiBackend for Dx12Backend {
                 // The device is needed only for the resource creation, which the
                 // factory reaches through the handle it captured.
                 device: self.device.device,
-                next_id: self.device.next_internal_id,
             };
             let created = Arc::new(Mutex::new(Dx12FrameUploader::new(move |capacity| {
                 factory.make_chunk(capacity)
@@ -494,31 +538,23 @@ impl RhiBackend for Dx12Backend {
         completion: Completion,
     ) -> RhiResult<()> {
         let encoding_start = cpu_profile.as_deref().and_then(SubmissionCpuProfile::begin);
-        let queue = match submit.queue {
-            QueueClass::Graphics => &mut self.device.graphics,
-            QueueClass::Compute => &mut self.device.compute,
-            // D3D12 has no dedicated transfer queue in this configuration, so
-            // transfer work runs on the copy queue.
-            QueueClass::Transfer => &mut self.device.copy,
-        };
-        let queue_kind = queue.kind;
-        let queue_fence = queue.fence;
+        // Execute planner releases, graphics, compute and copies in order on
+        // one queue. Resource states cannot cross native queue types without
+        // explicit handoffs and fence waits.
 
         // Recording may create the queue's allocator on first use.
         let mut registries = self
             .registries
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner);
-        let (command_list, staged) =
-            super::command_list::record(&mut self.device, &mut registries, queue_kind, submit)?;
-        drop(registries);
-        let queue = match queue_kind {
-            sys::D3D12_COMMAND_LIST_TYPE_DIRECT => &mut self.device.graphics,
-            sys::D3D12_COMMAND_LIST_TYPE_COMPUTE => &mut self.device.compute,
-            _ => &mut self.device.copy,
-        };
+        let super::command_list::EncodedSubmission {
+            list: command_list,
+            staged,
+            texture_states,
+            ..
+        } = super::command_list::record(&mut self.device, &mut registries, submit)?;
         // SAFETY: the list was closed by `record` and the queue is live.
-        let fence_value = execute_and_signal(queue, command_list);
+        let fence_value = self.device.execute(command_list);
         // SAFETY: the list is no longer needed on the CPU once submitted.
         unsafe { sys::IUnknownVtbl::release(command_list) };
         let fence_value = match fence_value {
@@ -534,18 +570,23 @@ impl RhiBackend for Dx12Backend {
                 return Err(error);
             }
         };
+        for (id, state) in texture_states {
+            if let Some(record) = registries.textures.get_mut(&id) {
+                record.state = state;
+            }
+        }
+        drop(registries);
         if let Some(profile) = cpu_profile {
             profile.end(CpuProfilePhase::Encoding, encoding_start);
             let queue_start = profile.begin();
             profile.end(CpuProfilePhase::QueueSubmit, queue_start);
         }
-        let _ = queue_fence;
 
         // D3D12 reports completion through the queue's fence. The waiter thread
         // blocks on it and then fires the frontend's callback, so the submit path
         // itself never waits.
         let waiter = super::device::FenceWait {
-            fence: queue.fence,
+            fence: self.device.graphics.fence,
             value: fence_value,
         };
         // Raw COM pointers are not `Send`; carrying their addresses keeps the
@@ -576,8 +617,11 @@ impl RhiBackend for Dx12Backend {
     }
 
     fn destroy_texture(&mut self, handle: Texture) {
-        let mut registries = self.lock();
-        if let Some(record) = registries.textures.remove(&handle.id()) {
+        let record = self.lock().textures.remove(&handle.id());
+        if let Some(record) = record {
+            if let Some(index) = record.attachment_index {
+                self.device.release_rtv_index(index);
+            }
             // SAFETY: the frame ring waited for every submission that could use it.
             unsafe { sys::IUnknownVtbl::release(record.resource) };
         }
@@ -617,7 +661,12 @@ impl RhiBackend for Dx12Backend {
         }
     }
 
-    fn destroy_acceleration_structure(&mut self, _handle: AccelerationStructure) {}
+    fn destroy_acceleration_structure(&mut self, handle: AccelerationStructure) {
+        #[cfg(target_os = "windows")]
+        self.lock().accelerations.remove(&handle.id());
+        #[cfg(not(target_os = "windows"))]
+        let _ = handle;
+    }
 
     // MARK: Synchronization
 
@@ -709,6 +758,7 @@ impl Dx12Backend {
 /// registry so the device can be borrowed mutably for its copy queue.
 pub struct TextureSnapshot {
     pub resource: sys::ComPtr,
+    pub state: u32,
     pub format: crate::rhi::TextureFormat,
     pub width: usize,
     pub height: usize,
@@ -721,7 +771,6 @@ pub struct TextureSnapshot {
 struct UploadFactory {
     registries: Arc<Mutex<Dx12Registries>>,
     device: sys::ComPtr,
-    next_id: u32,
 }
 
 // SAFETY: the factory holds a COM pointer and an `Arc<Mutex<_>>`. D3D12 resources
@@ -734,23 +783,20 @@ unsafe impl Sync for UploadFactory {}
 
 impl UploadFactory {
     fn make_chunk(&self, capacity: usize) -> RhiResult<Dx12UploadChunk> {
-        let handle = Buffer::new(
-            self.next_id
-                + self
-                    .registries
-                    .lock()
-                    .map(|guard| guard.buffers.len() as u32)
-                    .unwrap_or(0),
-        );
+        let mut registries = self
+            .registries
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let id = registries
+            .next_upload_buffer_id
+            .max(super::device::INTERNAL_ID_BASE);
+        let next = id.checked_add(1).ok_or(RhiError::OutOfMemory)?;
         let record = super::buffer::create_upload_heap(self.device, capacity.max(1))?;
         let pointer = record.mapped;
-        self.registries
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
-            .buffers
-            .insert(handle.id(), record);
+        registries.next_upload_buffer_id = next;
+        registries.buffers.insert(id, record);
         Ok(Dx12UploadChunk {
-            handle,
+            handle: Buffer::new(id),
             capacity,
             pointer,
         })

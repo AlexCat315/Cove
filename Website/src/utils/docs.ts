@@ -65,6 +65,8 @@ import component14 from '@/content/components/date-range.md?raw'
 import stepper from '@/content/components/stepper.md?raw'
 import mediaPlayer from '@/content/components/media-player.md?raw'
 import alert from '@/content/components/alert.md?raw'
+import badge from '@/content/components/badge.md?raw'
+import windowMenuBar from '@/content/components/window-menu-bar.md?raw'
 
 import actionGroupLayout from '@/content/components/action-group-layout.md?raw'
 import markdown from '@/content/components/markdown.md?raw'
@@ -96,6 +98,7 @@ export const docGroups: DocGroup[] = [
     group: 'Rust 组件',
     items: [
       { slug: 'gallery', title: 'Gallery 使用', raw: gallery },
+      { slug: 'window-menu-bar', title: '窗口菜单栏', raw: windowMenuBar },
       { slug: 'slider', title: 'Slider', raw: slider },
       { slug: 'range-slider', title: 'RangeSlider', raw: rangeSlider },
       { slug: 'list', title: 'List / ListRow', raw: list },
@@ -144,6 +147,7 @@ export const docGroups: DocGroup[] = [
       { slug: 'stepper', title: 'Stepper', raw: stepper },
       { slug: 'media-player', title: 'VideoPlayer / AudioPlayer', raw: mediaPlayer },
       { slug: 'alert', title: 'Alert', raw: alert },
+      { slug: 'badge', title: 'Badge', raw: badge },
     ],
   },
   {
