@@ -4,6 +4,12 @@
 
 Swift 源码逐页对照见文末《Swift 源码对照（逐页差异清单）》。
 
+## 2026-11-11 Windows 11 原生窗口菜单
+
+| 页面或组件 | 实现与自动化验收 | Windows 原生视觉与交互验收 | Rust 文档 |
+| --- | --- | --- | --- |
+| Gallery / 窗口菜单栏 | WinUI `MenuBar` 通过 XAML Islands 接入 SDL 窗口。DX12 合成层位于菜单控件下方，正文避让菜单。DevTools 断言页面切换、缩放和主题切换结果。 | Windows 11 x64 安装 Windows App Runtime 1.8 后，菜单栏透出系统材质，Navigate 弹出 Fluent 菜单。鼠标点击 Calendar、在菜单中按 Enter 返回 Dashboard、在窗口和菜单关闭后的焦点位置按 Ctrl+2 均有效。菜单随窗口缩放和浅色、深色主题变化。沉浸式菜单也通过实际鼠标切换至 Calendar。 | [窗口菜单栏](../Website/src/content/components/window-menu-bar.md) · [Gallery](../Website/src/content/components/gallery.md) |
+
 ## 2026-11-10 Windows DX12 Dashboard
 
 Windows 默认后端改为 DX12。初始化 DX12 失败时尝试 Vulkan。DX12 的 4× 解析、交换链呈现和附件描述符回收已接通。

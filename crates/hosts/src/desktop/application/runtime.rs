@@ -1148,6 +1148,7 @@ impl Application {
         }
         state.environment_override.borrow().apply(&mut environment);
         environment.translucent_window = host.backdrop() != cove_shell::WindowBackdrop::Opaque;
+        environment.title_bar_divider = state.config.window.title_bar_divider.separated();
         environment.system_appearance = match host.system_appearance() {
             cove_shell::SystemAppearance::Light => cove_core::SystemAppearance::Light,
             cove_shell::SystemAppearance::Dark => cove_core::SystemAppearance::Dark,
@@ -1285,6 +1286,13 @@ impl Application {
                         // ambient above, which is what `PortalStoreHolder::current()`
                         // actually reads; the composition-local copy would need
                         // `PortalStore: PartialEq`, which the registry does not provide.
+                        #[cfg(target_os = "windows")]
+                        let root_view = {
+                            use cove_ui_compose::primitives::layout::insets::{
+                                SafeArea, SafeAreaEdges,
+                            };
+                            AnyView::new(SafeArea::new(SafeAreaEdges::TOP, root_view))
+                        };
                         let content = AdaptiveApplicationContent::new(root_view, environment)
                             .text_scaler(scaler);
                         composition.install_view(AnyView::new(content), logical.0, logical.1);
@@ -1362,9 +1370,11 @@ impl Application {
             if let Some(appearance) = crate::desktop::window::appearance::changed_appearance(root) {
                 state.host.set_window_appearance(window_id, appearance);
             }
-            crate::desktop::window::appearance::sync_backdrop_tint(
+            let native_title_row = cfg!(target_os = "windows") && state.host.safe_area().top > 0.0;
+            crate::desktop::window::appearance::sync_window_background(
                 root,
                 state.environment.get().translucent_window,
+                native_title_row,
             );
         }
         let next = root.and_then(|root| state.chrome_collector.borrow_mut().collect(&root));

@@ -13,7 +13,7 @@ use cove_hosts::desktop::application::configuration::{
 use cove_hosts::desktop::diagnostics::ApplicationCheckpoint;
 use cove_hosts::{
     ApplicationConfiguration, ApplicationLaunch, ImmersiveMenuBar, NativeMenu, NativeMenuAction,
-    NativeMenuBar, NativeMenuItem, NativeMenuKeyModifiers, WindowBackdrop,
+    NativeMenuBar, NativeMenuItem, NativeMenuKeyModifiers, TitleBarDivider, WindowBackdrop,
 };
 use cove_ui_compose::adaptive::{SurfaceEnvironmentExt, SurfaceReader};
 use cove_ui_compose::theme::styles::appearance_modifier::Appearance;
@@ -27,10 +27,25 @@ fn configuration(launch: &ShowcaseLaunch) -> ApplicationConfiguration {
     if let Some(height) = launch.height {
         configuration.window.height = height;
     }
-    configuration.window.backdrop = WindowBackdrop::Sidebar;
-    if !launch.shared_counter && launch.menu_bar == ShowcaseMenuBar::Immersive {
+    // Both single-row modes keep the translucent window material; the legacy
+    // native menu keeps its opaque window so the WinUI MenuBar stays legible.
+    configuration.window.backdrop = match launch.menu_bar {
+        ShowcaseMenuBar::Native => WindowBackdrop::Opaque,
+        _ => WindowBackdrop::Sidebar,
+    };
+    if !launch.shared_counter
+        && matches!(
+            launch.menu_bar,
+            ShowcaseMenuBar::Immersive | ShowcaseMenuBar::Separated
+        )
+    {
         configuration.window.title_bar_style = AppWindowTitleBarStyle::HiddenInset;
     }
+    // The divider is the only difference between the two single-row looks.
+    configuration.window.title_bar_divider = match launch.menu_bar {
+        ShowcaseMenuBar::Separated => TitleBarDivider::Hairline,
+        _ => TitleBarDivider::Seamless,
+    };
     configuration.rendering.vsync = launch.vsync;
     configuration.diagnostics.shows_performance_hud = launch.performance_hud;
     configuration.frames.policy = if launch.continuous_frames() {
@@ -121,7 +136,7 @@ impl ShowcaseLaunch {
         );
         let mut native = None;
         match launch.menu_bar {
-            ShowcaseMenuBar::Immersive => {
+            ShowcaseMenuBar::Immersive | ShowcaseMenuBar::Separated => {
                 gallery = gallery.with_menu_bar(ImmersiveMenuBar::new(vec![menu]))
             }
             ShowcaseMenuBar::Native => {
@@ -148,5 +163,41 @@ impl ShowcaseLaunch {
             Some(bar) => application.native_menu_bar(bar),
             None => application,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn launch(flag: &str) -> ShowcaseLaunch {
+        ShowcaseLaunch::new(&[
+            "gallery".to_owned(),
+            "--menu-bar".to_owned(),
+            flag.to_owned(),
+        ])
+    }
+
+    /// The two looks must differ only in the divider: same row, same frame,
+    /// same translucent material.
+    #[test]
+    fn single_row_modes_share_the_frame_and_backdrop() {
+        let seamless = configuration(&launch("immersive"));
+        let separated = configuration(&launch("separated"));
+        assert_eq!(seamless.window.backdrop, separated.window.backdrop);
+        assert_eq!(seamless.window.backdrop, WindowBackdrop::Sidebar);
+        assert_eq!(
+            seamless.window.title_bar_style,
+            separated.window.title_bar_style
+        );
+        assert_eq!(
+            seamless.window.title_bar_style,
+            AppWindowTitleBarStyle::HiddenInset
+        );
+        assert_eq!(seamless.window.title_bar_divider, TitleBarDivider::Seamless);
+        assert_eq!(
+            separated.window.title_bar_divider,
+            TitleBarDivider::Hairline
+        );
     }
 }

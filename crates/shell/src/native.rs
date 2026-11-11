@@ -62,6 +62,8 @@ pub(crate) struct Chrome {
 pub(crate) enum Window {}
 pub(crate) type DialogCallback = unsafe extern "C" fn(*mut c_void, *const *const c_char, i32);
 unsafe extern "C" {
+    #[cfg(target_os = "windows")]
+    pub fn SDL_SetHint(name: *const c_char, value: *const c_char) -> bool;
     pub fn cove_shell_is_main_thread() -> bool;
     pub fn cove_shell_init() -> bool;
     pub fn cove_shell_quit();

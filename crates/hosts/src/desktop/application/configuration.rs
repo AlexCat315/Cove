@@ -25,6 +25,26 @@ impl AppWindowTitleBarStyle {
     }
 }
 
+/// How the single-row title bar meets the content beneath it.
+///
+/// Both variants share the same row, the same window controls and the same
+/// backdrop; only the row's fill and its bottom hairline differ. This keeps the
+/// choice independent of [`WindowBackdrop`] and [`AppWindowTitleBarStyle`].
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum TitleBarDivider {
+    /// The window material runs straight through the bar: no fill, no line.
+    #[default]
+    Seamless,
+    /// A tinted surface plus a one-pixel hairline, like a classic menu bar.
+    Hairline,
+}
+
+impl TitleBarDivider {
+    pub fn separated(self) -> bool {
+        self == Self::Hairline
+    }
+}
+
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum AppFrameDrivePolicy {
     /// Redraw when input, state, animations or an explicit request changes the UI.
@@ -62,6 +82,9 @@ pub struct WindowConfiguration {
     pub width: i32,
     pub height: i32,
     pub title_bar_style: AppWindowTitleBarStyle,
+    /// Visual separation of the single-row menu bar. Independent of `backdrop`
+    /// and `title_bar_style`, so both looks use the same layout and material.
+    pub title_bar_divider: TitleBarDivider,
     pub shows_dock_icon: bool,
     /// Requested backdrop; the platform may fall back to opaque.
     pub backdrop: cove_shell::WindowBackdrop,
@@ -81,6 +104,7 @@ impl Default for WindowConfiguration {
             width: 1280,
             height: 720,
             title_bar_style: AppWindowTitleBarStyle::Standard,
+            title_bar_divider: TitleBarDivider::Seamless,
             shows_dock_icon: true,
             backdrop: cove_shell::WindowBackdrop::Opaque,
             rendering: AppWindowRendering::default(),

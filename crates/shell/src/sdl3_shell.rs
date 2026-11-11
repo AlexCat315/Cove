@@ -20,6 +20,12 @@ impl Session {
                 "only one SDL shell can own the event queue on an application thread".into(),
             ));
         }
+        #[cfg(target_os = "windows")]
+        // The vendored SDL backend otherwise retains WS_CAPTION for borderless
+        // windows. Cove supplies the buttons and the hit-test regions for those windows.
+        unsafe {
+            native::SDL_SetHint(c"SDL_BORDERLESS_WINDOWED_STYLE".as_ptr(), c"0".as_ptr());
+        }
         // SAFETY: called on the application thread before any windows exist; the bridge checks SDL main-thread affinity.
         if !unsafe { native::cove_shell_init() } {
             SDL_LEASED.with(|slot| slot.set(false));
@@ -44,6 +50,10 @@ pub struct Sdl3WindowHandle {
     /// reach the platform.
     state: Cell<native::WindowState>,
     backdrop: Cell<WindowBackdrop>,
+    #[cfg(target_os = "windows")]
+    appearance: Cell<WindowAppearance>,
+    #[cfg(target_os = "windows")]
+    menu_height: Rc<Cell<i32>>,
 }
 impl Sdl3WindowHandle {
     fn state(&self) -> native::WindowState {
@@ -136,8 +146,12 @@ impl WindowHandle for Sdl3WindowHandle {
     }
     fn safe_area(&self) -> WindowSafeArea {
         let s = self.state();
+        #[cfg(target_os = "windows")]
+        let top = s.top + self.menu_height.get() as f32 / s.scale.max(1.0);
+        #[cfg(not(target_os = "windows"))]
+        let top = s.top;
         WindowSafeArea {
-            top: s.top,
+            top,
             bottom: s.bottom,
             leading: s.leading,
             trailing: s.trailing,
@@ -269,9 +283,23 @@ pub struct Sdl3Shell {
     menu_bar_choice: RefCell<Option<MenuBarCompletion>>,
     #[cfg(target_os = "windows")]
     windows_menu: RefCell<Option<crate::windows_menu_bar::WindowsMenuBar>>,
+    #[cfg(target_os = "windows")]
+    windows_menu_runtime: RefCell<Option<crate::windows_menu_bar::MenuRuntime>>,
     default_options: WindowOptions,
 }
 impl Sdl3Shell {
+    /// Whether the desktop can host the platform's native menu bar.
+    pub fn native_menu_bar_supported() -> bool {
+        #[cfg(target_os = "windows")]
+        {
+            crate::windows_menu_bar::available()
+        }
+        #[cfg(not(target_os = "windows"))]
+        {
+            crate::native_menu_bar::NativeMenuBarInstaller::is_supported()
+        }
+    }
+
     pub fn new() -> Result<Self, ShellError> {
         crate::diagnostics::install_sdl_logging();
         let (sender, receiver) = mpsc::channel();
@@ -291,6 +319,8 @@ impl Sdl3Shell {
             menu_bar_choice: RefCell::new(None),
             #[cfg(target_os = "windows")]
             windows_menu: RefCell::new(None),
+            #[cfg(target_os = "windows")]
+            windows_menu_runtime: RefCell::new(None),
             default_options: WindowOptions::default(),
         })
     }
@@ -472,6 +502,10 @@ impl Shell for Sdl3Shell {
             last_area: Cell::new(None),
             state: Cell::new(state),
             backdrop: Cell::new(WindowBackdrop::Opaque),
+            #[cfg(target_os = "windows")]
+            appearance: Cell::new(WindowAppearance::Light),
+            #[cfg(target_os = "windows")]
+            menu_height: Rc::new(Cell::new(0)),
         });
         let applied = match options.backdrop {
             WindowBackdrop::Opaque => false,
@@ -718,6 +752,19 @@ impl Shell for Sdl3Shell {
             unsafe {
                 native::cove_shell_appearance(w.pointer.get(), appearance == WindowAppearance::Dark)
             };
+            #[cfg(target_os = "windows")]
+            {
+                w.appearance.set(appearance);
+                if let Some(NativeRenderSurface::Win32Window { hwnd, .. }) = w.render_surface()
+                    && let Some(menu) = self
+                        .windows_menu
+                        .borrow()
+                        .as_ref()
+                        .filter(|menu| menu.hwnd() == hwnd)
+                {
+                    let _ = menu.set_appearance(appearance);
+                }
+            }
         }
     }
     fn set_window_chrome_hit_test(&self, id: WindowId, hit: Option<&WindowChromeHitTest>) {
@@ -811,18 +858,35 @@ impl Shell for Sdl3Shell {
             *self.menu_bar_choice.borrow_mut() = Some(on_choice);
         }
         #[cfg(target_os = "windows")]
-        if let Some(NativeRenderSurface::Win32Window { hwnd, .. }) = self
-            .main_window_id()
-            .and_then(|id| self.windows.get(&id))
-            .and_then(|window| window.render_surface())
+        if let Some(window) = self.main_window_id().and_then(|id| self.windows.get(&id))
+            && let Some(NativeRenderSurface::Win32Window { hwnd, .. }) = window.render_surface()
         {
-            match crate::windows_menu_bar::WindowsMenuBar::install(hwnd, bar) {
+            use crate::windows_menu_bar::{MenuRuntime, WindowsMenuBar};
+            let installed = (|| {
+                let mut runtime = self.windows_menu_runtime.borrow_mut();
+                if runtime.is_none() {
+                    *runtime = Some(MenuRuntime::start()?);
+                }
+                WindowsMenuBar::install(
+                    hwnd,
+                    bar,
+                    window.appearance.get(),
+                    window.menu_height.clone(),
+                    self.windows_menu.borrow().as_ref(),
+                )
+            })();
+            match installed {
                 Ok(menu) => {
                     *self.windows_menu.borrow_mut() = Some(menu);
                     *self.menu_bar_choice.borrow_mut() = Some(on_choice);
+                    window.refresh();
+                    Self::wake();
                 }
                 Err(error) => cove_logging::LogSystem::logger("com.cove.shell.menu").log(
-                    &cove_logging::LogEvent::new(cove_logging::Level::Warning, error.to_string()),
+                    &cove_logging::LogEvent::new(
+                        cove_logging::Level::Warning,
+                        format!("WinUI menu: {error}"),
+                    ),
                 ),
             }
         }
@@ -873,6 +937,8 @@ impl Shell for Sdl3Shell {
         *self.menu_bar_choice.borrow_mut() = None;
         #[cfg(not(target_os = "windows"))]
         crate::native_menu_bar::NativeMenuBarInstaller::clear();
+        #[cfg(target_os = "windows")]
+        self.windows_menu_runtime.get_mut().take();
         self.session = None;
         self.quitting = true;
     }

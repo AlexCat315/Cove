@@ -43,12 +43,29 @@ pub struct ShowcaseLaunch {
     pub menu_bar: ShowcaseMenuBar,
 }
 
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ShowcaseMenuBar {
-    #[default]
     None,
+    /// Single row; the window material runs through the bar.
     Immersive,
+    /// Same row; a tinted surface and a hairline separate it from the content.
+    Separated,
+    /// The platform application menu (macOS, or WinUI on Windows).
     Native,
+}
+
+impl Default for ShowcaseMenuBar {
+    fn default() -> Self {
+        if cfg!(any(
+            target_os = "windows",
+            target_os = "macos",
+            target_os = "linux"
+        )) {
+            Self::Immersive
+        } else {
+            Self::None
+        }
+    }
 }
 
 /// `--input` capability presets.
@@ -82,8 +99,10 @@ impl ShowcaseLaunch {
             rtl: arguments.iter().any(|value| value == "--rtl"),
             menu_bar: match Self::argument("--menu-bar", arguments).as_deref() {
                 Some("immersive") => ShowcaseMenuBar::Immersive,
+                Some("separated") => ShowcaseMenuBar::Separated,
                 Some("native") => ShowcaseMenuBar::Native,
-                _ => ShowcaseMenuBar::None,
+                Some("none") => ShowcaseMenuBar::None,
+                _ => ShowcaseMenuBar::default(),
             },
             input: match Self::argument("--input", arguments).as_deref() {
                 Some("touch") => ShowcaseInput::Touch,
@@ -162,7 +181,26 @@ mod checks {
         assert!(!launch.rtl);
         assert_eq!(launch.input, ShowcaseInput::Inherited);
         assert_eq!(launch.text_scale, 1.0);
+        #[cfg(any(target_os = "windows", target_os = "macos", target_os = "linux"))]
+        assert_eq!(launch.menu_bar, ShowcaseMenuBar::Immersive);
+        #[cfg(not(any(target_os = "windows", target_os = "macos", target_os = "linux")))]
+        assert_eq!(launch.menu_bar, ShowcaseMenuBar::None);
         assert!(!launch.continuous_frames());
+    }
+
+    #[test]
+    fn menu_bar_mode_can_be_overridden() {
+        for (flag, mode) in [
+            ("native", ShowcaseMenuBar::Native),
+            ("immersive", ShowcaseMenuBar::Immersive),
+            ("separated", ShowcaseMenuBar::Separated),
+            ("none", ShowcaseMenuBar::None),
+        ] {
+            assert_eq!(
+                ShowcaseLaunch::new(&args(&["--menu-bar", flag])).menu_bar,
+                mode
+            );
+        }
     }
 
     #[test]

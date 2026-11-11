@@ -15,7 +15,9 @@ let launch = ApplicationLaunch::new(content)
     .immersive_menu_bar(menus);
 ```
 
-将 `.immersive_menu_bar(menus)` 换成 `.native_menu_bar(menus)` 即可使用系统菜单。macOS 使用应用菜单栏，Windows 使用窗口的原生菜单栏。在没有统一原生菜单栏的桌面环境中，启动配置使用沉浸式菜单。
+`.immersive_menu_bar(menus)` 将菜单放进 Cove 自绘标题区。配合 `WindowBackdrop::Sidebar`，标题区和正文共用窗口材质。
+
+`.native_menu_bar(menus)` 使用平台菜单。macOS 由 AppKit 显示应用菜单。Windows 11 将 WinUI `MenuBar` 和系统窗口按钮放在同一行，Windows 管理拖动、缩放和窗口按钮。需安装对应架构的 Windows App Runtime 1.8。Linux 和缺少运行时的 Windows 仍使用标准窗口，应用菜单的支持情况可通过 `NativeMenuBar::is_supported()` 查询。
 
 用 `.submenu(NativeMenu::named("…"))` 添加子菜单。需要快捷键、选中或禁用状态时，用 `.item(NativeMenuAction::new(…))` 添加动作。原生菜单可通过 `AppDisplayHandle::install_native_menu_bar` 替换，刷新标题和可用状态。
 

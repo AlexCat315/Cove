@@ -5,7 +5,7 @@
 ## Unreleased
 
 - DX12 使用原生命令签名执行间接绘制和调度，支持网格与放大着色器，以及 DXR 三角形 BLAS、实例 TLAS 和内联光线查询。按实际硬件层级报告能力并遵循高性能或低功耗适配器偏好。
-- 桌面启动新增 `immersive_menu_bar`、`native_menu_bar` 和 `window_backdrop`。Windows 使用 Win32 原生菜单及 DirectComposition 透明合成，Gallery 可用 `--menu-bar immersive` 或 `--menu-bar native` 预览。
+- 桌面启动新增 `immersive_menu_bar`、`native_menu_bar` 和 `window_backdrop`。Gallery 默认使用 Cove 自绘沉浸式标题区，与侧栏共用窗口材质。Windows 11 的原生模式将 WinUI 应用菜单与系统按钮放在同一行，缺少 Windows App Runtime 1.8 时保留标准窗口。
 
 - Windows 默认使用 DX12，初始化失败时尝试 Vulkan。DX12 支持 4× 多重采样附件和解析、交换链颜色视图与呈现状态转换，以及录制的纹理拷贝。每个渲染通道以附件全尺寸初始化裁剪范围，修复 Gallery 窗口侧栏变黑。窗口调整尺寸后会回收已退休的附件描述符。
 - Badge 按单行文字测量，修复 Dashboard 导入状态被拆成两行。

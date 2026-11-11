@@ -65,7 +65,8 @@ pub fn create(
             }
             let compositor: IDCompositionDevice =
                 DCompositionCreateDevice(None::<&Dxgi::IDXGIDevice>)?;
-            let target = compositor.CreateTargetForHwnd(hwnd, true)?;
+            // Keep the swap chain below native child windows such as XAML Islands.
+            let target = compositor.CreateTargetForHwnd(hwnd, false)?;
             let visual = compositor.CreateVisual()?;
             visual.SetContent(&chain)?;
             target.SetRoot(&visual)?;

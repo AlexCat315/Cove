@@ -112,6 +112,9 @@ impl View for ImmersiveWindowTitleBar {
                 AnyView::new(WindowControlStrip::new()).modifier(WindowControlStripFrame),
             ));
         }
+        children.push(AnyView::new(
+            AnyView::new(TitleBarHairline).modifier(TitleBarHairlineModifier),
+        ));
         AnyView::new(
             WindowChromeRow { children }.modifier(WindowTitleBarModifier {
                 height: self.height,
@@ -204,14 +207,13 @@ impl cove_composition::ViewModifier for WindowTitleBarModifier {
             "app-window-title-bar".to_owned(),
         );
         let colors = cove_ui_compose::theme::theme_for_node(node).colors;
-        let translucent = node
-            .composition_value(&cove_ui_compose::adaptive::SurfaceEnvironment::key())
-            .translucent_window;
-        node.set_background_color(Some(if translucent {
-            colors.surface.multiplied_alpha(0.4)
-        } else {
-            colors.surface
-        }));
+        let environment =
+            node.composition_value(&cove_ui_compose::adaptive::SurfaceEnvironment::key());
+        node.set_background_color(title_bar_background(
+            colors.surface,
+            environment.translucent_window,
+            environment.title_bar_divider,
+        ));
     }
     fn apply_layout(&self, layout: &LayoutNode) {
         layout.set_flex_direction(FlexDirection::Row);
@@ -222,6 +224,70 @@ impl cove_composition::ViewModifier for WindowTitleBarModifier {
         layout.set_padding(6.0, cove_core::scene::Edge::Right);
         layout.set_padding(3.0, cove_core::scene::Edge::Top);
         layout.set_padding(3.0, cove_core::scene::Edge::Bottom);
+    }
+}
+
+/// The bar's fill for a given window material and divider preference.
+///
+/// Seamless + translucent leaves the bar clear so the material runs through it.
+/// A separated bar on a translucent window uses a *tinted* surface rather than
+/// an opaque one, so choosing the classic look never throws the material away.
+fn title_bar_background(
+    surface: cove_core::Color,
+    translucent: bool,
+    separated: bool,
+) -> Option<cove_core::Color> {
+    if separated {
+        Some(if translucent {
+            surface.multiplied_alpha(0.72)
+        } else {
+            surface
+        })
+    } else if !translucent {
+        Some(surface)
+    } else {
+        None
+    }
+}
+
+/// The hairline along the bottom of the title bar row.
+///
+/// It stays in the tree in both modes so switching the preference only changes
+/// a color, never rebuilds the chrome or its hit-test regions. Absolute
+/// positioning keeps it out of the row's flex layout.
+struct TitleBarHairline;
+
+impl PrimitiveView for TitleBarHairline {
+    fn make_node(&self) -> Node {
+        let node = Node::new();
+        node.set_is_hit_testable(false);
+        node
+    }
+    fn update_node(&self, _node: &Node) {}
+    fn make_layout_node(&self) -> Option<LayoutNode> {
+        Some(LayoutNode::new())
+    }
+}
+impl_primitive_view!(TitleBarHairline);
+
+struct TitleBarHairlineModifier;
+
+impl cove_composition::ViewModifier for TitleBarHairlineModifier {
+    fn apply_node(&self, node: &Node) {
+        let separated =
+            node.composition_value(&cove_ui_compose::adaptive::SurfaceEnvironment::key())
+                .title_bar_divider;
+        let colors = cove_ui_compose::theme::theme_for_node(node).colors;
+        // `divider` is too faint for a 1px line on a light material; `border`
+        // matches the hairline Windows draws under a classic menu bar.
+        node.set_background_color(separated.then_some(colors.border));
+    }
+    fn apply_layout(&self, layout: &LayoutNode) {
+        layout.set_position_type(cove_core::scene::PositionType::Absolute);
+        layout.set_position(0.0, cove_core::scene::Edge::Left);
+        layout.set_position(0.0, cove_core::scene::Edge::Right);
+        layout.set_position(0.0, cove_core::scene::Edge::Bottom);
+        layout.set_height(Some(1.0));
     }
 }
 
@@ -579,6 +645,29 @@ fn with_display_handle(body: impl FnOnce(&AppDisplayHandle)) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn seamless_bar_is_clear_on_a_translucent_window() {
+        assert_eq!(
+            title_bar_background(cove_core::Color::WHITE, true, false),
+            None
+        );
+    }
+
+    #[test]
+    fn separated_bar_keeps_the_material_visible() {
+        let surface = cove_core::Color::WHITE;
+        let fill =
+            title_bar_background(surface, true, true).expect("a separated bar has a fill");
+        assert_ne!(fill, surface, "the band must stay translucent");
+    }
+
+    #[test]
+    fn opaque_window_uses_the_full_surface_in_both_modes() {
+        let surface = cove_core::Color::WHITE;
+        assert_eq!(title_bar_background(surface, false, false), Some(surface));
+        assert_eq!(title_bar_background(surface, false, true), Some(surface));
+    }
 
     #[test]
     fn automatic_control_style_matches_the_platform() {

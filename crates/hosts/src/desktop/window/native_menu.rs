@@ -1,6 +1,6 @@
 //! Translation of Desktop/Sources/CoveUI/Window/NativeMenu.swift.
 //!
-//! macOS installs an application `NSMenu`. Windows installs a window `HMENU`.
+//! macOS installs an application `NSMenu`. Windows hosts a WinUI `MenuBar`.
 
 use cove_platform::NativeShortcut;
 
@@ -155,8 +155,8 @@ pub struct NativeMenuBar {
 
 impl NativeMenuBar {
     /// Whether the host window system provides a native menu bar.
-    pub const fn is_supported() -> bool {
-        cfg!(any(target_os = "macos", target_os = "windows"))
+    pub fn is_supported() -> bool {
+        cove_shell::Sdl3Shell::native_menu_bar_supported()
     }
 
     pub fn new(

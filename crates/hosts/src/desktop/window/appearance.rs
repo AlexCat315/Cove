@@ -28,11 +28,13 @@ pub fn changed_appearance(root: &Node) -> Option<WindowAppearance> {
     Some(appearance)
 }
 
-/// Over a translucent window the root carries the theme's backdrop tint, so
-/// every application gets a legible base without painting it itself.
-pub fn sync_backdrop_tint(root: &Node, translucent: bool) {
-    let tint = if translucent {
+/// The root paints a continuous surface under the window's chrome and content.
+pub fn sync_window_background(root: &Node, translucent: bool, native_title_row: bool) {
+    let tint = if translucent || native_title_row {
         provided_theme_within(root, 48, 2048).and_then(|theme| {
+            if !translucent {
+                return Some(theme.colors.surface_variant);
+            }
             let tint =
                 cove_ui_compose::theme::tokens::material::window_backdrop_tint(&theme.colors);
             if cfg!(target_os = "windows") {

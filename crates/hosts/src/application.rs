@@ -59,8 +59,9 @@ impl ApplicationLaunch {
         self
     }
 
-    /// Installs the native menu on macOS and Windows. Other desktop systems
-    /// render the same menus in Cove's title bar.
+    /// Presents menus with AppKit on macOS or beside the system caption buttons
+    /// using WinUI on Windows 11 with Windows App Runtime 1.8.
+    /// When the platform has no native application menu, keeps the system frame.
     pub fn native_menu_bar(mut self, menus: impl Into<crate::NativeMenuBar>) -> Self {
         self.menu_bar = Some(LaunchMenuBar::Native(menus.into()));
         self
@@ -84,45 +85,38 @@ impl ApplicationLaunch {
     pub fn run(mut self) -> Result<(), String> {
         crate::desktop::diagnostics::integration::set_diagnostics_factory(self.diagnostics);
         let mut callbacks = ApplicationCallbacks::default();
-        let immersive = match self.menu_bar.take() {
-            Some(LaunchMenuBar::Native(mut bar)) if crate::NativeMenuBar::is_supported() => {
-                if bar.app_name.is_empty() {
-                    bar.app_name = self.configuration.window.title.clone();
-                    bar.application_titles =
-                        crate::desktop::window::NativeApplicationMenuTitles::for_app_name(
-                            &bar.app_name,
-                        );
-                }
+        match self.menu_bar.take() {
+            Some(LaunchMenuBar::Native(mut bar)) => {
                 self.configuration.window.title_bar_style =
                     crate::desktop::application::configuration::AppWindowTitleBarStyle::Standard;
-                callbacks.ready = Some(std::rc::Rc::new(
-                    move |display: &crate::AppDisplayHandle| {
-                        display.install_native_menu_bar(&bar);
-                    },
-                ));
-                None
-            }
-            Some(LaunchMenuBar::Native(mut bar)) => {
-                if !bar.application_items.is_empty() {
-                    let title = if bar.app_name.is_empty() {
-                        &self.configuration.window.title
-                    } else {
-                        &bar.app_name
-                    };
-                    bar.menus.insert(
-                        0,
-                        crate::NativeMenu::new(title.clone(), bar.application_items),
+                if crate::NativeMenuBar::is_supported() {
+                    if bar.app_name.is_empty() {
+                        bar.app_name = self.configuration.window.title.clone();
+                        bar.application_titles =
+                            crate::desktop::window::NativeApplicationMenuTitles::for_app_name(
+                                &bar.app_name,
+                            );
+                    }
+                    callbacks.ready = Some(std::rc::Rc::new(
+                        move |display: &crate::AppDisplayHandle| {
+                            display.install_native_menu_bar(&bar);
+                        },
+                    ));
+                } else {
+                    cove_logging::LogSystem::logger("com.cove.ui.application").log(
+                        &cove_logging::LogEvent::new(
+                            cove_logging::Level::Warning,
+                            "Native application menus are unavailable on this system",
+                        ),
                     );
                 }
-                Some(bar.menus)
             }
-            Some(LaunchMenuBar::Immersive(menus)) => Some(menus),
-            None => None,
-        };
-        if let Some(menus) = immersive {
-            self.configuration.window.title_bar_style =
-                crate::desktop::application::configuration::AppWindowTitleBarStyle::HiddenInset;
-            self.root = crate::ImmersiveMenuBar::new(menus).with_content(self.root);
+            Some(LaunchMenuBar::Immersive(menus)) => {
+                self.configuration.window.title_bar_style =
+                    crate::desktop::application::configuration::AppWindowTitleBarStyle::HiddenInset;
+                self.root = crate::ImmersiveMenuBar::new(menus).with_content(self.root);
+            }
+            None => {}
         }
         Application::run(
             self.configuration,

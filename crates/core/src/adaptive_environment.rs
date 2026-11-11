@@ -205,6 +205,10 @@ pub struct Environment {
     /// The window shows the platform's blurred material wherever the UI
     /// leaves it clear, so a sidebar can omit its fill.
     pub translucent_window: bool,
+    /// The single-row title bar draws its own tinted surface and a hairline
+    /// against the content below. Orthogonal to `translucent_window`: a
+    /// translucent window can still ask for the classic separated look.
+    pub title_bar_divider: bool,
     /// Follows the system setting live; content decides whether to honor it.
     pub system_appearance: SystemAppearance,
 }
@@ -223,6 +227,7 @@ impl Default for Environment {
             keyboard: Keyboard::default(),
             reduces_motion: false,
             translucent_window: false,
+            title_bar_divider: false,
             system_appearance: SystemAppearance::Unknown,
         }
     }
