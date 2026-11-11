@@ -87,6 +87,15 @@ cargo test --locked -p cove-media-rhi --features ffmpeg
 
 `--check` 只报告，`--dry-run` 只输出安装计划。Android 目标由 setup 写入 NDK 编译器与 `CC_/CXX_/AR_`；`ffmpeg-sys-next` 要求这些变量指明交叉工具链（与 `cargo-ndk` 提供的变量一致）。
 
+Windows 本地构建用 `Tools/media-cargo.ps1` 组装进程环境：`ffmpeg-sys-next` 的构建脚本不读 setup 状态，只认环境变量，需要 MSVC 开发环境（`cl`/`link`、`INCLUDE`/`LIB`）与 MSYS2 的 `sh`/`make`/`nasm` 同时在 PATH 中。脚本加载 vcvars64、把 MSYS2 `usr\bin` 与 `ucrt64\bin` 接在 MSVC 目录之后、设置 `LIBCLANG_PATH`、bindgen 的 MSVC target（MSYS2 的 libclang 默认 GNU target，会误用 mingw 头文件）与 MSVC 链接器，不修改系统环境：
+
+```powershell
+./Tools/media-cargo.ps1 run -p cove-examples --bin gallery --features media-ffmpeg
+./Tools/media-cargo.ps1 test --locked -p cove-media --features ffmpeg --all-targets
+```
+
+dot-source（`. ./Tools/media-cargo.ps1`）可把同一环境加载进当前 shell 后直接使用 cargo。PATH 顺序必须让 `cl`/`link` 解析到 MSVC、`sh`/`make`/`nasm` 解析到 MSYS2；Git 的 `usr\bin` 自带 coreutils 的 `sh` 与 `link` 会遮蔽两者，脚本会将其移出 PATH。
+
 ## 7. 平台状态
 
 | 平台 | 实现 | 验证 |
