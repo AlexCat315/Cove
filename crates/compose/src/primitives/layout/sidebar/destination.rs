@@ -444,6 +444,8 @@ impl View for SidebarActionsTrigger {
         let popover = Popover::new(trigger, menu)
             .width(220.0)
             .placement(crate::primitives::overlays::PopoverPlacement::BottomTrailing)
+            .surface(crate::primitives::overlays::PopoverSurface::Content)
+            .overflow(crate::primitives::overlays::PopoverOverflow::Flip)
             .enabled(is_enabled)
             .trigger_description(PopoverTriggerDescription {
                 label: format!("Actions for {title}"),

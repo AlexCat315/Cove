@@ -464,6 +464,7 @@ impl View for AssetPicker {
             .enabled(is_enabled)
             .width(PICKER_WIDTH)
             .placement(PopoverPlacement::BottomTrailing)
+            .surface(crate::primitives::overlays::PopoverSurface::Content)
             .overflow(PopoverOverflow::Flip)
             .trigger_style(GhostButtonStyle)
             .trigger_description(

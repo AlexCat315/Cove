@@ -198,7 +198,9 @@ impl<Label: View + Clone + 'static> MenuButton<Label> {
         let mut popover = Popover::new(self.label.clone(), self.menu(presented))
             .is_presented(binding)
             .enabled(self.is_enabled)
-            .placement(self.placement);
+            .placement(self.placement)
+            .surface(crate::primitives::overlays::PopoverSurface::Content)
+            .overflow(crate::primitives::overlays::PopoverOverflow::Flip);
         popover.trigger_style = Some(self.resolved_trigger_style());
         if let Some(width) = self.width {
             popover = popover.width(width);

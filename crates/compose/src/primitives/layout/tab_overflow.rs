@@ -359,6 +359,8 @@ impl<Id: std::hash::Hash + Clone + PartialEq + 'static> View for TabOverflowStri
                         },
                     )
                     .placement(PopoverPlacement::BottomTrailing)
+                    .surface(crate::primitives::overlays::PopoverSurface::Content)
+                    .overflow(crate::primitives::overlays::PopoverOverflow::Flip)
                     .width(220.0),
                 ),
             );

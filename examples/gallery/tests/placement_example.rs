@@ -97,22 +97,14 @@ fn the_compact_trigger_is_capped_by_the_viewport() {
 
 #[test]
 fn the_story_starts_on_the_top_placement() {
-    let story = PlacementExample::new(GalleryOptions::default());
+    let story = PlacementExample::new(GalleryOptions::default(), |_| {});
     assert_eq!(story.selected(), 1);
     assert_eq!(story.selected_variant().label, "Top");
 }
 
 #[test]
 fn selecting_clamps_to_the_last_variant() {
-    let story = PlacementExample::new(GalleryOptions::default());
+    let story = PlacementExample::new(GalleryOptions::default(), |_| {});
     story.set_selected(99);
     assert_eq!(story.selected(), VARIANTS.len() - 1);
-}
-
-#[test]
-fn the_story_records_the_chosen_placement() {
-    let story = PlacementExample::new(GalleryOptions::default());
-    assert_eq!(story.last_action(), "");
-    story.record("TL");
-    assert_eq!(story.last_action(), "TL");
 }

@@ -215,6 +215,8 @@ impl View for ColumnVisibilityPicker {
             .is_presented(presented.binding())
             .enabled(self.is_enabled)
             .placement(crate::primitives::overlays::PopoverPlacement::BottomLeading)
+            .surface(crate::primitives::overlays::PopoverSurface::Content)
+            .overflow(crate::primitives::overlays::PopoverOverflow::Flip)
             .trigger_style(crate::theme::styles::buttons::SecondaryButtonStyle)
             .width(220.0);
         crate::AnyView::new(

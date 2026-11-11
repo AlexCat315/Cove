@@ -240,6 +240,8 @@ fn more_item<Id: std::hash::Hash + Eq + Clone + PartialEq + Send + Sync + 'stati
     .is_presented(shows_more.binding())
     .enabled(hidden.iter().any(|tab| tab.is_enabled))
     .placement(PopoverPlacement::TopTrailing)
+    .surface(crate::primitives::overlays::PopoverSurface::Content)
+    .overflow(crate::primitives::overlays::PopoverOverflow::Flip)
     .width(220.0)
     // Swift gives the trigger `PopoverTriggerDescription(label: "More tabs")`,
     // so assistive clients and the query surface see that name.

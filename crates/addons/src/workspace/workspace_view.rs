@@ -2039,6 +2039,8 @@ impl View for WorkspaceTabOverflow {
                 Popover::new(trigger, menu)
                     .is_presented(self.presented.binding())
                     .placement(PopoverPlacement::BottomTrailing)
+                    .surface(cove_ui_compose::primitives::overlays::PopoverSurface::Content)
+                    .overflow(cove_ui_compose::primitives::overlays::PopoverOverflow::Flip)
                     .width(240.0),
             )
             .modifier(WorkspaceRoleModifier::new(
@@ -3198,6 +3200,8 @@ impl View for WorkspaceCompactView {
             Popover::new(trigger, Menu::new(entries).width(240.0))
                 .is_presented(self.presented.binding())
                 .placement(PopoverPlacement::BottomLeading)
+                .surface(cove_ui_compose::primitives::overlays::PopoverSurface::Content)
+                .overflow(cove_ui_compose::primitives::overlays::PopoverOverflow::Flip)
                 .width(240.0),
         );
         let panel = (self.content)(selected.id.clone());

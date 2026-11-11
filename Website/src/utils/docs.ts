@@ -35,6 +35,8 @@ import motion from '@/content/components/motion.md?raw'
 import splitButton from '@/content/components/split-button.md?raw'
 import button from '@/content/components/button.md?raw'
 import completionPopover from '@/content/components/completion-popover.md?raw'
+import popover from '@/content/components/popover.md?raw'
+import popconfirm from '@/content/components/popconfirm.md?raw'
 import numberField from '@/content/components/number-field.md?raw'
 import field from '@/content/components/field.md?raw'
 import colorWheel from '@/content/components/color-wheel.md?raw'
@@ -125,6 +127,8 @@ export const docGroups: DocGroup[] = [
       { slug: 'button', title: 'Button', raw: button },
       { slug: 'split-button', title: 'SplitButton', raw: splitButton },
       { slug: 'completion-popover', title: 'CompletionPopover', raw: completionPopover },
+      { slug: 'popover', title: 'Popover', raw: popover },
+      { slug: 'popconfirm', title: 'Popconfirm', raw: popconfirm },
       { slug: 'number-field', title: 'NumberField', raw: numberField },
       { slug: 'field', title: 'Field', raw: field },
       { slug: 'select', title: 'Select', raw: select },

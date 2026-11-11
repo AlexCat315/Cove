@@ -11,12 +11,14 @@
 use cove_composition::Scope;
 use cove_core::State;
 use cove_core::scene::{Align, FlexDirection, Justify, Wrap};
+use cove_ui_compose::modifiers::interaction::AccessibilityExt;
 use cove_ui_compose::modifiers::layout::LayoutFrameExt;
 use cove_ui_compose::modifiers::style::SemanticStyleViewExt;
 use cove_ui_compose::primitives::controls::Button;
 use cove_ui_compose::primitives::layout::{
     DisclosureGroup, MobileTabBar, TabItem, TabOverflow, TabVariant, TabView,
 };
+use cove_ui_compose::primitives::media::Icon;
 use cove_ui_compose::primitives::overlays::menu::{MenuEntry, MenuItem, MenuSubmenu};
 use cove_ui_compose::primitives::overlays::{Modal, ModalOptions, Popover};
 use cove_ui_compose::primitives::text::Text;
@@ -39,7 +41,7 @@ pub const SUBMENU_WIDTH: f32 = 240.0;
 pub const MODAL_WIDTH: f32 = 440.0;
 pub const MODAL_HEIGHT: f32 = 220.0;
 /// The popover's declared width.
-pub const POPOVER_WIDTH: f32 = 260.0;
+pub const POPOVER_WIDTH: f32 = 300.0;
 
 /// The initial document tabs.
 pub const INITIAL_DOCUMENTS: [&str; 3] = ["Scene.cove", "Material.cove", "Notes.md"];
@@ -443,7 +445,11 @@ impl View for PopoverStory {
             Wrap::NoWrap,
             12.0,
             AnyView::new(TupleView::new(vec![
-                AnyView::new(TextField::new("Project name", self.name.binding())),
+                AnyView::new(
+                    Text::new("Project name")
+                        .semantic_font(cove_ui_compose::theme::SemanticFontRef::body_strong()),
+                ),
+                AnyView::new(TextField::new("Name", self.name.binding())),
                 AnyView::new(
                     Button::title("Done", done)
                         .button_style(cove_ui_compose::theme::styles::buttons::PrimaryButtonStyle),
@@ -451,39 +457,39 @@ impl View for PopoverStory {
             ])),
         ));
 
+        let trigger = AnyView::new(BoxView::new(
+            FlexDirection::Row,
+            Align::Center,
+            Justify::FlexStart,
+            Wrap::NoWrap,
+            6.0,
+            AnyView::new(TupleView::new(vec![
+                AnyView::new(Text::new("Project settings")),
+                AnyView::new(
+                    Icon::new(
+                        cove_ui_compose::primitives::media::ui_icon_catalog::navigation::chevron_down(),
+                        12.0,
+                    )
+                    .accessibility_hidden(true),
+                ),
+            ])),
+        ));
         let popover = AnyView::new(
-            Popover::new(Text::new("New project"), form)
+            Popover::new(trigger, form)
                 .is_presented(self.is_open.binding())
                 .width(POPOVER_WIDTH)
                 .enabled(self.options.is_enabled)
                 .debug_name("popover-anchored"),
         );
 
-        let caption = Text::new(format!(
-            "Name: {} · {}",
-            self.name(),
-            if self.is_open() { "open" } else { "closed" }
-        ))
-        .semantic_font(cove_ui_compose::theme::SemanticFontRef::caption())
-        .semantic_foreground(SemanticColorRef::on_surface_muted());
+        let caption = Text::new(format!("Name: {}", self.name()))
+            .semantic_font(cove_ui_compose::theme::SemanticFontRef::caption())
+            .semantic_foreground(SemanticColorRef::on_surface_muted());
 
-        let form = AnyView::new(StorySection::new(
+        AnyView::new(StorySection::new(
             "Anchored form",
             "The overlay escapes clipping and repositions near viewport edges.",
             AnyView::new(TupleView::new(vec![popover, AnyView::new(caption)])),
-        ));
-        AnyView::new(BoxView::new(
-            FlexDirection::Column,
-            Align::Stretch,
-            Justify::FlexStart,
-            Wrap::NoWrap,
-            24.0,
-            AnyView::new(TupleView::new(vec![
-                form,
-                AnyView::new(super::placement_example::PlacementExample::new(
-                    self.options.clone(),
-                )),
-            ])),
         ))
     }
 

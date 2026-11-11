@@ -6,17 +6,24 @@
 //! the side the placement asks for. The mirror math is ordinary arithmetic with
 //! three branches that are easy to transpose, so it lives here as a function.
 
+use std::rc::Rc;
+
 use cove_composition::Scope;
 use cove_core::State;
 use cove_core::scene::{Align, FlexDirection, Justify, Wrap};
-use cove_ui_compose::modifiers::style::SemanticStyleViewExt;
-use cove_ui_compose::primitives::controls::Button;
-use cove_ui_compose::primitives::overlays::{Popover, PopoverPlacement, PopoverTriggerDescription};
+use cove_ui_compose::adaptive::ContainerSizeReader;
+use cove_ui_compose::modifiers::layout::{
+    AbsolutePositionModifier, FrameDimension, LayoutFrameExt, PaddingExt,
+};
+use cove_ui_compose::modifiers::style::{AppearanceExt, SemanticStyleViewExt};
+use cove_ui_compose::primitives::controls::ButtonRole;
+use cove_ui_compose::primitives::controls::fields::select::{Select, SelectOption};
+use cove_ui_compose::primitives::overlays::{PopoverPlacement, Popconfirm};
 use cove_ui_compose::primitives::text::Text;
-use cove_ui_compose::theme::tokens::SemanticColorRef;
-use cove_ui_compose::{AnyView, BoxView, LayoutDebugExt, TupleView, View};
+use cove_ui_compose::theme::tokens::{SemanticColorRef, TextScaler, TextScalerReader};
+use cove_ui_compose::theme::{Theme, ThemeReader};
+use cove_ui_compose::{AnyView, BoxView, LayoutDebugExt, TupleView, View, ViewExt};
 
-use super::feedback::StorySection;
 use crate::gallery_content::catalog::GalleryOptions;
 
 /// The width at or above which the story shows the full grid instead of the
@@ -139,21 +146,21 @@ pub fn compact_trigger_width(width: f32, scale: f32) -> f32 {
 }
 
 /// `PopoverPlacementExample`: every named side, with a compact fallback.
+///
+/// The owning page receives each confirmed placement through `on_action`, so
+/// one "Last action" readout covers the whole Popconfirm page.
 pub struct PlacementExample {
     pub options: GalleryOptions,
     selected: State<usize>,
-    last_action: State<String>,
-    /// One presentation flag per variant, so each trigger owns its popover.
-    is_presented: State<Vec<bool>>,
+    on_action: Rc<dyn Fn(String)>,
 }
 
 impl PlacementExample {
-    pub fn new(options: GalleryOptions) -> Self {
+    pub fn new(options: GalleryOptions, on_action: impl Fn(String) + 'static) -> Self {
         Self {
             options,
             selected: State::new(1),
-            last_action: State::new(String::new()),
-            is_presented: State::new(vec![false; VARIANTS.len()]),
+            on_action: Rc::new(on_action),
         }
     }
 
@@ -169,118 +176,245 @@ impl PlacementExample {
     pub fn selected_variant(&self) -> PlacementVariant {
         VARIANTS[self.selected.get().min(VARIANTS.len() - 1)]
     }
-
-    pub fn last_action(&self) -> String {
-        self.last_action.get()
-    }
-
-    pub fn record(&self, label: impl Into<String>) {
-        self.last_action.set(label.into());
-    }
-
-    /// Every placement, in the order the grid shows them.
-    pub fn placements(&self) -> Vec<PopoverPlacement> {
-        VARIANTS.iter().map(|variant| variant.placement).collect()
-    }
 }
 
-impl PlacementExample {
-    /// The presentation binding of the variant at `index`.
-    fn presentation(&self, index: usize) -> cove_core::Binding<bool> {
-        let read = self.is_presented.clone();
-        let write = self.is_presented.clone();
-        cove_core::Binding::new(
-            move || read.get().get(index).copied().unwrap_or(false),
-            move |value: bool| {
-                write.update(|states| {
-                    if let Some(slot) = states.get_mut(index) {
-                        *slot = value;
-                    }
-                });
-            },
+/// One preview trigger: a real `Popconfirm` bubble on the requested side.
+fn preview(
+    variant: PlacementVariant,
+    is_enabled: bool,
+    on_action: Rc<dyn Fn(String)>,
+) -> AnyView {
+    AnyView::new(Popconfirm::new(
+        variant.label,
+        None,
+        format!("{} placement", variant.label),
+        "The bubble stays on the requested side of its trigger.",
+        "OK",
+        "Cancel",
+        ButtonRole::Normal,
+        variant.placement,
+        is_enabled,
+        move || on_action(variant.label.to_owned()),
+    ))
+}
+
+fn side_pair(left: usize, right: usize, is_enabled: bool, on_action: Rc<dyn Fn(String)>) -> AnyView {
+    AnyView::new(BoxView::new(
+        FlexDirection::Row,
+        Align::Center,
+        Justify::SpaceBetween,
+        Wrap::NoWrap,
+        8.0,
+        AnyView::new(TupleView::new(vec![
+            preview(VARIANTS[left], is_enabled, on_action.clone()),
+            preview(VARIANTS[right], is_enabled, on_action),
+        ])),
+    ))
+}
+
+fn centred_row(indices: &[usize], is_enabled: bool, on_action: Rc<dyn Fn(String)>) -> AnyView {
+    AnyView::new(BoxView::new(
+        FlexDirection::Row,
+        Align::Center,
+        Justify::Center,
+        Wrap::NoWrap,
+        8.0,
+        AnyView::new(TupleView::new(
+            indices
+                .iter()
+                .map(|&index| preview(VARIANTS[index], is_enabled, on_action.clone()))
+                .collect(),
+        )),
+    ))
+}
+
+/// The full grid: top and bottom rows centred, side pairs pushed to the edges,
+/// and the middle row flanking an "Anchor" caption.
+fn grid(is_enabled: bool, on_action: Rc<dyn Fn(String)>) -> AnyView {
+    let anchor_caption = AnyView::new(
+        Text::new("Anchor")
+            .semantic_font(cove_ui_compose::theme::SemanticFontRef::caption())
+            .semantic_foreground(SemanticColorRef::on_surface_muted()),
+    );
+    AnyView::new(BoxView::new(
+        FlexDirection::Column,
+        Align::Stretch,
+        Justify::FlexStart,
+        Wrap::NoWrap,
+        8.0,
+        AnyView::new(TupleView::new(vec![
+            centred_row(&[0, 1, 2], is_enabled, on_action.clone()),
+            side_pair(3, 6, is_enabled, on_action.clone()),
+            AnyView::new(BoxView::new(
+                FlexDirection::Row,
+                Align::Center,
+                Justify::SpaceBetween,
+                Wrap::NoWrap,
+                8.0,
+                AnyView::new(TupleView::new(vec![
+                    preview(VARIANTS[4], is_enabled, on_action.clone()),
+                    anchor_caption,
+                    preview(VARIANTS[7], is_enabled, on_action.clone()),
+                ])),
+            )),
+            side_pair(5, 8, is_enabled, on_action.clone()),
+            centred_row(&[9, 10, 11], is_enabled, on_action),
+        ])),
+    ))
+}
+
+/// The compact fallback: a selector plus one mirrored trigger.
+fn compact(
+    selected: State<usize>,
+    is_enabled: bool,
+    on_action: Rc<dyn Fn(String)>,
+    width: f32,
+    scaler: &TextScaler,
+) -> AnyView {
+    let index = selected.get().min(VARIANTS.len() - 1);
+    let trigger_width = compact_trigger_width(width, scaler.factor());
+    let anchor = compact_anchor(VARIANTS[index].placement, width, trigger_width);
+    let options: Vec<SelectOption<usize>> = VARIANTS
+        .iter()
+        .enumerate()
+        .map(|(index, variant)| SelectOption::new(index, variant.label, true))
+        .collect();
+    let mirrored = AnyView::new(
+        BoxView::new(
+            FlexDirection::Row,
+            Align::Center,
+            anchor.justify,
+            Wrap::NoWrap,
+            0.0,
+            preview(VARIANTS[index], is_enabled, on_action),
         )
-    }
+        .frame(
+            Some(FrameDimension::Points(trigger_width)),
+            None,
+            None,
+            None,
+            None,
+            None,
+        )
+        .modifier(AbsolutePositionModifier::new(
+            Some(anchor.x),
+            Some(anchor.y),
+            None,
+            None,
+        )),
+    );
+    AnyView::new(BoxView::new(
+        FlexDirection::Column,
+        Align::Stretch,
+        Justify::FlexStart,
+        Wrap::NoWrap,
+        12.0,
+        AnyView::new(TupleView::new(vec![
+            AnyView::new(Select::new(selected.binding(), options).enabled(is_enabled)),
+            AnyView::new(
+                BoxView::new(
+                    FlexDirection::Column,
+                    Align::Stretch,
+                    Justify::FlexStart,
+                    Wrap::NoWrap,
+                    0.0,
+                    mirrored,
+                )
+                .frame(
+                    None,
+                    Some(FrameDimension::Points(180.0)),
+                    None,
+                    None,
+                    None,
+                    None,
+                ),
+            ),
+        ])),
+    ))
 }
 
 impl View for PlacementExample {
     fn body(&self, _cx: &Scope) -> AnyView {
-        let enabled = self.options.is_enabled;
-        let title = Text::new("Placement playground")
-            .semantic_font(cove_ui_compose::theme::SemanticFontRef::body_strong());
-        let detail = Text::new(
-            "Named sides stay on that side. The card and pointer are shared with Popover.",
-        )
-        .semantic_font(cove_ui_compose::theme::SemanticFontRef::caption())
-        .semantic_foreground(SemanticColorRef::on_surface_muted());
-
-        let record = self.last_action.clone();
-        let grid = VARIANTS
-            .iter()
-            .enumerate()
-            .map(|(index, variant)| {
-                let record = record.clone();
-                let content = AnyView::new(BoxView::new(
-                    FlexDirection::Column,
-                    Align::FlexStart,
-                    Justify::FlexStart,
-                    Wrap::NoWrap,
-                    4.0,
-                    AnyView::new(TupleView::new(vec![
-                        AnyView::new(Text::new(format!("{:?}", variant.placement))),
-                        AnyView::new(
-                            Text::new("The bubble keeps this side of the trigger.")
-                                .semantic_font(cove_ui_compose::theme::SemanticFontRef::caption())
-                                .semantic_foreground(SemanticColorRef::on_surface_muted()),
-                        ),
-                        AnyView::new(Button::title("Move to Projects", move || {
-                            record.set("Move to Projects".to_owned())
-                        })),
-                    ])),
-                ));
+        let is_enabled = self.options.is_enabled;
+        let selected = self.selected.clone();
+        let on_action = self.on_action.clone();
+        AnyView::new(ThemeReader::new(move |theme: &Theme| {
+            let selected = selected.clone();
+            let on_action = on_action.clone();
+            let region = AnyView::new(TextScalerReader::new(move |scaler| {
+                let selected = selected.clone();
+                let on_action = on_action.clone();
+                let height = 240.0_f32.max(scaler.scale(32.0) * 5.0 + 32.0);
                 AnyView::new(
-                    Popover::new(Text::new(variant.label), content)
-                        .is_presented(self.presentation(index))
-                        .placement(variant.placement)
-                        .width(240.0)
-                        .trigger_description(PopoverTriggerDescription {
-                            label: format!("{:?} placement", variant.placement),
-                            value: String::new(),
-                            help: None,
-                        })
-                        .enabled(enabled)
-                        .debug_name("placement-popover"),
+                    AnyView::new(ContainerSizeReader::new(move |size| {
+                        if shows_full_grid(size.width) {
+                            grid(is_enabled, on_action.clone())
+                        } else {
+                            compact(
+                                selected.clone(),
+                                is_enabled,
+                                on_action.clone(),
+                                size.width,
+                                &scaler,
+                            )
+                        }
+                    }))
+                    .frame(
+                        None,
+                        Some(FrameDimension::Points(height)),
+                        None,
+                        None,
+                        None,
+                        None,
+                    )
+                    .debug_name("popover-placement-preview"),
                 )
-            })
-            .collect();
-
-        let last = Text::new(format!("Last action: {}", self.last_action()))
-            .semantic_font(cove_ui_compose::theme::SemanticFontRef::caption())
-            .semantic_foreground(SemanticColorRef::on_surface_muted());
-
-        AnyView::new(StorySection::new(
-            "Placement playground",
-            "Named sides stay on that side. The card and pointer are shared with Popover.",
+            }));
             AnyView::new(BoxView::new(
-                FlexDirection::Column,
-                Align::Stretch,
-                Justify::FlexStart,
+                FlexDirection::Row,
+                Align::Center,
+                Justify::Center,
                 Wrap::NoWrap,
-                10.0,
-                AnyView::new(TupleView::new(vec![
-                    AnyView::new(title),
-                    AnyView::new(detail),
-                    AnyView::new(BoxView::new(
-                        FlexDirection::Row,
-                        Align::Center,
+                0.0,
+                AnyView::new(
+                    BoxView::new(
+                        FlexDirection::Column,
+                        Align::Stretch,
                         Justify::FlexStart,
-                        Wrap::Wrap,
-                        8.0,
-                        AnyView::new(TupleView::new(grid)),
-                    )),
-                    AnyView::new(last),
-                ])),
-            )),
-        ))
+                        Wrap::NoWrap,
+                        10.0,
+                        AnyView::new(TupleView::new(vec![
+                            AnyView::new(Text::new("Placement playground").semantic_font(
+                                cove_ui_compose::theme::SemanticFontRef::body_strong(),
+                            )),
+                            AnyView::new(
+                                Text::new(
+                                    "Named sides stay on that side. The card and pointer are shared with Popover.",
+                                )
+                                .semantic_font(
+                                    cove_ui_compose::theme::SemanticFontRef::caption(),
+                                )
+                                .semantic_foreground(SemanticColorRef::on_surface_muted()),
+                            ),
+                            region,
+                        ])),
+                    )
+                    .padding(14.0)
+                    .background_color(theme.colors.surface)
+                    .corner_radius(theme.radius.md)
+                    .border_color(theme.colors.border, 1.0)
+                    .frame(
+                        Some(FrameDimension::Percent(100.0)),
+                        None,
+                        None,
+                        None,
+                        Some(400.0),
+                        None,
+                    )
+                    .debug_name("placement-playground"),
+                ),
+            ))
+        }))
     }
 
     fn tag(&self) -> &'static str {
@@ -288,6 +422,6 @@ impl View for PlacementExample {
     }
 
     fn dynamic_properties(&self) -> Vec<cove_composition::DynamicField> {
-        cove_composition::dynamic_fields!(self; selected, last_action, is_presented)
+        cove_composition::dynamic_fields!(self; selected)
     }
 }

@@ -5,10 +5,12 @@
 use cove_composition::Scope;
 use cove_core::State;
 use cove_core::scene::{Align, FlexDirection, Justify, Wrap};
-use cove_ui_compose::modifiers::layout::PaddingExt;
-use cove_ui_compose::modifiers::style::SemanticStyleViewExt;
+use cove_ui_compose::modifiers::interaction::AccessibilityExt;
+use cove_ui_compose::modifiers::layout::{FlexExt, LayoutFrameExt, PaddingExt};
+use cove_ui_compose::modifiers::style::{AppearanceExt, SemanticStyleViewExt};
 use cove_ui_compose::primitives::controls::Button;
 use cove_ui_compose::primitives::controls::ButtonRole;
+use cove_ui_compose::primitives::controls::Checkbox;
 use cove_ui_compose::primitives::data::avatar::Avatar;
 use cove_ui_compose::primitives::media::Icon;
 use cove_ui_compose::primitives::media::ui_icon_catalog as icons;
@@ -18,9 +20,11 @@ use cove_ui_compose::primitives::overlays::menu::{MenuEntry, MenuItem, MenuSubme
 use cove_ui_compose::primitives::overlays::{ContextMenuExt, Popconfirm};
 use cove_ui_compose::primitives::text::Text;
 use cove_ui_compose::theme::tokens::SemanticColorRef;
+use cove_ui_compose::theme::{Theme, ThemeReader};
 use cove_ui_compose::{AnyView, BoxView, LayoutDebugExt, TupleView, View};
 
 use super::feedback::StorySection;
+use super::placement_example::PlacementExample;
 use crate::gallery_content::catalog::GalleryOptions;
 
 fn caption(text: impl Into<String>) -> AnyView {
@@ -37,27 +41,31 @@ fn body_strong(text: impl Into<String>) -> AnyView {
     )
 }
 
-/// A labelled row: leading icon, title + detail, trailing control.
+/// A labelled row: leading icon, title + detail, trailing control. The leading
+/// group flexes from a 200-pt basis so the control wraps below it when narrow.
 fn labelled_row(
     icon: Option<cove_imaging::BundleImageResource>,
+    icon_color: SemanticColorRef,
     title: impl Into<String>,
     detail: impl Into<String>,
     trailing: AnyView,
-    is_enabled: bool,
 ) -> AnyView {
     let mut leading: Vec<AnyView> = Vec::new();
     if let Some(icon) = icon {
-        leading.push(AnyView::new(Icon::new(icon, 14.0)));
+        leading.push(AnyView::new(Icon::with_semantic(icon, 12.0, icon_color)));
     }
-    leading.push(AnyView::new(BoxView::new(
-        FlexDirection::Column,
-        Align::Stretch,
-        Justify::FlexStart,
-        Wrap::NoWrap,
-        2.0,
-        AnyView::new(TupleView::new(vec![body_strong(title), caption(detail)])),
-    )));
-    let _ = is_enabled;
+    leading.push(AnyView::new(
+        AnyView::new(BoxView::new(
+            FlexDirection::Column,
+            Align::Stretch,
+            Justify::FlexStart,
+            Wrap::NoWrap,
+            2.0,
+            AnyView::new(TupleView::new(vec![body_strong(title), caption(detail)])),
+        ))
+        .flex_with(1.0, 1.0, Some(0.0))
+        .frame_min_width(0.0),
+    ));
     AnyView::new(BoxView::new(
         FlexDirection::Row,
         Align::Center,
@@ -65,14 +73,18 @@ fn labelled_row(
         Wrap::Wrap,
         12.0,
         AnyView::new(TupleView::new(vec![
-            AnyView::new(BoxView::new(
-                FlexDirection::Row,
-                Align::Center,
-                Justify::FlexStart,
-                Wrap::NoWrap,
-                10.0,
-                AnyView::new(TupleView::new(leading)),
-            )),
+            AnyView::new(
+                AnyView::new(BoxView::new(
+                    FlexDirection::Row,
+                    Align::Center,
+                    Justify::FlexStart,
+                    Wrap::NoWrap,
+                    10.0,
+                    AnyView::new(TupleView::new(leading)),
+                ))
+                .flex_with(1.0, 1.0, Some(200.0))
+                .frame_min_width(0.0),
+            ),
             trailing,
         ])),
     ))
@@ -109,53 +121,82 @@ impl View for PopconfirmStory {
         let enabled = self.options.is_enabled && self.enabled.get();
 
         let delete_sink = self.last_action.clone();
-        let delete = Popconfirm::new(
-            "Delete",
-            Some(icons::action::trash()),
-            "Delete “Archived mockup”?",
-            "This action cannot be undone. The project and its local history will be removed.",
-            "Delete",
-            "Cancel",
-            ButtonRole::Destructive,
-            PopoverPlacement::Bottom,
-            enabled,
-            move || delete_sink.set("Deleted".to_owned()),
-        );
-
         let archive_sink = self.last_action.clone();
-        let archive = Popconfirm::new(
-            "Archive",
-            Some(icons::file::archive()),
-            "Archive “Archived mockup”?",
-            "The project moves to the archive and can be restored later.",
-            "Archive",
-            "Cancel",
-            ButtonRole::Normal,
-            PopoverPlacement::Bottom,
-            enabled,
-            move || archive_sink.set("Archived".to_owned()),
-        );
+        let card = AnyView::new(ThemeReader::new(move |theme: &Theme| {
+            let delete_sink = delete_sink.clone();
+            let archive_sink = archive_sink.clone();
+            let delete = Popconfirm::new(
+                "Delete",
+                Some(icons::action::trash()),
+                "Delete “Archived mockup”?",
+                "This action cannot be undone. The project and its local history will be removed.",
+                "Delete",
+                "Cancel",
+                ButtonRole::Destructive,
+                PopoverPlacement::Bottom,
+                enabled,
+                move || delete_sink.set("Deleted".to_owned()),
+            );
+            let archive = Popconfirm::new(
+                "Archive",
+                Some(icons::file::archive()),
+                "Archive this project?",
+                "You can restore it from the archive at any time.",
+                "Archive",
+                "Cancel",
+                ButtonRole::Normal,
+                PopoverPlacement::Bottom,
+                enabled,
+                move || archive_sink.set("Archived".to_owned()),
+            );
+            AnyView::new(
+                BoxView::new(
+                    FlexDirection::Column,
+                    Align::Stretch,
+                    Justify::FlexStart,
+                    Wrap::NoWrap,
+                    10.0,
+                    AnyView::new(TupleView::new(vec![
+                        labelled_row(
+                            Some(icons::action::trash()),
+                            SemanticColorRef::error(),
+                            "Delete project",
+                            "This removes the project and its local history.",
+                            AnyView::new(delete),
+                        ),
+                        labelled_row(
+                            Some(icons::file::archive()),
+                            SemanticColorRef::on_surface_muted(),
+                            "Archive project",
+                            "Keeps the project; it can be restored later.",
+                            AnyView::new(archive),
+                        ),
+                    ])),
+                )
+                .padding(14.0)
+                .background_color(theme.colors.surface)
+                .border_color(theme.colors.border, 1.0)
+                .corner_radius(theme.radius.md),
+            )
+        }));
 
-        let rows = AnyView::new(BoxView::new(
-            FlexDirection::Column,
-            Align::Stretch,
+        let enabled_binding = self.enabled.clone();
+        let controls = AnyView::new(BoxView::new(
+            FlexDirection::Row,
+            Align::Center,
             Justify::FlexStart,
-            Wrap::NoWrap,
-            10.0,
+            Wrap::Wrap,
+            8.0,
             AnyView::new(TupleView::new(vec![
-                labelled_row(
-                    Some(icons::action::trash()),
-                    "Delete project",
-                    "This removes the project and its local history.",
-                    AnyView::new(delete),
-                    enabled,
+                AnyView::new(
+                    Checkbox::from_boolean(enabled_binding.binding())
+                        .enabled(self.options.is_enabled)
+                        .accessibility_label("Enable confirmation actions"),
                 ),
-                labelled_row(
-                    Some(icons::file::archive()),
-                    "Archive project",
-                    "Hide it from the active list without deleting anything.",
-                    AnyView::new(archive),
-                    enabled,
+                caption("Enabled"),
+                AnyView::new(
+                    caption(format!("Last action: {}", self.last_action.get()))
+                        .debug_name("popconfirm-last-action"),
                 ),
                 AnyView::new(
                     BoxView::new(
@@ -163,21 +204,30 @@ impl View for PopconfirmStory {
                         Align::Center,
                         Justify::FlexStart,
                         Wrap::NoWrap,
-                        10.0,
-                        AnyView::new(TupleView::new(vec![
-                            caption("Last action"),
-                            body_strong(self.last_action.get()),
-                        ])),
+                        0.0,
+                        AnyView::new(TupleView::new(Vec::new())),
                     )
-                    .debug_name("popconfirm-last-action"),
+                    .flex_with(1.0, 1.0, None),
                 ),
             ])),
         ));
 
+        let placement_sink = self.last_action.clone();
+        let placement = AnyView::new(PlacementExample::new(self.options.clone(), move |label| {
+            placement_sink.set(label);
+        }));
+
         AnyView::new(StorySection::new(
             "Anchored confirmation",
             "The trigger is a real button; the popover owns focus, Escape and outside dismissal. Destructive actions require the explicit red confirm button.",
-            rows,
+            AnyView::new(TupleView::new(vec![
+                card,
+                controls,
+                caption(
+                    "Cancel or Escape closes the bubble without invoking the action. The destructive trigger is styled separately from the confirm button.",
+                ),
+                placement,
+            ])),
         ))
     }
 

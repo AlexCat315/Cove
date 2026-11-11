@@ -361,9 +361,9 @@ fn the_sidebar_lays_its_slots_and_rows_on_one_column() {
 
 #[test]
 fn every_placement_trigger_stays_inside_the_story() {
-    // The story now mounts one real `Popover` per placement, so the Swift
+    // The playground mounts one real `Popconfirm` per placement, so the Swift
     // contract is reachable: twelve labelled triggers, every one of them inside
-    // the story's box, and pressing one reveals its bubble.
+    // the playground card, and pressing one reveals its bubble.
     use cove_examples::gallery_content::catalog::GalleryOptions;
     use cove_examples::gallery_content::stories::placement_example::{PlacementExample, VARIANTS};
     use cove_ui_compose::modifiers::layout::{FrameDimension, LayoutFrameExt};
@@ -374,7 +374,7 @@ fn every_placement_trigger_stays_inside_the_story() {
     // environment itself; wrapping it in `with_scheduler` again deadlocks.
     for width in [390.0f32, 720.0] {
         for scale in [1.0f32, 2.0] {
-            let story = std::rc::Rc::new(PlacementExample::new(GalleryOptions::default()));
+            let story = std::rc::Rc::new(PlacementExample::new(GalleryOptions::default(), |_| {}));
             let mounted = story.clone();
             let section_width = width;
             GalleryScene::run(
@@ -401,24 +401,19 @@ fn every_placement_trigger_stays_inside_the_story() {
                         .layout_snapshot()
                         .into_iter()
                         .find(|entry| {
-                            entry
-                                .debug_name
-                                .as_deref()
-                                .is_some_and(|name| name.starts_with("story-section-"))
+                            entry.debug_name.as_deref() == Some("placement-playground")
                         })
                         .unwrap_or_else(|| {
-                            panic!("no story section at width {width} scale {scale}")
+                            panic!("no playground card at width {width} scale {scale}")
                         });
                     let section_frame = section.absolute_frame;
                     assert!(
                         section_frame.width > 0.0 && section_frame.height > 0.0,
-                        "the section has a real box at width {width}"
+                        "the card has a real box at width {width}"
                     );
 
-                    let labels: Vec<String> = VARIANTS
-                        .iter()
-                        .map(|variant| format!("{:?} placement", variant.placement))
-                        .collect();
+                    let labels: Vec<String> =
+                        VARIANTS.iter().map(|variant| variant.label.to_owned()).collect();
                     let debug_labels: Vec<String> = scene
                         .all(|node| node.accessibility().is_some())
                         .into_iter()
@@ -448,7 +443,7 @@ fn every_placement_trigger_stays_inside_the_story() {
                             frame.x >= section_frame.x - 1.0
                                 && frame.x + frame.width
                                     <= section_frame.x + section_frame.width + 1.0,
-                            "the trigger {frame:?} escapes its section {section_frame:?} \
+                            "the trigger {frame:?} escapes its card {section_frame:?} \
                              at width {width} scale {scale}"
                         );
                     }
@@ -465,6 +460,63 @@ impl cove_composition::View for PlacementStory {
     fn body(&self, cx: &Scope) -> AnyView {
         cove_composition::View::body(self.0.as_ref(), cx)
     }
+}
+
+/// Shares the popconfirm story's state with the test body.
+struct PopconfirmStoryHandle(std::rc::Rc<cove_examples::gallery_content::stories::PopconfirmStory>);
+
+impl cove_composition::View for PopconfirmStoryHandle {
+    fn body(&self, cx: &Scope) -> AnyView {
+        cove_composition::View::body(self.0.as_ref(), cx)
+    }
+}
+
+#[test]
+fn confirming_a_placement_bubble_records_its_label() {
+    // The playground reports through the page's shared "Last action" readout:
+    // open the TL bubble, press OK, and the page records "TL".
+    use cove_examples::gallery_content::catalog::GalleryOptions;
+    use cove_examples::gallery_content::stories::PopconfirmStory;
+
+    let story = std::rc::Rc::new(PopconfirmStory::new(GalleryOptions::default()));
+    let mounted = story.clone();
+    GalleryScene::run(
+        1280.0,
+        1400.0,
+        move |_| {
+            AnyView::new(cove_ui_compose::primitives::overlays::portal::LayerRoot::new(
+                AnyView::new(PopconfirmStoryHandle(mounted)),
+            ))
+        },
+        |scene| {
+            scene.settle_n(8);
+            let trigger = scene
+                .first(|node| {
+                    node.accessibility().is_some_and(|semantics| {
+                        semantics.role == cove_core::scene::AccessibilityRole::Button
+                    }) && cove_core::scene::AccessibilityTree::resolved_label(node) == "TL"
+                })
+                .expect("the TL placement trigger is mounted");
+            scene.click(&trigger);
+            scene.settle_n(4);
+
+            let ok = scene
+                .first(|node| {
+                    node.accessibility().is_some_and(|semantics| {
+                        semantics.role == cove_core::scene::AccessibilityRole::Button
+                    }) && cove_core::scene::AccessibilityTree::resolved_label(node) == "OK"
+                })
+                .expect("the TL bubble offers its OK action");
+            scene.click(&ok);
+            scene.settle_n(4);
+
+            assert_eq!(
+                story.last_action(),
+                "TL",
+                "confirming the bubble reports the placement label to the page"
+            );
+        },
+    );
 }
 
 #[test]
