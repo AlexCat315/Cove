@@ -25,7 +25,7 @@ struct Parent(Signal<u32>);
 impl View for Parent {
     fn body(&self, _: &Scope) -> AnyView {
         self.0.track();
-        application().root
+        application().content()
     }
 }
 

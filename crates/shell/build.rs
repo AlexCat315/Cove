@@ -56,6 +56,14 @@ fn main() {
         if assert_main_thread {
             apple.define("COVE_ASSERT_MAIN_THREAD", None);
         }
+        // apple.m uses `UTType.folder` / `UTType.item` /
+        // `initForOpeningContentTypes:asCopy:` which require the iOS 14 SDK
+        // availability. Without an explicit floor the cc build defaults below
+        // 14.0 and fails to compile apple.m; only pin it when the caller has
+        // not already set a deployment target.
+        if os == "ios" && std::env::var_os("IPHONEOS_DEPLOYMENT_TARGET").is_none() {
+            apple.flag("-miphoneos-version-min=14.0");
+        }
         apple.compile("cove_shell_apple");
         for framework in [
             "Foundation",

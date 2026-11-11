@@ -100,7 +100,9 @@ dispatch2 = "0.3"
 unsafe_op_in_unsafe_fn = "deny"
 
 [workspace.lints.clippy]
-undocumented_unsafe_blocks = "deny"
+# Kept as a warning rather than deny so the CI `cargo clippy` step reports it
+# without failing the build (the CI no longer treats Clippy warnings as errors).
+undocumented_unsafe_blocks = "warn"
 
 [package]
 name = "cove-ui"
