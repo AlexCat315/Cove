@@ -33,7 +33,7 @@ impl RootContent {
             Some(factory) => {
                 let launch = factory();
                 Self::Application {
-                    root: launch.content(),
+                    root: launch.root,
                     checkpoint: launch.checkpoint,
                 }
             }

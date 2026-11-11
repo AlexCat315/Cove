@@ -101,6 +101,7 @@ impl GalleryView {
         self.page.get()
     }
 
+    #[cfg(target_os = "windows")]
     pub fn with_menu_bar(mut self, menu_bar: impl View + 'static) -> Self {
         self.menu_bar = Some(AnyView::new(menu_bar));
         self
@@ -363,41 +364,42 @@ impl GalleryView {
             .tooltip(theme_tip)
             .debug_name("gallery-theme"),
         );
-
         // The divider toggle reads the published environment, so the launch
         // flag and a runtime click share one source of truth.
+        let shows_divider = self.menu_bar.is_some();
         erased(AnyView::new(cove_ui_compose::adaptive::SurfaceReader::new(
             move |environment: &Environment| {
-                let separated = environment.title_bar_divider;
-                let divider = Button::icon_default(
-                    ButtonIconSource::resource(if separated {
-                        icons::layout::rows_2()
+                let mut buttons = vec![theme.clone()];
+                if shows_divider {
+                    let separated = environment.title_bar_divider;
+                    let divider = Button::icon_default(
+                        ButtonIconSource::resource(if separated {
+                            icons::layout::rows_2()
+                        } else {
+                            icons::layout::panel_top()
+                        }),
+                        move || {
+                            if let Some(handle) = AppDisplayHandleHolder::current() {
+                                handle.set_title_bar_divider(!separated);
+                            }
+                        },
+                    )
+                    .selected(separated)
+                    .tooltip(if separated {
+                        "Show a seamless title bar"
                     } else {
-                        icons::layout::panel_top()
-                    }),
-                    move || {
-                        if let Some(handle) = AppDisplayHandleHolder::current() {
-                            handle.set_title_bar_divider(!separated);
-                        }
-                    },
-                )
-                .selected(separated)
-                .tooltip(if separated {
-                    "Show a seamless title bar"
-                } else {
-                    "Show a title bar divider"
-                })
-                .debug_name("gallery-title-bar-divider");
+                        "Show a title bar divider"
+                    })
+                    .debug_name("gallery-title-bar-divider");
+                    buttons.push(AnyView::new(divider));
+                }
                 AnyView::new(cove_ui_compose::BoxView::new(
                     FlexDirection::Row,
                     Align::Center,
                     Justify::FlexStart,
                     Wrap::NoWrap,
                     8.0,
-                    AnyView::new(cove_composition::TupleView::new(vec![
-                        theme.clone(),
-                        AnyView::new(divider),
-                    ])),
+                    AnyView::new(cove_composition::TupleView::new(buttons)),
                 ))
             },
         )))

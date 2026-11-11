@@ -30,6 +30,7 @@ pub enum BuiltinButtonChromeKind {
     Primary,
     Secondary,
     Ghost,
+    MenuBarItem,
     Destructive,
     Toggle { min_width: f32, height: f32 },
 }
@@ -121,7 +122,7 @@ impl BuiltinButtonChromeKind {
         };
         let line_height = theme.typography.label.line_height;
         match self {
-            Self::Primary | Self::Secondary | Self::Ghost | Self::Destructive => {
+            Self::Primary | Self::Secondary | Self::Ghost | Self::MenuBarItem | Self::Destructive => {
                 BuiltinButtonChromeMetrics {
                     height,
                     min_width: if is_icon_only { Some(height) } else { None },
@@ -133,8 +134,11 @@ impl BuiltinButtonChromeKind {
                         size.horizontal_padding()
                     }
                     .max(if is_icon_only { 2.0 } else { 0.0 }),
-                    // Push buttons are capsules; icon-only buttons become circles.
-                    radius: height * 0.5,
+                    radius: if self == Self::MenuBarItem {
+                        theme.radius.sm.min(4.0)
+                    } else {
+                        height * 0.5
+                    },
                     vertical_padding: ((height - line_height) / if touch { 4.0 } else { 2.0 })
                         .max(if touch { 4.0 } else { 2.0 }),
                 }
@@ -410,6 +414,21 @@ fn builtin_button_chrome_values(
                 clear
             }
         }
+        BuiltinButtonChromeKind::MenuBarItem => {
+            if pressed || state.is_selected {
+                theme
+                    .colors
+                    .state_layer_pressed
+                    .composited(theme.colors.on_surface.multiplied_alpha(0.06))
+            } else if hovered {
+                theme
+                    .colors
+                    .state_layer_hover
+                    .composited(theme.colors.on_surface.multiplied_alpha(0.05))
+            } else {
+                clear
+            }
+        }
         BuiltinButtonChromeKind::Destructive => {
             let error = theme.colors.error;
             if !state.is_enabled {
@@ -493,4 +512,38 @@ fn nearest_button_host_ancestor(node: &Node) -> Option<Node> {
         current = candidate.parent();
     }
     None
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn menu_bar_item_retains_highlight_while_open() {
+        let chrome = Node::new();
+        let button = Node::new();
+        let theme = theme_for_node(&chrome);
+        let kind = BuiltinButtonChromeKind::MenuBarItem;
+        let mut state = BuiltinButtonChromeState {
+            kind,
+            is_enabled: true,
+            is_selected: false,
+            is_icon_only: false,
+            metrics: kind.metrics(&theme, ControlSize::Regular, false, InputCapabilities::POINTER),
+        };
+        let idle = builtin_button_chrome_values(state, &chrome, Some(&button));
+        assert_eq!(idle.background, Color::CLEAR);
+        assert_eq!(idle.radius, 4.0);
+
+        button.set_attachment(BUTTON_HOST_HOVERED_KEY, true);
+        let hovered = builtin_button_chrome_values(state, &chrome, Some(&button));
+        assert!(hovered.background.a > theme.colors.state_layer_hover.a);
+        assert_eq!(hovered.radius, idle.radius);
+
+        button.set_attachment(BUTTON_HOST_HOVERED_KEY, false);
+        state.is_selected = true;
+        let open = builtin_button_chrome_values(state, &chrome, Some(&button));
+        assert!(open.background.a > hovered.background.a);
+        assert_eq!(open.radius, idle.radius);
+    }
 }

@@ -236,7 +236,7 @@ bool cove_shell_apple_backdrop(void *raw,int kind) {COVE_ASSERT_MAIN();
     /* The material reaches the top edge: content runs under a transparent
        title bar, and the bar's height is reported as the top safe area so the
        UI starts below it while the system keeps dragging and the title. */
-    window.styleMask|=NSWindowStyleMaskFullSizeContentView;window.titlebarAppearsTransparent=YES;window.titleVisibility=NSWindowTitleHidden;
+    window.styleMask|=NSWindowStyleMaskFullSizeContentView;window.titlebarAppearsTransparent=YES;
     /* The frame is unchanged, so AppKit posts no resize; SDL learns the taller
        content area from an explicit one. */
     [NSNotificationCenter.defaultCenter postNotificationName:NSWindowDidResizeNotification object:window];

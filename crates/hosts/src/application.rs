@@ -23,6 +23,7 @@ pub struct ApplicationLaunch {
 
 enum LaunchMenuBar {
     Native(crate::NativeMenuBar),
+    #[cfg(target_os = "windows")]
     Immersive(Vec<crate::NativeMenu>),
 }
 
@@ -66,16 +67,30 @@ impl ApplicationLaunch {
         self
     }
 
-    /// Draws the menu in Cove's client title bar, above the application content.
-    pub fn immersive_menu_bar(mut self, menus: Vec<crate::NativeMenu>) -> Self {
-        self.menu_bar = Some(LaunchMenuBar::Immersive(menus));
-        self
+    /// Presents the same menus in the Cove title bar on Windows or in the
+    /// system application menu bar on hosts that provide one.
+    pub fn menu_bar(self, menus: Vec<crate::NativeMenu>) -> Self {
+        #[cfg(target_os = "windows")]
+        {
+            let mut launch = self;
+            launch.menu_bar = Some(LaunchMenuBar::Immersive(menus));
+            launch
+        }
+        #[cfg(not(target_os = "windows"))]
+        {
+            self.native_menu_bar(menus)
+        }
     }
 
-    /// Resolves the root for hosts that install the application in an existing
-    /// surface, including Android and the browser.
+    /// Uses the platform presentation of `menu_bar`.
+    pub fn immersive_menu_bar(self, menus: Vec<crate::NativeMenu>) -> Self {
+        self.menu_bar(menus)
+    }
+
+    /// Resolves the root for the native window host.
     pub fn content(&self) -> AnyView {
         match &self.menu_bar {
+            #[cfg(target_os = "windows")]
             Some(LaunchMenuBar::Immersive(menus)) => crate::ImmersiveMenuBar::new(menus.clone())
                 .title(&self.configuration.window.title)
                 .with_content(self.root.clone()),
@@ -122,13 +137,12 @@ impl ApplicationLaunch {
                     );
                 }
             }
-            Some(LaunchMenuBar::Immersive(_))
-                if crate::desktop::window::chrome::HAS_DESKTOP_CHROME =>
-            {
+            #[cfg(target_os = "windows")]
+            Some(LaunchMenuBar::Immersive(_)) => {
                 self.configuration.window.title_bar_style =
                     crate::desktop::application::configuration::AppWindowTitleBarStyle::HiddenInset;
             }
-            _ => {}
+            None => {}
         }
         Application::run(self.configuration, None, root, callbacks, self.checkpoint)
     }

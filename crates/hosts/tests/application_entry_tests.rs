@@ -92,15 +92,13 @@ fn android_preserves_configuration_and_checkpoint_ownership() {
 }
 
 #[test]
-fn hosted_content_mounts_the_configured_immersive_caption_and_menu() {
+fn shared_menu_uses_window_chrome_only_on_windows() {
     let launch = ApplicationLaunch::new(EmptyView)
-        .immersive_menu_bar(vec![NativeMenu::named("Navigate").action("Home", || {})])
+        .menu_bar(vec![NativeMenu::named("Navigate").action("Home", || {})])
         .configure(|config| config.window.title = "Configured caption".into());
-    let mut content = DeclaredApplicationContent(launch);
-    let root = content.root(SceneLaunchMode::Application, 1.0).unwrap();
     let tree = Rc::new(RefCell::new(NodeTree::new()));
     let graph = Rc::new(ViewGraph::new(tree.clone(), Rc::new(Recomposer::new())));
-    graph.install_view(root, Default::default());
+    graph.install_view(launch.content(), Default::default());
     graph.recomposer.commit_all();
     graph.compute_layout(450.0, 300.0);
 
@@ -118,17 +116,34 @@ fn hosted_content_mounts_the_configured_immersive_caption_and_menu() {
     }
 
     let root = tree.borrow().root().unwrap();
-    let menu = labelled(&root, "Navigate").expect("the menu is mounted");
-    let caption = labelled(&root, "Configured caption").expect("the caption is mounted");
-    assert!(
-        !caption.is_hit_testable(),
-        "the caption preserves title-bar drag"
+    if cfg!(target_os = "windows") {
+        let menu = labelled(&root, "Navigate").expect("the menu is mounted");
+        let caption = labelled(&root, "Configured caption").expect("the caption is mounted");
+        assert!(
+            !caption.is_hit_testable(),
+            "the caption preserves title-bar drag"
+        );
+        let menu = menu.absolute_frame();
+        let caption = caption.absolute_frame();
+        assert!(
+            menu.x + menu.width <= caption.x,
+            "the caption clears the menu"
+        );
+        assert!(caption.x + caption.width <= 450.0);
+    } else {
+        assert!(labelled(&root, "Navigate").is_none());
+        assert!(labelled(&root, "Configured caption").is_none());
+    }
+
+    let mut hosted = DeclaredApplicationContent(launch);
+    graph.install_view(
+        hosted.root(SceneLaunchMode::Application, 1.0).unwrap(),
+        Default::default(),
     );
-    let menu = menu.absolute_frame();
-    let caption = caption.absolute_frame();
+    graph.recomposer.commit_all();
+    let root = tree.borrow().root().unwrap();
     assert!(
-        menu.x + menu.width <= caption.x,
-        "the caption clears the menu"
+        labelled(&root, "Navigate").is_none(),
+        "Android uses the host's chrome"
     );
-    assert!(caption.x + caption.width <= 450.0);
 }

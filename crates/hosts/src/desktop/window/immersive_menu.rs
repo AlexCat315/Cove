@@ -8,6 +8,7 @@ use cove_ui_compose::primitives::overlays::ShortcutHost;
 use cove_ui_compose::primitives::overlays::menu::{MenuEntry, MenuItem, MenuSubmenu};
 use cove_ui_compose::primitives::overlays::portal::LayerRoot;
 use cove_ui_compose::primitives::text::Text;
+use cove_ui_compose::theme::styles::buttons::MenuBarItemButtonStyle;
 
 use super::{
     ImmersiveWindowTitleBar, NativeMenu, NativeMenuAction, NativeMenuItem, NativeMenuKeyModifiers,
@@ -67,7 +68,7 @@ impl View for ImmersiveMenuBar {
                     entries(&menu.items, &mut 1),
                     AnyView::new(Text::new(&title).truncated()),
                 )
-                .ghost()
+                .trigger_style(MenuBarItemButtonStyle)
                 .composed()
                 .accessibility_label(title),
             )

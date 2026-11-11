@@ -36,7 +36,7 @@ pub enum ImmersiveWindowControlStyle {
 
 impl ImmersiveWindowControlStyle {
     /// macOS presents native traffic lights. Other desktops draw controls in
-    /// the client area. Mobile and browser hosts use the bar as in-app UI.
+    /// the client area. Mobile and browser hosts have no desktop caption controls.
     pub fn automatic() -> Self {
         if !HAS_DESKTOP_CHROME {
             Self::Hidden

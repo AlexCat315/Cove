@@ -276,8 +276,7 @@ pub struct Sdl3Shell {
     default_options: WindowOptions,
 }
 impl Sdl3Shell {
-    /// Whether the desktop can host the platform's native menu bar. Only
-    /// AppKit has one; desktop windows draw their own single-row menu bar.
+    /// Whether the shell implements the host's native application menu bar.
     pub fn native_menu_bar_supported() -> bool {
         crate::native_menu_bar::NativeMenuBarInstaller::is_supported()
     }

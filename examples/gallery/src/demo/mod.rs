@@ -46,6 +46,8 @@ pub struct ShowcaseLaunch {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ShowcaseMenuBar {
     None,
+    /// The host's system application menu bar, when available.
+    Native,
     /// Single row; the window material runs through the bar.
     Immersive,
     /// Same row; a tinted surface and a hairline separate it from the content.
@@ -54,15 +56,17 @@ pub enum ShowcaseMenuBar {
 
 impl Default for ShowcaseMenuBar {
     fn default() -> Self {
-        if cfg!(any(
-            target_os = "windows",
-            target_os = "macos",
-            target_os = "linux"
-        )) {
+        if cfg!(target_os = "windows") {
             Self::Immersive
         } else {
-            Self::None
+            Self::Native
         }
+    }
+}
+
+impl ShowcaseMenuBar {
+    fn uses_immersive_title_bar(self) -> bool {
+        cfg!(target_os = "windows") && matches!(self, Self::Immersive | Self::Separated)
     }
 }
 
@@ -178,10 +182,10 @@ mod checks {
         assert!(!launch.rtl);
         assert_eq!(launch.input, ShowcaseInput::Inherited);
         assert_eq!(launch.text_scale, 1.0);
-        #[cfg(any(target_os = "windows", target_os = "macos", target_os = "linux"))]
+        #[cfg(target_os = "windows")]
         assert_eq!(launch.menu_bar, ShowcaseMenuBar::Immersive);
-        #[cfg(not(any(target_os = "windows", target_os = "macos", target_os = "linux")))]
-        assert_eq!(launch.menu_bar, ShowcaseMenuBar::None);
+        #[cfg(not(target_os = "windows"))]
+        assert_eq!(launch.menu_bar, ShowcaseMenuBar::Native);
         assert!(!launch.continuous_frames());
     }
 

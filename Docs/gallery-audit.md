@@ -4,7 +4,16 @@
 
 Swift 源码逐页对照见文末《Swift 源码对照（逐页差异清单）》。
 
-## 2026-11-11 沉浸式标题栏
+## 2026-11-11 共享菜单与平台呈现
+
+| 页面或组件 | 实现与自动化验收 | 原生验收 | Rust 文档 |
+| --- | --- | --- | --- |
+| Gallery / 窗口菜单栏 | Navigate 的菜单项、快捷键和导航回调只定义一次。Windows 在 Cove 标题栏呈现，macOS 通过 AppKit 安装到系统应用菜单栏。原生快照测试覆盖两项动作及快捷键。Windows 顶层触发按钮使用 4pt 圆角，展开态底色比悬停更明显。 | Windows DevTools 验证 Navigate → Calendar。760pt 窗口截图目检悬停和展开底色，移开指针后展开底色仍可见。macOS 菜单栏实机待验收。 | [窗口菜单栏](../Website/src/content/components/window-menu-bar.md) · [Gallery](../Website/src/content/components/gallery.md) |
+| Gallery / 侧栏 | 标题栏分割线切换只随 Windows 自绘栏挂载。Linux、移动端和 Web 保留侧栏导航及宿主框架。 | 结构测试检查未挂载自绘栏时的侧栏布局。 | [Gallery](../Website/src/content/components/gallery.md) |
+
+## 2026-11-11 沉浸式标题栏历史验收
+
+此前移动端和 Web 的应用内菜单已由上方平台呈现策略取代。
 
 | 页面或组件 | 实现与自动化验收 | Windows 原生视觉与交互验收 | Rust 文档 |
 | --- | --- | --- | --- |

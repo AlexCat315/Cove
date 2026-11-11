@@ -4,7 +4,7 @@ Gallery 展示 Cove 的 Rust 组件。组件页的 Size、Scale、Disabled 和 R
 
 在 Windows 上运行 `cargo run -p cove-examples --bin gallery` 打开 Gallery。Windows 默认使用 Direct3D 12，设备初始化失败时尝试 Vulkan。传入 `-- --component dashboard` 或 `-- --component calendar` 可直接打开对应页面。
 
-桌面 Gallery 默认使用无分割的沉浸式菜单。Navigate、窗口标题、拖动区和窗口按钮在同一行。用 `-- --menu-bar separated` 添加顶部底色和分割线，也可在侧栏底部切换。`-- --menu-bar none` 关闭整条 Cove 顶部栏，使用系统窗口框架。Navigate 可切换 Dashboard 和 Calendar。Rust 用法见 [窗口菜单栏](/docs/window-menu-bar)。
+Navigate 的 Dashboard 和 Calendar 共用一份菜单定义。Windows 在 Cove 标题栏显示 Navigate，可用 `-- --menu-bar separated` 或侧栏底部按钮切换分割线。macOS 在屏幕顶部的系统菜单栏显示同一个 Navigate。Linux、移动端和 Web 可从侧栏访问这两个页面。`-- --menu-bar none` 关闭 Gallery 提供的菜单。Rust 用法见 [窗口菜单栏](/docs/window-menu-bar)。
 
 Dashboard 的 Asset import 卡片用 [Badge](/docs/badge) 显示当前状态。点击 Pause 或 Resume 暂停或继续导入，Advance 推进进度，完成后显示 Complete。
 

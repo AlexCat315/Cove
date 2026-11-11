@@ -1,7 +1,7 @@
 //! Translation of Desktop/Sources/CoveUI/Window/NativeMenu.swift.
 //!
-//! macOS installs an application `NSMenu`. Other desktop platforms draw a
-//! single-row menu bar inside the window (see `window::immersive_menu`).
+//! macOS installs an application `NSMenu`. Windows uses the same authored menu
+//! model in its client title bar.
 
 use cove_platform::NativeShortcut;
 

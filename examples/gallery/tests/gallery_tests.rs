@@ -352,15 +352,9 @@ fn the_sidebar_lays_its_slots_and_rows_on_one_column() {
                 "the navigation keeps its column beside the page"
             );
             let theme = scene.require_named("gallery-theme").absolute_frame();
-            let divider = scene
-                .require_named("gallery-title-bar-divider")
-                .absolute_frame();
             assert_eq!(theme.x, 10.0, "the footer shares the column's left inset");
             assert_eq!(theme.width, theme.height, "theme is an icon button");
-            assert_eq!(divider.width, divider.height, "divider is an icon button");
-            assert_eq!(theme.y, divider.y, "both controls share the footer row");
-            assert!(theme.x + theme.width <= divider.x);
-            assert!(divider.x + divider.width <= navigation.x + navigation.width);
+            assert!(scene.named("gallery-title-bar-divider").is_none());
         },
     );
 }

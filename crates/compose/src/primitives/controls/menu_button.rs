@@ -17,7 +17,9 @@ use crate::primitives::overlays::modal::uses_sheet;
 use crate::primitives::overlays::popover::{Popover, PopoverTriggerDescription};
 use crate::primitives::text::Text;
 use crate::theme::SemanticFontRef;
-use crate::theme::styles::buttons::{ButtonStyleViewExt, SecondaryButtonStyle};
+use crate::theme::styles::buttons::{
+    AnyButtonStyle, ButtonStyle, ButtonStyleViewExt, GhostButtonStyle, SecondaryButtonStyle,
+};
 use crate::{AnyView, BoxView, PrimitiveView, TupleView, View, ViewExt, impl_primitive_view};
 
 /// A button that opens a menu.
@@ -34,6 +36,7 @@ pub struct MenuButton<Label: View + Clone + 'static> {
     pub is_borderless: bool,
     pub prefers_native_menu: bool,
     pub label: Label,
+    pub trigger_style: Option<AnyButtonStyle>,
     /// Told when the menu opens and closes, for owners that must stay in place
     /// while it is shown (an auto-hiding control bar).
     pub on_open_change: Option<std::rc::Rc<dyn Fn(bool)>>,
@@ -62,6 +65,7 @@ impl<Label: View + Clone + 'static> MenuButton<Label> {
             is_borderless: false,
             prefers_native_menu: true,
             label,
+            trigger_style: None,
             on_open_change: None,
         }
     }
@@ -94,6 +98,22 @@ impl<Label: View + Clone + 'static> MenuButton<Label> {
     pub fn tooltip(mut self, tooltip: impl Into<String>) -> Self {
         self.tooltip = Some(tooltip.into());
         self
+    }
+
+    /// Styles the trigger button for either menu presentation.
+    pub fn trigger_style(mut self, style: impl ButtonStyle + 'static) -> Self {
+        self.trigger_style = Some(AnyButtonStyle::new(style));
+        self
+    }
+
+    fn resolved_trigger_style(&self) -> AnyButtonStyle {
+        self.trigger_style.clone().unwrap_or_else(|| {
+            if self.is_borderless {
+                AnyButtonStyle::new(GhostButtonStyle)
+            } else {
+                AnyButtonStyle::new(SecondaryButtonStyle)
+            }
+        })
     }
 
     /// The menu the popover presents; activating an item closes it.
@@ -152,13 +172,7 @@ impl<Label: View + Clone + 'static> MenuButton<Label> {
             false,
             self.tooltip.clone(),
         )
-        .button_style_any(if self.is_borderless {
-            crate::theme::styles::buttons::button_style::AnyButtonStyle::new(
-                crate::theme::styles::buttons::GhostButtonStyle,
-            )
-        } else {
-            crate::theme::styles::buttons::button_style::AnyButtonStyle::new(SecondaryButtonStyle)
-        })
+        .button_style_any(self.resolved_trigger_style())
         .capture_frame(frame);
         match &self.accessibility_label {
             Some(label) => AnyView::new(
@@ -185,11 +199,7 @@ impl<Label: View + Clone + 'static> MenuButton<Label> {
             .is_presented(binding)
             .enabled(self.is_enabled)
             .placement(self.placement);
-        popover = if self.is_borderless {
-            popover.trigger_style(crate::theme::styles::buttons::GhostButtonStyle)
-        } else {
-            popover.trigger_style(SecondaryButtonStyle)
-        };
+        popover.trigger_style = Some(self.resolved_trigger_style());
         if let Some(width) = self.width {
             popover = popover.width(width);
         }

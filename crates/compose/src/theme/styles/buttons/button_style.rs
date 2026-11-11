@@ -10,7 +10,7 @@ use crate::theme::{ControlSize, Theme};
 use crate::{AnyView, ModifiedContent, View, ViewExt};
 
 use super::destructive_button_style::DestructiveButtonStyle;
-use super::ghost_button_style::GhostButtonStyle;
+use super::ghost_button_style::{GhostButtonStyle, MenuBarItemButtonStyle};
 use super::plain_button_style::PlainButtonStyle;
 use super::primary_button_style::PrimaryButtonStyle;
 use super::secondary_button_style::SecondaryButtonStyle;
@@ -194,6 +194,7 @@ fn is_node_driven_interaction_style<S: ButtonStyle + 'static>() -> bool {
         || id == TypeId::of::<PrimaryButtonStyle>()
         || id == TypeId::of::<SecondaryButtonStyle>()
         || id == TypeId::of::<GhostButtonStyle>()
+        || id == TypeId::of::<MenuBarItemButtonStyle>()
         || id == TypeId::of::<DestructiveButtonStyle>()
         || id == TypeId::of::<ToggleButtonStyle>()
 }

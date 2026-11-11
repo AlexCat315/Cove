@@ -14,7 +14,8 @@ pub use cove_shell::WindowBackdrop;
 pub use desktop::AppDisplayHandle;
 pub use desktop::application::configuration::{ApplicationConfiguration, TitleBarDivider};
 pub use desktop::application::runtime::{Application, ApplicationCallbacks};
+#[cfg(target_os = "windows")]
+pub use desktop::window::ImmersiveMenuBar;
 pub use desktop::window::{
-    ImmersiveMenuBar, NativeMenu, NativeMenuAction, NativeMenuBar, NativeMenuItem,
-    NativeMenuKeyModifiers,
+    NativeMenu, NativeMenuAction, NativeMenuBar, NativeMenuItem, NativeMenuKeyModifiers,
 };

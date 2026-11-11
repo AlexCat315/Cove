@@ -4,6 +4,7 @@ pub mod appearance;
 pub mod auxiliary;
 pub mod chrome;
 pub mod chrome_views;
+#[cfg(target_os = "windows")]
 mod immersive_menu;
 pub mod native_menu;
 pub mod native_renderer;
@@ -18,6 +19,7 @@ pub use chrome_views::{
     ImmersiveWindowTitleBar, WindowChromeFixedSpace, WindowChromeInteractiveRegion,
     WindowControlButton, WindowControlGlyph, WindowControlStrip, WindowDragRegion,
 };
+#[cfg(target_os = "windows")]
 pub use immersive_menu::ImmersiveMenuBar;
 pub use native_menu::{
     NativeApplicationMenuTitles, NativeMenu, NativeMenuAction, NativeMenuBar, NativeMenuItem,

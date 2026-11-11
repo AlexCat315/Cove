@@ -139,8 +139,7 @@ impl NativeMenuBarInstaller {
         {
             let _ = bar;
             Err(ShellError::UnsupportedPlatform(
-                "an application menu bar requires AppKit; this platform presents Compose menus"
-                    .into(),
+                "the host has no native application menu bar".into(),
             ))
         }
     }
