@@ -22,6 +22,20 @@ fn styled() -> Text {
 
 两种构造方式都支持 `alignment`、`color`、`line_limit`、`truncated`、`display_only` 和环境字体。`TextTraits` 提供粗体、斜体、行内代码与删除线，可用 `|` 组合；`plain_text()` 读取拼接后的正文。
 
+## 浮点字号
+
+```rust
+use cove_ui::compose::modifiers::style::AppearanceExt;
+use cove_ui::core::{Font, FontWeight};
+use cove_ui::prelude::*;
+
+fn caption() -> impl View {
+    Text::new("Fractional type").font(Font::system(13.5, FontWeight::Regular))
+}
+```
+
+排版以浮点坐标计算字距、行宽和光标位置。绘制时，轮廓字形按最接近的四分之一设备像素横向取样，纵向基线对齐到设备像素。
+
 ## 选择与复制
 
 在一段或多段正文外使用 `text_selection(true)`。普通文字和样式片段参加同一选区；按钮、菜单行等控件继续拥有自身手势。

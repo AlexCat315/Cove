@@ -348,9 +348,9 @@ fn add_text_geometry() {
 }
 
 #[test]
-fn add_text_pixel_snap() {
+fn add_text_uses_quarter_pixel_phases_on_pixel_aligned_quads() {
     let Some((atlas, result)) = shaped_hi() else {
-        eprintln!("SKIP add_text_pixel_snap: no system test font available");
+        eprintln!("SKIP add_text_uses_quarter_pixel_phases: no system test font available");
         return;
     };
     let glyph = result
@@ -358,28 +358,27 @@ fn add_text_pixel_snap() {
         .first()
         .and_then(|line| line.glyphs.first())
         .expect("the first glyph exists");
-    let info = atlas
-        .rasterize_glyph(glyph.glyph_id, glyph.font_id)
-        .expect("the first glyph rasterises");
+    for (x, pixel_x, phase) in [
+        (0.0, 0.0, 0),
+        (0.26, 0.0, 1),
+        (0.52, 0.0, 2),
+        (0.74, 0.0, 3),
+        (0.90, 1.0, 0),
+        (-0.27, -1.0, 3),
+    ] {
+        let info = atlas
+            .rasterize_glyph_at(glyph.glyph_id, glyph.font_id, phase)
+            .expect("the first glyph rasterises at the expected phase");
+        let origin = Point::new(x - glyph.x, 0.5 - glyph.y);
+        let mut list = DrawList::default();
+        list.add_text(&result, origin, Color::WHITE, 7, Some(&atlas), None)
+            .expect("the text is accepted");
 
-    let origin = Point { x: 0.35, y: 0.65 };
-    let raw_x = origin.x + glyph.x + info.bearing_x;
-    let raw_y = origin.y + glyph.y - info.bearing_y;
-
-    let mut list = DrawList::default();
-    list.add_text(&result, origin, Color::WHITE, 7, Some(&atlas), None)
-        .expect("the text is accepted");
-
-    assert_eq!(
-        list.vertices()[0].x,
-        raw_x.round(),
-        "glyph quads snap to whole pixels in x"
-    );
-    assert_eq!(
-        list.vertices()[0].y,
-        raw_y.round(),
-        "glyph quads snap to whole pixels in y"
-    );
+        let vertex = list.vertices()[0];
+        assert_eq!((vertex.u, vertex.v), (info.uv_min_x, info.uv_min_y));
+        assert_eq!(vertex.x, pixel_x + info.bearing_x);
+        assert_eq!(vertex.y + info.bearing_y, 1.0, "snap the shared baseline");
+    }
 }
 
 #[test]

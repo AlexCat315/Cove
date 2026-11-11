@@ -3,6 +3,7 @@
 #include <ft2build.h>
 #include FT_FREETYPE_H
 #include FT_GLYPH_H
+#include FT_OUTLINE_H
 #include FT_MULTIPLE_MASTERS_H
 #include <hb.h>
 #include <hb-ft.h>
@@ -12,16 +13,9 @@
 #include <string.h>
 
 typedef struct { FT_Library library; FT_Face face; hb_font_t *font; float size,scale,strike_scale; int color_active; } CoveFace;
-/* Coverage arrives as sRGB-encoded alpha and is blended in sRGB space, which
-   leaves thin strokes lighter than the platform renderer draws the same face.
-   Lifting the coverage curve restores that weight once, at library setup. */
-static uint8_t coverage_gamma[256];
-static void build_coverage_gamma(void) {
-    for (int i=0;i<256;++i) coverage_gamma[i]=(uint8_t)lround(255.0*pow(i/255.0,0.75));
-}
 static char *copy_string(const char *text) { if (!text) text=""; const size_t n=strlen(text)+1; char *p=malloc(n); if (p) memcpy(p,text,n); return p; }
 void cove_text_free(void *memory) { free(memory); }
-void *cove_text_library_new(void) { FT_Library library=NULL; build_coverage_gamma(); return FT_Init_FreeType(&library)==0 ? library : NULL; }
+void *cove_text_library_new(void) { FT_Library library=NULL; return FT_Init_FreeType(&library)==0 ? library : NULL; }
 void cove_text_library_free(void *library) { if (library) FT_Done_FreeType(library); }
 static int requested_size(CoveFace *face) {
     const int result=FT_Set_Char_Size(face->face,0,(FT_F26Dot6)(face->size*face->scale*64),72,72);
@@ -144,14 +138,25 @@ void cove_text_resample_rgba(const uint8_t *pixels,size_t width,size_t height,ui
         }
     }
 }
-CoveGlyphBitmap cove_text_glyph_bitmap(void *value,uint32_t glyph,int color) {
+CoveGlyphBitmap cove_text_glyph_bitmap(void *value,uint32_t glyph,int color,int phase) {
     CoveFace *face=value; CoveGlyphBitmap result={0};
     if (color) { if (!ensure_color(face)) return result; } else ensure_normal(face);
-    const FT_Int32 flags=color ? FT_LOAD_COLOR : FT_LOAD_RENDER|FT_LOAD_FORCE_AUTOHINT|FT_LOAD_TARGET_LIGHT;
-    if (FT_Load_Glyph(face->face,glyph,flags) || !face->face->glyph) return result; FT_GlyphSlot slot=face->face->glyph;
-    if (color && slot->format!=FT_GLYPH_FORMAT_BITMAP && FT_Render_Glyph(slot,FT_RENDER_MODE_NORMAL)) return result;
+    const FT_Int32 flags = color ? FT_LOAD_COLOR : FT_LOAD_FORCE_AUTOHINT | FT_LOAD_TARGET_LIGHT;
+    if (FT_Load_Glyph(face->face, glyph, flags) || !face->face->glyph) return result;
+    const FT_GlyphSlot slot = face->face->glyph;
+    const int bitmap_strike = slot->format == FT_GLYPH_FORMAT_BITMAP;
+    phase &= 3;
+    if (!color && phase != 0 && slot->format == FT_GLYPH_FORMAT_OUTLINE) {
+        /* Apply the horizontal phase after hinting. A quarter pixel is 16 in 26.6. */
+        FT_Outline_Translate(&slot->outline, (FT_Pos)(phase * 16), 0);
+    }
+    if (!bitmap_strike && FT_Render_Glyph(slot, FT_RENDER_MODE_NORMAL)) return result;
     const FT_Bitmap bitmap=slot->bitmap; const uint32_t w=bitmap.width,h=bitmap.rows;
     result.metrics=bitmap_metrics(slot,(color ? face->strike_scale : 1)/face->scale); result.valid=1;
+    if (!color && bitmap_strike && phase >= 2) {
+        /* The Rust emitter anchors at the start of the pixel. Round fixed bitmap strikes. */
+        result.metrics.bearing_x += 1.0f / face->scale;
+    }
     if (!w || !h || !bitmap.buffer) return result;
     if (w>16384 || h>16384) { result.valid=0; return result; }
     const size_t channels=color ? 4 : 1; size_t length=(size_t)w*h*channels;
@@ -168,7 +173,7 @@ CoveGlyphBitmap cove_text_glyph_bitmap(void *value,uint32_t glyph,int color) {
                     pixels[at+2]=alpha ? (uint8_t)fmin(255,(row[x*4]*255u+alpha/2)/alpha) : 0; pixels[at+3]=(uint8_t)alpha;
                 } else if (bitmap.pixel_mode==FT_PIXEL_MODE_GRAY) pixels[at+3]=row[x];
                 else { free(pixels); result.valid=0; return result; }
-            } else { if (bitmap.pixel_mode==FT_PIXEL_MODE_GRAY) pixels[(size_t)y*w+x]=coverage_gamma[row[x]];
+            } else { if (bitmap.pixel_mode==FT_PIXEL_MODE_GRAY) pixels[(size_t)y*w+x]=row[x];
                 else if (bitmap.pixel_mode==FT_PIXEL_MODE_MONO) pixels[(size_t)y*w+x]=(row[x/8]&(0x80u>>(x%8))) ? 255 : 0;
                 else { free(pixels); result.valid=0; return result; } }
         }

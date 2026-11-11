@@ -4,6 +4,15 @@
 
 Swift 源码逐页对照见文末《Swift 源码对照（逐页差异清单）》。
 
+## 2026-11-11 浮点字号
+
+| 页面或组件 | 实现与自动化验收 | Windows 原生视觉与交互验收 | Rust 文档 |
+| --- | --- | --- | --- |
+| Text | 共用 Rust 绘制入口按设备 x 坐标选取四档相位，FreeType 平移轮廓后栅格化。回归覆盖 13.5pt、1.5× DPI 的四份覆盖图、缓存命中、负坐标、跨像素进位和基线取整。 | 本轮未单独检查 Text 页。 | [Text](../Website/src/content/components/text.md) |
+| Button / Variants | 沿用共享文字绘制。Windows DevTools 在 110% 文字缩放下确认七个按钮的布局高度和垂直位置一致。 | DevTools 点击 Primary 后确认 `Actions: 1`。`capture_ui` 在 `mirror.stop` 超时，字形目检待完成。 | [Button](../Website/src/content/components/button.md) |
+
+实现位于共享文字管线。Windows 之外的原生视觉与交互本轮未验证。
+
 ## 2026-11-11 Windows 11 原生窗口菜单
 
 | 页面或组件 | 实现与自动化验收 | Windows 原生视觉与交互验收 | Rust 文档 |

@@ -36,7 +36,7 @@ impl FreeTypeColorGlyphFace {
     }
     fn rasterize(&self, glyph: u32) -> Option<ColorGlyphBitmap> {
         // SAFETY: result owns a separate straight-RGBA buffer and is freed after copying it into Rust storage.
-        let bitmap = unsafe { native::cove_text_glyph_bitmap(self.face.pointer(), glyph, 1) };
+        let bitmap = unsafe { native::cove_text_glyph_bitmap(self.face.pointer(), glyph, 1, 0) };
         Some(ColorGlyphBitmap {
             pixels: bitmap.pixels(4)?,
             width: bitmap.width as usize,

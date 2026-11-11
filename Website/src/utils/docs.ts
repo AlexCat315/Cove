@@ -33,6 +33,7 @@ import textSelection from '@/content/components/text-selection.md?raw'
 import theme from '@/content/components/theme.md?raw'
 import motion from '@/content/components/motion.md?raw'
 import splitButton from '@/content/components/split-button.md?raw'
+import button from '@/content/components/button.md?raw'
 import completionPopover from '@/content/components/completion-popover.md?raw'
 import numberField from '@/content/components/number-field.md?raw'
 import field from '@/content/components/field.md?raw'
@@ -121,6 +122,7 @@ export const docGroups: DocGroup[] = [
       { slug: 'hover-card', title: 'HoverCard', raw: component7 },
       { slug: 'command-palette', title: 'CommandPalette', raw: component8 },
       { slug: 'menu', title: 'Menu / MenuItemContent', raw: component9 },
+      { slug: 'button', title: 'Button', raw: button },
       { slug: 'split-button', title: 'SplitButton', raw: splitButton },
       { slug: 'completion-popover', title: 'CompletionPopover', raw: completionPopover },
       { slug: 'number-field', title: 'NumberField', raw: numberField },

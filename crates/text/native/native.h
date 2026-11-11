@@ -22,7 +22,7 @@ void cove_text_axes_free(CoveFontAxes axes);
 int cove_text_apply_axes(void *face,const uint32_t *tags,const double *values,size_t count);
 int cove_text_glyph_metrics(void *face,uint32_t glyph,int layout,CoveGlyphMetrics *metrics);
 CoveLineMetrics cove_text_line_metrics(void *face,int color);
-CoveGlyphBitmap cove_text_glyph_bitmap(void *face,uint32_t glyph,int color);
+CoveGlyphBitmap cove_text_glyph_bitmap(void *face,uint32_t glyph,int color,int phase);
 CoveShapedRun cove_text_shape(void *face,const uint8_t *text,size_t length,uint32_t direction,uint32_t script,const char *language,uint32_t offset,int64_t font_id);
 uint32_t cove_text_script(uint32_t scalar);
 void cove_text_free(void *memory);

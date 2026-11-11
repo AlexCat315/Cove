@@ -316,8 +316,14 @@ impl FontFace {
             .then_some(metrics)
     }
     pub fn rasterize(&self, glyph: u32) -> Option<GlyphBitmap> {
+        self.rasterize_at(glyph, 0)
+    }
+    /// Rasterizes with a horizontal offset of `phase` quarter pixels (0–3).
+    pub fn rasterize_at(&self, glyph: u32, phase: u8) -> Option<GlyphBitmap> {
         // SAFETY: native result owns its bitmap until the guard is dropped.
-        let result = unsafe { native::cove_text_glyph_bitmap(self.pointer(), glyph, 0) };
+        let result = unsafe {
+            native::cove_text_glyph_bitmap(self.pointer(), glyph, 0, i32::from(phase & 3))
+        };
         Some(GlyphBitmap {
             pixels: result.pixels(1)?,
             width: result.width as usize,

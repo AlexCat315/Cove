@@ -1,4 +1,5 @@
 //! Translation of CoveUIText/FontCollection.swift.
+use crate::draw_list_text::add_text_at_scale;
 use crate::{FontAtlas, FontFace, FontFaceSelector, Script, ScriptTag, font_face::scalar_script};
 use cove_core::{
     Color, DrawError, DrawList, Point, ShapedGlyph, TextLayoutOptions, TextureId, layout_text,
@@ -159,27 +160,16 @@ impl FontCollection {
                 ..Default::default()
             },
         );
-        for line in &layout.lines {
-            for glyph in &line.glyphs {
-                let Some(info) = self
-                    .atlas
-                    .rasterize_glyph(glyph.glyph_id, glyph.font_id)
-                    .filter(|i| i.width > 0.0 && i.height > 0.0)
-                else {
-                    continue;
-                };
-                let snap = |value: f32| (value * self.raster_scale).round() / self.raster_scale;
-                list.add_atlas_glyph(
-                    info,
-                    Point {
-                        x: snap(origin.x + glyph.x + info.bearing_x),
-                        y: snap(origin.y + glyph.y - info.bearing_y),
-                    },
-                    color,
-                    texture_id,
-                )?;
-            }
-        }
+        add_text_at_scale(
+            list,
+            &layout,
+            origin,
+            color,
+            texture_id,
+            Some(&self.atlas),
+            None,
+            self.raster_scale,
+        )?;
         Ok(layout.total_width)
     }
 }

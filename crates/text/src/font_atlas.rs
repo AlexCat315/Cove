@@ -38,14 +38,17 @@ struct GlyphKey {
     glyph: u32,
     size: u32,
     scale: u32,
+    /// Horizontal offset in quarter pixels. Layout metrics use phase zero.
+    phase: u8,
 }
 impl GlyphKey {
-    fn new(font_id: i64, glyph: u32, size: f32, scale: f32) -> Self {
+    fn new(font_id: i64, glyph: u32, size: f32, scale: f32, phase: u8) -> Self {
         Self {
             font_id,
             glyph,
             size: size.to_bits(),
             scale: scale.to_bits(),
+            phase: phase & 3,
         }
     }
 }
@@ -190,12 +193,18 @@ impl FontAtlas {
             .or_else(|| if font_id == 0 { d.loaded.clone() } else { None })
     }
     fn key(&self, glyph: u32, font_id: i64) -> Option<GlyphKey> {
+        self.key_at(glyph, font_id, 0)
+    }
+    fn key_at(&self, glyph: u32, font_id: i64, phase: u8) -> Option<GlyphKey> {
         if let Some(source) = self.0.borrow().colors.get(&font_id) {
+            // Colour glyphs come from embedded bitmap strikes, which have a
+            // fixed pixel grid; they cannot be shifted by a quarter pixel.
             return Some(GlyphKey::new(
                 font_id,
                 glyph,
                 source.size,
                 source.raster_scale,
+                0,
             ));
         }
         let face = self.face(font_id)?;
@@ -204,6 +213,7 @@ impl FontAtlas {
             glyph,
             face.size(),
             face.raster_scale().max(1.0),
+            phase,
         ))
     }
     pub fn cached_glyph_info(&self, glyph: u32, font_id: i64) -> Option<GlyphAtlasInfo> {
@@ -236,7 +246,18 @@ impl FontAtlas {
         }
     }
     pub fn rasterize_glyph(&self, glyph: u32, font_id: i64) -> Option<GlyphAtlasInfo> {
-        let key = self.key(glyph, font_id)?;
+        self.rasterize_glyph_at(glyph, font_id, 0)
+    }
+    /// Caches an outline glyph with the requested horizontal offset in quarter
+    /// pixels (0–3). Use its bearings relative to a whole-pixel pen position.
+    pub fn rasterize_glyph_at(
+        &self,
+        glyph: u32,
+        font_id: i64,
+        phase: u8,
+    ) -> Option<GlyphAtlasInfo> {
+        let key = self.key_at(glyph, font_id, phase)?;
+        let phase = key.phase;
         if let Some(info) = self.0.borrow().raster.get(&key).copied() {
             return Some(info);
         }
@@ -254,7 +275,7 @@ impl FontAtlas {
         }
         let _ = self.glyph_metrics(glyph, font_id);
         let face = self.face(font_id)?;
-        let bitmap = face.rasterize(glyph)?;
+        let bitmap = face.rasterize_at(glyph, phase)?;
         let (w, h) = (bitmap.width, bitmap.height);
         let mut d = self.0.borrow_mut();
         if w > 0 && h > 0 && d.shelf_x + w + 1 > d.width {

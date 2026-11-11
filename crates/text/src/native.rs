@@ -242,7 +242,12 @@ unsafe extern "C" {
         metrics: *mut Metrics,
     ) -> c_int;
     pub fn cove_text_line_metrics(face: *mut c_void, color: c_int) -> LineMetrics;
-    pub fn cove_text_glyph_bitmap(face: *mut c_void, glyph: u32, color: c_int) -> Bitmap;
+    pub fn cove_text_glyph_bitmap(
+        face: *mut c_void,
+        glyph: u32,
+        color: c_int,
+        phase: c_int,
+    ) -> Bitmap;
     pub fn cove_text_shape(
         face: *mut c_void,
         text: *const u8,

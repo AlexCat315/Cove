@@ -61,10 +61,12 @@ fn rasterization_does_not_change_layout_metrics() {
             .atlas
             .glyph_metrics(glyph.glyph_id, glyph.font_id)
             .expect("metrics before rasterizing");
-        let _ = fonts
-            .atlas
-            .rasterize_glyph(glyph.glyph_id, glyph.font_id)
-            .expect("glyph rasterizes");
+        for phase in 0..4 {
+            fonts
+                .atlas
+                .rasterize_glyph_at(glyph.glyph_id, glyph.font_id, phase)
+                .expect("glyph rasterizes at each phase");
+        }
         let after = fonts
             .atlas
             .glyph_metrics(glyph.glyph_id, glyph.font_id)
@@ -86,6 +88,44 @@ fn rasterization_does_not_change_layout_metrics() {
             ),
             "drawing must not change wrapping or caret metrics on the next layout"
         );
+    }
+}
+
+#[test]
+fn fractional_size_and_dpi_use_four_distinct_coverage_masks() {
+    let mut fonts = FontCollection::new(128, 128);
+    assert_eq!(fonts.append(bytes("NotoSans.ttf")), Some(1));
+    let size = 13.5;
+    let scale = 1.5;
+    fonts.configure(size, scale);
+    let glyph = fonts.shape("H")[0];
+    let mut coverage = std::collections::BTreeSet::new();
+    for phase in 0..4 {
+        fonts.atlas.mark_clean();
+        let origin = Point::new(f32::from(phase) / (4.0 * scale), 0.0);
+        let mut list = DrawList::default();
+        let width = fonts
+            .draw("H", size, scale, &mut list, origin, Color::WHITE, 1)
+            .expect("draws a fractional origin");
+        assert_eq!(width, glyph.x_advance);
+        let payload = fonts.atlas.dirty_upload_payload().expect("new phase");
+        assert!(
+            coverage.insert(payload.pixels),
+            "phase {phase} changes coverage"
+        );
+
+        let info = fonts
+            .atlas
+            .rasterize_glyph_at(glyph.glyph_id, glyph.font_id, phase)
+            .expect("cached phase");
+        let vertex = list.vertices()[0];
+        assert_eq!((vertex.u, vertex.v), (info.uv_min_x, info.uv_min_y));
+        assert_eq!(vertex.x, info.bearing_x, "bitmap anchors on the pixel grid");
+        fonts.atlas.mark_clean();
+        let _ = fonts
+            .atlas
+            .rasterize_glyph_at(glyph.glyph_id, glyph.font_id, phase);
+        assert!(fonts.atlas.dirty_upload_payload().is_none());
     }
 }
 
