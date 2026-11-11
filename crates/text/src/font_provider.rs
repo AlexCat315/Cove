@@ -749,9 +749,15 @@ mod portable_style_tests {
         let values = styled_coordinates(&axes, FontWeight::Bold, true);
         assert_eq!(values[&axes[0].id], 650.0);
         assert_eq!(values[&axes[1].id], 1.0);
-        assert_eq!(
-            styled_coordinates(&axes, FontWeight::Regular, false)[&axes[0].id],
-            400.0
-        );
+        for (weight, expected) in [
+            (FontWeight::Regular, 400.0),
+            (FontWeight::Medium, 500.0),
+            (FontWeight::Semibold, 600.0),
+        ] {
+            assert_eq!(
+                styled_coordinates(&axes, weight, false)[&axes[0].id],
+                expected
+            );
+        }
     }
 }

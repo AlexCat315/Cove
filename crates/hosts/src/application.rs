@@ -59,8 +59,7 @@ impl ApplicationLaunch {
         self
     }
 
-    /// Presents menus with AppKit on macOS or beside the system caption buttons
-    /// using WinUI on Windows 11 with Windows App Runtime 1.8.
+    /// Presents the application menu with AppKit on macOS.
     /// When the platform has no native application menu, keeps the system frame.
     pub fn native_menu_bar(mut self, menus: impl Into<crate::NativeMenuBar>) -> Self {
         self.menu_bar = Some(LaunchMenuBar::Native(menus.into()));
@@ -73,6 +72,17 @@ impl ApplicationLaunch {
         self
     }
 
+    /// Resolves the root for hosts that install the application in an existing
+    /// surface, including Android and the browser.
+    pub fn content(&self) -> AnyView {
+        match &self.menu_bar {
+            Some(LaunchMenuBar::Immersive(menus)) => crate::ImmersiveMenuBar::new(menus.clone())
+                .title(&self.configuration.window.title)
+                .with_content(self.root.clone()),
+            _ => self.root.clone(),
+        }
+    }
+
     /// Chooses what the platform composites behind clear pixels of the window.
     pub fn window_backdrop(mut self, backdrop: crate::WindowBackdrop) -> Self {
         self.configuration.window.backdrop = backdrop;
@@ -83,6 +93,7 @@ impl ApplicationLaunch {
     /// platform directly. Android invokes the registered factory from its Activity
     /// instead of entering this blocking loop.
     pub fn run(mut self) -> Result<(), String> {
+        let root = self.content();
         crate::desktop::diagnostics::integration::set_diagnostics_factory(self.diagnostics);
         let mut callbacks = ApplicationCallbacks::default();
         match self.menu_bar.take() {
@@ -111,20 +122,15 @@ impl ApplicationLaunch {
                     );
                 }
             }
-            Some(LaunchMenuBar::Immersive(menus)) => {
+            Some(LaunchMenuBar::Immersive(_))
+                if crate::desktop::window::chrome::HAS_DESKTOP_CHROME =>
+            {
                 self.configuration.window.title_bar_style =
                     crate::desktop::application::configuration::AppWindowTitleBarStyle::HiddenInset;
-                self.root = crate::ImmersiveMenuBar::new(menus).with_content(self.root);
             }
-            None => {}
+            _ => {}
         }
-        Application::run(
-            self.configuration,
-            None,
-            self.root,
-            callbacks,
-            self.checkpoint,
-        )
+        Application::run(self.configuration, None, root, callbacks, self.checkpoint)
     }
 
     /// The process entry: called on the main thread, it keeps that thread as the

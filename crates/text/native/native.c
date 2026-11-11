@@ -140,7 +140,17 @@ void cove_text_resample_rgba(const uint8_t *pixels,size_t width,size_t height,ui
 }
 CoveGlyphBitmap cove_text_glyph_bitmap(void *value,uint32_t glyph,int color,int phase) {
     CoveFace *face=value; CoveGlyphBitmap result={0};
-    if (color) { if (!ensure_color(face)) return result; } else ensure_normal(face);
+    if (color) {
+        if (!ensure_color(face)) return result;
+    } else {
+        ensure_normal(face);
+    }
+    const int has_outline_advance = color && FT_IS_SCALABLE(face->face);
+    float color_advance = 0;
+    if (has_outline_advance) {
+        /* Shaping uses the unhinted advance. The bitmap supplies only the ink bounds. */
+        color_advance = (float)hb_font_get_glyph_h_advance(face->font, glyph) / 64 / face->scale;
+    }
     const FT_Int32 flags = color ? FT_LOAD_COLOR : FT_LOAD_FORCE_AUTOHINT | FT_LOAD_TARGET_LIGHT;
     if (FT_Load_Glyph(face->face, glyph, flags) || !face->face->glyph) return result;
     const FT_GlyphSlot slot = face->face->glyph;
@@ -153,6 +163,7 @@ CoveGlyphBitmap cove_text_glyph_bitmap(void *value,uint32_t glyph,int color,int 
     if (!bitmap_strike && FT_Render_Glyph(slot, FT_RENDER_MODE_NORMAL)) return result;
     const FT_Bitmap bitmap=slot->bitmap; const uint32_t w=bitmap.width,h=bitmap.rows;
     result.metrics=bitmap_metrics(slot,(color ? face->strike_scale : 1)/face->scale); result.valid=1;
+    if (has_outline_advance) result.metrics.advance = color_advance;
     if (!color && bitmap_strike && phase >= 2) {
         /* The Rust emitter anchors at the start of the pixel. Round fixed bitmap strikes. */
         result.metrics.bearing_x += 1.0f / face->scale;

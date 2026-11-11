@@ -132,7 +132,9 @@ impl ShowcaseLaunch {
             .collect(),
         );
         if launch.menu_bar != ShowcaseMenuBar::None {
-            gallery = gallery.with_menu_bar(ImmersiveMenuBar::new(vec![menu]));
+            gallery = gallery.with_menu_bar(
+                ImmersiveMenuBar::new(vec![menu]).title(&configuration.window.title),
+            );
         }
         let gallery = AnyView::new(gallery);
         let root = AnyView::new(SurfaceReader::new(move |inherited: &Environment| {

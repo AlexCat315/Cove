@@ -4,6 +4,16 @@
 
 Swift 源码逐页对照见文末《Swift 源码对照（逐页差异清单）》。
 
+## 2026-11-11 沉浸式标题栏
+
+| 页面或组件 | 实现与自动化验收 | Windows 原生视觉与交互验收 | Rust 文档 |
+| --- | --- | --- | --- |
+| Gallery / 窗口菜单栏 | 默认显示窗口配置中的标题。标题可截断，保留桌面拖动区域。Android 和浏览器复用应用声明的菜单，移动端和 Web 使用应用内菜单。宿主测试挂载菜单和标题并检查几何。 | 默认模式在 1080pt 和 760pt 均找到标题。DevTools 点击 Navigate → Calendar，截图显示 Calendar 页面、标题和窗口按钮。 | [窗口菜单栏](../Website/src/content/components/window-menu-bar.md) · [Gallery](../Website/src/content/components/gallery.md) |
+| Gallery / 侧栏 | 搜索和导航行维持 220pt。主题、分割线控件按同行图标按钮验证。Gallery 7 项测试通过。 | 本轮检查了侧栏随页面切换后的选中状态。 | [Gallery](../Website/src/content/components/gallery.md) |
+| Text | 轮廓型彩色字形用整形字体度量计算前进量。系统 Emoji 测试按 cluster 验证，CJK 改用随仓库提供的字体，字重测试覆盖静态字面和变量坐标。 | 本轮以结构与栅格测试验收。 | [Text](../Website/src/content/components/text.md) |
+
+高 DPI 下 SDL 窗口尺寸命令现在按窗口坐标换算，Windows 原生窗口测试确认最终尺寸为 560×300pt。其他平台的原生视觉与交互仍待设备验收。
+
 ## 2026-11-11 浮点字号
 
 | 页面或组件 | 实现与自动化验收 | Windows 原生视觉与交互验收 | Rust 文档 |
@@ -13,7 +23,9 @@ Swift 源码逐页对照见文末《Swift 源码对照（逐页差异清单）�
 
 实现位于共享文字管线。Windows 之外的原生视觉与交互本轮未验证。
 
-## 2026-11-11 Windows 11 原生窗口菜单
+## 2026-11-11 Windows 11 WinUI 菜单历史验收
+
+此处记录 XAML Islands 版本的验收。当前 Windows Gallery 采用 Cove 自绘标题栏。
 
 | 页面或组件 | 实现与自动化验收 | Windows 原生视觉与交互验收 | Rust 文档 |
 | --- | --- | --- | --- |

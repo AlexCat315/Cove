@@ -1,10 +1,15 @@
-use cove_composition::EmptyView;
+use cove_composition::{EmptyView, ViewGraph};
+use cove_core::scene::{Node, NodeTree, Recomposer};
 use cove_hosts::android::contract::SceneLaunchMode;
 use cove_hosts::android::sources::cove_android_app::content::scene::{
     DeclaredApplicationContent, HostedSceneContent,
 };
-use cove_hosts::{ApplicationCheckpoint, ApplicationConfiguration, ApplicationLaunch};
-use std::{cell::Cell, collections::BTreeMap, rc::Rc};
+use cove_hosts::{ApplicationCheckpoint, ApplicationConfiguration, ApplicationLaunch, NativeMenu};
+use std::{
+    cell::{Cell, RefCell},
+    collections::BTreeMap,
+    rc::Rc,
+};
 
 mod defaults {
     fn content() -> cove_composition::EmptyView {
@@ -84,4 +89,46 @@ fn android_preserves_configuration_and_checkpoint_ownership() {
             .restore_checkpoint("not json", SceneLaunchMode::Application)
             .is_err()
     );
+}
+
+#[test]
+fn hosted_content_mounts_the_configured_immersive_caption_and_menu() {
+    let launch = ApplicationLaunch::new(EmptyView)
+        .immersive_menu_bar(vec![NativeMenu::named("Navigate").action("Home", || {})])
+        .configure(|config| config.window.title = "Configured caption".into());
+    let mut content = DeclaredApplicationContent(launch);
+    let root = content.root(SceneLaunchMode::Application, 1.0).unwrap();
+    let tree = Rc::new(RefCell::new(NodeTree::new()));
+    let graph = Rc::new(ViewGraph::new(tree.clone(), Rc::new(Recomposer::new())));
+    graph.install_view(root, Default::default());
+    graph.recomposer.commit_all();
+    graph.compute_layout(450.0, 300.0);
+
+    fn labelled(node: &Node, label: &str) -> Option<Node> {
+        if node
+            .accessibility()
+            .is_some_and(|semantics| semantics.label == label)
+        {
+            Some(node.clone())
+        } else {
+            node.children()
+                .iter()
+                .find_map(|child| labelled(child, label))
+        }
+    }
+
+    let root = tree.borrow().root().unwrap();
+    let menu = labelled(&root, "Navigate").expect("the menu is mounted");
+    let caption = labelled(&root, "Configured caption").expect("the caption is mounted");
+    assert!(
+        !caption.is_hit_testable(),
+        "the caption preserves title-bar drag"
+    );
+    let menu = menu.absolute_frame();
+    let caption = caption.absolute_frame();
+    assert!(
+        menu.x + menu.width <= caption.x,
+        "the caption clears the menu"
+    );
+    assert!(caption.x + caption.width <= 450.0);
 }

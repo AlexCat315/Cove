@@ -655,12 +655,25 @@ impl Shell for Sdl3Shell {
         }
     }
     fn set_window_size(&self, id: WindowId, width: f32, height: f32) {
-        if width.is_finite() && height.is_finite() {
-            self.command(
-                id,
+        if width.is_finite()
+            && height.is_finite()
+            && let Some(window) = self.windows.get(&id)
+        {
+            let state = window.state();
+            // The public size uses logical points. SDL uses its own window
+            // coordinates, which are physical pixels on Windows.
+            let to_window_units = |points: f32, units: i32, pixels: i32| {
+                let factor = if units > 0 && pixels > 0 {
+                    state.scale * units as f32 / pixels as f32
+                } else {
+                    1.0
+                };
+                (points * factor).round().max(1.0) as i32
+            };
+            window.command(
                 2,
-                width.round().max(1.0) as i32,
-                height.round().max(1.0) as i32,
+                to_window_units(width, state.width, state.pixel_width),
+                to_window_units(height, state.height, state.pixel_height),
             );
         }
     }

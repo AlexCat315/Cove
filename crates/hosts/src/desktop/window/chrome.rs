@@ -18,6 +18,12 @@ pub const DRAG_REGION_KEY: &str = "CoveUI.windowChrome.dragRegion";
 /// Attachment key marking a region that must stay interactive (not draggable).
 pub const INTERACTIVE_REGION_KEY: &str = "CoveUI.windowChrome.interactiveRegion";
 
+pub(crate) const HAS_DESKTOP_CHROME: bool = !cfg!(any(
+    target_os = "ios",
+    target_os = "android",
+    target_arch = "wasm32"
+));
+
 /// How the immersive title bar renders its window controls.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum ImmersiveWindowControlStyle {
@@ -29,14 +35,14 @@ pub enum ImmersiveWindowControlStyle {
 }
 
 impl ImmersiveWindowControlStyle {
-    /// macOS presents native traffic lights; other platforms draw their own.
+    /// macOS presents native traffic lights. Other desktops draw controls in
+    /// the client area. Mobile and browser hosts use the bar as in-app UI.
     pub fn automatic() -> Self {
-        #[cfg(target_os = "macos")]
-        {
+        if !HAS_DESKTOP_CHROME {
+            Self::Hidden
+        } else if cfg!(target_os = "macos") {
             Self::Native
-        }
-        #[cfg(not(target_os = "macos"))]
-        {
+        } else {
             Self::Custom
         }
     }
@@ -52,13 +58,9 @@ impl ImmersiveWindowControlStyle {
 /// macOS keeps the native resizable window frame under `.hiddenInset`, so it
 /// avoids synthetic resize hit-test regions.
 pub fn platform_resize_border_width(value: f32) -> f32 {
-    #[cfg(target_os = "macos")]
-    {
-        let _ = value;
+    if !HAS_DESKTOP_CHROME || cfg!(target_os = "macos") {
         0.0
-    }
-    #[cfg(not(target_os = "macos"))]
-    {
+    } else {
         value
     }
 }

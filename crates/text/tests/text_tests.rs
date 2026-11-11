@@ -190,15 +190,17 @@ fn text_shaper_shapes_hello_into_five_glyphs() {
 #[test]
 fn text_shaper_shapes_cjk_text() {
     let atlas = FontAtlas::new(512, 512);
+    let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("fonts/NotoSansCJKsc.otf");
     assert!(
-        atlas.load_font_path(&PathBuf::from("/System/Library/Fonts/SFNS.ttf"), 16.0, 1.0),
-        "the system CJK-capable font loads"
+        atlas.load_font_path(&path, 16.0, 1.0),
+        "the bundled CJK font loads"
     );
     let mut shaper = TextShaper::default();
     shaper.set_face(atlas.font_face().expect("a loaded face"), 16.0);
 
     let glyphs = shaper.shape_latin("\u{4F60}\u{597D}");
     assert_eq!(glyphs.len(), 2, "two ideographs, two glyphs");
+    assert!(glyphs.iter().all(|glyph| glyph.glyph_id != 0));
 }
 
 #[test]

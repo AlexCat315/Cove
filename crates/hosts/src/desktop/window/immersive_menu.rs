@@ -18,6 +18,7 @@ use super::{
 pub struct ImmersiveMenuBar {
     menus: Vec<NativeMenu>,
     leading: Option<AnyView>,
+    title: String,
 }
 
 impl ImmersiveMenuBar {
@@ -25,11 +26,18 @@ impl ImmersiveMenuBar {
         Self {
             menus,
             leading: None,
+            title: String::new(),
         }
     }
 
     pub fn leading(mut self, view: impl View + 'static) -> Self {
         self.leading = Some(AnyView::new(view));
+        self
+    }
+
+    /// Displays a caption in the available title area. An empty caption hides it.
+    pub fn title(mut self, title: impl Into<String>) -> Self {
+        self.title = title.into();
         self
     }
 
@@ -91,7 +99,7 @@ impl View for ImmersiveMenuBar {
             2.0,
             AnyView::new(TupleView::new(children)),
         );
-        AnyView::new(ImmersiveWindowTitleBar::new(row))
+        AnyView::new(ImmersiveWindowTitleBar::new(row).title(&self.title))
     }
 }
 

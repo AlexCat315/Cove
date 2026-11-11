@@ -100,12 +100,14 @@ impl NativeMenuAction {
     }
 }
 
+#[derive(Clone)]
 pub enum NativeMenuItem {
     Action(NativeMenuAction),
     Submenu(NativeMenu),
     Separator,
 }
 
+#[derive(Clone)]
 pub struct NativeMenu {
     pub title: String,
     pub items: Vec<NativeMenuItem>,

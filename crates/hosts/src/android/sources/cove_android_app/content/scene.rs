@@ -153,7 +153,7 @@ impl HostedSceneContent for DeclaredApplicationContent {
 
     fn root(&mut self, mode: SceneLaunchMode, scale: f32) -> Result<AnyView, String> {
         if mode == SceneLaunchMode::Application {
-            Ok(self.0.root.clone())
+            Ok(self.0.content())
         } else {
             UnlinkedContent.root(mode, scale)
         }

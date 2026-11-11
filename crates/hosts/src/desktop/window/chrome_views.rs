@@ -25,14 +25,17 @@ use cove_core::scene::{
     Align, FlexDirection, HoverPhase, InputHandlerRoute, InputRoutingPriority,
     InteractionRegistryHolder, Justify, LayoutNode, Node,
 };
-use cove_core::{Color, DrawList, Point, Rect};
+use cove_core::{Color, DrawList, Point, Rect, TextAlignment};
 use cove_platform::MouseButton;
 use cove_shell::WindowChromeHitTest;
+use cove_ui_compose::modifiers::layout::{FlexExt, LayoutFrameExt};
+use cove_ui_compose::primitives::text::Text;
+use cove_ui_compose::theme::{SemanticColorRef, SemanticFontRef, SemanticStyleViewExt};
 use std::rc::Rc;
 
 use super::chrome::{
-    AppWindowChromeContextHolder, CONFIGURATION_KEY, DRAG_REGION_KEY, INTERACTIVE_REGION_KEY,
-    ImmersiveWindowControlStyle, platform_resize_border_width,
+    AppWindowChromeContextHolder, CONFIGURATION_KEY, DRAG_REGION_KEY, HAS_DESKTOP_CHROME,
+    INTERACTIVE_REGION_KEY, ImmersiveWindowControlStyle, platform_resize_border_width,
 };
 use crate::desktop::application::composition::AppDisplayHandleHolder;
 use crate::desktop::display::AppDisplayHandle;
@@ -58,6 +61,7 @@ pub struct ImmersiveWindowTitleBar {
     pub control_style: ImmersiveWindowControlStyle,
     pub native_controls_leading_inset: f32,
     pub leading: AnyView,
+    title: String,
 }
 
 impl ImmersiveWindowTitleBar {
@@ -68,6 +72,7 @@ impl ImmersiveWindowTitleBar {
             control_style: ImmersiveWindowControlStyle::Automatic,
             native_controls_leading_inset: DEFAULT_NATIVE_CONTROLS_LEADING_INSET,
             leading: AnyView::new(leading),
+            title: String::new(),
         }
     }
 
@@ -90,6 +95,11 @@ impl ImmersiveWindowTitleBar {
         self.native_controls_leading_inset = inset.max(0.0);
         self
     }
+
+    pub fn title(mut self, title: impl Into<String>) -> Self {
+        self.title = title.into();
+        self
+    }
 }
 
 impl View for ImmersiveWindowTitleBar {
@@ -105,7 +115,11 @@ impl View for ImmersiveWindowTitleBar {
             self.leading.clone(),
         )));
         children.push(AnyView::new(
-            AnyView::new(WindowDragRegion::default()).modifier(WindowDragRegionHeight(self.height)),
+            AnyView::new(WindowDragRegion {
+                title: self.title.clone(),
+                ..WindowDragRegion::default()
+            })
+            .modifier(WindowDragRegionHeight(self.height)),
         ));
         if style == ImmersiveWindowControlStyle::Custom {
             children.push(AnyView::new(
@@ -188,15 +202,17 @@ struct WindowTitleBarModifier {
 
 impl cove_composition::ViewModifier for WindowTitleBarModifier {
     fn apply_node(&self, node: &Node) {
-        node.set_attachment(
-            CONFIGURATION_KEY,
-            WindowChromeHitTest {
-                title_bar_height: self.height,
-                resize_border_width: self.resize_border_width,
-                uses_explicit_drag_rects: true,
-                ..WindowChromeHitTest::default()
-            },
-        );
+        if HAS_DESKTOP_CHROME {
+            node.set_attachment(
+                CONFIGURATION_KEY,
+                WindowChromeHitTest {
+                    title_bar_height: self.height,
+                    resize_border_width: self.resize_border_width,
+                    uses_explicit_drag_rects: true,
+                    ..WindowChromeHitTest::default()
+                },
+            );
+        }
         node.set_z_index(20_000.0);
         node.set_attachment(
             LayoutDebugAttachmentKey::LAYOUT_ROLE,
@@ -309,18 +325,19 @@ impl cove_composition::ViewModifier for WindowControlStripFrame {
     }
 }
 
-/// `WindowDragRegion`: the empty band the platform treats as a drag handle. A
-/// double click toggles maximize on every platform, matching the Swift pointer
-/// handler.
-#[derive(Clone, Copy, Debug, Default)]
+/// The title band acts as a drag handle on desktop, where double-clicking
+/// toggles the maximized state.
+#[derive(Clone, Debug, Default)]
 pub struct WindowDragRegion {
     pub min_length: f32,
+    title: String,
 }
 
 impl WindowDragRegion {
     pub fn new(min_length: f32) -> Self {
         Self {
             min_length: min_length.max(0.0),
+            ..Self::default()
         }
     }
 }
@@ -328,11 +345,14 @@ impl WindowDragRegion {
 impl PrimitiveView for WindowDragRegion {
     fn make_node(&self) -> Node {
         let node = Node::new();
-        node.set_is_hit_testable(true);
+        node.set_is_hit_testable(HAS_DESKTOP_CHROME);
         node
     }
 
     fn update_node(&self, node: &Node) {
+        if !HAS_DESKTOP_CHROME {
+            return;
+        }
         node.set_attachment(DRAG_REGION_KEY, true);
         let Some(registry) = InteractionRegistryHolder::current() else {
             return;
@@ -366,10 +386,28 @@ impl PrimitiveView for WindowDragRegion {
     }
 
     fn update_layout(&self, layout: &LayoutNode) {
+        layout.set_flex_direction(FlexDirection::Row);
+        layout.set_align_items(Align::Center);
+        layout.set_justify_content(Justify::Center);
         layout.set_flex_grow(1.0);
-        if self.min_length > 0.0 {
-            layout.set_flex_basis(self.min_length);
+        layout.set_min_width(Some(0.0));
+        layout.set_flex_basis(self.min_length);
+    }
+
+    fn children(&self, _node: &Node) -> Vec<AnyView> {
+        if self.title.is_empty() {
+            return Vec::new();
         }
+        vec![AnyView::new(
+            Text::new(&self.title)
+                .alignment(TextAlignment::Center)
+                .truncated()
+                .display_only(true)
+                .semantic_font(SemanticFontRef::caption())
+                .semantic_foreground(SemanticColorRef::on_surface_variant())
+                .frame_min_width(0.0)
+                .shrink(1.0),
+        )]
     }
 }
 impl_primitive_view!(WindowDragRegion);
@@ -745,7 +783,14 @@ mod tests {
         #[cfg(target_os = "macos")]
         assert_eq!(resolved, ImmersiveWindowControlStyle::Native);
         #[cfg(not(target_os = "macos"))]
-        assert_eq!(resolved, ImmersiveWindowControlStyle::Custom);
+        assert_eq!(
+            resolved,
+            if HAS_DESKTOP_CHROME {
+                ImmersiveWindowControlStyle::Custom
+            } else {
+                ImmersiveWindowControlStyle::Hidden
+            },
+        );
     }
 
     #[test]
@@ -758,7 +803,11 @@ mod tests {
         #[cfg(not(target_os = "macos"))]
         assert_eq!(
             platform_resize_border_width(DEFAULT_RESIZE_BORDER_WIDTH),
-            DEFAULT_RESIZE_BORDER_WIDTH
+            if HAS_DESKTOP_CHROME {
+                DEFAULT_RESIZE_BORDER_WIDTH
+            } else {
+                0.0
+            }
         );
     }
 
