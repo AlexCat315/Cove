@@ -132,10 +132,9 @@ impl View for ImmersiveWindowTitleBar {
                 AnyView::new(WindowControlStrip::new()).modifier(WindowControlStripFrame),
             ));
         }
-        children.push(AnyView::new(
-            AnyView::new(TitleBarHairline)
-                .modifier(TitleBarHairlineModifier(separated.then_some(colors.border))),
-        ));
+        children.push(AnyView::new(AnyView::new(TitleBarHairline).modifier(
+            TitleBarHairlineModifier(separated.then_some(colors.border)),
+        )));
         AnyView::new(
             WindowChromeRow { children }.modifier(WindowTitleBarModifier {
                 height: self.height,
@@ -551,9 +550,7 @@ fn draw_caption_glyph(
     let cy = origin.y + height * 0.5;
     let half = 5.0;
     let stroke = 1.0;
-    let square = |x: f32, y: f32, size: f32| {
-        Rect::new(x, y, size, size)
-    };
+    let square = |x: f32, y: f32, size: f32| Rect::new(x, y, size, size);
     match glyph {
         WindowControlGlyph::Minimize => {
             let _ = list.add_line(
@@ -683,11 +680,14 @@ impl PrimitiveView for WindowControlButton {
         );
         let weak = node.downgrade();
         let glyph = self.glyph;
-        registry.set_hover(node, Rc::new(move |phase| {
-            if let Some(node) = Node::upgrade(&weak) {
-                apply_caption_appearance(&node, glyph, phase == HoverPhase::Enter);
-            }
-        }));
+        registry.set_hover(
+            node,
+            Rc::new(move |phase| {
+                if let Some(node) = Node::upgrade(&weak) {
+                    apply_caption_appearance(&node, glyph, phase == HoverPhase::Enter);
+                }
+            }),
+        );
     }
 
     fn make_layout_node(&self) -> Option<LayoutNode> {
@@ -765,8 +765,7 @@ mod tests {
     #[test]
     fn separated_bar_keeps_the_material_visible() {
         let surface = cove_core::Color::WHITE;
-        let fill =
-            title_bar_background(surface, true, true).expect("a separated bar has a fill");
+        let fill = title_bar_background(surface, true, true).expect("a separated bar has a fill");
         assert_ne!(fill, surface, "the band must stay translucent");
     }
 

@@ -122,27 +122,29 @@ impl BuiltinButtonChromeKind {
         };
         let line_height = theme.typography.label.line_height;
         match self {
-            Self::Primary | Self::Secondary | Self::Ghost | Self::MenuBarItem | Self::Destructive => {
-                BuiltinButtonChromeMetrics {
-                    height,
-                    min_width: if is_icon_only { Some(height) } else { None },
-                    horizontal_padding: if is_icon_only {
-                        (height - line_height) / 2.0
-                    } else if touch {
-                        size.touch_padding()
-                    } else {
-                        size.horizontal_padding()
-                    }
-                    .max(if is_icon_only { 2.0 } else { 0.0 }),
-                    radius: if self == Self::MenuBarItem {
-                        theme.radius.sm.min(4.0)
-                    } else {
-                        height * 0.5
-                    },
-                    vertical_padding: ((height - line_height) / if touch { 4.0 } else { 2.0 })
-                        .max(if touch { 4.0 } else { 2.0 }),
+            Self::Primary
+            | Self::Secondary
+            | Self::Ghost
+            | Self::MenuBarItem
+            | Self::Destructive => BuiltinButtonChromeMetrics {
+                height,
+                min_width: if is_icon_only { Some(height) } else { None },
+                horizontal_padding: if is_icon_only {
+                    (height - line_height) / 2.0
+                } else if touch {
+                    size.touch_padding()
+                } else {
+                    size.horizontal_padding()
                 }
-            }
+                .max(if is_icon_only { 2.0 } else { 0.0 }),
+                radius: if self == Self::MenuBarItem {
+                    theme.radius.sm.min(4.0)
+                } else {
+                    height * 0.5
+                },
+                vertical_padding: ((height - line_height) / if touch { 4.0 } else { 2.0 })
+                    .max(if touch { 4.0 } else { 2.0 }),
+            },
             Self::Toggle {
                 min_width,
                 height: authored_height,
@@ -529,7 +531,12 @@ mod tests {
             is_enabled: true,
             is_selected: false,
             is_icon_only: false,
-            metrics: kind.metrics(&theme, ControlSize::Regular, false, InputCapabilities::POINTER),
+            metrics: kind.metrics(
+                &theme,
+                ControlSize::Regular,
+                false,
+                InputCapabilities::POINTER,
+            ),
         };
         let idle = builtin_button_chrome_values(state, &chrome, Some(&button));
         assert_eq!(idle.background, Color::CLEAR);

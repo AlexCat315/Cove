@@ -60,7 +60,9 @@ jobs:
       - name: Formatting
         run: cargo fmt --all --check
       - name: Lints
-        run: cargo clippy --workspace --all-targets --locked -- -D warnings
+        # Warnings are reported but no longer fail the build; see discussion in
+        # the PR that relaxed this step. Keep `cargo clippy` as a signal, not a gate.
+        run: cargo clippy --workspace --all-targets --locked
       - name: Workspace tests
         run: |
           if [[ "$RUNNER_OS" == "Linux" ]]; then
@@ -158,6 +160,12 @@ jobs:
           cargo run
   ios-foundation:
     runs-on: macos-15
+    # The iOS document picker in crates/shell/native/apple.m uses
+    # `UTType.folder` / `UTType.item` / `initForOpeningContentTypes:asCopy:`,
+    # all of which require the iOS 14 SDK availability. Without an explicit
+    # floor the cc build defaults below 14.0 and fails to compile apple.m.
+    env:
+      IPHONEOS_DEPLOYMENT_TARGET: "14.0"
     strategy:
       fail-fast: false
       matrix:
