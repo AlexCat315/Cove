@@ -533,8 +533,8 @@ static UIViewController *picker_presenter(void *raw){
 bool cove_shell_apple_picker(void *raw,int mode,const char *path,const char *const *names,const char *const *patterns,size_t count,bool multiple,CoveShellDialogCallback callback,void *box){COVE_ASSERT_MAIN();
     (void)path;(void)names;
     UIViewController *presenter=picker_presenter(raw);if(!presenter)return false;
-    NSArray<UTType*> *types=mode==1?@[[UTType folder]]:picker_types(patterns,count);
-    if(!types.count)types=@[[UTType item]];
+    NSArray<UTType*> *types=mode==1?@[UTType.folder]:picker_types(patterns,count);
+    if(!types.count)types=@[UTType.item];
     UIDocumentPickerViewController *picker=[[UIDocumentPickerViewController alloc] initForOpeningContentTypes:types asCopy:YES];
     picker.allowsMultipleSelection=multiple;
     CoveShellDocumentPicker *delegate=[CoveShellDocumentPicker new];delegate.callback=callback;delegate.box=box;delegate.export=NO;
