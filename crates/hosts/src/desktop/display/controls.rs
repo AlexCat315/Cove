@@ -10,6 +10,7 @@ pub struct PresentationControls {
     pub set_runtime_target_frame_rate: Option<std::rc::Rc<dyn Fn(Option<f64>)>>,
     pub set_runtime_frame_rate_mode: Option<std::rc::Rc<dyn Fn(PlatformFrameRateMode)>>,
     pub set_runtime_vsync_enabled: Option<std::rc::Rc<dyn Fn(bool)>>,
+    pub set_title_bar_divider: Option<std::rc::Rc<dyn Fn(bool)>>,
     pub current_runtime_display_refresh_rate: Option<std::rc::Rc<dyn Fn() -> Option<f64>>>,
 }
 

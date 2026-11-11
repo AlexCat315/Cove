@@ -15,8 +15,8 @@ pub use chrome::{
     WindowChromeHitTestCollector,
 };
 pub use chrome_views::{
-    Background, ImmersiveWindowTitleBar, WindowChromeFixedSpace, WindowChromeInteractiveRegion,
-    WindowControlButton, WindowControlStrip, WindowDragRegion,
+    ImmersiveWindowTitleBar, WindowChromeFixedSpace, WindowChromeInteractiveRegion,
+    WindowControlButton, WindowControlGlyph, WindowControlStrip, WindowDragRegion,
 };
 pub use immersive_menu::ImmersiveMenuBar;
 pub use native_menu::{

@@ -13,7 +13,7 @@ use cove_hosts::desktop::application::configuration::{
 use cove_hosts::desktop::diagnostics::ApplicationCheckpoint;
 use cove_hosts::{
     ApplicationConfiguration, ApplicationLaunch, ImmersiveMenuBar, NativeMenu, NativeMenuAction,
-    NativeMenuBar, NativeMenuItem, NativeMenuKeyModifiers, TitleBarDivider, WindowBackdrop,
+    NativeMenuItem, NativeMenuKeyModifiers, TitleBarDivider, WindowBackdrop,
 };
 use cove_ui_compose::adaptive::{SurfaceEnvironmentExt, SurfaceReader};
 use cove_ui_compose::theme::styles::appearance_modifier::Appearance;
@@ -27,12 +27,9 @@ fn configuration(launch: &ShowcaseLaunch) -> ApplicationConfiguration {
     if let Some(height) = launch.height {
         configuration.window.height = height;
     }
-    // Both single-row modes keep the translucent window material; the legacy
-    // native menu keeps its opaque window so the WinUI MenuBar stays legible.
-    configuration.window.backdrop = match launch.menu_bar {
-        ShowcaseMenuBar::Native => WindowBackdrop::Opaque,
-        _ => WindowBackdrop::Sidebar,
-    };
+    // The translucent material is the window default, independent of which
+    // single-row look is selected.
+    configuration.window.backdrop = WindowBackdrop::Sidebar;
     if !launch.shared_counter
         && matches!(
             launch.menu_bar,
@@ -134,15 +131,8 @@ impl ShowcaseLaunch {
             })
             .collect(),
         );
-        let mut native = None;
-        match launch.menu_bar {
-            ShowcaseMenuBar::Immersive | ShowcaseMenuBar::Separated => {
-                gallery = gallery.with_menu_bar(ImmersiveMenuBar::new(vec![menu]))
-            }
-            ShowcaseMenuBar::Native => {
-                native = Some(NativeMenuBar::new("CoveUI", Vec::new(), vec![menu]))
-            }
-            ShowcaseMenuBar::None => {}
+        if launch.menu_bar != ShowcaseMenuBar::None {
+            gallery = gallery.with_menu_bar(ImmersiveMenuBar::new(vec![menu]));
         }
         let gallery = AnyView::new(gallery);
         let root = AnyView::new(SurfaceReader::new(move |inherited: &Environment| {
@@ -156,13 +146,9 @@ impl ShowcaseLaunch {
                     Direction::Ltr
                 })
         }));
-        let application = ApplicationLaunch::new(root)
+        ApplicationLaunch::new(root)
             .configuration(configuration)
-            .diagnostics(cove_hosts::desktop::diagnostics::devtools::factory());
-        match native {
-            Some(bar) => application.native_menu_bar(bar),
-            None => application,
-        }
+            .diagnostics(cove_hosts::desktop::diagnostics::devtools::factory())
     }
 }
 

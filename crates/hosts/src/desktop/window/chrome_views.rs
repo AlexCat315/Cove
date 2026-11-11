@@ -22,13 +22,12 @@ use cove_composition::{
     AnyView, LayoutDebugAttachmentKey, PrimitiveView, View, ViewExt, impl_primitive_view,
 };
 use cove_core::scene::{
-    Align, FlexDirection, InputHandlerRoute, InputRoutingPriority, InteractionRegistryHolder,
-    Justify, LayoutNode, Node,
+    Align, FlexDirection, HoverPhase, InputHandlerRoute, InputRoutingPriority,
+    InteractionRegistryHolder, Justify, LayoutNode, Node,
 };
+use cove_core::{Color, DrawList, Point, Rect};
 use cove_platform::MouseButton;
 use cove_shell::WindowChromeHitTest;
-use cove_ui_compose::primitives::controls::{ButtonIcon, ButtonIconSource};
-use cove_ui_compose::primitives::media::ui_icon_catalog as icons;
 use std::rc::Rc;
 
 use super::chrome::{
@@ -44,8 +43,9 @@ pub const DEFAULT_TITLE_BAR_HEIGHT: f32 = 34.0;
 pub const DEFAULT_RESIZE_BORDER_WIDTH: f32 = 6.0;
 /// macOS keeps the native traffic lights, so the leading controls are reserved.
 pub const DEFAULT_NATIVE_CONTROLS_LEADING_INSET: f32 = 76.0;
-/// Custom control strip width.
-pub const CONTROL_STRIP_WIDTH: f32 = 100.0;
+/// Windows 11 caption buttons are 46 pt wide and fill the title bar height.
+pub const CONTROL_STRIP_WIDTH: f32 = 138.0;
+pub const CONTROL_BUTTON_WIDTH: f32 = 46.0;
 
 /// The immersive title bar.
 ///
@@ -304,7 +304,7 @@ struct WindowControlStripFrame;
 impl cove_composition::ViewModifier for WindowControlStripFrame {
     fn apply_layout(&self, layout: &LayoutNode) {
         layout.set_width(Some(CONTROL_STRIP_WIDTH));
-        layout.set_height(Some(24.0));
+        layout.set_height(Some(DEFAULT_TITLE_BAR_HEIGHT));
         layout.set_flex_shrink(0.0);
     }
 }
@@ -428,31 +428,18 @@ impl View for WindowControlStrip {
         let window_id = AppWindowChromeContextHolder::current().map(|context| context.window_id);
         let is_maximized = is_window_maximized(window_id);
 
-        let minimize = WindowControlButton::new(
-            icons::navigation::minimize(),
-            "Minimize",
-            "window-control-minimize",
-            Background::Normal,
-            move || {
-                with_display_handle(|handle| match window_id {
-                    Some(id) => handle.minimize_window_for(id),
-                    None => handle.minimize_window(),
-                });
-            },
-        );
+        let minimize = WindowControlButton::new(WindowControlGlyph::Minimize, move || {
+            with_display_handle(|handle| match window_id {
+                Some(id) => handle.minimize_window_for(id),
+                None => handle.minimize_window(),
+            });
+        });
         let maximize = WindowControlButton::new(
             if is_maximized {
-                icons::navigation::shrink()
+                WindowControlGlyph::Restore
             } else {
-                icons::navigation::maximize()
+                WindowControlGlyph::Maximize
             },
-            if is_maximized { "Restore" } else { "Maximize" },
-            if is_maximized {
-                "window-control-restore"
-            } else {
-                "window-control-maximize"
-            },
-            Background::Normal,
             move || {
                 with_display_handle(|handle| match window_id {
                     Some(id) => handle.toggle_maximize_window_for(id),
@@ -461,18 +448,12 @@ impl View for WindowControlStrip {
                 with_display_handle(|handle| handle.request_display());
             },
         );
-        let close = WindowControlButton::new(
-            icons::action::x(),
-            "Close",
-            "window-control-close",
-            Background::Destructive,
-            move || {
-                with_display_handle(|handle| match window_id {
-                    Some(id) => handle.close_window(id),
-                    None => handle.close_main_window(),
-                });
-            },
-        );
+        let close = WindowControlButton::new(WindowControlGlyph::Close, move || {
+            with_display_handle(|handle| match window_id {
+                Some(id) => handle.close_window(id),
+                None => handle.close_main_window(),
+            });
+        });
 
         AnyView::new(WindowControlRow {
             children: vec![
@@ -484,36 +465,134 @@ impl View for WindowControlStrip {
     }
 }
 
-/// Whether the close button draws destructive.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub enum Background {
-    #[default]
-    Normal,
-    Destructive,
+/// Windows-style caption glyphs, drawn as one-point geometric strokes rather
+/// than as UI icons.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum WindowControlGlyph {
+    Minimize,
+    Maximize,
+    Restore,
+    Close,
 }
 
-/// `WindowControlButton`: one 32x24 icon-only action.
+impl WindowControlGlyph {
+    fn label(self) -> &'static str {
+        match self {
+            Self::Minimize => "Minimize",
+            Self::Maximize => "Maximize",
+            Self::Restore => "Restore",
+            Self::Close => "Close",
+        }
+    }
+
+    fn debug_name(self) -> &'static str {
+        match self {
+            Self::Minimize => "window-control-minimize",
+            Self::Maximize => "window-control-maximize",
+            Self::Restore => "window-control-restore",
+            Self::Close => "window-control-close",
+        }
+    }
+
+    fn destructive(self) -> bool {
+        self == Self::Close
+    }
+}
+
+/// A 10pt glyph centered in the caption button, matching the Windows 11
+/// minimize line, maximize square, overlapping restore squares and close X.
+fn draw_caption_glyph(
+    list: &mut DrawList,
+    origin: Point,
+    width: f32,
+    height: f32,
+    glyph: WindowControlGlyph,
+    color: Color,
+) {
+    let cx = origin.x + width * 0.5;
+    let cy = origin.y + height * 0.5;
+    let half = 5.0;
+    let stroke = 1.0;
+    let square = |x: f32, y: f32, size: f32| {
+        Rect::new(x, y, size, size)
+    };
+    match glyph {
+        WindowControlGlyph::Minimize => {
+            let _ = list.add_line(
+                Point::new(cx - half, cy),
+                Point::new(cx + half, cy),
+                stroke,
+                color,
+            );
+        }
+        WindowControlGlyph::Maximize => {
+            let rect = square(cx - half, cy - half, half * 2.0);
+            let _ = list.add_rounded_rect_stroke(rect, 0.0, stroke, color);
+        }
+        WindowControlGlyph::Restore => {
+            let back = square(cx - half + 2.5, cy - half - 2.5, 7.5);
+            let front = square(cx - half, cy - half + 2.5, 7.5);
+            let _ = list.add_rounded_rect_stroke(back, 0.0, stroke, color);
+            let _ = list.add_rounded_rect_stroke(front, 0.0, stroke, color);
+        }
+        WindowControlGlyph::Close => {
+            let _ = list.add_line(
+                Point::new(cx - half, cy - half),
+                Point::new(cx + half, cy + half),
+                stroke,
+                color,
+            );
+            let _ = list.add_line(
+                Point::new(cx + half, cy - half),
+                Point::new(cx - half, cy + half),
+                stroke,
+                color,
+            );
+        }
+    }
+}
+
+/// Hover repaints the caption background and glyph together; the close button
+/// gets Windows' red plate with a white X.
+fn apply_caption_appearance(node: &Node, glyph: WindowControlGlyph, hovered: bool) {
+    let colors = cove_ui_compose::theme::theme_for_node(node).colors;
+    node.set_background_color(if hovered {
+        Some(if glyph.destructive() {
+            colors.error
+        } else {
+            colors.state_layer_hover
+        })
+    } else {
+        None
+    });
+    let stroke = if hovered && glyph.destructive() {
+        colors.on_accent
+    } else {
+        colors.on_surface
+    };
+    let weak = node.downgrade();
+    node.set_draw(Some(Rc::new(move |list, origin| {
+        let Some(node) = Node::upgrade(&weak) else {
+            return;
+        };
+        let frame = node.frame();
+        if frame.width <= 0.0 || frame.height <= 0.0 {
+            return;
+        }
+        draw_caption_glyph(list, origin, frame.width, frame.height, glyph, stroke);
+    })));
+}
+
+/// `WindowControlButton`: one Windows-sized caption button.
 pub struct WindowControlButton {
-    icon: cove_imaging::BundleImageResource,
-    tooltip: String,
-    debug_name: String,
-    background: Background,
+    glyph: WindowControlGlyph,
     action: Rc<dyn Fn()>,
 }
 
 impl WindowControlButton {
-    pub fn new(
-        icon: cove_imaging::BundleImageResource,
-        tooltip: impl Into<String>,
-        debug_name: impl Into<String>,
-        background: Background,
-        action: impl Fn() + 'static,
-    ) -> Self {
+    pub fn new(glyph: WindowControlGlyph, action: impl Fn() + 'static) -> Self {
         Self {
-            icon,
-            tooltip: tooltip.into(),
-            debug_name: debug_name.into(),
-            background,
+            glyph,
             action: Rc::new(action),
         }
     }
@@ -531,17 +610,18 @@ impl PrimitiveView for WindowControlButton {
         node.set_attachment(INTERACTIVE_REGION_KEY, true);
         node.set_attachment(
             LayoutDebugAttachmentKey::DEBUG_NAME,
-            self.debug_name.clone(),
+            self.glyph.debug_name().to_owned(),
         );
         let mut semantics = cove_core::scene::AccessibilitySemantics::new(
             cove_core::scene::AccessibilityRole::Button,
         );
-        semantics.label = self.tooltip.clone();
+        semantics.label = self.glyph.label().to_owned();
         node.set_accessibility(Some(semantics));
         let mut actions = node.accessibility_actions();
         let action = self.action.clone();
         actions.activate = Some(Rc::new(move || action()));
         node.set_accessibility_actions(actions);
+        apply_caption_appearance(node, self.glyph, false);
 
         let Some(registry) = InteractionRegistryHolder::current() else {
             return;
@@ -563,37 +643,27 @@ impl PrimitiveView for WindowControlButton {
                 cove_core::scene::EventResult::Handled
             }),
         );
+        let weak = node.downgrade();
+        let glyph = self.glyph;
+        registry.set_hover(node, Rc::new(move |phase| {
+            if let Some(node) = Node::upgrade(&weak) {
+                apply_caption_appearance(&node, glyph, phase == HoverPhase::Enter);
+            }
+        }));
     }
 
     fn make_layout_node(&self) -> Option<LayoutNode> {
         let layout = LayoutNode::new();
-        layout.set_flex_direction(FlexDirection::Row);
-        layout.set_align_items(Align::Center);
-        layout.set_justify_content(Justify::Center);
-        layout.set_width(Some(32.0));
-        layout.set_height(Some(24.0));
+        layout.set_width(Some(CONTROL_BUTTON_WIDTH));
+        layout.set_height(Some(DEFAULT_TITLE_BAR_HEIGHT));
         layout.set_flex_shrink(0.0);
         Some(layout)
     }
 
     fn update_layout(&self, layout: &LayoutNode) {
-        layout.set_width(Some(32.0));
-        layout.set_height(Some(24.0));
+        layout.set_width(Some(CONTROL_BUTTON_WIDTH));
+        layout.set_height(Some(DEFAULT_TITLE_BAR_HEIGHT));
         layout.set_flex_shrink(0.0);
-    }
-
-    fn children(&self, node: &Node) -> Vec<AnyView> {
-        let tint = if self.background == Background::Destructive {
-            let colors = cove_ui_compose::theme::theme_for_node(node).colors;
-            Some(colors.error)
-        } else {
-            None
-        };
-        vec![AnyView::new(ButtonIcon::new(
-            ButtonIconSource::resource(self.icon.clone()),
-            Some(12.0),
-            tint,
-        ))]
     }
 }
 impl_primitive_view!(WindowControlButton);

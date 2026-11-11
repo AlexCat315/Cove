@@ -50,8 +50,6 @@ pub enum ShowcaseMenuBar {
     Immersive,
     /// Same row; a tinted surface and a hairline separate it from the content.
     Separated,
-    /// The platform application menu (macOS, or WinUI on Windows).
-    Native,
 }
 
 impl Default for ShowcaseMenuBar {
@@ -100,7 +98,6 @@ impl ShowcaseLaunch {
             menu_bar: match Self::argument("--menu-bar", arguments).as_deref() {
                 Some("immersive") => ShowcaseMenuBar::Immersive,
                 Some("separated") => ShowcaseMenuBar::Separated,
-                Some("native") => ShowcaseMenuBar::Native,
                 Some("none") => ShowcaseMenuBar::None,
                 _ => ShowcaseMenuBar::default(),
             },
@@ -191,7 +188,6 @@ mod checks {
     #[test]
     fn menu_bar_mode_can_be_overridden() {
         for (flag, mode) in [
-            ("native", ShowcaseMenuBar::Native),
             ("immersive", ShowcaseMenuBar::Immersive),
             ("separated", ShowcaseMenuBar::Separated),
             ("none", ShowcaseMenuBar::None),

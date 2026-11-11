@@ -151,6 +151,9 @@ struct ApplicationState {
     memory_pressure: RefCell<Option<ApplicationMemoryPressure>>,
     display_handle: AppDisplayHandle,
     environment: State<Environment>,
+    /// Live preference for the title bar hairline; starts from the launch
+    /// configuration and can be toggled from the UI without rebuilding chrome.
+    title_bar_divider: Cell<bool>,
     /// Applied over host facts every frame: a launch preview device, then
     /// DevTools requests.
     environment_override: RefCell<EnvironmentOverride>,
@@ -221,6 +224,7 @@ impl Application {
         let rendering =
             Rc::new(AppRenderingContext::new(backend, &config).map_err(|error| error.to_string())?);
         let preview = preview_device();
+        let title_bar_divider = config.window.title_bar_divider.separated();
         let options = WindowOptions {
             width: preview
                 .as_ref()
@@ -281,6 +285,7 @@ impl Application {
             memory_pressure: RefCell::new(None),
             display_handle,
             environment,
+            title_bar_divider: Cell::new(title_bar_divider),
             recording_control: RefCell::new(RecordingControl::default()),
             environment_override: RefCell::new(
                 preview.map(|preset| preset.environment).unwrap_or_default(),
@@ -699,6 +704,12 @@ impl Application {
                     state: state.clone(),
                 };
                 move |enabled: bool| application.set_vsync_enabled(enabled)
+            })),
+            set_title_bar_divider: Some(Rc::new({
+                let application = Application {
+                    state: state.clone(),
+                };
+                move |separated: bool| application.set_title_bar_divider(separated)
             })),
             current_runtime_display_refresh_rate: Some(Rc::new({
                 let host = host.clone();
@@ -1148,7 +1159,7 @@ impl Application {
         }
         state.environment_override.borrow().apply(&mut environment);
         environment.translucent_window = host.backdrop() != cove_shell::WindowBackdrop::Opaque;
-        environment.title_bar_divider = state.config.window.title_bar_divider.separated();
+        environment.title_bar_divider = state.title_bar_divider.get();
         environment.system_appearance = match host.system_appearance() {
             cove_shell::SystemAppearance::Light => cove_core::SystemAppearance::Light,
             cove_shell::SystemAppearance::Dark => cove_core::SystemAppearance::Dark,
@@ -1329,6 +1340,17 @@ impl Application {
         self.update_surface_environment();
         self.configure_text_environment(state.host.content_scale_factor());
         self.upload_atlas_if_needed(false)
+    }
+
+    /// Toggles the title bar hairline at runtime. Changing the published
+    /// environment recomposes the chrome; no window or menu is rebuilt.
+    pub fn set_title_bar_divider(&self, separated: bool) {
+        let state = &self.state;
+        if state.title_bar_divider.replace(separated) == separated {
+            return;
+        }
+        self.update_surface_environment();
+        state.host.request_display(None);
     }
 
     pub fn set_vsync_enabled(&self, enabled: bool) {

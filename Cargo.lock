@@ -568,9 +568,6 @@ dependencies = [
  "objc2",
  "objc2-app-kit",
  "thiserror 2.0.21",
- "windows",
- "windows-core",
- "windows-future",
 ]
 
 [[package]]

@@ -12,7 +12,8 @@
 use cove_composition::Scope;
 use cove_composition::{AnyView, LayoutDebugExt, View, ViewExt};
 use cove_core::scene::{Align, FlexDirection, Justify, LayoutNode, Node, Wrap};
-use cove_core::{Binding, State};
+use cove_core::{Binding, Environment, State};
+use cove_hosts::desktop::application::composition::AppDisplayHandleHolder;
 use cove_ui_compose::adaptive::SurfaceEnvironment;
 use cove_ui_compose::animation::{AnimatedVisibility, Transition};
 use cove_ui_compose::modifiers::layout::{EdgeInsets, FlexExt, LayoutFrameExt, PaddingExt};
@@ -20,12 +21,10 @@ use cove_ui_compose::modifiers::style::AppearanceExt;
 use cove_ui_compose::primitives::controls::Button;
 use cove_ui_compose::primitives::controls::Checkbox;
 use cove_ui_compose::primitives::controls::fields::select::{Select, SelectOption};
-use cove_ui_compose::primitives::controls::{ButtonIcon, ButtonIconSource};
+use cove_ui_compose::primitives::controls::ButtonIconSource;
 use cove_ui_compose::primitives::layout::ScrollView;
 use cove_ui_compose::primitives::layout::insets::SafeArea;
-use cove_ui_compose::primitives::layout::sidebar::{
-    Sidebar, SidebarItem, SidebarItemStyle, SidebarSection,
-};
+use cove_ui_compose::primitives::layout::sidebar::{Sidebar, SidebarItem, SidebarSection};
 use cove_ui_compose::primitives::media::ui_icon_catalog as icons;
 use cove_ui_compose::primitives::navigation::{
     ListDetail, ListDetailPresentation, ListDetailState,
@@ -348,62 +347,58 @@ impl GalleryView {
     }
 
     fn navigation_footer(&self) -> AnyView {
-        let title = match self.appearance.get() {
-            Appearance::Light => "Switch to dark theme",
-            Appearance::Dark => "Switch to light theme",
+        let appearance = self.appearance.get();
+        let is_dark = appearance == Appearance::Dark;
+        let (theme_tip, theme_icon) = if is_dark {
+            ("Switch to light theme", icons::device::sun())
+        } else {
+            ("Switch to dark theme", icons::device::moon())
         };
         let view = self.clone_handle();
-        let icon = match self.appearance.get() {
-            Appearance::Light => icons::device::moon(),
-            Appearance::Dark => icons::device::sun(),
-        };
-        let label = cove_ui_compose::BoxView::new(
-            FlexDirection::Row,
-            Align::Center,
-            Justify::FlexStart,
-            Wrap::NoWrap,
-            10.0,
-            AnyView::new(cove_composition::TupleView::new(vec![
-                AnyView::new(ButtonIcon::new(
-                    ButtonIconSource::resource(icon),
-                    Some(16.0),
-                    None,
-                )),
-                AnyView::new(
-                    Text::new(title)
-                        .truncated()
-                        .semantic_font(SemanticFontRef::label()),
-                ),
-            ])),
-        )
-        .padding_edges(10.0, 0.0);
-        let label = AnyView::new(label);
-        let view = std::rc::Rc::new(view);
-        // The footer row matches the sidebar's own rows on every device.
+        let theme = AnyView::new(
+            Button::icon_default(ButtonIconSource::resource(theme_icon), move || {
+                view.toggle_theme()
+            })
+            .selected(is_dark)
+            .tooltip(theme_tip)
+            .debug_name("gallery-theme"),
+        );
+
+        // The divider toggle reads the published environment, so the launch
+        // flag and a runtime click share one source of truth.
         erased(AnyView::new(cove_ui_compose::adaptive::SurfaceReader::new(
-            move |environment: &cove_core::Environment| {
-                // An action, not a destination: a plain list row without the
-                // navigation chevron on handheld devices.
-                let presentation = if environment.device_class.is_handheld() {
-                    cove_ui_compose::primitives::layout::sidebar::SidebarPresentation::List {
-                        grouped: false,
-                    }
-                } else {
-                    cove_ui_compose::primitives::layout::sidebar::SidebarPresentation::Expanded
-                };
-                let view = view.clone();
-                AnyView::new(
-                    AnyView::new(Button::new(label.clone(), move || view.toggle_theme()))
-                        .button_style(SidebarItemStyle {
-                            minimum_height: if presentation.is_list() {
-                                environment.minimum_control_extent()
-                            } else {
-                                30.0
-                            },
-                            presentation,
-                        })
-                        .debug_name("gallery-theme"),
+            move |environment: &Environment| {
+                let separated = environment.title_bar_divider;
+                let divider = Button::icon_default(
+                    ButtonIconSource::resource(if separated {
+                        icons::layout::rows_2()
+                    } else {
+                        icons::layout::panel_top()
+                    }),
+                    move || {
+                        if let Some(handle) = AppDisplayHandleHolder::current() {
+                            handle.set_title_bar_divider(!separated);
+                        }
+                    },
                 )
+                .selected(separated)
+                .tooltip(if separated {
+                    "Show a seamless title bar"
+                } else {
+                    "Show a title bar divider"
+                })
+                .debug_name("gallery-title-bar-divider");
+                AnyView::new(cove_ui_compose::BoxView::new(
+                    FlexDirection::Row,
+                    Align::Center,
+                    Justify::FlexStart,
+                    Wrap::NoWrap,
+                    8.0,
+                    AnyView::new(cove_composition::TupleView::new(vec![
+                        theme.clone(),
+                        AnyView::new(divider),
+                    ])),
+                ))
             },
         )))
     }

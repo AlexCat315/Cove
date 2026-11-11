@@ -17,7 +17,9 @@ let launch = ApplicationLaunch::new(content)
 
 `.immersive_menu_bar(menus)` 将菜单放进 Cove 自绘标题区。配合 `WindowBackdrop::Sidebar`，标题区和正文共用窗口材质。
 
-`.native_menu_bar(menus)` 使用平台菜单。macOS 由 AppKit 显示应用菜单。Windows 11 将 WinUI `MenuBar` 和系统窗口按钮放在同一行，Windows 管理拖动、缩放和窗口按钮。需安装对应架构的 Windows App Runtime 1.8。Linux 和缺少运行时的 Windows 仍使用标准窗口，应用菜单的支持情况可通过 `NativeMenuBar::is_supported()` 查询。
+`.native_menu_bar(menus)` 使用平台菜单，目前仅 macOS 由 AppKit 显示应用菜单；其它桌面平台没有系统应用菜单，可通过 `NativeMenuBar::is_supported()` 查询。桌面窗口统一使用上面的自绘单行标题区。
+
+顶部栏与正文之间是否画分割线，由 `WindowConfiguration::title_bar_divider` 控制：`TitleBarDivider::Seamless`（默认）让窗口材质贯穿标题区，`TitleBarDivider::Hairline` 额外加一层淡色底和 1px 发丝线。两者布局和窗口按钮完全相同，偏好不依赖 `WindowBackdrop`。
 
 用 `.submenu(NativeMenu::named("…"))` 添加子菜单。需要快捷键、选中或禁用状态时，用 `.item(NativeMenuAction::new(…))` 添加动作。原生菜单可通过 `AppDisplayHandle::install_native_menu_bar` 替换，刷新标题和可用状态。
 

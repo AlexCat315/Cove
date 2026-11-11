@@ -169,6 +169,19 @@ impl AppDisplayHandle {
         self.request_display();
     }
 
+    pub fn set_title_bar_divider(&self, separated: bool) {
+        if let Some(set) = self
+            .bindings
+            .borrow()
+            .presentation
+            .set_title_bar_divider
+            .clone()
+        {
+            set(separated);
+        }
+        self.request_display();
+    }
+
     pub fn set_vsync_enabled(&self, enabled: bool) {
         if let Some(set) = self
             .bindings

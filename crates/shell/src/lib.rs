@@ -15,8 +15,6 @@ mod platform_shell;
 pub mod scroll;
 mod sdl3_clipboard;
 mod sdl3_shell;
-#[cfg(target_os = "windows")]
-mod windows_menu_bar;
 pub use application_entry::PlatformApplication;
 pub use color_sampler::screen_color_backend;
 pub use cove_platform::*;

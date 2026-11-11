@@ -18,19 +18,6 @@ objc2-app-kit.workspace = true
 block2.workspace = true
 [target.'cfg(target_os = "linux")'.dependencies]
 libc.workspace = true
-[target.'cfg(target_os = "windows")'.dependencies]
-windows = { version = "0.62.2", default-features = false, features = [
-    "Foundation",
-    "Graphics",
-    "Win32_Foundation",
-    "Win32_System_LibraryLoader",
-    "Win32_System_Memory",
-    "Win32_System_WinRT",
-    "Win32_UI_HiDpi",
-    "Win32_UI_WindowsAndMessaging",
-] }
-windows-core = { version = "0.62.2", default-features = false }
-windows-future = { version = "0.3.2", default-features = false }
 [build-dependencies]
 cc.workspace = true
 cove-native-build.workspace = true

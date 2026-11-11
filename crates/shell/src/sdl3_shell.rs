@@ -50,10 +50,6 @@ pub struct Sdl3WindowHandle {
     /// reach the platform.
     state: Cell<native::WindowState>,
     backdrop: Cell<WindowBackdrop>,
-    #[cfg(target_os = "windows")]
-    appearance: Cell<WindowAppearance>,
-    #[cfg(target_os = "windows")]
-    menu_height: Rc<Cell<i32>>,
 }
 impl Sdl3WindowHandle {
     fn state(&self) -> native::WindowState {
@@ -146,12 +142,8 @@ impl WindowHandle for Sdl3WindowHandle {
     }
     fn safe_area(&self) -> WindowSafeArea {
         let s = self.state();
-        #[cfg(target_os = "windows")]
-        let top = s.top + self.menu_height.get() as f32 / s.scale.max(1.0);
-        #[cfg(not(target_os = "windows"))]
-        let top = s.top;
         WindowSafeArea {
-            top,
+            top: s.top,
             bottom: s.bottom,
             leading: s.leading,
             trailing: s.trailing,
@@ -281,23 +273,13 @@ pub struct Sdl3Shell {
     dialogs: RefCell<Dialogs>,
     sampler: crate::color_sampler::ScreenColorSampler,
     menu_bar_choice: RefCell<Option<MenuBarCompletion>>,
-    #[cfg(target_os = "windows")]
-    windows_menu: RefCell<Option<crate::windows_menu_bar::WindowsMenuBar>>,
-    #[cfg(target_os = "windows")]
-    windows_menu_runtime: RefCell<Option<crate::windows_menu_bar::MenuRuntime>>,
     default_options: WindowOptions,
 }
 impl Sdl3Shell {
-    /// Whether the desktop can host the platform's native menu bar.
+    /// Whether the desktop can host the platform's native menu bar. Only
+    /// AppKit has one; desktop windows draw their own single-row menu bar.
     pub fn native_menu_bar_supported() -> bool {
-        #[cfg(target_os = "windows")]
-        {
-            crate::windows_menu_bar::available()
-        }
-        #[cfg(not(target_os = "windows"))]
-        {
-            crate::native_menu_bar::NativeMenuBarInstaller::is_supported()
-        }
+        crate::native_menu_bar::NativeMenuBarInstaller::is_supported()
     }
 
     pub fn new() -> Result<Self, ShellError> {
@@ -317,10 +299,6 @@ impl Sdl3Shell {
             }),
             sampler: crate::color_sampler::ScreenColorSampler::new(Arc::new(Self::wake)),
             menu_bar_choice: RefCell::new(None),
-            #[cfg(target_os = "windows")]
-            windows_menu: RefCell::new(None),
-            #[cfg(target_os = "windows")]
-            windows_menu_runtime: RefCell::new(None),
             default_options: WindowOptions::default(),
         })
     }
@@ -384,14 +362,7 @@ impl Sdl3Shell {
     /// AppKit enqueues menu choices on the main thread; the authored closures
     /// live on the UI thread, so they run as deferred work like a dialog result.
     fn complete_menu_bar_choices(&self) -> Vec<Box<dyn FnOnce()>> {
-        #[cfg(not(target_os = "windows"))]
         let choices = crate::native_menu_bar::NativeMenuBarInstaller::take_choices();
-        #[cfg(target_os = "windows")]
-        let choices = self
-            .windows_menu
-            .borrow()
-            .as_ref()
-            .map_or_else(Vec::new, |menu| menu.take_choices());
         if choices.is_empty() {
             return Vec::new();
         }
@@ -502,10 +473,6 @@ impl Shell for Sdl3Shell {
             last_area: Cell::new(None),
             state: Cell::new(state),
             backdrop: Cell::new(WindowBackdrop::Opaque),
-            #[cfg(target_os = "windows")]
-            appearance: Cell::new(WindowAppearance::Light),
-            #[cfg(target_os = "windows")]
-            menu_height: Rc::new(Cell::new(0)),
         });
         let applied = match options.backdrop {
             WindowBackdrop::Opaque => false,
@@ -540,17 +507,6 @@ impl Shell for Sdl3Shell {
     }
     fn destroy_window(&mut self, id: WindowId) {
         if let Some(window) = self.windows.remove(&id) {
-            #[cfg(target_os = "windows")]
-            if let Some(NativeRenderSurface::Win32Window { hwnd, .. }) = window.render_surface()
-                && self
-                    .windows_menu
-                    .get_mut()
-                    .as_ref()
-                    .is_some_and(|menu| menu.hwnd() == hwnd)
-            {
-                self.windows_menu.get_mut().take();
-                self.menu_bar_choice.get_mut().take();
-            }
             window.close();
         }
         self.order.retain(|entry| *entry != id);
@@ -752,19 +708,6 @@ impl Shell for Sdl3Shell {
             unsafe {
                 native::cove_shell_appearance(w.pointer.get(), appearance == WindowAppearance::Dark)
             };
-            #[cfg(target_os = "windows")]
-            {
-                w.appearance.set(appearance);
-                if let Some(NativeRenderSurface::Win32Window { hwnd, .. }) = w.render_surface()
-                    && let Some(menu) = self
-                        .windows_menu
-                        .borrow()
-                        .as_ref()
-                        .filter(|menu| menu.hwnd() == hwnd)
-                {
-                    let _ = menu.set_appearance(appearance);
-                }
-            }
         }
     }
     fn set_window_chrome_hit_test(&self, id: WindowId, hit: Option<&WindowChromeHitTest>) {
@@ -853,42 +796,11 @@ impl Shell for Sdl3Shell {
         }
     }
     fn install_menu_bar(&self, bar: &NativeMenuBarSnapshot, on_choice: MenuBarCompletion) {
-        #[cfg(not(target_os = "windows"))]
+        // AppKit owns the only platform application menu. Every other desktop
+        // host draws a single-row menu bar inside the window instead; the
+        // installer reports unsupported and this becomes a no-op.
         if crate::native_menu_bar::NativeMenuBarInstaller::install(bar).is_ok() {
             *self.menu_bar_choice.borrow_mut() = Some(on_choice);
-        }
-        #[cfg(target_os = "windows")]
-        if let Some(window) = self.main_window_id().and_then(|id| self.windows.get(&id))
-            && let Some(NativeRenderSurface::Win32Window { hwnd, .. }) = window.render_surface()
-        {
-            use crate::windows_menu_bar::{MenuRuntime, WindowsMenuBar};
-            let installed = (|| {
-                let mut runtime = self.windows_menu_runtime.borrow_mut();
-                if runtime.is_none() {
-                    *runtime = Some(MenuRuntime::start()?);
-                }
-                WindowsMenuBar::install(
-                    hwnd,
-                    bar,
-                    window.appearance.get(),
-                    window.menu_height.clone(),
-                    self.windows_menu.borrow().as_ref(),
-                )
-            })();
-            match installed {
-                Ok(menu) => {
-                    *self.windows_menu.borrow_mut() = Some(menu);
-                    *self.menu_bar_choice.borrow_mut() = Some(on_choice);
-                    window.refresh();
-                    Self::wake();
-                }
-                Err(error) => cove_logging::LogSystem::logger("com.cove.shell.menu").log(
-                    &cove_logging::LogEvent::new(
-                        cove_logging::Level::Warning,
-                        format!("WinUI menu: {error}"),
-                    ),
-                ),
-            }
         }
     }
     fn take_open_documents(&self) -> Vec<String> {
@@ -935,10 +847,7 @@ impl Shell for Sdl3Shell {
         self.dialogs.borrow_mut().callbacks.clear();
         self.sampler.cancel_all();
         *self.menu_bar_choice.borrow_mut() = None;
-        #[cfg(not(target_os = "windows"))]
         crate::native_menu_bar::NativeMenuBarInstaller::clear();
-        #[cfg(target_os = "windows")]
-        self.windows_menu_runtime.get_mut().take();
         self.session = None;
         self.quitting = true;
     }
