@@ -16,9 +16,8 @@ use super::{
 
 /// A Cove menu bar in the client title area. Pair it with
 /// `AppWindowTitleBarStyle::HiddenInset` and mount it above the content.
-pub struct ImmersiveMenuBar {
+pub(crate) struct ImmersiveMenuBar {
     menus: Vec<NativeMenu>,
-    leading: Option<AnyView>,
     title: String,
 }
 
@@ -26,14 +25,8 @@ impl ImmersiveMenuBar {
     pub fn new(menus: Vec<NativeMenu>) -> Self {
         Self {
             menus,
-            leading: None,
             title: String::new(),
         }
-    }
-
-    pub fn leading(mut self, view: impl View + 'static) -> Self {
-        self.leading = Some(AnyView::new(view));
-        self
     }
 
     /// Displays a caption in the available title area. An empty caption hides it.
@@ -53,26 +46,30 @@ impl ImmersiveMenuBar {
                 AnyView::new(self),
                 AnyView::new(AnyView::new(content).flex_with(1.0, 1.0, Some(0.0))),
             ])),
-        );
+        )
+        .flex_with(1.0, 1.0, Some(0.0));
         AnyView::new(LayerRoot::new(column))
     }
 }
 
 impl View for ImmersiveMenuBar {
     fn body(&self, _cx: &Scope) -> AnyView {
-        let mut children: Vec<_> = self.leading.iter().cloned().collect();
-        children.extend(self.menus.iter().map(|menu| {
-            let title = menu.title.clone();
-            AnyView::new(
-                MenuButton::new(
-                    entries(&menu.items, &mut 1),
-                    AnyView::new(Text::new(&title).truncated()),
+        let mut children: Vec<_> = self
+            .menus
+            .iter()
+            .map(|menu| {
+                let title = menu.title.clone();
+                AnyView::new(
+                    MenuButton::new(
+                        entries(&menu.items, &mut 1),
+                        AnyView::new(Text::new(&title).truncated()),
+                    )
+                    .trigger_style(MenuBarItemButtonStyle)
+                    .composed()
+                    .accessibility_label(title),
                 )
-                .trigger_style(MenuBarItemButtonStyle)
-                .composed()
-                .accessibility_label(title),
-            )
-        }));
+            })
+            .collect();
         let mut shortcuts = Vec::new();
         for menu in &self.menus {
             collect_shortcuts(&menu.items, &mut shortcuts);

@@ -12,19 +12,20 @@ pub use crate::desktop::diagnostics::integration::{
 /// Window size and chrome are consumed by desktop/iOS; Android owns its window
 /// through the Activity and consumes rendering, typography and runtime settings.
 pub struct ApplicationLaunch {
-    pub root: AnyView,
+    root: AnyView,
     pub configuration: ApplicationConfiguration,
     pub checkpoint: Option<ApplicationCheckpoint>,
     /// Diagnostics backend installed for this run. A build that links the
     /// DevTools crate supplies it; otherwise DevTools stays off.
     pub diagnostics: Option<DiagnosticsFactory>,
     menu_bar: Option<LaunchMenuBar>,
+    content_wrapper: Option<Box<dyn Fn(AnyView) -> AnyView>>,
 }
 
 enum LaunchMenuBar {
     Native(crate::NativeMenuBar),
     #[cfg(target_os = "windows")]
-    Immersive(Vec<crate::NativeMenu>),
+    Immersive(crate::NativeMenuBar),
 }
 
 impl ApplicationLaunch {
@@ -35,6 +36,7 @@ impl ApplicationLaunch {
             checkpoint: None,
             diagnostics: None,
             menu_bar: None,
+            content_wrapper: None,
         }
     }
 
@@ -69,33 +71,68 @@ impl ApplicationLaunch {
 
     /// Presents the same menus in the Cove title bar on Windows or in the
     /// system application menu bar on hosts that provide one.
-    pub fn menu_bar(self, menus: Vec<crate::NativeMenu>) -> Self {
+    pub fn menu_bar(self, menus: impl Into<crate::NativeMenuBar>) -> Self {
         #[cfg(target_os = "windows")]
         {
             let mut launch = self;
-            launch.menu_bar = Some(LaunchMenuBar::Immersive(menus));
+            launch.menu_bar = Some(LaunchMenuBar::Immersive(menus.into()));
             launch
         }
         #[cfg(not(target_os = "windows"))]
         {
-            self.native_menu_bar(menus)
+            if crate::NativeMenuBar::is_supported() {
+                self.native_menu_bar(menus)
+            } else {
+                self
+            }
         }
     }
 
-    /// Uses the platform presentation of `menu_bar`.
-    pub fn immersive_menu_bar(self, menus: Vec<crate::NativeMenu>) -> Self {
-        self.menu_bar(menus)
+    /// Applies an app-wide view wrapper, such as a theme, to the complete
+    /// content. On Windows this includes the title bar installed by `menu_bar`.
+    pub fn wrap_content<V: View + 'static>(
+        mut self,
+        wrap: impl Fn(AnyView) -> V + 'static,
+    ) -> Self {
+        self.content_wrapper = Some(Box::new(move |content| AnyView::new(wrap(content))));
+        self
     }
 
-    /// Resolves the root for the native window host.
+    /// Resolves the content for an embedded host such as Android or the web.
     pub fn content(&self) -> AnyView {
-        match &self.menu_bar {
-            #[cfg(target_os = "windows")]
-            Some(LaunchMenuBar::Immersive(menus)) => crate::ImmersiveMenuBar::new(menus.clone())
-                .title(&self.configuration.window.title)
-                .with_content(self.root.clone()),
-            _ => self.root.clone(),
+        self.apply_content_wrapper(self.root.clone())
+    }
+
+    fn apply_content_wrapper(&self, content: AnyView) -> AnyView {
+        match &self.content_wrapper {
+            Some(wrap) => wrap(content),
+            None => content,
         }
+    }
+
+    fn window_content(&self) -> AnyView {
+        let content = match &self.menu_bar {
+            #[cfg(target_os = "windows")]
+            Some(LaunchMenuBar::Immersive(bar)) => {
+                let mut menus = bar.menus.clone();
+                if !bar.application_items.is_empty() {
+                    let name = if bar.app_name.is_empty() {
+                        &self.configuration.window.title
+                    } else {
+                        &bar.app_name
+                    };
+                    menus.insert(
+                        0,
+                        crate::NativeMenu::new(name, bar.application_items.clone()),
+                    );
+                }
+                crate::desktop::window::ImmersiveMenuBar::new(menus)
+                    .title(&self.configuration.window.title)
+                    .with_content(self.root.clone())
+            }
+            _ => self.root.clone(),
+        };
+        self.apply_content_wrapper(content)
     }
 
     /// Chooses what the platform composites behind clear pixels of the window.
@@ -108,7 +145,7 @@ impl ApplicationLaunch {
     /// platform directly. Android invokes the registered factory from its Activity
     /// instead of entering this blocking loop.
     pub fn run(mut self) -> Result<(), String> {
-        let root = self.content();
+        let root = self.window_content();
         crate::desktop::diagnostics::integration::set_diagnostics_factory(self.diagnostics);
         let mut callbacks = ApplicationCallbacks::default();
         match self.menu_bar.take() {
@@ -191,6 +228,111 @@ impl ApplicationLaunch {
             )
             .map_err(|error| error.to_string())?
         }
+    }
+}
+
+#[cfg(all(test, target_os = "windows"))]
+mod tests {
+    use super::*;
+    use cove_composition::{DynamicField, Scope, ViewGraph};
+    use cove_core::State;
+    use cove_core::scene::{Node, NodeTree, Recomposer};
+    use cove_ui_compose::primitives::text::Text;
+    use cove_ui_compose::theme::styles::appearance_modifier::{Appearance, AppearanceViewExt};
+    use cove_ui_compose::theme::styles::circular_appearance::ThemeTransition;
+    use cove_ui_compose::theme::{Theme, theme_for_node};
+    use std::{cell::RefCell, rc::Rc};
+
+    struct ThemedContent {
+        appearance: State<Appearance>,
+        content: AnyView,
+    }
+
+    impl View for ThemedContent {
+        fn body(&self, _cx: &Scope) -> AnyView {
+            AnyView::new(
+                self.content
+                    .clone()
+                    .appearance(self.appearance.get(), ThemeTransition::Instant),
+            )
+        }
+
+        fn dynamic_properties(&self) -> Vec<DynamicField> {
+            vec![DynamicField::state("appearance", &self.appearance)]
+        }
+    }
+
+    #[test]
+    fn wrapper_applies_to_the_window_menu_and_body() {
+        let light = Theme::default_light();
+        let appearance = State::new(Appearance::Light);
+        let observed = appearance.clone();
+        let launch = ApplicationLaunch::new(Text::new("Body"))
+            .menu_bar(vec![
+                crate::NativeMenu::named("Navigate").action("Home", || {}),
+            ])
+            .configure(|config| config.window.title = "Configured caption".into())
+            .wrap_content(move |content| ThemedContent {
+                appearance: observed.clone(),
+                content,
+            });
+        let tree = Rc::new(RefCell::new(NodeTree::new()));
+        let graph = Rc::new(ViewGraph::new(tree.clone(), Rc::new(Recomposer::new())));
+        graph.install_view(launch.window_content(), Default::default());
+        graph.recomposer.commit_all();
+        graph.compute_layout(450.0, 300.0);
+
+        fn find(node: &Node, predicate: &impl Fn(&Node) -> bool) -> Option<Node> {
+            if predicate(node) {
+                Some(node.clone())
+            } else {
+                node.children()
+                    .iter()
+                    .find_map(|child| find(child, predicate))
+            }
+        }
+
+        let root = tree.borrow().root().unwrap();
+        let labelled = |label| {
+            find(&root, &|node| {
+                node.accessibility()
+                    .is_some_and(|semantics| semantics.label == label)
+            })
+            .expect("label is mounted")
+        };
+        let menu = labelled("Navigate");
+        let caption = labelled("Configured caption");
+        let body = labelled("Body");
+        for node in [&menu, &caption, &body] {
+            assert_eq!(theme_for_node(node).colors, light.colors);
+        }
+        assert!(!caption.is_hit_testable(), "caption preserves window drag");
+        let menu = menu.absolute_frame();
+        let caption = caption.absolute_frame();
+        assert!(menu.x + menu.width <= caption.x);
+        assert!(caption.x + caption.width <= 450.0);
+        assert!(body.absolute_frame().y >= menu.y + menu.height);
+        assert_eq!(body.absolute_frame().max_y(), 300.0);
+
+        let title_bar = || {
+            find(&root, &|node| {
+                node.attachment::<String>(cove_composition::LayoutDebugAttachmentKey::DEBUG_NAME)
+                    .as_deref()
+                    == Some("app-window-title-bar")
+            })
+            .expect("mounted title bar")
+        };
+        assert_eq!(title_bar().background_color(), Some(light.colors.surface));
+        let dark = Theme::default_dark();
+        appearance.set(Appearance::Dark);
+        cove_core::scene::drain_scene_invalidations();
+        graph.recomposer.commit_all();
+        graph.compute_layout(450.0, 300.0);
+        assert_eq!(
+            theme_for_node(&labelled("Body")).colors.background,
+            dark.colors.background
+        );
+        assert_eq!(title_bar().background_color(), Some(dark.colors.surface));
     }
 }
 

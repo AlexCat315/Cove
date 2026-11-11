@@ -20,7 +20,7 @@ pub use chrome_views::{
     WindowControlButton, WindowControlGlyph, WindowControlStrip, WindowDragRegion,
 };
 #[cfg(target_os = "windows")]
-pub use immersive_menu::ImmersiveMenuBar;
+pub(crate) use immersive_menu::ImmersiveMenuBar;
 pub use native_menu::{
     NativeApplicationMenuTitles, NativeMenu, NativeMenuAction, NativeMenuBar, NativeMenuItem,
     NativeMenuKeyModifiers,

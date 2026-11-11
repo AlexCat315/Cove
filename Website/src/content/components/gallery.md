@@ -6,6 +6,8 @@ Gallery 展示 Cove 的 Rust 组件。组件页的 Size、Scale、Disabled 和 R
 
 Navigate 的 Dashboard 和 Calendar 共用一份菜单定义。Windows 在 Cove 标题栏显示 Navigate，可用 `-- --menu-bar separated` 或侧栏底部按钮切换分割线。macOS 在屏幕顶部的系统菜单栏显示同一个 Navigate。Linux、移动端和 Web 可从侧栏访问这两个页面。`-- --menu-bar none` 关闭 Gallery 提供的菜单。Rust 用法见 [窗口菜单栏](/docs/window-menu-bar)。
 
+侧栏底部的主题按钮同时更新 Gallery 正文和 Windows 标题栏。
+
 Dashboard 的 Asset import 卡片用 [Badge](/docs/badge) 显示当前状态。点击 Pause 或 Resume 暂停或继续导入，Advance 推进进度，完成后显示 Complete。
 
 侧栏搜索按名称、分类和简介过滤导航，不改变当前页面。输入多个词时，条目需同时匹配这些词。按 Escape 或点击清空按钮恢复完整导航。

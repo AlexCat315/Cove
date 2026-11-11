@@ -92,58 +92,30 @@ fn android_preserves_configuration_and_checkpoint_ownership() {
 }
 
 #[test]
-fn shared_menu_uses_window_chrome_only_on_windows() {
+fn embedded_content_applies_the_wrapper_without_window_chrome() {
+    let wrapped = Rc::new(Cell::new(false));
+    let observed = wrapped.clone();
     let launch = ApplicationLaunch::new(EmptyView)
         .menu_bar(vec![NativeMenu::named("Navigate").action("Home", || {})])
-        .configure(|config| config.window.title = "Configured caption".into());
+        .wrap_content(move |content| {
+            observed.set(true);
+            content
+        });
     let tree = Rc::new(RefCell::new(NodeTree::new()));
     let graph = Rc::new(ViewGraph::new(tree.clone(), Rc::new(Recomposer::new())));
-    graph.install_view(launch.content(), Default::default());
-    graph.recomposer.commit_all();
-    graph.compute_layout(450.0, 300.0);
-
-    fn labelled(node: &Node, label: &str) -> Option<Node> {
-        if node
-            .accessibility()
-            .is_some_and(|semantics| semantics.label == label)
-        {
-            Some(node.clone())
-        } else {
-            node.children()
-                .iter()
-                .find_map(|child| labelled(child, label))
-        }
-    }
-
-    let root = tree.borrow().root().unwrap();
-    if cfg!(target_os = "windows") {
-        let menu = labelled(&root, "Navigate").expect("the menu is mounted");
-        let caption = labelled(&root, "Configured caption").expect("the caption is mounted");
-        assert!(
-            !caption.is_hit_testable(),
-            "the caption preserves title-bar drag"
-        );
-        let menu = menu.absolute_frame();
-        let caption = caption.absolute_frame();
-        assert!(
-            menu.x + menu.width <= caption.x,
-            "the caption clears the menu"
-        );
-        assert!(caption.x + caption.width <= 450.0);
-    } else {
-        assert!(labelled(&root, "Navigate").is_none());
-        assert!(labelled(&root, "Configured caption").is_none());
-    }
-
     let mut hosted = DeclaredApplicationContent(launch);
     graph.install_view(
         hosted.root(SceneLaunchMode::Application, 1.0).unwrap(),
         Default::default(),
     );
     graph.recomposer.commit_all();
-    let root = tree.borrow().root().unwrap();
-    assert!(
-        labelled(&root, "Navigate").is_none(),
-        "Android uses the host's chrome"
-    );
+
+    fn has_menu(node: &Node) -> bool {
+        node.accessibility()
+            .is_some_and(|semantics| semantics.label == "Navigate")
+            || node.children().iter().any(has_menu)
+    }
+
+    assert!(wrapped.get());
+    assert!(!has_menu(&tree.borrow().root().unwrap()));
 }

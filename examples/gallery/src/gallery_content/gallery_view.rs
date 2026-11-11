@@ -12,8 +12,7 @@
 use cove_composition::Scope;
 use cove_composition::{AnyView, LayoutDebugExt, View, ViewExt};
 use cove_core::scene::{Align, FlexDirection, Justify, LayoutNode, Node, Wrap};
-use cove_core::{Binding, Environment, State};
-use cove_hosts::desktop::application::composition::AppDisplayHandleHolder;
+use cove_core::{Binding, State};
 use cove_ui_compose::adaptive::SurfaceEnvironment;
 use cove_ui_compose::animation::{AnimatedVisibility, Transition};
 use cove_ui_compose::modifiers::layout::{EdgeInsets, FlexExt, LayoutFrameExt, PaddingExt};
@@ -75,7 +74,7 @@ pub struct GalleryView {
     pub text_scale: State<Option<f64>>,
     /// In a single pane, whether the page covers the navigation.
     pub showing_page: State<bool>,
-    menu_bar: Option<AnyView>,
+    footer_action: Option<AnyView>,
 }
 
 impl GalleryView {
@@ -93,7 +92,7 @@ impl GalleryView {
             reset_generation: State::new(0),
             text_scale: State::new(Some(text_scale)),
             showing_page: State::new(true),
-            menu_bar: None,
+            footer_action: None,
         }
     }
 
@@ -101,10 +100,13 @@ impl GalleryView {
         self.page.get()
     }
 
-    #[cfg(target_os = "windows")]
-    pub fn with_menu_bar(mut self, menu_bar: impl View + 'static) -> Self {
-        self.menu_bar = Some(AnyView::new(menu_bar));
+    pub(crate) fn with_footer_action(mut self, action: AnyView) -> Self {
+        self.footer_action = Some(action);
         self
+    }
+
+    pub(crate) fn into_content(self) -> impl View {
+        GalleryContent(self)
     }
 
     pub fn is_dark(&self) -> bool {
@@ -122,10 +124,7 @@ impl GalleryView {
     }
 
     pub fn toggle_theme(&self) {
-        self.appearance.set(match self.appearance.get() {
-            Appearance::Light => Appearance::Dark,
-            Appearance::Dark => Appearance::Light,
-        });
+        toggle_appearance(&self.appearance);
     }
 
     /// Matches the catalog filtered by the search field, grouped into sections in
@@ -178,10 +177,7 @@ impl GalleryView {
             },
         )
     }
-}
-
-impl View for GalleryView {
-    fn body(&self, _cx: &Scope) -> AnyView {
+    fn layout(&self) -> AnyView {
         let content = GalleryPagePane {
             page: self.page.clone(),
             options: self.options.clone(),
@@ -227,35 +223,22 @@ impl View for GalleryView {
         .list_width(NAVIGATION_WIDTH)
         .two_pane_width(TWO_PANE_WIDTH)
         .hairline(false);
-        let shell = AnyView::new(navigation)
-            .flex_with(1.0, 1.0, Some(0.0))
-            .frame(None, None, None, Some(0.0), None, None)
-            .debug_name("gallery-shell");
-        let shell = if let Some(menu) = &self.menu_bar {
-            AnyView::new(
-                cove_ui_compose::BoxView::new(
-                    FlexDirection::Column,
-                    Align::Stretch,
-                    Justify::FlexStart,
-                    Wrap::NoWrap,
-                    0.0,
-                    AnyView::new(cove_composition::TupleView::new(vec![
-                        menu.clone(),
-                        AnyView::new(shell),
-                    ])),
-                )
-                .flex_with(1.0, 1.0, Some(0.0)),
-            )
-        } else {
-            AnyView::new(shell)
-        };
-        let root = AnyView::new(SafeArea::all(LayerRoot::new(shell)))
-            .flex_with(1.0, 1.0, Some(0.0))
-            .modifier(GalleryShellFrame)
-            .modifier(GalleryWindowFill);
-        erased(AnyView::new(root).appearance(self.appearance.get(), ThemeTransition::circular()))
+        AnyView::new(
+            AnyView::new(navigation)
+                .flex_with(1.0, 1.0, Some(0.0))
+                .frame(None, None, None, Some(0.0), None, None)
+                .debug_name("gallery-shell"),
+        )
     }
+}
 
+impl View for GalleryView {
+    fn body(&self, _cx: &Scope) -> AnyView {
+        AnyView::new(
+            gallery_frame(LayerRoot::new(self.layout()))
+                .appearance(self.appearance.get(), ThemeTransition::circular()),
+        )
+    }
     fn dynamic_properties(&self) -> Vec<cove_composition::DynamicField> {
         use cove_composition::DynamicField;
         vec![
@@ -268,6 +251,27 @@ impl View for GalleryView {
             DynamicField::state("showing_page", &self.showing_page),
         ]
     }
+}
+
+struct GalleryContent(GalleryView);
+
+impl View for GalleryContent {
+    fn body(&self, _cx: &Scope) -> AnyView {
+        gallery_frame(self.0.layout())
+    }
+
+    fn dynamic_properties(&self) -> Vec<cove_composition::DynamicField> {
+        self.0.dynamic_properties()
+    }
+}
+
+fn gallery_frame(content: impl View + 'static) -> AnyView {
+    AnyView::new(
+        AnyView::new(SafeArea::all(content))
+            .flex_with(1.0, 1.0, Some(0.0))
+            .modifier(GalleryShellFrame)
+            .modifier(GalleryWindowFill),
+    )
 }
 
 impl GalleryView {
@@ -355,77 +359,35 @@ impl GalleryView {
         } else {
             ("Switch to dark theme", icons::device::moon())
         };
-        let view = self.clone_handle();
+        let appearance = self.appearance.clone();
         let theme = AnyView::new(
             Button::icon_default(ButtonIconSource::resource(theme_icon), move || {
-                view.toggle_theme()
+                toggle_appearance(&appearance)
             })
             .selected(is_dark)
             .tooltip(theme_tip)
             .debug_name("gallery-theme"),
         );
-        // The divider toggle reads the published environment, so the launch
-        // flag and a runtime click share one source of truth.
-        let shows_divider = self.menu_bar.is_some();
-        erased(AnyView::new(cove_ui_compose::adaptive::SurfaceReader::new(
-            move |environment: &Environment| {
-                let mut buttons = vec![theme.clone()];
-                if shows_divider {
-                    let separated = environment.title_bar_divider;
-                    let divider = Button::icon_default(
-                        ButtonIconSource::resource(if separated {
-                            icons::layout::rows_2()
-                        } else {
-                            icons::layout::panel_top()
-                        }),
-                        move || {
-                            if let Some(handle) = AppDisplayHandleHolder::current() {
-                                handle.set_title_bar_divider(!separated);
-                            }
-                        },
-                    )
-                    .selected(separated)
-                    .tooltip(if separated {
-                        "Show a seamless title bar"
-                    } else {
-                        "Show a title bar divider"
-                    })
-                    .debug_name("gallery-title-bar-divider");
-                    buttons.push(AnyView::new(divider));
-                }
-                AnyView::new(cove_ui_compose::BoxView::new(
-                    FlexDirection::Row,
-                    Align::Center,
-                    Justify::FlexStart,
-                    Wrap::NoWrap,
-                    8.0,
-                    AnyView::new(cove_composition::TupleView::new(buttons)),
-                ))
-            },
-        )))
-    }
-
-    /// A lightweight handle for closures that only need the theme toggle. State
-    /// values are reference-counted, so this shares the same storage.
-    fn clone_handle(&self) -> GalleryThemeToggle {
-        GalleryThemeToggle {
-            appearance: self.appearance.clone(),
-        }
+        let mut buttons = vec![theme];
+        buttons.extend(self.footer_action.iter().cloned());
+        AnyView::new(cove_ui_compose::BoxView::new(
+            FlexDirection::Row,
+            Align::Center,
+            Justify::FlexStart,
+            Wrap::NoWrap,
+            8.0,
+            AnyView::new(cove_composition::TupleView::new(buttons)),
+        ))
     }
 }
 
-/// Theme toggle shared by the docked and rail footers.
-struct GalleryThemeToggle {
-    appearance: State<Appearance>,
-}
-
-impl GalleryThemeToggle {
-    fn toggle_theme(&self) {
-        self.appearance.set(match self.appearance.get() {
+fn toggle_appearance(appearance: &State<Appearance>) {
+    appearance.update(|value| {
+        *value = match value {
             Appearance::Light => Appearance::Dark,
             Appearance::Dark => Appearance::Light,
-        });
-    }
+        };
+    });
 }
 
 struct GalleryShellFrame;

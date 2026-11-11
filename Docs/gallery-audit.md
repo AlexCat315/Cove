@@ -4,6 +4,12 @@
 
 Swift 源码逐页对照见文末《Swift 源码对照（逐页差异清单）》。
 
+## 2026-11-11 窗口菜单装配
+
+| 页面或组件 | 实现与自动化验收 | 原生验收 | Rust 文档 |
+| --- | --- | --- | --- |
+| Gallery / 窗口菜单栏 | 应用声明共享菜单，宿主装配标题栏和弹出层。主题包裹完整窗口。回归覆盖标题栏和正文同主题、正文填满剩余高度，以及嵌入宿主只装配应用内容。 | Windows DevTools 确认 760×600pt 窗口只有一个 portal host，正文从 y=34pt 填到窗口底部。点击主题按钮后，标题栏和正文一起切换到深色。验证分割线切换和 Navigate → Calendar。macOS 实机待验收。 | [窗口菜单栏](../Website/src/content/components/window-menu-bar.md) · [Gallery](../Website/src/content/components/gallery.md) |
+
 ## 2026-11-11 共享菜单与平台呈现
 
 | 页面或组件 | 实现与自动化验收 | 原生验收 | Rust 文档 |

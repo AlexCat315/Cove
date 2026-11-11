@@ -3,22 +3,23 @@ use super::{ShowcaseInput, ShowcaseLaunch, ShowcaseMenuBar, TITLE};
 use crate::counter::CounterView;
 use crate::gallery_content::catalog::GalleryPage;
 use crate::gallery_content::{CounterContent, GalleryView};
-use cove_composition::AnyView;
 use cove_composition::layout::LayoutDirectionExt;
+use cove_composition::{AnyView, DynamicField, LayoutDebugExt, Scope, View};
 use cove_core::scene::Direction;
-use cove_core::{Environment, InputCapabilities};
-#[cfg(target_os = "windows")]
-use cove_hosts::ImmersiveMenuBar;
-use cove_hosts::desktop::application::configuration::{
-    AppFrameDrivePolicy, AppWindowTitleBarStyle,
-};
+use cove_core::{Environment, InputCapabilities, State};
+use cove_hosts::desktop::application::composition::AppDisplayHandleHolder;
+use cove_hosts::desktop::application::configuration::AppFrameDrivePolicy;
 use cove_hosts::desktop::diagnostics::ApplicationCheckpoint;
 use cove_hosts::{
     ApplicationConfiguration, ApplicationLaunch, NativeMenu, NativeMenuAction, NativeMenuBar,
     NativeMenuItem, NativeMenuKeyModifiers, TitleBarDivider, WindowBackdrop,
 };
-use cove_ui_compose::adaptive::{SurfaceEnvironmentExt, SurfaceReader};
-use cove_ui_compose::theme::styles::appearance_modifier::Appearance;
+use cove_ui_compose::adaptive::{SurfaceEnvironment, SurfaceEnvironmentExt, SurfaceReader};
+use cove_ui_compose::primitives::controls::{Button, ButtonIconSource};
+use cove_ui_compose::primitives::media::ui_icon_catalog as icons;
+use cove_ui_compose::primitives::overlays::portal::LayerRoot;
+use cove_ui_compose::theme::styles::appearance_modifier::{Appearance, AppearanceViewExt};
+use cove_ui_compose::theme::styles::circular_appearance::ThemeTransition;
 use cove_ui_compose::theme::tokens::ReducedMotionViewExt;
 
 fn configuration(launch: &ShowcaseLaunch) -> ApplicationConfiguration {
@@ -32,11 +33,11 @@ fn configuration(launch: &ShowcaseLaunch) -> ApplicationConfiguration {
     // The translucent material is the window default, independent of which
     // single-row look is selected.
     configuration.window.backdrop = WindowBackdrop::Sidebar;
-    if !launch.shared_counter && launch.menu_bar.uses_immersive_title_bar() {
-        configuration.window.title_bar_style = AppWindowTitleBarStyle::HiddenInset;
-        if launch.menu_bar == ShowcaseMenuBar::Separated {
-            configuration.window.title_bar_divider = TitleBarDivider::Hairline;
-        }
+    if !launch.shared_counter
+        && launch.menu_bar.uses_immersive_title_bar()
+        && launch.menu_bar == ShowcaseMenuBar::Separated
+    {
+        configuration.window.title_bar_divider = TitleBarDivider::Hairline;
     }
     configuration.rendering.vsync = launch.vsync;
     configuration.diagnostics.shows_performance_hud = launch.performance_hud;
@@ -98,6 +99,57 @@ fn navigation_menu(gallery: &GalleryView) -> NativeMenu {
     )
 }
 
+fn title_bar_divider_button() -> AnyView {
+    AnyView::new(SurfaceReader::new(|environment: &Environment| {
+        let separated = environment.title_bar_divider;
+        let (icon, tip) = if separated {
+            (icons::layout::rows_2(), "Show a seamless title bar")
+        } else {
+            (icons::layout::panel_top(), "Show a title bar divider")
+        };
+        AnyView::new(
+            Button::icon_default(ButtonIconSource::resource(icon), move || {
+                if let Some(handle) = AppDisplayHandleHolder::current() {
+                    handle.set_title_bar_divider(!separated);
+                }
+            })
+            .selected(separated)
+            .tooltip(tip)
+            .debug_name("gallery-title-bar-divider"),
+        )
+    }))
+}
+
+struct ShowcaseContent {
+    launch: ShowcaseLaunch,
+    appearance: State<Appearance>,
+    content: AnyView,
+}
+
+impl View for ShowcaseContent {
+    fn body(&self, cx: &Scope) -> AnyView {
+        let inherited = cx.composition_value(&SurfaceEnvironment::key());
+        AnyView::new(
+            AnyView::new(
+                self.content
+                    .clone()
+                    .appearance(self.appearance.get(), ThemeTransition::circular()),
+            )
+            .surface_environment(surface(&self.launch, &inherited))
+            .reduced_motion(self.launch.reduce_motion || inherited.reduces_motion)
+            .layout_direction(if self.launch.rtl {
+                Direction::Rtl
+            } else {
+                Direction::Ltr
+            }),
+        )
+    }
+
+    fn dynamic_properties(&self) -> Vec<DynamicField> {
+        vec![DynamicField::state("appearance", &self.appearance)]
+    }
+}
+
 impl ShowcaseLaunch {
     pub fn application(self) -> ApplicationLaunch {
         let launch = self;
@@ -127,36 +179,29 @@ impl ShowcaseLaunch {
             },
             launch.text_scale,
         );
-        let menus =
-            (launch.menu_bar != ShowcaseMenuBar::None).then(|| vec![navigation_menu(&gallery)]);
-        #[cfg(target_os = "windows")]
-        let (gallery, menus) = match menus {
-            Some(menus) if launch.menu_bar.uses_immersive_title_bar() => (
+        let menu = (launch.menu_bar != ShowcaseMenuBar::None)
+            .then(|| NativeMenuBar::new("CoveUI", vec![], vec![navigation_menu(&gallery)]));
+        let appearance = gallery.appearance.clone();
+        let root = if launch.menu_bar.uses_immersive_title_bar() {
+            // The window menu and the stories share the host's portal layer.
+            AnyView::new(
                 gallery
-                    .with_menu_bar(ImmersiveMenuBar::new(menus).title(&configuration.window.title)),
-                None,
-            ),
-            menus => (gallery, menus),
+                    .with_footer_action(title_bar_divider_button())
+                    .into_content(),
+            )
+        } else {
+            AnyView::new(LayerRoot::new(gallery.into_content()))
         };
-        let gallery = AnyView::new(gallery);
-        let root = AnyView::new(SurfaceReader::new(move |inherited: &Environment| {
-            gallery
-                .clone()
-                .surface_environment(surface(&launch, inherited))
-                .reduced_motion(launch.reduce_motion || inherited.reduces_motion)
-                .layout_direction(if launch.rtl {
-                    Direction::Rtl
-                } else {
-                    Direction::Ltr
-                })
-        }));
         let app = ApplicationLaunch::new(root)
             .configuration(configuration)
+            .wrap_content(move |content| ShowcaseContent {
+                launch: launch.clone(),
+                appearance: appearance.clone(),
+                content,
+            })
             .diagnostics(cove_hosts::desktop::diagnostics::devtools::factory());
-        match menus {
-            Some(menus) if NativeMenuBar::is_supported() => {
-                app.native_menu_bar(NativeMenuBar::new("CoveUI", vec![], menus))
-            }
+        match menu {
+            Some(menu) => app.menu_bar(menu),
             _ => app,
         }
     }
@@ -175,25 +220,11 @@ mod tests {
     }
 
     #[test]
-    fn immersive_flags_only_change_windows_chrome() {
+    fn immersive_flags_only_set_the_windows_divider_preference() {
         let seamless = configuration(&launch("immersive"));
         let separated = configuration(&launch("separated"));
         assert_eq!(seamless.window.backdrop, separated.window.backdrop);
         assert_eq!(seamless.window.backdrop, WindowBackdrop::Sidebar);
-        assert_eq!(
-            seamless.window.title_bar_style,
-            separated.window.title_bar_style
-        );
-        let style = if cfg!(target_os = "windows") {
-            AppWindowTitleBarStyle::HiddenInset
-        } else {
-            AppWindowTitleBarStyle::Standard
-        };
-        assert_eq!(seamless.window.title_bar_style, style);
-        assert_eq!(
-            configuration(&launch("none")).window.title_bar_style,
-            AppWindowTitleBarStyle::Standard
-        );
         assert_eq!(seamless.window.title_bar_divider, TitleBarDivider::Seamless);
         assert_eq!(
             separated.window.title_bar_divider,

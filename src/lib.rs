@@ -14,8 +14,6 @@ pub use cove_browser as browser;
 pub use cove_composition as composition;
 pub use cove_devtools as devtools;
 pub use cove_hosts as hosts;
-#[cfg(target_os = "windows")]
-pub use cove_hosts::ImmersiveMenuBar;
 pub use cove_hosts::{
     ApplicationCheckpoint, ApplicationConfiguration, ApplicationLaunch, NativeMenu,
     NativeMenuAction, NativeMenuBar, NativeMenuItem, NativeMenuKeyModifiers, WindowBackdrop,

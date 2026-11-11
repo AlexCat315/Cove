@@ -28,9 +28,12 @@ use cove_core::scene::{
 use cove_core::{Color, DrawList, Point, Rect, TextAlignment};
 use cove_platform::MouseButton;
 use cove_shell::WindowChromeHitTest;
+use cove_ui_compose::adaptive::SurfaceEnvironment;
 use cove_ui_compose::modifiers::layout::{FlexExt, LayoutFrameExt};
 use cove_ui_compose::primitives::text::Text;
-use cove_ui_compose::theme::{SemanticColorRef, SemanticFontRef, SemanticStyleViewExt};
+use cove_ui_compose::theme::{
+    SemanticColorRef, SemanticFontRef, SemanticStyleViewExt, ThemeEnvironment,
+};
 use std::rc::Rc;
 
 use super::chrome::{
@@ -103,7 +106,10 @@ impl ImmersiveWindowTitleBar {
 }
 
 impl View for ImmersiveWindowTitleBar {
-    fn body(&self, _cx: &Scope) -> AnyView {
+    fn body(&self, cx: &Scope) -> AnyView {
+        let colors = cx.composition_value(&ThemeEnvironment::key()).colors;
+        let environment = cx.composition_value(&SurfaceEnvironment::key());
+        let separated = environment.title_bar_divider;
         let style = self.control_style.resolve();
         let mut children: Vec<AnyView> = Vec::new();
         if style == ImmersiveWindowControlStyle::Native {
@@ -127,12 +133,18 @@ impl View for ImmersiveWindowTitleBar {
             ));
         }
         children.push(AnyView::new(
-            AnyView::new(TitleBarHairline).modifier(TitleBarHairlineModifier),
+            AnyView::new(TitleBarHairline)
+                .modifier(TitleBarHairlineModifier(separated.then_some(colors.border))),
         ));
         AnyView::new(
             WindowChromeRow { children }.modifier(WindowTitleBarModifier {
                 height: self.height,
                 resize_border_width: platform_resize_border_width(self.resize_border_width),
+                background: title_bar_background(
+                    colors.surface,
+                    environment.translucent_window,
+                    separated,
+                ),
             }),
         )
     }
@@ -198,6 +210,7 @@ impl_primitive_view!(WindowChromeRow);
 struct WindowTitleBarModifier {
     height: f32,
     resize_border_width: f32,
+    background: Option<Color>,
 }
 
 impl cove_composition::ViewModifier for WindowTitleBarModifier {
@@ -222,14 +235,7 @@ impl cove_composition::ViewModifier for WindowTitleBarModifier {
             LayoutDebugAttachmentKey::DEBUG_NAME,
             "app-window-title-bar".to_owned(),
         );
-        let colors = cove_ui_compose::theme::theme_for_node(node).colors;
-        let environment =
-            node.composition_value(&cove_ui_compose::adaptive::SurfaceEnvironment::key());
-        node.set_background_color(title_bar_background(
-            colors.surface,
-            environment.translucent_window,
-            environment.title_bar_divider,
-        ));
+        node.set_background_color(self.background);
     }
     fn apply_layout(&self, layout: &LayoutNode) {
         layout.set_flex_direction(FlexDirection::Row);
@@ -286,17 +292,11 @@ impl PrimitiveView for TitleBarHairline {
 }
 impl_primitive_view!(TitleBarHairline);
 
-struct TitleBarHairlineModifier;
+struct TitleBarHairlineModifier(Option<Color>);
 
 impl cove_composition::ViewModifier for TitleBarHairlineModifier {
     fn apply_node(&self, node: &Node) {
-        let separated =
-            node.composition_value(&cove_ui_compose::adaptive::SurfaceEnvironment::key())
-                .title_bar_divider;
-        let colors = cove_ui_compose::theme::theme_for_node(node).colors;
-        // `divider` is too faint for a 1px line on a light material; `border`
-        // matches the hairline Windows draws under a classic menu bar.
-        node.set_background_color(separated.then_some(colors.border));
+        node.set_background_color(self.0);
     }
     fn apply_layout(&self, layout: &LayoutNode) {
         layout.set_position_type(cove_core::scene::PositionType::Absolute);
