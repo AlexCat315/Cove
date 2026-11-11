@@ -44,7 +44,11 @@ pub struct JsonSchema {
     pub allowed_values: Vec<JsonSchemaScalar>,
     #[serde(default, rename = "oneOf", skip_serializing_if = "Vec::is_empty")]
     pub one_of: Vec<JsonSchema>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        rename = "additionalProperties",
+        skip_serializing_if = "Option::is_none"
+    )]
     pub additional_properties: Option<bool>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub minimum: Option<f64>,
