@@ -188,14 +188,25 @@ impl View for ButtonStory {
                 AnyView::new({
                     let clicks = icon_clicks.clone();
                     Button::new(
-                        TupleView::new(vec![
-                            AnyView::new(ButtonIcon::new(
-                                ButtonIconSource::resource(icons::action::check()),
-                                None,
-                                None,
-                            )),
-                            AnyView::new(Text::new("Confirm")),
-                        ]),
+                        // An icon and a label are one unbreakable unit: the row
+                        // must not wrap, and the label keeps to a single line so
+                        // a narrow button ellipsizes instead of stacking the
+                        // word onto a second line.
+                        BoxView::new(
+                            FlexDirection::Row,
+                            Align::Center,
+                            Justify::Center,
+                            Wrap::NoWrap,
+                            6.0,
+                            AnyView::new(TupleView::new(vec![
+                                AnyView::new(ButtonIcon::new(
+                                    ButtonIconSource::resource(icons::action::check()),
+                                    None,
+                                    None,
+                                )),
+                                AnyView::new(Text::new("Confirm").truncated()),
+                            ])),
+                        ),
                         move || clicks.update(|value| *value += 1),
                     )
                     .tooltip("Confirm changes")

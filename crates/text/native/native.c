@@ -12,9 +12,16 @@
 #include <string.h>
 
 typedef struct { FT_Library library; FT_Face face; hb_font_t *font; float size,scale,strike_scale; int color_active; } CoveFace;
+/* Coverage arrives as sRGB-encoded alpha and is blended in sRGB space, which
+   leaves thin strokes lighter than the platform renderer draws the same face.
+   Lifting the coverage curve restores that weight once, at library setup. */
+static uint8_t coverage_gamma[256];
+static void build_coverage_gamma(void) {
+    for (int i=0;i<256;++i) coverage_gamma[i]=(uint8_t)lround(255.0*pow(i/255.0,0.75));
+}
 static char *copy_string(const char *text) { if (!text) text=""; const size_t n=strlen(text)+1; char *p=malloc(n); if (p) memcpy(p,text,n); return p; }
 void cove_text_free(void *memory) { free(memory); }
-void *cove_text_library_new(void) { FT_Library library=NULL; return FT_Init_FreeType(&library)==0 ? library : NULL; }
+void *cove_text_library_new(void) { FT_Library library=NULL; build_coverage_gamma(); return FT_Init_FreeType(&library)==0 ? library : NULL; }
 void cove_text_library_free(void *library) { if (library) FT_Done_FreeType(library); }
 static int requested_size(CoveFace *face) {
     const int result=FT_Set_Char_Size(face->face,0,(FT_F26Dot6)(face->size*face->scale*64),72,72);
@@ -161,7 +168,7 @@ CoveGlyphBitmap cove_text_glyph_bitmap(void *value,uint32_t glyph,int color) {
                     pixels[at+2]=alpha ? (uint8_t)fmin(255,(row[x*4]*255u+alpha/2)/alpha) : 0; pixels[at+3]=(uint8_t)alpha;
                 } else if (bitmap.pixel_mode==FT_PIXEL_MODE_GRAY) pixels[at+3]=row[x];
                 else { free(pixels); result.valid=0; return result; }
-            } else { if (bitmap.pixel_mode==FT_PIXEL_MODE_GRAY) pixels[(size_t)y*w+x]=row[x];
+            } else { if (bitmap.pixel_mode==FT_PIXEL_MODE_GRAY) pixels[(size_t)y*w+x]=coverage_gamma[row[x]];
                 else if (bitmap.pixel_mode==FT_PIXEL_MODE_MONO) pixels[(size_t)y*w+x]=(row[x/8]&(0x80u>>(x%8))) ? 255 : 0;
                 else { free(pixels); result.valid=0; return result; } }
         }
