@@ -365,8 +365,8 @@ cargo test -p cove-ui-compose --test compose --locked
 | Menu | 3 | 0 / 0 | 挂载/几何基础检查通过；DevTools 实测行高 24、面板内缩 4、行首留白 8、分隔带 11（含 1pt 细线）；减弱动效与关闭时长由结构用例覆盖；逐像素目检因本机无屏幕录制权限未完成 |
 | MenuButton | 0 | 0 / 0 | 挂载/几何基础检查通过；Menu 页 `Actions` 菜单实测开启/Escape 关闭均不残留 portal；待逐项交互和视觉验收 |
 | ContextMenu | 0 | 0 / 0 | 挂载/几何基础检查通过；待逐项交互和视觉验收 |
-| Popover | 1 | 0 / 0 | 本轮组件/页面修复：默认 surface/overflow 改为 bubble/constrain（对齐 Swift），锚点改弱引用、指针追踪触发器中心、补阴影与桥接；DevTools 实测 Anchored form 气泡卡片/描边/阴影/指针齐全，嵌套 TextField 改值回读 `Name: Harbor`，Done/Escape/点外部均关闭；用户文档已写 |
-| Popconfirm | 1 | 0 / 0 | 本轮页面修复：placement playground 自 Popover 页迁入（对齐 Swift），十二方位气泡共用 Last action 回读；DevTools 实测 TL/Right 方位与指针朝向正确、OK 回读 `Last action: TL`、窄屏（<340pt）退化为 Select+单预览且气泡约束在视口内；用户文档已写 |
+| Popover | 1 | 0 / 0 | 本轮组件/页面修复：默认 surface/overflow 改为 bubble/constrain（对齐 Swift），锚点改弱引用、补阴影与桥接；气泡沿交叉轴微调使指针始终对准触发器中心（窄触发器亦对齐，优于 Swift 固定边缘对齐导致的指针偏移）；DevTools 实测 Anchored form 气泡卡片/描边/阴影/指针齐全，嵌套 TextField 改值回读 `Name: Harbor`，Done/Escape/点外部均关闭；用户文档已写 |
+| Popconfirm | 1 | 0 / 0 | 本轮页面修复：placement playground 自 Popover 页迁入（对齐 Swift），十二方位气泡共用 Last action 回读；DevTools 实测 TL/Bottom/Right 指针中心与触发器中心偏移均为 0、OK 回读 `Last action: TL`、窄屏（<340pt）退化为 Select+单预览且气泡约束在视口内；用户文档已写 |
 | ActionSheet | 0 | 0 / 0 | 挂载/几何基础检查通过；待逐项交互和视觉验收 |
 | Modal | 0 | 0 / 0 | 挂载/几何基础检查通过；待逐项交互和视觉验收 |
 | DisclosureGroup | 0 | 0 / 0 | 挂载/几何基础检查通过；待逐项交互和视觉验收 |

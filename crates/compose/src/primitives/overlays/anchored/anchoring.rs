@@ -109,19 +109,36 @@ impl PopoverAnchor {
 
     pub fn geometry(&self, size: Size, placement: PopoverPlacement) -> PopoverGeometry {
         let anchor = self.frame();
-        let window = self
-            .owner
+        let owner = self.owner.as_ref().and_then(Node::upgrade);
+        let window = owner
             .as_ref()
-            .and_then(Node::upgrade)
             .map(|owner| {
                 crate::primitives::overlays::portal::anchored_bounds(
-                    &owner,
-                    portal_window_bounds(&owner),
+                    owner,
+                    portal_window_bounds(owner),
                     Some(anchor),
                     anchor.origin(),
                 )
             })
             .unwrap_or_else(|| Rect::new(0.0, 0.0, 0.0, 0.0));
+        // The painter keeps the pointer this far from the card edge: the inset
+        // shadow margin, the corner radius and half the pointer base. Matching
+        // it here lets the geometry slide the bubble so the pointer lands on
+        // the anchor centre instead of being clamped off it.
+        let pointer_clearance = if self.style == PopoverSurface::Bubble {
+            owner
+                .as_ref()
+                .map(|owner| {
+                    let theme = crate::theme::theme_for_node(owner);
+                    let body_width = (size.width - PopoverGeometry::INSET * 2.0).max(0.0);
+                    let body_height = (size.height - PopoverGeometry::INSET * 2.0).max(0.0);
+                    let radius = theme.radius.lg.min(body_width.min(body_height) / 2.0);
+                    PopoverGeometry::INSET + radius + PopoverGeometry::POINTER_HALF
+                })
+                .unwrap_or(0.0)
+        } else {
+            0.0
+        };
         PopoverGeometry::new(
             anchor,
             size,
@@ -135,6 +152,7 @@ impl PopoverAnchor {
             } else {
                 0.0
             },
+            pointer_clearance,
         )
     }
 
@@ -632,7 +650,7 @@ impl PrimitiveView for PopoverSurfaceHost {
                 placement,
             );
             let target = anchor.frame();
-            let half = 7.0_f32;
+            let half = PopoverGeometry::POINTER_HALF;
             let absolute = owner.absolute_frame();
             let (a, b, tip) = if geometry.edge.is_vertical() {
                 let center = (body.x + radius + half).max(

@@ -330,6 +330,7 @@ fn placements() {
                 overflow,
                 PopoverGeometry::MARGIN,
                 PopoverGeometry::GAP,
+                0.0,
             )
         };
     let center = Rect::new(600.0, 400.0, 80.0, 44.0);
@@ -389,6 +390,91 @@ fn placements() {
     assert!(
         adaptive.edge == PopoverEdge::Top && adaptive.frame.y + adaptive.frame.height < 850.0,
         "{adaptive:?}"
+    );
+}
+
+#[test]
+fn pointer_reaches_a_narrow_anchor_centre() {
+    let window = Rect::new(0.0, 0.0, 1280.0, 900.0);
+    let size = Size {
+        width: 300.0,
+        height: 160.0,
+    };
+    // The painter's corner radius for this body size, matching the default theme.
+    let radius = 12.0_f32;
+    let clearance = PopoverGeometry::INSET + radius + PopoverGeometry::POINTER_HALF;
+    let geometry = |anchor: Rect, placement: PopoverPlacement| {
+        PopoverGeometry::new(
+            anchor,
+            size,
+            window,
+            placement,
+            false,
+            PopoverOverflow::Constrain,
+            PopoverGeometry::MARGIN,
+            PopoverGeometry::GAP,
+            clearance,
+        )
+    };
+    // Mirrors the painter: the pointer centre is the anchor centre clamped to
+    // the card's straight edge, `clearance` in from each corner.
+    let pointer_centre = |frame: Rect, anchor: Rect, vertical: bool| {
+        if vertical {
+            let body_x = frame.x + PopoverGeometry::INSET;
+            let body_w = size.width - PopoverGeometry::INSET * 2.0;
+            (anchor.x + anchor.width / 2.0)
+                .max(body_x + radius + PopoverGeometry::POINTER_HALF)
+                .min(body_x + body_w - radius - PopoverGeometry::POINTER_HALF)
+        } else {
+            let body_y = frame.y + PopoverGeometry::INSET;
+            let body_h = size.height - PopoverGeometry::INSET * 2.0;
+            (anchor.y + anchor.height / 2.0)
+                .max(body_y + radius + PopoverGeometry::POINTER_HALF)
+                .min(body_y + body_h - radius - PopoverGeometry::POINTER_HALF)
+        }
+    };
+
+    // A narrow trigger under a leading-aligned top edge: the bubble slides left
+    // so the pointer lands on the trigger centre rather than the corner clamp.
+    let narrow = Rect::new(720.0, 558.0, 16.0, 18.0);
+    let layout = geometry(narrow, PopoverPlacement::TopLeading);
+    let centre = pointer_centre(layout.frame, narrow, true);
+    assert!(
+        (centre - (narrow.x + narrow.width / 2.0)).abs() < 0.01,
+        "pointer centre {centre} should equal the trigger centre {}",
+        narrow.x + narrow.width / 2.0
+    );
+
+    // A wide trigger keeps its leading edge aligned; no slide is needed.
+    let wide = Rect::new(600.0, 400.0, 80.0, 44.0);
+    let layout = geometry(wide, PopoverPlacement::TopLeading);
+    assert!(
+        (layout.frame.x - wide.x).abs() < 0.01,
+        "a wide trigger keeps leading alignment: {:?}",
+        layout.frame
+    );
+    assert!(
+        (pointer_centre(layout.frame, wide, true) - (wide.x + wide.width / 2.0)).abs() < 0.01
+    );
+
+    // The same slide on a horizontal edge keeps the pointer on the anchor's
+    // vertical centre.
+    let side = Rect::new(400.0, 300.0, 40.0, 16.0);
+    let layout = geometry(side, PopoverPlacement::TrailingTop);
+    assert!(
+        (pointer_centre(layout.frame, side, false) - (side.y + side.height / 2.0)).abs() < 0.01,
+        "horizontal pointer should reach the trigger centre: {:?}",
+        layout.frame
+    );
+
+    // Near the viewport edge the window clamp wins and the bubble stays inside.
+    let edge = Rect::new(8.0, 400.0, 16.0, 18.0);
+    let layout = geometry(edge, PopoverPlacement::TopLeading);
+    assert!(
+        layout.frame.x >= 8.0 - 0.01
+            && layout.frame.x + layout.frame.width <= 1272.0 + 0.01,
+        "the bubble stays within the window: {:?}",
+        layout.frame
     );
 }
 

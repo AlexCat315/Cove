@@ -111,6 +111,8 @@ impl PopoverGeometry {
     pub const MARGIN: f32 = 8.0;
     pub const GAP: f32 = 4.0;
     pub const INSET: f32 = 10.0;
+    /// Half the pointer triangle's base width.
+    pub const POINTER_HALF: f32 = 7.0;
 
     pub fn new(
         anchor: Rect,
@@ -121,6 +123,7 @@ impl PopoverGeometry {
         overflow: PopoverOverflow,
         margin: f32,
         gap: f32,
+        pointer_clearance: f32,
     ) -> Self {
         let bounds = Rect::new(
             window.x + margin.min(window.width / 2.0),
@@ -182,7 +185,7 @@ impl PopoverGeometry {
                 (minimum + maximum - extent) / 2.0
             }
         };
-        let (x, y) = if edge.is_vertical() {
+        let (mut x, mut y) = if edge.is_vertical() {
             (
                 aligned(anchor.x, anchor.x + anchor.width, size.width),
                 if edge == PopoverEdge::Top {
@@ -201,6 +204,28 @@ impl PopoverGeometry {
                 aligned(anchor.y, anchor.y + anchor.height, size.height),
             )
         };
+        // Slide the bubble along its cross axis so the pointer can actually
+        // reach the anchor's centre. A narrow trigger under a leading-aligned
+        // edge would otherwise sit inside the corner clearance and the painter
+        // would clamp the pointer away from it. The window clamp below still
+        // wins, so near a viewport edge the pointer falls back to its closest
+        // reachable point.
+        if pointer_clearance > 0.0 {
+            let (mid, extent, pos) = if edge.is_vertical() {
+                (anchor.x + anchor.width / 2.0, size.width, &mut x)
+            } else {
+                (anchor.y + anchor.height / 2.0, size.height, &mut y)
+            };
+            let low = *pos + pointer_clearance;
+            let high = *pos + extent - pointer_clearance;
+            if high > low {
+                if mid < low {
+                    *pos -= low - mid;
+                } else if mid > high {
+                    *pos += mid - high;
+                }
+            }
+        }
         let frame = Rect::new(
             bounds.x.max(x.min(bounds.x + bounds.width - size.width)),
             bounds.y.max(y.min(bounds.y + bounds.height - size.height)),
