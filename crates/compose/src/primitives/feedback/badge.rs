@@ -216,11 +216,11 @@ impl PrimitiveView for Badge {
         }
         row.push(AnyView::new(
             Text::new(self.title.clone())
-                .line_limit(Some(1))
                 .semantic_font(metrics.font())
                 .foreground_color(style.ink)
                 .flex(0.0)
-                .shrink(0.0),
+                .shrink(1.0)
+                .frame_min_width(0.0),
         ));
 
         vec![AnyView::new(

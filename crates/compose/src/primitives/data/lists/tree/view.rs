@@ -2878,7 +2878,8 @@ impl PrimitiveView for TreeRow {
                             Icon::with_semantic(icon, 16.0, SemanticColorRef::on_surface_variant()),
                             move || toggle(),
                         )
-                        .enabled(enabled),
+                        .enabled(enabled)
+                        .tooltip(label),
                     )
                     .button_style(crate::theme::styles::buttons::plain())
                     .frame_size(self.disclosure_width, row_height)

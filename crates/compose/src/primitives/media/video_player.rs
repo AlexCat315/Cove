@@ -577,7 +577,7 @@ impl Surface {
                     true,
                     false,
                     false,
-                    None,
+                    Some("Play".to_string()),
                     move || actions.toggle_playback(),
                 )
                 .button_style(ghost())

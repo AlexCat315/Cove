@@ -91,7 +91,7 @@ impl<Id: PartialEq + Eq + std::hash::Hash + Clone + Send + Sync + 'static> Sideb
             sections,
             presentation: SidebarPresentation::Expanded,
             expanded: None,
-            minimum_row_height: 30.0,
+            minimum_row_height: 38.0,
             on_activate: Rc::new(|_| {}),
             ambient_theme: crate::theme::styles::default_light_theme::value(),
             header: AnyView::new(crate::EmptyView),
@@ -139,7 +139,7 @@ impl<Id: PartialEq + Eq + std::hash::Hash + Clone + Send + Sync + 'static> Sideb
         self.minimum_row_height = if height.is_finite() {
             height.max(0.0)
         } else {
-            30.0
+            38.0
         };
         self
     }

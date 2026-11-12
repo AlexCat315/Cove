@@ -194,7 +194,8 @@ fn long_labels_wrap_without_losing_text_or_controls() {
                                     assert_eq!(measure.key.text, TITLE);
                                     assert!(
                                         measure.result.lines.len() > 1,
-                                        "the long title wraps to more than one line"
+                                        "the long title wraps to more than one line ({label}/{width}/{scale}/rtl={rtl}, {} line(s))",
+                                        measure.result.lines.len()
                                     );
                                     let frame = text.absolute_frame();
                                     assert!(

@@ -12,9 +12,10 @@ use cove_composition::Scope;
 use cove_core::{Binding, State};
 use cove_ui_compose::LayoutDebugExt;
 use cove_ui_compose::modifiers::style::SemanticStyleViewExt;
-use cove_ui_compose::primitives::controls::Button;
+use cove_ui_compose::primitives::controls::{Button, ButtonIconSource};
 use cove_ui_compose::primitives::controls::fields::combobox::{Combobox, ComboboxSearch};
 use cove_ui_compose::primitives::controls::fields::select::SelectOption;
+use cove_ui_compose::primitives::media::ui_icon_catalog as icons;
 use cove_ui_compose::primitives::controls::form::{Form, FormField};
 use cove_ui_compose::primitives::controls::{FormController, FormRule, FormSubmissionState};
 use cove_ui_compose::primitives::controls::{RadioGroup, RadioOption};
@@ -742,10 +743,20 @@ impl View for TooltipStory {
             .configure(|options| options.max_width = 220.0)
             .debug_name("tooltip-long"),
         );
+        let icon_only = AnyView::new(
+            Button::icon(
+                ButtonIconSource::resource(icons::action::copy()),
+                16.0,
+                || {},
+            )
+            .tooltip("Copy")
+            .enabled(enabled)
+            .debug_name("tooltip-icon-only"),
+        );
         AnyView::new(StorySection::new(
             "Tooltips",
-            "Hover or focus a target to reveal its label. Long labels wrap inside the bubble.",
-            AnyView::new(TupleView::new(vec![short, long])),
+            "Hover or focus a target to reveal its label. A button with only an icon carries its label in the bubble.",
+            AnyView::new(TupleView::new(vec![short, long, icon_only])),
         ))
     }
 

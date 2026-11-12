@@ -172,6 +172,7 @@ impl View for Dialog {
                         14.0,
                         move || dismiss.set(false),
                     )
+                    .tooltip("Close dialog")
                     .button_style(GhostButtonStyle)
                     .control_size(ControlSize::Small)
                     .accessibility_label("Close dialog"),

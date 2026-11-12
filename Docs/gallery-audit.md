@@ -8,7 +8,7 @@ Swift 源码逐页对照见文末《Swift 源码对照（逐页差异清单）�
 
 | 页面或组件 | 实现与自动化验收 | 原生验收 | Rust 文档 |
 | --- | --- | --- | --- |
-| Tooltip | 与 Swift 逐项对照：停留 0.6s、warm window 0.4s、嵌套内层优先、单提示仲裁、聚焦可见、截断才显示、上方放置越界翻下。悬停命中挂在目标节点上，容器默认可命中，空留白也能触发。 | 未做 | [Tooltip](../Website/src/content/components/tooltip.md) |
+| Tooltip | 与 Swift 逐项对照：停留 0.6s、warm window 0.4s、嵌套内层优先、单提示仲裁、聚焦可见、截断才显示、上方放置越界翻下。悬停命中挂在目标节点上，容器默认可命中，空留白也能触发。纯图标按钮（无绘制文字）正常出提示；补齐对话框关闭、视频中央播放、Tree/TreeTable 展开收起箭头的提示，Gallery 新增图标按钮示例。新增 `an_icon_only_button_presents_its_tooltip`。 | 未做 | [Tooltip](../Website/src/content/components/tooltip.md) |
 | HoverCard | 指针卡与触摸 sheet 两条路径；卡片内任意留白都保持打开（全局悬停命中修正后生效），Escape 与外部点击关闭。Gallery 补齐键盘可达的 “Open profile” Popover 入口与 MeshRenderer 第二个示例。 | 未做 | [HoverCard](../Website/src/content/components/hover-card.md) |
 | Menu / ContextMenu | 与 Swift 对照，层级、子菜单翻转与夹紧、行密度一致。Gallery 右键菜单补齐文件夹/复制图标、详情行、富文本链接行与 Organize → Export 两级子菜单；禁用项保留可见但跳过。 | 未做 | [Menu](../Website/src/content/components/menu.md) |
 | Notification / Toast | 补齐 Swift 的悬停暂停与安全区内边距：指针停在整张卡片（含留白）时暂停倒计时，移开继续；栈按安全区在顶部或底部加内边距。新增场景回归 `hovering_the_card_pauses_its_countdown`。 | 未做 | [Notification / Toast](../Website/src/content/components/toast.md) |
@@ -74,7 +74,7 @@ Windows 默认后端改为 DX12。初始化 DX12 失败时尝试 Vulkan。DX12 �
 | 页面或组件 | 实现与自动化验收 | Windows 原生视觉与交互验收 | Rust 文档 |
 | --- | --- | --- | --- |
 | Gallery / Dashboard | DX12 像素回归先绘制局部裁剪内容，再解析 4× 颜色附件并输出完整画面。复制与回读分别断言左右两侧的像素。 | 实际窗口的侧栏、图标与正文完整显示。缩小窗口后双栏仍正常。DevTools 验证侧栏切换页面与返回，以及 Pause、Resume、Advance，进度由 64% 更新到 76%。 | [Gallery](../Website/src/content/components/gallery.md) |
-| Badge | 共用 Rust 组件按单行内容测量，并保留完整辅助功能标签。 | Windows Dashboard 的 Running 与 Paused 徽标按一行显示。 | [Badge](../Website/src/content/components/badge.md) |
+| Badge | 共用 Rust 组件在窄栏内换行而非截断，徽标随文字增高，并保留完整辅助功能标签；`adaptive_compact_label` 覆盖 220pt 栏内完整换行。 | Windows Dashboard 的 Running 与 Paused 徽标按一行显示。 | [Badge](../Website/src/content/components/badge.md) |
 
 本轮使用 Windows x64 MSVC。原生验收覆盖窗口呈现、缩放与指针操作。键盘与 IME 验收另行记录。
 

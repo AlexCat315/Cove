@@ -31,7 +31,7 @@ use cove_composition::{AnyView, PrimitiveView};
 use cove_core::Binding;
 use cove_core::scene::{AccessibilityRole, Node, NodeResource};
 use cove_ui_compose::modifiers::interaction::AccessibilityExt;
-use cove_ui_compose::primitives::controls::Button;
+use cove_ui_compose::primitives::controls::{Button, ButtonIconSource};
 use cove_ui_compose::primitives::controls::fields::select::{Select, SelectOption};
 use cove_ui_compose::primitives::overlays::portal::PortalResource;
 use cove_ui_compose::primitives::overlays::tooltip::{
@@ -282,6 +282,29 @@ fn a_distinct_button_tooltip_is_kept() {
         assert!(
             session.is_presented(),
             "the distinct tip presents once its delay elapses"
+        );
+        let entries = scene.portal.entries();
+        assert_eq!(entries.len(), 1, "exactly one tooltip chip appears");
+        assert!(entries[0].is_tooltip, "the published entry is a tooltip");
+    });
+}
+
+#[test]
+fn an_icon_only_button_presents_its_tooltip() {
+    InteractiveScene::run(320.0, 60.0, |scene| {
+        let (_host, session) = mount_button(
+            scene,
+            Button::icon(ButtonIconSource::texture(7), 16.0, || {}).tooltip("Copy"),
+        );
+        session.set_hovered(true);
+        assert!(
+            session.is_active(),
+            "an icon-only button draws no text, so its tooltip adds information"
+        );
+        scene.settle(2, 1.0);
+        assert!(
+            session.is_presented(),
+            "the icon-only tip presents once its delay elapses"
         );
         let entries = scene.portal.entries();
         assert_eq!(entries.len(), 1, "exactly one tooltip chip appears");

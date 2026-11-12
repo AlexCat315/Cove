@@ -166,7 +166,7 @@ impl<Id: PartialEq + Eq + std::hash::Hash + Clone + Send + Sync + 'static> Adapt
         let presentation = geometry.presentation(self.options.layout.shows_rail_labels);
         // A pointer source list is dense, as on macOS; touch keeps 44pt.
         let row_height = if geometry.mode == SidebarMode::Expanded {
-            30.0
+            38.0
         } else {
             44.0
         };

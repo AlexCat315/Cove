@@ -380,7 +380,8 @@ where
                                                         ButtonIcon::new(icon, Some(12.0), None),
                                                         move || action(),
                                                     )
-                                                    .role(ButtonRole::Normal),
+                                                    .role(ButtonRole::Normal)
+                                                    .tooltip(label),
                                                 )
                                                 .button_style(
                                                     crate::theme::styles::buttons::secondary(),

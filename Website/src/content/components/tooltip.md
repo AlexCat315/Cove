@@ -17,6 +17,17 @@ let row = Text::new(long_title).truncated().tooltip_when_truncated(long_title);
 
 可见焦点落在目标上时提示随焦点出现；`tooltip_when_truncated` 只在该节点真的截断文字后才显示，完整可见的标签保持安静。焦点出现不享受 warm window 的免等待，避免菜单关闭后立刻盖住用户刚用过的工具条。
 
+## 纯图标控件
+
+图标按钮没有可见文字，提示就是它唯一的标签来源：
+
+```rust
+Button::icon(ButtonIconSource::resource(icons::action::copy()), 16.0, copy)
+    .tooltip("Copy");
+```
+
+`Button` 只在提示文字没有实际绘制出来时才展示气泡：文字按钮重复自己的标签会自动静默，图标按钮没有绘制文字，所以气泡照常出现；标签被省略号截断时例外，此时提示补回丢失的信息。对话框关闭按钮、视频中央播放按钮、树与表格的展开/收起箭头都按这条规则提供提示。
+
 ## 位置
 
 提示以目标为中心放在上方，顶部会超出窗口时翻到下方；实际高度参与落点计算，长文案按 `max_width`（默认 320pt）换行。
