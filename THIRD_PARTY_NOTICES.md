@@ -9,7 +9,7 @@ Cove 自有代码按 [Apache License 2.0](LICENSE) 提供。第三方源码、�
 | 组件 | 许可证及原文 |
 | --- | --- |
 | FFmpeg 9.0（libavcodec、libavfilter、libavformat、libavutil、libswresample、libswscale） | LGPL-2.1-or-later，不启用 GPL/version3/nonfree 组件；原文为源码树中的 `COPYING.LGPLv2.1`、`COPYING.LGPLv3` 及逐文件版权声明 |
-| `ffmpeg-sys-next` 9.0.1 | WTFPL；绑定在构建时生成 |
+| `ffmpeg-sys-next` 9.0.1 | WTFPL；仓库内含补丁副本 `third-party/ffmpeg-sys-next`（build script 注入 Cove 构建环境），绑定在构建时生成 |
 | `cpal` 0.18.2 及其平台后端 | Apache-2.0；各平台使用 CoreAudio、WASAPI、ALSA 或 AAudio 等系统 API |
 
 FFmpeg 源码与原文在首次构建时下载到 Cargo 的 `OUT_DIR`，不保存在本仓库。分发静态链接 FFmpeg 的二进制时，须同时提供对应源码、构建参数与重新链接材料；单独附带本文件或“关于”页面不能替代这些材料。具体操作见 [媒体分发说明](Docs/media-licensing.md)。

@@ -142,3 +142,8 @@ workspace = true
 [profile.release]
 lto = "thin"
 codegen-units = 1
+
+# Pinned copy of ffmpeg-sys-next whose build script loads Cove's MSVC + MSYS2
+# setup environment in-process; upstream only sees the ambient process PATH.
+[patch.crates-io]
+ffmpeg-sys-next = { path = "third-party/ffmpeg-sys-next" }

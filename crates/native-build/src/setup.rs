@@ -324,6 +324,118 @@ pub fn apply(command: &mut Command) -> io::Result<()> {
     command.envs(environment()?);
     Ok(())
 }
+/// Process environment for third-party build scripts that cannot read the setup
+/// state themselves: FFmpeg's `configure` runs under `sh` with the MSVC
+/// toolchain and only sees the process environment. Windows media builds only;
+/// other hosts and targets are left untouched.
+pub fn apply_media_process() -> io::Result<()> {
+    #[cfg(windows)]
+    {
+        if env::var("CARGO_CFG_TARGET_OS").as_deref() != Ok("windows")
+            || env::var("CARGO_FEATURE_BUILD").is_err()
+        {
+            return Ok(());
+        }
+        let msys = windows_drive().join("msys64");
+        if !msys.join("usr/bin/sh.exe").is_file() {
+            return Err(io::Error::other(
+                "MSYS2 not found; run 'cargo cove setup --media'",
+            ));
+        }
+        let (include, lib, msvc_path) = msvc_environment()?;
+        let mut paths = Vec::new();
+        for path in env::split_paths(&msvc_path) {
+            let text = path.to_string_lossy();
+            // Git's coreutils sh/link and any earlier MSYS entry would shadow the
+            // MSVC linker or the MSYS tools appended below.
+            if text.ends_with("Git\\usr\\bin")
+                || text.ends_with("Git\\mingw64\\bin")
+                || path.starts_with(&msys)
+            {
+                continue;
+            }
+            paths.push(path);
+        }
+        paths.push(msys.join("usr/bin"));
+        paths.push(msys.join("ucrt64/bin"));
+        let path = env::join_paths(paths).map_err(io::Error::other)?;
+        // Build scripts are single-threaded, so mutating the process environment is
+        // safe and is the only way to reach configure, make and bindgen from here.
+        unsafe {
+            env::set_var("PATH", path);
+            env::set_var("INCLUDE", include);
+            env::set_var("LIB", lib);
+        }
+        if env::var_os("LIBCLANG_PATH").is_none() {
+            let libclang = msys.join("ucrt64/bin");
+            if libclang.join("libclang.dll").is_file() {
+                unsafe { env::set_var("LIBCLANG_PATH", libclang) };
+            }
+        }
+        // MSYS2's libclang defaults to the GNU target and would parse FFmpeg's
+        // headers against mingw's include tree instead of the Windows SDK.
+        let target = "--target=x86_64-pc-windows-msvc";
+        let extra = env::var("BINDGEN_EXTRA_CLANG_ARGS").unwrap_or_default();
+        if !extra.contains(target) {
+            let extra = if extra.is_empty() {
+                target.to_string()
+            } else {
+                format!("{extra} {target}")
+            };
+            unsafe { env::set_var("BINDGEN_EXTRA_CLANG_ARGS", extra) };
+        }
+    }
+    Ok(())
+}
+#[cfg(windows)]
+fn msvc_environment() -> io::Result<(String, String, String)> {
+    use std::os::windows::process::CommandExt;
+    let root =
+        env::var_os("ProgramFiles(x86)").unwrap_or_else(|| "C:\\Program Files (x86)".into());
+    let vswhere = Path::new(&root).join("Microsoft Visual Studio/Installer/vswhere.exe");
+    let output = Command::new(vswhere)
+        .args([
+            "-latest",
+            "-products",
+            "*",
+            "-requires",
+            "Microsoft.VisualStudio.Component.VC.Tools.x86.x64",
+            "-property",
+            "installationPath",
+        ])
+        .output()?;
+    let installation = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    if installation.is_empty() {
+        return Err(io::Error::other(
+            "Visual Studio C++ tools not found; run 'cargo cove setup --media'",
+        ));
+    }
+    let vcvars = Path::new(&installation).join("VC/Auxiliary/Build/vcvars64.bat");
+    // cmd does not understand Command's backslash-quote escaping, so the whole
+    // command line goes in raw.
+    let output = Command::new("cmd")
+        .raw_arg(format!(
+            "/c call \"{}\" >nul 2>&1 && set",
+            vcvars.display()
+        ))
+        .output()?;
+    let mut values = (String::new(), String::new(), String::new());
+    for line in String::from_utf8_lossy(&output.stdout).lines() {
+        let Some((key, value)) = line.split_once('=') else {
+            continue;
+        };
+        match key {
+            "INCLUDE" => values.0 = value.to_string(),
+            "LIB" => values.1 = value.to_string(),
+            "PATH" => values.2 = value.to_string(),
+            _ => {}
+        }
+    }
+    if values.0.is_empty() || values.1.is_empty() {
+        return Err(io::Error::other("vcvars64 did not report INCLUDE/LIB"));
+    }
+    Ok(values)
+}
 pub fn command(program: &str) -> io::Result<Command> {
     let saved = state()?;
     let preferred = saved["tools"]

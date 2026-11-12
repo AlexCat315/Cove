@@ -17,7 +17,7 @@
 | `cpal` | `0.18.2` | 无默认 features；提供系统默认音频设备输出 |
 | `libc` | `0.2` | 自定义 AVIO 与 errno 映射 |
 
-FFmpeg 构建保持 `--disable-autodetect`、`--disable-programs`、`--disable-doc`，并关闭 `gpl`、`version3`、`nonfree`，因此产物为 LGPL-2.1-or-later 的静态库集合，不包含 GPL 编码器或外部库。库文件位于 Cargo 的 `OUT_DIR`，不写入共享前缀，也没有 pkg-config 或环境变量注入。
+FFmpeg 构建保持 `--disable-autodetect`、`--disable-programs`、`--disable-doc`，并关闭 `gpl`、`version3`、`nonfree`，因此产物为 LGPL-2.1-or-later 的静态库集合，不包含 GPL 编码器或外部库。库文件位于 Cargo 的 `OUT_DIR`，不写入共享前缀，也不修改用户环境（Windows 的补丁副本 build script 只在自身进程内注入工具链环境）。
 
 首次构建需要联网：构建脚本以 `git clone --depth=1 -b release/9.0` 获取 FFmpeg 源码到 `OUT_DIR`，之后 `configure`、`make`、`make install` 都在同一目录完成。
 
@@ -87,14 +87,7 @@ cargo test --locked -p cove-media-rhi --features ffmpeg
 
 `--check` 只报告，`--dry-run` 只输出安装计划。Android 目标由 setup 写入 NDK 编译器与 `CC_/CXX_/AR_`；`ffmpeg-sys-next` 要求这些变量指明交叉工具链（与 `cargo-ndk` 提供的变量一致）。
 
-Windows 本地构建用 `Tools/media-cargo.ps1` 组装进程环境：`ffmpeg-sys-next` 的构建脚本不读 setup 状态，只认环境变量，需要 MSVC 开发环境（`cl`/`link`、`INCLUDE`/`LIB`）与 MSYS2 的 `sh`/`make`/`nasm` 同时在 PATH 中。脚本加载 vcvars64、把 MSYS2 `usr\bin` 与 `ucrt64\bin` 接在 MSVC 目录之后、设置 `LIBCLANG_PATH`、bindgen 的 MSVC target（MSYS2 的 libclang 默认 GNU target，会误用 mingw 头文件）与 MSVC 链接器，不修改系统环境：
-
-```powershell
-./Tools/media-cargo.ps1 run -p cove-examples --bin gallery --features media-ffmpeg
-./Tools/media-cargo.ps1 test --locked -p cove-media --features ffmpeg --all-targets
-```
-
-dot-source（`. ./Tools/media-cargo.ps1`）可把同一环境加载进当前 shell 后直接使用 cargo。PATH 顺序必须让 `cl`/`link` 解析到 MSVC、`sh`/`make`/`nasm` 解析到 MSYS2；Git 的 `usr\bin` 自带 coreutils 的 `sh` 与 `link` 会遮蔽两者，脚本会将其移出 PATH。
+Windows 无需额外组装环境：仓库在 `third-party/ffmpeg-sys-next` 内含 `ffmpeg-sys-next` 的补丁副本（根 manifest 以 `[patch.crates-io]` 指向），其 build script 入口调用 `cove_native_build::setup::apply_media_process`，把 MSVC 开发环境（vcvars64 的 `INCLUDE`/`LIB` 与工具目录）与 MSYS2 的 `sh`/`make`/`nasm` 注入进程环境，并设置 `LIBCLANG_PATH` 与 bindgen 的 MSVC target（MSYS2 的 libclang 默认 GNU target，会误用 mingw 头文件）。PATH 顺序保证 `cl`/`link` 解析到 MSVC、`sh`/`make`/`nasm` 解析到 MSYS2，Git `usr\bin` 的 coreutils `sh`/`link` 被排除。`cargo cove setup --media` 之后即可直接使用普通 cargo 命令；升级 `ffmpeg-sys-next` 时需重新同步副本与其补丁。
 
 ## 7. 平台状态
 
