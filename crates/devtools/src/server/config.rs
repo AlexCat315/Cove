@@ -27,6 +27,22 @@ impl Default for DevToolsConfig {
     }
 }
 
+/// Whether a `COVE_DEVTOOLS` value opts in. Only an absent variable or one of
+/// the documented off values leaves DevTools disabled.
+pub fn is_enabled_value(value: &str) -> bool {
+    !matches!(
+        value.trim().to_ascii_lowercase().as_str(),
+        "" | "0" | "false" | "no" | "off"
+    )
+}
+
+/// Reads the same rule from the environment.
+pub fn enabled_from_environment() -> bool {
+    std::env::var("COVE_DEVTOOLS")
+        .ok()
+        .is_some_and(|value| is_enabled_value(&value))
+}
+
 impl DevToolsConfig {
     pub fn new(
         host: impl Into<String>,
@@ -43,16 +59,13 @@ impl DevToolsConfig {
         }
     }
 
-    /// Enable the server when `COVE_DEVTOOLS=1`. Debug builds only, matching the
-    /// Swift `#if !DEBUG` gate.
+    /// Enable the server when `COVE_DEVTOOLS` is set to an enabling value.
+    /// Debug builds only, matching the Swift `#if !DEBUG` gate.
     pub fn from_environment(app_title: &str) -> Option<Self> {
-        if !cfg!(debug_assertions) {
+        if !cfg!(debug_assertions) || !enabled_from_environment() {
             return None;
         }
         let environment = |key: &str| std::env::var(key).ok();
-        if environment("COVE_DEVTOOLS").as_deref() != Some("1") {
-            return None;
-        }
         let host = environment("COVE_DEVTOOLS_HOST").unwrap_or_else(|| "127.0.0.1".into());
         let port = environment("COVE_DEVTOOLS_PORT")
             .and_then(|value| value.parse::<u16>().ok())
@@ -362,8 +375,18 @@ mod tests {
     #[test]
     fn environment_opt_in_requires_the_debug_flag() {
         // Nothing is set in the test environment, so this must be `None`.
-        if std::env::var("COVE_DEVTOOLS").ok().as_deref() != Some("1") {
+        if !enabled_from_environment() {
             assert!(DevToolsConfig::from_environment("Test").is_none());
+        }
+    }
+
+    #[test]
+    fn only_documented_off_values_disable_devtools() {
+        for value in ["", " ", "0", "false", "FALSE", "no", " No ", "off"] {
+            assert!(!is_enabled_value(value), "{value:?} must stay disabled");
+        }
+        for value in ["1", "true", "yes", "on", "anything"] {
+            assert!(is_enabled_value(value), "{value:?} must enable DevTools");
         }
     }
 }

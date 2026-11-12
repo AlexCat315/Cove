@@ -9,7 +9,7 @@ COVE_DEVTOOLS=1 cargo run --package cove-examples
 cargo run --quiet --package cove-devtools-cli -- mcp
 ```
 
-仓库根目录的 `.mcp.json` 提供项目配置。支持该配置的 MCP 客户端可直接加载；其他客户端注册同一 stdio 命令：
+仓库根目录的 `.mcp.json` 指向 `Tools/DevTools/mcp.sh`：GUI 启动的 MCP 客户端 PATH 不含 Rust 工具链和 sccache，脚本补齐后 exec 同一命令。其他客户端注册同一 stdio 命令：
 
 ```json
 {
