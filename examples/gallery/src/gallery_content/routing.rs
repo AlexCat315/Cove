@@ -196,6 +196,9 @@ impl StoryDispatch {
             Self::Story(GalleryPage::MediaPlayer) => {
                 Some(AnyView::new(stories::MediaPlayerStory::new(options)))
             }
+            Self::Story(GalleryPage::RayTracedShadows) => Some(AnyView::new(
+                stories::ray_traced_shadows::RayTracedShadowsStory(options),
+            )),
             Self::Story(GalleryPage::Skeleton) => {
                 Some(AnyView::new(stories::SkeletonStory::new(options)))
             }
@@ -461,6 +464,7 @@ impl StorySource {
             (GalleryPage::Skeleton, "Feedback/SkeletonStory.swift"),
             (GalleryPage::Stepper, "Controls/StepperStory.swift"),
             (GalleryPage::MediaPlayer, "Media/MediaPlayerStory.swift"),
+            (GalleryPage::RayTracedShadows, "ray_traced_shadows/mod.rs"),
         ]
     }
 

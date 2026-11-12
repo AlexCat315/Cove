@@ -10,6 +10,8 @@ Navigate 的 Dashboard 和 Calendar 共用一份菜单定义。Windows 在 Cove 
 
 Dashboard 的 Asset import 卡片用 [Badge](/docs/badge) 显示当前状态。点击 Pause 或 Resume 暂停或继续导入，Advance 推进进度，完成后显示 Complete。
 
+Graphics → [Ray-Traced Shadows](/docs/ray-traced-shadows) 可移动面光源并切换阴影渲染方式。用 `-- --component ray-traced-shadows` 直接打开。
+
 侧栏搜索按名称、分类和简介过滤导航，不改变当前页面。输入多个词时，条目需同时匹配这些词。按 Escape 或点击清空按钮恢复完整导航。
 
 当前已补充使用说明的页面：

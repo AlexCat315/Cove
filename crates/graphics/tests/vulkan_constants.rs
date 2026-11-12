@@ -61,8 +61,8 @@ fn binding_constants_match_the_bundled_header() {
 
     let mut checked = 0;
     let mut mismatches = Vec::new();
-    for line in bindings.lines() {
-        let Some(rest) = line.trim().strip_prefix("pub const VK_") else {
+    for declaration in bindings.split("pub const VK_").skip(1) {
+        let Some((rest, _)) = declaration.split_once(';') else {
             continue;
         };
         let Some((name, rest)) = rest.split_once(':') else {
@@ -72,7 +72,7 @@ fn binding_constants_match_the_bundled_header() {
             continue;
         };
         let name = format!("VK_{name}");
-        let Some(value) = parse_integer(value.trim().trim_end_matches(';')) else {
+        let Some(value) = parse_integer(value) else {
             continue;
         };
         let Some(&header_value) = expected.get(&name) else {

@@ -12,14 +12,16 @@ pub use rhi::*;
 #[cfg(any(target_os = "macos", target_os = "ios"))]
 pub mod metal;
 
-/// The Vulkan backend reaches the driver through a runtime-loaded loader, so it
-/// is compiled on every host: only its registration is limited to the platforms
-/// that ship a Vulkan driver.
+/// The Vulkan backend loads the native driver at runtime.
+#[cfg(not(target_arch = "wasm32"))]
 pub mod vulkan;
 
-/// The DX12 backend reaches the driver through COM vtable dispatch, so it is
-/// compiled on every host; only its registration is limited to Windows.
+/// The DX12 backend reaches the driver through COM vtable dispatch.
+#[cfg(not(target_arch = "wasm32"))]
 pub mod dx12;
+
+#[cfg(target_arch = "wasm32")]
+pub mod webgpu;
 
 pub mod ui;
 pub use ui::*;

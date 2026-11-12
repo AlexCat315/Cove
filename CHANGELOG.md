@@ -4,6 +4,9 @@
 
 ## Unreleased
 
+- 浏览器新增 Rust RHI WebGPU 后端。Gallery 在 Web 复用原生 DrawList 渲染器和 4× MSAA，UI 与合成着色器由 Slang 生成浏览器产物。
+- Gallery 新增 Ray-Traced Shadows。移动面光源可实时查看软阴影，支持 DX12、Vulkan 和 Metal 光线查询，并提供光栅化对照和回退。场景几何在输出位图前进行四点覆盖采样。
+- 修复 Vulkan 加速结构能力探测和几何描述中的结构类型标识，使支持 `VK_KHR_ray_query` 的设备能够建立并查询场景。
 - DX12 使用原生命令签名执行间接绘制和调度，支持网格与放大着色器，以及 DXR 三角形 BLAS、实例 TLAS 和内联光线查询。按实际硬件层级报告能力并遵循高性能或低功耗适配器偏好。
 - 桌面启动新增 `immersive_menu_bar`、`native_menu_bar` 和 `window_backdrop`。Gallery 默认使用 Cove 自绘沉浸式标题区，与侧栏共用窗口材质。Windows 11 的原生模式将 WinUI 应用菜单与系统按钮放在同一行，缺少 Windows App Runtime 1.8 时保留标准窗口。
 

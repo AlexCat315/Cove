@@ -19,10 +19,10 @@ Clip space 使用 +Y 向上、深度 0…1；framebuffer / viewport 使用左上
 | 窗口呈现与 resize | 本机验证 | Android 横竖屏与 surface 重建真机验证；Win32 / Xlib / Wayland 待验证 | HWND swapchain 实现，待验证 |
 | 帧上传、延迟销毁、跨队列同步 | 本机验证 | 原生实现，独立 queue family 待验证 | 原生实现，待验证 |
 | Mesh / task | Mesh 已验证；task 关闭 | EXT 管线与直接 dispatch 实现，设备功能链控制，GPU 待验证 | MS / AS 管线与直接 dispatch 实现，GPU 待验证 |
-| BLAS / TLAS / compute ray query | 原生 MSL 命中与未命中已验证 | KHR 构建、地址、绑定实现，GPU 待验证 | DXR 构建、绑定实现；inline query 要求 tier 1.1，GPU 待验证 |
+| BLAS / TLAS / compute ray query | 原生 MSL 命中与未命中已验证 | KHR 构建、绑定与计算查询已在 Windows RTX 3050 验证 | DXR tier 1.1 构建、绑定与内联查询已在 Windows RTX 3050 验证 |
 | RT pipeline / SBT、AS update / compaction、间接 mesh | 关闭 | 关闭 | 关闭 |
 
-`Device.capabilities` 表示实现路径与当前设备支持的交集，默认值全部关闭。**功能存在与平台验证是两件事**：DX12、Vulkan RT / mesh 的源码已接入，但本机没有相应设备，不能把它们称为已验证。
+`Device.capabilities` 表示实现路径与当前设备支持的交集，默认值全部关闭。Gallery 的 Ray-Traced Shadows GPU 回归在 Windows 上对 DX12 和 Vulkan 分别验证全亮、全遮挡和部分遮挡的地板采样点，以及移动光源后的遮罩变化。
 
 `adapterCapabilities` 是硬件诊断信息，不能代替 `capabilities`。光追能力表示 API 可用，不保证具有专用光追单元；本机 Apple M1 测试验证功能正确性，不代表专用 RT 硬件性能。
 

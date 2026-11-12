@@ -88,7 +88,7 @@ impl MetalLibraryCache {
                     ))),
                 }
             }
-            ShaderFormat::Spirv | ShaderFormat::Dxil => Err(RhiError::unsupported_feature(
+            ShaderFormat::Spirv | ShaderFormat::Dxil | ShaderFormat::Wgsl => Err(RhiError::unsupported_feature(
                 "Metal backend does not import SPIR-V/DXIL shaders",
             )),
         }

@@ -159,7 +159,14 @@ pub struct NativeMenuBar {
 impl NativeMenuBar {
     /// Whether the host window system provides a native menu bar.
     pub fn is_supported() -> bool {
-        cove_shell::Sdl3Shell::native_menu_bar_supported()
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            cove_shell::Sdl3Shell::native_menu_bar_supported()
+        }
+        #[cfg(target_arch = "wasm32")]
+        {
+            false
+        }
     }
 
     pub fn new(
@@ -312,7 +319,7 @@ pub mod installer {
 }
 
 /// Other platforms present Compose menus, so there is nothing native to install.
-#[cfg(not(any(target_os = "macos", target_os = "windows")))]
+#[cfg(not(any(target_os = "macos", target_os = "windows", target_arch = "wasm32")))]
 pub mod installer {
     use super::*;
 
@@ -324,6 +331,7 @@ pub mod installer {
     }
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 pub use installer::install;
 
 /// Action table the shell routes a chosen menu item back through, keyed by the

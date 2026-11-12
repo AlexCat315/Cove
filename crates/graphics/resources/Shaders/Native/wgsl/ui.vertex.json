@@ -1,0 +1,28 @@
+{
+  "stage": "vertex",
+  "format": "wgsl",
+  "entryPoint": "uiVertex",
+  "code": "c3RydWN0IFVuaWZvcm1zX3N0ZDE0MF8wCnsKICAgIEBhbGlnbigxNikgdmlld3BvcnRfMCA6IHZlYzI8ZjMyPiwKICAgIEBhbGlnbig4KSBzcmdiXzAgOiBmMzIsCiAgICBAYWxpZ24oNCkgcGFkZGluZ18wIDogZjMyLAp9OwoKQGJpbmRpbmcoMCkgQGdyb3VwKDEpIHZhcjx1bmlmb3JtPiB1bmlmb3Jtc18wIDogVW5pZm9ybXNfc3RkMTQwXzA7CnN0cnVjdCBWZXJ0ZXhfMAp7CiAgICBAYnVpbHRpbihwb3NpdGlvbikgcG9zaXRpb25fMCA6IHZlYzQ8ZjMyPiwKICAgIEBsb2NhdGlvbigwKSB1dl8wIDogdmVjMjxmMzI+LAogICAgQGxvY2F0aW9uKDEpIGNvbG9yXzAgOiB2ZWM0PGYzMj4sCiAgICBAaW50ZXJwb2xhdGUoZmxhdCkgQGxvY2F0aW9uKDIpIHNyZ2JfMSA6IGYzMiwKfTsKCnN0cnVjdCB2ZXJ0ZXhJbnB1dF8wCnsKICAgIEBsb2NhdGlvbigwKSBwb3NpdGlvbl8xIDogdmVjMjxmMzI+LAogICAgQGxvY2F0aW9uKDEpIHV2XzEgOiB2ZWMyPGYzMj4sCiAgICBAbG9jYXRpb24oMikgY29sb3JfMSA6IHZlYzQ8ZjMyPiwKfTsKCkB2ZXJ0ZXgKZm4gdWlWZXJ0ZXgoIF9TMSA6IHZlcnRleElucHV0XzApIC0+IFZlcnRleF8wCnsKICAgIHZhciBvdXRwdXRfMCA6IFZlcnRleF8wOwogICAgb3V0cHV0XzAucG9zaXRpb25fMCA9IHZlYzQ8ZjMyPihfUzEucG9zaXRpb25fMS54IC8gdW5pZm9ybXNfMC52aWV3cG9ydF8wLnggKiAyLjBmIC0gMS4wZiwgMS4wZiAtIF9TMS5wb3NpdGlvbl8xLnkgLyB1bmlmb3Jtc18wLnZpZXdwb3J0XzAueSAqIDIuMGYsIDAuMGYsIDEuMGYpOwogICAgb3V0cHV0XzAudXZfMCA9IF9TMS51dl8xOwogICAgb3V0cHV0XzAuY29sb3JfMCA9IF9TMS5jb2xvcl8xOwogICAgb3V0cHV0XzAuc3JnYl8xID0gdW5pZm9ybXNfMC5zcmdiXzA7CiAgICByZXR1cm4gb3V0cHV0XzA7Cn0KCg==",
+  "interface": {
+    "threadgroupSize": {
+      "x": 1,
+      "y": 1,
+      "z": 1
+    },
+    "bindings": [],
+    "specializationConstants": [],
+    "threadgroupSpecialization": {
+      "x": null,
+      "y": null,
+      "z": null
+    },
+    "pushConstants": [
+      {
+        "slot": 0,
+        "byteCount": 16,
+        "stage": "vertex"
+      }
+    ]
+  },
+  "compiler": "Slang 2026.19"
+}

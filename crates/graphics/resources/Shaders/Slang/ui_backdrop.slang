@@ -42,7 +42,11 @@ struct BackdropParams {
                          // reveal:   xy = half frame size in px
     float4 reveal;       // reveal:   xy = centre in px, z = radius, w = feather
 };
+#ifdef COVE_WEBGPU
+[[vk::binding(0, 1)]] ConstantBuffer<BackdropParams> params;
+#else
 [[vk::push_constant]] ConstantBuffer<BackdropParams> params : register(b0, space0);
+#endif
 [[vk::binding(1, 0)]] Texture2D<float4> source : register(t1, space0);
 [[vk::binding(2, 0)]] SamplerState sourceSampler : register(s2, space0);
 

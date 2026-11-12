@@ -1,0 +1,22 @@
+{
+  "stage": "vertex",
+  "format": "wgsl",
+  "entryPoint": "backdropVertex",
+  "code": "c3RydWN0IEJhY2tkcm9wVmVydGV4XzAKewogICAgQGJ1aWx0aW4ocG9zaXRpb24pIHBvc2l0aW9uXzAgOiB2ZWM0PGYzMj4sCiAgICBAbG9jYXRpb24oMCkgdXZfMCA6IHZlYzI8ZjMyPiwKfTsKCnN0cnVjdCB2ZXJ0ZXhJbnB1dF8wCnsKICAgIEBsb2NhdGlvbigwKSBwb3NpdGlvbl8xIDogdmVjMjxmMzI+LAogICAgQGxvY2F0aW9uKDEpIHV2XzEgOiB2ZWMyPGYzMj4sCn07CgpAdmVydGV4CmZuIGJhY2tkcm9wVmVydGV4KCBfUzEgOiB2ZXJ0ZXhJbnB1dF8wKSAtPiBCYWNrZHJvcFZlcnRleF8wCnsKICAgIHZhciBvdXRwdXRfMCA6IEJhY2tkcm9wVmVydGV4XzA7CiAgICBvdXRwdXRfMC5wb3NpdGlvbl8wID0gdmVjNDxmMzI+KF9TMS5wb3NpdGlvbl8xLCAwLjBmLCAxLjBmKTsKICAgIG91dHB1dF8wLnV2XzAgPSBfUzEudXZfMTsKICAgIHJldHVybiBvdXRwdXRfMDsKfQoK",
+  "interface": {
+    "threadgroupSize": {
+      "x": 1,
+      "y": 1,
+      "z": 1
+    },
+    "bindings": [],
+    "specializationConstants": [],
+    "threadgroupSpecialization": {
+      "x": null,
+      "y": null,
+      "z": null
+    },
+    "pushConstants": []
+  },
+  "compiler": "Slang 2026.19"
+}

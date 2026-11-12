@@ -39,6 +39,7 @@ pub mod picker_stories;
 pub mod placement_example;
 pub mod primitive_gap_stories;
 pub mod product_stories;
+pub(super) mod ray_traced_shadows;
 pub mod rich_text;
 pub mod sidebar_stories;
 pub mod sidebar_story;

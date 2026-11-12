@@ -87,6 +87,7 @@ impl GalleryPage {
             Self::Progress => icons::status::loader(),
             Self::Skeleton => icons::layout::rows_2(),
             Self::MediaPlayer => icons::media::video(),
+            Self::RayTracedShadows => icons::device::sun(),
             Self::Empty => icons::file::inbox(),
             Self::Radio => icons::shape::circle_dot(),
             Self::Notification => icons::status::bell(),

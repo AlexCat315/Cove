@@ -23,6 +23,8 @@ pub enum RhiError {
     PresentFailed(String),
     #[error("RHI: device lost")]
     DeviceLost,
+    #[error("RHI: GPU work is still in flight")]
+    GpuBusy,
     #[error("RHI: frame not active")]
     FrameNotActive,
     /// A background preparation was cancelled by its caller.

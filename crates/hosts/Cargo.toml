@@ -13,8 +13,6 @@ devtools = ["dep:cove-devtools"]
 
 [dependencies]
 cove-devtools = { path = "../devtools", optional = true }
-cove-runtime.workspace = true
-cove-shell.workspace = true
 cove-composition.workspace = true
 cove-ui-compose = { path = "../compose" }
 cove-core.workspace = true
@@ -28,6 +26,10 @@ cove-http.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 libc.workspace = true
+
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+cove-runtime.workspace = true
+cove-shell.workspace = true
 
 [lints]
 workspace = true

@@ -770,15 +770,19 @@ fn create_logical_device(
     if features.ray_query {
         tail = (&mut ray_query as *mut sys::VkPhysicalDeviceRayQueryFeaturesKHR).cast();
     }
-    structure.accelerationStructure = u32::from(features.acceleration_structures);
-    structure.pNext = tail;
     if features.acceleration_structures {
+        structure = sys::VkPhysicalDeviceAccelerationStructureFeaturesKHR {
+            pNext: tail,
+            accelerationStructure: sys::VK_TRUE,
+            ..Default::default()
+        };
         tail =
             (&mut structure as *mut sys::VkPhysicalDeviceAccelerationStructureFeaturesKHR).cast();
-    }
-    address.bufferDeviceAddress = u32::from(features.acceleration_structures);
-    address.pNext = tail;
-    if features.acceleration_structures {
+        address = sys::VkPhysicalDeviceBufferDeviceAddressFeatures {
+            pNext: tail,
+            bufferDeviceAddress: sys::VK_TRUE,
+            ..Default::default()
+        };
         tail = (&mut address as *mut sys::VkPhysicalDeviceBufferDeviceAddressFeatures).cast();
     }
     local_size.maintenance4 = u32::from(features.maintenance4);

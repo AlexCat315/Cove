@@ -13,8 +13,39 @@ use crate::prototype::with_app;
 
 /// Publishes the frame for `width`×`height` logical points.
 #[unsafe(no_mangle)]
-pub extern "C" fn cove_render(width: f32, height: f32) {
-    with_app(|app| app.render(width, height));
+pub extern "C" fn cove_render(width: f32, height: f32) -> i32 {
+    #[cfg(target_arch = "wasm32")]
+    return with_app(|app| app.render_web(width, height));
+    #[cfg(not(target_arch = "wasm32"))]
+    {
+        with_app(|app| app.render(width, height));
+        0
+    }
+}
+
+#[cfg(target_arch = "wasm32")]
+#[unsafe(no_mangle)]
+pub extern "C" fn cove_webgpu_enable(bgra: bool) -> bool {
+    use cove_graphics::TextureFormat;
+    with_app(|app| {
+        app.enable_webgpu(if bgra {
+            TextureFormat::Bgra8Unorm
+        } else {
+            TextureFormat::Rgba8Unorm
+        })
+    })
+}
+
+#[cfg(target_arch = "wasm32")]
+#[unsafe(no_mangle)]
+pub extern "C" fn cove_webgpu_disable() {
+    with_app(|app| app.disable_webgpu());
+}
+
+#[cfg(target_arch = "wasm32")]
+#[unsafe(no_mangle)]
+pub extern "C" fn cove_webgpu_complete(token: u32) {
+    cove_graphics::webgpu::complete(token);
 }
 
 /// Sets the device pixel ratio used for glyph rasterisation (clamped 1…4).
@@ -66,6 +97,12 @@ pub extern "C" fn cove_atlas() -> *mut u8 {
 #[unsafe(no_mangle)]
 pub extern "C" fn cove_atlas_size() -> i32 {
     with_app(|app| app.atlas_buffer.count() as i32)
+}
+
+/// RGBA pixels retained by the most recently rendered draw list.
+#[unsafe(no_mangle)]
+pub extern "C" fn cove_raster_asset(id: u32) -> *const u8 {
+    with_app(|app| app.raster_asset_pixels(id))
 }
 
 /// Dispatches a synthetic pointer event. `kind`: 0 move, 1 down, 2 up, 3 click.
@@ -139,16 +176,6 @@ pub extern "C" fn cove_response() -> *mut u8 {
 #[unsafe(no_mangle)]
 pub extern "C" fn cove_response_size() -> i32 {
     with_app(|app| app.response_buffer.count() as i32)
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn cove_shader() -> *mut u8 {
-    with_app(|app| app.shader_buffer.pointer())
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn cove_shader_size() -> i32 {
-    with_app(|app| app.shader_buffer.count() as i32)
 }
 
 /// Publishes the DevTools `hello` envelope.

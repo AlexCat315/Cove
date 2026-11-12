@@ -101,6 +101,7 @@ pub enum GalleryPage {
     Carousel,
     Skeleton,
     MediaPlayer,
+    RayTracedShadows,
     Stepper,
     ViewportTraits,
     ViewThatFits,
@@ -214,6 +215,7 @@ impl GalleryPage {
         Self::Carousel,
         Self::Skeleton,
         Self::MediaPlayer,
+        Self::RayTracedShadows,
         Self::Stepper,
         Self::ViewportTraits,
         Self::ViewThatFits,
@@ -324,6 +326,7 @@ impl GalleryPage {
             Self::Carousel => "carousel",
             Self::Skeleton => "skeleton",
             Self::MediaPlayer => "mediaPlayer",
+            Self::RayTracedShadows => "ray-traced-shadows",
             Self::Stepper => "stepper",
             Self::ViewportTraits => "viewportTraits",
             Self::ViewThatFits => "viewThatFits",
@@ -965,6 +968,12 @@ impl GalleryCatalog {
                 "Video and audio playback, live levels and waveform seeking over any PlaybackControl.",
             ),
             GalleryEntry::new(
+                GalleryPage::RayTracedShadows,
+                "Ray-Traced Shadows",
+                "Graphics",
+                "Move an area light and compare ray-traced and rasterized shadows.",
+            ),
+            GalleryEntry::new(
                 GalleryPage::Stepper,
                 "Stepper",
                 "Navigation",
@@ -1183,7 +1192,8 @@ mod checks {
                 "Layout",
                 "Foundation",
                 "Feedback",
-                "Media"
+                "Media",
+                "Graphics",
             ]
         );
     }

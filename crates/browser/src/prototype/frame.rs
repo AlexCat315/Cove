@@ -35,6 +35,13 @@ pub struct Batch {
     pub clip: Option<[f32; 4]>,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
+pub struct RasterAsset {
+    pub id: u32,
+    pub width: u32,
+    pub height: u32,
+}
+
 /// The complete per-frame snapshot returned to JavaScript.
 #[derive(Clone, Debug, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -49,6 +56,7 @@ pub struct Frame {
     pub vertices: usize,
     pub indices: usize,
     pub batches: Vec<Batch>,
+    pub raster_assets: Vec<RasterAsset>,
     pub labels: Vec<Label>,
     pub tree: cove_devtools_protocol::TreeSnapshot,
     pub font_count: usize,

@@ -1,6 +1,8 @@
 //! Shared native application declaration and entry point.
 
-use crate::{Application, ApplicationCallbacks, ApplicationConfiguration};
+use crate::ApplicationConfiguration;
+#[cfg(not(target_arch = "wasm32"))]
+use crate::{Application, ApplicationCallbacks};
 use cove_composition::{AnyView, View};
 
 pub use crate::desktop::diagnostics::ApplicationCheckpoint;
@@ -18,10 +20,12 @@ pub struct ApplicationLaunch {
     /// Diagnostics backend installed for this run. A build that links the
     /// DevTools crate supplies it; otherwise DevTools stays off.
     pub diagnostics: Option<DiagnosticsFactory>,
+    #[cfg(not(target_arch = "wasm32"))]
     menu_bar: Option<LaunchMenuBar>,
     content_wrapper: Option<Box<dyn Fn(AnyView) -> AnyView>>,
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 enum LaunchMenuBar {
     Native(crate::NativeMenuBar),
     #[cfg(target_os = "windows")]
@@ -35,6 +39,7 @@ impl ApplicationLaunch {
             configuration: ApplicationConfiguration::default(),
             checkpoint: None,
             diagnostics: None,
+            #[cfg(not(target_arch = "wasm32"))]
             menu_bar: None,
             content_wrapper: None,
         }
@@ -65,7 +70,12 @@ impl ApplicationLaunch {
     /// Presents the application menu with AppKit on macOS.
     /// When the platform has no native application menu, keeps the system frame.
     pub fn native_menu_bar(mut self, menus: impl Into<crate::NativeMenuBar>) -> Self {
-        self.menu_bar = Some(LaunchMenuBar::Native(menus.into()));
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            self.menu_bar = Some(LaunchMenuBar::Native(menus.into()));
+        }
+        #[cfg(target_arch = "wasm32")]
+        let _ = (&mut self, menus);
         self
     }
 
@@ -110,6 +120,7 @@ impl ApplicationLaunch {
         }
     }
 
+    #[cfg(not(target_arch = "wasm32"))]
     fn window_content(&self) -> AnyView {
         let content = match &self.menu_bar {
             #[cfg(target_os = "windows")]
@@ -144,6 +155,7 @@ impl ApplicationLaunch {
     /// Runs the native window host on the calling thread, which then owns the
     /// platform directly. Android invokes the registered factory from its Activity
     /// instead of entering this blocking loop.
+    #[cfg(not(target_arch = "wasm32"))]
     pub fn run(mut self) -> Result<(), String> {
         let root = self.window_content();
         crate::desktop::diagnostics::integration::set_diagnostics_factory(self.diagnostics);
@@ -382,7 +394,7 @@ macro_rules! application {
         /// browser host makes its first `cove_render` call.
         #[cfg(all(target_arch = "wasm32", not(test)))]
         #[used]
-        #[link_section = ".init_array"]
+        #[unsafe(link_section = ".init_array")]
         static __COVE_APPLICATION_INIT: extern "C" fn() = {
             extern "C" fn register() {
                 $crate::wasm::install_application(application);

@@ -9,6 +9,7 @@ pub(super) fn source_artifact(
         GraphicsApi::Metal => "metal",
         GraphicsApi::Vulkan => "spirv",
         GraphicsApi::Dx12 => "dxil",
+        GraphicsApi::WebGpu => "wgsl",
     };
     let stage = match stage {
         ShaderStage::Vertex => "vertex",
@@ -121,6 +122,18 @@ fn bytes(backend: &str, name: &str, stage: &str) -> RhiResult<&'static [u8]> {
         }
         ("dxil", "ui_backdrop", "fragment") => {
             include_bytes!("../../resources/Shaders/Native/dxil/ui_backdrop.fragment.json")
+        }
+        ("wgsl", "ui", "vertex") => {
+            include_bytes!("../../resources/Shaders/Native/wgsl/ui.vertex.json")
+        }
+        ("wgsl", "ui", "fragment") => {
+            include_bytes!("../../resources/Shaders/Native/wgsl/ui.fragment.json")
+        }
+        ("wgsl", "ui_backdrop", "vertex") => {
+            include_bytes!("../../resources/Shaders/Native/wgsl/ui_backdrop.vertex.json")
+        }
+        ("wgsl", "ui_backdrop", "fragment") => {
+            include_bytes!("../../resources/Shaders/Native/wgsl/ui_backdrop.fragment.json")
         }
         _ => return Err(RhiError::unsupported_feature("missing offline UI shader")),
     })

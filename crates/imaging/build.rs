@@ -14,9 +14,13 @@ fn main() {
     }
     let os = env::var("CARGO_CFG_TARGET_OS").unwrap();
 
-    let plutovg = native::cmake("plutovg", &native::third_party("plutovg", "CMakeLists.txt"))
-        .define("PLUTOVG_BUILD_EXAMPLES", "OFF")
-        .build();
+    let mut plutovg = native::cmake("plutovg", &native::third_party("plutovg", "CMakeLists.txt"));
+    plutovg.define("PLUTOVG_BUILD_EXAMPLES", "OFF");
+    if os == "wasi" {
+        // The browser reactor uses the single-threaded WASI sysroot.
+        plutovg.define("HAVE_THREADS_H", "OFF");
+    }
+    let plutovg = plutovg.build();
     let lunasvg = native::cmake("lunasvg", &native::third_party("lunasvg", "CMakeLists.txt"))
         .define("USE_SYSTEM_PLUTOVG", "ON")
         .define("plutovg_DIR", plutovg.join("lib/cmake/plutovg"))

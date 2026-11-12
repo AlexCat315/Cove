@@ -133,6 +133,7 @@ impl VulkanBackend {
 fn probe_capabilities(context: &VulkanContext) -> Capabilities {
     let advanced = &context.advanced;
     let acceleration_structures = context.features.acceleration_structures
+        && advanced.buffer_device_address.is_some()
         && advanced.create_acceleration_structure.is_some()
         && advanced.destroy_acceleration_structure.is_some()
         && advanced.acceleration_structure_build_sizes.is_some()

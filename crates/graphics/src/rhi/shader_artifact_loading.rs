@@ -58,6 +58,7 @@ impl ShaderArtifact {
             GraphicsApi::Metal => "metal",
             GraphicsApi::Vulkan => "spirv",
             GraphicsApi::Dx12 => "dxil",
+            GraphicsApi::WebGpu => "wgsl",
         });
         let stage_name = match stage {
             ShaderStage::Vertex => "vertex",

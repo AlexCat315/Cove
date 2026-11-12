@@ -4,9 +4,12 @@ use crate::counter::CounterView;
 use crate::gallery_content::catalog::GalleryPage;
 use crate::gallery_content::{CounterContent, GalleryView};
 use cove_composition::layout::LayoutDirectionExt;
-use cove_composition::{AnyView, DynamicField, LayoutDebugExt, Scope, View};
+#[cfg(target_os = "windows")]
+use cove_composition::LayoutDebugExt;
+use cove_composition::{AnyView, DynamicField, Scope, View};
 use cove_core::scene::Direction;
 use cove_core::{Environment, InputCapabilities, State};
+#[cfg(target_os = "windows")]
 use cove_hosts::desktop::application::composition::AppDisplayHandleHolder;
 use cove_hosts::desktop::application::configuration::AppFrameDrivePolicy;
 use cove_hosts::desktop::diagnostics::ApplicationCheckpoint;
@@ -14,8 +17,12 @@ use cove_hosts::{
     ApplicationConfiguration, ApplicationLaunch, NativeMenu, NativeMenuAction, NativeMenuBar,
     NativeMenuItem, NativeMenuKeyModifiers, TitleBarDivider, WindowBackdrop,
 };
-use cove_ui_compose::adaptive::{SurfaceEnvironment, SurfaceEnvironmentExt, SurfaceReader};
+#[cfg(target_os = "windows")]
+use cove_ui_compose::adaptive::SurfaceReader;
+use cove_ui_compose::adaptive::{SurfaceEnvironment, SurfaceEnvironmentExt};
+#[cfg(target_os = "windows")]
 use cove_ui_compose::primitives::controls::{Button, ButtonIconSource};
+#[cfg(target_os = "windows")]
 use cove_ui_compose::primitives::media::ui_icon_catalog as icons;
 use cove_ui_compose::primitives::overlays::portal::LayerRoot;
 use cove_ui_compose::theme::styles::appearance_modifier::{Appearance, AppearanceViewExt};
@@ -99,6 +106,7 @@ fn navigation_menu(gallery: &GalleryView) -> NativeMenu {
     )
 }
 
+#[cfg(target_os = "windows")]
 fn title_bar_divider_button() -> AnyView {
     AnyView::new(SurfaceReader::new(|environment: &Environment| {
         let separated = environment.title_bar_divider;
@@ -182,6 +190,7 @@ impl ShowcaseLaunch {
         let menu = (launch.menu_bar != ShowcaseMenuBar::None)
             .then(|| NativeMenuBar::new("CoveUI", vec![], vec![navigation_menu(&gallery)]));
         let appearance = gallery.appearance.clone();
+        #[cfg(target_os = "windows")]
         let root = if launch.menu_bar.uses_immersive_title_bar() {
             // The window menu and the stories share the host's portal layer.
             AnyView::new(
@@ -192,6 +201,8 @@ impl ShowcaseLaunch {
         } else {
             AnyView::new(LayerRoot::new(gallery.into_content()))
         };
+        #[cfg(not(target_os = "windows"))]
+        let root = LayerRoot::new(gallery.into_content());
         let app = ApplicationLaunch::new(root)
             .configuration(configuration)
             .wrap_content(move |content| ShowcaseContent {

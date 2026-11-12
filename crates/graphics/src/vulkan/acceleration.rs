@@ -197,8 +197,7 @@ pub fn create_acceleration_structure(
                         transformData: 0,
                     };
                     geometry.push(sys::VkAccelerationStructureGeometryKHR {
-                        sType:
-                            sys::VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_BUILD_GEOMETRY_INFO_KHR,
+                        sType: sys::VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_KHR,
                         pNext: core::ptr::null(),
                         geometryType: sys::VK_GEOMETRY_TYPE_TRIANGLES_KHR,
                         geometry: sys::VkAccelerationStructureGeometryDataKHR {
@@ -263,7 +262,7 @@ pub fn create_acceleration_structure(
                     data: buffer_address(context, &lock(registries), buffer)?,
                 };
                 geometry.push(sys::VkAccelerationStructureGeometryKHR {
-                    sType: sys::VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_BUILD_GEOMETRY_INFO_KHR,
+                    sType: sys::VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_KHR,
                     pNext: core::ptr::null(),
                     geometryType: sys::VK_GEOMETRY_TYPE_INSTANCES_KHR,
                     geometry: sys::VkAccelerationStructureGeometryDataKHR {

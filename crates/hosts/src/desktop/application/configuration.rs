@@ -17,6 +17,7 @@ pub enum AppWindowTitleBarStyle {
 }
 
 impl AppWindowTitleBarStyle {
+    #[cfg(not(target_arch = "wasm32"))]
     pub fn platform_style(self) -> cove_shell::WindowTitleBarStyle {
         match self {
             Self::Standard => cove_shell::WindowTitleBarStyle::Standard,
@@ -87,7 +88,7 @@ pub struct WindowConfiguration {
     pub title_bar_divider: TitleBarDivider,
     pub shows_dock_icon: bool,
     /// Requested backdrop; the platform may fall back to opaque.
-    pub backdrop: cove_shell::WindowBackdrop,
+    pub backdrop: cove_platform::WindowBackdrop,
     pub rendering: AppWindowRendering,
 }
 
@@ -106,7 +107,7 @@ impl Default for WindowConfiguration {
             title_bar_style: AppWindowTitleBarStyle::Standard,
             title_bar_divider: TitleBarDivider::Seamless,
             shows_dock_icon: true,
-            backdrop: cove_shell::WindowBackdrop::Opaque,
+            backdrop: cove_platform::WindowBackdrop::Opaque,
             rendering: AppWindowRendering::default(),
         }
     }

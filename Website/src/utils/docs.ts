@@ -20,6 +20,7 @@ import cargo from '@/content/cargo.md?raw'
 import mobile from '@/content/components/mobile.md?raw'
 import adaptive from '@/content/components/adaptive.md?raw'
 import gallery from '@/content/components/gallery.md?raw'
+import rayTracedShadows from '@/content/components/ray-traced-shadows.md?raw'
 import slider from '@/content/components/slider.md?raw'
 import rangeSlider from '@/content/components/range-slider.md?raw'
 import list from '@/content/components/list.md?raw'
@@ -101,6 +102,7 @@ export const docGroups: DocGroup[] = [
     group: 'Rust 组件',
     items: [
       { slug: 'gallery', title: 'Gallery 使用', raw: gallery },
+      { slug: 'ray-traced-shadows', title: 'Ray-Traced Shadows', raw: rayTracedShadows },
       { slug: 'window-menu-bar', title: '窗口菜单栏', raw: windowMenuBar },
       { slug: 'slider', title: 'Slider', raw: slider },
       { slug: 'range-slider', title: 'RangeSlider', raw: rangeSlider },

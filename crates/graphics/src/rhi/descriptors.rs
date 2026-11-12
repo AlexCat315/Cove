@@ -706,6 +706,7 @@ pub enum NativeSurfaceKind {
     XlibWindow,
     WaylandSurface,
     AndroidWindow,
+    WebCanvas,
 }
 impl NativeSurfaceKind {
     pub fn platform_default() -> Self {
@@ -721,11 +722,16 @@ impl NativeSurfaceKind {
         {
             Self::XlibWindow
         }
+        #[cfg(target_arch = "wasm32")]
+        {
+            Self::WebCanvas
+        }
         #[cfg(not(any(
             target_os = "windows",
             target_os = "android",
             target_os = "linux",
-            target_os = "freebsd"
+            target_os = "freebsd",
+            target_arch = "wasm32"
         )))]
         {
             Self::MetalLayer

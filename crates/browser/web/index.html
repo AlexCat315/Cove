@@ -8,16 +8,15 @@
   <link rel="stylesheet" href="./styles.css">
 </head>
 <body>
-  <header><strong>CoveUI</strong><span>Swift / WebAssembly prototype</span><span id="status">Loading Wasm…</span></header>
+  <header><strong>CoveUI</strong><span>Rust / WebAssembly</span><span id="status">Loading Wasm…</span></header>
   <main>
     <section class="preview">
       <div class="heading"><h1>A shared core, running in your browser.</h1><p>Interact with the canvas, then inspect its tree or capture and restore state below.</p></div>
-      <div id="surface" tabindex="0" aria-label="CoveUI counter preview">
+      <div id="surface" tabindex="0" aria-label="CoveUI preview">
         <canvas id="gpu"></canvas><canvas id="fallback" hidden></canvas>
       </div>
       <p id="stats"></p>
       <div class="keyboard"><button id="increment">Increment</button><button id="reset">Reset</button><button id="theme">Toggle theme</button><span>Keyboard and screen reader controls for the canvas.</span></div>
-      <p class="scope">This preview shares Compose, Taffy, FreeType/HarfBuzz and DrawList with the desktop demo, and renders through the browser WebGPU API with WGSL shaders. Text uses the Wasm font atlas, including Chinese, Arabic, Devanagari and monochrome emoji. Inspect state changes or record and replay input below.</p>
     </section>
     <section class="inspector"><h2>CoveUI Inspector</h2><iframe id="inspector" title="CoveUI DevTools" src="./devtools/index.html?transport=browser"></iframe></section>
   </main>

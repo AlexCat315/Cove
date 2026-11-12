@@ -105,6 +105,7 @@ pub fn set_diagnostics_factory(factory: Option<DiagnosticsFactory>) {
     FACTORY.with(|slot| *slot.borrow_mut() = factory);
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 pub(crate) fn take_factory() -> Option<DiagnosticsFactory> {
     FACTORY.with(|slot| slot.borrow().clone())
 }

@@ -100,6 +100,7 @@ impl GalleryView {
         self.page.get()
     }
 
+    #[cfg(target_os = "windows")]
     pub(crate) fn with_footer_action(mut self, action: AnyView) -> Self {
         self.footer_action = Some(action);
         self

@@ -48,14 +48,16 @@ pub enum GraphicsApi {
     Metal,
     Vulkan,
     Dx12,
+    WebGpu,
 }
 impl GraphicsApi {
-    pub const ALL: [Self; 3] = [Self::Metal, Self::Vulkan, Self::Dx12];
+    pub const ALL: [Self; 4] = [Self::Metal, Self::Vulkan, Self::Dx12, Self::WebGpu];
     pub fn display_name(self) -> &'static str {
         match self {
             Self::Metal => "Metal",
             Self::Vulkan => "Vulkan",
             Self::Dx12 => "DirectX 12",
+            Self::WebGpu => "WebGPU",
         }
     }
 }
@@ -67,6 +69,7 @@ pub enum ShaderFormat {
     Metallib,
     Spirv,
     Dxil,
+    Wgsl,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]

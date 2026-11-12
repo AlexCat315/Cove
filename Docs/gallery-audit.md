@@ -1,8 +1,14 @@
 # Gallery 逐项验收记录
 
-更新：2026-11-09。目录共 104 页（Numeric 合并 NumberField+Vec3Field，Text Fields 合并 TextField+SearchField+TextArea+JsonField）。当前控件页的验收以以下 Swift 对照表为准；后续旧轮记录保留其原有范围。
+更新于 2026-11-12。目录共 106 页。Swift 对照表覆盖迁移的页面，新增 Rust 示例见对应日期的验收记录。
 
 Swift 源码逐页对照见文末《Swift 源码对照（逐页差异清单）》。
+
+## 2026-11-12 实时光追阴影
+
+| 页面 | 实现与自动化验收 | 原生视觉与交互验收 | Rust 文档 |
+| --- | --- | --- | --- |
+| Ray-Traced Shadows | Rust 光栅回归验证光源移动、半影和场景像素变化。DX12 和 Vulkan 在 RTX 3050 上对三个光源位置回读阴影遮罩，验证全亮、全遮挡和半影。Gallery 目录结构测试覆盖指针和触摸布局。 | Windows 390×760pt 截图目检场景完整。DevTools 录制切换至 Rasterization、把滑块由 8 拖到 16、再切回 DX12 ray query，并检查各步骤的状态。macOS、iOS、Linux 和 Android 实机待验收。 | [Ray-Traced Shadows](../Website/src/content/components/ray-traced-shadows.md) |
 
 ## 2026-11-11 窗口菜单装配
 

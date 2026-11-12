@@ -6,11 +6,15 @@ rust-version.workspace = true
 license.workspace = true
 description = "Browser/WebAssembly prototype host"
 
+[lib]
+crate-type = ["rlib", "cdylib"]
+
 [dependencies]
 cove-composition.workspace = true
 cove-core.workspace = true
 cove-platform.workspace = true
 cove-graphics.workspace = true
+cove-imaging.workspace = true
 cove-hosts = { path = "../hosts" }
 cove-logging.workspace = true
 cove-examples = { path = "../../examples/gallery" }

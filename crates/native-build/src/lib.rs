@@ -140,10 +140,14 @@ pub fn cmake(name: &str, source: &Path) -> cmake::Config {
                 .define("ANDROID_STL", "c++_static");
         }
         _ if target.starts_with("wasm") => {
-            config.define(
-                "CMAKE_TOOLCHAIN_FILE",
-                wasi_sdk().join("share/cmake/wasi-sdk.cmake"),
-            );
+            let cmake = wasi_sdk().join("share/cmake");
+            let legacy = cmake.join("wasi-sdk.cmake");
+            let toolchain = if legacy.is_file() {
+                legacy
+            } else {
+                cmake.join("wasi-sdk-p1.cmake")
+            };
+            config.define("CMAKE_TOOLCHAIN_FILE", toolchain);
         }
         _ => {}
     }
@@ -166,11 +170,17 @@ pub fn configure_cc(build: &mut cc::Build, cpp: bool) {
     for (key, value) in setup::environment().expect("read Cove toolchain state") {
         build.env(key, value);
     }
-    if target().starts_with("wasm") {
+    let target = target();
+    if target.starts_with("wasm") {
         let sdk = wasi_sdk();
+        let wasi_target = if target.contains("wasip") {
+            target.as_str()
+        } else {
+            "wasm32-wasi"
+        };
         build
             .compiler(sdk.join(if cpp { "bin/clang++" } else { "bin/clang" }))
-            .flag("--target=wasm32-wasi")
+            .flag(format!("--target={wasi_target}"))
             .flag(format!(
                 "--sysroot={}",
                 sdk.join("share/wasi-sysroot").display()
@@ -215,7 +225,24 @@ pub fn link_cxx_runtime() {
         // default search finds it after the API-level libc.so; an explicit
         // unversioned sysroot path would select the static libc.a instead.
         "android" => println!("cargo:rustc-link-lib=c++_shared"),
-        _ if is_msvc() || target.starts_with("wasm") => {}
+        _ if target.starts_with("wasm") => {
+            let sdk = wasi_sdk().join("share/wasi-sysroot/lib");
+            let lib = if target.contains("wasip") { sdk.join(target) } else { sdk.join("wasm32-wasi") };
+            let exceptions = lib.join("eh");
+            if exceptions.is_dir() {
+                println!("cargo:rustc-link-search=native={}", exceptions.display());
+            }
+            println!("cargo:rustc-link-search=native={}", lib.display());
+            println!("cargo:rustc-link-lib=static=c++");
+            println!("cargo:rustc-link-lib=static=c++abi");
+            for archive in ["unwind", "setjmp", "wasi-emulated-mman"] {
+                let filename = format!("lib{archive}.a");
+                if lib.join(&filename).is_file() || exceptions.join(filename).is_file() {
+                    println!("cargo:rustc-link-lib=static={archive}");
+                }
+            }
+        }
+        _ if is_msvc() => {}
         _ => println!("cargo:rustc-link-lib=stdc++"),
     }
 }

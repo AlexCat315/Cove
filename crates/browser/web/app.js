@@ -1,4 +1,5 @@
 import { WASI, File, OpenFile, ConsoleStdout } from "./wasi/index.js";
+import { createWebGpuBridge } from "./webgpu.js";
 
 const surface = document.querySelector("#surface");
 const textInput = document.createElement("textarea");
@@ -9,6 +10,8 @@ const status = document.querySelector("#status");
 const decoder = new TextDecoder();
 const encoder = new TextEncoder();
 let wasm, renderer, lastFrame, scheduled = false, inspectorPort;
+const webgpu = createWebGpuBridge(() => wasm, document.querySelector("#gpu"));
+const forcedRenderer = new URLSearchParams(location.search).get("renderer");
 const atlas = { width: 0, height: 0, pixels: null, revision: 0, update: null };
 
 function updateAtlas(frame) {
@@ -58,19 +61,23 @@ function schedule() {
     scheduled = false;
     const width = surface.clientWidth, height = surface.clientHeight;
     wasm.cove_set_scale(window.devicePixelRatio || 1);
-    wasm.cove_render(width, height);
+    const outcome = wasm.cove_render(width, height);
+    if (outcome === 1) { schedule(); return; }
+    if (outcome < 0) {
+      if (forcedRenderer === "webgpu") {
+        status.textContent = "WebGPU RHI frame failed";
+        return;
+      }
+      wasm.cove_webgpu_disable();
+      renderer = makeCanvasRenderer();
+      wasm.cove_render(width, height);
+    }
     lastFrame = readJSON(wasm.cove_snapshot(), wasm.cove_snapshot_size());
     surface.style.cursor = lastFrame.tree.inspection?.picking ? "crosshair" : "default";
     updateAtlas(lastFrame);
-    const vertices = readBytes(wasm.cove_vertices(), wasm.cove_vertex_bytes());
-    const indexCount = wasm.cove_index_count();
-    const indices = new Uint32Array(readBytes(wasm.cove_indices(), indexCount * 4).buffer);
-    try {
-      renderer.draw(lastFrame, vertices, indices);
-    } catch (error) {
-      if (renderer.backend !== "webgpu" || new URLSearchParams(location.search).get("renderer") === "webgpu") throw error;
-      console.warn("WebGPU presentation failed:", error.message);
-      renderer = makeCanvasRenderer();
+    if (renderer.backend === "canvas2d") {
+      const vertices = readBytes(wasm.cove_vertices(), wasm.cove_vertex_bytes());
+      const indices = new Uint32Array(readBytes(wasm.cove_indices(), wasm.cove_index_count() * 4).buffer);
       renderer.draw(lastFrame, vertices, indices);
     }
     if (lastFrame.focused === "counter.note") {
@@ -89,114 +96,82 @@ function schedule() {
   });
 }
 
-async function makeRenderer(shader) {
+async function makeRenderer() {
+  if (forcedRenderer === "canvas2d") return makeCanvasRenderer();
   try {
-    if (new URLSearchParams(location.search).get("renderer") === "canvas2d") throw new Error("Canvas2D requested");
-    const gpu = navigator.gpu;
-    const adapter = await gpu?.requestAdapter();
-    if (!adapter) throw new Error("No WebGPU adapter");
-    const device = await adapter.requestDevice();
-    let deviceLost = false;
-    device.addEventListener("uncapturederror", (event) => console.error("WebGPU:", event.error.message));
-    device.lost.then((info) => {
-      deviceLost = true;
-      console.warn("WebGPU device lost:", info.message);
-      if (renderer?.device !== device) return;
-      if (new URLSearchParams(location.search).get("renderer") === "webgpu") {
-        status.textContent = "WebGPU device lost";
-      } else {
-        renderer = makeCanvasRenderer();
-        schedule();
-      }
-    });
-    const format = gpu.getPreferredCanvasFormat();
-    const module = device.createShaderModule({ code: shader });
-    const pipeline = await device.createRenderPipelineAsync({
-      layout: "auto",
-      vertex: { module, entryPoint: "vs_main", buffers: [{ arrayStride: 20, attributes: [
-        { shaderLocation: 0, offset: 0, format: "float32x2" },
-        { shaderLocation: 1, offset: 8, format: "float32x2" },
-        { shaderLocation: 2, offset: 16, format: "unorm8x4" },
-      ] }] },
-      fragment: { module, entryPoint: "fs_main", targets: [{ format, blend: {
-        color: { srcFactor: "src-alpha", dstFactor: "one-minus-src-alpha", operation: "add" },
-        alpha: { srcFactor: "one", dstFactor: "one-minus-src-alpha", operation: "add" },
-      } }] }, primitive: { topology: "triangle-list" },
-    });
-    const canvas = document.querySelector("#gpu");
-    const context = canvas.getContext("webgpu");
-    context.configure({ device, format, alphaMode: "premultiplied" });
-    const uniform = device.createBuffer({ size: 16, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
-    const texture = device.createTexture({ size: [1, 1], format: "r8unorm", usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST });
-    device.queue.writeTexture({ texture }, new Uint8Array([255]), { bytesPerRow: 1 }, [1, 1]);
-    const bindGroup = device.createBindGroup({ layout: pipeline.getBindGroupLayout(0), entries: [
-      { binding: 0, resource: { buffer: uniform } }, { binding: 1, resource: texture.createView() },
-      { binding: 2, resource: device.createSampler({ magFilter: "linear", minFilter: "linear" }) },
-    ] });
-    const fontTexture = device.createTexture({ size: [2048, 2048], format: "r8unorm", usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST });
-    const fontBindGroup = device.createBindGroup({ layout: pipeline.getBindGroupLayout(0), entries: [
-      { binding: 0, resource: { buffer: uniform } }, { binding: 1, resource: fontTexture.createView() },
-      { binding: 2, resource: device.createSampler({ magFilter: "linear", minFilter: "linear" }) },
-    ] });
-    let atlasRevision = -1;
-    let vertexBuffer, indexBuffer, vertexCapacity = 0, indexCapacity = 0;
-    status.textContent = "Rust Wasm · WebGPU";
-    // Keep the GPU resources alive for the renderer's lifetime.
-    return { backend: "webgpu", gpu, adapter, device, get lost() { return deviceLost; }, draw(frame, vertices, indices) {
-      if (atlasRevision !== atlas.revision) {
-        const update = atlasRevision < 0 ? [0, 0, atlas.width, atlas.height] : atlas.update;
-        if (update) {
-          const [x, y, width, height] = update;
-          device.queue.writeTexture({ texture: fontTexture, origin: [x, y] },
-            atlas.pixels.subarray(y * atlas.width + x), { bytesPerRow: atlas.width }, [width, height]);
-        }
-        atlasRevision = atlas.revision;
-      }
-      const ratio = window.devicePixelRatio || 1;
-      canvas.width = Math.max(1, Math.round(surface.clientWidth * ratio));
-      canvas.height = Math.max(1, Math.round(surface.clientHeight * ratio));
-      if (vertices.byteLength > vertexCapacity) {
-        vertexBuffer?.destroy(); vertexCapacity = vertices.byteLength;
-        vertexBuffer = device.createBuffer({ size: vertexCapacity, usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST });
-      }
-      if (indices.byteLength > indexCapacity) {
-        indexBuffer?.destroy(); indexCapacity = indices.byteLength;
-        indexBuffer = device.createBuffer({ size: indexCapacity, usage: GPUBufferUsage.INDEX | GPUBufferUsage.COPY_DST });
-      }
-      device.queue.writeBuffer(vertexBuffer, 0, vertices);
-      device.queue.writeBuffer(indexBuffer, 0, indices);
-      device.queue.writeBuffer(uniform, 0, new Float32Array([frame.width, frame.height, 0, 0]));
-      const commands = device.createCommandEncoder();
-      const pass = commands.beginRenderPass({ colorAttachments: [{ view: context.getCurrentTexture().createView(), loadOp: "clear", storeOp: "store", clearValue: { r: 0, g: 0, b: 0, a: 0 } }] });
-      pass.setPipeline(pipeline); pass.setBindGroup(0, bindGroup);
-      pass.setVertexBuffer(0, vertexBuffer); pass.setIndexBuffer(indexBuffer, "uint32");
-      for (const batch of frame.batches) {
-        pass.setBindGroup(0, batch.textureID === 1 ? fontBindGroup : bindGroup);
-        const clip = batch.clip || [0, 0, frame.width, frame.height];
-        const x = Math.max(0, Math.floor(clip[0] * ratio)), y = Math.max(0, Math.floor(clip[1] * ratio));
-        const right = Math.min(canvas.width, Math.ceil((clip[0] + clip[2]) * ratio));
-        const bottom = Math.min(canvas.height, Math.ceil((clip[1] + clip[3]) * ratio));
-        if (right <= x || bottom <= y) continue;
-        pass.setScissorRect(x, y, right - x, bottom - y);
-        pass.drawIndexed(batch.count, 1, batch.offset);
-      }
-      pass.end(); device.queue.submit([commands.finish()]);
-    } };
+    const format = await webgpu.initialize();
+    if (!wasm.cove_webgpu_enable(format === "bgra8unorm")) throw new Error("WebGPU RHI initialization failed");
+    status.textContent = "Rust Wasm · WebGPU RHI";
+    return { backend: "webgpu", adapter: webgpu.adapter, get lost() { return webgpu.lost; } };
   } catch (error) {
-    if (new URLSearchParams(location.search).get("renderer") === "webgpu") throw error;
+    if (forcedRenderer === "webgpu") throw error;
     console.info("Using Canvas2D geometry adapter:", error.message);
     return makeCanvasRenderer();
   }
-
 }
 
 function makeCanvasRenderer() {
-    document.querySelector("#gpu").hidden = true;
-    const canvas = document.querySelector("#fallback"); canvas.hidden = false;
-    status.textContent = "Rust Wasm · Canvas2D fallback";
-    const alphaCanvas = document.createElement("canvas");
-    const tinted = new Map();
-    let atlasRevision = -1;
+  document.querySelector("#gpu").hidden = true;
+  const canvas = document.querySelector("#fallback"); canvas.hidden = false;
+  status.textContent = "Rust Wasm · Canvas2D fallback";
+  const alphaCanvas = document.createElement("canvas");
+  const tinted = new Map();
+  const rasterAssets = new Map();
+  let atlasRevision = -1;
+
+  function updateRasterAssets(descriptors) {
+    const visible = new Set(descriptors.map(asset => asset.id));
+    for (const id of rasterAssets.keys()) if (!visible.has(id)) rasterAssets.delete(id);
+    for (const { id, width, height } of descriptors) {
+      if (rasterAssets.has(id)) continue;
+      const pointer = wasm.cove_raster_asset(id);
+      if (!pointer) continue;
+      const source = document.createElement("canvas");
+      source.width = width; source.height = height;
+      const rgba = new Uint8ClampedArray(readBytes(pointer, width * height * 4).buffer);
+      source.getContext("2d").putImageData(new ImageData(rgba, width, height), 0, 0);
+      rasterAssets.set(id, source);
+    }
+  }
+
+  function drawImageBatch(context, source, batch, data, indices) {
+    let path, transform, alpha;
+    function flush() {
+      if (!path) return;
+      context.save();
+      context.clip(path);
+      context.transform(...transform);
+      context.globalAlpha = alpha;
+      context.drawImage(source, 0, 0);
+      context.restore();
+    }
+    function vertex(index) {
+      const offset = indices[index] * 20;
+      const u = data.getFloat32(offset + 8, true);
+      return [data.getFloat32(offset, true), data.getFloat32(offset + 4, true),
+        (u - (u >= 20 ? 20 : 10)) * source.width, data.getFloat32(offset + 12, true) * source.height,
+        (data.getUint32(offset + 16, true) >>> 24) / 255];
+    }
+    for (let i = batch.offset; i < batch.offset + batch.count; i += 3) {
+      const [x, y, u, v, opacity] = vertex(i);
+      const [x1, y1, u1, v1] = vertex(i + 1);
+      const [x2, y2, u2, v2] = vertex(i + 2);
+      const [du1, dv1, du2, dv2] = [u1 - u, v1 - v, u2 - u, v2 - v];
+      const det = du1 * dv2 - du2 * dv1;
+      if (Math.abs(det) < 1e-7) continue;
+      const a = ((x1 - x) * dv2 - (x2 - x) * dv1) / det;
+      const b = ((y1 - y) * dv2 - (y2 - y) * dv1) / det;
+      const c = ((x2 - x) * du1 - (x1 - x) * du2) / det;
+      const d = ((y2 - y) * du1 - (y1 - y) * du2) / det;
+      const matrix = [a, b, c, d, x - a * u - c * v, y - b * u - d * v];
+      // Clip adjacent triangles as one image so their shared edges have no seam.
+      if (!transform || opacity !== alpha || matrix.some((value, j) => Math.abs(value - transform[j]) > 0.002)) {
+        flush(); path = new Path2D(); transform = matrix; alpha = opacity;
+      }
+      path.moveTo(x, y); path.lineTo(x1, y1); path.lineTo(x2, y2); path.closePath();
+    }
+    flush();
+  }
     function fontSource(color) {
       if (!tinted.has(color)) {
         // Bound the cache; these are alpha textures tinted by vertex RGBA.
@@ -213,6 +188,7 @@ function makeCanvasRenderer() {
       return tinted.get(color);
     }
     return { backend: "canvas2d", draw(frame, vertices, indices) {
+      updateRasterAssets(frame.rasterAssets);
       if (atlasRevision !== atlas.revision) {
         const update = atlasRevision < 0 ? [0, 0, atlas.width, atlas.height] : atlas.update;
         if (atlasRevision < 0) { alphaCanvas.width = atlas.width; alphaCanvas.height = atlas.height; }
@@ -251,6 +227,11 @@ function makeCanvasRenderer() {
           }
           context.restore(); continue;
         }
+        const image = rasterAssets.get(batch.textureID);
+        if (image) {
+          drawImageBatch(context, image, batch, data, indices);
+          context.restore(); continue;
+        }
         let pathColor;
         for (let i = batch.offset; i < batch.offset + batch.count; i += 3) {
           const start = indices[i] * 20;
@@ -276,10 +257,16 @@ function makeCanvasRenderer() {
 }
 
 try {
-  const wasi = new WASI([], [], [new OpenFile(new File([])), ConsoleStdout.lineBuffered(console.log), ConsoleStdout.lineBuffered(console.error)]);
+  const component = new URLSearchParams(location.search).get("component");
+  const args = component ? ["gallery", "--component", component] : ["gallery"];
+  const wasi = new WASI(args, [], [new OpenFile(new File([])), ConsoleStdout.lineBuffered(console.log), ConsoleStdout.lineBuffered(console.error)]);
   const module = await WebAssembly.compile(await (await fetch("./cove.wasm")).arrayBuffer());
-  const instance = await WebAssembly.instantiate(module, { wasi_snapshot_preview1: wasi.wasiImport });
-  wasi.initialize(instance); wasm = instance.exports;
+  const instance = await WebAssembly.instantiate(module, {
+    wasi_snapshot_preview1: wasi.wasiImport,
+    cove_webgpu: webgpu.imports,
+  });
+  wasm = instance.exports;
+  wasi.initialize(instance);
   for (const font of ["NotoSans.ttf", "NotoSansCJKsc.otf", "NotoSansArabic.ttf", "NotoSansDevanagari.ttf", "NotoEmoji.ttf"]) {
     const result = await fetch(`./fonts/${font}`);
     if (!result.ok) throw new Error(`Cannot load font ${font}: HTTP ${result.status}`);
@@ -291,15 +278,7 @@ try {
       if (!wasm.cove_font_load(pointer, bytes.length)) throw new Error(`Invalid font: ${font}`);
     } finally { wasm.cove_free(pointer, bytes.length); }
   }
-  // The first call initializes Rust's lazily created shared prototype.
-  wasm.cove_render(surface.clientWidth, surface.clientHeight);
-  // Preserve the initial full/dirty upload before the next render marks it clean.
-  updateAtlas(readJSON(wasm.cove_snapshot(), wasm.cove_snapshot_size()));
-  renderer = await makeRenderer(decoder.decode(readBytes(wasm.cove_shader(), wasm.cove_shader_size())));
-  if (renderer.lost) {
-    if (new URLSearchParams(location.search).get("renderer") === "webgpu") throw new Error("WebGPU device lost during initialization");
-    renderer = makeCanvasRenderer();
-  }
+  renderer = await makeRenderer();
   for (const id of ["increment", "reset", "theme"]) {
     document.getElementById(id).addEventListener("click", () => {
       const rect = findNode(lastFrame?.tree.root, `counter.${id}`)?.absoluteFrame;

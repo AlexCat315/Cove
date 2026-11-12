@@ -260,7 +260,7 @@ impl Device {
         let stale: Vec<Texture> = previous.textures.iter().copied().collect();
         Self::validate_surface(&descriptor)?;
         Self::validate_unique_surface(&state, &descriptor, Some(handle))?;
-        self.drain_retirements(self.frame_ring.wait_until_idle());
+        self.wait_for_frame_retirements()?;
         self.backend().wait_until_idle()?;
         self.backend().configure_swapchain(handle, descriptor)?;
         for texture in stale {
@@ -327,7 +327,7 @@ impl Device {
             state.current_slot.is_none(),
             "close a swapchain outside a frame",
         )?;
-        self.drain_retirements(self.frame_ring.wait_until_idle());
+        self.wait_for_frame_retirements()?;
         self.backend().wait_until_idle()?;
         self.destroy_swapchain_locked(&mut state, handle);
         Ok(())
@@ -1203,7 +1203,11 @@ impl Device {
     pub fn begin_frame(&self) -> RhiResult<()> {
         let mut state = self.lock();
         rhi_require(state.current_slot.is_none(), "a frame is already active")?;
-        let (slot, ready) = self.frame_ring.begin();
+        let (slot, ready) = if self.backend_api == super::GraphicsApi::WebGpu {
+            self.frame_ring.try_begin().ok_or(RhiError::GpuBusy)?
+        } else {
+            self.frame_ring.begin()
+        };
         self.drain_retirements(ready);
         match self.backend().make_frame_uploader(slot) {
             Ok(mut uploader) => {
@@ -1669,8 +1673,16 @@ impl Device {
             state.current_slot.is_none(),
             "end_frame must precede wait_until_idle",
         )?;
-        self.drain_retirements(self.frame_ring.wait_until_idle());
+        self.wait_for_frame_retirements()?;
         self.backend().wait_until_idle()
+    }
+
+    fn wait_for_frame_retirements(&self) -> RhiResult<()> {
+        if self.backend_api == super::GraphicsApi::WebGpu && !self.frame_ring.is_idle() {
+            return Err(RhiError::GpuBusy);
+        }
+        self.drain_retirements(self.frame_ring.wait_until_idle());
+        Ok(())
     }
 
     fn retire_current(&self, action: super::Completion) {

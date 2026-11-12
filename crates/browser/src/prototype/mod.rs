@@ -17,6 +17,8 @@ pub mod abi;
 pub mod counter;
 pub mod frame;
 pub mod prototype;
+#[cfg(target_arch = "wasm32")]
+mod gpu;
 pub mod root_content;
 
 pub use frame::{Batch, Frame, Label, viewport_size};

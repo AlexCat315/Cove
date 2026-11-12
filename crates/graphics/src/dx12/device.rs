@@ -273,10 +273,8 @@ fn wait_for_fence(queue: &Dx12Queue, value: u64) -> RhiResult<()> {
 
 /// Shapes the RHI capability set from the probed feature level.
 ///
-/// Ray tracing stays **unadvertised** even on an adapter that supports DXR: the
-/// capability set is a promise the backend will honour, and this build does not
-/// link the DXR build/execute dispatch tables. The adapter's real support is
-/// reported separately through `AdapterCapabilities`, which is diagnostic.
+/// DXR tier 1.0 enables acceleration structures. Inline compute queries also
+/// require tier 1.1. The remaining ray tracing operations use their defaults.
 pub fn capabilities_for(mesh: bool, ray_tracing: bool, ray_query: bool) -> Capabilities {
     Capabilities::configure(|capabilities| {
         capabilities.graphics = true;

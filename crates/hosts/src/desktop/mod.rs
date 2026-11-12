@@ -8,13 +8,18 @@
 
 pub mod application;
 pub mod diagnostics;
+#[cfg(not(target_arch = "wasm32"))]
 pub mod display;
+#[cfg(not(target_arch = "wasm32"))]
 pub mod rendering;
+#[cfg(not(target_arch = "wasm32"))]
 pub mod resources_support;
 pub mod window;
 
 pub use application::configuration::{
     AppFrameDrivePolicy, AppWindowRendering, AppWindowTitleBarStyle, ApplicationConfiguration,
 };
+#[cfg(not(target_arch = "wasm32"))]
 pub use application::runtime::{Application, ApplicationCallbacks};
+#[cfg(not(target_arch = "wasm32"))]
 pub use display::{AppAuxiliaryWindowRequest, AppDisplayHandle};

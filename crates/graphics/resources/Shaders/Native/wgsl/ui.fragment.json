@@ -1,0 +1,43 @@
+{
+  "stage": "fragment",
+  "format": "wgsl",
+  "entryPoint": "uiFragment",
+  "code": "QGJpbmRpbmcoMSkgQGdyb3VwKDApIHZhciBhdGxhc18wIDogdGV4dHVyZV8yZDxmMzI+OwoKQGJpbmRpbmcoMikgQGdyb3VwKDApIHZhciBhdGxhc1NhbXBsZXJfMCA6IHNhbXBsZXI7CgpmbiBzcmdiVG9MaW5lYXJfMCggY29sb3JfMCA6IHZlYzM8ZjMyPikgLT4gdmVjMzxmMzI+CnsKICAgIHJldHVybiBzZWxlY3QocG93KChjb2xvcl8wICsgdmVjMzxmMzI+KDAuMDU0OTk5OTk5NzAxOTc2NzhmKSkgLyB2ZWMzPGYzMj4oMS4wNTQ5OTk5NDc1NDc5MTI2ZiksIHZlYzM8ZjMyPigyLjQwMDAwMDA5NTM2NzQzMTY0ZikpLCBjb2xvcl8wIC8gdmVjMzxmMzI+KDEyLjkyMDAwMDA3NjI5Mzk0NTMxZiksIGNvbG9yXzAgPD0gdmVjMzxmMzI+KDAuMDQwNDQ5OTk5MjcyODIzMzNmKSk7Cn0KCnN0cnVjdCBwaXhlbE91dHB1dF8wCnsKICAgIEBsb2NhdGlvbigwKSBvdXRwdXRfMCA6IHZlYzQ8ZjMyPiwKfTsKCnN0cnVjdCBwaXhlbElucHV0XzAKewogICAgQGxvY2F0aW9uKDApIHV2XzAgOiB2ZWMyPGYzMj4sCiAgICBAbG9jYXRpb24oMSkgY29sb3JfMSA6IHZlYzQ8ZjMyPiwKICAgIEBpbnRlcnBvbGF0ZShmbGF0KSBAbG9jYXRpb24oMikgc3JnYl8wIDogZjMyLAp9OwoKQGZyYWdtZW50CmZuIHVpRnJhZ21lbnQoIF9TMSA6IHBpeGVsSW5wdXRfMCwgQGJ1aWx0aW4ocG9zaXRpb24pIHBvc2l0aW9uXzAgOiB2ZWM0PGYzMj4pIC0+IHBpeGVsT3V0cHV0XzAKewogICAgdmFyIHNyZ2JfMSA6IGJvb2wgPSAoX1MxLnNyZ2JfMCkgPiAwLjVmOwogICAgdmFyIHJnYl8wIDogdmVjMzxmMzI+OwogICAgaWYoc3JnYl8xKQogICAgewogICAgICAgIHJnYl8wID0gc3JnYlRvTGluZWFyXzAoX1MxLmNvbG9yXzEueHl6KTsKICAgIH0KICAgIGVsc2UKICAgIHsKICAgICAgICByZ2JfMCA9IF9TMS5jb2xvcl8xLnh5ejsKICAgIH0KICAgIHZhciBfUzIgOiBmMzIgPSBfUzEudXZfMC54OwogICAgaWYoX1MyIDwgMC4wZikKICAgIHsKICAgICAgICB2YXIgX1MzIDogcGl4ZWxPdXRwdXRfMCA9IHBpeGVsT3V0cHV0XzAoIHZlYzQ8ZjMyPihyZ2JfMCwgX1MxLmNvbG9yXzEudykgKTsKICAgICAgICByZXR1cm4gX1MzOwogICAgfQogICAgaWYoX1MyID49IDIwLjBmKQogICAgewogICAgICAgIHZhciBfUzQgOiBwaXhlbE91dHB1dF8wID0gcGl4ZWxPdXRwdXRfMCggdmVjNDxmMzI+KHJnYl8wLCBfUzEuY29sb3JfMS53ICogKHRleHR1cmVTYW1wbGVMZXZlbCgoYXRsYXNfMCksIChhdGxhc1NhbXBsZXJfMCksICh2ZWMyPGYzMj4oX1MyIC0gMjAuMGYsIF9TMS51dl8wLnkpKSwgKDAuMGYpKSkudykgKTsKICAgICAgICByZXR1cm4gX1M0OwogICAgfQogICAgaWYoX1MyID49IDEwLjBmKQogICAgewogICAgICAgIHZhciBzYW1wbGVkXzAgOiB2ZWM0PGYzMj4gPSAodGV4dHVyZVNhbXBsZUxldmVsKChhdGxhc18wKSwgKGF0bGFzU2FtcGxlcl8wKSwgKHZlYzI8ZjMyPihfUzIgLSAxMC4wZiwgX1MxLnV2XzAueSkpLCAoMC4wZikpKTsKICAgICAgICB2YXIgdGV4dHVyZVJHQl8wIDogdmVjMzxmMzI+OwogICAgICAgIGlmKHNyZ2JfMSkKICAgICAgICB7CiAgICAgICAgICAgIHRleHR1cmVSR0JfMCA9IHNyZ2JUb0xpbmVhcl8wKHNhbXBsZWRfMC54eXopOwogICAgICAgIH0KICAgICAgICBlbHNlCiAgICAgICAgewogICAgICAgICAgICB0ZXh0dXJlUkdCXzAgPSBzYW1wbGVkXzAueHl6OwogICAgICAgIH0KICAgICAgICB2YXIgX1M1IDogcGl4ZWxPdXRwdXRfMCA9IHBpeGVsT3V0cHV0XzAoIHZlYzQ8ZjMyPihyZ2JfMCAqIHRleHR1cmVSR0JfMCwgX1MxLmNvbG9yXzEudyAqIHNhbXBsZWRfMC53KSApOwogICAgICAgIHJldHVybiBfUzU7CiAgICB9CiAgICB2YXIgYWxwaGFfMCA6IGYzMiA9ICh0ZXh0dXJlU2FtcGxlTGV2ZWwoKGF0bGFzXzApLCAoYXRsYXNTYW1wbGVyXzApLCAoX1MxLnV2XzApLCAoMC4wZikpKS54OwogICAgdmFyIGNvdmVyYWdlXzAgOiBmMzI7CiAgICBpZihzcmdiXzEpCiAgICB7CiAgICAgICAgY292ZXJhZ2VfMCA9IDEuMGYgLSBzcmdiVG9MaW5lYXJfMCh2ZWMzPGYzMj4oKDEuMGYgLSBhbHBoYV8wKSkpLng7CiAgICB9CiAgICBlbHNlCiAgICB7CiAgICAgICAgY292ZXJhZ2VfMCA9IHBvdyhhbHBoYV8wLCAwLjc1Zik7CiAgICB9CiAgICB2YXIgX1M2IDogcGl4ZWxPdXRwdXRfMCA9IHBpeGVsT3V0cHV0XzAoIHZlYzQ8ZjMyPihyZ2JfMCwgX1MxLmNvbG9yXzEudyAqIGNvdmVyYWdlXzApICk7CiAgICByZXR1cm4gX1M2Owp9Cgo=",
+  "interface": {
+    "threadgroupSize": {
+      "x": 1,
+      "y": 1,
+      "z": 1
+    },
+    "bindings": [
+      {
+        "name": "atlas",
+        "slot": 1,
+        "space": 0,
+        "type": "texture",
+        "buffer": {
+          "readOnly": true,
+          "elementStride": 0
+        }
+      },
+      {
+        "name": "atlasSampler",
+        "slot": 2,
+        "space": 0,
+        "type": "sampler",
+        "buffer": {
+          "readOnly": true,
+          "elementStride": 0
+        }
+      }
+    ],
+    "specializationConstants": [],
+    "threadgroupSpecialization": {
+      "x": null,
+      "y": null,
+      "z": null
+    },
+    "pushConstants": []
+  },
+  "compiler": "Slang 2026.19"
+}

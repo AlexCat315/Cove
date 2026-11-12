@@ -5,7 +5,7 @@
   "scripts": {
     "build": "bash build.sh",
     "serve": "python3 -m http.server 8080 --bind 127.0.0.1 --directory dist",
-    "verify": "node --check web/app.js",
+    "verify": "node --check web/app.js && node --check web/webgpu.js",
     "dev": "npm run build && npm run serve"
   },
   "dependencies": {

@@ -8,6 +8,8 @@ license.workspace = true
 [dependencies]
 thiserror.workspace = true
 tempfile.workspace = true
+
+[target.'cfg(any(unix, windows))'.dependencies]
 os_pipe.workspace = true
 
 [target.'cfg(unix)'.dependencies]

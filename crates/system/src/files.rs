@@ -8,13 +8,17 @@ use std::{
 unsafe extern "C" {
     fn cove_restrict_path(path: *const std::ffi::c_char, directory: i32) -> u32;
     fn cove_same_file(lhs: *const std::ffi::c_char, rhs: *const std::ffi::c_char) -> i32;
-    fn cove_file_lock(path: *const std::ffi::c_char, error: *mut u32) -> isize;
-    fn cove_file_try_lock(path: *const std::ffi::c_char) -> isize;
-    fn cove_file_unlock(handle: isize);
     fn cove_replace_file(
         source: *const std::ffi::c_char,
         destination: *const std::ffi::c_char,
     ) -> u32;
+}
+
+#[cfg(not(target_os = "wasi"))]
+unsafe extern "C" {
+    fn cove_file_lock(path: *const std::ffi::c_char, error: *mut u32) -> isize;
+    fn cove_file_try_lock(path: *const std::ffi::c_char) -> isize;
+    fn cove_file_unlock(handle: isize);
 }
 
 fn native_path(path: &Path) -> io::Result<CString> {
@@ -141,9 +145,19 @@ pub fn contains_path(directory: &Path, candidate: &Path) -> io::Result<bool> {
 
 /// Exclusive cross-process lock. Dropping the guard closes its native handle.
 pub struct FileLock {
+    #[cfg(not(target_os = "wasi"))]
     handle: isize,
 }
 impl FileLock {
+    #[cfg(target_os = "wasi")]
+    pub fn acquire(_: &Path) -> io::Result<Self> {
+        Err(io::Error::new(
+            io::ErrorKind::Unsupported,
+            "WASI has no cross-process file locking",
+        ))
+    }
+
+    #[cfg(not(target_os = "wasi"))]
     pub fn acquire(path: &Path) -> io::Result<Self> {
         let path = native_path(path)?;
         let mut error = 0;
@@ -161,13 +175,20 @@ impl FileLock {
     /// Swift's `cove_log_lock_file` is non-blocking (`LOCK_NB`); retention uses
     /// it to skip a session another process is still writing instead of waiting
     /// for that process to exit.
+    #[cfg(not(target_os = "wasi"))]
     pub fn try_acquire(path: &Path) -> Option<Self> {
         let path = native_path(path).ok()?;
         // SAFETY: valid NUL-terminated path; handle is exclusively owned on success.
         let handle = unsafe { cove_file_try_lock(path.as_ptr()) };
         (handle != -1).then_some(Self { handle })
     }
+
+    #[cfg(target_os = "wasi")]
+    pub fn try_acquire(_: &Path) -> Option<Self> {
+        None
+    }
 }
+#[cfg(not(target_os = "wasi"))]
 impl Drop for FileLock {
     fn drop(&mut self) {
         // SAFETY: handle was obtained by acquire and is closed exactly once.

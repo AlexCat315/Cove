@@ -4,7 +4,7 @@
 //! prefix here; the rename is deliberate and each pair is a straight port, not a
 //! gap. `UILinearGradient` → [`LinearGradient`], `UIVertex` → [`Vertex`],
 //! `UIRect` → [`Rect`], `UIClip` → [`Clip`], `UIRoundedRect` →
-//! [`RoundedRect`], `UIShader` → [`UI_SHADER_WGSL`], `UIReveal` → [`Reveal`],
+//! [`RoundedRect`], `UIReveal` → [`Reveal`],
 //! `LineBreaks` → [`line_break_opportunities`], `StateReadTracking` →
 //! [`ReadScope`], `UIEnvironment` → [`Environment`], `UIBackdrop` →
 //! [`Backdrop`], `UITextureAsset` → [`TextureAsset`], `DecodedImage` →
@@ -43,7 +43,6 @@ mod text_layout;
 mod text_measure_slot;
 mod text_scale;
 mod ui_reveal;
-mod ui_shader;
 pub mod work;
 
 pub use adaptive_environment::*;
@@ -77,4 +76,3 @@ pub use text_layout::*;
 pub use text_measure_slot::*;
 pub use text_scale::*;
 pub use ui_reveal::*;
-pub use ui_shader::*;

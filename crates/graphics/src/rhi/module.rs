@@ -24,12 +24,17 @@ pub fn platform_default_backends() -> Vec<GraphicsApi> {
     {
         vec![GraphicsApi::Vulkan]
     }
+    #[cfg(target_arch = "wasm32")]
+    {
+        vec![GraphicsApi::WebGpu]
+    }
     #[cfg(not(any(
         target_os = "macos",
         target_os = "ios",
         target_os = "windows",
         target_os = "linux",
-        target_os = "android"
+        target_os = "android",
+        target_arch = "wasm32"
     )))]
     {
         Vec::new()
@@ -39,11 +44,11 @@ pub fn platform_default_backends() -> Vec<GraphicsApi> {
 /// Android presentation commonly exposes RGBA surfaces; desktop renderers use
 /// the BGRA sRGB convention shared with Metal.
 pub fn platform_default_surface_format() -> TextureFormat {
-    #[cfg(target_os = "android")]
+    #[cfg(any(target_os = "android", target_arch = "wasm32"))]
     {
         TextureFormat::Rgba8Unorm
     }
-    #[cfg(not(target_os = "android"))]
+    #[cfg(not(any(target_os = "android", target_arch = "wasm32")))]
     {
         TextureFormat::Bgra8UnormSrgb
     }
@@ -60,6 +65,7 @@ pub fn is_compiled_in(api: GraphicsApi) -> bool {
             target_os = "android"
         )),
         GraphicsApi::Dx12 => cfg!(target_os = "windows"),
+        GraphicsApi::WebGpu => cfg!(target_arch = "wasm32"),
     }
 }
 
@@ -76,9 +82,9 @@ mod tests {
 
     #[test]
     fn surface_format_follows_the_platform() {
-        #[cfg(target_os = "android")]
+        #[cfg(any(target_os = "android", target_arch = "wasm32"))]
         assert_eq!(platform_default_surface_format(), TextureFormat::Rgba8Unorm);
-        #[cfg(not(target_os = "android"))]
+        #[cfg(not(any(target_os = "android", target_arch = "wasm32")))]
         assert_eq!(
             platform_default_surface_format(),
             TextureFormat::Bgra8UnormSrgb

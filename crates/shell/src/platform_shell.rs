@@ -33,16 +33,7 @@ pub enum SystemAppearance {
     Light,
     Dark,
 }
-/// What shows through where the UI leaves the window clear.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub enum WindowBackdrop {
-    /// The UI paints every pixel.
-    #[default]
-    Opaque,
-    /// The platform's blurred sidebar material, the way a macOS source list
-    /// shows the desktop through it.
-    Sidebar,
-}
+use cove_platform::WindowBackdrop;
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct ChromeRect {

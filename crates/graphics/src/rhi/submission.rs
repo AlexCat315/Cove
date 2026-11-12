@@ -218,6 +218,14 @@ impl FrameRing {
     /// Opens the next frame and returns its slot index plus the retirement
     /// identifiers that became runnable while opening it.
     pub fn begin(&self) -> (usize, Vec<u64>) {
+        self.begin_slot(true).expect("blocking frame begin has a slot")
+    }
+
+    pub fn try_begin(&self) -> Option<(usize, Vec<u64>)> {
+        self.begin_slot(false)
+    }
+
+    fn begin_slot(&self, wait: bool) -> Option<(usize, Vec<u64>)> {
         let mut state = self.lock();
         assert!(
             state.current.is_none(),
@@ -226,6 +234,9 @@ impl FrameRing {
         let slot_count = state.slots.len();
         let index = (state.epoch % slot_count as u64) as usize;
         while state.slots[index].in_flight {
+            if !wait {
+                return None;
+            }
             state = self
                 .condition
                 .wait(state)
@@ -241,7 +252,7 @@ impl FrameRing {
         slot.pending_command_buffers = 0;
         state.current = Some(index);
         drop(state);
-        (index, ready)
+        Some((index, ready))
     }
 
     /// Seals the current frame and returns retirements that became runnable.
@@ -331,6 +342,10 @@ impl FrameRing {
         let ready = drain_retirements(&mut state);
         drop(state);
         ready
+    }
+
+    pub fn is_idle(&self) -> bool {
+        !self.lock().slots.iter().any(|slot| slot.in_flight)
     }
 }
 
@@ -805,6 +820,20 @@ mod tests {
         allocator.reset();
         assert_eq!(allocator.allocate(16, 16).expect("after reset").offset(), 0);
         assert!(allocator.allocate(0, 16).is_err());
+    }
+
+    #[test]
+    fn a_busy_frame_slot_can_be_retried_without_waiting() {
+        let ring = FrameRing::new(1);
+        let (slot, _) = ring.try_begin().expect("first frame");
+        ring.register_command_buffer(slot);
+        ring.end();
+        assert!(!ring.is_idle());
+        assert!(ring.try_begin().is_none());
+        ring.command_buffer_completed(slot);
+        assert!(ring.is_idle());
+        assert!(ring.try_begin().is_some());
+        ring.end();
     }
 
     #[test]

@@ -18,8 +18,8 @@ use std::rc::Rc;
 use std::time::Instant;
 
 use cove_composition::ViewGraph;
+use cove_core::DrawList;
 use cove_core::scene::{EventDispatcher, NodeRenderer, NodeTree, PlatformInputContext, Recomposer};
-use cove_core::{DrawList, UI_SHADER_WGSL};
 use cove_devtools::client::DevToolsSession;
 use cove_devtools::inspection::SceneInspector;
 use cove_devtools_protocol::{
@@ -32,8 +32,10 @@ use cove_platform::{
 };
 use cove_text::FontCollection;
 
+#[cfg(target_arch = "wasm32")]
+use super::gpu::BrowserGpu;
 use crate::export_buffer::ExportBuffer;
-use crate::prototype::frame::{Batch, Frame, Label, viewport_size};
+use crate::prototype::frame::{Batch, Frame, Label, RasterAsset, viewport_size};
 
 /// Atlas edge in texels, matching the Swift prototype.
 const ATLAS_SIZE: usize = 2048;
@@ -81,8 +83,11 @@ pub struct BrowserPrototype<C: PrototypeContent> {
     pub index_buffer: ExportBuffer,
     pub snapshot_buffer: ExportBuffer,
     pub response_buffer: ExportBuffer,
-    pub shader_buffer: ExportBuffer,
     pub atlas_buffer: ExportBuffer,
+    #[cfg(target_arch = "wasm32")]
+    webgpu: Option<BrowserGpu>,
+    #[cfg(target_arch = "wasm32")]
+    webgpu_failed: bool,
 }
 
 impl<C: PrototypeContent> BrowserPrototype<C> {
@@ -110,8 +115,6 @@ impl<C: PrototypeContent> BrowserPrototype<C> {
         context.with_current(|| content.install(&graph));
         let mut fonts = FontCollection::new(ATLAS_SIZE, ATLAS_SIZE);
         fonts.configure(16.0, 1.0);
-        let mut shader_buffer = ExportBuffer::new();
-        shader_buffer.replace(UI_SHADER_WGSL.as_bytes());
         Self {
             content,
             tree,
@@ -135,15 +138,68 @@ impl<C: PrototypeContent> BrowserPrototype<C> {
             index_buffer: ExportBuffer::new(),
             snapshot_buffer: ExportBuffer::new(),
             response_buffer: ExportBuffer::new(),
-            shader_buffer,
             atlas_buffer: ExportBuffer::new(),
+            #[cfg(target_arch = "wasm32")]
+            webgpu: None,
+            #[cfg(target_arch = "wasm32")]
+            webgpu_failed: false,
         }
+    }
+
+    #[cfg(target_arch = "wasm32")]
+    pub(super) fn enable_webgpu(&mut self, format: cove_graphics::TextureFormat) -> bool {
+        match BrowserGpu::new(format) {
+            Ok(gpu) => {
+                self.webgpu = Some(gpu);
+                self.webgpu_failed = false;
+                true
+            }
+            Err(error) => {
+                eprintln!("WebGPU initialization: {error}");
+                false
+            }
+        }
+    }
+
+    #[cfg(target_arch = "wasm32")]
+    pub(super) fn disable_webgpu(&mut self) {
+        self.webgpu = None;
+        self.webgpu_failed = false;
+        self.fonts.atlas.reset();
+    }
+
+    #[cfg(target_arch = "wasm32")]
+    pub(super) fn render_web(&mut self, width: f32, height: f32) -> i32 {
+        if let Some(gpu) = &self.webgpu {
+            match gpu.ready() {
+                Ok(()) => {}
+                Err(cove_graphics::RhiError::GpuBusy) => return 1,
+                Err(error) => {
+                    eprintln!("WebGPU frame: {error}");
+                    return -1;
+                }
+            }
+        }
+        self.render(width, height);
+        if self.webgpu_failed { -1 } else { 0 }
     }
 
     pub fn set_raster_scale(&mut self, scale: f32) {
         if scale.is_finite() {
             self.raster_scale = scale.clamp(1.0, 4.0);
         }
+    }
+
+    pub(super) fn raster_asset_pixels(&self, id: u32) -> *const u8 {
+        let mut pixels = std::ptr::null();
+        self.draw_list
+            .resources
+            .for_each::<cove_imaging::ImageAsset>(|asset| {
+                if asset.texture_id == id {
+                    pixels = asset.image.pixels().as_ptr();
+                }
+            });
+        pixels
     }
 
     /// Appends a font face; returns its id, or `None` when rejected.
@@ -203,6 +259,18 @@ impl<C: PrototypeContent> BrowserPrototype<C> {
         }
 
         let upload = self.fonts.atlas.dirty_upload_payload();
+        #[cfg(target_arch = "wasm32")]
+        if let Some(gpu) = &mut self.webgpu
+            && let Err(error) = gpu.draw(
+                &self.draw_list,
+                &self.fonts.atlas,
+                [width, height],
+                self.raster_scale,
+            )
+        {
+            self.webgpu_failed = true;
+            eprintln!("WebGPU frame: {error}");
+        }
         match &upload {
             Some(payload) => self.atlas_buffer.replace(&payload.pixels),
             None => self.atlas_buffer.replace(&[]),
@@ -225,6 +293,16 @@ impl<C: PrototypeContent> BrowserPrototype<C> {
             .collect();
         let vertices = self.draw_list.vertices().len();
         let indices = self.draw_list.indices().len();
+        let mut raster_assets = Vec::new();
+        self.draw_list
+            .resources
+            .for_each::<cove_imaging::ImageAsset>(|asset| {
+                raster_assets.push(RasterAsset {
+                    id: asset.texture_id,
+                    width: asset.image.width(),
+                    height: asset.image.height(),
+                });
+            });
         let snapshot = self.inspector.snapshot();
         self.frame = Some(Frame {
             count,
@@ -241,6 +319,7 @@ impl<C: PrototypeContent> BrowserPrototype<C> {
             vertices,
             indices,
             batches,
+            raster_assets,
             labels,
             tree: snapshot,
             font_count: self.fonts.font_count(),

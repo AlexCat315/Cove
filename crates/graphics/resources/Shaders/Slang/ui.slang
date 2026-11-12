@@ -8,7 +8,11 @@ struct Vertex {
 // Compile stages separately so offline reflection exposes only each stage's ABI.
 #if UI_VERTEX_SHADER
 struct Uniforms { float2 viewport; float srgb; float padding; };
+#ifdef COVE_WEBGPU
+[[vk::binding(0, 1)]] ConstantBuffer<Uniforms> uniforms;
+#else
 [[vk::push_constant]] ConstantBuffer<Uniforms> uniforms : register(b0, space0);
+#endif
 struct Input { float2 position : TEXCOORD0; float2 uv : TEXCOORD1; float4 color : TEXCOORD2; };
 [shader("vertex")]
 Vertex uiVertex(Input input) {

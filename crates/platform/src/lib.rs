@@ -3,6 +3,16 @@ use serde::{Deserialize, Serialize};
 mod resources;
 pub use resources::ResourceBundle;
 
+/// What shows through where the UI leaves the window clear.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum WindowBackdrop {
+    /// The UI paints every pixel.
+    #[default]
+    Opaque,
+    /// The platform's blurred sidebar material.
+    Sidebar,
+}
+
 /// One pixel read from the screen: sRGB components in `0…1` with straight
 /// (unpremultiplied) alpha. This crate only defines the contract; reading a
 /// screen pixel is a host/backend responsibility with one native implementation

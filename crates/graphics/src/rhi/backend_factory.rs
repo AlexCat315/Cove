@@ -66,6 +66,10 @@ pub fn install_backends() {
         {
             register_backend(GraphicsApi::Dx12, crate::dx12::make_backend);
         }
+        #[cfg(target_arch = "wasm32")]
+        {
+            register_backend(GraphicsApi::WebGpu, crate::webgpu::make_backend);
+        }
     });
 }
 
@@ -92,6 +96,7 @@ fn not_built_message(api: GraphicsApi) -> &'static str {
         GraphicsApi::Metal => "Metal is only available on Apple platforms",
         GraphicsApi::Vulkan => "Vulkan is built for Windows, Linux and Android; macOS uses Metal",
         GraphicsApi::Dx12 => "DirectX 12 is only available on Windows",
+        GraphicsApi::WebGpu => "WebGPU requires the browser host",
     }
 }
 

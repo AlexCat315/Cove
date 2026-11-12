@@ -68,12 +68,14 @@ pub const fn process_execution_available() -> bool {
         target_os = "tvos",
         target_os = "watchos",
         target_os = "visionos",
-        target_os = "android"
+        target_os = "android",
+        target_arch = "wasm32"
     ))
 }
 
 /// Shared guard for every public launcher (`ProcessSession::new`,
 /// `ProcessSession::spawn`, `ProcessRunner::run*`, `NativeProcess::start`).
+#[cfg(any(unix, windows))]
 pub(crate) fn require_process_execution() -> Result<(), ProcessError> {
     if process_execution_available() {
         Ok(())
