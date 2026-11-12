@@ -6,12 +6,10 @@
 //! browser unchanged. The counter remains the fallback when no application
 //! module has been initialized.
 
-use std::collections::BTreeMap;
 use std::rc::Rc;
 
 use cove_composition::{AnyView, ViewGraph};
 use cove_examples::CounterView;
-use cove_hosts::ApplicationCheckpoint;
 use cove_ui_compose::primitives::overlays::portal::LayerRoot;
 
 use super::prototype::PrototypeContent;
@@ -21,23 +19,24 @@ pub enum RootContent {
     /// The shared counter prototype the Swift host hard-coded.
     Counter(CounterView),
     /// An application registered through `cove_ui::application!`.
-    Application {
-        root: AnyView,
-        checkpoint: Option<ApplicationCheckpoint>,
-    },
+    Application(AnyView),
 }
 
 impl RootContent {
-    /// Prefers the registered application, falling back to the counter.
+    /// Selects the root for this browser surface.
+    ///
+    /// The page shell is the Counter prototype: its buttons, note field and
+    /// `count`/`dark` frame payload only make sense with `CounterView`. Passing
+    /// `?component=<name>` to the page selects the registered
+    /// `cove_ui::application!` (Gallery) instead, so shared applications still
+    /// run unchanged in the browser.
     pub fn from_registration() -> Self {
+        let gallery = std::env::args().skip(1).any(|arg| arg == "--component");
+        if !gallery {
+            return Self::Counter(CounterView::new());
+        }
         match cove_hosts::wasm::application() {
-            Some(factory) => {
-                let launch = factory();
-                Self::Application {
-                    root: launch.content(),
-                    checkpoint: launch.checkpoint,
-                }
-            }
+            Some(factory) => Self::Application(factory().content()),
             None => Self::Counter(CounterView::new()),
         }
     }
@@ -56,35 +55,9 @@ impl PrototypeContent for RootContent {
                     Default::default(),
                 );
             }
-            Self::Application { root, .. } => {
+            Self::Application(root) => {
                 graph.install_view(root.clone(), Default::default());
             }
-        }
-    }
-
-    fn checkpoint(&self) -> BTreeMap<String, String> {
-        match self {
-            Self::Counter(counter) => counter.checkpoint(),
-            Self::Application {
-                checkpoint: Some(hooks),
-                ..
-            } => hooks.capture(),
-            Self::Application {
-                checkpoint: None, ..
-            } => BTreeMap::new(),
-        }
-    }
-
-    fn restore(&self, values: &BTreeMap<String, String>) -> bool {
-        match self {
-            Self::Counter(counter) => counter.restore(values),
-            Self::Application {
-                checkpoint: Some(hooks),
-                ..
-            } => hooks.restore(values),
-            Self::Application {
-                checkpoint: None, ..
-            } => values.is_empty(),
         }
     }
 
@@ -95,10 +68,7 @@ impl PrototypeContent for RootContent {
                 counter.dark.get(),
                 counter.note.get(),
             ),
-            // The frame's counter fields are prototype-specific; an application
-            // root publishes neutral values and exposes its state through the
-            // checkpoint hooks instead.
-            Self::Application { .. } => (0, false, String::new()),
+            Self::Application(_) => (0, false, String::new()),
         }
     }
 }

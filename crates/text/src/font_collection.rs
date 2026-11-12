@@ -26,6 +26,12 @@ impl FontCollection {
     pub fn font_count(&self) -> usize {
         self.faces.len()
     }
+    /// The most recently appended face. Hosts that share this atlas with a
+    /// separate text environment (the Wasm reactor) use it to seed shaping
+    /// without re-parsing the font bytes.
+    pub fn last_face(&self) -> Option<FontFace> {
+        self.faces.last().cloned()
+    }
     pub fn append(&mut self, bytes: Vec<u8>) -> Option<i64> {
         let face = FontFace::from_bytes(
             bytes,

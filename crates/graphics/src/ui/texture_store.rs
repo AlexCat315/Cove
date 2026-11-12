@@ -9,6 +9,47 @@ use std::{
     collections::HashMap,
     sync::{Arc, Mutex},
 };
+/// WebGPU requires recorded `copyBufferToTexture` rows to be 256-byte aligned
+/// and the source buffer to actually use that stride. Metal, Vulkan and DX12
+/// accept any stride at least as wide as the tight row, so padding every UI
+/// upload here is portable and keeps the WebGPU encoder's validation simple.
+pub(super) const TEXTURE_ROW_ALIGNMENT: usize = 256;
+
+/// Re-lays tight-packed pixels into padded rows and returns the aligned stride.
+pub(super) fn padded_texture_rows(
+    pixels: &[u8],
+    width: usize,
+    height: usize,
+    channels: usize,
+) -> RhiResult<(Vec<u8>, usize)> {
+    if width == 0 || height == 0 {
+        return Err(RhiError::invalid_argument("empty texture upload region"));
+    }
+    let tight = width
+        .checked_mul(channels)
+        .ok_or_else(|| RhiError::invalid_argument("texture upload row is too wide"))?;
+    let stride = tight.next_multiple_of(TEXTURE_ROW_ALIGNMENT);
+    let needed = tight
+        .checked_mul(height)
+        .ok_or_else(|| RhiError::OutOfMemory)?;
+    if pixels.len() < needed {
+        return Err(RhiError::invalid_argument(
+            "texture upload data is shorter than its extent",
+        ));
+    }
+    let total = stride
+        .checked_mul(height)
+        .ok_or_else(|| RhiError::OutOfMemory)?;
+    let mut padded = vec![0_u8; total];
+    for row in 0..height {
+        let source = row * tight;
+        let destination = row * stride;
+        padded[destination..destination + tight]
+            .copy_from_slice(&pixels[source..source + tight]);
+    }
+    Ok((padded, stride))
+}
+
 #[derive(Clone)]
 pub(super) struct TexturePatch {
     pub sequence: u64,
@@ -415,10 +456,16 @@ impl NativeUITextureStore {
     pub fn build_atlas_uploads(&self) -> RhiResult<(Vec<TextureBufferUpload>, usize, u64)> {
         let (mut result, mut bytes, mut sequence) = (Vec::new(), 0, 0);
         for upload in &self.pending {
-            let location = self.device.upload_transient(&upload.pixels, 4)?;
+            let (pixels, stride) = padded_texture_rows(
+                &upload.pixels,
+                upload.region.width as usize,
+                upload.region.height as usize,
+                4,
+            )?;
+            let location = self.device.upload_transient(&pixels, TEXTURE_ROW_ALIGNMENT)?;
             let mut command = TextureBufferUpload::new(
                 location.buffer,
-                upload.region.width as usize * 4,
+                stride,
                 self.atlases[upload.atlas].texture.texture(),
                 upload.region,
             );
@@ -490,4 +537,40 @@ unsafe extern "C" {
         size: f32,
     );
     fn cove_ui_pad_rgba(source: *const u8, width: usize, height: usize, destination: *mut u8);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::padded_texture_rows;
+
+    #[test]
+    fn rows_are_padded_to_256_bytes_and_keep_every_pixel() {
+        for (width, height, channels) in [(1, 1, 4), (37, 20, 1), (64, 3, 4), (2048, 2, 1)] {
+            let tight = width * channels;
+            let source: Vec<u8> = (0..tight * height).map(|i| (i % 251) as u8).collect();
+            let (padded, stride) =
+                padded_texture_rows(&source, width, height, channels).expect("pad rows");
+            assert_eq!(stride % 256, 0, "width {width} channels {channels}");
+            assert!(stride >= tight);
+            assert_eq!(padded.len(), stride * height);
+            for row in 0..height {
+                assert_eq!(
+                    &padded[row * stride..row * stride + tight],
+                    &source[row * tight..(row + 1) * tight]
+                );
+                assert!(
+                    padded[row * stride + tight..(row + 1) * stride]
+                        .iter()
+                        .all(|byte| *byte == 0),
+                    "padding must stay zero"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn short_or_empty_uploads_are_rejected() {
+        assert!(padded_texture_rows(&[0; 3], 1, 1, 4).is_err());
+        assert!(padded_texture_rows(&[], 0, 1, 4).is_err());
+    }
 }

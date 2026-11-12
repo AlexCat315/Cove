@@ -27,15 +27,9 @@ use cove_core::scene::{
     InvalidationSource, Node, NodeRenderer, NodeTree, PlatformInputContext, Recomposer,
 };
 use cove_devtools::inspection::{SceneEditor, SceneInspector};
-use cove_devtools::protocol::{
-    DevToolsCodec, Envelope, JsonValue, Session, StateDifference, Subscription, TreeSnapshot,
-};
-use cove_devtools_protocol::{InputRecorder, RECORDING_EVENT_LIMIT};
+use cove_devtools::protocol::{DevToolsCodec, StateDifference, TreeSnapshot};
 use cove_examples::{CounterText, CounterTextRun, CounterView};
-use cove_platform::{
-    InputEvent, KeyEvent, KeyModifiers, MouseButton, MouseButtonEvent, MouseWheelEvent,
-    ScrollDevice, ScrollInput, ScrollPhase, ScrollUnit,
-};
+use cove_platform::{InputEvent, KeyEvent, KeyModifiers, MouseButton, MouseButtonEvent};
 use cove_ui_compose::LayoutDebugAttachmentKey;
 
 use support::GalleryScene;
@@ -170,7 +164,7 @@ fn shared_compose_uses_taffy_and_retains_nodes_across_state_and_resize() {
 }
 
 #[test]
-fn the_render_mirror_agrees_with_the_input_tree() {
+fn the_render_tree_agrees_with_the_input_tree() {
     let counter = CounterView::new();
     support::GlobalTestLock::with_scheduler(|| {
         support::with_text_environment(|| {
@@ -293,45 +287,7 @@ fn shared_input_uses_capture_focus_and_release_semantics() {
 }
 
 #[test]
-fn protocol_validation_diff_and_bounded_recording_round_trip() {
-    let mut session = Session::default();
-    // Swift passed `.number(1)`; a state payload must be all-strings, so this is
-    // rejected and echoed back with the request id.
-    let restore = Envelope::new(
-        "state.restore",
-        Some(42),
-        Some(JsonValue::Object(
-            [("count".to_owned(), JsonValue::from(1))]
-                .into_iter()
-                .collect(),
-        )),
-    );
-    assert_eq!(
-        session
-            .validate(&restore)
-            .expect("a request whose values are not strings is rejected")
-            .id,
-        Some(42)
-    );
-    assert_eq!(
-        session
-            .validate(&Envelope::new("mirror.input", None, None))
-            .expect("mirror commands need a subscription")
-            .r#type,
-        "mirror.input.err"
-    );
-    assert!(
-        Envelope::new("timing.subscribe", None, None).ok().is_none(),
-        "an envelope without an id produces no acknowledgement"
-    );
-
-    session.set(Subscription::Tree, true);
-    session.reset();
-    assert!(
-        session.subscriptions.is_empty(),
-        "reset drops every subscription"
-    );
-
+fn checkpoint_difference_reports_changed_added_and_removed_values() {
     let difference = StateDifference::new(
         &BTreeMap::from([
             ("count".to_owned(), "1".to_owned()),
@@ -349,98 +305,6 @@ fn protocol_validation_diff_and_bounded_recording_round_trip() {
     );
     assert_eq!(difference.removed.get("old").map(String::as_str), Some("x"));
     assert_eq!(difference.added.get("new").map(String::as_str), Some("y"));
-
-    let mut recorder = InputRecorder::default();
-    recorder
-        .start(
-            BTreeMap::from([
-                ("count".to_owned(), "0".to_owned()),
-                ("dark".to_owned(), "false".to_owned()),
-            ]),
-            Some("counter.increment".to_owned()),
-        )
-        .expect("a valid checkpoint starts the recorder");
-    recorder.record(InputEvent::TextInput("中文🙂".to_owned()));
-    recorder.record(InputEvent::MouseWheel(MouseWheelEvent {
-        x: 0.0,
-        y: 0.0,
-        mouse_x: None,
-        mouse_y: None,
-        input: ScrollInput {
-            unit: ScrollUnit::Points,
-            device: ScrollDevice::Continuous,
-            phase: ScrollPhase::Ended,
-            momentum_phase: ScrollPhase::Began,
-            timestamp: 42.25,
-        },
-    }));
-    for _ in 0..RECORDING_EVENT_LIMIT {
-        recorder.record(InputEvent::KeyDown(KeyEvent {
-            scancode: 40,
-            keycode: 0,
-            modifiers: KeyModifiers::default(),
-            is_repeat: false,
-        }));
-    }
-    let recording = recorder.stop().expect("a stopped recording");
-    assert_eq!(
-        recording.events.len(),
-        RECORDING_EVENT_LIMIT,
-        "the event list is bounded"
-    );
-    assert!(
-        recording.truncated,
-        "the overflow is recorded as truncation"
-    );
-    assert!(recording.is_valid(), "a truncated recording is still valid");
-
-    let encoded = DevToolsCodec::json(&recording);
-    let decoded: cove_devtools_protocol::InputRecording =
-        DevToolsCodec::decode(&Some(encoded)).expect("decode");
-    match &decoded.events[0].event {
-        InputEvent::TextInput(text) => {
-            assert_eq!(text, "中文🙂", "Unicode survives the round trip")
-        }
-        other => panic!("expected text input, got {other:?}"),
-    }
-    match &decoded.events[1].event {
-        InputEvent::MouseWheel(wheel) => {
-            assert_eq!(wheel.input.phase, ScrollPhase::Ended);
-            assert_eq!(wheel.input.momentum_phase, ScrollPhase::Began);
-            assert_eq!(wheel.input.unit, ScrollUnit::Points);
-            assert_eq!(wheel.input.timestamp, 42.25);
-        }
-        other => panic!("expected wheel input, got {other:?}"),
-    }
-
-    let mut invalid = recording.clone();
-    invalid.events[1].event = InputEvent::MouseWheel(MouseWheelEvent {
-        x: 0.0,
-        y: 0.0,
-        mouse_x: None,
-        mouse_y: None,
-        input: ScrollInput {
-            timestamp: -1.0,
-            ..Default::default()
-        },
-    });
-    assert!(
-        !invalid.is_valid(),
-        "a negative scroll timestamp is invalid"
-    );
-
-    let mut invalid = recording.clone();
-    invalid.events[0].milliseconds = -1.0;
-    assert!(!invalid.is_valid(), "a negative event time is invalid");
-
-    let replay = Envelope::new("input.replay", None, Some(DevToolsCodec::json(&invalid)));
-    assert_eq!(
-        session
-            .validate(&replay)
-            .expect("an invalid recording is rejected")
-            .r#type,
-        "input.replay.err"
-    );
 }
 
 #[test]

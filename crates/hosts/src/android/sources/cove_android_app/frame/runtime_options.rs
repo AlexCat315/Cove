@@ -8,9 +8,8 @@ use std::time::{SystemTime, UNIX_EPOCH};
 #[derive(Clone, Debug, Default, Deserialize)]
 #[serde(default, rename_all = "camelCase")]
 pub struct DevToolsLaunch {
-    pub id: String,
+    pub endpoint: String,
     pub token: String,
-    pub descriptor_path: String,
     pub app_title: String,
 }
 

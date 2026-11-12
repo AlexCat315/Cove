@@ -15,6 +15,8 @@ pub mod shell;
 const ZIG_VERSION: &str = "0.17.0";
 /// Slang release required by `Tools/Shaders/build-native-ui.mjs`.
 const SLANG_VERSION: &str = "2026.19";
+/// wasi-sdk release used by every `wasm32-wasip*` build.
+const WASI_SDK_VERSION: &str = "34.0";
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Host {
@@ -40,6 +42,8 @@ pub struct Options {
     pub media: bool,
     /// Also provision the pinned Slang/DXIL shader toolchain.
     pub shaders: bool,
+    /// Provision the pinned wasi-sdk and a native Ninja for Wasm builds.
+    pub wasm: bool,
     pub check: bool,
     pub dry_run: bool,
     pub targets: Vec<String>,
@@ -122,6 +126,11 @@ const PINNED_SLANG: PinnedTool = PinnedTool {
     env_key: "SLANGC",
     version: SLANG_VERSION,
 };
+const PINNED_WASI_SDK: PinnedTool = PinnedTool {
+    name: "wasi-sdk",
+    env_key: "COVE_WASI_SDK_PATH",
+    version: WASI_SDK_VERSION,
+};
 
 struct Archive {
     name: &'static str,
@@ -146,9 +155,23 @@ fn slang_asset_id(name: &str) -> Option<u64> {
     })
 }
 
+/// Release asset IDs for wasi-sdk-34, used as the fallback when the
+/// `github.com/.../releases/download` edge fails. Hashes are still verified.
+fn wasi_asset_id(name: &str) -> Option<u64> {
+    Some(match name {
+        "wasi-sdk-34.0-arm64-linux.tar.gz" => 528366381,
+        "wasi-sdk-34.0-arm64-macos.tar.gz" => 528366387,
+        "wasi-sdk-34.0-arm64-windows.tar.gz" => 528366384,
+        "wasi-sdk-34.0-x86_64-linux.tar.gz" => 528366474,
+        "wasi-sdk-34.0-x86_64-macos.tar.gz" => 528366482,
+        "wasi-sdk-34.0-x86_64-windows.tar.gz" => 528366541,
+        _ => return None,
+    })
+}
+
 /// Official, checksum-pinned archives. Hashes mirror the release manifests at
-/// ziglang.org/download/index.json and the v2026.19 GitHub release digests;
-/// they are also the values used by `.github/actions/setup-slang` and CI.
+/// ziglang.org/download/index.json, the v2026.19 GitHub release digests and the
+/// wasi-sdk-34 release asset digests; they are also used by CI.
 fn pinned_archive(tool: PinnedTool, host: Host, arch: &str) -> Option<Archive> {
     let (name, checksum, base) = match (tool.name, host, arch) {
         ("zig", Host::Mac, "aarch64") => (
@@ -211,12 +234,47 @@ fn pinned_archive(tool: PinnedTool, host: Host, arch: &str) -> Option<Archive> {
             "fc922f214b5d115f663932e59e80e0f6b6cc6fae140979cf307da6459b6f8f33",
             format!("https://github.com/shader-slang/slang/releases/download/v{SLANG_VERSION}"),
         ),
+        ("wasi-sdk", Host::Mac, "aarch64") => (
+            "wasi-sdk-34.0-arm64-macos.tar.gz",
+            "9c59398106b417f8f14913380fdf0097a8cc0ff4af9eb3ce0065a859e88d49e9",
+            format!("https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-34"),
+        ),
+        ("wasi-sdk", Host::Mac, "x86_64") => (
+            "wasi-sdk-34.0-x86_64-macos.tar.gz",
+            "87d27fa8adc68dee59bfbf2e22a6d34ef717c34d6bf1d8af2a56fc929d9ce0eb",
+            format!("https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-34"),
+        ),
+        ("wasi-sdk", Host::Linux, "aarch64") => (
+            "wasi-sdk-34.0-arm64-linux.tar.gz",
+            "f7e243dff54d60bcc576e94d6166b69f410f2500ae4a9ceef34315be10e77971",
+            format!("https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-34"),
+        ),
+        ("wasi-sdk", Host::Linux, "x86_64") => (
+            "wasi-sdk-34.0-x86_64-linux.tar.gz",
+            "b761e3a0721dbae9c09a0059e5fdb2bf917d1b4a8a7b430fb3b5aafb0984b2c4",
+            format!("https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-34"),
+        ),
+        ("wasi-sdk", Host::Windows, "aarch64") => (
+            "wasi-sdk-34.0-arm64-windows.tar.gz",
+            "45e1c71f3e965621e7b98ebe1d37b0e4b1f77f3e8072113ffb4534e67b1a4b7c",
+            format!("https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-34"),
+        ),
+        ("wasi-sdk", Host::Windows, "x86_64") => (
+            "wasi-sdk-34.0-x86_64-windows.tar.gz",
+            "cccb5c323a9b34f0349a9b09e8804a0a7632c68c3310f4b5f437ed57d7e71d8f",
+            format!("https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-34"),
+        ),
         _ => return None,
     };
-    let fallback = (tool.name == "slangc")
-        .then(|| slang_asset_id(name))
-        .flatten()
-        .map(|id| format!("https://api.github.com/repos/shader-slang/slang/releases/assets/{id}"));
+    let fallback = match tool.name {
+        "slangc" => slang_asset_id(name).map(|id| {
+            format!("https://api.github.com/repos/shader-slang/slang/releases/assets/{id}")
+        }),
+        "wasi-sdk" => wasi_asset_id(name).map(|id| {
+            format!("https://api.github.com/repos/WebAssembly/wasi-sdk/releases/assets/{id}")
+        }),
+        _ => None,
+    };
     Some(Archive {
         name,
         url: format!("{base}/{name}"),
@@ -597,6 +655,7 @@ pub fn run(options: &Options) -> io::Result<Value> {
         .copied()
         .collect();
     let mut saved = state()?;
+    let mut wasm = wasm_status(options.wasm);
     let compiler = sdk::inspect_compiler(host)?;
     let mut report: Vec<_> = tools
         .iter()
@@ -609,7 +668,7 @@ pub fn run(options: &Options) -> io::Result<Value> {
         })
         .collect::<io::Result<_>>()?;
     let missing = report.iter().any(|r| r["ready"] != true);
-    let actions = installation_plan(host, options.media, options.shaders, &targets);
+    let actions = installation_plan(host, options.media, options.shaders, options.wasm, &targets);
     if options.dry_run {
         return Ok(json!({
             "dry_run": true,
@@ -617,6 +676,7 @@ pub fn run(options: &Options) -> io::Result<Value> {
             "compiler": compiler,
             "submodules": submodule_status()?,
             "shaders": shader_status(&saved, host)?,
+            "wasm": wasm,
             "targets": targets,
             "actions": actions,
             "user_path": user_path_plan(options),
@@ -641,6 +701,11 @@ pub fn run(options: &Options) -> io::Result<Value> {
             ensure_pinned(PINNED_SLANG, host, &mut saved)?;
             install_dxil(host, &saved)?;
         }
+        if options.wasm {
+            ensure_wasi_sdk(host, &mut saved)?;
+            record_native_ninja(&mut saved)?;
+            wasm = wasm_status(true);
+        }
         sdk::prepare(host, &targets, &mut saved)?;
         save(&saved)?;
         report = tools
@@ -656,7 +721,8 @@ pub fn run(options: &Options) -> io::Result<Value> {
         && compiler
         && sdk
         && submodules["ready"] == true
-        && (!options.shaders || shaders["ready"] == true);
+        && (!options.shaders || shaders["ready"] == true)
+        && (!options.wasm || wasm["ready"] == true);
     let user_path = if options.persist_path && !options.check && !options.dry_run {
         if ready {
             let directories = shell::persist(&saved)?;
@@ -686,6 +752,7 @@ pub fn run(options: &Options) -> io::Result<Value> {
         "sdk": sdk,
         "submodules": submodules,
         "shaders": shaders,
+        "wasm": wasm,
         "targets": targets,
         "user_path": user_path,
         "shell": shell_report(),
@@ -709,12 +776,190 @@ pub fn run(options: &Options) -> io::Result<Value> {
     }
     Ok(result)
 }
-pub fn installation_plan(host: Host, media: bool, shaders: bool, targets: &[String]) -> Value {
-    json!({"host":format!("{host:?}"),"media":media,"shaders":shaders,"targets":targets,
+fn find_sdk_root(destination: &Path) -> Option<PathBuf> {
+    if wasi_sdk_valid(destination) {
+        return Some(destination.to_path_buf());
+    }
+    let entries = fs::read_dir(destination).ok()?;
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if path.is_dir() && wasi_sdk_valid(&path) {
+            return Some(path);
+        }
+    }
+    None
+}
+
+/// An already usable wasi-sdk, from the process environment or the setup state.
+/// A bare path is not enough: the CMake toolchain, clang and the sysroot must
+/// all be present, otherwise a `cargo build --target wasm32-wasip1` fails deep
+/// inside a build script.
+pub fn wasm_sdk_path() -> io::Result<Option<PathBuf>> {
+    let root = env::var_os(PINNED_WASI_SDK.env_key)
+        .map(PathBuf::from)
+        .or_else(|| {
+            setting(PINNED_WASI_SDK.env_key)
+                .ok()
+                .flatten()
+                .map(PathBuf::from)
+        });
+    Ok(root.filter(|root| wasi_sdk_valid(root)))
+}
+
+fn wasi_sdk_valid(root: &Path) -> bool {
+    let binary = |name: &str| {
+        root.join("bin").join(if cfg!(windows) {
+            format!("{name}.exe")
+        } else {
+            name.to_owned()
+        })
+    };
+    binary("clang").is_file()
+        && binary("clang++").is_file()
+        && root.join("share/cmake").is_dir()
+        && root.join("share/wasi-sysroot").is_dir()
+}
+
+/// Finds a Ninja that does not execute commands through a POSIX shell.
+/// On Windows, MSYS2's Ninja runs commands with `/bin/sh`, which eats the
+/// backslashes in `C:\...\clang.exe`; a native Win32 Ninja uses `cmd.exe`.
+pub fn native_ninja() -> io::Result<PathBuf> {
+    if let Some(path) = env::var_os("COVE_NINJA")
+        .map(PathBuf::from)
+        .or_else(|| {
+            setting("COVE_NINJA")
+                .ok()
+                .flatten()
+                .map(PathBuf::from)
+        })
+        .filter(|path| path.is_file())
+    {
+        return Ok(path);
+    }
+    let search = environment()?
+        .into_iter()
+        .find(|(key, _)| key == "PATH")
+        .map(|(_, value)| value)
+        .unwrap_or_default();
+    let mut posix_shell = None;
+    for directory in env::split_paths(&search) {
+        for candidate in [directory.join("ninja"), directory.join("ninja.exe")] {
+            if !candidate.is_file() {
+                continue;
+            }
+            let normalized = candidate
+                .to_string_lossy()
+                .replace('\\', "/")
+                .to_ascii_lowercase();
+            let shell_based = cfg!(windows)
+                && (normalized.contains("/msys64/")
+                    || normalized.contains("/cygwin")
+                    || normalized.contains("/usr/bin/"));
+            if shell_based {
+                posix_shell.get_or_insert(candidate);
+            } else {
+                return Ok(candidate);
+            }
+        }
+    }
+    posix_shell.ok_or_else(|| {
+        io::Error::other(
+            "a native Ninja is required for Wasm CMake builds; install Ninja and run `cargo cove setup --wasm`",
+        )
+    })
+}
+
+/// Downloads and unpacks the pinned wasi-sdk into the Cove cache when no usable
+/// installation exists. The archive is verified against the release digest.
+fn ensure_wasi_sdk(host: Host, saved: &mut Value) -> io::Result<Value> {
+    if let Some(root) = wasm_sdk_path()? {
+        saved["environment"][PINNED_WASI_SDK.env_key] = json!(root.display().to_string());
+        save(saved)?;
+        return Ok(json!({
+            "name": "wasi-sdk", "ready": true,
+            "path": root.display().to_string(), "source": "host",
+        }));
+    }
+    let archive = pinned_archive(PINNED_WASI_SDK, host, env::consts::ARCH).ok_or_else(|| {
+        io::Error::other(format!(
+            "no pinned wasi-sdk archive for {}-{}",
+            env::consts::OS,
+            env::consts::ARCH
+        ))
+    })?;
+    let file = cache_dir()?.join("downloads").join(archive.name);
+    if !checksum_matches(&file, archive.checksum) {
+        download_pinned(&archive, &file)?;
+    }
+    let bytes = fs::read(&file)?;
+    let actual = format!("{:x}", Sha256::digest(&bytes));
+    if actual != archive.checksum {
+        return Err(io::Error::other(format!(
+            "{} checksum mismatch: {actual}",
+            archive.name
+        )));
+    }
+    let destination = cache_dir()?
+        .join("tools")
+        .join(format!("wasi-sdk-{WASI_SDK_VERSION}"));
+    if destination.exists() {
+        fs::remove_dir_all(&destination)?;
+    }
+    fs::create_dir_all(&destination)?;
+    // `cmake -E tar` is a native executable on every host. The MSYS tar on
+    // Windows treats `C:\...` as an rsh-style remote path, so it cannot unpack
+    // into the Cove cache; CMake also handles gzip transparently.
+    checked(
+        command("cmake")?
+            .args(["-E", "tar", "xf"])
+            .arg(&file)
+            .current_dir(&destination),
+    )?;
+    // Release archives wrap the SDK in one top-level directory. Keep that
+    // layout instead of stripping it, so no tar-specific flags are needed.
+    let root = find_sdk_root(&destination).ok_or_else(|| {
+        io::Error::other(format!(
+            "wasi-sdk {} is incomplete in {}",
+            archive.name,
+            destination.display()
+        ))
+    })?;
+    saved["environment"][PINNED_WASI_SDK.env_key] = json!(root.display().to_string());
+    save(saved)?;
+    Ok(json!({
+        "name": "wasi-sdk", "ready": true,
+        "path": root.display().to_string(),
+        "source": archive.url, "checksum": archive.checksum,
+    }))
+}
+
+fn wasm_status(enabled: bool) -> Value {
+    if !enabled {
+        return json!({"enabled": false});
+    }
+    let sdk = wasm_sdk_path().ok().flatten();
+    let ninja = native_ninja();
+    json!({
+        "enabled": true,
+        "ready": sdk.is_some() && ninja.is_ok(),
+        "wasi_sdk": sdk.map(|path| path.display().to_string()),
+        "ninja": ninja.as_ref().ok().map(|path| path.display().to_string()),
+        "error": ninja.as_ref().err().map(|error| error.to_string()),
+    })
+}
+
+fn record_native_ninja(saved: &mut Value) -> io::Result<()> {
+    let path = native_ninja()?;
+    saved["environment"]["COVE_NINJA"] = json!(path.display().to_string());
+    save(saved)
+}
+
+pub fn installation_plan(host: Host, media: bool, shaders: bool, wasm: bool, targets: &[String]) -> Value {
+    json!({"host":format!("{host:?}"),"media":media,"shaders":shaders,"wasm":wasm,"targets":targets,
         "manager":match host {Host::Mac=>"Homebrew and Apple softwareupdate / xcodebuild",Host::Windows=>"WinGet, MSYS2 and Visual Studio Installer",Host::Linux=>"apt-get / dnf / pacman / zypper / apk"},
         "requires_elevation":true,
         "sdk":"host compiler/SDK; Android SDK+NDK for android targets; full Xcode for iOS",
-        "pinned":format!("Zig {ZIG_VERSION} and Slang {SLANG_VERSION} archives, SHA-256 verified in the Cove cache"),
+        "pinned":format!("Zig {ZIG_VERSION}, Slang {SLANG_VERSION} and wasi-sdk {WASI_SDK_VERSION} archives, SHA-256 verified in the Cove cache"),
         "submodules":"git submodule update --init --recursive"})
 }
 fn save(value: &Value) -> io::Result<()> {
@@ -1363,15 +1608,17 @@ mod tests {
     #[test]
     fn every_host_has_an_installation_plan_and_mobile_sdk_paths() {
         for host in [Host::Mac, Host::Windows, Host::Linux] {
-            let plan = installation_plan(host, true, true, &["aarch64-linux-android".into()]);
+            let plan = installation_plan(host, true, true, true, &["aarch64-linux-android".into()]);
             assert!(plan["manager"].as_str().expect("manager").len() > 5);
             assert!(plan["sdk"].as_str().expect("SDK").contains("Android"));
+            assert!(plan["wasm"] == true);
             assert!(
                 plan["pinned"]
                     .as_str()
                     .expect("pinned")
                     .contains(ZIG_VERSION)
             );
+            assert!(plan["pinned"].as_str().unwrap().contains(WASI_SDK_VERSION));
         }
     }
     #[test]
@@ -1381,7 +1628,7 @@ mod tests {
     }
     #[test]
     fn every_host_and_architecture_has_a_verified_archive() {
-        for tool in [PINNED_ZIG, PINNED_SLANG] {
+        for tool in [PINNED_ZIG, PINNED_SLANG, PINNED_WASI_SDK] {
             for host in [Host::Mac, Host::Windows, Host::Linux] {
                 for arch in ["aarch64", "x86_64"] {
                     let archive = pinned_archive(tool, host, arch).unwrap_or_else(|| {
@@ -1396,11 +1643,15 @@ mod tests {
                     );
                     assert!(archive.url.ends_with(archive.name));
                     assert!(archive.name.contains(tool.version));
-                    if tool.name == "slangc" {
+                    if tool.name == "zig" {
+                        assert!(archive.fallback.is_none());
+                    } else {
                         let fallback = archive.fallback.as_ref().expect("API asset fallback");
                         assert!(fallback.starts_with("https://api.github.com/"));
-                    } else {
-                        assert!(archive.fallback.is_none());
+                        assert!(
+                            fallback.contains("/WebAssembly/wasi-sdk/")
+                                || fallback.contains("/shader-slang/slang/")
+                        );
                     }
                 }
             }
@@ -1410,6 +1661,7 @@ mod tests {
     fn unsupported_architectures_do_not_get_a_fabricated_archive() {
         assert!(pinned_archive(PINNED_ZIG, Host::Mac, "riscv64").is_none());
         assert!(pinned_archive(PINNED_SLANG, Host::Linux, "powerpc64").is_none());
+        assert!(pinned_archive(PINNED_WASI_SDK, Host::Mac, "riscv64").is_none());
     }
     #[test]
     fn version_arguments_match_each_compiler() {

@@ -68,7 +68,7 @@ impl LogRuntime {
         let configuration = LoggingConfiguration::new(|value| value.storage.enabled = false);
         let sanitizer = RecordSanitizer::new(&configuration);
         let identity = Process {
-            pid: i64::from(std::process::id()),
+            pid: i64::from(crate::process_id()),
             name: sanitizer.text(&process_name(), 256),
             run_id: sanitizer.text(&run_id.into(), 256),
         };

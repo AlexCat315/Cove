@@ -40,7 +40,6 @@ final class ContentSurfaceView extends SurfaceView implements SurfaceHolder.Call
 
     ContentSurfaceView(Context context, String checkpoint, String configuration, RuntimeOptions options, long application) {
         super(context);
-        Diagnostics.attach(this);
         metrics = new SurfaceMetrics(this, () -> session);
         this.checkpoint = checkpoint;
         this.configuration = configuration;
@@ -52,12 +51,14 @@ final class ContentSurfaceView extends SurfaceView implements SurfaceHolder.Call
         setFocusable(true);
         setFocusableInTouchMode(true);
         getHolder().addCallback(this);
+        if (options.devtools != null) Diagnostics.attach(this);
     }
     void configure(String configuration, RuntimeOptions options) {
         releaseSurface();
         closeApplication();
         this.configuration = configuration;
         this.options = options;
+        if (options.devtools != null) Diagnostics.attach(this); else Diagnostics.detach(this);
         pacing = new FramePacing(options.timings);
         lastSnapshotTime = 0;
         gameMode = configuration.contains("\"game\"");
@@ -142,7 +143,11 @@ final class ContentSurfaceView extends SurfaceView implements SurfaceHolder.Call
             connection = null;
         }
     }
-    void pumpDiagnostics(long value) { if (application != 0 && application == value) MainActivity.pumpDiagnostics(application); }
+    boolean pumpDiagnostics() {
+        if (options.devtools == null) return false;
+        if (application != 0) MainActivity.pumpDiagnostics(application);
+        return true;
+    }
     void closeApplication() { if (application != 0) { MainActivity.destroyApplication(application); application = 0; } }
     void trimMemory() { if (application != 0) MainActivity.memoryPressure(application); schedule(); }
     long detachApplication() { releaseSurface(); long retained = application; application = 0; return retained; }

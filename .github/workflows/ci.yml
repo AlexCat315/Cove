@@ -5,9 +5,11 @@ permissions:
 env:
   # `cove-media-rhi` and the desktop suite need the Vulkan loader plus a window
   # system; the loader only advertises VK_KHR_surface when one is present.
-  LINUX_NATIVE_PACKAGES: libvulkan-dev mesa-vulkan-drivers vulkan-validationlayers xvfb libx11-dev libxext-dev libxrandr-dev libxcursor-dev libxi-dev libxss-dev libxtst-dev libwayland-dev libxkbcommon-dev libasound2-dev libpulse-dev
+  LINUX_NATIVE_PACKAGES: libvulkan-dev mesa-vulkan-drivers vulkan-validationlayers xvfb libx11-dev libxext-dev libxrandr-dev libxcursor-dev libxi-dev libxss-dev libxtst-dev libwayland-dev libxkbcommon-dev libasound2-dev libpulse-dev libpipewire-0.3-dev libxcb1-dev libclang-dev libdbus-1-dev libegl-dev libgbm-dev
   # Asserted against ZIG_VERSION in crates/native-build/src/setup.rs below.
   ZIG_VERSION: 0.17.0
+  # Asserted against WASI_SDK_VERSION in crates/native-build/src/setup.rs.
+  WASI_SDK_VERSION: "34.0"
 concurrency:
   group: rust-ci-${{ github.ref }}
   cancel-in-progress: true
@@ -72,6 +74,41 @@ jobs:
           fi
       - name: Audit source layout and migration mappings
         run: cargo xtask audit --json
+  wasm:
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [macos-26, windows-2025, ubuntu-24.04]
+    runs-on: ${{ matrix.runner }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          submodules: recursive
+      - uses: mlugg/setup-zig@v2
+        with:
+          version: ${{ env.ZIG_VERSION }}
+      - name: Rust toolchain and Wasm target
+        run: |
+          rustup toolchain install 1.99.1 --profile minimal
+          rustup target add wasm32-wasip1 --toolchain 1.99.1
+      - uses: ilammy/msvc-dev-cmd@v1
+        if: runner.os == 'Windows'
+      - name: Verify pinned wasi-sdk version
+        run: |
+          pinned=$(sed -n 's/^const WASI_SDK_VERSION: &str = "\([^"]*\)";/\1/p' crates/native-build/src/setup.rs)
+          test "$pinned" = "$WASI_SDK_VERSION" || { echo "wasi-sdk version drift: setup.rs=$pinned ci.yml=$WASI_SDK_VERSION" >&2; exit 1; }
+      - name: Provision Wasm toolchain
+        # Installs the same pinned wasi-sdk archive on macOS, Linux and Windows.
+        run: cargo cove setup --wasm
+      - name: Build browser Wasm
+        working-directory: crates/browser
+        run: npm ci && npm run build && npm run verify
+      - name: Test Wasm reactor input
+        working-directory: crates/browser
+        run: npm run test:wasm
   media:
     # FFmpeg and its bindings build inside the `ffmpeg-sys-next` build script,
     # so CI runs the same cargo entry points developers use.

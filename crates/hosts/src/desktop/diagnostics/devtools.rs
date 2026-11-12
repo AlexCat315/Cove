@@ -1,45 +1,36 @@
-//! `DiagnosticsSession` adapter for the DevTools crate.
-//!
-//! `cove-hosts` links DevTools only when the `devtools` feature is on; the
-//! adapter is host code, so applications install it with
-//! [`factory`] instead of re-implementing the session themselves.
-
+//! Native attachment of the shared DevTools runtime probe.
 use super::integration::{
     DevToolsConfiguration, DiagnosticMemorySnapshot, DiagnosticsCallbacks, DiagnosticsFactory,
     DiagnosticsSession,
 };
 use cove_composition::ViewGraph;
-use cove_core::DrawList;
-use cove_core::scene::NodeTree;
-use cove_devtools::devtools::{DevTools, NativeAppFrameCapture};
-use cove_devtools::inspection::DiagnosticStateSource;
-use cove_devtools::server::config::DevToolsConfig;
-use cove_platform::InputEvent;
-use std::cell::RefCell;
+use cove_devtools::inspection::{DiagnosticMemorySnapshot as Memory, DiagnosticStateSource};
+use cove_devtools::probe_transport::ProbeTransport;
+use cove_devtools::protocol::{
+    TimingFrame,
+    control::{Registration, VERSION},
+};
+use cove_devtools::runtime_probe::RuntimeProbe;
 use std::collections::BTreeMap;
 use std::rc::Rc;
 use std::time::Instant;
 
-struct DevToolsSession {
-    devtools: DevTools,
+struct Session {
+    probe: RuntimeProbe,
+    transport: ProbeTransport,
     frame_start: Instant,
     layout_ms: f64,
     draw_ms: f64,
+    pending: BTreeMap<u64, TimingFrame>,
 }
 
-impl DiagnosticsSession for DevToolsSession {
+impl DiagnosticsSession for Session {
     fn drain(&mut self) {
-        self.devtools.pump();
-        self.devtools.notify_tree_changed();
-        self.devtools.notify_frame_finished();
+        self.transport.pump(&mut self.probe);
     }
 
-    fn intercept(&mut self, event: &InputEvent) -> bool {
-        self.devtools.intercept_input(event)
-    }
-
-    fn overlay(&mut self, list: &mut DrawList) {
-        self.devtools.draw_inspection_overlay(list);
+    fn overlay(&mut self, list: &mut cove_core::DrawList) {
+        self.probe.scene.editor.draw_overlay(list);
     }
 
     fn begin_frame(&mut self) {
@@ -51,140 +42,121 @@ impl DiagnosticsSession for DevToolsSession {
         self.draw_ms = draw_ms;
     }
 
-    fn presented(&mut self, tree: &mut NodeTree, list: &DrawList, presented: bool) {
+    fn frame_finished(&mut self, nodes: usize, batches: usize, token: Option<u64>) {
         let total_ms = self.frame_start.elapsed().as_secs_f64() * 1000.0;
-        // The host reports the present stage only to its fps logger, so the
-        // remainder of the frame is the presentation cost here.
-        let present_ms = (total_ms - self.layout_ms - self.draw_ms).max(0.0);
-        self.devtools.timing.record(
-            self.layout_ms,
-            self.draw_ms,
-            present_ms,
+        let frame = TimingFrame {
+            frame: 0,
+            recomposition_ms: None,
+            layout_ms: self.layout_ms,
+            draw_ms: self.draw_ms,
+            render_thread_ms: None,
+            submitted: token.is_some(),
+            presented: token.is_none().then_some(false),
             total_ms,
-            tree.node_count(),
-            list.batches().len(),
-            presented,
-        );
+            node_count: nodes,
+            batch_count: batches,
+        };
+        if let Some(token) = token {
+            if self.pending.len() >= 16
+                && let Some((_, expired)) = self.pending.pop_first()
+            {
+                self.probe.record(expired);
+            }
+            self.pending.insert(token, frame);
+        } else {
+            self.probe.record(frame);
+        }
     }
 
-    fn attach_input(&mut self, inject: Rc<dyn Fn(InputEvent)>) {
-        self.devtools
-            .set_input_delivery(Some(Rc::new(move |event| inject(event))));
-    }
-
-    fn mirror_is_active(&self) -> bool {
-        self.devtools.mirror_is_active()
-    }
-
-    fn mirror_wants_frame(&self) -> bool {
-        self.devtools.mirror_wants_frame()
-    }
-
-    fn mirror_capture(&mut self, list: &DrawList, pixels: (u32, u32), logical: (f32, f32)) {
-        self.devtools
-            .mirror_capture(list, pixels.0, pixels.1, logical.0, logical.1);
+    fn presentation_finished(&mut self, token: u64, presented: bool, render_thread_ms: f64) {
+        if let Some(mut frame) = self.pending.remove(&token) {
+            frame.presented = Some(presented);
+            frame.render_thread_ms = Some(render_thread_ms);
+            self.probe.record(frame);
+        }
     }
 
     fn stop(&mut self) {
-        self.devtools.stop();
+        self.probe.disconnect();
     }
 }
 
-/// Reads the live view graph, whose registry changes as views mount.
-struct GraphStateSource(Rc<ViewGraph>);
+struct GraphState(Rc<ViewGraph>);
 
-impl DiagnosticStateSource for GraphStateSource {
+impl DiagnosticStateSource for GraphState {
     fn descriptors(&self) -> Vec<cove_core::scene::StateDescriptor> {
         self.0.state_descriptors()
     }
+
     fn values(&self, ids: &[String]) -> Vec<cove_core::scene::StateValue> {
         self.0.state_values(ids)
     }
 }
 
-/// The diagnostics backend a DevTools-enabled application installs on its
-/// `ApplicationLaunch`, or in `set_diagnostics_factory` on Android.
 pub fn factory() -> DiagnosticsFactory {
     Rc::new(
-        |configuration: DevToolsConfiguration,
-         tree: Rc<RefCell<NodeTree>>,
-         graph: Rc<ViewGraph>,
-         _schedule: Rc<dyn Fn()>,
-         callbacks: DiagnosticsCallbacks|
-         -> Result<Box<dyn DiagnosticsSession>, String> {
-            let mut config = DevToolsConfig::from_environment(&configuration.app_title)
-                .ok_or_else(|| "DevTools is only available in debug builds".to_string())?;
-            if configuration.port != 0 {
-                config.port = configuration.port;
+        |configuration: DevToolsConfiguration, tree, graph, _, callbacks: DiagnosticsCallbacks| {
+            if !cfg!(debug_assertions) {
+                return Err("The DevTools runtime probe requires a debug build.".into());
             }
-            let render_tree = graph.render_tree().clone();
-            let mut devtools = DevTools::new(
-                config,
+            let mut probe = RuntimeProbe::new(
                 tree,
-                callbacks.invalidation_log.clone(),
-                Some(render_tree),
+                callbacks.invalidation_log,
+                Some(graph.render_tree().clone()),
+                Some(Rc::new(GraphState(graph))),
             );
-            devtools.set_state_source(Some(Rc::new(GraphStateSource(graph))));
-
-            if let Some(source) = callbacks.frame_source {
-                let capture = Rc::new(
-                    NativeAppFrameCapture::with_device(source.device, &source.renderer)
-                        .map_err(|error| error.to_string())?,
-                );
-                let reset = capture.clone();
-                devtools.attach_frame_tap(capture.frame_capture(), move || reset.reset());
-            }
-            let mirror_active = callbacks.mirror_active.clone();
-            *devtools.on_mirror_start.borrow_mut() = Some(Rc::new(move || mirror_active(true)));
-            let mirror_active = callbacks.mirror_active.clone();
-            *devtools.on_mirror_stop.borrow_mut() = Some(Rc::new(move || mirror_active(false)));
-            if let Some(resize) = callbacks.resize_window.clone() {
-                devtools.window.resize = Some(Rc::new(move |size| {
-                    resize(size.width as f32, size.height as f32)
+            if let Some(resize) = callbacks.resize_window {
+                probe.resize = Some(Rc::new(move |width, height| {
+                    match resize(width as f32, height as f32) {
+                        Some(error) => Err(error),
+                        None => Ok(()),
+                    }
                 }));
             }
-            if let Some(apply) = callbacks.environment.clone() {
-                devtools.window.environment = Some(Rc::new(move |payload: &serde_json::Value| {
-                    let request: cove_core::EnvironmentRequest =
-                        serde_json::from_value(payload.clone())
-                            .map_err(|error| format!("invalid environment request: {error}"))?;
+            if let Some(apply) = callbacks.environment {
+                probe.environment = Some(Rc::new(move |value| {
+                    let request = serde_json::from_value(value)
+                        .map_err(|error| format!("Invalid environment: {error}"))?;
                     apply(&request).map(|environment| environment_summary(&environment))
                 }));
             }
-
-            let memory = callbacks.memory.clone();
-            devtools.set_memory_snapshot(Some(Rc::new(move || {
-                let snapshot: DiagnosticMemorySnapshot = memory();
-                cove_devtools::inspection::DiagnosticMemorySnapshot {
+            *probe.diagnostics().memory.borrow_mut() = Some(Rc::new(move || {
+                let snapshot: DiagnosticMemorySnapshot = (callbacks.memory)();
+                Memory {
                     counters: snapshot
                         .counters
-                        .iter()
-                        .map(|(key, value)| (key.clone(), *value as i64))
+                        .into_iter()
+                        .map(|(key, value)| (key, value as i64))
                         .collect(),
                     windows: snapshot
                         .windows
-                        .iter()
+                        .into_iter()
                         .map(|(key, value)| {
-                            (
-                                key.clone(),
-                                BTreeMap::from([("bytes".to_owned(), *value as i64)]),
-                            )
+                            (key, BTreeMap::from([("bytes".to_owned(), value as i64)]))
                         })
                         .collect(),
                 }
-            })));
-
-            // A remote selection only reaches the draw list on the next frame.
-            let invalidate = callbacks.invalidate.clone();
-            *devtools.on_selection_changed.borrow_mut() = Some(Rc::new(move || invalidate()));
-
-            devtools.start().map_err(|error| error.to_string())?;
-            Ok(Box::new(DevToolsSession {
-                devtools,
+            }));
+            *probe.scene.editor.on_change.borrow_mut() = Some(callbacks.invalidate);
+            let transport = ProbeTransport::start(
+                Registration {
+                    version: VERSION,
+                    title: configuration.app_title,
+                    platform: std::env::consts::OS.to_owned(),
+                    pid: Some(std::process::id()),
+                    window: configuration.window,
+                    capabilities: probe.capabilities(),
+                },
+                configuration.connection,
+            )?;
+            Ok(Box::new(Session {
+                probe,
+                transport,
                 frame_start: Instant::now(),
                 layout_ms: 0.0,
                 draw_ms: 0.0,
-            }) as Box<dyn DiagnosticsSession>)
+                pending: BTreeMap::new(),
+            }))
         },
     )
 }

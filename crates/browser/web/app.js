@@ -3,13 +3,13 @@ import { createWebGpuBridge } from "./webgpu.js";
 
 const surface = document.querySelector("#surface");
 const textInput = document.createElement("textarea");
-textInput.id = "textInput"; textInput.setAttribute("aria-label", "Counter note input");
-textInput.style.cssText = "position:fixed;left:0;top:0;width:1px;height:1px;opacity:0;pointer-events:none";
+textInput.id = "textInput"; textInput.setAttribute("aria-label", "Cove text input");
+textInput.style.cssText = "position:fixed;left:0;top:0;width:1px;height:1px;padding:0;border:0;font-size:16px;opacity:0;pointer-events:none";
 textInput.tabIndex = -1; document.body.append(textInput);
 const status = document.querySelector("#status");
 const decoder = new TextDecoder();
 const encoder = new TextEncoder();
-let wasm, renderer, lastFrame, scheduled = false, inspectorPort;
+let wasm, renderer, lastFrame, scheduled = false;
 const webgpu = createWebGpuBridge(() => wasm, document.querySelector("#gpu"));
 const forcedRenderer = new URLSearchParams(location.search).get("renderer");
 const atlas = { width: 0, height: 0, pixels: null, revision: 0, update: null };
@@ -30,12 +30,6 @@ function updateAtlas(frame) {
   atlas.revision++;
 }
 
-function findNode(node, name) {
-  if (!node) return;
-  if (node.debugName === name) return node;
-  for (const child of node.children) { const found = findNode(child, name); if (found) return found; }
-}
-
 function readBytes(pointer, size) {
   // Copy before another Wasm call can grow memory or replace an export buffer.
   return new Uint8Array(wasm.memory.buffer, pointer >>> 0, size).slice();
@@ -52,7 +46,24 @@ function dispatch(envelope) {
     return response();
   } finally { wasm.cove_free(pointer, bytes.length); }
 }
-function post(envelope) { if (!envelope) return; inspectorPort?.postMessage({ kind: "message", data: JSON.stringify(envelope) }); }
+
+
+function syncTextInput() {
+  const active = document.activeElement;
+  if (active !== surface && active !== textInput) return;
+  const pointer = wasm.cove_text_input_area();
+  if (!pointer) {
+    if (active === textInput) surface.focus({preventScroll:true});
+    return;
+  }
+  const [x, y, height] = new Float32Array(wasm.memory.buffer, pointer >>> 0, 3);
+  const rect = surface.getBoundingClientRect();
+  const clamp = (value, max) => Math.max(0, Math.min(value, max));
+  textInput.style.left = `${rect.left + surface.clientLeft + clamp(x, surface.clientWidth - 1)}px`;
+  textInput.style.top = `${rect.top + surface.clientTop + clamp(y, surface.clientHeight - height)}px`;
+  textInput.style.height = `${Math.max(1, height)}px`;
+  if (active === surface) textInput.focus({preventScroll:true});
+}
 
 function schedule() {
   if (scheduled) return;
@@ -73,26 +84,14 @@ function schedule() {
       wasm.cove_render(width, height);
     }
     lastFrame = readJSON(wasm.cove_snapshot(), wasm.cove_snapshot_size());
-    surface.style.cursor = lastFrame.tree.inspection?.picking ? "crosshair" : "default";
     updateAtlas(lastFrame);
     if (renderer.backend === "canvas2d") {
       const vertices = readBytes(wasm.cove_vertices(), wasm.cove_vertex_bytes());
       const indices = new Uint32Array(readBytes(wasm.cove_indices(), wasm.cove_index_count() * 4).buffer);
       renderer.draw(lastFrame, vertices, indices);
     }
-    if (lastFrame.focused === "counter.note") {
-      const frame = findNode(lastFrame.tree.root, "counter.note")?.absoluteFrame;
-      if (frame) {
-        const rect = surface.getBoundingClientRect();
-        textInput.style.left = `${rect.left + frame.x + Math.min(frame.w - 20, 16 + lastFrame.noteWidth)}px`;
-        textInput.style.top = `${rect.top + frame.y + 12}px`;
-        textInput.style.height = "24px";
-      }
-      if (document.activeElement === surface) textInput.focus({preventScroll:true});
-    }
+    syncTextInput();
     document.querySelector("#stats").textContent = `count=${lastFrame.count} · ${lastFrame.vertices} vertices · ${lastFrame.batches.length} batches · ${lastFrame.fontCount} fonts · FreeType/HarfBuzz`;
-    wasm.cove_events();
-    for (const event of response()) post(event);
     if (wasm.cove_needs_frame()) schedule();
   });
 }
@@ -259,7 +258,7 @@ function makeCanvasRenderer() {
 
 try {
   const component = new URLSearchParams(location.search).get("component");
-  const args = component ? ["gallery", "--component", component] : ["gallery"];
+  const args = component ? ["gallery", "--component", component] : ["counter"];
   const wasi = new WASI(args, [], [new OpenFile(new File([])), ConsoleStdout.lineBuffered(console.log), ConsoleStdout.lineBuffered(console.error)]);
   const module = await WebAssembly.compile(await (await fetch("./cove.wasm")).arrayBuffer());
   const instance = await WebAssembly.instantiate(module, {
@@ -280,26 +279,45 @@ try {
     } finally { wasm.cove_free(pointer, bytes.length); }
   }
   renderer = await makeRenderer();
-  for (const id of ["increment", "reset", "theme"]) {
+  if (component) document.querySelector(".keyboard").hidden = true;
+  else ["increment", "reset", "theme"].forEach((id, action) => {
     document.getElementById(id).addEventListener("click", () => {
-      const rect = findNode(lastFrame?.tree.root, `counter.${id}`)?.absoluteFrame;
-      if (rect) wasm.cove_pointer(3, rect.x + rect.w / 2, rect.y + rect.h / 2);
+      wasm.cove_counter_action(action);
       schedule();
     });
-  }
+  });
   surface.tabIndex = 0;
-  const point = event => { const rect = surface.getBoundingClientRect(); return [event.clientX - rect.left, event.clientY - rect.top]; };
+  let composing = false, skipCompositionInput = false;
+  const point = event => {
+    const rect = surface.getBoundingClientRect();
+    return [event.clientX - rect.left - surface.clientLeft, event.clientY - rect.top - surface.clientTop];
+  };
+  surface.addEventListener("wheel", event => {
+    if (event.ctrlKey) return; // Browser pinch-to-zoom uses Ctrl+wheel.
+    // Read the mode first: some browsers choose delta units based on this access.
+    const mode = event.deltaMode;
+    wasm.cove_wheel(mode, event.deltaX, event.deltaY, ...point(event), event.timeStamp);
+    event.preventDefault();
+    schedule();
+  }, {passive:false});
   surface.addEventListener("pointermove", event => { wasm.cove_pointer(0, ...point(event)); schedule(); });
   surface.addEventListener("pointerleave", () => { wasm.cove_pointer(0, -1, -1); schedule(); });
   surface.addEventListener("pointerdown", event => {
     if (event.button !== 0) return;
-    surface.focus({preventScroll:true}); surface.setPointerCapture(event.pointerId);
-    wasm.cove_pointer(1, ...point(event)); schedule();
+    event.preventDefault();
+    // End any live preedit while its original Cove editor still has focus.
+    if (document.activeElement !== textInput || composing) surface.focus({preventScroll:true});
+    surface.setPointerCapture(event.pointerId);
+    wasm.cove_pointer(1, ...point(event));
+    // Keep the focus change inside the user gesture for mobile keyboards.
+    syncTextInput();
+    schedule();
   });
   surface.addEventListener("pointerup", event => {
     if (event.button !== 0) return;
     wasm.cove_pointer(2, ...point(event));
     if (surface.hasPointerCapture(event.pointerId)) surface.releasePointerCapture(event.pointerId);
+    syncTextInput();
     schedule();
   });
   surface.addEventListener("pointercancel", () => { wasm.cove_pointer(2, -1, -1); schedule(); });
@@ -312,55 +330,41 @@ try {
       wasm.cove_text(pointer, bytes.length, editing ? 1 : 0); schedule();
     } finally { wasm.cove_free(pointer, Math.max(1, bytes.length)); }
   }
-  let composing = false, skipCompositionInput = false;
   textInput.addEventListener("compositionstart", () => { composing = true; });
   textInput.addEventListener("compositionupdate", event => sendText(event.data, true));
   textInput.addEventListener("compositionend", event => {
-    composing = false; sendText(event.data); textInput.value = "";
+    composing = false; sendText(event.data, !event.data); textInput.value = "";
     skipCompositionInput = true; setTimeout(() => { skipCompositionInput = false; }, 0);
+  });
+  const editKeys = {deleteContentBackward:42, deleteContentForward:76, insertLineBreak:40, insertParagraph:40};
+  textInput.addEventListener("beforeinput", event => {
+    if (composing || event.isComposing) return;
+    // Soft keyboards can report these edits without a usable KeyboardEvent.code.
+    const code = editKeys[event.inputType];
+    if (!code) return;
+    event.preventDefault();
+    wasm.cove_key(code, 0, 1, 0);
+    wasm.cove_key(code, 0, 0, 0);
+    schedule();
   });
   textInput.addEventListener("input", event => {
     if (composing || event.isComposing || skipCompositionInput) return;
     sendText(event.data ?? textInput.value); textInput.value = "";
   });
   textInput.addEventListener("blur", () => { if (composing) sendText("", true); composing = false; textInput.value = ""; });
-  const codes = { Enter:40, Escape:41, Backspace:42, Tab:43, Space:44, ArrowRight:79, ArrowLeft:80, ArrowDown:81, ArrowUp:82 };
+  const codes = { Enter:40, Escape:41, Backspace:42, Tab:43, Space:44, Home:74, PageUp:75, Delete:76, End:77, PageDown:78, ArrowRight:79, ArrowLeft:80, ArrowDown:81, ArrowUp:82 };
   for (const target of [surface, textInput]) for (const name of ["keydown", "keyup"]) target.addEventListener(name, event => {
     if (composing || event.isComposing) return;
     const code = codes[event.code];
-    if (!code) return;
+    if (!code || (target === textInput && code === 44)) return;
     event.preventDefault();
     const modifiers = (event.shiftKey ? 1 : 0) | (event.ctrlKey ? 4 : 0) | (event.altKey ? 16 : 0) | (event.metaKey ? 64 : 0);
     wasm.cove_key(code, modifiers, name === "keydown" ? 1 : 0, event.repeat ? 1 : 0);
-    if (target === textInput && code === 43) surface.focus({preventScroll:true});
+    if (name === "keydown") syncTextInput();
     schedule();
   });
   new ResizeObserver(schedule).observe(surface);
-  window.addEventListener("message", (event) => {
-    const iframe = document.querySelector("#inspector");
-    if (event.origin !== location.origin || event.source !== iframe.contentWindow) return;
-    if (event.data?.type === "cove.devtools.probe") {
-      iframe.contentWindow.postMessage({ type: "cove.devtools.ready" }, location.origin);
-      return;
-    }
-    if (event.data?.type !== "cove.devtools.connect" || !event.ports[0]) return;
-    if (inspectorPort) { dispatch({ type: "bye" }); inspectorPort.close(); }
-    inspectorPort = event.ports[0];
-    const port = inspectorPort;
-    port.addEventListener("message", (event) => {
-      if (inspectorPort !== port) return;
-      if (event.data?.kind === "close") {
-        dispatch({ type: "bye" }); port.close(); inspectorPort = undefined; schedule();
-      } else if (event.data?.kind === "message") {
-        try { post(dispatch(JSON.parse(event.data.data))); schedule(); }
-        catch (error) { post({ type: "request.err", payload: { code: "bad_request", message: String(error) } }); }
-      }
-    });
-    port.start(); port.postMessage({ kind: "open" }); wasm.cove_hello(); post(response()); schedule();
-  });
-  const ready = () => document.querySelector("#inspector").contentWindow.postMessage({ type: "cove.devtools.ready" }, location.origin);
-  document.querySelector("#inspector").addEventListener("load", ready);
-  ready();
+  window.addEventListener("scroll", syncTextInput, {passive:true});
   window.coveDebug = {
     get snapshot() { return lastFrame; }, get backend() { return renderer.backend; },
     get gpuInfo() {
@@ -368,33 +372,62 @@ try {
       return info ? { vendor: info.vendor, architecture: info.architecture, device: info.device,
         description: info.description, isFallbackAdapter: info.isFallbackAdapter, lost: renderer.lost } : null;
     },
-    request(envelope) { const result = dispatch(envelope); schedule(); return result; },
   };
-  try {
-    const saved = sessionStorage.getItem("cove.dev.checkpoint");
-    if (saved) {
-      const restored = dispatch({type:"state.restore", id:0, payload:JSON.parse(saved)});
-      if (restored.type.endsWith(".err")) console.warn("Previous development state could not be restored", restored.payload);
-      sessionStorage.removeItem("cove.dev.checkpoint");
-    }
-  } catch (error) { console.warn("Development state restore failed", error); }
-  fetch("./dev-mode.json").then(result => result.ok ? result.json() : null).then(mode => {
-    if (!mode?.enabled) return;
-    const events = new EventSource("/__cove_events");
-    events.onopen = () => { window.coveDevConnected = true; };
-    const overlay = document.createElement("pre");
-    overlay.style.cssText = "position:fixed;bottom:0;left:0;right:0;max-height:45vh;overflow:auto;background:#251b22;color:#ffe0e5;padding:16px;z-index:1000;white-space:pre-wrap";
-    overlay.hidden = true; document.body.append(overlay);
-    events.onmessage = event => {
-      const message = JSON.parse(event.data);
-      if (message.type === "building") { overlay.textContent="Compiling Rust…"; overlay.hidden=false; }
-      if (message.type === "error") { overlay.textContent=message.message; overlay.hidden=false; }
-      if (message.type === "ready") {
-        const checkpoint = dispatch({type:"state.checkpoint",id:0}).payload;
-        sessionStorage.setItem("cove.dev.checkpoint", JSON.stringify(checkpoint));
-        location.assign("/" + location.search);
-      }
-    };
-  }).catch(error => console.warn("Development reload unavailable", error));
   schedule();
+  if (location.pathname.startsWith("/app/")) connectProbe().catch(error => console.warn("DevTools:", error.message));
 } catch (error) { status.textContent = "Prototype failed to load"; console.error(error); document.querySelector("#stats").textContent = String(error); }
+
+async function connectProbe() {
+  const storageKey = "cove.devtools.token";
+  const token = location.hash.slice(1) || sessionStorage.getItem(storageKey);
+  if (!token) return;
+  sessionStorage.setItem(storageKey, token);
+  history.replaceState(null, "", location.pathname + location.search);
+
+  const abort = new AbortController();
+  const post = async (path, payload, authorization) => {
+    const response = await fetch(path, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...(authorization ? { Authorization: "Bearer " + token } : {}),
+      },
+      body: JSON.stringify(payload),
+      signal: abort.signal,
+    });
+    if (response.status === 401) return Promise.reject(new DOMException("Open the current controller link.", "SecurityError"));
+    if (!response.ok) throw new Error("Controller request failed.");
+    return response.json();
+  };
+  let lease;
+  const release = () => {
+    if (lease) navigator.sendBeacon("/probe/close", JSON.stringify(lease));
+    lease = undefined;
+  };
+  const close = () => { abort.abort(); release(); };
+  window.addEventListener("pagehide", close, { once: true });
+  try {
+    while (!abort.signal.aborted) {
+      let completion = null;
+      try {
+        wasm.cove_probe_register();
+        lease = await post("/probe/register", response(), true);
+        while (!abort.signal.aborted) {
+          const work = await post("/probe/poll", { lease, completion });
+          completion = work ? { sequence: work.sequence, result: dispatch(work.command) } : null;
+          if (work?.command.method === "edit" || work?.command.method === "select") schedule();
+        }
+      } catch (error) {
+        if (error.name === "SecurityError") throw error;
+      } finally {
+        release();
+        wasm.cove_probe_disconnect();
+        if (!abort.signal.aborted) schedule();
+      }
+      if (!abort.signal.aborted) await new Promise(resolve => setTimeout(resolve, 400));
+    }
+  } finally {
+    close();
+    window.removeEventListener("pagehide", close);
+  }
+}

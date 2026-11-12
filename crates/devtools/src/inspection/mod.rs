@@ -1,11 +1,9 @@
 //! Scene inspection: snapshots, temporary styles and read-only diagnostics.
-mod actions;
 mod diagnostics;
 mod editor;
 mod inspector;
 pub use cove_agent::ui_tools as tools;
 
-pub use actions::{UIAccessibilityActions, perform_accessibility_action};
 pub use diagnostics::{
     DiagnosticCompactNode, DiagnosticError, DiagnosticGeometryIssue, DiagnosticLayoutSummary,
     DiagnosticMemorySnapshot, DiagnosticNode, DiagnosticOverflowIssue, DiagnosticOverview,

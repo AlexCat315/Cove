@@ -193,7 +193,7 @@ impl ApplicationLaunch {
             }
             None => {}
         }
-        Application::run(self.configuration, None, root, callbacks, self.checkpoint)
+        Application::run(self.configuration, None, root, callbacks)
     }
 
     /// The process entry: called on the main thread, it keeps that thread as the

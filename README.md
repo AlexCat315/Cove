@@ -4,7 +4,7 @@ Rust 2024 跨平台 UI 工具包。工作区版本为 `0.3.0-dev`，尚未发布
 
 Cove 自有代码采用 [Apache-2.0](LICENSE)。依赖保留各自许可，见 [第三方声明](THIRD_PARTY_NOTICES.md)；启用原生媒体后的随包材料见 [媒体许可证与分发](Docs/media-licensing.md)。
 
-需要 `rust-toolchain.toml` 固定的 Rust 工具链。`cargo cove setup` 检测并按平台补齐 C/C++ 编译器、CMake、Ninja、Zig 0.17，初始化 `third-party/` 子模块，并把校验过的工具路径写入 Cove 缓存状态供各 `build.rs` 读取：
+需要 `rust-toolchain.toml` 固定的 Rust 工具链。`cargo cove setup` 检测并按平台补齐 C/C++ 编译器、CMake、Ninja、Zig 0.17，初始化 `third-party/` 子模块，并把校验过的工具路径写入 Cove 缓存状态供各 `build.rs` 读取。构建浏览器 / Wasm 目标时追加 `--wasm`，它会按平台下载并校验 wasi-sdk 34、锁定原生 Ninja，CMake 生成器与编译器路径由 `cove-native-build` 统一处理：
 
 ```sh
 cargo cove setup
@@ -40,7 +40,7 @@ cargo cove setup --unpersist-path   # 撤销，只移除 Cove 自己的条目
 
 crate 使用 `src/`、`tests/`、`native/`、`resources/`；`build.rs` 位于 crate 根目录。性能关键的原生内核保留 C。
 
-AI 调试可直接使用 [DevTools MCP](crates/devtools/README.md)。项目配置见 `.mcp.json`；启动入口为 `cargo run --quiet -p cove-devtools-cli -- mcp`，提供查询、交互、等待、截图和性能工具。
+AI 调试可直接使用 [DevTools MCP](crates/devtools/README.md)。先运行 `cargo run -p cove-devtools-cli -- serve`，再用 `COVE_DEVTOOLS=1` 启动应用。浏览器 Inspector 与 `.mcp.json` 配置的 MCP 共用同一个控制器。
 
 ```sh
 cargo fmt --all --check
@@ -56,7 +56,7 @@ cargo cove setup --media
 cargo test --locked -p cove-media --features ffmpeg --all-targets
 ```
 
-`cargo cove setup --check` 只报告工具、SDK、子模块与 shader 工具链状态，CI 也用同一条命令校验清单；`--dry-run` 只输出安装计划（含 PATH 持久化计划，不会执行）。`--media` 追加 FFmpeg 工具，`--shaders` 追加 Slang/DXIL。`cargo cove env` 打印可直接 eval 的环境变量语句，`--persist-path` / `--unpersist-path` 管理用户级 PATH。所有报告都带 `shell` 与 `user_path` 字段，明确说明构建脚本与交互终端各自的环境来源。
+Wasm 目标还需要 `rustup target add wasm32-wasip1`，随后在 `crates/browser` 执行 `npm ci && npm run build && npm run serve`；详见 [浏览器宿主说明](crates/browser/README.md)。`cargo cove setup --check` 只报告工具、SDK、子模块、shader 与 wasm 工具链状态，CI 也用同一条命令校验清单；`--dry-run` 只输出安装计划（含 PATH 持久化计划，不会执行）。`--media` 追加 FFmpeg 工具，`--shaders` 追加 Slang/DXIL，`--wasm` 追加 wasi-sdk / 原生 Ninja（macOS、Linux、Windows 的 x86_64 与 aarch64 归档均有固定校验值）。`cargo cove env` 打印可直接 eval 的环境变量语句，`--persist-path` / `--unpersist-path` 管理用户级 PATH。所有报告都带 `shell` 与 `user_path` 字段，明确说明构建脚本与交互终端各自的环境来源。
 
 新建应用与打包：
 

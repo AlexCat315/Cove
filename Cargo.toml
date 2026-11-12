@@ -81,6 +81,7 @@ cove-composition-macros = { path = "crates/composition-macros" }
 cove-agent = { path = "crates/agent" }
 cove-http = { path = "crates/http" }
 cove-devtools-protocol = { path = "crates/devtools-protocol" }
+ureq = { version = "3.5.1", default-features = false, features = ["json"] }
 # CommonMark + GFM tables/strikethrough/task lists. The Swift original used
 # swift-markdown (cmark-gfm); this is the closest vetted equivalent. Pure Rust,
 # four small transitive crates, no build script, works on every target

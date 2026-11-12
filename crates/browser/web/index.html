@@ -11,14 +11,13 @@
   <header><strong>CoveUI</strong><span>Rust / WebAssembly</span><span id="status">Loading Wasm…</span></header>
   <main>
     <section class="preview">
-      <div class="heading"><h1>A shared core, running in your browser.</h1><p>Interact with the canvas, then inspect its tree or capture and restore state below.</p></div>
+      <div class="heading"><h1>Cove UI</h1></div>
       <div id="surface" tabindex="0" aria-label="CoveUI preview">
         <canvas id="gpu"></canvas><canvas id="fallback" hidden></canvas>
       </div>
       <p id="stats"></p>
       <div class="keyboard"><button id="increment">Increment</button><button id="reset">Reset</button><button id="theme">Toggle theme</button><span>Keyboard and screen reader controls for the canvas.</span></div>
     </section>
-    <section class="inspector"><h2>CoveUI Inspector</h2><iframe id="inspector" title="CoveUI DevTools" src="./devtools/index.html?transport=browser"></iframe></section>
   </main>
   <script type="module" src="./app.js"></script>
 </body>

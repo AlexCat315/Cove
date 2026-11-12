@@ -177,9 +177,8 @@ pub struct DiagnosticsConfiguration {
 
 impl DiagnosticsConfiguration {
     /// `DevToolsConfig.fromEnvironment(appTitle:)` in the Swift original: an
-    /// absent `COVE_DEVTOOLS` leaves DevTools off. The off values mirror
-    /// `cove_devtools::server::config::is_enabled_value`, which this module
-    /// cannot call because it also compiles without the `devtools` feature.
+    /// absent `COVE_DEVTOOLS` leaves DevTools off. Only the documented off
+    /// values disable it; anything else opts in.
     pub fn from_environment(
         app_title: &str,
     ) -> Option<super::super::diagnostics::integration::DevToolsConfiguration> {
@@ -190,15 +189,11 @@ impl DiagnosticsConfiguration {
         ) {
             return None;
         }
-        let port = std::env::var("COVE_DEVTOOLS_PORT")
-            .ok()
-            .and_then(|port| port.parse().ok())
-            .unwrap_or(0);
         Some(
             super::super::diagnostics::integration::DevToolsConfiguration {
-                port,
                 app_title: app_title.to_owned(),
-                launch: None,
+                window: None,
+                connection: None,
             },
         )
     }

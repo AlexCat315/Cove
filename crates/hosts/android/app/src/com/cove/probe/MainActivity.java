@@ -26,7 +26,6 @@ public final class MainActivity extends Activity {
     static native void destroyApplication(long application);
     static native void pumpDiagnostics(long application);
     static native void memoryPressure(long application);
-    static void scheduleDiagnostics(long application) { Diagnostics.schedule(application); }
     static native long open(long application, android.view.Surface surface, int width, int height);
     static native int frame(long session, long displayTimeNanos);
     static native int systemBarIcons(long session);

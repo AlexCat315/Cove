@@ -37,10 +37,9 @@ pub(crate) fn role_name(role: cove_core::scene::AccessibilityRole) -> String {
         .unwrap_or_else(|| format!("{role:?}"))
 }
 
-/// Search for a node by its stable identity. Both the `0x…` content hash from
-/// `identifier` and the raw element id are accepted, so a client may use either.
+/// Search for a live node by its element ID.
 pub(crate) fn find_in(node: &Node, id: &str) -> Option<Node> {
-    if SceneInspector::identifier(node) == id || node.id().0.to_string() == id {
+    if SceneInspector::identifier(node) == id {
         return Some(node.clone());
     }
     for child in node.children() {
@@ -53,16 +52,14 @@ pub(crate) fn find_in(node: &Node, id: &str) -> Option<Node> {
 
 /// Builds `NodeSummary` snapshots from a `NodeTree`.
 ///
-/// Stable id strategy: content hashes derived from `ElementId`, valid for the
-/// lifetime of the host process. Selection from the client is best-effort —
-/// stale ids are ignored by the host.
+/// IDs are valid for the lifetime of their nodes in this runtime.
 pub struct SceneInspector {
     tree: Rc<RefCell<NodeTree>>,
     pub editor: SceneEditor,
     /// Optional log to attach to snapshots, so clients can show recent
     /// dirty-propagation events alongside the tree.
     pub invalidation_log: Option<Arc<InvalidationLog>>,
-    /// Optional render-side mirror, surfaced as `renderInventory`.
+    /// Optional render tree, surfaced as `renderInventory`.
     pub render_tree: Option<RenderTree>,
 }
 
@@ -143,10 +140,9 @@ impl SceneInspector {
         find_in(&root, id)
     }
 
-    /// Stable identity for a node, matching Swift's `ObjectIdentifier` hash
-    /// formatting so existing clients keep working.
+    /// The same live element ID used by node queries and inspection commands.
     pub fn identifier(node: &Node) -> String {
-        format!("0x{:x}", node.id().0)
+        node.id().0.to_string()
     }
 }
 
@@ -224,7 +220,6 @@ fn summarize(node: &Node, owner_scope_id: Option<&str>) -> NodeSummary {
             has_border: node.border_color().is_some() && node.border_width() > 0.0,
         },
         children,
-        element_id: Some(node.id().0.to_string()),
         layout,
         style: Some(NodeStyleInfo {
             background_color: SceneEditor::hex(node.background_color()),

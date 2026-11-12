@@ -4,6 +4,21 @@
 
 Swift 源码逐页对照见文末《Swift 源码对照（逐页差异清单）》。
 
+## 2026-11-12 DevTools 控制器
+
+| 页面 | 自动化与连接 | 实际画面与操作 | Rust 文档 |
+| --- | --- | --- | --- |
+| Gallery / Button | CLI 调用同一控制器查询 Cove 节点并断言页面状态。 | Windows 捕获系统合成画面，按截图坐标点击侧栏并确认 Button 页状态。 | [Gallery](../Website/src/content/components/gallery.md) · [Button](../Website/src/content/components/button.md) |
+| Gallery / Drag & Drop | MCP 读取 Browse files 节点。操作期间的 CPU trace 可分页读取。 | Windows 通过系统鼠标打开文件面板，经 UI Automation 点击「取消」，再次枚举确认面板关闭。 | [Drag & Drop](../Website/src/content/components/drag-and-drop.md) |
+| Browser / Counter | Windows 无头 Edge 注册共享探针，Edge WebDriver 通过控制器抓取视口截图并点击 DOM 控件，Counter 由 0 变为 1。 | 物理触控板、软键盘和 IME 候选位置仍待实机验收。 | [Gallery](../Website/src/content/components/gallery.md) |
+
+## 2026-11-12 浏览器宿主输入
+
+| 页面或组件 | 实现与自动化验收 | 浏览器实机验收 | Rust 文档 |
+| --- | --- | --- | --- |
+| Gallery / ScrollView | WASM 反应器测试在默认浏览器尺寸下确认像素、行和页滚轮事件改变示例的纵向偏移。 | 滚轮、触控板与视觉待验收。 | [Gallery](../Website/src/content/components/gallery.md) · [ScrollView](../Website/src/content/components/scroll-view.md) |
+| Gallery / Text Fields | WASM 反应器测试确认点击搜索框立即返回光标坐标、预编辑不改变搜索结果、取消清除预编辑、提交后过滤导航，离开字段时停止文本输入。Counter 回归覆盖计数与备注。 | 浏览器键盘、IME 候选位置与移动软键盘待验收。 | [TextField](../Website/src/content/components/text-field.md) |
+
 ## 2026-11-12 overlays 核查与修复
 
 | 页面或组件 | 实现与自动化验收 | 原生验收 | Rust 文档 |

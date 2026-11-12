@@ -8,8 +8,7 @@ license.workspace = true
 [dependencies]
 serde.workspace = true
 serde_json.workspace = true
-cove-platform.workspace = true
-cove-logging.workspace = true
+thiserror.workspace = true
 
 [lints]
 workspace = true

@@ -5,8 +5,8 @@
 //! `RefCell`s because a snapshot must be readable through `&self` while the
 //! server still holds exclusive access for command handling.
 use crate::inspection::inspector::SceneInspector;
-use cove_core::scene::{Display, InvalidationSource, LayoutInsets, Node, NodeTree};
-use cove_core::{Color, DrawList, Point, Rect};
+use cove_core::scene::{InvalidationSource, LayoutInsets, Node, NodeTree};
+use cove_core::{Color, DrawList, Rect};
 use cove_devtools_protocol::{Envelope, InspectionState};
 use std::cell::{Cell, RefCell};
 use std::collections::BTreeMap;
@@ -43,9 +43,6 @@ pub struct SceneEditor {
     undo: RefCell<Vec<BTreeMap<String, Style>>>,
     redo: RefCell<Vec<BTreeMap<String, Style>>>,
     selected: RefCell<Option<Node>>,
-    hovered: RefCell<Option<Node>>,
-    picking: Cell<bool>,
-    swallowed_buttons: RefCell<Vec<cove_platform::MouseButton>>,
     /// Invoked after any change that the host may want to redraw for.
     pub on_change: RefCell<Option<Rc<dyn Fn()>>>,
 }
@@ -62,9 +59,6 @@ impl SceneEditor {
             undo: RefCell::new(Vec::new()),
             redo: RefCell::new(Vec::new()),
             selected: RefCell::new(None),
-            hovered: RefCell::new(None),
-            picking: Cell::new(false),
-            swallowed_buttons: RefCell::new(Vec::new()),
             on_change: RefCell::new(None),
         }
     }
@@ -101,7 +95,6 @@ impl SceneEditor {
                 let reference = Rc::new(RefCell::new(NodeRef {
                     node: Some(node.clone()),
                 }));
-                index.insert(node.id().0.to_string(), reference.clone());
                 index.insert(SceneInspector::identifier(&node), reference);
                 stack.extend(node.children());
             }
@@ -118,23 +111,19 @@ impl SceneEditor {
             })
     }
 
-    pub fn select(&self, id: Option<&str>) {
+    /// Highlight a live component in the next rendered frame.
+    pub fn select(&self, id: Option<&str>) -> bool {
         let node = id.and_then(|id| self.find(id));
+        if id.is_some() && node.is_none() {
+            return false;
+        }
         *self.selected.borrow_mut() = node;
-        *self.hovered.borrow_mut() = None;
         self.notify();
+        true
     }
 
     pub fn selected_node(&self) -> Option<Node> {
         self.selected.borrow().clone()
-    }
-
-    pub fn hovered_node(&self) -> Option<Node> {
-        self.hovered.borrow().clone()
-    }
-
-    pub fn picking(&self) -> bool {
-        self.picking.get()
     }
 
     pub fn state(&self) -> InspectionState {
@@ -145,12 +134,6 @@ impl SceneEditor {
                 .borrow()
                 .as_ref()
                 .map(|node| node.id().0.to_string()),
-            hovered_id: self
-                .hovered
-                .borrow()
-                .as_ref()
-                .map(|node| node.id().0.to_string()),
-            picking: self.picking.get(),
             can_undo: !self.undo.borrow().is_empty(),
             can_redo: !self.redo.borrow().is_empty(),
             override_count: self.overrides.borrow().len(),
@@ -184,25 +167,14 @@ impl SceneEditor {
         {
             *self.selected.borrow_mut() = None;
         }
-        if self
-            .hovered
-            .borrow()
-            .as_ref()
-            .is_some_and(|node| self.find(&node.id().0.to_string()).is_none())
-        {
-            *self.hovered.borrow_mut() = None;
-        }
     }
 
-    /// Disconnect/stop discards temporary styles and history. An outstanding
-    /// picker mouse-up is still consumed to avoid leaking half a gesture.
+    /// Disconnect/stop discards temporary styles and history.
     pub fn reset(&self) {
         self.apply(BTreeMap::new());
         self.undo.borrow_mut().clear();
         self.redo.borrow_mut().clear();
         *self.selected.borrow_mut() = None;
-        *self.hovered.borrow_mut() = None;
-        self.picking.set(false);
         self.notify();
     }
 
@@ -265,42 +237,14 @@ impl SceneEditor {
         self.apply(next);
     }
 
-    /// Handle one `inspect.*` command. Validation already ran in
-    /// `Session::validate`, so this only enforces scene-dependent limits.
+    /// Validate and apply one inspection command.
     pub fn handle(&self, request: &Envelope) -> Envelope {
+        if let Some(message) = cove_devtools_protocol::InspectionValidation::error(request) {
+            return request.error("bad_request", message);
+        }
         self.prune();
         let payload = request.payload.as_ref().and_then(|value| value.as_object());
         match request.r#type.as_str() {
-            "inspect.pick.start" => {
-                self.picking.set(true);
-                *self.hovered.borrow_mut() = None;
-            }
-            "inspect.pick.stop" => {
-                self.picking.set(false);
-                *self.hovered.borrow_mut() = None;
-            }
-            "inspect.hover" | "inspect.pick" => {
-                let Some(point) = payload.and_then(|payload| {
-                    Some(Point {
-                        x: payload.get("x")?.as_f64()? as f32,
-                        y: payload.get("y")?.as_f64()? as f32,
-                    })
-                }) else {
-                    return error(
-                        request,
-                        "bad_request",
-                        "Expected finite window coordinates x/y",
-                    );
-                };
-                let node = self.pick(point);
-                if request.r#type == "inspect.hover" {
-                    *self.hovered.borrow_mut() = node;
-                } else {
-                    *self.selected.borrow_mut() = node;
-                    *self.hovered.borrow_mut() = None;
-                    self.picking.set(false);
-                }
-            }
             "inspect.style.set" | "inspect.style.clear" => {
                 let Some(id) = payload
                     .and_then(|payload| payload.get("id"))
@@ -430,118 +374,11 @@ impl SceneEditor {
         response
     }
 
-    /// Visual hit test, in reverse paint order. Text and disabled controls are
-    /// inspectable; clipping, scrolling and invisible subtrees match rendering.
-    ///
-    /// Children are visited before their parent (last child first, highest z
-    /// first) so the topmost painted node wins, exactly as Swift's recursive
-    /// `visit` does.
-    pub fn pick(&self, point: Point) -> Option<Node> {
-        let root = self.tree.borrow().root()?;
-        fn visit(node: &Node, point: Point) -> Option<Node> {
-            if !node.is_layout_visible()
-                || node.opacity() <= 0.0
-                || node.subtree_opacity() <= 0.0
-                || node
-                    .layout_node()
-                    .is_some_and(|layout| layout.display() == Display::None)
-            {
-                return None;
-            }
-            let frame = node.absolute_frame();
-            let inside = frame.contains(point);
-            if !inside && node.clips_to_bounds() {
-                return None;
-            }
-            // Reverse paint order: greater z first, then later siblings first.
-            let mut children: Vec<(usize, Node)> =
-                node.children().into_iter().enumerate().collect();
-            children.sort_by(|(left_index, left), (right_index, right)| {
-                right
-                    .z_index()
-                    .partial_cmp(&left.z_index())
-                    .unwrap_or(std::cmp::Ordering::Equal)
-                    .then(right_index.cmp(left_index))
-            });
-            for (_, child) in children {
-                if let Some(hit) = visit(&child, point) {
-                    return Some(hit);
-                }
-            }
-            (inside && (node.layout_node().is_some() || node.background_color().is_some()))
-                .then(|| node.clone())
-        }
-        visit(&root, point)
-    }
-
-    /// Consume pointer input while picking. Returns `true` when the event was
-    /// handled and the host must not forward it to the scene.
-    pub fn intercept(&self, event: &cove_platform::InputEvent) -> bool {
-        use cove_platform::InputEvent;
-        if let InputEvent::MouseButtonUp(button) = event {
-            // Resolve the position in its own scope: under Rust 2024 the temporary
-            // `RefMut` from an `if let` scrutinee lives for the whole body, so
-            // calling `borrow_mut()` inside it panics with "RefCell already
-            // borrowed" on every second mouse-up while picking.
-            let position = {
-                self.swallowed_buttons
-                    .borrow()
-                    .iter()
-                    .position(|candidate| *candidate == button.button)
-            };
-            if let Some(position) = position {
-                self.swallowed_buttons.borrow_mut().remove(position);
-                return true;
-            }
-        }
-        if !self.picking.get() {
-            return false;
-        }
-        match event {
-            InputEvent::MouseMotion(motion) => {
-                *self.hovered.borrow_mut() = self.pick(Point {
-                    x: motion.x,
-                    y: motion.y,
-                });
-                self.notify();
-                true
-            }
-            InputEvent::MouseButtonDown(button) => {
-                self.swallowed_buttons.borrow_mut().push(button.button);
-                if button.button == cove_platform::MouseButton::Left {
-                    *self.selected.borrow_mut() = self.pick(Point {
-                        x: button.x,
-                        y: button.y,
-                    });
-                    self.picking.set(false);
-                    *self.hovered.borrow_mut() = None;
-                    self.notify();
-                }
-                true
-            }
-            InputEvent::KeyDown(key) => {
-                // 41 is Escape in the SDL/USB-HID scancode table.
-                if key.scancode == 41 {
-                    self.picking.set(false);
-                    *self.hovered.borrow_mut() = None;
-                    self.notify();
-                }
-                true
-            }
-            InputEvent::MouseButtonUp(_) | InputEvent::MouseWheel(_) | InputEvent::KeyUp(_) => true,
-            _ => false,
-        }
-    }
-
-    /// Draw the hover/selection outline plus padding tint, clipped by ancestors.
     pub fn draw_overlay(&self, list: &mut DrawList) {
         self.prune();
-        let node = self
-            .hovered
-            .borrow()
-            .clone()
-            .or_else(|| self.selected.borrow().clone());
-        let Some(node) = node else { return };
+        let Some(node) = self.selected_node() else {
+            return;
+        };
         let frame = node.absolute_frame();
         if frame.width <= 0.0 || frame.height <= 0.0 {
             return;
@@ -557,39 +394,7 @@ impl SceneEditor {
         for clip in &clips {
             list.push_clip_rect(*clip);
         }
-        let hovered = self.hovered.borrow().is_some();
-        if hovered && let Some(padding) = node.layout_node().map(|layout| layout.resolved_padding())
-        {
-            let tint = Color::from_rgba8(100, 210, 130, 75);
-            let _ = list.add_rect(Rect::new(frame.x, frame.y, frame.width, padding.top), tint);
-            let _ = list.add_rect(
-                Rect::new(
-                    frame.x,
-                    frame.y + (frame.height - padding.bottom).max(0.0),
-                    frame.width,
-                    padding.bottom,
-                ),
-                tint,
-            );
-            let _ = list.add_rect(
-                Rect::new(frame.x, frame.y, padding.left, frame.height),
-                tint,
-            );
-            let _ = list.add_rect(
-                Rect::new(
-                    frame.x + (frame.width - padding.right).max(0.0),
-                    frame.y,
-                    padding.right,
-                    frame.height,
-                ),
-                tint,
-            );
-        }
-        let color = if hovered {
-            Color::from_rgba8(250, 180, 40, 255)
-        } else {
-            Color::from_rgba8(80, 160, 255, 255)
-        };
+        let color = Color::from_rgba8(80, 160, 255, 255);
         let _ = list.add_rect(
             Rect::new(frame.x, frame.y, frame.width, 2.0_f32.min(frame.height)),
             color,
@@ -663,7 +468,6 @@ impl std::fmt::Debug for SceneEditor {
         formatter
             .debug_struct("SceneEditor")
             .field("overrides", &self.overrides.borrow().len())
-            .field("picking", &self.picking.get())
             .finish_non_exhaustive()
     }
 }

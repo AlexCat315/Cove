@@ -13,26 +13,27 @@
 //! stay independent of any particular demo.
 
 use std::cell::RefCell;
-use std::collections::BTreeMap;
 use std::rc::Rc;
 use std::time::Instant;
 
 use cove_composition::ViewGraph;
-use cove_core::DrawList;
 use cove_core::scene::{
     AnimatorScheduler, EventDispatcher, NodeRenderer, NodeTree, PlatformInputContext, Recomposer,
+    TextInputAreaResolver, TextInputAttachmentKey,
 };
-use cove_devtools::client::DevToolsSession;
-use cove_devtools::inspection::SceneInspector;
+use cove_core::{DrawList, Point, TextLayoutOptions, layout_text};
+use cove_devtools::inspection::DiagnosticStateSource;
+use cove_devtools::runtime_probe::RuntimeProbe;
 use cove_devtools_protocol::{
-    Envelope, HelloHostInfo, HelloPayload, InputRecorder, InputRecording, Session, StateDifference,
-    StateWatch, Subscription, TimingFrame, TreeSnapshot,
+    TimingFrame,
+    control::{Fault, ProbeCommand, Registration, VERSION},
 };
 use cove_platform::{
     InputEvent as PlatformInputEvent, KeyEvent, KeyModifiers, MouseButton, MouseButtonEvent,
-    MouseMotionEvent, PointerKind, TextEditingEvent,
+    MouseMotionEvent, MouseWheelEvent, PointerKind, ScrollInput, ScrollUnit, TextEditingEvent,
+    TextInputArea,
 };
-use cove_text::FontCollection;
+use cove_text::{DrawListText, FontCollection};
 
 #[cfg(target_arch = "wasm32")]
 use super::gpu::BrowserGpu;
@@ -48,15 +49,10 @@ const MAX_PAYLOAD: usize = 32 * 1024 * 1024;
 /// The root demo a browser host renders.
 ///
 /// Swift hard-codes `CounterView`; keeping the small surface behind a trait
-/// lets the same host drive any shared example that exposes checkpointable
-/// state and a view tree.
+/// lets the same host drive any shared example that supplies a view tree.
 pub trait PrototypeContent {
     /// The `View` this content installs as the graph root.
     fn install(self: &Rc<Self>, graph: &Rc<ViewGraph>);
-    /// Observable state serialised for `state.checkpoint`.
-    fn checkpoint(&self) -> BTreeMap<String, String>;
-    /// Restores observable state; returns `false` for invalid values.
-    fn restore(&self, values: &BTreeMap<String, String>) -> bool;
     /// The three values the frame payload publishes.
     fn summary(&self) -> (i64, bool, String);
 }
@@ -67,7 +63,8 @@ pub struct BrowserPrototype<C: PrototypeContent> {
     tree: Rc<RefCell<NodeTree>>,
     context: PlatformInputContext,
     dispatcher: EventDispatcher,
-    inspector: SceneInspector,
+    probe: RuntimeProbe,
+    probing: bool,
     graph: Rc<ViewGraph>,
     recomposer: Rc<Recomposer>,
     animations: AnimatorScheduler,
@@ -76,18 +73,15 @@ pub struct BrowserPrototype<C: PrototypeContent> {
     fonts: FontCollection,
     raster_scale: f32,
     frame: Option<Frame>,
-    frame_number: u64,
     recomposition_ms: f64,
     layout_ms: f64,
     render_ms: f64,
-    session: DevToolsSession,
-    recorder: InputRecorder,
-    last_observation: Option<cove_devtools_protocol::StateObservation>,
     pub vertex_buffer: ExportBuffer,
     pub index_buffer: ExportBuffer,
     pub snapshot_buffer: ExportBuffer,
     pub response_buffer: ExportBuffer,
     pub atlas_buffer: ExportBuffer,
+    input_anchor: [f32; 3],
     #[cfg(target_arch = "wasm32")]
     webgpu: Option<BrowserGpu>,
     #[cfg(target_arch = "wasm32")]
@@ -97,11 +91,12 @@ pub struct BrowserPrototype<C: PrototypeContent> {
 impl<C: PrototypeContent> BrowserPrototype<C> {
     /// Builds the reactor and installs `content` as the graph root.
     pub fn new(content: C) -> Self {
-        let _ = cove_logging::LogSystem::bootstrap(
-            Some("com.cove.browser"),
-            cove_logging::LoggingConfiguration::default(),
-            None,
-        );
+        // The browser has no persistent filesystem: WASI's `std::env::temp_dir()`
+        // panics, so file-backed logging stays off and records go to the console.
+        let configuration = cove_logging::LoggingConfiguration::new(|value| {
+            value.storage.enabled = false;
+        });
+        let _ = cove_logging::LogSystem::bootstrap(Some("com.cove.browser"), configuration, None);
         let content = Rc::new(content);
         let tree = Rc::new(RefCell::new(NodeTree::new()));
         let context = PlatformInputContext::default();
@@ -114,8 +109,6 @@ impl<C: PrototypeContent> BrowserPrototype<C> {
             context.focus_chain.clone(),
             cove_platform::WindowId(0),
         );
-        let inspector =
-            SceneInspector::new(tree.clone(), Some(context.invalidation_log.clone()), None);
         // One portal store and tooltip arbiter for this surface, installed before
         // the graph mounts so presenters and the portal host resolve the same
         // store. The browser drives a single window, so the thread-local animator
@@ -123,14 +116,35 @@ impl<C: PrototypeContent> BrowserPrototype<C> {
         cove_hosts::wasm::install_overlay_services(&context);
         let animations = AnimatorScheduler::current();
         context.with_current(|| content.install(&graph));
+        let probe = RuntimeProbe::new(
+            tree.clone(),
+            Some(context.invalidation_log.clone()),
+            Some(graph.render_tree().clone()),
+            Some(Rc::new(GraphState(graph.clone()))),
+        );
         let mut fonts = FontCollection::new(ATLAS_SIZE, ATLAS_SIZE);
         fonts.configure(16.0, 1.0);
+        // Compose `Text` primitives draw through the ambient TextEnvironment.
+        // Wasm has no system font resolver: share the reactor's atlas (fed by
+        // `cove_font_load`) and seed the shaper from the first loaded face.
+        let environment = cove_text::TextEnvironment::new(
+            fonts.atlas.clone(),
+            cove_text::TextShaper::default(),
+            1,
+            22.0,
+            cove_text::Color::WHITE,
+            None,
+            None,
+            cove_text::TextCacheLimits::default(),
+        );
+        cove_text::TextEnvironmentHolder::set_current(Some(environment));
         Self {
             content,
             tree,
             context,
             dispatcher,
-            inspector,
+            probe,
+            probing: false,
             graph,
             recomposer,
             animations,
@@ -139,18 +153,15 @@ impl<C: PrototypeContent> BrowserPrototype<C> {
             fonts,
             raster_scale: 1.0,
             frame: None,
-            frame_number: 0,
             recomposition_ms: 0.0,
             layout_ms: 0.0,
             render_ms: 0.0,
-            session: Session::default(),
-            recorder: InputRecorder::default(),
-            last_observation: None,
             vertex_buffer: ExportBuffer::new(),
             index_buffer: ExportBuffer::new(),
             snapshot_buffer: ExportBuffer::new(),
             response_buffer: ExportBuffer::new(),
             atlas_buffer: ExportBuffer::new(),
+            input_anchor: [0.0; 3],
             #[cfg(target_arch = "wasm32")]
             webgpu: None,
             #[cfg(target_arch = "wasm32")]
@@ -229,7 +240,20 @@ impl<C: PrototypeContent> BrowserPrototype<C> {
         if bytes.is_empty() || bytes.len() > MAX_PAYLOAD || self.fonts.font_count() >= 8 {
             return None;
         }
-        self.fonts.append(bytes.to_vec())
+        let id = self.fonts.append(bytes.to_vec())?;
+        // `TextShaper` emits glyphs with font id 0. Register the first loaded
+        // face under that id too and give it to the ambient shaper, so compose
+        // text rasterizes into the same atlas the host exports to JavaScript.
+        if id == 1
+            && let Some(face) = self.fonts.last_face()
+        {
+            self.fonts.atlas.register_face(face.clone(), 0);
+            if let Some(mut environment) = cove_text::TextEnvironmentHolder::current() {
+                environment.shaper.set_face(face, self.fonts.size);
+                cove_text::TextEnvironmentHolder::set_current(Some(environment));
+            }
+        }
+        Some(id)
     }
 
     /// Rebuilds the frame snapshot for the requested viewport.
@@ -266,17 +290,10 @@ impl<C: PrototypeContent> BrowserPrototype<C> {
         // `with_current` needs `&self.context` while the pass needs mutable
         // access to the draw list and fonts, so both halves are taken as
         // separate locals rather than through `self`.
-        let (context, tree, inspector) = (&self.context, &self.tree, &self.inspector);
+        let (context, tree) = (&self.context, &self.tree);
         let (draw_list, fonts) = (&mut self.draw_list, &mut self.fonts);
         context.with_current(|| {
-            encode_frame(
-                tree,
-                inspector,
-                draw_list,
-                fonts,
-                &mut labels,
-                &mut note_width,
-            );
+            encode_frame(tree, draw_list, fonts, &mut labels, &mut note_width);
         });
 
         if fonts.atlas.is_full() {
@@ -286,17 +303,13 @@ impl<C: PrototypeContent> BrowserPrototype<C> {
             labels.clear();
             note_width = 0.0;
             context.with_current(|| {
-                encode_frame(
-                    tree,
-                    inspector,
-                    draw_list,
-                    fonts,
-                    &mut labels,
-                    &mut note_width,
-                );
+                encode_frame(tree, draw_list, fonts, &mut labels, &mut note_width);
             });
         }
 
+        if self.probing {
+            self.probe.scene.editor.draw_overlay(&mut self.draw_list);
+        }
         let upload = self.fonts.atlas.dirty_upload_payload();
         #[cfg(target_arch = "wasm32")]
         if let Some(gpu) = &mut self.webgpu
@@ -342,7 +355,6 @@ impl<C: PrototypeContent> BrowserPrototype<C> {
                     height: asset.image.height(),
                 });
             });
-        let snapshot = self.inspector.snapshot();
         self.frame = Some(Frame {
             count,
             dark,
@@ -360,7 +372,6 @@ impl<C: PrototypeContent> BrowserPrototype<C> {
             batches,
             raster_assets,
             labels,
-            tree: snapshot,
             font_count: self.fonts.font_count(),
             atlas_width: self.fonts.atlas.width(),
             atlas_height: self.fonts.atlas.height(),
@@ -382,9 +393,22 @@ impl<C: PrototypeContent> BrowserPrototype<C> {
         if let Some(frame) = &self.frame {
             self.snapshot_buffer.encode(frame);
         }
-        self.frame_number = self.frame_number.wrapping_add(1);
         self.render_ms =
             (started.elapsed().as_secs_f64() * 1000.0) - self.recomposition_ms - self.layout_ms;
+        if self.probing {
+            self.probe.record(TimingFrame {
+                frame: 0,
+                recomposition_ms: Some(self.recomposition_ms),
+                layout_ms: self.layout_ms,
+                draw_ms: self.render_ms,
+                render_thread_ms: None,
+                submitted: true,
+                presented: None,
+                total_ms: self.recomposition_ms + self.layout_ms + self.render_ms,
+                node_count: self.tree.borrow_mut().node_count(),
+                batch_count: self.draw_list.batches().len(),
+            });
+        }
     }
 
     pub fn pointer(&mut self, kind: i32, x: f32, y: f32) {
@@ -461,12 +485,73 @@ impl<C: PrototypeContent> BrowserPrototype<C> {
         });
     }
 
+    pub(super) fn wheel(&self, unit: ScrollUnit, dx: f32, dy: f32, x: f32, y: f32, time: f64) {
+        // DOM deltas describe viewport motion, while Cove's wheel convention
+        // describes content motion. DOM does not expose gesture phases.
+        let event = PlatformInputEvent::MouseWheel(MouseWheelEvent {
+            x: -dx,
+            y: -dy,
+            mouse_x: Some(x),
+            mouse_y: Some(y),
+            input: ScrollInput {
+                unit,
+                timestamp: time / 1000.0,
+                ..ScrollInput::default()
+            },
+        });
+        self.context
+            .with_current(|| self.dispatcher.dispatch(&event));
+    }
+
+    pub(super) fn text_input_area(&mut self) -> *const f32 {
+        let anchor = self.context.with_current(|| {
+            let node = self.context.focus_chain.focused()?;
+            if !node.accepts_subtree_input() || !self.context.focus_chain.permits_input(&node) {
+                return None;
+            }
+            let origin = node.absolute_origin();
+            match node.attachment::<TextInputAreaResolver>(TextInputAttachmentKey::AREA_RESOLVER) {
+                Some(resolve) => resolve(&node, origin),
+                None => node.attachment(TextInputAttachmentKey::AREA).or_else(|| {
+                    // The prototype's custom note predates the shared editor.
+                    (crate::prototype::node_debug_name(&node).as_deref()
+                        == Some(cove_examples::CounterDebugName::NOTE))
+                    .then(|| TextInputArea {
+                        x: origin.x + 16.0,
+                        y: origin.y + 12.0,
+                        height: 24.0,
+                        cursor_x: self.frame.as_ref().map_or(0.0, |frame| {
+                            if frame.note.is_empty() {
+                                0.0
+                            } else {
+                                frame.note_width.min((node.frame().width - 36.0).max(0.0))
+                            }
+                        }),
+                        ..TextInputArea::default()
+                    })
+                }),
+            }
+        });
+        let Some(area) = anchor else {
+            return std::ptr::null();
+        };
+        self.input_anchor = [area.x + area.cursor_x, area.y, area.height];
+        if !self.input_anchor.iter().all(|value| value.is_finite()) {
+            return std::ptr::null();
+        }
+        self.input_anchor.as_ptr()
+    }
+
     pub fn text(&mut self, text: &str, editing: bool) {
         if text.len() > 32768 {
             return;
         }
         let event = if editing {
-            PlatformInputEvent::TextEditing(TextEditingEvent::from_utf16(text, 0, 0))
+            PlatformInputEvent::TextEditing(TextEditingEvent::from_utf16(
+                text,
+                text.encode_utf16().count() as i32,
+                0,
+            ))
         } else {
             PlatformInputEvent::TextInput(text.to_owned())
         };
@@ -475,268 +560,54 @@ impl<C: PrototypeContent> BrowserPrototype<C> {
         });
     }
 
-    pub fn hello(&mut self) {
-        let payload = HelloPayload::new(
-            HelloHostInfo {
-                pid: 0,
-                app_title: "CoveUI Wasm prototype".into(),
-                platform: "WebAssembly".into(),
-            },
-            [
-                "log",
-                "tree",
-                "select",
-                "timing",
-                "state",
-                "recording",
-                "inspect",
-                "style",
-                "source",
-                "recomposition",
-                "state.observe",
-                "timeline",
-            ]
-            .iter()
-            .map(|value| (*value).to_owned())
-            .collect(),
-        );
-        self.publish(&Envelope::new(
-            "hello",
-            None,
-            serde_json::to_value(payload).ok(),
-        ));
-    }
-
-    /// Handles one DevTools request.
-    pub fn dispatch(&mut self, bytes: &[u8]) {
-        let request = match serde_json::from_slice::<Envelope>(bytes) {
-            Ok(request) => request,
-            Err(_) => {
-                self.publish(&Envelope::new(
-                    "request.err",
-                    None,
-                    Some(serde_json::json!({
-                        "code": "bad_request",
-                        "message": "Invalid JSON",
-                    })),
-                ));
-                return;
-            }
-        };
-        if let Some(error) = self.session.validate(&request) {
-            self.publish(&error);
-            return;
-        }
-        if request.r#type.starts_with("inspect.") {
-            let response = self.inspector.editor.handle(&request);
-            self.publish(&response);
-            return;
-        }
-        let mut response = Envelope::new(format!("{}.ok", request.r#type), request.id, None);
-        match request.r#type.as_str() {
-            "hello.ack" => {}
-            "log.subscribe" => {
-                self.session.set(Subscription::Log, true);
-            }
-            "log.unsubscribe" => {
-                self.session.set(Subscription::Log, false);
-            }
-            "state.subscribe" => {
-                if let Some(watch) = decode::<StateWatch>(request.payload.as_ref()) {
-                    self.session.watched_state_ids = watch.ids;
-                }
-                self.session.set(Subscription::State, true);
-            }
-            "state.unsubscribe" => {
-                self.session.set(Subscription::State, false);
-                self.session.watched_state_ids.clear();
-                self.last_observation = None;
-            }
-            "timeline.subscribe" => {
-                self.session.set(Subscription::Timeline, true);
-                self.session.timeline_sequence = 0;
-                self.set_timeline_enabled(true);
-            }
-            "timeline.unsubscribe" => {
-                self.session.set(Subscription::Timeline, false);
-                self.set_timeline_enabled(false);
-            }
-            "tree.subscribe" => {
-                self.session.set(Subscription::Tree, true);
-                response.r#type = "tree.snapshot".into();
-                response.payload = self.tree_payload();
-            }
-            "tree.unsubscribe" => {
-                self.session.set(Subscription::Tree, false);
-            }
-            "timing.subscribe" => {
-                self.session.set(Subscription::Timing, true);
-            }
-            "timing.unsubscribe" => {
-                self.session.set(Subscription::Timing, false);
-            }
-            "select.node" => {
-                let id = request
-                    .payload
-                    .as_ref()
-                    .and_then(|payload| payload.get("id"))
-                    .and_then(|id| id.as_str())
-                    .map(str::to_owned);
-                match id.filter(|id| self.inspector.find(id).is_some()) {
-                    Some(id) => self.inspector.editor.select(Some(&id)),
-                    None => fail(&mut response, "Unknown node"),
-                }
-            }
-            "select.clear" => self.inspector.editor.select(None),
-            "state.checkpoint" => {
-                response.payload = serde_json::to_value(self.content.checkpoint()).ok();
-            }
-            "state.restore" => {
-                let restored = cove_devtools_protocol::state(&request.payload)
-                    .is_some_and(|values| self.content.restore(&values));
-                if !restored {
-                    fail(
-                        &mut response,
-                        "State requires count (0…999999) and dark (true/false), as strings",
-                    );
-                }
-            }
-            "state.diff" => {
-                let before = cove_devtools_protocol::state(&request.payload).unwrap_or_default();
-                let difference = StateDifference::new(&before, &self.content.checkpoint());
-                response.payload = serde_json::to_value(difference).ok();
-            }
-            "input.record.start" => {
-                if self.recorder.is_recording() {
-                    fail(&mut response, "Already recording");
-                } else {
-                    let started = self
-                        .recorder
-                        .start(self.content.checkpoint(), self.focused_name());
-                    if let Err(error) = started {
-                        fail(&mut response, error);
-                    }
-                }
-            }
-            "input.record.stop" => match self.recorder.stop() {
-                Some(recording) => {
-                    response.payload = serde_json::to_value(recording).ok();
-                }
-                None => fail(&mut response, "No recording"),
-            },
-            "input.replay" => {
-                let replayed = !self.recorder.is_recording()
-                    && decode::<InputRecording>(request.payload.as_ref())
-                        .is_some_and(|recording| self.replay(&recording));
-                if !replayed {
-                    fail(&mut response, "Invalid recording state");
-                }
-            }
-            "bye" => {
-                self.session.reset();
-                self.set_timeline_enabled(false);
-                self.last_observation = None;
-                self.recorder.stop();
-                self.inspector.editor.reset();
-            }
-            other => {
-                response.r#type = format!("{other}.err");
-                response.payload = Some(serde_json::json!({
-                    "code": "bad_request",
-                    "message": "Unsupported browser prototype message",
-                }));
-            }
-        }
-        self.publish(&response);
-    }
-
-    fn replay(&mut self, recording: &InputRecording) -> bool {
-        if !self.content.restore(&recording.initial_state) {
-            return false;
-        }
-        let Some((width, height)) = self.frame.as_ref().map(|frame| (frame.width, frame.height))
-        else {
-            return false;
-        };
-        self.context.pointer_capture.release();
-        self.context.with_current(|| {
-            self.recomposer.commit_all();
-            self.graph.compute_layout_if_needed(width, height);
-            for input in &recording.events {
-                self.dispatcher.dispatch(&input.event);
-                self.recomposer.commit_all();
-                self.graph.compute_layout_if_needed(width, height);
-            }
+    pub fn register_probe(&mut self) {
+        self.probing = true;
+        self.response_buffer.encode(&Registration {
+            version: VERSION,
+            title: "Cove Web".to_owned(),
+            platform: "web".to_owned(),
+            pid: None,
+            window: None,
+            capabilities: self.probe.capabilities(),
         });
-        true
     }
 
-    /// Publishes every enabled stream's pending events as a JSON array.
-    pub fn events(&mut self) {
-        let mut messages: Vec<Envelope> = Vec::new();
-        if self.session.subscriptions.contains(&Subscription::Tree)
-            && let Some(payload) = self.tree_payload()
-        {
-            messages.push(Envelope::new("tree.delta", None, Some(payload)));
+    pub fn disconnect_probe(&mut self) {
+        self.probing = false;
+        self.probe.disconnect();
+    }
+
+    pub fn dispatch(&mut self, bytes: &[u8]) {
+        let result = serde_json::from_slice::<ProbeCommand>(bytes)
+            .map_err(|error| Fault::new("invalid_request", error.to_string()))
+            .and_then(|command| self.context.with_current(|| self.probe.execute(command)));
+        self.response_buffer.encode(&result);
+    }
+
+    pub fn counter_action(&mut self, action: u32) {
+        let name = match action {
+            0 => cove_examples::CounterDebugName::INCREMENT,
+            1 => cove_examples::CounterDebugName::RESET,
+            2 => cove_examples::CounterDebugName::THEME,
+            _ => return,
+        };
+        fn find(node: cove_core::scene::Node, name: &str) -> Option<cove_core::scene::Node> {
+            if crate::prototype::node_debug_name(&node).as_deref() == Some(name) {
+                return Some(node);
+            }
+            node.children()
+                .into_iter()
+                .find_map(|child| find(child, name))
         }
-        if self.session.subscriptions.contains(&Subscription::Timing)
-            && let Some(frame) = &self.frame
-        {
-            let payload = TimingFrame {
-                frame: self.frame_number,
-                recomposition_ms: Some(self.recomposition_ms),
-                layout_ms: self.layout_ms,
-                draw_ms: self.render_ms,
-                present_ms: 0.0,
-                presented: Some(true),
-                total_ms: self.recomposition_ms + self.layout_ms + self.render_ms,
-                node_count: frame
-                    .tree
-                    .input_inventory
-                    .as_ref()
-                    .map_or(0, |inventory| inventory.node_count),
-                batch_count: frame.batches.len(),
-            };
-            messages.push(Envelope::new(
-                "timing.frame",
-                None,
-                serde_json::to_value(payload).ok(),
-            ));
+        let root = self.tree.borrow().root();
+        if let Some(node) = root.and_then(|root| find(root, name)) {
+            let rect = node.absolute_frame();
+            self.pointer(3, rect.x + rect.width / 2.0, rect.y + rect.height / 2.0);
         }
-        self.response_buffer.encode(&messages);
-    }
-
-    fn focused_name(&self) -> Option<String> {
-        self.context
-            .focus_chain
-            .focused()
-            .and_then(|node| crate::prototype::node_debug_name(&node))
-    }
-
-    fn set_timeline_enabled(&self, enabled: bool) {
-        self.tree
-            .borrow()
-            .timeline
-            .borrow_mut()
-            .set_enabled(enabled);
-    }
-
-    fn tree_payload(&self) -> Option<serde_json::Value> {
-        self.frame
-            .as_ref()
-            .and_then(|frame| serde_json::to_value(&frame.tree).ok())
-    }
-
-    fn publish(&mut self, envelope: &Envelope) {
-        self.response_buffer.encode(envelope);
     }
 
     pub fn frame(&self) -> Option<&Frame> {
         self.frame.as_ref()
-    }
-
-    pub fn tree_snapshot(&self) -> Option<&TreeSnapshot> {
-        self.frame.as_ref().map(|frame| &frame.tree)
     }
 
     pub fn font_count(&self) -> usize {
@@ -746,19 +617,6 @@ impl<C: PrototypeContent> BrowserPrototype<C> {
     pub fn draw_list(&self) -> &DrawList {
         &self.draw_list
     }
-}
-
-/// Rejects a request the way the Swift prototype does.
-fn fail(response: &mut Envelope, message: &str) {
-    response.r#type = response.r#type.replace(".ok", ".err");
-    response.payload = Some(serde_json::json!({
-        "code": "bad_request",
-        "message": message,
-    }));
-}
-
-fn decode<T: serde::de::DeserializeOwned>(payload: Option<&serde_json::Value>) -> Option<T> {
-    serde_json::from_value(payload?.clone()).ok()
 }
 
 /// Projects `Vertex` storage as bytes for the JavaScript upload.
@@ -787,7 +645,6 @@ fn index_bytes(indices: &[u32]) -> &[u8] {
 /// Shapes every text run and re-encodes the draw list for one frame.
 fn encode_frame(
     tree: &Rc<RefCell<NodeTree>>,
-    inspector: &SceneInspector,
     draw_list: &mut DrawList,
     fonts: &mut FontCollection,
     labels: &mut Vec<Label>,
@@ -800,15 +657,87 @@ fn encode_frame(
     collect_labels(fonts, &root, labels, note_width);
     NodeRenderer.render(&root, draw_list);
     tree.borrow_mut().flush();
-    inspector.editor.draw_overlay(draw_list);
 }
 
 /// Walks the tree in paint order, reshaping every text attachment.
+///
+/// The Swift prototype installs a `node.draw` hook for each `CounterTextRun`
+/// here, so glyphs inherit the render tree's clipping and ordering. Doing the
+/// shaping during the walk (rather than emitting quads directly) is what keeps
+/// text above the backgrounds `NodeRenderer` paints afterwards.
 fn collect_labels(
     fonts: &mut FontCollection,
     node: &cove_core::scene::Node,
     labels: &mut Vec<Label>,
     note_width: &mut f32,
 ) {
-    let _ = (fonts, node, labels, note_width);
+    if let Some(run) =
+        node.attachment::<cove_examples::CounterTextRun>(cove_examples::CounterText::ATTACHMENT)
+    {
+        let frame = node.absolute_frame();
+        let padding = node
+            .layout_node()
+            .map(|layout| layout.resolved_padding())
+            .unwrap_or_default();
+        let color = node.inherited_foreground_color().unwrap_or(run.color);
+        let scale = fonts.raster_scale;
+        fonts.configure(run.size, scale);
+        let glyphs = fonts.shape(&run.text);
+        let layout = layout_text(
+            &glyphs,
+            &run.text,
+            &fonts.atlas,
+            TextLayoutOptions {
+                line_height: run.size * 1.4,
+                ..Default::default()
+            },
+        );
+        let x = frame.x + run.inset + padding.left;
+        let y = frame.y
+            + padding.top
+            + (frame.height - padding.top - padding.bottom - run.size * 1.4) * 0.5;
+        labels.push(Label {
+            text: run.text.clone(),
+            x,
+            y,
+            size: run.size,
+            color: format!(
+                "rgba({}, {}, {}, {})",
+                (color.r * 255.0) as u8,
+                (color.g * 255.0) as u8,
+                (color.b * 255.0) as u8,
+                color.a
+            ),
+            width: layout.total_width,
+            glyphs: glyphs.iter().map(|glyph| glyph.glyph_id).collect(),
+            clusters: glyphs.iter().map(|glyph| glyph.cluster).collect(),
+            font_ids: glyphs.iter().map(|glyph| glyph.font_id).collect(),
+        });
+        if crate::prototype::node_debug_name(node).as_deref()
+            == Some(cove_examples::CounterDebugName::NOTE)
+        {
+            *note_width = layout.total_width;
+        }
+        let atlas = fonts.atlas.clone();
+        let origin = Point::new(x, y);
+        let tint = color;
+        node.set_draw(Some(Rc::new(move |list, _| {
+            let _ = list.add_text(&layout, origin, tint, 1, Some(&atlas), None);
+        })));
+    }
+    for child in node.children() {
+        collect_labels(fonts, &child, labels, note_width);
+    }
+}
+
+struct GraphState(Rc<ViewGraph>);
+
+impl DiagnosticStateSource for GraphState {
+    fn descriptors(&self) -> Vec<cove_core::scene::StateDescriptor> {
+        self.0.state_descriptors()
+    }
+
+    fn values(&self, ids: &[String]) -> Vec<cove_core::scene::StateValue> {
+        self.0.state_values(ids)
+    }
 }

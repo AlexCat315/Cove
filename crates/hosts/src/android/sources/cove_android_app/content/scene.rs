@@ -299,9 +299,9 @@ impl HostedScene {
         }
     }
 
-    pub fn did_present(&mut self) {
+    pub fn did_submit(&mut self, token: u64) {
         self.frames += 1;
-        self.content.did_present();
+        self.content.did_submit(token);
     }
 
     pub fn invalidate(&self) {

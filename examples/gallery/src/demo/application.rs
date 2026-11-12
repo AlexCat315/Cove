@@ -3,9 +3,9 @@ use super::{ShowcaseInput, ShowcaseLaunch, ShowcaseMenuBar, TITLE};
 use crate::counter::CounterView;
 use crate::gallery_content::catalog::GalleryPage;
 use crate::gallery_content::{CounterContent, GalleryView};
-use cove_composition::layout::LayoutDirectionExt;
 #[cfg(target_os = "windows")]
 use cove_composition::LayoutDebugExt;
+use cove_composition::layout::LayoutDirectionExt;
 use cove_composition::{AnyView, DynamicField, Scope, View};
 use cove_core::scene::Direction;
 use cove_core::{Environment, InputCapabilities, State};
@@ -173,10 +173,11 @@ impl ShowcaseLaunch {
                 move |values| restore.restore(values),
             );
             let content = CounterContent::new(counter);
-            return ApplicationLaunch::new(content)
-                .configuration(configuration)
-                .checkpoint(checkpoint)
-                .diagnostics(cove_hosts::desktop::diagnostics::devtools::factory());
+            return attach_devtools(
+                ApplicationLaunch::new(content)
+                    .configuration(configuration)
+                    .checkpoint(checkpoint),
+            );
         }
         let gallery = GalleryView::new(
             launch.page,
@@ -203,19 +204,26 @@ impl ShowcaseLaunch {
         };
         #[cfg(not(target_os = "windows"))]
         let root = LayerRoot::new(gallery.into_content());
-        let app = ApplicationLaunch::new(root)
-            .configuration(configuration)
-            .wrap_content(move |content| ShowcaseContent {
-                launch: launch.clone(),
-                appearance: appearance.clone(),
-                content,
-            })
-            .diagnostics(cove_hosts::desktop::diagnostics::devtools::factory());
+        let app = attach_devtools(
+            ApplicationLaunch::new(root)
+                .configuration(configuration)
+                .wrap_content(move |content| ShowcaseContent {
+                    launch: launch.clone(),
+                    appearance: appearance.clone(),
+                    content,
+                }),
+        );
         match menu {
             Some(menu) => app.menu_bar(menu),
             _ => app,
         }
     }
+}
+
+fn attach_devtools(app: ApplicationLaunch) -> ApplicationLaunch {
+    #[cfg(not(target_arch = "wasm32"))]
+    let app = app.diagnostics(cove_hosts::desktop::diagnostics::devtools::factory());
+    app
 }
 
 #[cfg(test)]

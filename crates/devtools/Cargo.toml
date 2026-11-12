@@ -4,20 +4,19 @@ version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
-description = "Cove DevTools client, inspection and local server"
+description = "Cove DevTools runtime probe and diagnostics"
 
 [dependencies]
 cove-agent.workspace = true
 cove-devtools-protocol.workspace = true
-cove-composition.workspace = true
 cove-core.workspace = true
-cove-graphics.workspace = true
-cove-platform.workspace = true
-cove-system.workspace = true
 cove-logging.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 thiserror.workspace = true
+
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+ureq.workspace = true
 
 [lints]
 workspace = true

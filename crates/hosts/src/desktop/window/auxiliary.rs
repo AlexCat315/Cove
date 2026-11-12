@@ -10,6 +10,9 @@ use crate::desktop::application::configuration::{
 };
 use crate::desktop::application::memory::AppWindowMemorySnapshot;
 use crate::desktop::application::typography::AdaptiveApplicationContent;
+use crate::desktop::diagnostics::integration::{
+    DiagnosticsCallbacks, DiagnosticsSession, take_factory,
+};
 use crate::desktop::rendering::ThreadedWindowRenderer;
 use crate::desktop::rendering::context::AppRenderingContext;
 use crate::desktop::window::chrome::{
@@ -21,12 +24,13 @@ use cove_core::{DrawList, Environment, State};
 use cove_platform::WindowId;
 use cove_runtime::{NativeAccessibility, PlatformWindowSession, Sdl3PlatformHost};
 use cove_shell::{NativeRenderSurface, WindowChromeHitTest};
+use cove_ui_compose::primitives::overlays::TooltipArbitrationAmbient;
 use cove_ui_compose::primitives::overlays::portal::portal_registry::{
     PortalStore, PortalStoreAmbient,
 };
-use cove_ui_compose::primitives::overlays::TooltipArbitrationAmbient;
 use std::cell::RefCell;
 use std::rc::Rc;
+use std::time::Instant;
 
 /// The platform style for an authored title-bar style.
 pub fn platform_style(style: AppWindowTitleBarStyle) -> cove_shell::WindowTitleBarStyle {
@@ -55,6 +59,7 @@ pub struct AuxiliaryAppWindow {
     set_window_chrome_hit_test: Rc<dyn Fn(WindowId, Option<&WindowChromeHitTest>)>,
     set_window_appearance: Rc<dyn Fn(WindowId, cove_shell::WindowAppearance)>,
     environment: State<Environment>,
+    diagnostics: Option<Box<dyn DiagnosticsSession>>,
 }
 
 impl AuxiliaryAppWindow {
@@ -104,6 +109,7 @@ impl AuxiliaryAppWindow {
             set_window_chrome_hit_test,
             set_window_appearance,
             environment: State::new(Environment::default()),
+            diagnostics: None,
         }
     }
 
@@ -113,6 +119,51 @@ impl AuxiliaryAppWindow {
 
     pub fn session(&self) -> &Rc<PlatformWindowSession> {
         &self.session
+    }
+
+    pub fn start_diagnostics(
+        &mut self,
+        host: &Sdl3PlatformHost,
+        title: &str,
+        surface: NativeRenderSurface,
+    ) -> Result<(), String> {
+        if self.diagnostics.is_some() {
+            return Ok(());
+        }
+        let (Some(mut config), Some(factory)) =
+            (self.config.diagnostics.dev_tools.clone(), take_factory())
+        else {
+            return Ok(());
+        };
+        let id = self.session.id;
+        config.app_title = title.to_owned();
+        config.window = cove_shell::platform_window_id(host.native_window_reference(id), surface);
+        let window = self.session.clone();
+        let invalidate: Rc<dyn Fn()> = Rc::new(move || window.request_display());
+        let host = host.clone();
+        self.diagnostics = Some(factory(
+            config,
+            self.session.tree.clone(),
+            self.graph.clone(),
+            invalidate.clone(),
+            DiagnosticsCallbacks {
+                invalidate,
+                memory: Rc::new(Default::default),
+                invalidation_log: Some(self.session.input_context.invalidation_log.clone()),
+                resize_window: Some(Rc::new(move |width, height| {
+                    host.set_window_size(id, width, height);
+                    None
+                })),
+                environment: None,
+            },
+        )?);
+        Ok(())
+    }
+
+    pub fn drain_diagnostics(&mut self) {
+        if let Some(diagnostics) = &mut self.diagnostics {
+            self.session.with_current(|| diagnostics.drain());
+        }
     }
 
     pub fn handle_init(
@@ -301,9 +352,15 @@ impl AuxiliaryAppWindow {
         let layer_renderer = &self.layer_renderer;
         let node_renderer = &self.node_renderer;
         let use_legacy = self.use_legacy_renderer;
+        let frame_start = Instant::now();
+        if let Some(diagnostics) = &mut self.diagnostics {
+            diagnostics.begin_frame();
+        }
+        let mut layout_ms = 0.0;
         session.with_current(|| {
             configure_text_environment(session.content_scale_factor());
             let _ = graph.compute_layout_if_needed(logical.0 as f32, logical.1 as f32);
+            layout_ms = frame_start.elapsed().as_secs_f64() * 1000.0;
             self.sync_window_chrome_hit_test();
             NativeAccessibility::synchronize(host, &session, &root, &timeline);
             let mut list = draw_list.borrow_mut();
@@ -317,6 +374,13 @@ impl AuxiliaryAppWindow {
                     .render(graph.render_tree(), &mut list);
             }
         });
+        if let Some(diagnostics) = &mut self.diagnostics {
+            diagnostics.overlay(&mut self.draw_list.borrow_mut());
+            diagnostics.prepared(
+                layout_ms,
+                frame_start.elapsed().as_secs_f64() * 1000.0 - layout_ms,
+            );
+        }
 
         if upload_atlas_if_needed(false).is_err() {
             return false;
@@ -326,9 +390,19 @@ impl AuxiliaryAppWindow {
         let Some(renderer) = &mut self.window_renderer else {
             return false;
         };
-        renderer
+        let batches = list.batches().len();
+        let submitted = renderer
             .submit(&mut list, (logical.0 as f32, logical.1 as f32))
-            .is_ok_and(|token| token.is_some())
+            .ok()
+            .flatten();
+        if let Some(diagnostics) = &mut self.diagnostics {
+            diagnostics.frame_finished(
+                self.session.tree.borrow_mut().node_count(),
+                batches,
+                submitted.map(|token| token.0),
+            );
+        }
+        submitted.is_some()
     }
 
     /// Collects finished frames. True when one could not present and must retry.
@@ -336,10 +410,15 @@ impl AuxiliaryAppWindow {
         let Some(renderer) = &mut self.window_renderer else {
             return Ok(false);
         };
-        renderer
+        let frames = renderer
             .take_presented()
-            .map(|frames| frames.iter().any(|frame| !frame.presented))
-            .map_err(|error| error.to_string())
+            .map_err(|error| error.to_string())?;
+        for frame in &frames {
+            if let Some(diagnostics) = &mut self.diagnostics {
+                diagnostics.presentation_finished(frame.token.0, frame.presented, frame.cpu_ms);
+            }
+        }
+        Ok(frames.iter().any(|frame| !frame.presented))
     }
 }
 
