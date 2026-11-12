@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+- 重写 Cove DevTools。Inspector、MCP 和 CLI 共用控制器，原生与 WASM 共用 Rust 探针。系统截图、平台输入和原生控件操作按目标执行。移除应用内镜像、旧 WebSocket 和合成输入回放。
+
 - WASM 浏览器宿主接通滚轮和触控板滚动。Gallery 的编辑字段可接收浏览器键盘和 IME 输入，输入位置跟随 Cove 光标。
 - 浏览器新增 Rust RHI WebGPU 后端。Gallery 在 Web 复用原生 DrawList 渲染器和 4× MSAA，UI 与合成着色器由 Slang 生成浏览器产物。
 - Gallery 新增 Ray-Traced Shadows。移动面光源可实时查看软阴影，支持 DX12、Vulkan 和 Metal 光线查询，并提供光栅化对照和回退。场景几何在输出位图前进行四点覆盖采样。

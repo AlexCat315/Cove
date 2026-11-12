@@ -4,9 +4,7 @@ use super::diagnostics::{AndroidDiagnostics, AndroidDiagnosticsHooks};
 use super::environment::SceneEnvironment;
 use super::surface::SurfaceState;
 use super::touch_input::TouchInput;
-use crate::desktop::diagnostics::integration::{
-    DevToolsConfiguration, DiagnosticMemorySnapshot, DiagnosticsFrameSource,
-};
+use crate::desktop::diagnostics::integration::{DevToolsConfiguration, DiagnosticMemorySnapshot};
 use cove_composition::{
     AnyView, LayoutDebugAttachmentKey, PrimitiveView, View, ViewGraph, ViewKind,
 };
@@ -93,8 +91,6 @@ pub struct AndroidContentSession {
     dispatcher: OnceCell<Rc<EventDispatcher>>,
     needs_update: Cell<bool>,
     diagnostics: RefCell<Option<AndroidDiagnostics>>,
-    /// A mirror session needs a steady frame stream even when the UI is idle.
-    mirroring: Rc<Cell<bool>>,
     draw_list: DrawList,
     render_tree: RenderTree,
     render_root: Option<cove_core::scene::Node>,
@@ -136,7 +132,9 @@ impl AndroidContentSession {
         // One overlay store and one tooltip arbiter per surface, so a popover
         // painted on this session cannot leak into another's portal layer and
         // only one tooltip is ever visible at a time.
-        context.add_scoped_ambient(Rc::new(PortalStoreAmbient::new(Rc::new(PortalStore::new()))));
+        context.add_scoped_ambient(Rc::new(PortalStoreAmbient::new(
+            Rc::new(PortalStore::new()),
+        )));
         context.add_scoped_ambient(Rc::new(TooltipArbitrationAmbient::new()));
         let surface = SurfaceState::new(scale);
         let mut environment = SceneEnvironment::new();
@@ -180,7 +178,6 @@ impl AndroidContentSession {
             dispatcher: OnceCell::new(),
             needs_update: Cell::new(true),
             diagnostics: RefCell::new(None),
-            mirroring: Rc::new(Cell::new(false)),
             draw_list,
             render_tree: RenderTree::new(),
             render_root: None,
@@ -258,7 +255,6 @@ impl AndroidContentSession {
         &self,
         config: DevToolsConfiguration,
         schedule: Rc<dyn Fn()>,
-        frame_source: Option<DiagnosticsFrameSource>,
     ) -> Result<(), String> {
         if let Some(previous) = self.diagnostics.borrow_mut().as_mut() {
             previous.stop();
@@ -342,17 +338,6 @@ impl AndroidContentSession {
             memory,
             AndroidDiagnosticsHooks {
                 invalidation_log: self.context.invalidation_log.clone(),
-                frame_source,
-                mirror_active: {
-                    let mirroring = self.mirroring.clone();
-                    Rc::new(move |active| mirroring.set(active))
-                },
-                inject: {
-                    let dispatcher = self.dispatcher();
-                    Rc::new(move |event| {
-                        dispatcher.dispatch(&event);
-                    })
-                },
                 environment: Some(environment),
             },
         )?;
@@ -384,7 +369,6 @@ impl AndroidContentSession {
 
     pub fn needs_frame(&self) -> bool {
         self.needs_update.get()
-            || self.mirroring.get()
             || self.recomposer.has_pending()
             || self.tree.borrow().has_render_updates()
             || self.animations.has_active_animations()
@@ -540,28 +524,22 @@ impl AndroidContentSession {
         drawing
     }
 
-    pub fn did_present(&mut self) {
+    pub fn did_submit(&mut self, token: u64) {
         if let Some(hud) = &mut self.performance_hud {
             hud.presented();
         }
         let mut tree = self.tree.borrow_mut();
         if let Some(diagnostics) = self.diagnostics.borrow_mut().as_mut() {
-            diagnostics.presented(&mut tree, &self.draw_list);
-            if diagnostics.wants_mirror_frame() {
-                let logical = self.surface.logical_size();
-                let scale = self.surface.scale();
-                diagnostics.mirror_capture(
-                    &self.draw_list,
-                    (
-                        (logical.0 * scale).round() as u32,
-                        (logical.1 * scale).round() as u32,
-                    ),
-                    logical,
-                );
-            }
+            diagnostics.submitted(tree.node_count(), self.draw_list.batches().len(), token);
         }
         self.needs_update.set(false);
         tree.flush();
+    }
+
+    pub fn presentation_finished(&self, token: u64, presented: bool, render_thread_ms: f64) {
+        if let Some(diagnostics) = self.diagnostics.borrow_mut().as_mut() {
+            diagnostics.presentation_finished(token, presented, render_thread_ms);
+        }
     }
 
     pub fn invalidate(&self) {
@@ -583,31 +561,6 @@ impl AndroidContentSession {
         let point = Point::new(x / scale, y / scale);
         let dispatcher = self.dispatcher();
         self.with_current(|| {
-            let button = MouseButtonEvent {
-                button: MouseButton::Left,
-                x: point.x,
-                y: point.y,
-                clicks: 1,
-                ..MouseButtonEvent::default()
-            };
-            let event = match kind {
-                0 => InputEvent::MouseButtonDown(button.clone()),
-                1 => InputEvent::MouseButtonUp(button),
-                _ => InputEvent::MouseMotion(MouseMotionEvent {
-                    x: point.x,
-                    y: point.y,
-                    ..MouseMotionEvent::default()
-                }),
-            };
-            let intercepted = self
-                .diagnostics
-                .borrow_mut()
-                .as_mut()
-                .is_some_and(|diagnostics| diagnostics.intercept(&event));
-            if intercepted {
-                self.needs_update.set(true);
-                return;
-            }
             if kind == 4 {
                 self.context.pointer_capture.release();
                 let button = MouseButtonEvent {

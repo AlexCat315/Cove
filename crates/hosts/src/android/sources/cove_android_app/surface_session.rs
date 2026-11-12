@@ -6,7 +6,7 @@ use super::frame::gpu_timings::GpuTimingReporter;
 use super::frame::timings::FrameTimings;
 use super::frame::window_renderer::{AndroidWindowRenderer, FrameSample, SurfaceLaunchInfo};
 use crate::android::contract::frame_clock::DisplayFramePacer;
-use crate::desktop::rendering::ThreadedWindowRenderer;
+use crate::desktop::rendering::{FrameToken, ThreadedWindowRenderer};
 use cove_graphics::rhi::{Device, RhiResult, TextureFormat};
 use cove_graphics::ui::{FontAtlasUpload, NativeDrawListRenderer};
 use cove_shell::NativeRenderSurface;
@@ -136,22 +136,29 @@ impl SurfaceSession {
         let submitted = self
             .submit(timestamp, prepare_nanos)
             .map_err(|error| error.to_string())?;
-        if submitted {
-            self.application.scene().borrow_mut().did_present();
+        if let Some(token) = submitted {
+            self.application.scene().borrow_mut().did_submit(token.0);
         }
         self.gpu_timings.tick(timestamp);
-        Ok(submitted)
+        Ok(submitted.is_some())
     }
 
     fn collect_presented(&mut self) -> RhiResult<()> {
         let frames = self.window_renderer.borrow_mut().take_presented()?;
+        for frame in &frames {
+            self.application
+                .scene()
+                .borrow()
+                .content()
+                .presentation_finished(frame.token.0, frame.presented, frame.cpu_ms);
+        }
         if frames.iter().any(|frame| !frame.presented) {
             self.application.scene().borrow().invalidate();
         }
         Ok(())
     }
 
-    fn submit(&mut self, timestamp: u64, prepare_nanos: u64) -> RhiResult<bool> {
+    fn submit(&mut self, timestamp: u64, prepare_nanos: u64) -> RhiResult<Option<FrameToken>> {
         let mut renderer = self.window_renderer.borrow_mut();
         let scene = self.application.scene().borrow();
         // Ordered with the frame, so the glyphs land before they are sampled.
@@ -165,7 +172,7 @@ impl SurfaceSession {
             timestamp,
             prepare_nanos,
         });
-        Ok(renderer.submit(&mut list, logical)?.is_some())
+        renderer.submit(&mut list, logical)
     }
 
     /// Waits for the render thread to release the swapchain, within a bound; the

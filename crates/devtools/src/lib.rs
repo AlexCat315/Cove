@@ -1,17 +1,8 @@
-//! DevTools client, inspector, agent and local server.
-//!
-//! Layering, bottom-up:
-//! - `client` — per-connection protocol state (re-exported from the protocol crate)
-//! - `inspection` — scene snapshots, temporary styles, read-only diagnostics
-//! - `agent` — re-export of `cove-agent` (schema, tools, skills, MCP, transports)
-//! - `server` — WebSocket transport, host adapters, protocol dispatch
-//! - `devtools` — frame mirroring, timing, input bridging, one-stop host entry
-//! - `probe` — headless diagnostic host
-pub mod client;
-pub mod devtools;
+//! Runtime instrumentation shared by native and browser hosts.
 pub mod inspection;
-pub mod probe;
-pub mod server;
+#[cfg(not(target_arch = "wasm32"))]
+pub mod probe_transport;
+pub mod runtime_probe;
 
 pub use cove_agent as agent;
 pub use cove_agent::transport as agent_transport;

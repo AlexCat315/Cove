@@ -4,6 +4,8 @@ Gallery 展示 Cove 的 Rust 组件。组件页的 Size、Scale、Disabled 和 R
 
 在 Windows 上运行 `cargo run -p cove-examples --bin gallery` 打开 Gallery。Windows 默认使用 Direct3D 12，设备初始化失败时尝试 Vulkan。传入 `-- --component dashboard` 或 `-- --component calendar` 可直接打开对应页面。
 
+调试 Gallery 时先启动 `cargo run -p cove-devtools-cli -- serve`，再用 `COVE_DEVTOOLS=1` 启动 Gallery。Inspector 可选择应用窗口、组件运行时或系统文件面板。
+
 浏览器版可用 `?component=scrollView` 或 `?component=textFields` 打开对应页面。在画布内滚动或点击字段输入时，事件会交给同一套 Rust 组件。
 
 Navigate 的 Dashboard 和 Calendar 共用一份菜单定义。Windows 在 Cove 标题栏显示 Navigate，可用 `-- --menu-bar separated` 或侧栏底部按钮切换分割线。macOS 在屏幕顶部的系统菜单栏显示同一个 Navigate。Linux、移动端和 Web 可从侧栏访问这两个页面。`-- --menu-bar none` 关闭 Gallery 提供的菜单。Rust 用法见 [窗口菜单栏](/docs/window-menu-bar)。

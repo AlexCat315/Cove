@@ -354,11 +354,6 @@ impl Diagnostics {
         let mut stack = vec![(summary_root, None)];
         while let Some((mut summary, parent)) = stack.pop() {
             let children = std::mem::take(&mut summary.children);
-            // Expose one canonical live identity to query clients.
-            summary.id = summary
-                .element_id
-                .clone()
-                .unwrap_or_else(|| summary.id.clone());
             if let Some(entry) = presentation.get(&summary.id) {
                 result.push(DiagnosticNode {
                     value_truncated: (Some(summary.id.as_str()) == value_node_id)

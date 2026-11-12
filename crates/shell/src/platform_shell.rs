@@ -116,6 +116,29 @@ pub enum NativeWindowReference {
     UIKit(usize),
     Win32(usize),
 }
+
+/// Stable window-server ID for correlating a debug probe with platform capture.
+pub fn platform_window_id(
+    native: Option<NativeWindowReference>,
+    surface: NativeRenderSurface,
+) -> Option<u64> {
+    match surface {
+        NativeRenderSurface::Win32Window { hwnd, .. } => Some(u64::from(hwnd as u32)),
+        NativeRenderSurface::XlibWindow { window, .. } => Some(window),
+        _ => {
+            #[cfg(target_os = "macos")]
+            if let Some(NativeWindowReference::AppKit(window)) = native {
+                // SAFETY: the shell supplies a live NSWindow on the UI thread during initialization.
+                let number: isize = unsafe {
+                    objc2::msg_send![window as *mut objc2::runtime::AnyObject, windowNumber]
+                };
+                return u64::try_from(number).ok().filter(|id| *id != 0);
+            }
+            let _ = native;
+            None
+        }
+    }
+}
 /// Hardware form the shell can observe. Phones are not distinguished here:
 /// handheld hosts report their class themselves.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]

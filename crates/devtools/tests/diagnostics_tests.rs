@@ -18,9 +18,6 @@
 //! - text search never matches a secure value
 //! - a label change stops matching the old text and starts matching the new
 //! - compact queries return one short record per node with state and redaction
-//! - accessibility actions run by node id without geometry
-//! - a disabled node and a missing node report a reason
-//! - reveal scrolls every scroll ancestor even for a disabled node
 //! - overview reports invalid geometry without losing JSON
 //! - overview reports content clipped by non-scrolling containers
 //! - the tool registry is the single definition source
@@ -33,8 +30,8 @@ use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 
 use cove_core::scene::{AccessibilityRole, AccessibilitySemantics, Node, NodeTree, StateRegistry};
-use cove_devtools::inspection::{Diagnostics, UIAccessibilityActions};
-use cove_devtools::protocol::{Envelope, JsonValue, MirrorAction, MirrorActivate};
+use cove_devtools::inspection::Diagnostics;
+use cove_devtools::protocol::{Envelope, JsonValue};
 
 fn envelope(kind: &str, payload: JsonValue) -> Envelope {
     Envelope::new(kind, None, Some(payload))
@@ -208,137 +205,6 @@ fn compact_queries_return_one_short_record_per_node_with_state_and_secure_redact
     assert_ne!(
         field_value, "private-needle",
         "a secure value is redacted in a compact record",
-    );
-}
-
-#[test]
-fn accessibility_actions_run_by_node_id_without_geometry() {
-    let mut tree = NodeTree::new();
-    let root = Node::new();
-    let item = Node::new();
-    let disabled = Node::new();
-    root.add_child(&item);
-    root.add_child(&disabled);
-
-    let activated = Rc::new(Cell::new(0_u32));
-    let stepped = Rc::new(Cell::new(0_u32));
-
-    let counter = activated.clone();
-    let mut actions = item.accessibility_actions();
-    actions.activate = Some(Rc::new(move || counter.set(counter.get() + 1)));
-    let counter = stepped.clone();
-    actions.increment = Some(Rc::new(move || counter.set(counter.get() + 1)));
-    item.set_accessibility_actions(actions);
-    item.set_accessibility(Some(
-        AccessibilitySemantics::new(AccessibilityRole::Button).with_label("Checkbox"),
-    ));
-
-    let counter = activated.clone();
-    let mut disabled_actions = disabled.accessibility_actions();
-    disabled_actions.activate = Some(Rc::new(move || counter.set(counter.get() + 100)));
-    disabled.set_accessibility_actions(disabled_actions);
-    let mut disabled_semantics = AccessibilitySemantics::new(AccessibilityRole::Button);
-    disabled_semantics.state.is_enabled = false;
-    disabled.set_accessibility(Some(disabled_semantics));
-
-    tree.set_root(Some(root));
-    let actions = UIAccessibilityActions::new(Rc::new(RefCell::new(tree)));
-
-    let request = |node: &Node, action: MirrorAction| MirrorActivate {
-        node_id: node.id().0.to_string(),
-        action,
-    };
-
-    assert_eq!(
-        actions.perform(&request(&item, MirrorAction::Activate)),
-        None,
-        "activate succeeds for a live node",
-    );
-    assert_eq!(activated.get(), 1);
-
-    assert_eq!(
-        actions.perform(&request(&item, MirrorAction::Increment)),
-        None,
-        "increment succeeds for a live node",
-    );
-    assert_eq!(stepped.get(), 1);
-
-    let decrement = actions
-        .perform(&request(&item, MirrorAction::Decrement))
-        .expect("an unregistered increment reports a reason");
-    assert!(
-        decrement.contains("no decrement"),
-        "the decrement reason names the missing action, got {decrement}",
-    );
-
-    let blocked = actions
-        .perform(&request(&disabled, MirrorAction::Activate))
-        .expect("a disabled node reports a reason");
-    assert!(
-        blocked.contains("disabled"),
-        "the reason says the node is disabled, got {blocked}",
-    );
-    assert_eq!(activated.get(), 1, "a disabled node never activates");
-
-    let missing = actions
-        .perform(&MirrorActivate {
-            node_id: "999999".into(),
-            action: MirrorAction::Activate,
-        })
-        .expect("a missing node reports a reason");
-    assert!(
-        missing.contains("missing"),
-        "the reason says the node is missing, got {missing}",
-    );
-}
-
-#[test]
-fn reveal_scrolls_every_scroll_ancestor_even_for_a_disabled_node() {
-    let mut tree = NodeTree::new();
-    let root = Node::new();
-    let outer = Node::new();
-    let inner = Node::new();
-    let target = Node::new();
-    root.add_child(&outer);
-    outer.add_child(&inner);
-    inner.add_child(&target);
-
-    let mut semantics = AccessibilitySemantics::new(AccessibilityRole::Button);
-    semantics.state.is_enabled = false;
-    target.set_accessibility(Some(semantics));
-
-    let revealed = Rc::new(RefCell::new(Vec::<String>::new()));
-    let log = revealed.clone();
-    outer.set_scroll_reveal(Some(Rc::new(move |_: cove_core::Rect| {
-        log.borrow_mut().push("outer".into());
-    })));
-    let log = revealed.clone();
-    inner.set_scroll_reveal(Some(Rc::new(move |_: cove_core::Rect| {
-        log.borrow_mut().push("inner".into());
-    })));
-
-    tree.set_root(Some(root));
-    let actions = UIAccessibilityActions::new(Rc::new(RefCell::new(tree)));
-
-    assert_eq!(
-        actions.perform(&MirrorActivate {
-            node_id: target.id().0.to_string(),
-            action: MirrorAction::Reveal,
-        }),
-        None,
-        "reveal succeeds even though the node is disabled",
-    );
-    assert_eq!(
-        revealed.borrow().as_slice(),
-        ["inner", "outer"],
-        "reveal walks from the nearest scroll ancestor outward",
-    );
-
-    target.reveal_in_scroll_ancestors(true);
-    assert_eq!(
-        revealed.borrow().as_slice(),
-        ["inner", "outer", "inner"],
-        "nearest-only reveal still reaches the innermost viewport",
     );
 }
 

@@ -1,96 +1,60 @@
 # Cove DevTools
 
-Rust 2024 运行时诊断、Inspector 和 AI 工具。应用端使用 WebSocket；AI 通过独立的 `cove-devtools` MCP 服务连接，同一会话复用一条应用连接。
+Inspector、MCP 和 CLI 共用一个 Rust 控制服务。原生宿主与 WASM 应用通过同一个 Rust 探针提供 Cove 组件、源码、日志、样式和 CPU 时间线。截图、鼠标键盘、触摸和原生控件操作由平台适配器执行。
 
-## 启动与 MCP 接入
+## 启动
+
+先启动控制器，再在另一个终端启动 Gallery。
 
 ```sh
-COVE_DEVTOOLS=1 cargo run --package cove-examples
-cargo run --quiet --package cove-devtools-cli -- mcp
+cargo run -p cove-devtools-cli -- serve
+COVE_DEVTOOLS=1 cargo run -p cove-examples --bin gallery
 ```
 
-仓库根目录的 `.mcp.json` 提供项目配置。支持该配置的 MCP 客户端可直接加载；其他客户端注册同一 stdio 命令：
+PowerShell 使用 `$env:COVE_DEVTOOLS = '1'` 设置环境变量。控制器默认监听 `127.0.0.1:9229`，终端打印 Inspector 链接。链接内含配对凭据，仅供当前开发会话使用。控制器把端点和凭据写入当前用户的本地配置目录。用 `COVE_DEVTOOLS_SESSION_FILE` 可指定发现文件，用 `COVE_DEVTOOLS_ENDPOINT` 和 `COVE_DEVTOOLS_TOKEN` 可显式指定配对。
 
-```json
-{
-  "mcpServers": {
-    "cove-devtools": {
-      "command": "cargo",
-      "args": ["run", "--quiet", "--manifest-path", "/absolute/path/to/Cove/Cargo.toml", "--package", "cove-devtools-cli", "--", "mcp"]
-    }
-  }
-}
-```
-
-服务可在应用启动前完成 `initialize`、`tools/list` 和任务指南发现。第一次操作时连接应用；连接失效后，下次调用重新连接。写操作失败不会自动重放。
-
-默认地址为 `ws://127.0.0.1:9229/`。通过 `--endpoint 9231`、`--endpoint ws://127.0.0.1:9231/` 或 `--endpoint @session.json` 指定目标，也可设置 `COVE_DEVTOOLS_ENDPOINT`。没有显式目标时依次读取 `COVE_DEVTOOLS_SESSION_FILE`、`COVE_DEVTOOLS_PORT`，最后使用 9229。
-
-应用端设置 `COVE_DEVTOOLS_SESSION_ID`、`COVE_DEVTOOLS_TOKEN` 和 `COVE_DEVTOOLS_SESSION_FILE` 后，将含认证端点的会话文件写入指定路径。MCP 服务重新连接时重读文件；连接 token 不会写入工具结果或连接错误。Android 使用 `adb forward tcp:9229 tcp:9229` 后连接本地端口。
-
-MCP 服务在 macOS、Linux 和 Windows 使用同一 Rust 实现，不依赖 UI/GPU 库。设备上的应用通过可达的 WebSocket 或端口转发接入；浏览器内的 MessageChannel Inspector 仍由浏览器宿主连接。具体工具是否可用取决于 `get_ui_session` 返回的实际 host capabilities。
-
-## 直接使用工具
-
-| 任务 | 工具 |
-| --- | --- |
-| 连接与能力发现 | `get_ui_session`、`get_diagnostics` |
-| 查找节点、布局与源位置 | `query_ui_nodes` |
-| 点击、填值、键盘、拖拽与滚动 | `click_ui`、`fill_ui`、`press_ui_key`、`input_ui` |
-| 可访问性动作与滚动到节点 | `activate_ui` |
-| 等待可见、隐藏、启用或字段值 | `wait_for_ui` |
-| 截图与窗口尺寸 | `capture_ui`、`resize_ui` |
-| 平台、设备类别、折叠姿态与铰链 | `set_ui_environment` |
-| 选择与临时样式 | `select_ui`、`set_ui_style`、`edit_ui_style_history` |
-| 日志、重组、公开状态与内存 | `query_ui_logs`、`query_ui_recomposition`、`query_ui_state`、`query_ui_memory` |
-| 帧耗时 | `record_ui_timings` |
-| 围绕操作录制 CPU 时间线 | `start_ui_trace`、`stop_ui_trace` |
-| 固定时段录制、分页与比较 | `capture_ui_trace`、`get_ui_trace`、`compare_ui_traces` |
-| 使用指南 | `list_skills`、`read_skill`，或 MCP `prompts/list`、`prompts/get` |
-
-`query_ui_nodes` 在 MCP/CLI 中默认 `compact: true`，返回节点 ID、语义、可见边界和源位置。设 `compact: false` 可读取完整布局与样式。角色筛选兼容 `button` / `Button`、`textField` / `TextField`；组合控件使用与原生无障碍一致的可见文字。普通发现不读取懒加载字段值。读取字段需显式指定 `node_id` 和 `include_value: true`，上限 4096 个字符并报告 `valueTruncated`；安全字段返回 `<redacted>`，不执行值 provider。
-
-交互工具的 `selector` 接受 `node_id`、`label`、`text`、`role` 和 `source`。`label` 精确匹配，`text` 为子串；点击和填值只接受唯一、可见、启用且未被模态作用域阻挡的目标。歧义会返回候选 ID。节点卸载后 ID 失效。
-
-常用调用参数：
-
-```json
-{"selector":{"label":"Save","role":"button"},"capture":true}
-{"selector":{"label":"Name","role":"textField"},"text":"Cove"}
-{"selector":{"node_id":"177"},"state":"value","expected":"Cove","timeout_ms":3000}
-{"key":"Enter"}
-{"scale":2,"settle_ms":400}
-```
-
-截图通过 MCP `image` content 返回，同时提供像素和逻辑尺寸；不会把 base64 放进文字上下文。`click_ui` / `fill_ui` 的 `capture: true` 在同一连接上立即截图。截图不包含 OS 窗口装饰；`settle_ms` 是 0–2000 ms 的采样延迟，不是异步完成断言。请使用 `wait_for_ui` 验证实际状态。
-
-`input_ui` 接受最多 256 个有类型的事件。指针坐标为逻辑点，滚轮位移使用点单位；键盘使用 `KeyboardEvent.code`。修饰键位为 Shift=1、Ctrl=2、Alt=4、Meta=8。`fill_ui` 根据远端平台选择全选快捷键，支持空字符串清空。事件在全部校验后才交付；每个 wait 最多 2000 ms，总等待最多 10000 ms。输入成功回执只确认交付。
-
-这些工具将事件交给运行时，文本注入不经过系统键盘或输入法。`fill_ui` 成功不能证明原生输入法已激活、候选位置正确或光标正在闪烁。输入组件应同时验证绑定值/搜索结果等后置条件，以及点击后使用真实键盘和输入法的原生路径。
-
-CPU trace 可先 start，再执行真实交互，最后 stop；后台连接线程会持续读取，避免录制期间空闲的 MCP 客户端阻塞宿主。事件与结果有上限，超出部分报告损失，最多保留八个 capture。停止时会读取最后一批 span。空闲采集可能为空；父子 span 重叠，CPU present 不代表 GPU 执行时间，帧样本也不代表显示 FPS。
-
-## 无 MCP 客户端时的 CLI
-
-相同工具可以直接调用，无需编写 WebSocket 脚本：
+MCP 客户端加载仓库的 `.mcp.json`。入口为 `cargo run --quiet -p cove-devtools-cli -- mcp`。MCP 可以先启动，工具调用时读取控制器发现文件。CLI 使用同一组命令：
 
 ```sh
 cargo run --quiet -p cove-devtools-cli -- tools
-cargo run --quiet -p cove-devtools-cli -- --endpoint 9231 call query_ui_nodes '{"text":"Save","role":"button"}'
-cargo run --quiet -p cove-devtools-cli -- call click_ui '{"selector":{"label":"Save","role":"button"}}'
-cargo run --quiet -p cove-devtools-cli -- call capture_ui '{"scale":2}' --image /tmp/cove.jpg
+cargo run --quiet -p cove-devtools-cli -- call get_ui_session '{}'
+cargo run --quiet -p cove-devtools-cli -- call query_ui_nodes '{"target":"RUNTIME_ID","text":"Actions:"}'
+cargo run --quiet -p cove-devtools-cli -- call capture_ui '{"target":"WINDOW_ID"}' --image capture.png
 ```
 
-一次 CLI 调用拥有一个连接。需要跨调用保持选择、样式历史或 start/stop trace 时使用 MCP 服务。JSON 输出不含截图 base64；`--image` 保存 JPEG。
+## 平台接入
 
-## Inspector 与宿主集成
+| 平台 | 接入方式 |
+| --- | --- |
+| Windows | Windows Graphics Capture 读取系统合成画面，UI Automation 查原生控件。系统键鼠受前台窗口、完整性级别和安全桌面约束。 |
+| macOS | ScreenCaptureKit 读取合成画面，Accessibility API 查原生控件，Quartz 发送键鼠事件。在系统设置中给运行控制器的终端或应用授予屏幕录制和辅助功能权限。 |
+| Linux / X11 | 从 X11 读取显示器画面并发送 XTest 输入，应用控件通过 AT-SPI 查询。 |
+| Linux / Wayland | 选择 Wayland shared screen，首次截图会请求 RemoteDesktop 与 ScreenCast 授权。PipeWire 画面与绝对坐标输入使用同一个流。绑定 Cove 运行时可继续看组件，AT-SPI 按应用查原生控件。发送键盘前先在共享显示器上聚焦目标。 |
+| Web | 用 `serve --web-root crates/browser/dist` 提供 WASM 页面。将 Inspector 链接的路径改为 `/app/` 并保留片段，打开即可注册探针。为页面截图和浏览器输入配置 WebDriver。 |
+| iOS / iPadOS | 使用 Appium XCUITest / WebDriverAgent 会话。通过 Xcode 或 Appium 启动开发版，设置 `COVE_DEVTOOLS=1`。模拟器可使用配套 Mac 的本地控制器，真机需通过隧道让设备侧的本地端口连到控制器。 |
+| Android | 使用 Appium UiAutomator2 会话。Debug APK 可用 `adb reverse tcp:9229 tcp:9229` 转发探针连接。启动 `com.cove.probe.MainActivity` 时将含 `endpoint`、`token` 和可选 `appTitle` 的 UTF-8 JSON 做 Base64 编码，传给字符串 extra `cove_devtools`。 |
 
-浏览器打开 `crates/devtools/client/index.html`，连接运行时端点。Inspector 提供树、镜像、布局、临时样式、重组统计、公开状态、日志、性能与宿主已安装的 checkpoint / 输入录制。流按连接显式订阅，断开后释放所属临时检查状态。
+Linux 构建控制器需要 PipeWire、XCB、Clang、D-Bus、EGL 与 GBM 开发依赖。Debian/Ubuntu 包名见仓库 CI 配置。
 
-框架宿主创建 `DevTools`，通过 `set_input_delivery` 安装输入回调，按需安装帧读取、状态、窗口和内存 provider，然后启动；每轮 UI 事件泵调用 `pump`，布局或帧完成后调用对应通知。`input`、`accessibility` 和 `mirror` 分别描述原始输入、语义动作和图片读取，截图缺失不妨碍已安装的输入工具。没有 provider 的能力不会被假定存在。
+配置已有 WebDriver 会话时，启动控制器传入 `--webdriver web,http://127.0.0.1:9515,SESSION_ID`。移动平台用 `ios` 或 `android`。控制器接入会话，设备启动、签名与会话创建由对应驱动负责。远端驱动通过本地端口隧道接入。在 Inspector 或 `bind_ui_target` 中关联运行时与对应会话。桌面探针有匹配的系统窗口标识时自动关联。
 
-协议见 [Inspection](../devtools-protocol/Inspection.md)、[Analysis](../devtools-protocol/Analysis.md)、[Observation](../devtools-protocol/Observation.md) 和 [Logs](../devtools-protocol/Logs.md)。
+## 操作与验收
+
+1. 用 `get_ui_session` 取得目标 ID。系统文件面板出现后，重新查询并选择面板目标。
+2. `capture_ui` 返回 PNG 资源、像素宽高、坐标范围和来源。桌面默认裁剪到窗口范围，`scope: "display"` 取窗口所在的显示器。桌面合成画面会保留实际遮挡。浏览器截图范围为页面视口。
+3. 用 `click_ui` 或 `input_ui` 传入截图 ID 和 `coordinates` 坐标。图片内点按宽高比例换算，并加上坐标原点。拖动和滚动同样使用截图坐标。窗口、显示器或浏览器上下文变化时重新截图。
+4. 用 `wait_for_ui` 检查 Cove 节点是否可见、隐藏、启用或取得预期值。值断言需要 `node_id` 与 `expected`。用 `query_native_ui` 或 `find_native_ui` 查原生控件，`activate_ui` 执行其系统动作。操作后重新查询控件、目标或画面，确认结果。
+
+`query_ui_nodes` 可筛选角色、文字和源文件，默认返回紧凑信息。单个字段可用 `node_id` 和 `include_value: true` 读取，安全字段保留脱敏。完整组件树在 Inspector 的 Components 中查看。
+
+`press_ui_key` 发送按键及修饰键，`type_ui_text` 使用平台的文本输入能力。输入回执表示交付。IME 候选、软键盘、物理触控板及系统拖入需要记录实际设备、输入路径与后置条件。浏览器视口外的系统界面可以选择浏览器所在桌面的显示器目标。
+
+`start_ui_trace` 与 `stop_ui_trace` 可包围实际操作，`get_ui_trace` 分页读取，`compare_ui_traces` 比较 CPU 阶段。帧计时区分 CPU 提交、渲染线程完成和宿主能观察到的呈现操作。GPU 执行和屏幕扫描输出没有在这些 CPU 样本中计量。
+
+## 宿主
+
+桌面、Android 和 Web 宿主使用 `RuntimeProbe`。原生探针由后台线程连接控制器，命令在所属窗口的 UI 线程执行。WASM 由页面传输相同消息。协议见 [DevTools 协议](../devtools-protocol/README.md)。
 
 ```sh
-cargo test -p cove-agent -p cove-devtools-protocol -p cove-devtools -p cove-devtools-cli --locked
+cargo test -p cove-devtools-protocol -p cove-devtools -p cove-devtools-cli
 ```

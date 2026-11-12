@@ -40,7 +40,7 @@ cargo cove setup --unpersist-path   # 撤销，只移除 Cove 自己的条目
 
 crate 使用 `src/`、`tests/`、`native/`、`resources/`；`build.rs` 位于 crate 根目录。性能关键的原生内核保留 C。
 
-AI 调试可直接使用 [DevTools MCP](crates/devtools/README.md)。项目配置见 `.mcp.json`；启动入口为 `cargo run --quiet -p cove-devtools-cli -- mcp`，提供查询、交互、等待、截图和性能工具。
+AI 调试可直接使用 [DevTools MCP](crates/devtools/README.md)。先运行 `cargo run -p cove-devtools-cli -- serve`，再用 `COVE_DEVTOOLS=1` 启动应用。浏览器 Inspector 与 `.mcp.json` 配置的 MCP 共用同一个控制器。
 
 ```sh
 cargo fmt --all --check

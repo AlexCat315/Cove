@@ -8,11 +8,21 @@ import java.lang.ref.WeakReference;
 final class Diagnostics {
     private static final Handler main = new Handler(Looper.getMainLooper());
     private static WeakReference<ContentSurfaceView> surface = new WeakReference<>(null);
-    static void attach(ContentSurfaceView view) { surface = new WeakReference<>(view); }
-    static void schedule(long application) {
-        main.post(() -> {
+    private static final Runnable poll = new Runnable() {
+        @Override public void run() {
             ContentSurfaceView view = surface.get();
-            if (view != null) view.pumpDiagnostics(application);
-        });
+            if (view != null && view.pumpDiagnostics()) main.postDelayed(this, 100);
+        }
+    };
+    static void attach(ContentSurfaceView view) {
+        surface = new WeakReference<>(view);
+        main.removeCallbacks(poll);
+        main.post(poll);
+    }
+    static void detach(ContentSurfaceView view) {
+        if (surface.get() == view) {
+            main.removeCallbacks(poll);
+            surface.clear();
+        }
     }
 }

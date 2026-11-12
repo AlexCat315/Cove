@@ -14,11 +14,10 @@
 #![allow(clippy::module_inception)]
 
 pub mod abi;
-pub mod counter;
 pub mod frame;
-pub mod prototype;
 #[cfg(target_arch = "wasm32")]
 mod gpu;
+pub mod prototype;
 pub mod root_content;
 
 pub use frame::{Batch, Frame, Label, viewport_size};
@@ -34,9 +33,6 @@ pub type Content = BrowserPrototype<RootContent>;
 
 /// The layout debug name recorded by `.debug_name(_)`, read back from a node.
 ///
-/// The DevTools protocol identifies nodes by this name for `select.node` and
-/// recording replay, so the host must resolve it the same way the inspector
-/// does: through the layout debug attachment.
 pub fn node_debug_name(node: &cove_core::scene::Node) -> Option<String> {
     node.attachment::<String>(cove_composition::LayoutDebugAttachmentKey::DEBUG_NAME)
 }

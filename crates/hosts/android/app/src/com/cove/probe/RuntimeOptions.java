@@ -25,10 +25,15 @@ final class RuntimeOptions {
         if ((context.getApplicationInfo().flags & android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE) != 0 && intent.hasExtra("cove_devtools")) {
             try {
                 launch = new JSONObject(new String(Base64.decode(intent.getStringExtra("cove_devtools"), Base64.DEFAULT), StandardCharsets.UTF_8));
-                String id = launch.getString("id");
-                if (!id.matches("[A-Fa-f0-9-]{36}")) throw new IllegalArgumentException("Invalid diagnostics session ID");
-                launch.put("descriptorPath", new File(context.getFilesDir(), "devtools/" + id + ".json").getAbsolutePath());
-            } catch (Exception error) { throw new IllegalArgumentException("Invalid diagnostics launch", error); }
+                String endpoint = launch.getString("endpoint");
+                String token = launch.getString("token");
+                if (!endpoint.matches("http://127\\.0\\.0\\.1:[0-9]{1,5}") || !token.matches("[A-Za-z0-9_-]{1,256}")) {
+                    throw new IllegalArgumentException("Invalid diagnostics controller address or token");
+                }
+            } catch (Exception error) {
+                android.util.Log.w("CoveDevTools", "Invalid diagnostics launch");
+                launch = null;
+            }
         }
         devtools = launch;
         try {

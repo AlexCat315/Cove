@@ -188,15 +188,11 @@ impl DiagnosticsConfiguration {
         ) {
             return None;
         }
-        let port = std::env::var("COVE_DEVTOOLS_PORT")
-            .ok()
-            .and_then(|port| port.parse().ok())
-            .unwrap_or(0);
         Some(
             super::super::diagnostics::integration::DevToolsConfiguration {
-                port,
                 app_title: app_title.to_owned(),
-                launch: None,
+                window: None,
+                connection: None,
             },
         )
     }

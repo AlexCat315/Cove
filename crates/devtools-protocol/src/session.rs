@@ -1,149 +1,13 @@
 use crate::*;
-use serde::{Deserialize, Serialize, de::DeserializeOwned};
-use std::collections::{BTreeMap, BTreeSet};
+use serde::{Deserialize, Serialize};
+use std::collections::BTreeMap;
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
-pub enum Subscription {
-    Tree,
-    Log,
-    Timing,
-    Mirror,
-    State,
-    Timeline,
-}
-
-impl Subscription {
-    pub const ALL: [Subscription; 6] = [
-        Subscription::Tree,
-        Subscription::Log,
-        Subscription::Timing,
-        Subscription::Mirror,
-        Subscription::State,
-        Subscription::Timeline,
-    ];
-
-    /// Wire name, matching Swift's raw values.
-    pub fn name(self) -> &'static str {
-        match self {
-            Subscription::Tree => "tree",
-            Subscription::Log => "log",
-            Subscription::Timing => "timing",
-            Subscription::Mirror => "mirror",
-            Subscription::State => "state",
-            Subscription::Timeline => "timeline",
-        }
-    }
-
-    pub fn parse(name: &str) -> Option<Self> {
-        Subscription::ALL
-            .into_iter()
-            .find(|value| value.name() == name)
-    }
-}
-
-/// Swift's `DevToolsSubscription`: the same six subscriptions, one definition.
-pub type DevToolsSubscription = Subscription;
-
-#[derive(Default)]
-pub struct Session {
-    pub subscriptions: BTreeSet<Subscription>,
-    pub watched_state_ids: Vec<String>,
-    pub log_query: cove_logging::LogQuery,
-    pub log_sequence: u64,
-    pub log_dropped: u64,
-    pub timeline_sequence: u64,
-}
-fn decode<T: DeserializeOwned>(request: &Envelope) -> Option<T> {
-    serde_json::from_value(request.payload.clone()?).ok()
-}
 fn no_payload(request: &Envelope) -> bool {
     request
         .payload
         .as_ref()
         .is_none_or(|p| p.is_null() || p.as_object().is_some_and(|p| p.is_empty()))
 }
-/// Read a flat string map out of an envelope payload. Returns `None` when the
-/// payload is absent, is not an object, or holds any non-string value — the same
-/// strictness as Swift's `compactMapValues(\\.stringValue)` preceded by an
-/// all-values check.
-pub fn state(payload: &Option<JsonValue>) -> Option<BTreeMap<String, String>> {
-    let object = payload.as_ref()?.as_object()?;
-    object
-        .iter()
-        .map(|(k, v)| Some((k.clone(), v.as_str()?.into())))
-        .collect()
-}
-impl Session {
-    pub fn set(&mut self, stream: Subscription, enabled: bool) -> bool {
-        if enabled {
-            self.subscriptions.insert(stream)
-        } else {
-            self.subscriptions.remove(&stream)
-        }
-    }
-    pub fn reset(&mut self) {
-        *self = Self::default();
-    }
-    pub fn validate(&self, request: &Envelope) -> Option<Envelope> {
-        if request.r#type.starts_with("inspect.") {
-            return inspection_error(request).map(|message| request.error("bad_request", message));
-        }
-        let valid = match request.r#type.as_str() {
-            "log.subscribe" => {
-                request.payload.is_none()
-                    || request.payload.as_ref().is_some_and(|p| {
-                        let Some(p) = p.as_object() else {
-                            return false;
-                        };
-                        let labels = p.get("labels").and_then(JsonValue::as_array);
-                        let text = p.get("text").and_then(JsonValue::as_str);
-                        p.get("minimum").is_none_or(|v| {
-                            serde_json::from_value::<cove_logging::Level>(v.clone()).is_ok()
-                        }) && (!p.contains_key("labels")
-                            || labels.is_some_and(|a| {
-                                a.len() <= 64
-                                    && a.iter().all(|v| {
-                                        v.as_str().is_some_and(|s| !s.is_empty() && s.len() <= 256)
-                                    })
-                            }))
-                            && (!p.contains_key("text") || text.is_some_and(|s| s.len() <= 4096))
-                            && p.get("afterSequence")
-                                .is_none_or(|v| v.as_u64().is_some() || v.is_null())
-                    })
-            }
-            "state.subscribe" => decode::<StateWatch>(request).is_some_and(|p| p.is_valid()),
-            "state.list" | "state.unsubscribe" | "timeline.subscribe" | "timeline.unsubscribe" => {
-                no_payload(request)
-            }
-            "select.node" => request
-                .payload
-                .as_ref()
-                .and_then(|p| p.get("id"))
-                .and_then(JsonValue::as_str)
-                .is_some(),
-            "state.restore" | "state.diff" => state(&request.payload).is_some(),
-            "mirror.input" | "mirror.activate"
-                if !self.subscriptions.contains(&Subscription::Mirror) =>
-            {
-                return Some(request.error(
-                    "invalid_state",
-                    "mirror commands require an active mirror subscription",
-                ));
-            }
-            "mirror.input" => decode::<MirrorInput>(request).is_some_and(|input| input.is_valid()),
-            "mirror.activate" => decode::<MirrorActivate>(request).is_some(),
-            "window.resize" => decode::<WindowResize>(request).is_some_and(|p| p.is_valid()),
-            "window.environment" => request.payload.as_ref().is_some_and(|payload| {
-                payload.is_object() && payload.to_string().len() <= 16 * 1024
-            }),
-            "mirror.start" => request.payload.is_none() || decode::<MirrorStart>(request).is_some(),
-            "input.replay" => decode::<InputRecording>(request).is_some_and(|p| p.is_valid()),
-            _ => true,
-        };
-        (!valid).then(|| request.error("bad_request", "invalid or unbounded command payload"))
-    }
-}
-
 fn exact_keys(object: &serde_json::Map<String, JsonValue>, keys: &[&str]) -> bool {
     object.len() == keys.len() && keys.iter().all(|key| object.contains_key(*key))
 }
@@ -166,11 +30,7 @@ pub struct InspectionValidation;
 impl InspectionValidation {
     /// Every inspection command. A name outside this set is unknown, not
     /// merely invalid.
-    pub const COMMANDS: [&'static str; 10] = [
-        "inspect.pick.start",
-        "inspect.pick.stop",
-        "inspect.hover",
-        "inspect.pick",
+    pub const COMMANDS: [&'static str; 6] = [
         "inspect.style.set",
         "inspect.style.undo",
         "inspect.style.redo",
@@ -209,18 +69,6 @@ impl InspectionValidation {
 pub fn inspection_error(request: &Envelope) -> Option<&'static str> {
     let object = request.payload.as_ref().and_then(JsonValue::as_object);
     match request.r#type.as_str() {
-        "inspect.hover" | "inspect.pick" => {
-            if !object.is_some_and(|p| {
-                exact_keys(p, &["x", "y"])
-                    && ["x", "y"].iter().all(|key| {
-                        p[*key]
-                            .as_f64()
-                            .is_some_and(|n| n.is_finite() && n.abs() <= 1_000_000.0)
-                    })
-            }) {
-                return Some("Expected finite window coordinates x/y");
-            }
-        }
         "inspect.style.clear" => {
             if !object.is_some_and(|p| exact_keys(p, &["id"]) && valid_id(p.get("id"))) {
                 return Some("Expected node id");
@@ -255,9 +103,7 @@ pub fn inspection_error(request: &Envelope) -> Option<&'static str> {
                 }
             }
         }
-        "inspect.pick.start"
-        | "inspect.pick.stop"
-        | "inspect.style.undo"
+        "inspect.style.undo"
         | "inspect.style.redo"
         | "inspect.style.clearAll"
         | "inspect.recomposition.reset" => {
@@ -309,83 +155,5 @@ impl StateDifference {
                 })
                 .collect(),
         }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    #[test]
-    fn mirror_requires_subscription_and_inspection_is_strict() {
-        let mut session = Session::default();
-        let request = Envelope::new(
-            "mirror.activate",
-            Some(3),
-            Some(serde_json::json!({"node_id":"7"})),
-        );
-        assert_eq!(
-            session.validate(&request).unwrap().payload.unwrap()["code"],
-            "invalid_state"
-        );
-        session.set(Subscription::Mirror, true);
-        assert!(session.validate(&request).is_none());
-        let request = Envelope::new(
-            "inspect.style.set",
-            None,
-            Some(serde_json::json!({
-                "id":"7", "properties":{"backgroundColor":"#12345678", "padding":{"top":1,"right":2,"bottom":3,"left":4}}
-            })),
-        );
-        assert!(session.validate(&request).is_none());
-        let request = Envelope::new(
-            "inspect.hover",
-            None,
-            Some(serde_json::json!({"x":0,"y":0,"extra":true})),
-        );
-        assert!(session.validate(&request).is_some());
-    }
-    #[test]
-    fn invalid_input_is_rejected_before_acknowledging_delivery() {
-        let mut session = Session::default();
-        session.set(Subscription::Mirror, true);
-        for payload in [
-            serde_json::json!({"kind": "keyDown", "key": "Unsupported"}),
-            serde_json::json!({"kind": "pointerDown", "x": 10}),
-            serde_json::json!({"kind": "text", "text": ""}),
-            serde_json::json!({"kind": "unknown"}),
-        ] {
-            assert!(
-                session
-                    .validate(&Envelope::new("mirror.input", Some(1), Some(payload)))
-                    .is_some()
-            );
-        }
-        assert!(
-            session
-                .validate(&Envelope::new(
-                    "mirror.input",
-                    Some(1),
-                    Some(serde_json::json!({"kind": "keyDown", "key": "Enter"}))
-                ))
-                .is_none()
-        );
-    }
-
-    #[test]
-    fn watched_ids_are_bounded_and_unique() {
-        assert!(
-            !StateWatch {
-                ids: vec!["a".into(), "a".into()]
-            }
-            .is_valid()
-        );
-        assert!(
-            !StateWatch {
-                ids: vec!["a".repeat(257)]
-            }
-            .is_valid()
-        );
-        let request = Envelope::new("state.list", Some(5), None);
-        assert_eq!(request.ok().unwrap().r#type, "state.list.ok");
     }
 }

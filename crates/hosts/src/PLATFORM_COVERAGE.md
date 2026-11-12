@@ -51,7 +51,7 @@ Hosts install the `ColorSampler` ambient only when `Sdl3PlatformHost::screen_col
 
 ## The three behaviours that could not be ported faithfully
 
-1. **DevTools is feature-gated, not always active.** The `devtools` feature links `cove-devtools` into `cove-hosts` (the workspace and Gallery enable it by default). With `COVE_DEVTOOLS=1` the host starts the server, inspection overlay, input interception and mirror capture; otherwise diagnostics fall back to `NullDiagnosticsSession` through the injected-factory seam (`set_diagnostics_factory`). **Reason:** diagnostics must remain optional for release builds, so the no-backend path is a deliberate fallback rather than a missing implementation.
+1. **DevTools is feature-gated.** With the `devtools` feature, a host launched with `COVE_DEVTOOLS=1` registers its runtime probe with the controller. Inspectors read diagnostics on demand. The controller owns platform capture and input. See [DevTools](../../devtools/README.md).
 
 2. **macOS memory pressure is read, not owned.** The sampler polls a published pressure level (`darwin::set_level`) instead of owning a `dispatch_source` with an event handler. Linux and Windows use their real mechanisms (`/proc/meminfo` + cgroup v2; `CreateMemoryResourceNotification`). **Reason:** a `dispatch_source` event handler is an Objective-C block, which this crate does not hand-encode. All three platforms sample on a worker thread and only raise a flag that the UI thread drains, because `Sdl3PlatformHost` is `!Send` and stays on the UI thread.
 

@@ -7,10 +7,6 @@
 //!   captured baseline
 //! - percentage padding, logical start edges and explicit debug padding interact
 //!   in the documented precedence order, including RTL
-//! - visual picking honours paint order, opacity, scroll offset and clipping,
-//!   and reaches nodes that are not hit-testable
-//! - while picking, the dispatcher consumes the gesture and the recorder never
-//!   sees it; a normal click still activates
 //! - malformed or stale edits are atomic: nothing applies and no undo entry is
 //!   recorded
 //! - the selection overlay restores the node's authored border
@@ -24,11 +20,10 @@ use std::rc::Rc;
 
 use cove_composition::AnyView;
 use cove_core::scene::{Direction, Edge, LayoutInsets, LayoutNode, Node, NodeTree};
-use cove_core::{Color, DrawList, Point, Rect};
+use cove_core::{Color, DrawList, Rect};
 use cove_devtools::inspection::{SceneEditor, SceneInspector};
 use cove_devtools::protocol::{Envelope, JsonValue};
 use cove_examples::CounterView;
-use cove_platform::{InputEvent, KeyEvent, KeyModifiers, MouseButton, MouseButtonEvent};
 use cove_ui_compose::LayoutDebugAttachmentKey;
 
 use support::GalleryScene;
@@ -302,161 +297,6 @@ fn padding_overrides_restore_percent_and_logical_rtl_styles_including_new_writes
 }
 
 #[test]
-fn visual_picking_uses_paint_order_scroll_and_clip_even_for_noninteractive_nodes() {
-    let tree = Rc::new(std::cell::RefCell::new(NodeTree::new()));
-    let root = Node::new();
-    let low = Node::new();
-    let high = Node::new();
-    let child = Node::new();
-    tree.borrow_mut().set_root(Some(root.clone()));
-    root.set_frame(Rect::new(0.0, 0.0, 200.0, 100.0));
-    root.set_background_color(Some(Color::WHITE));
-    root.add_child(&high);
-    root.add_child(&low);
-
-    for node in [&low, &high] {
-        node.set_frame(Rect::new(20.0, 10.0, 60.0, 60.0));
-        node.set_background_color(Some(Color::WHITE));
-        node.set_is_hit_testable(false);
-        node.set_allows_hit_testing(false);
-    }
-    high.set_z_index(1.0);
-    high.set_is_interaction_enabled(false);
-
-    let editor = SceneEditor::new(tree.clone());
-    assert_eq!(
-        editor.pick(Point::new(30.0, 20.0)).map(|node| node.id()),
-        Some(high.id()),
-        "the higher z-index wins even though it is not interactive"
-    );
-
-    high.set_opacity(0.0);
-    assert_eq!(
-        editor.pick(Point::new(30.0, 20.0)).map(|node| node.id()),
-        Some(low.id()),
-        "an invisible node cannot be picked"
-    );
-
-    high.set_opacity(1.0);
-    high.set_content_offset(Point::new(10.0, 0.0));
-    high.add_child(&child);
-    child.set_frame(Rect::new(60.0, 0.0, 30.0, 30.0));
-    child.set_background_color(Some(Color::BLACK));
-    assert_eq!(
-        editor.pick(Point::new(85.0, 20.0)).map(|node| node.id()),
-        Some(child.id()),
-        "the content offset is honoured when hit-testing a scrolled child"
-    );
-
-    high.set_clips_to_bounds(true);
-    assert_eq!(
-        editor.pick(Point::new(85.0, 20.0)).map(|node| node.id()),
-        Some(root.id()),
-        "a clipping parent rejects a point outside its own frame"
-    );
-    assert_eq!(
-        editor.pick(Point::new(75.0, 20.0)).map(|node| node.id()),
-        Some(child.id()),
-        "inside the clip the child is still reachable"
-    );
-}
-
-#[test]
-fn picking_consumes_gesture_and_recording_but_normal_clicks_still_work() {
-    let counter = CounterView::new();
-    GalleryScene::run(
-        640.0,
-        460.0,
-        |_| AnyView::new(counter.clone()),
-        |scene| {
-            let inspector = Rc::new(SceneInspector::new(scene.graph.tree.clone(), None, None));
-            let button = scene.require_named("counter.increment");
-            let frame = button.absolute_frame();
-            let event = MouseButtonEvent {
-                button: MouseButton::Left,
-                x: frame.x + frame.width / 2.0,
-                y: frame.y + frame.height / 2.0,
-                clicks: 1,
-                modifiers: KeyModifiers::default(),
-                kind: Default::default(),
-            };
-
-            let recorded = Rc::new(std::cell::Cell::new(0usize));
-            let mut dispatcher = scene.dispatcher();
-            let sink = recorded.clone();
-            dispatcher.event_sink = Some(Rc::new(move |_| sink.set(sink.get() + 1)));
-            let intercepted = inspector.clone();
-            dispatcher.event_interceptor =
-                Some(Rc::new(move |event| intercepted.editor.intercept(event)));
-
-            inspector.editor.handle(&command("pick.start", None, None));
-            assert!(inspector.editor.picking(), "pick.start arms the picker");
-            assert!(
-                !dispatcher.dispatch(&InputEvent::MouseButtonDown(event.clone())),
-                "a picking press is consumed"
-            );
-            assert!(
-                inspector
-                    .editor
-                    .selected_node()
-                    .is_some_and(|selected| selected.id() == button.id()),
-                "the press selects the node under the pointer"
-            );
-            assert!(
-                !inspector.editor.picking(),
-                "the picker stops after a press"
-            );
-            assert!(
-                !dispatcher.dispatch(&InputEvent::MouseButtonUp(event.clone())),
-                "the release that pairs a picking press is still swallowed"
-            );
-            assert_eq!(
-                recorded.get(),
-                0,
-                "consumed input never reaches the recording sink"
-            );
-            assert_eq!(counter.count.get(), 0, "the picking press did not activate");
-            assert!(
-                scene.capture.target().is_none(),
-                "the swallowed press never captures the pointer"
-            );
-
-            dispatcher.dispatch(&InputEvent::MouseButtonDown(event.clone()));
-            dispatcher.dispatch(&InputEvent::MouseButtonUp(event.clone()));
-            assert_eq!(counter.count.get(), 1, "a normal click still activates");
-            assert_eq!(recorded.get(), 2, "both halves reach the recording sink");
-
-            inspector.editor.handle(&command("pick.start", None, None));
-            dispatcher.dispatch(&InputEvent::KeyDown(KeyEvent {
-                scancode: 41,
-                keycode: 0,
-                modifiers: KeyModifiers::default(),
-                is_repeat: false,
-            }));
-            assert!(!inspector.editor.picking(), "Escape stops the picker");
-            assert_eq!(recorded.get(), 2, "Escape is consumed, not recorded");
-
-            // Repeated picking gestures must not leak swallow bookkeeping: the
-            // second pairing used to panic on the borrow, and a stale entry would
-            // swallow a later real release.
-            for _ in 0..3 {
-                inspector.editor.handle(&command("pick.start", None, None));
-                dispatcher.dispatch(&InputEvent::MouseButtonDown(event.clone()));
-                assert!(
-                    !dispatcher.dispatch(&InputEvent::MouseButtonUp(event.clone())),
-                    "each picked release is swallowed exactly once"
-                );
-            }
-            assert_eq!(
-                recorded.get(),
-                2,
-                "no picked press leaked into the recording sink"
-            );
-        },
-    );
-}
-
-#[test]
 fn malformed_or_stale_edits_are_atomic_and_selection_overlay_preserves_borders() {
     let tree = Rc::new(std::cell::RefCell::new(NodeTree::new()));
     let root = Node::new();
@@ -467,12 +307,6 @@ fn malformed_or_stale_edits_are_atomic_and_selection_overlay_preserves_borders()
     root.set_border_width(5.0);
 
     let editor = SceneEditor::new(tree.clone());
-    // GAP(editor.rs handle): Swift's `SceneEditor.handle` runs
-    // `InspectionValidation.error(request)` first and returns `.err` before
-    // mutating anything (SceneEditor.swift:88). The Rust `handle` skips
-    // validation entirely, so a malformed edit would apply. Validate with the
-    // session first, exactly as the server does before dispatch.
-    let session = cove_devtools_protocol::Session::default();
     for properties in [
         props(vec![
             ("backgroundColor", JsonValue::String("#ff0000".to_owned())),
@@ -490,9 +324,7 @@ fn malformed_or_stale_edits_are_atomic_and_selection_overlay_preserves_borders()
         props(vec![("width", JsonValue::from(20))]),
     ] {
         let request = command("style.set", Some(&root), Some(properties));
-        let response = session
-            .validate(&request)
-            .unwrap_or_else(|| panic!("validation accepted a malformed edit: {request:?}"));
+        let response = editor.handle(&request);
         assert_eq!(
             response.r#type, "inspect.style.set.err",
             "a rejected edit answers with .err, got {response:?}"

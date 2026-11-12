@@ -13,16 +13,39 @@ path = "src/main.rs"
 [dependencies]
 cove-agent.workspace = true
 cove-devtools-protocol.workspace = true
+serde.workspace = true
 serde_json.workspace = true
 clap.workspace = true
-tungstenite = { version = "0.30", default-features = false, features = ["handshake"] }
 base64 = "0.22"
-
-[dev-dependencies]
+getrandom = "0.4"
+tiny_http = "0.12"
 tempfile.workspace = true
-cove-devtools = { path = "../devtools" }
-cove-core.workspace = true
-cove-platform.workspace = true
+ureq.workspace = true
+image = { version = "0.25", default-features = false, features = ["png", "jpeg"] }
+
+[target.'cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))'.dependencies]
+xcap = "0.9.10"
+enigo = "0.6.1"
+
+[target.'cfg(target_os = "linux")'.dependencies]
+ashpd = { version = "0.14", default-features = false, features = ["async-io", "remote_desktop", "screencast"] }
+pipewire = "0.10.1"
+pollster = "1"
+zbus = { version = "5", features = ["blocking-api"] }
+
+[target.'cfg(target_os = "windows")'.dependencies]
+xcap = { version = "0.9.10", features = ["wgc"] }
+windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_UI_WindowsAndMessaging", "Win32_UI_HiDpi"] }
+windows = { version = "0.62", features = ["Win32_Foundation", "Win32_System_Com", "Win32_UI_Accessibility"] }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+block2.workspace = true
+objc2.workspace = true
+objc2-application-services = { version = "0.3", default-features = false, features = ["std", "HIServices", "AXError", "AXUIElement", "libc"] }
+objc2-core-foundation.workspace = true
+objc2-foundation.workspace = true
+objc2-core-graphics = "0.3"
+objc2-screen-capture-kit = { version = "0.3", default-features = false, features = ["std", "SCScreenshotManager", "block2", "objc2-core-foundation", "objc2-core-graphics"] }
 
 [lints]
 workspace = true

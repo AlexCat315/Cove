@@ -1,58 +1,80 @@
 use clap::{Parser, Subcommand};
 use cove_agent::transport::{self, Handler};
+use cove_devtools_cli::{Client, definitions};
 use serde_json::{Value, json};
-use std::sync::Arc;
+use std::{path::PathBuf, sync::Arc};
 
 #[derive(Parser)]
 #[command(
     name = "cove-devtools",
     version,
-    about = "Cove DevTools MCP server and AI tools"
+    about = "Cove DevTools controller, Inspector and MCP"
 )]
 struct Cli {
-    /// Port, ws:// endpoint or @session.json. Defaults to COVE_DEVTOOLS_ENDPOINT or 9229.
     #[arg(long, global = true)]
     endpoint: Option<String>,
     #[command(subcommand)]
     command: Command,
 }
+
 #[derive(Subcommand)]
 enum Command {
-    /// Serve MCP over stdin/stdout; keeps the application connection alive.
+    /// Start the local controller and serve the Inspector.
+    Serve {
+        #[arg(long, default_value_t = 9229)]
+        port: u16,
+        /// Directory produced by the browser build.
+        #[arg(long)]
+        web_root: Option<PathBuf>,
+        /// Attach platform,http://127.0.0.1:port,session-id. Repeat for other devices or tabs.
+        #[arg(long)]
+        webdriver: Vec<String>,
+    },
+    /// Connect an MCP client over stdin/stdout.
     Mcp,
-    /// List tool names, descriptions and input schemas without starting the app.
+    /// List command schemas.
     Tools,
-    /// Call a tool with a JSON arguments object.
+    /// Call the controller and print the result.
     Call {
         name: String,
         #[arg(default_value = "{}")]
         arguments: String,
-        /// Save image content here instead of printing base64.
+        /// Save the original lossless PNG.
         #[arg(long)]
-        image: Option<std::path::PathBuf>,
+        image: Option<PathBuf>,
     },
 }
 
-fn run() -> Result<bool, Box<dyn std::error::Error>> {
+fn run() -> Result<bool, Box<dyn std::error::Error + Send + Sync>> {
     let cli = Cli::parse();
-    let target = cli
-        .endpoint
-        .or_else(|| std::env::var("COVE_DEVTOOLS_ENDPOINT").ok())
-        .or_else(|| {
-            std::env::var("COVE_DEVTOOLS_SESSION_FILE")
-                .ok()
-                .map(|path| format!("@{path}"))
-        })
-        .or_else(|| std::env::var("COVE_DEVTOOLS_PORT").ok())
-        .unwrap_or_else(|| "9229".into());
+    let endpoint = cli.endpoint;
+    let token = std::env::var("COVE_DEVTOOLS_TOKEN").ok();
     match cli.command {
+        Command::Serve {
+            port,
+            web_root,
+            webdriver,
+        } => {
+            let token = token
+                .filter(|token| !token.is_empty())
+                .map_or_else(cove_devtools_cli::random_id, Ok)?;
+            if token.len() > 256
+                || !token
+                    .bytes()
+                    .all(|byte| byte.is_ascii_alphanumeric() || b"-_".contains(&byte))
+            {
+                return Err("COVE_DEVTOOLS_TOKEN must contain only letters, digits, hyphens and underscores.".into());
+            }
+            cove_devtools_cli::serve(port, token, web_root, webdriver)?;
+        }
         Command::Mcp => {
-            let server = cove_devtools_cli::mcp_server(target)?;
+            // Start MCP even before a controller is paired, so tools/list works.
+            let server = cove_devtools_cli::mcp_server(Arc::new(Client::new(endpoint, token)?))?;
             let handler: Handler = Arc::new(move |request| server.respond(request));
             transport::serve_stdio(handler)?;
         }
         Command::Tools => {
-            let tools: Vec<_> = cove_devtools_cli::definitions()
+            let tools: Vec<_> = definitions()
                 .iter()
                 .map(|tool| tool.mcp_definition())
                 .collect();
@@ -66,19 +88,18 @@ fn run() -> Result<bool, Box<dyn std::error::Error>> {
             arguments,
             image,
         } => {
+            let client = Arc::new(Client::new(endpoint, token)?);
             let arguments: Value = serde_json::from_str(&arguments)?;
-            let result = cove_devtools_cli::toolbox(target)?.execute(&name, &arguments)?;
-            if let Some(path) = image {
-                let first = result.images.first().ok_or("Tool returned no image.")?;
-                use base64::Engine;
-                std::fs::write(
-                    path,
-                    base64::engine::general_purpose::STANDARD.decode(&first.data)?,
-                )?;
-            }
+            let result = cove_devtools_cli::toolbox(client.clone())?.execute(&name, &arguments)?;
             let mut value = result.value().unwrap_or(Value::Null);
-            if !result.images.is_empty() {
-                value["images"] = json!(result.images.iter().map(|image| json!({"mimeType": image.mime_type, "encodedBytes": image.data.len()})).collect::<Vec<_>>());
+            if let Some(path) = image
+                && !result.is_error
+            {
+                let resource = value["resource"]
+                    .as_str()
+                    .ok_or("Command returned no capture.")?;
+                std::fs::write(&path, client.image(resource)?)?;
+                value["saved"] = json!(path);
             }
             println!("{}", serde_json::to_string_pretty(&value)?);
             return Ok(!result.is_error);
@@ -86,6 +107,7 @@ fn run() -> Result<bool, Box<dyn std::error::Error>> {
     }
     Ok(true)
 }
+
 fn main() -> std::process::ExitCode {
     match run() {
         Ok(true) => std::process::ExitCode::SUCCESS,

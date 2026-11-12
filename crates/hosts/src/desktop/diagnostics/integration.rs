@@ -8,9 +8,6 @@
 
 use cove_core::DrawList;
 use cove_core::scene::{InvalidationLog, NodeTree};
-use cove_graphics::rhi::Device;
-use cove_graphics::ui::NativeDrawListRenderer;
-use cove_platform::InputEvent;
 use std::cell::RefCell;
 use std::collections::BTreeMap;
 use std::rc::Rc;
@@ -18,9 +15,9 @@ use std::sync::Arc;
 
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct DevToolsConfiguration {
-    pub port: u16,
     pub app_title: String,
-    pub launch: Option<serde_json::Value>,
+    pub window: Option<u64>,
+    pub connection: Option<(String, String)>,
 }
 
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
@@ -29,21 +26,10 @@ pub struct DiagnosticMemorySnapshot {
     pub windows: BTreeMap<String, u64>,
 }
 
-/// The renderer an offscreen mirror capture draws with.
-pub struct DiagnosticsFrameSource {
-    pub device: Arc<Device>,
-    pub renderer: NativeDrawListRenderer,
-}
-
 pub struct DiagnosticsCallbacks {
     pub invalidate: Rc<dyn Fn()>,
     pub memory: Rc<dyn Fn() -> DiagnosticMemorySnapshot>,
     pub invalidation_log: Option<Arc<InvalidationLog>>,
-    /// `None` where the host cannot read frames back.
-    pub frame_source: Option<DiagnosticsFrameSource>,
-    /// Keeps frames flowing while a mirror session is active, including while the
-    /// window is occluded, and restores the host's policy afterwards.
-    pub mirror_active: Rc<dyn Fn(bool)>,
     /// `None` where windows cannot be resized. Returns why a resize failed.
     pub resize_window: Option<Rc<dyn Fn(f32, f32) -> Option<String>>>,
     /// `None` where the host cannot replace its reported facts. Returns the
@@ -56,32 +42,11 @@ pub struct DiagnosticsCallbacks {
 /// One DevTools session bound to a single host tree and render graph.
 pub trait DiagnosticsSession {
     fn drain(&mut self);
-    fn intercept(&mut self, event: &InputEvent) -> bool;
     fn overlay(&mut self, list: &mut DrawList);
     fn begin_frame(&mut self);
     fn prepared(&mut self, layout_ms: f64, draw_ms: f64);
-    /// Reports a frame handed to the render thread, with the list it recorded.
-    /// `presented` is false when the host had to skip the frame and will retry.
-    fn presented(&mut self, tree: &mut NodeTree, list: &DrawList, presented: bool);
-    /// Receives the host's injection point for remote input. Hosts that cannot
-    /// deliver synthetic events keep the default no-op.
-    fn attach_input(&mut self, inject: Rc<dyn Fn(InputEvent)>) {
-        let _ = inject;
-    }
-    /// Whether a mirror session is active, for hosts deciding what to keep warm.
-    fn mirror_is_active(&self) -> bool {
-        false
-    }
-    /// Whether the next frame would be captured, so the host only keeps a copy of
-    /// the draw list when it is needed.
-    fn mirror_wants_frame(&self) -> bool {
-        false
-    }
-    /// Reads `list` back for the mirror. Runs after the frame is handed over; the
-    /// capture takes the device's frame session, so it orders with presentation.
-    fn mirror_capture(&mut self, list: &DrawList, pixels: (u32, u32), logical: (f32, f32)) {
-        let _ = (list, pixels, logical);
-    }
+    fn frame_finished(&mut self, nodes: usize, batches: usize, token: Option<u64>);
+    fn presentation_finished(&mut self, token: u64, presented: bool, render_thread_ms: f64);
     fn stop(&mut self);
 }
 
@@ -113,12 +78,10 @@ pub(crate) fn take_factory() -> Option<DiagnosticsFactory> {
 pub struct NullDiagnosticsSession;
 impl DiagnosticsSession for NullDiagnosticsSession {
     fn drain(&mut self) {}
-    fn intercept(&mut self, _event: &InputEvent) -> bool {
-        false
-    }
     fn overlay(&mut self, _list: &mut DrawList) {}
     fn begin_frame(&mut self) {}
     fn prepared(&mut self, _layout_ms: f64, _draw_ms: f64) {}
-    fn presented(&mut self, _tree: &mut NodeTree, _list: &DrawList, _presented: bool) {}
+    fn frame_finished(&mut self, _nodes: usize, _batches: usize, _token: Option<u64>) {}
+    fn presentation_finished(&mut self, _token: u64, _presented: bool, _render_thread_ms: f64) {}
     fn stop(&mut self) {}
 }

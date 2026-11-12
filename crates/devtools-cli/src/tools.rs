@@ -1,21 +1,23 @@
-use cove_agent::{AgentTool, JsonSchema as S};
-use std::collections::BTreeMap;
+use cove_agent::{AgentTool, JsonSchema as S, ui_tools::Tool};
 
 fn object(fields: Vec<(&str, S)>, required: &[&str]) -> S {
     S::object(
         fields
             .into_iter()
             .map(|(name, schema)| (name.into(), schema))
-            .collect::<BTreeMap<_, _>>(),
+            .collect(),
         required.iter().map(|name| (*name).into()).collect(),
     )
 }
+
 fn text() -> S {
     S::string(Some(1), Some(256))
 }
+
 fn integer(min: f64, max: f64) -> S {
     S::integer(Some(min), Some(max))
 }
+
 fn choice(values: &[&str]) -> S {
     let mut schema = text();
     schema.allowed_values = values
@@ -24,99 +26,184 @@ fn choice(values: &[&str]) -> S {
         .collect();
     schema
 }
+
 fn tool(
     name: &str,
     description: &str,
-    fields: Vec<(&str, S)>,
+    mut fields: Vec<(&str, S)>,
     required: &[&str],
     read_only: bool,
 ) -> AgentTool {
+    if name != "get_ui_session" {
+        fields.push(("target", text()));
+    }
     AgentTool::new(name, description, object(fields, required), read_only)
 }
-fn selector() -> S {
-    object(
-        vec![
-            ("node_id", text()),
-            ("text", text()),
-            ("label", text()),
-            ("role", text()),
-            ("source", text()),
-        ],
-        &[],
-    )
-}
-/// Mirrors `cove_core::DevicePreset::NAMES`; the CLI does not link `cove-core`.
-const DEVICE_PRESETS: [&str; 13] = [
-    "iphone",
-    "ipad-split",
-    "android-phone",
-    "android-tablet",
-    "fold-cover",
-    "fold-open",
-    "fold-book",
-    "fold-tabletop",
-    "flip-open",
-    "dual-screen",
-    "macos",
-    "windows",
-    "linux",
-];
 
 pub fn definitions() -> Vec<AgentTool> {
-    let mut tools: Vec<_> = cove_agent::ui_tools::Tools::tools();
-    tools.extend([
-        tool("get_ui_session", "Connect to the app and read its actual host capabilities. Available before the app starts; failed calls reconnect next time. No OS automation or scripts needed.", vec![], &[], true),
-        tool("click_ui", "Click a unique visible, enabled node by selector. label is exact; text is substring. Ambiguous or stale targets fail. capture=true returns a fresh image on the same connection. Delivery alone does not assert resulting app state.", vec![("selector", selector()), ("button", integer(0., 4.)), ("capture", S::boolean())], &["selector"], false),
-        tool("fill_ui", "Focus a unique visible editable text field and replace its text using the remote platform's select-all shortcut. Values are not echoed. Verify using query_ui_nodes with node_id and include_value=true.", vec![("selector", selector()), ("text", S::string(Some(0), Some(16_384))), ("capture", S::boolean())], &["selector", "text"], false),
-        tool("press_ui_key", "Press and release a browser KeyboardEvent.code (Enter, Escape, KeyA, ArrowDown...). Modifier bits: shift=1, ctrl=2, alt=4, meta=8. Unsupported codes fail before delivery.", vec![("key", text()), ("modifiers", integer(0., 15.))], &["key"], false),
-        tool("input_ui", "Deliver a bounded sequence on one connection for dragging, scrolling and keyboard/text input. The whole sequence is validated first. Waits are limited to 2000 ms each and 10000 ms total. Coordinates are logical points; wheel deltas use the host's point units.", vec![("events", S::array_of(object(vec![
-            ("kind", choice(&["pointerMove", "pointerDown", "pointerUp", "wheel", "keyDown", "keyUp", "text", "wait", "externalDrop"])),
-            ("x", S::number(Some(-100_000.), Some(100_000.))), ("y", S::number(Some(-100_000.), Some(100_000.))),
-            ("deltaX", S::number(Some(-100_000.), Some(100_000.))), ("deltaY", S::number(Some(-100_000.), Some(100_000.))),
-            ("button", integer(0., 4.)), ("key", text()), ("text", S::string(Some(1), Some(16_384))),
-            ("modifiers", integer(0., 15.)), ("milliseconds", integer(0., 2000.)),
-            ("phase", choice(&["begin", "file", "text", "position", "complete"])),
-            ("paths", S::array_of(S::string(Some(1), Some(4096)), Some(256))),
-            ("source", S::string(Some(0), Some(256))),
-        ], &["kind"]), Some(256)))], &["events"], false),
-        tool("activate_ui", "Perform activate/increment/decrement/reveal using a node's accessibility action. Reveal can target offscreen or disabled nodes. Other actions require enabled nodes; ambiguous selectors fail.", vec![("selector", selector()), ("action", choice(&["activate", "increment", "decrement", "reveal"]))], &["selector"], false),
-        tool("wait_for_ui", "Poll a selector until visible, hidden, enabled or an exact field value is observed. Returns the matching nodes or a timeout error with the last observation. value requires selector.node_id and expected; secure values stay redacted.", vec![("selector", selector()), ("state", choice(&["visible", "hidden", "enabled", "value"])), ("expected", S::string(Some(0), Some(4096))), ("timeout_ms", integer(0., 10_000.))], &["selector"], true),
-        tool("capture_ui", "Return a fresh renderer screenshot as MCP image content with logical/pixel dimensions. settle_ms is an optional animation sampling delay, not a condition assertion. Does not include OS window chrome.", vec![("scale", S::number(Some(1.), Some(3.))), ("quality", S::number(Some(0.1), Some(1.))), ("settle_ms", integer(0., 2000.))], &[], true),
-        tool("resize_ui", "Resize the application viewport in logical points. Query resulting layout or capture_ui to verify the actual size.", vec![("width", S::number(Some(1.), Some(16_384.))), ("height", S::number(Some(1.), Some(16_384.)))], &["width", "height"], false),
-        tool("set_ui_environment", "Replace the device facts the host reports, to render another platform, device class, fold posture or hinge on this host. clear resets first; preset starts from a complete device and resizes the window where the host can; explicit fields apply last. Returns the environment the next frame publishes; verify layout with query_ui_nodes or capture_ui.", vec![
+    let mut tools: Vec<_> = Tool::ALL
+        .into_iter()
+        .map(|tool| {
+            let mut definition = tool.definition();
+            if !matches!(tool, Tool::ListSkills | Tool::ReadSkill) {
+                definition.schema.properties.insert("target".into(), text());
+            }
+            if matches!(tool, Tool::CaptureUiTrace) {
+                definition.read_only = false;
+            }
+            definition
+        })
+        .collect();
+    let point = || integer(-100_000., 100_000.);
+    let button = || integer(0., 2.);
+    let modifiers = || S::array_of(choice(&["Shift", "Control", "Alt", "Meta"]), Some(4));
+    let input_text = || S::string(Some(1), Some(16_384));
+    let action = S::choice(vec![
+        object(
+            vec![
+                ("kind", choice(&["click"])),
+                ("x", point()),
+                ("y", point()),
+                ("button", button()),
+            ],
+            &["kind", "x", "y"],
+        ),
+        object(
+            vec![
+                ("kind", choice(&["drag"])),
+                ("x", point()),
+                ("y", point()),
+                ("to_x", point()),
+                ("to_y", point()),
+            ],
+            &["kind", "x", "y", "to_x", "to_y"],
+        ),
+        object(
+            vec![
+                ("kind", choice(&["scroll"])),
+                ("x", point()),
+                ("y", point()),
+                ("dx", point()),
+                ("dy", point()),
+            ],
+            &["kind", "x", "y", "dx", "dy"],
+        ),
+        object(
+            vec![
+                ("kind", choice(&["key"])),
+                ("key", text()),
+                ("modifiers", modifiers()),
+            ],
+            &["kind", "key"],
+        ),
+        object(
+            vec![("kind", choice(&["text"])), ("text", input_text())],
+            &["kind", "text"],
+        ),
+        object(
+            vec![("kind", choice(&["activate"])), ("element", text())],
+            &["kind", "element"],
+        ),
+    ]);
+    let dimension = || S::number(Some(1.), Some(16_384.));
+    let color = || S::string(Some(7), Some(9));
+    let style = object(
+        vec![
+            ("backgroundColor", color()),
+            ("foregroundColor", color()),
+            (
+                "padding",
+                object(
+                    ["top", "right", "bottom", "left"]
+                        .into_iter()
+                        .map(|edge| (edge, S::number(Some(0.), Some(4096.))))
+                        .collect(),
+                    &["top", "right", "bottom", "left"],
+                ),
+            ),
+        ],
+        &[],
+    );
+    let environment = object(
+        vec![
             ("clear", S::boolean()),
-            ("preset", choice(&DEVICE_PRESETS)),
-            ("platform", choice(&["macos", "windows", "linux", "ios", "ipados", "android", "web"])),
-            ("designLanguage", choice(&["cupertino", "material", "fluent", "adwaita"])),
-            ("deviceClass", choice(&["phone", "foldable-book", "foldable-flip", "foldable-dual-screen", "tablet", "desktop"])),
+            ("preset", text()),
+            (
+                "platform",
+                choice(&[
+                    "macos", "windows", "linux", "ios", "ipados", "android", "web",
+                ]),
+            ),
+            (
+                "designLanguage",
+                choice(&["cupertino", "material", "fluent", "adwaita"]),
+            ),
+            (
+                "deviceClass",
+                choice(&[
+                    "phone",
+                    "foldable-book",
+                    "foldable-flip",
+                    "foldable-dual-screen",
+                    "tablet",
+                    "desktop",
+                ]),
+            ),
             ("posture", choice(&["flat", "tabletop", "book"])),
-            ("displayFeatures", S::array_of(object(vec![
-                ("kind", choice(&["fold", "hinge"])),
-                ("bounds", object(vec![("x", S::number(Some(0.), Some(16_384.))), ("y", S::number(Some(0.), Some(16_384.))), ("width", S::number(Some(0.), Some(16_384.))), ("height", S::number(Some(0.), Some(16_384.)))], &["x", "y", "width", "height"])),
-                ("orientation", choice(&["horizontal", "vertical"])),
-                ("occludes", S::boolean()), ("separates", S::boolean()),
-            ], &["kind", "bounds", "orientation"]), Some(8))),
-        ], &[], false),
-        tool("select_ui", "Select a unique node in the runtime inspector overlay, or clear this connection's selection.", vec![("selector", selector()), ("clear", S::boolean())], &[], false),
-        tool("set_ui_style", "Set temporary inspector overrides on a unique node. Colors use #RRGGBB or #RRGGBBAA; null resets a property. Overrides remain through recomposition and are discarded on disconnect.", vec![("selector", selector()), ("properties", object(vec![
-            ("padding", object(vec![("top", S::number(Some(0.), Some(4096.))), ("right", S::number(Some(0.), Some(4096.))), ("bottom", S::number(Some(0.), Some(4096.))), ("left", S::number(Some(0.), Some(4096.)))], &["top", "right", "bottom", "left"])),
-            ("backgroundColor", S::string(Some(7), Some(9))), ("foregroundColor", S::string(Some(7), Some(9)))
-        ], &[]))], &["selector", "properties"], false),
-        tool("edit_ui_style_history", "Undo/redo temporary styles or clear this connection's overrides. clear requires selector; clearAll removes all of this inspector session's overrides.", vec![("action", choice(&["undo", "redo", "clear", "clearAll"])), ("selector", selector())], &["action"], false),
-        tool("query_ui_logs", "Read bounded host log history with level/text/module filters and explicit loss counts.", vec![("minimum", choice(&["trace", "debug", "info", "notice", "warning", "error", "critical"])), ("text", S::string(Some(0), Some(4096))), ("labels", S::array_of(text(), Some(64)))], &[], true),
-        tool("record_ui_timings", "Collect actual frame timings for 50–5000 ms. Returns bounded samples and CPU summaries. Idle apps may produce no frames; CPU throughput is not display FPS or GPU duration.", vec![("duration_ms", integer(50., 5000.))], &[], false),
-        tool("start_ui_trace", "Start bounded CPU timeline capture, then perform real UI actions and call stop_ui_trace. Captures remain subscribed between tool calls on this connection.", vec![], &[], false),
-        tool("stop_ui_trace", "Stop the active CPU timeline capture and retain its bounded events. Returns a capture id, phase summary and loss counts. At most eight captures survive in this MCP session.", vec![], &[], false),
+            (
+                "displayFeatures",
+                S::array_of(
+                    object(
+                        vec![
+                            ("kind", choice(&["fold", "hinge"])),
+                            (
+                                "bounds",
+                                object(
+                                    vec![
+                                        ("x", point()),
+                                        ("y", point()),
+                                        ("width", dimension()),
+                                        ("height", dimension()),
+                                    ],
+                                    &["x", "y", "width", "height"],
+                                ),
+                            ),
+                            ("orientation", choice(&["horizontal", "vertical"])),
+                            ("occludes", S::boolean()),
+                            ("separates", S::boolean()),
+                        ],
+                        &["kind", "bounds", "orientation"],
+                    ),
+                    Some(8),
+                ),
+            ),
+        ],
+        &[],
+    );
+    tools.extend([
+        tool("get_ui_session", "List connected Cove runtimes, platform windows, displays, and configured WebDriver sessions.", vec![], &[], true),
+        tool("bind_ui_target", "Associate a runtime with its window, shared screen, or WebDriver session.", vec![("platform_target",text())], &["target","platform_target"], false),
+        tool("inspect_ui_tree", "Read the selected runtime's Cove tree.", vec![], &[], true),
+        tool("select_ui_node", "Highlight a Cove node or clear the highlight when node_id is omitted.", vec![("node_id",text())], &[], false),
+        tool("capture_ui", "Capture system-composited pixels or the selected browser viewport. The result includes the source and the coordinate space for input. Use scope=display to include the display outside a desktop window.", vec![("scope",choice(&["window","display"]))], &[], true),
+        tool("input_ui", "Perform one platform input action. Pointer coordinates use the coordinate space returned by capture_ui and require its capture_id. Delivery does not assert the resulting state.", vec![("action",action),("capture_id",text())], &["action"], false),
+        tool("click_ui", "Click a point in the coordinate space of capture_ui. Supply a fresh capture ID and check the postcondition.", vec![("capture_id",text()),("x",point()),("y",point()),("button",button())], &["capture_id","x","y"], false),
+        tool("press_ui_key", "Send a key to the selected platform target with optional modifiers.", vec![("key",text()),("modifiers",modifiers())], &["key"], false),
+        tool("type_ui_text", "Enter text through the platform's text input operation. For IME behavior use actual key events and observe the candidate window.", vec![("text",input_text())], &["text"], false),
+        tool("query_native_ui", "Read the platform accessibility or document tree when the selected adapter exposes it.", vec![], &[], true),
+        tool("find_native_ui", "Resolve exactly one platform element by the adapter's selector strategy.", vec![("using",text()),("value",S::string(Some(1),Some(2048)))], &["using","value"], true),
+        tool("activate_ui", "Invoke the platform action on an element returned by find_native_ui.", vec![("element",text())], &["element"], false),
+        tool("wait_for_ui", "Check a Cove node postcondition. Value checks require node_id and expected.", vec![("node_id",text()),("text",text()),("role",text()),("source",text()),("state",choice(&["visible","hidden","enabled","value"])),("expected",S::string(Some(0),Some(4096))),("timeout_ms",integer(0.,10_000.))], &[], true),
+        tool("resize_ui", "Request a runtime window resize in logical points.", vec![("width",dimension()),("height",dimension())], &["width","height"], false),
+        tool("set_ui_environment", "Set the selected runtime's simulated environment.", vec![("environment",environment)], &["environment"], false),
+        tool("edit_ui_style", "Apply, undo, or clear temporary style overrides by Cove node ID.", vec![
+            ("command",choice(&["inspect.style.set","inspect.style.undo","inspect.style.redo","inspect.style.clear","inspect.style.clearAll","inspect.recomposition.reset"])),
+            ("arguments",object(vec![("id",text()),("properties",style)],&[])),
+        ], &["command","arguments"], false),
+        tool("query_ui_logs", "Read the runtime's recent log records and loss counts.", vec![("after",integer(0.,9_007_199_254_740_991.))], &[], true),
+        tool("record_ui_timings", "Read recorded CPU frame timings after a sequence number.", vec![("after",integer(0.,9_007_199_254_740_991.))], &[], true),
+        tool("start_ui_trace", "Start recording CPU spans in the selected runtime.", vec![], &[], false),
+        tool("stop_ui_trace", "Finish the selected runtime's CPU trace and return its summary.", vec![], &[], false),
     ]);
     tools
-}
-
-pub const GUIDE: &str = "Use get_ui_session and get_diagnostics first. Query query_ui_nodes (compact is the default here) with text/role/source, then use click_ui or fill_ui with a unique selector; label matches exactly. Never guess coordinates or silently pick the first of several matches. Use input_ui for drag/scroll sequences and press_ui_key for shortcuts. Use wait_for_ui for observable postconditions, then capture_ui to inspect rendering; delivery acknowledgements are not behavior assertions. capture=true on click_ui/fill_ui returns an image on the same connection for transient states. Field values require explicit node_id and include_value=true; secure providers are never read. Start a CPU trace with start_ui_trace, perform the real operation, stop_ui_trace, then get_ui_trace or compare_ui_traces. capture_ui_trace records a fixed window; it does not create work. Missing host capabilities and idle or dropped samples must be reported. Nodes expire on unmount. The bridge reconnects on the next call after a transport failure and never retries mutations. Configure the cove-devtools mcp command once in the MCP client; do not write WebSocket scripts for these tools.";
-
-#[cfg(test)]
-mod environment_tool {
-    #[test]
-    fn presets_match_the_core_catalog() {
-        assert_eq!(super::DEVICE_PRESETS, cove_core::DevicePreset::NAMES);
-    }
 }

@@ -5,7 +5,7 @@ permissions:
 env:
   # `cove-media-rhi` and the desktop suite need the Vulkan loader plus a window
   # system; the loader only advertises VK_KHR_surface when one is present.
-  LINUX_NATIVE_PACKAGES: libvulkan-dev mesa-vulkan-drivers vulkan-validationlayers xvfb libx11-dev libxext-dev libxrandr-dev libxcursor-dev libxi-dev libxss-dev libxtst-dev libwayland-dev libxkbcommon-dev libasound2-dev libpulse-dev
+  LINUX_NATIVE_PACKAGES: libvulkan-dev mesa-vulkan-drivers vulkan-validationlayers xvfb libx11-dev libxext-dev libxrandr-dev libxcursor-dev libxi-dev libxss-dev libxtst-dev libwayland-dev libxkbcommon-dev libasound2-dev libpulse-dev libpipewire-0.3-dev libxcb1-dev libclang-dev libdbus-1-dev libegl-dev libgbm-dev
   # Asserted against ZIG_VERSION in crates/native-build/src/setup.rs below.
   ZIG_VERSION: 0.17.0
   # Asserted against WASI_SDK_VERSION in crates/native-build/src/setup.rs.

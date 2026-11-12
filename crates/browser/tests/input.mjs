@@ -34,7 +34,21 @@ function render(wasm) {
   assert.equal(wasm.cove_render(638, 438), 0);
   const pointer = wasm.cove_snapshot();
   const size = wasm.cove_snapshot_size();
-  return JSON.parse(decoder.decode(new Uint8Array(wasm.memory.buffer, pointer >>> 0, size)));
+  const frame = JSON.parse(decoder.decode(new Uint8Array(wasm.memory.buffer, pointer >>> 0, size)));
+  assert.equal(frame.tree, undefined, "the render payload does not carry diagnostics");
+  return { ...frame, tree: inspect(wasm, { method: "tree" }).Ok };
+}
+
+function inspect(wasm, operation) {
+  const command = Buffer.from(JSON.stringify(operation));
+  const request = wasm.cove_alloc(command.length);
+  assert.ok(request);
+  new Uint8Array(wasm.memory.buffer, request >>> 0, command.length).set(command);
+  wasm.cove_dispatch(request, command.length);
+  wasm.cove_free(request, command.length);
+  return JSON.parse(decoder.decode(new Uint8Array(
+    wasm.memory.buffer, wasm.cove_response() >>> 0, wasm.cove_response_size(),
+  )));
 }
 
 function find(node, name) {
@@ -108,7 +122,11 @@ function text(wasm, value, editing = false) {
 {
   const wasm = await launch();
   const root = render(wasm).tree.root;
-  wasm.cove_pointer(3, ...center(find(root, "counter.increment")));
+  const increment = find(root, "counter.increment");
+  const selection = inspect(wasm, { method: "select", params: { node_id: increment.id } });
+  assert.equal(selection.Ok?.selectedID, increment.id);
+  assert.equal(inspect(wasm, { method: "select", params: { node_id: "missing" } }).Err?.code, "stale_node");
+  wasm.cove_pointer(3, ...center(increment));
   wasm.cove_pointer(3, ...center(find(root, "counter.note")));
   assert.ok(anchor(wasm), "Counter note retains its input bridge");
   text(wasm, "你好");

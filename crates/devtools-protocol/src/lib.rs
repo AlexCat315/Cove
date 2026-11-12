@@ -1,28 +1,15 @@
-//! Transport-neutral DevTools schema. Rust input recordings use protocol 0.2.
+//! Transport-neutral Cove diagnostics and DevTools messages.
 //!
 //! Swift's `JSONValue` maps to `JsonValue` below — deliberately a re-export of
 //! `serde_json::Value`, not a second type: that enum already has exactly Swift's
 //! variants (`Null`/`Bool`/`Number`/`String`/`Array`/`Object`) and its accessors
 //! are Swift's `stringValue`/`objectValue`. Keeping one type means a payload can
 //! never hold two incompatible JSON trees.
-mod keyboard;
-mod recording;
+pub mod control;
 mod session;
-pub use keyboard::key_scancode;
-pub use recording::*;
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
 pub use serde_json::Value as JsonValue;
 pub use session::*;
-
-pub const PROTOCOL_VERSION: &str = "cove-devtools/0.2";
-
-/// Swift's `DevToolsProtocol` namespace. The Rust crate keeps the version in
-/// `PROTOCOL_VERSION`, which is the value `hello` advertises.
-pub struct DevToolsProtocol;
-
-impl DevToolsProtocol {
-    pub const VERSION: &'static str = PROTOCOL_VERSION;
-}
 
 macro_rules! payload {
     ($name:ident { $($(#[$attr:meta])* $field:ident : $kind:ty),* $(,)? }) => {
@@ -53,21 +40,6 @@ impl Envelope {
         )
     }
 }
-payload!(HelloHostInfo {
-    pid: u32,
-    app_title: String,
-    platform: String
-});
-payload!(HelloPayload { protocol: String, host: HelloHostInfo, capabilities: Vec<String> });
-impl HelloPayload {
-    pub fn new(host: HelloHostInfo, capabilities: Vec<String>) -> Self {
-        Self {
-            protocol: PROTOCOL_VERSION.into(),
-            host,
-            capabilities,
-        }
-    }
-}
 payload!(NodeFrame {
     x: f64,
     y: f64,
@@ -86,7 +58,6 @@ payload!(NodeSummary {
     id: String, view_tag: Option<String>, debug_name: Option<String>, frame: NodeFrame,
     absolute_frame: Option<NodeFrame>, content_offset: Option<NodePoint>, z_index: Option<f64>, opacity: Option<f64>,
     layout_role: Option<String>, semantic_role: Option<String>, flags: NodeFlags, children: Vec<NodeSummary>,
-    #[serde(rename = "elementID")] element_id: Option<String>,
     layout: Option<NodeLayoutInfo>, style: Option<NodeStyleInfo>, source: Option<SourceLocation>,
     #[serde(rename = "ownerScopeID")] owner_scope_id: Option<String>, recomposition: Option<Recomposition>,
 });
@@ -102,12 +73,6 @@ payload!(InvalidationRecord {
 });
 payload!(RenderInventory { object_count: usize, layer_roots: Vec<String> });
 payload!(InputInventory { node_count: usize, focusables: Vec<String>, hit_testables: Vec<String> });
-payload!(SelectNode { id: String });
-payload!(ErrorPayload {
-    code: String,
-    message: String
-});
-payload!(MirrorStart { fps: Option<f64>, quality: Option<f64>, scale: Option<f64> });
 payload!(WindowResize {
     width: f64,
     height: f64
@@ -117,96 +82,10 @@ impl WindowResize {
         (1.0..=16384.0).contains(&self.width) && (1.0..=16384.0).contains(&self.height)
     }
 }
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "lowercase")]
-pub enum MirrorAction {
-    #[default]
-    Activate,
-    Increment,
-    Decrement,
-    Reveal,
-}
-payload!(MirrorActivate {
-    #[serde(rename = "node_id")]
-    node_id: String,
-    #[serde(default)]
-    action: MirrorAction,
-});
-payload!(MirrorStopped { reason: String });
-payload!(MirrorFrame {
-    seq: u64,
-    width: u32,
-    height: u32,
-    logical_width: f64,
-    logical_height: f64,
-    jpeg_base64: String
-});
-payload!(MirrorInput {
-    kind: String, x: Option<f32>, y: Option<f32>, delta_x: Option<f32>, delta_y: Option<f32>,
-    button: Option<i64>, key: Option<String>, key_code: Option<i64>, text: Option<String>,
-    modifiers: Option<i64>, click_count: Option<i64>, is_repeat: Option<bool>, scroll: Option<cove_platform::ScrollInput>,
-    /// `externalDrop` payload: `"begin"`, `"file"`, `"text"`, `"position"` or
-    /// `"complete"`. Lets a client exercise the OS-drop path without a real drag
-    /// from another application.
-    #[serde(default)]
-    phase: Option<String>,
-    /// Absolute paths for `phase: "file"`.
-    #[serde(default)]
-    paths: Option<Vec<String>>,
-    /// The source application reported by the platform, when known.
-    #[serde(default)]
-    source: Option<String>,
-});
-impl MirrorInput {
-    pub fn is_valid(&self) -> bool {
-        if [self.x, self.y, self.delta_x, self.delta_y]
-            .into_iter()
-            .flatten()
-            .any(|value| !value.is_finite())
-            || self.button.is_some_and(|button| !(0..=4).contains(&button))
-            || self
-                .modifiers
-                .is_some_and(|modifiers| !(0..=15).contains(&modifiers))
-        {
-            return false;
-        }
-        match self.kind.as_str() {
-            "pointerMove" | "pointerDown" | "pointerUp" => self.x.is_some() && self.y.is_some(),
-            "wheel" => self.delta_x.is_some() || self.delta_y.is_some(),
-            "text" => self
-                .text
-                .as_ref()
-                .is_some_and(|text| !text.is_empty() && text.len() <= 65_536),
-            "keyDown" | "keyUp" => key_scancode(self.key.as_deref()).is_some(),
-            "externalDrop" => match self.phase.as_deref() {
-                Some("position") | Some("begin") | Some("complete") => {
-                    self.x.is_some() && self.y.is_some()
-                }
-                Some("file") => {
-                    self.x.is_some()
-                        && self.y.is_some()
-                        && self.paths.as_ref().is_some_and(|paths| {
-                            !paths.is_empty()
-                                && paths.len() <= 256
-                                && paths
-                                    .iter()
-                                    .all(|path| !path.is_empty() && path.len() <= 4096)
-                        })
-                }
-                Some("text") => {
-                    self.x.is_some()
-                        && self.y.is_some()
-                        && self.text.as_ref().is_some_and(|text| !text.is_empty())
-                }
-                _ => false,
-            },
-            _ => false,
-        }
-    }
-}
 payload!(TimingFrame {
     frame: u64, recomposition_ms: Option<f64>, layout_ms: f64, draw_ms: f64,
-    present_ms: f64, presented: Option<bool>, total_ms: f64, node_count: usize, batch_count: usize,
+    render_thread_ms: Option<f64>, submitted: bool, presented: Option<bool>,
+    total_ms: f64, node_count: usize, batch_count: usize,
 });
 payload!(RegisteredState {
     id: String, name: String, value_type: String, #[serde(rename = "scopeID")] scope_id: Option<String>,
@@ -230,12 +109,6 @@ payload!(ObservedState {
     truncated: bool
 });
 payload!(StateObservation { registered: Vec<RegisteredState>, values: Vec<ObservedState> });
-payload!(TimelineReason { kind: String, detail: Option<String> });
-payload!(TimelineEvent {
-    sequence: u64, phase: String, name: String, #[serde(rename = "scopeID")] scope_id: Option<String>,
-    start_ms: f64, duration_ms: f64, #[serde(default)] reasons: Vec<TimelineReason>,
-});
-payload!(TimelineSnapshot { events: Vec<TimelineEvent>, #[serde(default)] dropped: usize });
 payload!(InspectionInsets {
     top: f64,
     right: f64,
@@ -258,8 +131,7 @@ payload!(NodeLayoutInfo {
 payload!(NodeStyleInfo { background_color: Option<String>, foreground_color: Option<String>, overrides: Vec<String> });
 payload!(InspectionState {
     #[serde(rename = "selectedID")] selected_id: Option<String>,
-    #[serde(rename = "hoveredID")] hovered_id: Option<String>,
-    picking: bool, can_undo: bool, can_redo: bool, override_count: usize,
+    can_undo: bool, can_redo: bool, override_count: usize,
 });
 payload!(SourceLocation {
     #[serde(rename = "fileID")]
@@ -272,18 +144,6 @@ payload!(RecompositionReason {
     kind: String, detail: Option<String>, #[serde(rename = "originScopeID")] origin_scope_id: Option<String>,
 });
 payload!(Recomposition { count: u64, initial_ms: f64, last_ms: f64, total_ms: f64, max_ms: f64, reasons: Vec<RecompositionReason> });
-payload!(DevToolsLaunch {
-    id: String,
-    token: String,
-    descriptor_path: String,
-    app_title: String
-});
-payload!(DevToolsDiscovery {
-    id: String,
-    pid: u32,
-    endpoint: String
-});
-
 /// Decode an envelope payload into a concrete type. Returns `None` for an
 /// absent or malformed payload, matching Swift's `decodePayload(_:from:)`.
 pub fn decode_payload<T: serde::de::DeserializeOwned>(payload: &Option<JsonValue>) -> Option<T> {
@@ -307,85 +167,43 @@ impl DevToolsCodec {
     }
 }
 
-/// Swift names for the wire types above. Each is the same value as the Rust
-/// name it points at, never a parallel definition, so the two spellings cannot
-/// drift apart.
-pub type DevToolsEnvelope = Envelope;
-pub type InputInventoryPayload = InputInventory;
-pub type MirrorActivatePayload = MirrorActivate;
-/// Swift nests this in `MirrorActivatePayload.Action`.
-pub type MirrorActivateAction = MirrorAction;
-pub type MirrorFramePayload = MirrorFrame;
-pub type MirrorInputPayload = MirrorInput;
-pub type MirrorStartPayload = MirrorStart;
-pub type MirrorStoppedPayload = MirrorStopped;
-pub type RenderInventoryPayload = RenderInventory;
-pub type SelectNodePayload = SelectNode;
-pub type TimingFramePayload = TimingFrame;
-pub type TreeSnapshotPayload = TreeSnapshot;
-pub type WindowResizePayload = WindowResize;
-pub type ObservedStatePayload = ObservedState;
-pub type RegisteredStatePayload = RegisteredState;
-pub type StateObservationPayload = StateObservation;
-pub type StateWatchPayload = StateWatch;
-pub type TimelineEventPayload = TimelineEvent;
-pub type TimelineReasonPayload = TimelineReason;
-pub type TimelineSnapshotPayload = TimelineSnapshot;
-pub type RecompositionPayload = Recomposition;
-pub type RecompositionReasonPayload = RecompositionReason;
-pub type SourceLocationPayload = SourceLocation;
-
-/// Swift nested this in `DevToolsProtocol`; the seven cases and their wire names
-/// are already `cove_logging::Level`, so there is one definition.
-pub type LogLevel = cove_logging::Level;
-
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
     fn envelope_uses_the_swift_field_names() {
-        let envelope = DevToolsEnvelope::new("tree.subscribe", Some(3), None);
+        let envelope = Envelope::new("inspect.style.undo", Some(3), None);
         let value = serde_json::to_value(&envelope).unwrap();
-        assert_eq!(value["type"], "tree.subscribe");
+        assert_eq!(value["type"], "inspect.style.undo");
         assert_eq!(value["id"], 3);
         assert!(value.get("payload").is_some());
     }
 
     #[test]
     fn payloads_round_trip_through_the_codec() {
-        let frame = TimingFramePayload {
+        let frame = TimingFrame {
             frame: 1,
             recomposition_ms: None,
             layout_ms: 0.5,
             draw_ms: 0.25,
-            present_ms: 0.125,
+            render_thread_ms: Some(0.125),
+            submitted: true,
             presented: Some(true),
             total_ms: 1.0,
             node_count: 4,
             batch_count: 2,
         };
         let payload = Some(DevToolsCodec::json(&frame));
-        assert_eq!(
-            DevToolsCodec::decode::<TimingFramePayload>(&payload),
-            Some(frame)
-        );
+        assert_eq!(DevToolsCodec::decode::<TimingFrame>(&payload), Some(frame));
         let value = payload.as_ref().expect("encoded payload");
         assert!(value.get("recompositionMs").is_some());
         assert!(value.get("presented").is_some());
     }
 
     #[test]
-    fn mirror_activate_reads_the_snake_case_node_id() {
-        let payload = Some(serde_json::json!({ "node_id": "7" }));
-        let decoded = DevToolsCodec::decode::<MirrorActivatePayload>(&payload).unwrap();
-        assert_eq!(decoded.node_id, "7");
-        assert_eq!(decoded.action, MirrorAction::Activate);
-    }
-
-    #[test]
     fn source_location_keeps_the_capitalised_id_keys() {
-        let location = SourceLocationPayload {
+        let location = SourceLocation {
             file_id: "f".into(),
             file_path: "/tmp/a.swift".into(),
             line: 1,
@@ -394,12 +212,5 @@ mod tests {
         let value = DevToolsCodec::json(&location);
         assert_eq!(value["fileID"], "f");
         assert_eq!(value["filePath"], "/tmp/a.swift");
-    }
-
-    #[test]
-    fn json_value_is_serde_json_value() {
-        let value: JsonValue = serde_json::json!({ "a": 1 });
-        assert_eq!(value.as_object().map(|object| object.len()), Some(1));
-        assert_eq!(DevToolsProtocol::VERSION, PROTOCOL_VERSION);
     }
 }

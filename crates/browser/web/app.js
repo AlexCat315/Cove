@@ -9,7 +9,7 @@ textInput.tabIndex = -1; document.body.append(textInput);
 const status = document.querySelector("#status");
 const decoder = new TextDecoder();
 const encoder = new TextEncoder();
-let wasm, renderer, lastFrame, scheduled = false, inspectorPort;
+let wasm, renderer, lastFrame, scheduled = false;
 const webgpu = createWebGpuBridge(() => wasm, document.querySelector("#gpu"));
 const forcedRenderer = new URLSearchParams(location.search).get("renderer");
 const atlas = { width: 0, height: 0, pixels: null, revision: 0, update: null };
@@ -30,12 +30,6 @@ function updateAtlas(frame) {
   atlas.revision++;
 }
 
-function findNode(node, name) {
-  if (!node) return;
-  if (node.debugName === name) return node;
-  for (const child of node.children) { const found = findNode(child, name); if (found) return found; }
-}
-
 function readBytes(pointer, size) {
   // Copy before another Wasm call can grow memory or replace an export buffer.
   return new Uint8Array(wasm.memory.buffer, pointer >>> 0, size).slice();
@@ -52,7 +46,7 @@ function dispatch(envelope) {
     return response();
   } finally { wasm.cove_free(pointer, bytes.length); }
 }
-function post(envelope) { if (!envelope) return; inspectorPort?.postMessage({ kind: "message", data: JSON.stringify(envelope) }); }
+
 
 function syncTextInput() {
   const active = document.activeElement;
@@ -90,7 +84,6 @@ function schedule() {
       wasm.cove_render(width, height);
     }
     lastFrame = readJSON(wasm.cove_snapshot(), wasm.cove_snapshot_size());
-    surface.style.cursor = lastFrame.tree.inspection?.picking ? "crosshair" : "default";
     updateAtlas(lastFrame);
     if (renderer.backend === "canvas2d") {
       const vertices = readBytes(wasm.cove_vertices(), wasm.cove_vertex_bytes());
@@ -99,8 +92,6 @@ function schedule() {
     }
     syncTextInput();
     document.querySelector("#stats").textContent = `count=${lastFrame.count} · ${lastFrame.vertices} vertices · ${lastFrame.batches.length} batches · ${lastFrame.fontCount} fonts · FreeType/HarfBuzz`;
-    wasm.cove_events();
-    for (const event of response()) post(event);
     if (wasm.cove_needs_frame()) schedule();
   });
 }
@@ -288,13 +279,13 @@ try {
     } finally { wasm.cove_free(pointer, bytes.length); }
   }
   renderer = await makeRenderer();
-  for (const id of ["increment", "reset", "theme"]) {
+  if (component) document.querySelector(".keyboard").hidden = true;
+  else ["increment", "reset", "theme"].forEach((id, action) => {
     document.getElementById(id).addEventListener("click", () => {
-      const rect = findNode(lastFrame?.tree.root, `counter.${id}`)?.absoluteFrame;
-      if (rect) wasm.cove_pointer(3, rect.x + rect.w / 2, rect.y + rect.h / 2);
+      wasm.cove_counter_action(action);
       schedule();
     });
-  }
+  });
   surface.tabIndex = 0;
   let composing = false, skipCompositionInput = false;
   const point = event => {
@@ -374,31 +365,6 @@ try {
   });
   new ResizeObserver(schedule).observe(surface);
   window.addEventListener("scroll", syncTextInput, {passive:true});
-  window.addEventListener("message", (event) => {
-    const iframe = document.querySelector("#inspector");
-    if (event.origin !== location.origin || event.source !== iframe.contentWindow) return;
-    if (event.data?.type === "cove.devtools.probe") {
-      iframe.contentWindow.postMessage({ type: "cove.devtools.ready" }, location.origin);
-      return;
-    }
-    if (event.data?.type !== "cove.devtools.connect" || !event.ports[0]) return;
-    if (inspectorPort) { dispatch({ type: "bye" }); inspectorPort.close(); }
-    inspectorPort = event.ports[0];
-    const port = inspectorPort;
-    port.addEventListener("message", (event) => {
-      if (inspectorPort !== port) return;
-      if (event.data?.kind === "close") {
-        dispatch({ type: "bye" }); port.close(); inspectorPort = undefined; schedule();
-      } else if (event.data?.kind === "message") {
-        try { post(dispatch(JSON.parse(event.data.data))); schedule(); }
-        catch (error) { post({ type: "request.err", payload: { code: "bad_request", message: String(error) } }); }
-      }
-    });
-    port.start(); port.postMessage({ kind: "open" }); wasm.cove_hello(); post(response()); schedule();
-  });
-  const ready = () => document.querySelector("#inspector").contentWindow.postMessage({ type: "cove.devtools.ready" }, location.origin);
-  document.querySelector("#inspector").addEventListener("load", ready);
-  ready();
   window.coveDebug = {
     get snapshot() { return lastFrame; }, get backend() { return renderer.backend; },
     get gpuInfo() {
@@ -406,33 +372,62 @@ try {
       return info ? { vendor: info.vendor, architecture: info.architecture, device: info.device,
         description: info.description, isFallbackAdapter: info.isFallbackAdapter, lost: renderer.lost } : null;
     },
-    request(envelope) { const result = dispatch(envelope); schedule(); return result; },
   };
-  try {
-    const saved = sessionStorage.getItem("cove.dev.checkpoint");
-    if (saved) {
-      const restored = dispatch({type:"state.restore", id:0, payload:JSON.parse(saved)});
-      if (restored.type.endsWith(".err")) console.warn("Previous development state could not be restored", restored.payload);
-      sessionStorage.removeItem("cove.dev.checkpoint");
-    }
-  } catch (error) { console.warn("Development state restore failed", error); }
-  fetch("./dev-mode.json").then(result => result.ok ? result.json() : null).then(mode => {
-    if (!mode?.enabled) return;
-    const events = new EventSource("/__cove_events");
-    events.onopen = () => { window.coveDevConnected = true; };
-    const overlay = document.createElement("pre");
-    overlay.style.cssText = "position:fixed;bottom:0;left:0;right:0;max-height:45vh;overflow:auto;background:#251b22;color:#ffe0e5;padding:16px;z-index:1000;white-space:pre-wrap";
-    overlay.hidden = true; document.body.append(overlay);
-    events.onmessage = event => {
-      const message = JSON.parse(event.data);
-      if (message.type === "building") { overlay.textContent="Compiling Rust…"; overlay.hidden=false; }
-      if (message.type === "error") { overlay.textContent=message.message; overlay.hidden=false; }
-      if (message.type === "ready") {
-        const checkpoint = dispatch({type:"state.checkpoint",id:0}).payload;
-        sessionStorage.setItem("cove.dev.checkpoint", JSON.stringify(checkpoint));
-        location.assign("/" + location.search);
-      }
-    };
-  }).catch(error => console.warn("Development reload unavailable", error));
   schedule();
+  if (location.pathname.startsWith("/app/")) connectProbe().catch(error => console.warn("DevTools:", error.message));
 } catch (error) { status.textContent = "Prototype failed to load"; console.error(error); document.querySelector("#stats").textContent = String(error); }
+
+async function connectProbe() {
+  const storageKey = "cove.devtools.token";
+  const token = location.hash.slice(1) || sessionStorage.getItem(storageKey);
+  if (!token) return;
+  sessionStorage.setItem(storageKey, token);
+  history.replaceState(null, "", location.pathname + location.search);
+
+  const abort = new AbortController();
+  const post = async (path, payload, authorization) => {
+    const response = await fetch(path, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...(authorization ? { Authorization: "Bearer " + token } : {}),
+      },
+      body: JSON.stringify(payload),
+      signal: abort.signal,
+    });
+    if (response.status === 401) return Promise.reject(new DOMException("Open the current controller link.", "SecurityError"));
+    if (!response.ok) throw new Error("Controller request failed.");
+    return response.json();
+  };
+  let lease;
+  const release = () => {
+    if (lease) navigator.sendBeacon("/probe/close", JSON.stringify(lease));
+    lease = undefined;
+  };
+  const close = () => { abort.abort(); release(); };
+  window.addEventListener("pagehide", close, { once: true });
+  try {
+    while (!abort.signal.aborted) {
+      let completion = null;
+      try {
+        wasm.cove_probe_register();
+        lease = await post("/probe/register", response(), true);
+        while (!abort.signal.aborted) {
+          const work = await post("/probe/poll", { lease, completion });
+          completion = work ? { sequence: work.sequence, result: dispatch(work.command) } : null;
+          if (work?.command.method === "edit" || work?.command.method === "select") schedule();
+        }
+      } catch (error) {
+        if (error.name === "SecurityError") throw error;
+      } finally {
+        release();
+        wasm.cove_probe_disconnect();
+        if (!abort.signal.aborted) schedule();
+      }
+      if (!abort.signal.aborted) await new Promise(resolve => setTimeout(resolve, 400));
+    }
+  } finally {
+    close();
+    window.removeEventListener("pagehide", close);
+  }
+}

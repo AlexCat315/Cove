@@ -58,7 +58,6 @@ pub struct Frame {
     pub batches: Vec<Batch>,
     pub raster_assets: Vec<RasterAsset>,
     pub labels: Vec<Label>,
-    pub tree: cove_devtools_protocol::TreeSnapshot,
     pub font_count: usize,
     pub atlas_width: usize,
     pub atlas_height: usize,

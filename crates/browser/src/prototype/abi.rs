@@ -204,16 +204,19 @@ pub extern "C" fn cove_response_size() -> i32 {
     with_app(|app| app.response_buffer.count() as i32)
 }
 
-/// Publishes the DevTools `hello` envelope.
 #[unsafe(no_mangle)]
-pub extern "C" fn cove_hello() {
-    with_app(|app| app.hello());
+pub extern "C" fn cove_probe_register() {
+    with_app(|app| app.register_probe());
 }
 
-/// Publishes pending DevTools stream events as a JSON array.
 #[unsafe(no_mangle)]
-pub extern "C" fn cove_events() {
-    with_app(|app| app.events());
+pub extern "C" fn cove_probe_disconnect() {
+    with_app(|app| app.disconnect_probe());
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn cove_counter_action(action: u32) {
+    with_app(|app| app.counter_action(action));
 }
 
 /// Allocates a transfer buffer for one DevTools request.

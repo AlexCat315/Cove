@@ -3,7 +3,7 @@
 use super::content::scene::{HostedScene, linked_content};
 use super::frame::runtime_options::RuntimeOptions;
 use crate::android::contract::launch::SceneLaunch;
-use crate::desktop::diagnostics::integration::{DevToolsConfiguration, DiagnosticsFrameSource};
+use crate::desktop::diagnostics::integration::DevToolsConfiguration;
 use crate::desktop::rendering::ThreadedWindowRenderer;
 use cove_graphics::rhi::{Device, DeviceConfig, TextureFormat};
 use cove_graphics::ui::NativeDrawListRenderer;
@@ -96,14 +96,9 @@ impl AndroidApplication {
             .devtools
             .clone()
             .map(|launch| DevToolsConfiguration {
-                port: 0,
                 app_title: launch.app_title.clone(),
-                launch: Some(serde_json::json!({
-                    "id": launch.id,
-                    "token": launch.token,
-                    "descriptorPath": launch.descriptor_path,
-                    "appTitle": launch.app_title,
-                })),
+                window: None,
+                connection: Some((launch.endpoint, launch.token)),
             })
             .or_else(|| {
                 application
@@ -118,27 +113,11 @@ impl AndroidApplication {
                     application.schedule_diagnostics();
                 }
             });
-            // A frame the mirror reads back goes through a BGRA target of its own;
-            // the store stays shared with the presentation renderers.
-            let frame_source = {
-                let device = application.device();
-                let root = application.renderer();
-                device
-                    .with_frame_session(|| {
-                        root.borrow()
-                            .make_presentation_renderer(TextureFormat::Bgra8Unorm, 1)
-                    })
-                    .ok()
-                    .map(|renderer| DiagnosticsFrameSource {
-                        device: device.clone(),
-                        renderer,
-                    })
-            };
             application
                 .scene
                 .borrow()
                 .content()
-                .configure_diagnostics(configuration, schedule, frame_source)
+                .configure_diagnostics(configuration, schedule)
                 .map_err(|error| format!("diagnostics configuration failed: {error}"))?;
         }
         Ok(application)
