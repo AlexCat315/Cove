@@ -13,6 +13,7 @@ pub enum Tool {
     QueryUiRecomposition,
     QueryUiState,
     QueryUiMemory,
+    QueryUiNetwork,
     CaptureUiTrace,
     GetUiTrace,
     CompareUiTraces,
@@ -21,12 +22,13 @@ pub enum Tool {
 }
 
 impl Tool {
-    pub const ALL: [Tool; 10] = [
+    pub const ALL: [Tool; 11] = [
         Tool::GetDiagnostics,
         Tool::QueryUiNodes,
         Tool::QueryUiRecomposition,
         Tool::QueryUiState,
         Tool::QueryUiMemory,
+        Tool::QueryUiNetwork,
         Tool::CaptureUiTrace,
         Tool::GetUiTrace,
         Tool::CompareUiTraces,
@@ -45,6 +47,7 @@ impl Tool {
             Self::QueryUiRecomposition => "query_ui_recomposition",
             Self::QueryUiState => "query_ui_state",
             Self::QueryUiMemory => "query_ui_memory",
+            Self::QueryUiNetwork => "query_ui_network",
             Self::CaptureUiTrace => "capture_ui_trace",
             Self::GetUiTrace => "get_ui_trace",
             Self::CompareUiTraces => "compare_ui_traces",
@@ -111,6 +114,12 @@ impl Tool {
             Self::QueryUiMemory => AgentTool::new(
                 self.name(),
                 "Read logical text/image cache and per-window target memory estimates. Excludes driver pools and external scene textures; this is not process physical footprint. Null means the host has no provider.",
+                object(BTreeMap::new(), Vec::new()),
+                true,
+            ),
+            Self::QueryUiNetwork => AgentTool::new(
+                self.name(),
+                "Read bounded in-process HTTP activity recorded by cove-http: method, URL, status, timings, headers (credentials redacted) and truncated bodies.",
                 object(BTreeMap::new(), Vec::new()),
                 true,
             ),
@@ -275,7 +284,7 @@ mod tests {
         assert!(!Tool::CaptureUiTrace.is_immediate_read());
         assert!(!Tool::GetUiTrace.is_immediate_read());
         assert!(!Tool::CompareUiTraces.is_immediate_read());
-        assert_eq!(Tool::immediate_read_tools().len(), 7);
+        assert_eq!(Tool::immediate_read_tools().len(), 8);
     }
 
     #[test]

@@ -424,6 +424,7 @@ fn diagnostic_registry_is_the_single_definition_source() {
             "query_ui_recomposition",
             "query_ui_state",
             "query_ui_memory",
+            "query_ui_network",
             "list_skills",
             "read_skill",
         ],
@@ -495,6 +496,7 @@ fn immediate_wire_reads_share_toolbox_schemas_results_and_redaction() {
             "query_ui_recomposition",
             "query_ui_state",
             "query_ui_memory",
+            "query_ui_network",
             "list_skills",
             "read_skill",
         ]

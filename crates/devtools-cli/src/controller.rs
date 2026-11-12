@@ -41,6 +41,10 @@ impl Controller {
         })
     }
 
+    pub fn permissions(&self) -> Value {
+        crate::platform::permissions()
+    }
+
     fn targets(&self) -> Value {
         let runtimes = self.registry.list();
         let platforms = self.platform.list();
@@ -164,7 +168,13 @@ impl Controller {
         let target = args.as_object_mut().and_then(|args| args.remove("target"));
         let target = target.as_ref().and_then(Value::as_str);
         let result = match name {
-            "get_ui_session" => self.targets(),
+            "get_ui_session" => {
+                let mut session = self.targets();
+                session["platform"] = json!(std::env::consts::OS);
+                session["permissions"] = crate::platform::permissions();
+                session
+            }
+            "request_ui_permissions" => crate::platform::request_permissions(),
             "list_skills" => {
                 let library = cove_agent::ui_tools::Tools::skills();
                 let skills: Vec<_> = library

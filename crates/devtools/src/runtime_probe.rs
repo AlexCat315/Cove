@@ -43,7 +43,7 @@ impl RuntimeProbe {
     }
 
     pub fn capabilities(&self) -> Vec<String> {
-        let mut capabilities = vec!["tree", "diagnostics", "style", "trace", "timing"];
+        let mut capabilities = vec!["tree", "diagnostics", "style", "trace", "timing", "network"];
         if self.resize.is_some() {
             capabilities.push("resize");
         }

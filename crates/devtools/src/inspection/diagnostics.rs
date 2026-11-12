@@ -787,6 +787,7 @@ impl Diagnostics {
         crate::agent::JsonSchemaValidator::validate(arguments, &tool.definition().schema)
             .map_err(|error| DiagnosticError::InvalidConfiguration(error.to_string()))?;
         let data = match tool {
+            Tool::QueryUiNetwork => network_log(),
             Tool::QueryUiMemory => {
                 let memory = self.memory.borrow().clone();
                 serde_json::json!({ "ok": true, "data": memory.map(|provider| provider()) })
@@ -1427,6 +1428,37 @@ impl TraceStore {
             changes,
         })
     }
+}
+
+fn network_log() -> serde_json::Value {
+    let records: Vec<_> = cove_http::recording::snapshot()
+        .iter()
+        .map(|record| {
+            serde_json::json!({
+                "id": record.id,
+                "method": record.method,
+                "url": record.url,
+                "status": record.status,
+                "state": record.state.as_str(),
+                "error": record.error,
+                "startedAt": record.started_at_ms,
+                "ttfbMs": record.ttfb_ms,
+                "durationMs": record.duration_ms,
+                "requestBytes": record.request_bytes,
+                "responseBytes": record.response_bytes,
+                "requestHeaders": record.request_headers,
+                "responseHeaders": record.response_headers,
+                "requestBody": String::from_utf8_lossy(&record.request_body),
+                "requestBodyTruncated": record.request_body_truncated,
+                "responseBody": String::from_utf8_lossy(&record.response_body),
+                "responseBodyTruncated": record.response_body_truncated,
+            })
+        })
+        .collect();
+    serde_json::json!({
+        "ok": true,
+        "data": { "records": records, "limit": cove_http::recording::MAX_RECORDS }
+    })
 }
 
 fn next_capture_id() -> String {

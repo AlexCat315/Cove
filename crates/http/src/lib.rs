@@ -12,6 +12,8 @@ mod redirect;
 mod url;
 mod wire;
 
+pub mod recording;
+
 #[cfg(any(target_os = "macos", target_os = "ios"))]
 mod apple;
 #[cfg(cove_http_socket)]
@@ -259,7 +261,19 @@ impl Client {
 
     pub fn send(&self, request: Request) -> Result<Response, HttpError> {
         let url = request.validate()?;
-        backend::send(&self.config, request, url)
+        let record = recording::begin(&request);
+        match backend::send(&self.config, request, url) {
+            Ok(mut response) => {
+                recording::response(record, response.status, response.headers.clone());
+                let body = std::mem::replace(&mut response.body, Box::new(std::io::empty()));
+                response.body = recording::wrap_body(body, record);
+                Ok(response)
+            }
+            Err(error) => {
+                recording::failure(record, &error.to_string());
+                Err(error)
+            }
+        }
     }
 
     pub fn capabilities() -> Capabilities {

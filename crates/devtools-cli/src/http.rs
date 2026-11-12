@@ -30,6 +30,17 @@ pub fn serve(
     drivers: Vec<String>,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let controller = Arc::new(Controller::new(drivers)?);
+    let permissions = controller.permissions();
+    if permissions["screen_capture"] == false {
+        eprintln!(
+            "Screen Recording is off. Enable it for the terminal running this controller, then restart."
+        );
+    }
+    if permissions["accessibility"] == false {
+        eprintln!(
+            "Accessibility is off. Enable it for the terminal running this controller to inspect native controls."
+        );
+    }
     let web_root = web_root
         .map(std::fs::canonicalize)
         .transpose()?

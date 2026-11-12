@@ -315,3 +315,37 @@ fn unavailable() -> Fault {
         "This platform session does not provide this operation.",
     )
 }
+
+#[cfg(target_os = "macos")]
+pub fn permissions() -> Value {
+    // SAFETY: both functions only query the current process's authorization state.
+    json!({
+        "screen_capture": objc2_core_graphics::CGPreflightScreenCaptureAccess(),
+        "accessibility": unsafe { objc2_application_services::AXIsProcessTrusted() },
+    })
+}
+
+#[cfg(not(target_os = "macos"))]
+pub fn permissions() -> Value {
+    Value::Null
+}
+
+#[cfg(target_os = "macos")]
+pub fn request_permissions() -> Value {
+    use objc2_application_services::{AXIsProcessTrustedWithOptions, kAXTrustedCheckOptionPrompt};
+    use objc2_core_foundation::{CFBoolean, CFDictionary};
+    use objc2_core_graphics::CGRequestScreenCaptureAccess;
+    let screen_capture = CGRequestScreenCaptureAccess();
+    let accessibility = unsafe {
+        let options =
+            CFDictionary::from_slices(&[kAXTrustedCheckOptionPrompt], &[CFBoolean::new(true)]);
+        let options: &CFDictionary = (&*options).as_ref();
+        AXIsProcessTrustedWithOptions(Some(options))
+    };
+    json!({"screen_capture": screen_capture, "accessibility": accessibility})
+}
+
+#[cfg(not(target_os = "macos"))]
+pub fn request_permissions() -> Value {
+    json!({"requested": false, "reason": "no_platform_prompt"})
+}

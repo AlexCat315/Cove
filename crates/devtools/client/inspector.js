@@ -45,6 +45,7 @@ function updateTargetControls() {
   $("tree").disabled = !caps.includes("tree");
   $("native").disabled = !caps.includes("native_elements");
   $("logs").disabled = !caps.includes("diagnostics");
+  $("network").disabled = !caps.includes("network");
   $("timing").disabled = !caps.includes("timing");
   $("trace-start").disabled = !caps.includes("trace");
   $("trace-stop").disabled = !caps.includes("trace");
@@ -257,6 +258,7 @@ $("snap").onclick = () => run(() => capture(targets.value));
 $("tree").onclick = () => inspect("inspect_ui_tree");
 $("native").onclick = () => inspect("query_native_ui");
 $("logs").onclick = () => inspect("query_ui_logs");
+$("network").onclick = () => inspect("query_ui_network");
 $("timing").onclick = () => inspect("record_ui_timings");
 $("trace-start").onclick = () => inspect("start_ui_trace");
 $("trace-stop").onclick = () => inspect("stop_ui_trace");

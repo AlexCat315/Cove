@@ -182,6 +182,7 @@ pub fn definitions() -> Vec<AgentTool> {
     );
     tools.extend([
         tool("get_ui_session", "List connected Cove runtimes, platform windows, displays, and configured WebDriver sessions.", vec![], &[], true),
+        tool("request_ui_permissions", "Prompt macOS for Screen Recording and Accessibility access. Restart the controller after granting.", vec![], &[], false),
         tool("bind_ui_target", "Associate a runtime with its window, shared screen, or WebDriver session.", vec![("platform_target",text())], &["target","platform_target"], false),
         tool("inspect_ui_tree", "Read the selected runtime's Cove tree.", vec![], &[], true),
         tool("select_ui_node", "Highlight a Cove node or clear the highlight when node_id is omitted.", vec![("node_id",text())], &[], false),
