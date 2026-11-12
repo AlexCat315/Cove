@@ -35,3 +35,4 @@ __pycache__/
 .vscode/settings.json
 /Tools/MediaSmoke/target/
 /Tools/MediaSmoke/Cargo.lock
+Cargo.lock
