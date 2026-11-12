@@ -565,7 +565,7 @@ impl<Value: PartialEq + Clone + Send + Sync + 'static> PrimitiveView for Combobo
             node.composition_value(&cove_composition::adaptive::SurfaceEnvironment::key());
         let mut row: Vec<AnyView> = vec![AnyView::new(
             Text::new(self.title.clone())
-                .truncated()
+                .truncating_tail()
                 .semantic_font(SemanticFontRef::label())
                 .semantic_foreground(if self.is_placeholder {
                     SemanticColorRef::placeholder()
@@ -986,7 +986,7 @@ impl<Value: PartialEq + Clone + Send + Sync + 'static> PrimitiveView for Combobo
                 let is_highlighted = highlighted.as_ref() == Some(&option.value);
                 let mut row: Vec<AnyView> = vec![AnyView::new(
                     Text::new(option.label.clone())
-                        .truncated()
+                        .truncating_tail()
                         .semantic_font(SemanticFontRef::label())
                         .semantic_foreground(if option.is_enabled {
                             SemanticColorRef::on_surface()

@@ -1035,6 +1035,45 @@ fn touch_menus_drill_into_branches_in_one_modal_and_dismiss_after_activation() {
 }
 
 #[test]
+fn touch_menu_back_then_redrill_rebuilds_the_navigation_path() {
+    let fixture = Fixture::new(Sample::Menu);
+    let calls = fixture.calls.clone();
+    InteractiveScene::run(390.0, 844.0, |scene| {
+        scene.install(fixture.clone());
+        let trigger = titled_button(scene, "Commands").expect("the menu trigger is mounted");
+        scene.click(&trigger, 1);
+        let labelled = |title: &str| {
+            scene.first(|node| {
+                node.accessibility()
+                    .is_some_and(|semantics| semantics.role == AccessibilityRole::Button)
+                    && cove_core::scene::AccessibilityTree::resolved_label(node) == title
+            })
+        };
+
+        // Drill in, back out, then drill in again: each push must extend the current
+        // level's path, not a path captured before the back navigation.
+        scene.click(&labelled("More").expect("More"), 1);
+        assert!(scene.named("touch-menu-back").is_some(), "the first drill shows back");
+        scene.click(&scene.named("touch-menu-back").expect("back row"), 1);
+        assert!(
+            scene.named("touch-menu-back").is_none(),
+            "back returns to the root level"
+        );
+        scene.click(&labelled("More").expect("More again"), 1);
+        assert!(
+            scene.named("touch-menu-back").is_some(),
+            "re-drilling shows back again"
+        );
+        scene.click(&labelled("Export").expect("Export"), 1);
+        assert_eq!(calls.get(), 10, "Export runs after a back-and-re-drill");
+        assert!(
+            scene.named("touch-overlay-sheet").is_none(),
+            "activation dismisses the sheet"
+        );
+    });
+}
+
+#[test]
 fn popover_sheets_avoid_the_keyboard_and_restore_anchored_presentation_for_pointer_input() {
     let fixture = Fixture::new(Sample::Popover);
     let surface = fixture.surface.clone();

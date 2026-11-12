@@ -26,6 +26,10 @@ pub struct PortalEntry {
     pub placement: PortalPlacementMode,
     pub parent_id: Option<String>,
     pub is_exiting: bool,
+    /// A non-interactive tooltip chip, not a menu/popover/dialog surface. Lets
+    /// inspectors and tests tell an overlay apart from the tip explaining its
+    /// trigger, since both share the same store.
+    pub is_tooltip: bool,
     pub fit: PortalFitConstraints,
     /// Resolve against measured content in the same layout pass as the slot.
     pub position_for_size: Option<Rc<dyn Fn(Size) -> Point>>,
@@ -46,6 +50,7 @@ impl PortalEntry {
             placement: PortalPlacementMode::BelowAnchor,
             parent_id: None,
             is_exiting: false,
+            is_tooltip: false,
             fit: PortalFitConstraints::default(),
             position_for_size: None,
         }
@@ -103,6 +108,14 @@ impl PortalStore {
     /// The live entry registered under `id`.
     pub fn entry(&self, id: &str) -> Option<PortalEntry> {
         self.inner.borrow().storage.get(id).cloned()
+    }
+
+    /// Flags the entry under `id` as a tooltip chip so consumers can separate
+    /// tips from the overlays they describe.
+    pub fn mark_tooltip(&self, id: &str) {
+        if let Some(entry) = self.inner.borrow_mut().storage.get_mut(id) {
+            entry.is_tooltip = true;
+        }
     }
 
     pub fn revision(&self) -> i64 {
@@ -805,6 +818,15 @@ impl PortalResource {
             && let Some(store) = self.store()
         {
             store.set_dismissal(&id, anchor, dismiss);
+        }
+    }
+
+    /// Flags this resource's live entry as a tooltip chip.
+    pub fn mark_tooltip(&self) {
+        if let Some(id) = self.entry_id.borrow().clone()
+            && let Some(store) = self.store()
+        {
+            store.mark_tooltip(&id);
         }
     }
 }

@@ -187,7 +187,7 @@ impl View for StatusBarText {
                 SemanticFontRef::caption()
             };
             let main = Text::new(text.clone())
-                .truncated()
+                .truncating_tail()
                 .semantic_font(font.clone())
                 .semantic_foreground(ink.clone())
                 .frame_min_width(0.0)
@@ -195,7 +195,7 @@ impl View for StatusBarText {
             items.push(AnyView::new(main));
             if !detail.is_empty() {
                 let detail_view = Text::new(detail.clone())
-                    .truncated()
+                    .truncating_tail()
                     .semantic_font(font)
                     .semantic_foreground(SemanticColorRef::on_surface_muted())
                     .frame_min_width(0.0)

@@ -336,7 +336,7 @@ impl PrimitiveView for MenuButtonLabel {
             BoxView::new(
                 FlexDirection::Row, Align::Center, Justify::FlexStart, Wrap::NoWrap, 6.0,
                 AnyView::new(TupleView::new(vec![
-                    AnyView::new(Text::new(self.title.clone()).truncated()),
+                    AnyView::new(Text::new(self.title.clone()).truncating_tail()),
                     AnyView::new(crate::primitives::controls::button::ButtonIcon::new(
                         crate::primitives::controls::button::ButtonIconSource::resource(
                             crate::primitives::media::ui_icon_catalog::navigation::dropdown_chevron_down(),

@@ -24,6 +24,7 @@ use cove_shell::{NativeRenderSurface, WindowChromeHitTest};
 use cove_ui_compose::primitives::overlays::portal::portal_registry::{
     PortalStore, PortalStoreAmbient,
 };
+use cove_ui_compose::primitives::overlays::TooltipArbitrationAmbient;
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -147,11 +148,19 @@ impl AuxiliaryAppWindow {
         let logical_h = self.logical_h;
         let did_install_root = self.did_install_root;
         let session = self.session.clone();
-        // Scope this window's overlay store for every consumer that reads the
-        // process ambient, so one window's popover cannot paint into another's.
-        let ambient: Rc<dyn cove_core::scene::ScopedAmbient> =
-            Rc::new(PortalStoreScope::new(self.portal_store.clone()));
-        session.input_context.add_scoped_ambient(ambient);
+        // Scope this window's overlay store and tooltip arbiter for every
+        // consumer that reads the process ambient, so one window's popover
+        // cannot paint into another's. Registered once: `add_scoped_ambient`
+        // dedups by pointer identity, and each call would otherwise append a
+        // fresh `Rc`, stacking duplicate ambients on every re-init.
+        if !did_install_root {
+            let ambient: Rc<dyn cove_core::scene::ScopedAmbient> =
+                Rc::new(PortalStoreScope::new(self.portal_store.clone()));
+            session.input_context.add_scoped_ambient(ambient);
+            session
+                .input_context
+                .add_scoped_ambient(Rc::new(TooltipArbitrationAmbient::new()));
+        }
         session.with_current(|| {
             configure_text_environment(session.content_scale_factor());
             if !did_install_root {

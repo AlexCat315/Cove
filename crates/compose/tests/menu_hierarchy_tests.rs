@@ -32,7 +32,7 @@ use std::rc::Rc;
 use cove_composition::{AnyView, DynamicField, View, ViewExt};
 use cove_core::scene::{AccessibilityRole, Node};
 use cove_core::{Binding, Point, Rect, Size, State};
-use cove_platform::KeyModifiers;
+use cove_platform::{InputEvent, KeyModifiers, MouseMotionEvent};
 use cove_ui_compose::Scancode;
 use cove_ui_compose::modifiers::layout::AbsolutePositionModifier;
 use cove_ui_compose::primitives::overlays::Popover;
@@ -577,6 +577,91 @@ fn a_nested_branch_follows_its_clamped_parent_on_every_pass() {
                 assert_eq!(placed, expected, "revision {revision}, level {level}");
             }
         }
+    });
+}
+
+#[test]
+fn an_open_submenu_reports_its_frame_to_arm_the_crossing_grace() {
+    InteractiveScene::run(640.0, 400.0, |scene| {
+        let probe = Rc::new(Cell::new(0));
+        let actions = probe.clone();
+        let harness = MenuHarness::new(move |_| {
+            vec![
+                MenuEntry::Submenu(MenuSubmenu::new(
+                    1,
+                    "Tools",
+                    vec![item(2, "Build", &actions, 1)],
+                )),
+                MenuEntry::Item(MenuItem::new(3, "Copy", || {})),
+            ]
+        });
+        scene.install(harness.clone());
+        harness.shown_state().set(true);
+        scene.settle(5, 1.0);
+
+        let branch = row(scene, 1);
+        scene
+            .registry
+            .handlers(&branch)
+            .hover
+            .expect("the branch row handles hover")(cove_core::scene::HoverPhase::Enter);
+        scene.settle(3, 0.2);
+        assert_eq!(scene.portal.entries().len(), 2, "the Tools branch is open");
+
+        // The child panel reports its frame back to the parent session through
+        // on_frame; that reported frame is what arms the safe triangle.
+        let branch_frame = branch.absolute_frame();
+        let child_id = scene.portal.entries()[1].id.clone();
+        let child_slot = scene
+            .first(|node| {
+                node.attachment::<String>(PortalOwnership::ENTRY_KEY).as_deref()
+                    == Some(child_id.as_str())
+            })
+            .expect("the branch slot is mounted");
+        let child_frame = child_slot.absolute_frame();
+        assert!(
+            child_frame.x >= branch_frame.x + branch_frame.width - 1.0,
+            "the child opens beside the row, not over it"
+        );
+
+        // Record a rightward pointer path within the parent panel, heading into the
+        // child. The motion route feeds the parent session's pointer intent.
+        let centre_y = branch_frame.y + branch_frame.height / 2.0;
+        let motion = |x: f32, y: f32| {
+            InputEvent::MouseMotion(MouseMotionEvent {
+                x,
+                y,
+                delta_x: 0.0,
+                delta_y: 0.0,
+                kind: Default::default(),
+            })
+        };
+        let dispatcher = scene.dispatcher();
+        dispatcher.dispatch(&motion(branch_frame.x + 10.0, centre_y));
+        dispatcher.dispatch(&motion(branch_frame.x + branch_frame.width - 5.0, centre_y));
+
+        // Hovering a sibling row while heading into the open submenu waits the longer
+        // crossing delay (0.45s), not the ordinary 0.18s hover-out delay.
+        let sibling = row(scene, 3);
+        scene
+            .registry
+            .handlers(&sibling)
+            .hover
+            .expect("the sibling row handles hover")(cove_core::scene::HoverPhase::Enter);
+        scene.settle(1, 0.2);
+        assert_eq!(
+            scene.portal.entries().len(),
+            2,
+            "the crossing grace keeps the branch open past the ordinary delay"
+        );
+
+        // Once the grace elapses the sibling wins and the branch closes.
+        scene.settle(2, 0.2);
+        assert_eq!(
+            scene.portal.entries().len(),
+            1,
+            "after the crossing grace the sibling row takes over"
+        );
     });
 }
 

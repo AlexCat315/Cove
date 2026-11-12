@@ -11,7 +11,7 @@ use cove_composition::{AnyView, PrimitiveView, View};
 use cove_core::Point;
 use cove_core::scene::{
     Align, AnimatorScheduler, EventResult, FlexDirection, HoverPhase, InputHandlerRoute,
-    InteractionRegistryHolder, LayoutNode, Node, NodeResource, Wrap,
+    InteractionRegistryHolder, LayoutNode, Node, NodeResource, NodeWeak, Wrap,
 };
 
 use crate::BoxView;
@@ -19,7 +19,9 @@ use crate::modifiers::interaction::HoverExt;
 use crate::modifiers::layout::PaddingExt;
 use crate::modifiers::style::SurfaceStyleExt;
 use crate::primitives::controls::button::{Button, ButtonRole};
-use crate::primitives::overlays::portal::{PortalPlacementMode, PortalResource, PortalStoreHolder};
+use crate::primitives::overlays::portal::{
+    PortalPlacementMode, PortalResource, PortalStoreEnvironment, PortalStoreHolder,
+};
 use crate::theme::styles::buttons::ButtonStyleViewExt;
 use crate::theme::theme_for_node;
 
@@ -219,7 +221,7 @@ crate::impl_primitive_view!(HoverCardHost);
 
 /// Delays, hover intent and portal ownership share the node's lifetime.
 struct HoverCardSession {
-    node: RefCell<Option<Node>>,
+    node: RefCell<Option<NodeWeak>>,
     content: RefCell<Option<AnyView>>,
     options: RefCell<HoverCardTiming>,
     trigger_hovered: Cell<bool>,
@@ -230,6 +232,13 @@ struct HoverCardSession {
     elapsed: Cell<f64>,
     is_finished: Cell<bool>,
     me: RefCell<Weak<HoverCardSession>>,
+    /// Captured at mount so the timer registers and unregisters against the
+    /// window's scheduler, the way Swift holds `weak scheduler`.
+    scheduler: RefCell<Option<AnimatorScheduler>>,
+    /// One stable controller identity: re-registering the same `Rc` is deduped
+    /// by the scheduler, so a refresh can never stack a second clock that
+    /// advances `elapsed` twice per frame.
+    clock: RefCell<Option<Rc<ClockRef>>>,
 }
 
 impl HoverCardSession {
@@ -246,9 +255,24 @@ impl HoverCardSession {
             elapsed: Cell::new(0.0),
             is_finished: Cell::new(true),
             me: RefCell::new(Weak::new()),
+            scheduler: RefCell::new(None),
+            clock: RefCell::new(None),
         });
         *session.me.borrow_mut() = Rc::downgrade(&session);
         session
+    }
+
+    /// The single scheduled controller, created once with a weak back-reference
+    /// so its identity stays stable across register/unregister cycles.
+    fn clock(&self) -> Rc<ClockRef> {
+        if let Some(clock) = self.clock.borrow().as_ref() {
+            return clock.clone();
+        }
+        let clock = Rc::new(ClockRef {
+            session: self.me.borrow().clone(),
+        });
+        *self.clock.borrow_mut() = Some(clock.clone());
+        clock
     }
 
     fn set_trigger_hovered(&self, value: bool) {
@@ -297,8 +321,9 @@ impl HoverCardSession {
         } else {
             options.close_delay
         };
-        self.elapsed.set(0.0);
-        if delay == 0.0 {
+        // `elapsed` resets only when the pending direction changes (above), so a
+        // recomposition or a repeated hover callback cannot starve the timer.
+        if self.elapsed.get() >= delay {
             self.stop_waiting();
             if wanted {
                 self.show()
@@ -309,46 +334,41 @@ impl HoverCardSession {
         }
         if self.is_finished.get() {
             self.is_finished.set(false);
-            AnimatorScheduler::current().register(Rc::new(ClockRef {
-                session: self.me.borrow().clone(),
-            }));
+            if let Some(scheduler) = self.scheduler.borrow().as_ref() {
+                scheduler.register(self.clock());
+            }
         }
     }
 
-    /// Advance the open/close timer; returns whether more ticks are needed.
+    /// Advance the open/close timer, then re-evaluate intent the way Swift's
+    /// `tick` calls `refresh`; returns whether more ticks are needed.
     fn tick(&self, delta_time: f64) -> bool {
-        if self.is_finished.get() {
+        if self.is_finished.get() || self.node.borrow().is_none() {
             return false;
         }
-        self.elapsed
-            .set(self.elapsed.get() + delta_time.clamp(0.0, 60.0));
-        let options = *self.options.borrow();
-        let wanted = self.pending.get().unwrap_or(false);
-        let delay = if wanted {
-            options.open_delay
-        } else {
-            options.close_delay
-        };
-        if self.elapsed.get() >= delay {
-            self.stop_waiting();
-            if wanted {
-                self.show()
-            } else {
-                self.hide()
-            };
-            return false;
+        if !delta_time.is_finite() || delta_time <= 0.0 {
+            return !self.is_finished.get();
         }
-        true
+        self.elapsed.set(self.elapsed.get() + delta_time.min(60.0));
+        self.refresh();
+        !self.is_finished.get()
     }
 
     fn stop_waiting(&self) {
         self.is_finished.set(true);
         self.pending.set(None);
         self.elapsed.set(0.0);
+        if let (Some(scheduler), Some(clock)) = (
+            self.scheduler.borrow().as_ref(),
+            self.clock.borrow().as_ref(),
+        ) {
+            let controller: Rc<dyn cove_core::scene::AnyAnimationController> = clock.clone();
+            scheduler.unregister(&controller);
+        }
     }
 
     fn show(&self) {
-        let Some(node) = self.node.borrow().clone() else {
+        let Some(node) = self.node.borrow().as_ref().and_then(Node::upgrade) else {
             return;
         };
         if !node.accepts_subtree_input() {
@@ -371,7 +391,7 @@ impl HoverCardSession {
             0.0,
             content,
         )
-        .padding_edges(theme_for_node(&node).spacing.md, 0.0)
+        .padding(theme_for_node(&node).spacing.md)
         .floating_surface(theme_for_node(&node).radius.md)
         .on_hover(move |hovered| {
             if let Some(session) = weak.upgrade() {
@@ -381,7 +401,10 @@ impl HoverCardSession {
         let position = self.position(&node);
         if let Some(resource) = node.first_resource::<PortalResource>() {
             resource.present(
-                Some(PortalStoreHolder::current()),
+                Some(
+                    node.composition_value(&PortalStoreEnvironment::key())
+                        .unwrap_or_else(PortalStoreHolder::current),
+                ),
                 position,
                 options.width,
                 AnyView::new(HoverCardAccessory {
@@ -390,14 +413,20 @@ impl HoverCardSession {
                     content: AnyView::new(card),
                 }),
                 false,
-                PortalPlacementMode::Fixed,
+                // Below the trigger, flipping above it when the window has no
+                // room underneath — the same fit rule every anchored overlay uses.
+                PortalPlacementMode::BelowAnchor,
                 None,
                 None,
             );
-            let anchor_node = node.clone();
+            let anchor_node = node.downgrade();
             let weak = self.me.borrow().clone();
             resource.set_dismissal(
-                Rc::new(move || anchor_node.absolute_frame()),
+                Rc::new(move || {
+                    Node::upgrade(&anchor_node)
+                        .map(|node| node.absolute_frame())
+                        .unwrap_or_default()
+                }),
                 Rc::new(move || {
                     if let Some(session) = weak.upgrade() {
                         session.dismiss();
@@ -436,7 +465,7 @@ impl HoverCardSession {
         self.stop_waiting();
         self.presented.set(false);
         self.card_hovered.set(false);
-        if let Some(node) = self.node.borrow().clone()
+        if let Some(node) = self.node.borrow().as_ref().and_then(Node::upgrade)
             && let Some(resource) = node.first_resource::<PortalResource>()
         {
             resource.unmount(&node);
@@ -446,12 +475,14 @@ impl HoverCardSession {
 
 impl NodeResource for HoverCardSession {
     fn mount(&self, node: &Node) {
-        *self.node.borrow_mut() = Some(node.clone());
+        *self.node.borrow_mut() = Some(node.downgrade());
+        *self.scheduler.borrow_mut() = Some(AnimatorScheduler::current());
     }
 
     fn unmount(&self, _node: &Node) {
         self.hide();
         *self.node.borrow_mut() = None;
+        *self.scheduler.borrow_mut() = None;
         *self.content.borrow_mut() = None;
     }
 
@@ -469,7 +500,7 @@ impl cove_core::scene::AnyAnimationController for ClockRef {
     fn is_finished(&self) -> bool {
         self.session
             .upgrade()
-            .is_none_or(|session| !session.tick(0.0) && session.is_finished.get())
+            .is_none_or(|session| session.is_finished.get())
     }
 
     fn tick(&self, delta_time: f64) {

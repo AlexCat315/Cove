@@ -28,6 +28,9 @@ pub(crate) struct MenuLevelHost {
     pub rows: AnyView,
     pub on_key: Rc<dyn Fn(&cove_platform::KeyEvent, &Node) -> bool>,
     pub on_text: Rc<dyn Fn(&str, &Node) -> bool>,
+    /// Reports the panel's measured frame to the parent level so its pointer
+    /// intent can build the safe triangle toward an open submenu.
+    pub on_frame: Option<Rc<dyn Fn(cove_core::Rect)>>,
 }
 
 impl PrimitiveView for MenuLevelHost {
@@ -132,6 +135,7 @@ impl PrimitiveView for MenuLevelHost {
             .modifier(MenuScrollMarker { inset: PANEL_INSET })
             .modifier(MenuWindowBounds {
                 max_visible_rows: self.max_visible_rows,
+                on_frame: self.on_frame.clone(),
             });
         let panel = match self.width {
             Some(width) => AnyView::new(marked.frame_width(width.max(80.0))),
@@ -163,6 +167,7 @@ impl cove_composition::ViewModifier for MenuScrollMarker {
 /// Clamps the panel to the visible row budget and the window bounds.
 struct MenuWindowBounds {
     max_visible_rows: usize,
+    on_frame: Option<Rc<dyn Fn(cove_core::Rect)>>,
 }
 
 impl cove_composition::ViewModifier for MenuWindowBounds {
@@ -174,6 +179,7 @@ impl cove_composition::ViewModifier for MenuWindowBounds {
         layout.set_max_height(Some(budgeted_height(node, max_visible_rows)));
         let weak = node.downgrade();
         let previous_update = node.layout_did_update();
+        let on_frame = self.on_frame.clone();
         node.set_layout_did_update(Some(Rc::new(move |owner: &Node| {
             if let Some(update) = &previous_update {
                 update(owner);
@@ -187,6 +193,9 @@ impl cove_composition::ViewModifier for MenuWindowBounds {
             let height = budgeted_height(&node, max_visible_rows);
             if layout.max_height() != Some(height) {
                 layout.set_max_height(Some(height));
+            }
+            if let Some(report) = &on_frame {
+                report(node.absolute_frame());
             }
         }) as cove_core::scene::LayoutUpdateHook));
     }

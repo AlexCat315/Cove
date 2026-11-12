@@ -569,7 +569,12 @@ impl MenuLevel {
                                             session.set_navigation(state);
                                         }
                                     })),
-                                    on_frame: None,
+                                    on_frame: Some(Rc::new({
+                                        let session = self.session.clone();
+                                        move |frame: cove_core::Rect| {
+                                            session.pointer.borrow_mut().submenu_frame = Some(frame);
+                                        }
+                                    })),
                                 },
                                 self.session.child(branch.id),
                             ),
@@ -877,6 +882,7 @@ impl View for MenuLevel {
             rows: AnyView::new(crate::TupleView::new(rows)),
             on_key,
             on_text,
+            on_frame: self.configuration.on_frame.clone(),
         })
     }
 }

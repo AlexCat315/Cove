@@ -10,18 +10,17 @@
 //! - the delay is validated: a non-finite value falls back to the authored default,
 //!   a negative one clamps to zero, and a valid one is kept
 //!
-//! Named differences (production gaps, recorded rather than fixed): Swift's suite
-//! tested a *derived* per-host predicate, `ButtonHost.tooltipAddsText(to:)`, which
-//! compared a button's tooltip against the text it actually draws — including text
-//! marked `accessibilityHidden`, which was the bug the suite was written for. Rust
-//! has no such predicate:
-//! - `ButtonHost` never derives one, so there is no way to ask "would this tooltip
-//!   add information". `no_derived_tooltip_predicate` pins that.
-//! - The four Swift cases built on it (repeated label suppressed, hidden label
-//!   counted as drawn text, a distinct tooltip kept, a Select trigger staying
-//!   quiet) therefore have no counterpart. What Rust does provide is the opt-in
-//!   `only_when_truncated` gate, which the first three tests below exercise at full
-//!   strength instead.
+//! Swift's suite tested a *derived* per-host predicate, `ButtonHost.tooltipAddsText(to:)`,
+//! which compared a button's tooltip against the text it actually draws — including text
+//! marked `accessibilityHidden`, the bug the suite was written for. Rust implements the
+//! same predicate as `ButtonHost::tooltip_adds_text` and wires it into the tooltip session
+//! as the `canShow` closure (`Button::update_tooltip`). The predicate is private, so these
+//! tests observe it through the public `TooltipSession::is_active()`, whose final term *is*
+//! that closure for an enabled, hovered button with the default options. The four Swift
+//! cases are reproduced below — repeated label suppressed, hidden label counted as drawn
+//! text, a distinct tooltip kept, a Select trigger staying quiet — plus the truncation
+//! branch Rust adds: a clipped label presents its matching tooltip because the ellipsis
+//! hides information the pointer user still needs.
 
 use crate::support;
 
@@ -29,12 +28,17 @@ use std::cell::Cell;
 use std::rc::Rc;
 
 use cove_composition::{AnyView, PrimitiveView};
-use cove_core::scene::{Node, NodeResource};
+use cove_core::Binding;
+use cove_core::scene::{AccessibilityRole, Node, NodeResource};
+use cove_ui_compose::modifiers::interaction::AccessibilityExt;
+use cove_ui_compose::primitives::controls::Button;
+use cove_ui_compose::primitives::controls::fields::select::{Select, SelectOption};
 use cove_ui_compose::primitives::overlays::portal::PortalResource;
 use cove_ui_compose::primitives::overlays::tooltip::{
-    PORTAL_ATTACHMENT, TooltipArbitration, TooltipOptions, TooltipSession,
+    PORTAL_ATTACHMENT, TEXT_TRUNCATED, TooltipArbitration, TooltipOptions, TooltipSession,
 };
 use cove_ui_compose::primitives::text::Text;
+use cove_ui_compose::theme::styles::buttons::builtin_button_chrome::BUTTON_HOST_MARKER_KEY;
 
 use support::{GlobalTestLock, InteractiveScene};
 
@@ -215,57 +219,114 @@ fn only_when_truncated_gates_on_the_target_clipping_its_text() {
     });
 }
 
+/// Mounts a button and returns its host node and tooltip session. The host carries
+/// the button marker; `Button::update_tooltip` installs the session on that same node
+/// and wires `tooltip_adds_text` as its `canShow` predicate.
+fn mount_button(scene: &mut InteractiveScene, button: Button) -> (Node, Rc<TooltipSession>) {
+    scene.install(AnyView::new(button));
+    let host = scene
+        .first(|node| node.attachment::<bool>(BUTTON_HOST_MARKER_KEY).is_some())
+        .expect("the button host is mounted");
+    let session = host
+        .first_resource::<TooltipSession>()
+        .expect("a button with a tooltip carries a session");
+    (host, session)
+}
+
 #[test]
-fn no_derived_tooltip_predicate() {
-    // Gap: see the module note. Swift's `ButtonHost.tooltipAddsText(to:)` has no
-    // Rust counterpart, so a caller cannot ask whether a tooltip would add
-    // information for a given host.
-    GlobalTestLock::locked(|| {
-        use cove_ui_compose::primitives::controls::Button;
-
-        let graph = support::graph();
-        graph.install_view(
-            AnyView::new(Button::with_options(
-                Text::new("Medium"),
-                || {},
-                cove_ui_compose::primitives::controls::ButtonRole::Normal,
-                true,
-                false,
-                false,
-                Some("Medium".to_string()),
-            )),
-            Default::default(),
-        );
-
-        let root = graph.tree.borrow().root().expect("root");
-        let mut collected = vec![root.clone()];
-        let mut cursor = 0;
-        while cursor < collected.len() {
-            let children = collected[cursor].children();
-            collected.extend(children);
-            cursor += 1;
-        }
-
-        let host = collected
-            .iter()
-            .find(|node| {
-                node.accessibility().is_some_and(|semantics| {
-                    semantics.role == cove_core::scene::AccessibilityRole::Button
-                })
-            })
-            .expect("the button host is mounted");
-
-        // The tooltip reaches `semantics.help`, but nothing derives whether it is
-        // redundant with the label.
-        assert_eq!(
-            host.accessibility().expect("semantic host").help,
-            "Medium",
-            "the tooltip is published as help text"
-        );
+fn a_button_tooltip_repeating_its_label_is_suppressed() {
+    InteractiveScene::run(320.0, 60.0, |scene| {
+        let (_host, session) =
+            mount_button(scene, Button::title("Medium", || {}).tooltip("Medium"));
+        session.set_hovered(true);
         assert!(
-            host.attachment::<Rc<dyn Fn() -> bool>>("__tooltip_adds_text")
-                .is_none(),
-            "no derived tooltip-information predicate is published"
+            !session.is_active(),
+            "a tooltip equal to the drawn label adds nothing, so it stays hidden"
+        );
+        scene.settle(2, 1.0);
+        assert!(!session.is_presented(), "the redundant tip never presents");
+        assert!(scene.portal.entries().is_empty(), "nothing is published");
+    });
+}
+
+#[test]
+fn a_hidden_label_still_counts_as_drawn_text() {
+    InteractiveScene::run(320.0, 60.0, |scene| {
+        // The bug Swift's suite was written for: a label hidden from accessibility is
+        // still drawn, so a tooltip repeating it must stay hidden.
+        let (_host, session) = mount_button(
+            scene,
+            Button::new(Text::new("Medium").accessibility_hidden(true), || {}).tooltip("Medium"),
+        );
+        session.set_hovered(true);
+        assert!(
+            !session.is_active(),
+            "drawn text includes accessibility-hidden labels, so the tip is redundant"
+        );
+    });
+}
+
+#[test]
+fn a_distinct_button_tooltip_is_kept() {
+    InteractiveScene::run(320.0, 60.0, |scene| {
+        let (_host, session) = mount_button(
+            scene,
+            Button::title("Medium", || {}).tooltip("Canvas text size"),
+        );
+        session.set_hovered(true);
+        assert!(
+            session.is_active(),
+            "a tooltip that adds information survives the dedup predicate"
+        );
+        scene.settle(2, 1.0);
+        assert!(
+            session.is_presented(),
+            "the distinct tip presents once its delay elapses"
+        );
+        let entries = scene.portal.entries();
+        assert_eq!(entries.len(), 1, "exactly one tooltip chip appears");
+        assert!(entries[0].is_tooltip, "the published entry is a tooltip");
+    });
+}
+
+#[test]
+fn a_truncated_label_presents_its_matching_tooltip() {
+    InteractiveScene::run(320.0, 60.0, |scene| {
+        let (_host, session) =
+            mount_button(scene, Button::title("Medium", || {}).tooltip("Medium"));
+        // The painter marks a clipped label while drawing; simulate that mark so the
+        // predicate's truncation branch is observable without a paint pass.
+        let label = scene
+            .labelled("Medium", Some(AccessibilityRole::StaticText))
+            .expect("the button draws its title");
+        label.set_attachment(TEXT_TRUNCATED, true);
+        session.set_hovered(true);
+        assert!(
+            session.is_active(),
+            "an ellipsized label hides information, so its matching tooltip presents"
+        );
+    });
+}
+
+#[test]
+fn a_select_trigger_does_not_repeat_its_selected_value() {
+    InteractiveScene::run(200.0, 60.0, |scene| {
+        scene.install(AnyView::new(
+            Select::new(Binding::constant(1), vec![SelectOption::new(1, "Medium", true)])
+                .width(160.0),
+        ));
+        let host = scene
+            .first(|node| {
+                node.accessibility()
+                    .is_some_and(|semantics| semantics.role == AccessibilityRole::ComboBox)
+            })
+            .expect("the select trigger is mounted");
+        // The selected value is the trigger's name and value, never help: repeating it
+        // as help would make the system describe it twice.
+        assert_eq!(host.accessibility().expect("semantic host").help, "");
+        assert!(
+            host.first_resource::<TooltipSession>().is_none(),
+            "a select trigger installs no tooltip session"
         );
     });
 }

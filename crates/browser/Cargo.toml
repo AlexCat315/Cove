@@ -11,6 +11,7 @@ crate-type = ["rlib", "cdylib"]
 
 [dependencies]
 cove-composition.workspace = true
+cove-ui-compose = { path = "../compose" }
 cove-core.workspace = true
 cove-platform.workspace = true
 cove-graphics.workspace = true

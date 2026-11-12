@@ -590,7 +590,7 @@ fn an_open_settings_menu_keeps_the_controls_up() {
             })
             .expect("settings trigger");
         scene.click(&settings, 1);
-        assert!(!scene.portal.entries().is_empty(), "the menu is open");
+        assert!(!scene.overlay_portals().is_empty(), "the menu is open");
 
         std::thread::sleep(std::time::Duration::from_millis(80));
         scene.settle(3, 1.0 / 60.0);
@@ -600,7 +600,7 @@ fn an_open_settings_menu_keeps_the_controls_up() {
         );
 
         scene.click(&settings, 1);
-        assert!(scene.portal.entries().is_empty(), "the menu closed");
+        assert!(scene.overlay_portals().is_empty(), "the menu closed");
         // Resting on the bar keeps it up; once the pointer is over the picture,
         // idleness hides it again.
         let video = scene
@@ -640,7 +640,7 @@ fn position_reports_do_not_re_present_an_open_menu() {
             })
             .expect("settings trigger");
         scene.click(&settings, 1);
-        assert!(!scene.portal.entries().is_empty(), "the menu is open");
+        assert!(!scene.overlay_portals().is_empty(), "the menu is open");
         let revision = scene.portal.revision();
         for second in 1..=20u64 {
             control.change(|snapshot| {
@@ -683,7 +683,7 @@ fn rebuilding_the_settings_menu_keeps_an_open_submenu_in_place() {
     }
     /// The submenu's on-screen frame, checked against its row.
     fn placed_submenu(scene: &InteractiveScene, label: &str) -> Rect {
-        let entries = scene.portal.entries();
+        let entries = scene.overlay_portals();
         assert_eq!(entries.len(), 2, "{label}: one menu and one submenu");
         let entry = &entries[1];
         let slot = scene

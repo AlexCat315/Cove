@@ -178,6 +178,12 @@ impl PrimitiveView for MenuItemRowHost {
         if let Some(layout) = node.layout_node() {
             layout.set_min_height(Some(natural_row_height(node)));
         }
+        // A row node can be reused across recomposition when its entry changes
+        // from a plain item into a submenu; attach the portal resource on update
+        // too, not only at creation, so the branch can still present.
+        if self.item.has_submenu && node.first_resource::<PortalResource>().is_none() {
+            node.add_resource(PortalResource::new());
+        }
         node.set_is_focusable(self.item.is_enabled);
         node.set_is_tab_stop(self.item.is_enabled && self.is_highlighted);
         let focus_events = self.events.focus.clone();
@@ -508,10 +514,14 @@ impl PrimitiveView for MenuItemRowHost {
             ));
         } else {
             // Styled spans render as real runs, display-only: the row is the only
-            // hit target, so links inside a title must not take focus.
+            // hit target, so links inside a title must not take focus. They share
+            // the plain title's font and ink so a highlighted or destructive row
+            // inverts the rich runs together with the rest of the label.
             labels.push(AnyView::new(
                 crate::primitives::text::Text::runs(self.item.content.rich_title.clone())
-                    .display_only(true),
+                    .display_only(true)
+                    .semantic_font(SemanticFontRef::label())
+                    .foreground_color(title_color),
             ));
         }
         if let Some(detail) = self.item.content.detail.clone() {

@@ -400,8 +400,8 @@ impl PrimitiveView for WindowDragRegion {
         vec![AnyView::new(
             Text::new(&self.title)
                 .alignment(TextAlignment::Center)
-                .truncated()
                 .display_only(true)
+                .truncated()
                 .semantic_font(SemanticFontRef::caption())
                 .semantic_foreground(SemanticColorRef::on_surface_variant())
                 .frame_min_width(0.0)

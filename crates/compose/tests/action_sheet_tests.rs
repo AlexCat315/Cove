@@ -253,9 +253,9 @@ fn lifecycle_closes_before_execution_and_returns_focus() {
 
         let _first = button(scene, "Duplicate project");
         assert_eq!(
-            scene.portal.entries().len(),
+            scene.overlay_portals().len(),
             1,
-            "an open drawer publishes exactly one portal entry"
+            "an open drawer publishes exactly one overlay portal"
         );
         // Gap: Swift focused the first enabled action on a wide drawer. Rust
         // focuses the header's close control there instead (the first tab stop in
@@ -282,7 +282,7 @@ fn lifecycle_closes_before_execution_and_returns_focus() {
         scene.settle(8, 1.0);
         assert!(!open.get(), "the close control dismisses");
         assert_eq!(*result.borrow(), "None", "dismissing runs no action");
-        assert!(scene.portal.entries().is_empty(), "the drawer unmounts");
+        assert!(scene.overlay_portals().is_empty(), "the drawer unmounts");
 
         // An action runs exactly once and cannot reopen the sheet.
         open.set(true);
@@ -298,7 +298,7 @@ fn lifecycle_closes_before_execution_and_returns_focus() {
         assert!(!open.get(), "the row closes the sheet");
         assert_eq!(*result.borrow(), "Deleted", "the row ran its action");
         assert_eq!(calls.get(), 1, "a repeated activation does nothing");
-        assert!(scene.portal.entries().is_empty());
+        assert!(scene.overlay_portals().is_empty());
     });
 }
 

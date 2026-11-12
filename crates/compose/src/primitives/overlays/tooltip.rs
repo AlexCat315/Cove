@@ -10,14 +10,20 @@ use std::cell::{Cell, RefCell};
 use std::rc::{Rc, Weak};
 
 use crate::impl_primitive_view;
-use crate::modifiers::layout::LayoutFrameExt;
-use crate::primitives::overlays::portal::{PortalPlacementMode, PortalResource, PortalStoreHolder};
+use crate::modifiers::interaction::HitTestingExt;
+use crate::modifiers::layout::{LayoutFrameExt, PaddingExt};
+use crate::modifiers::style::{AppearanceExt, SemanticStyleViewExt};
+use crate::primitives::overlays::portal::{
+    PortalPlacementMode, PortalResource, PortalStore, PortalStoreEnvironment, PortalStoreHolder,
+};
+use crate::primitives::text::Text;
+use crate::theme::SemanticColorRef;
 use cove_composition::{AnyView, PrimitiveView, View};
 use cove_core::scene::{
     Align, AnimatorScheduler, EventResult, FocusChainHolder, HoverPhase, InputHandlerRoute,
-    InteractionRegistryHolder, LayoutNode, Node, NodeResource, PointerPhase,
+    InteractionRegistryHolder, LayoutNode, Node, NodeResource, NodeWeak, PointerPhase,
 };
-use cove_core::{Point, Rect, Size};
+use cove_core::{Color, Font, FontWeight, Point, Rect, Size};
 
 /// How long the pointer must rest before a tip appears.
 pub const DEFAULT_DELAY: f64 = 0.6;
@@ -225,6 +231,26 @@ fn now() -> f64 {
         .map_or(0.0, |elapsed| elapsed.as_secs_f64())
 }
 
+fn contains_truncated_text(node: &Node) -> bool {
+    if node.attachment::<bool>(TEXT_TRUNCATED) == Some(true) {
+        return true;
+    }
+    node.children().iter().any(contains_truncated_text)
+}
+
+/// The shared chip: inverted fill so it reads on both themes.
+pub fn tooltip_description(description: impl Into<String>) -> AnyView {
+    AnyView::new(
+        Text::new(description.into())
+            .font(Font::system(11.0, FontWeight::Regular))
+            .semantic_foreground(SemanticColorRef::background())
+            .padding_edges(8.0, 5.0)
+            .semantic_background(SemanticColorRef::on_surface())
+            .corner_radius(5.0)
+            .shadow(Color::from_rgba8(0, 0, 0, 51), 0.0, 2.0, 8.0),
+    )
+}
+
 fn is_descendant(node: &Node, ancestor: &Node) -> bool {
     let mut parent = node.parent();
     while let Some(candidate) = parent {
@@ -238,7 +264,9 @@ fn is_descendant(node: &Node, ancestor: &Node) -> bool {
 
 /// The rest/dismiss/hover state machine behind one target.
 pub struct TooltipSession {
-    node: RefCell<Option<Node>>,
+    node: RefCell<Option<NodeWeak>>,
+    store: RefCell<Option<Rc<PortalStore>>>,
+    clock_generation: Cell<u64>,
     content: RefCell<Option<AnyView>>,
     options: RefCell<TooltipOptions>,
     hovered: Cell<bool>,
@@ -262,6 +290,8 @@ impl Default for TooltipSession {
     fn default() -> Self {
         Self {
             node: RefCell::new(None),
+            store: RefCell::new(None),
+            clock_generation: Cell::new(0),
             content: RefCell::new(None),
             options: RefCell::new(TooltipOptions::default()),
             hovered: Cell::new(false),
@@ -280,7 +310,11 @@ impl Default for TooltipSession {
 
 impl NodeResource for TooltipSession {
     fn mount(&self, node: &Node) {
-        *self.node.borrow_mut() = Some(node.clone());
+        *self.node.borrow_mut() = Some(node.downgrade());
+        *self.store.borrow_mut() = Some(
+            node.composition_value(&PortalStoreEnvironment::key())
+                .unwrap_or_else(PortalStoreHolder::current),
+        );
         *self.owner.borrow_mut() = TooltipArbitration::current();
         if let Some(arbitration) = self.arbitration() {
             let weak = self.me_weak();
@@ -299,6 +333,7 @@ impl NodeResource for TooltipSession {
         }
         *self.owner.borrow_mut() = None;
         *self.node.borrow_mut() = None;
+        *self.store.borrow_mut() = None;
     }
 
     fn as_any_rc(self: Rc<Self>) -> Rc<dyn std::any::Any> {
@@ -321,7 +356,7 @@ impl TooltipSession {
     }
 
     pub fn anchor_node(&self) -> Option<Node> {
-        self.node.borrow().clone()
+        self.node.borrow().as_ref().and_then(Node::upgrade)
     }
 
     pub fn is_presented(&self) -> bool {
@@ -414,6 +449,7 @@ impl TooltipSession {
             self.is_finished.set(false);
             AnimatorScheduler::current().register(Rc::new(ClockRef {
                 session: self.me_weak(),
+                generation: self.clock_generation.get(),
             }));
         }
     }
@@ -430,10 +466,7 @@ impl TooltipSession {
     /// A truncated label marks its node while drawing. Text that fits keeps the
     /// tooltip hidden, so hovering ordinary labels stays quiet.
     fn shows_truncated_text(&self) -> bool {
-        self.node
-            .borrow()
-            .as_ref()
-            .is_some_and(|node| node.attachment::<bool>(TEXT_TRUNCATED) == Some(true))
+        self.anchor_node().is_some_and(|node| contains_truncated_text(&node))
     }
 
     /// Advance the rest timer. Returns `true` while it still needs ticks.
@@ -455,7 +488,7 @@ impl TooltipSession {
     }
 
     fn show(&self) {
-        let Some(node) = self.node.borrow().clone() else {
+        let Some(node) = self.anchor_node() else {
             return;
         };
         if !node.accepts_subtree_input() {
@@ -467,35 +500,35 @@ impl TooltipSession {
         if !(self.can_show.borrow())() {
             return;
         }
-        let Some(arbitration) = self.arbitration() else {
-            return;
-        };
-        if arbitration.has_inner_active(self) {
+        let arbitration = self.arbitration();
+        if arbitration
+            .as_ref()
+            .is_some_and(|arbitration| arbitration.has_inner_active(self))
+        {
             return;
         }
         self.presented.set(true);
         // One tip at a time: anything already on screen gives way to this one.
-        arbitration.hide_others(self);
-        arbitration.note_shown();
+        if let Some(arbitration) = &arbitration {
+            arbitration.hide_others(self);
+            arbitration.note_shown();
+        }
         let anchor = node.absolute_frame();
         let gap = self.options.borrow().gap;
         let window = window_bounds(&node);
         let options = self.options.borrow().clone();
         let sized_content = AnyView::new(ContentBox {
-            content: AnyView::new(content.frame(
-                None,
-                None,
-                None,
-                None,
-                Some(options.max_width),
-                None,
-            )),
+            content: AnyView::new(
+                content
+                    .frame(None, None, None, None, Some(options.max_width), None)
+                    .allows_hit_testing(false),
+            ),
         });
         let position_for_size =
             Rc::new(move |size: Size| Self::resting_spot(size, anchor, gap, window));
         if let Some(resource) = portal_resource(&node) {
             resource.present(
-                Some(PortalStoreHolder::current()),
+                self.store.borrow().clone(),
                 Self::resting_spot(Size::default(), anchor, gap, window),
                 None,
                 sized_content,
@@ -504,9 +537,14 @@ impl TooltipSession {
                 Some(position_for_size),
                 None,
             );
-            let anchor_node = node.clone();
+            resource.mark_tooltip();
+            let anchor_node = node.downgrade();
             resource.set_dismissal(
-                Rc::new(move || anchor_node.absolute_frame()),
+                Rc::new(move || {
+                    Node::upgrade(&anchor_node)
+                        .map(|node| node.absolute_frame())
+                        .unwrap_or_default()
+                }),
                 Rc::new({
                     let weak = self.me_weak();
                     move || {
@@ -536,7 +574,7 @@ impl TooltipSession {
     }
 
     pub fn update_position(&self) {
-        let Some(node) = self.node.borrow().clone() else {
+        let Some(node) = self.anchor_node() else {
             return;
         };
         if !node.accepts_subtree_input() {
@@ -566,7 +604,8 @@ impl TooltipSession {
         let was_presented = self.presented.get();
         self.is_finished.set(true);
         self.presented.set(false);
-        if let Some(node) = self.node.borrow().clone()
+        self.clock_generation.set(self.clock_generation.get().wrapping_add(1));
+        if let Some(node) = self.anchor_node()
             && let Some(resource) = portal_resource(&node)
         {
             resource.unmount(&node);
@@ -626,29 +665,37 @@ crate::impl_primitive_view!(ContentBox);
 /// A scheduled session tick, so the rest timer only needs the scheduler.
 struct ClockRef {
     session: Weak<TooltipSession>,
+    generation: u64,
+}
+
+impl ClockRef {
+    fn session(&self) -> Option<Rc<TooltipSession>> {
+        self.session
+            .upgrade()
+            .filter(|session| session.clock_generation.get() == self.generation)
+    }
 }
 
 impl cove_core::scene::AnyAnimationController for ClockRef {
     fn is_finished(&self) -> bool {
-        self.session
-            .upgrade()
+        self.session()
             .is_none_or(|session| session.is_finished())
     }
 
     fn tick(&self, delta_time: f64) {
-        if let Some(session) = self.session.upgrade() {
+        if let Some(session) = self.session() {
             session.tick(delta_time);
         }
     }
 
     fn finish_immediately(&self) {
-        if let Some(session) = self.session.upgrade() {
+        if let Some(session) = self.session() {
             session.hide();
         }
     }
 
     fn cancel(&self) {
-        if let Some(session) = self.session.upgrade() {
+        if let Some(session) = self.session() {
             session.hide();
         }
     }
@@ -696,6 +743,19 @@ impl cove_core::scene::ScopedAmbient for TooltipArbitrationAmbient {
         TooltipArbitration::activate(Some(self.arbitration.clone()))
     }
 }
+
+/// Attaches a managed description to any view.
+pub trait TooltipExt: View + Sized + 'static {
+    fn tooltip(self, description: impl Into<String>) -> Tooltip {
+        Tooltip::new(self, tooltip_description(description))
+    }
+
+    /// A description that is redundant unless the target had to clip text.
+    fn tooltip_when_truncated(self, description: impl Into<String>) -> Tooltip {
+        self.tooltip(description).only_when_truncated(true)
+    }
+}
+impl<T: View + Sized + 'static> TooltipExt for T {}
 
 /// An arbitrary target and non-interactive description, presented outside
 /// clipping through the portal.
@@ -850,13 +910,19 @@ impl CoordinateTooltipHost {
         let anchor = self.anchor.rect();
         let options = self.options.clone();
         let content = AnyView::new(ContentBox {
-            content: AnyView::new(SizeLimited {
-                content: self.content.clone(),
-                max_width: options.max_width,
-            }),
+            content: AnyView::new(
+                SizeLimited {
+                    content: self.content.clone(),
+                    max_width: options.max_width,
+                }
+                .allows_hit_testing(false),
+            ),
         });
         resource.present(
-            Some(PortalStoreHolder::current()),
+            Some(
+                node.composition_value(&PortalStoreEnvironment::key())
+                    .unwrap_or_else(PortalStoreHolder::current),
+            ),
             Point::new(anchor.x, anchor.y + anchor.height + options.gap),
             // The tip occupies its authored maximum width so a long message
             // wraps inside it instead of collapsing to one character next to
@@ -872,6 +938,7 @@ impl CoordinateTooltipHost {
             })),
             None,
         );
+        resource.mark_tooltip();
         let target = anchor;
         resource.set_dismissal(Rc::new(move || target), Rc::new(|| {}));
     }

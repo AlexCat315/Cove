@@ -14,12 +14,12 @@ use cove_core::scene::{Align, FlexDirection, Justify, Wrap};
 use cove_ui_compose::modifiers::interaction::AccessibilityExt;
 use cove_ui_compose::modifiers::layout::LayoutFrameExt;
 use cove_ui_compose::modifiers::style::SemanticStyleViewExt;
-use cove_ui_compose::primitives::controls::Button;
+use cove_ui_compose::primitives::controls::{Button, KeyboardShortcut, MenuButton};
 use cove_ui_compose::primitives::layout::{
     DisclosureGroup, MobileTabBar, TabItem, TabOverflow, TabVariant, TabView,
 };
 use cove_ui_compose::primitives::media::Icon;
-use cove_ui_compose::primitives::overlays::menu::{MenuEntry, MenuItem, MenuSubmenu};
+use cove_ui_compose::primitives::overlays::menu::{MenuEntry, MenuItem, MenuItemRole, MenuSubmenu};
 use cove_ui_compose::primitives::overlays::{Modal, ModalOptions, Popover};
 use cove_ui_compose::primitives::text::Text;
 use cove_ui_compose::primitives::text::text_buffer::TextBuffer;
@@ -77,35 +77,55 @@ pub fn leaf_count(entries: &[MenuEntry]) -> usize {
 ///
 /// `is_enabled` gates the interactive commands; `checked` drives the pin's check
 /// mark. Disabled entries stay visible so the menu can explain itself.
-pub fn workspace_entries(is_enabled: bool, checked: bool) -> Vec<MenuEntry> {
+pub fn workspace_entries(
+    is_enabled: bool,
+    checked: &State<bool>,
+    status: &State<String>,
+) -> Vec<MenuEntry> {
+    let command = |id, title, message: &'static str| {
+        let status = status.clone();
+        MenuItem::new(id, title, move || status.set(message.to_owned()))
+    };
+    let pin = {
+        let checked = checked.clone();
+        let status = status.clone();
+        move || {
+            checked.update(|value| *value = !*value);
+            status.set(if checked.get() { "Pinned" } else { "Unpinned" }.to_owned());
+        }
+    };
     vec![
         MenuEntry::Label {
             id: 100,
             title: "Workspace".to_owned(),
         },
-        MenuEntry::Item(MenuItem::new(101, "Copy", || {}).enabled(is_enabled)),
         MenuEntry::Item(
-            MenuItem::new(102, "Pin item", || {})
+            command(101, "Copy", "Copied")
+                .shortcut(KeyboardShortcut::primary("C").display_string())
+                .enabled(is_enabled),
+        ),
+        MenuEntry::Item(
+            MenuItem::new(102, "Pin item", pin)
                 .enabled(is_enabled)
-                .selected(checked),
+                .selected(checked.get()),
         ),
         MenuEntry::separator(103),
         MenuEntry::Submenu(MenuSubmenu {
             id: 104,
             title: "Settings".to_owned(),
             entries: vec![
-                MenuEntry::Item(MenuItem::new(105, "General", || {})),
+                MenuEntry::Item(command(105, "General", "General settings")),
                 MenuEntry::Submenu(MenuSubmenu {
                     id: 106,
                     title: "Appearance".to_owned(),
                     entries: vec![
-                        MenuEntry::Item(MenuItem::new(107, "System theme", || {}).selected(true)),
+                        MenuEntry::Item(command(107, "System theme", "System theme").selected(true)),
                         MenuEntry::Submenu(MenuSubmenu {
                             id: 108,
                             title: "Accent color".to_owned(),
                             entries: vec![
-                                MenuEntry::Item(MenuItem::new(109, "Blue", || {})),
-                                MenuEntry::Item(MenuItem::new(110, "Green", || {})),
+                                MenuEntry::Item(command(109, "Blue", "Blue accent")),
+                                MenuEntry::Item(command(110, "Green", "Green accent")),
                             ],
                             is_enabled: true,
                             width: SUBMENU_WIDTH,
@@ -123,35 +143,47 @@ pub fn workspace_entries(is_enabled: bool, checked: bool) -> Vec<MenuEntry> {
             icon: None,
         }),
         MenuEntry::Item(MenuItem::new(112, "Unavailable", || {}).enabled(false)),
-        MenuEntry::Item(MenuItem::new(113, "Delete", || {}).enabled(is_enabled)),
+        MenuEntry::Item(
+            command(113, "Delete", "Deleted")
+                .enabled(is_enabled)
+                .role(MenuItemRole::Destructive),
+        ),
     ]
 }
 
 /// Builds the 100-entry menu, where every tenth row is a group submenu.
-pub fn many_entries() -> Vec<MenuEntry> {
+pub fn many_entries(status: &State<String>) -> Vec<MenuEntry> {
     (0..MANY_COMMANDS)
         .map(|index| {
+            let command = |id, title: String, message: String| {
+                let status = status.clone();
+                MenuItem::new(id, title, move || status.set(message.clone()))
+            };
             if index % GROUP_STRIDE == 0 {
                 MenuEntry::Submenu(MenuSubmenu {
                     id: 1_000 + index as u64,
                     title: format!("Group {index}"),
                     entries: vec![
-                        MenuEntry::Item(MenuItem::new(
+                        MenuEntry::Item(command(
                             2_000 + index as u64,
-                            "Inspect group",
-                            || {},
+                            "Inspect group".to_owned(),
+                            format!("Inspect group {index}"),
                         )),
-                        MenuEntry::Item(MenuItem::new(3_000 + index as u64, "Export group", || {})),
+                        MenuEntry::Item(command(
+                            3_000 + index as u64,
+                            "Export group".to_owned(),
+                            format!("Export group {index}"),
+                        )),
                     ],
                     is_enabled: true,
                     width: SUBMENU_WIDTH,
                     icon: None,
                 })
             } else {
-                MenuEntry::Item(MenuItem::new(
+                MenuEntry::Item(command(
                     4_000 + index as u64,
                     format!("Command {index}"),
-                    || {},
+                    format!("Command {index}"),
                 ))
             }
         })
@@ -171,7 +203,7 @@ pub fn tab_after_close(documents: &[String], closed: usize) -> Option<String> {
     Some(documents[index].clone())
 }
 
-/// `MenuStory`: the native menu with nested branches.
+/// `MenuStory`: native and custom menus sharing nested commands and state.
 pub struct MenuStory {
     pub options: GalleryOptions,
     status: State<String>,
@@ -209,11 +241,11 @@ impl MenuStory {
     }
 
     pub fn entries(&self) -> Vec<MenuEntry> {
-        workspace_entries(self.options.is_enabled, self.checked.get())
+        workspace_entries(self.options.is_enabled, &self.checked, &self.status)
     }
 
     pub fn many(&self) -> Vec<MenuEntry> {
-        many_entries()
+        many_entries(&self.status)
     }
 
     /// The column check boxes: each selection toggles one bit.
@@ -273,49 +305,43 @@ impl View for MenuStory {
             )
         };
 
-        let copy = {
-            let status = self.status.clone();
-            MenuItem::new(101, "Copy", move || status.set("Copied".to_owned())).enabled(enabled)
-        };
-        let pin = {
-            let status = self.status.clone();
-            let checked = self.checked.clone();
-            MenuItem::new(102, "Pin item", move || {
-                checked.update(|value| *value = !*value);
-                status.set("Pinned".to_owned());
-            })
-            .enabled(enabled)
-            .selected(self.checked.get())
-        };
-        let native_entries = vec![
-            MenuEntry::Label {
-                id: 100,
-                title: "Workspace".to_owned(),
-            },
-            MenuEntry::Item(copy),
-            MenuEntry::Item(pin),
-            MenuEntry::separator(103),
-            MenuEntry::Submenu(MenuSubmenu {
-                id: 104,
-                title: "Settings".to_owned(),
-                entries: vec![
-                    MenuEntry::Item(MenuItem::new(105, "General", || {})),
-                    MenuEntry::Item(MenuItem::new(111, "Restricted", || {}).enabled(false)),
-                    MenuEntry::Item(MenuItem::new(112, "Delete project", || {}).enabled(enabled)),
-                ],
-                is_enabled: enabled,
-                width: SUBMENU_WIDTH,
-                icon: None,
-            }),
-        ];
+        let entries = self.entries();
         let native = AnyView::new(
             cove_ui_compose::primitives::controls::MenuButtonTitle::new(
                 "Workspace",
-                native_entries,
+                entries.clone(),
             )
             .enabled(enabled)
             .width(220.0)
             .debug_name("menu-native"),
+        );
+
+        let custom = AnyView::new(
+            MenuButton::new(
+                entries,
+                AnyView::new(BoxView::new(
+                    FlexDirection::Row,
+                    Align::Center,
+                    Justify::FlexStart,
+                    Wrap::NoWrap,
+                    6.0,
+                    AnyView::new(TupleView::new(vec![
+                        AnyView::new(Text::new("Show menu")),
+                        AnyView::new(
+                            Icon::new(
+                                cove_ui_compose::primitives::media::ui_icon_catalog::navigation::chevron_down(),
+                                12.0,
+                            )
+                            .accessibility_hidden(true),
+                        ),
+                    ])),
+                )),
+            )
+            .composed()
+            .accessibility_label("Show menu")
+            .enabled(enabled)
+            .width(220.0)
+            .debug_name("menu-custom"),
         );
 
         let columns = AnyView::new(BoxView::new(
@@ -368,6 +394,11 @@ impl View for MenuStory {
                             native,
                             AnyView::new(AnyView::new(caption(self.status())).debug_name("menu-status")),
                         ])),
+                    )),
+                    AnyView::new(StorySection::new(
+                        "Custom menu",
+                        "The same commands rendered by Cove.",
+                        custom,
                     )),
                     AnyView::new(StorySection::new(
                         "Selection columns",

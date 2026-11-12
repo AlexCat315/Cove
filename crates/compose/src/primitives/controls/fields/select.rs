@@ -265,7 +265,7 @@ impl<Value: PartialEq + Clone + Send + Sync + 'static> View for Select<Value> {
             AnyView::new(TupleView::new(vec![
                 AnyView::new(
                     Text::new(selected_label.clone())
-                        .truncated()
+                        .truncating_tail()
                         .semantic_font(SemanticFontRef::body())
                         .flex_with(1.0, 1.0, None)
                         .frame_min_width(0.0),

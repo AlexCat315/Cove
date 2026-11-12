@@ -20,3 +20,14 @@ pub fn install_application(factory: fn() -> crate::ApplicationLaunch) {
 pub fn application() -> Option<fn() -> crate::ApplicationLaunch> {
     APPLICATION.get().copied()
 }
+
+/// Installs one browser surface's overlay services before its graph mounts.
+/// Call once per input context, not when a frame or surface is recreated.
+pub fn install_overlay_services(context: &cove_core::scene::PlatformInputContext) {
+    use cove_ui_compose::primitives::overlays::TooltipArbitrationAmbient;
+    use cove_ui_compose::primitives::overlays::portal::{PortalStore, PortalStoreAmbient};
+    use std::rc::Rc;
+
+    context.add_scoped_ambient(Rc::new(PortalStoreAmbient::new(Rc::new(PortalStore::new()))));
+    context.add_scoped_ambient(Rc::new(TooltipArbitrationAmbient::new()));
+}

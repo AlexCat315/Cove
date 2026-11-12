@@ -627,7 +627,7 @@ impl<Id: PartialEq + Clone + std::hash::Hash + 'static> PrimitiveView for TabStr
         label_row.push(AnyView::new(
             AnyView::new(
                 Text::new(self.tab.label.clone())
-                    .truncated()
+                    .truncating_tail()
                     .semantic_font(SemanticFontRef::label())
                     .accessibility_hidden(true),
             )

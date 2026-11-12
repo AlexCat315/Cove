@@ -29,8 +29,8 @@ use crate::desktop::window::native_renderer::AppWindowRenderSettings;
 use crate::desktop::window::state::MainWindowState;
 use cove_composition::AnyView;
 use cove_core::scene::{
-    ClipboardHolder, FocusChainHolder, InteractionRegistryHolder, PointerCaptureHolder,
-    UIWorkSchedulerHolder,
+    ClipboardHolder, FocusChainHolder, InteractionRegistryHolder, PlatformInputContext,
+    PointerCaptureHolder, UIWorkSchedulerHolder,
 };
 use cove_core::{
     DevicePreset, Environment, EnvironmentOverride, Font, FontWeight, InputCapabilities, Insets,
@@ -49,6 +49,7 @@ use cove_ui_compose::primitives::interaction::{DroppedFile, FileDropRegistryHold
 use cove_ui_compose::primitives::overlays::portal::portal_registry::{
     PortalStore, PortalStoreAmbient,
 };
+use cove_ui_compose::primitives::overlays::TooltipArbitrationAmbient;
 use std::cell::{Cell, RefCell};
 use std::collections::{BTreeMap, HashMap};
 use std::rc::{Rc, Weak};
@@ -1291,6 +1292,7 @@ impl Application {
                 context.add_scoped_ambient(Rc::new(PortalStoreScope::new(
                     composition.portal_store.clone(),
                 )));
+                context.add_scoped_ambient(Rc::new(TooltipArbitrationAmbient::new()));
                 context.with_current(|| {
                     chrome::with_window_chrome_context(window_id, || {
                         // The portal store is scoped per window by the input context
@@ -1826,7 +1828,11 @@ impl Application {
             &name,
             tree,
             recomposer,
-            state.host.input_context(),
+            // An auxiliary window owns its focus chain, pointer capture and
+            // overlay ambients. Sharing the main window's context would stack a
+            // second portal store on the same ambient scope and let one window's
+            // focus/tooltip state leak into the other.
+            Rc::new(PlatformInputContext::new()),
             options,
         ) {
             Ok(session) => session,

@@ -143,7 +143,7 @@ fn tab_item<Id: std::hash::Hash + Eq + Clone + PartialEq + Send + Sync + 'static
     }
     column_items.push(AnyView::new(
         crate::primitives::text::Text::new(tab.label.clone())
-            .truncated()
+            .truncating_tail()
             .semantic_font(SemanticFontRef::caption())
             .accessibility_hidden(true),
     ));
@@ -225,7 +225,7 @@ fn more_item<Id: std::hash::Hash + Eq + Clone + PartialEq + Send + Sync + 'stati
             ),
             AnyView::new(
                 crate::primitives::text::Text::new("More")
-                    .truncated()
+                    .truncating_tail()
                     .semantic_font(SemanticFontRef::caption())
                     .accessibility_hidden(true),
             ),

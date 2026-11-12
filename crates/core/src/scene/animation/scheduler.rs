@@ -108,3 +108,14 @@ impl AnimatorScheduler {
         self.0.completions.borrow_mut().clear();
     }
 }
+
+impl crate::scene::ScopedAmbient for AnimatorScheduler {
+    fn activate(&self) -> Box<dyn FnOnce()> {
+        let previous = CURRENT.with(|current| current.replace(self.clone()));
+        Box::new(move || {
+            CURRENT.with(|current| {
+                current.replace(previous);
+            });
+        })
+    }
+}

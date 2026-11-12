@@ -61,7 +61,11 @@ impl Scancode {
     pub const F1: u32 = 58;
     pub const F2: u32 = 59;
     pub const F9: u32 = 66;
+    pub const F10: u32 = 67;
     pub const F12: u32 = 69;
+    /// The keyboard's context-menu key (SDL `APPLICATION`), the hardware
+    /// equivalent of a secondary click.
+    pub const APPLICATION: u32 = 101;
 }
 
 /// Unambiguous spelling for clients that also import an engine/runtime module

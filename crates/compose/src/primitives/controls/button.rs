@@ -2,6 +2,10 @@
 use crate::Scope;
 use crate::primitives::media::{Image, ImageContentMode, ImageRenderingMode, ImageSource};
 use crate::primitives::text::Text;
+use crate::primitives::overlays::portal::PortalResource;
+use crate::primitives::overlays::tooltip::{
+    PORTAL_ATTACHMENT, TEXT_TRUNCATED, TooltipOptions, TooltipSession, tooltip_description,
+};
 pub use crate::theme::styles::buttons::ButtonRole;
 use crate::theme::styles::buttons::{
     AnyButtonStyle, ButtonStyleConfiguration, ButtonStyleEnvironment,
@@ -9,7 +13,7 @@ use crate::theme::styles::buttons::{
 use crate::theme::{ControlSizeEnvironment, IconMetrics, IconMetricsReader, theme_for_node};
 use crate::{AnyView, BoxView, DynamicField, PrimitiveView, TupleView, View, impl_primitive_view};
 use cove_core::scene::{
-    AccessibilityActions, AccessibilityRole, AccessibilitySemantics, Align, CompositionLocal,
+    AccessibilityActions, AccessibilityRole, AccessibilitySemantics, AccessibilityTree, Align, CompositionLocal,
     EventPhase, EventResult, FlexDirection, FocusChainHolder, HoverPhase, InputHandlerRoute,
     InteractionRegistryHolder, Justify, LayoutNode, Node, PointerCaptureAttachmentKey,
     PointerCaptureHolder, PointerPhase, TextInputAttachmentKey, TextInputFocusChangeHandler,
@@ -109,7 +113,7 @@ impl Button {
 
     pub fn title(title: impl Into<String>, action: impl Fn() + 'static) -> Self {
         let title = title.into();
-        let mut button = Self::new(Text::new(title.clone()).truncated(), action);
+        let mut button = Self::new(Text::new(title.clone()).truncating_tail(), action);
         button.accessibility_text = Some(title);
         button
     }
@@ -334,6 +338,71 @@ impl ButtonHost {
         WindowRevealContext::record_activation(node);
         action();
     }
+
+    fn comparable(text: &str) -> String {
+        text.to_lowercase()
+            .trim_matches(|c: char| c.is_whitespace() || matches!(c, '.' | '…' | ':' | '：'))
+            .to_string()
+    }
+
+    fn tooltip_adds_text(node: &Node) -> bool {
+        let tooltip = Self::comparable(&node.accessibility().map_or_else(String::new, |s| s.help));
+        if tooltip.is_empty() {
+            return false;
+        }
+        let visible = Self::comparable(&AccessibilityTree::drawn_text(node));
+        // Drawn text includes accessibility-hidden labels, but retains their full
+        // accessible names even when the painter ellipsizes them. Do not mistake
+        // those unpainted suffixes for information already visible to the user.
+        visible.is_empty() || !visible.contains(&tooltip) || Self::has_truncated_text(node)
+    }
+
+    fn has_truncated_text(node: &Node) -> bool {
+        node.is_layout_visible()
+            && node.opacity() > 0.0
+            && node.subtree_opacity() > 0.0
+            && (node.attachment::<bool>(TEXT_TRUNCATED) == Some(true)
+                || node.children().iter().any(Self::has_truncated_text))
+    }
+
+    fn update_tooltip(&self, node: &Node) {
+        let Some(description) = self.tooltip.as_deref().map(str::trim).filter(|s| !s.is_empty()) else {
+            if let Some(session) = node.first_resource::<TooltipSession>() {
+                session.dismiss();
+            }
+            node.set_layout_did_update(None);
+            return;
+        };
+        let portal = node.first_resource::<PortalResource>().unwrap_or_else(|| {
+            let portal = PortalResource::new();
+            node.add_resource(portal.clone());
+            portal
+        });
+        node.set_attachment(PORTAL_ATTACHMENT, portal);
+        let session = node.first_resource::<TooltipSession>().unwrap_or_else(|| {
+            let session = TooltipSession::new();
+            node.add_resource(session.clone());
+            session
+        });
+        let weak_node = node.downgrade();
+        session.configure(
+            tooltip_description(description),
+            TooltipOptions { is_enabled: self.is_enabled, ..Default::default() },
+            FocusChainHolder::current().is_some_and(|chain| {
+                chain.is_focus_visible() && chain.focused().as_ref() == Some(node)
+            }),
+            Rc::new(move || Node::upgrade(&weak_node).is_some_and(|node| Self::tooltip_adds_text(&node))),
+        );
+        if !self.is_enabled || !crate::primitives::controls::adaptive::supports_control_hover(node) {
+            session.set_hovered(false);
+        }
+        let weak_session = Rc::downgrade(&session);
+        node.set_layout_did_update(Some(Rc::new(move |_| {
+            if let Some(session) = weak_session.upgrade() {
+                session.update_position();
+            }
+        })));
+    }
 }
 impl PrimitiveView for ButtonHost {
     fn make_node(&self) -> Node {
@@ -390,6 +459,7 @@ impl PrimitiveView for ButtonHost {
             }));
         }
         node.set_accessibility_actions(actions);
+        self.update_tooltip(node);
 
         let focus_state = self.focused.clone();
         let focus_node = node.downgrade();
@@ -401,6 +471,9 @@ impl PrimitiveView for ButtonHost {
             }
             if let Some(node) = Node::upgrade(&focus_node) {
                 crate::theme::styles::buttons::update_builtin_button_chrome_descendants(&node);
+                if let Some(session) = node.first_resource::<TooltipSession>() {
+                    session.set_focused(visible);
+                }
             }
         });
         node.set_attachment(TextInputAttachmentKey::FOCUS_CHANGE_HANDLER, focus_change);
@@ -425,12 +498,17 @@ impl PrimitiveView for ButtonHost {
         };
         let supports_hover = crate::primitives::controls::adaptive::supports_control_hover(node);
         let hovered = self.hovered.clone();
-        let hover_node = node.clone();
+        let hover_node = node.downgrade();
         registry.set_hover(
             node,
             Rc::new(move |phase| {
-                let value = phase == HoverPhase::Enter && supports_hover;
-                Self::write_interaction(&hover_node, HOVERED, &hovered, value, recompose);
+                let Some(node) = Node::upgrade(&hover_node) else { return };
+                let value = phase == HoverPhase::Enter
+                    && crate::primitives::controls::adaptive::supports_control_hover(&node);
+                if let Some(session) = node.first_resource::<TooltipSession>() {
+                    session.set_hovered(value);
+                }
+                Self::write_interaction(&node, HOVERED, &hovered, value, recompose);
             }),
         );
 
@@ -462,6 +540,9 @@ impl PrimitiveView for ButtonHost {
                 };
                 match phase {
                     PointerPhase::Down => {
+                        if let Some(session) = node.first_resource::<TooltipSession>() {
+                            session.dismiss();
+                        }
                         node.set_attachment(ACTIVE_PRESS, true);
                         if let Some(capture) = PointerCaptureHolder::current() {
                             capture.acquire(&node, true);

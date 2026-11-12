@@ -19,7 +19,9 @@ use std::time::Instant;
 
 use cove_composition::ViewGraph;
 use cove_core::DrawList;
-use cove_core::scene::{EventDispatcher, NodeRenderer, NodeTree, PlatformInputContext, Recomposer};
+use cove_core::scene::{
+    AnimatorScheduler, EventDispatcher, NodeRenderer, NodeTree, PlatformInputContext, Recomposer,
+};
 use cove_devtools::client::DevToolsSession;
 use cove_devtools::inspection::SceneInspector;
 use cove_devtools_protocol::{
@@ -68,6 +70,8 @@ pub struct BrowserPrototype<C: PrototypeContent> {
     inspector: SceneInspector,
     graph: Rc<ViewGraph>,
     recomposer: Rc<Recomposer>,
+    animations: AnimatorScheduler,
+    last_animation_tick: Instant,
     draw_list: DrawList,
     fonts: FontCollection,
     raster_scale: f32,
@@ -112,6 +116,12 @@ impl<C: PrototypeContent> BrowserPrototype<C> {
         );
         let inspector =
             SceneInspector::new(tree.clone(), Some(context.invalidation_log.clone()), None);
+        // One portal store and tooltip arbiter for this surface, installed before
+        // the graph mounts so presenters and the portal host resolve the same
+        // store. The browser drives a single window, so the thread-local animator
+        // scheduler is captured once and ticked each frame.
+        cove_hosts::wasm::install_overlay_services(&context);
+        let animations = AnimatorScheduler::current();
         context.with_current(|| content.install(&graph));
         let mut fonts = FontCollection::new(ATLAS_SIZE, ATLAS_SIZE);
         fonts.configure(16.0, 1.0);
@@ -123,6 +133,8 @@ impl<C: PrototypeContent> BrowserPrototype<C> {
             inspector,
             graph,
             recomposer,
+            animations,
+            last_animation_tick: Instant::now(),
             draw_list: DrawList::default(),
             fonts,
             raster_scale: 1.0,
@@ -202,6 +214,16 @@ impl<C: PrototypeContent> BrowserPrototype<C> {
         pixels
     }
 
+    /// Whether the JS host should request another animation frame: an overlay
+    /// animation is running, composition is queued, or the tree has unflushed
+    /// render updates. `render` flushes the tree, so this settles to `false`
+    /// once the surface is idle.
+    pub fn needs_frame(&self) -> bool {
+        self.animations.has_active_animations()
+            || self.recomposer.has_pending()
+            || self.tree.borrow().has_render_updates()
+    }
+
     /// Appends a font face; returns its id, or `None` when rejected.
     pub fn append_font(&mut self, bytes: &[u8]) -> Option<i64> {
         if bytes.is_empty() || bytes.len() > MAX_PAYLOAD || self.fonts.font_count() >= 8 {
@@ -215,7 +237,24 @@ impl<C: PrototypeContent> BrowserPrototype<C> {
         let started = Instant::now();
         let (width, height) = viewport_size(raw_width, raw_height);
 
-        self.recomposer.commit_all();
+        // Advance overlay/menu animations and commit composition inside the
+        // surface's ambient scope, so a controller registered while composing
+        // resolves this window's portal store and tooltip arbiter. The delta is
+        // capped so a long idle gap cannot skip an animation outright.
+        let delta = started
+            .duration_since(self.last_animation_tick)
+            .as_secs_f64()
+            .min(0.1);
+        self.last_animation_tick = started;
+        let animations = self.animations.clone();
+        let context = &self.context;
+        let recomposer = &self.recomposer;
+        animations.with_current(|| {
+            context.with_current(|| {
+                animations.tick(delta);
+                recomposer.commit_all();
+            });
+        });
         self.recomposition_ms = started.elapsed().as_secs_f64() * 1000.0;
 
         let layout_started = Instant::now();

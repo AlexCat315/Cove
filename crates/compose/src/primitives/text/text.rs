@@ -110,10 +110,24 @@ impl Text {
         self
     }
 
-    /// Draw one fitted line and record whether it was shortened.
-    pub fn truncated(mut self) -> Self {
+    /// Draw one fitted line and record whether it was shortened. Controls with
+    /// their own tooltip use this to avoid nesting descriptions.
+    pub fn truncating_tail(mut self) -> Self {
         self.truncates = true;
         self
+    }
+
+    /// A single fitted line with a full-text tooltip that appears only when the
+    /// line actually had to clip.
+    pub fn truncated(self) -> crate::AnyView {
+        let description = self.string.clone();
+        crate::AnyView::new(
+            crate::primitives::overlays::tooltip::Tooltip::new(
+                self.truncating_tail(),
+                crate::primitives::overlays::tooltip::tooltip_description(description),
+            )
+            .only_when_truncated(true),
+        )
     }
 
     fn metrics_for_layout(layout: &LayoutNode, environment: &TextEnvironment) -> TextMetrics {

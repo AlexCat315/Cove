@@ -19,6 +19,7 @@ use std::rc::Rc;
 use crate::modifiers::interaction::AccessibilityExt;
 use crate::modifiers::layout::{FlexExt, LayoutFrameExt, PaddingExt};
 use crate::modifiers::style::SemanticStyleViewExt;
+use crate::primitives::layout::ResolvedLayoutDirection;
 use crate::primitives::media::ui_icon_catalog;
 use crate::primitives::overlays::menu::{MenuEntry, MenuItemRole, MenuRowPresentation};
 use crate::primitives::overlays::roving_focus::{RovingFocusHost, RovingItem, SelectionNavigation};
@@ -30,7 +31,7 @@ use cove_composition::LayoutDebugExt;
 use cove_composition::Scancode;
 use cove_core::Signal;
 use cove_core::scene::{
-    AccessibilityRole, AccessibilitySemantics, Align, FlexDirection, Justify, Wrap,
+    AccessibilityRole, AccessibilitySemantics, Align, Direction, FlexDirection, Justify, Wrap,
 };
 
 /// One resolved sheet level: its entries and the title of the branch it shows.
@@ -107,10 +108,12 @@ impl TouchMenu {
     }
 
     fn entry_view(
-        &self,
         menu: TouchMenuSession,
         entry: &MenuEntry,
         active: Option<u64>,
+        path: &[u64],
+        direction: Direction,
+        on_item: Option<Rc<dyn Fn()>>,
     ) -> AnyView {
         let Some(row) = entry.row() else {
             return match entry {
@@ -128,7 +131,7 @@ impl TouchMenu {
 
         let activate = {
             let entry = entry.clone();
-            let on_item = self.on_item_activated.clone();
+            let base = path.to_vec();
             Rc::new(move || match &entry {
                 MenuEntry::Item(item) => {
                     (item.action)();
@@ -136,7 +139,7 @@ impl TouchMenu {
                         handler();
                     }
                 }
-                MenuEntry::Submenu(branch) => menu.push(branch.id),
+                MenuEntry::Submenu(branch) => menu.push(branch.id, &base),
                 _ => {}
             })
         };
@@ -156,6 +159,7 @@ impl TouchMenu {
                 TouchMenuRow {
                     row: row.clone(),
                     activate,
+                    direction,
                 }
                 .modifier(RovingItem::new(row.id, is_tab_stop, identity)),
             )
@@ -192,18 +196,25 @@ impl TouchMenuSession {
         }
     }
 
-    fn push(&self, id: u64) {
+    /// Pushes a branch onto the *resolved* path. Swift assigns
+    /// `path = current.path + [branch.id]`, so a stale suffix that `resolve`
+    /// dropped on the way down can never strand the sheet: the new path is
+    /// rebuilt from the level actually on screen.
+    fn push(&self, id: u64, base: &[u64]) {
+        let mut next = base.to_vec();
+        next.push(id);
         cove_core::batch(|| {
-            self.path.update(|path| path.push(id));
+            self.path.set(next);
             self.highlighted.set(None);
         });
     }
 
-    fn pop(&self) {
+    /// Pops one level off the *resolved* path (`current.path.dropLast()`), not
+    /// the raw stored path, so Back always returns to the visible parent.
+    fn pop(&self, base: &[u64]) {
+        let next = base[..base.len().saturating_sub(1)].to_vec();
         cove_core::batch(|| {
-            self.path.update(|path| {
-                path.pop();
-            });
+            self.path.set(next);
             self.highlighted.set(None);
         });
     }
@@ -218,83 +229,105 @@ impl View for TouchMenu {
         let level = menu.level(&self.entries);
         let enabled = level.enabled_ids();
         let active = menu.active(&level);
-
-        let mut children = Vec::new();
-        if let Some(title) = &level.title {
-            let back = menu;
-            children.push(AnyView::new(
-                AnyView::new(
-                    crate::primitives::controls::Button::new(
-                        AnyView::new(BoxView::new(
-                            FlexDirection::Row,
-                            Align::Center,
-                            Justify::FlexStart,
-                            Wrap::NoWrap,
-                            8.0,
-                            AnyView::new(TupleView::new(vec![
-                                AnyView::new(
-                                    crate::primitives::media::Icon::with_semantic(
-                                        ui_icon_catalog::navigation::arrow_left(),
-                                        16.0,
-                                        SemanticColorRef::on_surface(),
-                                    )
-                                    .accessibility_hidden(true),
-                                ),
-                                AnyView::new(
-                                    Text::new(title.clone())
-                                        .truncated()
-                                        .semantic_font(SemanticFontRef::body_strong()),
-                                ),
-                            ])),
-                        )),
-                        move || back.pop(),
-                    )
-                    .role(ButtonRole::Normal),
-                )
-                .button_style(crate::theme::styles::buttons::plain())
-                .accessibility(|semantics: &mut AccessibilitySemantics| {
-                    semantics.label = "Back".to_string();
-                })
-                .debug_name("touch-menu-back"),
-            ));
-            children.push(AnyView::new(crate::primitives::text::Divider::horizontal()));
-        }
-
-        for entry in &level.entries {
-            children.push(self.entry_view(menu, entry, active));
-        }
-
-        let body = AnyView::new(
-            AnyView::new(BoxView::new(
-                FlexDirection::Column,
-                Align::Stretch,
-                Justify::FlexStart,
-                Wrap::NoWrap,
-                0.0,
-                AnyView::new(TupleView::new(children)),
-            ))
-            .frame(None, None, Some(0.0), None, None, None)
-            .debug_name("touch-menu"),
-        );
-
+        let entries = level.entries.clone();
+        let title = level.title.clone();
+        let resolved_path = level.path.clone();
+        let on_item = self.on_item_activated.clone();
         let highlighted = menu.highlighted;
-        AnyView::new(
-            RovingFocusHost::new(
-                enabled,
-                move || highlighted.get(),
-                move |id: u64| highlighted.set(Some(id)),
-                |id: &u64| *id,
-                body,
-            )
-            .command(|event| {
-                matches!(
-                    event.scancode,
-                    Scancode::ARROW_UP | Scancode::ARROW_DOWN | Scancode::HOME | Scancode::END
+        // The back arrow and the submenu chevron point along the reading
+        // direction, so an RTL sheet mirrors them the way Swift's
+        // `ResolvedLayoutDirection` does.
+        AnyView::new(ResolvedLayoutDirection::new(move |direction| {
+            let rtl = direction == Direction::Rtl;
+            let mut children = Vec::new();
+            if let Some(title) = &title {
+                let back = menu;
+                let back_path = resolved_path.clone();
+                let arrow = if rtl {
+                    ui_icon_catalog::navigation::arrow_right()
+                } else {
+                    ui_icon_catalog::navigation::arrow_left()
+                };
+                children.push(AnyView::new(
+                    AnyView::new(
+                        crate::primitives::controls::Button::new(
+                            AnyView::new(BoxView::new(
+                                FlexDirection::Row,
+                                Align::Center,
+                                Justify::FlexStart,
+                                Wrap::NoWrap,
+                                8.0,
+                                AnyView::new(TupleView::new(vec![
+                                    AnyView::new(
+                                        crate::primitives::media::Icon::with_semantic(
+                                            arrow,
+                                            16.0,
+                                            SemanticColorRef::on_surface(),
+                                        )
+                                        .accessibility_hidden(true),
+                                    ),
+                                    AnyView::new(
+                                        Text::new(title.clone())
+                                            .truncating_tail()
+                                            .semantic_font(SemanticFontRef::body_strong()),
+                                    ),
+                                ])),
+                            )),
+                            move || back.pop(&back_path),
+                        )
+                        .role(ButtonRole::Normal),
+                    )
+                    .button_style(crate::theme::styles::buttons::plain())
+                    .accessibility(|semantics: &mut AccessibilitySemantics| {
+                        semantics.label = "Back".to_string();
+                    })
+                    .debug_name("touch-menu-back"),
+                ));
+                children.push(AnyView::new(crate::primitives::text::Divider::horizontal()));
+            }
+
+            for entry in &entries {
+                children.push(Self::entry_view(
+                    menu,
+                    entry,
+                    active,
+                    &resolved_path,
+                    direction,
+                    on_item.clone(),
+                ));
+            }
+
+            let body = AnyView::new(
+                AnyView::new(BoxView::new(
+                    FlexDirection::Column,
+                    Align::Stretch,
+                    Justify::FlexStart,
+                    Wrap::NoWrap,
+                    0.0,
+                    AnyView::new(TupleView::new(children)),
+                ))
+                .frame(None, None, Some(0.0), None, None, None)
+                .debug_name("touch-menu"),
+            );
+
+            AnyView::new(
+                RovingFocusHost::new(
+                    enabled.clone(),
+                    move || highlighted.get(),
+                    move |id: u64| highlighted.set(Some(id)),
+                    |id: &u64| *id,
+                    body,
                 )
-                .then(|| SelectionNavigation::command_for(event.scancode))
-                .flatten()
-            }),
-        )
+                .command(|event| {
+                    matches!(
+                        event.scancode,
+                        Scancode::ARROW_UP | Scancode::ARROW_DOWN | Scancode::HOME | Scancode::END
+                    )
+                    .then(|| SelectionNavigation::command_for(event.scancode))
+                    .flatten()
+                }),
+            )
+        }))
     }
 }
 
@@ -304,12 +337,14 @@ impl View for TouchMenu {
 struct TouchMenuRow {
     row: MenuRowPresentation,
     activate: Rc<dyn Fn()>,
+    direction: Direction,
 }
 
 impl View for TouchMenuRow {
     fn body(&self, _cx: &Scope) -> AnyView {
         let row = self.row.clone();
         let activate = self.activate.clone();
+        let rtl = self.direction == Direction::Rtl;
         let role = if row.role == MenuItemRole::Destructive {
             ButtonRole::Destructive
         } else {
@@ -322,11 +357,20 @@ impl View for TouchMenuRow {
             ));
         }
 
-        let mut text = vec![AnyView::new(
-            Text::new(row.title.clone())
-                .truncated()
-                .semantic_font(SemanticFontRef::body()),
-        )];
+        let title = if row.content.rich_title.is_empty() {
+            AnyView::new(
+                Text::new(row.title.clone())
+                    .truncating_tail()
+                    .semantic_font(SemanticFontRef::body()),
+            )
+        } else {
+            AnyView::new(
+                Text::runs(row.content.rich_title.clone())
+                    .display_only(true)
+                    .semantic_font(SemanticFontRef::body()),
+            )
+        };
+        let mut text = vec![title];
         if let Some(detail) = &row.content.detail {
             text.push(AnyView::new(
                 Text::new(detail.clone())
@@ -337,7 +381,11 @@ impl View for TouchMenuRow {
         }
 
         let trailing = if row.has_submenu {
-            Some(ui_icon_catalog::navigation::chevron_right())
+            Some(if rtl {
+                ui_icon_catalog::navigation::chevron_left()
+            } else {
+                ui_icon_catalog::navigation::chevron_right()
+            })
         } else if row.is_selected {
             Some(ui_icon_catalog::action::check())
         } else if row.is_link() {

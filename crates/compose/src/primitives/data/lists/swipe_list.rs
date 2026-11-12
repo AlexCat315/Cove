@@ -516,7 +516,7 @@ impl View for SwipeRowBody {
                         Button::new(
                             AnyView::new(
                                 Text::new(title.clone())
-                                    .truncated()
+                                    .truncating_tail()
                                     .semantic_font(SemanticFontRef::caption()),
                             ),
                             move || {

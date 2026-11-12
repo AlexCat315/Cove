@@ -59,5 +59,5 @@ pub(crate) mod api {
     pub use super::toast::{
         NotificationHost, ToastAction, ToastController, ToastNotification, ToastPosition,
     };
-    pub use super::tooltip::{Tooltip, TooltipAnchor, TooltipOptions};
+    pub use super::tooltip::{Tooltip, TooltipAnchor, TooltipExt, TooltipOptions};
 }

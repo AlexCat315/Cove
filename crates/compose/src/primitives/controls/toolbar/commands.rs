@@ -133,7 +133,7 @@ impl ToolbarCommands {
             let button = Button::with_options(
                 AnyView::new(
                     crate::primitives::text::Text::new(command.title.clone())
-                        .truncated()
+                        .truncating_tail()
                         .semantic_font(crate::theme::SemanticFontRef::label()),
                 ),
                 {

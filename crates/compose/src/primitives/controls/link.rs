@@ -49,7 +49,7 @@ impl Link {
     }
 
     pub fn title(title: impl Into<String>, action: impl Fn() + 'static) -> Self {
-        Self::new(Text::new(title).truncated(), action)
+        Self::new(Text::new(title).truncating_tail(), action)
     }
 
     pub fn enabled(mut self, enabled: bool) -> Self {

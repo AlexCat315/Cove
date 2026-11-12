@@ -27,7 +27,7 @@ use cove_platform::{
 };
 use cove_text::TextCacheLimits;
 use cove_text::{FontAtlas, TextEnvironment, TextEnvironmentHolder, TextFontResolver, TextShaper};
-use cove_ui_compose::primitives::overlays::portal::{PortalStore, PortalStoreHolder};
+use cove_ui_compose::primitives::overlays::portal::{PortalEntry, PortalStore, PortalStoreHolder};
 
 /// Cross-platform test font resolved from the host's system fonts. CoveUI no
 /// longer bundles a font, so the assertions below are font-agnostic.
@@ -369,6 +369,17 @@ impl InteractiveScene {
             self.focus.clone(),
             WindowId::MAIN,
         )
+    }
+
+    /// Live overlay portals (menus, popovers, dialogs), excluding tooltip chips.
+    /// A focused or hovered trigger legitimately publishes a tip alongside its
+    /// overlay, so overlay lifecycle assertions count these, not every entry.
+    pub fn overlay_portals(&self) -> Vec<PortalEntry> {
+        self.portal
+            .entries()
+            .into_iter()
+            .filter(|entry| !entry.is_tooltip)
+            .collect()
     }
 
     pub fn nodes(&self) -> Vec<Node> {

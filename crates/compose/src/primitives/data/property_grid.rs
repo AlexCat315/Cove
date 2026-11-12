@@ -690,7 +690,7 @@ impl PropertyGridSurface {
                 let label_text = if leading {
                     AnyView::new(
                         Text::new(label.clone())
-                            .truncated()
+                            .truncating_tail()
                             .semantic_font(SemanticFontRef::caption())
                             .semantic_foreground(SemanticColorRef::on_surface_variant()),
                     )

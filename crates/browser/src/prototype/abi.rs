@@ -48,6 +48,12 @@ pub extern "C" fn cove_webgpu_complete(token: u32) {
     cove_graphics::webgpu::complete(token);
 }
 
+/// Whether animations or queued composition need another animation frame.
+#[unsafe(no_mangle)]
+pub extern "C" fn cove_needs_frame() -> i32 {
+    with_app(|app| i32::from(app.needs_frame()))
+}
+
 /// Sets the device pixel ratio used for glyph rasterisation (clamped 1…4).
 #[unsafe(no_mangle)]
 pub extern "C" fn cove_set_scale(scale: f32) {

@@ -421,7 +421,7 @@ fn menu() {
         scene.click(&more, 1);
         scene.settle(8, 1.0);
         assert_eq!(
-            scene.portal.entries().len(),
+            scene.overlay_portals().len(),
             1,
             "clicking More presents the overflow portal"
         );
@@ -434,9 +434,9 @@ fn menu() {
             "End plus Return mounts the last tab's panel"
         );
         assert!(
-            scene.portal.entries().is_empty(),
+            scene.overlay_portals().is_empty(),
             "activating a menu item dismisses the menu; entries {:?}",
-            scene.portal.entries().len()
+            scene.overlay_portals().len()
         );
         let history = labelled(scene, "History", Some(AccessibilityRole::Tab))
             .expect("the promoted header is retained as a tab");

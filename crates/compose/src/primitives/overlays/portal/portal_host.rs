@@ -12,6 +12,7 @@
 //! not pinned — it is not ownership evidence.
 
 use crate::Scope;
+use std::any::Any;
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -21,7 +22,7 @@ use cove_composition::{
     AnyView, LayoutDebugAttachmentKey, PrimitiveView, View, ViewExt, impl_primitive_view,
 };
 use cove_core::scene::{
-    Edge, InputHandlerRoute, InteractionRegistryHolder, LayoutNode, Node, PointerPhase,
+    Edge, InputHandlerRoute, InteractionRegistryHolder, LayoutNode, Node, NodeResource, PointerPhase,
     PositionType, WheelRoutingAttachmentKey, WheelRoutingPriority,
 };
 use cove_core::{Point, Rect, Signal, Size};
@@ -35,6 +36,29 @@ use super::portal_registry::{
 const BOUND_STORE: &str = "CoveUICompose.portalHost.store";
 /// Node attachment carrying the observer token so it can be released.
 const OBSERVER_TOKEN: &str = "CoveUICompose.portalHost.token";
+
+/// Releases the store observer when the host node leaves the tree, mirroring
+/// Swift's `PortalHostObserver.deinit`. The rebind in `update_node` only fires on
+/// a store-identity change, so without this a host recreated against the same
+/// store would leave a dead revision callback registered in the window.
+struct PortalHostObserverCleanup;
+
+impl NodeResource for PortalHostObserverCleanup {
+    fn mount(&self, _node: &Node) {}
+
+    fn unmount(&self, node: &Node) {
+        if let (Some(store), Some(token)) = (
+            node.attachment::<Rc<PortalStore>>(BOUND_STORE),
+            node.attachment::<u64>(OBSERVER_TOKEN),
+        ) {
+            store.remove_observer(token);
+        }
+    }
+
+    fn as_any_rc(self: Rc<Self>) -> Rc<dyn Any> {
+        self
+    }
+}
 
 /// Renders the portal entries registered in the owning window's store.
 #[derive(Default)]
@@ -83,6 +107,7 @@ impl PrimitiveView for PortalHostPrimitive {
     fn make_node(&self) -> Node {
         let node = Node::new();
         node.set_is_hit_testable(false);
+        node.add_resource(Rc::new(PortalHostObserverCleanup));
         node.set_attachment(
             LayoutDebugAttachmentKey::LAYOUT_ROLE,
             "portal-host".to_owned(),

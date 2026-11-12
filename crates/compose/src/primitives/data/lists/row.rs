@@ -212,7 +212,7 @@ impl View for ListRow {
                         title_text = title_text.semantic_foreground(SemanticColorRef::error());
                     }
                     let secondary = |text: String| {
-                        let view = Text::new(text).truncated().clipped();
+                        let view = Text::new(text).truncating_tail().clipped();
                         if on_accent {
                             AnyView::new(view.opacity(0.8))
                         } else {

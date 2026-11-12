@@ -123,6 +123,10 @@ impl ViewModifier for HoverModifier {
         let Some(registry) = InteractionRegistryHolder::current() else {
             return;
         };
+        // Containers default to non-hit-testable, so without this the handler
+        // would only fire over a hit-testable descendant, never the view's own
+        // empty area. Children still win hits: the walk descends before claiming.
+        node.set_is_hit_testable(true);
         let on_change = self.on_change.clone();
         registry.set_hover(
             node,

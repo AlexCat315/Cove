@@ -320,6 +320,32 @@ impl PrimitiveView for ContextMenuHost {
                     EventResult::Handled
                 }),
             );
+            // Keyboard equivalent of a secondary click: the Application key or
+            // Shift+F10 opens the menu at the focused region's top-left, so the
+            // menu is reachable without a pointer (Swift has no keyboard opener).
+            let on_open = self.on_open.clone();
+            let weak = node.downgrade();
+            registry.set_key(
+                node,
+                InputHandlerRoute::control(),
+                Rc::new(move |event, phase| {
+                    if phase == EventPhase::Capture {
+                        return EventResult::Ignored;
+                    }
+                    let menu_key = event.scancode == crate::Scancode::APPLICATION
+                        || (event.scancode == crate::Scancode::F10
+                            && event.modifiers.has_shift());
+                    if !menu_key {
+                        return EventResult::Ignored;
+                    }
+                    let Some(node) = Node::upgrade(&weak) else {
+                        return EventResult::Ignored;
+                    };
+                    let frame = node.absolute_frame();
+                    on_open(Point::new(frame.x, frame.y));
+                    EventResult::Handled
+                }),
+            );
         }
         let Some(resource) = node.first_resource::<PortalResource>() else {
             return;

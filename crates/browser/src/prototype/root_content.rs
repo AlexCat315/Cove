@@ -12,6 +12,7 @@ use std::rc::Rc;
 use cove_composition::{AnyView, ViewGraph};
 use cove_examples::CounterView;
 use cove_hosts::ApplicationCheckpoint;
+use cove_ui_compose::primitives::overlays::portal::LayerRoot;
 
 use super::prototype::PrototypeContent;
 
@@ -46,7 +47,14 @@ impl PrototypeContent for RootContent {
     fn install(self: &Rc<Self>, graph: &Rc<ViewGraph>) {
         match self.as_ref() {
             Self::Counter(counter) => {
-                graph.install(CounterView::clone(counter), Default::default());
+                // The counter fallback has no chrome of its own, so it needs a
+                // portal layer for tooltips/menus/popovers to paint into. An
+                // application root supplies its own `LayerRoot`, so it is
+                // installed unchanged to avoid stacking two portal hosts.
+                graph.install_view(
+                    AnyView::new(LayerRoot::new(CounterView::clone(counter))),
+                    Default::default(),
+                );
             }
             Self::Application { root, .. } => {
                 graph.install_view(root.clone(), Default::default());

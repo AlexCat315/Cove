@@ -453,6 +453,61 @@ fn hover_card_cancels_pending_work_and_survives_the_gap() {
 }
 
 #[test]
+fn hover_card_timer_keeps_one_clock_and_accumulates_across_refreshes() {
+    InteractiveScene::run(900.0, 700.0, |scene| {
+        scene.install(LayerRoot::new(
+            HoverCard::new(
+                AnyView::new(Text::new("Profile")),
+                AnyView::new(Text::new("Detail")),
+            )
+            .open_delay(0.3)
+            .close_delay(0.15),
+        ));
+        scene.settle(12, 1.0 / 60.0);
+        let host = scene
+            .first(|node| node.attachment::<bool>("hoverCard.host") == Some(true))
+            .expect("the hover card mounts a host");
+        let hover = scene
+            .registry
+            .handlers(&host)
+            .hover
+            .expect("the host registers a hover handler");
+
+        hover(HoverPhase::Enter);
+        assert_eq!(
+            AnimatorScheduler::current().active_count(),
+            1,
+            "hovering schedules exactly one open timer"
+        );
+        AnimatorScheduler::current().tick(0.2);
+        assert!(
+            scene.portal.entries().is_empty(),
+            "0.2s of a 0.3s delay presents nothing"
+        );
+
+        // A benign refresh (the pointer is still on the trigger) must neither reset
+        // the accumulated elapsed time nor stack a second clock on the scheduler.
+        hover(HoverPhase::Enter);
+        assert_eq!(
+            AnimatorScheduler::current().active_count(),
+            1,
+            "a repeated hover refresh never stacks a second clock"
+        );
+        AnimatorScheduler::current().tick(0.1);
+        assert_eq!(
+            scene.portal.entries().len(),
+            1,
+            "the elapsed time accumulated across the refresh opens the card once"
+        );
+        assert_eq!(
+            AnimatorScheduler::current().active_count(),
+            0,
+            "presenting unregisters the open timer"
+        );
+    });
+}
+
+#[test]
 fn toolbar_arrows_move_focus_and_disabled_bars_block_input() {
     InteractiveScene::run(900.0, 700.0, |scene| {
         let calls = Rc::new(Cell::new(0_usize));

@@ -93,6 +93,7 @@ function schedule() {
     document.querySelector("#stats").textContent = `count=${lastFrame.count} · ${lastFrame.vertices} vertices · ${lastFrame.batches.length} batches · ${lastFrame.fontCount} fonts · FreeType/HarfBuzz`;
     wasm.cove_events();
     for (const event of response()) post(event);
+    if (wasm.cove_needs_frame()) schedule();
   });
 }
 

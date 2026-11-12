@@ -9,7 +9,8 @@ use std::rc::Rc;
 
 use crate::animation::content::AnimatedVisibility;
 use crate::animation::transition::{Transition, TransitionEdge};
-use crate::modifiers::layout::{FlexExt, PaddingExt};
+use crate::modifiers::interaction::HoverExt;
+use crate::modifiers::layout::{EdgeInsets, FlexExt, PaddingExt};
 use crate::modifiers::style::{AppearanceExt, SemanticStyleViewExt};
 use crate::primitives::controls::button::{Button, ButtonIconSource};
 use crate::primitives::overlays::portal::portal_registry::PortalResource;
@@ -251,14 +252,25 @@ fn present(
         ));
         cards.push(card);
     }
-    let stack = AnyView::new(BoxView::new(
-        FlexDirection::Column,
-        Align::Stretch,
-        Justify::FlexStart,
-        Wrap::NoWrap,
-        10.0,
-        AnyView::new(crate::TupleView::new(cards)),
-    ));
+    let surface: cove_core::Environment =
+        node.composition_value(&crate::adaptive::SurfaceEnvironment::key());
+    let safe = surface.safe_area.normalized();
+    let safe_padding = if position.is_bottom() {
+        EdgeInsets::new(0.0, 0.0, safe.bottom, 0.0)
+    } else {
+        EdgeInsets::new(safe.top, 0.0, 0.0, 0.0)
+    };
+    let stack = AnyView::new(
+        BoxView::new(
+            FlexDirection::Column,
+            Align::Stretch,
+            Justify::FlexStart,
+            Wrap::NoWrap,
+            10.0,
+            AnyView::new(crate::TupleView::new(cards)),
+        )
+        .padding_insets(safe_padding),
+    );
     if let Some(resource) = resource.as_ref() {
         resource.present(
             store,
@@ -397,7 +409,12 @@ impl View for ToastCard {
                 ))
                 .corner_radius(theme.radius.xl)
                 .border_color(crate::theme::floating_outline(&theme.colors), 1.0)
-                .shadow(cove_core::Color::from_rgba8(0, 0, 0, 48), 0.0, 10.0, 24.0),
+                .shadow(cove_core::Color::from_rgba8(0, 0, 0, 48), 0.0, 10.0, 24.0)
+                .on_hover({
+                    let controller = controller.clone();
+                    let id = notification.id.clone();
+                    move |hovered| controller.set_paused(hovered, &id)
+                }),
             )
         }))
     }

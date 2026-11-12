@@ -53,7 +53,7 @@ impl DisclosureGroup {
     ) -> Self {
         let label = AnyView::new(
             Text::new(title)
-                .truncated()
+                .truncating_tail()
                 .semantic_font(SemanticFontRef::label())
                 .semantic_foreground(SemanticColorRef::on_surface_variant())
                 .frame_min_width(0.0),

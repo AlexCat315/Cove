@@ -556,6 +556,45 @@ fn context_menu_lifecycle() {
 }
 
 #[test]
+fn context_menu_opens_from_the_keyboard() {
+    InteractiveScene::run(400.0, 300.0, |scene| {
+        scene.install(AnyView::new(LayerRoot::new(AnyView::new(ContextMenu::new(
+            || vec![MenuEntry::Item(MenuItem::new(1, "Rename", || {}))],
+            AnyView::new(
+                Button::new(Text::new("Entity"), || {})
+                    .frame_size(80.0, 32.0)
+                    .debug_name("entity"),
+            ),
+        )))));
+        let trigger = scene.named("entity").expect("the trigger is mounted");
+        // Focus the trigger so the key path runs through the context-menu host.
+        scene.click(&trigger, 1);
+        assert!(
+            scene.portal.entries().is_empty(),
+            "a plain left click does not open the menu"
+        );
+
+        scene.key(Scancode::F10, KeyModifiers::LEFT_SHIFT);
+        assert_eq!(
+            scene.portal.entries().len(),
+            1,
+            "Shift+F10 opens the context menu without a pointer"
+        );
+
+        scene.key(Scancode::ESCAPE, KeyModifiers::default());
+        assert!(scene.portal.entries().is_empty(), "Escape closes the menu");
+
+        scene.click(&trigger, 1);
+        scene.key(Scancode::APPLICATION, KeyModifiers::default());
+        assert_eq!(
+            scene.portal.entries().len(),
+            1,
+            "the Application key opens the context menu"
+        );
+    });
+}
+
+#[test]
 fn resizable_viewport_drag_grows_the_field() {
     InteractiveScene::run(300.0, 400.0, |scene| {
         scene.install(AnyView::new(

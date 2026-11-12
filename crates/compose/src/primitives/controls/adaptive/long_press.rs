@@ -1,7 +1,7 @@
 //! Translation of Primitives/Controls/Adaptive/LongPress.swift.
 use cove_core::Point;
 use cove_core::scene::{
-    AnimatorScheduler, AnyAnimationController, Node, NodeResource, PointerCaptureHolder,
+    AnimatorScheduler, AnyAnimationController, Node, NodeResource, NodeWeak, PointerCaptureHolder,
 };
 use std::any::Any;
 use std::cell::{Cell, RefCell};
@@ -10,7 +10,7 @@ use std::rc::{Rc, Weak};
 /// A hold observes the tap until it wins. Motion/wheel input cancels before
 /// an ancestor scroll takes over; only recognition cancels the child press.
 pub struct TouchLongPress {
-    node: RefCell<Option<Node>>,
+    node: RefCell<Option<NodeWeak>>,
     origin: Cell<Option<Point>>,
     elapsed: Cell<f64>,
     is_finished: Cell<bool>,
@@ -59,7 +59,8 @@ impl TouchLongPress {
         if self.is_finished.get() {
             return;
         }
-        let (Some(node), Some(origin)) = (self.node.borrow().clone(), self.origin.get()) else {
+        let node = self.node.borrow().as_ref().and_then(Node::upgrade);
+        let (Some(node), Some(origin)) = (node, self.origin.get()) else {
             return;
         };
         if !node.accepts_subtree_input() {
@@ -96,7 +97,7 @@ impl TouchLongPress {
 
 impl NodeResource for TouchLongPress {
     fn mount(&self, node: &Node) {
-        *self.node.borrow_mut() = Some(node.clone());
+        *self.node.borrow_mut() = Some(node.downgrade());
     }
     fn unmount(&self, _node: &Node) {
         self.cancel();

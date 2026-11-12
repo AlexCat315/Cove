@@ -21,6 +21,8 @@ use cove_platform::{
     InputEvent, KeyEvent, KeyModifiers, MouseButton, MouseButtonEvent, MouseMotionEvent,
     MouseWheelEvent, ScrollDevice, ScrollInput, ScrollUnit, TextEditingEvent,
 };
+use cove_ui_compose::primitives::overlays::TooltipArbitrationAmbient;
+use cove_ui_compose::primitives::overlays::portal::{PortalStore, PortalStoreAmbient};
 use cove_ui_compose::theme::{TextScalerViewExt, surface_theme};
 use std::cell::{Cell, OnceCell, RefCell};
 use std::rc::Rc;
@@ -131,6 +133,11 @@ impl AndroidContentSession {
         let tree = Rc::new(RefCell::new(NodeTree::new()));
         let recomposer = Rc::new(Recomposer::new());
         let context = Rc::new(PlatformInputContext::new());
+        // One overlay store and one tooltip arbiter per surface, so a popover
+        // painted on this session cannot leak into another's portal layer and
+        // only one tooltip is ever visible at a time.
+        context.add_scoped_ambient(Rc::new(PortalStoreAmbient::new(Rc::new(PortalStore::new()))));
+        context.add_scoped_ambient(Rc::new(TooltipArbitrationAmbient::new()));
         let surface = SurfaceState::new(scale);
         let mut environment = SceneEnvironment::new();
         if let Some(configuration) = &configuration {

@@ -35,7 +35,7 @@ impl PanelStyle for DefaultPanelStyle {
                 AnyView::new(TupleView::new(vec![
                     AnyView::new(
                         Text::new(configuration.title.clone())
-                            .truncated()
+                            .truncating_tail()
                             .semantic_font(SemanticFontRef::label())
                             .semantic_foreground(title_color)
                             .frame_min_width(0.0)
