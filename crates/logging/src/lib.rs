@@ -25,3 +25,17 @@ pub mod system;
 pub use logging_exports::*;
 
 pub use configuration::LoggingConfiguration;
+
+/// Process identity for log records. WASI has no process ids and Rust's
+/// `std::process::id()` panics there ("no pids on this platform"), so the Wasm
+/// reactor reports 0 instead of aborting during logging bootstrap.
+pub(crate) fn process_id() -> u32 {
+    #[cfg(target_arch = "wasm32")]
+    {
+        0
+    }
+    #[cfg(not(target_arch = "wasm32"))]
+    {
+        std::process::id()
+    }
+}

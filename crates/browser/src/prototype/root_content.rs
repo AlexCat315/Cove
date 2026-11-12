@@ -28,8 +28,18 @@ pub enum RootContent {
 }
 
 impl RootContent {
-    /// Prefers the registered application, falling back to the counter.
+    /// Selects the root for this browser surface.
+    ///
+    /// The page shell is the Counter prototype: its buttons, note field and
+    /// `count`/`dark` frame payload only make sense with `CounterView`. Passing
+    /// `?component=<name>` to the page selects the registered
+    /// `cove_ui::application!` (Gallery) instead, so shared applications still
+    /// run unchanged in the browser.
     pub fn from_registration() -> Self {
+        let gallery = std::env::args().skip(1).any(|arg| arg == "--component");
+        if !gallery {
+            return Self::Counter(CounterView::new());
+        }
         match cove_hosts::wasm::application() {
             Some(factory) => {
                 let launch = factory();

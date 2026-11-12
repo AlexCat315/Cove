@@ -3,7 +3,9 @@ use super::{
     draw_geometry::NativeUIGeometry,
     raster_workspace::NativeUIRasterWorkspace,
     shader_resources::{NativeUIPipeline, NativeUIShaderResources},
-    texture_store::{NativeUITextureStore, TextureSlot},
+    texture_store::{
+        NativeUITextureStore, TEXTURE_ROW_ALIGNMENT, TextureSlot, padded_texture_rows,
+    },
     viewport::NativeUIViewport,
 };
 use crate::rhi::*;
@@ -427,22 +429,31 @@ impl NativeDrawListRenderer {
         for slot in &slots {
             let patches = slot.snapshot();
             for patch in &patches {
-                let location = self.device.upload_transient(&patch.pixels, 4)?;
                 let channels = if slot.resource.descriptor().format == TextureFormat::R8Unorm {
                     1
                 } else {
                     4
                 };
+                // Recorded WebGPU copies require a 256-byte aligned row stride
+                // and matching padded source bytes; the other backends ignore
+                // the padding and read only the tight row.
+                let (pixels, stride) = padded_texture_rows(
+                    &patch.pixels,
+                    patch.region.width as usize,
+                    patch.region.height as usize,
+                    channels,
+                )?;
+                let location = self.device.upload_transient(&pixels, TEXTURE_ROW_ALIGNMENT)?;
                 let mut upload = TextureBufferUpload::new(
                     location.buffer,
-                    patch.region.width as usize * channels,
+                    stride,
                     slot.resource.texture(),
                     patch.region,
                 );
                 upload.offset = location.offset;
                 uploads.push(upload);
                 statistics.texture_uploads += 1;
-                statistics.texture_upload_bytes += patch.pixels.len();
+                statistics.texture_upload_bytes += pixels.len();
             }
             if let Some(last) = patches.last() {
                 commits.push((slot.clone(), last.sequence));

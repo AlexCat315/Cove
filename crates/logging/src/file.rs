@@ -199,7 +199,7 @@ fn session_identifier() -> String {
         .map(|duration| duration.as_nanos() as u64)
         .unwrap_or_default();
     let counter = COUNTER.fetch_add(1, Ordering::Relaxed);
-    let pid = u64::from(std::process::id());
+    let pid = u64::from(crate::process_id());
     let high = nanos ^ (pid << 32) ^ counter.rotate_left(17);
     let low = nanos.rotate_left(23) ^ counter.wrapping_mul(0x9E37_79B9_7F4A_7C15) ^ pid;
     format!(

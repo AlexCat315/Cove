@@ -40,6 +40,9 @@ enum Command {
         /// Provision the pinned Slang/DXIL shader toolchain as well.
         #[arg(long)]
         shaders: bool,
+        /// Provision the pinned wasi-sdk and native Ninja for Wasm builds.
+        #[arg(long)]
+        wasm: bool,
         /// Check without installing or changing system configuration.
         #[arg(long)]
         check: bool,
@@ -55,6 +58,8 @@ enum Command {
         #[arg(long)]
         unpersist_path: bool,
     },
+    /// Print the absolute wasi-sdk root used by Wasm builds (for build scripts).
+    WasmSdkPath,
     /// Print shell statements that expose Cove's pinned tools in this shell.
     /// Does not change any persistent configuration.
     Env {
@@ -219,6 +224,7 @@ fn execute(cli: Cli) -> Result<()> {
         Command::Setup {
             media,
             shaders,
+            wasm,
             check,
             dry_run,
             target,
@@ -229,6 +235,7 @@ fn execute(cli: Cli) -> Result<()> {
             let mut report = cove_native_build::setup::run(&cove_native_build::setup::Options {
                 media,
                 shaders,
+                wasm,
                 check,
                 dry_run,
                 targets: target,
@@ -253,6 +260,15 @@ fn execute(cli: Cli) -> Result<()> {
                     "native tools, SDKs or submodules are not ready; run `cargo cove setup`".into(),
                 );
             }
+            Ok(())
+        }
+        Command::WasmSdkPath => {
+            let path = cove_native_build::setup::wasm_sdk_path()
+                .map_err(|e| e.to_string())?
+                .ok_or_else(|| {
+                    "no wasi-sdk found; run `cargo cove setup --wasm`".to_owned()
+                })?;
+            println!("{}", path.display());
             Ok(())
         }
         Command::Env { shell } => {

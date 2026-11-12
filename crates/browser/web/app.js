@@ -259,7 +259,7 @@ function makeCanvasRenderer() {
 
 try {
   const component = new URLSearchParams(location.search).get("component");
-  const args = component ? ["gallery", "--component", component] : ["gallery"];
+  const args = component ? ["gallery", "--component", component] : ["counter"];
   const wasi = new WASI(args, [], [new OpenFile(new File([])), ConsoleStdout.lineBuffered(console.log), ConsoleStdout.lineBuffered(console.error)]);
   const module = await WebAssembly.compile(await (await fetch("./cove.wasm")).arrayBuffer());
   const instance = await WebAssembly.instantiate(module, {

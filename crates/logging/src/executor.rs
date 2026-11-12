@@ -31,39 +31,45 @@ impl LogExecutor {
             signal: Condvar::new(),
             stopped: Mutex::new(false),
         });
-        let worker_shared = shared.clone();
-        let worker = std::thread::Builder::new()
-            .name("com.cove.logging".into())
-            .spawn(move || {
-                loop {
-                    let job = {
-                        let mut queue = worker_shared
-                            .queue
-                            .lock()
-                            .unwrap_or_else(|e| e.into_inner());
-                        while queue.is_empty() {
-                            if *worker_shared
-                                .stopped
+        #[cfg(target_arch = "wasm32")]
+        // WASI is single-threaded; `enqueue` runs jobs inline instead.
+        let worker = None;
+        #[cfg(not(target_arch = "wasm32"))]
+        let worker = {
+            let worker_shared = shared.clone();
+            std::thread::Builder::new()
+                .name("com.cove.logging".into())
+                .spawn(move || {
+                    loop {
+                        let job = {
+                            let mut queue = worker_shared
+                                .queue
                                 .lock()
-                                .unwrap_or_else(|e| e.into_inner())
-                            {
-                                return;
-                            }
-                            queue = worker_shared
-                                .signal
-                                .wait(queue)
                                 .unwrap_or_else(|e| e.into_inner());
+                            while queue.is_empty() {
+                                if *worker_shared
+                                    .stopped
+                                    .lock()
+                                    .unwrap_or_else(|e| e.into_inner())
+                                {
+                                    return;
+                                }
+                                queue = worker_shared
+                                    .signal
+                                    .wait(queue)
+                                    .unwrap_or_else(|e| e.into_inner());
+                            }
+                            queue.pop_front()
+                        };
+                        if let Some(job) = job {
+                            IS_CURRENT.with(|current| current.set(true));
+                            job();
+                            IS_CURRENT.with(|current| current.set(false));
                         }
-                        queue.pop_front()
-                    };
-                    if let Some(job) = job {
-                        IS_CURRENT.with(|current| current.set(true));
-                        job();
-                        IS_CURRENT.with(|current| current.set(false));
                     }
-                }
-            })
-            .ok();
+                })
+                .ok()
+        };
         Self {
             shared,
             worker: Mutex::new(worker),
@@ -80,6 +86,10 @@ impl LogExecutor {
         T: Send + 'static,
         F: FnOnce() -> T + Send + 'static,
     {
+        // With no worker thread on WASI, waiting on the channel would spin forever.
+        if cfg!(target_arch = "wasm32") {
+            return body();
+        }
         if self.is_current() {
             return body();
         }
@@ -101,6 +111,10 @@ impl LogExecutor {
     }
 
     fn enqueue(&self, job: Job) {
+        if cfg!(target_arch = "wasm32") {
+            job();
+            return;
+        }
         if self.is_current() {
             job();
             return;

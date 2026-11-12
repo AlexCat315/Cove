@@ -18,7 +18,7 @@ use std::rc::Rc;
 use std::time::Instant;
 
 use cove_composition::ViewGraph;
-use cove_core::DrawList;
+use cove_core::{DrawList, Point, TextLayoutOptions, layout_text};
 use cove_core::scene::{
     AnimatorScheduler, EventDispatcher, NodeRenderer, NodeTree, PlatformInputContext, Recomposer,
 };
@@ -32,7 +32,7 @@ use cove_platform::{
     InputEvent as PlatformInputEvent, KeyEvent, KeyModifiers, MouseButton, MouseButtonEvent,
     MouseMotionEvent, PointerKind, TextEditingEvent,
 };
-use cove_text::FontCollection;
+use cove_text::{DrawListText, FontCollection};
 
 #[cfg(target_arch = "wasm32")]
 use super::gpu::BrowserGpu;
@@ -97,11 +97,12 @@ pub struct BrowserPrototype<C: PrototypeContent> {
 impl<C: PrototypeContent> BrowserPrototype<C> {
     /// Builds the reactor and installs `content` as the graph root.
     pub fn new(content: C) -> Self {
-        let _ = cove_logging::LogSystem::bootstrap(
-            Some("com.cove.browser"),
-            cove_logging::LoggingConfiguration::default(),
-            None,
-        );
+        // The browser has no persistent filesystem: WASI's `std::env::temp_dir()`
+        // panics, so file-backed logging stays off and records go to the console.
+        let configuration = cove_logging::LoggingConfiguration::new(|value| {
+            value.storage.enabled = false;
+        });
+        let _ = cove_logging::LogSystem::bootstrap(Some("com.cove.browser"), configuration, None);
         let content = Rc::new(content);
         let tree = Rc::new(RefCell::new(NodeTree::new()));
         let context = PlatformInputContext::default();
@@ -125,6 +126,20 @@ impl<C: PrototypeContent> BrowserPrototype<C> {
         context.with_current(|| content.install(&graph));
         let mut fonts = FontCollection::new(ATLAS_SIZE, ATLAS_SIZE);
         fonts.configure(16.0, 1.0);
+        // Compose `Text` primitives draw through the ambient TextEnvironment.
+        // Wasm has no system font resolver: share the reactor's atlas (fed by
+        // `cove_font_load`) and seed the shaper from the first loaded face.
+        let environment = cove_text::TextEnvironment::new(
+            fonts.atlas.clone(),
+            cove_text::TextShaper::default(),
+            1,
+            22.0,
+            cove_text::Color::WHITE,
+            None,
+            None,
+            cove_text::TextCacheLimits::default(),
+        );
+        cove_text::TextEnvironmentHolder::set_current(Some(environment));
         Self {
             content,
             tree,
@@ -229,7 +244,20 @@ impl<C: PrototypeContent> BrowserPrototype<C> {
         if bytes.is_empty() || bytes.len() > MAX_PAYLOAD || self.fonts.font_count() >= 8 {
             return None;
         }
-        self.fonts.append(bytes.to_vec())
+        let id = self.fonts.append(bytes.to_vec())?;
+        // `TextShaper` emits glyphs with font id 0. Register the first loaded
+        // face under that id too and give it to the ambient shaper, so compose
+        // text rasterizes into the same atlas the host exports to JavaScript.
+        if id == 1
+            && let Some(face) = self.fonts.last_face()
+        {
+            self.fonts.atlas.register_face(face.clone(), 0);
+            if let Some(mut environment) = cove_text::TextEnvironmentHolder::current() {
+                environment.shaper.set_face(face, self.fonts.size);
+                cove_text::TextEnvironmentHolder::set_current(Some(environment));
+            }
+        }
+        Some(id)
     }
 
     /// Rebuilds the frame snapshot for the requested viewport.
@@ -804,11 +832,71 @@ fn encode_frame(
 }
 
 /// Walks the tree in paint order, reshaping every text attachment.
+///
+/// The Swift prototype installs a `node.draw` hook for each `CounterTextRun`
+/// here, so glyphs inherit the render tree's clipping and ordering. Doing the
+/// shaping during the walk (rather than emitting quads directly) is what keeps
+/// text above the backgrounds `NodeRenderer` paints afterwards.
 fn collect_labels(
     fonts: &mut FontCollection,
     node: &cove_core::scene::Node,
     labels: &mut Vec<Label>,
     note_width: &mut f32,
 ) {
-    let _ = (fonts, node, labels, note_width);
+    if let Some(run) = node
+        .attachment::<cove_examples::CounterTextRun>(cove_examples::CounterText::ATTACHMENT)
+    {
+        let frame = node.absolute_frame();
+        let padding = node
+            .layout_node()
+            .map(|layout| layout.resolved_padding())
+            .unwrap_or_default();
+        let color = node.inherited_foreground_color().unwrap_or(run.color);
+        let scale = fonts.raster_scale;
+        fonts.configure(run.size, scale);
+        let glyphs = fonts.shape(&run.text);
+        let layout = layout_text(
+            &glyphs,
+            &run.text,
+            &fonts.atlas,
+            TextLayoutOptions {
+                line_height: run.size * 1.4,
+                ..Default::default()
+            },
+        );
+        let x = frame.x + run.inset + padding.left;
+        let y = frame.y + padding.top
+            + (frame.height - padding.top - padding.bottom - run.size * 1.4) * 0.5;
+        labels.push(Label {
+            text: run.text.clone(),
+            x,
+            y,
+            size: run.size,
+            color: format!(
+                "rgba({}, {}, {}, {})",
+                (color.r * 255.0) as u8,
+                (color.g * 255.0) as u8,
+                (color.b * 255.0) as u8,
+                color.a
+            ),
+            width: layout.total_width,
+            glyphs: glyphs.iter().map(|glyph| glyph.glyph_id).collect(),
+            clusters: glyphs.iter().map(|glyph| glyph.cluster).collect(),
+            font_ids: glyphs.iter().map(|glyph| glyph.font_id).collect(),
+        });
+        if crate::prototype::node_debug_name(node).as_deref()
+            == Some(cove_examples::CounterDebugName::NOTE)
+        {
+            *note_width = layout.total_width;
+        }
+        let atlas = fonts.atlas.clone();
+        let origin = Point::new(x, y);
+        let tint = color;
+        node.set_draw(Some(Rc::new(move |list, _| {
+            let _ = list.add_text(&layout, origin, tint, 1, Some(&atlas), None);
+        })));
+    }
+    for child in node.children() {
+        collect_labels(fonts, &child, labels, note_width);
+    }
 }
