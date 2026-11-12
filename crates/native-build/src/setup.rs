@@ -356,6 +356,14 @@ pub fn apply_media_process() -> io::Result<()> {
             }
             paths.push(path);
         }
+        // fetch() shells out to git, which setup may only discover outside PATH
+        // (Git\cmd and friends), so the injected PATH needs those directories too.
+        for path in extra_paths()? {
+            if path.starts_with(&msys) || !path.is_dir() {
+                continue;
+            }
+            paths.push(path);
+        }
         paths.push(msys.join("usr/bin"));
         paths.push(msys.join("ucrt64/bin"));
         let path = env::join_paths(paths).map_err(io::Error::other)?;
@@ -424,15 +432,19 @@ fn msvc_environment() -> io::Result<(String, String, String)> {
         let Some((key, value)) = line.split_once('=') else {
             continue;
         };
-        match key {
+        // Windows keeps the inherited name's case ("Path" in most shells), so
+        // matching PATH exactly would silently drop the MSVC directories.
+        match key.to_ascii_uppercase().as_str() {
             "INCLUDE" => values.0 = value.to_string(),
             "LIB" => values.1 = value.to_string(),
             "PATH" => values.2 = value.to_string(),
             _ => {}
         }
     }
-    if values.0.is_empty() || values.1.is_empty() {
-        return Err(io::Error::other("vcvars64 did not report INCLUDE/LIB"));
+    if values.0.is_empty() || values.1.is_empty() || values.2.is_empty() {
+        return Err(io::Error::other(
+            "vcvars64 did not report INCLUDE/LIB/PATH",
+        ));
     }
     Ok(values)
 }
