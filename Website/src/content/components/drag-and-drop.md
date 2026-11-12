@@ -48,6 +48,12 @@ let scope = DragScope::new(Column::new(
 
 `Tree` 的行拖拽是集合内部的排序/归属操作，使用 `TreeDragOperations`（`can_drag` / `can_drop` / `on_drop` 与生命周期事件）。它与通用 `Draggable` 共用指针捕获规则：按下可让外层滚动容器滚动，越过阈值后独占。行拖拽的落点是 `Before` / `Inside` / `After` 三个带区。
 
+## 资产拖放目标
+
+`AssetDropTarget` 把自身登记到进程级 `AssetDropRegistry`，并按 `accepted_kinds` 过滤载荷。空集合接受任意类型。落点命中多个重叠目标时，**最后登记（最上层绘制）的目标生效**，与 Swift 的命中规则一致；同帧更新只替换原登记，不会重复入列。
+
+`can_drop` 用于只判断某个具体目标是否接受当前载荷（例如字段高亮），不触发投递。
+
 ## Gallery
 
 Gallery 的 Drag & Drop 页演示两个不同 payload 的标签拖入对应 lane：拖动期间目标 lane 使用选中态高亮，预览由 portal 渲染，释放后只在匹配的 lane 写入结果。Tree 的拖拽生命周期由 `list_tree_tests` 与 `tree_features_tests` 覆盖。

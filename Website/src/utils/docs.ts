@@ -54,9 +54,11 @@ import component3 from '@/content/components/scroll-view.md?raw'
 import component4 from '@/content/components/scrollbar.md?raw'
 import component5 from '@/content/components/route-outlet.md?raw'
 import component6 from '@/content/components/async-image.md?raw'
-import component7 from '@/content/components/hover-card.md?raw'
-import component8 from '@/content/components/command-palette.md?raw'
-import component9 from '@/content/components/menu.md?raw'
+import hoverCard from '@/content/components/hover-card.md?raw'
+import commandPalette from '@/content/components/command-palette.md?raw'
+import menu from '@/content/components/menu.md?raw'
+import tooltip from '@/content/components/tooltip.md?raw'
+import toast from '@/content/components/toast.md?raw'
 import component10 from '@/content/components/toolbar.md?raw'
 import component11 from '@/content/components/vec3-field.md?raw'
 import component12 from '@/content/components/timeline.md?raw'
@@ -123,9 +125,11 @@ export const docGroups: DocGroup[] = [
       { slug: 'scrollbar', title: 'Scrollbar', raw: component4 },
       { slug: 'route-outlet', title: 'RouteOutlet', raw: component5 },
       { slug: 'async-image', title: 'AsyncImage', raw: component6 },
-      { slug: 'hover-card', title: 'HoverCard', raw: component7 },
-      { slug: 'command-palette', title: 'CommandPalette', raw: component8 },
-      { slug: 'menu', title: 'Menu / MenuItemContent', raw: component9 },
+      { slug: 'hover-card', title: 'HoverCard', raw: hoverCard },
+      { slug: 'command-palette', title: 'CommandPalette', raw: commandPalette },
+      { slug: 'menu', title: 'Menu / MenuItemContent', raw: menu },
+      { slug: 'tooltip', title: 'Tooltip', raw: tooltip },
+      { slug: 'toast', title: 'Notification / Toast', raw: toast },
       { slug: 'button', title: 'Button', raw: button },
       { slug: 'split-button', title: 'SplitButton', raw: splitButton },
       { slug: 'completion-popover', title: 'CompletionPopover', raw: completionPopover },

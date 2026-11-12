@@ -4,27 +4,27 @@
 //! - the compact palette uses a 16pt window inset and 44pt result rows
 //! - the regular palette keeps the 640x560 desktop geometry and 40pt rows
 //!
-//! Named difference against the Swift suite: `CommandPalette::body`
-//! (`crates/compose/src/primitives/overlays/command_palette.rs`) hard-codes one desktop
-//! geometry and never derives `compact` from `surface.viewport.width`, so a
-//! 390pt surface does not get Swift's `width - 16` panel with an 8pt inset and
-//! centred placement. The compact case therefore asserts only that the panel is
-//! clamped inside the surface. Row heights do follow Swift: the authored 40pt row
-//! is raised to the 44pt control floor on touch. The panel also carries no
-//! `commandPalette.panel` debug name, so geometry is read from the modal dialog
-//! node instead.
+//! `CommandPalette::body` derives `compact` from the window width in its
+//! `fitting_geometry` pass, matching Swift: a sub-600pt surface gets a centred
+//! `width - 16` panel with an 8pt inset, while the desktop keeps 640x560 at a
+//! 72pt top inset. Row heights follow Swift: the authored 40pt row is raised to
+//! the 44pt control floor on touch. The panel carries no `commandPalette.panel`
+//! debug name, so geometry is read from the modal dialog node instead.
 
 use crate::support;
 
+use std::cell::RefCell;
 use std::rc::Rc;
 
 use cove_composition::AnyView;
 use cove_core::scene::{AccessibilityRole, Node, PlatformInputContext};
 use cove_core::{Binding, Environment, InputCapabilities};
+use cove_platform::{InputEvent, KeyEvent, KeyModifiers};
 use cove_ui_compose::adaptive::SurfaceEnvironmentExt;
 use cove_ui_compose::modifiers::layout::LayoutFrameExt;
 use cove_ui_compose::primitives::overlays::portal::{LayerRoot, PortalStore, PortalStoreAmbient};
 use cove_ui_compose::primitives::overlays::{CommandPalette, PaletteCommand};
+use cove_ui_compose::Scancode;
 
 use support::GlobalTestLock;
 
@@ -122,22 +122,19 @@ fn compact_palette_uses_the_surface_geometry() {
             let panel = panel(nodes);
             let frame = panel.absolute_frame();
             assert!(
-                frame.width <= 390.0 && frame.height <= 820.0,
-                "the panel stays inside the 390x820 surface, got {}x{}",
-                frame.width,
+                (frame.width - 374.0).abs() < 1.0,
+                "a 390pt surface gets Swift's width - 16 panel, got {}",
+                frame.width
+            );
+            assert!(
+                (frame.x - 8.0).abs() < 2.0,
+                "the compact panel is centred with an 8pt margin, got x={}",
+                frame.x
+            );
+            assert!(
+                (frame.height - 560.0).abs() < 1.0,
+                "the compact panel keeps the 560pt height cap, got {}",
                 frame.height
-            );
-            assert!(
-                frame.x >= 0.0 && frame.max_x() <= 390.0,
-                "the panel starts inside the surface, got x={} maxX={}",
-                frame.x,
-                frame.max_x()
-            );
-            assert!(
-                frame.y >= 0.0 && frame.max_y() <= 820.0,
-                "the panel ends inside the surface, got y={} maxY={}",
-                frame.y,
-                frame.max_y()
             );
 
             let toggle = row(nodes, "Toggle Theme").expect("the first result row");
@@ -163,6 +160,59 @@ fn compact_palette_uses_the_surface_geometry() {
             );
         },
     );
+}
+
+#[test]
+fn arrows_and_run_stay_within_the_filtered_results() {
+    // A query that matches one command, an arrow that must not escape into a
+    // filtered-out command, and Return must run only what the list shows.
+    let ran = Rc::new(RefCell::new(Vec::<String>::new()));
+    support::InteractiveScene::run(1280.0, 820.0, |scene| {
+        let commands: Vec<PaletteCommand> = ROWS
+            .iter()
+            .map(|(title, group)| {
+                let ran = ran.clone();
+                let name = (*title).to_string();
+                PaletteCommand::new(*title, move || ran.borrow_mut().push(name.clone())).group(*group)
+            })
+            .collect();
+        scene.install(AnyView::new(LayerRoot::new(CommandPalette::new(
+            Binding::constant(true),
+            commands,
+        ))));
+
+        let field = scene
+            .first(|node| {
+                node.accessibility()
+                    .is_some_and(|semantics| semantics.role == AccessibilityRole::TextField)
+            })
+            .expect("the palette mounts a search field");
+        scene.focus.focus(Some(&field), true);
+        let input = scene.dispatcher();
+        input.dispatch(&InputEvent::TextInput("theme".into()));
+        scene.settle(2, 0.1);
+        // Only "Toggle Theme" survives the query, so an Arrow must stay on it.
+        input.dispatch(&InputEvent::KeyDown(KeyEvent {
+            scancode: Scancode::ARROW_DOWN,
+            keycode: 0,
+            modifiers: KeyModifiers::default(),
+            is_repeat: false,
+        }));
+        scene.settle(2, 0.1);
+        input.dispatch(&InputEvent::KeyDown(KeyEvent {
+            scancode: Scancode::RETURN,
+            keycode: 0,
+            modifiers: KeyModifiers::default(),
+            is_repeat: false,
+        }));
+        scene.settle(2, 0.1);
+
+        assert_eq!(
+            ran.borrow().as_slice(),
+            ["Toggle Theme"],
+            "Return runs the only visible match, never a query-hidden command"
+        );
+    });
 }
 
 #[test]

@@ -200,6 +200,21 @@ pub trait HitTestingExt: View + Sized + 'static {
 }
 impl<T: View + Sized + 'static> HitTestingExt for T {}
 
+/// Whether Tab focus stops on this view. Rows that are pointers-only (a search
+/// result, a menu entry) opt out so Tab stays on the surrounding field.
+pub struct TabStopModifier(pub bool);
+impl ViewModifier for TabStopModifier {
+    fn apply_node(&self, node: &Node) {
+        node.set_is_tab_stop(self.0);
+    }
+}
+pub trait TabStopExt: View + Sized + 'static {
+    fn tab_stop(self, enabled: bool) -> ModifiedContent {
+        self.modifier(TabStopModifier(enabled))
+    }
+}
+impl<T: View + Sized + 'static> TabStopExt for T {}
+
 pub trait HoverExt: View + Sized + 'static {
     fn on_hover(self, on_change: impl Fn(bool) + 'static) -> ModifiedContent {
         self.modifier(HoverModifier::new(on_change))

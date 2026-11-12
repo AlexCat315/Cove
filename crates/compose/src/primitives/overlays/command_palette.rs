@@ -20,7 +20,7 @@ use cove_core::{Binding, Signal};
 use cove_imaging::BundleImageResource;
 use cove_platform::KeyEvent;
 
-use crate::modifiers::interaction::{AccessibilityExt, HoverExt};
+use crate::modifiers::interaction::{AccessibilityExt, HoverExt, TabStopExt};
 use crate::modifiers::layout::{FlexExt, LayoutFrameExt, PaddingExt};
 use crate::modifiers::style::{AppearanceExt, SemanticStyleViewExt};
 use crate::primitives::controls::button::{Button, ButtonRole};
@@ -296,13 +296,16 @@ impl View for CommandPalette {
         };
 
         let on_move = {
-            let items = items.clone();
+            // Navigation walks the query-filtered results (including recents),
+            // matching what the list shows — not the full authored command set.
+            let selectable = selectable.clone();
             Rc::new(move |delta: i64, wraps: bool| {
-                let selectable = first_selectable_all(&items);
-                let index = state
+                let current = state
                     .highlighted_id
                     .get()
-                    .and_then(|id| selectable.iter().position(|item| item.id == id));
+                    .filter(|id| selectable.iter().any(|item| &item.id == id))
+                    .or_else(|| selectable.first().map(|item| item.id.clone()));
+                let index = current.and_then(|id| selectable.iter().position(|item| item.id == id));
                 match destination(selectable.len(), index, delta, wraps) {
                     Some(next) => state
                         .highlighted_id
@@ -332,10 +335,11 @@ impl View for CommandPalette {
         };
 
         let on_run_highlighted = {
-            let items = items.clone();
+            // Run what the cursor is on within the filtered results, not a
+            // command the query has hidden.
+            let selectable = selectable.clone();
             let run_command = run_command.clone();
             Rc::new(move || {
-                let selectable = first_selectable_all(&items);
                 let effective = state
                     .highlighted_id
                     .get()
@@ -400,8 +404,21 @@ impl View for CommandPalette {
             Modal::new(is_presented, palette)
                 .options(options)
                 .fitting_geometry(|geometry, size| {
-                    if size.height > 0.0 {
-                        geometry.height = geometry.height.min((size.height - 144.0).max(240.0));
+                    if size.width < cove_core::Viewport::COMPACT_MAXIMUM_WIDTH {
+                        // A phone loses too much width and height to the 72pt
+                        // desktop inset: use a 16pt margin and center, so the
+                        // result viewport stays visible.
+                        geometry.width = (size.width - 16.0).max(240.0);
+                        geometry.height = (size.height - 16.0).max(240.0).min(560.0);
+                        geometry.inset = 8.0;
+                        geometry.placement = ModalPlacement::Center;
+                    } else {
+                        geometry.width = 640.0;
+                        geometry.inset = 72.0;
+                        geometry.placement = ModalPlacement::Top;
+                        if size.height > 0.0 {
+                            geometry.height = geometry.height.min((size.height - 144.0).max(240.0));
+                        }
                     }
                 }),
         )
@@ -417,15 +434,6 @@ fn first_selectable(items: &[PaletteCommand]) -> Option<String> {
         .iter()
         .find(|item| item.is_enabled)
         .map(|item| item.id.clone())
-}
-
-/// All enabled commands, in authored order.
-fn first_selectable_all(items: &[PaletteCommand]) -> Vec<CommandItem> {
-    items
-        .iter()
-        .filter(|item| item.is_enabled)
-        .map(PaletteCommand::item)
-        .collect()
 }
 
 /// The panel: search field, results, footer.
@@ -845,11 +853,15 @@ impl View for CommandRow {
         })
         .frame(None, None, None, None, Some(f32::INFINITY), None);
         AnyView::new(
-            AnyView::new(row.button_style(GhostButtonStyle)).on_hover(move |hovered| {
-                if hovered && enabled {
-                    on_highlight(hover_id.clone());
-                }
-            }),
+            AnyView::new(row.button_style(GhostButtonStyle))
+                .on_hover(move |hovered| {
+                    if hovered && enabled {
+                        on_highlight(hover_id.clone());
+                    }
+                })
+                // Search stays the sole Tab stop; pointer clicks still run each
+                // result. Matches Swift's `CommandResultModifier`.
+                .tab_stop(false),
         )
     }
 

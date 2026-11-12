@@ -12,12 +12,13 @@
 
 use crate::support;
 
-use std::collections::BTreeSet;
+use std::cell::RefCell;
+use std::collections::{BTreeSet, HashSet};
 use std::rc::Rc;
 
 use cove_composition::AnyView;
 use cove_core::scene::Node;
-use cove_core::{Binding, Point, State};
+use cove_core::{Binding, Point, Rect, State};
 use cove_ui_compose::modifiers::layout::LayoutFrameExt;
 use cove_ui_compose::primitives::controls::fields::asset_ref_field::icon_resource;
 use cove_ui_compose::primitives::controls::fields::icon_for;
@@ -156,6 +157,44 @@ fn registry_drop_dispatches_to_target() {
 
             AssetDropRegistryHolder::set_current(None);
         });
+    });
+}
+
+#[test]
+fn an_overlapping_drop_reaches_the_topmost_zone() {
+    GlobalTestLock::locked(|| {
+        let registry = Rc::new(AssetDropRegistry::new());
+        let back = Node::new();
+        back.set_frame(Rect::new(0.0, 0.0, 100.0, 100.0));
+        let front = Node::new();
+        front.set_frame(Rect::new(0.0, 0.0, 100.0, 100.0));
+        let hits = Rc::new(RefCell::new(Vec::<&'static str>::new()));
+
+        let back_hits = hits.clone();
+        registry.register(
+            &back,
+            HashSet::<String>::new(),
+            true,
+            Rc::new(move |_| back_hits.borrow_mut().push("back")),
+        );
+        let front_hits = hits.clone();
+        registry.register(
+            &front,
+            HashSet::<String>::new(),
+            true,
+            Rc::new(move |_| front_hits.borrow_mut().push("front")),
+        );
+
+        let payload = AssetDropPayload::new("asset-1", "SM_Ruin", "mesh");
+        assert!(
+            AssetDropRegistry::drop(&registry, &payload, Point::new(50.0, 50.0)),
+            "an overlapping drop is accepted"
+        );
+        assert_eq!(
+            hits.borrow().as_slice(),
+            ["front"],
+            "the last-registered (topmost) zone wins an overlapping hit"
+        );
     });
 }
 

@@ -4,6 +4,21 @@
 
 Swift 源码逐页对照见文末《Swift 源码对照（逐页差异清单）》。
 
+## 2026-11-12 overlays 核查与修复
+
+| 页面或组件 | 实现与自动化验收 | 原生验收 | Rust 文档 |
+| --- | --- | --- | --- |
+| Tooltip | 与 Swift 逐项对照：停留 0.6s、warm window 0.4s、嵌套内层优先、单提示仲裁、聚焦可见、截断才显示、上方放置越界翻下。悬停命中挂在目标节点上，容器默认可命中，空留白也能触发。 | 未做 | [Tooltip](../Website/src/content/components/tooltip.md) |
+| HoverCard | 指针卡与触摸 sheet 两条路径；卡片内任意留白都保持打开（全局悬停命中修正后生效），Escape 与外部点击关闭。Gallery 补齐键盘可达的 “Open profile” Popover 入口与 MeshRenderer 第二个示例。 | 未做 | [HoverCard](../Website/src/content/components/hover-card.md) |
+| Menu / ContextMenu | 与 Swift 对照，层级、子菜单翻转与夹紧、行密度一致。Gallery 右键菜单补齐文件夹/复制图标、详情行、富文本链接行与 Organize → Export 两级子菜单；禁用项保留可见但跳过。 | 未做 | [Menu](../Website/src/content/components/menu.md) |
+| Notification / Toast | 补齐 Swift 的悬停暂停与安全区内边距：指针停在整张卡片（含留白）时暂停倒计时，移开继续；栈按安全区在顶部或底部加内边距。新增场景回归 `hovering_the_card_pauses_its_countdown`。 | 未做 | [Notification / Toast](../Website/src/content/components/toast.md) |
+| Command Palette | 修复导航与激活走全量命令而非查询过滤结果的问题（方向键只走可见项，Return 只运行高亮项）；窗口窄于 600pt 改用居中紧凑几何；结果行退出 Tab 链，搜索框是唯一停靠点。新增 `arrows_and_run_stay_within_the_filtered_results`，紧凑几何测试改为断言实际尺寸。 | 未做 | [CommandPalette](../Website/src/content/components/command-palette.md) |
+| Drag & Drop（AssetDropTarget） | 重叠落点改为最后登记（最上层）的目标生效，与 Swift 一致；新增 `an_overlapping_drop_reaches_the_topmost_zone`。 | 未做 | [Drag & Drop](../Website/src/content/components/drag-and-drop.md) |
+
+全局悬停修正：`HoverModifier` 在注册回调时把节点设为可命中。此前 `BoxView` 等容器默认不可命中，悬停回调只能在子控件上触发，容器自身留白（卡片内边距、toast 卡片空白）收不到 Enter/Leave。子节点仍优先命中，回归覆盖 compose 全量 1751 项（2 项既有失败与本次无关）。
+
+本轮的视觉与交互结论来自结构测试与场景回归；Gallery 原生截图、真机指针与键盘验收尚未执行。
+
 ## 2026-11-12 实时光追阴影
 
 | 页面 | 实现与自动化验收 | 原生视觉与交互验收 | Rust 文档 |
@@ -397,8 +412,8 @@ cargo test -p cove-ui-compose --test compose --locked
 | RadioGroup | 0 | 0 / 0 | 挂载/几何基础检查通过；待逐项交互和视觉验收 |
 | Form | 0 | 0 / 0 | 挂载/几何基础检查通过；待逐项交互和视觉验收 |
 | Combobox | 0 | 0 / 0 | 挂载/几何基础检查通过；待逐项交互和视觉验收 |
-| Notification | 0 | 0 / 0 | 挂载/几何基础检查通过；待逐项交互和视觉验收 |
-| Tooltip | 0 | 0 / 0 | 挂载/几何基础检查通过；待逐项交互和视觉验收 |
+| Notification | 0 | 1 / 0 | 悬停暂停与安全区已补齐并有场景回归（`hovering_the_card_pauses_its_countdown`）；待原生视觉验收 |
+| Tooltip | 0 | 0 / 0 | 与 Swift 行为逐项对齐（延迟、warm window、嵌套内层优先、截断才显示）；待原生视觉与键盘验收 |
 | Sidebar | 0 | 0 / 0 | 2026-11-07 贴边全高、中性滑动选中、强调色图标，明暗截图目检通过；同日 Gallery 窗口改为 macOS 侧栏材质（侧栏无填充）、正文放入圆角卡片，DevTools 截图确认卡片与侧栏透明区，系统材质的实际合成未截图验证（无屏幕录制权限） |
 | NavigationDrawer | 0 | 0 / 0 | 挂载/几何基础检查通过；待逐项交互和视觉验收 |
 | NavigationRail | 0 | 0 / 0 | 挂载/几何基础检查通过；待逐项交互和视觉验收 |
@@ -423,12 +438,12 @@ cargo test -p cove-ui-compose --test compose --locked
 | AlertDialog | 0 | 0 / 0 | 挂载/几何基础检查通过；待逐项交互和视觉验收 |
 | Sheet | 0 | 0 / 0 | 挂载/几何基础检查通过；待逐项交互和视觉验收 |
 | BottomSheet | 0 | 0 / 0 | 挂载/几何基础检查通过；待逐项交互和视觉验收 |
-| Command Palette | 0 | 0 / 0 | 挂载/几何基础检查通过；待逐项交互和视觉验收 |
+| Command Palette | 0 | 2 / 0 | 导航与激活只走查询过滤结果、紧凑窗口几何、结果行退出 Tab 链；有场景回归；待原生视觉验收 |
 | NavigationStack | 0 | 0 / 0 | 挂载/几何基础检查通过；待逐项交互和视觉验收 |
 | ListDetail / AdaptiveTabs | 2 | 0 / 0 | `list_detail_tests` 结构覆盖；桌面 DevTools 实测选择、单栏返回、预设切换与三种 tab 呈现；待原生触摸与真机验收 |
-| Drag & Drop | 0 | 0 / 0 | 挂载/几何基础检查通过；待逐项交互和视觉验收 |
+| Drag & Drop | 0 | 1 / 0 | 重叠资产落点按最后登记目标生效，有场景回归；待逐项原生交互验收 |
 | Drag Upload | 0 | 3 / 0 | 拖放区命中、类型/数量拒绝、批次聚合、目录拒绝、空过滤与 Content-Type 查表有结构回归；DevTools 注入 begin→file→complete 已端到端验证；原生 OS 拖入与原生打开面板尚未验收 |
-| HoverCard | 0 | 0 / 0 | 挂载/几何基础检查通过；待逐项交互和视觉验收 |
+| HoverCard | 0 | 0 / 0 | 卡片整面悬停、Escape/外部点击关闭与 Swift 对齐；Gallery 补齐键盘入口与第二个示例；待原生视觉验收 |
 | Timeline | 2 | 0 / 0 | 挂载/几何基础检查通过；待逐项交互和视觉验收 |
 | Toolbar | 0 | 0 / 0 | 挂载/几何基础检查通过；待逐项交互和视觉验收 |
 | Link | 3 | 0 / 0 | 挂载/几何基础检查通过；待逐项交互和视觉验收 |

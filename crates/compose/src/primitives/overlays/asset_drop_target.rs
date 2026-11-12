@@ -97,11 +97,12 @@ impl AssetDropRegistry {
     }
 
     /// Delivers the payload to the topmost zone under the point; returns whether
-    /// any zone accepted it.
+    /// any zone accepted it. Zones register in paint order, so the last one
+    /// added is the topmost and wins an overlapping hit.
     pub fn drop(&self, payload: &AssetDropPayload, point: Point) -> bool {
         self.prune();
         let zones = self.zones.borrow();
-        for zone in zones.iter() {
+        for zone in zones.iter().rev() {
             let Some(node) = Node::upgrade(&zone.node) else {
                 continue;
             };

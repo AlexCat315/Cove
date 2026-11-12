@@ -6,7 +6,7 @@ use cove_composition::Scope;
 use cove_core::State;
 use cove_core::scene::{Align, FlexDirection, Justify, Wrap};
 use cove_ui_compose::modifiers::interaction::AccessibilityExt;
-use cove_ui_compose::modifiers::layout::{FlexExt, LayoutFrameExt, PaddingExt};
+use cove_ui_compose::modifiers::layout::{EdgeInsets, FlexExt, LayoutFrameExt, PaddingExt};
 use cove_ui_compose::modifiers::style::{AppearanceExt, SemanticStyleViewExt};
 use cove_ui_compose::primitives::controls::Button;
 use cove_ui_compose::primitives::controls::ButtonRole;
@@ -14,11 +14,16 @@ use cove_ui_compose::primitives::controls::Checkbox;
 use cove_ui_compose::primitives::data::avatar::Avatar;
 use cove_ui_compose::primitives::media::Icon;
 use cove_ui_compose::primitives::media::ui_icon_catalog as icons;
-use cove_ui_compose::primitives::overlays::PopoverPlacement;
 use cove_ui_compose::primitives::overlays::hover_card::HoverCard;
-use cove_ui_compose::primitives::overlays::menu::{MenuEntry, MenuItem, MenuSubmenu};
-use cove_ui_compose::primitives::overlays::{ContextMenuExt, Popconfirm};
+use cove_ui_compose::primitives::overlays::menu::{
+    MenuEntry, MenuItem, MenuItemContent, MenuSubmenu,
+};
+use cove_ui_compose::primitives::overlays::{
+    ContextMenuExt, Popconfirm, Popover, PopoverOverflow, PopoverPlacement, PopoverSurface,
+};
+use cove_ui_compose::primitives::text::rich::run::{TextRun, TextTraits};
 use cove_ui_compose::primitives::text::Text;
+use cove_ui_compose::theme::styles::buttons::ButtonStyleViewExt;
 use cove_ui_compose::theme::tokens::SemanticColorRef;
 use cove_ui_compose::theme::{Theme, ThemeReader};
 use cove_ui_compose::{AnyView, BoxView, LayoutDebugExt, TupleView, View};
@@ -244,6 +249,7 @@ impl View for PopconfirmStory {
 pub struct HoverCardStory {
     pub options: GalleryOptions,
     following: State<bool>,
+    profile_open: State<bool>,
 }
 
 impl HoverCardStory {
@@ -251,6 +257,7 @@ impl HoverCardStory {
         Self {
             options,
             following: State::new(false),
+            profile_open: State::new(false),
         }
     }
 
@@ -261,6 +268,18 @@ impl HoverCardStory {
     /// Toggles the follow action the card exposes.
     pub fn toggle_following(&self) {
         self.following.update(|value| *value = !*value);
+    }
+
+    pub fn is_profile_open(&self) -> bool {
+        self.profile_open.get()
+    }
+
+    pub fn open_profile(&self) {
+        self.profile_open.set(true);
+    }
+
+    pub fn close_profile(&self) {
+        self.profile_open.set(false);
     }
 }
 
@@ -306,6 +325,7 @@ impl View for HoverCardStory {
                         toggle.update(|value| *value = !*value)
                     })
                     .enabled(enabled)
+                    .button_style(cove_ui_compose::theme::styles::buttons::secondary())
                     .debug_name("hover-follow"),
                 ),
             ])),
@@ -323,6 +343,64 @@ impl View for HoverCardStory {
         .width(Some(340.0))
         .enabled(enabled);
 
+        // The pointer card is unreachable from the keyboard; the same detail
+        // opens as an anchored card from a button, as Swift's story does.
+        let open_profile = AnyView::new(
+            Popover::new(
+                AnyView::new(
+                    Text::new("Open profile")
+                        .semantic_font(cove_ui_compose::theme::SemanticFontRef::label()),
+                ),
+                AnyView::new(
+                    profile
+                        .clone()
+                        .padding_insets(EdgeInsets::all(16.0))
+                        .semantic_background(SemanticColorRef::surface_floating())
+                        .corner_radius(8.0),
+                ),
+            )
+            .is_presented(self.profile_open.binding())
+            .width(360.0)
+            .surface(PopoverSurface::Content)
+            .overflow(PopoverOverflow::Flip)
+            .enabled(enabled)
+            .debug_name("hover-open-profile"),
+        );
+
+        let mesh_card = HoverCard::new(
+            AnyView::new(BoxView::new(
+                FlexDirection::Row,
+                Align::Center,
+                Justify::FlexStart,
+                Wrap::NoWrap,
+                6.0,
+                AnyView::new(TupleView::new(vec![
+                    AnyView::new(Icon::with_semantic(
+                        icons::editor::box_(),
+                        14.0,
+                        SemanticColorRef::on_surface_muted(),
+                    )),
+                    body_strong("MeshRenderer"),
+                ])),
+            )),
+            AnyView::new(BoxView::new(
+                FlexDirection::Column,
+                Align::Stretch,
+                Justify::FlexStart,
+                Wrap::NoWrap,
+                6.0,
+                AnyView::new(TupleView::new(vec![
+                    AnyView::new(
+                        Text::new("Renders a mesh with a material")
+                            .semantic_font(cove_ui_compose::theme::SemanticFontRef::body()),
+                    ),
+                    caption("Costs one draw call per submesh."),
+                ])),
+            )),
+        )
+        .width(Some(300.0))
+        .enabled(enabled);
+
         let content = AnyView::new(BoxView::new(
             FlexDirection::Column,
             Align::Stretch,
@@ -331,11 +409,13 @@ impl View for HoverCardStory {
             12.0,
             AnyView::new(TupleView::new(vec![
                 AnyView::new(card),
+                open_profile,
                 caption(if following {
                     "Following Ada"
                 } else {
                     "Not following Ada"
                 }),
+                AnyView::new(mesh_card),
             ])),
         ));
 
@@ -351,7 +431,7 @@ impl View for HoverCardStory {
     }
 
     fn dynamic_properties(&self) -> Vec<cove_composition::DynamicField> {
-        cove_composition::dynamic_fields!(self; following)
+        cove_composition::dynamic_fields!(self; following, profile_open)
     }
 }
 
@@ -384,37 +464,78 @@ impl ContextMenuStory {
     /// The entries the card offers, in authored order.
     pub fn entries(&self) -> Vec<MenuEntry> {
         let record = self.last_action.clone();
+        let enabled = self.options.is_enabled;
+        let command = |id: u64, title: &'static str, message: &'static str| {
+            let record = record.clone();
+            MenuEntry::Item(
+                MenuItem::new(id, title, move || record.set(message.to_owned())).enabled(enabled),
+            )
+        };
+        let mut organize_entries = vec![command(206, "Move to folder", "Moved to folder")];
+        organize_entries.push(MenuEntry::Submenu(MenuSubmenu {
+            id: 207,
+            title: "Export".to_owned(),
+            entries: vec![
+                command(208, "JSON", "Exported JSON"),
+                command(209, "Swift", "Exported Swift"),
+            ],
+            is_enabled: enabled,
+            width: 200.0,
+            icon: None,
+        }));
         vec![
             MenuEntry::Item(
                 MenuItem::new(201, "Open", {
                     let record = record.clone();
-                    move || record.set("Open".to_owned())
+                    move || record.set("Opened".to_owned())
                 })
-                .enabled(self.options.is_enabled),
+                .enabled(enabled)
+                .content(MenuItemContent::new(
+                    Some(icons::file::folder()),
+                    Vec::new(),
+                    None,
+                    None,
+                )),
             ),
-            MenuEntry::Item(MenuItem::new(202, "Duplicate", {
-                let record = record.clone();
-                move || record.set("Duplicate".to_owned())
-            })),
-            MenuEntry::separator(203),
+            MenuEntry::Item(
+                MenuItem::new(202, "Duplicate", {
+                    let record = record.clone();
+                    move || record.set("Duplicated".to_owned())
+                })
+                .enabled(enabled)
+                .content(MenuItemContent::new(
+                    Some(icons::action::copy()),
+                    Vec::new(),
+                    Some("Creates a copy next to the original".to_owned()),
+                    None,
+                )),
+            ),
+            MenuEntry::Item(
+                MenuItem::new(203, "Documentation", {
+                    let record = record.clone();
+                    move || record.set("Opened documentation".to_owned())
+                })
+                .enabled(enabled)
+                .content(MenuItemContent::new(
+                    None,
+                    vec![
+                        TextRun::new("Read the "),
+                        TextRun::with_traits("guide", TextTraits::BOLD),
+                    ],
+                    None,
+                    Some("https://cove.example/docs".to_owned()),
+                )),
+            ),
+            MenuEntry::separator(204),
             MenuEntry::Submenu(MenuSubmenu {
-                id: 204,
-                title: "Move to".to_owned(),
-                entries: vec![
-                    MenuEntry::Item(MenuItem::new(205, "Projects", {
-                        let record = record.clone();
-                        move || record.set("Move to Projects".to_owned())
-                    })),
-                    MenuEntry::Item(MenuItem::new(206, "Archive", {
-                        let record = record.clone();
-                        move || record.set("Move to Archive".to_owned())
-                    })),
-                ],
-                is_enabled: self.options.is_enabled,
+                id: 205,
+                title: "Organize".to_owned(),
+                entries: organize_entries,
+                is_enabled: enabled,
                 width: 200.0,
                 icon: None,
             }),
-            MenuEntry::Item(MenuItem::new(207, "Delete", || {}).enabled(false)),
+            MenuEntry::Item(MenuItem::new(210, "Delete", || {}).enabled(false)),
         ]
     }
 }
@@ -430,8 +551,8 @@ impl View for ContextMenuStory {
             .context_menu(self.entries()),
         );
         AnyView::new(StorySection::new(
-            "Right-click menu",
-            "Control-click or right-click the card for the menu. Submenus open on hover or Right, Escape dismisses the innermost level first, and unavailable commands stay visible but skipped.",
+            "Context actions",
+            "Control-click or right-click the card for the menu. Submenus open on hover or Right, Escape dismisses the innermost level first, and unavailable commands stay visible but skipped. Icons, details and links keep the row's plain title for search and type-ahead.",
             AnyView::new(BoxView::new(
                 FlexDirection::Column,
                 Align::FlexStart,

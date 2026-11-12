@@ -15,6 +15,7 @@ use std::rc::Rc;
 
 use cove_composition::AnyView;
 use cove_core::scene::Node;
+use cove_platform::{InputEvent, MouseMotionEvent};
 use cove_ui_compose::modifiers::layout::LayoutFrameExt;
 use cove_ui_compose::primitives::overlays::portal::{LayerRoot, PortalStore, PortalStoreHolder};
 use cove_ui_compose::primitives::overlays::toast::{
@@ -146,6 +147,68 @@ fn a_posted_card_fades_in_and_dismissal_releases_the_portal() {
         });
     });
 }
+
+#[test]
+fn hovering_the_card_pauses_its_countdown() {
+    GlobalTestLock::locked(|| {
+        support::with_test_text_environment(|| {
+            let controller = ToastController::new(1);
+            let host_controller = controller.clone();
+            support::InteractiveScene::run(WIDTH, HEIGHT, |scene| {
+                scene.install(AnyView::new(
+                    AnyView::new(LayerRoot::new(AnyView::new(NotificationHost::new(
+                        host_controller.clone(),
+                    ))))
+                    .frame_size(WIDTH, HEIGHT),
+                ));
+                // A long duration so the mounting settles cannot elapse it.
+                controller.post(
+                    ToastNotification::new("Pinned")
+                        .id("pinned")
+                        .duration(Some(100.0)),
+                );
+                scene.settle(2, 0.1);
+                assert!(controller.needs_clock(), "a fresh card counts down");
+
+                let title = scene
+                    .first(|node| {
+                        node.layout_node()
+                            .and_then(|layout| layout.text_inputs())
+                            .is_some_and(|inputs| inputs.text == "Pinned")
+                    })
+                    .expect("posting mounts the card");
+                let frame = title.absolute_frame();
+                // One persistent dispatcher: hover state lives on the
+                // dispatcher, so a fresh one per event would forget the entry.
+                let dispatcher = scene.dispatcher();
+                dispatcher.dispatch(&InputEvent::MouseMotion(MouseMotionEvent {
+                    x: frame.x + frame.width / 2.0,
+                    y: frame.y + frame.height / 2.0,
+                    delta_x: 0.0,
+                    delta_y: 0.0,
+                    kind: Default::default(),
+                }));
+                assert!(
+                    !controller.needs_clock(),
+                    "hovering anywhere on the card pauses its countdown"
+                );
+
+                dispatcher.dispatch(&InputEvent::MouseMotion(MouseMotionEvent {
+                    x: 2.0,
+                    y: 2.0,
+                    delta_x: 0.0,
+                    delta_y: 0.0,
+                    kind: Default::default(),
+                }));
+                assert!(
+                    controller.needs_clock(),
+                    "leaving the card resumes the countdown"
+                );
+            });
+        });
+    });
+}
+
 
 #[test]
 fn reduced_motion_leaves_no_exit_clocks() {
