@@ -18,10 +18,11 @@ use std::rc::Rc;
 use std::time::Instant;
 
 use cove_composition::ViewGraph;
-use cove_core::{DrawList, Point, TextLayoutOptions, layout_text};
 use cove_core::scene::{
     AnimatorScheduler, EventDispatcher, NodeRenderer, NodeTree, PlatformInputContext, Recomposer,
+    TextInputAreaResolver, TextInputAttachmentKey,
 };
+use cove_core::{DrawList, Point, TextLayoutOptions, layout_text};
 use cove_devtools::client::DevToolsSession;
 use cove_devtools::inspection::SceneInspector;
 use cove_devtools_protocol::{
@@ -30,7 +31,8 @@ use cove_devtools_protocol::{
 };
 use cove_platform::{
     InputEvent as PlatformInputEvent, KeyEvent, KeyModifiers, MouseButton, MouseButtonEvent,
-    MouseMotionEvent, PointerKind, TextEditingEvent,
+    MouseMotionEvent, MouseWheelEvent, PointerKind, ScrollInput, ScrollUnit, TextEditingEvent,
+    TextInputArea,
 };
 use cove_text::{DrawListText, FontCollection};
 
@@ -88,6 +90,7 @@ pub struct BrowserPrototype<C: PrototypeContent> {
     pub snapshot_buffer: ExportBuffer,
     pub response_buffer: ExportBuffer,
     pub atlas_buffer: ExportBuffer,
+    input_anchor: [f32; 3],
     #[cfg(target_arch = "wasm32")]
     webgpu: Option<BrowserGpu>,
     #[cfg(target_arch = "wasm32")]
@@ -166,6 +169,7 @@ impl<C: PrototypeContent> BrowserPrototype<C> {
             snapshot_buffer: ExportBuffer::new(),
             response_buffer: ExportBuffer::new(),
             atlas_buffer: ExportBuffer::new(),
+            input_anchor: [0.0; 3],
             #[cfg(target_arch = "wasm32")]
             webgpu: None,
             #[cfg(target_arch = "wasm32")]
@@ -489,12 +493,73 @@ impl<C: PrototypeContent> BrowserPrototype<C> {
         });
     }
 
+    pub(super) fn wheel(&self, unit: ScrollUnit, dx: f32, dy: f32, x: f32, y: f32, time: f64) {
+        // DOM deltas describe viewport motion, while Cove's wheel convention
+        // describes content motion. DOM does not expose gesture phases.
+        let event = PlatformInputEvent::MouseWheel(MouseWheelEvent {
+            x: -dx,
+            y: -dy,
+            mouse_x: Some(x),
+            mouse_y: Some(y),
+            input: ScrollInput {
+                unit,
+                timestamp: time / 1000.0,
+                ..ScrollInput::default()
+            },
+        });
+        self.context
+            .with_current(|| self.dispatcher.dispatch(&event));
+    }
+
+    pub(super) fn text_input_area(&mut self) -> *const f32 {
+        let anchor = self.context.with_current(|| {
+            let node = self.context.focus_chain.focused()?;
+            if !node.accepts_subtree_input() || !self.context.focus_chain.permits_input(&node) {
+                return None;
+            }
+            let origin = node.absolute_origin();
+            match node.attachment::<TextInputAreaResolver>(TextInputAttachmentKey::AREA_RESOLVER) {
+                Some(resolve) => resolve(&node, origin),
+                None => node.attachment(TextInputAttachmentKey::AREA).or_else(|| {
+                    // The prototype's custom note predates the shared editor.
+                    (crate::prototype::node_debug_name(&node).as_deref()
+                        == Some(cove_examples::CounterDebugName::NOTE))
+                    .then(|| TextInputArea {
+                        x: origin.x + 16.0,
+                        y: origin.y + 12.0,
+                        height: 24.0,
+                        cursor_x: self.frame.as_ref().map_or(0.0, |frame| {
+                            if frame.note.is_empty() {
+                                0.0
+                            } else {
+                                frame.note_width.min((node.frame().width - 36.0).max(0.0))
+                            }
+                        }),
+                        ..TextInputArea::default()
+                    })
+                }),
+            }
+        });
+        let Some(area) = anchor else {
+            return std::ptr::null();
+        };
+        self.input_anchor = [area.x + area.cursor_x, area.y, area.height];
+        if !self.input_anchor.iter().all(|value| value.is_finite()) {
+            return std::ptr::null();
+        }
+        self.input_anchor.as_ptr()
+    }
+
     pub fn text(&mut self, text: &str, editing: bool) {
         if text.len() > 32768 {
             return;
         }
         let event = if editing {
-            PlatformInputEvent::TextEditing(TextEditingEvent::from_utf16(text, 0, 0))
+            PlatformInputEvent::TextEditing(TextEditingEvent::from_utf16(
+                text,
+                text.encode_utf16().count() as i32,
+                0,
+            ))
         } else {
             PlatformInputEvent::TextInput(text.to_owned())
         };
@@ -843,8 +908,8 @@ fn collect_labels(
     labels: &mut Vec<Label>,
     note_width: &mut f32,
 ) {
-    if let Some(run) = node
-        .attachment::<cove_examples::CounterTextRun>(cove_examples::CounterText::ATTACHMENT)
+    if let Some(run) =
+        node.attachment::<cove_examples::CounterTextRun>(cove_examples::CounterText::ATTACHMENT)
     {
         let frame = node.absolute_frame();
         let padding = node
@@ -865,7 +930,8 @@ fn collect_labels(
             },
         );
         let x = frame.x + run.inset + padding.left;
-        let y = frame.y + padding.top
+        let y = frame.y
+            + padding.top
             + (frame.height - padding.top - padding.bottom - run.size * 1.4) * 0.5;
         labels.push(Label {
             text: run.text.clone(),

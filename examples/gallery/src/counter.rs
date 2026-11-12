@@ -698,7 +698,7 @@ impl PrimitiveView for DemoNote {
         node.set_background_color(Some(self.color.multiplied_alpha(0.06)));
         node.set_attachment(
             cove_ui_compose::LayoutDebugAttachmentKey::DEBUG_NAME,
-            CounterDebugName::NOTE,
+            CounterDebugName::NOTE.to_owned(),
         );
 
         let current = self.value.get();

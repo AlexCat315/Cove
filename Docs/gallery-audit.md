@@ -4,6 +4,13 @@
 
 Swift 源码逐页对照见文末《Swift 源码对照（逐页差异清单）》。
 
+## 2026-11-12 浏览器宿主输入
+
+| 页面或组件 | 实现与自动化验收 | 浏览器实机验收 | Rust 文档 |
+| --- | --- | --- | --- |
+| Gallery / ScrollView | WASM 反应器测试在默认浏览器尺寸下确认像素、行和页滚轮事件改变示例的纵向偏移。 | 滚轮、触控板与视觉待验收。 | [Gallery](../Website/src/content/components/gallery.md) · [ScrollView](../Website/src/content/components/scroll-view.md) |
+| Gallery / Text Fields | WASM 反应器测试确认点击搜索框立即返回光标坐标、预编辑不改变搜索结果、取消清除预编辑、提交后过滤导航，离开字段时停止文本输入。Counter 回归覆盖计数与备注。 | 浏览器键盘、IME 候选位置与移动软键盘待验收。 | [TextField](../Website/src/content/components/text-field.md) |
+
 ## 2026-11-12 overlays 核查与修复
 
 | 页面或组件 | 实现与自动化验收 | 原生验收 | Rust 文档 |

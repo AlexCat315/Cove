@@ -117,6 +117,26 @@ pub extern "C" fn cove_pointer(kind: i32, x: f32, y: f32) {
     with_app(|app| app.pointer(kind, x, y));
 }
 
+/// Dispatches DOM wheel deltas in pixels, lines or pages (modes 0, 1 and 2).
+#[unsafe(no_mangle)]
+pub extern "C" fn cove_wheel(mode: u32, dx: f32, dy: f32, x: f32, y: f32, time: f64) {
+    use cove_platform::ScrollUnit;
+    let unit = match mode {
+        0 => ScrollUnit::Points,
+        1 => ScrollUnit::Lines,
+        2 => ScrollUnit::Pages,
+        _ => return,
+    };
+    with_app(|app| app.wheel(unit, dx, dy, x, y, time));
+}
+
+/// Returns three floats (caret x, top y and line height) in surface points,
+/// or null if the focused node does not accept text. Read before the next call.
+#[unsafe(no_mangle)]
+pub extern "C" fn cove_text_input_area() -> *const f32 {
+    with_app(|app| app.text_input_area())
+}
+
 /// Dispatches a synthetic key event.
 #[unsafe(no_mangle)]
 pub extern "C" fn cove_key(code: u32, modifiers: u32, down: i32, repeated: i32) {
@@ -132,7 +152,7 @@ pub unsafe extern "C" fn cove_text(pointer: *const c_char, count: i32, editing: 
     let Ok(count) = usize::try_from(count) else {
         return;
     };
-    if pointer.is_null() || count == 0 || count > 32768 {
+    if pointer.is_null() || (count == 0 && editing == 0) || count > 32768 {
         return;
     }
     // SAFETY: the caller guarantees `count` readable UTF-8 bytes.

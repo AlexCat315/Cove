@@ -17,10 +17,13 @@ npm run serve
 
 默认监听 `127.0.0.1:8080`。`COVE_WASM_CONFIGURATION=release` 生成优化版本；`COVE_WASM_OUTPUT` 可调整输出目录。字体和许可证位于 [`../text/fonts`](../text/fonts/README.md)。
 
+默认打开 Counter。用 `?component=scrollView` 或 `?component=textFields` 打开 Gallery 对应页面。画布内可用滚轮和触控板滚动；点击可编辑字段后可使用浏览器键盘和输入法。
+
 ```sh
 npm run verify
+npm run test:wasm
 ```
 
-此命令检查前端脚本语法；浏览器端的渲染、输入和 GPU 行为需在浏览器中验证。
+`verify` 检查前端脚本语法。`test:wasm` 实例化构建后的模块，验证 Counter 和 Gallery 的输入路由及状态变化。浏览器绘制、GPU、系统键盘和 IME 仍需实机验证。
 
 UI 着色器来自 `crates/graphics/resources/Shaders/Slang`。修改源码后，在仓库根目录运行 `node Tools/Shaders/build-native-ui.mjs --wgsl`，使用 `cargo cove setup --shaders` 配置的 Slang 2026.19 重新生成浏览器产物。

@@ -106,8 +106,9 @@ jobs:
       - name: Build browser Wasm
         working-directory: crates/browser
         run: npm ci && npm run build && npm run verify
-      - name: Validate Wasm module
-        run: node -e "const fs=require('fs');const b=fs.readFileSync('crates/browser/dist/cove.wasm');if(!WebAssembly.validate(b))process.exit(1);console.log('valid wasm module:',b.length,'bytes')"
+      - name: Test Wasm reactor input
+        working-directory: crates/browser
+        run: npm run test:wasm
   media:
     # FFmpeg and its bindings build inside the `ffmpeg-sys-next` build script,
     # so CI runs the same cargo entry points developers use.

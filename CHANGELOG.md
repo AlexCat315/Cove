@@ -4,6 +4,7 @@
 
 ## Unreleased
 
+- WASM 浏览器宿主接通滚轮和触控板滚动。Gallery 的编辑字段可接收浏览器键盘和 IME 输入，输入位置跟随 Cove 光标。
 - 浏览器新增 Rust RHI WebGPU 后端。Gallery 在 Web 复用原生 DrawList 渲染器和 4× MSAA，UI 与合成着色器由 Slang 生成浏览器产物。
 - Gallery 新增 Ray-Traced Shadows。移动面光源可实时查看软阴影，支持 DX12、Vulkan 和 Metal 光线查询，并提供光栅化对照和回退。场景几何在输出位图前进行四点覆盖采样。
 - 修复 Vulkan 加速结构能力探测和几何描述中的结构类型标识，使支持 `VK_KHR_ray_query` 的设备能够建立并查询场景。

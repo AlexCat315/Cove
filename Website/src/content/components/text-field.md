@@ -2,6 +2,8 @@
 
 `TextField` 编辑绑定的 `TextBuffer`。普通输入、删除、清空和平台输入法提交都会更新同一个绑定；候选组合只显示预览，提交后才改变绑定。
 
+浏览器宿主在可编辑字段获得焦点时启用文本输入，并将输入法定位到光标。可在 Gallery 的 `?component=textFields` 验证。
+
 ```rust
 use cove_ui::prelude::*;
 
