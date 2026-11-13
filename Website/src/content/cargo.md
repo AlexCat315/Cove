@@ -16,7 +16,7 @@ cargo generate --git https://github.com/AlexCat315/Cove.git Templates/app --name
 ```bash
 cargo run
 cargo test
-COVE_DEVTOOLS=1 cargo run
+cargo run   # 调试版自带 DevTools 控制器，终端打印 Inspector 链接
 ```
 
 ## 打包

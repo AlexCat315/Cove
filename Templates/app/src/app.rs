@@ -13,7 +13,7 @@ pub fn application() -> ApplicationLaunch {
         .configure(|app| {
             app.window.title = "{{application_name}}".into();
         })
-        // DevTools stays off until `COVE_DEVTOOLS=1` and a debug build.
+        // A debug build attaches DevTools and starts its own controller.
         .diagnostics(cove_ui::hosts::desktop::diagnostics::devtools::factory())
 }
 

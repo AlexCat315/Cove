@@ -1,11 +1,12 @@
 # DevTools
 
-启动控制器，再从 Rust 工程启动带 DevTools 的调试版。
+调试版自带控制器，一条命令启动带 DevTools 的调试版。
 
 ```sh
-cargo run -p cove-devtools-cli -- serve
-COVE_DEVTOOLS=1 cargo run -p cove-examples --bin gallery
+cargo run -p cove-examples --bin gallery --features media-ffmpeg
 ```
+
+终端打印 Inspector 链接，CLI 与 MCP 直接可用。已有控制器在运行时自动配对；`COVE_DEVTOOLS=0` 关闭 DevTools。
 
 在 Inspector 选中应用，点击 **Capture** 查看 Cove 渲染画面。**Pick** 查找像素下的组件，**Interact** 在应用内点击、拖动或滚动。键盘和文本输入发往选中运行时内的控件。
 

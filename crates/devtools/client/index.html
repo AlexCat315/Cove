@@ -390,6 +390,9 @@
       <header class="aux-header">
         <div class="aux-title"><h1>State</h1><p id="state-meta" class="aux-meta"></p></div>
         <div class="aux-actions">
+          <label class="inline-field" for="state-scope">Scope</label>
+          <select id="state-scope" aria-label="Owner scope"><option value="">All scopes</option></select>
+          <label class="check" title="Poll the runtime for the watched state summaries"><input id="state-follow" type="checkbox"> Follow</label>
           <button id="state-refresh" class="tool-button" type="button">
             <svg class="icon" aria-hidden="true"><use href="#i-refresh"></use></svg><span>Refresh</span>
           </button>

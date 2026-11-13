@@ -176,26 +176,27 @@ pub struct DiagnosticsConfiguration {
 }
 
 impl DiagnosticsConfiguration {
-    /// `DevToolsConfig.fromEnvironment(appTitle:)` in the Swift original: an
-    /// absent `COVE_DEVTOOLS` leaves DevTools off. Only the documented off
-    /// values disable it; anything else opts in.
+    /// A debug build attaches DevTools on its own, so `cargo run` needs neither
+    /// an environment variable nor a second command. `COVE_DEVTOOLS` overrides
+    /// that default: the documented off values disable it, anything else opts
+    /// in. A release build stays off unless it opts in.
     pub fn from_environment(
         app_title: &str,
     ) -> Option<super::super::diagnostics::integration::DevToolsConfiguration> {
-        let value = std::env::var("COVE_DEVTOOLS").ok()?;
-        if matches!(
-            value.trim().to_ascii_lowercase().as_str(),
-            "" | "0" | "false" | "no" | "off"
-        ) {
-            return None;
-        }
-        Some(
+        let enabled = match std::env::var("COVE_DEVTOOLS") {
+            Ok(value) => !matches!(
+                value.trim().to_ascii_lowercase().as_str(),
+                "" | "0" | "false" | "no" | "off"
+            ),
+            Err(_) => cfg!(debug_assertions),
+        };
+        enabled.then(|| {
             super::super::diagnostics::integration::DevToolsConfiguration {
                 app_title: app_title.to_owned(),
                 window: None,
                 connection: None,
-            },
-        )
+            }
+        })
     }
 }
 

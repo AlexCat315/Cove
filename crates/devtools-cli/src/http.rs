@@ -78,6 +78,44 @@ impl Drop for RunningController {
     }
 }
 
+/// The controller a runtime pairs with: one already running, or one started
+/// inside this process so launching the app needs no second command.
+pub enum AttachedController {
+    External(ConnectionInfo),
+    Embedded(RunningController),
+}
+
+impl AttachedController {
+    pub fn connection(&self) -> &ConnectionInfo {
+        match self {
+            Self::External(info) => info,
+            Self::Embedded(controller) => controller.connection(),
+        }
+    }
+
+    pub fn is_embedded(&self) -> bool {
+        matches!(self, Self::Embedded(_))
+    }
+
+    /// A live controller keeps ownership of the discovery file. An explicitly
+    /// configured endpoint is left alone even while it is unreachable, so a
+    /// controller started later still wins over an in-process one.
+    pub fn attach(port: u16) -> Result<Self, Box<dyn std::error::Error + Send + Sync>> {
+        let configured = std::env::var_os("COVE_DEVTOOLS_ENDPOINT").is_some()
+            || std::env::var_os("COVE_DEVTOOLS_TOKEN").is_some();
+        if let Ok(info) = ConnectionInfo::resolve(None, None)
+            && (configured || controller_is_live(&info))
+        {
+            return Ok(Self::External(info));
+        }
+        // A stale process can hold the default port; an ephemeral one keeps the
+        // Inspector reachable instead of failing the launch.
+        let controller =
+            RunningController::start(port, None).or_else(|_| RunningController::start(0, None))?;
+        Ok(Self::Embedded(controller))
+    }
+}
+
 struct Discovery {
     path: PathBuf,
     info: ConnectionInfo,

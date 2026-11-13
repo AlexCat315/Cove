@@ -13,9 +13,40 @@ use cove_devtools::protocol::{
 };
 use cove_devtools::runtime_capture::{self, FramePixels};
 use cove_devtools::runtime_probe::RuntimeProbe;
+use cove_devtools_cli::AttachedController;
+use std::cell::RefCell;
 use std::collections::BTreeMap;
-use std::rc::Rc;
+use std::rc::{Rc, Weak};
 use std::time::Instant;
+
+/// The port `cove-devtools serve` uses, so an embedded controller is reachable
+/// at the address the CLI and MCP already expect.
+const CONTROLLER_PORT: u16 = 9229;
+
+thread_local! {
+    static CONTROLLER: RefCell<Weak<AttachedController>> = const { RefCell::new(Weak::new()) };
+}
+
+/// The controller every window in this process shares. It lives as long as the
+/// last diagnostics session, so stopping the app releases the discovery file.
+fn controller() -> Result<Rc<AttachedController>, String> {
+    CONTROLLER.with(|slot| {
+        if let Some(controller) = slot.borrow().upgrade() {
+            return Ok(controller);
+        }
+        let controller = Rc::new(
+            AttachedController::attach(CONTROLLER_PORT).map_err(|error| error.to_string())?,
+        );
+        if controller.is_embedded() {
+            eprintln!(
+                "Inspector: {}",
+                cove_devtools_cli::inspector_url(controller.connection())
+            );
+        }
+        *slot.borrow_mut() = Rc::downgrade(&controller);
+        Ok(controller)
+    })
+}
 
 struct Session {
     probe: RuntimeProbe,
@@ -28,6 +59,8 @@ struct Session {
     /// The tree's CPU timeline, and the span window closed for each frame.
     timeline: Timeline,
     window: FrameWindow,
+    /// Keeps an in-process controller alive for as long as this session.
+    _controller: Option<Rc<AttachedController>>,
 }
 
 impl DiagnosticsSession for Session {
@@ -113,6 +146,18 @@ pub fn factory() -> DiagnosticsFactory {
             if !cfg!(debug_assertions) {
                 return Err("The DevTools runtime probe requires a debug build.".into());
             }
+            // An explicitly paired runtime (Android's launch extra) keeps its own
+            // connection; otherwise this process supplies the controller.
+            let controller = match configuration.connection {
+                Some(_) => None,
+                None => Some(controller()?),
+            };
+            let connection = configuration.connection.clone().or_else(|| {
+                controller.as_ref().map(|controller| {
+                    let info = controller.connection();
+                    (info.endpoint.clone(), info.token.clone())
+                })
+            });
             let timeline: Timeline = tree.borrow().timeline.clone();
             let window = FrameWindow::new(&timeline);
             let mut probe = RuntimeProbe::new(
@@ -217,7 +262,7 @@ pub fn factory() -> DiagnosticsFactory {
                     window: configuration.window,
                     capabilities,
                 },
-                configuration.connection,
+                connection,
             )?;
             Ok(Box::new(Session {
                 probe,
@@ -229,6 +274,7 @@ pub fn factory() -> DiagnosticsFactory {
                 pending: BTreeMap::new(),
                 timeline,
                 window,
+                _controller: controller,
             }))
         },
     )

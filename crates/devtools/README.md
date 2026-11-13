@@ -4,14 +4,17 @@ Inspector、MCP 和 CLI 共用一个 Rust 控制服务。原生宿主与 WASM �
 
 ## 启动
 
-先启动控制器，再在另一个终端启动 Gallery。
+调试版自带控制器，一条命令即可：
 
 ```sh
-cargo run -p cove-devtools-cli -- serve
-COVE_DEVTOOLS=1 cargo run -p cove-examples --bin gallery
+cargo run -p cove-examples --bin gallery --features media-ffmpeg
 ```
 
-PowerShell 使用 `$env:COVE_DEVTOOLS = '1'` 设置环境变量。控制器默认监听 `127.0.0.1:9229`，终端打印 Inspector 链接。链接内含配对凭据，仅供当前开发会话使用。控制器把端点和凭据写入当前用户的本地配置目录。用 `COVE_DEVTOOLS_SESSION_FILE` 可指定发现文件，用 `COVE_DEVTOOLS_ENDPOINT` 和 `COVE_DEVTOOLS_TOKEN` 可显式指定配对。
+终端打印 Inspector 链接，CLI 与 MCP 直接可用，无需第二个命令。调试版默认开启 DevTools，`COVE_DEVTOOLS=0` 关闭；发布版默认关闭。
+
+已有控制器在运行时（例如单独执行 `cargo run -p cove-devtools-cli -- serve`），应用直接配对，不再另起控制器。显式设置 `COVE_DEVTOOLS_ENDPOINT` 或 `COVE_DEVTOOLS_TOKEN` 时沿用该端点，即使它暂时不可达，也不会被进程内控制器覆盖。
+
+控制器默认监听 `127.0.0.1:9229`，端口被占用时改用临时端口并打印实际链接。链接内含配对凭据，仅供当前开发会话使用。控制器把端点和凭据写入当前用户的本地配置目录，用 `COVE_DEVTOOLS_SESSION_FILE` 可指定发现文件。
 
 MCP 客户端加载仓库的 `.mcp.json`，它调用 `Tools/DevTools/mcp.sh`：GUI 启动的客户端 PATH 不含 Rust 工具链和 sccache，脚本补齐后 exec `cargo run --quiet -p cove-devtools-cli -- mcp`。MCP 可以先启动，工具调用时读取控制器发现文件。CLI 使用同一组命令：
 

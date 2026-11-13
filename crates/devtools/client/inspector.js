@@ -267,6 +267,8 @@ const dom = {
   stateMeta: $("state-meta"),
   stateRefresh: $("state-refresh"),
   stateContent: $("state-content"),
+  stateScope: $("state-scope"),
+  stateFollow: $("state-follow"),
   performanceMeta: $("performance-meta"),
   performanceBudget: $("performance-budget"),
   performanceFollow: $("performance-follow"),
@@ -1369,7 +1371,7 @@ function resetTargetData(previousTarget = state.targetId) {
   resetPerformance(previousTarget);
   resetNetwork();
   resetLogs();
-  state.registeredState = emptyRegisteredState();
+  resetRegisteredState();
   resetMemory(previousTarget);
   resetAppSize();
   resetDebugger(previousTarget);
@@ -3352,6 +3354,7 @@ function stopAllFollowTimers() {
   stopTimer("performance");
   stopTimer("debugger");
   stopTimer("memory");
+  stopTimer("registeredState");
 }
 
 function syncFollowTimers() {
@@ -3368,6 +3371,9 @@ function syncFollowTimers() {
   }
   if (state.view === "memory" && state.memory.follow && state.caps.runtime) {
     state.memory.timer = setInterval(() => loadMemory({ quiet: true }), state.memory.intervalMs);
+  }
+  if (state.view === "state" && state.registeredState.follow && state.caps.state) {
+    state.registeredState.timer = setInterval(() => loadRegisteredState(state.registeredState.offset, { quiet: true }), 2000);
   }
   syncDebuggerTimer();
 }
@@ -4718,6 +4724,9 @@ function frameParts(frame) {
     layout: numberValue(frame?.layoutMs),
     draw: numberValue(frame?.drawMs),
     encode: numberValue(frame?.renderThreadMs),
+    // GPU execution overlaps the CPU phases, so it is reported beside them and
+    // never summed into UI, total or the jank decision.
+    gpu: numberValue(frame?.gpuMs),
     total: numberValue(frame?.totalMs),
   };
 }
@@ -5005,6 +5014,11 @@ function renderFrameChart(frames, budget) {
   const notes = [];
   if (missingRecomposition) notes.push("Recomposition is not reported by this runtime; UI bars contain layout and draw only.");
   if (missingEncode) notes.push("Encode bars appear only for frames whose presentation the host observed.");
+  if (recent.some(frame => frameParts(frame).gpu !== null)) {
+    notes.push("GPU is the backend's measured execution time for the frame's submission. It overlaps the CPU phases, so it is not part of the UI or Encode bars and is not added to Total.");
+  } else {
+    notes.push("GPU execution is not reported for these frames; no estimate is substituted.");
+  }
   return el("div", { class: "panel-block" },
     el("div", { class: "panel-block-head" },
       el("h2", { text: "Frame chart" }),
@@ -5061,6 +5075,7 @@ function renderFrameTable(frames, budget) {
     el("th", { class: "num", text: "Frame" }),
     el("th", { class: "num", text: "UI" }),
     el("th", { class: "num", text: "Encode" }),
+    el("th", { class: "num", text: "GPU" }),
     el("th", { class: "num", text: "Total" }),
     el("th", { class: "num", text: "Recomp" }),
     el("th", { class: "num", text: "Layout" }),
@@ -5084,6 +5099,7 @@ function renderFrameTable(frames, budget) {
       el("td", { class: "num mono-cell", text: `#${frame.frame}` }),
       el("td", { class: "num", text: ui === null ? "not reported" : fmtNumber(ui, 2) }),
       el("td", { class: "num", text: parts.encode === null ? "not reported" : fmtNumber(parts.encode, 2) }),
+      el("td", { class: "num", text: parts.gpu === null ? "not reported" : fmtNumber(parts.gpu, 2) }),
       el("td", { class: "num", text: fmtNumber(parts.total, 2) }),
       el("td", { class: "num", text: parts.recomposition === null ? "not reported" : fmtNumber(parts.recomposition, 2) }),
       el("td", { class: "num", text: fmtNumber(parts.layout, 2) }),
@@ -5254,6 +5270,7 @@ function renderFrameAnalysis() {
     metric("Layout", fmtNumber(parts.layout, 2), "ms"),
     metric("Draw", fmtNumber(parts.draw, 2), "ms"),
     metric("Encode", parts.encode === null ? "Not reported" : fmtNumber(parts.encode, 2), parts.encode === null ? "" : "ms"),
+    metric("GPU", parts.gpu === null ? "Not reported" : fmtNumber(parts.gpu, 2), parts.gpu === null ? "" : "ms"),
     metric("Nodes", fmtNumber(numberValue(frame.nodeCount), 0)),
     metric("Batches", fmtNumber(numberValue(frame.batchCount), 0)),
   ));
@@ -6233,6 +6250,7 @@ function validateSnapshotFrame(frame, index) {
     layoutMs: snapshotNumber(frame.layoutMs, `${label} layoutMs`),
     drawMs: snapshotNumber(frame.drawMs, `${label} drawMs`),
     renderThreadMs: snapshotOptionalNumber(frame.renderThreadMs, `${label} renderThreadMs`),
+    gpuMs: snapshotOptionalNumber(frame.gpuMs, `${label} gpuMs`),
     submitted: frame.submitted,
     presented: frame.presented === true ? true : frame.presented === false ? false : null,
     totalMs: snapshotNumber(frame.totalMs, `${label} totalMs`),
@@ -11623,6 +11641,235 @@ function resetMemory(previousTarget = state.targetId) {
   state.memory = emptyMemory();
   state.memory.request = request;
   if (state.view === "memory") renderMemory();
+}
+
+/* Registered State
+ *
+ * query_ui_state lists only the state a component opted in to expose. Summaries
+ * are read for explicitly watched ids, so private state is never requested. An
+ * unmounted id is reported as missing rather than dropped silently.
+ */
+
+function emptyRegisteredState() {
+  return {
+    loaded: false, loading: false, error: null, request: 0,
+    descriptors: [], total: 0, nextOffset: null, offset: 0, limit: 50,
+    scope: "", watched: [], values: {}, missing: [],
+    refreshedAt: 0, follow: dom.stateFollow?.checked === true, timer: null,
+  };
+}
+
+async function loadRegisteredState(offset = 0, options = {}) {
+  const registered = state.registeredState;
+  if (!state.token || !state.targetId || !state.caps.state) {
+    renderRegisteredState();
+    return;
+  }
+  if (registered.loading) return;
+  const targetId = state.targetId;
+  const request = registered.request + 1;
+  registered.request = request;
+  registered.loading = true;
+  registered.error = null;
+  registered.offset = offset;
+  renderRegisteredState();
+  try {
+    const params = { target: targetId, offset, limit: registered.limit };
+    if (registered.scope) params.scope_id = registered.scope;
+    if (registered.watched.length) params.ids = registered.watched;
+    const data = unwrapData(await rpc("query_ui_state", params));
+    if (request !== registered.request || targetId !== state.targetId) return;
+    const metadata = data?.metadata ?? {};
+    registered.descriptors = Array.isArray(metadata.items) ? metadata.items : [];
+    registered.total = numberValue(metadata.total) ?? registered.descriptors.length;
+    registered.nextOffset = numberValue(metadata.nextOffset);
+    registered.values = {};
+    for (const value of Array.isArray(data?.values) ? data.values : []) {
+      if (typeof value?.id === "string") registered.values[value.id] = value;
+    }
+    registered.missing = Array.isArray(data?.missingIDs) ? data.missingIDs : [];
+    registered.loaded = true;
+    registered.refreshedAt = Date.now();
+    if (options.quiet !== true) toast("Registered state refreshed.", "success", 3000);
+  } catch (error) {
+    if (request !== registered.request || targetId !== state.targetId) return;
+    registered.error = error;
+    if (error?.code === "unknown_command") {
+      registered.error = new RpcError("This controller does not expose query_ui_state.", "unknown_command");
+    }
+    if (options.quiet !== true) toast(errorMessage(error), "error", 8000);
+  } finally {
+    if (request === registered.request && targetId === state.targetId) {
+      registered.loading = false;
+      renderRegisteredState();
+    }
+  }
+}
+
+function ensureRegisteredState() {
+  if (!state.token || !state.targetId || !state.caps.state) {
+    renderRegisteredState();
+    return;
+  }
+  if (!state.registeredState.loaded && !state.registeredState.loading) {
+    loadRegisteredState(0, { quiet: true });
+  } else {
+    renderRegisteredState();
+  }
+}
+
+function resetRegisteredState() {
+  stopTimer("registeredState");
+  const request = state.registeredState.request + 1;
+  state.registeredState = emptyRegisteredState();
+  state.registeredState.request = request;
+  if (state.view === "state") renderRegisteredState();
+}
+
+function setRegisteredStateChrome() {
+  const registered = state.registeredState;
+  const scopes = [...new Set(registered.descriptors.map(item => item.scope_id).filter(Boolean))].sort();
+  const selected = registered.scope;
+  if (selected && !scopes.includes(selected)) scopes.push(selected);
+  dom.stateScope.replaceChildren(el("option", { text: "All scopes", attrs: { value: "" } }),
+    ...scopes.map(scope => el("option", { text: scope, attrs: { value: scope } })));
+  dom.stateScope.value = selected;
+  dom.stateScope.disabled = !state.caps.state || !scopes.length;
+  dom.stateFollow.checked = registered.follow;
+  dom.stateFollow.disabled = !state.caps.state;
+  dom.stateRefresh.disabled = !state.caps.state || registered.loading;
+  if (!state.token || !state.targetId) {
+    dom.stateMeta.textContent = "No target selected.";
+  } else if (!state.caps.state) {
+    dom.stateMeta.textContent = "Unavailable for this target.";
+  } else if (registered.loading) {
+    dom.stateMeta.textContent = "Reading…";
+  } else if (!registered.loaded) {
+    dom.stateMeta.textContent = "";
+  } else {
+    dom.stateMeta.textContent = `${registered.total} registered · ${registered.watched.length} watched`;
+  }
+}
+
+function renderRegisteredStateRow(descriptor) {
+  const registered = state.registeredState;
+  const id = descriptor.id;
+  const watched = registered.watched.includes(id);
+  const value = registered.values[id];
+  const missing = registered.missing.includes(id);
+  const summary = missing
+    ? "Unmounted"
+    : value === undefined
+      ? (watched ? "Not reported" : "Not watched")
+      : value.summary;
+  return el("tr", { class: watched ? "is-selected" : "" },
+    el("td", {}, el("input", {
+      attrs: { type: "checkbox", "aria-label": `Watch ${descriptor.name || id}` },
+      props: { checked: watched, disabled: missing },
+      on: {
+        change: event => {
+          registered.watched = event.target.checked
+            ? [...registered.watched, id]
+            : registered.watched.filter(item => item !== id);
+          loadRegisteredState(registered.offset, { quiet: true });
+        },
+      },
+    })),
+    el("td", { text: textOf(descriptor.name), attrs: { title: id } }),
+    el("td", { text: textOf(descriptor.value_type) }),
+    el("td", { text: textOf(descriptor.scope_id) }),
+    el("td", {},
+      el("span", { text: textOf(summary) }),
+      value?.truncated ? el("span", { class: "pane-meta", text: " truncated" }) : null),
+  );
+}
+
+function renderRegisteredState() {
+  const host = dom.stateContent;
+  clear(host);
+  setRegisteredStateChrome();
+  const registered = state.registeredState;
+  if (!state.token || !targetById()) {
+    showState(host, { icon: "device", title: "No target", message: "Select a connected Cove runtime to read its registered state." });
+    return;
+  }
+  if (!state.caps.state) {
+    showState(host, {
+      icon: "info",
+      title: "State observation is unavailable",
+      message: "This runtime does not advertise state observation. Only state a component opts in to expose can be read.",
+    });
+    return;
+  }
+  if (registered.loading && !registered.loaded) {
+    showState(host, { kind: "loading", title: "Reading registered state" });
+    return;
+  }
+  if (registered.error && !registered.loaded) {
+    showState(host, {
+      kind: "error",
+      title: "State read failed",
+      message: errorMessage(registered.error),
+      action: "Retry",
+      onAction: () => isDisconnectedError(registered.error) ? refreshCurrent() : loadRegisteredState(registered.offset),
+    });
+    return;
+  }
+  if (!registered.loaded) {
+    showState(host, {
+      icon: "info",
+      title: "Registered state",
+      message: "Read the state this runtime opted in to expose.",
+      action: "Read state",
+      primary: true,
+      onAction: () => loadRegisteredState(0),
+    });
+    return;
+  }
+  if (registered.error) host.append(errorInline(errorMessage(registered.error)));
+  if (!registered.descriptors.length) {
+    host.append(emptyInline(registered.scope
+      ? "No registered state in this scope."
+      : "This runtime exposes no registered state. State is only listed when a component opts in."));
+    return;
+  }
+  if (registered.missing.length) {
+    host.append(errorInline(`Unmounted ids are not read: ${registered.missing.join(", ")}`));
+  }
+  const rows = registered.descriptors.map(renderRegisteredStateRow);
+  const start = registered.offset + 1;
+  const end = registered.offset + registered.descriptors.length;
+  host.append(el("div", { class: "panel-block" },
+    el("div", { class: "panel-block-head" },
+      el("h2", { text: "Registered state" }),
+      el("span", { class: "pane-meta", text: `${start}–${end} of ${registered.total}` }),
+    ),
+    el("div", { class: "table-wrap" }, el("table", { class: "data-table" },
+      el("thead", {}, el("tr", {},
+        el("th", { text: "Watch" }),
+        el("th", { text: "Name" }),
+        el("th", { text: "Type" }),
+        el("th", { text: "Scope" }),
+        el("th", { text: "Value" }),
+      )),
+      el("tbody", {}, ...rows),
+    )),
+  ));
+  host.append(el("div", { class: "panel-block-head" },
+    el("button", {
+      class: "tool-button",
+      props: { type: "button", disabled: registered.offset === 0 || registered.loading },
+      text: "Previous",
+      on: { click: () => loadRegisteredState(Math.max(0, registered.offset - registered.limit), { quiet: true }) },
+    }),
+    el("button", {
+      class: "tool-button",
+      props: { type: "button", disabled: registered.nextOffset === null || registered.loading },
+      text: "Next",
+      on: { click: () => loadRegisteredState(registered.nextOffset, { quiet: true }) },
+    }),
+  ));
+  host.append(el("div", { class: "perf-note", text: "Values are read only for watched ids. A summary is the component's own description, truncated by the runtime; unwatched state is never requested." }));
 }
 
 /* App Size
@@ -17786,7 +18033,16 @@ function bindEvents() {
   dom.logsSearch.addEventListener("input", renderLogs);
   dom.logsLevel.addEventListener("change", renderLogs);
   dom.logsLabel.addEventListener("change", renderLogs);
-  dom.stateRefresh.addEventListener("click", () => loadRegisteredState(0));
+  dom.stateRefresh.addEventListener("click", () => loadRegisteredState(state.registeredState.offset));
+  dom.stateScope.addEventListener("change", () => {
+    state.registeredState.scope = dom.stateScope.value;
+    loadRegisteredState(0, { quiet: true });
+  });
+  dom.stateFollow.addEventListener("change", () => {
+    state.registeredState.follow = dom.stateFollow.checked;
+    syncFollowTimers();
+    if (state.registeredState.follow) loadRegisteredState(state.registeredState.offset, { quiet: true });
+  });
 
   dom.performanceRefresh.addEventListener("click", () => {
     const perf = state.performance;

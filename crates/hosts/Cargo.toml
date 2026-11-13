@@ -9,7 +9,7 @@ description = "Platform application hosts (desktop, Android, iOS)"
 [features]
 default = []
 ## Links the DevTools crate and exposes `diagnostics::devtools::factory`.
-devtools = ["dep:cove-devtools"]
+devtools = ["dep:cove-devtools", "dep:cove-devtools-cli"]
 
 [dependencies]
 cove-devtools = { path = "../devtools", optional = true }
@@ -31,6 +31,7 @@ libc.workspace = true
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 cove-runtime.workspace = true
 cove-shell.workspace = true
+cove-devtools-cli = { path = "../devtools-cli", optional = true }
 
 [target.'cfg(target_os = "windows")'.dependencies]
 windows-sys = { version = "0.61", features = [
