@@ -1224,6 +1224,13 @@ impl Device {
         }
     }
 
+    /// Requests timestamps for submissions recorded after this call in the active frame.
+    pub fn measure_gpu_frame(&self) -> Option<super::GpuFrameTiming> {
+        let state = self.lock();
+        let slot = state.current_slot?;
+        Some(self.frame_ring.measure(slot))
+    }
+
     /// Ends the frame and releases the per-frame upload context.
     pub fn end_frame(&self) {
         let mut state = self.lock();
@@ -1421,12 +1428,26 @@ impl Device {
                     .unwrap_or_else(std::sync::PoisonError::into_inner)
                     .extend(completed);
             });
-            match self
-                .backend()
-                .submit(planned_submit, cpu_profile.as_deref_mut(), completion)
-            {
+            let epoch = self.frame_ring.measurement_epoch(slot);
+            let result = if let Some(epoch) = epoch {
+                let ring = self.frame_ring.clone();
+                self.backend().submit_timed(
+                    planned_submit,
+                    cpu_profile.as_deref_mut(),
+                    Box::new(move |nanos| {
+                        ring.note_gpu_sample(slot, epoch, nanos);
+                        completion();
+                    }),
+                )
+            } else {
+                self.backend().submit(planned_submit, cpu_profile.as_deref_mut(), completion)
+            };
+            match result {
                 Ok(()) => submitted = true,
                 Err(error) => {
+                    if let Some(epoch) = epoch {
+                        self.frame_ring.note_gpu_sample(slot, epoch, None);
+                    }
                     self.drain_retirements(self.frame_ring.unregister_command_buffer(slot));
                     if submitted {
                         state.submission_fault = Some(RhiError::submit_failed(

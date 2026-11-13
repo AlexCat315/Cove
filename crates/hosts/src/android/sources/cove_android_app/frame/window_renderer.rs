@@ -76,7 +76,7 @@ impl AndroidWindowRenderer {
         }
     }
 
-    fn present(&mut self, list: &DrawList, logical: (f32, f32)) -> RhiResult<bool> {
+    fn present(&mut self, list: &DrawList, logical: (f32, f32), gpu: Option<&mut Option<cove_graphics::rhi::GpuFrameTiming>>) -> RhiResult<bool> {
         let device = self.device.clone();
         let Some(swapchain) = self.swapchain else {
             return Ok(false);
@@ -90,6 +90,9 @@ impl AndroidWindowRenderer {
             }
         }
         let _end = EndFrame(&device);
+        if let Some(gpu) = gpu {
+            *gpu = device.measure_gpu_frame();
+        }
         let image = self.timings.measure_result(Phase::DrawableAcquire, || {
             device.acquire_swapchain_image(swapchain)
         })?;
@@ -250,14 +253,14 @@ impl AppWindowRenderer for AndroidWindowRenderer {
         device.with_frame_session(|| device.configure_swapchain(swapchain, descriptor))
     }
 
-    fn draw(&mut self, list: &mut DrawList, logical: (f32, f32)) -> RhiResult<bool> {
+    fn draw(&mut self, list: &mut DrawList, logical: (f32, f32), gpu: Option<&mut Option<cove_graphics::rhi::GpuFrameTiming>>) -> RhiResult<bool> {
         let sample = self.frame_samples.try_recv().ok();
         self.timings.begin_with(
             Phase::ScenePrepare,
             sample.as_ref().map_or(0, |s| s.prepare_nanos),
         );
         let device = self.device.clone();
-        let presented = device.with_frame_session(|| self.present(list, logical))?;
+        let presented = device.with_frame_session(|| self.present(list, logical, gpu))?;
         self.timings.finish(
             sample.map_or(0, |s| s.timestamp),
             list.vertices().len(),

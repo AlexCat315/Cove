@@ -39,19 +39,20 @@ type Reply<T> = Sender<T>;
 pub struct FrameToken(pub u64);
 
 /// The outcome of a frame that left the render thread.
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Debug)]
 pub struct FramePresented {
     pub token: FrameToken,
     /// False when the renderer skipped presentation (occluded or locked window).
     pub presented: bool,
     pub cpu_ms: f64,
+    pub gpu: Option<cove_graphics::rhi::GpuFrameTiming>,
 }
 
 enum Command {
     Configure(NativeRenderSurface, (u32, u32), bool, Reply<RhiResult<()>>),
     Resize((u32, u32), bool),
     Upload(FontAtlasUpload),
-    Frame(FrameToken, DrawList, (f32, f32)),
+    Frame(FrameToken, DrawList, (f32, f32), bool),
     SetPresentationActive(bool),
     Trim,
     Capture(Reply<RhiResult<CapturedFrame>>),
@@ -64,6 +65,7 @@ enum Completion {
         list: Box<DrawList>,
         result: RhiResult<bool>,
         cpu_ms: f64,
+        gpu: Option<cove_graphics::rhi::GpuFrameTiming>,
     },
     Failed(RhiError),
 }
@@ -96,15 +98,17 @@ impl Worker {
                 let result = self.renderer.upload_font_atlas(upload);
                 self.report(result);
             }
-            Command::Frame(token, mut list, logical) => {
+            Command::Frame(token, mut list, logical, measure_gpu) => {
                 let start = Instant::now();
-                let result = self.renderer.draw(&mut list, logical);
+                let mut gpu = None;
+                let result = self.renderer.draw(&mut list, logical, measure_gpu.then_some(&mut gpu));
                 self.publish_snapshot();
                 let _ = self.done.send(Completion::Frame {
                     token,
                     list: Box::new(list),
                     result,
                     cpu_ms: start.elapsed().as_secs_f64() * 1000.0,
+                    gpu,
                 });
                 wake_scene_thread();
             }
@@ -315,6 +319,7 @@ impl ThreadedWindowRenderer {
                 list,
                 result,
                 cpu_ms,
+                gpu,
             } => {
                 self.in_flight = self.in_flight.saturating_sub(1);
                 self.recycled.push(*list);
@@ -323,6 +328,7 @@ impl ThreadedWindowRenderer {
                         token,
                         presented: value,
                         cpu_ms,
+                        gpu,
                     }),
                     Err(error) => {
                         failure.get_or_insert(error);
@@ -373,6 +379,7 @@ impl ThreadedWindowRenderer {
         &mut self,
         list: &mut DrawList,
         logical: (f32, f32),
+        measure_gpu: bool,
     ) -> RhiResult<Option<FrameToken>> {
         if !self.has_frame_capacity() {
             // Refusing the frame is a pacing decision, not a failure: remember
@@ -388,7 +395,7 @@ impl ThreadedWindowRenderer {
         list.clip_revision = frame.clip_revision;
         self.next_token += 1;
         let token = FrameToken(self.next_token);
-        self.send(Command::Frame(token, frame, logical))?;
+        self.send(Command::Frame(token, frame, logical, measure_gpu))?;
         self.in_flight += 1;
         Ok(Some(token))
     }
@@ -475,7 +482,7 @@ mod tests {
                 .push(format!("resize {}x{}", size.0, size.1));
             Ok(())
         }
-        fn draw(&mut self, list: &mut DrawList, _: (f32, f32)) -> RhiResult<bool> {
+        fn draw(&mut self, list: &mut DrawList, _: (f32, f32), _: Option<&mut Option<cove_graphics::rhi::GpuFrameTiming>>) -> RhiResult<bool> {
             let mut log = self.0.lock().unwrap();
             log.events.push(format!("draw {}", list.pixel_scale));
             log.threads.push(std::thread::current().id());
@@ -514,7 +521,7 @@ mod tests {
                 renderer.take_presented().unwrap();
                 std::thread::yield_now();
             }
-            assert!(renderer.submit(&mut list, (10.0, 10.0)).unwrap().is_some());
+            assert!(renderer.submit(&mut list, (10.0, 10.0), false).unwrap().is_some());
         }
         renderer.resize((20, 20), true).unwrap();
         assert_eq!(
@@ -561,7 +568,7 @@ mod tests {
         fn resize(&mut self, _: (u32, u32), _: bool) -> RhiResult<()> {
             Err(RhiError::invalid_argument("resize refused"))
         }
-        fn draw(&mut self, _: &mut DrawList, _: (f32, f32)) -> RhiResult<bool> {
+        fn draw(&mut self, _: &mut DrawList, _: (f32, f32), _: Option<&mut Option<cove_graphics::rhi::GpuFrameTiming>>) -> RhiResult<bool> {
             let (permits, changed) = &*self.release;
             let mut permits = permits.lock().unwrap();
             while *permits == 0 {
@@ -620,12 +627,12 @@ mod tests {
         let start = Instant::now();
         for _ in 0..MAX_FRAMES_IN_FLIGHT {
             let mut list = DrawList::default();
-            assert!(renderer.submit(&mut list, (1.0, 1.0)).unwrap().is_some());
+            assert!(renderer.submit(&mut list, (1.0, 1.0), false).unwrap().is_some());
         }
         assert!(!renderer.has_frame_capacity());
         let mut dropped = DrawList::default();
         dropped.pixel_scale = 7.0;
-        assert_eq!(renderer.submit(&mut dropped, (1.0, 1.0)).unwrap(), None);
+        assert_eq!(renderer.submit(&mut dropped, (1.0, 1.0), false).unwrap(), None);
         assert_eq!(dropped.pixel_scale, 7.0, "a dropped frame keeps its list");
         assert!(start.elapsed() < Duration::from_secs(1));
         assert_eq!(drawn.load(std::sync::atomic::Ordering::SeqCst), 0);
@@ -644,7 +651,7 @@ mod tests {
         let mut list = DrawList::default();
         list.geometry_antialiasing = cove_core::GeometryAntialiasing::Analytic;
         list.clip_revision = 9;
-        renderer.submit(&mut list, (1.0, 1.0)).unwrap();
+        renderer.submit(&mut list, (1.0, 1.0), false).unwrap();
         assert_eq!(
             list.geometry_antialiasing,
             cove_core::GeometryAntialiasing::Analytic
@@ -674,7 +681,7 @@ mod tests {
     fn close_gives_up_on_a_wedged_render_thread() {
         let (mut renderer, _release, _) = gated();
         let mut list = DrawList::default();
-        renderer.submit(&mut list, (1.0, 1.0)).unwrap();
+        renderer.submit(&mut list, (1.0, 1.0), false).unwrap();
         let start = Instant::now();
         assert!(renderer.close().is_err());
         assert!(start.elapsed() < CLOSE_TIMEOUT + Duration::from_secs(1));
@@ -685,7 +692,7 @@ mod tests {
         let log = Arc::new(Mutex::new(Log::default()));
         let mut renderer = ThreadedWindowRenderer::inline(Box::new(Recording(log.clone())));
         let mut list = DrawList::default();
-        renderer.submit(&mut list, (1.0, 1.0)).unwrap();
+        renderer.submit(&mut list, (1.0, 1.0), false).unwrap();
         assert_eq!(renderer.take_presented().unwrap().len(), 1);
         renderer.close().unwrap();
         assert_eq!(log.lock().unwrap().threads, [std::thread::current().id()]);

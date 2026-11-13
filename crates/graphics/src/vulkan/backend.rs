@@ -61,6 +61,28 @@ pub struct VulkanBackend {
 unsafe impl Send for VulkanBackend {}
 
 impl VulkanBackend {
+    fn submit_impl(
+        &mut self,
+        submit: &PlannedSubmit,
+        cpu_profile: Option<&mut SubmissionCpuProfile>,
+        completion: Result<crate::rhi::TimedCompletion, Completion>,
+    ) -> RhiResult<()> {
+        if self.active_slot >= self.frames.len() {
+            return Err(RhiError::submit_failed("begin a frame before submitting"));
+        }
+        let gpu_profile = self.gpu_timestamp_profile.clone();
+        let mut submitter = Submitter {
+            context: &self.context,
+            registries: &self.registries,
+            frames: &mut self.frames,
+            active_slot: self.active_slot,
+            timeline_semaphores: &mut self.timeline_semaphores,
+            submission_status: Arc::clone(&self.submission_status),
+        };
+        submitter.submit(submit, cpu_profile, gpu_profile.as_ref(), completion)
+    }
+
+
     /// Whether a usable Vulkan driver (ICD) is present.
     pub fn is_available() -> bool {
         setup::is_available()
@@ -742,19 +764,16 @@ impl RhiBackend for VulkanBackend {
         cpu_profile: Option<&mut SubmissionCpuProfile>,
         completion: Completion,
     ) -> RhiResult<()> {
-        if self.active_slot >= self.frames.len() {
-            return Err(RhiError::submit_failed("begin a frame before submitting"));
-        }
-        let gpu_profile = self.gpu_timestamp_profile.clone();
-        let mut submitter = Submitter {
-            context: &self.context,
-            registries: &self.registries,
-            frames: &mut self.frames,
-            active_slot: self.active_slot,
-            timeline_semaphores: &mut self.timeline_semaphores,
-            submission_status: Arc::clone(&self.submission_status),
-        };
-        submitter.submit(submit, cpu_profile, gpu_profile.as_ref(), completion)
+        self.submit_impl(submit, cpu_profile, Err(completion))
+    }
+
+    fn submit_timed(
+        &mut self,
+        submit: &PlannedSubmit,
+        cpu_profile: Option<&mut SubmissionCpuProfile>,
+        completion: crate::rhi::TimedCompletion,
+    ) -> RhiResult<()> {
+        self.submit_impl(submit, cpu_profile, Ok(completion))
     }
 
     // MARK: Deferred destruction

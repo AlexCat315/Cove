@@ -371,17 +371,22 @@ impl<C: PrototypeContent> BrowserPrototype<C> {
         // later frames cannot inherit this one's spans.
         let attribution = self.window.close(&self.timeline);
         let upload = self.fonts.atlas.dirty_upload_payload();
+        let mut gpu_measurement: Option<cove_devtools::runtime_probe::GpuMeasurement> = None;
         #[cfg(target_arch = "wasm32")]
-        if let Some(gpu) = &mut self.webgpu
-            && let Err(error) = gpu.draw(
+        if let Some(gpu) = &mut self.webgpu {
+            match gpu.draw(
                 &self.draw_list,
                 &self.fonts.atlas,
                 [width, height],
                 self.raster_scale,
-            )
-        {
-            self.webgpu_failed = true;
-            eprintln!("WebGPU frame: {error}");
+                self.probing,
+            ) {
+                Ok(timing) => gpu_measurement = timing.map(|gpu| Box::new(move || gpu.result()) as _),
+                Err(error) => {
+                    self.webgpu_failed = true;
+                    eprintln!("WebGPU frame: {error}");
+                }
+            }
         }
         match &upload {
             Some(payload) => self.atlas_buffer.replace(&payload.pixels),
@@ -462,6 +467,7 @@ impl<C: PrototypeContent> BrowserPrototype<C> {
                 layout_ms: self.layout_ms,
                 draw_ms: self.render_ms,
                 render_thread_ms: None,
+                gpu_ms: None,
                 submitted: true,
                 presented: None,
                 total_ms: self.recomposition_ms + self.layout_ms + self.render_ms,
@@ -471,7 +477,7 @@ impl<C: PrototypeContent> BrowserPrototype<C> {
                 timeline_end: 0,
             };
             attribution.apply_window(&mut frame);
-            self.probe.record(frame);
+            self.probe.record_measured(frame, gpu_measurement);
         }
     }
 

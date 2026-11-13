@@ -125,7 +125,7 @@ pub trait AppWindowRenderer {
     ) -> RhiResult<()>;
     fn resize(&mut self, size: (u32, u32), vsync: bool) -> RhiResult<()>;
     /// Present `list`, returning false when presentation was skipped.
-    fn draw(&mut self, list: &mut DrawList, logical: (f32, f32)) -> RhiResult<bool>;
+    fn draw(&mut self, list: &mut DrawList, logical: (f32, f32), gpu: Option<&mut Option<cove_graphics::rhi::GpuFrameTiming>>) -> RhiResult<bool>;
     /// Write copied font-atlas regions before the next frame is encoded.
     fn upload_font_atlas(&mut self, upload: FontAtlasUpload) -> RhiResult<()>;
     fn capture(&mut self) -> RhiResult<CapturedFrame> {
@@ -280,7 +280,7 @@ impl AppWindowRenderer for NativeAppWindowRenderer {
         device.with_frame_session(|| self.renderer.apply_font_atlas_upload(upload))
     }
 
-    fn draw(&mut self, list: &mut DrawList, logical: (f32, f32)) -> RhiResult<bool> {
+    fn draw(&mut self, list: &mut DrawList, logical: (f32, f32), gpu: Option<&mut Option<cove_graphics::rhi::GpuFrameTiming>>) -> RhiResult<bool> {
         let list: &DrawList = list;
         if self.native.is_none() && !self.render_in_background {
             return Ok(false);
@@ -314,6 +314,9 @@ impl AppWindowRenderer for NativeAppWindowRenderer {
                 }
             }
             let _end = EndFrame(&device);
+            if let Some(gpu) = gpu {
+                *gpu = device.measure_gpu_frame();
+            }
             let image = self
                 .swapchain
                 .map(|swapchain| device.acquire_swapchain_image(swapchain))

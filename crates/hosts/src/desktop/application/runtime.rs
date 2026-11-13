@@ -1082,7 +1082,7 @@ impl Application {
                 }
                 for frame in &frames {
                     self.with_diagnostics(|session| {
-                        session.presentation_finished(frame.token.0, frame.presented, frame.cpu_ms);
+                        session.presentation_finished(frame.token.0, frame.presented, frame.cpu_ms, frame.gpu.clone());
                     });
                 }
             }
@@ -1594,7 +1594,7 @@ impl Application {
                 return FrameOutcome::Skipped;
             };
             let mut list = state.composition.draw_list.borrow_mut();
-            renderer.submit(&mut list, (logical_w, logical_h))
+            renderer.submit(&mut list, (logical_w, logical_h), state.diagnostics.borrow().dev_tools.is_some())
         };
         self.with_diagnostics(|session| {
             session.frame_finished(

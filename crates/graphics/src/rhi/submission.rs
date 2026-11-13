@@ -142,6 +142,25 @@ struct SlotState {
     sealed: bool,
     epoch: u64,
     completed_epoch: u64,
+    timing: Option<FrameMeasurement>,
+}
+
+/// One frame's GPU duration, filled asynchronously when its slot retires.
+#[derive(Clone, Debug, Default)]
+pub struct GpuFrameTiming(std::sync::Arc<Mutex<Option<Option<u64>>>>);
+
+impl GpuFrameTiming {
+    pub fn result(&self) -> Option<Option<u64>> {
+        *self.0.lock().unwrap_or_else(std::sync::PoisonError::into_inner)
+    }
+}
+
+#[derive(Default)]
+struct FrameMeasurement {
+    result: GpuFrameTiming,
+    elapsed: u64,
+    has_sample: bool,
+    incomplete: bool,
 }
 
 /// A deferred-destruction request expressed only as the set of frame-slot
@@ -180,6 +199,7 @@ impl FrameRing {
                 sealed: false,
                 epoch: 0,
                 completed_epoch: 0,
+                timing: None,
             })
             .collect();
         Self {
@@ -298,6 +318,31 @@ impl FrameRing {
         state.slots[slot_index].pending_command_buffers += 1;
     }
 
+    pub(crate) fn measure(&self, slot_index: usize) -> GpuFrameTiming {
+        let mut state = self.lock();
+        let slot = &mut state.slots[slot_index];
+        slot.timing.get_or_insert_with(FrameMeasurement::default).result.clone()
+    }
+
+    pub(crate) fn measurement_epoch(&self, slot_index: usize) -> Option<u64> {
+        let state = self.lock();
+        let slot = &state.slots[slot_index];
+        slot.timing.as_ref().map(|_| slot.epoch)
+    }
+
+    pub(crate) fn note_gpu_sample(&self, slot_index: usize, epoch: u64, nanos: Option<u64>) {
+        let mut state = self.lock();
+        let slot = &mut state.slots[slot_index];
+        if slot.epoch == epoch && let Some(timing) = &mut slot.timing {
+            if let Some(elapsed) = nanos.and_then(|value| timing.elapsed.checked_add(value)) {
+                timing.elapsed = elapsed;
+                timing.has_sample = true;
+            } else {
+                timing.incomplete = true;
+            }
+        }
+    }
+
     pub fn unregister_command_buffer(&self, slot_index: usize) -> Vec<u64> {
         self.complete_command_buffer(slot_index);
         drain_retirements(&mut self.lock())
@@ -358,6 +403,10 @@ fn finish_if_ready(state: &mut FrameRingState, index: usize) {
     // API thread under the device's lock, never against live registries.
     let epoch = slot.epoch;
     let slot = &mut state.slots[index];
+    if let Some(timing) = slot.timing.take() {
+        let nanos = (timing.has_sample && !timing.incomplete).then_some(timing.elapsed);
+        *timing.result.0.lock().unwrap_or_else(std::sync::PoisonError::into_inner) = Some(nanos);
+    }
     slot.completed_epoch = epoch;
     slot.in_flight = false;
     state.completed_frames += 1;

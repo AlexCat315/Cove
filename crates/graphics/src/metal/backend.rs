@@ -293,7 +293,16 @@ impl RhiBackend for MetalBackend {
         cpu_profile: Option<&mut SubmissionCpuProfile>,
         completion: Completion,
     ) -> RhiResult<()> {
-        submit::submit(&mut self.device, submit, cpu_profile, completion)
+        submit::submit(&mut self.device, submit, cpu_profile, Err(completion))
+    }
+
+    fn submit_timed(
+        &mut self,
+        submit: &PlannedSubmit,
+        cpu_profile: Option<&mut SubmissionCpuProfile>,
+        completion: crate::rhi::TimedCompletion,
+    ) -> RhiResult<()> {
+        submit::submit(&mut self.device, submit, cpu_profile, Ok(completion))
     }
 
     // MARK: Deferred destruction

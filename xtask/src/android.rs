@@ -4,6 +4,7 @@
 use crate::process::{self, cargo};
 use crate::project::Project;
 use crate::{Mode, Result, Target};
+use base64::{Engine, engine::general_purpose::STANDARD};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
@@ -308,15 +309,53 @@ fn adb(device: Option<&str>) -> Command {
     command
 }
 
-pub fn launch(project: &Project, apk: &Path, device: Option<&str>) -> Result<()> {
+pub fn launch(project: &Project, apk: &Path, device: Option<&str>, devtools: Option<&crate::devtools::Session>) -> Result<()> {
     process::run(adb(device).args(["install", "-r"]).arg(apk))?;
-    process::run(adb(device).args([
-        "shell",
-        "am",
-        "start",
-        "-n",
-        &format!("{}/{ACTIVITY}", project.id),
-    ]))
+    let activity = format!("{}/{ACTIVITY}", project.id);
+    let Some(session) = devtools else {
+        return process::run(adb(device).args(["shell", "am", "start", "-n", &activity]));
+    };
+    let info = session.connection();
+    let port = info.endpoint.rsplit_once(':').ok_or("missing controller port")?.1;
+    let port = format!("tcp:{port}");
+    process::run(adb(device).args(["reverse", "--no-rebind", &port, &port]))?;
+    let _reverse = Reverse { device, port };
+    let configuration = STANDARD.encode(serde_json::to_vec(&serde_json::json!({
+        "endpoint": info.endpoint,
+        "token": info.token,
+        "appTitle": project.name,
+    })).map_err(|error| error.to_string())?);
+    session.run(adb(device).args([
+        "shell", "am", "start", "-S", "-W", "-n", &activity, "--es", "cove_devtools", &configuration,
+    ]))?;
+
+    let mut deadline = std::time::Instant::now() + std::time::Duration::from_secs(10);
+    let mut observed_process = false;
+    while !session.interrupted() {
+        let output = adb(device).args(["shell", "pidof", &project.id]).output().map_err(|error| error.to_string())?;
+        if output.status.success() && !output.stdout.is_empty() {
+            observed_process = true;
+            // Allow a brief process replacement before ending the session.
+            deadline = std::time::Instant::now() + std::time::Duration::from_secs(2);
+        } else if !output.stderr.is_empty() {
+            return Err(String::from_utf8_lossy(&output.stderr).trim().to_owned());
+        } else if std::time::Instant::now() >= deadline {
+            return if observed_process { Ok(()) } else { Err(format!("{} did not start", project.id)) };
+        }
+        std::thread::sleep(std::time::Duration::from_millis(250));
+    }
+    Ok(())
+}
+
+struct Reverse<'a> {
+    device: Option<&'a str>,
+    port: String,
+}
+
+impl Drop for Reverse<'_> {
+    fn drop(&mut self) {
+        let _ = adb(self.device).args(["reverse", "--remove", &self.port]).status();
+    }
 }
 
 pub fn devices() -> Result<()> {

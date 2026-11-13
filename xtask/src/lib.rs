@@ -6,6 +6,7 @@ mod android;
 mod apple;
 mod audit;
 mod desktop;
+mod devtools;
 mod process;
 mod project;
 mod setup_config;
@@ -75,7 +76,19 @@ enum Command {
     /// Build and bundle the application.
     Package(Target),
     /// Bundle, install and launch the application.
-    Run(Target),
+    Run {
+        /// Launch a debug build and its local Cove DevTools controller.
+        #[arg(long, conflicts_with_all = ["release", "profile"])]
+        devtools: bool,
+        /// Local controller port. Defaults to an available port.
+        #[arg(long, requires = "devtools")]
+        devtools_port: Option<u16>,
+        /// Serve and debug an existing Web build instead of a native bundle.
+        #[arg(long, requires = "devtools")]
+        web_root: Option<PathBuf>,
+        #[command(flatten)]
+        target: Target,
+    },
     /// Build the Android library and stage the Gradle inputs.
     AndroidPrepare {
         #[arg(long, value_enum, default_value_t = Mode::Debug)]
@@ -295,16 +308,30 @@ fn execute(cli: Cli) -> Result<()> {
             println!("{}", product.display());
             Ok(())
         }
-        Command::Run(target) => {
+        Command::Run { target, devtools, devtools_port, web_root } => {
+            if let Some(root) = web_root {
+                let session = devtools::Session::start(devtools_port.unwrap_or(0), Some(root))?;
+                while !session.interrupted() {
+                    std::thread::sleep(std::time::Duration::from_millis(100));
+                }
+                return Ok(());
+            }
             let platform = target.platform.unwrap_or_else(Platform::host);
-            let project = Project::load(target.package.as_deref())?;
+            let project = Project::load_for_run(target.package.as_deref(), devtools)?;
             let product = bundle(&project, platform, &target)?;
+            // Device tunnels use a known port. The simulator shares the Mac's loopback.
+            let port = devtools_port.unwrap_or(if platform == Platform::Ios && !target.simulator {
+                9229
+            } else {
+                0
+            });
+            let session = devtools.then(|| devtools::Session::start(port, None)).transpose()?;
             match platform {
-                Platform::Android => android::launch(&project, &product, target.device.as_deref()),
-                Platform::Ios => apple::launch_ios(&project, &product, &target),
-                Platform::Mac => apple::launch_mac(&project, &product, &target.arguments),
+                Platform::Android => android::launch(&project, &product, target.device.as_deref(), session.as_ref()),
+                Platform::Ios => apple::launch_ios(&project, &product, &target, session.as_ref()),
+                Platform::Mac => apple::launch_mac(&project, &product, &target.arguments, session.as_ref()),
                 Platform::Windows | Platform::Linux => {
-                    desktop::launch(&project, &product, &target.arguments)
+                    desktop::launch(&project, &product, &target.arguments, session.as_ref())
                 }
             }
         }

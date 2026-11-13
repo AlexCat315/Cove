@@ -259,10 +259,14 @@ const dom = {
   logsMeta: $("logs-meta"),
   logsSearch: $("logs-search"),
   logsLevel: $("logs-level"),
+  logsLabel: $("logs-label"),
   logsFollow: $("logs-follow"),
   logsClear: $("logs-clear"),
   logsRefresh: $("logs-refresh"),
   logsContent: $("logs-content"),
+  stateMeta: $("state-meta"),
+  stateRefresh: $("state-refresh"),
+  stateContent: $("state-content"),
   performanceMeta: $("performance-meta"),
   performanceBudget: $("performance-budget"),
   performanceFollow: $("performance-follow"),
@@ -389,6 +393,7 @@ const state = {
     follow: false, timer: null, clearing: false, clearError: null, generation: 0, cleared: false,
   },
   performance: emptyPerformance(),
+  registeredState: emptyRegisteredState(),
   memory: emptyMemory(),
   appSize: emptyAppSize(),
   deepLinks: emptyDeepLinks(),
@@ -413,6 +418,7 @@ function emptyCaps() {
     capture: false,
     input: false,
     logs: false,
+    state: false,
     network: false,
     networkControl: false,
     timing: false,
@@ -730,6 +736,7 @@ function readTargetCaps(target) {
   caps.capture = advertised.has("capture");
   caps.input = advertised.has("input");
   caps.logs = caps.runtime && advertised.has("diagnostics");
+  caps.state = caps.runtime && advertised.has("state");
   caps.network = caps.runtime && advertised.has("network");
   caps.networkControl = caps.runtime && advertised.has("network_control");
   caps.timing = caps.runtime && advertised.has("timing");
@@ -1362,6 +1369,7 @@ function resetTargetData(previousTarget = state.targetId) {
   resetPerformance(previousTarget);
   resetNetwork();
   resetLogs();
+  state.registeredState = emptyRegisteredState();
   resetMemory(previousTarget);
   resetAppSize();
   resetDebugger(previousTarget);
@@ -1388,6 +1396,7 @@ function resetTargetData(previousTarget = state.targetId) {
 function ensureCurrentView() {
   if (state.view === "network") ensureNetwork();
   else if (state.view === "logs") ensureLogs();
+  else if (state.view === "state") ensureRegisteredState();
   else if (state.view === "performance") ensurePerformance();
   else if (state.view === "memory") ensureMemory();
   else if (state.view === "app-size") ensureAppSize();
@@ -3983,6 +3992,7 @@ function resetLogs() {
     cleared: false,
   };
   dom.logsMeta.textContent = "Recent runtime log records.";
+  dom.logsLabel.value = "";
   dom.logsBadge.hidden = true;
   if (state.view === "logs") renderLogs();
 }
@@ -4116,6 +4126,7 @@ function setLogsChrome() {
 }
 
 function logMatches(record) {
+  if (dom.logsLabel.value && record.label !== dom.logsLabel.value) return false;
   const minimum = LEVELS.indexOf(dom.logsLevel.value);
   const levelIndex = LEVELS.indexOf(record.level);
   if (minimum >= 0 && levelIndex >= 0 && levelIndex < minimum) return false;
@@ -4131,6 +4142,13 @@ function renderLogs() {
   const host = dom.logsContent;
   clear(host);
   setLogsChrome();
+  const selectedLabel = dom.logsLabel.value;
+  const labels = [...new Set(state.logs.records.map(record => record.label).filter(Boolean))].sort();
+  if (selectedLabel && !labels.includes(selectedLabel)) labels.push(selectedLabel);
+  dom.logsLabel.replaceChildren(el("option", { text: "All labels", attrs: { value: "" } }),
+    ...labels.map(label => el("option", { text: label, attrs: { value: label } })));
+  dom.logsLabel.value = selectedLabel;
+  dom.logsLabel.disabled = !state.caps.logs || !labels.length;
   const target = targetById();
   if (!target) {
     dom.logsMeta.textContent = "No target selected.";
@@ -17490,10 +17508,10 @@ function debuggerUnloadDetach() {
 /* Views and refresh */
 
 function switchView(view, options = {}) {
-  if (!["inspector", "network", "logs", "performance", "memory", "app-size", "deep-links", "debugger"].includes(view)) return;
+  if (!["inspector", "network", "logs", "performance", "memory", "app-size", "deep-links", "debugger", "state"].includes(view)) return;
   if (state.view === view && !options.force) return;
   state.view = view;
-  const titles = { inspector: "Inspector", network: "Network", logs: "Logs", performance: "Performance", memory: "Memory", "app-size": "App Size", "deep-links": "Deep Links", debugger: "Debugger" };
+  const titles = { inspector: "Inspector", network: "Network", logs: "Logs", performance: "Performance", memory: "Memory", "app-size": "App Size", "deep-links": "Deep Links", debugger: "Debugger", state: "State" };
   document.title = `Cove DevTools · ${titles[view]}`;
   const tabs = [...document.querySelectorAll(".rail-tab")];
   for (const tab of tabs) {
@@ -17527,6 +17545,9 @@ async function refreshCurrent() {
   } else if (state.view === "logs") {
     if (state.caps.logs) await loadLogs({ reset: true });
     else renderLogs();
+  } else if (state.view === "state") {
+    if (state.caps.state) await loadRegisteredState(0);
+    else renderRegisteredState();
   } else if (state.view === "performance") {
     if (state.performance.snapshot) {
       renderPerformance();
@@ -17764,6 +17785,8 @@ function bindEvents() {
   });
   dom.logsSearch.addEventListener("input", renderLogs);
   dom.logsLevel.addEventListener("change", renderLogs);
+  dom.logsLabel.addEventListener("change", renderLogs);
+  dom.stateRefresh.addEventListener("click", () => loadRegisteredState(0));
 
   dom.performanceRefresh.addEventListener("click", () => {
     const perf = state.performance;
@@ -17940,9 +17963,9 @@ function handleGlobalKeydown(event) {
   if (typing || dialogOpen) return;
   if (event.altKey && !event.ctrlKey && !event.metaKey) {
     const index = Number(event.key);
-    if (index >= 1 && index <= 8) {
+    if (index >= 1 && index <= 9) {
       event.preventDefault();
-      switchView(["inspector", "network", "logs", "performance", "memory", "app-size", "deep-links", "debugger"][index - 1], { focusTab: true });
+      switchView(["inspector", "network", "logs", "performance", "memory", "app-size", "deep-links", "debugger", "state"][index - 1], { focusTab: true });
       return;
     }
   }

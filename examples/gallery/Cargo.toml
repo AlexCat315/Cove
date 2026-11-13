@@ -5,6 +5,7 @@ edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
 description = "Gallery, demo and mobile example content"
+default-run = "gallery"
 
 [features]
 ## Plays the bundled clip through FFmpeg instead of the synthetic source.

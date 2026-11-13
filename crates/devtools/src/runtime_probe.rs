@@ -27,6 +27,7 @@ pub type ContentGeometrySource = Rc<dyn Fn() -> Result<ContentGeometry, String>>
 pub type RefreshRateSource = Rc<dyn Fn() -> Option<f64>>;
 
 pub type RuntimeInputSink = Rc<dyn Fn(InputEvent)>;
+pub type GpuMeasurement = Box<dyn Fn() -> Option<Option<u64>>>;
 
 pub struct RuntimeProbe {
     pub viewport: Option<Rc<dyn Fn() -> Viewport>>,
@@ -39,6 +40,7 @@ pub struct RuntimeProbe {
     pub display_refresh_rate: Option<RefreshRateSource>,
     timeline: Timeline,
     timing: VecDeque<TimingFrame>,
+    pending_timing: VecDeque<(TimingFrame, Option<GpuMeasurement>, std::time::Instant)>,
     sequence: u64,
     profile: UiProfiler,
     allocation_sites: AllocationSites,
@@ -66,6 +68,7 @@ impl RuntimeProbe {
             display_refresh_rate: None,
             timeline,
             timing: VecDeque::new(),
+            pending_timing: VecDeque::new(),
             sequence: 0,
             profile: UiProfiler::new(thread),
             allocation_sites: AllocationSites::new(),
@@ -114,6 +117,9 @@ impl RuntimeProbe {
         if self.display_refresh_rate.is_some() {
             capabilities.push("refresh_rate");
         }
+        if self.diagnostics.state_observation_available() {
+            capabilities.push("state");
+        }
         if crate::profile::unavailable_reason().is_none() {
             capabilities.push("cpu_profile");
         }
@@ -123,13 +129,34 @@ impl RuntimeProbe {
         capabilities.into_iter().map(str::to_owned).collect()
     }
 
-    pub fn record(&mut self, mut frame: TimingFrame) {
+    pub fn record(&mut self, frame: TimingFrame) {
+        self.record_measured(frame, None);
+    }
+
+    pub fn record_measured(&mut self, mut frame: TimingFrame, gpu: Option<GpuMeasurement>) {
         self.sequence += 1;
         frame.frame = self.sequence;
-        if self.timing.len() == 240 {
-            self.timing.pop_front();
+        self.pending_timing.push_back((frame, gpu, std::time::Instant::now()));
+        self.flush_timing();
+    }
+
+    fn flush_timing(&mut self) {
+        // Keep sequence order for incremental readers and bound how long a
+        // missing GPU completion can delay the CPU timeline.
+        while let Some((_, gpu, recorded)) = self.pending_timing.front() {
+            let nanos = match gpu.as_ref().map_or(Some(None), |query| query()) {
+                Some(nanos) => nanos,
+                None if self.pending_timing.len() >= 16
+                    || recorded.elapsed() >= std::time::Duration::from_secs(1) => None,
+                None => break,
+            };
+            let (mut frame, _, _) = self.pending_timing.pop_front().expect("front was present");
+            frame.gpu_ms = nanos.map(|nanos| nanos as f64 / 1_000_000.0);
+            if self.timing.len() == 240 {
+                self.timing.pop_front();
+            }
+            self.timing.push_back(frame);
         }
-        self.timing.push_back(frame);
     }
 
     pub fn execute(&mut self, command: ProbeCommand) -> Result<Value, Fault> {
@@ -292,12 +319,16 @@ impl RuntimeProbe {
                     .map_err(|error| invalid(error.to_string()))?;
                 serialize(serde_json::to_value(comparison))
             }
-            ProbeCommand::Timing { after } => Ok(json!({
+            ProbeCommand::Timing { after } => {
+                self.flush_timing();
+                Ok(json!({
                 "frames": self.timing.iter().filter(|frame| frame.frame > after).collect::<Vec<_>>(),
                 "dropped": self.timing.front().map_or(0, |frame| frame.frame.saturating_sub(after).saturating_sub(1)),
                 "refreshRate": self.display_refresh_rate.as_ref().and_then(|query| query()),
-            })),
+                }))
+            }
             ProbeCommand::AnalyzeUiFrame { frame } => {
+                self.flush_timing();
                 let analysis = match self.timing.iter().find(|timing| timing.frame == frame) {
                     Some(timing) => FrameAnalysis::for_frame(timing, &self.timeline.borrow()),
                     None => FrameAnalysis::not_retained(frame, self.timing.len()),

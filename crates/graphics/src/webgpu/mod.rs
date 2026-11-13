@@ -47,6 +47,28 @@ struct WebGpu {
 }
 
 impl WebGpu {
+    fn submit_impl(
+        &mut self,
+        submit: &PlannedSubmit,
+        measure_gpu: bool,
+        completion: TimedCompletion,
+    ) -> RhiResult<()> {
+        for wait in &submit.wait_semaphores {
+            rhi_require(self.signals.get(&wait.id).copied().unwrap_or(0) >= wait.value,
+                "WebGPU timeline waits require a signal already queued on the device")?;
+        }
+        self.host.queue_timed(
+            "submit",
+            json!({ "passes": commands::encode(submit)?, "measureGpu": measure_gpu }),
+            completion,
+        )?;
+        for signal in &submit.signal_semaphores {
+            let value = self.signals.entry(signal.id).or_default();
+            *value = (*value).max(signal.value);
+        }
+        Ok(())
+    }
+
     fn destroy(&self, kind: &str, id: u32) {
         let _ = self
             .host
@@ -438,20 +460,16 @@ impl RhiBackend for WebGpu {
         _profile: Option<&mut SubmissionCpuProfile>,
         completion: Completion,
     ) -> RhiResult<()> {
-        for wait in &submit.wait_semaphores {
-            rhi_require(self.signals.get(&wait.id).copied().unwrap_or(0) >= wait.value,
-                "WebGPU timeline waits require a signal already queued on the device")?;
-        }
-        self.host.queue(
-            "submit",
-            json!({ "passes": commands::encode(submit)? }),
-            completion,
-        )?;
-        for signal in &submit.signal_semaphores {
-            let value = self.signals.entry(signal.id).or_default();
-            *value = (*value).max(signal.value);
-        }
-        Ok(())
+        self.submit_impl(submit, false, Box::new(move |_| completion()))
+    }
+
+    fn submit_timed(
+        &mut self,
+        submit: &PlannedSubmit,
+        _profile: Option<&mut SubmissionCpuProfile>,
+        completion: TimedCompletion,
+    ) -> RhiResult<()> {
+        self.submit_impl(submit, true, completion)
     }
 
     fn destroy_buffer(&mut self, handle: Buffer) {

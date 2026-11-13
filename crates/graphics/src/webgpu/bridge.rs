@@ -5,7 +5,7 @@ use std::sync::atomic::{AtomicU32, AtomicUsize, Ordering};
 
 use serde_json::{Value, json};
 
-use crate::rhi::{Completion, RhiError, RhiResult};
+use crate::rhi::{Completion, RhiError, RhiResult, TimedCompletion};
 
 #[link(wasm_import_module = "cove_webgpu")]
 unsafe extern "C" {
@@ -13,7 +13,7 @@ unsafe extern "C" {
 }
 
 struct Pending {
-    callback: Option<Completion>,
+    callback: Option<TimedCompletion>,
     count: Arc<AtomicUsize>,
 }
 
@@ -28,12 +28,12 @@ thread_local! {
 }
 
 /// Called by the browser on the event loop after the WebGPU queue completes.
-pub fn complete(token: u32) {
+pub fn complete(token: u32, nanos: Option<u64>) {
     let pending = COMPLETIONS.with(|completions| completions.borrow_mut().remove(&token));
     if let Some(mut pending) = pending
         && let Some(callback) = pending.callback.take()
     {
-        callback();
+        callback(nanos);
     }
 }
 
@@ -69,7 +69,11 @@ impl Host {
         }
     }
 
-    pub fn queue(&self, op: &str, mut args: Value, callback: Completion) -> RhiResult<()> {
+    pub fn queue(&self, op: &str, args: Value, callback: Completion) -> RhiResult<()> {
+        self.queue_timed(op, args, Box::new(move |_| callback()))
+    }
+
+    pub fn queue_timed(&self, op: &str, mut args: Value, callback: TimedCompletion) -> RhiResult<()> {
         static NEXT: AtomicU32 = AtomicU32::new(1);
         let token = NEXT.fetch_add(1, Ordering::Relaxed);
         self.pending.fetch_add(1, Ordering::Relaxed);

@@ -180,7 +180,7 @@ impl WindowResize {
 }
 payload!(TimingFrame {
     frame: u64, recomposition_ms: Option<f64>, layout_ms: f64, draw_ms: f64,
-    render_thread_ms: Option<f64>, submitted: bool, presented: Option<bool>,
+    render_thread_ms: Option<f64>, #[serde(default)] gpu_ms: Option<f64>, submitted: bool, presented: Option<bool>,
     total_ms: f64, node_count: usize, batch_count: usize,
     // The CPU timeline window this frame owns: spans with a sequence in
     // `(timeline_start, timeline_end]` were produced while the frame was
@@ -413,6 +413,7 @@ mod tests {
             layout_ms: 0.5,
             draw_ms: 0.25,
             render_thread_ms: Some(0.125),
+            gpu_ms: None,
             submitted: true,
             presented: Some(true),
             total_ms: 1.0,

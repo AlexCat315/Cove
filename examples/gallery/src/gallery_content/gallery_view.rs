@@ -84,8 +84,10 @@ impl GalleryView {
         } else {
             1.0
         };
+        let page = State::new(initial_page);
+        page.expose(|page| page.raw_value().to_owned());
         Self {
-            page: State::new(initial_page),
+            page,
             search: State::new(TextBuffer::default()),
             appearance: State::new(appearance),
             options: State::new(GalleryOptions::default()),

@@ -441,7 +441,7 @@ impl AuxiliaryAppWindow {
         };
         let batches = list.batches().len();
         let submitted = renderer
-            .submit(&mut list, (logical.0 as f32, logical.1 as f32))
+            .submit(&mut list, (logical.0 as f32, logical.1 as f32), self.diagnostics.is_some())
             .ok()
             .flatten();
         if let Some(diagnostics) = &mut self.diagnostics {
@@ -465,7 +465,7 @@ impl AuxiliaryAppWindow {
             .map_err(|error| error.to_string())?;
         for frame in &frames {
             if let Some(diagnostics) = &mut self.diagnostics {
-                diagnostics.presentation_finished(frame.token.0, frame.presented, frame.cpu_ms);
+                diagnostics.presentation_finished(frame.token.0, frame.presented, frame.cpu_ms, frame.gpu.clone());
             }
         }
         Ok(self.session.is_presentation_active() && frames.iter().any(|frame| !frame.presented))

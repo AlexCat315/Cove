@@ -5,12 +5,20 @@ export function createWebGpuBridge(wasm, canvas) {
   const devices = new Map();
   let adapter, gpu, lost = false, fault;
 
-  function complete(token, buffers = []) {
-    function retire() {
+  function complete(token, buffers = [], readback) {
+    function retire(nanos) {
       for (const buffer of buffers) buffer.destroy();
-      wasm().cove_webgpu_complete(token);
+      wasm().cove_webgpu_complete(token, nanos === undefined ? 0 : 1, nanos ?? 0n);
     }
-    gpu.queue.onSubmittedWorkDone().then(retire, retire);
+    if (readback) {
+      readback.mapAsync(GPUMapMode.READ).then(() => {
+        const [start, end] = new BigUint64Array(readback.getMappedRange());
+        readback.unmap();
+        retire(end >= start ? end - start : undefined);
+      }, () => gpu.queue.onSubmittedWorkDone().then(() => retire(), () => retire()));
+    } else {
+      gpu.queue.onSubmittedWorkDone().then(() => retire(), () => retire());
+    }
   }
 
   function bindingResource(objects, resource) {
@@ -169,14 +177,38 @@ export function createWebGpuBridge(wasm, canvas) {
       case "submit": {
         const encoder = gpu.createCommandEncoder();
         const transient = [];
+        let readback;
         try {
+          const queries = args.measureGpu && gpu.features.has("timestamp-query")
+            ? gpu.createQuerySet({ type: "timestamp", count: 2 }) : null;
+          if (queries) {
+            transient.push(queries);
+            encoder.beginComputePass({
+              timestampWrites: { querySet: queries, beginningOfPassWriteIndex: 0 },
+            }).end();
+          }
           for (const pass of args.passes) encodePass(encoder, objects, pass, transient);
+          if (queries) {
+            encoder.beginComputePass({
+              timestampWrites: { querySet: queries, endOfPassWriteIndex: 1 },
+            }).end();
+            const resolved = gpu.createBuffer({
+              size: 16, usage: GPUBufferUsage.QUERY_RESOLVE | GPUBufferUsage.COPY_SRC,
+            });
+            transient.push(resolved);
+            readback = gpu.createBuffer({
+              size: 16, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ,
+            });
+            transient.push(readback);
+            encoder.resolveQuerySet(queries, 0, 2, resolved, 0);
+            encoder.copyBufferToBuffer(resolved, 0, readback, 0, 16);
+          }
           gpu.queue.submit([encoder.finish()]);
         } catch (error) {
           for (const buffer of transient) buffer.destroy();
           throw error;
         }
-        complete(args.completion, transient);
+        complete(args.completion, transient, readback);
         break;
       }
       case "destroy": {
@@ -196,7 +228,8 @@ export function createWebGpuBridge(wasm, canvas) {
     async initialize() {
       adapter = await navigator.gpu?.requestAdapter();
       if (!adapter) throw new Error("No WebGPU adapter");
-      gpu = await adapter.requestDevice();
+      const requiredFeatures = adapter.features.has("timestamp-query") ? ["timestamp-query"] : [];
+      gpu = await adapter.requestDevice({ requiredFeatures });
       gpu.addEventListener("uncapturederror", event => { fault = event.error; console.error("WebGPU RHI:", fault.message); });
       gpu.lost.then(info => { lost = true; console.warn("WebGPU RHI:", info.message); });
       return navigator.gpu.getPreferredCanvasFormat();

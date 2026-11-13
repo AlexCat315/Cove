@@ -84,9 +84,9 @@ impl AndroidDiagnostics {
         self.session.frame_finished(nodes, batches, Some(token));
     }
 
-    pub fn presentation_finished(&mut self, token: u64, presented: bool, render_thread_ms: f64) {
+    pub fn presentation_finished(&mut self, token: u64, presented: bool, render_thread_ms: f64, gpu: Option<cove_graphics::rhi::GpuFrameTiming>) {
         self.session
-            .presentation_finished(token, presented, render_thread_ms);
+            .presentation_finished(token, presented, render_thread_ms, gpu);
     }
 
     pub fn stop(&mut self) {

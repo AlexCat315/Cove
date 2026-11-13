@@ -1759,7 +1759,82 @@ struct FenceWaiter {
     fence: sys::VkFence,
     status: Arc<super::status::VulkanSubmissionStatus>,
     timestamps: Option<TimestampRecording>,
-    completion: Completion,
+    frame_timestamps: Option<SubmissionTimestamps>,
+    completion: Result<crate::rhi::TimedCompletion, Completion>,
+}
+
+/// A query pair owned by one submission until its fence signals.
+struct SubmissionTimestamps {
+    device: sys::VkDevice,
+    pool: sys::VkQueryPool,
+    commands: sys::QueryCommands,
+    period: f64,
+    bits: u32,
+}
+
+impl SubmissionTimestamps {
+    fn new(context: &VulkanContext, bits: u32) -> Option<Self> {
+        let period = f64::from(context.limits.timestampPeriod);
+        if !(1..=64).contains(&bits) || !period.is_finite() || period <= 0.0 {
+            return None;
+        }
+        let commands = context.resources.queries;
+        let descriptor = sys::VkQueryPoolCreateInfo {
+            sType: sys::VK_STRUCTURE_TYPE_QUERY_POOL_CREATE_INFO,
+            pNext: core::ptr::null(),
+            flags: 0,
+            queryType: sys::VK_QUERY_TYPE_TIMESTAMP,
+            queryCount: 2,
+            pipelineStatistics: 0,
+        };
+        let mut pool = sys::VK_NULL_HANDLE;
+        // SAFETY: both pointers are valid for the duration of the call.
+        let status = unsafe {
+            (commands.create_query_pool)(context.device, &descriptor, core::ptr::null(), &mut pool)
+        };
+        (status == sys::VK_SUCCESS && pool != sys::VK_NULL_HANDLE).then(|| Self {
+            device: context.device, pool, commands, period, bits,
+        })
+    }
+
+    fn begin(&self, cmd: sys::VkCommandBuffer) {
+        // SAFETY: cmd is recording and this submission owns the pool.
+        unsafe {
+            (self.commands.cmd_reset_query_pool)(cmd, self.pool, 0, 2);
+            (self.commands.cmd_write_timestamp)(cmd, sys::VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, self.pool, 0);
+        }
+    }
+
+    fn end(&self, cmd: sys::VkCommandBuffer) {
+        // SAFETY: cmd is recording and this submission reset the query pair.
+        unsafe {
+            (self.commands.cmd_write_timestamp)(cmd, sys::VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, self.pool, 1);
+        }
+    }
+
+    fn nanos(&self) -> Option<u64> {
+        let mut ticks = [0u64; 2];
+        // SAFETY: the fence signalled and the destination holds both results.
+        let status = unsafe {
+            (self.commands.get_query_pool_results)(
+                self.device, self.pool, 0, 2, size_of_val(&ticks),
+                ticks.as_mut_ptr().cast(), size_of::<u64>() as u64, sys::VK_QUERY_RESULT_64_BIT,
+            )
+        };
+        if status != sys::VK_SUCCESS {
+            return None;
+        }
+        let mask = u64::MAX >> (64 - self.bits);
+        let elapsed = ticks[1].wrapping_sub(ticks[0]) & mask;
+        Some((elapsed as f64 * self.period).round() as u64)
+    }
+}
+
+impl Drop for SubmissionTimestamps {
+    fn drop(&mut self) {
+        // SAFETY: the submission either failed before queueing or has retired.
+        unsafe { (self.commands.destroy_query_pool)(self.device, self.pool, core::ptr::null()) };
+    }
 }
 
 // SAFETY: every field is a Vulkan handle or a table of entry points, both of which
@@ -1781,10 +1856,21 @@ impl FenceWaiter {
         // SAFETY: the fence signalled (or the wait failed and the driver still owns
         // it), and nothing else references it.
         unsafe { (self.sync.destroy_fence)(self.device, self.fence, core::ptr::null()) };
-        if let Some(recording) = &self.timestamps {
-            recording.read_results();
+        let nanos = if result == sys::VK_SUCCESS {
+            if let Some(recording) = &self.timestamps {
+                recording.read_results();
+            }
+            self.frame_timestamps.as_ref().and_then(SubmissionTimestamps::nanos)
+        } else {
+            None
+        };
+        // Release the query pool before the callback can retire the last frame
+        // and let the API thread destroy the device.
+        drop(self.frame_timestamps);
+        match self.completion {
+            Ok(timed) => timed(nanos),
+            Err(untimed) => untimed(),
         }
-        (self.completion)();
     }
 }
 
@@ -1813,7 +1899,7 @@ impl Submitter<'_> {
         submit: &PlannedSubmit,
         mut cpu_profile: Option<&mut SubmissionCpuProfile>,
         gpu_profile: Option<&Arc<GpuTimestampProfile>>,
-        completion: Completion,
+        completion: Result<crate::rhi::TimedCompletion, Completion>,
     ) -> RhiResult<()> {
         let encoding_start = cpu_profile.as_deref().and_then(SubmissionCpuProfile::begin);
         let queue = match submit.queue {
@@ -1849,6 +1935,14 @@ impl Submitter<'_> {
             "vkBeginCommandBuffer failed",
         )?;
 
+        let frame_timestamps = if completion.is_ok() {
+            SubmissionTimestamps::new(self.context, queue.timestamp_bits)
+        } else {
+            None
+        };
+        if let Some(timestamps) = &frame_timestamps {
+            timestamps.begin(cmd);
+        }
         let encode_result = {
             let mut encoder = Encoder::new(self.context, self.registries, cmd);
             encoder.encode(&submit.commands, gpu_profile, self.active_slot, self.frames)
@@ -1861,6 +1955,9 @@ impl Submitter<'_> {
                 return Err(error);
             }
         };
+        if let Some(timestamps) = &frame_timestamps {
+            timestamps.end(cmd);
+        }
         rhi_require(
             // SAFETY: `cmd` is recording and has not been ended yet.
             unsafe { (self.context.draw.end_command_buffer)(cmd) } == sys::VK_SUCCESS,
@@ -1930,6 +2027,7 @@ impl Submitter<'_> {
             fence,
             status: Arc::clone(&self.submission_status),
             timestamps,
+            frame_timestamps,
             completion,
         };
         std::thread::spawn(move || waiter.wait());

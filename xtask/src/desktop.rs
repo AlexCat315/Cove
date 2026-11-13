@@ -56,11 +56,11 @@ fn folder(project: &Project, output: &Path, executable: &Path) -> Result<PathBuf
     Ok(directory)
 }
 
-pub fn launch(project: &Project, directory: &Path, arguments: &[String]) -> Result<()> {
+pub fn launch(project: &Project, directory: &Path, arguments: &[String], devtools: Option<&crate::devtools::Session>) -> Result<()> {
     let name = if cfg!(windows) {
         format!("{}.exe", project.bin()?)
     } else {
         project.bin()?.to_owned()
     };
-    process::run(Command::new(directory.join(name)).args(arguments))
+    crate::devtools::launch_desktop(Command::new(directory.join(name)).args(arguments), devtools)
 }

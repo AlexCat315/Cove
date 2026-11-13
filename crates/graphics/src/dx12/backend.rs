@@ -44,6 +44,92 @@ pub struct Dx12Backend {
 }
 
 impl Dx12Backend {
+    fn submit_impl(
+        &mut self,
+        submit: &PlannedSubmit,
+        cpu_profile: Option<&mut SubmissionCpuProfile>,
+        completion: Result<crate::rhi::TimedCompletion, Completion>,
+    ) -> RhiResult<()> {
+        let encoding_start = cpu_profile.as_deref().and_then(SubmissionCpuProfile::begin);
+        // Execute planner releases, graphics, compute and copies in order on
+        // one queue. Resource states cannot cross native queue types without
+        // explicit handoffs and fence waits.
+
+        // Recording may create the queue's allocator on first use.
+        let mut registries = self
+            .registries
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let super::command_list::EncodedSubmission {
+            list: command_list,
+            staged,
+            texture_states,
+            #[cfg(target_os = "windows")]
+            timestamps,
+            ..
+        } = super::command_list::record(&mut self.device, &mut registries, submit, completion.is_ok())?;
+        // SAFETY: the list was closed by `record` and the queue is live.
+        let fence_value = self.device.execute(command_list);
+        // SAFETY: the list is no longer needed on the CPU once submitted.
+        unsafe { sys::IUnknownVtbl::release(command_list) };
+        let fence_value = match fence_value {
+            Ok(value) => value,
+            Err(error) => {
+                // SAFETY: the submission never reached the GPU, so its staging
+                // buffers have no outstanding readers.
+                unsafe {
+                    for resource in staged {
+                        sys::IUnknownVtbl::release(resource);
+                    }
+                }
+                return Err(error);
+            }
+        };
+        for (id, state) in texture_states {
+            if let Some(record) = registries.textures.get_mut(&id) {
+                record.state = state;
+            }
+        }
+        drop(registries);
+        if let Some(profile) = cpu_profile {
+            profile.end(CpuProfilePhase::Encoding, encoding_start);
+            let queue_start = profile.begin();
+            profile.end(CpuProfilePhase::QueueSubmit, queue_start);
+        }
+
+        // D3D12 reports completion through the queue's fence. The waiter thread
+        // blocks on it and then fires the frontend's callback, so the submit path
+        // itself never waits.
+        let waiter = super::device::FenceWait {
+            fence: self.device.graphics.fence,
+            value: fence_value,
+        };
+        // Raw COM pointers are not `Send`; carrying their addresses keeps the
+        // release on the thread that observed the fence.
+        let staged: Vec<u64> = staged.into_iter().map(|resource| resource as u64).collect();
+        std::thread::spawn(move || {
+            #[cfg(target_os = "windows")]
+            let nanos = waiter.wait().ok().and_then(|_| timestamps.as_ref()?.nanos());
+            #[cfg(target_os = "windows")]
+            drop(timestamps);
+            #[cfg(not(target_os = "windows"))]
+            let nanos = { let _ = waiter.wait(); None };
+            // SAFETY: each address belongs to a staging buffer created for this
+            // submission, and the GPU has retired the fence that referenced it.
+            unsafe {
+                for address in staged {
+                    sys::IUnknownVtbl::release(address as sys::ComPtr);
+                }
+            }
+            match completion {
+                Ok(timed) => timed(nanos),
+                Err(untimed) => untimed(),
+            }
+        });
+        Ok(())
+    }
+
+
     /// Creates the backend, or reports that DX12 needs Windows.
     pub fn make(config: DeviceConfig) -> RhiResult<Self> {
         Ok(Self {
@@ -537,73 +623,16 @@ impl RhiBackend for Dx12Backend {
         cpu_profile: Option<&mut SubmissionCpuProfile>,
         completion: Completion,
     ) -> RhiResult<()> {
-        let encoding_start = cpu_profile.as_deref().and_then(SubmissionCpuProfile::begin);
-        // Execute planner releases, graphics, compute and copies in order on
-        // one queue. Resource states cannot cross native queue types without
-        // explicit handoffs and fence waits.
+        self.submit_impl(submit, cpu_profile, Err(completion))
+    }
 
-        // Recording may create the queue's allocator on first use.
-        let mut registries = self
-            .registries
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner);
-        let super::command_list::EncodedSubmission {
-            list: command_list,
-            staged,
-            texture_states,
-            ..
-        } = super::command_list::record(&mut self.device, &mut registries, submit)?;
-        // SAFETY: the list was closed by `record` and the queue is live.
-        let fence_value = self.device.execute(command_list);
-        // SAFETY: the list is no longer needed on the CPU once submitted.
-        unsafe { sys::IUnknownVtbl::release(command_list) };
-        let fence_value = match fence_value {
-            Ok(value) => value,
-            Err(error) => {
-                // SAFETY: the submission never reached the GPU, so its staging
-                // buffers have no outstanding readers.
-                unsafe {
-                    for resource in staged {
-                        sys::IUnknownVtbl::release(resource);
-                    }
-                }
-                return Err(error);
-            }
-        };
-        for (id, state) in texture_states {
-            if let Some(record) = registries.textures.get_mut(&id) {
-                record.state = state;
-            }
-        }
-        drop(registries);
-        if let Some(profile) = cpu_profile {
-            profile.end(CpuProfilePhase::Encoding, encoding_start);
-            let queue_start = profile.begin();
-            profile.end(CpuProfilePhase::QueueSubmit, queue_start);
-        }
-
-        // D3D12 reports completion through the queue's fence. The waiter thread
-        // blocks on it and then fires the frontend's callback, so the submit path
-        // itself never waits.
-        let waiter = super::device::FenceWait {
-            fence: self.device.graphics.fence,
-            value: fence_value,
-        };
-        // Raw COM pointers are not `Send`; carrying their addresses keeps the
-        // release on the thread that observed the fence.
-        let staged: Vec<u64> = staged.into_iter().map(|resource| resource as u64).collect();
-        std::thread::spawn(move || {
-            let _ = waiter.wait();
-            // SAFETY: each address belongs to a staging buffer created for this
-            // submission, and the GPU has retired the fence that referenced it.
-            unsafe {
-                for address in staged {
-                    sys::IUnknownVtbl::release(address as sys::ComPtr);
-                }
-            }
-            completion();
-        });
-        Ok(())
+    fn submit_timed(
+        &mut self,
+        submit: &PlannedSubmit,
+        cpu_profile: Option<&mut SubmissionCpuProfile>,
+        completion: crate::rhi::TimedCompletion,
+    ) -> RhiResult<()> {
+        self.submit_impl(submit, cpu_profile, Ok(completion))
     }
 
     // MARK: Deferred destruction

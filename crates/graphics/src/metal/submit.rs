@@ -23,7 +23,7 @@ use crate::rhi::{
     ColorLoadAction, Completion, ComputeCommand, ComputePassRecord, CopyCommand, CopyPassRecord,
     CpuProfilePhase, DepthLoadAction, GpuTimestampMarker, MeshPipeline, PlannedCommand,
     PlannedSubmit, QueueClass, RenderCommand, RenderPassRecord, RenderTextureInfo, RhiError,
-    RhiResult, SubmissionCpuProfile, Texture, TextureUsage, rhi_byte_range,
+    RhiResult, SubmissionCpuProfile, Texture, TextureUsage, TimedCompletion, rhi_byte_range,
     rhi_color_texture_copy_extent, rhi_count, rhi_render_pass_signature, rhi_require,
     rhi_texture_subresource_extent, rhi_texture_transfer_bytes, rhi_texture_upload_bytes,
 };
@@ -41,7 +41,7 @@ pub fn submit(
     device: &mut MetalDeviceHandle,
     submit: &PlannedSubmit,
     mut cpu_profile: Option<&mut SubmissionCpuProfile>,
-    completion: Completion,
+    completion: Result<TimedCompletion, Completion>,
 ) -> RhiResult<()> {
     device.submission_status.check()?;
     let encoding_start = cpu_profile.as_deref().and_then(SubmissionCpuProfile::begin);
@@ -109,15 +109,25 @@ pub fn submit(
             if let Some(error) = buffer.error() {
                 status.record(error.localizedDescription().to_string());
             }
-            if let Some(profile) = &gpu_profile {
-                note_gpu_timestamps(profile, buffer, gpu_label);
-            }
             let taken = user_completion
                 .lock()
                 .unwrap_or_else(std::sync::PoisonError::into_inner)
                 .take();
             if let Some(completion) = taken {
-                completion();
+                let nanos = (gpu_profile.is_some() || completion.is_ok())
+                    .then(|| elapsed_gpu_nanos(buffer)).flatten();
+                if let Some(profile) = &gpu_profile {
+                    if let Some(nanos) = nanos {
+                        profile.note("ok");
+                        profile.append(GpuTimestampMarker::new(gpu_label, nanos));
+                    } else {
+                        profile.note("Metal command buffer did not expose completed GPU timestamps");
+                    }
+                }
+                match completion {
+                    Ok(timed) => timed(nanos),
+                    Err(untimed) => untimed(),
+                }
             }
         },
     );
@@ -137,13 +147,7 @@ pub fn submit(
     Ok(())
 }
 
-/// Records one GPU timing marker for a completed command buffer. A buffer that
-/// did not expose finished timestamps is reported by status, never as zero.
-fn note_gpu_timestamps(
-    profile: &crate::rhi::GpuTimestampProfile,
-    buffer: &ProtocolObject<dyn MTLCommandBuffer>,
-    label: &str,
-) {
+fn elapsed_gpu_nanos(buffer: &ProtocolObject<dyn MTLCommandBuffer>) -> Option<u64> {
     let seconds = buffer.GPUEndTime() - buffer.GPUStartTime();
     if buffer.status() == objc2_metal::MTLCommandBufferStatus::Completed
         && buffer.GPUStartTime() > 0.0
@@ -151,10 +155,9 @@ fn note_gpu_timestamps(
         && seconds > 0.0
         && seconds < u64::MAX as f64 / 1e9
     {
-        profile.note("ok");
-        profile.append(GpuTimestampMarker::new(label, (seconds * 1e9) as u64));
+        Some((seconds * 1e9) as u64)
     } else {
-        profile.note("Metal command buffer did not expose completed GPU timestamps");
+        None
     }
 }
 

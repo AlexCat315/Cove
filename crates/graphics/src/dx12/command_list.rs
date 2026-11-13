@@ -31,6 +31,8 @@ pub struct EncodedSubmission {
     pub staged: Vec<sys::ComPtr>,
     pub texture_states: HashMap<u32, u32>,
     buffer_states: HashMap<u32, u32>,
+    #[cfg(target_os = "windows")]
+    pub timestamps: Option<SubmissionTimestamps>,
 }
 
 /// Records `submit` into a freshly opened command list and closes it.
@@ -42,10 +44,11 @@ pub fn record(
     device: &mut Dx12DeviceHandle,
     registries: &mut Dx12Registries,
     submit: &PlannedSubmit,
+    measure_gpu: bool,
 ) -> RhiResult<EncodedSubmission> {
     #[cfg(not(target_os = "windows"))]
     {
-        let _ = (device, registries, submit);
+        let _ = (device, registries, submit, measure_gpu);
         Err(RhiError::unsupported_backend(
             "DirectX 12 is only available on Windows",
         ))
@@ -53,11 +56,16 @@ pub fn record(
     #[cfg(target_os = "windows")]
     {
         let list = open_graphics_list(device)?;
+        let timestamps = if measure_gpu { SubmissionTimestamps::new(device) } else { None };
+        if let Some(timestamps) = &timestamps {
+            timestamps.write(list, 0);
+        }
         let mut encoded = EncodedSubmission {
             list,
             staged: Vec::new(),
             texture_states: HashMap::new(),
             buffer_states: HashMap::new(),
+            timestamps,
         };
         for command in &submit.commands {
             if let Err(error) = encode(device, registries, command, &mut encoded) {
@@ -71,6 +79,10 @@ pub fn record(
                 }
                 return Err(error);
             }
+        }
+        if let Some(timestamps) = &encoded.timestamps {
+            timestamps.write(list, 1);
+            timestamps.resolve(list);
         }
         // SAFETY: the list is open and holds the recorded commands.
         let status = unsafe {
@@ -91,6 +103,69 @@ pub fn record(
             )));
         }
         Ok(encoded)
+    }
+}
+
+#[cfg(target_os = "windows")]
+pub struct SubmissionTimestamps {
+    heap: windows::Win32::Graphics::Direct3D12::ID3D12QueryHeap,
+    buffer: windows::Win32::Graphics::Direct3D12::ID3D12Resource,
+    mapping: usize,
+    frequency: u64,
+}
+
+#[cfg(target_os = "windows")]
+impl SubmissionTimestamps {
+    fn new(device: &Dx12DeviceHandle) -> Option<Self> {
+        use windows::Win32::Graphics::Direct3D12::*;
+        use windows::core::Interface;
+        let descriptor = D3D12_QUERY_HEAP_DESC {
+            Type: D3D12_QUERY_HEAP_TYPE_TIMESTAMP,
+            Count: 2,
+            NodeMask: 0,
+        };
+        // SAFETY: the native device and queue are alive throughout setup.
+        let (frequency, heap) = unsafe {
+            let queue = ID3D12CommandQueue::from_raw_borrowed(&device.graphics.queue)?;
+            let frequency = queue.GetTimestampFrequency().ok().filter(|value| *value != 0)?;
+            let native = ID3D12Device::from_raw_borrowed(&device.device)?;
+            let mut heap = None;
+            native.CreateQueryHeap(&descriptor, &mut heap).ok()?;
+            (frequency, heap?)
+        };
+        let readback = super::buffer::create_in_heap_for_transfer(
+            device.device, 16, sys::D3D12_HEAP_TYPE_READBACK,
+        ).ok()?;
+        // SAFETY: the returned record owns the initial resource reference.
+        let buffer = unsafe { ID3D12Resource::from_raw(readback.resource) };
+        Some(Self { heap, buffer, mapping: readback.mapped as usize, frequency })
+    }
+
+    fn write(&self, list: sys::ComPtr, index: u32) {
+        use windows::Win32::Graphics::Direct3D12::*;
+        use windows::core::Interface;
+        // SAFETY: the command list is open, and this query index belongs to it.
+        unsafe {
+            let list = ID3D12GraphicsCommandList::from_raw_borrowed(&list).expect("open list");
+            list.EndQuery(&self.heap, D3D12_QUERY_TYPE_TIMESTAMP, index);
+        }
+    }
+
+    fn resolve(&self, list: sys::ComPtr) {
+        use windows::Win32::Graphics::Direct3D12::*;
+        use windows::core::Interface;
+        // SAFETY: both queries precede this command and the buffer holds both values.
+        unsafe {
+            let list = ID3D12GraphicsCommandList::from_raw_borrowed(&list).expect("open list");
+            list.ResolveQueryData(&self.heap, D3D12_QUERY_TYPE_TIMESTAMP, 0, 2, &self.buffer, 0);
+        }
+    }
+
+    pub fn nanos(&self) -> Option<u64> {
+        // SAFETY: the fence signalled and the readback resource is still mapped.
+        let [start, end] = unsafe { (self.mapping as *const [u64; 2]).read_unaligned() };
+        let ticks = end.checked_sub(start)?;
+        u64::try_from(u128::from(ticks) * 1_000_000_000 / u128::from(self.frequency)).ok()
     }
 }
 

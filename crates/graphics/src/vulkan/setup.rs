@@ -21,6 +21,7 @@ use super::sys;
 pub struct VulkanQueue {
     pub handle: sys::VkQueue,
     pub family: u32,
+    pub timestamp_bits: u32,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -318,6 +319,7 @@ struct QueueFamilies {
     graphics: u32,
     compute: u32,
     transfer: u32,
+    timestamp_bits: Vec<u32>,
 }
 
 /// Builds a full context, throwing a clear error if any stage fails.
@@ -483,14 +485,17 @@ fn build_context(
             graphics: VulkanQueue {
                 handle: graphics_queue,
                 family: families.graphics,
+                timestamp_bits: families.timestamp_bits[families.graphics as usize],
             },
             compute: VulkanQueue {
                 handle: compute_queue,
                 family: families.compute,
+                timestamp_bits: families.timestamp_bits[families.compute as usize],
             },
             transfer: VulkanQueue {
                 handle: transfer_queue,
                 family: families.transfer,
+                timestamp_bits: families.timestamp_bits[families.transfer as usize],
             },
         },
         device_name,
@@ -606,6 +611,7 @@ fn find_queue_families(
         graphics: u32::MAX,
         compute: u32::MAX,
         transfer: u32::MAX,
+        timestamp_bits: Vec::new(),
     };
     if count == 0 {
         return families;
@@ -620,6 +626,7 @@ fn find_queue_families(
         )
     };
     for (index, family) in properties.iter().take(count as usize).enumerate() {
+        families.timestamp_bits.push(family.timestampValidBits);
         let index = index as u32;
         let has_graphics = family.queueFlags & sys::VK_QUEUE_GRAPHICS_BIT != 0;
         if has_graphics && families.graphics == u32::MAX {

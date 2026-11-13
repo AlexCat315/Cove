@@ -156,7 +156,7 @@ impl SurfaceSession {
                 .scene()
                 .borrow()
                 .content()
-                .presentation_finished(frame.token.0, frame.presented, frame.cpu_ms);
+                .presentation_finished(frame.token.0, frame.presented, frame.cpu_ms, frame.gpu.clone());
         }
         if frames.iter().any(|frame| !frame.presented) {
             self.application.scene().borrow().invalidate();
@@ -173,12 +173,13 @@ impl SurfaceSession {
         }
         let logical = scene.size();
         let mut list = scene.list().clone();
+        let measure_gpu = scene.content().has_diagnostics();
         drop(scene);
         let _ = self.frame_samples.send(FrameSample {
             timestamp,
             prepare_nanos,
         });
-        renderer.submit(&mut list, logical)
+        renderer.submit(&mut list, logical, measure_gpu)
     }
 
     /// Waits for the render thread to release the swapchain, within a bound; the

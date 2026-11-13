@@ -60,6 +60,7 @@ impl DiagnosticsSession for Session {
             layout_ms: self.layout_ms,
             draw_ms: self.draw_ms,
             render_thread_ms: None,
+            gpu_ms: None,
             submitted: token.is_some(),
             presented: token.is_none().then_some(false),
             total_ms,
@@ -81,11 +82,11 @@ impl DiagnosticsSession for Session {
         }
     }
 
-    fn presentation_finished(&mut self, token: u64, presented: bool, render_thread_ms: f64) {
+    fn presentation_finished(&mut self, token: u64, presented: bool, render_thread_ms: f64, gpu: Option<cove_graphics::rhi::GpuFrameTiming>) {
         if let Some(mut frame) = self.pending.remove(&token) {
             frame.presented = Some(presented);
             frame.render_thread_ms = Some(render_thread_ms);
-            self.probe.record(frame);
+            self.probe.record_measured(frame, gpu.map(|gpu| Box::new(move || gpu.result()) as _));
         }
     }
 

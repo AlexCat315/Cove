@@ -7,7 +7,7 @@ mod http;
 mod registry;
 mod tools;
 
-pub use http::serve;
+pub use http::{RunningController, inspector_url, serve};
 pub use registry::random_id;
 pub use tools::definitions;
 

@@ -429,6 +429,7 @@ mod tests {
             layout_ms: 0.0,
             draw_ms: 0.0,
             render_thread_ms: None,
+            gpu_ms: None,
             submitted: true,
             presented: None,
             total_ms: 0.0,

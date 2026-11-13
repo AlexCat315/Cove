@@ -7,7 +7,8 @@ use serde_json::{Value, json};
 use std::io::{Cursor, Read, Write};
 use std::path::{Component, Path, PathBuf};
 use std::sync::Arc;
-use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+use std::time::Duration;
 use tiny_http::{Header, Method, Request, Response, Server};
 
 #[derive(Deserialize)]
@@ -28,34 +29,129 @@ pub fn serve(
     token: String,
     web_root: Option<PathBuf>,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-    let controller = Arc::new(Controller::new());
+    let (server, discovery) = bind(port, token)?;
+    eprintln!("Inspector: {}", inspector_url(&discovery.info));
+    run(&server, &discovery.info.token, web_root, &AtomicBool::new(false))
+}
+
+pub fn inspector_url(info: &ConnectionInfo) -> String {
+    format!("{}/#{}", info.endpoint, info.token)
+}
+
+pub struct RunningController {
+    discovery: Discovery,
+    stop: Arc<AtomicBool>,
+    worker: Option<std::thread::JoinHandle<()>>,
+}
+
+impl RunningController {
+    pub fn start(
+        port: u16,
+        web_root: Option<PathBuf>,
+    ) -> Result<Self, Box<dyn std::error::Error + Send + Sync>> {
+        let web_root = web_root.map(std::fs::canonicalize).transpose()?;
+        let token = crate::random_id().map_err(|error| error.message)?;
+        let (server, discovery) = bind(port, token.clone())?;
+        let stop = Arc::new(AtomicBool::new(false));
+        let worker_stop = stop.clone();
+        let worker = std::thread::Builder::new()
+            .name("cove.devtools.controller".into())
+            .spawn(move || {
+                if let Err(error) = run(&server, &token, web_root, &worker_stop) {
+                    eprintln!("Cove DevTools: {error}");
+                }
+            })?;
+        Ok(Self { discovery, stop, worker: Some(worker) })
+    }
+
+    pub fn connection(&self) -> &ConnectionInfo {
+        &self.discovery.info
+    }
+}
+
+impl Drop for RunningController {
+    fn drop(&mut self) {
+        self.stop.store(true, Ordering::Release);
+        if let Some(worker) = self.worker.take() {
+            let _ = worker.join();
+        }
+    }
+}
+
+struct Discovery {
+    path: PathBuf,
+    info: ConnectionInfo,
+    previous: Option<ConnectionInfo>,
+}
+
+impl Drop for Discovery {
+    fn drop(&mut self) {
+        if !ConnectionInfo::local().is_some_and(|info| info.token == self.info.token) {
+            return;
+        }
+        if let Some(info) = self.previous.as_ref().filter(|info| controller_is_live(info)) {
+            let _ = publish(&self.path, info);
+        } else {
+            let _ = std::fs::remove_file(&self.path);
+        }
+    }
+}
+
+fn controller_is_live(info: &ConnectionInfo) -> bool {
+    if !crate::local_http(&info.endpoint) {
+        return false;
+    }
+    let agent: ureq::Agent = ureq::Agent::config_builder()
+        .timeout_global(Some(Duration::from_millis(250)))
+        .proxy(None)
+        .max_redirects(0)
+        .build()
+        .into();
+    agent.get(&format!("{}/health", info.endpoint.trim_end_matches('/')))
+        .header("Authorization", &format!("Bearer {}", info.token))
+        .call()
+        .is_ok_and(|response| response.status().as_u16() == 204)
+}
+
+fn bind(
+    port: u16,
+    token: String,
+) -> Result<(Server, Discovery), Box<dyn std::error::Error + Send + Sync>> {
+    let server = Server::http(("127.0.0.1", port))?;
+    let info = ConnectionInfo { endpoint: format!("http://{}", server.server_addr()), token };
+    let path = ConnectionInfo::path().ok_or("Set COVE_DEVTOOLS_SESSION_FILE for local discovery.")?;
+    let previous = ConnectionInfo::local();
+    publish(&path, &info)?;
+    Ok((server, Discovery { path, info, previous }))
+}
+
+fn publish(path: &Path, info: &ConnectionInfo) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    let folder = path.parent().filter(|path| !path.as_os_str().is_empty()).unwrap_or(Path::new("."));
+    std::fs::create_dir_all(folder)?;
+    let mut file = tempfile::NamedTempFile::new_in(folder)?;
+    serde_json::to_writer(&mut file, info)?;
+    file.flush()?;
+    file.persist(path)?;
+    Ok(())
+}
+
+fn run(
+    server: &Server,
+    token: &str,
+    web_root: Option<PathBuf>,
+    stop: &AtomicBool,
+) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let web_root = web_root
         .map(std::fs::canonicalize)
         .transpose()?
         .map(Arc::new);
-    let server = Server::http(("127.0.0.1", port))?;
-    let address = server.server_addr();
-    let session_file =
-        ConnectionInfo::path().ok_or("Set COVE_DEVTOOLS_SESSION_FILE for local discovery.")?;
-    let folder = session_file
-        .parent()
-        .filter(|path| !path.as_os_str().is_empty())
-        .unwrap_or(Path::new("."));
-    std::fs::create_dir_all(folder)?;
-    let mut file = tempfile::NamedTempFile::new_in(folder)?;
-    serde_json::to_writer(
-        &mut file,
-        &ConnectionInfo {
-            endpoint: format!("http://{address}"),
-            token: token.clone(),
-        },
-    )?;
-    file.flush()?;
-    file.persist(session_file)?;
-    eprintln!("Inspector: http://{address}/#{token}");
+    let controller = Arc::new(Controller::new());
     let authorization = Arc::new(format!("Bearer {token}"));
     let workers = Arc::new(AtomicUsize::new(0));
-    for request in server.incoming_requests() {
+    while !stop.load(Ordering::Acquire) {
+        let Some(request) = server.recv_timeout(Duration::from_millis(100))? else {
+            continue;
+        };
         if workers.fetch_add(1, Ordering::AcqRel) >= 64 {
             workers.fetch_sub(1, Ordering::AcqRel);
             let _ = request.respond(Response::empty(503));
@@ -149,6 +245,9 @@ fn handle(
         header.field.equiv("Authorization") && header.value.as_str() == authorization
     });
     match (request.method(), path.as_str()) {
+        (&Method::Get, "/health") if allowed => {
+            let _ = request.respond(Response::empty(204));
+        }
         (&Method::Post, "/probe/register") if allowed => {
             let result = read::<Registration>(&mut request)
                 .and_then(|probe| controller.registry.register(probe));

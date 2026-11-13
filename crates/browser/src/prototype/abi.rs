@@ -44,8 +44,8 @@ pub extern "C" fn cove_webgpu_disable() {
 
 #[cfg(target_arch = "wasm32")]
 #[unsafe(no_mangle)]
-pub extern "C" fn cove_webgpu_complete(token: u32) {
-    cove_graphics::webgpu::complete(token);
+pub extern "C" fn cove_webgpu_complete(token: u32, measured: u32, nanos: u64) {
+    cove_graphics::webgpu::complete(token, (measured != 0).then_some(nanos));
 }
 
 /// Whether animations or queued composition need another animation frame.

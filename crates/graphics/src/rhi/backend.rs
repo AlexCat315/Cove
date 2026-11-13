@@ -30,6 +30,8 @@ use super::{
 
 /// Completion callback run once the GPU has retired the work.
 pub type Completion = Box<dyn FnOnce() + Send + 'static>;
+/// Completion with elapsed GPU nanoseconds, when the submission exposed them.
+pub type TimedCompletion = Box<dyn FnOnce(Option<u64>) + Send + 'static>;
 
 pub trait RhiBackend: Send {
     /// The graphics API this backend implements.
@@ -194,6 +196,15 @@ pub trait RhiBackend: Send {
         cpu_profile: Option<&mut SubmissionCpuProfile>,
         completion: Completion,
     ) -> RhiResult<()>;
+
+    fn submit_timed(
+        &mut self,
+        submit: &PlannedSubmit,
+        cpu_profile: Option<&mut SubmissionCpuProfile>,
+        completion: TimedCompletion,
+    ) -> RhiResult<()> {
+        self.submit(submit, cpu_profile, Box::new(move || completion(None)))
+    }
 
     // MARK: Deferred destruction (called by FrameRing)
 

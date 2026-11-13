@@ -124,6 +124,9 @@
       <button class="rail-tab" id="tab-debugger" data-view="debugger" role="tab" aria-selected="false" aria-controls="view-debugger" tabindex="-1" type="button">
         <svg class="icon" aria-hidden="true"><use href="#i-bug"></use></svg><span>Debugger</span><span class="rail-paused" id="debugger-badge" hidden></span>
       </button>
+      <button class="rail-tab" id="tab-state" data-view="state" role="tab" aria-selected="false" aria-controls="view-state" tabindex="-1" type="button">
+        <svg class="icon" aria-hidden="true"><use href="#i-hierarchy"></use></svg><span>State</span>
+      </button>
     </div>
     <div class="rail-meta" id="rail-meta"></div>
   </nav>
@@ -134,7 +137,7 @@
         <div class="setup-card">
           <div class="setup-icon" aria-hidden="true"><svg class="icon"><use href="#i-device"></use></svg></div>
           <h1>Connect to the controller</h1>
-          <p>Open the Inspector link printed by <code>cove-devtools serve</code>, or paste its session token.</p>
+          <p>Open the Inspector link printed by <code>cargo cove run --devtools</code>, or paste its session token.</p>
           <form id="token-form" class="token-form">
             <label for="token-input">Session token</label>
             <div class="token-row">
@@ -370,6 +373,7 @@
             <option value="error">Error</option>
             <option value="critical">Critical</option>
           </select>
+          <select id="logs-label" aria-label="Log label"><option value="">All labels</option></select>
           <label class="check"><input id="logs-follow" type="checkbox"> Follow</label>
           <button id="logs-clear" class="tool-button" type="button" title="Clear the runtime's replay log history">
             <svg class="icon" aria-hidden="true"><use href="#i-trash"></use></svg><span>Clear</span>
@@ -380,6 +384,18 @@
         </div>
       </header>
       <div id="logs-content" class="aux-content"></div>
+    </section>
+
+    <section id="view-state" class="view aux-view" role="tabpanel" aria-labelledby="tab-state" hidden>
+      <header class="aux-header">
+        <div class="aux-title"><h1>State</h1><p id="state-meta" class="aux-meta"></p></div>
+        <div class="aux-actions">
+          <button id="state-refresh" class="tool-button" type="button">
+            <svg class="icon" aria-hidden="true"><use href="#i-refresh"></use></svg><span>Refresh</span>
+          </button>
+        </div>
+      </header>
+      <div id="state-content" class="aux-content"></div>
     </section>
 
     <section id="view-performance" class="view aux-view" role="tabpanel" aria-labelledby="tab-performance" hidden>

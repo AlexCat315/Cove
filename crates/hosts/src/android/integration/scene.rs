@@ -600,9 +600,9 @@ impl AndroidContentSession {
         tree.flush();
     }
 
-    pub fn presentation_finished(&self, token: u64, presented: bool, render_thread_ms: f64) {
+    pub fn presentation_finished(&self, token: u64, presented: bool, render_thread_ms: f64, gpu: Option<cove_graphics::rhi::GpuFrameTiming>) {
         if let Some(diagnostics) = self.diagnostics.borrow_mut().as_mut() {
-            diagnostics.presentation_finished(token, presented, render_thread_ms);
+            diagnostics.presentation_finished(token, presented, render_thread_ms, gpu);
         }
     }
 

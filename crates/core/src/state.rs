@@ -160,6 +160,9 @@ impl<T: Send + 'static> State<T> {
             &self.0.value.lock().unwrap_or_else(|e| e.into_inner()).0,
         ))
     }
+    pub fn is_exposed(&self) -> bool {
+        self.0.summary.lock().unwrap_or_else(|e| e.into_inner()).is_some()
+    }
     pub fn set_read_tracking_owner(&self, scope: ReadScope, precise: bool) {
         let mut tracking = self.0.tracking.lock().unwrap_or_else(|e| e.into_inner());
         tracking.owner = Some(scope);

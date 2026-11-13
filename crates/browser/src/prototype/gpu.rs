@@ -40,7 +40,8 @@ impl BrowserGpu {
         atlas: &FontAtlas,
         logical: [f32; 2],
         scale: f32,
-    ) -> RhiResult<()> {
+        measure_gpu: bool,
+    ) -> RhiResult<Option<GpuFrameTiming>> {
         self.renderer.upload_font_atlas(atlas, 1)?;
         let scale = scale.min(8192.0 / logical[0].max(logical[1]));
         let pixels = logical.map(|axis| (axis * scale).round().max(1.0) as usize);
@@ -81,6 +82,7 @@ impl BrowserGpu {
             .expect("created browser framebuffer")
             .texture();
         self.device.begin_frame()?;
+        let timing = measure_gpu.then(|| self.device.measure_gpu_frame()).flatten();
         let result = (|| {
             let image = self.device.acquire_swapchain_image(swapchain)?;
             let mut commands = CommandBuffer::new();
@@ -105,6 +107,6 @@ impl BrowserGpu {
             self.device.present(image)
         })();
         self.device.end_frame();
-        result
+        result.map(|()| timing)
     }
 }

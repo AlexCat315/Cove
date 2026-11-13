@@ -136,8 +136,8 @@ pub fn bundle_mac(project: &Project, target: &Target, output: &Path) -> Result<P
     Ok(app)
 }
 
-pub fn launch_mac(project: &Project, app: &Path, arguments: &[String]) -> Result<()> {
-    process::run(Command::new(app.join("Contents/MacOS").join(project.bin()?)).args(arguments))
+pub fn launch_mac(project: &Project, app: &Path, arguments: &[String], devtools: Option<&crate::devtools::Session>) -> Result<()> {
+    crate::devtools::launch_desktop(Command::new(app.join("Contents/MacOS").join(project.bin()?)).args(arguments), devtools)
 }
 
 pub fn bundle_ios(project: &Project, target: &Target, output: &Path) -> Result<PathBuf> {
@@ -197,7 +197,7 @@ pub fn bundle_ios(project: &Project, target: &Target, output: &Path) -> Result<P
     Ok(app)
 }
 
-pub fn launch_ios(project: &Project, app: &Path, target: &Target) -> Result<()> {
+pub fn launch_ios(project: &Project, app: &Path, target: &Target, devtools: Option<&crate::devtools::Session>) -> Result<()> {
     if target.simulator {
         let device = target.device.as_deref().unwrap_or("booted");
         if device != "booted" {
@@ -211,13 +211,14 @@ pub fn launch_ios(project: &Project, app: &Path, target: &Target) -> Result<()> 
                 .args(["simctl", "install", device])
                 .arg(app),
         )?;
-        return process::run(Command::new("xcrun").args([
-            "simctl",
-            "launch",
-            "--console-pty",
-            device,
-            &project.id,
-        ]));
+        let mut launch = Command::new("xcrun");
+        launch.args(["simctl", "launch", "--console-pty"]);
+        if let Some(session) = devtools {
+            launch.arg("--terminate-running-process");
+            launch.envs(session.environment().map(|(key, value)| (format!("SIMCTL_CHILD_{key}"), value)));
+            return session.run(launch.args([device, &project.id]));
+        }
+        return process::run(launch.args([device, &project.id]));
     }
     let device = target
         .device
@@ -228,15 +229,15 @@ pub fn launch_ios(project: &Project, app: &Path, target: &Target) -> Result<()> 
             .args(["devicectl", "device", "install", "app", "--device", device])
             .arg(app),
     )?;
-    process::run(Command::new("xcrun").args([
-        "devicectl",
-        "device",
-        "process",
-        "launch",
-        "--device",
-        device,
-        &project.id,
-    ]))
+    let mut launch = Command::new("xcrun");
+    launch.args(["devicectl", "device", "process", "launch", "--device", device]);
+    if let Some(session) = devtools {
+        let environment: std::collections::BTreeMap<_, _> = session.environment().into_iter().collect();
+        let environment = serde_json::to_string(&environment).map_err(|error| error.to_string())?;
+        launch.args(["--console", "--terminate-existing", "--environment-variables", &environment]);
+        return session.run(launch.arg(&project.id));
+    }
+    process::run(launch.arg(&project.id))
 }
 
 pub fn devices() -> Result<()> {

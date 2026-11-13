@@ -140,7 +140,7 @@ pub trait DiagnosticsSession {
     fn begin_frame(&mut self);
     fn prepared(&mut self, layout_ms: f64, draw_ms: f64);
     fn frame_finished(&mut self, nodes: usize, batches: usize, token: Option<u64>);
-    fn presentation_finished(&mut self, token: u64, presented: bool, render_thread_ms: f64);
+    fn presentation_finished(&mut self, token: u64, presented: bool, render_thread_ms: f64, gpu: Option<cove_graphics::rhi::GpuFrameTiming>);
     fn stop(&mut self);
 }
 
@@ -176,6 +176,6 @@ impl DiagnosticsSession for NullDiagnosticsSession {
     fn begin_frame(&mut self) {}
     fn prepared(&mut self, _layout_ms: f64, _draw_ms: f64) {}
     fn frame_finished(&mut self, _nodes: usize, _batches: usize, _token: Option<u64>) {}
-    fn presentation_finished(&mut self, _token: u64, _presented: bool, _render_thread_ms: f64) {}
+    fn presentation_finished(&mut self, _token: u64, _presented: bool, _render_thread_ms: f64, _gpu: Option<cove_graphics::rhi::GpuFrameTiming>) {}
     fn stop(&mut self) {}
 }

@@ -38,6 +38,7 @@ fn frame() -> TimingFrame {
         layout_ms: 0.5,
         draw_ms: 0.5,
         render_thread_ms: None,
+        gpu_ms: None,
         submitted: true,
         presented: None,
         total_ms: 1.0,
