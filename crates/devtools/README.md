@@ -47,7 +47,9 @@ DevTools 的画面范围为 Cove 渲染内容。系统标题栏、原生文件�
 
 `start_ui_trace` 与 `stop_ui_trace` 可包围实际操作，`get_ui_trace` 分页读取，`compare_ui_traces` 比较 CPU 阶段。帧计时区分 CPU 提交、渲染线程完成和宿主能观察到的呈现操作。Frames 用独立柱显示 GPU 提交执行时间，并按 UI、Encode、GPU 中最慢的一项排序。选中帧会显示活跃帧槽内实际发生的着色器及管线创建次数与 CPU 时间。
 
-`start_ui_profile hz=1000 duration_ms=5000` 用 `cove-profiling` 的真实采样器跟随 UI 线程，`stop_ui_profile` 停止、join 并在后台线程完成符号化，`get_ui_profile` 返回有界聚合调用栈（不逐样本返回），`query_ui_hotspots` 按函数和 `file:line` 返回 self/inclusive 热点。单次采样上限 10 秒；self 时间是独占时间，inclusive 时间在同一采样内对每帧只计一次，时间按相邻采样的实际间隔累计。64 位 macOS、iOS/iPadOS、Windows、Linux、Android 提供原生采样。WASM 和其余架构报告 `unavailable`。
+`start_ui_profile hz=1000 duration_ms=5000` 用 `cove-profiling` 的真实采样器跟随 UI 线程，`stop_ui_profile` 停止、join 并在后台线程完成符号化，`get_ui_profile` 返回有界聚合调用栈（不逐样本返回），`query_ui_hotspots` 按函数和 `file:line` 返回 self/inclusive 热点。单次采样上限 10 秒；self 时间是独占时间，inclusive 时间在同一采样内对每帧只计一次，时间按相邻采样的实际间隔累计。64 位 macOS、iOS/iPadOS、Windows、Linux、Android 提供原生采样。
+
+WebAssembly 运行在页面唯一线程上，无法被外部挂起读栈，因此浏览器改为**协作式阶段计时**：`crates/browser` 的 `render` 在 recompose、layout、encode、upload、submit 处计时，帧尾提交总时长，`crates/devtools/src/profile/cooperative.rs` 把它们聚合成 profile 形状。答案的 `source` 是 `instrumented`，`hz` 与 `sampleIntervalMs` 为 `0`，`samples` 的单位是**实测毫秒**（一单位 = 1 ms，帧自时与各阶段相加等于帧总时），`samplesTaken` 是记录的帧数。面板据此把 "Sample rate" 换成 "Phase timing"、把样本计数改称帧与毫秒。详见 [devtools-profile.md](../../Docs/devtools-profile.md)。
 
 ## 客户端源码结构
 

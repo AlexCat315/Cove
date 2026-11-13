@@ -320,6 +320,9 @@ impl<C: PrototypeContent> BrowserPrototype<C> {
     /// Rebuilds the frame snapshot for the requested viewport.
     pub fn render(&mut self, raw_width: f32, raw_height: f32) {
         let started = Instant::now();
+        // A cooperative profile records where this frame's CPU went; when none is
+        // running the phase timings below are skipped entirely.
+        let profiling = self.probe.profiling_phases();
         let (width, height) = viewport_size(raw_width, raw_height);
         self.content_size.set((width, height));
 
@@ -342,11 +345,18 @@ impl<C: PrototypeContent> BrowserPrototype<C> {
             });
         });
         self.recomposition_ms = started.elapsed().as_secs_f64() * 1000.0;
+        if profiling {
+            self.probe.record_phase("recompose", self.recomposition_ms);
+        }
 
         let layout_started = Instant::now();
         self.graph.compute_layout_if_needed(width, height);
         self.layout_ms = layout_started.elapsed().as_secs_f64() * 1000.0;
+        if profiling {
+            self.probe.record_phase("layout", self.layout_ms);
+        }
 
+        let encode_started = profiling.then(Instant::now);
         let mut labels: Vec<Label> = Vec::new();
         let mut note_width = 0.0_f32;
         // `with_current` needs `&self.context` while the pass needs mutable
@@ -372,6 +382,10 @@ impl<C: PrototypeContent> BrowserPrototype<C> {
         if self.probing {
             self.probe.scene.editor.draw_overlay(&mut self.draw_list);
         }
+        if let Some(encode_started) = encode_started {
+            let encode_ms = encode_started.elapsed().as_secs_f64() * 1000.0;
+            self.probe.record_phase("encode", encode_ms);
+        }
         // Close the frame's timeline window even when nothing is recorded, so
         // later frames cannot inherit this one's spans.
         let attribution = self.window.close(&self.timeline);
@@ -386,6 +400,7 @@ impl<C: PrototypeContent> BrowserPrototype<C> {
         let mut gpu_breakdown: Option<cove_devtools_protocol::GpuFrameBreakdown> = None;
         #[cfg(target_arch = "wasm32")]
         if let Some(gpu) = &mut self.webgpu {
+            let submit_started = profiling.then(Instant::now);
             match gpu.draw(
                 &self.draw_list,
                 &self.fonts.atlas,
@@ -417,12 +432,21 @@ impl<C: PrototypeContent> BrowserPrototype<C> {
                     eprintln!("WebGPU frame: {error}");
                 }
             }
+            if let Some(submit_started) = submit_started {
+                let submit_ms = submit_started.elapsed().as_secs_f64() * 1000.0;
+                self.probe.record_phase("submit", submit_ms);
+            }
         }
+        let upload_started = profiling.then(Instant::now);
         match &upload {
             Some(payload) => self.atlas_buffer.replace(&payload.pixels),
             None => self.atlas_buffer.replace(&[]),
         }
         self.fonts.atlas.mark_clean();
+        if let Some(upload_started) = upload_started {
+            let upload_ms = upload_started.elapsed().as_secs_f64() * 1000.0;
+            self.probe.record_phase("upload", upload_ms);
+        }
 
         let (count, dark, note) = self.content.summary();
         let batches = self
@@ -490,6 +514,10 @@ impl<C: PrototypeContent> BrowserPrototype<C> {
         }
         self.render_ms =
             (started.elapsed().as_secs_f64() * 1000.0) - self.recomposition_ms - self.layout_ms;
+        if profiling {
+            let total_ms = started.elapsed().as_secs_f64() * 1000.0;
+            self.probe.record_frame(total_ms);
+        }
         if self.probing {
             let mut frame = TimingFrame {
                 gpu_breakdown: gpu_breakdown.take(),

@@ -8,7 +8,8 @@ use std::time::{Duration, Instant};
 
 use cove_devtools_protocol::control::Fault;
 use cove_devtools_protocol::{
-    ProfileFrame, ProfileHotspot, ProfileStack, ProfileStatus, UiHotspots, UiProfile,
+    ProfileFrame, ProfileHotspot, ProfileSource, ProfileStack, ProfileStatus, UiHotspots,
+    UiProfile,
 };
 use cove_profiling::{
     CpuSampler, MAX_SAMPLES, PlatformSupport, SampleConfig, SamplingError, SymbolizedFrame,
@@ -20,8 +21,7 @@ use serde_json::{Value, json};
 pub(crate) const MAX_DURATION_MS: u32 = 10_000;
 /// Highest rate the wire accepts.
 pub(crate) const MAX_HZ: u32 = 1_000;
-/// Most hotspots one query returns.
-pub(crate) const MAX_HOTSPOTS: usize = 200;
+pub(crate) use super::MAX_HOTSPOTS;
 /// Aggregated stacks in one profile answer.
 const MAX_STACKS: usize = 24;
 /// Frames recorded per sample.
@@ -230,6 +230,7 @@ impl Report {
     fn summary(&self, status: ProfileStatus) -> UiProfile {
         UiProfile {
             status,
+            source: ProfileSource::Sampler,
             thread: self.thread.clone(),
             hz: self.hz,
             duration_ms: self.duration_ms,
@@ -255,6 +256,7 @@ impl Report {
         let limit = limit.clamp(1, MAX_HOTSPOTS);
         UiHotspots {
             status,
+            source: ProfileSource::Sampler,
             thread: self.thread.clone(),
             hz: self.hz,
             duration_ms: self.duration_ms,
@@ -463,6 +465,7 @@ impl UiProfiler {
                     }
                     None => UiHotspots {
                         status: ProfileStatus::Idle,
+                        source: ProfileSource::Sampler,
                         thread: self.thread.clone(),
                         hz: self.hz,
                         duration_ms: 0.0,
@@ -498,6 +501,7 @@ impl UiProfiler {
         let samples_taken = self.live.load(Ordering::Relaxed);
         UiProfile {
             status: ProfileStatus::Running,
+            source: ProfileSource::Sampler,
             thread: self.thread.clone(),
             hz: self.hz,
             duration_ms: elapsed_ms,
@@ -522,6 +526,7 @@ impl UiProfiler {
             .map_or(0.0, |started| started.elapsed().as_secs_f64() * 1000.0);
         UiHotspots {
             status: ProfileStatus::Running,
+            source: ProfileSource::Sampler,
             thread: self.thread.clone(),
             hz: self.hz,
             duration_ms: elapsed_ms,

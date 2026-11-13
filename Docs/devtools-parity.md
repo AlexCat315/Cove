@@ -8,7 +8,7 @@
 | Component work | Performance Components and `query_ui_component_activity` rank live component scopes by rebuilds, uncached layout computations or actual paints. The mounted-tree totals change when owned nodes are removed. |
 | Semantics | Inspector's Semantics view and `query_ui_semantics` project the app's own semantic tree with hierarchy and input state. The diagnostic path omits text field drafts and secure values. |
 | GPU and compilation | Frames plots GPU beside UI and Encode, ranks slow frames by the largest stage, and reports measured cold shader/pipeline creation in an active frame slot. Pass-level and compositor attribution remain open. |
-| CPU sampling | Native implementations cover 64-bit macOS, iOS, Linux, Android and Windows. WASM CPU profiling still needs a browser-side sampling integration. |
+| CPU sampling | Native implementations cover 64-bit macOS, iOS, Linux, Android and Windows with a real sampler. WebAssembly cannot be suspended and sampled, so the browser reports measured frame phases as an `instrumented` profile instead of `unavailable`. |
 | Debugger | Local desktop LLDB attach and explicitly forwarded native debug stubs are supported. Log points and exception filters use the adapter's advertised capabilities. Device setup and native device acceptance remain open. |
 | Delivery and testing | Builds with `COVE_DEVTOOLS_ESBUILD` offer a bundled `/packed` entry. The default module graph remains available. The live acceptance script uses the same CLI and controller as the Inspector. |
 
@@ -256,7 +256,7 @@ These are Dart/Flutter mechanisms, recorded so they are not tracked as missing C
 | --- | --- | --- | --- | --- | --- | --- |
 | Inspector tree/query | verified live | shared Rust path, not exercised here | shared Rust path, not exercised here | shared Rust path, not exercised here | shared Rust path, not exercised here | browser probe path, not exercised here |
 | App frame capture / pick | Metal framebuffer | DX12 or Vulkan framebuffer | Vulkan framebuffer | Metal framebuffer | Vulkan framebuffer | WebGPU or Canvas2D canvas |
-| CPU sampler | verified (arm64) | unavailable (`crates/profiling/src/platform/unsupported.rs:8-55`) | unavailable (`crates/profiling/src/platform/unsupported.rs:8-55`) | unavailable | unavailable | unavailable (`profile/unavailable.rs`) |
+| CPU sampler | verified (arm64) | unsupported by the sampler (`crates/profiling/src/platform/unsupported.rs`) | unsupported by the sampler (`crates/profiling/src/platform/unsupported.rs`) | unsupported by the sampler | unsupported by the sampler | no sampler; `profile/wasm.rs` reports measured phases (`source: instrumented`) |
 | Memory counters | verified live | desktop provider, not exercised here | desktop provider, not exercised here | callback wired (`crates/hosts/src/android/integration/scene.rs:286-360`), not exercised | not verified | no provider (returns `null`) |
 | HTTP recording | verified by test | shared path | shared path | shared path | shared path | `cove-http` only; browser `fetch` not recorded |
 | WebSocket | absent | absent | absent | absent | absent | absent |

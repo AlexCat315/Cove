@@ -534,13 +534,16 @@ export function refreshProfileView(profile = state.performance.profile) {
   if (meta) meta.textContent = profileViewMeta(profile);
 }
 
-export function renderProfileTreeHead() {
+export function renderProfileTreeHead(profile) {
+  // A cooperative profile's unit is a measured millisecond, so the columns say
+  // which unit their numbers are in.
+  const instrumented = profile?.source === "instrumented";
   return el("div", { class: "profile-tree-head", attrs: { "aria-hidden": "true" } },
     el("span", { text: "" }),
     el("span", { text: "Function" }),
     el("span", { text: "Location" }),
-    el("span", { class: "num", text: "Self" }),
-    el("span", { class: "num", text: "Samples" }),
+    el("span", { class: "num", text: instrumented ? "Self ms" : "Self" }),
+    el("span", { class: "num", text: instrumented ? "Inclusive ms" : "Samples" }),
     el("span", { class: "num", text: "Self %" }),
     el("span", { class: "num", text: "%" }),
   );
@@ -610,10 +613,10 @@ export function renderProfileCallTree(profile, model) {
   if (!model.rows.length) return [emptyInline(profileEmptyMessage(profile, "call-tree"))];
   const needle = profileFilterNeedle(profile);
   const { rows, truncated } = profileVisibleTreeRows(tree.root, profile.expanded, needle);
-  const content = [renderProfileTreeHead()];
+  const content = [renderProfileTreeHead(profile)];
   content.push(el("div", { class: "profile-tree-root" },
-    el("span", { class: "profile-fn", text: tree.root.label }),
-    el("span", { class: "num", text: `${formatCount(tree.root.samples)} samples` }),
+    el("span", { class: "profile-fn", text: profile.source === "instrumented" ? "All frames" : tree.root.label }),
+    el("span", { class: "num", text: profile.source === "instrumented" ? `${formatCount(tree.root.samples)} ms` : `${formatCount(tree.root.samples)} samples` }),
     el("span", { class: "num", text: profileSharePercent(tree.root.samples, model.shareBase) }),
   ));
   if (!rows.length) {

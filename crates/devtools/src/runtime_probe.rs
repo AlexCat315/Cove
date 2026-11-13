@@ -77,6 +77,24 @@ impl RuntimeProbe {
         }
     }
 
+    /// Records one measured render phase for a cooperative CPU profile. The
+    /// browser runtime has no sampler, so it reports the phases it timed.
+    pub fn record_phase(&self, label: &'static str, ms: f64) {
+        crate::profile::record_phase(label, ms);
+    }
+
+    /// Closes a frame's cooperative entry with its measured total; the
+    /// difference from the recorded phases becomes the frame's self time.
+    pub fn record_frame(&self, total_ms: f64) {
+        crate::profile::record_frame(total_ms);
+    }
+
+    /// Whether a cooperative profile is recording, so the render path can skip
+    /// timings it would only discard.
+    pub fn profiling_phases(&self) -> bool {
+        crate::profile::is_recording()
+    }
+
     /// The UI thread whose CPU time `profile_start` samples.
     pub fn ui_thread_name(&self) -> &str {
         self.profile.thread_name()

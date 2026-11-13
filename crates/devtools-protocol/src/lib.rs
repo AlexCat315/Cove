@@ -425,10 +425,21 @@ payload!(ProfileHotspot {
     self_percent: f64,
     inclusive_percent: f64,
 });
+// Where a profile's numbers come from. `sampler` counts periodic stack samples
+// taken by suspending the UI thread; `instrumented` accumulates the durations
+// the runtime measured around its own frame phases, so `samples` count phase
+// occurrences and every millisecond is measured, never synthesized.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ProfileSource {
+    Sampler,
+    Instrumented,
+}
 // A bounded answer to `profile_read`. Stacks are aggregated by identical frame
 // sequence, not one record per sample; `stacks_truncated` reports the bound.
 payload!(UiProfile {
     status: ProfileStatus,
+    source: ProfileSource,
     thread: String,
     hz: u32,
     duration_ms: f64,
@@ -444,6 +455,7 @@ payload!(UiProfile {
 // time counts a frame once per sample, so child time does not inflate it.
 payload!(UiHotspots {
     status: ProfileStatus,
+    source: ProfileSource,
     thread: String,
     hz: u32,
     duration_ms: f64,
@@ -1019,6 +1031,7 @@ mod tests {
         };
         let profile = UiProfile {
             status: ProfileStatus::Ready,
+            source: ProfileSource::Sampler,
             thread: "main".into(),
             hz: 1000,
             duration_ms: 300.0,
@@ -1046,6 +1059,7 @@ mod tests {
 
         let hotspots = UiHotspots {
             status: ProfileStatus::Ready,
+            source: ProfileSource::Sampler,
             thread: "main".into(),
             hz: 1000,
             duration_ms: 300.0,

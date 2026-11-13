@@ -328,6 +328,7 @@ function normalizeProfilePayload(data, options = {}) {
     reason,
     thread: firstStringValue(root.thread, root.threadName, root.thread_name, outer.thread, outer.threadName),
     platform: firstStringValue(root.platform, outer.platform),
+    source: firstStringValue(root.source, root.profileSource, root.profile_source, outer.source),
     intervalMs,
     hz,
     elapsedMs,
@@ -360,6 +361,7 @@ export function applyProfilePayload(data, options = {}) {
   if (normalized.reason) profile.reason = normalized.reason;
   if (normalized.thread) profile.thread = normalized.thread;
   if (normalized.platform) profile.platform = normalized.platform;
+  if (normalized.source === "instrumented" || normalized.source === "sampler") profile.source = normalized.source;
   // An idle answer describes no run: its hz/interval are runtime defaults, not
   // the rate the user selected, so they must not overwrite the controls.
   const describesRun = ["sampling", "stopping", "complete"].includes(profile.status) || (normalized.totalSamples ?? 0) > 0;
@@ -402,7 +404,12 @@ export function applyProfilePayload(data, options = {}) {
     profile.completedAt = profile.completedAt || Date.now();
     if (profile.elapsedMs <= 0 && profile.reportedDurationMs !== null) profile.elapsedMs = profile.reportedDurationMs;
   }
-  if (profile.samplesTaken < profile.stackTotalSamples) profile.samplesTaken = profile.stackTotalSamples;
+  // Native stacks count samples, so a tree total can exceed the reported count.
+  // A cooperative profile counts measured milliseconds instead: the frame count
+  // must not be raised to that unit total.
+  if (profile.source !== "instrumented" && profile.samplesTaken < profile.stackTotalSamples) {
+    profile.samplesTaken = profile.stackTotalSamples;
+  }
   return normalized;
 }
 

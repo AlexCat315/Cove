@@ -170,6 +170,49 @@ function emptyProfile() {
   };
 }
 
+// A WebAssembly answer: measured phase durations, no sampling rate.
+function instrumentedProfile() {
+  const frame = { label: "frame", function: "Cove frame" };
+  return {
+    status: "ready",
+    source: "instrumented",
+    thread: "web",
+    hz: 0,
+    durationMs: 400,
+    sampleIntervalMs: 0,
+    samplesTaken: 24,
+    samplesDropped: 0,
+    // One unit is one measured millisecond: 86 + 170 + 144 = 400 ms.
+    retainedSamples: 400,
+    samplesPerSecond: 60,
+    stacksTruncated: false,
+    stacks: [
+      { samples: 86, percent: 21.5, frames: [frame] },
+      { samples: 170, percent: 42.5, frames: [frame, { label: "layout", function: "layout" }] },
+      { samples: 144, percent: 36.0, frames: [frame, { label: "encode", function: "encode" }] },
+    ],
+  };
+}
+
+function instrumentedHotspots(profile = instrumentedProfile()) {
+  return {
+    status: "ready",
+    source: "instrumented",
+    thread: profile.thread,
+    hz: 0,
+    durationMs: profile.durationMs,
+    sampleIntervalMs: 0,
+    samplesTaken: profile.samplesTaken,
+    samplesDropped: 0,
+    retainedSamples: profile.retainedSamples,
+    truncated: false,
+    hotspots: [
+      { label: "frame", function: "Cove frame", selfSamples: 24, inclusiveSamples: 24, selfMs: 86, inclusiveMs: 400, selfPercent: 21.5, inclusivePercent: 100 },
+      { label: "layout", function: "layout", selfSamples: 24, inclusiveSamples: 24, selfMs: 170, inclusiveMs: 170, selfPercent: 42.5, inclusivePercent: 42.5 },
+    ],
+  };
+}
+
 function rpcError(code, message) {
   return {
     jsonrpc: "2.0",
@@ -204,6 +247,7 @@ function createFake(mode) {
       throw rpcError("unsupported", "CPU sampling is not available on this platform. The sampler reports unsupported and synthesizes no samples.");
     }
     if (mode === "empty") return emptyProfile();
+    if (mode === "instrumented") return instrumentedProfile();
     if (mode === "truncated") return truncatedProfile();
     if (mode === "idle") {
       return {
@@ -238,14 +282,17 @@ function createFake(mode) {
     if (method === "start_ui_profile") {
       if (mode === "unsupported") return profileResponse();
       if (mode === "running") return runningProfile(flow.live);
+      if (mode === "instrumented") return instrumentedProfile();
       return readyProfile();
     }
     if (method === "stop_ui_profile") {
       if (mode === "running") flow.stopped = true;
+      if (mode === "instrumented") return instrumentedProfile();
       return mode === "empty" ? emptyProfile() : mode === "truncated" ? truncatedProfile() : readyProfile();
     }
     if (method === "query_ui_hotspots") {
       if (mode === "unsupported") throw rpcError("unsupported", "CPU sampling is not available on this platform.");
+      if (mode === "instrumented") return instrumentedHotspots();
       if (mode === "empty") return { ...emptyProfile(), hotspots: [] };
       if (mode === "truncated") return { ...truncatedProfile(), hotspots: [] };
       return hotspotsPayload();
@@ -492,7 +539,7 @@ async function page(cdp) {
       status: q(".perf-chip")?.textContent.trim() ?? "",
       stats: {
         elapsed: stat("Elapsed"),
-        taken: stat("Samples"),
+        taken: stat("Samples") || stat("Frames"),
         retained: stat("Retained"),
         dropped: stat("Dropped"),
         rate: stat("Observed rate"),
@@ -937,8 +984,37 @@ async function scenarioTruncated() {
   });
 }
 
+async function scenarioInstrumented() {
+  await runScenario("instrumented", async ({ cdp }) => {
+    await waitFor(cdp, "instrumented profile", `document.querySelector("#performance-profile .stat-row .perf-chip")?.textContent.trim() === "Ready"`);
+    const view = await page(cdp);
+    // A sample-rate control would claim a rate the browser cannot honour.
+    assert.equal(await cdp.evaluate(`document.getElementById("profile-hz") === null`), true, "no sample-rate select");
+    assert.match(await cdp.evaluate(`document.querySelector("#performance-profile .profile-controls")?.textContent || ""`), /Phase timing/);
+    assert.match(await cdp.evaluate(`document.getElementById("profile-start")?.title || ""`), /frame phase/);
+    assert.equal(view.stats.taken, "24 recorded", "the frame count is named, not a sample count");
+    assert.equal(view.stats.retained, "400 ms measured", "the retained unit is measured milliseconds");
+    assert.match(view.stats.rate, /60 frames\/s/);
+    assert.equal(await cdp.evaluate(`[...document.querySelectorAll("#performance-profile .stat-label")]
+      .some(label => label.textContent === "Interval")`), false, "no interval is reported without a rate");
+    assert.deepEqual(
+      view.treeRows.map(row => row.label).sort(),
+      ["Cove frame", "encode", "layout"],
+      "the measured frame expands into its phases",
+    );
+    const layoutRow = view.treeRows.find(row => row.label === "layout");
+    // The phase leaf carries its 170 measured milliseconds as an inclusive total
+    // and no self time of its own.
+    assert.deepEqual(layoutRow.cells, ["0", "170", "0.0%", "42.5%"], "phase units are measured milliseconds");
+    assert.match(view.root, /All frames/, "the shared root of the measured stacks is named for frames");
+    assert.match(view.root, /400 ms/, "the units add up to the measured frame time");
+    console.log("PASS  instrumented profile: phase timing replaces the sample rate and reports frames");
+  });
+}
+
 const scenarios = [
   ["ready", scenarioReady],
+  ["instrumented", scenarioInstrumented],
   ["idle", scenarioIdleRate],
   ["running", scenarioRunning],
   ["empty", scenarioEmpty],

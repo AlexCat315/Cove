@@ -87,7 +87,7 @@ function renderProfileBottomUp(profile, model) {
     content.push(...listProfileNotes(profileModelNotes(profile, model)));
     return content;
   }
-  content.push(renderProfileTreeHead());
+  content.push(renderProfileTreeHead(profile));
   let truncatedRows = false;
   const list = el("div", { class: "profile-tree", attrs: { role: "tree", "aria-label": "CPU profile bottom-up tree" } });
   for (const group of groups) {
@@ -511,7 +511,14 @@ function renderProfileViews(profile) {
   return el("div", { class: "panel-block profile-views" },
     el("div", { class: "panel-block-head" },
       el("h2", { text: "Profile views" }),
-      el("span", { class: "pane-meta", text: `${formatCount(profile.samplesTaken)} samples · ${formatCount(profile.retainedSamples || profile.stackTotalSamples)} retained` }),
+      el("span", {
+        class: "pane-meta",
+        // The browser runtime measures milliseconds, not samples: the unit is
+        // named so the counts cannot be read as stack samples.
+        text: profile.source === "instrumented"
+          ? `${formatCount(profile.samplesTaken)} frames · ${formatCount(profile.retainedSamples || profile.stackTotalSamples)} ms measured`
+          : `${formatCount(profile.samplesTaken)} samples · ${formatCount(profile.retainedSamples || profile.stackTotalSamples)} retained`,
+      }),
     ),
     el("div", { class: "panel-block-body" },
       renderProfileViewTabs(profile),

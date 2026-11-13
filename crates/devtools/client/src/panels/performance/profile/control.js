@@ -115,7 +115,9 @@ export async function startProfile() {
       profile.status = "sampling";
       if (!profile.startedAt) profile.startedAt = Date.now();
       startProfilePolling(profile);
-      toast(`Sampling ${profile.thread || "the UI thread"} at ${profile.hz} Hz. Stop when the operation is complete.`, "success", 5000);
+      toast(profile.source === "instrumented"
+        ? `Recording frame phases on ${profile.thread || "the UI thread"}. Stop when the operation is complete.`
+        : `Sampling ${profile.thread || "the UI thread"} at ${profile.hz} Hz. Stop when the operation is complete.`, "success", 5000);
     }
   } catch (error) {
     if (request !== profile.request || targetId !== state.targetId || state.performance.profile !== profile) return;
@@ -434,7 +436,11 @@ export function renderProfileControls(profile, options = {}) {
   const start = el("button", {
     class: "tool-button is-primary",
     props: { id: "profile-start", type: "button", disabled: disabled || sampling || profile.loading },
-    attrs: { title: "Start a real CPU sample of the UI thread" },
+    attrs: {
+      title: profile.source === "instrumented"
+        ? "Start recording the measured CPU time of each frame phase"
+        : "Start a real CPU sample of the UI thread",
+    },
     on: { click: () => startProfile() },
   }, icon("record"), el("span", { text: "Start profile" }));
   const stop = el("button", {
@@ -454,8 +460,15 @@ export function renderProfileControls(profile, options = {}) {
       },
     },
   }, icon("refresh"), el("span", { text: "Refresh" }));
+  // The WebAssembly runtime measures its frame phases instead of sampling stacks,
+  // so a sample rate would be a claim it cannot honour.
+  const instrumented = profile.source === "instrumented";
   return el("div", { class: "profile-controls" },
-    el("label", { class: "profile-field" }, "Sample rate", hz),
+    instrumented
+      ? el("div", { class: "profile-field" },
+        "Phase timing",
+        el("span", { class: "perf-chip is-info", attrs: { title: "The browser runtime measures its frame phases; there is no sample rate" }, text: "measured" }))
+      : el("label", { class: "profile-field" }, "Sample rate", hz),
     el("label", { class: "profile-field" }, "Duration", duration),
     el("div", { class: "profile-actions" },
       profile.status === "sampling"
@@ -469,6 +482,7 @@ export function renderProfileControls(profile, options = {}) {
 }
 
 export function renderProfileStats(profile) {
+  const instrumented = profile.source === "instrumented";
   const elapsed = profileElapsedMs(profile);
   const rate = profile.samplesPerSecond ?? (elapsed > 0 ? (profile.samplesTaken / (elapsed / 1000)) : null);
   const interval = profile.intervalMs ?? (profile.hz > 0 ? 1000 / profile.hz : null);
@@ -480,20 +494,22 @@ export function renderProfileStats(profile) {
       el("div", { class: "stat-label", text: "Elapsed" }),
       el("div", { class: "stat-value" }, fmtSeconds(elapsed))),
     el("div", { class: "stat" },
-      el("div", { class: "stat-label", text: "Samples" }),
-      el("div", { class: "stat-value" }, formatCount(profile.samplesTaken), el("small", { text: " taken" }))),
+      el("div", { class: "stat-label", text: instrumented ? "Frames" : "Samples" }),
+      el("div", { class: "stat-value" }, formatCount(profile.samplesTaken), el("small", { text: instrumented ? " recorded" : " taken" }))),
     el("div", { class: "stat" },
       el("div", { class: "stat-label", text: "Retained" }),
-      el("div", { class: "stat-value" }, formatCount(profile.retainedSamples || profile.samples.length || profile.stackTotalSamples), el("small", { text: " samples" }))),
+      el("div", { class: "stat-value" }, formatCount(profile.retainedSamples || profile.samples.length || profile.stackTotalSamples), el("small", { text: instrumented ? " ms measured" : " samples" }))),
     el("div", { class: "stat" },
       el("div", { class: "stat-label", text: "Dropped" }),
       el("div", { class: "stat-value" }, formatCount(profile.samplesDropped))),
     el("div", { class: "stat" },
       el("div", { class: "stat-label", text: "Observed rate" }),
-      el("div", { class: "stat-value" }, rate === null ? "—" : fmtNumber(rate, 0), el("small", { text: " samples/s" }))),
-    el("div", { class: "stat" },
-      el("div", { class: "stat-label", text: "Interval" }),
-      el("div", { class: "stat-value" }, interval === null ? `${fmtNumber(profile.hz, 0)}` : fmtNumber(interval, 2), el("small", { text: interval === null ? " Hz" : " ms" }))),
+      el("div", { class: "stat-value" }, rate === null ? "—" : fmtNumber(rate, 0), el("small", { text: instrumented ? " frames/s" : " samples/s" }))),
+    instrumented
+      ? null
+      : el("div", { class: "stat" },
+        el("div", { class: "stat-label", text: "Interval" }),
+        el("div", { class: "stat-value" }, interval === null ? `${fmtNumber(profile.hz, 0)}` : fmtNumber(interval, 2), el("small", { text: interval === null ? " Hz" : " ms" }))),
     el("div", { class: "stat" },
       el("div", { class: "stat-label", text: "Thread" }),
       el("div", { class: "stat-value", attrs: { title: profile.thread || "" } }, profile.thread || "—")),

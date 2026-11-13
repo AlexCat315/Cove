@@ -178,6 +178,9 @@ export function emptyProfile() {
     elapsedMs: 0,
     thread: "",
     platform: "",
+    // "sampler" for native stack sampling, "instrumented" for the WebAssembly
+    // runtime's measured frame phases.
+    source: "sampler",
     intervalMs: null,
     samplesTaken: 0,
     samplesDropped: 0,
