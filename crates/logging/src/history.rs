@@ -43,6 +43,17 @@ impl LogHistory {
         self.count = (self.count + 1).min(self.storage.len());
     }
 
+    /// Empties the replay window while keeping its capacity, so later records
+    /// reuse the same storage without a reallocation or a shift. Returns the
+    /// number of records removed.
+    pub fn clear(&mut self) -> usize {
+        let cleared = self.count;
+        self.storage.fill(None);
+        self.next = 0;
+        self.count = 0;
+        cleared
+    }
+
     pub fn resize(&mut self, capacity: usize) {
         if capacity == self.storage.len() {
             return;

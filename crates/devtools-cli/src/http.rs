@@ -114,10 +114,13 @@ fn read<T: DeserializeOwned>(request: &mut Request) -> Result<T, Fault> {
             "The request is malformed or exceeds the size limit.",
         )
     };
-    if request
-        .body_length()
-        .is_some_and(|length| length > MAX_MESSAGE)
-    {
+    if let Some(length) = request.body_length().filter(|length| *length > MAX_MESSAGE) {
+        // A probe result that outgrows the wire disconnects its target unless
+        // the cause is visible; report the route and the size.
+        eprintln!(
+            "cove-devtools: rejecting a {length}-byte request to {}",
+            request.url()
+        );
         return Err(invalid());
     }
     let mut bytes = Vec::new();

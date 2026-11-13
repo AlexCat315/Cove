@@ -71,6 +71,8 @@ function schedule() {
   requestAnimationFrame(() => {
     scheduled = false;
     const width = surface.clientWidth, height = surface.clientHeight;
+    const rect = surface.getBoundingClientRect();
+    wasm.cove_set_content_origin(rect.left + surface.clientLeft, rect.top + surface.clientTop);
     wasm.cove_set_scale(window.devicePixelRatio || 1);
     const outcome = wasm.cove_render(width, height);
     if (outcome === 1) { schedule(); return; }

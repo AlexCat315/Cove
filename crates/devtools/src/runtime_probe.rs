@@ -1,8 +1,14 @@
 //! Commands available inside every Cove runtime, independent of its transport.
-use crate::inspection::{DiagnosticStateSource, Diagnostics, SceneInspector, Tool};
+use crate::allocation_sites::AllocationSites;
+use crate::frame_analysis::{FrameAnalysis, Timeline};
+use crate::inspection::{DebugPaint, DiagnosticStateSource, Diagnostics, SceneInspector, Tool};
+use crate::profile::UiProfiler;
+use cove_core::Point;
 use cove_core::scene::{InvalidationLog, NodeTree, RenderTree};
 use cove_devtools_protocol::control::{Fault, ProbeCommand};
-use cove_devtools_protocol::{Envelope, TimingFrame};
+use cove_devtools_protocol::{
+    ContentGeometry, Envelope, MAX_TREE_PAGE_BYTES, NodeHit, NodePoint, TimingFrame,
+};
 use serde_json::{Value, json};
 use std::cell::RefCell;
 use std::collections::VecDeque;
@@ -11,14 +17,22 @@ use std::sync::Arc;
 
 pub type Resize = Rc<dyn Fn(f64, f64) -> Result<(), String>>;
 pub type Environment = Rc<dyn Fn(Value) -> Result<Value, String>>;
+/// Reports where the runtime content sits in the host's window-server space.
+/// Hosts that cannot observe it leave this absent, and the probe answers
+/// `unavailable` rather than inventing coordinates.
+pub type ContentGeometrySource = Rc<dyn Fn() -> Result<ContentGeometry, String>>;
 
 pub struct RuntimeProbe {
     diagnostics: Diagnostics,
     pub scene: SceneInspector,
     pub resize: Option<Resize>,
     pub environment: Option<Environment>,
+    pub content_geometry: Option<ContentGeometrySource>,
+    timeline: Timeline,
     timing: VecDeque<TimingFrame>,
     sequence: u64,
+    profile: UiProfiler,
+    allocation_sites: AllocationSites,
 }
 
 impl RuntimeProbe {
@@ -28,14 +42,27 @@ impl RuntimeProbe {
         render_tree: Option<RenderTree>,
         state: Option<Rc<dyn DiagnosticStateSource>>,
     ) -> Self {
+        let timeline = tree.borrow().timeline.clone();
+        // The probe is built on the UI thread; the CPU profiler follows that
+        // thread by the name Rust gave it, so the sampler can find it later.
+        let thread = std::thread::current().name().unwrap_or("main").to_owned();
         Self {
             diagnostics: Diagnostics::with_state_source(tree.clone(), state),
             scene: SceneInspector::new(tree, invalidation, render_tree),
             resize: None,
             environment: None,
+            content_geometry: None,
+            timeline,
             timing: VecDeque::new(),
             sequence: 0,
+            profile: UiProfiler::new(thread),
+            allocation_sites: AllocationSites::new(),
         }
+    }
+
+    /// The UI thread whose CPU time `profile_start` samples.
+    pub fn ui_thread_name(&self) -> &str {
+        self.profile.thread_name()
     }
 
     pub fn diagnostics(&self) -> &Diagnostics {
@@ -43,12 +70,37 @@ impl RuntimeProbe {
     }
 
     pub fn capabilities(&self) -> Vec<String> {
-        let mut capabilities = vec!["tree", "diagnostics", "style", "trace", "timing", "network"];
+        let mut capabilities = vec![
+            "tree",
+            "tree_page",
+            "diagnostics",
+            "style",
+            "trace",
+            "timing",
+            "frame_analysis",
+            "network",
+            "network_control",
+            "inspect_nodes",
+            "debug_paint",
+            "baselines",
+            "oversized_images",
+            "repaint_highlight",
+            "animation_speed",
+        ];
         if self.resize.is_some() {
             capabilities.push("resize");
         }
         if self.environment.is_some() {
             capabilities.push("environment");
+        }
+        if self.content_geometry.is_some() {
+            capabilities.push("content_geometry");
+        }
+        if crate::profile::unavailable_reason().is_none() {
+            capabilities.push("cpu_profile");
+        }
+        if crate::allocation_sites::unavailable_reason().is_none() {
+            capabilities.push("allocation_sites");
         }
         capabilities.into_iter().map(str::to_owned).collect()
     }
@@ -73,7 +125,33 @@ impl RuntimeProbe {
         let serialize =
             |result: serde_json::Result<Value>| result.map_err(|error| invalid(error.to_string()));
         match command {
-            ProbeCommand::Tree => serialize(serde_json::to_value(self.scene.snapshot())),
+            ProbeCommand::Tree => serialize(serde_json::to_value(self.scene.summary_snapshot())),
+            ProbeCommand::TreePage {
+                node_id,
+                depth,
+                limit,
+            } => {
+                let build = |limit: usize| {
+                    self.scene
+                        .tree_page(node_id.as_deref(), depth, limit)
+                        .map_err(|error| Fault::new(error.code(), error.to_string()))
+                };
+                let mut page = build(limit)?;
+                let mut bytes =
+                    serde_json::to_vec(&page).map_err(|error| invalid(error.to_string()))?;
+                // The agent toolbox refuses a result above 512 KiB. Shrink the
+                // node cap until the serialised page fits, keeping the page
+                // honest about the cut.
+                while bytes.len() > MAX_TREE_PAGE_BYTES && page.node_count > 1 {
+                    let scaled = page.node_count.saturating_mul(MAX_TREE_PAGE_BYTES) / bytes.len();
+                    let next = scaled.clamp(1, page.node_count - 1);
+                    page = build(next)?;
+                    page.truncated = true;
+                    bytes =
+                        serde_json::to_vec(&page).map_err(|error| invalid(error.to_string()))?;
+                }
+                serialize(serde_json::to_value(page))
+            }
             ProbeCommand::Select { node_id } => {
                 if !self.scene.editor.select(node_id.as_deref()) {
                     return Err(Fault::new(
@@ -82,6 +160,46 @@ impl RuntimeProbe {
                     ));
                 }
                 serialize(serde_json::to_value(self.scene.editor.state()))
+            }
+            ProbeCommand::NodeAt { x, y } => {
+                if !x.is_finite() || !y.is_finite() {
+                    return Err(invalid("The hit-test point must be finite.".into()));
+                }
+                let point = Point {
+                    x: x as f32,
+                    y: y as f32,
+                };
+                let hit = self.scene.node_at(point).map_or_else(
+                    || NodeHit {
+                        node_id: None,
+                        path: Vec::new(),
+                        local_point: None,
+                        absolute_frame: None,
+                    },
+                    |hit| NodeHit {
+                        node_id: Some(SceneInspector::identifier(&hit.node)),
+                        path: hit.path.iter().map(SceneInspector::identifier).collect(),
+                        local_point: Some(NodePoint {
+                            x: hit.local_point.x as f64,
+                            y: hit.local_point.y as f64,
+                        }),
+                        absolute_frame: Some(crate::inspection::encode_frame(
+                            hit.node.absolute_frame(),
+                        )),
+                    },
+                );
+                serialize(serde_json::to_value(hit))
+            }
+            ProbeCommand::ContentGeometry => {
+                let geometry = self.content_geometry.as_ref().ok_or_else(unavailable)?()
+                    .map_err(|message| Fault::new("unavailable", message))?;
+                if !geometry.is_valid() {
+                    return Err(Fault::new(
+                        "unavailable",
+                        "The host reported content geometry that is not finite and positive.",
+                    ));
+                }
+                serialize(serde_json::to_value(geometry))
             }
             ProbeCommand::Read { name, arguments } => {
                 let tool = Tool::parse(&name)
@@ -152,6 +270,51 @@ impl RuntimeProbe {
                 "frames": self.timing.iter().filter(|frame| frame.frame > after).collect::<Vec<_>>(),
                 "dropped": self.timing.front().map_or(0, |frame| frame.frame.saturating_sub(after).saturating_sub(1)),
             })),
+            ProbeCommand::AnalyzeUiFrame { frame } => {
+                let analysis = match self.timing.iter().find(|timing| timing.frame == frame) {
+                    Some(timing) => FrameAnalysis::for_frame(timing, &self.timeline.borrow()),
+                    None => FrameAnalysis::not_retained(frame, self.timing.len()),
+                };
+                serialize(serde_json::to_value(analysis))
+            }
+            ProbeCommand::ProfileStart { hz, duration_ms } => self.profile.start(hz, duration_ms),
+            ProbeCommand::ProfileStop => self.profile.stop(),
+            ProbeCommand::ProfileRead => self.profile.read(),
+            ProbeCommand::ProfileHotspots { limit } => self.profile.hotspots(limit),
+            ProbeCommand::AllocationStart { rate } => self.allocation_sites.start(rate),
+            ProbeCommand::AllocationStop => self.allocation_sites.stop(),
+            ProbeCommand::AllocationSites { limit } => self.allocation_sites.sites(limit),
+            ProbeCommand::DebugPaint { guidelines } => {
+                let applied = self.scene.editor.set_debug_paint(DebugPaint { guidelines });
+                serialize(serde_json::to_value(applied))
+            }
+            ProbeCommand::Baselines { enabled } => {
+                let applied = self.scene.editor.set_baselines(enabled);
+                Ok(json!({"baselines": applied}))
+            }
+            ProbeCommand::OversizedImages { enabled } => {
+                let applied = self.scene.editor.set_oversized_images(enabled);
+                Ok(json!({"enabled": applied}))
+            }
+            ProbeCommand::RepaintHighlight { enabled } => {
+                let applied = self.scene.editor.set_repaint_highlight(enabled);
+                Ok(json!({"enabled": applied}))
+            }
+            ProbeCommand::AnimationScale { scale } => {
+                if !scale.is_finite() {
+                    return Err(invalid("The animation time scale must be finite.".into()));
+                }
+                let applied = cove_core::scene::set_animation_time_scale(scale);
+                Ok(json!({"scale": applied}))
+            }
+            ProbeCommand::NetworkRecording { enabled } => {
+                cove_http::recording::set_enabled(enabled);
+                Ok(json!({"enabled": cove_http::recording::is_enabled()}))
+            }
+            ProbeCommand::ClearNetwork => Ok(json!({
+                "cleared": cove_http::recording::clear(),
+                "limit": cove_http::recording::MAX_RECORDS,
+            })),
             ProbeCommand::Logs { after } => {
                 let mut logs = cove_logging::LogSystem::snapshot(cove_logging::LogQuery {
                     after_sequence: after,
@@ -166,11 +329,24 @@ impl RuntimeProbe {
                 }
                 serialize(serde_json::to_value(logs))
             }
+            ProbeCommand::ClearLogs => {
+                let cleared = cove_logging::LogSystem::clear_history();
+                let logs = cove_logging::LogSystem::snapshot(cove_logging::LogQuery::default());
+                Ok(json!({
+                    "cleared": cleared,
+                    "dropped": logs.dropped,
+                    "firstAvailableSequence": logs.first_available_sequence,
+                }))
+            }
         }
     }
 
     pub fn disconnect(&mut self) {
         self.scene.editor.reset();
         self.diagnostics.reset_captures();
+        self.profile.reset();
+        self.allocation_sites.reset();
+        cove_core::scene::reset_animation_time_scale();
+        cove_http::recording::reset();
     }
 }

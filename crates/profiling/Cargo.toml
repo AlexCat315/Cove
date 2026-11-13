@@ -1,0 +1,18 @@
+[package]
+name = "cove-profiling"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "Bounded in-process CPU sampling and DWARF symbolization for Cove DevTools"
+
+[dependencies]
+addr2line.workspace = true
+thiserror.workspace = true
+
+[target.'cfg(target_os = "macos")'.dependencies]
+libc.workspace = true
+mach2.workspace = true
+
+[lints]
+workspace = true

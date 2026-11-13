@@ -1,5 +1,8 @@
 //! Cove DevTools controller and its MCP client.
+mod app_size;
 mod controller;
+mod debugger;
+mod deep_links;
 mod http;
 mod platform;
 mod registry;

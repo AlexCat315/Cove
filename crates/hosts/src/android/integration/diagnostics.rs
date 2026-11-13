@@ -1,8 +1,8 @@
 //! Translation of Android/Integration/Diagnostics.swift.
 
 use crate::desktop::diagnostics::integration::{
-    DevToolsConfiguration, DiagnosticMemorySnapshot, DiagnosticsCallbacks, DiagnosticsSession,
-    NullDiagnosticsSession, take_factory,
+    ContentGeometry, DevToolsConfiguration, DiagnosticMemorySnapshot, DiagnosticsCallbacks,
+    DiagnosticsSession, NullDiagnosticsSession, take_factory,
 };
 use cove_composition::ViewGraph;
 use cove_core::DrawList;
@@ -16,6 +16,7 @@ pub struct AndroidDiagnosticsHooks {
     pub environment: Option<
         Rc<dyn Fn(&cove_core::EnvironmentRequest) -> Result<cove_core::Environment, String>>,
     >,
+    pub content_geometry: Option<Rc<dyn Fn() -> Result<ContentGeometry, String>>>,
 }
 
 pub struct AndroidDiagnostics {
@@ -43,6 +44,7 @@ impl AndroidDiagnostics {
                 // A surface fills the screen; the system owns its size.
                 resize_window: None,
                 environment: hooks.environment,
+                content_geometry: hooks.content_geometry,
             };
             factory(config, tree, graph, schedule, callbacks)?
         } else {

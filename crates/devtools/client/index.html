@@ -1,45 +1,659 @@
 <!doctype html>
 <html lang="en">
+<head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="light dark">
 <title>Cove DevTools</title>
+<script>
+  try {
+    const stored = localStorage.getItem("cove.devtools.theme") || "auto";
+    const dark = stored === "dark" || (stored === "auto" && matchMedia("(prefers-color-scheme: dark)").matches);
+    document.documentElement.dataset.theme = dark ? "dark" : "light";
+  } catch {}
+</script>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230b63ce'/%3E%3Cpath d='M8 9h4v14H8zM14 9h4v14h-4zM20 9h4v14h-4z' fill='white' opacity='.9'/%3E%3C/svg%3E">
 <link rel="stylesheet" href="/inspector.css">
-<header>
-  <div class="toolbar">
-    <strong>Cove DevTools</strong>
-    <select id="targets" aria-label="Target"><option value="">Select a target</option></select>
-    <button id="refresh">Refresh</button>
-    <span id="status" role="status"></span>
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to content</a>
+
+<svg class="icon-sprite" aria-hidden="true" focusable="false">
+  <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M20 11a8 8 0 1 0-.6 4.2"/><path d="M20 4v7h-7"/></symbol>
+  <symbol id="i-search" viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m15.5 15.5 4.5 4.5"/></symbol>
+  <symbol id="i-select" viewBox="0 0 24 24"><path d="m5 3 6.5 17 2.4-6.1L20 11.5 5 3Z"/></symbol>
+  <symbol id="i-pick" viewBox="0 0 24 24"><circle cx="12" cy="12" r="7"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/><circle cx="12" cy="12" r="1.5" fill="currentColor" stroke="none"/></symbol>
+  <symbol id="i-guidelines" viewBox="0 0 24 24"><rect x="2.5" y="3.5" width="19" height="17" rx="2" stroke-dasharray="3 2"/><rect x="7" y="8" width="10" height="8" rx="1" stroke-dasharray="3 2"/></symbol>
+  <symbol id="i-baseline" viewBox="0 0 24 24"><path d="M5 6h9M5 10h14M5 14h7"/><path d="M3 18.5h18" stroke-dasharray="3 2"/></symbol>
+  <symbol id="i-speed" viewBox="0 0 24 24"><path d="M4.6 18.5a8.6 8.6 0 1 1 14.8 0"/><path d="m12 13.5 4.1-4.1"/><circle cx="12" cy="13.5" r="1.3" fill="currentColor" stroke="none"/><path d="M4.2 13.5h2.1M17.7 13.5h2.1"/></symbol>
+  <symbol id="i-oversized" viewBox="0 0 24 24"><rect x="3" y="6" width="14" height="12" rx="2"/><circle cx="7.5" cy="10.5" r="1.5"/><path d="m3.5 16 3.5-3.5 3 3 2.5-2 3 2.5"/><path d="M16 3h5v5M21 3l-5 5"/></symbol>
+  <symbol id="i-repaint" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2" stroke-dasharray="3 2"/><path d="M7 16.5 10.5 7.5M12 16.5 15.5 7.5M17 16.5 20 9.5"/></symbol>
+  <symbol id="i-camera" viewBox="0 0 24 24"><path d="M4 8h3l1.5-2h7L17 8h3a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1Z"/><circle cx="12" cy="13" r="3.4"/></symbol>
+  <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 3v11"/><path d="m7.5 9.5 4.5 4.5 4.5-4.5"/><path d="M4 19h16"/></symbol>
+  <symbol id="i-upload" viewBox="0 0 24 24"><path d="M12 20V9"/><path d="m7.5 13.5 4.5-4.5 4.5 4.5"/><path d="M4 4h16"/></symbol>
+  <symbol id="i-network" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3c2.5 2.5 3.8 5.6 3.8 9S14.5 18.5 12 21c-2.5-2.5-3.8-5.6-3.8-9S9.5 5.5 12 3Z"/></symbol>
+  <symbol id="i-logs" viewBox="0 0 24 24"><path d="M6 5h12M6 10h12M6 15h8M6 20h5"/></symbol>
+  <symbol id="i-trash" viewBox="0 0 24 24"><path d="M4 7h16"/><path d="M9 7V4h6v3"/><path d="m6.5 7 1 13h9l1-13"/><path d="M10 11v5M14 11v5"/></symbol>
+  <symbol id="i-timer" viewBox="0 0 24 24"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 1.5"/><path d="M9 2h6"/></symbol>
+  <symbol id="i-trace" viewBox="0 0 24 24"><path d="M3 12h3l2.5-7 4 14 3-9 2 2h3.5"/></symbol>
+  <symbol id="i-chevron" viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></symbol>
+  <symbol id="i-copy" viewBox="0 0 24 24"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/></symbol>
+  <symbol id="i-close" viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18"/></symbol>
+  <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M19.1 4.9l-1.4 1.4M6.3 17.7l-1.4 1.4"/></symbol>
+  <symbol id="i-moon" viewBox="0 0 24 24"><path d="M20 14.5A8.5 8.5 0 0 1 9.5 4a8.5 8.5 0 1 0 10.5 10.5Z"/></symbol>
+  <symbol id="i-auto" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 3v18"/><path d="M12 3a9 9 0 0 1 0 18Z" fill="currentColor" stroke="none"/></symbol>
+  <symbol id="i-keyboard" viewBox="0 0 24 24"><rect x="2.5" y="6" width="19" height="12" rx="2"/><path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M6 14h.01M18 14h.01M9 14h6"/></symbol>
+  <symbol id="i-hierarchy" viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="5" rx="1"/><rect x="3" y="16" width="6" height="5" rx="1"/><rect x="15" y="16" width="6" height="5" rx="1"/><path d="M12 8v4M6 16v-2h12v2"/></symbol>
+  <symbol id="i-collapse" viewBox="0 0 24 24"><path d="m7 10 5 5 5-5"/><path d="m7 5 5 5 5-5"/></symbol>
+  <symbol id="i-copy-path" viewBox="0 0 24 24"><path d="M4 5h7l2 2h7v12H4Z"/><path d="M8 12h8M8 16h5"/></symbol>
+  <symbol id="i-record" viewBox="0 0 24 24"><circle cx="12" cy="12" r="6" fill="currentColor" stroke="none"/></symbol>
+  <symbol id="i-stop" viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="1.5" fill="currentColor" stroke="none"/></symbol>
+  <symbol id="i-play" viewBox="0 0 24 24"><path d="M8 5v14l11-7Z"/></symbol>
+  <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v5"/><circle cx="12" cy="8" r=".8" fill="currentColor" stroke="none"/></symbol>
+  <symbol id="i-alert" viewBox="0 0 24 24"><path d="M10.3 3.8 2.9 17a2 2 0 0 0 1.7 3h14.8a2 2 0 0 0 1.7-3L13.7 3.8a2 2 0 0 0-3.4 0Z"/><path d="M12 9v4"/><circle cx="12" cy="16.5" r=".8" fill="currentColor" stroke="none"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12.5 4.5 4.5L19 7.5"/></symbol>
+  <symbol id="i-link" viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.1 0l2.1-2.1a5 5 0 0 0-7.1-7.1L11 5"/><path d="M14 11a5 5 0 0 0-7.1 0l-2.1 2.1a5 5 0 0 0 7.1 7.1L13 19"/></symbol>
+  <symbol id="i-device" viewBox="0 0 24 24"><rect x="4" y="3" width="16" height="13" rx="2"/><path d="M9 21h6M12 16v5"/></symbol>
+  <symbol id="i-memory" viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="2"/><path d="M9 2v4M15 2v4M9 18v4M15 18v4M2 9h4M2 15h4M18 9h4M18 15h4"/></symbol>
+  <symbol id="i-package" viewBox="0 0 24 24"><path d="m12 3 8 4.5v9L12 21l-8-4.5v-9L12 3Z"/><path d="m4 7.5 8 4.5 8-4.5M12 12v9"/></symbol>
+  <symbol id="i-empty" viewBox="0 0 24 24"><rect x="3.5" y="4.5" width="17" height="15" rx="2"/><path d="M3.5 10h17M9 10v9.5"/></symbol>
+  <symbol id="i-bug" viewBox="0 0 24 24"><rect x="8" y="7" width="8" height="12" rx="4"/><path d="M9.5 7a2.5 2.5 0 0 1 5 0"/><path d="M8 11H4M16 11h4M8 15H4.5M16 15h3.5M8 19l-2.5 2M16 19l2.5 2M12 7V3"/></symbol>
+  <symbol id="i-pause" viewBox="0 0 24 24"><rect x="7" y="5" width="3.5" height="14" rx="1"/><rect x="13.5" y="5" width="3.5" height="14" rx="1"/></symbol>
+  <symbol id="i-step-over" viewBox="0 0 24 24"><path d="M5 16a7 7 0 0 1 7-7h5"/><path d="m14 6 3 3-3 3"/><circle cx="5" cy="19" r="1.6"/></symbol>
+  <symbol id="i-step-into" viewBox="0 0 24 24"><path d="M12 3v10"/><path d="m8 9 4 4 4-4"/><circle cx="12" cy="19" r="1.6"/></symbol>
+  <symbol id="i-step-out" viewBox="0 0 24 24"><path d="M12 13V3"/><path d="m8 7 4-4 4 4"/><circle cx="12" cy="19" r="1.6"/></symbol>
+  <symbol id="i-breakpoint" viewBox="0 0 24 24"><circle cx="12" cy="12" r="5" fill="currentColor" stroke="none"/></symbol>
+</svg>
+
+<header class="app-header">
+  <div class="brand" aria-label="Cove DevTools">
+    <span class="brand-mark" aria-hidden="true"><span></span><span></span><span></span></span>
+    <span class="brand-name">Cove</span>
+    <span class="brand-product">DevTools</span>
   </div>
-  <div id="binding" class="toolbar" hidden>
-    <select id="platform-target" aria-label="Platform target"></select>
-    <button id="bind">Bind</button>
+
+  <div class="target-bar">
+    <label class="sr-only" for="targets">Target</label>
+    <select id="targets" aria-label="Target" disabled>
+      <option value="">Loading targets…</option>
+    </select>
+    <button id="refresh" class="icon-button" type="button" title="Refresh targets (R)" aria-label="Refresh targets">
+      <svg class="icon" aria-hidden="true"><use href="#i-refresh"></use></svg>
+    </button>
+    <span id="connection" class="status-pill is-offline" role="status">
+      <span class="status-dot" aria-hidden="true"></span>
+      <span id="connection-text">Disconnected</span>
+    </span>
+  </div>
+
+  <div id="permissions" class="permission-group" role="group" aria-label="System permissions"></div>
+
+  <div class="header-actions">
+    <button id="request-permissions" class="text-button" type="button" hidden>Request access</button>
+    <button id="shortcuts-button" class="icon-button" type="button" title="Keyboard shortcuts (?)" aria-label="Keyboard shortcuts">
+      <svg class="icon" aria-hidden="true"><use href="#i-keyboard"></use></svg>
+    </button>
+    <button id="theme-button" class="icon-button" type="button" title="Theme: follow system" aria-label="Theme: follow system">
+      <svg class="icon" aria-hidden="true"><use id="theme-icon" href="#i-auto"></use></svg>
+    </button>
   </div>
 </header>
-<main>
-  <section aria-label="Target capture">
-    <select id="scope" aria-label="Capture scope">
-      <option value="window">Window</option><option value="display">Display</option>
-    </select>
-    <button id="snap" disabled>Capture</button>
-    <a id="save" download="cove-capture.png" hidden>Save PNG</a>
-    <input id="key" aria-label="Key" size="9" value="Enter">
-    <button id="press" disabled>Press</button>
-    <input id="text" aria-label="Text" size="12">
-    <button id="type" disabled>Type</button>
-    <img id="capture" alt="Target screenshot" draggable="false" hidden>
-  </section>
-  <section aria-label="Diagnostics">
-    <button id="tree" disabled>Components</button>
-    <button id="native" disabled>Native UI</button>
-    <button id="logs" disabled>Logs</button>
-    <button id="network" disabled>Network</button>
-    <button id="timing" disabled>Timings</button>
-    <button id="trace-start" disabled>Start trace</button>
-    <button id="trace-stop" disabled>Stop trace</button>
-    <div id="nodes" hidden></div>
-    <pre id="details" tabindex="0"></pre>
-  </section>
-</main>
+
+<div id="permission-banner" class="alert alert-warning" role="alert" hidden>
+  <svg class="icon" aria-hidden="true"><use href="#i-alert"></use></svg>
+  <span id="permission-banner-text"></span>
+  <button id="permission-banner-action" class="text-button" type="button">Request access</button>
+</div>
+
+<div id="bind-banner" class="alert alert-info" role="status" hidden>
+  <svg class="icon" aria-hidden="true"><use href="#i-link"></use></svg>
+  <span id="bind-message">This runtime has no capture target. Bind its window to enable screenshots and picking.</span>
+  <label class="inline-field" for="bind-target">Window</label>
+  <select id="bind-target"></select>
+  <button id="bind-button" class="tool-button" type="button">Bind</button>
+</div>
+
+<div class="app-body">
+  <nav class="rail" aria-label="DevTools sections">
+    <div class="rail-tabs" role="tablist" aria-orientation="vertical" aria-label="DevTools sections">
+      <button class="rail-tab" id="tab-inspector" data-view="inspector" role="tab" aria-selected="true" aria-controls="view-inspector" type="button">
+        <svg class="icon" aria-hidden="true"><use href="#i-hierarchy"></use></svg><span>Inspector</span>
+      </button>
+      <button class="rail-tab" id="tab-network" data-view="network" role="tab" aria-selected="false" aria-controls="view-network" tabindex="-1" type="button">
+        <svg class="icon" aria-hidden="true"><use href="#i-network"></use></svg><span>Network</span><span class="rail-badge" id="network-badge" hidden></span>
+      </button>
+      <button class="rail-tab" id="tab-logs" data-view="logs" role="tab" aria-selected="false" aria-controls="view-logs" tabindex="-1" type="button">
+        <svg class="icon" aria-hidden="true"><use href="#i-logs"></use></svg><span>Logs</span><span class="rail-badge" id="logs-badge" hidden></span>
+      </button>
+      <button class="rail-tab" id="tab-performance" data-view="performance" role="tab" aria-selected="false" aria-controls="view-performance" tabindex="-1" type="button">
+        <svg class="icon" aria-hidden="true"><use href="#i-timer"></use></svg><span>Performance</span><span class="rail-recording" id="performance-recording-dot" hidden aria-label="Trace recording"></span>
+      </button>
+      <button class="rail-tab" id="tab-memory" data-view="memory" role="tab" aria-selected="false" aria-controls="view-memory" tabindex="-1" type="button">
+        <svg class="icon" aria-hidden="true"><use href="#i-memory"></use></svg><span>Memory</span>
+      </button>
+      <button class="rail-tab" id="tab-app-size" data-view="app-size" role="tab" aria-selected="false" aria-controls="view-app-size" tabindex="-1" type="button">
+        <svg class="icon" aria-hidden="true"><use href="#i-package"></use></svg><span>App Size</span>
+      </button>
+      <button class="rail-tab" id="tab-deep-links" data-view="deep-links" role="tab" aria-selected="false" aria-controls="view-deep-links" tabindex="-1" type="button">
+        <svg class="icon" aria-hidden="true"><use href="#i-link"></use></svg><span>Deep Links</span>
+      </button>
+      <button class="rail-tab" id="tab-debugger" data-view="debugger" role="tab" aria-selected="false" aria-controls="view-debugger" tabindex="-1" type="button">
+        <svg class="icon" aria-hidden="true"><use href="#i-bug"></use></svg><span>Debugger</span><span class="rail-paused" id="debugger-badge" hidden></span>
+      </button>
+    </div>
+    <div class="rail-meta" id="rail-meta"></div>
+  </nav>
+
+  <main id="main" tabindex="-1">
+    <section id="view-inspector" class="view inspector-view" role="tabpanel" aria-labelledby="tab-inspector">
+      <div id="setup-state" class="setup-state" hidden>
+        <div class="setup-card">
+          <div class="setup-icon" aria-hidden="true"><svg class="icon"><use href="#i-device"></use></svg></div>
+          <h1>Connect to the controller</h1>
+          <p>Open the Inspector link printed by <code>cove-devtools serve</code>, or paste its session token.</p>
+          <form id="token-form" class="token-form">
+            <label for="token-input">Session token</label>
+            <div class="token-row">
+              <input id="token-input" type="password" autocomplete="off" spellcheck="false" placeholder="Bearer token">
+              <button class="tool-button is-primary" type="submit">Connect</button>
+            </div>
+          </form>
+          <p id="setup-error" class="form-error" role="alert" hidden></p>
+        </div>
+      </div>
+
+      <div id="inspector-content" hidden>
+        <div class="inspector-toolbar">
+          <div class="segmented" role="group" aria-label="Selection mode">
+            <button id="mode-select" type="button" aria-pressed="true" title="Browse the component tree" aria-label="Select components from the tree">
+              <svg class="icon" aria-hidden="true"><use href="#i-select"></use></svg><span>Select</span>
+            </button>
+            <button id="mode-pick" type="button" aria-pressed="false" title="Pick a component in a screenshot" aria-label="Pick a component at a point">
+              <svg class="icon" aria-hidden="true"><use href="#i-pick"></use></svg><span>Pick</span>
+            </button>
+          </div>
+
+          <button id="repaint-highlight-button" class="tool-button" type="button" aria-pressed="false" title="Highlight repainted nodes on the target" aria-label="Highlight repaints" disabled>
+            <svg class="icon" aria-hidden="true"><use href="#i-repaint"></use></svg><span>Highlight repaints</span>
+          </button>
+
+          <button id="guidelines-button" class="tool-button" type="button" aria-pressed="false" title="Show layout guidelines on the target" aria-label="Layout guidelines" disabled>
+            <svg class="icon" aria-hidden="true"><use href="#i-guidelines"></use></svg><span>Guidelines</span>
+          </button>
+
+          <button id="baselines-button" class="tool-button" type="button" aria-pressed="false" title="Show text baselines on the target" aria-label="Text baselines" disabled>
+            <svg class="icon" aria-hidden="true"><use href="#i-baseline"></use></svg><span>Baselines</span>
+          </button>
+
+          <button id="slow-animations-button" class="tool-button" type="button" aria-pressed="false" title="Slow animations to 0.2× the runtime time scale" aria-label="Slow animations" disabled>
+            <svg class="icon" aria-hidden="true"><use href="#i-speed"></use></svg><span>Slow animations</span>
+          </button>
+
+          <button id="oversized-images-button" class="tool-button" type="button" aria-pressed="false" title="Highlight images decoded larger than their display rect" aria-label="Oversized images" disabled>
+            <svg class="icon" aria-hidden="true"><use href="#i-oversized"></use></svg><span>Oversized images</span>
+          </button>
+
+          <label class="search-field" for="tree-search">
+            <svg class="icon" aria-hidden="true"><use href="#i-search"></use></svg>
+            <input id="tree-search" type="search" placeholder="Search components" autocomplete="off" spellcheck="false" aria-label="Search components">
+            <kbd>/</kbd>
+          </label>
+
+          <div class="filter-group" role="group" aria-label="Component filters">
+            <label class="check"><input id="filter-anchors" type="checkbox" checked> Components</label>
+            <label class="check"><input id="filter-primitives" type="checkbox" checked> Primitives</label>
+          </div>
+
+          <div class="toolbar-spacer"></div>
+
+          <label class="inline-field" for="capture-scope">Scope</label>
+          <select id="capture-scope" aria-label="Capture scope">
+            <option value="window">Window</option>
+            <option value="display">Display</option>
+          </select>
+          <button id="capture-button" class="tool-button" type="button" title="Capture the target window or display" aria-label="Capture screenshot" disabled>
+            <svg class="icon" aria-hidden="true"><use href="#i-camera"></use></svg><span>Capture</span>
+          </button>
+          <button id="node-shot-button" class="tool-button" type="button" title="Capture the selected node (requires inspect_nodes)" aria-label="Capture node screenshot" disabled>
+            <svg class="icon" aria-hidden="true"><use href="#i-camera"></use></svg><span>Node</span>
+          </button>
+          <button id="save-button" class="tool-button" type="button" title="Save the current screenshot as PNG" aria-label="Save screenshot" disabled>
+            <svg class="icon" aria-hidden="true"><use href="#i-download"></use></svg><span>Save</span>
+          </button>
+        </div>
+
+        <div id="pick-hint" class="pick-hint" hidden>
+          <svg class="icon" aria-hidden="true"><use href="#i-pick"></use></svg>
+          <span id="pick-hint-text">Click a point in the screenshot to select the component there.</span>
+          <button id="pick-exit" class="text-button" type="button">Exit pick mode</button>
+        </div>
+        <div id="capability-note" class="capability-note" role="note" hidden></div>
+
+        <div class="inspector-grid">
+          <section class="tree-pane" aria-labelledby="tree-heading">
+            <header class="pane-header">
+              <div class="pane-title">
+                <h2 id="tree-heading">Components</h2>
+                <span id="tree-meta" class="pane-meta"></span>
+              </div>
+              <div class="pane-actions">
+                <button id="tree-refresh" class="icon-button small" type="button" title="Refresh component tree" aria-label="Refresh component tree">
+                  <svg class="icon" aria-hidden="true"><use href="#i-refresh"></use></svg>
+                </button>
+                <button id="tree-collapse" class="icon-button small" type="button" title="Collapse all" aria-label="Collapse all">
+                  <svg class="icon" aria-hidden="true"><use href="#i-collapse"></use></svg>
+                </button>
+              </div>
+            </header>
+            <div id="tree-state" class="state-host"></div>
+            <div id="tree" class="tree" role="tree" aria-label="Component tree" hidden></div>
+            <div id="tree-footer" class="tree-footer" hidden></div>
+          </section>
+
+          <section class="details-pane" aria-labelledby="details-heading">
+            <div id="details-state" class="state-host"></div>
+            <div id="details-content" hidden>
+              <header class="node-header">
+                <div class="node-title-line">
+                  <h2 id="details-heading"></h2>
+                  <span id="node-kind" class="badge"></span>
+                </div>
+                <div class="node-subtitle">
+                  <code id="node-id"></code>
+                  <button id="copy-node-id" class="icon-button small" type="button" title="Copy node ID" aria-label="Copy node ID">
+                    <svg class="icon" aria-hidden="true"><use href="#i-copy"></use></svg>
+                  </button>
+                </div>
+                <div id="node-flags" class="flag-row"></div>
+              </header>
+
+              <div class="node-actions">
+                <button id="highlight-button" class="text-button" type="button">Highlight</button>
+                <button id="clear-highlight" class="text-button" type="button">Clear highlight</button>
+                <button id="read-value-button" class="text-button" type="button" hidden>Read live value</button>
+              </div>
+
+              <section id="screenshot-panel" class="screenshot-panel" aria-label="Screenshot">
+                <header class="screenshot-head">
+                  <h3>Screenshot</h3>
+                  <span id="screenshot-meta" class="pane-meta"></span>
+                  <div class="screenshot-actions">
+                    <button id="screenshot-zoom" class="text-button" type="button" title="Toggle screenshot zoom" hidden>Fit</button>
+                    <button id="screenshot-clear" class="text-button" type="button" title="Clear the screenshot" hidden>Clear</button>
+                  </div>
+                </header>
+                <div id="screenshot-body" class="screenshot-body"></div>
+              </section>
+
+              <div class="detail-tabs" role="tablist" aria-label="Node details">
+                <button id="tab-properties" class="detail-tab" role="tab" aria-selected="true" aria-controls="panel-properties" tabindex="0" type="button">Properties</button>
+                <button id="tab-render" class="detail-tab" role="tab" aria-selected="false" aria-controls="panel-render" tabindex="-1" type="button">Render</button>
+                <button id="tab-layout" class="detail-tab" role="tab" aria-selected="false" aria-controls="panel-layout" tabindex="-1" type="button">Layout</button>
+                <button id="tab-source" class="detail-tab" role="tab" aria-selected="false" aria-controls="panel-source" tabindex="-1" type="button">Source</button>
+              </div>
+              <div id="panel-properties" class="detail-panel" role="tabpanel" aria-labelledby="tab-properties"></div>
+              <div id="panel-render" class="detail-panel" role="tabpanel" aria-labelledby="tab-render" hidden></div>
+              <div id="panel-layout" class="detail-panel" role="tabpanel" aria-labelledby="tab-layout" hidden></div>
+              <div id="panel-source" class="detail-panel" role="tabpanel" aria-labelledby="tab-source" hidden></div>
+            </div>
+          </section>
+        </div>
+
+        <section class="input-drawer" aria-labelledby="input-heading">
+          <header class="drawer-header">
+            <svg class="icon" aria-hidden="true"><use href="#i-keyboard"></use></svg>
+            <h2 id="input-heading">Input</h2>
+            <span id="input-meta" class="pane-meta"></span>
+            <button id="input-toggle" class="text-button" type="button" aria-expanded="true" aria-controls="input-body">Hide</button>
+          </header>
+          <div id="input-body" class="input-body">
+            <form id="key-form" class="input-row" autocomplete="off">
+              <label class="inline-field" for="key-value">Key</label>
+              <input id="key-value" class="compact-input" type="text" placeholder="Enter" spellcheck="false" maxlength="256" aria-describedby="input-help">
+              <fieldset class="modifiers">
+                <legend class="sr-only">Modifiers</legend>
+                <label class="check"><input type="checkbox" name="modifier" value="Shift"> Shift</label>
+                <label class="check"><input type="checkbox" name="modifier" value="Control"> Control</label>
+                <label class="check"><input type="checkbox" name="modifier" value="Alt"> Alt</label>
+                <label class="check"><input type="checkbox" name="modifier" value="Meta"> Meta</label>
+              </fieldset>
+              <button id="send-key" class="tool-button" type="submit" disabled>Send key</button>
+            </form>
+            <form id="text-form" class="input-row" autocomplete="off">
+              <label class="inline-field" for="text-value">Text</label>
+              <input id="text-value" class="text-input" type="text" placeholder="Text to type" spellcheck="false" maxlength="16384">
+              <button id="send-text" class="tool-button" type="submit" disabled>Send text</button>
+            </form>
+            <p id="input-help" class="input-help">Delivery is acknowledged by the platform. Verify the resulting UI state.</p>
+          </div>
+        </section>
+      </div>
+    </section>
+
+    <section id="view-network" class="view aux-view" role="tabpanel" aria-labelledby="tab-network" hidden>
+      <header class="aux-header">
+        <div class="aux-title">
+          <h1>Network</h1>
+          <p id="network-meta" class="aux-meta">Recorded in-process HTTP activity.</p>
+        </div>
+        <div class="aux-actions">
+          <label class="search-field small" for="network-search">
+            <svg class="icon" aria-hidden="true"><use href="#i-search"></use></svg>
+            <input id="network-search" type="search" placeholder="Filter URL" aria-label="Filter network requests" autocomplete="off" spellcheck="false">
+          </label>
+          <label class="inline-field" for="network-state-filter">State</label>
+          <select id="network-state-filter" aria-label="Filter by request state">
+            <option value="all">All</option>
+            <option value="pending">Pending</option>
+            <option value="complete">Complete</option>
+            <option value="failed">Failed</option>
+            <option value="cancelled">Cancelled</option>
+          </select>
+          <label class="check"><input id="network-follow" type="checkbox"> Follow</label>
+          <button id="network-recording-toggle" class="tool-button" type="button" title="Pause recording new HTTP requests" disabled>
+            <svg class="icon" aria-hidden="true"><use href="#i-pause"></use></svg><span>Pause</span>
+          </button>
+          <button id="network-clear" class="tool-button" type="button" title="Clear the runtime's retained network records" disabled>
+            <svg class="icon" aria-hidden="true"><use href="#i-trash"></use></svg><span>Clear</span>
+          </button>
+          <button id="network-refresh" class="tool-button" type="button">
+            <svg class="icon" aria-hidden="true"><use href="#i-refresh"></use></svg><span>Refresh</span>
+          </button>
+        </div>
+      </header>
+      <div id="network-recording-status" class="network-banner" role="status" hidden>
+        <svg class="icon" aria-hidden="true"><use href="#i-pause"></use></svg>
+        <strong>Recording paused</strong>
+        <span class="muted">Existing requests are retained. New requests are not recorded.</span>
+      </div>
+      <div id="network-content" class="aux-content"></div>
+    </section>
+
+    <section id="view-logs" class="view aux-view" role="tabpanel" aria-labelledby="tab-logs" hidden>
+      <header class="aux-header">
+        <div class="aux-title">
+          <h1>Logs</h1>
+          <p id="logs-meta" class="aux-meta">Recent runtime log records.</p>
+        </div>
+        <div class="aux-actions">
+          <label class="search-field small" for="logs-search">
+            <svg class="icon" aria-hidden="true"><use href="#i-search"></use></svg>
+            <input id="logs-search" type="search" placeholder="Filter logs" aria-label="Filter logs" autocomplete="off" spellcheck="false">
+          </label>
+          <label class="inline-field" for="logs-level">Level</label>
+          <select id="logs-level" aria-label="Minimum log level">
+            <option value="trace">Trace</option>
+            <option value="debug">Debug</option>
+            <option value="info" selected>Info</option>
+            <option value="notice">Notice</option>
+            <option value="warning">Warning</option>
+            <option value="error">Error</option>
+            <option value="critical">Critical</option>
+          </select>
+          <label class="check"><input id="logs-follow" type="checkbox"> Follow</label>
+          <button id="logs-clear" class="tool-button" type="button" title="Clear the runtime's replay log history">
+            <svg class="icon" aria-hidden="true"><use href="#i-trash"></use></svg><span>Clear</span>
+          </button>
+          <button id="logs-refresh" class="tool-button" type="button">
+            <svg class="icon" aria-hidden="true"><use href="#i-refresh"></use></svg><span>Refresh</span>
+          </button>
+        </div>
+      </header>
+      <div id="logs-content" class="aux-content"></div>
+    </section>
+
+    <section id="view-performance" class="view aux-view" role="tabpanel" aria-labelledby="tab-performance" hidden>
+      <header class="aux-header">
+        <div class="aux-title">
+          <h1>Performance</h1>
+          <p id="performance-meta" class="aux-meta">Frame timings, CPU spans and sampled CPU profiles published by the runtime.</p>
+        </div>
+        <div class="aux-actions">
+          <span id="performance-snapshot-badge" class="snapshot-badge" hidden></span>
+          <label class="inline-field" for="performance-budget">Budget</label>
+          <select id="performance-budget" aria-label="Frame budget from display refresh rate" title="The runtime does not publish its display refresh rate. The budget is the rate you select here.">
+            <option value="60">60 Hz · 16.7 ms</option>
+            <option value="90">90 Hz · 11.1 ms</option>
+            <option value="120">120 Hz · 8.3 ms</option>
+          </select>
+          <label class="check"><input id="performance-follow" type="checkbox"> Follow</label>
+          <span id="performance-elapsed" class="recording-label" hidden>Recording</span>
+          <button id="performance-start" class="tool-button" type="button" title="Record CPU spans around a real operation">
+            <svg class="icon" aria-hidden="true"><use href="#i-record"></use></svg><span>Start trace</span>
+          </button>
+          <button id="performance-stop" class="tool-button" type="button" title="Stop the CPU trace" disabled>
+            <svg class="icon" aria-hidden="true"><use href="#i-stop"></use></svg><span>Stop</span>
+          </button>
+          <button id="performance-refresh" class="tool-button" type="button" title="Refresh frame timings">
+            <svg class="icon" aria-hidden="true"><use href="#i-refresh"></use></svg><span>Refresh</span>
+          </button>
+          <button id="performance-export" class="tool-button" type="button" title="Export recorded frames and spans" disabled>
+            <svg class="icon" aria-hidden="true"><use href="#i-download"></use></svg><span>Export</span>
+          </button>
+          <button id="performance-import" class="tool-button" type="button" title="Import a performance snapshot">
+            <svg class="icon" aria-hidden="true"><use href="#i-upload"></use></svg><span>Import</span>
+          </button>
+          <input id="performance-file" type="file" accept="application/json,.json" hidden aria-label="Import performance snapshot">
+        </div>
+      </header>
+      <div class="perf-tabs" role="tablist" aria-label="Performance sections">
+        <button id="tab-performance-frames" class="perf-tab" data-perf-tab="frames" role="tab" aria-selected="true" aria-controls="performance-frames" type="button">Frames</button>
+        <button id="tab-performance-timeline" class="perf-tab" data-perf-tab="timeline" role="tab" aria-selected="false" aria-controls="performance-timeline" tabindex="-1" type="button">Timeline</button>
+        <button id="tab-performance-profile" class="perf-tab" data-perf-tab="profile" role="tab" aria-selected="false" aria-controls="performance-profile" tabindex="-1" type="button">CPU Profile</button>
+      </div>
+      <div id="performance-content" class="aux-content">
+        <div id="performance-frames" class="perf-panel" role="tabpanel" aria-labelledby="tab-performance-frames"></div>
+        <div id="performance-timeline" class="perf-panel" role="tabpanel" aria-labelledby="tab-performance-timeline" hidden></div>
+        <div id="performance-profile" class="perf-panel" role="tabpanel" aria-labelledby="tab-performance-profile" hidden></div>
+      </div>
+    </section>
+
+    <section id="view-memory" class="view aux-view" role="tabpanel" aria-labelledby="tab-memory" hidden>
+      <header class="aux-header">
+        <div class="aux-title">
+          <h1>Memory</h1>
+          <p id="memory-meta" class="aux-meta">Process RSS and virtual are host readings; allocator counters appear when the host installs a tracking allocator; caches are estimates. Not a heap object graph.</p>
+        </div>
+        <div class="aux-actions">
+          <button id="memory-refresh" class="tool-button" type="button" title="Refresh memory counters" disabled>
+            <svg class="icon" aria-hidden="true"><use href="#i-refresh"></use></svg><span>Refresh</span>
+          </button>
+        </div>
+      </header>
+      <div id="memory-content" class="aux-content"></div>
+    </section>
+
+    <section id="view-app-size" class="view aux-view" role="tabpanel" aria-labelledby="tab-app-size" hidden>
+      <header class="aux-header">
+        <div class="aux-title">
+          <h1>App Size</h1>
+          <p id="app-size-meta" class="aux-meta">Sections, symbols and crate groups read from the selected runtime's native executable.</p>
+        </div>
+        <div class="aux-actions">
+          <button id="app-size-refresh" class="tool-button" type="button" title="Read the native executable again">
+            <svg class="icon" aria-hidden="true"><use href="#i-refresh"></use></svg><span>Refresh</span>
+          </button>
+        </div>
+      </header>
+      <div id="app-size-content" class="aux-content"></div>
+    </section>
+
+    <section id="view-deep-links" class="view aux-view deep-links-view" role="tabpanel" aria-labelledby="tab-deep-links" hidden>
+      <header class="aux-header">
+        <div class="aux-title">
+          <h1>Deep Links</h1>
+          <p id="deep-links-meta" class="aux-meta">Validate Android intent filters and Apple URL types in a project root.</p>
+        </div>
+        <form id="deep-links-root-form" class="aux-actions dl-root-form" autocomplete="off">
+          <label class="inline-field" for="deep-links-root">Project root</label>
+          <input id="deep-links-root" class="compact-input dl-root-input" type="text" placeholder="/absolute/project/root" spellcheck="false" maxlength="4096" aria-describedby="deep-links-root-error">
+          <button id="deep-links-validate" class="tool-button is-primary" type="submit">Validate</button>
+        </form>
+      </header>
+      <p id="deep-links-root-error" class="form-error dl-root-error" role="alert" hidden></p>
+      <div id="deep-links-content" class="aux-content"></div>
+    </section>
+
+    <section id="view-debugger" class="view aux-view debugger-view" role="tabpanel" aria-labelledby="tab-debugger" hidden>
+      <header class="aux-header">
+        <div class="aux-title">
+          <h1>Debugger</h1>
+          <p id="debugger-meta" class="aux-meta">Debug adapter sessions attach to one process at a time.</p>
+        </div>
+        <div class="aux-actions">
+          <span id="debugger-status" class="state-badge">Not attached</span>
+          <button id="debugger-refresh" class="tool-button" type="button" title="Refresh debugger state">
+            <svg class="icon" aria-hidden="true"><use href="#i-refresh"></use></svg><span>Refresh</span>
+          </button>
+          <button id="debugger-attach" class="tool-button is-primary" type="button" disabled>Attach</button>
+          <button id="debugger-detach" class="tool-button" type="button" disabled>Detach</button>
+        </div>
+      </header>
+
+      <div id="debugger-unavailable" class="debugger-unavailable" role="alert" hidden>
+        <svg class="icon" aria-hidden="true"><use href="#i-alert"></use></svg>
+        <div>
+          <strong id="debugger-unavailable-title">Debugger unavailable</strong>
+          <p id="debugger-unavailable-reason"></p>
+          <p id="debugger-adapter" class="debugger-adapter" hidden></p>
+        </div>
+      </div>
+
+      <div class="dbg-controls" role="toolbar" aria-label="Process control">
+        <button id="debugger-pause" class="tool-button" type="button" disabled>
+          <svg class="icon" aria-hidden="true"><use href="#i-pause"></use></svg><span>Pause</span>
+        </button>
+        <button id="debugger-continue" class="tool-button" type="button" disabled>
+          <svg class="icon" aria-hidden="true"><use href="#i-play"></use></svg><span>Continue</span>
+        </button>
+        <span class="dbg-control-sep" aria-hidden="true"></span>
+        <button id="debugger-step-over" class="tool-button" type="button" disabled>
+          <svg class="icon" aria-hidden="true"><use href="#i-step-over"></use></svg><span>Step over</span>
+        </button>
+        <button id="debugger-step-into" class="tool-button" type="button" disabled>
+          <svg class="icon" aria-hidden="true"><use href="#i-step-into"></use></svg><span>Step in</span>
+        </button>
+        <button id="debugger-step-out" class="tool-button" type="button" disabled>
+          <svg class="icon" aria-hidden="true"><use href="#i-step-out"></use></svg><span>Step out</span>
+        </button>
+        <span id="debugger-session" class="dbg-session">No session</span>
+        <span class="toolbar-spacer"></span>
+        <span id="debugger-busy" class="inline-spinner" hidden><span class="spinner" aria-hidden="true"></span><span id="debugger-busy-text">Working</span></span>
+      </div>
+
+      <div class="dbg-grid">
+        <aside class="dbg-side" aria-label="Debugger navigation">
+          <section class="dbg-pane dbg-threads-pane" aria-labelledby="debugger-threads-heading">
+            <header class="dbg-pane-head">
+              <h2 id="debugger-threads-heading">Threads</h2>
+              <span id="debugger-threads-meta" class="pane-meta"></span>
+            </header>
+            <div id="debugger-threads" class="dbg-list" role="group" aria-label="Threads"></div>
+          </section>
+          <section class="dbg-pane dbg-stack-pane" aria-labelledby="debugger-stack-heading">
+            <header class="dbg-pane-head">
+              <h2 id="debugger-stack-heading">Call Stack</h2>
+              <span id="debugger-stack-meta" class="pane-meta"></span>
+            </header>
+            <div id="debugger-stack" class="dbg-list" role="group" aria-label="Call stack"></div>
+          </section>
+          <section class="dbg-pane dbg-breakpoints-pane" aria-labelledby="debugger-breakpoints-heading">
+            <header class="dbg-pane-head">
+              <h2 id="debugger-breakpoints-heading">Breakpoints</h2>
+              <span id="debugger-breakpoints-meta" class="pane-meta"></span>
+            </header>
+            <div id="debugger-breakpoints" class="dbg-list" role="group" aria-label="Breakpoints"></div>
+          </section>
+        </aside>
+
+        <section class="dbg-source-pane" aria-labelledby="debugger-source-heading">
+          <header class="dbg-source-head">
+            <h2 id="debugger-source-heading">Source</h2>
+            <code id="debugger-source-path" class="dbg-source-path">No file</code>
+            <span id="debugger-source-meta" class="pane-meta"></span>
+            <span class="toolbar-spacer"></span>
+            <form id="debugger-open-form" class="dbg-open-form" autocomplete="off">
+              <label class="sr-only" for="debugger-open-path">Source path</label>
+              <input id="debugger-open-path" class="compact-input dbg-path-input" type="text" placeholder="Open path" spellcheck="false" maxlength="4096">
+              <button id="debugger-open" class="tool-button small" type="submit" disabled>Open</button>
+            </form>
+          </header>
+          <div id="debugger-source" class="dbg-source" role="region" aria-label="Source code" tabindex="0"></div>
+        </section>
+
+        <section class="dbg-vars-pane" aria-labelledby="debugger-scopes-heading">
+          <header class="dbg-pane-head">
+            <h2 id="debugger-scopes-heading">Scopes</h2>
+            <span id="debugger-scopes-meta" class="pane-meta"></span>
+            <div class="pane-actions">
+              <button id="debugger-variables-refresh" class="icon-button small" type="button" title="Refresh scopes and variables" aria-label="Refresh scopes and variables" disabled>
+                <svg class="icon" aria-hidden="true"><use href="#i-refresh"></use></svg>
+              </button>
+            </div>
+          </header>
+          <div id="debugger-variables" class="dbg-vars" role="group" aria-label="Scopes and variables"></div>
+        </section>
+      </div>
+
+      <section class="dbg-console" aria-labelledby="debugger-console-heading">
+        <header class="dbg-console-head">
+          <h2 id="debugger-console-heading">Console</h2>
+          <span id="debugger-console-meta" class="pane-meta"></span>
+          <button id="debugger-console-clear" class="text-button" type="button">Clear</button>
+        </header>
+        <div id="debugger-console" class="dbg-console-log" role="log" aria-live="polite" aria-relevant="additions"></div>
+        <form id="debugger-evaluate-form" class="dbg-evaluate" autocomplete="off">
+          <label class="sr-only" for="debugger-expression">Evaluate expression</label>
+          <span class="dbg-prompt" aria-hidden="true">&gt;</span>
+          <input id="debugger-expression" type="text" placeholder="Evaluate in the selected frame" spellcheck="false" autocomplete="off">
+          <button id="debugger-evaluate" class="tool-button" type="submit" disabled>Evaluate</button>
+        </form>
+      </section>
+    </section>
+  </main>
+</div>
+
+<dialog id="shortcuts-dialog" class="modal" aria-labelledby="shortcuts-title">
+  <div class="modal-head">
+    <h2 id="shortcuts-title">Keyboard shortcuts</h2>
+    <button id="shortcuts-close" class="icon-button" type="button" aria-label="Close shortcuts">
+      <svg class="icon" aria-hidden="true"><use href="#i-close"></use></svg>
+    </button>
+  </div>
+  <table class="shortcut-table">
+    <tbody>
+      <tr><th scope="row">Focus search</th><td><kbd>/</kbd></td></tr>
+      <tr><th scope="row">Toggle pick mode</th><td><kbd>P</kbd></td></tr>
+      <tr><th scope="row">Refresh targets and view</th><td><kbd>R</kbd></td></tr>
+      <tr><th scope="row">Sections</th><td><kbd>Alt</kbd> + <kbd>1</kbd>…<kbd>8</kbd></td></tr>
+      <tr><th scope="row">Navigate tree</th><td><kbd>↑</kbd><kbd>↓</kbd><kbd>←</kbd><kbd>→</kbd></td></tr>
+      <tr><th scope="row">Debugger continue</th><td><kbd>F5</kbd></td></tr>
+      <tr><th scope="row">Debugger step</th><td><kbd>F10</kbd> <kbd>F11</kbd> <kbd>Shift</kbd>+<kbd>F11</kbd></td></tr>
+      <tr><th scope="row">Exit pick or close dialog</th><td><kbd>Esc</kbd></td></tr>
+      <tr><th scope="row">Shortcuts</th><td><kbd>?</kbd></td></tr>
+    </tbody>
+  </table>
+</dialog>
+
+<dialog id="network-dialog" class="modal modal-wide" aria-labelledby="network-dialog-title">
+  <div class="modal-head">
+    <h2 id="network-dialog-title">Request</h2>
+    <button id="network-dialog-close" class="icon-button" type="button" aria-label="Close request details">
+      <svg class="icon" aria-hidden="true"><use href="#i-close"></use></svg>
+    </button>
+  </div>
+  <div id="network-dialog-body" class="modal-body"></div>
+</dialog>
+
+<div id="toast" class="toast" role="status" aria-live="polite" hidden>
+  <svg class="icon toast-icon" aria-hidden="true"><use href="#i-info"></use></svg>
+  <span id="toast-text"></span>
+  <button id="toast-close" class="icon-button small" type="button" aria-label="Dismiss message">
+    <svg class="icon" aria-hidden="true"><use href="#i-close"></use></svg>
+  </button>
+</div>
+<div id="live-region" class="sr-only" aria-live="polite" aria-atomic="true"></div>
+
 <script type="module" src="/inspector.js"></script>
+</body>
 </html>

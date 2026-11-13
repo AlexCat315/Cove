@@ -1,0 +1,28 @@
+[package]
+name = "cove-alloc"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "Allocation tracking and allocation-site sampling for Cove DevTools"
+
+[dependencies]
+thiserror.workspace = true
+
+[target.'cfg(any(target_vendor = "apple", all(target_os = "linux", target_env = "gnu")))'.dependencies]
+libc.workspace = true
+
+[lints]
+workspace = true
+
+[[test]]
+name = "tracking"
+harness = false
+
+[[test]]
+name = "no_install"
+harness = false
+
+[[test]]
+name = "sampling"
+harness = false

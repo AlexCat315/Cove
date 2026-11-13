@@ -83,7 +83,9 @@ final class SurfaceMetrics {
                 : configuration.smallestScreenWidthDp >= 600 ? FoldingState.TABLET : FoldingState.PHONE;
         int posture = folding != null ? folding.posture() : FoldingState.FLAT;
         float[] features = folding != null ? folding.features(density) : new float[0];
-        MainActivity.surface(target, density, device, posture, features,
+        int[] origin = new int[2];
+        view.getLocationOnScreen(origin);
+        MainActivity.surface(target, density, origin[0], origin[1], device, posture, features,
                 safe.top / density, (rtl ? safe.right : safe.left) / density,
                 safe.bottom / density, (rtl ? safe.left : safe.right) / density,
                 keyboard / density, textSizes(display, density));

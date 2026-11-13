@@ -1138,7 +1138,9 @@ impl Sdl3PlatformHost {
             }
         }
         if frame_due || (prepare && !animations_were_active) {
-            scheduler.tick((animation_time - state.last_animation_tick_time.get()).max(0.0));
+            scheduler.tick(scale_animation_delta(
+                (animation_time - state.last_animation_tick_time.get()).max(0.0),
+            ));
             state
                 .last_animation_tick_time
                 .set(state.last_animation_tick_time.get().max(animation_time));

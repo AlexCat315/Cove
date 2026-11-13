@@ -576,9 +576,10 @@ pub unsafe extern "C" fn cove_android_scroll(
 
 /// `cove_android_surface`
 ///
-/// Reports device facts the window itself cannot derive: density, hardware
-/// class, fold posture and display features, safe area, keyboard height and
-/// the accessibility text-size samples.
+/// Reports device facts the window itself cannot derive: density, the
+/// surface's display-pixel origin, hardware class, fold posture and display
+/// features, safe area, keyboard height and the accessibility text-size
+/// samples.
 ///
 /// # Safety
 /// `pointer` must be null or a live session pointer; `features` must be null
@@ -589,6 +590,8 @@ pub unsafe extern "C" fn cove_android_scroll(
 pub unsafe extern "C" fn cove_android_surface(
     pointer: SessionPointer,
     density: f32,
+    origin_x: f32,
+    origin_y: f32,
     device: i32,
     posture: i32,
     features: *const f32,
@@ -631,6 +634,11 @@ pub unsafe extern "C" fn cove_android_surface(
         // SAFETY: the caller guarantees `feature_count` readable floats.
         unsafe { std::slice::from_raw_parts(features, feature_count as usize) }
     };
+    handle
+        .session()
+        .scene()
+        .content()
+        .set_surface_origin(origin_x, origin_y);
     handle.session().scene().content().update_surface(
         DeviceFacts::decode(device, posture, feature_values),
         safe_area,

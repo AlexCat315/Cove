@@ -51,6 +51,18 @@ Linux 构建控制器需要 PipeWire、XCB、Clang、D-Bus、EGL 与 GBM 开发�
 
 `start_ui_trace` 与 `stop_ui_trace` 可包围实际操作，`get_ui_trace` 分页读取，`compare_ui_traces` 比较 CPU 阶段。帧计时区分 CPU 提交、渲染线程完成和宿主能观察到的呈现操作。GPU 执行和屏幕扫描输出没有在这些 CPU 样本中计量。
 
+`start_ui_profile hz=1000 duration_ms=5000` 用 `cove-profiling` 的真实采样器跟随 UI 线程，`stop_ui_profile` 停止、join 并在后台线程完成符号化，`get_ui_profile` 返回有界聚合调用栈（不逐样本返回），`query_ui_hotspots` 按函数和 `file:line` 返回 self/inclusive 热点。单次采样上限 10 秒；self 时间是独占时间，inclusive 时间在同一采样内对每帧只计一次，时间按相邻采样的实际间隔累计。仅 macOS 提供真实采样；其他平台返回 `unavailable` 及原因，不合成样本。
+
+## 调试器
+
+`get_ui_session` 的 `debugger` 字段报告 `lldb-dap` 路径、版本、Developer mode 和已有会话。`attach_ui_debugger` 仅对本机桌面运行时按 PID 启动异步 attach，默认最多等待 8 秒；被 macOS 的 task_for_pid 授权拒绝时返回 `unavailable` 并保留适配器原文，等待超时返回 `timeout` 并清理适配器与 debugserver。`get_ui_debugger` 读取会话状态、停止原因和断点，`set_ui_breakpoint`/`clear_ui_breakpoint` 按绝对源码路径设置或清除断点，`control_ui_debugger` 执行 pause、resume、step_over、step_in、step_out。`get_ui_debug_stack` 返回线程、帧和顶层作用域，`read_ui_debug_variables` 分页读取变量，`evaluate_ui_debug` 在已停止的帧中求值。运行中的进程返回 `not_stopped`，不返回旧帧或伪造的暂停状态；`detach_ui_debugger` 要求适配器不终止目标。
+
+## 深度链接
+
+`get_ui_deep_links root=/绝对项目路径` 只读取项目根目录内固定的平台文件：Android `Platforms/Android/app/src/main/AndroidManifest.xml`、macOS `Info.plist`、`Platforms/{macOS,iOS}` 下的 `Info.plist`/`*.entitlements`，以及已知位置的 `assetlinks.json`/`apple-app-site-association`。根路径必须是绝对路径且不含 `..`；任何解析到根目录之外的符号链接都会被拒绝，单个文件上限 4 MiB。
+
+Android 用真实 XML 解析器读取 intent filter 的 VIEW、BROWSABLE、scheme/host/path、`autoVerify` 和行号；Apple 用 plist 解析器读取 `CFBundleURLTypes` 与 `com.apple.developer.associated-domains`。关联文件按真实 JSON 校验。返回 `files`、`android`、`apple` 与 `summary`；问题包含 `code`、`severity`、`file`、`location`（有行号时为 `file:line`）和修复建议。缺少平台文件表示未配置，不是错误；空项目返回 `No deep links configured.`。该工具只校验本地配置，不访问线上 `/.well-known`，也不校验包名、签名或运行时 URL 投递。
+
 ## 宿主
 
 桌面、Android 和 Web 宿主使用 `RuntimeProbe`。原生探针由后台线程连接控制器，命令在所属窗口的 UI 线程执行。WASM 由页面传输相同消息。协议见 [DevTools 协议](../devtools-protocol/README.md)。

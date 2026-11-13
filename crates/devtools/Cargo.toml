@@ -17,8 +17,14 @@ serde_json.workspace = true
 thiserror.workspace = true
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+cove-alloc.workspace = true
+cove-profiling.workspace = true
 ureq.workspace = true
 
 [lints]
 workspace = true
+
+[[test]]
+name = "allocation_sites"
+harness = false
 

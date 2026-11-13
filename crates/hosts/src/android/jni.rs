@@ -403,6 +403,8 @@ pub unsafe extern "C" fn Java_com_cove_probe_MainActivity_surface(
     _class: Object,
     value: i64,
     density: f32,
+    origin_x: f32,
+    origin_y: f32,
     device: i32,
     posture: i32,
     features: Object,
@@ -479,6 +481,8 @@ pub unsafe extern "C" fn Java_com_cove_probe_MainActivity_surface(
         bridge::cove_android_surface(
             session,
             density,
+            origin_x,
+            origin_y,
             device,
             posture,
             feature_values,

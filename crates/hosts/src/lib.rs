@@ -1,9 +1,11 @@
 //! Native application hosts for desktop, iOS and Android, and the Wasm entry.
+pub mod allocation;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod android;
 pub mod application;
 pub mod application_services;
 pub mod desktop;
+pub mod process_memory;
 pub mod wasm;
 
 pub use application::{

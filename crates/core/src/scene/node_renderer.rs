@@ -119,6 +119,12 @@ fn render_node(node: &Node, list: &mut DrawList, placed: Affine2D) {
     if let Some(draw) = node.draw() {
         paint_scaled(&draw, list, Point::new(abs_x, abs_y), scale);
     }
+    // Record a real paint of this node's own box or content. A node that only
+    // places children emits no vertices of its own, so it keeps its
+    // generation; the bump is diagnostic state and never dirties the node.
+    if list.vertices().len() > first_vertex {
+        node.bump_repaint();
+    }
 
     // 6. Children — placed where this node's *content* sits, which is its own
     //    frame slid by -content_offset and then scaled. The offset stays
@@ -276,6 +282,53 @@ mod tests {
         let mut list = DrawList::default();
         NodeRenderer::new().render(&root, &mut list);
         assert!(list.vertices().is_empty());
+    }
+
+    #[test]
+    fn painting_bumps_the_repaint_epoch_on_every_frame() {
+        let node = Node::new();
+        node.set_frame(Rect::new(0.0, 0.0, 20.0, 20.0));
+        node.set_background_color(Some(Color::BLACK));
+        let mut list = DrawList::default();
+        let renderer = NodeRenderer::new();
+        renderer.render(&node, &mut list);
+        assert_eq!(node.repaint_epoch(), 1, "the first frame paints the node");
+        renderer.render(&node, &mut DrawList::default());
+        assert_eq!(
+            node.repaint_epoch(),
+            2,
+            "the uncached renderer repaints the node again"
+        );
+    }
+
+    #[test]
+    fn nodes_that_only_place_children_keep_their_epoch() {
+        let root = Node::new();
+        root.set_frame(Rect::new(0.0, 0.0, 100.0, 100.0));
+        let wrapper = Node::new();
+        wrapper.set_frame(Rect::new(5.0, 5.0, 50.0, 50.0));
+        let painted = Node::new();
+        painted.set_frame(Rect::new(0.0, 0.0, 10.0, 10.0));
+        painted.set_background_color(Some(Color::BLACK));
+        let hidden = Node::new();
+        hidden.set_frame(Rect::new(0.0, 0.0, 10.0, 10.0));
+        hidden.set_background_color(Some(Color::BLACK));
+        hidden.set_layout_visibility(false);
+        wrapper.add_child(&painted);
+        wrapper.add_child(&hidden);
+        root.add_child(&wrapper);
+        NodeRenderer::new().render(&root, &mut DrawList::default());
+        assert_eq!(
+            (root.repaint_epoch(), wrapper.repaint_epoch()),
+            (0, 0),
+            "a node that emits nothing of its own is not a paint"
+        );
+        assert_eq!(
+            painted.repaint_epoch(),
+            1,
+            "a painted child records its own paint"
+        );
+        assert_eq!(hidden.repaint_epoch(), 0, "a hidden node never paints");
     }
 
     #[test]

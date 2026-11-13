@@ -62,6 +62,12 @@ pub extern "C" fn cove_set_scale(scale: f32) {
     }
 }
 
+/// Reports the canvas's top-left in the page viewport, in CSS pixels.
+#[unsafe(no_mangle)]
+pub extern "C" fn cove_set_content_origin(x: f32, y: f32) {
+    with_app(|app| app.set_content_origin(x, y));
+}
+
 /// Allocates a transfer buffer the host fills with font bytes.
 ///
 /// # Safety

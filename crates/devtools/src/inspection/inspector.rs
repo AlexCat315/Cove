@@ -11,9 +11,9 @@ use cove_core::scene::{
     RenderTree,
 };
 use cove_devtools_protocol::{
-    InputInventory, InspectionInsets, InvalidationRecord, NodeFlags, NodeFrame, NodeLayoutInfo,
-    NodePoint, NodeStyleInfo, NodeSummary, Recomposition, RecompositionReason, RenderInventory,
-    SourceLocation, TreeSnapshot,
+    InputInventory, InspectionInsets, InvalidationRecord, MAX_TREE_PAGE_DEPTH, MAX_TREE_PAGE_NODES,
+    NodeFlags, NodeFrame, NodeLayoutInfo, NodePoint, NodeStyleInfo, NodeSummary, Recomposition,
+    RecompositionReason, RenderInventory, SourceLocation, TreePage, TreePageNode, TreeSnapshot,
 };
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -50,6 +50,88 @@ pub(crate) fn find_in(node: &Node, id: &str) -> Option<Node> {
     None
 }
 
+/// Why a bounded tree page could not be built.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum TreePageError {
+    /// `depth` is outside `1..=MAX_TREE_PAGE_DEPTH`.
+    Depth,
+    /// `limit` is outside `1..=MAX_TREE_PAGE_NODES`.
+    Limit,
+    /// The requested root ID is empty or longer than an element ID can be.
+    NodeId,
+    /// No live node has the requested element ID.
+    Stale(String),
+}
+
+impl TreePageError {
+    /// The fault code the wire reports for this error.
+    pub fn code(&self) -> &'static str {
+        match self {
+            Self::Stale(_) => "stale_node",
+            Self::Depth | Self::Limit | Self::NodeId => "invalid_request",
+        }
+    }
+}
+
+impl std::fmt::Display for TreePageError {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Depth => write!(
+                formatter,
+                "depth must be an integer from 1 to {MAX_TREE_PAGE_DEPTH}."
+            ),
+            Self::Limit => write!(
+                formatter,
+                "limit must be an integer from 1 to {MAX_TREE_PAGE_NODES}."
+            ),
+            Self::NodeId => {
+                formatter.write_str("node_id must be a live element ID of 1 to 256 bytes.")
+            }
+            Self::Stale(id) => write!(formatter, "No live node has element ID {id}."),
+        }
+    }
+}
+
+impl std::error::Error for TreePageError {}
+
+/// Pre-order walk that stops adding nodes at the page's node limit.
+struct PageBuilder {
+    limit: usize,
+    node_count: usize,
+    truncated: bool,
+}
+
+impl PageBuilder {
+    /// Adds `node` when the page still has room and returns its summary.
+    ///
+    /// `levels` is how many node levels remain below and including `node`.
+    fn build(&mut self, node: &Node, levels: usize) -> Option<TreePageNode> {
+        if self.node_count >= self.limit {
+            self.truncated = true;
+            return None;
+        }
+        self.node_count += 1;
+        let children = if levels > 1 {
+            let mut children = Vec::new();
+            for child in node.children() {
+                match self.build(&child, levels - 1) {
+                    Some(page) => children.push(page),
+                    // The only reason a live child is skipped is the node
+                    // limit, which `build` already recorded.
+                    None => break,
+                }
+            }
+            children
+        } else {
+            if !node.children().is_empty() {
+                self.truncated = true;
+            }
+            Vec::new()
+        };
+        Some(page_node(node, children))
+    }
+}
+
 /// Builds `NodeSummary` snapshots from a `NodeTree`.
 ///
 /// IDs are valid for the lifetime of their nodes in this runtime.
@@ -80,6 +162,21 @@ impl SceneInspector {
     /// Capture a snapshot of the current scene. Must run on the thread that
     /// mutates the tree.
     pub fn snapshot(&self) -> TreeSnapshot {
+        self.build_snapshot(true)
+    }
+
+    /// A snapshot for the wire `tree` command.
+    ///
+    /// A live gallery publishes thousands of nodes; full layout, style and
+    /// recomposition detail does not fit one protocol message. This keeps the
+    /// identity, geometry, roles, flags, source and children a client needs to
+    /// render and select, and leaves the detailed read to `get_diagnostics` and
+    /// `query_ui_nodes`, which use [`Self::snapshot`].
+    pub fn summary_snapshot(&self) -> TreeSnapshot {
+        self.build_snapshot(false)
+    }
+
+    fn build_snapshot(&self, detailed: bool) -> TreeSnapshot {
         // `state()` prunes stale overrides, so it is deliberately `&self`.
         let inspection = self.editor.state();
         let invalidations = self.invalidation_log.as_ref().map(|log| {
@@ -119,12 +216,74 @@ impl SceneInspector {
             }
         });
         TreeSnapshot {
-            root: root.map(|root| summarize(&root, None)),
+            root: root.map(|root| {
+                if detailed {
+                    summarize(&root, None, &self.editor)
+                } else {
+                    summarize_summary(&root)
+                }
+            }),
             invalidations,
             render_inventory,
             input_inventory,
             inspection: Some(inspection),
         }
+    }
+
+    /// A bounded subtree rooted at `node_id`, or at the scene root when it is
+    /// absent.
+    ///
+    /// `depth` counts node levels and includes the page root, so `depth = 1`
+    /// returns the root alone. Every returned node is a live node: nodes past
+    /// `depth`, past `limit` or past the caller's byte budget are omitted and
+    /// reported through [`TreePage::truncated`]. The byte budget is applied by
+    /// the transport, which measures the serialised page; the inspector only
+    /// enforces the node and depth bounds.
+    pub fn tree_page(
+        &self,
+        node_id: Option<&str>,
+        depth: usize,
+        limit: usize,
+    ) -> Result<TreePage, TreePageError> {
+        if !(1..=MAX_TREE_PAGE_DEPTH).contains(&depth) {
+            return Err(TreePageError::Depth);
+        }
+        if !(1..=MAX_TREE_PAGE_NODES).contains(&limit) {
+            return Err(TreePageError::Limit);
+        }
+        if node_id.is_some_and(|id| id.is_empty() || id.len() > 256) {
+            return Err(TreePageError::NodeId);
+        }
+        let tree = self.tree.borrow();
+        let Some(root) = tree.root() else {
+            return match node_id {
+                Some(id) => Err(TreePageError::Stale(id.to_owned())),
+                None => Ok(TreePage {
+                    root: None,
+                    depth,
+                    limit,
+                    node_count: 0,
+                    truncated: false,
+                }),
+            };
+        };
+        let start = match node_id {
+            Some(id) => find_in(&root, id).ok_or_else(|| TreePageError::Stale(id.to_owned()))?,
+            None => root,
+        };
+        let mut builder = PageBuilder {
+            limit,
+            node_count: 0,
+            truncated: false,
+        };
+        let page_root = builder.build(&start, depth);
+        Ok(TreePage {
+            root: page_root,
+            depth,
+            limit,
+            node_count: builder.node_count,
+            truncated: builder.truncated,
+        })
     }
 
     /// The tree this inspector reads. Handles let a caller mutate the tree
@@ -144,9 +303,19 @@ impl SceneInspector {
     pub fn identifier(node: &Node) -> String {
         node.id().0.to_string()
     }
+
+    /// The deepest node under a content-space point.
+    ///
+    /// This is the same hit test platform input uses, so a client selecting a
+    /// node at a point agrees with what a click would target. Nothing is
+    /// dispatched and no state changes.
+    pub fn node_at(&self, point: cove_core::Point) -> Option<cove_core::scene::HitResult> {
+        let root = self.tree.borrow().root()?;
+        cove_core::scene::HitTester::hit_test(&root, point)
+    }
 }
 
-fn summarize(node: &Node, owner_scope_id: Option<&str>) -> NodeSummary {
+fn summarize(node: &Node, owner_scope_id: Option<&str>, editor: &SceneEditor) -> NodeSummary {
     let absolute = node.absolute_frame();
     let recomposition_metrics = node.recomposition_metrics();
     let owner = if recomposition_metrics.is_some() {
@@ -157,7 +326,7 @@ fn summarize(node: &Node, owner_scope_id: Option<&str>) -> NodeSummary {
     let children: Vec<NodeSummary> = node
         .children()
         .iter()
-        .map(|child| summarize(child, owner.as_deref()))
+        .map(|child| summarize(child, owner.as_deref(), editor))
         .collect();
     let layout = node.layout_node().map(|layout| {
         let padding = layout.resolved_padding();
@@ -180,19 +349,11 @@ fn summarize(node: &Node, owner_scope_id: Option<&str>) -> NodeSummary {
             flex_shrink: layout.flex_shrink() as f64,
         }
     });
-    let overrides: Vec<String> = [
-        (
-            "padding",
-            node.layout_node()
-                .is_some_and(|layout| layout.debug_padding().is_some()),
-        ),
-        ("backgroundColor", node.debug_background_color().is_some()),
-        ("foregroundColor", node.debug_foreground_color().is_some()),
-    ]
-    .into_iter()
-    .filter(|&(_name, present)| present)
-    .map(|(name, _present)| name.to_string())
-    .collect();
+    let overrides: Vec<String> = editor
+        .override_properties(&SceneInspector::identifier(node))
+        .into_iter()
+        .map(str::to_string)
+        .collect();
     NodeSummary {
         id: SceneInspector::identifier(node),
         view_tag: node.view_tag(),
@@ -206,19 +367,8 @@ fn summarize(node: &Node, owner_scope_id: Option<&str>) -> NodeSummary {
         z_index: Some(node.z_index() as f64),
         opacity: Some(node.opacity() as f64),
         layout_role: node.attachment::<String>(DebugAttachmentKey::LAYOUT_ROLE),
-        semantic_role: node
-            .attachment::<String>(DebugAttachmentKey::SEMANTIC_ROLE)
-            .or_else(|| {
-                node.accessibility()
-                    .map(|semantics| crate::inspection::inspector::role_name(semantics.role))
-            }),
-        flags: NodeFlags {
-            hit_testable: node.is_hit_testable(),
-            focusable: node.is_focusable(),
-            clips_to_bounds: node.clips_to_bounds(),
-            has_background: node.background_color().is_some(),
-            has_border: node.border_color().is_some() && node.border_width() > 0.0,
-        },
+        semantic_role: semantic_role(node),
+        flags: node_flags(node),
         children,
         layout,
         style: Some(NodeStyleInfo {
@@ -226,12 +376,7 @@ fn summarize(node: &Node, owner_scope_id: Option<&str>) -> NodeSummary {
             foreground_color: SceneEditor::hex(node.inherited_foreground_color()),
             overrides,
         }),
-        source: node.source_location().map(|location| SourceLocation {
-            file_id: location.file_id,
-            file_path: location.file_path,
-            line: location.line,
-            column: location.column,
-        }),
+        source: source_location(node),
         owner_scope_id: owner,
         recomposition: recomposition_metrics.map(|metrics| Recomposition {
             count: metrics.count,
@@ -252,6 +397,75 @@ fn summarize(node: &Node, owner_scope_id: Option<&str>) -> NodeSummary {
     }
 }
 
+/// The wire `tree` payload: identity, geometry, roles, flags and children only.
+///
+/// Detailed layout, style and recomposition are deliberately absent so a
+/// gallery-sized tree stays inside one bounded protocol message.
+fn summarize_summary(node: &Node) -> NodeSummary {
+    NodeSummary {
+        id: SceneInspector::identifier(node),
+        view_tag: node.view_tag(),
+        debug_name: node.attachment::<String>(DebugAttachmentKey::DEBUG_NAME),
+        frame: encode_frame(node.frame()),
+        absolute_frame: Some(encode_frame(node.absolute_frame())),
+        content_offset: None,
+        z_index: None,
+        opacity: None,
+        layout_role: node.attachment::<String>(DebugAttachmentKey::LAYOUT_ROLE),
+        semantic_role: semantic_role(node),
+        flags: node_flags(node),
+        children: node.children().iter().map(summarize_summary).collect(),
+        layout: None,
+        style: None,
+        source: source_location(node),
+        owner_scope_id: None,
+        recomposition: None,
+    }
+}
+
+/// A page node: the wire summary's identity, geometry, roles, source and
+/// children, with the summary's always-null detail slots left out.
+fn page_node(node: &Node, children: Vec<TreePageNode>) -> TreePageNode {
+    TreePageNode {
+        id: SceneInspector::identifier(node),
+        view_tag: node.view_tag(),
+        debug_name: node.attachment::<String>(DebugAttachmentKey::DEBUG_NAME),
+        frame: encode_frame(node.frame()),
+        absolute_frame: encode_frame(node.absolute_frame()),
+        layout_role: node.attachment::<String>(DebugAttachmentKey::LAYOUT_ROLE),
+        semantic_role: semantic_role(node),
+        source: source_location(node),
+        children,
+    }
+}
+
+fn semantic_role(node: &Node) -> Option<String> {
+    node.attachment::<String>(DebugAttachmentKey::SEMANTIC_ROLE)
+        .or_else(|| {
+            node.accessibility()
+                .map(|semantics| crate::inspection::inspector::role_name(semantics.role))
+        })
+}
+
+fn node_flags(node: &Node) -> NodeFlags {
+    NodeFlags {
+        hit_testable: node.is_hit_testable(),
+        focusable: node.is_focusable(),
+        clips_to_bounds: node.clips_to_bounds(),
+        has_background: node.background_color().is_some(),
+        has_border: node.border_color().is_some() && node.border_width() > 0.0,
+    }
+}
+
+fn source_location(node: &Node) -> Option<SourceLocation> {
+    node.source_location().map(|location| SourceLocation {
+        file_id: location.file_id,
+        file_path: location.file_path,
+        line: location.line,
+        column: location.column,
+    })
+}
+
 fn insets(value: LayoutInsets) -> InspectionInsets {
     InspectionInsets {
         top: value.top as f64,
@@ -261,7 +475,7 @@ fn insets(value: LayoutInsets) -> InspectionInsets {
     }
 }
 
-fn encode_frame(frame: Rect) -> NodeFrame {
+pub(crate) fn encode_frame(frame: Rect) -> NodeFrame {
     NodeFrame {
         x: frame.x as f64,
         y: frame.y as f64,

@@ -11,7 +11,8 @@ use crate::desktop::application::configuration::{
 use crate::desktop::application::memory::AppWindowMemorySnapshot;
 use crate::desktop::application::typography::AdaptiveApplicationContent;
 use crate::desktop::diagnostics::integration::{
-    DiagnosticsCallbacks, DiagnosticsSession, take_factory,
+    DiagnosticsCallbacks, DiagnosticsSession, take_factory, window_content_geometry,
+    window_content_position_is_global,
 };
 use crate::desktop::rendering::ThreadedWindowRenderer;
 use crate::desktop::rendering::context::AppRenderingContext;
@@ -140,7 +141,9 @@ impl AuxiliaryAppWindow {
         config.window = cove_shell::platform_window_id(host.native_window_reference(id), surface);
         let window = self.session.clone();
         let invalidate: Rc<dyn Fn()> = Rc::new(move || window.request_display());
-        let host = host.clone();
+        let resize_host = host.clone();
+        let geometry_host = host.clone();
+        let geometry_session = self.session.clone();
         self.diagnostics = Some(factory(
             config,
             self.session.tree.clone(),
@@ -151,10 +154,23 @@ impl AuxiliaryAppWindow {
                 memory: Rc::new(Default::default),
                 invalidation_log: Some(self.session.input_context.invalidation_log.clone()),
                 resize_window: Some(Rc::new(move |width, height| {
-                    host.set_window_size(id, width, height);
+                    resize_host.set_window_size(id, width, height);
                     None
                 })),
                 environment: None,
+                content_geometry: Some(Rc::new(move || {
+                    if !window_content_position_is_global() {
+                        return Err(
+                            "This session does not expose a global window position.".to_owned()
+                        );
+                    }
+                    window_content_geometry(
+                        geometry_host.window_position(geometry_session.id),
+                        geometry_session.logical_size(),
+                        geometry_session.content_scale_factor(),
+                        cfg!(any(target_os = "macos", target_os = "ios")),
+                    )
+                })),
             },
         )?);
         Ok(())

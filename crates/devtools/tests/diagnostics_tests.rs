@@ -437,12 +437,20 @@ fn diagnostic_registry_is_the_single_definition_source() {
             tool.name(),
             "the definition is named for the tool"
         );
-        // Swift's `AgentTool.init` defaults `readOnly` to `true` and
-        // `UIDiagnosticTool` never overrides it (`Contracts/Tool.swift:14`,
-        // `Tools/Diagnostics.swift`), so every diagnostic tool is read-only.
+        // Swift's `AgentTool.init` defaults `readOnly` to `true` and the
+        // diagnostic tools follow that default. The UI profile start/stop pair
+        // is the deliberate exception: it changes sampler state, so the
+        // published annotation must say so.
         assert!(
-            definition.read_only,
-            "{} is read-only, matching the Swift default",
+            definition.read_only
+                || matches!(
+                    tool,
+                    UIDiagnosticTool::StartUiProfile
+                        | UIDiagnosticTool::StopUiProfile
+                        | UIDiagnosticTool::StartUiAllocationProfile
+                        | UIDiagnosticTool::StopUiAllocationProfile
+                ),
+            "{} declares whether it mutates state",
             tool.name(),
         );
         let schema = definition.schema;
@@ -562,6 +570,10 @@ fn immediate_wire_rejects_malformed_unbounded_and_async_requests() {
         "capture_ui_trace",
         "get_ui_trace",
         "compare_ui_traces",
+        "start_ui_profile",
+        "stop_ui_profile",
+        "get_ui_profile",
+        "query_ui_hotspots",
         "inspect.style.set",
         "missing",
     ] {

@@ -93,14 +93,26 @@ pub fn is_enabled() -> bool {
     ENABLED.load(Ordering::Relaxed)
 }
 
+/// Restore the build's default recording state. DevTools calls this on
+/// disconnect so a paused session does not silently stop instrumentation after
+/// the controller goes away.
+pub fn reset() {
+    ENABLED.store(cfg!(debug_assertions), Ordering::Relaxed);
+}
+
 /// Capture request and response bodies up to [`MAX_BODY_BYTES`]. Metadata is
 /// recorded regardless.
 pub fn set_capture_bodies(capture: bool) {
     CAPTURE_BODIES.store(capture, Ordering::Relaxed);
 }
 
-pub fn clear() {
-    lock().entries.clear();
+/// Remove every retained record and return how many were removed. Pending
+/// requests finish against a record that no longer exists and are not revived.
+pub fn clear() -> usize {
+    let mut log = lock();
+    let cleared = log.entries.len();
+    log.entries.clear();
+    cleared
 }
 
 pub fn snapshot() -> Vec<NetworkRecord> {

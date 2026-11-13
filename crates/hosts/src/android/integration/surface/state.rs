@@ -1,6 +1,6 @@
 //! Translation of Android/Integration/Surface/State.swift.
 
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 
 use cove_core::{
@@ -14,6 +14,7 @@ use super::DeviceFacts;
 /// Session geometry survives swapchain recreation. Native updates replace
 /// device facts; frame preparation replaces only viewport facts. The published
 /// environment is the reported one with any DevTools override applied.
+#[derive(Clone)]
 pub struct SurfaceState {
     shared: Rc<Shared>,
     system_bar_icon_style: i32,
@@ -23,6 +24,9 @@ struct Shared {
     value: State<Environment>,
     reported: RefCell<Environment>,
     environment_override: RefCell<EnvironmentOverride>,
+    /// The surface's top-left in display pixels, as the Activity measured it.
+    /// `None` until the first measurement, so nothing reports an assumed origin.
+    origin: Cell<Option<(f32, f32)>>,
 }
 
 impl Shared {
@@ -70,6 +74,7 @@ impl SurfaceState {
                 value: State::new(surface.clone()),
                 reported: RefCell::new(surface),
                 environment_override: RefCell::new(EnvironmentOverride::default()),
+                origin: Cell::new(None),
             }),
             system_bar_icon_style: -1,
         }
@@ -119,6 +124,19 @@ impl SurfaceState {
             surface.text_scale = text_scale;
         }
         self.shared.publish()
+    }
+
+    /// Replaces the surface's top-left in display pixels. Keeping the last
+    /// measured value means a query between layout passes still reports where
+    /// the content was drawn rather than dropping to the display origin.
+    pub fn set_origin(&self, origin: (f32, f32)) {
+        if origin.0.is_finite() && origin.1.is_finite() {
+            self.shared.origin.set(Some(origin));
+        }
+    }
+
+    pub fn origin(&self) -> Option<(f32, f32)> {
+        self.shared.origin.get()
     }
 
     pub fn prepare(&self, pixels: (i32, i32), scale: f32) {

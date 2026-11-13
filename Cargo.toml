@@ -4,6 +4,7 @@ members = [
     "crates/platform",
     "crates/system",
     "crates/watch",
+    "crates/alloc",
     "crates/logging",
     "crates/graphics",
     "crates/text",
@@ -23,6 +24,8 @@ members = [
     "crates/devtools",
     "crates/devtools-protocol",
     "crates/devtools-cli",
+    "crates/debugger",
+    "crates/profiling",
     "crates/addons",
     "xtask",
     "crates/browser",
@@ -41,6 +44,8 @@ repository = "https://github.com/AlexCat315/Cove"
 serde = { version = "1", features = ["derive", "rc"] }
 serde_json = "1"
 thiserror = "2"
+addr2line = "0.27"
+mach2 = "0.6"
 taffy = { version = "0.15.1", default-features = false, features = ["std", "flexbox", "grid", "calc"] }
 cc = "1"
 cmake = "0.1"
@@ -55,6 +60,7 @@ cove-core = { path = "crates/core" }
 cove-platform = { path = "crates/platform" }
 cove-system = { path = "crates/system" }
 cove-watch = { path = "crates/watch" }
+cove-alloc = { path = "crates/alloc" }
 cove-logging = { path = "crates/logging" }
 cove-graphics = { path = "crates/graphics" }
 cove-text = { path = "crates/text" }
@@ -81,6 +87,8 @@ cove-composition-macros = { path = "crates/composition-macros" }
 cove-agent = { path = "crates/agent" }
 cove-http = { path = "crates/http" }
 cove-devtools-protocol = { path = "crates/devtools-protocol" }
+cove-debugger = { path = "crates/debugger" }
+cove-profiling = { path = "crates/profiling" }
 ureq = { version = "3.5.1", default-features = false, features = ["json"] }
 # CommonMark + GFM tables/strikethrough/task lists. The Swift original used
 # swift-markdown (cmark-gfm); this is the closest vetted equivalent. Pure Rust,

@@ -4,6 +4,7 @@ use super::integration::{
     DiagnosticsSession,
 };
 use cove_composition::ViewGraph;
+use cove_devtools::frame_analysis::{FrameWindow, Timeline};
 use cove_devtools::inspection::{DiagnosticMemorySnapshot as Memory, DiagnosticStateSource};
 use cove_devtools::probe_transport::ProbeTransport;
 use cove_devtools::protocol::{
@@ -22,6 +23,9 @@ struct Session {
     layout_ms: f64,
     draw_ms: f64,
     pending: BTreeMap<u64, TimingFrame>,
+    /// The tree's CPU timeline, and the span window closed for each frame.
+    timeline: Timeline,
+    window: FrameWindow,
 }
 
 impl DiagnosticsSession for Session {
@@ -44,7 +48,10 @@ impl DiagnosticsSession for Session {
 
     fn frame_finished(&mut self, nodes: usize, batches: usize, token: Option<u64>) {
         let total_ms = self.frame_start.elapsed().as_secs_f64() * 1000.0;
-        let frame = TimingFrame {
+        // Recomposition commits before the host begins the frame, so the window
+        // spans everything since the previous frame closed.
+        let attribution = self.window.close(&self.timeline);
+        let mut frame = TimingFrame {
             frame: 0,
             recomposition_ms: None,
             layout_ms: self.layout_ms,
@@ -55,7 +62,10 @@ impl DiagnosticsSession for Session {
             total_ms,
             node_count: nodes,
             batch_count: batches,
+            timeline_start: 0,
+            timeline_end: 0,
         };
+        attribution.apply(&mut frame);
         if let Some(token) = token {
             if self.pending.len() >= 16
                 && let Some((_, expired)) = self.pending.pop_first()
@@ -99,6 +109,8 @@ pub fn factory() -> DiagnosticsFactory {
             if !cfg!(debug_assertions) {
                 return Err("The DevTools runtime probe requires a debug build.".into());
             }
+            let timeline: Timeline = tree.borrow().timeline.clone();
+            let window = FrameWindow::new(&timeline);
             let mut probe = RuntimeProbe::new(
                 tree,
                 callbacks.invalidation_log,
@@ -118,6 +130,18 @@ pub fn factory() -> DiagnosticsFactory {
                     let request = serde_json::from_value(value)
                         .map_err(|error| format!("Invalid environment: {error}"))?;
                     apply(&request).map(|environment| environment_summary(&environment))
+                }));
+            }
+            if let Some(geometry) = callbacks.content_geometry {
+                probe.content_geometry = Some(Rc::new(move || {
+                    let geometry = geometry()?;
+                    Ok(cove_devtools::protocol::ContentGeometry {
+                        origin_x: geometry.origin.0,
+                        origin_y: geometry.origin.1,
+                        scale: geometry.scale,
+                        width: geometry.size.0,
+                        height: geometry.size.1,
+                    })
                 }));
             }
             *probe.diagnostics().memory.borrow_mut() = Some(Rc::new(move || {
@@ -156,6 +180,8 @@ pub fn factory() -> DiagnosticsFactory {
                 layout_ms: 0.0,
                 draw_ms: 0.0,
                 pending: BTreeMap::new(),
+                timeline,
+                window,
             }))
         },
     )

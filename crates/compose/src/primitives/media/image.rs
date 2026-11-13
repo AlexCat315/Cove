@@ -15,7 +15,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use crate::{PrimitiveView, impl_primitive_view};
-use cove_core::scene::{Point, Rect, Size};
+use cove_core::scene::{Point, Rect, Size, clear_image_pixel_metrics, record_image_pixel_metrics};
 use cove_core::{Color, TextureId};
 use cove_imaging::{ImageAsset, TextureImage};
 
@@ -261,11 +261,8 @@ impl PrimitiveView for Image {
                     })
                 })
                 .unwrap_or_else(|| snapshot.source.clone());
-            let geometry = ImageGeometry::new(
-                container,
-                resolved.source_pixel_size(),
-                snapshot.content_mode,
-            );
+            let source_pixels = resolved.source_pixel_size();
+            let geometry = ImageGeometry::new(container, source_pixels, snapshot.content_mode);
             let mut rect = geometry.rect;
             let pixel_scale = list.pixel_scale.max(1.0);
             let selected = resolved.resolution(
@@ -314,6 +311,15 @@ impl PrimitiveView for Image {
                     Point::new(geometry.uv_min.x, geometry.uv_min.y),
                     Point::new(geometry.uv_max.x, geometry.uv_max.y),
                 );
+            }
+            match source_pixels {
+                Some(source) => record_image_pixel_metrics(
+                    node,
+                    source,
+                    (rect.width * pixel_scale, rect.height * pixel_scale),
+                    vector_raster.is_some(),
+                ),
+                None => clear_image_pixel_metrics(node),
             }
         });
     }

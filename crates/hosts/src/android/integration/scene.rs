@@ -4,7 +4,9 @@ use super::diagnostics::{AndroidDiagnostics, AndroidDiagnosticsHooks};
 use super::environment::SceneEnvironment;
 use super::surface::SurfaceState;
 use super::touch_input::TouchInput;
-use crate::desktop::diagnostics::integration::{DevToolsConfiguration, DiagnosticMemorySnapshot};
+use crate::desktop::diagnostics::integration::{
+    ContentGeometry, DevToolsConfiguration, DiagnosticMemorySnapshot,
+};
 use cove_composition::{
     AnyView, LayoutDebugAttachmentKey, PrimitiveView, View, ViewGraph, ViewKind,
 };
@@ -12,7 +14,7 @@ use cove_core::scene::ComponentSourceLocation;
 use cove_core::scene::{
     AnimatorScheduler, EventDispatcher, NodeRenderer, NodeTree, PlatformInputContext, Recomposer,
     RenderTree, TextEditActions, TextEditCommand, TextInputAttachmentKey, TextInputClient,
-    TextInputSnapshot,
+    TextInputSnapshot, scale_animation_delta,
 };
 use cove_core::{DrawList, Environment, GeometryAntialiasing, Point, State};
 use cove_platform::{
@@ -23,6 +25,7 @@ use cove_ui_compose::primitives::overlays::TooltipArbitrationAmbient;
 use cove_ui_compose::primitives::overlays::portal::{PortalStore, PortalStoreAmbient};
 use cove_ui_compose::theme::{TextScalerViewExt, surface_theme};
 use std::cell::{Cell, OnceCell, RefCell};
+use std::collections::BTreeMap;
 use std::rc::Rc;
 use std::time::Instant;
 
@@ -251,6 +254,12 @@ impl AndroidContentSession {
         }
     }
 
+    /// Records the surface's top-left in display pixels. The Activity measures
+    /// this with `View.getLocationOnScreen`; it is not derivable here.
+    pub fn set_surface_origin(&self, x: f32, y: f32) {
+        self.surface.set_origin((x, y));
+    }
+
     pub fn configure_diagnostics(
         &self,
         config: DevToolsConfiguration,
@@ -277,8 +286,8 @@ impl AndroidContentSession {
             .map(|text| text.layout_cache_snapshot());
         let memory = {
             let graph = graph.clone();
-            Rc::new(move || DiagnosticMemorySnapshot {
-                counters: [
+            Rc::new(move || {
+                let mut counters: BTreeMap<String, u64> = [
                     (
                         "shapingEntries".to_owned(),
                         shaping.map_or(0, |cache| cache.entries as u64),
@@ -303,8 +312,13 @@ impl AndroidContentSession {
                     ),
                 ]
                 .into_iter()
-                .collect(),
-                windows: Default::default(),
+                .collect();
+                crate::process_memory::insert_counters(&mut counters);
+                crate::allocation::insert_counters(&mut counters);
+                DiagnosticMemorySnapshot {
+                    counters,
+                    windows: Default::default(),
+                }
             }) as Rc<dyn Fn() -> DiagnosticMemorySnapshot>
         };
         let invalidate = {
@@ -329,6 +343,20 @@ impl AndroidContentSession {
                     ) -> Result<cove_core::Environment, String>,
                 >
         };
+        let surface = self.surface.clone();
+        let content_geometry = Rc::new(move || {
+            let (x, y) = surface
+                .origin()
+                .ok_or("The Activity has not measured the surface position yet.")?;
+            Ok(ContentGeometry {
+                origin: (f64::from(x), f64::from(y)),
+                scale: f64::from(surface.scale()),
+                size: (
+                    f64::from(surface.logical_size().0),
+                    f64::from(surface.logical_size().1),
+                ),
+            })
+        });
         let diagnostics = AndroidDiagnostics::new(
             config,
             self.tree.clone(),
@@ -339,6 +367,7 @@ impl AndroidContentSession {
             AndroidDiagnosticsHooks {
                 invalidation_log: self.context.invalidation_log.clone(),
                 environment: Some(environment),
+                content_geometry: Some(content_geometry),
             },
         )?;
         *self.diagnostics.borrow_mut() = Some(diagnostics);
@@ -460,7 +489,7 @@ impl AndroidContentSession {
                     }
                     let layout_start = Instant::now();
                     environment.drain();
-                    animations.tick(delta_time);
+                    animations.tick(scale_animation_delta(delta_time));
                     recomposer.commit_all();
                     graph.compute_layout_if_needed(width, height);
                     let theme = tree.borrow().root().and_then(|root| surface_theme(&root));

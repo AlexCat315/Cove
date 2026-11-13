@@ -12,6 +12,7 @@ path = "src/main.rs"
 
 [dependencies]
 cove-agent.workspace = true
+cove-debugger.workspace = true
 cove-devtools-protocol.workspace = true
 serde.workspace = true
 serde_json.workspace = true
@@ -22,6 +23,10 @@ tiny_http = "0.12"
 tempfile.workspace = true
 ureq.workspace = true
 image = { version = "0.25", default-features = false, features = ["png", "jpeg"] }
+object = { version = "0.40", default-features = false, features = ["read", "std"] }
+rustc-demangle = "0.1"
+plist = { version = "1.10", default-features = false }
+quick-xml = "0.41"
 
 [target.'cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))'.dependencies]
 xcap = "0.9.10"
@@ -35,10 +40,11 @@ zbus = { version = "5", features = ["blocking-api"] }
 
 [target.'cfg(target_os = "windows")'.dependencies]
 xcap = { version = "0.9.10", features = ["wgc"] }
-windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_UI_WindowsAndMessaging", "Win32_UI_HiDpi"] }
+windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_System_Threading", "Win32_UI_WindowsAndMessaging", "Win32_UI_HiDpi"] }
 windows = { version = "0.62", features = ["Win32_Foundation", "Win32_System_Com", "Win32_UI_Accessibility"] }
 
 [target.'cfg(target_os = "macos")'.dependencies]
+libc.workspace = true
 block2.workspace = true
 objc2.workspace = true
 objc2-application-services = { version = "0.3", default-features = false, features = ["std", "HIServices", "AXError", "AXUIElement", "libc"] }

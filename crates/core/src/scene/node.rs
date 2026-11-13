@@ -12,7 +12,7 @@ use super::{
 use crate::{Color, DrawList, LinearGradient, Point, Rect, Reveal, SurfaceShadow};
 use cove_platform::SystemCursor;
 use std::any::Any;
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
 use std::collections::{BTreeMap, HashSet};
 use std::hash::{Hash, Hasher};
 use std::rc::{Rc, Weak};
@@ -161,6 +161,10 @@ pub struct NodeData {
     pub attachments: BTreeMap<String, Rc<dyn Any>>,
     pub composition_values: BTreeMap<CompositionLocalKey, Rc<dyn Any>>,
     resources: Vec<Rc<dyn NodeResource>>,
+    /// How many times the renderers painted this node's own box or content.
+    /// A cell because the renderers bump it through `&Node`; reading or writing
+    /// it never invalidates layout or painting.
+    repaint_epoch: Cell<u64>,
 }
 
 /// A retained-mode node in the CoveUI scene tree.
@@ -256,6 +260,7 @@ impl Node {
             attachments: BTreeMap::new(),
             composition_values: BTreeMap::new(),
             resources: Vec::new(),
+            repaint_epoch: Cell::new(0),
         })))
     }
 
@@ -621,6 +626,25 @@ impl Node {
         let mut data = self.0.borrow_mut();
         data.is_dirty = false;
         data.render_dirty = false;
+    }
+
+    // MARK: - Repaint record
+
+    /// How many times this node's own box or content has been painted.
+    ///
+    /// Monotonic and diagnostic-only: reading it or bumping it never marks the
+    /// node dirty. A node retained in a layer cache keeps its value across
+    /// frames because its cached draw list is appended instead of repainted.
+    pub fn repaint_epoch(&self) -> u64 {
+        self.0.borrow().repaint_epoch.get()
+    }
+
+    /// Record one paint of this node and return the new generation.
+    pub fn bump_repaint(&self) -> u64 {
+        let data = self.0.borrow();
+        let next = data.repaint_epoch.get().saturating_add(1);
+        data.repaint_epoch.set(next);
+        next
     }
 
     // MARK: - Geometry

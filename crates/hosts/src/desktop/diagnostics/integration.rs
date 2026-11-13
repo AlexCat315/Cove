@@ -37,6 +37,75 @@ pub struct DiagnosticsCallbacks {
     pub environment: Option<
         Rc<dyn Fn(&cove_core::EnvironmentRequest) -> Result<cove_core::Environment, String>>,
     >,
+    /// `None` where the host cannot observe where its content sits on screen.
+    /// A client must then refuse point selection instead of guessing.
+    pub content_geometry: Option<Rc<dyn Fn() -> Result<ContentGeometry, String>>>,
+}
+
+/// Where a runtime's content starts in the window-server coordinate space a
+/// platform capture reports, plus the runtime viewport it holds.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct ContentGeometry {
+    /// Content `(0, 0)` in window-server units (the space window bounds use).
+    pub origin: (f64, f64),
+    /// Window-server units per runtime logical point.
+    pub scale: f64,
+    /// Content viewport in runtime logical points.
+    pub size: (f64, f64),
+}
+
+/// Whether the platform reports window positions in the global screen space a
+/// capture uses.
+///
+/// Wayland deliberately withholds global window positions, so SDL only knows
+/// the display origin there. Reporting that as content geometry would invent
+/// coordinates; callers refuse instead. An explicitly x11-backed SDL session
+/// keeps its real position.
+#[cfg(target_os = "linux")]
+pub fn window_content_position_is_global() -> bool {
+    if let Ok(driver) = std::env::var("SDL_VIDEODRIVER") {
+        if driver.eq_ignore_ascii_case("wayland") {
+            return false;
+        }
+        if driver.eq_ignore_ascii_case("x11") {
+            return true;
+        }
+    }
+    std::env::var_os("WAYLAND_DISPLAY").is_none()
+}
+
+#[cfg(not(target_os = "linux"))]
+pub fn window_content_position_is_global() -> bool {
+    true
+}
+
+/// Builds content geometry from the window facts the platform shell publishes.
+///
+/// `position` is SDL's content-area origin: the vendored SDL backends store
+/// `ClientToScreen` on Windows/X11 and the AppKit content rect on Apple, which
+/// is the window-server space captures use. `logical_size` is the runtime
+/// viewport. `position_is_logical` distinguishes Apple's point space from the
+/// physical-pixel space Windows and X11 report.
+pub fn window_content_geometry(
+    position: Option<(f32, f32)>,
+    logical_size: (u32, u32),
+    content_scale: f32,
+    position_is_logical: bool,
+) -> Result<ContentGeometry, String> {
+    let (x, y) = position.ok_or("The platform does not report the window's content position.")?;
+    let scale = if position_is_logical {
+        1.0
+    } else {
+        f64::from(content_scale)
+    };
+    if !x.is_finite() || !y.is_finite() || !scale.is_finite() || scale <= 0.0 {
+        return Err("The platform reported non-finite content geometry.".to_owned());
+    }
+    Ok(ContentGeometry {
+        origin: (f64::from(x), f64::from(y)),
+        scale,
+        size: (f64::from(logical_size.0), f64::from(logical_size.1)),
+    })
 }
 
 /// One DevTools session bound to a single host tree and render graph.

@@ -13,7 +13,8 @@ use super::services::ApplicationServices;
 use super::typography::{AdaptiveApplicationContent, ApplicationTypography};
 use crate::desktop::diagnostics::frame_metrics::FrameMetrics;
 use crate::desktop::diagnostics::integration::{
-    DiagnosticsCallbacks, DiagnosticsSession, take_factory,
+    DiagnosticsCallbacks, DiagnosticsSession, take_factory, window_content_geometry,
+    window_content_position_is_global,
 };
 use crate::desktop::diagnostics::performance_hud::PerformanceHud;
 use crate::desktop::diagnostics::session::{ApplicationDiagnostics, DiagnosticsQueries};
@@ -518,6 +519,23 @@ impl Application {
                 };
                 Some(Rc::new(move |request: &cove_core::EnvironmentRequest| {
                     application.request_environment(request)
+                }))
+            },
+            content_geometry: {
+                let host = state.host.clone();
+                Some(Rc::new(move || {
+                    if !window_content_position_is_global() {
+                        return Err(
+                            "This session does not expose a global window position.".to_owned()
+                        );
+                    }
+                    let id = host.main_window().ok_or("No main window")?;
+                    window_content_geometry(
+                        host.window_position(id),
+                        host.logical_size(),
+                        host.content_scale_factor(),
+                        cfg!(any(target_os = "macos", target_os = "ios")),
+                    )
                 }))
             },
         };
@@ -1646,7 +1664,7 @@ impl Application {
     ) -> crate::desktop::diagnostics::DiagnosticMemorySnapshot {
         let value = self.memory_snapshot();
         let state = &self.state;
-        let counters = BTreeMap::from([
+        let mut counters = BTreeMap::from([
             (
                 "shapingEntries".to_owned(),
                 value
@@ -1685,6 +1703,8 @@ impl Application {
                 state.composition.graph.skipped_parent_updates() as u64,
             ),
         ]);
+        crate::process_memory::insert_counters(&mut counters);
+        crate::allocation::insert_counters(&mut counters);
         // `DiagnosticMemorySnapshot.windows` is a flat map, so each window's
         // counters are keyed `<window>.<counter>` to keep every value while
         // matching the shared shape.

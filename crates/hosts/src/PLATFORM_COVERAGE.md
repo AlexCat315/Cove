@@ -39,6 +39,20 @@ Native web views belong to the platform thread on every desktop platform; wrap t
 
 Hosts install the `ColorSampler` ambient only when `Sdl3PlatformHost::screen_color_backend().is_available()`. A new pick supersedes the previous one (`Cancelled`), and `Sdl3Shell::shutdown()` cancels every in-flight worker. Native picker interaction on Windows and Linux has not been visually accepted on real hardware yet; the wire codec, pixel decoding and async queue are covered by structural tests.
 
+## Process memory counters
+
+`process_memory` is the shared reader behind the `processResidentBytes` and `processVirtualBytes` entries of `query_ui_memory`, installed by both the desktop `Application::diagnostic_memory_snapshot` and the Android memory closure. It reads the kernel once per query; a target without a reader omits the counters (`ProcessMemory` leaves the field `None`) and publishes the reason through `process_memory::unavailable_reason()` — a missing reading is never reported as zero.
+
+| Platform | Resident | Virtual | Backend | Limitation |
+| --- | --- | --- | --- | --- |
+| macOS | `pti_resident_size` | `pti_virtual_size` (address space) | `proc_pidinfo(PROC_PIDTASKINFO)` | — |
+| iOS | `resident_size` | `virtual_size` (address space) | `task_info(MACH_TASK_BASIC_INFO)` | iOS has no `proc_pidinfo`; the Mach task port is the public reading |
+| Linux, Android | `VmRSS` | `VmSize` (address space) | `/proc/self/status` | A kernel without those fields falls back to omitting the counter |
+| Windows | `WorkingSetSize` | `PagefileUsage` | `K32GetProcessMemoryInfo` + `PROCESS_MEMORY_COUNTERS` | `PROCESS_MEMORY_COUNTERS` has no address-space field; the virtual counter is private commit ("Commit size"), not reserved address space |
+| Wasm, other targets | — | — | none | No process address space to sample; both counters are omitted |
+
+`cargo test -p cove-hosts --lib` asserts a positive resident reading and `resident <= virtual` for the address-space backends. Each other backend compiles under its own `cfg`; a full `cargo check -p cove-hosts --target <triple>` additionally needs that platform's native SDK.
+
 ### Platform gate counts (`target_os = "…"` occurrences)
 
 | Gate | Occurrences |
@@ -48,6 +62,14 @@ Hosts install the `ColorSampler` ambient only when `Sdl3PlatformHost::screen_col
 | `windows` | 5 |
 | `linux` | 3 |
 | `ios` | 3 |
+
+## Allocation counters
+
+`allocation` adds the `cove-alloc` heap counters to the same `query_ui_memory` answer: `allocCurrentBytes`, `allocPeakBytes`, `allocTotalBytes`, `allocDeallocatedBytes`, `allocLiveBlocks`, `allocPeakLiveBlocks`, `allocTotalBlocks`, `allocDeallocatedBlocks`, plus one `allocSizeClass…LiveBytes` entry per size class (64 B, 256 B, 1 KiB, 4 KiB, 16 KiB, 64 KiB, 1 MiB, larger). The application opts in by installing `cove_alloc::TrackingAllocator` as its `#[global_allocator]`; `examples/gallery/src/bin/gallery.rs` does. A binary that does not install it publishes none of these entries — `cove_alloc::snapshot()` is `None` until the allocator has served its first allocation, so "not instrumented" is never reported as zero live bytes.
+
+The counters are measured in the allocator from the caller's `Layout`: no per-allocation header, no call stack. They measure bytes and blocks only. Rust object types, retaining paths, garbage collection and leaks are **not** available and are not approximated: a live block is one that has not been released, whether or not it is reachable.
+
+`cargo test -p cove-alloc` runs the lib unit tests plus two standalone binaries: `tests/tracking.rs` installs the tracking allocator as `#[global_allocator]` and asserts the counters rise, peak/current stay plausible (peak ≥ current, total ≥ current, live + released = total, size classes sum to the totals), and that realloc/dealloc accounting is exact; `tests/no_install.rs` asserts an uninstrumented process reports nothing and that one served allocation flips the counters on.
 
 ## The three behaviours that could not be ported faithfully
 

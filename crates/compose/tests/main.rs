@@ -120,6 +120,7 @@ mod grid_span;
 mod gutter_tests;
 mod image_file_content_mode_tests;
 mod image_pipeline_tests;
+mod image_pixel_metrics_tests;
 mod indicator_tests;
 mod interaction_tests;
 mod interactive_scene;

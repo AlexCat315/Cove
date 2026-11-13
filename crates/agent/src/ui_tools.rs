@@ -17,12 +17,19 @@ pub enum Tool {
     CaptureUiTrace,
     GetUiTrace,
     CompareUiTraces,
+    StartUiProfile,
+    StopUiProfile,
+    GetUiProfile,
+    QueryUiHotspots,
+    StartUiAllocationProfile,
+    StopUiAllocationProfile,
+    QueryUiAllocationSites,
     ListSkills,
     ReadSkill,
 }
 
 impl Tool {
-    pub const ALL: [Tool; 11] = [
+    pub const ALL: [Tool; 18] = [
         Tool::GetDiagnostics,
         Tool::QueryUiNodes,
         Tool::QueryUiRecomposition,
@@ -32,6 +39,13 @@ impl Tool {
         Tool::CaptureUiTrace,
         Tool::GetUiTrace,
         Tool::CompareUiTraces,
+        Tool::StartUiProfile,
+        Tool::StopUiProfile,
+        Tool::GetUiProfile,
+        Tool::QueryUiHotspots,
+        Tool::StartUiAllocationProfile,
+        Tool::StopUiAllocationProfile,
+        Tool::QueryUiAllocationSites,
         Tool::ListSkills,
         Tool::ReadSkill,
     ];
@@ -51,18 +65,35 @@ impl Tool {
             Self::CaptureUiTrace => "capture_ui_trace",
             Self::GetUiTrace => "get_ui_trace",
             Self::CompareUiTraces => "compare_ui_traces",
+            Self::StartUiProfile => "start_ui_profile",
+            Self::StopUiProfile => "stop_ui_profile",
+            Self::GetUiProfile => "get_ui_profile",
+            Self::QueryUiHotspots => "query_ui_hotspots",
+            Self::StartUiAllocationProfile => "start_ui_allocation_profile",
+            Self::StopUiAllocationProfile => "stop_ui_allocation_profile",
+            Self::QueryUiAllocationSites => "query_ui_allocation_sites",
             Self::ListSkills => "list_skills",
             Self::ReadSkill => "read_skill",
         }
     }
 
     /// Tools the native DevTools wire adapter may execute synchronously in the
-    /// host's frame inbox. Trace reads and comparisons stay on the asynchronous
-    /// toolbox because they depend on retained capture state.
+    /// host's frame inbox. Trace reads, trace comparisons and the UI profile
+    /// commands stay on the asynchronous toolbox: they depend on retained
+    /// capture or sampler state.
     pub fn is_immediate_read(self) -> bool {
         !matches!(
             self,
-            Self::CaptureUiTrace | Self::GetUiTrace | Self::CompareUiTraces
+            Self::CaptureUiTrace
+                | Self::GetUiTrace
+                | Self::CompareUiTraces
+                | Self::StartUiProfile
+                | Self::StopUiProfile
+                | Self::GetUiProfile
+                | Self::QueryUiHotspots
+                | Self::StartUiAllocationProfile
+                | Self::StopUiAllocationProfile
+                | Self::QueryUiAllocationSites
         )
     }
 
@@ -198,6 +229,78 @@ impl Tool {
                 ),
                 true,
             ),
+            Self::StartUiProfile => AgentTool::new(
+                self.name(),
+                "Sample the selected runtime's UI thread with the in-process CPU sampler. Sampling stops by itself after duration_ms, bounded to 10s; the symbolization runs on a background thread. macOS only; other platforms return unavailable with the reason instead of samples.",
+                object(
+                    BTreeMap::from([
+                        (
+                            "hz".to_string(),
+                            JsonSchema::integer(Some(1.0), Some(1_000.0)),
+                        ),
+                        (
+                            "duration_ms".to_string(),
+                            JsonSchema::integer(Some(1.0), Some(10_000.0)),
+                        ),
+                    ]),
+                    vec!["hz".to_string(), "duration_ms".to_string()],
+                ),
+                false,
+            ),
+            Self::StopUiProfile => AgentTool::new(
+                self.name(),
+                "Stop the active UI profile, join the sampler and return the symbolized profile: aggregated stacks, retained and dropped sample counts, and the bound. macOS only; other platforms return unavailable with the reason.",
+                object(BTreeMap::new(), Vec::new()),
+                false,
+            ),
+            Self::GetUiProfile => AgentTool::new(
+                self.name(),
+                "Read the active or most recent UI profile. Stacks are aggregated, never one record per sample, and at most 24 are returned. While sampling, counters are live and stacks are empty. macOS only.",
+                object(BTreeMap::new(), Vec::new()),
+                true,
+            ),
+            Self::QueryUiHotspots => AgentTool::new(
+                self.name(),
+                "Read aggregated self and inclusive hotspots of the retained UI profile, by function and source line. Self time is exclusive; inclusive time counts a frame once per sample. Times accumulate the measured gap between retained samples. macOS only.",
+                object(
+                    BTreeMap::from([(
+                        "limit".to_string(),
+                        JsonSchema::integer(Some(1.0), Some(200.0)),
+                    )]),
+                    Vec::new(),
+                ),
+                true,
+            ),
+            Self::StartUiAllocationProfile => AgentTool::new(
+                self.name(),
+                "Start sampling allocation sites in the selected runtime's process. rate is the 1-in-N divisor: every rate-th fresh allocation through the tracking allocator captures a bounded caller stack. Counters are cumulative sampled allocations, not live heap, and no object types, retaining paths or leaks are inferred. A start replaces any previous session. Requires a runtime that advertises allocation_sites; unsupported platforms return unavailable with the reason.",
+                object(
+                    BTreeMap::from([(
+                        "rate".to_string(),
+                        JsonSchema::integer(Some(1.0), Some(1_000_000.0)),
+                    )]),
+                    vec!["rate".to_string()],
+                ),
+                false,
+            ),
+            Self::StopUiAllocationProfile => AgentTool::new(
+                self.name(),
+                "Stop allocation-site sampling and return the window's bounded, symbolized sites with sampled bytes and blocks, attempted/retained/dropped samples, capture failures and truncation flags. Addresses are real sampled return addresses; function, file and line stay absent when the platform cannot symbolize. These are cumulative sampled allocations, not live heap.",
+                object(BTreeMap::new(), Vec::new()),
+                false,
+            ),
+            Self::QueryUiAllocationSites => AgentTool::new(
+                self.name(),
+                "Read the live allocation-site sampling session's sites, or the last stopped report. limit caps returned sites (default 20, max 64); sitesTruncated reports the cut. Counters are cumulative sampled allocations, not live heap. Idle means this probe session never sampled.",
+                object(
+                    BTreeMap::from([(
+                        "limit".to_string(),
+                        JsonSchema::integer(Some(1.0), Some(64.0)),
+                    )]),
+                    Vec::new(),
+                ),
+                true,
+            ),
             Self::ListSkills => AgentTool::new(
                 self.name(),
                 "List the host's available task guides without loading their bodies.",
@@ -236,7 +339,7 @@ impl Tools {
 
 /// Built-in task guide shipped with the crate.
 pub const UI_DIAGNOSTICS_GUIDE: &str = "\
-Start with get_diagnostics to discover available data. Use query_ui_nodes to locate the affected component and its compiled source location. Query owner recomposition statistics and explicitly exposed state summaries as needed. Capture a bounded CPU trace around the real operation; an idle capture is not evidence of a successful action. Read capture events and compare equivalent workloads before and after a change. Parent spans include child work; do not sum overlapping spans as frame time. CPU draw and present timing do not measure GPU execution. Cite node, scope, sample or capture IDs with observations. Treat recommendations and correlated timings as hypotheses. Report missing, stale, truncated or dropped data. This guide grants no additional tools or write permissions.";
+Start with get_diagnostics to discover available data. Use query_ui_nodes to locate the affected component and its compiled source location. Query owner recomposition statistics and explicitly exposed state summaries as needed. Capture a bounded CPU trace around the real operation; an idle capture is not evidence of a successful action. On macOS, sample the UI thread with start_ui_profile, then read get_ui_profile and query_ui_hotspots to attribute its time to function and source line; other platforms report unavailable. Read capture events and compare equivalent workloads before and after a change. Parent spans include child work; do not sum overlapping spans as frame time. CPU draw and present timing do not measure GPU execution. Cite node, scope, sample or capture IDs with observations. Treat recommendations and correlated timings as hypotheses. Report missing, stale, truncated or dropped data. This guide grants no additional tools or write permissions.";
 
 /// The default library: one built-in guide plus any guide found on disk.
 pub fn default_skill_library() -> AgentSkillLibrary {
@@ -280,11 +383,75 @@ mod tests {
     }
 
     #[test]
-    fn trace_tools_are_not_immediate_reads() {
-        assert!(!Tool::CaptureUiTrace.is_immediate_read());
-        assert!(!Tool::GetUiTrace.is_immediate_read());
-        assert!(!Tool::CompareUiTraces.is_immediate_read());
+    fn asynchronous_tools_are_not_immediate_reads() {
+        for tool in [
+            Tool::CaptureUiTrace,
+            Tool::GetUiTrace,
+            Tool::CompareUiTraces,
+            Tool::StartUiProfile,
+            Tool::StopUiProfile,
+            Tool::GetUiProfile,
+            Tool::QueryUiHotspots,
+            Tool::StartUiAllocationProfile,
+            Tool::StopUiAllocationProfile,
+            Tool::QueryUiAllocationSites,
+        ] {
+            assert!(!tool.is_immediate_read(), "{}", tool.name());
+        }
         assert_eq!(Tool::immediate_read_tools().len(), 8);
+    }
+
+    #[test]
+    fn allocation_site_tools_are_bounded_and_name_their_basis() {
+        let start = Tool::StartUiAllocationProfile.definition();
+        assert!(!start.read_only, "starting sampling changes runtime state");
+        assert_eq!(start.schema.required, vec!["rate".to_string()]);
+        assert_eq!(start.schema.properties["rate"].maximum, Some(1_000_000.0));
+        assert!(
+            start.description.contains("not live heap"),
+            "{} names what the counters measure",
+            start.name
+        );
+
+        assert!(!Tool::StopUiAllocationProfile.definition().read_only);
+
+        let query = Tool::QueryUiAllocationSites.definition();
+        assert!(query.read_only);
+        let limit = &query.schema.properties["limit"];
+        let maximum = limit
+            .maximum
+            .or_else(|| limit.one_of.iter().find_map(|candidate| candidate.maximum));
+        assert_eq!(maximum, Some(64.0));
+        assert!(
+            query.description.contains("not live heap"),
+            "{} names what the counters measure",
+            query.name
+        );
+    }
+
+    #[test]
+    fn ui_profile_tools_declare_their_platform_and_mutation() {
+        let start = Tool::StartUiProfile.definition();
+        assert!(!start.read_only);
+        assert_eq!(
+            start.schema.required,
+            vec!["duration_ms".to_string(), "hz".to_string()]
+        );
+        assert!(!Tool::StopUiProfile.definition().read_only);
+        assert!(Tool::GetUiProfile.definition().read_only);
+        assert!(Tool::QueryUiHotspots.definition().read_only);
+        for tool in [
+            Tool::StartUiProfile,
+            Tool::StopUiProfile,
+            Tool::GetUiProfile,
+            Tool::QueryUiHotspots,
+        ] {
+            assert!(
+                tool.definition().description.contains("macOS"),
+                "{} names the platform",
+                tool.name()
+            );
+        }
     }
 
     #[test]

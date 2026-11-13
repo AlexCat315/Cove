@@ -22,6 +22,7 @@ cove-text.workspace = true
 cove-imaging.workspace = true
 cove-system.workspace = true
 cove-logging.workspace = true
+cove-alloc.workspace = true
 cove-http.workspace = true
 serde.workspace = true
 serde_json.workspace = true
@@ -30,6 +31,13 @@ libc.workspace = true
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 cove-runtime.workspace = true
 cove-shell.workspace = true
+
+[target.'cfg(target_os = "windows")'.dependencies]
+windows-sys = { version = "0.61", features = [
+    "Win32_Foundation",
+    "Win32_System_ProcessStatus",
+    "Win32_System_Threading",
+] }
 
 [lints]
 workspace = true

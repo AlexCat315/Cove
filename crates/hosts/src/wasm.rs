@@ -28,6 +28,8 @@ pub fn install_overlay_services(context: &cove_core::scene::PlatformInputContext
     use cove_ui_compose::primitives::overlays::portal::{PortalStore, PortalStoreAmbient};
     use std::rc::Rc;
 
-    context.add_scoped_ambient(Rc::new(PortalStoreAmbient::new(Rc::new(PortalStore::new()))));
+    context.add_scoped_ambient(Rc::new(PortalStoreAmbient::new(
+        Rc::new(PortalStore::new()),
+    )));
     context.add_scoped_ambient(Rc::new(TooltipArbitrationAmbient::new()));
 }

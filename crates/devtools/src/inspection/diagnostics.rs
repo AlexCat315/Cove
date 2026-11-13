@@ -938,6 +938,17 @@ impl Diagnostics {
                     "capture_ui_trace requires the asynchronous toolbox.".into(),
                 ));
             }
+            Tool::StartUiProfile
+            | Tool::StopUiProfile
+            | Tool::GetUiProfile
+            | Tool::QueryUiHotspots
+            | Tool::StartUiAllocationProfile
+            | Tool::StopUiAllocationProfile
+            | Tool::QueryUiAllocationSites => {
+                return Err(DiagnosticError::InvalidConfiguration(
+                    "UI profile commands require the asynchronous toolbox.".into(),
+                ));
+            }
         };
         Ok(data)
     }
@@ -1457,7 +1468,13 @@ fn network_log() -> serde_json::Value {
         .collect();
     serde_json::json!({
         "ok": true,
-        "data": { "records": records, "limit": cove_http::recording::MAX_RECORDS }
+        "data": {
+            "records": records,
+            "limit": cove_http::recording::MAX_RECORDS,
+            // The live flag, so a paused recorder is visible before any control
+            // call; the client must not infer recording state from the table.
+            "enabled": cove_http::recording::is_enabled(),
+        }
     })
 }
 

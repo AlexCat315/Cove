@@ -14,6 +14,7 @@ media-ffmpeg = ["cove-media/ffmpeg"]
 cove-ui-compose = { path = "../../crates/compose" }
 cove-ui-addons = { path = "../../crates/addons" }
 cove-hosts = { path = "../../crates/hosts", features = ["devtools"] }
+cove-alloc.workspace = true
 cove-composition.workspace = true
 cove-core.workspace = true
 cove-platform.workspace = true

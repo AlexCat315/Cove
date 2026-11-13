@@ -81,6 +81,13 @@ impl LogSystem {
         Self::runtime().snapshot(&query)
     }
 
+    /// Empties the process runtime's replay window and the loss count for that
+    /// window. Sequences keep increasing for records logged afterwards.
+    /// Returns the number of removed records.
+    pub fn clear_history() -> usize {
+        Self::runtime().clear_history()
+    }
+
     pub fn observe(
         query: LogQuery,
         replay: bool,

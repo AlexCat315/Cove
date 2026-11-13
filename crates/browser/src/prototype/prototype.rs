@@ -12,16 +12,17 @@
 //! [`PrototypeContent`] so the host ABI, frame encoding and DevTools plumbing
 //! stay independent of any particular demo.
 
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 use std::time::Instant;
 
 use cove_composition::ViewGraph;
 use cove_core::scene::{
     AnimatorScheduler, EventDispatcher, NodeRenderer, NodeTree, PlatformInputContext, Recomposer,
-    TextInputAreaResolver, TextInputAttachmentKey,
+    TextInputAreaResolver, TextInputAttachmentKey, scale_animation_delta,
 };
 use cove_core::{DrawList, Point, TextLayoutOptions, layout_text};
+use cove_devtools::frame_analysis::{FrameWindow, Timeline};
 use cove_devtools::inspection::DiagnosticStateSource;
 use cove_devtools::runtime_probe::RuntimeProbe;
 use cove_devtools_protocol::{
@@ -76,12 +77,19 @@ pub struct BrowserPrototype<C: PrototypeContent> {
     recomposition_ms: f64,
     layout_ms: f64,
     render_ms: f64,
+    timeline: Timeline,
+    window: FrameWindow,
     pub vertex_buffer: ExportBuffer,
     pub index_buffer: ExportBuffer,
     pub snapshot_buffer: ExportBuffer,
     pub response_buffer: ExportBuffer,
     pub atlas_buffer: ExportBuffer,
     input_anchor: [f32; 3],
+    /// The canvas's top-left in the page viewport, in CSS pixels, as last
+    /// reported by the JavaScript host. `None` until the host has measured it.
+    content_origin: Rc<Cell<Option<(f32, f32)>>>,
+    /// The logical size the last frame laid out at.
+    content_size: Rc<Cell<(f32, f32)>>,
     #[cfg(target_arch = "wasm32")]
     webgpu: Option<BrowserGpu>,
     #[cfg(target_arch = "wasm32")]
@@ -116,12 +124,36 @@ impl<C: PrototypeContent> BrowserPrototype<C> {
         cove_hosts::wasm::install_overlay_services(&context);
         let animations = AnimatorScheduler::current();
         context.with_current(|| content.install(&graph));
-        let probe = RuntimeProbe::new(
+        let content_origin = Rc::new(Cell::new(None));
+        let content_size = Rc::new(Cell::new((0.0, 0.0)));
+        let timeline: Timeline = tree.borrow().timeline.clone();
+        let window = FrameWindow::new(&timeline);
+        let mut probe = RuntimeProbe::new(
             tree.clone(),
             Some(context.invalidation_log.clone()),
             Some(graph.render_tree().clone()),
             Some(Rc::new(GraphState(graph.clone()))),
         );
+        // A wasm reactor cannot read its own place in the page: the JavaScript
+        // host reports the canvas origin. Until it does, point mapping stays
+        // unavailable instead of assuming the viewport origin.
+        probe.content_geometry = Some(Rc::new({
+            let origin = content_origin.clone();
+            let size = content_size.clone();
+            move || {
+                let (x, y) = origin
+                    .get()
+                    .ok_or("The browser host has not reported the canvas position yet.")?;
+                let (width, height) = size.get();
+                Ok(cove_devtools_protocol::ContentGeometry {
+                    origin_x: f64::from(x),
+                    origin_y: f64::from(y),
+                    scale: 1.0,
+                    width: f64::from(width),
+                    height: f64::from(height),
+                })
+            }
+        }));
         let mut fonts = FontCollection::new(ATLAS_SIZE, ATLAS_SIZE);
         fonts.configure(16.0, 1.0);
         // Compose `Text` primitives draw through the ambient TextEnvironment.
@@ -156,12 +188,16 @@ impl<C: PrototypeContent> BrowserPrototype<C> {
             recomposition_ms: 0.0,
             layout_ms: 0.0,
             render_ms: 0.0,
+            timeline,
+            window,
             vertex_buffer: ExportBuffer::new(),
             index_buffer: ExportBuffer::new(),
             snapshot_buffer: ExportBuffer::new(),
             response_buffer: ExportBuffer::new(),
             atlas_buffer: ExportBuffer::new(),
             input_anchor: [0.0; 3],
+            content_origin,
+            content_size,
             #[cfg(target_arch = "wasm32")]
             webgpu: None,
             #[cfg(target_arch = "wasm32")]
@@ -213,6 +249,13 @@ impl<C: PrototypeContent> BrowserPrototype<C> {
         }
     }
 
+    /// Records the canvas origin the page host measured, in CSS pixels.
+    pub fn set_content_origin(&self, x: f32, y: f32) {
+        if x.is_finite() && y.is_finite() {
+            self.content_origin.set(Some((x, y)));
+        }
+    }
+
     pub(super) fn raster_asset_pixels(&self, id: u32) -> *const u8 {
         let mut pixels = std::ptr::null();
         self.draw_list
@@ -260,6 +303,7 @@ impl<C: PrototypeContent> BrowserPrototype<C> {
     pub fn render(&mut self, raw_width: f32, raw_height: f32) {
         let started = Instant::now();
         let (width, height) = viewport_size(raw_width, raw_height);
+        self.content_size.set((width, height));
 
         // Advance overlay/menu animations and commit composition inside the
         // surface's ambient scope, so a controller registered while composing
@@ -275,7 +319,7 @@ impl<C: PrototypeContent> BrowserPrototype<C> {
         let recomposer = &self.recomposer;
         animations.with_current(|| {
             context.with_current(|| {
-                animations.tick(delta);
+                animations.tick(scale_animation_delta(delta));
                 recomposer.commit_all();
             });
         });
@@ -310,6 +354,9 @@ impl<C: PrototypeContent> BrowserPrototype<C> {
         if self.probing {
             self.probe.scene.editor.draw_overlay(&mut self.draw_list);
         }
+        // Close the frame's timeline window even when nothing is recorded, so
+        // later frames cannot inherit this one's spans.
+        let attribution = self.window.close(&self.timeline);
         let upload = self.fonts.atlas.dirty_upload_payload();
         #[cfg(target_arch = "wasm32")]
         if let Some(gpu) = &mut self.webgpu
@@ -396,7 +443,7 @@ impl<C: PrototypeContent> BrowserPrototype<C> {
         self.render_ms =
             (started.elapsed().as_secs_f64() * 1000.0) - self.recomposition_ms - self.layout_ms;
         if self.probing {
-            self.probe.record(TimingFrame {
+            let mut frame = TimingFrame {
                 frame: 0,
                 recomposition_ms: Some(self.recomposition_ms),
                 layout_ms: self.layout_ms,
@@ -407,7 +454,11 @@ impl<C: PrototypeContent> BrowserPrototype<C> {
                 total_ms: self.recomposition_ms + self.layout_ms + self.render_ms,
                 node_count: self.tree.borrow_mut().node_count(),
                 batch_count: self.draw_list.batches().len(),
-            });
+                timeline_start: 0,
+                timeline_end: 0,
+            };
+            attribution.apply_window(&mut frame);
+            self.probe.record(frame);
         }
     }
 

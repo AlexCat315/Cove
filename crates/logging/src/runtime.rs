@@ -450,6 +450,40 @@ impl LogRuntime {
         }
     }
 
+    /// Empties the replay window and forgets the loss count for the cleared
+    /// window. The sequence counter keeps running, so records logged after the
+    /// clear continue above the cleared ones instead of reusing numbers.
+    /// Returns the number of removed records.
+    pub fn clear_history(&self) -> usize {
+        if self.worker.is_current() {
+            // `sync` from inside the worker would wait on itself.
+            return self.clear_history_inline();
+        }
+        let this = self.clone_handle();
+        self.worker.sync(move || this.clear_history_inline())
+    }
+
+    fn clear_history_inline(&self) -> usize {
+        {
+            let mut capture = self.capture.lock().unwrap_or_else(|e| e.into_inner());
+            // The window's loss count is reset below, so reporting it now would
+            // describe records the clear is about to remove.
+            capture.reported_drops = capture.dropped;
+        }
+        // Pending records were logged before the clear; deliver them through
+        // the normal outputs so subscribers and the file still see them.
+        self.drain();
+        let cleared = self
+            .history
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .clear();
+        let mut capture = self.capture.lock().unwrap_or_else(|e| e.into_inner());
+        capture.dropped = 0;
+        capture.reported_drops = 0;
+        cleared
+    }
+
     pub fn snapshot(&self, query: &LogQuery) -> LogSnapshot {
         let this = self.clone_handle();
         let query = query.clone();

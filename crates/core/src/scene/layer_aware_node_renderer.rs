@@ -337,6 +337,12 @@ fn begin(
     if let Some(draw) = node.draw() {
         paint_scaled(&draw, target_list(open), Point::new(x, y), scale);
     }
+    // Same rule as `NodeRenderer`: a node counts as repainted only when it
+    // emitted its own box or content. `reuse` returns before `begin`, so a
+    // layer served from cache keeps its generation across frames.
+    if target_list(open).vertices().len() > first_vertex {
+        node.bump_repaint();
+    }
     let descendant_start = target_list(open).vertices().len();
     let record = open.last_mut().expect("the record was just pushed");
     record.first_vertex = first_vertex;
@@ -549,5 +555,35 @@ mod tests {
         let mut frame = DrawList::default();
         renderer.render(&tree, &mut frame);
         assert!(frame.vertices().is_empty());
+    }
+
+    #[test]
+    fn a_layer_served_from_cache_does_not_bump_the_repaint_epoch() {
+        let (_root, card, tree) = scene();
+        let mut renderer = LayerAwareNodeRenderer::new();
+        renderer.render(&tree, &mut DrawList::default());
+        assert_eq!(card.repaint_epoch(), 1, "the first frame paints the card");
+
+        renderer.render(&tree, &mut DrawList::default());
+        assert_eq!(
+            card.repaint_epoch(),
+            1,
+            "the reused cached layer appends vertices without repainting"
+        );
+    }
+
+    #[test]
+    fn a_layer_that_has_to_rerecord_bumps_the_repaint_epoch() {
+        let (_root, card, tree) = scene();
+        let mut renderer = LayerAwareNodeRenderer::new();
+        renderer.render(&tree, &mut DrawList::default());
+        let object = tree.render_object(&card).unwrap();
+        object.set_cache_invalid(true);
+        renderer.render(&tree, &mut DrawList::default());
+        assert_eq!(
+            card.repaint_epoch(),
+            2,
+            "a re-recorded layer really paints again"
+        );
     }
 }
