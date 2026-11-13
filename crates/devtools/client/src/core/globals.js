@@ -234,7 +234,9 @@ export const dom = {
   readValueButton: $("read-value-button"),
   screenshotMeta: $("screenshot-meta"),
   screenshotBody: $("screenshot-body"),
+  screenshotExpand: $("screenshot-expand"),
   screenshotZoom: $("screenshot-zoom"),
+  screenshotPanel: document.querySelector(".screenshot-panel"),
   screenshotClear: $("screenshot-clear"),
   panels: {
     properties: $("panel-properties"),
@@ -391,6 +393,7 @@ export const state = {
   visibleRows: [],
   activeDetailTab: "properties",
   capture: null,
+  captureExpanded: false,
   captureLoading: false,
   captureError: null,
   captureAttempt: "window",

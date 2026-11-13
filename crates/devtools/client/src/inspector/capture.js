@@ -128,14 +128,24 @@ export function renderScreenshot() {
   body.replaceChildren();
   body.classList.toggle("is-pick", state.mode === "pick" && state.capture?.kind === "window");
   body.classList.toggle("is-interact", state.mode === "interact" && state.capture?.kind === "window");
-  body.classList.toggle("is-zoom", state.capture?.zoom === "actual");
+  const zoom = state.capture?.zoom ?? "fit";
+  body.classList.toggle("is-zoom", typeof zoom === "number");
   body.classList.toggle("is-busy", state.captureLoading || state.pickBusy);
   dom.screenshotZoom.hidden = !state.capture;
   dom.screenshotClear.hidden = !state.capture;
+  dom.screenshotExpand.hidden = !state.capture;
+  dom.screenshotExpand.textContent = state.captureExpanded ? "Collapse" : "Expand";
+  dom.screenshotExpand.title = state.captureExpanded
+    ? "Give the details column back to the node inspector"
+    : "Fill the details column with the frame";
+  dom.screenshotPanel?.classList.toggle("is-expanded", state.captureExpanded && !!state.capture);
   dom.saveButton.disabled = !state.capture;
   dom.captureButton.disabled = !state.caps.capture || state.captureLoading;
   dom.nodeShotButton.disabled = !(state.caps.inspectNodes && state.caps.capture) || !state.selectedId || state.captureLoading;
-  dom.screenshotZoom.textContent = state.capture?.zoom === "actual" ? "Fit" : "100%";
+  dom.screenshotZoom.textContent = zoom === "fit" ? "100%" : zoom === 1 ? "200%" : "Fit";
+  dom.screenshotZoom.title = zoom === "fit"
+    ? "Show the capture at one image pixel per screen pixel"
+    : zoom === 1 ? "Double the capture for precise picking" : "Fit the capture to the pane";
 
   if (state.captureLoading && !state.capture) {
     dom.screenshotMeta.textContent = state.captureAttempt === "node" ? "Capturing node…" : "Capturing window…";
@@ -183,8 +193,8 @@ export function renderScreenshot() {
     if (capture.width !== width || capture.height !== height) {
       capture.width = width;
       capture.height = height;
-      updateScreenshotMeta();
     }
+    updateScreenshotMeta();
   });
   if (state.mode === "pick" && capture.kind === "window") {
     image.addEventListener("click", event => handlePickClick(event, image));
@@ -192,6 +202,14 @@ export function renderScreenshot() {
   }
   if (state.mode === "interact" && capture.kind === "window") bindFrameInput(image, capture);
   body.append(image);
+  if (typeof zoom === "number") {
+    const { width } = captureDimensions(capture);
+    if (width) {
+      image.style.width = `${Math.round(width * zoom)}px`;
+      image.style.height = "auto";
+    }
+  }
+  bindZoomPan(body);
   updateScreenshotMeta();
 }
 
@@ -206,10 +224,57 @@ function updateScreenshotMeta() {
   pieces.push(capture.kind === "node" ? "Node" : "Window");
   if (width && height) pieces.push(`${width}×${height}`);
   if (capture.source) pieces.push(String(capture.source));
+  const shown = dom.screenshotBody.querySelector("img");
+  const shownWidth = shown ? shown.getBoundingClientRect().width : 0;
+  if (width && shownWidth) pieces.push(`${Math.round((shownWidth / width) * 100)}%`);
   if (capture.kind === "node" && capture.nodeId) pieces.push(`node ${shortId(capture.nodeId)}`);
   if (capture.capture_id || capture.captureId) pieces.push(shortId(capture.capture_id || capture.captureId));
   dom.screenshotMeta.textContent = pieces.join(" · ");
   dom.screenshotMeta.title = pieces.join(" · ");
+}
+
+export function toggleScreenshotExpand() {
+  if (!state.capture) return;
+  state.captureExpanded = !state.captureExpanded;
+  renderScreenshot();
+}
+
+// A zoomed capture is wider or taller than the pane, so dragging pans it instead
+// of asking the reader to hunt for a scrollbar. A drag that actually moved must
+// not also land as a pick click.
+function bindZoomPan(body) {
+  if (body.dataset.zoomPan === "on") return;
+  body.dataset.zoomPan = "on";
+  let drag = null;
+  let moved = false;
+  body.addEventListener("pointerdown", event => {
+    if (!body.classList.contains("is-zoom") || event.button !== 0) return;
+    drag = { x: event.clientX, y: event.clientY, left: body.scrollLeft, top: body.scrollTop };
+    moved = false;
+  });
+  body.addEventListener("pointermove", event => {
+    if (!drag) return;
+    const dx = event.clientX - drag.x;
+    const dy = event.clientY - drag.y;
+    if (!moved && Math.abs(dx) + Math.abs(dy) > 4) {
+      moved = true;
+      // Capture only once a drag really starts: capturing on pointerdown would
+      // retarget the following click to this pane and swallow the pick.
+      body.setPointerCapture?.(event.pointerId);
+    }
+    if (!moved) return;
+    body.scrollLeft = drag.left - dx;
+    body.scrollTop = drag.top - dy;
+  });
+  const release = () => { drag = null; };
+  body.addEventListener("pointerup", release);
+  body.addEventListener("pointercancel", release);
+  body.addEventListener("click", event => {
+    if (!moved) return;
+    event.stopPropagation();
+    event.preventDefault();
+    moved = false;
+  }, true);
 }
 
 function handlePickClick(event, image) {
@@ -379,9 +444,16 @@ function retryCapture() {
   else captureWindow();
 }
 
+// Zoom is a scale, not a flag: "fit" fills the pane, 1 draws one image pixel per
+// screen pixel, 2 doubles it for picking a control that fit shrank below a
+// comfortable target.
+const ZOOM_CYCLE = ["fit", 1, 2];
+
 export function toggleScreenshotZoom() {
   if (!state.capture) return;
-  state.capture.zoom = state.capture.zoom === "actual" ? "fit" : "actual";
+  const current = state.capture.zoom ?? "fit";
+  const next = ZOOM_CYCLE[(ZOOM_CYCLE.indexOf(current) + 1) % ZOOM_CYCLE.length];
+  state.capture.zoom = next;
   renderScreenshot();
 }
 

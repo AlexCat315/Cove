@@ -1,6 +1,12 @@
 /* Details */
-.details-pane { overflow: hidden; }
-#details-content { display: flex; flex-direction: column; min-height: 0; flex: 1 1 auto; overflow: auto; }
+.details-pane { overflow: hidden; position: relative; }
+#details-content {
+  display: flex;
+  flex-direction: column;
+  min-height: 160px;
+  flex: 1 1 0;
+  overflow: auto;
+}
 .node-header {
   padding: 10px 14px 7px;
   border-bottom: 1px solid var(--border);

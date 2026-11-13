@@ -60,6 +60,8 @@ DevTools 的画面范围为 Cove 渲染内容。系统标题栏、原生文件�
 
 `/index.html` 与 `/inspector.css` 仍由服务端把分片**字节拼接**成单份文档与样式表；`/inspector.js` 不再拼接，它是一条由 manifest 生成的入口模块，逐条 `import` 各分片，分片本身按 `/src/<路径>` 提供，浏览器按真实的模块图加载。跨文件符号必须显式 `import`/`export`：新增一个函数只在属主文件加 `export`，再在使用处 `import`；import 绑定是只读的，需要改值（如请求序号）由属主模块导出推进函数（`nextRpcSequence`）而不是让调用方自增。新增、拆分或改名模块只需改 `manifest.json`；生产端两张表由 `crates/devtools-cli/build.rs` 从 manifest 生成，漏登记的同类文件会让构建直接失败，不依赖任何手写列表。`client/tests/harness-server.mjs` 以同样方式派生入口并按 `/src/` 提供模块，各 harness 只保留自己的 fake `/rpc` 控制器与场景。
 
+画面上的取点与输入工作面（尺寸分配、`Expand` 覆盖整列、`fit → 1× → 2×` 缩放与拖拽平移）见 [devtools-capture.md](../../Docs/devtools-capture.md)。组件树的折叠口径见 [devtools-tree.md](../../Docs/devtools-tree.md)。
+
 ## 调试器
 
 需要停在源码断点时，用 `cargo cove run --devtools` 启动 Gallery。这个入口在启动器进程中运行控制器，应用暂停后 Inspector 仍能响应。
