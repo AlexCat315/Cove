@@ -24,7 +24,7 @@ Status legend:
 | Inspector debug painting: repaint rainbow | `set_ui_repaint_highlight` + per-node paint generations from real renderer entries | implemented + verified (toggle/DrawList; native visual acceptance pending) |
 | Inspector debug painting: oversized images | `set_ui_oversized_images` + `SceneEditor` 2px outlines from each image's recorded source/display pixel sizes | implemented + verified (toggle/DrawList; native visual acceptance pending) |
 | Inspector slow animations (Flutter `timeDilation`) | `set_ui_animation_speed` + global core animation time scale applied to each host's scheduler delta | implemented + verified (runtime/probe/controller; client control tracked separately) |
-| Inspector flex/layout explorer with editable flex properties | editable grow/shrink/justify/align via `edit_ui_style`; read-only layout panel | implemented + verified (basis/fit and per-child constraint explorer still missing) |
+| Inspector flex/layout explorer with editable flex properties | editable grow/shrink/justify/align via `edit_ui_style`; layout panel with node constraints and an overflow warning | implemented + verified (basis/fit and parent-supplied `BoxConstraints` still missing) |
 | Performance frames chart and jank view | `record_ui_timings` + client frames chart | implemented + verified |
 | Performance Frame analysis tab | `analyze_ui_frame` phase attribution from retained trace spans | implemented + verified |
 | Performance timeline events + enhanced tracing | `start_ui_trace` / `stop_ui_trace` CPU span timeline and flame chart | implemented + verified (CPU spans only) |
@@ -41,7 +41,7 @@ Status legend:
 | App Size: Dart AOT/package/class attribution | none | proven not applicable (Cove has no Dart AOT output) |
 | Deep Links validator | `get_ui_deep_links` reads Android manifest/assetlinks and Apple plists/entitlements/AASA under the project root | implemented + verified (gallery has none; fixture projects cover links and failures) |
 | Provider-like state inspection | opted-in state registry (`query_ui_state`) | implemented + verified |
-| DevTools extension host (third-party UI from packages) | none | needs architecture work; pub/Dart extension mechanism proven not applicable |
+| DevTools extension host (third-party UI from packages) | `DevToolsExtension` protocol + `extensions` capability; runtime registry, `list_extensions` / `set_extension_enabled`, sandboxed Extensions rail view | implemented + verified (fake-controller harness); pub/Dart discovery proven not applicable |
 | Hot reload / hot restart | none | needs runtime work; structural blocker |
 
 ## Inspector
@@ -62,6 +62,17 @@ Cove's Inspector is a live Cove node tree, not a Flutter widget/render-element t
 - Slow animations are implemented independently of debug paint: `set_ui_animation_speed {scale}` stores a process-wide scale in `cove_core::scene::animation` (clamped to 0.05–10, returned as applied) and every host that ticks the animator scales only its scheduler delta, so frame pacing, input and diagnostics stay on wall-clock time. The probe advertises `animation_speed` and resets the scale to 1.0 when DevTools disconnects.
 - The Flutter widget/render-element object model and its flex explorer are **proven not applicable**; the analogue is Cove's node/component tree. Editable flex grow/shrink/justify/align is implemented and verified; per-child basis/fit and a constraint graph remain missing (runtime work).
 - Flutter's widget-creation instrumentation and package-directory tree filtering have no direct equivalent; Cove shows a source location only when the node record publishes one (`crates/devtools/client/inspector.js:1834`), and the tree is not filtered by project/package directory.
+- Node details now publish size constraints and an overflow flag (`NodeConstraints` / `NodeLayoutInfo.overflowDetected` in `crates/devtools-protocol/src/lib.rs`, populated by `SceneInspector::summarize`). The Layout panel shows the node's own authored min/max width/height (unbounded edges as `∞`) and warns when a non-clipping node has a child whose frame escapes its box — Cove's analogue of "A RenderFlex overflowed". These are the resolved self-bounds, **not** the parent's incoming `BoxConstraints`; the warning is boolean and does not report an overflowed pixel count. Protocol round-trip and legacy-decode tests cover both fields.
+
+## Extensions
+
+Flutter DevTools lets packages contribute their own tooling panels. Cove has no pub/Dart package mechanism, so the equivalent is a runtime-side registry with a protocol contract:
+
+- `DevToolsExtension` / `ExtensionList` (`crates/devtools-protocol/src/lib.rs`) carry `id`, `name`, `description`, `version`, `homepage`, `iconPath`, `entryPath` and an `enabled` flag. The probe advertises the `extensions` capability whenever a `DiagnosticExtensionSource` is installed (`crates/devtools/src/runtime_probe.rs`).
+- Hosts install a shared `ExtensionRegistry` (`crates/devtools/src/inspection/diagnostics.rs`); packages call `register`. `builtin_extension_registry()` ships one self-contained data-URL panel so the framework is live before any package opts in. Desktop (`crates/hosts/src/desktop/diagnostics/devtools.rs`) and WASM (`crates/browser/src/prototype/prototype.rs`) both install it.
+- `list_extensions` and `set_extension_enabled` are immediate-read tools (`crates/agent/src/ui_tools.rs`), so the controller's existing `ProbeCommand::Read` path serves them without a new transport. `definitions()` injects the `target` field into their schemas as it does for every other tool.
+- The Inspector's Extensions rail view (`crates/devtools/client/index.html`, the Extensions section of `inspector.js`) lists registrations, toggles enablement for the session and opens an entry point in a sandboxed iframe (`allow-scripts allow-forms allow-popups`, never `allow-same-origin`). Unsafe schemes such as `javascript:` are rejected client-side. Capability loss, empty registries and failed reads get explicit states rather than fabricated entries.
+- `node crates/devtools/client/tests/extensions-harness.mjs` passes five scenarios against a fake controller and headless Chrome: capability gating with no RPC, registry read plus enable toggle and sandboxed frame, rejected unsafe scheme, empty registry, and failed read with Retry. Rust integration tests `extensions_list_and_toggle_through_the_wire` and `extensions_without_a_source_are_unavailable` cover the wire path. Real package-authored panels have not been exercised against a live controller.
 
 ## Performance
 
@@ -249,6 +260,7 @@ The app-local capture path uses the runtime surface on each platform.
 - `cargo test -p cove-devtools-protocol -p cove-devtools -p cove-devtools-cli`: **81 passed, 0 failed** (12 frame-analysis unit, 6 diagnostic presentation, 12 diagnostics, 5 frame-analysis integration, 7 inspection geometry, 1 network, 3 profile, 2 tree summary, 27 controller, 6 protocol), plus 0 doc-tests. The run included the real macOS sampler test.
 - `cargo check -p cove-debugger`: success. `cargo test -p cove-debugger tests::mock::` 13 passed; `cargo test -p cove-debugger framing::` 6 passed. The real attach-denied test was not run (TCC prompt).
 - `node crates/devtools/client/tests/debugger-harness.mjs`: **RESULT PASS**, eight scenarios (DOM audit, unavailable, developer-mode warning, refused attach, attach timeout, narrow-window layout, full paused flow, all rail views), using a fake controller and headless Chrome; it starts no Rust process and attaches to nothing.
+- `node crates/devtools/client/tests/extensions-harness.mjs`: **RESULT PASS**, five scenarios (capability gating, registry read/enable toggle/sandboxed frame, rejected unsafe scheme, empty registry, failed read + Retry), fake controller and headless Chrome. `cargo test -p cove-devtools-protocol -p cove-agent -p cove-devtools -p cove-devtools-cli` passes, including the extension wire tests and the `node_layout_info` constraint tests; `cargo check -p cove-hosts --features devtools` and `cargo check -p cove-browser` succeed.
 - Isolated live controller + gallery (ephemeral port, temporary discovery file, both processes killed after):
   - tree: 1,884 nodes; capabilities `tree, diagnostics, style, trace, timing, frame_analysis, network, inspect_nodes, resize, environment, content_geometry, cpu_profile`.
   - debugger: adapter discovered, `available: true`, `developer_mode: false`, `session: null`; stack/control/variables before attach return `no_session`/"Attach the UI debugger to this runtime first."

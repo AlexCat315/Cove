@@ -8,11 +8,12 @@ use crate::inspection::editor::SceneEditor;
 use cove_core::Rect;
 use cove_core::scene::{
     InvalidationLog, InvalidationPhase, InvalidationSource, LayoutInsets, Node, NodeTree,
-    RenderTree,
+    Overflow, RenderTree,
 };
 use cove_devtools_protocol::{
     InputInventory, InspectionInsets, InvalidationRecord, MAX_TREE_PAGE_DEPTH, MAX_TREE_PAGE_NODES,
-    NodeFlags, NodeFrame, NodeLayoutInfo, NodePoint, NodeStyleInfo, NodeSummary, Recomposition,
+    NodeConstraints, NodeFlags, NodeFrame, NodeLayoutInfo, NodePoint, NodeStyleInfo, NodeSummary,
+    Recomposition,
     RecompositionReason, RenderInventory, SourceLocation, TreePage, TreePageNode, TreeSnapshot,
 };
 use std::cell::RefCell;
@@ -331,6 +332,19 @@ fn summarize(node: &Node, owner_scope_id: Option<&str>, editor: &SceneEditor) ->
     let layout = node.layout_node().map(|layout| {
         let padding = layout.resolved_padding();
         let border = layout.resolved_border();
+        // Flutter's "RenderFlex overflowed" warning: a non-clipping parent whose
+        // child escapes its box. Children are positioned in this node's local
+        // origin, so any frame outside `[0, 0, width, height]` is spilling out.
+        let epsilon = 0.5;
+        let box_frame = node.frame();
+        let overflow_detected = layout.overflow() == Overflow::Visible
+            && node.children().iter().any(|child| {
+                let child_frame = child.frame();
+                child_frame.x < -epsilon
+                    || child_frame.y < -epsilon
+                    || child_frame.x + child_frame.width > box_frame.width + epsilon
+                    || child_frame.y + child_frame.height > box_frame.height + epsilon
+            });
         NodeLayoutInfo {
             padding: insets(padding),
             margin: insets(layout.resolved_margin()),
@@ -347,6 +361,13 @@ fn summarize(node: &Node, owner_scope_id: Option<&str>, editor: &SceneEditor) ->
             align_items: format!("{:?}", layout.align_items()),
             flex_grow: layout.flex_grow() as f64,
             flex_shrink: layout.flex_shrink() as f64,
+            constraints: NodeConstraints {
+                min_width: layout.min_width().map(|value| value as f64),
+                max_width: layout.max_width().map(|value| value as f64),
+                min_height: layout.min_height().map(|value| value as f64),
+                max_height: layout.max_height().map(|value| value as f64),
+            },
+            overflow_detected,
         }
     });
     let overrides: Vec<String> = editor

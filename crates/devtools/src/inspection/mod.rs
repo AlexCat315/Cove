@@ -5,9 +5,10 @@ mod inspector;
 pub use cove_agent::ui_tools as tools;
 
 pub use diagnostics::{
-    DiagnosticCompactNode, DiagnosticError, DiagnosticGeometryIssue, DiagnosticLayoutSummary,
-    DiagnosticMemorySnapshot, DiagnosticNode, DiagnosticOverflowIssue, DiagnosticOverview,
-    DiagnosticPage, DiagnosticPresentation, DiagnosticStateSource, Diagnostics,
+    DiagnosticCompactNode, DiagnosticError, DiagnosticExtensionSource, DiagnosticGeometryIssue,
+    DiagnosticLayoutSummary, DiagnosticMemorySnapshot, DiagnosticNode, DiagnosticOverflowIssue,
+    DiagnosticOverview, DiagnosticPage, DiagnosticPresentation, DiagnosticStateSource, Diagnostics,
+    ExtensionRegistry, builtin_extension_registry,
     DiagnosticsStateQuery, MemoryPressure, TraceCapture, TraceComparison, TracePhase, TracePhaseChange, TraceQuery,
     UIDiagnosticCompactNode, UIDiagnosticGeometryIssue, UIDiagnosticLayoutSummary,
     UIDiagnosticMemorySnapshot, UIDiagnosticNode, UIDiagnosticOverflowIssue, UIDiagnosticOverview,

@@ -5,23 +5,17 @@
 // Protocol. No Rust process is started and no real process is attached.
 import { spawn } from "node:child_process";
 import { createServer } from "node:http";
-import { access, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { access, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import assert from "node:assert/strict";
+import { serveClientAsset } from "./harness-server.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const clientDir = resolve(here, "..");
 const chromePath = process.env.CHROME_PATH
   || "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
-
-const files = {
-  "/": ["index.html", "text/html; charset=utf-8"],
-  "/index.html": ["index.html", "text/html; charset=utf-8"],
-  "/inspector.js": ["inspector.js", "text/javascript; charset=utf-8"],
-  "/inspector.css": ["inspector.css", "text/css; charset=utf-8"],
-};
 
 const adapter = {
   path: "/Library/Developer/CommandLineTools/usr/bin/lldb-dap",
@@ -423,13 +417,7 @@ async function startServer(mode) {
       response.end();
       return;
     }
-    const entry = files[url.pathname];
-    if (request.method === "GET" && entry) {
-      const body = await readFile(join(clientDir, entry[0]));
-      response.writeHead(200, { "content-type": entry[1], "cache-control": "no-store" });
-      response.end(body);
-      return;
-    }
+    if (request.method === "GET" && await serveClientAsset(response, url.pathname)) return;
     response.writeHead(404);
     response.end();
   });
@@ -677,7 +665,11 @@ async function auditDom(cdp) {
     if (brokenIcons.length) failures.push("broken icon references: " + [...new Set(brokenIcons)].join(", "));
 
     const tabs = [...document.querySelectorAll(".rail-tab")];
-    if (tabs.length !== 8) failures.push("rail tab count is " + tabs.length);
+    const panels = [...document.querySelectorAll(".view[role='tabpanel']")];
+    if (panels.length !== tabs.length) failures.push("rail tabs (" + tabs.length + ") do not match views (" + panels.length + ")");
+    for (const panel of panels) {
+      if (!tabs.some(tab => tab.getAttribute("aria-controls") === panel.id)) failures.push(panel.id + " has no rail tab");
+    }
     const views = new Set(tabs.map(tab => tab.dataset.view));
     if (views.size !== tabs.length) failures.push("duplicate rail views");
     for (const tab of tabs) {
@@ -702,7 +694,7 @@ async function auditDom(cdp) {
     return failures;
   })()`);
   assert.deepEqual(report, [], `DOM audit failed:\n${report.join("\n")}`);
-  console.log("PASS  DOM audit: unique ids, live aria/label references, icon symbols, eight rail tabs, named controls");
+  console.log("PASS  DOM audit: unique ids, live aria/label references, icon symbols, rail tabs matching tabpanels, named controls");
 }
 
 async function readCalls(fake) {
@@ -1108,7 +1100,7 @@ async function scenarioFlow() {
       await waitFor(cdp, `${name} view`, `document.getElementById("view-${name}")?.hidden === false`);
     }
     console.log("PASS  attach/pause/step/continue/threads/stack/scopes/variables/evaluate/breakpoints/detach flow");
-    console.log("PASS  all eight rail views render without a page exception");
+    console.log("PASS  all rail views render without a page exception");
   });
 }
 

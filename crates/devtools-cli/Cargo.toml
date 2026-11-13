@@ -34,5 +34,8 @@ libc.workspace = true
 [target.'cfg(target_os = "windows")'.dependencies]
 windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_System_Threading"] }
 
+[build-dependencies]
+serde_json.workspace = true
+
 [lints]
 workspace = true

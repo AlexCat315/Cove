@@ -249,6 +249,12 @@ pub fn factory() -> DiagnosticsFactory {
                 }
             }));
             *probe.scene.editor.on_change.borrow_mut() = Some(callbacks.invalidate);
+            // DevTools extensions register into this shared store; the Inspector
+            // lists and toggles them. Packages add panels through the host API; a
+            // built-in extension proves the framework end-to-end without a package.
+            probe.diagnostics().set_extension_source(Rc::new(
+                cove_devtools::inspection::builtin_extension_registry(),
+            ));
             let mut capabilities = probe.capabilities();
             if capture.is_some() {
                 capabilities.push("capture".into());

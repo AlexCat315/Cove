@@ -211,12 +211,47 @@ payload!(ObservedState {
     truncated: bool
 });
 payload!(StateObservation { registered: Vec<RegisteredState>, values: Vec<ObservedState> });
+// A DevTools extension a package or the host registered. Mirrors Flutter's
+// DevTools extension contract: a discoverable panel with a hosted entry point the
+// Inspector opens in a sandboxed frame. `entryPath` is a URL the client loads.
+payload!(DevToolsExtension {
+    id: String,
+    name: String,
+    description: String,
+    version: String,
+    homepage: Option<String>,
+    #[serde(rename = "iconPath")] icon_path: Option<String>,
+    #[serde(rename = "entryPath")] entry_path: String,
+    enabled: bool,
+});
+// The full set of extensions the runtime currently advertises.
+payload!(ExtensionList { extensions: Vec<DevToolsExtension> });
 payload!(InspectionInsets {
     top: f64,
     right: f64,
     bottom: f64,
     left: f64
 });
+// The size constraints a node publishes for itself, in logical points.
+// These are the authored `min-*`/`max-*` limits (Flutter's Inspector shows the
+// parent's incoming `BoxConstraints`; Cove's layout resolves the node's own
+// bounds, which is the closest stable value the scene keeps after layout).
+payload!(NodeConstraints {
+    min_width: Option<f64>,
+    max_width: Option<f64>,
+    min_height: Option<f64>,
+    max_height: Option<f64>,
+});
+impl Default for NodeConstraints {
+    fn default() -> Self {
+        Self {
+            min_width: None,
+            max_width: None,
+            min_height: None,
+            max_height: None,
+        }
+    }
+}
 payload!(NodeLayoutInfo {
     padding: InspectionInsets,
     margin: InspectionInsets,
@@ -229,6 +264,13 @@ payload!(NodeLayoutInfo {
     align_items: String,
     flex_grow: f64,
     flex_shrink: f64,
+    #[serde(default)]
+    constraints: NodeConstraints,
+    /// True when a child's frame spills outside this node's box while its
+    /// `overflow` is `Visible` — the Cove equivalent of Flutter's
+    /// "A RenderFlex overflowed by N pixels" warning.
+    #[serde(default)]
+    overflow_detected: bool,
 });
 payload!(NodeStyleInfo { background_color: Option<String>, foreground_color: Option<String>, overrides: Vec<String> });
 payload!(InspectionState {
@@ -462,6 +504,60 @@ mod tests {
         let value = DevToolsCodec::json(&location);
         assert_eq!(value["fileID"], "f");
         assert_eq!(value["filePath"], "/tmp/a.swift");
+    }
+
+    #[test]
+    fn node_layout_info_carries_constraints_and_overflow() {
+        let info = NodeLayoutInfo {
+            padding: InspectionInsets { top: 0.0, right: 0.0, bottom: 0.0, left: 0.0 },
+            margin: InspectionInsets { top: 0.0, right: 0.0, bottom: 0.0, left: 0.0 },
+            border: InspectionInsets { top: 0.0, right: 0.0, bottom: 0.0, left: 0.0 },
+            content_width: 100.0,
+            content_height: 40.0,
+            direction: "Ltr".into(),
+            flex_direction: "Row".into(),
+            justify_content: "FlexStart".into(),
+            align_items: "Stretch".into(),
+            flex_grow: 0.0,
+            flex_shrink: 1.0,
+            constraints: NodeConstraints {
+                min_width: Some(80.0),
+                max_width: None,
+                min_height: Some(20.0),
+                max_height: Some(200.0),
+            },
+            overflow_detected: true,
+        };
+        let value = DevToolsCodec::json(&info);
+        assert_eq!(value["constraints"]["minWidth"], 80.0);
+        assert_eq!(value["constraints"]["maxHeight"], 200.0);
+        assert_eq!(value["overflowDetected"], true);
+        let decoded = DevToolsCodec::decode::<NodeLayoutInfo>(&Some(value))
+            .expect("a full layout block decodes");
+        assert_eq!(decoded.constraints.min_width, Some(80.0));
+        assert!(decoded.overflow_detected);
+    }
+
+    #[test]
+    fn node_layout_info_accepts_legacy_messages_without_constraints() {
+        // Clients built before constraints/overflow existed must still decode.
+        let legacy = serde_json::json!({
+            "padding": { "top": 0.0, "right": 0.0, "bottom": 0.0, "left": 0.0 },
+            "margin": { "top": 0.0, "right": 0.0, "bottom": 0.0, "left": 0.0 },
+            "border": { "top": 0.0, "right": 0.0, "bottom": 0.0, "left": 0.0 },
+            "contentWidth": 100.0,
+            "contentHeight": 40.0,
+            "direction": "Ltr",
+            "flexDirection": "Row",
+            "justifyContent": "FlexStart",
+            "alignItems": "Stretch",
+            "flexGrow": 0.0,
+            "flexShrink": 1.0
+        });
+        let decoded = DevToolsCodec::decode::<NodeLayoutInfo>(&Some(legacy))
+            .expect("a legacy layout block decodes");
+        assert_eq!(decoded.constraints, NodeConstraints::default());
+        assert!(!decoded.overflow_detected);
     }
 
     #[test]

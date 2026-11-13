@@ -9,24 +9,15 @@
 // fake controller's responses.
 import { spawn } from "node:child_process";
 import { createServer } from "node:http";
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { access } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { dirname, join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { join, resolve } from "node:path";
 import assert from "node:assert/strict";
+import { serveClientAsset } from "./harness-server.mjs";
 
-const here = dirname(fileURLToPath(import.meta.url));
-const clientDir = resolve(here, "..");
 const chromePath = process.env.CHROME_PATH
   || "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
-
-const files = {
-  "/": ["index.html", "text/html; charset=utf-8"],
-  "/index.html": ["index.html", "text/html; charset=utf-8"],
-  "/inspector.js": ["inspector.js", "text/javascript; charset=utf-8"],
-  "/inspector.css": ["inspector.css", "text/css; charset=utf-8"],
-};
 
 const validRoot = "/tmp/cove-deep-links/valid";
 const secondRoot = "/tmp/cove-deep-links/second";
@@ -208,13 +199,7 @@ async function startServer(mode) {
       response.end();
       return;
     }
-    const entry = files[url.pathname];
-    if (request.method === "GET" && entry) {
-      const body = await readFile(join(clientDir, entry[0]));
-      response.writeHead(200, { "content-type": entry[1], "cache-control": "no-store" });
-      response.end(body);
-      return;
-    }
+    if (request.method === "GET" && await serveClientAsset(response, url.pathname)) return;
     response.writeHead(404);
     response.end();
   });
@@ -482,7 +467,11 @@ async function auditDeepLinksDom(cdp) {
       .filter(id => !symbols.has(id));
     if (brokenIcons.length) failures.push("broken icon references: " + [...new Set(brokenIcons)].join(", "));
     const tabs = [...document.querySelectorAll(".rail-tab")];
-    if (tabs.length !== 8) failures.push("rail tab count is " + tabs.length);
+    const panels = [...document.querySelectorAll(".view[role='tabpanel']")];
+    if (panels.length !== tabs.length) failures.push("rail tabs (" + tabs.length + ") do not match views (" + panels.length + ")");
+    for (const panel of panels) {
+      if (!tabs.some(tab => tab.getAttribute("aria-controls") === panel.id)) failures.push(panel.id + " has no rail tab");
+    }
     const views = new Set(tabs.map(tab => tab.dataset.view));
     if (views.size !== tabs.length) failures.push("duplicate rail views");
     const selected = document.getElementById("tab-deep-links");
@@ -521,7 +510,7 @@ async function auditDeepLinksDom(cdp) {
     return failures;
   })()`);
   assert.deepEqual(report, [], `Deep Links DOM audit failed:\n${report.join("\n")}`);
-  console.log("PASS  DOM audit: unique ids, live references, icon symbols, eight rail tabs, named controls, absolute-root input, issue tables");
+  console.log("PASS  DOM audit: unique ids, live references, icon symbols, rail tabs matching tabpanels, named controls, absolute-root input, issue tables");
 }
 
 let audited = false;

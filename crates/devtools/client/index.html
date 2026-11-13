@@ -44,6 +44,7 @@
   <symbol id="i-auto" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 3v18"/><path d="M12 3a9 9 0 0 1 0 18Z" fill="currentColor" stroke="none"/></symbol>
   <symbol id="i-keyboard" viewBox="0 0 24 24"><rect x="2.5" y="6" width="19" height="12" rx="2"/><path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M6 14h.01M18 14h.01M9 14h6"/></symbol>
   <symbol id="i-hierarchy" viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="5" rx="1"/><rect x="3" y="16" width="6" height="5" rx="1"/><rect x="15" y="16" width="6" height="5" rx="1"/><path d="M12 8v4M6 16v-2h12v2"/></symbol>
+  <symbol id="i-extension" viewBox="0 0 24 24"><path d="M9 3H5a2 2 0 0 0-2 2v4h2a2 2 0 1 1 0 4H3v4a2 2 0 0 0 2 2h4v-2a2 2 0 1 1 4 0v2h4a2 2 0 0 0 2-2v-4h-2a2 2 0 1 1 0-4h2V5a2 2 0 0 0-2-2h-4v2a2 2 0 1 1-4 0Z"/></symbol>
   <symbol id="i-collapse" viewBox="0 0 24 24"><path d="m7 10 5 5 5-5"/><path d="m7 5 5 5 5-5"/></symbol>
   <symbol id="i-copy-path" viewBox="0 0 24 24"><path d="M4 5h7l2 2h7v12H4Z"/><path d="M8 12h8M8 16h5"/></symbol>
   <symbol id="i-record" viewBox="0 0 24 24"><circle cx="12" cy="12" r="6" fill="currentColor" stroke="none"/></symbol>
@@ -126,6 +127,9 @@
       </button>
       <button class="rail-tab" id="tab-state" data-view="state" role="tab" aria-selected="false" aria-controls="view-state" tabindex="-1" type="button">
         <svg class="icon" aria-hidden="true"><use href="#i-hierarchy"></use></svg><span>State</span>
+      </button>
+      <button class="rail-tab" id="tab-extensions" data-view="extensions" role="tab" aria-selected="false" aria-controls="view-extensions" tabindex="-1" type="button">
+        <svg class="icon" aria-hidden="true"><use href="#i-extension"></use></svg><span>Extensions</span>
       </button>
     </div>
     <div class="rail-meta" id="rail-meta"></div>
@@ -399,6 +403,18 @@
         </div>
       </header>
       <div id="state-content" class="aux-content"></div>
+    </section>
+
+    <section id="view-extensions" class="view aux-view" role="tabpanel" aria-labelledby="tab-extensions" hidden>
+      <header class="aux-header">
+        <div class="aux-title"><h1>Extensions</h1><p id="extensions-meta" class="aux-meta">Panels the runtime registers through the DevTools extension API.</p></div>
+        <div class="aux-actions">
+          <button id="extensions-refresh" class="tool-button" type="button">
+            <svg class="icon" aria-hidden="true"><use href="#i-refresh"></use></svg><span>Refresh</span>
+          </button>
+        </div>
+      </header>
+      <div id="extensions-content" class="aux-content"></div>
     </section>
 
     <section id="view-performance" class="view aux-view" role="tabpanel" aria-labelledby="tab-performance" hidden>

@@ -10,7 +10,8 @@ use cove_core::scene::{
     StateValue,
 };
 use cove_devtools_protocol::{
-    Envelope, NodeFrame, NodeSummary, SourceLocation, StateObservation, StateWatch,
+    DevToolsExtension, Envelope, ExtensionList, NodeFrame, NodeSummary, SourceLocation,
+    StateObservation, StateWatch,
 };
 use serde::{Deserialize, Serialize};
 use std::cell::RefCell;
@@ -202,6 +203,7 @@ pub struct DiagnosticOverview {
     pub node_count: usize,
     pub component_count: usize,
     pub state_observation_available: bool,
+    pub extension_available: bool,
     pub timeline_available: bool,
     pub has_root: bool,
     pub layout_issues: DiagnosticLayoutSummary,
@@ -274,6 +276,95 @@ impl DiagnosticStateSource for StateRegistry {
     }
 }
 
+/// Where diagnostics reads opted-in DevTools extensions. Evaluated on the scene
+/// thread. A host installs one (typically an [`ExtensionRegistry`]) so packages
+/// can register panels the Inspector lists and enables — Flutter's DevTools
+/// extension framework, where a package publishes a discoverable panel.
+pub trait DiagnosticExtensionSource {
+    fn list(&self) -> Vec<DevToolsExtension>;
+    /// Enable or disable the named extension for this session. Returns false when
+    /// the id was never registered, so a stale toggle is reported rather than
+    /// silently dropped.
+    fn set_enabled(&self, id: &str, enabled: bool) -> bool;
+}
+
+/// An in-memory extension registry a host or package populates. Cloning shares the
+/// same backing store, so the host can register extensions and hand the Inspector
+/// a read/write source through `Diagnostics`.
+#[derive(Clone, Default)]
+pub struct ExtensionRegistry {
+    extensions: Rc<RefCell<Vec<DevToolsExtension>>>,
+}
+
+impl ExtensionRegistry {
+    /// Register an extension. Re-registering an id replaces its record so the
+    /// latest metadata (name, version, entry point) wins.
+    pub fn register(&self, extension: DevToolsExtension) {
+        let mut extensions = self.extensions.borrow_mut();
+        if let Some(slot) = extensions.iter_mut().find(|existing| existing.id == extension.id) {
+            *slot = extension;
+        } else {
+            extensions.push(extension);
+        }
+    }
+}
+
+impl DiagnosticExtensionSource for ExtensionRegistry {
+    fn list(&self) -> Vec<DevToolsExtension> {
+        self.extensions.borrow().clone()
+    }
+    fn set_enabled(&self, id: &str, enabled: bool) -> bool {
+        let mut extensions = self.extensions.borrow_mut();
+        match extensions.iter_mut().find(|extension| extension.id == id) {
+            Some(extension) => {
+                extension.enabled = enabled;
+                true
+            }
+            None => false,
+        }
+    }
+}
+
+/// The registry every host installs so the extension framework is live before
+/// any package opts in. This built-in panel is self-contained (a data URL), so
+/// no asset server is required; packages add their own entries at runtime.
+pub fn builtin_extension_registry() -> ExtensionRegistry {
+    let registry = ExtensionRegistry::default();
+    registry.register(DevToolsExtension {
+        id: "cove.inspector".into(),
+        name: "Cove Inspector".into(),
+        description: "Built-in DevTools extension. Packages register their own panels through the extension API; each opens in a sandboxed frame.".into(),
+        version: env!("CARGO_PKG_VERSION").into(),
+        homepage: None,
+        icon_path: None,
+        entry_path: builtin_extension_panel(),
+        enabled: true,
+    });
+    registry
+}
+
+fn builtin_extension_panel() -> String {
+    let html = "<!doctype html><meta charset=utf-8>\
+        <body style='font:13px system-ui;margin:0;padding:14px;color:#e6e6e6;background:#1e1e1e'>\
+        <h3 style='margin:0 0 8px'>Cove Inspector</h3>\
+        <p style='margin:0;opacity:.75'>This panel is a built-in DevTools extension. Packages register their own panels through the extension API; each appears here and opens in a sandboxed frame.</p>\
+        </body>";
+    let encoded: String = html
+        .chars()
+        .map(|character| match character {
+            ' ' => "%20".into(),
+            '<' => "%3C".into(),
+            '>' => "%3E".into(),
+            '#' => "%23".into(),
+            '&' => "%26".into(),
+            '%' => "%25".into(),
+            '\n' => "%0A".into(),
+            other => other.to_string(),
+        })
+        .collect();
+    format!("data:text/html,{encoded}")
+}
+
 /// Read-only facade over the same scene data the inspector uses.
 pub struct Diagnostics {
     tree: Rc<RefCell<NodeTree>>,
@@ -282,6 +373,8 @@ pub struct Diagnostics {
     traces: RefCell<TraceStore>,
     /// Optional memory provider the host installs.
     pub memory: RefCell<Option<Rc<dyn Fn() -> DiagnosticMemorySnapshot>>>,
+    /// Optional DevTools extension source the host installs.
+    extensions: RefCell<Option<Rc<dyn DiagnosticExtensionSource>>>,
 }
 
 impl Diagnostics {
@@ -302,6 +395,7 @@ impl Diagnostics {
             state,
             traces: RefCell::new(TraceStore::default()),
             memory: RefCell::new(None),
+            extensions: RefCell::new(None),
         }
     }
 
@@ -315,6 +409,36 @@ impl Diagnostics {
 
     pub fn state_observation_available(&self) -> bool {
         self.state.is_some()
+    }
+
+    /// Install the DevTools extension source packages register into. The host calls
+    /// this once at startup; a `None` source means no extensions are advertised.
+    pub fn set_extension_source(&self, source: Rc<dyn DiagnosticExtensionSource>) {
+        *self.extensions.borrow_mut() = Some(source);
+    }
+
+    pub fn extensions_available(&self) -> bool {
+        self.extensions.borrow().is_some()
+    }
+
+    pub fn list_extensions(&self) -> ExtensionList {
+        let Some(source) = self.extensions.borrow().clone() else {
+            return ExtensionList {
+                extensions: Vec::new(),
+            };
+        };
+        ExtensionList {
+            extensions: source.list(),
+        }
+    }
+
+    /// Enable or disable the named extension. Returns false when the id was never
+    /// registered, so a stale toggle is surfaced rather than silently dropped.
+    pub fn set_extension_enabled(&self, id: &str, enabled: bool) -> bool {
+        match self.extensions.borrow().as_ref() {
+            Some(source) => source.set_enabled(id, enabled),
+            None => false,
+        }
     }
 
     /// Flatten every live node with its semantics and presentation.
@@ -645,6 +769,7 @@ impl Diagnostics {
             node_count: nodes.total,
             component_count: self.query_recomposition(None, 0, 0, 1).total,
             state_observation_available: self.state.is_some(),
+            extension_available: self.extensions_available(),
             timeline_available: true,
             has_root: nodes.total > 0,
             layout_issues: self.layout_issues(limit),
@@ -894,6 +1019,35 @@ impl Diagnostics {
                         .unwrap_or(50) as usize,
                 )?;
                 serde_json::json!({ "ok": true, "data": query })
+            }
+            Tool::ListExtensions => {
+                if self.extensions.borrow().is_none() {
+                    return Err(DiagnosticError::InvalidConfiguration(
+                        "DevTools extensions are unavailable in this host.".into(),
+                    ));
+                }
+                serde_json::json!({ "ok": true, "data": self.list_extensions() })
+            }
+            Tool::SetExtensionEnabled => {
+                let id = arguments
+                    .get("id")
+                    .and_then(|value| value.as_str())
+                    .filter(|id| !id.is_empty() && id.len() <= 256)
+                    .ok_or_else(|| {
+                        DiagnosticError::InvalidConfiguration(
+                            "set_extension_enabled requires a non-empty id.".into(),
+                        )
+                    })?;
+                let enabled = arguments
+                    .get("enabled")
+                    .and_then(|value| value.as_bool())
+                    .ok_or_else(|| {
+                        DiagnosticError::InvalidConfiguration(
+                            "set_extension_enabled requires an enabled boolean.".into(),
+                        )
+                    })?;
+                let applied = self.set_extension_enabled(id, enabled);
+                serde_json::json!({ "ok": applied })
             }
             Tool::GetUiTrace => {
                 let Some(id) = arguments.get("capture_id").and_then(|value| value.as_str()) else {

@@ -120,6 +120,9 @@ impl RuntimeProbe {
         if self.diagnostics.state_observation_available() {
             capabilities.push("state");
         }
+        if self.diagnostics.extensions_available() {
+            capabilities.push("extensions");
+        }
         if crate::profile::unavailable_reason().is_none() {
             capabilities.push("cpu_profile");
         }

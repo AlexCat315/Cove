@@ -24,12 +24,14 @@ pub enum Tool {
     StartUiAllocationProfile,
     StopUiAllocationProfile,
     QueryUiAllocationSites,
+    ListExtensions,
+    SetExtensionEnabled,
     ListSkills,
     ReadSkill,
 }
 
 impl Tool {
-    pub const ALL: [Tool; 18] = [
+    pub const ALL: [Tool; 20] = [
         Tool::GetDiagnostics,
         Tool::QueryUiNodes,
         Tool::QueryUiRecomposition,
@@ -46,6 +48,8 @@ impl Tool {
         Tool::StartUiAllocationProfile,
         Tool::StopUiAllocationProfile,
         Tool::QueryUiAllocationSites,
+        Tool::ListExtensions,
+        Tool::SetExtensionEnabled,
         Tool::ListSkills,
         Tool::ReadSkill,
     ];
@@ -72,6 +76,8 @@ impl Tool {
             Self::StartUiAllocationProfile => "start_ui_allocation_profile",
             Self::StopUiAllocationProfile => "stop_ui_allocation_profile",
             Self::QueryUiAllocationSites => "query_ui_allocation_sites",
+            Self::ListExtensions => "list_extensions",
+            Self::SetExtensionEnabled => "set_extension_enabled",
             Self::ListSkills => "list_skills",
             Self::ReadSkill => "read_skill",
         }
@@ -301,6 +307,24 @@ impl Tool {
                 ),
                 true,
             ),
+            Self::ListExtensions => AgentTool::new(
+                self.name(),
+                "List the DevTools extensions this runtime registered: id, name, description, version, entry point and whether the panel is enabled. Packages opt in by registering an extension; an empty list means none are active.",
+                object(BTreeMap::new(), Vec::new()),
+                true,
+            ),
+            Self::SetExtensionEnabled => AgentTool::new(
+                self.name(),
+                "Enable or disable a DevTools extension's panel. The change persists for this session; the client reloads the extension list to reflect it. False means the id was not registered.",
+                object(
+                    BTreeMap::from([
+                        ("id".to_string(), text()),
+                        ("enabled".to_string(), JsonSchema::boolean()),
+                    ]),
+                    vec!["id".to_string(), "enabled".to_string()],
+                ),
+                false,
+            ),
             Self::ListSkills => AgentTool::new(
                 self.name(),
                 "List the host's available task guides without loading their bodies.",
@@ -398,7 +422,7 @@ mod tests {
         ] {
             assert!(!tool.is_immediate_read(), "{}", tool.name());
         }
-        assert_eq!(Tool::immediate_read_tools().len(), 8);
+        assert_eq!(Tool::immediate_read_tools().len(), 10);
     }
 
     #[test]

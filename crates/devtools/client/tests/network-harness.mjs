@@ -12,23 +12,16 @@
 // the fake controller's responses.
 import { spawn } from "node:child_process";
 import { createServer } from "node:http";
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import assert from "node:assert/strict";
+import { serveClientAsset } from "./harness-server.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
-const clientDir = resolve(here, "..");
 const chromePath = process.env.CHROME_PATH
   || "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
-
-const files = {
-  "/": ["index.html", "text/html; charset=utf-8"],
-  "/index.html": ["index.html", "text/html; charset=utf-8"],
-  "/inspector.js": ["inspector.js", "text/javascript; charset=utf-8"],
-  "/inspector.css": ["inspector.css", "text/css; charset=utf-8"],
-};
 
 const LIMIT = 256;
 const RUNTIME_CAPS = ["tree", "network", "network_control"];
@@ -258,13 +251,7 @@ async function startServer(mode) {
       res.end();
       return;
     }
-    const entry = files[url.pathname];
-    if (req.method === "GET" && entry) {
-      const body = await readFile(join(clientDir, entry[0]));
-      res.writeHead(200, { "content-type": entry[1], "cache-control": "no-store" });
-      res.end(body);
-      return;
-    }
+    if (req.method === "GET" && await serveClientAsset(res, url.pathname)) return;
     res.writeHead(404);
     res.end();
   });

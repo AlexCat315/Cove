@@ -425,6 +425,8 @@ fn diagnostic_registry_is_the_single_definition_source() {
             "query_ui_state",
             "query_ui_memory",
             "query_ui_network",
+            "list_extensions",
+            "set_extension_enabled",
             "list_skills",
             "read_skill",
         ],
@@ -449,6 +451,7 @@ fn diagnostic_registry_is_the_single_definition_source() {
                         | UIDiagnosticTool::StopUiProfile
                         | UIDiagnosticTool::StartUiAllocationProfile
                         | UIDiagnosticTool::StopUiAllocationProfile
+                        | UIDiagnosticTool::SetExtensionEnabled
                 ),
             "{} declares whether it mutates state",
             tool.name(),
@@ -505,6 +508,8 @@ fn immediate_wire_reads_share_toolbox_schemas_results_and_redaction() {
             "query_ui_state",
             "query_ui_memory",
             "query_ui_network",
+            "list_extensions",
+            "set_extension_enabled",
             "list_skills",
             "read_skill",
         ]
@@ -535,6 +540,70 @@ fn immediate_wire_reads_share_toolbox_schemas_results_and_redaction() {
         field["node"]["children"].as_array().map(Vec::len),
         Some(0),
         "a query returns flat records, so the node has no children",
+    );
+}
+
+#[test]
+fn extensions_list_and_toggle_through_the_wire() {
+    use cove_devtools::inspection::ExtensionRegistry;
+
+    let tree = NodeTree::new();
+    let diagnostics = Diagnostics::new(Rc::new(RefCell::new(tree)), None);
+
+    let registry = Rc::new(ExtensionRegistry::default());
+    registry.register(cove_devtools::protocol::DevToolsExtension {
+        id: "demo.tips".into(),
+        name: "Tips".into(),
+        description: "Demo extension panel.".into(),
+        version: "1.0.0".into(),
+        homepage: None,
+        icon_path: None,
+        entry_path: "data:text/html,<body>hi</body>".into(),
+        enabled: true,
+    });
+    diagnostics.set_extension_source(registry.clone());
+
+    let listed = diagnostics.handle_read_request(&call("list_extensions", serde_json::json!({})));
+    assert_eq!(listed.r#type, "diagnostics.call.ok");
+    let listed_data = data(&listed);
+    let extensions = listed_data["extensions"].as_array().unwrap();
+    assert_eq!(extensions.len(), 1);
+    assert_eq!(extensions[0]["id"], "demo.tips");
+    assert_eq!(extensions[0]["enabled"], true);
+
+    // Disabling a registered id returns ok: true and the change persists.
+    let disabled = diagnostics.handle_read_request(&call(
+        "set_extension_enabled",
+        serde_json::json!({ "id": "demo.tips", "enabled": false }),
+    ));
+    assert_eq!(disabled.r#type, "diagnostics.call.ok");
+    assert_eq!(
+        disabled.payload.as_ref().unwrap()["ok"],
+        true,
+        "set_extension_enabled response was: {:?}",
+        disabled.payload
+    );
+
+    let listed = diagnostics.handle_read_request(&call("list_extensions", serde_json::json!({})));
+    assert_eq!(data(&listed)["extensions"][0]["enabled"], false);
+
+    // Toggling an unknown id reports ok: false rather than silently dropping.
+    let missing = diagnostics.handle_read_request(&call(
+        "set_extension_enabled",
+        serde_json::json!({ "id": "nope", "enabled": true }),
+    ));
+    assert_eq!(missing.payload.as_ref().unwrap()["ok"], false);
+}
+
+#[test]
+fn extensions_without_a_source_are_unavailable() {
+    let diagnostics = Diagnostics::new(Rc::new(RefCell::new(NodeTree::new())), None);
+    let listed = diagnostics.handle_read_request(&call("list_extensions", serde_json::json!({})));
+    assert_eq!(listed.r#type, "diagnostics.call.err");
+    assert_eq!(
+        listed.payload.as_ref().unwrap()["code"].as_str(),
+        Some("bad_request"),
+        "the absence of an extension source is reported, not a blank list"
     );
 }
 

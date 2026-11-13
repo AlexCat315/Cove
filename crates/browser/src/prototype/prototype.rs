@@ -134,6 +134,11 @@ impl<C: PrototypeContent> BrowserPrototype<C> {
             Some(graph.render_tree().clone()),
             Some(Rc::new(GraphState(graph.clone()))),
         );
+        // The browser hosts the same DevTools extension framework as the desktop:
+        // packages register panels into this shared registry at runtime.
+        probe.diagnostics().set_extension_source(Rc::new(
+            cove_devtools::inspection::builtin_extension_registry(),
+        ));
         // A wasm reactor cannot read its own place in the page: the JavaScript
         // host reports the canvas origin. Until it does, point mapping stays
         // unavailable instead of assuming the viewport origin.
