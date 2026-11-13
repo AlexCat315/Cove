@@ -1,154 +1,19 @@
 # DevTools acceptance
 
-Acceptance runs exercise the real controller, the real macOS platform adapter and the real gallery. They never substitute recorded data for a live capture. A run that cannot obtain pixels or content geometry stops as blocked instead of passing.
+Acceptance runs exercise the controller and a real Gallery runtime.
 
-## Milestone 1: Inspector select-at-point and node screenshot
-
-Script: `Tools/DevTools/acceptance/m1-inspector.sh`
+## Milestone 1 — App-local capture and picking
 
 ```sh
-Tools/DevTools/acceptance/m1-inspector.sh          # removes its temporary run directory on success
-Tools/DevTools/acceptance/m1-inspector.sh --keep   # keeps logs and PNGs
+Tools/DevTools/acceptance/m1-inspector.sh
+Tools/DevTools/acceptance/m1-inspector.sh --keep
 ```
 
-The first run can take several minutes while cargo builds the two debug binaries. The script is idempotent and isolated:
+The harness starts an isolated controller and Gallery on macOS. The Gallery starts without taking keyboard focus. The harness selects the registered runtime by process ID, reads its framebuffer through `capture_ui`, and checks the PNG dimensions and decoded pixels. It uses `select_ui_at` to round-trip an image pixel through the Cove hit tester and verifies the node ID, path, and frame. It then checks the dimensions, pixels, and node metadata returned by `capture_ui_node`. Pointer coordinates start at the top-left of each returned image, including a node crop.
 
-- It builds `target/debug/cove-devtools` and `target/debug/gallery` with cargo, then launches those binaries directly. This is the same executable `cargo run -p cove-devtools-cli -- serve` and `cargo run -p cove-examples --bin gallery` launch; direct PIDs let cleanup stop exactly its own processes. It never calls `cargo run` wrappers that would outlive the script.
-- It writes a fresh discovery file under `$TMPDIR/cove-devtools-m1.*` and exports `COVE_DEVTOOLS_SESSION_FILE`, `COVE_DEVTOOLS_ENDPOINT` and `COVE_DEVTOOLS_TOKEN` to the controller, the gallery and every CLI call. The user's existing controller and discovery file are never read.
-- It picks an ephemeral loopback port and refuses port 9229.
-- It starts one gallery window with `COVE_DEVTOOLS=1` and selects its window by that process PID, so another gallery with the same title is never captured.
-- On exit, `EXIT`/`INT`/`TERM` traps stop the gallery and controller by PID (TERM, then KILL after five seconds). Logs are kept on failure and removed on success unless `--keep` is used.
+On 2026-11-13 the macOS run passed all seven checks. It decoded a 2560×1440 Gallery frame and a 48×32 node crop. Separate live runs verified Button navigation, Slider drag, sidebar scrolling, text entry, and Backspace with runtime postconditions and traces. Headless Chrome verified both Canvas2D and WebGPU frame readback and input, including Inspector interaction with a background WebGPU tab.
 
-### Exact steps
-
-1. Preflight macOS, `cargo`, `python3` and `jq`; build both binaries.
-2. Start the controller:
-
-   ```sh
-   COVE_DEVTOOLS_SESSION_FILE=... COVE_DEVTOOLS_TOKEN=... \
-     target/debug/cove-devtools serve --port <ephemeral>
-   ```
-
-   Poll `cove-devtools call get_ui_session '{}'` until the controller answers and the discovery file exists.
-3. Start the gallery:
-
-   ```sh
-   COVE_DEVTOOLS=1 COVE_DEVTOOLS_SESSION_FILE=... COVE_DEVTOOLS_TOKEN=... \
-     COVE_DEVTOOLS_ENDPOINT=http://127.0.0.1:<port> target/debug/gallery
-   ```
-
-   Poll `get_ui_session` until a runtime with the gallery PID (or the title `CoveUI — Component Showcase`) registers.
-4. Require `permissions.screen_capture = true` and `permissions.accessibility = true`.
-5. Select the runtime and its macOS window target. If the controller has not auto-bound them, call `bind_ui_target` and verify `runtime.platform_target` afterwards.
-6. `capture_ui` with `scope: "window"`, save the PNG, decode IHDR and pixels, and require a non-uniform, partially opaque window image.
-7. `query_ui_nodes` with `visible_only: true`, `compact: true`, up to five pages (500 visible nodes). Keep framed nodes whose visible frame is inside the window.
-8. For up to 150 candidates, fetch the full node with `query_ui_nodes {node_id, compact: false}`. Keep nodes that are visible, input-enabled, hit-testable, have an `absoluteFrame`, and whose absolute frame matches the visible frame within 2 points (unclipped).
-9. Calibrate capture pixels to content points with two real `select_ui_at` calls. This derives the affine mapping (content origin and scale) instead of assuming a Retina factor or a title-bar height.
-10. Map each candidate's visible-frame centre to a capture pixel and call:
-
-    ```json
-    {"target":"<runtime>","capture_id":"<window capture>","x":<pixel>,"y":<pixel>}
-    ```
-
-    Require the echoed `capture_id`, `hit.nodeID == <candidate>`, `hit.path` ending at that ID, `contentPoint` within 2 points of the queried centre, and `hit.absoluteFrame` matching the queried absolute frame.
-11. `capture_ui_node` with `{"target":"<runtime>","node_id":"<candidate>"}` and `--image node.png`. Require `node_id`, `contentFrame`, normal capture fields, matching dimensions at the calibrated scale, crop coordinates matching `contentFrame`, and decoded pixels that are not fully transparent, non-uniform unless the node reports a background, and mostly opaque when it has one.
-12. Print `RESULT PASS` and exit 0.
-
-The harness tries up to 20 eligible candidates because the point may hit a sibling overlay or a descendant first. The run fails if no candidate round-trips.
-
-### Response contracts asserted
-
-`select_ui_at` (read-only; it hit-tests, it does not dispatch input or mutate the editor selection):
-
-```json
-{
-  "capture_id": "<same capture>",
-  "contentPoint": {"x": 0.0, "y": 0.0},
-  "hit": {
-    "nodeID": "<id or null>",
-    "path": ["<root>", "..."],
-    "localPoint": {"x": 0.0, "y": 0.0},
-    "absoluteFrame": {"x": 0.0, "y": 0.0, "w": 0.0, "h": 0.0}
-  }
-}
-```
-
-`x`/`y` are **capture image pixels** (integers), not content points. The controller maps the pixel centre through the runtime's `ContentGeometry`; the harness recovers that mapping by calibrating with two calls.
-
-`capture_ui_node` (normal capture shape plus node evidence):
-
-```json
-{
-  "capture_id": "<new capture>",
-  "resource": "/captures/<id>",
-  "source": "<platform capture source>",
-  "width": 0,
-  "height": 0,
-  "coordinates": {"x": 0, "y": 0, "width": 0, "height": 0},
-  "node_id": "<selected node>",
-  "contentFrame": {"x": 0.0, "y": 0.0, "w": 0.0, "h": 0.0}
-}
-```
-
-`contentFrame` is the node's absolute content frame used for the crop. The PNG dimensions must equal the capture `width`/`height` and the crop implied by `contentFrame` at the calibrated scale (floor/ceil and rounding allow at least four pixels, plus 2% for large nodes). `coordinates` is the crop region in window-server units.
-
-### Pass conditions
-
-Exit code 0 and every line below printed:
-
-```text
-PASS  controller ready ... (default port 9229 not used)
-PASS  runtime selected: ...
-PASS  macOS permissions: screen_capture=true accessibility=true
-PASS  runtime ... bound to window ...
-PASS  window capture ... from '<source>' (...)
-PASS  runtime returned N nodes; M have a usable visible frame
-PASS  capture mapping: ... server units per pixel ... content origin (...)
-PASS  select_ui_at at capture pixel (...) -> hit.nodeID ... 
-PASS  capture_ui_node produced WxH PNG ... 
-RESULT PASS  Milestone 1 Inspector: select-at-point and node screenshot
-```
-
-Exit codes:
-
-| Code | Meaning |
-| --- | --- |
-| 0 | Pass; all assertions above succeeded |
-| 1 | Functional failure: wrong hit ID, missing node, wrong PNG dimensions/pixels, stale/expired capture, contract shape mismatch |
-| 2 | Blocked: non-macOS host, missing dependency, build failure, missing product tool, missing macOS permission, capture unavailable, gallery/controller did not start |
-| 130/143 | Interrupted; processes were stopped by the traps |
-
-### Known TCC and platform blockers
-
-- **Screen Recording** (`permissions.screen_capture=false`): the controller prints `Screen Recording is off. Enable it for the terminal running this controller, then restart.` The harness reports both missing permissions in one actionable block and exits 2 before capturing. Grant it in **System Settings > Privacy & Security > Screen & System Audio Recording** (older macOS: **Screen Recording**) for the terminal or app that launches the script, quit and reopen that app, then rerun. With a controller running, `cove-devtools call request_ui_permissions '{}'` asks macOS for both permissions; restart the process after a TCC change.
-- **Accessibility** (`permissions.accessibility=false`): grant in **System Settings > Privacy & Security > Accessibility** for the same app and restart it. The Milestone 1 scene path is a runtime hit test and does not use native accessibility, but the acceptance policy requires both permissions documented in `crates/devtools/README.md`.
-- **Capture present but unusable** (`capture_denied`, `capture_failed`, `not_visible`, uniform frame): keep the gallery window on an unlocked display, do not minimize it, and do not cover it with an opaque window. The desktop capture reads the composited display, so an occluded window yields the occluder's pixels.
-- **No GUI session**: launching from a headless SSH session or without WindowServer leaves no window target. The harness blocks with `No macOS window target is associated with gallery pid ...`.
-- **Content geometry unavailable**: `select_ui_at`/`capture_ui_node` require the host to report where runtime content sits in window-server space. Hosts that cannot observe it (for example Wayland, which deliberately withholds global positions) return an explicit `unavailable` error; the harness blocks instead of inventing coordinates.
-- **Missing final tools or arguments**: if `select_ui_at` is absent, lacks `capture_id`/`x`/`y`, or `capture_ui_node` is absent or does not require `node_id`, the harness exits 2 and names the missing contract.
-- **Wrong response shape**: a missing `contentFrame`, `node_id`, capture fields, or a mismatched `hit.nodeID`/frame is a functional failure (exit 1) with the field or value named.
-- **Build/port races**: a failing build blocks with the cargo log; a bound ephemeral port makes the controller exit, which is also reported with the controller log.
-
-### Evidence and limitations
-
-- Artifacts live under the printed temporary directory: `logs/controller.log`, `logs/gallery.log`, `logs/calls.log`, `artifacts/window.png`, `artifacts/node.png`, and the queried node pages. They are removed after a successful run unless `--keep` is passed; failed runs keep them.
-- Pixel validation checks the PNG signature, IHDR dimensions, decode/filters, unique colours, transparency and opaque ratio. It is not a golden-image diff. The window capture may include the system compositor's view of overlapping windows.
-- The harness verifies the node screenshot is a crop of the live window at the node's `contentFrame`; it does not compare against a reference rendering.
-- Keep the gallery window stationary while the run is in progress. Calibration is derived from the stored window capture and live content geometry; moving or resizing the window invalidates the mapping.
-- Keep the gallery window on one display. A window spanning displays with different scale factors is not a uniform affine mapping, so the calibration assumptions do not hold.
-- No product code is modified. The harness only calls the public controller tools and reads their PNG resources.
-
-### Current verification status
-
-The harness was run on this machine against an isolated controller and gallery. Controller startup, discovery isolation, gallery registration, runtime selection and the TCC gate passed/failed as designed:
-
-```text
-PASS  controller ready at http://127.0.0.1:<ephemeral> (default port 9229 not used)
-PASS  runtime selected: <id> (CoveUI — Component Showcase, pid <pid>)
-BLOCKED  Missing macOS permission(s): Screen Recording (permissions.screen_capture=false). Accessibility (permissions.accessibility=false).
-```
-
-Both `permissions.screen_capture` and `permissions.accessibility` were false for this automation host, and the controller logged `Screen Recording is off` / `Accessibility is off`. A full pass requires granting both permissions to the app that launches the script, restarting it, and rerunning. That is the only unverified portion: the real capture, calibration, node hit test and node PNG checks cannot execute without Screen Recording. Granting the permissions and rerunning the same command is the proof.
+The harness uses Cove frame readback and scene queries. It requires a macOS GUI session to start Gallery. The Metal readback regression test also renders and reads pixels without creating a native window.
 
 ## Milestone 3: CPU profiler
 

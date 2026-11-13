@@ -8,7 +8,9 @@
 use super::timings::{FrameTimings, Phase};
 use crate::android::sources::cove_android_app::bridge::AcquiredNativeWindow;
 use crate::desktop::application::memory::{AppWindowMemorySnapshot, AppWindowRendererState};
-use crate::desktop::window::native_renderer::AppWindowRenderer;
+use crate::desktop::window::native_renderer::{
+    AppWindowRenderer, CapturedFrame, capture_framebuffer,
+};
 use cove_core::DrawList;
 use cove_graphics::rhi::{
     CommandBuffer, Device, QueueClass, RenderColorTarget, RhiError, RhiResult, SurfaceDescriptor,
@@ -28,6 +30,7 @@ pub struct FrameSample {
 
 /// Facts the open log line reports alongside the swapchain's.
 pub struct SurfaceLaunchInfo {
+    pub capture_enabled: bool,
     pub benchmark: bool,
     pub gpu_timings: bool,
 }
@@ -41,6 +44,7 @@ pub struct AndroidWindowRenderer {
     window: Option<AcquiredNativeWindow>,
     swapchain: Option<Swapchain>,
     framebuffer: Option<TextureResource>,
+    frame_logical_size: Option<(f32, f32)>,
     timings: FrameTimings,
     frame_samples: Receiver<FrameSample>,
     state: AppWindowRendererState,
@@ -65,6 +69,7 @@ impl AndroidWindowRenderer {
             window: None,
             swapchain: None,
             framebuffer: None,
+            frame_logical_size: None,
             timings,
             frame_samples,
             state: AppWindowRendererState::Unconfigured,
@@ -95,7 +100,7 @@ impl AndroidWindowRenderer {
         // drawable.
         let frosted = self.renderer.supports_backdrop()
             && list.batches().iter().any(|batch| batch.backdrop.is_some());
-        if !frosted {
+        if !frosted && !self.info.capture_enabled {
             self.framebuffer = None;
         } else if self.framebuffer.as_ref().is_none_or(|buffer| {
             let descriptor = buffer.descriptor();
@@ -107,7 +112,9 @@ impl AndroidWindowRenderer {
                     image.width,
                     image.height,
                     TextureFormat::Rgba8Unorm,
-                    TextureUsage::COLOR_TARGET | TextureUsage::SAMPLED,
+                    TextureUsage::COLOR_TARGET
+                        | TextureUsage::SAMPLED
+                        | TextureUsage::TRANSFER_SOURCE,
                 )
                 .with_label("android-ui-framebuffer"),
             )?);
@@ -126,7 +133,7 @@ impl AndroidWindowRenderer {
                     &mut commands,
                     RenderColorTarget::clearing(target_texture, clear_color),
                     viewport,
-                    framebuffer_texture,
+                    framebuffer_texture.filter(|_| frosted),
                 )?;
                 if framebuffer_texture.is_some() {
                     renderer.record_blit(
@@ -146,6 +153,7 @@ impl AndroidWindowRenderer {
         frame.did_submit();
         self.timings
             .measure_result(Phase::Present, || device.present(image))?;
+        self.frame_logical_size = Some(logical);
         Ok(true)
     }
 
@@ -256,6 +264,14 @@ impl AppWindowRenderer for AndroidWindowRenderer {
             list.indices().len(),
         );
         Ok(presented)
+    }
+
+    fn capture(&mut self) -> RhiResult<CapturedFrame> {
+        capture_framebuffer(
+            &self.device,
+            self.framebuffer.as_ref(),
+            self.frame_logical_size,
+        )
     }
 
     fn upload_font_atlas(&mut self, upload: FontAtlasUpload) -> RhiResult<()> {

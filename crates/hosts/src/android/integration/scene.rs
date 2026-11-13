@@ -92,7 +92,7 @@ pub struct AndroidContentSession {
     nodes: NodeRenderer,
     graph: OnceCell<Rc<ViewGraph>>,
     dispatcher: OnceCell<Rc<EventDispatcher>>,
-    needs_update: Cell<bool>,
+    needs_update: Rc<Cell<bool>>,
     /// Set when the platform asks the process to trim memory, which is
     /// Android's memory-pressure signal (`cove_android_memory_pressure`).
     platform_trim_requested: Rc<Cell<bool>>,
@@ -182,7 +182,7 @@ impl AndroidContentSession {
             nodes: NodeRenderer::new(),
             graph: OnceCell::new(),
             dispatcher: OnceCell::new(),
-            needs_update: Cell::new(true),
+            needs_update: Rc::new(Cell::new(true)),
             platform_trim_requested: Rc::new(Cell::new(false)),
             diagnostics: RefCell::new(None),
             draw_list,
@@ -272,6 +272,7 @@ impl AndroidContentSession {
         &self,
         config: DevToolsConfiguration,
         schedule: Rc<dyn Fn()>,
+        capture: crate::desktop::diagnostics::integration::CaptureRequest,
     ) -> Result<(), String> {
         if let Some(previous) = self.diagnostics.borrow_mut().as_mut() {
             previous.stop();
@@ -375,9 +376,22 @@ impl AndroidContentSession {
             self.tree.clone(),
             graph,
             schedule,
-            invalidate,
+            invalidate.clone(),
             memory,
             AndroidDiagnosticsHooks {
+                capture,
+                viewport: Rc::new({
+                    let surface = self.surface.clone();
+                    move || surface.logical_size()
+                }),
+                input: Rc::new({
+                    let dispatcher = self.dispatcher();
+                    let needs_update = self.needs_update.clone();
+                    move |event| {
+                        dispatcher.dispatch_local(&event);
+                        needs_update.set(true);
+                    }
+                }),
                 invalidation_log: self.context.invalidation_log.clone(),
                 environment: Some(environment),
                 content_geometry: Some(content_geometry),
@@ -389,6 +403,10 @@ impl AndroidContentSession {
         )?;
         *self.diagnostics.borrow_mut() = Some(diagnostics);
         Ok(())
+    }
+
+    pub(crate) fn has_diagnostics(&self) -> bool {
+        self.diagnostics.borrow().is_some()
     }
 
     pub fn pump_diagnostics(&self) {
@@ -502,7 +520,6 @@ impl AndroidContentSession {
             environment.with_current(scale, || {
                 context.with_current(|| {
                     if let Some(diagnostics) = diagnostics.borrow_mut().as_mut() {
-                        diagnostics.drain();
                         diagnostics.begin_frame();
                     }
                     let layout_start = Instant::now();

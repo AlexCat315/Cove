@@ -37,7 +37,18 @@ pub struct DiagnosticMemorySnapshot {
     pub pressure: MemoryPressure,
 }
 
+#[cfg(not(target_arch = "wasm32"))]
+pub type FrameCapture = std::sync::mpsc::Receiver<
+    cove_graphics::rhi::RhiResult<crate::desktop::window::native_renderer::CapturedFrame>,
+>;
+#[cfg(not(target_arch = "wasm32"))]
+pub type CaptureRequest = Rc<dyn Fn() -> Result<FrameCapture, String>>;
+
 pub struct DiagnosticsCallbacks {
+    #[cfg(not(target_arch = "wasm32"))]
+    pub capture: Option<CaptureRequest>,
+    pub viewport: Rc<dyn Fn() -> (f32, f32)>,
+    pub input: Rc<dyn Fn(cove_platform::InputEvent)>,
     pub invalidate: Rc<dyn Fn()>,
     pub memory: Rc<dyn Fn() -> DiagnosticMemorySnapshot>,
     pub invalidation_log: Option<Arc<InvalidationLog>>,

@@ -1,6 +1,6 @@
 # Cove DevTools
 
-Inspector、MCP 和 CLI 共用一个 Rust 控制服务。原生宿主与 WASM 应用通过同一个 Rust 探针提供 Cove 组件、源码、日志、样式和 CPU 时间线。截图、鼠标键盘、触摸和原生控件操作由平台适配器执行。
+Inspector、MCP 和 CLI 共用一个 Rust 控制服务。原生宿主与 WASM 应用通过同一个 Rust 探针提供 Cove 组件、源码、日志、样式和 CPU 时间线。画面由应用自己的渲染器提供，调试输入在所选 Cove 运行时内分发。
 
 ## 启动
 
@@ -26,28 +26,21 @@ cargo run --quiet -p cove-devtools-cli -- call capture_ui '{"target":"WINDOW_ID"
 
 | 平台 | 接入方式 |
 | --- | --- |
-| Windows | Windows Graphics Capture 读取系统合成画面，UI Automation 查原生控件。系统键鼠受前台窗口、完整性级别和安全桌面约束。 |
-| macOS | ScreenCaptureKit 读取合成画面，Accessibility API 查原生控件，Quartz 发送键鼠事件。在系统设置中给运行控制器的终端或应用授予屏幕录制和辅助功能权限。 |
-| Linux / X11 | 从 X11 读取显示器画面并发送 XTest 输入，应用控件通过 AT-SPI 查询。 |
-| Linux / Wayland | 选择 Wayland shared screen，首次截图会请求 RemoteDesktop 与 ScreenCast 授权。PipeWire 画面与绝对坐标输入使用同一个流。绑定 Cove 运行时可继续看组件，AT-SPI 按应用查原生控件。发送键盘前先在共享显示器上聚焦目标。 |
-| Web | 用 `serve --web-root crates/browser/dist` 提供 WASM 页面。将 Inspector 链接的路径改为 `/app/` 并保留片段，打开即可注册探针。为页面截图和浏览器输入配置 WebDriver。 |
-| iOS / iPadOS | 使用 Appium XCUITest / WebDriverAgent 会话。通过 Xcode 或 Appium 启动开发版，设置 `COVE_DEVTOOLS=1`。模拟器可使用配套 Mac 的本地控制器，真机需通过隧道让设备侧的本地端口连到控制器。 |
-| Android | 使用 Appium UiAutomator2 会话。Debug APK 可用 `adb reverse tcp:9229 tcp:9229` 转发探针连接。启动 `com.cove.probe.MainActivity` 时将含 `endpoint`、`token` 和可选 `appTitle` 的 UTF-8 JSON 做 Base64 编码，传给字符串 extra `cove_devtools`。 |
+| macOS、Windows、Linux | 调试版用 `COVE_DEVTOOLS=1` 注册。控制器读取该窗口的 GPU 渲染目标。窗口被遮挡时，调试宿主继续渲染到自己的纹理。 |
+| iOS / iPadOS | 用 Xcode 启动设置了 `COVE_DEVTOOLS=1` 的调试版。模拟器可连接配套 Mac 的控制器。真机通过隧道接入控制器。 |
+| Android | Debug APK 可用 `adb reverse tcp:9229 tcp:9229` 接入。启动 `com.cove.probe.MainActivity` 时，把含 `endpoint`、`token` 和可选 `appTitle` 的 UTF-8 JSON 进行 Base64 编码，传给字符串 extra `cove_devtools`。 |
+| Web | 用 `serve --web-root crates/browser/dist` 提供 WASM 页面。将 Inspector 链接的路径改为 `/app/` 并保留片段，打开即可注册。画面来自页面自己的 Canvas。 |
 
-Linux 构建控制器需要 PipeWire、XCB、Clang、D-Bus、EGL 与 GBM 开发依赖。Debian/Ubuntu 包名见仓库 CI 配置。
-
-配置已有 WebDriver 会话时，启动控制器传入 `--webdriver web,http://127.0.0.1:9515,SESSION_ID`。移动平台用 `ios` 或 `android`。控制器接入会话，设备启动、签名与会话创建由对应驱动负责。远端驱动通过本地端口隧道接入。在 Inspector 或 `bind_ui_target` 中关联运行时与对应会话。桌面探针有匹配的系统窗口标识时自动关联。
+macOS 自动化可用 `SDL_WINDOW_ACTIVATE_WHEN_SHOWN=0 SDL_WINDOW_ACTIVATE_WHEN_RAISED=0 COVE_DEVTOOLS=1` 启动 Gallery，保留当前应用的键盘焦点。
 
 ## 操作与验收
 
-1. 用 `get_ui_session` 取得目标 ID。系统文件面板出现后，重新查询并选择面板目标。
-2. `capture_ui` 返回 PNG 资源、像素宽高、坐标范围和来源。桌面默认裁剪到窗口范围，`scope: "display"` 取窗口所在的显示器。桌面合成画面会保留实际遮挡。浏览器截图范围为页面视口。
-3. 用 `click_ui` 或 `input_ui` 传入截图 ID 和 `coordinates` 坐标。图片内点按宽高比例换算，并加上坐标原点。拖动和滚动同样使用截图坐标。窗口、显示器或浏览器上下文变化时重新截图。
-4. 用 `wait_for_ui` 检查 Cove 节点是否可见、隐藏、启用或取得预期值。值断言需要 `node_id` 与 `expected`。用 `query_native_ui` 或 `find_native_ui` 查原生控件，`activate_ui` 执行其系统动作。操作后重新查询控件、目标或画面，确认结果。
+1. 用 `get_ui_session` 选择 Cove 运行时。各窗口有独立目标 ID。
+2. `capture_ui` 获取应用画面的 PNG、尺寸和 capture ID。 `capture_ui_node` 裁出节点的可见画面区域。高分辨率画面超过传输上限时按比例缩小。
+3. `select_ui_at` 用画面像素命中组件。在 Inspector 选择 **Interact**，可以在画面上点击、拖动或滚动。CLI/MCP 的 `click_ui` 与 `input_ui` 使用同一个 capture ID，坐标原点是返回图片的左上角。视口尺寸变化后重新获取画面。
+4. `press_ui_key` 和 `type_ui_text` 在运行时内分发按键和已提交文本。用 `wait_for_ui` 验证节点可见性或预期值。值断言需要 `node_id` 与 `expected`。安全字段保留脱敏。
 
-`query_ui_nodes` 可筛选角色、文字和源文件，默认返回紧凑信息。单个字段可用 `node_id` 和 `include_value: true` 读取，安全字段保留脱敏。完整组件树在 Inspector 的 Components 中查看。
-
-`press_ui_key` 发送按键及修饰键，`type_ui_text` 使用平台的文本输入能力。输入回执表示交付。IME 候选、软键盘、物理触控板及系统拖入需要记录实际设备、输入路径与后置条件。浏览器视口外的系统界面可以选择浏览器所在桌面的显示器目标。
+DevTools 的画面范围为 Cove 渲染内容。系统标题栏、原生文件面板、软键盘和输入法候选窗由操作系统管理。应用内输入验收覆盖 Cove 控件的交互与状态变化，物理设备和原生输入法验收需要实际操作。
 
 `start_ui_trace` 与 `stop_ui_trace` 可包围实际操作，`get_ui_trace` 分页读取，`compare_ui_traces` 比较 CPU 阶段。帧计时区分 CPU 提交、渲染线程完成和宿主能观察到的呈现操作。GPU 执行和屏幕扫描输出没有在这些 CPU 样本中计量。
 

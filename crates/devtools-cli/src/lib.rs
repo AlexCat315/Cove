@@ -4,7 +4,6 @@ mod controller;
 mod debugger;
 mod deep_links;
 mod http;
-mod platform;
 mod registry;
 mod tools;
 
@@ -94,7 +93,7 @@ impl Client {
             .cloned()
             .ok_or_else(|| failure("Missing controller result."))?;
         let mut image = None;
-        if name == "capture_ui" {
+        if matches!(name, "capture_ui" | "capture_ui_node") {
             let resource = data["resource"].as_str().unwrap_or_default();
             match self.image(resource).and_then(|bytes| attachment(&bytes)) {
                 Ok((bytes, mime, width, height)) => {

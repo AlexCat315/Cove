@@ -12,11 +12,14 @@ cove-devtools-protocol.workspace = true
 cove-core.workspace = true
 cove-http.workspace = true
 cove-logging.workspace = true
+cove-platform.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 thiserror.workspace = true
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+base64 = "0.22"
+image = { version = "0.25", default-features = false, features = ["png"] }
 cove-alloc.workspace = true
 cove-profiling.workspace = true
 ureq.workspace = true

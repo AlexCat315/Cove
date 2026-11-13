@@ -86,10 +86,8 @@
     </span>
   </div>
 
-  <div id="permissions" class="permission-group" role="group" aria-label="System permissions"></div>
 
   <div class="header-actions">
-    <button id="request-permissions" class="text-button" type="button" hidden>Request access</button>
     <button id="shortcuts-button" class="icon-button" type="button" title="Keyboard shortcuts (?)" aria-label="Keyboard shortcuts">
       <svg class="icon" aria-hidden="true"><use href="#i-keyboard"></use></svg>
     </button>
@@ -98,20 +96,6 @@
     </button>
   </div>
 </header>
-
-<div id="permission-banner" class="alert alert-warning" role="alert" hidden>
-  <svg class="icon" aria-hidden="true"><use href="#i-alert"></use></svg>
-  <span id="permission-banner-text"></span>
-  <button id="permission-banner-action" class="text-button" type="button">Request access</button>
-</div>
-
-<div id="bind-banner" class="alert alert-info" role="status" hidden>
-  <svg class="icon" aria-hidden="true"><use href="#i-link"></use></svg>
-  <span id="bind-message">This runtime has no capture target. Bind its window to enable screenshots and picking.</span>
-  <label class="inline-field" for="bind-target">Window</label>
-  <select id="bind-target"></select>
-  <button id="bind-button" class="tool-button" type="button">Bind</button>
-</div>
 
 <div class="app-body">
   <nav class="rail" aria-label="DevTools sections">
@@ -171,6 +155,7 @@
             <button id="mode-pick" type="button" aria-pressed="false" title="Pick a component in a screenshot" aria-label="Pick a component at a point">
               <svg class="icon" aria-hidden="true"><use href="#i-pick"></use></svg><span>Pick</span>
             </button>
+            <button id="mode-interact" type="button" aria-pressed="false" title="Send pointer input to the Cove app" disabled>Interact</button>
           </div>
 
           <button id="repaint-highlight-button" class="tool-button" type="button" aria-pressed="false" title="Highlight repainted nodes on the target" aria-label="Highlight repaints" disabled>
@@ -206,12 +191,7 @@
 
           <div class="toolbar-spacer"></div>
 
-          <label class="inline-field" for="capture-scope">Scope</label>
-          <select id="capture-scope" aria-label="Capture scope">
-            <option value="window">Window</option>
-            <option value="display">Display</option>
-          </select>
-          <button id="capture-button" class="tool-button" type="button" title="Capture the target window or display" aria-label="Capture screenshot" disabled>
+          <button id="capture-button" class="tool-button" type="button" title="Capture the Cove frame" aria-label="Capture screenshot" disabled>
             <svg class="icon" aria-hidden="true"><use href="#i-camera"></use></svg><span>Capture</span>
           </button>
           <button id="node-shot-button" class="tool-button" type="button" title="Capture the selected node (requires inspect_nodes)" aria-label="Capture node screenshot" disabled>
@@ -250,7 +230,18 @@
             <div id="tree-footer" class="tree-footer" hidden></div>
           </section>
 
-          <section class="details-pane" aria-labelledby="details-heading">
+          <section class="details-pane" aria-label="Inspector details">
+            <section id="screenshot-panel" class="screenshot-panel" aria-label="App frame">
+              <header class="screenshot-head">
+                <h3>App frame</h3>
+                <span id="screenshot-meta" class="pane-meta"></span>
+                <div class="screenshot-actions">
+                  <button id="screenshot-zoom" class="text-button" type="button" title="Toggle screenshot zoom" hidden>Fit</button>
+                  <button id="screenshot-clear" class="text-button" type="button" title="Clear the screenshot" hidden>Clear</button>
+                </div>
+              </header>
+              <div id="screenshot-body" class="screenshot-body"></div>
+            </section>
             <div id="details-state" class="state-host"></div>
             <div id="details-content" hidden>
               <header class="node-header">
@@ -272,18 +263,6 @@
                 <button id="clear-highlight" class="text-button" type="button">Clear highlight</button>
                 <button id="read-value-button" class="text-button" type="button" hidden>Read live value</button>
               </div>
-
-              <section id="screenshot-panel" class="screenshot-panel" aria-label="Screenshot">
-                <header class="screenshot-head">
-                  <h3>Screenshot</h3>
-                  <span id="screenshot-meta" class="pane-meta"></span>
-                  <div class="screenshot-actions">
-                    <button id="screenshot-zoom" class="text-button" type="button" title="Toggle screenshot zoom" hidden>Fit</button>
-                    <button id="screenshot-clear" class="text-button" type="button" title="Clear the screenshot" hidden>Clear</button>
-                  </div>
-                </header>
-                <div id="screenshot-body" class="screenshot-body"></div>
-              </section>
 
               <div class="detail-tabs" role="tablist" aria-label="Node details">
                 <button id="tab-properties" class="detail-tab" role="tab" aria-selected="true" aria-controls="panel-properties" tabindex="0" type="button">Properties</button>
@@ -324,7 +303,7 @@
               <input id="text-value" class="text-input" type="text" placeholder="Text to type" spellcheck="false" maxlength="16384">
               <button id="send-text" class="tool-button" type="submit" disabled>Send text</button>
             </form>
-            <p id="input-help" class="input-help">Delivery is acknowledged by the platform. Verify the resulting UI state.</p>
+            <p id="input-help" class="input-help">Input goes to the selected Cove runtime.</p>
           </div>
         </section>
       </div>

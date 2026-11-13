@@ -1,8 +1,18 @@
 # Gallery 逐项验收记录
 
-更新于 2026-11-12。目录共 106 页。Swift 对照表覆盖迁移的页面，新增 Rust 示例见对应日期的验收记录。
+更新于 2026-11-13。目录共 106 页。Swift 对照表覆盖迁移的页面，新增 Rust 示例见对应日期的验收记录。
 
 Swift 源码逐页对照见文末《Swift 源码对照（逐页差异清单）》。
+
+## 2026-11-13 DevTools 应用内画面与输入
+
+| 页面 | 实现与自动化 | 实际画面与操作 | Rust 文档 |
+| --- | --- | --- | --- |
+| Gallery / Dashboard | macOS Metal 渲染目标读回测试和 M1 验收通过。 | 从 Gallery 取回 2560×1440 PNG，按像素命中 Size 节点，裁出 48×32 PNG。像素用脚本检查，人工视觉验收待做。 | [DevTools](../Website/src/content/components/devtools.md) |
+| Gallery / Button、Slider、侧栏搜索 | macOS 探针调用 `click_ui`、`input_ui`、`type_ui_text`、`press_ui_key`，用查询断言后置状态。 | 进入 Button 页，Slider 从 0.35 拖到 0.859375，滚动改变侧栏节点位置，搜索输入后按 Backspace 得到预期值。两次交互均有 trace。原生键盘和 IME 未验收。 | [Button](../Website/src/content/components/button.md) · [DevTools](../Website/src/content/components/devtools.md) |
+| Browser / Counter | WASM 构建通过。无头 Chrome 上分别运行 Canvas2D 与 WebGPU。 | 两种渲染器均取回 Canvas PNG，验证节点裁图、命中、点击计数、Unicode 输入和 Backspace。Inspector 的 Interact 成功操作后台 WebGPU 标签页。 | [DevTools](../Website/src/content/components/devtools.md) |
+
+Windows 与 Linux 控制器交叉检查通过。两个平台的宿主交叉检查受本机 C 工具链限制。Android Gallery 已用 NDK 链接，暂无设备验证。iOS/iPadOS 与 macOS 共用 Metal 宿主，本机缺少 iPhoneOS / iPhoneSimulator SDK。Windows、Linux 的窗口渲染与输入待原生验收。
 
 ## 2026-11-12 DevTools 控制器
 

@@ -49,6 +49,7 @@ pub struct EventDispatcher {
     pub event_interceptor: Option<EventInterceptor>,
     pub trace_sink: Option<TraceSink>,
     active_cursor: Cell<SystemCursor>,
+    suppress_system_cursor: Cell<bool>,
     /// Last known pointer position from `MouseMotion`. Used to hit-test wheel
     /// events (which carry no position on SDL3) so they reach the node under
     /// the cursor instead of only the root or focused node.
@@ -79,6 +80,7 @@ impl EventDispatcher {
             event_interceptor: None,
             trace_sink: None,
             active_cursor: Cell::new(SystemCursor::Arrow),
+            suppress_system_cursor: Cell::new(false),
             last_cursor: Cell::new(None),
             hovered_path: RefCell::new(Vec::new()),
             wheel_gesture: RefCell::new(WheelGesture::default()),
@@ -94,6 +96,14 @@ impl EventDispatcher {
     }
 
     // MARK: - Public dispatch
+
+    /// Dispatches an app-local event without updating the system cursor.
+    pub fn dispatch_local(&self, event: &InputEvent) -> bool {
+        let previous = self.suppress_system_cursor.replace(true);
+        let handled = self.dispatch(event);
+        self.suppress_system_cursor.set(previous);
+        handled
+    }
 
     pub fn dispatch(&self, event: &InputEvent) -> bool {
         if let Some(interceptor) = &self.event_interceptor
@@ -746,7 +756,7 @@ impl EventDispatcher {
                 break;
             }
         }
-        if resolved != self.active_cursor.get() {
+        if !self.suppress_system_cursor.get() && resolved != self.active_cursor.get() {
             self.active_cursor.set(resolved);
             if let Some(sink) = &self.cursor_sink {
                 sink(resolved);

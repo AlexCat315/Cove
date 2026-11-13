@@ -4,7 +4,7 @@
 
 ## Unreleased
 
-- 重写 Cove DevTools。Inspector、MCP 和 CLI 共用控制器，原生与 WASM 共用 Rust 探针。系统截图、平台输入和原生控件操作按目标执行。移除应用内镜像、旧 WebSocket 和合成输入回放。
+- 重写 Cove DevTools。Inspector、MCP 和 CLI 共用控制器，原生与 WASM 共用 Rust 探针。画面来自 Cove 渲染目标或页面 Canvas，点击、拖动、滚动、按键和文本在所选运行时内分发。移除系统录屏、辅助功能授权、全局输入和 WebDriver 绑定入口。
 
 - WASM 浏览器宿主接通滚轮和触控板滚动。Gallery 的编辑字段可接收浏览器键盘和 IME 输入，输入位置跟随 Cove 光标。
 - 浏览器新增 Rust RHI WebGPU 后端。Gallery 在 Web 复用原生 DrawList 渲染器和 4× MSAA，UI 与合成着色器由 Slang 生成浏览器产物。

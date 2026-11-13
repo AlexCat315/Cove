@@ -44,7 +44,7 @@ pub struct AuxiliaryAppWindow {
     root_view: AnyView,
     portal_store: Rc<PortalStore>,
     rendering: Rc<AppRenderingContext>,
-    window_renderer: Option<ThreadedWindowRenderer>,
+    window_renderer: Rc<RefCell<Option<ThreadedWindowRenderer>>>,
     config: ApplicationConfiguration,
     window_rendering: AppWindowRendering,
     use_legacy_renderer: bool,
@@ -94,7 +94,7 @@ impl AuxiliaryAppWindow {
             root_view,
             portal_store,
             rendering,
-            window_renderer: None,
+            window_renderer: Rc::new(RefCell::new(None)),
             window_rendering,
             use_legacy_renderer,
             config,
@@ -150,6 +150,28 @@ impl AuxiliaryAppWindow {
             self.graph.clone(),
             invalidate.clone(),
             DiagnosticsCallbacks {
+                capture: Some(Rc::new({
+                    let renderer = self.window_renderer.clone();
+                    move || {
+                        renderer
+                            .borrow_mut()
+                            .as_mut()
+                            .ok_or("The renderer is unavailable.")?
+                            .capture()
+                            .map_err(|error| error.to_string())
+                    }
+                })),
+                viewport: Rc::new({
+                    let session = self.session.clone();
+                    move || {
+                        let (width, height) = session.logical_size();
+                        (width as f32, height as f32)
+                    }
+                }),
+                input: Rc::new({
+                    let session = self.session.clone();
+                    move |event| session.dispatch_local(event)
+                }),
                 invalidate,
                 memory: Rc::new(Default::default),
                 invalidation_log: Some(self.session.input_context.invalidation_log.clone()),
@@ -179,6 +201,7 @@ impl AuxiliaryAppWindow {
                 },
             },
         )?);
+        host.set_window_keep_rendering(id, true);
         Ok(())
     }
 
@@ -206,12 +229,12 @@ impl AuxiliaryAppWindow {
         );
         let mut renderer = self
             .rendering
-            .make_window(settings)
+            .make_window(settings, self.config.diagnostics.dev_tools.is_some())
             .map_err(|error| error.to_string())?;
         renderer
             .configure(native, (width_px, height_px), self.is_vsync_enabled)
             .map_err(|error| error.to_string())?;
-        self.window_renderer = Some(renderer);
+        *self.window_renderer.borrow_mut() = Some(renderer);
 
         let window_id = self.session.id;
         let graph = self.graph.clone();
@@ -262,13 +285,13 @@ impl AuxiliaryAppWindow {
     /// Releases this window's GPU surface before the shell destroys its native
     /// window.
     pub fn release_gpu_surface(&mut self) {
-        if let Some(mut renderer) = self.window_renderer.take() {
+        if let Some(mut renderer) = self.window_renderer.borrow_mut().take() {
             let _ = renderer.close();
         }
     }
 
     pub fn set_presentation_active(&mut self, active: bool) -> Result<(), String> {
-        match &mut self.window_renderer {
+        match self.window_renderer.borrow_mut().as_mut() {
             Some(renderer) => renderer
                 .set_presentation_active(active)
                 .map_err(|e| e.to_string()),
@@ -278,6 +301,7 @@ impl AuxiliaryAppWindow {
 
     pub fn memory_snapshot(&self) -> Option<AppWindowMemorySnapshot> {
         self.window_renderer
+            .borrow()
             .as_ref()
             .map(|renderer| renderer.memory_snapshot())
     }
@@ -297,7 +321,7 @@ impl AuxiliaryAppWindow {
         let logical = self.session.logical_size();
         self.logical_w = logical.0;
         self.logical_h = logical.1;
-        if let Some(renderer) = &mut self.window_renderer {
+        if let Some(renderer) = self.window_renderer.borrow_mut().as_mut() {
             renderer
                 .resize((width_px, height_px), self.is_vsync_enabled)
                 .map_err(|error| error.to_string())?;
@@ -313,7 +337,7 @@ impl AuxiliaryAppWindow {
     pub fn set_vsync_enabled(&mut self, enabled: bool) {
         self.is_vsync_enabled = enabled;
         let size = self.session.drawable_size();
-        if let Some(renderer) = &mut self.window_renderer {
+        if let Some(renderer) = self.window_renderer.borrow_mut().as_mut() {
             let _ = renderer.resize(size, enabled);
         }
         self.session.request_display();
@@ -353,10 +377,12 @@ impl AuxiliaryAppWindow {
         configure_text_environment: &dyn Fn(f32),
         upload_atlas_if_needed: &dyn Fn(bool) -> Result<(), String>,
     ) -> bool {
-        let Some(renderer) = &self.window_renderer else {
-            return false;
-        };
-        if !renderer.is_configured() || !renderer.has_frame_capacity() {
+        if !self
+            .window_renderer
+            .borrow()
+            .as_ref()
+            .is_some_and(|renderer| renderer.is_configured() && renderer.has_frame_capacity())
+        {
             return false;
         }
         let (root, timeline) = {
@@ -409,7 +435,8 @@ impl AuxiliaryAppWindow {
         }
 
         let mut list = self.draw_list.borrow_mut();
-        let Some(renderer) = &mut self.window_renderer else {
+        let mut renderer = self.window_renderer.borrow_mut();
+        let Some(renderer) = renderer.as_mut() else {
             return false;
         };
         let batches = list.batches().len();
@@ -429,7 +456,8 @@ impl AuxiliaryAppWindow {
 
     /// Collects finished frames. True when one could not present and must retry.
     pub fn take_presented(&mut self) -> Result<bool, String> {
-        let Some(renderer) = &mut self.window_renderer else {
+        let mut renderer = self.window_renderer.borrow_mut();
+        let Some(renderer) = renderer.as_mut() else {
             return Ok(false);
         };
         let frames = renderer
@@ -440,7 +468,7 @@ impl AuxiliaryAppWindow {
                 diagnostics.presentation_finished(frame.token.0, frame.presented, frame.cpu_ms);
             }
         }
-        Ok(frames.iter().any(|frame| !frame.presented))
+        Ok(self.session.is_presentation_active() && frames.iter().any(|frame| !frame.presented))
     }
 }
 

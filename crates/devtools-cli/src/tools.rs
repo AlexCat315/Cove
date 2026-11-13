@@ -100,10 +100,6 @@ pub fn definitions() -> Vec<AgentTool> {
             vec![("kind", choice(&["text"])), ("text", input_text())],
             &["kind", "text"],
         ),
-        object(
-            vec![("kind", choice(&["activate"])), ("element", text())],
-            &["kind", "element"],
-        ),
     ]);
     let dimension = || S::number(Some(1.), Some(16_384.));
     let color = || S::string(Some(7), Some(9));
@@ -189,22 +185,17 @@ pub fn definitions() -> Vec<AgentTool> {
         &[],
     );
     tools.extend([
-        tool("get_ui_session", "List connected Cove runtimes, platform windows, displays, and configured WebDriver sessions.", vec![], &[], true),
-        tool("request_ui_permissions", "Prompt macOS for Screen Recording and Accessibility access. Restart the controller after granting.", vec![], &[], false),
-        tool("bind_ui_target", "Associate a runtime with its window, shared screen, or WebDriver session.", vec![("platform_target",text())], &["target","platform_target"], false),
+        tool("get_ui_session", "List connected Cove runtimes and their capabilities.", vec![], &[], true),
         tool("inspect_ui_tree", "Read the selected runtime's Cove tree.", vec![], &[], true),
         tool("query_ui_tree", "Read a bounded, real subtree of the live Cove tree. Omit node_id to start at the scene root. depth counts node levels including that root (default 4, max 16); limit caps returned nodes (default 500, max 2000). Returns nodeCount and truncated; nodes cut by depth, limit or the wire byte budget are omitted, never synthesised. Use this instead of inspect_ui_tree for a gallery-sized tree that exceeds the agent result budget.", vec![("node_id",text()),("depth",integer(1.,16.)),("limit",integer(1.,2000.))], &[], true),
         tool("select_ui_node", "Highlight a Cove node or clear the highlight when node_id is omitted.", vec![("node_id",text())], &[], false),
         tool("select_ui_at", "Hit-test the live Cove tree at an image pixel in a capture without dispatching input. Returns the deepest node, its root-first path, and the content-space point used.", vec![("capture_id",text()),("x",integer(0.,100_000.)),("y",integer(0.,100_000.))], &["capture_id","x","y"], true),
         tool("capture_ui_node", "Capture a fresh window image and crop it to a node's absolute frame. Returns a new capture ID and the crop's coordinate space for input.", vec![("node_id",text())], &["node_id"], true),
-        tool("capture_ui", "Capture system-composited pixels or the selected browser viewport. The result includes the source and the coordinate space for input. Use scope=display to include the display outside a desktop window.", vec![("scope",choice(&["window","display"]))], &[], true),
-        tool("input_ui", "Perform one platform input action. Pointer coordinates use the coordinate space returned by capture_ui and require its capture_id. Delivery does not assert the resulting state.", vec![("action",action),("capture_id",text())], &["action"], false),
+        tool("capture_ui", "Read a PNG from the selected Cove runtime. Pointer tools take image-relative pixel coordinates and the returned capture ID.", vec![], &[], true),
+        tool("input_ui", "Dispatch one action inside the selected Cove runtime. Pointer coordinates use the coordinate space returned by capture_ui and require its capture_id. Delivery does not assert the resulting state.", vec![("action",action),("capture_id",text())], &["action"], false),
         tool("click_ui", "Click a point in the coordinate space of capture_ui. Supply a fresh capture ID and check the postcondition.", vec![("capture_id",text()),("x",point()),("y",point()),("button",button())], &["capture_id","x","y"], false),
-        tool("press_ui_key", "Send a key to the selected platform target with optional modifiers.", vec![("key",text()),("modifiers",modifiers())], &["key"], false),
-        tool("type_ui_text", "Enter text through the platform's text input operation. For IME behavior use actual key events and observe the candidate window.", vec![("text",input_text())], &["text"], false),
-        tool("query_native_ui", "Read the platform accessibility or document tree when the selected adapter exposes it.", vec![], &[], true),
-        tool("find_native_ui", "Resolve exactly one platform element by the adapter's selector strategy.", vec![("using",text()),("value",S::string(Some(1),Some(2048)))], &["using","value"], true),
-        tool("activate_ui", "Invoke the platform action on an element returned by find_native_ui.", vec![("element",text())], &["element"], false),
+        tool("press_ui_key", "Dispatch a key inside the selected Cove runtime.", vec![("key",text()),("modifiers",modifiers())], &["key"], false),
+        tool("type_ui_text", "Dispatch committed text to the selected Cove runtime's focused control.", vec![("text",input_text())], &["text"], false),
         tool("wait_for_ui", "Check a Cove node postcondition. Value checks require node_id and expected.", vec![("node_id",text()),("text",text()),("role",text()),("source",text()),("state",choice(&["visible","hidden","enabled","value"])),("expected",S::string(Some(0),Some(4096))),("timeout_ms",integer(0.,10_000.))], &[], true),
         tool("resize_ui", "Request a runtime window resize in logical points.", vec![("width",dimension()),("height",dimension())], &["width","height"], false),
         tool("set_ui_environment", "Set the selected runtime's simulated environment.", vec![("environment",environment)], &["environment"], false),

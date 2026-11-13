@@ -112,7 +112,7 @@ pub(crate) fn executable(pid: u32) -> Result<PathBuf, Fault> {
             "Linux could not resolve the executable path for process {pid} from {link}: {error}"
         ))
     })?;
-    use std::os::unix::ffi::{OsStrExt, OsStringExt};
+    use std::os::unix::ffi::OsStringExt;
     let mut bytes = path.into_os_string().into_vec();
     if bytes.ends_with(b" (deleted)") {
         bytes.truncate(bytes.len() - b" (deleted)".len());

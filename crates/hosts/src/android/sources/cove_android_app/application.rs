@@ -113,11 +113,26 @@ impl AndroidApplication {
                     application.schedule_diagnostics();
                 }
             });
+            let capture = Rc::new({
+                let weak = Rc::downgrade(&application);
+                move || {
+                    let application = weak.upgrade().ok_or("The application is closed.")?;
+                    let renderer = application
+                        .window_renderer
+                        .borrow()
+                        .upgrade()
+                        .ok_or("The surface renderer is unavailable.")?;
+                    renderer
+                        .borrow_mut()
+                        .capture()
+                        .map_err(|error| error.to_string())
+                }
+            });
             application
                 .scene
                 .borrow()
                 .content()
-                .configure_diagnostics(configuration, schedule)
+                .configure_diagnostics(configuration, schedule, capture)
                 .map_err(|error| format!("diagnostics configuration failed: {error}"))?;
         }
         Ok(application)

@@ -32,9 +32,9 @@ if [[ ! -x "$objcopy" && ! -x "$objcopy.exe" ]]; then
   exit 1
 fi
 
-flags=()
-if [[ "$configuration" == "release" ]]; then flags+=(--release); fi
-cargo build --locked --package cove-browser --target "$target" --lib "${flags[@]}"
+set -- --locked --package cove-browser --target "$target" --lib
+if [[ "$configuration" == "release" ]]; then set -- "$@" --release; fi
+cargo build "$@"
 metadata="$(cargo metadata --no-deps --format-version 1)"
 workspace_root="$(python3 -c 'import json,sys; print(json.load(sys.stdin)["workspace_root"])' <<< "$metadata")"
 target_dir="$(python3 -c 'import json,sys; print(json.load(sys.stdin)["target_directory"])' <<< "$metadata")"

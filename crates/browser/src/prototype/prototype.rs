@@ -27,7 +27,7 @@ use cove_devtools::inspection::DiagnosticStateSource;
 use cove_devtools::runtime_probe::RuntimeProbe;
 use cove_devtools_protocol::{
     TimingFrame,
-    control::{Fault, ProbeCommand, Registration, VERSION},
+    control::{Fault, ProbeCommand, Registration, VERSION, Viewport},
 };
 use cove_platform::{
     InputEvent as PlatformInputEvent, KeyEvent, KeyModifiers, MouseButton, MouseButtonEvent,
@@ -63,7 +63,7 @@ pub struct BrowserPrototype<C: PrototypeContent> {
     content: Rc<C>,
     tree: Rc<RefCell<NodeTree>>,
     context: PlatformInputContext,
-    dispatcher: EventDispatcher,
+    dispatcher: Rc<EventDispatcher>,
     probe: RuntimeProbe,
     probing: bool,
     graph: Rc<ViewGraph>,
@@ -110,13 +110,13 @@ impl<C: PrototypeContent> BrowserPrototype<C> {
         let context = PlatformInputContext::default();
         let recomposer = Rc::new(Recomposer::new());
         let graph = Rc::new(ViewGraph::new(tree.clone(), recomposer.clone()));
-        let dispatcher = EventDispatcher::new(
+        let dispatcher = Rc::new(EventDispatcher::new(
             tree.clone(),
             context.interactions.clone(),
             context.pointer_capture.clone(),
             context.focus_chain.clone(),
             cove_platform::WindowId(0),
-        );
+        ));
         // One portal store and tooltip arbiter for this surface, installed before
         // the graph mounts so presenters and the portal host resolve the same
         // store. The browser drives a single window, so the thread-local animator
@@ -152,6 +152,19 @@ impl<C: PrototypeContent> BrowserPrototype<C> {
                     width: f64::from(width),
                     height: f64::from(height),
                 })
+            }
+        }));
+        probe.viewport = Some(Rc::new({
+            let size = content_size.clone();
+            move || {
+                let (width, height) = size.get();
+                Viewport { width, height }
+            }
+        }));
+        probe.input = Some(Rc::new({
+            let dispatcher = dispatcher.clone();
+            move |event| {
+                dispatcher.dispatch_local(&event);
             }
         }));
         let mut fonts = FontCollection::new(ATLAS_SIZE, ATLAS_SIZE);
@@ -613,13 +626,19 @@ impl<C: PrototypeContent> BrowserPrototype<C> {
 
     pub fn register_probe(&mut self) {
         self.probing = true;
+        let capabilities = self.probe.capabilities();
+        #[cfg(target_arch = "wasm32")]
+        let capabilities = capabilities
+            .into_iter()
+            .chain(["capture".to_owned()])
+            .collect();
         self.response_buffer.encode(&Registration {
             version: VERSION,
             title: "Cove Web".to_owned(),
             platform: "web".to_owned(),
             pid: None,
             window: None,
-            capabilities: self.probe.capabilities(),
+            capabilities,
         });
     }
 

@@ -5,6 +5,9 @@ pub mod inspection;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod probe_transport;
 mod profile;
+#[cfg(not(target_arch = "wasm32"))]
+pub mod runtime_capture;
+mod runtime_input;
 pub mod runtime_probe;
 
 pub use cove_agent as agent;

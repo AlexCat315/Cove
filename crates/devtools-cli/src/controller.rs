@@ -1,40 +1,32 @@
 use crate::debugger::{ControlAction, DebuggerManager};
-use crate::platform::{Action, Geometry, ListedTarget, Platform, Rect, Scope, Target};
 use crate::registry::{Registry, random_id};
+use base64::{Engine, engine::general_purpose::STANDARD};
 use cove_agent::{AgentTool, JsonSchemaValidator, ui_tools::Tool};
 use cove_debugger::{DapSession, SessionSnapshot};
-use cove_devtools_protocol::control::{Fault, ProbeCommand};
-use cove_devtools_protocol::{
-    ContentGeometry, MAX_TREE_PAGE_DEPTH, MAX_TREE_PAGE_NODES, NodeFrame, TreeSnapshot,
+use cove_devtools_protocol::control::{
+    Fault, MAX_CAPTURE_BYTES, ProbeCommand, RuntimeCapture, RuntimeInput, Viewport,
 };
-use image::{RgbaImage, imageops};
+use cove_devtools_protocol::{MAX_TREE_PAGE_DEPTH, MAX_TREE_PAGE_NODES, NodeFrame, TreePage};
+use image::{ImageDecoder, ImageFormat, ImageReader, Limits, RgbaImage, imageops};
+use serde::Serialize;
 use serde_json::{Value, json};
-use std::collections::{HashMap, VecDeque};
+use std::collections::VecDeque;
 use std::io::Cursor;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 struct Frame {
     id: String,
-    target: Target,
-    /// The full capture geometry, used to detect a target that moved.
-    geometry: Geometry,
-    /// The part of `geometry.coordinates` this frame shows. A node crop is
-    /// smaller than its window; input is bounded by this region.
-    region: Rect,
+    target: String,
+    mapping: CaptureMapping,
     png: Arc<Vec<u8>>,
-    width: u32,
-    height: u32,
     time: Instant,
 }
 
 pub struct Controller {
     pub registry: Registry,
-    platform: Platform,
     tools: Vec<AgentTool>,
     frames: Mutex<VecDeque<Frame>>,
-    bindings: Mutex<HashMap<String, Target>>,
-    input: Mutex<()>,
     debugger: DebuggerManager,
 }
 
@@ -49,265 +41,109 @@ const DEFAULT_PAGE_LIMIT: usize = 500;
 /// Allocation sites one query returns when the caller gives no limit.
 const DEFAULT_ALLOCATION_SITES: usize = 20;
 
-/// Maps a capture image's pixels onto the runtime's content logical space.
-///
-/// The capture reports `coordinates` in the platform's window-server space
-/// while its image may be denser (a Retina window is 2x). The runtime reports
-/// where its content `(0, 0)` sits in that same server space and how server
-/// units divide into content logical points. Keeping the three conversions in
-/// one place makes pixel → content and content → crop inverses of each other.
-#[derive(Clone, Copy, Debug)]
-struct ContentMapping {
-    coordinates: Rect,
-    image: (u32, u32),
-    origin: (f64, f64),
-    scale: f64,
-}
-
-/// An immutable copy of a retained capture's geometry.
-#[derive(Clone, Debug)]
-struct StoredFrame {
-    geometry: Geometry,
-    region: Rect,
-    width: u32,
-    height: u32,
-}
-
-/// The frame `capture_ui_node` crops for a node in a wire `tree` snapshot.
-fn node_absolute_frame(tree: &TreeSnapshot, node_id: &str) -> Result<NodeFrame, Fault> {
-    tree.root
-        .as_ref()
-        .and_then(|root| root.find(node_id))
-        .ok_or_else(|| {
-            Fault::new(
-                "stale_node",
-                "The selected component is no longer in the scene.",
-            )
-        })?
-        .absolute_frame
-        .clone()
-        .ok_or_else(|| Fault::new("invalid_node", "The node has no absolute frame."))
-}
-
-impl StoredFrame {
-    /// The coordinate space this frame's image shows: the crop for a node
-    /// capture, the whole capture otherwise. Input bounds and pixel mapping use
-    /// it, while `geometry` stays intact so movement checks compare like with
-    /// like.
-    fn presented(&self) -> Geometry {
-        Geometry {
-            coordinates: self.region,
-            window: self.geometry.window,
-            display: self.geometry.display,
-            context: self.geometry.context.clone(),
-        }
-    }
-}
-
-/// A pixel rectangle inside a capture and the server-space rectangle it shows.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-struct CropRect {
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
+struct PixelRegion {
     x: u32,
     y: u32,
     width: u32,
     height: u32,
-    coordinates: Rect,
 }
 
-impl ContentMapping {
-    fn new(
-        geometry: &Geometry,
-        image: (u32, u32),
-        content: &ContentGeometry,
-    ) -> Result<Self, Fault> {
-        let coordinates = geometry.coordinates;
-        if image.0 == 0 || image.1 == 0 || coordinates.width == 0 || coordinates.height == 0 {
-            return Err(Fault::new("capture_size", "The capture has no pixel area."));
-        }
-        if !content.is_valid() {
-            return Err(Fault::new(
-                "unavailable",
-                "The runtime reported invalid content geometry.",
-            ));
-        }
-        Ok(Self {
-            coordinates,
+/// Coordinates in a returned image are pixel-relative, including for node crops.
+#[derive(Clone, Copy, Debug)]
+struct CaptureMapping {
+    viewport: Viewport,
+    image: (u32, u32),
+    region: PixelRegion,
+}
+
+impl CaptureMapping {
+    fn full(viewport: Viewport, image: (u32, u32)) -> Self {
+        Self {
+            viewport,
             image,
-            origin: (content.origin_x, content.origin_y),
-            scale: content.scale,
-        })
+            region: PixelRegion {
+                x: 0,
+                y: 0,
+                width: image.0,
+                height: image.1,
+            },
+        }
     }
 
-    /// Window-server units per image pixel on each axis. The two differ when a
-    /// scaled capture rounds its pixel width.
-    fn units(&self) -> (f64, f64) {
-        (
-            f64::from(self.coordinates.width) / f64::from(self.image.0),
-            f64::from(self.coordinates.height) / f64::from(self.image.1),
-        )
-    }
-
-    /// Image pixel → content logical point, using the pixel's centre so a point
-    /// inside a pixel stays inside the node drawn there.
-    fn content_point(&self, pixel: (f64, f64)) -> Result<(f64, f64), Fault> {
-        if !pixel.0.is_finite()
-            || !pixel.1.is_finite()
-            || !(0.0..f64::from(self.image.0)).contains(&pixel.0)
-            || !(0.0..f64::from(self.image.1)).contains(&pixel.1)
+    fn content_point(self, x: f64, y: f64) -> Result<(f32, f32), Fault> {
+        if !(0.0..f64::from(self.region.width)).contains(&x)
+            || !(0.0..f64::from(self.region.height)).contains(&y)
         {
             return Err(invalid("The point is outside the captured image."));
         }
-        let (ux, uy) = self.units();
-        let server_x = f64::from(self.coordinates.x) + (pixel.0 + 0.5) * ux;
-        let server_y = f64::from(self.coordinates.y) + (pixel.1 + 0.5) * uy;
+        let map = |value: f64, offset, pixels, logical| {
+            ((value.floor() + 0.5 + f64::from(offset)) / f64::from(pixels) * f64::from(logical))
+                as f32
+        };
         Ok((
-            (server_x - self.origin.0) / self.scale,
-            (server_y - self.origin.1) / self.scale,
+            map(x, self.region.x, self.image.0, self.viewport.width),
+            map(y, self.region.y, self.image.1, self.viewport.height),
         ))
     }
 
-    /// Content logical frame → the pixel rectangle that contains it.
-    ///
-    /// Returns `None` when the frame has no area or none of it lies inside the
-    /// capture.
-    fn crop(&self, frame: &NodeFrame) -> Option<CropRect> {
-        if !frame.x.is_finite()
-            || !frame.y.is_finite()
-            || !frame.w.is_finite()
-            || !frame.h.is_finite()
+    fn crop(self, frame: &NodeFrame) -> Option<PixelRegion> {
+        if ![frame.x, frame.y, frame.w, frame.h]
+            .into_iter()
+            .all(f64::is_finite)
             || frame.w <= 0.0
             || frame.h <= 0.0
         {
             return None;
         }
-        let (ux, uy) = self.units();
-        let left = self.origin.0 + frame.x * self.scale;
-        let top = self.origin.1 + frame.y * self.scale;
-        let right = left + frame.w * self.scale;
-        let bottom = top + frame.h * self.scale;
-        if ![left, top, right, bottom]
-            .iter()
-            .all(|value| value.is_finite())
-        {
-            return None;
-        }
-        let width = f64::from(self.image.0);
-        let height = f64::from(self.image.1);
-        let px0 = ((left - f64::from(self.coordinates.x)) / ux)
-            .floor()
-            .clamp(0.0, width);
-        let py0 = ((top - f64::from(self.coordinates.y)) / uy)
-            .floor()
-            .clamp(0.0, height);
-        let px1 = ((right - f64::from(self.coordinates.x)) / ux)
-            .ceil()
-            .clamp(0.0, width);
-        let py1 = ((bottom - f64::from(self.coordinates.y)) / uy)
-            .ceil()
-            .clamp(0.0, height);
-        if px1 <= px0 || py1 <= py0 {
-            return None;
-        }
-        let x = px0 as u32;
-        let y = py0 as u32;
-        let crop_width = (px1 - px0) as u32;
-        let crop_height = (py1 - py0) as u32;
-        Some(CropRect {
+        let sx = f64::from(self.image.0) / f64::from(self.viewport.width);
+        let sy = f64::from(self.image.1) / f64::from(self.viewport.height);
+        let bounds = |start: f64, length: f64, scale: f64, pixels: u32| {
+            (
+                (start * scale).floor().clamp(0.0, f64::from(pixels)) as u32,
+                ((start + length) * scale)
+                    .ceil()
+                    .clamp(0.0, f64::from(pixels)) as u32,
+            )
+        };
+        let (x, right) = bounds(frame.x, frame.w, sx, self.image.0);
+        let (y, bottom) = bounds(frame.y, frame.h, sy, self.image.1);
+        (right > x && bottom > y).then(|| PixelRegion {
             x,
             y,
-            width: crop_width,
-            height: crop_height,
-            coordinates: Rect {
-                x: (f64::from(self.coordinates.x) + px0 * ux).round() as i32,
-                y: (f64::from(self.coordinates.y) + py0 * uy).round() as i32,
-                width: (f64::from(crop_width) * ux).round().max(1.0) as u32,
-                height: (f64::from(crop_height) * uy).round().max(1.0) as u32,
-            },
+            width: right - x,
+            height: bottom - y,
         })
     }
+}
+
+fn node_absolute_frame(tree: TreePage, node_id: &str) -> Result<NodeFrame, Fault> {
+    tree.root
+        .filter(|root| root.id == node_id)
+        .map(|root| root.absolute_frame)
+        .ok_or_else(|| {
+            Fault::new(
+                "stale_node",
+                "The selected component is no longer in the scene.",
+            )
+        })
 }
 
 impl Controller {
     #[cfg(test)]
     fn with_debugger(debugger: DebuggerManager) -> Self {
-        let mut controller = Self::new(Vec::new()).unwrap();
+        let mut controller = Self::new();
         controller.debugger = debugger;
         controller
     }
 
-    pub fn new(drivers: Vec<String>) -> Result<Self, Fault> {
-        Ok(Self {
+    pub fn new() -> Self {
+        Self {
             registry: Registry::default(),
-            platform: Platform::new(drivers)?,
             tools: crate::tools::definitions(),
             frames: Mutex::new(VecDeque::new()),
-            bindings: Mutex::new(HashMap::new()),
-            input: Mutex::new(()),
             debugger: DebuggerManager::new(),
-        })
-    }
-
-    pub fn permissions(&self) -> Value {
-        crate::platform::permissions()
-    }
-
-    fn targets(&self) -> Value {
-        let runtimes = self.registry.list();
-        let platforms = self.platform.list();
-        let mut bindings = self.bindings.lock().unwrap();
-        bindings.retain(|id, platform| {
-            runtimes.iter().any(|runtime| runtime["id"] == *id)
-                && platforms.iter().any(|current| current.target == *platform)
-        });
-        let mut targets = runtimes;
-        for runtime in &mut targets {
-            if let Some(platform) =
-                self.resolve_binding(runtime["id"].as_str().unwrap(), &platforms, &bindings)
-            {
-                runtime["platform_target"] = json!(platform.id());
-                if let (Some(caps), Some(platform_caps)) = (
-                    runtime["capabilities"].as_array_mut(),
-                    platform.describe()["capabilities"].as_array(),
-                ) {
-                    caps.extend(platform_caps.iter().cloned());
-                }
-            }
-            #[cfg(target_os = "linux")]
-            if runtime["platform"] == "linux"
-                && platforms
-                    .iter()
-                    .any(|target| target.target == Target::Wayland)
-                && let Some(caps) = runtime["capabilities"].as_array_mut()
-            {
-                caps.push(json!("native_elements"));
-            }
         }
-        targets.extend(platforms.iter().map(ListedTarget::describe));
-        json!({"targets": targets})
-    }
-
-    fn resolve_binding<'a>(
-        &self,
-        id: &str,
-        platform: &'a [ListedTarget],
-        bindings: &HashMap<String, Target>,
-    ) -> Option<&'a ListedTarget> {
-        if let Some(bound) = bindings.get(id) {
-            return platform.iter().find(|item| item.target == *bound);
-        }
-        let (_, runtime) = self
-            .registry
-            .registrations()
-            .into_iter()
-            .find(|(target, _)| target == id)?;
-        let pid = runtime.pid?;
-        let mut windows = platform.iter().filter(|item| {
-            runtime.platform == item.platform && matches!(item.target,
-                Target::Window { pid: window_pid, id: window_id }
-                    if window_pid == pid && runtime.window.is_none_or(|id| id == u64::from(window_id)))
-        });
-        let first = windows.next()?;
-        windows.next().is_none().then_some(first)
     }
 
     fn runtime(&self, target: Option<&str>) -> Result<String, Fault> {
@@ -324,39 +160,6 @@ impl Controller {
                 "Use get_ui_session to select a runtime target.",
             )),
         }
-    }
-
-    fn platform(&self, id: Option<&str>) -> Result<Target, Fault> {
-        let targets = self.platform.list();
-        if let Some(id) = id
-            && let Some(target) = targets.iter().find(|target| target.id() == id)
-        {
-            return Ok(target.target.clone());
-        }
-        let runtime = self.runtime(id)?;
-        self.resolve_binding(&runtime, &targets, &self.bindings.lock().unwrap())
-            .map(|target| target.target.clone())
-            .ok_or_else(|| {
-                Fault::new(
-                    "target_unbound",
-                    "Select a platform target or bind this runtime to one.",
-                )
-            })
-    }
-
-    fn native_target(&self, id: Option<&str>) -> Result<Target, Fault> {
-        #[cfg(target_os = "linux")]
-        if let Ok(runtime) = self.runtime(id)
-            && let Some((_, registration)) = self
-                .registry
-                .registrations()
-                .into_iter()
-                .find(|(target, _)| *target == runtime)
-            && let Some(target) = self.platform.native_process(&registration)
-        {
-            return Ok(target);
-        }
-        self.platform(id)
     }
 
     fn probe(&self, id: Option<&str>, command: ProbeCommand) -> Result<Value, Fault> {
@@ -386,19 +189,6 @@ impl Controller {
         &self,
         id: Option<&str>,
     ) -> Result<(String, u32, std::path::PathBuf), Fault> {
-        if let Some(id) = id
-            && !self
-                .registry
-                .registrations()
-                .iter()
-                .any(|(current, _)| current == id)
-            && self.platform.list().iter().any(|listed| listed.id() == id)
-        {
-            return Err(Fault::new(
-                "unavailable",
-                "App Size measures the native executable of a running Cove runtime. The selected target is a platform window, display or browser session, which has no runtime executable.",
-            ));
-        }
         let runtime = self.runtime(id)?;
         let registration = self
             .registry
@@ -525,13 +315,11 @@ impl Controller {
         let target = target.as_ref().and_then(Value::as_str);
         let result = match name {
             "get_ui_session" => {
-                let mut session = self.targets();
+                let mut session = json!({"targets": self.registry.list()});
                 session["platform"] = json!(std::env::consts::OS);
-                session["permissions"] = crate::platform::permissions();
                 session["debugger"] = self.debugger.availability_json();
                 session
             }
-            "request_ui_permissions" => crate::platform::request_permissions(),
             "list_skills" => {
                 let library = cove_agent::ui_tools::Tools::skills();
                 let skills: Vec<_> = library
@@ -547,46 +335,6 @@ impl Controller {
                     .read(args["name"].as_str().unwrap())
                     .map_err(|error| invalid(error.to_string()))?;
                 json!({"ok": true, "data": skill})
-            }
-            "bind_ui_target" => {
-                let runtime = self.runtime(target)?;
-                let (_, registration) = self
-                    .registry
-                    .registrations()
-                    .into_iter()
-                    .find(|(id, _)| *id == runtime)
-                    .ok_or_else(|| Fault::new("target_gone", "The runtime disconnected."))?;
-                let platform = self
-                    .platform
-                    .list()
-                    .into_iter()
-                    .find(|item| item.id() == args["platform_target"].as_str().unwrap())
-                    .ok_or_else(|| Fault::new("target_gone", "No such platform target."))?;
-                let compatible = registration.platform == platform.platform
-                    && match platform.target {
-                        Target::Window { pid, id } => {
-                            registration.pid == Some(pid)
-                                && registration
-                                    .window
-                                    .is_none_or(|window| window == u64::from(id))
-                        }
-                        Target::Driver(_) => true,
-                        Target::Display(_) => false,
-                        #[cfg(target_os = "linux")]
-                        Target::Wayland => true,
-                        #[cfg(target_os = "linux")]
-                        Target::AccessibleProcess(_) => false,
-                    };
-                if !compatible {
-                    return Err(invalid(
-                        "Select the runtime's own window or a WebDriver session for the same platform.",
-                    ));
-                }
-                self.bindings
-                    .lock()
-                    .unwrap()
-                    .insert(runtime, platform.target);
-                json!({"bound": true})
             }
             "inspect_ui_tree" => self.probe(target, ProbeCommand::Tree)?,
             "query_ui_tree" => {
@@ -632,102 +380,90 @@ impl Controller {
             "select_ui_at" => {
                 let runtime = self.runtime(target)?;
                 self.require_capability(&runtime, "inspect_nodes")?;
-                let platform_target = self.platform(target)?;
                 let capture_id = args["capture_id"].as_str().unwrap();
-                let frame = self.stored_frame(capture_id, &platform_target)?;
-                let content = self.content_geometry(&runtime)?;
-                let mapping =
-                    ContentMapping::new(&frame.presented(), (frame.width, frame.height), &content)?;
+                let mapping = self.stored_frame(capture_id, &runtime)?;
                 let point = mapping
-                    .content_point((args["x"].as_f64().unwrap(), args["y"].as_f64().unwrap()))?;
-                let mut hit = self.registry.invoke(
+                    .content_point(args["x"].as_f64().unwrap(), args["y"].as_f64().unwrap())?;
+                let hit = self.registry.invoke(
                     &runtime,
                     ProbeCommand::NodeAt {
-                        x: point.0,
-                        y: point.1,
+                        x: f64::from(point.0),
+                        y: f64::from(point.1),
                     },
                 )?;
-                hit["capture_id"] = json!(capture_id);
-                hit["contentPoint"] = json!({"x": point.0, "y": point.1});
-                hit
+                json!({
+                    "capture_id": capture_id,
+                    "contentPoint": {"x": point.0, "y": point.1},
+                    "hit": hit,
+                })
             }
-            "capture_ui_node" => {
+            "capture_ui" | "capture_ui_node" => {
                 let runtime = self.runtime(target)?;
-                let platform_target = self.platform(target)?;
-                let node_id = args["node_id"].as_str().unwrap();
-                // Capture first: the crop is cut from these pixels, so the node
-                // frame and content origin are read against the captured moment.
-                let capture = self.platform.capture(&platform_target, Scope::Window)?;
-                let content = self.content_geometry(&runtime)?;
-                let tree: TreeSnapshot =
-                    serde_json::from_value(self.registry.invoke(&runtime, ProbeCommand::Tree)?)
-                        .map_err(|error| Fault::new("internal", error.to_string()))?;
-                let frame = node_absolute_frame(&tree, node_id)?;
-                let image = (capture.pixels.width(), capture.pixels.height());
-                let mapping = ContentMapping::new(&capture.geometry, image, &content)?;
-                let crop = mapping.crop(&frame).ok_or_else(|| {
-                    Fault::new(
-                        "node_not_visible",
-                        "The node has no area inside the window capture.",
-                    )
-                })?;
-                let pixels =
-                    imageops::crop_imm(&capture.pixels, crop.x, crop.y, crop.width, crop.height)
-                        .to_image();
-                // The frame keeps the full window geometry so a later input
-                // action can still detect that the target moved; only the
-                // presented region is the crop.
-                let mut result = self.store_capture(
-                    platform_target,
-                    capture.geometry,
-                    crop.coordinates,
-                    pixels,
-                    capture.source,
-                )?;
-                result["node_id"] = json!(node_id);
-                result["contentFrame"] = serde_json::to_value(frame)
+                let node_id = args["node_id"].as_str();
+                let (png, mut mapping) = self.capture(&runtime)?;
+                if let Some(node_id) = node_id {
+                    let tree: TreePage = serde_json::from_value(self.registry.invoke(
+                        &runtime,
+                        ProbeCommand::TreePage {
+                            node_id: Some(node_id.into()),
+                            depth: 1,
+                            limit: 1,
+                        },
+                    )?)
                     .map_err(|error| Fault::new("internal", error.to_string()))?;
-                result
+                    let frame = node_absolute_frame(tree, node_id)?;
+                    let crop = mapping.crop(&frame).ok_or_else(|| {
+                        Fault::new(
+                            "node_not_visible",
+                            "The node has no area inside the captured frame.",
+                        )
+                    })?;
+                    let pixels = imageops::crop_imm(
+                        &decode_capture(&png)?,
+                        crop.x,
+                        crop.y,
+                        crop.width,
+                        crop.height,
+                    )
+                    .to_image();
+                    let mut png = Cursor::new(Vec::new());
+                    pixels
+                        .write_to(&mut png, ImageFormat::Png)
+                        .map_err(|error| Fault::new("capture_failed", error.to_string()))?;
+                    mapping.region = crop;
+                    let mut result = self.store_capture(runtime, mapping, png.into_inner())?;
+                    result["node_id"] = json!(node_id);
+                    result["contentFrame"] = json!(frame);
+                    result
+                } else {
+                    self.store_capture(runtime, mapping, png)?
+                }
             }
-            "query_native_ui" => self
-                .platform
-                .native_elements(&self.native_target(target)?)?,
-            "find_native_ui" => self.platform.find_element(
-                &self.native_target(target)?,
-                args["using"].as_str().unwrap(),
-                args["value"].as_str().unwrap(),
-            )?,
-            "capture_ui" => {
-                let scope = args["scope"].as_str().unwrap_or("window");
-                self.capture(
-                    self.platform(target)?,
-                    if scope == "display" {
-                        Scope::Display
-                    } else {
-                        Scope::Window
-                    },
-                )?
-            }
-            "input_ui" | "click_ui" | "press_ui_key" | "activate_ui" | "type_ui_text" => {
+            "input_ui" | "click_ui" | "press_ui_key" | "type_ui_text" => {
                 let action = match name {
                     "input_ui" => args["action"].clone(),
                     "click_ui" => {
-                        json!({"kind":"click", "x": args["x"], "y":args["y"], "button":args["button"].as_u64().unwrap_or(0)})
+                        json!({"kind":"click", "x":args["x"], "y":args["y"], "button":args["button"].as_u64().unwrap_or(0)})
                     }
                     "press_ui_key" => {
-                        json!({"kind":"key","key":args["key"],"modifiers":args["modifiers"].as_array().cloned().unwrap_or_default()})
+                        json!({"kind":"key", "key":args["key"], "modifiers":args["modifiers"].as_array().cloned().unwrap_or_default()})
                     }
-                    "activate_ui" => json!({"kind":"activate","element":args["element"]}),
-                    _ => json!({"kind":"text", "text": args["text"]}),
+                    _ => json!({"kind":"text", "text":args["text"]}),
                 };
-                let action: Action =
-                    serde_json::from_value(action).map_err(|error| invalid(error.to_string()))?;
-                let selected = if matches!(action, Action::Activate { .. }) {
-                    self.native_target(target)?
-                } else {
-                    self.platform(target)?
-                };
-                self.input(selected, args["capture_id"].as_str(), action)?
+                let runtime = self.runtime(target)?;
+                self.require_capability(&runtime, "input")?;
+                let mapping = args["capture_id"]
+                    .as_str()
+                    .map(|id| self.stored_frame(id, &runtime))
+                    .transpose()?;
+                let action = map_input(action, mapping)?;
+                self.registry.invoke(
+                    &runtime,
+                    ProbeCommand::Input {
+                        viewport: mapping.map(|mapping| mapping.viewport),
+                        action,
+                    },
+                )?
             }
             "wait_for_ui" => self.wait_for(target, args)?,
             "resize_ui" => self.probe(
@@ -1120,46 +856,56 @@ impl Controller {
         Ok(result)
     }
 
-    fn capture(&self, target: Target, scope: Scope) -> Result<Value, Fault> {
-        let capture = self.platform.capture(&target, scope)?;
-        let region = capture.geometry.coordinates;
-        self.store_capture(
-            target,
-            capture.geometry,
-            region,
-            capture.pixels,
-            capture.source,
-        )
+    fn capture(&self, target: &str) -> Result<(Vec<u8>, CaptureMapping), Fault> {
+        self.require_capability(target, "capture")?;
+        let capture: RuntimeCapture =
+            serde_json::from_value(self.registry.invoke(target, ProbeCommand::Capture)?)
+                .map_err(|error| Fault::new("capture_failed", error.to_string()))?;
+        let viewport = capture.viewport;
+        if ![viewport.width, viewport.height]
+            .into_iter()
+            .all(|axis| axis.is_finite() && axis > 0.0)
+            || capture.png.len() > MAX_CAPTURE_BYTES.div_ceil(3) * 4
+        {
+            return Err(Fault::new("capture_size", "Invalid capture size."));
+        }
+        let png = STANDARD
+            .decode(capture.png)
+            .map_err(|error| Fault::new("capture_failed", error.to_string()))?;
+        if png.len() > MAX_CAPTURE_BYTES {
+            return Err(Fault::new(
+                "capture_size",
+                "The capture exceeds the probe message budget.",
+            ));
+        }
+        let decoder = capture_reader(&png)
+            .into_decoder()
+            .map_err(|error| Fault::new("capture_failed", error.to_string()))?;
+        let image = decoder.dimensions();
+        drop(decoder);
+        Ok((png, CaptureMapping::full(viewport, image)))
     }
 
-    /// Encodes and retains a capture under the shared frame budget.
     fn store_capture(
         &self,
-        target: Target,
-        geometry: Geometry,
-        region: Rect,
-        pixels: RgbaImage,
-        source: &str,
+        target: String,
+        mapping: CaptureMapping,
+        png: Vec<u8>,
     ) -> Result<Value, Fault> {
         let id = random_id()?;
-        let width = pixels.width();
-        let height = pixels.height();
-        let mut png = Cursor::new(Vec::new());
-        pixels
-            .write_to(&mut png, image::ImageFormat::Png)
-            .map_err(|error| Fault::new("capture_failed", error.to_string()))?;
-        let png = png.into_inner();
+        let region = mapping.region;
+        let result = json!({
+            "capture_id": id, "resource": format!("/captures/{id}"), "source": "runtime",
+            "width": region.width, "height": region.height,
+            "coordinates": PixelRegion { x: 0, y: 0, ..region },
+        });
         if png.len() > 32 * 1024 * 1024 {
             return Err(Fault::new(
                 "capture_size",
-                "The encoded capture exceeds the resource budget.",
+                "The encoded frame exceeds the capture budget.",
             ));
         }
         let mut frames = self.frames.lock().unwrap();
-        let result = json!({
-            "capture_id": id, "resource": format!("/captures/{id}"), "source": source,
-            "width": width, "height": height, "coordinates": region,
-        });
         while frames.len() >= 8
             || frames.iter().map(|frame| frame.png.len()).sum::<usize>() + png.len()
                 > 64 * 1024 * 1024
@@ -1169,11 +915,8 @@ impl Controller {
         frames.push_back(Frame {
             id,
             target,
-            geometry,
-            region,
+            mapping,
             png: Arc::new(png),
-            width,
-            height,
             time: Instant::now(),
         });
         Ok(result)
@@ -1188,23 +931,17 @@ impl Controller {
             .map(|frame| frame.png.clone())
     }
 
-    /// The live frame for a capture ID, rejecting expired or foreign captures.
-    fn stored_frame(&self, id: &str, target: &Target) -> Result<StoredFrame, Fault> {
+    fn stored_frame(&self, id: &str, target: &str) -> Result<CaptureMapping, Fault> {
         self.frames
             .lock()
             .unwrap()
             .iter()
             .find(|frame| {
                 frame.id == id
-                    && frame.target == *target
+                    && frame.target == target
                     && frame.time.elapsed() < Duration::from_secs(120)
             })
-            .map(|frame| StoredFrame {
-                geometry: frame.geometry.clone(),
-                region: frame.region,
-                width: frame.width,
-                height: frame.height,
-            })
+            .map(|frame| frame.mapping)
             .ok_or_else(|| {
                 Fault::new(
                     "stale_capture",
@@ -1235,41 +972,6 @@ impl Controller {
                 format!("The runtime does not advertise {capability}."),
             ))
         }
-    }
-
-    fn content_geometry(&self, runtime: &str) -> Result<ContentGeometry, Fault> {
-        self.require_capability(runtime, "content_geometry")?;
-        let value = self
-            .registry
-            .invoke(runtime, ProbeCommand::ContentGeometry)?;
-        let geometry: ContentGeometry = serde_json::from_value(value)
-            .map_err(|error| Fault::new("unavailable", error.to_string()))?;
-        if !geometry.is_valid() {
-            return Err(Fault::new(
-                "unavailable",
-                "The runtime reported invalid content geometry.",
-            ));
-        }
-        Ok(geometry)
-    }
-
-    fn input(&self, target: Target, capture: Option<&str>, action: Action) -> Result<Value, Fault> {
-        let frame = capture
-            .map(|id| self.stored_frame(id, &target))
-            .transpose()?;
-        if let Some(frame) = &frame {
-            // Bound the point to the region the client saw, while the full
-            // capture geometry still detects a target that moved.
-            action.validate(Some(&frame.presented()))?;
-        }
-        let _writer = self
-            .input
-            .try_lock()
-            .map_err(|_| Fault::new("busy", "Another input action is in progress."))?;
-        let source =
-            self.platform
-                .perform(&target, action, frame.as_ref().map(|frame| &frame.geometry))?;
-        Ok(json!({"delivered": true, "source": source, "verified": false}))
     }
 
     fn wait_for(&self, target: Option<&str>, args: Value) -> Result<Value, Fault> {
@@ -1329,169 +1031,112 @@ impl Controller {
     }
 }
 
+fn capture_reader(bytes: &[u8]) -> ImageReader<Cursor<&[u8]>> {
+    let mut reader = ImageReader::with_format(Cursor::new(bytes), ImageFormat::Png);
+    let mut limits = Limits::default();
+    limits.max_image_width = Some(8192);
+    limits.max_image_height = Some(8192);
+    limits.max_alloc = Some(128 * 1024 * 1024);
+    reader.limits(limits);
+    reader
+}
+
+fn decode_capture(bytes: &[u8]) -> Result<RgbaImage, Fault> {
+    capture_reader(bytes)
+        .decode()
+        .map(|image| image.into_rgba8())
+        .map_err(|error| Fault::new("capture_failed", error.to_string()))
+}
+
+fn map_input(mut action: Value, mapping: Option<CaptureMapping>) -> Result<RuntimeInput, Fault> {
+    let kind = action["kind"]
+        .as_str()
+        .ok_or_else(|| invalid("Input action is required."))?;
+    if matches!(kind, "click" | "drag" | "scroll") {
+        let mapping = mapping.ok_or_else(|| invalid("Pointer operations require a capture ID."))?;
+        let map = |action: &mut Value, x: &str, y: &str| {
+            let point = mapping.content_point(
+                action[x]
+                    .as_f64()
+                    .ok_or_else(|| invalid("Invalid pointer coordinates."))?,
+                action[y]
+                    .as_f64()
+                    .ok_or_else(|| invalid("Invalid pointer coordinates."))?,
+            )?;
+            action[x] = json!(point.0);
+            action[y] = json!(point.1);
+            Ok::<(), Fault>(())
+        };
+        if kind == "drag" {
+            map(&mut action, "to_x", "to_y")?;
+        }
+        map(&mut action, "x", "y")?;
+        if action["kind"] == "click" && action["button"].is_null() {
+            action["button"] = json!(0);
+        }
+    }
+    if action["kind"] == "key" && action["modifiers"].is_null() {
+        action["modifiers"] = json!([]);
+    }
+    serde_json::from_value(action).map_err(|error| invalid(error.to_string()))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use std::path::Path;
 
-    fn geometry(x: i32, y: i32, width: u32, height: u32) -> Geometry {
-        Geometry {
-            coordinates: Rect {
-                x,
-                y,
-                width,
-                height,
-            },
-            window: None,
-            display: None,
-            context: None,
-        }
-    }
-
-    fn content(origin: (f64, f64), scale: f64) -> ContentGeometry {
-        ContentGeometry {
-            origin_x: origin.0,
-            origin_y: origin.1,
-            scale,
-            width: 800.0,
-            height: 600.0,
-        }
-    }
-
-    fn frame(x: f64, y: f64, w: f64, h: f64) -> NodeFrame {
-        NodeFrame { x, y, w, h }
-    }
-
     #[test]
-    fn pixel_centres_map_through_a_one_x_capture() {
-        let mapping = ContentMapping::new(
-            &geometry(100, 200, 400, 300),
-            (400, 300),
-            &content((100.0, 200.0), 1.0),
-        )
-        .unwrap();
-        assert_eq!(mapping.content_point((0.0, 0.0)).unwrap(), (0.5, 0.5));
+    fn cropped_input_uses_image_pixels_and_refuses_outside_points() {
+        let viewport = Viewport {
+            width: 400.0,
+            height: 300.0,
+        };
+        let mut mapping = CaptureMapping::full(viewport, (800, 600));
         assert_eq!(
-            mapping.content_point((399.0, 299.0)).unwrap(),
-            (399.5, 299.5)
-        );
-        assert_eq!(
-            mapping.content_point((400.0, 0.0)).unwrap_err().code,
-            "invalid_request"
-        );
-    }
-
-    #[test]
-    fn a_two_x_capture_halves_pixels_before_subtracting_the_origin() {
-        let mapping = ContentMapping::new(
-            &geometry(100, 200, 400, 300),
-            (800, 600),
-            &content((100.0, 200.0), 1.0),
-        )
-        .unwrap();
-        assert_eq!(
-            mapping.content_point((200.0, 100.0)).unwrap(),
+            mapping.content_point(200.0, 100.0).unwrap(),
             (100.25, 50.25)
         );
+        let crop = mapping
+            .crop(&NodeFrame {
+                x: 10.0,
+                y: 20.0,
+                w: 30.0,
+                h: 40.0,
+            })
+            .unwrap();
         assert_eq!(
-            mapping.content_point((799.0, 599.0)).unwrap(),
-            (399.75, 299.75)
-        );
-    }
-
-    #[test]
-    fn content_scale_converts_window_server_units_to_logical_points() {
-        // A 200% Windows display: one logical point covers two server pixels.
-        let mapping = ContentMapping::new(
-            &geometry(0, 0, 400, 300),
-            (400, 300),
-            &content((0.0, 0.0), 2.0),
-        )
-        .unwrap();
-        assert_eq!(mapping.content_point((20.0, 10.0)).unwrap(), (10.25, 5.25));
-        assert_eq!(
-            mapping.crop(&frame(10.0, 20.0, 30.0, 40.0)).unwrap(),
-            CropRect {
+            crop,
+            PixelRegion {
                 x: 20,
                 y: 40,
                 width: 60,
-                height: 80,
-                coordinates: Rect {
-                    x: 20,
-                    y: 40,
-                    width: 60,
-                    height: 80,
-                },
+                height: 80
             }
         );
-    }
-
-    #[test]
-    fn a_two_x_capture_crops_the_node_region_in_image_pixels() {
-        let mapping = ContentMapping::new(
-            &geometry(0, 0, 400, 300),
-            (800, 600),
-            &content((100.0, 50.0), 1.0),
-        )
-        .unwrap();
-        let crop = mapping.crop(&frame(10.0, 20.0, 30.0, 40.0)).unwrap();
+        mapping.region = crop;
         assert_eq!(
-            (crop.x, crop.y, crop.width, crop.height),
-            (220, 140, 60, 80)
+            map_input(json!({"kind":"click","x":0,"y":79}), Some(mapping)).unwrap(),
+            RuntimeInput::Click {
+                x: 10.25,
+                y: 59.75,
+                button: 0
+            },
         );
-        assert_eq!(
-            crop.coordinates,
-            Rect {
-                x: 110,
-                y: 70,
-                width: 30,
-                height: 40,
-            }
+        assert!(
+            map_input(
+                json!({"kind":"drag","x":0,"y":0,"to_x":60,"to_y":1}),
+                Some(mapping)
+            )
+            .is_err()
         );
-    }
-
-    #[test]
-    fn a_node_outside_the_capture_has_no_crop() {
-        let mapping = ContentMapping::new(
-            &geometry(0, 0, 400, 300),
-            (400, 300),
-            &content((0.0, 0.0), 1.0),
-        )
-        .unwrap();
-        assert!(mapping.crop(&frame(500.0, 20.0, 30.0, 40.0)).is_none());
-        assert!(mapping.crop(&frame(10.0, 20.0, 0.0, 40.0)).is_none());
-        let clipped = mapping.crop(&frame(390.0, 290.0, 30.0, 40.0)).unwrap();
-        assert_eq!(
-            (clipped.x, clipped.y, clipped.width, clipped.height),
-            (390, 290, 10, 10)
-        );
-    }
-
-    #[test]
-    fn cropping_returns_only_the_node_pixels() {
-        let mut image = RgbaImage::from_pixel(800, 600, image::Rgba([0, 0, 0, 255]));
-        for y in 140..220 {
-            for x in 220..280 {
-                image.put_pixel(x, y, image::Rgba([255, 255, 255, 255]));
-            }
-        }
-        let mapping = ContentMapping::new(
-            &geometry(0, 0, 400, 300),
-            (800, 600),
-            &content((100.0, 50.0), 1.0),
-        )
-        .unwrap();
-        let crop = mapping.crop(&frame(10.0, 20.0, 30.0, 40.0)).unwrap();
-        let pixels = imageops::crop_imm(&image, crop.x, crop.y, crop.width, crop.height).to_image();
-        assert_eq!((pixels.width(), pixels.height()), (60, 80));
-        assert!(pixels.pixels().all(|pixel| pixel.0 == [255, 255, 255, 255]));
-        assert_eq!(image.get_pixel(219, 140).0, [0, 0, 0, 255]);
+        assert!(map_input(json!({"kind":"click","x":0,"y":0}), None).is_err());
     }
 
     #[test]
     fn a_runtime_without_the_capability_is_refused_before_dispatch() {
         use cove_devtools_protocol::control::{Registration, VERSION};
-        let controller = Controller::new(Vec::new()).unwrap();
+        let controller = Controller::new();
         let lease = controller
             .registry
             .register(Registration {
@@ -1550,7 +1195,7 @@ mod tests {
     #[test]
     fn ui_profile_tools_refuse_a_runtime_without_a_sampler() {
         use cove_devtools_protocol::control::{Registration, VERSION};
-        let controller = Controller::new(Vec::new()).unwrap();
+        let controller = Controller::new();
         let lease = controller
             .registry
             .register(Registration {
@@ -1645,7 +1290,7 @@ mod tests {
     #[test]
     fn allocation_site_tools_refuse_a_runtime_without_the_sampler() {
         use cove_devtools_protocol::control::{Registration, VERSION};
-        let controller = Controller::new(Vec::new()).unwrap();
+        let controller = Controller::new();
         let lease = controller
             .registry
             .register(Registration {
@@ -1688,7 +1333,7 @@ mod tests {
     #[test]
     fn allocation_site_tools_dispatch_start_stop_and_query() {
         use cove_devtools_protocol::control::{Completion, Poll, Registration, VERSION};
-        let controller = Controller::new(Vec::new()).unwrap();
+        let controller = Controller::new();
         let lease = controller
             .registry
             .register(Registration {
@@ -1800,7 +1445,7 @@ mod tests {
     #[test]
     fn ui_debug_paint_dispatches_and_reports_the_applied_state() {
         use cove_devtools_protocol::control::{Completion, Poll, Registration, VERSION};
-        let controller = Controller::new(Vec::new()).unwrap();
+        let controller = Controller::new();
         let lease = controller
             .registry
             .register(Registration {
@@ -1858,7 +1503,7 @@ mod tests {
     #[test]
     fn debug_paint_is_refused_without_the_capability() {
         use cove_devtools_protocol::control::{Registration, VERSION};
-        let controller = Controller::new(Vec::new()).unwrap();
+        let controller = Controller::new();
         let lease = controller
             .registry
             .register(Registration {
@@ -1899,7 +1544,7 @@ mod tests {
     #[test]
     fn ui_baselines_dispatches_and_reports_the_applied_state() {
         use cove_devtools_protocol::control::{Completion, Poll, Registration, VERSION};
-        let controller = Controller::new(Vec::new()).unwrap();
+        let controller = Controller::new();
         let lease = controller
             .registry
             .register(Registration {
@@ -1955,7 +1600,7 @@ mod tests {
     #[test]
     fn baselines_are_refused_without_the_capability() {
         use cove_devtools_protocol::control::{Registration, VERSION};
-        let controller = Controller::new(Vec::new()).unwrap();
+        let controller = Controller::new();
         let lease = controller
             .registry
             .register(Registration {
@@ -1999,7 +1644,7 @@ mod tests {
     #[test]
     fn ui_oversized_images_dispatches_and_reports_the_applied_state() {
         use cove_devtools_protocol::control::{Completion, Poll, Registration, VERSION};
-        let controller = Controller::new(Vec::new()).unwrap();
+        let controller = Controller::new();
         let lease = controller
             .registry
             .register(Registration {
@@ -2055,7 +1700,7 @@ mod tests {
     #[test]
     fn oversized_images_are_refused_without_the_capability() {
         use cove_devtools_protocol::control::{Registration, VERSION};
-        let controller = Controller::new(Vec::new()).unwrap();
+        let controller = Controller::new();
         let lease = controller
             .registry
             .register(Registration {
@@ -2103,7 +1748,7 @@ mod tests {
     #[test]
     fn ui_repaint_highlight_dispatches_and_reports_the_applied_state() {
         use cove_devtools_protocol::control::{Completion, Poll, Registration, VERSION};
-        let controller = Controller::new(Vec::new()).unwrap();
+        let controller = Controller::new();
         let lease = controller
             .registry
             .register(Registration {
@@ -2159,7 +1804,7 @@ mod tests {
     #[test]
     fn repaint_highlight_is_refused_without_the_capability() {
         use cove_devtools_protocol::control::{Registration, VERSION};
-        let controller = Controller::new(Vec::new()).unwrap();
+        let controller = Controller::new();
         let lease = controller
             .registry
             .register(Registration {
@@ -2210,7 +1855,7 @@ mod tests {
     #[test]
     fn ui_animation_speed_dispatches_and_reports_the_applied_scale() {
         use cove_devtools_protocol::control::{Completion, Poll, Registration, VERSION};
-        let controller = Controller::new(Vec::new()).unwrap();
+        let controller = Controller::new();
         let lease = controller
             .registry
             .register(Registration {
@@ -2266,7 +1911,7 @@ mod tests {
     #[test]
     fn animation_speed_is_refused_without_the_capability() {
         use cove_devtools_protocol::control::{Registration, VERSION};
-        let controller = Controller::new(Vec::new()).unwrap();
+        let controller = Controller::new();
         let lease = controller
             .registry
             .register(Registration {
@@ -2294,7 +1939,7 @@ mod tests {
 
     #[test]
     fn animation_speed_schema_refuses_scales_outside_the_runtime_range() {
-        let controller = Controller::new(Vec::new()).unwrap();
+        let controller = Controller::new();
         for scale in [0.0, 0.01, 10.5, 100.0] {
             let fault = controller
                 .execute(
@@ -2326,7 +1971,7 @@ mod tests {
     #[test]
     fn clear_ui_logs_dispatches_and_returns_the_clear_acknowledgement() {
         use cove_devtools_protocol::control::{Completion, Poll, Registration, VERSION};
-        let controller = Controller::new(Vec::new()).unwrap();
+        let controller = Controller::new();
         let lease = controller
             .registry
             .register(Registration {
@@ -2383,7 +2028,7 @@ mod tests {
 
     #[test]
     fn clear_ui_logs_requires_a_connected_runtime_target() {
-        let controller = Controller::new(Vec::new()).unwrap();
+        let controller = Controller::new();
         let fault = controller.execute("clear_ui_logs", json!({})).unwrap_err();
         assert_eq!(
             fault.code, "invalid_request",
@@ -2428,7 +2073,7 @@ mod tests {
     #[test]
     fn set_ui_network_recording_dispatches_and_returns_the_applied_state() {
         use cove_devtools_protocol::control::{Completion, Poll, Registration, VERSION};
-        let controller = Controller::new(Vec::new()).unwrap();
+        let controller = Controller::new();
         let lease = controller
             .registry
             .register(Registration {
@@ -2484,7 +2129,7 @@ mod tests {
     #[test]
     fn clear_ui_network_dispatches_and_returns_the_cleared_count() {
         use cove_devtools_protocol::control::{Completion, Poll, Registration, VERSION};
-        let controller = Controller::new(Vec::new()).unwrap();
+        let controller = Controller::new();
         let lease = controller
             .registry
             .register(Registration {
@@ -2535,7 +2180,7 @@ mod tests {
     #[test]
     fn network_control_is_refused_without_the_capability() {
         use cove_devtools_protocol::control::{Registration, VERSION};
-        let controller = Controller::new(Vec::new()).unwrap();
+        let controller = Controller::new();
         let lease = controller
             .registry
             .register(Registration {
@@ -2566,7 +2211,7 @@ mod tests {
 
     #[test]
     fn network_control_errors_name_the_missing_input() {
-        let controller = Controller::new(Vec::new()).unwrap();
+        let controller = Controller::new();
         let fault = controller
             .execute("set_ui_network_recording", json!({"target": "runtime"}))
             .unwrap_err();
@@ -2757,7 +2402,7 @@ mod tests {
     #[test]
     fn ui_debugger_tools_refuse_a_runtime_without_an_attached_session() {
         use cove_devtools_protocol::control::{Registration, VERSION};
-        let controller = Controller::new(Vec::new()).unwrap();
+        let controller = Controller::new();
         let lease = controller
             .registry
             .register(Registration {
@@ -2816,7 +2461,7 @@ mod tests {
     #[test]
     fn a_non_local_platform_pid_is_not_attached() {
         use cove_devtools_protocol::control::{Registration, VERSION};
-        let controller = Controller::new(Vec::new()).unwrap();
+        let controller = Controller::new();
         let lease = controller
             .registry
             .register(Registration {
@@ -2838,7 +2483,7 @@ mod tests {
     #[test]
     fn a_runtime_without_a_pid_reports_why_the_debugger_cannot_attach() {
         use cove_devtools_protocol::control::{Registration, VERSION};
-        let controller = Controller::new(Vec::new()).unwrap();
+        let controller = Controller::new();
         let lease = controller
             .registry
             .register(Registration {
@@ -2858,131 +2503,27 @@ mod tests {
     }
 
     #[test]
-    fn a_cropped_frame_maps_pixels_through_its_presented_region() {
-        let frame = StoredFrame {
-            geometry: geometry(100, 200, 400, 300),
-            region: Rect {
-                x: 110,
-                y: 220,
-                width: 30,
-                height: 40,
+    fn capture_cache_keeps_eight_and_isolates_targets() {
+        let controller = Controller::new();
+        let mapping = CaptureMapping::full(
+            Viewport {
+                width: 100.0,
+                height: 100.0,
             },
-            width: 60,
-            height: 80,
-        };
-        let mapping = ContentMapping::new(
-            &frame.presented(),
-            (frame.width, frame.height),
-            &content((110.0, 220.0), 1.0),
-        )
-        .unwrap();
-        assert_eq!(mapping.content_point((0.0, 0.0)).unwrap(), (0.25, 0.25));
-        assert_eq!(mapping.content_point((59.0, 79.0)).unwrap(), (29.75, 39.75));
-    }
-
-    #[test]
-    fn input_is_bounded_by_the_region_the_client_saw() {
-        let full = geometry(0, 0, 400, 300);
-        let region = Rect {
-            x: 100,
-            y: 100,
-            width: 50,
-            height: 50,
-        };
-        let validation = Geometry {
-            coordinates: region,
-            window: full.window,
-            display: full.display,
-            context: full.context.clone(),
-        };
-        assert!(
-            Action::Click {
-                x: 140,
-                y: 140,
-                button: 0
-            }
-            .validate(Some(&validation))
-            .is_ok()
+            (100, 100),
         );
-        assert_eq!(
-            Action::Click {
-                x: 10,
-                y: 10,
-                button: 0
-            }
-            .validate(Some(&validation))
-            .unwrap_err()
-            .code,
-            "invalid_request",
-            "a crop cannot accept input outside the node it showed"
-        );
-        assert_eq!(
-            validation.coordinates, region,
-            "the full window geometry stays available for movement checks"
-        );
-    }
-
-    #[test]
-    fn frame_cache_keeps_eight_and_preserves_the_presented_region() {
-        let controller = Controller::new(Vec::new()).unwrap();
-        let target = Target::Display(1);
         let mut ids = Vec::new();
         for index in 0..9u8 {
-            let pixels = RgbaImage::from_pixel(2, 2, image::Rgba([index, 0, 0, 255]));
             let result = controller
-                .store_capture(
-                    target.clone(),
-                    geometry(0, 0, 100, 100),
-                    Rect {
-                        x: 10,
-                        y: 10,
-                        width: 2,
-                        height: 2,
-                    },
-                    pixels,
-                    "test",
-                )
+                .store_capture("one".into(), mapping, vec![index])
                 .unwrap();
             ids.push(result["capture_id"].as_str().unwrap().to_owned());
         }
         assert_eq!(controller.frames.lock().unwrap().len(), 8);
-        assert!(
-            controller.image(&ids[0]).is_none(),
-            "the oldest frame evicted"
-        );
-        let stored = controller.stored_frame(&ids[8], &target).unwrap();
+        assert!(controller.image(&ids[0]).is_none());
+        assert!(controller.stored_frame(&ids[8], "one").is_ok());
         assert_eq!(
-            stored.region,
-            Rect {
-                x: 10,
-                y: 10,
-                width: 2,
-                height: 2,
-            }
-        );
-        assert_eq!(
-            stored.geometry.coordinates,
-            Rect {
-                x: 0,
-                y: 0,
-                width: 100,
-                height: 100,
-            }
-        );
-        assert_eq!(
-            stored.presented().coordinates,
-            Rect {
-                x: 10,
-                y: 10,
-                width: 2,
-                height: 2,
-            }
-        );
-        assert_eq!(
-            controller
-                .stored_frame(&ids[8], &Target::Display(2))
-                .unwrap_err()
-                .code,
+            controller.stored_frame(&ids[8], "two").unwrap_err().code,
             "stale_capture"
         );
     }
@@ -3033,7 +2574,7 @@ mod tests {
 
     #[test]
     fn ui_app_size_reads_the_registered_runtime_executable() {
-        let controller = Controller::new(Vec::new()).unwrap();
+        let controller = Controller::new();
         let target = app_size_runtime(&controller, std::env::consts::OS, Some(std::process::id()));
         let value = controller
             .execute(
@@ -3059,7 +2600,7 @@ mod tests {
 
     #[test]
     fn ui_app_size_is_unavailable_without_a_local_pid() {
-        let controller = Controller::new(Vec::new()).unwrap();
+        let controller = Controller::new();
         let remote = app_size_runtime(&controller, "ios", Some(std::process::id()));
         let fault = controller
             .execute("get_ui_app_size", json!({"target": remote}))
@@ -3079,20 +2620,6 @@ mod tests {
     }
 
     #[test]
-    fn ui_app_size_refuses_a_platform_target() {
-        let controller = Controller::new(vec!["web,http://127.0.0.1:9515,session".into()]).unwrap();
-        let fault = controller
-            .execute("get_ui_app_size", json!({"target": "driver:0"}))
-            .unwrap_err();
-        assert_eq!(fault.code, "unavailable");
-        assert!(
-            fault.message.contains("platform window"),
-            "{}",
-            fault.message
-        );
-    }
-
-    #[test]
     fn ui_deep_links_tool_is_published_and_reads_a_project_root() {
         let definitions = crate::tools::definitions();
         let tool = definitions
@@ -3107,7 +2634,7 @@ mod tests {
             "the common target field stays available"
         );
 
-        let controller = Controller::new(Vec::new()).unwrap();
+        let controller = Controller::new();
         let gallery = Path::new(env!("CARGO_MANIFEST_DIR"))
             .join("../../examples/gallery")
             .canonicalize()
@@ -3132,7 +2659,7 @@ mod tests {
 
     #[test]
     fn ui_deep_links_rejects_a_relative_root() {
-        let controller = Controller::new(Vec::new()).unwrap();
+        let controller = Controller::new();
         let fault = controller
             .execute("get_ui_deep_links", json!({"root": "examples/gallery"}))
             .unwrap_err();
@@ -3165,7 +2692,7 @@ mod tests {
     #[test]
     fn ui_tree_page_dispatches_the_bounded_query() {
         use cove_devtools_protocol::control::{Completion, Poll, Registration, VERSION};
-        let controller = Controller::new(Vec::new()).unwrap();
+        let controller = Controller::new();
         let lease = controller
             .registry
             .register(Registration {
@@ -3230,7 +2757,7 @@ mod tests {
     #[test]
     fn ui_tree_page_defaults_to_four_levels_and_five_hundred_nodes() {
         use cove_devtools_protocol::control::{Completion, Poll, Registration, VERSION};
-        let controller = Controller::new(Vec::new()).unwrap();
+        let controller = Controller::new();
         let lease = controller
             .registry
             .register(Registration {
@@ -3283,7 +2810,7 @@ mod tests {
     #[test]
     fn ui_tree_page_rejects_out_of_range_bounds_and_node_ids() {
         use cove_devtools_protocol::control::{Registration, VERSION};
-        let controller = Controller::new(Vec::new()).unwrap();
+        let controller = Controller::new();
         let lease = controller
             .registry
             .register(Registration {
@@ -3313,7 +2840,7 @@ mod tests {
     #[test]
     fn ui_tree_page_requires_the_runtime_capability() {
         use cove_devtools_protocol::control::{Registration, VERSION};
-        let controller = Controller::new(Vec::new()).unwrap();
+        let controller = Controller::new();
         let lease = controller
             .registry
             .register(Registration {
@@ -3335,7 +2862,7 @@ mod tests {
     #[test]
     fn ui_tree_page_surfaces_a_stale_node_from_the_runtime() {
         use cove_devtools_protocol::control::{Completion, Poll, Registration, VERSION};
-        let controller = Controller::new(Vec::new()).unwrap();
+        let controller = Controller::new();
         let lease = controller
             .registry
             .register(Registration {
@@ -3386,34 +2913,22 @@ mod tests {
 
     #[test]
     fn a_summary_tree_finds_a_nested_node_and_its_frame() {
-        let node = |id: &str, x: f64, children: Value| {
-            json!({
-                "id": id,
+        let tree: TreePage = serde_json::from_value(json!({
+            "root": {
+                "id": "c",
                 "frame": {"x": 0.0, "y": 0.0, "w": 1.0, "h": 1.0},
-                "absoluteFrame": {"x": x, "y": 20.0, "w": 30.0, "h": 40.0},
-                "flags": {
-                    "hitTestable": true, "focusable": false, "clipsToBounds": false,
-                    "hasBackground": false, "hasBorder": false,
-                },
-                "children": children,
-            })
-        };
-        let tree: TreeSnapshot = serde_json::from_value(json!({
-            "root": node("root", 0.0, json!([
-                node("a", 0.0, json!([])),
-                node("b", 1.0, json!([node("c", 2.0, json!([]))])),
-            ])),
+                "absoluteFrame": {"x": 2.0, "y": 20.0, "w": 30.0, "h": 40.0}
+            },
+            "depth": 1, "limit": 1, "nodeCount": 1, "truncated": false
         }))
         .unwrap();
-        assert_eq!(tree.root.as_ref().unwrap().find("c").unwrap().id, "c");
-        assert!(tree.root.as_ref().unwrap().find("missing").is_none());
-        let frame = node_absolute_frame(&tree, "c").unwrap();
+        let frame = node_absolute_frame(tree.clone(), "c").unwrap();
         assert_eq!(
             (frame.x, frame.y, frame.w, frame.h),
             (2.0, 20.0, 30.0, 40.0)
         );
         assert_eq!(
-            node_absolute_frame(&tree, "missing").unwrap_err().code,
+            node_absolute_frame(tree, "missing").unwrap_err().code,
             "stale_node"
         );
     }

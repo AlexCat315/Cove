@@ -5,10 +5,11 @@ use crate::inspection::{DebugPaint, DiagnosticStateSource, Diagnostics, SceneIns
 use crate::profile::UiProfiler;
 use cove_core::Point;
 use cove_core::scene::{InvalidationLog, NodeTree, RenderTree};
-use cove_devtools_protocol::control::{Fault, ProbeCommand};
+use cove_devtools_protocol::control::{Fault, ProbeCommand, Viewport};
 use cove_devtools_protocol::{
     ContentGeometry, Envelope, MAX_TREE_PAGE_BYTES, NodeHit, NodePoint, TimingFrame,
 };
+use cove_platform::InputEvent;
 use serde_json::{Value, json};
 use std::cell::RefCell;
 use std::collections::VecDeque;
@@ -25,7 +26,11 @@ pub type ContentGeometrySource = Rc<dyn Fn() -> Result<ContentGeometry, String>>
 /// this absent, and the probe reports no rate rather than assuming 60 Hz.
 pub type RefreshRateSource = Rc<dyn Fn() -> Option<f64>>;
 
+pub type RuntimeInputSink = Rc<dyn Fn(InputEvent)>;
+
 pub struct RuntimeProbe {
+    pub viewport: Option<Rc<dyn Fn() -> Viewport>>,
+    pub input: Option<RuntimeInputSink>,
     diagnostics: Diagnostics,
     pub scene: SceneInspector,
     pub resize: Option<Resize>,
@@ -53,6 +58,8 @@ impl RuntimeProbe {
         Self {
             diagnostics: Diagnostics::with_state_source(tree.clone(), state),
             scene: SceneInspector::new(tree, invalidation, render_tree),
+            viewport: None,
+            input: None,
             resize: None,
             environment: None,
             content_geometry: None,
@@ -92,6 +99,9 @@ impl RuntimeProbe {
             "repaint_highlight",
             "animation_speed",
         ];
+        if self.viewport.is_some() && self.input.is_some() {
+            capabilities.push("input");
+        }
         if self.resize.is_some() {
             capabilities.push("resize");
         }
@@ -133,6 +143,14 @@ impl RuntimeProbe {
         let serialize =
             |result: serde_json::Result<Value>| result.map_err(|error| invalid(error.to_string()));
         match command {
+            // The transport handles capture because only its host owns the render surface.
+            ProbeCommand::Capture => Err(unavailable()),
+            ProbeCommand::Input { viewport, action } => {
+                let current = self.viewport.as_ref().ok_or_else(unavailable)?();
+                let send = self.input.as_ref().ok_or_else(unavailable)?;
+                crate::runtime_input::dispatch(action, viewport, current, send.as_ref())?;
+                Ok(json!({"delivered": true, "source": "runtime", "verified": false}))
+            }
             ProbeCommand::Tree => serialize(serde_json::to_value(self.scene.summary_snapshot())),
             ProbeCommand::TreePage {
                 node_id,

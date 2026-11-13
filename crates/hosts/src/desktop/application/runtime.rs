@@ -232,7 +232,9 @@ impl Application {
                     preset.size.height as i32
                 }),
             title_bar_style: config.window.title_bar_style.platform_style(),
-            shows_dock_icon: config.window.shows_dock_icon,
+            shows_dock_icon: config.window.shows_dock_icon
+                && !(config.diagnostics.dev_tools.is_some()
+                    && environment_flag("SDL_WINDOW_ACTIVATE_WHEN_SHOWN").as_deref() == Some("0")),
             backdrop: if cfg!(target_os = "windows")
                 && rendering.device().backend_api() != cove_graphics::rhi::GraphicsApi::Dx12
             {
@@ -492,6 +494,34 @@ impl Application {
         );
         let schedule: Rc<dyn Fn()> = Rc::new(move || host.request_display(None));
         let callbacks = DiagnosticsCallbacks {
+            capture: Some(Rc::new({
+                let weak = Rc::downgrade(state);
+                move || {
+                    let state = weak.upgrade().ok_or("The window is closed.")?;
+                    state
+                        .window_renderer
+                        .borrow_mut()
+                        .as_mut()
+                        .ok_or("The renderer is unavailable.")?
+                        .capture()
+                        .map_err(|error| error.to_string())
+                }
+            })),
+            viewport: Rc::new({
+                let host = state.host.clone();
+                move || {
+                    let (width, height) = host.logical_size();
+                    (width as f32, height as f32)
+                }
+            }),
+            input: Rc::new({
+                let host = state.host.clone();
+                move |event| {
+                    if let Some(session) = host.main_session() {
+                        session.dispatch_local(event);
+                    }
+                }
+            }),
             invalidate: schedule.clone(),
             memory: {
                 let application = Application {
@@ -554,6 +584,9 @@ impl Application {
                 let mut diagnostics = state.diagnostics.borrow_mut();
                 diagnostics.queries = Some(DiagnosticsQueries::default());
                 diagnostics.dev_tools = Some(session);
+                if let Some(id) = state.host.main_window() {
+                    state.host.set_window_keep_rendering(id, true);
+                }
             }
             Err(error) => LogSystem::logger("com.cove.ui.diagnostics").log(&LogEvent::new(
                 Level::Error,
@@ -1039,7 +1072,12 @@ impl Application {
                 if let Some(frame) = frames.last() {
                     state.last_render_ms.set(frame.cpu_ms);
                 }
-                if frames.iter().any(|frame| !frame.presented) {
+                if frames.iter().any(|frame| !frame.presented)
+                    && state
+                        .host
+                        .main_session()
+                        .is_some_and(|session| session.is_presentation_active())
+                {
                     state.host.retry_display(None);
                 }
                 for frame in &frames {
@@ -1241,7 +1279,7 @@ impl Application {
         }
         let mut renderer = state
             .rendering
-            .make_window(settings)
+            .make_window(settings, state.config.diagnostics.dev_tools.is_some())
             .map_err(|error| error.to_string())?;
         let vsync = state.main_window.borrow().is_vsync_enabled;
         renderer
@@ -1628,7 +1666,7 @@ impl Application {
             // When the window goes off-screen the swapchain / MSAA / framebuffer
             // are already released. Also drop the heavy CPU caches (glyph atlas,
             // image assets, render tree) so backgrounding actually reclaims memory.
-            if !active {
+            if !active && state.diagnostics.borrow().dev_tools.is_none() {
                 self.trim_memory();
             }
         } else if let Some(window) = state.auxiliary_windows.borrow_mut().get_mut(&window_id)

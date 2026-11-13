@@ -1,7 +1,7 @@
 //! Network worker for native runtimes. Only the UI thread executes probe commands.
 use crate::runtime_probe::RuntimeProbe;
 use cove_devtools_protocol::control::{
-    Completion, ConnectionInfo, Lease, Poll, Registration, Work,
+    Completion, ConnectionInfo, Fault, Lease, Poll, ProbeCommand, Registration, Work,
 };
 use serde::Serialize;
 use std::sync::Arc;
@@ -28,8 +28,19 @@ fn post_json<T: Serialize>(
     request.send(body).ok()
 }
 
+pub type DeferredCapture = Box<dyn FnOnce() -> Result<serde_json::Value, Fault> + Send>;
+pub type PrepareCapture = dyn Fn() -> Result<DeferredCapture, Fault>;
+
+enum Reply {
+    Ready(Completion),
+    Capture {
+        sequence: u64,
+        finish: DeferredCapture,
+    },
+}
+
 enum Message {
-    Work(Work, SyncSender<Completion>, Instant),
+    Work(Work, SyncSender<Reply>, Instant),
     Reset,
 }
 
@@ -119,7 +130,13 @@ impl ProbeTransport {
                                         break;
                                     }
                                     match result.recv_timeout(timeout) {
-                                        Ok(value) => completion = Some(value),
+                                        Ok(Reply::Ready(value)) => completion = Some(value),
+                                        Ok(Reply::Capture { sequence, finish }) => {
+                                            completion = Some(Completion {
+                                                sequence,
+                                                result: finish(),
+                                            });
+                                        }
                                         Err(_) => break,
                                     }
                                 }
@@ -142,14 +159,28 @@ impl ProbeTransport {
         Ok(Self { requests, stopped })
     }
 
-    pub fn pump(&self, probe: &mut RuntimeProbe) {
+    pub fn pump(&self, probe: &mut RuntimeProbe, capture: Option<&PrepareCapture>) {
         for message in self.requests.try_iter().take(4) {
             match message {
                 Message::Work(work, reply, deadline) if Instant::now() < deadline => {
-                    let _ = reply.try_send(Completion {
-                        sequence: work.sequence,
-                        result: probe.execute(work.command),
-                    });
+                    let sequence = work.sequence;
+                    let response = if matches!(work.command, ProbeCommand::Capture)
+                        && let Some(prepare) = capture
+                    {
+                        match prepare() {
+                            Ok(finish) => Reply::Capture { sequence, finish },
+                            Err(error) => Reply::Ready(Completion {
+                                sequence,
+                                result: Err(error),
+                            }),
+                        }
+                    } else {
+                        Reply::Ready(Completion {
+                            sequence,
+                            result: probe.execute(work.command),
+                        })
+                    };
+                    let _ = reply.try_send(response);
                 }
                 Message::Work(..) => {}
                 Message::Reset => probe.disconnect(),

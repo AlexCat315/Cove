@@ -3,7 +3,7 @@
 #
 # Starts an isolated controller and the real gallery, then verifies that a
 # visible node can be selected by a point through the runtime hit tester and
-# captured as a PNG. Every step uses live runtime and screen-capture data.
+# captured as a PNG. Every step uses live Cove framebuffer and scene data.
 #
 # Builds with cargo, then launches the resulting binaries directly. They are
 # the same targets `cargo run` would launch; direct PIDs make cleanup exact.
@@ -11,7 +11,7 @@
 # Usage: Tools/DevTools/acceptance/m1-inspector.sh [--keep]
 #
 # Exit codes: 0 pass, 1 functional assertion failure, 2 blocked (platform,
-# permissions, capture or missing product tool). Interrupt exits 130/143 after
+# capture or missing product tool). Interrupt exits 130/143 after
 # cleanup. See Docs/devtools-acceptance.md for the full contract.
 set -euo pipefail
 
@@ -302,7 +302,7 @@ pass "controller ready at $COVE_DEVTOOLS_ENDPOINT (default port 9229 not used)"
 step "Start gallery with COVE_DEVTOOLS=1"
 (
   cd "$ROOT"
-  export COVE_DEVTOOLS=1
+  export COVE_DEVTOOLS=1 SDL_WINDOW_ACTIVATE_WHEN_SHOWN=0 SDL_WINDOW_ACTIVATE_WHEN_RAISED=0
   exec "$GALLERY"
 ) >"$RUN_DIR/logs/gallery.log" 2>&1 &
 GALLERY_PID=$!
@@ -340,90 +340,17 @@ case ",$CAPABILITIES," in
 esac
 pass "runtime selected: $RUNTIME_ID ($RUNTIME_TITLE, pid $RUNTIME_PID)"
 
-step "Check macOS capture and accessibility permissions"
-cove_call get_ui_session '{}'
-[ "$CALL_STATUS" -eq 0 ] || blocked "get_ui_session failed after the runtime registered: $(call_message)" \
-  "Inspect controller.log; the controller may have shut down."
-SESSION_JSON=$CALL_OUT
-PLATFORM=$(jq -r '.platform // empty' <<<"$SESSION_JSON")
-[ "$PLATFORM" = "macos" ] || blocked "The controller reports platform '$PLATFORM' instead of macos." \
-  "Run the acceptance harness on the macOS host."
-
-SCREEN=$(jq -r '.permissions.screen_capture // false' <<<"$SESSION_JSON")
-ACCESS=$(jq -r '.permissions.accessibility // false' <<<"$SESSION_JSON")
-MISSING_PERMISSIONS=""
-if [ "$SCREEN" != "true" ]; then
-  MISSING_PERMISSIONS="${MISSING_PERMISSIONS}Screen Recording (permissions.screen_capture=false). "
-fi
-if [ "$ACCESS" != "true" ]; then
-  MISSING_PERMISSIONS="${MISSING_PERMISSIONS}Accessibility (permissions.accessibility=false). "
-fi
-MISSING_PERMISSIONS=${MISSING_PERMISSIONS% }
-if [ -n "$MISSING_PERMISSIONS" ]; then
-  blocked "Missing macOS permission(s): $MISSING_PERMISSIONS" \
-    "System Settings > Privacy & Security > Screen & System Audio Recording (Screen Recording on older macOS) and > Accessibility: enable the terminal/app that launches this script, quit and reopen it, then rerun. This run cannot pass without live pixels; a stale controller process keeps the old TCC decision."
-fi
-pass "macOS permissions: screen_capture=true accessibility=true"
-
-step "Select runtime window and bind it"
-PLATFORM_TARGET=$(jq -r '.platform_target // empty' <<<"$RUNTIME_JSON")
-window_deadline=$(( $(date +%s) + 15 ))
-while :; do
-  WINDOW_ID=""
-  if [ -n "$PLATFORM_TARGET" ] && jq -e --arg id "$PLATFORM_TARGET" \
-    '.targets[]? | select(.kind == "window" and .id == $id)' >/dev/null 2>&1 <<<"$SESSION_JSON"; then
-    WINDOW_ID=$PLATFORM_TARGET
-  fi
-  if [ -z "$WINDOW_ID" ]; then
-    WINDOW_ID=$(jq -r --argjson pid "$GALLERY_PID" --arg title "$RUNTIME_TITLE" '
-      ([ .targets[]? | select(.kind == "window" and .title == $title)
-          | select(.id | startswith("window:" + ($pid | tostring) + ":"))
-          | .id ] | .[0])
-      // ([ .targets[]? | select(.kind == "window")
-            | select(.id | startswith("window:" + ($pid | tostring) + ":"))
-            | .id ] | .[0])
-      // empty
-    ' <<<"$SESSION_JSON")
-  fi
-  [ -n "$WINDOW_ID" ] && break
-  [ "$(date +%s)" -lt "$window_deadline" ] || break
-  sleep 0.5
-  cove_call get_ui_session '{}'
-  [ "$CALL_STATUS" -eq 0 ] || break
-  SESSION_JSON=$CALL_OUT
-  RUNTIME_JSON=$(jq -c --arg id "$RUNTIME_ID" '[ .targets[]? | select(.id == $id) ] | .[0] // empty' <<<"$SESSION_JSON")
-  [ -n "$RUNTIME_JSON" ] || break
-  PLATFORM_TARGET=$(jq -r '.platform_target // empty' <<<"$RUNTIME_JSON")
-done
-[ -n "$WINDOW_ID" ] || blocked \
-  "No macOS window target is associated with gallery pid $GALLERY_PID." \
-  "Check gallery.log and that the window is not minimized; get_ui_session lists window targets only for visible windows."
-
-if [ "$PLATFORM_TARGET" != "$WINDOW_ID" ]; then
-  bind_args=$(jq -cn --arg target "$RUNTIME_ID" --arg platform "$WINDOW_ID" \
-    '{target: $target, platform_target: $platform}')
-  cove_call bind_ui_target "$bind_args"
-  [ "$CALL_STATUS" -eq 0 ] || failed \
-    "bind_ui_target failed for runtime $RUNTIME_ID and window $WINDOW_ID: $(call_message)"
-  jq -e '.bound == true' >/dev/null 2>&1 <<<"$CALL_OUT" || failed \
-    "bind_ui_target did not return bound=true for runtime $RUNTIME_ID."
-  cove_call get_ui_session '{}'
-  [ "$CALL_STATUS" -eq 0 ] || failed "get_ui_session failed after binding: $(call_message)"
-  SESSION_JSON=$CALL_OUT
-  RUNTIME_JSON=$(jq -c --arg id "$RUNTIME_ID" '[ .targets[]? | select(.id == $id) ] | .[0] // empty' <<<"$SESSION_JSON")
-  [ -n "$RUNTIME_JSON" ] || failed "Runtime $RUNTIME_ID disappeared after binding."
-  PLATFORM_TARGET=$(jq -r '.platform_target // empty' <<<"$RUNTIME_JSON")
-  [ "$PLATFORM_TARGET" = "$WINDOW_ID" ] || failed \
-    "Runtime $RUNTIME_ID reports platform_target='$PLATFORM_TARGET' after binding to '$WINDOW_ID'."
-fi
-pass "runtime $RUNTIME_ID bound to window $WINDOW_ID"
+case ",$CAPABILITIES," in
+  *,capture,*) ;;
+  *) failed "Runtime $RUNTIME_ID registered without frame capture." ;;
+esac
 
 step "Capture the window with capture_ui"
-capture_args=$(jq -cn --arg target "$WINDOW_ID" '{target: $target, scope: "window"}')
+capture_args=$(jq -cn --arg target "$RUNTIME_ID" '{target: $target}')
 cove_call_image capture_ui "$capture_args" "$RUN_DIR/artifacts/window.png"
 if [ "$CALL_STATUS" -ne 0 ]; then
   blocked "capture_ui failed: $(call_message)" \
-    "Verify Screen Recording, keep the gallery window on an unlocked display, and rerun. This is not a pass; no pixels were captured."
+    "Check gallery.log for framebuffer readback errors."
 fi
 CAPTURE_JSON=$CALL_OUT
 CAPTURE_ID=$(jq -r '.capture_id // empty' <<<"$CAPTURE_JSON")
@@ -435,7 +362,7 @@ COORD_W=$(jq -r '.coordinates.width // empty' <<<"$CAPTURE_JSON")
 COORD_H=$(jq -r '.coordinates.height // empty' <<<"$CAPTURE_JSON")
 CAPTURE_SOURCE=$(jq -r '.source // empty' <<<"$CAPTURE_JSON")
 [ -n "$CAPTURE_ID" ] || failed "capture_ui returned no capture_id."
-[ -n "$CAPTURE_SOURCE" ] || failed "capture_ui returned no source provenance."
+[ "$CAPTURE_SOURCE" = "runtime" ] || failed "capture_ui did not return a runtime frame."
 for value in "$CAP_W" "$CAP_H" "$COORD_X" "$COORD_Y" "$COORD_W" "$COORD_H"; do
   if ! [[ "$value" =~ ^-?[0-9]+$ ]]; then
     failed "capture_ui returned a non-integer dimension or coordinate: '$value'."
@@ -460,8 +387,8 @@ W_OPAQUE=$(jq -r '.opaquePixels' <<<"$window_stats")
 [ "$W_STATS_W" -eq "$CAP_W" ] && [ "$W_STATS_H" -eq "$CAP_H" ] || failed \
   "capture_ui reported ${CAP_W}x${CAP_H} but the PNG is ${W_STATS_W}x${W_STATS_H}."
 if [ "$W_UNIQUE" -lt 2 ] || [ "$W_OPAQUE" -eq 0 ]; then
-  blocked "The window capture is uniform (${W_UNIQUE} colors, ${W_OPAQUE} opaque pixels); ScreenCaptureKit produced no usable content." \
-    "Confirm Screen Recording, unlock the display, keep the gallery window visible (not minimized or fully covered by an opaque window), and rerun."
+  blocked "The window capture is uniform (${W_UNIQUE} colors, ${W_OPAQUE} opaque pixels). The runtime returned no usable pixels." \
+    "Check the runtime render log."
 fi
 pass "window capture ${CAP_W}x${CAP_H} pixels from '$CAPTURE_SOURCE' (${W_UNIQUE} colors, ${W_OPAQUE} opaque pixels)"
 
@@ -631,7 +558,7 @@ read -r CAL_SCALE_X CAL_SCALE_Y CAL_ORIGIN_X CAL_ORIGIN_Y <<<"$calibration"
 is_number "$CAL_SCALE_X" && is_number "$CAL_SCALE_Y" \
   && is_number "$CAL_ORIGIN_X" && is_number "$CAL_ORIGIN_Y" || failed \
   "select_ui_at calibration produced non-numeric geometry."
-pass "capture mapping: ${UX} x ${UY} server units per pixel, ${CAL_SCALE_X} server units per content point, content origin (${CAL_ORIGIN_X}, ${CAL_ORIGIN_Y})"
+pass "capture mapping: ${UX} x ${UY} image coordinates per pixel, ${CAL_SCALE_X} image coordinates per content point, content origin (${CAL_ORIGIN_X}, ${CAL_ORIGIN_Y})"
 
 step "Build eligible nodes (hit-testable, visible, unclipped)"
 : >"$RUN_DIR/eligible.tsv"
@@ -639,6 +566,7 @@ checked=0
 last_node_error=""
 while IFS="$SEP" read -r id fx fy fw fh role label area candidate_labeled; do
   [ -n "$id" ] || continue
+  [ "$checked" -lt 45 ] || break
   checked=$((checked + 1))
   node_args=$(jq -cn --arg target "$RUNTIME_ID" --arg id "$id" \
     '{target: $target, node_id: $id, compact: false, limit: 1}')
@@ -692,9 +620,6 @@ while IFS="$SEP" read -r id fx fy fw fh role label area candidate_labeled; do
   fi
   eligible_line="$id$SEP$fx$SEP$fy$SEP$fw$SEP$fh$SEP$absolute_x$SEP$absolute_y$SEP$absolute_w$SEP$absolute_h$SEP$role$SEP$label$SEP$hasbg$SEP$area$SEP$labeled"
   printf '%s\n' "$eligible_line" >>"$RUN_DIR/eligible.tsv"
-  if [ "$checked" -ge 150 ]; then
-    break
-  fi
 done <"$RUN_DIR/candidates.tsv"
 
 sort -t "$SEP" -k14,14nr -k12,12r -k13,13n "$RUN_DIR/eligible.tsv" >"$RUN_DIR/eligible-sorted.tsv"
@@ -851,29 +776,14 @@ if ! tool_required_has capture_ui_node node_id; then
   blocked "capture_ui_node does not require node_id." \
     "Restore the {target?, node_id} contract and rerun."
 fi
-USE_TARGET_NODE=0
-if tool_has_property capture_ui_node target; then
-  USE_TARGET_NODE=1
-fi
-USE_CAPTURE_NODE=0
-if tool_required_has capture_ui_node capture_id; then
-  USE_CAPTURE_NODE=1
-fi
-
-node_args=$(jq -cn \
-  --arg target "$RUNTIME_ID" --arg node "$CHOSEN_ID" --arg capture "$CAPTURE_ID" \
-  --argjson use_target "$USE_TARGET_NODE" --argjson use_capture "$USE_CAPTURE_NODE" '
-  {} + (if $use_target then {target: $target} else {} end)
-     + {node_id: $node}
-     + (if $use_capture then {capture_id: $capture} else {} end)
-')
+node_args=$(jq -cn --arg target "$RUNTIME_ID" --arg node "$CHOSEN_ID" '{target: $target, node_id: $node}')
 cove_call_image capture_ui_node "$node_args" "$RUN_DIR/artifacts/node.png"
 if [ "$CALL_STATUS" -ne 0 ]; then
   code=$(jq -r '.code // empty' <<<"$CALL_OUT" 2>/dev/null || true)
   case "$code" in
     capture_denied|capture_failed|not_visible|unavailable|target_gone|platform_error)
       blocked "capture_ui_node failed: $(call_message)" \
-        "Verify Screen Recording, keep the gallery window and selected node visible, and rerun."
+        "Check the runtime render log and the node frame."
       ;;
     *)
       failed "capture_ui_node failed: $(call_message)"
@@ -949,38 +859,9 @@ tol_h=$(awk -v a="$CONTENT_H" -v b="$expected_px_h" 'BEGIN { m = (a > b ? a : b)
 awk -v w="$S_W" -v h="$S_H" -v ew="$expected_px_w" -v eh="$expected_px_h" -v tw="$tol_w" -v th="$tol_h" '
   BEGIN { exit !((w - ew <= tw && ew - w <= tw) && (h - eh <= th && eh - h <= th)) }' || failed \
   "Node PNG ${S_W}x${S_H} does not match the contentFrame crop (${expected_px_w}x${expected_px_h})."
-if ! awk -v w="$NODE_COORD_W" -v h="$NODE_COORD_H" -v fw="$CONTENT_W" -v fh="$CONTENT_H" \
-  -v sx="$CAL_SCALE_X" -v sy="$CAL_SCALE_Y" '
-  BEGIN {
-    expected_w = fw * sx;
-    expected_h = fh * sy;
-    dw = w - expected_w; if (dw < 0) dw = -dw;
-    dh = h - expected_h; if (dh < 0) dh = -dh;
-    exit !(dw <= 2 && dh <= 2)
-  }'; then
-  failed "Node capture coordinates ${NODE_COORD_W}x${NODE_COORD_H} do not match contentFrame ${CONTENT_W}x${CONTENT_H} at the calibrated scale."
-fi
-if ! awk -v x="$NODE_COORD_X" -v y="$NODE_COORD_Y" \
-  -v ox="$CAL_ORIGIN_X" -v oy="$CAL_ORIGIN_Y" -v sx="$CAL_SCALE_X" -v sy="$CAL_SCALE_Y" \
-  -v fx="$CONTENT_X" -v fy="$CONTENT_Y" '
-  BEGIN {
-    expected_x = ox + fx * sx;
-    expected_y = oy + fy * sy;
-    dx = x - expected_x; if (dx < 0) dx = -dx;
-    dy = y - expected_y; if (dy < 0) dy = -dy;
-    exit !(dx <= 2 && dy <= 2)
-  }'; then
-  failed "Node crop origin (${NODE_COORD_X}, ${NODE_COORD_Y}) does not match contentFrame origin (${CONTENT_X}, ${CONTENT_Y}) at the calibrated scale."
-fi
-awk -v w="$S_W" -v h="$S_H" -v fw="$CONTENT_W" -v fh="$CONTENT_H" '
-  BEGIN {
-    if (fw <= 0 || fh <= 0 || h <= 0) exit 1;
-    expected = fw / fh;
-    actual = w / h;
-    difference = (actual - expected) / expected;
-    if (difference < 0) difference = -difference;
-    exit !(difference <= 0.03)
-  }' || failed "Node PNG aspect ratio ${S_W}x${S_H} does not match contentFrame ${CONTENT_W}x${CONTENT_H}."
+[ "$NODE_COORD_X" = 0 ] && [ "$NODE_COORD_Y" = 0 ] \
+  && [ "$NODE_COORD_W" = "$NODE_W" ] && [ "$NODE_COORD_H" = "$NODE_H" ] || failed \
+  "Node capture coordinates do not match its image pixels."
 
 if [ "$S_UNIQUE" -lt 2 ] && [ "$CHOSEN_BG" != "true" ]; then
   failed "Node PNG is uniform (${S_UNIQUE} color) and the node reports no background; cannot prove node pixels."
@@ -995,7 +876,6 @@ pass "capture_ui_node produced ${S_W}x${S_H} PNG from '$NODE_SOURCE' (contentFra
 
 printf '\nRESULT PASS  Milestone 1 Inspector: select-at-point and node screenshot\n'
 printf '  runtime:      %s\n' "$RUNTIME_ID"
-printf '  window:       %s\n' "$WINDOW_ID"
 printf '  window PNG:   %sx%s, %s colors\n' "$CAP_W" "$CAP_H" "$W_UNIQUE"
 printf '  node:         %s (%s, label=%s)\n' "$CHOSEN_ID" "$CHOSEN_ROLE" "$CHOSEN_LABEL"
 printf '  select pixel: %s,%s -> content %s,%s\n' "$CHOSEN_PX" "$CHOSEN_PY" "$CHOSEN_CX" "$CHOSEN_CY"

@@ -9,8 +9,8 @@
 use super::super::application::memory::{AppWindowMemorySnapshot, AppWindowRendererState};
 use cove_core::DrawList;
 use cove_graphics::rhi::{
-    CommandBuffer, Device, RenderColorTarget, RhiResult, SurfaceDescriptor, Swapchain,
-    TextureDescriptor, TextureFormat, TextureResource, TextureUsage,
+    CommandBuffer, Device, RenderColorTarget, RhiError, RhiResult, SurfaceDescriptor, Swapchain,
+    TextureDescriptor, TextureFormat, TextureResource, TextureSubresource, TextureUsage,
 };
 use cove_graphics::ui::{FontAtlasUpload, NativeDrawListRenderer, NativeUIViewport};
 use cove_runtime::SurfaceFactory;
@@ -29,6 +29,89 @@ pub struct AppWindowRenderSettings {
     pub premultiplied_alpha: bool,
 }
 
+pub struct CapturedFrame {
+    pub logical_size: (f32, f32),
+    pub width: u32,
+    pub height: u32,
+    pub rgba: Vec<u8>,
+}
+
+/// Reads a renderer-owned resolved image on its render thread.
+pub(crate) fn capture_framebuffer(
+    device: &Device,
+    framebuffer: Option<&TextureResource>,
+    logical_size: Option<(f32, f32)>,
+) -> RhiResult<CapturedFrame> {
+    let framebuffer =
+        framebuffer.ok_or_else(|| RhiError::invalid_argument("No rendered frame is available."))?;
+    let logical_size = logical_size
+        .ok_or_else(|| RhiError::invalid_argument("No rendered frame is available."))?;
+    let descriptor = framebuffer.descriptor();
+    let (width, height) = (descriptor.width, descriptor.height);
+    let byte_count = width
+        .checked_mul(height)
+        .and_then(|pixels| pixels.checked_mul(4))
+        .filter(|&bytes| bytes <= 128 * 1024 * 1024)
+        .ok_or_else(|| {
+            RhiError::invalid_argument("The framebuffer exceeds the capture size limit.")
+        })?;
+    let mut rgba = vec![0; byte_count];
+    device.with_frame_session(|| {
+        device.wait_until_idle()?;
+        device.read_texture_data(
+            framebuffer.texture(),
+            width,
+            height,
+            width * 4,
+            TextureSubresource::default(),
+            &mut rgba,
+        )
+    })?;
+    if matches!(
+        descriptor.format,
+        TextureFormat::Bgra8Unorm | TextureFormat::Bgra8UnormSrgb
+    ) {
+        for pixel in rgba.as_chunks_mut::<4>().0 {
+            pixel.swap(0, 2);
+        }
+    }
+    // The render target stores premultiplied color. PNG expects straight alpha.
+    let srgb = matches!(
+        descriptor.format,
+        TextureFormat::Bgra8UnormSrgb | TextureFormat::Rgba8UnormSrgb
+    );
+    for pixel in rgba.as_chunks_mut::<4>().0 {
+        let alpha = f32::from(pixel[3]) / 255.0;
+        if alpha > 0.0 && alpha < 1.0 {
+            for channel in &mut pixel[..3] {
+                let encoded = f32::from(*channel) / 255.0;
+                let linear = if !srgb {
+                    encoded
+                } else if encoded <= 0.04045 {
+                    encoded / 12.92
+                } else {
+                    ((encoded + 0.055) / 1.055).powf(2.4)
+                };
+                let straight = (linear / alpha).min(1.0);
+                let encoded = if !srgb {
+                    straight
+                } else if straight <= 0.0031308 {
+                    straight * 12.92
+                } else {
+                    1.055 * straight.powf(1.0 / 2.4) - 0.055
+                };
+                *channel = (encoded * 255.0).round() as u8;
+            }
+        }
+    }
+    Ok(CapturedFrame {
+        logical_size,
+        width: width as u32,
+        height: height as u32,
+        rgba,
+    })
+}
+
 /// Presentation ownership for one window. Runs on the render thread, where its
 /// calls may wait on the GPU and the display.
 pub trait AppWindowRenderer {
@@ -45,6 +128,11 @@ pub trait AppWindowRenderer {
     fn draw(&mut self, list: &mut DrawList, logical: (f32, f32)) -> RhiResult<bool>;
     /// Write copied font-atlas regions before the next frame is encoded.
     fn upload_font_atlas(&mut self, upload: FontAtlasUpload) -> RhiResult<()>;
+    fn capture(&mut self) -> RhiResult<CapturedFrame> {
+        Err(RhiError::unsupported_feature(
+            "This renderer has no app-local capture.",
+        ))
+    }
     fn set_presentation_active(&mut self, active: bool) -> RhiResult<()>;
     /// Releases what the next frame can rebuild.
     fn trim_memory(&mut self) -> RhiResult<()> {
@@ -64,6 +152,8 @@ pub struct NativeAppWindowRenderer {
     size: (u32, u32),
     /// Owned copy of the presented frame, so a panel can blur it.
     framebuffer: Option<TextureResource>,
+    frame_logical_size: Option<(f32, f32)>,
+    render_in_background: bool,
     presentation_active: bool,
     vsync: bool,
     state: AppWindowRendererState,
@@ -75,6 +165,15 @@ impl NativeAppWindowRenderer {
         renderer: NativeDrawListRenderer,
         settings: AppWindowRenderSettings,
     ) -> Self {
+        Self::with_background_rendering(device, renderer, settings, false)
+    }
+
+    pub(crate) fn with_background_rendering(
+        device: Arc<Device>,
+        renderer: NativeDrawListRenderer,
+        settings: AppWindowRenderSettings,
+        render_in_background: bool,
+    ) -> Self {
         Self {
             device,
             renderer,
@@ -83,6 +182,8 @@ impl NativeAppWindowRenderer {
             swapchain: None,
             size: (0, 0),
             framebuffer: None,
+            frame_logical_size: None,
+            render_in_background,
             presentation_active: true,
             vsync: true,
             state: AppWindowRendererState::Unconfigured,
@@ -181,23 +282,26 @@ impl AppWindowRenderer for NativeAppWindowRenderer {
 
     fn draw(&mut self, list: &mut DrawList, logical: (f32, f32)) -> RhiResult<bool> {
         let list: &DrawList = list;
-        let Some(native) = self.native else {
+        if self.native.is_none() && !self.render_in_background {
             return Ok(false);
-        };
-        if !self.presentation_active || self.size.0 == 0 || self.size.1 == 0 {
+        }
+        if (!self.presentation_active && !self.render_in_background)
+            || self.size.0 == 0
+            || self.size.1 == 0
+        {
             return Ok(false);
         }
         let device = self.device.clone();
         let size = self.size;
         let vsync = self.vsync;
         device.with_frame_session(|| {
-            if self.swapchain.is_none() {
+            if self.presentation_active
+                && self.swapchain.is_none()
+                && let Some(native) = self.native
+            {
                 self.swapchain =
                     Some(device.make_swapchain(self.surface_descriptor(native, size, vsync))?);
             }
-            let Some(swapchain) = self.swapchain else {
-                return Ok(false);
-            };
             self.renderer.configure(
                 TextureFormat::Bgra8UnormSrgb,
                 self.settings.samples as usize,
@@ -210,8 +314,13 @@ impl AppWindowRenderer for NativeAppWindowRenderer {
                 }
             }
             let _end = EndFrame(&device);
-            let image = device.acquire_swapchain_image(swapchain)?;
-            let pixels = (image.width, image.height);
+            let image = self
+                .swapchain
+                .map(|swapchain| device.acquire_swapchain_image(swapchain))
+                .transpose()?;
+            let pixels = image.map_or((size.0 as usize, size.1 as usize), |image| {
+                (image.width, image.height)
+            });
             let clear = self.settings.clear_color;
             // Resolved history serves every frame. Effects never promote the
             // raster workspace into a persistent full-frame MSAA allocation.
@@ -226,7 +335,9 @@ impl AppWindowRenderer for NativeAppWindowRenderer {
                         pixels.0,
                         pixels.1,
                         TextureFormat::Bgra8UnormSrgb,
-                        TextureUsage::COLOR_TARGET | TextureUsage::SAMPLED,
+                        TextureUsage::COLOR_TARGET
+                            | TextureUsage::SAMPLED
+                            | TextureUsage::TRANSFER_SOURCE,
                     )
                     .with_label("ui-framebuffer"),
                 )?);
@@ -244,19 +355,21 @@ impl AppWindowRenderer for NativeAppWindowRenderer {
                 clear,
                 usize::MAX,
             )?;
-            let present = RenderColorTarget {
-                resolve_texture: None,
-                texture: image.texture,
-                load_action: cove_graphics::rhi::ColorLoadAction::DontCare,
-                store: true,
-            };
-            self.renderer.record_blit(
-                framebuffer.texture(),
-                &mut commands,
-                present,
-                self.settings.surface_format,
-                [pixels.0, pixels.1],
-            )?;
+            if let Some(image) = image {
+                let present = RenderColorTarget {
+                    resolve_texture: None,
+                    texture: image.texture,
+                    load_action: cove_graphics::rhi::ColorLoadAction::DontCare,
+                    store: true,
+                };
+                self.renderer.record_blit(
+                    framebuffer.texture(),
+                    &mut commands,
+                    present,
+                    self.settings.surface_format,
+                    [pixels.0, pixels.1],
+                )?;
+            }
             device.submit(
                 &commands,
                 cove_graphics::rhi::QueueClass::Graphics,
@@ -266,9 +379,20 @@ impl AppWindowRenderer for NativeAppWindowRenderer {
             )?;
             let mut frame = frame;
             frame.did_submit();
-            device.present(image)?;
-            Ok(true)
+            if let Some(image) = image {
+                device.present(image)?;
+            }
+            self.frame_logical_size = Some(logical);
+            Ok(image.is_some())
         })
+    }
+
+    fn capture(&mut self) -> RhiResult<CapturedFrame> {
+        capture_framebuffer(
+            &self.device,
+            self.framebuffer.as_ref(),
+            self.frame_logical_size,
+        )
     }
 
     fn set_presentation_active(&mut self, active: bool) -> RhiResult<()> {
@@ -293,8 +417,10 @@ impl AppWindowRenderer for NativeAppWindowRenderer {
                     Ok(())
                 })?;
             }
-            self.framebuffer = None;
-            self.renderer.trim_presentation_resources();
+            if !self.render_in_background {
+                self.framebuffer = None;
+                self.renderer.trim_presentation_resources();
+            }
         }
         Ok(())
     }
@@ -315,5 +441,56 @@ impl AppWindowRenderer for NativeAppWindowRenderer {
         })?;
         self.renderer.trim_presentation_resources();
         Ok(())
+    }
+}
+
+#[cfg(all(test, target_os = "macos"))]
+mod tests {
+    use super::*;
+    use cove_core::{Color, Rect};
+    use cove_graphics::rhi::{DeviceConfig, GraphicsApi};
+
+    #[test]
+    fn capture_reads_the_current_offscreen_render_target() {
+        let device = Arc::new(
+            Device::make(DeviceConfig {
+                preferred_backends: vec![GraphicsApi::Metal],
+                ..DeviceConfig::default()
+            })
+            .expect("Metal device"),
+        );
+        let renderer = NativeDrawListRenderer::new(device.clone()).unwrap();
+        let mut renderer = NativeAppWindowRenderer::with_background_rendering(
+            device,
+            renderer,
+            AppWindowRenderSettings {
+                samples: 1,
+                clear_color: [0.0, 0.0, 0.0, 1.0],
+                surface_format: TextureFormat::Bgra8UnormSrgb,
+                premultiplied_alpha: false,
+            },
+            true,
+        );
+        renderer.size = (128, 96);
+        let mut list = DrawList::default();
+        let _ = list.add_rect(
+            Rect::new(16.0, 12.0, 32.0, 24.0),
+            Color {
+                r: 1.0,
+                g: 0.0,
+                b: 0.0,
+                a: 1.0,
+            },
+        );
+        assert!(!renderer.draw(&mut list, (64.0, 48.0)).unwrap());
+        let first = renderer.capture().unwrap();
+        assert_eq!(first.logical_size, (64.0, 48.0));
+        assert_eq!((first.width, first.height), (128, 96));
+        let offset = (30 * 128 + 40) * 4;
+        assert_eq!(&first.rgba[offset..offset + 4], &[255, 0, 0, 255]);
+        list.reset();
+        assert!(!renderer.draw(&mut list, (64.0, 48.0)).unwrap());
+        let next = renderer.capture().unwrap();
+        assert_eq!(&next.rgba[offset..offset + 4], &[0, 0, 0, 255]);
     }
 }

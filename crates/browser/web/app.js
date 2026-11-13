@@ -70,32 +70,37 @@ function schedule() {
   scheduled = true;
   requestAnimationFrame(() => {
     scheduled = false;
-    const width = surface.clientWidth, height = surface.clientHeight;
-    const rect = surface.getBoundingClientRect();
-    wasm.cove_set_content_origin(rect.left + surface.clientLeft, rect.top + surface.clientTop);
-    wasm.cove_set_scale(window.devicePixelRatio || 1);
-    const outcome = wasm.cove_render(width, height);
-    if (outcome === 1) { schedule(); return; }
-    if (outcome < 0) {
-      if (forcedRenderer === "webgpu") {
-        status.textContent = "WebGPU RHI frame failed";
-        return;
-      }
-      wasm.cove_webgpu_disable();
-      renderer = makeCanvasRenderer();
-      wasm.cove_render(width, height);
-    }
-    lastFrame = readJSON(wasm.cove_snapshot(), wasm.cove_snapshot_size());
-    updateAtlas(lastFrame);
-    if (renderer.backend === "canvas2d") {
-      const vertices = readBytes(wasm.cove_vertices(), wasm.cove_vertex_bytes());
-      const indices = new Uint32Array(readBytes(wasm.cove_indices(), wasm.cove_index_count() * 4).buffer);
-      renderer.draw(lastFrame, vertices, indices);
-    }
-    syncTextInput();
-    document.querySelector("#stats").textContent = `count=${lastFrame.count} · ${lastFrame.vertices} vertices · ${lastFrame.batches.length} batches · ${lastFrame.fontCount} fonts · FreeType/HarfBuzz`;
-    if (wasm.cove_needs_frame()) schedule();
+    const result = renderFrame();
+    if (result === 1 || (result === 0 && wasm.cove_needs_frame())) schedule();
   });
+}
+
+function renderFrame({ syncNativeFocus = true } = {}) {
+  const width = surface.clientWidth, height = surface.clientHeight;
+  const rect = surface.getBoundingClientRect();
+  wasm.cove_set_content_origin(rect.left + surface.clientLeft, rect.top + surface.clientTop);
+  wasm.cove_set_scale(window.devicePixelRatio || 1);
+  const outcome = wasm.cove_render(width, height);
+  if (outcome === 1) return 1;
+  if (outcome < 0) {
+    if (forcedRenderer === "webgpu") {
+      status.textContent = "WebGPU RHI frame failed";
+      return -1;
+    }
+    wasm.cove_webgpu_disable();
+    renderer = makeCanvasRenderer();
+    wasm.cove_render(width, height);
+  }
+  lastFrame = readJSON(wasm.cove_snapshot(), wasm.cove_snapshot_size());
+  updateAtlas(lastFrame);
+  if (renderer.backend === "canvas2d") {
+    const vertices = readBytes(wasm.cove_vertices(), wasm.cove_vertex_bytes());
+    const indices = new Uint32Array(readBytes(wasm.cove_indices(), wasm.cove_index_count() * 4).buffer);
+    renderer.draw(lastFrame, vertices, indices);
+  }
+  if (syncNativeFocus) syncTextInput();
+  document.querySelector("#stats").textContent = `count=${lastFrame.count} · ${lastFrame.vertices} vertices · ${lastFrame.batches.length} batches · ${lastFrame.fontCount} fonts · FreeType/HarfBuzz`;
+  return 0;
 }
 
 async function makeRenderer() {
@@ -379,12 +384,59 @@ try {
   if (location.pathname.startsWith("/app/")) connectProbe().catch(error => console.warn("DevTools:", error.message));
 } catch (error) { status.textContent = "Prototype failed to load"; console.error(error); document.querySelector("#stats").textContent = String(error); }
 
+async function renderProbeFrame() {
+  const deadline = performance.now() + 2500;
+  let result = renderFrame({ syncNativeFocus: false });
+  while (result === 1 && performance.now() < deadline) {
+    await new Promise(resolve => setTimeout(resolve, 16));
+    result = renderFrame({ syncNativeFocus: false });
+  }
+  return result;
+}
+
+async function captureFrame() {
+  try {
+    if (await renderProbeFrame() !== 0) throw new Error("The canvas could not render a frame.");
+    // The canvas still owns the current WebGPU texture in this task.
+    const current = document.querySelector(renderer.backend === "webgpu" ? "#gpu" : "#fallback");
+    const canvas = document.createElement("canvas");
+    canvas.width = current.width;
+    canvas.height = current.height;
+    canvas.getContext("2d").drawImage(current, 0, 0);
+    const viewport = { width: lastFrame.width, height: lastFrame.height };
+    const maxPng = 1_500_000;
+    let source = canvas;
+    while (true) {
+      const blob = await new Promise(resolve => source.toBlob(resolve, "image/png"));
+      if (!blob) throw new Error("The canvas could not be exported.");
+      if (blob.size <= maxPng) {
+        const png = await new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result.split(",")[1]);
+          reader.onerror = () => reject(reader.error);
+          reader.readAsDataURL(blob);
+        });
+        return { Ok: { viewport, png } };
+      }
+      if (source.width <= 1 && source.height <= 1) throw new Error("The image exceeds the capture budget.");
+      const scaled = document.createElement("canvas");
+      scaled.width = Math.max(1, Math.floor(source.width / 2));
+      scaled.height = Math.max(1, Math.floor(source.height / 2));
+      scaled.getContext("2d").drawImage(source, 0, 0, scaled.width, scaled.height);
+      source = scaled;
+    }
+  } catch (error) {
+    return { Err: { code: "capture_failed", message: error.message } };
+  }
+}
+
 async function connectProbe() {
   const storageKey = "cove.devtools.token";
   const token = location.hash.slice(1) || sessionStorage.getItem(storageKey);
   if (!token) return;
   sessionStorage.setItem(storageKey, token);
   history.replaceState(null, "", location.pathname + location.search);
+  if (!lastFrame) await renderProbeFrame();
 
   const abort = new AbortController();
   const post = async (path, payload, authorization) => {
@@ -416,8 +468,18 @@ async function connectProbe() {
         lease = await post("/probe/register", response(), true);
         while (!abort.signal.aborted) {
           const work = await post("/probe/poll", { lease, completion });
-          completion = work ? { sequence: work.sequence, result: dispatch(work.command) } : null;
-          if (work?.command.method === "edit" || work?.command.method === "select") schedule();
+          if (!work) {
+            completion = null;
+            continue;
+          }
+          const method = work.command.method;
+          const result = method === "capture" ? await captureFrame() : dispatch(work.command);
+          completion = { sequence: work.sequence, result };
+          if (method === "input" && result.Ok?.delivered) {
+            await renderProbeFrame();
+          } else if (method === "edit" || method === "select") {
+            schedule();
+          }
         }
       } catch (error) {
         if (error.name === "SecurityError") throw error;

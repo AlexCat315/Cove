@@ -58,6 +58,7 @@ impl SurfaceSession {
                 FrameTimings::new(application.runtime().timings),
                 samples,
                 SurfaceLaunchInfo {
+                    capture_enabled: application.scene().borrow().content().has_diagnostics(),
                     benchmark: application.runtime().benchmark,
                     gpu_timings: gpu_timings.is_recording(),
                 },
@@ -112,6 +113,11 @@ impl SurfaceSession {
     /// whether a frame was handed over; with every frame in flight the callback
     /// returns at once and the next vsync tries again.
     pub fn frame(&mut self, timestamp: u64) -> Result<bool, String> {
+        self.application
+            .scene()
+            .borrow()
+            .content()
+            .pump_diagnostics();
         self.collect_presented()
             .map_err(|error| error.to_string())?;
         if !self.window_renderer.borrow().has_frame_capacity() {

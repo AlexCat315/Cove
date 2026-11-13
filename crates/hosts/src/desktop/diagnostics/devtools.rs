@@ -6,11 +6,12 @@ use super::integration::{
 use cove_composition::ViewGraph;
 use cove_devtools::frame_analysis::{FrameWindow, Timeline};
 use cove_devtools::inspection::{DiagnosticMemorySnapshot as Memory, DiagnosticStateSource};
-use cove_devtools::probe_transport::ProbeTransport;
+use cove_devtools::probe_transport::{PrepareCapture, ProbeTransport};
 use cove_devtools::protocol::{
     TimingFrame,
-    control::{Registration, VERSION},
+    control::{Fault, Registration, VERSION, Viewport},
 };
+use cove_devtools::runtime_capture::{self, FramePixels};
 use cove_devtools::runtime_probe::RuntimeProbe;
 use std::collections::BTreeMap;
 use std::rc::Rc;
@@ -19,6 +20,7 @@ use std::time::Instant;
 struct Session {
     probe: RuntimeProbe,
     transport: ProbeTransport,
+    capture: Option<Box<PrepareCapture>>,
     frame_start: Instant,
     layout_ms: f64,
     draw_ms: f64,
@@ -30,7 +32,8 @@ struct Session {
 
 impl DiagnosticsSession for Session {
     fn drain(&mut self) {
-        self.transport.pump(&mut self.probe);
+        self.transport
+            .pump(&mut self.probe, self.capture.as_deref());
     }
 
     fn overlay(&mut self, list: &mut cove_core::DrawList) {
@@ -117,6 +120,37 @@ pub fn factory() -> DiagnosticsFactory {
                 Some(graph.render_tree().clone()),
                 Some(Rc::new(GraphState(graph))),
             );
+            probe.input = Some(callbacks.input);
+            probe.viewport = Some(Rc::new(move || {
+                let (width, height) = (callbacks.viewport)();
+                Viewport { width, height }
+            }));
+            let capture = callbacks.capture.map(|request| -> Box<PrepareCapture> {
+                Box::new(move || {
+                    let reply =
+                        request().map_err(|message| Fault::new("capture_failed", message))?;
+                    Ok(Box::new(move || {
+                        let frame = reply
+                            .recv_timeout(std::time::Duration::from_secs(3))
+                            .map_err(|error| Fault::new("capture_failed", error.to_string()))?
+                            .map_err(|error| Fault::new("capture_failed", error.to_string()))?;
+                        let viewport = Viewport {
+                            width: frame.logical_size.0,
+                            height: frame.logical_size.1,
+                        };
+                        let capture = runtime_capture::encode(
+                            FramePixels {
+                                width: frame.width,
+                                height: frame.height,
+                                rgba: frame.rgba,
+                            },
+                            viewport,
+                        )?;
+                        serde_json::to_value(capture)
+                            .map_err(|error| Fault::new("capture_failed", error.to_string()))
+                    }))
+                })
+            });
             if let Some(resize) = callbacks.resize_window {
                 probe.resize = Some(Rc::new(move |width, height| {
                     match resize(width as f32, height as f32) {
@@ -169,6 +203,10 @@ pub fn factory() -> DiagnosticsFactory {
                 }
             }));
             *probe.scene.editor.on_change.borrow_mut() = Some(callbacks.invalidate);
+            let mut capabilities = probe.capabilities();
+            if capture.is_some() {
+                capabilities.push("capture".into());
+            }
             let transport = ProbeTransport::start(
                 Registration {
                     version: VERSION,
@@ -176,13 +214,14 @@ pub fn factory() -> DiagnosticsFactory {
                     platform: std::env::consts::OS.to_owned(),
                     pid: Some(std::process::id()),
                     window: configuration.window,
-                    capabilities: probe.capabilities(),
+                    capabilities,
                 },
                 configuration.connection,
             )?;
             Ok(Box::new(Session {
                 probe,
                 transport,
+                capture,
                 frame_start: Instant::now(),
                 layout_ms: 0.0,
                 draw_ms: 0.0,

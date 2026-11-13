@@ -63,6 +63,7 @@ impl AppRenderingContext {
     pub fn make_window(
         &self,
         settings: AppWindowRenderSettings,
+        render_in_background: bool,
     ) -> RhiResult<ThreadedWindowRenderer> {
         let device = self.device.clone();
         let presentation = device.with_frame_session(|| {
@@ -71,7 +72,12 @@ impl AppRenderingContext {
                 settings.samples as usize,
             )
         })?;
-        let renderer = Box::new(NativeAppWindowRenderer::new(device, presentation, settings));
+        let renderer = Box::new(NativeAppWindowRenderer::with_background_rendering(
+            device,
+            presentation,
+            settings,
+            render_in_background,
+        ));
         if std::env::var_os("COVE_SYNC_RENDER").is_some_and(|value| value == "1") {
             return Ok(ThreadedWindowRenderer::inline(renderer));
         }

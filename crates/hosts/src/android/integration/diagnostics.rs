@@ -1,8 +1,8 @@
 //! Translation of Android/Integration/Diagnostics.swift.
 
 use crate::desktop::diagnostics::integration::{
-    ContentGeometry, DevToolsConfiguration, DiagnosticMemorySnapshot, DiagnosticsCallbacks,
-    DiagnosticsSession, NullDiagnosticsSession, take_factory,
+    CaptureRequest, ContentGeometry, DevToolsConfiguration, DiagnosticMemorySnapshot,
+    DiagnosticsCallbacks, DiagnosticsSession, NullDiagnosticsSession, take_factory,
 };
 use cove_composition::ViewGraph;
 use cove_core::DrawList;
@@ -12,6 +12,9 @@ use std::rc::Rc;
 use std::sync::Arc;
 
 pub struct AndroidDiagnosticsHooks {
+    pub capture: CaptureRequest,
+    pub viewport: Rc<dyn Fn() -> (f32, f32)>,
+    pub input: Rc<dyn Fn(cove_platform::InputEvent)>,
     pub invalidation_log: Arc<InvalidationLog>,
     pub environment: Option<
         Rc<dyn Fn(&cove_core::EnvironmentRequest) -> Result<cove_core::Environment, String>>,
@@ -36,6 +39,9 @@ impl AndroidDiagnostics {
     ) -> Result<Self, String> {
         let session = if let Some(factory) = take_factory() {
             let callbacks = DiagnosticsCallbacks {
+                capture: Some(hooks.capture),
+                viewport: hooks.viewport,
+                input: hooks.input,
                 invalidate: {
                     let invalidate = invalidate.clone();
                     Rc::new(move || invalidate())

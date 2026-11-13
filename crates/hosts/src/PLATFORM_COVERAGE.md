@@ -73,7 +73,7 @@ The counters are measured in the allocator from the caller's `Layout`: no per-al
 
 ## The three behaviours that could not be ported faithfully
 
-1. **DevTools is feature-gated.** With the `devtools` feature, a host launched with `COVE_DEVTOOLS=1` registers its runtime probe with the controller. Inspectors read diagnostics on demand. The controller owns platform capture and input. See [DevTools](../../devtools/README.md).
+1. **DevTools is feature-gated.** With the `devtools` feature, a host launched with `COVE_DEVTOOLS=1` registers its runtime probe with the controller. Inspectors read diagnostics on demand. The host supplies Cove framebuffer pixels and dispatches app-local input. See [DevTools](../../devtools/README.md).
 
 2. **macOS memory pressure is read, not owned.** The sampler polls a published pressure level (`darwin::set_level`) instead of owning a `dispatch_source` with an event handler. Linux and Windows use their real mechanisms (`/proc/meminfo` + cgroup v2; `CreateMemoryResourceNotification`). **Reason:** a `dispatch_source` event handler is an Objective-C block, which this crate does not hand-encode. All three platforms sample on a worker thread and only raise a flag that the UI thread drains, because `Sdl3PlatformHost` is `!Send` and stays on the UI thread.
 

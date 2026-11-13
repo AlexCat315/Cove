@@ -26,6 +26,6 @@ npm run test:wasm
 
 `verify` 检查前端脚本语法。`test:wasm` 实例化构建后的模块，验证 Counter 和 Gallery 的输入路由及状态变化。浏览器绘制、GPU、系统键盘和 IME 仍需实机验证。
 
-用 `cargo run -p cove-devtools-cli -- serve --web-root crates/browser/dist` 启动控制器，再打开终端打印的 URL，将路径改为 `/app/` 并保留配对片段。Inspector、MCP 和 CLI 随即可以选择 WASM 运行时。浏览器截图与操作需要配对 WebDriver 会话，见 [DevTools](../devtools/README.md)。
+用 `cargo run -p cove-devtools-cli -- serve --web-root crates/browser/dist` 启动控制器，再打开终端打印的 URL，将路径改为 `/app/` 并保留配对片段。Inspector、MCP 和 CLI 随即可以选择 WASM 运行时。浏览器从自身 Canvas 导出画面，操作直接进入 Cove 场景，见 [DevTools](../devtools/README.md)。
 
 UI 着色器来自 `crates/graphics/resources/Shaders/Slang`。修改源码后，在仓库根目录运行 `node Tools/Shaders/build-native-ui.mjs --wgsl`，使用 `cargo cove setup --shaders` 配置的 Slang 2026.19 重新生成浏览器产物。

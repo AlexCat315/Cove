@@ -4,6 +4,55 @@ use serde_json::Value;
 
 pub const VERSION: u32 = 1;
 pub const MAX_MESSAGE: usize = 2 * 1024 * 1024;
+/// Leaves room for Base64 and the probe reply inside MAX_MESSAGE.
+pub const MAX_CAPTURE_BYTES: usize = 1_500_000;
+
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+pub struct Viewport {
+    pub width: f32,
+    pub height: f32,
+}
+
+impl Viewport {
+    pub fn contains(self, x: f32, y: f32) -> bool {
+        (0.0..self.width).contains(&x) && (0.0..self.height).contains(&y)
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RuntimeCapture {
+    pub viewport: Viewport,
+    pub png: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum RuntimeInput {
+    Click {
+        x: f32,
+        y: f32,
+        button: u8,
+    },
+    Drag {
+        x: f32,
+        y: f32,
+        to_x: f32,
+        to_y: f32,
+    },
+    Scroll {
+        x: f32,
+        y: f32,
+        dx: i32,
+        dy: i32,
+    },
+    Key {
+        key: String,
+        modifiers: Vec<String>,
+    },
+    Text {
+        text: String,
+    },
+}
 
 #[cfg(not(target_arch = "wasm32"))]
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -136,6 +185,13 @@ pub enum ProbeCommand {
     /// The runtime content origin in the platform's window-server coordinate
     /// space and the scale between that space and runtime logical points.
     ContentGeometry,
+    /// Returns one PNG from the runtime's own render surface.
+    Capture,
+    /// Sends an action to the selected runtime's scene dispatcher.
+    Input {
+        viewport: Option<Viewport>,
+        action: RuntimeInput,
+    },
     Read {
         name: String,
         arguments: Value,

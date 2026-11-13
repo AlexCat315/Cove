@@ -181,7 +181,7 @@ void *cove_shell_apple_attach(void *rawWindow,void *rawLayer,bool inset,bool doc
 #if TARGET_OS_OSX
     NSWindow *window=context.window;
     if(inset){window.titleVisibility=NSWindowTitleHidden;window.titlebarAppearsTransparent=YES;window.styleMask|=NSWindowStyleMaskFullSizeContentView;window.toolbarStyle=NSWindowToolbarStyleUnifiedCompact;}
-    [window makeKeyAndOrderFront:nil];[NSApp activateIgnoringOtherApps:YES];
+    if(SDL_GetHintBoolean(SDL_HINT_WINDOW_ACTIVATE_WHEN_SHOWN,true)){[window makeKeyAndOrderFront:nil];[NSApp activateIgnoringOtherApps:YES];}
     if(!scrollType)scrollType=SDL_RegisterEvents(1);
     __weak CoveShellAppleWindow *weak=context;
     context.scrollMonitor=[NSEvent addLocalMonitorForEventsMatchingMask:NSEventMaskScrollWheel handler:^NSEvent*(NSEvent *event){

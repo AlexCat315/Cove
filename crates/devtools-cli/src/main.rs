@@ -26,9 +26,6 @@ enum Command {
         /// Directory produced by the browser build.
         #[arg(long)]
         web_root: Option<PathBuf>,
-        /// Attach platform,http://127.0.0.1:port,session-id. Repeat for other devices or tabs.
-        #[arg(long)]
-        webdriver: Vec<String>,
     },
     /// Connect an MCP client over stdin/stdout.
     Mcp,
@@ -50,11 +47,7 @@ fn run() -> Result<bool, Box<dyn std::error::Error + Send + Sync>> {
     let endpoint = cli.endpoint;
     let token = std::env::var("COVE_DEVTOOLS_TOKEN").ok();
     match cli.command {
-        Command::Serve {
-            port,
-            web_root,
-            webdriver,
-        } => {
+        Command::Serve { port, web_root } => {
             let token = token
                 .filter(|token| !token.is_empty())
                 .map_or_else(cove_devtools_cli::random_id, Ok)?;
@@ -65,7 +58,7 @@ fn run() -> Result<bool, Box<dyn std::error::Error + Send + Sync>> {
             {
                 return Err("COVE_DEVTOOLS_TOKEN must contain only letters, digits, hyphens and underscores.".into());
             }
-            cove_devtools_cli::serve(port, token, web_root, webdriver)?;
+            cove_devtools_cli::serve(port, token, web_root)?;
         }
         Command::Mcp => {
             // Start MCP even before a controller is paired, so tools/list works.

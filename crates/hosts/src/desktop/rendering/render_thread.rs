@@ -13,7 +13,7 @@
 //! font uploads and frames are ordered by one command channel, so an upload
 //! always lands before the frame that samples it.
 use crate::desktop::application::memory::AppWindowMemorySnapshot;
-use crate::desktop::window::native_renderer::AppWindowRenderer;
+use crate::desktop::window::native_renderer::{AppWindowRenderer, CapturedFrame};
 use cove_core::DrawList;
 use cove_core::scene::wake_scene_thread;
 use cove_graphics::rhi::{RhiError, RhiResult};
@@ -54,6 +54,7 @@ enum Command {
     Frame(FrameToken, DrawList, (f32, f32)),
     SetPresentationActive(bool),
     Trim,
+    Capture(Reply<RhiResult<CapturedFrame>>),
     Close(Reply<RhiResult<()>>),
 }
 
@@ -114,6 +115,9 @@ impl Worker {
             Command::Trim => {
                 let result = self.renderer.trim_memory();
                 self.report(result);
+            }
+            Command::Capture(reply) => {
+                let _ = reply.send(self.renderer.capture());
             }
             Command::Close(reply) => {
                 let result = self.renderer.close();
@@ -251,6 +255,13 @@ impl ThreadedWindowRenderer {
         let result = answer.recv().unwrap_or_else(|_| Err(stopped()));
         self.configured = result.is_ok();
         result
+    }
+
+    /// Queues readback after the frames already handed to this renderer.
+    pub fn capture(&mut self) -> RhiResult<Receiver<RhiResult<CapturedFrame>>> {
+        let (reply, answer) = channel();
+        self.send(Command::Capture(reply))?;
+        Ok(answer)
     }
 
     pub fn resize(&mut self, size: (u32, u32), vsync: bool) -> RhiResult<()> {

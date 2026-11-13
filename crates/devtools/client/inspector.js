@@ -178,14 +178,6 @@ const dom = {
   refresh: $("refresh"),
   connection: $("connection"),
   connectionText: $("connection-text"),
-  permissions: $("permissions"),
-  requestPermissions: $("request-permissions"),
-  permissionBanner: $("permission-banner"),
-  permissionBannerText: $("permission-banner-text"),
-  permissionBannerAction: $("permission-banner-action"),
-  bindBanner: $("bind-banner"),
-  bindTarget: $("bind-target"),
-  bindButton: $("bind-button"),
   themeButton: $("theme-button"),
   themeIcon: $("theme-icon"),
   shortcutsButton: $("shortcuts-button"),
@@ -199,6 +191,7 @@ const dom = {
   inspectorContent: $("inspector-content"),
   modeSelect: $("mode-select"),
   modePick: $("mode-pick"),
+  modeInteract: $("mode-interact"),
   repaintHighlightButton: $("repaint-highlight-button"),
   guidelinesButton: $("guidelines-button"),
   baselinesButton: $("baselines-button"),
@@ -207,7 +200,6 @@ const dom = {
   treeSearch: $("tree-search"),
   filterAnchors: $("filter-anchors"),
   filterPrimitives: $("filter-primitives"),
-  captureScope: $("capture-scope"),
   captureButton: $("capture-button"),
   nodeShotButton: $("node-shot-button"),
   saveButton: $("save-button"),
@@ -354,7 +346,6 @@ const state = {
   connected: false,
   sessionLoading: false,
   platform: "",
-  permissions: null,
   targets: [],
   targetId: "",
   targetEpoch: 0,
@@ -421,7 +412,6 @@ function emptyCaps() {
     tree: false,
     capture: false,
     input: false,
-    native: false,
     logs: false,
     network: false,
     networkControl: false,
@@ -430,7 +420,6 @@ function emptyCaps() {
     frameAnalysis: false,
     profile: false,
     inspectNodes: false,
-    contentGeometry: false,
     repaintHighlight: false,
     debugPaint: false,
     baselines: false,
@@ -740,7 +729,6 @@ function readTargetCaps(target) {
   caps.tree = caps.runtime && advertised.has("tree");
   caps.capture = advertised.has("capture");
   caps.input = advertised.has("input");
-  caps.native = advertised.has("native_elements");
   caps.logs = caps.runtime && advertised.has("diagnostics");
   caps.network = caps.runtime && advertised.has("network");
   caps.networkControl = caps.runtime && advertised.has("network_control");
@@ -749,7 +737,6 @@ function readTargetCaps(target) {
   caps.frameAnalysis = caps.runtime && FRAME_ANALYSIS_CAPABILITIES.some(name => advertised.has(name));
   caps.profile = caps.runtime && PROFILE_CAPABILITIES.some(name => advertised.has(name));
   caps.inspectNodes = caps.runtime && advertised.has("inspect_nodes");
-  caps.contentGeometry = caps.runtime && advertised.has("content_geometry");
   caps.repaintHighlight = caps.runtime && advertised.has("repaint_highlight");
   caps.debugPaint = caps.runtime && advertised.has("debug_paint");
   caps.baselines = caps.runtime && advertised.has("baselines");
@@ -812,10 +799,6 @@ function showSetup(error = "") {
   dom.setupError.hidden = !error;
   dom.setupError.textContent = error;
   dom.tokenInput.value = "";
-  dom.permissionBanner.hidden = true;
-  dom.bindBanner.hidden = true;
-  dom.requestPermissions.hidden = true;
-  clear(dom.permissions);
   clear(dom.railMeta);
   setConnection("offline", "Disconnected");
 }
@@ -842,63 +825,6 @@ function applyTheme() {
   const label = state.theme === "auto" ? "follow system" : state.theme;
   dom.themeButton.title = `Theme: ${label}`;
   dom.themeButton.setAttribute("aria-label", `Theme: ${label}`);
-}
-
-function renderPermissions() {
-  clear(dom.permissions);
-  const permissions = state.permissions;
-  if (!permissions || typeof permissions !== "object") {
-    dom.permissions.append(el("span", { class: "permission", attrs: { title: "The controller did not report platform permissions." } },
-      icon("info"), el("span", { text: "Permissions" }), el("strong", { text: "not reported" })));
-    dom.requestPermissions.hidden = true;
-    dom.permissionBanner.hidden = true;
-    return;
-  }
-  const labels = {
-    screen_capture: "Screen Recording",
-    accessibility: "Accessibility",
-  };
-  let anyOff = false;
-  for (const [key, label] of Object.entries(labels)) {
-    if (!Object.prototype.hasOwnProperty.call(permissions, key)) continue;
-    const on = permissions[key] === true;
-    if (!on) anyOff = true;
-    dom.permissions.append(el("span", { class: `permission ${on ? "is-on" : "is-off"}`, attrs: { title: `${label}: ${on ? "granted" : "not granted"}` } },
-      icon(on ? "check" : "alert"),
-      el("span", { text: label }),
-      el("strong", { text: on ? "on" : "off" })));
-  }
-  dom.requestPermissions.hidden = !anyOff;
-  const captureOff = permissions.screen_capture === false;
-  dom.permissionBanner.hidden = !captureOff;
-  if (captureOff) {
-    dom.permissionBannerText.textContent = "Screen Recording is off. Screenshots and pick-at-point need it for the terminal running this controller.";
-  }
-}
-
-function renderBindBanner() {
-  const target = targetById();
-  const caps = state.caps;
-  if (!target || target.kind !== "runtime" || caps.capture || target.platform_target) {
-    dom.bindBanner.hidden = true;
-    return;
-  }
-  const candidates = state.targets.filter(candidate =>
-    candidate.platform === target.platform
-    && candidate.kind !== "runtime"
-    && candidate.kind !== "display"
-    && (candidate.kind === "webdriver"
-      || candidate.kind === "portal"
-      || (candidate.kind === "window" && target.pid && candidate.id.startsWith(`window:${target.pid}:`))));
-  if (!candidates.length) {
-    dom.bindBanner.hidden = true;
-    return;
-  }
-  const previous = dom.bindTarget.value;
-  dom.bindTarget.replaceChildren(new Option("Select a window", ""));
-  for (const candidate of candidates) dom.bindTarget.append(new Option(candidate.title, candidate.id));
-  if (candidates.some(candidate => candidate.id === previous)) dom.bindTarget.value = previous;
-  dom.bindBanner.hidden = false;
 }
 
 function renderTargets() {
@@ -942,7 +868,6 @@ async function refreshSession(options = {}) {
   try {
     const session = await rpc("get_ui_session");
     state.platform = String(session?.platform || "");
-    state.permissions = session?.permissions ?? null;
     state.targets = Array.isArray(session?.targets) ? session.targets : [];
     let next = previousTarget;
     if (!state.targets.some(target => target.id === next)) next = defaultTargetId();
@@ -957,8 +882,6 @@ async function refreshSession(options = {}) {
       ensureCurrentView();
     }
     showWorkspace();
-    renderPermissions();
-    renderBindBanner();
     if (!quiet) {
       const count = state.targets.length;
       toast(count ? `${count} target${count === 1 ? "" : "s"} connected.` : "No targets are connected. Start the app with COVE_DEVTOOLS=1.", count ? "success" : "info");
@@ -985,7 +908,6 @@ async function refreshSession(options = {}) {
 async function chooseTarget(id) {
   if (!id || id === state.targetId) return;
   await activateTarget(id, { reset: true });
-  renderBindBanner();
 }
 
 async function activateTarget(id, options = {}) {
@@ -996,7 +918,6 @@ async function activateTarget(id, options = {}) {
   state.caps = readTargetCaps(targetById(id));
   dom.targets.value = id;
   updateTargetUi();
-  renderBindBanner();
   if (state.caps.tree) {
     await loadTree();
   } else {
@@ -1016,25 +937,19 @@ function updateTargetUi() {
   if ((state.baselines.active || state.baselines.busy) && !state.caps.baselines) resetBaselines(target?.id || "");
   if ((state.slowAnimations.active || state.slowAnimations.busy) && !state.caps.animationSpeed) resetSlowAnimations(target?.id || "");
   if ((state.oversizedImages.active || state.oversizedImages.busy) && !state.caps.oversizedImages) resetOversizedImages(target?.id || "");
-  if (state.mode === "pick" && (!state.caps.capture || !state.caps.inspectNodes || !state.caps.contentGeometry)) {
+  if (state.mode === "pick" && (!state.caps.capture || !state.caps.inspectNodes)) {
     state.mode = "select";
   }
+  if (state.mode === "interact" && !(state.caps.capture && state.caps.input)) state.mode = "select";
   const caps = state.caps;
   dom.captureButton.disabled = !caps.capture || state.captureLoading;
-  dom.nodeShotButton.disabled = !(caps.inspectNodes && caps.contentGeometry && caps.capture) || !state.selectedId || state.captureLoading;
+  dom.nodeShotButton.disabled = !(caps.inspectNodes && caps.capture) || !state.selectedId || state.captureLoading;
   dom.saveButton.disabled = !state.capture;
-  dom.modePick.disabled = !(caps.inspectNodes && caps.contentGeometry && caps.capture);
+  dom.modePick.disabled = !(caps.inspectNodes && caps.capture);
   dom.treeRefresh.disabled = !caps.tree || state.treeLoading;
   dom.treeCollapse.disabled = !caps.tree || !state.treeLoaded;
-  dom.modeSelect.setAttribute("aria-pressed", String(state.mode === "select"));
-  dom.modePick.setAttribute("aria-pressed", String(state.mode === "pick"));
-  dom.modePick.disabled = !(state.caps.inspectNodes && state.caps.contentGeometry && state.caps.capture);
-  dom.pickHint.hidden = state.mode !== "pick";
-  dom.screenshotBody.classList.toggle("is-pick", state.mode === "pick");
+  updateModeUi();
   dom.tree.hidden = !caps.tree || !state.treeLoaded || state.treeError !== null;
-  dom.captureScope.disabled = !caps.capture;
-  dom.requestPermissions.hidden = !(state.permissions && (state.permissions.screen_capture === false || state.permissions.accessibility === false));
-  renderPermissions();
   renderCapabilityNote();
   renderRepaintHighlightUi();
   renderGuidelinesUi();
@@ -1067,13 +982,10 @@ function renderCapabilityNote() {
     notes.push("No target is selected.");
   } else if (!caps.runtime && !caps.capture) {
     notes.push("This target exposes neither a component tree nor capture.");
-  } else if (!caps.runtime) {
-    notes.push("This is a platform target: screenshots and input are available, but component inspection requires a Cove runtime.");
   } else {
     if (!caps.tree) notes.push("This runtime does not advertise a component tree.");
     if (!caps.inspectNodes) notes.push("This runtime does not advertise inspect_nodes: pick-at-point and node screenshots are unavailable.");
-    else if (!caps.contentGeometry) notes.push("This runtime does not publish content geometry; pick-at-point and node screenshots need it to map capture pixels.");
-    if (!caps.capture) notes.push("This runtime has no bound capture target: screenshots, pick-at-point and node screenshots are unavailable.");
+    if (!caps.capture) notes.push("This runtime does not advertise frame capture.");
   }
   dom.capabilityNote.hidden = notes.length === 0;
   dom.capabilityNote.textContent = notes.join(" ");
@@ -1483,41 +1395,6 @@ function ensureCurrentView() {
   else if (state.view === "debugger") ensureDebugger();
 }
 
-async function bindTarget() {
-  const target = targetById();
-  const platformTarget = dom.bindTarget.value;
-  if (!target || !platformTarget) {
-    toast("Select a window or driver to bind.", "error");
-    return;
-  }
-  dom.bindButton.disabled = true;
-  try {
-    await rpc("bind_ui_target", { target: target.id, platform_target: platformTarget });
-    toast("Target bound. Refreshing capabilities.", "success");
-    await refreshSession({ quiet: true });
-  } catch (error) {
-    toast(errorMessage(error), "error", 9000);
-  } finally {
-    dom.bindButton.disabled = false;
-  }
-}
-
-async function requestPermissions() {
-  dom.requestPermissions.disabled = true;
-  dom.permissionBannerAction.disabled = true;
-  try {
-    const result = await rpc("request_ui_permissions");
-    if (result && typeof result === "object") state.permissions = { ...(state.permissions || {}), ...result };
-    renderPermissions();
-    toast("macOS may require a controller restart after access is granted.", "info", 9000);
-    await refreshSession({ quiet: true });
-  } catch (error) {
-    toast(errorMessage(error), "error", 9000);
-  } finally {
-    dom.requestPermissions.disabled = false;
-    dom.permissionBannerAction.disabled = false;
-  }
-}
 function showState(host, options = {}) {
   clear(host);
   host.hidden = false;
@@ -1833,7 +1710,7 @@ function renderTreeArea() {
     showState(dom.treeState, {
       icon: "hierarchy",
       title: "Component tree unavailable",
-      message: caps.runtime ? "This runtime did not advertise a component tree." : "Select a Cove runtime target to inspect components. Platform window and display targets provide capture and input.",
+      message: caps.runtime ? "This runtime did not advertise a component tree." : "Select a Cove runtime to inspect components.",
     });
     dom.tree.hidden = true;
     dom.treeMeta.textContent = "No component tree";
@@ -2931,7 +2808,7 @@ function renderDetailTab() {
 }
 
 function updateNodeButtons() {
-  dom.nodeShotButton.disabled = !(state.caps.inspectNodes && state.caps.contentGeometry && state.caps.capture) || !state.selectedId || state.captureLoading;
+  dom.nodeShotButton.disabled = !(state.caps.inspectNodes && state.caps.capture) || !state.selectedId || state.captureLoading;
   dom.highlightButton.disabled = !state.selectedId || !state.caps.runtime;
   dom.clearHighlight.disabled = !state.caps.runtime;
   dom.readValueButton.disabled = !state.selectedId || state.detailLoading;
@@ -2976,14 +2853,13 @@ async function captureWindow() {
   }
   const targetId = state.targetId;
   const epoch = state.targetEpoch;
-  const scope = dom.captureScope.value === "display" ? "display" : "window";
   state.captureAttempt = "window";
   state.captureLoading = true;
   state.captureError = null;
   updateNodeButtons();
   renderScreenshot();
   try {
-    const result = await rpc("capture_ui", { target: targetId, scope });
+    const result = await rpc("capture_ui", { target: targetId });
     if (epoch !== state.targetEpoch || targetId !== state.targetId) return;
     await applyCaptureResult(result, "window", null, targetId, epoch);
   } catch (error) {
@@ -3001,12 +2877,12 @@ async function captureWindow() {
 
 async function captureNode() {
   if (state.captureLoading || state.pickBusy) return;
-  if (!state.caps.inspectNodes || !state.caps.contentGeometry) {
-    toast("This runtime cannot map capture pixels to content; node screenshots are unavailable.", "error", 8000);
+  if (!state.caps.inspectNodes) {
+    toast("This runtime does not advertise inspect_nodes.", "error", 8000);
     return;
   }
   if (!state.caps.capture) {
-    toast("This runtime has no bound capture target; bind its window before taking a node screenshot.", "error", 8000);
+    toast("This runtime does not advertise frame capture.", "error", 8000);
     return;
   }
   if (!state.selectedId) {
@@ -3079,13 +2955,14 @@ function renderScreenshot() {
   const body = dom.screenshotBody;
   body.replaceChildren();
   body.classList.toggle("is-pick", state.mode === "pick" && state.capture?.kind === "window");
+  body.classList.toggle("is-interact", state.mode === "interact" && state.capture?.kind === "window");
   body.classList.toggle("is-zoom", state.capture?.zoom === "actual");
   body.classList.toggle("is-busy", state.captureLoading || state.pickBusy);
   dom.screenshotZoom.hidden = !state.capture;
   dom.screenshotClear.hidden = !state.capture;
   dom.saveButton.disabled = !state.capture;
   dom.captureButton.disabled = !state.caps.capture || state.captureLoading;
-  dom.nodeShotButton.disabled = !(state.caps.inspectNodes && state.caps.contentGeometry && state.caps.capture) || !state.selectedId || state.captureLoading;
+  dom.nodeShotButton.disabled = !(state.caps.inspectNodes && state.caps.capture) || !state.selectedId || state.captureLoading;
   dom.screenshotZoom.textContent = state.capture?.zoom === "actual" ? "Fit" : "100%";
 
   if (state.captureLoading && !state.capture) {
@@ -3108,8 +2985,7 @@ function renderScreenshot() {
   if (!state.capture) {
     const caps = state.caps;
     let message = "Capture the window to inspect it visually and pick components.";
-    if (!caps.capture) message = "Bind a capture target to take window or node screenshots.";
-    else if (!caps.runtime) message = "Capture the platform target, or select a runtime to inspect components.";
+    if (!caps.capture) message = "Select a runtime with frame capture.";
     showState(body, {
       icon: "camera",
       title: "No screenshot",
@@ -3142,6 +3018,7 @@ function renderScreenshot() {
     image.addEventListener("click", event => handlePickClick(event, image));
     image.title = "Click to select the component at this point";
   }
+  if (state.mode === "interact" && capture.kind === "window") bindFrameInput(image, capture);
   body.append(image);
   updateScreenshotMeta();
 }
@@ -3159,10 +3036,6 @@ function updateScreenshotMeta() {
   if (capture.source) pieces.push(String(capture.source));
   if (capture.kind === "node" && capture.nodeId) pieces.push(`node ${shortId(capture.nodeId)}`);
   if (capture.capture_id || capture.captureId) pieces.push(shortId(capture.capture_id || capture.captureId));
-  if (capture.coordinates) {
-    const rect = capture.coordinates;
-    if (numberValue(rect.x) !== null && numberValue(rect.y) !== null) pieces.push(`origin ${fmtNumber(rect.x, 0)},${fmtNumber(rect.y, 0)}`);
-  }
   dom.screenshotMeta.textContent = pieces.join(" · ");
   dom.screenshotMeta.title = pieces.join(" · ");
 }
@@ -3171,24 +3044,79 @@ function handlePickClick(event, image) {
   if (state.mode !== "pick" || state.pickBusy || !state.capture) return;
   const capture = state.capture;
   if (capture.kind !== "window") return;
+  const point = imagePoint(event, image, capture);
+  if (point && capture.capture_id) pickAt(point.x, point.y, capture.capture_id);
+}
+
+function imagePoint(event, image, capture) {
   const rect = image.getBoundingClientRect();
-  if (!rect.width || !rect.height) return;
   const { width, height } = captureDimensions(capture);
-  if (!width || !height) {
-    toast("The capture has no pixel dimensions; take a new screenshot.", "error");
-    return;
+  if (!rect.width || !rect.height || !width || !height) return null;
+  const x = (event.clientX - rect.left) / rect.width;
+  const y = (event.clientY - rect.top) / rect.height;
+  if (x < 0 || x >= 1 || y < 0 || y >= 1) return null;
+  return { x: Math.floor(x * width), y: Math.floor(y * height) };
+}
+
+function bindFrameInput(image, capture) {
+  image.draggable = false;
+  let press = null;
+  image.addEventListener("pointerdown", event => {
+    if (state.inputBusy || event.button > 2 || !event.isPrimary) return;
+    const point = imagePoint(event, image, capture);
+    if (!point) return;
+    event.preventDefault();
+    image.setPointerCapture(event.pointerId);
+    press = { point, button: event.button, id: event.pointerId };
+  });
+  image.addEventListener("pointercancel", () => { press = null; });
+  image.addEventListener("pointerup", event => {
+    const start = press;
+    press = null;
+    if (!start || start.id !== event.pointerId) return;
+    const end = imagePoint(event, image, capture);
+    if (!end) return;
+    const moved = Math.hypot(end.x - start.point.x, end.y - start.point.y) > 4;
+    if (moved && start.button === 0) {
+      sendFrameInput(capture, { kind: "drag", ...start.point, to_x: end.x, to_y: end.y });
+    } else if (!moved) {
+      sendFrameInput(capture, { kind: "click", ...end, button: start.button });
+    }
+  });
+  image.addEventListener("contextmenu", event => event.preventDefault());
+  let scroll;
+  let timer;
+  image.addEventListener("wheel", event => {
+    const point = imagePoint(event, image, capture);
+    if (!point || state.inputBusy) return;
+    event.preventDefault();
+    const divisor = event.deltaMode === 0 ? 40 : event.deltaMode === 2 ? 0.1 : 1;
+    scroll ??= { kind: "scroll", ...point, dx: 0, dy: 0 };
+    scroll.dx += event.deltaX / divisor;
+    scroll.dy += event.deltaY / divisor;
+    clearTimeout(timer);
+    timer = setTimeout(() => {
+      const action = scroll;
+      scroll = null;
+      const delta = value => Math.max(-10000, Math.min(10000, Math.round(value) || Math.sign(value)));
+      sendFrameInput(capture, { ...action, dx: delta(action.dx), dy: delta(action.dy) });
+    }, 100);
+  }, { passive: false });
+}
+
+async function sendFrameInput(capture, action) {
+  if (state.mode !== "interact" || state.capture !== capture || state.inputBusy) return;
+  const target = state.targetId;
+  const epoch = state.targetEpoch;
+  setInputBusy(true);
+  try {
+    await rpc("input_ui", { target, capture_id: capture.capture_id, action });
+    if (epoch === state.targetEpoch) await captureWindow();
+  } catch (error) {
+    if (epoch === state.targetEpoch) toast(errorMessage(error), "error");
+  } finally {
+    if (epoch === state.targetEpoch) setInputBusy(false);
   }
-  const ratioX = (event.clientX - rect.left) / rect.width;
-  const ratioY = (event.clientY - rect.top) / rect.height;
-  if (ratioX < 0 || ratioX > 1 || ratioY < 0 || ratioY > 1) return;
-  const x = Math.max(0, Math.min(width - 1, Math.floor(ratioX * width)));
-  const y = Math.max(0, Math.min(height - 1, Math.floor(ratioY * height)));
-  const captureId = capture.capture_id || capture.captureId;
-  if (!captureId) {
-    toast("The capture has no capture_id; take a new screenshot.", "error");
-    return;
-  }
-  pickAt(x, y, captureId);
 }
 
 async function pickAt(x, y, captureId) {
@@ -3292,12 +3220,10 @@ function clearScreenshot() {
 }
 
 function enterPickMode() {
-  if (!state.caps.inspectNodes || !state.caps.contentGeometry) {
+  if (!state.caps.inspectNodes) {
     state.mode = "select";
     updateModeUi();
-    toast(state.caps.inspectNodes
-      ? "This runtime does not publish content geometry; pick-at-point is unavailable."
-      : "This runtime does not advertise inspect_nodes; pick-at-point is unavailable.", "error", 8000);
+    toast("This runtime does not advertise inspect_nodes.", "error", 8000);
     return;
   }
   if (!state.caps.capture) {
@@ -3319,6 +3245,7 @@ function enterPickMode() {
 function exitPickMode() {
   state.mode = "select";
   updateModeUi();
+  renderScreenshot();
   renderDetails();
 }
 
@@ -3326,6 +3253,8 @@ function updateModeUi() {
   dom.modeSelect.setAttribute("aria-pressed", String(state.mode === "select"));
   dom.modePick.setAttribute("aria-pressed", String(state.mode === "pick"));
   dom.modePick.disabled = !(state.caps.inspectNodes && state.caps.capture);
+  dom.modeInteract.disabled = !(state.caps.input && state.caps.capture);
+  dom.modeInteract.setAttribute("aria-pressed", String(state.mode === "interact"));
   dom.pickHint.hidden = state.mode !== "pick";
   dom.screenshotBody.classList.toggle("is-pick", state.mode === "pick" && state.capture?.kind === "window");
   if (!state.selectedId && state.mode === "pick") renderDetails();
@@ -3340,7 +3269,7 @@ function renderInputUi() {
   dom.keyForm.querySelectorAll("input, button").forEach(control => { control.disabled = disabled; });
   dom.textForm.querySelectorAll("input, button").forEach(control => { control.disabled = disabled; });
   dom.inputMeta.textContent = caps.input
-    ? `Platform input · ${target?.title || "target"}`
+    ? `App input · ${target?.title || "target"}`
     : "This target does not advertise input.";
   updateInputButtons();
 }
@@ -17759,20 +17688,19 @@ function bindEvents() {
     if (state.mode === "pick") exitPickMode();
     else enterPickMode();
   });
+  dom.modeInteract.addEventListener("click", () => {
+    if (dom.modeInteract.disabled) return;
+    state.mode = "interact";
+    updateModeUi();
+    if (state.capture?.kind === "window") renderScreenshot();
+    else captureWindow();
+  });
   dom.pickExit.addEventListener("click", () => exitPickMode());
   dom.captureButton.addEventListener("click", () => captureWindow());
   dom.nodeShotButton.addEventListener("click", () => captureNode());
   dom.saveButton.addEventListener("click", saveCapture);
   dom.screenshotZoom.addEventListener("click", toggleScreenshotZoom);
   dom.screenshotClear.addEventListener("click", clearScreenshot);
-  dom.captureScope.addEventListener("change", () => {
-    if (state.capture) {
-      releaseCapture();
-      updateTargetUi();
-      renderScreenshot();
-    }
-  });
-
   dom.highlightButton.addEventListener("click", () => {
     if (state.selectedId) highlightNode(state.selectedId);
   });
@@ -17932,9 +17860,6 @@ function bindEvents() {
   dom.debuggerOpenForm.addEventListener("submit", openDebuggerSource);
   dom.debuggerEvaluateForm.addEventListener("submit", evaluateDebuggerExpression);
   dom.debuggerConsoleClear.addEventListener("click", clearDebuggerConsole);
-  dom.requestPermissions.addEventListener("click", requestPermissions);
-  dom.permissionBannerAction.addEventListener("click", requestPermissions);
-  dom.bindButton.addEventListener("click", bindTarget);
 
   dom.themeButton.addEventListener("click", () => {
     const order = ["auto", "light", "dark"];
@@ -18082,8 +18007,6 @@ function init() {
   bindEvents();
   document.title = "Cove DevTools · Inspector";
   setDetailTab(state.activeDetailTab);
-  renderPermissions();
-  renderBindBanner();
   renderScreenshot();
   renderInputUi();
   renderTreeArea();

@@ -4,7 +4,7 @@ Gallery 展示 Cove 的 Rust 组件。组件页的 Size、Scale、Disabled 和 R
 
 在 Windows 上运行 `cargo run -p cove-examples --bin gallery` 打开 Gallery。Windows 默认使用 Direct3D 12，设备初始化失败时尝试 Vulkan。传入 `-- --component dashboard` 或 `-- --component calendar` 可直接打开对应页面。
 
-调试 Gallery 时先启动 `cargo run -p cove-devtools-cli -- serve`，再用 `COVE_DEVTOOLS=1` 启动 Gallery。Inspector 可选择应用窗口、组件运行时或系统文件面板。
+调试 Gallery 时先启动 `cargo run -p cove-devtools-cli -- serve`，再用 `COVE_DEVTOOLS=1` 启动 Gallery。在 Inspector 选择 Cove 运行时，查看应用帧、检查组件或发送应用内输入。操作见 [DevTools](/docs/devtools)。
 
 浏览器版可用 `?component=scrollView` 或 `?component=textFields` 打开对应页面。在画布内滚动或点击字段输入时，事件会交给同一套 Rust 组件。
 

@@ -138,6 +138,7 @@ pub struct PlatformWindowSession {
     dispatcher: EventDispatcher,
     did_call_on_init: Cell<bool>,
     last_text_input_area: Cell<Option<TextInputArea>>,
+    local_text_focus: Cell<bool>,
     last_text_cursor_tick: Cell<f64>,
     needs_display: Cell<bool>,
     injected_press_held: Cell<bool>,
@@ -182,6 +183,7 @@ impl PlatformWindowSession {
             dispatcher,
             did_call_on_init: Cell::new(false),
             last_text_input_area: Cell::new(None),
+            local_text_focus: Cell::new(false),
             last_text_cursor_tick: Cell::new(0.0),
             needs_display: Cell::new(true),
             injected_press_held: Cell::new(false),
@@ -257,6 +259,12 @@ impl PlatformWindowSession {
         self.input_context.focus_chain.clone()
     }
     fn accepts_native(&self, event: &InputEvent) -> bool {
+        if matches!(
+            event,
+            InputEvent::MouseButtonDown(_) | InputEvent::KeyDown(_) | InputEvent::WindowFocusGained
+        ) {
+            self.local_text_focus.set(false);
+        }
         match event {
             InputEvent::MouseMotion(_) | InputEvent::MouseWheel(_) => {
                 !self.injected_press_held.get()
@@ -290,6 +298,26 @@ impl PlatformWindowSession {
         }
         self.request_display();
     }
+    /// Dispatches inside this session without touching the platform event queue.
+    pub fn dispatch_local(&self, event: InputEvent) {
+        let previous_focus = self.focus_chain().focused().map(|node| node.id());
+        if let Some(observer) = callback(&self.callbacks.input_observer) {
+            observer(&event);
+        }
+        if callback(&self.callbacks.input_interceptor).is_some_and(|f| f(&event)) {
+            return;
+        }
+        if self.with_current(|| self.dispatcher.dispatch_local(&event))
+            && let Some(handler) = callback(&self.callbacks.on_event)
+        {
+            self.with_current(|| handler(&event));
+        }
+        if previous_focus != self.focus_chain().focused().map(|node| node.id()) {
+            self.local_text_focus.set(true);
+        }
+        self.request_display();
+    }
+
     fn update_presentation(&self, active: bool) -> bool {
         if self.presentation_active.replace(active) == active {
             return false;
@@ -1244,7 +1272,7 @@ impl Sdl3PlatformHost {
                 }
             }
             let area = session.focused_text_area();
-            if area != session.last_text_input_area.get() {
+            if !session.local_text_focus.get() && area != session.last_text_input_area.get() {
                 shell.borrow().set_text_input_area(session.id, area);
                 session.last_text_input_area.set(area);
             }
