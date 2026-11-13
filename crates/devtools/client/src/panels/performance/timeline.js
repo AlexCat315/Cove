@@ -1,6 +1,13 @@
 /* Timeline */
+import { clear, el, fmtMs, fmtNumber, numberValue, shortId } from "../../core/format.js";
+import { $, MAX_FLAME_BARS, MAX_SNAPSHOT_EVENTS, RpcError, SPAN_TABLE_LIMIT, dom, state } from "../../core/globals.js";
+import { errorMessage, rpc, targetById, toast } from "../../core/session.js";
+import { emptyInline, errorInline, kvList, rawDetails, showState } from "../../core/ui-helpers.js";
+import { snapshotBanner } from "./frames.js";
+import { activeCaptureRecord, captureRecordById, renderPerformance, setPerformanceTab } from "./overview.js";
 
-function updateTraceElapsed() {
+
+export function updateTraceElapsed() {
   const perf = state.performance;
   if (!perf.recording) {
     dom.performanceElapsed.hidden = true;
@@ -11,7 +18,7 @@ function updateTraceElapsed() {
   dom.performanceElapsed.hidden = false;
 }
 
-async function startTrace() {
+export async function startTrace() {
   const perf = state.performance;
   if (perf.snapshot) {
     toast("Return to live data before recording a trace.", "info");
@@ -48,7 +55,7 @@ async function startTrace() {
   }
 }
 
-async function stopTrace(options = {}) {
+export async function stopTrace(options = {}) {
   const quiet = options.quiet === true;
   const perf = state.performance;
   if (!perf.recording) {
@@ -124,7 +131,7 @@ function updateCaptureSummary(summary) {
   if (record) record.summary = summary;
 }
 
-async function fetchTracePage(record, options = {}) {
+export async function fetchTracePage(record, options = {}) {
   const perf = state.performance;
   if (!record || !record.summary?.id || record.imported || record.loading || record.complete || !state.targetId) return false;
   const targetId = state.targetId;
@@ -158,7 +165,7 @@ async function fetchTracePage(record, options = {}) {
   }
 }
 
-async function loadTraceEvents(options = {}) {
+export async function loadTraceEvents(options = {}) {
   const record = options.captureId ? captureRecordById(options.captureId) : activeCaptureRecord();
   if (!record) return;
   if (record.loading || record.complete || record.imported) {
@@ -258,7 +265,7 @@ async function compareTraces() {
   renderPerformance();
 }
 
-function renderTimelinePanel() {
+export function renderTimelinePanel() {
   const host = dom.performanceTimeline;
   clear(host);
   const perf = state.performance;

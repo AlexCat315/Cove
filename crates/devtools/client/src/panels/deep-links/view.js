@@ -1,3 +1,12 @@
+import { clear, el, icon } from "../../core/format.js";
+import { MAX_DEEP_LINKS_ENTRIES, MAX_DEEP_LINKS_FILES, MAX_DEEP_LINKS_ISSUES, RpcError, dom, state } from "../../core/globals.js";
+import { errorMessage, rpc, toast, unwrapData } from "../../core/session.js";
+import { errorInline, showState } from "../../core/ui-helpers.js";
+import { deepLinksEmptyBody, deepLinksFileStatus, deepLinksKindLabel, deepLinksLocation, deepLinksPanel, deepLinksPlatformLabel, deepLinksPlural, deepLinksRootError, deepLinksStat, deepLinksTable, normalizeDeepLinks } from "./model.js";
+import { formatWallTime } from "../memory/snapshot.js";
+import { writeDeepLinksRootPreference } from "../performance/overview.js";
+import { formatCount } from "../performance/profile/model.js";
+
 function deepLinksIssueRows(issues, limit) {
   return issues.slice(0, limit).map(issue => el("tr", { class: `dl-issue-row is-${issue.severity || "neutral"}` },
     el("td", {}, el("span", { class: `dl-severity is-${issue.severity || "neutral"}`, text: issue.severity || "issue" })),
@@ -173,7 +182,7 @@ function deepLinksScope(model, root) {
   );
 }
 
-function renderDeepLinks() {
+export function renderDeepLinks() {
   const host = dom.deepLinksContent;
   clear(host);
   const app = state.deepLinks;
@@ -325,13 +334,13 @@ function setDeepLinksChrome() {
   dom.deepLinksMeta.textContent = `${stateText} · ${deepLinksPlural(model.summary.files, "file")} · ${deepLinksPlural(model.summary.androidSchemes, "Android scheme")} · ${deepLinksPlural(model.summary.appleDomains, "Apple domain")} · ${deepLinksPlural(model.summary.issues, "issue")} · validated ${formatWallTime(app.refreshedAt)}`;
 }
 
-function showDeepLinksRootError(message) {
+export function showDeepLinksRootError(message) {
   dom.deepLinksRootError.hidden = !message;
   dom.deepLinksRootError.textContent = message || "";
   dom.deepLinksRoot.setAttribute("aria-invalid", message ? "true" : "false");
 }
 
-async function loadDeepLinks(options = {}) {
+export async function loadDeepLinks(options = {}) {
   const app = state.deepLinks;
   const root = String(options.root ?? app.root).trim();
   if (!state.token) {
@@ -389,7 +398,7 @@ async function loadDeepLinks(options = {}) {
   }
 }
 
-function submitDeepLinks(event) {
+export function submitDeepLinks(event) {
   event?.preventDefault();
   const root = dom.deepLinksRoot.value.trim();
   dom.deepLinksRoot.value = root;
@@ -397,7 +406,7 @@ function submitDeepLinks(event) {
   loadDeepLinks({ root, quiet: false });
 }
 
-function ensureDeepLinks() {
+export function ensureDeepLinks() {
   renderDeepLinks();
 }
 

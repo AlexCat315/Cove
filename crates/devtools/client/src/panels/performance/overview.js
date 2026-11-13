@@ -1,4 +1,13 @@
 /* Performance */
+import { clear, el, fmtMs, fmtNumber, numberValue } from "../../core/format.js";
+import { $, ALLOCATION_DEFAULT_RATE, BUDGET_KEY, BUDGET_RATES, DEEP_LINKS_ROOT_KEY, MEMORY_INTERVALS, MEMORY_INTERVAL_KEY, PERFORMANCE_TABS, PROFILE_DEFAULT_DURATION, PROFILE_DEFAULT_HZ, PROFILE_DURATIONS, PROFILE_HZ_RATES, dom, state } from "../../core/globals.js";
+import { rpc, targetById } from "../../core/session.js";
+import { stopTimer, syncFollowTimers } from "../network.js";
+import { frameJank, loadFrames, renderFramesPanel } from "./frames.js";
+import { clearProfileTimers, ensureProfile, fmtSeconds, formatCount, profileElapsedMs, profilePlatformName } from "./profile/model.js";
+import { renderProfilePanel } from "./profile/views.js";
+import { renderTimelinePanel, updateTraceElapsed } from "./timeline.js";
+
 
 function readBudgetPreference() {
   try {
@@ -9,13 +18,13 @@ function readBudgetPreference() {
   }
 }
 
-function writeBudgetPreference(rate) {
+export function writeBudgetPreference(rate) {
   try { localStorage.setItem(BUDGET_KEY, String(rate)); } catch {}
 }
 
 /// Adopts the display rate the runtime measured. An absent or non-positive
 /// rate leaves the user's preference in charge rather than assuming 60 Hz.
-function applyRuntimeRefreshRate(perf, rate) {
+export function applyRuntimeRefreshRate(perf, rate) {
   const hz = rate !== null && Number.isFinite(rate) && rate > 0 ? rate : null;
   perf.refreshHz = hz;
   if (hz !== null && !perf.budgetManual) perf.budgetHz = hz;
@@ -24,7 +33,7 @@ function applyRuntimeRefreshRate(perf, rate) {
 
 /// Keeps the budget selector honest about where its rate comes from: the
 /// runtime's measured display rate, or a rate the user chose by hand.
-function syncBudgetOptions(perf) {
+export function syncBudgetOptions(perf) {
   const select = dom.performanceBudget;
   if (!select) return;
   const rates = [...BUDGET_RATES];
@@ -83,13 +92,13 @@ function readMemoryIntervalPreference() {
   return 2000;
 }
 
-function writeMemoryIntervalPreference(interval) {
+export function writeMemoryIntervalPreference(interval) {
   try {
     localStorage.setItem(MEMORY_INTERVAL_KEY, String(interval));
   } catch {}
 }
 
-function emptyMemory() {
+export function emptyMemory() {
   return {
     loaded: false,
     loading: false,
@@ -106,7 +115,7 @@ function emptyMemory() {
   };
 }
 
-function emptyAppSize() {
+export function emptyAppSize() {
   return {
     loaded: false,
     loading: false,
@@ -122,7 +131,7 @@ function emptyAppSize() {
   };
 }
 
-function emptyDeepLinks() {
+export function emptyDeepLinks() {
   return {
     root: readDeepLinksRootPreference(),
     validatedRoot: "",
@@ -143,14 +152,14 @@ function readDeepLinksRootPreference() {
   }
 }
 
-function writeDeepLinksRootPreference(root) {
+export function writeDeepLinksRootPreference(root) {
   try {
     if (root) localStorage.setItem(DEEP_LINKS_ROOT_KEY, root);
     else localStorage.removeItem(DEEP_LINKS_ROOT_KEY);
   } catch {}
 }
 
-function emptyProfile() {
+export function emptyProfile() {
   return {
     status: "idle",
     supported: null,
@@ -190,7 +199,7 @@ function emptyProfile() {
   };
 }
 
-function emptyPerformance() {
+export function emptyPerformance() {
   return {
     tab: "frames",
     budgetHz: readBudgetPreference(),
@@ -229,7 +238,7 @@ function emptyPerformance() {
   };
 }
 
-function resetPerformance(previousTarget = state.targetId) {
+export function resetPerformance(previousTarget = state.targetId) {
   const previous = state.performance;
   if (previous?.recordTimer) clearInterval(previous.recordTimer);
   if (previous?.recording && previousTarget) {
@@ -254,7 +263,7 @@ function resetPerformance(previousTarget = state.targetId) {
   if (state.view === "performance") renderPerformance();
 }
 
-function ensurePerformance() {
+export function ensurePerformance() {
   const perf = state.performance;
   if (!state.token || perf.snapshot || !state.targetId) {
     renderPerformance();
@@ -268,16 +277,16 @@ function ensurePerformance() {
   if (perf.tab === "profile") ensureProfile();
 }
 
-function activeCaptureRecord() {
+export function activeCaptureRecord() {
   const perf = state.performance;
   return perf.captures.find(record => record.summary?.id === perf.activeCaptureId) || null;
 }
 
-function captureRecordById(id) {
+export function captureRecordById(id) {
   return state.performance.captures.find(record => record.summary?.id === id) || null;
 }
 
-function setPerformanceTab(tab, options = {}) {
+export function setPerformanceTab(tab, options = {}) {
   if (!PERFORMANCE_TABS.includes(tab)) return;
   if (state.performance.tab === tab && options.force !== true) return;
   state.performance.tab = tab;
@@ -427,7 +436,7 @@ function updatePerformanceMeta() {
   dom.performanceMeta.textContent = parts.join(" · ");
 }
 
-function renderPerformance() {
+export function renderPerformance() {
   const scrollTop = dom.performanceContent.scrollTop;
   const spansScroll = state.performance.tab === "timeline"
     ? dom.performanceTimeline.querySelector(".spans-table-wrap")?.scrollTop ?? 0

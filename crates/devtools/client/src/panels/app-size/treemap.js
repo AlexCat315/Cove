@@ -1,4 +1,9 @@
-function renderAppSizeTreemap(executable) {
+import { el, fmtBytes, icon } from "../../core/format.js";
+import { APP_SIZE_TREEMAP_HEIGHT, APP_SIZE_TREEMAP_LEGEND, APP_SIZE_TREEMAP_WIDTH, MAX_APP_SIZE_CONTAINMENT_GROUPS, state } from "../../core/globals.js";
+import { formatCount } from "../performance/profile/model.js";
+import { renderAppSize } from "./diff.js";
+import { appSizeCoverageLabel, appSizeFocusTreemapRow, appSizePanel, appSizeSquarify, appSizeTreemapCellTitle, appSizeTreemapSource, appSizeTreemapTone, appSizeTreemapTruncation } from "./sections.js";
+export function renderAppSizeTreemap(executable) {
   const source = appSizeTreemapSource(executable);
   const block = appSizePanel("Size treemap", `${fmtBytes(source.sum)} · ${formatCount(source.drawn.length)} ${source.label}`);
   block.id = "app-size-treemap-panel";

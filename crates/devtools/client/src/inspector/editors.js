@@ -1,4 +1,10 @@
-function renderRender(node, detail, entry) {
+import { clear, el, fmtNumber, numberValue } from "../core/format.js";
+import { $, DETAIL_TABS, FLEX_ALIGN_VALUES, FLEX_FACTOR_LIMIT, FLEX_JUSTIFY_VALUES, FLEX_PROPERTY_NAMES, FLEX_RECORD_ATTEMPTS, FLEX_RECORD_DELAY_MS, RpcError, dom, state } from "../core/globals.js";
+import { errorMessage, rpc, targetById, toast, unwrapData } from "../core/session.js";
+import { emptyInline, errorInline, kvList, metric, rawDetails, sectionBlock } from "../core/ui-helpers.js";
+import { currentNode, renderDetails } from "./tree.js";
+
+export function renderRender(node, detail, entry) {
   const panel = dom.panels.render;
   clear(panel);
   const flags = node.flags || {};
@@ -404,7 +410,7 @@ function flexEditorCurrent(epoch, targetId, request, nodeId) {
     && editor.key === flexEditorKey(nodeId);
 }
 
-function resetFlexEditorState() {
+export function resetFlexEditorState() {
   const editor = state.flexEditor;
   editor.request += 1;
   editor.key = "";
@@ -533,7 +539,7 @@ async function submitFlexEditor(mode) {
   }
 }
 
-function renderLayout(node, detail, entry) {
+export function renderLayout(node, detail, entry) {
   const panel = dom.panels.layout;
   clear(panel);
   const layout = node.layout;
@@ -619,7 +625,7 @@ function renderLayout(node, detail, entry) {
   if (state.detailError) panel.append(errorInline(errorMessage(state.detailError)));
 }
 
-function renderSource(node, entry) {
+export function renderSource(node, entry) {
   const panel = dom.panels.source;
   clear(panel);
   const source = node.source;
@@ -650,7 +656,7 @@ function renderSource(node, entry) {
   ));
 }
 
-function setDetailTab(name, focus = false) {
+export function setDetailTab(name, focus = false) {
   if (!DETAIL_TABS.includes(name)) return;
   state.activeDetailTab = name;
   for (const tab of DETAIL_TABS) {
@@ -664,18 +670,18 @@ function setDetailTab(name, focus = false) {
   }
 }
 
-function renderDetailTab() {
+export function renderDetailTab() {
   setDetailTab(state.activeDetailTab);
 }
 
-function updateNodeButtons() {
+export function updateNodeButtons() {
   dom.nodeShotButton.disabled = !(state.caps.inspectNodes && state.caps.capture) || !state.selectedId || state.captureLoading;
   dom.highlightButton.disabled = !state.selectedId || !state.caps.runtime;
   dom.clearHighlight.disabled = !state.caps.runtime;
   dom.readValueButton.disabled = !state.selectedId || state.detailLoading;
 }
 
-async function copyText(value, label = "Value") {
+export async function copyText(value, label = "Value") {
   const text = String(value ?? "");
   try {
     if (navigator.clipboard?.writeText) {

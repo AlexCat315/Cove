@@ -1,4 +1,13 @@
-function updateDebuggerButtons() {
+import { clear, el, icon } from "../../core/format.js";
+import { DEBUGGER_CONSOLE_LIMIT, dom, MAX_DEBUGGER_SOURCE_LINES, nextRpcSequence, state } from "../../core/globals.js";
+import { errorMessage, targetById } from "../../core/session.js";
+import { showState } from "../../core/ui-helpers.js";
+import { stopTimer } from "../network.js";
+import { firstStringValue, isObjectValue } from "../performance/profile/model.js";
+import { authHeaders } from "../../core/session.js";
+import { applyDebuggerSnapshot, debuggerAdapterLabel, debuggerBreakpointLabel, debuggerBreakpointsAt, debuggerCurrentLocation, debuggerFrameLabel, debuggerFrameLocation, debuggerScalarText, debuggerStatusIsExplicit, emptyDebugger, selectedDebuggerFrame } from "./model.js";
+import { attachDebugger, debuggerCall, debuggerCanAct, debuggerStatusLabel, debuggerStatusTone, debuggerVisibleBreakpoints, loadDebuggerSource, loadDebuggerStack, loadDebuggerVariableChildren, selectDebuggerFrame, selectDebuggerThread, toggleDebuggerBreakpoint, toggleDebuggerBreakpointAtLine } from "./session.js";
+export function updateDebuggerButtons() {
   const dbg = state.debugger;
   const targetOk = Boolean(state.connected && state.token && state.targetId && state.caps.runtime);
   const busy = Boolean(dbg.busy);
@@ -29,7 +38,7 @@ function updateDebuggerButtons() {
   }
 }
 
-function renderDebuggerChrome() {
+export function renderDebuggerChrome() {
   const dbg = state.debugger;
   const label = debuggerStatusLabel(dbg.status);
   dom.debuggerStatus.textContent = label;
@@ -119,7 +128,7 @@ function appendDebuggerPaneMessage(host, message, options = {}) {
   }
 }
 
-function renderDebuggerThreads() {
+export function renderDebuggerThreads() {
   const dbg = state.debugger;
   const signature = JSON.stringify({
     threads: dbg.threads,
@@ -173,7 +182,7 @@ function renderDebuggerThreads() {
   }
 }
 
-function renderDebuggerStack() {
+export function renderDebuggerStack() {
   const dbg = state.debugger;
   const signature = JSON.stringify({
     frames: dbg.frames,
@@ -247,7 +256,7 @@ function renderDebuggerStack() {
   }
 }
 
-function renderDebuggerBreakpoints(force = false) {
+export function renderDebuggerBreakpoints(force = false) {
   const dbg = state.debugger;
   const visible = debuggerVisibleBreakpoints();
   const hitIds = new Set(dbg.stop?.hitBreakpointIds || []);
@@ -327,7 +336,7 @@ function debuggerSourceSignature() {
   });
 }
 
-function updateDebuggerSourceHead() {
+export function updateDebuggerSourceHead() {
   const dbg = state.debugger;
   const source = dbg.source;
   const current = debuggerCurrentLocation();
@@ -344,7 +353,7 @@ function updateDebuggerSourceHead() {
   dom.debuggerSourceMeta.textContent = meta.join(" · ");
 }
 
-function renderDebuggerSource(force = false) {
+export function renderDebuggerSource(force = false) {
   const dbg = state.debugger;
   const signature = debuggerSourceSignature();
   if (!force && signature === dbg.renderSig.source) {
@@ -433,7 +442,7 @@ function renderDebuggerSource(force = false) {
   }
 }
 
-function debuggerScopeKey(index) {
+export function debuggerScopeKey(index) {
   return `scope:${index}`;
 }
 
@@ -459,7 +468,7 @@ function debuggerVariablesSignature() {
   });
 }
 
-function renderDebuggerVariables(force = false) {
+export function renderDebuggerVariables(force = false) {
   const dbg = state.debugger;
   const signature = debuggerVariablesSignature();
   if (!force && signature === dbg.renderSig.variables) {
@@ -635,7 +644,7 @@ function debuggerConsoleEntryElement(entry) {
       entry.type ? el("span", { class: "dbg-console-type", text: ` ${entry.type}` }) : null));
 }
 
-function appendDebuggerConsole(kind, text, options = {}) {
+export function appendDebuggerConsole(kind, text, options = {}) {
   const dbg = state.debugger;
   const entry = { kind, text: String(text ?? ""), type: options.type || "" };
   dbg.console.push(entry);
@@ -650,7 +659,7 @@ function appendDebuggerConsole(kind, text, options = {}) {
   updateDebuggerButtons();
 }
 
-function renderDebuggerConsole() {
+export function renderDebuggerConsole() {
   const dbg = state.debugger;
   const host = dom.debuggerConsole;
   clear(host);
@@ -664,7 +673,7 @@ function renderDebuggerConsole() {
   updateDebuggerButtons();
 }
 
-function clearDebuggerConsole() {
+export function clearDebuggerConsole() {
   state.debugger.console = [];
   renderDebuggerConsole();
 }
@@ -692,7 +701,7 @@ function debuggerEvaluation(data) {
   return { text: debuggerScalarText(data), type: "" };
 }
 
-async function evaluateDebuggerExpression(event) {
+export async function evaluateDebuggerExpression(event) {
   event.preventDefault();
   const dbg = state.debugger;
   if (!dbg.attached || dbg.status !== "paused" || dbg.evaluateBusy) return;
@@ -730,14 +739,14 @@ async function evaluateDebuggerExpression(event) {
   }
 }
 
-function openDebuggerSource(event) {
+export function openDebuggerSource(event) {
   event.preventDefault();
   const path = dom.debuggerOpenPath.value.trim();
   if (!path) return;
   loadDebuggerSource({ path }, { quiet: false });
 }
 
-function renderDebugger() {
+export function renderDebugger() {
   renderDebuggerChrome();
   renderDebuggerThreads();
   renderDebuggerStack();
@@ -746,7 +755,7 @@ function renderDebugger() {
   renderDebuggerVariables();
 }
 
-function resetDebugger(previousTarget = state.targetId) {
+export function resetDebugger(previousTarget = state.targetId) {
   const previous = state.debugger;
   stopTimer("debugger");
   if (previous?.attached && previousTarget && state.token) {
@@ -761,7 +770,7 @@ function resetDebugger(previousTarget = state.targetId) {
   }
 }
 
-function debuggerUnloadDetach() {
+export function debuggerUnloadDetach() {
   const dbg = state.debugger;
   if (!state.token || !state.targetId || !dbg.attached) return;
   try {
@@ -771,7 +780,7 @@ function debuggerUnloadDetach() {
       headers: { ...authHeaders(), "Content-Type": "application/json" },
       body: JSON.stringify({
         jsonrpc: "2.0",
-        id: ++rpcSequence,
+        id: nextRpcSequence(),
         method: "get_ui_debugger",
         params: { target: state.targetId, action: "detach" },
       }),

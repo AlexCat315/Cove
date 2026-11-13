@@ -1,6 +1,15 @@
 /* Screenshot and pick-at-point */
+import { fmtNumber, numberValue, shortId, slug } from "../core/format.js";
+import { RpcError, dom, state } from "../core/globals.js";
+import { authHeaders, errorMessage, isDisconnectedError, rpc, targetById, toast, updateTargetUi } from "../core/session.js";
+import { showState } from "../core/ui-helpers.js";
+import { updateNodeButtons } from "./editors.js";
+import { setInputBusy } from "./input.js";
+import { currentNode, highlightNode, loadNodeDetail, loadTree, nodeLabel, renderDetails, renderTreeArea, selectNode } from "./tree.js";
+import { refreshCurrent } from "../shell/views.js";
 
-function releaseCapture() {
+
+export function releaseCapture() {
   if (state.capture?.url) URL.revokeObjectURL(state.capture.url);
   state.capture = null;
   state.captureError = null;
@@ -8,7 +17,7 @@ function releaseCapture() {
   state.pickBusy = false;
 }
 
-async function captureWindow() {
+export async function captureWindow() {
   if (state.captureLoading || state.pickBusy) return;
   if (!state.caps.capture || !state.targetId) {
     toast("This target does not advertise capture.", "error");
@@ -38,7 +47,7 @@ async function captureWindow() {
   }
 }
 
-async function captureNode() {
+export async function captureNode() {
   if (state.captureLoading || state.pickBusy) return;
   if (!state.caps.inspectNodes) {
     toast("This runtime does not advertise inspect_nodes.", "error", 8000);
@@ -114,7 +123,7 @@ function captureDimensions(capture) {
   return { width, height };
 }
 
-function renderScreenshot() {
+export function renderScreenshot() {
   const body = dom.screenshotBody;
   body.replaceChildren();
   body.classList.toggle("is-pick", state.mode === "pick" && state.capture?.kind === "window");
@@ -347,7 +356,7 @@ async function pickAt(x, y, captureId) {
   }
 }
 
-function saveCapture() {
+export function saveCapture() {
   const capture = state.capture;
   if (!capture?.url) return;
   const target = targetById();
@@ -370,19 +379,19 @@ function retryCapture() {
   else captureWindow();
 }
 
-function toggleScreenshotZoom() {
+export function toggleScreenshotZoom() {
   if (!state.capture) return;
   state.capture.zoom = state.capture.zoom === "actual" ? "fit" : "actual";
   renderScreenshot();
 }
 
-function clearScreenshot() {
+export function clearScreenshot() {
   releaseCapture();
   updateTargetUi();
   renderScreenshot();
 }
 
-function enterPickMode() {
+export function enterPickMode() {
   if (!state.caps.inspectNodes) {
     state.mode = "select";
     updateModeUi();
@@ -405,14 +414,14 @@ function enterPickMode() {
   dom.pickHintText.textContent = "Click a point in the screenshot. The runtime resolves it to a component through a real hit test.";
 }
 
-function exitPickMode() {
+export function exitPickMode() {
   state.mode = "select";
   updateModeUi();
   renderScreenshot();
   renderDetails();
 }
 
-function updateModeUi() {
+export function updateModeUi() {
   dom.modeSelect.setAttribute("aria-pressed", String(state.mode === "select"));
   dom.modePick.setAttribute("aria-pressed", String(state.mode === "pick"));
   dom.modePick.disabled = !(state.caps.inspectNodes && state.caps.capture);

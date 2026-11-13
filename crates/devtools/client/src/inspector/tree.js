@@ -1,3 +1,10 @@
+import { appendChildren, basename, clear, el, fmtMs, fmtNumber, icon, shortId } from "../core/format.js";
+import { RpcError, dom, state } from "../core/globals.js";
+import { errorMessage, retryTree, rpc, targetById, toast, unwrapData } from "../core/session.js";
+import { emptyInline, errorInline, hideState, kvList, metric, rawDetails, sectionBlock, showState } from "../core/ui-helpers.js";
+import { releaseCapture, renderScreenshot } from "./capture.js";
+import { renderDetailTab, renderLayout, renderRender, renderSource, resetFlexEditorState, updateNodeButtons } from "./editors.js";
+
 function nodeChildren(node) {
   return Array.isArray(node?.children) ? node.children : [];
 }
@@ -14,7 +21,7 @@ function shortType(viewTag) {
   return path[path.length - 1];
 }
 
-function nodeLabel(node) {
+export function nodeLabel(node) {
   return node?.debugName || node?.semanticRole || shortType(node?.viewTag)
     || (node?.id === state.rootId ? "Root" : shortId(node?.id)) || "Node";
 }
@@ -82,7 +89,7 @@ function buildIndex(root) {
   state.anchorCount = anchors;
 }
 
-async function loadTree(options = {}) {
+export async function loadTree(options = {}) {
   if (!state.caps.tree || !state.targetId) return;
   const targetId = state.targetId;
   const epoch = state.targetEpoch;
@@ -230,7 +237,7 @@ function appendHighlighted(container, text, query) {
   if (from < value.length) container.append(document.createTextNode(value.slice(from)));
 }
 
-function renderTreeArea() {
+export function renderTreeArea() {
   const target = targetById();
   const caps = state.caps;
   const scrollTop = dom.tree.scrollTop;
@@ -407,7 +414,7 @@ function renderTreeArea() {
   }
 }
 
-function selectNode(id, options = {}) {
+export function selectNode(id, options = {}) {
   const entry = state.entries.get(id);
   if (!entry) {
     toast("The node is no longer in the scene.", "error");
@@ -441,7 +448,7 @@ function selectNode(id, options = {}) {
   highlightNode(id);
 }
 
-async function loadNodeDetail(id) {
+export async function loadNodeDetail(id) {
   if (!state.caps.runtime || !state.targetId) return;
   const targetId = state.targetId;
   const epoch = state.targetEpoch;
@@ -473,7 +480,7 @@ async function loadNodeDetail(id) {
   }
 }
 
-async function readLiveValue() {
+export async function readLiveValue() {
   const id = state.selectedId;
   if (!id) return;
   const epoch = state.targetEpoch;
@@ -497,7 +504,7 @@ async function readLiveValue() {
   }
 }
 
-function highlightNode(id) {
+export function highlightNode(id) {
   const targetId = state.targetId;
   const epoch = state.targetEpoch;
   clearTimeout(state.highlightTimer);
@@ -508,7 +515,7 @@ function highlightNode(id) {
   }, 90);
 }
 
-function clearHighlight() {
+export function clearHighlight() {
   clearTimeout(state.highlightTimer);
   const targetId = state.targetId;
   rpc("select_ui_node", { target: targetId }).catch(error => toast(errorMessage(error), "error", 7000));
@@ -518,7 +525,7 @@ function selectedEntry() {
   return state.selectedId ? state.entries.get(state.selectedId) : null;
 }
 
-function currentNode() {
+export function currentNode() {
   const entry = selectedEntry();
   if (!entry) return null;
   const detailNode = state.detail?.node;
@@ -526,7 +533,7 @@ function currentNode() {
   return { ...entry.node, ...detailNode, children: entry.node.children };
 }
 
-function renderDetails() {
+export function renderDetails() {
   const target = targetById();
   if (!target) {
     showState(dom.detailsState, { icon: "device", title: "No target", message: "Select a connected target." });

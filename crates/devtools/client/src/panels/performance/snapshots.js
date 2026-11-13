@@ -1,6 +1,14 @@
 /* Performance snapshots */
+import { numberValue, slug } from "../../core/format.js";
+import { BUDGET_RATES, MAX_FRAME_RECORDS, MAX_SNAPSHOT_EVENTS, PROFILE_DEFAULT_DURATION, PROFILE_DEFAULT_HZ, PROFILE_DURATIONS, PROFILE_HZ_RATES, SNAPSHOT_SCHEMA, SNAPSHOT_VERSION, dom, state } from "../../core/globals.js";
+import { errorMessage, targetById, toast } from "../../core/session.js";
+import { stopTimer, syncFollowTimers } from "../network.js";
+import { activeCaptureRecord, emptyPerformance, emptyProfile, ensurePerformance, renderPerformance, writeBudgetPreference } from "./overview.js";
+import { clearProfileTimers } from "./profile/model.js";
+import { fetchTracePage } from "./timeline.js";
 
-function downloadJson(filename, value) {
+
+export function downloadJson(filename, value) {
   const blob = new Blob([JSON.stringify(value, null, 2)], { type: "application/json" });
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
@@ -44,7 +52,7 @@ function performanceSnapshotPayload() {
   };
 }
 
-async function exportPerformance() {
+export async function exportPerformance() {
   const perf = state.performance;
   if (perf.loading) {
     toast("Wait for the current frame read to finish before exporting.", "info");
@@ -218,7 +226,7 @@ function parsePerformanceSnapshot(text) {
   };
 }
 
-async function importPerformance(file) {
+export async function importPerformance(file) {
   if (!file) return;
   const perf = state.performance;
   if (perf.recording) {
@@ -298,7 +306,7 @@ async function importPerformance(file) {
   }
 }
 
-function returnToLive() {
+export function returnToLive() {
   const perf = state.performance;
   const budget = perf.budgetHz;
   const tab = perf.tab;

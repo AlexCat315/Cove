@@ -1,17 +1,23 @@
 /* CPU profile */
+import { numberValue } from "../../../core/format.js";
+import { MAX_PROFILE_FRAMES, MAX_PROFILE_SAMPLES, MAX_PROFILE_STACKS, PROFILE_POLL_MS, state } from "../../../core/globals.js";
+import { errorMessage, rpc, targetById, toast } from "../../../core/session.js";
+import { renderPerformance } from "../overview.js";
+import { loadHotspots, pollProfile, profileErrorIsUnavailable, profileErrorIsUnsupported, stopProfile } from "./control.js";
 
-function isObjectValue(value) {
+
+export function isObjectValue(value) {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 }
 
-function firstStringValue(...values) {
+export function firstStringValue(...values) {
   for (const value of values) {
     if (typeof value === "string" && value.trim()) return value;
   }
   return "";
 }
 
-function firstNumberValue(...values) {
+export function firstNumberValue(...values) {
   for (const value of values) {
     const number = numberValue(value);
     if (number !== null) return number;
@@ -19,39 +25,39 @@ function firstNumberValue(...values) {
   return null;
 }
 
-function firstArrayValue(...values) {
+export function firstArrayValue(...values) {
   for (const value of values) {
     if (Array.isArray(value)) return value;
   }
   return [];
 }
 
-function formatCount(value) {
+export function formatCount(value) {
   const number = numberValue(value);
   return number === null ? "—" : Math.round(number).toLocaleString();
 }
 
-function fmtSeconds(value) {
+export function fmtSeconds(value) {
   const number = numberValue(value);
   if (number === null) return "—";
   if (number < 1000) return `${number.toFixed(0)} ms`;
   return `${(number / 1000).toFixed(number < 10000 ? 2 : 1)} s`;
 }
 
-function formatPercent(value, digits = 1) {
+export function formatPercent(value, digits = 1) {
   const number = numberValue(value);
   if (number === null) return "—";
   const percent = number > 1.5 ? number : number * 100;
   return `${percent.toFixed(digits)}%`;
 }
 
-function formatAddress(value) {
+export function formatAddress(value) {
   if (typeof value === "string" && value.trim()) return value.trim();
   const number = numberValue(value);
   return number === null ? "" : `0x${Math.max(0, Math.trunc(number)).toString(16)}`;
 }
 
-function profilePlatformName(target = targetById()) {
+export function profilePlatformName(target = targetById()) {
   const raw = String(state.performance?.profile?.platform || target?.platform || state.platform || "").toLowerCase();
   if (raw.includes("mac") || raw === "darwin" || raw === "osx") return "macos";
   if (raw.includes("windows") || raw === "win32" || raw === "win64") return "windows";
@@ -59,7 +65,7 @@ function profilePlatformName(target = targetById()) {
   return raw;
 }
 
-function profilePlatformUnsupported(target = targetById()) {
+export function profilePlatformUnsupported(target = targetById()) {
   const platform = profilePlatformName(target);
   if (platform === "linux") {
     return "CPU sampling is not implemented on Linux in this build. The sampler reports Unsupported and synthesizes no samples; use a macOS host or an external system profiler.";
@@ -70,7 +76,7 @@ function profilePlatformUnsupported(target = targetById()) {
   return "";
 }
 
-function normalizeProfileStatus(value, hasSamples) {
+export function normalizeProfileStatus(value, hasSamples) {
   const status = String(value ?? "").trim().toLowerCase();
   if (["sampling", "running", "recording", "active", "started"].includes(status)) return "sampling";
   if (["stopping", "finalizing"].includes(status)) return "stopping";
@@ -84,7 +90,7 @@ function normalizeProfileStatus(value, hasSamples) {
   return status ? status : "idle";
 }
 
-function profilePayloadRoot(data) {
+export function profilePayloadRoot(data) {
   const outer = isObjectValue(data) ? data : {};
   if (isObjectValue(outer.profile)) return outer.profile;
   if (isObjectValue(outer.cpuProfile)) return outer.cpuProfile;
@@ -94,7 +100,7 @@ function profilePayloadRoot(data) {
   return outer;
 }
 
-function normalizeProfileFrame(frame) {
+export function normalizeProfileFrame(frame) {
   if (typeof frame === "string") {
     return { label: frame, function: frame, file: "", line: null, address: "" };
   }
@@ -338,7 +344,7 @@ function normalizeProfilePayload(data, options = {}) {
   };
 }
 
-function applyProfilePayload(data, options = {}) {
+export function applyProfilePayload(data, options = {}) {
   const profile = state.performance.profile;
   const normalized = normalizeProfilePayload(data, options);
   if (normalized.supported === false && normalized.status !== "complete") {
@@ -400,14 +406,14 @@ function applyProfilePayload(data, options = {}) {
   return normalized;
 }
 
-function profileElapsedMs(profile = state.performance.profile) {
+export function profileElapsedMs(profile = state.performance.profile) {
   if (profile.status === "sampling" && profile.startedAt) {
     return Math.max(profile.elapsedMs, Date.now() - profile.startedAt);
   }
   return profile.elapsedMs;
 }
 
-function clearProfileTimers(profile = state.performance?.profile) {
+export function clearProfileTimers(profile = state.performance?.profile) {
   if (!profile) return;
   if (profile.pollTimer) clearInterval(profile.pollTimer);
   if (profile.stopTimer) clearTimeout(profile.stopTimer);
@@ -416,7 +422,7 @@ function clearProfileTimers(profile = state.performance?.profile) {
   profile.polling = false;
 }
 
-function profileStatusLabel(profile) {
+export function profileStatusLabel(profile) {
   switch (profile.status) {
     case "sampling": return "Running";
     case "starting": return "Starting";
@@ -429,7 +435,7 @@ function profileStatusLabel(profile) {
   }
 }
 
-function profileStatusTone(profile) {
+export function profileStatusTone(profile) {
   switch (profile.status) {
     case "sampling":
     case "starting": return "bad";
@@ -442,7 +448,7 @@ function profileStatusTone(profile) {
   }
 }
 
-function startProfilePolling(profile) {
+export function startProfilePolling(profile) {
   clearProfileTimers(profile);
   if (profile.status !== "sampling" || !state.targetId) return;
   profile.polling = true;
@@ -456,7 +462,7 @@ function startProfilePolling(profile) {
   }
 }
 
-async function ensureProfile() {
+export async function ensureProfile() {
   const perf = state.performance;
   const profile = perf.profile;
   if (!state.token || perf.snapshot || !state.targetId) return;
@@ -470,7 +476,7 @@ async function ensureProfile() {
   await loadProfile({ quiet: true });
 }
 
-async function loadProfile(options = {}) {
+export async function loadProfile(options = {}) {
   const perf = state.performance;
   const profile = perf.profile;
   const targetId = state.targetId;

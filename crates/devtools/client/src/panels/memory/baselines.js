@@ -6,6 +6,16 @@
  * Cumulative sampled counters from different sessions or rates are not
  * heap growth and are labelled as such instead of being converted.
  */
+import { el, fmtBytes, icon, slug } from "../../core/format.js";
+import { $, ALLOCATION_DEFAULT_RATE, ALLOCATION_RATE_LIMIT, ALLOCATION_SESSION_NONCE, ALLOCATION_SNAPSHOT_FRAME_KEYS, ALLOCATION_SNAPSHOT_KEYS, ALLOCATION_SNAPSHOT_REPORT_KEYS, ALLOCATION_SNAPSHOT_SCHEMA, ALLOCATION_SNAPSHOT_SITE_KEYS, ALLOCATION_SNAPSHOT_STATUSES, ALLOCATION_SNAPSHOT_VERSION, MAX_ALLOCATION_SITES, MAX_ALLOCATION_SITE_FRAMES, MAX_ALLOCATION_SNAPSHOT_BYTES, state } from "../../core/globals.js";
+import { targetById, toast } from "../../core/session.js";
+import { errorInline } from "../../core/ui-helpers.js";
+import { allocationSiteState, allocationSiteTopFrame, allocationSiteTruncationNotices, renderAllocationSiteStack } from "./sampling.js";
+import { allocationSiteRateValue, allocationSiteStackIdentity, formatWallTime } from "./snapshot.js";
+import { renderAllocationSitesView } from "./view.js";
+import { formatCount, isObjectValue } from "../performance/profile/model.js";
+import { downloadJson } from "../performance/snapshots.js";
+
 
 function allocationSnapshotRequireKeys(value, keys, label) {
   if (!isObjectValue(value)) throw new Error(`${label} is not an object`);
@@ -489,7 +499,7 @@ function allocationBaselineFullTime(milliseconds) {
   }
 }
 
-function renderAllocationBaseline(allocation, report) {
+export function renderAllocationBaseline(allocation, report) {
   const baseline = allocation.baseline;
   const block = el("section", {
     class: "memory-baseline",

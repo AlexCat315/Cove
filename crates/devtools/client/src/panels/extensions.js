@@ -6,15 +6,22 @@
  * enable or disable each for the session, and opens one in a sandboxed frame.
  * This is the Cove equivalent of Flutter's DevTools extension framework.
  */
+import { clear, el, textOf } from "../core/format.js";
+import { dom, state } from "../core/globals.js";
+import { errorMessage, isDisconnectedError, rpc, targetById, toast, unwrapData } from "../core/session.js";
+import { emptyInline, errorInline, kvList, sectionBlock, showState } from "../core/ui-helpers.js";
+import { loadRegisteredState } from "./state.js";
+import { refreshCurrent } from "../shell/views.js";
 
-function emptyExtensions() {
+
+export function emptyExtensions() {
   return {
     list: [], loaded: false, loading: false, error: null, request: 0,
     openedId: null,
   };
 }
 
-function ensureExtensions() {
+export function ensureExtensions() {
   if (!state.token || !state.targetId || !state.caps.extensions) {
     renderExtensions();
     return;
@@ -23,7 +30,7 @@ function ensureExtensions() {
   else renderExtensions();
 }
 
-async function loadExtensions(options = {}) {
+export async function loadExtensions(options = {}) {
   const extensions = state.extensions;
   if (!state.token || !state.targetId || !state.caps.extensions) {
     renderExtensions();
@@ -94,7 +101,7 @@ function setExtensionsChrome() {
   }
 }
 
-function renderExtensions() {
+export function renderExtensions() {
   const host = dom.extensionsContent;
   clear(host);
   setExtensionsChrome();
@@ -198,7 +205,7 @@ function renderExtensionFrame(extension) {
   );
 }
 
-function resetExtensions() {
+export function resetExtensions() {
   const request = state.extensions.request + 1;
   state.extensions = emptyExtensions();
   state.extensions.request = request;
@@ -263,7 +270,7 @@ function renderRegisteredStateRow(descriptor) {
   );
 }
 
-function renderRegisteredState() {
+export function renderRegisteredState() {
   const host = dom.stateContent;
   clear(host);
   setRegisteredStateChrome();

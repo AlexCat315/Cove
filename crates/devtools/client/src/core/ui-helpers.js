@@ -1,4 +1,20 @@
-function resetTargetData(previousTarget = state.targetId) {
+import { resetBaselines, resetDebugPaintState, resetOversizedImages, resetRepaintHighlight, resetSlowAnimations } from "./debug-paint.js";
+import { clear, el, icon, textOf } from "./format.js";
+import { dom, state } from "./globals.js";
+import { releaseCapture } from "../inspector/capture.js";
+import { resetFlexEditorState } from "../inspector/editors.js";
+import { ensureAppSize, resetAppSize } from "../panels/app-size/diff.js";
+import { ensureDebugger } from "../panels/debugger/session.js";
+import { resetDebugger } from "../panels/debugger/view.js";
+import { ensureDeepLinks } from "../panels/deep-links/view.js";
+import { ensureExtensions, resetExtensions } from "../panels/extensions.js";
+import { ensureLogs, resetLogs } from "../panels/logs.js";
+import { ensureMemory, resetMemory } from "../panels/memory/view.js";
+import { ensureNetwork, resetNetwork, stopAllFollowTimers } from "../panels/network.js";
+import { ensurePerformance, resetPerformance } from "../panels/performance/overview.js";
+import { ensureRegisteredState, resetRegisteredState } from "../panels/state.js";
+
+export function resetTargetData(previousTarget = state.targetId) {
   state.tree = null;
   state.entries = new Map();
   state.rootId = null;
@@ -54,7 +70,7 @@ function resetTargetData(previousTarget = state.targetId) {
   if (dom.networkDialog.open) dom.networkDialog.close();
 }
 
-function ensureCurrentView() {
+export function ensureCurrentView() {
   if (state.view === "network") ensureNetwork();
   else if (state.view === "logs") ensureLogs();
   else if (state.view === "state") ensureRegisteredState();
@@ -66,7 +82,7 @@ function ensureCurrentView() {
   else if (state.view === "debugger") ensureDebugger();
 }
 
-function showState(host, options = {}) {
+export function showState(host, options = {}) {
   clear(host);
   host.hidden = false;
   const kind = options.kind || "empty";
@@ -90,16 +106,16 @@ function showState(host, options = {}) {
   return host;
 }
 
-function hideState(host) {
+export function hideState(host) {
   clear(host);
   host.hidden = true;
 }
 
-function sectionBlock(title, ...children) {
+export function sectionBlock(title, ...children) {
   return el("div", { class: "section" }, el("h3", { text: title }), ...children);
 }
 
-function kvList(pairs) {
+export function kvList(pairs) {
   const dl = el("dl", { class: "kv" });
   for (const [label, value] of pairs) {
     if (value === undefined) continue;
@@ -108,21 +124,21 @@ function kvList(pairs) {
   return dl;
 }
 
-function emptyInline(message) {
+export function emptyInline(message) {
   return el("div", { class: "empty-inline", text: message });
 }
 
-function errorInline(message) {
+export function errorInline(message) {
   return el("div", { class: "error-inline", text: message });
 }
 
-function metric(label, value, suffix = "") {
+export function metric(label, value, suffix = "") {
   return el("div", { class: "metric" },
     el("span", { class: "metric-label", text: label }),
     el("span", { class: "metric-value" }, String(value), suffix ? el("small", { text: ` ${suffix}` }) : null));
 }
 
-function rawDetails(label, value) {
+export function rawDetails(label, value) {
   return el("details", { class: "raw" },
     el("summary", { text: label }),
     el("pre", { text: JSON.stringify(value, null, 2) }));

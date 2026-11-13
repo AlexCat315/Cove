@@ -317,14 +317,15 @@ async function runScenario(mode, body) {
   try {
     chrome = await startChrome(profile, server.url);
     cdp = await connect(chrome.wsUrl);
-    await waitFor(cdp, "the Inspector to connect", `document.getElementById("extensions-content") !== null`);
+    await waitFor(cdp, "the Inspector to boot", `document.getElementById("connection-text")?.textContent.trim() !== "Disconnected"`);
+    await waitFor(cdp, "the Extensions view to exist", `document.getElementById("extensions-content") !== null`);
     await body({ cdp, fake: server.fake });
     assert.deepEqual(cdp.exceptions, [], "no uncaught page exceptions");
   } finally {
     cdp?.socket.close();
     if (chrome) await chrome.close();
     await server.close();
-    await rm(profile, { recursive: true, force: true });
+    await rm(profile, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
   }
 }
 

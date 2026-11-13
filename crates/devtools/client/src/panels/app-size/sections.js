@@ -7,7 +7,11 @@
  * an AOT attribution. Bytes that no returned segment or section accounts for
  * stay in an explicit bucket instead of being distributed.
  */
-
+import { el, fmtBytes, icon } from "../../core/format.js";
+import { $, MAX_APP_SIZE_GROUPS, MAX_APP_SIZE_SECTIONS, MAX_APP_SIZE_SEGMENTS, MAX_APP_SIZE_SYMBOLS, state } from "../../core/globals.js";
+import { formatCount, isObjectValue } from "../performance/profile/model.js";
+import { APP_SIZE_TREEMAP_TONES, dom } from "../../core/globals.js";
+import { appSizeAddress, appSizeAliasCount, appSizeFirstNumber, appSizeFirstText, appSizeSymbolGroupName, appSizeTruncationNotice } from "./model.js";
 function appSizeSegmentEntry(entry) {
   if (!isObjectValue(entry)) return null;
   const name = appSizeFirstText(entry.name, entry.segment, entry.segmentName, entry.segment_name, entry.id);
@@ -52,12 +56,12 @@ function appSizeSegmentEntry(entry) {
   };
 }
 
-function appSizeListCoverage(shown, returned, total, truncated) {
+export function appSizeListCoverage(shown, returned, total, truncated) {
   const complete = truncated !== true && (total === null ? shown >= returned : shown >= total);
   return { shown, returned, total, truncated: truncated === true, complete };
 }
 
-function appSizeCoverageLabel(info) {
+export function appSizeCoverageLabel(info) {
   if (!info) return "Not reported";
   if (info.total !== null) return `${formatCount(info.shown)} of ${formatCount(info.total)}`;
   return `${formatCount(info.shown)} of ${formatCount(info.returned)} returned`;
@@ -106,7 +110,7 @@ function appSizeGroupSymbols(symbols) {
     || (left.name < right.name ? -1 : left.name > right.name ? 1 : 0));
 }
 
-function appSizeBuildContainment({
+export function appSizeBuildContainment({
   root,
   sections,
   symbols,
@@ -404,7 +408,7 @@ function appSizeBuildContainment({
   };
 }
 
-function appSizePanel(title, meta, ...children) {
+export function appSizePanel(title, meta, ...children) {
   return el("div", { class: "panel-block" },
     el("div", { class: "panel-block-head" },
       el("h2", { text: title }),
@@ -414,7 +418,7 @@ function appSizePanel(title, meta, ...children) {
   );
 }
 
-function appSizeTable(headers, rows) {
+export function appSizeTable(headers, rows) {
   return el("div", { class: "table-wrap" }, el("table", { class: "data-table" },
     el("thead", {}, el("tr", {}, ...headers.map(header => el("th", { class: header.num ? "num" : "", text: header.label })))),
     el("tbody", {}, ...rows),
@@ -425,7 +429,7 @@ function appSizeEmptyBody(message) {
   return el("div", { class: "panel-block-body" }, el("p", { class: "app-size-note", text: message }));
 }
 
-function renderAppSizeSections(executable) {
+export function renderAppSizeSections(executable) {
   const info = executable.truncation.sections;
   const shown = executable.sections.slice(0, MAX_APP_SIZE_SECTIONS);
   const block = appSizePanel("Sections", `${formatCount(executable.sections.length)} reported`);
@@ -459,7 +463,7 @@ function renderAppSizeSections(executable) {
   return block;
 }
 
-function renderAppSizeSymbols(executable) {
+export function renderAppSizeSymbols(executable) {
   const info = executable.truncation.symbols;
   const shown = executable.symbols.slice(0, MAX_APP_SIZE_SYMBOLS);
   const showCrate = shown.some(symbol => symbol.crateName);
@@ -485,7 +489,7 @@ function renderAppSizeSymbols(executable) {
   return block;
 }
 
-function renderAppSizeGroups(executable) {
+export function renderAppSizeGroups(executable) {
   const info = executable.truncation.groups;
   const shown = executable.groups.slice(0, MAX_APP_SIZE_GROUPS);
   const showSymbols = shown.some(group => group.symbolCount !== null);
@@ -520,7 +524,7 @@ function appSizeStat(label, value, detail) {
     el("div", { class: "stat-value" }, value, detail ? el("small", { text: ` ${detail}` }) : null));
 }
 
-function renderAppSizeStats(executable) {
+export function renderAppSizeStats(executable) {
   const total = executable.totalBytes;
   const countDetail = (info, count) => (info.total !== null && info.total > count ? `of ${formatCount(info.total)}` : null);
   return el("div", { class: "stat-row" },
@@ -531,7 +535,7 @@ function renderAppSizeStats(executable) {
   );
 }
 
-function appSizeSource(executable, target) {
+export function appSizeSource(executable, target) {
   const pid = executable.pid ?? appSizeFirstNumber(target?.pid, target?.processId, target?.process_id);
   const meta = [
     pid === null || pid === undefined ? "" : `PID ${pid}`,
@@ -551,7 +555,7 @@ function appSizeSource(executable, target) {
   );
 }
 
-function appSizeScope(executable, target) {
+export function appSizeScope(executable, target) {
   const pid = executable.pid ?? appSizeFirstNumber(target?.pid, target?.processId, target?.process_id);
   const path = executable.path ? ` (${executable.path})` : "";
   const label = executable.label || "Running native executable, not Flutter/Dart AOT.";
@@ -577,7 +581,7 @@ function appSizeCssEscape(value) {
   return text.replace(/["\\]/g, "\\$&");
 }
 
-function appSizeTreemapTone(name) {
+export function appSizeTreemapTone(name) {
   let hash = 2166136261;
   const text = String(name);
   for (let index = 0; index < text.length; index += 1) {
@@ -603,7 +607,7 @@ function appSizeWorstRatio(areas, side, area) {
 // Squarified layout over a fixed grid. Sorting by bytes, then name, keeps the
 // output identical for identical payloads; positions are converted to
 // percentages so the rendered treemap stays responsive.
-function appSizeSquarify(entries, width, height) {
+export function appSizeSquarify(entries, width, height) {
   const total = entries.reduce((sum, entry) => sum + entry.value, 0);
   if (!(total > 0) || !(width > 0) || !(height > 0)) return [];
   const scale = (width * height) / total;
@@ -663,7 +667,7 @@ function appSizeSquarify(entries, width, height) {
   }).filter(rect => rect.w > 0 && rect.h > 0);
 }
 
-function appSizeTreemapSource(executable) {
+export function appSizeTreemapSource(executable) {
   const mode = state.appSize.treemapMode === "sections" ? "sections" : "groups";
   const all = mode === "sections" ? executable.sections : executable.groups;
   const limit = mode === "sections" ? MAX_APP_SIZE_SECTIONS : MAX_APP_SIZE_GROUPS;
@@ -686,7 +690,7 @@ function appSizeTreemapSource(executable) {
   };
 }
 
-function appSizeTreemapTruncation(source) {
+export function appSizeTreemapTruncation(source) {
   const info = source.info;
   if (!info) return "";
   const shown = source.shown.length;
@@ -702,7 +706,7 @@ function appSizeTreemapTruncation(source) {
   return parts.join(" ");
 }
 
-function appSizeTreemapCellTitle(source, item) {
+export function appSizeTreemapCellTitle(source, item) {
   const percent = source.sum > 0 ? (item.value / source.sum) * 100 : 0;
   const parts = [item.name, fmtBytes(item.value), `${percent.toFixed(2)}% of shown ${source.label} bytes`];
   const symbols = item.entry.symbolCount;
@@ -710,7 +714,7 @@ function appSizeTreemapCellTitle(source, item) {
   return parts.join(" · ");
 }
 
-function appSizeFocusTreemapRow(mode, name) {
+export function appSizeFocusTreemapRow(mode, name) {
   const current = state.appSize.treemapFocus;
   const next = current && current.mode === mode && current.name === name ? null : { mode, name };
   state.appSize.treemapFocus = next;

@@ -1,3 +1,17 @@
+import { renderBaselinesUi, renderGuidelinesUi, renderOversizedImagesUi, renderRepaintHighlightUi, renderSlowAnimationsUi, resetBaselines, resetDebugPaintState, resetOversizedImages, resetRepaintHighlight, resetSlowAnimations } from "./debug-paint.js";
+import { clear, el } from "./format.js";
+import { $, ALLOCATION_SITE_CAPABILITIES, FRAME_ANALYSIS_CAPABILITIES, PROFILE_CAPABILITIES, RpcError, THEME_KEY, TOKEN_KEY, dom, emptyCaps, nextRpcSequence, state } from "./globals.js";
+import { ensureCurrentView, resetTargetData } from "./ui-helpers.js";
+import { renderScreenshot, updateModeUi } from "../inspector/capture.js";
+import { renderInputUi } from "../inspector/input.js";
+import { loadTree, renderDetails, renderTreeArea } from "../inspector/tree.js";
+import { ensureDeepLinks } from "../panels/deep-links/view.js";
+import { renderLogs } from "../panels/logs.js";
+import { abandonAllocationSites, ensureAllocationSites } from "../panels/memory/sampling.js";
+import { renderMemory } from "../panels/memory/view.js";
+import { renderNetwork, syncFollowTimers } from "../panels/network.js";
+import { refreshCurrent } from "../shell/views.js";
+
 function setConnection(kind, label) {
   const wasOnline = state.connected;
   dom.connection.classList.remove("is-online", "is-offline", "is-busy");
@@ -29,7 +43,7 @@ function setConnectionBusy(busy) {
   }
 }
 
-function toast(message, kind = "info", duration = 6000) {
+export function toast(message, kind = "info", duration = 6000) {
   clearTimeout(state.toastTimer);
   const text = String(message ?? "");
   if (!text) return;
@@ -41,34 +55,34 @@ function toast(message, kind = "info", duration = 6000) {
   state.toastTimer = setTimeout(() => { dom.toast.hidden = true; }, duration);
 }
 
-function isDisconnectedError(error) {
+export function isDisconnectedError(error) {
   return error?.code === "target_gone" || error?.code === "target_required";
 }
 
-function retryTree() {
+export function retryTree() {
   if (isDisconnectedError(state.treeError)) refreshCurrent();
   else loadTree({ preserveExpansion: true });
 }
 
-function errorMessage(error) {
+export function errorMessage(error) {
   if (error instanceof RpcError) {
     return error.code && error.code !== "error" ? `${error.message} (${error.code})` : error.message;
   }
   return error?.message ? String(error.message) : String(error);
 }
 
-function authHeaders() {
+export function authHeaders() {
   return { Authorization: `Bearer ${state.token}` };
 }
 
-async function rpc(method, params = {}, options = {}) {
+export async function rpc(method, params = {}, options = {}) {
   if (!state.token) throw new RpcError("The controller token is missing.", "unauthorized");
   let response;
   try {
     response = await fetch("/rpc", {
       method: "POST",
       headers: { ...authHeaders(), "Content-Type": "application/json" },
-      body: JSON.stringify({ jsonrpc: "2.0", id: ++rpcSequence, method, params }),
+      body: JSON.stringify({ jsonrpc: "2.0", id: nextRpcSequence(), method, params }),
       signal: options.signal,
     });
   } catch (error) {
@@ -100,7 +114,7 @@ async function rpc(method, params = {}, options = {}) {
   return reply.result;
 }
 
-function unwrapData(result) {
+export function unwrapData(result) {
   if (result && result.ok === false) {
     throw new RpcError(result.error?.message || "The runtime reported an error.", result.error?.code || "runtime_error");
   }
@@ -108,7 +122,7 @@ function unwrapData(result) {
   return result;
 }
 
-function targetById(id = state.targetId) {
+export function targetById(id = state.targetId) {
   return state.targets.find(target => target.id === id) || null;
 }
 
@@ -156,7 +170,7 @@ function defaultTargetId() {
   return state.targets[0]?.id || "";
 }
 
-function readToken() {
+export function readToken() {
   const hash = location.hash.replace(/^#/, "");
   if (hash) {
     let token = hash;
@@ -175,12 +189,12 @@ function readToken() {
   }
 }
 
-function storeToken(token) {
+export function storeToken(token) {
   state.token = token;
   try { sessionStorage.setItem(TOKEN_KEY, token); } catch {}
 }
 
-function showSetup(error = "") {
+export function showSetup(error = "") {
   if (state.token) {
     state.token = "";
     try { sessionStorage.removeItem(TOKEN_KEY); } catch {}
@@ -196,19 +210,19 @@ function showSetup(error = "") {
   setConnection("offline", "Disconnected");
 }
 
-function showWorkspace() {
+export function showWorkspace() {
   dom.setup.hidden = true;
   dom.inspectorContent.hidden = false;
   dom.targets.disabled = state.targets.length === 0;
 }
 
-function setThemePreference(preference) {
+export function setThemePreference(preference) {
   state.theme = ["auto", "light", "dark"].includes(preference) ? preference : "auto";
   try { localStorage.setItem(THEME_KEY, state.theme); } catch {}
   applyTheme();
 }
 
-function applyTheme() {
+export function applyTheme() {
   const resolved = state.theme === "auto"
     ? (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light")
     : state.theme;
@@ -248,7 +262,7 @@ function renderTargets() {
   dom.targets.disabled = false;
 }
 
-async function refreshSession(options = {}) {
+export async function refreshSession(options = {}) {
   const quiet = options.quiet === true;
   if (!state.token) {
     showSetup();
@@ -298,7 +312,7 @@ async function refreshSession(options = {}) {
   }
 }
 
-async function chooseTarget(id) {
+export async function chooseTarget(id) {
   if (!id || id === state.targetId) return;
   await activateTarget(id, { reset: true });
 }
@@ -322,7 +336,7 @@ async function activateTarget(id, options = {}) {
   syncFollowTimers();
 }
 
-function updateTargetUi() {
+export function updateTargetUi() {
   const target = targetById();
   state.caps = readTargetCaps(target);
   if ((state.repaintHighlight.active || state.repaintHighlight.busy) && !state.caps.repaintHighlight) resetRepaintHighlight(target?.id || "");

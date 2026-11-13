@@ -55,10 +55,10 @@ DevTools 的画面范围为 Cove 渲染内容。系统标题栏、原生文件�
 
 - `client/markup/`：`head.html`、`shell.html`（页头、rail、`<main>` 起始）、`views/`（每个面板一段 `<section>`）、`dialogs.html`、`tail.html`，按序拼成 `/index.html`。
 - `client/css/`：`base.css`，`shell/`（页头、布局、setup、modal、toast、滚动条、响应式），`inspector/`（toolbar、grid、states、details、screenshot、detail tabs、flex explorer、input drawer），`panels/` 与 `panels/performance/` 对应各面板样式，按序拼成 `/inspector.css`。
-- `client/src/`：`core/` 放全局引用与共享状态（`globals.js`、`format.js`、`session.js`、`ui-helpers.js`、`debug-paint.js`），`inspector/` 放节点树（`tree.js`）、详情编辑器（`editors.js`）、画面捕获与输入，`shell/` 放视图切换、事件绑定与启动。多文件面板各自成目录：`panels/memory/`（快照、采样、基线、视图）、`panels/debugger/`（模型、会话、视图）、`panels/app-size/`（模型、分区、treemap、diff）、`panels/deep-links/`（模型、视图）、`panels/performance/profile/`（模型、控制、树视图、面板视图）；单文件面板（`network`、`logs`、`state`、`extensions`、`overview`、`frames`、`timeline`、`snapshots`）留在 `panels/` 或 `panels/performance/`。按序拼成 `/inspector.js`。
+- `client/src/`：`core/` 放全局引用与共享状态（`globals.js`、`format.js`、`session.js`、`ui-helpers.js`、`debug-paint.js`），`inspector/` 放节点树（`tree.js`）、详情编辑器（`editors.js`）、画面捕获与输入，`shell/` 放视图切换、事件绑定与启动。多文件面板各自成目录：`panels/memory/`（快照、采样、基线、视图）、`panels/debugger/`（模型、会话、视图）、`panels/app-size/`（模型、分区、treemap、diff）、`panels/deep-links/`（模型、视图）、`panels/performance/profile/`（模型、控制、树视图、面板视图）；单文件面板（`network`、`logs`、`state`、`extensions`、`overview`、`frames`、`timeline`、`snapshots`）留在 `panels/` 或 `panels/performance/`。每个文件都是独立 ES module，按 `manifest.json` 的 `modules.parts` 顺序加载。
 - `client/tests/`：harness 与共享静态服务。
 
-三个 bundle 都由服务端把分片**字节拼接**成单份资源：JS 分片共享同一顶层作用域，不是独立 ES module，`import`/`export` 不会跨分片生效；HTML 与 CSS 拼接后仍是同一份文档与样式表。因此新增、拆分或改名分片只需改 `manifest.json`；生产端表由 `crates/devtools-cli/build.rs` 从 manifest 生成，漏登记的同类文件会让构建直接失败，不依赖任何手写列表。`client/tests/harness-server.mjs` 以同一种方式拼接并提供静态文件，各 harness 只保留自己的 fake `/rpc` 控制器与场景。
+`/index.html` 与 `/inspector.css` 仍由服务端把分片**字节拼接**成单份文档与样式表；`/inspector.js` 不再拼接，它是一条由 manifest 生成的入口模块，逐条 `import` 各分片，分片本身按 `/src/<路径>` 提供，浏览器按真实的模块图加载。跨文件符号必须显式 `import`/`export`：新增一个函数只在属主文件加 `export`，再在使用处 `import`；import 绑定是只读的，需要改值（如请求序号）由属主模块导出推进函数（`nextRpcSequence`）而不是让调用方自增。新增、拆分或改名模块只需改 `manifest.json`；生产端两张表由 `crates/devtools-cli/build.rs` 从 manifest 生成，漏登记的同类文件会让构建直接失败，不依赖任何手写列表。`client/tests/harness-server.mjs` 以同样方式派生入口并按 `/src/` 提供模块，各 harness 只保留自己的 fake `/rpc` 控制器与场景。
 
 ## 调试器
 

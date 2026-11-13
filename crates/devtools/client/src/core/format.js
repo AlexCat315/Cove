@@ -1,4 +1,6 @@
-function el(tag, options = {}, ...children) {
+import { $ } from "./globals.js";
+
+export function el(tag, options = {}, ...children) {
   const node = document.createElement(tag);
   if (options.class) node.className = options.class;
   if (options.text !== undefined && options.text !== null) node.textContent = String(options.text);
@@ -24,7 +26,7 @@ function el(tag, options = {}, ...children) {
   return node;
 }
 
-function appendChildren(node, children) {
+export function appendChildren(node, children) {
   for (const child of children.flat(Infinity)) {
     if (child === undefined || child === null || child === false) continue;
     node.append(child instanceof Node ? child : document.createTextNode(String(child)));
@@ -35,7 +37,7 @@ function clearNode(node) {
   node.replaceChildren();
 }
 
-function icon(name, className = "icon") {
+export function icon(name, className = "icon") {
   const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
   svg.setAttribute("class", className);
   svg.setAttribute("aria-hidden", "true");
@@ -45,30 +47,30 @@ function icon(name, className = "icon") {
   return svg;
 }
 
-function clear(element) {
+export function clear(element) {
   element.replaceChildren();
 }
 
-function textOf(value, fallback = "—") {
+export function textOf(value, fallback = "—") {
   if (value === undefined || value === null || value === "") return fallback;
   return String(value);
 }
 
-function numberValue(value) {
+export function numberValue(value) {
   return typeof value === "number" && Number.isFinite(value) ? value : null;
 }
 
-function fmtNumber(value, digits = 1) {
+export function fmtNumber(value, digits = 1) {
   const number = numberValue(value);
   return number === null ? "—" : number.toFixed(digits);
 }
 
-function fmtMs(value, digits = 2) {
+export function fmtMs(value, digits = 2) {
   const number = numberValue(value);
   return number === null ? "—" : `${number.toFixed(digits)} ms`;
 }
 
-function fmtBytes(value) {
+export function fmtBytes(value) {
   const number = numberValue(value);
   if (number === null) return "—";
   if (number < 1024) return `${number} B`;
@@ -77,7 +79,7 @@ function fmtBytes(value) {
   return `${(number / (1024 * 1024 * 1024)).toFixed(2)} GB`;
 }
 
-function fmtClock(seconds) {
+export function fmtClock(seconds) {
   const number = numberValue(seconds);
   if (number === null) return "—";
   const date = new Date(number * 1000);
@@ -89,14 +91,14 @@ function fmtClock(seconds) {
   }
 }
 
-function fmtDate(seconds) {
+export function fmtDate(seconds) {
   const number = numberValue(seconds);
   if (number === null) return "—";
   const date = new Date(number * 1000);
   return Number.isNaN(date.getTime()) ? "—" : date.toLocaleString();
 }
 
-function fmtEpochMs(milliseconds) {
+export function fmtEpochMs(milliseconds) {
   const number = numberValue(milliseconds);
   if (number === null) return "—";
   const date = new Date(number);
@@ -108,17 +110,17 @@ function fmtEpochMs(milliseconds) {
   }
 }
 
-function shortId(id) {
+export function shortId(id) {
   const value = String(id ?? "");
   return value.length > 12 ? `${value.slice(0, 4)}…${value.slice(-5)}` : value;
 }
 
-function basename(path) {
+export function basename(path) {
   const value = String(path ?? "");
   return value.split(/[\\/]/).pop() || value;
 }
 
-function slug(value) {
+export function slug(value) {
   return String(value ?? "capture").trim().replace(/[^A-Za-z0-9._-]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 64) || "capture";
 }
 

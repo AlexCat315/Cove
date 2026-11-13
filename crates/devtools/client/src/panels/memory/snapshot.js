@@ -1,6 +1,11 @@
 /* Memory */
+import { numberValue } from "../../core/format.js";
+import { $, ALLOCATION_RATE_LIMIT, MAX_ALLOCATION_SITE_FRAMES, MEMORY_SAMPLE_LIMIT, state } from "../../core/globals.js";
+import { booleanOf } from "../network.js";
+import { firstNumberValue, firstStringValue, formatCount, isObjectValue } from "../performance/profile/model.js";
 
-const MEMORY_BYTE_LABELS = {
+
+export const MEMORY_BYTE_LABELS = {
   shapingBytes: ["Shaping cache", "Estimated bytes held by the text shaping cache."],
   layoutBytes: ["Text layout cache", "Estimated bytes held by the text layout cache."],
   imageBytes: ["Image cache", "Bytes held by decoded image assets."],
@@ -11,12 +16,12 @@ const MEMORY_BYTE_LABELS = {
   processVirtualBytes: ["Process virtual", "Virtual address space reserved by the host process, read from the operating system."],
 };
 
-const MEMORY_PROCESS_COUNTERS = [
+export const MEMORY_PROCESS_COUNTERS = [
   ["processResidentBytes", "Process RSS"],
   ["processVirtualBytes", "Process virtual"],
 ];
 
-const MEMORY_ENTRY_LABELS = {
+export const MEMORY_ENTRY_LABELS = {
   shapingEntries: "Shaping entries",
   layoutEntries: "Text layout entries",
   imageEntries: "Image assets",
@@ -27,7 +32,7 @@ const MEMORY_ENTRY_LABELS = {
   msaaMemoryless: "Memoryless MSAA",
 };
 
-const MEMORY_ALLOCATION_ROWS = [
+export const MEMORY_ALLOCATION_ROWS = [
   {
     label: "Current",
     description: "Bytes held by the host's tracking allocator and not yet freed.",
@@ -146,7 +151,7 @@ function memorySizeClasses(root, counters, consumed) {
   return memorySizeClassCounters(counters, consumed);
 }
 
-function memorySizeClassLabel(label) {
+export function memorySizeClassLabel(label) {
   const text = String(label).trim();
   const number = Number(text);
   if (text !== "" && Number.isFinite(number)) return `${formatCount(number)} B`;
@@ -158,7 +163,7 @@ function memorySizeClassLabel(label) {
   return text;
 }
 
-function memorySizeClassSortValue(label) {
+export function memorySizeClassSortValue(label) {
   const text = String(label).trim().toLowerCase();
   const number = Number(text);
   if (text !== "" && Number.isFinite(number)) return number;
@@ -190,7 +195,7 @@ function readMemoryCounterMap(source) {
   return counters;
 }
 
-function normalizeMemorySnapshot(data) {
+export function normalizeMemorySnapshot(data) {
   const root = isObjectValue(data) && isObjectValue(data.data) ? data.data : data;
   if (!isObjectValue(root)) return null;
   const counters = readMemoryCounterMap(root.counters);
@@ -245,7 +250,7 @@ function readMemoryPressure(value) {
   return { subscribed: subscribed === true, low: low === true };
 }
 
-function recordMemorySample(data) {
+export function recordMemorySample(data) {
   const snapshot = normalizeMemorySnapshot(data);
   if (!snapshot) return;
   const memory = state.memory;
@@ -264,11 +269,11 @@ function recordMemorySample(data) {
   }
 }
 
-function memoryCounterValue(counters, name) {
+export function memoryCounterValue(counters, name) {
   return numberValue(counters[name]);
 }
 
-function sumMemoryCounters(counters, names) {
+export function sumMemoryCounters(counters, names) {
   let total = null;
   for (const name of names) {
     const value = numberValue(counters[name]);
@@ -277,7 +282,7 @@ function sumMemoryCounters(counters, names) {
   return total;
 }
 
-function memoryWindowTotals(windows, name) {
+export function memoryWindowTotals(windows, name) {
   let total = null;
   for (const counters of windows.values()) {
     const value = numberValue(counters[name]);
@@ -286,7 +291,7 @@ function memoryWindowTotals(windows, name) {
   return total;
 }
 
-function formatWallTime(milliseconds) {
+export function formatWallTime(milliseconds) {
   const number = numberValue(milliseconds);
   if (number === null) return "—";
   const date = new Date(number);
@@ -298,7 +303,7 @@ function formatWallTime(milliseconds) {
   }
 }
 
-function allocationSiteErrorKind(error) {
+export function allocationSiteErrorKind(error) {
   if (!error) return "error";
   const code = String(error.code || "").toLowerCase();
   const message = String(error.message || "");
@@ -308,7 +313,7 @@ function allocationSiteErrorKind(error) {
   return "error";
 }
 
-function allocationSiteRateValue(value) {
+export function allocationSiteRateValue(value) {
   const number = numberValue(value);
   if (number === null || !Number.isInteger(number) || number < 1 || number > ALLOCATION_RATE_LIMIT) return null;
   return number;
@@ -413,7 +418,7 @@ function normalizeAllocationSiteFrame(frame) {
   return { label, function: functionName, file, line, address, module };
 }
 
-function allocationSiteStackIdentity(frames) {
+export function allocationSiteStackIdentity(frames) {
   return frames
     .map(frame => `${frame.address}\u0000${frame.function}\u0000${frame.file}\u0000${frame.line ?? ""}`)
     .join("\u0001");
@@ -465,7 +470,7 @@ function normalizeAllocationSite(site, index) {
   return { key, stackKey, frames, framesOmitted, framesTruncated, bytes, blocks, raw: site };
 }
 
-function normalizeAllocationSitePayload(data) {
+export function normalizeAllocationSitePayload(data) {
   const empty = {
     status: "",
     rawStatus: "",
@@ -709,7 +714,7 @@ function normalizeAllocationSitePayload(data) {
   };
 }
 
-function allocationSitePayloadRate(payload, fallback) {
+export function allocationSitePayloadRate(payload, fallback) {
   return Number.isInteger(payload.rate) && payload.rate > 0 ? payload.rate : fallback;
 }
 

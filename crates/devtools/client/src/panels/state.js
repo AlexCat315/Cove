@@ -4,8 +4,14 @@
  * are read for explicitly watched ids, so private state is never requested. An
  * unmounted id is reported as missing rather than dropped silently.
  */
+import { numberValue } from "../core/format.js";
+import { RpcError, dom, state } from "../core/globals.js";
+import { errorMessage, rpc, toast, unwrapData } from "../core/session.js";
+import { renderRegisteredState } from "./extensions.js";
+import { stopTimer } from "./network.js";
 
-function emptyRegisteredState() {
+
+export function emptyRegisteredState() {
   return {
     loaded: false, loading: false, error: null, request: 0,
     descriptors: [], total: 0, nextOffset: null, offset: 0, limit: 50,
@@ -14,7 +20,7 @@ function emptyRegisteredState() {
   };
 }
 
-async function loadRegisteredState(offset = 0, options = {}) {
+export async function loadRegisteredState(offset = 0, options = {}) {
   const registered = state.registeredState;
   if (!state.token || !state.targetId || !state.caps.state) {
     renderRegisteredState();
@@ -61,7 +67,7 @@ async function loadRegisteredState(offset = 0, options = {}) {
   }
 }
 
-function ensureRegisteredState() {
+export function ensureRegisteredState() {
   if (!state.token || !state.targetId || !state.caps.state) {
     renderRegisteredState();
     return;
@@ -73,7 +79,7 @@ function ensureRegisteredState() {
   }
 }
 
-function resetRegisteredState() {
+export function resetRegisteredState() {
   stopTimer("registeredState");
   const request = state.registeredState.request + 1;
   state.registeredState = emptyRegisteredState();

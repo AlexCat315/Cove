@@ -1,3 +1,10 @@
+import { DEBUGGER_RPC_TIMEOUT_MS, RpcError, state } from "../../core/globals.js";
+import { errorMessage, rpc, targetById, toast, unwrapData } from "../../core/session.js";
+import { applyDebuggerSnapshot, clearDebuggerSessionData, debuggerBreakpointList, debuggerBreakpointsAt, debuggerFrameList, debuggerHasData, debuggerNumber, debuggerPathKey, debuggerPathsMatch, debuggerRoot, debuggerScopeList, debuggerThreadList, debuggerUnavailableInfo, debuggerVariablesFrom, normalizeDebuggerSource, resetDebuggerVariables, selectedDebuggerFrame, sortDebuggerBreakpoints } from "./model.js";
+import { appendDebuggerConsole, debuggerScopeKey, renderDebugger, renderDebuggerBreakpoints, renderDebuggerChrome, renderDebuggerSource, renderDebuggerStack, renderDebuggerThreads, renderDebuggerVariables, updateDebuggerButtons, updateDebuggerSourceHead } from "./view.js";
+import { syncDebuggerTimer } from "../network.js";
+import { firstStringValue, isObjectValue } from "../performance/profile/model.js";
+
 function debuggerRequestParams(params = {}) {
   const body = {};
   for (const [key, value] of Object.entries(params)) {
@@ -6,7 +13,7 @@ function debuggerRequestParams(params = {}) {
   return body;
 }
 
-async function debuggerCall(method, params = {}, options = {}) {
+export async function debuggerCall(method, params = {}, options = {}) {
   const target = options.target ?? state.targetId;
   if (!target) throw new RpcError("Select a runtime target first.", "no_target");
   const timeoutMs = options.timeout ?? DEBUGGER_RPC_TIMEOUT_MS;
@@ -42,7 +49,7 @@ async function debuggerSourceCall(params, options = {}) {
   throw new RpcError(`The controller exposes no debugger source tool. Tried ${missing.join(" and ")}.`, "unknown_command");
 }
 
-async function refreshDebugger(options = {}) {
+export async function refreshDebugger(options = {}) {
   const dbg = state.debugger;
   if (!state.token) {
     renderDebugger();
@@ -102,7 +109,7 @@ async function ensureDebuggerSessionData(options = {}) {
   if (!dbg.sourceLoaded && !dbg.sourceLoading) await loadDebuggerSourceForFrame(frame, options);
 }
 
-function ensureDebugger() {
+export function ensureDebugger() {
   if (!state.token || !state.targetId || !state.caps.runtime) {
     renderDebugger();
     return;
@@ -114,7 +121,7 @@ function ensureDebugger() {
   renderDebugger();
 }
 
-async function loadDebuggerStack(threadId, options = {}) {
+export async function loadDebuggerStack(threadId, options = {}) {
   const dbg = state.debugger;
   if (!state.token || !state.targetId || !state.caps.runtime || !dbg.attached) return;
   if (dbg.stackLoading) return;
@@ -207,7 +214,7 @@ function debuggerFrameSourceMatches(frame) {
   return false;
 }
 
-async function selectDebuggerFrame(frame, index, options = {}) {
+export async function selectDebuggerFrame(frame, index, options = {}) {
   const dbg = state.debugger;
   if (!frame) return;
   const sameFrame = dbg.frameIndex === index;
@@ -246,7 +253,7 @@ async function selectDebuggerFrame(frame, index, options = {}) {
   await Promise.all(tasks);
 }
 
-async function selectDebuggerThread(thread) {
+export async function selectDebuggerThread(thread) {
   if (!thread || thread.id === null) return;
   const dbg = state.debugger;
   if (dbg.threadId === thread.id) return;
@@ -283,7 +290,7 @@ async function openDebuggerFirstScope(options = {}) {
   }
 }
 
-async function loadDebuggerScopes(frame, options = {}) {
+export async function loadDebuggerScopes(frame, options = {}) {
   const dbg = state.debugger;
   if (!state.token || !state.targetId || !state.caps.runtime || !frame || frame.id === null || !dbg.attached) return;
   const targetId = state.targetId;
@@ -322,7 +329,7 @@ async function loadDebuggerScopes(frame, options = {}) {
   }
 }
 
-async function loadDebuggerVariableChildren(key, reference, options = {}) {
+export async function loadDebuggerVariableChildren(key, reference, options = {}) {
   const dbg = state.debugger;
   if (!state.token || !state.targetId || !state.caps.runtime || reference === null || !dbg.attached) return;
   if (dbg.variableLoading.has(key)) return;
@@ -389,7 +396,7 @@ async function loadDebuggerSourceForFrame(frame, options = {}) {
   });
 }
 
-async function loadDebuggerSource(params = {}, options = {}) {
+export async function loadDebuggerSource(params = {}, options = {}) {
   const dbg = state.debugger;
   if (!state.token || !state.targetId || !state.caps.runtime || !dbg.attached) return;
   const targetId = state.targetId;
@@ -471,11 +478,11 @@ async function loadDebuggerSource(params = {}, options = {}) {
   }
 }
 
-function debuggerBreakpointKey(breakpoint) {
+export function debuggerBreakpointKey(breakpoint) {
   return `${debuggerPathKey(breakpoint.path)}:${breakpoint.line ?? ""}`;
 }
 
-function debuggerVisibleBreakpoints() {
+export function debuggerVisibleBreakpoints() {
   const dbg = state.debugger;
   const active = dbg.breakpoints.map(breakpoint => ({ ...breakpoint, enabled: true }));
   const disabled = [...dbg.disabledBreakpoints.values()].map(breakpoint => ({ ...breakpoint, enabled: false }));
@@ -555,7 +562,7 @@ async function setDebuggerBreakpoint(path, line, enabled, options = {}) {
   }
 }
 
-function toggleDebuggerBreakpointAtLine(path, line) {
+export function toggleDebuggerBreakpointAtLine(path, line) {
   const existing = debuggerBreakpointsAt(path, line);
   const active = existing.find(breakpoint => breakpoint.enabled);
   const disabled = existing.find(breakpoint => !breakpoint.enabled);
@@ -563,7 +570,7 @@ function toggleDebuggerBreakpointAtLine(path, line) {
   else setDebuggerBreakpoint(path, line, true, { condition: disabled?.condition });
 }
 
-function toggleDebuggerBreakpoint(breakpoint, enabled) {
+export function toggleDebuggerBreakpoint(breakpoint, enabled) {
   if (!breakpoint.path || breakpoint.line === null) {
     toast("The adapter returned this breakpoint without a source location.", "error", 8000);
     return;
@@ -576,7 +583,7 @@ function invalidateDebuggerStatusRequest() {
   state.debugger.statusLoading = false;
 }
 
-async function attachDebugger() {
+export async function attachDebugger() {
   const dbg = state.debugger;
   if (!debuggerCanAct(false) || dbg.attached) return;
   const targetId = state.targetId;
@@ -621,7 +628,7 @@ async function attachDebugger() {
   }
 }
 
-async function detachDebugger() {
+export async function detachDebugger() {
   const dbg = state.debugger;
   if (!debuggerCanAct(false) || dbg.busy) return;
   if (!dbg.attached && dbg.status !== "attaching") return;
@@ -649,7 +656,7 @@ async function detachDebugger() {
   }
 }
 
-async function runDebuggerControl(action, label) {
+export async function runDebuggerControl(action, label) {
   const dbg = state.debugger;
   if (!dbg.attached || dbg.busy) return;
   if (action !== "pause" && dbg.status !== "paused") return;
@@ -693,14 +700,14 @@ async function runDebuggerControl(action, label) {
   }
 }
 
-function debuggerCanAct(requireAttached) {
+export function debuggerCanAct(requireAttached) {
   if (!state.connected || !state.token || !state.targetId || !state.caps.runtime) return false;
   const dbg = state.debugger;
   if (requireAttached) return dbg.attached && !dbg.busy;
   return dbg.adapterAvailable !== false;
 }
 
-function debuggerStatusLabel(status) {
+export function debuggerStatusLabel(status) {
   return {
     idle: "Not attached",
     unknown: "Unknown",
@@ -715,7 +722,7 @@ function debuggerStatusLabel(status) {
   }[status] || "Unknown";
 }
 
-function debuggerStatusTone(status) {
+export function debuggerStatusTone(status) {
   if (status === "paused") return "paused";
   if (status === "attached" || status === "running") return "complete";
   if (status === "attaching") return "pending";

@@ -1,3 +1,10 @@
+import { el, fmtBytes, icon } from "../../core/format.js";
+import { $, ALLOCATION_POLL_MS, ALLOCATION_RATE_LIMIT, ALLOCATION_SITE_COMMANDS, MAX_ALLOCATION_SITES, MAX_ALLOCATION_SITE_FRAMES, RpcError, state } from "../../core/globals.js";
+import { errorMessage, rpc, toast, unwrapData } from "../../core/session.js";
+import { allocationSiteErrorKind, allocationSitePayloadRate, allocationSiteRateValue, formatWallTime, normalizeAllocationSitePayload } from "./snapshot.js";
+import { renderAllocationSitesView } from "./view.js";
+import { formatCount, isObjectValue } from "../performance/profile/model.js";
+
 async function allocationSiteRpc(operation, params) {
   const names = ALLOCATION_SITE_COMMANDS[operation];
   let last = null;
@@ -13,7 +20,7 @@ async function allocationSiteRpc(operation, params) {
   throw last || new RpcError("The controller does not expose allocation-site sampling.", "unknown_command");
 }
 
-function releaseAllocationSampling(targetId) {
+export function releaseAllocationSampling(targetId) {
   if (!targetId || !state.token) return Promise.resolve();
   return (async () => {
     for (const name of ALLOCATION_SITE_COMMANDS.stop) {
@@ -27,13 +34,13 @@ function releaseAllocationSampling(targetId) {
   })();
 }
 
-function stopAllocationPolling() {
+export function stopAllocationPolling() {
   const timer = state.memory?.allocation?.timer;
   if (timer) clearInterval(timer);
   if (state.memory?.allocation) state.memory.allocation.timer = null;
 }
 
-function syncAllocationPolling() {
+export function syncAllocationPolling() {
   const allocation = state.memory?.allocation;
   if (!allocation) return;
   const shouldPoll = allocation.status === "running"
@@ -78,7 +85,7 @@ function applyAllocationSiteFailure(allocation, error, options = {}) {
   stopAllocationPolling();
 }
 
-async function startAllocationSites() {
+export async function startAllocationSites() {
   const allocation = state.memory.allocation;
   const targetId = state.targetId;
   if (!state.token || !targetId || !state.caps.runtime) return;
@@ -164,7 +171,7 @@ async function startAllocationSites() {
   }
 }
 
-async function queryAllocationSites(options = {}) {
+export async function queryAllocationSites(options = {}) {
   const allocation = state.memory.allocation;
   const targetId = state.targetId;
   if (!state.token || !targetId || !state.caps.runtime) return;
@@ -265,7 +272,7 @@ async function queryAllocationSites(options = {}) {
   }
 }
 
-async function stopAllocationSites(options = {}) {
+export async function stopAllocationSites(options = {}) {
   const allocation = state.memory.allocation;
   const targetId = state.targetId;
   if (!state.token || !targetId) return;
@@ -353,7 +360,7 @@ async function stopAllocationSites(options = {}) {
   }
 }
 
-async function resetAllocationSites() {
+export async function resetAllocationSites() {
   const allocation = state.memory.allocation;
   const targetId = state.targetId;
   if (!state.token || !targetId || !state.connected) return;
@@ -415,7 +422,7 @@ async function resetAllocationSites() {
   }
 }
 
-function ensureAllocationSites() {
+export function ensureAllocationSites() {
   const allocation = state.memory.allocation;
   if (!state.token || !state.targetId || !state.caps.runtime) return;
   if (!state.caps.allocationSites) {
@@ -442,7 +449,7 @@ function ensureAllocationSites() {
   }
 }
 
-function abandonAllocationSites() {
+export function abandonAllocationSites() {
   const allocation = state.memory?.allocation;
   if (!allocation) return;
   stopAllocationPolling();
@@ -456,13 +463,13 @@ function abandonAllocationSites() {
   }
 }
 
-function allocationSiteFailureKind(allocation) {
+export function allocationSiteFailureKind(allocation) {
   if (!state.connected) return "offline";
   if (["unsupported", "unavailable", "error", "offline"].includes(allocation.status)) return allocation.status;
   return "";
 }
 
-function allocationSiteStatusLabel(allocation) {
+export function allocationSiteStatusLabel(allocation) {
   if (!state.connected) return "Disconnected";
   return {
     idle: "Idle",
@@ -477,7 +484,7 @@ function allocationSiteStatusLabel(allocation) {
   }[allocation.status] || "Idle";
 }
 
-function allocationSiteStatusClass(allocation) {
+export function allocationSiteStatusClass(allocation) {
   if (!state.connected) return "failed";
   if (allocation.status === "running" || allocation.status === "starting") return "pending";
   if (allocation.status === "stopped") return "complete";
@@ -485,7 +492,7 @@ function allocationSiteStatusClass(allocation) {
   return "cancelled";
 }
 
-function allocationSiteMeta(allocation) {
+export function allocationSiteMeta(allocation) {
   const report = allocation.report;
   const rate = report?.rate ?? allocation.rate;
   const parts = [`1-in-${formatCount(rate)}`];
@@ -510,7 +517,7 @@ function allocationSiteMeta(allocation) {
   return parts.join(" · ");
 }
 
-function allocationSiteScopeNote() {
+export function allocationSiteScopeNote() {
   return el("div", { class: "memory-scope" },
     icon("info"),
     el("span", {},
@@ -520,7 +527,7 @@ function allocationSiteScopeNote() {
   );
 }
 
-function allocationSiteState(kind, title, message, options = {}) {
+export function allocationSiteState(kind, title, message, options = {}) {
   const node = el("div", { class: `memory-site-state${kind === "error" ? " is-error" : ""}` },
     el("span", { class: "memory-site-state-icon" }, icon(options.icon || "memory")),
     el("div", { class: "memory-site-state-text" },
@@ -539,7 +546,7 @@ function allocationSiteState(kind, title, message, options = {}) {
   return node;
 }
 
-function allocationSiteRateControl(allocation, disabled) {
+export function allocationSiteRateControl(allocation, disabled) {
   const input = el("input", {
     class: "compact-input",
     attrs: {
@@ -581,14 +588,14 @@ function allocationSiteRateControl(allocation, disabled) {
   );
 }
 
-function allocationSiteMetric(label, value, format, title) {
+export function allocationSiteMetric(label, value, format, title) {
   return el("div", { class: "metric", attrs: { title } },
     el("span", { class: "metric-label", text: label }),
     el("span", { class: "metric-value", text: value === null ? "—" : format(value) }),
   );
 }
 
-function allocationSiteTopFrame(site) {
+export function allocationSiteTopFrame(site) {
   const frame = site.frames[0] || null;
   if (!frame) {
     return { name: "No stack captured", location: "", address: "" };
@@ -600,7 +607,7 @@ function allocationSiteTopFrame(site) {
   };
 }
 
-function renderAllocationSiteStack(site) {
+export function renderAllocationSiteStack(site) {
   const list = el("ol", { class: "memory-site-stack" });
   if (!site.frames.length) {
     list.append(el("li", { class: "memory-site-frame memory-site-frame-empty", text: "No stack was captured for this site." }));
@@ -636,7 +643,7 @@ function renderAllocationSiteStack(site) {
   );
 }
 
-function renderAllocationSiteTable(report, allocation) {
+export function renderAllocationSiteTable(report, allocation) {
   const ranked = [...report.sites]
     .sort((left, right) => (right.bytes ?? -1) - (left.bytes ?? -1)
       || (right.blocks ?? -1) - (left.blocks ?? -1)
@@ -701,7 +708,7 @@ function renderAllocationSiteTable(report, allocation) {
   return el("div", { class: "table-wrap memory-site-table-wrap" }, table);
 }
 
-function allocationSiteTruncationNotices(report) {
+export function allocationSiteTruncationNotices(report) {
   const notices = [];
   if (report.symbolizationReason) {
     const reason = report.symbolizationReason.trim().replace(/[.!]$/, "");

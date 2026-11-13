@@ -1,11 +1,13 @@
 // Shared static asset serving for the fake-controller harnesses.
 //
-// client/manifest.json is the single source of truth for the served bundles:
-// /index.html, /inspector.css and /inspector.js are each the byte-for-byte
-// concatenation of their ordered parts. The production controller embeds those
-// same parts at compile time (crates/devtools-cli/build.rs); this helper
-// concatenates them the same way, and serves any other client file from disk by
-// path. Each harness only supplies its own fake /rpc controller and scenarios.
+// client/manifest.json is the single source of truth for the served assets:
+// /index.html and /inspector.css are the byte-for-byte concatenation of their
+// ordered parts, and the module set behind /inspector.js is served as real ES
+// modules, with an entry generated from the same part list. The production
+// controller embeds those same parts at compile time
+// (crates/devtools-cli/build.rs); this helper derives the same entry, serves the
+// modules from disk by path, and falls back to any other client file. Each
+// harness only supplies its own fake /rpc controller and scenarios.
 import { readFile } from "node:fs/promises";
 import { dirname, extname, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -33,19 +35,31 @@ const MIME_BY_EXTENSION = {
   ".txt": "text/plain; charset=utf-8",
 };
 
-let bundles = null;
+let assets = null;
 
-async function servedBundles() {
-  if (!bundles) {
+// Bundled routes are concatenated once; the module entry is the import list
+// derived from the manifest, so its order is never restated here.
+async function servedAssets() {
+  if (!assets) {
     const manifest = JSON.parse(await readFile(manifestPath, "utf8"));
-    bundles = new Map(await Promise.all(manifest.bundles.map(async bundle => {
+    const bundles = new Map(await Promise.all(manifest.bundles.map(async bundle => {
       const parts = await Promise.all(
         bundle.parts.map(part => readFile(resolve(clientDir, bundle.root, part), "utf8")),
       );
       return [bundle.path, { media: bundle.media, body: parts.join("") }];
     })));
+    const modules = manifest.modules
+      ? {
+          path: manifest.modules.path,
+          media: manifest.modules.media,
+          body: manifest.modules.parts
+            .map(part => `import "/${manifest.modules.root}/${part}";\n`)
+            .join(""),
+        }
+      : null;
+    assets = { bundles, modules };
   }
-  return bundles;
+  return assets;
 }
 
 // Maps a request path to a file inside the client directory, refusing anything
@@ -70,10 +84,12 @@ function clientFile(pathname) {
 // Writes the asset when pathname is served and returns true. A false return lets
 // the harness fall through to its own 404 handling.
 export async function serveClientAsset(response, pathname) {
-  const bundle = (await servedBundles()).get(pathname === "/" ? "/index.html" : pathname);
-  if (bundle) {
-    response.writeHead(200, { "content-type": bundle.media, "cache-control": "no-store" });
-    response.end(bundle.body);
+  const served = await servedAssets();
+  const asset = served.bundles.get(pathname === "/" ? "/index.html" : pathname)
+    ?? (served.modules?.path === pathname ? served.modules : null);
+  if (asset) {
+    response.writeHead(200, { "content-type": asset.media, "cache-control": "no-store" });
+    response.end(asset.body);
     return true;
   }
   const file = clientFile(pathname);

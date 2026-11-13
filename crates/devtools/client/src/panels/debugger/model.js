@@ -10,8 +10,13 @@
  * Every paused state, frame, scope, variable, breakpoint and source line shown
  * here comes from a response.
  */
+import { basename } from "../../core/format.js";
+import { $, MAX_DEBUGGER_SOURCE_LINES, state } from "../../core/globals.js";
+import { debuggerBreakpointKey, debuggerVisibleBreakpoints } from "./session.js";
+import { firstStringValue, isObjectValue } from "../performance/profile/model.js";
 
-function emptyDebugger() {
+
+export function emptyDebugger() {
   return {
     loaded: false,
     status: "idle",
@@ -73,7 +78,7 @@ function emptyDebugger() {
   };
 }
 
-function debuggerRoot(data) {
+export function debuggerRoot(data) {
   if (!isObjectValue(data)) return {};
   return isObjectValue(data.debugger) ? data.debugger : data;
 }
@@ -103,7 +108,7 @@ function debuggerVariablesReference(value) {
   return id === 0 || id === "0" ? null : id;
 }
 
-function debuggerNumber(value) {
+export function debuggerNumber(value) {
   if (typeof value === "number" && Number.isFinite(value)) return value;
   if (typeof value === "string" && /^-?\d+(\.\d+)?$/.test(value.trim())) return Number(value);
   return null;
@@ -116,7 +121,7 @@ function debuggerArray(...values) {
   return null;
 }
 
-function debuggerPathKey(value) {
+export function debuggerPathKey(value) {
   let path = String(value ?? "").trim();
   if (!path) return "";
   path = path.replace(/^file:\/\//i, "");
@@ -125,7 +130,7 @@ function debuggerPathKey(value) {
   return path;
 }
 
-function debuggerPathsMatch(left, right) {
+export function debuggerPathsMatch(left, right) {
   const a = debuggerPathKey(left);
   const b = debuggerPathKey(right);
   if (!a || !b) return false;
@@ -143,7 +148,7 @@ function debuggerRawStatus(root) {
     .replace(/[\s-]+/g, "_");
 }
 
-function debuggerUnavailableInfo(root) {
+export function debuggerUnavailableInfo(root) {
   const session = debuggerSessionObject(root);
   const raw = debuggerRawStatus(root);
   const marker = root.unavailable ?? root.debugger_unavailable ?? session.unavailable;
@@ -272,14 +277,14 @@ function normalizeDebuggerStop(raw) {
   };
 }
 
-function debuggerStatusIsExplicit(data) {
+export function debuggerStatusIsExplicit(data) {
   const root = debuggerRoot(data);
   return ["status", "state", "phase", "session", "available", "unavailable", "attached", "detached", "paused", "running", "attaching", "terminated", "sessions", "warning", "developer_mode", "last_error"].some(
     key => Object.prototype.hasOwnProperty.call(root, key),
   );
 }
 
-function debuggerHasData(data) {
+export function debuggerHasData(data) {
   const root = debuggerRoot(data);
   return ["status", "state", "phase", "session", "available", "unavailable", "attached", "detached", "paused", "running", "attaching", "terminated", "sessions", "warning", "developer_mode", "last_error", "pid", "adapter", "debug_adapter", "dap", "threads", "frames", "stack", "call_stack", "scopes", "source", "breakpoints", "thread_id", "frame_id", "stop", "total_frames", "truncated", "threads_error", "scopes_error"].some(
     key => Object.prototype.hasOwnProperty.call(root, key),
@@ -309,7 +314,7 @@ function debuggerAdapterFrom(data, fallback = null) {
   return adapter;
 }
 
-function debuggerAdapterLabel(adapter) {
+export function debuggerAdapterLabel(adapter) {
   if (!adapter) return "";
   const clean = value => String(value || "").replace(/\s+/g, " ").trim();
   const name = clean(adapter.name);
@@ -374,7 +379,7 @@ function normalizeDebuggerSourceRef(raw, fallback = {}) {
   };
 }
 
-function normalizeDebuggerSource(raw, fallback = {}) {
+export function normalizeDebuggerSource(raw, fallback = {}) {
   if (raw === null || raw === undefined) return null;
   if (typeof raw === "string") {
     return {
@@ -469,7 +474,7 @@ function normalizeDebuggerFrames(raw) {
   return raw.map(normalizeDebuggerFrame).filter(Boolean);
 }
 
-function debuggerScalarText(value) {
+export function debuggerScalarText(value) {
   if (value === null) return "null";
   if (value === undefined) return "";
   if (typeof value === "string") return value;
@@ -552,7 +557,7 @@ function normalizeDebuggerBreakpoints(raw, fallbackPath = "") {
   return raw.map((breakpoint, index) => normalizeDebuggerBreakpoint(breakpoint, index, fallbackPath)).filter(Boolean);
 }
 
-function debuggerBreakpointList(data) {
+export function debuggerBreakpointList(data) {
   const root = debuggerRoot(data);
   const session = debuggerSessionObject(root);
   const source = isObjectValue(root.source) ? root.source : isObjectValue(root.selected_source) ? root.selected_source : null;
@@ -562,7 +567,7 @@ function debuggerBreakpointList(data) {
   );
 }
 
-function sortDebuggerBreakpoints(breakpoints) {
+export function sortDebuggerBreakpoints(breakpoints) {
   return [...breakpoints].sort((left, right) => {
     const path = debuggerPathKey(left.path).localeCompare(debuggerPathKey(right.path));
     if (path !== 0) return path;
@@ -570,35 +575,35 @@ function sortDebuggerBreakpoints(breakpoints) {
   });
 }
 
-function debuggerBreakpointsAt(path, line) {
+export function debuggerBreakpointsAt(path, line) {
   return debuggerVisibleBreakpoints().filter(breakpoint => breakpoint.line === line && debuggerPathsMatch(breakpoint.path, path));
 }
 
-function debuggerBreakpointLabel(breakpoint) {
+export function debuggerBreakpointLabel(breakpoint) {
   const path = breakpoint.path || "unknown source";
   return breakpoint.line === null ? path : `${path}:${breakpoint.line}`;
 }
 
-function debuggerThreadList(data) {
+export function debuggerThreadList(data) {
   const root = debuggerRoot(data);
   const session = debuggerSessionObject(root);
   return normalizeDebuggerThreads(debuggerArray(root.threads, root.thread_list, session.threads));
 }
 
-function debuggerFrameList(data) {
+export function debuggerFrameList(data) {
   const root = debuggerRoot(data);
   const session = debuggerSessionObject(root);
   return normalizeDebuggerFrames(debuggerArray(root.frames, root.stack, root.call_stack, root.callStack, session.frames, session.stack));
 }
 
-function debuggerScopeList(data) {
+export function debuggerScopeList(data) {
   const root = debuggerRoot(data);
   const session = debuggerSessionObject(root);
   const frame = isObjectValue(root.frame) ? root.frame : null;
   return normalizeDebuggerScopes(debuggerArray(root.scopes, root.scope_list, session.scopes, frame?.scopes));
 }
 
-function debuggerVariablesFrom(data) {
+export function debuggerVariablesFrom(data) {
   if (Array.isArray(data)) return normalizeDebuggerVariables(data);
   const root = debuggerRoot(data);
   const result = isObjectValue(root.result) ? root.result : null;
@@ -606,13 +611,13 @@ function debuggerVariablesFrom(data) {
   return raw ? normalizeDebuggerVariables(raw) : null;
 }
 
-function selectedDebuggerFrame() {
+export function selectedDebuggerFrame() {
   const dbg = state.debugger;
   if (dbg.frameIndex === null) return null;
   return dbg.frames[dbg.frameIndex] || null;
 }
 
-function debuggerCurrentLocation() {
+export function debuggerCurrentLocation() {
   const dbg = state.debugger;
   if (dbg.status !== "paused") return null;
   const frame = selectedDebuggerFrame();
@@ -626,18 +631,18 @@ function debuggerCurrentLocation() {
   return { line: frame.line, column: frame.column };
 }
 
-function debuggerFrameLabel(frame) {
+export function debuggerFrameLabel(frame) {
   return frame.name || `Frame ${frame.index + 1}`;
 }
 
-function debuggerFrameLocation(frame) {
+export function debuggerFrameLocation(frame) {
   const path = frame.source?.path || frame.source?.name || "";
   const file = path ? basename(path) : "";
   const line = frame.line !== null ? String(frame.line) : "";
   return [file, line].filter(Boolean).join(":");
 }
 
-function resetDebuggerVariables() {
+export function resetDebuggerVariables() {
   const dbg = state.debugger;
   dbg.variableEpoch += 1;
   dbg.variableChildren.clear();
@@ -650,7 +655,7 @@ function resetDebuggerVariables() {
   dbg.renderSig.variables = "";
 }
 
-function clearDebuggerSessionData(options = {}) {
+export function clearDebuggerSessionData(options = {}) {
   const dbg = state.debugger;
   dbg.threads = [];
   dbg.threadsError = null;
@@ -679,7 +684,7 @@ function clearDebuggerSessionData(options = {}) {
   dbg.renderSig = {};
 }
 
-function applyDebuggerSnapshot(data) {
+export function applyDebuggerSnapshot(data) {
   const dbg = state.debugger;
   const root = debuggerRoot(data);
   const session = debuggerSessionObject(root);

@@ -1,6 +1,9 @@
 /* Keyboard and text input */
+import { dom, state } from "../core/globals.js";
+import { errorMessage, rpc, targetById, toast } from "../core/session.js";
 
-function renderInputUi() {
+
+export function renderInputUi() {
   const caps = state.caps;
   const target = targetById();
   const disabled = !caps.input || state.inputBusy;
@@ -12,18 +15,18 @@ function renderInputUi() {
   updateInputButtons();
 }
 
-function updateInputButtons() {
+export function updateInputButtons() {
   const disabled = !state.caps.input || state.inputBusy;
   dom.sendKey.disabled = disabled || !dom.keyValue.value.trim();
   dom.sendText.disabled = disabled || !dom.textValue.value.trim();
 }
 
-function setInputBusy(busy) {
+export function setInputBusy(busy) {
   state.inputBusy = busy;
   renderInputUi();
 }
 
-async function sendKey(event) {
+export async function sendKey(event) {
   event?.preventDefault();
   if (!state.caps.input || state.inputBusy) return;
   const key = dom.keyValue.value.trim();
@@ -42,7 +45,7 @@ async function sendKey(event) {
   }
 }
 
-async function sendText(event) {
+export async function sendText(event) {
   event?.preventDefault();
   if (!state.caps.input || state.inputBusy) return;
   const text = dom.textValue.value;
@@ -60,7 +63,7 @@ async function sendText(event) {
   }
 }
 
-function toggleInputDrawer() {
+export function toggleInputDrawer() {
   const expanded = dom.inputToggle.getAttribute("aria-expanded") === "true";
   dom.inputToggle.setAttribute("aria-expanded", String(!expanded));
   dom.inputToggle.textContent = expanded ? "Show" : "Hide";

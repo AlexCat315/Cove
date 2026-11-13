@@ -1,6 +1,34 @@
 /* Static event wiring */
+import { toggleBaselines, toggleGuidelines, toggleOversizedImages, toggleRepaintHighlight, toggleSlowAnimations } from "../core/debug-paint.js";
+import { $, BUDGET_RATES, DETAIL_TABS, MEMORY_INTERVALS, dom, state } from "../core/globals.js";
+import { applyTheme, chooseTarget, errorMessage, refreshSession, setThemePreference, showWorkspace, storeToken, toast } from "../core/session.js";
+import { ensureCurrentView } from "../core/ui-helpers.js";
+import { captureNode, captureWindow, clearScreenshot, enterPickMode, exitPickMode, renderScreenshot, saveCapture, toggleScreenshotZoom, updateModeUi } from "../inspector/capture.js";
+import { copyText, setDetailTab } from "../inspector/editors.js";
+import { sendKey, sendText, toggleInputDrawer, updateInputButtons } from "../inspector/input.js";
+import { clearHighlight, highlightNode, loadTree, readLiveValue, renderDetails, renderTreeArea, selectNode } from "../inspector/tree.js";
+import { loadAppSize } from "../panels/app-size/diff.js";
+import { selectedDebuggerFrame } from "../panels/debugger/model.js";
+import { attachDebugger, detachDebugger, loadDebuggerScopes, refreshDebugger, runDebuggerControl } from "../panels/debugger/session.js";
+import { clearDebuggerConsole, debuggerUnloadDetach, evaluateDebuggerExpression, openDebuggerSource } from "../panels/debugger/view.js";
+import { deepLinksRootError } from "../panels/deep-links/model.js";
+import { renderDeepLinks, showDeepLinksRootError, submitDeepLinks } from "../panels/deep-links/view.js";
+import { loadExtensions } from "../panels/extensions.js";
+import { clearLogs, loadLogs, renderLogs } from "../panels/logs.js";
+import { stopAllocationPolling, syncAllocationPolling } from "../panels/memory/sampling.js";
+import { loadMemory, refreshMemoryView } from "../panels/memory/view.js";
+import { clearNetwork, loadNetwork, renderNetwork, setNetworkRecording, stopAllFollowTimers, syncFollowTimers } from "../panels/network.js";
+import { loadFrames } from "../panels/performance/frames.js";
+import { renderPerformance, setPerformanceTab, syncBudgetOptions, writeBudgetPreference, writeDeepLinksRootPreference, writeMemoryIntervalPreference } from "../panels/performance/overview.js";
+import { pollProfile } from "../panels/performance/profile/control.js";
+import { clearProfileTimers, loadProfile } from "../panels/performance/profile/model.js";
+import { exportPerformance, importPerformance } from "../panels/performance/snapshots.js";
+import { startTrace, stopTrace } from "../panels/performance/timeline.js";
+import { loadRegisteredState } from "../panels/state.js";
+import { refreshCurrent, switchView } from "./views.js";
 
-function bindEvents() {
+
+export function bindEvents() {
   const railTabs = [...document.querySelectorAll(".rail-tab")];
   for (const tab of railTabs) {
     tab.addEventListener("click", () => switchView(tab.dataset.view));

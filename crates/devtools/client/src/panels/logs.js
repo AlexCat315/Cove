@@ -1,6 +1,13 @@
 /* Logs */
+import { basename, clear, el, fmtClock, fmtDate, numberValue, textOf } from "../core/format.js";
+import { LEVELS, dom, state } from "../core/globals.js";
+import { errorMessage, isDisconnectedError, rpc, targetById, toast, unwrapData } from "../core/session.js";
+import { errorInline, kvList, showState } from "../core/ui-helpers.js";
+import { stopTimer, syncFollowTimers } from "./network.js";
+import { refreshCurrent } from "../shell/views.js";
 
-function resetLogs() {
+
+export function resetLogs() {
   stopTimer("logs");
   state.logs = {
     loaded: false, loading: false, error: null, records: [], dropped: 0, firstAvailable: null,
@@ -13,7 +20,7 @@ function resetLogs() {
   if (state.view === "logs") renderLogs();
 }
 
-function ensureLogs() {
+export function ensureLogs() {
   if (!state.token || !state.targetId || !state.caps.logs) {
     renderLogs();
     return;
@@ -22,7 +29,7 @@ function ensureLogs() {
   else renderLogs();
 }
 
-async function loadLogs(options = {}) {
+export async function loadLogs(options = {}) {
   const quiet = options.quiet === true;
   const logs = state.logs;
   if (!state.caps.logs || !state.targetId || logs.loading || logs.clearing) return;
@@ -73,7 +80,7 @@ async function loadLogs(options = {}) {
   }
 }
 
-async function clearLogs() {
+export async function clearLogs() {
   const logs = state.logs;
   if (!state.caps.logs || !state.targetId || !state.token || !state.connected || logs.clearing) return;
   const targetId = state.targetId;
@@ -154,7 +161,7 @@ function logMatches(record) {
     .filter(Boolean).join(" ").toLowerCase().includes(query);
 }
 
-function renderLogs() {
+export function renderLogs() {
   const host = dom.logsContent;
   clear(host);
   setLogsChrome();

@@ -1,3 +1,14 @@
+import { clear, el, fmtBytes, fmtEpochMs, icon } from "../../core/format.js";
+import { MAX_MEMORY_COUNTERS, RpcError, dom, state } from "../../core/globals.js";
+import { errorMessage, rpc, targetById, toast, unwrapData } from "../../core/session.js";
+import { emptyInline, errorInline, showState } from "../../core/ui-helpers.js";
+import { renderAllocationBaseline } from "./baselines.js";
+import { allocationSiteFailureKind, allocationSiteMeta, allocationSiteMetric, allocationSiteRateControl, allocationSiteScopeNote, allocationSiteState, allocationSiteStatusClass, allocationSiteStatusLabel, allocationSiteTruncationNotices, ensureAllocationSites, queryAllocationSites, releaseAllocationSampling, renderAllocationSiteTable, resetAllocationSites, startAllocationSites, stopAllocationPolling, stopAllocationSites } from "./sampling.js";
+import { MEMORY_ALLOCATION_ROWS, MEMORY_BYTE_LABELS, MEMORY_ENTRY_LABELS, MEMORY_PROCESS_COUNTERS, formatWallTime, memoryCounterValue, memorySizeClassLabel, memorySizeClassSortValue, memoryWindowTotals, normalizeMemorySnapshot, recordMemorySample, sumMemoryCounters } from "./snapshot.js";
+import { stopTimer } from "../network.js";
+import { emptyMemory } from "../performance/overview.js";
+import { fmtSeconds, formatCount } from "../performance/profile/model.js";
+
 function renderAllocationSitesBody(allocation, report) {
   const failure = allocationSiteFailureKind(allocation);
   const body = el("div", { class: "memory-site-body" });
@@ -111,7 +122,7 @@ function renderMemoryAllocationSites() {
   );
 }
 
-function renderAllocationSitesView(options = {}) {
+export function renderAllocationSitesView(options = {}) {
   if (state.view !== "memory") return;
   const host = dom.memoryContent;
   const current = host.querySelector("#memory-allocation-sites");
@@ -125,7 +136,7 @@ function renderAllocationSitesView(options = {}) {
   host.scrollTop = scrollTop;
 }
 
-function refreshMemoryView() {
+export function refreshMemoryView() {
   loadMemory({ reset: false });
   queryAllocationSites({ quiet: true });
 }
@@ -604,7 +615,7 @@ function renderMemoryChart(memory) {
   );
 }
 
-function renderMemory() {
+export function renderMemory() {
   const host = dom.memoryContent;
   clear(host);
   setMemoryChrome();
@@ -681,7 +692,7 @@ function renderMemory() {
   }
 }
 
-async function loadMemory(options = {}) {
+export async function loadMemory(options = {}) {
   const memory = state.memory;
   if (!state.token || !state.targetId || !state.caps.runtime) {
     renderMemory();
@@ -721,7 +732,7 @@ async function loadMemory(options = {}) {
   }
 }
 
-function ensureMemory() {
+export function ensureMemory() {
   if (!state.token || !state.targetId || !state.caps.runtime) {
     renderMemory();
     return;
@@ -734,7 +745,7 @@ function ensureMemory() {
   ensureAllocationSites();
 }
 
-function resetMemory(previousTarget = state.targetId) {
+export function resetMemory(previousTarget = state.targetId) {
   const previousAllocation = state.memory?.allocation;
   stopAllocationPolling();
   stopTimer("memory");

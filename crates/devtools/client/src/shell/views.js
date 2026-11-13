@@ -1,6 +1,26 @@
 /* Views and refresh */
+import { $, state } from "../core/globals.js";
+import { refreshSession, showSetup, updateTargetUi } from "../core/session.js";
+import { ensureCurrentView } from "../core/ui-helpers.js";
+import { loadTree } from "../inspector/tree.js";
+import { loadAppSize } from "../panels/app-size/diff.js";
+import { refreshDebugger } from "../panels/debugger/session.js";
+import { renderDebugger } from "../panels/debugger/view.js";
+import { loadDeepLinks, renderDeepLinks } from "../panels/deep-links/view.js";
+import { loadExtensions, renderExtensions, renderRegisteredState } from "../panels/extensions.js";
+import { loadLogs, renderLogs } from "../panels/logs.js";
+import { syncAllocationPolling } from "../panels/memory/sampling.js";
+import { loadMemory, renderMemory } from "../panels/memory/view.js";
+import { loadNetwork, renderNetwork, syncFollowTimers } from "../panels/network.js";
+import { loadFrames } from "../panels/performance/frames.js";
+import { activeCaptureRecord, renderPerformance } from "../panels/performance/overview.js";
+import { pollProfile } from "../panels/performance/profile/control.js";
+import { loadProfile } from "../panels/performance/profile/model.js";
+import { loadTraceEvents } from "../panels/performance/timeline.js";
+import { loadRegisteredState } from "../panels/state.js";
 
-function switchView(view, options = {}) {
+
+export function switchView(view, options = {}) {
   if (!["inspector", "network", "logs", "performance", "memory", "app-size", "deep-links", "debugger", "state", "extensions"].includes(view)) return;
   if (state.view === view && !options.force) return;
   state.view = view;
@@ -23,7 +43,7 @@ function switchView(view, options = {}) {
   }
 }
 
-async function refreshCurrent() {
+export async function refreshCurrent() {
   if (!state.token) {
     showSetup();
     return;

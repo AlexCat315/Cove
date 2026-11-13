@@ -1,4 +1,7 @@
-function renderRepaintHighlightUi() {
+import { NORMAL_ANIMATION_SCALE, SLOW_ANIMATION_SCALE, dom, state } from "./globals.js";
+import { errorMessage, rpc, targetById, toast, unwrapData } from "./session.js";
+
+export function renderRepaintHighlightUi() {
   const target = targetById();
   const available = Boolean(state.connected && target && state.caps.runtime && state.caps.repaintHighlight);
   const on = available && state.repaintHighlight.active;
@@ -28,7 +31,7 @@ function repaintHighlightFrom(result, requested) {
   return requested;
 }
 
-function resetRepaintHighlight(previousTarget = state.targetId) {
+export function resetRepaintHighlight(previousTarget = state.targetId) {
   const wasOn = state.repaintHighlight.active;
   const inFlight = state.repaintHighlight.busy;
   state.repaintHighlight.request += 1;
@@ -39,7 +42,7 @@ function resetRepaintHighlight(previousTarget = state.targetId) {
   sendRepaintHighlight(previousTarget, false).catch(() => {});
 }
 
-async function toggleRepaintHighlight() {
+export async function toggleRepaintHighlight() {
   const target = targetById();
   if (!state.connected || !target || !state.caps.runtime || !state.caps.repaintHighlight || state.repaintHighlight.busy) return;
   const targetId = target.id;
@@ -64,7 +67,7 @@ async function toggleRepaintHighlight() {
   }
 }
 
-function renderGuidelinesUi() {
+export function renderGuidelinesUi() {
   const target = targetById();
   const available = Boolean(state.connected && target && state.caps.runtime && state.caps.debugPaint);
   const on = available && state.debugPaint.guidelines;
@@ -94,7 +97,7 @@ function debugPaintFrom(result, requested) {
   return requested;
 }
 
-function resetDebugPaintState(previousTarget = state.targetId) {
+export function resetDebugPaintState(previousTarget = state.targetId) {
   const wasOn = state.debugPaint.guidelines;
   const inFlight = state.debugPaint.busy;
   state.debugPaint.request += 1;
@@ -105,7 +108,7 @@ function resetDebugPaintState(previousTarget = state.targetId) {
   sendDebugPaint(previousTarget, false).catch(() => {});
 }
 
-async function toggleGuidelines() {
+export async function toggleGuidelines() {
   const target = targetById();
   if (!state.connected || !target || !state.caps.runtime || !state.caps.debugPaint || state.debugPaint.busy) return;
   const targetId = target.id;
@@ -130,7 +133,7 @@ async function toggleGuidelines() {
   }
 }
 
-function renderBaselinesUi() {
+export function renderBaselinesUi() {
   const target = targetById();
   const available = Boolean(state.connected && target && state.caps.runtime && state.caps.baselines);
   const on = available && state.baselines.active;
@@ -160,7 +163,7 @@ function baselinesFrom(result, requested) {
   return requested;
 }
 
-function resetBaselines(previousTarget = state.targetId) {
+export function resetBaselines(previousTarget = state.targetId) {
   const wasOn = state.baselines.active;
   const inFlight = state.baselines.busy;
   state.baselines.request += 1;
@@ -171,7 +174,7 @@ function resetBaselines(previousTarget = state.targetId) {
   sendBaselines(previousTarget, false).catch(() => {});
 }
 
-async function toggleBaselines() {
+export async function toggleBaselines() {
   const target = targetById();
   if (!state.connected || !target || !state.caps.runtime || !state.caps.baselines || state.baselines.busy) return;
   const targetId = target.id;
@@ -216,7 +219,7 @@ function isSlowAnimationScale(scale) {
   return Number.isFinite(scale) && scale > 0 && scale < 0.999;
 }
 
-function renderSlowAnimationsUi() {
+export function renderSlowAnimationsUi() {
   const target = targetById();
   const available = Boolean(state.connected && target && state.caps.runtime && state.caps.animationSpeed);
   const on = available && state.slowAnimations.active;
@@ -230,7 +233,7 @@ function renderSlowAnimationsUi() {
   dom.slowAnimationsButton.title = title;
 }
 
-function resetSlowAnimations(previousTarget = state.targetId) {
+export function resetSlowAnimations(previousTarget = state.targetId) {
   const wasSlowed = state.slowAnimations.active;
   const inFlight = state.slowAnimations.busy;
   state.slowAnimations.request += 1;
@@ -242,7 +245,7 @@ function resetSlowAnimations(previousTarget = state.targetId) {
   sendAnimationSpeed(previousTarget, NORMAL_ANIMATION_SCALE).catch(() => {});
 }
 
-async function toggleSlowAnimations() {
+export async function toggleSlowAnimations() {
   const target = targetById();
   if (!state.connected || !target || !state.caps.runtime || !state.caps.animationSpeed || state.slowAnimations.busy) return;
   const targetId = target.id;
@@ -268,7 +271,7 @@ async function toggleSlowAnimations() {
   }
 }
 
-function renderOversizedImagesUi() {
+export function renderOversizedImagesUi() {
   const target = targetById();
   const available = Boolean(state.connected && target && state.caps.runtime && state.caps.oversizedImages);
   const on = available && state.oversizedImages.active;
@@ -298,7 +301,7 @@ function oversizedImagesFrom(result, requested) {
   return requested;
 }
 
-function resetOversizedImages(previousTarget = state.targetId) {
+export function resetOversizedImages(previousTarget = state.targetId) {
   const wasOn = state.oversizedImages.active;
   const inFlight = state.oversizedImages.busy;
   state.oversizedImages.request += 1;
@@ -309,7 +312,7 @@ function resetOversizedImages(previousTarget = state.targetId) {
   sendOversizedImages(previousTarget, false).catch(() => {});
 }
 
-async function toggleOversizedImages() {
+export async function toggleOversizedImages() {
   const target = targetById();
   if (!state.connected || !target || !state.caps.runtime || !state.caps.oversizedImages || state.oversizedImages.busy) return;
   const targetId = target.id;

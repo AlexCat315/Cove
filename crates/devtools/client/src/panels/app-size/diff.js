@@ -1,3 +1,14 @@
+import { clear, el, fmtBytes, icon, numberValue } from "../../core/format.js";
+import { APP_SIZE_SNAPSHOT_SCHEMA, APP_SIZE_SNAPSHOT_VERSION, MAX_APP_SIZE_DIFF_ROWS, RpcError, dom, state } from "../../core/globals.js";
+import { errorMessage, rpc, targetById, toast, unwrapData } from "../../core/session.js";
+import { errorInline, showState } from "../../core/ui-helpers.js";
+import { appSizeFirstNumber, appSizeTargetUnavailable, normalizeAppSize } from "./model.js";
+import { appSizePanel, appSizeScope, appSizeSource, appSizeTable, renderAppSizeGroups, renderAppSizeSections, renderAppSizeStats, renderAppSizeSymbols } from "./sections.js";
+import { renderAppSizeTreemap } from "./treemap.js";
+import { formatWallTime } from "../memory/snapshot.js";
+import { emptyAppSize } from "../performance/overview.js";
+import { formatCount, isObjectValue } from "../performance/profile/model.js";
+
 function appSizeSnapshotOptionalNumber(value, label) {
   if (value === undefined || value === null) return null;
   if (typeof value !== "number" || !Number.isFinite(value) || value < 0) {
@@ -549,7 +560,7 @@ function setAppSizeChrome() {
   dom.appSizeMeta.textContent = `${total} · ${formatCount(executable.sections.length)} sections · ${formatCount(executable.symbols.length)} symbols · ${formatCount(executable.groups.length)} crate groups · updated ${formatWallTime(app.refreshedAt)}`;
 }
 
-function renderAppSize() {
+export function renderAppSize() {
   const host = dom.appSizeContent;
   clear(host);
   setAppSizeChrome();
@@ -644,13 +655,14 @@ function renderAppSize() {
   host.append(renderAppSizeSymbols(executable));
   host.append(renderAppSizeGroups(executable));
   host.append(renderAppSizeDiff(executable));
+
   if (executable.totalBytes === null) {
     host.append(el("div", { class: "app-size-note", text: "The controller reported no total executable size. A sum of section sizes is not substituted for it." }));
   }
   host.append(el("div", { class: "app-size-note", text: "Sections are object-file sections, not loaded memory mappings. Symbol sizes and crate groups are reported by the native analyzer; bytes outside those groups stay unassigned." }));
 }
 
-async function loadAppSize(options = {}) {
+export async function loadAppSize(options = {}) {
   const app = state.appSize;
   const target = targetById();
   if (!state.token || !target) {
@@ -700,7 +712,7 @@ async function loadAppSize(options = {}) {
   }
 }
 
-function ensureAppSize() {
+export function ensureAppSize() {
   const target = targetById();
   if (!state.token || !target || appSizeTargetUnavailable(target)) {
     renderAppSize();
@@ -713,7 +725,7 @@ function ensureAppSize() {
   renderAppSize();
 }
 
-function resetAppSize() {
+export function resetAppSize() {
   const request = state.appSize.request + 1;
   state.appSize = emptyAppSize();
   state.appSize.request = request;

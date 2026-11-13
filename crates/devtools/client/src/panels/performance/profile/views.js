@@ -1,3 +1,14 @@
+import { clear, el, fmtMs, fmtNumber, numberValue } from "../../../core/format.js";
+import { dom, MAX_HOTSPOTS, MAX_PROFILE_BOTTOM_CALLERS, MAX_PROFILE_BOTTOM_GROUPS, MAX_PROFILE_FLAME_BARS, MAX_PROFILE_STACK_FRAMES, MAX_PROFILE_TREE_DEPTH, MAX_PROFILE_TREE_ROWS, PROFILE_FLAME_MIN_PERCENT, PROFILE_METHOD_SORT_KEYS, PROFILE_VIEW_LABELS, state } from "../../../core/globals.js";
+import { errorMessage, targetById } from "../../../core/session.js";
+import { emptyInline, errorInline, showState } from "../../../core/ui-helpers.js";
+import { snapshotBanner } from "../frames.js";
+import { renderPerformance } from "../overview.js";
+import { returnToLive } from "../snapshots.js";
+import { PROFILE_VIEWS } from "../../../core/globals.js";
+import { loadHotspots, renderProfileControls, renderProfileStats, startProfile } from "./control.js";
+import { fmtSeconds, formatCount, formatPercent, loadProfile, profilePlatformName, profilePlatformUnsupported } from "./model.js";
+import { buildProfileModel, collapseProfileAll, expandProfileAll, listProfileNotes, profileCallerRows, profileEmptyMessage, profileFilterNeedle, profileFrameIdentity, profileFrameKeyFromHotspot, profileFrameLabel, profileFrameLocation, profileModelNotes, profileNodeMatches, profileSelect, profileSelectionNode, profileSharePercent, profileTextMatches, profileViewMeta, profileViewTabKeydown, refreshProfileView, renderProfileCallTree, renderProfileTreeHead, setProfileView, toggleProfileNode } from "./trees.js";
 function renderProfileCallerRow(profile, entry, needle) {
   const node = entry.node;
   const expandable = Boolean(node.callersArray.length);
@@ -483,7 +494,7 @@ function renderProfileViewToolbar(profile) {
   );
 }
 
-function renderProfileViewBody(profile, model) {
+export function renderProfileViewBody(profile, model) {
   switch (profile.view) {
     case "bottom-up": return renderProfileBottomUp(profile, model);
     case "flame-chart": return renderProfileFlameChart(profile, model);
@@ -511,7 +522,7 @@ function renderProfileViews(profile) {
   );
 }
 
-function renderProfilePanel() {
+export function renderProfilePanel() {
   const host = dom.performanceProfile;
   clear(host);
   const perf = state.performance;

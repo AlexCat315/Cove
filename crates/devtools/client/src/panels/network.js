@@ -1,12 +1,24 @@
 /* Network */
+import { clear, el, fmtBytes, fmtEpochMs, fmtMs, numberValue, textOf } from "../core/format.js";
+import { DEBUGGER_POLL_MS, dom, state } from "../core/globals.js";
+import { errorMessage, isDisconnectedError, rpc, targetById, toast, unwrapData } from "../core/session.js";
+import { emptyInline, errorInline, kvList, sectionBlock, showState } from "../core/ui-helpers.js";
+import { copyText } from "../inspector/editors.js";
+import { refreshDebugger } from "./debugger/session.js";
+import { loadLogs } from "./logs.js";
+import { loadMemory } from "./memory/view.js";
+import { loadFrames } from "./performance/frames.js";
+import { loadRegisteredState } from "./state.js";
+import { refreshCurrent } from "../shell/views.js";
 
-function stopTimer(key) {
+
+export function stopTimer(key) {
   const timer = state[key]?.timer;
   if (timer) clearInterval(timer);
   if (state[key]) state[key].timer = null;
 }
 
-function stopAllFollowTimers() {
+export function stopAllFollowTimers() {
   stopTimer("network");
   stopTimer("logs");
   stopTimer("performance");
@@ -15,7 +27,7 @@ function stopAllFollowTimers() {
   stopTimer("registeredState");
 }
 
-function syncFollowTimers() {
+export function syncFollowTimers() {
   stopAllFollowTimers();
   if (document.hidden || !state.connected || !state.targetId) return;
   if (state.view === "network" && state.network.follow && state.caps.network) {
@@ -36,7 +48,7 @@ function syncFollowTimers() {
   syncDebuggerTimer();
 }
 
-function syncDebuggerTimer() {
+export function syncDebuggerTimer() {
   stopTimer("debugger");
   if (document.hidden || !state.connected || !state.token || !state.targetId || state.view !== "debugger") return;
   const dbg = state.debugger;
@@ -44,7 +56,7 @@ function syncDebuggerTimer() {
   dbg.timer = setInterval(() => refreshDebugger({ quiet: true, poll: true }), DEBUGGER_POLL_MS);
 }
 
-function resetNetwork() {
+export function resetNetwork() {
   stopTimer("network");
   state.network = {
     loaded: false, loading: false, error: null, records: [], limit: 0, follow: dom.networkFollow.checked, timer: null,
@@ -57,7 +69,7 @@ function resetNetwork() {
   if (state.view === "network") renderNetwork();
 }
 
-function ensureNetwork() {
+export function ensureNetwork() {
   if (!state.token || !state.targetId) {
     renderNetwork();
     return;
@@ -70,7 +82,7 @@ function ensureNetwork() {
   else renderNetwork();
 }
 
-async function loadNetwork(options = {}) {
+export async function loadNetwork(options = {}) {
   const quiet = options.quiet === true;
   const net = state.network;
   if (!state.caps.network || !state.targetId || net.loading || net.clearPending) return;
@@ -115,7 +127,7 @@ async function loadNetwork(options = {}) {
   }
 }
 
-function booleanOf(value) {
+export function booleanOf(value) {
   return typeof value === "boolean" ? value : null;
 }
 
@@ -129,7 +141,7 @@ function networkControlsAvailable() {
   return Boolean(state.targetId && state.caps.network && state.caps.networkControl && !state.network.controlUnavailable);
 }
 
-async function setNetworkRecording(enabled) {
+export async function setNetworkRecording(enabled) {
   const net = state.network;
   if (!networkControlsAvailable() || !state.token || !state.connected) return;
   if (net.recordingPending || net.clearPending) return;
@@ -164,7 +176,7 @@ async function setNetworkRecording(enabled) {
   }
 }
 
-async function clearNetwork() {
+export async function clearNetwork() {
   const net = state.network;
   if (!networkControlsAvailable() || !state.token || !state.connected) return;
   if (net.clearPending || net.recordingPending) return;
@@ -441,7 +453,7 @@ function renderNetworkWaterfall(records) {
   );
 }
 
-function renderNetwork() {
+export function renderNetwork() {
   const host = dom.networkContent;
   clear(host);
   setNetworkChrome();

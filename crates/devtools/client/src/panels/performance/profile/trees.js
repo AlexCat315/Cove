@@ -1,6 +1,11 @@
 /* CPU profile views: call tree, bottom-up, flame chart, methods and stacks */
-
-function profileFrameIdentity(frame) {
+import { clear, el, numberValue } from "../../../core/format.js";
+import { $, MAX_PROFILE_BOTTOM_CALLERS, MAX_PROFILE_BOTTOM_GROUPS, MAX_PROFILE_FLAME_BARS, MAX_PROFILE_FLAME_DEPTH, MAX_PROFILE_SAMPLES, MAX_PROFILE_STACKS, MAX_PROFILE_TREE_CHILDREN, MAX_PROFILE_TREE_DEPTH, MAX_PROFILE_TREE_NODES, MAX_PROFILE_TREE_ROWS, PROFILE_FLAME_MIN_PERCENT, PROFILE_VIEWS, state } from "../../../core/globals.js";
+import { emptyInline } from "../../../core/ui-helpers.js";
+import { renderPerformance } from "../overview.js";
+import { formatCount, normalizeProfileFrame } from "./model.js";
+import { renderProfileViewBody } from "./views.js";
+export function profileFrameIdentity(frame) {
   const name = typeof frame?.function === "string" ? frame.function.trim() : "";
   if (name) return `fn:${name}`;
   const file = typeof frame?.file === "string" ? frame.file.trim() : "";
@@ -10,19 +15,19 @@ function profileFrameIdentity(frame) {
   return `label:${String(frame?.label || "unknown frame")}`;
 }
 
-function profileFrameLabel(frame) {
+export function profileFrameLabel(frame) {
   const name = typeof frame?.function === "string" ? frame.function.trim() : "";
   if (name) return name;
   const label = String(frame?.label || "").trim();
   return label || "unknown frame";
 }
 
-function profileFrameLocation(frame) {
+export function profileFrameLocation(frame) {
   if (!frame?.file) return "";
   return `${frame.file}${frame.line === null || frame.line === undefined ? "" : `:${Math.trunc(frame.line)}`}`;
 }
 
-function profileFrameKeyFromHotspot(entry) {
+export function profileFrameKeyFromHotspot(entry) {
   return profileFrameIdentity({
     function: entry.function,
     file: entry.file,
@@ -32,7 +37,7 @@ function profileFrameKeyFromHotspot(entry) {
   });
 }
 
-function profileSharePercent(samples, base, digits = 1) {
+export function profileSharePercent(samples, base, digits = 1) {
   if (samples === null || samples === undefined || !base) return "—";
   return `${((samples / base) * 100).toFixed(digits)}%`;
 }
@@ -243,7 +248,7 @@ function layoutProfileFlame(root, shareBase) {
   };
 }
 
-function buildProfileModel(profile) {
+export function buildProfileModel(profile) {
   const rows = [];
   let total = 0;
   for (const stack of profile.stacks) {
@@ -289,7 +294,7 @@ function buildProfileModel(profile) {
   return { rows, total, shareBase, functions, tree, bottomUp, flame };
 }
 
-function profileModelNotes(profile, model) {
+export function profileModelNotes(profile, model) {
   const notes = [];
   if (!model.shareBase) return notes;
   notes.push(`Shares are relative to ${formatCount(model.shareBase)} retained samples, not the requested rate.`);
@@ -311,20 +316,20 @@ function profileModelNotes(profile, model) {
   return notes;
 }
 
-function profileFilterNeedle(profile) {
+export function profileFilterNeedle(profile) {
   return String(profile.filter || "").trim().toLowerCase();
 }
 
-function profileTextMatches(needle, ...values) {
+export function profileTextMatches(needle, ...values) {
   if (!needle) return true;
   return values.some(value => String(value ?? "").toLowerCase().includes(needle));
 }
 
-function profileNodeMatches(node, needle) {
+export function profileNodeMatches(node, needle) {
   return profileTextMatches(needle, node.label, node.location, node.frame?.function, node.frame?.file);
 }
 
-function profileEmptyMessage(profile, view) {
+export function profileEmptyMessage(profile, view) {
   if (["sampling", "starting"].includes(profile.status)) {
     return "Sampling is running. Stacks are ranked when the sampler stops; no stack is synthesized while it runs.";
   }
@@ -373,7 +378,7 @@ function profileVisibleTreeRows(root, expanded, needle) {
   return { rows, truncated };
 }
 
-function profileCallerRows(group, expanded, needle) {
+export function profileCallerRows(group, expanded, needle) {
   const rows = [];
   let truncated = false;
   const visible = new Map();
@@ -407,7 +412,7 @@ function profileCallerRows(group, expanded, needle) {
   return { rows, truncated };
 }
 
-function profileViewMeta(profile) {
+export function profileViewMeta(profile) {
   const parts = [
     `${formatCount(profile.stacks.length)} stacks`,
     `${formatCount(profile.stackTotalSamples || profile.retainedSamples)} samples`,
@@ -417,18 +422,18 @@ function profileViewMeta(profile) {
   return parts.join(" · ");
 }
 
-function listProfileNotes(notes) {
+export function listProfileNotes(notes) {
   return notes.filter(Boolean).map(note => el("div", { class: "perf-note", text: note }));
 }
 
-function profileSelect(profile, selection) {
+export function profileSelect(profile, selection) {
   if (!selection) return;
   if (profile.selection && profile.selection.key === selection.key) profile.selection = null;
   else profile.selection = { key: selection.key, label: selection.label, location: selection.location || "" };
   refreshProfileView(profile);
 }
 
-function toggleProfileNode(profile, node) {
+export function toggleProfileNode(profile, node) {
   const expandable = Boolean(node.childrenArray?.length || node.callersArray?.length);
   if (!expandable) return;
   if (profile.expanded.has(node.key)) profile.expanded.delete(node.key);
@@ -436,7 +441,7 @@ function toggleProfileNode(profile, node) {
   refreshProfileView(profile);
 }
 
-function expandProfileAll(profile) {
+export function expandProfileAll(profile) {
   const model = buildProfileModel(profile);
   const expanded = new Set();
   const visit = (node, key) => {
@@ -456,18 +461,18 @@ function expandProfileAll(profile) {
   refreshProfileView(profile);
 }
 
-function collapseProfileAll(profile) {
+export function collapseProfileAll(profile) {
   profile.expanded = new Set();
   refreshProfileView(profile);
 }
 
-function setProfileView(profile, view) {
+export function setProfileView(profile, view) {
   if (!PROFILE_VIEWS.includes(view) || profile.view === view) return;
   profile.view = view;
   renderPerformance();
 }
 
-function profileViewTabKeydown(profile, view, event) {
+export function profileViewTabKeydown(profile, view, event) {
   const index = PROFILE_VIEWS.indexOf(view);
   let next = null;
   if (event.key === "ArrowRight") next = PROFILE_VIEWS[(index + 1) % PROFILE_VIEWS.length];
@@ -481,7 +486,7 @@ function profileViewTabKeydown(profile, view, event) {
   $(`profile-view-tab-${next}`)?.focus();
 }
 
-function profileSelectionNode(profile, model) {
+export function profileSelectionNode(profile, model) {
   const host = el("div", { class: "profile-selection", props: { id: "profile-selection" }, attrs: { "aria-live": "polite" } });
   const selection = profile.selection;
   host.hidden = !selection;
@@ -517,7 +522,7 @@ function updateProfileSelection(profile, model) {
   current.replaceWith(profileSelectionNode(profile, model));
 }
 
-function refreshProfileView(profile = state.performance.profile) {
+export function refreshProfileView(profile = state.performance.profile) {
   const model = buildProfileModel(profile);
   const body = $("profile-view-body");
   if (body) {
@@ -529,7 +534,7 @@ function refreshProfileView(profile = state.performance.profile) {
   if (meta) meta.textContent = profileViewMeta(profile);
 }
 
-function renderProfileTreeHead() {
+export function renderProfileTreeHead() {
   return el("div", { class: "profile-tree-head", attrs: { "aria-hidden": "true" } },
     el("span", { text: "" }),
     el("span", { text: "Function" }),
@@ -600,7 +605,7 @@ function renderProfileTreeRow(profile, entry, needle) {
   return row;
 }
 
-function renderProfileCallTree(profile, model) {
+export function renderProfileCallTree(profile, model) {
   const tree = model.tree;
   if (!model.rows.length) return [emptyInline(profileEmptyMessage(profile, "call-tree"))];
   const needle = profileFilterNeedle(profile);

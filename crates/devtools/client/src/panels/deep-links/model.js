@@ -6,12 +6,16 @@
  * schemes/domains/issues and a summary. Only the absolute root is sent, so the
  * controller can reject traversal, symlink escapes and unknown files.
  */
+import { el, numberValue } from "../../core/format.js";
+import { $ } from "../../core/globals.js";
+import { firstStringValue, formatCount, isObjectValue } from "../performance/profile/model.js";
+
 
 function deepLinksAbsoluteRoot(root) {
   return root.startsWith("/") || /^[A-Za-z]:[\\/]/.test(root) || root.startsWith("\\\\");
 }
 
-function deepLinksRootError(root) {
+export function deepLinksRootError(root) {
   if (!root) return "Enter an absolute project root.";
   if (!deepLinksAbsoluteRoot(root)) return "The project root must be an absolute path. Relative paths and traversal are not sent to the controller.";
   if (root.split(/[\\/]+/).includes("..")) return "The project root must not contain .. path segments.";
@@ -40,7 +44,7 @@ function deepLinksFirstNumber(...values) {
   return null;
 }
 
-function deepLinksRoot(data) {
+export function deepLinksRoot(data) {
   if (!isObjectValue(data)) return null;
   return isObjectValue(data.data) ? data.data : data;
 }
@@ -71,13 +75,13 @@ function deepLinksPlatform(value) {
   return platform;
 }
 
-function deepLinksPlatformLabel(platform) {
+export function deepLinksPlatformLabel(platform) {
   if (platform === "android") return "Android";
   if (platform === "apple") return "Apple";
   return platform || "Project";
 }
 
-function deepLinksKindLabel(kind) {
+export function deepLinksKindLabel(kind) {
   return {
     manifest: "Android manifest",
     android_manifest: "Android manifest",
@@ -93,7 +97,7 @@ function deepLinksKindLabel(kind) {
   }[String(kind || "").toLowerCase()] || kind || "";
 }
 
-function deepLinksFileStatus(status) {
+export function deepLinksFileStatus(status) {
   const raw = String(status || "").toLowerCase();
   if (["missing", "absent", "not_configured", "not-configured", "notconfigured", "none"].includes(raw)) {
     return { label: "Not configured", tone: "muted" };
@@ -279,7 +283,7 @@ function deepLinksConfigured(root, android, apple) {
   return android.schemes.length > 0 || android.hosts.length > 0 || apple.schemes.length > 0 || apple.domains.length > 0;
 }
 
-function normalizeDeepLinks(data) {
+export function normalizeDeepLinks(data) {
   const root = deepLinksRoot(data);
   if (!root) return null;
   const reason = deepLinksUnavailableReason(root);
@@ -366,11 +370,11 @@ function normalizeDeepLinks(data) {
   };
 }
 
-function deepLinksPlural(count, singular, plural = `${singular}s`) {
+export function deepLinksPlural(count, singular, plural = `${singular}s`) {
   return `${formatCount(count)} ${count === 1 ? singular : plural}`;
 }
 
-function deepLinksPanel(title, meta, ...children) {
+export function deepLinksPanel(title, meta, ...children) {
   return el("div", { class: "panel-block" },
     el("div", { class: "panel-block-head" },
       el("h2", { text: title }),
@@ -380,25 +384,25 @@ function deepLinksPanel(title, meta, ...children) {
   );
 }
 
-function deepLinksTable(headers, rows) {
+export function deepLinksTable(headers, rows) {
   return el("div", { class: "table-wrap" }, el("table", { class: "data-table" },
     el("thead", {}, el("tr", {}, ...headers.map(header => el("th", { class: header.num ? "num" : "", text: header.label })))),
     el("tbody", {}, ...rows),
   ));
 }
 
-function deepLinksEmptyBody(message) {
+export function deepLinksEmptyBody(message) {
   return el("div", { class: "panel-block-body" }, el("p", { class: "dl-note", text: message }));
 }
 
-function deepLinksStat(label, value, detail = "") {
+export function deepLinksStat(label, value, detail = "") {
   return el("div", { class: "stat" },
     el("div", { class: "stat-label", text: label }),
     el("div", { class: "stat-value" }, formatCount(value), detail ? el("small", { text: ` ${detail}` }) : null),
   );
 }
 
-function deepLinksLocation(issue) {
+export function deepLinksLocation(issue) {
   const path = issue.path || issue.file;
   if (path) {
     let location = path;

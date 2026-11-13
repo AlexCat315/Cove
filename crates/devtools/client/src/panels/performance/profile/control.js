@@ -1,4 +1,10 @@
-async function pollProfile() {
+import { el, fmtNumber, icon, numberValue } from "../../../core/format.js";
+import { MAX_HOTSPOTS, PROFILE_DURATIONS, PROFILE_HZ_RATES, RpcError, state } from "../../../core/globals.js";
+import { errorMessage, rpc, toast } from "../../../core/session.js";
+import { renderPerformance } from "../overview.js";
+import { applyProfilePayload, clearProfileTimers, firstArrayValue, firstNumberValue, firstStringValue, fmtSeconds, formatAddress, formatCount, isObjectValue, loadProfile, normalizeProfileStatus, profileElapsedMs, profilePayloadRoot, profilePlatformUnsupported, profileStatusLabel, profileStatusTone, startProfilePolling } from "./model.js";
+
+export async function pollProfile() {
   const perf = state.performance;
   const profile = perf.profile;
   const targetId = state.targetId;
@@ -38,18 +44,18 @@ async function pollProfile() {
   }
 }
 
-function profileErrorIsUnsupported(error) {
+export function profileErrorIsUnsupported(error) {
   if (!error) return false;
   if (["unsupported", "not_supported"].includes(error.code)) return true;
   return /not available on|unsupported|no sampler/i.test(error.message || "");
 }
 
-function profileErrorIsUnavailable(error) {
+export function profileErrorIsUnavailable(error) {
   if (!error) return false;
   return error.code === "unavailable" || /unavailable/i.test(error.message || "");
 }
 
-async function startProfile() {
+export async function startProfile() {
   const perf = state.performance;
   const profile = perf.profile;
   if (perf.snapshot || !state.targetId) return;
@@ -133,7 +139,7 @@ async function startProfile() {
   }
 }
 
-async function stopProfile(options = {}) {
+export async function stopProfile(options = {}) {
   const perf = state.performance;
   const profile = perf.profile;
   const targetId = state.targetId;
@@ -200,7 +206,7 @@ async function stopProfile(options = {}) {
   renderPerformance();
 }
 
-async function loadHotspots(options = {}) {
+export async function loadHotspots(options = {}) {
   const perf = state.performance;
   const profile = perf.profile;
   const targetId = state.targetId;
@@ -397,7 +403,7 @@ function normalizeHotspots(data, profile) {
   };
 }
 
-function renderProfileControls(profile, options = {}) {
+export function renderProfileControls(profile, options = {}) {
   const disabled = options.disabled === true;
   const sampling = ["sampling", "starting", "stopping"].includes(profile.status);
   const hzRates = PROFILE_HZ_RATES.includes(profile.hz)
@@ -462,7 +468,7 @@ function renderProfileControls(profile, options = {}) {
   );
 }
 
-function renderProfileStats(profile) {
+export function renderProfileStats(profile) {
   const elapsed = profileElapsedMs(profile);
   const rate = profile.samplesPerSecond ?? (elapsed > 0 ? (profile.samplesTaken / (elapsed / 1000)) : null);
   const interval = profile.intervalMs ?? (profile.hz > 0 ? 1000 / profile.hz : null);

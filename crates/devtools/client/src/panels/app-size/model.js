@@ -5,6 +5,11 @@
  * response. Cove has no Dart AOT output, so no package, library, class or
  * function attribution is invented; unattributed bytes stay unassigned.
  */
+import { el, numberValue } from "../../core/format.js";
+import { $, APP_SIZE_LOCAL_PLATFORMS, MAX_APP_SIZE_GROUPS, MAX_APP_SIZE_SECTIONS, MAX_APP_SIZE_SEGMENTS, MAX_APP_SIZE_SYMBOLS, state } from "../../core/globals.js";
+import { appSizeBuildContainment, appSizeListCoverage } from "./sections.js";
+import { firstNumberValue, formatCount, isObjectValue } from "../performance/profile/model.js";
+
 
 function appSizeWireNumber(value) {
   const direct = numberValue(value);
@@ -17,7 +22,7 @@ function appSizeWireNumber(value) {
   return null;
 }
 
-function appSizeFirstNumber(...values) {
+export function appSizeFirstNumber(...values) {
   for (const value of values) {
     const number = appSizeWireNumber(value);
     if (number !== null) return number;
@@ -31,7 +36,7 @@ function appSizeText(value) {
   return "";
 }
 
-function appSizeFirstText(...values) {
+export function appSizeFirstText(...values) {
   for (const value of values) {
     const text = appSizeText(value);
     if (text) return text;
@@ -39,7 +44,7 @@ function appSizeFirstText(...values) {
   return "";
 }
 
-function appSizeAddress(value) {
+export function appSizeAddress(value) {
   const text = appSizeText(value);
   if (text) {
     if (/^0x[0-9a-f]+$/i.test(text)) return text.toLowerCase();
@@ -68,7 +73,7 @@ function appSizePlatformLabel(platform) {
   }[platform] || platform;
 }
 
-function appSizeTargetUnavailable(target) {
+export function appSizeTargetUnavailable(target) {
   if (!target) return "Select a connected runtime.";
   if (target.kind !== "runtime") {
     return "App Size reads a running runtime's native executable. This target is a window, display or driver, so there is no process to analyze.";
@@ -199,7 +204,7 @@ function appSizeSectionBareName(entry) {
   return appSizeFirstText(entry.name, entry.section, entry.sectionName, entry.section_name, entry.id);
 }
 
-function appSizeAliasCount(entry) {
+export function appSizeAliasCount(entry) {
   if (Array.isArray(entry.aliases)) return entry.aliases.length;
   if (Array.isArray(entry.aliasNames)) return entry.aliasNames.length;
   if (Array.isArray(entry.alias_names)) return entry.alias_names.length;
@@ -215,7 +220,7 @@ function appSizeZeroFill(entry) {
     "zerofill", "zero_fill", "szero_fill", "threadlocalzerofill"].includes(kind);
 }
 
-function appSizeSymbolGroupName(name) {
+export function appSizeSymbolGroupName(name) {
   const text = String(name || "").replace(/^</, "");
   const head = (text.split("::")[0] || text).split(" as ")[0].trim();
   return (head || "(unknown)").slice(0, 160);
@@ -277,7 +282,7 @@ function appSizeWarnings(root) {
   return [...new Set(warnings)];
 }
 
-function normalizeAppSize(data) {
+export function normalizeAppSize(data) {
   const root = appSizeRoot(data);
   if (!root) return null;
   const reason = appSizeUnavailableReason(root);
@@ -500,7 +505,7 @@ function normalizeAppSize(data) {
   return executableMeta;
 }
 
-function appSizeTruncationNotice(info, label) {
+export function appSizeTruncationNotice(info, label) {
   if (!info) return null;
   let message = "";
   if (info.total !== null && info.total > info.shown) {

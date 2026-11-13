@@ -1,4 +1,12 @@
 /* Frames */
+import { clear, el, fmtMs, fmtNumber, icon, numberValue, shortId, textOf } from "../../core/format.js";
+import { $, FRAME_TABLE_LIMIT, FRAME_WINDOW, MAX_FRAME_RECORDS, dom, state } from "../../core/globals.js";
+import { errorMessage, isDisconnectedError, rpc, targetById, toast } from "../../core/session.js";
+import { emptyInline, errorInline, kvList, metric, rawDetails, showState } from "../../core/ui-helpers.js";
+import { applyRuntimeRefreshRate, renderPerformance, setPerformanceTab } from "./overview.js";
+import { returnToLive } from "./snapshots.js";
+import { refreshCurrent } from "../../shell/views.js";
+
 
 function frameParts(frame) {
   return {
@@ -19,13 +27,13 @@ function frameUiMs(frame) {
   return (parts.recomposition ?? 0) + (parts.layout ?? 0) + (parts.draw ?? 0);
 }
 
-function frameJank(frame, budget) {
+export function frameJank(frame, budget) {
   const ui = frameUiMs(frame);
   const encode = frameParts(frame).encode;
   return (ui !== null && ui > budget) || (encode !== null && encode > budget);
 }
 
-async function loadFrames(options = {}) {
+export async function loadFrames(options = {}) {
   const quiet = options.quiet === true;
   const perf = state.performance;
   if (perf.snapshot || !state.caps.timing || !state.targetId || perf.loading) return;
@@ -71,7 +79,7 @@ async function loadFrames(options = {}) {
   }
 }
 
-function renderFramesPanel() {
+export function renderFramesPanel() {
   const host = dom.performanceFrames;
   clear(host);
   const perf = state.performance;
@@ -150,7 +158,7 @@ function renderFramesPanel() {
   }
 }
 
-function snapshotBanner() {
+export function snapshotBanner() {
   const perf = state.performance;
   const snapshot = perf.snapshot;
   const source = snapshot?.target?.title || "";
