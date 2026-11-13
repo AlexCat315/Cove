@@ -297,6 +297,9 @@ fn internal(frame: &serde_json::Value) -> bool {
         "alloc::alloc::exchange_malloc",
         "libc::backtrace",
         "backtrace::",
+        "RtlCaptureStackBackTrace",
+        "_Unwind_Backtrace",
+        "_Unwind_GetIP",
     ]
     .iter()
     .any(|name| function.contains(name))

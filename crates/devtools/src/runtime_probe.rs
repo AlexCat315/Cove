@@ -21,6 +21,9 @@ pub type Environment = Rc<dyn Fn(Value) -> Result<Value, String>>;
 /// Hosts that cannot observe it leave this absent, and the probe answers
 /// `unavailable` rather than inventing coordinates.
 pub type ContentGeometrySource = Rc<dyn Fn() -> Result<ContentGeometry, String>>;
+/// The display's real refresh rate in Hz. Hosts that cannot observe it leave
+/// this absent, and the probe reports no rate rather than assuming 60 Hz.
+pub type RefreshRateSource = Rc<dyn Fn() -> Option<f64>>;
 
 pub struct RuntimeProbe {
     diagnostics: Diagnostics,
@@ -28,6 +31,7 @@ pub struct RuntimeProbe {
     pub resize: Option<Resize>,
     pub environment: Option<Environment>,
     pub content_geometry: Option<ContentGeometrySource>,
+    pub display_refresh_rate: Option<RefreshRateSource>,
     timeline: Timeline,
     timing: VecDeque<TimingFrame>,
     sequence: u64,
@@ -52,6 +56,7 @@ impl RuntimeProbe {
             resize: None,
             environment: None,
             content_geometry: None,
+            display_refresh_rate: None,
             timeline,
             timing: VecDeque::new(),
             sequence: 0,
@@ -95,6 +100,9 @@ impl RuntimeProbe {
         }
         if self.content_geometry.is_some() {
             capabilities.push("content_geometry");
+        }
+        if self.display_refresh_rate.is_some() {
+            capabilities.push("refresh_rate");
         }
         if crate::profile::unavailable_reason().is_none() {
             capabilities.push("cpu_profile");
@@ -269,6 +277,7 @@ impl RuntimeProbe {
             ProbeCommand::Timing { after } => Ok(json!({
                 "frames": self.timing.iter().filter(|frame| frame.frame > after).collect::<Vec<_>>(),
                 "dropped": self.timing.front().map_or(0, |frame| frame.frame.saturating_sub(after).saturating_sub(1)),
+                "refreshRate": self.display_refresh_rate.as_ref().and_then(|query| query()),
             })),
             ProbeCommand::AnalyzeUiFrame { frame } => {
                 let analysis = match self.timing.iter().find(|timing| timing.frame == frame) {

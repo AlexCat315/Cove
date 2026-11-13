@@ -756,7 +756,9 @@ pub(crate) fn analyze(pid: u32, executable: &Path, limits: Limits) -> Result<Val
         truncated.push("groups");
     }
 
-    Ok(json!({
+    // One flat `json!` literal this wide exceeds serde_json's macro recursion
+    // limit, so the report is assembled from its own sections.
+    let mut report = json!({
         "available": true,
         "measurement": "native_executable",
         "label": LABEL,
@@ -773,6 +775,8 @@ pub(crate) fn analyze(pid: u32, executable: &Path, limits: Limits) -> Result<Val
         "segment_file_bytes": segment_file_bytes,
         "segment_vm_bytes": segment_vm_bytes,
         "segments": segment_rows,
+    });
+    let sections = json!({
         "section_bytes": section_vm_bytes,
         "section_vm_bytes": section_vm_bytes,
         "section_file_bytes": section_file_bytes,
@@ -781,6 +785,8 @@ pub(crate) fn analyze(pid: u32, executable: &Path, limits: Limits) -> Result<Val
         "sections_returned": section_rows.len(),
         "sections_truncated": sections_truncated,
         "sections": section_rows,
+    });
+    let symbols = json!({
         "symbol_bytes": symbol_bytes,
         "symbol_size_basis": "Symbol sizes come from the object symbol table. Mach-O records no sizes, so a size-less text symbol is sized to the next text symbol in its own section and marked inferred_size; data symbols keep their recorded size. Symbols that share one section and address are aliases: they are reported on one row with an alias count instead of being charged twice.",
         "symbol_count": symbol_count,
@@ -790,10 +796,14 @@ pub(crate) fn analyze(pid: u32, executable: &Path, limits: Limits) -> Result<Val
         "symbols_returned": symbol_rows.len(),
         "symbols_truncated": symbols_truncated,
         "symbols": symbol_rows,
+    });
+    let groups = json!({
         "group_count": group_count,
         "groups_returned": group_rows.len(),
         "groups_truncated": groups_truncated,
         "groups": group_rows,
+    });
+    let totals = json!({
         "attributed_bytes": split.attributed_file_bytes,
         "attributed_vm_bytes": split.attributed_vm_bytes,
         "linkedit_bytes": split.linkedit_bytes,
@@ -820,7 +830,12 @@ pub(crate) fn analyze(pid: u32, executable: &Path, limits: Limits) -> Result<Val
             "groups": limits.groups,
         },
         "truncated": truncated,
-    }))
+    });
+    let object = report.as_object_mut().expect("the report is an object");
+    for section in [sections, symbols, groups, totals] {
+        object.extend(section.as_object().expect("each section is an object").clone());
+    }
+    Ok(report)
 }
 
 #[cfg(test)]

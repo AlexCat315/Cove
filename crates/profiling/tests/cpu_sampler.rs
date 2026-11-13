@@ -1,18 +1,34 @@
 //! End-to-end sampler checks: a real busy thread is sampled and symbolized.
+//!
+//! The same assertions run on every backend. Where no sampler exists, the
+//! platform-gap test covers the reported error instead and the sampling tests
+//! return early rather than inventing a profile.
 
-use cove_profiling::{CpuSampler, SampleConfig, Symbolizer};
-
-#[cfg(target_os = "macos")]
-use std::sync::Arc;
-#[cfg(target_os = "macos")]
 use std::sync::atomic::{AtomicBool, Ordering};
-#[cfg(target_os = "macos")]
+use std::sync::{Arc, Mutex, MutexGuard};
 use std::thread;
-#[cfg(target_os = "macos")]
 use std::time::Duration;
 
+use cove_profiling::{
+    CpuSampler, PlatformSupport, SampleConfig, SamplingError, SymbolizationError, Symbolizer,
+    platform_support,
+};
+
+/// Linux and Android install one process-wide SIGPROF handler, so sampling
+/// tests must not overlap on any platform.
+static SAMPLER_LOCK: Mutex<()> = Mutex::new(());
+
+fn sampler_lock() -> MutexGuard<'static, ()> {
+    SAMPLER_LOCK
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
+}
+
+fn supported() -> bool {
+    matches!(platform_support(), PlatformSupport::Supported)
+}
+
 /// Kept out of line so a sampled instruction address lands inside it.
-#[cfg(target_os = "macos")]
 #[inline(never)]
 fn cove_profiling_busy_loop(stop: &AtomicBool) {
     let mut accumulator: u64 = 0;
@@ -22,7 +38,8 @@ fn cove_profiling_busy_loop(stop: &AtomicBool) {
     }
 }
 
-#[cfg(target_os = "macos")]
+/// Names stay within the 15 bytes the Linux kernel keeps in `comm`, so two
+/// tests cannot collide on a truncated prefix.
 fn start_busy_thread(name: &str) -> (Arc<AtomicBool>, thread::JoinHandle<()>) {
     let stop = Arc::new(AtomicBool::new(false));
     let thread_stop = Arc::clone(&stop);
@@ -30,19 +47,27 @@ fn start_busy_thread(name: &str) -> (Arc<AtomicBool>, thread::JoinHandle<()>) {
         .name(name.to_owned())
         .spawn(move || cove_profiling_busy_loop(&thread_stop))
         .expect("spawn busy thread");
-    // Give the pthread its name before the sampler enumerates threads.
+    // Give the thread its name before the sampler enumerates threads.
     thread::sleep(Duration::from_millis(50));
     (stop, handle)
 }
 
-#[cfg(target_os = "macos")]
-mod macos {
+/// Source paths are recorded with the host's separator.
+fn source_path(path: &str) -> String {
+    path.replace('\\', "/")
+}
+
+mod sampled {
     use super::*;
 
     #[test]
     fn samples_a_busy_thread_and_resolves_a_known_symbol() {
-        let name = format!("cove-profiling-test-{}", std::process::id());
-        let (stop, busy) = start_busy_thread(&name);
+        if !supported() {
+            return;
+        }
+        let _guard = sampler_lock();
+        let name = "cove-prof-busy";
+        let (stop, busy) = start_busy_thread(name);
         let config = SampleConfig {
             interval: Duration::from_millis(1),
             max_samples: 1024,
@@ -54,7 +79,7 @@ mod macos {
             sampler.samples_taken() > 0,
             "the sampler reported no live samples"
         );
-        assert_eq!(sampler.thread_name(), name.as_str());
+        assert_eq!(sampler.thread_name(), name);
         assert!(sampler.elapsed() >= Duration::from_millis(350));
         let profile = sampler.stop().expect("stop sampler");
         stop.store(true, Ordering::Release);
@@ -114,10 +139,9 @@ mod macos {
         );
         assert!(
             resolved.iter().all(|frame| {
-                frame
-                    .location
-                    .as_ref()
-                    .is_some_and(|location| location.file.ends_with("tests/cpu_sampler.rs"))
+                frame.location.as_ref().is_some_and(|location| {
+                    source_path(&location.file).ends_with("tests/cpu_sampler.rs")
+                })
             }),
             "a busy-loop frame resolved outside its source file: {resolved:?}"
         );
@@ -126,7 +150,7 @@ mod macos {
                 .location
                 .as_ref()
                 .is_some_and(|location| location.line.is_some())),
-            "no busy-loop frame carried a DWARF line: {resolved:?}"
+            "no busy-loop frame carried a line number: {resolved:?}"
         );
         let labelled = resolved
             .iter()
@@ -143,8 +167,12 @@ mod macos {
 
     #[test]
     fn ring_buffer_is_bounded_and_keeps_the_newest_samples() {
-        let name = format!("cove-profiling-ring-{}", std::process::id());
-        let (stop, busy) = start_busy_thread(&name);
+        if !supported() {
+            return;
+        }
+        let _guard = sampler_lock();
+        let name = "cove-prof-ring";
+        let (stop, busy) = start_busy_thread(name);
         let config = SampleConfig {
             interval: Duration::from_millis(1),
             max_samples: 16,
@@ -177,38 +205,56 @@ mod macos {
 
     #[test]
     fn reports_unknown_thread_names_instead_of_inventing_a_profile() {
-        let error = CpuSampler::start(
-            "cove-profiling-thread-that-does-not-exist",
-            SampleConfig::default(),
-        );
-        assert!(matches!(
-            error,
-            Err(cove_profiling::SamplingError::ThreadNotFound(_))
-        ));
+        if !supported() {
+            return;
+        }
+        let _guard = sampler_lock();
+        let error = CpuSampler::start("cove-prof-absent", SampleConfig::default());
+        assert!(matches!(error, Err(SamplingError::ThreadNotFound(_))));
+    }
+
+    #[test]
+    fn refuses_to_sample_the_calling_thread() {
+        if !supported() {
+            return;
+        }
+        let _guard = sampler_lock();
+        let outcome = thread::Builder::new()
+            .name("cove-prof-self".to_owned())
+            .spawn(|| {
+                // Let the name reach the kernel before the sampler looks for it.
+                thread::sleep(Duration::from_millis(20));
+                CpuSampler::start("cove-prof-self", SampleConfig::default()).map(|_| ())
+            })
+            .expect("spawn")
+            .join()
+            .expect("join");
+        assert!(matches!(outcome, Err(SamplingError::TargetIsCaller)));
     }
 }
 
-#[cfg(not(target_os = "macos"))]
-mod unsupported {
-    use super::*;
-
-    #[test]
-    fn sampling_and_symbolization_report_the_platform_gap() {
-        assert!(matches!(
-            cove_profiling::platform_support(),
-            cove_profiling::PlatformSupport::Unsupported { reason } if !reason.is_empty()
-        ));
-        let error = match CpuSampler::start("main", SampleConfig::default()) {
-            Ok(_) => panic!("a sampler was created on a platform without one"),
-            Err(error) => error,
-        };
-        assert!(matches!(
-            error,
-            cove_profiling::SamplingError::Unsupported { .. }
-        ));
-        assert!(matches!(
-            Symbolizer::new(),
-            Err(cove_profiling::SymbolizationError::Unsupported { .. })
-        ));
+#[test]
+fn platform_support_matches_the_sampler_outcome() {
+    match platform_support() {
+        PlatformSupport::Supported => {
+            let _guard = sampler_lock();
+            assert!(matches!(
+                CpuSampler::start("cove-prof-absent", SampleConfig::default()),
+                Err(SamplingError::ThreadNotFound(_))
+            ));
+            assert!(Symbolizer::new().is_ok());
+        }
+        PlatformSupport::Unsupported { reason } => {
+            assert!(!reason.is_empty());
+            let error = match CpuSampler::start("main", SampleConfig::default()) {
+                Ok(_) => panic!("a sampler was created on a platform without one"),
+                Err(error) => error,
+            };
+            assert!(matches!(error, SamplingError::Unsupported { .. }));
+            assert!(matches!(
+                Symbolizer::new(),
+                Err(SymbolizationError::Unsupported { .. })
+            ));
+        }
     }
 }

@@ -538,6 +538,10 @@ impl Application {
                     )
                 }))
             },
+            display_refresh_rate: {
+                let host = state.host.clone();
+                Some(Rc::new(move || host.current_display_refresh_rate(None)))
+            },
         };
         match factory(
             configuration,
@@ -1715,7 +1719,14 @@ impl Application {
                 windows.insert(format!("{prefix}.{name}"), count);
             }
         }
-        crate::desktop::diagnostics::DiagnosticMemorySnapshot { counters, windows }
+        crate::desktop::diagnostics::DiagnosticMemorySnapshot {
+            counters,
+            windows,
+            pressure: crate::desktop::diagnostics::MemoryPressure {
+                subscribed: super::memory::platform_pressure::is_subscribed(),
+                low: super::memory::platform_pressure::is_low(),
+            },
+        }
     }
 
     pub fn trim_memory(&self) {

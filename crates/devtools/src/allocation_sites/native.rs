@@ -94,7 +94,7 @@ fn is_allocator_internal(frame: &AllocationSiteFrame) -> bool {
     let Some(function) = frame.function.as_deref() else {
         return false;
     };
-    const NAMES: [&str; 18] = [
+    const NAMES: [&str; 21] = [
         "cove_alloc::",
         "cove_alloc::TrackingAllocator",
         "cove_alloc::sampling",
@@ -113,6 +113,9 @@ fn is_allocator_internal(frame: &AllocationSiteFrame) -> bool {
         "alloc::alloc::exchange_malloc",
         "libc::backtrace",
         "backtrace::",
+        "RtlCaptureStackBackTrace",
+        "_Unwind_Backtrace",
+        "_Unwind_GetIP",
     ];
     NAMES.iter().any(|name| function.contains(name))
 }

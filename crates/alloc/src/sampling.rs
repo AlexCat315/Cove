@@ -9,10 +9,14 @@
 //!
 //! # What is real
 //!
-//! Stacks are captured with `libc::backtrace` on Apple platforms and GNU Linux. The
-//! addresses are raw instruction pointers; symbolization is a later layer.
-//! Identical addresses within one process identify one allocation site, so
-//! aggregation by stack is exact for the (unsymbolized) data that was captured.
+//! Stacks are captured for real on every platform Cove ships on: `libc::backtrace`
+//! on Apple and GNU Linux, `RtlCaptureStackBackTrace` on Windows, and the Itanium
+//! unwinder's `_Unwind_Backtrace` on Android and musl Linux. Each backend skips its
+//! own capture frame, so the innermost retained address is the sampling hook on
+//! every platform. The addresses are raw instruction pointers; symbolization is a
+//! later layer. Identical addresses within one process identify one allocation
+//! site, so aggregation by stack is exact for the (unsymbolized) data that was
+//! captured.
 //!
 //! # Rules
 //!
@@ -34,10 +38,10 @@
 //!
 //! # Platform gaps
 //!
-//! Windows, musl Linux, Android, wasm and every other target without
-//! `libc::backtrace` report [`SamplingSupport::Unsupported`] with a reason.
-//! [`start_sampling`] returns [`SamplingError::Unsupported`] there instead of
-//! enabling a sampler that cannot capture stacks.
+//! wasm and any other target with no stack walker — including a Linux libc that
+//! is neither glibc nor musl — report [`SamplingSupport::Unsupported`] with a
+//! reason. [`start_sampling`] returns [`SamplingError::Unsupported`] there
+//! instead of enabling a sampler that cannot capture stacks.
 
 mod capture;
 mod ring;
@@ -56,7 +60,7 @@ pub const SITE_RING_CAPACITY: usize = ring::CAPACITY;
 /// Whether allocation-site sampling can capture real stacks on this target.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum SamplingSupport {
-    /// `libc::backtrace` is available and sites are real.
+    /// A platform stack walker is available and sites are real.
     Supported,
     /// This target cannot capture stacks; the reason names the gap.
     Unsupported {
@@ -91,10 +95,10 @@ pub enum SamplingError {
 pub struct AllocationSite {
     /// Raw instruction addresses, innermost caller first.
     ///
-    /// Addresses are absolute in-process values returned by `libc::backtrace`;
-    /// they are not symbolized and are not comparable across processes. The
-    /// innermost few frames belong to the sampling hook itself; symbolization is
-    /// the layer that filters them from the caller's view.
+    /// Addresses are absolute in-process values returned by the platform's stack
+    /// walker; they are not symbolized and are not comparable across processes.
+    /// The innermost few frames belong to the sampling hook itself; symbolization
+    /// is the layer that filters them from the caller's view.
     pub frames: Vec<u64>,
     /// Bytes allocated through this exact stack.
     pub bytes: u64,
@@ -120,7 +124,7 @@ pub struct AllocationSiteReport {
     /// Samples overwritten by newer ones, lost to a slot claim race, or
     /// rejected as incomplete.
     pub samples_dropped: u64,
-    /// Sampling triggers where `libc::backtrace` produced no caller frame.
+    /// Sampling triggers where the platform's stack walker produced no caller frame.
     pub capture_failures: u64,
 }
 
@@ -412,14 +416,17 @@ mod tests {
     #[test]
     fn support_names_a_real_capture_backend() {
         let support = sampling_support();
-        let has_backtrace = cfg!(any(
+        let has_walker = cfg!(any(
             target_vendor = "apple",
-            all(target_os = "linux", target_env = "gnu")
+            all(target_os = "linux", target_env = "gnu"),
+            target_os = "windows",
+            target_os = "android",
+            all(target_os = "linux", target_env = "musl"),
         ));
         assert_eq!(
             matches!(support, SamplingSupport::Supported),
-            has_backtrace,
-            "supported must mean libc::backtrace exists"
+            has_walker,
+            "supported must mean a real platform stack walker exists"
         );
         if let SamplingSupport::Unsupported { platform, reason } = support {
             assert!(!platform.is_empty(), "an unsupported answer names the OS");

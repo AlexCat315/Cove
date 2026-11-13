@@ -33,7 +33,7 @@ public final class MainActivity extends Activity {
     static native void text(long session, String text, boolean composing);
     static native void key(long session, int scancode, int modifiers);
     static native void scroll(long session, float x, float y, float deltaX, float deltaY);
-    static native void surface(long session, float density, float originX, float originY, int device, int posture, float[] features, float top, float leading, float bottom, float trailing, float keyboard, float[] textSizes);
+    static native void surface(long session, float density, float originX, float originY, int device, int posture, float[] features, float top, float leading, float bottom, float trailing, float keyboard, float[] textSizes, float refreshRate);
     static native void keyState(long session, int scancode, boolean down);
     static native void edit(long session, int kind, int start, int end);
     static native String snapshot(long session);

@@ -101,6 +101,22 @@ function cacheOnlySnapshot() {
   };
 }
 
+// A provider whose readings move between polls, so the overview chart has a
+// real series to draw. Read index 2 reports a subscribed low-pressure signal.
+function seriesSnapshot(read) {
+  return {
+    counters: {
+      ...cacheCounters(),
+      processResidentBytes: (100 + read * 20) * 1048576,
+      processVirtualBytes: 536870912,
+      allocCurrentBytes: (16 + read * 4) * 1048576,
+      allocLiveBlocks: 96 + read,
+    },
+    windows: windows(),
+    pressure: { subscribed: true, low: read === 2 },
+  };
+}
+
 function rpcError(code, message) {
   return {
     jsonrpc: "2.0",
@@ -111,6 +127,7 @@ function rpcError(code, message) {
 
 function createFake(mode) {
   const calls = [];
+  let seriesReads = 0;
 
   function session() {
     return {
@@ -131,6 +148,7 @@ function createFake(mode) {
 
   function memoryResponse() {
     if (mode === "null") return { ok: true, data: null };
+    if (mode === "series") return { ok: true, data: seriesSnapshot(seriesReads++) };
     if (mode === "allocator") return { ok: true, data: allocatorSnapshot() };
     if (mode === "partial") return { ok: true, data: partialSnapshot() };
     return { ok: true, data: cacheOnlySnapshot() };
@@ -320,6 +338,19 @@ async function waitFor(cdp, description, expression, timeout = 8000) {
     await new Promise(resolve => setTimeout(resolve, 50));
   }
   throw new Error(`Timed out waiting for ${description}. Last value: ${JSON.stringify(last)}`);
+}
+
+async function waitUntil(description, predicate, timeout = 8000) {
+  const deadline = Date.now() + timeout;
+  while (Date.now() < deadline) {
+    if (predicate()) return;
+    await new Promise(resolve => setTimeout(resolve, 40));
+  }
+  throw new Error(`Timed out waiting for ${description}.`);
+}
+
+function close(a, b, tolerance, message) {
+  assert.ok(Math.abs(a - b) <= tolerance, `${message}: ${a} vs ${b} (tolerance ${tolerance})`);
 }
 
 async function click(cdp, selector) {
@@ -555,6 +586,188 @@ async function scenarioNull() {
   });
 }
 
+function chartScript() {
+  return `(() => {
+    const block = [...document.querySelectorAll("#memory-content .panel-block")]
+      .find(node => node.querySelector("h2")?.textContent === "Memory overview");
+    if (!block) return null;
+    const plot = block.querySelector(".memory-chart-plot");
+    const clip = node => node ? node.style.clipPath : "";
+    return {
+      meta: block.querySelector(".pane-meta")?.textContent || "",
+      empty: block.querySelector(".empty-inline")?.textContent || "",
+      hasCanvas: block.querySelector("canvas") !== null,
+      lines: [...block.querySelectorAll(".memory-line")].map(node => ({
+        key: [...node.classList].find(name => name.startsWith("is-")).slice(3),
+        clip: clip(node),
+      })),
+      areas: [...block.querySelectorAll(".memory-area")].map(node => [...node.classList].find(name => name.startsWith("is-")).slice(3)),
+      dots: [...block.querySelectorAll(".memory-dot")].map(node => [...node.classList].find(name => name.startsWith("is-")).slice(3)),
+      pressure: block.querySelectorAll(".memory-pressure").length,
+      pressureTitles: [...block.querySelectorAll(".memory-pressure")].map(node => node.getAttribute("title")),
+      yaxis: [...block.querySelectorAll(".memory-yaxis span")].map(node => node.textContent),
+      xaxis: [...block.querySelectorAll(".memory-xaxis span")].map(node => node.textContent),
+      readout: block.querySelector(".memory-chart-readout")?.textContent || "",
+      cursorHidden: block.querySelector(".memory-cursor")?.hidden ?? true,
+      legend: [...block.querySelectorAll(".memory-legend-toggle")].map(node => ({
+        key: [...node.classList].find(name => name.startsWith("is-")).slice(3),
+        on: node.classList.contains("is-on"),
+        pressed: node.getAttribute("aria-pressed"),
+        text: node.textContent,
+      })),
+      notes: [...block.querySelectorAll(".perf-note")].map(node => node.textContent),
+      plotRect: plot ? (() => { const r = plot.getBoundingClientRect(); return { left: r.left, top: r.top, width: r.width, height: r.height }; })() : null,
+      pressureStat: (() => {
+        const node = [...document.querySelectorAll("#memory-content .stat")]
+          .find(row => row.querySelector(".stat-label")?.textContent === "Memory pressure");
+        return node?.querySelector(".stat-value")?.textContent.trim() ?? "";
+      })(),
+    };
+  })()`;
+}
+
+function niceByteScale(max) {
+  if (max <= 0) return 1024;
+  const base = 10 ** Math.floor(Math.log10(max));
+  for (const step of [1, 2, 5, 10]) {
+    if (step * base >= max) return step * base;
+  }
+  return 10 * base;
+}
+
+function fmtBytes(value) {
+  if (value < 1024) return `${value} B`;
+  if (value < 1048576) return `${(value / 1024).toFixed(1)} KB`;
+  if (value < 1073741824) return `${(value / 1048576).toFixed(1)} MB`;
+  return `${(value / 1073741824).toFixed(2)} GB`;
+}
+
+async function refreshMemory(cdp, fake) {
+  const before = fake.calls.filter(name => name === "query_ui_memory").length;
+  await click(cdp, "#memory-refresh");
+  await waitFor(cdp, "memory refresh", `(() => {
+    const button = document.getElementById("memory-refresh");
+    return button.disabled === false;
+  })()`);
+  await waitUntil("refresh read", () => fake.calls.filter(name => name === "query_ui_memory").length > before);
+  await new Promise(resolve => setTimeout(resolve, 120));
+}
+
+async function scenarioOverviewChart() {
+  await runScenario("series", async ({ cdp, fake }) => {
+    // One reading: every series is a single point, never an invented trend.
+    await waitFor(cdp, "overview chart", `document.querySelector("#memory-content .memory-chart-plot") !== null`);
+    let chart = await cdp.evaluate(chartScript());
+    assert.equal(chart.hasCanvas, false, "the overview chart stays DOM/CSS");
+    assert.match(chart.meta, /1 sample ·/);
+    assert.deepEqual(chart.dots.sort(), ["allocated", "caches", "rss", "targets"]);
+    assert.equal(chart.lines.length, 0);
+    assert.ok(chart.notes.some(note => /a trend needs at least two readings/.test(note)));
+    assert.equal(chart.pressure, 0, "a normal pressure sample draws no mark");
+    assert.equal(chart.pressureStat, "Normal");
+
+    // Three more readings produce real lines whose geometry matches the
+    // provider's bytes, not the row order.
+    await refreshMemory(cdp, fake);
+    await refreshMemory(cdp, fake);
+    await refreshMemory(cdp, fake);
+    chart = await cdp.evaluate(chartScript());
+    assert.match(chart.meta, /4 samples ·/);
+    assert.equal(chart.dots.length, 0);
+    assert.deepEqual(chart.lines.map(line => line.key).sort(), ["allocated", "caches", "rss", "targets"]);
+    assert.deepEqual(chart.areas.sort(), ["allocated", "caches", "rss", "targets"]);
+    const scale = niceByteScale(160 * 1048576);
+    assert.equal(chart.yaxis[4], fmtBytes(scale), "the top tick labels the real byte scale");
+    assert.equal(chart.yaxis[0], "0 B");
+    const rss = chart.lines.find(line => line.key === "rss");
+    const points = rss.clip.replace(/^polygon\(/, "").replace(/\)$/, "").split(", ").map(pair => pair.trim().split(" "));
+    // Forward points then the reversed line band: the first four are the series.
+    const forward = points.slice(0, 4);
+    close(parseFloat(forward[0][0]), 0, 0.001, "the first sample sits at the axis origin");
+    close(parseFloat(forward[3][0]), 100, 0.001, "the last sample sits at the axis end");
+    close(parseFloat(forward[0][1]), 100 - ((100 * 1048576) / scale) * 100, 0.01, "the first RSS point matches 100 MiB");
+    close(parseFloat(forward[3][1]), 100 - ((160 * 1048576) / scale) * 100, 0.01, "the last RSS point matches 160 MiB");
+    close(parseFloat(forward[1][1]), 100 - ((120 * 1048576) / scale) * 100, 0.01, "the second RSS point matches 120 MiB");
+    assert.ok(points.slice(4).every(pair => pair[1].startsWith("calc(")), "the line band keeps a constant pixel thickness");
+    assert.equal(chart.pressure, 1, "only the subscribed low sample draws a mark");
+    assert.match(chart.pressureTitles[0], /Memory-pressure signal at/);
+    assert.ok(chart.notes.some(note => /Vertical marks are the host's subscribed memory-pressure signal/.test(note)));
+    assert.equal(chart.pressureStat, "Normal", "the latest sample is normal again");
+    assert.match(chart.readout, /Process RSS 160\.0 MB/);
+    assert.match(chart.readout, /Allocator current 28\.0 MB/);
+    assert.equal(chart.cursorHidden, true);
+    assert.equal(chart.xaxis.length, 3);
+    await screenshot(cdp, process.env.MEMORY_CHART_SHOT);
+
+    // Hovering reads the nearest real sample; leaving returns to the latest.
+    // The extremes are spacing-independent: the first and last readings.
+    let rect = (await cdp.evaluate(chartScript())).plotRect;
+    await cdp.send("Input.dispatchMouseEvent", { type: "mouseMoved", x: rect.left + 2, y: rect.top + rect.height / 2 });
+    await waitFor(cdp, "cursor readout", `(() => {
+      const block = [...document.querySelectorAll("#memory-content .panel-block")].find(node => node.querySelector("h2")?.textContent === "Memory overview");
+      return block.querySelector(".memory-cursor").hidden === false;
+    })()`);
+    chart = await cdp.evaluate(chartScript());
+    assert.match(chart.readout, /Process RSS 100\.0 MB/, "the cursor reads the nearest sample, not an interpolation");
+    rect = chart.plotRect;
+    await cdp.send("Input.dispatchMouseEvent", { type: "mouseMoved", x: rect.left + rect.width - 2, y: rect.top + rect.height / 2 });
+    await waitFor(cdp, "cursor at last sample", `(() => {
+      const block = [...document.querySelectorAll("#memory-content .panel-block")].find(node => node.querySelector("h2")?.textContent === "Memory overview");
+      return /Process RSS 160\\.0 MB/.test(block.querySelector(".memory-chart-readout").textContent);
+    })()`);
+    await cdp.send("Input.dispatchMouseEvent", { type: "mouseMoved", x: rect.left - 40, y: rect.top - 40 });
+    await waitFor(cdp, "cursor hidden", `(() => {
+      const block = [...document.querySelectorAll("#memory-content .panel-block")].find(node => node.querySelector("h2")?.textContent === "Memory overview");
+      return block.querySelector(".memory-cursor").hidden === true;
+    })()`);
+    chart = await cdp.evaluate(chartScript());
+    assert.match(chart.readout, /Process RSS 160\.0 MB/);
+
+    // Legend toggles rescale the axis to the remaining series.
+    await click(cdp, '.memory-legend-toggle.is-rss');
+    await waitFor(cdp, "rss hidden", `document.querySelector("#memory-content .memory-line.is-rss") === null`);
+    chart = await cdp.evaluate(chartScript());
+    assert.equal(chart.legend.find(item => item.key === "rss").on, false);
+    assert.equal(chart.legend.find(item => item.key === "rss").pressed, "false");
+    assert.equal(chart.yaxis[4], fmtBytes(niceByteScale(28 * 1048576)), "hiding RSS rescales to the allocator series");
+    assert.doesNotMatch(chart.readout, /Process RSS/);
+    await click(cdp, '.memory-legend-toggle.is-virtual');
+    await waitFor(cdp, "virtual shown", `document.querySelector("#memory-content .memory-line.is-virtual") !== null`);
+    chart = await cdp.evaluate(chartScript());
+    assert.equal(chart.yaxis[4], fmtBytes(niceByteScale(536870912)), "virtual dominates the scale when shown");
+    await click(cdp, '.memory-legend-toggle.is-virtual');
+    await click(cdp, '.memory-legend-toggle.is-rss');
+    await waitFor(cdp, "rss restored", `document.querySelector("#memory-content .memory-line.is-rss") !== null`);
+
+    // Follow appends real readings on the chosen interval.
+    await cdp.evaluate(`(() => {
+      const select = document.getElementById("memory-interval");
+      select.value = "1000";
+      select.dispatchEvent(new Event("change", { bubbles: true }));
+    })()`);
+    await click(cdp, "#memory-follow");
+    const readsBeforeFollow = fake.calls.filter(name => name === "query_ui_memory").length;
+    await waitUntil("follow polls", () => fake.calls.filter(name => name === "query_ui_memory").length >= readsBeforeFollow + 2, 9000);
+    chart = await cdp.evaluate(chartScript());
+    const followedSamples = parseInt(chart.meta, 10);
+    assert.ok(followedSamples >= 6, `follow appended real readings: ${chart.meta}`);
+    await click(cdp, "#memory-follow");
+    const readsAfterStop = fake.calls.filter(name => name === "query_ui_memory").length;
+    await new Promise(resolve => setTimeout(resolve, 1600));
+    assert.equal(fake.calls.filter(name => name === "query_ui_memory").length, readsAfterStop, "unfollowing stops the poll");
+
+    // Reset discards the series without touching the provider snapshot.
+    await click(cdp, '#memory-content .panel-block-head button');
+    await waitFor(cdp, "series reset", `document.querySelector("#memory-content .memory-chart-plot") === null`);
+    chart = await cdp.evaluate(chartScript());
+    assert.match(chart.empty, /No samples recorded yet/);
+    assert.equal(chart.pressureStat, "Normal", "resetting the series keeps the current snapshot");
+    await refreshMemory(cdp, fake);
+    chart = await cdp.evaluate(chartScript());
+    assert.match(chart.meta, /1 sample ·/);
+  });
+}
+
 console.log("Memory allocation harness: fake controller + headless Chrome");
 await scenarioAllocator();
 console.log("PASS  allocator counters and flat size-class histogram");
@@ -564,4 +777,6 @@ await scenarioCacheOnly();
 console.log("PASS  no allocator reports Not reported while RSS/cache/render stay");
 await scenarioNull();
 console.log("PASS  null provider keeps the unavailable state with no allocation panel");
+await scenarioOverviewChart();
+console.log("PASS  overview chart: real sample series, byte-accurate geometry, pressure marks, hover readout, legend rescale, follow polling, reset");
 console.log("RESULT PASS");

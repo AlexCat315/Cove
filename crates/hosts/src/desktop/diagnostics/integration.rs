@@ -20,10 +20,21 @@ pub struct DevToolsConfiguration {
     pub connection: Option<(String, String)>,
 }
 
+/// The host's platform memory-pressure signal, in the shape DevTools consumes.
+///
+/// `subscribed` is false where the host never wired the signal, which is not a
+/// measured "normal".
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct MemoryPressure {
+    pub subscribed: bool,
+    pub low: bool,
+}
+
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct DiagnosticMemorySnapshot {
     pub counters: BTreeMap<String, u64>,
     pub windows: BTreeMap<String, u64>,
+    pub pressure: MemoryPressure,
 }
 
 pub struct DiagnosticsCallbacks {
@@ -40,6 +51,9 @@ pub struct DiagnosticsCallbacks {
     /// `None` where the host cannot observe where its content sits on screen.
     /// A client must then refuse point selection instead of guessing.
     pub content_geometry: Option<Rc<dyn Fn() -> Result<ContentGeometry, String>>>,
+    /// The display's real refresh rate in Hz, or `None` where the host cannot
+    /// observe it. A client must not assume 60 Hz when this is absent.
+    pub display_refresh_rate: Option<Rc<dyn Fn() -> Option<f64>>>,
 }
 
 /// Where a runtime's content starts in the window-server coordinate space a

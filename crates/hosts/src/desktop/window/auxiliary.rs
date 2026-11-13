@@ -171,6 +171,12 @@ impl AuxiliaryAppWindow {
                         cfg!(any(target_os = "macos", target_os = "ios")),
                     )
                 })),
+                display_refresh_rate: {
+                    let refresh_host = host.clone();
+                    Some(Rc::new(move || {
+                        refresh_host.current_display_refresh_rate(Some(id))
+                    }))
+                },
             },
         )?);
         Ok(())

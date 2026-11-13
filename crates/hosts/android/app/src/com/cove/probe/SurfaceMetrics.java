@@ -85,10 +85,14 @@ final class SurfaceMetrics {
         float[] features = folding != null ? folding.features(density) : new float[0];
         int[] origin = new int[2];
         view.getLocationOnScreen(origin);
+        // The display's own rate, not a frame-interval estimate: an app drawing
+        // at 30 fps on a 60 Hz panel must still report 60 Hz.
+        android.view.Display panel = view.getDisplay();
+        float refreshRate = panel != null ? panel.getRefreshRate() : 0f;
         MainActivity.surface(target, density, origin[0], origin[1], device, posture, features,
                 safe.top / density, (rtl ? safe.right : safe.left) / density,
                 safe.bottom / density, (rtl ? safe.left : safe.right) / density,
-                keyboard / density, textSizes(display, density));
+                keyboard / density, textSizes(display, density), refreshRate);
     }
 
     private static float[] textSizes(DisplayMetrics display, float density) {

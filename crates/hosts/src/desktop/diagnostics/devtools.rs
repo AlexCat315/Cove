@@ -144,6 +144,9 @@ pub fn factory() -> DiagnosticsFactory {
                     })
                 }));
             }
+            if let Some(refresh_rate) = callbacks.display_refresh_rate {
+                probe.display_refresh_rate = Some(refresh_rate);
+            }
             *probe.diagnostics().memory.borrow_mut() = Some(Rc::new(move || {
                 let snapshot: DiagnosticMemorySnapshot = (callbacks.memory)();
                 Memory {
@@ -159,6 +162,10 @@ pub fn factory() -> DiagnosticsFactory {
                             (key, BTreeMap::from([("bytes".to_owned(), value as i64)]))
                         })
                         .collect(),
+                    pressure: cove_devtools::inspection::MemoryPressure {
+                        subscribed: snapshot.pressure.subscribed,
+                        low: snapshot.pressure.low,
+                    },
                 }
             }));
             *probe.scene.editor.on_change.borrow_mut() = Some(callbacks.invalidate);

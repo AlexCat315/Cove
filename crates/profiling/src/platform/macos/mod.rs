@@ -21,8 +21,9 @@ use mach2::vm::mach_vm_deallocate;
 use mach2::vm_types::{mach_vm_address_t, mach_vm_size_t};
 
 use crate::config::{MAX_STACK_DEPTH, SampleConfig};
+use crate::platform::ring::{RawSample, Ring};
 use crate::sampler::Collected;
-use crate::{PlatformSupport, Sample, SamplingError, SymbolizationError};
+use crate::{PlatformSupport, SamplingError, SymbolizationError};
 
 mod symbols;
 mod unwind;
@@ -292,7 +293,13 @@ fn sample_once(
     let stack = stack_bounds(pthread);
     let registers = unwind::read_registers(port)?;
     let mut frames = [0_u64; MAX_STACK_DEPTH];
-    let depth = unwind::unwind(registers, stack, max_stack_depth, &mut frames);
+    let depth = unwind::unwind(
+        registers,
+        stack,
+        max_stack_depth,
+        unwind::ADDRESS_MASK,
+        &mut frames,
+    );
     suspension.resume()?;
     Ok(RawSample {
         offset,
@@ -330,101 +337,5 @@ impl Drop for Suspension {
             // balanced; retry once and ignore a dead-target error.
             unsafe { thread_resume(self.port) };
         }
-    }
-}
-
-struct RawSample {
-    offset: Duration,
-    depth: u8,
-    frames: [u64; MAX_STACK_DEPTH],
-}
-
-/// Fixed-size ring, written only by the sampler thread.
-struct Ring {
-    slots: Vec<RawSample>,
-    capacity: usize,
-    next: usize,
-    total: u64,
-}
-
-impl Ring {
-    fn new(capacity: usize) -> Self {
-        Self {
-            slots: Vec::with_capacity(capacity),
-            capacity,
-            next: 0,
-            total: 0,
-        }
-    }
-
-    fn push(&mut self, sample: RawSample) {
-        self.total += 1;
-        if self.slots.len() < self.capacity {
-            self.slots.push(sample);
-        } else {
-            self.slots[self.next] = sample;
-            self.next = (self.next + 1) % self.capacity;
-        }
-    }
-
-    fn finish(self) -> (Vec<Sample>, u64) {
-        let len = self.slots.len();
-        let dropped = self.total - len as u64;
-        let mut ordered = Vec::with_capacity(len);
-        if len == self.capacity {
-            ordered.extend(self.slots[self.next..].iter());
-            ordered.extend(self.slots[..self.next].iter());
-        } else {
-            ordered.extend(self.slots.iter());
-        }
-        let samples = ordered
-            .into_iter()
-            .map(|raw| Sample {
-                offset: raw.offset,
-                stack: raw.frames[..usize::from(raw.depth)].to_vec(),
-            })
-            .collect();
-        (samples, dropped)
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    fn raw(offset_ms: u64) -> RawSample {
-        RawSample {
-            offset: Duration::from_millis(offset_ms),
-            depth: 1,
-            frames: [0x1000; MAX_STACK_DEPTH],
-        }
-    }
-
-    #[test]
-    fn ring_keeps_the_newest_samples_in_order() {
-        let mut ring = Ring::new(3);
-        for offset in 0..5 {
-            ring.push(raw(offset));
-        }
-        let (samples, dropped) = ring.finish();
-        assert_eq!(dropped, 2);
-        assert_eq!(
-            samples.iter().map(|s| s.offset).collect::<Vec<_>>(),
-            vec![
-                Duration::from_millis(2),
-                Duration::from_millis(3),
-                Duration::from_millis(4)
-            ]
-        );
-    }
-
-    #[test]
-    fn ring_does_not_report_drops_before_it_is_full() {
-        let mut ring = Ring::new(4);
-        ring.push(raw(0));
-        ring.push(raw(1));
-        let (samples, dropped) = ring.finish();
-        assert_eq!(samples.len(), 2);
-        assert_eq!(dropped, 0);
     }
 }

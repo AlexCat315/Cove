@@ -10,7 +10,7 @@ use addr2line::Loader;
 
 use crate::{SourceLocation, SymbolizedFrame};
 
-use super::unwind::canonical_address;
+use super::unwind::{ADDRESS_MASK, canonical_address};
 
 /// `MH_MAGIC_64`, the only header layout a 64-bit macOS process has.
 const MH_MAGIC_64: u32 = 0xfeed_facf;
@@ -40,7 +40,7 @@ impl Symbolizer {
 
     /// Resolves one address, caching the answer including misses.
     pub(crate) fn resolve(&mut self, address: u64) -> SymbolizedFrame {
-        let address = canonical_address(address);
+        let address = canonical_address(address, ADDRESS_MASK);
         if let Some(frame) = self.cache.get(&address) {
             return frame.clone();
         }

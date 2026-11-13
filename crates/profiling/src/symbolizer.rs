@@ -6,10 +6,14 @@ use crate::{SymbolizationError, SymbolizedFrame};
 ///
 /// On macOS this reads the loaded image list from dyld and looks addresses up
 /// in the on-disk Mach-O (including split-DWARF object files and dSYM
-/// bundles) with `addr2line`. Results are cached per address.
+/// bundles) with `addr2line`. On Linux and Android it reads the executable
+/// mappings from `/proc/self/maps`, derives each ELF image's load bias and
+/// resolves with `addr2line`, falling back to `dladdr`. On Windows it resolves
+/// through dbghelp, which reads PDB and DWARF alike. Results are cached per
+/// address.
 ///
-/// Linux and Windows currently return [`SymbolizationError::Unsupported`]
-/// from [`Symbolizer::new`]; no symbol names are invented.
+/// Targets without a backend return [`SymbolizationError::Unsupported`] from
+/// [`Symbolizer::new`]; no symbol names are invented.
 pub struct Symbolizer {
     inner: crate::platform::Symbolizer,
 }

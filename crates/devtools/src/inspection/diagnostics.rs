@@ -52,11 +52,24 @@ impl<T> DiagnosticPage<T> {
     }
 }
 
+/// The host's platform memory-pressure signal.
+///
+/// `subscribed` is false where the host never wired the signal, which is not
+/// the same as a measured "normal": a client must not draw a pressure line
+/// from an unobserved signal.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MemoryPressure {
+    pub subscribed: bool,
+    pub low: bool,
+}
+
 /// Memory counters the host chooses to report.
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 pub struct DiagnosticMemorySnapshot {
     pub counters: BTreeMap<String, i64>,
     pub windows: BTreeMap<String, BTreeMap<String, i64>>,
+    pub pressure: MemoryPressure,
 }
 
 /// A node plus its semantics, ancestor link and computed presentation.

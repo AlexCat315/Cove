@@ -71,6 +71,19 @@ function initialRecords(id) {
   ];
 }
 
+function waterfallRecords() {
+  // Wall-clock-relative starts so the pending request's lower bound is a
+  // sensible span rather than a year of clock drift.
+  const base = Date.now() - 4000;
+  const make = overrides => ({ ...request("GET", "https://example.test/placeholder", 200), ...overrides });
+  return [
+    make({ id: 901, url: "https://example.test/first", startedAt: base, ttfbMs: 20, durationMs: 100 }),
+    make({ id: 902, url: "https://example.test/unsplit", startedAt: base + 400, ttfbMs: null, durationMs: 80 }),
+    make({ id: 903, url: "https://example.test/failed", startedAt: base + 900, ttfbMs: 15, durationMs: 60, status: 503, state: "failed" }),
+    make({ id: 904, url: "https://example.test/pending", startedAt: base + 3000, ttfbMs: 10, durationMs: 0, status: null, state: "pending", error: null }),
+  ];
+}
+
 function rpcError(code, message) {
   return {
     jsonrpc: "2.0",
@@ -94,6 +107,9 @@ function createFake(mode) {
   }
   let pendingToggle = null;
   let pendingClear = null;
+  if (mode === "waterfall") {
+    recorders.set("runtime-1", { records: waterfallRecords(), enabled: true });
+  }
 
   function targets() {
     if (mode === "no-network") {
@@ -974,6 +990,156 @@ async function scenarioFollowAcrossClear() {
   });
 }
 
+function waterfallScript() {
+  return `(() => {
+    const block = [...document.querySelectorAll("#network-content .panel-block")]
+      .find(node => node.querySelector("h2")?.textContent === "Waterfall");
+    if (!block) return null;
+    const rows = [...block.querySelectorAll(".waterfall-row")].map(row => {
+      const bar = row.querySelector(".waterfall-bar");
+      return {
+        id: row.dataset.request,
+        url: row.querySelector(".waterfall-url")?.textContent || "",
+        method: row.querySelector(".waterfall-method")?.textContent || "",
+        duration: row.querySelector(".waterfall-duration")?.textContent || "",
+        title: row.getAttribute("title") || "",
+        aria: row.getAttribute("aria-label") || "",
+        role: row.getAttribute("role") || "",
+        tabindex: row.tabIndex,
+        failed: row.classList.contains("is-failed"),
+        barFailed: bar ? bar.classList.contains("is-failed") : false,
+        barPending: bar ? bar.classList.contains("is-pending") : false,
+        left: parseFloat(bar ? bar.style.left : "NaN"),
+        width: parseFloat(bar ? bar.style.width : "NaN"),
+        segments: [...(bar ? bar.querySelectorAll(".waterfall-seg") : [])].map(seg => ({
+          kind: [...seg.classList].find(name => name.startsWith("is-")) || "",
+          flex: parseFloat(seg.style.flex.split(" ")[0]),
+          title: seg.getAttribute("title") || "",
+        })),
+      };
+    });
+    const track = block.querySelector(".waterfall-rows");
+    return {
+      meta: block.querySelector(".pane-meta")?.textContent || "",
+      rows,
+      ticks: [...block.querySelectorAll(".waterfall-tick")].map(node => ({ left: parseFloat(node.style.left), text: node.textContent })),
+      legend: [...block.querySelectorAll(".perf-legend span")].map(node => node.textContent),
+      notes: [...block.querySelectorAll(".perf-note")].map(node => node.textContent),
+      role: track ? track.getAttribute("role") || "" : "",
+      ariaLabel: track ? track.getAttribute("aria-label") || "" : "",
+      tableRows: document.querySelectorAll("#network-content tbody tr").length,
+      hasCanvas: block.querySelector("canvas") !== null,
+    };
+  })()`;
+}
+
+function close(a, b, tolerance, message) {
+  assert.ok(Math.abs(a - b) <= tolerance, `${message}: ${a} vs ${b} (tolerance ${tolerance})`);
+}
+
+async function scenarioWaterfall() {
+  await runScenario("waterfall", async ({ cdp }) => {
+    await openNetwork(cdp, 4);
+    const chart = await cdp.evaluate(waterfallScript());
+    assert.ok(chart, "the waterfall panel is rendered above the table");
+    assert.equal(chart.hasCanvas, false, "charts stay DOM/CSS, no canvas");
+    assert.equal(chart.tableRows, 4, "the table keeps every record");
+    assert.equal(chart.role, "listbox");
+    assert.match(chart.ariaLabel, /4 requests/);
+    assert.deepEqual(chart.rows.map(row => row.id), ["901", "902", "903", "904"], "rows run oldest to newest");
+    assert.deepEqual(chart.rows.map(row => row.method), ["GET", "GET", "GET", "GET"]);
+    assert.match(chart.meta, /4 requests/);
+    assert.match(chart.meta, /span/);
+
+    // The axis span is derived from two known start offsets, then every other
+    // row's position is checked against it: the bars must be placed by the
+    // recorder's timestamps, not by row index.
+    close(chart.rows[0].left, 0, 0.001, "the first request starts at the axis origin");
+    const span = (400 * 100) / chart.rows[1].left;
+    assert.ok(span > 3000 && span < 20000, `derived span is plausible: ${span}`);
+    close(chart.rows[2].left, (900 / span) * 100, 0.05, "the failed request is placed by its start time");
+    close(chart.rows[3].left, (3000 / span) * 100, 0.05, "the pending request is placed by its start time");
+    close(chart.rows[0].width, (100 / span) * 100, 0.05, "a completed bar spans its recorded duration");
+    close(chart.rows[1].width, (80 / span) * 100, 0.05, "the unsplit bar spans its recorded duration");
+    close(chart.rows[2].width, (60 / span) * 100, 0.05, "the failed bar spans its recorded duration");
+    // The pending request is the right edge: it was still in flight at read time.
+    close(chart.rows[3].left + chart.rows[3].width, 100, 0.05, "the in-flight bar ends at the read instant");
+    assert.ok(chart.rows[3].width > (100 / span) * 100, "the in-flight bar is longer than its 10 ms head arrival");
+
+    // Phase split comes from ttfbMs and durationMs only.
+    const [firstWaiting, firstReceiving] = chart.rows[0].segments;
+    assert.equal(firstWaiting.kind, "is-waiting");
+    assert.equal(firstReceiving.kind, "is-receiving");
+    close(firstWaiting.flex / firstReceiving.flex, 20 / 80, 0.01, "wait/receive split matches 20 ms of 100 ms");
+    assert.match(firstWaiting.title, /20\.00 ms/);
+    assert.match(firstReceiving.title, /80\.00 ms/);
+    assert.equal(chart.rows[1].segments.length, 1, "no head arrival means one undivided bar");
+    assert.equal(chart.rows[1].segments[0].kind, "is-unsplit");
+    assert.match(chart.rows[1].segments[0].title, /did not capture a response-head arrival/);
+    const [failedWaiting, failedReceiving] = chart.rows[2].segments;
+    close(failedWaiting.flex / failedReceiving.flex, 15 / 45, 0.01, "the failed request keeps its real split");
+    assert.equal(chart.rows[2].failed, true);
+    assert.equal(chart.rows[2].barFailed, true);
+    const [pendingWaiting, pendingInflight] = chart.rows[3].segments;
+    assert.equal(pendingWaiting.kind, "is-waiting");
+    assert.equal(pendingInflight.kind, "is-inflight");
+    assert.equal(chart.rows[3].barPending, true);
+    assert.match(chart.rows[3].duration, /^≥ /, "an in-flight duration is a lower bound, not a completion");
+    assert.match(chart.rows[3].title, /in flight/);
+    assert.match(chart.rows[3].aria, /head 10\.00 ms/);
+    assert.match(chart.rows[0].duration, /^100\.0 ms$/);
+
+    // Axis and honest provenance notes.
+    assert.deepEqual(chart.ticks.map(tick => tick.left), [0, 25, 50, 75, 100]);
+    close(parseFloat(chart.ticks[4].text), span, 1, "the last tick labels the real span");
+    assert.equal(chart.ticks[0].text, "0 ms");
+    assert.equal(chart.legend.length, 5);
+    assert.ok(chart.notes.some(note => /no DNS, connect, TLS or queueing phases/.test(note)), "the missing phases are stated, not drawn");
+    assert.ok(chart.notes.some(note => /lower bound on their duration/.test(note)), "the in-flight edge is explained");
+    assert.ok(chart.notes.some(note => /wait\/receive split is not estimated/.test(note)), "the unsplit bar is explained");
+    await screenshot(cdp, process.env.NETWORK_WATERFALL_ALL_SHOT);
+
+    // A row opens the same detail dialog as the table.
+    await click(cdp, '.waterfall-row[data-request="902"]');
+    await waitFor(cdp, "waterfall detail dialog", `document.getElementById("network-dialog").open === true`);
+    const dialogTitle = await cdp.evaluate(`document.getElementById("network-dialog-title").textContent`);
+    assert.match(dialogTitle, /https:\/\/example\.test\/unsplit/);
+    await click(cdp, "#network-dialog-close");
+    await waitFor(cdp, "dialog closed", `document.getElementById("network-dialog").open === false`);
+
+    // Keyboard traversal mirrors the frame chart.
+    await cdp.evaluate(`document.querySelector('.waterfall-row[data-request="901"]').focus()`);
+    await cdp.send("Input.dispatchKeyEvent", { type: "keyDown", key: "ArrowDown", code: "ArrowDown", windowsVirtualKeyCode: 40 });
+    await cdp.send("Input.dispatchKeyEvent", { type: "keyUp", key: "ArrowDown", code: "ArrowDown", windowsVirtualKeyCode: 40 });
+    const focused = await cdp.evaluate(`document.activeElement?.dataset?.request || ""`);
+    assert.equal(focused, "902", "ArrowDown moves to the next request");
+    const tabindexes = await cdp.evaluate(`[...document.querySelectorAll(".waterfall-row")].map(row => row.tabIndex)`);
+    assert.deepEqual(tabindexes, [-1, 0, -1, -1], "only the focused row stays tabbable");
+
+    // The toggle hides the chart without touching the table.
+    await click(cdp, "#network-waterfall");
+    await waitFor(cdp, "waterfall hidden", `document.querySelector("#network-content .waterfall") === null`);
+    const hidden = await controls(cdp);
+    assert.equal(hidden.rows, 4, "hiding the waterfall keeps the table");
+    await click(cdp, "#network-waterfall");
+    await waitFor(cdp, "waterfall restored", `document.querySelector("#network-content .waterfall") !== null`);
+
+    // Filtering narrows the axis to the matching requests.
+    await cdp.evaluate(`(() => {
+      const select = document.getElementById("network-state-filter");
+      select.value = "pending";
+      select.dispatchEvent(new Event("change", { bubbles: true }));
+    })()`);
+    await waitFor(cdp, "filtered waterfall", `document.querySelectorAll("#network-content .waterfall-row").length === 1`);
+    const filtered = await cdp.evaluate(waterfallScript());
+    assert.equal(filtered.rows[0].id, "904");
+    close(filtered.rows[0].left, 0, 0.001, "a single filtered request defines its own origin");
+    close(filtered.rows[0].width, 100, 0.001, "a single in-flight request fills the axis");
+    assert.equal(filtered.tableRows, 1);
+    await screenshot(cdp, process.env.NETWORK_WATERFALL_SHOT);
+  });
+}
+
 console.log("Network controls harness: fake controller + headless Chrome");
 await scenarioPauseResumeClear();
 console.log("PASS  pause/resume/clear: recorder toggled, paused table retained, new requests blocked live, clear empties the recorder and the table");
@@ -997,4 +1163,6 @@ await scenarioNoNetworkCapability();
 console.log("PASS  network absent: view unavailable, controls disabled, no RPC sent");
 await scenarioFollowAcrossClear();
 console.log("PASS  follow: stays enabled across a clear, new requests appear, cleared rows stay gone");
+await scenarioWaterfall();
+console.log("PASS  waterfall: bars placed by recorded timestamps, real wait/receive split, in-flight lower bound, unsplit and failed rows, dialog, keyboard, toggle, filter");
 console.log("RESULT PASS");

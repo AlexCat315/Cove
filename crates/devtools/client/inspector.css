@@ -1361,6 +1361,224 @@ main { flex: 1 1 auto; min-width: 0; min-height: 0; overflow: hidden; outline: n
 .data-table tbody tr.is-selected { background: var(--accent-weak); }
 .data-table tbody tr.is-selected:hover { background: var(--accent-weak); }
 
+.waterfall {
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+}
+.waterfall-axis,
+.waterfall-row {
+  display: grid;
+  grid-template-columns: minmax(110px, 210px) minmax(0, 1fr) 76px;
+  gap: 8px;
+  align-items: center;
+}
+.waterfall-axis { margin-bottom: 4px; }
+.waterfall-axis-track { position: relative; height: 13px; }
+.waterfall-axis-spacer { display: block; }
+.waterfall-tick {
+  position: absolute;
+  top: 0;
+  transform: translateX(-50%);
+  color: var(--muted);
+  font-size: 9px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.waterfall-tick:first-child { transform: none; }
+.waterfall-tick:last-child { transform: translateX(-100%); }
+.waterfall-rows { max-height: 264px; overflow-y: auto; }
+.waterfall-row {
+  padding: 2px 3px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.waterfall-row:hover { background: var(--surface-2); }
+.waterfall-row:focus-visible { outline: 2px solid var(--focus); outline-offset: -2px; }
+.waterfall-row.is-failed .waterfall-duration { color: var(--bad); }
+.waterfall-label { display: flex; align-items: baseline; gap: 5px; min-width: 0; }
+.waterfall-method {
+  flex: none;
+  color: var(--text-secondary);
+  font-size: 9.5px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+.waterfall-url {
+  overflow: hidden;
+  color: var(--text);
+  font-size: 10.5px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  direction: rtl;
+  text-align: left;
+}
+.waterfall-track {
+  position: relative;
+  height: 14px;
+  border-radius: 3px;
+  background: var(--surface-2);
+}
+.waterfall-bar {
+  position: absolute;
+  top: 2px;
+  bottom: 2px;
+  display: flex;
+  min-width: 3px;
+  overflow: hidden;
+  border-radius: 2px;
+}
+.waterfall-seg { display: block; height: 100%; min-width: 1px; }
+.waterfall-seg.is-waiting { background: var(--perf-encode); opacity: 0.7; }
+.waterfall-seg.is-receiving { background: var(--perf-layout); }
+.waterfall-seg.is-unsplit { background: var(--surface-3); box-shadow: inset 0 0 0 1px var(--border-strong); }
+.waterfall-seg.is-inflight {
+  background-color: var(--warn-weak);
+  background-image: repeating-linear-gradient(45deg, color-mix(in srgb, var(--warn) 55%, transparent) 0 3px, transparent 3px 6px);
+}
+.waterfall-seg.is-failed { background: var(--bad); }
+.waterfall-bar.is-failed { box-shadow: 0 0 0 1px var(--bad); }
+.waterfall-duration {
+  color: var(--text-secondary);
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  white-space: nowrap;
+}
+.perf-legend span.is-waiting::before { background: var(--perf-encode); opacity: 0.7; }
+.perf-legend span.is-receiving::before { background: var(--perf-layout); }
+.perf-legend span.is-unsplit::before { background: var(--surface-3); box-shadow: inset 0 0 0 1px var(--border-strong); }
+.perf-legend span.is-inflight::before {
+  background-color: var(--warn-weak);
+  background-image: repeating-linear-gradient(45deg, color-mix(in srgb, var(--warn) 55%, transparent) 0 2px, transparent 2px 4px);
+}
+.perf-legend span.is-failed::before { background: var(--bad); }
+
+.memory-chart {
+  display: grid;
+  grid-template-columns: 58px minmax(0, 1fr);
+  grid-template-rows: 168px auto;
+  gap: 0 6px;
+  padding: 8px 8px 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+}
+.memory-yaxis { position: relative; grid-row: 1; }
+.memory-yaxis span {
+  position: absolute;
+  right: 4px;
+  transform: translateY(50%);
+  color: var(--muted);
+  font-size: 9px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.memory-chart-plot {
+  position: relative;
+  grid-row: 1;
+  overflow: hidden;
+  border-left: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+}
+.memory-grid {
+  position: absolute;
+  left: 0;
+  right: 0;
+  border-top: 1px dashed var(--surface-3);
+  pointer-events: none;
+}
+.memory-area,
+.memory-line { position: absolute; inset: 0; pointer-events: none; }
+.memory-area.is-rss { background: color-mix(in srgb, var(--perf-layout) 14%, transparent); }
+.memory-area.is-allocated { background: color-mix(in srgb, var(--perf-recomposition) 16%, transparent); }
+.memory-area.is-caches { background: color-mix(in srgb, var(--perf-draw) 12%, transparent); }
+.memory-area.is-targets { background: color-mix(in srgb, var(--perf-encode) 12%, transparent); }
+.memory-area.is-virtual { background: color-mix(in srgb, var(--perf-total) 12%, transparent); }
+.memory-line.is-rss { background: var(--perf-layout); }
+.memory-line.is-allocated { background: var(--perf-recomposition); }
+.memory-line.is-caches { background: var(--perf-draw); }
+.memory-line.is-targets { background: var(--perf-encode); }
+.memory-line.is-virtual { background: var(--perf-total); }
+.memory-dot {
+  position: absolute;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  transform: translate(-50%, 50%);
+}
+.memory-dot.is-rss { background: var(--perf-layout); }
+.memory-dot.is-allocated { background: var(--perf-recomposition); }
+.memory-dot.is-caches { background: var(--perf-draw); }
+.memory-dot.is-targets { background: var(--perf-encode); }
+.memory-dot.is-virtual { background: var(--perf-total); }
+.memory-pressure {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  transform: translateX(-50%);
+  background: color-mix(in srgb, var(--warn) 65%, transparent);
+  pointer-events: none;
+}
+.memory-cursor {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  transform: translateX(-50%);
+  background: var(--border-strong);
+  pointer-events: none;
+}
+.memory-xaxis {
+  grid-column: 2;
+  display: flex;
+  justify-content: space-between;
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 9.5px;
+  font-variant-numeric: tabular-nums;
+}
+.memory-chart-readout {
+  margin-top: 7px;
+  color: var(--text-secondary);
+  font-size: 10.5px;
+  font-variant-numeric: tabular-nums;
+}
+.memory-legend { align-items: center; }
+.memory-legend-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 1px 5px;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background: none;
+  color: var(--muted);
+  font: inherit;
+  font-size: 10px;
+  cursor: pointer;
+  opacity: 0.55;
+}
+.memory-legend-toggle::before {
+  content: "";
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  background: var(--surface-3);
+}
+.memory-legend-toggle.is-on { opacity: 1; color: var(--text-secondary); }
+.memory-legend-toggle:hover { background: var(--surface-2); }
+.memory-legend-toggle:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
+.memory-legend-toggle.is-rss::before { background: var(--perf-layout); }
+.memory-legend-toggle.is-allocated::before { background: var(--perf-recomposition); }
+.memory-legend-toggle.is-caches::before { background: var(--perf-draw); }
+.memory-legend-toggle.is-targets::before { background: var(--perf-encode); }
+.memory-legend-toggle.is-virtual::before { background: var(--perf-total); }
+.perf-legend span.is-pressure::before { width: 2px; height: 10px; border-radius: 1px; background: var(--warn); }
+
 .flame-controls { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-bottom: 8px; }
 .flame-controls .pane-meta { margin-left: auto; }
 .flame-scroll {

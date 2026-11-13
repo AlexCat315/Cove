@@ -27,6 +27,10 @@ struct Shared {
     /// The surface's top-left in display pixels, as the Activity measured it.
     /// `None` until the first measurement, so nothing reports an assumed origin.
     origin: Cell<Option<(f32, f32)>>,
+    /// The display's refresh rate in Hz, as the Activity read it from
+    /// `Display.getRefreshRate()`. `None` until the first measurement, so
+    /// nothing reports an assumed 60 Hz.
+    refresh_rate: Cell<Option<f32>>,
 }
 
 impl Shared {
@@ -75,6 +79,7 @@ impl SurfaceState {
                 reported: RefCell::new(surface),
                 environment_override: RefCell::new(EnvironmentOverride::default()),
                 origin: Cell::new(None),
+                refresh_rate: Cell::new(None),
             }),
             system_bar_icon_style: -1,
         }
@@ -137,6 +142,18 @@ impl SurfaceState {
 
     pub fn origin(&self) -> Option<(f32, f32)> {
         self.shared.origin.get()
+    }
+
+    /// Records the display refresh rate the platform reported. A non-finite or
+    /// non-positive rate is refused rather than stored as a measurement.
+    pub fn set_refresh_rate(&self, hz: f32) {
+        if hz.is_finite() && hz > 0.0 {
+            self.shared.refresh_rate.set(Some(hz));
+        }
+    }
+
+    pub fn refresh_rate(&self) -> Option<f32> {
+        self.shared.refresh_rate.get()
     }
 
     pub fn prepare(&self, pixels: (i32, i32), scale: f32) {

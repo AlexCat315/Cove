@@ -93,6 +93,9 @@ pub struct AndroidContentSession {
     graph: OnceCell<Rc<ViewGraph>>,
     dispatcher: OnceCell<Rc<EventDispatcher>>,
     needs_update: Cell<bool>,
+    /// Set when the platform asks the process to trim memory, which is
+    /// Android's memory-pressure signal (`cove_android_memory_pressure`).
+    platform_trim_requested: Rc<Cell<bool>>,
     diagnostics: RefCell<Option<AndroidDiagnostics>>,
     draw_list: DrawList,
     render_tree: RenderTree,
@@ -180,6 +183,7 @@ impl AndroidContentSession {
             graph: OnceCell::new(),
             dispatcher: OnceCell::new(),
             needs_update: Cell::new(true),
+            platform_trim_requested: Rc::new(Cell::new(false)),
             diagnostics: RefCell::new(None),
             draw_list,
             render_tree: RenderTree::new(),
@@ -260,6 +264,10 @@ impl AndroidContentSession {
         self.surface.set_origin((x, y));
     }
 
+    pub fn set_surface_refresh_rate(&self, hz: f32) {
+        self.surface.set_refresh_rate(hz);
+    }
+
     pub fn configure_diagnostics(
         &self,
         config: DevToolsConfiguration,
@@ -286,6 +294,7 @@ impl AndroidContentSession {
             .map(|text| text.layout_cache_snapshot());
         let memory = {
             let graph = graph.clone();
+            let trim_requested = self.platform_trim_requested.clone();
             Rc::new(move || {
                 let mut counters: BTreeMap<String, u64> = [
                     (
@@ -318,6 +327,10 @@ impl AndroidContentSession {
                 DiagnosticMemorySnapshot {
                     counters,
                     windows: Default::default(),
+                    pressure: crate::desktop::diagnostics::MemoryPressure {
+                        subscribed: true,
+                        low: trim_requested.get(),
+                    },
                 }
             }) as Rc<dyn Fn() -> DiagnosticMemorySnapshot>
         };
@@ -368,6 +381,10 @@ impl AndroidContentSession {
                 invalidation_log: self.context.invalidation_log.clone(),
                 environment: Some(environment),
                 content_geometry: Some(content_geometry),
+                display_refresh_rate: {
+                    let surface = self.surface.clone();
+                    Some(Rc::new(move || surface.refresh_rate().map(f64::from)))
+                },
             },
         )?;
         *self.diagnostics.borrow_mut() = Some(diagnostics);
@@ -383,6 +400,7 @@ impl AndroidContentSession {
     }
 
     pub fn trim_memory(&mut self) {
+        self.platform_trim_requested.set(true);
         if let Some(text) = self.environment.text() {
             text.trim_text_caches();
         }

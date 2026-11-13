@@ -53,6 +53,7 @@ cove-native-build = { path = "crates/native-build" }
 clap = { version = "4", features = ["derive"] }
 tempfile = "3"
 libc = "0.2"
+windows-sys = { version = "0.59", default-features = false }
 os_pipe = "1"
 unicode-general-category = "1"
 unicode-segmentation = "1"

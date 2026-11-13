@@ -414,6 +414,7 @@ pub unsafe extern "C" fn Java_com_cove_probe_MainActivity_surface(
     trailing: f32,
     keyboard: f32,
     text_sizes: Object,
+    refresh_rate: f32,
 ) {
     let Some(session) = session(value) else {
         return;
@@ -494,6 +495,7 @@ pub unsafe extern "C" fn Java_com_cove_probe_MainActivity_surface(
             keyboard,
             samples,
             count,
+            refresh_rate,
         );
     }
     if !feature_values.is_null() {

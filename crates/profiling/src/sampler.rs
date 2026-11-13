@@ -11,7 +11,6 @@ pub(crate) struct Collected {
     pub(crate) samples_taken: u64,
     pub(crate) samples_dropped: u64,
     pub(crate) samples: Vec<Sample>,
-    #[cfg_attr(not(target_os = "macos"), allow(dead_code))]
     pub(crate) failure: Option<SamplingError>,
 }
 

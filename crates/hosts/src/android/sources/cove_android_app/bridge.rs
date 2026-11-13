@@ -603,6 +603,7 @@ pub unsafe extern "C" fn cove_android_surface(
     keyboard: f32,
     text_sizes: *const f32,
     text_count: i32,
+    refresh_rate: f32,
 ) {
     // SAFETY: the caller's `# Safety` contract guarantees a null or live session pointer.
     let Some(handle) = (unsafe { session(pointer) }) else {
@@ -639,6 +640,11 @@ pub unsafe extern "C" fn cove_android_surface(
         .scene()
         .content()
         .set_surface_origin(origin_x, origin_y);
+    handle
+        .session()
+        .scene()
+        .content()
+        .set_surface_refresh_rate(refresh_rate);
     handle.session().scene().content().update_surface(
         DeviceFacts::decode(device, posture, feature_values),
         safe_area,

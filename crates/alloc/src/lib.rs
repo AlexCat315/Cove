@@ -39,9 +39,10 @@
 //! guard keeps an unwinder that allocates internally from recursively sampling.
 //! Reallocations are counted as one release plus one allocation by
 //! [`snapshot`], but they are not sampled: sites describe fresh `alloc` and
-//! `alloc_zeroed` blocks. Capture exists on Apple platforms and GNU Linux through
-//! `libc::backtrace`; elsewhere [`sampling_support`] reports
-//! [`SamplingSupport::Unsupported`] and [`start_sampling`] fails with
+//! `alloc_zeroed` blocks. Capture is real on Apple and GNU Linux
+//! (`libc::backtrace`), Windows (`RtlCaptureStackBackTrace`) and Android/musl
+//! Linux (`_Unwind_Backtrace`); on the remaining targets [`sampling_support`]
+//! reports [`SamplingSupport::Unsupported`] and [`start_sampling`] fails with
 //! [`SamplingError::Unsupported`] instead of inventing sites.
 
 mod sampling;

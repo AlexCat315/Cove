@@ -9,7 +9,7 @@ pub mod session;
 
 pub use checkpoint::ApplicationCheckpoint;
 pub use frame_metrics::FrameMetrics;
-pub use integration::{DiagnosticMemorySnapshot, DiagnosticsSession};
+pub use integration::{DiagnosticMemorySnapshot, DiagnosticsSession, MemoryPressure};
 pub use performance_hud::PerformanceHud;
 pub use session::{ApplicationDiagnostics, DiagnosticsQueries};
 

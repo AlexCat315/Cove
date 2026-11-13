@@ -32,6 +32,12 @@ pub enum SamplingError {
     /// The sampler thread panicked; no trustworthy profile exists.
     #[error("the sampler thread panicked")]
     SamplerPanicked,
+    /// Another sampler, or the application's own SIGPROF handler, is active.
+    #[error("a CPU sampler or SIGPROF handler is already active in this process")]
+    SamplerBusy,
+    /// The sampling signal could not be installed; the value is an `errno`.
+    #[error("installing the CPU sampling signal handler failed with errno {0}")]
+    SignalSetup(i32),
 }
 
 /// Why symbolization is unavailable.

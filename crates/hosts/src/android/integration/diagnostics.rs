@@ -17,6 +17,7 @@ pub struct AndroidDiagnosticsHooks {
         Rc<dyn Fn(&cove_core::EnvironmentRequest) -> Result<cove_core::Environment, String>>,
     >,
     pub content_geometry: Option<Rc<dyn Fn() -> Result<ContentGeometry, String>>>,
+    pub display_refresh_rate: Option<Rc<dyn Fn() -> Option<f64>>>,
 }
 
 pub struct AndroidDiagnostics {
@@ -45,6 +46,7 @@ impl AndroidDiagnostics {
                 resize_window: None,
                 environment: hooks.environment,
                 content_geometry: hooks.content_geometry,
+                display_refresh_rate: hooks.display_refresh_rate,
             };
             factory(config, tree, graph, schedule, callbacks)?
         } else {

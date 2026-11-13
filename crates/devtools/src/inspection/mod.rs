@@ -8,7 +8,7 @@ pub use diagnostics::{
     DiagnosticCompactNode, DiagnosticError, DiagnosticGeometryIssue, DiagnosticLayoutSummary,
     DiagnosticMemorySnapshot, DiagnosticNode, DiagnosticOverflowIssue, DiagnosticOverview,
     DiagnosticPage, DiagnosticPresentation, DiagnosticStateSource, Diagnostics,
-    DiagnosticsStateQuery, TraceCapture, TraceComparison, TracePhase, TracePhaseChange, TraceQuery,
+    DiagnosticsStateQuery, MemoryPressure, TraceCapture, TraceComparison, TracePhase, TracePhaseChange, TraceQuery,
     UIDiagnosticCompactNode, UIDiagnosticGeometryIssue, UIDiagnosticLayoutSummary,
     UIDiagnosticMemorySnapshot, UIDiagnosticNode, UIDiagnosticOverflowIssue, UIDiagnosticOverview,
     UIDiagnosticPage, UIDiagnosticPresentation, UIDiagnosticTool, UIDiagnosticTools, UIDiagnostics,

@@ -48,6 +48,11 @@ const MAX_PROFILE_FLAME_DEPTH = 40;
 const PROFILE_FLAME_MIN_PERCENT = 0.15;
 const PROFILE_METHOD_SORT_KEYS = ["label", "location", "selfMs", "inclusiveMs", "selfPercent", "inclusivePercent", "selfSamples", "inclusiveSamples"];
 const MAX_MEMORY_COUNTERS = 256;
+// The overview chart keeps a bounded ring of provider readings. Each point is
+// one real query_ui_memory response; nothing is interpolated into a sample.
+const MEMORY_SAMPLE_LIMIT = 720;
+const MEMORY_INTERVALS = [1000, 2000, 5000];
+const MEMORY_INTERVAL_KEY = "cove.devtools.memoryIntervalMs";
 // Allocation sites are opt-in sampled stacks from cove_alloc, not heap objects.
 // The controller owns the real ring, symbolization and bounds; this view only
 // caps what it draws and says when something was cut.
@@ -249,6 +254,7 @@ const dom = {
   networkSearch: $("network-search"),
   networkStateFilter: $("network-state-filter"),
   networkFollow: $("network-follow"),
+  networkWaterfall: $("network-waterfall"),
   networkRecordingToggle: $("network-recording-toggle"),
   networkRecordingStatus: $("network-recording-status"),
   networkClear: $("network-clear"),
@@ -283,6 +289,8 @@ const dom = {
   performanceRecordingDot: $("performance-recording-dot"),
   memoryMeta: $("memory-meta"),
   memoryRefresh: $("memory-refresh"),
+  memoryFollow: $("memory-follow"),
+  memoryInterval: $("memory-interval"),
   memoryContent: $("memory-content"),
   appSizeMeta: $("app-size-meta"),
   appSizeRefresh: $("app-size-refresh"),
@@ -383,6 +391,7 @@ const state = {
     loaded: false, loading: false, error: null, records: [], limit: 0, follow: false, timer: null,
     recording: null, recordingPending: false, recordingRequest: null, clearPending: false,
     controlError: null, controlUnavailable: false, cleared: false, generation: 0, recordingEpoch: 0,
+    readAt: 0, waterfall: true,
   },
   logs: {
     loaded: false, loading: false, error: null, records: [], dropped: 0, firstAvailable: null,
@@ -3404,6 +3413,7 @@ function stopAllFollowTimers() {
   stopTimer("logs");
   stopTimer("performance");
   stopTimer("debugger");
+  stopTimer("memory");
 }
 
 function syncFollowTimers() {
@@ -3417,6 +3427,9 @@ function syncFollowTimers() {
   }
   if (state.view === "performance" && state.performance.tab === "frames" && state.performance.follow && state.caps.timing && !state.performance.snapshot) {
     state.performance.timer = setInterval(() => loadFrames({ quiet: true }), 1000);
+  }
+  if (state.view === "memory" && state.memory.follow && state.caps.runtime) {
+    state.memory.timer = setInterval(() => loadMemory({ quiet: true }), state.memory.intervalMs);
   }
   syncDebuggerTimer();
 }
@@ -3435,6 +3448,7 @@ function resetNetwork() {
     loaded: false, loading: false, error: null, records: [], limit: 0, follow: dom.networkFollow.checked, timer: null,
     recording: null, recordingPending: false, recordingRequest: null, clearPending: false,
     controlError: null, controlUnavailable: false, cleared: false, generation: 0, recordingEpoch: 0,
+    readAt: 0, waterfall: true,
   };
   dom.networkMeta.textContent = "Recorded in-process HTTP activity.";
   dom.networkBadge.hidden = true;
@@ -3474,6 +3488,10 @@ async function loadNetwork(options = {}) {
     net.limit = numberValue(data?.limit) ?? 0;
     net.loaded = true;
     net.error = null;
+    // The wall clock at which the runtime's snapshot was read. A pending
+    // request has no recorded end, so this is the only honest right edge for
+    // its bar: the request was still in flight at this instant.
+    net.readAt = Date.now();
     if (records.length) net.cleared = false;
     // A read that started before a control call carries the pre-call state; it
     // may merge records but must not overwrite the confirmed recording state.
@@ -3641,6 +3659,186 @@ function networkMatches(record) {
     .join(" ").toLowerCase().includes(query);
 }
 
+function networkWaterfallRows(records, readAt) {
+  const rows = [];
+  let unplaced = 0;
+  for (const record of records) {
+    const start = numberValue(record.startedAt);
+    if (start === null) {
+      unplaced += 1;
+      continue;
+    }
+    const ttfb = numberValue(record.ttfbMs);
+    const duration = numberValue(record.durationMs);
+    const pending = record.state === "pending";
+    // A pending request has no recorded end. The read instant is the only
+    // honest right edge: it was still in flight then, so its duration is at
+    // least this much, never an invented completion.
+    const elapsed = pending
+      ? Math.max(0, readAt - start, ttfb ?? 0)
+      : Math.max(0, duration ?? 0, ttfb ?? 0);
+    rows.push({ record, start, ttfb, duration, pending, elapsed, end: start + elapsed });
+  }
+  rows.sort((left, right) => left.start - right.start || Number(left.record.id ?? 0) - Number(right.record.id ?? 0));
+  return { rows, unplaced };
+}
+
+function renderNetworkWaterfall(records) {
+  const net = state.network;
+  const readAt = net.readAt || Date.now();
+  const { rows, unplaced } = networkWaterfallRows(records, readAt);
+  if (!rows.length) {
+    return el("div", { class: "panel-block" },
+      el("div", { class: "panel-block-head" }, el("h2", { text: "Waterfall" })),
+      el("div", { class: "panel-block-body" },
+        emptyInline("No request carries a start timestamp, so nothing can be placed on a time axis."),
+      ),
+    );
+  }
+  const origin = rows[0].start;
+  const latest = rows.reduce((maximum, row) => Math.max(maximum, row.end), origin);
+  const span = Math.max(latest - origin, 1);
+  const percent = value => Math.max(0, Math.min(100, (value / span) * 100));
+  const list = el("div", {
+    class: "waterfall-rows",
+    attrs: {
+      role: "listbox",
+      "aria-label": `Request waterfall for ${rows.length} requests over ${fmtMs(span, 1)}.`,
+    },
+  });
+  for (const [index, row] of rows.entries()) {
+    const { record, start, ttfb, pending, elapsed } = row;
+    const offset = start - origin;
+    const status = numberValue(record.status);
+    const failed = record.state === "failed" || (status !== null && status >= 400);
+    const segments = [];
+    const head = ttfb === null ? null : Math.min(ttfb, elapsed);
+    if (head !== null && head > 0) {
+      segments.push({ kind: "waiting", from: 0, to: head, label: `Waiting for response head ${fmtMs(head)}` });
+    }
+    if (pending) {
+      segments.push({
+        kind: "inflight",
+        from: head ?? 0,
+        to: elapsed,
+        label: head === null
+          ? `In flight ${fmtMs(elapsed)}; the response head had not arrived when the runtime was read`
+          : `Receiving body, still in flight after ${fmtMs(elapsed)}`,
+      });
+    } else if (elapsed > (head ?? 0)) {
+      segments.push({
+        kind: head === null ? "unsplit" : "receiving",
+        from: head ?? 0,
+        to: elapsed,
+        label: head === null
+          ? `Total ${fmtMs(elapsed)}; the recorder did not capture a response-head arrival, so no wait/receive split is drawn`
+          : `Receiving body ${fmtMs(elapsed - head)}`,
+      });
+    }
+    if (!segments.length) {
+      segments.push({ kind: failed ? "failed" : "receiving", from: 0, to: elapsed, label: `Total ${fmtMs(elapsed)}` });
+    }
+    const describe = `${textOf(record.method, "?")} ${textOf(record.url, "")}: started ${fmtEpochMs(start)}, `
+      + `${pending ? "in flight" : textOf(record.state, "unknown")}, `
+      + `${ttfb === null ? "head arrival not recorded" : `head ${fmtMs(ttfb)}`}, `
+      + `${pending ? `at least ${fmtMs(elapsed)}` : `total ${fmtMs(elapsed)}`}`
+      + `${failed ? ", failed" : ""}`;
+    const bar = el("div", {
+      class: `waterfall-bar${failed ? " is-failed" : ""}${pending ? " is-pending" : ""}`,
+      attrs: { style: `left:${percent(offset)}%;width:${percent(elapsed)}%` },
+    });
+    for (const segment of segments) {
+      const width = segment.to - segment.from;
+      bar.append(el("span", {
+        class: `waterfall-seg is-${segment.kind}`,
+        attrs: { style: `flex:${Math.max(width, 0.001)} 1 0`, title: segment.label },
+      }));
+    }
+    const option = el("div", {
+      class: `waterfall-row${failed ? " is-failed" : ""}`,
+      attrs: {
+        role: "option",
+        "aria-selected": "false",
+        tabindex: index === 0 ? "0" : "-1",
+        "aria-label": describe,
+        title: describe,
+        "data-request": String(record.id ?? index),
+      },
+      on: { click: () => showNetworkRecord(record) },
+    },
+      el("span", { class: "waterfall-label" },
+        el("span", { class: "waterfall-method", text: textOf(record.method, "?") }),
+        el("span", { class: "waterfall-url", text: textOf(record.url, "(no URL)") }),
+      ),
+      el("span", { class: "waterfall-track" }, bar),
+      el("span", { class: "waterfall-duration", text: pending ? `≥ ${fmtMs(elapsed, 1)}` : fmtMs(elapsed, 1) }),
+    );
+    list.append(option);
+  }
+  list.addEventListener("keydown", event => {
+    const current = event.target.closest?.(".waterfall-row");
+    if (!current) return;
+    const options = [...list.children];
+    const index = options.indexOf(current);
+    let next = null;
+    if (event.key === "ArrowDown") next = options[Math.min(options.length - 1, index + 1)];
+    else if (event.key === "ArrowUp") next = options[Math.max(0, index - 1)];
+    else if (event.key === "Home") next = options[0];
+    else if (event.key === "End") next = options[options.length - 1];
+    else if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      current.click();
+      return;
+    }
+    if (!next) return;
+    event.preventDefault();
+    for (const option of options) option.tabIndex = -1;
+    next.tabIndex = 0;
+    next.focus();
+  });
+  const ticks = [0, 0.25, 0.5, 0.75, 1].map(fraction => el("span", {
+    class: "waterfall-tick",
+    attrs: { style: `left:${fraction * 100}%` },
+    text: fmtMs(span * fraction, span < 10 ? 2 : 0),
+  }));
+  const notes = [
+    "Cove's recorder timestamps the request start, the response head and the body end. It captures no DNS, connect, TLS or queueing phases, so none are drawn here.",
+  ];
+  if (rows.some(row => row.pending)) {
+    notes.push(`In-flight requests end at the read instant ${fmtEpochMs(readAt)}. That is a lower bound on their duration, not a recorded completion.`);
+  }
+  if (rows.some(row => row.ttfb === null && !row.pending)) {
+    notes.push("Requests without a recorded head arrival show one undivided bar; the wait/receive split is not estimated.");
+  }
+  if (unplaced) {
+    notes.push(`${unplaced} request${unplaced === 1 ? "" : "s"} carried no start timestamp and ${unplaced === 1 ? "is" : "are"} omitted from the axis.`);
+  }
+  return el("div", { class: "panel-block" },
+    el("div", { class: "panel-block-head" },
+      el("h2", { text: "Waterfall" }),
+      el("span", { class: "pane-meta", text: `${rows.length} request${rows.length === 1 ? "" : "s"} · ${fmtMs(span, 1)} span · from ${fmtEpochMs(origin)}` }),
+    ),
+    el("div", { class: "panel-block-body" },
+      el("div", { class: "waterfall" },
+        el("div", { class: "waterfall-axis" },
+          el("span", { class: "waterfall-axis-spacer" }),
+          el("span", { class: "waterfall-axis-track" }, ...ticks),
+          el("span", { class: "waterfall-axis-spacer is-duration" }),
+        ),
+        list,
+      ),
+      el("div", { class: "perf-legend" },
+        el("span", { class: "is-waiting", text: "Waiting for head" }),
+        el("span", { class: "is-receiving", text: "Receiving body" }),
+        el("span", { class: "is-inflight", text: "In flight" }),
+        el("span", { class: "is-unsplit", text: "Head not recorded" }),
+        el("span", { class: "is-failed", text: "Failed" }),
+      ),
+      ...notes.map(note => el("div", { class: "perf-note", text: note })),
+    ),
+  );
+}
+
 function renderNetwork() {
   const host = dom.networkContent;
   clear(host);
@@ -3757,6 +3955,7 @@ function renderNetwork() {
   if (net.clearError) host.append(errorInline(`Clear failed: ${errorMessage(net.clearError)}`));
   if (net.controlError) host.append(errorInline(`Recording control failed: ${errorMessage(net.controlError)}`));
   if (net.error) host.append(errorInline(errorMessage(net.error)));
+  if (net.waterfall) host.append(renderNetworkWaterfall(filtered));
   const table = el("table", { class: "data-table" },
     el("thead", {}, el("tr", {},
       el("th", { text: "Time" }),
@@ -4125,6 +4324,42 @@ function writeBudgetPreference(rate) {
   try { localStorage.setItem(BUDGET_KEY, String(rate)); } catch {}
 }
 
+/// Adopts the display rate the runtime measured. An absent or non-positive
+/// rate leaves the user's preference in charge rather than assuming 60 Hz.
+function applyRuntimeRefreshRate(perf, rate) {
+  const hz = rate !== null && Number.isFinite(rate) && rate > 0 ? rate : null;
+  perf.refreshHz = hz;
+  if (hz !== null && !perf.budgetManual) perf.budgetHz = hz;
+  syncBudgetOptions(perf);
+}
+
+/// Keeps the budget selector honest about where its rate comes from: the
+/// runtime's measured display rate, or a rate the user chose by hand.
+function syncBudgetOptions(perf) {
+  const select = dom.performanceBudget;
+  if (!select) return;
+  const rates = [...BUDGET_RATES];
+  if (perf.refreshHz !== null && !rates.includes(perf.refreshHz)) rates.push(perf.refreshHz);
+  rates.sort((left, right) => left - right);
+  const existing = [...select.options].map(option => Number(option.value));
+  if (existing.length !== rates.length || existing.some((rate, index) => rate !== rates[index])) {
+    clear(select);
+    for (const rate of rates) {
+      select.append(el("option", {
+        attrs: { value: String(rate) },
+        text: `${fmtNumber(rate, rate % 1 === 0 ? 0 : 1)} Hz · ${fmtNumber(1000 / rate, 1)} ms`,
+      }));
+    }
+  }
+  select.value = String(perf.budgetHz);
+  const measured = perf.refreshHz !== null && !perf.budgetManual;
+  select.title = measured
+    ? `The runtime measured this display's refresh rate: ${fmtNumber(perf.refreshHz, 1)} Hz. Choose another rate to override it.`
+    : perf.refreshHz === null
+      ? "The runtime does not publish its display refresh rate. The budget is the rate you select here."
+      : `Overriding the runtime's measured ${fmtNumber(perf.refreshHz, 1)} Hz display rate.`;
+}
+
 function emptyAllocationSites() {
   return {
     loaded: false,
@@ -4151,6 +4386,20 @@ function emptyAllocationSites() {
   };
 }
 
+function readMemoryIntervalPreference() {
+  try {
+    const value = Number(localStorage.getItem(MEMORY_INTERVAL_KEY));
+    if (MEMORY_INTERVALS.includes(value)) return value;
+  } catch {}
+  return 2000;
+}
+
+function writeMemoryIntervalPreference(interval) {
+  try {
+    localStorage.setItem(MEMORY_INTERVAL_KEY, String(interval));
+  } catch {}
+}
+
 function emptyMemory() {
   return {
     loaded: false,
@@ -4159,6 +4408,11 @@ function emptyMemory() {
     data: null,
     refreshedAt: 0,
     request: 0,
+    history: [],
+    follow: dom.memoryFollow?.checked === true,
+    timer: null,
+    intervalMs: readMemoryIntervalPreference(),
+    series: { rss: true, allocated: true, caches: true, targets: true, virtual: false },
     allocation: emptyAllocationSites(),
   };
 }
@@ -4251,6 +4505,10 @@ function emptyPerformance() {
   return {
     tab: "frames",
     budgetHz: readBudgetPreference(),
+    /// The display rate the runtime published, or null when it cannot observe
+    /// one. A published rate drives the budget until the user overrides it.
+    refreshHz: null,
+    budgetManual: false,
     frames: [],
     dropped: 0,
     loaded: false,
@@ -4556,6 +4814,7 @@ async function loadFrames(options = {}) {
     if (frames.length > MAX_FRAME_RECORDS) frames = frames.slice(-MAX_FRAME_RECORDS);
     perf.frames = frames;
     perf.dropped = Math.max(perf.dropped, numberValue(data?.dropped) ?? 0);
+    applyRuntimeRefreshRate(perf, numberValue(data?.refreshRate));
     perf.loaded = true;
     perf.error = null;
     if (perf.selectedFrame !== null && !frames.some(frame => frame.frame === perf.selectedFrame)) {
@@ -8731,7 +8990,36 @@ function normalizeMemorySnapshot(data) {
   }
   const allocation = memoryAllocationStats(counters);
   const sizeClasses = memorySizeClasses(root, counters, allocation.consumed);
-  return { counters, windows, allocation, sizeClasses };
+  return { counters, windows, allocation, sizeClasses, pressure: readMemoryPressure(root.pressure) };
+}
+
+// An unsubscribed signal is not a measured "normal": the chart must draw no
+// pressure mark for it, and the stats must say it was never observed.
+function readMemoryPressure(value) {
+  if (!isObjectValue(value)) return null;
+  const subscribed = booleanOf(value.subscribed);
+  const low = booleanOf(value.low);
+  if (subscribed === null && low === null) return null;
+  return { subscribed: subscribed === true, low: low === true };
+}
+
+function recordMemorySample(data) {
+  const snapshot = normalizeMemorySnapshot(data);
+  if (!snapshot) return;
+  const memory = state.memory;
+  const counters = snapshot.counters;
+  memory.history.push({
+    at: Date.now(),
+    rss: memoryCounterValue(counters, "processResidentBytes"),
+    virtual: memoryCounterValue(counters, "processVirtualBytes"),
+    allocated: snapshot.allocation.rows.find(row => row.label === "Current")?.bytes ?? null,
+    caches: sumMemoryCounters(counters, ["shapingBytes", "layoutBytes", "imageBytes"]),
+    targets: memoryWindowTotals(snapshot.windows, "targetBytes"),
+    pressure: snapshot.pressure,
+  });
+  if (memory.history.length > MEMORY_SAMPLE_LIMIT) {
+    memory.history.splice(0, memory.history.length - MEMORY_SAMPLE_LIMIT);
+  }
 }
 
 function memoryCounterValue(counters, name) {
@@ -10898,6 +11186,18 @@ function renderMemoryStats(snapshot) {
     el("div", { class: "stat" },
       el("div", { class: "stat-label", text: "Skipped parents" }),
       el("div", { class: "stat-value" }, formatCount(memoryCounterValue(counters, "skippedParentUpdates")))),
+    el("div", { class: "stat" },
+      el("div", { class: "stat-label", text: "Memory pressure" }),
+      el("div", {
+        class: "stat-value",
+        attrs: {
+          title: snapshot.pressure === null
+            ? "The host reported no memory-pressure field."
+            : snapshot.pressure.subscribed
+              ? "The host subscribes to the platform memory-pressure signal."
+              : "The host never wired the platform memory-pressure signal; this is not a measured normal.",
+        },
+      }, snapshot.pressure === null ? "Not reported" : snapshot.pressure.subscribed ? (snapshot.pressure.low ? "Low" : "Normal") : "Not observed")),
   );
 }
 
@@ -11004,6 +11304,9 @@ function setMemoryChrome() {
   const target = targetById();
   const memory = state.memory;
   dom.memoryRefresh.disabled = !state.token || !state.caps.runtime || memory.loading;
+  dom.memoryFollow.disabled = !state.token || !state.connected || !state.caps.runtime;
+  dom.memoryInterval.disabled = dom.memoryFollow.disabled;
+  dom.memoryInterval.value = String(memory.intervalMs);
   if (!state.token || !target) {
     dom.memoryMeta.textContent = "No target selected.";
     return;
@@ -11042,6 +11345,194 @@ function setMemoryChrome() {
   dom.memoryMeta.textContent = allocation.reported
     ? `${parts.join(" · ")}. RSS and allocator counters are measured; caches are estimates.`
     : `${parts.join(" · ")}. RSS is measured; no allocator counters are reported; caches are estimates.`;
+}
+
+const MEMORY_SERIES = [
+  { key: "rss", label: "Process RSS" },
+  { key: "allocated", label: "Allocator current" },
+  { key: "caches", label: "Logical caches" },
+  { key: "targets", label: "Render targets" },
+  { key: "virtual", label: "Process virtual" },
+];
+
+function memoryChartScale(values) {
+  const max = values.reduce((maximum, value) => Math.max(maximum, value), 0);
+  if (max <= 0) return 1024;
+  const base = 10 ** Math.floor(Math.log10(max));
+  for (const step of [1, 2, 5, 10]) {
+    if (step * base >= max) return step * base;
+  }
+  return 10 * base;
+}
+
+function memorySeriesPoints(history, key, scale, origin, span) {
+  const points = [];
+  for (const sample of history) {
+    const value = sample[key];
+    if (value === null) continue;
+    points.push({
+      x: span > 0 ? ((sample.at - origin) / span) * 100 : 0,
+      y: Math.max(0, Math.min(100, (value / scale) * 100)),
+      sample,
+    });
+  }
+  return points;
+}
+
+function renderMemoryChart(memory) {
+  const history = memory.history;
+  const reset = el("button", {
+    class: "tool-button",
+    attrs: { type: "button", title: "Discard the recorded samples and start a new series" },
+    text: "Reset",
+    on: {
+      click: () => {
+        memory.history = [];
+        renderMemory();
+      },
+    },
+  });
+  const head = el("div", { class: "panel-block-head" }, el("h2", { text: "Memory overview" }));
+  if (!history.length) {
+    head.append(reset);
+    return el("div", { class: "panel-block" }, head,
+      el("div", { class: "panel-block-body" },
+        emptyInline("No samples recorded yet. Refresh or enable Follow to append provider readings to the series."),
+      ),
+    );
+  }
+  const origin = history[0].at;
+  const latest = history[history.length - 1].at;
+  const span = latest - origin;
+  const visible = MEMORY_SERIES.filter(series => memory.series[series.key]);
+  const values = [];
+  for (const series of visible) {
+    for (const sample of history) {
+      if (sample[series.key] !== null) values.push(sample[series.key]);
+    }
+  }
+  const scale = memoryChartScale(values);
+  head.append(
+    el("span", { class: "pane-meta", text: `${history.length} sample${history.length === 1 ? "" : "s"} · ${fmtSeconds(span)} · ${fmtBytes(scale)} scale` }),
+    reset,
+  );
+  const plot = el("div", {
+    class: "memory-chart-plot",
+    attrs: {
+      role: "img",
+      "aria-label": `Memory overview: ${history.length} samples over ${fmtSeconds(span)}, scale ${fmtBytes(scale)}.`,
+    },
+  });
+  for (const fraction of [0.25, 0.5, 0.75, 1]) {
+    plot.append(el("div", { class: "memory-grid", attrs: { style: `bottom:${fraction * 100}%` } }));
+  }
+  for (const series of visible) {
+    const points = memorySeriesPoints(history, series.key, scale, origin, span);
+    if (!points.length) continue;
+    if (points.length === 1) {
+      plot.append(el("div", {
+        class: `memory-dot is-${series.key}`,
+        attrs: {
+          style: `left:${points[0].x}%;bottom:${points[0].y}%`,
+          title: `${series.label} ${fmtBytes(points[0].sample[series.key])} at ${fmtEpochMs(points[0].sample.at)}`,
+        },
+      }));
+      continue;
+    }
+    const forward = points.map(point => `${point.x}% ${100 - point.y}%`).join(", ");
+    plot.append(el("div", {
+      class: `memory-area is-${series.key}`,
+      attrs: { style: `clip-path:polygon(${forward}, ${points[points.length - 1].x}% 100%, ${points[0].x}% 100%)` },
+    }));
+    const backward = points.slice().reverse().map(point => `${point.x}% calc(${100 - point.y}% - 2px)`).join(", ");
+    plot.append(el("div", {
+      class: `memory-line is-${series.key}`,
+      attrs: { style: `clip-path:polygon(${forward}, ${backward})` },
+    }));
+  }
+  let pressureMarks = 0;
+  for (const sample of history) {
+    if (!sample.pressure?.subscribed || !sample.pressure.low) continue;
+    pressureMarks += 1;
+    const x = span > 0 ? ((sample.at - origin) / span) * 100 : 0;
+    plot.append(el("div", {
+      class: "memory-pressure",
+      attrs: { style: `left:${x}%`, title: `Memory-pressure signal at ${fmtEpochMs(sample.at)}` },
+    }));
+  }
+  const cursor = el("div", { class: "memory-cursor", props: { hidden: true } });
+  plot.append(cursor);
+  const readout = el("div", { class: "memory-chart-readout", attrs: { role: "status" } });
+  const describe = sample => `${fmtEpochMs(sample.at)} · ` + visible
+    .map(series => `${series.label} ${sample[series.key] === null ? "not reported" : fmtBytes(sample[series.key])}`)
+    .join(" · ");
+  readout.textContent = describe(history[history.length - 1]);
+  plot.addEventListener("pointermove", event => {
+    const rect = plot.getBoundingClientRect();
+    if (rect.width <= 0) return;
+    const ratio = Math.max(0, Math.min(1, (event.clientX - rect.left) / rect.width));
+    const at = origin + ratio * span;
+    let nearest = history[0];
+    for (const sample of history) {
+      if (Math.abs(sample.at - at) < Math.abs(nearest.at - at)) nearest = sample;
+    }
+    cursor.hidden = false;
+    cursor.style.left = `${span > 0 ? ((nearest.at - origin) / span) * 100 : 0}%`;
+    readout.textContent = describe(nearest);
+  });
+  plot.addEventListener("pointerleave", () => {
+    cursor.hidden = true;
+    readout.textContent = describe(history[history.length - 1]);
+  });
+  const yaxis = el("div", { class: "memory-yaxis" },
+    ...[0, 0.25, 0.5, 0.75, 1].map(fraction => el("span", {
+      attrs: { style: `bottom:${fraction * 100}%` },
+      text: fmtBytes(scale * fraction),
+    })),
+  );
+  const legend = el("div", { class: "perf-legend memory-legend" },
+    ...MEMORY_SERIES.map(series => el("button", {
+      class: `memory-legend-toggle is-${series.key}${memory.series[series.key] ? " is-on" : ""}`,
+      attrs: { type: "button", "aria-pressed": String(memory.series[series.key]), title: `Show or hide ${series.label} on the overview chart` },
+      text: series.label,
+      on: {
+        click: () => {
+          memory.series[series.key] = !memory.series[series.key];
+          renderMemory();
+        },
+      },
+    })),
+    el("span", { class: "is-pressure", text: "Pressure signal" }),
+  );
+  const notes = [
+    "Each point is one query_ui_memory reading. Lines connect reported readings; a gap is never filled with an invented sample.",
+    "RSS covers the whole process. Allocator current, logical caches and render targets are subsets or estimates, drawn as separate series and never stacked into a total.",
+  ];
+  if (visible.some(series => history.some(sample => sample[series.key] === null))) {
+    notes.push("A series with unreported readings plots only the readings the host returned.");
+  }
+  notes.push(pressureMarks
+    ? "Vertical marks are the host's subscribed memory-pressure signal at the sample that observed it."
+    : "No subscribed memory-pressure signal was observed in these samples, so no pressure marks are drawn.");
+  if (history.length === 1) {
+    notes.push("One sample: a trend needs at least two readings, so each series is drawn as a single point.");
+  }
+  return el("div", { class: "panel-block" }, head,
+    el("div", { class: "panel-block-body" },
+      el("div", { class: "memory-chart" },
+        yaxis,
+        plot,
+        el("div", { class: "memory-xaxis" },
+          el("span", { text: fmtEpochMs(origin) }),
+          el("span", { text: fmtSeconds(span) }),
+          el("span", { text: fmtEpochMs(latest) }),
+        ),
+      ),
+      readout,
+      legend,
+      ...notes.map(note => el("div", { class: "perf-note", text: note })),
+    ),
+  );
 }
 
 function renderMemory() {
@@ -11099,6 +11590,7 @@ function renderMemory() {
   }
   host.append(memoryScopeNote());
   if (memory.error) host.append(errorInline(errorMessage(memory.error)));
+  host.append(renderMemoryChart(memory));
   host.append(renderMemoryStats(snapshot));
   host.append(renderMemoryAllocator(snapshot));
   host.append(renderMemoryAllocationSites());
@@ -11143,6 +11635,7 @@ async function loadMemory(options = {}) {
     state.memory.loaded = true;
     state.memory.data = data === null ? null : data;
     state.memory.refreshedAt = Date.now();
+    recordMemorySample(data);
     if (options.quiet !== true) toast("Memory counters refreshed.", "success", 3000);
   } catch (error) {
     if (request !== memory.request || targetId !== state.targetId) return;
@@ -11175,6 +11668,7 @@ function ensureMemory() {
 function resetMemory(previousTarget = state.targetId) {
   const previousAllocation = state.memory?.allocation;
   stopAllocationPolling();
+  stopTimer("memory");
   if (previousTarget && previousAllocation && ["running", "starting", "stopping"].includes(previousAllocation.status)) {
     releaseAllocationSampling(previousTarget).catch(() => {});
   }
@@ -17324,6 +17818,10 @@ function bindEvents() {
   });
   dom.networkSearch.addEventListener("input", renderNetwork);
   dom.networkStateFilter.addEventListener("change", renderNetwork);
+  dom.networkWaterfall.addEventListener("change", () => {
+    state.network.waterfall = dom.networkWaterfall.checked;
+    renderNetwork();
+  });
   dom.networkDialogClose.addEventListener("click", () => dom.networkDialog.close());
   dom.networkDialog.addEventListener("click", event => {
     if (event.target === dom.networkDialog) dom.networkDialog.close();
@@ -17349,6 +17847,18 @@ function bindEvents() {
     loadFrames({ reset: true });
   });
   dom.memoryRefresh.addEventListener("click", () => refreshMemoryView());
+  dom.memoryFollow.addEventListener("change", () => {
+    state.memory.follow = dom.memoryFollow.checked;
+    syncFollowTimers();
+    if (state.memory.follow) loadMemory({ quiet: true });
+  });
+  dom.memoryInterval.addEventListener("change", () => {
+    const interval = Number(dom.memoryInterval.value);
+    if (!MEMORY_INTERVALS.includes(interval)) return;
+    state.memory.intervalMs = interval;
+    writeMemoryIntervalPreference(interval);
+    syncFollowTimers();
+  });
   dom.appSizeRefresh.addEventListener("click", () => loadAppSize({ reset: false }));
   dom.deepLinksRootForm.addEventListener("submit", submitDeepLinks);
   dom.deepLinksRoot.addEventListener("input", () => {
@@ -17369,9 +17879,15 @@ function bindEvents() {
   });
   dom.performanceBudget.addEventListener("change", () => {
     const rate = Number(dom.performanceBudget.value);
-    if (!BUDGET_RATES.includes(rate)) return;
-    state.performance.budgetHz = rate;
+    const perf = state.performance;
+    if (!Number.isFinite(rate) || rate <= 0) return;
+    if (!BUDGET_RATES.includes(rate) && rate !== perf.refreshHz) return;
+    perf.budgetHz = rate;
+    // Picking the measured rate by hand returns the budget to the runtime;
+    // any other choice is an explicit override of it.
+    perf.budgetManual = perf.refreshHz !== null && rate !== perf.refreshHz;
     writeBudgetPreference(rate);
+    syncBudgetOptions(perf);
     renderPerformance();
   });
   dom.performanceStart.addEventListener("click", startTrace);
