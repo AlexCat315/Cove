@@ -81,7 +81,14 @@ impl LayoutNode {
         if let Some(state) = &owner.data().custom {
             state.invalidate();
         }
-        let size = engine::layout_probe(self, width, height, direction, engine::Probe::Measure);
+        let size = engine::layout_probe(
+            self,
+            width,
+            height,
+            direction,
+            engine::Probe::Measure,
+            false,
+        );
         self.0
             .engine
             .store_measurement(width, height, direction, size);
@@ -110,6 +117,7 @@ impl LayoutNode {
             height,
             owner.custom_layout_direction(),
             engine::Probe::Place,
+            false,
         )
     }
 
@@ -132,7 +140,8 @@ impl LayoutNode {
             return;
         }
         let direction = owner.custom_layout_direction();
-        let mut size = engine::layout_probe(self, width, height, direction, engine::Probe::Measure);
+        let mut size =
+            engine::layout_probe(self, width, height, direction, engine::Probe::Measure, true);
         // A child wider than its slot is laid out again in a stretching probe:
         // an auto-width flex container resolves to its min-content width (a
         // nowrap label is as wide as the whole label), so it would otherwise
@@ -140,7 +149,7 @@ impl LayoutNode {
         // stretch only runs when the child actually overflows, so an at-most
         // proposal still leaves a narrower child at its own size.
         if width.is_some_and(|slot| size.width > slot + 0.01) {
-            size = engine::layout_probe(self, width, height, direction, engine::Probe::Place);
+            size = engine::layout_probe(self, width, height, direction, engine::Probe::Place, true);
         }
         self.place_custom_layouts();
         // The probe reports the size the child settled on: its own size when the

@@ -18,13 +18,14 @@ import { pollProfile } from "../panels/performance/profile/control.js";
 import { loadProfile } from "../panels/performance/profile/model.js";
 import { loadTraceEvents } from "../panels/performance/timeline.js";
 import { loadRegisteredState } from "../panels/state.js";
+import { loadSceneDiagnostics } from "../panels/scene-diagnostics.js";
 
 
 export function switchView(view, options = {}) {
-  if (!["inspector", "network", "logs", "performance", "memory", "app-size", "deep-links", "debugger", "state", "extensions"].includes(view)) return;
+  if (!["inspector", "network", "logs", "performance", "memory", "app-size", "deep-links", "debugger", "state", "extensions", "semantics"].includes(view)) return;
   if (state.view === view && !options.force) return;
   state.view = view;
-  const titles = { inspector: "Inspector", network: "Network", logs: "Logs", performance: "Performance", memory: "Memory", "app-size": "App Size", "deep-links": "Deep Links", debugger: "Debugger", state: "State", extensions: "Extensions" };
+  const titles = { inspector: "Inspector", network: "Network", logs: "Logs", performance: "Performance", memory: "Memory", "app-size": "App Size", "deep-links": "Deep Links", debugger: "Debugger", state: "State", extensions: "Extensions", semantics: "Semantics" };
   document.title = `Cove DevTools · ${titles[view]}`;
   const tabs = [...document.querySelectorAll(".rail-tab")];
   for (const tab of tabs) {
@@ -64,6 +65,8 @@ export async function refreshCurrent() {
   } else if (state.view === "extensions") {
     if (state.caps.extensions) await loadExtensions({ reset: true });
     else renderExtensions();
+  } else if (state.view === "semantics") {
+    await loadSceneDiagnostics("semantics");
   } else if (state.view === "performance") {
     if (state.performance.snapshot) {
       renderPerformance();
@@ -71,6 +74,8 @@ export async function refreshCurrent() {
       if (state.performance.profile.status === "sampling") await pollProfile();
       else if (state.caps.profile) await loadProfile({ quiet: true });
       else renderPerformance();
+    } else if (state.performance.tab === "components") {
+      await loadSceneDiagnostics("components");
     } else {
       if (state.caps.timing) await loadFrames({ reset: true });
       else renderPerformance();

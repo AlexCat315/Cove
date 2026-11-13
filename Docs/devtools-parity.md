@@ -1,5 +1,19 @@
 # Flutter DevTools 3.50 parity
 
+## 2026-11-14 update
+
+| Capability | Cove |
+| --- | --- |
+| Layout Explorer | Debug probes report the latest full Taffy input for each axis, the parent and child layout edges, solved and published geometry, flex basis, and alignment. Inspector shows overflow distances and text diagnostics. |
+| Component work | Performance Components and `query_ui_component_activity` rank live component scopes by rebuilds, uncached layout computations or actual paints. The mounted-tree totals change when owned nodes are removed. |
+| Semantics | Inspector's Semantics view and `query_ui_semantics` project the app's own semantic tree with hierarchy and input state. The diagnostic path omits text field drafts and secure values. |
+| GPU and compilation | Frames plots GPU beside UI and Encode, ranks slow frames by the largest stage, and reports measured cold shader/pipeline creation in an active frame slot. Pass-level and compositor attribution remain open. |
+| CPU sampling | Native implementations cover 64-bit macOS, iOS, Linux, Android and Windows. WASM CPU profiling still needs a browser-side sampling integration. |
+| Debugger | Local desktop LLDB attach and explicitly forwarded native debug stubs are supported. Log points and exception filters use the adapter's advertised capabilities. Device setup and native device acceptance remain open. |
+| Delivery and testing | Builds with `COVE_DEVTOOLS_ESBUILD` offer a bundled `/packed` entry. The default module graph remains available. The live acceptance script uses the same CLI and controller as the Inspector. |
+
+The sections below preserve the earlier audit snapshot. Current verification is tracked in [the Gallery audit](gallery-audit.md). Flutter's comparison surface is documented in its [Performance view](https://docs.flutter.dev/tools/devtools/performance) and [Inspector](https://docs.flutter.dev/tools/devtools/inspector).
+
 Audit snapshot: 2026-11-13 04:28 CST, working tree at `095b5923` plus the uncommitted M1–M3 and debugger work. Line numbers are from that snapshot; the debugger implementation landed while this audit ran, so its client line numbers were still moving (see [Concurrent work](#concurrent-work)).
 
 This is the goal's recorded matrix. A row is `implemented + verified` only when the repository, its tests, or an isolated live controller run supports it. Nothing here treats a UI shell, a schema, or a synthetic payload as a completed feature.

@@ -96,6 +96,13 @@ impl RenderObject {
     pub fn cached_layer_list(&self) -> Option<DrawList> {
         self.0.borrow().cached_layer_list.clone()
     }
+    pub fn cached_batch_count(&self) -> Option<usize> {
+        self.0
+            .borrow()
+            .cached_layer_list
+            .as_ref()
+            .map(|list| list.batches().len())
+    }
     pub fn set_cached_layer_list(&self, list: Option<DrawList>) {
         self.0.borrow_mut().cached_layer_list = list;
     }
@@ -113,6 +120,9 @@ impl RenderObject {
     }
     pub fn last_clip_stack(&self) -> Vec<Clip> {
         self.0.borrow().last_clip_stack.clone()
+    }
+    pub fn last_clip_count(&self) -> usize {
+        self.0.borrow().last_clip_stack.len()
     }
     /// Compares the recorded clip stack without cloning it.
     pub fn last_clip_stack_eq(&self, clips: &[Clip]) -> bool {

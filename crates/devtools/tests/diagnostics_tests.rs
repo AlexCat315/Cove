@@ -33,6 +33,67 @@ use cove_core::scene::{AccessibilityRole, AccessibilitySemantics, Node, NodeTree
 use cove_devtools::inspection::Diagnostics;
 use cove_devtools::protocol::{Envelope, JsonValue};
 
+#[test]
+fn layout_activity_and_semantics_report_runtime_work() {
+    use cove_core::Rect;
+    use cove_core::scene::{ComponentRecompositionMetrics, Direction, LayoutNode};
+    use serde_json::json;
+
+    let root = Node::new();
+    root.set_frame(Rect::new(0.0, 0.0, 200.0, 100.0));
+    root.set_view_tag(Some("Scene".into()));
+    root.set_recomposition_metrics(Some(ComponentRecompositionMetrics::default()));
+    root.set_accessibility(Some(AccessibilitySemantics::new(AccessibilityRole::Group)));
+    let child = Node::new();
+    child.set_frame(Rect::new(0.0, 0.0, 200.0, 30.0));
+    child.set_accessibility(Some(
+        AccessibilitySemantics::new(AccessibilityRole::TextField).with_value("private draft"),
+    ));
+    root.add_child(&child);
+    let parent_layout = LayoutNode::new();
+    let child_layout = LayoutNode::new();
+    child_layout.set_height(Some(30.0));
+    parent_layout.add_child(&child_layout);
+    root.set_layout_node(Some(&parent_layout));
+    child.set_layout_node(Some(&child_layout));
+    parent_layout.calculate_layout(Some(200.0), Some(100.0), Direction::Ltr);
+    let count = child_layout.layout_count();
+    parent_layout.calculate_layout(Some(200.0), Some(100.0), Direction::Ltr);
+    assert_eq!(
+        child_layout.layout_count(),
+        count,
+        "a cache hit does not increment layout"
+    );
+    child.bump_repaint();
+    let mut tree = NodeTree::new();
+    tree.set_root(Some(root.clone()));
+    let diagnostics = Diagnostics::new(Rc::new(RefCell::new(tree)), None);
+    let id = child.id().0.to_string();
+
+    let chain =
+        data(&diagnostics.handle_read_request(&call("query_ui_layout", json!({"node_id": id}))));
+    assert_eq!(chain["parent"]["id"], root.id().0.to_string());
+    assert_eq!(chain["node"]["solved"]["h"], 30.0);
+    if cfg!(debug_assertions) {
+        assert_eq!(chain["node"]["incoming"]["width"]["known"], 200.0);
+    }
+    let activity = data(&diagnostics.handle_read_request(&call(
+        "query_ui_component_activity",
+        json!({"sort_by": "paint"}),
+    )));
+    assert_eq!(activity["items"][0]["paintCount"], 1);
+    if cfg!(debug_assertions) {
+        assert!(activity["items"][0]["layoutCount"].as_u64().unwrap() > 0);
+    }
+    let semantics = data(&diagnostics.handle_read_request(&call(
+        "query_ui_semantics",
+        json!({"offset": 1, "limit": 1}),
+    )));
+    assert_eq!(semantics["items"][0]["id"], id);
+    assert_eq!(semantics["items"][0]["parentID"], root.id().0.to_string());
+    assert_eq!(semantics["items"][0]["semantics"]["value"], "");
+}
+
 fn envelope(kind: &str, payload: JsonValue) -> Envelope {
     Envelope::new(kind, None, Some(payload))
 }
@@ -422,6 +483,9 @@ fn diagnostic_registry_is_the_single_definition_source() {
             "get_diagnostics",
             "query_ui_nodes",
             "query_ui_recomposition",
+            "query_ui_layout",
+            "query_ui_component_activity",
+            "query_ui_semantics",
             "query_ui_state",
             "query_ui_memory",
             "query_ui_network",
@@ -505,6 +569,9 @@ fn immediate_wire_reads_share_toolbox_schemas_results_and_redaction() {
             "get_diagnostics",
             "query_ui_nodes",
             "query_ui_recomposition",
+            "query_ui_layout",
+            "query_ui_component_activity",
+            "query_ui_semantics",
             "query_ui_state",
             "query_ui_memory",
             "query_ui_network",

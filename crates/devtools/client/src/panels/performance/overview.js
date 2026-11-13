@@ -7,6 +7,7 @@ import { frameJank, loadFrames, renderFramesPanel } from "./frames.js";
 import { clearProfileTimers, ensureProfile, fmtSeconds, formatCount, profileElapsedMs, profilePlatformName } from "./profile/model.js";
 import { renderProfilePanel } from "./profile/views.js";
 import { renderTimelinePanel, updateTraceElapsed } from "./timeline.js";
+import { ensureSceneDiagnostics } from "../scene-diagnostics.js";
 
 
 function readBudgetPreference() {
@@ -307,8 +308,10 @@ function setPerformanceChrome() {
   dom.performanceBudget.disabled = snapshot || !framesTab;
   dom.performanceFollow.checked = perf.follow;
   dom.performanceFollow.disabled = snapshot || !caps.timing || !framesTab;
-  dom.performanceRefresh.disabled = snapshot || (profileTab ? !caps.profile || perf.profile.loading : !caps.timing || perf.loading);
-  dom.performanceRefresh.title = profileTab ? "Refresh CPU profile and hot spots" : "Refresh frame timings";
+  dom.performanceRefresh.disabled = snapshot || (perf.tab === "components"
+    ? !caps.componentActivity : profileTab ? !caps.profile || perf.profile.loading : !caps.timing || perf.loading);
+  dom.performanceRefresh.title = perf.tab === "components" ? "Refresh component activity"
+    : profileTab ? "Refresh CPU profile and hot spots" : "Refresh frame timings";
   dom.performanceStart.disabled = snapshot || !caps.trace || perf.recording || perf.traceLoading;
   dom.performanceStop.disabled = snapshot || !perf.recording || perf.traceLoading;
   dom.performanceStart.title = snapshot
@@ -337,6 +340,10 @@ function updatePerformanceMeta() {
   }
   if (!target) {
     dom.performanceMeta.textContent = "No target selected.";
+    return;
+  }
+  if (perf.tab === "components") {
+    dom.performanceMeta.textContent = "Mounted components";
     return;
   }
   if (!state.caps.runtime) {
@@ -454,7 +461,8 @@ export function renderPerformance() {
   }
   if (perf.tab === "frames") renderFramesPanel();
   else if (perf.tab === "timeline") renderTimelinePanel();
-  else renderProfilePanel();
+  else if (perf.tab === "profile") renderProfilePanel();
+  else ensureSceneDiagnostics("components");
   updatePerformanceMeta();
   dom.performanceContent.scrollTop = scrollTop;
   const spans = dom.performanceTimeline.querySelector(".spans-table-wrap");

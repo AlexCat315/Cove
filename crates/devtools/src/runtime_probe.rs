@@ -1,7 +1,9 @@
 //! Commands available inside every Cove runtime, independent of its transport.
 use crate::allocation_sites::AllocationSites;
 use crate::frame_analysis::{FrameAnalysis, Timeline};
-use crate::inspection::{DebugPaint, DiagnosticStateSource, Diagnostics, SceneInspector, Tool};
+use crate::inspection::{
+    DebugPaint, DiagnosticError, DiagnosticStateSource, Diagnostics, SceneInspector, Tool,
+};
 use crate::profile::UiProfiler;
 use cove_core::Point;
 use cove_core::scene::{InvalidationLog, NodeTree, RenderTree};
@@ -93,6 +95,8 @@ impl RuntimeProbe {
             "trace",
             "timing",
             "frame_analysis",
+            "component_activity",
+            "semantics_tree",
             "network",
             "network_control",
             "inspect_nodes",
@@ -139,7 +143,8 @@ impl RuntimeProbe {
     pub fn record_measured(&mut self, mut frame: TimingFrame, gpu: Option<GpuMeasurement>) {
         self.sequence += 1;
         frame.frame = self.sequence;
-        self.pending_timing.push_back((frame, gpu, std::time::Instant::now()));
+        self.pending_timing
+            .push_back((frame, gpu, std::time::Instant::now()));
         self.flush_timing();
     }
 
@@ -150,7 +155,10 @@ impl RuntimeProbe {
             let nanos = match gpu.as_ref().map_or(Some(None), |query| query()) {
                 Some(nanos) => nanos,
                 None if self.pending_timing.len() >= 16
-                    || recorded.elapsed() >= std::time::Duration::from_secs(1) => None,
+                    || recorded.elapsed() >= std::time::Duration::from_secs(1) =>
+                {
+                    None
+                }
                 None => break,
             };
             let (mut frame, _, _) = self.pending_timing.pop_front().expect("front was present");
@@ -263,7 +271,12 @@ impl RuntimeProbe {
                     .ok_or_else(|| Fault::new("unknown_command", "Unknown diagnostic command."))?;
                 self.diagnostics
                     .execute_read_json(tool, &arguments)
-                    .map_err(|error| invalid(error.to_string()))
+                    .map_err(|error| match error {
+                        DiagnosticError::MissingNode(_) => {
+                            Fault::new("stale_node", error.to_string())
+                        }
+                        _ => invalid(error.to_string()),
+                    })
             }
             ProbeCommand::Edit { name, arguments } => {
                 use cove_devtools_protocol::InspectionValidation;

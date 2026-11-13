@@ -123,6 +123,10 @@ function validateSnapshotFrame(frame, index) {
     drawMs: snapshotNumber(frame.drawMs, `${label} drawMs`),
     renderThreadMs: snapshotOptionalNumber(frame.renderThreadMs, `${label} renderThreadMs`),
     gpuMs: snapshotOptionalNumber(frame.gpuMs, `${label} gpuMs`),
+    pipelineCreation: frame.pipelineCreation == null ? null : {
+      count: snapshotNumber(frame.pipelineCreation.count, `${label} pipeline creations`, { integer: true }),
+      cpuMs: snapshotNumber(frame.pipelineCreation.cpuMs, `${label} pipeline creation CPU ms`),
+    },
     submitted: frame.submitted,
     presented: frame.presented === true ? true : frame.presented === false ? false : null,
     totalMs: snapshotNumber(frame.totalMs, `${label} totalMs`),

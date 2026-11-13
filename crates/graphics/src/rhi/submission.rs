@@ -147,11 +147,29 @@ struct SlotState {
 
 /// One frame's GPU duration, filled asynchronously when its slot retires.
 #[derive(Clone, Debug, Default)]
-pub struct GpuFrameTiming(std::sync::Arc<Mutex<Option<Option<u64>>>>);
+pub struct GpuFrameTiming(std::sync::Arc<Mutex<FrameTimings>>);
+
+#[derive(Debug, Default)]
+struct FrameTimings {
+    gpu: Option<Option<u64>>,
+    pipeline_creations: u64,
+    pipeline_nanos: u64,
+}
 
 impl GpuFrameTiming {
     pub fn result(&self) -> Option<Option<u64>> {
-        *self.0.lock().unwrap_or_else(std::sync::PoisonError::into_inner)
+        self.0
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .gpu
+    }
+
+    pub fn pipeline_creation(&self) -> (u64, u64) {
+        let timing = self
+            .0
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        (timing.pipeline_creations, timing.pipeline_nanos)
     }
 }
 
@@ -238,7 +256,8 @@ impl FrameRing {
     /// Opens the next frame and returns its slot index plus the retirement
     /// identifiers that became runnable while opening it.
     pub fn begin(&self) -> (usize, Vec<u64>) {
-        self.begin_slot(true).expect("blocking frame begin has a slot")
+        self.begin_slot(true)
+            .expect("blocking frame begin has a slot")
     }
 
     pub fn try_begin(&self) -> Option<(usize, Vec<u64>)> {
@@ -321,7 +340,10 @@ impl FrameRing {
     pub(crate) fn measure(&self, slot_index: usize) -> GpuFrameTiming {
         let mut state = self.lock();
         let slot = &mut state.slots[slot_index];
-        slot.timing.get_or_insert_with(FrameMeasurement::default).result.clone()
+        slot.timing
+            .get_or_insert_with(FrameMeasurement::default)
+            .result
+            .clone()
     }
 
     pub(crate) fn measurement_epoch(&self, slot_index: usize) -> Option<u64> {
@@ -333,13 +355,28 @@ impl FrameRing {
     pub(crate) fn note_gpu_sample(&self, slot_index: usize, epoch: u64, nanos: Option<u64>) {
         let mut state = self.lock();
         let slot = &mut state.slots[slot_index];
-        if slot.epoch == epoch && let Some(timing) = &mut slot.timing {
+        if slot.epoch == epoch
+            && let Some(timing) = &mut slot.timing
+        {
             if let Some(elapsed) = nanos.and_then(|value| timing.elapsed.checked_add(value)) {
                 timing.elapsed = elapsed;
                 timing.has_sample = true;
             } else {
                 timing.incomplete = true;
             }
+        }
+    }
+
+    pub(crate) fn note_pipeline_creation(&self, slot_index: usize, nanos: u64) {
+        let state = self.lock();
+        if let Some(timing) = &state.slots[slot_index].timing {
+            let mut sample = timing
+                .result
+                .0
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner);
+            sample.pipeline_creations = sample.pipeline_creations.saturating_add(1);
+            sample.pipeline_nanos = sample.pipeline_nanos.saturating_add(nanos);
         }
     }
 
@@ -405,7 +442,12 @@ fn finish_if_ready(state: &mut FrameRingState, index: usize) {
     let slot = &mut state.slots[index];
     if let Some(timing) = slot.timing.take() {
         let nanos = (timing.has_sample && !timing.incomplete).then_some(timing.elapsed);
-        *timing.result.0.lock().unwrap_or_else(std::sync::PoisonError::into_inner) = Some(nanos);
+        timing
+            .result
+            .0
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .gpu = Some(nanos);
     }
     slot.completed_epoch = epoch;
     slot.in_flight = false;
@@ -883,6 +925,25 @@ mod tests {
         assert!(ring.is_idle());
         assert!(ring.try_begin().is_some());
         ring.end();
+    }
+
+    #[test]
+    fn pipeline_creation_stays_with_its_frame_slot_epoch() {
+        let ring = FrameRing::new(1);
+        let (slot, _) = ring.begin();
+        let first = ring.measure(slot);
+        ring.note_pipeline_creation(slot, 250_000);
+        ring.note_pipeline_creation(slot, 750_000);
+        ring.end();
+        assert_eq!(first.pipeline_creation(), (2, 1_000_000));
+
+        let (next, _) = ring.begin();
+        assert_eq!(slot, next);
+        let second = ring.measure(next);
+        ring.note_pipeline_creation(next, 100);
+        ring.end();
+        assert_eq!(second.pipeline_creation(), (1, 100));
+        assert_eq!(first.pipeline_creation(), (2, 1_000_000));
     }
 
     #[test]

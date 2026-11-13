@@ -337,12 +337,6 @@ fn begin(
     if let Some(draw) = node.draw() {
         paint_scaled(&draw, target_list(open), Point::new(x, y), scale);
     }
-    // Same rule as `NodeRenderer`: a node counts as repainted only when it
-    // emitted its own box or content. `reuse` returns before `begin`, so a
-    // layer served from cache keeps its generation across frames.
-    if target_list(open).vertices().len() > first_vertex {
-        node.bump_repaint();
-    }
     let descendant_start = target_list(open).vertices().len();
     let record = open.last_mut().expect("the record was just pushed");
     record.first_vertex = first_vertex;
@@ -356,6 +350,7 @@ fn finish(open: &mut Vec<OpenNode>) {
     let opacity = record.node.as_ref().map_or(1.0, Node::opacity);
     let subtree_opacity = record.node.as_ref().map_or(1.0, Node::subtree_opacity);
     let overlay: Option<Painter> = record.node.as_ref().and_then(Node::overlay_draw);
+    let node = record.node.clone();
     let (own, first_vertex, descendant_start) =
         (record.own, record.first_vertex, record.descendant_start);
     {
@@ -364,8 +359,16 @@ fn finish(open: &mut Vec<OpenNode>) {
             list.pop_mask();
         }
         list.multiply_opacity(descendant_start, opacity);
+        let before_overlay = list.vertices().len();
         if let Some(overlay) = &overlay {
             paint_scaled(overlay, list, Point::new(own.e, own.f), own.a);
+        }
+        // A cache hit bypasses the node's record. Descendant vertices are
+        // excluded from this node's paint count.
+        if let Some(node) = node
+            && (descendant_start > first_vertex || list.vertices().len() > before_overlay)
+        {
+            node.bump_repaint();
         }
         list.multiply_opacity(first_vertex, subtree_opacity);
         if clipped {

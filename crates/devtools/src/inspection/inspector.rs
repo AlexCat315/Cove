@@ -7,15 +7,163 @@
 use crate::inspection::editor::SceneEditor;
 use cove_core::Rect;
 use cove_core::scene::{
-    InvalidationLog, InvalidationPhase, InvalidationSource, LayoutInsets, Node, NodeTree,
-    Overflow, RenderTree,
+    InvalidationLog, InvalidationPhase, InvalidationSource, LayoutInsets, Node, NodeTree, Overflow,
+    RenderTree,
 };
 use cove_devtools_protocol::{
-    InputInventory, InspectionInsets, InvalidationRecord, MAX_TREE_PAGE_DEPTH, MAX_TREE_PAGE_NODES,
+    InputInventory, InspectionInsets, InvalidationRecord, LayoutAxisInput, LayoutChain,
+    LayoutChainNode, LayoutExtent, LayoutProposal, MAX_TREE_PAGE_DEPTH, MAX_TREE_PAGE_NODES,
     NodeConstraints, NodeFlags, NodeFrame, NodeLayoutInfo, NodePoint, NodeStyleInfo, NodeSummary,
-    Recomposition,
-    RecompositionReason, RenderInventory, SourceLocation, TreePage, TreePageNode, TreeSnapshot,
+    Recomposition, RecompositionReason, RenderInventory, SourceLocation, TreePage, TreePageNode,
+    TreeSnapshot,
 };
+
+const MAX_LAYOUT_CHAIN_CHILDREN: usize = 32;
+
+pub(super) fn layout_chain(node: &Node) -> Option<LayoutChain> {
+    use cove_core::scene::LayoutNode;
+
+    fn entry(layout: &LayoutNode, owner: Option<&Node>) -> LayoutChainNode {
+        let incoming = layout.layout_input().map(|input| {
+            let axis = |known, definite, parent, space| {
+                let (available_kind, available) = match space {
+                    taffy::AvailableSpace::Definite(value) => ("definite", Some(value)),
+                    taffy::AvailableSpace::MinContent => ("min-content", None),
+                    taffy::AvailableSpace::MaxContent => ("max-content", None),
+                };
+                LayoutAxisInput {
+                    known,
+                    definite: known.map(|_| definite),
+                    parent,
+                    available,
+                    available_kind: available_kind.into(),
+                }
+            };
+            LayoutProposal {
+                width: axis(
+                    input.known_dimensions.width,
+                    input.known_dimensions_are_definite.width,
+                    input.parent_size.width,
+                    input.available_space.width,
+                ),
+                height: axis(
+                    input.known_dimensions.height,
+                    input.known_dimensions_are_definite.height,
+                    input.parent_size.height,
+                    input.available_space.height,
+                ),
+            }
+        });
+        LayoutChainNode {
+            id: owner.map(SceneInspector::identifier),
+            name: owner.and_then(|node| {
+                node.attachment::<String>(DebugAttachmentKey::DEBUG_NAME)
+                    .or_else(|| node.view_tag())
+            }),
+            incoming,
+            solved: encode_frame(layout.frame()),
+            resolved: owner.map(|node| encode_frame(node.frame())),
+            visible: owner.map(Node::is_layout_visible),
+        }
+    }
+
+    // Component scopes are transparent to Taffy. Resolve a scope with one
+    // layout root to that root so selection in component mode can explain it.
+    let mut layout_owner = node.clone();
+    if layout_owner.layout_node().is_none() {
+        let mut roots = Vec::new();
+        let mut stack = layout_owner.children();
+        while let Some(child) = stack.pop() {
+            if child.layout_node().is_some() {
+                roots.push(child);
+                if roots.len() > 1 {
+                    return None;
+                }
+            } else {
+                stack.extend(child.children());
+            }
+        }
+        layout_owner = roots.pop()?;
+    }
+    let node = &layout_owner;
+    let layout = node.layout_node()?;
+    let parent = layout.parent().map(|parent| {
+        let mut owner = node.parent();
+        while let Some(ancestor) = owner.as_ref() {
+            if ancestor.layout_node().as_ref() == Some(&parent) {
+                break;
+            }
+            owner = ancestor.parent();
+        }
+        entry(&parent, owner.as_ref())
+    });
+    let layout_children = layout.children();
+    let mut owners = Vec::new();
+    let mut stack = node.children();
+    while let Some(child) = stack.pop() {
+        if let Some(child_layout) = child.layout_node() {
+            owners.push((child_layout, child));
+        } else {
+            stack.extend(child.children());
+        }
+    }
+    let children = layout_children
+        .iter()
+        .take(MAX_LAYOUT_CHAIN_CHILDREN)
+        .map(|child| {
+            entry(
+                child,
+                owners
+                    .iter()
+                    .find(|(layout, _)| layout == child)
+                    .map(|(_, node)| node),
+            )
+        })
+        .collect();
+    let bounds = node.frame();
+    let mut overflow = InspectionInsets {
+        top: 0.0,
+        right: 0.0,
+        bottom: 0.0,
+        left: 0.0,
+    };
+    if layout.overflow() == Overflow::Visible && !node.clips_to_bounds() {
+        for (_, child) in &owners {
+            if !child.is_layout_visible() {
+                continue;
+            }
+            let frame = child.frame();
+            overflow.left = overflow.left.max(f64::from(-frame.x));
+            overflow.top = overflow.top.max(f64::from(-frame.y));
+            overflow.right = overflow
+                .right
+                .max(f64::from(frame.x + frame.width - bounds.width));
+            overflow.bottom = overflow
+                .bottom
+                .max(f64::from(frame.y + frame.height - bounds.height));
+        }
+    }
+    let overflow = [overflow.top, overflow.right, overflow.bottom, overflow.left]
+        .into_iter()
+        .any(|edge| edge > 0.5)
+        .then_some(overflow);
+    Some(LayoutChain {
+        parent,
+        node: entry(&layout, Some(node)),
+        children,
+        child_count: layout_children.len(),
+        overflow,
+        flex_basis: format!("{:?}", layout.style().flex_basis),
+        align_self: format!("{:?}", layout.align_self()),
+        text_truncated: node.attachment("__text_truncated"),
+        text_overflow: node
+            .attachment::<cove_core::Size>("__text_overflow")
+            .map(|size| LayoutExtent {
+                width: size.width,
+                height: size.height,
+            }),
+    })
+}
 use std::cell::RefCell;
 use std::rc::Rc;
 use std::sync::Arc;

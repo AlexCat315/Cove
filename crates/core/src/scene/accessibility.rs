@@ -213,6 +213,25 @@ impl AccessibilityTree {
         viewport: Option<Rect>,
         resolve_values: bool,
     ) -> Vec<AccessibilityElement> {
+        let values = if resolve_values {
+            Values::Resolve
+        } else {
+            Values::Authored
+        };
+        Self::collect_snapshot(root, viewport, values)
+    }
+
+    /// Application semantics for diagnostics. Field drafts and secure values
+    /// are removed before label aggregation and description resolution.
+    pub fn diagnostic_snapshot(root: &Node) -> Vec<AccessibilityElement> {
+        Self::collect_snapshot(root, None, Values::Diagnostic)
+    }
+
+    fn collect_snapshot(
+        root: &Node,
+        viewport: Option<Rect>,
+        values: Values,
+    ) -> Vec<AccessibilityElement> {
         let mut elements = Vec::new();
         let clip = viewport.unwrap_or_else(|| root.absolute_frame());
         let parent_accepts = root
@@ -224,7 +243,7 @@ impl AccessibilityTree {
             clip,
             false,
             parent_accepts,
-            resolve_values,
+            values,
             &mut elements,
         );
 
@@ -344,13 +363,20 @@ fn resolve(
         .collect()
 }
 
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Values {
+    Resolve,
+    Authored,
+    Diagnostic,
+}
+
 fn collect(
     node: &Node,
     transform: Affine2D,
     clip: Rect,
     combines_text: bool,
     parent_accepts_input: bool,
-    resolve_values: bool,
+    values: Values,
     output: &mut Vec<AccessibilityElement>,
 ) {
     let semantics = node.accessibility();
@@ -402,7 +428,7 @@ fn collect(
             child_clip,
             child_combines,
             accepts_input,
-            resolve_values,
+            values,
             &mut children,
         );
     }
@@ -439,7 +465,11 @@ fn collect(
             .collect::<Vec<_>>()
             .join(", ");
     }
-    if resolve_values && node.accessibility_value_provider().is_some() {
+    if values == Values::Diagnostic
+        && (semantic.state.is_secure || semantic.role == AccessibilityRole::TextField)
+    {
+        semantic.value.clear();
+    } else if values == Values::Resolve && node.accessibility_value_provider().is_some() {
         semantic.value = node.resolved_accessibility_value();
     } else if semantic.state.is_secure {
         semantic.value = "•".repeat(semantic.value.chars().count());

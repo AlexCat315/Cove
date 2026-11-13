@@ -6,8 +6,8 @@ use serde::{Deserialize, de::DeserializeOwned};
 use serde_json::{Value, json};
 use std::io::{Cursor, Read, Write};
 use std::path::{Component, Path, PathBuf};
-use std::sync::{Arc, OnceLock};
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+use std::sync::{Arc, OnceLock};
 use std::time::Duration;
 use tiny_http::{Header, Method, Request, Response, Server};
 
@@ -31,7 +31,12 @@ pub fn serve(
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let (server, discovery) = bind(port, token)?;
     eprintln!("Inspector: {}", inspector_url(&discovery.info));
-    run(&server, &discovery.info.token, web_root, &AtomicBool::new(false))
+    run(
+        &server,
+        &discovery.info.token,
+        web_root,
+        &AtomicBool::new(false),
+    )
 }
 
 pub fn inspector_url(info: &ConnectionInfo) -> String {
@@ -61,7 +66,11 @@ impl RunningController {
                     eprintln!("Cove DevTools: {error}");
                 }
             })?;
-        Ok(Self { discovery, stop, worker: Some(worker) })
+        Ok(Self {
+            discovery,
+            stop,
+            worker: Some(worker),
+        })
     }
 
     pub fn connection(&self) -> &ConnectionInfo {
@@ -127,7 +136,11 @@ impl Drop for Discovery {
         if !ConnectionInfo::local().is_some_and(|info| info.token == self.info.token) {
             return;
         }
-        if let Some(info) = self.previous.as_ref().filter(|info| controller_is_live(info)) {
+        if let Some(info) = self
+            .previous
+            .as_ref()
+            .filter(|info| controller_is_live(info))
+        {
             let _ = publish(&self.path, info);
         } else {
             let _ = std::fs::remove_file(&self.path);
@@ -145,7 +158,8 @@ fn controller_is_live(info: &ConnectionInfo) -> bool {
         .max_redirects(0)
         .build()
         .into();
-    agent.get(&format!("{}/health", info.endpoint.trim_end_matches('/')))
+    agent
+        .get(&format!("{}/health", info.endpoint.trim_end_matches('/')))
         .header("Authorization", &format!("Bearer {}", info.token))
         .call()
         .is_ok_and(|response| response.status().as_u16() == 204)
@@ -156,15 +170,32 @@ fn bind(
     token: String,
 ) -> Result<(Server, Discovery), Box<dyn std::error::Error + Send + Sync>> {
     let server = Server::http(("127.0.0.1", port))?;
-    let info = ConnectionInfo { endpoint: format!("http://{}", server.server_addr()), token };
-    let path = ConnectionInfo::path().ok_or("Set COVE_DEVTOOLS_SESSION_FILE for local discovery.")?;
+    let info = ConnectionInfo {
+        endpoint: format!("http://{}", server.server_addr()),
+        token,
+    };
+    let path =
+        ConnectionInfo::path().ok_or("Set COVE_DEVTOOLS_SESSION_FILE for local discovery.")?;
     let previous = ConnectionInfo::local();
     publish(&path, &info)?;
-    Ok((server, Discovery { path, info, previous }))
+    Ok((
+        server,
+        Discovery {
+            path,
+            info,
+            previous,
+        },
+    ))
 }
 
-fn publish(path: &Path, info: &ConnectionInfo) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-    let folder = path.parent().filter(|path| !path.as_os_str().is_empty()).unwrap_or(Path::new("."));
+fn publish(
+    path: &Path,
+    info: &ConnectionInfo,
+) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    let folder = path
+        .parent()
+        .filter(|path| !path.as_os_str().is_empty())
+        .unwrap_or(Path::new("."));
     std::fs::create_dir_all(folder)?;
     let mut file = tempfile::NamedTempFile::new_in(folder)?;
     serde_json::to_writer(&mut file, info)?;
@@ -443,6 +474,23 @@ fn client_bundle(path: &str) -> Option<(&'static str, &'static str)> {
 /// Resolves a served route to its media type and body: concatenated bundles
 /// first, then the ES module set behind the module entry route.
 fn client_asset(path: &str) -> Option<(&'static str, &'static str)> {
+    #[cfg(cove_packed_inspector)]
+    {
+        if path == "/packed" {
+            static PACKED_HTML: OnceLock<String> = OnceLock::new();
+            let (mime, html) = client_bundle("/index.html")?;
+            return Some((
+                mime,
+                PACKED_HTML.get_or_init(|| html.replace("/inspector.js", "/inspector.bundle.js")),
+            ));
+        }
+        if path == "/inspector.bundle.js" {
+            return Some((
+                "text/javascript; charset=utf-8",
+                include_str!(concat!(env!("OUT_DIR"), "/inspector.bundle.js")),
+            ));
+        }
+    }
     client_bundle(path).or_else(|| client_module(path))
 }
 
@@ -466,7 +514,10 @@ fn client_module(path: &str) -> Option<(&'static str, &'static str)> {
         });
         return Some((media, entry.as_str()));
     }
-    let relative = path.strip_prefix('/')?.strip_prefix(root)?.strip_prefix('/')?;
+    let relative = path
+        .strip_prefix('/')?
+        .strip_prefix(root)?
+        .strip_prefix('/')?;
     parts
         .iter()
         .find(|(part, _)| *part == relative)
@@ -513,7 +564,10 @@ mod tests {
             assert_eq!(body.len(), total, "{route} dropped or duplicated bytes");
             let first = parts.first().expect("at least one part").1;
             let last = parts.last().expect("at least one part").1;
-            assert!(body.starts_with(first), "{route} must start with its first part");
+            assert!(
+                body.starts_with(first),
+                "{route} must start with its first part"
+            );
             assert!(body.ends_with(last), "{route} must end with its last part");
         }
         assert!(client_bundle("/missing").is_none());

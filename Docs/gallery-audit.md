@@ -1,8 +1,18 @@
 # Gallery 逐项验收记录
 
-更新于 2026-11-13。目录共 106 页。Swift 对照表覆盖迁移的页面，新增 Rust 示例见对应日期的验收记录。
+更新于 2026-11-14。目录共 106 页。Swift 对照表覆盖迁移的页面，新增 Rust 示例见对应日期的验收记录。
 
 Swift 源码逐页对照见文末《Swift 源码对照（逐页差异清单）》。
+
+## 2026-11-14 DevTools 布局、组件与语义
+
+| 页面 | 实现与自动化 | 实际画面与操作 | Rust 文档 |
+| --- | --- | --- | --- |
+| Gallery / Dashboard、Button | `scene-diagnostics.py` 走真实 CLI、控制器和探针，检查布局输入、求解尺寸、组件计数、语义父子边及文本输入值过滤。 | macOS 一条命令启动 Gallery。经应用帧与运行时输入切到 Button，确认 `Actions: 0`。最近一次获得 822 条 trace，组件计数增长。 | [DevTools](../Website/src/content/components/devtools.md) |
+| DevTools / Layout、Performance、Semantics | 无头 Chrome 连接同一个真实控制器，验证布局链、组件表、语义树、GPU 柱和最慢帧排序。默认入口和 `/packed` 都已打开并检查。 | DOM 和真实 RPC 验收通过。人工视觉、物理输入与 IME 待验收。 | [DevTools](../Website/src/content/components/devtools.md) |
+| Browser / Button | WASM 构建通过。无头 Chrome 的 Canvas2D 与 WebGPU 各自注册并查询布局链、组件计数和语义树。 | WebGPU 返回真实 GPU 样本，Canvas2D 帧不提供 GPU 样本。 | [DevTools](../Website/src/content/components/devtools.md) |
+
+Android 与 iOS 宿主交叉检查通过。Windows 与 Linux 控制器和采样器交叉检查通过，宿主依赖分别受 Windows SDK 头文件和 Linux 交叉 GCC 限制。macOS 独立控制器启动通过，LLDB 附加 Gallery 超时且系统 Developer Mode 关闭。设备上的采样、断点及转发待验收。扩展图形测试中的 Metal ray query 集成测试未能创建共享事件。
 
 ## 2026-11-13 DevTools 应用内画面与输入
 

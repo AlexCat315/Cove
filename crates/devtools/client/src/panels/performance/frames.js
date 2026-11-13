@@ -14,8 +14,7 @@ function frameParts(frame) {
     layout: numberValue(frame?.layoutMs),
     draw: numberValue(frame?.drawMs),
     encode: numberValue(frame?.renderThreadMs),
-    // GPU execution overlaps the CPU phases, so it is reported beside them and
-    // never summed into UI, total or the jank decision.
+    // GPU execution overlaps the CPU phases and has its own budget comparison.
     gpu: numberValue(frame?.gpuMs),
     total: numberValue(frame?.totalMs),
   };
@@ -28,9 +27,12 @@ function frameUiMs(frame) {
 }
 
 export function frameJank(frame, budget) {
-  const ui = frameUiMs(frame);
-  const encode = frameParts(frame).encode;
-  return (ui !== null && ui > budget) || (encode !== null && encode > budget);
+  return frameCost(frame) > budget;
+}
+
+function frameCost(frame) {
+  const { encode, gpu } = frameParts(frame);
+  return Math.max(frameUiMs(frame) ?? 0, encode ?? 0, gpu ?? 0);
 }
 
 export async function loadFrames(options = {}) {
@@ -241,6 +243,7 @@ function renderFrameChart(frames, budget) {
     const ui = frameUiMs(frame);
     if (ui !== null) values.push(ui);
     if (parts.encode !== null) values.push(parts.encode);
+    if (parts.gpu !== null) values.push(parts.gpu);
     if (parts.total !== null) values.push(parts.total);
   }
   const scale = Math.max(values.reduce((maximum, value) => Math.max(maximum, value), 0), budget * 1.25, 1);
@@ -254,7 +257,7 @@ function renderFrameChart(frames, budget) {
     const ui = frameUiMs(frame);
     const jank = frameJank(frame, budget);
     const isSelected = frame.frame === selected;
-    const describe = `Frame ${frame.frame}: total ${fmtNumber(parts.total, 2)} ms, UI ${ui === null ? "not reported" : `${fmtNumber(ui, 2)} ms`}, encode ${parts.encode === null ? "not reported" : `${fmtNumber(parts.encode, 2)} ms`}${jank ? ", over budget" : ""}`;
+    const describe = `Frame ${frame.frame}: total ${fmtMs(parts.total, 2)}, UI ${fmtMs(ui, 2)}, encode ${fmtMs(parts.encode, 2)}, GPU ${fmtMs(parts.gpu, 2)}${jank ? ", over budget" : ""}`;
     const column = el("div", {
       class: `frame-column${jank ? " is-jank" : ""}${isSelected ? " is-selected" : ""}`,
       attrs: {
@@ -270,6 +273,7 @@ function renderFrameChart(frames, budget) {
     const bars = column.firstElementChild;
     if (ui !== null) bars.append(frameUiBar(parts, ui, scale));
     if (parts.encode !== null) bars.append(el("div", { class: "frame-bar is-encode", attrs: { style: `height:${barPercent(parts.encode, scale)}%` } }));
+    if (parts.gpu !== null) bars.append(el("div", { class: "frame-bar is-gpu", attrs: { style: `height:${barPercent(parts.gpu, scale)}%` } }));
     if (parts.total !== null) bars.append(el("div", { class: "frame-bar is-total", attrs: { style: `height:${barPercent(parts.total, scale)}%` } }));
     columns.append(column);
   }
@@ -304,11 +308,7 @@ function renderFrameChart(frames, budget) {
   const notes = [];
   if (missingRecomposition) notes.push("Recomposition is not reported by this runtime; UI bars contain layout and draw only.");
   if (missingEncode) notes.push("Encode bars appear only for frames whose presentation the host observed.");
-  if (recent.some(frame => frameParts(frame).gpu !== null)) {
-    notes.push("GPU is the backend's measured execution time for the frame's submission. It overlaps the CPU phases, so it is not part of the UI or Encode bars and is not added to Total.");
-  } else {
-    notes.push("GPU execution is not reported for these frames; no estimate is substituted.");
-  }
+  const hasGpu = recent.some(frame => frameParts(frame).gpu !== null);
   return el("div", { class: "panel-block" },
     el("div", { class: "panel-block-head" },
       el("h2", { text: "Frame chart" }),
@@ -326,6 +326,7 @@ function renderFrameChart(frames, budget) {
         el("span", { class: "is-budget", text: `${fmtNumber(budget, 1)} ms budget` }),
         el("span", { class: "is-ui", text: "UI" }),
         el("span", { class: "is-encode", text: "Encode" }),
+        hasGpu ? el("span", { class: "is-gpu", text: "GPU" }) : null,
         el("span", { class: "is-total", text: "Total" }),
         el("span", { class: "is-jank", text: "Over budget" }),
       ),
@@ -359,7 +360,11 @@ function updateFrameSelection() {
 }
 
 function renderFrameTable(frames, budget) {
-  const rows = frames.slice().reverse().slice(0, FRAME_TABLE_LIMIT);
+  const performance = state.performance;
+  const order = performance.frameOrder ?? "latest";
+  const rows = (order === "worst"
+    ? frames.toSorted((left, right) => frameCost(right) - frameCost(left) || right.frame - left.frame)
+    : frames.slice().reverse()).slice(0, FRAME_TABLE_LIMIT);
   const selected = state.performance.selectedFrame;
   const header = el("tr", {},
     el("th", { class: "num", text: "Frame" }),
@@ -403,7 +408,16 @@ function renderFrameTable(frames, budget) {
   return el("div", { class: "panel-block" },
     el("div", { class: "panel-block-head" },
       el("h2", { text: "Frames" }),
-      el("span", { class: "pane-meta", text: `newest first · ${rows.length} of ${frames.length}` }),
+      el("span", { class: "pane-meta", text: `${rows.length} of ${frames.length}` }),
+      el("select", {
+        attrs: { "aria-label": "Frame order" },
+        on: { change: event => {
+          performance.frameOrder = event.target.value;
+          renderPerformance();
+          document.querySelector('[aria-label="Frame order"]')?.focus();
+        } },
+      }, [["latest", "Newest first"], ["worst", "Slowest stage first"]].map(([value, text]) =>
+        el("option", { attrs: { value }, props: { selected: order === value }, text }))),
     ),
     el("div", { class: "table-wrap" }, el("table", { class: "data-table frame-table" }, el("thead", {}, header), body)),
   );
@@ -551,6 +565,7 @@ function renderFrameAnalysis() {
     perfChip(jank ? "Over budget" : "Within budget", jank ? "bad" : "good"),
     parts.recomposition === null ? perfChip("Recomposition not reported", "muted") : null,
     parts.encode === null ? perfChip("Encode not observed", "muted") : null,
+    frame.pipelineCreation?.count > 0 ? perfChip(`${frame.pipelineCreation.count} shader or pipeline creations · ${fmtMs(frame.pipelineCreation.cpuMs, 2)} CPU`, "muted") : null,
   );
   body.append(verdicts);
   body.append(el("div", { class: "metrics" },

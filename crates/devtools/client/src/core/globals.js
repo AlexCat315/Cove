@@ -23,7 +23,7 @@ export const FLEX_FACTOR_LIMIT = 1000;
 export const FLEX_RECORD_ATTEMPTS = 5;
 export const FLEX_RECORD_DELAY_MS = 100;
 export const LEVELS = ["trace", "debug", "info", "notice", "warning", "error", "critical"];
-export const PERFORMANCE_TABS = ["frames", "timeline", "profile"];
+export const PERFORMANCE_TABS = ["frames", "timeline", "profile", "components"];
 export const BUDGET_RATES = [60, 90, 120];
 export const BUDGET_KEY = "cove.devtools.budgetHz";
 export const PROFILE_CAPABILITIES = ["cpu_profile", "profiling", "cpu_sampling", "profile"];
@@ -445,6 +445,8 @@ export function emptyCaps() {
     timing: false,
     trace: false,
     frameAnalysis: false,
+    componentActivity: false,
+    semanticsTree: false,
     profile: false,
     inspectNodes: false,
     repaintHighlight: false,

@@ -10,7 +10,7 @@ description = "Bounded in-process CPU sampling and DWARF symbolization for Cove 
 addr2line.workspace = true
 thiserror.workspace = true
 
-[target.'cfg(target_os = "macos")'.dependencies]
+[target.'cfg(any(target_os = "macos", target_os = "ios"))'.dependencies]
 libc.workspace = true
 mach2.workspace = true
 

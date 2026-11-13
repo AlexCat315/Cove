@@ -20,6 +20,7 @@ import { loadMemory, refreshMemoryView } from "../panels/memory/view.js";
 import { clearNetwork, loadNetwork, renderNetwork, setNetworkRecording, stopAllFollowTimers, syncFollowTimers } from "../panels/network.js";
 import { loadFrames } from "../panels/performance/frames.js";
 import { renderPerformance, setPerformanceTab, syncBudgetOptions, writeBudgetPreference, writeDeepLinksRootPreference, writeMemoryIntervalPreference } from "../panels/performance/overview.js";
+import { loadSceneDiagnostics } from "../panels/scene-diagnostics.js";
 import { pollProfile } from "../panels/performance/profile/control.js";
 import { clearProfileTimers, loadProfile } from "../panels/performance/profile/model.js";
 import { exportPerformance, importPerformance } from "../panels/performance/snapshots.js";
@@ -256,7 +257,16 @@ export function bindEvents() {
       else loadProfile({ quiet: true });
       return;
     }
+    if (perf.tab === "components") {
+      loadSceneDiagnostics("components");
+      return;
+    }
     loadFrames({ reset: true });
+  });
+  $("semantics-refresh").addEventListener("click", () => loadSceneDiagnostics("semantics"));
+  $("component-activity-filter").addEventListener("submit", event => {
+    event.preventDefault();
+    loadSceneDiagnostics("components");
   });
   dom.memoryRefresh.addEventListener("click", () => refreshMemoryView());
   dom.memoryFollow.addEventListener("change", () => {

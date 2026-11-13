@@ -505,6 +505,7 @@ struct BreakpointUpdate {
 struct BreakpointSpec {
     line: u32,
     condition: Option<String>,
+    log_message: Option<String>,
     id: Option<u64>,
     verified: bool,
     message: Option<String>,
@@ -519,6 +520,7 @@ impl BreakpointSpec {
             line: self.line,
             resolved_line: update.and_then(|update| update.line).or(self.resolved_line),
             condition: self.condition.clone(),
+            log_message: self.log_message.clone(),
             id: self.id,
             verified: update.map_or(self.verified, |update| update.verified),
             message: update
@@ -540,6 +542,8 @@ pub struct DapSession {
     attached: AtomicBool,
     debuggee_pid: Mutex<Option<u32>>,
     adapter_version: Mutex<Option<String>>,
+    capabilities: Mutex<Option<InitializeInfo>>,
+    exception_filters: Mutex<Vec<String>>,
     stderr: Arc<Mutex<Vec<u8>>>,
     stderr_thread: Mutex<Option<JoinHandle<()>>>,
     adapter_pid: u32,
@@ -564,6 +568,8 @@ impl DapSession {
             attached: AtomicBool::new(false),
             debuggee_pid: Mutex::new(None),
             adapter_version: Mutex::new(None),
+            capabilities: Mutex::new(None),
+            exception_filters: Mutex::new(Vec::new()),
             stderr,
             stderr_thread: Mutex::new(Some(stderr_thread)),
             adapter_pid,
@@ -586,6 +592,8 @@ impl DapSession {
             attached: AtomicBool::new(false),
             debuggee_pid: Mutex::new(None),
             adapter_version: Mutex::new(None),
+            capabilities: Mutex::new(None),
+            exception_filters: Mutex::new(Vec::new()),
             stderr: Arc::new(Mutex::new(Vec::new())),
             stderr_thread: Mutex::new(None),
             adapter_pid: 0,
@@ -685,7 +693,7 @@ impl DapSession {
         if let Some(version) = &version {
             *self.adapter_version.lock().unwrap() = Some(version.clone());
         }
-        Ok(InitializeInfo {
+        let info = InitializeInfo {
             adapter_version: version,
             supports_configuration_done: body
                 .get("supportsConfigurationDoneRequest")
@@ -699,7 +707,94 @@ impl DapSession {
                 .get("supportsConditionalBreakpoints")
                 .and_then(Value::as_bool)
                 .unwrap_or(false),
-        })
+            supports_log_points: body["supportsLogPoints"].as_bool().unwrap_or(false),
+            exception_filters: body["exceptionBreakpointFilters"]
+                .as_array()
+                .into_iter()
+                .flatten()
+                .take(32)
+                .filter_map(|filter| {
+                    let id = filter["filter"].as_str()?;
+                    if id.is_empty() || id.len() > 128 {
+                        return None;
+                    }
+                    Some(crate::model::ExceptionFilter {
+                        id: id.to_owned(),
+                        label: filter["label"]
+                            .as_str()
+                            .unwrap_or(id)
+                            .chars()
+                            .take(160)
+                            .collect(),
+                    })
+                })
+                .collect(),
+        };
+        *self.capabilities.lock().unwrap() = Some(info.clone());
+        Ok(info)
+    }
+
+    pub fn capabilities(&self) -> Option<InitializeInfo> {
+        self.capabilities.lock().unwrap().clone()
+    }
+
+    pub fn exception_filters(&self) -> Vec<String> {
+        self.exception_filters.lock().unwrap().clone()
+    }
+
+    pub fn set_exception_filters(&self, filters: &[String]) -> Result<Vec<String>> {
+        let _control = self.control.lock().unwrap();
+        self.ensure_attached()?;
+        let available = self
+            .capabilities()
+            .map(|info| info.exception_filters)
+            .unwrap_or_default();
+        if available.is_empty() {
+            return Err(DebuggerError::new(
+                "unavailable",
+                "The adapter reports no exception filters.",
+            ));
+        }
+        let unique: std::collections::BTreeSet<_> = filters.iter().collect();
+        if unique.len() != filters.len()
+            || filters
+                .iter()
+                .any(|id| !available.iter().any(|filter| filter.id == *id))
+        {
+            return Err(invalid(
+                "Choose distinct exception filter IDs advertised by the adapter.",
+            ));
+        }
+        self.transport.request(
+            "setExceptionBreakpoints",
+            json!({"filters": filters}),
+            self.request_timeout(),
+        )?;
+        *self.exception_filters.lock().unwrap() = filters.to_vec();
+        Ok(filters.to_vec())
+    }
+
+    pub fn output(&self, after: u64) -> Vec<crate::model::DebuggerOutput> {
+        let state = self.transport.shared.state.lock().unwrap();
+        state
+            .events
+            .iter()
+            .filter(|entry| entry.index > after && entry.value["event"] == "output")
+            .filter_map(|entry| {
+                let body = &entry.value["body"];
+                Some(crate::model::DebuggerOutput {
+                    sequence: entry.index,
+                    category: body["category"]
+                        .as_str()
+                        .unwrap_or("console")
+                        .chars()
+                        .take(32)
+                        .collect(),
+                    text: body["output"].as_str()?.chars().take(2048).collect(),
+                })
+            })
+            .take(40)
+            .collect()
     }
 
     /// Attaches to `pid` and completes DAP configuration.
@@ -707,17 +802,32 @@ impl DapSession {
     /// A refusal (permissions, missing process) is reported with the adapter's
     /// own words and the session is torn down; no paused state is invented.
     pub fn attach(&self, pid: u32) -> Result<SessionSnapshot> {
+        self.attach_with(json!({"pid": pid, "stopOnEntry": false}), Some(pid))
+    }
+
+    /// Attaches through a GDB remote stub forwarded to the controller host.
+    pub fn attach_loopback(
+        &self,
+        port: u16,
+        program: Option<&str>,
+        pid: u32,
+    ) -> Result<SessionSnapshot> {
+        let mut args =
+            json!({"gdb-remote-host": "127.0.0.1", "gdb-remote-port": port, "stopOnEntry": false});
+        if let Some(program) = program {
+            args["program"] = json!(program);
+        }
+        self.attach_with(args, Some(pid))
+    }
+
+    fn attach_with(&self, arguments: Value, pid: Option<u32>) -> Result<SessionSnapshot> {
         let _control = self.control.lock().unwrap();
         self.ensure_open()?;
         if self.attached.swap(true, Ordering::AcqRel) {
             return Err(invalid("This session is already attached."));
         }
         let cursor = self.transport.shared.cursor();
-        let attach = self.transport.request(
-            "attach",
-            json!({"pid": pid, "stopOnEntry": false}),
-            ATTACH_TIMEOUT,
-        );
+        let attach = self.transport.request("attach", arguments, ATTACH_TIMEOUT);
         let body = match attach {
             Ok(body) => body,
             Err(error) => {
@@ -739,7 +849,7 @@ impl DapSession {
             self.shutdown(error.clone());
             return Err(error);
         }
-        *self.debuggee_pid.lock().unwrap() = Some(pid);
+        *self.debuggee_pid.lock().unwrap() = pid;
         let _ = self.transport.shared.wait_event(
             cursor,
             |event| event["event"] == "stopped",
@@ -924,10 +1034,30 @@ impl DapSession {
         line: u32,
         condition: Option<&str>,
     ) -> Result<Vec<Breakpoint>> {
+        self.set_source_breakpoint(path, line, condition, None)
+    }
+
+    pub fn set_source_breakpoint(
+        &self,
+        path: &str,
+        line: u32,
+        condition: Option<&str>,
+        log_message: Option<&str>,
+    ) -> Result<Vec<Breakpoint>> {
         if line == 0 {
             return Err(invalid("A breakpoint line must be at least 1."));
         }
         self.ensure_attached()?;
+        if log_message.is_some()
+            && !self
+                .capabilities()
+                .is_some_and(|info| info.supports_log_points)
+        {
+            return Err(DebuggerError::new(
+                "unavailable",
+                "The adapter does not advertise log points.",
+            ));
+        }
         let path = Self::normalized_path(path)?;
         let _control = self.control.lock().unwrap();
         let mut registry = self.breakpoints.lock().unwrap();
@@ -937,6 +1067,7 @@ impl DapSession {
             BreakpointSpec {
                 line,
                 condition: condition.map(str::to_owned),
+                log_message: log_message.map(str::to_owned),
                 id: None,
                 verified: false,
                 message: None,
@@ -1024,6 +1155,9 @@ impl DapSession {
                 if let Some(condition) = &spec.condition {
                     entry["condition"] = json!(condition);
                 }
+                if let Some(log_message) = &spec.log_message {
+                    entry["logMessage"] = json!(log_message);
+                }
                 entry
             })
             .collect();
@@ -1058,6 +1192,7 @@ impl DapSession {
                             .map(|line| line.min(u32::MAX as u64) as u32)
                     }),
                     condition: spec.condition.clone(),
+                    log_message: spec.log_message.clone(),
                     id,
                     verified: update.map_or_else(
                         || {

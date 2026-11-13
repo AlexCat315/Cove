@@ -212,26 +212,25 @@ fn named_thread(port: mach_port_t) -> Option<(String, libc::pthread_t)> {
     // SAFETY: a successful `thread_info` initialized the identifier.
     let identifier = unsafe { identifier.assume_init() };
 
-    let mut info = std::mem::MaybeUninit::<libc::proc_threadinfo>::zeroed();
-    let expected = std::mem::size_of::<libc::proc_threadinfo>() as libc::c_int;
-    // SAFETY: libproc copies at most `expected` bytes into the zeroed buffer.
-    let written = unsafe {
-        libc::proc_pidinfo(
-            libc::getpid(),
-            libc::PROC_PIDTHREADINFO,
-            identifier.thread_handle,
-            info.as_mut_ptr().cast::<libc::c_void>(),
-            expected,
+    let mut info = std::mem::MaybeUninit::<libc::thread_extended_info>::zeroed();
+    let mut count = libc::THREAD_EXTENDED_INFO_COUNT;
+    // SAFETY: the kernel copies the thread record into the correctly sized buffer.
+    let result = unsafe {
+        libc::thread_info(
+            port,
+            libc::THREAD_EXTENDED_INFO as libc::thread_flavor_t,
+            info.as_mut_ptr().cast::<libc::integer_t>(),
+            &mut count,
         )
     };
-    if written != expected {
+    if result != KERN_SUCCESS || count != libc::THREAD_EXTENDED_INFO_COUNT {
         return None;
     }
-    // SAFETY: `proc_pidinfo` filled the whole struct on success; `pth_name` is
-    // a NUL-terminated fixed-size array.
+    // SAFETY: a successful call filled the record, including the fixed-size name.
     let info = unsafe { info.assume_init() };
-    // SAFETY: the kernel guarantees a NUL-terminated name in `pth_name`.
-    let name = unsafe { CStr::from_ptr(info.pth_name.as_ptr()) }
+    let bytes = info.pth_name.map(|value| value as u8);
+    let name = CStr::from_bytes_until_nul(&bytes)
+        .ok()?
         .to_string_lossy()
         .into_owned();
     Some((name, identifier.thread_handle as libc::pthread_t))

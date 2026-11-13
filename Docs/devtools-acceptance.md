@@ -2,6 +2,10 @@
 
 Acceptance runs exercise the controller and a real Gallery runtime.
 
+## Live scene diagnostics
+
+Launch the debug Gallery with `cargo run -p cove-examples --bin gallery --features media-ffmpeg`, then run `python3 Tools/DevTools/acceptance/scene-diagnostics.py` with the CLI built. The script selects Dashboard, follows the sidebar Button node's layout inputs and children, checks the runtime's semantics, and uses an application frame to send the Button click inside Cove. It checks the resulting page and the changes to component work, with a trace around the operation.
+
 ## Milestone 1 — App-local capture and picking
 
 ```sh

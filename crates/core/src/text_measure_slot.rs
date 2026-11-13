@@ -46,4 +46,5 @@ impl std::hash::Hash for TextLayoutCacheKey {
 pub struct TextLayoutCacheEntry {
     pub key: TextLayoutCacheKey,
     pub result: TextLayoutResult,
+    pub truncated: bool,
 }

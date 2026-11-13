@@ -1,4 +1,4 @@
-import { DEBUGGER_RPC_TIMEOUT_MS, RpcError, state } from "../../core/globals.js";
+import { $, DEBUGGER_RPC_TIMEOUT_MS, RpcError, state } from "../../core/globals.js";
 import { errorMessage, rpc, targetById, toast, unwrapData } from "../../core/session.js";
 import { applyDebuggerSnapshot, clearDebuggerSessionData, debuggerBreakpointList, debuggerBreakpointsAt, debuggerFrameList, debuggerHasData, debuggerNumber, debuggerPathKey, debuggerPathsMatch, debuggerRoot, debuggerScopeList, debuggerThreadList, debuggerUnavailableInfo, debuggerVariablesFrom, normalizeDebuggerSource, resetDebuggerVariables, selectedDebuggerFrame, sortDebuggerBreakpoints } from "./model.js";
 import { appendDebuggerConsole, debuggerScopeKey, renderDebugger, renderDebuggerBreakpoints, renderDebuggerChrome, renderDebuggerSource, renderDebuggerStack, renderDebuggerThreads, renderDebuggerVariables, updateDebuggerButtons, updateDebuggerSourceHead } from "./view.js";
@@ -74,7 +74,17 @@ export async function refreshDebugger(options = {}) {
     applyDebuggerSnapshot(data);
     dbg.loaded = true;
     dbg.lastRefresh = Date.now();
-    if (dbg.attached) await ensureDebuggerSessionData({ quiet: true });
+    if (dbg.attached) {
+      await ensureDebuggerSessionData({ quiet: true });
+      if (dbg.capabilities?.supports_log_points) {
+        const output = await debuggerCall("get_ui_debugger_output", { after: dbg.outputAfter }, { target: targetId }).catch(() => null);
+        if (request !== dbg.request || targetId !== state.targetId) return;
+        for (const entry of output?.events ?? []) {
+          appendDebuggerConsole(entry.category === "stderr" ? "error" : "event", entry.text);
+          dbg.outputAfter = entry.sequence;
+        }
+      }
+    }
   } catch (error) {
     if (request !== dbg.request || targetId !== state.targetId) return;
     const message = errorMessage(error);
@@ -501,7 +511,7 @@ function applyDebuggerBreakpointList(data, path) {
   return true;
 }
 
-async function setDebuggerBreakpoint(path, line, enabled, options = {}) {
+export async function setDebuggerBreakpoint(path, line, enabled, options = {}) {
   const dbg = state.debugger;
   if (!debuggerCanAct(true) || !path || line === null) return;
   const targetId = state.targetId;
@@ -509,6 +519,7 @@ async function setDebuggerBreakpoint(path, line, enabled, options = {}) {
   const visible = debuggerBreakpointsAt(path, line);
   const existing = visible[0] || null;
   const condition = firstStringValue(options.condition, existing?.condition);
+  const logMessage = options.logMessage ?? existing?.logMessage;
   const key = debuggerBreakpointKey({ path, line });
   invalidateDebuggerStatusRequest();
   dbg.busy = enabled ? "Setting breakpoint" : "Clearing breakpoint";
@@ -520,6 +531,7 @@ async function setDebuggerBreakpoint(path, line, enabled, options = {}) {
         path,
         line,
         condition: condition || undefined,
+        log_message: logMessage || undefined,
       }, { target: targetId });
     } else {
       data = await debuggerCall("clear_ui_breakpoint", { path, line }, { target: targetId });
@@ -537,6 +549,7 @@ async function setDebuggerBreakpoint(path, line, enabled, options = {}) {
         column: existing.column,
         resolvedLine: null,
         condition: existing.condition,
+        logMessage: existing.logMessage,
         label: "",
         enabled: false,
         verified: null,
@@ -558,6 +571,25 @@ async function setDebuggerBreakpoint(path, line, enabled, options = {}) {
       renderDebuggerChrome();
       renderDebuggerBreakpoints(true);
       renderDebuggerSource(true);
+    }
+  }
+}
+
+export async function setDebuggerExceptionFilters(filters) {
+  const dbg = state.debugger;
+  if (!debuggerCanAct(true)) return;
+  const targetId = state.targetId;
+  dbg.busy = "Setting exception breakpoints";
+  renderDebuggerBreakpoints(true);
+  try {
+    const result = await debuggerCall("set_ui_exception_breakpoints", { filters }, { target: targetId });
+    if (dbg === state.debugger && targetId === state.targetId) dbg.exceptionFilters = result.exception_filters;
+  } catch (error) {
+    if (dbg === state.debugger) toast(errorMessage(error), "error", 8000);
+  } finally {
+    if (dbg === state.debugger) {
+      dbg.busy = "";
+      renderDebuggerBreakpoints(true);
     }
   }
 }
@@ -586,6 +618,18 @@ function invalidateDebuggerStatusRequest() {
 export async function attachDebugger() {
   const dbg = state.debugger;
   if (!debuggerCanAct(false) || dbg.attached) return;
+  const args = { timeout_ms: 8000 };
+  if (dbg.requiresForward) {
+    const port = $("debugger-forward-port");
+    if (!port.value || !port.checkValidity()) {
+      port.focus();
+      toast("Enter the local port forwarded to the device debugger.", "error", 5000);
+      return;
+    }
+    args.remote_port = port.valueAsNumber;
+    const program = $("debugger-symbols").value.trim();
+    if (program) args.program = program;
+  }
   const targetId = state.targetId;
   invalidateDebuggerStatusRequest();
   dbg.busy = "Attaching";
@@ -593,7 +637,7 @@ export async function attachDebugger() {
   appendDebuggerConsole("event", "Attach requested.");
   renderDebuggerChrome();
   try {
-    const data = await debuggerCall("attach_ui_debugger", { timeout_ms: 8000 }, { target: targetId, timeout: 15000 });
+    const data = await debuggerCall("attach_ui_debugger", args, { target: targetId, timeout: 15000 });
     if (targetId !== state.targetId) return;
     invalidateDebuggerStatusRequest();
     if (debuggerHasData(data)) applyDebuggerSnapshot(data);

@@ -74,6 +74,23 @@ struct SessionHandle {
     changed: Condvar,
 }
 
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub(crate) enum SessionKey {
+    Local(u32),
+    Remote(String),
+}
+
+impl From<u32> for SessionKey {
+    fn from(pid: u32) -> Self {
+        Self::Local(pid)
+    }
+}
+
+pub(crate) struct ForwardedDebugger {
+    pub port: u16,
+    pub program: Option<String>,
+}
+
 impl SessionHandle {
     fn new(pid: u32, target: String) -> Self {
         Self {
@@ -113,6 +130,8 @@ impl SessionHandle {
                         "last_error": Value::Null,
                         "adapter_version": snapshot.adapter_version,
                         "breakpoints": snapshot.breakpoints,
+                        "capabilities": session.capabilities(),
+                        "exception_filters": session.exception_filters(),
                         "events_dropped": snapshot.events_dropped,
                     })
                 }
@@ -127,7 +146,7 @@ impl SessionHandle {
 pub(crate) struct DebuggerManager {
     availability: OnceLock<Availability>,
     connector: Option<Arc<Connector>>,
-    sessions: Mutex<HashMap<u32, Arc<SessionHandle>>>,
+    sessions: Mutex<HashMap<SessionKey, Arc<SessionHandle>>>,
 }
 
 impl DebuggerManager {
@@ -170,21 +189,24 @@ impl DebuggerManager {
         values
     }
 
-    pub(crate) fn summary(&self, pid: u32) -> Option<Value> {
+    pub(crate) fn summary(&self, key: impl Into<SessionKey>) -> Option<Value> {
         self.sessions
             .lock()
             .unwrap()
-            .get(&pid)
+            .get(&key.into())
             .map(|handle| handle.summary())
     }
 
     /// Returns the live session for a PID, or an explicit state error.
-    pub(crate) fn session(&self, pid: u32) -> Result<Arc<DapSession>, DebuggerError> {
+    pub(crate) fn session(
+        &self,
+        key: impl Into<SessionKey>,
+    ) -> Result<Arc<DapSession>, DebuggerError> {
         let handle = self
             .sessions
             .lock()
             .unwrap()
-            .get(&pid)
+            .get(&key.into())
             .cloned()
             .ok_or_else(|| {
                 DebuggerError::new(
@@ -210,15 +232,31 @@ impl DebuggerManager {
     ///
     /// A refusal reports the adapter's own reason as `unavailable`; a hung
     /// authorization prompt reports `timeout` after the session is aborted.
+    #[cfg(test)]
     pub(crate) fn attach(
         &self,
         target: &str,
         pid: u32,
         timeout: Duration,
     ) -> Result<SessionSnapshot, DebuggerError> {
+        self.attach_with(target, pid, SessionKey::Local(pid), timeout, None)
+    }
+
+    pub(crate) fn attach_with(
+        &self,
+        target: &str,
+        pid: u32,
+        key: SessionKey,
+        timeout: Duration,
+        remote: Option<ForwardedDebugger>,
+    ) -> Result<SessionSnapshot, DebuggerError> {
         let timeout = timeout.clamp(MIN_ATTACH_TIMEOUT, MAX_ATTACH_TIMEOUT);
         let availability = self.availability().clone();
-        let developer_mode = availability.developer_mode;
+        let developer_mode = if remote.is_some() {
+            None
+        } else {
+            availability.developer_mode
+        };
         if self.connector.is_none() && availability.adapter.is_none() {
             return Err(DebuggerError::unavailable(
                 availability
@@ -230,7 +268,7 @@ impl DebuggerManager {
         let started = Instant::now();
         let (handle, creator) = {
             let mut sessions = self.sessions.lock().unwrap();
-            if let Some(handle) = sessions.get(&pid).cloned() {
+            if let Some(handle) = sessions.get(&key).cloned() {
                 let reuse = match &*handle.phase.lock().unwrap() {
                     Phase::Attached(session) if live(session) => {
                         return Ok(session.snapshot());
@@ -242,12 +280,12 @@ impl DebuggerManager {
                     (handle, false)
                 } else {
                     let handle = Arc::new(SessionHandle::new(pid, target.to_owned()));
-                    sessions.insert(pid, Arc::clone(&handle));
+                    sessions.insert(key, Arc::clone(&handle));
                     (handle, true)
                 }
             } else {
                 let handle = Arc::new(SessionHandle::new(pid, target.to_owned()));
-                sessions.insert(pid, Arc::clone(&handle));
+                sessions.insert(key, Arc::clone(&handle));
                 (handle, true)
             }
         };
@@ -256,6 +294,7 @@ impl DebuggerManager {
                 Arc::clone(&handle),
                 availability.adapter.clone(),
                 developer_mode,
+                remote,
             );
         }
         let deadline = started + timeout;
@@ -346,6 +385,7 @@ impl DebuggerManager {
         handle: Arc<SessionHandle>,
         adapter: Option<Adapter>,
         developer_mode: Option<bool>,
+        remote: Option<ForwardedDebugger>,
     ) {
         let connector = self.connector.clone();
         let pid = handle.pid;
@@ -386,7 +426,11 @@ impl DebuggerManager {
                     }
                     worker.changed.notify_all();
                     session.initialize()?;
-                    session.attach(pid)?;
+                    if let Some(remote) = remote {
+                        session.attach_loopback(remote.port, remote.program.as_deref(), pid)?;
+                    } else {
+                        session.attach(pid)?;
+                    }
                     Ok(session)
                 })();
                 let mut phase = worker.phase.lock().unwrap();
@@ -424,8 +468,8 @@ impl DebuggerManager {
     }
 
     /// Detaches or aborts one session and forgets it.
-    pub(crate) fn detach(&self, pid: u32) -> Result<&'static str, DebuggerError> {
-        let handle = self.sessions.lock().unwrap().remove(&pid);
+    pub(crate) fn detach(&self, key: impl Into<SessionKey>) -> Result<&'static str, DebuggerError> {
+        let handle = self.sessions.lock().unwrap().remove(&key.into());
         let Some(handle) = handle else {
             return Err(DebuggerError::new(
                 "no_session",

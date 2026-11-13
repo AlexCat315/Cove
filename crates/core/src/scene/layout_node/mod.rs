@@ -111,6 +111,16 @@ impl Default for LayoutNode {
 }
 
 impl LayoutNode {
+    /// The most recent full layout request made by the layout engine.
+    pub fn layout_input(&self) -> Option<taffy::LayoutInput> {
+        self.0.engine.layout_input()
+    }
+
+    /// Full layout computations, excluding size probes and layout cache hits.
+    pub fn layout_count(&self) -> Option<u64> {
+        self.0.engine.layout_count()
+    }
+
     pub fn new() -> Self {
         Self(Rc::new(LayoutCell {
             data: RefCell::new(LayoutNodeData {

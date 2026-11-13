@@ -105,6 +105,7 @@ pub struct Breakpoint {
     pub line: u32,
     pub resolved_line: Option<u32>,
     pub condition: Option<String>,
+    pub log_message: Option<String>,
     pub id: Option<u64>,
     pub verified: bool,
     pub message: Option<String>,
@@ -129,4 +130,19 @@ pub struct InitializeInfo {
     pub supports_configuration_done: bool,
     pub supports_function_breakpoints: bool,
     pub supports_conditional_breakpoints: bool,
+    pub supports_log_points: bool,
+    pub exception_filters: Vec<ExceptionFilter>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+pub struct ExceptionFilter {
+    pub id: String,
+    pub label: String,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+pub struct DebuggerOutput {
+    pub sequence: u64,
+    pub category: String,
+    pub text: String,
 }

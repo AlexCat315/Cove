@@ -376,6 +376,10 @@ impl<C: PrototypeContent> BrowserPrototype<C> {
         // later frames cannot inherit this one's spans.
         let attribution = self.window.close(&self.timeline);
         let upload = self.fonts.atlas.dirty_upload_payload();
+        #[cfg(target_arch = "wasm32")]
+        let mut pipeline_creation = None;
+        #[cfg(not(target_arch = "wasm32"))]
+        let pipeline_creation = None;
         let mut gpu_measurement: Option<cove_devtools::runtime_probe::GpuMeasurement> = None;
         #[cfg(target_arch = "wasm32")]
         if let Some(gpu) = &mut self.webgpu {
@@ -386,7 +390,16 @@ impl<C: PrototypeContent> BrowserPrototype<C> {
                 self.raster_scale,
                 self.probing,
             ) {
-                Ok(timing) => gpu_measurement = timing.map(|gpu| Box::new(move || gpu.result()) as _),
+                Ok(timing) => {
+                    if let Some(timing) = timing {
+                        let (count, nanos) = timing.pipeline_creation();
+                        pipeline_creation = Some(cove_devtools_protocol::PipelineCreation {
+                            count,
+                            cpu_ms: nanos as f64 / 1_000_000.0,
+                        });
+                        gpu_measurement = Some(Box::new(move || timing.result()));
+                    }
+                }
                 Err(error) => {
                     self.webgpu_failed = true;
                     eprintln!("WebGPU frame: {error}");
@@ -473,6 +486,7 @@ impl<C: PrototypeContent> BrowserPrototype<C> {
                 draw_ms: self.render_ms,
                 render_thread_ms: None,
                 gpu_ms: None,
+                pipeline_creation,
                 submitted: true,
                 presented: None,
                 total_ms: self.recomposition_ms + self.layout_ms + self.render_ms,

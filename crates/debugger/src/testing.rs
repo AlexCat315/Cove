@@ -167,6 +167,8 @@ fn serve(
                 "supportsConfigurationDoneRequest": true,
                 "supportsConditionalBreakpoints": true,
                 "supportsFunctionBreakpoints": false,
+                "supportsLogPoints": true,
+                "exceptionBreakpointFilters": [{"filter":"throw","label":"On throw"}],
             })),
             "attach" => match &options.fail_attach {
                 Some(reason) => failure("attach", reason.clone()),
@@ -236,6 +238,7 @@ fn serve(
                 Some(reason) => failure("evaluate", reason.clone()),
                 None => success(json!({"result": "42", "type": "Int", "variablesReference": 0})),
             },
+            "setExceptionBreakpoints" => success(json!({})),
             "setBreakpoints" => {
                 let path = arguments["source"]["path"]
                     .as_str()

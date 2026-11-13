@@ -3,15 +3,17 @@
 //! This is the surface an agent or MCP client reads. Live `Node`s never escape:
 //! every query projects into a bounded, serialisable record so a model cannot
 //! hold scene state across a step.
-use crate::inspection::inspector::{DebugAttachmentKey, SceneInspector};
+use crate::inspection::inspector::{
+    DebugAttachmentKey, SceneInspector, encode_frame, layout_chain,
+};
 use cove_core::Rect;
 use cove_core::scene::{
     AccessibilitySemantics, AccessibilityTree, Node, NodeTree, StateDescriptor, StateRegistry,
     StateValue,
 };
 use cove_devtools_protocol::{
-    DevToolsExtension, Envelope, ExtensionList, NodeFrame, NodeSummary, SourceLocation,
-    StateObservation, StateWatch,
+    ComponentActivity, DevToolsExtension, Envelope, ExtensionList, NodeFrame, NodeSummary,
+    SourceLocation, StateObservation, StateWatch,
 };
 use serde::{Deserialize, Serialize};
 use std::cell::RefCell;
@@ -53,6 +55,18 @@ impl<T> DiagnosticPage<T> {
     }
 }
 
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DiagnosticSemanticNode {
+    pub id: String,
+    #[serde(rename = "parentID")]
+    pub parent_id: Option<String>,
+    pub depth: usize,
+    pub semantics: AccessibilitySemantics,
+    pub frame: NodeFrame,
+    pub accepts_input: bool,
+}
+
 /// The host's platform memory-pressure signal.
 ///
 /// `subscribed` is false where the host never wired the signal, which is not
@@ -84,6 +98,10 @@ pub struct DiagnosticNode {
     pub presentation: DiagnosticPresentation,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub value_truncated: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub layout_chain: Option<cove_devtools_protocol::LayoutChain>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub render_object: Option<cove_devtools_protocol::RenderObjectInfo>,
 }
 
 /// Current presentation, separate from authored node flags. Visible bounds
@@ -301,7 +319,10 @@ impl ExtensionRegistry {
     /// latest metadata (name, version, entry point) wins.
     pub fn register(&self, extension: DevToolsExtension) {
         let mut extensions = self.extensions.borrow_mut();
-        if let Some(slot) = extensions.iter_mut().find(|existing| existing.id == extension.id) {
+        if let Some(slot) = extensions
+            .iter_mut()
+            .find(|existing| existing.id == extension.id)
+        {
             *slot = extension;
         } else {
             extensions.push(extension);
@@ -499,6 +520,8 @@ impl Diagnostics {
                     node: summary.clone(),
                     parent_id: parent.clone(),
                     presentation: entry.clone(),
+                    layout_chain: None,
+                    render_object: None,
                 });
             }
             let id = summary.id.clone();
@@ -538,7 +561,7 @@ impl Diagnostics {
         }
         let text = text.map(str::to_lowercase);
         let source = source.map(str::to_lowercase);
-        let matches: Vec<DiagnosticNode> =
+        let mut matches: Vec<DiagnosticNode> =
             all.into_iter()
                 .filter(|item| {
                     let node = &item.node;
@@ -594,6 +617,26 @@ impl Diagnostics {
                     true
                 })
                 .collect();
+        if let Some(id) = id
+            && let Some(item) = matches.first_mut()
+            && let Some(node) = self.inspector.find(id)
+        {
+            item.layout_chain = layout_chain(&node);
+            item.render_object =
+                node.render_object()
+                    .map(|object| cove_devtools_protocol::RenderObjectInfo {
+                        parent_id: object
+                            .parent()
+                            .map(|parent| parent.element_id().0.to_string()),
+                        child_count: object.children().len(),
+                        layer_root: object.is_layer_root(),
+                        cache_invalid: object.cache_invalid(),
+                        cached_batches: object.cached_batch_count(),
+                        paint_bounds: object.cached_paint_bounds().map(encode_frame),
+                        clip_count: object.last_clip_count(),
+                        paint_count: node.repaint_epoch(),
+                    });
+        }
         Ok(DiagnosticPage::new(&matches, offset, limit))
     }
 
@@ -636,6 +679,121 @@ impl Diagnostics {
                 .then(left.node.id.cmp(&right.node.id))
         });
         DiagnosticPage::new(&matches, offset, limit)
+    }
+
+    pub fn component_activity(
+        &self,
+        text: Option<&str>,
+        sort_by: &str,
+        offset: usize,
+        limit: usize,
+    ) -> DiagnosticPage<ComponentActivity> {
+        let Some(root) = self.tree.borrow().root() else {
+            return DiagnosticPage::new(&[], offset, limit);
+        };
+        let mut rows = Vec::<ComponentActivity>::new();
+        let mut stack = vec![(root, None)];
+        while let Some((node, mut owner)) = stack.pop() {
+            if let Some(metrics) = node.recomposition_metrics() {
+                owner = Some(rows.len());
+                rows.push(ComponentActivity {
+                    id: SceneInspector::identifier(&node),
+                    name: node
+                        .attachment::<String>(DebugAttachmentKey::DEBUG_NAME)
+                        .or_else(|| node.view_tag())
+                        .unwrap_or_else(|| "Component".into())
+                        .chars()
+                        .take(160)
+                        .collect(),
+                    build_count: Some(metrics.count),
+                    layout_count: cfg!(debug_assertions).then_some(0),
+                    paint_count: 0,
+                    reasons: metrics
+                        .last_reasons
+                        .into_iter()
+                        .take(4)
+                        .map(|reason| cove_devtools_protocol::RecompositionReason {
+                            kind: reason.kind,
+                            detail: reason.detail,
+                            origin_scope_id: reason.origin_scope.map(|id| id.to_string()),
+                        })
+                        .collect(),
+                });
+            }
+            if let Some(owner) = owner {
+                let row = &mut rows[owner];
+                if let Some(count) = node.layout_node().and_then(|layout| layout.layout_count()) {
+                    row.layout_count = row
+                        .layout_count
+                        .map(|current| current.saturating_add(count));
+                }
+                row.paint_count = row.paint_count.saturating_add(node.repaint_epoch());
+            }
+            stack.extend(node.children().into_iter().map(|child| (child, owner)));
+        }
+        if let Some(text) = text {
+            let text = text.to_lowercase();
+            rows.retain(|row| row.name.to_lowercase().contains(&text));
+        }
+        let count = |row: &ComponentActivity| match sort_by {
+            "layout" => row.layout_count,
+            "paint" => Some(row.paint_count),
+            _ => row.build_count,
+        };
+        rows.sort_unstable_by(|left, right| {
+            count(right)
+                .cmp(&count(left))
+                .then_with(|| left.id.cmp(&right.id))
+        });
+        DiagnosticPage::new(&rows, offset, limit)
+    }
+
+    pub fn semantics_tree(
+        &self,
+        offset: usize,
+        limit: usize,
+    ) -> DiagnosticPage<DiagnosticSemanticNode> {
+        fn flatten(
+            elements: Vec<cove_core::scene::AccessibilityElement>,
+            parent: Option<&str>,
+            depth: usize,
+            out: &mut Vec<DiagnosticSemanticNode>,
+        ) {
+            for mut element in elements {
+                let id = element.id().0.to_string();
+                let semantics = &mut element.semantics;
+                for field in [
+                    &mut semantics.label,
+                    &mut semantics.help,
+                    &mut semantics.identifier,
+                    &mut semantics.value,
+                ] {
+                    *field = field.chars().take(160).collect();
+                }
+                if let Some(reference) = &mut semantics.described_by {
+                    *reference = reference.chars().take(160).collect();
+                }
+                out.push(DiagnosticSemanticNode {
+                    id: id.clone(),
+                    parent_id: parent.map(str::to_owned),
+                    depth,
+                    semantics: element.semantics,
+                    frame: encode_frame(element.frame),
+                    accepts_input: element.accepts_input,
+                });
+                flatten(element.children, Some(&id), depth + 1, out);
+            }
+        }
+        let mut rows = Vec::new();
+        if let Some(root) = self.tree.borrow().root() {
+            flatten(
+                AccessibilityTree::diagnostic_snapshot(&root),
+                None,
+                0,
+                &mut rows,
+            );
+        }
+        DiagnosticPage::new(&rows, offset, limit)
     }
 
     /// List opted-in state metadata, reading summaries only for explicit ids.
@@ -994,6 +1152,29 @@ impl Diagnostics {
                 );
                 self.validate_geometry(&page)?;
                 serde_json::json!({ "ok": true, "data": page })
+            }
+            Tool::QueryUiLayout => {
+                let id = arguments["node_id"].as_str().unwrap_or_default();
+                let node = self
+                    .inspector
+                    .find(id)
+                    .ok_or_else(|| DiagnosticError::MissingNode(id.into()))?;
+                serde_json::json!({ "ok": true, "data": layout_chain(&node) })
+            }
+            Tool::QueryUiComponentActivity | Tool::QueryUiSemantics => {
+                let offset = arguments["offset"].as_u64().unwrap_or(0) as usize;
+                let limit = arguments["limit"].as_u64().unwrap_or(50) as usize;
+                let page = if tool == Tool::QueryUiComponentActivity {
+                    serde_json::to_value(self.component_activity(
+                        arguments["text"].as_str(),
+                        arguments["sort_by"].as_str().unwrap_or("build"),
+                        offset,
+                        limit,
+                    ))
+                } else {
+                    serde_json::to_value(self.semantics_tree(offset, limit))
+                };
+                serde_json::json!({ "ok": true, "data": page.expect("diagnostic records are serializable") })
             }
             Tool::QueryUiState => {
                 let ids: Vec<String> = arguments

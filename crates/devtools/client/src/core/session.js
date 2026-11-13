@@ -142,6 +142,8 @@ function readTargetCaps(target) {
   caps.timing = caps.runtime && advertised.has("timing");
   caps.trace = caps.runtime && advertised.has("trace");
   caps.frameAnalysis = caps.runtime && FRAME_ANALYSIS_CAPABILITIES.some(name => advertised.has(name));
+  caps.componentActivity = caps.runtime && advertised.has("component_activity");
+  caps.semanticsTree = caps.runtime && advertised.has("semantics_tree");
   caps.profile = caps.runtime && PROFILE_CAPABILITIES.some(name => advertised.has(name));
   caps.inspectNodes = caps.runtime && advertised.has("inspect_nodes");
   caps.repaintHighlight = caps.runtime && advertised.has("repaint_highlight");

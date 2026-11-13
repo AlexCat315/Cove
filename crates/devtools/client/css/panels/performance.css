@@ -159,13 +159,14 @@
   width: 100%;
   height: 100%;
 }
-.frame-bar { width: 5px; min-height: 2px; border-radius: 1px 1px 0 0; }
+.frame-bar { width: 5px; flex-shrink: 1; min-width: 1px; min-height: 2px; border-radius: 1px 1px 0 0; }
 .frame-bar.is-ui { display: flex; flex-direction: column-reverse; overflow: hidden; background: var(--perf-layout); }
 .frame-seg { display: block; width: 100%; }
 .frame-seg.is-recomposition { background: var(--perf-recomposition); }
 .frame-seg.is-layout { background: var(--perf-layout); }
 .frame-seg.is-draw { background: var(--perf-draw); }
 .frame-bar.is-encode { background: var(--perf-encode); }
+.frame-bar.is-gpu { background: var(--good); }
 .frame-bar.is-total { background: var(--perf-total); opacity: 0.65; }
 .frame-threshold {
   position: absolute;
@@ -198,6 +199,7 @@
 .perf-legend span.is-budget::before { height: 2px; border-radius: 1px; background: var(--warn); }
 .perf-legend span.is-ui::before { background: var(--perf-ui); }
 .perf-legend span.is-encode::before { background: var(--perf-encode); }
+.perf-legend span.is-gpu::before { background: var(--good); }
 .perf-legend span.is-total::before { background: var(--perf-total); }
 .perf-legend span.is-jank::before { border-radius: 50%; background: var(--bad); }
 .frame-row { cursor: pointer; }

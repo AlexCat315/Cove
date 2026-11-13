@@ -20,6 +20,7 @@ pub struct NativeUIDrawStatistics {
     pub indices: usize,
     pub draw_calls: usize,
     pub texture_uploads: usize,
+    /// Logical texel bytes, excluding staging row padding and atlas gutters.
     pub texture_upload_bytes: usize,
 }
 pub struct NativeUIDrawFrame {
@@ -443,7 +444,9 @@ impl NativeDrawListRenderer {
                     patch.region.height as usize,
                     channels,
                 )?;
-                let location = self.device.upload_transient(&pixels, TEXTURE_ROW_ALIGNMENT)?;
+                let location = self
+                    .device
+                    .upload_transient(&pixels, TEXTURE_ROW_ALIGNMENT)?;
                 let mut upload = TextureBufferUpload::new(
                     location.buffer,
                     stride,
@@ -453,7 +456,8 @@ impl NativeDrawListRenderer {
                 upload.offset = location.offset;
                 uploads.push(upload);
                 statistics.texture_uploads += 1;
-                statistics.texture_upload_bytes += pixels.len();
+                statistics.texture_upload_bytes +=
+                    patch.region.width as usize * patch.region.height as usize * channels;
             }
             if let Some(last) = patches.last() {
                 commits.push((slot.clone(), last.sequence));

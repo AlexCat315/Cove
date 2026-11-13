@@ -5,6 +5,11 @@
           <p id="debugger-meta" class="aux-meta">Debug adapter sessions attach to one process at a time.</p>
         </div>
         <div class="aux-actions">
+          <label id="debugger-forward" class="aux-actions" hidden>
+            <span>Forwarded port</span>
+            <input id="debugger-forward-port" type="number" min="1" max="65535" aria-label="Forwarded debugger port">
+            <input id="debugger-symbols" type="text" placeholder="Symbol file path" aria-label="Local symbol file">
+          </label>
           <span id="debugger-status" class="state-badge">Not attached</span>
           <button id="debugger-refresh" class="tool-button" type="button" title="Refresh debugger state">
             <svg class="icon" aria-hidden="true"><use href="#i-refresh"></use></svg><span>Refresh</span>

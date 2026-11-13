@@ -87,6 +87,10 @@ pub(super) struct EngineState {
     probe_cache: RefCell<Cache>,
     place_cache: RefCell<Cache>,
     measurements: RefCell<Vec<(Proposal, Size)>>,
+    #[cfg(debug_assertions)]
+    last_layout_input: Cell<Option<LayoutInput>>,
+    #[cfg(debug_assertions)]
+    layout_count: Cell<u64>,
 }
 
 impl Default for EngineState {
@@ -101,11 +105,29 @@ impl Default for EngineState {
             probe_cache: RefCell::new(Cache::new()),
             place_cache: RefCell::new(Cache::new()),
             measurements: RefCell::new(Vec::new()),
+            #[cfg(debug_assertions)]
+            last_layout_input: Cell::new(None),
+            #[cfg(debug_assertions)]
+            layout_count: Cell::new(0),
         }
     }
 }
 
 impl EngineState {
+    pub(super) fn layout_input(&self) -> Option<LayoutInput> {
+        #[cfg(debug_assertions)]
+        return self.last_layout_input.get();
+        #[cfg(not(debug_assertions))]
+        None
+    }
+
+    pub(super) fn layout_count(&self) -> Option<u64> {
+        #[cfg(debug_assertions)]
+        return Some(self.layout_count.get());
+        #[cfg(not(debug_assertions))]
+        None
+    }
+
     pub(super) fn layout(&self) -> Layout {
         self.layout.get()
     }
@@ -240,7 +262,10 @@ pub(super) fn resolved_direction(cell: &LayoutCell) -> Direction {
     cell.engine.built_direction.get()
 }
 
-pub(super) struct LayoutTree;
+pub(super) struct LayoutTree {
+    #[cfg(debug_assertions)]
+    record_layout: bool,
+}
 
 pub(super) struct ChildIter<'a> {
     cell: &'a LayoutCell,
@@ -319,6 +344,14 @@ impl LayoutPartialTree for LayoutTree {
         }
     }
     fn compute_child_layout(&mut self, id: NodeId, inputs: LayoutInput) -> LayoutOutput {
+        #[cfg(debug_assertions)]
+        if self.record_layout && !is_probe(id) && inputs.run_mode != RunMode::ComputeSize {
+            // SAFETY: the node is retained by the active layout tree.
+            let engine = &unsafe { cell(id) }.engine;
+            engine
+                .last_layout_input
+                .set((inputs.run_mode == RunMode::PerformLayout).then_some(inputs));
+        }
         if inputs.run_mode == RunMode::PerformHiddenLayout {
             self.set_unrounded_layout(id, &Layout::with_order(0));
             return compute_hidden_layout(self, id);
@@ -326,6 +359,11 @@ impl LayoutPartialTree for LayoutTree {
         compute_cached_layout(self, id, inputs, |tree, id, inputs| {
             // SAFETY: see `cell`.
             let node = unsafe { cell(id) };
+            #[cfg(debug_assertions)]
+            if tree.record_layout && !is_probe(id) && inputs.run_mode == RunMode::PerformLayout {
+                let count = &node.engine.layout_count;
+                count.set(count.get().saturating_add(1));
+            }
             let mut output = if is_probe(id) {
                 compute_flexbox_layout(tree, id, inputs)
             } else {
@@ -606,7 +644,10 @@ pub(super) fn layout_root(
         },
         vertical_margins_are_collapsible: Line::FALSE,
     };
-    let mut tree = LayoutTree;
+    let mut tree = LayoutTree {
+        #[cfg(debug_assertions)]
+        record_layout: true,
+    };
     let output = tree.compute_child_layout(id, inputs);
     let resolve = resolve_calc;
     let style = style_of(id);
@@ -625,6 +666,7 @@ pub(super) fn layout_probe(
     height: Option<f32>,
     direction: Direction,
     probe: Probe,
+    _placing: bool,
 ) -> Size {
     refresh_style(&child.0, direction);
     let inputs = LayoutInput {
@@ -643,7 +685,10 @@ pub(super) fn layout_probe(
         },
         vertical_margins_are_collapsible: Line::FALSE,
     };
-    let mut tree = LayoutTree;
+    let mut tree = LayoutTree {
+        #[cfg(debug_assertions)]
+        record_layout: _placing,
+    };
     tree.compute_child_layout(probe_id(child, probe), inputs);
     let size = child.0.engine.layout().size;
     Size {

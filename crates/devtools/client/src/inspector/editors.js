@@ -2,7 +2,7 @@ import { clear, el, fmtNumber, numberValue } from "../core/format.js";
 import { $, DETAIL_TABS, FLEX_ALIGN_VALUES, FLEX_FACTOR_LIMIT, FLEX_JUSTIFY_VALUES, FLEX_PROPERTY_NAMES, FLEX_RECORD_ATTEMPTS, FLEX_RECORD_DELAY_MS, RpcError, dom, state } from "../core/globals.js";
 import { errorMessage, rpc, targetById, toast, unwrapData } from "../core/session.js";
 import { emptyInline, errorInline, kvList, metric, rawDetails, sectionBlock } from "../core/ui-helpers.js";
-import { currentNode, renderDetails } from "./tree.js";
+import { currentNode, renderDetails, selectNode } from "./tree.js";
 
 export function renderRender(node, detail, entry) {
   const panel = dom.panels.render;
@@ -41,6 +41,20 @@ export function renderRender(node, detail, entry) {
   }
 
   const inventory = state.tree?.renderInventory;
+  const object = detail?.renderObject;
+  if (object) {
+    const bounds = object.paintBounds;
+    panel.append(sectionBlock("Render object", kvList([
+      ["Parent", object.parentID && state.entries.has(object.parentID)
+        ? el("button", { class: "tool-button", text: `#${object.parentID}`, on: { click: () => selectNode(object.parentID) } }) : "—"],
+      ["Children", object.childCount],
+      ["Layer root", object.layerRoot ? "Yes" : "No"],
+      ["Layer cache", object.cachedBatches == null ? "Empty" : object.cacheInvalid ? "Invalidated" : `${object.cachedBatches} batches`],
+      ["Paint bounds", bounds ? `${fmtNumber(bounds.x)}, ${fmtNumber(bounds.y)} · ${fmtNumber(bounds.w)} × ${fmtNumber(bounds.h)}` : "—"],
+      ["Clip stack", object.clipCount],
+      ["Paint count", object.paintCount],
+    ])));
+  }
   if (inventory) {
     const isLayerRoot = Array.isArray(inventory.layerRoots) && inventory.layerRoots.includes(node.id);
     panel.append(sectionBlock("Render inventory",
@@ -561,6 +575,7 @@ export function renderLayout(node, detail, entry) {
       ["Z-index", node.zIndex ?? "—"],
     ]),
   ));
+  if (detail?.layoutChain) panel.append(renderLayoutChain(detail.layoutChain));
   if (!layout) {
     if (state.detailLoading && !state.detail) {
       panel.append(sectionBlock("Box model", el("div", { class: "inline-spinner" }, el("span", { class: "spinner" }), "Reading layout…")));
@@ -601,28 +616,61 @@ export function renderLayout(node, detail, entry) {
       ),
     ),
   ));
-  // Flutter's Inspector shows the parent's incoming BoxConstraints; Cove publishes
-  // the node's own authored min/max bounds, the stable value the scene keeps after
-  // layout. An unbounded edge is Infinity, rendered as "∞".
   const constraints = layout.constraints || {};
-  const bound = value => value == null ? "∞" : fmtNumber(value);
-  panel.append(sectionBlock("Constraints",
+  const bound = value => value == null ? "—" : fmtNumber(value);
+  panel.append(sectionBlock("Authored bounds",
     el("div", { class: "metrics" },
       metric("Min W", bound(constraints.minWidth)),
       metric("Max W", bound(constraints.maxWidth)),
       metric("Min H", bound(constraints.minHeight)),
       metric("Max H", bound(constraints.maxHeight)),
     ),
-    kvList([
-      ["Width", `${bound(constraints.minWidth)} … ${bound(constraints.maxWidth)}`],
-      ["Height", `${bound(constraints.minHeight)} … ${bound(constraints.maxHeight)}`],
-    ]),
   ));
-  if (layout.overflowDetected) {
-    panel.append(el("div", { class: "warn-inline", text: "Overflow detected: a child escapes this node's box and overflow is Visible — Flutter reports this as “RenderFlex overflowed by N pixels”." }));
+  if (layout.overflowDetected && !detail?.layoutChain) {
+    panel.append(el("div", { class: "warn-inline", text: "A child extends beyond this node’s bounds." }));
   }
   panel.append(renderFlexSection(node, layout, contentWidth, contentHeight));
   if (state.detailError) panel.append(errorInline(errorMessage(state.detailError)));
+}
+
+function renderLayoutChain(chain) {
+  const axis = input => input
+    ? [input.known == null ? "Auto" : `${fmtNumber(input.known)}${input.definite === false ? " (indefinite)" : ""}`,
+      input.available == null ? input.availableKind : fmtNumber(input.available),
+      input.parent == null ? "—" : fmtNumber(input.parent)].join(" / ")
+    : "—";
+  const size = frame => frame ? `${fmtNumber(frame.w)} × ${fmtNumber(frame.h)}` : "—";
+  const links = [chain.parent && ["Parent", chain.parent], ["Selected", chain.node],
+    ...chain.children.map(child => ["Child", child])].filter(Boolean);
+  const rows = links.map(([kind, item]) => {
+    const name = item.name || (item.id ? `#${item.id}` : "Layout root");
+    const linked = item.id !== state.selectedId && state.entries.has(item.id);
+    return el("tr", {},
+      el("td", {}, linked
+        ? el("button", { class: "tool-button", text: `${kind} · ${name}`, on: { click: () => selectNode(item.id) } })
+        : `${kind} · ${name}`),
+      el("td", { text: axis(item.incoming?.width) }),
+      el("td", { text: axis(item.incoming?.height) }),
+      el("td", { text: size(item.solved) }),
+      el("td", { text: item.visible === false ? "Hidden" : size(item.resolved) }),
+    );
+  });
+  const overflow = chain.textOverflow;
+  const edges = ["top", "right", "bottom", "left"].filter(edge => chain.overflow?.[edge] > 0.5)
+    .map(edge => `${edge} ${fmtNumber(chain.overflow[edge])} pt`);
+  return sectionBlock("Layout chain",
+    el("div", { class: "table-wrap" }, el("table", { class: "data-table" },
+      el("thead", {}, el("tr", {}, ["Node", "Width input", "Height input", "Solved", "Resolved"].map(text => el("th", { text })))),
+      el("tbody", {}, rows),
+    )),
+    el("p", { class: "muted", text: "Input order: known / available / percentage basis. Units are logical points." }),
+    chain.childCount > chain.children.length ? el("p", { class: "muted", text: `${chain.children.length} of ${chain.childCount} layout children` }) : null,
+    kvList([["Flex basis", chain.flexBasis], ["Align self", chain.alignSelf]]),
+    chain.textTruncated ? el("div", { class: "warn-inline", text: "Text truncated" }) : null,
+    edges.length ? el("div", { class: "warn-inline", text: `Child overflow · ${edges.join(" · ")}` }) : null,
+    (overflow?.width > 0.5 || overflow?.height > 0.5)
+      ? el("div", { class: "warn-inline", text: `Text exceeds its content box by ${fmtNumber(overflow.width)} × ${fmtNumber(overflow.height)} pt` }) : null,
+  );
 }
 
 export function renderSource(node, entry) {

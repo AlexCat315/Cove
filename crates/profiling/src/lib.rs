@@ -9,7 +9,7 @@
 //!
 //! # What is real
 //!
-//! On macOS (arm64 and x86_64) the sampler uses Mach thread state from
+//! On macOS and iOS (arm64 and x86_64) the sampler uses Mach thread state from
 //! `thread_get_state` on thread ports obtained with `task_threads` for the
 //! current task — no `task_for_pid`, entitlements or elevated rights — and
 //! walks the frame-pointer chain by reading the suspended thread's stack.
@@ -53,7 +53,7 @@
 //!
 //! - Start the sampler from a thread other than the one being sampled; the
 //!   caller must stay runnable while the target is suspended.
-//! - Thread names are the names set with `pthread_setname_np`. macOS truncates
+//! - Thread names are the names set with `pthread_setname_np`. Darwin truncates
 //!   them to 63 bytes; the Linux kernel truncates `comm` to 15 bytes, so a
 //!   longer name is matched by its truncated prefix. Windows matches the full
 //!   UTF-16 thread description.

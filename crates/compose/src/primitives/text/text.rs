@@ -277,23 +277,25 @@ impl Text {
             letter_spacing: metrics.letter_spacing,
             atlas_id: environment.atlas.identity(),
         };
-        let mut result = layout
+        if let Some(cached) = layout
             .and_then(|layout| layout.text_measure())
             .filter(|cached| cached.key == key)
-            .map(|cached| cached.result)
-            .unwrap_or_else(|| {
-                (*environment.cached_layout(
-                    &text,
-                    Some(&metrics.font),
-                    Some(metrics.line_height),
-                    layout_width,
-                    self.alignment,
-                    metrics.letter_spacing,
-                ))
-                .clone()
-            });
-        let line_limit = self.line_limit;
-        if let Some(limit) = line_limit.filter(|limit| result.lines.len() > *limit) {
+        {
+            return (cached.result, cached.truncated);
+        }
+        let mut result = (*environment.cached_layout(
+            &text,
+            Some(&metrics.font),
+            Some(metrics.line_height),
+            layout_width,
+            self.alignment,
+            metrics.letter_spacing,
+        ))
+        .clone();
+        let line_limited = self.line_limit.filter(|limit| result.lines.len() > *limit);
+        let truncated = line_limited.is_some()
+            || (self.truncates && text != self.string.lines().collect::<Vec<_>>().join(" "));
+        if let Some(limit) = line_limited {
             result.lines.truncate(limit);
             result.total_width = result
                 .lines
@@ -310,9 +312,9 @@ impl Text {
             layout.set_text_measure(Some(TextLayoutCacheEntry {
                 key,
                 result: result.clone(),
+                truncated,
             }));
         }
-        let truncated = self.truncates && text != self.string.lines().collect::<Vec<_>>().join(" ");
         (result, truncated)
     }
 
@@ -449,6 +451,8 @@ impl PrimitiveView for Text {
         node.set_foreground_color(self.color);
         node.set_clips_to_bounds(self.truncates);
         if self.runs.is_some() {
+            node.remove_attachment("__text_truncated");
+            node.remove_attachment("__text_overflow");
             node.set_attachment("__text_runs", true);
             node.set_is_hit_testable(true);
             let surface = self.runs_surface(node);
@@ -512,6 +516,16 @@ impl PrimitiveView for Text {
             let (result, truncated) =
                 snapshot.layout_result(&environment, layout.as_ref(), &metrics, width);
             node.set_attachment("__text_truncated", truncated);
+            #[cfg(debug_assertions)]
+            node.set_attachment(
+                "__text_overflow",
+                cove_core::Size {
+                    width: (result.total_width - width).max(0.0),
+                    height: (result.total_height
+                        - (node.frame().height - padding.vertical()).max(0.0))
+                    .max(0.0),
+                },
+            );
             let color = node
                 .debug_foreground_color()
                 .or(snapshot.color)

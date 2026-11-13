@@ -40,6 +40,7 @@ const DEFAULT_PAGE_DEPTH: usize = 4;
 const DEFAULT_PAGE_LIMIT: usize = 500;
 /// Allocation sites one query returns when the caller gives no limit.
 const DEFAULT_ALLOCATION_SITES: usize = 20;
+const SELF_ATTACH_REASON: &str = "The controller is inside this process. Launch with cargo cove run --devtools to debug source while the app is paused.";
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
 struct PixelRegion {
@@ -221,8 +222,11 @@ impl Controller {
         Ok((runtime, pid, executable))
     }
 
-    /// Resolves a runtime to the operating-system process lldb-dap attaches to.
-    fn debug_target(&self, id: Option<&str>) -> Result<(String, u32), Fault> {
+    /// Resolves a runtime to a local PID or a separately keyed remote session.
+    fn debug_target(
+        &self,
+        id: Option<&str>,
+    ) -> Result<(String, u32, crate::debugger::SessionKey), Fault> {
         let runtime = self.runtime(id)?;
         let registration = self
             .registry
@@ -231,10 +235,15 @@ impl Controller {
             .find(|(current, _)| *current == runtime)
             .map(|(_, registration)| registration)
             .ok_or_else(|| Fault::new("target_gone", "The runtime disconnected."))?;
-        if registration.platform != std::env::consts::OS
-            || !matches!(
+        let local = registration.platform == std::env::consts::OS
+            && matches!(
                 registration.platform.as_str(),
                 "macos" | "windows" | "linux"
+            );
+        if !local
+            && !matches!(
+                registration.platform.as_str(),
+                "ios" | "android" | "macos" | "windows" | "linux"
             )
         {
             return Err(Fault::new(
@@ -251,15 +260,20 @@ impl Controller {
                 "The selected runtime reports no operating-system process ID, so lldb-dap cannot attach.",
             )
         })?;
-        Ok((runtime, pid))
+        let key = if local {
+            crate::debugger::SessionKey::Local(pid)
+        } else {
+            crate::debugger::SessionKey::Remote(runtime.clone())
+        };
+        Ok((runtime, pid, key))
     }
 
     fn debug_session(
         &self,
         id: Option<&str>,
     ) -> Result<(String, u32, std::sync::Arc<DapSession>), Fault> {
-        let (runtime, pid) = self.debug_target(id)?;
-        let session = self.debugger.session(pid).map_err(crate::debugger::fault)?;
+        let (runtime, pid, key) = self.debug_target(id)?;
+        let session = self.debugger.session(key).map_err(crate::debugger::fault)?;
         Ok((runtime, pid, session))
     }
 
@@ -653,30 +667,69 @@ impl Controller {
                 crate::deep_links::inspect(root)?
             }
             "get_ui_debugger" => {
-                let (_, pid) = self.debug_target(target)?;
-                let session = self.debugger.summary(pid).unwrap_or(Value::Null);
-                self.debugger_payload(session)
+                let (_, pid, key) = self.debug_target(target)?;
+                let requires_forward = matches!(key, crate::debugger::SessionKey::Remote(_));
+                let session = self.debugger.summary(key).unwrap_or(Value::Null);
+                let mut payload = self.debugger_payload(session);
+                payload["requires_forward"] = json!(requires_forward);
+                if !requires_forward && pid == std::process::id() {
+                    payload["available"] = json!(false);
+                    payload["reason"] = json!(SELF_ATTACH_REASON);
+                }
+                payload
             }
             "attach_ui_debugger" => {
-                let (runtime, pid) = self.debug_target(target)?;
+                let (runtime, pid, key) = self.debug_target(target)?;
+                if matches!(key, crate::debugger::SessionKey::Local(_)) && pid == std::process::id()
+                {
+                    return Err(Fault::new("unavailable", SELF_ATTACH_REASON));
+                }
+                let remote = if let Some(port) = args["remote_port"].as_u64() {
+                    if matches!(key, crate::debugger::SessionKey::Local(_)) {
+                        return Err(invalid(
+                            "remote_port is for a target registered from a different platform.",
+                        ));
+                    }
+                    let program = args["program"].as_str().map(str::to_owned);
+                    if program
+                        .as_ref()
+                        .is_some_and(|program| !std::path::Path::new(program).is_absolute())
+                    {
+                        return Err(invalid(
+                            "program must be an absolute path to the local symbol file.",
+                        ));
+                    }
+                    Some(crate::debugger::ForwardedDebugger {
+                        port: port as u16,
+                        program,
+                    })
+                } else {
+                    if matches!(key, crate::debugger::SessionKey::Remote(_)) {
+                        return Err(Fault::new(
+                            "unavailable",
+                            "The selected process is not local. Supply remote_port for its forwarded debug stub.",
+                        ));
+                    }
+                    None
+                };
                 let timeout = Duration::from_millis(
                     args["timeout_ms"]
                         .as_u64()
                         .unwrap_or(crate::debugger::DEFAULT_ATTACH_TIMEOUT.as_millis() as u64),
                 );
                 self.debugger
-                    .attach(&runtime, pid, timeout)
+                    .attach_with(&runtime, pid, key.clone(), timeout, remote)
                     .map_err(crate::debugger::fault)?;
                 let mut payload =
-                    self.debugger_payload(self.debugger.summary(pid).unwrap_or(Value::Null));
+                    self.debugger_payload(self.debugger.summary(key).unwrap_or(Value::Null));
                 payload["attached"] = json!(true);
                 payload["pid"] = json!(pid);
                 payload["state"] = payload["session"]["state"].clone();
                 payload
             }
             "detach_ui_debugger" => {
-                let (_, pid) = self.debug_target(target)?;
-                let outcome = self.debugger.detach(pid).map_err(crate::debugger::fault)?;
+                let (_, pid, key) = self.debug_target(target)?;
+                let outcome = self.debugger.detach(key).map_err(crate::debugger::fault)?;
                 json!({
                     "pid": pid,
                     "detached": outcome == "detached",
@@ -690,7 +743,7 @@ impl Controller {
                 let line = args["line"].as_f64().unwrap_or(0.0) as u32;
                 let condition = args["condition"].as_str();
                 let breakpoints = session
-                    .set_breakpoint(path, line, condition)
+                    .set_source_breakpoint(path, line, condition, args["log_message"].as_str())
                     .map_err(crate::debugger::fault)?;
                 let verified = breakpoints
                     .iter()
@@ -704,6 +757,25 @@ impl Controller {
                     "verified": verified,
                     "breakpoints": breakpoints,
                 })
+            }
+            "set_ui_exception_breakpoints" => {
+                let (_, pid, session) = self.debug_session(target)?;
+                let filters = args["filters"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .filter_map(Value::as_str)
+                    .map(str::to_owned)
+                    .collect::<Vec<_>>();
+                let filters = session
+                    .set_exception_filters(&filters)
+                    .map_err(crate::debugger::fault)?;
+                json!({"pid": pid, "exception_filters": filters})
+            }
+            "get_ui_debugger_output" => {
+                let (_, pid, session) = self.debug_session(target)?;
+                let after = args["after"].as_u64().unwrap_or(0);
+                json!({"pid": pid, "events": session.output(after)})
             }
             "clear_ui_breakpoint" => {
                 let (_, pid, session) = self.debug_session(target)?;
@@ -2478,6 +2550,82 @@ mod tests {
             .unwrap_err();
         assert_eq!(fault.code, "unavailable");
         assert!(fault.message.contains("not local"));
+    }
+
+    #[test]
+    fn a_debugger_cannot_pause_its_own_controller_process() {
+        use cove_devtools_protocol::control::{Registration, VERSION};
+        let controller = Controller::with_debugger(mock_debugger());
+        let lease = controller
+            .registry
+            .register(Registration {
+                version: VERSION,
+                title: "Embedded controller".into(),
+                platform: std::env::consts::OS.into(),
+                pid: Some(std::process::id()),
+                window: None,
+                capabilities: vec!["tree".into()],
+            })
+            .unwrap();
+        let args = json!({"target": lease.id});
+        assert_eq!(
+            controller.execute("get_ui_debugger", args.clone()).unwrap()["available"],
+            false
+        );
+        assert_eq!(
+            controller
+                .execute("attach_ui_debugger", args)
+                .unwrap_err()
+                .message,
+            SELF_ATTACH_REASON
+        );
+    }
+
+    #[test]
+    fn forwarded_debugger_sessions_are_scoped_to_the_runtime() {
+        use cove_devtools_protocol::control::{Registration, VERSION};
+        let controller = Controller::with_debugger(mock_debugger());
+        let first = controller
+            .registry
+            .register(Registration {
+                version: VERSION,
+                title: "Android A".into(),
+                platform: "android".into(),
+                pid: Some(42),
+                window: None,
+                capabilities: vec!["tree".into()],
+            })
+            .unwrap();
+        let second = controller
+            .registry
+            .register(Registration {
+                version: VERSION,
+                title: "Android B".into(),
+                platform: "android".into(),
+                pid: Some(42),
+                window: None,
+                capabilities: vec!["tree".into()],
+            })
+            .unwrap();
+        let status = controller
+            .execute("get_ui_debugger", json!({"target": first.id}))
+            .unwrap();
+        assert_eq!(status["requires_forward"], true);
+        let attached = controller
+            .execute(
+                "attach_ui_debugger",
+                json!({"target": first.id, "remote_port": 3456}),
+            )
+            .unwrap();
+        assert_eq!(attached["attached"], true);
+        let other = controller
+            .execute("get_ui_debugger", json!({"target": second.id}))
+            .unwrap();
+        assert!(other["session"].is_null());
+        let detached = controller
+            .execute("detach_ui_debugger", json!({"target": first.id}))
+            .unwrap();
+        assert_eq!(detached["detached"], true);
     }
 
     #[test]

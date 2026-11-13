@@ -7,7 +7,7 @@ pub use cove_agent::ui_tools as tools;
 pub use diagnostics::{
     DiagnosticCompactNode, DiagnosticError, DiagnosticExtensionSource, DiagnosticGeometryIssue,
     DiagnosticLayoutSummary, DiagnosticMemorySnapshot, DiagnosticNode, DiagnosticOverflowIssue,
-    DiagnosticOverview, DiagnosticPage, DiagnosticPresentation, DiagnosticStateSource, Diagnostics,
+    DiagnosticOverview, DiagnosticPage, DiagnosticPresentation, DiagnosticSemanticNode, DiagnosticStateSource, Diagnostics,
     ExtensionRegistry, builtin_extension_registry,
     DiagnosticsStateQuery, MemoryPressure, TraceCapture, TraceComparison, TracePhase, TracePhaseChange, TraceQuery,
     UIDiagnosticCompactNode, UIDiagnosticGeometryIssue, UIDiagnosticLayoutSummary,

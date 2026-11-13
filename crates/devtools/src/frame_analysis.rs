@@ -430,6 +430,7 @@ mod tests {
             draw_ms: 0.0,
             render_thread_ms: None,
             gpu_ms: None,
+            pipeline_creation: None,
             submitted: true,
             presented: None,
             total_ms: 0.0,

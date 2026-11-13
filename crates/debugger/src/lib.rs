@@ -32,8 +32,9 @@ pub mod testing;
 pub use adapter::{Adapter, Availability};
 pub use error::{DebuggerError, Result};
 pub use model::{
-    Breakpoint, EvaluateResult, InitializeInfo, Scope, SessionSnapshot, SessionState, SourceInfo,
-    StackFrame, StackTrace, StopInfo, ThreadInfo, Variable, VariablePage,
+    Breakpoint, DebuggerOutput, EvaluateResult, ExceptionFilter, InitializeInfo, Scope,
+    SessionSnapshot, SessionState, SourceInfo, StackFrame, StackTrace, StopInfo, ThreadInfo,
+    Variable, VariablePage,
 };
 pub use session::{DapSession, Step};
 

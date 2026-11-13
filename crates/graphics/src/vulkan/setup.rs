@@ -902,18 +902,21 @@ mod tests {
             graphics: 0,
             compute: 0,
             transfer: 0,
+            timestamp_bits: Vec::new(),
         };
         assert_eq!(unique_family_list(&families), vec![0]);
         let families = QueueFamilies {
             graphics: 0,
             compute: 1,
             transfer: 2,
+            timestamp_bits: Vec::new(),
         };
         assert_eq!(unique_family_list(&families), vec![0, 1, 2]);
         let families = QueueFamilies {
             graphics: u32::MAX,
             compute: u32::MAX,
             transfer: u32::MAX,
+            timestamp_bits: Vec::new(),
         };
         assert!(unique_family_list(&families).is_empty());
     }

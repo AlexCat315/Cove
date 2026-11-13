@@ -33,7 +33,7 @@ fn prefix(source: &RichParagraph, bytes: usize, ellipsis: bool) -> RichParagraph
     result
 }
 
-fn single_line(source: &RichParagraph) -> RichParagraph {
+pub(super) fn single_line(source: &RichParagraph) -> RichParagraph {
     let mut result = source.clone();
     result.spans.clear();
     let text = source.text();

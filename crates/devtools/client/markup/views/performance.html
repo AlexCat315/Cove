@@ -36,11 +36,24 @@
         <button id="tab-performance-frames" class="perf-tab" data-perf-tab="frames" role="tab" aria-selected="true" aria-controls="performance-frames" type="button">Frames</button>
         <button id="tab-performance-timeline" class="perf-tab" data-perf-tab="timeline" role="tab" aria-selected="false" aria-controls="performance-timeline" tabindex="-1" type="button">Timeline</button>
         <button id="tab-performance-profile" class="perf-tab" data-perf-tab="profile" role="tab" aria-selected="false" aria-controls="performance-profile" tabindex="-1" type="button">CPU Profile</button>
+        <button id="tab-performance-components" class="perf-tab" data-perf-tab="components" role="tab" aria-selected="false" aria-controls="performance-components" tabindex="-1" type="button">Components</button>
       </div>
       <div id="performance-content" class="aux-content">
         <div id="performance-frames" class="perf-panel" role="tabpanel" aria-labelledby="tab-performance-frames"></div>
         <div id="performance-timeline" class="perf-panel" role="tabpanel" aria-labelledby="tab-performance-timeline" hidden></div>
         <div id="performance-profile" class="perf-panel" role="tabpanel" aria-labelledby="tab-performance-profile" hidden></div>
+        <div id="performance-components" class="perf-panel" role="tabpanel" aria-labelledby="tab-performance-components" hidden>
+          <form id="component-activity-filter" class="aux-actions">
+            <input name="text" type="search" aria-label="Component name" placeholder="Filter components" maxlength="256">
+            <select name="sort" aria-label="Rank components by">
+              <option value="build">Rebuilds</option>
+              <option value="layout">Layouts</option>
+              <option value="paint">Paints</option>
+            </select>
+            <button class="tool-button" type="submit">Apply</button>
+          </form>
+          <div id="component-activity-content"></div>
+        </div>
       </div>
     </section>
 

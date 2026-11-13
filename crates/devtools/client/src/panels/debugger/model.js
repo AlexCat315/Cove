@@ -68,6 +68,10 @@ export function emptyDebugger() {
     sourceError: null,
     sourceRequest: 0,
     breakpoints: [],
+    capabilities: null,
+    requiresForward: false,
+    exceptionFilters: [],
+    outputAfter: 0,
     disabledBreakpoints: new Map(),
     busy: "",
     evaluateBusy: false,
@@ -628,7 +632,7 @@ export function debuggerCurrentLocation() {
   const sameFrame = dbg.source.frameId !== null && frame.id !== null && dbg.source.frameId === frame.id
     && (!sourcePath || !framePath || debuggerPathsMatch(sourcePath, framePath));
   if (!sameFrame && !(sourcePath && framePath && debuggerPathsMatch(sourcePath, framePath))) return null;
-  return { line: frame.line, column: frame.column };
+  return { path: sourcePath || framePath, line: frame.line, column: frame.column };
 }
 
 export function debuggerFrameLabel(frame) {
@@ -680,6 +684,9 @@ export function clearDebuggerSessionData(options = {}) {
   }
   if (!options.keepBreakpoints) {
     dbg.breakpoints = [];
+    dbg.capabilities = null;
+    dbg.exceptionFilters = [];
+    dbg.outputAfter = 0;
   }
   dbg.renderSig = {};
 }
@@ -708,6 +715,9 @@ export function applyDebuggerSnapshot(data) {
   }
 
   if (root.available !== undefined) dbg.adapterAvailable = root.available !== false;
+  if (root.requires_forward !== undefined) dbg.requiresForward = root.requires_forward === true;
+  if (session.capabilities !== undefined) dbg.capabilities = session.capabilities;
+  if (Array.isArray(session.exception_filters)) dbg.exceptionFilters = session.exception_filters;
   if (root.warning !== undefined) dbg.warning = firstStringValue(root.warning);
   if (root.developer_mode !== undefined) {
     dbg.developerMode = root.developer_mode === true ? true : root.developer_mode === false ? false : null;

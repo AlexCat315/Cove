@@ -180,7 +180,9 @@ impl WindowResize {
 }
 payload!(TimingFrame {
     frame: u64, recomposition_ms: Option<f64>, layout_ms: f64, draw_ms: f64,
-    render_thread_ms: Option<f64>, #[serde(default)] gpu_ms: Option<f64>, submitted: bool, presented: Option<bool>,
+    render_thread_ms: Option<f64>, #[serde(default)] gpu_ms: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")] pipeline_creation: Option<PipelineCreation>,
+    submitted: bool, presented: Option<bool>,
     total_ms: f64, node_count: usize, batch_count: usize,
     // The CPU timeline window this frame owns: spans with a sequence in
     // `(timeline_start, timeline_end]` were produced while the frame was
@@ -188,6 +190,10 @@ payload!(TimingFrame {
     // including frames recorded by probes older than this field.
     #[serde(default)] timeline_start: u64,
     #[serde(default)] timeline_end: u64,
+});
+payload!(PipelineCreation {
+    count: u64,
+    cpu_ms: f64
 });
 payload!(RegisteredState {
     id: String, name: String, value_type: String, #[serde(rename = "scopeID")] scope_id: Option<String>,
@@ -232,10 +238,7 @@ payload!(InspectionInsets {
     bottom: f64,
     left: f64
 });
-// The size constraints a node publishes for itself, in logical points.
-// These are the authored `min-*`/`max-*` limits (Flutter's Inspector shows the
-// parent's incoming `BoxConstraints`; Cove's layout resolves the node's own
-// bounds, which is the closest stable value the scene keeps after layout).
+// Authored length bounds in logical points.
 payload!(NodeConstraints {
     min_width: Option<f64>,
     max_width: Option<f64>,
@@ -273,6 +276,58 @@ payload!(NodeLayoutInfo {
     overflow_detected: bool,
 });
 payload!(NodeStyleInfo { background_color: Option<String>, foreground_color: Option<String>, overrides: Vec<String> });
+payload!(LayoutAxisInput {
+    known: Option<f32>,
+    definite: Option<bool>,
+    parent: Option<f32>,
+    available: Option<f32>,
+    available_kind: String,
+});
+payload!(LayoutProposal {
+    width: LayoutAxisInput,
+    height: LayoutAxisInput,
+});
+payload!(LayoutChainNode {
+    id: Option<String>,
+    name: Option<String>,
+    incoming: Option<LayoutProposal>,
+    solved: NodeFrame,
+    resolved: Option<NodeFrame>,
+    visible: Option<bool>,
+});
+payload!(LayoutChain {
+    parent: Option<LayoutChainNode>,
+    node: LayoutChainNode,
+    children: Vec<LayoutChainNode>,
+    child_count: usize,
+    overflow: Option<InspectionInsets>,
+    flex_basis: String,
+    align_self: String,
+    text_truncated: Option<bool>,
+    text_overflow: Option<LayoutExtent>,
+});
+payload!(LayoutExtent {
+    width: f32,
+    height: f32
+});
+payload!(ComponentActivity {
+    id: String,
+    name: String,
+    build_count: Option<u64>,
+    layout_count: Option<u64>,
+    paint_count: u64,
+    reasons: Vec<RecompositionReason>,
+});
+payload!(RenderObjectInfo {
+    #[serde(rename = "parentID")] parent_id: Option<String>,
+    child_count: usize,
+    layer_root: bool,
+    cache_invalid: bool,
+    cached_batches: Option<usize>,
+    paint_bounds: Option<NodeFrame>,
+    clip_count: usize,
+    paint_count: u64,
+});
 payload!(InspectionState {
     #[serde(rename = "selectedID")] selected_id: Option<String>,
     can_undo: bool, can_redo: bool, override_count: usize,
@@ -456,6 +511,7 @@ mod tests {
             draw_ms: 0.25,
             render_thread_ms: Some(0.125),
             gpu_ms: None,
+            pipeline_creation: None,
             submitted: true,
             presented: Some(true),
             total_ms: 1.0,
@@ -509,9 +565,24 @@ mod tests {
     #[test]
     fn node_layout_info_carries_constraints_and_overflow() {
         let info = NodeLayoutInfo {
-            padding: InspectionInsets { top: 0.0, right: 0.0, bottom: 0.0, left: 0.0 },
-            margin: InspectionInsets { top: 0.0, right: 0.0, bottom: 0.0, left: 0.0 },
-            border: InspectionInsets { top: 0.0, right: 0.0, bottom: 0.0, left: 0.0 },
+            padding: InspectionInsets {
+                top: 0.0,
+                right: 0.0,
+                bottom: 0.0,
+                left: 0.0,
+            },
+            margin: InspectionInsets {
+                top: 0.0,
+                right: 0.0,
+                bottom: 0.0,
+                left: 0.0,
+            },
+            border: InspectionInsets {
+                top: 0.0,
+                right: 0.0,
+                bottom: 0.0,
+                left: 0.0,
+            },
             content_width: 100.0,
             content_height: 40.0,
             direction: "Ltr".into(),

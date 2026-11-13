@@ -13,6 +13,7 @@ import { ensureMemory, resetMemory } from "../panels/memory/view.js";
 import { ensureNetwork, resetNetwork, stopAllFollowTimers } from "../panels/network.js";
 import { ensurePerformance, resetPerformance } from "../panels/performance/overview.js";
 import { ensureRegisteredState, resetRegisteredState } from "../panels/state.js";
+import { ensureSceneDiagnostics, resetSceneDiagnostics } from "../panels/scene-diagnostics.js";
 
 export function resetTargetData(previousTarget = state.targetId) {
   state.tree = null;
@@ -46,6 +47,7 @@ export function resetTargetData(previousTarget = state.targetId) {
   resetNetwork();
   resetLogs();
   resetRegisteredState();
+  resetSceneDiagnostics();
   resetExtensions();
   resetMemory(previousTarget);
   resetAppSize();
@@ -74,6 +76,7 @@ export function ensureCurrentView() {
   if (state.view === "network") ensureNetwork();
   else if (state.view === "logs") ensureLogs();
   else if (state.view === "state") ensureRegisteredState();
+  else if (state.view === "semantics") ensureSceneDiagnostics("semantics");
   else if (state.view === "extensions") ensureExtensions();
   else if (state.view === "performance") ensurePerformance();
   else if (state.view === "memory") ensureMemory();

@@ -3,7 +3,7 @@
 //! Name, schema and the immediate-read capability live together so the DevTools
 //! wire adapter, the MCP toolbox and the handlers cannot drift into separate
 //! string lists.
-use crate::{AgentError, AgentSkill, AgentSkillLibrary, AgentTool, JsonSchema};
+use crate::{AgentError, AgentSkill, AgentSkillLibrary, AgentTool, JsonSchema, JsonSchemaScalar};
 use std::collections::BTreeMap;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
@@ -11,6 +11,9 @@ pub enum Tool {
     GetDiagnostics,
     QueryUiNodes,
     QueryUiRecomposition,
+    QueryUiLayout,
+    QueryUiComponentActivity,
+    QueryUiSemantics,
     QueryUiState,
     QueryUiMemory,
     QueryUiNetwork,
@@ -31,10 +34,13 @@ pub enum Tool {
 }
 
 impl Tool {
-    pub const ALL: [Tool; 20] = [
+    pub const ALL: [Tool; 23] = [
         Tool::GetDiagnostics,
         Tool::QueryUiNodes,
         Tool::QueryUiRecomposition,
+        Tool::QueryUiLayout,
+        Tool::QueryUiComponentActivity,
+        Tool::QueryUiSemantics,
         Tool::QueryUiState,
         Tool::QueryUiMemory,
         Tool::QueryUiNetwork,
@@ -63,6 +69,9 @@ impl Tool {
             Self::GetDiagnostics => "get_diagnostics",
             Self::QueryUiNodes => "query_ui_nodes",
             Self::QueryUiRecomposition => "query_ui_recomposition",
+            Self::QueryUiLayout => "query_ui_layout",
+            Self::QueryUiComponentActivity => "query_ui_component_activity",
+            Self::QueryUiSemantics => "query_ui_semantics",
             Self::QueryUiState => "query_ui_state",
             Self::QueryUiMemory => "query_ui_memory",
             Self::QueryUiNetwork => "query_ui_network",
@@ -193,6 +202,41 @@ impl Tool {
                 ),
                 true,
             ),
+            Self::QueryUiLayout => AgentTool::new(
+                self.name(),
+                "Read one live node's actual layout inputs, resolved size, layout parent and first 32 layout children.",
+                object(
+                    BTreeMap::from([("node_id".into(), text())]),
+                    vec!["node_id".into()],
+                ),
+                true,
+            ),
+            Self::QueryUiComponentActivity => AgentTool::new(
+                self.name(),
+                "Rank live components by measured rebuilds, layout computations or paints. Counts are cumulative for the currently mounted nodes.",
+                merge(
+                    vec![
+                        ("text", text()),
+                        (
+                            "sort_by",
+                            JsonSchema {
+                                allowed_values: ["build", "layout", "paint"]
+                                    .map(|name| JsonSchemaScalar::String(name.into()))
+                                    .into(),
+                                ..JsonSchema::string(None, None)
+                            },
+                        ),
+                    ],
+                    Vec::new(),
+                ),
+                true,
+            ),
+            Self::QueryUiSemantics => AgentTool::new(
+                self.name(),
+                "Page through the Cove runtime's own semantics tree. Values from text fields are excluded.",
+                object(paging(), Vec::new()),
+                true,
+            ),
             Self::QueryUiState => AgentTool::new(
                 self.name(),
                 "List opted-in state metadata. Read summaries only for explicit ids; private state is never exposed. Unmounted ids are reported as missing.",
@@ -237,7 +281,7 @@ impl Tool {
             ),
             Self::StartUiProfile => AgentTool::new(
                 self.name(),
-                "Sample the selected runtime's UI thread with the in-process CPU sampler. Sampling stops by itself after duration_ms, bounded to 10s; the symbolization runs on a background thread. macOS only; other platforms return unavailable with the reason instead of samples.",
+                "Sample the selected runtime's UI thread with the in-process CPU sampler. Sampling stops by itself after duration_ms, bounded to 10s; the symbolization runs on a background thread. Supported on 64-bit macOS, iOS, Windows, Linux and Android. Other targets report unavailable.",
                 object(
                     BTreeMap::from([
                         (
@@ -255,19 +299,19 @@ impl Tool {
             ),
             Self::StopUiProfile => AgentTool::new(
                 self.name(),
-                "Stop the active UI profile, join the sampler and return the symbolized profile: aggregated stacks, retained and dropped sample counts, and the bound. macOS only; other platforms return unavailable with the reason.",
+                "Stop the active UI profile, join the sampler and return the symbolized profile: aggregated stacks, retained and dropped sample counts, and the bound. Supported on 64-bit macOS, iOS, Windows, Linux and Android.",
                 object(BTreeMap::new(), Vec::new()),
                 false,
             ),
             Self::GetUiProfile => AgentTool::new(
                 self.name(),
-                "Read the active or most recent UI profile. Stacks are aggregated, never one record per sample, and at most 24 are returned. While sampling, counters are live and stacks are empty. macOS only.",
+                "Read the active or most recent UI profile. Stacks are aggregated, never one record per sample, and at most 24 are returned. While sampling, counters are live and stacks are empty. Supported on 64-bit macOS, iOS, Windows, Linux and Android.",
                 object(BTreeMap::new(), Vec::new()),
                 true,
             ),
             Self::QueryUiHotspots => AgentTool::new(
                 self.name(),
-                "Read aggregated self and inclusive hotspots of the retained UI profile, by function and source line. Self time is exclusive; inclusive time counts a frame once per sample. Times accumulate the measured gap between retained samples. macOS only.",
+                "Read aggregated self and inclusive hotspots of the retained UI profile, by function and source line. Self time is exclusive; inclusive time counts a frame once per sample. Times accumulate the measured gap between retained samples. Supported on 64-bit macOS, iOS, Windows, Linux and Android.",
                 object(
                     BTreeMap::from([(
                         "limit".to_string(),
@@ -363,7 +407,7 @@ impl Tools {
 
 /// Built-in task guide shipped with the crate.
 pub const UI_DIAGNOSTICS_GUIDE: &str = "\
-Start with get_diagnostics to discover available data. Use query_ui_nodes to locate the affected component and its compiled source location. Query owner recomposition statistics and explicitly exposed state summaries as needed. Capture a bounded CPU trace around the real operation; an idle capture is not evidence of a successful action. On macOS, sample the UI thread with start_ui_profile, then read get_ui_profile and query_ui_hotspots to attribute its time to function and source line; other platforms report unavailable. Read capture events and compare equivalent workloads before and after a change. Parent spans include child work; do not sum overlapping spans as frame time. CPU draw and present timing do not measure GPU execution. Cite node, scope, sample or capture IDs with observations. Treat recommendations and correlated timings as hypotheses. Report missing, stale, truncated or dropped data. This guide grants no additional tools or write permissions.";
+Start with get_diagnostics to discover available data. Use query_ui_nodes to locate the affected component and its compiled source location. Query owner recomposition statistics and explicitly exposed state summaries as needed. Capture a bounded CPU trace around the real operation; an idle capture is not evidence of a successful action. On targets advertising cpu_profile, sample the UI thread with start_ui_profile, then read get_ui_profile and query_ui_hotspots to attribute its time to function and source line. Read capture events and compare equivalent workloads before and after a change. Parent spans include child work; do not sum overlapping spans as frame time. CPU draw and present timing do not measure GPU execution. Cite node, scope, sample or capture IDs with observations. Treat recommendations and correlated timings as hypotheses. Report missing, stale, truncated or dropped data. This guide grants no additional tools or write permissions.";
 
 /// The default library: one built-in guide plus any guide found on disk.
 pub fn default_skill_library() -> AgentSkillLibrary {
@@ -422,7 +466,7 @@ mod tests {
         ] {
             assert!(!tool.is_immediate_read(), "{}", tool.name());
         }
-        assert_eq!(Tool::immediate_read_tools().len(), 10);
+        assert_eq!(Tool::immediate_read_tools().len(), 13);
     }
 
     #[test]

@@ -693,6 +693,7 @@ impl SceneEditor {
                     while let Some(node) = stack.pop() {
                         if let Some(mut metrics) = node.recomposition_metrics() {
                             metrics.reset();
+                            node.set_recomposition_metrics(Some(metrics));
                         }
                         stack.extend(node.children());
                     }

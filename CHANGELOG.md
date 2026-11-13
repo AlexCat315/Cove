@@ -4,6 +4,10 @@
 
 ## Unreleased
 
+- DevTools 显示 Taffy 实际布局链、边缘溢出及普通文本截断。Performance 新增组件重建、布局、绘制计数和最慢帧排序，帧图单独显示 GPU 时间，帧详情报告活跃帧槽内的着色器和管线创建。
+- 新增 Cove 运行时 Semantics 树。Debugger 支持适配器公布的日志断点、异常过滤器及输出事件，移动端可连接转发到 loopback 的原生调试 stub。iOS/iPadOS 接入 Mach CPU 采样。Inspector 可选嵌入单个 JavaScript 包。
+- 修复纹理上传统计，把 staging 行填充从逻辑纹素字节中排除。修正 iOS 文件选择器的类型数组语法。
+
 - 重写 Cove DevTools。Inspector、MCP 和 CLI 共用控制器，原生与 WASM 共用 Rust 探针。画面来自 Cove 渲染目标或页面 Canvas，点击、拖动、滚动、按键和文本在所选运行时内分发。移除系统录屏、辅助功能授权、全局输入和 WebDriver 绑定入口。
 - DevTools 补齐两类 Flutter 对等能力：节点详情新增尺寸约束和溢出检测，非裁剪父节点有子节点越出自身盒子时给出警告（对应 `RenderFlex overflowed`）；新增 `DevToolsExtension` 协议与 `extensions` 能力，运行时经 `DiagnosticExtensionSource` / `ExtensionRegistry` 注册面板，Inspector 的 Extensions 视图负责列出、启用停用并在沙箱 iframe 中打开。`list_extensions` 和 `set_extension_enabled` 复用即时读通道，桌面与 WASM 宿主共用内置扩展。新增 `extensions-harness.mjs`，覆盖能力门控、注册表读取、启用切换、非法 scheme、空注册表与失败重试。
 

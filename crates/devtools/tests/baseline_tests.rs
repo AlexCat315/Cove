@@ -97,6 +97,7 @@ fn text_entry(lines: Vec<TextLine>) -> TextLayoutCacheEntry {
             total_width,
             total_height,
         },
+        truncated: false,
     }
 }
 

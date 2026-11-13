@@ -21,7 +21,35 @@ fn initialize_preserves_the_adapter_capabilities() {
     assert!(info.supports_configuration_done);
     assert!(info.supports_conditional_breakpoints);
     assert!(!info.supports_function_breakpoints);
+    assert!(info.supports_log_points);
+    assert_eq!(info.exception_filters[0].id, "throw");
     assert!(info.adapter_version.unwrap().contains("mock-lldb"));
+}
+
+#[test]
+fn log_points_and_exception_filters_forward_adapter_requests() {
+    let (session, handle) = attached();
+    let path = if cfg!(windows) {
+        "C:\\app\\main.rs"
+    } else {
+        "/app/main.rs"
+    };
+    let points = session
+        .set_source_breakpoint(path, 12, Some("n > 0"), Some("n = {n}"))
+        .unwrap();
+    assert_eq!(points[0].log_message.as_deref(), Some("n = {n}"));
+    assert_eq!(
+        handle.requests_named("setBreakpoints")[0]["arguments"]["breakpoints"][0]["logMessage"],
+        "n = {n}"
+    );
+    assert_eq!(
+        session.set_exception_filters(&["throw".into()]).unwrap(),
+        ["throw"]
+    );
+    assert!(session.set_exception_filters(&["unknown".into()]).is_err());
+    assert_eq!(session.exception_filters(), ["throw"]);
+    assert_eq!(handle.requests_named("setExceptionBreakpoints").len(), 1);
+    assert!(session.set_exception_filters(&[]).unwrap().is_empty());
 }
 
 #[test]

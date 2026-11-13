@@ -573,6 +573,9 @@ impl Device {
             if during_frame {
                 self.warn_pipeline_creation_during_frame("shader module", Some(&label));
             }
+            if let Some(slot) = state.current_slot {
+                self.frame_ring.note_pipeline_creation(slot, nanoseconds);
+            }
         } else {
             state.pipeline_store.record_shader_cache_hit();
         }
@@ -788,6 +791,11 @@ impl Device {
             lease.created || lease.discarded.is_some(),
             during_frame,
         );
+        if (lease.created || lease.discarded.is_some())
+            && let Some(slot) = state.current_slot
+        {
+            self.frame_ring.note_pipeline_creation(slot, nanoseconds);
+        }
         if lease.created {
             state.interfaces.uses.insert(
                 lease.handle.id(),
@@ -839,6 +847,11 @@ impl Device {
             lease.created || lease.discarded.is_some(),
             during_frame,
         );
+        if (lease.created || lease.discarded.is_some())
+            && let Some(slot) = state.current_slot
+        {
+            self.frame_ring.note_pipeline_creation(slot, nanoseconds);
+        }
         if lease.created {
             state.interfaces.uses.insert(
                 lease.handle.id(),
@@ -890,6 +903,11 @@ impl Device {
             lease.created || lease.discarded.is_some(),
             during_frame,
         );
+        if (lease.created || lease.discarded.is_some())
+            && let Some(slot) = state.current_slot
+        {
+            self.frame_ring.note_pipeline_creation(slot, nanoseconds);
+        }
         if lease.created {
             state.interfaces.uses.insert(
                 lease.handle.id(),
@@ -1440,7 +1458,8 @@ impl Device {
                     }),
                 )
             } else {
-                self.backend().submit(planned_submit, cpu_profile.as_deref_mut(), completion)
+                self.backend()
+                    .submit(planned_submit, cpu_profile.as_deref_mut(), completion)
             };
             match result {
                 Ok(()) => submitted = true,

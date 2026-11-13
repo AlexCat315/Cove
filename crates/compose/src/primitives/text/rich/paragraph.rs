@@ -285,8 +285,29 @@ fn paint(
         return;
     }
     let palette = RichTextPalette::resolve(node);
+    #[cfg(debug_assertions)]
+    let source = paragraph;
     let paragraph = paragraph_at_node(paragraph, node);
     let flow = RichTextFlow::layout(&paragraph, frame.width, &environment);
+    #[cfg(debug_assertions)]
+    {
+        let (line_limit, truncates) = node
+            .attachment::<(Option<usize>, bool)>("__text_display_options")
+            .unwrap_or_default();
+        let shortened = if truncates {
+            paragraph.text() != super::display::single_line(source).text()
+        } else {
+            line_limit.is_some_and(|limit| limit != 1) && paragraph.text() != source.text()
+        };
+        node.set_attachment("__text_truncated", shortened);
+        node.set_attachment(
+            "__text_overflow",
+            cove_core::Size {
+                width: (flow.width - frame.width).max(0.0),
+                height: (flow.height - frame.height).max(0.0),
+            },
+        );
+    }
     let opacity = node.opacity();
     let focused_link = node.attachment::<usize>(FOCUSED_LINK);
 

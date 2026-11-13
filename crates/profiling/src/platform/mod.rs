@@ -4,13 +4,13 @@ mod fp;
 mod ring;
 
 #[cfg(all(
-    target_os = "macos",
+    any(target_os = "macos", target_os = "ios"),
     any(target_arch = "aarch64", target_arch = "x86_64")
 ))]
 mod macos;
 
 #[cfg(all(
-    target_os = "macos",
+    any(target_os = "macos", target_os = "ios"),
     any(target_arch = "aarch64", target_arch = "x86_64")
 ))]
 pub(crate) use macos::{Sampler, Symbolizer, support, symbolizer};
@@ -41,7 +41,7 @@ pub(crate) use windows::{Sampler, Symbolizer, support, symbolizer};
 
 #[cfg(not(any(
     all(
-        target_os = "macos",
+        any(target_os = "macos", target_os = "ios"),
         any(target_arch = "aarch64", target_arch = "x86_64")
     ),
     all(
@@ -57,7 +57,7 @@ mod unsupported;
 
 #[cfg(not(any(
     all(
-        target_os = "macos",
+        any(target_os = "macos", target_os = "ios"),
         any(target_arch = "aarch64", target_arch = "x86_64")
     ),
     all(

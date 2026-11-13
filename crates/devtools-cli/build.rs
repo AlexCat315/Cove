@@ -15,6 +15,8 @@ use std::path::{Path, PathBuf};
 
 fn main() {
     println!("cargo:rerun-if-changed=build.rs");
+    println!("cargo:rerun-if-env-changed=COVE_DEVTOOLS_ESBUILD");
+    println!("cargo:rustc-check-cfg=cfg(cove_packed_inspector)");
     let manifest_dir = PathBuf::from(env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR"));
     let client_dir = manifest_dir.join("../devtools/client");
     let manifest_path = client_dir.join("manifest.json");
@@ -27,6 +29,47 @@ fn main() {
     let manifest: serde_json::Value = serde_json::from_str(&manifest).unwrap_or_else(|error| {
         fail(&format!("{} is not valid JSON: {error}", manifest_path.display()))
     });
+    if let Some(esbuild) = env::var_os("COVE_DEVTOOLS_ESBUILD") {
+        let modules = &manifest["modules"];
+        let root = string_field(modules, "root");
+        let parts = modules["parts"]
+            .as_array()
+            .unwrap_or_else(|| fail("missing module parts"));
+        let entry = parts
+            .iter()
+            .map(|part| {
+                let part = part
+                    .as_str()
+                    .unwrap_or_else(|| fail("module path must be a string"));
+                let absolute = safe_join(&safe_join(&client_dir, &root), part);
+                format!(
+                    "import {};\n",
+                    serde_json::to_string(&absolute).expect("serializable module path")
+                )
+            })
+            .collect::<String>();
+        let out = PathBuf::from(env::var_os("OUT_DIR").expect("OUT_DIR"));
+        let entry_path = out.join("inspector-entry.mjs");
+        fs::write(&entry_path, entry).unwrap_or_else(|error| fail(&error.to_string()));
+        let packed = out.join("inspector.bundle.js");
+        let mut output = std::ffi::OsString::from("--outfile=");
+        output.push(&packed);
+        let status = std::process::Command::new(esbuild)
+            .arg(entry_path)
+            .args([
+                "--bundle",
+                "--format=esm",
+                "--platform=browser",
+                "--log-level=warning",
+            ])
+            .arg(output)
+            .status()
+            .unwrap_or_else(|error| fail(&format!("cannot run COVE_DEVTOOLS_ESBUILD: {error}")));
+        if !status.success() {
+            fail("could not bundle Inspector modules");
+        }
+        println!("cargo:rustc-cfg=cove_packed_inspector");
+    }
     let bundles = manifest["bundles"]
         .as_array()
         .unwrap_or_else(|| fail("manifest.json must define a `bundles` array"));

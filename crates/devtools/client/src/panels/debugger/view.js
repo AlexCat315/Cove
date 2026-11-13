@@ -1,12 +1,12 @@
 import { clear, el, icon } from "../../core/format.js";
-import { DEBUGGER_CONSOLE_LIMIT, dom, MAX_DEBUGGER_SOURCE_LINES, nextRpcSequence, state } from "../../core/globals.js";
+import { $, DEBUGGER_CONSOLE_LIMIT, dom, MAX_DEBUGGER_SOURCE_LINES, nextRpcSequence, state } from "../../core/globals.js";
 import { errorMessage, targetById } from "../../core/session.js";
 import { showState } from "../../core/ui-helpers.js";
 import { stopTimer } from "../network.js";
 import { firstStringValue, isObjectValue } from "../performance/profile/model.js";
 import { authHeaders } from "../../core/session.js";
 import { applyDebuggerSnapshot, debuggerAdapterLabel, debuggerBreakpointLabel, debuggerBreakpointsAt, debuggerCurrentLocation, debuggerFrameLabel, debuggerFrameLocation, debuggerScalarText, debuggerStatusIsExplicit, emptyDebugger, selectedDebuggerFrame } from "./model.js";
-import { attachDebugger, debuggerCall, debuggerCanAct, debuggerStatusLabel, debuggerStatusTone, debuggerVisibleBreakpoints, loadDebuggerSource, loadDebuggerStack, loadDebuggerVariableChildren, selectDebuggerFrame, selectDebuggerThread, toggleDebuggerBreakpoint, toggleDebuggerBreakpointAtLine } from "./session.js";
+import { attachDebugger, debuggerCall, debuggerCanAct, debuggerStatusLabel, debuggerStatusTone, debuggerVisibleBreakpoints, loadDebuggerSource, loadDebuggerStack, loadDebuggerVariableChildren, selectDebuggerFrame, selectDebuggerThread, setDebuggerBreakpoint, setDebuggerExceptionFilters, toggleDebuggerBreakpoint, toggleDebuggerBreakpointAtLine } from "./session.js";
 export function updateDebuggerButtons() {
   const dbg = state.debugger;
   const targetOk = Boolean(state.connected && state.token && state.targetId && state.caps.runtime);
@@ -14,6 +14,10 @@ export function updateDebuggerButtons() {
   const attaching = dbg.status === "attaching";
   const attached = dbg.attached;
   const paused = dbg.status === "paused";
+  const forward = $("debugger-forward");
+  forward.hidden = !dbg.requiresForward || attached;
+  $("debugger-forward-port").disabled = busy;
+  $("debugger-symbols").disabled = busy;
   dom.debuggerAttach.disabled = !targetOk || dbg.adapterAvailable === false || attached || attaching || busy;
   dom.debuggerDetach.disabled = !targetOk || (!attached && !attaching) || busy;
   dom.debuggerPause.disabled = !targetOk || !attached || paused || busy;
@@ -267,6 +271,9 @@ export function renderDebuggerBreakpoints(force = false) {
     attached: dbg.attached,
     busy: dbg.busy,
     hit: [...hitIds],
+    exceptionFilters: dbg.exceptionFilters,
+    capabilities: dbg.capabilities,
+    location: debuggerCurrentLocation(),
   });
   if (!force && signature === dbg.renderSig.breakpoints) return;
   dbg.renderSig.breakpoints = signature;
@@ -279,6 +286,35 @@ export function renderDebuggerBreakpoints(force = false) {
   if (context && !visible.length) {
     appendDebuggerPaneMessage(host, context.text, { loading: context.loading });
     return;
+  }
+  const available = dbg.capabilities?.exception_filters ?? [];
+  if (available.length) {
+    host.append(el("fieldset", {},
+      el("legend", { text: "Exception breakpoints" }),
+      available.map(filter => el("label", { class: "dbg-bp-row" },
+        el("input", {
+          attrs: { type: "checkbox" },
+          props: { checked: dbg.exceptionFilters.includes(filter.id), disabled: Boolean(dbg.busy) },
+          on: { change: event => {
+            const next = new Set(dbg.exceptionFilters);
+            if (event.target.checked) next.add(filter.id);
+            else next.delete(filter.id);
+            setDebuggerExceptionFilters([...next]);
+          } },
+        }),
+        filter.label,
+      )),
+    ));
+  }
+  const location = debuggerCurrentLocation();
+  if (dbg.capabilities?.supports_log_points && location?.path && location.line > 0) {
+    const message = el("input", { attrs: { required: "", maxlength: 1024, placeholder: "Log message", "aria-label": "Log point message" } });
+    host.append(el("form", { class: "dbg-bp-row", on: { submit: event => {
+      event.preventDefault();
+      if (message.value.trim()) setDebuggerBreakpoint(location.path, location.line, true, { logMessage: message.value });
+    } } }, message, el("button", {
+      class: "tool-button", text: `Log at line ${location.line}`, props: { disabled: Boolean(dbg.busy), type: "submit" },
+    })));
   }
   if (!visible.length) {
     host.append(el("div", { class: "dbg-empty", text: dbg.status === "paused" ? "No breakpoints. Select a source line gutter to set one." : "No breakpoints." }));
@@ -296,6 +332,7 @@ export function renderDebuggerBreakpoints(force = false) {
       meta.push(`resolved ${breakpoint.resolvedLine}`);
     }
     if (breakpoint.condition) meta.push(`if ${breakpoint.condition}`);
+    if (breakpoint.logMessage) meta.push(`log ${breakpoint.logMessage}`);
     if (hit) meta.push("hit");
     const row = el("label", {
       class: `dbg-bp-row ${breakpoint.enabled ? "" : "is-disabled"} ${hit ? "is-hit" : ""}`.trim(),

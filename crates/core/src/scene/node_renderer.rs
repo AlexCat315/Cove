@@ -122,9 +122,7 @@ fn render_node(node: &Node, list: &mut DrawList, placed: Affine2D) {
     // Record a real paint of this node's own box or content. A node that only
     // places children emits no vertices of its own, so it keeps its
     // generation; the bump is diagnostic state and never dirties the node.
-    if list.vertices().len() > first_vertex {
-        node.bump_repaint();
-    }
+    let painted_box = list.vertices().len() > first_vertex;
 
     // 6. Children — placed where this node's *content* sits, which is its own
     //    frame slid by -content_offset and then scaled. The offset stays
@@ -145,8 +143,12 @@ fn render_node(node: &Node, list: &mut DrawList, placed: Affine2D) {
 
     // 7. Overlay (scrollbars, focus rings drawn above content).
     list.multiply_opacity(descendant_start, node.opacity());
+    let before_overlay = list.vertices().len();
     if let Some(overlay) = node.overlay_draw() {
         paint_scaled(&overlay, list, Point::new(abs_x, abs_y), scale);
+    }
+    if painted_box || list.vertices().len() > before_overlay {
+        node.bump_repaint();
     }
 
     list.multiply_opacity(first_vertex, node.subtree_opacity());
