@@ -13,6 +13,10 @@ You must not omit the implementation for any platform simply because it cannot b
 
 For performance-critical sections, please inline assembly.
 
+## Layout
+
+There is one grid geometry engine: Taffy's CSS Grid. Author layouts with `.grid(GridSpec)` plus `.grid_cell(GridCell)`; tracks, gaps, `grid-template-areas` and per-item placement map one-to-one onto CSS. `crates/compose/src/primitives/layout/grid/` is the table policy layer (column policies, named-column visibility, row windows) and must not grow a second track solver — it compiles its policy into `GridStyle` and lets Taffy place the cells.
+
 Apply breaking changes without requiring confirmation prior to the release of version 1.0.0.
 
 ## DevTools

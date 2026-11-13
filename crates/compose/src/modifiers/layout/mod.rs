@@ -1,8 +1,17 @@
-//! Layout modifiers for padding, flex, absolute positioning and frames.
+//! Layout modifiers: padding, flex, frames, absolute positioning and authored
+//! CSS Grid. Grid geometry itself lives in the core engine (Taffy); the grid
+//! module only declares the authored surface for it.
 pub mod frame_capture;
+mod grid;
 mod values;
 pub use frame_capture::*;
+pub use grid::*;
 pub use values::*;
+
+pub use cove_core::scene::{
+    GridAreaError, GridAreaSpan, GridAreaTemplate, GridAutoFlow, GridBreadth, GridPlacement,
+    GridRepeat, GridTemplateTrack, GridTrack,
+};
 
 use crate::{ModifiedContent, View, ViewExt, ViewModifier};
 use cove_core::scene::{Edge, Interpolatable, LayoutNode, Node, PositionType};

@@ -30,12 +30,17 @@ pub use crate::primitives::overlays::api::*;
 pub use crate::primitives::text::api::*;
 
 pub use crate::foundation::Date;
-pub use crate::modifiers::layout::{FlexExt, FrameDimension, LayoutFrameExt, PaddingExt};
+pub use crate::modifiers::layout::{
+    FlexExt, FrameDimension, GridCell, GridExt, GridSpec, LayoutFrameExt, PaddingExt,
+};
 pub use crate::modifiers::style::SemanticStyleViewExt;
 pub use crate::theme::{ControlSize, ControlSizeViewExt, SemanticColorRef, SemanticFontRef};
 pub use cove_composition::LayoutDebugExt;
 
 pub use crate::{Alignment, AnyView, BoxView, Column, Row, TupleView, View, ViewExt};
 pub use cove_composition::Scope;
-pub use cove_core::scene::{Align, Direction, FlexDirection, Justify, Point, Rect, Size, Wrap};
+pub use cove_core::scene::{
+    Align, Direction, FlexDirection, GridAreaTemplate, GridAutoFlow, GridBreadth, GridPlacement,
+    GridRepeat, GridTemplateTrack, GridTrack, Justify, Point, Rect, Size, Wrap,
+};
 pub use cove_core::{Binding, Color, Signal, State};

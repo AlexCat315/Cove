@@ -1,4 +1,9 @@
 //! Translation of Compose/Sources/CoveUICompose/Primitives/Layout/Grid/Columns.swift.
+//!
+//! Column *policy* only: which columns exist, their bounds and the width each
+//! policy asks for. The container compiles this into a `GridStyle`, and Taffy
+//! resolves the final tracks and cell frames, so nothing here duplicates CSS
+//! track sizing.
 
 /// Width policy for one grid column. An adaptive column expands into as many
 /// columns as its allocated width can hold. Children occupy one cell each.
@@ -81,6 +86,12 @@ impl GridTrackResolver {
             + Self::finite_nonnegative(spacing) * columns.len().saturating_sub(1) as f32
     }
 
+    /// Policy preview of the tracks a column set asks for.
+    ///
+    /// Not the layout pass: containers load the adaptive width into
+    /// `GridStyle` and Taffy resolves the real tracks, so this stays here for
+    /// the policy tests that assert column arithmetic and for containers that
+    /// need the requested widths before measuring.
     pub fn widths(
         columns: &[GridColumn],
         available_width: Option<f32>,

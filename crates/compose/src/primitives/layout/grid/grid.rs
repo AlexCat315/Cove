@@ -1,4 +1,9 @@
 //! Translation of Compose/Sources/CoveUICompose/Primitives/Layout/Grid/Grid.swift.
+//!
+//! This is the table policy layer, not a geometry engine: `arrangement` compiles
+//! the column policy into a `GridStyle` on a Taffy grid root, places one proxy
+//! child per cell, and reads the resolved frames back. The authored CSS Grid
+//! surface (`.grid(GridSpec)`) reaches the same engine without the policy.
 use crate::Scope;
 use std::collections::HashMap;
 use std::rc::Rc;
@@ -16,9 +21,13 @@ use super::named_columns::{
 };
 use super::span::GridSpanKey;
 
-/// A general row-major grid built on the public measurement and placement
-/// contract. Row heights come from the tallest measured child in each row.
-/// Children may cover several cells with `.gridCellSpan(columns:rows:)`.
+/// A table grid: the column policy decides which columns exist and how wide
+/// each wants to be, then Taffy's CSS Grid solves the tracks, cells and row
+/// heights. Children may cover several cells with [`GridSpan`](super::GridSpan).
+///
+/// For plain CSS-shaped layouts (explicit tracks, `fr`, named areas, per-item
+/// placement) use the authored surface instead: `.grid(GridSpec)` /
+/// `.grid_cell(GridCell)`.
 #[derive(Clone, Debug)]
 pub struct GridLayout {
     columns: Vec<GridColumn>,
