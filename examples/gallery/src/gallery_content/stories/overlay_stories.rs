@@ -21,8 +21,8 @@ use cove_ui_compose::primitives::overlays::menu::{
 use cove_ui_compose::primitives::overlays::{
     ContextMenuExt, Popconfirm, Popover, PopoverOverflow, PopoverPlacement, PopoverSurface,
 };
-use cove_ui_compose::primitives::text::rich::run::{TextRun, TextTraits};
 use cove_ui_compose::primitives::text::Text;
+use cove_ui_compose::primitives::text::rich::run::{TextRun, TextTraits};
 use cove_ui_compose::theme::styles::buttons::ButtonStyleViewExt;
 use cove_ui_compose::theme::tokens::SemanticColorRef;
 use cove_ui_compose::theme::{Theme, ThemeReader};

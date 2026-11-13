@@ -38,7 +38,9 @@ fn container(content: Vec<AnyView>) -> AnyView {
 }
 
 fn frame(scene: &support::InteractiveScene, name: &str) -> (f32, f32, f32, f32) {
-    let node: Node = scene.named(name).unwrap_or_else(|| panic!("{name} is mounted"));
+    let node: Node = scene
+        .named(name)
+        .unwrap_or_else(|| panic!("{name} is mounted"));
     let frame = node.frame();
     (frame.x, frame.y, frame.width, frame.height)
 }
@@ -79,9 +81,21 @@ fn named_areas_place_every_cell_on_explicit_lines() {
         // 400 wide minus one 10pt gap leaves 390: the fixed track keeps 120 and
         // the `fr` track takes the remaining 270. Rows: 40 fixed, then 300 - 40
         // - 10 = 250 for the `fr` row.
-        assert_frame("header spans both columns", frame(scene, "header"), (0.0, 0.0, 400.0, 40.0));
-        assert_frame("main fills the free column", frame(scene, "main"), (0.0, 50.0, 270.0, 250.0));
-        assert_frame("side sits after the gap", frame(scene, "side"), (280.0, 50.0, 120.0, 250.0));
+        assert_frame(
+            "header spans both columns",
+            frame(scene, "header"),
+            (0.0, 0.0, 400.0, 40.0),
+        );
+        assert_frame(
+            "main fills the free column",
+            frame(scene, "main"),
+            (0.0, 50.0, 270.0, 250.0),
+        );
+        assert_frame(
+            "side sits after the gap",
+            frame(scene, "side"),
+            (280.0, 50.0, 120.0, 250.0),
+        );
     });
 }
 
@@ -102,7 +116,11 @@ fn areas_alone_imply_auto_tracks() {
         // The template alone creates two auto tracks, so the second cell lands
         // after the 20pt gap instead of beside the first in a single track.
         assert_frame("left track", frame(scene, "left"), (0.0, 0.0, 60.0, 30.0));
-        assert_frame("right track", frame(scene, "right"), (80.0, 0.0, 60.0, 30.0));
+        assert_frame(
+            "right track",
+            frame(scene, "right"),
+            (80.0, 0.0, 60.0, 30.0),
+        );
     });
 }
 
@@ -124,8 +142,16 @@ fn spans_and_explicit_cells_follow_css_placement() {
         scene.install(view);
 
         // 320 wide, two 10pt gaps: each `fr` track is 100.
-        assert_frame("a two-track span", frame(scene, "wide"), (0.0, 0.0, 210.0, 20.0));
-        assert_frame("an explicit third column", frame(scene, "pinned"), (220.0, 0.0, 100.0, 20.0));
+        assert_frame(
+            "a two-track span",
+            frame(scene, "wide"),
+            (0.0, 0.0, 210.0, 20.0),
+        );
+        assert_frame(
+            "an explicit third column",
+            frame(scene, "pinned"),
+            (220.0, 0.0, 100.0, 20.0),
+        );
         assert_frame(
             "a row span starts on its explicit row",
             frame(scene, "tall"),
@@ -148,8 +174,8 @@ fn named_lines_place_a_child() {
         let view = container(vec![AnyView::new(
             cell(None, Some(20.0), "slot").grid_cell(placement),
         )])
-            .fill()
-            .grid(spec);
+        .fill()
+        .grid(spec);
         scene.install(view);
         assert_frame(
             "named lines resolve to the second track",

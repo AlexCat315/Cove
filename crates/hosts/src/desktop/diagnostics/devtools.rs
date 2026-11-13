@@ -59,6 +59,11 @@ struct Session {
     /// The tree's CPU timeline, and the span window closed for each frame.
     timeline: Timeline,
     window: FrameWindow,
+    /// Layers the renderer composited for the frame currently being prepared.
+    census: Option<cove_core::scene::LayerCensus>,
+    /// The census that belongs to each in-flight frame. Frames may present out of
+    /// order, so the census travels with the token rather than the session.
+    frame_census: BTreeMap<u64, cove_core::scene::LayerCensus>,
     /// Keeps an in-process controller alive for as long as this session.
     _controller: Option<Rc<AttachedController>>,
 }
@@ -82,12 +87,17 @@ impl DiagnosticsSession for Session {
         self.draw_ms = draw_ms;
     }
 
+    fn layers_composited(&mut self, census: &cove_core::scene::LayerCensus) {
+        self.census = Some(census.clone());
+    }
+
     fn frame_finished(&mut self, nodes: usize, batches: usize, token: Option<u64>) {
         let total_ms = self.frame_start.elapsed().as_secs_f64() * 1000.0;
         // Recomposition commits before the host begins the frame, so the window
         // spans everything since the previous frame closed.
         let attribution = self.window.close(&self.timeline);
         let mut frame = TimingFrame {
+            gpu_breakdown: None,
             frame: 0,
             recomposition_ms: None,
             layout_ms: self.layout_ms,
@@ -109,6 +119,9 @@ impl DiagnosticsSession for Session {
                 && let Some((_, expired)) = self.pending.pop_first()
             {
                 self.probe.record(expired);
+            }
+            if let Some(census) = self.census.take() {
+                self.frame_census.insert(token, census);
             }
             self.pending.insert(token, frame);
         } else {
@@ -132,6 +145,23 @@ impl DiagnosticsSession for Session {
                     count,
                     cpu_ms: nanos as f64 / 1_000_000.0,
                 });
+                // The census belongs to the frame that was just presented, which
+                // is the one this token names.
+                let passes = gpu.pass_reports();
+                let markers = gpu.markers();
+                let layers = self.frame_census.remove(&token);
+                if let Some(layers) = layers.as_ref() {
+                    let source = gpu_timing_source(&markers);
+                    frame.gpu_breakdown = Some(cove_devtools::gpu_breakdown::assemble(
+                        &passes,
+                        layers,
+                        &markers
+                            .iter()
+                            .map(cove_devtools::gpu_breakdown::Marker::from)
+                            .collect::<Vec<_>>(),
+                        source,
+                    ));
+                }
             }
             self.probe
                 .record_measured(frame, gpu.map(|gpu| Box::new(move || gpu.result()) as _));
@@ -140,6 +170,33 @@ impl DiagnosticsSession for Session {
 
     fn stop(&mut self) {
         self.probe.disconnect();
+    }
+}
+
+/// Which clock a frame's GPU samples came from, inferred from what the backend
+/// labelled them with.
+///
+/// Vulkan labels each pass (`renderPass#0`, `ui-frame`); Metal labels each
+/// submission. An empty sample list is a measurement that did not happen, so it
+/// reports `cpu-only` rather than borrowing a neighbouring frame's source.
+fn gpu_timing_source(
+    markers: &[cove_graphics::rhi::GpuTimestampMarker],
+) -> cove_devtools::gpu_breakdown::GpuTimingSource {
+    use cove_devtools::gpu_breakdown::GpuTimingSource;
+    let per_pass = markers.iter().any(|marker| {
+        marker.label.starts_with("renderPass")
+            || marker.label.starts_with("computePass")
+            || marker.label.starts_with("copyPass")
+    });
+    if per_pass {
+        GpuTimingSource::VulkanTimestamps
+    } else if markers
+        .iter()
+        .any(|marker| marker.label.contains("submission"))
+    {
+        GpuTimingSource::MetalSubmission
+    } else {
+        GpuTimingSource::CpuOnly
     }
 }
 
@@ -293,6 +350,8 @@ pub fn factory() -> DiagnosticsFactory {
                 layout_ms: 0.0,
                 draw_ms: 0.0,
                 pending: BTreeMap::new(),
+                census: None,
+                frame_census: BTreeMap::new(),
                 timeline,
                 window,
                 _controller: controller,

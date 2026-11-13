@@ -456,8 +456,7 @@ pub fn apply_media_process() -> io::Result<()> {
 #[cfg(windows)]
 fn msvc_environment() -> io::Result<(String, String, String)> {
     use std::os::windows::process::CommandExt;
-    let root =
-        env::var_os("ProgramFiles(x86)").unwrap_or_else(|| "C:\\Program Files (x86)".into());
+    let root = env::var_os("ProgramFiles(x86)").unwrap_or_else(|| "C:\\Program Files (x86)".into());
     let vswhere = Path::new(&root).join("Microsoft Visual Studio/Installer/vswhere.exe");
     let output = Command::new(vswhere)
         .args([
@@ -480,10 +479,7 @@ fn msvc_environment() -> io::Result<(String, String, String)> {
     // cmd does not understand Command's backslash-quote escaping, so the whole
     // command line goes in raw.
     let output = Command::new("cmd")
-        .raw_arg(format!(
-            "/c call \"{}\" >nul 2>&1 && set",
-            vcvars.display()
-        ))
+        .raw_arg(format!("/c call \"{}\" >nul 2>&1 && set", vcvars.display()))
         .output()?;
     let mut values = (String::new(), String::new(), String::new());
     for line in String::from_utf8_lossy(&output.stdout).lines() {
@@ -500,9 +496,7 @@ fn msvc_environment() -> io::Result<(String, String, String)> {
         }
     }
     if values.0.is_empty() || values.1.is_empty() || values.2.is_empty() {
-        return Err(io::Error::other(
-            "vcvars64 did not report INCLUDE/LIB/PATH",
-        ));
+        return Err(io::Error::other("vcvars64 did not report INCLUDE/LIB/PATH"));
     }
     Ok(values)
 }
@@ -826,12 +820,7 @@ fn wasi_sdk_valid(root: &Path) -> bool {
 pub fn native_ninja() -> io::Result<PathBuf> {
     if let Some(path) = env::var_os("COVE_NINJA")
         .map(PathBuf::from)
-        .or_else(|| {
-            setting("COVE_NINJA")
-                .ok()
-                .flatten()
-                .map(PathBuf::from)
-        })
+        .or_else(|| setting("COVE_NINJA").ok().flatten().map(PathBuf::from))
         .filter(|path| path.is_file())
     {
         return Ok(path);
@@ -954,7 +943,13 @@ fn record_native_ninja(saved: &mut Value) -> io::Result<()> {
     save(saved)
 }
 
-pub fn installation_plan(host: Host, media: bool, shaders: bool, wasm: bool, targets: &[String]) -> Value {
+pub fn installation_plan(
+    host: Host,
+    media: bool,
+    shaders: bool,
+    wasm: bool,
+    targets: &[String],
+) -> Value {
     json!({"host":format!("{host:?}"),"media":media,"shaders":shaders,"wasm":wasm,"targets":targets,
         "manager":match host {Host::Mac=>"Homebrew and Apple softwareupdate / xcodebuild",Host::Windows=>"WinGet, MSYS2 and Visual Studio Installer",Host::Linux=>"apt-get / dnf / pacman / zypper / apk"},
         "requires_elevation":true,

@@ -1380,6 +1380,15 @@ impl Device {
         self.backend().set_gpu_timestamp_profile(profile);
     }
 
+    /// The profile attached right now, if any.
+    ///
+    /// Several readers can share one profile: each drains its own cursor, so a
+    /// telemetry reporter and a DevTools session see the same samples without
+    /// consuming each other's.
+    pub fn gpu_timestamp_profile(&self) -> Option<Arc<GpuTimestampProfile>> {
+        self.backend().gpu_timestamp_profile()
+    }
+
     /// Plans and submits a recorded command buffer. Submission is asynchronous;
     /// completion is tracked against the current frame slot.
     pub fn submit(

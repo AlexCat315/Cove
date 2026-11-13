@@ -10,7 +10,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 
 use windows_sys::Win32::Foundation::{GetLastError, HANDLE};
 use windows_sys::Win32::System::Diagnostics::Debug::{
-    IMAGEHLP_LINEW64, SYMOPT_DEFERRED_LOADS, SYMOPT_LOAD_LINES, SYMOPT_UNDNAME, SYMBOL_INFOW,
+    IMAGEHLP_LINEW64, SYMBOL_INFOW, SYMOPT_DEFERRED_LOADS, SYMOPT_LOAD_LINES, SYMOPT_UNDNAME,
     SymCleanup, SymFromAddrW, SymGetLineFromAddrW64, SymInitializeW, SymRefreshModuleList,
     SymSetOptions,
 };
@@ -84,7 +84,9 @@ impl Drop for Symbolizer {
 }
 
 fn lock() -> std::sync::MutexGuard<'static, ()> {
-    DBGHELP.lock().unwrap_or_else(|poisoned| poisoned.into_inner())
+    DBGHELP
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
 }
 
 /// Initializes dbghelp for the first symbolizer and returns the process handle.
@@ -213,7 +215,13 @@ mod tests {
 
     #[test]
     fn wide_string_stops_at_the_terminator() {
-        let text = [u16::from(b'c'), u16::from(b'o'), u16::from(b'v'), u16::from(b'e'), 0];
+        let text = [
+            u16::from(b'c'),
+            u16::from(b'o'),
+            u16::from(b'v'),
+            u16::from(b'e'),
+            0,
+        ];
         assert_eq!(wide_string(text.as_ptr()).as_deref(), Some("cove"));
         assert_eq!(wide_string(std::ptr::null()), None);
         let empty = [0_u16];

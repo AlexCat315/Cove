@@ -1,11 +1,11 @@
 //! Stateful action buttons and their style-driven presentation.
 use crate::Scope;
 use crate::primitives::media::{Image, ImageContentMode, ImageRenderingMode, ImageSource};
-use crate::primitives::text::Text;
 use crate::primitives::overlays::portal::PortalResource;
 use crate::primitives::overlays::tooltip::{
     PORTAL_ATTACHMENT, TEXT_TRUNCATED, TooltipOptions, TooltipSession, tooltip_description,
 };
+use crate::primitives::text::Text;
 pub use crate::theme::styles::buttons::ButtonRole;
 use crate::theme::styles::buttons::{
     AnyButtonStyle, ButtonStyleConfiguration, ButtonStyleEnvironment,
@@ -13,11 +13,11 @@ use crate::theme::styles::buttons::{
 use crate::theme::{ControlSizeEnvironment, IconMetrics, IconMetricsReader, theme_for_node};
 use crate::{AnyView, BoxView, DynamicField, PrimitiveView, TupleView, View, impl_primitive_view};
 use cove_core::scene::{
-    AccessibilityActions, AccessibilityRole, AccessibilitySemantics, AccessibilityTree, Align, CompositionLocal,
-    EventPhase, EventResult, FlexDirection, FocusChainHolder, HoverPhase, InputHandlerRoute,
-    InteractionRegistryHolder, Justify, LayoutNode, Node, PointerCaptureAttachmentKey,
-    PointerCaptureHolder, PointerPhase, TextInputAttachmentKey, TextInputFocusChangeHandler,
-    WindowRevealContext, Wrap,
+    AccessibilityActions, AccessibilityRole, AccessibilitySemantics, AccessibilityTree, Align,
+    CompositionLocal, EventPhase, EventResult, FlexDirection, FocusChainHolder, HoverPhase,
+    InputHandlerRoute, InteractionRegistryHolder, Justify, LayoutNode, Node,
+    PointerCaptureAttachmentKey, PointerCaptureHolder, PointerPhase, TextInputAttachmentKey,
+    TextInputFocusChangeHandler, WindowRevealContext, Wrap,
 };
 use cove_core::{Color, State, TextureId};
 use cove_imaging::BundleImageResource;
@@ -366,7 +366,12 @@ impl ButtonHost {
     }
 
     fn update_tooltip(&self, node: &Node) {
-        let Some(description) = self.tooltip.as_deref().map(str::trim).filter(|s| !s.is_empty()) else {
+        let Some(description) = self
+            .tooltip
+            .as_deref()
+            .map(str::trim)
+            .filter(|s| !s.is_empty())
+        else {
             if let Some(session) = node.first_resource::<TooltipSession>() {
                 session.dismiss();
             }
@@ -387,13 +392,19 @@ impl ButtonHost {
         let weak_node = node.downgrade();
         session.configure(
             tooltip_description(description),
-            TooltipOptions { is_enabled: self.is_enabled, ..Default::default() },
+            TooltipOptions {
+                is_enabled: self.is_enabled,
+                ..Default::default()
+            },
             FocusChainHolder::current().is_some_and(|chain| {
                 chain.is_focus_visible() && chain.focused().as_ref() == Some(node)
             }),
-            Rc::new(move || Node::upgrade(&weak_node).is_some_and(|node| Self::tooltip_adds_text(&node))),
+            Rc::new(move || {
+                Node::upgrade(&weak_node).is_some_and(|node| Self::tooltip_adds_text(&node))
+            }),
         );
-        if !self.is_enabled || !crate::primitives::controls::adaptive::supports_control_hover(node) {
+        if !self.is_enabled || !crate::primitives::controls::adaptive::supports_control_hover(node)
+        {
             session.set_hovered(false);
         }
         let weak_session = Rc::downgrade(&session);
@@ -502,7 +513,9 @@ impl PrimitiveView for ButtonHost {
         registry.set_hover(
             node,
             Rc::new(move |phase| {
-                let Some(node) = Node::upgrade(&hover_node) else { return };
+                let Some(node) = Node::upgrade(&hover_node) else {
+                    return;
+                };
                 let value = phase == HoverPhase::Enter
                     && crate::primitives::controls::adaptive::supports_control_hover(&node);
                 if let Some(session) = node.first_resource::<TooltipSession>() {

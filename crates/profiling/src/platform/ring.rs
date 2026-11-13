@@ -2,8 +2,8 @@
 
 use std::time::Duration;
 
-use crate::config::MAX_STACK_DEPTH;
 use crate::Sample;
+use crate::config::MAX_STACK_DEPTH;
 
 /// One captured stack before it is turned into a [`Sample`].
 pub(crate) struct RawSample {

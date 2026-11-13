@@ -73,7 +73,12 @@ impl Host {
         self.queue_timed(op, args, Box::new(move |_| callback()))
     }
 
-    pub fn queue_timed(&self, op: &str, mut args: Value, callback: TimedCompletion) -> RhiResult<()> {
+    pub fn queue_timed(
+        &self,
+        op: &str,
+        mut args: Value,
+        callback: TimedCompletion,
+    ) -> RhiResult<()> {
         static NEXT: AtomicU32 = AtomicU32::new(1);
         let token = NEXT.fetch_add(1, Ordering::Relaxed);
         self.pending.fetch_add(1, Ordering::Relaxed);

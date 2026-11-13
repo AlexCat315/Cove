@@ -550,7 +550,20 @@ impl AndroidContentSession {
                                 *render_root = Some(root.clone());
                                 *render_structure_version = version;
                             }
-                            layers.borrow_mut().render(render_tree, draw_list);
+                            let wants_census = diagnostics.borrow().is_some();
+                            if wants_census {
+                                let mut census = cove_core::scene::LayerCensus::default();
+                                layers.borrow_mut().render_with_census(
+                                    render_tree,
+                                    draw_list,
+                                    Some(&mut census),
+                                );
+                                if let Some(diagnostics) = diagnostics.borrow_mut().as_mut() {
+                                    diagnostics.layers_composited(&census);
+                                }
+                            } else {
+                                layers.borrow_mut().render(render_tree, draw_list);
+                            }
                         }
                         if let Some(hud) = performance_hud {
                             hud.tick();
@@ -600,7 +613,13 @@ impl AndroidContentSession {
         tree.flush();
     }
 
-    pub fn presentation_finished(&self, token: u64, presented: bool, render_thread_ms: f64, gpu: Option<cove_graphics::rhi::GpuFrameTiming>) {
+    pub fn presentation_finished(
+        &self,
+        token: u64,
+        presented: bool,
+        render_thread_ms: f64,
+        gpu: Option<cove_graphics::rhi::GpuFrameTiming>,
+    ) {
         if let Some(diagnostics) = self.diagnostics.borrow_mut().as_mut() {
             diagnostics.presentation_finished(token, presented, render_thread_ms, gpu);
         }

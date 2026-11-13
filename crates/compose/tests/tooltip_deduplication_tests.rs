@@ -31,8 +31,8 @@ use cove_composition::{AnyView, PrimitiveView};
 use cove_core::Binding;
 use cove_core::scene::{AccessibilityRole, Node, NodeResource};
 use cove_ui_compose::modifiers::interaction::AccessibilityExt;
-use cove_ui_compose::primitives::controls::{Button, ButtonIconSource};
 use cove_ui_compose::primitives::controls::fields::select::{Select, SelectOption};
+use cove_ui_compose::primitives::controls::{Button, ButtonIconSource};
 use cove_ui_compose::primitives::overlays::portal::PortalResource;
 use cove_ui_compose::primitives::overlays::tooltip::{
     PORTAL_ATTACHMENT, TEXT_TRUNCATED, TooltipArbitration, TooltipOptions, TooltipSession,
@@ -335,8 +335,11 @@ fn a_truncated_label_presents_its_matching_tooltip() {
 fn a_select_trigger_does_not_repeat_its_selected_value() {
     InteractiveScene::run(200.0, 60.0, |scene| {
         scene.install(AnyView::new(
-            Select::new(Binding::constant(1), vec![SelectOption::new(1, "Medium", true)])
-                .width(160.0),
+            Select::new(
+                Binding::constant(1),
+                vec![SelectOption::new(1, "Medium", true)],
+            )
+            .width(160.0),
         ));
         let host = scene
             .first(|node| {

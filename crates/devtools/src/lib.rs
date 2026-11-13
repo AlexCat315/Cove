@@ -1,6 +1,7 @@
 //! Runtime instrumentation shared by native and browser hosts.
 mod allocation_sites;
 pub mod frame_analysis;
+pub mod gpu_breakdown;
 pub mod inspection;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod probe_transport;

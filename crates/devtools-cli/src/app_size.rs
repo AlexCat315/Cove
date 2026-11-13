@@ -343,8 +343,11 @@ fn section_row(section: &object::Section<'_, '_>, segments: &[SegmentRow]) -> Se
     };
     // Mach-O names the owning segment on the section. ELF and PE do not, so
     // use the mapped address; address 0 means the section is not mapped.
-    if row.segment.is_empty() && row.address != 0
-        && let Some(segment) = segments.iter().find(|segment| segment.contains(row.address))
+    if row.segment.is_empty()
+        && row.address != 0
+        && let Some(segment) = segments
+            .iter()
+            .find(|segment| segment.contains(row.address))
     {
         row.segment = segment.name.clone();
     }
@@ -405,7 +408,9 @@ fn dedupe_aliases(symbols: Vec<SymbolRow>) -> (Vec<SymbolRow>, usize) {
             let existing = &mut kept[position];
             existing.aliases += 1;
             if existing.alias_names.len() < MAX_ALIAS_NAMES {
-                existing.alias_names.push(truncated(&symbol.raw, MAX_ALIAS_NAME));
+                existing
+                    .alias_names
+                    .push(truncated(&symbol.raw, MAX_ALIAS_NAME));
             }
             if symbol.size > existing.size {
                 existing.size = symbol.size;
@@ -515,10 +520,10 @@ fn accounting(
         }
         attributed_file_bytes =
             attributed_file_bytes.saturating_add(symbol_bytes.min(extent.file_size));
-        attributed_vm_bytes =
-            attributed_vm_bytes.saturating_add(symbol_bytes.min(extent.vm_size));
+        attributed_vm_bytes = attributed_vm_bytes.saturating_add(symbol_bytes.min(extent.vm_size));
     }
-    let attributed_file_bytes = attributed_file_bytes.min(file_bytes.saturating_sub(linkedit_bytes));
+    let attributed_file_bytes =
+        attributed_file_bytes.min(file_bytes.saturating_sub(linkedit_bytes));
     let unattributed_bytes = file_bytes
         .saturating_sub(attributed_file_bytes)
         .saturating_sub(linkedit_bytes);
@@ -564,9 +569,8 @@ pub(crate) fn analyze(pid: u32, executable: &Path, limits: Limits) -> Result<Val
         {
             segment.section_count += 1;
             segment.section_vm_bytes = segment.section_vm_bytes.saturating_add(section.vm_size);
-            segment.section_file_bytes = segment
-                .section_file_bytes
-                .saturating_add(section.file_size);
+            segment.section_file_bytes =
+                segment.section_file_bytes.saturating_add(section.file_size);
             segment.section_zero_fill_bytes = segment
                 .section_zero_fill_bytes
                 .saturating_add(section.zero_fill_size());
@@ -588,9 +592,9 @@ pub(crate) fn analyze(pid: u32, executable: &Path, limits: Limits) -> Result<Val
     let section_file_bytes = sections
         .iter()
         .fold(0u64, |sum, section| sum.saturating_add(section.file_size));
-    let section_zero_fill_bytes = sections
-        .iter()
-        .fold(0u64, |sum, section| sum.saturating_add(section.zero_fill_size()));
+    let section_zero_fill_bytes = sections.iter().fold(0u64, |sum, section| {
+        sum.saturating_add(section.zero_fill_size())
+    });
     let section_ranges: HashMap<usize, (u64, u64)> = sections
         .iter()
         .map(|section| (section.index, (section.address, section.end_address())))
@@ -833,7 +837,12 @@ pub(crate) fn analyze(pid: u32, executable: &Path, limits: Limits) -> Result<Val
     });
     let object = report.as_object_mut().expect("the report is an object");
     for section in [sections, symbols, groups, totals] {
-        object.extend(section.as_object().expect("each section is an object").clone());
+        object.extend(
+            section
+                .as_object()
+                .expect("each section is an object")
+                .clone(),
+        );
     }
     Ok(report)
 }
@@ -968,7 +977,10 @@ mod tests {
             let file_size = section["file_size"].as_u64().unwrap();
             let zero_fill = section["zero_fill_size"].as_u64().unwrap();
             assert_eq!(vm_size, size, "size keeps its VM meaning");
-            assert_eq!(section["end_address"], section["address"].as_u64().unwrap() + vm_size);
+            assert_eq!(
+                section["end_address"],
+                section["address"].as_u64().unwrap() + vm_size
+            );
             assert_eq!(zero_fill, vm_size.saturating_sub(file_size));
             if file_size <= vm_size {
                 assert_eq!(file_size + zero_fill, vm_size, "{}", section["name"]);
@@ -998,7 +1010,9 @@ mod tests {
         {
             assert!(text_sections > 0, "Mach-O sections belong to __TEXT");
             assert!(
-                segments.iter().any(|segment| segment["name"] == "__LINKEDIT"),
+                segments
+                    .iter()
+                    .any(|segment| segment["name"] == "__LINKEDIT"),
                 "a Mach-O executable has a __LINKEDIT segment"
             );
             assert!(
@@ -1019,8 +1033,7 @@ mod tests {
             value["symbol_count"].as_u64().unwrap() + value["alias_count"].as_u64().unwrap()
         );
         assert!(
-            value["aliased_symbols"].as_u64().unwrap()
-                <= value["alias_count"].as_u64().unwrap()
+            value["aliased_symbols"].as_u64().unwrap() <= value["alias_count"].as_u64().unwrap()
         );
         if value["alias_count"].as_u64().unwrap() == 0 {
             assert_eq!(value["aliased_symbols"], 0);
@@ -1045,10 +1058,30 @@ mod tests {
             groups: 1,
         });
         for (name, count, truncated, returned) in [
-            ("segments", "segment_count", "segments_truncated", "segments_returned"),
-            ("sections", "section_count", "sections_truncated", "sections_returned"),
-            ("symbols", "symbol_count", "symbols_truncated", "symbols_returned"),
-            ("groups", "group_count", "groups_truncated", "groups_returned"),
+            (
+                "segments",
+                "segment_count",
+                "segments_truncated",
+                "segments_returned",
+            ),
+            (
+                "sections",
+                "section_count",
+                "sections_truncated",
+                "sections_returned",
+            ),
+            (
+                "symbols",
+                "symbol_count",
+                "symbols_truncated",
+                "symbols_returned",
+            ),
+            (
+                "groups",
+                "group_count",
+                "groups_truncated",
+                "groups_returned",
+            ),
         ] {
             let rows = value[name].as_array().unwrap();
             assert!(rows.len() <= 1, "{name}");
@@ -1254,9 +1287,7 @@ mod tests {
         assert_eq!(split.unattributed_bytes, 220);
         assert_eq!(split.unmapped_symbol_bytes, 20);
         assert_eq!(
-            split.attributed_file_bytes
-                + split.linkedit_bytes
-                + split.unattributed_bytes,
+            split.attributed_file_bytes + split.linkedit_bytes + split.unattributed_bytes,
             1000
         );
 

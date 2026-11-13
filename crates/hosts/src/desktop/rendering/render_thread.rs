@@ -101,7 +101,9 @@ impl Worker {
             Command::Frame(token, mut list, logical, measure_gpu) => {
                 let start = Instant::now();
                 let mut gpu = None;
-                let result = self.renderer.draw(&mut list, logical, measure_gpu.then_some(&mut gpu));
+                let result =
+                    self.renderer
+                        .draw(&mut list, logical, measure_gpu.then_some(&mut gpu));
                 self.publish_snapshot();
                 let _ = self.done.send(Completion::Frame {
                     token,
@@ -482,7 +484,12 @@ mod tests {
                 .push(format!("resize {}x{}", size.0, size.1));
             Ok(())
         }
-        fn draw(&mut self, list: &mut DrawList, _: (f32, f32), _: Option<&mut Option<cove_graphics::rhi::GpuFrameTiming>>) -> RhiResult<bool> {
+        fn draw(
+            &mut self,
+            list: &mut DrawList,
+            _: (f32, f32),
+            _: Option<&mut Option<cove_graphics::rhi::GpuFrameTiming>>,
+        ) -> RhiResult<bool> {
             let mut log = self.0.lock().unwrap();
             log.events.push(format!("draw {}", list.pixel_scale));
             log.threads.push(std::thread::current().id());
@@ -521,7 +528,12 @@ mod tests {
                 renderer.take_presented().unwrap();
                 std::thread::yield_now();
             }
-            assert!(renderer.submit(&mut list, (10.0, 10.0), false).unwrap().is_some());
+            assert!(
+                renderer
+                    .submit(&mut list, (10.0, 10.0), false)
+                    .unwrap()
+                    .is_some()
+            );
         }
         renderer.resize((20, 20), true).unwrap();
         assert_eq!(
@@ -568,7 +580,12 @@ mod tests {
         fn resize(&mut self, _: (u32, u32), _: bool) -> RhiResult<()> {
             Err(RhiError::invalid_argument("resize refused"))
         }
-        fn draw(&mut self, _: &mut DrawList, _: (f32, f32), _: Option<&mut Option<cove_graphics::rhi::GpuFrameTiming>>) -> RhiResult<bool> {
+        fn draw(
+            &mut self,
+            _: &mut DrawList,
+            _: (f32, f32),
+            _: Option<&mut Option<cove_graphics::rhi::GpuFrameTiming>>,
+        ) -> RhiResult<bool> {
             let (permits, changed) = &*self.release;
             let mut permits = permits.lock().unwrap();
             while *permits == 0 {
@@ -627,12 +644,20 @@ mod tests {
         let start = Instant::now();
         for _ in 0..MAX_FRAMES_IN_FLIGHT {
             let mut list = DrawList::default();
-            assert!(renderer.submit(&mut list, (1.0, 1.0), false).unwrap().is_some());
+            assert!(
+                renderer
+                    .submit(&mut list, (1.0, 1.0), false)
+                    .unwrap()
+                    .is_some()
+            );
         }
         assert!(!renderer.has_frame_capacity());
         let mut dropped = DrawList::default();
         dropped.pixel_scale = 7.0;
-        assert_eq!(renderer.submit(&mut dropped, (1.0, 1.0), false).unwrap(), None);
+        assert_eq!(
+            renderer.submit(&mut dropped, (1.0, 1.0), false).unwrap(),
+            None
+        );
         assert_eq!(dropped.pixel_scale, 7.0, "a dropped frame keeps its list");
         assert!(start.elapsed() < Duration::from_secs(1));
         assert_eq!(drawn.load(std::sync::atomic::Ordering::SeqCst), 0);

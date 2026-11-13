@@ -51,7 +51,9 @@ impl Project {
                 .find(|entry| manifest(entry) == workspace_root.join("Cargo.toml"))
                 .and_then(|root| {
                     if gallery_default && root["name"] == "cove-ui" {
-                        packages.iter().find(|entry| manifest(entry) == workspace_root.join("examples/gallery/Cargo.toml"))
+                        packages.iter().find(|entry| {
+                            manifest(entry) == workspace_root.join("examples/gallery/Cargo.toml")
+                        })
                     } else {
                         Some(root)
                     }
@@ -91,7 +93,10 @@ impl Project {
                 .ok_or("manifest has no directory")?
                 .to_path_buf(),
             target_dir: PathBuf::from(metadata["target_directory"].as_str().unwrap_or("target")),
-            bin: entry["default_run"].as_str().map(str::to_owned).or_else(|| target("bin")),
+            bin: entry["default_run"]
+                .as_str()
+                .map(str::to_owned)
+                .or_else(|| target("bin")),
             lib: target("lib").map(|name| name.replace('-', "_")),
             id: cove_metadata["id"]
                 .as_str()

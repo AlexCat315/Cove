@@ -56,7 +56,11 @@ pub fn record(
     #[cfg(target_os = "windows")]
     {
         let list = open_graphics_list(device)?;
-        let timestamps = if measure_gpu { SubmissionTimestamps::new(device) } else { None };
+        let timestamps = if measure_gpu {
+            SubmissionTimestamps::new(device)
+        } else {
+            None
+        };
         if let Some(timestamps) = &timestamps {
             timestamps.write(list, 0);
         }
@@ -127,18 +131,29 @@ impl SubmissionTimestamps {
         // SAFETY: the native device and queue are alive throughout setup.
         let (frequency, heap) = unsafe {
             let queue = ID3D12CommandQueue::from_raw_borrowed(&device.graphics.queue)?;
-            let frequency = queue.GetTimestampFrequency().ok().filter(|value| *value != 0)?;
+            let frequency = queue
+                .GetTimestampFrequency()
+                .ok()
+                .filter(|value| *value != 0)?;
             let native = ID3D12Device::from_raw_borrowed(&device.device)?;
             let mut heap = None;
             native.CreateQueryHeap(&descriptor, &mut heap).ok()?;
             (frequency, heap?)
         };
         let readback = super::buffer::create_in_heap_for_transfer(
-            device.device, 16, sys::D3D12_HEAP_TYPE_READBACK,
-        ).ok()?;
+            device.device,
+            16,
+            sys::D3D12_HEAP_TYPE_READBACK,
+        )
+        .ok()?;
         // SAFETY: the returned record owns the initial resource reference.
         let buffer = unsafe { ID3D12Resource::from_raw(readback.resource) };
-        Some(Self { heap, buffer, mapping: readback.mapped as usize, frequency })
+        Some(Self {
+            heap,
+            buffer,
+            mapping: readback.mapped as usize,
+            frequency,
+        })
     }
 
     fn write(&self, list: sys::ComPtr, index: u32) {
@@ -157,7 +172,14 @@ impl SubmissionTimestamps {
         // SAFETY: both queries precede this command and the buffer holds both values.
         unsafe {
             let list = ID3D12GraphicsCommandList::from_raw_borrowed(&list).expect("open list");
-            list.ResolveQueryData(&self.heap, D3D12_QUERY_TYPE_TIMESTAMP, 0, 2, &self.buffer, 0);
+            list.ResolveQueryData(
+                &self.heap,
+                D3D12_QUERY_TYPE_TIMESTAMP,
+                0,
+                2,
+                &self.buffer,
+                0,
+            );
         }
     }
 

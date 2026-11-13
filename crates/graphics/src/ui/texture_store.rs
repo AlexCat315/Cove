@@ -44,8 +44,7 @@ pub(super) fn padded_texture_rows(
     for row in 0..height {
         let source = row * tight;
         let destination = row * stride;
-        padded[destination..destination + tight]
-            .copy_from_slice(&pixels[source..source + tight]);
+        padded[destination..destination + tight].copy_from_slice(&pixels[source..source + tight]);
     }
     Ok((padded, stride))
 }
@@ -462,7 +461,9 @@ impl NativeUITextureStore {
                 upload.region.height as usize,
                 4,
             )?;
-            let location = self.device.upload_transient(&pixels, TEXTURE_ROW_ALIGNMENT)?;
+            let location = self
+                .device
+                .upload_transient(&pixels, TEXTURE_ROW_ALIGNMENT)?;
             let mut command = TextureBufferUpload::new(
                 location.buffer,
                 stride,

@@ -664,10 +664,7 @@ impl PrimitiveView for PopoverSurfaceHost {
                 };
                 // Bridge the hairline seam between the card edge and the
                 // pointer's base so the border stroke never shows through.
-                let _ = list.add_rect(
-                    Rect::new(center - half, base - 1.0, half * 2.0, 2.0),
-                    fill,
-                );
+                let _ = list.add_rect(Rect::new(center - half, base - 1.0, half * 2.0, 2.0), fill);
                 (
                     Point::new(center - half, base),
                     Point::new(center + half, base),
@@ -690,10 +687,7 @@ impl PrimitiveView for PopoverSurfaceHost {
                 } else {
                     body.x
                 };
-                let _ = list.add_rect(
-                    Rect::new(base - 1.0, center - half, 2.0, half * 2.0),
-                    fill,
-                );
+                let _ = list.add_rect(Rect::new(base - 1.0, center - half, 2.0, half * 2.0), fill);
                 (
                     Point::new(base, center - half),
                     Point::new(base, center + half),

@@ -89,6 +89,8 @@ Android 用真实 XML 解析器读取 intent filter 的 VIEW、BROWSABLE、schem
 
 ## 宿主
 
+逐 pass 与合成层归因的口径（哪个后端能测到什么、层的索引窗口如何嵌套、被裁剪的层如何上报）见 [GPU pass 与层归因](../../Docs/devtools-gpu-breakdown.md)。
+
 桌面、Android 和 Web 宿主使用 `RuntimeProbe`。原生探针由后台线程连接控制器，命令在所属窗口的 UI 线程执行。WASM 由页面传输相同消息。协议见 [DevTools 协议](../devtools-protocol/README.md)。
 
 ```sh

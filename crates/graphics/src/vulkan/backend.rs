@@ -82,7 +82,6 @@ impl VulkanBackend {
         submitter.submit(submit, cpu_profile, gpu_profile.as_ref(), completion)
     }
 
-
     /// Whether a usable Vulkan driver (ICD) is present.
     pub fn is_available() -> bool {
         setup::is_available()

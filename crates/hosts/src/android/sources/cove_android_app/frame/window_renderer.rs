@@ -76,7 +76,12 @@ impl AndroidWindowRenderer {
         }
     }
 
-    fn present(&mut self, list: &DrawList, logical: (f32, f32), gpu: Option<&mut Option<cove_graphics::rhi::GpuFrameTiming>>) -> RhiResult<bool> {
+    fn present(
+        &mut self,
+        list: &DrawList,
+        logical: (f32, f32),
+        mut gpu: Option<&mut Option<cove_graphics::rhi::GpuFrameTiming>>,
+    ) -> RhiResult<bool> {
         let device = self.device.clone();
         let Some(swapchain) = self.swapchain else {
             return Ok(false);
@@ -90,8 +95,8 @@ impl AndroidWindowRenderer {
             }
         }
         let _end = EndFrame(&device);
-        if let Some(gpu) = gpu {
-            *gpu = device.measure_gpu_frame();
+        if let Some(slot) = gpu.as_deref_mut() {
+            *slot = device.measure_gpu_frame();
         }
         let image = self.timings.measure_result(Phase::DrawableAcquire, || {
             device.acquire_swapchain_image(swapchain)
@@ -149,6 +154,14 @@ impl AndroidWindowRenderer {
                 }
                 Ok(frame)
             })?;
+        // Publish the pass census and share the device's timestamp profile, so
+        // DevTools reads the same per-pass samples the timing reporter logs.
+        if let Some(frame) = gpu.as_deref().and_then(|slot| slot.as_ref()) {
+            frame.set_pass_reports(commands.pass_reports());
+            if let Some(profile) = device.gpu_timestamp_profile() {
+                frame.set_timestamp_profile(profile);
+            }
+        }
         self.timings.measure_result(Phase::QueueSubmit, || {
             device.submit(&commands, QueueClass::Graphics, &[], &[], None)
         })?;
@@ -253,7 +266,12 @@ impl AppWindowRenderer for AndroidWindowRenderer {
         device.with_frame_session(|| device.configure_swapchain(swapchain, descriptor))
     }
 
-    fn draw(&mut self, list: &mut DrawList, logical: (f32, f32), gpu: Option<&mut Option<cove_graphics::rhi::GpuFrameTiming>>) -> RhiResult<bool> {
+    fn draw(
+        &mut self,
+        list: &mut DrawList,
+        logical: (f32, f32),
+        gpu: Option<&mut Option<cove_graphics::rhi::GpuFrameTiming>>,
+    ) -> RhiResult<bool> {
         let sample = self.frame_samples.try_recv().ok();
         self.timings.begin_with(
             Phase::ScenePrepare,

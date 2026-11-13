@@ -119,7 +119,9 @@ pub fn workspace_entries(
                     id: 106,
                     title: "Appearance".to_owned(),
                     entries: vec![
-                        MenuEntry::Item(command(107, "System theme", "System theme").selected(true)),
+                        MenuEntry::Item(
+                            command(107, "System theme", "System theme").selected(true),
+                        ),
                         MenuEntry::Submenu(MenuSubmenu {
                             id: 108,
                             title: "Accent color".to_owned(),

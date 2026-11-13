@@ -278,9 +278,7 @@ fn execute(cli: Cli) -> Result<()> {
         Command::WasmSdkPath => {
             let path = cove_native_build::setup::wasm_sdk_path()
                 .map_err(|e| e.to_string())?
-                .ok_or_else(|| {
-                    "no wasi-sdk found; run `cargo cove setup --wasm`".to_owned()
-                })?;
+                .ok_or_else(|| "no wasi-sdk found; run `cargo cove setup --wasm`".to_owned())?;
             println!("{}", path.display());
             Ok(())
         }
@@ -308,7 +306,12 @@ fn execute(cli: Cli) -> Result<()> {
             println!("{}", product.display());
             Ok(())
         }
-        Command::Run { target, devtools, devtools_port, web_root } => {
+        Command::Run {
+            target,
+            devtools,
+            devtools_port,
+            web_root,
+        } => {
             if let Some(root) = web_root {
                 let session = devtools::Session::start(devtools_port.unwrap_or(0), Some(root))?;
                 while !session.interrupted() {
@@ -325,11 +328,20 @@ fn execute(cli: Cli) -> Result<()> {
             } else {
                 0
             });
-            let session = devtools.then(|| devtools::Session::start(port, None)).transpose()?;
+            let session = devtools
+                .then(|| devtools::Session::start(port, None))
+                .transpose()?;
             match platform {
-                Platform::Android => android::launch(&project, &product, target.device.as_deref(), session.as_ref()),
+                Platform::Android => android::launch(
+                    &project,
+                    &product,
+                    target.device.as_deref(),
+                    session.as_ref(),
+                ),
                 Platform::Ios => apple::launch_ios(&project, &product, &target, session.as_ref()),
-                Platform::Mac => apple::launch_mac(&project, &product, &target.arguments, session.as_ref()),
+                Platform::Mac => {
+                    apple::launch_mac(&project, &product, &target.arguments, session.as_ref())
+                }
                 Platform::Windows | Platform::Linux => {
                     desktop::launch(&project, &product, &target.arguments, session.as_ref())
                 }

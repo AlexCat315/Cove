@@ -82,7 +82,10 @@ impl BrowserGpu {
             .expect("created browser framebuffer")
             .texture();
         self.device.begin_frame()?;
-        let timing = measure_gpu.then(|| self.device.measure_gpu_frame()).flatten();
+        let timing = measure_gpu
+            .then(|| self.device.measure_gpu_frame())
+            .flatten();
+
         let result = (|| {
             let image = self.device.acquire_swapchain_image(swapchain)?;
             let mut commands = CommandBuffer::new();
@@ -101,6 +104,11 @@ impl BrowserGpu {
                 self.format,
                 pixels,
             )?;
+            // Publish the pass census before submission, so a reader that gets
+            // the timing handle can also see what the frame recorded.
+            if let Some(frame) = &timing {
+                frame.set_pass_reports(commands.pass_reports());
+            }
             self.device
                 .submit(&commands, QueueClass::Graphics, &[], &[], None)?;
             frame.did_submit();

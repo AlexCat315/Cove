@@ -236,11 +236,7 @@ mod unsupported {
         {
             "stack capture is not available on wasm"
         }
-        #[cfg(all(
-            target_os = "linux",
-            not(target_env = "gnu"),
-            not(target_env = "musl")
-        ))]
+        #[cfg(all(target_os = "linux", not(target_env = "gnu"), not(target_env = "musl")))]
         {
             "this Linux libc exports neither backtrace nor _Unwind_Backtrace; build with glibc or musl"
         }

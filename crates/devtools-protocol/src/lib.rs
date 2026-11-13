@@ -190,10 +190,60 @@ payload!(TimingFrame {
     // including frames recorded by probes older than this field.
     #[serde(default)] timeline_start: u64,
     #[serde(default)] timeline_end: u64,
+    // Pass and layer attribution for this frame. Absent when the host records no
+    // GPU frame, or when the probe that produced the frame predates this field.
+    #[serde(default, skip_serializing_if = "Option::is_none")] gpu_breakdown: Option<GpuFrameBreakdown>,
 });
 payload!(PipelineCreation {
     count: u64,
     cpu_ms: f64
+});
+payload!(GpuPass {
+    label: String,
+    /// `render`, `compute`, `copy` or `accelerationStructure`.
+    kind: String,
+    draws: u64,
+    indices: u64,
+    vertices: u64,
+    /// Indices into `GpuFrameBreakdown::layers` this pass rendered. Empty means
+    /// the pass drew geometry no layer owns.
+    #[serde(default)] layers: Vec<u32>,
+    /// GPU time of this pass. Present only when the backend times passes
+    /// individually; `timing_source` on the breakdown says which backends do.
+    #[serde(default, skip_serializing_if = "Option::is_none")] gpu_ms: Option<f64>,
+});
+payload!(GpuLayer {
+    /// The layer root's node id, when the census could name it.
+    #[serde(rename = "nodeID", default, skip_serializing_if = "Option::is_none")] node_id: Option<String>,
+    /// The layer's window in the frame index buffer.
+    first_index: u64,
+    index_count: u64,
+    /// False when the frame reused the layer's cached draw list.
+    recorded: bool,
+    /// True when reuse only translated cached vertices.
+    translated: bool,
+    /// True for a layer whose cached geometry sat entirely outside the frame.
+    skipped: bool,
+    x: f64,
+    y: f64,
+    width: f64,
+    height: f64,
+    /// Indices into `GpuFrameBreakdown::passes` that rendered this layer.
+    #[serde(default)] passes: Vec<u32>,
+});
+impl GpuLayer {
+    /// The layer's window as a `(first, count)` pair.
+    pub fn index_range(&self) -> (u64, u64) {
+        (self.first_index, self.index_count)
+    }
+}
+payload!(GpuFrameBreakdown {
+    /// Where pass times came from: `vulkan-timestamps` (one label per pass),
+    /// `metal-submission` (one label per submission), `webgpu` (one number for
+    /// the whole frame), or `cpu-only` when nothing was sampled.
+    timing_source: String,
+    #[serde(default)] passes: Vec<GpuPass>,
+    #[serde(default)] layers: Vec<GpuLayer>,
 });
 payload!(RegisteredState {
     id: String, name: String, value_type: String, #[serde(rename = "scopeID")] scope_id: Option<String>,
@@ -503,8 +553,62 @@ mod tests {
     }
 
     #[test]
+    fn a_frame_without_a_breakdown_still_reads() {
+        // Probes older than the breakdown field omit it entirely.
+        let json = serde_json::json!({
+            "frame": 3,
+            "layoutMs": 0.5,
+            "drawMs": 0.25,
+            "submitted": true,
+            "totalMs": 1.0,
+            "nodeCount": 2,
+            "batchCount": 1
+        });
+        let frame: TimingFrame = serde_json::from_value(json).expect("old frame shape");
+        assert!(frame.gpu_breakdown.is_none());
+    }
+
+    #[test]
+    fn a_breakdown_names_passes_and_their_layers() {
+        let breakdown = GpuFrameBreakdown {
+            timing_source: "vulkan-timestamps".to_owned(),
+            passes: vec![GpuPass {
+                label: "ui-frame".to_owned(),
+                kind: "render".to_owned(),
+                draws: 3,
+                indices: 120,
+                vertices: 0,
+                layers: vec![0, 1],
+                gpu_ms: Some(0.42),
+            }],
+            layers: vec![GpuLayer {
+                node_id: Some("7".to_owned()),
+                first_index: 0,
+                index_count: 120,
+                recorded: true,
+                translated: false,
+                skipped: false,
+                x: 0.0,
+                y: 0.0,
+                width: 320.0,
+                height: 40.0,
+                passes: vec![0],
+            }],
+        };
+        let value = serde_json::to_value(&breakdown).expect("serialize");
+        assert_eq!(value["timingSource"], "vulkan-timestamps");
+        assert_eq!(value["passes"][0]["layers"][1], 1);
+        assert_eq!(value["passes"][0]["gpuMs"], 0.42);
+        assert_eq!(value["layers"][0]["nodeID"], "7");
+        assert_eq!(value["layers"][0]["firstIndex"], 0);
+        let read: GpuFrameBreakdown = serde_json::from_value(value).expect("round trip");
+        assert_eq!(read, breakdown);
+    }
+
+    #[test]
     fn payloads_round_trip_through_the_codec() {
         let frame = TimingFrame {
+            gpu_breakdown: None,
             frame: 1,
             recomposition_ms: None,
             layout_ms: 0.5,

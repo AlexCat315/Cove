@@ -1053,7 +1053,10 @@ fn touch_menu_back_then_redrill_rebuilds_the_navigation_path() {
         // Drill in, back out, then drill in again: each push must extend the current
         // level's path, not a path captured before the back navigation.
         scene.click(&labelled("More").expect("More"), 1);
-        assert!(scene.named("touch-menu-back").is_some(), "the first drill shows back");
+        assert!(
+            scene.named("touch-menu-back").is_some(),
+            "the first drill shows back"
+        );
         scene.click(&scene.named("touch-menu-back").expect("back row"), 1);
         assert!(
             scene.named("touch-menu-back").is_none(),

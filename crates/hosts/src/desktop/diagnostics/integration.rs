@@ -139,8 +139,20 @@ pub trait DiagnosticsSession {
     fn overlay(&mut self, list: &mut DrawList);
     fn begin_frame(&mut self);
     fn prepared(&mut self, layout_ms: f64, draw_ms: f64);
+    /// What the layer-aware renderer composited this frame. Called right after
+    /// the draw list is recorded, before the frame is submitted, so a session can
+    /// join layer windows with the passes the renderer later records.
+    fn layers_composited(&mut self, census: &cove_core::scene::LayerCensus) {
+        let _ = census;
+    }
     fn frame_finished(&mut self, nodes: usize, batches: usize, token: Option<u64>);
-    fn presentation_finished(&mut self, token: u64, presented: bool, render_thread_ms: f64, gpu: Option<cove_graphics::rhi::GpuFrameTiming>);
+    fn presentation_finished(
+        &mut self,
+        token: u64,
+        presented: bool,
+        render_thread_ms: f64,
+        gpu: Option<cove_graphics::rhi::GpuFrameTiming>,
+    );
     fn stop(&mut self);
 }
 
@@ -176,6 +188,13 @@ impl DiagnosticsSession for NullDiagnosticsSession {
     fn begin_frame(&mut self) {}
     fn prepared(&mut self, _layout_ms: f64, _draw_ms: f64) {}
     fn frame_finished(&mut self, _nodes: usize, _batches: usize, _token: Option<u64>) {}
-    fn presentation_finished(&mut self, _token: u64, _presented: bool, _render_thread_ms: f64, _gpu: Option<cove_graphics::rhi::GpuFrameTiming>) {}
+    fn presentation_finished(
+        &mut self,
+        _token: u64,
+        _presented: bool,
+        _render_thread_ms: f64,
+        _gpu: Option<cove_graphics::rhi::GpuFrameTiming>,
+    ) {
+    }
     fn stop(&mut self) {}
 }

@@ -119,7 +119,10 @@ mod tests {
 
     #[test]
     fn canonical_address_drops_authentication_bits() {
-        assert_eq!(canonical_address(0x1234_5678_9abc_def0, MASK), 0x5678_9abc_def0);
+        assert_eq!(
+            canonical_address(0x1234_5678_9abc_def0, MASK),
+            0x5678_9abc_def0
+        );
         assert_eq!(canonical_address(0x1000, MASK), 0x1000);
     }
 

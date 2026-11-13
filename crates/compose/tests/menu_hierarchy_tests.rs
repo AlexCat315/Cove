@@ -614,7 +614,8 @@ fn an_open_submenu_reports_its_frame_to_arm_the_crossing_grace() {
         let child_id = scene.portal.entries()[1].id.clone();
         let child_slot = scene
             .first(|node| {
-                node.attachment::<String>(PortalOwnership::ENTRY_KEY).as_deref()
+                node.attachment::<String>(PortalOwnership::ENTRY_KEY)
+                    .as_deref()
                     == Some(child_id.as_str())
             })
             .expect("the branch slot is mounted");

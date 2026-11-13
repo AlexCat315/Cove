@@ -18,7 +18,7 @@ use cove_ui_compose::modifiers::layout::{
 use cove_ui_compose::modifiers::style::{AppearanceExt, SemanticStyleViewExt};
 use cove_ui_compose::primitives::controls::ButtonRole;
 use cove_ui_compose::primitives::controls::fields::select::{Select, SelectOption};
-use cove_ui_compose::primitives::overlays::{PopoverPlacement, Popconfirm};
+use cove_ui_compose::primitives::overlays::{Popconfirm, PopoverPlacement};
 use cove_ui_compose::primitives::text::Text;
 use cove_ui_compose::theme::tokens::{SemanticColorRef, TextScaler, TextScalerReader};
 use cove_ui_compose::theme::{Theme, ThemeReader};
@@ -179,11 +179,7 @@ impl PlacementExample {
 }
 
 /// One preview trigger: a real `Popconfirm` bubble on the requested side.
-fn preview(
-    variant: PlacementVariant,
-    is_enabled: bool,
-    on_action: Rc<dyn Fn(String)>,
-) -> AnyView {
+fn preview(variant: PlacementVariant, is_enabled: bool, on_action: Rc<dyn Fn(String)>) -> AnyView {
     AnyView::new(Popconfirm::new(
         variant.label,
         None,
@@ -198,7 +194,12 @@ fn preview(
     ))
 }
 
-fn side_pair(left: usize, right: usize, is_enabled: bool, on_action: Rc<dyn Fn(String)>) -> AnyView {
+fn side_pair(
+    left: usize,
+    right: usize,
+    is_enabled: bool,
+    on_action: Rc<dyn Fn(String)>,
+) -> AnyView {
     AnyView::new(BoxView::new(
         FlexDirection::Row,
         Align::Center,

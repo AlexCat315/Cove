@@ -1793,7 +1793,11 @@ impl SubmissionTimestamps {
             (commands.create_query_pool)(context.device, &descriptor, core::ptr::null(), &mut pool)
         };
         (status == sys::VK_SUCCESS && pool != sys::VK_NULL_HANDLE).then(|| Self {
-            device: context.device, pool, commands, period, bits,
+            device: context.device,
+            pool,
+            commands,
+            period,
+            bits,
         })
     }
 
@@ -1801,14 +1805,24 @@ impl SubmissionTimestamps {
         // SAFETY: cmd is recording and this submission owns the pool.
         unsafe {
             (self.commands.cmd_reset_query_pool)(cmd, self.pool, 0, 2);
-            (self.commands.cmd_write_timestamp)(cmd, sys::VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, self.pool, 0);
+            (self.commands.cmd_write_timestamp)(
+                cmd,
+                sys::VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+                self.pool,
+                0,
+            );
         }
     }
 
     fn end(&self, cmd: sys::VkCommandBuffer) {
         // SAFETY: cmd is recording and this submission reset the query pair.
         unsafe {
-            (self.commands.cmd_write_timestamp)(cmd, sys::VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, self.pool, 1);
+            (self.commands.cmd_write_timestamp)(
+                cmd,
+                sys::VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
+                self.pool,
+                1,
+            );
         }
     }
 
@@ -1817,8 +1831,14 @@ impl SubmissionTimestamps {
         // SAFETY: the fence signalled and the destination holds both results.
         let status = unsafe {
             (self.commands.get_query_pool_results)(
-                self.device, self.pool, 0, 2, size_of_val(&ticks),
-                ticks.as_mut_ptr().cast(), size_of::<u64>() as u64, sys::VK_QUERY_RESULT_64_BIT,
+                self.device,
+                self.pool,
+                0,
+                2,
+                size_of_val(&ticks),
+                ticks.as_mut_ptr().cast(),
+                size_of::<u64>() as u64,
+                sys::VK_QUERY_RESULT_64_BIT,
             )
         };
         if status != sys::VK_SUCCESS {
@@ -1860,7 +1880,9 @@ impl FenceWaiter {
             if let Some(recording) = &self.timestamps {
                 recording.read_results();
             }
-            self.frame_timestamps.as_ref().and_then(SubmissionTimestamps::nanos)
+            self.frame_timestamps
+                .as_ref()
+                .and_then(SubmissionTimestamps::nanos)
         } else {
             None
         };

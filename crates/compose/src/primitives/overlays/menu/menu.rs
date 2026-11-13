@@ -572,7 +572,8 @@ impl MenuLevel {
                                     on_frame: Some(Rc::new({
                                         let session = self.session.clone();
                                         move |frame: cove_core::Rect| {
-                                            session.pointer.borrow_mut().submenu_frame = Some(frame);
+                                            session.pointer.borrow_mut().submenu_frame =
+                                                Some(frame);
                                         }
                                     })),
                                 },

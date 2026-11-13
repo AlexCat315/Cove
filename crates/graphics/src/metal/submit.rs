@@ -115,13 +115,15 @@ pub fn submit(
                 .take();
             if let Some(completion) = taken {
                 let nanos = (gpu_profile.is_some() || completion.is_ok())
-                    .then(|| elapsed_gpu_nanos(buffer)).flatten();
+                    .then(|| elapsed_gpu_nanos(buffer))
+                    .flatten();
                 if let Some(profile) = &gpu_profile {
                     if let Some(nanos) = nanos {
                         profile.note("ok");
                         profile.append(GpuTimestampMarker::new(gpu_label, nanos));
                     } else {
-                        profile.note("Metal command buffer did not expose completed GPU timestamps");
+                        profile
+                            .note("Metal command buffer did not expose completed GPU timestamps");
                     }
                 }
                 match completion {

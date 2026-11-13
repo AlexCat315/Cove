@@ -10,6 +10,7 @@ description = "Cove DevTools runtime probe and diagnostics"
 cove-agent.workspace = true
 cove-devtools-protocol.workspace = true
 cove-core.workspace = true
+cove-graphics.workspace = true
 cove-http.workspace = true
 cove-logging.workspace = true
 cove-platform.workspace = true

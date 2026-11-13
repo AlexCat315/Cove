@@ -33,6 +33,7 @@ fn span(timeline: &Rc<RefCell<PerformanceTimeline>>, phase: &str, name: &str) {
 
 fn frame() -> TimingFrame {
     TimingFrame {
+        gpu_breakdown: None,
         frame: 0,
         recomposition_ms: None,
         layout_ms: 0.5,

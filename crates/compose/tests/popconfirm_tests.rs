@@ -453,9 +453,7 @@ fn pointer_reaches_a_narrow_anchor_centre() {
         "a wide trigger keeps leading alignment: {:?}",
         layout.frame
     );
-    assert!(
-        (pointer_centre(layout.frame, wide, true) - (wide.x + wide.width / 2.0)).abs() < 0.01
-    );
+    assert!((pointer_centre(layout.frame, wide, true) - (wide.x + wide.width / 2.0)).abs() < 0.01);
 
     // The same slide on a horizontal edge keeps the pointer on the anchor's
     // vertical centre.
@@ -471,8 +469,7 @@ fn pointer_reaches_a_narrow_anchor_centre() {
     let edge = Rect::new(8.0, 400.0, 16.0, 18.0);
     let layout = geometry(edge, PopoverPlacement::TopLeading);
     assert!(
-        layout.frame.x >= 8.0 - 0.01
-            && layout.frame.x + layout.frame.width <= 1272.0 + 0.01,
+        layout.frame.x >= 8.0 - 0.01 && layout.frame.x + layout.frame.width <= 1272.0 + 0.01,
         "the bubble stays within the window: {:?}",
         layout.frame
     );

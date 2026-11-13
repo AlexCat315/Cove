@@ -381,6 +381,9 @@ impl<C: PrototypeContent> BrowserPrototype<C> {
         #[cfg(not(target_arch = "wasm32"))]
         let pipeline_creation = None;
         let mut gpu_measurement: Option<cove_devtools::runtime_probe::GpuMeasurement> = None;
+        // The browser encoder records passes, not compositing layers, so the
+        // breakdown carries pass geometry and says its GPU clock is frame-wide.
+        let mut gpu_breakdown: Option<cove_devtools_protocol::GpuFrameBreakdown> = None;
         #[cfg(target_arch = "wasm32")]
         if let Some(gpu) = &mut self.webgpu {
             match gpu.draw(
@@ -397,6 +400,15 @@ impl<C: PrototypeContent> BrowserPrototype<C> {
                             count,
                             cpu_ms: nanos as f64 / 1_000_000.0,
                         });
+                        let passes = timing.pass_reports();
+                        if !passes.is_empty() {
+                            gpu_breakdown = Some(cove_devtools::gpu_breakdown::assemble(
+                                &passes,
+                                &cove_core::scene::LayerCensus::default(),
+                                &[],
+                                cove_devtools::gpu_breakdown::GpuTimingSource::WebGpuFrame,
+                            ));
+                        }
                         gpu_measurement = Some(Box::new(move || timing.result()));
                     }
                 }
@@ -480,6 +492,7 @@ impl<C: PrototypeContent> BrowserPrototype<C> {
             (started.elapsed().as_secs_f64() * 1000.0) - self.recomposition_ms - self.layout_ms;
         if self.probing {
             let mut frame = TimingFrame {
+                gpu_breakdown: gpu_breakdown.take(),
                 frame: 0,
                 recomposition_ms: Some(self.recomposition_ms),
                 layout_ms: self.layout_ms,

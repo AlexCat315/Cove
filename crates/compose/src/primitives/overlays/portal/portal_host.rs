@@ -22,8 +22,8 @@ use cove_composition::{
     AnyView, LayoutDebugAttachmentKey, PrimitiveView, View, ViewExt, impl_primitive_view,
 };
 use cove_core::scene::{
-    Edge, InputHandlerRoute, InteractionRegistryHolder, LayoutNode, Node, NodeResource, PointerPhase,
-    PositionType, WheelRoutingAttachmentKey, WheelRoutingPriority,
+    Edge, InputHandlerRoute, InteractionRegistryHolder, LayoutNode, Node, NodeResource,
+    PointerPhase, PositionType, WheelRoutingAttachmentKey, WheelRoutingPriority,
 };
 use cove_core::{Point, Rect, Signal, Size};
 

@@ -333,8 +333,7 @@ impl PrimitiveView for ContextMenuHost {
                         return EventResult::Ignored;
                     }
                     let menu_key = event.scancode == crate::Scancode::APPLICATION
-                        || (event.scancode == crate::Scancode::F10
-                            && event.modifiers.has_shift());
+                        || (event.scancode == crate::Scancode::F10 && event.modifiers.has_shift());
                     if !menu_key {
                         return EventResult::Ignored;
                     }

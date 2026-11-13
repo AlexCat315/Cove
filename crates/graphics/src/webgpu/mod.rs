@@ -54,8 +54,10 @@ impl WebGpu {
         completion: TimedCompletion,
     ) -> RhiResult<()> {
         for wait in &submit.wait_semaphores {
-            rhi_require(self.signals.get(&wait.id).copied().unwrap_or(0) >= wait.value,
-                "WebGPU timeline waits require a signal already queued on the device")?;
+            rhi_require(
+                self.signals.get(&wait.id).copied().unwrap_or(0) >= wait.value,
+                "WebGPU timeline waits require a signal already queued on the device",
+            )?;
         }
         self.host.queue_timed(
             "submit",
@@ -308,7 +310,10 @@ impl RhiBackend for WebGpu {
         descriptor: PipelineLayoutDescriptor,
     ) -> RhiResult<()> {
         let sets: Vec<_> = descriptor.set_layouts.iter().map(|set| set.id()).collect();
-        rhi_require(sets.len() + usize::from(!descriptor.push_constants.is_empty()) <= 4, "WebGPU supports four bind groups including the constants group")?;
+        rhi_require(
+            sets.len() + usize::from(!descriptor.push_constants.is_empty()) <= 4,
+            "WebGPU supports four bind groups including the constants group",
+        )?;
         let constants: Vec<_> = descriptor.push_constants.iter().map(|range| json!({
             "slot": range.slot, "visibility": visibility(ShaderVisibility::from_stage(range.stage)), "size": range.byte_count,
         })).collect();

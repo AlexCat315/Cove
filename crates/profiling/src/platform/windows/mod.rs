@@ -232,11 +232,7 @@ fn run(
     let mut failure = None;
     while !stop.load(Ordering::Acquire) {
         let tick = Instant::now();
-        match sample_once(
-            thread as HANDLE,
-            config.max_stack_depth,
-            started.elapsed(),
-        ) {
+        match sample_once(thread as HANDLE, config.max_stack_depth, started.elapsed()) {
             Ok(sample) => {
                 ring.push(sample);
                 taken.fetch_add(1, Ordering::Relaxed);

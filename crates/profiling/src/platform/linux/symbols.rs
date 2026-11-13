@@ -112,7 +112,10 @@ fn scan_images() -> Vec<Image> {
     let mut by_path: HashMap<PathBuf, Vec<Mapping>> = HashMap::new();
     for line in text.lines() {
         if let Some(mapping) = parse_mapping(line) {
-            by_path.entry(mapping.path.clone()).or_default().push(mapping);
+            by_path
+                .entry(mapping.path.clone())
+                .or_default()
+                .push(mapping);
         }
     }
     let mut images = Vec::new();
@@ -269,10 +272,9 @@ mod tests {
 
     #[test]
     fn parses_an_executable_file_mapping() {
-        let mapping = parse_mapping(
-            "7f0000000000-7f0000001000 r-xp 00002000 08:01 4242 /usr/lib/libcove.so",
-        )
-        .expect("mapping");
+        let mapping =
+            parse_mapping("7f0000000000-7f0000001000 r-xp 00002000 08:01 4242 /usr/lib/libcove.so")
+                .expect("mapping");
         assert_eq!(mapping.start, 0x7f0000000000);
         assert_eq!(mapping.end, 0x7f0000001000);
         assert_eq!(mapping.offset, 0x2000);
@@ -288,10 +290,9 @@ mod tests {
 
     #[test]
     fn keeps_a_path_that_contains_spaces() {
-        let mapping = parse_mapping(
-            "7f0000000000-7f0000001000 r-xp 00000000 08:01 7 /opt/my app/bin/cove",
-        )
-        .expect("mapping");
+        let mapping =
+            parse_mapping("7f0000000000-7f0000001000 r-xp 00000000 08:01 7 /opt/my app/bin/cove")
+                .expect("mapping");
         assert_eq!(mapping.path, Path::new("/opt/my app/bin/cove"));
     }
 }

@@ -268,10 +268,8 @@ fn writable_mappings() -> Vec<(u64, u64)> {
         let Some((start, end)) = range.split_once('-') else {
             continue;
         };
-        if let (Ok(start), Ok(end)) = (
-            u64::from_str_radix(start, 16),
-            u64::from_str_radix(end, 16),
-        ) && end > start
+        if let (Ok(start), Ok(end)) = (u64::from_str_radix(start, 16), u64::from_str_radix(end, 16))
+            && end > start
         {
             ranges.push((start, end));
         }

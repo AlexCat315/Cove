@@ -32,6 +32,40 @@ pub struct LayerAwareNodeRenderer {
     content_placements: Vec<Affine2D>,
 }
 
+/// One layer the frame composited, with the index window it contributed.
+///
+/// A layer owns a contiguous index range in the frame draw list, so a recorded
+/// pass draw belongs to the layer whose range contains it. `recorded` is false
+/// when the frame reused the layer's cached list; `translated` says that reuse
+/// only moved cached vertices instead of re-recording them.
+#[derive(Clone, Debug, PartialEq)]
+pub struct CompositedLayer {
+    /// The layer root's element id, in the same form DevTools reports node ids.
+    pub node: Option<String>,
+    pub first_index: u64,
+    pub index_count: u64,
+    pub recorded: bool,
+    pub translated: bool,
+    /// Bounds of the layer at composite time, in frame coordinates.
+    pub bounds: Rect,
+}
+
+/// One layer root the culling step dropped before it could composite.
+#[derive(Clone, Debug, PartialEq)]
+pub struct SkippedLayer {
+    pub node: Option<String>,
+    pub bounds: Rect,
+}
+
+/// Layer census for one frame: what composited, in paint order, plus what was
+/// skipped. Skipped entries are the layers an author expects to see and cannot
+/// find on screen, so they are recorded rather than silently dropped.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct LayerCensus {
+    pub layers: Vec<CompositedLayer>,
+    pub skipped: Vec<SkippedLayer>,
+}
+
 struct OpenNode {
     object: Option<RenderObject>,
     node: Option<Node>,
@@ -73,6 +107,18 @@ impl LayerAwareNodeRenderer {
     /// Execute the cached preorder plan. Exit records preserve painter, mask,
     /// overlay and opacity ordering without using the call stack.
     pub fn render(&mut self, tree: &RenderTree, frame: &mut DrawList) {
+        self.render_with_census(tree, frame, None);
+    }
+
+    /// Renders the frame and, when `census` is given, records every composited
+    /// and skipped layer. The census allocates only when asked for, so the plain
+    /// `render` path stays allocation-free.
+    pub fn render_with_census(
+        &mut self,
+        tree: &RenderTree,
+        frame: &mut DrawList,
+        mut census: Option<&mut LayerCensus>,
+    ) {
         let Some(root_object) = tree.root() else {
             return;
         };
@@ -111,7 +157,13 @@ impl LayerAwareNodeRenderer {
         let mut index = 0;
         while index < plan.objects.len() || open.len() > 1 {
             if open.len() > 1 && index >= open.last().map_or(0, |record| record.end) {
-                finish(&mut open);
+                let event = finish(&mut open);
+                if let (Some(census), Some(event)) = (census.as_deref_mut(), event) {
+                    match event {
+                        LayerEvent::Composited(layer) => census.layers.push(layer),
+                        LayerEvent::Skipped(layer) => census.skipped.push(layer),
+                    }
+                }
                 continue;
             }
             if index >= plan.objects.len() {
@@ -149,6 +201,16 @@ impl LayerAwareNodeRenderer {
             if node.clips_to_bounds() && bounds.width > 0.0 && bounds.height > 0.0 {
                 let destination = target_list(&mut open);
                 if RenderCulling::is_outside(bounds, destination) {
+                    // A layer root culled here never reaches `finish`, so this is
+                    // the only place that can report it.
+                    if object.is_layer_root()
+                        && let Some(census) = census.as_deref_mut()
+                    {
+                        census.skipped.push(SkippedLayer {
+                            node: Some(node.id().0.to_string()),
+                            bounds,
+                        });
+                    }
                     index = end;
                     continue;
                 }
@@ -182,9 +244,10 @@ impl LayerAwareNodeRenderer {
             if object.is_layer_root() {
                 let placement_unchanged = object.last_placement() == Some(own);
                 let clip_unchanged = object.last_clip_stack_eq(&parent_clips);
-                let reused = {
+                let (outcome, first_index) = {
                     let destination = target_list(&mut open);
-                    reuse(
+                    let first_index = destination.indices().len() as u64;
+                    let outcome = reuse(
                         &object,
                         &node,
                         destination,
@@ -192,11 +255,43 @@ impl LayerAwareNodeRenderer {
                         &parent_clips,
                         placement_unchanged,
                         clip_unchanged,
-                    )
+                    );
+                    (outcome, first_index)
                 };
-                if reused {
-                    index = end;
-                    continue;
+                let layer_bounds = Rect::new(
+                    own.e,
+                    own.f,
+                    node.frame().width * own.a,
+                    node.frame().height * own.a,
+                );
+                match outcome {
+                    ReuseOutcome::Missed => {}
+                    ReuseOutcome::Reused { translated } => {
+                        if let Some(census) = census.as_deref_mut() {
+                            let index_count =
+                                target_list(&mut open).indices().len() as u64 - first_index;
+                            census.layers.push(CompositedLayer {
+                                node: Some(node.id().0.to_string()),
+                                first_index,
+                                index_count,
+                                recorded: false,
+                                translated,
+                                bounds: layer_bounds,
+                            });
+                        }
+                        index = end;
+                        continue;
+                    }
+                    ReuseOutcome::Skipped => {
+                        if let Some(census) = census.as_deref_mut() {
+                            census.skipped.push(SkippedLayer {
+                                node: Some(node.id().0.to_string()),
+                                bounds: layer_bounds,
+                            });
+                        }
+                        index = end;
+                        continue;
+                    }
                 }
                 let defer_container = has_children
                     && (!allows_cache
@@ -343,8 +438,31 @@ fn begin(
     record.descendant_start = descendant_start;
 }
 
-fn finish(open: &mut Vec<OpenNode>) {
-    let Some(record) = open.last() else { return };
+/// What a collapsing layer root did to the frame draw list.
+enum LayerEvent {
+    Composited(CompositedLayer),
+    Skipped(SkippedLayer),
+}
+
+fn layer_bounds(record: &OpenNode) -> Rect {
+    let scale = record.own.a;
+    match record.node.as_ref() {
+        Some(node) => Rect::new(
+            record.own.e,
+            record.own.f,
+            node.frame().width * scale,
+            node.frame().height * scale,
+        ),
+        None => Rect::new(record.own.e, record.own.f, 0.0, 0.0),
+    }
+}
+
+fn finish(open: &mut Vec<OpenNode>) -> Option<LayerEvent> {
+    let Some(record) = open.last() else {
+        return None;
+    };
+    let node_id = record.node.as_ref().map(|node| node.id().0.to_string());
+    let bounds = layer_bounds(record);
     let mask = record.mask;
     let clipped = record.clipped;
     let opacity = record.node.as_ref().map_or(1.0, Node::opacity);
@@ -375,17 +493,25 @@ fn finish(open: &mut Vec<OpenNode>) {
             list.pop_clip_rect();
         }
     }
-    let Some(record) = open.pop() else { return };
-    let Some(object) = record.object else { return };
+    let Some(record) = open.pop() else {
+        return None;
+    };
+    let Some(object) = record.object else {
+        return None;
+    };
     if !object.is_layer_root() {
-        return;
+        return None;
     }
     object.set_last_placement(Some(record.own));
     object.set_last_clip_stack(record.parent_clips.to_vec());
     object.set_cache_invalid(false);
     let Some(mut list) = record.list else {
+        // No own list means the container drew straight into its parent's list:
+        // it never composited independently, so it is not a layer a reader would
+        // look for. A layer that recorded but painted nothing keeps its list and
+        // is reported with an empty window instead.
         object.set_cached_layer_list(None);
-        return;
+        return None;
     };
     for clip in record.parent_clips.iter().rev() {
         list.pop_clip(*clip);
@@ -397,14 +523,38 @@ fn finish(open: &mut Vec<OpenNode>) {
         None
     });
     object.set_cached_layer_list(Some(list.clone()));
-    if let Some(bounds) = object.cached_paint_bounds() {
+    if let Some(paint_bounds) = object.cached_paint_bounds() {
         let destination = target_list(open);
-        if RenderCulling::is_outside(bounds, destination) {
-            return;
+        if RenderCulling::is_outside(paint_bounds, destination) {
+            return Some(LayerEvent::Skipped(SkippedLayer {
+                node: node_id,
+                bounds,
+            }));
         }
     }
     let destination = target_list(open);
+    let first_index = destination.indices().len() as u64;
     let _ = destination.append_preclipped(&list, &record.parent_clips, Point::default());
+    let index_count = destination.indices().len() as u64 - first_index;
+    Some(LayerEvent::Composited(CompositedLayer {
+        node: node_id,
+        first_index,
+        index_count,
+        recorded: true,
+        translated: false,
+        bounds,
+    }))
+}
+
+/// What a layer root's cache lookup did.
+enum ReuseOutcome {
+    /// Nothing cached, or the cache is unusable: the caller records the subtree.
+    Missed,
+    /// Reused the cached list. `translated` means only the vertices moved.
+    Reused { translated: bool },
+    /// The cached layer sits entirely outside the frame, so its subtree was
+    /// skipped without appending anything.
+    Skipped,
 }
 
 /// A cache hit also handles offscreen leaves: its whole subtree is skipped.
@@ -416,17 +566,17 @@ fn reuse(
     clips: &[Clip],
     placement_unchanged: bool,
     clip_unchanged: bool,
-) -> bool {
+) -> ReuseOutcome {
     if object.cache_invalid() || !clip_unchanged {
-        return false;
+        return ReuseOutcome::Missed;
     }
     let Some(cached) = object.cached_layer_list() else {
-        return false;
+        return ReuseOutcome::Missed;
     };
     if cached.pixel_scale != list.pixel_scale
         || cached.geometry_antialiasing != list.geometry_antialiasing
     {
-        return false;
+        return ReuseOutcome::Missed;
     }
     if !object.has_children()
         && let Some(bounds) = object.cached_paint_bounds()
@@ -441,12 +591,12 @@ fn reuse(
             bounds.height,
         );
         if RenderCulling::is_outside(moved, list) {
-            return true;
+            return ReuseOutcome::Skipped;
         }
     }
     if placement_unchanged {
         let _ = list.append_preclipped(&cached, clips, Point::default());
-        return true;
+        return ReuseOutcome::Reused { translated: false };
     }
     if !object.has_children()
         && !node.clips_to_bounds()
@@ -457,9 +607,9 @@ fn reuse(
         && !crosses_rounded_corner(object.cached_paint_bounds(), old, own, clips)
     {
         let _ = list.append_preclipped(&cached, clips, Point::new(own.e - old.e, own.f - old.f));
-        return true;
+        return ReuseOutcome::Reused { translated: true };
     }
-    false
+    ReuseOutcome::Missed
 }
 
 /// A cached leaf was clipped where it was recorded. If the mask cut any of it
@@ -529,6 +679,79 @@ mod tests {
         let mut second = DrawList::default();
         renderer.render(&tree, &mut second);
         assert_eq!(second.vertices().len(), first);
+    }
+
+    #[test]
+    fn the_census_names_the_layer_and_its_index_window() {
+        let (_root, card, tree) = scene();
+        let mut renderer = LayerAwareNodeRenderer::new();
+        let mut frame = DrawList::default();
+        let mut census = LayerCensus::default();
+        renderer.render_with_census(&tree, &mut frame, Some(&mut census));
+        assert_eq!(census.layers.len(), 1, "the clipped card is one layer");
+        let layer = &census.layers[0];
+        assert_eq!(
+            layer.node.as_deref(),
+            Some(card.id().0.to_string().as_str())
+        );
+        assert!(layer.recorded, "a first frame records, it cannot reuse");
+        assert_eq!(
+            layer.index_count as usize,
+            frame.indices().len(),
+            "the layer owns every index this frame drew"
+        );
+        assert_eq!(layer.first_index, 0);
+        assert_eq!(
+            (layer.bounds.x, layer.bounds.y, layer.bounds.width),
+            (10.0, 10.0, 50.0),
+            "the census reports the layer's own frame, not the root's"
+        );
+        assert!(census.skipped.is_empty());
+    }
+
+    #[test]
+    fn a_cached_layer_reports_reuse_instead_of_recording() {
+        let (_root, card, tree) = scene();
+        let mut renderer = LayerAwareNodeRenderer::new();
+        renderer.render(&tree, &mut DrawList::default());
+        let mut frame = DrawList::default();
+        let mut census = LayerCensus::default();
+        renderer.render_with_census(&tree, &mut frame, Some(&mut census));
+        // The root had no own list on the first frame (a container defers), so
+        // on the second it composites as a layer of its own and the card's
+        // window nests inside it. Windows therefore nest, and a pass that draws
+        // the outer window touches both layers.
+        let card_layer = census
+            .layers
+            .iter()
+            .find(|layer| layer.node.as_deref() == Some(card.id().0.to_string().as_str()))
+            .expect("the card composites on every frame");
+        assert!(
+            !card_layer.recorded,
+            "an unchanged layer comes back from its cache"
+        );
+        assert!(!card_layer.translated);
+        assert_eq!(card_layer.index_count as usize, frame.indices().len());
+    }
+
+    #[test]
+    fn a_layer_outside_the_frame_is_reported_as_skipped() {
+        let (root, card, tree) = scene();
+        let mut renderer = LayerAwareNodeRenderer::new();
+        renderer.render(&tree, &mut DrawList::default());
+        // Shrinking the root puts the card's window fully outside it, and a
+        // clipping layer root is culled before it can composite.
+        root.set_frame(Rect::new(0.0, 0.0, 1.0, 1.0));
+        let mut frame = DrawList::default();
+        let mut census = LayerCensus::default();
+        renderer.render_with_census(&tree, &mut frame, Some(&mut census));
+        assert!(frame.indices().is_empty());
+        assert_eq!(census.layers.len(), 0);
+        assert_eq!(census.skipped.len(), 1, "the frame culled the layer");
+        assert_eq!(
+            census.skipped[0].node.as_deref(),
+            Some(card.id().0.to_string().as_str())
+        );
     }
 
     #[test]

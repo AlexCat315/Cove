@@ -604,6 +604,7 @@ function renderFrameAnalysis() {
     verdict.textContent = `UI and encode are within the ${fmtNumber(budget, 1)} ms budget.`;
   }
   body.append(verdict);
+  body.append(gpuBreakdownSection(frame.gpuBreakdown));
   body.append(el("div", { class: "section", attrs: { style: "margin-top:10px" } },
     el("h3", { text: "Attribution" }),
     frameAnalysisAttribution(),
@@ -624,6 +625,70 @@ function renderFrameAnalysis() {
       : "The runtime reports no timeline window for this frame, so retained spans cannot be attributed to it.";
   }
   body.append(el("div", { class: "perf-note", text: correlation }));
+}
+
+// The breakdown names how pass times were obtained, because the backends do not
+// measure the same thing: Vulkan times each pass, Metal times each submission and
+// leaves pass rows without a number. A missing number means "not measured".
+const GPU_SOURCE_NOTES = {
+  "vulkan-timestamps": "GPU time is one labelled sample per pass.",
+  "metal-submission": "GPU time covers the whole submission; this backend does not time passes individually.",
+  "webgpu": "GPU time covers the whole frame; the browser encoder does not report passes with times.",
+  "cpu-only": "No GPU samples were attached, so pass rows carry geometry only.",
+};
+
+function gpuBreakdownSection(breakdown) {
+  if (!breakdown || !Array.isArray(breakdown.passes) || breakdown.passes.length === 0) return null;
+  const passes = breakdown.passes;
+  const layers = Array.isArray(breakdown.layers) ? breakdown.layers : [];
+  const note = GPU_SOURCE_NOTES[breakdown.timingSource] ?? `Timing source ${breakdown.timingSource ?? "unknown"}.`;
+  const passRows = [["Pass", "Kind", "Draws", "Indices", "GPU", "Layers"]];
+  for (const pass of passes) {
+    const gpu = numberValue(pass.gpuMs);
+    passRows.push([
+      pass.label ?? "unnamed",
+      pass.kind ?? "",
+      fmtNumber(numberValue(pass.draws), 0),
+      fmtNumber(numberValue(pass.indices), 0),
+      gpu === null ? "not measured" : fmtMs(gpu, 3),
+      Array.isArray(pass.layers) && pass.layers.length > 0 ? pass.layers.join(", ") : "none",
+    ]);
+  }
+  const layerRows = [["Layer", "Indices", "State", "Passes"]];
+  for (const [index, layer] of layers.entries()) {
+    const state = layer.skipped
+      ? "skipped by culling"
+      : layer.recorded ? "recorded" : layer.translated ? "cached, moved" : "cached";
+    const first = numberValue(layer.firstIndex) ?? 0;
+    const count = numberValue(layer.indexCount) ?? 0;
+    layerRows.push([
+      `${index}: ${shortId(layer.nodeID) || "unnamed layer"}`,
+      `${first}..${first + count}`,
+      state,
+      Array.isArray(layer.passes) && layer.passes.length > 0 ? layer.passes.join(", ") : "none",
+    ]);
+  }
+  return el("div", { class: "section", attrs: { style: "margin-top:10px" } },
+    el("h3", { text: "GPU passes" }),
+    el("div", { class: "perf-note", text: note }),
+    dataTable(passRows, "No pass was recorded for this frame."),
+    layers.length === 0
+      ? el("div", { class: "perf-note", text: "This host reports no compositing layers, so passes cannot be attributed to layers." })
+      : dataTable(layerRows, "No layer survived culling."),
+    el("div", { class: "perf-note", text: "Layer windows nest: a container that composites its children owns an outer window that contains theirs. A strip pass draws every visible layer, so its layer list is the whole visible set." }),
+  );
+}
+
+function dataTable(rows, emptyText) {
+  if (rows.length <= 1) return el("div", { class: "perf-note", text: emptyText });
+  const head = el("tr", {}, ...rows[0].map(cell => el("th", { text: String(cell) })));
+  const body = rows.slice(1).map(row => el("tr", {}, ...row.map(cell => el("td", { text: String(cell) }))));
+  return el("div", { class: "table-wrap" },
+    el("table", { class: "data-table" },
+      el("thead", {}, head),
+      el("tbody", {}, ...body),
+    ),
+  );
 }
 
 async function loadFrameAnalysis(frameNumber) {

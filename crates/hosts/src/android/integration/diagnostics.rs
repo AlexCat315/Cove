@@ -80,11 +80,21 @@ impl AndroidDiagnostics {
         self.session.prepared(layout, draw);
     }
 
+    pub fn layers_composited(&mut self, census: &cove_core::scene::LayerCensus) {
+        self.session.layers_composited(census);
+    }
+
     pub fn submitted(&mut self, nodes: usize, batches: usize, token: u64) {
         self.session.frame_finished(nodes, batches, Some(token));
     }
 
-    pub fn presentation_finished(&mut self, token: u64, presented: bool, render_thread_ms: f64, gpu: Option<cove_graphics::rhi::GpuFrameTiming>) {
+    pub fn presentation_finished(
+        &mut self,
+        token: u64,
+        presented: bool,
+        render_thread_ms: f64,
+        gpu: Option<cove_graphics::rhi::GpuFrameTiming>,
+    ) {
         self.session
             .presentation_finished(token, presented, render_thread_ms, gpu);
     }

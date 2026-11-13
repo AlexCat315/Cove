@@ -466,7 +466,8 @@ impl TooltipSession {
     /// A truncated label marks its node while drawing. Text that fits keeps the
     /// tooltip hidden, so hovering ordinary labels stays quiet.
     fn shows_truncated_text(&self) -> bool {
-        self.anchor_node().is_some_and(|node| contains_truncated_text(&node))
+        self.anchor_node()
+            .is_some_and(|node| contains_truncated_text(&node))
     }
 
     /// Advance the rest timer. Returns `true` while it still needs ticks.
@@ -604,7 +605,8 @@ impl TooltipSession {
         let was_presented = self.presented.get();
         self.is_finished.set(true);
         self.presented.set(false);
-        self.clock_generation.set(self.clock_generation.get().wrapping_add(1));
+        self.clock_generation
+            .set(self.clock_generation.get().wrapping_add(1));
         if let Some(node) = self.anchor_node()
             && let Some(resource) = portal_resource(&node)
         {
@@ -678,8 +680,7 @@ impl ClockRef {
 
 impl cove_core::scene::AnyAnimationController for ClockRef {
     fn is_finished(&self) -> bool {
-        self.session()
-            .is_none_or(|session| session.is_finished())
+        self.session().is_none_or(|session| session.is_finished())
     }
 
     fn tick(&self, delta_time: f64) {

@@ -1082,7 +1082,12 @@ impl Application {
                 }
                 for frame in &frames {
                     self.with_diagnostics(|session| {
-                        session.presentation_finished(frame.token.0, frame.presented, frame.cpu_ms, frame.gpu.clone());
+                        session.presentation_finished(
+                            frame.token.0,
+                            frame.presented,
+                            frame.cpu_ms,
+                            frame.gpu.clone(),
+                        );
                     });
                 }
             }
@@ -1545,10 +1550,25 @@ impl Application {
             list.pixel_scale = state.host.content_scale_factor();
         }
         let draw_trace = timeline.borrow().begin();
+        let mut layer_census = None;
         {
             let mut list = state.composition.draw_list.borrow_mut();
             if state.composition.use_legacy_renderer {
                 state.composition.node_renderer.render(&root, &mut list);
+            } else if state.diagnostics.borrow().dev_tools.is_some() {
+                // A census costs one allocation per layer; only a live session
+                // asks for it, so ordinary frames record exactly as before.
+                let mut census = cove_core::scene::LayerCensus::default();
+                state
+                    .composition
+                    .layer_renderer
+                    .borrow_mut()
+                    .render_with_census(
+                        state.composition.graph.render_tree(),
+                        &mut list,
+                        Some(&mut census),
+                    );
+                layer_census = Some(census);
             } else {
                 state
                     .composition
@@ -1560,6 +1580,9 @@ impl Application {
                 state.performance_hud.borrow_mut().draw(&mut list);
             }
             self.with_diagnostics(|session| session.overlay(&mut list));
+        }
+        if let Some(census) = layer_census.as_ref() {
+            self.with_diagnostics(|session| session.layers_composited(census));
         }
         let draw_end = Instant::now();
         timeline
@@ -1594,7 +1617,11 @@ impl Application {
                 return FrameOutcome::Skipped;
             };
             let mut list = state.composition.draw_list.borrow_mut();
-            renderer.submit(&mut list, (logical_w, logical_h), state.diagnostics.borrow().dev_tools.is_some())
+            renderer.submit(
+                &mut list,
+                (logical_w, logical_h),
+                state.diagnostics.borrow().dev_tools.is_some(),
+            )
         };
         self.with_diagnostics(|session| {
             session.frame_finished(

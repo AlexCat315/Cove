@@ -56,7 +56,12 @@ fn folder(project: &Project, output: &Path, executable: &Path) -> Result<PathBuf
     Ok(directory)
 }
 
-pub fn launch(project: &Project, directory: &Path, arguments: &[String], devtools: Option<&crate::devtools::Session>) -> Result<()> {
+pub fn launch(
+    project: &Project,
+    directory: &Path,
+    arguments: &[String],
+    devtools: Option<&crate::devtools::Session>,
+) -> Result<()> {
     let name = if cfg!(windows) {
         format!("{}.exe", project.bin()?)
     } else {

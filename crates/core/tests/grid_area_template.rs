@@ -11,13 +11,23 @@ fn rows_parse_into_rectangles() {
 
     let header = template.area("header").expect("header is named");
     assert_eq!(
-        (header.column_start, header.column_end, header.row_start, header.row_end),
+        (
+            header.column_start,
+            header.column_end,
+            header.row_start,
+            header.row_end
+        ),
         (1, 3, 1, 2),
         "header spans both columns and one row"
     );
     let main = template.area("main").expect("main is named");
     assert_eq!(
-        (main.column_start, main.column_end, main.row_start, main.row_end),
+        (
+            main.column_start,
+            main.column_end,
+            main.row_start,
+            main.row_end
+        ),
         (1, 2, 2, 3),
         "main is the first cell of the second row"
     );
@@ -41,7 +51,14 @@ fn unnamed_cells_keep_the_template_extent() {
 fn ragged_rows_are_rejected() {
     let error = GridAreaTemplate::new(&["a a", "b"]).expect_err("ragged template");
     assert!(
-        matches!(error, GridAreaError::Ragged { row: 1, expected: 2, found: 1 }),
+        matches!(
+            error,
+            GridAreaError::Ragged {
+                row: 1,
+                expected: 2,
+                found: 1
+            }
+        ),
         "got {error:?}"
     );
 }
@@ -90,6 +107,12 @@ fn grid_style_carries_areas() {
 
 #[test]
 fn track_helpers_match_css_breadths() {
-    assert_eq!(GridTrack::points(240.0), GridTrack::length(cove_core::scene::LayoutStyleValue::Points(240.0)));
-    assert_eq!(GridTrack::percent(50.0), GridTrack::length(cove_core::scene::LayoutStyleValue::Percent(50.0)));
+    assert_eq!(
+        GridTrack::points(240.0),
+        GridTrack::length(cove_core::scene::LayoutStyleValue::Points(240.0))
+    );
+    assert_eq!(
+        GridTrack::percent(50.0),
+        GridTrack::length(cove_core::scene::LayoutStyleValue::Percent(50.0))
+    );
 }

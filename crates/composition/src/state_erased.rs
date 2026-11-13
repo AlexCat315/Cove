@@ -81,9 +81,10 @@ impl<T: Clone + Send + 'static> ErasedState for StateField<T> {
     }
     fn dev_tools_read(&self) -> Option<Rc<dyn Fn() -> String>> {
         let state = self.state.clone();
-        state.is_exposed().then(|| Rc::new(move || {
-            state.inspection_summary().unwrap_or_default()
-        }) as Rc<dyn Fn() -> String>)
+        state.is_exposed().then(|| {
+            Rc::new(move || state.inspection_summary().unwrap_or_default())
+                as Rc<dyn Fn() -> String>
+        })
     }
     fn wire(&self, invalidate: Rc<dyn Fn()>, precise: bool) {
         if precise {

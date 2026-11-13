@@ -67,7 +67,12 @@ impl Dx12Backend {
             #[cfg(target_os = "windows")]
             timestamps,
             ..
-        } = super::command_list::record(&mut self.device, &mut registries, submit, completion.is_ok())?;
+        } = super::command_list::record(
+            &mut self.device,
+            &mut registries,
+            submit,
+            completion.is_ok(),
+        )?;
         // SAFETY: the list was closed by `record` and the queue is live.
         let fence_value = self.device.execute(command_list);
         // SAFETY: the list is no longer needed on the CPU once submitted.
@@ -109,11 +114,17 @@ impl Dx12Backend {
         let staged: Vec<u64> = staged.into_iter().map(|resource| resource as u64).collect();
         std::thread::spawn(move || {
             #[cfg(target_os = "windows")]
-            let nanos = waiter.wait().ok().and_then(|_| timestamps.as_ref()?.nanos());
+            let nanos = waiter
+                .wait()
+                .ok()
+                .and_then(|_| timestamps.as_ref()?.nanos());
             #[cfg(target_os = "windows")]
             drop(timestamps);
             #[cfg(not(target_os = "windows"))]
-            let nanos = { let _ = waiter.wait(); None };
+            let nanos = {
+                let _ = waiter.wait();
+                None
+            };
             // SAFETY: each address belongs to a staging buffer created for this
             // submission, and the GPU has retired the fence that referenced it.
             unsafe {
@@ -128,7 +139,6 @@ impl Dx12Backend {
         });
         Ok(())
     }
-
 
     /// Creates the backend, or reports that DX12 needs Windows.
     pub fn make(config: DeviceConfig) -> RhiResult<Self> {

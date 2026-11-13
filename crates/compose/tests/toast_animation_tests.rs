@@ -209,7 +209,6 @@ fn hovering_the_card_pauses_its_countdown() {
     });
 }
 
-
 #[test]
 fn reduced_motion_leaves_no_exit_clocks() {
     GlobalTestLock::locked(|| {

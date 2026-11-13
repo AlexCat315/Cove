@@ -424,6 +424,7 @@ mod tests {
 
     fn frame(start: u64, end: u64) -> TimingFrame {
         TimingFrame {
+            gpu_breakdown: None,
             frame: 7,
             recomposition_ms: None,
             layout_ms: 0.0,

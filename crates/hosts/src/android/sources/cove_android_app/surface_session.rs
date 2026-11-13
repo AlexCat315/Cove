@@ -156,7 +156,12 @@ impl SurfaceSession {
                 .scene()
                 .borrow()
                 .content()
-                .presentation_finished(frame.token.0, frame.presented, frame.cpu_ms, frame.gpu.clone());
+                .presentation_finished(
+                    frame.token.0,
+                    frame.presented,
+                    frame.cpu_ms,
+                    frame.gpu.clone(),
+                );
         }
         if frames.iter().any(|frame| !frame.presented) {
             self.application.scene().borrow().invalidate();

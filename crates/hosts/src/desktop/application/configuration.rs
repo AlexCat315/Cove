@@ -190,13 +190,13 @@ impl DiagnosticsConfiguration {
             ),
             Err(_) => cfg!(debug_assertions),
         };
-        enabled.then(|| {
-            super::super::diagnostics::integration::DevToolsConfiguration {
+        enabled.then(
+            || super::super::diagnostics::integration::DevToolsConfiguration {
                 app_title: app_title.to_owned(),
                 window: None,
                 connection: None,
-            }
-        })
+            },
+        )
     }
 }
 

@@ -20,11 +20,11 @@ use cove_composition::AnyView;
 use cove_core::scene::{AccessibilityRole, Node, PlatformInputContext};
 use cove_core::{Binding, Environment, InputCapabilities};
 use cove_platform::{InputEvent, KeyEvent, KeyModifiers};
+use cove_ui_compose::Scancode;
 use cove_ui_compose::adaptive::SurfaceEnvironmentExt;
 use cove_ui_compose::modifiers::layout::LayoutFrameExt;
 use cove_ui_compose::primitives::overlays::portal::{LayerRoot, PortalStore, PortalStoreAmbient};
 use cove_ui_compose::primitives::overlays::{CommandPalette, PaletteCommand};
-use cove_ui_compose::Scancode;
 
 use support::GlobalTestLock;
 
@@ -173,7 +173,8 @@ fn arrows_and_run_stay_within_the_filtered_results() {
             .map(|(title, group)| {
                 let ran = ran.clone();
                 let name = (*title).to_string();
-                PaletteCommand::new(*title, move || ran.borrow_mut().push(name.clone())).group(*group)
+                PaletteCommand::new(*title, move || ran.borrow_mut().push(name.clone()))
+                    .group(*group)
             })
             .collect();
         scene.install(AnyView::new(LayerRoot::new(CommandPalette::new(

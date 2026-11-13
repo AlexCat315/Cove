@@ -154,6 +154,13 @@ struct FrameTimings {
     gpu: Option<Option<u64>>,
     pipeline_creations: u64,
     pipeline_nanos: u64,
+    /// Pass census of the frame that produced this timing, when the recorder
+    /// published one. Empty for backends and hosts that do not record it.
+    passes: Vec<crate::rhi::PassReport>,
+    /// The profile this frame's GPU samples land in. The reader drains it, so
+    /// the host sees samples as they complete instead of racing the completion
+    /// thread right after `present`.
+    profile: Option<std::sync::Arc<GpuTimestampProfile>>,
 }
 
 impl GpuFrameTiming {
@@ -162,6 +169,50 @@ impl GpuFrameTiming {
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner)
             .gpu
+    }
+
+    /// Publishes what the frame recorded, pass by pass.
+    ///
+    /// Called by the recording side right after it builds the command buffer, so
+    /// a host can join pass geometry with composited layers at presentation time.
+    pub fn set_pass_reports(&self, passes: Vec<crate::rhi::PassReport>) {
+        self.0
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .passes = passes;
+    }
+
+    /// Points this frame at the profile its GPU samples will land in.
+    pub fn set_timestamp_profile(&self, profile: std::sync::Arc<GpuTimestampProfile>) {
+        self.0
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .profile = Some(profile);
+    }
+
+    /// GPU samples completed since the last frame read them.
+    ///
+    /// Frames are read in submission order, so a sample that completes after its
+    /// frame was read lands on the next frame's read. Sampling is asynchronous;
+    /// this is the price of not blocking the reader on the GPU.
+    pub fn markers(&self) -> Vec<GpuTimestampMarker> {
+        let profile = self
+            .0
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .profile
+            .clone();
+        profile
+            .map(|profile| profile.drain_markers())
+            .unwrap_or_default()
+    }
+
+    pub fn pass_reports(&self) -> Vec<crate::rhi::PassReport> {
+        self.0
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .passes
+            .clone()
     }
 
     pub fn pipeline_creation(&self) -> (u64, u64) {
@@ -755,6 +806,9 @@ struct GpuTimestampState {
     markers: Vec<GpuTimestampMarker>,
     completed: usize,
     status: String,
+    /// How many retained markers a reader has already taken. Only advances
+    /// through `drain_markers`, so a frame can consume exactly its own samples.
+    consumed: usize,
 }
 
 /// Optional asynchronous GPU timing for queued submissions.
@@ -771,6 +825,17 @@ struct GpuTimestampState {
 pub struct GpuTimestampProfile {
     state: Mutex<GpuTimestampState>,
     marker_limit: usize,
+}
+impl std::fmt::Debug for GpuTimestampProfile {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let state = self.lock();
+        formatter
+            .debug_struct("GpuTimestampProfile")
+            .field("markers", &state.markers.len())
+            .field("completed", &state.completed)
+            .field("status", &state.status)
+            .finish()
+    }
 }
 impl GpuTimestampProfile {
     /// Bounded so an unbounded session cannot grow the sample list for ever.
@@ -819,6 +884,19 @@ impl GpuTimestampProfile {
         self.lock().markers.clone()
     }
 
+    /// Markers completed since the last drain, in completion order.
+    ///
+    /// A frame reader wants exactly the samples its own submission produced; the
+    /// returning cursor keeps a slow reader from seeing them twice. Markers
+    /// dropped past `marker_limit` are gone for good, which is why
+    /// `sample_count` still reports them.
+    pub fn drain_markers(&self) -> Vec<GpuTimestampMarker> {
+        let mut state = self.lock();
+        let drained = state.markers[state.consumed..].to_vec();
+        state.consumed = state.markers.len();
+        drained
+    }
+
     /// Total markers completed, including any not retained past the limit.
     pub fn sample_count(&self) -> usize {
         self.lock().completed
@@ -827,6 +905,7 @@ impl GpuTimestampProfile {
     pub fn reset(&self) {
         let mut state = self.lock();
         state.markers.clear();
+        state.consumed = 0;
         state.completed = 0;
     }
 }

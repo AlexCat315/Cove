@@ -136,8 +136,8 @@ fn wasm_cmake_toolchain(sdk: &Path) -> PathBuf {
     );
     let ninja = setup::native_ninja()
         .unwrap_or_else(|error| panic!("Wasm CMake builds need Ninja: {error}"));
-    let path = PathBuf::from(env::var_os("OUT_DIR").expect("OUT_DIR"))
-        .join("cove-wasi-toolchain.cmake");
+    let path =
+        PathBuf::from(env::var_os("OUT_DIR").expect("OUT_DIR")).join("cove-wasi-toolchain.cmake");
     fs::write(&path, wasm_toolchain_contents(sdk, &upstream, &ninja))
         .unwrap_or_else(|error| panic!("write {}: {error}", path.display()));
     path
@@ -310,7 +310,11 @@ pub fn link_cxx_runtime() {
         "android" => println!("cargo:rustc-link-lib=c++_shared"),
         _ if target.starts_with("wasm") => {
             let sdk = wasi_sdk().join("share/wasi-sysroot/lib");
-            let lib = if target.contains("wasip") { sdk.join(target) } else { sdk.join("wasm32-wasi") };
+            let lib = if target.contains("wasip") {
+                sdk.join(target)
+            } else {
+                sdk.join("wasm32-wasi")
+            };
             let exceptions = lib.join("eh");
             if exceptions.is_dir() {
                 println!("cargo:rustc-link-search=native={}", exceptions.display());

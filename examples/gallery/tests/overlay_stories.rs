@@ -44,7 +44,10 @@ fn the_hover_story_tracks_the_keyboard_profile_card() {
     let story = HoverCardStory::new(GalleryOptions::default());
     assert!(!story.is_profile_open());
     story.open_profile();
-    assert!(story.is_profile_open(), "Open profile presents the anchored card");
+    assert!(
+        story.is_profile_open(),
+        "Open profile presents the anchored card"
+    );
     story.close_profile();
     assert!(!story.is_profile_open());
 }
@@ -72,7 +75,10 @@ fn the_context_menu_keeps_rich_rows_and_nested_export() {
     assert!(open.content.icon.is_some(), "Open keeps its folder glyph");
 
     let duplicate = item_named(&entries, "Duplicate").expect("Duplicate row");
-    assert!(duplicate.content.icon.is_some(), "Duplicate keeps its copy glyph");
+    assert!(
+        duplicate.content.icon.is_some(),
+        "Duplicate keeps its copy glyph"
+    );
     assert_eq!(
         duplicate.content.detail.as_deref(),
         Some("Creates a copy next to the original"),

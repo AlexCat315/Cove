@@ -19,13 +19,17 @@ impl Session {
         ctrlc::set_handler(move || signal.store(true, Ordering::Release))
             .map_err(|error| error.to_string())?;
         let browser_app = web_root.is_some();
-        let controller = RunningController::start(port, web_root).map_err(|error| error.to_string())?;
+        let controller =
+            RunningController::start(port, web_root).map_err(|error| error.to_string())?;
         let info = controller.connection();
         eprintln!("Inspector: {}", inspector_url(info));
         if browser_app {
             eprintln!("App: {}/app/#{}", info.endpoint, info.token);
         }
-        Ok(Self { controller, interrupted })
+        Ok(Self {
+            controller,
+            interrupted,
+        })
     }
 
     pub fn connection(&self) -> &ConnectionInfo {
@@ -48,14 +52,19 @@ impl Session {
     pub fn run(&self, command: &mut Command) -> Result<()> {
         // Mobile launch arguments can contain pairing credentials.
         let program = command.get_program().to_string_lossy().into_owned();
-        let mut child = command.spawn().map_err(|error| format!("{program}: {error}"))?;
+        let mut child = command
+            .spawn()
+            .map_err(|error| format!("{program}: {error}"))?;
         loop {
             if self.interrupted() {
                 let _ = child.kill();
                 let _ = child.wait();
                 return Ok(());
             }
-            match child.try_wait().map_err(|error| format!("{program}: {error}"))? {
+            match child
+                .try_wait()
+                .map_err(|error| format!("{program}: {error}"))?
+            {
                 Some(status) if status.success() => return Ok(()),
                 Some(status) => return Err(format!("{program} exited with {status}")),
                 None => std::thread::sleep(Duration::from_millis(100)),

@@ -400,9 +400,7 @@ fn every_placement_trigger_stays_inside_the_story() {
                         .graph
                         .layout_snapshot()
                         .into_iter()
-                        .find(|entry| {
-                            entry.debug_name.as_deref() == Some("placement-playground")
-                        })
+                        .find(|entry| entry.debug_name.as_deref() == Some("placement-playground"))
                         .unwrap_or_else(|| {
                             panic!("no playground card at width {width} scale {scale}")
                         });
@@ -412,8 +410,10 @@ fn every_placement_trigger_stays_inside_the_story() {
                         "the card has a real box at width {width}"
                     );
 
-                    let labels: Vec<String> =
-                        VARIANTS.iter().map(|variant| variant.label.to_owned()).collect();
+                    let labels: Vec<String> = VARIANTS
+                        .iter()
+                        .map(|variant| variant.label.to_owned())
+                        .collect();
                     let debug_labels: Vec<String> = scene
                         .all(|node| node.accessibility().is_some())
                         .into_iter()
@@ -484,9 +484,11 @@ fn confirming_a_placement_bubble_records_its_label() {
         1280.0,
         1400.0,
         move |_| {
-            AnyView::new(cove_ui_compose::primitives::overlays::portal::LayerRoot::new(
-                AnyView::new(PopconfirmStoryHandle(mounted)),
-            ))
+            AnyView::new(
+                cove_ui_compose::primitives::overlays::portal::LayerRoot::new(AnyView::new(
+                    PopconfirmStoryHandle(mounted),
+                )),
+            )
         },
         |scene| {
             scene.settle_n(8);

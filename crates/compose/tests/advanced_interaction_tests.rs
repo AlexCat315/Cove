@@ -558,14 +558,16 @@ fn context_menu_lifecycle() {
 #[test]
 fn context_menu_opens_from_the_keyboard() {
     InteractiveScene::run(400.0, 300.0, |scene| {
-        scene.install(AnyView::new(LayerRoot::new(AnyView::new(ContextMenu::new(
-            || vec![MenuEntry::Item(MenuItem::new(1, "Rename", || {}))],
-            AnyView::new(
-                Button::new(Text::new("Entity"), || {})
-                    .frame_size(80.0, 32.0)
-                    .debug_name("entity"),
+        scene.install(AnyView::new(LayerRoot::new(AnyView::new(
+            ContextMenu::new(
+                || vec![MenuEntry::Item(MenuItem::new(1, "Rename", || {}))],
+                AnyView::new(
+                    Button::new(Text::new("Entity"), || {})
+                        .frame_size(80.0, 32.0)
+                        .debug_name("entity"),
+                ),
             ),
-        )))));
+        ))));
         let trigger = scene.named("entity").expect("the trigger is mounted");
         // Focus the trigger so the key path runs through the context-menu host.
         scene.click(&trigger, 1);
