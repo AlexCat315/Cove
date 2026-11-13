@@ -31,4 +31,4 @@ pub use named_columns::{
     ColumnVisibilityPlan, ColumnVisibilityTrack, GridColumnError, GridNamedColumns,
 };
 pub use row_heights::GridRowHeights;
-pub use span::{GridSpan, GridSpanCell, GridSpanKey, GridSpanPlacement};
+pub use span::{GridSpan, GridSpanCell, GridSpanPlacement};

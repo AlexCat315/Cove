@@ -1,6 +1,4 @@
 //! Translation of Compose/Sources/CoveUICompose/Primitives/Layout/Grid/Span.swift.
-use crate::{LayoutValueExt, LayoutValueKey, View};
-
 /// Cells a grid child covers. Spans are clamped to the resolved column count;
 /// named field columns ignore spans because hiding a field column would
 /// otherwise move every spanning cell.
@@ -26,25 +24,6 @@ impl Default for GridSpan {
         Self::SINGLE
     }
 }
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct GridSpanKey;
-impl LayoutValueKey for GridSpanKey {
-    type Value = GridSpan;
-    fn default_value() -> Self::Value {
-        GridSpan::SINGLE
-    }
-}
-
-/// Let this child cover several `Grid` columns and/or rows. Placement is
-/// row-major: a cell that does not fit the remaining columns of a row starts
-/// the next free row.
-pub trait GridCellSpanExt: View + Sized + 'static {
-    fn grid_cell_span(self, columns: usize, rows: usize) -> crate::ModifiedContent {
-        self.layout_value::<GridSpanKey>(GridSpan::new(columns, rows))
-    }
-}
-impl<T: View + Sized + 'static> GridCellSpanExt for T {}
 
 /// Row-major auto placement with an occupancy table, as in CSS grid's sparse
 /// flow. Heights grow so every multi-row cell fits its spanned rows.

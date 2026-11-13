@@ -19,7 +19,7 @@ use super::columns::{GridColumn, GridTrackResolver};
 use super::named_columns::{
     ColumnVisibilityPlan, ColumnVisibilityTrack, GridColumnError, GridNamedColumns,
 };
-use super::span::GridSpanKey;
+use super::span::GridSpan;
 
 /// A table grid: the column policy decides which columns exist and how wide
 /// each wants to be, then Taffy's CSS Grid solves the tracks, cells and row
@@ -156,7 +156,7 @@ impl GridLayout {
                     false
                 }
             } else {
-                let span = subview.value::<GridSpanKey>();
+                let span = authored_span(subview);
                 grid.column = [
                     GridPlacement::Auto,
                     GridPlacement::Span(
@@ -257,6 +257,21 @@ impl Layout for GridLayout {
         }
     }
 }
+/// Coverage declared by the child through the authored grid surface. A table
+/// grid only honours spans; explicit lines belong to `.grid(GridSpec)`, whose
+/// placement is not row-major.
+fn authored_span(subview: &LayoutSubview) -> GridSpan {
+    let grid = subview.grid_style();
+    GridSpan::new(track_span(&grid.column[1]), track_span(&grid.row[1]))
+}
+
+fn track_span(placement: &cove_core::scene::GridPlacement<String>) -> usize {
+    match placement {
+        cove_core::scene::GridPlacement::Span(count) => (*count).max(1) as usize,
+        _ => 1,
+    }
+}
+
 struct NativeArrangement {
     frames: Vec<Option<Rect>>,
     size: Size,

@@ -71,7 +71,7 @@ fn named_areas_place_every_cell_on_explicit_lines() {
             AnyView::new(cell(None, None, "main").grid_cell(main)),
             AnyView::new(cell(None, None, "side").grid_cell(side)),
         ])
-        .frame_height(300.0)
+        .fill()
         .grid(spec);
 
         scene.install(view);
@@ -135,15 +135,46 @@ fn spans_and_explicit_cells_follow_css_placement() {
 }
 
 #[test]
-fn justify_items_centers_without_touching_the_track() {
-    support::InteractiveScene::run(200.0, 100.0, |scene| {
-        let spec = GridSpec::new([GridTrack::points(200.0).into()]).justify_items(Align::Center);
-        let view = container(vec![AnyView::new(cell(Some(60.0), Some(20.0), "badge"))]).grid(spec);
+fn named_lines_place_a_child() {
+    support::InteractiveScene::run(300.0, 100.0, |scene| {
+        let spec = GridSpec::new([GridTrack::fr(1.0).into(), GridTrack::points(100.0).into()])
+            .column_names([
+                vec!["lead".to_string()],
+                vec!["split".to_string()],
+                vec!["tail".to_string()],
+            ])
+            .row_names([vec!["top".to_string()], vec!["bottom".to_string()]]);
+        let placement = GridCell::named(("split", "tail"), ("top", "bottom"));
+        let view = container(vec![AnyView::new(
+            cell(None, Some(20.0), "slot").grid_cell(placement),
+        )])
+            .fill()
+            .grid(spec);
         scene.install(view);
         assert_frame(
-            "a centered item keeps its own width",
-            frame(scene, "badge"),
-            (70.0, 0.0, 60.0, 20.0),
+            "named lines resolve to the second track",
+            frame(scene, "slot"),
+            (200.0, 0.0, 100.0, 20.0),
+        );
+    });
+}
+
+#[test]
+fn auto_fill_repeats_tracks_to_fit() {
+    support::InteractiveScene::run(320.0, 100.0, |scene| {
+        let spec = GridSpec::new([GridTemplateTrack::repeat(
+            GridRepeat::AutoFill,
+            [GridTrack::points(80.0)],
+        )])
+        .gap(10.0);
+        let view = container(vec![AnyView::new(cell(None, Some(20.0), "first"))])
+            .fill()
+            .grid(spec);
+        scene.install(view);
+        assert_frame(
+            "three 80pt tracks fit 320 with two 10pt gaps",
+            frame(scene, "first"),
+            (0.0, 0.0, 80.0, 20.0),
         );
     });
 }

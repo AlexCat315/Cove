@@ -481,5 +481,41 @@ pub trait LayoutFrameExt: View + Sized + 'static {
             None,
         )
     }
+    /// Takes the parent's extent on both axes (CSS `width: 100%; height: 100%`).
+    ///
+    /// The layout root fills the viewport by itself, but its children size to
+    /// their content; an app shell calls this on the view that should cover the
+    /// window. A percentage resolves against the parent's definite size, which
+    /// a viewport-filling parent always has.
+    fn fill(self) -> ModifiedContent {
+        self.frame(
+            Some(FrameDimension::Percent(100.0)),
+            Some(FrameDimension::Percent(100.0)),
+            None,
+            None,
+            None,
+            None,
+        )
+    }
+    fn fill_width(self) -> ModifiedContent {
+        self.frame(
+            Some(FrameDimension::Percent(100.0)),
+            None,
+            None,
+            None,
+            None,
+            None,
+        )
+    }
+    fn fill_height(self) -> ModifiedContent {
+        self.frame(
+            None,
+            Some(FrameDimension::Percent(100.0)),
+            None,
+            None,
+            None,
+            None,
+        )
+    }
 }
 impl<T: View + Sized + 'static> LayoutFrameExt for T {}

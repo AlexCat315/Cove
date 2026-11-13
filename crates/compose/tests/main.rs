@@ -117,6 +117,7 @@ mod four_tree_consistency_tests;
 mod grid_columns_tests;
 mod grid_layout_tests;
 mod grid_modifier_tests;
+mod grid_placement_parity;
 mod grid_span;
 mod gutter_tests;
 mod image_file_content_mode_tests;

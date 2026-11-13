@@ -36,8 +36,8 @@
 
 use crate::{ModifiedContent, View, ViewExt, ViewModifier};
 use cove_core::scene::{
-    Align, Display, GridAreaTemplate, GridAutoFlow, GridPlacement, GridStyle, GridTemplateTrack,
-    GridTrack, Gutter, LayoutNode, Node,
+    Align, Display, GridAreaTemplate, GridAutoFlow, GridPlacement, GridTemplateTrack, GridTrack,
+    Gutter, LayoutNode, Node,
 };
 
 /// A child's placement inside its parent's grid.
@@ -86,6 +86,23 @@ impl GridCell {
         }
     }
 
+    /// Placement by named lines, as authored in [`GridSpec::column_names`].
+    ///
+    /// Both names resolve to the first line carrying them, which is the CSS
+    /// meaning of `grid-column-start: left` / `grid-column-end: split`.
+    pub fn named(column: (&str, &str), row: (&str, &str)) -> Self {
+        Self {
+            column: [
+                GridPlacement::NamedLine(column.0.to_string(), 1),
+                GridPlacement::NamedLine(column.1.to_string(), 1),
+            ],
+            row: [
+                GridPlacement::NamedLine(row.0.to_string(), 1),
+                GridPlacement::NamedLine(row.1.to_string(), 1),
+            ],
+        }
+    }
+
     /// Placement of the named area in `template`; `None` when it has no such
     /// area. Lines come from the template, so the placement stays explicit and
     /// independent of how Taffy resolves area names internally.
@@ -121,6 +138,11 @@ pub struct GridSpec {
     pub align_items: Option<Align>,
     pub column_gap: Option<f32>,
     pub row_gap: Option<f32>,
+    /// Names for each column line (`grid-template-columns` line names); one set
+    /// per line, so an N-track template has N + 1 sets.
+    pub column_names: Vec<Vec<String>>,
+    /// Names for each row line.
+    pub row_names: Vec<Vec<String>>,
 }
 
 impl GridSpec {
@@ -182,6 +204,16 @@ impl GridSpec {
         self
     }
 
+    pub fn column_names(mut self, names: impl IntoIterator<Item = Vec<String>>) -> Self {
+        self.column_names = names.into_iter().collect();
+        self
+    }
+
+    pub fn row_names(mut self, names: impl IntoIterator<Item = Vec<String>>) -> Self {
+        self.row_names = names.into_iter().collect();
+        self
+    }
+
     pub fn justify_items(mut self, align: Align) -> Self {
         self.justify_items = Some(align);
         self
@@ -218,16 +250,21 @@ impl GridModifier {
         if let Some(align) = self.spec.align_items {
             layout.set_align_items(align);
         }
-        layout.set_grid_style(GridStyle {
-            columns: self.spec.columns.clone(),
-            rows: self.spec.rows.clone(),
-            auto_columns: self.spec.auto_columns.clone(),
-            auto_rows: self.spec.auto_rows.clone(),
-            auto_flow: self.spec.flow,
-            areas: self.spec.areas.clone(),
-            justify_items: self.spec.justify_items,
-            ..GridStyle::default()
-        });
+        // A container can also be placed inside its parent's grid, so keep the
+        // placement fields this spec does not own.
+        let mut grid = layout.style().grid;
+        grid.columns.clone_from(&self.spec.columns);
+        grid.rows.clone_from(&self.spec.rows);
+        grid.auto_columns.clone_from(&self.spec.auto_columns);
+        grid.auto_rows.clone_from(&self.spec.auto_rows);
+        grid.auto_flow = self.spec.flow;
+        grid.areas.clone_from(&self.spec.areas);
+        grid.column_names.clone_from(&self.spec.column_names);
+        grid.row_names.clone_from(&self.spec.row_names);
+        if self.spec.justify_items.is_some() {
+            grid.justify_items = self.spec.justify_items;
+        }
+        layout.set_grid_style(grid);
     }
 }
 
@@ -246,11 +283,35 @@ impl ViewModifier for GridCellModifier {
         let Some(layout) = node.layout_node() else {
             return;
         };
-        layout.set_grid_style(GridStyle {
-            column: self.0.column.clone(),
-            row: self.0.row.clone(),
-            ..GridStyle::default()
-        });
+        // Read-modify-write so stacking `.grid_cell(...)` with a per-item
+        // alignment keeps both; replacing the whole style would silently drop
+        // whichever modifier ran first.
+        let mut grid = layout.style().grid;
+        grid.column.clone_from(&self.0.column);
+        grid.row.clone_from(&self.0.row);
+        layout.set_grid_style(grid);
+    }
+}
+
+/// Per-item alignment inside its cell (CSS `justify-self` / `align-self`).
+pub struct GridSelfAlignmentModifier {
+    pub justify_self: Option<Align>,
+    pub align_self: Option<Align>,
+}
+
+impl ViewModifier for GridSelfAlignmentModifier {
+    fn apply_node(&self, node: &Node) {
+        let Some(layout) = node.layout_node() else {
+            return;
+        };
+        let mut grid = layout.style().grid;
+        if self.justify_self.is_some() {
+            grid.justify_self = self.justify_self;
+        }
+        layout.set_grid_style(grid);
+        if let Some(align) = self.align_self {
+            layout.set_align_self(align);
+        }
     }
 }
 
@@ -268,6 +329,22 @@ pub trait GridExt: View + Sized + 'static {
     /// Auto-placed shorthand for [`GridCell::span`].
     fn grid_span(self, columns: u16, rows: u16) -> ModifiedContent {
         self.grid_cell(GridCell::span(columns, rows))
+    }
+
+    /// Horizontal placement of this item inside its cell (`justify-self`).
+    fn grid_justify_self(self, align: Align) -> ModifiedContent {
+        self.modifier(GridSelfAlignmentModifier {
+            justify_self: Some(align),
+            align_self: None,
+        })
+    }
+
+    /// Vertical placement of this item inside its cell (`align-self`).
+    fn grid_align_self(self, align: Align) -> ModifiedContent {
+        self.modifier(GridSelfAlignmentModifier {
+            justify_self: None,
+            align_self: Some(align),
+        })
     }
 }
 impl<T: View + Sized + 'static> GridExt for T {}

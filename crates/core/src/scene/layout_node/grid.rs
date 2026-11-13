@@ -83,6 +83,14 @@ impl From<GridTrack> for GridTemplateTrack {
     }
 }
 impl GridTemplateTrack {
+    /// `repeat(count, tracks)`, including `auto-fill` and `auto-fit` counts.
+    pub fn repeat(count: GridRepeat, tracks: impl IntoIterator<Item = GridTrack>) -> Self {
+        Self::Repeat {
+            count,
+            tracks: tracks.into_iter().collect(),
+        }
+    }
+
     fn to_taffy(&self, calc: &CalcStorage) -> taffy::GridTemplateComponent<String> {
         match self {
             Self::Track(track) => taffy::GridTemplateComponent::Single(track.to_taffy(calc)),

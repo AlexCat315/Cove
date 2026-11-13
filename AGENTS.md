@@ -15,7 +15,7 @@ For performance-critical sections, please inline assembly.
 
 ## Layout
 
-There is one grid geometry engine: Taffy's CSS Grid. Author layouts with `.grid(GridSpec)` plus `.grid_cell(GridCell)`; tracks, gaps, `grid-template-areas` and per-item placement map one-to-one onto CSS. `crates/compose/src/primitives/layout/grid/` is the table policy layer (column policies, named-column visibility, row windows) and must not grow a second track solver — it compiles its policy into `GridStyle` and lets Taffy place the cells.
+There is one grid geometry engine: Taffy's CSS Grid. Author layouts with `.grid(GridSpec)` plus `.grid_cell(GridCell)`; tracks, gaps, `grid-template-areas`, line names and per-item placement map one-to-one onto CSS. A grid container sizes to content unless it declares an extent, so a window-covering shell calls `.fill()` (or `.fill_width()`/`.fill_height()`); `fr` rows otherwise resolve against zero content height. `crates/compose/src/primitives/layout/grid/` is the table policy layer (column policies, named-column visibility, row windows) and must not grow a second track solver — it compiles its policy into `GridStyle` and lets Taffy place the cells. Measured placement behaviour is recorded in `Docs/layout-grid-parity.md`.
 
 Apply breaking changes without requiring confirmation prior to the release of version 1.0.0.
 

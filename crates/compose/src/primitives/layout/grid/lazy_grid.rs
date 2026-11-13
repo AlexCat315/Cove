@@ -3,6 +3,7 @@ use crate::Scope;
 use std::ops::Range;
 use std::rc::Rc;
 
+use crate::modifiers::layout::GridExt;
 use crate::{AnyView, BoxView, LayoutNode, PrimitiveView, View, ViewKind};
 use cove_core::State;
 use cove_core::scene::Point;
@@ -425,9 +426,8 @@ impl<T: Clone + 'static> LazyGridView<T> {
                 content: (self.content)(element),
             });
             if rows.span_of_item(index) > 1 {
-                use super::span::GridCellSpanExt;
                 cells.push(AnyView::new(
-                    content.grid_cell_span(rows.span_of_item(index), 1),
+                    content.grid_span(1, rows.span_of_item(index) as u16),
                 ));
             } else {
                 cells.push(content);

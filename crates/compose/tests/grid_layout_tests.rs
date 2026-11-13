@@ -23,7 +23,7 @@ use cove_composition::layout::LayoutDirectionExt;
 use cove_composition::{Alignment, AnyView, LayoutDebugExt, TupleView};
 use cove_core::scene::{Align, Direction, FlexDirection, Justify, Node, Wrap};
 use cove_ui_compose::BoxView;
-use cove_ui_compose::modifiers::layout::LayoutFrameExt;
+use cove_ui_compose::modifiers::layout::{GridExt, LayoutFrameExt};
 use cove_ui_compose::primitives::layout::grid::{Grid, GridColumn, GridTrackResolver};
 
 use support::GlobalTestLock;
@@ -371,5 +371,49 @@ fn adaptive_reflow() {
             "at 150pt only two columns fit, so cell 2 starts row 1"
         );
         assert_eq!(found["cell-4"].frame().y, 50.0, "cell 4 lands in row 2");
+    });
+}
+
+#[test]
+fn table_grid_reads_the_authored_span() {
+    GlobalTestLock::locked(|| {
+        let graph = support::graph();
+        let grid = grid_node(
+            vec![
+                GridColumn::Fixed(60.0),
+                GridColumn::Fixed(60.0),
+                GridColumn::Fixed(60.0),
+            ],
+            10.0,
+            0.0,
+            Alignment::TopLeading,
+            vec![
+                AnyView::new(cell("cell-0", Some(40.0), Some(20.0)).grid_span(2, 1)),
+                cell("cell-1", Some(30.0), Some(20.0)),
+                cell("cell-2", Some(20.0), Some(10.0)),
+            ],
+        );
+        graph.install_view(
+            AnyView::new(AnyView::new(grid).frame_width(200.0)),
+            Default::default(),
+        );
+        graph.compute_layout(200.0, 200.0);
+        let root = graph.tree.borrow().root().expect("root");
+        let found = cells(&root);
+        assert_eq!(
+            (found["cell-0"].frame().x, found["cell-0"].frame().width),
+            (0.0, 40.0),
+            "the spanning cell keeps its authored width in the first track"
+        );
+        assert_eq!(
+            found["cell-1"].frame().x,
+            140.0,
+            "the next cell starts in the third track, proving the span covered two"
+        );
+        assert_eq!(
+            found["cell-2"].frame().y,
+            20.0,
+            "the third cell wraps to the row below the tallest spanned content"
+        );
     });
 }

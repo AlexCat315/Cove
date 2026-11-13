@@ -65,6 +65,13 @@ impl LayoutSubview {
             .attachment::<K::Value>(&LayoutValueStorage::key::<K>())
             .unwrap_or_else(K::default_value)
     }
+    /// The grid placement the child declared with `.grid_cell(...)` / `.grid_span(...)`.
+    ///
+    /// Containers that compile a table policy into a grid read coverage from
+    /// here, so a child declares spans once, in the same vocabulary CSS uses.
+    pub fn grid_style(&self) -> cove_core::scene::GridStyle {
+        self.node.style().grid
+    }
     pub fn size_that_fits(&self, proposal: ProposedViewSize) -> Size {
         self.node
             .measure_for_custom_layout(proposal.width, proposal.height)
