@@ -85,6 +85,11 @@ export function bindEvents() {
     state.scrollSelection = false;
     renderTreeArea();
   });
+  dom.filterChains.addEventListener("change", () => {
+    state.filters.chains = dom.filterChains.checked;
+    state.scrollSelection = false;
+    loadTree({ preserveExpansion: true });
+  });
 
   dom.tree.addEventListener("click", event => {
     const twisty = event.target.closest(".tree-twisty");

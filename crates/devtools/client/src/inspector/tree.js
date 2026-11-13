@@ -14,11 +14,52 @@ function nodeIsAnchor(node, isRoot = false) {
   return node?.ownerScopeID === node?.id || Boolean(node?.recomposition);
 }
 
-function shortType(viewTag) {
+export function shortType(viewTag) {
   const value = String(viewTag ?? "");
   if (!value) return "";
-  const path = value.split("::");
+  const angle = value.indexOf("<");
+  const base = angle >= 0 ? value.slice(0, angle) : value;
+  const path = base.split("::");
   return path[path.length - 1];
+}
+
+/**
+ * A wrapper is the node the composition layer inserts for a single modifier: it has
+ * no authored name, no source, no recomposition scope and exactly one child. Folding
+ * those runs is what turns the modifier stack into the node it wraps, so the tree
+ * reads as content instead of as a chain of one-child hops.
+ */
+function nodeIsWrapper(node, isRoot = false) {
+  if (!node || isRoot) return false;
+  if (node.debugName || node.semanticRole || node.source || node.recomposition) return false;
+  if (node.ownerScopeID === node.id) return false;
+  return nodeChildren(node).length === 1;
+}
+
+function foldWrapperChains(root) {
+  let folded = 0;
+  const fold = (node) => {
+    const kept = [];
+    for (const child of nodeChildren(node)) {
+      let current = child;
+      const chain = [];
+      while (nodeIsWrapper(current)) {
+        const next = nodeChildren(current)[0];
+        if (!next) break;
+        chain.push(nodeLabel(current));
+        current = next;
+      }
+      if (chain.length > 0) {
+        folded += chain.length;
+        current.foldedWrappers = [...(current.foldedWrappers ?? []), ...chain];
+      }
+      kept.push(fold(current));
+    }
+    node.children = kept;
+    return node;
+  };
+  if (!root) return { root: null, folded: 0 };
+  return { root: fold(root), folded };
 }
 
 export function nodeLabel(node) {
@@ -102,6 +143,12 @@ export async function loadTree(options = {}) {
     const snapshot = await rpc("inspect_ui_tree", { target: targetId });
     if (epoch !== state.targetEpoch || request !== state.treeRequest || targetId !== state.targetId) return;
     state.tree = snapshot && typeof snapshot === "object" ? snapshot : { root: null };
+    state.foldedWrappers = 0;
+    if (state.tree.root && state.filters.chains) {
+      const folded = foldWrapperChains(state.tree.root);
+      state.tree.root = folded.root;
+      state.foldedWrappers = folded.folded;
+    }
     state.treeLoaded = true;
     state.treeError = null;
     buildIndex(state.tree.root || null);
@@ -375,12 +422,17 @@ export function renderTreeArea() {
     const label = el("span", { class: "tree-label" });
     appendHighlighted(label, nodeLabel(row.node), query);
     const role = nodeRole(row.node);
-    const title = [row.node.debugName, row.node.viewTag, role, row.node.id].filter(Boolean).join(" · ");
+    const folded = row.node.foldedWrappers ?? [];
+    const foldedChip = folded.length > 0
+      ? el("span", { class: "tree-fold", text: `+${folded.length}`, attrs: { title: folded.join(" → ") } })
+      : null;
+    const title = [row.node.debugName, row.node.viewTag, role, row.node.id, folded.length > 0 ? `${folded.length} folded: ${folded.join(" → ")}` : null].filter(Boolean).join(" · ");
     appendChildren(rowNode, [
       el("span", { class: "tree-indent", attrs: { "aria-hidden": "true", style: `width:${row.depth * 14}px;flex:0 0 ${row.depth * 14}px` } }),
       twisty,
       el("span", { class: `node-glyph ${row.entry.anchor ? "anchor" : "primitive"}`, attrs: { "aria-hidden": "true" } }),
       label,
+      foldedChip,
       role && role !== label.textContent ? el("span", { class: "tree-role", text: role }) : null,
     ]);
     rowNode.title = title;

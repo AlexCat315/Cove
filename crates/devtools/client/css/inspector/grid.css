@@ -30,6 +30,9 @@
 
 .tree { flex: 1 1 auto; min-height: 0; overflow: auto; padding: 3px 0 16px; font-size: 12px; outline: none; }
 .tree-row {
+  /* Deep trees are wide, not narrow: a row grows to its content and the pane
+     scrolls sideways instead of squeezing the label into an ellipsis. */
+  min-width: max-content;
   display: flex;
   align-items: center;
   gap: 5px;
@@ -67,12 +70,21 @@
 }
 .node-glyph.primitive { border-color: var(--muted); border-radius: 50%; transform: scale(0.72); }
 .node-glyph.anchor { background: color-mix(in srgb, var(--accent) 18%, transparent); }
-.tree-label { overflow: hidden; text-overflow: ellipsis; color: var(--text); }
+.tree-label { flex: 0 0 auto; color: var(--text); }
+.tree-fold {
+  flex: 0 0 auto;
+  padding: 0 3px;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  color: var(--muted);
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+}
 .tree-indent { flex: 0 0 auto; }
 .tree-row.is-context .tree-label { color: var(--muted); font-weight: 500; }
 .tree-row.is-context .node-glyph { opacity: 0.42; }
 .tree-label mark { background: var(--warn-weak); color: inherit; border-radius: 2px; }
-.tree-role { color: var(--muted); font-size: 10.5px; overflow: hidden; text-overflow: ellipsis; }
+.tree-role { flex: 0 0 auto; color: var(--muted); font-size: 10.5px; }
 .tree-flag {
   padding: 0 3px;
   border: 1px solid var(--border);
