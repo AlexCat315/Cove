@@ -1,0 +1,22 @@
+    <section id="view-memory" class="view aux-view" role="tabpanel" aria-labelledby="tab-memory" hidden>
+      <header class="aux-header">
+        <div class="aux-title">
+          <h1>Memory</h1>
+          <p id="memory-meta" class="aux-meta">Process RSS and virtual are host readings; allocator counters appear when the host installs a tracking allocator; caches are estimates. Not a heap object graph.</p>
+        </div>
+        <div class="aux-actions">
+          <label class="check" title="Poll the runtime's memory provider and append each reading to the overview chart"><input id="memory-follow" type="checkbox"> Follow</label>
+          <label class="inline-field" for="memory-interval">Every</label>
+          <select id="memory-interval" aria-label="Memory polling interval">
+            <option value="1000">1 s</option>
+            <option value="2000">2 s</option>
+            <option value="5000">5 s</option>
+          </select>
+          <button id="memory-refresh" class="tool-button" type="button" title="Refresh memory counters" disabled>
+            <svg class="icon" aria-hidden="true"><use href="#i-refresh"></use></svg><span>Refresh</span>
+          </button>
+        </div>
+      </header>
+      <div id="memory-content" class="aux-content"></div>
+    </section>
+

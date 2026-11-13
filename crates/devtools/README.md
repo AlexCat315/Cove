@@ -51,9 +51,14 @@ DevTools 的画面范围为 Cove 渲染内容。系统标题栏、原生文件�
 
 ## 客户端源码结构
 
-`client/src/` 按职责分层：`core/` 放全局引用与共享状态（`globals.js`、`format.js`、`session.js`、`ui-helpers.js`、`debug-paint.js`），`inspector/` 放节点树（`tree.js`）、详情编辑器（`editors.js`）、画面捕获与输入，`shell/` 放视图切换、事件绑定与启动。多文件面板各自成目录：`panels/memory/`（快照、采样、基线、视图）、`panels/debugger/`（模型、会话、视图）、`panels/app-size/`（模型、分区、treemap、diff）、`panels/deep-links/`（模型、视图）、`panels/performance/profile/`（模型、控制、树视图、面板视图）；单文件面板（`network`、`logs`、`state`、`extensions`、`overview`、`frames`、`timeline`、`snapshots`）留在 `panels/` 或 `panels/performance/`。`client/index.html`、`client/inspector.css`、`client/tests/` 保持在原位。
+客户端源码分四棵目录树，全部由 `client/manifest.json` 声明拼装顺序：
 
-浏览器只请求一个 `/inspector.js`。服务端按 `client/src/manifest.json` 的顺序把分片**字节拼接**成这唯一的模块：分片共享同一顶层作用域，不是独立 ES module，`import`/`export` 不会跨分片生效。因此新增或拆分分片只需改 `manifest.json`；生产端清单由 `crates/devtools-cli/build.rs` 从 manifest 生成，漏登记的 `.js` 会让构建直接失败，不依赖任何手写列表。`client/tests/harness-server.mjs` 以同一种方式拼接并提供静态文件，各 harness 只保留自己的 fake `/rpc` 控制器与场景。
+- `client/markup/`：`head.html`、`shell.html`（页头、rail、`<main>` 起始）、`views/`（每个面板一段 `<section>`）、`dialogs.html`、`tail.html`，按序拼成 `/index.html`。
+- `client/css/`：`base.css`，`shell/`（页头、布局、setup、modal、toast、滚动条、响应式），`inspector/`（toolbar、grid、states、details、screenshot、detail tabs、flex explorer、input drawer），`panels/` 与 `panels/performance/` 对应各面板样式，按序拼成 `/inspector.css`。
+- `client/src/`：`core/` 放全局引用与共享状态（`globals.js`、`format.js`、`session.js`、`ui-helpers.js`、`debug-paint.js`），`inspector/` 放节点树（`tree.js`）、详情编辑器（`editors.js`）、画面捕获与输入，`shell/` 放视图切换、事件绑定与启动。多文件面板各自成目录：`panels/memory/`（快照、采样、基线、视图）、`panels/debugger/`（模型、会话、视图）、`panels/app-size/`（模型、分区、treemap、diff）、`panels/deep-links/`（模型、视图）、`panels/performance/profile/`（模型、控制、树视图、面板视图）；单文件面板（`network`、`logs`、`state`、`extensions`、`overview`、`frames`、`timeline`、`snapshots`）留在 `panels/` 或 `panels/performance/`。按序拼成 `/inspector.js`。
+- `client/tests/`：harness 与共享静态服务。
+
+三个 bundle 都由服务端把分片**字节拼接**成单份资源：JS 分片共享同一顶层作用域，不是独立 ES module，`import`/`export` 不会跨分片生效；HTML 与 CSS 拼接后仍是同一份文档与样式表。因此新增、拆分或改名分片只需改 `manifest.json`；生产端表由 `crates/devtools-cli/build.rs` 从 manifest 生成，漏登记的同类文件会让构建直接失败，不依赖任何手写列表。`client/tests/harness-server.mjs` 以同一种方式拼接并提供静态文件，各 harness 只保留自己的 fake `/rpc` 控制器与场景。
 
 ## 调试器
 

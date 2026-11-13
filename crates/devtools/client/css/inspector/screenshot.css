@@ -1,0 +1,48 @@
+/* Screenshot */
+.screenshot-panel { border-bottom: 1px solid var(--border); flex: 0 0 auto; background: var(--surface); }
+.screenshot-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 14px 5px;
+}
+.screenshot-head h3 { flex: 0 0 auto; }
+.screenshot-head .pane-meta { flex: 1 1 auto; }
+.screenshot-actions { display: flex; gap: 2px; }
+.screenshot-body {
+  margin: 0 14px 10px;
+  min-height: 72px;
+  max-height: 34vh;
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background:
+    linear-gradient(45deg, var(--surface-2) 25%, transparent 25%, transparent 75%, var(--surface-2) 75%) 0 0 / 16px 16px,
+    linear-gradient(45deg, var(--surface-2) 25%, transparent 25%, transparent 75%, var(--surface-2) 75%) 8px 8px / 16px 16px,
+    var(--surface);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+.screenshot-body .state { min-height: 70px; padding: 10px; }
+.screenshot-body img {
+  display: block;
+  max-width: 100%;
+  max-height: 34vh;
+  object-fit: contain;
+  cursor: default;
+}
+.screenshot-body.is-pick img { cursor: crosshair; }
+.screenshot-body.is-interact img { cursor: pointer; touch-action: none; }
+.screenshot-body.is-zoom img { max-width: none; max-height: none; }
+.screenshot-body.is-busy img { pointer-events: none; }
+.screenshot-body.is-pick { outline: 2px solid var(--accent); outline-offset: -2px; }
+.screenshot-body.is-busy::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: color-mix(in srgb, var(--surface) 55%, transparent);
+  cursor: progress;
+}
+

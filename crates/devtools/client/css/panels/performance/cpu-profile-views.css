@@ -1,0 +1,201 @@
+/* CPU profile views */
+.profile-views .panel-block-body { padding-top: 8px; }
+.profile-view-tabs {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  margin-bottom: 8px;
+  border-bottom: 1px solid var(--border);
+}
+.profile-view-tab {
+  height: 27px;
+  padding: 0 9px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  color: var(--muted);
+  font-size: 11.5px;
+  font-weight: 600;
+}
+.profile-view-tab:hover { color: var(--text); }
+.profile-view-tab[aria-selected="true"] { color: var(--accent); border-bottom-color: var(--accent); }
+.profile-view-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+.profile-view-toolbar .pane-meta { margin-left: auto; }
+.profile-filter {
+  height: 27px;
+  min-width: 180px;
+  max-width: 280px;
+  flex: 0 1 240px;
+  padding: 0 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text);
+  font-size: 11.5px;
+}
+.profile-filter:focus { outline: 2px solid var(--focus); outline-offset: -1px; }
+.profile-selection {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+  padding: 6px 9px;
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  font-size: 11px;
+}
+.profile-selection[hidden] { display: none; }
+.profile-selection-label { font-weight: 650; }
+.profile-selection-location { font-family: var(--mono); font-size: 10.5px; color: var(--muted); overflow-wrap: anywhere; }
+.profile-selection-stats { color: var(--text-secondary); font-variant-numeric: tabular-nums; }
+.profile-selection .tool-button { margin-left: auto; }
+.profile-tree-head,
+.profile-tree-row {
+  display: grid;
+  grid-template-columns: 18px minmax(120px, 1.3fr) minmax(0, 1fr) 54px 62px 52px 48px;
+  align-items: center;
+  gap: 6px;
+}
+.profile-tree-head {
+  padding: 0 6px 5px;
+  border-bottom: 1px solid var(--border);
+  color: var(--muted);
+  font-size: 9.5px;
+  font-weight: 650;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.profile-tree-head .num { text-align: right; }
+.profile-tree-root {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 5px 6px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface-2);
+  font-size: 11.5px;
+  font-weight: 650;
+}
+.profile-tree-root .profile-fn { margin-right: auto; }
+.profile-tree {
+  max-height: 460px;
+  overflow: auto;
+  border-bottom: 1px solid var(--border);
+}
+.profile-tree-row {
+  min-height: var(--row);
+  padding: 3px 6px 3px calc(6px + var(--profile-indent, 0px));
+  border-bottom: 1px solid var(--border);
+  font-size: 11.5px;
+  cursor: pointer;
+}
+.profile-tree-row:last-child { border-bottom: 0; }
+.profile-tree-row:hover { background: var(--surface-2); }
+.profile-tree-row:focus-visible { outline: 2px solid var(--focus); outline-offset: -2px; }
+.profile-tree-row.is-selected { background: var(--accent-weak); }
+.profile-tree-row.is-match .profile-fn { color: var(--accent); }
+.profile-tree-row.is-caller .profile-fn { color: var(--text-secondary); }
+.profile-tree-row.is-group .profile-fn { font-weight: 650; }
+.profile-tree-row .num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.profile-twisty {
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: 0;
+  border-radius: 3px;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 11px;
+  line-height: 1;
+}
+.profile-twisty:hover { background: var(--surface-3); color: var(--text); }
+.profile-twisty.is-empty { display: inline-block; }
+.profile-fn {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--mono);
+  font-size: 11px;
+}
+.profile-tree-row .profile-location { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.profile-sort {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-weight: 650;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+.profile-sort:hover { color: var(--text); }
+.profile-sort.is-active { color: var(--accent); }
+.profile-methods-table th[aria-sort="none"] { color: var(--muted); }
+.profile-methods-table td:first-child { max-width: 340px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.profile-stacks-table tbody tr { cursor: pointer; }
+.profile-stack-frame.is-leaf { color: var(--text); cursor: pointer; }
+.profile-stack-frame.is-leaf:hover { color: var(--accent); }
+.profile-stack-frame.is-selected { background: var(--accent-weak); box-shadow: inset 2px 0 0 var(--accent); }
+.profile-flame-scroll {
+  max-height: 460px;
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+}
+.profile-flame-plot { min-width: 100%; }
+.profile-flame-row {
+  display: grid;
+  grid-template-columns: 46px minmax(0, 1fr);
+  border-bottom: 1px solid var(--border);
+}
+.profile-flame-row:last-child { border-bottom: 0; }
+.profile-flame-depth {
+  display: flex;
+  align-items: center;
+  padding: 0 8px;
+  border-right: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 9.5px;
+}
+.profile-flame-track {
+  position: relative;
+  height: 20px;
+}
+.profile-flame-bar {
+  position: absolute;
+  top: 3px;
+  height: 14px;
+  min-width: 1px;
+  padding: 0 4px;
+  overflow: hidden;
+  border: 1px solid var(--border-strong);
+  border-radius: 2px;
+  background: var(--accent-weak);
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 9.5px;
+  line-height: 12px;
+  text-align: left;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.profile-flame-bar:hover { border-color: var(--accent); }
+.profile-flame-bar.is-selected { border-color: var(--accent); background: var(--accent); color: var(--accent-text); }
+.profile-flame-bar.is-match { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+.profile-flame-bar.is-dimmed { opacity: 0.35; }
+.profile-flame-bar .profile-flame-location { margin-left: 5px; color: var(--muted); font-size: 9px; }
+.profile-flame-bar.is-selected .profile-flame-location { color: var(--accent-text); opacity: 0.8; }
+

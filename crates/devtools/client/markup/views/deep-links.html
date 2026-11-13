@@ -1,0 +1,16 @@
+    <section id="view-deep-links" class="view aux-view deep-links-view" role="tabpanel" aria-labelledby="tab-deep-links" hidden>
+      <header class="aux-header">
+        <div class="aux-title">
+          <h1>Deep Links</h1>
+          <p id="deep-links-meta" class="aux-meta">Validate Android intent filters and Apple URL types in a project root.</p>
+        </div>
+        <form id="deep-links-root-form" class="aux-actions dl-root-form" autocomplete="off">
+          <label class="inline-field" for="deep-links-root">Project root</label>
+          <input id="deep-links-root" class="compact-input dl-root-input" type="text" placeholder="/absolute/project/root" spellcheck="false" maxlength="4096" aria-describedby="deep-links-root-error">
+          <button id="deep-links-validate" class="tool-button is-primary" type="submit">Validate</button>
+        </form>
+      </header>
+      <p id="deep-links-root-error" class="form-error dl-root-error" role="alert" hidden></p>
+      <div id="deep-links-content" class="aux-content"></div>
+    </section>
+

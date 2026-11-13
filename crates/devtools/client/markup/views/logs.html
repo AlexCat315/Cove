@@ -1,0 +1,34 @@
+    <section id="view-logs" class="view aux-view" role="tabpanel" aria-labelledby="tab-logs" hidden>
+      <header class="aux-header">
+        <div class="aux-title">
+          <h1>Logs</h1>
+          <p id="logs-meta" class="aux-meta">Recent runtime log records.</p>
+        </div>
+        <div class="aux-actions">
+          <label class="search-field small" for="logs-search">
+            <svg class="icon" aria-hidden="true"><use href="#i-search"></use></svg>
+            <input id="logs-search" type="search" placeholder="Filter logs" aria-label="Filter logs" autocomplete="off" spellcheck="false">
+          </label>
+          <label class="inline-field" for="logs-level">Level</label>
+          <select id="logs-level" aria-label="Minimum log level">
+            <option value="trace">Trace</option>
+            <option value="debug">Debug</option>
+            <option value="info" selected>Info</option>
+            <option value="notice">Notice</option>
+            <option value="warning">Warning</option>
+            <option value="error">Error</option>
+            <option value="critical">Critical</option>
+          </select>
+          <select id="logs-label" aria-label="Log label"><option value="">All labels</option></select>
+          <label class="check"><input id="logs-follow" type="checkbox"> Follow</label>
+          <button id="logs-clear" class="tool-button" type="button" title="Clear the runtime's replay log history">
+            <svg class="icon" aria-hidden="true"><use href="#i-trash"></use></svg><span>Clear</span>
+          </button>
+          <button id="logs-refresh" class="tool-button" type="button">
+            <svg class="icon" aria-hidden="true"><use href="#i-refresh"></use></svg><span>Refresh</span>
+          </button>
+        </div>
+      </header>
+      <div id="logs-content" class="aux-content"></div>
+    </section>
+

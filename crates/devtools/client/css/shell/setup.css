@@ -1,0 +1,38 @@
+/* Setup */
+.setup-state { height: 100%; display: grid; place-items: center; padding: 24px; overflow: auto; }
+.setup-card {
+  width: min(470px, 100%);
+  padding: 30px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+.setup-icon {
+  width: 40px; height: 40px;
+  display: grid;
+  place-items: center;
+  margin-bottom: 14px;
+  border-radius: 10px;
+  background: var(--accent-weak);
+  color: var(--accent);
+}
+.setup-icon .icon { width: 22px; height: 22px; }
+.setup-card h1 { font-size: 20px; margin-bottom: 6px; }
+.setup-card p { color: var(--text-secondary); margin-bottom: 18px; }
+.setup-card code { padding: 1px 4px; background: var(--surface-2); border-radius: 4px; }
+.token-form label { display: block; font-size: 11px; font-weight: 650; color: var(--muted); margin-bottom: 5px; }
+.token-row { display: flex; gap: 8px; }
+.token-row input {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 32px;
+  padding: 0 9px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  font-family: var(--mono);
+  font-size: 12px;
+}
+.form-error { margin-top: 12px !important; color: var(--bad) !important; font-size: 12px; }
+

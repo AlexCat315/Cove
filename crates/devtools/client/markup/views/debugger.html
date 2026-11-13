@@ -1,0 +1,116 @@
+    <section id="view-debugger" class="view aux-view debugger-view" role="tabpanel" aria-labelledby="tab-debugger" hidden>
+      <header class="aux-header">
+        <div class="aux-title">
+          <h1>Debugger</h1>
+          <p id="debugger-meta" class="aux-meta">Debug adapter sessions attach to one process at a time.</p>
+        </div>
+        <div class="aux-actions">
+          <span id="debugger-status" class="state-badge">Not attached</span>
+          <button id="debugger-refresh" class="tool-button" type="button" title="Refresh debugger state">
+            <svg class="icon" aria-hidden="true"><use href="#i-refresh"></use></svg><span>Refresh</span>
+          </button>
+          <button id="debugger-attach" class="tool-button is-primary" type="button" disabled>Attach</button>
+          <button id="debugger-detach" class="tool-button" type="button" disabled>Detach</button>
+        </div>
+      </header>
+
+      <div id="debugger-unavailable" class="debugger-unavailable" role="alert" hidden>
+        <svg class="icon" aria-hidden="true"><use href="#i-alert"></use></svg>
+        <div>
+          <strong id="debugger-unavailable-title">Debugger unavailable</strong>
+          <p id="debugger-unavailable-reason"></p>
+          <p id="debugger-adapter" class="debugger-adapter" hidden></p>
+        </div>
+      </div>
+
+      <div class="dbg-controls" role="toolbar" aria-label="Process control">
+        <button id="debugger-pause" class="tool-button" type="button" disabled>
+          <svg class="icon" aria-hidden="true"><use href="#i-pause"></use></svg><span>Pause</span>
+        </button>
+        <button id="debugger-continue" class="tool-button" type="button" disabled>
+          <svg class="icon" aria-hidden="true"><use href="#i-play"></use></svg><span>Continue</span>
+        </button>
+        <span class="dbg-control-sep" aria-hidden="true"></span>
+        <button id="debugger-step-over" class="tool-button" type="button" disabled>
+          <svg class="icon" aria-hidden="true"><use href="#i-step-over"></use></svg><span>Step over</span>
+        </button>
+        <button id="debugger-step-into" class="tool-button" type="button" disabled>
+          <svg class="icon" aria-hidden="true"><use href="#i-step-into"></use></svg><span>Step in</span>
+        </button>
+        <button id="debugger-step-out" class="tool-button" type="button" disabled>
+          <svg class="icon" aria-hidden="true"><use href="#i-step-out"></use></svg><span>Step out</span>
+        </button>
+        <span id="debugger-session" class="dbg-session">No session</span>
+        <span class="toolbar-spacer"></span>
+        <span id="debugger-busy" class="inline-spinner" hidden><span class="spinner" aria-hidden="true"></span><span id="debugger-busy-text">Working</span></span>
+      </div>
+
+      <div class="dbg-grid">
+        <aside class="dbg-side" aria-label="Debugger navigation">
+          <section class="dbg-pane dbg-threads-pane" aria-labelledby="debugger-threads-heading">
+            <header class="dbg-pane-head">
+              <h2 id="debugger-threads-heading">Threads</h2>
+              <span id="debugger-threads-meta" class="pane-meta"></span>
+            </header>
+            <div id="debugger-threads" class="dbg-list" role="group" aria-label="Threads"></div>
+          </section>
+          <section class="dbg-pane dbg-stack-pane" aria-labelledby="debugger-stack-heading">
+            <header class="dbg-pane-head">
+              <h2 id="debugger-stack-heading">Call Stack</h2>
+              <span id="debugger-stack-meta" class="pane-meta"></span>
+            </header>
+            <div id="debugger-stack" class="dbg-list" role="group" aria-label="Call stack"></div>
+          </section>
+          <section class="dbg-pane dbg-breakpoints-pane" aria-labelledby="debugger-breakpoints-heading">
+            <header class="dbg-pane-head">
+              <h2 id="debugger-breakpoints-heading">Breakpoints</h2>
+              <span id="debugger-breakpoints-meta" class="pane-meta"></span>
+            </header>
+            <div id="debugger-breakpoints" class="dbg-list" role="group" aria-label="Breakpoints"></div>
+          </section>
+        </aside>
+
+        <section class="dbg-source-pane" aria-labelledby="debugger-source-heading">
+          <header class="dbg-source-head">
+            <h2 id="debugger-source-heading">Source</h2>
+            <code id="debugger-source-path" class="dbg-source-path">No file</code>
+            <span id="debugger-source-meta" class="pane-meta"></span>
+            <span class="toolbar-spacer"></span>
+            <form id="debugger-open-form" class="dbg-open-form" autocomplete="off">
+              <label class="sr-only" for="debugger-open-path">Source path</label>
+              <input id="debugger-open-path" class="compact-input dbg-path-input" type="text" placeholder="Open path" spellcheck="false" maxlength="4096">
+              <button id="debugger-open" class="tool-button small" type="submit" disabled>Open</button>
+            </form>
+          </header>
+          <div id="debugger-source" class="dbg-source" role="region" aria-label="Source code" tabindex="0"></div>
+        </section>
+
+        <section class="dbg-vars-pane" aria-labelledby="debugger-scopes-heading">
+          <header class="dbg-pane-head">
+            <h2 id="debugger-scopes-heading">Scopes</h2>
+            <span id="debugger-scopes-meta" class="pane-meta"></span>
+            <div class="pane-actions">
+              <button id="debugger-variables-refresh" class="icon-button small" type="button" title="Refresh scopes and variables" aria-label="Refresh scopes and variables" disabled>
+                <svg class="icon" aria-hidden="true"><use href="#i-refresh"></use></svg>
+              </button>
+            </div>
+          </header>
+          <div id="debugger-variables" class="dbg-vars" role="group" aria-label="Scopes and variables"></div>
+        </section>
+      </div>
+
+      <section class="dbg-console" aria-labelledby="debugger-console-heading">
+        <header class="dbg-console-head">
+          <h2 id="debugger-console-heading">Console</h2>
+          <span id="debugger-console-meta" class="pane-meta"></span>
+          <button id="debugger-console-clear" class="text-button" type="button">Clear</button>
+        </header>
+        <div id="debugger-console" class="dbg-console-log" role="log" aria-live="polite" aria-relevant="additions"></div>
+        <form id="debugger-evaluate-form" class="dbg-evaluate" autocomplete="off">
+          <label class="sr-only" for="debugger-expression">Evaluate expression</label>
+          <span class="dbg-prompt" aria-hidden="true">&gt;</span>
+          <input id="debugger-expression" type="text" placeholder="Evaluate in the selected frame" spellcheck="false" autocomplete="off">
+          <button id="debugger-evaluate" class="tool-button" type="submit" disabled>Evaluate</button>
+        </form>
+      </section>
+    </section>

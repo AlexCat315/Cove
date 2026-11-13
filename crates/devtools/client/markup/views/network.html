@@ -1,0 +1,40 @@
+    <section id="view-network" class="view aux-view" role="tabpanel" aria-labelledby="tab-network" hidden>
+      <header class="aux-header">
+        <div class="aux-title">
+          <h1>Network</h1>
+          <p id="network-meta" class="aux-meta">Recorded in-process HTTP activity.</p>
+        </div>
+        <div class="aux-actions">
+          <label class="search-field small" for="network-search">
+            <svg class="icon" aria-hidden="true"><use href="#i-search"></use></svg>
+            <input id="network-search" type="search" placeholder="Filter URL" aria-label="Filter network requests" autocomplete="off" spellcheck="false">
+          </label>
+          <label class="inline-field" for="network-state-filter">State</label>
+          <select id="network-state-filter" aria-label="Filter by request state">
+            <option value="all">All</option>
+            <option value="pending">Pending</option>
+            <option value="complete">Complete</option>
+            <option value="failed">Failed</option>
+            <option value="cancelled">Cancelled</option>
+          </select>
+          <label class="check"><input id="network-follow" type="checkbox"> Follow</label>
+          <label class="check" title="Draw each request against the wall clock, split at the recorded response-head arrival"><input id="network-waterfall" type="checkbox" checked> Waterfall</label>
+          <button id="network-recording-toggle" class="tool-button" type="button" title="Pause recording new HTTP requests" disabled>
+            <svg class="icon" aria-hidden="true"><use href="#i-pause"></use></svg><span>Pause</span>
+          </button>
+          <button id="network-clear" class="tool-button" type="button" title="Clear the runtime's retained network records" disabled>
+            <svg class="icon" aria-hidden="true"><use href="#i-trash"></use></svg><span>Clear</span>
+          </button>
+          <button id="network-refresh" class="tool-button" type="button">
+            <svg class="icon" aria-hidden="true"><use href="#i-refresh"></use></svg><span>Refresh</span>
+          </button>
+        </div>
+      </header>
+      <div id="network-recording-status" class="network-banner" role="status" hidden>
+        <svg class="icon" aria-hidden="true"><use href="#i-pause"></use></svg>
+        <strong>Recording paused</strong>
+        <span class="muted">Existing requests are retained. New requests are not recorded.</span>
+      </div>
+      <div id="network-content" class="aux-content"></div>
+    </section>
+

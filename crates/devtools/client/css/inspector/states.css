@@ -1,0 +1,41 @@
+/* States */
+.state-host { flex: 1 1 auto; min-height: 0; overflow: auto; }
+.state {
+  min-height: 120px;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 24px;
+  text-align: center;
+  color: var(--muted);
+  font-size: 12px;
+}
+.state.compact { min-height: 64px; height: auto; padding: 12px; }
+.state .state-icon {
+  width: 30px; height: 30px;
+  display: grid;
+  place-items: center;
+  border-radius: 8px;
+  background: var(--surface-2);
+  color: var(--muted);
+  margin-bottom: 2px;
+}
+.state .state-icon .icon { width: 17px; height: 17px; }
+.state strong { color: var(--text-secondary); font-size: 12.5px; font-weight: 650; }
+.state p { max-width: 380px; line-height: 1.5; }
+.state .tool-button { margin-top: 4px; }
+.state.is-error .state-icon { background: var(--bad-weak); color: var(--bad); }
+.state.is-error strong { color: var(--bad); }
+.state.is-loading .state-icon { background: transparent; }
+.spinner {
+  width: 18px; height: 18px;
+  border: 2px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.75s linear infinite;
+}
+.inline-spinner { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); font-size: 11px; }
+

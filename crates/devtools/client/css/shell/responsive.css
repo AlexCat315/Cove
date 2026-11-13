@@ -1,0 +1,111 @@
+/* Responsive */
+@media (max-width: 1180px) {
+  .inspector-grid { grid-template-columns: minmax(260px, 34%) minmax(0, 1fr); }
+  .search-field { max-width: none; }
+  .dbg-grid { grid-template-columns: minmax(170px, 210px) minmax(280px, 1fr) minmax(210px, 260px); }
+  .dbg-path-input { width: 110px; }
+}
+@media (max-width: 900px) {
+  :root { --rail-width: 66px; }
+  .brand-product { display: none; }
+  .app-header { gap: 8px; padding: 0 10px; }
+  .target-bar { flex-basis: 240px; }
+  .rail-tab span:not(.rail-badge):not(.rail-recording) { font-size: 9px; }
+  .inspector-grid {
+    grid-template-columns: 1fr;
+    grid-template-rows: minmax(180px, 42dvh) minmax(0, 1fr);
+    overflow: auto;
+  }
+  .tree-pane { min-height: 180px; }
+  .details-pane { min-height: 300px; overflow: auto; }
+  #details-content { overflow: visible; }
+  .screenshot-body { max-height: 30vh; }
+  .dbg-grid { grid-template-columns: 160px minmax(0, 1fr) 208px; }
+  .dbg-session { display: none; }
+  .dbg-source-path { max-width: 30%; }
+  .dbg-open-form { display: none; }
+  .dl-root-form { flex-wrap: wrap; justify-content: flex-start; }
+  .dl-root-input { width: min(100%, 420px); }
+}
+@media (max-width: 680px) {
+  body { overflow: auto; }
+  .app-header { height: auto; min-height: var(--header-height); flex-wrap: wrap; padding: 8px 10px; }
+  .brand { flex: 0 0 auto; }
+  .target-bar { order: 3; flex-basis: 100%; max-width: none; }
+  .header-actions { margin-left: auto; }
+  .app-body { height: auto; min-height: calc(100dvh - var(--header-height)); }
+  .rail {
+    position: sticky;
+    top: 0;
+    z-index: 15;
+    width: 100%;
+    flex-basis: 100%;
+    flex-direction: row;
+    padding: 4px;
+    overflow-x: auto;
+    border-right: 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .app-body { flex-direction: column; }
+  .rail-tabs { flex-direction: row; flex: 0 0 auto; }
+  .rail-tab { width: auto; min-width: 64px; min-height: 42px; flex-direction: row; gap: 5px; padding: 6px 8px; font-size: 10px; }
+  .rail-tab[aria-selected="true"]::before { left: 8px; right: 8px; top: auto; bottom: -4px; width: auto; height: 2px; border-radius: 2px 2px 0 0; }
+  .rail-tab .icon { width: 16px; height: 16px; }
+  .rail-meta { display: none; }
+  .rail-badge { position: static; }
+  main { overflow: visible; }
+  .view { height: auto; min-height: calc(100dvh - 120px); }
+  .inspector-view { height: auto; }
+  #inspector-content { height: auto; }
+  .inspector-grid { display: flex; flex-direction: column; overflow: visible; }
+  .tree-pane { min-height: 240px; max-height: 52dvh; }
+  .details-pane { min-height: 0; overflow: visible; }
+  #details-content { overflow: visible; }
+  .inspector-toolbar { gap: 6px; }
+  .search-field { flex-basis: 100%; max-width: none; }
+  .filter-group { order: 5; }
+  .toolbar-spacer { display: none; }
+  .inspector-toolbar .inline-field, .inspector-toolbar select { display: none; }
+  .input-drawer { position: static; border-top: 1px solid var(--border); }
+  .input-body { gap: 8px; }
+  .text-input { width: min(220px, 55vw); }
+  .aux-header { padding: 10px 12px; }
+  .aux-content { padding: 10px 12px 24px; overflow: visible; }
+  .aux-actions { justify-content: flex-start; }
+  .log-entry > summary { grid-template-columns: 62px 50px minmax(0, 1fr); }
+  .log-source, .log-label { display: none; }
+  .screenshot-body { max-height: 30dvh; }
+  .flame-row { grid-template-columns: 84px minmax(0, 1fr); }
+  .profile-flame-row { grid-template-columns: 36px minmax(0, 1fr); }
+  .profile-tree-head, .profile-tree-row { grid-template-columns: 16px minmax(96px, 1.4fr) minmax(0, 1fr) 42px 50px 42px 40px; gap: 4px; }
+  .profile-view-toolbar .pane-meta { display: none; }
+  .perf-tabs { padding: 0 12px; }
+  .snapshot-banner .tool-button { margin-left: 0; }
+  .debugger-view { height: auto; }
+  .dbg-controls { padding: 7px 12px; }
+  .dbg-grid { display: flex; flex-direction: column; min-height: 0; border-bottom: 0; }
+  .dbg-side { max-height: none; border-right: 0; border-bottom: 1px solid var(--border); overflow: visible; }
+  .dbg-threads-pane { max-height: 220px; }
+  .dbg-stack-pane, .dbg-breakpoints-pane { min-height: 120px; max-height: 240px; }
+  .dbg-source-pane { min-height: 320px; max-height: 62dvh; border-right: 0; border-bottom: 1px solid var(--border); }
+  .dbg-vars-pane { min-height: 180px; max-height: 42dvh; }
+  .dbg-console { max-height: none; }
+  .dbg-console-log { max-height: 190px; }
+  .debugger-unavailable { margin: 0 12px 10px; }
+}
+@media (max-width: 440px) {
+  .brand-name { font-size: 13px; }
+  .status-pill { padding: 0 7px; font-size: 10px; }
+  .target-bar { flex-wrap: wrap; }
+  .target-bar select { flex-basis: calc(100% - 38px); }
+  .inspector-toolbar .segmented span { display: none; }
+  .inspector-toolbar .tool-button span { display: none; }
+  .inspector-toolbar .tool-button { width: 30px; justify-content: center; padding: 0; }
+  .dbg-controls .tool-button span { display: none; }
+  .dbg-controls .tool-button { width: 30px; justify-content: center; padding: 0; }
+  .dbg-source-head .pane-meta { display: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.001ms !important; animation-iteration-count: 1 !important; transition-duration: 0.001ms !important; scroll-behavior: auto !important; }
+}

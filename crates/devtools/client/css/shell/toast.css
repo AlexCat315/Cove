@@ -1,0 +1,23 @@
+/* Toast */
+.toast {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  z-index: 80;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  width: min(420px, calc(100vw - 32px));
+  padding: 9px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-elevated);
+  box-shadow: var(--shadow);
+  color: var(--text);
+  font-size: 12px;
+}
+.toast .toast-icon { color: var(--accent); margin-top: 1px; }
+.toast.is-error .toast-icon { color: var(--bad); }
+.toast.is-success .toast-icon { color: var(--good); }
+.toast > span { flex: 1 1 auto; overflow-wrap: anywhere; }
+

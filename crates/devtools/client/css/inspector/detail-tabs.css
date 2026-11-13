@@ -1,0 +1,57 @@
+/* Detail tabs */
+.detail-tabs {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 0 10px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+  flex: 0 0 auto;
+  position: sticky;
+  top: 0;
+  z-index: 2;
+}
+.detail-tab {
+  height: 34px;
+  padding: 0 10px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+.detail-tab:hover { color: var(--text); }
+.detail-tab[aria-selected="true"] { color: var(--accent); border-bottom-color: var(--accent); }
+.detail-panel { padding: 12px 14px 22px; min-height: 0; }
+.detail-panel:focus { outline: none; }
+
+.section { margin-bottom: 16px; }
+.section:last-child { margin-bottom: 0; }
+.section > h3 {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 6px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--border);
+}
+.section > h3 .count { margin-left: auto; color: var(--muted); font-weight: 500; text-transform: none; letter-spacing: 0; }
+.kv {
+  display: grid;
+  grid-template-columns: minmax(96px, max-content) minmax(0, 1fr);
+  gap: 3px 14px;
+  margin: 0;
+  font-size: 12px;
+}
+.kv dt { color: var(--muted); }
+.kv dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
+.kv dd code { background: var(--surface-2); padding: 1px 4px; border-radius: 3px; }
+.value-emphasis { font-family: var(--mono); }
+.mono { font-family: var(--mono); font-size: 11.5px; }
+.muted { color: var(--muted); }
+.truncate { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; display: inline-block; vertical-align: bottom; }
+.empty-inline { padding: 8px 10px; border: 1px dashed var(--border); border-radius: var(--radius-sm); color: var(--muted); font-size: 11.5px; }
+.error-inline { padding: 8px 10px; border: 1px solid color-mix(in srgb, var(--bad) 35%, var(--border)); border-radius: var(--radius-sm); background: var(--bad-weak); color: var(--bad); font-size: 11.5px; }
+.warn-inline { padding: 8px 10px; border: 1px solid color-mix(in srgb, var(--warn) 35%, var(--border)); border-radius: var(--radius-sm); background: var(--warn-weak); color: var(--warn); font-size: 11.5px; }
+

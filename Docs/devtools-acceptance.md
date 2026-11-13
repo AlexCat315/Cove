@@ -618,7 +618,7 @@ Exit codes:
 bash -n Tools/DevTools/acceptance/allocation-sites.sh
 # clean
 
-node --check crates/devtools/client/inspector.js
+find crates/devtools/client/src -name '*.js' -exec node --check {} \;
 node --check crates/devtools/client/tests/allocation-sites-harness.mjs
 # node --check: OK
 

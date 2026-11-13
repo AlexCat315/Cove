@@ -1,0 +1,45 @@
+/* Input drawer */
+.input-drawer {
+  flex: 0 0 auto;
+  border-top: 1px solid var(--border);
+  background: var(--bg-elevated);
+}
+.drawer-header {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 4px 12px;
+  min-height: 31px;
+}
+.drawer-header .icon { width: 14px; height: 14px; color: var(--muted); }
+.drawer-header h2 { font-size: 11px; text-transform: uppercase; letter-spacing: 0.045em; color: var(--text-secondary); }
+.drawer-header .pane-meta { flex: 1 1 auto; }
+.input-body {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  padding: 0 12px 8px;
+}
+.input-row { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; margin: 0; }
+.compact-input, .text-input {
+  height: 26px;
+  padding: 0 7px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  font-size: 12px;
+}
+.compact-input { width: 90px; font-family: var(--mono); }
+.text-input { width: 210px; }
+.modifiers {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.input-row .tool-button { height: 26px; }
+.input-help { color: var(--muted); font-size: 10.5px; flex-basis: 100%; margin-top: -2px; }
+

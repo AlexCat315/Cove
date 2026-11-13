@@ -1,0 +1,94 @@
+/* Flex explorer */
+.flex-editor { display: grid; gap: 8px; margin-bottom: 8px; }
+.flex-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; }
+.flex-field { display: grid; gap: 3px; min-width: 0; }
+.flex-field > span { color: var(--muted); font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; }
+.flex-field .compact-input { width: 100%; height: 27px; font-family: var(--mono); }
+.flex-field select.compact-input { font-family: inherit; }
+.flex-field.is-dirty > span { color: var(--accent); }
+.flex-field.is-dirty .compact-input { border-color: var(--accent); }
+.flex-field input[aria-invalid="true"] { border-color: var(--bad); }
+.flex-actions { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.flex-status { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); font-size: 11px; }
+.flex-status:empty { display: none; }
+.flex-status.is-error { color: var(--bad); }
+.flex-status.is-warn { color: var(--warn); }
+.flex-status .spinner { width: 13px; height: 13px; border-width: 2px; }
+
+.metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)); gap: 6px; }
+.metric {
+  padding: 7px 9px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  min-width: 0;
+}
+.metric-label { display: block; color: var(--muted); font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; }
+.metric-value { display: block; margin-top: 1px; font-size: 14px; font-weight: 650; font-variant-numeric: tabular-nums; overflow: hidden; text-overflow: ellipsis; }
+.metric-value small { font-size: 10px; font-weight: 500; color: var(--muted); }
+
+.box-model { display: grid; gap: 4px; }
+.box-row { display: grid; grid-template-columns: 52px minmax(0, 1fr) 52px; align-items: center; gap: 5px; }
+.box-cell {
+  padding: 5px 7px;
+  border-radius: 4px;
+  text-align: center;
+  font-family: var(--mono);
+  font-size: 11px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.box-edge { background: var(--surface-2); color: var(--text-secondary); border: 1px solid var(--border); }
+.box-content { background: var(--accent-weak); color: var(--accent); border: 1px solid color-mix(in srgb, var(--accent) 30%, var(--border)); }
+.box-border { background: color-mix(in srgb, var(--warn) 14%, var(--surface)); border: 1px solid color-mix(in srgb, var(--warn) 30%, var(--border)); color: var(--warn); }
+.box-padding { background: color-mix(in srgb, var(--good) 12%, var(--surface)); border: 1px solid color-mix(in srgb, var(--good) 30%, var(--border)); color: var(--good); }
+.box-margin { background: var(--surface-2); border: 1px dashed var(--border-strong); color: var(--muted); }
+.box-label { color: var(--muted); font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; }
+.box-center {
+  display: grid;
+  place-items: center;
+  min-height: 62px;
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface-2);
+  text-align: center;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+.legend { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 6px; color: var(--muted); font-size: 10px; }
+.legend span::before { content: ""; display: inline-block; width: 8px; height: 8px; margin-right: 4px; border-radius: 2px; background: var(--muted); }
+.legend .padding::before { background: var(--good); }
+.legend .border::before { background: var(--warn); }
+.legend .content::before { background: var(--accent); }
+.legend .slow::before { background: var(--warn); }
+.legend .over::before { background: var(--bad); }
+
+.source-card {
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface-2);
+}
+.source-path { font-family: var(--mono); font-size: 12.5px; overflow-wrap: anywhere; }
+.source-location { display: flex; align-items: center; gap: 8px; margin-top: 6px; }
+.source-location .pill { padding: 2px 7px; border-radius: 999px; background: var(--surface); border: 1px solid var(--border); font-family: var(--mono); font-size: 11px; }
+.source-actions { display: flex; gap: 6px; margin-top: 12px; flex-wrap: wrap; }
+
+.raw { margin-top: 12px; }
+.raw summary { cursor: pointer; color: var(--muted); font-size: 11px; font-weight: 600; user-select: none; }
+.raw pre {
+  margin: 6px 0 0;
+  padding: 9px;
+  max-height: 280px;
+  overflow: auto;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: 11px;
+  line-height: 1.45;
+  white-space: pre;
+}
+

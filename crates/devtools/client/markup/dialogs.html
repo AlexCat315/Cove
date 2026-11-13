@@ -1,0 +1,34 @@
+  </main>
+</div>
+
+<dialog id="shortcuts-dialog" class="modal" aria-labelledby="shortcuts-title">
+  <div class="modal-head">
+    <h2 id="shortcuts-title">Keyboard shortcuts</h2>
+    <button id="shortcuts-close" class="icon-button" type="button" aria-label="Close shortcuts">
+      <svg class="icon" aria-hidden="true"><use href="#i-close"></use></svg>
+    </button>
+  </div>
+  <table class="shortcut-table">
+    <tbody>
+      <tr><th scope="row">Focus search</th><td><kbd>/</kbd></td></tr>
+      <tr><th scope="row">Toggle pick mode</th><td><kbd>P</kbd></td></tr>
+      <tr><th scope="row">Refresh targets and view</th><td><kbd>R</kbd></td></tr>
+      <tr><th scope="row">Sections</th><td><kbd>Alt</kbd> + <kbd>1</kbd>…<kbd>8</kbd></td></tr>
+      <tr><th scope="row">Navigate tree</th><td><kbd>↑</kbd><kbd>↓</kbd><kbd>←</kbd><kbd>→</kbd></td></tr>
+      <tr><th scope="row">Debugger continue</th><td><kbd>F5</kbd></td></tr>
+      <tr><th scope="row">Debugger step</th><td><kbd>F10</kbd> <kbd>F11</kbd> <kbd>Shift</kbd>+<kbd>F11</kbd></td></tr>
+      <tr><th scope="row">Exit pick or close dialog</th><td><kbd>Esc</kbd></td></tr>
+      <tr><th scope="row">Shortcuts</th><td><kbd>?</kbd></td></tr>
+    </tbody>
+  </table>
+</dialog>
+
+<dialog id="network-dialog" class="modal modal-wide" aria-labelledby="network-dialog-title">
+  <div class="modal-head">
+    <h2 id="network-dialog-title">Request</h2>
+    <button id="network-dialog-close" class="icon-button" type="button" aria-label="Close request details">
+      <svg class="icon" aria-hidden="true"><use href="#i-close"></use></svg>
+    </button>
+  </div>
+  <div id="network-dialog-body" class="modal-body"></div>
+</dialog>

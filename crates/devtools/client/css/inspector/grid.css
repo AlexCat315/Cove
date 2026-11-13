@@ -1,0 +1,95 @@
+/* Inspector grid */
+.inspector-grid {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(290px, 38%) minmax(0, 1fr);
+  background: var(--border);
+  gap: 1px;
+}
+.tree-pane, .details-pane {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  background: var(--surface);
+}
+.pane-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 35px;
+  padding: 5px 8px 5px 12px;
+  border-bottom: 1px solid var(--border);
+  flex: 0 0 auto;
+}
+.pane-title { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
+.pane-meta { color: var(--muted); font-size: 11px; font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pane-actions { display: flex; align-items: center; gap: 2px; }
+
+.tree { flex: 1 1 auto; min-height: 0; overflow: auto; padding: 3px 0 16px; font-size: 12px; outline: none; }
+.tree-row {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  min-height: var(--row);
+  padding: 0 8px 0 4px;
+  border-radius: 0;
+  cursor: default;
+  user-select: none;
+  white-space: nowrap;
+}
+.tree-row:hover { background: var(--surface-2); }
+.tree-row[aria-selected="true"] { background: var(--accent-weak); }
+.tree-row[aria-selected="true"] .tree-label { color: var(--accent); font-weight: 650; }
+.tree-row:focus-visible { outline-offset: -2px; }
+.tree-twisty {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px; height: 18px;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: var(--muted);
+  flex: 0 0 16px;
+}
+.tree-twisty .icon { width: 11px; height: 11px; transition: transform 120ms ease; }
+.tree-twisty[aria-expanded="true"] .icon { transform: rotate(90deg); }
+.tree-twisty.empty { visibility: hidden; }
+.node-glyph {
+  width: 12px; height: 12px;
+  flex: 0 0 12px;
+  border-radius: 2px;
+  border: 1.4px solid var(--accent);
+  opacity: 0.85;
+}
+.node-glyph.primitive { border-color: var(--muted); border-radius: 50%; transform: scale(0.72); }
+.node-glyph.anchor { background: color-mix(in srgb, var(--accent) 18%, transparent); }
+.tree-label { overflow: hidden; text-overflow: ellipsis; color: var(--text); }
+.tree-indent { flex: 0 0 auto; }
+.tree-row.is-context .tree-label { color: var(--muted); font-weight: 500; }
+.tree-row.is-context .node-glyph { opacity: 0.42; }
+.tree-label mark { background: var(--warn-weak); color: inherit; border-radius: 2px; }
+.tree-role { color: var(--muted); font-size: 10.5px; overflow: hidden; text-overflow: ellipsis; }
+.tree-flag {
+  padding: 0 3px;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  color: var(--muted);
+  font-size: 9px;
+  line-height: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+.tree-footer {
+  flex: 0 0 auto;
+  padding: 5px 12px;
+  border-top: 1px solid var(--border);
+  color: var(--muted);
+  font-size: 11px;
+  background: var(--surface);
+}
+.tree-footer .text-button { padding: 0 3px; }
+

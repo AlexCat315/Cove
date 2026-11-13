@@ -1,0 +1,180 @@
+    <section id="view-inspector" class="view inspector-view" role="tabpanel" aria-labelledby="tab-inspector">
+      <div id="setup-state" class="setup-state" hidden>
+        <div class="setup-card">
+          <div class="setup-icon" aria-hidden="true"><svg class="icon"><use href="#i-device"></use></svg></div>
+          <h1>Connect to the controller</h1>
+          <p>Open the Inspector link printed by <code>cargo cove run --devtools</code>, or paste its session token.</p>
+          <form id="token-form" class="token-form">
+            <label for="token-input">Session token</label>
+            <div class="token-row">
+              <input id="token-input" type="password" autocomplete="off" spellcheck="false" placeholder="Bearer token">
+              <button class="tool-button is-primary" type="submit">Connect</button>
+            </div>
+          </form>
+          <p id="setup-error" class="form-error" role="alert" hidden></p>
+        </div>
+      </div>
+
+      <div id="inspector-content" hidden>
+        <div class="inspector-toolbar">
+          <div class="segmented" role="group" aria-label="Selection mode">
+            <button id="mode-select" type="button" aria-pressed="true" title="Browse the component tree" aria-label="Select components from the tree">
+              <svg class="icon" aria-hidden="true"><use href="#i-select"></use></svg><span>Select</span>
+            </button>
+            <button id="mode-pick" type="button" aria-pressed="false" title="Pick a component in a screenshot" aria-label="Pick a component at a point">
+              <svg class="icon" aria-hidden="true"><use href="#i-pick"></use></svg><span>Pick</span>
+            </button>
+            <button id="mode-interact" type="button" aria-pressed="false" title="Send pointer input to the Cove app" disabled>Interact</button>
+          </div>
+
+          <button id="repaint-highlight-button" class="tool-button" type="button" aria-pressed="false" title="Highlight repainted nodes on the target" aria-label="Highlight repaints" disabled>
+            <svg class="icon" aria-hidden="true"><use href="#i-repaint"></use></svg><span>Highlight repaints</span>
+          </button>
+
+          <button id="guidelines-button" class="tool-button" type="button" aria-pressed="false" title="Show layout guidelines on the target" aria-label="Layout guidelines" disabled>
+            <svg class="icon" aria-hidden="true"><use href="#i-guidelines"></use></svg><span>Guidelines</span>
+          </button>
+
+          <button id="baselines-button" class="tool-button" type="button" aria-pressed="false" title="Show text baselines on the target" aria-label="Text baselines" disabled>
+            <svg class="icon" aria-hidden="true"><use href="#i-baseline"></use></svg><span>Baselines</span>
+          </button>
+
+          <button id="slow-animations-button" class="tool-button" type="button" aria-pressed="false" title="Slow animations to 0.2× the runtime time scale" aria-label="Slow animations" disabled>
+            <svg class="icon" aria-hidden="true"><use href="#i-speed"></use></svg><span>Slow animations</span>
+          </button>
+
+          <button id="oversized-images-button" class="tool-button" type="button" aria-pressed="false" title="Highlight images decoded larger than their display rect" aria-label="Oversized images" disabled>
+            <svg class="icon" aria-hidden="true"><use href="#i-oversized"></use></svg><span>Oversized images</span>
+          </button>
+
+          <label class="search-field" for="tree-search">
+            <svg class="icon" aria-hidden="true"><use href="#i-search"></use></svg>
+            <input id="tree-search" type="search" placeholder="Search components" autocomplete="off" spellcheck="false" aria-label="Search components">
+            <kbd>/</kbd>
+          </label>
+
+          <div class="filter-group" role="group" aria-label="Component filters">
+            <label class="check"><input id="filter-anchors" type="checkbox" checked> Components</label>
+            <label class="check"><input id="filter-primitives" type="checkbox" checked> Primitives</label>
+          </div>
+
+          <div class="toolbar-spacer"></div>
+
+          <button id="capture-button" class="tool-button" type="button" title="Capture the Cove frame" aria-label="Capture screenshot" disabled>
+            <svg class="icon" aria-hidden="true"><use href="#i-camera"></use></svg><span>Capture</span>
+          </button>
+          <button id="node-shot-button" class="tool-button" type="button" title="Capture the selected node (requires inspect_nodes)" aria-label="Capture node screenshot" disabled>
+            <svg class="icon" aria-hidden="true"><use href="#i-camera"></use></svg><span>Node</span>
+          </button>
+          <button id="save-button" class="tool-button" type="button" title="Save the current screenshot as PNG" aria-label="Save screenshot" disabled>
+            <svg class="icon" aria-hidden="true"><use href="#i-download"></use></svg><span>Save</span>
+          </button>
+        </div>
+
+        <div id="pick-hint" class="pick-hint" hidden>
+          <svg class="icon" aria-hidden="true"><use href="#i-pick"></use></svg>
+          <span id="pick-hint-text">Click a point in the screenshot to select the component there.</span>
+          <button id="pick-exit" class="text-button" type="button">Exit pick mode</button>
+        </div>
+        <div id="capability-note" class="capability-note" role="note" hidden></div>
+
+        <div class="inspector-grid">
+          <section class="tree-pane" aria-labelledby="tree-heading">
+            <header class="pane-header">
+              <div class="pane-title">
+                <h2 id="tree-heading">Components</h2>
+                <span id="tree-meta" class="pane-meta"></span>
+              </div>
+              <div class="pane-actions">
+                <button id="tree-refresh" class="icon-button small" type="button" title="Refresh component tree" aria-label="Refresh component tree">
+                  <svg class="icon" aria-hidden="true"><use href="#i-refresh"></use></svg>
+                </button>
+                <button id="tree-collapse" class="icon-button small" type="button" title="Collapse all" aria-label="Collapse all">
+                  <svg class="icon" aria-hidden="true"><use href="#i-collapse"></use></svg>
+                </button>
+              </div>
+            </header>
+            <div id="tree-state" class="state-host"></div>
+            <div id="tree" class="tree" role="tree" aria-label="Component tree" hidden></div>
+            <div id="tree-footer" class="tree-footer" hidden></div>
+          </section>
+
+          <section class="details-pane" aria-label="Inspector details">
+            <section id="screenshot-panel" class="screenshot-panel" aria-label="App frame">
+              <header class="screenshot-head">
+                <h3>App frame</h3>
+                <span id="screenshot-meta" class="pane-meta"></span>
+                <div class="screenshot-actions">
+                  <button id="screenshot-zoom" class="text-button" type="button" title="Toggle screenshot zoom" hidden>Fit</button>
+                  <button id="screenshot-clear" class="text-button" type="button" title="Clear the screenshot" hidden>Clear</button>
+                </div>
+              </header>
+              <div id="screenshot-body" class="screenshot-body"></div>
+            </section>
+            <div id="details-state" class="state-host"></div>
+            <div id="details-content" hidden>
+              <header class="node-header">
+                <div class="node-title-line">
+                  <h2 id="details-heading"></h2>
+                  <span id="node-kind" class="badge"></span>
+                </div>
+                <div class="node-subtitle">
+                  <code id="node-id"></code>
+                  <button id="copy-node-id" class="icon-button small" type="button" title="Copy node ID" aria-label="Copy node ID">
+                    <svg class="icon" aria-hidden="true"><use href="#i-copy"></use></svg>
+                  </button>
+                </div>
+                <div id="node-flags" class="flag-row"></div>
+              </header>
+
+              <div class="node-actions">
+                <button id="highlight-button" class="text-button" type="button">Highlight</button>
+                <button id="clear-highlight" class="text-button" type="button">Clear highlight</button>
+                <button id="read-value-button" class="text-button" type="button" hidden>Read live value</button>
+              </div>
+
+              <div class="detail-tabs" role="tablist" aria-label="Node details">
+                <button id="tab-properties" class="detail-tab" role="tab" aria-selected="true" aria-controls="panel-properties" tabindex="0" type="button">Properties</button>
+                <button id="tab-render" class="detail-tab" role="tab" aria-selected="false" aria-controls="panel-render" tabindex="-1" type="button">Render</button>
+                <button id="tab-layout" class="detail-tab" role="tab" aria-selected="false" aria-controls="panel-layout" tabindex="-1" type="button">Layout</button>
+                <button id="tab-source" class="detail-tab" role="tab" aria-selected="false" aria-controls="panel-source" tabindex="-1" type="button">Source</button>
+              </div>
+              <div id="panel-properties" class="detail-panel" role="tabpanel" aria-labelledby="tab-properties"></div>
+              <div id="panel-render" class="detail-panel" role="tabpanel" aria-labelledby="tab-render" hidden></div>
+              <div id="panel-layout" class="detail-panel" role="tabpanel" aria-labelledby="tab-layout" hidden></div>
+              <div id="panel-source" class="detail-panel" role="tabpanel" aria-labelledby="tab-source" hidden></div>
+            </div>
+          </section>
+        </div>
+
+        <section class="input-drawer" aria-labelledby="input-heading">
+          <header class="drawer-header">
+            <svg class="icon" aria-hidden="true"><use href="#i-keyboard"></use></svg>
+            <h2 id="input-heading">Input</h2>
+            <span id="input-meta" class="pane-meta"></span>
+            <button id="input-toggle" class="text-button" type="button" aria-expanded="true" aria-controls="input-body">Hide</button>
+          </header>
+          <div id="input-body" class="input-body">
+            <form id="key-form" class="input-row" autocomplete="off">
+              <label class="inline-field" for="key-value">Key</label>
+              <input id="key-value" class="compact-input" type="text" placeholder="Enter" spellcheck="false" maxlength="256" aria-describedby="input-help">
+              <fieldset class="modifiers">
+                <legend class="sr-only">Modifiers</legend>
+                <label class="check"><input type="checkbox" name="modifier" value="Shift"> Shift</label>
+                <label class="check"><input type="checkbox" name="modifier" value="Control"> Control</label>
+                <label class="check"><input type="checkbox" name="modifier" value="Alt"> Alt</label>
+                <label class="check"><input type="checkbox" name="modifier" value="Meta"> Meta</label>
+              </fieldset>
+              <button id="send-key" class="tool-button" type="submit" disabled>Send key</button>
+            </form>
+            <form id="text-form" class="input-row" autocomplete="off">
+              <label class="inline-field" for="text-value">Text</label>
+              <input id="text-value" class="text-input" type="text" placeholder="Text to type" spellcheck="false" maxlength="16384">
+              <button id="send-text" class="tool-button" type="submit" disabled>Send text</button>
+            </form>
+            <p id="input-help" class="input-help">Input goes to the selected Cove runtime.</p>
+          </div>
+        </section>
+      </div>
+    </section>
+
