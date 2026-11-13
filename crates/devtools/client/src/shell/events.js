@@ -3,7 +3,7 @@ import { toggleBaselines, toggleGuidelines, toggleOversizedImages, toggleRepaint
 import { $, BUDGET_RATES, DETAIL_TABS, MEMORY_INTERVALS, dom, state } from "../core/globals.js";
 import { applyTheme, chooseTarget, errorMessage, refreshSession, setThemePreference, showWorkspace, storeToken, toast } from "../core/session.js";
 import { ensureCurrentView } from "../core/ui-helpers.js";
-import { captureNode, captureWindow, clearScreenshot, enterPickMode, exitPickMode, renderScreenshot, saveCapture, toggleScreenshotExpand, toggleScreenshotZoom, updateModeUi } from "../inspector/capture.js";
+import { bindFrameSplit, captureNode, captureWindow, clearScreenshot, enterPickMode, exitPickMode, renderScreenshot, restoreFrameShare, saveCapture, toggleScreenshotExpand, toggleScreenshotZoom, updateModeUi } from "../inspector/capture.js";
 import { copyText, setDetailTab } from "../inspector/editors.js";
 import { sendKey, sendText, toggleInputDrawer, updateInputButtons } from "../inspector/input.js";
 import { clearHighlight, highlightNode, loadTree, readLiveValue, renderDetails, renderTreeArea, selectNode } from "../inspector/tree.js";
@@ -177,6 +177,8 @@ export function bindEvents() {
   dom.captureButton.addEventListener("click", () => captureWindow());
   dom.nodeShotButton.addEventListener("click", () => captureNode());
   dom.saveButton.addEventListener("click", saveCapture);
+  bindFrameSplit();
+  restoreFrameShare();
   dom.screenshotExpand.addEventListener("click", toggleScreenshotExpand);
   dom.screenshotZoom.addEventListener("click", toggleScreenshotZoom);
   dom.screenshotClear.addEventListener("click", clearScreenshot);

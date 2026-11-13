@@ -311,6 +311,58 @@ async function main() {
     const fitScale = Math.round((fit.imageWidth / FRAME_WIDTH) * 100);
     assert.ok(fit.meta.includes(`${fitScale}%`), `meta ${fit.meta} reports the real scale ${fitScale}%`);
 
+    // 1a. The splitter gives the frame whatever share the reader drags to, and
+    //     that share is remembered across reloads.
+    await cdp.evaluate(`localStorage.removeItem("cove.devtools.frameShare")`);
+    const splitRect = await cdp.evaluate(`document.getElementById("details-split").getBoundingClientRect().toJSON()`);
+    assert.ok(splitRect.height > 0 && !splitRect.hidden, "the splitter is visible under the frame");
+    const splitX = Math.round(splitRect.left + splitRect.width / 2);
+    const splitY = Math.round(splitRect.top + splitRect.height / 2);
+    await cdp.mouse("mousePressed", splitX, splitY);
+    await cdp.mouse("mouseMoved", splitX, splitY - 120);
+    await cdp.mouse("mouseReleased", splitX, splitY - 120);
+    const shrunk = await cdp.evaluate(paneState());
+    assert.ok(
+      Math.abs((fit.paneHeight - shrunk.paneHeight) - 120) <= 3,
+      `dragging the splitter 120px up shrank the frame by that much (${Math.round(fit.paneHeight - shrunk.paneHeight)})`,
+    );
+    const storedShare = Number(await cdp.evaluate(`localStorage.getItem("cove.devtools.frameShare")`));
+    assert.ok(storedShare > 0 && storedShare < 1, `the dragged share is stored (${storedShare})`);
+    // A reload reads it back instead of the built-in default.
+    await cdp.send("Page.reload");
+    await waitFor(cdp, "reloaded tree", `document.querySelectorAll("#tree .tree-row").length > 0`);
+    for (let attempt = 0; attempt < 6; attempt++) {
+      if (await cdp.evaluate(`document.getElementById("screenshot-body")?.querySelector("img") !== null`)) break;
+      await click(cdp, "#capture-button");
+      await sleep(300);
+    }
+    await waitFor(cdp, "capture after reload", `document.getElementById("screenshot-body")?.querySelector("img") !== null`);
+    await sleep(200);
+    const restored = await cdp.evaluate(paneState());
+    assert.ok(
+      Math.abs(restored.paneHeight - shrunk.paneHeight) <= 3,
+      `the stored share survives a reload (${Math.round(restored.paneHeight)} vs ${Math.round(shrunk.paneHeight)})`,
+    );
+    // Double-click returns to the default divide.
+    await cdp.evaluate(`(() => {
+      const handle = document.getElementById("details-split");
+      handle.dispatchEvent(new MouseEvent("dblclick", { bubbles: true }));
+      return true;
+    })()`);
+    await sleep(100);
+    const reset = await cdp.evaluate(paneState());
+    assert.ok(reset.paneHeight > shrunk.paneHeight, `double-click restores a taller frame (${Math.round(reset.paneHeight)})`);
+    // Keyboard: focus the handle and shrink it with ArrowDown.
+    await cdp.evaluate(`document.getElementById("details-split").focus()`);
+    await cdp.send("Input.dispatchKeyEvent", { type: "keyDown", key: "ArrowDown", code: "ArrowDown", windowsVirtualKeyCode: 40 });
+    await cdp.send("Input.dispatchKeyEvent", { type: "keyUp", key: "ArrowDown", code: "ArrowDown", windowsVirtualKeyCode: 40 });
+    await sleep(100);
+    const keyed = await cdp.evaluate(paneState());
+    assert.ok(Math.abs(keyed.paneHeight - reset.paneHeight - 24) <= 3, `ArrowDown grows the frame by a step (${Math.round(keyed.paneHeight - reset.paneHeight)})`);
+    // Back to the default share for the rest of the scenario.
+    await cdp.evaluate(`document.getElementById("details-split").dispatchEvent(new MouseEvent("dblclick", { bubbles: true }))`);
+    await sleep(100);
+
     // 1b. Expanding hands the whole details column to the frame, which is the
     //     one-click answer to "the frame is too small to pick in".
     const column = await cdp.evaluate(`document.querySelector(".details-pane").getBoundingClientRect().height`);
@@ -396,7 +448,8 @@ async function main() {
     assert.ok(refit.scrollWidth <= refit.clientWidth + 1, `a fitted frame needs no horizontal scroll (${refit.scrollWidth}/${refit.clientWidth})`);
 
     assert.deepEqual(cdp.exceptions, [], "the page raised no exception");
-    console.log(`capture harness: expanded ${Math.round(expanded.paneHeight)}px of a ${Math.round(column)}px column (docked ${Math.round(fit.paneHeight)}), `
+    console.log(`capture harness: splitter drag ${Math.round(fit.paneHeight - shrunk.paneHeight)}px (share ${storedShare.toFixed(3)}, restored after reload), `
+      + `expanded ${Math.round(expanded.paneHeight)}px of a ${Math.round(column)}px column (docked ${Math.round(fit.paneHeight)}), `
       + `fit ${fitScale}% (${Math.round(fit.imageWidth)}×${Math.round(fit.imageHeight)} in a `
       + `${Math.round(fit.paneHeight)}px pane), 1:1 scrolls ${actual.scrollWidth}/${actual.clientWidth}, drag panned ${panned.scrollLeft}px, `
       + `2× pick mapped to ${picks[0].params.x},${picks[0].params.y}.`);

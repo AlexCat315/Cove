@@ -5,12 +5,19 @@ sized and zoomed for that job rather than for a preview thumbnail.
 
 ## Sizing
 
-- The pane takes `flex: 0 0 62%` of the details column with a `220px` floor. The
-  node inspector keeps the rest and can shrink to its `160px` floor.
+- A splitter (`#details-split`, `role="separator"`) divides the frame pane from
+  the node inspector inside the details column. Dragging it sets the frame's
+  share of the column between `160px` and column height minus `160px`; the share
+  is stored in `localStorage` under `cove.devtools.frameShare`, so it survives
+  reloads. Double-click or `Home` restores the built-in `62%`, arrow keys move by
+  24px (`Shift` 64px), `End` gives the frame everything it may take. The default
+  share without a stored value is `62%`.
+- Resizing does not rebuild the image, so a zoomed frame keeps its pan.
 - `Expand` in the frame header overlays the pane on the whole details column
   (`.screenshot-panel.is-expanded`, absolutely positioned against
   `.details-pane`). It is a one-click trade of the node inspector for a
-  full-height frame, and `Collapse` restores the docked height.
+  full-height frame, and `Collapse` restores the docked height; while expanded
+  the splitter is hidden because there is nothing to divide.
 - The body is `flex: 1 1 auto`; the image is `max-width/height: 100%` with
   `margin: auto`, so a fitted frame is centered and uses the pane rather than a
   viewport-relative cap.
@@ -37,7 +44,9 @@ sized and zoomed for that job rather than for a preview thumbnail.
 ## Verification
 
 `client/tests/capture-harness.mjs` serves a 2560×1440 frame and checks: fit fills
-more than the old `34vh` cap and reports its real scale; `Expand` covers the
-details column and `Collapse` restores the docked height; 1× scrolls inside the
-pane; a drag pans it; a 2× click reaches `select_ui_at` with image coordinates
-scaled by the step.
+more than the old `34vh` cap and reports its real scale; a splitter drag of 120px
+moves the divide by that much, the share is stored and read back after a reload,
+`ArrowDown` moves it by one step, and double-click restores `62%`; `Expand` covers
+the details column and `Collapse` restores the docked height; 1× scrolls inside
+the pane; a drag pans it; a 2× click reaches `select_ui_at` with image
+coordinates scaled by the step.

@@ -139,6 +139,11 @@ export function renderScreenshot() {
     ? "Give the details column back to the node inspector"
     : "Fill the details column with the frame";
   dom.screenshotPanel?.classList.toggle("is-expanded", state.captureExpanded && !!state.capture);
+  if (dom.detailsSplit) {
+    // An expanded frame covers the column, so the handle has nothing to divide.
+    dom.detailsSplit.hidden = state.captureExpanded;
+    dom.detailsSplit.setAttribute("aria-valuenow", String(Math.round((frameColumn()?.getBoundingClientRect().height || 0) * state.frameShare)));
+  }
   dom.saveButton.disabled = !state.capture;
   dom.captureButton.disabled = !state.caps.capture || state.captureLoading;
   dom.nodeShotButton.disabled = !(state.caps.inspectNodes && state.caps.capture) || !state.selectedId || state.captureLoading;
@@ -231,6 +236,98 @@ function updateScreenshotMeta() {
   if (capture.capture_id || capture.captureId) pieces.push(shortId(capture.capture_id || capture.captureId));
   dom.screenshotMeta.textContent = pieces.join(" · ");
   dom.screenshotMeta.title = pieces.join(" · ");
+}
+
+const FRAME_SHARE_KEY = "cove.devtools.frameShare";
+const FRAME_SHARE_MIN = 0.18;
+const FRAME_SHARE_MAX = 0.8;
+const FRAME_PANE_MIN_PX = 160;
+const FRAME_DETAILS_MIN_PX = 160;
+
+function frameColumn() {
+  return dom.screenshotPanel?.parentElement || null;
+}
+
+function clampFrameShare(share, columnHeight) {
+  let low = FRAME_SHARE_MIN;
+  let high = FRAME_SHARE_MAX;
+  if (columnHeight > 0) {
+    low = Math.max(low, FRAME_PANE_MIN_PX / columnHeight);
+    high = Math.min(high, 1 - FRAME_DETAILS_MIN_PX / columnHeight);
+  }
+  if (high < low) high = low;
+  return Math.min(high, Math.max(low, share));
+}
+
+function applyFrameShare(share, { persist = true } = {}) {
+  if (!dom.screenshotPanel) return;
+  const columnHeight = frameColumn()?.getBoundingClientRect().height || 0;
+  const clamped = clampFrameShare(share, columnHeight);
+  state.frameShare = clamped;
+  dom.screenshotPanel.style.flexGrow = "0";
+  dom.screenshotPanel.style.flexShrink = "0";
+  dom.screenshotPanel.style.flexBasis = `${(clamped * 100).toFixed(2)}%`;
+  if (dom.detailsSplit) {
+    dom.detailsSplit.setAttribute("aria-valuemin", String(FRAME_PANE_MIN_PX));
+    dom.detailsSplit.setAttribute("aria-valuemax", String(Math.max(FRAME_PANE_MIN_PX, Math.round(columnHeight - FRAME_DETAILS_MIN_PX))));
+    dom.detailsSplit.setAttribute("aria-valuenow", String(Math.round(columnHeight * clamped)));
+  }
+  if (persist) {
+    try { localStorage.setItem(FRAME_SHARE_KEY, clamped.toFixed(4)); } catch {}
+  }
+}
+
+export function restoreFrameShare() {
+  let stored = NaN;
+  try { stored = Number(localStorage.getItem(FRAME_SHARE_KEY)); } catch {}
+  applyFrameShare(Number.isFinite(stored) && stored > 0 ? stored : state.frameShare, { persist: false });
+}
+
+// The frame and the node inspector share one column, and which one needs the room
+// depends on the job at hand: picking wants a tall frame, editing wants details.
+// So the divide is a handle the reader drags, and the chosen share survives reloads.
+export function bindFrameSplit() {
+  const handle = dom.detailsSplit;
+  if (!handle) return;
+  let drag = null;
+  const endDrag = () => {
+    if (!drag) return;
+    // Resizing must not rebuild the image: a zoomed frame would lose its pan.
+    drag = null;
+    handle.classList.remove("is-dragging");
+  };
+  handle.addEventListener("pointerdown", event => {
+    if (event.button !== 0 || state.captureExpanded) return;
+    const column = frameColumn()?.getBoundingClientRect();
+    if (!column?.height) return;
+    drag = { id: event.pointerId, top: column.top, height: column.height };
+    handle.setPointerCapture?.(event.pointerId);
+    handle.classList.add("is-dragging");
+    event.preventDefault();
+  });
+  handle.addEventListener("pointermove", event => {
+    if (!drag || event.pointerId !== drag.id) return;
+    applyFrameShare((event.clientY - drag.top) / drag.height);
+  });
+  handle.addEventListener("pointerup", endDrag);
+  handle.addEventListener("pointercancel", endDrag);
+  handle.addEventListener("dblclick", event => {
+    event.preventDefault();
+    applyFrameShare(0.62);
+  });
+  handle.addEventListener("keydown", event => {
+    const columnHeight = frameColumn()?.getBoundingClientRect().height || 0;
+    if (!columnHeight) return;
+    const step = event.shiftKey ? 64 : 24;
+    let share = state.frameShare;
+    if (event.key === "ArrowUp") share -= step / columnHeight;
+    else if (event.key === "ArrowDown") share += step / columnHeight;
+    else if (event.key === "Home") share = FRAME_SHARE_MIN;
+    else if (event.key === "End") share = 1;
+    else return;
+    event.preventDefault();
+    applyFrameShare(share);
+  });
 }
 
 export function toggleScreenshotExpand() {

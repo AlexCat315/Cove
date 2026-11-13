@@ -237,6 +237,7 @@ export const dom = {
   screenshotExpand: $("screenshot-expand"),
   screenshotZoom: $("screenshot-zoom"),
   screenshotPanel: document.querySelector(".screenshot-panel"),
+  detailsSplit: $("details-split"),
   screenshotClear: $("screenshot-clear"),
   panels: {
     properties: $("panel-properties"),
@@ -394,6 +395,7 @@ export const state = {
   activeDetailTab: "properties",
   capture: null,
   captureExpanded: false,
+  frameShare: 0.62,
   captureLoading: false,
   captureError: null,
   captureAttempt: "window",
