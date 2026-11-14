@@ -12,7 +12,7 @@
 //! encodes is preserved: flex weights, divider hairlines, the negative-margin
 //! hit slop and the reserve arithmetic.
 use super::controller::{WorkspaceCommand, WorkspaceController, WorkspaceTarget};
-use super::drag::{self, DRAG_OVERLAY_ROOT_KEY, DRAG_THRESHOLD};
+use super::drag::{self, DRAG_OVERLAY_ROOT_KEY, drag_crossed};
 use super::ids::{
     WorkspaceEdge, WorkspaceFloatingWindowID, WorkspacePanelID, WorkspaceSlotID,
     WorkspaceSplitAxis, WorkspaceTabGroupID,
@@ -39,6 +39,7 @@ fn erased(view: impl View + 'static) -> AnyView {
     AnyView::new(view)
 }
 use cove_core::Color;
+use cove_core::Point;
 use cove_core::scene::{
     AccessibilityRole, AccessibilitySemantics, Align, Edge, FlexDirection, FocusChainHolder,
     InputHandlerRoute, InputRoutingPriority, InteractionRegistryHolder, Justify, LayoutNode, Node,
@@ -2162,11 +2163,23 @@ impl PrimitiveView for WorkspaceTabButton {
             "workspace.tab.drag",
         );
 
+        // Scroll-while-dragging: holding a tab near the strip's left or right
+        // edge scrolls the tab row so hidden tabs come within reach. One
+        // resource per node, because recomposition reruns `update_node`.
+        let auto_scroll = node
+            .first_resource::<cove_ui_compose::primitives::interaction::EdgeAutoScroll>()
+            .unwrap_or_else(|| {
+                let auto_scroll = cove_ui_compose::primitives::interaction::EdgeAutoScroll::new();
+                node.add_resource(auto_scroll.clone());
+                auto_scroll
+            });
+
         let press_node = node.clone();
         let press_controller = self.controller.clone();
         let press_document = self.document.clone();
         let press_group = self.group_id.clone();
         let press_panel = self.panel_id.clone();
+        let press_scroll = auto_scroll.clone();
         registry.set_pointer(
             node,
             route.clone(),
@@ -2194,6 +2207,7 @@ impl PrimitiveView for WorkspaceTabButton {
                     }
                     cove_core::scene::PointerPhase::Up => {
                         let state = press_node.attachment::<TabPressState>(TAB_PRESS_KEY);
+                        press_scroll.end();
                         press_node.remove_attachment(TAB_PRESS_KEY);
                         press_node.set_cursor(Some(cove_platform::SystemCursor::Pointer));
                         press_node.set_opacity(1.0);
@@ -2242,6 +2256,7 @@ impl PrimitiveView for WorkspaceTabButton {
         let motion_group = self.group_id.clone();
         let motion_panel = self.panel_id.clone();
         let motion_title = self.title.clone();
+        let motion_scroll = auto_scroll.clone();
         registry.set_motion(
             node,
             route,
@@ -2263,10 +2278,29 @@ impl PrimitiveView for WorkspaceTabButton {
                     .get(&motion_panel)
                     .is_none_or(|panel| panel.is_draggable);
                 let mut did_drag = state.did_drag;
-                if !did_drag && draggable && dx.abs().max(dy.abs()) >= DRAG_THRESHOLD {
+                if !did_drag && draggable && drag_crossed(dx, dy) {
                     did_drag = true;
                     motion_node.set_cursor(Some(cove_platform::SystemCursor::Move));
                     motion_node.set_opacity(0.42);
+                    if let Some(root) = drag::workspace_root(&motion_node) {
+                        let repaint_root = root.clone();
+                        motion_scroll.begin(
+                            Point::new(event.x, event.y),
+                            cove_ui_compose::primitives::layout::ScrollAxis::Horizontal,
+                            Rc::new(move || {
+                                // Content moved under a still pointer, so the
+                                // overlay has to re-resolve and repaint.
+                                repaint_root.mark_render_dirty(
+                                    cove_core::scene::InvalidationSource::style_set(
+                                        "workspaceTabDragAutoScroll",
+                                    ),
+                                );
+                            }),
+                        );
+                    }
+                }
+                if did_drag {
+                    motion_scroll.update(Point::new(event.x, event.y));
                 }
                 motion_node.set_attachment(
                     TAB_PRESS_KEY,
@@ -2277,19 +2311,14 @@ impl PrimitiveView for WorkspaceTabButton {
                     },
                 );
                 if did_drag && let Some(root) = drag::workspace_root(&motion_node) {
-                    let resolution = drag::resolve_drag(
-                        event.x,
-                        event.y,
-                        &motion_group,
-                        &motion_panel,
-                        &motion_document,
-                        &motion_node,
-                    );
                     let overlay = drag::WorkspaceTabDragOverlayState {
                         cursor_x: event.x,
                         cursor_y: event.y,
+                        source_width: motion_node.absolute_frame().width,
                         title: motion_title.clone(),
-                        resolution,
+                        group_id: motion_group.clone(),
+                        panel_id: motion_panel.clone(),
+                        document: motion_document.clone(),
                     };
                     drag::set_drag_overlay(Some(&overlay), &root);
                 }
@@ -2306,6 +2335,7 @@ impl PrimitiveView for WorkspaceTabButton {
         let activate_group = self.group_id.clone();
         let activate_panel = self.panel_id.clone();
         let key_node = node.downgrade();
+        let key_scroll = auto_scroll.clone();
         let key_panels = self
             .document
             .groups
@@ -2328,6 +2358,29 @@ impl PrimitiveView for WorkspaceTabButton {
                     || event.modifiers.has_alt()
                 {
                     return cove_core::scene::EventResult::Ignored;
+                }
+                if event.scancode == cove_composition::Scancode::ESCAPE {
+                    // Escape abandons a drag without applying it: the tab
+                    // returns to rest and the overlay disappears.
+                    if let Some(owner) = Node::upgrade(&key_node)
+                        && owner
+                            .attachment::<TabPressState>(TAB_PRESS_KEY)
+                            .is_some_and(|state| state.did_drag)
+                    {
+                        owner.remove_attachment(TAB_PRESS_KEY);
+                        key_scroll.end();
+                        owner.set_opacity(1.0);
+                        owner.set_cursor(Some(cove_platform::SystemCursor::Pointer));
+                        if let Some(root) = drag::workspace_root(&owner) {
+                            drag::set_drag_overlay(None, &root);
+                        }
+                        if let Some(capture) = PointerCaptureHolder::current()
+                            && capture.target().as_ref() == Some(&owner)
+                        {
+                            capture.release();
+                        }
+                        return cove_core::scene::EventResult::Handled;
+                    }
                 }
                 if let Some(owner) = Node::upgrade(&key_node) {
                     let mut layout = owner.layout_node();
@@ -3085,7 +3138,7 @@ fn install_floating_drag(
             if !state.did_drag {
                 let dx = event.x - state.down_x;
                 let dy = event.y - state.down_y;
-                if dx.abs().max(dy.abs()) >= DRAG_THRESHOLD {
+                if drag_crossed(dx, dy) {
                     motion_node.set_attachment(
                         FLOATING_DRAG_KEY,
                         TabPressState {

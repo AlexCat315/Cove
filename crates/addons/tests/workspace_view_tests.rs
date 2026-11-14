@@ -52,11 +52,12 @@ use cove_core::Rect;
 use cove_core::scene::{AccessibilityRole, Align, FlexDirection, Justify, Node, Wrap};
 use cove_platform::{InputEvent, KeyEvent, KeyModifiers};
 use cove_ui_addons::workspace::{
-    WorkspaceAxisSizing, WorkspaceCommand, WorkspaceController, WorkspaceDocument, WorkspaceEdge,
-    WorkspaceFloatingWindowID, WorkspaceLayoutNode, WorkspacePanel, WorkspacePanelID,
-    WorkspacePanelSizing, WorkspaceRect, WorkspaceSlot, WorkspaceSlotID, WorkspaceSlotKind,
-    WorkspaceSlotSize, WorkspaceSplitAxis, WorkspaceSplitFractions, WorkspaceTabGroup,
-    WorkspaceTabGroupID, WorkspaceTarget, WorkspaceView,
+    WorkspaceAxisSizing, WorkspaceCommand, WorkspaceController, WorkspaceDocument,
+    WorkspaceDragResolution, WorkspaceEdge, WorkspaceFloatingWindowID, WorkspaceLayoutNode,
+    WorkspacePanel, WorkspacePanelID, WorkspacePanelSizing, WorkspaceRect, WorkspaceSlot,
+    WorkspaceSlotID, WorkspaceSlotKind, WorkspaceSlotSize, WorkspaceSplitAxis,
+    WorkspaceSplitFractions, WorkspaceTabGroup, WorkspaceTabGroupID, WorkspaceTarget,
+    WorkspaceView, drag_overlay,
 };
 use cove_ui_compose::BoxView;
 use cove_ui_compose::modifiers::layout::{FlexExt, LayoutFrameExt};
@@ -146,6 +147,13 @@ impl ViewRig {
     fn end_drag(&mut self, at: Point) {
         self.rig.end_drag(at);
         self.sync();
+    }
+
+    fn overlay_root(&self) -> Option<Node> {
+        self.rig
+            .nodes()
+            .into_iter()
+            .find(|node| node.attachment::<bool>("__workspace_drag_overlay_root") == Some(true))
     }
 
     fn key(&mut self, scancode: u32) {
@@ -2307,5 +2315,165 @@ fn a_tab_is_a_browser_tab_flush_with_its_panel() {
         cover.background_color(),
         Some(theme.colors.surface),
         "the cover carries the tab fill"
+    );
+}
+
+#[test]
+fn the_reorder_caret_spans_the_tab_strip() {
+    // The caret marks the insertion point between two labels: it must cover
+    // exactly the tabs' height and sit on the boundary, not on the padded
+    // drop band around it.
+    let document = workspace_support::make_bare_document(
+        &[("main", &["files", "search"])],
+        WorkspaceSlotID::center(),
+    );
+    let controller = Rc::new(RefCell::new(WorkspaceController::new(document)));
+    let mut rig = ViewRig::standard(controller, 1000.0, 640.0);
+
+    let files = rig.frame("workspace-tab-files");
+    let search = rig.frame("workspace-tab-search");
+    rig.begin_drag(center_of(search));
+    rig.move_drag(Point {
+        x: files.x + 3.0,
+        y: files.y + files.height * 0.5,
+    });
+
+    let root = rig
+        .overlay_root()
+        .expect("the workspace installs a drag overlay root");
+    let overlay = drag_overlay(&root).expect("a drag is in flight");
+    let Some(WorkspaceDragResolution::Reorder(preview)) = overlay.resolution(&root) else {
+        panic!("dropping on the first tab's leading edge reorders");
+    };
+    let line = preview.line_frame;
+    assert_eq!(preview.target_index, 0);
+    assert_eq!(line.height, files.height, "the caret spans the strip");
+    assert_eq!(line.y, files.y, "the caret starts at the tab tops");
+    assert_eq!(line.width, 2.5, "the caret is an insertion point");
+    assert!(
+        (line.x + line.width * 0.5 - files.x).abs() <= 0.5,
+        "the caret sits on the boundary, {line:?} vs {files:?}"
+    );
+    assert_eq!(line.x, 4.0 - 1.25);
+}
+
+#[test]
+fn escape_abandons_a_drag() {
+    let document = workspace_support::make_bare_document(
+        &[("main", &["files", "search"])],
+        WorkspaceSlotID::center(),
+    );
+    let controller = Rc::new(RefCell::new(WorkspaceController::new(document)));
+    let mut rig = ViewRig::standard(controller, 1000.0, 640.0);
+
+    let files = center_of(rig.frame("workspace-tab-files"));
+    rig.begin_drag(files);
+    rig.move_drag(Point {
+        x: files.x + 12.0,
+        y: files.y + 12.0,
+    });
+    let root = rig
+        .overlay_root()
+        .expect("the workspace installs a drag overlay root");
+    assert!(drag_overlay(&root).is_some(), "the drag is live");
+
+    rig.key(Scancode::ESCAPE);
+
+    assert!(
+        drag_overlay(&root).is_none(),
+        "Escape drops the overlay without applying it"
+    );
+    assert_eq!(
+        rig.named("workspace-tab-files").opacity(),
+        1.0,
+        "the source tab returns to full opacity"
+    );
+    assert_eq!(
+        rig.panels_of("main"),
+        panels(&["files", "search"]),
+        "the order is untouched"
+    );
+}
+
+#[test]
+fn holding_a_dragged_tab_at_the_edge_scrolls_the_strip() {
+    // Dragging a tab to the strip's trailing edge has to bring hidden tabs
+    // within reach: the row scrolls while the pointer stays put, and the
+    // overlay keeps re-resolving against the scrolled strip.
+    let ids: Vec<String> = (0..12).map(|index| format!("t{index}")).collect();
+    let refs: Vec<&str> = ids.iter().map(String::as_str).collect();
+    let document = workspace_support::make_bare_document(
+        &[("main", refs.as_slice())],
+        WorkspaceSlotID::center(),
+    );
+    let controller = Rc::new(RefCell::new(WorkspaceController::new(document)));
+    let mut rig = ViewRig::standard(controller, 200.0, 500.0);
+
+    let strip = rig.named("workspace-tabs-scroll-main");
+    assert!(
+        strip.content_offset().x == 0.0,
+        "the strip starts at its leading edge"
+    );
+
+    let first = center_of(rig.frame("workspace-tab-t0"));
+    rig.begin_drag(first);
+    let edge = Point {
+        x: 195.0,
+        y: first.y,
+    };
+    rig.move_drag(edge);
+
+    // Tick the animator the way the host does every frame.
+    for _ in 0..4 {
+        cove_core::scene::AnimatorScheduler::current().tick(0.1);
+        rig.pump();
+    }
+
+    assert!(
+        strip.content_offset().x > 0.0,
+        "holding at the trailing edge scrolls the row, offset {:?}",
+        strip.content_offset()
+    );
+
+    // The overlay still resolves while the content moves under the pointer.
+    let root = rig.overlay_root().expect("a drag is in flight");
+    assert!(
+        drag_overlay(&root).is_some(),
+        "the drag survives the automatic scroll"
+    );
+
+    rig.end_drag(edge);
+    assert_eq!(
+        rig.frame("workspace-tab-t0").y,
+        rig.frame("workspace-tab-t1").y,
+        "releasing still lands on the strip"
+    );
+}
+
+#[test]
+fn holding_a_dragged_tab_mid_strip_does_not_scroll() {
+    let ids: Vec<String> = (0..12).map(|index| format!("t{index}")).collect();
+    let refs: Vec<&str> = ids.iter().map(String::as_str).collect();
+    let document = workspace_support::make_bare_document(
+        &[("main", refs.as_slice())],
+        WorkspaceSlotID::center(),
+    );
+    let controller = Rc::new(RefCell::new(WorkspaceController::new(document)));
+    let mut rig = ViewRig::standard(controller, 200.0, 500.0);
+
+    let first = center_of(rig.frame("workspace-tab-t0"));
+    rig.begin_drag(first);
+    rig.move_drag(Point {
+        x: first.x + 10.0,
+        y: first.y + 2.0,
+    });
+    for _ in 0..4 {
+        cove_core::scene::AnimatorScheduler::current().tick(0.1);
+        rig.pump();
+    }
+    assert_eq!(
+        rig.named("workspace-tabs-scroll-main").content_offset().x,
+        0.0,
+        "a drag held away from the edges leaves the row alone"
     );
 }
