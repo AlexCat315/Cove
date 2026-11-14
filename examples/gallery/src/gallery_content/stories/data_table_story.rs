@@ -292,7 +292,7 @@ impl DataTableStory {
             options,
             rows: Rc::new(RefCell::new(rows)),
             selection: State::new(BTreeSet::new()),
-            status: State::new("1,000 rows loaded".to_owned()),
+            status: State::new("Ready".to_owned()),
             is_frozen: State::new(true),
             navigation: Rc::new(RefCell::new(Navigation::default())),
             order: State::new(Vec::new()),
@@ -336,8 +336,9 @@ impl DataTableStory {
         let rows: Vec<WarehouseRow> = (0..count).map(WarehouseRow::generate).collect();
         *self.rows.borrow_mut() = rows;
         self.selection.set(BTreeSet::new());
-        self.status
-            .set(format!("{} rows loaded", group_thousands(count)));
+        // The card's toolbar owns the row count, so this strip reports events
+        // only; a second copy of the same number 400pt below it is noise.
+        self.status.set("Loaded".to_owned());
         self.navigate_to(0);
     }
 

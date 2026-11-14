@@ -61,10 +61,10 @@ fn loading_rows_clears_the_selection_and_focuses_the_first_row() {
     // The sample opens on its 1,000-row dataset so the page shows a table, not
     // the empty state.
     assert_eq!(story.row_count(), 1_000);
-    assert_eq!(story.status(), "1,000 rows loaded");
+    assert_eq!(story.status(), "Ready");
     story.load(1_000);
     assert_eq!(story.row_count(), 1_000);
-    assert_eq!(story.status(), "1,000 rows loaded");
+    assert_eq!(story.status(), "Loaded");
     assert!(story.selection().is_empty());
     assert_eq!(story.navigation().row, Some(0));
 }

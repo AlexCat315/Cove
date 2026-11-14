@@ -1321,12 +1321,17 @@ impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 
                     BoxView::new(
                         cove_core::scene::FlexDirection::Row,
                         cove_core::scene::Align::Center,
-                        cove_core::scene::Justify::FlexEnd,
+                        cove_core::scene::Justify::SpaceBetween,
                         cove_core::scene::Wrap::NoWrap,
-                        0.0,
-                        AnyView::new(TupleView::new(vec![picker])),
+                        8.0,
+                        AnyView::new(TupleView::new(vec![
+                            crate::primitives::data::lists::table::toolbar_count(
+                                controller.model.count(),
+                            ),
+                            picker,
+                        ])),
                     )
-                    .padding_edges(8.0, 0.0)
+                    .padding_edges(20.0, 0.0)
                     .frame_height(TOOLBAR_HEIGHT * scale),
                 )
                 .flex_with(0.0, 0.0, None),
@@ -2030,7 +2035,10 @@ impl PrimitiveView for DataTableRowHost {
         node.set_attachment(ROW_INDEX_MARKER, self.row);
         let theme = theme_for_node(node);
         let fill = if self.is_selected {
-            theme.colors.accent
+            // A selected row is a tint of the accent, not the accent itself:
+            // a saturated fill drops the value contrast to nothing and looks
+            // like a highlighted text run.
+            theme.colors.state_layer_selected
         } else if self.is_striped && self.row % 2 == 1 {
             // macOS alternating rows: one step of fill, never a tinted wash.
             theme.colors.surface_variant
@@ -2083,6 +2091,7 @@ impl PrimitiveView for DataTableRowHost {
         }));
         let height = self.height;
         let separator_inset = self.separator_inset;
+        let is_selected = self.is_selected;
         let draw_node = node.downgrade();
         node.update_draw(self.row, move |list, origin| {
             // A row separation is a hairline, not a box: it spans the row and
@@ -2091,7 +2100,8 @@ impl PrimitiveView for DataTableRowHost {
                 return;
             };
             let width = live.absolute_frame().width;
-            let color = theme_for_node(&live).colors.divider;
+            let theme = theme_for_node(&live);
+            let color = theme.colors.divider;
             let _ = list.add_rect(
                 cove_core::Rect::new(
                     origin.x + separator_inset,
@@ -2101,6 +2111,15 @@ impl PrimitiveView for DataTableRowHost {
                 ),
                 color,
             );
+            // The marker is the accent itself, so the selection still reads
+            // when the tint is this light — and it survives a colour-blind
+            // viewer who cannot separate the tint from the card.
+            if is_selected {
+                let _ = list.add_rect(
+                    cove_core::Rect::new(origin.x, origin.y, 2.0, height),
+                    theme.colors.accent,
+                );
+            }
         });
     }
 

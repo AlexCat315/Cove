@@ -58,6 +58,29 @@ impl<Id> Default for TableSession<Id> {
     }
 }
 
+/// Groups digits the way a count is written in a toolbar: `1,000`, `200,000`.
+pub(crate) fn grouped_count(count: usize) -> String {
+    let digits = count.to_string();
+    let mut out = String::with_capacity(digits.len() + digits.len() / 3);
+    for (index, ch) in digits.chars().enumerate() {
+        if index > 0 && (digits.len() - index) % 3 == 0 {
+            out.push(',');
+        }
+        out.push(ch);
+    }
+    out
+}
+
+/// The leading toolbar slot: how much data the table is showing.
+pub(crate) fn toolbar_count(count: usize) -> AnyView {
+    AnyView::new(
+        Text::new(format!("{} rows", grouped_count(count)))
+            .semantic_font(crate::theme::SemanticFontRef::label())
+            .semantic_foreground(crate::theme::SemanticColorRef::on_surface())
+            .flex_with(0.0, 0.0, None),
+    )
+}
+
 /// Authored inputs for a `Table`.
 pub struct TableOptions<Id: CollectionId> {
     /// Rows the user can select. Session-local single selection when absent.
@@ -416,24 +439,26 @@ impl<Record: Clone + 'static, Id: CollectionId> Table<Record, Id> {
 
         let mut children: Vec<AnyView> = Vec::new();
         if let Some(picker) = self.picker(&plan, is_enabled) {
-            // Same toolbar slot as the data table: the picker is an action on
-            // the card's first row, right-aligned, with a rule under it.
+            // The card's first row is a toolbar, not a caption strip: the
+            // data set's size anchors the leading edge and the column action
+            // the trailing one, on the same 20pt gutter the cells use. No rule
+            // below it — the header already has its own band, and a rule there
+            // would cut the card in half.
             children.push(AnyView::new(
                 AnyView::new(
                     BoxView::new(
                         FlexDirection::Row,
                         Align::Center,
-                        Justify::FlexEnd,
+                        Justify::SpaceBetween,
                         Wrap::NoWrap,
-                        0.0,
-                        AnyView::new(TupleView::new(vec![picker])),
+                        8.0,
+                        AnyView::new(TupleView::new(vec![toolbar_count(ids.len()), picker])),
                     )
-                    .padding_edges(8.0, 0.0)
+                    .padding_edges(20.0, 0.0)
                     .frame_height(44.0),
                 )
                 .flex_with(0.0, 0.0, None),
             ));
-            children.push(AnyView::new(Divider::new()));
         }
         children.push(grid);
 

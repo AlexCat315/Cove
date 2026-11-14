@@ -8,7 +8,6 @@ use crate::modifiers::layout::{FlexExt, LayoutFrameExt};
 use crate::modifiers::layout::PaddingExt;
 use crate::primitives::overlays::{MenuEntry, MenuItem};
 use crate::theme::SemanticStyleViewExt;
-use crate::theme::styles::buttons::ButtonStyleViewExt;
 use crate::{View, ViewExt};
 use cove_core::Binding;
 
@@ -237,6 +236,8 @@ impl View for ColumnVisibilityPicker {
             })
             .flex_with(0.0, 0.0, None);
         crate::AnyView::new(
+            // The caption explains the trigger, so it sits right before it:
+            // as a pair they read as one control at the trailing end.
             crate::AnyView::new(crate::BoxView::new(
                 cove_core::scene::FlexDirection::Row,
                 cove_core::scene::Align::Center,
@@ -244,8 +245,8 @@ impl View for ColumnVisibilityPicker {
                 cove_core::scene::Wrap::NoWrap,
                 8.0,
                 crate::AnyView::new(crate::TupleView::new(vec![
-                    crate::AnyView::new(crate::AnyView::new(popover).flex_with(0.0, 0.0, None)),
                     crate::AnyView::new(summary),
+                    crate::AnyView::new(popover),
                 ])),
             ))
             .frame_min_width(0.0),
