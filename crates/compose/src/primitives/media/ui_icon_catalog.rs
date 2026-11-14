@@ -12,9 +12,23 @@ fn bundle_root() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("resources")
 }
 
+mod embedded {
+    //! The 24x24 alpha-mask icons compiled into the binary (`build.rs`).
+
+    include!(concat!(env!("OUT_DIR"), "/ui_icons_embedded.rs"));
+}
+
 /// Resolve a bundled icon by asset slug.
+///
+/// The SVG bytes travel inside the binary. Resolving through the source tree
+/// only works on the machine that built the app, which is why a packaged APK
+/// used to draw an empty box wherever an icon belonged.
 pub fn asset(name: impl Into<String>) -> BundleImageResource {
-    BundleImageResource::svg(name, bundle_root(), Some(PathBuf::from("UIIcons")))
+    let name = name.into();
+    match embedded::bytes(&name) {
+        Some(bytes) => BundleImageResource::svg_embedded(name, bytes),
+        None => BundleImageResource::svg(name, bundle_root(), Some(PathBuf::from("UIIcons"))),
+    }
 }
 
 macro_rules! icon_group {
@@ -554,4 +568,38 @@ pub fn categories() -> Vec<String> {
         }
     }
     result
+}
+
+#[cfg(test)]
+mod embedded_tests {
+    use super::*;
+
+    // A packaged app has no source tree, so every catalog entry has to carry
+    // its bytes. This is the regression that made Android draw empty boxes.
+    #[test]
+    fn every_catalog_icon_ships_inside_the_binary() {
+        let entries = all();
+        assert!(
+            entries.len() > 200,
+            "the catalog is smaller than the shipped icon set: {}",
+            entries.len()
+        );
+        for entry in &entries {
+            let bytes = embedded::bytes(&entry.name)
+                .unwrap_or_else(|| panic!("{} is not embedded", entry.name));
+            assert!(!bytes.is_empty(), "{} embedded no bytes", entry.name);
+            assert_eq!(
+                entry.resource.embedded(),
+                Some(bytes),
+                "{} resolved to a file instead of its bytes",
+                entry.name
+            );
+        }
+    }
+
+    #[test]
+    fn embedded_table_covers_the_shipped_svg_set() {
+        // Not every shipped SVG is a catalog entry, but no entry may miss one.
+        assert!(embedded::COUNT >= all().len());
+    }
 }

@@ -6,6 +6,10 @@ pub struct BundleImageResource {
     pub file_extension: String,
     pub bundle: PathBuf,
     pub subdirectory: Option<PathBuf>,
+    /// Bytes compiled into the binary. A packaged app carries no source tree,
+    /// so an icon that is only reachable through `path()` disappears on
+    /// Android; embedding keeps one lookup rule for every platform.
+    embedded: Option<&'static [u8]>,
 }
 impl BundleImageResource {
     pub fn new(
@@ -19,7 +23,22 @@ impl BundleImageResource {
             file_extension: extension.into(),
             bundle: bundle.into(),
             subdirectory,
+            embedded: None,
         }
+    }
+    /// A vector asset that travels inside the binary instead of on disk.
+    pub fn svg_embedded(name: impl Into<String>, data: &'static [u8]) -> Self {
+        Self {
+            name: name.into(),
+            file_extension: "svg".to_owned(),
+            bundle: PathBuf::from("<embedded>"),
+            subdirectory: None,
+            embedded: Some(data),
+        }
+    }
+    /// The compiled-in bytes, when this resource is embedded.
+    pub fn embedded(&self) -> Option<&'static [u8]> {
+        self.embedded
     }
     pub fn svg(
         name: impl Into<String>,
@@ -28,12 +47,26 @@ impl BundleImageResource {
     ) -> Self {
         Self::new(name, "svg", bundle, subdirectory)
     }
-    pub fn path(&self) -> Option<PathBuf> {
-        let file = if self.file_extension.is_empty() {
+    /// The file name this resource asks for, with its extension.
+    fn file_name(&self) -> String {
+        if self.file_extension.is_empty() {
             self.name.clone()
         } else {
             format!("{}.{}", self.name, self.file_extension)
-        };
+        }
+    }
+    /// The path this resource names, whether or not it exists on disk.
+    ///
+    /// Diagnostics and extension checks use it for embedded assets too, which
+    /// keeps one code path for icons that ship inside the binary.
+    pub fn synthetic_path(&self) -> PathBuf {
+        match &self.subdirectory {
+            Some(subdirectory) => self.bundle.join(subdirectory).join(self.file_name()),
+            None => self.bundle.join(self.file_name()),
+        }
+    }
+    pub fn path(&self) -> Option<PathBuf> {
+        let file = self.file_name();
         if let Some(subdirectory) = &self.subdirectory {
             let path = self.bundle.join(subdirectory).join(&file);
             if path.is_file() {

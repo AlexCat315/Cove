@@ -9,7 +9,9 @@ use std::path::{Path, PathBuf};
 use std::rc::Rc;
 use std::sync::Arc;
 
-use cove_imaging::ImageAssetRegistryHolder;
+use cove_imaging::{
+    ImageAsset, ImageAssetRegistry, ImageAssetRegistryHolder, ImageDecoder, PixelSize,
+};
 
 use super::image::{Image, ImageSource};
 
@@ -43,6 +45,40 @@ impl Key {
     }
 }
 
+/// Where a vector's bytes come from: a file on disk, or the binary itself.
+#[derive(Clone)]
+enum VectorSource {
+    Path(PathBuf),
+    Bytes(&'static [u8]),
+}
+
+impl VectorSource {
+    /// The name used for extension checks and diagnostics.
+    fn hint_path(&self) -> PathBuf {
+        match self {
+            Self::Path(path) => path.clone(),
+            Self::Bytes(_) => PathBuf::from("embedded.svg"),
+        }
+    }
+
+    fn raster_target(&self, width: f32, height: f32) -> Option<PixelSize> {
+        Image::raster_target(&self.hint_path(), width, height, cove_core::content_scale())
+    }
+
+    fn rasterize(
+        &self,
+        registry: Option<Arc<ImageAssetRegistry>>,
+        target: Option<PixelSize>,
+    ) -> Result<Arc<ImageAsset>, String> {
+        match self {
+            Self::Path(path) => Image::rasterize(registry, path, target),
+            Self::Bytes(data) => ImageDecoder::decode_with_hint(data, "svg", target)
+                .and_then(ImageAsset::new)
+                .map_err(|error| error.to_string()),
+        }
+    }
+}
+
 /// Cache of the raster variant used at the current draw size.
 ///
 /// The source it starts with was rasterized at the authored size. A later size
@@ -50,7 +86,7 @@ impl Key {
 /// rasterizes the new one on the worker pool; `on_ready` asks for a repaint
 /// once it lands.
 pub struct VectorImageRaster {
-    path: PathBuf,
+    source: VectorSource,
     key: RefCell<Key>,
     asset: RefCell<ImageSource>,
     pending: RefCell<Option<Key>>,
@@ -58,8 +94,23 @@ pub struct VectorImageRaster {
 
 impl VectorImageRaster {
     pub fn new(path: impl Into<PathBuf>, initial: ImageSource, width: f32, height: f32) -> Self {
+        Self::with_source(VectorSource::Path(path.into()), initial, width, height)
+    }
+
+    /// An icon that ships inside the binary; the raster still follows the
+    /// draw size, so no file has to exist at run time.
+    pub fn from_bytes(
+        data: &'static [u8],
+        initial: ImageSource,
+        width: f32,
+        height: f32,
+    ) -> Self {
+        Self::with_source(VectorSource::Bytes(data), initial, width, height)
+    }
+
+    fn with_source(source: VectorSource, initial: ImageSource, width: f32, height: f32) -> Self {
         Self {
-            path: path.into(),
+            source,
             key: RefCell::new(Key::new(width, height)),
             asset: RefCell::new(initial),
             // The initial source is already rasterized at this size.
@@ -72,7 +123,12 @@ impl VectorImageRaster {
     pub fn resolve(&self, width: f32, height: f32) -> ImageSource {
         let next = Key::new(width, height);
         if next != *self.key.borrow() {
-            *self.asset.borrow_mut() = Image::resolve_path(&self.path, width, height);
+            let target = self.source.raster_target(width, height);
+            let raster = self
+                .source
+                .rasterize(ImageAssetRegistryHolder::current(), target);
+            *self.asset.borrow_mut() =
+                Image::source_for(&self.source.hint_path(), raster);
             *self.key.borrow_mut() = next;
         }
         self.asset.borrow().clone()
@@ -91,13 +147,13 @@ impl VectorImageRaster {
             return self.asset.borrow().clone();
         }
         *self.pending.borrow_mut() = Some(next);
-        let path = self.path.clone();
-        let target = Image::raster_target(&path, width, height, cove_core::content_scale());
+        let source = self.source.clone();
+        let target = source.raster_target(width, height);
         let registry = ImageAssetRegistryHolder::current();
         let raster = Rc::downgrade(self);
-        let job_path = path.clone();
+        let job_source = source.clone();
         cove_core::work::spawn_then(
-            move || Image::rasterize(registry, &job_path, target),
+            move || job_source.rasterize(registry, target),
             move |result| {
                 let Some(raster) = raster.upgrade() else {
                     return;
@@ -107,7 +163,7 @@ impl VectorImageRaster {
                     return;
                 }
                 raster.pending.borrow_mut().take();
-                *raster.asset.borrow_mut() = Image::source_for(&path, result);
+                *raster.asset.borrow_mut() = Image::source_for(&source.hint_path(), result);
                 *raster.key.borrow_mut() = next;
                 on_ready();
             },
@@ -115,7 +171,11 @@ impl VectorImageRaster {
         self.asset.borrow().clone()
     }
 
-    pub fn path(&self) -> &Path {
-        &self.path
+    /// The file this raster follows, when it is file-backed.
+    pub fn path(&self) -> Option<&Path> {
+        match &self.source {
+            VectorSource::Path(path) => Some(path),
+            VectorSource::Bytes(_) => None,
+        }
     }
 }

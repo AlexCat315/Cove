@@ -125,6 +125,9 @@ pub struct Image {
     pub foreground: Option<Color>,
     /// Set for SVG/PDF sources so the raster follows the draw size and density.
     pub vector_source_url: Option<PathBuf>,
+    /// Set instead of `vector_source_url` when the vector ships inside the
+    /// binary, which is how bundled icons reach a packaged app.
+    pub vector_source_bytes: Option<&'static [u8]>,
 }
 
 #[derive(Clone, PartialEq)]
@@ -137,6 +140,7 @@ struct PaintIdentity {
     rendering_mode: ImageRenderingMode,
     foreground: Option<Color>,
     vector_source_url: Option<PathBuf>,
+    vector_source_bytes: Option<&'static [u8]>,
 }
 
 impl Image {
@@ -161,6 +165,7 @@ impl Image {
             rendering_mode: ImageRenderingMode::Color,
             foreground: None,
             vector_source_url: None,
+            vector_source_bytes: None,
         }
     }
 
@@ -200,14 +205,23 @@ impl PrimitiveView for Image {
 
     fn update_node(&self, node: &cove_core::scene::Node) {
         let snapshot = self.clone();
-        let vector_raster = self.vector_source_url.clone().map(|path| {
-            std::rc::Rc::new(VectorImageRaster::new(
+        let vector_raster = if let Some(path) = self.vector_source_url.clone() {
+            Some(std::rc::Rc::new(VectorImageRaster::new(
                 path,
                 self.source.clone(),
                 self.width,
                 self.height,
-            ))
-        });
+            )))
+        } else {
+            self.vector_source_bytes.map(|bytes| {
+                std::rc::Rc::new(VectorImageRaster::from_bytes(
+                    bytes,
+                    self.source.clone(),
+                    self.width,
+                    self.height,
+                ))
+            })
+        };
         let identity = PaintIdentity {
             source: self.source.clone(),
             width: self.width,
@@ -217,6 +231,7 @@ impl PrimitiveView for Image {
             rendering_mode: self.rendering_mode,
             foreground: self.foreground,
             vector_source_url: self.vector_source_url.clone(),
+            vector_source_bytes: self.vector_source_bytes,
         };
         let draw_node = node.clone();
         node.update_draw(identity, move |list, origin| {

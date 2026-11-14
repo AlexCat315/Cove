@@ -154,6 +154,9 @@ impl Image {
         width: f32,
         height: f32,
     ) -> ImageSource {
+        if let Some(data) = resource.embedded() {
+            return Self::resolve_embedded(resource, data, width, height);
+        }
         match resource.path() {
             Some(path) => Self::resolve_path(path, width, height),
             None => {
@@ -168,6 +171,22 @@ impl Image {
                 }
             }
         }
+    }
+
+    /// Rasterises bytes that ship inside the binary, at the same density rule
+    /// the file-backed constructor uses.
+    pub fn resolve_embedded(
+        resource: &BundleImageResource,
+        data: &'static [u8],
+        width: f32,
+        height: f32,
+    ) -> ImageSource {
+        let path = resource.synthetic_path();
+        let target = Self::raster_target(&path, width, height, cove_core::content_scale());
+        let decoded = ImageDecoder::decode_with_hint(data, &resource.file_extension, target)
+            .and_then(ImageAsset::new)
+            .map_err(|error| error.to_string());
+        Self::source_for(&path, decoded)
     }
 
     pub fn from_file(path: impl AsRef<Path>, size: Size) -> Self {
@@ -188,6 +207,12 @@ impl Image {
     }
 
     pub fn from_resource(resource: &BundleImageResource, size: Size) -> Self {
+        if let Some(data) = resource.embedded() {
+            let source = Self::resolve_embedded(resource, data, size.width, size.height);
+            let mut image = Self::new(source, size);
+            image.vector_source_bytes = Some(data);
+            return image;
+        }
         match resource.path() {
             Some(path) => Self::from_file(path, size),
             None => {
