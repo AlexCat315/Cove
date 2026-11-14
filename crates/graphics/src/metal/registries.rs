@@ -7,6 +7,7 @@
 //! (upload-ring chunks, swapchain drawables) use a high-offset ID space so they
 //! can never collide with frontend handles.
 use std::collections::HashMap;
+use std::sync::Arc;
 
 use objc2::rc::Retained;
 use objc2::runtime::ProtocolObject;
@@ -172,7 +173,9 @@ pub struct MetalShaderRecord {
 /// retired resource. Called under the frontend's device/frame synchronization.
 #[derive(Default)]
 pub struct MetalBindingRegistry {
-    sets: HashMap<u32, MetalBindingSet>,
+    /// Registered sets are immutable, so the encoder shares them out of the
+    /// registry lock instead of copying entries and apply tables per bind.
+    sets: HashMap<u32, Arc<MetalBindingSet>>,
     users: HashMap<u32, Vec<u32>>,
 }
 
@@ -182,7 +185,13 @@ impl MetalBindingRegistry {
     }
 
     pub fn get(&self, id: u32) -> Option<&MetalBindingSet> {
-        self.sets.get(&id)
+        self.sets.get(&id).map(Arc::as_ref)
+    }
+
+    /// A refcounted handle for the encoder to replay after the registry lock is
+    /// released. Cloning an `Arc` allocates nothing, unlike copying a set.
+    pub fn share(&self, id: u32) -> Option<Arc<MetalBindingSet>> {
+        self.sets.get(&id).map(Arc::clone)
     }
 
     /// Inserts (or replaces) one binding set, keeping the reverse index exact.
@@ -194,7 +203,7 @@ impl MetalBindingRegistry {
                 users.push(id);
             }
         }
-        self.sets.insert(id, set);
+        self.sets.insert(id, Arc::new(set));
     }
 
     pub fn remove(&mut self, id: u32) {

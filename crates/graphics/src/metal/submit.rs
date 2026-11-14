@@ -30,9 +30,7 @@ use crate::rhi::{
 
 use super::device::{MetalDeviceHandle, VERTEX_BUFFER_BASE_INDEX};
 use super::formats;
-use super::registries::{
-    MetalBindingSet, MetalBoundEntry, MetalBoundValue, MetalDynamicKey, MetalMeshPipeline,
-};
+use super::registries::{MetalBindingSet, MetalBoundValue, MetalDynamicKey, MetalMeshPipeline};
 use super::resources::lock;
 use super::timestamps::{self, PassSampling, SubmissionTimestamps};
 use objc2_metal::{
@@ -885,17 +883,12 @@ impl<'a> PassEncoder<'a> {
     ) -> RhiResult<()> {
         let Some(binding_set) = ({
             let registries = lock(&self.registries);
-            registries
-                .binding_sets
-                .get(handle.id())
-                .map(shallow_clone_binding_set)
+            registries.binding_sets.share(handle.id())
         }) else {
             return Err(RhiError::invalid_argument("unknown render binding set"));
         };
-        let unique_positions: std::collections::HashSet<usize> =
-            binding_set.dynamic_offset_index.values().copied().collect();
         rhi_require(
-            dynamic_offsets.len() == unique_positions.len(),
+            dynamic_offsets.len() == required_dynamic_offsets(&binding_set),
             "dynamic offset count does not match the binding layout",
         )?;
         let applies = if self.current_mesh_pipeline.is_none() {
@@ -1110,17 +1103,12 @@ impl<'a> PassEncoder<'a> {
                 )?;
                 let Some(binding_set) = ({
                     let registries = lock(&self.registries);
-                    registries
-                        .binding_sets
-                        .get(set.id())
-                        .map(shallow_clone_binding_set)
+                    registries.binding_sets.share(set.id())
                 }) else {
                     return Err(RhiError::invalid_argument("unknown compute binding set"));
                 };
-                let unique_positions: std::collections::HashSet<usize> =
-                    binding_set.dynamic_offset_index.values().copied().collect();
                 rhi_require(
-                    dynamic_offsets.len() == unique_positions.len(),
+                    dynamic_offsets.len() == required_dynamic_offsets(&binding_set),
                     "dynamic offset count does not match the binding layout",
                 )?;
                 for apply in &binding_set.compute_applies {
@@ -1529,24 +1517,15 @@ fn is_memoryless(registries: &super::registries::MetalRegistries, handle: Textur
         .is_some_and(|texture| texture.storageMode() == MTLStorageMode::Memoryless)
 }
 
-/// Copies a registered binding set's resolved data out of the registry lock so
-/// the encoder can replay it without holding the mutex across GPU calls.
-fn shallow_clone_binding_set(set: &MetalBindingSet) -> MetalBindingSet {
-    MetalBindingSet {
-        entries: set
-            .entries
-            .iter()
-            .map(|entry| MetalBoundEntry {
-                slot: entry.slot,
-                visibility: entry.visibility,
-                resource: entry.resource.clone(),
-            })
-            .collect(),
-        graphics_applies: set.graphics_applies.clone(),
-        mesh_applies: set.mesh_applies.clone(),
-        compute_applies: set.compute_applies.clone(),
-        dynamic_offset_index: set.dynamic_offset_index.clone(),
-    }
+/// How many dynamic offsets a set's layout needs. The positions are dense
+/// (`0..n` in ascending dynamic-slot order), so the maximum decides it without
+/// building a set on every bind.
+fn required_dynamic_offsets(set: &MetalBindingSet) -> usize {
+    set.dynamic_offset_index
+        .values()
+        .copied()
+        .max()
+        .map_or(0, |position| position + 1)
 }
 
 #[cfg(test)]
@@ -1562,15 +1541,61 @@ mod tests {
     }
 
     #[test]
-    fn a_shallow_binding_set_copy_preserves_apply_tables() {
-        let mut dynamic = std::collections::HashMap::new();
-        dynamic.insert(3u32, 0usize);
-        let set = MetalBindingSet::new(Vec::new(), &dynamic);
-        let copy = shallow_clone_binding_set(&set);
-        assert_eq!(copy.graphics_applies.len(), set.graphics_applies.len());
-        assert_eq!(
-            copy.dynamic_offset_index.len(),
-            set.dynamic_offset_index.len()
-        );
+    fn a_set_with_dynamic_slots_requires_one_offset_per_position() {
+        // Positions are dense and assigned in ascending slot order, so the set
+        // reports them exactly and the bind path never has to build one.
+        let set = MetalBindingSet {
+            entries: Vec::new(),
+            graphics_applies: Vec::new(),
+            mesh_applies: Vec::new(),
+            compute_applies: Vec::new(),
+            dynamic_offset_index: std::collections::HashMap::from([
+                (
+                    MetalDynamicKey {
+                        stage: crate::rhi::ShaderStage::Vertex,
+                        index: 1,
+                    },
+                    0usize,
+                ),
+                (
+                    MetalDynamicKey {
+                        stage: crate::rhi::ShaderStage::Fragment,
+                        index: 1,
+                    },
+                    0usize,
+                ),
+            ]),
+        };
+        assert_eq!(required_dynamic_offsets(&set), 1);
+
+        let two = MetalBindingSet {
+            entries: Vec::new(),
+            graphics_applies: Vec::new(),
+            mesh_applies: Vec::new(),
+            compute_applies: Vec::new(),
+            dynamic_offset_index: std::collections::HashMap::from([
+                (
+                    MetalDynamicKey {
+                        stage: crate::rhi::ShaderStage::Vertex,
+                        index: 1,
+                    },
+                    0usize,
+                ),
+                (
+                    MetalDynamicKey {
+                        stage: crate::rhi::ShaderStage::Fragment,
+                        index: 4,
+                    },
+                    1usize,
+                ),
+            ]),
+        };
+        assert_eq!(required_dynamic_offsets(&two), 2);
+    }
+
+    #[test]
+    fn a_set_without_dynamic_slots_requires_no_offsets() {
+        let set = MetalBindingSet::new(Vec::new(), &std::collections::HashMap::new());
+        assert_eq!(required_dynamic_offsets(&set), 0);
     }
 }

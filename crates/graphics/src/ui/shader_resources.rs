@@ -75,13 +75,15 @@ impl NativeUIShaderResources {
         }))
     }
     pub fn binding(&self, texture: Texture) -> RhiResult<BindingSet> {
-        self.device.make_binding_set(
-            self.bindings,
-            BindingSetDescriptor::new(vec![
-                BindingSetEntry::new(1, BindingResource::Texture(texture)),
-                BindingSetEntry::new(2, BindingResource::Sampler(self.sampler)),
-            ]),
-        )
+        // The same (layout, texture, sampler) triple is re-probed for every batch
+        // of every frame, so the entries live on the stack: a cache hit allocates
+        // nothing, and the device only copies them when it must build a set.
+        let entries = [
+            BindingSetEntry::new(1, BindingResource::Texture(texture)),
+            BindingSetEntry::new(2, BindingResource::Sampler(self.sampler)),
+        ];
+        self.device
+            .make_binding_set_entries(self.bindings, &entries)
     }
 }
 impl Drop for NativeUIShaderResources {

@@ -21,14 +21,14 @@ use cove_logging::{Level, Location, LogRuntime, LogValue};
 use super::{
     AccelerationStructure, AccelerationStructureBuild, AccelerationStructureDescriptor,
     AdapterCapabilities, BindingLayout, BindingLayoutDescriptor, BindingLayoutEntry,
-    BindingResource, BindingSet, BindingSetDescriptor, Buffer, BufferDescriptor, CacheStats,
-    Capabilities, CommandBuffer, ComputePipeline, ComputePipelineDescriptor, ComputePipelineKey,
-    DeviceCaches, DeviceConfig, FrameRing, FrameUploader, GpuTimestampProfile, GraphicsPipeline,
-    GraphicsPipelineDescriptor, GraphicsPipelineKey, MeshPipeline, MeshPipelineDescriptor,
-    MeshPipelineKey, PipelineInterfaces, PipelineKind, PipelineLayout, PipelineLayoutDescriptor,
-    PipelineStatistics, PipelineStore, PipelineUse, PresentationMode, QueueClass,
-    ResourcePreparationContext, ResourcePreparationProgress, RhiBackend, RhiError, RhiResult,
-    Sampler, SamplerDescriptor, ShaderModule, ShaderModuleDescriptor, ShaderModuleKey,
+    BindingResource, BindingSet, BindingSetDescriptor, BindingSetEntry, Buffer, BufferDescriptor,
+    CacheStats, Capabilities, CommandBuffer, ComputePipeline, ComputePipelineDescriptor,
+    ComputePipelineKey, DeviceCaches, DeviceConfig, FrameRing, FrameUploader, GpuTimestampProfile,
+    GraphicsPipeline, GraphicsPipelineDescriptor, GraphicsPipelineKey, MeshPipeline,
+    MeshPipelineDescriptor, MeshPipelineKey, PipelineInterfaces, PipelineKind, PipelineLayout,
+    PipelineLayoutDescriptor, PipelineStatistics, PipelineStore, PipelineUse, PresentationMode,
+    QueueClass, ResourcePreparationContext, ResourcePreparationProgress, RhiBackend, RhiError,
+    RhiResult, Sampler, SamplerDescriptor, ShaderModule, ShaderModuleDescriptor, ShaderModuleKey,
     SubmissionCpuProfile, SubmissionPlanner, SubmitDescriptor, SurfaceDescriptor, Swapchain,
     SwapchainImage, Texture, TextureAllocation, TextureDescriptor, TextureSubresource,
     TextureUploadRegion, TimelineSemaphore, UploadLocation, rhi_require, rhi_validate_sample_count,
@@ -1098,7 +1098,26 @@ impl Device {
         layout: BindingLayout,
         descriptor: BindingSetDescriptor,
     ) -> RhiResult<BindingSet> {
+        self.make_binding_set_entries(layout, &descriptor.entries)
+    }
+
+    /// Slice form of `make_binding_set`. Hot render loops rebuild the same
+    /// (texture, sampler) set every frame and every batch, so callers may pass a
+    /// stack-resident slice: a cache hit then allocates nothing at all.
+    pub fn make_binding_set_entries(
+        &self,
+        layout: BindingLayout,
+        entries: &[BindingSetEntry],
+    ) -> RhiResult<BindingSet> {
         let mut state = self.lock();
+        if state.caches.binding_layout_entries(layout.id()).is_none() {
+            return Err(RhiError::invalid_argument("unknown binding layout"));
+        }
+        // Probe before copying anything: a hit needs neither the layout copy nor
+        // an owned entry list.
+        if let Some(existing) = state.caches.binding_sets.existing(layout.id(), entries) {
+            return Ok(BindingSet::new(existing));
+        }
         let Some(layout_entries) = state
             .caches
             .binding_layout_entries(layout.id())
@@ -1106,16 +1125,9 @@ impl Device {
         else {
             return Err(RhiError::invalid_argument("unknown binding layout"));
         };
-        if let Some(existing) = state
-            .caches
-            .binding_sets
-            .existing(layout.id(), &descriptor.entries)
-        {
-            return Ok(BindingSet::new(existing));
-        }
         // Layouts and cached sets are immutable. A full-value cache hit already
         // passed this validation when the set was registered.
-        Self::validate_binding_set(&descriptor, &layout_entries)?;
+        Self::validate_binding_set_entries(entries, &layout_entries)?;
         if let Some(evicted) = state.caches.binding_sets.evict_if_full() {
             self.teardown_binding_set(&mut state, evicted);
         }
@@ -1124,7 +1136,7 @@ impl Device {
         state
             .caches
             .binding_sets
-            .insert(handle.id(), layout.id(), &descriptor.entries);
+            .insert(handle.id(), layout.id(), entries);
         state.caches.store_binding_set(handle.id(), layout.id());
         let read_only: HashSet<u32> = layout_entries
             .iter()
@@ -1133,20 +1145,15 @@ impl Device {
             .collect();
         state
             .planner
-            .register_binding_set_entries(handle.id(), &descriptor.entries, &read_only);
+            .register_binding_set_entries(handle.id(), entries, &read_only);
 
-        if let Err(error) = self.backend().register_binding_set(
-            handle,
-            layout,
-            layout_entries,
-            descriptor.entries.clone(),
-        ) {
+        if let Err(error) =
+            self.backend()
+                .register_binding_set(handle, layout, layout_entries, entries.to_vec())
+        {
             // Roll back the frontend so we never hold a set the backend lacks
             // (the Zig prototype silently swallowed this and mis-bound).
-            state
-                .caches
-                .binding_sets
-                .remove(layout.id(), &descriptor.entries);
+            state.caches.binding_sets.remove(layout.id(), entries);
             state.caches.remove_binding_set_owner(handle.id());
             state.planner.remove_binding_set_entries(handle.id());
             return Err(error);
@@ -1174,23 +1181,19 @@ impl Device {
         }));
     }
 
-    fn validate_binding_set(
-        descriptor: &BindingSetDescriptor,
+    fn validate_binding_set_entries(
+        entries: &[BindingSetEntry],
         layout_entries: &[BindingLayoutEntry],
     ) -> RhiResult<()> {
-        if descriptor.entries.len() != layout_entries.len() {
+        if entries.len() != layout_entries.len() {
             return Err(RhiError::layout_mismatch(format!(
                 "binding set has {} entries; layout expects {}",
-                descriptor.entries.len(),
+                entries.len(),
                 layout_entries.len()
             )));
         }
         for layout_entry in layout_entries {
-            let Some(entry) = descriptor
-                .entries
-                .iter()
-                .find(|entry| entry.slot == layout_entry.slot)
-            else {
+            let Some(entry) = entries.iter().find(|entry| entry.slot == layout_entry.slot) else {
                 return Err(RhiError::layout_mismatch(format!(
                     "binding set is missing entry for slot {}",
                     layout_entry.slot

@@ -227,7 +227,7 @@ impl PipelineLayoutCache {
 
 // MARK: - Binding set cache
 
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
 pub struct BindingSetCacheKey {
     pub layout_id: u32,
     pub entries: Vec<BindingSetEntry>,
@@ -238,6 +238,10 @@ pub struct BindingSetCacheKey {
 /// teardown.
 pub struct BindingSetCache {
     lru: LruMap<BindingSetCacheKey, u32>,
+    /// Scratch key reused by every lookup. Binding sets are probed once per
+    /// draw batch and per frame, so building the key on the heap each time
+    /// showed up as steady allocation churn in hot render loops.
+    probe: BindingSetCacheKey,
     stats: CacheStats,
 }
 impl BindingSetCache {
@@ -246,6 +250,7 @@ impl BindingSetCache {
     pub fn new() -> Self {
         Self {
             lru: LruMap::new(),
+            probe: BindingSetCacheKey::default(),
             stats: CacheStats::default(),
         }
     }
@@ -259,17 +264,29 @@ impl BindingSetCache {
     }
 
     pub fn existing(&mut self, layout_id: u32, entries: &[BindingSetEntry]) -> Option<u32> {
-        let key = BindingSetCacheKey {
-            layout_id,
-            entries: entries.to_vec(),
-        };
-        if let Some(id) = self.lru.get(&key) {
-            let id = *id;
-            self.stats.hits += 1;
-            return Some(id);
+        let key = self.probe_key(layout_id, entries);
+        let hit = self.lru.get(&key).copied();
+        self.probe = key;
+        match hit {
+            Some(id) => {
+                self.stats.hits += 1;
+                Some(id)
+            }
+            None => {
+                self.stats.misses += 1;
+                None
+            }
         }
-        self.stats.misses += 1;
-        None
+    }
+
+    /// Fills the scratch key in place: a warmed probe reuses its cached capacity,
+    /// so a cache hit costs no allocation at all.
+    fn probe_key(&mut self, layout_id: u32, entries: &[BindingSetEntry]) -> BindingSetCacheKey {
+        let mut key = std::mem::take(&mut self.probe);
+        key.layout_id = layout_id;
+        key.entries.clear();
+        key.entries.extend_from_slice(entries);
+        key
     }
 
     pub fn insert(&mut self, handle_id: u32, layout_id: u32, entries: &[BindingSetEntry]) {
@@ -294,10 +311,10 @@ impl BindingSetCache {
     /// Removes a known set entry. Used when the caller explicitly destroys a
     /// binding set; it already holds the layout ID and entries.
     pub fn remove(&mut self, layout_id: u32, entries: &[BindingSetEntry]) -> Option<u32> {
-        self.lru.remove(&BindingSetCacheKey {
-            layout_id,
-            entries: entries.to_vec(),
-        })
+        let key = self.probe_key(layout_id, entries);
+        let removed = self.lru.remove(&key);
+        self.probe = key;
+        removed
     }
 
     pub fn reset_stats(&mut self) {
