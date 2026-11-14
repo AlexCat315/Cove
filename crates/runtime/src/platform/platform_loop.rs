@@ -180,6 +180,16 @@ impl PlatformLoop {
                     self.shell.set_window_size(id, width, height);
                 }
             }
+            PlatformCommand::SetMinSize(id, width, height) => {
+                if let Some(id) = native(&self.native_ids, id) {
+                    self.shell.set_window_min_size(id, width, height);
+                }
+            }
+            PlatformCommand::SetTitle(id, title) => {
+                if let Some(id) = native(&self.native_ids, id) {
+                    self.shell.set_window_title(id, &title);
+                }
+            }
             PlatformCommand::SetDisplayRefresh(id, enabled) => {
                 self.refresh_wanted.insert(id, enabled);
             }

@@ -26,6 +26,7 @@ pub struct MainWindowControls {
     pub main_window_maximized_query: Option<std::rc::Rc<dyn Fn() -> bool>>,
     pub set_main_window_chrome_hit_test_action:
         Option<std::rc::Rc<dyn Fn(Option<&WindowChromeHitTest>)>>,
+    pub set_main_window_title_action: Option<std::rc::Rc<dyn Fn(&str)>>,
 }
 
 /// Actions the host wires to any window by identifier.

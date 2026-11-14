@@ -27,6 +27,9 @@ pub struct ListRowStyleConfiguration {
     /// Another row follows in the same group, so a hairline belongs under this
     /// one. The last row of a list or section ends the group instead.
     pub shows_separator: bool,
+    /// Keeps the hairline inside these edges. `None` inherits the style's own
+    /// inset; `Some(0.0)` draws it edge to edge.
+    pub separator_inset: Option<f32>,
     pub theme: Theme,
     pub input: InputCapabilities,
 }

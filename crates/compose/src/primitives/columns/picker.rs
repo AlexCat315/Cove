@@ -5,6 +5,7 @@
 //! Translation of `Primitives/Columns/Picker.swift`.
 use crate::modifiers::interaction::AccessibilityExt;
 use crate::modifiers::layout::{FlexExt, LayoutFrameExt};
+use crate::modifiers::layout::PaddingExt;
 use crate::primitives::overlays::{MenuEntry, MenuItem};
 use crate::theme::SemanticStyleViewExt;
 use crate::theme::styles::buttons::ButtonStyleViewExt;
@@ -184,41 +185,57 @@ impl View for ColumnVisibilityPicker {
         // Scope-owned, so the presentation survives the recomposition the
         // choice itself triggers.
         let presented = cx.state(|| false);
-        let toggle = presented;
-        let trigger = crate::primitives::controls::Button::with_options(
-            crate::primitives::text::Text::new("Columns"),
-            move || toggle.set(!toggle.get()),
-            crate::primitives::controls::button::ButtonRole::Normal,
-            self.is_enabled,
-            false,
-            presented.get(),
-            None,
-        )
-        .button_style(crate::theme::styles::buttons::SecondaryButtonStyle)
-        .composition_local(
-            crate::primitives::controls::button::ActionControlAccessibility::label(),
-            Some(COLUMN_VISIBILITY_LABEL.to_string()),
-        )
-        .frame(None, None, Some(44.0), Some(44.0), None, None);
-        let summary = crate::primitives::text::Text::new(model.summary.clone())
-            .semantic_font(crate::theme::SemanticFontRef::caption())
-            .semantic_foreground(crate::theme::SemanticColorRef::on_surface_muted())
-            .accessibility(|semantics| {
-                semantics.role = cove_core::scene::AccessibilityRole::Status;
-            })
-            .flex_with(1.0, 1.0, Some(0.0))
-            .frame(None, None, Some(0.0), None, None, None);
         let dismiss = presented;
         let menu = crate::primitives::overlays::Menu::new(entries)
             .on_item_activated(move || dismiss.set(false));
+        // One control, one chrome. The trigger used to be a `Button` handed to
+        // `Popover`, which wraps its label in a button of its own: two nested
+        // capsule backgrounds, one inside the other. The popover now owns the
+        // whole trigger, and the trigger is a text-only ghost label, so the
+        // picker reads as a toolbar action instead of a pill in a pill.
+        let trigger = crate::AnyView::new(
+            crate::BoxView::new(
+                cove_core::scene::FlexDirection::Row,
+                cove_core::scene::Align::Center,
+                cove_core::scene::Justify::FlexStart,
+                cove_core::scene::Wrap::NoWrap,
+                4.0,
+                crate::AnyView::new(crate::TupleView::new(vec![
+                    crate::AnyView::new(
+                        crate::primitives::text::Text::new("Columns")
+                            .semantic_font(crate::theme::SemanticFontRef::label())
+                            .semantic_foreground(crate::theme::SemanticColorRef::on_surface()),
+                    ),
+                    crate::AnyView::new(
+                        crate::primitives::text::Text::new("\u{25BE}")
+                            .semantic_font(crate::theme::SemanticFontRef::caption())
+                            .semantic_foreground(
+                                crate::theme::SemanticColorRef::on_surface_muted(),
+                            ),
+                    ),
+                ])),
+            )
+            .padding_edges(6.0, 0.0),
+        );
         let popover = crate::primitives::overlays::Popover::new(trigger, menu)
             .is_presented(presented.binding())
             .enabled(self.is_enabled)
             .placement(crate::primitives::overlays::PopoverPlacement::BottomLeading)
             .surface(crate::primitives::overlays::PopoverSurface::Content)
             .overflow(crate::primitives::overlays::PopoverOverflow::Flip)
-            .trigger_style(crate::theme::styles::buttons::SecondaryButtonStyle)
-            .width(220.0);
+            .trigger_style(crate::theme::styles::buttons::GhostButtonStyle)
+            .width(220.0)
+            .composition_local(
+                crate::primitives::controls::button::ActionControlAccessibility::label(),
+                Some(COLUMN_VISIBILITY_LABEL.to_string()),
+            );
+        let summary = crate::primitives::text::Text::new(model.summary.clone())
+            .semantic_font(crate::theme::SemanticFontRef::caption())
+            .semantic_foreground(crate::theme::SemanticColorRef::on_surface_muted())
+            .accessibility(|semantics| {
+                semantics.role = cove_core::scene::AccessibilityRole::Status;
+            })
+            .flex_with(0.0, 0.0, None);
         crate::AnyView::new(
             crate::AnyView::new(crate::BoxView::new(
                 cove_core::scene::FlexDirection::Row,

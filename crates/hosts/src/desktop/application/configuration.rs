@@ -82,6 +82,10 @@ pub struct WindowConfiguration {
     pub title: String,
     pub width: i32,
     pub height: i32,
+    /// Smallest size the user may resize the window to, in logical points.
+    /// Zero leaves that axis unbounded.
+    pub min_width: i32,
+    pub min_height: i32,
     pub title_bar_style: AppWindowTitleBarStyle,
     /// Visual separation of the single-row menu bar. Independent of `backdrop`
     /// and `title_bar_style`, so both looks use the same layout and material.
@@ -104,6 +108,8 @@ impl Default for WindowConfiguration {
                 .unwrap_or_else(|| "CoveUI".to_owned()),
             width: 1280,
             height: 720,
+            min_width: 0,
+            min_height: 0,
             title_bar_style: AppWindowTitleBarStyle::Standard,
             title_bar_divider: TitleBarDivider::Seamless,
             shows_dock_icon: true,

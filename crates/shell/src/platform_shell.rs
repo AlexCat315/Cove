@@ -78,6 +78,9 @@ impl WindowChromeHitTest {
 pub struct WindowOptions {
     pub width: i32,
     pub height: i32,
+    /// Smallest user-resizable size in logical points; zero means unbounded.
+    pub min_width: i32,
+    pub min_height: i32,
     pub title_bar_style: WindowTitleBarStyle,
     pub shows_dock_icon: bool,
     pub backdrop: WindowBackdrop,
@@ -87,6 +90,8 @@ impl Default for WindowOptions {
         Self {
             width: 1280,
             height: 720,
+            min_width: 0,
+            min_height: 0,
             title_bar_style: WindowTitleBarStyle::Standard,
             shows_dock_icon: true,
             backdrop: WindowBackdrop::Opaque,
@@ -295,6 +300,12 @@ pub trait Shell {
     fn window_position(&self, id: WindowId) -> Option<(f32, f32)>;
     fn set_window_position(&self, id: WindowId, x: f32, y: f32);
     fn set_window_size(&self, id: WindowId, width: f32, height: f32);
+    /// Smallest size the user may resize the window to, in logical points.
+    /// Shells without window management ignore it.
+    fn set_window_min_size(&self, _id: WindowId, _width: f32, _height: f32) {}
+    /// Replaces the window's title bar text. Shells without window management
+    /// ignore it.
+    fn set_window_title(&self, _id: WindowId, _title: &str) {}
     fn raise_window(&self, id: WindowId);
     fn minimize_window(&self, id: WindowId);
     fn maximize_window(&self, id: WindowId);

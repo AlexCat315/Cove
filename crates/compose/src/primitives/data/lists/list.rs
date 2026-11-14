@@ -15,7 +15,9 @@ use crate::primitives::controls::adaptive::{apply_touch_control_extent, supports
 use crate::primitives::layout::virtualization::FixedVirtualStack;
 use crate::primitives::overlays::selection_key_host::SelectionKeyHost;
 use crate::theme::styles::components::selection_appearance::{SelectionAppearance, SelectionRole};
-use crate::theme::styles::components::{ListRowStyleConfiguration, ListRowStyleEnvironment};
+use crate::theme::styles::components::{
+    FlushListRowStyle, ListRowStyleConfiguration, ListRowStyleEnvironment, ListRowStyleViewExt,
+};
 use crate::theme::{TextScalerReader, theme_for_node};
 use crate::{AnyView, PrimitiveView, View, ViewExt, impl_primitive_view};
 use cove_core::scene::{
@@ -111,6 +113,7 @@ pub(crate) struct ListRowHost {
     pub id: u64,
     pub is_selected: bool,
     pub row_height: f32,
+    pub separator_inset: Option<f32>,
     pub shows_separator: bool,
     pub on_activate: Rc<dyn Fn()>,
     pub on_tap: Option<Rc<dyn Fn(cove_platform::KeyModifiers)>>,
@@ -273,6 +276,7 @@ impl PrimitiveView for ListRowHost {
             is_enabled: true,
             row_height: self.row_height,
             shows_separator: self.shows_separator,
+            separator_inset: self.separator_inset,
             theme,
             input,
         })]
@@ -287,6 +291,13 @@ pub struct List<Id: CollectionId> {
     /// Authored logical height, before text scaling and the touch density floor.
     pub row_height: Option<f32>,
     pub row_spacing: f32,
+    /// Rows run edge to edge: no inset box, no row padding, full-bleed
+    /// separators. A table owns its own chrome, so it cannot sit inside the
+    /// grouped-list box that gives an inset list a second rounded card.
+    pub flush_rows: bool,
+    /// Runs the separator inside the row's edges. `None` keeps the row style's
+    /// own inset; `Some(0.0)` draws it edge to edge.
+    pub separator_inset: Option<f32>,
     pub on_activate: Option<Rc<dyn Fn(&Id)>>,
     pub refresh: Option<RefreshOptions>,
     pub row_content: Rc<dyn Fn(&Id, RowState) -> AnyView>,
@@ -301,6 +312,8 @@ impl<Id: CollectionId> List<Id> {
             selection: Selection::none(),
             row_height: None,
             row_spacing: 0.0,
+            flush_rows: false,
+            separator_inset: None,
             on_activate: None,
             refresh: None,
             row_content: Rc::new(row_content),
@@ -325,6 +338,17 @@ impl<Id: CollectionId> List<Id> {
 
     pub fn row_spacing(mut self, row_spacing: f32) -> Self {
         self.row_spacing = row_spacing.max(0.0);
+        self
+    }
+
+    /// Rows run edge to edge, without the grouped-list box or row padding.
+    pub fn flush_rows(mut self, flush: bool) -> Self {
+        self.flush_rows = flush;
+        self
+    }
+
+    pub fn separator_inset(mut self, inset: f32) -> Self {
+        self.separator_inset = Some(inset.max(0.0));
         self
     }
 
@@ -395,6 +419,7 @@ impl<Id: CollectionId> List<Id> {
                             id: 0,
                             is_selected: selected,
                             row_height: height,
+                            separator_inset: list.separator_inset,
                             shows_separator: last.as_ref() != Some(id)
                                 && !next
                                     .get(id)
@@ -423,6 +448,15 @@ impl<Id: CollectionId> View for List<Id> {
         let host = AnyView::new(SelectionKeyHost::new(rows, true, move |event| {
             core.handle_key(event)
         }));
+        if self.flush_rows {
+            // A table paints the card, so its rows cannot bring a second one:
+            // no inset box, no row padding, separators edge to edge.
+            return AnyView::new(
+                host.list_row_style(FlushListRowStyle)
+                    .flex(1.0)
+                    .frame(None, None, Some(0.0), Some(0.0), None, None),
+            );
+        }
         // An inset list: one rounded box in the surface fill, its rows inset
         // so the selection band clears the box edge.
         AnyView::new(
@@ -449,6 +483,8 @@ impl<Id: CollectionId> List<Id> {
             selection: self.selection.clone(),
             row_height: self.row_height,
             row_spacing: self.row_spacing,
+            flush_rows: self.flush_rows,
+            separator_inset: self.separator_inset,
             on_activate: self.on_activate.clone(),
             refresh: self.refresh.clone(),
             row_content: self.row_content.clone(),

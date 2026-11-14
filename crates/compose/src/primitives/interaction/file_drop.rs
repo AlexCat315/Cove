@@ -574,6 +574,8 @@ pub struct FileDropZone {
     /// so reading it would either fail or send something the user did not pick.
     pub allows_directories: bool,
     pub is_enabled: bool,
+    /// Paint the resting well. Off makes the zone transparent over its content.
+    pub shows_chrome: bool,
     /// The live drag is over this zone. Provided by the owner so the zone can be
     /// painted by a binding the host already drives.
     pub is_targeted: Binding<bool>,
@@ -593,6 +595,7 @@ impl FileDropZone {
             maximum_files: usize::MAX,
             allows_directories: false,
             is_enabled: true,
+            shows_chrome: true,
             is_targeted: Binding::constant(false),
             outcome: Binding::constant(FileDropOutcome::Idle),
             on_drop: Rc::new(on_drop),
@@ -629,6 +632,14 @@ impl FileDropZone {
 
     pub fn is_enabled(mut self, is_enabled: bool) -> Self {
         self.is_enabled = is_enabled;
+        self
+    }
+
+    /// Whether the zone paints its resting well (sunken fill, rounded corner,
+    /// padding). Turn it off to make an existing surface — a whole window, say —
+    /// accept drops without restyling it; the targeted chrome still paints.
+    pub fn shows_chrome(mut self, shows_chrome: bool) -> Self {
+        self.shows_chrome = shows_chrome;
         self
     }
 
@@ -682,6 +693,9 @@ impl View for FileDropZone {
             content: self.content.clone(),
         });
         let is_enabled = self.is_enabled;
+        if !self.shows_chrome {
+            return AnyView::new(host);
+        }
         // The zone owns its resting chrome: a sunken well with a dashed border.
         // Without it the control is invisible until a drag is in flight, which
         // reads as loose text rather than a drop target.

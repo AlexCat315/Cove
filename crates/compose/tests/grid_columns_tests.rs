@@ -387,8 +387,8 @@ fn matrix() {
 
         let picker = labelled(scene, "Column visibility");
         assert!(
-            picker.frame().width >= 44.0 && picker.frame().height >= 44.0,
-            "the Column visibility picker is at least 44pt: {:?}",
+            picker.frame().width >= 44.0 && picker.frame().height >= 28.0,
+            "the Column visibility picker keeps a text trigger's tap width: {:?}",
             picker.frame()
         );
 
@@ -410,6 +410,19 @@ fn matrix() {
                             scene.width = width;
                             scene.settle(8, 1.0);
 
+                            let picker_floor = if input.contains(InputCapabilities::TOUCH) {
+                                44.0
+                            } else {
+                                28.0
+                            };
+                            let picker_frame = picker.frame();
+                            assert!(
+                                picker_frame.height >= picker_floor
+                                    && picker_frame.width >= 44.0,
+                                "the picker keeps its adaptive target at {width}pt (touch={}): {:?}",
+                                input.contains(InputCapabilities::TOUCH),
+                                picker_frame
+                            );
                             assert!(
                                 target(scene, "Open one") == one,
                                 "Open one keeps its node at {width}pt / {scale}x / rtl={rtl}"

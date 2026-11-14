@@ -422,9 +422,17 @@ fn matrix() {
 
                             let picker = labelled(scene, "Column visibility")
                                 .expect("the table mounts the Column visibility picker");
+                            // A text trigger is one line at pointer density and
+                            // grows to the 44pt touch target on touch input.
+                            let picker_floor = if input.contains(InputCapabilities::TOUCH) {
+                                44.0
+                            } else {
+                                28.0
+                            };
                             assert!(
-                                picker.frame().width >= 44.0 && picker.frame().height >= 44.0,
-                                "the picker is a 44pt target at {width}pt: {:?}",
+                                picker.frame().width >= 44.0
+                                    && picker.frame().height >= picker_floor,
+                                "the picker keeps its adaptive target at {width}pt: {:?}",
                                 picker.frame()
                             );
                             assert!(

@@ -54,6 +54,8 @@ pub enum PlatformCommand {
     SetAppearance(WindowId, cove_shell::WindowAppearance),
     SetPosition(WindowId, f32, f32),
     SetSize(WindowId, f32, f32),
+    SetMinSize(WindowId, f32, f32),
+    SetTitle(WindowId, String),
     SetDisplayRefresh(WindowId, bool),
     UpdateAccessibility(WindowId, AccessibilitySnapshot),
 
@@ -100,6 +102,8 @@ enum Slot {
     Appearance,
     Position,
     Size,
+    MinSize,
+    Title,
     DisplayRefresh,
     Accessibility,
 }
@@ -113,6 +117,8 @@ impl PlatformCommand {
             Self::SetAppearance(id, _) => (id.0, Slot::Appearance),
             Self::SetPosition(id, ..) => (id.0, Slot::Position),
             Self::SetSize(id, ..) => (id.0, Slot::Size),
+            Self::SetMinSize(id, ..) => (id.0, Slot::MinSize),
+            Self::SetTitle(id, _) => (id.0, Slot::Title),
             Self::SetDisplayRefresh(id, _) => (id.0, Slot::DisplayRefresh),
             Self::UpdateAccessibility(id, _) => (id.0, Slot::Accessibility),
             _ => return None,

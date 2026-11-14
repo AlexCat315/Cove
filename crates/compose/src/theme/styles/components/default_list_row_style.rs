@@ -74,7 +74,7 @@ impl ListRowStyle for DefaultListRowStyle {
         let separator = ListRowSeparatorModifier {
             color: theme.colors.divider,
             is_enabled: configuration.shows_separator && !configuration.is_selected,
-            inset: edge,
+            inset: configuration.separator_inset.unwrap_or(edge),
         };
         AnyView::new(
             result
@@ -179,5 +179,65 @@ impl cove_composition::ViewModifier for AnimatedRowFill {
             self.on_accent
                 .then(|| crate::theme::theme_for_node(node).colors.on_accent),
         );
+    }
+}
+
+/// Edge-to-edge row chrome for containers that already paint their own card
+/// (tables, grids). No inset box, no row padding: the content keeps the column
+/// geometry the header was laid out with, and the separator runs the full row.
+#[derive(Clone, Copy, Debug, Default)]
+pub struct FlushListRowStyle;
+
+impl ListRowStyle for FlushListRowStyle {
+    fn make_body(&self, configuration: ListRowStyleConfiguration) -> AnyView {
+        let theme = configuration.theme.clone();
+        let on_accent = configuration.is_selected && configuration.is_emphasized;
+        let fill = if !configuration.is_selected {
+            Color::CLEAR
+        } else if configuration.is_emphasized {
+            theme.colors.accent
+        } else {
+            theme.colors.surface_pressed
+        };
+        let alpha = if configuration.is_enabled { 1.0 } else { 0.55 };
+        let row = AnyView::new(Row::new(
+            VerticalAlignment::Center,
+            0.0,
+            AnyView::new(
+                configuration
+                    .content
+                    .clone()
+                    .frame_min_width(0.0)
+                    .flex_with(1.0, 1.0, Some(0.0)),
+            ),
+        )
+        .frame_height(configuration.row_height));
+        let context = super::list_row_style::ListRowContext {
+            is_selected: configuration.is_selected,
+            is_emphasized: configuration.is_emphasized,
+            is_enabled: configuration.is_enabled,
+        };
+        let row = AnyView::new(
+            row.composition_local(super::list_row_style::ListRowContext::key(), context),
+        );
+        let row = if on_accent {
+            AnyView::new(row.semantic_foreground(crate::theme::SemanticColorRef::on_accent()))
+        } else {
+            row
+        };
+        let separator = ListRowSeparatorModifier {
+            color: theme.colors.divider,
+            is_enabled: configuration.shows_separator && !configuration.is_selected,
+            inset: configuration.separator_inset.unwrap_or(0.0),
+        };
+        AnyView::new(
+            row.modifier(separator)
+                .opacity(alpha)
+                .modifier(AnimatedRowFill {
+                    fill,
+                    on_accent,
+                    radius: 0.0,
+                }),
+        )
     }
 }

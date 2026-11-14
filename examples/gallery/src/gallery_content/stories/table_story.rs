@@ -6,7 +6,7 @@
 use std::collections::{BTreeMap, HashMap};
 
 use cove_composition::Scope;
-use cove_core::State;
+use cove_core::{State, TextAlignment};
 use cove_core::scene::{Align, FlexDirection, Justify, Wrap};
 use cove_ui_compose::modifiers::layout::LayoutFrameExt;
 use cove_ui_compose::modifiers::style::SemanticStyleViewExt;
@@ -132,7 +132,13 @@ impl TableStory {
                     Text::new(record.stock.to_string()).semantic_font(SemanticFontRef::label()),
                 )
             })
-            .layout(sized(120.0))
+            .layout({
+                let mut layout = sized(120.0);
+                // Counts line up on their last digit; left-aligned numbers read
+                // as labels, not as quantities.
+                layout.alignment = TextAlignment::Trailing;
+                layout
+            })
             .visibility(ColumnVisibility::Optional)
             .compare(|left: &InventoryRecord, right: &InventoryRecord| {
                 TableStory::stock_comparison(left.stock, right.stock)
@@ -149,6 +155,8 @@ impl TableStory {
         options.column_widths = Some(self.widths.binding());
         options.column_visibility = Some(self.visibility.binding());
         options.is_enabled = self.options.is_enabled;
+        // The table ends at the card's edge instead of in a blank band.
+        options.layout.fills_width = true;
         options
     }
 

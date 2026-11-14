@@ -10,8 +10,8 @@ use crate::desktop::application::composition::{
 use cove_core::scene::{
     ClipboardHolder, ClipboardRequester, ColorSampler, ColorSamplerCallback, FilePicker,
     FilePickerCallback, FileSaver, FileSaverCallback, FocusChain, FocusChainHolder,
-    InteractionRegistry, InteractionRegistryHolder, PointerCapture, PointerCaptureHolder,
-    UIWorkSchedulerHolder,
+    FolderPicker, FolderPickerCallback, InteractionRegistry, InteractionRegistryHolder,
+    PointerCapture, PointerCaptureHolder, UIWorkSchedulerHolder,
 };
 use cove_imaging::{ImageAssetRegistry, ImageAssetRegistryHolder};
 use cove_text::{TextEnvironment, TextEnvironmentHolder};
@@ -27,6 +27,7 @@ pub struct ApplicationServices {
     clipboard_write: Option<Rc<dyn Fn(&str)>>,
     sampler: Option<ColorSamplerCallback>,
     picker: Option<FilePickerCallback>,
+    folder_picker: Option<FolderPickerCallback>,
     saver: Option<FileSaverCallback>,
     images: Option<std::sync::Arc<ImageAssetRegistry>>,
     drops: Option<Rc<AssetDropRegistry>>,
@@ -47,6 +48,7 @@ impl ApplicationServices {
             clipboard_write: clipboard_handlers::write(),
             sampler: color_sampler_handler::handler(),
             picker: file_picker_handler::handler(),
+            folder_picker: folder_picker_handler::handler(),
             saver: file_saver_handler::handler(),
             images: ImageAssetRegistryHolder::current(),
             drops: AssetDropRegistryHolder::current(),
@@ -70,6 +72,8 @@ impl ApplicationServices {
         color_sampler_handler::remember(self.sampler);
         FilePicker::set_presenter(self.picker.clone());
         file_picker_handler::remember(self.picker);
+        FolderPicker::set_presenter(self.folder_picker.clone());
+        folder_picker_handler::remember(self.folder_picker);
         FileSaver::set_presenter(self.saver.clone());
         file_saver_handler::remember(self.saver);
         ImageAssetRegistryHolder::set_current(self.images);
@@ -142,6 +146,25 @@ pub mod file_picker_handler {
     }
 
     pub fn handler() -> Option<FilePickerCallback> {
+        SLOT.with(|slot| slot.borrow().clone())
+    }
+}
+
+/// Native folder-panel registry, mirroring [`file_picker_handler`] because
+/// `FolderPicker` exposes no getter.
+pub mod folder_picker_handler {
+    use super::*;
+    use std::cell::RefCell;
+
+    thread_local! {
+        static SLOT: RefCell<Option<FolderPickerCallback>> = const { RefCell::new(None) };
+    }
+
+    pub fn remember(handler: Option<FolderPickerCallback>) {
+        SLOT.with(|slot| *slot.borrow_mut() = handler);
+    }
+
+    pub fn handler() -> Option<FolderPickerCallback> {
         SLOT.with(|slot| slot.borrow().clone())
     }
 }

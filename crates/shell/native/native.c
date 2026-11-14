@@ -9,6 +9,7 @@
 #include <windows.h>
 #endif
 #include <math.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 struct CoveShellWindow { SDL_Window *window; void *metal_view,*layer,*apple; SDL_Cursor *cursors[12]; CoveShellChrome chrome; CoveShellRect *drag,*non_drag; bool has_chrome; };
@@ -204,7 +205,13 @@ void cove_shell_command(CoveShellWindow *h,int command,int a,int b) { COVE_ASSER
 #if defined(__APPLE__)
     if(cove_shell_apple_command(h->apple,command,a))return;
 #endif
-    switch(command){case 1:SDL_SetWindowPosition(h->window,a,b);break;case 2:SDL_SetWindowSize(h->window,a,b);break;case 3:SDL_RaiseWindow(h->window);break;case 4:SDL_MinimizeWindow(h->window);break;case 5:SDL_MaximizeWindow(h->window);break;case 6:SDL_RestoreWindow(h->window);break;case 7:SDL_HideWindow(h->window);break;case 8:SDL_ShowWindow(h->window);break;case 9:SDL_ShowWindowSystemMenu(h->window,a,b);break;case 10:SDL_SetWindowFullscreen(h->window,a!=0);break;case 11:SDL_SetWindowAlwaysOnTop(h->window,a!=0);break;}
+    switch(command){case 1:SDL_SetWindowPosition(h->window,a,b);break;case 2:SDL_SetWindowSize(h->window,a,b);break;case 3:SDL_RaiseWindow(h->window);break;case 4:SDL_MinimizeWindow(h->window);break;case 5:SDL_MaximizeWindow(h->window);break;case 6:SDL_RestoreWindow(h->window);break;case 7:SDL_HideWindow(h->window);break;case 8:SDL_ShowWindow(h->window);break;case 9:SDL_ShowWindowSystemMenu(h->window,a,b);break;case 10:SDL_SetWindowFullscreen(h->window,a!=0);break;case 11:SDL_SetWindowAlwaysOnTop(h->window,a!=0);break;case 12:SDL_SetWindowMinimumSize(h->window,a,b);break;}
+}
+void cove_shell_set_title(CoveShellWindow *h,const char *title){ COVE_ASSERT_MAIN();
+    if(!h||!title)return;
+    fprintf(stderr,"DBG cove_shell_set_title main=%d title=%s\n",(int)SDL_IsMainThread(),title);
+    SDL_SetWindowTitle(h->window,title);
+    fprintf(stderr,"DBG sdl title now=%s\n",SDL_GetWindowTitle(h->window));
 }
 bool cove_shell_is_fullscreen(CoveShellWindow *h) { COVE_ASSERT_MAIN();
     if(!h)return false;

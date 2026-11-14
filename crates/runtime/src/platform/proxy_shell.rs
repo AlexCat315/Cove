@@ -348,6 +348,12 @@ impl Shell for ProxyShell {
     fn set_window_size(&self, id: WindowId, width: f32, height: f32) {
         self.post(PlatformCommand::SetSize(id, width, height));
     }
+    fn set_window_min_size(&self, id: WindowId, width: f32, height: f32) {
+        self.post(PlatformCommand::SetMinSize(id, width, height));
+    }
+    fn set_window_title(&self, id: WindowId, title: &str) {
+        self.post(PlatformCommand::SetTitle(id, title.to_owned()));
+    }
     fn raise_window(&self, id: WindowId) {
         self.post(PlatformCommand::Raise(id));
     }

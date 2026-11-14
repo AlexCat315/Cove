@@ -59,6 +59,13 @@ pub type FilePickCompletion = Box<dyn FnOnce(Vec<String>)>;
 /// Host open-panel presenter installed by the platform shell.
 pub type FilePickerCallback = Rc<dyn Fn(&[FilePickerFilter], bool, FilePickCompletion)>;
 
+/// Receives the chosen directory once the native folder panel closed. `None`
+/// when the user cancelled.
+pub type FolderPickCompletion = Box<dyn FnOnce(Option<String>)>;
+/// Host folder-panel presenter installed by the platform shell. The first
+/// argument is the directory the panel opens at, when the caller knows one.
+pub type FolderPickerCallback = Rc<dyn Fn(Option<&str>, FolderPickCompletion)>;
+
 /// A document the application wants written through the native save panel.
 ///
 /// The bytes travel with the request because iOS and Android export the
@@ -101,6 +108,7 @@ thread_local! {
     static NATIVE_MENU_PRESENTER: RefCell<Option<NativeMenuPresenterCallback>> = const { RefCell::new(None) };
     static COLOR_SAMPLER: RefCell<Option<ColorSamplerCallback>> = const { RefCell::new(None) };
     static FILE_PICKER: RefCell<Option<FilePickerCallback>> = const { RefCell::new(None) };
+    static FOLDER_PICKER: RefCell<Option<FolderPickerCallback>> = const { RefCell::new(None) };
     static FILE_SAVER: RefCell<Option<FileSaverCallback>> = const { RefCell::new(None) };
     static OPENED_DOCUMENTS: RefCell<Option<OpenedDocumentsCallback>> = const { RefCell::new(None) };
     static PENDING_DOCUMENTS: RefCell<Vec<String>> = const { RefCell::new(Vec::new()) };
@@ -214,6 +222,31 @@ impl FilePicker {
     }
     pub fn set_presenter(present: Option<FilePickerCallback>) {
         FILE_PICKER.with(|slot| *slot.borrow_mut() = present);
+    }
+}
+
+/// Holds the native folder panel, injected by the platform shell.
+///
+/// Choosing a destination directory is a different panel from choosing a file:
+/// it returns one directory and never filters by extension. Without an
+/// installed picker every request completes with `None`, so a caller can
+/// disable its browse affordance instead of pretending a panel opened.
+pub struct FolderPicker;
+impl FolderPicker {
+    /// Shows a folder panel opened at `default_path`; `done` receives the
+    /// chosen directory, `None` when the user cancelled.
+    pub fn request(default_path: Option<&str>, done: FolderPickCompletion) {
+        match FOLDER_PICKER.with(|slot| slot.borrow().clone()) {
+            Some(present) => present(default_path, done),
+            None => done(None),
+        }
+    }
+    /// Whether a platform shell installed a folder picker on this thread.
+    pub fn is_installed() -> bool {
+        FOLDER_PICKER.with(|slot| slot.borrow().is_some())
+    }
+    pub fn set_presenter(present: Option<FolderPickerCallback>) {
+        FOLDER_PICKER.with(|slot| *slot.borrow_mut() = present);
     }
 }
 

@@ -32,7 +32,11 @@ void cove_shell_event_free(CoveShellEvent *event);
 bool cove_shell_wait(uint64_t timeout_ns);
 void cove_shell_wake(void);
 double cove_shell_monotonic_seconds(void);
+/* command: 1 position, 2 size, 3 raise, 4 minimize, 5 maximize, 6 restore,
+   7 hide, 8 show, 9 system menu, 10 fullscreen, 11 always-on-top,
+   12 minimum size. Sizes and positions are in SDL window units. */
 void cove_shell_command(CoveShellWindow *window,int command,int a,int b);
+void cove_shell_set_title(CoveShellWindow *window,const char *title);
 bool cove_shell_is_fullscreen(CoveShellWindow *h);
 void cove_shell_chrome(CoveShellWindow *window,const CoveShellChrome *chrome);
 void cove_shell_text_area(CoveShellWindow *window,const float *area);

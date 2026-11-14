@@ -232,6 +232,8 @@ impl Application {
                     preset.size.height as i32
                 }),
             title_bar_style: config.window.title_bar_style.platform_style(),
+            min_width: config.window.min_width.max(0),
+            min_height: config.window.min_height.max(0),
             shows_dock_icon: config.window.shows_dock_icon
                 && !(config.diagnostics.dev_tools.is_some()
                     && environment_flag("SDL_WINDOW_ACTIVATE_WHEN_SHOWN").as_deref() == Some("0")),
@@ -416,6 +418,14 @@ impl Application {
         });
         cove_core::scene::FilePicker::set_presenter(Some(picker.clone()));
         super::services::file_picker_handler::remember(Some(picker));
+        let folder_picker: cove_core::scene::FolderPickerCallback = Rc::new({
+            let display = state.display_handle.clone();
+            move |default_path: Option<&str>, done: cove_core::scene::FolderPickCompletion| {
+                display.request_open_folder(default_path, done);
+            }
+        });
+        cove_core::scene::FolderPicker::set_presenter(Some(folder_picker.clone()));
+        super::services::folder_picker_handler::remember(Some(folder_picker));
         let saver: cove_core::scene::FileSaverCallback = Rc::new({
             let display = state.display_handle.clone();
             move |request: cove_core::scene::FileSaveRequest,
@@ -725,6 +735,14 @@ impl Application {
                 move || {
                     if let Some(id) = host.main_window() {
                         host.minimize_window(id);
+                    }
+                }
+            })),
+            set_main_window_title_action: Some(Rc::new({
+                let host = host.clone();
+                move |title: &str| {
+                    if let Some(id) = host.main_window() {
+                        host.set_window_title(id, title);
                     }
                 }
             })),

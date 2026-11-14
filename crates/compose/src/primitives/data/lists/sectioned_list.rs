@@ -554,6 +554,7 @@ where
                 id: 0,
                 is_selected: selected,
                 row_height: height,
+                separator_inset: None,
                 shows_separator,
                 on_activate: Rc::new(move || activate.activate(activate_id.clone())),
                 on_tap: Some(Rc::new(move |modifiers| {

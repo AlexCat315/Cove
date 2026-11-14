@@ -32,7 +32,7 @@ use cove_core::scene::{
     EventPhase, EventResult, FlexDirection, FocusChainHolder, HoverPhase, InputHandlerRoute,
     InteractionRegistryHolder, Justify, LayoutNode, Node, PointerCaptureHolder, PointerPhase, Wrap,
 };
-use cove_core::{Binding, Color, Point, Size, State};
+use cove_core::{Binding, Color, Point, Size, State, TextAlignment};
 use cove_platform::{KeyEvent, KeyModifiers, MouseButton, SystemCursor};
 
 use super::column_order::DataTableColumnOrder;
@@ -46,7 +46,7 @@ use super::selection_model::{DataTableNavigation, DataTableSelection, DataTableS
 use super::table_column::{
     ColumnVisibility, TableColumn, TableColumnPlan, TableLayout, TableSort, TableSortDirection,
 };
-use crate::modifiers::layout::{FlexExt, LayoutFrameExt, PaddingExt};
+use crate::modifiers::layout::{EdgeInsets, FlexExt, LayoutFrameExt, PaddingExt};
 use crate::modifiers::style::{AppearanceExt, SemanticStyleViewExt};
 use crate::primitives::data::lists::selection::Selection;
 use crate::primitives::feedback::EmptyState;
@@ -56,7 +56,7 @@ use crate::primitives::text::text_field::{
     TextField, TextFieldBehavior, TextFieldEvents, TextFieldNavigationRequest,
 };
 use crate::primitives::text::{Divider, Text};
-use crate::theme::{SemanticFontRef, node_text_scaler, theme_for_node};
+use crate::theme::{SemanticColorRef, SemanticFontRef, node_text_scaler, theme_for_node};
 use crate::{AnyView, BoxView, PrimitiveView, TupleView, View, impl_primitive_view};
 use cove_core::scene::ObservableObject;
 
@@ -612,10 +612,29 @@ impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 
             .iter()
             .filter_map(|index| ordered.get(*index).cloned())
             .collect();
-        let presented: Vec<f32> = columns
+        let mut presented: Vec<f32> = columns
             .iter()
             .map(|column| self.width_of(column, &stored))
             .collect();
+        // `fills_width` only applies when nothing had to be dropped for space:
+        // stretching the last column over slack that hidden columns would have
+        // used would misreport the table's real width.
+        if self.layout.fills_width
+            && !presented.is_empty()
+            && resolved.frozen_count < presented.len()
+        {
+            let visible: f32 = ordered
+                .iter()
+                .filter(|column| overrides.get(&column.id) != Some(&false))
+                .map(|column| widths.get(&column.id).copied().unwrap_or(column.layout.width))
+                .sum();
+            let slack = available_width - visible;
+            if slack > 0.5
+                && let Some((column, last)) = columns.last().zip(presented.last_mut())
+            {
+                *last = column.layout.constrained(*last + slack);
+            }
+        }
         let geometry = DataTableColumnGeometry::new(presented, resolved.frozen_count);
         DataTablePlan { columns, geometry }
     }
@@ -1306,9 +1325,15 @@ impl PrimitiveView for DataTableChrome {
 
     fn update_node(&self, node: &Node) {
         let theme = theme_for_node(node);
+        // The card owns its fill, so the header and the rows paint the same
+        // surface instead of leaning on whatever sits behind the table.
+        node.set_background_color(Some(theme.colors.surface));
         node.set_border_color(Some(theme.colors.border));
         node.set_border_width(1.0);
         node.set_corner_radius(theme.radius.lg);
+        // Rows paint edge to edge; without clipping their fills square off the
+        // card's rounded corners.
+        node.set_clips_to_bounds(true);
         node.set_opacity(if self.is_enabled { 1.0 } else { 0.55 });
         node.set_accessibility(Some(AccessibilitySemantics {
             role: AccessibilityRole::Table,
@@ -1901,6 +1926,7 @@ impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 
             is_enabled: self.controller.is_enabled,
             is_frozen_lane,
             height: self.height,
+            separator_inset: self.layout.separator_inset.unwrap_or(0.0),
             content: AnyView::new(
                 BoxView::new(
                     FlexDirection::Row,
@@ -1925,6 +1951,7 @@ struct DataTableRowHost {
     is_enabled: bool,
     is_frozen_lane: bool,
     height: f32,
+    separator_inset: f32,
     content: AnyView,
 }
 
@@ -1950,7 +1977,9 @@ impl PrimitiveView for DataTableRowHost {
             // macOS alternating rows: one step of fill, never a tinted wash.
             theme.colors.surface_variant
         } else {
-            theme.colors.background
+            // The card's own fill: `background` is the page colour, which in a
+            // dark theme is darker than the card and reads as a hole.
+            theme.colors.surface
         };
         self.hover.register(self.row, node, fill, self.is_selected);
         let is_hovered = self.is_enabled && self.hover.current() == Some(self.row);
@@ -1995,10 +2024,24 @@ impl PrimitiveView for DataTableRowHost {
             ..Default::default()
         }));
         let height = self.height;
+        let separator_inset = self.separator_inset;
+        let draw_node = node.downgrade();
         node.update_draw(self.row, move |list, origin| {
+            // A row separation is a hairline, not a box: it spans the row and
+            // stops at the inset, so a flush table runs it edge to edge.
+            let Some(live) = Node::upgrade(&draw_node) else {
+                return;
+            };
+            let width = live.absolute_frame().width;
+            let color = theme_for_node(&live).colors.divider;
             let _ = list.add_rect(
-                cove_core::Rect::new(origin.x, origin.y + height - 1.0, 1.0, 1.0),
-                cove_core::Color::CLEAR,
+                cove_core::Rect::new(
+                    origin.x + separator_inset,
+                    origin.y + height - 0.5,
+                    (width - 2.0 * separator_inset).max(0.0),
+                    0.5,
+                ),
+                color,
             );
         });
     }
@@ -2378,11 +2421,24 @@ impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 
             .filter(|_| is_sorted)
             .map(|sort| sort.direction);
         let controller = self.controller.clone();
+        let alignment = self.column.layout.alignment;
         let mut row: Vec<AnyView> = Vec::new();
+        let text = Text::new(self.column.title.clone()).alignment(alignment);
+        // `.truncated()` wraps the label in a tooltip host, and that wrapper
+        // lays its child out leading — a trailing column's title would snap
+        // back to the left edge. Leading columns keep the tooltip; the others
+        // clip at the cell edge instead.
+        let label = if alignment == TextAlignment::Leading {
+            AnyView::new(text.truncated())
+        } else {
+            AnyView::new(text)
+        };
         row.push(AnyView::new(
-            Text::new(self.column.title.clone())
-                .truncated()
-                .semantic_font(SemanticFontRef::label())
+            label
+                // A column label is a label, not a value: semibold and one
+                // step back in contrast, matching the light table's header.
+                .semantic_font(SemanticFontRef::body_strong())
+                .semantic_foreground(SemanticColorRef::on_surface_muted())
                 .flex_with(1.0, 1.0, Some(0.0)),
         ));
         if is_sorted {
@@ -2394,16 +2450,43 @@ impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 
                 .semantic_font(SemanticFontRef::caption()),
             ));
         }
+        // The label sits where the column's values sit: a trailing column's
+        // header has to land on the same right edge as its numbers.
+        let justify = match alignment {
+            TextAlignment::Leading => Justify::FlexStart,
+            TextAlignment::Trailing => Justify::FlexEnd,
+            TextAlignment::Center => Justify::Center,
+        };
+        // The grip sits inside the column's own width; a 6pt sibling here
+        // would widen every header column past the body column below it, and
+        // the columns would drift further apart with each rendered column.
+        let grip = if self.column.layout.is_resizable {
+            crate::primitives::data::columns::resize_grip::RESIZE_GRIP_WIDTH
+        } else {
+            0.0
+        };
+        // A trailing label gets the grip's width back as padding, so it lands
+        // on the same right edge as the values under it.
+        let trailing_padding = if alignment == TextAlignment::Trailing {
+            (10.0 - grip).max(0.0)
+        } else {
+            10.0
+        };
         let label = AnyView::new(
             BoxView::new(
                 FlexDirection::Row,
                 Align::Center,
-                Justify::FlexStart,
+                justify,
                 Wrap::NoWrap,
                 6.0,
                 AnyView::new(TupleView::new(row)),
             )
-            .padding_edges(10.0, 0.0),
+            .padding_insets(EdgeInsets {
+                leading: 10.0,
+                trailing: trailing_padding,
+                top: 0.0,
+                bottom: 0.0,
+            }),
         );
         let mut cells: Vec<AnyView> = vec![AnyView::new(HeaderCellHost {
             controller: controller.clone(),
@@ -2412,7 +2495,7 @@ impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 
             is_enabled: self.is_enabled,
             column_id,
             title: self.column.title.clone(),
-            width: self.width,
+            width: (self.width - grip).max(0.0),
             height: self.height,
             sortable: sortable && self.is_enabled,
             is_sorted,
@@ -2650,7 +2733,10 @@ impl PrimitiveView for HeaderPaint {
     }
 
     fn update_node(&self, node: &Node) {
-        node.set_background_color(Some(theme_for_node(node).colors.surface_variant));
+        // The header sits *inside* the table card, so it paints the card's own
+        // fill. `surface_variant` is the page/region grey: painting it here cut
+        // a hole in the card and left the header floating over the page.
+        node.set_background_color(Some(theme_for_node(node).colors.surface));
     }
 
     fn children(&self, _node: &Node) -> Vec<AnyView> {

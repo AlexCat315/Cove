@@ -7,7 +7,7 @@
 //! type rather than being buried in a body closure.
 
 use cove_composition::Scope;
-use cove_core::State;
+use cove_core::{State, TextAlignment};
 use std::cell::Cell;
 use std::rc::Rc;
 
@@ -884,13 +884,17 @@ pub fn adaptive_table_columns() -> Vec<TableColumn<usize>> {
         TableColumn::new("name", "Asset", move |row: &usize| {
             AnyView::new(Text::new(format!("Asset {row}")))
         })
-        .layout(sized(160.0)),
+        .layout(sized(220.0)),
         // `quantity` and `category` are optional: a narrow table drops them
         // rather than clipping, which is what makes the sample adaptive.
         TableColumn::new("quantity", "Quantity", move |row: &usize| {
             AnyView::new(Text::new(format!("{}", row * 7)))
         })
-        .layout(sized(100.0))
+        .layout({
+            let mut layout = sized(120.0);
+            layout.alignment = TextAlignment::Trailing;
+            layout
+        })
         .visibility(ColumnVisibility::Optional),
         TableColumn::new("category", "Category", move |row: &usize| {
             AnyView::new(Text::new(if row.is_multiple_of(2) {
@@ -899,7 +903,7 @@ pub fn adaptive_table_columns() -> Vec<TableColumn<usize>> {
                 "Material"
             }))
         })
-        .layout(sized(130.0))
+        .layout(sized(160.0))
         .visibility(ColumnVisibility::Optional),
     ];
     columns
@@ -935,6 +939,7 @@ impl View for AdaptiveTableSample {
         if self.data {
             let mut options = DataTableOptions::default();
             options.is_enabled = enabled;
+            options.layout.fills_width = true;
             let table = DataTable::from_records(rows, |row: &usize| *row, adaptive_table_columns())
                 .expect("the gallery table columns are static with unique ids")
                 .options(options);
@@ -942,6 +947,9 @@ impl View for AdaptiveTableSample {
         }
         let mut options = TableOptions::default();
         options.is_enabled = enabled;
+        // A table that stops at 40% of its card reads as unfinished; the last
+        // column takes the slack so the grid ends at the card's edge.
+        options.layout.fills_width = true;
         let table = Table::new(rows, |row: &usize| *row, adaptive_table_columns())
             .expect("the gallery table columns are static with unique ids")
             .options(options);

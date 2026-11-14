@@ -14,7 +14,7 @@ pub mod slider_style;
 pub mod text_field_style;
 pub mod tree_row_style;
 
-pub use default_list_row_style::DefaultListRowStyle;
+pub use default_list_row_style::{DefaultListRowStyle, FlushListRowStyle};
 pub use default_panel_style::DefaultPanelStyle;
 pub use default_slider_style::DefaultSliderStyle;
 pub use default_text_field_style::DefaultTextFieldStyle;

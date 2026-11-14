@@ -316,6 +316,23 @@ impl Sdl3Shell {
             window.command(command, a, b);
         }
     }
+    /// The public geometry uses logical points. SDL uses its own window
+    /// coordinates, which are physical pixels on Windows.
+    fn to_window_units(&self, id: WindowId, width: f32, height: f32) -> Option<(i32, i32)> {
+        let state = self.windows.get(&id)?.state();
+        let convert = |points: f32, units: i32, pixels: i32| {
+            let factor = if units > 0 && pixels > 0 {
+                state.scale * units as f32 / pixels as f32
+            } else {
+                1.0
+            };
+            (points * factor).round().max(1.0) as i32
+        };
+        Some((
+            convert(width, state.width, state.pixel_width),
+            convert(height, state.height, state.pixel_height),
+        ))
+    }
     fn parent(&self, id: Option<WindowId>) -> *mut native::Window {
         id.or_else(|| self.main_window_id())
             .and_then(|id| self.windows.get(&id))
@@ -493,6 +510,13 @@ impl Shell for Sdl3Shell {
             }
         }
         self.windows.insert(id, window.clone());
+        if options.min_width > 0 || options.min_height > 0 {
+            self.set_window_min_size(
+                id,
+                options.min_width.max(1) as f32,
+                options.min_height.max(1) as f32,
+            );
+        }
         self.order.retain(|entry| *entry != id);
         self.order.push(id);
         self.quitting = false;
@@ -656,24 +680,30 @@ impl Shell for Sdl3Shell {
     fn set_window_size(&self, id: WindowId, width: f32, height: f32) {
         if width.is_finite()
             && height.is_finite()
+            && let Some((width, height)) = self.to_window_units(id, width, height)
             && let Some(window) = self.windows.get(&id)
         {
-            let state = window.state();
-            // The public size uses logical points. SDL uses its own window
-            // coordinates, which are physical pixels on Windows.
-            let to_window_units = |points: f32, units: i32, pixels: i32| {
-                let factor = if units > 0 && pixels > 0 {
-                    state.scale * units as f32 / pixels as f32
-                } else {
-                    1.0
-                };
-                (points * factor).round().max(1.0) as i32
-            };
-            window.command(
-                2,
-                to_window_units(width, state.width, state.pixel_width),
-                to_window_units(height, state.height, state.pixel_height),
-            );
+            window.command(2, width, height);
+        }
+    }
+    fn set_window_min_size(&self, id: WindowId, width: f32, height: f32) {
+        if width.is_finite()
+            && height.is_finite()
+            && let Some((width, height)) = self.to_window_units(id, width, height)
+            && let Some(window) = self.windows.get(&id)
+        {
+            window.command(12, width, height);
+        }
+    }
+    fn set_window_title(&self, id: WindowId, title: &str) {
+        let Ok(title) = CString::new(title) else {
+            return;
+        };
+        if let Some(window) = self.windows.get(&id) {
+            // SAFETY: the bridge copies the title synchronously and only calls
+            // SDL for a live window pointer.
+            unsafe { native::cove_shell_set_title(window.pointer.get(), title.as_ptr()) };
+            window.refresh();
         }
     }
     fn raise_window(&self, id: WindowId) {

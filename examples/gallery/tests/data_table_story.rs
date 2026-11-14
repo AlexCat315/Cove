@@ -58,8 +58,10 @@ fn the_story_declares_three_authored_plus_thirty_metric_columns() {
 #[test]
 fn loading_rows_clears_the_selection_and_focuses_the_first_row() {
     let story = story();
-    assert_eq!(story.row_count(), 0);
-    assert_eq!(story.status(), "Load a dataset to begin");
+    // The sample opens on its 1,000-row dataset so the page shows a table, not
+    // the empty state.
+    assert_eq!(story.row_count(), 1_000);
+    assert_eq!(story.status(), "1,000 rows loaded");
     story.load(1_000);
     assert_eq!(story.row_count(), 1_000);
     assert_eq!(story.status(), "1,000 rows loaded");
@@ -81,6 +83,8 @@ fn navigating_bumps_the_request_id() {
 #[test]
 fn middle_and_last_are_inert_on_an_empty_table() {
     let story = story();
+    // Empty the table explicitly: the sample now opens populated.
+    story.load(0);
     assert!(!story.navigate_middle());
     assert!(!story.navigate_last());
     story.load(101);

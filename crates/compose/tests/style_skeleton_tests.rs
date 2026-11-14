@@ -139,6 +139,7 @@ fn list_row_style_defaults_and_renders_a_selected_row() {
             is_enabled: true,
             row_height: 30.0,
             shows_separator: true,
+            separator_inset: None,
             theme: Theme::default_dark(),
             input: InputCapabilities::POINTER | InputCapabilities::KEYBOARD,
         });

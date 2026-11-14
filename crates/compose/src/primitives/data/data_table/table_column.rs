@@ -250,6 +250,13 @@ pub struct TableLayout {
     /// Authored logical height, before text scaling and the touch density floor.
     pub header_height: f32,
     pub is_striped: bool,
+    /// How far the hairline between rows stops from either edge. `Some(0.0)`
+    /// runs it edge to edge, which is what a table wants: the rules then read
+    /// as one column of grid instead of as floating dashes.
+    pub separator_inset: Option<f32>,
+    /// Lets the last visible column absorb the width the other columns leave
+    /// unused, so the table never ends in a band of empty card.
+    pub fills_width: bool,
     pub empty_title: String,
 }
 
@@ -259,6 +266,8 @@ impl Default for TableLayout {
             row_height: 36.0,
             header_height: 38.0,
             is_striped: false,
+            separator_inset: Some(0.0),
+            fills_width: false,
             empty_title: "No records".to_string(),
         }
     }

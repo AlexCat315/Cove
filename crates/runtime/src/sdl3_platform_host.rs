@@ -664,6 +664,16 @@ impl Sdl3PlatformHost {
             s.borrow().set_window_size(id, width, height);
         }
     }
+    pub fn set_window_min_size(&self, id: WindowId, width: f32, height: f32) {
+        if let Some(s) = self.shell() {
+            s.borrow().set_window_min_size(id, width, height);
+        }
+    }
+    pub fn set_window_title(&self, id: WindowId, title: &str) {
+        if let Some(s) = self.shell() {
+            s.borrow().set_window_title(id, title);
+        }
+    }
     pub fn minimize_window(&self, id: WindowId) {
         if let Some(s) = self.shell() {
             s.borrow().minimize_window(id);

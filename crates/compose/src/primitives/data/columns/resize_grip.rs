@@ -9,14 +9,19 @@ use std::rc::Rc;
 use cove_core::Binding;
 use cove_core::scene::{
     AccessibilityActions, AccessibilityRole, AccessibilitySemantics, AccessibilityState, Align,
-    EventPhase, EventResult, InputHandlerRoute, InteractionRegistryHolder, LayoutNode, Node,
-    PointerCaptureHolder, PointerPhase, Rect,
+    EventPhase, EventResult, HoverPhase, InputHandlerRoute, InteractionRegistryHolder, LayoutNode,
+    Node, PointerCaptureHolder, PointerPhase, Rect,
 };
 use cove_platform::{MouseButton, SystemCursor};
 
 use crate::primitives::data::data_table::table_column::TableColumnLayout;
 use crate::theme::theme_for_node;
 use crate::{AnyView, PrimitiveView, View};
+
+/// The width a grip reserves inside its column, in points.
+pub(crate) const RESIZE_GRIP_WIDTH: f32 = 6.0;
+
+const GRIP_HOVERED: &str = "__table_resize_grip_hovered";
 
 /// The width a grip edits, in points.
 pub(crate) struct ResizeGrip {
@@ -52,7 +57,7 @@ impl PrimitiveView for ResizeGrip {
 
     fn make_layout_node(&self) -> Option<LayoutNode> {
         let layout = LayoutNode::new();
-        layout.set_width(Some(6.0));
+        layout.set_width(Some(RESIZE_GRIP_WIDTH));
         layout.set_align_self(Align::Stretch);
         Some(layout)
     }
@@ -96,16 +101,31 @@ impl PrimitiveView for ResizeGrip {
             ..Default::default()
         });
 
-        // A hairline down the header edge: the grip is the only thing marking
-        // where one column stops and the next starts.
+        // The grip owns the column's trailing 6pt. Its hairline is a hover
+        // affordance, not a grid: drawn only while the pointer is on the grip,
+        // at the column edge, so a resting header has no vertical rules.
         let theme = theme_for_node(node);
         let color = theme.colors.border.multiplied_alpha(node.opacity());
         let is_enabled = self.is_enabled;
-        let height = node.frame().height;
+        let width = node.frame().width - RESIZE_GRIP_WIDTH;
+        let draw_node = node.downgrade();
         node.update_overlay_draw(
-            (color.rgba8(), is_enabled, height.to_bits()),
+            (color.rgba8(), is_enabled, width.to_bits()),
             move |list, origin| {
-                let _ = list.add_rect(Rect::new(origin.x + 2.5, origin.y, 1.0, height), color);
+                let Some(owner) = Node::upgrade(&draw_node) else {
+                    return;
+                };
+                // A grid line on every column edge reads as a spreadsheet; the
+                // hairline is the grip's own affordance, so it shows up only
+                // while the pointer is on it.
+                if !owner.attachment::<bool>(GRIP_HOVERED).unwrap_or(false) {
+                    return;
+                }
+                let frame = owner.frame();
+                let _ = list.add_rect(
+                    Rect::new(origin.x + width, origin.y, 1.0, frame.height),
+                    color,
+                );
             },
         );
 
@@ -116,6 +136,27 @@ impl PrimitiveView for ResizeGrip {
             registry.remove(node);
             return;
         }
+
+        // The hairline is the grip's own affordance: it follows the pointer so
+        // a resting header stays free of vertical rules.
+        let hover_node = node.downgrade();
+        registry.set_hover(
+            node,
+            Rc::new(move |phase| {
+                let Some(owner) = Node::upgrade(&hover_node) else {
+                    return;
+                };
+                let hovered = phase == HoverPhase::Enter
+                    && crate::primitives::controls::adaptive::supports_control_hover(&owner);
+                if owner.attachment::<bool>(GRIP_HOVERED) == Some(hovered) {
+                    return;
+                }
+                owner.set_attachment(GRIP_HOVERED, hovered);
+                owner.mark_render_dirty(cove_core::scene::InvalidationSource::style_set(
+                    "resizeGripHover",
+                ));
+            }),
+        );
 
         // The press origin and the width it started from: a motion event is
         // resolved against the press instead of accumulating deltas.

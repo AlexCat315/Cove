@@ -21,6 +21,7 @@ use crate::Scope;
 use crate::modifiers::interaction::AccessibilityExt;
 use crate::modifiers::layout::{FlexExt, LayoutFrameExt, PaddingExt};
 use crate::modifiers::style::{AppearanceExt, SemanticStyleViewExt};
+use crate::primitives::data::columns::resize_grip::RESIZE_GRIP_WIDTH;
 use crate::primitives::data::columns::ResizeGrip;
 use crate::primitives::data::data_table::model::sorted_order;
 use crate::primitives::data::data_table::table_column::{
@@ -291,7 +292,7 @@ impl<Record: Clone + 'static, Id: CollectionId> Table<Record, Id> {
             0,
             &HashSet::new(),
         );
-        let presented = plan
+        let presented: Vec<(TableColumn<Record>, f32)> = plan
             .indices
             .iter()
             .filter_map(|index| self.columns.get(*index))
@@ -303,6 +304,21 @@ impl<Record: Clone + 'static, Id: CollectionId> Table<Record, Id> {
                 (column.clone(), constrained)
             })
             .collect();
+        let presented = if self.options.layout.fills_width && !presented.is_empty() {
+            let used: f32 = presented.iter().map(|(_, width)| *width).sum();
+            let slack = width - used;
+            let mut filled = presented;
+            if slack > 0.5 {
+                // The last column absorbs what the others leave unused, so the
+                // table's right edge is a column edge, not a blank band.
+                if let Some((column, last)) = filled.last_mut() {
+                    *last = column.layout.constrained(*last + slack);
+                }
+            }
+            filled
+        } else {
+            presented
+        };
         (presented, plan)
     }
 
@@ -320,6 +336,15 @@ impl<Record: Clone + 'static, Id: CollectionId> Table<Record, Id> {
                 .collect(),
         );
         let ids: Vec<Id> = records.iter().map(|record| row_id(record)).collect();
+        // One pass up front: the row closure asks for its own index on every
+        // rebuild, so scanning the record list per row would be quadratic.
+        let index_by_id: Rc<HashMap<Id, usize>> = Rc::new(
+            records
+                .iter()
+                .enumerate()
+                .map(|(index, record)| (row_id(record), index))
+                .collect(),
+        );
 
         let list = if ids.is_empty() {
             AnyView::new(
@@ -330,20 +355,16 @@ impl<Record: Clone + 'static, Id: CollectionId> Table<Record, Id> {
                 .flex_with(1.0, 1.0, None),
             )
         } else {
-            let rows = records.clone();
             let columns = Rc::new(presented.clone());
             let lookup = by_id.clone();
-            let own_row_id = row_id.clone();
+            let indices = index_by_id.clone();
             let row_height = layout.row_height;
             let is_striped = layout.is_striped;
             let row_content = move |id: &Id, state: crate::primitives::data::lists::RowState| {
                 let Some(record) = lookup.get(id) else {
                     return AnyView::new(crate::EmptyView);
                 };
-                let index = rows
-                    .iter()
-                    .position(|row| own_row_id(row) == *id)
-                    .unwrap_or(0);
+                let index = indices.get(id).copied().unwrap_or(0);
                 let cells: Vec<AnyView> = columns
                     .iter()
                     .map(|(column, width)| {
@@ -355,7 +376,11 @@ impl<Record: Clone + 'static, Id: CollectionId> Table<Record, Id> {
             let mut list = crate::primitives::data::lists::List::new(ids.clone(), row_content)
                 .selection(self.selection())
                 .row_height(row_height)
-                .row_spacing(0.0);
+                .row_spacing(0.0)
+                // The table paints the card; the rows must not paint a second
+                // one, and their columns must start where the header's do.
+                .flush_rows(true)
+                .separator_inset(layout.separator_inset.unwrap_or(0.0));
             if let Some(handler) = &self.on_activate {
                 let handler = handler.clone();
                 let lookup = by_id.clone();
@@ -401,6 +426,10 @@ impl<Record: Clone + 'static, Id: CollectionId> Table<Record, Id> {
                     0.0,
                     AnyView::new(TupleView::new(children)),
                 )
+                // The rows paint no fill of their own (flush rows are
+                // transparent), so the card has to own the surface — otherwise
+                // the table shows the region behind it.
+                .semantic_background(crate::theme::SemanticColorRef::surface())
                 .semantic_border(crate::theme::SemanticColorRef::border(), 1.0)
                 .corner_radius_metric(crate::theme::ThemeMetric::group_radius()),
             )
@@ -427,10 +456,20 @@ impl<Record: Clone + 'static, Id: CollectionId> Table<Record, Id> {
             .map(|(column, width)| {
                 let direction = self.sort_direction(&column.id);
                 let sortable = column.compare.is_some() && is_enabled;
+                // The grip lives *inside* the column's width, not beside it: a
+                // 6pt sibling in the header row would make every header column
+                // wider than the body column it labels, and the gap would grow
+                // with each column.
+                let grip = if column.layout.is_resizable {
+                    RESIZE_GRIP_WIDTH
+                } else {
+                    0.0
+                };
                 let mut parts: Vec<AnyView> = vec![AnyView::new(header_cell(
                     column.title.clone(),
-                    *width,
+                    (*width - grip).max(0.0),
                     layout.header_height,
+                    column.layout.alignment,
                     direction,
                     sortable,
                     {
@@ -666,6 +705,7 @@ fn header_cell(
     title: String,
     width: f32,
     height: f32,
+    alignment: cove_core::TextAlignment,
     direction: Option<TableSortDirection>,
     sortable: bool,
     sort: impl Fn() + 'static,
@@ -675,17 +715,26 @@ fn header_cell(
         Some(TableSortDirection::Descending) => " \u{2193}",
         None => "",
     };
+    // The label follows the column's alignment, so a numeric column's header
+    // sits over its numbers instead of over the values' left edge.
+    let justify = match alignment {
+        cove_core::TextAlignment::Leading => Justify::FlexStart,
+        cove_core::TextAlignment::Trailing => Justify::FlexEnd,
+        cove_core::TextAlignment::Center => Justify::Center,
+    };
     let content = AnyView::new(
         BoxView::new(
             FlexDirection::Row,
             Align::Center,
-            Justify::FlexStart,
+            justify,
             Wrap::NoWrap,
             6.0,
             AnyView::new(TupleView::new(vec![AnyView::new(
                 AnyView::new(Text::new(format!("{title}{indicator}")))
-                    .semantic_font(crate::theme::SemanticFontRef::label())
-                    .semantic_foreground(crate::theme::SemanticColorRef::on_surface()),
+                    // A column label is a label, not a value: semibold and one
+                    // step back in contrast, so the rows read as the data.
+                    .semantic_font(crate::theme::SemanticFontRef::body_strong())
+                    .semantic_foreground(crate::theme::SemanticColorRef::on_surface_muted()),
             )])),
         )
         .padding_edges(10.0, 0.0)

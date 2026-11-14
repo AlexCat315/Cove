@@ -19,7 +19,7 @@ use std::cell::RefCell;
 use std::collections::BTreeSet;
 use std::rc::Rc;
 
-use cove_core::State;
+use cove_core::{State, TextAlignment};
 use cove_ui_compose::modifiers::layout::LayoutFrameExt;
 use cove_ui_compose::modifiers::style::SemanticStyleViewExt;
 use cove_ui_compose::primitives::controls::{Button, Toggle};
@@ -278,11 +278,14 @@ pub struct Navigation {
 
 impl DataTableStory {
     pub fn new(options: GalleryOptions) -> Self {
+        // A data table demo opens on a populated table: an empty grid is a
+        // preview of the empty state, not of how the table behaves under load.
+        let rows: Vec<WarehouseRow> = (0..SMALL_LOAD).map(WarehouseRow::generate).collect();
         Self {
             options,
-            rows: Rc::new(RefCell::new(Vec::new())),
+            rows: Rc::new(RefCell::new(rows)),
             selection: State::new(BTreeSet::new()),
-            status: State::new("Load a dataset to begin".to_owned()),
+            status: State::new("1,000 rows loaded".to_owned()),
             is_frozen: State::new(true),
             navigation: Rc::new(RefCell::new(Navigation::default())),
             order: State::new(Vec::new()),
@@ -448,7 +451,11 @@ impl DataTableStory {
             TableColumn::new("quantity", "Quantity", |row: &WarehouseRow| {
                 AnyView::new(Text::new(row.quantity.to_string()))
             })
-            .layout(sized(100.0))
+            .layout({
+                let mut layout = sized(100.0);
+                layout.alignment = TextAlignment::Trailing;
+                layout
+            })
             .visibility(ColumnVisibility::Optional)
             .compare(|left: &WarehouseRow, right: &WarehouseRow| {
                 compare_quantities(left.quantity, right.quantity)
@@ -479,6 +486,9 @@ impl View for DataTableStory {
         let enabled = self.options.is_enabled;
         let mut options = DataTableOptions::default();
         options.is_enabled = enabled;
+        // Three visible columns in a wide card: the last one takes the slack so
+        // the grid ends at the card edge.
+        options.layout.fills_width = true;
         options.frozen_column_count = self.frozen_column_count();
         options.column_order = Some(self.order.binding());
         options.selection = Some(Selection::multiple(self.selection.binding()));

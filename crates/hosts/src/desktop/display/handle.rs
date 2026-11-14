@@ -218,6 +218,19 @@ impl AppDisplayHandle {
 
     // MARK: - Main window
 
+    /// Replaces the main window's title bar text.
+    pub fn set_window_title(&self, title: &str) {
+        let action = self
+            .bindings
+            .borrow()
+            .main_window
+            .set_main_window_title_action
+            .clone();
+        if let Some(action) = action {
+            action(title);
+        }
+    }
+
     pub fn minimize_window(&self) {
         let action = self
             .bindings
