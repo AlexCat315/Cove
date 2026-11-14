@@ -42,14 +42,14 @@ use cove_ui_compose::adaptive::SurfaceEnvironmentExt;
 use cove_ui_compose::modifiers::interaction::AccessibilityExt;
 use cove_ui_compose::modifiers::layout::{FlexExt, LayoutFrameExt};
 use cove_ui_compose::primitives::controls::Button;
-use cove_ui_compose::primitives::data::data_table::table_column::{
+use cove_ui_compose::primitives::data::lists::Selection;
+use cove_ui_compose::primitives::data::table::table_column::{
     ColumnVisibility, ComparisonResult, TableColumn, TableColumnLayout, TableColumnPlan,
     TableTextEditing,
 };
-use cove_ui_compose::primitives::data::data_table::{
-    DataTable, DataTableModel, DataTableNavigation, DataTableOptions, DataTableSelection,
+use cove_ui_compose::primitives::data::table::{
+    Table, TableModel, TableNavigation, TableOptions, TableSelection,
 };
-use cove_ui_compose::primitives::data::lists::Selection;
 use cove_ui_compose::primitives::overlays::portal::LayerRoot;
 use cove_ui_compose::primitives::text::Text;
 use cove_ui_compose::theme::styles::appearance_modifier::{Appearance, AppearanceViewExt};
@@ -124,7 +124,7 @@ fn bind<T: Clone + Send + 'static>(state: &State<T>) -> Binding<T> {
 #[derive(Clone)]
 struct Harness {
     controlled: bool,
-    model: Rc<DataTableModel<Record, i32>>,
+    model: Rc<TableModel<Record, i32>>,
     width: State<f32>,
     scale: State<f32>,
     input: State<InputCapabilities>,
@@ -132,16 +132,16 @@ struct Harness {
     enabled: State<bool>,
     overrides: State<HashMap<String, bool>>,
     widths: State<BTreeMap<String, f32>>,
-    selection: State<DataTableSelection<i32>>,
+    selection: State<TableSelection<i32>>,
     selected: State<Option<i32>>,
-    navigation: State<DataTableNavigation<i32>>,
+    navigation: State<TableNavigation<i32>>,
 }
 
 impl Harness {
     fn new(controlled: bool) -> Self {
         Self {
             controlled,
-            model: DataTableModel::try_new(records(100), |record| record.id)
+            model: TableModel::try_new(records(100), |record| record.id)
                 .expect("unique data table row IDs"),
             width: State::new(720.0),
             scale: State::new(1.0),
@@ -150,9 +150,9 @@ impl Harness {
             enabled: State::new(true),
             overrides: State::new(HashMap::new()),
             widths: State::new(BTreeMap::new()),
-            selection: State::new(DataTableSelection::new()),
+            selection: State::new(TableSelection::new()),
             selected: State::new(None),
-            navigation: State::new(DataTableNavigation::default()),
+            navigation: State::new(TableNavigation::default()),
         }
     }
 }
@@ -162,16 +162,16 @@ impl View for Harness {
         let widths = bind(&self.widths);
         let enabled = self.enabled.get();
         let table = AnyView::new(
-            DataTable::try_new(self.model.clone(), columns())
+            Table::try_new(self.model.clone(), columns())
                 .expect("unique data table column IDs")
-                .options(DataTableOptions {
+                .options(TableOptions {
                     selection: Some(Selection::single(bind(&self.selected))),
                     cursor: Some(bind(&self.selection)),
                     column_widths: Some(widths),
                     column_visibility: self.controlled.then(|| bind(&self.overrides)),
                     navigation: self.navigation.get(),
                     is_enabled: enabled,
-                    ..DataTableOptions::default()
+                    ..TableOptions::default()
                 })
                 .flex_with(1.0, 1.0, Some(0.0)),
         );
@@ -328,7 +328,7 @@ fn plans() {
     assert_eq!(all_frozen.indices, [0, 1, 2, 3]);
     assert_eq!(all_frozen.frozen_count, 4);
 
-    let geometry = cove_ui_compose::primitives::data::data_table::DataTableColumnGeometry::new(
+    let geometry = cove_ui_compose::primitives::data::table::TableColumnGeometry::new(
         vec![140.0, 100.0, 100.0, 100.0],
         4,
     );
@@ -441,7 +441,7 @@ fn matrix() {
                                 picker.absolute_frame()
                             );
 
-                            let expected_height = 36.0 * scale;
+                            let expected_height = 44.0 * scale;
                             let touch_floor = if input.contains(InputCapabilities::TOUCH) {
                                 44.0
                             } else {
@@ -557,7 +557,7 @@ fn picker() {
             );
             assert!(
                 !cell_labels(scene).contains("Notes"),
-                "clearing the overrides returns the DataTable to the 390pt plan"
+                "clearing the overrides returns the Table to the 390pt plan"
             );
 
             harness.enabled.set(false);
@@ -641,7 +641,7 @@ fn edit_and_navigation() {
             "the committed cell keeps the cursor on its column"
         );
 
-        harness.navigation.set(DataTableNavigation {
+        harness.navigation.set(TableNavigation {
             request_id: Some(1),
             row_id: Some(99),
             column_id: Some("c1".to_string()),
@@ -699,7 +699,7 @@ fn local_session() {
 
             assert!(
                 !cell_labels(scene).contains("Notes"),
-                "the unbound DataTable applies its automatic 390pt plan"
+                "the unbound Table applies its automatic 390pt plan"
             );
             assert!(cell_labels(scene).contains("Category"));
 
@@ -774,7 +774,7 @@ fn ai_queries() {
         assert_eq!(
             count(scene, "Notes"),
             0,
-            "a disabled DataTable drops its cells from input-enabled discovery"
+            "a disabled Table drops its cells from input-enabled discovery"
         );
     });
 }

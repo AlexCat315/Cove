@@ -10,7 +10,7 @@ use cove_composition::Scope;
 use cove_core::State;
 use cove_ui_compose::modifiers::style::SemanticStyleViewExt;
 use cove_ui_compose::primitives::controls::ButtonRole;
-use cove_ui_compose::primitives::data::data_table::table_column::ComparisonResult;
+use cove_ui_compose::primitives::data::table::table_column::ComparisonResult;
 use cove_ui_compose::primitives::media::ui_icon_catalog as icons;
 use cove_ui_compose::primitives::overlays::modal::action_sheet::{
     ActionSheet, ActionSheetAction, ActionSheetQuestion,

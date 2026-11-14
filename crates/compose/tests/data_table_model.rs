@@ -1,4 +1,4 @@
-//! Translation of `Tests/CoveUIComposeTests/DataTableModelTests.swift`.
+//! Translation of `Tests/CoveUIComposeTests/TableModelTests.swift`.
 //!
 //! Behaviour checklist:
 //! - 200K rows have stable projections and constant-time ID lookup
@@ -11,16 +11,16 @@
 //!
 //! Model difference: the Swift model delivers its projection from a background
 //! task, so its suite polls `sorting.isPending` until delivery. The Rust
-//! `DataTableModel::set_sort` builds the projection synchronously (the
+//! `TableModel::set_sort` builds the projection synchronously (the
 //! pending flag only brackets the build), so these tests assert the settled
 //! state directly instead of polling.
 
 use std::rc::Rc;
 
 use cove_platform::KeyModifiers;
-use cove_ui_compose::primitives::data::data_table::table_column::{ComparisonResult, TableSort};
-use cove_ui_compose::primitives::data::data_table::{
-    DataTableColumnGeometry, DataTableModel, DataTableSelection, DataTableSelectionMode,
+use cove_ui_compose::primitives::data::table::table_column::{ComparisonResult, TableSort};
+use cove_ui_compose::primitives::data::table::{
+    TableColumnGeometry, TableModel, TableSelection, TableSelectionMode,
 };
 
 #[derive(Clone, Debug, PartialEq)]
@@ -45,7 +45,7 @@ fn comparator() -> Option<Rc<dyn Fn(&TableTestRow, &TableTestRow) -> ComparisonR
 
 #[test]
 fn large_projection_is_stable_and_lookup_is_constant_time() {
-    let model = DataTableModel::try_new(
+    let model = TableModel::try_new(
         (0..200_000)
             .map(|index| TableTestRow {
                 id: index,
@@ -132,7 +132,7 @@ fn large_projection_is_stable_and_lookup_is_constant_time() {
 
 #[test]
 fn edits_and_replacement_preserve_the_latest_data() {
-    let model = DataTableModel::try_new(
+    let model = TableModel::try_new(
         (0..10_000)
             .map(|index| TableTestRow {
                 id: index,
@@ -187,7 +187,7 @@ fn edits_and_replacement_preserve_the_latest_data() {
 
 #[test]
 fn range_selection_follows_display_order() {
-    let model = DataTableModel::try_new(
+    let model = TableModel::try_new(
         (0..12)
             .map(|index| TableTestRow {
                 id: index,
@@ -199,15 +199,15 @@ fn range_selection_follows_display_order() {
     .expect("unique data table row IDs");
     model.set_sort(Some(TableSort::new("value")), comparator());
 
-    let mut selection: DataTableSelection<usize> = DataTableSelection::new();
-    selection.select(1, &model, DataTableSelectionMode::Multiple, KeyModifiers(0));
+    let mut selection: TableSelection<usize> = TableSelection::new();
+    selection.select(1, &model, TableSelectionMode::Multiple, KeyModifiers(0));
     selection.select(
         4,
         &model,
-        DataTableSelectionMode::Multiple,
+        TableSelectionMode::Multiple,
         KeyModifiers::LEFT_SHIFT,
     );
-    // `DataTableSelection` keeps ids in a `BTreeSet`, so the range reads in id
+    // `TableSelection` keeps ids in a `BTreeSet`, so the range reads in id
     // order rather than click order. Swift's ordered list holds the same set.
     let ids: Vec<usize> = selection.selected_ids.iter().copied().collect();
     assert_eq!(
@@ -231,7 +231,7 @@ fn range_selection_follows_display_order() {
     selection.select(
         3,
         &model,
-        DataTableSelectionMode::Multiple,
+        TableSelectionMode::Multiple,
         KeyModifiers::LEFT_GUI,
     );
     let ids: Vec<usize> = selection.selected_ids.iter().copied().collect();
@@ -245,7 +245,7 @@ fn range_selection_follows_display_order() {
     selection.select(
         0,
         &model,
-        DataTableSelectionMode::Single,
+        TableSelectionMode::Single,
         KeyModifiers::LEFT_SHIFT,
     );
     let ids: Vec<usize> = selection.selected_ids.iter().copied().collect();
@@ -254,7 +254,7 @@ fn range_selection_follows_display_order() {
 
 #[test]
 fn deletion_cleanup_drops_ids_that_left_the_model() {
-    let model = DataTableModel::try_new(
+    let model = TableModel::try_new(
         (0..12)
             .map(|index| TableTestRow {
                 id: index,
@@ -266,12 +266,12 @@ fn deletion_cleanup_drops_ids_that_left_the_model() {
     .expect("unique data table row IDs");
     model.set_sort(Some(TableSort::new("value")), comparator());
 
-    let mut selection: DataTableSelection<usize> = DataTableSelection::new();
-    selection.select(1, &model, DataTableSelectionMode::Multiple, KeyModifiers(0));
+    let mut selection: TableSelection<usize> = TableSelection::new();
+    selection.select(1, &model, TableSelectionMode::Multiple, KeyModifiers(0));
     selection.select(
         4,
         &model,
-        DataTableSelectionMode::Multiple,
+        TableSelectionMode::Multiple,
         KeyModifiers::LEFT_SHIFT,
     );
     assert!(!selection.selected_ids.is_empty(), "the range is selected");
@@ -291,7 +291,7 @@ fn deletion_cleanup_drops_ids_that_left_the_model() {
 
 #[test]
 fn hundreds_of_columns_window_by_width_with_independent_frozen_columns() {
-    let geometry = DataTableColumnGeometry::new(vec![100.0; 500], 2);
+    let geometry = TableColumnGeometry::new(vec![100.0; 500], 2);
     assert_eq!(
         geometry.frozen_width(),
         200.0,
@@ -320,7 +320,7 @@ fn hundreds_of_columns_window_by_width_with_independent_frozen_columns() {
 
 #[test]
 fn descending_sorts_do_not_reverse_ties() {
-    let model = DataTableModel::try_new(
+    let model = TableModel::try_new(
         (0..6)
             .map(|index| TableTestRow {
                 id: index,
@@ -344,7 +344,7 @@ fn descending_sorts_do_not_reverse_ties() {
 
 #[test]
 fn a_replaced_row_set_rebuilds_the_active_projection() {
-    let model = DataTableModel::try_new(
+    let model = TableModel::try_new(
         vec![
             TableTestRow { id: 1, value: 30 },
             TableTestRow { id: 2, value: 10 },
@@ -380,7 +380,7 @@ fn a_replaced_row_set_rebuilds_the_active_projection() {
 
 #[test]
 fn an_empty_model_reports_no_rows() {
-    let model = DataTableModel::try_new(Vec::<TableTestRow>::new(), |row: &TableTestRow| row.id)
+    let model = TableModel::try_new(Vec::<TableTestRow>::new(), |row: &TableTestRow| row.id)
         .expect("unique data table row IDs");
     assert_eq!(model.count(), 0);
     assert_eq!(model.row_id_at(0), None, "no row exists at index 0");
@@ -391,7 +391,7 @@ fn an_empty_model_reports_no_rows() {
 
 #[test]
 fn invalid_row_identity_leaves_the_current_model_intact() {
-    let model = DataTableModel::try_new(vec![1, 2], |row| *row).unwrap();
+    let model = TableModel::try_new(vec![1, 2], |row| *row).unwrap();
     let revision = model.revision();
     assert!(model.replace_rows(vec![3, 3]).is_err());
     assert!(!model.update_row(&1, |row| *row = 2));

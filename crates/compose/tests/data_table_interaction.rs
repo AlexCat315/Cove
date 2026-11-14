@@ -1,4 +1,4 @@
-//! Translation of `Tests/CoveUIComposeTests/DataTableInteractionTests.swift`
+//! Translation of `Tests/CoveUIComposeTests/TableInteractionTests.swift`
 //! (virtualization and frozen-cell halves).
 //!
 //! Behaviour checklist:
@@ -10,7 +10,7 @@
 //! - a controlled selection follows pointer modifiers and keyboard chords
 //!
 //! Model difference: the Swift suite drives a live scene. The Rust image
-//! exposes the mounted window (`DataTableWindows`) and the selection contract
+//! exposes the mounted window (`TableWindows`) and the selection contract
 //! as pure functions, so the tests assert the same numbers through them. The
 //! scene-level wiring that turns them into nodes is covered by
 //! `data_table_layout.rs` and the host markers asserted here.
@@ -21,9 +21,9 @@ use std::sync::{Arc, Mutex};
 use cove_core::Binding;
 use cove_core::Point;
 use cove_platform::KeyModifiers;
-use cove_ui_compose::primitives::data::data_table::{
-    DataTableColumnGeometry, DataTableModel, DataTableRowMetrics, DataTableSelection,
-    DataTableSelectionMode, DataTableWindows,
+use cove_ui_compose::primitives::data::table::{
+    TableColumnGeometry, TableModel, TableRowMetrics, TableSelection, TableSelectionMode,
+    TableWindows,
 };
 
 const ROWS: usize = 200_000;
@@ -41,8 +41,8 @@ struct GridRow {
     value: usize,
 }
 
-fn model(rows: usize) -> Rc<DataTableModel<GridRow, usize>> {
-    DataTableModel::try_new(
+fn model(rows: usize) -> Rc<TableModel<GridRow, usize>> {
+    TableModel::try_new(
         (0..rows)
             .map(|index| GridRow {
                 id: index,
@@ -54,20 +54,20 @@ fn model(rows: usize) -> Rc<DataTableModel<GridRow, usize>> {
     .expect("unique data table row IDs")
 }
 
-fn geometry() -> DataTableColumnGeometry {
-    DataTableColumnGeometry::new(vec![COLUMN_WIDTH; COLUMNS], FROZEN)
+fn geometry() -> TableColumnGeometry {
+    TableColumnGeometry::new(vec![COLUMN_WIDTH; COLUMNS], FROZEN)
 }
 
-fn metrics() -> DataTableRowMetrics {
-    DataTableRowMetrics::fixed(ROWS, ROW_HEIGHT)
+fn metrics() -> TableRowMetrics {
+    TableRowMetrics::fixed(ROWS, ROW_HEIGHT)
 }
 
 fn moving_width() -> f32 {
     VIEWPORT_WIDTH - geometry().frozen_width()
 }
 
-fn window(offset: Point) -> DataTableWindows {
-    DataTableWindows::resolve(
+fn window(offset: Point) -> TableWindows {
+    TableWindows::resolve(
         &metrics(),
         &geometry(),
         offset,
@@ -78,7 +78,7 @@ fn window(offset: Point) -> DataTableWindows {
 }
 
 /// Counts the cells the window would mount, the Swift suite's `cells.count`.
-fn mounted_cells(window: &DataTableWindows) -> usize {
+fn mounted_cells(window: &TableWindows) -> usize {
     window.rows(ROWS).len() * window.columns(COLUMNS).len()
 }
 
@@ -232,18 +232,17 @@ fn pointer_modifiers_and_keyboard_chords_share_one_selection() {
     // Selection is the shared state both paths write, so the contract is that
     // the same sequence of selections lands on the same ids.
     let model = model(100);
-    let selection: Arc<Mutex<DataTableSelection<usize>>> =
-        Arc::new(Mutex::new(DataTableSelection::new()));
+    let selection: Arc<Mutex<TableSelection<usize>>> = Arc::new(Mutex::new(TableSelection::new()));
 
     // click(1) then shift-click(3) selects the run 1..=3.
     selection
         .lock()
         .unwrap()
-        .select(1, &model, DataTableSelectionMode::Multiple, KeyModifiers(0));
+        .select(1, &model, TableSelectionMode::Multiple, KeyModifiers(0));
     selection.lock().unwrap().select(
         3,
         &model,
-        DataTableSelectionMode::Multiple,
+        TableSelectionMode::Multiple,
         KeyModifiers::LEFT_SHIFT,
     );
     let ids: Vec<usize> = selection
@@ -259,7 +258,7 @@ fn pointer_modifiers_and_keyboard_chords_share_one_selection() {
     selection.lock().unwrap().select(
         2,
         &model,
-        DataTableSelectionMode::Multiple,
+        TableSelectionMode::Multiple,
         KeyModifiers::LEFT_GUI,
     );
     let ids: Vec<usize> = selection
@@ -275,7 +274,7 @@ fn pointer_modifiers_and_keyboard_chords_share_one_selection() {
     selection.lock().unwrap().select(
         3,
         &model,
-        DataTableSelectionMode::Multiple,
+        TableSelectionMode::Multiple,
         KeyModifiers::LEFT_SHIFT,
     );
     assert!(
@@ -302,18 +301,17 @@ fn pointer_modifiers_and_keyboard_chords_share_one_selection() {
 fn a_selection_binding_can_drive_a_controlled_table() {
     // The Swift harness passes a `Binding` so clicks write back. The Rust
     // options take the same binding, so the round trip is asserted here.
-    let selection: Arc<Mutex<DataTableSelection<usize>>> =
-        Arc::new(Mutex::new(DataTableSelection::new()));
+    let selection: Arc<Mutex<TableSelection<usize>>> = Arc::new(Mutex::new(TableSelection::new()));
     let read = selection.clone();
     let write = selection.clone();
-    let binding: Binding<DataTableSelection<usize>> = Binding::new(
+    let binding: Binding<TableSelection<usize>> = Binding::new(
         move || read.lock().unwrap().clone(),
         move |value| *write.lock().unwrap() = value,
     );
 
     let model = model(20);
     let mut next = binding.get();
-    next.select(4, &model, DataTableSelectionMode::Single, KeyModifiers(0));
+    next.select(4, &model, TableSelectionMode::Single, KeyModifiers(0));
     binding.set(next);
 
     assert_eq!(

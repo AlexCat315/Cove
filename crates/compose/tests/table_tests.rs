@@ -15,11 +15,12 @@ use std::collections::{BTreeMap, HashMap};
 
 use cove_composition::Scope;
 use cove_core::State;
-use cove_ui_compose::primitives::data::data_table::table_column::{
+use cove_ui_compose::primitives::data::lists::Selection;
+use cove_ui_compose::primitives::data::table::table_column::{
     ColumnVisibility, ComparisonResult, TableColumn, TableColumnLayout, TableColumnPlan, TableSort,
     TableSortDirection,
 };
-use cove_ui_compose::primitives::data::lists::{Selection, Table, TableOptions};
+use cove_ui_compose::primitives::data::table::{Table, TableOptions};
 use cove_ui_compose::primitives::text::Text;
 use cove_ui_compose::{AnyView, View};
 
@@ -179,7 +180,7 @@ fn equal_comparisons_retain_source_order_in_both_directions() {
                 column_id: "name".to_string(),
                 direction,
             };
-            let order = cove_ui_compose::primitives::data::data_table::model::sorted_order(
+            let order = cove_ui_compose::primitives::data::table::model::sorted_order(
                 &tied,
                 &sort,
                 &(|left: &Row, right: &Row| comparison(&left.name, &right.name)),
@@ -295,7 +296,7 @@ fn an_empty_table_keeps_its_columns() {
         let table = Table::<Row, usize>::new(vec![], |row: &Row| row.id, columns())
             .expect("the fixture ids are unique")
             .options(TableOptions::default());
-        assert_eq!(table.records().len(), 0, "no rows are listed");
+        assert_eq!(table.model().count(), 0, "no rows are listed");
         assert_eq!(
             table.columns().len(),
             2,
@@ -350,6 +351,6 @@ fn the_table_mounts_its_body() {
         let scene = Scope::detached();
         let table = table(TableOptions::default());
         let _ = table.body(&scene);
-        assert_eq!(table.records().len(), 3, "the fixture rows are retained");
+        assert_eq!(table.model().count(), 3, "the fixture rows are retained");
     });
 }

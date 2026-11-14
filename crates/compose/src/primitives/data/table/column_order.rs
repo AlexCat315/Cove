@@ -1,4 +1,4 @@
-//! Translation of `Primitives/Data/DataTable/ColumnOrder.swift`.
+//! Translation of `Primitives/Data/Table/ColumnOrder.swift`.
 //!
 //! Display order of authored columns. Unknown IDs are ignored and columns
 //! missing from a saved order keep their authored position after the ordered
@@ -15,12 +15,12 @@
 
 use std::collections::HashMap;
 
-use super::data_table_geometry::DataTableColumnGeometry;
+use super::table_geometry::TableColumnGeometry;
 
 /// Authorable column ordering for a data table.
-pub enum DataTableColumnOrder {}
+pub enum TableColumnOrder {}
 
-impl DataTableColumnOrder {
+impl TableColumnOrder {
     /// Reorders `ids` (authored order) by `order` (saved display order).
     pub fn apply(order: &[String], ids: &[String]) -> Vec<String> {
         if order.is_empty() {
@@ -70,7 +70,7 @@ impl DataTableColumnOrder {
     }
 
     /// The presented column whose span contains the dragged column's centre.
-    pub fn target(source: usize, offset: f32, geometry: &DataTableColumnGeometry) -> usize {
+    pub fn target(source: usize, offset: f32, geometry: &TableColumnGeometry) -> usize {
         let Some(&width) = geometry.widths.get(source) else {
             return source;
         };

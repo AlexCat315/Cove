@@ -185,14 +185,14 @@ PostureLayout::new()
 | 类别 | 组件 | 要求 |
 |---|---|---|
 | 通用 | Button、Toggle、Checkbox、Radio、Slider、RangeSlider、Rating、TextField、Select、Badge、Progress、Spinner、Avatar、Tag、Alert、EmptyState、Skeleton、Link、Stepper、Carousel、Chart、Image、Markdown | 跟随设计语言换样式（§7）；触摸时命中区 ≥ 44（Material 48）；不依赖 hover |
-| 桌面惯用，手持需换形态 | Sidebar、Tree、DataTable、Table、PropertyGrid、SplitView、Workspace / Dock、StatusBar、Toolbar、Tooltip、HoverCard、ContextMenu、Command Palette、Breadcrumb、Kbd、SplitButton、Scrollbar、Pagination、Menu bar | 见下表 |
+| 桌面惯用，手持需换形态 | Sidebar、Tree、Table、PropertyGrid、SplitView、Workspace / Dock、StatusBar、Toolbar、Tooltip、HoverCard、ContextMenu、Command Palette、Breadcrumb、Kbd、SplitButton、Scrollbar、Pagination、Menu bar | 见下表 |
 | 手持惯用，桌面需对应物 | BottomSheet、ActionSheet、SwipeList、RefreshableList、WheelPicker、MobileTabBar、HorizontalSwipe | 见下表 |
 
 | 组件 | 手持形态 | 桌面形态 |
 |---|---|---|
 | Sidebar | 平台列表：Cupertino inset grouped（圆角分组、整行可点、尾部箭头），Material 列表（整宽行、前置图标）；不保留选中高亮 | 侧栏面板与选中高亮 |
 | Tree | 逐层下钻（每层一个 push 页） | 展开折叠 |
-| DataTable / Table | 卡片列表，或冻结首列横向滚动 | 表格 |
+| Table | 卡片列表，或冻结首列横向滚动 | 表格 |
 | PropertyGrid | 分组表单 | 两列网格 |
 | SplitView / Workspace | `ListDetail` 或单栏 | 可拖动分栏 |
 | Toolbar | 导航栏 + 底部工具栏 / 溢出菜单 | 窗口工具栏 |

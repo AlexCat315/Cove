@@ -352,7 +352,6 @@ fn dragged_label_copies_on_each_shell() {
         GalleryPage::Tabs,
         GalleryPage::List,
         GalleryPage::Table,
-        GalleryPage::DataTable,
         GalleryPage::Tree,
         GalleryPage::Sidebar,
         GalleryPage::Panel,

@@ -384,7 +384,7 @@ API 收敛：删除 RichText 类型与导出，无兼容别名。普通文字与
 - 212 个挂载/布局场景：每页各检查宽屏 1280×820、指针、浅色、100% 字号，以及 390×820、触摸、深色、200% 字号。
 - 上述场景无无效数值/负尺寸几何。正文选择检查覆盖 106 页，跨页壳拖选复制覆盖 15 种页壳。
 - 单元/场景验证不等于所有页面已做视觉和交互验收；原生 Windows、Linux、iOS、Android 尚未设备实测。修改位于共享 Rust 实现，未增加平台空实现。
-- `clippedOverflow` 是诊断线索，包含可能有意裁剪的控件，不直接认定为缺陷；DataTable、WheelPicker、Carousel、SwipeList、Tree 的线索仍待逐项观察。
+- `clippedOverflow` 是诊断线索，包含可能有意裁剪的控件，不直接认定为缺陷；Table、WheelPicker、Carousel、SwipeList、Tree 的线索仍待逐项观察。
 
 本轮检查结果（TextFieldStyle / TextBuffer）：
 
@@ -473,8 +473,7 @@ cargo test -p cove-ui-compose --test compose --locked
 | NavigationDrawer | 0 | 0 / 0 | 挂载/几何基础检查通过；待逐项交互和视觉验收 |
 | NavigationRail | 0 | 0 / 0 | 挂载/几何基础检查通过；待逐项交互和视觉验收 |
 | AppBar / NavigationBar | 0 | 0 / 0 | 挂载/几何基础检查通过；待逐项交互和视觉验收 |
-| Table | 2 | 6 / 6 | 段落与 Swift 对齐（10,000 行库存表 + 空数据）；排序循环、隐藏排序列、列宽约束、窄宽丢列、空数据保留表头与单选已有回归；待逐项原生视觉验收 |
-| DataTable | 3 | 3 / 0 | 挂载/几何基础检查通过；待逐项交互和视觉验收 |
+| Table | 3 | 9 / 6 | 统一后的单个 `Table` 页面：仓库表（最多 200,000 行 × 35 列）、项目树与 `TreeTable` 三个段落；持久模型、冻结列、列序、多选、单元格编辑、排序循环、隐藏排序列、列宽约束、窄宽丢列与空数据保留表头已有回归；新视觉（16pt gutter、44pt 行、40pt 表头、通栏发丝线、`surface_variant` 表头/工具栏色带、3pt 选中条、紧凑空状态、16pt 卡片圆角）经 catalog geometry 检查；待逐项原生视觉验收 |
 | Calendar | 2 | 0 / 0 | 挂载/几何基础检查通过；待逐项交互和视觉验收 |
 | DatePicker | 0 | 0 / 0 | 挂载/几何基础检查通过；待逐项交互和视觉验收 |
 | DateRangePicker | 0 | 0 / 0 | 挂载/几何基础检查通过；待逐项交互和视觉验收 |
@@ -544,7 +543,7 @@ cargo test -p cove-ui-compose --test compose --locked
 | --- | --- | ---: | --- |
 | ActionSheet | `ActionSheetStory` | 2 | Project actions、Long action lists |
 | EmptyState | `EmptyStory` | 1 | Empty content |
-| Table | `TableStory` | 2 | Inventory · 10,000 rows、Empty data |
+| Table | `TableStory` | 3 | Warehouse · up to 200,000 rows × 35 columns、Project tree、Tree table |
 | Toolbar | `ToolbarStory` | 1 | Toolbar |
 | Workspace / Dock | Dock workspace | 1 | Dock workspace |
 
@@ -609,7 +608,7 @@ cargo test -p cove-ui-compose --test compose --locked
 | Combobox | Remote results | 2/2 | 出现在本页源码，未单独成段 |
 | Command Palette | Custom footer | 2/2 | 出现在本页源码，未单独成段 |
 | ContextMenu | Context actions | 2/2 | 出现在本页源码，未单独成段 |
-| DataTable | TreeTable | 1/1 | 出现在本页源码，未单独成段 |
+| Table | TreeTable | 1/1 | 出现在本页源码，未单独成段 |
 | DatePicker | Date input | 1/2 | 未出现：input |
 | EmptyState | Empty content | 2/2 | 出现在本页源码，未单独成段 |
 | Image | Content modes | 2/2 | 出现在本页源码，未单独成段 |
@@ -625,8 +624,8 @@ cargo test -p cove-ui-compose --test compose --locked
 | ScrollView | Native scroll stream | 1/3 | 未出现：native、stream |
 | SearchField | Search input | 2/2 | 出现在本页源码，未单独成段 |
 | Select | Typed options | 2/2 | 出现在本页源码，未单独成段 |
-| Table | Inventory · 10,000 rows | 1/1 | 已单独成段（`gallery-table`，10,000 行） |
-| Table | Empty data | 2/2 | 已单独成段（保留表头 + 空状态） |
+| Table | Warehouse | 2/2 | 已单独成段（`gallery-data-table`，最多 200,000 行） |
+| Table | Tree table | 2/2 | 已单独成段 |
 | TextArea | Resizable text area | 2/3 | 未出现：resizable |
 | TimeField | Time input | 1/2 | 未出现：input |
 | TimePicker | Segmented time input | 1/3 | 未出现：input、segmented |
@@ -665,7 +664,7 @@ cargo test -p cove-ui-compose --test compose --locked
 | Command Palette | 2 | 1 | 1 | 0 | 1 | 段落少 1 段 |
 | ContextMenu | 1 | 1 | 0 | 0 | 1 | 段落数持平 |
 | Dashboard | 0 | 0 | 0 | 0 | 0 | Rust 无段落结构 |
-| DataTable | 2 | 3 | 1 | 0 | 1 | 段落多于 Swift |
+| Table | 2 | 3 | 2 | 0 | 1 | 段落多于 Swift |
 | DatePicker | 1 | 1 | 0 | 0 | 1 | 段落数持平 |
 | DateRangePicker | 1 | 1 | 1 | 0 | 0 | 段落数持平 |
 | Dialog | 1 | 1 | 1 | 0 | 0 | 段落数持平 |
@@ -718,7 +717,7 @@ cargo test -p cove-ui-compose --test compose --locked
 | StatusBar | 3 | 3 | 3 | 0 | 0 | 段落数持平 |
 | Stepper | 3 | 3 | 3 | 0 | 0 | 段落数持平 |
 | SwipeList | 1 | 1 | 1 | 0 | 0 | 段落数持平 |
-| Table | 2 | 2 | 2 | 0 | 0 | 段落数持平 |
+| Table | 2 | 3 | 2 | 0 | 1 | 段落多于 Swift |
 | TabView | 3 | 4 | 3 | 0 | 0 | 段落多于 Swift |
 | Tag | 2 | 3 | 2 | 0 | 0 | 段落多于 Swift |
 | Text Editor | 1 | 1 | 1 | 0 | 0 | 段落数持平 |

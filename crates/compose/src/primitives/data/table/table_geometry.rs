@@ -1,14 +1,14 @@
 //! Prefix geometry for horizontally virtualized data table columns.
 use std::ops::Range;
 
-pub struct DataTableColumnGeometry {
+pub struct TableColumnGeometry {
     pub widths: Vec<f32>,
     starts: Vec<f32>,
     pub frozen_count: usize,
     pub total_width: f32,
 }
 
-impl Clone for DataTableColumnGeometry {
+impl Clone for TableColumnGeometry {
     fn clone(&self) -> Self {
         Self {
             widths: self.widths.clone(),
@@ -19,7 +19,7 @@ impl Clone for DataTableColumnGeometry {
     }
 }
 
-impl DataTableColumnGeometry {
+impl TableColumnGeometry {
     pub fn new(widths: Vec<f32>, frozen_count: usize) -> Self {
         let frozen_count = frozen_count.min(widths.len());
         let mut starts = Vec::with_capacity(widths.len());

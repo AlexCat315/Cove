@@ -451,11 +451,14 @@ impl<Id: CollectionId> View for List<Id> {
         if self.flush_rows {
             // A table paints the card, so its rows cannot bring a second one:
             // no inset box, no row padding, separators edge to edge.
-            return AnyView::new(
-                host.list_row_style(FlushListRowStyle)
-                    .flex(1.0)
-                    .frame(None, None, Some(0.0), Some(0.0), None, None),
-            );
+            return AnyView::new(host.list_row_style(FlushListRowStyle).flex(1.0).frame(
+                None,
+                None,
+                Some(0.0),
+                Some(0.0),
+                None,
+                None,
+            ));
         }
         // An inset list: one rounded box in the surface fill, its rows inset
         // so the selection band clears the box edge.

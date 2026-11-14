@@ -20,7 +20,6 @@ mod tools;
 #[cfg(not(target_arch = "wasm32"))]
 pub use tools::{FfmpegTools, ToolError, ToolSearch, resolve as resolve_ffmpeg_tools};
 
-
 #[cfg(all(feature = "ffmpeg", not(target_arch = "wasm32")))]
 mod engine;
 #[cfg(all(feature = "ffmpeg", not(target_arch = "wasm32")))]

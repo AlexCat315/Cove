@@ -8,7 +8,7 @@ use cove_examples::gallery_content::stories::data_stories::{
     numeric_comparison,
 };
 use cove_ui_compose::primitives::data::chart::ChartRange;
-use cove_ui_compose::primitives::data::data_table::table_column::ComparisonResult;
+use cove_ui_compose::primitives::data::table::table_column::ComparisonResult;
 
 #[test]
 fn the_chart_starts_at_the_full_domain() {
@@ -69,9 +69,9 @@ fn the_brushed_caption_appears_only_with_a_selection() {
 }
 
 #[test]
-fn the_adaptive_sample_defaults_to_the_data_table() {
+fn the_adaptive_sample_defaults_to_frozen_columns() {
     let sample = AdaptiveTableSample::new(GalleryOptions::default(), true);
-    assert!(sample.uses_data_table());
+    assert!(sample.uses_frozen_columns());
     assert_eq!(sample.row_count(), 30);
 }
 

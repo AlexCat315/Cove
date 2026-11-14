@@ -99,12 +99,7 @@ impl VectorImageRaster {
 
     /// An icon that ships inside the binary; the raster still follows the
     /// draw size, so no file has to exist at run time.
-    pub fn from_bytes(
-        data: &'static [u8],
-        initial: ImageSource,
-        width: f32,
-        height: f32,
-    ) -> Self {
+    pub fn from_bytes(data: &'static [u8], initial: ImageSource, width: f32, height: f32) -> Self {
         Self::with_source(VectorSource::Bytes(data), initial, width, height)
     }
 
@@ -127,8 +122,7 @@ impl VectorImageRaster {
             let raster = self
                 .source
                 .rasterize(ImageAssetRegistryHolder::current(), target);
-            *self.asset.borrow_mut() =
-                Image::source_for(&self.source.hint_path(), raster);
+            *self.asset.borrow_mut() = Image::source_for(&self.source.hint_path(), raster);
             *self.key.borrow_mut() = next;
         }
         self.asset.borrow().clone()

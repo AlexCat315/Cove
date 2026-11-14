@@ -24,8 +24,7 @@ use std::time::Instant;
 
 use cove_devtools_protocol::control::Fault;
 use cove_devtools_protocol::{
-    ProfileFrame, ProfileHotspot, ProfileSource, ProfileStack, ProfileStatus, UiHotspots,
-    UiProfile,
+    ProfileFrame, ProfileHotspot, ProfileSource, ProfileStack, ProfileStatus, UiHotspots, UiProfile,
 };
 
 /// Distinct phases one run keeps; further labels are counted as dropped.
@@ -189,7 +188,12 @@ impl Recorder {
                 percent: self.unit_share(self_units, total_units),
                 frames: vec![frame_node("frame", "Cove frame")],
             });
-            for (row, units) in self.rows.iter().zip(phase_units.iter()).take(MAX_STACKS - 1) {
+            for (row, units) in self
+                .rows
+                .iter()
+                .zip(phase_units.iter())
+                .take(MAX_STACKS - 1)
+            {
                 stacks.push(ProfileStack {
                     samples: *units,
                     percent: self.unit_share(*units, total_units),
@@ -383,7 +387,10 @@ mod tests {
     fn accumulates_measured_phases_into_one_root_and_one_stack_per_phase() {
         reset();
         start(0).unwrap();
-        profile_frame(&[("recompose", 2.0), ("layout", 6.0), ("encode", 3.0)], 12.0);
+        profile_frame(
+            &[("recompose", 2.0), ("layout", 6.0), ("encode", 3.0)],
+            12.0,
+        );
         profile_frame(&[("layout", 5.0), ("encode", 2.0)], 9.0);
         stop().unwrap();
 
@@ -452,7 +459,11 @@ mod tests {
         // A browser renders on demand: no new frame may arrive before the bound.
         std::thread::sleep(std::time::Duration::from_millis(2));
         let profile = read("web");
-        assert_eq!(profile.status, ProfileStatus::Ready, "the bound does not wait for a frame");
+        assert_eq!(
+            profile.status,
+            ProfileStatus::Ready,
+            "the bound does not wait for a frame"
+        );
         assert_eq!(profile.samples_taken, 1);
         reset();
     }
@@ -464,9 +475,22 @@ mod tests {
         // Static labels, so the first twelve fill the bound and the rest drop.
         for index in 0..(MAX_DISTINCT_PHASES + 4) {
             let static_label: &'static str = match index {
-                0 => "p0", 1 => "p1", 2 => "p2", 3 => "p3", 4 => "p4", 5 => "p5",
-                6 => "p6", 7 => "p7", 8 => "p8", 9 => "p9", 10 => "p10", 11 => "p11",
-                12 => "p12", 13 => "p13", 14 => "p14", _ => "p15",
+                0 => "p0",
+                1 => "p1",
+                2 => "p2",
+                3 => "p3",
+                4 => "p4",
+                5 => "p5",
+                6 => "p6",
+                7 => "p7",
+                8 => "p8",
+                9 => "p9",
+                10 => "p10",
+                11 => "p11",
+                12 => "p12",
+                13 => "p13",
+                14 => "p14",
+                _ => "p15",
             };
             record_phase(static_label, 1.0);
         }

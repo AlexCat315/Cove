@@ -1,6 +1,6 @@
 //! Translation of `TableResizeGrip` in `Primitives/Data/Lists/Table.swift`.
 //!
-//! Column resize grip shared by `Table` and `DataTable`: drag, arrow keys and
+//! Column resize grip shared by `Table` and `Table`: drag, arrow keys and
 //! the accessibility actions all write one constrained width through the
 //! binding it is handed, so neither table needs a resize path of its own.
 use std::cell::RefCell;
@@ -14,7 +14,7 @@ use cove_core::scene::{
 };
 use cove_platform::{MouseButton, SystemCursor};
 
-use crate::primitives::data::data_table::table_column::TableColumnLayout;
+use crate::primitives::data::table::table_column::TableColumnLayout;
 use crate::theme::theme_for_node;
 use crate::{AnyView, PrimitiveView, View};
 

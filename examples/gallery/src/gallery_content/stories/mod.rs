@@ -18,7 +18,6 @@ pub mod controls;
 pub mod data_list_stories;
 pub mod data_stories;
 pub mod data_stories_file;
-pub mod data_table_story;
 pub mod drag_upload_story;
 pub mod feedback;
 pub mod field_stories;
@@ -75,7 +74,6 @@ pub use data_stories_file::{
     DragAndDropStory, RefreshListStory, SectionedListStory, SwipeListStory, TreeStory,
     VirtualStackStory,
 };
-pub use data_table_story::DataTableStory;
 pub use drag_upload_story::DragUploadStory;
 pub use feedback::{AlertStory, BadgeStory, EmptyStory, ProgressStory, StorySection};
 pub use field_stories::{
@@ -114,7 +112,7 @@ pub use rich_text::TextStory;
 pub use sidebar_stories::{NestedSidebarExample, ResizableSidebarExample};
 pub use sidebar_story::SidebarStory;
 pub use stepper::StepperStory;
-pub use table_story::{InventoryRecord, TABLE_RECORDS, TableStory};
+pub use table_story::TableStory;
 pub use text_editor_story::TextEditorStory;
 pub use theme::ThemeStory;
 pub use time_picker_story::TimePickerStory;

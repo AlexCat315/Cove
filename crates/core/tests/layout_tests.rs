@@ -365,7 +365,7 @@ fn logical_end_mirrors_under_rtl_when_set_before_parenting() {
 fn per_node_layout_direction_reverses_row_order() {
     // A node's own `layout_direction` must reach its children's placement, not
     // just be readable through `direction()`. This is the contract the whole
-    // RTL story rests on: Sidebar, Toolbar, DataTable frozen columns and the
+    // RTL story rests on: Sidebar, Toolbar, Table frozen columns and the
     // avatar status indicator all depend on it.
     for (direction, first_x, second_x) in [
         (Direction::Ltr, 0.0f32, 44.0f32),

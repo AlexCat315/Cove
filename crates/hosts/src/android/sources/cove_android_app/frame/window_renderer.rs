@@ -130,7 +130,9 @@ impl AndroidWindowRenderer {
             .framebuffer
             .as_ref()
             .map(|buffer| buffer.texture())
-            .ok_or_else(|| RhiError::invalid_argument("the android frame needs a resolve target"))?;
+            .ok_or_else(|| {
+                RhiError::invalid_argument("the android frame needs a resolve target")
+            })?;
         let clear_color = self.clear_color;
         let renderer = &mut self.renderer;
         let frame = self

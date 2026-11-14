@@ -42,7 +42,7 @@ let scope = DragScope::new(Column::new(
 
 ## 阈值统一
 
-“按下还是拖拽”的判定集中在 `primitives::interaction::drag_threshold`：`DRAG_THRESHOLD`（6pt）与 `crossed` / `crossed_along_axis`。通用拖放、`Tree` 行拖拽、`SwipeList` 滑动、`DataTable` 列拖拽与 `WheelPicker` 都读同一组值，调灵敏度只需要改一处。
+“按下还是拖拽”的判定集中在 `primitives::interaction::drag_threshold`：`DRAG_THRESHOLD`（6pt）与 `crossed` / `crossed_along_axis`。通用拖放、`Tree` 行拖拽、`SwipeList` 滑动、`Table` 列拖拽与 `WheelPicker` 都读同一组值，调灵敏度只需要改一处。
 
 ## 与 Tree 拖拽的区别
 

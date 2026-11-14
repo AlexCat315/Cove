@@ -1,7 +1,7 @@
 //! Translation of the column model in Primitives/Data/Lists/Table.swift and of
 //! Primitives/Data/Columns/Visibility.swift via the `TableColumnPlan` type below.
 //!
-//! What a `DataTable` column is: its cell, width, visibility, comparison and text
+//! What a `Table` column is: its cell, width, visibility, comparison and text
 //! editing.
 use std::collections::BTreeMap;
 use std::rc::Rc;
@@ -268,15 +268,17 @@ pub struct TableLayout {
 impl Default for TableLayout {
     fn default() -> Self {
         Self {
-            // Airy grid: 40pt rows give 14pt values room to breathe, and the
-            // 44pt header keeps the labels from crowding the rule below them.
-            row_height: 40.0,
-            header_height: 44.0,
+            // 44pt rows hold a 16pt value without crowding, and the compact
+            // 40pt header keeps the grid anchored to the data.
+            row_height: 44.0,
+            header_height: 40.0,
             is_striped: false,
-            // The hairline stops short of both edges: a full-bleed rule turns
-            // the card into graph paper, an inset one reads as a row divider.
-            separator_inset: Some(20.0),
-            fills_width: false,
+            // Full bleed: the rules run edge to edge so the rows read as one
+            // grid, not as a column of floating dashes.
+            separator_inset: Some(0.0),
+            // A table is a surface, not a shrink-wrapped list: let the flexible
+            // column take the leftover width instead of ending in dead card.
+            fills_width: true,
             empty_title: "No records".to_string(),
         }
     }

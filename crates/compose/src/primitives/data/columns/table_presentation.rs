@@ -1,7 +1,7 @@
 //! Translation of Primitives/Data/Columns/TablePresentation.swift.
 //!
 //! One container query and one visibility plan for both table implementations,
-//! so `Table` and `DataTable` agree on which columns are visible at a given
+//! so `Table` and `Table` agree on which columns are visible at a given
 //! width.
 //!
 //! Behaviour checklist:
@@ -20,7 +20,7 @@ use crate::modifiers::layout::{FlexExt, LayoutFrameExt};
 use crate::primitives::columns::{
     ColumnVisibilityPicker, ColumnVisibilityPickerModel, ColumnVisibilityPlan,
 };
-use crate::primitives::data::data_table::table_column::{
+use crate::primitives::data::table::table_column::{
     ColumnVisibility, TableColumn, TableColumnPlan,
 };
 use crate::primitives::layout::scroll_view::ScrollView as ScrollViewPrimitive;

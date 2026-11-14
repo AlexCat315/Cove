@@ -1,8 +1,8 @@
 //! Translation of Primitives/Data/TreeTable/TreeTable.swift.
 //!
-//! A `DataTable` whose first column carries the hierarchy: indentation and a
+//! A `Table` whose first column carries the hierarchy: indentation and a
 //! disclosure button. Columns, widths, priorities, ordering, virtualization and
-//! keyboard grid navigation are `DataTable`'s. With the first column focused,
+//! keyboard grid navigation are `Table`'s. With the first column focused,
 //! Right expands (or moves to the first child) and Left collapses (or moves to
 //! the parent), as in a tree. Sorting and cell editing are not offered:
 //! siblings keep their authored order.
@@ -24,14 +24,14 @@ use std::rc::Rc;
 use crate::modifiers::interaction::AccessibilityExt;
 use crate::modifiers::layout::{FlexExt, LayoutFrameExt};
 use crate::primitives::controls::button::{Button, ButtonIcon, ButtonIconSource};
-use crate::primitives::data::data_table::table_column::{
-    ColumnVisibility, TableColumn, TableColumnLayout, TableLayout,
-};
-use crate::primitives::data::data_table::{
-    DataTable, DataTableModel, DataTableNavigation, DataTableOptions, DataTableSelection,
-};
 use crate::primitives::data::lists::selection::{CollectionId, Selection};
 use crate::primitives::data::lists::tree::view::flatten_visible;
+use crate::primitives::data::table::table_column::{
+    ColumnVisibility, TableColumn, TableColumnLayout, TableLayout,
+};
+use crate::primitives::data::table::{
+    Table, TableModel, TableNavigation, TableOptions, TableSelection,
+};
 use crate::primitives::media::ui_icon_catalog;
 use crate::theme::TextScalerReader;
 use crate::theme::styles::buttons::{ButtonRole, ButtonStyleViewExt};
@@ -192,7 +192,7 @@ where
     .collect()
 }
 
-/// A `DataTable` whose first column carries the hierarchy.
+/// A `Table` whose first column carries the hierarchy.
 pub struct TreeTable<Record, Id>
 where
     Record: Clone + 'static,
@@ -206,15 +206,9 @@ where
     pub on_activate: Option<Rc<dyn Fn(&Record)>>,
     local_expanded: State<BTreeSet<Id>>,
     local_selection: State<Option<Id>>,
-    cursor: State<DataTableSelection<Id>>,
-    navigation: State<DataTableNavigation<Id>>,
-    model: RefCell<
-        Option<(
-            Vec<Id>,
-            Vec<bool>,
-            Rc<DataTableModel<TreeTableRow<Record>, Id>>,
-        )>,
-    >,
+    cursor: State<TableSelection<Id>>,
+    navigation: State<TableNavigation<Id>>,
+    model: RefCell<Option<(Vec<Id>, Vec<bool>, Rc<TableModel<TreeTableRow<Record>, Id>>)>>,
 }
 
 impl<Record, Id> TreeTable<Record, Id>
@@ -240,8 +234,8 @@ where
             on_activate: None,
             local_expanded: State::new(BTreeSet::new()),
             local_selection: State::new(None),
-            cursor: State::new(DataTableSelection::new()),
-            navigation: State::new(DataTableNavigation::new()),
+            cursor: State::new(TableSelection::new()),
+            navigation: State::new(TableNavigation::new()),
             model: RefCell::new(None),
         })
     }
@@ -289,7 +283,7 @@ where
 
     /// Rebuilds the model only when the visible projection or the expansion
     /// signature changed.
-    fn model(&self) -> Rc<DataTableModel<TreeTableRow<Record>, Id>> {
+    fn model(&self) -> Rc<TableModel<TreeTableRow<Record>, Id>> {
         let rows = flatten_tree_table(&self.roots, &*self.children, &*self.id_of, &self.expanded());
         let ids: Vec<Id> = rows.iter().map(|row| (self.id_of)(&row.record)).collect();
         let states: Vec<bool> = rows.iter().map(|row| row.is_expanded).collect();
@@ -300,9 +294,8 @@ where
             return model.clone();
         }
         let id_of = self.id_of.clone();
-        let model =
-            DataTableModel::try_new(rows, move |row: &TreeTableRow<Record>| id_of(&row.record))
-                .expect("unique data table row IDs");
+        let model = TableModel::try_new(rows, move |row: &TreeTableRow<Record>| id_of(&row.record))
+            .expect("unique data table row IDs");
         *self.model.borrow_mut() = Some((ids, states, model.clone()));
         model
     }
@@ -472,7 +465,7 @@ where
         let mapped = self.mapped_columns();
         let options = &self.options;
 
-        let mut table_options: DataTableOptions<Id> = DataTableOptions::new();
+        let mut table_options: TableOptions<Id> = TableOptions::new();
         table_options.selection = Some(self.selection());
         table_options.cursor = Some(self.cursor.binding());
         table_options.column_widths = options.column_widths.clone();
@@ -483,7 +476,7 @@ where
         table_options.frozen_column_count = 1;
         table_options.navigation = self.navigation.get();
 
-        let mut table = DataTable::try_new(model.clone(), mapped)
+        let mut table = Table::try_new(model.clone(), mapped)
             .expect("unique data table column IDs")
             .options(table_options);
         if let Some(handler) = &self.on_activate {
@@ -519,7 +512,7 @@ where
     /// so it cannot borrow `self` for the node's lifetime.
     fn key_handler(
         &self,
-        model: Rc<DataTableModel<TreeTableRow<Record>, Id>>,
+        model: Rc<TableModel<TreeTableRow<Record>, Id>>,
     ) -> Rc<dyn Fn(&KeyEvent, &Id) -> bool> {
         let is_enabled = self.options.is_enabled;
         let expanded_binding = self.options.expanded.clone();
@@ -569,7 +562,7 @@ where
                 next_cursor.focused_column_id = first_column.clone();
                 cursor.set(next_cursor);
 
-                let mut request = DataTableNavigation::new();
+                let mut request = TableNavigation::new();
                 request.request_id = Some(next_navigation_request_id());
                 request.row_id = Some(target.clone());
                 request.column_id = first_column.clone();

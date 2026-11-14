@@ -4,8 +4,8 @@
 //!
 //! Translation of `Primitives/Columns/Picker.swift`.
 use crate::modifiers::interaction::AccessibilityExt;
-use crate::modifiers::layout::{FlexExt, LayoutFrameExt};
 use crate::modifiers::layout::PaddingExt;
+use crate::modifiers::layout::{FlexExt, LayoutFrameExt};
 use crate::primitives::overlays::{MenuEntry, MenuItem};
 use crate::theme::SemanticStyleViewExt;
 use crate::{View, ViewExt};
@@ -106,6 +106,7 @@ pub struct ColumnVisibilityPicker {
     plan: ColumnVisibilityPlan,
     overrides: Binding<HashMap<String, bool>>,
     is_enabled: bool,
+    shows_summary: bool,
 }
 
 impl ColumnVisibilityPicker {
@@ -120,7 +121,16 @@ impl ColumnVisibilityPicker {
             plan,
             overrides,
             is_enabled,
+            shows_summary: true,
         }
+    }
+
+    /// Hides the "3 of 4 columns" caption beside the trigger. A container that
+    /// already states the count — a table toolbar, for example — turns it off
+    /// so the two captions do not fight for the same line.
+    pub fn shows_summary(mut self, shows_summary: bool) -> Self {
+        self.shows_summary = shows_summary;
+        self
     }
 
     /// Menu entries in the order Swift authors them: the automatic reset, a
@@ -235,6 +245,11 @@ impl View for ColumnVisibilityPicker {
                 semantics.role = cove_core::scene::AccessibilityRole::Status;
             })
             .flex_with(0.0, 0.0, None);
+        let mut pair: Vec<crate::AnyView> = Vec::new();
+        if self.shows_summary {
+            pair.push(crate::AnyView::new(summary));
+        }
+        pair.push(crate::AnyView::new(popover));
         crate::AnyView::new(
             // The caption explains the trigger, so it sits right before it:
             // as a pair they read as one control at the trailing end.
@@ -244,10 +259,7 @@ impl View for ColumnVisibilityPicker {
                 cove_core::scene::Justify::FlexStart,
                 cove_core::scene::Wrap::NoWrap,
                 8.0,
-                crate::AnyView::new(crate::TupleView::new(vec![
-                    crate::AnyView::new(summary),
-                    crate::AnyView::new(popover),
-                ])),
+                crate::AnyView::new(crate::TupleView::new(pair)),
             ))
             .frame_min_width(0.0),
         )

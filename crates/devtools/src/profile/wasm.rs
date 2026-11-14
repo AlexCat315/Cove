@@ -63,5 +63,6 @@ impl UiProfiler {
 }
 
 fn profile_value<T: serde::Serialize>(payload: &T) -> Value {
-    serde_json::to_value(payload).unwrap_or_else(|error| serde_json::json!({ "error": error.to_string() }))
+    serde_json::to_value(payload)
+        .unwrap_or_else(|error| serde_json::json!({ "error": error.to_string() }))
 }

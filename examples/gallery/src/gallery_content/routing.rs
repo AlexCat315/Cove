@@ -248,9 +248,6 @@ impl StoryDispatch {
             Self::Story(GalleryPage::Sidebar) => {
                 Some(AnyView::new(stories::SidebarStory::new(options)))
             }
-            Self::Story(GalleryPage::DataTable) => {
-                Some(AnyView::new(stories::DataTableStory::new(options)))
-            }
             Self::Story(GalleryPage::Web) => Some(AnyView::new(stories::WebStory::new(options))),
             Self::Story(GalleryPage::Menu) => Some(AnyView::new(stories::MenuStory::new(options))),
             Self::Story(GalleryPage::ContextMenu) => {
@@ -399,8 +396,7 @@ impl StorySource {
             (GalleryPage::NavigationDrawer, "Layout/DrawerStory.swift"),
             (GalleryPage::NavigationRail, "Layout/RailStory.swift"),
             (GalleryPage::AppBar, "Navigation/AppBarStory.swift"),
-            (GalleryPage::Table, "Data/DateTableStories.swift"),
-            (GalleryPage::DataTable, "Data/DataTableStory.swift"),
+            (GalleryPage::Table, "Data/DataTableStory.swift"),
             (GalleryPage::Calendar, "Data/DateTableStories.swift"),
             (GalleryPage::DatePicker, "Data/DateTableStories.swift"),
             (

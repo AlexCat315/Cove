@@ -1,23 +1,23 @@
 //! Behaviour tests for row geometry and the sort projection.
 //!
-//! Translation of `Primitives/Data/DataTable/{VariableRows,DataTableSortWorker}.swift`.
+//! Translation of `Primitives/Data/Table/{VariableRows,TableSortWorker}.swift`.
 //! Stable sorting and prefix-sum row metrics are both silent-failure territory:
 //! ties that reverse, or a row that reports the wrong top, are invisible without
 //! an assertion.
 
 use std::rc::Rc;
 
-use cove_ui_compose::primitives::data::data_table::table_column::{
+use cove_ui_compose::primitives::data::table::table_column::{
     ComparisonResult, TableSort, TableSortDirection,
 };
-use cove_ui_compose::primitives::data::data_table::{
-    DataTableRowMetrics, DataTableSortRequest, accepts_projection,
+use cove_ui_compose::primitives::data::table::{
+    TableRowMetrics, TableSortRequest, accepts_projection,
 };
 use cove_ui_compose::primitives::layout::virtualization::VariableRowIndex;
 
 #[test]
 fn a_fixed_table_uses_arithmetic() {
-    let metrics = DataTableRowMetrics::fixed(4, 30.0);
+    let metrics = TableRowMetrics::fixed(4, 30.0);
     assert_eq!(metrics.top(0), 0.0);
     assert_eq!(metrics.top(2), 60.0);
     assert_eq!(metrics.height(3), 30.0);
@@ -28,7 +28,7 @@ fn a_fixed_table_uses_arithmetic() {
 fn a_variable_table_uses_the_prefix_index() {
     let mut index = VariableRowIndex::new();
     index.replace(&[0, 1, 2], &[20.0, 50.0, 10.0], 0.0);
-    let metrics = DataTableRowMetrics::variable(3, 20.0, index);
+    let metrics = TableRowMetrics::variable(3, 20.0, index);
     assert_eq!(metrics.top(0), 0.0);
     assert_eq!(metrics.top(1), 20.0);
     assert_eq!(metrics.top(2), 70.0);
@@ -40,7 +40,7 @@ fn a_variable_table_uses_the_prefix_index() {
 fn row_at_finds_the_containing_row_and_clamps() {
     let mut index = VariableRowIndex::new();
     index.replace(&[0, 1, 2], &[20.0, 50.0, 10.0], 0.0);
-    let metrics = DataTableRowMetrics::variable(3, 20.0, index);
+    let metrics = TableRowMetrics::variable(3, 20.0, index);
     assert_eq!(metrics.row_at(0.0), 0);
     assert_eq!(metrics.row_at(19.0), 0);
     assert_eq!(
@@ -57,7 +57,7 @@ fn row_at_finds_the_containing_row_and_clamps() {
 
 #[test]
 fn row_at_on_a_fixed_table_clamps_to_the_last_row() {
-    let metrics = DataTableRowMetrics::fixed(3, 30.0);
+    let metrics = TableRowMetrics::fixed(3, 30.0);
     assert_eq!(metrics.row_at(0.0), 0);
     assert_eq!(metrics.row_at(35.0), 1);
     assert_eq!(metrics.row_at(1000.0), 2);
@@ -65,12 +65,12 @@ fn row_at_on_a_fixed_table_clamps_to_the_last_row() {
 
 #[test]
 fn an_empty_table_has_no_row() {
-    assert_eq!(DataTableRowMetrics::fixed(0, 30.0).row_at(50.0), 0);
+    assert_eq!(TableRowMetrics::fixed(0, 30.0).row_at(50.0), 0);
 }
 
 #[test]
 fn visible_range_covers_the_viewport_with_overscan() {
-    let metrics = DataTableRowMetrics::fixed(20, 30.0);
+    let metrics = TableRowMetrics::fixed(20, 30.0);
     // A 60pt viewport at offset 0 covers rows 0..2; overscan 1 adds one each side.
     let visible = metrics.visible_range(0.0, 60.0, 1);
     assert_eq!(visible.start, 0);
@@ -81,7 +81,7 @@ fn visible_range_covers_the_viewport_with_overscan() {
 fn a_descending_sort_keeps_ties_in_source_order() {
     // Two records share a key; a descending sort must NOT reverse them.
     let keys = [1, 2, 2, 3];
-    let request = DataTableSortRequest {
+    let request = TableSortRequest {
         records: keys.to_vec(),
         ids: (0..keys.len()).collect(),
         sort: TableSort {
@@ -108,7 +108,7 @@ fn a_descending_sort_keeps_ties_in_source_order() {
 #[test]
 fn an_ascending_sort_orders_by_key() {
     let keys = [3, 1, 2];
-    let request = DataTableSortRequest {
+    let request = TableSortRequest {
         records: keys.to_vec(),
         ids: (0..keys.len()).collect(),
         sort: TableSort {

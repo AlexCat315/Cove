@@ -313,10 +313,8 @@ mod tests {
 
     impl Scratch {
         fn new(name: &str) -> Self {
-            let path = std::env::temp_dir().join(format!(
-                "cove-media-tools-{name}-{}",
-                std::process::id()
-            ));
+            let path = std::env::temp_dir()
+                .join(format!("cove-media-tools-{name}-{}", std::process::id()));
             let _ = fs::remove_dir_all(&path);
             fs::create_dir_all(&path).expect("scratch directory");
             Self { path }
@@ -445,7 +443,10 @@ mod tests {
         scratch.executable("ffprobe", "#!/bin/sh\nexit 0\n");
 
         let tools = FfmpegTools::from_ffmpeg(ffmpeg).expect("the pair resolves");
-        assert_eq!(tools.version().expect("version runs"), "ffmpeg version 9.0.1");
+        assert_eq!(
+            tools.version().expect("version runs"),
+            "ffmpeg version 9.0.1"
+        );
     }
 
     #[cfg(unix)]
@@ -461,7 +462,8 @@ mod tests {
     }
 
     #[test]
-    fn a_missing_tool_lists_every_path_it_tried() {        let scratch = Scratch::new("not-found");
+    fn a_missing_tool_lists_every_path_it_tried() {
+        let scratch = Scratch::new("not-found");
         let empty = scratch.path.join("empty");
         fs::create_dir_all(&empty).expect("empty directory");
 
@@ -485,12 +487,17 @@ mod tests {
     fn the_pinned_build_is_discoverable_without_any_override() {
         let tools = FfmpegTools::discover().expect("the ffmpeg-tools build resolves");
         assert!(
-            tools.ffmpeg().starts_with(bundled_directory().expect("a bundled directory")),
+            tools
+                .ffmpeg()
+                .starts_with(bundled_directory().expect("a bundled directory")),
             "{}",
             tools.ffmpeg().display()
         );
         assert!(
-            tools.version().expect("version runs").starts_with("ffmpeg version"),
+            tools
+                .version()
+                .expect("version runs")
+                .starts_with("ffmpeg version"),
         );
     }
 }

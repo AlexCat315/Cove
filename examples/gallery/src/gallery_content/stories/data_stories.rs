@@ -21,11 +21,10 @@ use cove_ui_compose::primitives::data::chart::{
     ChartScaleKind, ChartSeries, ChartSeriesStyle, ChartSlice, ChartStacking, ChartStyle,
     ChartThreshold, ChartValueAxis, ChartXDomain, PieCenter,
 };
-use cove_ui_compose::primitives::data::data_table::table_column::{
+use cove_ui_compose::primitives::data::table::table_column::{
     ColumnVisibility, ComparisonResult, TableColumn, TableColumnLayout,
 };
-use cove_ui_compose::primitives::data::data_table::{DataTable, DataTableOptions};
-use cove_ui_compose::primitives::data::lists::{Table, TableOptions};
+use cove_ui_compose::primitives::data::table::{Table, TableOptions};
 use cove_ui_compose::primitives::text::Text;
 use cove_ui_compose::theme::tokens::SemanticColorRef;
 use cove_ui_compose::{AnyView, BoxView, LayoutDebugExt, TupleView, View};
@@ -913,10 +912,10 @@ pub fn adaptive_table_columns() -> Vec<TableColumn<usize>> {
     columns
 }
 
-/// `AdaptiveTableSample`: the same columns rendered as either table flavour.
+/// `AdaptiveTableSample`: one table, two option sets.
 pub struct AdaptiveTableSample {
     pub options: GalleryOptions,
-    /// `true` selects the editing `DataTable`; `false` the lighter `Table`.
+    /// `true` freezes the first two columns and keeps the heavier model.
     pub data: bool,
 }
 
@@ -929,7 +928,7 @@ impl AdaptiveTableSample {
         ADAPTIVE_TABLE_ROWS
     }
 
-    pub fn uses_data_table(&self) -> bool {
+    pub fn uses_frozen_columns(&self) -> bool {
         self.data
     }
 }
@@ -938,22 +937,12 @@ impl View for AdaptiveTableSample {
     fn body(&self, _cx: &Scope) -> AnyView {
         let enabled = self.options.is_enabled;
         let rows: Vec<usize> = (0..ADAPTIVE_TABLE_ROWS).collect();
-        // The same columns drive either flavour, which is the point of the
-        // sample: only the data lifecycle and the weight differ.
-        if self.data {
-            let mut options = DataTableOptions::default();
-            options.is_enabled = enabled;
-            options.layout.fills_width = true;
-            let table = DataTable::from_records(rows, |row: &usize| *row, adaptive_table_columns())
-                .expect("the gallery table columns are static with unique ids")
-                .options(options);
-            return AnyView::new(table);
-        }
         let mut options = TableOptions::default();
         options.is_enabled = enabled;
         // A table that stops at 40% of its card reads as unfinished; the last
         // column takes the slack so the grid ends at the card's edge.
         options.layout.fills_width = true;
+        options.frozen_column_count = if self.data { 2 } else { 1 };
         let table = Table::new(rows, |row: &usize| *row, adaptive_table_columns())
             .expect("the gallery table columns are static with unique ids")
             .options(options);

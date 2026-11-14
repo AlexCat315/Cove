@@ -417,8 +417,7 @@ fn matrix() {
                             };
                             let picker_frame = picker.frame();
                             assert!(
-                                picker_frame.height >= picker_floor
-                                    && picker_frame.width >= 44.0,
+                                picker_frame.height >= picker_floor && picker_frame.width >= 44.0,
                                 "the picker keeps its adaptive target at {width}pt (touch={}): {:?}",
                                 input.contains(InputCapabilities::TOUCH),
                                 picker_frame

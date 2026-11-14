@@ -1,4 +1,4 @@
-//! Translation of `Primitives/Data/DataTable/{DataTableHosts,EditorPresence}.swift`.
+//! Translation of `Primitives/Data/Table/{TableHosts,EditorPresence}.swift`.
 //!
 //! Row, cell and input hosts, plus the editor-presence probe.
 //!
@@ -16,7 +16,7 @@
 
 use cove_core::Color;
 
-use super::data_table_geometry::DataTableColumnGeometry;
+use super::table_geometry::TableColumnGeometry;
 
 /// What a row host needs to repaint.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -130,7 +130,7 @@ pub fn editor_blur_outcome(editor_still_present_inside_root: bool) -> EditorBlur
 /// scroll position, because that region does not scroll.
 pub fn drop_indicator_x(
     boundary: f32,
-    geometry: &DataTableColumnGeometry,
+    geometry: &TableColumnGeometry,
     horizontal_offset: f32,
 ) -> f32 {
     if boundary <= geometry.frozen_width() {

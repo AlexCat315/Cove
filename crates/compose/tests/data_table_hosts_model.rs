@@ -1,13 +1,13 @@
 //! Behaviour tests for row/cell host update rules.
 //!
-//! Translation of `Primitives/Data/DataTable/{DataTableHosts,EditorPresence}.swift`.
+//! Translation of `Primitives/Data/Table/{TableHosts,EditorPresence}.swift`.
 //! Row striping precedence and the equality-gated update are both easy to get
 //! wrong and invisible without assertions.
 
 use cove_core::Color;
-use cove_ui_compose::primitives::data::data_table::{
-    CellHostUpdate, DataTableColumnGeometry, EditorBlurOutcome, RowAccessibilityRole,
-    RowHostUpdate, drop_indicator_x, editor_blur_outcome,
+use cove_ui_compose::primitives::data::table::{
+    CellHostUpdate, EditorBlurOutcome, RowAccessibilityRole, RowHostUpdate, TableColumnGeometry,
+    drop_indicator_x, editor_blur_outcome,
 };
 
 fn accent() -> Color {
@@ -172,7 +172,7 @@ fn a_blur_commits_only_when_the_editor_left_the_tree() {
 
 #[test]
 fn a_drop_indicator_in_the_frozen_prefix_ignores_scroll() {
-    let geometry = DataTableColumnGeometry::new(vec![100.0, 100.0, 100.0], 1);
+    let geometry = TableColumnGeometry::new(vec![100.0, 100.0, 100.0], 1);
     // Boundary 50 sits inside the frozen 100pt prefix.
     assert_eq!(drop_indicator_x(50.0, &geometry, 30.0), 50.0);
     // Boundary 150 is in the scrolling region, so the offset applies.

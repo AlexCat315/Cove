@@ -52,12 +52,12 @@ use cove_ui_compose::modifiers::interaction::AccessibilityExt;
 use cove_ui_compose::modifiers::layout::{FlexExt, LayoutFrameExt};
 use cove_ui_compose::primitives::controls::Button;
 use cove_ui_compose::primitives::controls::MenuButton;
-use cove_ui_compose::primitives::data::data_table::DataTable;
-use cove_ui_compose::primitives::data::data_table::table_column::TableColumn;
 use cove_ui_compose::primitives::data::lists::RowState;
 use cove_ui_compose::primitives::data::lists::{
     List, ListRow, ListRowOptions, ListSection, SectionedList, Selection,
 };
+use cove_ui_compose::primitives::data::table::Table;
+use cove_ui_compose::primitives::data::table::table_column::TableColumn;
 use cove_ui_compose::primitives::layout::insets::{SafeArea, SurfaceRoot};
 use cove_ui_compose::primitives::layout::mobile_tab_bar::MobileTabBar;
 use cove_ui_compose::primitives::layout::{TabItem, TabVariant, TabView};
@@ -803,7 +803,7 @@ fn nonlinear_text_scaling_keeps_a_table_action_inside_its_authored_row() {
                 scaled_size: 42.0,
             },
         ]);
-        let table = DataTable::from_records(
+        let table = Table::new(
             vec![1, 2],
             |value: &i32| *value,
             vec![TableColumn::new("action", "Action", |_record: &i32| {

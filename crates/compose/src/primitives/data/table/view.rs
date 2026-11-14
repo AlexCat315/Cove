@@ -1,12 +1,12 @@
-//! Translation of `Primitives/Data/DataTable/DataTable.swift` (the view half).
+//! Translation of `Primitives/Data/Table/Table.swift` (the view half).
 //!
 //! A persistent row model, fixed header, frozen leading columns and a two-axis
 //! cell window. Only visible rows and columns — plus overscan — create view
 //! nodes, so a 200,000 x 100 table mounts a few dozen cells.
 //!
 //! This file composes the rest of the module instead of re-deriving it:
-//! [`DataTableColumnGeometry`] resolves column spans and the visible column
-//! window, [`DataTableRowMetrics`] resolves row spans, [`TableColumnPlan`]
+//! [`TableColumnGeometry`] resolves column spans and the visible column
+//! window, [`TableRowMetrics`] resolves row spans, [`TableColumnPlan`]
 //! resolves which columns fit, [`CellEditing`] owns the draft lifecycle, and
 //! the host/editing primitives carry the per-node update contract.
 //!
@@ -35,21 +35,21 @@ use cove_core::scene::{
 use cove_core::{Binding, Color, Point, Size, State, TextAlignment};
 use cove_platform::{KeyEvent, KeyModifiers, MouseButton, SystemCursor};
 
-use super::column_order::DataTableColumnOrder;
-use super::data_table_geometry::DataTableColumnGeometry;
-use super::editing_model::{CellEditing, DataTableEditingState, EditableColumn};
-use super::model::DataTableModel;
+use super::column_order::TableColumnOrder;
+use super::editing_model::{CellEditing, EditableColumn, TableEditingState};
+use super::model::TableModel;
 use super::row_metrics::{
-    DataTableRowMetrics, RowHeightKey, row_height_key_matches, variable_row_heights,
+    RowHeightKey, TableRowMetrics, row_height_key_matches, variable_row_heights,
 };
-use super::selection_model::{DataTableNavigation, DataTableSelection, DataTableSelectionMode};
+use super::selection_model::{TableNavigation, TableSelection, TableSelectionMode};
 use super::table_column::{
     ColumnVisibility, TableColumn, TableColumnPlan, TableLayout, TableSort, TableSortDirection,
 };
+use super::table_geometry::TableColumnGeometry;
 use crate::modifiers::layout::{EdgeInsets, FlexExt, LayoutFrameExt, PaddingExt};
 use crate::modifiers::style::{AppearanceExt, SemanticStyleViewExt};
 use crate::primitives::data::lists::selection::Selection;
-use crate::primitives::feedback::EmptyState;
+use crate::primitives::feedback::{EmptyState, EmptyStateProminence};
 use crate::primitives::layout::{ScrollAxis, ScrollView, ScrollbarGutter};
 use crate::primitives::text::text_buffer::TextBuffer;
 use crate::primitives::text::text_field::{
@@ -70,12 +70,12 @@ const COLUMN_DRAG_SLOP: f32 = crate::primitives::interaction::DRAG_THRESHOLD;
 /// The hovered row, painted directly on its nodes so entering a row recomposes
 /// nothing. The frozen and moving lanes each mount a node for the same row.
 #[derive(Default)]
-pub struct DataTableRowHover {
+pub struct TableRowHover {
     row: std::cell::Cell<Option<usize>>,
     nodes: RefCell<HashMap<usize, Vec<(cove_core::scene::NodeWeak, Color, bool)>>>,
 }
 
-impl DataTableRowHover {
+impl TableRowHover {
     fn register(&self, row: usize, node: &Node, fill: Color, is_selected: bool) {
         let mut nodes = self.nodes.borrow_mut();
         let lane = nodes.entry(row).or_default();
@@ -120,40 +120,44 @@ impl DataTableRowHover {
     }
 }
 
-/// Authored options for a `DataTable`.
-pub struct DataTableOptions<Id: Ord + Clone> {
+/// Authored options for a `Table`.
+pub struct TableOptions<Id: Ord + Clone> {
     /// The selected rows; session-local multiple selection when `None`.
     pub selection: Option<Selection<Id>>,
+    /// An externally owned sort. The table keeps its model as the single source
+    /// of truth and writes back through this binding when the user sorts.
+    pub sort: Option<Binding<Option<TableSort>>>,
     /// The cell cursor, for a caller that observes or moves it. Its selected
     /// rows follow `selection`.
-    pub cursor: Option<Binding<DataTableSelection<Id>>>,
+    pub cursor: Option<Binding<TableSelection<Id>>>,
     pub column_widths: Option<Binding<BTreeMap<String, f32>>>,
     pub column_visibility: Option<Binding<HashMap<String, bool>>>,
     /// Display order by column id; header drags and Alt+Left/Right write it.
     pub column_order: Option<Binding<Vec<String>>>,
     pub layout: TableLayout,
     pub frozen_column_count: usize,
-    pub navigation: DataTableNavigation<Id>,
+    pub navigation: TableNavigation<Id>,
     pub is_enabled: bool,
 }
 
-impl<Id: Ord + Clone> Default for DataTableOptions<Id> {
+impl<Id: Ord + Clone> Default for TableOptions<Id> {
     fn default() -> Self {
         Self {
             selection: None,
+            sort: None,
             cursor: None,
             column_widths: None,
             column_visibility: None,
             column_order: None,
             layout: TableLayout::default(),
             frozen_column_count: 1,
-            navigation: DataTableNavigation::default(),
+            navigation: TableNavigation::default(),
             is_enabled: true,
         }
     }
 }
 
-impl<Id: Ord + Clone> DataTableOptions<Id> {
+impl<Id: Ord + Clone> TableOptions<Id> {
     pub fn new() -> Self {
         Self::default()
     }
@@ -164,14 +168,14 @@ impl<Id: Ord + Clone> DataTableOptions<Id> {
 /// A pure function of the offset, viewport and metrics, so it needs no state
 /// of its own: two builds over the same scroll position mount the same cells.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub struct DataTableWindows {
+pub struct TableWindows {
     pub row_start: usize,
     pub row_count: usize,
     pub column_start: usize,
     pub column_count: usize,
 }
 
-impl DataTableWindows {
+impl TableWindows {
     pub fn rows(&self, count: usize) -> std::ops::Range<usize> {
         let start = self.row_start.min(count);
         start..(start + self.row_count).min(count)
@@ -185,8 +189,8 @@ impl DataTableWindows {
     /// Rows intersecting the viewport, plus `overscan` on each side. `slack`
     /// trades rebuild frequency for a slightly larger pane.
     pub fn resolve(
-        metrics: &DataTableRowMetrics,
-        geometry: &DataTableColumnGeometry,
+        metrics: &TableRowMetrics,
+        geometry: &TableColumnGeometry,
         offset: Point,
         moving_width: f32,
         viewport_height: f32,
@@ -206,8 +210,8 @@ impl DataTableWindows {
 /// Session values that survive recomposition: the fallbacks for selection,
 /// widths and visibility, plus the draft and the last applied navigation.
 #[derive(Clone)]
-pub struct DataTableSession<Id: Ord + Clone> {
-    pub selection: DataTableSelection<Id>,
+pub struct TableSession<Id: Ord + Clone> {
+    pub selection: TableSelection<Id>,
     pub widths: BTreeMap<String, f32>,
     pub visibility: HashMap<String, bool>,
     pub order: Vec<String>,
@@ -215,10 +219,10 @@ pub struct DataTableSession<Id: Ord + Clone> {
     pub last_navigation: Option<u64>,
 }
 
-impl<Id: Ord + Clone> Default for DataTableSession<Id> {
+impl<Id: Ord + Clone> Default for TableSession<Id> {
     fn default() -> Self {
         Self {
-            selection: DataTableSelection::default(),
+            selection: TableSelection::default(),
             widths: BTreeMap::new(),
             visibility: HashMap::new(),
             order: Vec::new(),
@@ -229,49 +233,50 @@ impl<Id: Ord + Clone> Default for DataTableSession<Id> {
 }
 
 /// A persistent row model, fixed header, frozen columns and two-axis window.
-pub struct DataTable<
-    Record: Clone + 'static,
-    Id: Ord + std::hash::Hash + Clone + Send + Sync + 'static,
-> {
-    pub model: Rc<DataTableModel<Record, Id>>,
+pub struct Table<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 'static>
+{
+    pub model: Rc<TableModel<Record, Id>>,
     columns: Vec<TableColumn<Record>>,
-    pub options: DataTableOptions<Id>,
+    pub options: TableOptions<Id>,
     pub on_activate: Option<Rc<dyn Fn(&Record)>>,
     /// Per-record logical height, scaled with text. `None` keeps every row at
     /// `options.layout.row_height`, which also remains the minimum.
     pub row_height: Option<Rc<dyn Fn(&Record) -> f32>>,
     /// Hierarchy keys (`TreeTable`) get the first chance at row navigation.
     pub row_key_handler: Option<Rc<dyn Fn(&KeyEvent, &Id) -> bool>>,
-    session: State<DataTableSession<Id>>,
+    session: State<TableSession<Id>>,
     offset: State<Point>,
-    /// Rows from `from_records`, poured into the model the view retains.
+    /// Rows from `new`, poured into the model the view retains.
     records: Option<Rc<Vec<Record>>>,
 }
 
 impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 'static>
-    DataTable<Record, Id>
+    Table<Record, Id>
 {
-    /// A table over plain records. The view keeps its own model, so sorting
-    /// survives the parent passing a new array.
+    /// A table over plain records. The same construction path covers a handful
+    /// of rows and hundreds of thousands: the view owns one persistent model,
+    /// sorts in place and mounts only the visible cell window.
     ///
     /// Column and row IDs must be unique.
-    pub fn from_records(
+    pub fn new(
         records: Vec<Record>,
         row_id: impl Fn(&Record) -> Id + 'static,
         columns: Vec<TableColumn<Record>>,
     ) -> Result<Self, DuplicateId> {
-        let model = DataTableModel::try_new(records.clone(), row_id)?;
+        let model = TableModel::try_new(records.clone(), row_id)?;
         let mut table = Self::try_new(model, columns)?;
         table.records = Some(Rc::new(records));
         Ok(table)
     }
 
+    /// A table over an already owned model, for a caller that shares rows
+    /// between several views. `new` is the usual entry point.
     pub fn try_new(
-        model: Rc<DataTableModel<Record, Id>>,
+        model: Rc<TableModel<Record, Id>>,
         columns: Vec<TableColumn<Record>>,
     ) -> Result<Self, DuplicateId> {
-        check_ids(columns.iter().map(|item| &item.id), "Data table column")?;
-        let mut options = DataTableOptions::default();
+        check_ids(columns.iter().map(|item| &item.id), "Table column")?;
+        let mut options = TableOptions::default();
         options.layout.validate();
         Ok(Self {
             model,
@@ -280,15 +285,30 @@ impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 
             on_activate: None,
             row_height: None,
             row_key_handler: None,
-            session: State::new(DataTableSession::default()),
+            session: State::new(TableSession::default()),
             offset: State::new(Point::default()),
             records: None,
         })
     }
 
-    pub fn options(mut self, options: DataTableOptions<Id>) -> Self {
+    pub fn options(mut self, options: TableOptions<Id>) -> Self {
         self.options = options;
         self.options.layout.validate();
+        // The model is the source of truth, but an option set can name a sort
+        // before the first render: adopt it now so accessors and the first body
+        // agree.
+        if let Some(binding) = &self.options.sort {
+            let requested = binding.get();
+            if requested != self.model.sort() {
+                let compare = requested.as_ref().and_then(|sort| {
+                    self.columns
+                        .iter()
+                        .find(|column| column.id == sort.column_id)
+                        .and_then(|column| column.compare.clone())
+                });
+                self.model.set_sort(requested, compare);
+            }
+        }
         self
     }
 
@@ -302,13 +322,33 @@ impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 
         self
     }
 
-    fn controller(&self) -> DataTableController<Record, Id> {
-        DataTableController {
+    /// The authored columns, in declaration order.
+    pub fn columns(&self) -> &[TableColumn<Record>] {
+        &self.columns
+    }
+
+    /// The persistent row model. Sorting, row replacement and observers live
+    /// here; the table reads it rather than copying the rows on every render.
+    pub fn model(&self) -> Rc<TableModel<Record, Id>> {
+        self.model.clone()
+    }
+
+    /// The direction this column is sorted by, if it is the sort column.
+    pub fn sort_direction(&self, column_id: &str) -> Option<TableSortDirection> {
+        self.model
+            .sort()
+            .filter(|sort| sort.column_id == column_id)
+            .map(|sort| sort.direction)
+    }
+
+    fn controller(&self) -> TableController<Record, Id> {
+        TableController {
             model: self.model.clone(),
             columns: Rc::new(self.columns.clone()),
             session: self.session.clone(),
             offset: self.offset.clone(),
             on_activate: self.on_activate.clone(),
+            sort: self.options.sort.clone(),
             row_height: self.row_height.clone(),
             row_key_handler: self.row_key_handler.clone(),
             layout: self.options.layout.clone(),
@@ -326,11 +366,23 @@ impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 
 }
 
 impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 'static> View
-    for DataTable<Record, Id>
+    for Table<Record, Id>
 {
     fn body(&self, cx: &Scope) -> AnyView {
+        if let Some(binding) = &self.options.sort {
+            let requested = binding.get();
+            if requested != self.model.sort() {
+                let compare = requested.as_ref().and_then(|sort| {
+                    self.columns
+                        .iter()
+                        .find(|column| column.id == sort.column_id)
+                        .and_then(|column| column.compare.clone())
+                });
+                self.model.set_sort(requested, compare);
+            }
+        }
         let mut controller = self.controller();
-        controller.row_hover = cx.remember(Rc::<DataTableRowHover>::default);
+        controller.row_hover = cx.remember(Rc::<TableRowHover>::default);
         if let Some(records) = &self.records {
             let retained = cx.remember(|| self.model.clone());
             let poured = cx.remember(|| Rc::new(RefCell::new(None::<Rc<Vec<Record>>>)));
@@ -339,7 +391,7 @@ impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 
                 .as_ref()
                 .is_some_and(|last| Rc::ptr_eq(last, records));
             if is_new && !Rc::ptr_eq(&retained, &self.model) {
-                // `from_records` validated these IDs against the same rule.
+                // `new` validated these IDs against the same rule.
                 let _ = retained.replace_rows(records.as_ref().clone());
             }
             *poured.borrow_mut() = Some(records.clone());
@@ -362,7 +414,7 @@ impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 
         }
         let probe = controller.clone();
         AnyView::new(crate::adaptive::ContainerSizeReader::new(
-            move |size: Size| DataTableSurface {
+            move |size: Size| TableSurface {
                 controller: probe.clone(),
                 size,
             },
@@ -379,12 +431,12 @@ impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 
 
 /// Holds the table's observer on a model for as long as the view is mounted.
 struct ModelSubscription<Record: 'static, Id: Eq + std::hash::Hash + Clone + 'static> {
-    model: Rc<DataTableModel<Record, Id>>,
+    model: Rc<TableModel<Record, Id>>,
     token: u64,
 }
 
 impl<Record: 'static, Id: Eq + std::hash::Hash + Clone + 'static> ModelSubscription<Record, Id> {
-    fn new(model: Rc<DataTableModel<Record, Id>>, handler: Rc<dyn Fn()>) -> Self {
+    fn new(model: Rc<TableModel<Record, Id>>, handler: Rc<dyn Fn()>) -> Self {
         let token = model.register_observer(handler);
         Self { model, token }
     }
@@ -399,31 +451,32 @@ impl<Record: 'static, Id: Eq + std::hash::Hash + Clone + 'static> Drop
 }
 
 /// State and helpers shared by the header, the lanes and the keyboard host.
-pub struct DataTableController<
+pub struct TableController<
     Record: 'static,
     Id: Ord + std::hash::Hash + Clone + Send + Sync + 'static,
 > {
-    pub model: Rc<DataTableModel<Record, Id>>,
+    pub model: Rc<TableModel<Record, Id>>,
     pub columns: Rc<Vec<TableColumn<Record>>>,
-    pub session: State<DataTableSession<Id>>,
+    pub session: State<TableSession<Id>>,
     pub offset: State<Point>,
     pub on_activate: Option<Rc<dyn Fn(&Record)>>,
+    pub sort: Option<Binding<Option<TableSort>>>,
     pub row_height: Option<Rc<dyn Fn(&Record) -> f32>>,
     pub row_key_handler: Option<Rc<dyn Fn(&KeyEvent, &Id) -> bool>>,
     pub layout: TableLayout,
     pub frozen_column_count: usize,
     pub is_enabled: bool,
     pub selection: Option<Selection<Id>>,
-    pub cursor: Option<Binding<DataTableSelection<Id>>>,
-    row_hover: Rc<DataTableRowHover>,
+    pub cursor: Option<Binding<TableSelection<Id>>>,
+    row_hover: Rc<TableRowHover>,
     pub column_widths: Option<Binding<BTreeMap<String, f32>>>,
     pub column_visibility: Option<Binding<HashMap<String, bool>>>,
     pub column_order: Option<Binding<Vec<String>>>,
-    pub navigation: DataTableNavigation<Id>,
+    pub navigation: TableNavigation<Id>,
 }
 
 impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 'static> Clone
-    for DataTableController<Record, Id>
+    for TableController<Record, Id>
 {
     fn clone(&self) -> Self {
         Self {
@@ -432,6 +485,7 @@ impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 
             session: self.session.clone(),
             offset: self.offset.clone(),
             on_activate: self.on_activate.clone(),
+            sort: self.sort.clone(),
             row_height: self.row_height.clone(),
             row_key_handler: self.row_key_handler.clone(),
             layout: self.layout.clone(),
@@ -449,18 +503,18 @@ impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 
 }
 
 impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 'static>
-    DataTableController<Record, Id>
+    TableController<Record, Id>
 {
-    fn selection_mode(&self) -> DataTableSelectionMode {
+    fn selection_mode(&self) -> TableSelectionMode {
         match self.selection.as_ref() {
-            Some(Selection::Single(_)) => DataTableSelectionMode::Single,
-            _ => DataTableSelectionMode::Multiple,
+            Some(Selection::Single(_)) => TableSelectionMode::Single,
+            _ => TableSelectionMode::Multiple,
         }
     }
 
     /// The cursor from whichever store owns it, with the selected rows from the
     /// caller's selection.
-    fn selection(&self, session: &DataTableSession<Id>) -> DataTableSelection<Id> {
+    fn selection(&self, session: &TableSession<Id>) -> TableSelection<Id> {
         let mut state = match self.cursor.as_ref() {
             Some(binding) => binding.get(),
             None => session.selection.clone(),
@@ -471,7 +525,7 @@ impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 
         state
     }
 
-    fn write_selection(&self, next: DataTableSelection<Id>) {
+    fn write_selection(&self, next: TableSelection<Id>) {
         if let Some(selection) = self.selection.as_ref() {
             selection.replace(next.selected_ids.iter().cloned());
         }
@@ -485,7 +539,7 @@ impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 
         }
     }
 
-    fn visibility(&self, session: &DataTableSession<Id>) -> HashMap<String, bool> {
+    fn visibility(&self, session: &TableSession<Id>) -> HashMap<String, bool> {
         match self.column_visibility.as_ref() {
             Some(binding) => binding.get(),
             None => session.visibility.clone(),
@@ -559,19 +613,19 @@ impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 
         }
     }
 
-    fn display_order(&self, session: &DataTableSession<Id>) -> Vec<String> {
+    fn display_order(&self, session: &TableSession<Id>) -> Vec<String> {
         let authored: Vec<String> = self
             .columns
             .iter()
             .map(|column| column.id.clone())
             .collect();
         match self.column_order.as_ref() {
-            Some(binding) => DataTableColumnOrder::apply(&binding.get(), &authored),
-            None => DataTableColumnOrder::apply(&session.order, &authored),
+            Some(binding) => TableColumnOrder::apply(&binding.get(), &authored),
+            None => TableColumnOrder::apply(&session.order, &authored),
         }
     }
 
-    fn ordered_columns(&self, session: &DataTableSession<Id>) -> Vec<TableColumn<Record>> {
+    fn ordered_columns(&self, session: &TableSession<Id>) -> Vec<TableColumn<Record>> {
         let mut by_id: HashMap<String, TableColumn<Record>> = self
             .columns
             .iter()
@@ -584,7 +638,7 @@ impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 
     }
 
     /// Presented columns, their geometry and the frozen prefix for one width.
-    fn plan(&self, session: &DataTableSession<Id>, available_width: f32) -> DataTablePlan<Record> {
+    fn plan(&self, session: &TableSession<Id>, available_width: f32) -> TablePlan<Record> {
         let ordered = self.ordered_columns(session);
         let stored = self.stored_widths();
         let widths: BTreeMap<String, f32> = ordered
@@ -626,7 +680,12 @@ impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 
             let visible: f32 = ordered
                 .iter()
                 .filter(|column| overrides.get(&column.id) != Some(&false))
-                .map(|column| widths.get(&column.id).copied().unwrap_or(column.layout.width))
+                .map(|column| {
+                    widths
+                        .get(&column.id)
+                        .copied()
+                        .unwrap_or(column.layout.width)
+                })
                 .sum();
             let slack = available_width - visible;
             if slack > 0.5 {
@@ -639,13 +698,13 @@ impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 
                 }
             }
         }
-        let geometry = DataTableColumnGeometry::new(presented, resolved.frozen_count);
-        DataTablePlan { columns, geometry }
+        let geometry = TableColumnGeometry::new(presented, resolved.frozen_count);
+        TablePlan { columns, geometry }
     }
 
     /// Row geometry, rebuilt only when the revision, count, minimum height or
     /// text scale changes.
-    fn metrics(&self, node: &Node) -> DataTableRowMetrics {
+    fn metrics(&self, node: &Node) -> TableRowMetrics {
         let count = self.model.count();
         let surface = node.composition_value(&crate::adaptive::SurfaceEnvironment::key());
         let minimum = self
@@ -662,8 +721,8 @@ impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 
             minimum,
             scale: node_text_scaler(node).factor(),
         };
-        if let Some(cached) = node
-            .attachment::<Rc<RefCell<Option<(RowHeightKey, DataTableRowMetrics)>>>>(METRICS_CACHE)
+        if let Some(cached) =
+            node.attachment::<Rc<RefCell<Option<(RowHeightKey, TableRowMetrics)>>>>(METRICS_CACHE)
             && let Some((cached_key, metrics)) = cached.borrow().as_ref()
             && row_height_key_matches(Some(*cached_key), key)
         {
@@ -680,12 +739,12 @@ impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 
                 let ids: Vec<usize> = (0..count).collect();
                 let mut index = crate::primitives::layout::virtualization::VariableRowIndex::new();
                 index.replace(&ids, &heights, 0.0);
-                DataTableRowMetrics::variable(count, minimum, index)
+                TableRowMetrics::variable(count, minimum, index)
             }
-            None => DataTableRowMetrics::fixed(count, minimum),
+            None => TableRowMetrics::fixed(count, minimum),
         };
         let cache = node
-            .attachment::<Rc<RefCell<Option<(RowHeightKey, DataTableRowMetrics)>>>>(METRICS_CACHE)
+            .attachment::<Rc<RefCell<Option<(RowHeightKey, TableRowMetrics)>>>>(METRICS_CACHE)
             .unwrap_or_else(|| {
                 let cache = Rc::new(RefCell::new(None));
                 node.set_attachment(METRICS_CACHE, cache.clone());
@@ -700,8 +759,8 @@ impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 
     fn clamped_offset(
         &self,
         next: Point,
-        plan: &DataTablePlan<Record>,
-        metrics: &DataTableRowMetrics,
+        plan: &TablePlan<Record>,
+        metrics: &TableRowMetrics,
         moving_width: f32,
         viewport_height: f32,
     ) -> Point {
@@ -714,8 +773,8 @@ impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 
         &self,
         row: usize,
         column: Option<usize>,
-        plan: &DataTablePlan<Record>,
-        metrics: &DataTableRowMetrics,
+        plan: &TablePlan<Record>,
+        metrics: &TableRowMetrics,
         moving_width: f32,
         viewport_height: f32,
     ) {
@@ -745,7 +804,7 @@ impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 
             .set(self.clamped_offset(offset, plan, metrics, moving_width, viewport_height));
     }
 
-    fn begin_editing(&self, row: usize, column: usize, plan: &DataTablePlan<Record>) {
+    fn begin_editing(&self, row: usize, column: usize, plan: &TablePlan<Record>) {
         if !self.is_enabled {
             return;
         }
@@ -773,7 +832,7 @@ impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 
 
     fn open_draft(
         &self,
-        session: &DataTableSession<Id>,
+        session: &TableSession<Id>,
         row_id: &Id,
         column_id: &str,
     ) -> Option<String> {
@@ -856,7 +915,7 @@ impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 
     fn move_editor(
         &self,
         direction: i32,
-        plan: &DataTablePlan<Record>,
+        plan: &TablePlan<Record>,
         input: &Rc<RefCell<Option<Node>>>,
     ) {
         if !self.commit_editing(input) {
@@ -878,7 +937,7 @@ impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 
             })
             .collect();
         let Some(next_id) =
-            DataTableEditingState::next_editable(&draft.column_id, direction, &editable)
+            TableEditingState::next_editable(&draft.column_id, direction, &editable)
         else {
             return;
         };
@@ -913,10 +972,13 @@ impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 
             Some(sort) if sort.column_id == column_id => None,
             _ => Some(TableSort::new(column_id.to_string())),
         };
-        self.model.set_sort(next, Some(compare));
+        self.model.set_sort(next.clone(), Some(compare));
+        if let Some(binding) = self.sort.as_ref() {
+            binding.set(next);
+        }
     }
 
-    fn move_column(&self, plan: &DataTablePlan<Record>, index: usize, step: i32) -> bool {
+    fn move_column(&self, plan: &TablePlan<Record>, index: usize, step: i32) -> bool {
         if !self.is_enabled {
             return false;
         }
@@ -930,7 +992,7 @@ impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 
 
     /// Writes `index` next to `target` in the display order. A column stays in
     /// its own lane, frozen or moving.
-    fn move_column_to(&self, plan: &DataTablePlan<Record>, index: usize, target: usize) {
+    fn move_column_to(&self, plan: &TablePlan<Record>, index: usize, target: usize) {
         let frozen = plan.geometry.frozen_count;
         if index == target || (index < frozen) != (target < frozen) {
             return;
@@ -941,7 +1003,7 @@ impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 
         };
         let session = self.session.get();
         let order = self.display_order(&session);
-        let next = DataTableColumnOrder::move_id(&source.id, &destination.id, &order);
+        let next = TableColumnOrder::move_id(&source.id, &destination.id, &order);
         match self.column_order.as_ref() {
             Some(binding) => binding.set(next),
             None => {
@@ -956,8 +1018,8 @@ impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 
     fn handle_key(
         &self,
         event: &KeyEvent,
-        plan: &DataTablePlan<Record>,
-        metrics: &DataTableRowMetrics,
+        plan: &TablePlan<Record>,
+        metrics: &TableRowMetrics,
         moving_width: f32,
         viewport_height: f32,
         _input: &Rc<RefCell<Option<Node>>>,
@@ -998,7 +1060,7 @@ impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 
         }
         if event.scancode == crate::Scancode::A
             && (event.modifiers.has_gui() || event.modifiers.has_ctrl())
-            && self.selection_mode() == DataTableSelectionMode::Multiple
+            && self.selection_mode() == TableSelectionMode::Multiple
         {
             selection.select_all(&self.model);
             self.write_selection(selection);
@@ -1072,8 +1134,8 @@ impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 
     /// Applies a pending navigation request once per request identity.
     fn apply_navigation(
         &self,
-        plan: &DataTablePlan<Record>,
-        metrics: &DataTableRowMetrics,
+        plan: &TablePlan<Record>,
+        metrics: &TableRowMetrics,
         moving_width: f32,
         viewport_height: f32,
     ) {
@@ -1129,13 +1191,7 @@ impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 
         self.activate(row);
     }
 
-    fn select(
-        &self,
-        row: usize,
-        column: usize,
-        plan: &DataTablePlan<Record>,
-        modifiers: KeyModifiers,
-    ) {
+    fn select(&self, row: usize, column: usize, plan: &TablePlan<Record>, modifiers: KeyModifiers) {
         let session = self.session.get();
         let mut selection = self.selection(&session);
         selection.select(row, &self.model, self.selection_mode(), modifiers);
@@ -1156,7 +1212,7 @@ impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 
 
 /// The table's own tracks re-expressed through the shared columns contract, so
 /// the picker and the planner read one visibility type.
-fn plan_available_width<Record>(plan: &DataTablePlan<Record>, moving_width: f32) -> f32 {
+fn plan_available_width<Record>(plan: &TablePlan<Record>, moving_width: f32) -> f32 {
     plan.geometry.frozen_width() + moving_width
 }
 
@@ -1169,12 +1225,12 @@ fn focus_node(input: &Rc<RefCell<Option<Node>>>) {
 }
 
 /// Presented columns plus their geometry.
-pub struct DataTablePlan<Record> {
+pub struct TablePlan<Record> {
     pub columns: Vec<TableColumn<Record>>,
-    pub geometry: DataTableColumnGeometry,
+    pub geometry: TableColumnGeometry,
 }
 
-impl<Record> Clone for DataTablePlan<Record> {
+impl<Record> Clone for TablePlan<Record> {
     fn clone(&self) -> Self {
         Self {
             columns: self.columns.clone(),
@@ -1186,16 +1242,41 @@ impl<Record> Clone for DataTablePlan<Record> {
 /// Height of the card's toolbar row (the column picker lives here), in
 /// unscaled points.
 const TOOLBAR_HEIGHT: f32 = 44.0;
+/// Horizontal inset inside a cell or a header label. One gutter for both, so
+/// headers and values share the same edge.
+const CELL_GUTTER: f32 = 16.0;
+
+/// Groups digits in threes: `12000` becomes `12,000`.
+fn grouped_count(count: usize) -> String {
+    let digits = count.to_string();
+    let mut out = String::with_capacity(digits.len() + digits.len() / 3);
+    for (index, ch) in digits.chars().enumerate() {
+        if index > 0 && (digits.len() - index) % 3 == 0 {
+            out.push(',');
+        }
+        out.push(ch);
+    }
+    out
+}
+
+/// The quiet row count on the toolbar's leading edge.
+fn toolbar_count(count: usize) -> AnyView {
+    AnyView::new(
+        Text::new(format!("{} rows", grouped_count(count)))
+            .semantic_font(SemanticFontRef::label())
+            .semantic_foreground(SemanticColorRef::on_surface_variant())
+            .flex_with(0.0, 0.0, None),
+    )
+}
 
 /// The measured surface: turns a size into a plan and a window.
-struct DataTableSurface<Record: 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 'static>
-{
-    controller: DataTableController<Record, Id>,
+struct TableSurface<Record: 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 'static> {
+    controller: TableController<Record, Id>,
     size: Size,
 }
 
 impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 'static> View
-    for DataTableSurface<Record, Id>
+    for TableSurface<Record, Id>
 {
     fn kind(&self) -> crate::ViewKind<'_> {
         crate::ViewKind::Primitive(self)
@@ -1207,7 +1288,7 @@ impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 
 }
 
 impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 'static>
-    PrimitiveView for DataTableSurface<Record, Id>
+    PrimitiveView for TableSurface<Record, Id>
 {
     fn make_node(&self) -> Node {
         let node = Node::new();
@@ -1250,7 +1331,7 @@ impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 
         let metrics = controller.metrics(node);
         controller.apply_navigation(&plan, &metrics, moving_width, viewport_height);
         let offset = controller.offset.get();
-        let window = DataTableWindows::resolve(
+        let window = TableWindows::resolve(
             &metrics,
             &plan.geometry,
             offset,
@@ -1265,7 +1346,7 @@ impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 
         let input: Rc<RefCell<Option<Node>>> = Rc::new(RefCell::new(None));
         // The header stays mounted for an empty dataset, so the sort controls
         // and column titles remain reachable; only the body is replaced.
-        let content = AnyView::new(DataTableLanes {
+        let content = AnyView::new(TableLanes {
             controller: controller.clone(),
             plan: plan.clone(),
             metrics: metrics.clone(),
@@ -1297,15 +1378,18 @@ impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 
             );
             let tracks = TableColumnPlan::tracks(&ordered, &widths);
             Some(AnyView::new(
-                AnyView::new(crate::primitives::columns::ColumnVisibilityPicker::new(
-                    crate::primitives::data::columns::picker_tracks(&tracks),
-                    crate::primitives::columns::ColumnVisibilityPlan {
-                        indices: resolved.indices.clone(),
-                        required_ids: resolved.required_ids.clone(),
-                    },
-                    controller.visibility_binding(),
-                    controller.is_enabled,
-                ))
+                AnyView::new(
+                    crate::primitives::columns::ColumnVisibilityPicker::new(
+                        crate::primitives::data::columns::picker_tracks(&tracks),
+                        crate::primitives::columns::ColumnVisibilityPlan {
+                            indices: resolved.indices.clone(),
+                            required_ids: resolved.required_ids.clone(),
+                        },
+                        controller.visibility_binding(),
+                        controller.is_enabled,
+                    )
+                    .shows_summary(false),
+                )
                 .flex_with(0.0, 0.0, None),
             ))
         } else {
@@ -1314,8 +1398,8 @@ impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 
         let mut bands: Vec<AnyView> = Vec::new();
         if let Some(picker) = picker {
             // The picker is a toolbar action, not a caption above the table:
-            // it sits on the card's first row, hard against the trailing edge,
-            // and the rule below separates it from the column header.
+            // it sits on the card's tinted band, hard against the trailing
+            // edge, and the rule below separates it from the column header.
             bands.push(AnyView::new(
                 AnyView::new(
                     BoxView::new(
@@ -1325,20 +1409,20 @@ impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 
                         cove_core::scene::Wrap::NoWrap,
                         8.0,
                         AnyView::new(TupleView::new(vec![
-                            crate::primitives::data::lists::table::toolbar_count(
-                                controller.model.count(),
-                            ),
+                            toolbar_count(controller.model.count()),
                             picker,
                         ])),
                     )
-                    .padding_edges(20.0, 0.0)
-                    .frame_height(TOOLBAR_HEIGHT * scale),
+                    .padding_edges(CELL_GUTTER, 0.0)
+                    .frame_width(self.size.width)
+                    .frame_height(TOOLBAR_HEIGHT * scale)
+                    .semantic_background(SemanticColorRef::surface_variant()),
                 )
                 .flex_with(0.0, 0.0, None),
             ));
         }
         bands.push(content);
-        vec![AnyView::new(DataTableChrome {
+        vec![AnyView::new(TableChrome {
             content: AnyView::new(
                 BoxView::new(
                     cove_core::scene::FlexDirection::Column,
@@ -1359,7 +1443,7 @@ impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 
 }
 
 /// Outer border, corner radius and the table-level semantics.
-struct DataTableChrome {
+struct TableChrome {
     content: AnyView,
     is_enabled: bool,
     header_height: f32,
@@ -1367,7 +1451,7 @@ struct DataTableChrome {
     columns: usize,
 }
 
-impl PrimitiveView for DataTableChrome {
+impl PrimitiveView for TableChrome {
     fn make_node(&self) -> Node {
         let node = Node::new();
         node.set_is_hit_testable(false);
@@ -1381,7 +1465,7 @@ impl PrimitiveView for DataTableChrome {
         node.set_background_color(Some(theme.colors.surface));
         node.set_border_color(Some(theme.colors.border));
         node.set_border_width(1.0);
-        node.set_corner_radius(theme.radius.lg);
+        node.set_corner_radius(theme.radius.xl);
         // Rows paint edge to edge; without clipping their fills square off the
         // card's rounded corners.
         node.set_clips_to_bounds(true);
@@ -1403,24 +1487,24 @@ impl PrimitiveView for DataTableChrome {
         vec![self.content.clone()]
     }
 }
-impl_primitive_view!(DataTableChrome);
+impl_primitive_view!(TableChrome);
 
 /// Header plus the two body lanes, wired to one keyboard host.
-struct DataTableLanes<Record: 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 'static> {
-    controller: DataTableController<Record, Id>,
-    plan: DataTablePlan<Record>,
-    metrics: DataTableRowMetrics,
-    window: DataTableWindows,
+struct TableLanes<Record: 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 'static> {
+    controller: TableController<Record, Id>,
+    plan: TablePlan<Record>,
+    metrics: TableRowMetrics,
+    window: TableWindows,
     offset: Point,
     moving_width: f32,
     viewport_height: f32,
     layout: TableLayout,
-    session: DataTableSession<Id>,
+    session: TableSession<Id>,
     input: Rc<RefCell<Option<Node>>>,
 }
 
 impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 'static> View
-    for DataTableLanes<Record, Id>
+    for TableLanes<Record, Id>
 {
     fn body(&self, _cx: &Scope) -> AnyView {
         let header = build_header(
@@ -1486,10 +1570,13 @@ impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 
 
         let body = if self.controller.model.count() == 0 {
             AnyView::new(
-                AnyView::new(EmptyState::new(
-                    self.layout.empty_title.clone(),
-                    "Change your filters or add a record.",
-                ))
+                AnyView::new(
+                    EmptyState::new(
+                        self.layout.empty_title.clone(),
+                        "Change your filters or add a record.",
+                    )
+                    .prominence(EmptyStateProminence::Compact),
+                )
                 .flex_with(1.0, 1.0, Some(0.0)),
             )
         } else {
@@ -1535,7 +1622,7 @@ impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 
             .frame(None, None, Some(0.0), Some(0.0), None, None),
         );
 
-        AnyView::new(DataTableInputHost {
+        AnyView::new(TableInputHost {
             controller: self.controller.clone(),
             plan: self.plan.clone(),
             metrics: self.metrics.clone(),
@@ -1551,10 +1638,10 @@ fn header_cells<
     Record: Clone + 'static,
     Id: Ord + std::hash::Hash + Clone + Send + Sync + 'static,
 >(
-    controller: &DataTableController<Record, Id>,
-    plan: &DataTablePlan<Record>,
+    controller: &TableController<Record, Id>,
+    plan: &TablePlan<Record>,
     range: std::ops::Range<usize>,
-    geometry: &DataTableColumnGeometry,
+    geometry: &TableColumnGeometry,
     offset: Point,
     layout: &TableLayout,
 ) -> AnyView {
@@ -1612,12 +1699,12 @@ fn build_header<
     Record: Clone + 'static,
     Id: Ord + std::hash::Hash + Clone + Send + Sync + 'static,
 >(
-    controller: &DataTableController<Record, Id>,
-    plan: &DataTablePlan<Record>,
-    _metrics: &DataTableRowMetrics,
+    controller: &TableController<Record, Id>,
+    plan: &TablePlan<Record>,
+    _metrics: &TableRowMetrics,
     offset: Point,
     layout: &TableLayout,
-    _session: &DataTableSession<Id>,
+    _session: &TableSession<Id>,
 ) -> AnyView {
     let geometry = &plan.geometry;
     let frozen_count = geometry.frozen_count.min(plan.columns.len());
@@ -1677,13 +1764,13 @@ fn build_frozen_lane<
     Record: Clone + 'static,
     Id: Ord + std::hash::Hash + Clone + Send + Sync + 'static,
 >(
-    controller: &DataTableController<Record, Id>,
-    plan: &DataTablePlan<Record>,
-    metrics: &DataTableRowMetrics,
-    window: DataTableWindows,
+    controller: &TableController<Record, Id>,
+    plan: &TablePlan<Record>,
+    metrics: &TableRowMetrics,
+    window: TableWindows,
     _offset: Point,
     layout: &TableLayout,
-    session: &DataTableSession<Id>,
+    session: &TableSession<Id>,
     viewport_height: f32,
     moving_width: f32,
     input: Rc<RefCell<Option<Node>>>,
@@ -1711,13 +1798,13 @@ fn build_moving_lane<
     Record: Clone + 'static,
     Id: Ord + std::hash::Hash + Clone + Send + Sync + 'static,
 >(
-    controller: &DataTableController<Record, Id>,
-    plan: &DataTablePlan<Record>,
-    metrics: &DataTableRowMetrics,
-    window: DataTableWindows,
+    controller: &TableController<Record, Id>,
+    plan: &TablePlan<Record>,
+    metrics: &TableRowMetrics,
+    window: TableWindows,
     offset: Point,
     layout: &TableLayout,
-    session: &DataTableSession<Id>,
+    session: &TableSession<Id>,
     moving_width: f32,
     viewport_height: f32,
     input: Rc<RefCell<Option<Node>>>,
@@ -1758,13 +1845,13 @@ fn build_moving_lane<
 /// lane's own height is the table's full scroll extent.
 struct LaneRows<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 'static>
 {
-    controller: DataTableController<Record, Id>,
-    plan: DataTablePlan<Record>,
-    metrics: DataTableRowMetrics,
+    controller: TableController<Record, Id>,
+    plan: TablePlan<Record>,
+    metrics: TableRowMetrics,
     rows: std::ops::Range<usize>,
     columns: std::ops::Range<usize>,
     layout: TableLayout,
-    session: DataTableSession<Id>,
+    session: TableSession<Id>,
     viewport_height: f32,
     moving_width: f32,
     input: Rc<RefCell<Option<Node>>>,
@@ -1791,7 +1878,7 @@ impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 
             ));
         }
         for index in self.rows.clone() {
-            children.push(AnyView::new(DataTableRow {
+            children.push(AnyView::new(TableRow {
                 controller: self.controller.clone(),
                 plan: self.plan.clone(),
                 row: index,
@@ -1838,13 +1925,13 @@ struct FrozenLane<
     Record: Clone + 'static,
     Id: Ord + std::hash::Hash + Clone + Send + Sync + 'static,
 > {
-    controller: DataTableController<Record, Id>,
-    plan: DataTablePlan<Record>,
-    metrics: DataTableRowMetrics,
+    controller: TableController<Record, Id>,
+    plan: TablePlan<Record>,
+    metrics: TableRowMetrics,
     rows: std::ops::Range<usize>,
     columns: std::ops::Range<usize>,
     layout: TableLayout,
-    session: DataTableSession<Id>,
+    session: TableSession<Id>,
     viewport_height: f32,
     moving_width: f32,
     input: Rc<RefCell<Option<Node>>>,
@@ -1874,13 +1961,13 @@ struct MovingRows<
     Record: Clone + 'static,
     Id: Ord + std::hash::Hash + Clone + Send + Sync + 'static,
 > {
-    controller: DataTableController<Record, Id>,
-    plan: DataTablePlan<Record>,
-    metrics: DataTableRowMetrics,
+    controller: TableController<Record, Id>,
+    plan: TablePlan<Record>,
+    metrics: TableRowMetrics,
     rows: std::ops::Range<usize>,
     columns: std::ops::Range<usize>,
     layout: TableLayout,
-    session: DataTableSession<Id>,
+    session: TableSession<Id>,
     viewport_height: f32,
     moving_width: f32,
     input: Rc<RefCell<Option<Node>>>,
@@ -1909,22 +1996,20 @@ impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 
 }
 
 /// One row: the cells for one range of columns.
-struct DataTableRow<
-    Record: Clone + 'static,
-    Id: Ord + std::hash::Hash + Clone + Send + Sync + 'static,
-> {
-    controller: DataTableController<Record, Id>,
-    plan: DataTablePlan<Record>,
+struct TableRow<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 'static>
+{
+    controller: TableController<Record, Id>,
+    plan: TablePlan<Record>,
     row: usize,
     height: f32,
     columns: std::ops::Range<usize>,
     layout: TableLayout,
-    session: DataTableSession<Id>,
+    session: TableSession<Id>,
     input: Rc<RefCell<Option<Node>>>,
 }
 
 impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 'static> View
-    for DataTableRow<Record, Id>
+    for TableRow<Record, Id>
 {
     fn body(&self, _cx: &Scope) -> AnyView {
         let Some(record) = self.controller.model.record_at(self.row) else {
@@ -1966,7 +2051,7 @@ impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 
                 .unwrap_or(column.layout.width);
             let is_active = selection.focused_id.as_ref() == Some(&row_id)
                 && selection.focused_column_id.as_ref() == Some(&column.id);
-            cells.push(AnyView::new(DataTableCell {
+            cells.push(AnyView::new(TableCell {
                 controller: self.controller.clone(),
                 plan: self.plan.clone(),
                 column: column.clone(),
@@ -1981,7 +2066,7 @@ impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 
                 input: self.input.clone(),
             }));
         }
-        AnyView::new(DataTableRowHost {
+        AnyView::new(TableRowHost {
             row: self.row,
             hover: self.controller.row_hover.clone(),
             is_selected,
@@ -2006,9 +2091,9 @@ impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 
 }
 
 /// One body row: paint, hairline separator and the row marker.
-struct DataTableRowHost {
+struct TableRowHost {
     row: usize,
-    hover: Rc<DataTableRowHover>,
+    hover: Rc<TableRowHover>,
     is_selected: bool,
     is_striped: bool,
     is_enabled: bool,
@@ -2018,7 +2103,7 @@ struct DataTableRowHost {
     content: AnyView,
 }
 
-impl PrimitiveView for DataTableRowHost {
+impl PrimitiveView for TableRowHost {
     fn make_node(&self) -> Node {
         let node = Node::new();
         node.set_is_hit_testable(false);
@@ -2116,7 +2201,7 @@ impl PrimitiveView for DataTableRowHost {
             // viewer who cannot separate the tint from the card.
             if is_selected {
                 let _ = list.add_rect(
-                    cove_core::Rect::new(origin.x, origin.y, 2.0, height),
+                    cove_core::Rect::new(origin.x, origin.y, 3.0, height),
                     theme.colors.accent,
                 );
             }
@@ -2127,15 +2212,13 @@ impl PrimitiveView for DataTableRowHost {
         vec![self.content.clone()]
     }
 }
-impl_primitive_view!(DataTableRowHost);
+impl_primitive_view!(TableRowHost);
 
 /// One body cell. Owns the draft editor when this cell is being edited.
-struct DataTableCell<
-    Record: Clone + 'static,
-    Id: Ord + std::hash::Hash + Clone + Send + Sync + 'static,
-> {
-    controller: DataTableController<Record, Id>,
-    plan: DataTablePlan<Record>,
+struct TableCell<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 'static>
+{
+    controller: TableController<Record, Id>,
+    plan: TablePlan<Record>,
     column: TableColumn<Record>,
     column_index: usize,
     row: usize,
@@ -2144,12 +2227,12 @@ struct DataTableCell<
     is_active: bool,
     width: f32,
     height: f32,
-    session: DataTableSession<Id>,
+    session: TableSession<Id>,
     input: Rc<RefCell<Option<Node>>>,
 }
 
 impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 'static> View
-    for DataTableCell<Record, Id>
+    for TableCell<Record, Id>
 {
     fn body(&self, _cx: &Scope) -> AnyView {
         let title = self.column.title.clone();
@@ -2186,7 +2269,7 @@ impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 
             cove_core::TextAlignment::Trailing => Justify::FlexEnd,
             cove_core::TextAlignment::Center => Justify::Center,
         };
-        AnyView::new(DataTableCellHost {
+        AnyView::new(TableCellHost {
             controller: self.controller.clone(),
             plan: self.plan.clone(),
             title,
@@ -2205,7 +2288,7 @@ impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 
                     0.0,
                     content,
                 )
-                .padding_edges(20.0, 4.0)
+                .padding_edges(CELL_GUTTER, 4.0)
                 .clipped(),
             ),
         })
@@ -2213,12 +2296,12 @@ impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 
 }
 
 /// Cell shell: focus ring, hover fill, activation and the accessibility cell.
-struct DataTableCellHost<
+struct TableCellHost<
     Record: Clone + 'static,
     Id: Ord + std::hash::Hash + Clone + Send + Sync + 'static,
 > {
-    controller: DataTableController<Record, Id>,
-    plan: DataTablePlan<Record>,
+    controller: TableController<Record, Id>,
+    plan: TablePlan<Record>,
     title: String,
     row: usize,
     column_index: usize,
@@ -2230,7 +2313,7 @@ struct DataTableCellHost<
 }
 
 impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 'static>
-    PrimitiveView for DataTableCellHost<Record, Id>
+    PrimitiveView for TableCellHost<Record, Id>
 {
     fn make_node(&self) -> Node {
         let node = Node::new();
@@ -2322,7 +2405,7 @@ impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 
     }
 }
 impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 'static> View
-    for DataTableCellHost<Record, Id>
+    for TableCellHost<Record, Id>
 {
     fn kind(&self) -> crate::ViewKind<'_> {
         crate::ViewKind::Primitive(self)
@@ -2337,8 +2420,8 @@ struct DraftEditor<
     Record: Clone + 'static,
     Id: Ord + std::hash::Hash + Clone + Send + Sync + 'static,
 > {
-    controller: DataTableController<Record, Id>,
-    plan: DataTablePlan<Record>,
+    controller: TableController<Record, Id>,
+    plan: TablePlan<Record>,
     /// The table's keyboard host, which regains focus once the draft closes.
     input: Rc<RefCell<Option<Node>>>,
     /// One-per-open-editor identity, so the field requests focus exactly once.
@@ -2472,8 +2555,8 @@ struct HeaderCell<
     Record: Clone + 'static,
     Id: Ord + std::hash::Hash + Clone + Send + Sync + 'static,
 > {
-    controller: DataTableController<Record, Id>,
-    plan: DataTablePlan<Record>,
+    controller: TableController<Record, Id>,
+    plan: TablePlan<Record>,
     column: TableColumn<Record>,
     index: usize,
     width: f32,
@@ -2546,9 +2629,9 @@ impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 
         // A trailing label gets the grip's width back as padding, so it lands
         // on the same right edge as the values under it.
         let trailing_padding = if alignment == TextAlignment::Trailing {
-            (20.0 - grip).max(0.0)
+            (CELL_GUTTER - grip).max(0.0)
         } else {
-            20.0
+            CELL_GUTTER
         };
         let label = AnyView::new(
             BoxView::new(
@@ -2560,7 +2643,7 @@ impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 
                 AnyView::new(TupleView::new(row)),
             )
             .padding_insets(EdgeInsets {
-                leading: 20.0,
+                leading: CELL_GUTTER,
                 trailing: trailing_padding,
                 top: 0.0,
                 bottom: 0.0,
@@ -2607,8 +2690,8 @@ struct HeaderCellHost<
     Record: Clone + 'static,
     Id: Ord + std::hash::Hash + Clone + Send + Sync + 'static,
 > {
-    controller: DataTableController<Record, Id>,
-    plan: DataTablePlan<Record>,
+    controller: TableController<Record, Id>,
+    plan: TablePlan<Record>,
     index: usize,
     is_enabled: bool,
     column_id: String,
@@ -2711,7 +2794,7 @@ impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 
                         }
                         match drag {
                             Some((start, true)) => {
-                                let target = DataTableColumnOrder::target(
+                                let target = TableColumnOrder::target(
                                     index,
                                     event.x - start,
                                     &plan.geometry,
@@ -2769,7 +2852,7 @@ fn shared_resize_grip<
     Record: Clone + 'static,
     Id: Ord + std::hash::Hash + Clone + Send + Sync + 'static,
 >(
-    controller: &DataTableController<Record, Id>,
+    controller: &TableController<Record, Id>,
     column: &TableColumn<Record>,
     is_enabled: bool,
 ) -> crate::primitives::data::columns::ResizeGrip {
@@ -2798,7 +2881,8 @@ fn shared_resize_grip<
     )
 }
 
-/// Header background, matching the canvas fill the reference table uses.
+/// A tinted band: the toolbar and the column header share one fill, so the
+/// header reads as chrome rather than as the first body row.
 struct HeaderPaint {
     content: AnyView,
 }
@@ -2811,10 +2895,7 @@ impl PrimitiveView for HeaderPaint {
     }
 
     fn update_node(&self, node: &Node) {
-        // The header shares the card's fill: the grey region behind the card
-        // is the same `surface_variant`, so a tinted band read as a notch cut
-        // out of the card. Typography and the rule below carry the separation.
-        node.set_background_color(Some(theme_for_node(node).colors.surface));
+        node.set_background_color(Some(theme_for_node(node).colors.surface_variant));
     }
 
     fn children(&self, _node: &Node) -> Vec<AnyView> {
@@ -2866,13 +2947,13 @@ impl PrimitiveView for DataOffsetPane {
 impl_primitive_view!(DataOffsetPane);
 
 /// Owns the keyboard routing and the focus target for grid navigation.
-struct DataTableInputHost<
+struct TableInputHost<
     Record: Clone + 'static,
     Id: Ord + std::hash::Hash + Clone + Send + Sync + 'static,
 > {
-    controller: DataTableController<Record, Id>,
-    plan: DataTablePlan<Record>,
-    metrics: DataTableRowMetrics,
+    controller: TableController<Record, Id>,
+    plan: TablePlan<Record>,
+    metrics: TableRowMetrics,
     moving_width: f32,
     viewport_height: f32,
     input: Rc<RefCell<Option<Node>>>,
@@ -2880,7 +2961,7 @@ struct DataTableInputHost<
 }
 
 impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 'static>
-    PrimitiveView for DataTableInputHost<Record, Id>
+    PrimitiveView for TableInputHost<Record, Id>
 {
     fn make_node(&self) -> Node {
         let node = Node::new();
@@ -2976,7 +3057,7 @@ impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 
     }
 }
 impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 'static> View
-    for DataTableInputHost<Record, Id>
+    for TableInputHost<Record, Id>
 {
     fn kind(&self) -> crate::ViewKind<'_> {
         crate::ViewKind::Primitive(self)

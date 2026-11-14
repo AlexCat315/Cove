@@ -1,4 +1,4 @@
-//! Translation of `Tests/CoveUIComposeTests/DataTableScrollTests.swift`.
+//! Translation of `Tests/CoveUIComposeTests/TableScrollTests.swift`.
 //!
 //! Behaviour checklist:
 //! - the table mounts a viewport whose row window is non-empty and initially
@@ -12,7 +12,7 @@
 //!
 //! Model difference: the Swift suite reads `table.session.viewport.size`,
 //! `table.session.offset` and the parent's `scrollOffset` binding to assert
-//! boundary containment numerically. The Rust `DataTable` keeps both the offset
+//! boundary containment numerically. The Rust `Table` keeps both the offset
 //! and the viewport in a private `State<Point>` field (`view.rs:186`, `235`) and
 //! exposes no accessor, so those exact numbers are not reachable from an
 //! integration test. The same invariants are asserted through observable
@@ -32,8 +32,8 @@ use cove_core::scene::{
 use cove_core::{Binding, Point};
 use cove_platform::{InputEvent, MouseButton, MouseButtonEvent, MouseWheelEvent, WindowId};
 use cove_ui_compose::modifiers::layout::LayoutFrameExt;
-use cove_ui_compose::primitives::data::data_table::table_column::{TableColumn, TableColumnLayout};
-use cove_ui_compose::primitives::data::data_table::{DataTable, DataTableModel, DataTableOptions};
+use cove_ui_compose::primitives::data::table::table_column::{TableColumn, TableColumnLayout};
+use cove_ui_compose::primitives::data::table::{Table, TableModel, TableOptions};
 use cove_ui_compose::primitives::layout::{ScrollAxis, ScrollView};
 use cove_ui_compose::primitives::text::Text;
 use cove_ui_compose::{BoxView, Scancode};
@@ -55,8 +55,8 @@ fn nodes(graph: &Rc<ViewGraph>) -> Vec<Node> {
     collected
 }
 
-fn table_model(row_count: usize) -> Rc<DataTableModel<usize, usize>> {
-    DataTableModel::try_new((0..row_count).collect(), |record| *record)
+fn table_model(row_count: usize) -> Rc<TableModel<usize, usize>> {
+    TableModel::try_new((0..row_count).collect(), |record| *record)
         .expect("unique data table row IDs")
 }
 
@@ -97,7 +97,7 @@ impl Harness {
 
         let table = AnyView::new(
             AnyView::new(
-                DataTable::try_new(table_model(row_count), columns())
+                Table::try_new(table_model(row_count), columns())
                     .expect("unique data table column IDs"),
             )
             .frame_size(500.0, 180.0),
@@ -335,4 +335,4 @@ fn vertical_input_reaches_the_parent_when_the_rows_fit() {
     });
 }
 
-fn _unused(_: DataTableOptions<usize>, _: MouseButtonEvent, _: MouseButton) {}
+fn _unused(_: TableOptions<usize>, _: MouseButtonEvent, _: MouseButton) {}

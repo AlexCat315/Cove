@@ -1006,7 +1006,11 @@ mod tests {
         assert_eq!(value["section_zero_fill_bytes"], section_zero_fill);
         #[cfg(target_os = "macos")]
         {
-            assert!(sections.iter().any(|section| section["segment"] == "__TEXT"));
+            assert!(
+                sections
+                    .iter()
+                    .any(|section| section["segment"] == "__TEXT")
+            );
             assert!(
                 segments
                     .iter()
@@ -1023,7 +1027,10 @@ mod tests {
         let unattributed = value["unattributed_bytes"].as_u64().unwrap();
         assert_eq!(attributed + linkedit + unattributed, file_bytes);
         if value["symbol_count"] == 0 {
-            assert_eq!(attributed, 0, "a symbol-free image attributes no file bytes");
+            assert_eq!(
+                attributed, 0,
+                "a symbol-free image attributes no file bytes"
+            );
         } else {
             assert!(attributed > 0, "the symbol table covers real bytes");
         }

@@ -11,12 +11,12 @@
 //!   lanes inside the body at 2x and 1x
 //!
 //! Named differences from the Swift suite:
-//! - The non-`DataTable` `Table` primitive is not implemented in Rust; only
-//!   `DataTable` exists, and it covers the scaled row, frozen lane and paging
+//! - The non-`Table` `Table` primitive is not implemented in Rust; only
+//!   `Table` exists, and it covers the scaled row, frozen lane and paging
 //!   legs below. Swift's separate `Table` row leg therefore has no counterpart
 //!   here.
 //! - Swift asserts a "Resize First column" grip at `max(38 * scale, 44)`; the
-//!   Rust `DataTable` mounts no per-column resize grip, so the leg is removed
+//!   Rust `Table` mounts no per-column resize grip, so the leg is removed
 //!   and recorded here rather than asserted.
 //! - Swift reads the data-table session's `focusedID`, `viewport.size` and
 //!   `offset.y`. The Rust session is private, so paging is asserted through the
@@ -37,9 +37,9 @@ use cove_core::{Binding, Environment, InputCapabilities, Point, State};
 use cove_platform::KeyModifiers;
 use cove_ui_compose::adaptive::SurfaceEnvironmentExt;
 use cove_ui_compose::modifiers::layout::LayoutFrameExt;
-use cove_ui_compose::primitives::data::data_table::table_column::{TableColumn, TableLayout};
-use cove_ui_compose::primitives::data::data_table::{DataTable, DataTableModel, DataTableOptions};
 use cove_ui_compose::primitives::data::lists::{List, Selection};
+use cove_ui_compose::primitives::data::table::table_column::{TableColumn, TableLayout};
+use cove_ui_compose::primitives::data::table::{Table, TableModel, TableOptions};
 use cove_ui_compose::primitives::layout::grid::{GridRowHeights, LazyGrid};
 use cove_ui_compose::primitives::text::Text;
 use cove_ui_compose::theme::styles::appearance_modifier::{Appearance, AppearanceViewExt};
@@ -117,17 +117,17 @@ impl View for GeometryHarness {
         )))
         .row_height(30.0)
         .row_spacing(3.0);
-        let model = DataTableModel::try_new(records.clone(), |record| *record)
+        let model = TableModel::try_new(records.clone(), |record| *record)
             .expect("unique data table row IDs");
-        let data_table = DataTable::try_new(model, columns())
+        let data_table = Table::try_new(model, columns())
             .expect("unique data table column IDs")
-            .options(DataTableOptions {
+            .options(TableOptions {
                 selection: None,
                 layout: TableLayout {
                     row_height: 36.0,
                     ..TableLayout::default()
                 },
-                ..DataTableOptions::default()
+                ..TableOptions::default()
             });
         let grid = LazyGrid::try_new(
             (0..20_000).collect::<Vec<usize>>(),
@@ -463,9 +463,9 @@ struct NavigationHarness {
 
 impl View for NavigationHarness {
     fn body(&self, _cx: &Scope) -> AnyView {
-        let model = DataTableModel::try_new((0..1_000).collect::<Vec<usize>>(), |record| *record)
+        let model = TableModel::try_new((0..1_000).collect::<Vec<usize>>(), |record| *record)
             .expect("unique data table row IDs");
-        let table = DataTable::try_new(model, columns())
+        let table = Table::try_new(model, columns())
             .expect("unique data table column IDs")
             .frame_height(310.0);
         AnyView::new(
@@ -513,7 +513,7 @@ fn data_table_paging_follows_live_text_scale() {
             for row in &last {
                 assert_eq!(
                     row.frame().height,
-                    36.0 * value,
+                    44.0 * value,
                     "data-table rows follow the live scale at {value}x (actual {})",
                     row.frame().height
                 );

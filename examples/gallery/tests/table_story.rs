@@ -7,15 +7,15 @@
 use std::collections::HashSet;
 
 use cove_examples::gallery_content::catalog::GalleryOptions;
-use cove_examples::gallery_content::stories::data_table_story::{
-    CATEGORIES, DataTableStory, ProjectNode, SortStats, TOTAL_COLUMNS, WarehouseRow,
-    apply_quantity, compare_names, compare_quantities, group_thousands, validate_name,
-    validate_quantity, visible_tree_rows,
+use cove_examples::gallery_content::stories::table_story::{
+    CATEGORIES, ProjectNode, SortStats, TOTAL_COLUMNS, TableStory, WarehouseRow, apply_quantity,
+    compare_names, compare_quantities, group_thousands, validate_name, validate_quantity,
+    visible_tree_rows,
 };
-use cove_ui_compose::primitives::data::data_table::table_column::ComparisonResult;
+use cove_ui_compose::primitives::data::table::table_column::ComparisonResult;
 
-fn story() -> DataTableStory {
-    DataTableStory::new(GalleryOptions::default())
+fn story() -> TableStory {
+    TableStory::new(GalleryOptions::default())
 }
 
 #[test]

@@ -1,5 +1,5 @@
-//! Translation of `Primitives/Data/DataTable/DataTableSelection.swift` and the
-//! navigation request from `DataTable.swift`.
+//! Translation of `Primitives/Data/Table/TableSelection.swift` and the
+//! navigation request from `Table.swift`.
 //!
 //! Selection is rows plus a focused column: the cell cursor is a row and a
 //! column, and the two move independently so a range selection can stay on one
@@ -16,11 +16,11 @@ use std::collections::BTreeSet;
 
 use cove_platform::KeyModifiers;
 
-use super::model::DataTableModel;
+use super::model::TableModel;
 
 /// Whether a table selects one row or many.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub enum DataTableSelectionMode {
+pub enum TableSelectionMode {
     Single,
     #[default]
     Multiple,
@@ -28,14 +28,14 @@ pub enum DataTableSelectionMode {
 
 /// Rows that are selected, plus the cell cursor.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct DataTableSelection<Id: Ord + Clone> {
+pub struct TableSelection<Id: Ord + Clone> {
     pub selected_ids: BTreeSet<Id>,
     pub focused_id: Option<Id>,
     pub anchor_id: Option<Id>,
     pub focused_column_id: Option<String>,
 }
 
-impl<Id: Ord + Clone> Default for DataTableSelection<Id> {
+impl<Id: Ord + Clone> Default for TableSelection<Id> {
     fn default() -> Self {
         Self {
             selected_ids: BTreeSet::new(),
@@ -46,7 +46,7 @@ impl<Id: Ord + Clone> Default for DataTableSelection<Id> {
     }
 }
 
-impl<Id: Ord + Clone> DataTableSelection<Id> {
+impl<Id: Ord + Clone> TableSelection<Id> {
     pub fn new() -> Self {
         Self::default()
     }
@@ -59,8 +59,8 @@ impl<Id: Ord + Clone> DataTableSelection<Id> {
     pub fn select<Record: 'static>(
         &mut self,
         index: usize,
-        model: &DataTableModel<Record, Id>,
-        mode: DataTableSelectionMode,
+        model: &TableModel<Record, Id>,
+        mode: TableSelectionMode,
         modifiers: KeyModifiers,
     ) where
         Id: Eq + std::hash::Hash,
@@ -71,7 +71,7 @@ impl<Id: Ord + Clone> DataTableSelection<Id> {
         let Some(id) = model.row_id_at(index) else {
             return;
         };
-        if mode == DataTableSelectionMode::Multiple && modifiers.has_shift() {
+        if mode == TableSelectionMode::Multiple && modifiers.has_shift() {
             if let Some(anchor) = self.anchor_id.clone()
                 && let Some(anchor_index) = model.index_for(&anchor)
             {
@@ -83,7 +83,7 @@ impl<Id: Ord + Clone> DataTableSelection<Id> {
                 self.selected_ids = [id.clone()].into();
                 self.anchor_id = Some(id.clone());
             }
-        } else if mode == DataTableSelectionMode::Multiple
+        } else if mode == TableSelectionMode::Multiple
             && (modifiers.has_gui() || modifiers.has_ctrl())
         {
             if !self.selected_ids.remove(&id) {
@@ -98,7 +98,7 @@ impl<Id: Ord + Clone> DataTableSelection<Id> {
     }
 
     /// Drops ids that are no longer in the model.
-    pub fn retain_existing<Record: 'static>(&mut self, model: &DataTableModel<Record, Id>)
+    pub fn retain_existing<Record: 'static>(&mut self, model: &TableModel<Record, Id>)
     where
         Id: Eq + std::hash::Hash,
     {
@@ -120,7 +120,7 @@ impl<Id: Ord + Clone> DataTableSelection<Id> {
     }
 
     /// Selects every row in the model.
-    pub fn select_all<Record: 'static>(&mut self, model: &DataTableModel<Record, Id>)
+    pub fn select_all<Record: 'static>(&mut self, model: &TableModel<Record, Id>)
     where
         Id: Eq + std::hash::Hash,
     {
@@ -143,13 +143,13 @@ impl<Id: Ord + Clone> DataTableSelection<Id> {
 /// A request to reveal one cell, keyed by a request identity so the same
 /// request is not applied twice.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct DataTableNavigation<Id> {
+pub struct TableNavigation<Id> {
     pub request_id: Option<u64>,
     pub row_id: Option<Id>,
     pub column_id: Option<String>,
 }
 
-impl<Id> Default for DataTableNavigation<Id> {
+impl<Id> Default for TableNavigation<Id> {
     fn default() -> Self {
         Self {
             request_id: None,
@@ -159,7 +159,7 @@ impl<Id> Default for DataTableNavigation<Id> {
     }
 }
 
-impl<Id> DataTableNavigation<Id> {
+impl<Id> TableNavigation<Id> {
     pub fn new() -> Self {
         Self::default()
     }

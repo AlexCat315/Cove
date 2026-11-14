@@ -23,11 +23,11 @@ use cove_core::{State, TextAlignment};
 use cove_ui_compose::modifiers::layout::LayoutFrameExt;
 use cove_ui_compose::modifiers::style::SemanticStyleViewExt;
 use cove_ui_compose::primitives::controls::{Button, Toggle};
-use cove_ui_compose::primitives::data::data_table::table_column::ComparisonResult;
-use cove_ui_compose::primitives::data::data_table::{
-    ColumnVisibility, DataTable, DataTableOptions, TableColumn, TableColumnLayout, TableTextEditing,
-};
 use cove_ui_compose::primitives::data::lists::Selection;
+use cove_ui_compose::primitives::data::table::table_column::{
+    ColumnVisibility, ComparisonResult, TableColumn, TableColumnLayout, TableTextEditing,
+};
+use cove_ui_compose::primitives::data::table::{Table, TableOptions};
 use cove_ui_compose::primitives::data::{TreeTable, TreeTableColumn, TreeTableOptions};
 use cove_ui_compose::primitives::text::Text;
 use cove_ui_compose::theme::tokens::SemanticColorRef;
@@ -262,8 +262,8 @@ pub fn group_thousands(value: usize) -> String {
     out
 }
 
-/// `DataTableStory`: the warehouse table plus the project tree.
-pub struct DataTableStory {
+/// `TableStory`: the warehouse table plus the project tree.
+pub struct TableStory {
     pub options: GalleryOptions,
     rows: Rc<RefCell<Vec<WarehouseRow>>>,
     selection: State<BTreeSet<usize>>,
@@ -283,7 +283,7 @@ pub struct Navigation {
     pub request_id: u64,
 }
 
-impl DataTableStory {
+impl TableStory {
     pub fn new(options: GalleryOptions) -> Self {
         // A data table demo opens on a populated table: an empty grid is a
         // preview of the empty state, not of how the table behaves under load.
@@ -519,10 +519,10 @@ pub fn find_node(nodes: &[ProjectNode], id: &str) -> Option<ProjectNode> {
     None
 }
 
-impl View for DataTableStory {
+impl View for TableStory {
     fn body(&self, _cx: &Scope) -> AnyView {
         let enabled = self.options.is_enabled;
-        let mut options = DataTableOptions::default();
+        let mut options = TableOptions::default();
         options.is_enabled = enabled;
         // Three visible columns in a wide card: the last one takes the slack so
         // the grid ends at the card edge.
@@ -533,7 +533,7 @@ impl View for DataTableStory {
 
         let activate = self.handle();
         let table = AnyView::new(
-            DataTable::from_records(self.rows(), |row: &WarehouseRow| row.id, self.columns())
+            Table::new(self.rows(), |row: &WarehouseRow| row.id, self.columns())
                 .expect("the gallery table columns are static with unique ids")
                 .options(options)
                 .on_activate(move |row: &WarehouseRow| activate.activate(row.id))
@@ -662,7 +662,7 @@ impl View for DataTableStory {
                 )),
                 AnyView::new(StorySection::new(
                     "Tree table",
-                    "The first column carries the hierarchy: Right expands a branch or enters its first child, Left collapses or returns to the parent. Columns, widths, freezing and grid navigation come from DataTable.",
+                    "The first column carries the hierarchy: Right expands a branch or enters its first child, Left collapses or returns to the parent. Columns, widths, freezing and grid navigation come from Table.",
                     AnyView::new(TreeTableSample {
                         expanded: self.tree_expanded.clone(),
                         selected: self.tree_selected.clone(),
@@ -674,7 +674,7 @@ impl View for DataTableStory {
     }
 
     fn tag(&self) -> &'static str {
-        "DataTableStory"
+        "TableStory"
     }
 
     fn dynamic_properties(&self) -> Vec<cove_composition::DynamicField> {

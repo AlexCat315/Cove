@@ -200,18 +200,20 @@ impl ListRowStyle for FlushListRowStyle {
             theme.colors.surface_pressed
         };
         let alpha = if configuration.is_enabled { 1.0 } else { 0.55 };
-        let row = AnyView::new(Row::new(
-            VerticalAlignment::Center,
-            0.0,
-            AnyView::new(
-                configuration
-                    .content
-                    .clone()
-                    .frame_min_width(0.0)
-                    .flex_with(1.0, 1.0, Some(0.0)),
-            ),
-        )
-        .frame_height(configuration.row_height));
+        let row = AnyView::new(
+            Row::new(
+                VerticalAlignment::Center,
+                0.0,
+                AnyView::new(
+                    configuration
+                        .content
+                        .clone()
+                        .frame_min_width(0.0)
+                        .flex_with(1.0, 1.0, Some(0.0)),
+                ),
+            )
+            .frame_height(configuration.row_height),
+        );
         let context = super::list_row_style::ListRowContext {
             is_selected: configuration.is_selected,
             is_emphasized: configuration.is_emphasized,

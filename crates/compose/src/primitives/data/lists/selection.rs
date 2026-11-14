@@ -10,7 +10,7 @@ use cove_core::{Binding, State};
 use cove_platform::{KeyEvent, KeyModifiers};
 
 /// The bound on row identity across `List`, `SectionedList`, `ReorderableList`,
-/// `SwipeList`, `Tree` and `DataTable`.
+/// `SwipeList`, `Tree` and `Table`.
 pub trait CollectionId: Ord + std::hash::Hash + Clone + Send + Sync + 'static {}
 impl<T: Ord + std::hash::Hash + Clone + Send + Sync + 'static> CollectionId for T {}
 

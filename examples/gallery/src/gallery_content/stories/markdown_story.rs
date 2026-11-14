@@ -146,8 +146,11 @@ impl View for MarkdownStory {
                         // not a clamp: without the scroll view the overflow
                         // paints straight through the card and caption.
                         AnyView::new(
-                            AnyView::new(ScrollView::new(ScrollAxis::Vertical, AnyView::new(viewer)))
-                                .frame_height(420.0),
+                            AnyView::new(ScrollView::new(
+                                ScrollAxis::Vertical,
+                                AnyView::new(viewer),
+                            ))
+                            .frame_height(420.0),
                         ),
                         AnyView::new(caption),
                     ])),

@@ -1,4 +1,4 @@
-//! Translation of `Primitives/Data/DataTable/{VariableRows,DataTableSortWorker}.swift`.
+//! Translation of `Primitives/Data/Table/{VariableRows,TableSortWorker}.swift`.
 //!
 //! Row geometry for the display order, and the off-thread sort projection.
 //!
@@ -19,13 +19,13 @@ use std::collections::HashMap;
 use std::rc::Rc;
 
 use super::super::super::layout::virtualization::VariableRowIndex;
-use crate::primitives::data::data_table::table_column::{
+use crate::primitives::data::table::table_column::{
     ComparisonResult, TableSort, TableSortDirection,
 };
 
 /// Row geometry for the display order.
 #[derive(Clone, Debug)]
-pub struct DataTableRowMetrics {
+pub struct TableRowMetrics {
     pub count: usize,
     /// Height used when the table has no variable-row resolver.
     pub fixed: f32,
@@ -33,7 +33,7 @@ pub struct DataTableRowMetrics {
     pub index: Option<Rc<VariableRowIndex<usize>>>,
 }
 
-impl DataTableRowMetrics {
+impl TableRowMetrics {
     pub fn fixed(count: usize, fixed: f32) -> Self {
         Self {
             count,
@@ -149,7 +149,7 @@ pub fn variable_row_heights(
 
 /// The display order produced by a sort.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct DataTableProjection<Id: Clone + Eq + std::hash::Hash> {
+pub struct TableProjection<Id: Clone + Eq + std::hash::Hash> {
     /// Source indices in display order.
     pub order: Vec<usize>,
     /// Display position of each id.
@@ -157,20 +157,20 @@ pub struct DataTableProjection<Id: Clone + Eq + std::hash::Hash> {
 }
 
 /// One sort request, ready to run off-thread.
-pub struct DataTableSortRequest<Record> {
+pub struct TableSortRequest<Record> {
     pub records: Vec<Record>,
     pub ids: Vec<usize>,
     pub sort: TableSort,
     pub compare: Rc<dyn Fn(&Record, &Record) -> ComparisonResult>,
 }
 
-impl<Record> DataTableSortRequest<Record> {
+impl<Record> TableSortRequest<Record> {
     /// Sorts the display order.
     ///
     /// Equal comparisons fall back to the source index in **both** directions,
     /// so a descending sort does not reverse ties — that is what makes the order
     /// stable rather than merely deterministic.
-    pub fn build(&self) -> DataTableProjection<usize> {
+    pub fn build(&self) -> TableProjection<usize> {
         let wanted = match self.sort.direction {
             TableSortDirection::Ascending => ComparisonResult::Ascending,
             TableSortDirection::Descending => ComparisonResult::Descending,
@@ -191,7 +191,7 @@ impl<Record> DataTableSortRequest<Record> {
             .enumerate()
             .map(|(position, source)| (self.ids[*source], position))
             .collect();
-        DataTableProjection { order, positions }
+        TableProjection { order, positions }
     }
 }
 

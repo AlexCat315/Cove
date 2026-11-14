@@ -19,9 +19,9 @@ use cove_core::scene::{Align, FlexDirection, Justify, Node, Wrap};
 use cove_platform::{InputEvent, KeyModifiers, MouseMotionEvent};
 use cove_ui_compose::modifiers::layout::LayoutFrameExt;
 use cove_ui_compose::primitives::data::avatar::avatar::Avatar;
-use cove_ui_compose::primitives::data::data_table::table_column::{TableColumn, TableColumnLayout};
-use cove_ui_compose::primitives::data::data_table::{DataTable, DataTableOptions};
 use cove_ui_compose::primitives::data::lists::{RowState, Selection, SwipeList};
+use cove_ui_compose::primitives::data::table::table_column::{TableColumn, TableColumnLayout};
+use cove_ui_compose::primitives::data::table::{Table, TableOptions};
 use cove_ui_compose::primitives::layout::{BoundedScrollView, TabItem, TabOverflow, TabView};
 use cove_ui_compose::primitives::overlays::portal::LayerRoot;
 use cove_ui_compose::primitives::overlays::{CommandPalette, PaletteCommand};
@@ -270,12 +270,12 @@ impl View for Fixture {
             })
             .collect();
         AnyView::new(
-            DataTable::from_records((0..5).collect(), |record: &i32| *record, columns)
+            Table::new((0..5).collect(), |record: &i32| *record, columns)
                 .expect("unique IDs")
-                .options(DataTableOptions {
+                .options(TableOptions {
                     column_order: Some(self.order.binding()),
                     frozen_column_count: 0,
-                    ..DataTableOptions::default()
+                    ..TableOptions::default()
                 })
                 .frame_size(400.0, 300.0),
         )

@@ -1,5 +1,5 @@
-//! Translation of `Primitives/Data/DataTable/{DataTableModel,DataTableSortWorker}.swift`
-//! (the model half) and the row-storage core of `DataTable.swift`.
+//! Translation of `Primitives/Data/Table/{TableModel,TableSortWorker}.swift`
+//! (the model half) and the row-storage core of `Table.swift`.
 //!
 //! UI-owned row storage and a persistent display projection. Rendering reads
 //! rows and ID positions in O(1); a sort builds a projection once per command
@@ -21,12 +21,12 @@ use std::rc::Rc;
 
 use cove_core::scene::{ObservableObject, ObservablePublisher};
 
-use super::row_metrics::DataTableProjection;
+use super::row_metrics::TableProjection;
 use super::table_column::{ComparisonResult, TableSort, TableSortDirection};
 
 /// Background-sort telemetry, surfaced so a caller can show progress.
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
-pub struct DataTableSortingStatus {
+pub struct TableSortingStatus {
     pub is_pending: bool,
     pub completed_builds: usize,
     pub cache_hits: usize,
@@ -41,20 +41,20 @@ struct RowStorage<Record, Id: Eq + std::hash::Hash + Clone> {
 }
 
 /// UI-owned row storage with a persistent display projection.
-pub struct DataTableModel<Record: 'static, Id: Eq + std::hash::Hash + Clone + 'static> {
+pub struct TableModel<Record: 'static, Id: Eq + std::hash::Hash + Clone + 'static> {
     storage: RefCell<RowStorage<Record, Id>>,
-    projection: RefCell<Option<DataTableProjection<Id>>>,
-    cache: RefCell<Vec<(TableSort, DataTableProjection<Id>)>>,
+    projection: RefCell<Option<TableProjection<Id>>>,
+    cache: RefCell<Vec<(TableSort, TableProjection<Id>)>>,
     generation: RefCell<u64>,
     comparator: RefCell<Option<Rc<dyn Fn(&Record, &Record) -> ComparisonResult>>>,
     sort: RefCell<Option<TableSort>>,
-    sorting: RefCell<DataTableSortingStatus>,
+    sorting: RefCell<TableSortingStatus>,
     revision: RefCell<u64>,
     publisher: ObservablePublisher,
 }
 
 impl<Record: 'static, Id: Eq + std::hash::Hash + Clone + 'static> ObservableObject
-    for DataTableModel<Record, Id>
+    for TableModel<Record, Id>
 {
     fn register_observer(&self, handler: Rc<dyn Fn()>) -> u64 {
         self.publisher.register_observer(handler)
@@ -64,7 +64,7 @@ impl<Record: 'static, Id: Eq + std::hash::Hash + Clone + 'static> ObservableObje
     }
 }
 
-impl<Record: 'static, Id: Eq + std::hash::Hash + Clone + 'static> DataTableModel<Record, Id> {
+impl<Record: 'static, Id: Eq + std::hash::Hash + Clone + 'static> TableModel<Record, Id> {
     pub fn try_new(
         records: Vec<Record>,
         id: impl Fn(&Record) -> Id + 'static,
@@ -77,7 +77,7 @@ impl<Record: 'static, Id: Eq + std::hash::Hash + Clone + 'static> DataTableModel
             generation: RefCell::new(0),
             comparator: RefCell::new(None),
             sort: RefCell::new(None),
-            sorting: RefCell::new(DataTableSortingStatus::default()),
+            sorting: RefCell::new(TableSortingStatus::default()),
             revision: RefCell::new(0),
             publisher: ObservablePublisher::default(),
         }))
@@ -124,7 +124,7 @@ impl<Record: 'static, Id: Eq + std::hash::Hash + Clone + 'static> DataTableModel
         self.sort.borrow().clone()
     }
 
-    pub fn sorting(&self) -> DataTableSortingStatus {
+    pub fn sorting(&self) -> TableSortingStatus {
         *self.sorting.borrow()
     }
 
@@ -286,7 +286,7 @@ impl<Record, Id: Eq + std::hash::Hash + Clone> RowStorage<Record, Id> {
 ///
 /// Equal comparisons retain source order in both directions, so a stable sort
 /// never reshuffles rows the comparator cannot separate. Shared by the async
-/// `DataTable` projection and the synchronous `Table`.
+/// `Table` projection and the synchronous `Table`.
 pub fn sorted_order<Record>(
     records: &[Record],
     sort: &TableSort,
@@ -315,14 +315,14 @@ fn project<Record, Id: Eq + std::hash::Hash + Clone>(
     ids: &[Id],
     sort: &TableSort,
     compare: &Rc<dyn Fn(&Record, &Record) -> ComparisonResult>,
-) -> DataTableProjection<Id> {
+) -> TableProjection<Id> {
     let order = sorted_order(records, sort, compare.as_ref());
     let positions = order
         .iter()
         .enumerate()
         .filter_map(|(position, source)| ids.get(*source).map(|id| (id.clone(), position)))
         .collect();
-    DataTableProjection { order, positions }
+    TableProjection { order, positions }
 }
 
 /// Whether a sort is currently ascending.

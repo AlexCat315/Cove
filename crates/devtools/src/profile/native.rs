@@ -8,8 +8,7 @@ use std::time::{Duration, Instant};
 
 use cove_devtools_protocol::control::Fault;
 use cove_devtools_protocol::{
-    ProfileFrame, ProfileHotspot, ProfileSource, ProfileStack, ProfileStatus, UiHotspots,
-    UiProfile,
+    ProfileFrame, ProfileHotspot, ProfileSource, ProfileStack, ProfileStatus, UiHotspots, UiProfile,
 };
 use cove_profiling::{
     CpuSampler, MAX_SAMPLES, PlatformSupport, SampleConfig, SamplingError, SymbolizedFrame,

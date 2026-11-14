@@ -95,7 +95,6 @@ impl GalleryPage {
             Self::NavigationDrawer => icons::layout::panel_left(),
             Self::NavigationRail => icons::navigation::chevrons_right(),
             Self::Table => icons::layout::table(),
-            Self::DataTable => icons::layout::grid(),
             Self::Calendar | Self::DatePicker | Self::DateRangePicker => icons::data::calendar(),
             Self::TimeField | Self::TimePicker | Self::WheelPicker => icons::data::clock(),
             Self::Timeline => icons::data::activity(),

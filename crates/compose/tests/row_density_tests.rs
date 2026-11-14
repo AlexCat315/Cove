@@ -32,10 +32,10 @@ use cove_core::{Environment, InputCapabilities, State};
 use cove_platform::KeyModifiers;
 use cove_ui_compose::adaptive::SurfaceEnvironmentExt;
 use cove_ui_compose::modifiers::layout::{FlexExt, LayoutFrameExt};
-use cove_ui_compose::primitives::data::data_table::table_column::{TableColumn, TableLayout};
-use cove_ui_compose::primitives::data::data_table::{DataTable, DataTableModel, DataTableOptions};
 use cove_ui_compose::primitives::data::lists::RowState;
 use cove_ui_compose::primitives::data::lists::tree::{Tree, TreeLayout, TreeOptions};
+use cove_ui_compose::primitives::data::table::table_column::{TableColumn, TableLayout};
+use cove_ui_compose::primitives::data::table::{Table, TableModel, TableOptions};
 use cove_ui_compose::primitives::overlays::menu::{Menu, MenuEntry, MenuItem, MenuSubmenu};
 use cove_ui_compose::primitives::overlays::portal::LayerRoot;
 use cove_ui_compose::primitives::text::Text;
@@ -150,7 +150,7 @@ impl View for CollectionHarness {
     fn body(&self, _cx: &Scope) -> AnyView {
         let authored = self.authored.get();
         let records = records();
-        let model = DataTableModel::try_new(records.clone(), |record| *record)
+        let model = TableModel::try_new(records.clone(), |record| *record)
             .expect("unique data table row IDs");
         let tree = Tree::new(
             records.clone(),
@@ -171,23 +171,23 @@ impl View for CollectionHarness {
             },
             ..TreeOptions::default()
         });
-        let table = DataTable::from_records(records.clone(), |record: &usize| *record, columns())
+        let table = Table::new(records.clone(), |record: &usize| *record, columns())
             .expect("unique table column IDs")
-            .options(DataTableOptions {
+            .options(TableOptions {
                 layout: TableLayout {
                     row_height: authored,
                     ..TableLayout::default()
                 },
-                ..DataTableOptions::default()
+                ..TableOptions::default()
             });
-        let data_table = DataTable::try_new(model, columns())
+        let data_table = Table::try_new(model, columns())
             .expect("unique data table column IDs")
-            .options(DataTableOptions {
+            .options(TableOptions {
                 layout: TableLayout {
                     row_height: authored,
                     ..TableLayout::default()
                 },
-                ..DataTableOptions::default()
+                ..TableOptions::default()
             });
         let mut surface = Environment::default();
         surface.input = self.input.get();
@@ -381,9 +381,9 @@ struct TableHarness {
 
 impl View for TableHarness {
     fn body(&self, _cx: &Scope) -> AnyView {
-        let model = DataTableModel::try_new(records(), |record| *record)
-            .expect("unique data table row IDs");
-        let table = DataTable::try_new(model, columns())
+        let model =
+            TableModel::try_new(records(), |record| *record).expect("unique data table row IDs");
+        let table = Table::try_new(model, columns())
             .expect("unique data table column IDs")
             .frame_height(310.0);
         let mut surface = Environment::default();

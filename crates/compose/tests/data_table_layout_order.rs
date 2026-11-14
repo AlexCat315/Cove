@@ -1,4 +1,4 @@
-//! Translation of `Tests/CoveUIComposeTests/DataTableLayoutTests.swift`.
+//! Translation of `Tests/CoveUIComposeTests/TableLayoutTests.swift`.
 //!
 //! Behaviour checklist:
 //! - applying a saved order keeps unknown columns in authored order
@@ -13,9 +13,9 @@
 //! projection as pure functions, so those are asserted directly with the same
 //! inputs and the same expected numbers.
 
-use cove_ui_compose::primitives::data::data_table::{
-    DataTableColumnGeometry, DataTableColumnOrder, DataTableRowMetrics, RowHeightKey,
-    row_height_key_matches, variable_row_heights,
+use cove_ui_compose::primitives::data::table::{
+    RowHeightKey, TableColumnGeometry, TableColumnOrder, TableRowMetrics, row_height_key_matches,
+    variable_row_heights,
 };
 
 #[derive(Clone, Debug)]
@@ -35,7 +35,7 @@ fn columns() -> Vec<String> {
 #[test]
 fn applying_a_saved_order_keeps_unknown_columns_in_authored_order() {
     let ids = columns();
-    let applied = DataTableColumnOrder::apply(
+    let applied = TableColumnOrder::apply(
         &["lines".to_string(), "ghost".to_string(), "id".to_string()],
         &ids,
     );
@@ -50,7 +50,7 @@ fn applying_a_saved_order_keeps_unknown_columns_in_authored_order() {
 fn an_empty_saved_order_preserves_the_authored_order() {
     let ids = columns();
     assert_eq!(
-        DataTableColumnOrder::apply(&[], &ids),
+        TableColumnOrder::apply(&[], &ids),
         ids,
         "no saved order means no reordering"
     );
@@ -59,7 +59,7 @@ fn an_empty_saved_order_preserves_the_authored_order() {
 #[test]
 fn a_duplicated_saved_entry_does_not_shift_later_columns() {
     let ids = columns();
-    let applied = DataTableColumnOrder::apply(
+    let applied = TableColumnOrder::apply(
         &["name".to_string(), "name".to_string(), "id".to_string()],
         &ids,
     );
@@ -74,22 +74,22 @@ fn a_duplicated_saved_entry_does_not_shift_later_columns() {
 fn moving_a_column_places_it_next_to_its_target() {
     let order = columns();
     assert_eq!(
-        DataTableColumnOrder::move_id("id", "lines", &order),
+        TableColumnOrder::move_id("id", "lines", &order),
         vec!["name", "lines", "id"],
         "moving right inserts after the target"
     );
     assert_eq!(
-        DataTableColumnOrder::move_id("lines", "id", &order),
+        TableColumnOrder::move_id("lines", "id", &order),
         vec!["lines", "id", "name"],
         "moving left inserts before the target"
     );
     assert_eq!(
-        DataTableColumnOrder::move_id("id", "id", &order),
+        TableColumnOrder::move_id("id", "id", &order),
         order,
         "moving onto itself is a no-op"
     );
     assert_eq!(
-        DataTableColumnOrder::move_id("ghost", "id", &order),
+        TableColumnOrder::move_id("ghost", "id", &order),
         order,
         "an unknown source leaves the order untouched"
     );
@@ -97,19 +97,19 @@ fn moving_a_column_places_it_next_to_its_target() {
 
 #[test]
 fn the_drop_target_is_the_column_under_the_dragged_centre() {
-    let geometry = DataTableColumnGeometry::new(vec![100.0, 100.0, 100.0], 0);
+    let geometry = TableColumnGeometry::new(vec![100.0, 100.0, 100.0], 0);
     assert_eq!(
-        DataTableColumnOrder::target(0, 160.0, &geometry),
+        TableColumnOrder::target(0, 160.0, &geometry),
         2,
         "a 160pt rightward drag ends over the third column"
     );
     assert_eq!(
-        DataTableColumnOrder::target(2, -120.0, &geometry),
+        TableColumnOrder::target(2, -120.0, &geometry),
         1,
         "a 120pt leftward drag ends over the second column"
     );
     assert_eq!(
-        DataTableColumnOrder::target(1, 0.0, &geometry),
+        TableColumnOrder::target(1, 0.0, &geometry),
         1,
         "no drag keeps the source over itself"
     );
@@ -125,7 +125,7 @@ fn variable_row_heights_drive_the_extent_and_offsets() {
     assert_eq!(heights[2], 108.0, "a three-line row is 108pt");
 
     let expected_total: f32 = (0..count).map(|row| ((row % 3 + 1) * 36) as f32).sum();
-    let metrics = DataTableRowMetrics::variable(count, 36.0, {
+    let metrics = TableRowMetrics::variable(count, 36.0, {
         let mut index =
             cove_ui_compose::primitives::layout::virtualization::VariableRowIndex::new();
         index.replace(&(0..count).collect::<Vec<_>>(), &heights, 0.0);

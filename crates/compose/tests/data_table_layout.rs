@@ -1,5 +1,5 @@
-//! Translation of `Tests/CoveUIComposeTests/DataTableLayoutTests.swift` and the
-//! virtualization half of `DataTableInteractionTests.swift`.
+//! Translation of `Tests/CoveUIComposeTests/TableLayoutTests.swift` and the
+//! virtualization half of `TableInteractionTests.swift`.
 //!
 //! Behaviour checklist:
 //! - 200K rows by 100 columns mount only the visible cells
@@ -10,8 +10,8 @@
 //! - scrolled-out cells are never mounted
 
 use cove_core::Point;
-use cove_ui_compose::primitives::data::data_table::{
-    DataTableColumnGeometry, DataTableRowMetrics, DataTableWindows,
+use cove_ui_compose::primitives::data::table::{
+    TableColumnGeometry, TableRowMetrics, TableWindows,
 };
 
 const ROW_HEIGHT: f32 = 38.0;
@@ -19,12 +19,12 @@ const HEADER: f32 = 38.0;
 const VIEWPORT_WIDTH: f32 = 800.0;
 const VIEWPORT_HEIGHT: f32 = 340.0;
 
-fn geometry() -> DataTableColumnGeometry {
-    DataTableColumnGeometry::new(vec![100.0; 100], 1)
+fn geometry() -> TableColumnGeometry {
+    TableColumnGeometry::new(vec![100.0; 100], 1)
 }
 
-fn metrics() -> DataTableRowMetrics {
-    DataTableRowMetrics::fixed(200_000, ROW_HEIGHT)
+fn metrics() -> TableRowMetrics {
+    TableRowMetrics::fixed(200_000, ROW_HEIGHT)
 }
 
 /// The moving pane's width once the frozen column is subtracted.
@@ -34,7 +34,7 @@ fn moving_width() -> f32 {
 
 #[test]
 fn a_large_table_mounts_only_visible_cells() {
-    let windows = DataTableWindows::resolve(
+    let windows = TableWindows::resolve(
         &metrics(),
         &geometry(),
         Point::default(),
@@ -97,7 +97,7 @@ fn the_window_is_a_pure_function_of_its_inputs() {
     let metrics = metrics();
     let geometry = geometry();
     let offset = Point::new(1_200.0, 7_600.0);
-    let first = DataTableWindows::resolve(
+    let first = TableWindows::resolve(
         &metrics,
         &geometry,
         offset,
@@ -105,7 +105,7 @@ fn the_window_is_a_pure_function_of_its_inputs() {
         VIEWPORT_HEIGHT,
         1,
     );
-    let second = DataTableWindows::resolve(
+    let second = TableWindows::resolve(
         &metrics,
         &geometry,
         offset,
@@ -127,7 +127,7 @@ fn end_jumps_the_window_to_the_last_row() {
     // Align the viewport bottom with the content bottom, the `End` behaviour.
     let offset = Point::new(0.0, (total - VIEWPORT_HEIGHT).max(0.0));
 
-    let windows = DataTableWindows::resolve(
+    let windows = TableWindows::resolve(
         &metrics,
         &geometry(),
         offset,
@@ -160,7 +160,7 @@ fn end_jumps_the_window_to_the_last_row() {
 fn scrolled_out_rows_are_never_mounted() {
     let metrics = metrics();
     let offset = Point::new(0.0, metrics.top(150_000));
-    let windows = DataTableWindows::resolve(
+    let windows = TableWindows::resolve(
         &metrics,
         &geometry(),
         offset,
@@ -184,7 +184,7 @@ fn scrolled_out_rows_are_never_mounted() {
 fn overscan_widens_the_window_without_breaking_the_viewport_rule() {
     let metrics = metrics();
     let geometry = geometry();
-    let plain = DataTableWindows::resolve(
+    let plain = TableWindows::resolve(
         &metrics,
         &geometry,
         Point::new(0.0, 3_800.0),
@@ -192,7 +192,7 @@ fn overscan_widens_the_window_without_breaking_the_viewport_rule() {
         VIEWPORT_HEIGHT,
         0,
     );
-    let padded = DataTableWindows::resolve(
+    let padded = TableWindows::resolve(
         &metrics,
         &geometry,
         Point::new(0.0, 3_800.0),
@@ -234,8 +234,8 @@ fn the_header_offset_clears_the_sticky_header() {
 
 #[test]
 fn zero_height_metrics_do_not_panic() {
-    let metrics = DataTableRowMetrics::fixed(0, ROW_HEIGHT);
-    let windows = DataTableWindows::resolve(
+    let metrics = TableRowMetrics::fixed(0, ROW_HEIGHT);
+    let windows = TableWindows::resolve(
         &metrics,
         &geometry(),
         Point::default(),
@@ -252,7 +252,7 @@ fn a_narrow_viewport_still_mounts_fewer_than_two_hundred_cells() {
     for width in [200.0f32, 400.0, 800.0, 1_600.0] {
         let geometry = geometry();
         let moving = (width - geometry.frozen_width()).max(1.0);
-        let windows = DataTableWindows::resolve(
+        let windows = TableWindows::resolve(
             &metrics(),
             &geometry,
             Point::default(),

@@ -125,7 +125,10 @@ impl Project {
             version: entry["version"].as_str().unwrap_or("0.1.0").to_owned(),
             build: cove_metadata["build"].as_u64().unwrap_or(1),
             helpers: declared("helpers"),
-            resources: declared("resources").into_iter().map(PathBuf::from).collect(),
+            resources: declared("resources")
+                .into_iter()
+                .map(PathBuf::from)
+                .collect(),
             package: name,
         })
     }
@@ -217,12 +220,7 @@ impl Project {
     /// Stages every declared helper beside the application binary. Cocoa
     /// bundles keep helpers in `Contents/MacOS`, where the signing step covers
     /// them; desktop folders and iOS app roots hold executables directly.
-    pub fn stage_helpers(
-        &self,
-        directory: &Path,
-        mode: Mode,
-        target: Option<&str>,
-    ) -> Result<()> {
+    pub fn stage_helpers(&self, directory: &Path, mode: Mode, target: Option<&str>) -> Result<()> {
         for helper in &self.helpers {
             let executable = self.build_helper(helper, mode, target)?;
             process::copy(
@@ -311,7 +309,8 @@ mod tests {
         let output = tempfile::tempdir().expect("bundle");
         std::fs::create_dir_all(root.path().join("RenderBackend/Resources/shaders")).expect("dirs");
         std::fs::write(
-            root.path().join("RenderBackend/Resources/shaders/main.slang"),
+            root.path()
+                .join("RenderBackend/Resources/shaders/main.slang"),
             "shader",
         )
         .expect("write");

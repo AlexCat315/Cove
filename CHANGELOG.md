@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+- **表格收敛为单一 `Table` 组件并重新设计视觉（2026-11-14）**：此前 `Table`（`lists::Table`）与 `DataTable` 是两套并列的模型与 API，行高、表头、列宽与选择语义各不相同。现在只剩一个 `Table`：`crates/compose/src/primitives/data/data_table/` 更名并提升为 `data/table/`，`DataTable*` 全部改名为 `Table*`（`ChartDataTable*` 保持原样），旧的轻量 `lists::Table` 删除。唯一模型是持久化的 `TableModel`，`Table::new(records, row_id, columns)` 直接建表，`Table::try_new(model, columns)` 供共享模型与 `TreeTable` 使用；`TableOptions` 合并了原先分散的选项，并新增受控排序 `sort: Option<Binding<Option<TableSort>>>`，模型仍是排序真值来源，变更会写回绑定。视觉上重做行度量与框架：单元格左右 16pt 留白、44pt 行高 / 40pt 表头、整行通栏分隔线、表头与工具栏共用 `surface_variant` 底色、3pt 强调色选中标记、紧凑空状态与 16pt 卡片圆角。`ColumnVisibilityPicker` 新增 `shows_summary(bool)`，表格工具栏不再重复行数。Gallery 只保留一个 `Table` 页（id `table`），移除原先并列的简单表格页与 `Table (advanced)` 页，统一页展示持久模型、冻结列、列序、多选、单元格编辑与 `TreeTable`。文档同步改写 `Website/src/content/components/table.md` 与 `Docs/gallery-audit.md`。
+
 - **Android 真机上打开下拉菜单会崩溃（2026-11-14，Adreno 710 / Android 16）**：同一个手势下叠了三层缺陷。
   - 点击即 `SIGABRT`：`HostedScene::snapshot()` 在同一个结构体字面量里调用 `content_source.borrow()`（`checkpoint()` 与 `page()`）又调用需要 `borrow_mut()` 的 `typography_statistics()`，两个 `borrow()` 临时值活到整条语句结束，`RefCell` 必然双重借用；panic 穿过 `extern "C"` 边界变成 `panic_cannot_unwind` 中止进程。现在状态、页码、排版统计各取到局部变量后再构造快照。顺带在 Android 桥里装了 panic 日志钩子：Rust 的 stderr 不进 logcat，此前只能靠 tombstone 猜。
   - 菜单改由 RHI 拒绝而非崩溃：`SheetDragHandle` 用 `frame_size(f32::INFINITY, 44.0)` 表示「占满父宽」，但布局引擎按字面求解点数，无界父容器把它解成 `x = -inf, width = inf`；`FrameModifier` 现在把非有限点数读成 `Percent(100)`（无界时退化为 `auto`），`LayoutPass` 再把任何非有限解折叠为零尺寸，取整/切片不会再产出 NaN 顶点（此前是 `invalid UI vertices or indices: vertex 67174 … x=NaN`，整帧被丢弃、页面下半截空白）。

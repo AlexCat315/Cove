@@ -1,4 +1,4 @@
-//! Translation of `Primitives/Data/DataTable/DataTableEditing.swift` (the model
+//! Translation of `Primitives/Data/Table/TableEditing.swift` (the model
 //! half: draft lifecycle, validation and Tab traversal).
 //!
 //! Behaviour checklist:
@@ -14,7 +14,7 @@
 
 /// One in-progress cell edit.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct DataTableCellDraft {
+pub struct TableCellDraft {
     /// Row identity, not index: the display order can change underneath an edit.
     pub row_id: String,
     pub column_id: String,
@@ -42,11 +42,11 @@ pub enum CommitOutcome {
 
 /// State of one editable table.
 #[derive(Clone, Debug, Default)]
-pub struct DataTableEditingState {
-    pub draft: Option<DataTableCellDraft>,
+pub struct TableEditingState {
+    pub draft: Option<TableCellDraft>,
 }
 
-impl DataTableEditingState {
+impl TableEditingState {
     pub fn new() -> Self {
         Self::default()
     }
@@ -61,7 +61,7 @@ impl DataTableEditingState {
         row_id: impl Into<String>,
         column_id: impl Into<String>,
         initial: impl Into<String>,
-        previous_still_valid: impl FnOnce(&DataTableCellDraft) -> CommitAnswer,
+        previous_still_valid: impl FnOnce(&TableCellDraft) -> CommitAnswer,
     ) -> bool {
         let (row_id, column_id) = (row_id.into(), column_id.into());
         if let Some(draft) = &self.draft
@@ -76,7 +76,7 @@ impl DataTableEditingState {
             return false;
         }
         let initial = initial.into();
-        self.draft = Some(DataTableCellDraft {
+        self.draft = Some(TableCellDraft {
             row_id,
             column_id,
             original: initial.clone(),
@@ -92,7 +92,7 @@ impl DataTableEditingState {
     /// and column still exist and whether the value is acceptable.
     pub fn commit(
         &mut self,
-        answer: impl FnOnce(&DataTableCellDraft) -> CommitAnswer,
+        answer: impl FnOnce(&TableCellDraft) -> CommitAnswer,
     ) -> CommitOutcome {
         let Some(draft) = self.draft.clone() else {
             return CommitOutcome::NoDraft;
@@ -148,7 +148,7 @@ impl DataTableEditingState {
 
 /// One in-progress cell edit, keyed by the table's own row identity.
 ///
-/// The string-keyed [`DataTableCellDraft`] above is the identity-free form used
+/// The string-keyed [`TableCellDraft`] above is the identity-free form used
 /// by the model tests; a mounted table uses this one so a row id never has to
 /// round-trip through a `String`.
 #[derive(Clone, Debug, PartialEq, Eq)]
