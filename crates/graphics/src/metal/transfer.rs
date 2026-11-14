@@ -9,7 +9,7 @@ use objc2::rc::Retained;
 use objc2::runtime::ProtocolObject;
 use objc2_metal::{
     MTLBlitCommandEncoder, MTLBuffer, MTLCommandBuffer, MTLCommandEncoder, MTLCommandQueue,
-    MTLDevice, MTLEvent, MTLOrigin, MTLResourceOptions, MTLSize, MTLTexture,
+    MTLDevice, MTLOrigin, MTLResourceOptions, MTLSize, MTLTexture,
 };
 
 use crate::rhi::{
@@ -855,19 +855,6 @@ pub fn as_drawable(
     unsafe {
         &*(drawable as *const ProtocolObject<dyn objc2_quartz_core::CAMetalDrawable>
             as *const ProtocolObject<dyn objc2_metal::MTLDrawable>)
-    }
-}
-
-/// Re-types a `MTLSharedEvent` reference as its parent `MTLEvent` protocol,
-/// which is the type the command-buffer wait/signal calls accept.
-pub fn as_event(
-    event: &ProtocolObject<dyn objc2_metal::MTLSharedEvent>,
-) -> &ProtocolObject<dyn MTLEvent> {
-    // SAFETY: `MTLSharedEvent` refines `MTLEvent`, so the same object pointer is
-    // a valid `MTLEvent` object and only the static protocol type changes.
-    unsafe {
-        &*(event as *const ProtocolObject<dyn objc2_metal::MTLSharedEvent>
-            as *const ProtocolObject<dyn MTLEvent>)
     }
 }
 

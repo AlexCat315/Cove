@@ -88,71 +88,72 @@ impl CommandBuffer {
     /// Passes appear in recording order, which is the order the renderer authored
     /// them in; the planner's injected barriers do not add rows.
     pub fn pass_reports(&self) -> Vec<PassReport> {
-        self.commands()
-            .iter()
-            .filter_map(|command| match command {
-                RecordedCommand::RenderPass(record) => {
-                    let label = record
-                        .descriptor
-                        .label
-                        .filter(|label| !label.is_empty())
-                        .unwrap_or("<unnamed>")
-                        .to_owned();
-                    let mut report = PassReport::new(label, PassKind::Render);
-                    for command in &record.body {
-                        match command {
-                            RenderCommand::Draw {
-                                vertex_count,
-                                instance_count,
-                                ..
-                            } => {
-                                report.draws += 1;
-                                report.instances += (*instance_count).max(0) as u64;
-                                report.vertices += (*vertex_count).max(0) as u64;
-                            }
-                            RenderCommand::DrawIndexed(arguments) => {
-                                report.draws += 1;
-                                report.instances += arguments.instance_count.max(0) as u64;
-                                report.indices += arguments.index_count.max(0) as u64;
-                                if arguments.index_count > 0 {
-                                    report.ranges.push(PassIndexRange::new(
-                                        arguments.first_index.max(0) as u64,
-                                        arguments.index_count as u64,
-                                    ));
-                                }
-                            }
-                            RenderCommand::DrawIndirect { draw_count, .. } => {
-                                report.draws += 1;
-                                report.instances += (*draw_count).max(0) as u64;
-                            }
-                            RenderCommand::DrawMeshTasks(_) => {
-                                report.draws += 1;
-                            }
-                            _ => {}
+        self.pass_report_iter().collect()
+    }
+
+    pub(crate) fn pass_report_iter(&self) -> impl Iterator<Item = PassReport> + '_ {
+        self.commands().iter().filter_map(|command| match command {
+            RecordedCommand::RenderPass(record) => {
+                let label = record
+                    .descriptor
+                    .label
+                    .filter(|label| !label.is_empty())
+                    .unwrap_or("<unnamed>")
+                    .to_owned();
+                let mut report = PassReport::new(label, PassKind::Render);
+                for command in &record.body {
+                    match command {
+                        RenderCommand::Draw {
+                            vertex_count,
+                            instance_count,
+                            ..
+                        } => {
+                            report.draws += 1;
+                            report.instances += (*instance_count).max(0) as u64;
+                            report.vertices += (*vertex_count).max(0) as u64;
                         }
+                        RenderCommand::DrawIndexed(arguments) => {
+                            report.draws += 1;
+                            report.instances += arguments.instance_count.max(0) as u64;
+                            report.indices += arguments.index_count.max(0) as u64;
+                            if arguments.index_count > 0 {
+                                report.ranges.push(PassIndexRange::new(
+                                    arguments.first_index.max(0) as u64,
+                                    arguments.index_count as u64,
+                                ));
+                            }
+                        }
+                        RenderCommand::DrawIndirect { draw_count, .. } => {
+                            report.draws += 1;
+                            report.instances += (*draw_count).max(0) as u64;
+                        }
+                        RenderCommand::DrawMeshTasks(_) => {
+                            report.draws += 1;
+                        }
+                        _ => {}
                     }
-                    Some(report)
                 }
-                RecordedCommand::ComputePass(record) => {
-                    let mut report = PassReport::new("computePass".to_owned(), PassKind::Compute);
-                    report.draws = record.body.len() as u64;
-                    Some(report)
-                }
-                RecordedCommand::CopyPass(record) => {
-                    let mut report = PassReport::new("copyPass".to_owned(), PassKind::Copy);
-                    report.draws = record.body.len() as u64;
-                    Some(report)
-                }
-                RecordedCommand::AccelerationStructureBuild(_) => {
-                    let mut report = PassReport::new(
-                        "accelerationStructure".to_owned(),
-                        PassKind::AccelerationStructure,
-                    );
-                    report.draws = 1;
-                    Some(report)
-                }
-                _ => None,
-            })
-            .collect()
+                Some(report)
+            }
+            RecordedCommand::ComputePass(record) => {
+                let mut report = PassReport::new("computePass".to_owned(), PassKind::Compute);
+                report.draws = record.body.len() as u64;
+                Some(report)
+            }
+            RecordedCommand::CopyPass(record) => {
+                let mut report = PassReport::new("copyPass".to_owned(), PassKind::Copy);
+                report.draws = record.body.len() as u64;
+                Some(report)
+            }
+            RecordedCommand::AccelerationStructureBuild(_) => {
+                let mut report = PassReport::new(
+                    "accelerationStructure".to_owned(),
+                    PassKind::AccelerationStructure,
+                );
+                report.draws = 1;
+                Some(report)
+            }
+            _ => None,
+        })
     }
 }

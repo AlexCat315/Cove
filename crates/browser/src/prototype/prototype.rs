@@ -18,8 +18,9 @@ use std::time::Instant;
 
 use cove_composition::ViewGraph;
 use cove_core::scene::{
-    AnimatorScheduler, EventDispatcher, NodeRenderer, NodeTree, PlatformInputContext, Recomposer,
-    TextInputAreaResolver, TextInputAttachmentKey, scale_animation_delta,
+    AnimatorScheduler, EventDispatcher, LayerAwareNodeRenderer, LayerCensus, NodeTree,
+    PlatformInputContext, Recomposer, TextInputAreaResolver, TextInputAttachmentKey,
+    scale_animation_delta,
 };
 use cove_core::{DrawList, Point, TextLayoutOptions, layout_text};
 use cove_devtools::frame_analysis::{FrameWindow, Timeline};
@@ -71,6 +72,7 @@ pub struct BrowserPrototype<C: PrototypeContent> {
     animations: AnimatorScheduler,
     last_animation_tick: Instant,
     draw_list: DrawList,
+    renderer: LayerAwareNodeRenderer,
     fonts: FontCollection,
     raster_scale: f32,
     frame: Option<Frame>,
@@ -200,6 +202,7 @@ impl<C: PrototypeContent> BrowserPrototype<C> {
             animations,
             last_animation_tick: Instant::now(),
             draw_list: DrawList::default(),
+            renderer: LayerAwareNodeRenderer::new(),
             fonts,
             raster_scale: 1.0,
             frame: None,
@@ -243,6 +246,7 @@ impl<C: PrototypeContent> BrowserPrototype<C> {
         self.webgpu = None;
         self.webgpu_failed = false;
         self.fonts.atlas.reset();
+        self.graph.render_tree().trim_caches();
     }
 
     #[cfg(target_arch = "wasm32")]
@@ -263,7 +267,11 @@ impl<C: PrototypeContent> BrowserPrototype<C> {
 
     pub fn set_raster_scale(&mut self, scale: f32) {
         if scale.is_finite() {
-            self.raster_scale = scale.clamp(1.0, 4.0);
+            let scale = scale.clamp(1.0, 4.0);
+            if self.raster_scale != scale {
+                self.raster_scale = scale;
+                self.graph.render_tree().trim_caches();
+            }
         }
     }
 
@@ -359,25 +367,29 @@ impl<C: PrototypeContent> BrowserPrototype<C> {
         let encode_started = profiling.then(Instant::now);
         let mut labels: Vec<Label> = Vec::new();
         let mut note_width = 0.0_f32;
-        // `with_current` needs `&self.context` while the pass needs mutable
-        // access to the draw list and fonts, so both halves are taken as
-        // separate locals rather than through `self`.
-        let (context, tree) = (&self.context, &self.tree);
-        let (draw_list, fonts) = (&mut self.draw_list, &mut self.fonts);
-        context.with_current(|| {
-            encode_frame(tree, draw_list, fonts, &mut labels, &mut note_width);
+        let render_tree = self.graph.render_tree();
+        let mut layer_census = self.probing.then(LayerCensus::default);
+        self.context.with_current(|| {
+            if let Some(root) = self.tree.borrow().root() {
+                collect_labels(&mut self.fonts, &root, &mut labels, &mut note_width);
+            }
+            if self.fonts.atlas.is_full() {
+                self.fonts.atlas.reset();
+                render_tree.trim_caches();
+                labels.clear();
+                note_width = 0.0;
+                if let Some(root) = self.tree.borrow().root() {
+                    collect_labels(&mut self.fonts, &root, &mut labels, &mut note_width);
+                }
+            }
+            self.draw_list.reset();
+            self.renderer.render_with_census(
+                render_tree,
+                &mut self.draw_list,
+                layer_census.as_mut(),
+            );
+            self.tree.borrow_mut().flush();
         });
-
-        if fonts.atlas.is_full() {
-            // Resetting the atlas invalidates every UV, so re-encode the whole
-            // frame instead of patching the swapped glyphs.
-            fonts.atlas.reset();
-            labels.clear();
-            note_width = 0.0;
-            context.with_current(|| {
-                encode_frame(tree, draw_list, fonts, &mut labels, &mut note_width);
-            });
-        }
 
         if self.probing {
             self.probe.scene.editor.draw_overlay(&mut self.draw_list);
@@ -391,13 +403,9 @@ impl<C: PrototypeContent> BrowserPrototype<C> {
         let attribution = self.window.close(&self.timeline);
         let upload = self.fonts.atlas.dirty_upload_payload();
         #[cfg(target_arch = "wasm32")]
-        let mut pipeline_creation = None;
+        let (mut pipeline_creation, mut gpu_measurement, mut gpu_breakdown) = (None, None, None);
         #[cfg(not(target_arch = "wasm32"))]
-        let pipeline_creation = None;
-        let mut gpu_measurement: Option<cove_devtools::runtime_probe::GpuMeasurement> = None;
-        // The browser encoder records passes, not compositing layers, so the
-        // breakdown carries pass geometry and says its GPU clock is frame-wide.
-        let mut gpu_breakdown: Option<cove_devtools_protocol::GpuFrameBreakdown> = None;
+        let (pipeline_creation, gpu_measurement, gpu_breakdown) = (None, None, None);
         #[cfg(target_arch = "wasm32")]
         if let Some(gpu) = &mut self.webgpu {
             let submit_started = profiling.then(Instant::now);
@@ -416,15 +424,14 @@ impl<C: PrototypeContent> BrowserPrototype<C> {
                             cpu_ms: nanos as f64 / 1_000_000.0,
                         });
                         let passes = timing.pass_reports();
-                        if !passes.is_empty() {
+                        if let Some(census) = &layer_census {
                             gpu_breakdown = Some(cove_devtools::gpu_breakdown::assemble(
                                 &passes,
-                                &cove_core::scene::LayerCensus::default(),
-                                &[],
-                                cove_devtools::gpu_breakdown::GpuTimingSource::WebGpuFrame,
+                                timing.pass_count(),
+                                census,
                             ));
                         }
-                        gpu_measurement = Some(Box::new(move || timing.result()));
+                        gpu_measurement = Some(timing);
                     }
                 }
                 Err(error) => {
@@ -520,7 +527,11 @@ impl<C: PrototypeContent> BrowserPrototype<C> {
         }
         if self.probing {
             let mut frame = TimingFrame {
-                gpu_breakdown: gpu_breakdown.take(),
+                gpu_breakdown: gpu_breakdown.or_else(|| {
+                    layer_census
+                        .filter(|census| !census.layers.is_empty() || !census.skipped.is_empty())
+                        .map(|census| cove_devtools::gpu_breakdown::assemble(&[], 0, &census))
+                }),
                 frame: 0,
                 recomposition_ms: Some(self.recomposition_ms),
                 layout_ms: self.layout_ms,
@@ -778,29 +789,12 @@ fn index_bytes(indices: &[u32]) -> &[u8] {
     }
 }
 
-/// Shapes every text run and re-encodes the draw list for one frame.
-fn encode_frame(
-    tree: &Rc<RefCell<NodeTree>>,
-    draw_list: &mut DrawList,
-    fonts: &mut FontCollection,
-    labels: &mut Vec<Label>,
-    note_width: &mut f32,
-) {
-    let Some(root) = tree.borrow().root() else {
-        return;
-    };
-    draw_list.reset();
-    collect_labels(fonts, &root, labels, note_width);
-    NodeRenderer.render(&root, draw_list);
-    tree.borrow_mut().flush();
-}
-
 /// Walks the tree in paint order, reshaping every text attachment.
 ///
 /// The Swift prototype installs a `node.draw` hook for each `CounterTextRun`
 /// here, so glyphs inherit the render tree's clipping and ordering. Doing the
 /// shaping during the walk (rather than emitting quads directly) is what keeps
-/// text above the backgrounds `NodeRenderer` paints afterwards.
+/// text above the backgrounds the layer renderer paints afterwards.
 fn collect_labels(
     fonts: &mut FontCollection,
     node: &cove_core::scene::Node,

@@ -5,7 +5,7 @@ mod bridge;
 mod commands;
 mod formats;
 
-pub use bridge::complete;
+pub use bridge::{complete, pass_timing};
 
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
@@ -61,7 +61,7 @@ impl WebGpu {
         }
         self.host.queue_timed(
             "submit",
-            json!({ "passes": commands::encode(submit)?, "measureGpu": measure_gpu }),
+            json!({ "passes": commands::encode(submit)?, "timestampPasses": measure_gpu.then_some(completion.pass_count) }),
             completion,
         )?;
         for signal in &submit.signal_semaphores {
@@ -465,7 +465,14 @@ impl RhiBackend for WebGpu {
         _profile: Option<&mut SubmissionCpuProfile>,
         completion: Completion,
     ) -> RhiResult<()> {
-        self.submit_impl(submit, false, Box::new(move |_| completion()))
+        self.submit_impl(
+            submit,
+            false,
+            TimedCompletion {
+                pass_count: 0,
+                callback: Box::new(move |_| completion()),
+            },
+        )
     }
 
     fn submit_timed(

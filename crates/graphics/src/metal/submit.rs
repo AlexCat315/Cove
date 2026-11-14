@@ -2,7 +2,7 @@
 //! `PlannedSubmit` → `MTLCommandBuffer` encoding.
 //!
 //! Submission is asynchronous: work is encoded into an `MTLCommandBuffer`,
-//! timeline semaphores map to `MTLSharedEvent` encode-wait/signal, and the
+//! timeline semaphores map to `MTLEvent` encode-wait/signal, and the
 //! frontend completion callback fires from the completed handler. There is no
 //! `waitUntilCompleted` and no per-submit idle.
 use std::sync::Arc;
@@ -34,7 +34,54 @@ use super::registries::{
     MetalBindingSet, MetalBoundEntry, MetalBoundValue, MetalDynamicKey, MetalMeshPipeline,
 };
 use super::resources::lock;
-use super::transfer::as_event;
+use super::timestamps::{self, PassSampling, SubmissionTimestamps};
+use objc2_metal::{
+    MTLAccelerationStructurePassDescriptor, MTLBlitPassDescriptor, MTLComputePassDescriptor,
+    MTLCounterSampleBuffer, MTLCounterSamplingPoint,
+};
+
+#[derive(Clone, Copy)]
+struct PassTiming<'a> {
+    sampling: PassSampling,
+    buffer: Option<&'a ProtocolObject<dyn MTLCounterSampleBuffer>>,
+}
+
+impl<'a> PassTiming<'a> {
+    fn record(
+        timings: Option<&'a mut SubmissionTimestamps>,
+        index: usize,
+        boundary: MTLCounterSamplingPoint,
+    ) -> Self {
+        if let Some(timings) = timings {
+            let sampling = timings.pass(index, boundary);
+            Self {
+                sampling,
+                buffer: Some(timings.buffer()),
+            }
+        } else {
+            Self {
+                sampling: PassSampling::Unavailable,
+                buffer: None,
+            }
+        }
+    }
+}
+
+// All supported command encoders expose the same command-boundary sampling call.
+macro_rules! sample_command_boundary {
+    ($timing:expr, $encoder:expr, $offset:expr) => {
+        if let (PassSampling::Commands(first), Some(buffer)) = ($timing.sampling, $timing.buffer) {
+            // SAFETY: the encoder's sampling point was checked and the pass owns these indices.
+            unsafe {
+                $encoder.sampleCountersInBuffer_atSampleIndex_withBarrier(
+                    buffer,
+                    first + $offset,
+                    true,
+                )
+            };
+        }
+    };
+}
 
 /// Encodes one planned submission and returns once it is queued.
 pub fn submit(
@@ -56,13 +103,13 @@ pub fn submit(
 
     // Wait on timeline semaphores (cross-queue release fences).
     for semaphore in &submit.wait_semaphores {
-        let event = device.shared_event(semaphore.id).ok_or_else(|| {
+        let event = device.timeline_event(semaphore.id).ok_or_else(|| {
             RhiError::submit_failed(format!(
-                "cannot create shared event for wait semaphore {}",
+                "cannot create Metal event for wait semaphore {}",
                 semaphore.id
             ))
         })?;
-        command_buffer.encodeWaitForEvent_value(as_event(&event), semaphore.value);
+        command_buffer.encodeWaitForEvent_value(&event, semaphore.value);
     }
 
     let registries = Arc::clone(&device.registries);
@@ -72,9 +119,24 @@ pub fn submit(
         device.disabled_depth_state.clone(),
         &command_buffer,
     );
+    let mut timestamps = completion
+        .as_ref()
+        .ok()
+        .and_then(|timed| SubmissionTimestamps::new(&device.device, timed.pass_count));
     let encode_result = (|| -> RhiResult<()> {
+        let mut index = 0;
         for command in &submit.commands {
-            encoder.encode(command, cpu_profile.as_deref_mut())?;
+            let point = match command {
+                PlannedCommand::RenderPass(_) => MTLCounterSamplingPoint::AtDrawBoundary,
+                PlannedCommand::ComputePass(_) | PlannedCommand::AccelerationStructureBuild(_) => {
+                    MTLCounterSamplingPoint::AtDispatchBoundary
+                }
+                PlannedCommand::CopyPass(_) => MTLCounterSamplingPoint::AtBlitBoundary,
+                PlannedCommand::Barriers(_) => continue,
+            };
+            let timing = PassTiming::record(timestamps.as_mut(), index, point);
+            encoder.encode(command, timing, cpu_profile.as_deref_mut())?;
+            index += 1;
         }
         Ok(())
     })();
@@ -83,13 +145,13 @@ pub fn submit(
 
     // Signal timeline semaphores when this buffer completes.
     for semaphore in &submit.signal_semaphores {
-        let event = device.shared_event(semaphore.id).ok_or_else(|| {
+        let event = device.timeline_event(semaphore.id).ok_or_else(|| {
             RhiError::submit_failed(format!(
-                "cannot create shared event for signal semaphore {}",
+                "cannot create Metal event for signal semaphore {}",
                 semaphore.id
             ))
         })?;
-        command_buffer.encodeSignalEvent_value(as_event(&event), semaphore.value);
+        command_buffer.encodeSignalEvent_value(&event, semaphore.value);
     }
 
     // Capture the profile for this submission now; later frames may detach it
@@ -127,7 +189,19 @@ pub fn submit(
                     }
                 }
                 match completion {
-                    Ok(timed) => timed(nanos),
+                    Ok(timed) => {
+                        let passes = timestamps
+                            .as_ref()
+                            .filter(|_| {
+                                buffer.status() == objc2_metal::MTLCommandBufferStatus::Completed
+                            })
+                            .map(SubmissionTimestamps::read)
+                            .unwrap_or_default();
+                        timed.complete(crate::rhi::GpuSubmissionTiming {
+                            nanoseconds: nanos,
+                            passes,
+                        });
+                    }
                     Err(untimed) => untimed(),
                 }
             }
@@ -208,6 +282,7 @@ impl<'a> PassEncoder<'a> {
     fn encode(
         &mut self,
         command: &PlannedCommand,
+        timing: PassTiming<'_>,
         cpu_profile: Option<&mut SubmissionCpuProfile>,
     ) -> RhiResult<()> {
         match command {
@@ -236,33 +311,44 @@ impl<'a> PassEncoder<'a> {
                         MTLResourceOptions::StorageModePrivate,
                     )
                     .ok_or(RhiError::OutOfMemory)?;
-                let encoder = self
-                    .command_buffer
-                    .accelerationStructureCommandEncoder()
-                    .ok_or(RhiError::OutOfMemory)?;
+                let encoder = if let (PassSampling::Stages(first), Some(buffer)) =
+                    (timing.sampling, timing.buffer)
+                {
+                    let descriptor = MTLAccelerationStructurePassDescriptor::new();
+                    timestamps::attach_acceleration(&descriptor, buffer, first);
+                    Some(
+                        self.command_buffer
+                            .accelerationStructureCommandEncoderWithDescriptor(&descriptor),
+                    )
+                } else {
+                    self.command_buffer.accelerationStructureCommandEncoder()
+                }
+                .ok_or(RhiError::OutOfMemory)?;
+                sample_command_boundary!(timing, encoder, 0);
                 encoder.buildAccelerationStructure_descriptor_scratchBuffer_scratchBufferOffset(
                     &structure,
                     &descriptor,
                     &scratch,
                     0,
                 );
+                sample_command_boundary!(timing, encoder, 1);
                 encoder.endEncoding();
                 Ok(())
             }
             // Metal tracks resource hazards automatically within a command
-            // buffer; cross-queue fences are expressed via shared events.
+            // buffer; cross-queue fences use device-local events.
             PlannedCommand::Barriers(_) => Ok(()),
             PlannedCommand::RenderPass(record) => {
                 self.end_active_encoders();
-                self.encode_render_pass(record, cpu_profile)
+                self.encode_render_pass(record, timing, cpu_profile)
             }
             PlannedCommand::ComputePass(record) => {
                 self.end_active_encoders();
-                self.encode_compute_pass(record)
+                self.encode_compute_pass(record, timing)
             }
             PlannedCommand::CopyPass(record) => {
                 self.end_active_encoders();
-                self.encode_copy_pass(record)
+                self.encode_copy_pass(record, timing)
             }
         }
     }
@@ -367,13 +453,18 @@ impl<'a> PassEncoder<'a> {
     fn encode_render_pass(
         &mut self,
         record: &RenderPassRecord,
+        timing: PassTiming<'_>,
         mut cpu_profile: Option<&mut SubmissionCpuProfile>,
     ) -> RhiResult<()> {
         let setup_start = cpu_profile
             .as_deref()
             .and_then(|profile| profile.begin_detail(CpuProfilePhase::PassSetup));
         self.validate_render_attachments(record)?;
-        let pass_descriptor = { MTLRenderPassDescriptor::new() };
+        let pass_descriptor = MTLRenderPassDescriptor::new();
+        if let (PassSampling::RenderStages(first), Some(buffer)) = (timing.sampling, timing.buffer)
+        {
+            timestamps::attach_render(&pass_descriptor, buffer, first);
+        }
         let color_attachments = pass_descriptor.colorAttachments();
 
         {
@@ -446,6 +537,7 @@ impl<'a> PassEncoder<'a> {
             .command_buffer
             .renderCommandEncoderWithDescriptor(&pass_descriptor)
             .ok_or_else(|| RhiError::submit_failed("cannot create render command encoder"))?;
+        sample_command_boundary!(timing, encoder, 0);
         self.render_encoder = Some(encoder);
         self.render_bindings = Some(super::render_bindings::MetalRenderBindings::new());
         self.current_index_buffer = None;
@@ -460,6 +552,8 @@ impl<'a> PassEncoder<'a> {
         for command in &record.body {
             self.encode_render_command(command, cpu_profile.as_deref_mut())?;
         }
+        let encoder = self.render_encoder.as_ref().expect("active render encoder");
+        sample_command_boundary!(timing, encoder, 1);
         if let Some(profile) = cpu_profile {
             profile.end_detail(CpuProfilePhase::CommandReplay, replay_start);
         }
@@ -944,11 +1038,22 @@ impl<'a> PassEncoder<'a> {
 
     // MARK: Compute pass
 
-    fn encode_compute_pass(&mut self, record: &ComputePassRecord) -> RhiResult<()> {
-        let encoder = self
-            .command_buffer
-            .computeCommandEncoder()
+    fn encode_compute_pass(
+        &mut self,
+        record: &ComputePassRecord,
+        timing: PassTiming<'_>,
+    ) -> RhiResult<()> {
+        let encoder =
+            if let (PassSampling::Stages(first), Some(buffer)) = (timing.sampling, timing.buffer) {
+                let descriptor = MTLComputePassDescriptor::new();
+                timestamps::attach_compute(&descriptor, buffer, first);
+                self.command_buffer
+                    .computeCommandEncoderWithDescriptor(&descriptor)
+            } else {
+                self.command_buffer.computeCommandEncoder()
+            }
             .ok_or_else(|| RhiError::submit_failed("cannot create compute command encoder"))?;
+        sample_command_boundary!(timing, encoder, 0);
         // Install the encoder before encoding anything. Swift assigns
         // `computeEncoder` first for exactly this reason: an encoding failure
         // must still leave a live encoder for `endActiveEncoders()` to end.
@@ -964,6 +1069,7 @@ impl<'a> PassEncoder<'a> {
         for command in &record.body {
             self.encode_compute_command(command, &encoder)?;
         }
+        sample_command_boundary!(timing, encoder, 1);
         Ok(())
     }
 
@@ -1141,17 +1247,29 @@ impl<'a> PassEncoder<'a> {
 
     // MARK: Copy pass
 
-    fn encode_copy_pass(&mut self, record: &CopyPassRecord) -> RhiResult<()> {
-        let encoder = self
-            .command_buffer
-            .blitCommandEncoder()
+    fn encode_copy_pass(
+        &mut self,
+        record: &CopyPassRecord,
+        timing: PassTiming<'_>,
+    ) -> RhiResult<()> {
+        let encoder =
+            if let (PassSampling::Stages(first), Some(buffer)) = (timing.sampling, timing.buffer) {
+                let descriptor = MTLBlitPassDescriptor::new();
+                timestamps::attach_blit(&descriptor, buffer, first);
+                self.command_buffer
+                    .blitCommandEncoderWithDescriptor(&descriptor)
+            } else {
+                self.command_buffer.blitCommandEncoder()
+            }
             .ok_or(RhiError::OutOfMemory)?;
+        sample_command_boundary!(timing, encoder, 0);
         let result = (|| -> RhiResult<()> {
             for command in &record.body {
                 self.encode_copy_command(command, &encoder)?;
             }
             Ok(())
         })();
+        sample_command_boundary!(timing, encoder, 1);
         encoder.endEncoding();
         result
     }

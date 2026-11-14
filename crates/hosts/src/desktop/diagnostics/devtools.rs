@@ -55,15 +55,12 @@ struct Session {
     frame_start: Instant,
     layout_ms: f64,
     draw_ms: f64,
-    pending: BTreeMap<u64, TimingFrame>,
+    pending: BTreeMap<u64, (TimingFrame, cove_core::scene::LayerCensus)>,
     /// The tree's CPU timeline, and the span window closed for each frame.
     timeline: Timeline,
     window: FrameWindow,
     /// Layers the renderer composited for the frame currently being prepared.
     census: Option<cove_core::scene::LayerCensus>,
-    /// The census that belongs to each in-flight frame. Frames may present out of
-    /// order, so the census travels with the token rather than the session.
-    frame_census: BTreeMap<u64, cove_core::scene::LayerCensus>,
     /// Keeps an in-process controller alive for as long as this session.
     _controller: Option<Rc<AttachedController>>,
 }
@@ -114,16 +111,14 @@ impl DiagnosticsSession for Session {
             timeline_end: 0,
         };
         attribution.apply(&mut frame);
+        let census = self.census.take().unwrap_or_default();
         if let Some(token) = token {
             if self.pending.len() >= 16
-                && let Some((_, expired)) = self.pending.pop_first()
+                && let Some((_, (expired, _))) = self.pending.pop_first()
             {
                 self.probe.record(expired);
             }
-            if let Some(census) = self.census.take() {
-                self.frame_census.insert(token, census);
-            }
-            self.pending.insert(token, frame);
+            self.pending.insert(token, (frame, census));
         } else {
             self.probe.record(frame);
         }
@@ -136,7 +131,7 @@ impl DiagnosticsSession for Session {
         render_thread_ms: f64,
         gpu: Option<cove_graphics::rhi::GpuFrameTiming>,
     ) {
-        if let Some(mut frame) = self.pending.remove(&token) {
+        if let Some((mut frame, census)) = self.pending.remove(&token) {
             frame.presented = Some(presented);
             frame.render_thread_ms = Some(render_thread_ms);
             if let Some(gpu) = &gpu {
@@ -145,58 +140,21 @@ impl DiagnosticsSession for Session {
                     count,
                     cpu_ms: nanos as f64 / 1_000_000.0,
                 });
-                // The census belongs to the frame that was just presented, which
-                // is the one this token names.
                 let passes = gpu.pass_reports();
-                let markers = gpu.markers();
-                let layers = self.frame_census.remove(&token);
-                if let Some(layers) = layers.as_ref() {
-                    let source = gpu_timing_source(&markers);
+                if !passes.is_empty() || !census.layers.is_empty() || !census.skipped.is_empty() {
                     frame.gpu_breakdown = Some(cove_devtools::gpu_breakdown::assemble(
                         &passes,
-                        layers,
-                        &markers
-                            .iter()
-                            .map(cove_devtools::gpu_breakdown::Marker::from)
-                            .collect::<Vec<_>>(),
-                        source,
+                        gpu.pass_count(),
+                        &census,
                     ));
                 }
             }
-            self.probe
-                .record_measured(frame, gpu.map(|gpu| Box::new(move || gpu.result()) as _));
+            self.probe.record_measured(frame, gpu);
         }
     }
 
     fn stop(&mut self) {
         self.probe.disconnect();
-    }
-}
-
-/// Which clock a frame's GPU samples came from, inferred from what the backend
-/// labelled them with.
-///
-/// Vulkan labels each pass (`renderPass#0`, `ui-frame`); Metal labels each
-/// submission. An empty sample list is a measurement that did not happen, so it
-/// reports `cpu-only` rather than borrowing a neighbouring frame's source.
-fn gpu_timing_source(
-    markers: &[cove_graphics::rhi::GpuTimestampMarker],
-) -> cove_devtools::gpu_breakdown::GpuTimingSource {
-    use cove_devtools::gpu_breakdown::GpuTimingSource;
-    let per_pass = markers.iter().any(|marker| {
-        marker.label.starts_with("renderPass")
-            || marker.label.starts_with("computePass")
-            || marker.label.starts_with("copyPass")
-    });
-    if per_pass {
-        GpuTimingSource::VulkanTimestamps
-    } else if markers
-        .iter()
-        .any(|marker| marker.label.contains("submission"))
-    {
-        GpuTimingSource::MetalSubmission
-    } else {
-        GpuTimingSource::CpuOnly
     }
 }
 
@@ -351,7 +309,6 @@ pub fn factory() -> DiagnosticsFactory {
                 draw_ms: 0.0,
                 pending: BTreeMap::new(),
                 census: None,
-                frame_census: BTreeMap::new(),
                 timeline,
                 window,
                 _controller: controller,

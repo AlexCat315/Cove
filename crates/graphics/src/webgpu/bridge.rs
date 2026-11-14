@@ -5,7 +5,7 @@ use std::sync::atomic::{AtomicU32, AtomicUsize, Ordering};
 
 use serde_json::{Value, json};
 
-use crate::rhi::{Completion, RhiError, RhiResult, TimedCompletion};
+use crate::rhi::{Completion, GpuSubmissionTiming, RhiError, RhiResult, TimedCompletion};
 
 #[link(wasm_import_module = "cove_webgpu")]
 unsafe extern "C" {
@@ -14,6 +14,7 @@ unsafe extern "C" {
 
 struct Pending {
     callback: Option<TimedCompletion>,
+    passes: Vec<Option<u64>>,
     count: Arc<AtomicUsize>,
 }
 
@@ -27,13 +28,26 @@ thread_local! {
     static COMPLETIONS: RefCell<HashMap<u32, Pending>> = RefCell::default();
 }
 
+pub fn pass_timing(token: u32, index: u32, nanos: u64) {
+    COMPLETIONS.with(|completions| {
+        if let Some(pending) = completions.borrow_mut().get_mut(&token)
+            && let Some(sample) = pending.passes.get_mut(index as usize)
+        {
+            *sample = Some(nanos);
+        }
+    });
+}
+
 /// Called by the browser on the event loop after the WebGPU queue completes.
 pub fn complete(token: u32, nanos: Option<u64>) {
     let pending = COMPLETIONS.with(|completions| completions.borrow_mut().remove(&token));
     if let Some(mut pending) = pending
         && let Some(callback) = pending.callback.take()
     {
-        callback(nanos);
+        callback.complete(GpuSubmissionTiming {
+            nanoseconds: nanos,
+            passes: std::mem::take(&mut pending.passes),
+        });
     }
 }
 
@@ -70,7 +84,14 @@ impl Host {
     }
 
     pub fn queue(&self, op: &str, args: Value, callback: Completion) -> RhiResult<()> {
-        self.queue_timed(op, args, Box::new(move |_| callback()))
+        self.queue_timed(
+            op,
+            args,
+            TimedCompletion {
+                pass_count: 0,
+                callback: Box::new(move |_| callback()),
+            },
+        )
     }
 
     pub fn queue_timed(
@@ -86,6 +107,7 @@ impl Host {
             completions.borrow_mut().insert(
                 token,
                 Pending {
+                    passes: vec![None; callback.pass_count],
                     callback: Some(callback),
                     count: self.pending.clone(),
                 },

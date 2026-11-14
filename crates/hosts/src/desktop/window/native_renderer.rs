@@ -148,10 +148,6 @@ pub trait AppWindowRenderer {
 
 /// Swapchain-backed renderer that presents the draw list through an owned
 /// framebuffer so a frosted panel can sample the resolved frame.
-/// Samples retained when a DevTools session reads GPU pass timings. The session
-/// drains them per frame, so this bound only matters when a reader stalls.
-const GPU_MARKER_LIMIT: usize = 4096;
-
 pub struct NativeAppWindowRenderer {
     device: Arc<Device>,
     renderer: NativeDrawListRenderer,
@@ -167,7 +163,6 @@ pub struct NativeAppWindowRenderer {
     vsync: bool,
     /// GPU sampling attached while a DevTools session reads frames. Detached
     /// again when the session goes away, so ordinary frames pay nothing.
-    gpu_profile: Option<std::sync::Arc<cove_graphics::rhi::GpuTimestampProfile>>,
     state: AppWindowRendererState,
 }
 
@@ -198,7 +193,6 @@ impl NativeAppWindowRenderer {
             render_in_background,
             presentation_active: true,
             vsync: true,
-            gpu_profile: None,
             state: AppWindowRendererState::Unconfigured,
         }
     }
@@ -297,7 +291,7 @@ impl AppWindowRenderer for NativeAppWindowRenderer {
         &mut self,
         list: &mut DrawList,
         logical: (f32, f32),
-        mut gpu: Option<&mut Option<cove_graphics::rhi::GpuFrameTiming>>,
+        gpu: Option<&mut Option<cove_graphics::rhi::GpuFrameTiming>>,
     ) -> RhiResult<bool> {
         let list: &DrawList = list;
         if self.native.is_none() && !self.render_in_background {
@@ -332,19 +326,8 @@ impl AppWindowRenderer for NativeAppWindowRenderer {
                 }
             }
             let _end = EndFrame(&device);
-            if let Some(slot) = gpu.as_deref_mut() {
+            if let Some(slot) = gpu {
                 *slot = device.measure_gpu_frame();
-                // Sample passes only while something reads them: a profile
-                // allocates a query pool per submission on Vulkan.
-                if self.gpu_profile.is_none() && device.supports_gpu_timestamps() {
-                    let profile = std::sync::Arc::new(
-                        cove_graphics::rhi::GpuTimestampProfile::new(GPU_MARKER_LIMIT),
-                    );
-                    device.set_gpu_timestamp_profile(Some(profile.clone()));
-                    self.gpu_profile = Some(profile);
-                }
-            } else if self.gpu_profile.take().is_some() {
-                device.set_gpu_timestamp_profile(None);
             }
             let image = self
                 .swapchain
@@ -401,14 +384,6 @@ impl AppWindowRenderer for NativeAppWindowRenderer {
                     self.settings.surface_format,
                     [pixels.0, pixels.1],
                 )?;
-            }
-            // Publish what this frame recorded so the host can attribute passes
-            // to composited layers once the GPU reports completion.
-            if let Some(frame) = gpu.as_deref().and_then(|slot| slot.as_ref()) {
-                frame.set_pass_reports(commands.pass_reports());
-                if let Some(profile) = &self.gpu_profile {
-                    frame.set_timestamp_profile(profile.clone());
-                }
             }
             device.submit(
                 &commands,
@@ -522,14 +497,14 @@ mod tests {
                 a: 1.0,
             },
         );
-        assert!(!renderer.draw(&mut list, (64.0, 48.0)).unwrap());
+        assert!(!renderer.draw(&mut list, (64.0, 48.0), None).unwrap());
         let first = renderer.capture().unwrap();
         assert_eq!(first.logical_size, (64.0, 48.0));
         assert_eq!((first.width, first.height), (128, 96));
         let offset = (30 * 128 + 40) * 4;
         assert_eq!(&first.rgba[offset..offset + 4], &[255, 0, 0, 255]);
         list.reset();
-        assert!(!renderer.draw(&mut list, (64.0, 48.0)).unwrap());
+        assert!(!renderer.draw(&mut list, (64.0, 48.0), None).unwrap());
         let next = renderer.capture().unwrap();
         assert_eq!(&next.rgba[offset..offset + 4], &[0, 0, 0, 255]);
     }

@@ -1629,18 +1629,7 @@ impl VulkanBackend {
             );
         }
 
-        // Per-frame query pools and command pools.
         for frame in &mut self.frames {
-            if let Some(pool) = frame.query_pool.take() {
-                // SAFETY: the device is idle.
-                unsafe {
-                    (context.resources.queries.destroy_query_pool)(
-                        context.device,
-                        pool,
-                        core::ptr::null(),
-                    );
-                }
-            }
             let pool_ids = frame.command_pools.keys().copied().collect::<Vec<_>>();
             for id in pool_ids {
                 let pool = frame.command_pools.remove(&id);

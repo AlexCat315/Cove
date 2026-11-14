@@ -238,12 +238,13 @@ impl GpuLayer {
     }
 }
 payload!(GpuFrameBreakdown {
-    /// Where pass times came from: `vulkan-timestamps` (one label per pass),
-    /// `metal-submission` (one label per submission), `webgpu` (one number for
-    /// the whole frame), or `cpu-only` when nothing was sampled.
+    /// Timestamp backend, or `cpu-only` when nothing was sampled.
     timing_source: String,
     #[serde(default)] passes: Vec<GpuPass>,
     #[serde(default)] layers: Vec<GpuLayer>,
+    /// Full row counts, including rows omitted from the bounded response.
+    #[serde(default)] pass_count: usize,
+    #[serde(default)] layer_count: usize,
 });
 payload!(RegisteredState {
     id: String, name: String, value_type: String, #[serde(rename = "scopeID")] scope_id: Option<String>,
@@ -584,6 +585,8 @@ mod tests {
     fn a_breakdown_names_passes_and_their_layers() {
         let breakdown = GpuFrameBreakdown {
             timing_source: "vulkan-timestamps".to_owned(),
+            pass_count: 1,
+            layer_count: 1,
             passes: vec![GpuPass {
                 label: "ui-frame".to_owned(),
                 kind: "render".to_owned(),

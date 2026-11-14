@@ -157,11 +157,12 @@ struct FrameTimings {
     /// Pass census of the frame that produced this timing, when the recorder
     /// published one. Empty for backends and hosts that do not record it.
     passes: Vec<crate::rhi::PassReport>,
-    /// The profile this frame's GPU samples land in. The reader drains it, so
-    /// the host sees samples as they complete instead of racing the completion
-    /// thread right after `present`.
-    profile: Option<std::sync::Arc<GpuTimestampProfile>>,
+    pass_count: usize,
+    api: Option<crate::rhi::GraphicsApi>,
+    samples: Vec<Option<u64>>,
 }
+
+pub const MAX_FRAME_GPU_PASSES: usize = 64;
 
 impl GpuFrameTiming {
     pub fn result(&self) -> Option<Option<u64>> {
@@ -171,40 +172,19 @@ impl GpuFrameTiming {
             .gpu
     }
 
-    /// Publishes what the frame recorded, pass by pass.
-    ///
-    /// Called by the recording side right after it builds the command buffer, so
-    /// a host can join pass geometry with composited layers at presentation time.
-    pub fn set_pass_reports(&self, passes: Vec<crate::rhi::PassReport>) {
-        self.0
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
-            .passes = passes;
-    }
-
-    /// Points this frame at the profile its GPU samples will land in.
-    pub fn set_timestamp_profile(&self, profile: std::sync::Arc<GpuTimestampProfile>) {
-        self.0
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
-            .profile = Some(profile);
-    }
-
-    /// GPU samples completed since the last frame read them.
-    ///
-    /// Frames are read in submission order, so a sample that completes after its
-    /// frame was read lands on the next frame's read. Sampling is asynchronous;
-    /// this is the price of not blocking the reader on the GPU.
-    pub fn markers(&self) -> Vec<GpuTimestampMarker> {
-        let profile = self
+    /// Returns the frame duration and ordered pass samples once its slot retires.
+    pub fn retired(&self) -> Option<(crate::rhi::GraphicsApi, crate::rhi::GpuSubmissionTiming)> {
+        let timing = self
             .0
             .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
-            .profile
-            .clone();
-        profile
-            .map(|profile| profile.drain_markers())
-            .unwrap_or_default()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        Some((
+            timing.api?,
+            crate::rhi::GpuSubmissionTiming {
+                nanoseconds: timing.gpu?,
+                passes: timing.samples.clone(),
+            },
+        ))
     }
 
     pub fn pass_reports(&self) -> Vec<crate::rhi::PassReport> {
@@ -213,6 +193,13 @@ impl GpuFrameTiming {
             .unwrap_or_else(std::sync::PoisonError::into_inner)
             .passes
             .clone()
+    }
+
+    pub fn pass_count(&self) -> usize {
+        self.0
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .pass_count
     }
 
     pub fn pipeline_creation(&self) -> (u64, u64) {
@@ -388,32 +375,90 @@ impl FrameRing {
         state.slots[slot_index].pending_command_buffers += 1;
     }
 
-    pub(crate) fn measure(&self, slot_index: usize) -> GpuFrameTiming {
+    pub(crate) fn measure(
+        &self,
+        slot_index: usize,
+        api: crate::rhi::GraphicsApi,
+    ) -> GpuFrameTiming {
         let mut state = self.lock();
-        let slot = &mut state.slots[slot_index];
-        slot.timing
-            .get_or_insert_with(FrameMeasurement::default)
+        let timing = state.slots[slot_index]
+            .timing
+            .get_or_insert_with(FrameMeasurement::default);
+        timing
             .result
-            .clone()
+            .0
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .api = Some(api);
+        timing.result.clone()
     }
 
-    pub(crate) fn measurement_epoch(&self, slot_index: usize) -> Option<u64> {
+    pub(crate) fn gpu_report_capacity(&self, slot_index: usize) -> Option<usize> {
+        let state = self.lock();
+        let timing = state.slots[slot_index].timing.as_ref()?;
+        Some(
+            MAX_FRAME_GPU_PASSES
+                - timing
+                    .result
+                    .0
+                    .lock()
+                    .unwrap_or_else(std::sync::PoisonError::into_inner)
+                    .passes
+                    .len(),
+        )
+    }
+
+    pub(crate) fn reserve_gpu_samples(
+        &self,
+        slot_index: usize,
+        reports: impl Iterator<Item = crate::rhi::PassReport>,
+        pass_count: usize,
+    ) -> Option<(u64, std::ops::Range<usize>)> {
         let state = self.lock();
         let slot = &state.slots[slot_index];
-        slot.timing.as_ref().map(|_| slot.epoch)
+        let mut result = slot
+            .timing
+            .as_ref()?
+            .result
+            .0
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let start = result.passes.len();
+        result.pass_count += pass_count;
+        result.passes.extend(reports);
+        let end = result.passes.len();
+        result.samples.resize(end, None);
+        Some((slot.epoch, start..end))
     }
 
-    pub(crate) fn note_gpu_sample(&self, slot_index: usize, epoch: u64, nanos: Option<u64>) {
+    pub(crate) fn note_gpu_sample(
+        &self,
+        slot_index: usize,
+        epoch: u64,
+        range: std::ops::Range<usize>,
+        sample: crate::rhi::GpuSubmissionTiming,
+    ) {
         let mut state = self.lock();
         let slot = &mut state.slots[slot_index];
         if slot.epoch == epoch
             && let Some(timing) = &mut slot.timing
         {
-            if let Some(elapsed) = nanos.and_then(|value| timing.elapsed.checked_add(value)) {
+            if let Some(elapsed) = sample
+                .nanoseconds
+                .and_then(|value| timing.elapsed.checked_add(value))
+            {
                 timing.elapsed = elapsed;
                 timing.has_sample = true;
             } else {
                 timing.incomplete = true;
+            }
+            let mut result = timing
+                .result
+                .0
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner);
+            for (target, source) in result.samples[range].iter_mut().zip(sample.passes) {
+                *target = source;
             }
         }
     }
@@ -806,8 +851,7 @@ struct GpuTimestampState {
     markers: Vec<GpuTimestampMarker>,
     completed: usize,
     status: String,
-    /// How many retained markers a reader has already taken. Only advances
-    /// through `drain_markers`, so a frame can consume exactly its own samples.
+    /// Completion-order cursor for the device-wide profiler.
     consumed: usize,
 }
 
@@ -886,10 +930,7 @@ impl GpuTimestampProfile {
 
     /// Markers completed since the last drain, in completion order.
     ///
-    /// A frame reader wants exactly the samples its own submission produced; the
-    /// returning cursor keeps a slow reader from seeing them twice. Markers
-    /// dropped past `marker_limit` are gone for good, which is why
-    /// `sample_count` still reports them.
+    /// Markers dropped past the retention limit are still counted by `sample_count`.
     pub fn drain_markers(&self) -> Vec<GpuTimestampMarker> {
         let mut state = self.lock();
         let drained = state.markers[state.consumed..].to_vec();
@@ -1007,10 +1048,77 @@ mod tests {
     }
 
     #[test]
+    fn gpu_pass_samples_stay_in_recording_order_across_out_of_order_completions() {
+        use crate::rhi::{GpuSubmissionTiming, GraphicsApi, PassKind, PassReport};
+
+        let ring = FrameRing::new(1);
+        let (slot, _) = ring.begin();
+        let frame = ring.measure(slot, GraphicsApi::Vulkan);
+        let pass = || PassReport {
+            label: "repeated".into(),
+            kind: PassKind::Render,
+            draws: 0,
+            instances: 0,
+            vertices: 0,
+            indices: 0,
+            ranges: Vec::new(),
+        };
+        let (epoch, first) = ring
+            .reserve_gpu_samples(slot, [pass(), pass()].into_iter(), 2)
+            .unwrap();
+        let (_, second) = ring
+            .reserve_gpu_samples(slot, [pass()].into_iter(), 1)
+            .unwrap();
+        ring.register_command_buffer(slot);
+        ring.register_command_buffer(slot);
+        ring.end();
+        ring.note_gpu_sample(
+            slot,
+            epoch,
+            second,
+            GpuSubmissionTiming {
+                nanoseconds: Some(400),
+                passes: vec![Some(300)],
+            },
+        );
+        ring.command_buffer_completed(slot);
+        assert!(frame.retired().is_none());
+        ring.note_gpu_sample(
+            slot,
+            epoch,
+            first,
+            GpuSubmissionTiming {
+                nanoseconds: Some(200),
+                passes: vec![None, Some(100)],
+            },
+        );
+        ring.command_buffer_completed(slot);
+        let (api, result) = frame.retired().unwrap();
+        assert_eq!(api, GraphicsApi::Vulkan);
+        assert_eq!(result.nanoseconds, Some(600));
+        assert_eq!(result.passes, [None, Some(100), Some(300)]);
+
+        let (next, _) = ring.begin();
+        let other = ring.measure(next, GraphicsApi::Vulkan);
+        ring.note_gpu_sample(
+            next,
+            epoch,
+            0..1,
+            GpuSubmissionTiming {
+                nanoseconds: Some(200),
+                passes: vec![Some(100)],
+            },
+        );
+        ring.end();
+        assert_eq!(other.result(), Some(None));
+        assert!(other.retired().unwrap().1.passes.is_empty());
+    }
+
+    #[test]
     fn pipeline_creation_stays_with_its_frame_slot_epoch() {
         let ring = FrameRing::new(1);
         let (slot, _) = ring.begin();
-        let first = ring.measure(slot);
+        let first = ring.measure(slot, crate::rhi::GraphicsApi::Metal);
         ring.note_pipeline_creation(slot, 250_000);
         ring.note_pipeline_creation(slot, 750_000);
         ring.end();
@@ -1018,7 +1126,7 @@ mod tests {
 
         let (next, _) = ring.begin();
         assert_eq!(slot, next);
-        let second = ring.measure(next);
+        let second = ring.measure(next, crate::rhi::GraphicsApi::Metal);
         ring.note_pipeline_creation(next, 100);
         ring.end();
         assert_eq!(second.pipeline_creation(), (1, 100));

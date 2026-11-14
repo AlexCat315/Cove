@@ -104,11 +104,6 @@ impl BrowserGpu {
                 self.format,
                 pixels,
             )?;
-            // Publish the pass census before submission, so a reader that gets
-            // the timing handle can also see what the frame recorded.
-            if let Some(frame) = &timing {
-                frame.set_pass_reports(commands.pass_reports());
-            }
             self.device
                 .submit(&commands, QueueClass::Graphics, &[], &[], None)?;
             frame.did_submit();

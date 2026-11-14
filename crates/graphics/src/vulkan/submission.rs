@@ -28,10 +28,6 @@ use super::resources::{create_buffer, destroy_buffer, lock};
 use super::setup::VulkanContext;
 use super::sys;
 
-/// Queries reserved per frame slot for GPU timing. Two are used per command, so
-/// this bounds a submission at 128 timed commands.
-pub const SLOT_QUERY_CAPACITY: u32 = 256;
-
 // MARK: - Command pools
 
 /// A frame slot reuses its peak number of command buffers. Resetting a Vulkan
@@ -84,16 +80,13 @@ impl CommandPool {
     }
 }
 
-/// Per-slot frames-in-flight state: command pools and GPU timing.
+/// Per-slot command pools and upload storage.
 pub struct VulkanFrame {
     /// Shared so the frontend's `FrameUploader` handle and the slot's pool state
     /// can both reach it: the frontend owns the boxed handle for the backend's
     /// lifetime, while the slot resets it at each frame start.
     pub uploader: Arc<Mutex<VulkanFrameUploader>>,
     pub command_pools: HashMap<u32, CommandPool>,
-    pub query_pool: Option<sys::VkQueryPool>,
-    /// Result of the last creation attempt, kept only to explain a failure.
-    pub query_pool_failure: sys::VkResult,
 }
 
 impl VulkanFrame {
@@ -101,8 +94,6 @@ impl VulkanFrame {
         Self {
             uploader,
             command_pools: HashMap::new(),
-            query_pool: None,
-            query_pool_failure: sys::VK_SUCCESS,
         }
     }
 }
@@ -474,7 +465,6 @@ pub struct Encoder<'a> {
     context: &'a VulkanContext,
     registries: &'a Arc<Mutex<VulkanRegistries>>,
     cmd: sys::VkCommandBuffer,
-    timing: Option<TimestampRecording>,
 }
 
 impl<'a> Encoder<'a> {
@@ -487,47 +477,34 @@ impl<'a> Encoder<'a> {
             context,
             registries,
             cmd,
-            timing: None,
         }
     }
 
-    /// Encodes every command, returning the timestamp recording the caller must
-    /// hand to the fence completion.
-    pub fn encode(
+    fn encode(
         &mut self,
         commands: &[PlannedCommand],
-        profile: Option<&Arc<GpuTimestampProfile>>,
-        slot: usize,
-        frames: &mut [VulkanFrame],
-    ) -> RhiResult<Option<TimestampRecording>> {
-        // Timestamps bracket each command so a slow pass is attributed to itself.
-        let labels = encode_labels(commands);
-        self.timing = self.begin_timestamps(profile, commands.len(), labels, slot, frames);
-        for (index, command) in commands.iter().enumerate() {
-            if let Some(timing) = &self.timing {
-                // SAFETY: `cmd` is recording.
-                unsafe {
-                    self.write_timestamp(
-                        timing,
-                        sys::VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
-                        (index * 2) as u32,
-                    )
-                };
+        timestamps: Option<&SubmissionTimestamps>,
+    ) -> RhiResult<()> {
+        let mut index = 2;
+        for command in commands {
+            let timing = timestamps.filter(|timing| {
+                index < timing.count && !matches!(command, PlannedCommand::Barriers(_))
+            });
+            if let Some(timing) = timing {
+                timing.write(self.cmd, sys::VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, index);
             }
-            // SAFETY: the caller opened `cmd` for recording.
+            // SAFETY: the caller opened the command buffer for recording.
             unsafe { self.encode_command(command)? };
-            if let Some(timing) = &self.timing {
-                // SAFETY: `cmd` is still recording.
-                unsafe {
-                    self.write_timestamp(
-                        timing,
-                        sys::VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
-                        (index * 2 + 1) as u32,
-                    )
-                };
+            if let Some(timing) = timing {
+                timing.write(
+                    self.cmd,
+                    sys::VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
+                    index + 1,
+                );
+                index += 2;
             }
         }
-        Ok(self.timing.take())
+        Ok(())
     }
 
     unsafe fn encode_command(&mut self, command: &PlannedCommand) -> RhiResult<()> {
@@ -1531,199 +1508,6 @@ impl<'a> Encoder<'a> {
             describe_texture(texture)
         })
     }
-
-    /// Per-frame-slot query pool, created on first use and kept for the slot's
-    /// life so steady-state sampling performs no allocation.
-    fn begin_timestamps(
-        &self,
-        profile: Option<&Arc<GpuTimestampProfile>>,
-        marker_count: usize,
-        labels: Vec<String>,
-        slot: usize,
-        frames: &mut [VulkanFrame],
-    ) -> Option<TimestampRecording> {
-        let profile = profile?;
-        let period = f64::from(self.context.limits.timestampPeriod);
-        if period <= 0.0 {
-            profile.note(format!("unusable timestampPeriod={period}"));
-            return None;
-        }
-        if marker_count == 0 {
-            profile.note("submission had no commands");
-            return None;
-        }
-        let query_count = marker_count * 2;
-        if query_count > SLOT_QUERY_CAPACITY as usize {
-            profile.note(format!(
-                "submission needs {query_count} queries, capacity {SLOT_QUERY_CAPACITY}"
-            ));
-            return None;
-        }
-        let frame = frames.get_mut(slot)?;
-        let pool = match frame.query_pool {
-            Some(pool) => pool,
-            None => {
-                let create_info = sys::VkQueryPoolCreateInfo {
-                    sType: sys::VK_STRUCTURE_TYPE_QUERY_POOL_CREATE_INFO,
-                    pNext: core::ptr::null(),
-                    flags: 0,
-                    queryType: sys::VK_QUERY_TYPE_TIMESTAMP,
-                    queryCount: SLOT_QUERY_CAPACITY,
-                    pipelineStatistics: 0,
-                };
-                let mut storage: sys::VkQueryPool = sys::VK_NULL_HANDLE;
-                // SAFETY: `create_info` outlives the call and the out-parameter is a
-                // live local.
-                let result = unsafe {
-                    (self.context.resources.queries.create_query_pool)(
-                        self.context.device,
-                        &create_info,
-                        core::ptr::null(),
-                        &mut storage,
-                    )
-                };
-                frame.query_pool_failure = result;
-                if result != sys::VK_SUCCESS || storage == sys::VK_NULL_HANDLE {
-                    profile.note(format!("vkCreateQueryPool -> {result}"));
-                    return None;
-                }
-                frame.query_pool = Some(storage);
-                storage
-            }
-        };
-        // SAFETY: `cmd` is recording and the pool belongs to this device.
-        unsafe {
-            (self.context.resources.queries.cmd_reset_query_pool)(
-                self.cmd,
-                pool,
-                0,
-                query_count as u32,
-            )
-        };
-        profile.note(format!(
-            "recording {query_count} queries over {marker_count} passes"
-        ));
-        Some(TimestampRecording {
-            pool,
-            query_count: query_count as u32,
-            labels,
-            profile: profile.clone(),
-            period,
-            device: self.context.device,
-            read_results: self.context.resources.queries.get_query_pool_results,
-        })
-    }
-
-    /// Writes one timestamp and the barrier that makes it visible. The spec's
-    /// query-pool pattern: an empty memory dependency scoped to the host, so the
-    /// write is ordered and readable without gating device memory.
-    ///
-    /// # Safety
-    /// `cmd` must be recording.
-    unsafe fn write_timestamp(&self, recording: &TimestampRecording, stage: u32, query: u32) {
-        // SAFETY: `cmd` is recording and the query index was reserved above.
-        unsafe {
-            (self.context.resources.queries.cmd_write_timestamp)(
-                self.cmd,
-                stage,
-                recording.pool,
-                query,
-            )
-        };
-        let barrier = sys::VkMemoryBarrier {
-            sType: sys::VK_STRUCTURE_TYPE_MEMORY_BARRIER,
-            pNext: core::ptr::null(),
-            srcAccessMask: sys::VK_ACCESS_HOST_WRITE_BIT,
-            dstAccessMask: sys::VK_ACCESS_HOST_READ_BIT,
-        };
-        // SAFETY: `cmd` is recording and `barrier` outlives the call.
-        unsafe {
-            (self.context.draw.cmd_pipeline_barrier)(
-                self.cmd,
-                sys::VK_PIPELINE_STAGE_HOST_BIT,
-                sys::VK_PIPELINE_STAGE_HOST_BIT,
-                0,
-                1,
-                &barrier,
-                0,
-                core::ptr::null(),
-                0,
-                core::ptr::null(),
-            )
-        };
-    }
-}
-
-/// A retired timestamp query pool plus what is needed to turn it into markers.
-/// Held by the fence completion until the GPU signals, then read exactly once.
-pub struct TimestampRecording {
-    pub pool: sys::VkQueryPool,
-    pub query_count: u32,
-    pub labels: Vec<String>,
-    pub profile: Arc<GpuTimestampProfile>,
-    /// Driver-supplied nanoseconds per timestamp tick.
-    pub period: f64,
-    /// Cloned so the completion thread can read results without the context.
-    device: sys::VkDevice,
-    read_results: sys::PFN_vkGetQueryPoolResults,
-}
-
-impl TimestampRecording {
-    /// Turns this completed submission's query pool into profile markers.
-    ///
-    /// Runs on the fence waiter once the GPU signalled. The pool is already
-    /// retired, so the results are final; a query the driver could not resolve is
-    /// skipped rather than reported as zero.
-    pub fn read_results(&self) {
-        let count = self.query_count as usize;
-        let mut raw = vec![0u64; count];
-        // SAFETY: `raw` is sized to `count` u64 values and the pool holds at least
-        // that many queries, which the GPU already finished.
-        let status = unsafe {
-            (self.read_results)(
-                self.device,
-                self.pool,
-                0,
-                self.query_count,
-                std::mem::size_of_val(&raw[..]),
-                raw.as_mut_ptr().cast(),
-                core::mem::size_of::<u64>() as sys::VkDeviceSize,
-                sys::VK_QUERY_RESULT_64_BIT | sys::VK_QUERY_RESULT_WAIT_BIT,
-            )
-        };
-        if status != sys::VK_SUCCESS {
-            self.profile
-                .note(format!("vkGetQueryPoolResults returned {status}"));
-            return;
-        }
-        let mut usable = 0;
-        for query in (0..count).step_by(2) {
-            let (start, end) = (raw[query], raw[query + 1]);
-            // Drivers may leave a zero or non-advancing pair when a marker straddles
-            // a context switch.
-            if start == 0 || end <= start {
-                continue;
-            }
-            let elapsed = ((end - start) as f64 * self.period).round();
-            if elapsed <= 0.0 {
-                continue;
-            }
-            let index = query / 2;
-            let label = self
-                .labels
-                .get(index)
-                .cloned()
-                .unwrap_or_else(|| format!("pass#{index}"));
-            self.profile
-                .append(GpuTimestampMarker::new(label, elapsed as u64));
-            usable += 1;
-        }
-        self.profile.note(if usable == 0 {
-            "queries returned no advancing pair".to_owned()
-        } else {
-            "ok".to_owned()
-        });
-    }
 }
 
 /// Diagnostic names for the markers `encode` writes, in the same order.
@@ -1731,20 +1515,20 @@ pub fn encode_labels(commands: &[PlannedCommand]) -> Vec<String> {
     let mut counters: HashMap<&'static str, usize> = HashMap::new();
     commands
         .iter()
-        .map(|command| {
+        .filter_map(|command| {
             let (kind, name) = match command {
                 PlannedCommand::RenderPass(record) => ("renderPass", record.descriptor.label),
                 PlannedCommand::ComputePass(_) => ("computePass", None),
                 PlannedCommand::CopyPass(_) => ("copyPass", None),
-                PlannedCommand::Barriers(_) => ("barriers", None),
+                PlannedCommand::Barriers(_) => return None,
                 PlannedCommand::AccelerationStructureBuild(_) => ("asBuild", None),
             };
             let ordinal = *counters.entry(kind).or_insert(0);
             counters.insert(kind, ordinal + 1);
-            match name {
+            Some(match name {
                 Some(name) if !name.is_empty() => name.to_owned(),
                 _ => format!("{kind}#{ordinal}"),
-            }
+            })
         })
         .collect()
 }
@@ -1758,33 +1542,35 @@ struct FenceWaiter {
     sync: sys::SyncCommands,
     fence: sys::VkFence,
     status: Arc<super::status::VulkanSubmissionStatus>,
-    timestamps: Option<TimestampRecording>,
+    profile: Option<(Arc<GpuTimestampProfile>, Vec<String>)>,
     frame_timestamps: Option<SubmissionTimestamps>,
     completion: Result<crate::rhi::TimedCompletion, Completion>,
 }
 
-/// A query pair owned by one submission until its fence signals.
+/// A query pool owned by one submission until its fence signals.
 struct SubmissionTimestamps {
     device: sys::VkDevice,
     pool: sys::VkQueryPool,
     commands: sys::QueryCommands,
     period: f64,
     bits: u32,
+    count: u32,
 }
 
 impl SubmissionTimestamps {
-    fn new(context: &VulkanContext, bits: u32) -> Option<Self> {
+    fn new(context: &VulkanContext, bits: u32, pass_count: usize) -> Option<Self> {
         let period = f64::from(context.limits.timestampPeriod);
         if !(1..=64).contains(&bits) || !period.is_finite() || period <= 0.0 {
             return None;
         }
         let commands = context.resources.queries;
+        let count = 2 + 2 * pass_count as u32;
         let descriptor = sys::VkQueryPoolCreateInfo {
             sType: sys::VK_STRUCTURE_TYPE_QUERY_POOL_CREATE_INFO,
             pNext: core::ptr::null(),
             flags: 0,
             queryType: sys::VK_QUERY_TYPE_TIMESTAMP,
-            queryCount: 2,
+            queryCount: count,
             pipelineStatistics: 0,
         };
         let mut pool = sys::VK_NULL_HANDLE;
@@ -1798,44 +1584,31 @@ impl SubmissionTimestamps {
             commands,
             period,
             bits,
+            count,
         })
     }
 
     fn begin(&self, cmd: sys::VkCommandBuffer) {
         // SAFETY: cmd is recording and this submission owns the pool.
-        unsafe {
-            (self.commands.cmd_reset_query_pool)(cmd, self.pool, 0, 2);
-            (self.commands.cmd_write_timestamp)(
-                cmd,
-                sys::VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
-                self.pool,
-                0,
-            );
-        }
+        unsafe { (self.commands.cmd_reset_query_pool)(cmd, self.pool, 0, self.count) };
+        self.write(cmd, sys::VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, 0);
     }
 
-    fn end(&self, cmd: sys::VkCommandBuffer) {
-        // SAFETY: cmd is recording and this submission reset the query pair.
-        unsafe {
-            (self.commands.cmd_write_timestamp)(
-                cmd,
-                sys::VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
-                self.pool,
-                1,
-            );
-        }
+    fn write(&self, cmd: sys::VkCommandBuffer, stage: u32, index: u32) {
+        // SAFETY: cmd is recording and this query was reset by begin.
+        unsafe { (self.commands.cmd_write_timestamp)(cmd, stage, self.pool, index) };
     }
 
-    fn nanos(&self) -> Option<u64> {
-        let mut ticks = [0u64; 2];
-        // SAFETY: the fence signalled and the destination holds both results.
+    fn read(&self) -> Option<crate::rhi::GpuSubmissionTiming> {
+        let mut ticks = vec![0u64; self.count as usize];
+        // SAFETY: the fence signalled and the destination holds every result.
         let status = unsafe {
             (self.commands.get_query_pool_results)(
                 self.device,
                 self.pool,
                 0,
-                2,
-                size_of_val(&ticks),
+                self.count,
+                size_of_val(ticks.as_slice()),
                 ticks.as_mut_ptr().cast(),
                 size_of::<u64>() as u64,
                 sys::VK_QUERY_RESULT_64_BIT,
@@ -1845,8 +1618,15 @@ impl SubmissionTimestamps {
             return None;
         }
         let mask = u64::MAX >> (64 - self.bits);
-        let elapsed = ticks[1].wrapping_sub(ticks[0]) & mask;
-        Some((elapsed as f64 * self.period).round() as u64)
+        let nanos = |pair: &[u64; 2]| {
+            let elapsed = pair[1].wrapping_sub(pair[0]) & mask;
+            let nanos = (elapsed as f64 * self.period).round();
+            (nanos < u64::MAX as f64).then_some(nanos as u64)
+        };
+        Some(crate::rhi::GpuSubmissionTiming {
+            nanoseconds: nanos(&[ticks[0], ticks[1]]),
+            passes: ticks[2..].as_chunks::<2>().0.iter().map(nanos).collect(),
+        })
     }
 }
 
@@ -1876,21 +1656,27 @@ impl FenceWaiter {
         // SAFETY: the fence signalled (or the wait failed and the driver still owns
         // it), and nothing else references it.
         unsafe { (self.sync.destroy_fence)(self.device, self.fence, core::ptr::null()) };
-        let nanos = if result == sys::VK_SUCCESS {
-            if let Some(recording) = &self.timestamps {
-                recording.read_results();
+        let timing = (result == sys::VK_SUCCESS)
+            .then(|| self.frame_timestamps.as_ref()?.read())
+            .flatten()
+            .unwrap_or_default();
+        if let Some((profile, labels)) = self.profile {
+            profile.note(if timing.nanoseconds.is_some() {
+                "ok"
+            } else {
+                "Vulkan timestamp queries unavailable"
+            });
+            for (label, nanos) in labels.into_iter().zip(&timing.passes) {
+                if let Some(nanos) = nanos {
+                    profile.append(GpuTimestampMarker::new(label, *nanos));
+                }
             }
-            self.frame_timestamps
-                .as_ref()
-                .and_then(SubmissionTimestamps::nanos)
-        } else {
-            None
-        };
+        }
         // Release the query pool before the callback can retire the last frame
         // and let the API thread destroy the device.
         drop(self.frame_timestamps);
         match self.completion {
-            Ok(timed) => timed(nanos),
+            Ok(timed) => timed.complete(timing),
             Err(untimed) => untimed(),
         }
     }
@@ -1957,28 +1743,27 @@ impl Submitter<'_> {
             "vkBeginCommandBuffer failed",
         )?;
 
-        let frame_timestamps = if completion.is_ok() {
-            SubmissionTimestamps::new(self.context, queue.timestamp_bits)
+        let profile = gpu_profile.map(|profile| {
+            let mut labels = encode_labels(&submit.commands);
+            labels.truncate(128);
+            (profile.clone(), labels)
+        });
+        let pass_count = completion
+            .as_ref()
+            .map_or(0, |timed| timed.pass_count)
+            .max(profile.as_ref().map_or(0, |(_, labels)| labels.len()));
+        let frame_timestamps = if completion.is_ok() || profile.is_some() {
+            SubmissionTimestamps::new(self.context, queue.timestamp_bits, pass_count)
         } else {
             None
         };
         if let Some(timestamps) = &frame_timestamps {
             timestamps.begin(cmd);
         }
-        let encode_result = {
-            let mut encoder = Encoder::new(self.context, self.registries, cmd);
-            encoder.encode(&submit.commands, gpu_profile, self.active_slot, self.frames)
-        };
-        let timestamps = match encode_result {
-            Ok(timestamps) => timestamps,
-            Err(error) => {
-                // The buffer stays recorded; the pool reset at the next slot reuse
-                // discards it.
-                return Err(error);
-            }
-        };
+        Encoder::new(self.context, self.registries, cmd)
+            .encode(&submit.commands, frame_timestamps.as_ref())?;
         if let Some(timestamps) = &frame_timestamps {
-            timestamps.end(cmd);
+            timestamps.write(cmd, sys::VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, 1);
         }
         rhi_require(
             // SAFETY: `cmd` is recording and has not been ended yet.
@@ -2048,7 +1833,7 @@ impl Submitter<'_> {
             sync: self.context.sync,
             fence,
             status: Arc::clone(&self.submission_status),
-            timestamps,
+            profile,
             frame_timestamps,
             completion,
         };

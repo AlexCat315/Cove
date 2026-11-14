@@ -29,7 +29,6 @@ pub type ContentGeometrySource = Rc<dyn Fn() -> Result<ContentGeometry, String>>
 pub type RefreshRateSource = Rc<dyn Fn() -> Option<f64>>;
 
 pub type RuntimeInputSink = Rc<dyn Fn(InputEvent)>;
-pub type GpuMeasurement = Box<dyn Fn() -> Option<Option<u64>>>;
 
 pub struct RuntimeProbe {
     pub viewport: Option<Rc<dyn Fn() -> Viewport>>,
@@ -41,8 +40,15 @@ pub struct RuntimeProbe {
     pub content_geometry: Option<ContentGeometrySource>,
     pub display_refresh_rate: Option<RefreshRateSource>,
     timeline: Timeline,
-    timing: VecDeque<TimingFrame>,
-    pending_timing: VecDeque<(TimingFrame, Option<GpuMeasurement>, std::time::Instant)>,
+    timing: VecDeque<(
+        TimingFrame,
+        Option<cove_devtools_protocol::GpuFrameBreakdown>,
+    )>,
+    pending_timing: VecDeque<(
+        TimingFrame,
+        Option<cove_graphics::rhi::GpuFrameTiming>,
+        std::time::Instant,
+    )>,
     sequence: u64,
     profile: UiProfiler,
     allocation_sites: AllocationSites,
@@ -158,7 +164,11 @@ impl RuntimeProbe {
         self.record_measured(frame, None);
     }
 
-    pub fn record_measured(&mut self, mut frame: TimingFrame, gpu: Option<GpuMeasurement>) {
+    pub fn record_measured(
+        &mut self,
+        mut frame: TimingFrame,
+        gpu: Option<cove_graphics::rhi::GpuFrameTiming>,
+    ) {
         self.sequence += 1;
         frame.frame = self.sequence;
         self.pending_timing
@@ -170,21 +180,26 @@ impl RuntimeProbe {
         // Keep sequence order for incremental readers and bound how long a
         // missing GPU completion can delay the CPU timeline.
         while let Some((_, gpu, recorded)) = self.pending_timing.front() {
-            let nanos = match gpu.as_ref().map_or(Some(None), |query| query()) {
-                Some(nanos) => nanos,
-                None if self.pending_timing.len() >= 16
-                    || recorded.elapsed() >= std::time::Duration::from_secs(1) =>
-                {
-                    None
-                }
-                None => break,
-            };
+            let timing = gpu.as_ref().and_then(|gpu| gpu.retired());
+            if gpu.is_some()
+                && timing.is_none()
+                && self.pending_timing.len() < 16
+                && recorded.elapsed() < std::time::Duration::from_secs(1)
+            {
+                break;
+            }
             let (mut frame, _, _) = self.pending_timing.pop_front().expect("front was present");
-            frame.gpu_ms = nanos.map(|nanos| nanos as f64 / 1_000_000.0);
+            if let Some((api, timing)) = timing {
+                frame.gpu_ms = timing.nanoseconds.map(|nanos| nanos as f64 / 1_000_000.0);
+                if let Some(breakdown) = &mut frame.gpu_breakdown {
+                    crate::gpu_breakdown::apply_timing(breakdown, api, &timing);
+                }
+            }
             if self.timing.len() == 240 {
                 self.timing.pop_front();
             }
-            self.timing.push_back(frame);
+            let breakdown = frame.gpu_breakdown.take();
+            self.timing.push_back((frame, breakdown));
         }
     }
 
@@ -356,15 +371,20 @@ impl RuntimeProbe {
             ProbeCommand::Timing { after } => {
                 self.flush_timing();
                 Ok(json!({
-                "frames": self.timing.iter().filter(|frame| frame.frame > after).collect::<Vec<_>>(),
-                "dropped": self.timing.front().map_or(0, |frame| frame.frame.saturating_sub(after).saturating_sub(1)),
+                "frames": self.timing.iter().map(|(frame, _)| frame).filter(|frame| frame.frame > after).collect::<Vec<_>>(),
+                "dropped": self.timing.front().map_or(0, |(frame, _)| frame.frame.saturating_sub(after).saturating_sub(1)),
                 "refreshRate": self.display_refresh_rate.as_ref().and_then(|query| query()),
                 }))
             }
             ProbeCommand::AnalyzeUiFrame { frame } => {
                 self.flush_timing();
-                let analysis = match self.timing.iter().find(|timing| timing.frame == frame) {
-                    Some(timing) => FrameAnalysis::for_frame(timing, &self.timeline.borrow()),
+                let analysis = match self.timing.iter().find(|(timing, _)| timing.frame == frame) {
+                    Some((timing, breakdown)) => {
+                        let mut analysis =
+                            FrameAnalysis::for_frame(timing, &self.timeline.borrow());
+                        analysis.gpu_breakdown = breakdown.clone();
+                        analysis
+                    }
                     None => FrameAnalysis::not_retained(frame, self.timing.len()),
                 };
                 serialize(serde_json::to_value(analysis))

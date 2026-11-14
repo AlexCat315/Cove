@@ -80,7 +80,7 @@ impl AndroidWindowRenderer {
         &mut self,
         list: &DrawList,
         logical: (f32, f32),
-        mut gpu: Option<&mut Option<cove_graphics::rhi::GpuFrameTiming>>,
+        gpu: Option<&mut Option<cove_graphics::rhi::GpuFrameTiming>>,
     ) -> RhiResult<bool> {
         let device = self.device.clone();
         let Some(swapchain) = self.swapchain else {
@@ -95,7 +95,7 @@ impl AndroidWindowRenderer {
             }
         }
         let _end = EndFrame(&device);
-        if let Some(slot) = gpu.as_deref_mut() {
+        if let Some(slot) = gpu {
             *slot = device.measure_gpu_frame();
         }
         let image = self.timings.measure_result(Phase::DrawableAcquire, || {
@@ -154,14 +154,6 @@ impl AndroidWindowRenderer {
                 }
                 Ok(frame)
             })?;
-        // Publish the pass census and share the device's timestamp profile, so
-        // DevTools reads the same per-pass samples the timing reporter logs.
-        if let Some(frame) = gpu.as_deref().and_then(|slot| slot.as_ref()) {
-            frame.set_pass_reports(commands.pass_reports());
-            if let Some(profile) = device.gpu_timestamp_profile() {
-                frame.set_timestamp_profile(profile);
-            }
-        }
         self.timings.measure_result(Phase::QueueSubmit, || {
             device.submit(&commands, QueueClass::Graphics, &[], &[], None)
         })?;

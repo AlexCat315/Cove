@@ -10,7 +10,7 @@
 //! are no longer retained, yields [`FrameStatus::Unavailable`] with the reason;
 //! nothing is estimated from the frame's own millisecond fields.
 use cove_core::scene::{PerformanceTimeline, TimelineEvent};
-use cove_devtools_protocol::TimingFrame;
+use cove_devtools_protocol::{GpuFrameBreakdown, TimingFrame};
 use serde::{Deserialize, Serialize};
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -185,6 +185,8 @@ pub struct FrameSpan {
 pub struct FrameAnalysis {
     pub frame: u64,
     pub status: FrameStatus,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub gpu_breakdown: Option<GpuFrameBreakdown>,
     pub window: Option<FrameRange>,
     pub dominant_phase: Option<String>,
     pub phases: Vec<FramePhaseSummary>,
@@ -207,6 +209,7 @@ impl FrameAnalysis {
         Self {
             frame,
             status: FrameStatus::Unavailable,
+            gpu_breakdown: None,
             window,
             dominant_phase: None,
             phases: Vec::new(),
@@ -329,6 +332,7 @@ pub fn analyze_spans(
         return FrameAnalysis {
             frame: frame.frame,
             status: FrameStatus::Unavailable,
+            gpu_breakdown: None,
             window: Some(window),
             dominant_phase: None,
             phases: Vec::new(),
@@ -369,6 +373,7 @@ pub fn analyze_spans(
     FrameAnalysis {
         frame: frame.frame,
         status: FrameStatus::Ok,
+        gpu_breakdown: None,
         window: Some(window),
         dominant_phase: dominant,
         phases,

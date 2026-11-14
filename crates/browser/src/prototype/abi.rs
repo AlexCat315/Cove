@@ -48,6 +48,12 @@ pub extern "C" fn cove_webgpu_complete(token: u32, measured: u32, nanos: u64) {
     cove_graphics::webgpu::complete(token, (measured != 0).then_some(nanos));
 }
 
+#[cfg(target_arch = "wasm32")]
+#[unsafe(no_mangle)]
+pub extern "C" fn cove_webgpu_pass_timing(token: u32, index: u32, nanos: u64) {
+    cove_graphics::webgpu::pass_timing(token, index, nanos);
+}
+
 /// Whether animations or queued composition need another animation frame.
 #[unsafe(no_mangle)]
 pub extern "C" fn cove_needs_frame() -> i32 {

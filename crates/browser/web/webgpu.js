@@ -12,7 +12,12 @@ export function createWebGpuBridge(wasm, canvas) {
     }
     if (readback) {
       readback.mapAsync(GPUMapMode.READ).then(() => {
-        const [start, end] = new BigUint64Array(readback.getMappedRange());
+        const ticks = new BigUint64Array(readback.getMappedRange());
+        for (let index = 2; index < ticks.length; index += 2) {
+          const start = ticks[index], end = ticks[index + 1];
+          if (end >= start) wasm().cove_webgpu_pass_timing(token, (index - 2) / 2, end - start);
+        }
+        const [start, end] = ticks;
         readback.unmap();
         retire(end >= start ? end - start : undefined);
       }, () => gpu.queue.onSubmittedWorkDone().then(() => retire(), () => retire()));
@@ -31,8 +36,12 @@ export function createWebGpuBridge(wasm, canvas) {
     return objects.get(resource.sampler);
   }
 
-  function encodePass(encoder, objects, record, transient) {
+  function encodePass(encoder, objects, record, transient, timestampWrites) {
     if (record.type === "copy") {
+      if (timestampWrites) {
+        const { querySet, beginningOfPassWriteIndex } = timestampWrites;
+        encoder.beginComputePass({ timestampWrites: { querySet, beginningOfPassWriteIndex } }).end();
+      }
       for (const [op, ...args] of record.body) {
         if (op === "texture") {
           const [src, dst, extent] = args;
@@ -49,6 +58,10 @@ export function createWebGpuBridge(wasm, canvas) {
           encoder.copyTextureToBuffer({ texture: objects.get(texture) },
             { buffer: objects.get(buffer), offset, bytesPerRow }, extent);
         }
+      }
+      if (timestampWrites) {
+        const { querySet, endOfPassWriteIndex } = timestampWrites;
+        encoder.beginComputePass({ timestampWrites: { querySet, endOfPassWriteIndex } }).end();
       }
       return;
     }
@@ -68,9 +81,9 @@ export function createWebGpuBridge(wasm, canvas) {
           descriptor.depthStencilAttachment.stencilReadOnly = true;
         }
       }
-      pass = encoder.beginRenderPass(descriptor);
+      pass = encoder.beginRenderPass({ ...descriptor, timestampWrites });
     } else {
-      pass = encoder.beginComputePass();
+      pass = encoder.beginComputePass({ timestampWrites });
     }
 
     let pipeline, appliedConstants;
@@ -179,29 +192,36 @@ export function createWebGpuBridge(wasm, canvas) {
         const transient = [];
         let readback;
         try {
-          const queries = args.measureGpu && gpu.features.has("timestamp-query")
-            ? gpu.createQuerySet({ type: "timestamp", count: 2 }) : null;
+          const count = 2 + 2 * (args.timestampPasses ?? 0);
+          const queries = args.timestampPasses != null && gpu.features.has("timestamp-query")
+            ? gpu.createQuerySet({ type: "timestamp", count }) : null;
           if (queries) {
             transient.push(queries);
             encoder.beginComputePass({
               timestampWrites: { querySet: queries, beginningOfPassWriteIndex: 0 },
             }).end();
           }
-          for (const pass of args.passes) encodePass(encoder, objects, pass, transient);
+          for (const [index, pass] of args.passes.entries()) {
+            const timestampWrites = queries && index < args.timestampPasses
+              ? { querySet: queries, beginningOfPassWriteIndex: 2 + 2 * index, endOfPassWriteIndex: 3 + 2 * index }
+              : undefined;
+            encodePass(encoder, objects, pass, transient, timestampWrites);
+          }
           if (queries) {
+            const size = count * 8;
             encoder.beginComputePass({
               timestampWrites: { querySet: queries, endOfPassWriteIndex: 1 },
             }).end();
             const resolved = gpu.createBuffer({
-              size: 16, usage: GPUBufferUsage.QUERY_RESOLVE | GPUBufferUsage.COPY_SRC,
+              size, usage: GPUBufferUsage.QUERY_RESOLVE | GPUBufferUsage.COPY_SRC,
             });
             transient.push(resolved);
             readback = gpu.createBuffer({
-              size: 16, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ,
+              size, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ,
             });
             transient.push(readback);
-            encoder.resolveQuerySet(queries, 0, 2, resolved, 0);
-            encoder.copyBufferToBuffer(resolved, 0, readback, 0, 16);
+            encoder.resolveQuerySet(queries, 0, count, resolved, 0);
+            encoder.copyBufferToBuffer(resolved, 0, readback, 0, size);
           }
           gpu.queue.submit([encoder.finish()]);
         } catch (error) {

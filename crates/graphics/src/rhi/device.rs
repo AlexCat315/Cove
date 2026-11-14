@@ -1246,7 +1246,7 @@ impl Device {
     pub fn measure_gpu_frame(&self) -> Option<super::GpuFrameTiming> {
         let state = self.lock();
         let slot = state.current_slot?;
-        Some(self.frame_ring.measure(slot))
+        Some(self.frame_ring.measure(slot, self.backend_api()))
     }
 
     /// Ends the frame and releases the per-frame upload context.
@@ -1444,6 +1444,10 @@ impl Device {
         }
 
         let mut submitted = false;
+        let mut reports = self
+            .frame_ring
+            .gpu_report_capacity(slot)
+            .map(|limit| command_buffer.pass_report_iter().take(limit));
         for planned_submit in &plan.submits {
             self.frame_ring.register_command_buffer(slot);
             let frame_ring = Arc::clone(&self.frame_ring);
@@ -1455,16 +1459,37 @@ impl Device {
                     .unwrap_or_else(std::sync::PoisonError::into_inner)
                     .extend(completed);
             });
-            let epoch = self.frame_ring.measurement_epoch(slot);
-            let result = if let Some(epoch) = epoch {
+            let reservation = reports.as_mut().and_then(|reports| {
+                let pass_count = planned_submit
+                    .commands
+                    .iter()
+                    .filter(|command| !matches!(command, super::PlannedCommand::Barriers(_)))
+                    .count();
+                // Queue handoffs carry barriers only. The main submission
+                // carries the authored passes in their recording order.
+                if pass_count == 0 {
+                    return None;
+                }
+                self.frame_ring.reserve_gpu_samples(
+                    slot,
+                    reports.by_ref().take(pass_count),
+                    pass_count,
+                )
+            });
+            let result = if let Some((epoch, range)) = &reservation {
                 let ring = self.frame_ring.clone();
+                let epoch = *epoch;
+                let range = range.clone();
                 self.backend().submit_timed(
                     planned_submit,
                     cpu_profile.as_deref_mut(),
-                    Box::new(move |nanos| {
-                        ring.note_gpu_sample(slot, epoch, nanos);
-                        completion();
-                    }),
+                    super::TimedCompletion {
+                        pass_count: range.len(),
+                        callback: Box::new(move |sample| {
+                            ring.note_gpu_sample(slot, epoch, range, sample);
+                            completion();
+                        }),
+                    },
                 )
             } else {
                 self.backend()
@@ -1473,8 +1498,9 @@ impl Device {
             match result {
                 Ok(()) => submitted = true,
                 Err(error) => {
-                    if let Some(epoch) = epoch {
-                        self.frame_ring.note_gpu_sample(slot, epoch, None);
+                    if let Some((epoch, range)) = reservation {
+                        self.frame_ring
+                            .note_gpu_sample(slot, epoch, range, Default::default());
                     }
                     self.drain_retirements(self.frame_ring.unregister_command_buffer(slot));
                     if submitted {

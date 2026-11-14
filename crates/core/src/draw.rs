@@ -244,16 +244,19 @@ impl DrawList {
         clips: &[Clip],
         translation: Point,
     ) -> Result<(), DrawError> {
-        if self
-            .masks
-            .iter()
-            .all(|mask| clips.iter().any(|clip| clip.mask.as_ref() == Some(mask)))
-        {
+        if self.can_append_preclipped(clips) {
             self.append_unmasked(source, translation)
         } else {
             self.append(source, translation)
         }
     }
+
+    pub(crate) fn can_append_preclipped(&self, clips: &[Clip]) -> bool {
+        self.masks
+            .iter()
+            .all(|mask| clips.iter().any(|clip| clip.mask.as_ref() == Some(mask)))
+    }
+
     fn append_unmasked(&mut self, source: &Self, translation: Point) -> Result<(), DrawError> {
         self.check_capacity(source.vertices.len(), source.indices.len())?;
         if source.clip_revision != 0 {

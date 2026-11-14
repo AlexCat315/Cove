@@ -108,6 +108,17 @@ function snapshotOptionalNumber(value, label) {
   return snapshotNumber(value, label);
 }
 
+function validateGpuBreakdown(value, label) {
+  if (value == null) return undefined;
+  const { timingSource, passes, layers, passCount, layerCount } = value;
+  if (typeof timingSource !== "string" || !Array.isArray(passes) || !Array.isArray(layers)
+      || !passes.every(pass => pass && typeof pass === "object")
+      || !layers.every(layer => layer && typeof layer === "object")) {
+    throw new Error(`${label} has an invalid GPU breakdown.`);
+  }
+  return { timingSource, passes, layers, passCount, layerCount };
+}
+
 function validateSnapshotFrame(frame, index) {
   const label = `Frame ${index + 1}`;
   if (!frame || typeof frame !== "object" || Array.isArray(frame)) throw new Error(`${label} is not an object.`);
@@ -123,6 +134,7 @@ function validateSnapshotFrame(frame, index) {
     drawMs: snapshotNumber(frame.drawMs, `${label} drawMs`),
     renderThreadMs: snapshotOptionalNumber(frame.renderThreadMs, `${label} renderThreadMs`),
     gpuMs: snapshotOptionalNumber(frame.gpuMs, `${label} gpuMs`),
+    gpuBreakdown: validateGpuBreakdown(frame.gpuBreakdown, label),
     pipelineCreation: frame.pipelineCreation == null ? null : {
       count: snapshotNumber(frame.pipelineCreation.count, `${label} pipeline creations`, { integer: true }),
       cpuMs: snapshotNumber(frame.pipelineCreation.cpuMs, `${label} pipeline creation CPU ms`),

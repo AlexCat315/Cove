@@ -11,8 +11,8 @@ use std::collections::HashMap;
 use objc2::rc::Retained;
 use objc2::runtime::ProtocolObject;
 use objc2_metal::{
-    MTLBuffer, MTLComputePipelineState, MTLDepthStencilState, MTLFunction, MTLLibrary,
-    MTLPrimitiveType, MTLRenderPipelineState, MTLSamplerState, MTLSharedEvent, MTLTexture,
+    MTLBuffer, MTLComputePipelineState, MTLDepthStencilState, MTLEvent, MTLFunction, MTLLibrary,
+    MTLPrimitiveType, MTLRenderPipelineState, MTLSamplerState, MTLTexture,
 };
 
 use crate::rhi::{
@@ -241,7 +241,7 @@ pub struct MetalRegistries {
     /// encoder can re-apply them when the pipeline is bound.
     pub pipeline_raster_states: HashMap<u32, RasterizationState>,
     pub binding_sets: MetalBindingRegistry,
-    pub shared_events: HashMap<u32, Retained<ProtocolObject<dyn MTLSharedEvent>>>,
+    pub timeline_events: HashMap<u32, Retained<ProtocolObject<dyn MTLEvent>>>,
     /// Internal-handle counter for backend-owned resources (upload chunks,
     /// swapchain drawables). Starts above the frontend's low IDs.
     internal_id: u32,
@@ -284,7 +284,7 @@ impl MetalRegistries {
             pipeline_primitives: HashMap::new(),
             pipeline_raster_states: HashMap::new(),
             binding_sets: MetalBindingRegistry::new(),
-            shared_events: HashMap::new(),
+            timeline_events: HashMap::new(),
             internal_id: INTERNAL_ID_BASE,
         }
     }

@@ -57,7 +57,11 @@ export async function loadFrames(options = {}) {
     if (perf.snapshot || epoch !== state.targetEpoch || targetId !== state.targetId) return;
     const incoming = Array.isArray(data?.frames) ? data.frames : [];
     const merged = new Map(perf.frames.map(frame => [frame.frame, frame]));
-    for (const frame of incoming) merged.set(frame.frame, frame);
+    for (const frame of incoming) {
+      const breakdown = merged.get(frame.frame)?.gpuBreakdown;
+      if (breakdown && !frame.gpuBreakdown) frame.gpuBreakdown = breakdown;
+      merged.set(frame.frame, frame);
+    }
     let frames = [...merged.values()].sort((left, right) => (numberValue(left.frame) ?? 0) - (numberValue(right.frame) ?? 0));
     if (frames.length > MAX_FRAME_RECORDS) frames = frames.slice(-MAX_FRAME_RECORDS);
     perf.frames = frames;
@@ -590,21 +594,14 @@ function renderFrameAnalysis() {
     ["Frame sequence", String(frame.frame)],
     ["Timeline window (seq)", timelineWindow],
   ]));
-  const verdict = el("div", { class: "perf-note" });
   if (jank) {
-    const reasons = [];
-    if (ui !== null && ui > budget) reasons.push(`UI ${fmtNumber(ui, 2)} ms exceeds ${fmtNumber(budget, 1)} ms by ${fmtNumber(ui - budget, 2)} ms`);
-    if (parts.encode !== null && parts.encode > budget) reasons.push(`encode ${fmtNumber(parts.encode, 2)} ms exceeds ${fmtNumber(budget, 1)} ms by ${fmtNumber(parts.encode - budget, 2)} ms`);
-    verdict.textContent = `${reasons.join("; ")}.`;
-  } else if (parts.encode === null) {
-    verdict.textContent = `UI is within the ${fmtNumber(budget, 1)} ms budget. Encode time was not observed, so raster jank cannot be assessed.`;
-  } else if (numberValue(parts.total) !== null && parts.total > budget) {
-    verdict.textContent = `UI and encode are within the ${fmtNumber(budget, 1)} ms budget. Total is ${fmtNumber(parts.total, 2)} ms; the runtime measures it separately, so it also covers work outside the UI and encode sums.`;
-  } else {
-    verdict.textContent = `UI and encode are within the ${fmtNumber(budget, 1)} ms budget.`;
+    const overBudget = [["UI", ui], ["Encode", parts.encode], ["GPU", parts.gpu]]
+      .filter(([, ms]) => ms !== null && ms > budget)
+      .map(([label, ms]) => `${label} ${fmtMs(ms, 2)}`);
+    body.append(el("div", { class: "perf-note", text: `${overBudget.join(" · ")} · Budget ${fmtMs(budget, 2)}` }));
   }
-  body.append(verdict);
-  body.append(gpuBreakdownSection(frame.gpuBreakdown));
+  const breakdown = gpuBreakdownSection(frame.gpuBreakdown ?? (perf.analysis.frame === frame.frame ? perf.analysis.data?.gpuBreakdown : null));
+  if (breakdown) body.append(breakdown);
   body.append(el("div", { class: "section", attrs: { style: "margin-top:10px" } },
     el("h3", { text: "Attribution" }),
     frameAnalysisAttribution(),
@@ -627,21 +624,25 @@ function renderFrameAnalysis() {
   body.append(el("div", { class: "perf-note", text: correlation }));
 }
 
-// The breakdown names how pass times were obtained, because the backends do not
-// measure the same thing: Vulkan times each pass, Metal times each submission and
-// leaves pass rows without a number. A missing number means "not measured".
 const GPU_SOURCE_NOTES = {
-  "vulkan-timestamps": "GPU time is one labelled sample per pass.",
-  "metal-submission": "GPU time covers the whole submission; this backend does not time passes individually.",
-  "webgpu": "GPU time covers the whole frame; the browser encoder does not report passes with times.",
-  "cpu-only": "No GPU samples were attached, so pass rows carry geometry only.",
+  "vulkan-timestamps": "Vulkan timestamps",
+  "metal-counters": "Metal counters",
+  "metal-submission": "Metal submission time",
+  "dx12-timestamps": "DirectX 12 timestamps",
+  "webgpu": "WebGPU timestamps",
+  "cpu-only": "GPU timing unavailable",
 };
 
 function gpuBreakdownSection(breakdown) {
-  if (!breakdown || !Array.isArray(breakdown.passes) || breakdown.passes.length === 0) return null;
-  const passes = breakdown.passes;
+  if (!breakdown) return null;
+  const passes = Array.isArray(breakdown.passes) ? breakdown.passes : [];
   const layers = Array.isArray(breakdown.layers) ? breakdown.layers : [];
-  const note = GPU_SOURCE_NOTES[breakdown.timingSource] ?? `Timing source ${breakdown.timingSource ?? "unknown"}.`;
+  const note = GPU_SOURCE_NOTES[breakdown.timingSource] ?? breakdown.timingSource;
+  const passCount = numberValue(breakdown.passCount) ?? passes.length;
+  const layerCount = numberValue(breakdown.layerCount) ?? layers.length;
+  const counts = [];
+  if (passCount > passes.length) counts.push(`${passes.length} of ${passCount} passes`);
+  if (layerCount > layers.length) counts.push(`${layers.length} of ${layerCount} layers`);
   const passRows = [["Pass", "Kind", "Draws", "Indices", "GPU", "Layers"]];
   for (const pass of passes) {
     const gpu = numberValue(pass.gpuMs);
@@ -670,12 +671,10 @@ function gpuBreakdownSection(breakdown) {
   }
   return el("div", { class: "section", attrs: { style: "margin-top:10px" } },
     el("h3", { text: "GPU passes" }),
-    el("div", { class: "perf-note", text: note }),
+    note ? el("div", { class: "perf-note", text: note }) : null,
     dataTable(passRows, "No pass was recorded for this frame."),
-    layers.length === 0
-      ? el("div", { class: "perf-note", text: "This host reports no compositing layers, so passes cannot be attributed to layers." })
-      : dataTable(layerRows, "No layer survived culling."),
-    el("div", { class: "perf-note", text: "Layer windows nest: a container that composites its children owns an outer window that contains theirs. A strip pass draws every visible layer, so its layer list is the whole visible set." }),
+    layers.length > 0 ? dataTable(layerRows, "") : null,
+    counts.length ? el("div", { class: "perf-note", text: counts.join(" · ") }) : null,
   );
 }
 
@@ -712,6 +711,10 @@ async function loadFrameAnalysis(frameNumber) {
     if (request !== state.performance.analysis.request || targetId !== state.targetId) return;
     state.performance.analysis = { frame: frameNumber, loading: false, error: null, data, request };
     state.performance.analysisCache.set(key, data);
+    if (data?.gpuBreakdown) {
+      const current = state.performance.frames.find(item => item.frame === frameNumber);
+      if (current) current.gpuBreakdown = data.gpuBreakdown;
+    }
   } catch (error) {
     if (request !== state.performance.analysis.request || targetId !== state.targetId) return;
     state.performance.analysis = { frame: frameNumber, loading: false, error, data: null, request };

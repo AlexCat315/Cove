@@ -84,6 +84,7 @@ struct OpenNode {
     mask: Option<RoundedRect>,
     clipped: bool,
     inherited_clip_revision: u64,
+    census_start: Option<usize>,
 }
 
 /// The list primitives are currently recorded into: the nearest enclosing
@@ -153,11 +154,12 @@ impl LayerAwareNodeRenderer {
             mask: None,
             clipped: false,
             inherited_clip_revision: 0,
+            census_start: None,
         }];
         let mut index = 0;
         while index < plan.objects.len() || open.len() > 1 {
             if open.len() > 1 && index >= open.last().map_or(0, |record| record.end) {
-                let event = finish(&mut open);
+                let event = finish(&mut open, census.as_deref_mut());
                 if let (Some(census), Some(event)) = (census.as_deref_mut(), event) {
                     match event {
                         LayerEvent::Composited(layer) => census.layers.push(layer),
@@ -314,6 +316,10 @@ impl LayerAwareNodeRenderer {
                     child_allows_cache = false;
                 }
             }
+            let census_start = layer
+                .as_ref()
+                .and(census.as_ref())
+                .map(|census| census.layers.len());
             begin(
                 &mut open,
                 &object,
@@ -324,6 +330,7 @@ impl LayerAwareNodeRenderer {
                 &parent_clips,
                 child_allows_cache,
                 inherited_clip_revision,
+                census_start,
             );
             index += 1;
         }
@@ -352,6 +359,7 @@ fn begin(
     parent_clips: &Rc<[Clip]>,
     allows_container_cache: bool,
     inherited_clip_revision: u64,
+    census_start: Option<usize>,
 ) {
     let scale = own.a;
     let (x, y) = (own.e, own.f);
@@ -385,6 +393,7 @@ fn begin(
         mask,
         clipped,
         inherited_clip_revision,
+        census_start,
     });
     let first_vertex = target_list(open).vertices().len();
     if let Some(reveal) = node.reveal_request() {
@@ -457,12 +466,10 @@ fn layer_bounds(record: &OpenNode) -> Rect {
     }
 }
 
-fn finish(open: &mut Vec<OpenNode>) -> Option<LayerEvent> {
+fn finish(open: &mut Vec<OpenNode>, mut census: Option<&mut LayerCensus>) -> Option<LayerEvent> {
     let Some(record) = open.last() else {
         return None;
     };
-    let node_id = record.node.as_ref().map(|node| node.id().0.to_string());
-    let bounds = layer_bounds(record);
     let mask = record.mask;
     let clipped = record.clipped;
     let opacity = record.node.as_ref().map_or(1.0, Node::opacity);
@@ -493,19 +500,15 @@ fn finish(open: &mut Vec<OpenNode>) -> Option<LayerEvent> {
             list.pop_clip_rect();
         }
     }
-    let Some(record) = open.pop() else {
-        return None;
-    };
-    let Some(object) = record.object else {
-        return None;
-    };
+    let mut record = open.pop()?;
+    let object = record.object.as_ref()?;
     if !object.is_layer_root() {
         return None;
     }
     object.set_last_placement(Some(record.own));
     object.set_last_clip_stack(record.parent_clips.to_vec());
     object.set_cache_invalid(false);
-    let Some(mut list) = record.list else {
+    let Some(mut list) = record.list.take() else {
         // No own list means the container drew straight into its parent's list:
         // it never composited independently, so it is not a layer a reader would
         // look for. A layer that recorded but painted nothing keeps its list and
@@ -526,23 +529,43 @@ fn finish(open: &mut Vec<OpenNode>) -> Option<LayerEvent> {
     if let Some(paint_bounds) = object.cached_paint_bounds() {
         let destination = target_list(open);
         if RenderCulling::is_outside(paint_bounds, destination) {
-            return Some(LayerEvent::Skipped(SkippedLayer {
-                node: node_id,
-                bounds,
-            }));
+            if let Some(start) = record.census_start
+                && let Some(census) = census
+            {
+                census.layers.truncate(start);
+                return Some(LayerEvent::Skipped(SkippedLayer {
+                    node: record.node.as_ref().map(|node| node.id().0.to_string()),
+                    bounds: layer_bounds(&record),
+                }));
+            }
+            return None;
         }
     }
     let destination = target_list(open);
     let first_index = destination.indices().len() as u64;
-    let _ = destination.append_preclipped(&list, &record.parent_clips, Point::default());
+    let can_rebase = census.is_some() && destination.can_append_preclipped(&record.parent_clips);
+    let appended = destination.append_preclipped(&list, &record.parent_clips, Point::default());
+    let census = census.take()?;
+    if let Some(start) = record.census_start {
+        if can_rebase && appended.is_ok() {
+            for layer in &mut census.layers[start..] {
+                layer.first_index += first_index;
+            }
+        } else {
+            // Reapplying a rounded mask can replace indices. The parent still
+            // owns the resulting range, but descendant ranges are unmappable.
+            census.layers.truncate(start);
+        }
+    }
+    appended.ok()?;
     let index_count = destination.indices().len() as u64 - first_index;
     Some(LayerEvent::Composited(CompositedLayer {
-        node: node_id,
+        node: record.node.as_ref().map(|node| node.id().0.to_string()),
         first_index,
         index_count,
         recorded: true,
         translated: false,
-        bounds,
+        bounds: layer_bounds(&record),
     }))
 }
 
@@ -732,6 +755,50 @@ mod tests {
         );
         assert!(!card_layer.translated);
         assert_eq!(card_layer.index_count as usize, frame.indices().len());
+    }
+
+    #[test]
+    fn nested_layers_report_indices_relative_to_the_frame() {
+        let (root, card, tree) = scene();
+        let inner = Node::new();
+        inner.set_frame(Rect::new(4.0, 4.0, 8.0, 8.0));
+        inner.set_background_color(Some(Color::WHITE));
+        inner.set_clips_to_bounds(true);
+        card.add_child(&inner);
+        let first = Node::new();
+        first.set_frame(Rect::new(0.0, 0.0, 3.0, 3.0));
+        first.set_background_color(Some(Color::BLACK));
+        root.add_child(&first);
+        root.reorder_children(&[first, card.clone()]);
+        tree.install(&root);
+
+        let mut renderer = LayerAwareNodeRenderer::new();
+        renderer.render(&tree, &mut DrawList::default());
+        // Keep the root in the frame list so the card can cache its subtree.
+        tree.render_object(&root).unwrap().set_cache_invalid(true);
+        let mut frame = DrawList::default();
+        let mut census = LayerCensus::default();
+        renderer.render_with_census(&tree, &mut frame, Some(&mut census));
+        let layer = |node: &Node| {
+            let id = node.id().0.to_string();
+            census
+                .layers
+                .iter()
+                .find(|layer| layer.node.as_deref() == Some(id.as_str()))
+                .unwrap()
+        };
+        let parent = layer(&card);
+        let child = layer(&inner);
+        assert!(parent.first_index > 0);
+        assert_eq!(child.first_index, parent.first_index + 6);
+        assert_eq!(
+            child.first_index + child.index_count,
+            parent.first_index + parent.index_count
+        );
+        assert_eq!(
+            child.first_index + child.index_count,
+            frame.indices().len() as u64
+        );
     }
 
     #[test]

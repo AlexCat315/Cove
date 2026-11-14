@@ -17,9 +17,9 @@ use objc2::rc::Retained;
 use objc2::runtime::ProtocolObject;
 use objc2_foundation::NSString;
 use objc2_metal::{
-    MTLCommandQueue, MTLDepthStencilDescriptor, MTLDepthStencilState, MTLDevice, MTLGPUFamily,
-    MTLIndirectCommandBufferDescriptor, MTLIndirectCommandType, MTLPixelFormat, MTLResourceOptions,
-    MTLSharedEvent, MTLTextureDescriptor, MTLTextureType, MTLTextureUsage,
+    MTLCommandQueue, MTLDepthStencilDescriptor, MTLDepthStencilState, MTLDevice, MTLEvent,
+    MTLGPUFamily, MTLIndirectCommandBufferDescriptor, MTLIndirectCommandType, MTLPixelFormat,
+    MTLResourceOptions, MTLTextureDescriptor, MTLTextureType, MTLTextureUsage,
 };
 use objc2_quartz_core::{CAMetalDrawable, CAMetalLayer};
 
@@ -241,25 +241,22 @@ impl MetalDeviceHandle {
         }
     }
 
-    /// Shared event for a timeline semaphore ID, created on first use.
-    pub fn shared_event(
-        &mut self,
-        id: u32,
-    ) -> Option<Retained<ProtocolObject<dyn MTLSharedEvent>>> {
+    /// Device-local event for a timeline semaphore ID, created on first use.
+    pub fn timeline_event(&mut self, id: u32) -> Option<Retained<ProtocolObject<dyn MTLEvent>>> {
         {
             let registries = self
                 .registries
                 .lock()
                 .unwrap_or_else(std::sync::PoisonError::into_inner);
-            if let Some(existing) = registries.shared_events.get(&id) {
+            if let Some(existing) = registries.timeline_events.get(&id) {
                 return Some(existing.clone());
             }
         }
-        let event = self.device.newSharedEvent()?;
+        let event = self.device.newEvent()?;
         self.registries
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner)
-            .shared_events
+            .timeline_events
             .insert(id, event.clone());
         Some(event)
     }

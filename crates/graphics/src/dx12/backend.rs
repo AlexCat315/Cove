@@ -13,13 +13,13 @@ use crate::rhi::{
     AccelerationStructure, AccelerationStructureDescriptor, AdapterCapabilities, BindingLayout,
     BindingLayoutDescriptor, BindingLayoutEntry, BindingSet, BindingSetEntry, Buffer,
     BufferDescriptor, Capabilities, Completion, ComputePipeline, ComputePipelineDescriptor,
-    CpuProfilePhase, DeviceConfig, FrameUploader, GpuTimestampProfile, GraphicsApi,
-    GraphicsPipeline, GraphicsPipelineDescriptor, MeshPipeline, MeshPipelineDescriptor,
-    PipelineLayout, PipelineLayoutDescriptor, PlannedSubmit, PresentationMode, RhiBackend,
-    RhiCompilationWork, RhiCompiledObject, RhiError, RhiResult, Sampler, SamplerDescriptor,
-    ShaderModule, ShaderModuleDescriptor, SubmissionCpuProfile, SurfaceDescriptor, Swapchain,
-    SwapchainImage, Texture, TextureAllocation, TextureDescriptor, TextureSubresource,
-    TextureUploadRegion, rhi_require, rhi_validate_texture_samples,
+    CpuProfilePhase, DeviceConfig, FrameUploader, GpuTimestampMarker, GpuTimestampProfile,
+    GraphicsApi, GraphicsPipeline, GraphicsPipelineDescriptor, MeshPipeline,
+    MeshPipelineDescriptor, PipelineLayout, PipelineLayoutDescriptor, PlannedSubmit,
+    PresentationMode, RhiBackend, RhiCompilationWork, RhiCompiledObject, RhiError, RhiResult,
+    Sampler, SamplerDescriptor, ShaderModule, ShaderModuleDescriptor, SubmissionCpuProfile,
+    SurfaceDescriptor, Swapchain, SwapchainImage, Texture, TextureAllocation, TextureDescriptor,
+    TextureSubresource, TextureUploadRegion, rhi_require, rhi_validate_texture_samples,
 };
 
 use super::device::Dx12DeviceHandle;
@@ -51,6 +51,12 @@ impl Dx12Backend {
         completion: Result<crate::rhi::TimedCompletion, Completion>,
     ) -> RhiResult<()> {
         let encoding_start = cpu_profile.as_deref().and_then(SubmissionCpuProfile::begin);
+        let gpu_profile = self.gpu_timestamp_profile.clone();
+        let timestamp_passes = completion
+            .as_ref()
+            .ok()
+            .map(|timed| timed.pass_count)
+            .or_else(|| gpu_profile.as_ref().map(|_| 0));
         // Execute planner releases, graphics, compute and copies in order on
         // one queue. Resource states cannot cross native queue types without
         // explicit handoffs and fence waits.
@@ -71,7 +77,7 @@ impl Dx12Backend {
             &mut self.device,
             &mut registries,
             submit,
-            completion.is_ok(),
+            timestamp_passes,
         )?;
         // SAFETY: the list was closed by `record` and the queue is live.
         let fence_value = self.device.execute(command_list);
@@ -114,16 +120,17 @@ impl Dx12Backend {
         let staged: Vec<u64> = staged.into_iter().map(|resource| resource as u64).collect();
         std::thread::spawn(move || {
             #[cfg(target_os = "windows")]
-            let nanos = waiter
+            let timing = waiter
                 .wait()
                 .ok()
-                .and_then(|_| timestamps.as_ref()?.nanos());
+                .and_then(|_| timestamps.as_ref().map(|timestamps| timestamps.read()))
+                .unwrap_or_default();
             #[cfg(target_os = "windows")]
             drop(timestamps);
             #[cfg(not(target_os = "windows"))]
-            let nanos = {
+            let timing = {
                 let _ = waiter.wait();
-                None
+                crate::rhi::GpuSubmissionTiming::default()
             };
             // SAFETY: each address belongs to a staging buffer created for this
             // submission, and the GPU has retired the fence that referenced it.
@@ -132,8 +139,16 @@ impl Dx12Backend {
                     sys::IUnknownVtbl::release(address as sys::ComPtr);
                 }
             }
+            if let Some(profile) = gpu_profile {
+                if let Some(nanos) = timing.nanoseconds {
+                    profile.note("ok");
+                    profile.append(GpuTimestampMarker::new("graphics submission", nanos));
+                } else {
+                    profile.note("DirectX 12 timestamp queries unavailable");
+                }
+            }
             match completion {
-                Ok(timed) => timed(nanos),
+                Ok(timed) => timed.complete(timing),
                 Err(untimed) => untimed(),
             }
         });
@@ -722,7 +737,7 @@ impl RhiBackend for Dx12Backend {
     }
 
     fn supports_gpu_timestamps(&self) -> bool {
-        false
+        self.device.timestamp_frequency().is_some()
     }
 
     fn gpu_timestamp_profile(&self) -> Option<Arc<GpuTimestampProfile>> {
