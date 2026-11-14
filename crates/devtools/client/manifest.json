@@ -40,7 +40,7 @@
         "inspector/detail-tabs.css",
         "inspector/flex-explorer.css",
         "inspector/input-drawer.css",
-        "panels/aux.css",
+        "panels/auxiliary.css",
         "panels/performance.css",
         "panels/performance/cpu-profile.css",
         "panels/performance/cpu-profile-views.css",
