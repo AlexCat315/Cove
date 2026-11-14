@@ -323,7 +323,8 @@ fn logical_size_and_scale_follow_rotation_and_density() {
             text.clone(),
         );
         session.prepare((800, 1600), 2.0, 0.0);
-        session.did_present();
+        session.did_submit(1);
+        session.presentation_finished(1, true, 0.0, None);
         assert!(
             !session.needs_frame(),
             "a presented frame settles the session"

@@ -1,113 +1,26 @@
 # GPU pass and layer attribution
 
-`TimingFrame` used to answer one question about the GPU: how long the whole frame
-took. It now also answers "which passes did this frame record, how much geometry
-did each carry, and which composited layer owned that geometry". This note
-records what the numbers actually mean, because the three backends do not
-measure the same thing and pretending they do would make the panel lie.
+**Performance → Frames** shows CPU phases and the GPU duration reported by the runtime. Select a frame to see the recorded passes, sampled durations, draw counts and links to the layers whose indices were used. The GPU samples belong to the submission that produced them. Frame slots publish them only after retirement, including when submissions complete out of order.
 
-## What is collected
-
-Three independent censuses are joined per frame:
-
-| Census | Source | Cost |
+| Backend | GPU clock | `timingSource` |
 | --- | --- | --- |
-| Passes | `CommandBuffer::pass_reports()` in `crates/graphics/src/rhi/pass_report.rs` | Walks the recorded commands once, no allocation beyond the row vector |
-| Layers | `LayerCensus` from `LayerAwareNodeRenderer::render_with_census` in `crates/core/src/scene` | One `CompositedLayer` per layer root; only collected while a DevTools session is live |
-| GPU time | `GpuTimestampProfile` markers the backend already produces | Zero when no profile is attached |
+| Metal | Command buffer duration and pass boundary counters, where available | `metal-counters` or `metal-submission` |
+| Vulkan | Per-submission query pool with pairs at pass boundaries | `vulkan-timestamps` |
+| DirectX 12 | Direct queue timestamps resolved into a fence-owned readback buffer | `dx12-timestamps` |
+| WebGPU | `timestamp-query` for the submission and each tracked pass | `webgpu` |
+| No available GPU timestamps | Pass and layer geometry | `cpu-only` |
 
-The join lives in `crates/devtools/src/gpu_breakdown.rs::assemble`. It never
-apportions or estimates: a pass is attributed to a layer only when their index
-windows overlap, and a pass gets a `gpuMs` only when a timestamp marker names
-it.
+Coverage includes the native desktop and mobile hosts and the browser prototype. Canvas2D exposes layer geometry. Hardware and browser features determine which samples are available. A missing `gpuMs` appears as “not measured”. The frame total sums measured submissions and excludes presentation and barrier-only queue handoffs. Pass intervals can overlap on the GPU and can include time spent waiting on dependencies inside the command stream.
 
-## Where GPU pass time really exists
+## How layers map to draw calls
 
-The only backend that times individual passes is Vulkan. `encode_labels` in
-`crates/graphics/src/vulkan/submission.rs` writes one timestamp pair per planned
-pass, labelled with the pass's descriptor label or `renderPass#N`.
+A composited layer contributes a contiguous range of indices to the Cove draw list. A pass links to a layer when one of its indexed draws overlaps that range. Nested layer ranges can overlap. A reused container contributes its cached range, and a culled layer is marked `skipped` with no range. When applying an additional rounded mask changes indices at a cache boundary, the profiler attributes the resulting range to the containing layer. Fullscreen passes that sample intermediate textures can carry zero layer links. Pass timings are durations of GPU work and no milliseconds are allocated to layers.
 
-| Backend | Sampling granularity | `timingSource` |
-| --- | --- | --- |
-| Vulkan (Android, Linux) | One labelled pair per pass | `vulkan-timestamps` |
-| Metal (macOS, iOS) | One pair per submission (`graphics submission`) | `metal-submission` |
-| WebGPU (browser prototype) | One number for the whole frame | `webgpu` |
-| Nothing attached | none | `cpu-only` |
+## Reading recorded frames
 
-On Metal a breakdown therefore has every pass row and every layer row, and
-`gpuMs` is absent on all of them. That is the honest reading: the pass split is
-known, the per-pass GPU cost is not measured. A panel must render the missing
-value as "not measured", not as 0 ms. Adding Metal pass timing means
-`MTLCounterSampleBuffer` sample points at pass boundaries; it is not implemented
-and should not be faked by dividing the submission total across pass geometry.
+`record_ui_timings` returns lightweight frame records. Request `analyze_ui_frame` with a retained frame number to get its `gpuBreakdown`, including when CPU trace data is unavailable. The response includes up to 64 passes and 128 layers and reports their full row counts. Selected frames with loaded details preserve them when exported into a performance snapshot.
 
-For unnamed passes, the Vulkan labels (`renderPass#0`) cannot be matched by name.
-`attribute_labels` matches them by ordinal among the unnamed passes of the same
-kind. A marker that names no pass, such as a submission-level label, stays
-unattached.
-
-## How layers map to index windows
-
-`LayerAwareNodeRenderer` appends each layer's cached `DrawList` into the frame
-list, so a layer owns the contiguous index window that append created. The census
-records `firstIndex`/`indexCount` around the append, plus whether the layer was
-`recorded` this frame or came back from its cache (`translated` when reuse only
-moved cached vertices).
-
-Consequences a reader has to know:
-
-* **Windows nest.** A layer root that composites its children as a cached
-  container produces an outer window that contains the inner ones. A pass that
-  draws the outer window therefore reports both layers. Nesting is real
-  compositing, not double counting of geometry: the frame index buffer holds one
-  copy.
-* **A deferred container is not a layer.** On the frame a container first
-  records, it has no own list and draws straight into its parent, so the census
-  omits it. The same layer appears from the next frame on, when it has a cache.
-* **Culled layers are reported, not dropped.** A layer root removed by culling —
-  either before recording (`render`'s clip cull) or when its cached bounds sit
-  outside the frame — lands in `layers` with `skipped: true` and an empty window.
-  Skipped entries have no passes; they exist to explain an absent layer.
-* **Every strip pass draws every visible layer.** `record_raster_pass` re-draws
-  the whole batch list per `stripHeight` band, so a strip pass's `layers` list is
-  the full visible set. Only backdrop and blur passes correspond to a single
-  composite, and therefore to a single layer. Do not read "one pass per layer"
-  into the data; the renderer never had that structure.
-
-## Platform coverage
-
-* Desktop (`crates/hosts/src/desktop`): census at draw time, pass reports and
-  timestamp profile at submit, join at presentation. A profile is installed only
-  while a DevTools session reads frames, and removed when it stops.
-* Android (`crates/hosts/src/android`): same path, sharing the profile the
-  `cove_android_app` timing reporter installs, so telemetry and DevTools read the
-  same samples through separate drain cursors. These sources are compiled only
-  for Android targets, so they are not checked by a macOS build.
-* Browser (`crates/browser/src/prototype`): the prototype encodes with a flat
-  node renderer, not the layer compositor, so it publishes passes and reports
-  `webgpu` as its clock with an empty layer list. Layer attribution there needs a
-  census in that encoder, which is not implemented.
-
-## Reading it
-
-`record_ui_timings` returns frames with the `gpuBreakdown` payload, so both MCP
-and `cove-devtools call` see it. Each pass row carries `label`, `kind`, `draws`,
-`indices`, `vertices`, `layers` (indices into `layers`) and optional `gpuMs`; each
-layer row carries `nodeID`, `firstIndex`, `indexCount`, `recorded`, `translated`,
-`skipped`, its bounds, and `passes` (indices into `passes`).
-
-The Inspector performance panel renders both tables in the frame detail
-(`crates/devtools/client/src/panels/performance/frames.js`), with the pass table
-labelled by the same source note the payload carries.
-
-## Tests that pin the behaviour
-
-* `crates/graphics/tests/pass_reports.rs` — recording order, unnamed labels,
-  index windows, empty buffer.
-* `crates/core/src/scene/layer_aware_node_renderer.rs` tests — recorded versus
-  reused versus skipped layers, and the layer window matching the frame's
-  indices.
-* `crates/devtools/src/gpu_breakdown.rs` tests — window overlap, skipped layers,
-  Vulkan label matching including ordinals, Metal leaving pass times unmeasured.
-* `crates/devtools-protocol/src/lib.rs` tests — a frame without the breakdown
-  still deserializes, and a breakdown round-trips with `nodeID`/`gpuMs` naming.
+```sh
+cove-devtools call record_ui_timings '{}'
+cove-devtools call analyze_ui_frame '{"frame":42}'
+```

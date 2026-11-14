@@ -81,9 +81,34 @@ def verify(target):
         if row["id"] in before
         for key in ("buildCount", "layoutCount", "paintCount")
     )
+    frames = runtime("record_ui_timings")["frames"]
+    assert frames and all("gpuBreakdown" not in frame for frame in frames)
+    breakdown = None
+    for frame in reversed(frames):
+        if frame.get("gpuMs") is None:
+            continue
+        detail = runtime("analyze_ui_frame", frame=frame["frame"])
+        assert detail["frame"] == frame["frame"]
+        breakdown = detail.get("gpuBreakdown")
+        if breakdown:
+            break
+    if os.environ.get("COVE_EXPECT_GPU_PASSES") == "1":
+        assert breakdown and any(pass_.get("gpuMs", 0) > 0 for pass_ in breakdown["passes"])
+    gpu = {}
+    if breakdown:
+        assert len(breakdown["passes"]) <= breakdown["passCount"]
+        assert len(breakdown["layers"]) <= breakdown["layerCount"]
+        for index, pass_ in enumerate(breakdown["passes"]):
+            assert all(index in breakdown["layers"][layer]["passes"] for layer in pass_["layers"])
+        gpu = {
+            "gpuFrame": frame["frame"], "gpuMs": frame["gpuMs"],
+            "gpuSource": breakdown["timingSource"], "passes": len(breakdown["passes"]),
+            "layers": breakdown["layerCount"],
+        }
     print(json.dumps({
         "components": after["total"], "semantics": semantics["total"],
         "traceEvents": trace["eventCount"], "layout": chain["node"]["solved"],
+        **gpu,
     }))
 
 

@@ -159,6 +159,23 @@ impl Dx12DeviceHandle {
         Ok(allocator)
     }
 
+    pub fn timestamp_frequency(&self) -> Option<u64> {
+        #[cfg(target_os = "windows")]
+        {
+            use windows::Win32::Graphics::Direct3D12::ID3D12CommandQueue;
+            use windows::core::Interface;
+            // SAFETY: the native queue is alive for the duration of the call.
+            unsafe {
+                ID3D12CommandQueue::from_raw_borrowed(&self.graphics.queue)?
+                    .GetTimestampFrequency()
+                    .ok()
+                    .filter(|frequency| *frequency != 0)
+            }
+        }
+        #[cfg(not(target_os = "windows"))]
+        None
+    }
+
     pub fn execute(&mut self, list: sys::ComPtr) -> RhiResult<u64> {
         let value = execute_and_signal(&mut self.graphics, list)?;
         self.allocators[self.active_allocator].1 = value;

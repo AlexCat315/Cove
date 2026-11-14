@@ -4,6 +4,16 @@
 
 Swift 源码逐页对照见文末《Swift 源码对照（逐页差异清单）》。
 
+## 2026-11-14 DevTools GPU pass 与合成层
+
+| 页面 | 实现与自动化 | 实际操作 |
+| --- | --- | --- |
+| Gallery / Button | 槽位复用、提交乱序、同名 pass、缺失查询和嵌套层索引均有回归测试。 | macOS 单命令启动。通过应用内画面和输入切到 Button，回读状态并记录 798 条 trace。控制器返回 Metal 同帧 GPU 时间及逐 pass 时间，双向的 pass 与层链接一致。 |
+| DevTools / Performance | 帧汇总与明细分别读取。 | 无头 Chrome 连接真实控制器，选中帧后显示 `ui-frame`、`backdrop-blit`、Metal 计时来源以及层列表截断计数。导出再导入性能快照后，逐 pass 详情可读。 |
+| Browser / Performance | WASM 构建和运行时 RPC 验收通过。 | Chromium SwiftShader WebGPU 测得两个 pass 并关联 8 个层。Canvas2D 返回 8 个层，GPU 时间为空。 |
+
+Android、iOS 与 Windows 宿主交叉检查通过，Linux 图形 crate 交叉检查通过。Linux 完整宿主的 SDL 配置缺少 XCursor 开发库。Windows、Linux、Android、iOS GPU 硬件及物理输入待验收。Metal 光线查询集成测试已恢复。[DevTools](../Website/src/content/components/devtools.md)
+
 ## 2026-11-14 DevTools 布局、组件与语义
 
 | 页面 | 实现与自动化 | 实际画面与操作 | Rust 文档 |

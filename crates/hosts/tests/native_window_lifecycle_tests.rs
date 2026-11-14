@@ -89,7 +89,7 @@ fn drawing_before_configure_presents_nothing() {
 
     assert!(
         !window
-            .draw(&mut list, (64.0, 64.0))
+            .draw(&mut list, (64.0, 64.0), None)
             .expect("draw before configure"),
         "an unconfigured window cannot present"
     );
@@ -117,7 +117,7 @@ fn suspend_and_resize_without_a_surface_stay_safe() {
 
     assert!(
         !window
-            .draw(&mut list, (64.0, 64.0))
+            .draw(&mut list, (64.0, 64.0), None)
             .expect("draw while suspended"),
         "a suspended window draws without presenting"
     );

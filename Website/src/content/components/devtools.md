@@ -28,10 +28,13 @@ cargo run --quiet -p cove-devtools-cli -- call click_ui '{"target":"RUNTIME_ID",
 
 **Performance → Components** 按当前挂载组件的重建、布局或绘制计数排序。重建从挂载后开始计数，布局计入完整求解，绘制计入实际生成内容的节点。**Frames** 可按最慢阶段排序。GPU 时间单独比较帧预算。帧槽内发生的着色器和管线创建会显示次数及 CPU 时间。
 
+在 **Performance → Frames** 选中一帧可查看 **GPU passes**，包括 GPU 实测时间、绘制次数和关联的合成层。时间采样取决于后端和设备。合成层显示缓存与裁剪状态。展开帧详情后导出可把对应的 pass 数据保存到性能快照。
+
 **Semantics** 查看 Cove 场景中的语义层级和控件状态，点击行可定位到 Inspector。文本输入草稿和安全字段值从语义树中排除。
 
 ```sh
 cove-devtools call query_ui_layout '{"node_id":"NODE_ID"}'
 cove-devtools call query_ui_component_activity '{"sort_by":"layout","limit":20}'
+cove-devtools call analyze_ui_frame '{"frame":42}'
 cove-devtools call query_ui_semantics '{"limit":20}'
 ```

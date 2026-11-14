@@ -94,7 +94,8 @@ fn android_host_retains_content_but_releases_input_across_surface_lifetimes() {
             "the button keeps its authored frame"
         );
 
-        session.did_present();
+        session.did_submit(1);
+        session.presentation_finished(1, true, 0.0, None);
         assert!(
             !session.needs_frame(),
             "presenting clears the pending frame request"
@@ -115,14 +116,16 @@ fn android_host_retains_content_but_releases_input_across_surface_lifetimes() {
         );
 
         session.prepare((200, 100), 1.0, 1.0 / 120.0);
-        session.did_present();
+        session.did_submit(2);
+        session.presentation_finished(2, true, 0.0, None);
 
         // The press releases with a short spring, so the click settles over a
         // few frames; the Swift suite allowed up to 120 for trailing animation.
         let mut settled_after = 0;
         while session.needs_frame() && settled_after < 120 {
             session.prepare((200, 100), 1.0, 1.0 / 60.0);
-            session.did_present();
+            session.did_submit(100 + settled_after);
+            session.presentation_finished(100 + settled_after, true, 0.0, None);
             settled_after += 1;
         }
         assert!(
@@ -139,7 +142,8 @@ fn android_host_retains_content_but_releases_input_across_surface_lifetimes() {
 
         session.invalidate();
         session.prepare((400, 200), 2.0, 0.0);
-        session.did_present();
+        session.did_submit(4);
+        session.presentation_finished(4, true, 0.0, None);
 
         assert_eq!(
             count.get(),
@@ -160,12 +164,14 @@ fn surface_recreation_at_a_new_scale_publishes_the_new_density() {
         let count = State::new(0);
         let mut session = session(1.0, &count);
         session.prepare((200, 100), 1.0, 0.0);
-        session.did_present();
+        session.did_submit(5);
+        session.presentation_finished(5, true, 0.0, None);
         assert_eq!(session.scale(), 1.0, "the session starts at the host scale");
 
         session.suspend();
         session.prepare((300, 150), 3.0, 0.0);
-        session.did_present();
+        session.did_submit(6);
+        session.presentation_finished(6, true, 0.0, None);
         assert_eq!(session.scale(), 3.0, "the new density is published");
         assert_eq!(
             session.logical_size(),
@@ -197,7 +203,8 @@ fn pointer_input_is_ignored_while_it_is_not_finite() {
         let count = State::new(0);
         let mut session = session(1.0, &count);
         session.prepare((200, 100), 1.0, 0.0);
-        session.did_present();
+        session.did_submit(7);
+        session.presentation_finished(7, true, 0.0, None);
 
         let bounds = *session
             .inspect()

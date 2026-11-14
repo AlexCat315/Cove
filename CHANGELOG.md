@@ -4,6 +4,9 @@
 
 ## Unreleased
 
+- DevTools 按帧读取 Metal、Vulkan、DX12 和 WebGPU 的逐 pass 时间，Frames 显示对应的绘制量和合成层。帧详情按需读取，支持保存在性能快照中。浏览器复用 Cove 的合成层渲染器，Canvas2D 可检查合成层。
+- Metal 的设备内跨队列同步使用本地事件，修复部分设备创建共享事件失败后无法执行光线查询的问题。
+
 - DevTools 显示 Taffy 实际布局链、边缘溢出及普通文本截断。Performance 新增组件重建、布局、绘制计数和最慢帧排序，帧图单独显示 GPU 时间，帧详情报告活跃帧槽内的着色器和管线创建。
 - 新增 Cove 运行时 Semantics 树。Debugger 支持适配器公布的日志断点、异常过滤器及输出事件，移动端可连接转发到 loopback 的原生调试 stub。iOS/iPadOS 接入 Mach CPU 采样。Inspector 可选嵌入单个 JavaScript 包。
 - 修复纹理上传统计，把 staging 行填充从逻辑纹素字节中排除。修正 iOS 文件选择器的类型数组语法。
