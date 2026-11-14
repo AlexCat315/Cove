@@ -10,6 +10,7 @@ use cove_core::scene::{
 };
 use cove_core::scene::{FocusChainHolder, InputRoutingPriority, InteractionRegistryHolder};
 use cove_core::{Clip, Color, DrawList, Painter, Point, Rect, RoundedRect, paint_scaled};
+use cove_platform::SystemCursor;
 use cove_text::TextEnvironmentHolder;
 use std::any::Any;
 use std::cell::RefCell;
@@ -52,6 +53,10 @@ struct SelectionMember {
     text: Rc<dyn Fn() -> String>,
     /// Caret offset nearest to a window-space point.
     offset_at: Rc<dyn Fn(Point) -> usize>,
+    /// Whether the point is over a painted line of glyphs. The node's frame
+    /// covers its padding and whatever the parent stretched it to, so a label
+    /// in a dock panel owned the text cursor across the whole panel.
+    caret_at: Rc<dyn Fn(Point) -> bool>,
 }
 
 impl SelectionMember {
@@ -152,6 +157,7 @@ impl TextSelectionScope {
         node: &Node,
         text: Rc<dyn Fn() -> String>,
         offset_at: Rc<dyn Fn(Point) -> usize>,
+        caret_at: Rc<dyn Fn(Point) -> bool>,
     ) {
         let registration = if let Some(existing) = node.first_resource::<SelectionRegistration>() {
             existing
@@ -188,6 +194,7 @@ impl TextSelectionScope {
                     node: node.downgrade(),
                     text,
                     offset_at,
+                    caret_at,
                 },
             );
         }
@@ -587,19 +594,14 @@ impl TextSelectionScope {
     /// Whether a window-space point lands on a paragraph this scope owns.
     pub fn text_under(&mut self, point: Point) -> bool {
         self.update_order();
-        let mut edge: i32 = 0;
-        // SAFETY: frames is a live repr(C) slice for the supplied count and edge
-        // is a writable local. The synchronous C search retains neither pointer.
-        unsafe {
-            cove_selection_find(
-                self.frames.as_ptr(),
-                self.frames.len(),
-                point.x as f64,
-                point.y as f64,
-                false,
-                &mut edge,
-            ) >= 0
-        }
+        // The frames above answer "which paragraph comes first", not "is there
+        // a glyph here": they are the members' whole node rectangles.
+        self.members.values().any(|member| {
+            member
+                .node()
+                .filter(|node| node.parent().is_some())
+                .is_some_and(|_| (member.caret_at)(point))
+        })
     }
 
     /// The selected UTF-8 range within one paragraph.
@@ -851,14 +853,27 @@ impl TextSelectionChrome {
     }
 
     /// True when an ancestor already owns the pointer gesture — a button, list
-    /// row or table cell. Only normal-priority routes count: chrome-priority
-    /// ones are infrastructure and a scroll view's route exists to scroll.
+    /// row, table cell or workspace chrome.
+    ///
+    /// Two things count. A normal-priority pointer route (a control), and any
+    /// ancestor that declares a cursor of its own: a workspace tab or split
+    /// divider registers at capture priority yet still says the pointer means
+    /// "hand" or "resize", and its title must not turn that into a caret. The
+    /// workspace canvas declares no cursor, so selectable text inside panels
+    /// keeps its caret. A scroll view's route exists only to scroll, so it does
+    /// not count.
     pub fn is_inside_control(node: &Node) -> bool {
         let Some(registry) = InteractionRegistryHolder::current() else {
             return false;
         };
         let mut ancestor = node.parent();
         while let Some(current) = ancestor {
+            let chrome_cursor = current
+                .cursor()
+                .is_some_and(|cursor| cursor != SystemCursor::Ibeam);
+            if chrome_cursor {
+                return true;
+            }
             if let Some(route) = registry.handlers(&current).pointer_route
                 && route.priority <= InputRoutingPriority::NORMAL
                 && route.role != cove_core::scene::InputHandlerRole::Scroll
@@ -1076,4 +1091,28 @@ pub type SelectionTextEnvironment = TextEnvironmentHolder;
 /// Convenience for tests and hosts that need the current focus visibility.
 pub fn focus_is_visible() -> bool {
     FocusChainHolder::current().is_some_and(|chain| chain.is_focus_visible())
+}
+
+/// Whether a window-space point lands on one of a text block's painted lines.
+///
+/// A caret belongs to glyphs. A member's node frame covers its padding and
+/// whatever the parent stretched it to, so testing the frame let a one-line
+/// label claim the text cursor across a whole dock panel and steal it from the
+/// control underneath. Each line contributes its own `(top, height, width)`
+/// box, measured from the block's content origin.
+pub(crate) fn point_on_text_line(
+    point: Point,
+    origin: Point,
+    lines: impl Iterator<Item = (f32, f32, f32)>,
+) -> bool {
+    lines
+        .filter(|(_, height, width)| *height > 0.0 && *width > 0.0)
+        .any(|(top, height, width)| {
+            let local_y = point.y - origin.y;
+            let local_x = point.x - origin.x;
+            local_y >= top
+                && local_y < top + height
+                && local_x >= 0.0
+                && local_x <= width + cove_core::TEXT_FIT_TOLERANCE
+        })
 }

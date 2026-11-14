@@ -872,9 +872,12 @@ fn paint() {
         ui_icon_catalog::status::star(),
         ui_icon_catalog::status::star_fill(),
     ] {
-        let path = resource.path().expect("the icon resolves");
-        let bitmap = cove_imaging::ImageDecoder::decode(
-            &path,
+        let bytes = resource
+            .embedded()
+            .expect("the star ships its bytes inside the binary");
+        let bitmap = cove_imaging::ImageDecoder::decode_with_hint(
+            bytes,
+            "svg",
             Some(cove_imaging::PixelSize {
                 width: 40,
                 height: 40,

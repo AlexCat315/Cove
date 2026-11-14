@@ -11,7 +11,7 @@ use crate::theme::{TextScaler, TextStyleToken, theme_for_node};
 use crate::{PrimitiveView, impl_primitive_view};
 use cove_core::scene::{AccessibilityRole, AccessibilitySemantics, LayoutNode, MeasureMode, Node};
 use cove_core::{
-    Color, Font, TextAlignment, TextLayoutCacheEntry, TextLayoutCacheKey, TextLayoutResult,
+    Color, Font, Point, TextAlignment, TextLayoutCacheEntry, TextLayoutCacheKey, TextLayoutResult,
     TextMeasureInputs,
 };
 use cove_text::{DrawListText, TextEnvironment, TextEnvironmentHolder};
@@ -188,6 +188,7 @@ impl Text {
             return;
         };
         let owner = node.downgrade();
+        let caret = owner.clone();
         let string = self.string.clone();
         TextSelectionScope::register(
             &handle.0,
@@ -213,6 +214,28 @@ impl Text {
                 text.grapheme_indices(true)
                     .nth(index)
                     .map_or(text.len(), |(offset, _)| offset)
+            }),
+            Rc::new(move |point| {
+                let Some(node) = Node::upgrade(&caret) else {
+                    return false;
+                };
+                let Some(layout) = node.layout_node() else {
+                    return false;
+                };
+                let Some(entry) = layout.text_measure() else {
+                    return false;
+                };
+                let padding = layout.resolved_padding();
+                let frame = node.absolute_frame();
+                crate::primitives::text::rich::text_selection::point_on_text_line(
+                    point,
+                    Point::new(frame.x + padding.left, frame.y + padding.top),
+                    entry
+                        .result
+                        .lines
+                        .iter()
+                        .map(|line| (line.top_y, entry.key.line_height, line.width)),
+                )
             }),
         );
         super::selection_input::install(node, &handle.0);
@@ -444,8 +467,7 @@ impl Text {
             // Same fill rule as the plain-text measure: centred and trailing
             // paragraphs need the line box to keep their alignment at paint
             // time, which re-lays the flow at the node's own width.
-            let measured = if paragraph.alignment == TextAlignment::Leading || !width.is_finite()
-            {
+            let measured = if paragraph.alignment == TextAlignment::Leading || !width.is_finite() {
                 flow.width
             } else {
                 flow.width.max(width)

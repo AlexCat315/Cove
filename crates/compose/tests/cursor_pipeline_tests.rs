@@ -162,3 +162,43 @@ fn text_cursor_survives_focus_drag_and_recomposition() {
         });
     }
 }
+
+#[test]
+fn a_label_inside_a_control_keeps_the_control_cursor() {
+    use cove_core::Point;
+    use cove_platform::{InputEvent, MouseMotionEvent};
+    use support::InteractiveScene;
+
+    fn motion(point: Point) -> InputEvent {
+        InputEvent::MouseMotion(MouseMotionEvent {
+            x: point.x,
+            y: point.y,
+            delta_x: 0.0,
+            delta_y: 0.0,
+            kind: Default::default(),
+        })
+    }
+
+    InteractiveScene::run(480.0, 200.0, |scene| {
+        scene.install(Button::title("Save", || {}));
+        let label = scene
+            .first(|node| {
+                node.accessibility().is_some_and(|semantics| {
+                    semantics.label == "Save" && node.children().is_empty()
+                })
+            })
+            .expect("the button label");
+        let bounds = label.absolute_frame();
+        let inside = Point::new(
+            bounds.x + bounds.width * 0.5,
+            bounds.y + bounds.height * 0.5,
+        );
+        let events = scene.dispatcher();
+        events.dispatch(&motion(inside));
+        assert_eq!(
+            events.cursor(),
+            SystemCursor::Pointer,
+            "text inside a control shows the control's cursor, not the text cursor"
+        );
+    });
+}

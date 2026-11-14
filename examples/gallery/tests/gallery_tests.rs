@@ -594,3 +594,45 @@ fn the_rating_story_mounts_inside_the_shell() {
         },
     );
 }
+
+#[test]
+fn the_dock_tab_bar_keeps_the_hand_cursor() {
+    // Selecting text is enabled app-wide, and a dock tab's title is a selectable
+    // paragraph inside draggable chrome. The tab says the pointer means "hand",
+    // so hovering its strip must never turn into the text caret.
+    use cove_platform::{InputEvent, MouseMotionEvent, SystemCursor};
+    scene(
+        1280.0,
+        720.0,
+        GalleryPage::Workspace,
+        Appearance::Light,
+        |scene| {
+            let dock = scene.require_named("workspace-dock");
+            let frame = dock.absolute_frame();
+            let dispatcher = scene.dispatcher();
+            let mut checked = 0;
+            for step in 0..24 {
+                let x = frame.x + frame.width * (0.02 + 0.5 * step as f32 / 23.0);
+                for y_ratio in [0.03_f32, 0.06, 0.09] {
+                    let point = cove_core::Point::new(x, frame.y + frame.height * y_ratio);
+                    dispatcher.dispatch(&InputEvent::MouseMotion(MouseMotionEvent {
+                        x: point.x,
+                        y: point.y,
+                        delta_x: 0.0,
+                        delta_y: 0.0,
+                        kind: Default::default(),
+                    }));
+                    assert_ne!(
+                        dispatcher.cursor(),
+                        SystemCursor::Ibeam,
+                        "the dock tab strip at ({}, {}) shows the text caret instead of the hand",
+                        point.x,
+                        point.y
+                    );
+                    checked += 1;
+                }
+            }
+            assert!(checked >= 72);
+        },
+    );
+}

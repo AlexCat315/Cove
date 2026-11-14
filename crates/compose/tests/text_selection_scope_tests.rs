@@ -78,11 +78,17 @@ fn paragraph(
     let node = Node::new();
     node.set_frame(at);
     parent.add_child(&node);
+    // These cases are about bookkeeping, so they claim the live frame rather
+    // than a glyph line map; the composed text tests cover the real map.
+    let owner = node.downgrade();
     TextSelectionScope::register(
         scope,
         &node,
         Rc::new(move || text.to_string()),
         Rc::new(|_point: cove_core::Point| 2.min(text.len())),
+        Rc::new(move |point: cove_core::Point| {
+            Node::upgrade(&owner).is_some_and(|node| node.absolute_frame().contains(point))
+        }),
     );
     node
 }
@@ -338,6 +344,7 @@ fn detached_subtrees_and_reused_nodes_leave_their_previous_scope() {
             &node,
             Rc::new(|| "hello".to_string()),
             Rc::new(|_point| 2),
+            Rc::new(|_point| true),
         );
         assert!(
             scope
@@ -351,6 +358,7 @@ fn detached_subtrees_and_reused_nodes_leave_their_previous_scope() {
             &node,
             Rc::new(|| "hello".to_string()),
             Rc::new(|_point| 2),
+            Rc::new(|_point| true),
         );
         assert!(
             !scope

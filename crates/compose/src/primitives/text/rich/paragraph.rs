@@ -173,6 +173,7 @@ impl PrimitiveView for RichTextSurface {
         if let Some(scope) = scope {
             let source = self.paragraph.clone();
             let owner = node.downgrade();
+            let caret_owner = owner.clone();
             TextSelectionScope::register(
                 &scope.0,
                 node,
@@ -192,6 +193,33 @@ impl PrimitiveView for RichTextSurface {
                             &environment,
                         )
                         .offset(point.x - frame.x, point.y - frame.y)
+                    }
+                }),
+                Rc::new({
+                    let paragraph = self.paragraph.clone();
+                    move |point| {
+                        let (Some(owner), Some(environment)) = (
+                            Node::upgrade(&caret_owner),
+                            TextEnvironmentHolder::current(),
+                        ) else {
+                            return false;
+                        };
+                        let frame = owner.absolute_frame();
+                        let padding = owner
+                            .layout_node()
+                            .map_or(Default::default(), |layout| layout.resolved_padding());
+                        let flow = RichTextFlow::layout(
+                            &paragraph_at_node(&paragraph, &owner),
+                            frame.width,
+                            &environment,
+                        );
+                        crate::primitives::text::rich::text_selection::point_on_text_line(
+                            point,
+                            Point::new(frame.x + padding.left, frame.y + padding.top),
+                            flow.lines
+                                .iter()
+                                .map(|line| (line.top, line.height, line.width)),
+                        )
                     }
                 }),
             );

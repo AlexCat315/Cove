@@ -102,6 +102,7 @@ fn position(node: &Node, cluster: usize) -> TextSelectionPosition {
 fn register(scope: &SharedTextSelectionScope, label: &Node, text: &str) {
     let source = text.to_string();
     let owned = source.clone();
+    let owner = label.downgrade();
     TextSelectionScope::register(
         scope,
         label,
@@ -109,6 +110,11 @@ fn register(scope: &SharedTextSelectionScope, label: &Node, text: &str) {
         Rc::new(move |point: Point| {
             // A crude caret map: one cluster per point of x, clamped to the text.
             (point.x.max(0.0) as usize).min(source.chars().count())
+        }),
+        // The label's own frame stands in for the glyph map here; the caret
+        // map itself is exercised by the composed `Text` cursor tests.
+        Rc::new(move |point: Point| {
+            Node::upgrade(&owner).is_some_and(|node| node.absolute_frame().contains(point))
         }),
     );
 }

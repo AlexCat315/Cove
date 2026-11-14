@@ -2217,3 +2217,95 @@ fn an_in_slot_split_shares_its_slot_by_fraction() {
         );
     });
 }
+
+#[test]
+fn hovering_a_tab_label_shows_the_pointer_cursor() {
+    // The gallery enables app-wide text selection, so the tab's title text is a
+    // selectable paragraph sitting inside draggable chrome. The chrome says the
+    // pointer means "hand", so the title must not turn it into a caret.
+    use cove_platform::{InputEvent, MouseMotionEvent, SystemCursor};
+    use cove_ui_compose::primitives::text::rich::text_selection::TextSelectionViewExt;
+
+    let controller = Rc::new(RefCell::new(WorkspaceController::new(
+        workspace_support::make_document(),
+    )));
+    let root_controller = controller.clone();
+    let rig = ViewRig::new(controller, 1000.0, 640.0, move || {
+        AnyView::new(
+            workspace_support::workspace_root(root_controller.clone()).text_selection(true),
+        )
+    });
+    let tab = rig.rig.named("workspace-tab-console");
+    let frame = tab.absolute_frame();
+    let dispatcher = &rig.rig.dispatcher;
+    for step in 0..7 {
+        let x = frame.x + frame.width * (0.2 + 0.6 * step as f32 / 6.0);
+        let point = cove_core::Point::new(x, frame.y + frame.height * 0.5);
+        dispatcher.dispatch(&InputEvent::MouseMotion(MouseMotionEvent {
+            x: point.x,
+            y: point.y,
+            delta_x: 0.0,
+            delta_y: 0.0,
+            kind: Default::default(),
+        }));
+        assert_eq!(
+            dispatcher.cursor(),
+            SystemCursor::Pointer,
+            "the tab title at x={x} shows the hand, not the text caret"
+        );
+    }
+}
+
+#[test]
+fn a_tab_is_a_browser_tab_flush_with_its_panel() {
+    // Browser chrome: the active tab paints the panel's own surface, rounds its
+    // top corners, and sits exactly on the panel's top edge so the tab and the
+    // page read as one sheet. Inactive tabs stay clear on the strip.
+    let document = workspace_support::make_bare_document(
+        &[("main", &["files", "search"])],
+        WorkspaceSlotID::center(),
+    );
+    let controller = Rc::new(RefCell::new(WorkspaceController::new(document)));
+    let rig = ViewRig::standard(controller, 1000.0, 640.0);
+    let tab_node = rig.named("workspace-tab-files");
+    let theme = cove_ui_compose::theme::theme_for_node(&tab_node);
+    let tab = tab_node.absolute_frame();
+    let panel = rig.named("workspace-panel-scroll-files").absolute_frame();
+    assert!(
+        (tab.max_y() - panel.y).abs() <= 0.5,
+        "the tab foot sits on the panel edge, tab {tab:?} panel {panel:?}"
+    );
+    assert_eq!(
+        tab_node.background_color(),
+        Some(theme.colors.surface),
+        "the active tab wears the panel surface"
+    );
+    assert_eq!(
+        rig.named("workspace-tab-search").background_color(),
+        Some(cove_core::Color::CLEAR),
+        "an inactive tab stays clear on the strip"
+    );
+    assert_eq!(
+        tab_node.corner_radius(),
+        8.0,
+        "the tab rounds its top corners"
+    );
+    // The rounded foot is squared off by a cover child spanning the tab's width.
+    let cover = tab_node
+        .children()
+        .into_iter()
+        .find(|child| (child.absolute_frame().height - 8.0).abs() < 0.5)
+        .unwrap_or_else(|| {
+            let frames: Vec<_> = tab_node
+                .children()
+                .into_iter()
+                .map(|child| (child.absolute_frame(), child.background_color()))
+                .collect();
+            panic!("the tab squares its foot with a cover, children {frames:?}")
+        });
+    assert_eq!(
+        cover.background_color(),
+        Some(theme.colors.surface),
+        "the cover carries the tab fill"
+    );
+}

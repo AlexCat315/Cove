@@ -45,9 +45,6 @@ use cove_core::scene::{
     PointerCaptureHolder, PositionType,
 };
 use cove_platform::MouseButton;
-use cove_ui_compose::animation::geometry::{
-    SlidingSelectionHost, SlidingSelectionMark, SlidingSelectionStyle, is_in_sliding_selection,
-};
 use cove_ui_compose::modifiers::layout::{FlexExt, LayoutFrameExt};
 use cove_ui_compose::modifiers::style::AppearanceExt;
 use cove_ui_compose::primitives::controls::Button;
@@ -1843,72 +1840,63 @@ struct WorkspaceTabBar {
 
 impl View for WorkspaceTabBar {
     fn body(&self, _cx: &Scope) -> AnyView {
-        let active = self
-            .group
-            .active_panel_id
-            .clone()
-            .or_else(|| self.group.panels.first().cloned());
-        let mut tabs: Vec<AnyView> = Vec::new();
-        for panel_id in &self.group.panels {
-            let Some(panel) = self.document.panels.get(panel_id) else {
-                continue;
-            };
-            tabs.push(AnyView::new(WorkspaceTabButton {
-                group_id: self.group.id.clone(),
-                panel_id: panel_id.clone(),
-                title: panel.title.clone(),
-                is_active: active.as_ref() == Some(panel_id),
-                is_pinned: self.group.is_pinned(panel_id),
-                document: self.document.clone(),
-                controller: self.controller.clone(),
-            }));
-        }
-        let active_title = active
-            .as_ref()
-            .and_then(|id| self.document.panels.get(id))
-            .map(|panel| panel.title.clone())
-            .unwrap_or_default();
-        let mut list = AccessibilitySemantics::new(AccessibilityRole::TabList);
-        list.label = "Panel tabs".to_string();
-        list.value = active_title;
-        // One capsule slides between the tabs, as in every other tab strip.
-        let row = AnyView::new(
-            AnyView::new(
-                WorkspaceBox::row()
-                    .align(Align::Center)
-                    .spacing(2.0)
-                    .children(tabs)
-                    .boxed(),
-            )
-            .modifier(SlidingSelectionHost::new(|theme| SlidingSelectionStyle {
-                fill: theme.colors.surface_variant,
-                corner_radius: theme.radius.pill,
-                shadow: cove_core::SurfaceShadow::NONE,
-            })),
-        )
-        .modifier(WorkspaceSemanticsModifier(list));
-        // The row scrolls by wheel and trackpad; a bar would sit over the
-        // tabs, and the trailing menu already reaches every panel.
-        let scroller = AnyView::new(
-            ScrollView::horizontal(row)
-                .scrollbar_gutter(cove_ui_compose::ScrollbarGutter::Hidden)
-                .debug_name(&format!(
-                    "workspace-tabs-scroll-{}",
-                    self.group.id.raw_value()
-                )),
-        )
-        .flex_with(1.0, 1.0, Some(0.0));
         let group = self.group.clone();
         let document = self.document.clone();
         let controller = self.controller.clone();
         erased(WorkspaceMetricsReader {
             build: Rc::new(move |metrics| {
-                let scroller = scroller.clone();
-
+                let active = group
+                    .active_panel_id
+                    .clone()
+                    .or_else(|| group.panels.first().cloned());
+                let tab_height = (metrics.tab_height - TAB_STRIP_TOP).max(0.0);
+                let mut tabs: Vec<AnyView> = Vec::new();
+                for panel_id in &group.panels {
+                    let Some(panel) = document.panels.get(panel_id) else {
+                        continue;
+                    };
+                    tabs.push(AnyView::new(WorkspaceTabButton {
+                        group_id: group.id.clone(),
+                        panel_id: panel_id.clone(),
+                        title: panel.title.clone(),
+                        is_active: active.as_ref() == Some(panel_id),
+                        is_pinned: group.is_pinned(panel_id),
+                        height: tab_height,
+                        document: document.clone(),
+                        controller: controller.clone(),
+                    }));
+                }
+                let active_title = active
+                    .as_ref()
+                    .and_then(|id| document.panels.get(id))
+                    .map(|panel| panel.title.clone())
+                    .unwrap_or_default();
+                let mut list = AccessibilitySemantics::new(AccessibilityRole::TabList);
+                list.label = "Panel tabs".to_string();
+                list.value = active_title;
+                // Browser-style strip: the bar paints the chrome surface and
+                // each tab paints its own shape, so there is no sliding capsule
+                // to share.
+                let row = AnyView::new(
+                    WorkspaceBox::row()
+                        .align(Align::Stretch)
+                        .spacing(1.0)
+                        .children(tabs)
+                        .boxed(),
+                )
+                .modifier(WorkspaceSemanticsModifier(list));
+                // The row scrolls by wheel and trackpad; a bar would sit over
+                // the tabs, and the trailing menu already reaches every panel.
+                let scroller = AnyView::new(
+                    ScrollView::horizontal(row)
+                        .scrollbar_gutter(cove_ui_compose::ScrollbarGutter::Hidden)
+                        .debug_name(&format!("workspace-tabs-scroll-{}", group.id.raw_value())),
+                )
+                .flex_with(1.0, 1.0, Some(0.0));
                 erased(
                     AnyView::new(
                         WorkspaceBox::row()
-                            .align(Align::Center)
+                            .align(Align::Stretch)
                             .child(scroller)
                             .child(WorkspaceTabOverflow {
                                 group: group.clone(),
@@ -1935,6 +1923,7 @@ impl cove_composition::ViewModifier for WorkspaceTabBarModifier {
             LayoutDebugAttachmentKey::LAYOUT_ROLE,
             "workspace-tab-bar".to_owned(),
         );
+        node.set_background_color(Some(theme_for_node(node).colors.surface_variant));
         node.set_attachment(
             LayoutDebugAttachmentKey::SEMANTIC_ROLE,
             "workspace.tab.bar".to_owned(),
@@ -1944,10 +1933,13 @@ impl cove_composition::ViewModifier for WorkspaceTabBarModifier {
         node.set_accessibility(Some(semantics));
     }
     fn apply_layout(&self, layout: &LayoutNode) {
-        layout.set_height(Some(self.metrics.tab_height.max(26.0)));
+        layout.set_height(Some(self.metrics.tab_height.max(TAB_MIN_HEIGHT)));
         layout.set_flex_shrink(0.0);
         layout.set_padding(4.0, Edge::Left);
         layout.set_padding(4.0, Edge::Right);
+        // The strip keeps a sliver of chrome above the tabs, the way a browser
+        // toolbar shows over the tab row.
+        layout.set_padding(TAB_STRIP_TOP, Edge::Top);
     }
 }
 
@@ -2076,6 +2068,9 @@ struct WorkspaceTabButton {
     title: String,
     is_active: bool,
     is_pinned: bool,
+    /// Inner tab height: the strip minus its top inset, so a tab's foot lands
+    /// on the panel edge.
+    height: f32,
     document: WorkspaceDocument,
     controller: Rc<RefCell<WorkspaceController>>,
 }
@@ -2097,6 +2092,18 @@ impl PrimitiveView for WorkspaceTabButton {
 
     fn update_node(&self, node: &Node) {
         node.set_cursor(Some(cove_platform::SystemCursor::Pointer));
+        // The tab paints its own browser-style shape: rounded top corners, a
+        // flat foot, and a fill that matches the panel so the active tab merges
+        // with the page beneath it. Children paint inside that shape, so the
+        // node must not clip them back into a capsule.
+        let theme = theme_for_node(node);
+        node.set_background_color(Some(if self.is_active {
+            theme.colors.surface
+        } else {
+            Color::CLEAR
+        }));
+        node.set_corner_radius(TAB_CORNER_RADIUS);
+        node.set_clips_to_bounds(false);
         node.set_attachment(
             LayoutDebugAttachmentKey::DEBUG_NAME,
             format!("workspace-tab-{}", self.panel_id.raw_value()),
@@ -2405,20 +2412,29 @@ impl PrimitiveView for WorkspaceTabButton {
     fn update_layout(&self, layout: &LayoutNode) {
         layout.set_flex_direction(FlexDirection::Row);
         layout.set_align_items(Align::Center);
+        layout.set_justify_content(Justify::Center);
         layout.set_flex_shrink(0.0);
+        // Tabs take the strip's full height: the active tab's foot has to sit
+        // exactly on the panel's top edge, not float above it.
+        layout.set_align_self(Align::Stretch);
+        layout.set_min_height(Some(self.height));
     }
 
     fn children(&self, node: &Node) -> Vec<AnyView> {
-        // Selected tab: a `surfaceVariant` capsule, 9 pt padding, no rules
-        // above or between tabs. Inside the bar's sliding selection the
-        // capsule is the bar's, so it glides to the new tab instead of
-        // jumping; the tab only marks itself as its target.
+        // Browser-style tab: the active tab paints the panel's own surface with
+        // rounded top corners and a bottom flush against the panel, so the tab
+        // and the page read as one sheet. Inactive tabs stay transparent on the
+        // strip and only their label is muted.
         let theme = theme_for_node(node);
-        let slides = self.is_active && is_in_sliding_selection(node);
-        let fill = if self.is_active && !slides {
-            theme.colors.surface_variant
+        let fill = if self.is_active {
+            theme.colors.surface
         } else {
             Color::CLEAR
+        };
+        let label_color = if self.is_active {
+            SemanticColorRef::on_surface()
+        } else {
+            SemanticColorRef::on_surface_variant()
         };
         let mut row = WorkspaceBox::row().align(Align::Center).spacing(4.0);
         if self.is_pinned {
@@ -2427,19 +2443,22 @@ impl PrimitiveView for WorkspaceTabButton {
                     .modifier(WorkspaceDotModifier(SemanticColorRef::on_surface_muted())),
             );
         }
-        row = row.child(Text::new(self.title.clone()).semantic_font(SemanticFontRef::label()));
-        vec![erased(
-            AnyView::new(
-                AnyView::new(WorkspaceBox::row().child(row.boxed()).boxed()).modifier(
-                    WorkspaceTabButtonModifier {
-                        fill,
-                        radius: TAB_MIN_HEIGHT * 0.5,
-                        padding: 9.0,
-                    },
-                ),
-            )
-            .modifier(SlidingSelectionMark(slides)),
-        )]
+        row = row.child(
+            Text::new(self.title.clone())
+                .semantic_font(SemanticFontRef::label())
+                .semantic_foreground(label_color),
+        );
+        vec![
+            // The rounded bottom arcs would show as notches where the tab meets
+            // the panel, so a short cover of the same fill squares the foot off
+            // once the tab itself has painted its shape.
+            erased(
+                AnyView::new(WorkspaceBox::row())
+                    .modifier(WorkspaceTabBottomCoverModifier { fill })
+                    .modifier(WorkspaceTabBottomSquaringModifier),
+            ),
+            erased(AnyView::new(row.boxed()).modifier(WorkspaceTabContentModifier)),
+        ]
     }
 }
 impl_primitive_view!(WorkspaceTabButton);
@@ -2458,26 +2477,46 @@ impl cove_composition::ViewModifier for WorkspaceDotModifier {
     }
 }
 
-/// Height of a panel tab's capsule.
+/// Height of a panel tab.
 const TAB_MIN_HEIGHT: f32 = 26.0;
+/// Chrome above the tab row, the way a browser toolbar shows over its tabs.
+const TAB_STRIP_TOP: f32 = 4.0;
+/// Top corner radius of a browser-style tab.
+const TAB_CORNER_RADIUS: f32 = 8.0;
+/// Horizontal padding between the label and the tab edge.
+const TAB_LABEL_PADDING: f32 = 12.0;
 
-struct WorkspaceTabButtonModifier {
+struct WorkspaceTabBottomCoverModifier {
     fill: Color,
-    radius: f32,
-    padding: f32,
 }
 
-impl cove_composition::ViewModifier for WorkspaceTabButtonModifier {
+impl cove_composition::ViewModifier for WorkspaceTabBottomCoverModifier {
     fn apply_node(&self, node: &Node) {
         node.set_background_color(Some(self.fill));
-        node.set_corner_radius(self.radius);
-        node.set_clips_to_bounds(true);
     }
+}
+
+/// Pins the cover to the tab's foot, spanning its full width.
+struct WorkspaceTabBottomSquaringModifier;
+
+impl cove_composition::ViewModifier for WorkspaceTabBottomSquaringModifier {
     fn apply_layout(&self, layout: &LayoutNode) {
-        layout.set_flex_shrink(0.0);
-        layout.set_min_height(Some(TAB_MIN_HEIGHT));
-        layout.set_padding(self.padding, Edge::Left);
-        layout.set_padding(self.padding, Edge::Right);
+        layout.set_position_type(PositionType::Absolute);
+        layout.set_position(0.0, Edge::Left);
+        layout.set_position(0.0, Edge::Right);
+        layout.set_position(0.0, Edge::Bottom);
+        layout.set_height(Some(TAB_CORNER_RADIUS));
+    }
+}
+
+/// The label's padding, kept off the tab node so the foot cover can reach the
+/// tab's own edges.
+struct WorkspaceTabContentModifier;
+
+impl cove_composition::ViewModifier for WorkspaceTabContentModifier {
+    fn apply_layout(&self, layout: &LayoutNode) {
+        layout.set_padding(TAB_LABEL_PADDING, Edge::Left);
+        layout.set_padding(TAB_LABEL_PADDING, Edge::Right);
     }
 }
 
