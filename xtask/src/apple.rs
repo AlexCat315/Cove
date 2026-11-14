@@ -103,6 +103,20 @@ fn sign(bundle: &Path, identity: &str, entitlements: Option<&Path>, hardened: bo
     process::run(command.arg(bundle))
 }
 
+/// Signs each staged helper before the bundle itself. iOS treats a second
+/// executable in the app root as nested code, so an unsigned helper makes the
+/// whole bundle fail verification; macOS notarization likewise wants helpers
+/// signed with the application's identity.
+fn sign_helpers(project: &Project, directory: &Path, identity: &str, hardened: bool) -> Result<()> {
+    for helper in &project.helpers {
+        let executable = directory.join(helper);
+        if executable.is_file() {
+            sign(&executable, identity, None, hardened)?;
+        }
+    }
+    Ok(())
+}
+
 pub fn bundle_mac(project: &Project, target: &Target, output: &Path) -> Result<PathBuf> {
     let executable = project.build_bin(target.mode(), None)?;
     let bin = project.bin()?;
@@ -131,6 +145,7 @@ pub fn bundle_mac(project: &Project, target: &Target, output: &Path) -> Result<P
     )?;
     let identity = target.identity.as_deref().unwrap_or("-");
     let entitlements = platform.join("Entitlements.plist");
+    sign_helpers(project, &contents.join("MacOS"), identity, identity != "-")?;
     sign(
         &app,
         identity,
@@ -153,6 +168,7 @@ pub fn launch_mac(
 }
 
 pub fn bundle_ios(project: &Project, target: &Target, output: &Path) -> Result<PathBuf> {
+    project.reject_helpers_for_ios()?;
     let triple = if target.simulator {
         "aarch64-apple-ios-sim"
     } else {
@@ -167,7 +183,6 @@ pub fn bundle_ios(project: &Project, target: &Target, output: &Path) -> Result<P
     let platform = project.platforms("iOS");
     process::copy_tree(&platform.join("Resources"), &app)?;
     project.stage_extra_resources(&app)?;
-    project.stage_helpers(&app, target.mode(), Some(triple))?;
     let build = project.build.to_string();
     let mut entries = identity_entries(project, bin, &build);
     entries.extend(ios_entries(target.simulator));

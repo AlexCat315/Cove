@@ -253,11 +253,21 @@ impl Project {
     /// Android packages run code out of the APK, so a helper executable has no
     /// place to run. Fail instead of shipping an inert file.
     pub fn reject_helpers_for_android(&self) -> Result<()> {
+        self.reject_helpers_for("Android")
+    }
+
+    /// iOS applications cannot `exec` a second binary either: a helper in the
+    /// app root is dead weight that also breaks `codesign` verification.
+    pub fn reject_helpers_for_ios(&self) -> Result<()> {
+        self.reject_helpers_for("iOS")
+    }
+
+    fn reject_helpers_for(&self, platform: &str) -> Result<()> {
         if self.helpers.is_empty() {
             Ok(())
         } else {
             Err(format!(
-                "Android packages cannot run helper executables (declared: {})",
+                "{platform} packages cannot run helper executables (declared: {})",
                 self.helpers.join(", ")
             ))
         }
@@ -333,6 +343,17 @@ mod tests {
         let error = project
             .reject_helpers_for_android()
             .expect_err("helpers cannot run on Android");
+        assert!(error.contains("plugin-host"));
+    }
+
+    #[test]
+    fn ios_rejects_helper_executables() {
+        let root = tempfile::tempdir().expect("source tree");
+        let project = project(root.path(), root.path());
+        let error = project
+            .reject_helpers_for_ios()
+            .expect_err("helpers cannot run on iOS");
+        assert!(error.contains("iOS"));
         assert!(error.contains("plugin-host"));
     }
 
