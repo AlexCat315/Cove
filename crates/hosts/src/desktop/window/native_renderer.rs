@@ -227,7 +227,7 @@ impl AppWindowRenderer for NativeAppWindowRenderer {
     fn memory_snapshot(&self) -> AppWindowMemorySnapshot {
         let bytes = self.framebuffer.as_ref().map_or(0, |buffer| {
             let descriptor = buffer.descriptor();
-            descriptor.width * descriptor.height * 4
+            framebuffer_bytes(descriptor.width, descriptor.height, descriptor.format)
         });
         AppWindowMemorySnapshot {
             state: self.state,
@@ -459,6 +459,16 @@ impl AppWindowRenderer for NativeAppWindowRenderer {
     }
 }
 
+/// Bytes the offscreen frame owns. The presented layer is twice as wide per
+/// pixel on a translucent window, but the frame itself stays eight-bit sRGB.
+fn framebuffer_bytes(width: usize, height: usize, format: TextureFormat) -> usize {
+    let bytes_per_pixel = match format {
+        TextureFormat::Rgba16Float => 8,
+        _ => 4,
+    };
+    width * height * bytes_per_pixel
+}
+
 #[cfg(all(test, target_os = "macos"))]
 mod tests {
     use super::*;
@@ -507,5 +517,19 @@ mod tests {
         assert!(!renderer.draw(&mut list, (64.0, 48.0), None).unwrap());
         let next = renderer.capture().unwrap();
         assert_eq!(&next.rgba[offset..offset + 4], &[0, 0, 0, 255]);
+    }
+
+    #[test]
+    fn the_framebuffer_reports_bytes_its_pixel_format_occupies() {
+        assert_eq!(
+            framebuffer_bytes(2560, 1440, TextureFormat::Bgra8UnormSrgb),
+            14_745_600,
+            "an eight-bit frame owns four bytes per pixel"
+        );
+        assert_eq!(
+            framebuffer_bytes(2560, 1440, TextureFormat::Rgba16Float),
+            29_491_200,
+            "a half-float frame owns eight"
+        );
     }
 }

@@ -80,16 +80,16 @@ impl NativeUIRasterWorkspace {
         })
     }
     pub fn estimated_bytes(&self) -> usize {
-        self.logical_bytes()
-            + self.strip.as_ref().map_or(0, |t| {
-                t.descriptor().width
-                    * t.descriptor().height
-                    * if self.format == TextureFormat::Rgba16Float {
-                        8
-                    } else {
-                        4
-                    }
-            })
+        let strip = self.strip.as_ref().map_or(0, |t| {
+            t.descriptor().width
+                * t.descriptor().height
+                * if self.format == TextureFormat::Rgba16Float {
+                    8
+                } else {
+                    4
+                }
+        });
+        owned_bytes(self.memoryless(), self.logical_bytes(), strip)
     }
     pub fn allocated_bytes(&self) -> Option<usize> {
         match &self.multisample {
@@ -115,5 +115,31 @@ impl NativeUIRasterWorkspace {
                 .as_ref()
                 .map(|_| self.strip.as_ref().map_or(output, |t| t.texture())),
         }
+    }
+}
+
+/// Bytes a workspace actually owns. A tile-only multisample target reports a
+/// logical size that never becomes device memory, so only its resolve strip
+/// counts.
+fn owned_bytes(memoryless: bool, logical: usize, strip: usize) -> usize {
+    if memoryless { strip } else { logical + strip }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::owned_bytes;
+
+    #[test]
+    fn a_memoryless_multisample_target_counts_only_its_resolve_strip() {
+        assert_eq!(
+            owned_bytes(true, 58_982_400, 1_048_576),
+            1_048_576,
+            "tile-only storage reports a logical bound, not bytes it owns"
+        );
+    }
+
+    #[test]
+    fn a_resident_multisample_target_counts_its_full_size() {
+        assert_eq!(owned_bytes(false, 14_745_600, 0), 14_745_600);
     }
 }

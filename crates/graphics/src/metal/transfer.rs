@@ -563,6 +563,21 @@ pub fn configure_swapchain(
     layer.setPixelFormat(formats::pixel_format(descriptor.color_format));
     layer::set_colorspace(&layer, descriptor.color_format);
     layer.setFramebufferOnly(true);
+    // A sixteen-bit layer costs twice the bytes per pixel of an eight-bit one,
+    // so the default three-deep pool would hold ~90 MB of drawables at 1440p.
+    // Two keeps a window's presentation buffers near what an eight-bit,
+    // three-deep pool costs, and UI frames do not need the third buffer's
+    // compositor slack.
+    layer.setMaximumDrawableCount(
+        if matches!(
+            descriptor.color_format,
+            crate::rhi::TextureFormat::Rgba16Float
+        ) {
+            2
+        } else {
+            3
+        },
+    );
     // `NSSize` is the Foundation spelling of `CGSize`, so it needs no extra
     // core-foundation dependency for this one field.
     layer.setDrawableSize(objc2_foundation::NSSize {
