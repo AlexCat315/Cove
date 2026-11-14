@@ -315,18 +315,64 @@ double cove_shell_monotonic_seconds(void){return (double)SDL_GetPerformanceCount
    asynchronous backend per window system. No C entry point blocks here. */
 
 struct CoveShellAudioStream { SDL_AudioStream *stream; };
-static SDL_AtomicInt audio_initialized;
+typedef struct { SDL_AtomicInt references; bool success; char error[512]; } CoveAudioInitResult;
+static SDL_SpinLock cove_audio_init_lock;
+static void cove_audio_init_release(CoveAudioInitResult *result) {
+    if (SDL_AddAtomicInt(&result->references,-1) == 1) free(result);
+}
+static void SDLCALL cove_audio_init_on_main(void *userdata) {
+    CoveAudioInitResult *result = userdata;
+    SDL_LockSpinlock(&cove_audio_init_lock);
+    if (!SDL_IsMainThread()) {
+        SDL_strlcpy(result->error,"audio initialization requires the SDL main thread",sizeof(result->error));
+        SDL_UnlockSpinlock(&cove_audio_init_lock);
+        cove_audio_init_release(result);
+        return;
+    }
+    result->success = SDL_InitSubSystem(SDL_INIT_AUDIO);
+    if (!result->success) SDL_strlcpy(result->error,SDL_GetError(),sizeof(result->error));
+    SDL_UnlockSpinlock(&cove_audio_init_lock);
+    cove_audio_init_release(result);
+}
+static void SDLCALL cove_audio_quit_on_main(void *userdata) {
+    (void)userdata;
+    if (!SDL_IsMainThread()) { SDL_LogError(SDL_LOG_CATEGORY_AUDIO,"cannot release audio subsystem without a main event loop"); return; }
+    SDL_QuitSubSystem(SDL_INIT_AUDIO);
+}
+bool cove_shell_audio_init(void) {
+    CoveAudioInitResult *result = calloc(1,sizeof(*result));
+    if (!result) return SDL_OutOfMemory();
+    /* The callback retains its own reference: SDL may report a dispatch
+       timeout while the queued callback is still able to run later. */
+    SDL_SetAtomicInt(&result->references,2);
+    if (!SDL_RunOnMainThread(cove_audio_init_on_main,result,true)) {
+        /* On timeout SDL can still run the callback; all other failure paths
+           either failed to queue it or canceled it before invocation. */
+        if (SDL_strcmp(SDL_GetError(),"Callback timed out") != 0)
+            cove_audio_init_release(result);
+        cove_audio_init_release(result);
+        return false;
+    }
+    bool success = result->success;
+    if (!success) SDL_SetError("%s",result->error);
+    cove_audio_init_release(result);
+    return success;
+}
+void cove_shell_audio_quit(void) {
+    if (!SDL_RunOnMainThread(cove_audio_quit_on_main,NULL,false))
+        SDL_LogError(SDL_LOG_CATEGORY_AUDIO,"cannot dispatch audio shutdown: %s",SDL_GetError());
+}
 CoveShellAudioStream *cove_shell_audio_open_default(int frequency,int channels) {
     if (frequency <= 0 || channels <= 0) { SDL_SetError("invalid audio stream format"); return NULL; }
-    if (!SDL_GetAtomicInt(&audio_initialized)) {
-        if (!SDL_InitSubSystem(SDL_INIT_AUDIO)) return NULL;
-        SDL_SetAtomicInt(&audio_initialized,1);
-    }
+    if (!cove_shell_audio_init()) return NULL;
     SDL_AudioSpec spec; spec.format = SDL_AUDIO_F32; spec.channels = channels; spec.freq = frequency;
     SDL_AudioStream *stream = SDL_OpenAudioDeviceStream(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK,&spec,NULL,NULL);
-    if (!stream) return NULL;
+    if (!stream) {
+        char error[512]; SDL_strlcpy(error,SDL_GetError(),sizeof(error));
+        cove_shell_audio_quit(); SDL_SetError("%s",error); return NULL;
+    }
     CoveShellAudioStream *handle = calloc(1,sizeof(*handle));
-    if (!handle) { SDL_DestroyAudioStream(stream); return NULL; }
+    if (!handle) { SDL_DestroyAudioStream(stream); cove_shell_audio_quit(); SDL_OutOfMemory(); return NULL; }
     handle->stream = stream;
     return handle;
 }
@@ -353,6 +399,8 @@ bool cove_shell_audio_put(CoveShellAudioStream *handle,const void *bytes,int len
     if (!handle || !bytes || length <= 0) return false;
     return SDL_PutAudioStreamData(handle->stream,bytes,length);
 }
+bool cove_shell_audio_set_gain(CoveShellAudioStream *handle,float gain) { return handle && SDL_SetAudioStreamGain(handle->stream,gain); }
+bool cove_shell_audio_set_frequency_ratio(CoveShellAudioStream *handle,float ratio) { return handle && SDL_SetAudioStreamFrequencyRatio(handle->stream,ratio); }
 bool cove_shell_audio_flush(CoveShellAudioStream *handle) { return handle && SDL_FlushAudioStream(handle->stream); }
 bool cove_shell_audio_pause(CoveShellAudioStream *handle) { return handle && SDL_PauseAudioStreamDevice(handle->stream); }
 bool cove_shell_audio_resume(CoveShellAudioStream *handle) { return handle && SDL_ResumeAudioStreamDevice(handle->stream); }
@@ -360,4 +408,5 @@ void cove_shell_audio_close(CoveShellAudioStream *handle) {
     if (!handle) return;
     SDL_DestroyAudioStream(handle->stream);
     free(handle);
+    cove_shell_audio_quit();
 }

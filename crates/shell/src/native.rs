@@ -101,10 +101,9 @@ unsafe extern "C" {
     pub fn cove_shell_clipboard_read() -> *mut c_char;
     pub fn cove_shell_clipboard_write(text: *const c_char) -> bool;
     pub fn cove_shell_free(pointer: *mut c_void);
-    pub fn cove_shell_audio_open_default(
-        frequency: i32,
-        channels: i32,
-    ) -> *mut AudioStream;
+    pub fn cove_shell_audio_init() -> bool;
+    pub fn cove_shell_audio_quit();
+    pub fn cove_shell_audio_open_default(frequency: i32, channels: i32) -> *mut AudioStream;
     pub fn cove_shell_audio_format(
         stream: *mut AudioStream,
         format: *mut i32,
@@ -113,8 +112,13 @@ unsafe extern "C" {
     ) -> bool;
     pub fn cove_shell_audio_queued(stream: *mut AudioStream) -> i32;
     pub fn cove_shell_audio_available(stream: *mut AudioStream) -> i32;
-    pub fn cove_shell_audio_put(stream: *mut AudioStream, bytes: *const c_void, length: i32)
-    -> bool;
+    pub fn cove_shell_audio_put(
+        stream: *mut AudioStream,
+        bytes: *const c_void,
+        length: i32,
+    ) -> bool;
+    pub fn cove_shell_audio_set_gain(stream: *mut AudioStream, gain: f32) -> bool;
+    pub fn cove_shell_audio_set_frequency_ratio(stream: *mut AudioStream, ratio: f32) -> bool;
     pub fn cove_shell_audio_flush(stream: *mut AudioStream) -> bool;
     pub fn cove_shell_audio_pause(stream: *mut AudioStream) -> bool;
     pub fn cove_shell_audio_resume(stream: *mut AudioStream) -> bool;

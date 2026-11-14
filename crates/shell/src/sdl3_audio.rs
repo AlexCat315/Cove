@@ -7,8 +7,8 @@
 //! [`resume`](Sdl3AudioDevice::resume). Every method is safe to call from any
 //! thread; SDL locks the stream internally.
 
-use crate::native;
 use crate::ShellError;
+use crate::native;
 use std::ffi::c_void;
 
 /// The sample format the device consumes, as SDL reports it.
@@ -110,6 +110,30 @@ pub struct Sdl3AudioDevice {
     stream: *mut native::AudioStream,
 }
 
+/// Owns one SDL audio subsystem reference independent of any playback stream.
+///
+/// Initialization from a worker waits for the main thread to process SDL
+/// events; the main thread must not wait for that worker while it initializes.
+pub struct Sdl3AudioSubsystem;
+
+impl Sdl3AudioSubsystem {
+    pub fn new() -> Result<Self, ShellError> {
+        // SAFETY: the bridge dispatches initialization to SDL's main thread.
+        if unsafe { native::cove_shell_audio_init() } {
+            Ok(Self)
+        } else {
+            Err(native::error())
+        }
+    }
+}
+
+impl Drop for Sdl3AudioSubsystem {
+    fn drop(&mut self) {
+        // SAFETY: the bridge dispatches release of this reference to SDL's main thread.
+        unsafe { native::cove_shell_audio_quit() };
+    }
+}
+
 // SAFETY: the wrapper owns no Rust state besides the SDL stream pointer, and
 // every SDL audio-stream call locks the stream internally. It is deliberately
 // not `Sync`, so concurrent access still needs a lock chosen by the caller.
@@ -144,12 +168,7 @@ impl Sdl3AudioDevice {
         // SAFETY: `self.stream` is an open stream; the out pointers are valid
         // for this call.
         let reported = unsafe {
-            native::cove_shell_audio_format(
-                self.stream,
-                &mut format,
-                &mut channels,
-                &mut frequency,
-            )
+            native::cove_shell_audio_format(self.stream, &mut format, &mut channels, &mut frequency)
         };
         if !reported {
             return None;
@@ -185,8 +204,9 @@ impl Sdl3AudioDevice {
         })?;
         // SAFETY: `samples` is a live, correctly aligned `f32` slice and
         // `length` counts its bytes exactly.
-        let accepted =
-            unsafe { native::cove_shell_audio_put(self.stream, samples.as_ptr() as *const c_void, length) };
+        let accepted = unsafe {
+            native::cove_shell_audio_put(self.stream, samples.as_ptr() as *const c_void, length)
+        };
         if accepted {
             Ok(())
         } else {
@@ -194,7 +214,27 @@ impl Sdl3AudioDevice {
         }
     }
 
-    /// Drops queued input without waiting for the device to play it.
+    /// Sets the gain applied by SDL to this live stream.
+    pub fn set_gain(&mut self, gain: f32) -> Result<(), ShellError> {
+        // SAFETY: this handle owns a live stream; SDL validates the gain.
+        if unsafe { native::cove_shell_audio_set_gain(self.stream, gain) } {
+            Ok(())
+        } else {
+            Err(native::error())
+        }
+    }
+
+    /// Sets the live stream's resampling frequency ratio.
+    pub fn set_frequency_ratio(&mut self, ratio: f32) -> Result<(), ShellError> {
+        // SAFETY: this handle owns a live stream; SDL validates the ratio.
+        if unsafe { native::cove_shell_audio_set_frequency_ratio(self.stream, ratio) } {
+            Ok(())
+        } else {
+            Err(native::error())
+        }
+    }
+
+    /// Flushes buffered conversion state so the stream can play its tail.
     pub fn flush(&mut self) -> Result<(), ShellError> {
         // SAFETY: `self.stream` is an open stream.
         if unsafe { native::cove_shell_audio_flush(self.stream) } {
@@ -244,13 +284,20 @@ impl Drop for Sdl3AudioDevice {
 mod tests {
     use super::*;
 
+    unsafe extern "C" {
+        fn SDL_PumpEvents();
+    }
+
     #[test]
     fn sdl_sample_formats_map_to_named_values() {
         assert_eq!(AudioSampleFormat::from_raw(0x0008), AudioSampleFormat::U8);
         assert_eq!(AudioSampleFormat::from_raw(0x8010), AudioSampleFormat::S16);
         assert_eq!(AudioSampleFormat::from_raw(0x8020), AudioSampleFormat::S32);
         assert_eq!(AudioSampleFormat::from_raw(0x8120), AudioSampleFormat::F32);
-        assert_eq!(AudioSampleFormat::from_raw(0x1234), AudioSampleFormat::Unknown(0x1234));
+        assert_eq!(
+            AudioSampleFormat::from_raw(0x1234),
+            AudioSampleFormat::Unknown(0x1234)
+        );
         assert_eq!(AudioSampleFormat::F32.bits(), Some(32));
         assert!(AudioSampleFormat::F32.is_float());
         assert!(!AudioSampleFormat::S16.is_float());
@@ -285,8 +332,7 @@ mod tests {
 
     #[test]
     fn the_default_device_reports_a_usable_format_when_one_exists() {
-        let Ok(mut device) = Sdl3AudioDevice::open_default(AudioStreamSpec::stereo(48_000))
-        else {
+        let Ok(mut device) = Sdl3AudioDevice::open_default(AudioStreamSpec::stereo(48_000)) else {
             // Headless CI machines have no playback device; the bridge reports
             // that as an initialization error rather than pretending to play.
             eprintln!("no default playback device on this host; skipping");
@@ -296,10 +342,53 @@ mod tests {
         assert!(format.frequency >= 8_000, "{format:?}");
         assert!(format.channels >= 1, "{format:?}");
         assert!(format.frame_bytes().is_some(), "{format:?}");
-        device.resume().expect("the stream starts paused and resumes");
+        device
+            .resume()
+            .expect("the stream starts paused and resumes");
         device.put(&[0.0; 960]).expect("a silent block is accepted");
+        device.set_gain(0.5).expect("gain changes on a live stream");
+        device
+            .set_frequency_ratio(1.25)
+            .expect("frequency ratio changes on a live stream");
+        assert!(device.set_gain(-1.0).is_err());
+        assert!(device.set_frequency_ratio(0.0).is_err());
         assert!(device.queued_bytes() > 0 || device.available_bytes() > 0);
         device.pause().expect("pause");
         device.flush().expect("flush");
+        let subsystem = Sdl3AudioSubsystem::new().expect("initialize another reference");
+        let mut second = Sdl3AudioDevice::open_default(AudioStreamSpec::stereo(48_000))
+            .expect("open a second stream");
+        drop(subsystem);
+        drop(device);
+        second.set_gain(0.5).expect("remaining stream stays valid");
+        second
+            .put(&[0.0; 128])
+            .expect("remaining stream accepts samples");
+        let (tx, rx) = std::sync::mpsc::channel();
+        let worker = std::thread::spawn(move || {
+            let result = Sdl3AudioDevice::open_default(AudioStreamSpec::stereo(48_000))
+                .and_then(|mut stream| stream.set_gain(0.25));
+            tx.send(result).expect("report worker result");
+        });
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+        loop {
+            // SAFETY: this test initialized SDL on the current thread.
+            unsafe { SDL_PumpEvents() };
+            if let Ok(result) = rx.try_recv() {
+                result.expect("worker initialized its stream on the main thread");
+                break;
+            }
+            assert!(
+                std::time::Instant::now() < deadline,
+                "audio main-thread dispatch timed out"
+            );
+            std::thread::sleep(std::time::Duration::from_millis(1));
+        }
+        worker.join().expect("worker finished");
+        // SAFETY: drain the worker's deferred subsystem release on the SDL main thread.
+        unsafe { SDL_PumpEvents() };
+        drop(second);
+        let _reopened = Sdl3AudioDevice::open_default(AudioStreamSpec::stereo(48_000))
+            .expect("subsystem can be initialized again");
     }
 }

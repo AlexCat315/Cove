@@ -118,6 +118,28 @@ impl MediaDecoder {
         &self.info
     }
 
+    /// The stream whose video decoder was successfully opened, if any.
+    pub fn video_stream(&self) -> Option<&StreamInfo> {
+        self.video
+            .as_ref()
+            .and_then(|active| self.info.streams.get(active.index))
+    }
+
+    /// Dimensions reported by the opened video codec context.
+    pub fn video_dimensions(&self) -> Option<(u32, u32)> {
+        let active = self.video.as_ref()?;
+        // SAFETY: an active decoder owns a live codec context until it is dropped.
+        let (width, height) = unsafe { ((*active.context).width, (*active.context).height) };
+        Some((width.max(0) as u32, height.max(0) as u32))
+    }
+
+    /// The stream whose audio decoder was successfully opened, if any.
+    pub fn audio_stream(&self) -> Option<&StreamInfo> {
+        self.audio
+            .as_ref()
+            .and_then(|active| self.info.streams.get(active.index))
+    }
+
     /// Cancelling it makes a blocked read on another thread return `Cancelled`.
     pub fn cancellation_token(&self) -> CancellationToken {
         self.token.clone()

@@ -13,15 +13,17 @@ mod native_menu_wire;
 mod open_documents;
 mod platform_shell;
 pub mod scroll;
-mod sdl3_clipboard;
 mod sdl3_audio;
+mod sdl3_clipboard;
 mod sdl3_shell;
 pub use application_entry::PlatformApplication;
 pub use color_sampler::screen_color_backend;
 pub use cove_platform::*;
 pub use display_refresh::DisplayRefreshTick;
 pub use platform_shell::*;
-pub use sdl3_audio::{AudioDeviceFormat, AudioSampleFormat, AudioStreamSpec, Sdl3AudioDevice};
+pub use sdl3_audio::{
+    AudioDeviceFormat, AudioSampleFormat, AudioStreamSpec, Sdl3AudioDevice, Sdl3AudioSubsystem,
+};
 pub use sdl3_clipboard::Sdl3Clipboard;
 pub use sdl3_shell::{Sdl3Shell, Sdl3WindowHandle, external_drop, wheel_event};
 pub fn make_default_shell() -> Result<Sdl3Shell, ShellError> {

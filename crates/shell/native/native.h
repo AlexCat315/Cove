@@ -55,6 +55,8 @@ void cove_shell_free(void *memory);
    fills it with put before resume. Every function is safe from any thread; SDL
    locks the stream internally. */
 typedef struct CoveShellAudioStream CoveShellAudioStream;
+bool cove_shell_audio_init(void);
+void cove_shell_audio_quit(void);
 CoveShellAudioStream *cove_shell_audio_open_default(int frequency,int channels);
 /* The device's real format, not the requested one: SDL converts into it. */
 bool cove_shell_audio_format(CoveShellAudioStream *stream,int *format,int *channels,int *frequency);
@@ -64,6 +66,8 @@ int cove_shell_audio_queued(CoveShellAudioStream *stream);
 int cove_shell_audio_available(CoveShellAudioStream *stream);
 /* `bytes` holds f32 interleaved sample frames; `length` is its byte count. */
 bool cove_shell_audio_put(CoveShellAudioStream *stream,const void *bytes,int length);
+bool cove_shell_audio_set_gain(CoveShellAudioStream *stream,float gain);
+bool cove_shell_audio_set_frequency_ratio(CoveShellAudioStream *stream,float ratio);
 bool cove_shell_audio_flush(CoveShellAudioStream *stream);
 bool cove_shell_audio_pause(CoveShellAudioStream *stream);
 bool cove_shell_audio_resume(CoveShellAudioStream *stream);
