@@ -66,7 +66,7 @@ let table = Table::try_new(model, columns)?;
 
 行体走虚拟化窗口，只挂载可见行列及少量 overscan，因此 200,000 行 × 100 列也只创建几十个单元格。固定行高由 `TableLayout::row_height` 给出；`Table::row_height` 可为每行提供独立高度，文本缩放与触摸最小高度仍会参与计算。
 
-选中通过 `Selection<Id>` 传入（与 `List` 一致），未提供时用会话内的选中集合。选中的行整行铺满，左侧 3pt 强调条与选中底色共同标记，列边界笔直贯穿每一行；`TableLayout::is_striped` 打开隔行底色。
+选中通过 `Selection<Id>` 传入（与 `List` 一致），未提供时用会话内的选中集合。选中的行整行铺满，前导泳道左缘的 3pt 强调条与选中底色共同标记，列边界笔直贯穿每一行；强调条只画在起始列为 0 的泳道上，冻结边界后的移动泳道不会重复第二条。`TableLayout::is_striped` 打开隔行底色。
 
 `on_activate` 在点击或回车激活某行时回调该行的记录。键盘导航覆盖方向键、Page Up/Down、Home/End、`Cmd/Ctrl+A` 全选，以及 F2 / Return 进入编辑。
 
@@ -74,7 +74,7 @@ let table = Table::try_new(model, columns)?;
 
 ## 视觉
 
-表格是一张卡片：16pt 单元格与表头内边距、44pt 行高、40pt 表头、大圆角与 1pt 边框。表头与工具栏共用 `surface_variant` 色带，表头下方以发丝线分隔；行分隔线通栏铺满，选择态使用强调条加浅色底，而不是整行反白。
+表格是一张卡片：16pt 单元格与表头内边距、44pt 行高、40pt 表头、大圆角与 1pt 边框。表头与工具栏共用 `surface_variant` 色带，表头下方以发丝线分隔；行分隔线通栏铺满，选择态使用强调条加浅色底，而不是整行反白。排序箭头紧贴标题右侧（标签按内容取宽，不再被弹性空间推到列缘）。行内草稿字段使用扁平编辑器面：不另画浅底 well、发丝线或焦点 halo，焦点环由单元格自身持有。`TreeTable` 的披露按钮是纯字形的 ghost  affordance，静止时无 bezel，悬停才出现状态层。
 
 ## 可访问性
 

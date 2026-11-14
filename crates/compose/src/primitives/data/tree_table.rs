@@ -23,7 +23,7 @@ use std::rc::Rc;
 
 use crate::modifiers::interaction::AccessibilityExt;
 use crate::modifiers::layout::{FlexExt, LayoutFrameExt};
-use crate::primitives::controls::button::{Button, ButtonIcon, ButtonIconSource};
+use crate::primitives::controls::button::{Button, ButtonIconSource};
 use crate::primitives::data::lists::selection::{CollectionId, Selection};
 use crate::primitives::data::lists::tree::view::flatten_visible;
 use crate::primitives::data::table::table_column::{
@@ -34,7 +34,7 @@ use crate::primitives::data::table::{
 };
 use crate::primitives::media::ui_icon_catalog;
 use crate::theme::TextScalerReader;
-use crate::theme::styles::buttons::{ButtonRole, ButtonStyleViewExt};
+use crate::theme::styles::buttons::ButtonStyleViewExt;
 use crate::{AnyView, BoxView, TupleView, View};
 use cove_composition::Scancode;
 use cove_core::scene::{
@@ -366,30 +366,23 @@ where
                                         };
                                         let label = if is_expanded { "Collapse" } else { "Expand" };
                                         let action = toggle.clone();
-                                        children.push(
+                                        children.push(AnyView::new(
                                             AnyView::new(
-                                                AnyView::new(
-                                                    Button::new(
-                                                        ButtonIcon::new(icon, Some(12.0), None),
-                                                        move || action(),
-                                                    )
-                                                    .role(ButtonRole::Normal)
+                                                Button::icon(icon, 12.0, move || action())
                                                     .tooltip(label),
-                                                )
-                                                .button_style(
-                                                    crate::theme::styles::buttons::secondary(),
-                                                )
-                                                .flex_with(0.0, 0.0, None)
-                                                .accessibility({
-                                                    let label = label.to_string();
-                                                    move |semantics: &mut AccessibilitySemantics| {
-                                                        semantics.label = label.clone();
-                                                        semantics.state.is_expanded =
-                                                            Some(is_expanded);
-                                                    }
-                                                }),
-                                            ),
-                                        );
+                                            )
+                                            // A tree disclosure is a glyph-only affordance:
+                                            // no bezel at rest, a state layer on hover.
+                                            .button_style(crate::theme::styles::buttons::ghost())
+                                            .flex_with(0.0, 0.0, None)
+                                            .accessibility({
+                                                let label = label.to_string();
+                                                move |semantics: &mut AccessibilitySemantics| {
+                                                    semantics.label = label.clone();
+                                                    semantics.state.is_expanded = Some(is_expanded);
+                                                }
+                                            }),
+                                        ));
                                     } else {
                                         children.push(AnyView::new(
                                             AnyView::new(crate::EmptyView)

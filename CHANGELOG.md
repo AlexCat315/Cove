@@ -4,6 +4,9 @@
 
 ## Unreleased
 
+- **Table / TreeTable 外观收敛（2026-11-15）**：对照 macOS 原生 `NSTableView`、VS Code Explorer、Linear、Ant Design 与 Supernova Data Table 规范打磨 Gallery 表格页。选中强调条只画在起始列为 0 的前导泳道上，冻结前缀后的移动泳道起点落在冻结边界，不再重复第二条竖条；表头标签改为内容基准 flex，排序箭头紧贴标题右侧，不再被弹性空间推到列缘；行内草稿字段改挂扁平 `EditorTextFieldStyle`，不再嵌套浅底 well、发丝线与焦点 halo，焦点环由单元格自身持有；`TreeTable` 披露按钮由 secondary 带框按钮改为纯字形 `ghost` 图标按钮，静止无 bezel、悬停才出现状态层。Gallery Project tree 示例的行结构对齐 TreeTable 首列：层级缩进用空槽对齐标签，可展开节点用 ghost chevron，叶子保留同宽空槽。
+  - 已知遗留：该 Project tree 手工列表在 macOS 调试 DevTools 会话里布局帧正确但字形/图标不栅格化；stash 全部改动、重建干净 HEAD 后依旧复现，属布局/裁剪或绘制遍历层的既有缺陷，非本轮改动引入，待引擎层定位。
+
 - **表格收敛为单一 `Table` 组件并重新设计视觉（2026-11-14）**：此前 `Table`（`lists::Table`）与 `DataTable` 是两套并列的模型与 API，行高、表头、列宽与选择语义各不相同。现在只剩一个 `Table`：`crates/compose/src/primitives/data/data_table/` 更名并提升为 `data/table/`，`DataTable*` 全部改名为 `Table*`（`ChartDataTable*` 保持原样），旧的轻量 `lists::Table` 删除。唯一模型是持久化的 `TableModel`，`Table::new(records, row_id, columns)` 直接建表，`Table::try_new(model, columns)` 供共享模型与 `TreeTable` 使用；`TableOptions` 合并了原先分散的选项，并新增受控排序 `sort: Option<Binding<Option<TableSort>>>`，模型仍是排序真值来源，变更会写回绑定。视觉上重做行度量与框架：单元格左右 16pt 留白、44pt 行高 / 40pt 表头、整行通栏分隔线、表头与工具栏共用 `surface_variant` 底色、3pt 强调色选中标记、紧凑空状态与 16pt 卡片圆角。`ColumnVisibilityPicker` 新增 `shows_summary(bool)`，表格工具栏不再重复行数。Gallery 只保留一个 `Table` 页（id `table`），移除原先并列的简单表格页与 `Table (advanced)` 页，统一页展示持久模型、冻结列、列序、多选、单元格编辑与 `TreeTable`。文档同步改写 `Website/src/content/components/table.md` 与 `Docs/gallery-audit.md`。
 
 - **Android 真机上打开下拉菜单会崩溃（2026-11-14，Adreno 710 / Android 16）**：同一个手势下叠了三层缺陷。

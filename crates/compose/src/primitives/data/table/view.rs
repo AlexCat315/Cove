@@ -56,6 +56,7 @@ use crate::primitives::text::text_field::{
     TextField, TextFieldBehavior, TextFieldEvents, TextFieldNavigationRequest,
 };
 use crate::primitives::text::{Divider, Text};
+use crate::theme::styles::components::{AnyTextFieldStyle, EditorTextFieldStyle};
 use crate::theme::{SemanticColorRef, SemanticFontRef, node_text_scaler, theme_for_node};
 use crate::{AnyView, BoxView, PrimitiveView, TupleView, View, impl_primitive_view};
 use cove_core::scene::ObservableObject;
@@ -2073,6 +2074,7 @@ impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 
             is_striped: self.layout.is_striped,
             is_enabled: self.controller.is_enabled,
             is_frozen_lane,
+            is_leading_lane: self.columns.start == 0,
             height: self.height,
             separator_inset: self.layout.separator_inset.unwrap_or(0.0),
             content: AnyView::new(
@@ -2098,6 +2100,10 @@ struct TableRowHost {
     is_striped: bool,
     is_enabled: bool,
     is_frozen_lane: bool,
+    /// True for the lane whose first visible column is index 0. The selection
+    /// marker lives on the table's leading edge, so only this lane draws it;
+    /// the moving lane starts at the frozen boundary and must not repeat it.
+    is_leading_lane: bool,
     height: f32,
     separator_inset: f32,
     content: AnyView,
@@ -2177,6 +2183,7 @@ impl PrimitiveView for TableRowHost {
         let height = self.height;
         let separator_inset = self.separator_inset;
         let is_selected = self.is_selected;
+        let is_leading_lane = self.is_leading_lane;
         let draw_node = node.downgrade();
         node.update_draw(self.row, move |list, origin| {
             // A row separation is a hairline, not a box: it spans the row and
@@ -2198,8 +2205,11 @@ impl PrimitiveView for TableRowHost {
             );
             // The marker is the accent itself, so the selection still reads
             // when the tint is this light — and it survives a colour-blind
-            // viewer who cannot separate the tint from the card.
-            if is_selected {
+            // viewer who cannot separate the tint from the card. It belongs to
+            // the table's leading edge: the moving lane's origin starts at the
+            // frozen boundary, so drawing there would repeat the bar beside the
+            // frozen prefix.
+            if is_selected && is_leading_lane {
                 let _ = list.add_rect(
                     cove_core::Rect::new(origin.x, origin.y, 3.0, height),
                     theme.colors.accent,
@@ -2498,7 +2508,11 @@ impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 
                     true
                 })),
                 ..Default::default()
-            });
+            })
+            // The active cell already owns the focus ring. The draft field uses
+            // the flat editor face so it does not paint a second well, hairline
+            // or halo nested inside the cell chrome.
+            .style(AnyTextFieldStyle::new(EditorTextFieldStyle));
         let semantics = AccessibilitySemantics {
             role: AccessibilityRole::TextField,
             label: format!("Edit {}", self.title),
@@ -2600,7 +2614,10 @@ impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 
                 // and the data reads first.
                 .semantic_font(SemanticFontRef::label())
                 .semantic_foreground(SemanticColorRef::on_surface_variant())
-                .flex_with(1.0, 1.0, Some(0.0)),
+                // The label sizes to its own content: the sort arrow sits right
+                // beside the title instead of being pushed to the column's far
+                // edge. A zero flex basis would collapse the label to 0 width.
+                .flex_with(0.0, 1.0, None),
         ));
         if is_sorted {
             row.push(AnyView::new(

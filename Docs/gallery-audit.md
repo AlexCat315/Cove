@@ -1,8 +1,22 @@
 # Gallery 逐项验收记录
 
-更新于 2026-11-14。目录共 106 页。Swift 对照表覆盖迁移的页面，新增 Rust 示例见对应日期的验收记录。
+更新于 2026-11-15。目录共 106 页。Swift 对照表覆盖迁移的页面，新增 Rust 示例见对应日期的验收记录。
 
 Swift 源码逐页对照见文末《Swift 源码对照（逐页差异清单）》。
+
+## 2026-11-15 Table / TreeTable 外观收敛
+
+对照 macOS 原生 `NSTableView`、VS Code Explorer、Linear、Ant Design 与 Supernova Data Table 规范：整行 tint、披露箭头为无边框 chevron（悬停才出现状态层）、左对齐列的排序箭头贴标题右侧。
+
+| 页面或组件 | 实现与自动化 | 原生视觉与交互验收 | Rust 文档 |
+| --- | --- | --- | --- |
+| Gallery / Table 选中条 | `TableRowHost` 新增 `is_leading_lane`，仅起始列号为 0 的泳道画 3pt 强调条；冻结前缀后的移动泳道起点落在冻结边界，不再重复第二条竖条。`cove-ui-compose` 全量 1777 项通过，`table_story` 22 项通过。 | macOS DevTools 真机复核：选中行只在表左缘出现一条 accent 竖条，冻结边界处无第二条。 | [Table](../Website/src/content/components/table.md) |
+| Gallery / Table 表头排序箭头 | 表头标签改为内容基准 flex（basis `None`），箭头紧贴标题右侧，不再被弹性空间推到列缘；basis 为 0 会把标签压成 0 宽，故保留内容基准。 | macOS DevTools 真机复核：箭头与标题同基线相邻。右对齐列仍保持「标题 + 箭头」居尾顺序（与 Swift 原版一致，未采用 Supernova 的箭头置左建议）。 | [Table](../Website/src/content/components/table.md) |
+| Gallery / Table 行内编辑器 | 草稿 `TextField` 改挂 `EditorTextFieldStyle`（flat、`surface_sunken` 底、无边框/halo），焦点环由单元格自身持有，消除嵌套双层框。 | macOS DevTools 打开 Asset 名单元格复核：无第二道边框与 halo；Category / Quantity 列同代码路径，未逐列截图。 | [Table](../Website/src/content/components/table.md) |
+| Gallery / TreeTable 披露按钮 | 展开/收起控件由 secondary 带框按钮改为 `Button::icon` + `ghost()` 样式，去掉 bezel；tooltip 保留 Collapse/Expand。 | macOS DevTools 真机复核：静止为无边框 chevron，悬停出现状态层。 | [Table](../Website/src/content/components/table.md) |
+| Gallery / Table · Project tree 示例 | 行结构对齐 TreeTable 首列：层级缩进用裸 `EmptyView.frame_width` 槽位对齐标签，可展开节点用 ghost chevron 图标按钮，叶子保留同宽空槽对齐标签；标签显式 `on_surface` 前景。`table_story` 场景测试 22 项通过。 | **未通过（既有缺陷，待修）**：在 macOS 调试 DevTools 会话里，该手工拼装的列表行布局帧正确（行高 32/20、标签已测宽），但字形与图标不栅格化，卡片色带只露出约一行高。把本轮全部改动 stash、重建干净 HEAD 后空白依旧复现，故非本轮改动引入；已排除裸 Text 前景未继承、Column 包裹、缩进槽包裹方式等假设。根因定位在布局/裁剪或绘制遍历层（疑似某层 `clips_to_bounds` 裁剪矩形未随行高增长，或静态卡片内裸行未进入绘制遍历），单测不覆盖原生绘制，未被结构测试捕获。其余平台原生视觉验收待引擎层修复后一并补做。 | [Table](../Website/src/content/components/table.md) |
+
+自动化汇总：`cove-ui-compose` 1777 passed + 3 doctests；`cove-examples` 111 passed，唯一失败 `ray_traced_shadows::ray_query::tests::metal_shadow_masks`（MSL `uint2 thread_position_in_grid` 编译错误）为本轮之前既有失败，与本页无关。DevTools 文本注入不验证原生键盘与 IME。
 
 ## 2026-11-14 DevTools 跨平台采样与 Windows 验收
 

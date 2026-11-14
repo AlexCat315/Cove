@@ -20,16 +20,18 @@ use std::collections::BTreeSet;
 use std::rc::Rc;
 
 use cove_core::{State, TextAlignment};
-use cove_ui_compose::modifiers::layout::LayoutFrameExt;
+use cove_ui_compose::modifiers::layout::{FlexExt, LayoutFrameExt};
 use cove_ui_compose::modifiers::style::SemanticStyleViewExt;
-use cove_ui_compose::primitives::controls::{Button, Toggle};
+use cove_ui_compose::primitives::controls::{Button, ButtonIconSource, Toggle};
 use cove_ui_compose::primitives::data::lists::Selection;
 use cove_ui_compose::primitives::data::table::table_column::{
     ColumnVisibility, ComparisonResult, TableColumn, TableColumnLayout, TableTextEditing,
 };
 use cove_ui_compose::primitives::data::table::{Table, TableOptions};
 use cove_ui_compose::primitives::data::{TreeTable, TreeTableColumn, TreeTableOptions};
+use cove_ui_compose::primitives::media::ui_icon_catalog as icons;
 use cove_ui_compose::primitives::text::Text;
+use cove_ui_compose::theme::styles::buttons::{ButtonStyleViewExt, ghost};
 use cove_ui_compose::theme::tokens::SemanticColorRef;
 use cove_ui_compose::{AnyView, BoxView, LayoutDebugExt, TupleView, View};
 
@@ -585,34 +587,78 @@ impl View for TableStory {
             .map(|(id, depth)| {
                 let node = find_node(&ProjectNode::sample(), &id);
                 let is_expandable = node.as_ref().is_some_and(|node| node.is_expandable());
+                let is_expanded = self.expanded.get().contains(&id);
                 let title = node
                     .as_ref()
                     .map(|node| node.name.to_owned())
                     .unwrap_or_else(|| id.clone());
-                let indented = AnyView::new(
-                    AnyView::new(Text::new(format!("{}{}", "···".repeat(depth), title)))
-                        .frame_min_width(0.0),
+
+                // Indent and disclosure slots are bare empty-sized spacers so the
+                // labels line up; the geometry mirrors the TreeTable first column.
+                let indent: AnyView = AnyView::new(
+                    AnyView::new(cove_ui_compose::EmptyView)
+                        .frame_width(depth as f32 * 16.0)
+                        .flex_with(0.0, 0.0, None),
                 );
-                match is_expandable {
-                    true => {
-                        let story = self.handle();
-                        let toggle_id = id.clone();
-                        AnyView::new(BoxView::new(
-                            cove_core::scene::FlexDirection::Row,
-                            cove_core::scene::Align::Center,
-                            cove_core::scene::Justify::FlexStart,
-                            cove_core::scene::Wrap::NoWrap,
-                            8.0,
-                            AnyView::new(TupleView::new(vec![
-                                indented,
-                                AnyView::new(Button::title("Toggle", move || {
-                                    story.toggle_branch(&toggle_id)
-                                })),
-                            ])),
-                        ))
-                    }
-                    false => indented,
-                }
+                let disclosure: AnyView = if is_expandable {
+                    let story = self.handle();
+                    let toggle_id = id.clone();
+                    AnyView::new(
+                        AnyView::new(
+                            Button::icon(
+                                ButtonIconSource::resource(if is_expanded {
+                                    icons::navigation::chevron_down()
+                                } else {
+                                    icons::navigation::chevron_right()
+                                }),
+                                12.0,
+                                move || story.toggle_branch(&toggle_id),
+                            )
+                            .tooltip(if is_expanded {
+                                "Collapse"
+                            } else {
+                                "Expand"
+                            }),
+                        )
+                        // A tree disclosure is a glyph-only affordance: no bezel at
+                        // rest, a state layer on hover.
+                        .button_style(ghost())
+                        .flex_with(0.0, 0.0, None)
+                        .frame_width(20.0),
+                    )
+                } else {
+                    // Leaves keep the disclosure slot so every label lines up.
+                    AnyView::new(
+                        AnyView::new(cove_ui_compose::EmptyView)
+                            .frame_width(20.0)
+                            .flex_with(0.0, 0.0, None),
+                    )
+                };
+                let label: AnyView = AnyView::new(
+                    AnyView::new(BoxView::new(
+                        cove_core::scene::FlexDirection::Row,
+                        cove_core::scene::Align::Center,
+                        cove_core::scene::Justify::FlexStart,
+                        cove_core::scene::Wrap::NoWrap,
+                        0.0,
+                        AnyView::new(
+                            Text::new(title)
+                                .semantic_foreground(SemanticColorRef::on_surface())
+                                .frame_min_width(0.0),
+                        ),
+                    ))
+                    .flex_with(1.0, 1.0, Some(0.0))
+                    .frame(None, None, Some(0.0), None, None, None),
+                );
+
+                AnyView::new(BoxView::new(
+                    cove_core::scene::FlexDirection::Row,
+                    cove_core::scene::Align::Center,
+                    cove_core::scene::Justify::FlexStart,
+                    cove_core::scene::Wrap::NoWrap,
+                    2.0,
+                    AnyView::new(TupleView::new(vec![indent, disclosure, label])),
+                ))
             })
             .collect();
 
@@ -658,7 +704,14 @@ impl View for TableStory {
                 AnyView::new(StorySection::new(
                     "Project tree",
                     "A node's children appear only when every ancestor is expanded.",
-                    AnyView::new(TupleView::new(tree)),
+                    AnyView::new(BoxView::new(
+                        cove_core::scene::FlexDirection::Column,
+                        cove_core::scene::Align::Stretch,
+                        cove_core::scene::Justify::FlexStart,
+                        cove_core::scene::Wrap::NoWrap,
+                        8.0,
+                        AnyView::new(TupleView::new(tree)),
+                    )),
                 )),
                 AnyView::new(StorySection::new(
                     "Tree table",
