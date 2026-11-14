@@ -176,8 +176,12 @@ impl NativeMenuBuilder {
     /// cannot be resolved, carries no icon.
     fn make_icon(resource: Option<&cove_imaging::BundleImageResource>) -> Option<NativeMenuIcon> {
         let resource = resource?;
-        let path = resource.path()?;
-        let data = std::fs::read(path).ok()?;
+        // Bundled glyphs may only exist as compiled-in bytes; a packaged app has
+        // no source tree to read them from.
+        let data = match resource.embedded() {
+            Some(bytes) => bytes.to_vec(),
+            None => std::fs::read(resource.path()?).ok()?,
+        };
         let png =
             cove_imaging::ImageDecoder::template_png(&data, &resource.file_extension, ICON_POINTS)
                 .ok()?;

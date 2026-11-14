@@ -259,12 +259,33 @@ impl FrameModifier {
         value
     }
     fn apply_width(spec: FrameDimensionSpec, layout: &LayoutNode) {
+        let spec = Self::finite_extent(spec);
         layout.set_width_value(spec);
         layout.set_attachment(FRAME_WIDTH_ATTACHMENT, spec);
     }
     fn apply_height(spec: FrameDimensionSpec, layout: &LayoutNode) {
+        let spec = Self::finite_extent(spec);
         layout.set_height_value(spec);
         layout.set_attachment(FRAME_HEIGHT_ATTACHMENT, spec);
+    }
+    /// Reads "as wide/tall as the parent allows" as a percentage, not a point
+    /// value of infinity.
+    ///
+    /// `frame_size(f32::INFINITY, 44.0)` is this framework's spelling for
+    /// "fill the parent", but the layout engine solves a point extent literally:
+    /// an unbounded parent hands the child `width = inf`, and the write-back
+    /// stores `x = -inf, width = inf` on the node. Nothing downstream can paint
+    /// that — the draw pass snaps it to a zero-size rect at a NaN origin and the
+    /// RHI rejects the whole frame (`invalid UI vertices or indices`). A
+    /// percentage cannot produce that geometry: it resolves against the parent's
+    /// definite size, and reads as `auto` when the parent has none.
+    fn finite_extent(spec: FrameDimensionSpec) -> FrameDimensionSpec {
+        match spec {
+            FrameDimensionSpec::Points(value) if !value.is_finite() => {
+                FrameDimensionSpec::Percent(100.0)
+            }
+            other => other,
+        }
     }
     fn current_width(layout: &LayoutNode) -> FrameDimensionSpec {
         layout

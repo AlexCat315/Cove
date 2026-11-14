@@ -562,7 +562,16 @@ fn make_writer(rating: &Rating, node: &Node) -> Rc<dyn Fn(f64)> {
 
 /// A cached raster for one catalog icon at a logical size.
 fn icon_raster(slug: &str, size: f32) -> Option<VectorImageRaster> {
-    let path = ui_icon_catalog::asset(slug).path()?;
+    let resource = ui_icon_catalog::asset(slug);
+    // A packaged app has no source tree, so the glyph has to come from the
+    // bytes compiled into the binary. Resolving only through the bundle path
+    // silently produced no raster at all, and the rating drew no stars.
+    if let Some(bytes) = resource.embedded() {
+        let initial =
+            crate::primitives::media::image::Image::resolve_resource(&resource, size, size);
+        return Some(VectorImageRaster::from_bytes(bytes, initial, size, size));
+    }
+    let path = resource.path()?;
     let initial = crate::primitives::media::image::Image::resolve_path(&path, size, size);
     Some(VectorImageRaster::new(path, initial, size, size))
 }

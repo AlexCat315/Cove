@@ -238,8 +238,16 @@ impl<Value: PartialEq + Clone + Send + Sync + 'static> Select<Value> {
             .collect()
     }
 
-    fn menu(&self) -> AnyView {
-        AnyView::new(Menu::new(self.menu_entries()).max_visible_rows(self.max_visible_rows))
+    fn menu(&self, is_presented: Binding<bool>) -> AnyView {
+        // A popup menu closes on the choice, the way a macOS popup button does.
+        // Without this the menu stayed open after the value changed, and on a
+        // compact width — where the same menu is presented as a bottom sheet —
+        // the sheet kept covering the content until something dismissed it.
+        AnyView::new(
+            Menu::new(self.menu_entries())
+                .max_visible_rows(self.max_visible_rows)
+                .on_item_activated(move || is_presented.set(false)),
+        )
     }
 }
 
@@ -281,7 +289,7 @@ impl<Value: PartialEq + Clone + Send + Sync + 'static> View for Select<Value> {
             ])),
         )
         .padding_edges(12.0, 6.0);
-        let popover = Popover::new(trigger, self.menu())
+        let popover = Popover::new(trigger, self.menu(is_presented.clone()))
             .is_presented(is_presented)
             .enabled(self.is_enabled)
             .sizing(PopoverSizing::Anchor)

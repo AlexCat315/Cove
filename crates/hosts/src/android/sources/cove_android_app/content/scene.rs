@@ -388,21 +388,29 @@ impl HostedScene {
             .collect::<BTreeMap<_, _>>();
         let (width, height) = self.size();
         let nodes: Vec<SemanticNode> = semantic_nodes(&inspection.semantics);
+        // `content_source` is a `RefCell`: read it in statements of their own.
+        // Holding a `borrow()` temporary inside the struct literal below keeps
+        // it alive until the whole expression ends, and the typography driver
+        // needs `borrow_mut()` in the meantime — which panicked on every
+        // snapshot the accessibility layer asked for.
+        let state = self.content_source.borrow().checkpoint();
+        let page = self.content_source.borrow().page();
+        let typography = self.typography_statistics();
         let value = Snapshot {
             session: &self.session_id,
-            state: self.content_source.borrow().checkpoint(),
+            state,
             focused: self.focused_id(),
             preedit: self.content.preedit(),
             controls,
             width,
             height,
             scale: self.scale(),
-            typography: self.typography_statistics(),
+            typography,
             vertices: self.drawing.vertices().len(),
             indices: self.drawing.indices().len(),
             frames: self.frames,
             mode: self.launch.mode.as_str(),
-            page: self.content_source.borrow().page(),
+            page,
             editor: self.editor_snapshot(),
             nodes,
         };

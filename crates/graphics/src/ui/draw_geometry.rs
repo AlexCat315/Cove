@@ -16,7 +16,7 @@ impl NativeUIGeometry {
             )
         } != 0;
         if !valid {
-            return Err(RhiError::invalid_argument("invalid UI vertices or indices"));
+            return Err(RhiError::invalid_argument(describe_invalid_geometry(list)));
         }
         let mut relies_on_clip = Vec::with_capacity(list.batches().len());
         for batch in list.batches() {
@@ -59,6 +59,64 @@ impl NativeUIGeometry {
     }
     pub fn matches(&self, list: &DrawList) -> bool {
         self.snapshot.geometry_shares_storage(list)
+    }
+}
+
+/// Names the first offending vertex or index, so a rejected frame reports what
+/// went wrong instead of only that it did.
+fn describe_invalid_geometry(list: &DrawList) -> String {
+    if let Some((index, vertex)) = list.vertices().iter().enumerate().find(|(_, vertex)| {
+        !(vertex.x.is_finite()
+            && vertex.y.is_finite()
+            && vertex.u.is_finite()
+            && vertex.v.is_finite())
+    }) {
+        let batch = list.batches().iter().enumerate().find(|(_, batch)| {
+            let start = batch.index_offset as usize;
+            let count = batch.index_count as usize;
+            list.indices()
+                .get(start..start + count)
+                .is_some_and(|indices| indices.contains(&(index as u32)))
+        });
+        let owner = match batch {
+            Some((position, batch)) => format!(
+                "batch {position} texture={:?} indices={}..{} scissor={:?}",
+                batch.texture_id,
+                batch.index_offset,
+                batch.index_offset as usize + batch.index_count as usize,
+                batch.scissor
+            ),
+            None => "no batch references it".to_owned(),
+        };
+        let nearby: Vec<String> = list
+            .vertices()
+            .iter()
+            .skip(index.saturating_sub(4))
+            .take(4)
+            .map(|vertex| format!("({},{})", vertex.x, vertex.y))
+            .collect();
+        return format!(
+            "invalid UI vertices or indices: vertex {index} of {} is not finite (x={} y={} u={} v={}), {owner}, quad corners {}",
+            list.vertices().len(),
+            vertex.x,
+            vertex.y,
+            vertex.u,
+            vertex.v,
+            nearby.join(" ")
+        );
+    }
+    let vertex_count = list.vertices().len() as u32;
+    match list
+        .indices()
+        .iter()
+        .enumerate()
+        .find(|(_, index)| **index >= vertex_count)
+    {
+        Some((offset, index)) => format!(
+            "invalid UI vertices or indices: index {offset} of {} is {index}, past {vertex_count} vertices",
+            list.indices().len()
+        ),
+        None => "invalid UI vertices or indices".to_owned(),
     }
 }
 
