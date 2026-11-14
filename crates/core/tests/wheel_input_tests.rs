@@ -121,6 +121,62 @@ impl Fixture {
 }
 
 #[test]
+fn a_wheel_over_a_region_with_nothing_to_scroll_leaves_neighbouring_viewports_alone() {
+    let f = Fixture::new();
+    // Only the left column scrolls. The pointer sits in the right column,
+    // which has no scroll handler at all -- a page that cannot scroll.
+    let left = f.counter(&f.left, InputHandlerRoute::scroll());
+
+    f.wheel_with(250.0, ScrollPhase::Began, ScrollPhase::None);
+    assert_eq!(
+        left.get(),
+        0,
+        "a wheel outside a scrollable region must not move it",
+    );
+
+    f.wheel(250.0);
+    assert_eq!(
+        left.get(),
+        0,
+        "a phaseless wheel outside a scrollable region must not move it either",
+    );
+}
+
+#[test]
+fn a_wheel_outside_every_scrollable_region_does_not_steal_a_pane_under_a_gap() {
+    let f = Fixture::new();
+    let left = f.counter(&f.left, InputHandlerRoute::scroll());
+    let right = f.counter(&f.right, InputHandlerRoute::scroll());
+
+    // Pointer in the 20pt gutter between the two columns.
+    f.wheel_with(190.0, ScrollPhase::Began, ScrollPhase::None);
+    assert_eq!(
+        (left.get(), right.get()),
+        (0, 0),
+        "a wheel in the gap between panes belongs to neither",
+    );
+}
+
+#[test]
+fn a_wheel_elsewhere_does_not_move_a_focused_pane() {
+    let f = Fixture::new();
+    f.left.set_is_focusable(true);
+    f.focus.focus(Some(&f.left), false);
+    let left = f.counter(&f.left, InputHandlerRoute::scroll());
+
+    // The pointer sits over the right pane, which cannot scroll. Focus lives
+    // in the left pane, but focus must never pull a wheel the cursor did not
+    // walk into -- that is how a page with nothing to scroll ends up moving
+    // a neighbouring region.
+    f.wheel(250.0);
+    assert_eq!(
+        left.get(),
+        0,
+        "focus must not move a pane the pointer never entered",
+    );
+}
+
+#[test]
 fn gesture_and_os_momentum_stay_with_their_consumer_and_a_click_catches_momentum() {
     let f = Fixture::new();
     let left = f.counter(&f.left, InputHandlerRoute::default());

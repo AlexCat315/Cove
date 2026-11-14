@@ -356,7 +356,11 @@ impl EventDispatcher {
         {
             return;
         }
-        if let Some(path) = focused_path.as_deref()
+        // Focus is only a fallback when there is no pointer to route by. With
+        // a live pointer, delivering to a focused pane the cursor never
+        // entered scrolls a region the user is not pointing at.
+        if self.last_cursor.get().is_none()
+            && let Some(path) = focused_path.as_deref()
             && !same_wheel_target(Some(path), preferred_focused_path.as_deref())
             && !same_wheel_target(Some(path), hit_path.as_deref())
             && self.deliver_wheel(path, &event) == EventResult::Handled
@@ -368,11 +372,12 @@ impl EventDispatcher {
             return;
         }
         let kind = EventKind::Wheel(event.clone());
-        if self.deliver_global_routes(
+        if self.deliver_routed(
             &kind,
             &InputHandlerRole::Scroll,
             InputRoutingPriority::NORMAL,
             &HashSet::new(),
+            self.last_cursor.get(),
         ) == EventResult::Handled
         {
             self.wheel_gesture.borrow_mut().finish(event.input);
@@ -559,6 +564,22 @@ impl EventDispatcher {
         min_priority: InputRoutingPriority,
         excluded: &HashSet<ElementId>,
     ) -> EventResult {
+        self.deliver_routed(kind, role, min_priority, excluded, None)
+    }
+
+    /// Same routing as [`Self::deliver_global_routes`], restricted to handlers
+    /// whose window-space bounds contain `point`. A wheel that nothing under
+    /// the cursor could consume must not fall through to a pane the pointer
+    /// never entered; the geometry filter keeps the fallback local to the
+    /// region the user is actually hovering.
+    fn deliver_routed(
+        &self,
+        kind: &EventKind,
+        role: &InputHandlerRole,
+        min_priority: InputRoutingPriority,
+        excluded: &HashSet<ElementId>,
+        under: Option<Point>,
+    ) -> EventResult {
         let Some(root) = self.tree.borrow().root() else {
             return EventResult::Ignored;
         };
@@ -572,6 +593,11 @@ impl EventDispatcher {
                 continue;
             }
             if !node.accepts_subtree_input() {
+                continue;
+            }
+            if let Some(point) = under
+                && !node.absolute_frame().contains(point)
+            {
                 continue;
             }
             if matches!(
