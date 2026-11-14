@@ -4,7 +4,13 @@
 
 ## Unreleased
 
-- **打包产物里的 UI 图标全部缺失（2026-11-14，Android 真机）**：`ui_icon_catalog` 用 `env!("CARGO_MANIFEST_DIR")` 拼图标根目录，那是编译机的源码树路径；`BundleImageResource::path()` 在运行期 `is_file()` 检查，APK 里既没有这棵树也没有 stage 过 `UIIcons`，于是每个图标都落到 `TextureId::none`，`IconButton`/侧栏等位置画成实心方块。桌面端只是恰好读到了本机源码树才显得正常。现在 `build.rs` 把 218 个 SVG 用 `include_bytes!` 编进二进制，`BundleImageResource` 增加内嵌字节形态，`Image::resolve_embedded` 与 `VectorImageRaster` 都支持字节源，尺寸/密度变化仍按原逻辑重栅格。新增两条单测锁住「每个 catalog 条目都能取到内嵌字节」。
+- **Android 真机上打开下拉菜单会崩溃（2026-11-14，Adreno 710 / Android 16）**：同一个手势下叠了三层缺陷。
+  - 点击即 `SIGABRT`：`HostedScene::snapshot()` 在同一个结构体字面量里调用 `content_source.borrow()`（`checkpoint()` 与 `page()`）又调用需要 `borrow_mut()` 的 `typography_statistics()`，两个 `borrow()` 临时值活到整条语句结束，`RefCell` 必然双重借用；panic 穿过 `extern "C"` 边界变成 `panic_cannot_unwind` 中止进程。现在状态、页码、排版统计各取到局部变量后再构造快照。顺带在 Android 桥里装了 panic 日志钩子：Rust 的 stderr 不进 logcat，此前只能靠 tombstone 猜。
+  - 菜单改由 RHI 拒绝而非崩溃：`SheetDragHandle` 用 `frame_size(f32::INFINITY, 44.0)` 表示「占满父宽」，但布局引擎按字面求解点数，无界父容器把它解成 `x = -inf, width = inf`；`FrameModifier` 现在把非有限点数读成 `Percent(100)`（无界时退化为 `auto`），`LayoutPass` 再把任何非有限解折叠为零尺寸，取整/切片不会再产出 NaN 顶点（此前是 `invalid UI vertices or indices: vertex 67174 … x=NaN`，整帧被丢弃、页面下半截空白）。
+  - 选中后菜单不关：`Select` 从未给 `Menu` 接 `on_item_activated`，值变了但弹层还在；紧凑宽度下这个菜单是底部 sheet，会一直盖住内容。现在选中即收起。
+  - 诊断：`NativeUIGeometry` 的拒绝信息从「invalid UI vertices or indices」改为指名首个非有限顶点（下标、坐标、所属 batch 的纹理与索引区间、相邻四个角点）或越界索引，帧失败可直接定位。
+
+- **打包产物里的 UI 图标全部缺失（2026-11-14，Android 真机）**：`ui_icon_catalog` 用 `env!("CARGO_MANIFEST_DIR")` 拼图标根目录，那是编译机的源码树路径；`BundleImageResource::path()` 在运行期 `is_file()` 检查，APK 里既没有这棵树也没有 stage 过 `UIIcons`，于是每个图标都落到 `TextureId::none`，`IconButton`/侧栏等位置画成实心方块。桌面端只是恰好读到了本机源码树才显得正常。现在 `build.rs` 把 218 个 SVG 用 `include_bytes!` 编进二进制，`BundleImageResource` 增加内嵌字节形态，`Image::resolve_embedded` 与 `VectorImageRaster` 都支持字节源，尺寸/密度变化仍按原逻辑重栅格。新增两条单测锁住「每个 catalog 条目都能取到内嵌字节」。同轮漏改的两处调用点一并补上：`Rating` 的 `icon_raster` 与原生菜单 `make_icon` 仍只走 `BundleImageResource::path()`，打包后取不到文件，星星整排不画、菜单项没有图标；现在都优先用内嵌字节。
 - **Android 宿主把 UI 直接录进 drawable，画面花屏（2026-11-14，Adreno 710）**：`AndroidWindowRenderer::present` 在非毛玻璃帧上把 draw list 直接录进 swapchain 图像，而 UI 管线是按 `Rgba8Unorm` + 显示采样数创建的，drawable 却是单采样、surface 格式；样本数与格式双重不匹配，Adreno 栅格化出的文字被切条、整屏错行（桌面宿主另有 resolve 路径，所以从未暴露）。现在与桌面宿主走同一契约：始终解析进自有 `android-ui-framebuffer`（`record_presentation` 负责 MSAA 工作区与解析），再 blit 到 drawable。真机上 Dashboard/Button 页渲染正确，点击切页与滚动即时生效，连续运行 20 s 无崩溃。
 - **`cove-debugger` 原生 shim 的构建缺陷（2026-11-14）**：四处会阻断全新构建的问题一并修掉——`cc_build` 给 C 源文件传 `-std=c++17`（clang 直接报错，Android 目标必挂）；链接非 framework 的 liblldb 时写成 `-lldb`，clang 解析成 `-l ldb` 并报 `library 'ldb' not found`，应为 `-llldb`；`native/include/VERSION` 在大小写不敏感文件系统上遮蔽 libc++ 的 `<version>`，改名 `LLDB-VERSION.txt`；`evaluate_in` 依赖 `SBFrame::GetValueForVariablePath` 的单参重载，而各版 LLDB 运行时导出的名字与 vendored SB API 头声明不一致（`Undefined symbols`），改用同一语义的表达式求值。
 

@@ -275,6 +275,27 @@ fn log(message: &str, level: Level, label: &str) {
     forward_to_logcat(message);
 }
 
+/// Reports a Rust panic to logcat under the `CovePanic` tag.
+///
+/// A panic inside this `extern "C"` surface never reaches Java: Rust's stderr
+/// is not connected to logcat on Android, so the only trace is an anonymous
+/// tombstone (`panic_cannot_unwind`) in the crash buffer. The payload is what
+/// names the failing `file:line` and assertion, so it is worth emitting
+/// directly; the previous hook still runs afterwards.
+fn install_panic_logger() {
+    static ONCE: std::sync::Once = std::sync::Once::new();
+    ONCE.call_once(|| {
+        let previous = std::panic::take_hook();
+        std::panic::set_hook(Box::new(move |info| {
+            let text = format!("CovePanic: {info}");
+            if let Ok(text) = std::ffi::CString::new(text.replace('\0', "")) {
+                ndk::log_write(c"CovePanic", &text);
+            }
+            previous(info);
+        }));
+    });
+}
+
 /// Forwards one record to Android's log facility when `liblog` is available.
 fn forward_to_logcat(message: &str) {
     let Ok(tag) = std::ffi::CString::new("CoveHost") else {
@@ -324,6 +345,7 @@ pub unsafe extern "C" fn cove_android_create_application(
     options: *const u16,
     options_count: i32,
 ) -> ApplicationPointer {
+    install_panic_logger();
     // SAFETY: forwarded pointer/count contracts from the caller.
     let checkpoint = unsafe { utf16_string(checkpoint, checkpoint_count) };
     // SAFETY: forwarded pointer/count contracts from the caller.

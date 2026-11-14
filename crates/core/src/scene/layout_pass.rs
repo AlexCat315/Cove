@@ -20,7 +20,7 @@ impl LayoutPass {
 }
 
 fn apply(layout_node: &LayoutNode, node: &Node) {
-    node.set_frame(node.resolve_layout_frame(layout_node.frame()));
+    node.set_frame(finite_frame(node.resolve_layout_frame(layout_node.frame())));
     // Layout observers must run for every pass, including when the resolved
     // frame is unchanged. Frame capture, anchor tracking, and other node-owned
     // resources use this hook to refresh derived geometry.
@@ -34,10 +34,58 @@ fn apply(layout_node: &LayoutNode, node: &Node) {
     }
 }
 
+/// Collapses a solved frame the layout engine could not bound to a paintable one.
+///
+/// An unbounded axis (an intrinsic probe, an overlay measured at max content) can
+/// solve a literal point extent to infinity, which then lands as `x = -inf,
+/// width = inf`. Nothing downstream can use that: slicing and snapping produce
+/// NaN vertices, and the RHI rejects the entire frame. A non-finite axis is
+/// never meaningful, so it degrades to a zero extent instead of poisoning the
+/// draw list.
+fn finite_frame(frame: crate::Rect) -> crate::Rect {
+    if frame.x.is_finite()
+        && frame.y.is_finite()
+        && frame.width.is_finite()
+        && frame.height.is_finite()
+    {
+        return frame;
+    }
+    crate::Rect::new(
+        if frame.x.is_finite() { frame.x } else { 0.0 },
+        if frame.y.is_finite() { frame.y } else { 0.0 },
+        if frame.width.is_finite() {
+            frame.width.max(0.0)
+        } else {
+            0.0
+        },
+        if frame.height.is_finite() {
+            frame.height.max(0.0)
+        } else {
+            0.0
+        },
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::Rect;
+
+    #[test]
+    fn an_unbounded_solve_is_collapsed_to_a_paintable_frame() {
+        // An overlay measured at max content once wrote `x = -inf, width = inf`
+        // here, which the draw pass turned into NaN vertices at a zero size.
+        assert_eq!(
+            finite_frame(Rect::new(f32::NEG_INFINITY, 0.0, f32::INFINITY, 44.0)),
+            Rect::new(0.0, 0.0, 0.0, 44.0)
+        );
+        assert_eq!(
+            finite_frame(Rect::new(f32::NAN, f32::NAN, 36.0, 4.0)),
+            Rect::new(0.0, 0.0, 36.0, 4.0)
+        );
+        let inside = Rect::new(12.0, 34.0, 36.0, 4.0);
+        assert_eq!(finite_frame(inside), inside);
+    }
 
     #[test]
     fn frames_are_written_down_the_matching_trees() {
