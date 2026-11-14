@@ -337,11 +337,10 @@ std::vector<lldb::SBValue> to_vector(lldb::SBValueList list) {
 
 lldb::SBValue evaluate_in(lldb::SBFrame &frame, const char *expression,
                           uint32_t timeout_ms) {
-  /* A variable path reads memory without running the debuggee. */
-  lldb::SBValue value = frame.GetValueForVariablePath(expression);
-  if (value.IsValid() && value.GetError().Success()) {
-    return value;
-  }
+  // `SBFrame::GetValueForVariablePath` is not stable across LLDB builds: the
+  // runtimes export the path-taking overload under names the vendored SB API
+  // headers do not declare, so linking against it fails. Expression evaluation
+  // reaches the same value without depending on that overload.
   lldb::SBExpressionOptions options;
   options.SetUnwindOnError(true);
   options.SetIgnoreBreakpoints(true);

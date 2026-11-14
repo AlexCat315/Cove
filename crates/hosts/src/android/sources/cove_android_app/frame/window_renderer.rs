@@ -101,16 +101,13 @@ impl AndroidWindowRenderer {
         let image = self.timings.measure_result(Phase::DrawableAcquire, || {
             device.acquire_swapchain_image(swapchain)
         })?;
-        // A frosted panel samples what is already behind it, and a swapchain
-        // image is a render target that cannot be sampled. Only pay for the
-        // owned texture — and the blit that follows — on frames that really
-        // have a panel doing the sampling; the rest render straight into the
-        // drawable.
-        let frosted = self.renderer.supports_backdrop()
-            && list.batches().iter().any(|batch| batch.backdrop.is_some());
-        if !frosted && !self.info.capture_enabled {
-            self.framebuffer = None;
-        } else if self.framebuffer.as_ref().is_none_or(|buffer| {
+        // The UI pipeline is configured for the display sample count and for
+        // `Rgba8Unorm`, while a drawable is single-sampled and uses the surface
+        // format. Recording the frame straight into the drawable hands the
+        // pipeline a sample-count and format it was not built for, which Adreno
+        // rasterizes into garbage. Resolve into an owned texture and blit it
+        // into the drawable, the same contract the desktop host uses.
+        if self.framebuffer.as_ref().is_none_or(|buffer| {
             let descriptor = buffer.descriptor();
             descriptor.width != image.width || descriptor.height != image.height
         }) {
@@ -129,29 +126,31 @@ impl AndroidWindowRenderer {
         }
         let viewport = NativeUIViewport::new([image.width, image.height], [logical.0, logical.1]);
         let mut commands = CommandBuffer::new();
-        let framebuffer_texture = self.framebuffer.as_ref().map(|buffer| buffer.texture());
-        let target_texture = framebuffer_texture.unwrap_or(image.texture);
+        let framebuffer_texture = self
+            .framebuffer
+            .as_ref()
+            .map(|buffer| buffer.texture())
+            .ok_or_else(|| RhiError::invalid_argument("the android frame needs a resolve target"))?;
         let clear_color = self.clear_color;
         let renderer = &mut self.renderer;
         let frame = self
             .timings
             .measure_result(Phase::CommandRecord, || -> RhiResult<_> {
-                let frame = renderer.record(
+                let frame = renderer.record_presentation(
                     list,
                     &mut commands,
-                    RenderColorTarget::clearing(target_texture, clear_color),
+                    framebuffer_texture,
                     viewport,
-                    framebuffer_texture.filter(|_| frosted),
+                    clear_color,
+                    usize::MAX,
                 )?;
-                if framebuffer_texture.is_some() {
-                    renderer.record_blit(
-                        target_texture,
-                        &mut commands,
-                        RenderColorTarget::new(image.texture),
-                        cove_graphics::rhi::platform_default_surface_format(),
-                        [image.width, image.height],
-                    )?;
-                }
+                renderer.record_blit(
+                    framebuffer_texture,
+                    &mut commands,
+                    RenderColorTarget::new(image.texture),
+                    cove_graphics::rhi::platform_default_surface_format(),
+                    [image.width, image.height],
+                )?;
                 Ok(frame)
             })?;
         self.timings.measure_result(Phase::QueueSubmit, || {

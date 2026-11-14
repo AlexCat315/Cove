@@ -203,7 +203,11 @@ fn cc_build(cpp: bool) -> cc::Build {
         // pointees are incomplete; C4251 is inherent to the SB API, not actionable.
         build.flag("/wd4251");
     } else {
-        build.flag("-std=c++17").flag("-fPIC");
+        // `-std=c++17` is invalid for C sources, and the stub is compiled as C.
+        if cpp {
+            build.flag("-std=c++17");
+        }
+        build.flag("-fPIC");
     }
     build
 }
@@ -266,7 +270,7 @@ fn link(
             } else {
                 command
                     .arg(format!("-L{}", lldb.libdir.display()))
-                    .arg("-lldb")
+                    .arg("-llldb")
                     .arg(format!("-Wl,-rpath,{}", lldb.libdir.display()));
             }
         }
