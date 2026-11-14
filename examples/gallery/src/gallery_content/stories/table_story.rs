@@ -593,13 +593,24 @@ impl View for TableStory {
                     .map(|node| node.name.to_owned())
                     .unwrap_or_else(|| id.clone());
 
-                // Indent and disclosure slots are bare empty-sized spacers so the
-                // labels line up; the geometry mirrors the TreeTable first column.
-                let indent: AnyView = AnyView::new(
-                    AnyView::new(cove_ui_compose::EmptyView)
-                        .frame_width(depth as f32 * 16.0)
+                // Indent and disclosure slots are layout-backed spacers so the
+                // labels line up; an EmptyView alone has no layout node and its
+                // explicit width is dropped by the flex solver.
+                let spacer = |width: f32| {
+                    AnyView::new(
+                        BoxView::new(
+                            cove_core::scene::FlexDirection::Row,
+                            cove_core::scene::Align::Center,
+                            cove_core::scene::Justify::FlexStart,
+                            cove_core::scene::Wrap::NoWrap,
+                            0.0,
+                            AnyView::new(cove_ui_compose::EmptyView),
+                        )
+                        .frame_width(width)
                         .flex_with(0.0, 0.0, None),
-                );
+                    )
+                };
+                let indent: AnyView = spacer(depth as f32 * 16.0);
                 let disclosure: AnyView = if is_expandable {
                     let story = self.handle();
                     let toggle_id = id.clone();
@@ -628,11 +639,7 @@ impl View for TableStory {
                     )
                 } else {
                     // Leaves keep the disclosure slot so every label lines up.
-                    AnyView::new(
-                        AnyView::new(cove_ui_compose::EmptyView)
-                            .frame_width(20.0)
-                            .flex_with(0.0, 0.0, None),
-                    )
+                    spacer(20.0)
                 };
                 let label: AnyView = AnyView::new(
                     AnyView::new(BoxView::new(
