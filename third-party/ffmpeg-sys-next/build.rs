@@ -539,8 +539,13 @@ fn build(sysroot: Option<&str>) -> io::Result<()> {
     // stop autodetected libraries enabling themselves, causing linking errors
     configure.arg("--disable-autodetect");
 
-    // do not build programs since we don't need them
-    configure.arg("--disable-programs");
+    // Programs are opt-in: the libraries never need `ffmpeg`/`ffprobe` in-process.
+    if env::var("CARGO_FEATURE_BUILD_PROGRAMS").is_ok() {
+        configure.arg("--enable-ffmpeg");
+        configure.arg("--enable-ffprobe");
+    } else {
+        configure.arg("--disable-programs");
+    }
 
     // do not generate documentation
     configure.arg("--disable-doc");
@@ -796,6 +801,10 @@ fn build(sysroot: Option<&str>) -> io::Result<()> {
     {
         return Err(io::Error::other("make install failed"));
     }
+
+    // Dependents read this through `DEP_FFMPEG_BIN_DIR`; their build scripts turn
+    // it into a compile-time constant so packaged apps can find the CLIs.
+    println!("cargo:bin_dir={}", search().join("bin").display());
 
     Ok(())
 }

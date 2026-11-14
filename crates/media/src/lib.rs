@@ -14,6 +14,13 @@ pub use kernel::{SampleStats, channel_stats, sample_stats};
 pub use source::*;
 pub use types::*;
 
+/// Locating the FFmpeg command-line tools used by export and probing.
+#[cfg(not(target_arch = "wasm32"))]
+mod tools;
+#[cfg(not(target_arch = "wasm32"))]
+pub use tools::{FfmpegTools, ToolError, ToolSearch, resolve as resolve_ffmpeg_tools};
+
+
 #[cfg(all(feature = "ffmpeg", not(target_arch = "wasm32")))]
 mod engine;
 #[cfg(all(feature = "ffmpeg", not(target_arch = "wasm32")))]

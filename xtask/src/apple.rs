@@ -114,6 +114,10 @@ pub fn bundle_mac(project: &Project, target: &Target, output: &Path) -> Result<P
     project.stage_resources(&resources)?;
     let platform = project.platforms("macOS");
     process::copy_tree(&platform.join("Resources"), &resources)?;
+    project.stage_extra_resources(&resources)?;
+    // Helpers live beside the main executable so `Command::new` and a signed
+    // bundle both find them; `sign` covers everything below `Contents`.
+    project.stage_helpers(&contents.join("MacOS"), target.mode(), None)?;
     let build = project.build.to_string();
     let mut entries = identity_entries(project, bin, &build);
     entries.push(("LSMinimumSystemVersion", Plist::String(MINIMUM_VERSION)));
@@ -162,6 +166,8 @@ pub fn bundle_ios(project: &Project, target: &Target, output: &Path) -> Result<P
     project.stage_resources(&app)?;
     let platform = project.platforms("iOS");
     process::copy_tree(&platform.join("Resources"), &app)?;
+    project.stage_extra_resources(&app)?;
+    project.stage_helpers(&app, target.mode(), Some(triple))?;
     let build = project.build.to_string();
     let mut entries = identity_entries(project, bin, &build);
     entries.extend(ios_entries(target.simulator));

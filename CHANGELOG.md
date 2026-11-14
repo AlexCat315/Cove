@@ -4,6 +4,13 @@
 
 ## Unreleased
 
+- **Diffuse 迁移登记的四项缺口（2026-11-14）**：
+  - Android 宿主按启动模式安装场景内容。新增 `cove_hosts::android::install_scene_content(mode, factory)` 与 `SceneContentFactory`，`HostedScene` 不再把 `SceneLaunchMode::Game` 直接判为未链接，而是先查按模式登记的内容，再回落到 application 内容；同一模式只认首次安装，与 `install_application_content` 的语义一致。
+  - `cove-shell` 新增 SDL3 播放设备接口。`Sdl3AudioDevice::open_default(AudioStreamSpec)` 以 f32 规格打开默认播放流，打开时为暂停状态；`format()` 报告设备真实采样率、声道与 `AudioSampleFormat`（另给 `frame_bytes()` 便于按帧排队），`queued_bytes()` / `available_bytes()` 供节奏控制，`put` / `flush` / `pause` / `resume` 驱动播放，`Drop` 关闭流。SDL 音频子系统惰性初始化，可为多个流复用。
+  - `cove-media` 新增 FFmpeg 命令行工具解析层。`FfmpegTools::discover()` 按 `COVE_FFMPEG_EXECUTABLE`/`COVE_FFPROBE_EXECUTABLE` → `COVE_FFMPEG_DIR` → `ffmpeg-tools` 构建出的目录 → `PATH` 的顺序解析，校验目标存在且可执行，并提供 `ffmpeg()`/`ffprobe()`、`version()`/`probe_version()`；失败时 `ToolError` 列出尝试过的路径，而不是等到播放时才暴露 spawn 失败。新增 `ffmpeg-tools` 特性会以 `ffmpeg-sys-next` 固定的 `release/9.0` 一并构建 `ffmpeg`、`ffprobe`（vendored 版本新增 `build-programs`，默认仍不产可执行文件）。
+  - `cove-package` 支持 helper 可执行文件与额外资源。`[package.metadata.cove]` 新增 `helpers = ["bin-name"]` 与 `resources = ["相对路径"]`；macOS 把 helper 放进 `Contents/MacOS`、资源复制到 `Contents/Resources` 并在签名前完成，iOS 复制到 app 根目录，Windows/Linux 放进可执行文件旁的目录，Android 复制资源到 assets 并对 helpers 明确报错（Android 无法运行 helper 可执行文件）。
+
+
 - 修复 DevTools 的跨平台 MCP 启动及 Windows、Linux 的 CPU Profile 入口。Windows 可从可执行文件旁边的匹配 PDB 解析函数和源码位置，Web 阶段计时在停止后保留实际帧数。
 
 - DevTools 按帧读取 Metal、Vulkan、DX12 和 WebGPU 的逐 pass 时间，Frames 显示对应的绘制量和合成层。帧详情按需读取，支持保存在性能快照中。浏览器复用 Cove 的合成层渲染器，Canvas2D 可检查合成层。

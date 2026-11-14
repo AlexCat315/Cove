@@ -313,3 +313,51 @@ double cove_shell_monotonic_seconds(void){return (double)SDL_GetPerformanceCount
 
 /* Screen-colour sampling lives in Rust (crate::color_sampler), with one
    asynchronous backend per window system. No C entry point blocks here. */
+
+struct CoveShellAudioStream { SDL_AudioStream *stream; };
+static SDL_AtomicInt audio_initialized;
+CoveShellAudioStream *cove_shell_audio_open_default(int frequency,int channels) {
+    if (frequency <= 0 || channels <= 0) { SDL_SetError("invalid audio stream format"); return NULL; }
+    if (!SDL_GetAtomicInt(&audio_initialized)) {
+        if (!SDL_InitSubSystem(SDL_INIT_AUDIO)) return NULL;
+        SDL_SetAtomicInt(&audio_initialized,1);
+    }
+    SDL_AudioSpec spec; spec.format = SDL_AUDIO_F32; spec.channels = channels; spec.freq = frequency;
+    SDL_AudioStream *stream = SDL_OpenAudioDeviceStream(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK,&spec,NULL,NULL);
+    if (!stream) return NULL;
+    CoveShellAudioStream *handle = calloc(1,sizeof(*handle));
+    if (!handle) { SDL_DestroyAudioStream(stream); return NULL; }
+    handle->stream = stream;
+    return handle;
+}
+bool cove_shell_audio_format(CoveShellAudioStream *handle,int *format,int *channels,int *frequency) {
+    if (!handle) return false;
+    SDL_AudioSpec source,device;
+    if (!SDL_GetAudioStreamFormat(handle->stream,&source,&device)) return false;
+    if (format) *format = (int)device.format;
+    if (channels) *channels = device.channels;
+    if (frequency) *frequency = device.freq;
+    return true;
+}
+int cove_shell_audio_queued(CoveShellAudioStream *handle) {
+    if (!handle) return 0;
+    int queued = SDL_GetAudioStreamQueued(handle->stream);
+    return queued < 0 ? 0 : queued;
+}
+int cove_shell_audio_available(CoveShellAudioStream *handle) {
+    if (!handle) return 0;
+    int available = SDL_GetAudioStreamAvailable(handle->stream);
+    return available < 0 ? 0 : available;
+}
+bool cove_shell_audio_put(CoveShellAudioStream *handle,const void *bytes,int length) {
+    if (!handle || !bytes || length <= 0) return false;
+    return SDL_PutAudioStreamData(handle->stream,bytes,length);
+}
+bool cove_shell_audio_flush(CoveShellAudioStream *handle) { return handle && SDL_FlushAudioStream(handle->stream); }
+bool cove_shell_audio_pause(CoveShellAudioStream *handle) { return handle && SDL_PauseAudioStreamDevice(handle->stream); }
+bool cove_shell_audio_resume(CoveShellAudioStream *handle) { return handle && SDL_ResumeAudioStreamDevice(handle->stream); }
+void cove_shell_audio_close(CoveShellAudioStream *handle) {
+    if (!handle) return;
+    SDL_DestroyAudioStream(handle->stream);
+    free(handle);
+}

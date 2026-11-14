@@ -9,6 +9,9 @@ description = "Media control, retained frame output and optional FFmpeg integrat
 [features]
 default = []
 ffmpeg = ["dep:ffmpeg-sys-next", "dep:cpal", "dep:cove-http"]
+# Builds `ffmpeg`/`ffprobe` from the same pinned FFmpeg release as the libraries,
+# so export and probing run against a version Cove controls.
+ffmpeg-tools = ["ffmpeg", "ffmpeg-sys-next/build-programs"]
 
 [dependencies]
 cove-logging.workspace = true

@@ -2,14 +2,14 @@
 
 use crate::process;
 use crate::project::Project;
-use crate::{Result, Target};
+use crate::{Mode, Result, Target};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
 /// `<output>/<Name>/` with the executable, resources and an embedded manifest.
 pub fn bundle_windows(project: &Project, target: &Target, output: &Path) -> Result<PathBuf> {
     let executable = project.build_bin(target.mode(), None)?;
-    let directory = folder(project, output, &executable)?;
+    let directory = folder(project, output, &executable, target.mode())?;
     let installed = directory.join(executable.file_name().expect("executable has a name"));
     let manifest = project.platforms("Windows").join("Application.manifest");
     if manifest.is_file() {
@@ -28,7 +28,7 @@ pub fn bundle_windows(project: &Project, target: &Target, output: &Path) -> Resu
 /// `<output>/<Name>/` with the executable, resources and a `.desktop` entry.
 pub fn bundle_linux(project: &Project, target: &Target, output: &Path) -> Result<PathBuf> {
     let executable = project.build_bin(target.mode(), None)?;
-    let directory = folder(project, output, &executable)?;
+    let directory = folder(project, output, &executable, target.mode())?;
     let template = project.platforms("Linux").join("Application.desktop");
     let mut entry = std::fs::read_to_string(&template)
         .unwrap_or_else(|_| "[Desktop Entry]\nType=Application\nTerminal=false\n".into());
@@ -43,7 +43,7 @@ pub fn bundle_linux(project: &Project, target: &Target, output: &Path) -> Result
     Ok(directory)
 }
 
-fn folder(project: &Project, output: &Path, executable: &Path) -> Result<PathBuf> {
+fn folder(project: &Project, output: &Path, executable: &Path, mode: Mode) -> Result<PathBuf> {
     let directory = output.join(&project.name);
     process::remove_dir(&directory)?;
     process::copy(
@@ -53,6 +53,8 @@ fn folder(project: &Project, output: &Path, executable: &Path) -> Result<PathBuf
     project.stage_resources(&directory)?;
     let platform = if cfg!(windows) { "Windows" } else { "Linux" };
     process::copy_tree(&project.platforms(platform).join("Resources"), &directory)?;
+    project.stage_extra_resources(&directory)?;
+    project.stage_helpers(&directory, mode, None)?;
     Ok(directory)
 }
 

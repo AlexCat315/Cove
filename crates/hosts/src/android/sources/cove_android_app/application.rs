@@ -37,7 +37,7 @@ impl AndroidApplication {
         } else {
             1.0
         };
-        let content = linked_content();
+        let content = linked_content(launch.mode);
         let configuration = content.configuration().cloned();
         if let Some(configuration) = &configuration {
             runtime.vsync &= configuration.rendering.vsync;

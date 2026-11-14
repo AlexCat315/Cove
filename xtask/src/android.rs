@@ -86,6 +86,7 @@ fn llvm(ndk: &Path) -> Result<PathBuf> {
 /// Builds the library and stages `lib/` and `assets/` for Gradle; writes
 /// `Platforms/Android/cove.properties`. Returns the staged mode directory.
 pub fn prepare(project: &Project, mode: Mode) -> Result<PathBuf> {
+    project.reject_helpers_for_android()?;
     let platform = project.platforms("Android");
     if !platform.join("settings.gradle.kts").is_file() {
         return Err(format!(
@@ -168,6 +169,7 @@ pub fn prepare(project: &Project, mode: Mode) -> Result<PathBuf> {
         )?;
     }
     project.stage_resources(&assets)?;
+    project.stage_extra_resources(&assets)?;
 
     let properties = [
         (

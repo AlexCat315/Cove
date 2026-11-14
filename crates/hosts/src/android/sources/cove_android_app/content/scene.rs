@@ -167,7 +167,13 @@ impl HostedSceneContent for DeclaredApplicationContent {
     }
 }
 
-pub(crate) fn linked_content() -> Box<dyn HostedSceneContent> {
+pub(crate) fn linked_content(mode: SceneLaunchMode) -> Box<dyn HostedSceneContent> {
+    // An installation made for this launch mode wins over the application
+    // entry points, so a game crate can host its own scene while the same APK
+    // keeps the shared application/declaration seam for other modes.
+    if let Some(factory) = crate::android::scene_content(mode) {
+        return factory();
+    }
     if let Some(factory) = crate::android::application() {
         let launch = factory();
         // The session is built later on this thread, so the backend the launch
@@ -200,7 +206,8 @@ impl HostedScene {
         scale: f32,
         _device: Arc<Device>,
     ) -> Result<Self, String> {
-        Self::with_content(checkpoint, launch, scale, linked_content())
+        let mode = launch.mode;
+        Self::with_content(checkpoint, launch, scale, linked_content(mode))
     }
 
     pub fn with_content(
@@ -420,4 +427,43 @@ fn new_session_id() -> String {
         .map(|duration| duration.as_nanos())
         .unwrap_or(0);
     format!("{nanos:032x}")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Content that carries only an identity marker, so a test can observe
+    /// which seam answered without building a view tree.
+    struct Marker(&'static str);
+
+    impl HostedSceneContent for Marker {
+        fn root(&mut self, _mode: SceneLaunchMode, _scale: f32) -> Result<AnyView, String> {
+            Err(self.0.to_owned())
+        }
+
+        fn page(&self) -> Option<String> {
+            Some(self.0.to_owned())
+        }
+    }
+
+    fn game_content() -> Box<dyn HostedSceneContent> {
+        Box::new(Marker("game"))
+    }
+
+    fn later_content() -> Box<dyn HostedSceneContent> {
+        Box::new(Marker("later"))
+    }
+
+    #[test]
+    fn a_mode_installation_replaces_the_unlinked_seam_and_the_first_one_wins() {
+        crate::android::install_scene_content(SceneLaunchMode::Game, game_content);
+        // A second registration for the same mode must not displace the first.
+        crate::android::install_scene_content(SceneLaunchMode::Game, later_content);
+        let content = linked_content(SceneLaunchMode::Game);
+        assert_eq!(content.page().as_deref(), Some("game"));
+        // Other modes keep their own seam rather than inheriting the game one.
+        let application = linked_content(SceneLaunchMode::Application);
+        assert_ne!(application.page().as_deref(), Some("game"));
+    }
 }

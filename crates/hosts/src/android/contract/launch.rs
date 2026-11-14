@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 /// Authored launch content shared by the APK producer and native consumer.
 /// Transient benchmark, timing, input and display state never enter this
 /// document.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum SceneLaunchMode {
     Counter,

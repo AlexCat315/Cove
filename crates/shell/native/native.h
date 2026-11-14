@@ -50,6 +50,24 @@ bool cove_shell_global_pointer(float *x,float *y);
 char *cove_shell_clipboard_read(void);
 bool cove_shell_clipboard_write(const char *text);
 void cove_shell_free(void *memory);
+/* Default playback device: a stream that converts caller-supplied f32 sample
+   frames to whatever the device wants. The stream opens paused, so a caller
+   fills it with put before resume. Every function is safe from any thread; SDL
+   locks the stream internally. */
+typedef struct CoveShellAudioStream CoveShellAudioStream;
+CoveShellAudioStream *cove_shell_audio_open_default(int frequency,int channels);
+/* The device's real format, not the requested one: SDL converts into it. */
+bool cove_shell_audio_format(CoveShellAudioStream *stream,int *format,int *channels,int *frequency);
+/* Input bytes not yet consumed, and converted bytes already available. Both
+   return 0 when SDL reports an error. */
+int cove_shell_audio_queued(CoveShellAudioStream *stream);
+int cove_shell_audio_available(CoveShellAudioStream *stream);
+/* `bytes` holds f32 interleaved sample frames; `length` is its byte count. */
+bool cove_shell_audio_put(CoveShellAudioStream *stream,const void *bytes,int length);
+bool cove_shell_audio_flush(CoveShellAudioStream *stream);
+bool cove_shell_audio_pause(CoveShellAudioStream *stream);
+bool cove_shell_audio_resume(CoveShellAudioStream *stream);
+void cove_shell_audio_close(CoveShellAudioStream *stream);
 /* status: 0 the user chose the listed paths, 1 the user cancelled, 2 the panel
    could not run, 3 the platform exported the bytes itself and does not disclose
    a destination (the list is then empty). */
