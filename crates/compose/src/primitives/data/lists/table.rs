@@ -527,7 +527,10 @@ impl<Record: Clone + 'static, Id: CollectionId> Table<Record, Id> {
                 0.0,
                 AnyView::new(TupleView::new(cells)),
             )
-            .semantic_background(crate::theme::SemanticColorRef::background()),
+            // A header band has to read as part of the card: `background` is
+            // the window colour, which punches a hole in the surface in dark
+            // themes and is invisible against the card in light ones.
+            .semantic_background(crate::theme::SemanticColorRef::surface_variant()),
         )
     }
 
@@ -559,7 +562,10 @@ impl<Record: Clone + 'static, Id: CollectionId> Table<Record, Id> {
                 self.overrides(),
                 is_enabled,
             ))
-            .flex_with(0.0, 0.0, None),
+            .flex_with(0.0, 0.0, None)
+            // The picker and the header form one band at the top of the card;
+            // painting the picker row keeps the band from breaking in two.
+            .semantic_background(crate::theme::SemanticColorRef::surface_variant()),
         ))
     }
 

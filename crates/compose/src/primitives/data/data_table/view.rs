@@ -1179,6 +1179,11 @@ impl<Record> Clone for DataTablePlan<Record> {
     }
 }
 
+/// Height of the column-picker row above the card, in unscaled points.
+const PICKER_ROW_HEIGHT: f32 = 28.0;
+/// Space between the picker row and the table card.
+const PICKER_ROW_GAP: f32 = 12.0;
+
 /// The measured surface: turns a size into a plan and a window.
 struct DataTableSurface<Record: 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 'static>
 {
@@ -1219,7 +1224,21 @@ impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 
             surface.minimum_control_extent(),
         );
         let session = controller.session.get();
-        let vertical_chrome = layout.header_height + 1.0;
+        // The card sits under the column picker, so the lane viewport is the
+        // card's interior: the whole measured surface minus the picker row and
+        // the chrome. Ignoring the picker here makes the lanes taller than the
+        // card and rows paint past its bottom edge.
+        let has_picker = controller
+            .ordered_columns(&session)
+            .iter()
+            .any(|column| column.visibility != ColumnVisibility::Required);
+        let picker_height = if has_picker {
+            PICKER_ROW_HEIGHT * scale
+        } else {
+            0.0
+        };
+        let picker_gap = if has_picker { PICKER_ROW_GAP } else { 0.0 };
+        let vertical_chrome = layout.header_height + 1.0 + picker_height + picker_gap;
         let viewport_height = (self.size.height - vertical_chrome).max(1.0);
         let plan = controller.plan(&session, self.size.width);
         let frozen_width = plan.geometry.frozen_width();
@@ -1256,11 +1275,7 @@ impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 
         });
 
         // The picker sits above the table and shares the plan the body uses.
-        let picker = if controller
-            .ordered_columns(&picker_session)
-            .iter()
-            .any(|column| column.visibility != ColumnVisibility::Required)
-        {
+        let picker = if has_picker {
             let ordered = controller.ordered_columns(&picker_session);
             let stored = controller.stored_widths();
             let widths: BTreeMap<String, f32> = ordered
@@ -1294,7 +1309,7 @@ impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 
         };
         let mut children: Vec<AnyView> = Vec::new();
         if let Some(picker) = picker {
-            children.push(picker);
+            children.push(AnyView::new(AnyView::new(picker).frame_height(picker_height)));
         }
         children.push(AnyView::new(DataTableChrome {
             content,
@@ -1303,7 +1318,17 @@ impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 
             model_rows: controller.model.count(),
             columns: controller.columns.len(),
         }));
-        children
+        vec![AnyView::new(
+            BoxView::new(
+                cove_core::scene::FlexDirection::Column,
+                cove_core::scene::Align::Stretch,
+                cove_core::scene::Justify::FlexStart,
+                cove_core::scene::Wrap::NoWrap,
+                picker_gap,
+                AnyView::new(TupleView::new(children)),
+            )
+            .flex_with(1.0, 1.0, Some(0.0)),
+        )]
     }
 }
 
@@ -1451,7 +1476,19 @@ impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 
                     0.0,
                     AnyView::new(TupleView::new(body_children)),
                 )
-                .frame(None, None, Some(0.0), Some(0.0), None, None),
+                // The body is the lane viewport, not the lane extent: without a
+                // pinned height the scroll views below grow to the full row
+                // count and paint rows outside the card.
+                .frame(
+                    None,
+                    Some(crate::modifiers::layout::FrameDimension::Points(
+                        self.viewport_height,
+                    )),
+                    Some(0.0),
+                    None,
+                    None,
+                    None,
+                ),
             )
         };
 
@@ -2733,10 +2770,10 @@ impl PrimitiveView for HeaderPaint {
     }
 
     fn update_node(&self, node: &Node) {
-        // The header sits *inside* the table card, so it paints the card's own
-        // fill. `surface_variant` is the page/region grey: painting it here cut
-        // a hole in the card and left the header floating over the page.
-        node.set_background_color(Some(theme_for_node(node).colors.surface));
+        // The header is a band inside the card: `surface_variant` separates it
+        // from the rows without leaving the card's fill, which `background`
+        // would do in dark themes.
+        node.set_background_color(Some(theme_for_node(node).colors.surface_variant));
     }
 
     fn children(&self, _node: &Node) -> Vec<AnyView> {
