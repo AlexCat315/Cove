@@ -266,18 +266,30 @@ pub struct AvatarGroupSlot {
     pub z_index: f32,
     pub content: AnyView,
 }
+impl AvatarGroupSlot {
+    /// Absolute placement for one member. The overlap slider moves `x`, and a
+    /// reused slot node keeps the layout built when it first materialised,
+    /// so this has to run on every update rather than only at creation.
+    fn apply_placement(&self, layout: &LayoutNode) {
+        layout.set_position_type(PositionType::Absolute);
+        layout.set_position(self.x, Edge::Left);
+        layout.set_position(0.0, Edge::Top);
+        layout.set_width(Some(self.diameter));
+        layout.set_height(Some(self.diameter));
+    }
+}
+
 impl PrimitiveView for AvatarGroupSlot {
     fn make_node(&self) -> Node {
         Node::new()
     }
     fn make_layout_node(&self) -> Option<LayoutNode> {
         let layout = LayoutNode::new();
-        layout.set_position_type(PositionType::Absolute);
-        layout.set_position(self.x, Edge::Left);
-        layout.set_position(0.0, Edge::Top);
-        layout.set_width(Some(self.diameter));
-        layout.set_height(Some(self.diameter));
+        self.apply_placement(&layout);
         Some(layout)
+    }
+    fn update_layout(&self, layout: &LayoutNode) {
+        self.apply_placement(layout);
     }
     fn update_node(&self, node: &Node) {
         node.set_z_index(self.z_index);

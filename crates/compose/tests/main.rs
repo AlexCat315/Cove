@@ -44,6 +44,7 @@ mod asset_ref_field_tests;
 mod asset_ref_model;
 mod async_image_tests;
 mod avatar;
+mod avatar_overlap_tests;
 mod avatar_presence;
 mod bidi_tests;
 mod bool_control_label;
