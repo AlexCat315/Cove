@@ -118,7 +118,11 @@ impl TableStory {
             TableColumn::new("category", "Category", |record: &InventoryRecord| {
                 AnyView::new(Text::new(record.category).semantic_font(SemanticFontRef::label()))
             })
-            .layout(sized(180.0))
+            .layout({
+                let mut layout = sized(180.0);
+                layout.is_flex = true;
+                layout
+            })
             .visibility(ColumnVisibility::Optional)
             .compare(|left: &InventoryRecord, right: &InventoryRecord| {
                 match left.category.cmp(right.category) {

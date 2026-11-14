@@ -903,7 +903,11 @@ pub fn adaptive_table_columns() -> Vec<TableColumn<usize>> {
                 "Material"
             }))
         })
-        .layout(sized(160.0))
+        .layout({
+            let mut layout = sized(160.0);
+            layout.is_flex = true;
+            layout
+        })
         .visibility(ColumnVisibility::Optional),
     ];
     columns

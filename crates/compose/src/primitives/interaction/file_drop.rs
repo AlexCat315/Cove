@@ -686,6 +686,7 @@ impl View for FileDropZone {
             is_enabled: self.is_enabled,
             is_targeted: self.is_targeted.clone(),
             outcome: self.outcome.clone(),
+            shows_chrome: self.shows_chrome,
             on_drop: self.on_drop.clone(),
             on_targeted: self.on_targeted.clone(),
             on_rejected: self.on_rejected.clone(),
@@ -718,6 +719,7 @@ struct PaintIdentity {
     is_targeted: bool,
     outcome: FileDropOutcome,
     is_enabled: bool,
+    shows_chrome: bool,
 }
 
 struct FileDropZoneHost {
@@ -727,6 +729,7 @@ struct FileDropZoneHost {
     is_enabled: bool,
     is_targeted: Binding<bool>,
     outcome: Binding<FileDropOutcome>,
+    shows_chrome: bool,
     on_drop: Rc<dyn Fn(Vec<DroppedFile>)>,
     on_targeted: Option<Rc<dyn Fn(bool)>>,
     on_rejected: Option<Rc<dyn Fn(&[DroppedFile])>>,
@@ -770,16 +773,24 @@ impl PrimitiveView for FileDropZoneHost {
             is_targeted: self.is_targeted.get(),
             outcome: self.outcome.get(),
             is_enabled: self.is_enabled,
+            shows_chrome: self.shows_chrome,
         };
         let outcome = identity.outcome;
         let is_targeted = identity.is_targeted;
         let is_enabled = identity.is_enabled;
+        let shows_chrome = identity.shows_chrome;
         let draw_node = node.clone();
         node.update_overlay_draw(identity, move |list, origin| {
             let theme = theme_for_node(&draw_node);
             let frame = draw_node.frame();
             let rect = Rect::new(origin.x, origin.y, frame.width, frame.height);
             if rect.width <= 0.0 || rect.height <= 0.0 {
+                return;
+            }
+            // A chrome-less zone covers a surface that is already a drop
+            // target (a whole window, say): a resting dashed frame there is
+            // permanent noise, so it only paints once a drag arrives.
+            if !shows_chrome && !is_targeted && outcome == FileDropOutcome::Idle && is_enabled {
                 return;
             }
             let radius = theme.radius.lg;

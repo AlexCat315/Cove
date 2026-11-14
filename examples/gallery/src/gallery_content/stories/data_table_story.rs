@@ -2,7 +2,7 @@
 //!
 //! Swift source: `GalleryContent/Stories/Data/DataTableStory.swift`.
 //!
-//! Up to 200,000 rows across 33 columns, with a frozen first column, per-column
+//! Up to 200,000 rows across 35 columns, with a frozen first column, per-column
 //! widths and visibility, in-cell editing with validation, and a tree whose
 //! disclosure state drives what is visible.
 //!
@@ -39,10 +39,10 @@ use crate::gallery_content::catalog::GalleryOptions;
 /// The row counts the loader offers.
 pub const SMALL_LOAD: usize = 1_000;
 pub const LARGE_LOAD: usize = 200_000;
-/// The metric column count beyond the three authored columns.
+/// The metric column count beyond the five authored columns.
 pub const METRIC_COLUMNS: usize = 30;
 /// The total column count, matching the story's title.
-pub const TOTAL_COLUMNS: usize = 3 + METRIC_COLUMNS;
+pub const TOTAL_COLUMNS: usize = 5 + METRIC_COLUMNS;
 /// The category rotation.
 pub const CATEGORIES: [&str; 3] = ["Texture", "Material", "Mesh"];
 
@@ -52,8 +52,13 @@ pub struct WarehouseRow {
     pub id: usize,
     pub name: String,
     pub category: &'static str,
+    pub owner: &'static str,
+    pub updated: String,
     pub quantity: usize,
 }
+
+/// Who the asset is assigned to, rotating by row id.
+const OWNERS: [&str; 4] = ["Nia Park", "Kai Ito", "Rin Vos", "Ada Bell"];
 
 impl WarehouseRow {
     /// The row at `id`, generated from the same formulas as the story.
@@ -65,11 +70,13 @@ impl WarehouseRow {
             id,
             name: format!("Asset {}", id + 1),
             category: CATEGORIES[id % 3],
+            owner: OWNERS[id % 4],
+            updated: format!("2026-11-{:02}", (id % 28) + 1),
             quantity: (id * 17) % 250,
         }
     }
 
-    /// The metric at column `index` (0-based beyond the authored three).
+    /// The metric at column `index` (0-based beyond the authored five).
     pub fn metric(&self, index: usize) -> usize {
         (self.id * (index + 3)) % 10_000
     }
@@ -446,8 +453,38 @@ impl DataTableStory {
             TableColumn::new("category", "Category", |row: &WarehouseRow| {
                 AnyView::new(Text::new(row.category))
             })
-            .layout(sized(120.0))
-            .visibility(ColumnVisibility::Optional),
+            .layout({
+                let mut layout = sized(180.0);
+                // The category column is the one with room to breathe: it takes
+                // the card's slack so the quantity column stays compact and
+                // right-aligned at the table's edge.
+                layout.is_flex = true;
+                layout
+            })
+            .visibility(ColumnVisibility::Optional)
+            .compare(|left: &WarehouseRow, right: &WarehouseRow| {
+                compare_names(&left.category, &right.category)
+            }),
+            TableColumn::new("owner", "Owner", |row: &WarehouseRow| {
+                AnyView::new(Text::new(row.owner))
+            })
+            .layout(sized(150.0))
+            .visibility(ColumnVisibility::Optional)
+            .compare(|left: &WarehouseRow, right: &WarehouseRow| {
+                compare_names(&left.owner, &right.owner)
+            }),
+            TableColumn::new("updated", "Updated", |row: &WarehouseRow| {
+                AnyView::new(Text::new(row.updated.clone()))
+            })
+            .layout({
+                let mut layout = sized(140.0);
+                layout.alignment = TextAlignment::Trailing;
+                layout
+            })
+            .visibility(ColumnVisibility::Optional)
+            .compare(|left: &WarehouseRow, right: &WarehouseRow| {
+                compare_names(&left.updated, &right.updated)
+            }),
             TableColumn::new("quantity", "Quantity", |row: &WarehouseRow| {
                 AnyView::new(Text::new(row.quantity.to_string()))
             })
@@ -590,7 +627,7 @@ impl View for DataTableStory {
             24.0,
             AnyView::new(TupleView::new(vec![
                 AnyView::new(StorySection::new(
-                    "Warehouse · up to 200,000 rows × 33 columns",
+                    "Warehouse · up to 200,000 rows × 35 columns",
                     "Load rows once. Narrow tables hide lower-priority columns. Use Columns to reveal them or restore Automatic columns; explicit choices scroll horizontally while Asset remains frozen. Double-click Asset or Quantity, or press F2, to edit.",
                     AnyView::new(BoxView::new(
                         cove_core::scene::FlexDirection::Column,

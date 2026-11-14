@@ -50,8 +50,8 @@ fn metrics_derive_from_the_row_id() {
 }
 
 #[test]
-fn the_story_declares_three_authored_plus_thirty_metric_columns() {
-    assert_eq!(TOTAL_COLUMNS, 33);
+fn the_story_declares_five_authored_plus_thirty_metric_columns() {
+    assert_eq!(TOTAL_COLUMNS, 35);
     assert_eq!(CATEGORIES.len(), 3);
 }
 

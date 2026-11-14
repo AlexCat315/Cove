@@ -9,7 +9,6 @@
 #include <windows.h>
 #endif
 #include <math.h>
-#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 struct CoveShellWindow { SDL_Window *window; void *metal_view,*layer,*apple; SDL_Cursor *cursors[12]; CoveShellChrome chrome; CoveShellRect *drag,*non_drag; bool has_chrome; };
@@ -209,9 +208,7 @@ void cove_shell_command(CoveShellWindow *h,int command,int a,int b) { COVE_ASSER
 }
 void cove_shell_set_title(CoveShellWindow *h,const char *title){ COVE_ASSERT_MAIN();
     if(!h||!title)return;
-    fprintf(stderr,"DBG cove_shell_set_title main=%d title=%s\n",(int)SDL_IsMainThread(),title);
     SDL_SetWindowTitle(h->window,title);
-    fprintf(stderr,"DBG sdl title now=%s\n",SDL_GetWindowTitle(h->window));
 }
 bool cove_shell_is_fullscreen(CoveShellWindow *h) { COVE_ASSERT_MAIN();
     if(!h)return false;

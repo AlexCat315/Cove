@@ -629,10 +629,14 @@ impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 
                 .map(|column| widths.get(&column.id).copied().unwrap_or(column.layout.width))
                 .sum();
             let slack = available_width - visible;
-            if slack > 0.5
-                && let Some((column, last)) = columns.last().zip(presented.last_mut())
-            {
-                *last = column.layout.constrained(*last + slack);
+            if slack > 0.5 {
+                let target = columns
+                    .iter()
+                    .rposition(|column| column.layout.is_flex)
+                    .unwrap_or(columns.len() - 1);
+                if let Some(column) = columns.get(target) {
+                    presented[target] = column.layout.constrained(presented[target] + slack);
+                }
             }
         }
         let geometry = DataTableColumnGeometry::new(presented, resolved.frozen_count);
@@ -1179,10 +1183,9 @@ impl<Record> Clone for DataTablePlan<Record> {
     }
 }
 
-/// Height of the column-picker row above the card, in unscaled points.
-const PICKER_ROW_HEIGHT: f32 = 28.0;
-/// Space between the picker row and the table card.
-const PICKER_ROW_GAP: f32 = 12.0;
+/// Height of the card's toolbar row (the column picker lives here), in
+/// unscaled points.
+const TOOLBAR_HEIGHT: f32 = 44.0;
 
 /// The measured surface: turns a size into a plan and a window.
 struct DataTableSurface<Record: 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 'static>
@@ -1232,13 +1235,14 @@ impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 
             .ordered_columns(&session)
             .iter()
             .any(|column| column.visibility != ColumnVisibility::Required);
-        let picker_height = if has_picker {
-            PICKER_ROW_HEIGHT * scale
+        let toolbar_height = if has_picker {
+            TOOLBAR_HEIGHT * scale
         } else {
             0.0
         };
-        let picker_gap = if has_picker { PICKER_ROW_GAP } else { 0.0 };
-        let vertical_chrome = layout.header_height + 1.0 + picker_height + picker_gap;
+        // The toolbar and the header are both chrome inside the card, so the
+        // lane viewport is the card's interior.
+        let vertical_chrome = layout.header_height + 1.0 + toolbar_height;
         let viewport_height = (self.size.height - vertical_chrome).max(1.0);
         let plan = controller.plan(&session, self.size.width);
         let frozen_width = plan.geometry.frozen_width();
@@ -1307,28 +1311,45 @@ impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 
         } else {
             None
         };
-        let mut children: Vec<AnyView> = Vec::new();
+        let mut bands: Vec<AnyView> = Vec::new();
         if let Some(picker) = picker {
-            children.push(AnyView::new(AnyView::new(picker).frame_height(picker_height)));
+            // The picker is a toolbar action, not a caption above the table:
+            // it sits on the card's first row, hard against the trailing edge,
+            // and the rule below separates it from the column header.
+            bands.push(AnyView::new(
+                AnyView::new(
+                    BoxView::new(
+                        cove_core::scene::FlexDirection::Row,
+                        cove_core::scene::Align::Center,
+                        cove_core::scene::Justify::FlexEnd,
+                        cove_core::scene::Wrap::NoWrap,
+                        0.0,
+                        AnyView::new(TupleView::new(vec![picker])),
+                    )
+                    .padding_edges(8.0, 0.0)
+                    .frame_height(TOOLBAR_HEIGHT * scale),
+                )
+                .flex_with(0.0, 0.0, None),
+            ));
         }
-        children.push(AnyView::new(DataTableChrome {
-            content,
+        bands.push(content);
+        vec![AnyView::new(DataTableChrome {
+            content: AnyView::new(
+                BoxView::new(
+                    cove_core::scene::FlexDirection::Column,
+                    cove_core::scene::Align::Stretch,
+                    cove_core::scene::Justify::FlexStart,
+                    cove_core::scene::Wrap::NoWrap,
+                    0.0,
+                    AnyView::new(TupleView::new(bands)),
+                )
+                .flex_with(1.0, 1.0, None),
+            ),
             is_enabled: controller.is_enabled,
             header_height: self.size.height,
             model_rows: controller.model.count(),
             columns: controller.columns.len(),
-        }));
-        vec![AnyView::new(
-            BoxView::new(
-                cove_core::scene::FlexDirection::Column,
-                cove_core::scene::Align::Stretch,
-                cove_core::scene::Justify::FlexStart,
-                cove_core::scene::Wrap::NoWrap,
-                picker_gap,
-                AnyView::new(TupleView::new(children)),
-            )
-            .flex_with(1.0, 1.0, Some(0.0)),
-        )]
+        })]
     }
 }
 
@@ -2165,7 +2186,7 @@ impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 
                     0.0,
                     content,
                 )
-                .padding_edges(10.0, 4.0)
+                .padding_edges(20.0, 4.0)
                 .clipped(),
             ),
         })
@@ -2472,10 +2493,11 @@ impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 
         };
         row.push(AnyView::new(
             label
-                // A column label is a label, not a value: semibold and one
-                // step back in contrast, matching the light table's header.
-                .semantic_font(SemanticFontRef::body_strong())
-                .semantic_foreground(SemanticColorRef::on_surface_muted())
+                // A column label is a label, not a value: one size down from
+                // the body and a step back in contrast, so the header recedes
+                // and the data reads first.
+                .semantic_font(SemanticFontRef::label())
+                .semantic_foreground(SemanticColorRef::on_surface_variant())
                 .flex_with(1.0, 1.0, Some(0.0)),
         ));
         if is_sorted {
@@ -2505,9 +2527,9 @@ impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 
         // A trailing label gets the grip's width back as padding, so it lands
         // on the same right edge as the values under it.
         let trailing_padding = if alignment == TextAlignment::Trailing {
-            (10.0 - grip).max(0.0)
+            (20.0 - grip).max(0.0)
         } else {
-            10.0
+            20.0
         };
         let label = AnyView::new(
             BoxView::new(
@@ -2519,7 +2541,7 @@ impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 
                 AnyView::new(TupleView::new(row)),
             )
             .padding_insets(EdgeInsets {
-                leading: 10.0,
+                leading: 20.0,
                 trailing: trailing_padding,
                 top: 0.0,
                 bottom: 0.0,
@@ -2770,10 +2792,10 @@ impl PrimitiveView for HeaderPaint {
     }
 
     fn update_node(&self, node: &Node) {
-        // The header is a band inside the card: `surface_variant` separates it
-        // from the rows without leaving the card's fill, which `background`
-        // would do in dark themes.
-        node.set_background_color(Some(theme_for_node(node).colors.surface_variant));
+        // The header shares the card's fill: the grey region behind the card
+        // is the same `surface_variant`, so a tinted band read as a notch cut
+        // out of the card. Typography and the rule below carry the separation.
+        node.set_background_color(Some(theme_for_node(node).colors.surface));
     }
 
     fn children(&self, _node: &Node) -> Vec<AnyView> {

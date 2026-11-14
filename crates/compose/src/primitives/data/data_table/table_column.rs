@@ -47,6 +47,10 @@ pub struct TableColumnLayout {
     pub max_width: f32,
     pub alignment: TextAlignment,
     pub is_resizable: bool,
+    /// Absorbs the table's leftover width when `fills_width` is on. A single
+    /// flexible column keeps the numeric columns at their authored width and
+    /// pressed against the trailing edge.
+    pub is_flex: bool,
 }
 
 impl Default for TableColumnLayout {
@@ -57,6 +61,7 @@ impl Default for TableColumnLayout {
             max_width: 800.0,
             alignment: TextAlignment::Leading,
             is_resizable: true,
+            is_flex: false,
         }
     }
 }
@@ -263,10 +268,14 @@ pub struct TableLayout {
 impl Default for TableLayout {
     fn default() -> Self {
         Self {
-            row_height: 36.0,
-            header_height: 38.0,
+            // Airy grid: 40pt rows give 14pt values room to breathe, and the
+            // 44pt header keeps the labels from crowding the rule below them.
+            row_height: 40.0,
+            header_height: 44.0,
             is_striped: false,
-            separator_inset: Some(0.0),
+            // The hairline stops short of both edges: a full-bleed rule turns
+            // the card into graph paper, an inset one reads as a row divider.
+            separator_inset: Some(20.0),
             fills_width: false,
             empty_title: "No records".to_string(),
         }

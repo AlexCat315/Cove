@@ -309,10 +309,14 @@ impl<Record: Clone + 'static, Id: CollectionId> Table<Record, Id> {
             let slack = width - used;
             let mut filled = presented;
             if slack > 0.5 {
-                // The last column absorbs what the others leave unused, so the
-                // table's right edge is a column edge, not a blank band.
-                if let Some((column, last)) = filled.last_mut() {
-                    *last = column.layout.constrained(*last + slack);
+                // A flexible column absorbs the unused width so the trailing
+                // columns keep their authored size against the right edge.
+                let target = filled
+                    .iter()
+                    .rposition(|(column, _)| column.layout.is_flex)
+                    .unwrap_or(filled.len() - 1);
+                if let Some((column, width)) = filled.get_mut(target) {
+                    *width = column.layout.constrained(*width + slack);
                 }
             }
             filled
@@ -412,7 +416,24 @@ impl<Record: Clone + 'static, Id: CollectionId> Table<Record, Id> {
 
         let mut children: Vec<AnyView> = Vec::new();
         if let Some(picker) = self.picker(&plan, is_enabled) {
-            children.push(picker);
+            // Same toolbar slot as the data table: the picker is an action on
+            // the card's first row, right-aligned, with a rule under it.
+            children.push(AnyView::new(
+                AnyView::new(
+                    BoxView::new(
+                        FlexDirection::Row,
+                        Align::Center,
+                        Justify::FlexEnd,
+                        Wrap::NoWrap,
+                        0.0,
+                        AnyView::new(TupleView::new(vec![picker])),
+                    )
+                    .padding_edges(8.0, 0.0)
+                    .frame_height(44.0),
+                )
+                .flex_with(0.0, 0.0, None),
+            ));
+            children.push(AnyView::new(Divider::new()));
         }
         children.push(grid);
 
@@ -527,10 +548,10 @@ impl<Record: Clone + 'static, Id: CollectionId> Table<Record, Id> {
                 0.0,
                 AnyView::new(TupleView::new(cells)),
             )
-            // A header band has to read as part of the card: `background` is
-            // the window colour, which punches a hole in the surface in dark
-            // themes and is invisible against the card in light ones.
-            .semantic_background(crate::theme::SemanticColorRef::surface_variant()),
+            // The header shares the card's fill and is separated by its rule
+            // instead: a grey band here became a notch against the grey region
+            // the card sits on.
+            .semantic_background(crate::theme::SemanticColorRef::surface()),
         )
     }
 
@@ -562,10 +583,7 @@ impl<Record: Clone + 'static, Id: CollectionId> Table<Record, Id> {
                 self.overrides(),
                 is_enabled,
             ))
-            .flex_with(0.0, 0.0, None)
-            // The picker and the header form one band at the top of the card;
-            // painting the picker row keeps the band from breaking in two.
-            .semantic_background(crate::theme::SemanticColorRef::surface_variant()),
+            .flex_with(0.0, 0.0, None),
         ))
     }
 
@@ -695,7 +713,7 @@ fn cell<Record>(
                 0.0,
                 content,
             )
-            .padding_edges(10.0, 0.0)
+            .padding_edges(20.0, 0.0)
             .frame_size(width, row_height),
         )
         .clipped()
@@ -743,7 +761,7 @@ fn header_cell(
                     .semantic_foreground(crate::theme::SemanticColorRef::on_surface_muted()),
             )])),
         )
-        .padding_edges(10.0, 0.0)
+        .padding_edges(20.0, 0.0)
         .frame_size(width, height),
     );
     AnyView::new(AnyView::new(HeaderButton {
