@@ -424,17 +424,6 @@ impl RhiBackend for VulkanBackend {
             ));
         }
         let index = presentation::image_index(window, image.swapchain, image.texture.id())?;
-        let ready = match window.presentation.ready.get(&image.texture.id()) {
-            Some(semaphore) => *semaphore,
-            None => {
-                let created = binary_semaphore(&self.context)?;
-                window
-                    .presentation
-                    .ready
-                    .insert(image.texture.id(), created);
-                created
-            }
-        };
         let generation = window.generation;
         let pending_acquire = window.presentation.pending_acquire;
         let acquire_semaphore = window.acquire_semaphores.get(&slot).copied();
@@ -454,19 +443,19 @@ impl RhiBackend for VulkanBackend {
             }
         })?;
 
-        // The present itself waits on the acquire semaphore, so the image is
-        // acquired before the compositor reads it.
+        // `one_shot` waits for the transition on the same queue that submitted the
+        // frame, so every draw into this image has finished by now and the present
+        // needs no "render complete" semaphore. The only pending signal left is the
+        // one the acquire itself produced, which the present must consume.
         let wait_semaphores: Vec<sys::VkSemaphore> = if pending_acquire {
             match acquire_semaphore {
-                // The present waits for the acquire *and* the transition's own
-                // signal, so both are signalled before the compositor reads it.
-                Some(semaphore) => vec![semaphore, ready],
+                Some(semaphore) => vec![semaphore],
                 None => {
                     return Err(RhiError::present_failed("acquire semaphore is missing"));
                 }
             }
         } else {
-            vec![ready]
+            Vec::new()
         };
         let chain_handle = self
             .swapchains

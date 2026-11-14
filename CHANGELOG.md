@@ -4,6 +4,10 @@
 
 ## Unreleased
 
+- **Android 真机暴露的两处渲染缺陷（2026-11-14，Adreno 710 / Android 16）**：
+  - 独立 APK 启动中断。debug 构建默认自挂 DevTools，而自托管 controller 需要把端点写进桌面可读的发现文件；Android 应用进程没有这样的位置，初始化在 `diagnostics configuration failed: Set COVE_DEVTOOLS_SESSION_FILE for local discovery` 处直接失败。`DiagnosticsConfiguration::from_environment` 的 debug 默认改为 `cfg!(debug_assertions) && !cfg!(target_os = "android")`，`COVE_DEVTOOLS` 与 `cargo cove run --devtools` 的配对启动仍按原语义生效。
+  - 首帧提交在 `vkEndCommandBuffer` 崩溃（SIGSEGV，`vulkan.adreno.so qglinternal::vkEndCommandBuffer+216`）。根因是 render pass 与 framebuffer 由 `encode_render_pass` 的局部 `RenderPassObjects` 持有，函数返回即析构，而命令缓冲仍在引用它们，违反 Vulkan 的对象生命周期。现在这些对象随 `Encoder` 移交给 `FenceWaiter`，在提交 fence 触发后才销毁。顺带修正 present 等待一个从未被 signal 的二进制信号量：版面转换的 `one_shot` 已在同一队列上等待，present 只需消费 acquire 信号量。修复后同一帧在真机上持续运行、不再崩溃；`cargo test -p cove-graphics --lib` 193 passed，macOS bundle 与 Android APK 均重新打包验证。
+
 - **Diffuse 迁移登记的四项缺口（2026-11-14）**：
   - Android 宿主按启动模式安装场景内容。新增 `cove_hosts::android::install_scene_content(mode, factory)` 与 `SceneContentFactory`，`HostedScene` 不再把 `SceneLaunchMode::Game` 直接判为未链接，而是先查按模式登记的内容，再回落到 application 内容；同一模式只认首次安装，与 `install_application_content` 的语义一致。
   - `cove-shell` 新增 SDL3 播放设备接口。`Sdl3AudioDevice::open_default(AudioStreamSpec)` 以 f32 规格打开默认播放流，打开时为暂停状态；`format()` 报告设备真实采样率、声道与 `AudioSampleFormat`（另给 `frame_bytes()` 便于按帧排队），`queued_bytes()` / `available_bytes()` 供节奏控制，`put` / `flush` / `pause` / `resume` 驱动播放，`Drop` 关闭流。SDL 音频子系统惰性初始化，可为多个流复用。

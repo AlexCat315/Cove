@@ -465,6 +465,11 @@ pub struct Encoder<'a> {
     context: &'a VulkanContext,
     registries: &'a Arc<Mutex<VulkanRegistries>>,
     cmd: sys::VkCommandBuffer,
+    /// Render passes and framebuffers recorded into this command buffer. Vulkan
+    /// requires them to stay alive until the submission that uses them has
+    /// finished executing, so ownership moves to the fence waiter instead of
+    /// being released when encoding returns.
+    pass_objects: Vec<RenderPassObjects>,
 }
 
 impl<'a> Encoder<'a> {
@@ -477,6 +482,7 @@ impl<'a> Encoder<'a> {
             context,
             registries,
             cmd,
+            pass_objects: Vec::new(),
         }
     }
 
@@ -951,6 +957,9 @@ impl<'a> Encoder<'a> {
 
         // SAFETY: the pass was begun above and `cmd` is still recording.
         unsafe { render_objects.end(self.cmd) };
+        // The recorded command buffer references both objects; keep them until the
+        // submission retires instead of destroying them here.
+        self.pass_objects.push(render_objects);
         replay
     }
 
@@ -1544,6 +1553,10 @@ struct FenceWaiter {
     status: Arc<super::status::VulkanSubmissionStatus>,
     profile: Option<(Arc<GpuTimestampProfile>, Vec<String>)>,
     frame_timestamps: Option<SubmissionTimestamps>,
+    /// Render passes and framebuffers the submission's command buffer references.
+    /// Released once the fence has signalled, which is the earliest point Vulkan
+    /// allows destroying them.
+    pass_objects: Vec<RenderPassObjects>,
     completion: Result<crate::rhi::TimedCompletion, Completion>,
 }
 
@@ -1675,6 +1688,8 @@ impl FenceWaiter {
         // Release the query pool before the callback can retire the last frame
         // and let the API thread destroy the device.
         drop(self.frame_timestamps);
+        // The fence has signalled, so the command buffer no longer touches these.
+        drop(self.pass_objects);
         match self.completion {
             Ok(timed) => timed.complete(timing),
             Err(untimed) => untimed(),
@@ -1760,8 +1775,9 @@ impl Submitter<'_> {
         if let Some(timestamps) = &frame_timestamps {
             timestamps.begin(cmd);
         }
-        Encoder::new(self.context, self.registries, cmd)
-            .encode(&submit.commands, frame_timestamps.as_ref())?;
+        let mut encoder = Encoder::new(self.context, self.registries, cmd);
+        encoder.encode(&submit.commands, frame_timestamps.as_ref())?;
+        let pass_objects = encoder.pass_objects;
         if let Some(timestamps) = &frame_timestamps {
             timestamps.write(cmd, sys::VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, 1);
         }
@@ -1835,6 +1851,7 @@ impl Submitter<'_> {
             status: Arc::clone(&self.submission_status),
             profile,
             frame_timestamps,
+            pass_objects,
             completion,
         };
         std::thread::spawn(move || waiter.wait());

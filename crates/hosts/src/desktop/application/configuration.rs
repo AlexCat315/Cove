@@ -180,6 +180,13 @@ impl DiagnosticsConfiguration {
     /// an environment variable nor a second command. `COVE_DEVTOOLS` overrides
     /// that default: the documented off values disable it, anything else opts
     /// in. A release build stays off unless it opts in.
+    ///
+    /// Android is excluded from the debug default: a self-hosted controller
+    /// publishes its endpoint through a discovery file, and an app process has
+    /// no writable location a desktop can read, so attaching on its own aborted
+    /// startup with `Set COVE_DEVTOOLS_SESSION_FILE for local discovery`. A
+    /// paired launch (`cargo cove run --devtools`) supplies an explicit
+    /// connection and is unaffected.
     pub fn from_environment(
         app_title: &str,
     ) -> Option<super::super::diagnostics::integration::DevToolsConfiguration> {
@@ -188,7 +195,7 @@ impl DiagnosticsConfiguration {
                 value.trim().to_ascii_lowercase().as_str(),
                 "" | "0" | "false" | "no" | "off"
             ),
-            Err(_) => cfg!(debug_assertions),
+            Err(_) => cfg!(debug_assertions) && !cfg!(target_os = "android"),
         };
         enabled.then(
             || super::super::diagnostics::integration::DevToolsConfiguration {
