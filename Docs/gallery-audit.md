@@ -4,6 +4,16 @@
 
 Swift 源码逐页对照见文末《Swift 源码对照（逐页差异清单）》。
 
+## 2026-11-14 DevTools 跨平台采样与 Windows 验收
+
+| 页面 | 实现与自动化 | 实际操作 |
+| --- | --- | --- |
+| Gallery / Button | 场景脚本使用整数图片坐标，验证页面状态、布局链、语义树、组件计数、trace 和 GPU pass 与层的关联。 | Windows 默认构建从应用帧取点切到 Button，确认 `Actions: 0`。记录 804 条 trace，DX12 返回两个计时 pass 和 47 个层。 |
+| DevTools / CPU Profile | 浏览器 harness 覆盖 Windows、Linux 能力门控及 Web 帧数和毫秒显示。Rust 测试在 Windows 对真实线程采样，检查调用栈、源码行和提前停止。 | 仓库 MCP 配置完成握手，列出 64 个工具并找到同一 Gallery。围绕上述操作采集 2,992 个样本，200 个热点中 181 个有源码行。 |
+| Browser / Counter | 本轮 WASM 构建通过。 | 无头 Edge 使用 Canvas2D。通过 Cove 回读的画面命中 Increment 和 Reset，比较计数节点裁图并验证增加后变化、重置后恢复。阶段计时返回 6 帧、21 ms 和 3 个热点。 |
+
+Windows 实测使用默认 Gallery 构建，带 FFmpeg 的构建在下载源码时中断。LLDB 链路通过模拟适配器测试。其他平台实机、物理键盘及 IME 本轮未验收。[DevTools](../Website/src/content/components/devtools.md)
+
 ## 2026-11-14 DevTools GPU pass 与合成层
 
 | 页面 | 实现与自动化 | 实际操作 |

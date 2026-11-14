@@ -8,6 +8,8 @@ cargo run -p cove-examples --bin gallery --features media-ffmpeg
 
 终端打印 Inspector 链接，CLI 与 MCP 直接可用。已有控制器在运行时自动配对；`COVE_DEVTOOLS=0` 关闭 DevTools。
 
+从仓库根目录加载 `.mcp.json` 即可启动 MCP 服务。若客户端找不到 Cargo，在客户端配置中把 `command` 设为本机 Cargo 的绝对路径。
+
 在 Inspector 选中应用，点击 **Capture** 查看 Cove 渲染画面。**Pick** 查找像素下的组件，**Interact** 在应用内点击、拖动或滚动。键盘和文本输入发往选中运行时内的控件。
 
 ```sh
@@ -29,6 +31,8 @@ cargo run --quiet -p cove-devtools-cli -- call click_ui '{"target":"RUNTIME_ID",
 **Performance → Components** 按当前挂载组件的重建、布局或绘制计数排序。重建从挂载后开始计数，布局计入完整求解，绘制计入实际生成内容的节点。**Frames** 可按最慢阶段排序。GPU 时间单独比较帧预算。帧槽内发生的着色器和管线创建会显示次数及 CPU 时间。
 
 在 **Performance → Frames** 选中一帧可查看 **GPU passes**，包括 GPU 实测时间、绘制次数和关联的合成层。时间采样取决于后端和设备。合成层显示缓存与裁剪状态。展开帧详情后导出可把对应的 pass 数据保存到性能快照。
+
+在 **Performance → CPU Profile** 选择时长，开始记录后操作要分析的控件，再停止并查看调用树和热点。面板由运行时的 `cpu_profile` 能力启用。原生宿主显示 UI 线程采样，Windows 调试版可从匹配的 PDB 解析函数和源码位置。WebAssembly 显示记录的帧数和各阶段耗时。
 
 **Semantics** 查看 Cove 场景中的语义层级和控件状态，点击行可定位到 Inspector。文本输入草稿和安全字段值从语义树中排除。
 

@@ -1,4 +1,4 @@
-//! UI CPU profiles: a real macOS sampler and explicit gaps elsewhere.
+//! UI CPU profiles through the runtime probe.
 //!
 //! The wire shape is pinned here: bounded aggregated stacks instead of one
 //! record per sample, aggregated self/inclusive hotspots with `function
@@ -32,31 +32,46 @@ fn profile_start_rejects_requests_outside_the_bounds() {
         .unwrap_err();
     assert_eq!(fault.code, "invalid_request");
     assert!(!probe.ui_thread_name().is_empty());
-    #[cfg(target_os = "macos")]
-    assert_eq!(
-        probe.execute(ProbeCommand::ProfileRead).unwrap()["status"],
-        "idle",
-        "a probe that never sampled reports an explicit idle state"
-    );
 }
 
-#[cfg(target_os = "macos")]
-mod macos {
+#[cfg(not(target_arch = "wasm32"))]
+mod native {
     use super::*;
     use std::time::{Duration, Instant};
 
-    /// Kept short: macOS rejects pthread names longer than 63 bytes, and the
-    /// sampler finds this thread by the name Rust assigned to it.
+    // Linux and Android install one process-wide sampling signal handler.
+    static SAMPLER_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
     #[test]
     fn profiles_the_probe_thread() {
+        let _guard = SAMPLER_LOCK.lock().unwrap();
+        std::thread::Builder::new()
+            .name("cove-prof-probe".into())
+            .spawn(verify_probe_profile)
+            .unwrap()
+            .join()
+            .unwrap();
+    }
+
+    fn verify_probe_profile() {
         let mut probe = probe();
+        if let cove_profiling::PlatformSupport::Unsupported { reason } =
+            cove_profiling::platform_support()
+        {
+            verify_unsupported(&mut probe, reason);
+            return;
+        }
         let thread = probe.ui_thread_name().to_owned();
         assert!(
             probe
                 .capabilities()
                 .iter()
                 .any(|name| name == "cpu_profile"),
-            "macOS advertises the sampler"
+            "the runtime advertises its sampler"
+        );
+        assert_eq!(
+            probe.execute(ProbeCommand::ProfileRead).unwrap()["status"],
+            "idle"
         );
 
         let started = probe
@@ -96,6 +111,7 @@ mod macos {
         };
 
         assert_eq!(profile["thread"], thread.as_str());
+        assert_eq!(profile["source"], "sampler");
         assert_eq!(profile["hz"], 500);
         assert_eq!(profile["sampleIntervalMs"], 2.0);
         let samples = profile["samplesTaken"].as_u64().unwrap();
@@ -203,6 +219,22 @@ mod macos {
 
     #[test]
     fn stops_an_active_run_before_its_bound() {
+        if !matches!(
+            cove_profiling::platform_support(),
+            cove_profiling::PlatformSupport::Supported
+        ) {
+            return;
+        }
+        let _guard = SAMPLER_LOCK.lock().unwrap();
+        std::thread::Builder::new()
+            .name("cove-prof-stop".into())
+            .spawn(verify_early_stop)
+            .unwrap()
+            .join()
+            .unwrap();
+    }
+
+    fn verify_early_stop() {
         let mut probe = probe();
         probe
             .execute(ProbeCommand::ProfileStart {
@@ -229,40 +261,29 @@ mod macos {
             "stopping early keeps the ring within its bound"
         );
     }
-}
-
-#[cfg(not(target_os = "macos"))]
-#[test]
-fn profiles_report_the_platform_gap() {
-    eprintln!(
-        "skipping the real CPU sampler test: {} reports no sampler",
-        std::env::consts::OS
-    );
-    let mut probe = probe();
-    assert!(
-        !probe
-            .capabilities()
-            .iter()
-            .any(|name| name == "cpu_profile"),
-        "a runtime without a sampler must not advertise one"
-    );
-    let fault = probe
-        .execute(ProbeCommand::ProfileStart {
-            hz: 100,
-            duration_ms: 100,
-        })
-        .unwrap_err();
-    assert_eq!(fault.code, "unavailable");
-    assert!(
-        !fault.message.is_empty(),
-        "the platform gap carries its reason"
-    );
-    for command in [
-        ProbeCommand::ProfileStop,
-        ProbeCommand::ProfileRead,
-        ProbeCommand::ProfileHotspots { limit: 10 },
-    ] {
-        let fault = probe.execute(command).unwrap_err();
+    fn verify_unsupported(probe: &mut RuntimeProbe, reason: &str) {
+        assert!(
+            !probe
+                .capabilities()
+                .iter()
+                .any(|name| name == "cpu_profile"),
+            "a runtime without a sampler must not advertise one"
+        );
+        let fault = probe
+            .execute(ProbeCommand::ProfileStart {
+                hz: 100,
+                duration_ms: 100,
+            })
+            .unwrap_err();
         assert_eq!(fault.code, "unavailable");
+        assert_eq!(fault.message, reason);
+        for command in [
+            ProbeCommand::ProfileStop,
+            ProbeCommand::ProfileRead,
+            ProbeCommand::ProfileHotspots { limit: 10 },
+        ] {
+            let fault = probe.execute(command).unwrap_err();
+            assert_eq!(fault.code, "unavailable");
+        }
     }
 }

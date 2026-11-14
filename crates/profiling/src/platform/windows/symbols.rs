@@ -6,18 +6,19 @@
 use std::borrow::Cow;
 use std::collections::HashMap;
 use std::sync::Mutex;
-use std::sync::atomic::{AtomicUsize, Ordering};
 
-use windows_sys::Win32::Foundation::{GetLastError, HANDLE};
+use windows_sys::Win32::Foundation::{CloseHandle, GetLastError, HANDLE};
 use windows_sys::Win32::System::Diagnostics::Debug::{
     IMAGEHLP_LINEW64, SYMBOL_INFOW, SYMOPT_DEFERRED_LOADS, SYMOPT_LOAD_LINES, SYMOPT_UNDNAME,
-    SymCleanup, SymFromAddrW, SymGetLineFromAddrW64, SymInitializeW, SymRefreshModuleList,
-    SymSetOptions,
+    SymCleanup, SymFromAddrW, SymGetLineFromAddrW64, SymGetSearchPathW, SymInitializeW,
+    SymRefreshModuleList, SymSetOptions, SymSetSearchPathW,
 };
-use windows_sys::Win32::System::Threading::GetCurrentProcess;
+use windows_sys::Win32::System::Threading::{
+    GetCurrentProcessId, OpenProcess, PROCESS_QUERY_INFORMATION, PROCESS_VM_READ,
+};
 
 use crate::platform::fp::canonical_address;
-use crate::{SourceLocation, SymbolizedFrame};
+use crate::{SourceLocation, SymbolizationError, SymbolizedFrame};
 
 use super::unwind::ADDRESS_MASK;
 
@@ -28,22 +29,29 @@ const MAX_SYMBOL_NAME: usize = 2048;
 /// Bound on a wide-string scan so a missing terminator cannot run away.
 const MAX_PATH_CHARS: usize = 32_768;
 
-static DBGHELP: Mutex<()> = Mutex::new(());
-static USERS: AtomicUsize = AtomicUsize::new(0);
+static DBGHELP: Mutex<Option<Session>> = Mutex::new(None);
 
-pub(crate) struct Symbolizer {
+struct Session {
     /// Stored as an integer so the symbolizer stays `Send`.
     process: isize,
+    users: usize,
+}
+
+pub(crate) struct Symbolizer {
     cache: HashMap<u64, SymbolizedFrame>,
 }
 
 impl Symbolizer {
-    pub(crate) fn new() -> Self {
-        let process = acquire();
-        Self {
-            process,
-            cache: HashMap::new(),
+    pub(crate) fn new() -> Result<Self, SymbolizationError> {
+        let mut session = lock();
+        if let Some(session) = session.as_mut() {
+            session.users += 1;
+        } else {
+            *session = Some(Session::open()?);
         }
+        Ok(Self {
+            cache: HashMap::new(),
+        })
     }
 
     /// Resolves one address, caching the answer including misses.
@@ -61,8 +69,8 @@ impl Symbolizer {
     }
 
     fn resolve_uncached(&self, address: u64) -> SymbolizedFrame {
-        let _guard = lock();
-        let process = self.process as HANDLE;
+        let session = lock();
+        let process = session.as_ref().expect("live symbol session").process as HANDLE;
         if let Some(frame) = lookup(process, address) {
             return frame;
         }
@@ -79,36 +87,90 @@ impl Symbolizer {
 
 impl Drop for Symbolizer {
     fn drop(&mut self) {
-        release(self.process as HANDLE);
+        let mut guard = lock();
+        let session = guard.as_mut().expect("live symbol session");
+        session.users -= 1;
+        if session.users == 0 {
+            *guard = None;
+        }
     }
 }
 
-fn lock() -> std::sync::MutexGuard<'static, ()> {
+fn lock() -> std::sync::MutexGuard<'static, Option<Session>> {
     DBGHELP
         .lock()
         .unwrap_or_else(|poisoned| poisoned.into_inner())
 }
 
-/// Initializes dbghelp for the first symbolizer and returns the process handle.
-fn acquire() -> isize {
-    let _guard = lock();
-    // SAFETY: GetCurrentProcess returns a pseudo-handle for this process.
-    let process = unsafe { GetCurrentProcess() };
-    if USERS.fetch_add(1, Ordering::AcqRel) == 0 {
-        // SAFETY: the option flags are a valid dbghelp bitmask.
+impl Session {
+    fn open() -> Result<Self, SymbolizationError> {
+        // SAFETY: the real handle identifies our process without sharing the
+        // pseudo-handle session that other components may use.
+        let process = unsafe {
+            OpenProcess(
+                PROCESS_QUERY_INFORMATION | PROCESS_VM_READ,
+                0,
+                GetCurrentProcessId(),
+            )
+        };
+        if process.is_null() {
+            return Err(SymbolizationError::WindowsSession(unsafe {
+                GetLastError()
+            }));
+        }
+        // SAFETY: the option flags are valid and the caller holds DBGHELP.
         unsafe { SymSetOptions(SYMOPT_DEFERRED_LOADS | SYMOPT_LOAD_LINES | SYMOPT_UNDNAME) };
-        // SAFETY: a null search path uses the default; invading the process
-        // makes dbghelp enumerate its loaded modules.
-        unsafe { SymInitializeW(process, std::ptr::null(), 1) };
+        // SAFETY: the handle grants module enumeration and remains open for the session.
+        if unsafe { SymInitializeW(process, std::ptr::null(), 1) } == 0 {
+            let error = unsafe { GetLastError() };
+            unsafe { CloseHandle(process) };
+            return Err(SymbolizationError::WindowsSession(error));
+        }
+        add_executable_directory(process);
+        Ok(Self {
+            process: process as isize,
+            users: 1,
+        })
     }
-    process as isize
 }
 
-fn release(process: HANDLE) {
-    let _guard = lock();
-    if USERS.fetch_sub(1, Ordering::AcqRel) == 1 {
-        // SAFETY: this is the last symbolizer, so dbghelp can be torn down.
-        unsafe { SymCleanup(process) };
+fn add_executable_directory(process: HANDLE) {
+    use std::os::windows::ffi::OsStrExt;
+    let Ok(executable) = std::env::current_exe() else {
+        return;
+    };
+    let Some(directory) = executable.parent() else {
+        return;
+    };
+    // MSVC may record a relative PDB path. Keep DbgHelp's default search
+    // path and add the executable's directory for adjacent PDBs.
+    let mut default_path = vec![0_u16; MAX_PATH_CHARS];
+    // SAFETY: the session is initialized under DBGHELP and owns this buffer.
+    if unsafe {
+        SymGetSearchPathW(
+            process,
+            default_path.as_mut_ptr(),
+            default_path.len() as u32,
+        )
+    } == 0
+    {
+        return;
+    }
+    let mut path: Vec<u16> = directory.as_os_str().encode_wide().collect();
+    path.push(u16::from(b';'));
+    path.extend(default_path.into_iter().take_while(|&ch| ch != 0));
+    path.push(0);
+    // SAFETY: the path is NUL-terminated and the session is initialized.
+    unsafe { SymSetSearchPathW(process, path.as_ptr()) };
+}
+
+impl Drop for Session {
+    fn drop(&mut self) {
+        // SAFETY: the last user holds DBGHELP while ending this session.
+        unsafe {
+            SymCleanup(self.process as HANDLE);
+            CloseHandle(self.process as HANDLE);
+        }
     }
 }
 
@@ -143,7 +205,9 @@ fn lookup(process: HANDLE, address: u64) -> Option<SymbolizedFrame> {
         let length = (buffer.info.NameLen as usize).min(MAX_SYMBOL_NAME);
         // SAFETY: dbghelp wrote `NameLen` characters starting at `Name`, which
         // is contiguous with the trailing `name` array in this repr(C) buffer.
-        let chars = unsafe { std::slice::from_raw_parts(buffer.info.Name.as_ptr(), length) };
+        let name = (&raw const buffer).cast::<u8>();
+        let name = unsafe { name.add(std::mem::offset_of!(SYMBOL_INFOW, Name)) }.cast::<u16>();
+        let chars = unsafe { std::slice::from_raw_parts(name, length) };
         let name = String::from_utf16_lossy(chars);
         (!name.is_empty()).then(|| addr2line::demangle_auto(Cow::Owned(name), None).into_owned())
     } else {
@@ -203,12 +267,6 @@ fn wide_string(pointer: *const u16) -> Option<String> {
     Some(String::from_utf16_lossy(chars))
 }
 
-/// Reported when dbghelp could not be initialized at all.
-pub(crate) fn initialization_error() -> i32 {
-    // SAFETY: GetLastError only reads the calling thread's last-error code.
-    unsafe { GetLastError() as i32 }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -235,8 +293,9 @@ mod tests {
             info: unsafe { std::mem::zeroed::<SYMBOL_INFOW>() },
             name: [0; MAX_SYMBOL_NAME],
         };
-        let base = std::ptr::addr_of!(buffer.info.Name) as usize;
-        let end = std::ptr::addr_of!(buffer.name) as usize;
-        assert_eq!(end - base, 2);
+        assert!(
+            size_of_val(&buffer) - std::mem::offset_of!(SYMBOL_INFOW, Name)
+                >= MAX_SYMBOL_NAME * size_of::<u16>()
+        );
     }
 }

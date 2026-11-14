@@ -2,7 +2,7 @@ import { el, fmtNumber, icon, numberValue } from "../../../core/format.js";
 import { MAX_HOTSPOTS, PROFILE_DURATIONS, PROFILE_HZ_RATES, RpcError, state } from "../../../core/globals.js";
 import { errorMessage, rpc, toast } from "../../../core/session.js";
 import { renderPerformance } from "../overview.js";
-import { applyProfilePayload, clearProfileTimers, firstArrayValue, firstNumberValue, firstStringValue, fmtSeconds, formatAddress, formatCount, isObjectValue, loadProfile, normalizeProfileStatus, profileElapsedMs, profilePayloadRoot, profilePlatformUnsupported, profileStatusLabel, profileStatusTone, startProfilePolling } from "./model.js";
+import { applyProfilePayload, clearProfileTimers, firstArrayValue, firstNumberValue, firstStringValue, fmtSeconds, formatAddress, formatCount, isObjectValue, loadProfile, normalizeProfileStatus, profileElapsedMs, profilePayloadRoot, profileStatusLabel, profileStatusTone, startProfilePolling } from "./model.js";
 
 export async function pollProfile() {
   const perf = state.performance;
@@ -59,10 +59,6 @@ export async function startProfile() {
   const perf = state.performance;
   const profile = perf.profile;
   if (perf.snapshot || !state.targetId) return;
-  if (profilePlatformUnsupported()) {
-    renderPerformance();
-    return;
-  }
   if (!state.caps.profile) {
     toast("This runtime does not advertise CPU profiling.", "info");
     return;
@@ -167,7 +163,6 @@ export async function stopProfile(options = {}) {
       profile.loaded = true;
       profile.completedAt = Date.now();
       if (profile.elapsedMs <= 0) profile.elapsedMs = Math.max(0, profile.completedAt - profile.startedAt);
-      profile.samplesTaken = Math.max(profile.samplesTaken, profile.stackTotalSamples);
       stopped = true;
     }
   } catch (error) {
@@ -193,14 +188,14 @@ export async function stopProfile(options = {}) {
   await loadProfile({ quiet: true });
   if (profile.status === "complete") {
     profile.loaded = true;
-    if (profile.samplesTaken === 0 && profile.stackTotalSamples > 0) profile.samplesTaken = profile.stackTotalSamples;
     if (!profile.hotspots.data && !profile.hotspots.loading) await loadHotspots({ quiet: options.quiet === true });
   }
   if (!options.quiet) {
+    const unit = profile.source === "instrumented" ? "frames" : "samples";
     toast(
       profile.samplesTaken
-        ? `CPU profile stopped with ${formatCount(profile.samplesTaken)} samples.`
-        : "CPU profile stopped with no samples.",
+        ? `CPU profile stopped with ${formatCount(profile.samplesTaken)} ${unit}.`
+        : `CPU profile stopped with no ${unit}.`,
       profile.samplesTaken ? "success" : "info",
       6000,
     );
@@ -213,7 +208,6 @@ export async function loadHotspots(options = {}) {
   const profile = perf.profile;
   const targetId = state.targetId;
   if (!state.token || !targetId || perf.snapshot || !state.caps.profile) return;
-  if (profilePlatformUnsupported()) return;
   if (profile.hotspots.loading) return;
   profile.hotspots.loading = true;
   profile.hotspots.error = null;
@@ -406,6 +400,7 @@ function normalizeHotspots(data, profile) {
 }
 
 export function renderProfileControls(profile, options = {}) {
+  const instrumented = profile.source === "instrumented";
   const disabled = options.disabled === true;
   const sampling = ["sampling", "starting", "stopping"].includes(profile.status);
   const hzRates = PROFILE_HZ_RATES.includes(profile.hz)
@@ -437,7 +432,7 @@ export function renderProfileControls(profile, options = {}) {
     class: "tool-button is-primary",
     props: { id: "profile-start", type: "button", disabled: disabled || sampling || profile.loading },
     attrs: {
-      title: profile.source === "instrumented"
+      title: instrumented
         ? "Start recording the measured CPU time of each frame phase"
         : "Start a real CPU sample of the UI thread",
     },
@@ -446,13 +441,13 @@ export function renderProfileControls(profile, options = {}) {
   const stop = el("button", {
     class: "tool-button",
     props: { id: "profile-stop", type: "button", disabled: disabled || !sampling || profile.loading },
-    attrs: { title: "Stop sampling and read the profile" },
+    attrs: { title: "Stop and read the profile" },
     on: { click: () => stopProfile() },
   }, icon("stop"), el("span", { text: "Stop" }));
   const refresh = el("button", {
     class: "tool-button",
     props: { id: "profile-refresh", type: "button", disabled: disabled || profile.loading },
-    attrs: { title: profile.status === "sampling" ? "Read the current sample count" : "Read the profile and hot spots" },
+    attrs: { title: "Read the profile and hot spots" },
     on: {
       click: () => {
         if (profile.status === "sampling") pollProfile();
@@ -460,9 +455,6 @@ export function renderProfileControls(profile, options = {}) {
       },
     },
   }, icon("refresh"), el("span", { text: "Refresh" }));
-  // The WebAssembly runtime measures its frame phases instead of sampling stacks,
-  // so a sample rate would be a claim it cannot honour.
-  const instrumented = profile.source === "instrumented";
   return el("div", { class: "profile-controls" },
     instrumented
       ? el("div", { class: "profile-field" },
@@ -472,7 +464,7 @@ export function renderProfileControls(profile, options = {}) {
     el("label", { class: "profile-field" }, "Duration", duration),
     el("div", { class: "profile-actions" },
       profile.status === "sampling"
-        ? el("span", { class: "profile-live", text: `${fmtSeconds(profileElapsedMs(profile))} · ${formatCount(profile.samplesTaken)} samples` })
+        ? el("span", { class: "profile-live", text: `${fmtSeconds(profileElapsedMs(profile))} · ${formatCount(profile.samplesTaken)} ${instrumented ? "frames" : "samples"}` })
         : null,
       start,
       stop,

@@ -297,6 +297,10 @@ export function buildProfileModel(profile) {
 export function profileModelNotes(profile, model) {
   const notes = [];
   if (!model.shareBase) return notes;
+  if (profile.source === "instrumented") {
+    if (profile.stacksTruncated) notes.push("Some frame phases were omitted.");
+    return notes;
+  }
   notes.push(`Shares are relative to ${formatCount(model.shareBase)} retained samples, not the requested rate.`);
   if (profile.stacksTruncated) {
     notes.push(`The runtime returned only its ${formatCount(profile.stacks.length)} hottest stack groups; samples outside them are not represented.`);
@@ -330,6 +334,10 @@ export function profileNodeMatches(node, needle) {
 }
 
 export function profileEmptyMessage(profile, view) {
+  if (profile.source === "instrumented") {
+    if (["sampling", "starting"].includes(profile.status)) return "Recording frame phases…";
+    if (profile.status === "complete") return "No frame timings were recorded.";
+  }
   if (["sampling", "starting"].includes(profile.status)) {
     return "Sampling is running. Stacks are ranked when the sampler stops; no stack is synthesized while it runs.";
   }
@@ -413,7 +421,7 @@ export function profileCallerRows(group, expanded, needle) {
 }
 
 export function profileViewMeta(profile) {
-  const parts = [
+  const parts = profile.source === "instrumented" ? [] : [
     `${formatCount(profile.stacks.length)} stacks`,
     `${formatCount(profile.stackTotalSamples || profile.retainedSamples)} samples`,
   ];

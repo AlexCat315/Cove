@@ -39,7 +39,7 @@ pub(crate) fn support() -> PlatformSupport {
 }
 
 pub(crate) fn symbolizer() -> Result<Symbolizer, SymbolizationError> {
-    Ok(Symbolizer::new())
+    Symbolizer::new()
 }
 
 fn last_error() -> i32 {

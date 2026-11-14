@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+- 修复 DevTools 的跨平台 MCP 启动及 Windows、Linux 的 CPU Profile 入口。Windows 可从可执行文件旁边的匹配 PDB 解析函数和源码位置，Web 阶段计时在停止后保留实际帧数。
+
 - DevTools 按帧读取 Metal、Vulkan、DX12 和 WebGPU 的逐 pass 时间，Frames 显示对应的绘制量和合成层。帧详情按需读取，支持保存在性能快照中。浏览器复用 Cove 的合成层渲染器，Canvas2D 可检查合成层。
 - Metal 的设备内跨队列同步使用本地事件，修复部分设备创建共享事件失败后无法执行光线查询的问题。
 

@@ -7,8 +7,9 @@ import time
 from pathlib import Path
 
 
+CLI_NAME = "cove-devtools.exe" if os.name == "nt" else "cove-devtools"
 CLI = os.environ.get(
-    "COVE_DEVTOOLS_CLI", str(Path(__file__).resolve().parents[3] / "target/debug/cove-devtools")
+    "COVE_DEVTOOLS_CLI", str(Path(__file__).resolve().parents[3] / "target/debug" / CLI_NAME)
 )
 
 
@@ -33,8 +34,8 @@ def verify(target):
         runtime(
             "click_ui",
             capture_id=frame["capture_id"],
-            x=(bounds["x"] + bounds["w"] / 2) * frame["width"] / viewport["w"],
-            y=(bounds["y"] + bounds["h"] / 2) * frame["height"] / viewport["h"],
+            x=int((bounds["x"] + bounds["w"] / 2) * frame["width"] / viewport["w"]),
+            y=int((bounds["y"] + bounds["h"] / 2) * frame["height"] / viewport["h"]),
         )
 
     metadata = runtime("query_ui_state", limit=50)["data"]["metadata"]
@@ -93,7 +94,7 @@ def verify(target):
         if breakdown:
             break
     if os.environ.get("COVE_EXPECT_GPU_PASSES") == "1":
-        assert breakdown and any(pass_.get("gpuMs", 0) > 0 for pass_ in breakdown["passes"])
+        assert breakdown and any((pass_.get("gpuMs") or 0) > 0 for pass_ in breakdown["passes"])
     gpu = {}
     if breakdown:
         assert len(breakdown["passes"]) <= breakdown["passCount"]

@@ -16,7 +16,7 @@ cargo run -p cove-examples --bin gallery --features media-ffmpeg
 
 控制器默认监听 `127.0.0.1:9229`，端口被占用时改用临时端口并打印实际链接。链接内含配对凭据，仅供当前开发会话使用。控制器把端点和凭据写入当前用户的本地配置目录，用 `COVE_DEVTOOLS_SESSION_FILE` 可指定发现文件。
 
-MCP 客户端加载仓库的 `.mcp.json`，它调用 `Tools/DevTools/mcp.sh`：GUI 启动的客户端 PATH 不含 Rust 工具链和 sccache，脚本补齐后 exec `cargo run --quiet -p cove-devtools-cli -- mcp`。MCP 可以先启动，工具调用时读取控制器发现文件。CLI 使用同一组命令：
+MCP 客户端从仓库根目录加载 `.mcp.json`，用 PATH 中的 Cargo 启动 Rust stdio 服务。GUI 客户端找不到 Cargo 时，可在客户端配置中把 `command` 设为本机 Cargo 的绝对路径。macOS 和 Linux 也可用 `Tools/DevTools/mcp.sh` 补齐工具链路径。MCP 可以先启动，工具调用时读取控制器发现文件。CLI 使用同一组命令：
 
 ```sh
 cargo run --quiet -p cove-devtools-cli -- tools
@@ -47,7 +47,7 @@ DevTools 的画面范围为 Cove 渲染内容。系统标题栏、原生文件�
 
 `start_ui_trace` 与 `stop_ui_trace` 可包围实际操作，`get_ui_trace` 分页读取，`compare_ui_traces` 比较 CPU 阶段。帧计时区分 CPU 提交、渲染线程完成和宿主能观察到的呈现操作。Frames 用独立柱显示 GPU 提交执行时间，并按 UI、Encode、GPU 中最慢的一项排序。选中帧会显示活跃帧槽内实际发生的着色器及管线创建次数与 CPU 时间。
 
-`start_ui_profile hz=1000 duration_ms=5000` 用 `cove-profiling` 的真实采样器跟随 UI 线程，`stop_ui_profile` 停止、join 并在后台线程完成符号化，`get_ui_profile` 返回有界聚合调用栈（不逐样本返回），`query_ui_hotspots` 按函数和 `file:line` 返回 self/inclusive 热点。单次采样上限 10 秒；self 时间是独占时间，inclusive 时间在同一采样内对每帧只计一次，时间按相邻采样的实际间隔累计。64 位 macOS、iOS/iPadOS、Windows、Linux、Android 提供原生采样。
+`start_ui_profile hz=1000 duration_ms=5000` 用 `cove-profiling` 的真实采样器跟随 UI 线程，`stop_ui_profile` 停止、join 并在后台线程完成符号化，`get_ui_profile` 返回有界聚合调用栈（不逐样本返回），`query_ui_hotspots` 按函数和 `file:line` 返回 self/inclusive 热点。单次采样上限 10 秒；self 时间是独占时间，inclusive 时间在同一采样内对每帧只计一次，时间按相邻采样的实际间隔累计。Inspector 根据运行时公布的 `cpu_profile` 能力启用面板。64 位 macOS、iOS/iPadOS、Windows、Linux、Android 提供原生采样。Windows 调试版可从可执行文件旁边的匹配 PDB 解析函数和源码位置。
 
 WebAssembly 运行在页面唯一线程上，无法被外部挂起读栈，因此浏览器改为**协作式阶段计时**：`crates/browser` 的 `render` 在 recompose、layout、encode、upload、submit 处计时，帧尾提交总时长，`crates/devtools/src/profile/cooperative.rs` 把它们聚合成 profile 形状。答案的 `source` 是 `instrumented`，`hz` 与 `sampleIntervalMs` 为 `0`，`samples` 的单位是**实测毫秒**（一单位 = 1 ms，帧自时与各阶段相加等于帧总时），`samplesTaken` 是记录的帧数。面板据此把 "Sample rate" 换成 "Phase timing"、把样本计数改称帧与毫秒。详见 [devtools-profile.md](../../Docs/devtools-profile.md)。
 

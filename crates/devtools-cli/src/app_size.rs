@@ -970,7 +970,6 @@ mod tests {
         let mut section_vm = 0u64;
         let mut section_file = 0u64;
         let mut section_zero_fill = 0u64;
-        let mut text_sections = 0usize;
         for section in sections {
             let vm_size = section["vm_size"].as_u64().unwrap();
             let size = section["size"].as_u64().unwrap();
@@ -992,7 +991,6 @@ mod tests {
                 assert!(offset.saturating_add(file_size) <= file_bytes);
             }
             if section["segment"] == "__TEXT" {
-                text_sections += 1;
                 assert!(
                     section["segment_index"].as_u64().is_some(),
                     "a __TEXT section names its segment"
@@ -1008,7 +1006,7 @@ mod tests {
         assert_eq!(value["section_zero_fill_bytes"], section_zero_fill);
         #[cfg(target_os = "macos")]
         {
-            assert!(text_sections > 0, "Mach-O sections belong to __TEXT");
+            assert!(sections.iter().any(|section| section["segment"] == "__TEXT"));
             assert!(
                 segments
                     .iter()
@@ -1024,7 +1022,11 @@ mod tests {
         let linkedit = value["linkedit_bytes"].as_u64().unwrap();
         let unattributed = value["unattributed_bytes"].as_u64().unwrap();
         assert_eq!(attributed + linkedit + unattributed, file_bytes);
-        assert!(attributed > 0, "the symbol table covers real text bytes");
+        if value["symbol_count"] == 0 {
+            assert_eq!(attributed, 0, "a symbol-free image attributes no file bytes");
+        } else {
+            assert!(attributed > 0, "the symbol table covers real bytes");
+        }
         assert_eq!(value["accounting"]["attributed_bytes"], attributed);
         assert_eq!(value["accounting"]["linkedit_bytes"], linkedit);
         assert_eq!(value["accounting"]["unattributed_bytes"], unattributed);

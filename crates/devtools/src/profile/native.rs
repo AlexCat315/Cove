@@ -723,13 +723,13 @@ mod tests {
         assert_eq!(profiler.read().unwrap()["status"], "idle");
     }
 
-    #[cfg(not(target_os = "macos"))]
     #[test]
-    fn a_real_sampler_run_is_skipped_with_the_platform_reason() {
-        let reason = unavailable_reason().expect("this platform has no sampler");
-        eprintln!("skipping the real CPU sampler test: {reason}");
-        assert!(!reason.is_empty());
+    fn initial_profile_state_matches_platform_support() {
         let mut profiler = UiProfiler::new("main".into());
+        let Some(reason) = unavailable_reason() else {
+            assert_eq!(profiler.read().unwrap()["status"], "idle");
+            return;
+        };
         let fault = profiler.start(100, 100).unwrap_err();
         assert_eq!(fault.code, "unavailable");
         assert_eq!(fault.message, reason);
@@ -760,7 +760,5 @@ mod tests {
             "invalid_request"
         );
         assert_eq!(profiler.thread_name(), "main");
-        #[cfg(target_os = "macos")]
-        assert_eq!(profiler.read().unwrap()["status"], "idle");
     }
 }

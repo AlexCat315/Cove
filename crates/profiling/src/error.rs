@@ -43,6 +43,9 @@ pub enum SamplingError {
 /// Why symbolization is unavailable.
 #[derive(Clone, Debug, PartialEq, Eq, thiserror::Error)]
 pub enum SymbolizationError {
+    /// Windows could not open or initialize the symbol session.
+    #[error("opening the Windows symbol session failed (Win32 error {0})")]
+    WindowsSession(u32),
     /// The platform has no compiled-image lookup in this milestone.
     #[error("symbolization is not available on {platform}: {reason}")]
     Unsupported {

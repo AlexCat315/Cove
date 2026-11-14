@@ -44,6 +44,7 @@
 - 统计项：`Samples` → `Frames`（`N recorded`）、`Retained` → `N ms measured`、`Observed rate` → `frames/s`；`Interval` 整项隐藏。
 - 面板标题显示 `N frames · M ms measured`；调用树根行显示 `All frames`，列头是 `Self ms` / `Inclusive ms`。
 - 启动 toast 不再声称以某个 Hz 采样。
+- 停止提示与面板摘要保留实际帧数。Flame chart 和 Stacks 用毫秒，Methods 显示阶段耗时与占比。
 
 ## 验证
 
@@ -51,3 +52,5 @@
 - `cargo check -p cove-browser --target wasm32-wasip1`（`WASI_SDK_PATH` 指向 `cargo cove setup --wasm` 装的 wasi-sdk）：wasm 专属分支（`profile/wasm.rs` 与 `render` 的 submit 打点）在真实目标上编译通过。
 - 真实链路：`cargo run -p cove-devtools-cli -- serve --web-root crates/browser/dist` + 新构建的 wasm 页面（headless Chrome）。Web 运行时能力表已含 `cpu_profile`，`start_ui_profile` 返回 `source: "instrumented"`、`hz: 0`；抓帧后 `get_ui_profile` 为 `status: ready`、`samplesTaken: 1`、`retainedSamples: 2`、阶段行 `encode 2 ms`，时限过后无需新帧即收束。
 - `node crates/devtools/client/tests/profile-harness.mjs instrumented`：无 Hz 选择、`Phase timing` 标签、`24 recorded`、`400 ms measured`、无 `Interval`、阶段行按毫秒显示。
+- `node crates/devtools/client/tests/profile-harness.mjs windows linux instrumented-stop`：已公布能力的 Windows 和 Linux 目标可启动采样并读取热点，Web 停止后仍显示 24 帧和 400 ms。用 `CHROME_PATH` 指向本机 Chromium 浏览器。
+- 新构建的 WASM Counter 在无头 Edge 上经 CLI 取点、点击并回读计数节点裁图。增加和重置期间记录 6 帧、21 ms，聚合栈毫秒之和等于实测总量。

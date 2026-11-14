@@ -1,7 +1,7 @@
 /* CPU profile */
 import { numberValue } from "../../../core/format.js";
 import { MAX_PROFILE_FRAMES, MAX_PROFILE_SAMPLES, MAX_PROFILE_STACKS, PROFILE_POLL_MS, state } from "../../../core/globals.js";
-import { errorMessage, rpc, targetById, toast } from "../../../core/session.js";
+import { errorMessage, rpc, toast } from "../../../core/session.js";
 import { renderPerformance } from "../overview.js";
 import { loadHotspots, pollProfile, profileErrorIsUnavailable, profileErrorIsUnsupported, stopProfile } from "./control.js";
 
@@ -55,25 +55,6 @@ export function formatAddress(value) {
   if (typeof value === "string" && value.trim()) return value.trim();
   const number = numberValue(value);
   return number === null ? "" : `0x${Math.max(0, Math.trunc(number)).toString(16)}`;
-}
-
-export function profilePlatformName(target = targetById()) {
-  const raw = String(state.performance?.profile?.platform || target?.platform || state.platform || "").toLowerCase();
-  if (raw.includes("mac") || raw === "darwin" || raw === "osx") return "macos";
-  if (raw.includes("windows") || raw === "win32" || raw === "win64") return "windows";
-  if (raw.includes("linux")) return "linux";
-  return raw;
-}
-
-export function profilePlatformUnsupported(target = targetById()) {
-  const platform = profilePlatformName(target);
-  if (platform === "linux") {
-    return "CPU sampling is not implemented on Linux in this build. The sampler reports Unsupported and synthesizes no samples; use a macOS host or an external system profiler.";
-  }
-  if (platform === "windows") {
-    return "CPU sampling is not implemented on Windows in this build. The sampler reports Unsupported and synthesizes no samples; use a macOS host or an external system profiler.";
-  }
-  return "";
 }
 
 export function normalizeProfileStatus(value, hasSamples) {
@@ -327,7 +308,6 @@ function normalizeProfilePayload(data, options = {}) {
     available: availableValue === undefined ? null : availableValue === true,
     reason,
     thread: firstStringValue(root.thread, root.threadName, root.thread_name, outer.thread, outer.threadName),
-    platform: firstStringValue(root.platform, outer.platform),
     source: firstStringValue(root.source, root.profileSource, root.profile_source, outer.source),
     intervalMs,
     hz,
@@ -360,8 +340,12 @@ export function applyProfilePayload(data, options = {}) {
   }
   if (normalized.reason) profile.reason = normalized.reason;
   if (normalized.thread) profile.thread = normalized.thread;
-  if (normalized.platform) profile.platform = normalized.platform;
-  if (normalized.source === "instrumented" || normalized.source === "sampler") profile.source = normalized.source;
+  if (normalized.source === "instrumented" || normalized.source === "sampler") {
+    profile.source = normalized.source;
+    if (profile.source === "instrumented" && profile.methodSort.key === "selfSamples") {
+      profile.methodSort = { key: "selfMs", dir: -1 };
+    }
+  }
   // An idle answer describes no run: its hz/interval are runtime defaults, not
   // the rate the user selected, so they must not overwrite the controls.
   const describesRun = ["sampling", "stopping", "complete"].includes(profile.status) || (normalized.totalSamples ?? 0) > 0;
@@ -474,7 +458,6 @@ export async function ensureProfile() {
   const profile = perf.profile;
   if (!state.token || perf.snapshot || !state.targetId) return;
   if (!state.caps.runtime || !state.caps.profile) return;
-  if (profilePlatformUnsupported()) return;
   if (profile.loading || profile.status === "sampling" || profile.status === "starting" || profile.status === "stopping") return;
   if (profile.loaded || profile.status === "complete" || profile.status === "unsupported" || profile.status === "unavailable") {
     renderPerformance();
@@ -489,7 +472,6 @@ export async function loadProfile(options = {}) {
   const targetId = state.targetId;
   if (!state.token || !targetId || perf.snapshot) return;
   if (!state.caps.profile && options.force !== true) return;
-  if (profilePlatformUnsupported()) return;
   if (profile.loading) return;
   const request = profile.loadRequest + 1;
   profile.loadRequest = request;

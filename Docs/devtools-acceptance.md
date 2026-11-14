@@ -4,7 +4,9 @@ Acceptance runs exercise the controller and a real Gallery runtime.
 
 ## Live scene diagnostics
 
-Launch the debug Gallery with `cargo run -p cove-examples --bin gallery --features media-ffmpeg`, then run `python3 Tools/DevTools/acceptance/scene-diagnostics.py` with the CLI built. The script selects Dashboard, follows the sidebar Button node's layout inputs and children, checks the runtime's semantics, and uses an application frame to send the Button click inside Cove. It checks the resulting page and the changes to component work, with a trace around the operation.
+Launch the debug Gallery with `cargo run -p cove-examples --bin gallery`. Build the CLI with `cargo build -p cove-devtools-cli`, then run `python Tools/DevTools/acceptance/scene-diagnostics.py`. The script follows the sidebar Button node's layout inputs and children, checks the runtime's semantics, and clicks the Button page from a Cove frame. It checks the resulting page and component work with a trace around the operation. Set `COVE_EXPECT_GPU_PASSES=1` to require GPU pass timestamps.
+
+The Windows DX12 run on 2026-11-14 verified the Button transition, trace, and two passes. The same Gallery was discovered through the MCP stdio service. Sampling during the operation returned 2,992 samples with source lines for 181 hotspots. See the [Gallery audit](gallery-audit.md).
 
 ## Milestone 1 — App-local capture and picking
 

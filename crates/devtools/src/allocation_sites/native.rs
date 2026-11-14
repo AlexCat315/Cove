@@ -46,9 +46,8 @@ fn sampling_fault(error: &SamplingError) -> Fault {
 
 /// Symbol resolution for the sampled addresses.
 ///
-/// Linux can capture stacks but `cove_profiling` has no Linux symbolizer yet;
-/// addresses are then returned unresolved with `symbolization_reason` set. The
-/// probe never invents names.
+/// When symbolization is unavailable the probe returns captured addresses
+/// with `symbolization_reason` set.
 struct Symbols {
     inner: Option<Symbolizer>,
     reason: Option<String>,

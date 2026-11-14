@@ -2379,13 +2379,14 @@ mod tests {
             .register(Registration {
                 version: VERSION,
                 title: "gallery".into(),
-                platform: "macos".into(),
+                platform: std::env::consts::OS.into(),
                 pid: Some(424_242),
                 window: None,
                 capabilities: vec!["tree".into()],
             })
             .unwrap();
         let target = lease.id.clone();
+        let source = std::env::temp_dir().join("mock").join("lib.rs");
         let attached = controller
             .execute("attach_ui_debugger", json!({"target": target}))
             .unwrap();
@@ -2401,7 +2402,7 @@ mod tests {
         let set = controller
             .execute(
                 "set_ui_breakpoint",
-                json!({"target": target, "path": "/tmp/mock/src/lib.rs", "line": 12}),
+                json!({"target": target, "path": source, "line": 12}),
             )
             .unwrap();
         assert_eq!(set["verified"], true);
@@ -2456,7 +2457,7 @@ mod tests {
         let cleared = controller
             .execute(
                 "clear_ui_breakpoint",
-                json!({"target": target, "path": "/tmp/mock/src/lib.rs", "line": 12}),
+                json!({"target": target, "path": source, "line": 12}),
             )
             .unwrap();
         assert!(cleared["breakpoints"].as_array().unwrap().is_empty());

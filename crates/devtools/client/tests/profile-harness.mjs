@@ -221,9 +221,10 @@ function rpcError(code, message) {
   };
 }
 
-function createFake(mode) {
+function createFake(mode, platform) {
   const calls = [];
-  const flow = { live: 7, stopped: false };
+  const flow = { live: mode === "instrumented-stop" ? 0 : 7, stopped: false };
+  const instrumented = mode === "instrumented" || mode === "instrumented-stop";
 
   function session() {
     return {
@@ -233,7 +234,7 @@ function createFake(mode) {
         {
           id: "runtime-1",
           title: "Profile Target",
-          platform: "macos",
+          platform,
           pid: 4242,
           kind: "runtime",
           capabilities: ["tree", "timing", "trace", "cpu_profile"],
@@ -248,6 +249,17 @@ function createFake(mode) {
     }
     if (mode === "empty") return emptyProfile();
     if (mode === "instrumented") return instrumentedProfile();
+    if (mode === "instrumented-stop") {
+      if (flow.stopped) return instrumentedProfile();
+      return {
+        ...emptyProfile(),
+        status: flow.live ? "running" : "idle",
+        source: "instrumented",
+        hz: 0,
+        sampleIntervalMs: 0,
+        samplesTaken: flow.live,
+      };
+    }
     if (mode === "truncated") return truncatedProfile();
     if (mode === "idle") {
       return {
@@ -282,17 +294,21 @@ function createFake(mode) {
     if (method === "start_ui_profile") {
       if (mode === "unsupported") return profileResponse();
       if (mode === "running") return runningProfile(flow.live);
-      if (mode === "instrumented") return instrumentedProfile();
+      if (mode === "instrumented-stop") {
+        flow.live = 3;
+        return profileResponse();
+      }
+      if (instrumented) return instrumentedProfile();
       return readyProfile();
     }
     if (method === "stop_ui_profile") {
-      if (mode === "running") flow.stopped = true;
-      if (mode === "instrumented") return instrumentedProfile();
+      if (mode === "running" || mode === "instrumented-stop") flow.stopped = true;
+      if (instrumented) return instrumentedProfile();
       return mode === "empty" ? emptyProfile() : mode === "truncated" ? truncatedProfile() : readyProfile();
     }
     if (method === "query_ui_hotspots") {
       if (mode === "unsupported") throw rpcError("unsupported", "CPU sampling is not available on this platform.");
-      if (mode === "instrumented") return instrumentedHotspots();
+      if (instrumented) return instrumentedHotspots();
       if (mode === "empty") return { ...emptyProfile(), hotspots: [] };
       if (mode === "truncated") return { ...truncatedProfile(), hotspots: [] };
       return hotspotsPayload();
@@ -300,11 +316,11 @@ function createFake(mode) {
     throw rpcError("unknown_command", `Unknown command ${method}.`);
   }
 
-  return { calls, flow, handle };
+  return { calls, handle };
 }
 
-async function startServer(mode) {
-  const fake = createFake(mode);
+async function startServer(mode, platform) {
+  const fake = createFake(mode, platform);
   const server = createServer(async (request, response) => {
     const url = new URL(request.url, "http://127.0.0.1");
     if (request.method === "POST" && url.pathname === "/rpc") {
@@ -395,9 +411,9 @@ async function startChrome(profile, url) {
     child,
     wsUrl: target.webSocketDebuggerUrl,
     close: async () => {
-      child.kill("SIGTERM");
+      if (child.exitCode !== null || child.signalCode !== null) return;
       await new Promise(resolve => {
-        const timer = setTimeout(() => { child.kill("SIGKILL"); resolve(); }, 3000);
+        const timer = setTimeout(() => child.kill("SIGKILL"), 3000);
         child.once("exit", () => { clearTimeout(timer); resolve(); });
       });
     },
@@ -636,8 +652,8 @@ async function auditProfileDom(cdp) {
 
 let audited = false;
 
-async function runScenario(mode, body) {
-  const server = await startServer(mode);
+async function runScenario(mode, body, platform = "macos") {
+  const server = await startServer(mode, platform);
   const profile = await mkdtemp(join(tmpdir(), "cove-profile-harness-"));
   let chrome = null;
   let cdp = null;
@@ -648,8 +664,10 @@ async function runScenario(mode, body) {
     await body({ cdp, fake: server.fake, mode });
     assert.deepEqual(cdp.exceptions, [], `page exceptions: ${cdp.exceptions.join("\n")}`);
   } finally {
-    cdp?.close();
+    // Let Chromium release its data-directory lock before removing the profile.
+    cdp?.send("Browser.close").catch(() => {});
     await chrome?.close();
+    cdp?.close();
     await server.close();
     await rm(profile, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
   }
@@ -1008,13 +1026,54 @@ async function scenarioInstrumented() {
     assert.deepEqual(layoutRow.cells, ["0", "170", "0.0%", "42.5%"], "phase units are measured milliseconds");
     assert.match(view.root, /All frames/, "the shared root of the measured stacks is named for frames");
     assert.match(view.root, /400 ms/, "the units add up to the measured frame time");
+    assert.match(await text(cdp, "#performance-meta"), /24 frames.*400 ms measured/);
+    await click(cdp, "#profile-view-tab-flame-chart");
+    assert.match((await page(cdp)).flameBars[0].title, /All frames · 400 ms/);
+    await click(cdp, "#profile-view-tab-stacks");
+    assert.match(await text(cdp, ".profile-stacks-table thead"), /Time \(ms\)/);
+    await click(cdp, "#profile-view-tab-methods");
+    await waitFor(cdp, "phase hot spots", `document.querySelector(".profile-methods-table tbody tr") !== null`);
+    const header = await text(cdp, ".profile-methods-table thead");
+    assert.match(header, /Self time/);
+    assert.doesNotMatch(header, /samples/i);
+    assert.match(await text(cdp, '.profile-methods-table [aria-sort="descending"]'), /Self time/);
     console.log("PASS  instrumented profile: phase timing replaces the sample rate and reports frames");
-  });
+  }, "web");
+}
+
+async function scenarioInstrumentedStop() {
+  await runScenario("instrumented-stop", async ({ cdp }) => {
+    await waitFor(cdp, "phase timing controls", `document.querySelector(".profile-controls")?.textContent.includes("Phase timing") && !document.getElementById("profile-start")?.disabled`);
+    await click(cdp, "#profile-start");
+    await waitFor(cdp, "live frame count", `document.querySelector(".profile-live")?.textContent.includes("3 frames") && !document.getElementById("profile-stop")?.disabled`);
+    await click(cdp, "#profile-stop");
+    await waitFor(cdp, "stop confirmation", `document.body.textContent.includes("CPU profile stopped with 24 frames.")`);
+    const view = await page(cdp);
+    assert.equal(view.stats.taken, "24 recorded");
+    assert.equal(view.stats.retained, "400 ms measured");
+    console.log("PASS  stopping phase timing preserves the frame count");
+  }, "web");
+}
+
+async function scenarioNativeProfile(platform) {
+  await runScenario("idle", async ({ cdp, fake }) => {
+    await waitFor(cdp, "idle profile", `document.querySelector("#performance-profile .perf-chip")?.textContent.trim() === "Idle" && !document.getElementById("profile-start")?.disabled`);
+    await click(cdp, "#profile-start");
+    await waitFor(cdp, "ready profile", `document.querySelector("#performance-profile .perf-chip")?.textContent.trim() === "Ready"`);
+    for (const method of ["get_ui_profile", "start_ui_profile", "query_ui_hotspots"]) {
+      assert.ok(fake.calls.some(call => call.method === method && call.params.target === "runtime-1"), method);
+    }
+    assert.match(await text(cdp, "#performance-meta"), /samples/);
+    console.log(`PASS  ${platform}: advertised CPU profiling loads, starts and fetches hot spots`);
+  }, platform);
 }
 
 const scenarios = [
   ["ready", scenarioReady],
   ["instrumented", scenarioInstrumented],
+  ["instrumented-stop", scenarioInstrumentedStop],
+  ["windows", () => scenarioNativeProfile("windows")],
+  ["linux", () => scenarioNativeProfile("linux")],
   ["idle", scenarioIdleRate],
   ["running", scenarioRunning],
   ["empty", scenarioEmpty],

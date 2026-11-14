@@ -4,7 +4,7 @@ import { $, ALLOCATION_DEFAULT_RATE, BUDGET_KEY, BUDGET_RATES, DEEP_LINKS_ROOT_K
 import { rpc, targetById } from "../../core/session.js";
 import { stopTimer, syncFollowTimers } from "../network.js";
 import { frameJank, loadFrames, renderFramesPanel } from "./frames.js";
-import { clearProfileTimers, ensureProfile, fmtSeconds, formatCount, profileElapsedMs, profilePlatformName } from "./profile/model.js";
+import { clearProfileTimers, ensureProfile, fmtSeconds, formatCount, profileElapsedMs } from "./profile/model.js";
 import { renderProfilePanel } from "./profile/views.js";
 import { renderTimelinePanel, updateTraceElapsed } from "./timeline.js";
 import { ensureSceneDiagnostics } from "../scene-diagnostics.js";
@@ -177,7 +177,6 @@ export function emptyProfile() {
     completedAt: 0,
     elapsedMs: 0,
     thread: "",
-    platform: "",
     // "sampler" for native stack sampling, "instrumented" for the WebAssembly
     // runtime's measured frame phases.
     source: "sampler",
@@ -381,22 +380,23 @@ function updatePerformanceMeta() {
   }
   if (perf.tab === "profile") {
     const profile = perf.profile;
-    const platform = profilePlatformName(target);
-    if (profile.status === "unsupported" || platform === "linux" || platform === "windows") {
-      dom.performanceMeta.textContent = `CPU sampling is not available on ${platform === "windows" ? "Windows" : platform === "linux" ? "Linux" : platform || "this platform"}.`;
+    if (["unsupported", "unavailable"].includes(profile.status)) {
+      dom.performanceMeta.textContent = "CPU profiling is unavailable.";
       return;
     }
     if (!state.caps.profile) {
       dom.performanceMeta.textContent = "This runtime does not advertise CPU profiling.";
       return;
     }
+    const instrumented = profile.source === "instrumented";
+    const count = `${formatCount(profile.samplesTaken)} ${instrumented ? "frames" : "samples"}`;
     if (profile.status === "sampling" || profile.status === "starting") {
       const parts = [
-        `Sampling ${profile.thread || "the UI thread"}`,
+        instrumented ? "Recording frame phases" : `Sampling ${profile.thread || "the UI thread"}`,
         fmtSeconds(profileElapsedMs(profile)),
-        `${formatCount(profile.samplesTaken)} samples`,
+        count,
       ];
-      if (profile.samplesDropped) parts.push(`${formatCount(profile.samplesDropped)} overwritten`);
+      if (profile.samplesDropped) parts.push(`${formatCount(profile.samplesDropped)} dropped`);
       dom.performanceMeta.textContent = parts.join(" · ");
       return;
     }
@@ -410,12 +410,12 @@ function updatePerformanceMeta() {
     }
     if (profile.status === "complete" || profile.samples.length || profile.samplesTaken) {
       const parts = [
-        `${formatCount(profile.samplesTaken)} samples`,
+        count,
         fmtSeconds(profile.elapsedMs || profile.reportedDurationMs),
         profile.thread || "unknown thread",
-        `${formatCount(profile.stacks.length)} hot stacks`,
+        instrumented ? `${formatCount(profile.retainedSamples)} ms measured` : `${formatCount(profile.stacks.length)} hot stacks`,
       ];
-      if (profile.samplesDropped) parts.push(`${formatCount(profile.samplesDropped)} overwritten`);
+      if (profile.samplesDropped) parts.push(`${formatCount(profile.samplesDropped)} dropped`);
       dom.performanceMeta.textContent = parts.join(" · ");
       return;
     }

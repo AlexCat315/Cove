@@ -1,4 +1,4 @@
-import { clear, el, fmtMs, fmtNumber, numberValue } from "../../../core/format.js";
+import { clear, el, fmtMs, numberValue } from "../../../core/format.js";
 import { dom, MAX_HOTSPOTS, MAX_PROFILE_BOTTOM_CALLERS, MAX_PROFILE_BOTTOM_GROUPS, MAX_PROFILE_FLAME_BARS, MAX_PROFILE_STACK_FRAMES, MAX_PROFILE_TREE_DEPTH, MAX_PROFILE_TREE_ROWS, PROFILE_FLAME_MIN_PERCENT, PROFILE_METHOD_SORT_KEYS, PROFILE_VIEW_LABELS, state } from "../../../core/globals.js";
 import { errorMessage, targetById } from "../../../core/session.js";
 import { emptyInline, errorInline, showState } from "../../../core/ui-helpers.js";
@@ -6,8 +6,8 @@ import { snapshotBanner } from "../frames.js";
 import { renderPerformance } from "../overview.js";
 import { returnToLive } from "../snapshots.js";
 import { PROFILE_VIEWS } from "../../../core/globals.js";
-import { loadHotspots, renderProfileControls, renderProfileStats, startProfile } from "./control.js";
-import { fmtSeconds, formatCount, formatPercent, loadProfile, profilePlatformName, profilePlatformUnsupported } from "./model.js";
+import { loadHotspots, renderProfileControls, renderProfileStats } from "./control.js";
+import { fmtSeconds, formatCount, formatPercent, loadProfile } from "./model.js";
 import { buildProfileModel, collapseProfileAll, expandProfileAll, listProfileNotes, profileCallerRows, profileEmptyMessage, profileFilterNeedle, profileFrameIdentity, profileFrameKeyFromHotspot, profileFrameLabel, profileFrameLocation, profileModelNotes, profileNodeMatches, profileSelect, profileSelectionNode, profileSharePercent, profileTextMatches, profileViewMeta, profileViewTabKeydown, refreshProfileView, renderProfileCallTree, renderProfileTreeHead, setProfileView, toggleProfileNode } from "./trees.js";
 function renderProfileCallerRow(profile, entry, needle) {
   const node = entry.node;
@@ -152,7 +152,9 @@ function renderProfileBottomUp(profile, model) {
   }
   content.push(list);
   const notes = profileModelNotes(profile, model);
-  notes.push("Each leaf row counts samples whose innermost frame is that function; expanding it walks outward through its callers.");
+  if (profile.source !== "instrumented") {
+    notes.push("Each row groups samples by their innermost function. Expand a row to see its callers.");
+  }
   if (bottom.unattributedSamples) {
     notes.push(`${formatCount(bottom.unattributedSamples)} sample${bottom.unattributedSamples === 1 ? "" : "s"} from ${formatCount(bottom.unattributedStacks)} stack${bottom.unattributedStacks === 1 ? "" : "s"} have no captured frames and are not attributed to a leaf function.`);
   }
@@ -171,6 +173,8 @@ function renderProfileBottomUp(profile, model) {
 function renderProfileFlameChart(profile, model) {
   const flame = model.flame;
   if (!model.rows.length || !model.shareBase) return [emptyInline(profileEmptyMessage(profile, "flame-chart"))];
+  const instrumented = profile.source === "instrumented";
+  const unit = instrumented ? "ms" : "samples";
   const needle = profileFilterNeedle(profile);
   let matches = 0;
   const plot = el("div", { class: "profile-flame-plot" });
@@ -183,8 +187,8 @@ function renderProfileFlameChart(profile, model) {
       const selected = profile.selection?.key === node.identity;
       const width = Math.min(100, Math.max(0, bar.width));
       const left = Math.min(100, Math.max(0, bar.start));
-      const label = node.root ? "All samples" : node.label;
-      const title = `${label}${node.location ? ` · ${node.location}` : ""} · ${formatCount(node.samples)} samples · ${profileSharePercent(node.samples, model.shareBase)}${node.selfSamples ? ` · self ${formatCount(node.selfSamples)} (${profileSharePercent(node.selfSamples, model.shareBase)})` : ""}`;
+      const label = node.root ? (instrumented ? "All frames" : "All samples") : node.label;
+      const title = `${label}${node.location ? ` · ${node.location}` : ""} · ${formatCount(node.samples)} ${unit} · ${profileSharePercent(node.samples, model.shareBase)}${node.selfSamples ? ` · self ${formatCount(node.selfSamples)} (${profileSharePercent(node.selfSamples, model.shareBase)})` : ""}`;
       const classes = ["profile-flame-bar"];
       if (selected) classes.push("is-selected");
       if (matched) classes.push("is-match");
@@ -215,10 +219,10 @@ function renderProfileFlameChart(profile, model) {
   }
   const chart = el("div", {
     class: "profile-flame-scroll",
-    attrs: { role: "group", "aria-label": `CPU flame chart: ${flame.bars} bars across ${flame.depth} depth rows. Width is the share of retained samples.` },
+    attrs: { role: "group", "aria-label": `CPU flame chart. Width is the share of ${instrumented ? "measured time" : "retained samples"}.` },
   }, plot);
   const notes = profileModelNotes(profile, model);
-  notes.push("The flame chart is inverted: the outermost call is the full-width top bar, children sit directly below their caller, and width is the share of retained samples.");
+  if (!instrumented) notes.push("The outermost call is at the top. Width is the share of retained samples.");
   if (flame.depthCapped) notes.push(`Branches deeper than ${flame.maxDepth} levels are not drawn.`);
   if (flame.barCapped) notes.push(`Only the first ${MAX_PROFILE_FLAME_BARS} bars are drawn; branches beyond the cap are not shown.`);
   if (flame.thinSkipped) notes.push(`${formatCount(flame.thinSkipped)} branches below ${PROFILE_FLAME_MIN_PERCENT}% share are not drawn; their samples remain counted in the parent bar.`);
@@ -251,7 +255,7 @@ function renderProfileStacksView(profile, model) {
   const table = el("table", { class: "data-table profile-stacks-table" },
     el("thead", {}, el("tr", {},
       el("th", { class: "num", text: "#" }),
-      el("th", { class: "num", text: "Samples" }),
+      el("th", { class: "num", text: profile.source === "instrumented" ? "Time (ms)" : "Samples" }),
       el("th", { class: "num", text: "Share" }),
       el("th", { text: "Stack (innermost first)" }),
     )),
@@ -358,6 +362,7 @@ function profileSortHeader(profile, label, key, className = "") {
 
 function renderMethodsView(profile, model) {
   const hotspot = profile.hotspots;
+  const instrumented = profile.source === "instrumented";
   const content = [];
   if (hotspot.loading) {
     content.push(el("div", { class: "inline-spinner" }, el("span", { class: "spinner" }), "Reading hot spots…"));
@@ -386,7 +391,9 @@ function renderMethodsView(profile, model) {
     return content;
   }
   if (!hotspot.data.entries.length) {
-    content.push(emptyInline(profile.status === "complete"
+    content.push(emptyInline(profile.status === "complete" && instrumented
+      ? "No frame timings were recorded."
+      : profile.status === "complete"
       ? "No hot functions were computed from the retained samples."
       : "No hot functions yet."));
     return content;
@@ -410,8 +417,8 @@ function renderMethodsView(profile, model) {
       profileSortHeader(profile, "Inclusive time", "inclusiveMs", "num"),
       profileSortHeader(profile, "Self %", "selfPercent", "num"),
       profileSortHeader(profile, "Inclusive %", "inclusivePercent", "num"),
-      profileSortHeader(profile, "Self samples", "selfSamples", "num"),
-      profileSortHeader(profile, "Inclusive samples", "inclusiveSamples", "num"),
+      instrumented ? null : profileSortHeader(profile, "Self samples", "selfSamples", "num"),
+      instrumented ? null : profileSortHeader(profile, "Inclusive samples", "inclusiveSamples", "num"),
     )),
     el("tbody", {}, ...sorted.map(entry => {
       const location = entry.file ? `${entry.file}${entry.line === null ? "" : `:${Math.trunc(entry.line)}`}` : "—";
@@ -429,15 +436,16 @@ function renderMethodsView(profile, model) {
       el("td", { class: "num", text: entry.inclusiveMs === null ? "—" : fmtMs(entry.inclusiveMs, 2) }),
       el("td", { class: "num", text: entry.selfPercent === null ? "—" : `${entry.selfPercent.toFixed(1)}%` }),
       el("td", { class: "num", text: entry.inclusivePercent === null ? "—" : `${entry.inclusivePercent.toFixed(1)}%` }),
-      el("td", { class: "num mono-cell", text: entry.selfSamples === null ? "—" : formatCount(entry.selfSamples) }),
-      el("td", { class: "num mono-cell", text: entry.inclusiveSamples === null ? "—" : formatCount(entry.inclusiveSamples) }),
+      instrumented ? null : el("td", { class: "num mono-cell", text: entry.selfSamples === null ? "—" : formatCount(entry.selfSamples) }),
+      instrumented ? null : el("td", { class: "num mono-cell", text: entry.inclusiveSamples === null ? "—" : formatCount(entry.inclusiveSamples) }),
       );
     })),
   );
   content.push(el("div", { class: "table-wrap" }, table));
   const notes = [];
-  notes.push("Self counts only samples whose innermost frame is this function; inclusive also counts samples where it appears as a caller.");
-  if (hotspot.data.totalSamples !== null) notes.push(`Computed from ${formatCount(hotspot.data.totalSamples)} retained samples over ${fmtSeconds(hotspot.data.durationMs)}.`);
+  if (!instrumented && hotspot.data.totalSamples !== null) {
+    notes.push(`Computed from ${formatCount(hotspot.data.totalSamples)} retained samples over ${fmtSeconds(hotspot.data.durationMs)}.`);
+  }
   if (needle) notes.push(`${formatCount(filtered.length)} of ${formatCount(all.length)} methods match “${String(profile.filter).trim()}”.`);
   if (hotspot.data.omitted) notes.push(`The runtime returned the ${MAX_HOTSPOTS} hottest functions; ${formatCount(hotspot.data.omitted)} more were omitted by the client cap.`);
   else if (hotspot.data.truncated) notes.push(`The runtime's bounded answer contains the ${formatCount(all.length)} hottest functions; more were omitted by the runtime.`);
@@ -556,21 +564,12 @@ export function renderProfilePanel() {
     showState(host, { icon: "timer", title: "CPU profiling is unavailable", message: "CPU sampling comes from a Cove runtime. Select a runtime target." });
     return;
   }
-  const unsupported = profilePlatformUnsupported(target);
-  if (unsupported) {
-    showState(host, {
-      icon: "timer",
-      title: `CPU sampling is unavailable on ${profilePlatformName(target) === "windows" ? "Windows" : profilePlatformName(target) === "linux" ? "Linux" : profilePlatformName(target)}`,
-      message: unsupported,
-    });
-    return;
-  }
   if (!state.caps.profile) {
     const block = el("div");
     showState(block, {
       icon: "timer",
       title: "CPU profiling is unavailable",
-      message: "This runtime does not advertise cpu_profile. If the controller was built with profiling, check support directly; no samples are synthesized when it is absent.",
+      message: "This runtime does not advertise CPU profiling.",
       action: "Check support",
       onAction: () => loadProfile({ quiet: true, force: true }),
     });
@@ -583,7 +582,7 @@ export function renderProfilePanel() {
     showState(block, {
       icon: "timer",
       title: profile.status === "unsupported" ? "CPU sampling is unsupported" : "CPU profile is unavailable",
-      message: profile.reason || "The runtime reported that CPU profiling cannot run here. No samples are synthesized.",
+      message: profile.reason || "The runtime reported that CPU profiling cannot run here.",
       action: "Check support",
       onAction: () => loadProfile({ quiet: true, force: true }),
     });
@@ -592,14 +591,8 @@ export function renderProfilePanel() {
   }
   host.append(renderProfileControls(profile));
   host.append(renderProfileStats(profile));
-  const intervalMs = profile.intervalMs ?? (profile.hz > 0 ? 1000 / profile.hz : null);
-  host.append(el("div", { class: "profile-note" },
-    `Real stack samples from ${profile.thread || "the UI thread"} at ${fmtNumber(intervalMs, 2)} ms (${fmtNumber(profile.hz, 0)} Hz). macOS code and symbols are resolved from the process image; Linux and Windows report unsupported and never synthesize samples.`));
-  if (profile.reason && ["unsupported", "unavailable"].includes(profile.status)) {
-    host.append(emptyInline(profile.reason));
-  }
   if (profile.loading && ["starting", "stopping"].includes(profile.status)) {
-    host.append(el("div", { class: "inline-spinner" }, el("span", { class: "spinner" }), profile.status === "stopping" ? "Stopping and reading the profile…" : "Starting the sampler…"));
+    host.append(el("div", { class: "inline-spinner" }, el("span", { class: "spinner" }), profile.status === "stopping" ? "Stopping and reading the profile…" : "Starting the profile…"));
   }
   if (profile.error) {
     host.append(errorInline(errorMessage(profile.error)));
@@ -612,21 +605,9 @@ export function renderProfilePanel() {
       }));
     }
   }
-  if (profile.status === "idle" && !profile.loading) {
-    const block = el("div");
-    showState(block, {
-      icon: "timer",
-      title: "No CPU profile",
-      message: "Start a bounded sample of the UI thread, perform the operation, then stop. Samples are recorded by the in-process sampler, not inferred from frames.",
-      action: "Start profile",
-      onAction: startProfile,
-    });
-    host.append(block);
-  }
   const hasProfileData = profile.samples.length > 0 || profile.stacks.length > 0;
   if (hasProfileData || ["sampling", "starting", "stopping", "complete"].includes(profile.status)) {
     host.append(renderProfileViews(profile));
   }
-  host.append(el("div", { class: "perf-note", text: "CPU profiles are sampled from the live process. They do not require Screen Recording and are distinct from trace spans: a trace records named spans, a profile samples raw stacks." }));
 }
 
