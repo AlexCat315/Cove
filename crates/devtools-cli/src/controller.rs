@@ -2,7 +2,7 @@ use crate::debugger::{ControlAction, DebuggerManager};
 use crate::registry::{Registry, random_id};
 use base64::{Engine, engine::general_purpose::STANDARD};
 use cove_agent::{AgentTool, JsonSchemaValidator, ui_tools::Tool};
-use cove_debugger::{DapSession, SessionSnapshot};
+use cove_debugger::{DebugSession, SessionSnapshot};
 use cove_devtools_protocol::control::{
     Fault, MAX_CAPTURE_BYTES, ProbeCommand, RuntimeCapture, RuntimeInput, Viewport,
 };
@@ -249,7 +249,7 @@ impl Controller {
             return Err(Fault::new(
                 "unavailable",
                 format!(
-                    "lldb-dap attach is limited to desktop runtimes on this machine; the selected {} runtime's process is not local.",
+                    "Debugger attach is limited to desktop runtimes on this machine; the selected {} runtime's process is not local.",
                     registration.platform
                 ),
             ));
@@ -257,7 +257,7 @@ impl Controller {
         let pid = registration.pid.ok_or_else(|| {
             Fault::new(
                 "unavailable",
-                "The selected runtime reports no operating-system process ID, so lldb-dap cannot attach.",
+                "The selected runtime reports no operating-system process ID, so the debugger cannot attach.",
             )
         })?;
         let key = if local {
@@ -271,7 +271,7 @@ impl Controller {
     fn debug_session(
         &self,
         id: Option<&str>,
-    ) -> Result<(String, u32, std::sync::Arc<DapSession>), Fault> {
+    ) -> Result<(String, u32, std::sync::Arc<DebugSession>), Fault> {
         let (runtime, pid, key) = self.debug_target(id)?;
         let session = self.debugger.session(key).map_err(crate::debugger::fault)?;
         Ok((runtime, pid, session))
@@ -288,7 +288,7 @@ impl Controller {
     }
 
     /// Reads one frame's scopes and their first page of variables.
-    fn scope_variables(session: &DapSession, frame_id: u64) -> Result<Value, Fault> {
+    fn scope_variables(session: &DebugSession, frame_id: u64) -> Result<Value, Fault> {
         let scopes = session.scopes(frame_id).map_err(crate::debugger::fault)?;
         let truncated = scopes.len() > 6;
         let mut values = Vec::new();
@@ -301,6 +301,13 @@ impl Controller {
                 "source": scope.source,
                 "line": scope.line,
             });
+            if scope.expensive {
+                // Statics and registers are read when the scope is expanded.
+                value["variables"] = json!([]);
+                value["deferred"] = json!(true);
+                values.push(value);
+                continue;
+            }
             match session.variables(scope.variables_reference, 0, 50, None) {
                 Ok(page) => {
                     value["variables"] = json!(page.variables);
@@ -2354,18 +2361,17 @@ mod tests {
         use cove_debugger::testing::MockAdapter;
         use std::sync::Arc;
         DebuggerManager::with_source(
-            cove_debugger::Availability {
-                adapter: Some(cove_debugger::Adapter {
+            cove_debugger::Availability::dap(
+                Some(cove_debugger::Adapter {
                     path: "/mock/lldb-dap".into(),
                     version: "mock-lldb".into(),
                 }),
-                developer_mode: Some(false),
-                platform: "macos".into(),
-                reason: None,
-            },
+                Some(false),
+                "macos",
+            ),
             Arc::new(|| {
                 let (session, _handle) = MockAdapter::pair();
-                Ok(session)
+                Ok(session.into())
             }),
         )
     }

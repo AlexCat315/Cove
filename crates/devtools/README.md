@@ -68,11 +68,23 @@ WebAssembly 运行在页面唯一线程上，无法被外部挂起读栈，因�
 
 需要停在源码断点时，用 `cargo cove run --devtools` 启动 Gallery。这个入口在启动器进程中运行控制器，应用暂停后 Inspector 仍能响应。
 
-`get_ui_session` 的 `debugger` 字段报告 `lldb-dap` 路径、版本、Developer mode 和已有会话。`attach_ui_debugger` 对本机桌面运行时按 PID 启动异步 attach，默认最多等待 8 秒；被 macOS 的 task_for_pid 授权拒绝时返回 `unavailable` 并保留适配器原文，等待超时返回 `timeout` 并清理适配器与 debugserver。`get_ui_debugger` 读取会话状态、停止原因和断点，`set_ui_breakpoint`/`clear_ui_breakpoint` 按绝对源码路径设置或清除断点，`control_ui_debugger` 执行 pause、resume、step_over、step_in、step_out。`get_ui_debug_stack` 返回线程、帧和顶层作用域，`read_ui_debug_variables` 分页读取变量，`evaluate_ui_debug` 在已停止的帧中求值。运行中的进程返回 `not_stopped`，不返回旧帧或伪造的暂停状态；`detach_ui_debugger` 要求适配器不终止目标。
+调试后端有两个：进程内 liblldb（SB API）和 `lldb-dap` 子进程。控制器能加载 liblldb 时用前者，否则回退到 `lldb-dap`；`COVE_DEBUGGER_BACKEND=dap` 强制使用 `lldb-dap`。liblldb 的查找顺序是 `COVE_LIBLLDB`、构建时发现的路径（`COVE_LLDB_DIR` 或标准 LLVM 安装目录）、平台常见安装位置。构建时找不到 liblldb 会编译一个只报告 `unavailable` 的 stub。
+
+原生后端的构建依赖：
+
+| 平台 | 必需 | 启用原生后端还需要 |
+| --- | --- | --- |
+| Linux | C/C++ 编译器 | LLDB 开发包（如 `liblldb-<版本>-dev`，提供 `/usr/lib/llvm-<版本>/lib/liblldb.so`） |
+| macOS | Xcode Command Line Tools | 自带的 `LLDB.framework`；Homebrew 的 `llvm` 优先 |
+| Windows | MSVC | LLVM 官方安装包（`%ProgramFiles%\LLVM`） |
+
+LLDB SB API 头文件随仓库分发（`crates/debugger/native/include/`，来源与更新方式见该目录的 `README.md`），不需要另行下载。
+
+`get_ui_session` 的 `debugger` 字段报告 `backend`（`native` 或 `dap`）、`native`（liblldb 版本与路径）或 `native_reason`、`lldb-dap` 路径与版本、Developer mode 和已有会话。`attach_ui_debugger` 对本机桌面运行时按 PID 启动异步 attach，默认最多等待 8 秒；被 macOS 的 task_for_pid 授权拒绝时返回 `unavailable` 并保留适配器原文，等待超时返回 `timeout` 并清理适配器与 debugserver。`get_ui_debugger` 读取会话状态、停止原因和断点，`set_ui_breakpoint`/`clear_ui_breakpoint` 按绝对源码路径设置或清除断点，`control_ui_debugger` 执行 pause、resume、step_over、step_in、step_out。`get_ui_debug_stack` 返回线程、帧和顶层作用域，`read_ui_debug_variables` 分页读取变量，`evaluate_ui_debug` 在已停止的帧中求值。运行中的进程返回 `not_stopped`，不返回旧帧或伪造的暂停状态；`detach_ui_debugger` 要求适配器不终止目标。
 
 Android 和 iOS/iPadOS 可以把设备上的原生调试 stub 转发到控制器主机的 loopback。Debugger 填写转发端口及可选的本地符号文件绝对路径，或者调用 `attach_ui_debugger` 并传入 `remote_port` 和 `program`。设备的签名、stub 和转发由平台工具配置。 [LLDB 远程调试](https://lldb.llvm.org/use/remote.html)
 
-`get_ui_debugger` 返回适配器公布的 `supports_log_points` 与 `exception_filters`。在暂停的源码位置设置日志断点，或传 `set_ui_breakpoint.log_message`。`set_ui_exception_breakpoints` 接受适配器公布的 filter ID 数组。适配器输出进入 Debugger Console，也可用 `get_ui_debugger_output` 的 `after` 游标读取。Rust panic 是否可捕获取决于适配器和目标配置。
+`get_ui_debugger` 返回适配器公布的 `supports_log_points` 与 `exception_filters`。在暂停的源码位置设置日志断点，或传 `set_ui_breakpoint.log_message`。`set_ui_exception_breakpoints` 接受适配器公布的 filter ID 数组。适配器输出进入 Debugger Console，也可用 `get_ui_debugger_output` 的 `after` 游标读取。原生后端的 filter 是 `rust_panic`、`cpp_throw`、`cpp_catch`、`objc_throw`、`objc_catch`；日志断点消息里的 `{表达式}` 在命中帧中求值，命中后不暂停目标。`lldb-dap` 后端下 Rust panic 是否可捕获取决于适配器和目标配置。
 
 ## 布局与组件诊断
 

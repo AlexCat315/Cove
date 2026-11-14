@@ -1,5 +1,6 @@
 //! One Debug Adapter Protocol session over a child `lldb-dap`.
 use crate::adapter::Adapter;
+use crate::backend::{normalized_source_path, state_name};
 use crate::error::{DebuggerError, Result};
 use crate::framing::{read_message, write_message};
 use crate::model::{
@@ -10,7 +11,6 @@ use crate::process::{AdapterProcess, join_bounded, read_stderr_tail};
 use serde_json::{Value, json};
 use std::collections::{BTreeMap, HashMap, VecDeque};
 use std::io::{BufReader, Read, Write};
-use std::path::Path;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::mpsc::{self, RecvTimeoutError};
 use std::sync::{Arc, Condvar, Mutex};
@@ -31,18 +31,6 @@ const MAX_VERSION_CHARS: usize = 2048;
 
 fn invalid(message: impl Into<String>) -> DebuggerError {
     DebuggerError::new("invalid_request", message)
-}
-
-fn state_name(state: SessionState) -> &'static str {
-    match state {
-        SessionState::Starting => "starting",
-        SessionState::Attached => "attached",
-        SessionState::Running => "running",
-        SessionState::Stopped => "stopped",
-        SessionState::Exited => "exited",
-        SessionState::Terminated => "terminated",
-        SessionState::Closed => "closed",
-    }
 }
 
 fn text(value: &Value, key: &str) -> Option<String> {
@@ -1002,15 +990,6 @@ impl DapSession {
             .collect()
     }
 
-    fn normalized_path(path: &str) -> Result<String> {
-        if path.is_empty() || !Path::new(path).is_absolute() {
-            return Err(invalid("Use an absolute source path."));
-        }
-        Ok(std::fs::canonicalize(path)
-            .map(|path| path.to_string_lossy().into_owned())
-            .unwrap_or_else(|_| path.to_owned()))
-    }
-
     fn breakpoints_for(
         registry: &BTreeMap<String, BTreeMap<u32, BreakpointSpec>>,
         path: &str,
@@ -1058,7 +1037,7 @@ impl DapSession {
                 "The adapter does not advertise log points.",
             ));
         }
-        let path = Self::normalized_path(path)?;
+        let path = normalized_source_path(path)?;
         let _control = self.control.lock().unwrap();
         let mut registry = self.breakpoints.lock().unwrap();
         let previous = registry.clone();
@@ -1103,7 +1082,7 @@ impl DapSession {
     /// Clears one line, or every breakpoint in the source when `line` is None.
     pub fn clear_breakpoints(&self, path: &str, line: Option<u32>) -> Result<Vec<Breakpoint>> {
         self.ensure_attached()?;
-        let path = Self::normalized_path(path)?;
+        let path = normalized_source_path(path)?;
         let _control = self.control.lock().unwrap();
         let mut registry = self.breakpoints.lock().unwrap();
         let previous = registry.clone();

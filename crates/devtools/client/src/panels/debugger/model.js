@@ -298,6 +298,14 @@ export function debuggerHasData(data) {
 function debuggerAdapterFrom(data, fallback = null) {
   const root = debuggerRoot(data);
   const session = debuggerSessionObject(root);
+  if ((session.backend ?? root.backend) === "native" && isObjectValue(root.native)) {
+    return {
+      name: "liblldb",
+      version: firstStringValue(root.native.version, session.adapter_version),
+      path: firstStringValue(root.native.library),
+      protocol: "sb",
+    };
+  }
   const raw = root.adapter ?? root.debug_adapter ?? root.dap ?? session.adapter ?? session.debug_adapter;
   const name = firstStringValue(root.adapter_name, session.adapter_name);
   const version = firstStringValue(root.adapter_version, session.adapter_version);

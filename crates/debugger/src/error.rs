@@ -35,6 +35,14 @@ impl DebuggerError {
         )
     }
 
+    /// In-process LLDB refused an operation; its words are preserved.
+    pub fn native(command: &str, reason: impl Into<String>) -> Self {
+        Self::new(
+            "adapter_error",
+            format!("LLDB rejected {command}: {}", reason.into()),
+        )
+    }
+
     /// A bounded wait elapsed without the expected response.
     pub fn timeout(what: impl Into<String>, elapsed: std::time::Duration) -> Self {
         Self::new(

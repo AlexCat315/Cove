@@ -1,4 +1,5 @@
 //! Debug adapter discovery.
+use crate::backend::{BackendKind, NativeBackend};
 use crate::error::{DebuggerError, Result};
 use crate::process::run_capture;
 use serde::Serialize;
@@ -74,6 +75,10 @@ impl Adapter {
 /// What the controller can offer before a session exists.
 #[derive(Clone, Debug, Serialize)]
 pub struct Availability {
+    /// In-process liblldb, preferred when present.
+    pub native: Option<NativeBackend>,
+    /// Why liblldb could not be loaded, when it could not.
+    pub native_reason: Option<String>,
     pub adapter: Option<Adapter>,
     pub developer_mode: Option<bool>,
     pub platform: String,
@@ -86,17 +91,48 @@ impl Availability {
     /// `COVE_LLDB_DAP` is authoritative when set: a broken override is reported
     /// instead of silently trying another binary.
     pub fn discover() -> Self {
+        let (native, native_reason) = match NativeBackend::discover() {
+            Ok(native) => (Some(native), None),
+            Err(reason) => (None, Some(reason)),
+        };
+        let mut availability = Self::discover_adapter();
+        if native.is_some() {
+            // A missing lldb-dap is not a problem while liblldb is usable.
+            availability.reason = None;
+        }
+        availability.native = native;
+        availability.native_reason = native_reason;
+        availability
+    }
+
+    /// An availability with no native backend, for adapter-only callers.
+    pub fn dap(adapter: Option<Adapter>, developer_mode: Option<bool>, platform: &str) -> Self {
+        Self {
+            native: None,
+            native_reason: None,
+            adapter,
+            developer_mode,
+            platform: platform.to_owned(),
+            reason: None,
+        }
+    }
+
+    fn discover_adapter() -> Self {
         let developer_mode = developer_mode();
         if let Some(override_path) = std::env::var_os("COVE_LLDB_DAP") {
             let path = PathBuf::from(override_path);
             return match Adapter::from_path(path.clone()) {
                 Ok(adapter) => Self {
+                    native: None,
+                    native_reason: None,
                     adapter: Some(adapter),
                     developer_mode,
                     platform: std::env::consts::OS.to_owned(),
                     reason: None,
                 },
                 Err(error) => Self {
+                    native: None,
+                    native_reason: None,
                     adapter: None,
                     developer_mode,
                     platform: std::env::consts::OS.to_owned(),
@@ -120,6 +156,8 @@ impl Availability {
             match Adapter::from_path(path.clone()) {
                 Ok(adapter) => {
                     return Self {
+                        native: None,
+                        native_reason: None,
                         adapter: Some(adapter),
                         developer_mode,
                         platform: std::env::consts::OS.to_owned(),
@@ -133,6 +171,8 @@ impl Availability {
             }
         }
         Self {
+            native: None,
+            native_reason: None,
             adapter: None,
             developer_mode,
             platform: std::env::consts::OS.to_owned(),
@@ -144,12 +184,23 @@ impl Availability {
     }
 
     pub fn is_available(&self) -> bool {
-        self.adapter.is_some()
+        self.native.is_some() || self.adapter.is_some()
+    }
+
+    /// The backend a new session would use.
+    pub fn backend(&self) -> Option<BackendKind> {
+        if self.native.is_some() {
+            Some(BackendKind::Native)
+        } else if self.adapter.is_some() {
+            Some(BackendKind::Dap)
+        } else {
+            None
+        }
     }
 
     /// A truthful caveat about attach rights, or `None`.
     pub fn warning(&self) -> Option<String> {
-        if self.adapter.is_none() {
+        if !self.is_available() {
             return self.reason.clone();
         }
         if self.platform == "macos" && self.developer_mode == Some(false) {

@@ -1,4 +1,5 @@
 mod mock;
+mod native;
 
 #[cfg(unix)]
 mod process;

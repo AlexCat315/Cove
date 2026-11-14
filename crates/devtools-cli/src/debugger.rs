@@ -1,6 +1,6 @@
 //! Controller-level debugger sessions keyed by runtime process ID.
 use cove_debugger::{
-    Adapter, Availability, DapSession, DebuggerError, SessionSnapshot, SessionState, Step,
+    Availability, DebugSession, DebuggerError, SessionSnapshot, SessionState, Step,
 };
 use cove_devtools_protocol::control::Fault;
 use serde_json::{Value, json};
@@ -13,7 +13,7 @@ pub(crate) const MIN_ATTACH_TIMEOUT: Duration = Duration::from_millis(500);
 pub(crate) const MAX_ATTACH_TIMEOUT: Duration = Duration::from_secs(30);
 const ABORT_WAIT: Duration = Duration::from_secs(2);
 
-type Connector = dyn Fn() -> Result<DapSession, DebuggerError> + Send + Sync;
+type Connector = dyn Fn() -> Result<DebugSession, DebuggerError> + Send + Sync;
 
 /// Converts a debugger failure for the controller's JSON-RPC error shape.
 pub(crate) fn fault(error: DebuggerError) -> Fault {
@@ -40,7 +40,7 @@ fn decorate(mut error: DebuggerError, developer_mode: Option<bool>) -> DebuggerE
     error
 }
 
-fn live(session: &DapSession) -> bool {
+fn live(session: &DebugSession) -> bool {
     !session.is_closed()
         && !matches!(
             session.snapshot().state,
@@ -61,8 +61,8 @@ fn state_name(state: SessionState) -> &'static str {
 }
 
 enum Phase {
-    Attaching { session: Option<Arc<DapSession>> },
-    Attached(Arc<DapSession>),
+    Attaching { session: Option<Arc<DebugSession>> },
+    Attached(Arc<DebugSession>),
     Failed { error: DebuggerError },
 }
 
@@ -128,6 +128,7 @@ impl SessionHandle {
                         "state": state_name(snapshot.state),
                         "stop": snapshot.stop,
                         "last_error": Value::Null,
+                        "backend": session.backend(),
                         "adapter_version": snapshot.adapter_version,
                         "breakpoints": snapshot.breakpoints,
                         "capabilities": session.capabilities(),
@@ -177,6 +178,7 @@ impl DebuggerManager {
         let availability = self.availability();
         let mut value = serde_json::to_value(availability).unwrap_or_else(|_| json!({}));
         value["available"] = json!(availability.is_available());
+        value["backend"] = json!(availability.backend());
         value["warning"] = json!(availability.warning());
         value["sessions"] = json!(self.list());
         value
@@ -201,7 +203,7 @@ impl DebuggerManager {
     pub(crate) fn session(
         &self,
         key: impl Into<SessionKey>,
-    ) -> Result<Arc<DapSession>, DebuggerError> {
+    ) -> Result<Arc<DebugSession>, DebuggerError> {
         let handle = self
             .sessions
             .lock()
@@ -257,12 +259,12 @@ impl DebuggerManager {
         } else {
             availability.developer_mode
         };
-        if self.connector.is_none() && availability.adapter.is_none() {
+        if self.connector.is_none() && !availability.is_available() {
             return Err(DebuggerError::unavailable(
                 availability
                     .reason
                     .clone()
-                    .unwrap_or_else(|| "lldb-dap is unavailable.".to_owned()),
+                    .unwrap_or_else(|| "No debugger backend is available.".to_owned()),
             ));
         }
         let started = Instant::now();
@@ -290,12 +292,7 @@ impl DebuggerManager {
             }
         };
         if creator {
-            self.spawn_attach(
-                Arc::clone(&handle),
-                availability.adapter.clone(),
-                developer_mode,
-                remote,
-            );
+            self.spawn_attach(Arc::clone(&handle), availability, developer_mode, remote);
         }
         let deadline = started + timeout;
         let mut phase = handle.phase.lock().unwrap();
@@ -360,7 +357,7 @@ impl DebuggerManager {
                     .map(|session| session.diagnostics())
                     .unwrap_or_default();
                 let mut message = format!(
-                    "lldb-dap did not finish attaching to PID {pid} within {} ms. An authorization prompt may be waiting.",
+                    "The debugger did not finish attaching to PID {pid} within {} ms. An authorization prompt may be waiting.",
                     timeout.as_millis()
                 );
                 if !diagnostics.is_empty() {
@@ -383,7 +380,7 @@ impl DebuggerManager {
     fn spawn_attach(
         &self,
         handle: Arc<SessionHandle>,
-        adapter: Option<Adapter>,
+        availability: Availability,
         developer_mode: Option<bool>,
         remote: Option<ForwardedDebugger>,
     ) {
@@ -393,17 +390,10 @@ impl DebuggerManager {
         let spawned = std::thread::Builder::new()
             .name("cove.debugger.attach".into())
             .spawn(move || {
-                let result = (|| -> Result<Arc<DapSession>, DebuggerError> {
+                let result = (|| -> Result<Arc<DebugSession>, DebuggerError> {
                     let session = match &connector {
                         Some(connector) => connector()?,
-                        None => {
-                            let adapter = adapter.ok_or_else(|| {
-                                DebuggerError::unavailable(
-                                    "lldb-dap is unavailable; check get_ui_session debugger availability.",
-                                )
-                            })?;
-                            DapSession::spawn(&adapter)?
-                        }
+                        None => DebugSession::open(&availability)?,
                     };
                     let session = Arc::new(session);
                     {
@@ -566,7 +556,7 @@ impl ControlAction {
         }
     }
 
-    pub(crate) fn apply(&self, session: &DapSession) -> Result<SessionSnapshot, DebuggerError> {
+    pub(crate) fn apply(&self, session: &DebugSession) -> Result<SessionSnapshot, DebuggerError> {
         match *self {
             Self::Pause { thread_id } => session.pause(thread_id),
             Self::Resume => session.resume(),
@@ -582,15 +572,14 @@ mod tests {
     use std::sync::atomic::{AtomicUsize, Ordering};
 
     fn availability() -> Availability {
-        Availability {
-            adapter: Some(Adapter {
+        Availability::dap(
+            Some(cove_debugger::Adapter {
                 path: "/mock/lldb-dap".into(),
                 version: "mock-lldb".into(),
             }),
-            developer_mode: Some(false),
-            platform: "macos".into(),
-            reason: None,
-        }
+            Some(false),
+            "macos",
+        )
     }
 
     fn mock_manager() -> (DebuggerManager, Arc<AtomicUsize>) {
@@ -601,7 +590,7 @@ mod tests {
             Arc::new(move || {
                 counter.fetch_add(1, Ordering::SeqCst);
                 let (session, _handle) = MockAdapter::pair();
-                Ok(session)
+                Ok(session.into())
             }),
         );
         (manager, calls)
@@ -641,7 +630,7 @@ mod tests {
                     MockOptions::default()
                         .fail_attach("attach failed (Not allowed to attach to process.)"),
                 );
-                Ok(session)
+                Ok(session.into())
             }),
         );
         let error = manager
@@ -661,7 +650,7 @@ mod tests {
             availability(),
             Arc::new(|| {
                 let (session, _handle) = MockAdapter::with(MockOptions::default().ignore("attach"));
-                Ok(session)
+                Ok(session.into())
             }),
         );
         let started = Instant::now();
@@ -706,10 +695,74 @@ mod tests {
         let value = manager.availability_json();
         assert!(value.get("available").is_some());
         assert!(value["sessions"].as_array().unwrap().is_empty());
-        if value["available"] == true {
-            assert!(value["adapter"]["path"].is_string());
-            assert!(value["adapter"]["version"].is_string());
+        match value["backend"].as_str() {
+            Some("native") => assert!(value["native"]["version"].is_string()),
+            Some("dap") => {
+                assert!(value["adapter"]["path"].is_string());
+                assert!(value["adapter"]["version"].is_string());
+            }
+            _ => assert_eq!(value["available"], false),
         }
+    }
+
+    #[test]
+    fn a_native_session_attaches_pauses_and_detaches_through_the_manager() {
+        use cove_debugger::BackendKind;
+        use std::process::{Child, Command, Stdio};
+
+        struct Disposable(Child);
+        impl Drop for Disposable {
+            fn drop(&mut self) {
+                let _ = self.0.kill();
+                let _ = self.0.wait();
+            }
+        }
+
+        let manager = DebuggerManager::new();
+        if manager.availability().backend() != Some(BackendKind::Native) {
+            eprintln!("native LLDB is unavailable; skipping the native manager check");
+            return;
+        }
+        let mut command = if cfg!(windows) {
+            let mut command = Command::new("ping");
+            command.args(["-n", "120", "127.0.0.1"]);
+            command
+        } else {
+            let mut command = Command::new("sleep");
+            command.arg("120");
+            command
+        };
+        let mut target = Disposable(
+            command
+                .stdin(Stdio::null())
+                .stdout(Stdio::null())
+                .stderr(Stdio::null())
+                .spawn()
+                .unwrap(),
+        );
+        let pid = target.0.id();
+        if let Err(error) = manager.attach("gallery", pid, Duration::from_secs(15)) {
+            // A host that forbids attach says so; nothing is left half-attached.
+            assert_eq!(error.code(), "unavailable", "{}", error.message());
+            assert_eq!(manager.summary(pid).unwrap()["state"], "failed");
+            return;
+        }
+        let summary = manager.summary(pid).unwrap();
+        assert_eq!(summary["backend"], "native");
+        assert_eq!(summary["capabilities"]["supports_log_points"], true);
+        assert_eq!(manager.availability_json()["backend"], "native");
+
+        let session = manager.session(pid).unwrap();
+        let stopped = ControlAction::parse("pause", None)
+            .unwrap()
+            .apply(&session)
+            .unwrap();
+        assert_eq!(stopped.state, SessionState::Stopped);
+        assert_eq!(manager.summary(pid).unwrap()["state"], "stopped");
+        assert!(!session.stack_trace(None, 0, 4).unwrap().frames.is_empty());
+
+        assert_eq!(manager.detach(pid).unwrap(), "detached");
+        assert!(target.0.try_wait().unwrap().is_none());
     }
 
     #[cfg(target_os = "macos")]
@@ -727,7 +780,7 @@ mod tests {
 
         let manager = DebuggerManager::new();
         if !manager.availability().is_available() {
-            eprintln!("lldb-dap is unavailable; skipping the real attach check");
+            eprintln!("no debugger backend is available; skipping the real attach check");
             return;
         }
         let target = Disposable(Command::new("/bin/sleep").arg("30").spawn().unwrap());

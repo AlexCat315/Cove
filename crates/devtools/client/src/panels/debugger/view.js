@@ -336,7 +336,7 @@ export function renderDebuggerBreakpoints(force = false) {
     if (hit) meta.push("hit");
     const row = el("label", {
       class: `dbg-bp-row ${breakpoint.enabled ? "" : "is-disabled"} ${hit ? "is-hit" : ""}`.trim(),
-      attrs: breakpoint.enabled ? null : { title: "Disabled breakpoints are cleared in lldb-dap and restored when enabled." },
+      attrs: breakpoint.enabled ? null : { title: "Disabled breakpoints are cleared in the debugger and restored when enabled." },
     },
     el("input", {
       attrs: {
