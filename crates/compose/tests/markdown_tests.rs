@@ -418,6 +418,82 @@ fn table_columns() {
 }
 
 #[test]
+fn bullets_center_on_the_first_line() {
+    render("- hello\n  - nested", 320.0, |mounted| {
+        let text = |needle: &str| {
+            mounted
+                .iter()
+                .find(|node| label(node) == needle)
+                .unwrap_or_else(|| panic!("the text {needle:?} is mounted"))
+                .absolute_frame()
+        };
+        // A drawn dot is a small square box; both levels draw one. Each dot
+        // appears twice (node and its render mirror), so dedupe by position.
+        let mut dots: Vec<_> = mounted
+            .iter()
+            .filter(|node| {
+                let frame = node.frame();
+                (frame.width - 6.0).abs() < 0.5 && (frame.height - 6.0).abs() < 0.5
+            })
+            .map(|node| node.absolute_frame())
+            .collect();
+        dots.dedup_by(|a, b| (a.x - b.x).abs() < 0.5 && (a.y - b.y).abs() < 0.5);
+        assert_eq!(dots.len(), 2, "both levels draw a dot, got {dots:?}");
+        let hello = text("hello");
+        let nested = text("nested");
+        for (dot, line) in [(dots[0], hello), (dots[1], nested)] {
+            let dot_center = dot.y + dot.height / 2.0;
+            let line_center = line.y + line.height / 2.0;
+            assert!(
+                (dot_center - line_center).abs() < 2.0,
+                "the dot centres on its first text line, dot {dot:?} line {line:?}"
+            );
+        }
+    });
+}
+
+#[test]
+fn table_cell_alignments() {
+    // One column per alignment; the narrow cell shows the alignment against
+    // the widest cell that sizes the column.
+    render(
+        "| left | center | right |\n| :--- | :---: | ---: |\n| x | y | z |\n| wide left cell | wide center cell | wide right cell |",
+        800.0,
+        |mounted| {
+            let cell = |text: &str| {
+                mounted
+                    .iter()
+                    .find(|node| label(node) == text)
+                    .unwrap_or_else(|| panic!("the cell {text:?} is present"))
+                    .absolute_frame()
+            };
+            let narrow = cell("y");
+            let wide = cell("wide center cell");
+            let column_center = (wide.x + wide.max_x()) / 2.0;
+            let narrow_center = (narrow.x + narrow.max_x()) / 2.0;
+            assert!(
+                (narrow_center - column_center).abs() < 2.0,
+                "the centred cell sits on the column centre, narrow {narrow:?} wide {wide:?}"
+            );
+
+            let narrow = cell("z");
+            let wide = cell("wide right cell");
+            assert!(
+                (narrow.max_x() - wide.max_x()).abs() < 2.0,
+                "the right-aligned cell shares the column's trailing edge, narrow {narrow:?} wide {wide:?}"
+            );
+
+            let narrow = cell("x");
+            let wide = cell("wide left cell");
+            assert!(
+                (narrow.x - wide.x).abs() < 2.0,
+                "the leading cell shares the column's leading edge, narrow {narrow:?} wide {wide:?}"
+            );
+        },
+    );
+}
+
+#[test]
 fn heading_paragraph_and_table_links_report_opens() {
     GlobalTestLock::locked(|| {
         support::with_test_text_environment(|| {

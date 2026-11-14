@@ -11,6 +11,7 @@ use cove_composition::Scope;
 use cove_core::State;
 use cove_ui_compose::modifiers::layout::LayoutFrameExt;
 use cove_ui_compose::modifiers::style::SemanticStyleViewExt;
+use cove_ui_compose::primitives::layout::{ScrollAxis, ScrollView};
 use cove_ui_compose::primitives::text::Text;
 use cove_ui_compose::primitives::text::markdown::markdown_view::MarkdownView;
 use cove_ui_compose::primitives::text::markdown::parse::blocks;
@@ -140,7 +141,14 @@ impl View for MarkdownStory {
                     "Document",
                     "Headings, inline styles, nested and task lists, quotes, a scrolling code block, a table and a rule — rendered from one Markdown string.",
                     AnyView::new(TupleView::new(vec![
-                        AnyView::new(AnyView::new(viewer).frame_height(420.0)),
+                        // The rendered document grows to its content (roughly
+                        // 685pt here), so the 420pt frame is a scroll viewport,
+                        // not a clamp: without the scroll view the overflow
+                        // paints straight through the card and caption.
+                        AnyView::new(
+                            AnyView::new(ScrollView::new(ScrollAxis::Vertical, AnyView::new(viewer)))
+                                .frame_height(420.0),
+                        ),
                         AnyView::new(caption),
                     ])),
                 )),

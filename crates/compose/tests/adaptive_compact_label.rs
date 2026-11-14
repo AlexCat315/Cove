@@ -28,6 +28,7 @@ use cove_ui_compose::modifiers::layout::LayoutFrameExt;
 use cove_ui_compose::primitives::controls::FieldLabel;
 use cove_ui_compose::primitives::controls::KeyCap;
 use cove_ui_compose::primitives::controls::Tag;
+use cove_ui_compose::primitives::controls::fields::select::KeyboardShortcutPlatform;
 use cove_ui_compose::primitives::feedback::{Badge, StatusTone};
 use cove_ui_compose::primitives::text::TextField;
 use cove_ui_compose::primitives::text::text_buffer::TextBuffer;
@@ -120,8 +121,17 @@ fn long_labels_wrap_without_losing_text_or_controls() {
                                     ),
                                 ));
                                 column.push(AnyView::new(
-                                    AnyView::new(KeyCap::new(["⌘", "⇧", KEY]))
-                                        .debug_name("long-caps"),
+                                    AnyView::new(
+                                        // The test asserts the macOS spoken
+                                        // form ("Command Shift …"), so pin the
+                                        // platform instead of following the
+                                        // host — the glyph-to-speech mapping
+                                        // under test only exists on macOS.
+                                        KeyCap::new(["⌘", "⇧", KEY]).configure(|cap| {
+                                            cap.platform = KeyboardShortcutPlatform::MacOS;
+                                        }),
+                                    )
+                                    .debug_name("long-caps"),
                                 ));
                                 column.push(AnyView::new(
                                     FieldLabel::new(TITLE).configure(|options| {

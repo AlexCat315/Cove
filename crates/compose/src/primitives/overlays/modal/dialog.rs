@@ -182,7 +182,10 @@ impl View for Dialog {
             let header_insets = if sheet {
                 EdgeInsets::new(0.0, 20.0, 4.0, 20.0)
             } else {
-                EdgeInsets::all(18.0)
+                // The body scroll view keeps its own top inset, so the header
+                // drops its bottom one — stacking both doubled the
+                // title-to-body gap to 36pt.
+                EdgeInsets::new(18.0, 18.0, 0.0, 18.0)
             };
             column.push(AnyView::new(
                 AnyView::new(BoxView::new(

@@ -115,7 +115,7 @@ impl PrimitiveView for MarkdownListRow {
 
     fn update_node(&self, _node: &Node) {}
 
-    fn children(&self, _node: &Node) -> Vec<AnyView> {
+    fn children(&self, node: &Node) -> Vec<AnyView> {
         let marker = match self.item.is_checked {
             Some(checked) => AnyView::new(MarkdownTaskMarker {
                 is_checked: checked,
@@ -130,6 +130,23 @@ impl PrimitiveView for MarkdownListRow {
                 _ => AnyView::new(MarkdownBullet { depth: self.depth }),
             },
         };
+        // The marker centers on the item's first line, not on the whole item:
+        // the row top-aligns its columns, so the marker box takes the first
+        // line's height and centers within it.
+        let theme = theme_for_node(node);
+        let scaler = crate::theme::node_text_scaler(node);
+        let first_line = scaler.scale(theme.typography.resolved_body().line_height);
+        let marker = AnyView::new(
+            BoxView::new(
+                FlexDirection::Row,
+                Align::Center,
+                Justify::FlexStart,
+                Wrap::NoWrap,
+                0.0,
+                marker,
+            )
+            .frame(None, None, None, Some(first_line), None, None),
+        );
         let mut blocks: Vec<AnyView> = Vec::new();
         for block in &self.item.blocks {
             blocks.push(match self.render_block.as_ref() {

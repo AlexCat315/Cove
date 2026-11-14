@@ -286,6 +286,9 @@ mod zstack;
 #[test]
 fn every_test_file_is_declared() {
     let directory = concat!(env!("CARGO_MANIFEST_DIR"), "/tests");
+    // The working tree may use CRLF (core.autocrlf), so match against
+    // line-ending-normalised source instead of raw bytes.
+    let source = include_str!("main.rs").replace("\r\n", "\n");
     for entry in std::fs::read_dir(directory).expect("the test directory") {
         let path = entry.expect("a directory entry").path();
         let stem = path
@@ -294,7 +297,7 @@ fn every_test_file_is_declared() {
             .unwrap_or("");
         if path.extension().is_some_and(|extension| extension == "rs") && stem != "main" {
             assert!(
-                include_str!("main.rs").contains(&format!("\nmod {stem};\n")),
+                source.contains(&format!("\nmod {stem};\n")),
                 "declare `mod {stem};` in tests/main.rs"
             );
         }

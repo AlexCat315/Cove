@@ -398,8 +398,18 @@ impl Text {
                 };
                 let (result, _) =
                     snapshot.layout_result(&environment, Some(&layout), &metrics, width);
+                // A centred or trailing paragraph aligns against the line box,
+                // so it must fill the proposed width; hugging to the widest
+                // line would throw the alignment away when paint re-lays the
+                // text out at the node's own width.
+                let measured = if snapshot.alignment == TextAlignment::Leading || !width.is_finite()
+                {
+                    result.total_width
+                } else {
+                    result.total_width.max(width)
+                };
                 cove_core::Size {
-                    width: result.total_width,
+                    width: measured,
                     height: result.total_height,
                 }
             },
@@ -431,8 +441,17 @@ impl Text {
                 &environment,
             );
             let flow = super::rich::flow::RichTextFlow::layout(&paragraph, width, &environment);
+            // Same fill rule as the plain-text measure: centred and trailing
+            // paragraphs need the line box to keep their alignment at paint
+            // time, which re-lays the flow at the node's own width.
+            let measured = if paragraph.alignment == TextAlignment::Leading || !width.is_finite()
+            {
+                flow.width
+            } else {
+                flow.width.max(width)
+            };
             cove_core::Size {
-                width: flow.width,
+                width: measured,
                 height: flow.height,
             }
         })));
