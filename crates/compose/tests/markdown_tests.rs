@@ -171,13 +171,18 @@ fn block_structure() {
         "a tight list item keeps its own text, got items {:?}",
         ordered.items
     );
-    let MarkdownBlock::List(nested) = &ordered.items[1].blocks[0] else {
+    assert_eq!(
+        ordered.items[1].blocks[0],
+        MarkdownBlock::paragraph("four"),
+        "a tight item's text stays in the item, ahead of its nested list"
+    );
+    let MarkdownBlock::List(nested) = &ordered.items[1].blocks[1] else {
         panic!("expected a nested list, got {:?}", ordered.items[1].blocks);
     };
-    assert!(
-        !nested.items[0].blocks.is_empty(),
-        "the tight nested item keeps its text too, got {:?}",
-        nested.items[0].blocks
+    assert_eq!(
+        nested.items[0].blocks,
+        vec![MarkdownBlock::paragraph("nested")],
+        "the nested item holds only its own text"
     );
     assert_eq!(nested.start, None, "the nested list is bulleted");
     assert_eq!(

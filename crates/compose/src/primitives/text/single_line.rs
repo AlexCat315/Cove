@@ -2,6 +2,7 @@
 //! fallback fonts and extended grapheme clusters instead of slicing glyphs.
 
 use cove_core::line_breaks::is_newline;
+use cove_core::text_overflows;
 use unicode_segmentation::UnicodeSegmentation;
 
 pub struct SingleLineText;
@@ -15,10 +16,10 @@ impl SingleLineText {
         if width <= 0.0 {
             return String::new();
         }
-        if measure(&text) <= width {
+        if !text_overflows(measure(&text), width) {
             return text;
         }
-        if measure("\u{2026}") > width {
+        if text_overflows(measure("\u{2026}"), width) {
             return String::new();
         }
         let characters: Vec<&str> = text.graphemes(true).collect();
@@ -28,7 +29,7 @@ impl SingleLineText {
             let count = (lower + upper).div_ceil(2);
             let mut candidate: String = characters[..count].concat();
             candidate.push('\u{2026}');
-            if measure(&candidate) <= width {
+            if !text_overflows(measure(&candidate), width) {
                 lower = count;
             } else {
                 upper = count - 1;

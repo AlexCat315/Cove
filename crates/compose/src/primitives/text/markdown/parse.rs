@@ -238,6 +238,23 @@ fn convert<'a>(events: impl Iterator<Item = Event<'a>>) -> Vec<MarkdownBlock> {
     }
 
     for event in events {
+        // A tight list item has no paragraph wrapper, so its text is still in
+        // the inline buffer when a block opens inside it. That text belongs to
+        // the item, ahead of the block, not to whatever the block contains.
+        if let Event::Start(
+            Tag::Paragraph
+            | Tag::Heading { .. }
+            | Tag::BlockQuote(_)
+            | Tag::List(_)
+            | Tag::Table(_)
+            | Tag::CodeBlock(_),
+        ) = &event
+        {
+            let runs = std::mem::take(&mut inline).finish();
+            if !runs.is_empty() {
+                emit(&mut stack, &mut blocks, MarkdownBlock::Paragraph(runs));
+            }
+        }
         match event {
             Event::Start(tag) => match tag {
                 Tag::Paragraph => inline = InlineState::default(),

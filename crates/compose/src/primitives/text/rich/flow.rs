@@ -516,7 +516,7 @@ impl FlowBuilder {
                 continue;
             }
             let breaks_here = index > start && items[index - 1].cluster != item.cluster;
-            if width + item.extent() > self.max_width && breaks_here && !item.is_space {
+            if cove_core::text_overflows(width + item.extent(), self.max_width) && breaks_here && !item.is_space {
                 let soft = (start + 1..=index)
                     .rev()
                     .find(|position| items[*position].break_before && !items[*position].is_space);

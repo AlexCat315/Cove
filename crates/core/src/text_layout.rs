@@ -55,6 +55,21 @@ impl Default for TextLayoutOptions {
     }
 }
 type Measured = (ShapedGlyph, Option<GlyphMetrics>);
+
+/// Slack allowed when fitting text into a width.
+///
+/// A container sizes itself from its text's natural width and then hands the
+/// text back `container - padding - siblings`. Those f32 sums lose a few ulps,
+/// so the text can be offered a hair less than the width it reported. Without
+/// slack that hair wraps the last glyph or truncates the label. 1/64 px is the
+/// sub-pixel unit browsers lay text out in and is far below one device pixel.
+pub const TEXT_FIT_TOLERANCE: f32 = 1.0 / 64.0;
+
+/// Whether text of `extent` does not fit in `limit`.
+#[inline]
+pub fn text_overflows(extent: f32, limit: f32) -> bool {
+    extent > limit + TEXT_FIT_TOLERANCE
+}
 pub fn layout_text(
     shaped: &[ShapedGlyph],
     text: &str,
@@ -143,7 +158,7 @@ pub fn layout_text(
         };
         let mut next_pen_x = pen_x + gap + glyph.x_advance;
         let mut wrapped = false;
-        if next_pen_x > options.max_width
+        if text_overflows(next_pen_x, options.max_width)
             && !current.is_empty()
             && current.last().is_some_and(|g| g.0.cluster != glyph.cluster)
         {
