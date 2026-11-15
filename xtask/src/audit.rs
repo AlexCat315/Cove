@@ -33,6 +33,13 @@ pub(crate) fn run(as_json: bool) -> Result<()> {
                         source.display()
                     ));
                 }
+            } else if kind.iter().any(|k| k == "example") {
+                if !source.starts_with(directory.join("examples")) {
+                    return Err(format!(
+                        "Cargo example outside examples/: {}",
+                        source.display()
+                    ));
+                }
             } else if kind.iter().any(|k| k == "custom-build") {
                 if source != directory.join("build.rs") {
                     return Err(format!(

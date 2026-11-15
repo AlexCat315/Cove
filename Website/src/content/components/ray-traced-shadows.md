@@ -12,7 +12,7 @@ cargo run -p cove-examples --bin gallery -- --component ray-traced-shadows
 
 示例在工作线程上创建离屏 RHI 设备，用遮挡物三角形构建 BLAS，再用实例构建 TLAS。移动光源时复用这些结构，每个地板采样点向面光源发出八条可见性射线。光栅路径用同一组光源位置把遮挡物投影到地面。两条路径都生成阴影遮罩，由 Rust 的场景光栅器完成着色。场景每像素做四点覆盖和深度测试，合成后作为 `ImageAsset` 显示。离屏遮罩回读和图像上传是示例的开销。
 
-DX12 和 Vulkan 共用 `shadows.hlsl`，Metal 使用 `shadows.metal`。修改 HLSL 后，用支持 SPIR-V 的 [DirectX Shader Compiler v1.8.2505.1](https://github.com/microsoft/DirectXShaderCompiler/releases/tag/v1.8.2505.1) 从着色器目录重新生成随 Gallery 打包的两个产物。
+DX12 和 Vulkan 共用 `shadows.hlsl`，Metal 使用 `shadows.metal`，由运行时创建计算管线。修改 HLSL 后，用支持 SPIR-V 的 [DirectX Shader Compiler v1.8.2505.1](https://github.com/microsoft/DirectXShaderCompiler/releases/tag/v1.8.2505.1) 从着色器目录重新生成随 Gallery 打包的两个产物。
 
 ```sh
 dxc -T cs_6_5 -E shadowMain -Fo shadows.dxil shadows.hlsl

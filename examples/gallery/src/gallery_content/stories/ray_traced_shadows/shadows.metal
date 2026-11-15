@@ -11,8 +11,8 @@ struct Scene {
 kernel void shadowMain(device uint *shadowMask [[buffer(0)]],
                        instance_acceleration_structure occluders [[buffer(1)]],
                        constant Scene &scene [[buffer(2)]],
-                       uint2 thread [[thread_position_in_grid]]) {
-    float2 floorPosition = scene.floorGrid.x + (float2(thread) + 0.5f) * scene.floorGrid.y;
+                       uint2 gid [[thread_position_in_grid]]) {
+    float2 floorPosition = scene.floorGrid.x + (float2(gid) + 0.5f) * scene.floorGrid.y;
     ray shadowRay;
     shadowRay.origin = float3(floorPosition.x, 0.001f, floorPosition.y);
     shadowRay.min_distance = 0.001f;
@@ -25,5 +25,5 @@ kernel void shadowMain(device uint *shadowMask [[buffer(0)]],
         shadowRay.direction = toLight / shadowRay.max_distance;
         blocked += tracer.intersect(shadowRay, occluders).type != intersection_type::none ? 1 : 0;
     }
-    shadowMask[thread.y * uint(scene.floorGrid.z) + thread.x] = blocked;
+    shadowMask[gid.y * uint(scene.floorGrid.z) + gid.x] = blocked;
 }

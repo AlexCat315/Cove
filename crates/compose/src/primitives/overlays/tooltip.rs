@@ -20,8 +20,9 @@ use crate::primitives::text::Text;
 use crate::theme::SemanticColorRef;
 use cove_composition::{AnyView, PrimitiveView, View};
 use cove_core::scene::{
-    Align, AnimatorScheduler, EventResult, FocusChainHolder, HoverPhase, InputHandlerRoute,
-    InteractionRegistryHolder, LayoutNode, Node, NodeResource, NodeWeak, PointerPhase,
+    Align, AnimatorScheduler, EventResult, FocusChainHolder, HoverPhase, InputHandlerRole,
+    InputHandlerRoute, InputRoutingPriority, InteractionRegistryHolder, LayoutNode, Node,
+    NodeResource, NodeWeak, PointerPhase,
 };
 use cove_core::{Color, Font, FontWeight, Point, Rect, Size};
 
@@ -1011,7 +1012,11 @@ impl PrimitiveView for TooltipHost {
             let pointer_session = Rc::downgrade(&session);
             registry.set_pointer(
                 node,
-                InputHandlerRoute::control(),
+                InputHandlerRoute::new(
+                    InputHandlerRole::Overlay,
+                    InputRoutingPriority::NORMAL,
+                    "tooltip.dismiss",
+                ),
                 Rc::new(move |_, phase, _| {
                     if phase == PointerPhase::Down
                         && let Some(session) = pointer_session.upgrade()

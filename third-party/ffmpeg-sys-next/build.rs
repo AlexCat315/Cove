@@ -326,6 +326,18 @@ fn build(sysroot: Option<&str>) -> io::Result<()> {
     // Command's path is not relative to command's current_dir
     let configure_path = source_dir.join("configure");
     assert!(configure_path.exists());
+    if cfg!(all(target_os = "windows", target_env = "msvc")) {
+        // FFmpeg writes this AWK expression through shell echo into config.mak.
+        // MSYS can collapse its two backslashes before make invokes AWK.
+        let source = std::fs::read_to_string(&configure_path)?;
+        let old = r#"gsub(/\\/, "/")"#;
+        if source.contains(old) {
+            std::fs::write(
+                &configure_path,
+                source.replace(old, r#"gsub(sprintf("%c%c", 92, 92), "/")"#),
+            )?;
+        }
+    }
     let mut configure = if cfg!(target_os = "windows") {
         if Command::new("sh")
             .arg("-c")

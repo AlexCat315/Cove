@@ -33,9 +33,7 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use cove_composition::AnyView;
-use cove_core::scene::{
-    AccessibilityRole, ClipboardHolder, InputHandlerRole, InputRoutingPriority, Node,
-};
+use cove_core::scene::{AccessibilityRole, ClipboardHolder, InputHandlerRole, Node};
 use cove_core::{Environment, InputCapabilities, Point, Rect};
 use cove_examples::gallery_content::GalleryView;
 use cove_examples::gallery_content::catalog::{GalleryCatalog, GalleryPage};
@@ -302,8 +300,9 @@ fn every_page_presses_its_labels() {
                                     }
                                     if let Some(route) =
                                         scene.interactions.handlers(&current).pointer_route
-                                        && route.priority <= InputRoutingPriority::NORMAL
-                                        && route.role != InputHandlerRole::Scroll
+                                        && matches!(route.role,
+                                            InputHandlerRole::Control | InputHandlerRole::Workspace
+                                                | InputHandlerRole::Drag | InputHandlerRole::TextInput)
                                     {
                                         owned = true;
                                         break;

@@ -6,6 +6,8 @@
 
 `MenuButton::trigger_style(style)` 为触发按钮指定 `ButtonStyle`。
 
+使用原生菜单时，`MenuButton` 在每次布局更新后读取触发按钮的位置，移动或重建触发按钮后仍以它为菜单锚点。
+
 共享 Rust 实现覆盖所有宿主平台。自动化场景验证与原生视觉、键盘及 IME 验收分别记录在 Gallery 验收表中。
 
 ## 行密度与分节

@@ -9,8 +9,8 @@ use std::rc::Rc;
 use cove_core::Binding;
 use cove_core::scene::{
     AccessibilityActions, AccessibilityRole, AccessibilitySemantics, AccessibilityState, Align,
-    EventPhase, EventResult, HoverPhase, InputHandlerRoute, InteractionRegistryHolder, LayoutNode,
-    Node, PointerCaptureHolder, PointerPhase, Rect,
+    EventPhase, EventResult, HoverPhase, InputHandlerRole, InputHandlerRoute, InputRoutingPriority,
+    InteractionRegistryHolder, LayoutNode, Node, PointerCaptureHolder, PointerPhase, Rect,
 };
 use cove_platform::{MouseButton, SystemCursor};
 
@@ -167,7 +167,11 @@ impl PrimitiveView for ResizeGrip {
             let down_node = node.downgrade();
             registry.set_pointer(
                 node,
-                InputHandlerRoute::control(),
+                InputHandlerRoute::new(
+                    InputHandlerRole::Drag,
+                    InputRoutingPriority::NORMAL,
+                    "column.resize",
+                ),
                 Rc::new(move |event, phase, event_phase| {
                     if event_phase == EventPhase::Capture || event.button != MouseButton::Left {
                         return EventResult::Ignored;

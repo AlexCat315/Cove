@@ -44,6 +44,8 @@ jobs:
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
   desktop:
     needs: metadata
+    env:
+      CARGO_PROFILE_RELEASE_DEBUG: "1"
     runs-on: ${{ matrix.runner }}
     strategy:
       fail-fast: false
