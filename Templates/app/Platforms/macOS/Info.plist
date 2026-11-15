@@ -30,15 +30,16 @@
         </dict>
     </array>
 
-    Services: a Finder right-click "Services" entry that receives selected file
-    URLs. The matching native selector is routed to the open-documents inbox by
-    cove-shell; the service target is still pending (see Docs/shell-context-menu.md).
+    Services: a Finder right-click "Services" entry. The service selector is
+    dispatched to the open-documents inbox by cove-shell once the app registers
+    a services provider. NSSendFileTypes is the file-service key; NSSendTypes is
+    for pasteboard types and does not match Finder's file selection reliably.
     <key>NSServices</key>
     <array>
         <dict>
             <key>NSMenuItem</key><dict><key>default</key><string>Extract with this app</string></dict>
             <key>NSMessage</key><string>coveExtractService:</string>
-            <key>NSSendTypes</key><array><string>public.file-url</string></array>
+            <key>NSSendFileTypes</key><array><string>public.item</string></array>
         </dict>
     </array>
     -->

@@ -268,7 +268,11 @@ bool cove_shell_global_pointer(float *x,float *y){ COVE_ASSERT_MAIN();if(!SDL_Ge
 char *cove_shell_clipboard_read(void){ COVE_ASSERT_MAIN();return SDL_GetClipboardText();}bool cove_shell_clipboard_write(const char *text){ COVE_ASSERT_MAIN();return SDL_SetClipboardText(text);}void cove_shell_free(void *p){SDL_free(p);}
 struct DialogBox{CoveShellDialogCallback callback;void *context;SDL_DialogFileFilter *filters;char *path;size_t count;};
 static void dialog_box_free(struct DialogBox *box){for(size_t i=0;i<box->count;i++){SDL_free((void*)box->filters[i].name);SDL_free((void*)box->filters[i].pattern);}SDL_free(box->filters);SDL_free(box->path);SDL_free(box);}
-static void SDLCALL dialog_done(void *raw,const char *const *files,int filter){struct DialogBox *box=raw;int status=2;if(filter>=0&&files){status=files[0]?0:1;}box->callback(box->context,files,status);dialog_box_free(box);}
+/* SDL's third argument is the chosen filter index, but the macOS backend
+   reports -1 for every outcome, a successful pick included, so the file list
+   alone decides: NULL means the panel failed, an empty first entry means the
+   user cancelled, a path means a choice. */
+static void SDLCALL dialog_done(void *raw,const char *const *files,int filter){(void)filter;struct DialogBox *box=raw;int status;if(!files){status=2;}else if(files[0]){status=0;}else{status=1;}box->callback(box->context,files,status);dialog_box_free(box);}
 #if defined(__APPLE__)
 /* The picker already speaks the cove status convention, so forward it verbatim
    and only borrow the box's freeing. */
