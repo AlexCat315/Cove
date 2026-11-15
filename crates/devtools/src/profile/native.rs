@@ -616,8 +616,10 @@ mod tests {
         let mut accumulator = 1u64;
         while !stop.load(Ordering::Relaxed) {
             // Keep sampled instructions in this function even in optimized builds.
-            for _ in 0..4096 {
+            let mut iteration = 0;
+            while iteration < 4096 {
                 accumulator = (accumulator >> 1) ^ ((accumulator & 1) * 0xd800_0000_0000_0000);
+                iteration += 1;
             }
             std::hint::black_box(accumulator);
         }

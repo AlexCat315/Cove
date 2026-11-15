@@ -35,8 +35,10 @@ fn cove_profiling_busy_loop(stop: &AtomicBool) {
     while !stop.load(Ordering::Relaxed) {
         // Leave enough work between flag checks for optimized samples to
         // land in this function instead of the inlined atomic load.
-        for _ in 0..4096 {
+        let mut iteration = 0;
+        while iteration < 4096 {
             accumulator = (accumulator >> 1) ^ ((accumulator & 1) * 0xd800_0000_0000_0000);
+            iteration += 1;
         }
         std::hint::black_box(accumulator);
     }
