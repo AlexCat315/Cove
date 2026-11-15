@@ -4,4 +4,42 @@
     <key>NSHighResolutionCapable</key><true/>
     <key>NSPrincipalClass</key><string>NSApplication</string>
     <key>LSMinimumSystemVersion</key><string>26.0</string>
+    <!--
+    System shell association reference. Uncomment and adapt for an archive/utility
+    app; see Docs/shell-context-menu.md. These two blocks are not active in the
+    generic template.
+
+    Document types: appear in the file's "Open With" submenu.
+    <key>CFBundleDocumentTypes</key>
+    <array>
+        <dict>
+            <key>CFBundleTypeName</key><string>Archive</string>
+            <key>CFBundleTypeRole</key><string>Viewer</string>
+            <key>LSHandlerRank</key><string>Alternate</string>
+            <key>LSItemContentTypes</key>
+            <array>
+                <string>public.zip-archive</string>
+                <string>public.tar-archive</string>
+                <string>org.gnu.gzip-archive</string>
+            </array>
+            <key>CFBundleTypeExtensions</key>
+            <array>
+                <string>zip</string><string>7z</string><string>rar</string>
+                <string>tar</string><string>gz</string><string>tgz</string>
+            </array>
+        </dict>
+    </array>
+
+    Services: a Finder right-click "Services" entry that receives selected file
+    URLs. The matching native selector is routed to the open-documents inbox by
+    cove-shell; the service target is still pending (see Docs/shell-context-menu.md).
+    <key>NSServices</key>
+    <array>
+        <dict>
+            <key>NSMenuItem</key><dict><key>default</key><string>Extract with this app</string></dict>
+            <key>NSMessage</key><string>coveExtractService:</string>
+            <key>NSSendTypes</key><array><string>public.file-url</string></array>
+        </dict>
+    </array>
+    -->
 </dict></plist>

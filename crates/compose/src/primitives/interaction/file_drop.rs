@@ -795,40 +795,34 @@ impl PrimitiveView for FileDropZoneHost {
             }
             let radius = theme.radius.lg;
             let stroke_width = theme.inputs.border_width.max(1.0);
-            let (fill, stroke, is_solid) = if !is_enabled {
-                (None, theme.colors.divider, false)
+            // The outline is always dashed: a drop target reads as a dashed
+            // well at rest and keeps that language while a drag hovers, with
+            // the fill and stroke color carrying the accept/reject state.
+            let (fill, stroke) = if !is_enabled {
+                (None, theme.colors.divider)
             } else {
                 match (is_targeted, outcome) {
                     (_, FileDropOutcome::Accepted) => (
                         Some(theme.colors.accent.multiplied_alpha(0.10)),
                         theme.colors.accent.multiplied_alpha(0.85),
-                        true,
                     ),
                     (_, FileDropOutcome::Rejected) => (
                         Some(theme.colors.error.multiplied_alpha(0.08)),
                         theme.colors.error.multiplied_alpha(0.70),
-                        true,
                     ),
                     (true, FileDropOutcome::Idle) => (
                         Some(theme.colors.accent.multiplied_alpha(0.04)),
                         theme.colors.accent.multiplied_alpha(0.80),
-                        true,
                     ),
-                    (false, FileDropOutcome::Idle) => (
-                        None,
-                        theme.colors.border_strong.multiplied_alpha(0.65),
-                        false,
-                    ),
+                    (false, FileDropOutcome::Idle) => {
+                        (None, theme.colors.border_strong.multiplied_alpha(0.65))
+                    }
                 }
             };
             if let Some(fill) = fill {
                 let _ = list.add_rounded_rect(rect, radius, fill);
             }
-            if is_solid {
-                let _ = list.add_rounded_rect_stroke(rect, radius, stroke_width, stroke);
-            } else {
-                add_dashed_rounded_rect_stroke(list, rect, radius, stroke_width, stroke);
-            }
+            add_dashed_rounded_rect_stroke(list, rect, radius, stroke_width, stroke);
         });
     }
 

@@ -1375,6 +1375,7 @@ impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 
         let input: Rc<RefCell<Option<Node>>> = Rc::new(RefCell::new(None));
         // The header stays mounted for an empty dataset, so the sort controls
         // and column titles remain reachable; only the body is replaced.
+        let is_card = layout.is_card;
         let content = AnyView::new(TableLanes {
             controller: controller.clone(),
             plan: plan.clone(),
@@ -1464,6 +1465,7 @@ impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 
             header_height: self.size.height,
             model_rows: controller.model.count(),
             columns: controller.columns.len(),
+            is_card,
         })]
     }
 }
@@ -1475,6 +1477,7 @@ struct TableChrome {
     header_height: f32,
     model_rows: usize,
     columns: usize,
+    is_card: bool,
 }
 
 impl PrimitiveView for TableChrome {
@@ -1486,12 +1489,21 @@ impl PrimitiveView for TableChrome {
 
     fn update_node(&self, node: &Node) {
         let theme = theme_for_node(node);
-        // The card owns its fill, so the header and the rows paint the same
-        // surface instead of leaning on whatever sits behind the table.
-        node.set_background_color(Some(theme.colors.surface));
-        node.set_border_color(Some(theme.colors.border));
-        node.set_border_width(1.0);
-        node.set_corner_radius(theme.radius.md);
+        if self.is_card {
+            // The card owns its fill, so the header and the rows paint the same
+            // surface instead of leaning on whatever sits behind the table.
+            node.set_background_color(Some(theme.colors.surface));
+            node.set_border_color(Some(theme.colors.border));
+            node.set_border_width(1.0);
+            node.set_corner_radius(theme.radius.md);
+        } else {
+            // A flush list fills its pane: the rows already paint the page
+            // colour, so the chrome matches it and drops the card's border and
+            // rounded corners instead of framing the rows as a hole in a card.
+            node.set_background_color(Some(theme.colors.background));
+            node.set_border_width(0.0);
+            node.set_corner_radius(0.0);
+        }
         // Rows paint edge to edge; without clipping their fills square off the
         // card's rounded corners.
         node.set_clips_to_bounds(true);

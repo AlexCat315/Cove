@@ -4,6 +4,11 @@
 
 ## Unreleased
 
+### 系统外壳文件菜单集成
+
+- 新增 [Docs/shell-context-menu.md](Docs/shell-context-menu.md)：梳理把应用命令注入 macOS 访达 / Windows 资源管理器文件右键菜单的机制、与现有 opened-documents 接收链路的对接点，以及框架 / 打包器 / 安装器的职责边界。
+- macOS 应用模板 `Info.plist` 增加注释化的 `CFBundleDocumentTypes` 与 `NSServices` 参考块。文档类型关联、macOS 服务原生回调与 Windows 静态动词注册层仍待实现，见文档待办。
+
 ## 0.3.0 — 2026-11-15
 
 Cove 0.3.0 将 SDK 迁移到 Rust 2024，使用 Cargo 构建和管理依赖。

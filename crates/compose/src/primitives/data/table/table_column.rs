@@ -262,6 +262,10 @@ pub struct TableLayout {
     /// Lets the last visible column absorb the width the other columns leave
     /// unused, so the table never ends in a band of empty card.
     pub fills_width: bool,
+    /// Whether the table draws its rounded, bordered card chrome. A document
+    /// list that fills a pane edge to edge (a file browser, a mail list) sets
+    /// this false so the rows sit flush on the pane instead of inside a card.
+    pub is_card: bool,
     pub empty_title: String,
 }
 
@@ -277,6 +281,7 @@ impl Default for TableLayout {
             // A table is a surface, not a shrink-wrapped list: let the flexible
             // column take the leftover width instead of ending in dead card.
             fills_width: true,
+            is_card: true,
             empty_title: "No records".to_string(),
         }
     }
