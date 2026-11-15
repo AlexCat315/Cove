@@ -21,11 +21,11 @@ use std::cell::RefCell;
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::rc::Rc;
 
-use crate::modifiers::interaction::AccessibilityExt;
+use crate::modifiers::interaction::{AccessibilityExt, TabStopExt};
 use crate::modifiers::layout::{FlexExt, LayoutFrameExt};
 use crate::primitives::controls::button::{Button, ButtonIconSource};
 use crate::primitives::data::lists::selection::{CollectionId, Selection};
-use crate::primitives::data::lists::tree::view::flatten_visible;
+use crate::primitives::data::lists::tree::view::{fixed_spacer, flatten_visible};
 use crate::primitives::data::table::table_column::{
     ColumnVisibility, TableColumn, TableColumnLayout, TableLayout,
 };
@@ -301,142 +301,187 @@ where
     }
 
     /// The first column's cell: indentation, disclosure button, then content.
-    fn mapped_columns(&self) -> Vec<TableColumn<TreeTableRow<Record>>> {
+    fn mapped_columns(&self, toggle: Rc<dyn Fn(&Id)>) -> Vec<TableColumn<TreeTableRow<Record>>> {
         let indentation = self.options.indentation;
-        let expanded_binding = self.options.expanded.clone();
-        let fallback = self.local_expanded.clone();
-        let id_of = self.id_of.clone();
-
+        let is_enabled = self.options.is_enabled;
         self.columns
             .iter()
             .enumerate()
             .map(|(index, column)| {
                 let content = column.content.clone();
-                let mapped: TableColumn<TreeTableRow<Record>> = if index == 0 {
-                    let toggle_expanded = expanded_binding.clone();
-                    let toggle_fallback = fallback.clone();
-                    let toggle_id_of = id_of.clone();
-                    TableColumn::new(
-                        column.id.clone(),
-                        column.title.clone(),
-                        move |row: &TreeTableRow<Record>| {
-                            let depth = row.depth;
-                            let has_children = row.has_children;
-                            let is_expanded = row.is_expanded;
-                            let record = row.record.clone();
-                            let toggle_id = toggle_id_of(&row.record);
-
-                            let toggle: Rc<dyn Fn()> = {
-                                let expanded_binding = toggle_expanded.clone();
-                                let fallback = toggle_fallback.clone();
-                                let toggle_id = toggle_id.clone();
-                                Rc::new(move || {
-                                    let mut next = match &expanded_binding {
-                                        Some(binding) => binding.get(),
-                                        None => fallback.get(),
-                                    };
-                                    if !next.remove(&toggle_id) {
-                                        next.insert(toggle_id.clone());
-                                    }
-                                    match &expanded_binding {
-                                        Some(binding) => binding.set(next),
-                                        None => fallback.set(next),
-                                    }
-                                })
-                            };
-
-                            let content = content.clone();
-                            AnyView::new(TextScalerReader::new(
-                                move |scaler: crate::theme::TextScaler| {
-                                    let indent = scaler.scale(indentation) * (depth.min(12) as f32);
-                                    let mut children = vec![AnyView::new(
-                                        AnyView::new(crate::EmptyView)
-                                            .frame_width(indent.max(0.0))
-                                            .flex_with(0.0, 0.0, None),
-                                    )];
-                                    if has_children {
-                                        let icon = if is_expanded {
-                                            ButtonIconSource::resource(
-                                                ui_icon_catalog::navigation::chevron_down(),
-                                            )
-                                        } else {
-                                            ButtonIconSource::resource(
-                                                ui_icon_catalog::navigation::chevron_right(),
-                                            )
-                                        };
-                                        let label = if is_expanded { "Collapse" } else { "Expand" };
-                                        let action = toggle.clone();
-                                        children.push(AnyView::new(
-                                            AnyView::new(
-                                                Button::icon(icon, 12.0, move || action())
-                                                    .tooltip(label),
-                                            )
-                                            // A tree disclosure is a glyph-only affordance:
-                                            // no bezel at rest, a state layer on hover.
-                                            .button_style(crate::theme::styles::buttons::ghost())
-                                            .flex_with(0.0, 0.0, None)
-                                            .accessibility({
-                                                let label = label.to_string();
-                                                move |semantics: &mut AccessibilitySemantics| {
-                                                    semantics.label = label.clone();
-                                                    semantics.state.is_expanded = Some(is_expanded);
-                                                }
-                                            }),
-                                        ));
-                                    } else {
-                                        children.push(AnyView::new(
-                                            AnyView::new(crate::EmptyView)
-                                                .frame_width(20.0)
-                                                .flex_with(0.0, 0.0, None),
-                                        ));
-                                    }
-                                    children.push(AnyView::new(
-                                        AnyView::new(BoxView::new(
-                                            FlexDirection::Row,
-                                            Align::Center,
-                                            Justify::FlexStart,
-                                            Wrap::NoWrap,
-                                            0.0,
-                                            (content)(&record),
-                                        ))
-                                        .flex_with(1.0, 1.0, Some(0.0))
-                                        .frame(
-                                            None,
-                                            None,
-                                            Some(0.0),
-                                            None,
-                                            None,
-                                            None,
-                                        ),
-                                    ));
-                                    AnyView::new(BoxView::new(
-                                        FlexDirection::Row,
-                                        Align::Center,
-                                        Justify::FlexStart,
-                                        Wrap::NoWrap,
-                                        2.0,
-                                        AnyView::new(TupleView::new(children)),
-                                    ))
-                                },
-                            ))
-                        },
-                    )
-                } else {
-                    TableColumn::new(
-                        column.id.clone(),
-                        column.title.clone(),
-                        move |row: &TreeTableRow<Record>| (content)(&row.record),
-                    )
-                };
+                let id_of = self.id_of.clone();
+                let toggle = toggle.clone();
+                let mapped = TableColumn::new(
+                    column.id.clone(),
+                    column.title.clone(),
+                    move |row: &TreeTableRow<Record>| {
+                        let label = content(&row.record);
+                        if index != 0 {
+                            return label;
+                        }
+                        let id = id_of(&row.record);
+                        let toggle = toggle.clone();
+                        hierarchy_cell(
+                            label,
+                            row.depth,
+                            indentation,
+                            row.has_children,
+                            row.is_expanded,
+                            is_enabled,
+                            move || toggle(&id),
+                        )
+                    },
+                );
+                let mut layout = column.layout;
                 let visibility = if index == 0 {
+                    layout.alignment = cove_core::TextAlignment::Leading;
                     ColumnVisibility::Required
                 } else {
                     column.visibility
                 };
-                mapped.layout(column.layout).visibility(visibility)
+                mapped.layout(layout).visibility(visibility)
             })
             .collect()
     }
+
+    fn disclosure_action(
+        &self,
+        model: Rc<TableModel<TreeTableRow<Record>, Id>>,
+    ) -> Rc<dyn Fn(&Id)> {
+        let expansion = self
+            .options
+            .expanded
+            .clone()
+            .unwrap_or_else(|| self.local_expanded.binding());
+        let selection = self.selection();
+        let cursor = self.cursor.clone();
+        let first_column = self.columns[0].id.clone();
+        Rc::new(move |id| {
+            let mut expanded = expansion.get();
+            if expanded.remove(id) {
+                let Some(index) = model.index_for(id) else {
+                    return;
+                };
+                let Some(branch) = model.record_at(index) else {
+                    return;
+                };
+                let mut selected = selection.ids();
+                let mut current = cursor.get();
+                let mut removed_selection = false;
+                for index in index + 1..model.count() {
+                    let Some(row) = model.record_at(index) else {
+                        break;
+                    };
+                    if row.depth <= branch.depth {
+                        break;
+                    }
+                    let Some(child_id) = model.row_id_at(index) else {
+                        break;
+                    };
+                    removed_selection |= selected.remove(&child_id);
+                    if current.focused_id.as_ref() == Some(&child_id) {
+                        current.focused_id = Some(id.clone());
+                        current.focused_column_id = Some(first_column.clone());
+                    }
+                    if current.anchor_id.as_ref() == Some(&child_id) {
+                        current.anchor_id = Some(id.clone());
+                    }
+                }
+                if removed_selection {
+                    selected.insert(id.clone());
+                    selection.replace(selected.iter().cloned());
+                    if current.focused_id.is_none() {
+                        current.focused_id = Some(id.clone());
+                        current.focused_column_id = Some(first_column.clone());
+                    }
+                }
+                current.selected_ids = selected;
+                cursor.set(current);
+            } else {
+                expanded.insert(id.clone());
+            }
+            expansion.set(expanded);
+        })
+    }
+}
+
+fn hierarchy_cell(
+    label: AnyView,
+    depth: usize,
+    indentation: f32,
+    has_children: bool,
+    is_expanded: bool,
+    is_enabled: bool,
+    toggle: impl Fn() + 'static,
+) -> AnyView {
+    let toggle = Rc::new(toggle);
+    AnyView::new(crate::adaptive::SurfaceReader::new(
+        move |surface: &cove_core::Environment| {
+            let slot = if surface.input.contains(cove_core::InputCapabilities::TOUCH) {
+                surface.minimum_control_extent()
+            } else {
+                24.0
+            };
+            let label = label.clone();
+            let toggle = toggle.clone();
+            AnyView::new(TextScalerReader::new(
+                move |scaler: crate::theme::TextScaler| {
+                    let indent = scaler.scale(indentation.max(0.0)) * depth.min(12) as f32;
+                    let disclosure = if has_children {
+                        let icon = if is_expanded {
+                            ui_icon_catalog::navigation::chevron_down()
+                        } else {
+                            ui_icon_catalog::navigation::chevron_right()
+                        };
+                        let action = toggle.clone();
+                        let title = if is_expanded { "Collapse" } else { "Expand" };
+                        AnyView::new(
+                            AnyView::new(
+                                Button::icon(ButtonIconSource::resource(icon), 12.0, move || {
+                                    action()
+                                })
+                                .enabled(is_enabled)
+                                .accessibility_text(title)
+                                .tooltip(title),
+                            )
+                            .button_style(crate::theme::styles::buttons::plain())
+                            .frame_size(slot, slot)
+                            .tab_stop(false)
+                            .accessibility(
+                                move |semantics: &mut AccessibilitySemantics| {
+                                    semantics.state.is_expanded = Some(is_expanded);
+                                },
+                            ),
+                        )
+                    } else {
+                        fixed_spacer(slot, slot)
+                    };
+                    let label = BoxView::new(
+                        FlexDirection::Row,
+                        Align::Center,
+                        Justify::FlexStart,
+                        Wrap::NoWrap,
+                        0.0,
+                        label.clone(),
+                    )
+                    .frame_min_width(0.0)
+                    .flex_with(0.0, 1.0, None);
+                    AnyView::new(BoxView::new(
+                        FlexDirection::Row,
+                        Align::Center,
+                        Justify::FlexStart,
+                        Wrap::NoWrap,
+                        0.0,
+                        AnyView::new(TupleView::new(vec![
+                            AnyView::new(fixed_spacer(indent, 1.0).flex_with(0.0, 0.0, None)),
+                            AnyView::new(disclosure.flex_with(0.0, 0.0, None)),
+                            AnyView::new(label),
+                        ])),
+                    ))
+                },
+            ))
+        },
+    ))
 }
 
 fn next_navigation_request_id() -> u64 {
@@ -455,7 +500,8 @@ where
 {
     fn body(&self, _cx: &Scope) -> AnyView {
         let model = self.model();
-        let mapped = self.mapped_columns();
+        let toggle = self.disclosure_action(model.clone());
+        let mapped = self.mapped_columns(toggle.clone());
         let options = &self.options;
 
         let mut table_options: TableOptions<Id> = TableOptions::new();
@@ -477,7 +523,7 @@ where
             table = table.on_activate(move |row: &TreeTableRow<Record>| handler(&row.record));
         }
 
-        table.row_key_handler = Some(self.key_handler(model));
+        table.row_key_handler = Some(self.key_handler(model, toggle));
         AnyView::new(
             AnyView::new(table).accessibility(|semantics: &mut AccessibilitySemantics| {
                 semantics.role = AccessibilityRole::Tree;
@@ -506,10 +552,9 @@ where
     fn key_handler(
         &self,
         model: Rc<TableModel<TreeTableRow<Record>, Id>>,
+        toggle: Rc<dyn Fn(&Id)>,
     ) -> Rc<dyn Fn(&KeyEvent, &Id) -> bool> {
         let is_enabled = self.options.is_enabled;
-        let expanded_binding = self.options.expanded.clone();
-        let fallback = self.local_expanded.clone();
         let selection = self.selection();
         let cursor = self.cursor.clone();
         let navigation = self.navigation.clone();
@@ -531,21 +576,6 @@ where
                 return false;
             };
 
-            let expanded = || match &expanded_binding {
-                Some(binding) => binding.get(),
-                None => fallback.get(),
-            };
-            let write_expanded = |next: BTreeSet<Id>| match &expanded_binding {
-                Some(binding) => binding.set(next),
-                None => fallback.set(next),
-            };
-            let toggle = |id: &Id| {
-                let mut next = expanded();
-                if !next.remove(id) {
-                    next.insert(id.clone());
-                }
-                write_expanded(next);
-            };
             let focus = |target: &Id| {
                 selection.replace([target.clone()]);
                 let mut next_cursor = cursor.get();

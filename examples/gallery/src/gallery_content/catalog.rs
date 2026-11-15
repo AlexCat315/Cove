@@ -770,7 +770,7 @@ impl GalleryCatalog {
                 GalleryPage::Table,
                 "Table",
                 "Data",
-                "Up to 200,000 virtualized rows over a persistent model, with frozen columns, stable sorting, multi-selection, cell editing and a tree table.",
+                "Virtualized rows, frozen columns and inline editing.",
             ),
             GalleryEntry::new(
                 GalleryPage::Calendar,

@@ -30,7 +30,8 @@ use std::rc::Rc;
 use cove_core::scene::{
     AccessibilityActions, AccessibilityRole, AccessibilitySemantics, AccessibilityState, Align,
     EventPhase, EventResult, FlexDirection, FocusChainHolder, HoverPhase, InputHandlerRoute,
-    InteractionRegistryHolder, Justify, LayoutNode, Node, PointerCaptureHolder, PointerPhase, Wrap,
+    InteractionRegistryHolder, Justify, LayoutNode, Node, PointerCaptureHolder, PointerPhase,
+    TextInputAttachmentKey, TextInputFocusChangeHandler, Wrap,
 };
 use cove_core::{Binding, Color, Point, Size, State, TextAlignment};
 use cove_platform::{KeyEvent, KeyModifiers, MouseButton, SystemCursor};
@@ -50,15 +51,20 @@ use crate::modifiers::layout::{EdgeInsets, FlexExt, LayoutFrameExt, PaddingExt};
 use crate::modifiers::style::{AppearanceExt, SemanticStyleViewExt};
 use crate::primitives::data::lists::selection::Selection;
 use crate::primitives::feedback::{EmptyState, EmptyStateProminence};
-use crate::primitives::layout::{ScrollAxis, ScrollView, ScrollbarGutter};
+use crate::primitives::layout::{ScrollAxis, ScrollView};
+use crate::primitives::overlays::tooltip::TooltipExt;
 use crate::primitives::text::text_buffer::TextBuffer;
 use crate::primitives::text::text_field::{
-    TextField, TextFieldBehavior, TextFieldEvents, TextFieldNavigationRequest,
+    TextField, TextFieldBehavior, TextFieldContentPadding, TextFieldDecoration, TextFieldEvents,
+    TextFieldLayout, TextFieldNavigationRequest,
 };
 use crate::primitives::text::{Divider, Text};
-use crate::theme::styles::components::{AnyTextFieldStyle, EditorTextFieldStyle};
+use crate::theme::styles::components::{
+    AnyTextFieldStyle, TextFieldStyle, TextFieldStyleConfiguration,
+};
 use crate::theme::{SemanticColorRef, SemanticFontRef, node_text_scaler, theme_for_node};
 use crate::{AnyView, BoxView, PrimitiveView, TupleView, View, impl_primitive_view};
+use cove_composition::ViewExt;
 use cove_core::scene::ObservableObject;
 
 const INPUT_MARKER: &str = "dataTable.input";
@@ -671,23 +677,11 @@ impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 
             .iter()
             .map(|column| self.width_of(column, &stored))
             .collect();
-        // `fills_width` only applies when nothing had to be dropped for space:
-        // stretching the last column over slack that hidden columns would have
-        // used would misreport the table's real width.
         if self.layout.fills_width
             && !presented.is_empty()
             && resolved.frozen_count < presented.len()
         {
-            let visible: f32 = ordered
-                .iter()
-                .filter(|column| overrides.get(&column.id) != Some(&false))
-                .map(|column| {
-                    widths
-                        .get(&column.id)
-                        .copied()
-                        .unwrap_or(column.layout.width)
-                })
-                .sum();
+            let visible: f32 = presented.iter().sum();
             let slack = available_width - visible;
             if slack > 0.5 {
                 let target = columns
@@ -831,18 +825,6 @@ impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 
         self.session.set(session);
     }
 
-    fn open_draft(
-        &self,
-        session: &TableSession<Id>,
-        row_id: &Id,
-        column_id: &str,
-    ) -> Option<String> {
-        let draft = session.editing.draft.as_ref()?;
-        draft
-            .is_for(row_id, column_id)
-            .then(|| draft.buffer.clone())
-    }
-
     fn set_draft_buffer(&self, value: String) {
         let mut session = self.session.get();
         session.editing.set_buffer(value);
@@ -887,25 +869,33 @@ impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 
             self.session.set(session);
             return true;
         };
-        if let Some(message) = editing.rejection(&draft.buffer) {
-            session.editing.reject(message);
-            self.session.set(session);
-            return false;
-        }
         if self.model.index_for(&draft.row_id).is_none() {
             session.editing.cancel();
             self.session.set(session);
             return true;
         }
-        let row_id = draft.row_id.clone();
-        let original = draft.original.clone();
-        let value = draft.buffer.clone();
+        if let Some(message) = editing.rejection(&draft.buffer) {
+            session.editing.reject(message);
+            self.session.set(session);
+            return false;
+        }
+        if draft.is_dirty()
+            && !self
+                .model
+                .update_row(&draft.row_id, |record| editing.apply(record, &draft.buffer))
+        {
+            crate::core::Logger::compose().warning(format!(
+                "Table edit in column {:?} could not preserve row identity",
+                draft.column_id
+            ));
+            session
+                .editing
+                .reject(crate::i18n::tr("The edit must preserve the row ID."));
+            self.session.set(session);
+            return false;
+        }
         session.editing.cancel();
         self.session.set(session);
-        if value != original {
-            self.model
-                .update_row(&row_id, |record| editing.apply(record, &value));
-        }
         if restore_focus {
             focus_node(input);
         }
@@ -917,35 +907,53 @@ impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 
         &self,
         direction: i32,
         plan: &TablePlan<Record>,
+        metrics: &TableRowMetrics,
+        moving_width: f32,
+        viewport_height: f32,
         input: &Rc<RefCell<Option<Node>>>,
     ) {
-        if !self.commit_editing(input) {
-            return;
-        }
         let session = self.session.get();
         let Some(draft) = session.editing.draft.as_ref() else {
             return;
         };
-        let Some(row) = self.model.index_for(&draft.row_id) else {
-            return;
-        };
-        let editable: Vec<EditableColumn> = self
-            .ordered_columns(&session)
+        let editable: Vec<EditableColumn> = plan
+            .columns
             .iter()
             .map(|column| EditableColumn {
                 id: column.id.clone(),
                 is_editable: column.text_editing.is_some(),
             })
             .collect();
-        let Some(next_id) =
-            TableEditingState::next_editable(&draft.column_id, direction, &editable)
-        else {
+        let next = TableEditingState::next_editable(&draft.column_id, direction, &editable)
+            .and_then(|id| plan.columns.iter().position(|column| column.id == id));
+        if !self.commit_editing_without_focus(input) {
+            return;
+        }
+        let (Some(row), Some(next_column)) = (self.model.index_for(&draft.row_id), next) else {
+            focus_node(input);
             return;
         };
-        let Some(next_column) = plan.columns.iter().position(|column| column.id == next_id) else {
-            return;
-        };
+        let mut selection = self.selection(&self.session.get());
+        selection.focused_id = Some(draft.row_id.clone());
+        selection.focused_column_id = Some(plan.columns[next_column].id.clone());
+        self.write_selection(selection);
         self.begin_editing(row, next_column, plan);
+        let available_width = plan_available_width(plan, moving_width);
+        let next_plan = self.plan(&self.session.get(), available_width);
+        let moving_width = (available_width - next_plan.geometry.frozen_width()).max(1.0);
+        let next_id = &plan.columns[next_column].id;
+        let next_column = next_plan
+            .columns
+            .iter()
+            .position(|column| &column.id == next_id);
+        self.reveal(
+            row,
+            next_column,
+            &next_plan,
+            metrics,
+            moving_width,
+            viewport_height,
+        );
     }
 
     fn cycle_sort(&self, column_id: &str) {
@@ -1023,12 +1031,29 @@ impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 
         metrics: &TableRowMetrics,
         moving_width: f32,
         viewport_height: f32,
-        _input: &Rc<RefCell<Option<Node>>>,
+        input: &Rc<RefCell<Option<Node>>>,
     ) -> bool {
         if !self.is_enabled || self.model.count() == 0 || plan.columns.is_empty() {
             return false;
         }
         let session = self.session.get();
+        if event.scancode == crate::Scancode::TAB
+            && session.editing.draft.is_some()
+            && !event.modifiers.has_gui()
+            && !event.modifiers.has_ctrl()
+            && !event.modifiers.has_alt()
+        {
+            let direction = if event.modifiers.has_shift() { -1 } else { 1 };
+            self.move_editor(
+                direction,
+                plan,
+                metrics,
+                moving_width,
+                viewport_height,
+                input,
+            );
+            return true;
+        }
         let mut selection = self.selection(&session);
         let current = selection
             .focused_id
@@ -1040,7 +1065,10 @@ impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 
             .and_then(|id| plan.columns.iter().position(|column| column.id == *id))
             .unwrap_or(0);
 
-        if column == 0
+        if self
+            .columns
+            .first()
+            .is_some_and(|first| first.id == plan.columns[column].id)
             && let Some(current) = current
             && let Some(row_id) = self.model.row_id_at(current)
             && let Some(handler) = self.row_key_handler.clone()
@@ -1153,13 +1181,9 @@ impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 
             return;
         };
         let session = self.session.get();
-        let column = self
-            .navigation
-            .column_id
-            .as_ref()
-            .and_then(|id| plan.columns.iter().position(|column| column.id == *id));
         // A requested cell in a hidden column becomes visible.
         if let Some(column_id) = self.navigation.column_id.as_ref()
+            && !plan.columns.iter().any(|column| column.id == *column_id)
             && let Some(column) = self
                 .ordered_columns(&session)
                 .into_iter()
@@ -1172,10 +1196,14 @@ impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 
         let mut session = self.session.get();
         session.last_navigation = Some(request_id);
         self.session.set(session);
-        let plan = self.plan(
-            &self.session.get(),
-            plan_available_width(plan, moving_width),
-        );
+        let available_width = plan_available_width(plan, moving_width);
+        let plan = self.plan(&self.session.get(), available_width);
+        let moving_width = (available_width - plan.geometry.frozen_width()).max(1.0);
+        let column = self
+            .navigation
+            .column_id
+            .as_ref()
+            .and_then(|id| plan.columns.iter().position(|column| column.id == *id));
         self.reveal(row, column, &plan, metrics, moving_width, viewport_height);
     }
 
@@ -1242,10 +1270,10 @@ impl<Record> Clone for TablePlan<Record> {
 
 /// Height of the card's toolbar row (the column picker lives here), in
 /// unscaled points.
-const TOOLBAR_HEIGHT: f32 = 44.0;
+const TOOLBAR_HEIGHT: f32 = 36.0;
 /// Horizontal inset inside a cell or a header label. One gutter for both, so
 /// headers and values share the same edge.
-const CELL_GUTTER: f32 = 16.0;
+const CELL_GUTTER: f32 = 12.0;
 
 /// Groups digits in threes: `12000` becomes `12,000`.
 fn grouped_count(count: usize) -> String {
@@ -1318,7 +1346,7 @@ impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 
             .iter()
             .any(|column| column.visibility != ColumnVisibility::Required);
         let toolbar_height = if has_picker {
-            TOOLBAR_HEIGHT * scale
+            (TOOLBAR_HEIGHT * scale).max(surface.minimum_control_extent())
         } else {
             0.0
         };
@@ -1398,9 +1426,6 @@ impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 
         };
         let mut bands: Vec<AnyView> = Vec::new();
         if let Some(picker) = picker {
-            // The picker is a toolbar action, not a caption above the table:
-            // it sits on the card's tinted band, hard against the trailing
-            // edge, and the rule below separates it from the column header.
             bands.push(AnyView::new(
                 AnyView::new(
                     BoxView::new(
@@ -1416,8 +1441,8 @@ impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 
                     )
                     .padding_edges(CELL_GUTTER, 0.0)
                     .frame_width(self.size.width)
-                    .frame_height(TOOLBAR_HEIGHT * scale)
-                    .semantic_background(SemanticColorRef::surface_variant()),
+                    .frame_height(toolbar_height)
+                    .semantic_background(SemanticColorRef::surface()),
                 )
                 .flex_with(0.0, 0.0, None),
             ));
@@ -1466,7 +1491,7 @@ impl PrimitiveView for TableChrome {
         node.set_background_color(Some(theme.colors.surface));
         node.set_border_color(Some(theme.colors.border));
         node.set_border_width(1.0);
-        node.set_corner_radius(theme.radius.xl);
+        node.set_corner_radius(theme.radius.md);
         // Rows paint edge to edge; without clipping their fills square off the
         // card's rounded corners.
         node.set_clips_to_bounds(true);
@@ -1734,18 +1759,6 @@ fn build_header<
             None,
         ),
     ));
-    parts.push(AnyView::new(
-        BoxView::new(
-            FlexDirection::Row,
-            Align::Center,
-            Justify::FlexStart,
-            Wrap::NoWrap,
-            0.0,
-            AnyView::new(crate::EmptyView),
-        )
-        .frame_width(12.0)
-        .flex_with(0.0, 0.0, None),
-    ));
     AnyView::new(HeaderPaint {
         content: AnyView::new(
             BoxView::new(
@@ -1828,9 +1841,8 @@ fn build_moving_lane<
         input,
     });
 
-    let scroll = ScrollView::new(ScrollAxis::Both, content)
-        .scrollbar_gutter(ScrollbarGutter::Stable)
-        .scroll_offset(controller.offset.binding());
+    let scroll =
+        ScrollView::new(ScrollAxis::Both, content).scroll_offset(controller.offset.binding());
     let _ = offset;
     AnyView::new(AnyView::new(scroll).flex_with(1.0, 1.0, Some(0.0)).frame(
         None,
@@ -2247,30 +2259,26 @@ impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 
     fn body(&self, _cx: &Scope) -> AnyView {
         let title = self.column.title.clone();
         let draft = self
-            .controller
-            .open_draft(&self.session, &self.row_id, &self.column.id);
-        let content = match draft.clone() {
-            Some(buffer) => AnyView::new(DraftEditor {
-                controller: self.controller.clone(),
-                plan: self.plan.clone(),
-                input: self.input.clone(),
-                token: self
-                    .session
-                    .editing
-                    .draft
-                    .as_ref()
-                    .map_or(0, |draft| draft.token),
-                column_id: self.column.id.clone(),
-                buffer,
-                title: title.clone(),
-                error: self
-                    .session
-                    .editing
-                    .draft
-                    .as_ref()
-                    .and_then(|draft| draft.error.clone()),
-                is_enabled: self.controller.is_enabled,
-            }),
+            .session
+            .editing
+            .draft
+            .as_ref()
+            .filter(|draft| draft.is_for(&self.row_id, &self.column.id));
+        let content = match draft {
+            Some(draft) => AnyView::new(
+                DraftEditor {
+                    controller: self.controller.clone(),
+                    input: self.input.clone(),
+                    token: draft.token,
+                    column_id: self.column.id.clone(),
+                    buffer: draft.buffer.clone(),
+                    title: title.clone(),
+                    error: draft.error.clone(),
+                    width: (self.width - 2.0 * CELL_GUTTER).max(1.0),
+                    is_enabled: self.controller.is_enabled,
+                }
+                .id(draft.token),
+            ),
             None => self.column.cell(&self.record),
         };
         let alignment = self.column.layout.alignment;
@@ -2282,10 +2290,12 @@ impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 
         AnyView::new(TableCellHost {
             controller: self.controller.clone(),
             plan: self.plan.clone(),
+            input: self.input.clone(),
             title,
             row: self.row,
             column_index: self.column_index,
             is_active: self.is_active,
+            is_invalid: draft.is_some_and(|draft| draft.error.is_some()),
             is_enabled: self.controller.is_enabled,
             width: self.width,
             height: self.height,
@@ -2298,7 +2308,7 @@ impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 
                     0.0,
                     content,
                 )
-                .padding_edges(CELL_GUTTER, 4.0)
+                .padding_edges(CELL_GUTTER, 0.0)
                 .clipped(),
             ),
         })
@@ -2312,10 +2322,12 @@ struct TableCellHost<
 > {
     controller: TableController<Record, Id>,
     plan: TablePlan<Record>,
+    input: Rc<RefCell<Option<Node>>>,
     title: String,
     row: usize,
     column_index: usize,
     is_active: bool,
+    is_invalid: bool,
     is_enabled: bool,
     width: f32,
     height: f32,
@@ -2336,6 +2348,8 @@ impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 
         layout.set_width(Some(self.width));
         layout.set_height(Some(self.height));
         layout.set_flex_shrink(0.0);
+        layout.set_justify_content(Justify::Center);
+        layout.set_align_items(Align::Stretch);
         Some(layout)
     }
 
@@ -2350,8 +2364,16 @@ impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 
         // A disabled table removes its cells from input-enabled discovery, so
         // an accessibility read cannot reach a control the pointer cannot.
         node.set_allows_hit_testing(self.is_enabled);
-        node.set_border_width(if self.is_active { 1.0 } else { 0.0 });
-        node.set_border_color(Some(theme.colors.focus_ring));
+        node.set_border_width(if self.is_active || self.is_invalid {
+            1.0
+        } else {
+            0.0
+        });
+        node.set_border_color(Some(if self.is_invalid {
+            theme.colors.error
+        } else {
+            theme.colors.focus_ring
+        }));
         node.set_clips_to_bounds(true);
         node.set_accessibility(Some(AccessibilitySemantics {
             role: AccessibilityRole::Cell,
@@ -2364,7 +2386,6 @@ impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 
             ..Default::default()
         }));
         let controller = self.controller.clone();
-        let _plan = self.plan.clone();
         let row = self.row;
         let column_index = self.column_index;
         let activate = self.is_enabled;
@@ -2379,18 +2400,9 @@ impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 
             registry.remove(node);
             return;
         }
-        node.set_cursor(Some(SystemCursor::Pointer));
-        registry.set_hover(
-            node,
-            Rc::new(move |phase: HoverPhase| {
-                if let Some(owner) = None::<Node> {
-                    let _ = owner;
-                }
-                let _ = phase;
-            }),
-        );
         let controller = self.controller.clone();
         let plan = self.plan.clone();
+        let input = self.input.clone();
         registry.set_pointer(
             node,
             InputHandlerRoute::control(),
@@ -2399,9 +2411,31 @@ impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 
                     return EventResult::Ignored;
                 }
                 if phase == PointerPhase::Down {
+                    let Some(row_id) = controller.model.row_id_at(row) else {
+                        return EventResult::Ignored;
+                    };
+                    if controller
+                        .session
+                        .get()
+                        .editing
+                        .is_editing(&row_id, &plan.columns[column_index].id)
+                    {
+                        return EventResult::Handled;
+                    }
+                    if !controller.commit_editing_without_focus(&input) {
+                        return EventResult::Handled;
+                    }
+                    let Some(row) = controller.model.index_for(&row_id) else {
+                        return EventResult::Ignored;
+                    };
                     controller.select(row, column_index, &plan, event.modifiers);
+                    focus_node(&input);
                     if event.clicks >= 2 {
-                        controller.begin_editing(row, column_index, &plan);
+                        if plan.columns[column_index].text_editing.is_some() {
+                            controller.begin_editing(row, column_index, &plan);
+                        } else {
+                            controller.activate(row);
+                        }
                     }
                     return EventResult::Handled;
                 }
@@ -2431,7 +2465,6 @@ struct DraftEditor<
     Id: Ord + std::hash::Hash + Clone + Send + Sync + 'static,
 > {
     controller: TableController<Record, Id>,
-    plan: TablePlan<Record>,
     /// The table's keyboard host, which regains focus once the draft closes.
     input: Rc<RefCell<Option<Node>>>,
     /// One-per-open-editor identity, so the field requests focus exactly once.
@@ -2440,46 +2473,40 @@ struct DraftEditor<
     buffer: String,
     title: String,
     error: Option<String>,
+    width: f32,
     is_enabled: bool,
 }
 
 impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 'static> View
     for DraftEditor<Record, Id>
 {
-    fn body(&self, _cx: &Scope) -> AnyView {
+    fn body(&self, cx: &Scope) -> AnyView {
         let controller = self.controller.clone();
-        let plan = self.plan.clone();
         // The table's own keyboard host, so committing hands focus back to the
         // table instead of dropping it.
         let input = self.input.clone();
-        let buffer = self.buffer.clone();
-        let _write_controller = controller.clone();
-        // `Binding` requires `Send + Sync`; the draft buffer itself lives on the
-        // controller, so the source is mirrored through a `State` and written back
-        // on set (same pattern as the virtual stack's offset binding).
-        let text_state = cove_core::State::new(TextBuffer::new(&buffer));
-        text_state.set(TextBuffer::new(&buffer));
-        let text = Binding::new(
-            {
-                let text_state = text_state.clone();
-                move || text_state.get()
-            },
-            {
-                let text_state = text_state.clone();
-                move |value: TextBuffer| text_state.set(value)
-            },
-        );
+        let text = cx
+            .remember(|| State::new(TextBuffer::new(&self.buffer)))
+            .binding();
         let change_controller = controller.clone();
         let submit_controller = controller.clone();
         let submit_input = input.clone();
         let cancel_controller = controller.clone();
         let cancel_input = input.clone();
-        let tab_controller = controller.clone();
-        let tab_plan = plan.clone();
-        let tab_input = input.clone();
         let blur_controller = controller.clone();
         let blur_input = input.clone();
+        let token = self.token;
         let mut field = TextField::new("", text)
+            .layout(TextFieldLayout {
+                max_visible_lines: 1,
+                ideal_width: self.width,
+                wraps_lines: false,
+                ..Default::default()
+            })
+            .decoration(TextFieldDecoration {
+                content_padding: Some(TextFieldContentPadding::new(0.0, 2.0)),
+                ..Default::default()
+            })
             .behavior(TextFieldBehavior {
                 disabled: !self.is_enabled,
                 ..Default::default()
@@ -2497,22 +2524,20 @@ impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 
                 // Clicking away commits the draft. Focus already moved to
                 // whatever the person clicked, so this path does not restore it.
                 on_blur: Some(Rc::new(move || {
-                    blur_controller.commit_editing_without_focus(&blur_input);
-                })),
-                on_key_down: Some(Rc::new(move |event: &KeyEvent| {
-                    if event.scancode != crate::Scancode::TAB {
-                        return false;
+                    if blur_controller
+                        .session
+                        .get()
+                        .editing
+                        .draft
+                        .as_ref()
+                        .is_some_and(|draft| draft.token == token)
+                    {
+                        blur_controller.commit_editing_without_focus(&blur_input);
                     }
-                    let direction = if event.modifiers.has_shift() { -1 } else { 1 };
-                    tab_controller.move_editor(direction, &tab_plan, &tab_input);
-                    true
                 })),
                 ..Default::default()
             })
-            // The active cell already owns the focus ring. The draft field uses
-            // the flat editor face so it does not paint a second well, hairline
-            // or halo nested inside the cell chrome.
-            .style(AnyTextFieldStyle::new(EditorTextFieldStyle));
+            .style(AnyTextFieldStyle::new(TableDraftStyle));
         let semantics = AccessibilitySemantics {
             role: AccessibilityRole::TextField,
             label: format!("Edit {}", self.title),
@@ -2534,10 +2559,25 @@ impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 
             focus_request_id: (self.token > 0).then_some(self.token),
             ..Default::default()
         };
-        AnyView::new(TextFieldShell {
-            field: AnyView::new(field.padding_edges(4.0, 2.0)),
+        let field = TextFieldShell {
+            field: AnyView::new(field.frame_width(self.width)),
             semantics,
-        })
+        };
+        // Keep the tooltip host mounted across validation changes so the field
+        // keeps its focus and caret when an edit is rejected.
+        AnyView::new(
+            field
+                .tooltip(self.error.clone().unwrap_or_default())
+                .configure(|options| options.is_enabled = self.error.is_some()),
+        )
+    }
+}
+
+struct TableDraftStyle;
+
+impl TextFieldStyle for TableDraftStyle {
+    fn make_body(&self, configuration: TextFieldStyleConfiguration) -> AnyView {
+        configuration.content
     }
 }
 
@@ -2613,20 +2653,30 @@ impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 
                 // the body and a step back in contrast, so the header recedes
                 // and the data reads first.
                 .semantic_font(SemanticFontRef::label())
-                .semantic_foreground(SemanticColorRef::on_surface_variant())
+                .semantic_foreground(if is_sorted {
+                    SemanticColorRef::accent()
+                } else {
+                    SemanticColorRef::on_surface_muted()
+                })
                 // The label sizes to its own content: the sort arrow sits right
                 // beside the title instead of being pushed to the column's far
                 // edge. A zero flex basis would collapse the label to 0 width.
                 .flex_with(0.0, 1.0, None),
         ));
         if is_sorted {
-            row.push(AnyView::new(
+            let arrow = AnyView::new(
                 Text::new(match direction {
                     Some(TableSortDirection::Descending) => "↓",
                     _ => "↑",
                 })
-                .semantic_font(SemanticFontRef::caption()),
-            ));
+                .semantic_font(SemanticFontRef::caption())
+                .semantic_foreground(SemanticColorRef::accent()),
+            );
+            if alignment == TextAlignment::Trailing {
+                row.insert(0, arrow);
+            } else {
+                row.push(arrow);
+            }
         }
         // The label sits where the column's values sit: a trailing column's
         // header has to land on the same right edge as its numbers.
@@ -2735,6 +2785,8 @@ impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 
         layout.set_width(Some(self.width));
         layout.set_height(Some(self.height));
         layout.set_flex_shrink(0.0);
+        layout.set_justify_content(Justify::Center);
+        layout.set_align_items(Align::Stretch);
         Some(layout)
     }
 
@@ -2746,34 +2798,101 @@ impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 
 
     fn update_node(&self, node: &Node) {
         node.set_allows_hit_testing(self.is_enabled);
+        node.set_is_focusable(self.sortable);
+        let controller = self.controller.clone();
+        let column_id = self.column_id.clone();
+        let sort: Rc<dyn Fn()> = Rc::new(move || controller.cycle_sort(&column_id));
         node.set_accessibility(Some(AccessibilitySemantics {
-            role: AccessibilityRole::Button,
-            label: format!("Sort by {}", self.title),
-            help: match (self.is_sorted, self.direction) {
+            role: if self.sortable {
+                AccessibilityRole::Button
+            } else {
+                AccessibilityRole::StaticText
+            },
+            label: if self.sortable {
+                format!("Sort by {}", self.title)
+            } else {
+                self.title.clone()
+            },
+            help: match (self.sortable, self.direction) {
                 (true, Some(TableSortDirection::Ascending)) => {
-                    "Sorted ascending. Activate to sort descending.".to_string()
+                    "Sorted ascending. Activate to sort descending.".into()
                 }
                 (true, Some(TableSortDirection::Descending)) => {
-                    "Sorted descending. Activate to restore source order.".to_string()
+                    "Sorted descending. Activate to restore source order.".into()
                 }
-                _ => "Activate to sort ascending.".to_string(),
+                (true, None) => "Activate to sort ascending.".into(),
+                (false, _) => String::new(),
             },
             state: AccessibilityState {
-                is_enabled: self.sortable,
+                is_enabled: self.is_enabled,
                 is_selected: self.is_sorted,
                 ..Default::default()
             },
+            combines_children: self.sortable,
             ..Default::default()
         }));
+        node.set_accessibility_actions(AccessibilityActions {
+            activate: self.sortable.then(|| sort.clone()),
+            ..Default::default()
+        });
         let Some(registry) = InteractionRegistryHolder::current() else {
             return;
         };
         node.set_is_hit_testable(self.is_enabled);
         if !self.is_enabled {
             registry.remove(node);
+            node.set_background_color(None);
+            node.set_border_width(0.0);
             return;
         }
-        node.set_cursor(Some(SystemCursor::Pointer));
+        node.set_cursor(self.sortable.then_some(SystemCursor::Pointer));
+        if self.sortable {
+            let weak = node.downgrade();
+            let theme = theme_for_node(node);
+            let hover_color = theme.colors.state_layer_hover;
+            registry.set_hover(
+                node,
+                Rc::new(move |phase| {
+                    if let Some(node) = Node::upgrade(&weak) {
+                        let hovered = phase == HoverPhase::Enter
+                            && crate::primitives::controls::adaptive::supports_control_hover(&node);
+                        node.set_background_color(hovered.then_some(hover_color));
+                    }
+                }),
+            );
+            let weak = node.downgrade();
+            let focus: TextInputFocusChangeHandler = Rc::new(move |focused| {
+                if let Some(node) = Node::upgrade(&weak) {
+                    let visible = focused
+                        && FocusChainHolder::current()
+                            .is_some_and(|chain| chain.is_focus_visible());
+                    node.set_border_width(if visible { 1.0 } else { 0.0 });
+                }
+            });
+            node.set_border_color(Some(theme.colors.focus_ring));
+            node.set_attachment(TextInputAttachmentKey::FOCUS_CHANGE_HANDLER, focus);
+            registry.set_key(
+                node,
+                InputHandlerRoute::control(),
+                Rc::new(move |event, phase| {
+                    if phase != EventPhase::Capture
+                        && matches!(
+                            event.scancode,
+                            crate::Scancode::SPACE
+                                | crate::Scancode::RETURN
+                                | crate::Scancode::KEYPAD_ENTER
+                        )
+                    {
+                        if !event.is_repeat {
+                            sort();
+                        }
+                        EventResult::Handled
+                    } else {
+                        EventResult::Ignored
+                    }
+                }),
+            );
+        }
         let controller = self.controller.clone();
         let column_id = self.column_id.clone();
         let plan = self.plan.clone();
@@ -2898,8 +3017,7 @@ fn shared_resize_grip<
     )
 }
 
-/// A tinted band: the toolbar and the column header share one fill, so the
-/// header reads as chrome rather than as the first body row.
+/// The column header's background across both lanes.
 struct HeaderPaint {
     content: AnyView,
 }
@@ -3004,6 +3122,7 @@ impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 
         *self.input.borrow_mut() = Some(node.clone());
         node.set_attachment(INPUT_MARKER, true);
         node.set_is_focusable(self.controller.is_enabled);
+        node.set_automatically_focus_on_pointer_down(false);
         let Some(registry) = InteractionRegistryHolder::current() else {
             return;
         };

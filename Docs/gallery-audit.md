@@ -4,6 +4,16 @@
 
 Swift 源码逐页对照见文末《Swift 源码对照（逐页差异清单）》。
 
+## 2026-11-15 Table 页面布局与交互
+
+| 页面或组件 | 实现与自动化 | macOS Gallery 与 DevTools 验收 | Rust 文档 |
+| --- | --- | --- | --- |
+| Warehouse | 桌面默认 36pt 行高、32pt 表头，文字垂直居中，数字列和表头右缘对齐。35 列共用持久模型，30 个指标列由 Columns 按需显示。回归覆盖隐列、表头键盘排序、列拖动、编辑校验与 Tab 双向跳格。 | 浅色宽窗口、深色窄窗口截图复核，窄窗口优先保留可编辑的 Quantity。验证排序三态、通过 Columns 显示 Metric 1、跳到第 501 行、载入 200,000 行并定位末行。提交 Asset 后 Tab 到 Quantity，拒绝非法值并保留草稿，修正后提交。 | [Table](../Website/src/content/components/table.md) |
+| Project tree | 复用共享 `Tree` 的可见行投影、选中和展开交互，示例移除重复描述。 | 在正常页面中滚动到示例。点击 Render 的箭头后确认出现第二级文件，逐级缩进可见。 | [Tree](../Website/src/content/components/tree.md) |
+| Tree table | 首列按深度缩进，分支与叶节点共享等宽槽。收起分支时将其子树内的选中项和游标移到该分支。回归覆盖布局坐标和选中状态。 | Scene、Lights、Sun 的标签依次相差 16pt。点击子行后用 ← 返回父行，再用 ← / → 收起和展开分支，核对选中行及 Sun 的显隐。 | [TreeTable](../Website/src/content/components/tree-table.md) |
+
+自动化通过 `compose` 1,780 项、`table_story` 22 项及 Website 构建。DevTools 应用内注入覆盖键盘命令和已提交文本。物理键盘、IME、滚轮与触控板，以及其他平台的原生验收尚待进行。
+
 ## 2026-11-15 Table / TreeTable 外观收敛
 
 对照 macOS 原生 `NSTableView`、VS Code Explorer、Linear、Ant Design 与 Supernova Data Table 规范：整行 tint、披露箭头为无边框 chevron（悬停才出现状态层）、左对齐列的排序箭头贴标题右侧。

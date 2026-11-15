@@ -45,11 +45,12 @@ use cove_ui_compose::primitives::controls::Button;
 use cove_ui_compose::primitives::data::lists::Selection;
 use cove_ui_compose::primitives::data::table::table_column::{
     ColumnVisibility, ComparisonResult, TableColumn, TableColumnLayout, TableColumnPlan,
-    TableTextEditing,
+    TableLayout, TableTextEditing,
 };
 use cove_ui_compose::primitives::data::table::{
     Table, TableModel, TableNavigation, TableOptions, TableSelection,
 };
+use cove_ui_compose::primitives::data::{TreeTable, TreeTableColumn, TreeTableOptions};
 use cove_ui_compose::primitives::overlays::portal::LayerRoot;
 use cove_ui_compose::primitives::text::Text;
 use cove_ui_compose::theme::styles::appearance_modifier::{Appearance, AppearanceViewExt};
@@ -380,6 +381,73 @@ fn plans() {
 }
 
 #[test]
+fn hidden_columns_stay_hidden_until_requested() {
+    let mut columns = columns();
+    columns[2].visibility = ColumnVisibility::Hidden;
+    let plan = |overrides| {
+        TableColumnPlan::resolve(
+            &columns,
+            &BTreeMap::new(),
+            &overrides,
+            720.0,
+            1,
+            &Default::default(),
+        )
+    };
+    assert_eq!(plan(HashMap::new()).indices, [0, 1, 3]);
+    assert_eq!(
+        plan(HashMap::from([("c2".to_owned(), true)])).indices,
+        [0, 1, 2, 3]
+    );
+}
+
+#[test]
+fn tree_table_aligns_siblings_and_rehomes_selection_when_a_branch_collapses() {
+    InteractiveScene::run(720.0, HEIGHT, |scene| {
+        let expanded = State::new(BTreeSet::from([0, 1]));
+        let selected = State::new(Some(2));
+        let tree = TreeTable::try_new(
+            vec![0],
+            |row: &usize| *row,
+            |row| match row {
+                0 => Some(vec![1, 3]),
+                1 => Some(vec![2]),
+                _ => None,
+            },
+            TreeTableColumn::new("tree", "Tree", |row: &usize| {
+                AnyView::new(
+                    Text::new(format!("Node {row}")).debug_name(&format!("tree-record-{row}")),
+                )
+            }),
+            [TreeTableColumn::new("type", "Type", |_| {
+                AnyView::new(Text::new("Record"))
+            })],
+        )
+        .unwrap()
+        .options(TreeTableOptions {
+            expanded: Some(expanded.binding()),
+            selection: Some(Selection::single(selected.binding())),
+            ..Default::default()
+        });
+        scene.install(tree.frame_size(720.0, HEIGHT));
+        let label_position = |id| {
+            scene
+                .named(&format!("tree-record-{id}"))
+                .unwrap()
+                .absolute_frame()
+                .x
+        };
+        assert_eq!(label_position(1), label_position(3));
+        assert_eq!(label_position(2) - label_position(1), 16.0);
+        let root_disclosure = labelled(scene, "Collapse").unwrap();
+        scene.click(&root_disclosure, 1);
+        assert!(!expanded.get().contains(&0));
+        assert_eq!(selected.get(), Some(0));
+        assert!(scene.named("tree-record-2").is_none());
+    });
+}
+
+#[test]
 fn matrix() {
     {
         InteractiveScene::run(720.0, HEIGHT, |scene| {
@@ -441,7 +509,7 @@ fn matrix() {
                                 picker.absolute_frame()
                             );
 
-                            let expected_height = 44.0 * scale;
+                            let expected_height = TableLayout::default().row_height * scale;
                             let touch_floor = if input.contains(InputCapabilities::TOUCH) {
                                 44.0
                             } else {
@@ -656,6 +724,45 @@ fn edit_and_navigation() {
 }
 
 #[test]
+fn tab_keeps_a_rejected_draft_and_walks_visible_editable_cells_after_a_fix() {
+    InteractiveScene::run(720.0, HEIGHT, |scene| {
+        let harness = Harness::new(true);
+        harness
+            .overrides
+            .set(HashMap::from([("c1".to_owned(), false)]));
+        scene.install(harness.clone());
+        scene.click(&scene.named("column-value-0-0").unwrap(), 1);
+        scene.key(Scancode::F2, KeyModifiers::default());
+        let field = editor_field(scene);
+        scene.key(Scancode::BACKSPACE, KeyModifiers::default());
+        scene.key(Scancode::TAB, KeyModifiers::default());
+        assert_eq!(scene.focus.focused(), Some(field));
+        assert!(
+            labelled(scene, "Edit Name")
+                .unwrap()
+                .accessibility()
+                .unwrap()
+                .state
+                .is_invalid
+        );
+
+        type_text(scene, "Fixed");
+        scene.key(Scancode::TAB, KeyModifiers::default());
+        assert_eq!(harness.model.record_for(&0).unwrap().name, "Fixed");
+        assert!(labelled(scene, "Edit Quantity").is_some());
+        assert_eq!(scene.focus.focused(), Some(editor_field(scene)));
+        assert_eq!(
+            harness.selection.get().focused_column_id.as_deref(),
+            Some("c2")
+        );
+
+        scene.key(Scancode::TAB, KeyModifiers::LEFT_SHIFT);
+        assert!(labelled(scene, "Edit Name").is_some());
+        assert_eq!(scene.focus.focused(), Some(editor_field(scene)));
+    });
+}
+
+#[test]
 fn sort_and_focus() {
     InteractiveScene::run(720.0, HEIGHT, |scene| {
         let harness = Harness::new(true);
@@ -666,7 +773,8 @@ fn sort_and_focus() {
         let sort = labelled(scene, "Sort by Notes").expect("the header mounts");
         scene.click(&sort, 1);
         let sort = labelled(scene, "Sort by Notes").expect("the header stays mounted");
-        scene.click(&sort, 1);
+        scene.focus.focus(Some(&sort), true);
+        scene.key(Scancode::RETURN, KeyModifiers::default());
         scene.settle(10, 1.0);
         let first = scene
             .named("column-value-0-99")

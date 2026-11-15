@@ -212,6 +212,17 @@ impl View for StorySection {
                 )
             }))
         };
+        let mut children = vec![AnyView::new(
+            Text::new(title)
+                .semantic_font(cove_ui_compose::theme::SemanticFontRef::headline())
+                .semantic_foreground(SemanticColorRef::on_surface()),
+        )];
+        if !detail.is_empty() {
+            children.push(AnyView::new(
+                Text::new(detail).semantic_foreground(SemanticColorRef::on_surface_muted()),
+            ));
+        }
+        children.push(card);
         AnyView::new(
             BoxView::new(
                 FlexDirection::Column,
@@ -219,17 +230,7 @@ impl View for StorySection {
                 Justify::FlexStart,
                 Wrap::NoWrap,
                 8.0,
-                AnyView::new(TupleView::new(vec![
-                    AnyView::new(
-                        Text::new(title)
-                            .semantic_font(cove_ui_compose::theme::SemanticFontRef::headline())
-                            .semantic_foreground(SemanticColorRef::on_surface()),
-                    ),
-                    AnyView::new(
-                        Text::new(detail).semantic_foreground(SemanticColorRef::on_surface_muted()),
-                    ),
-                    card,
-                ])),
+                AnyView::new(TupleView::new(children)),
             )
             .flex(0.0)
             .debug_name(&self.debug_name_value()),

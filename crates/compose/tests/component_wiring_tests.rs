@@ -289,8 +289,10 @@ impl View for Fixture {
 fn header(scene: &InteractiveScene, title: &str) -> Node {
     scene
         .first(|node| {
-            node.accessibility()
-                .is_some_and(|semantics| semantics.label == format!("Sort by {title}"))
+            node.is_hit_testable()
+                && node
+                    .accessibility()
+                    .is_some_and(|semantics| semantics.label == title)
         })
         .expect("the header mounts")
 }

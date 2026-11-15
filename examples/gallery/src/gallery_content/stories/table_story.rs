@@ -15,28 +15,30 @@
 //! - navigating to a row sets both row and column and bumps the request id
 
 use cove_composition::Scope;
-use std::cell::RefCell;
-use std::collections::BTreeSet;
+use std::collections::{BTreeSet, HashSet};
 use std::rc::Rc;
 
+use cove_core::scene::{Align, FlexDirection, Justify, Wrap};
 use cove_core::{State, TextAlignment};
-use cove_ui_compose::modifiers::layout::{FlexExt, LayoutFrameExt};
+use cove_ui_compose::modifiers::layout::{LayoutFrameExt, PaddingExt};
 use cove_ui_compose::modifiers::style::SemanticStyleViewExt;
-use cove_ui_compose::primitives::controls::{Button, ButtonIconSource, Toggle};
+use cove_ui_compose::primitives::controls::{Button, Toggle};
 use cove_ui_compose::primitives::data::lists::Selection;
-use cove_ui_compose::primitives::data::table::table_column::{
-    ColumnVisibility, ComparisonResult, TableColumn, TableColumnLayout, TableTextEditing,
+use cove_ui_compose::primitives::data::lists::tree::{
+    Tree, TreeLayout, TreeOptions, TreeSelection,
 };
-use cove_ui_compose::primitives::data::table::{Table, TableOptions};
+use cove_ui_compose::primitives::data::table::table_column::{
+    ColumnVisibility, ComparisonResult, TableColumn, TableColumnLayout, TableLayout,
+    TableTextEditing,
+};
+use cove_ui_compose::primitives::data::table::{Table, TableModel, TableNavigation, TableOptions};
 use cove_ui_compose::primitives::data::{TreeTable, TreeTableColumn, TreeTableOptions};
-use cove_ui_compose::primitives::media::ui_icon_catalog as icons;
 use cove_ui_compose::primitives::text::Text;
-use cove_ui_compose::theme::styles::buttons::{ButtonStyleViewExt, ghost};
-use cove_ui_compose::theme::tokens::SemanticColorRef;
+use cove_ui_compose::theme::{SemanticColorRef, SemanticFontRef, ThemeMetric};
 use cove_ui_compose::{AnyView, BoxView, LayoutDebugExt, TupleView, View};
 
 use super::feedback::StorySection;
-use crate::gallery_content::catalog::GalleryOptions;
+use crate::gallery_content::catalog::{CowSize, GalleryOptions};
 
 /// The row counts the loader offers.
 pub const SMALL_LOAD: usize = 1_000;
@@ -267,13 +269,13 @@ pub fn group_thousands(value: usize) -> String {
 /// `TableStory`: the warehouse table plus the project tree.
 pub struct TableStory {
     pub options: GalleryOptions,
-    rows: Rc<RefCell<Vec<WarehouseRow>>>,
+    model: Rc<TableModel<WarehouseRow, usize>>,
     selection: State<BTreeSet<usize>>,
     status: State<String>,
     is_frozen: State<bool>,
-    navigation: Rc<RefCell<Navigation>>,
+    navigation: State<Navigation>,
     order: State<Vec<String>>,
-    expanded: State<Vec<String>>,
+    expanded: State<HashSet<String>>,
     tree_expanded: State<BTreeSet<String>>,
     tree_selected: State<Option<String>>,
 }
@@ -292,25 +294,28 @@ impl TableStory {
         let rows: Vec<WarehouseRow> = (0..SMALL_LOAD).map(WarehouseRow::generate).collect();
         Self {
             options,
-            rows: Rc::new(RefCell::new(rows)),
+            model: TableModel::try_new(rows, |row: &WarehouseRow| row.id)
+                .expect("warehouse generator assigns one unique id per row"),
             selection: State::new(BTreeSet::new()),
             status: State::new("Ready".to_owned()),
             is_frozen: State::new(true),
-            navigation: Rc::new(RefCell::new(Navigation::default())),
+            navigation: State::new(Navigation::default()),
             order: State::new(Vec::new()),
             // The sample tree opens with `engine` expanded.
-            expanded: State::new(vec!["engine".to_owned()]),
+            expanded: State::new(HashSet::from(["engine".to_owned()])),
             tree_expanded: State::new(BTreeSet::from(["scene".to_owned(), "lights".to_owned()])),
             tree_selected: State::new(Some("camera".to_owned())),
         }
     }
 
     pub fn row_count(&self) -> usize {
-        self.rows.borrow().len()
+        self.model.count()
     }
 
     pub fn rows(&self) -> Vec<WarehouseRow> {
-        self.rows.borrow().clone()
+        (0..self.model.count())
+            .filter_map(|index| self.model.record_at(index))
+            .collect()
     }
 
     pub fn status(&self) -> String {
@@ -330,13 +335,18 @@ impl TableStory {
     }
 
     pub fn navigation(&self) -> Navigation {
-        *self.navigation.borrow()
+        self.navigation.get()
     }
 
     /// Replaces the dataset, clears the selection and focuses the first row.
     pub fn load(&self, count: usize) {
         let rows: Vec<WarehouseRow> = (0..count).map(WarehouseRow::generate).collect();
-        *self.rows.borrow_mut() = rows;
+        if let Err(error) = self.model.replace_rows(rows) {
+            cove_ui_compose::core::Logger::new("com.cove.gallery.table")
+                .error(format!("Could not load warehouse rows: {error}"));
+            self.status.set("Could not load rows".to_owned());
+            return;
+        }
         self.selection.set(BTreeSet::new());
         // The card's toolbar owns the row count, so this strip reports events
         // only; a second copy of the same number 400pt below it is noise.
@@ -346,9 +356,10 @@ impl TableStory {
 
     /// Moves focus to a row, leaving the column on the name column.
     pub fn navigate_to(&self, index: usize) {
-        let mut navigation = self.navigation.borrow_mut();
-        navigation.row = Some(index);
-        navigation.request_id = navigation.request_id.wrapping_add(1);
+        self.navigation.update(|navigation| {
+            navigation.row = self.model.row_id_at(index);
+            navigation.request_id = navigation.request_id.wrapping_add(1);
+        });
     }
 
     /// Jumps to the middle row.
@@ -374,11 +385,10 @@ impl TableStory {
     /// Records the activation the table reported.
     pub fn activate(&self, row_id: usize) {
         let name = self
-            .rows
-            .borrow()
-            .iter()
-            .find(|row| row.id == row_id)
-            .map(|row| row.name.clone())
+            .model
+            .index_for(&row_id)
+            .and_then(|index| self.model.record_at(index))
+            .map(|row| row.name)
             .unwrap_or_else(|| format!("Asset {}", row_id + 1));
         self.status.set(format!("Opened {name}"));
     }
@@ -395,21 +405,18 @@ impl TableStory {
     }
 
     pub fn expanded(&self) -> Vec<String> {
-        self.expanded.get()
+        self.expanded.get().into_iter().collect()
     }
 
     pub fn visible_tree(&self) -> Vec<(String, usize)> {
-        let set: std::collections::HashSet<String> = self.expanded.get().into_iter().collect();
-        visible_tree_rows(&set)
+        visible_tree_rows(&self.expanded.get())
     }
 
     /// Toggles a branch's disclosure.
     pub fn toggle_branch(&self, id: &str) {
         self.expanded.update(|current| {
-            if let Some(position) = current.iter().position(|value| value == id) {
-                current.remove(position);
-            } else {
-                current.push(id.to_owned());
+            if !current.remove(id) {
+                current.insert(id.to_owned());
             }
         });
     }
@@ -422,7 +429,7 @@ impl TableStory {
     fn handle(&self) -> Self {
         Self {
             options: self.options.clone(),
-            rows: self.rows.clone(),
+            model: self.model.clone(),
             selection: self.selection.clone(),
             status: self.status.clone(),
             is_frozen: self.is_frozen.clone(),
@@ -441,29 +448,28 @@ impl TableStory {
             layout.width = width;
             layout
         };
-        vec![
+        let mut columns = vec![
             TableColumn::new("name", "Asset", |row: &WarehouseRow| {
                 AnyView::new(Text::new(row.name.clone()))
             })
-            .layout(sized(180.0))
-            .text_editing(TableTextEditing::new(
-                |row: &WarehouseRow| row.name.clone(),
-                |row: &mut WarehouseRow, value: &str| row.name = value.to_owned(),
-            ))
+            .layout(TableColumnLayout {
+                is_flex: true,
+                ..sized(184.0)
+            })
+            .text_editing(
+                TableTextEditing::new(
+                    |row: &WarehouseRow| row.name.clone(),
+                    |row: &mut WarehouseRow, value: &str| row.name = value.to_owned(),
+                )
+                .validate(|value| validate_name(value).map(str::to_owned)),
+            )
             .compare(|left: &WarehouseRow, right: &WarehouseRow| {
                 compare_names(&left.name, &right.name)
             }),
             TableColumn::new("category", "Category", |row: &WarehouseRow| {
                 AnyView::new(Text::new(row.category))
             })
-            .layout({
-                let mut layout = sized(180.0);
-                // The category column is the one with room to breathe: it takes
-                // the card's slack so the quantity column stays compact and
-                // right-aligned at the table's edge.
-                layout.is_flex = true;
-                layout
-            })
+            .layout(sized(136.0))
             .visibility(ColumnVisibility::Optional)
             .compare(|left: &WarehouseRow, right: &WarehouseRow| {
                 compare_names(&left.category, &right.category)
@@ -497,49 +503,74 @@ impl TableStory {
                 layout
             })
             .visibility(ColumnVisibility::Optional)
+            .priority(20)
             .compare(|left: &WarehouseRow, right: &WarehouseRow| {
                 compare_quantities(left.quantity, right.quantity)
             })
-            .text_editing(TableTextEditing::new(
-                |row: &WarehouseRow| row.quantity.to_string(),
-                apply_quantity,
-            )),
-        ]
+            .text_editing(
+                TableTextEditing::new(
+                    |row: &WarehouseRow| row.quantity.to_string(),
+                    apply_quantity,
+                )
+                .validate(|value| validate_quantity(value).map(str::to_owned)),
+            ),
+        ];
+        columns.extend((0..METRIC_COLUMNS).map(|metric| {
+            TableColumn::new(
+                format!("metric-{}", metric + 1),
+                format!("Metric {}", metric + 1),
+                move |row: &WarehouseRow| AnyView::new(Text::new(row.metric(metric).to_string())),
+            )
+            .layout(TableColumnLayout {
+                alignment: TextAlignment::Trailing,
+                ..sized(100.0)
+            })
+            .visibility(ColumnVisibility::Hidden)
+            .compare(move |left: &WarehouseRow, right: &WarehouseRow| {
+                compare_quantities(left.metric(metric), right.metric(metric))
+            })
+        }));
+        columns
     }
 }
 
-/// The sample node with `id`, if the authored tree has one.
-pub fn find_node(nodes: &[ProjectNode], id: &str) -> Option<ProjectNode> {
-    for node in nodes {
-        if node.id == id {
-            return Some(node.clone());
-        }
-        if let Some(found) = find_node(&node.children, id) {
-            return Some(found);
-        }
+fn table_layout(size: CowSize) -> TableLayout {
+    let (row_height, header_height) = match size {
+        CowSize::Mini => (28.0, 28.0),
+        CowSize::Small => (32.0, 30.0),
+        CowSize::Regular => (36.0, 32.0),
+        CowSize::Large => (44.0, 40.0),
+    };
+    TableLayout {
+        row_height,
+        header_height,
+        ..Default::default()
     }
-    None
 }
 
 impl View for TableStory {
     fn body(&self, _cx: &Scope) -> AnyView {
         let enabled = self.options.is_enabled;
-        let mut options = TableOptions::default();
-        options.is_enabled = enabled;
-        // Three visible columns in a wide card: the last one takes the slack so
-        // the grid ends at the card edge.
-        options.layout.fills_width = true;
-        options.frozen_column_count = self.frozen_column_count();
-        options.column_order = Some(self.order.binding());
-        options.selection = Some(Selection::multiple(self.selection.binding()));
-
+        let navigation = self.navigation();
         let activate = self.handle();
         let table = AnyView::new(
-            Table::new(self.rows(), |row: &WarehouseRow| row.id, self.columns())
+            Table::try_new(self.model.clone(), self.columns())
                 .expect("the gallery table columns are static with unique ids")
-                .options(options)
+                .options(TableOptions {
+                    is_enabled: enabled,
+                    layout: table_layout(self.options.size),
+                    frozen_column_count: self.frozen_column_count(),
+                    column_order: Some(self.order.binding()),
+                    selection: Some(Selection::multiple(self.selection.binding())),
+                    navigation: TableNavigation {
+                        request_id: navigation.row.map(|_| navigation.request_id),
+                        row_id: navigation.row,
+                        column_id: Some("name".to_owned()),
+                    },
+                    ..Default::default()
+                })
                 .on_activate(move |row: &WarehouseRow| activate.activate(row.id))
-                .frame_height(320.0)
+                .frame_height(322.0)
                 .debug_name("data-table"),
         );
 
@@ -548,187 +579,106 @@ impl View for TableStory {
         let middle = self.handle();
         let last = self.handle();
         let controls = AnyView::new(BoxView::new(
-            cove_core::scene::FlexDirection::Row,
-            cove_core::scene::Align::Center,
-            cove_core::scene::Justify::FlexStart,
-            cove_core::scene::Wrap::Wrap,
-            12.0,
+            FlexDirection::Row,
+            Align::Center,
+            Justify::FlexStart,
+            Wrap::Wrap,
+            8.0,
             AnyView::new(TupleView::new(vec![
                 AnyView::new(
-                    Button::title("Load 1,000 rows", move || small.load(SMALL_LOAD))
-                        .enabled(enabled),
+                    Button::title("Load 1,000", move || small.load(SMALL_LOAD)).enabled(enabled),
                 ),
                 AnyView::new(
-                    Button::title("Load 200,000 rows", move || large.load(LARGE_LOAD))
-                        .enabled(enabled),
+                    Button::title("Load 200,000", move || large.load(LARGE_LOAD)).enabled(enabled),
                 ),
-                AnyView::new(Button::title("Middle row", move || {
-                    middle.navigate_middle();
-                })),
-                AnyView::new(Button::title("Last row", move || {
-                    last.navigate_last();
-                })),
+                AnyView::new(
+                    Button::title("Middle row", move || {
+                        middle.navigate_middle();
+                    })
+                    .enabled(enabled),
+                ),
+                AnyView::new(
+                    Button::title("Last row", move || {
+                        last.navigate_last();
+                    })
+                    .enabled(enabled),
+                ),
                 AnyView::new(
                     Toggle::labeled("Freeze Asset", self.is_frozen.binding()).enabled(enabled),
                 ),
             ])),
         ));
 
-        let status = Text::new(self.status())
-            .semantic_font(cove_ui_compose::theme::SemanticFontRef::caption())
-            .semantic_foreground(SemanticColorRef::on_surface_muted());
-        let order = Text::new(self.order_caption())
-            .semantic_font(cove_ui_compose::theme::SemanticFontRef::caption())
-            .semantic_foreground(SemanticColorRef::on_surface_muted());
+        let mut warehouse = vec![controls, table];
+        let status = self.status();
+        if status != "Ready" && status != "Loaded" {
+            warehouse.push(AnyView::new(
+                Text::new(status)
+                    .semantic_font(SemanticFontRef::caption())
+                    .semantic_foreground(SemanticColorRef::on_surface_muted())
+                    .debug_name("gallery-data-table"),
+            ));
+        }
 
-        let tree: Vec<AnyView> = self
-            .visible_tree()
-            .into_iter()
-            .map(|(id, depth)| {
-                let node = find_node(&ProjectNode::sample(), &id);
-                let is_expandable = node.as_ref().is_some_and(|node| node.is_expandable());
-                let is_expanded = self.expanded.get().contains(&id);
-                let title = node
-                    .as_ref()
-                    .map(|node| node.name.to_owned())
-                    .unwrap_or_else(|| id.clone());
+        let project = Tree::new(
+            ProjectNode::sample(),
+            |node: &ProjectNode| node.id.to_owned(),
+            |node: &ProjectNode| node.children.clone(),
+            |node: &ProjectNode, _| AnyView::new(Text::new(node.name).truncating_tail()),
+        )
+        .options(TreeOptions {
+            is_enabled: enabled,
+            selection: TreeSelection {
+                expanded: Some(self.expanded.binding()),
+                ..TreeSelection::local([])
+            },
+            layout: TreeLayout::default()
+                .row_height(table_layout(self.options.size).row_height)
+                .leading_padding(8.0)
+                .trailing_padding(8.0),
+            ..Default::default()
+        });
 
-                // Indent and disclosure slots are layout-backed spacers so the
-                // labels line up; an EmptyView alone has no layout node and its
-                // explicit width is dropped by the flex solver.
-                let spacer = |width: f32| {
-                    AnyView::new(
-                        BoxView::new(
-                            cove_core::scene::FlexDirection::Row,
-                            cove_core::scene::Align::Center,
-                            cove_core::scene::Justify::FlexStart,
-                            cove_core::scene::Wrap::NoWrap,
-                            0.0,
-                            AnyView::new(cove_ui_compose::EmptyView),
-                        )
-                        .frame_width(width)
-                        .flex_with(0.0, 0.0, None),
-                    )
-                };
-                let indent: AnyView = spacer(depth as f32 * 16.0);
-                let disclosure: AnyView = if is_expandable {
-                    let story = self.handle();
-                    let toggle_id = id.clone();
-                    AnyView::new(
-                        AnyView::new(
-                            Button::icon(
-                                ButtonIconSource::resource(if is_expanded {
-                                    icons::navigation::chevron_down()
-                                } else {
-                                    icons::navigation::chevron_right()
-                                }),
-                                12.0,
-                                move || story.toggle_branch(&toggle_id),
-                            )
-                            .tooltip(if is_expanded {
-                                "Collapse"
-                            } else {
-                                "Expand"
-                            }),
-                        )
-                        // A tree disclosure is a glyph-only affordance: no bezel at
-                        // rest, a state layer on hover.
-                        .button_style(ghost())
-                        .flex_with(0.0, 0.0, None)
-                        .frame_width(20.0),
-                    )
-                } else {
-                    // Leaves keep the disclosure slot so every label lines up.
-                    spacer(20.0)
-                };
-                let label: AnyView = AnyView::new(
-                    AnyView::new(BoxView::new(
-                        cove_core::scene::FlexDirection::Row,
-                        cove_core::scene::Align::Center,
-                        cove_core::scene::Justify::FlexStart,
-                        cove_core::scene::Wrap::NoWrap,
-                        0.0,
-                        AnyView::new(
-                            Text::new(title)
-                                .semantic_foreground(SemanticColorRef::on_surface())
-                                .frame_min_width(0.0),
-                        ),
-                    ))
-                    .flex_with(1.0, 1.0, Some(0.0))
-                    .frame(None, None, Some(0.0), None, None, None),
-                );
-
-                AnyView::new(BoxView::new(
-                    cove_core::scene::FlexDirection::Row,
-                    cove_core::scene::Align::Center,
-                    cove_core::scene::Justify::FlexStart,
-                    cove_core::scene::Wrap::NoWrap,
-                    2.0,
-                    AnyView::new(TupleView::new(vec![indent, disclosure, label])),
-                ))
-            })
-            .collect();
-
-        let caption = Text::new("Return commits · Escape cancels · Tab moves to the next editable cell · Arrows / Page Up / Page Down / Home / End navigate".to_string())
-        .semantic_font(cove_ui_compose::theme::SemanticFontRef::caption())
-        .semantic_foreground(SemanticColorRef::on_surface_muted());
-
-        AnyView::new(cove_ui_compose::BoxView::new(
-            cove_core::scene::FlexDirection::Column,
-            cove_core::scene::Align::Stretch,
-            cove_core::scene::Justify::FlexStart,
-            cove_core::scene::Wrap::NoWrap,
+        AnyView::new(BoxView::new(
+            FlexDirection::Column,
+            Align::Stretch,
+            Justify::FlexStart,
+            Wrap::NoWrap,
             24.0,
             AnyView::new(TupleView::new(vec![
-                AnyView::new(StorySection::new(
-                    "Warehouse · up to 200,000 rows × 35 columns",
-                    "Load rows once. Narrow tables hide lower-priority columns. Use Columns to reveal them or restore Automatic columns; explicit choices scroll horizontally while Asset remains frozen. Double-click Asset or Quantity, or press F2, to edit.",
+                AnyView::new(StorySection::plain(
+                    "Warehouse",
+                    "Double-click Asset or Quantity, or press F2, to edit.",
                     AnyView::new(BoxView::new(
-                        cove_core::scene::FlexDirection::Column,
-                        cove_core::scene::Align::Stretch,
-                        cove_core::scene::Justify::FlexStart,
-                        cove_core::scene::Wrap::NoWrap,
-                        12.0,
-                        AnyView::new(TupleView::new(vec![
-                            controls,
-                            table,
-                            AnyView::new(BoxView::new(
-                                cove_core::scene::FlexDirection::Row,
-                                cove_core::scene::Align::Center,
-                                cove_core::scene::Justify::FlexStart,
-                                cove_core::scene::Wrap::Wrap,
-                                12.0,
-                                AnyView::new(TupleView::new(vec![
-                                    AnyView::new(
-                                        AnyView::new(status).debug_name("gallery-data-table"),
-                                    ),
-                                    AnyView::new(order),
-                                ])),
-                            )),
-                        ])),
-                    )),
-                )),
-                AnyView::new(StorySection::new(
-                    "Project tree",
-                    "A node's children appear only when every ancestor is expanded.",
-                    AnyView::new(BoxView::new(
-                        cove_core::scene::FlexDirection::Column,
-                        cove_core::scene::Align::Stretch,
-                        cove_core::scene::Justify::FlexStart,
-                        cove_core::scene::Wrap::NoWrap,
+                        FlexDirection::Column,
+                        Align::Stretch,
+                        Justify::FlexStart,
+                        Wrap::NoWrap,
                         8.0,
-                        AnyView::new(TupleView::new(tree)),
+                        AnyView::new(TupleView::new(warehouse)),
                     )),
                 )),
-                AnyView::new(StorySection::new(
+                AnyView::new(StorySection::plain(
+                    "Project tree",
+                    "",
+                    AnyView::new(
+                        project
+                            .frame_height(184.0)
+                            .padding_edges(0.0, 4.0)
+                            .semantic_background(SemanticColorRef::surface_variant())
+                            .corner_radius_metric(ThemeMetric::control_radius())
+                            .debug_name("project-tree"),
+                    ),
+                )),
+                AnyView::new(StorySection::plain(
                     "Tree table",
-                    "The first column carries the hierarchy: Right expands a branch or enters its first child, Left collapses or returns to the parent. Columns, widths, freezing and grid navigation come from Table.",
+                    "",
                     AnyView::new(TreeTableSample {
+                        options: self.options.clone(),
                         expanded: self.tree_expanded.clone(),
                         selected: self.tree_selected.clone(),
                     }),
                 )),
-                AnyView::new(caption),
             ])),
         ))
     }
@@ -738,7 +688,7 @@ impl View for TableStory {
     }
 
     fn dynamic_properties(&self) -> Vec<cove_composition::DynamicField> {
-        cove_composition::dynamic_fields!(self; selection, status, is_frozen, order, expanded)
+        cove_composition::dynamic_fields!(self; status, is_frozen, navigation)
     }
 }
 
@@ -806,6 +756,7 @@ impl AssetNode {
 /// The tree-table demonstration: real `TreeTable` bound to the story's own
 /// expansion and selection state.
 pub struct TreeTableSample {
+    options: GalleryOptions,
     expanded: State<BTreeSet<String>>,
     selected: State<Option<String>>,
 }
@@ -822,51 +773,45 @@ impl TreeTableSample {
 
 impl View for TreeTableSample {
     fn body(&self, _cx: &Scope) -> AnyView {
-        let mut options = TreeTableOptions::default();
-        options.expanded = Some(self.expanded.binding());
-        options.selection = Some(Selection::single(self.selected.binding()));
-        options.indentation = 16.0;
+        let options = TreeTableOptions {
+            expanded: Some(self.expanded.binding()),
+            selection: Some(Selection::single(self.selected.binding())),
+            layout: table_layout(self.options.size),
+            is_enabled: self.options.is_enabled,
+            ..Default::default()
+        };
 
-        let table = AnyView::new(
+        AnyView::new(
             TreeTable::try_new(
                 AssetNode::sample(),
                 |node: &AssetNode| node.id.clone(),
                 |node: &AssetNode| (!node.children.is_empty()).then(|| node.children.clone()),
                 TreeTableColumn::new("name", "Name", |node: &AssetNode| {
-                    AnyView::new(Text::new(node.name.clone()))
+                    AnyView::new(Text::new(node.name.clone()).truncating_tail())
+                })
+                .layout(TableColumnLayout {
+                    width: 208.0,
+                    is_flex: true,
+                    ..Default::default()
                 }),
                 [
                     TreeTableColumn::new("kind", "Type", |node: &AssetNode| {
-                        AnyView::new(Text::new(node.kind.clone()))
+                        AnyView::new(Text::new(node.kind.clone()).truncating_tail())
                     }),
                     TreeTableColumn::new("size", "Size", |node: &AssetNode| {
                         AnyView::new(Text::new(node.size.clone()))
+                    })
+                    .layout(TableColumnLayout {
+                        width: 104.0,
+                        alignment: TextAlignment::Trailing,
+                        ..Default::default()
                     }),
                 ],
             )
             .expect("the gallery tree-table columns are static with unique ids")
             .options(options)
-            .frame_height(240.0)
+            .frame_height(288.0)
             .debug_name("tree-table"),
-        );
-
-        let caption = Text::new(match self.selected() {
-            Some(id) => format!("Selected: {id}"),
-            None => "No asset selected".to_owned(),
-        })
-        .semantic_font(cove_ui_compose::theme::SemanticFontRef::caption())
-        .semantic_foreground(SemanticColorRef::on_surface_muted());
-
-        AnyView::new(BoxView::new(
-            cove_core::scene::FlexDirection::Column,
-            cove_core::scene::Align::Stretch,
-            cove_core::scene::Justify::FlexStart,
-            cove_core::scene::Wrap::NoWrap,
-            8.0,
-            AnyView::new(TupleView::new(vec![
-                table,
-                AnyView::new(AnyView::new(caption).debug_name("tree-table-selection")),
-            ])),
-        ))
+        )
     }
 }

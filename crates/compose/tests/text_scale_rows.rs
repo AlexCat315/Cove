@@ -513,7 +513,7 @@ fn data_table_paging_follows_live_text_scale() {
             for row in &last {
                 assert_eq!(
                     row.frame().height,
-                    44.0 * value,
+                    TableLayout::default().row_height * value,
                     "data-table rows follow the live scale at {value}x (actual {})",
                     row.frame().height
                 );

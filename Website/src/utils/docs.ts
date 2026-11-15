@@ -66,6 +66,7 @@ import component12 from '@/content/components/timeline.md?raw'
 import chart from '@/content/components/chart.md?raw'
 import table from '@/content/components/table.md?raw'
 import tree from '@/content/components/tree.md?raw'
+import treeTable from '@/content/components/tree-table.md?raw'
 import dragAndDrop from '@/content/components/drag-and-drop.md?raw'
 import component13 from '@/content/components/tab-view.md?raw'
 import component14 from '@/content/components/date-range.md?raw'
@@ -154,6 +155,7 @@ export const docGroups: DocGroup[] = [
       { slug: 'chart', title: 'Chart', raw: chart },
       { slug: 'table', title: 'Table', raw: table },
       { slug: 'tree', title: 'Tree', raw: tree },
+      { slug: 'tree-table', title: 'TreeTable', raw: treeTable },
       { slug: 'drag-and-drop', title: 'Drag & Drop', raw: dragAndDrop },
       { slug: 'timeline', title: 'Timeline', raw: component12 },
       { slug: 'tab-view', title: 'TabView', raw: component13 },

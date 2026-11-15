@@ -268,10 +268,8 @@ pub struct TableLayout {
 impl Default for TableLayout {
     fn default() -> Self {
         Self {
-            // 44pt rows hold a 16pt value without crowding, and the compact
-            // 40pt header keeps the grid anchored to the data.
-            row_height: 44.0,
-            header_height: 40.0,
+            row_height: 36.0,
+            header_height: 32.0,
             is_striped: false,
             // Full bleed: the rules run edge to edge so the rows read as one
             // grid, not as a column of floating dashes.
@@ -298,7 +296,7 @@ impl TableLayout {
         self.header_height = if self.header_height.is_finite() {
             self.header_height.max(24.0)
         } else {
-            38.0
+            32.0
         };
     }
 
@@ -338,12 +336,8 @@ pub struct TableColumnPlan {
     pub available_width: f32,
 }
 
-/// The table's three-way visibility maps onto the shared plan's two-way one.
-///
-/// `Hidden` is handled by the table before planning (the column is filtered out
-/// entirely), so only `Required` and `Optional` reach the resolver. Automatic
-/// columns leave the plan in ascending `priority` order, and equal priorities
-/// fall back to the authored order.
+/// Maps the table's visibility into the grid planner. Hidden columns are
+/// included in the tracks so the picker can list them.
 fn table_visibility(
     column: &TableColumn<impl Sized>,
 ) -> crate::primitives::layout::grid::ColumnVisibility {
@@ -401,8 +395,14 @@ impl TableColumnPlan {
                 .map(|column| column.id.clone()),
         );
 
+        let mut overrides = overrides.clone();
+        for column in columns {
+            if column.visibility == ColumnVisibility::Hidden {
+                overrides.entry(column.id.clone()).or_insert(false);
+            }
+        }
         let plan =
-            ColumnVisibilityPlan::resolve(&tracks, overrides, available_width, 0.0, &required);
+            ColumnVisibilityPlan::resolve(&tracks, &overrides, available_width, 0.0, &required);
 
         // A frozen prefix that fills the viewport cannot stay frozen: there would
         // be no scrollable region left for the remaining columns.

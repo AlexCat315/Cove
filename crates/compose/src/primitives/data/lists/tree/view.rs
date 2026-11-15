@@ -2452,7 +2452,7 @@ fn virtual_align(align: TreeScrollAlign) -> VirtualScrollAlign {
 /// A fixed-size empty slot. `EmptyView` has no layout node, so a frame applied
 /// to it reserves no width; leaf rows then lose their indentation and
 /// disclosure gutter.
-fn fixed_spacer(width: f32, height: f32) -> AnyView {
+pub(crate) fn fixed_spacer(width: f32, height: f32) -> AnyView {
     AnyView::new(
         AnyView::new(BoxView::new(
             FlexDirection::Row,
