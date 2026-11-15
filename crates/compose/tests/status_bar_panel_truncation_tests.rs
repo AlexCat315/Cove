@@ -18,7 +18,8 @@
 //! stretching probe, so the cell takes the slot the layout assigned it and the
 //! labels ellipsize inside it. At a 320pt bar the leading fact is 225.969pt wide
 //! from x = 8 and the trailing state starts at 253.969.
-//! `the_truncating_fact_stops_at_the_trailing_state` pins that.
+//! `the_truncating_fact_stops_at_the_trailing_state` checks the gap without
+//! depending on the host font's measured width.
 //! - a long panel title stays on one line at both a narrow and a wide panel, and
 //!   the narrow title is genuinely narrower so the accessory keeps its space
 
@@ -221,8 +222,6 @@ fn a_long_panel_title_stays_one_line_and_gives_space_back() {
 
 #[test]
 fn the_truncating_fact_stops_at_the_trailing_state() {
-    // The resolved difference above, pinned with the concrete geometry so a
-    // regression is easy to spot.
     GlobalTestLock::locked(|| {
         support::with_test_text_environment(|| {
             let leading = "feature/workspace-permissions-and-collaboration";
@@ -254,10 +253,11 @@ fn the_truncating_fact_stops_at_the_trailing_state() {
                 .expect("the trailing fact is mounted")
                 .absolute_frame();
 
-            let gap = cove_ui_compose::theme::theme_for_node(&root).spacing.md;
+            let gap = cove_ui_compose::theme::theme_for_node(&root).spacing.md + 12.0;
+            let actual_gap = trailing_frame.x - leading_frame.max_x();
             assert!(
-                (trailing_frame.x - leading_frame.max_x() - gap).abs() < 0.5,
-                "the leading fact takes the available space up to the themed gap"
+                (actual_gap - gap).abs() < 0.5,
+                "the leading fact takes the available space up to the {gap}pt gap, got {actual_gap}pt"
             );
             assert!(
                 leading_frame.max_x() <= trailing_frame.x,

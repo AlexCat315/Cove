@@ -31,9 +31,13 @@ fn supported() -> bool {
 /// Kept out of line so a sampled instruction address lands inside it.
 #[inline(never)]
 fn cove_profiling_busy_loop(stop: &AtomicBool) {
-    let mut accumulator: u64 = 0;
+    let mut accumulator: u64 = 1;
     while !stop.load(Ordering::Relaxed) {
-        accumulator = accumulator.wrapping_add(1);
+        // Leave enough work between flag checks for optimized samples to
+        // land in this function instead of the inlined atomic load.
+        for _ in 0..4096 {
+            accumulator = (accumulator >> 1) ^ ((accumulator & 1) * 0xd800_0000_0000_0000);
+        }
         std::hint::black_box(accumulator);
     }
 }

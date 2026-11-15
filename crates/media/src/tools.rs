@@ -457,6 +457,7 @@ mod tests {
                     .arg(format!("linker={}", linker.to_string_lossy()));
             }
             let result = compiler
+                .arg("--edition=2024")
                 .arg(&source)
                 .arg("-o")
                 .arg(&executable)
