@@ -49,7 +49,7 @@ pub struct Sdl3WindowHandle {
     /// Refreshed once per event poll and after every command, so reads never
     /// reach the platform.
     state: Cell<native::WindowState>,
-    backdrop: Cell<WindowBackdrop>,
+    translucent: Cell<bool>,
 }
 impl Sdl3WindowHandle {
     fn state(&self) -> native::WindowState {
@@ -129,8 +129,8 @@ impl WindowHandle for Sdl3WindowHandle {
             _ => None,
         }
     }
-    fn backdrop(&self) -> WindowBackdrop {
-        self.backdrop.get()
+    fn translucent(&self) -> bool {
+        self.translucent.get()
     }
     fn system_appearance(&self) -> SystemAppearance {
         // SAFETY: reads SDL's cached theme value; no window state is touched.
@@ -488,19 +488,16 @@ impl Shell for Sdl3Shell {
             _session: self.session.as_ref().unwrap().clone(),
             last_area: Cell::new(None),
             state: Cell::new(state),
-            backdrop: Cell::new(WindowBackdrop::Opaque),
+            translucent: Cell::new(false),
         });
-        let applied = match options.backdrop {
-            WindowBackdrop::Opaque => false,
-            // The DX12 swapchain applies the DWM backdrop with DirectComposition.
-            #[cfg(target_os = "windows")]
-            WindowBackdrop::Sidebar => true,
-            // SAFETY: the window pointer is live and owned by `window`.
-            #[cfg(not(target_os = "windows"))]
-            WindowBackdrop::Sidebar => unsafe { native::cove_shell_backdrop(pointer, 1) },
-        };
+        // The DX12 swapchain applies the DWM material with DirectComposition.
+        #[cfg(target_os = "windows")]
+        let applied = true;
+        // SAFETY: the window pointer is live and owned by `window`.
+        #[cfg(not(target_os = "windows"))]
+        let applied = unsafe { native::cove_shell_backdrop(pointer, 1) };
         if applied {
-            window.backdrop.set(options.backdrop);
+            window.translucent.set(true);
             // The backdrop moves content under the title bar; the first frame
             // must already see the new size and top inset.
             let mut state = native::WindowState::default();

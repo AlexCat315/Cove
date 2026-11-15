@@ -44,8 +44,8 @@ impl WindowHandle for ProxyWindow {
     fn safe_area(&self) -> WindowSafeArea {
         self.snapshot().safe_area
     }
-    fn backdrop(&self) -> cove_shell::WindowBackdrop {
-        self.snapshot().backdrop
+    fn translucent(&self) -> bool {
+        self.snapshot().translucent
     }
     fn system_appearance(&self) -> cove_shell::SystemAppearance {
         self.snapshot().system_appearance

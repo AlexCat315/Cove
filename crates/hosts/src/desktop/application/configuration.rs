@@ -30,7 +30,7 @@ impl AppWindowTitleBarStyle {
 ///
 /// Both variants share the same row, the same window controls and the same
 /// backdrop; only the row's fill and its bottom hairline differ. This keeps the
-/// choice independent of [`WindowBackdrop`] and [`AppWindowTitleBarStyle`].
+/// choice independent of [`AppWindowTitleBarStyle`].
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum TitleBarDivider {
     /// The window material runs straight through the bar: no fill, no line.
@@ -91,8 +91,6 @@ pub struct WindowConfiguration {
     /// and `title_bar_style`, so both looks use the same layout and material.
     pub title_bar_divider: TitleBarDivider,
     pub shows_dock_icon: bool,
-    /// Requested backdrop; the platform may fall back to opaque.
-    pub backdrop: cove_platform::WindowBackdrop,
     pub rendering: AppWindowRendering,
 }
 
@@ -113,7 +111,6 @@ impl Default for WindowConfiguration {
             title_bar_style: AppWindowTitleBarStyle::Standard,
             title_bar_divider: TitleBarDivider::Seamless,
             shows_dock_icon: true,
-            backdrop: cove_platform::WindowBackdrop::Opaque,
             rendering: AppWindowRendering::default(),
         }
     }

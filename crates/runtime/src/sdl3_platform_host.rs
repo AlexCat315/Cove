@@ -621,11 +621,11 @@ impl Sdl3PlatformHost {
     pub fn native_window_reference(&self, id: WindowId) -> Option<NativeWindowReference> {
         self.shell()?.borrow().window(id)?.native_window_reference()
     }
-    /// The backdrop the main window's platform applied.
-    pub fn backdrop(&self) -> cove_shell::WindowBackdrop {
+    /// Whether the main window's platform composited its material.
+    pub fn translucent(&self) -> bool {
         self.shell()
             .and_then(|s| self.main_window().and_then(|id| s.borrow().window(id)))
-            .map_or(cove_shell::WindowBackdrop::Opaque, |w| w.backdrop())
+            .is_some_and(|w| w.translucent())
     }
     /// The system light/dark appearance reported for the main window.
     pub fn system_appearance(&self) -> cove_shell::SystemAppearance {

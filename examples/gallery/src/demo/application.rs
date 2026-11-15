@@ -15,7 +15,7 @@ use cove_hosts::desktop::application::configuration::AppFrameDrivePolicy;
 use cove_hosts::desktop::diagnostics::ApplicationCheckpoint;
 use cove_hosts::{
     ApplicationConfiguration, ApplicationLaunch, NativeMenu, NativeMenuAction, NativeMenuBar,
-    NativeMenuItem, NativeMenuKeyModifiers, TitleBarDivider, WindowBackdrop,
+    NativeMenuItem, NativeMenuKeyModifiers, TitleBarDivider,
 };
 #[cfg(target_os = "windows")]
 use cove_ui_compose::adaptive::SurfaceReader;
@@ -37,9 +37,6 @@ fn configuration(launch: &ShowcaseLaunch) -> ApplicationConfiguration {
     if let Some(height) = launch.height {
         configuration.window.height = height;
     }
-    // The translucent material is the window default, independent of which
-    // single-row look is selected.
-    configuration.window.backdrop = WindowBackdrop::Sidebar;
     if !launch.shared_counter
         && launch.menu_bar.uses_immersive_title_bar()
         && launch.menu_bar == ShowcaseMenuBar::Separated
@@ -243,7 +240,7 @@ mod tests {
         let seamless = configuration(&launch("immersive"));
         let separated = configuration(&launch("separated"));
         assert_eq!(seamless.window.backdrop, separated.window.backdrop);
-        assert_eq!(seamless.window.backdrop, WindowBackdrop::Sidebar);
+        assert_eq!(seamless.window.title_bar_style, separated.window.title_bar_style);
         assert_eq!(seamless.window.title_bar_divider, TitleBarDivider::Seamless);
         assert_eq!(
             separated.window.title_bar_divider,

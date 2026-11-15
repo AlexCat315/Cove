@@ -33,7 +33,6 @@ pub enum SystemAppearance {
     Light,
     Dark,
 }
-use cove_platform::WindowBackdrop;
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct ChromeRect {
@@ -83,7 +82,6 @@ pub struct WindowOptions {
     pub min_height: i32,
     pub title_bar_style: WindowTitleBarStyle,
     pub shows_dock_icon: bool,
-    pub backdrop: WindowBackdrop,
 }
 impl Default for WindowOptions {
     fn default() -> Self {
@@ -94,7 +92,6 @@ impl Default for WindowOptions {
             min_height: 0,
             title_bar_style: WindowTitleBarStyle::Standard,
             shows_dock_icon: true,
-            backdrop: WindowBackdrop::Opaque,
         }
     }
 }
@@ -174,10 +171,11 @@ pub trait WindowHandle {
     fn is_visible(&self) -> bool;
     fn is_minimized(&self) -> bool;
     fn is_occluded(&self) -> bool;
-    /// The backdrop the platform actually applied; `Opaque` where the
-    /// requested material is unavailable.
-    fn backdrop(&self) -> WindowBackdrop {
-        WindowBackdrop::Opaque
+    /// Whether the platform actually composited its window material behind
+    /// clear pixels. Windows have no way to be opaque: a platform that cannot
+    /// blur reports `false` and the UI paints every pixel instead.
+    fn translucent(&self) -> bool {
+        false
     }
     /// The system light/dark appearance as seen by this window's platform.
     fn system_appearance(&self) -> SystemAppearance {
@@ -202,7 +200,7 @@ pub struct WindowSnapshot {
     pub refresh_rate: Option<f64>,
     pub surface: Option<NativeRenderSurface>,
     pub native_window: Option<NativeWindowReference>,
-    pub backdrop: WindowBackdrop,
+    pub translucent: bool,
     pub system_appearance: SystemAppearance,
 }
 pub type DialogCompletion = Box<dyn FnOnce(Vec<String>)>;
@@ -434,7 +432,7 @@ pub trait Shell {
             refresh_rate: self.display_refresh_rate(Some(id)),
             surface: window.render_surface(),
             native_window: window.native_window_reference(),
-            backdrop: window.backdrop(),
+            translucent: window.translucent(),
             system_appearance: window.system_appearance(),
         })
     }

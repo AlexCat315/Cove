@@ -146,12 +146,6 @@ impl ApplicationLaunch {
         self.apply_content_wrapper(content)
     }
 
-    /// Chooses what the platform composites behind clear pixels of the window.
-    pub fn window_backdrop(mut self, backdrop: crate::WindowBackdrop) -> Self {
-        self.configuration.window.backdrop = backdrop;
-        self
-    }
-
     /// Runs the native window host on the calling thread, which then owns the
     /// platform directly. Android invokes the registered factory from its Activity
     /// instead of entering this blocking loop.

@@ -237,13 +237,6 @@ impl Application {
             shows_dock_icon: config.window.shows_dock_icon
                 && !(config.diagnostics.dev_tools.is_some()
                     && environment_flag("SDL_WINDOW_ACTIVATE_WHEN_SHOWN").as_deref() == Some("0")),
-            backdrop: if cfg!(target_os = "windows")
-                && rendering.device().backend_api() != cove_graphics::rhi::GraphicsApi::Dx12
-            {
-                cove_shell::WindowBackdrop::Opaque
-            } else {
-                config.window.backdrop
-            },
         };
         let host = Sdl3PlatformHost::new(config.window.title.clone(), options);
         let portal_store = Rc::new(PortalStore::new());
@@ -1201,7 +1194,7 @@ impl Application {
             }
         }
         state.environment_override.borrow().apply(&mut environment);
-        environment.translucent_window = host.backdrop() != cove_shell::WindowBackdrop::Opaque;
+        environment.translucent_window = host.translucent();
         environment.title_bar_divider = state.title_bar_divider.get();
         environment.system_appearance = match host.system_appearance() {
             cove_shell::SystemAppearance::Light => cove_core::SystemAppearance::Light,
@@ -1291,7 +1284,7 @@ impl Application {
         }
         let mut settings =
             AppWindowRenderSettings::resolve(&state.config, state.config.window.rendering);
-        if state.host.backdrop() != cove_shell::WindowBackdrop::Opaque {
+        if state.host.translucent() {
             // Premultiplied clear: untouched pixels reveal the platform material.
             settings.clear_color = [0.0; 4];
             settings.premultiplied_alpha = true;

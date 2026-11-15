@@ -13,7 +13,7 @@ pub use application::{
     DiagnosticsSession,
 };
 pub use application_services::{http::TransportCapabilities, install_platform_services};
-pub use cove_platform::WindowBackdrop;
+
 #[cfg(not(target_arch = "wasm32"))]
 pub use desktop::AppDisplayHandle;
 pub use desktop::application::configuration::{ApplicationConfiguration, TitleBarDivider};
