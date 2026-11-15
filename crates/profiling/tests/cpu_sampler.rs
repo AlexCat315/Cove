@@ -127,44 +127,26 @@ mod sampled {
             .iter()
             .flat_map(|sample| sample.frames.iter())
             .collect::<Vec<_>>();
-        let resolved = frames
+        // An optimized sample in inlined code can carry the caller's symbol
+        // together with a source location from the inlined function.
+        let labelled = frames
             .iter()
-            .filter(|frame| {
+            .find(|frame| {
                 frame
                     .function
                     .as_deref()
                     .is_some_and(|name| name.contains("cove_profiling_busy_loop"))
+                    && frame.location.as_ref().is_some_and(|location| {
+                        location.line.is_some()
+                            && source_path(&location.file).ends_with("tests/cpu_sampler.rs")
+                    })
             })
-            .collect::<Vec<_>>();
-        assert!(
-            !resolved.is_empty(),
-            "no frame resolved to the busy loop; first frames: {:?}",
-            frames.iter().take(6).collect::<Vec<_>>()
-        );
-        assert!(
-            resolved.iter().all(|frame| {
-                frame.location.as_ref().is_some_and(|location| {
-                    source_path(&location.file).ends_with("tests/cpu_sampler.rs")
-                })
-            }),
-            "a busy-loop frame resolved outside its source file: {resolved:?}"
-        );
-        assert!(
-            resolved.iter().any(|frame| frame
-                .location
-                .as_ref()
-                .is_some_and(|location| location.line.is_some())),
-            "no busy-loop frame carried a line number: {resolved:?}"
-        );
-        let labelled = resolved
-            .iter()
-            .find(|frame| {
-                frame
-                    .location
-                    .as_ref()
-                    .is_some_and(|location| location.line.is_some())
-            })
-            .expect("a busy-loop frame with a line");
+            .unwrap_or_else(|| {
+                panic!(
+                    "no sample resolved to a busy-loop source line: {:?}",
+                    &frames[..frames.len().min(10)]
+                )
+            });
         assert!(labelled.label().contains("cove_profiling_busy_loop"));
         assert!(labelled.label().contains("cpu_sampler.rs:"));
     }
