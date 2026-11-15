@@ -860,8 +860,8 @@ impl TextSelectionChrome {
     /// divider registers at capture priority yet still says the pointer means
     /// "hand" or "resize", and its title must not turn that into a caret. The
     /// workspace canvas declares no cursor, so selectable text inside panels
-    /// keeps its caret. A scroll view's route exists only to scroll, so it does
-    /// not count.
+    /// keeps its caret. Scroll routing and tooltip dismissal do not own a
+    /// text selection gesture.
     pub fn is_inside_control(node: &Node) -> bool {
         let Some(registry) = InteractionRegistryHolder::current() else {
             return false;
@@ -876,7 +876,11 @@ impl TextSelectionChrome {
             }
             if let Some(route) = registry.handlers(&current).pointer_route
                 && route.priority <= InputRoutingPriority::NORMAL
-                && route.role != cove_core::scene::InputHandlerRole::Scroll
+                && !matches!(
+                    route.role,
+                    cove_core::scene::InputHandlerRole::Scroll
+                        | cove_core::scene::InputHandlerRole::Overlay
+                )
             {
                 return true;
             }

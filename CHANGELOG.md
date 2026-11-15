@@ -18,6 +18,7 @@ Cove 0.3.0 将 SDK 迁移到 Rust 2024，使用 Cargo 构建和管理依赖。
 
 - Rust SDK 提供共享 UI、窗口与移动宿主、终端组件、原生渲染后端和 WebAssembly 浏览器宿主。桌面与移动宿主的能力及限制见 [平台覆盖矩阵](https://github.com/AlexCat315/Cove/blob/v0.3.0/crates/hosts/src/PLATFORM_COVERAGE.md)。
 - DevTools 提供浏览器 Inspector、MCP 和 CLI。Gallery 的调试构建随应用启动控制器。
+- 修复原生菜单重建后无法打开、Metal 阴影示例无法编译，以及 Windows FFmpeg 依赖生成的路径转义。
 - Table 默认采用 36pt 桌面行高和 32pt 表头。行内编辑支持 Tab 双向跳格和校验，TreeTable 修复统一缩进并在收起分支时保留可见的选中行。
 - 此版本以 Cargo Git 依赖和源码提供。源码构建请使用带子模块的 Git checkout。
 

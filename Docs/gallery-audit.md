@@ -9,6 +9,7 @@ Swift 源码逐页对照见文末《Swift 源码对照（逐页差异清单）�
 | 页面 | 实现与自动化 | Rust 文档 |
 | --- | --- | --- |
 | Menu | 布局捕获在复用节点时更新锚点存储，原生菜单继续读取当前触发按钮的位置。挂载测试验证原生呈现与回调。 | [Menu](../Website/src/content/components/menu.md) |
+| 文本选择 | 提示浮层的关闭事件与控件按下事件分开识别，截断文字仍能参与外层阅读选择。Gallery 全页测试覆盖文字与控件的输入归属。 | [文本选择](../Website/src/content/components/text-selection.md) |
 | Ray-Traced Shadows | Metal 内核的网格坐标改用合法的标识符，发布回归覆盖原生计算管线。 | [Ray-Traced Shadows](../Website/src/content/components/ray-traced-shadows.md) |
 
 本轮以自动化验收为主，Gallery 的设备视觉与原生输入验收另计。
