@@ -80,21 +80,26 @@ function text(wasm, value, editing = false) {
 
 {
   const wasm = await launch("scrollView");
-  const scroll = () => find(render(wasm).tree.root, "scroll-view-control");
+  const scroll = () => {
+    const { id } = find(render(wasm).tree.root, "scroll-view-control");
+    const result = inspect(wasm, {
+      method: "read",
+      params: { name: "query_ui_nodes", arguments: { node_id: id } },
+    });
+    return result.Ok.data.items[0].node;
+  };
   // In the default browser viewport the surrounding story clips the lower rows.
   const wheelPoint = ({ absoluteFrame: { x, y, w } }) => [x + w / 2, y + 8];
-  // Tree summaries expose geometry. Scroll movement is visible in the content
-  // frame even though the detailed contentOffset field is absent.
-  const contentY = node => node.children[0].absoluteFrame.y;
   const start = scroll();
+  assert.equal(start.contentOffset.y, 0);
   wasm.cove_wheel(0, 0, 70, ...wheelPoint(start), 10);
   const afterPixels = scroll();
-  assert.equal(contentY(start) - contentY(afterPixels), 70);
+  assert.equal(afterPixels.contentOffset.y, 70);
   wasm.cove_wheel(1, 0, 1, ...wheelPoint(afterPixels), 20);
   const afterLines = scroll();
-  assert.ok(contentY(afterPixels) - contentY(afterLines) > 1, "line delta uses the scroll view's step");
+  assert.ok(afterLines.contentOffset.y > 71, "line delta uses the scroll view's step");
   wasm.cove_wheel(2, 0, 1, ...wheelPoint(afterLines), 30);
-  const pageDelta = contentY(afterLines) - contentY(scroll());
+  const pageDelta = scroll().contentOffset.y - afterLines.contentOffset.y;
   assert.ok(pageDelta > 1 && pageDelta < afterLines.frame.h, "page delta uses the clipped viewport");
 }
 
