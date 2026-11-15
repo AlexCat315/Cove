@@ -1066,6 +1066,9 @@ impl Application {
     /// Collects finished frames: recycles their buffers, surfaces render errors and
     /// retries frames the renderer could not present.
     fn deliver_open_documents(&self) {
+        /* Services the OS delivered while this thread was busy: the provider
+           enqueues on the main thread, the handler must run here. */
+        cove_shell::services::poll();
         let documents = self.state.host.take_open_documents();
         if !documents.is_empty() {
             cove_core::scene::OpenedDocuments::deliver(documents);

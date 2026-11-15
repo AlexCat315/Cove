@@ -79,22 +79,55 @@ Windows 与 Linux 的动词在启动时把文件路径写进命令行（`%1` / `
                      error:(NSString **)error;
 ```
 
-**目标对象不需要自有 app delegate**。服务消息不进 Apple Event，走的是响应链/服务提供者：
+**目标对象不需要自有 app delegate**。服务消息不进 Apple Event，AppKit 直接把 `NSMessage` 发到 `NSApp` 的 services provider：
 
 ```objc
-// 在应用启动完成后注册一次；provider 需被强引用。
+// 启动后注册一次；provider 需被强引用（NSApp 不持有它）。
 [NSApp setServicesProvider:provider];
-[NSApp registerServicesMenuSendTypes:@[NSPasteboardTypeFileURL]
-                         returnTypes:@[]];
 ```
 
-provider 实现里从 `pboard` 读 `NSURL`（`NSFilenamesPboardType` 仅为兼容旧系统），解析成本地路径后推入现有 `cove_open_documents_push` 收件箱，复用上面的接收链路。
+`registerServicesMenuSendTypes:returnTypes:` 是**消费**服务一侧（声明本应用可收发哪些粘贴板类型）的 API，与发布服务无关，发布侧不需要它。
 
-**可见性前提**：应用必须被 LaunchServices 注册（`cargo run` 出的裸二进制不会被注册，服务一定不出现），改完清单需重新注册并让 Finder 刷新缓存：
+provider 只要能响应 `NSMessage` 声明的选择器即可。框架已内置一个转发 provider：它用 `-forwardInvocation:` 接住所有 `…:userData:error:` 选择器，从粘贴板读 `NSURL` 文件项，再派发到下面的 Rust 注册表。
+
+### 框架已提供（`cove_shell::services`，经 `cove_ui::hosts::shell_services` 可用）
+
+```rust
+use cove_ui::hosts::shell_services::{self, ShellVerb};
+
+shell_services::install(
+    &[ShellVerb {
+        id: "open",
+        label: Some("用本应用打开"),
+        selector: "coveExtractService:",   // 与 Info.plist 的 NSMessage 一致
+    }],
+    |verb, paths| { /* verb id + 选中的文件路径；已在 UI 线程调用 */ },
+);
+```
+
+- 线程：`install` 在**构建 UI 的线程**登记（也是 handler 将来被调用的线程）；provider 由平台主线程在首个 tick 落装，服务到达时只把 `(verb, path…)` 入队并唤醒循环，handler 由 UI 线程逐帧 `poll` 执行——handler 不必跨线程，也不要在里面阻塞。
+- 选择器匹配按 `NSMessage` 部分：AppKit 实际调用的是 `coveExtractService:userData:error:`，注册时只写 `coveExtractService:`。选择器未注册或选中为空时，错误文本会回填给 AppKit，访达按系统方式提示。
+- 非 macOS 返回 `ServiceError::Unsupported`。
+- 未打包的 `cargo run` 二进制调用成功但访达里不出现，这是 LaunchServices 未注册，不是接口失败。
+- Windows 的注册表键由 `cove_shell::services::windows_verb_entries(target, verb, exe, scope)` 生成（`*` / `Directory` / `Directory\Background` / `SystemFileAssociations\.<ext>` 四种目标，含 `MUIVerb`、`Icon`、`MultiSelectModel`、`command`），安装器负责写入与卸载。
+
+
+**可见性前提**：`NSServices` 必须落在**打包产物**的 `Info.plist` 里，应用必须被 LaunchServices 注册（`cargo run` 出的裸二进制不会被注册，服务一定不出现）。清单有两个来源：通用模板 `Templates/app/Platforms/macOS/Info.plist`（注释块），以及应用自带的 `Platforms/macOS/Info.plist`（如 RichZip 已有，打包时覆盖模板）。改完需重新注册并让 Finder 刷新缓存：
 
 ```bash
 /System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister -f /Applications/YourApp.app
 killall Finder          # 菜单缓存刷新
+```
+
+不改动访达界面也能验证链路是否通（服务会被启动并收到选择）：
+
+```bash
+plutil -p "App.app/Contents/Info.plist" | grep -A6 NSServices
+lsregister -dump | grep -i -B3 -A3 "message:.*coveExtract"   # 服务已登记
+# 用 pasteboard + NSPerformService 走一遍真实投递（Swift）
+swift -e 'import AppKit; let pb = NSPasteboard(name: .general); pb.clearContents();
+pb.writeObjects([URL(fileURLWithPath: "/tmp/a.zip") as NSURL]);
+print(NSPerformService("用 MugenZip 打开", pb))'
 ```
 
 ### 3. Action Extension（「快速操作」）
@@ -109,8 +142,8 @@ killall Finder          # 菜单缓存刷新
 
 ### 打包注意
 
-- 清单源是 **`Templates/app/Platforms/macOS/Info.plist`**（不是 `Platforms/macOS/Info.plist`；后者若存在也属组件自己的模板，如 `crates/terminal/`）。该模板已带**注释化**的 `CFBundleDocumentTypes` / `NSServices` 参考块，默认不生效；应用按自己的扩展名/UTI 解注释并改写。
-- macOS 清单由外部打包器 `cove-package`（`xtask/`，git 依赖 tag `v0.3.0`）拷进 `.app`。模板到产物的键保留/合并方式需在实际打包产物里核实，不能假设模板原样保留。
+- 清单有两级：通用模板 **`Templates/app/Platforms/macOS/Info.plist`**（带注释化的 `CFBundleDocumentTypes` / `NSServices` 参考块，默认不生效），以及应用自带的 **`Platforms/macOS/Info.plist`**（打包时覆盖模板，如 RichZip 已有一份，服务项直接写在这里才生效）。`crates/terminal/Platforms/…` 是终端组件自己的清单，与 app 模板无关。
+- macOS 清单由外部打包器 `cove-package`（`xtask/`，git 依赖 tag `v0.3.0`）拷进 `.app`，随后 `plutil -replace` 覆盖 bundle 标识等键。已核实：应用自带的 `NSServices` 会出现在产物的 `Info.plist`，并被 LaunchServices 登记为 `service id`。
 
 ## Windows
 
@@ -162,22 +195,24 @@ Linux 没有 Windows 式的统一注册表动词，也没有 macOS 的服务清�
 | --- | --- | --- |
 | 应用内文件列表、行操作菜单 | Compose `ContextMenu` | 已有 |
 | 被带文件启动 / 唤起后的路径接收 | shell / host / core | 已有 |
-| 平台无关的「动词注册」抽象（动词名、扩展名/UTI、目标命令、目标回调） | shell（薄抽象） | 缺 |
+| 平台无关的「动词注册」抽象（动词 id、文案、选择器、回调） | shell（`services` 模块） | 已有（macOS 生效，其余平台返回 `Unsupported`） |
 | macOS 文档类型、服务清单声明 | 打包清单 `Templates/app/…/Info.plist` | 模板已有注释块，应用侧未启用 |
-| macOS 服务回调目标（provider） | shell 的 Apple 层 | 缺（不需要 app delegate，加 provider 即可） |
+| macOS 服务回调目标（provider） | shell 的 Apple 层（`apple.m`） | 已有（转发 provider + Rust 注册表） |
 | macOS Finder Sync / Action Extension | 独立 target + 打包器 | 缺 |
-| Windows 静态动词注册/卸载 | 安装器 | 缺（无安装器框架） |
+| Windows 静态动词注册/卸载 | 安装器 | 键计划已有（`windows_verb_entries`），写入/卸载待安装器接入 |
 | Windows `IExplorerCommand` 处理器 | 独立 COM 服务器 + MSIX | 缺 |
 | Linux 各文件管理器 action 文件 | 安装器 | 缺 |
 
-分层原则：动词的**文案与语义**（「解压到此处」、适用扩展名）属于应用；壳层只做「把命令和回调登记进平台机制、把路径送进 opened-documents」的通用工作，不在框架里硬编码压缩包语义。
+分层原则：动词的**文案与语义**（「解压到此处」、适用扩展名）属于应用；壳层只做「把命令和回调登记进平台机制、把路径送进 opened-documents」的通用工作，不在框架里硬编码压缩包语义。当前实现里 `ShellVerb` 只有 `id` / `label` / `selector`，扩展名与 UTI 仍由应用自己的清单声明——等 Linux 落地时再补成完整描述符。
 
 ## 待办与验收
 
-- 壳层：新增平台无关的动词注册 API（动词 id、显示名、适用扩展名/UTI、激活命令、回调），内部按平台落到 Info.plist 片段、注册表键或 Linux action 文件；先支持 macOS 服务与 Windows 静态动词两条最小路径。
-- macOS：`NSApp setServicesProvider:` 接入，provider 把路径推入 opened-documents。**原生可见性**（访达「服务」菜单出现该项、选中文件后回调到应用）须打包成 `.app` 真机复核。
-- Windows：安装器写入/卸载动词；`MultiSelectModel` 与多选语义实测；Win11「显示更多选项」下的可见性实测。
-- Linux：至少覆盖 Nautilus 与 Dolphin 两种机制，其余按需。
+- [x] 壳层动词注册 API（`cove_shell::services::install` / `poll`）+ macOS provider（含 UI 线程回投）。
+- [x] Windows 静态动词键计划（`windows_verb_entries`），含四类目标与 `MultiSelectModel`。
+- [x] macOS 链路复核：打包成 `.app` → `lsregister -f` → 产物 `Info.plist` 带 `NSServices` → LaunchServices 登记 `service id` → `NSPerformService` 投递到应用（handler 收到 verb 与路径）。
+- [ ] 访达「服务」菜单的人工点击复核（本机无辅助功能授权，菜单项的文字停留未自动验证）。
+- [ ] Windows：安装器接入写入/卸载；`MultiSelectModel` 与多选语义、Win11「显示更多选项」可见性实测。
+- [ ] Linux：至少覆盖 Nautilus scripts 与 Dolphin service menus 两种机制。
 - 验收原则：键位构造、注册表路径、pasteboard/参数解析可用结构化测试覆盖；外壳里的实际可见性与交互属原生验收，单列记录，不与结构测试混同。DevTools 不覆盖外壳菜单可见性。
 - 「改了没效果」排查顺序：是否真的注册（macOS `lsregister -dump | grep -i <app>`；Windows `reg query "HKCU\Software\Classes\*\shell\<verb>"`；Linux `xdg-mime query default <mime>`）、是否刷新了外壳缓存（Finder 重启 / `SHChangeNotify` / 注销重登）、是否为沙箱或开发构建。
 

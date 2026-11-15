@@ -31,6 +31,8 @@ Cove 0.3.0 将 SDK 迁移到 Rust 2024，使用 Cargo 构建和管理依赖。
 
 ### 开发记录
 
+- **外壳动词注册落地（2026-11-15）**：新增 `cove_shell::services`（经 `cove_ui::hosts::shell_services` 使用）。macOS 侧 `apple.m` 装了 `NSApp` 的 services provider，用 `-forwardInvocation:` 接住所有 `…:userData:error:` 选择器，从粘贴板按类读 `NSURL` 文件项，再派发到 Rust 的动词表；`install` 在构建 UI 的线程登记，provider 由平台主线程首个 tick 落装，服务到达时只把 `(verb, path…)` 入队并 `cove_shell_wake()`，handler 由 UI 线程经 `services::poll` 执行。选择器按 `NSMessage` 前缀匹配（AppKit 实际调用 `…:userData:error:`），未注册选择器或空选择把错误文本回填给 AppKit。已用打包产物 + `lsregister` + `NSPerformService` 验证：服务登记为 `service id`，投递到 handler。Windows 侧 `windows_verb_entries` 生成 `*` / `Directory` / `Directory\Background` / `SystemFileAssociations\.<ext>` 四类静态动词键（`MUIVerb`、`Icon`、`MultiSelectModel`、`command`），写入与卸载仍归安装器。Linux 尚无运行时发布路径。文档同步修正：`registerServicesMenuSendTypes:returnTypes:` 属消费服务一侧，发布侧只需 `NSServices` + `setServicesProvider:`；模板 `NSServices` 的 `NSSendTypes` 改为 `NSSendFileTypes`。
+
 - 新增 [系统外壳文件菜单集成文档](Docs/shell-context-menu.md)，梳理 macOS 访达和 Windows 资源管理器的右键菜单、opened-documents 接收链路，以及框架、打包器和安装器的职责。模板包含注释化的 `CFBundleDocumentTypes` 与 `NSServices` 配置。后续实现见文档待办。
 
 - **Table / TreeTable 外观收敛（2026-11-15）**：对照 macOS 原生 `NSTableView`、VS Code Explorer、Linear、Ant Design 与 Supernova Data Table 规范打磨 Gallery 表格页。选中强调条只画在起始列为 0 的前导泳道上，冻结前缀后的移动泳道起点落在冻结边界，不再重复第二条竖条；表头标签改为内容基准 flex，排序箭头紧贴标题右侧，不再被弹性空间推到列缘；行内草稿字段改挂扁平 `EditorTextFieldStyle`，不再嵌套浅底 well、发丝线与焦点 halo，焦点环由单元格自身持有；`TreeTable` 披露按钮由 secondary 带框按钮改为纯字形 `ghost` 图标按钮，静止无 bezel、悬停才出现状态层。Gallery Project tree 示例的行结构对齐 TreeTable 首列：层级缩进槽与叶子披露槽改为 BoxView 承载的固定宽度间隔——裸 `EmptyView` 是 `ViewKind::Empty`、不生成布局节点，其 `frame_width` 被弹性求解器丢弃；可展开节点用 ghost chevron，叶子保留同宽空槽。

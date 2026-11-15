@@ -19,6 +19,7 @@ pub use desktop::AppDisplayHandle;
 pub use desktop::application::configuration::{ApplicationConfiguration, TitleBarDivider};
 #[cfg(not(target_arch = "wasm32"))]
 pub use desktop::application::runtime::{Application, ApplicationCallbacks};
+pub use cove_shell::services as shell_services;
 pub use desktop::window::{
     NativeMenu, NativeMenuAction, NativeMenuBar, NativeMenuItem, NativeMenuKeyModifiers,
 };

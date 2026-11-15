@@ -94,6 +94,76 @@ void cove_shell_open_documents_install(void){COVE_ASSERT_MAIN();
     [manager setEventHandler:openDocumentsTarget andSelector:@selector(handleURLEvent:withReplyEvent:) forEventClass:kInternetEventClass andEventID:kAEGetURL];
     [manager setEventHandler:openDocumentsTarget andSelector:@selector(handleOpenDocuments:withReplyEvent:) forEventClass:kCoreEventClass andEventID:kAEOpenDocuments];
 }
+/* Finder "Services": AppKit calls the selector named by the app's Info.plist
+   NSServices entry on the object installed with -setServicesProvider:. Services
+   do not travel as AppleEvents, so this needs no app delegate — the provider
+   forwards every `…:userData:error:` selector into Rust, which owns the verb
+   table and hands back the message AppKit shows to the user. */
+static CoveShellServiceCallback serviceCallback;
+static id servicesProvider;
+@interface CoveShellServicesProvider : NSObject
+- (BOOL)cove_isServiceSelector:(SEL)selector;
+@end
+@implementation CoveShellServicesProvider
+- (BOOL)cove_isServiceSelector:(SEL)selector{
+    /* Only the documented pasteboard/userData/error shape is routed; anything
+       else falls through to NSObject so AppKit sees a plain non-responder. */
+    return [NSStringFromSelector(selector) hasSuffix:@":userData:error:"];
+}
+- (BOOL)respondsToSelector:(SEL)selector{
+    if([self cove_isServiceSelector:selector])return YES;
+    return [super respondsToSelector:selector];
+}
+- (NSMethodSignature *)methodSignatureForSelector:(SEL)selector{
+    if([self cove_isServiceSelector:selector])return [NSMethodSignature signatureWithObjCTypes:"v@:@@^@"];
+    return [super methodSignatureForSelector:selector];
+}
+- (void)forwardInvocation:(NSInvocation *)invocation{
+    SEL selector=invocation.selector;
+    if(![self cove_isServiceSelector:selector]){[super forwardInvocation:invocation];return;}
+    __unsafe_unretained NSPasteboard *pboard=nil;
+    [invocation getArgument:&pboard atIndex:2];
+    /* Read the out-parameter as a raw pointer: ARC has no ownership qualifier
+       for `NSString **` and flags the direct form at compile time. */
+    void *rawError=NULL;
+    [invocation getArgument:&rawError atIndex:4];
+    NSString * __autoreleasing *errorOut=(NSString * __autoreleasing *)rawError;
+    /* Finder hands the selection over as file URLs; read them by class so the
+       deprecated NSFilenamesPboardType plist is not needed. */
+    NSArray<NSURL*> *urls=[pboard readObjectsForClasses:@[NSURL.class]
+                                               options:@{NSPasteboardURLReadingFileURLsOnlyKey:@YES}];
+    NSMutableArray<NSString*> *paths=[NSMutableArray array];
+    for(NSURL *url in urls){
+        if(url.isFileURL&&url.path.length)[paths addObject:url.path];
+    }
+    NSUInteger count=paths.count;
+    const char **argv=calloc(count?count:1,sizeof(char*));
+    for(NSUInteger i=0;i<count;i++)argv[i]=paths[i].UTF8String;
+    const char *message=serviceCallback?serviceCallback(NSStringFromSelector(selector).UTF8String,argv,count):"services are not installed";
+    free(argv);
+    if(errorOut)*errorOut=message?[NSString stringWithUTF8String:message]:nil;
+}
+@end
+bool cove_shell_services_install(CoveShellServiceCallback callback){COVE_ASSERT_MAIN();
+    if(!callback)return false;
+    serviceCallback=callback;
+    static dispatch_once_t once;
+    dispatch_once(&once,^{
+        /* SDL creates NSApp during startup; creating it first here is harmless
+           and lets an early install from the app's own setup succeed. */
+        [NSApplication sharedApplication];
+        servicesProvider=[CoveShellServicesProvider new];
+        [NSApp setServicesProvider:servicesProvider];
+        /* AppKit opens the services port while finishing its launch, so a
+           provider set before that can be overwritten by the launch sequence;
+           apply it again once the launch is complete. */
+        [[NSNotificationCenter defaultCenter] addObserverForName:NSApplicationDidFinishLaunchingNotification
+                                                          object:nil
+                                                           queue:[NSOperationQueue mainQueue]
+                                                      usingBlock:^(NSNotification *note){(void)note;[NSApp setServicesProvider:servicesProvider];}];
+    });
+    return YES;
+}
 #else
 /* SDL's UIKit delegates forward openURL as a drag; divert handleURL: into the
    open-documents inbox so an OS open is not mistaken for a drop on a window. */

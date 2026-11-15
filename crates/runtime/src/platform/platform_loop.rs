@@ -78,6 +78,9 @@ impl PlatformLoop {
         for work in self.shell.take_deferred_callbacks() {
             work();
         }
+        /* Apps may have registered shell verbs before the platform existed; the
+           provider needs the UI thread, so apply them once it is running. */
+        cove_shell::services::flush_pending();
         let documents = self.shell.take_open_documents();
         if !documents.is_empty() {
             self.link.post(PlatformMessage::DocumentsOpened(documents));

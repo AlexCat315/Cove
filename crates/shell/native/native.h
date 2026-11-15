@@ -138,5 +138,12 @@ void cove_shell_open_documents_install(void);
 /* Drains one opened document/URL into an owned NUL-terminated copy the caller
    frees with cove_shell_free. False when the queue is empty. Thread-safe. */
 bool cove_shell_open_documents_take(char **out);
+/* Publishes the Finder "Services" entries declared by the app's Info.plist
+   `NSServices` block. `callback` runs on the main thread with the invoked
+   selector and the selected file paths (owned by the call); it returns a
+   NUL-terminated message to report back as the service error, or NULL on
+   success. False when no callback is supplied. */
+typedef const char *(*CoveShellServiceCallback)(const char *selector,const char *const *paths,size_t count);
+bool cove_shell_services_install(CoveShellServiceCallback callback);
 #endif
 #endif
