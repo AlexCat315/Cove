@@ -1,6 +1,6 @@
 # Cove
 
-Rust 2024 跨平台 UI 工具包。工作区版本为 `0.3.0-dev`，尚未发布。
+Rust 2024 跨平台 UI 工具包。版本 `0.3.0`。
 
 Cove 自有代码采用 [Apache-2.0](LICENSE)。依赖保留各自许可，见 [第三方声明](THIRD_PARTY_NOTICES.md)；启用原生媒体后的随包材料见 [媒体许可证与分发](Docs/media-licensing.md)。
 
@@ -61,7 +61,7 @@ Wasm 目标还需要 `rustup target add wasm32-wasip1`，随后在 `crates/brows
 新建应用与打包：
 
 ```sh
-cargo generate --git https://github.com/AlexCat315/Cove.git Templates/app --name my-app
+cargo generate --git https://github.com/AlexCat315/Cove.git --tag v0.3.0 Templates/app --name my-app
 cargo xtask package android --release --package cove-examples
 cargo xtask run ios --simulator --package cove-examples
 ```

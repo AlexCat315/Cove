@@ -6,34 +6,49 @@ on:
     inputs:
       tag:
         description: Existing SDK version tag to build and publish
-        required: true
+        required: false
         type: string
+      publish:
+        description: Tag and publish the version from main after validation
+        type: boolean
+        default: false
 run-name: Release ${{ inputs.tag || github.ref_name }}
 permissions:
   contents: write
-env:
-  RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
 concurrency:
   group: sdk-release-${{ inputs.tag || github.ref_name }}
   cancel-in-progress: false
 jobs:
   metadata:
     runs-on: ubuntu-24.04
+    outputs:
+      tag: ${{ steps.version.outputs.tag }}
     steps:
       - uses: actions/checkout@v7.0.1
         with:
           ref: ${{ inputs.tag || github.ref }}
       - name: Audit source layout and migration mappings
-        run: cargo xtask audit --json
+        run: cargo run --locked --quiet -p cove-package --bin cove-package -- audit --json
       - name: Verify release metadata
-        run: node Tools/Release/check-version.mjs "$RELEASE_TAG" --release
+        id: version
+        env:
+          SELECTED_TAG: ${{ inputs.tag || (github.ref_type == 'tag' && github.ref_name) || '' }}
+          PUBLISH_FROM_MAIN: ${{ inputs.publish }}
+        run: |
+          if [[ "$PUBLISH_FROM_MAIN" == true && "$GITHUB_REF" != refs/heads/main ]]; then
+            echo "::error::Publishing an untagged commit requires the main branch."
+            exit 1
+          fi
+          tag="${SELECTED_TAG:-v$(node Tools/Release/version.mjs)}"
+          node Tools/Release/check-version.mjs "$tag" --release
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
   desktop:
     needs: metadata
     runs-on: ${{ matrix.runner }}
     strategy:
       fail-fast: false
       matrix:
-        runner: [xcode-27, windows-2025-vs2026, ubuntu-24.04]
+        runner: [macos-26, windows-2025, ubuntu-24.04]
     defaults:
       run:
         shell: bash
@@ -46,9 +61,9 @@ jobs:
       - name: Test workspace
         run: |
           if [ "$RUNNER_OS" = Linux ]; then
-            xvfb-run -a cargo test --workspace --locked --release -- --test-threads=1
+            xvfb-run -a cargo test --workspace --locked --release --no-fail-fast -- --test-threads=1
           else
-            cargo test --workspace --locked --release -- --test-threads=1
+            cargo test --workspace --locked --release --no-fail-fast -- --test-threads=1
           fi
   mobile:
     needs: metadata
@@ -59,9 +74,9 @@ jobs:
         include:
           - runner: ubuntu-24.04
             target: aarch64-linux-android
-          - runner: xcode-27
+          - runner: macos-26
             target: aarch64-apple-ios
-          - runner: xcode-27
+          - runner: macos-26
             target: aarch64-apple-ios-sim
     defaults:
       run:
@@ -82,16 +97,20 @@ jobs:
           ndk="$ANDROID_HOME/ndk/30.0.16248370"
           ndk_bin="$ndk/toolchains/llvm/prebuilt/linux-x86_64/bin"
           echo "ANDROID_NDK_HOME=$ndk" >> "$GITHUB_ENV"
+          echo "ANDROID_NDK_ROOT=$ndk" >> "$GITHUB_ENV"
           echo "CC_aarch64_linux_android=$ndk_bin/aarch64-linux-android26-clang" >> "$GITHUB_ENV"
           echo "CXX_aarch64_linux_android=$ndk_bin/aarch64-linux-android26-clang++" >> "$GITHUB_ENV"
           echo "AR_aarch64_linux_android=$ndk_bin/llvm-ar" >> "$GITHUB_ENV"
           echo "CARGO_TARGET_AARCH64_LINUX_ANDROID_LINKER=$ndk_bin/aarch64-linux-android26-clang" >> "$GITHUB_ENV"
       - name: Build workspace for ${{ matrix.target }}
+        env:
+          IPHONEOS_DEPLOYMENT_TARGET: "14.0"
         run: |
           rustup target add ${{ matrix.target }}
           cargo build --workspace --lib --locked --release --target ${{ matrix.target }}
   publish:
-    needs: [desktop, mobile]
+    if: github.ref_type == 'tag' || inputs.tag != '' || inputs.publish == true
+    needs: [metadata, desktop, mobile]
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v7.0.1
@@ -100,6 +119,21 @@ jobs:
       - name: Publish the SDK release
         env:
           GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ needs.metadata.outputs.tag }}
+          SELECTED_TAG: ${{ inputs.tag || (github.ref_type == 'tag' && github.ref_name) || '' }}
         run: |
           node Tools/Release/release-notes.mjs > release-notes.md
-          gh release create "$RELEASE_TAG" --verify-tag --title "Cove SDK $RELEASE_TAG" --notes-file release-notes.md
+          if [[ -n "$SELECTED_TAG" ]]; then
+            tag_args=(--verify-tag)
+          else
+            tag_commit=$(git ls-remote origin "refs/tags/$RELEASE_TAG^{}" | cut -f1)
+            if [[ -z "$tag_commit" ]]; then
+              tag_commit=$(git ls-remote origin "refs/tags/$RELEASE_TAG" | cut -f1)
+            fi
+            if [[ -n "$tag_commit" && "$tag_commit" != "$GITHUB_SHA" ]]; then
+              echo "::error::$RELEASE_TAG already points to a different commit."
+              exit 1
+            fi
+            tag_args=(--target "$GITHUB_SHA")
+          fi
+          gh release create "$RELEASE_TAG" "${tag_args[@]}" --title "Cove SDK $RELEASE_TAG" --notes-file release-notes.md

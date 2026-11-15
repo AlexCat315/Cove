@@ -12,8 +12,10 @@ use std::alloc::{Layout, alloc, alloc_zeroed, dealloc, realloc};
 static ALLOC: TrackingAllocator = TrackingAllocator::new();
 
 fn main() {
-    let startup = cove_alloc::snapshot()
-        .expect("the process allocator is installed, so startup allocations are counted");
+    // Windows can reach main before Rust makes a heap allocation.
+    drop(std::hint::black_box(Box::new(0u8)));
+    let startup =
+        cove_alloc::snapshot().expect("the tracking allocator counted the first allocation");
     assert!(cove_alloc::installed());
     assert!(
         startup.total_blocks > 0,

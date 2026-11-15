@@ -36,3 +36,4 @@ __pycache__/
 /Tools/MediaSmoke/target/
 /Tools/MediaSmoke/Cargo.lock
 Cargo.lock
+!/Cargo.lock

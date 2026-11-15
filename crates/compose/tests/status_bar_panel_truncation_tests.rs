@@ -254,9 +254,10 @@ fn the_truncating_fact_stops_at_the_trailing_state() {
                 .expect("the trailing fact is mounted")
                 .absolute_frame();
 
-            assert_eq!(
-                leading_frame.width, 225.96875,
-                "the leading fact takes the space left after the trailing state"
+            let gap = cove_ui_compose::theme::theme_for_node(&root).spacing.md;
+            assert!(
+                (trailing_frame.x - leading_frame.max_x() - gap).abs() < 0.5,
+                "the leading fact takes the available space up to the themed gap"
             );
             assert!(
                 leading_frame.max_x() <= trailing_frame.x,

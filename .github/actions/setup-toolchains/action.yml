@@ -3,22 +3,21 @@ description: Prepare the Rust and native build tools used by the SDK.
 runs:
   using: composite
   steps:
-    - name: Select Xcode
+    - name: Report Xcode
       if: runner.os == 'macOS'
       shell: bash
       run: |
-        sudo xcode-select -s /Applications/Xcode_27.0.app
-        echo "DEVELOPER_DIR=/Applications/Xcode_27.0.app/Contents/Developer" >> "$GITHUB_ENV"
-        echo "TOOLCHAINS=com.apple.dt.toolchain.XcodeDefault" >> "$GITHUB_ENV"
+        xcodebuild -version
+        xcodebuild -showsdks
     - name: Rust toolchain
       shell: bash
       run: rustup show active-toolchain || rustup toolchain install
-    - uses: lukka/get-cmake@latest
-      with:
-        cmakeVersion: '4.4.4'
-        ninjaVersion: '1.13.2'
     - uses: ilammy/msvc-dev-cmd@v1
       if: runner.os == 'Windows'
+    - name: Pin MSVC linker
+      if: runner.os == 'Windows'
+      shell: bash
+      run: printf 'CARGO_TARGET_X86_64_PC_WINDOWS_MSVC_LINKER=%sbin\\HostX64\\x64\\link.exe\n' "$VCToolsInstallDir" >> "$GITHUB_ENV"
     - name: Pinned Zig version
       # Single source of truth: ZIG_VERSION in crates/native-build/src/setup.rs.
       id: zig
@@ -35,4 +34,4 @@ runs:
       shell: bash
       run: |
         sudo apt-get update
-        sudo apt-get install -y libvulkan-dev mesa-vulkan-drivers vulkan-validationlayers glslc patchelf xvfb libx11-dev libxext-dev libxrandr-dev libxcursor-dev libxi-dev libxss-dev libxtst-dev libwayland-dev libxkbcommon-dev libasound2-dev libpulse-dev
+        sudo apt-get install -y libvulkan-dev mesa-vulkan-drivers vulkan-validationlayers glslc patchelf xvfb libx11-dev libxext-dev libxrandr-dev libxcursor-dev libxi-dev libxss-dev libxtst-dev libwayland-dev libxkbcommon-dev libasound2-dev libpulse-dev libpipewire-0.3-dev libxcb1-dev libclang-dev libdbus-1-dev libegl-dev libgbm-dev fonts-noto-cjk fonts-noto-color-emoji

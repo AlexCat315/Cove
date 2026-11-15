@@ -396,7 +396,10 @@ mod tests {
             .expect("the helper builds and stages");
 
         assert!(
-            bundle.path().join("plugin-host").is_file(),
+            bundle
+                .path()
+                .join(format!("plugin-host{}", std::env::consts::EXE_SUFFIX))
+                .is_file(),
             "the helper lands beside the app binary"
         );
     }

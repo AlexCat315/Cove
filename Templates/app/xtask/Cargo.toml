@@ -5,4 +5,4 @@ edition = "2024"
 publish = false
 
 [dependencies]
-cove-package = { git = "https://github.com/AlexCat315/Cove.git" }
+cove-package = { git = "https://github.com/AlexCat315/Cove.git", tag = "v0.3.0" }

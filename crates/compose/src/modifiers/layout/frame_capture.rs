@@ -31,7 +31,7 @@ impl FrameBox {
 }
 
 struct FrameCaptureResource {
-    frame: FrameBox,
+    frame: Rc<std::cell::RefCell<FrameBox>>,
     previous_layout: std::cell::RefCell<Option<LayoutUpdateHook>>,
 }
 
@@ -44,9 +44,9 @@ impl NodeResource for FrameCaptureResource {
             if let Some(previous) = &previous {
                 previous(updated);
             }
-            frame.update(updated.absolute_frame());
+            frame.borrow().update(updated.absolute_frame());
         })));
-        self.frame.update(node.absolute_frame());
+        self.frame.borrow().update(node.absolute_frame());
     }
 
     fn unmount(&self, node: &Node) {
@@ -62,9 +62,12 @@ pub struct FrameCaptureModifier(pub FrameBox);
 
 impl ViewModifier for FrameCaptureModifier {
     fn apply_node(&self, node: &Node) {
-        if node.first_resource::<FrameCaptureResource>().is_none() {
+        if let Some(resource) = node.first_resource::<FrameCaptureResource>() {
+            self.0.update(node.absolute_frame());
+            *resource.frame.borrow_mut() = self.0.clone();
+        } else {
             node.add_resource(Rc::new(FrameCaptureResource {
-                frame: self.0.clone(),
+                frame: Rc::new(std::cell::RefCell::new(self.0.clone())),
                 previous_layout: std::cell::RefCell::new(None),
             }));
         }

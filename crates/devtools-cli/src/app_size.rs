@@ -341,6 +341,16 @@ fn section_row(section: &object::Section<'_, '_>, segments: &[SegmentRow]) -> Se
         offset: file_range.map(|(offset, _)| offset),
         address: section.address(),
     };
+    if let object::SectionFlags::Elf { sh_flags, .. } = section.flags() {
+        let allocated = (sh_flags & object::elf::SHF_ALLOC) == object::elf::SHF_ALLOC;
+        let tls_zero_fill =
+            (sh_flags & object::elf::SHF_TLS) == object::elf::SHF_TLS && file_range.is_none();
+        // PT_LOAD does not map the thread-local .tbss storage. Its nominal
+        // address can overlap an ordinary allocated section.
+        if !allocated || tls_zero_fill {
+            return row;
+        }
+    }
     // Mach-O names the owning segment on the section. ELF and PE do not, so
     // use the mapped address; address 0 means the section is not mapped.
     if row.segment.is_empty()

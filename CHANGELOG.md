@@ -4,6 +4,29 @@
 
 ## Unreleased
 
+## 0.3.0 — 2026-11-15
+
+Cove 0.3.0 将 SDK 迁移到 Rust 2024，使用 Cargo 构建和管理依赖。
+
+### 从 0.2.x 迁移
+
+- 用 `Templates/app` 生成 Rust 应用，将原 Swift 视图和业务入口迁入新工程。Cargo 依赖固定到 `v0.3.0`。现有 Swift 应用可继续使用 [0.2.13](https://github.com/AlexCat315/Cove/releases/tag/v0.2.13)。
+- 使用 `cargo cove setup` 准备构建工具，通过 `cargo xtask package` 生成应用包。平台构建要求见 [README](https://github.com/AlexCat315/Cove/blob/v0.3.0/README.md)。
+- `DataTable` 和旧轻量表格收敛到 `Table`。使用 `Table::new` 创建表格，或用 `Table::try_new` 接入共享 `TableModel`。
+
+### 主要变化
+
+- Rust SDK 提供共享 UI、窗口与移动宿主、终端组件、原生渲染后端和 WebAssembly 浏览器宿主。桌面与移动宿主的能力及限制见 [平台覆盖矩阵](https://github.com/AlexCat315/Cove/blob/v0.3.0/crates/hosts/src/PLATFORM_COVERAGE.md)。
+- DevTools 提供浏览器 Inspector、MCP 和 CLI。Gallery 的调试构建随应用启动控制器。
+- Table 默认采用 36pt 桌面行高和 32pt 表头。行内编辑支持 Tab 双向跳格和校验，TreeTable 修复统一缩进并在收起分支时保留可见的选中行。
+- 此版本以 Cargo Git 依赖和源码提供。源码构建请使用带子模块的 Git checkout。
+
+[完整变更记录](https://github.com/AlexCat315/Cove/blob/v0.3.0/CHANGELOG.md)
+
+<!-- release-notes-end -->
+
+### 开发记录
+
 - **Table / TreeTable 外观收敛（2026-11-15）**：对照 macOS 原生 `NSTableView`、VS Code Explorer、Linear、Ant Design 与 Supernova Data Table 规范打磨 Gallery 表格页。选中强调条只画在起始列为 0 的前导泳道上，冻结前缀后的移动泳道起点落在冻结边界，不再重复第二条竖条；表头标签改为内容基准 flex，排序箭头紧贴标题右侧，不再被弹性空间推到列缘；行内草稿字段改挂扁平 `EditorTextFieldStyle`，不再嵌套浅底 well、发丝线与焦点 halo，焦点环由单元格自身持有；`TreeTable` 披露按钮由 secondary 带框按钮改为纯字形 `ghost` 图标按钮，静止无 bezel、悬停才出现状态层。Gallery Project tree 示例的行结构对齐 TreeTable 首列：层级缩进槽与叶子披露槽改为 BoxView 承载的固定宽度间隔——裸 `EmptyView` 是 `ViewKind::Empty`、不生成布局节点，其 `frame_width` 被弹性求解器丢弃；可展开节点用 ghost chevron，叶子保留同宽空槽。
   - 诊断更正：先前怀疑的「引擎绘制遍历丢字形 / 裁剪矩形未随行高增长」已被 live 探针证伪——行与字形进入视口后均正常栅格化并绘制；下方内容不可见是外层页面 ScrollView 折叠裁剪所致。遗留：外层 ScrollView 内容高过视口时，DevTools 注入的滚动/翻页事件送达后偏移不跟随；事件注入不覆盖原生滚轮与触控板路由，需真机 trackpad 复核滚动可达性。
 

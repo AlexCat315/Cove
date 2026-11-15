@@ -27,18 +27,7 @@ jobs:
       - uses: actions/checkout@v7.0.1
         with:
           submodules: recursive
-      - uses: mlugg/setup-zig@v2
-        with:
-          version: ${{ env.ZIG_VERSION }}
-      - name: Rust toolchain
-        run: rustup toolchain install 1.99.1 --profile minimal --component rustfmt --component clippy
-      - uses: ilammy/msvc-dev-cmd@v1
-        if: runner.os == 'Windows'
-      - name: Pin MSVC linker
-        # `shell: bash` re-prepends Git's `/usr/bin` at every step, so GNU
-        # coreutils `link.exe` shadows the MSVC linker in PATH lookups.
-        if: runner.os == 'Windows'
-        run: printf 'CARGO_TARGET_X86_64_PC_WINDOWS_MSVC_LINKER=%sbin\\HostX64\\x64\\link.exe\n' "$VCToolsInstallDir" >> "$GITHUB_ENV"
+      - uses: ./.github/actions/setup-toolchains
       - uses: actions/cache@v5
         with:
           path: |
@@ -46,11 +35,6 @@ jobs:
             ~/.cargo/git
             target
           key: rust-${{ runner.os }}-${{ hashFiles('Cargo.lock', 'rust-toolchain.toml') }}
-      - name: Linux native dependencies
-        if: runner.os == 'Linux'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y $LINUX_NATIVE_PACKAGES
       - name: Verify native tool manifest
         # Same tool list developers run; fails if CI's setup-zig/SDK drifts
         # away from cove-native-build's BASE manifest or a submodule is missing.
@@ -87,15 +71,9 @@ jobs:
       - uses: actions/checkout@v7.0.1
         with:
           submodules: recursive
-      - uses: mlugg/setup-zig@v2
-        with:
-          version: ${{ env.ZIG_VERSION }}
-      - name: Rust toolchain and Wasm target
-        run: |
-          rustup toolchain install 1.99.1 --profile minimal
-          rustup target add wasm32-wasip1 --toolchain 1.99.1
-      - uses: ilammy/msvc-dev-cmd@v1
-        if: runner.os == 'Windows'
+      - uses: ./.github/actions/setup-toolchains
+      - name: Wasm target
+        run: rustup target add wasm32-wasip1
       - name: Verify pinned wasi-sdk version
         run: |
           pinned=$(sed -n 's/^const WASI_SDK_VERSION: &str = "\([^"]*\)";/\1/p' crates/native-build/src/setup.rs)

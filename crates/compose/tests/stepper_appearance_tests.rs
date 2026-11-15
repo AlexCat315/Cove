@@ -113,10 +113,11 @@ fn adaptive_compact_branch_stacks_steps_without_collapsing() {
 
 #[test]
 fn horizontal_connectors_span_the_gap_between_markers() {
+    const WIDTH: f32 = 960.0;
     let (_selected, binding) = selection();
     let stepper = AnyView::new(Stepper::try_new(steps(), binding).expect("unique ids"));
-    InteractiveScene::run(720.0, 600.0, |scene| {
-        scene.install(layout(720.0, 600.0, stepper));
+    InteractiveScene::run(WIDTH, 600.0, |scene| {
+        scene.install(layout(WIDTH, 600.0, stepper));
         let markers = tagged(scene, "StepperMarker");
         let lines = tagged(scene, "StepperConnector");
         assert_eq!(markers.len(), 3);

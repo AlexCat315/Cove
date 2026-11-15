@@ -794,6 +794,7 @@ mod tests {
                     "attach succeeded while Developer mode is disabled"
                 );
                 manager.detach(pid).expect("detach the disposable target");
+                assert!(manager.summary(pid).is_none());
             }
             Err(error) => {
                 assert_eq!(error.code(), "unavailable", "{}", error.message());
@@ -805,9 +806,9 @@ mod tests {
                 if manager.availability().developer_mode == Some(false) {
                     assert!(error.message().contains("Developer mode is disabled"));
                 }
+                assert_eq!(manager.summary(pid).unwrap()["state"], "failed");
             }
         }
-        assert_eq!(manager.summary(pid).unwrap()["state"], "failed");
     }
 
     #[test]

@@ -325,7 +325,7 @@ mod tests {
         }
 
         fn executable_in(&self, directory: &Path, name: &str, body: &str) -> PathBuf {
-            let path = directory.join(name);
+            let path = candidate(directory, name);
             fs::write(&path, body).expect("write the tool");
             #[cfg(unix)]
             {
@@ -375,7 +375,7 @@ mod tests {
 
         let tools = FfmpegTools::from_ffmpeg(ffmpeg.clone()).expect("the sibling resolves");
         assert_eq!(tools.ffmpeg(), ffmpeg);
-        assert_eq!(tools.ffprobe(), scratch.path.join("ffprobe"));
+        assert_eq!(tools.ffprobe(), candidate(&scratch.path, "ffprobe"));
     }
 
     #[test]
@@ -414,7 +414,7 @@ mod tests {
         .expect("the complete directory resolves");
 
         assert_eq!(tools.ffmpeg(), ffmpeg);
-        assert_eq!(tools.ffprobe(), complete.join("ffprobe"));
+        assert_eq!(tools.ffprobe(), candidate(&complete, "ffprobe"));
     }
 
     #[test]
@@ -429,17 +429,46 @@ mod tests {
         })
         .expect("PATH holds both tools");
 
-        assert_eq!(tools.ffmpeg(), scratch.path.join("ffmpeg"));
+        assert_eq!(tools.ffmpeg(), candidate(&scratch.path, "ffmpeg"));
         assert_eq!(tools.ffprobe(), ffprobe);
     }
 
     #[test]
     fn version_reads_the_first_line_of_ffmpeg_output() {
         let scratch = Scratch::new("version");
+        #[cfg(unix)]
         let ffmpeg = scratch.executable(
             "ffmpeg",
             "#!/bin/sh\nprintf 'ffmpeg version 9.0.1\\nbuilt with clang\\n'\n",
         );
+        #[cfg(windows)]
+        let ffmpeg = {
+            let executable = candidate(&scratch.path, "ffmpeg");
+            let source = scratch.path.join("fixture.rs");
+            fs::write(
+                &source,
+                r#"fn main() { println!("ffmpeg version 9.0.1\nbuild metadata"); }"#,
+            )
+            .expect("write the version fixture");
+            let mut compiler = Command::new("rustc");
+            if let Some(linker) = std::env::var_os("CARGO_TARGET_X86_64_PC_WINDOWS_MSVC_LINKER") {
+                compiler
+                    .arg("-C")
+                    .arg(format!("linker={}", linker.to_string_lossy()));
+            }
+            let result = compiler
+                .arg(&source)
+                .arg("-o")
+                .arg(&executable)
+                .output()
+                .expect("run the Rust compiler");
+            assert!(
+                result.status.success(),
+                "{}",
+                String::from_utf8_lossy(&result.stderr)
+            );
+            executable
+        };
         scratch.executable("ffprobe", "#!/bin/sh\nexit 0\n");
 
         let tools = FfmpegTools::from_ffmpeg(ffmpeg).expect("the pair resolves");
@@ -476,7 +505,10 @@ mod tests {
         match error {
             ToolError::NotFound { tool, searched } => {
                 assert_eq!(tool, FFMPEG);
-                assert_eq!(searched, vec![empty.join("ffmpeg"), empty.join("ffprobe")]);
+                assert_eq!(
+                    searched,
+                    vec![candidate(&empty, "ffmpeg"), candidate(&empty, "ffprobe")]
+                );
             }
             other => panic!("unexpected error: {other}"),
         }

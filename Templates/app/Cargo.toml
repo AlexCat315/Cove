@@ -14,7 +14,7 @@ build = 1
 members = [".", "xtask"]
 
 [dependencies]
-cove-ui = { git = "https://github.com/AlexCat315/Cove.git" }
+cove-ui = { git = "https://github.com/AlexCat315/Cove.git", tag = "v0.3.0" }
 
 [profile.release]
 lto = "thin"

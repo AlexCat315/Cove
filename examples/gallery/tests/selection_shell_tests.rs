@@ -296,6 +296,10 @@ fn every_page_presses_its_labels() {
                                 let mut ancestor = node.parent();
                                 let mut owned = false;
                                 while let Some(current) = ancestor {
+                                    if current.accessibility().is_some_and(|semantics| !semantics.state.is_enabled) {
+                                        owned = true;
+                                        break;
+                                    }
                                     if let Some(route) =
                                         scene.interactions.handlers(&current).pointer_route
                                         && route.priority <= InputRoutingPriority::NORMAL
